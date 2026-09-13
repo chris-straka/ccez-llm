@@ -20,8 +20,6 @@ import {
 	isRefsOnly,
 	redactedCopyText
 } from "./annotations";
-import { buildTranslateMessages, translateSelection } from "./translate";
-import type { ChatProvider } from "./providers/types";
 import type { ChatMsgId } from "./chat";
 import type { AnnotationId } from "./annotations";
 
@@ -318,33 +316,5 @@ describe("refs-only display", () => {
 	it("copies refs-only quotes instead of an empty string", () => {
 		const list = addAnnotation([], "m1" as ChatMsgId, "langue", "meaning?");
 		expect(redactedCopyText(withAnnotations("", list))).toBe("langue");
-	});
-});
-
-describe("translate helper", () => {
-	it("builds a translation-only prompt", () => {
-		const messages = buildTranslateMessages("bonjour", "English");
-		expect(messages[0]?.role).toBe("system");
-		expect(messages[0]?.content).toContain("English");
-		expect(messages[1]).toEqual({ role: "user", content: "bonjour" });
-	});
-
-	it("returns the trimmed translation, rejects blanks", async () => {
-		const provider: ChatProvider = {
-			id: "scripted",
-			chat: async () => ({ content: "  hello  ", usage: null }),
-			stream: async () => ({ content: "", usage: null })
-		};
-		await expect(translateSelection(provider, "bonjour", "English")).resolves.toBe("hello");
-		await expect(translateSelection(provider, "   ", "English")).rejects.toThrow(
-			"Nothing selected"
-		);
-		await expect(
-			translateSelection(
-				{ ...provider, chat: async () => ({ content: "  ", usage: null }) },
-				"bonjour",
-				"English"
-			)
-		).rejects.toThrow("Empty translation");
 	});
 });

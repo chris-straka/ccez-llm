@@ -1739,7 +1739,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		return true;
 	}
 	$effect(() => {
-		const setting = settings.promptIdleSec ?? 6;
+		const setting = settings.promptIdleSec;
 		// Phones never idle-hide (see the mount migration above): the
 		// prompt is a permanent fixture, like other chat apps.
 		const idleSec = !androidUI ? setting : 0;

@@ -45,16 +45,13 @@ test("mid-word drags snap out to whole words", async ({ page }) => {
 	await expect(page.locator(".prompt-tools .review-quote").first()).toHaveText(/hello world/);
 });
 
-test("create box centers over narrow highlights, cursor-places wide ones", async ({ page }) => {
+test("create box centers over narrow highlights, wide ones open at the cursor", async ({ page }) => {
 	await seedChat(page, [
 		{ role: "assistant", content: "Kyoto is an old capital with many temples and quiet gardens" }
 	]);
 	await page.goto("/");
 	const para = page.locator("article.assistant .rendered p").first();
 	await expect(para).toBeVisible({ timeout: 60_000 });
-	const box = await para.boundingBox();
-	if (!box) throw new Error("message has no box");
-	const y = box.y + box.height / 2;
 
 	// Narrow: double-click picks one word; the box centers over it
 	// while the Annotate button stays at the cursor end.
@@ -85,15 +82,22 @@ test("create box centers over narrow highlights, cursor-places wide ones", async
 	if (!menuBox) throw new Error("missing menu box");
 	expect(Math.abs(menuBox.x - (paraBox.x + 10 - 16))).toBeLessThanOrEqual(8);
 	await page.keyboard.press("Escape");
+	// Settle first: the pill fades out on a timer that unwraps its
+	// wash mark, and closing returns focus to the composer (which
+	// scrolls the list) — measuring or dragging mid-fade races both.
+	await expect(page.locator(".ann-pop")).toHaveCount(0);
 
 	// Wide: dragging the whole paragraph keeps the cursor placement —
 	// the box opens at the selection end, not the paragraph center.
-	await page.mouse.move(box.x + 10, y);
+	const wide = await para.boundingBox();
+	if (!wide) throw new Error("message lost its box");
+	const wideY = wide.y + wide.height / 2;
+	await page.mouse.move(wide.x + 10, wideY);
 	await page.mouse.down();
-	await page.mouse.move(box.x + box.width - 10, y, { steps: 8 });
+	await page.mouse.move(wide.x + wide.width - 10, wideY, { steps: 8 });
 	await page.mouse.up();
 	await expect(page.locator(".sel-menu")).toBeVisible();
-	const endX = box.x + box.width - 10;
+	const endX = wide.x + wide.width - 10;
 	await page.locator('.sel-menu button:has-text("Annotate")').click();
 	await expect(pop).toBeVisible();
 	const wideBox = await pop.boundingBox();
@@ -146,7 +150,7 @@ test("empty annotations bake a question mark for the model", async ({ page }) =>
 	await expect(user.locator(".ann-refs-comment").first()).toHaveText("?");
 });
 
-test("annotations-only messages render as an em-dash with the count above", async ({ page }) => {
+test("annotations-only messages render as an em-dash with the count pill above", async ({ page }) => {
 	await seedChat(page, [
 		{ role: "user", content: 'Annotated selections:\n1. "Kyoto" — ?' }
 	]);

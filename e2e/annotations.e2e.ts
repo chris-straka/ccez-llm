@@ -837,7 +837,7 @@ test("mid-word drags snap out to whole words", async ({ page }) => {
 	await expect(page.locator(".prompt-tools .review-quote").first()).toHaveText(/hello world/);
 });
 
-test("create box centers over narrow highlights, cursor-places wide ones", async ({ page }) => {
+test("create box centers over narrow highlights, wide ones open at the cursor", async ({ page }) => {
 	await seedChat(page, [
 		{ role: "assistant", content: "Kyoto is an old capital with many temples and quiet gardens" }
 	]);
@@ -944,7 +944,7 @@ test("empty annotations bake a question mark for the model", async ({ page }) =>
 	await expect(user.locator(".ann-refs-comment").first()).toHaveText("?");
 });
 
-test("annotations-only messages render as an em-dash with the count above", async ({ page }) => {
+test("annotations-only messages render as an em-dash with the count pill above", async ({ page }) => {
 	await seedChat(page, [
 		{ role: "user", content: 'Annotated selections:\n1. "Kyoto" — ?' }
 	]);
