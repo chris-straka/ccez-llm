@@ -1,4 +1,4 @@
-# Ccez Studio — DONE (archive of finished stages)
+# Ccez LLM — DONE (archive of finished stages)
 
 Moved here from `TODO.md` so the working file holds open work only.
 History is preserved, newest last within each section. The full verbatim
@@ -565,3 +565,20 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
 
 ## Pile: s1-suites (work/s1-suites)
 - Merged e2e suites (sel-menu+ios, android+touch+share, voice+error+native+ios, furigana+hover+ruby, annotations+ux, chrome-misc one-liners); 9 specs removed, merged files green on E2E_PORT=5231 except 3 failures also failing on HEAD (chrome idle-hide, annotation badge re-press + review note-labels).
+
+## Refactors (Sep 2026, main)
+- [x] Platform-cast cleanup: `src/lib/web-apis.d.ts` declares the DOM-lib-missing
+      APIs (launchQueue, save picker, Tauri internals, speech recognition,
+      CSS.highlights/Highlight, build stamps); ~20 `as unknown as` repeats
+      deleted. One `closestFromTarget` helper in `events.ts` collapses ~35
+      `as HTMLElement` repeats; stale casts (import.meta.env,
+      EditorView.composing, mediaDevices) and five settings delete-casts
+      (via `dropRetiredKeys`) go. Check 0/0, 780 unit green.
+- [x] Key-dispatch decisions out of `onKey` into `src/lib/keybindings.ts`
+      (`messageKeyAction`/`spaceKeyAction`/`deleteChatScope`, 13 unit tests):
+      11 guard soups become token checks, bodies verbatim. Priority inside
+      (Esc+f-over-fold, M/N needing no hover, X yielding to rich editors).
+      aid-actions/fold-preview/row-hide e2e green; 4 prompt.e2e.ts failures
+      reproduce on the pristine tree (pre-existing). Remaining ~19 `onKey`
+      branches (modifier chords, scroll/sidebar clusters) still inline —
+      next slice when wanted.

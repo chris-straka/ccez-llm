@@ -126,10 +126,13 @@ explicit ask in that turn. Name committed files explicitly, never
 
 ## Known structural debt
 
-- `src/routes/+page.svelte` is ~2.5k lines (sidebar, messages, composer,
-  popovers in one file) and stays that way by explicit decision (Sep 2026):
+- `src/routes/+page.svelte` is ~12.2k lines (sidebar, messages, composer,
+  popovers in one file) and stays one file by explicit decision (Sep 2026):
   nothing fixed so far was caused by its size, it is AI-navigable via search,
-  and a split buys no user-visible change for real regression risk. Revisit
-  only on a concrete trigger — a tangled-state bug, painful HMR, or wanting
-  component-level tests. Testing Library is deferred for the same reason:
+  and a split buys no user-visible change for real regression risk. Instead
+  the `onKey` dispatcher is being hollowed out branch by branch into
+  `src/lib/keybindings.ts`: decisions are pure functions over an explicit
+  facts snapshot (unit-tested, priority encoded inside), effects stay in the
+  component. New dispatcher branches follow that split — no new untested
+  guard soup in `onKey`. Testing Library is deferred for the same reason:
   test pure logic and bridge contracts with colocated Vitest instead.
