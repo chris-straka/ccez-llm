@@ -173,6 +173,7 @@
 	type FingerTrack
 } from "$lib/platform";
 import { desktopShortcuts, filteredShortcuts, touchShortcuts } from "$lib/shortcuts";
+	import { deleteChatScope, messageKeyAction, spaceKeyAction } from "$lib/keybindings";
 import { closestFromTarget, consumeEvent, isEditableTarget, isFieldTarget } from "$lib/events";
 	import {
 		detectScript,
@@ -5483,27 +5484,26 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			// so a held Space can't bounce the prompt back open. Own-
 			// message edits and attachment drafts are exempt: clearing
 			// real work must stay explicit (Escape).
-			if (
-				event.key === " " &&
-				!event.repeat &&
-				!event.isComposing &&
-				!event.metaKey &&
-				!event.ctrlKey &&
-				!event.altKey &&
-				editingMsgId === null &&
-				attachments.length === 0 &&
-				composerText() === "" &&
-				closestFromTarget(event.target, ".prompt .cm-content, .prompt .ta-input")
-			) {
+			const spaceAction = spaceKeyAction({
+				key: event.key,
+				metaKey: event.metaKey,
+				ctrlKey: event.ctrlKey,
+				altKey: event.altKey,
+				shiftKey: event.shiftKey,
+				repeat: event.repeat,
+				isComposing: event.isComposing,
+				editing: editingMsgId !== null,
+				hasAttachments: attachments.length > 0,
+				composerEmpty: composerText() === "",
+				inPrompt:
+					closestFromTarget(event.target, ".prompt .cm-content, .prompt .ta-input") !== null
+			});
+			if (spaceAction === "dismiss-composer") {
 				event.preventDefault();
 				editor?.blur();
 				return;
 			}
-			if (
-				event.key === " " &&
-				event.repeat &&
-				closestFromTarget(event.target, ".prompt .cm-content, .prompt .ta-input")
-			) {
+			if (spaceAction === "swallow-repeat") {
 				event.preventDefault();
 				return;
 			}
@@ -5644,14 +5644,16 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				setVoiceEnabled(!voiceOn());
 				return;
 			}
-			if (
-				(event.metaKey || event.ctrlKey) &&
-				!event.shiftKey &&
-				!event.altKey &&
-				(event.key === "Backspace" || event.key === "Delete") &&
-				!inEditor &&
-				!isEditableTarget(event.target)
-			) {
+			const delScope = deleteChatScope({
+				metaKey: event.metaKey,
+				ctrlKey: event.ctrlKey,
+				altKey: event.altKey,
+				shiftKey: event.shiftKey,
+				key: event.key,
+				inEditor: inEditor !== null,
+				inEditable: isEditableTarget(event.target)
+			});
+			if (delScope === "chat") {
 				// ⌘Delete drops the whole current chat (a blank one takes
 				// its place, so the composer never strands) and resets the
 				// voice language to the checked keyboard. Mac Delete-key
@@ -5662,14 +5664,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				editor?.focus();
 				return;
 			}
-			if (
-				(event.metaKey || event.ctrlKey) &&
-				event.shiftKey &&
-				!event.altKey &&
-				(event.key === "Backspace" || event.key === "Delete") &&
-				!inEditor &&
-				!isEditableTarget(event.target)
-			) {
+			if (delScope === "all") {
 				// ⌘⇧Delete drops EVERY chat (a blank one takes their
 				// place, so the composer never strands) and resets the
 				// voice language to the checked keyboard.
@@ -5814,16 +5809,32 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 					}
 				}
 			}
-			if (
-				event.key === "a" &&
-				!inEditor &&
-				hoveredIdx >= 0 &&
-				!event.metaKey &&
-				!event.ctrlKey &&
-				!event.altKey &&
-				!event.shiftKey &&
-				!isFieldTarget(event.target)
-			) {
+			// One snapshot for every hovered-message hotkey below: the
+			// guards each walked the target themselves, so this is also
+			// fewer ancestor walks per keypress, not more.
+			const msgFacts = {
+				key: event.key,
+				code: event.code,
+				metaKey: event.metaKey,
+				ctrlKey: event.ctrlKey,
+				altKey: event.altKey,
+				shiftKey: event.shiftKey,
+				inEditor: inEditor !== null,
+				inField: isFieldTarget(event.target),
+				inEditable: isEditableTarget(event.target),
+				inInteractive:
+					closestFromTarget(event.target, "input, textarea, select, button, a, [contenteditable]") !==
+					null,
+				inFieldOrFilter:
+					closestFromTarget(
+						event.target,
+						"input, textarea, select, [contenteditable], .shortcuts-filter"
+					) !== null,
+				hoveredIdx,
+				escDownAt
+			};
+			const msgAction = messageKeyAction(msgFacts);
+			if (msgAction === "toggle-aids") {
 				// A toggles every aid the hovered message offers — pinyin
 				// over Chinese lines, furigana over Japanese ones (dual
 				// rendering applies each to its own lines, so a mixed
@@ -5845,15 +5856,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 					return;
 				}
 			}
-			if (
-				(event.key === "m" || event.key === "n") &&
-				!inEditor &&
-				!event.metaKey &&
-				!event.ctrlKey &&
-				!event.altKey &&
-				!event.shiftKey &&
-				!isFieldTarget(event.target)
-			) {
+			if (msgAction === "pin-pinyin" || msgAction === "pin-furigana") {
 				// M pins pinyin, N pins furigana on the message in the
 				// middle of the screen (toggle — a second press lifts it).
 				// Kinds the center message doesn't offer stay off, exactly
@@ -5869,18 +5872,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 					return;
 				}
 			}
-			if (
-				(event.key === "f" || event.key === "F") &&
-				!event.metaKey &&
-				!event.ctrlKey &&
-				!event.altKey &&
-				!event.shiftKey &&
-				escDownAt !== 0 &&
-				!closestFromTarget(
-					event.target,
-					"input, textarea, select, [contenteditable], .shortcuts-filter"
-				)
-			) {
+			if (msgAction === "exit-fullscreen") {
 				// Esc+f exits fullscreen — the only way out. Escape
 				// alone never exits (it keeps its dismiss job).
 								consumeEvent(event);
@@ -5888,16 +5880,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				void exitFullscreen();
 				return;
 			}
-			if (
-				(event.key === "f" || event.key === "F") &&
-				!inEditor &&
-				hoveredIdx >= 0 &&
-				!event.metaKey &&
-				!event.ctrlKey &&
-				!event.altKey &&
-				!event.shiftKey &&
-				!isFieldTarget(event.target)
-			) {
+			if (msgAction === "fold-hovered") {
 				// F folds/unfolds the hovered message. The prompt owns
 				// keystrokes inside it, so typing "f" there is untouched.
 				const target = chat.messages[hoveredIdx];
@@ -5907,16 +5890,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 					return;
 				}
 			}
-			if (
-				(event.key === "e" || event.key === "E") &&
-				!inEditor &&
-				hoveredIdx >= 0 &&
-				!event.metaKey &&
-				!event.ctrlKey &&
-				!event.altKey &&
-				!event.shiftKey &&
-				!isFieldTarget(event.target)
-			) {
+			if (msgAction === "edit-hovered") {
 				// E pulls the hovered own message into the composer for
 				// editing — same ownership rule as F, own messages only.
 				const target = chat.messages[hoveredIdx];
@@ -5926,16 +5900,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 					return;
 				}
 			}
-		if (
-			(event.key === "x" || event.key === "X") &&
-			!inEditor &&
-			hoveredIdx >= 0 &&
-			!event.metaKey &&
-			!event.ctrlKey &&
-			!event.altKey &&
-			!event.shiftKey &&
-			!isEditableTarget(event.target)
-		) {
+		if (msgAction === "cut-hovered") {
 				// X cuts the hovered message (copies, then deletes): Shift+D
 				// below deletes without touching the clipboard.
 				// An in-place code edit owns its keystrokes — X types x.
@@ -5943,16 +5908,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				cutHoverMessage(hoveredIdx);
 				return;
 		}
-		if (
-			event.code === "KeyD" &&
-			event.shiftKey &&
-			!inEditor &&
-			hoveredIdx >= 0 &&
-			!event.metaKey &&
-			!event.ctrlKey &&
-			!event.altKey &&
-			!closestFromTarget(event.target, "input, textarea, select, button, a, [contenteditable]")
-		) {
+		if (msgAction === "delete-hovered") {
 			// Shift+D drops the hovered message and copies nothing
 			// (X is the cut key). Bare Delete never deletes — too easy
 			// to hit while reading. Physical code, so any layout's D
