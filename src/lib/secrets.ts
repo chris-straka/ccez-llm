@@ -46,11 +46,10 @@ export function secretAccount(providerId: string): string {
 export function tauriBackendAvailable(): boolean {
 	try {
 		if (typeof window === "undefined") return false;
-		const w = window as unknown as Record<string, unknown>;
 		// Tauri v2 exposes __TAURI_INTERNALS__ (__TAURI__ was v1). Checking
 		// only the v1 name silently disabled every tauri-gated branch in the
 		// real app (traffic clearance, Keychain, shell UI).
-		return w.__TAURI_INTERNALS__ !== undefined || w.__TAURI__ !== undefined;
+		return window.__TAURI_INTERNALS__ !== undefined || window.__TAURI__ !== undefined;
 	} catch {
 		return false;
 	}

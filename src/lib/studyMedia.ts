@@ -105,10 +105,7 @@ export function rmsOf(samples: ArrayLike<number>): number {
 function mediaDevicesGetUserMedia(): unknown {
   try {
     if (typeof navigator === "undefined") return null;
-    const devices = (
-      navigator as unknown as { mediaDevices?: { getUserMedia?: unknown } }
-    ).mediaDevices;
-    return devices?.getUserMedia ?? null;
+    return navigator.mediaDevices?.getUserMedia ?? null;
   } catch {
     return null;
   }

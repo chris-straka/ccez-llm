@@ -18,6 +18,7 @@
 		type RenderedMessage
 	} from "$lib/render";
 	import { codeRunBody, runCodeBlock } from "$lib/coderun";
+	import { closestFromTarget } from "$lib/events";
 	import type { ChatMsg, ChatMsgId } from "$lib/chat";
 	import { applyMarks, annRefsFor, type AnnotationMark, type AnnotationId } from "$lib/annotations";
 
@@ -284,8 +285,7 @@
 	});
 
 	function badgeIdOf(target: EventTarget | null): string | null {
-		const badge = (target as HTMLElement | null)?.closest?.("[data-ann-badge]");
-		return badge instanceof HTMLElement ? (badge.dataset.annBadge ?? null) : null;
+		return closestFromTarget(target, "[data-ann-badge]")?.dataset.annBadge ?? null;
 	}
 
 	/**
@@ -311,7 +311,7 @@
 	}
 
 	function onBadgeOut(event: MouseEvent): void {
-		const to = (event.relatedTarget as HTMLElement | null)?.closest?.("[data-ann-badge]");
+		const to = closestFromTarget(event.relatedTarget, "[data-ann-badge]");
 		if (to) return;
 		if (hoverNullSent) return;
 		hoverNullSent = true;
@@ -319,7 +319,7 @@
 	}
 
 	function onBodyClick(event: MouseEvent): void {
-		const badge = (event.target as HTMLElement).closest<HTMLElement>("[data-ann-badge]");
+		const badge = closestFromTarget(event.target, "[data-ann-badge]");
 		if (badge) {
 			const rect = badge.getBoundingClientRect();
 			// Stamped from AnnotationMark ids (applyMarks); dataset erases
@@ -330,7 +330,7 @@
 			});
 			return;
 		}
-		const fold = (event.target as HTMLElement).closest<HTMLElement>("[data-paste-fold]");
+		const fold = closestFromTarget(event.target, "[data-paste-fold]");
 		if (fold) {
 			onFoldToggle?.(Number(fold.dataset.pasteFold ?? -1));
 			return;
@@ -338,18 +338,18 @@
 		// Display math chrome: `$` flips rendered/raw, the copy icon
 		// copies the TeX, and a left click on a folded block unfolds it
 		// (right-click toggles the fold).
-		const mathWrap = (event.target as HTMLElement).closest<HTMLElement>("[data-math-index]");
+		const mathWrap = closestFromTarget(event.target, "[data-math-index]");
 		if (mathWrap && rendered) {
 			const index = Number(mathWrap.dataset.mathIndex ?? -1);
 			const entry = rendered.maths[index];
 			// Entry lookup stays: copy needs the TeX.
 			if (!entry) return;
-			if ((event.target as HTMLElement).closest(".ccez-math-tex")) {
+			if (closestFromTarget(event.target, ".ccez-math-tex")) {
 				if (mathWrap.dataset.mathRaw === "1") mathWrap.removeAttribute("data-math-raw");
 				else mathWrap.dataset.mathRaw = "1";
 				return;
 			}
-			if ((event.target as HTMLElement).closest(".ccez-math-copy")) {
+			if (closestFromTarget(event.target, ".ccez-math-copy")) {
 				if (!navigator.clipboard) onToast?.("Couldn't copy to the clipboard.");
 				else
 					void navigator.clipboard.writeText(mathCopyText(entry.tex)).then(
@@ -373,14 +373,14 @@
 		// so clicks there never copy. Copy lives on the icon button
 		// alone (folding rides `data-folded`, wired elsewhere). A left
 		// click on a folded block unfolds it; right-click toggles.
-		const codeBlock = (event.target as HTMLElement).closest<HTMLElement>(".ccez-code");
+		const codeBlock = closestFromTarget(event.target, ".ccez-code");
 		if (!codeBlock || !rendered) return;
 		if (codeBlock.dataset.folded === "1") {
 			codeBlock.removeAttribute("data-folded");
 			return;
 		}
-		const copyButton = (event.target as HTMLElement).closest<HTMLElement>("[data-code-copy]");
-		const runButton = (event.target as HTMLElement).closest<HTMLElement>("[data-code-run]");
+		const copyButton = closestFromTarget(event.target, "[data-code-copy]");
+		const runButton = closestFromTarget(event.target, "[data-code-run]");
 		if (runButton) {
 			onRunBlock(Number(runButton.dataset.codeRun ?? -1));
 			return;
@@ -410,23 +410,22 @@
 	function stampRunOutputs(): void {
 		if (!bodyEl) return;
 		for (const block of bodyEl.querySelectorAll(".ccez-code")) {
-			const el = block as HTMLElement;
-			const run = el.querySelector("[data-code-run]");
+			const run = block.querySelector("[data-code-run]");
 			const index = Number(run?.getAttribute("data-code-run") ?? -1);
 			if (Number.isNaN(index) || index < 0) continue;
 			const output = runOutputs[index];
 			if (runningBlocks[index] !== true && output === undefined) continue;
 			if (output === "") {
 				// Silent run: no tray at all (a re-run clears a stale one).
-				el.querySelector(":scope > .ccez-code-output")?.remove();
+				block.querySelector(":scope > .ccez-code-output")?.remove();
 				continue;
 			}
-			let out = el.querySelector<HTMLElement>(":scope > .ccez-code-output");
+			let out = block.querySelector<HTMLElement>(":scope > .ccez-code-output");
 			if (!out) {
 				out = document.createElement("div");
 				out.className = "ccez-code-output";
 				out.dataset.codeOutput = String(index);
-				el.appendChild(out);
+				block.appendChild(out);
 			}
 			const text = output ?? "Running\u2026";
 			if (out.textContent !== text) out.textContent = text;

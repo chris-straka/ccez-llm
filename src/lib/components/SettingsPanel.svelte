@@ -78,13 +78,10 @@
 	let modelLoading = $state(false);
 	let modelError = $state("");
 	/** Staleness marker for installed builds (compile time via vite
-	`define`, no declaration file needed via the guarded globalThis
-	read). Dev builds show nothing: "dev · live" reads as noise at
-	the bottom of the menu. */
-	const buildStamp =
-		((globalThis as unknown as { __BUILD_STAMP__?: string }).__BUILD_STAMP__ ?? "release");
-	const appVersion =
-		((globalThis as unknown as { __APP_VERSION__?: string }).__APP_VERSION__ ?? "");
+	`define`, declared in web-apis.d.ts). Dev builds show nothing:
+	"dev · live" reads as noise at the bottom of the menu. */
+	const buildStamp = globalThis.__BUILD_STAMP__ ?? "release";
+	const appVersion = globalThis.__APP_VERSION__ ?? "";
 	const showStamp = !import.meta.env.DEV;
 
 	/**

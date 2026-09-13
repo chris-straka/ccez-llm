@@ -242,7 +242,7 @@ interface DictationResultEvent {
 	results?: Array<Array<{ transcript?: string }>>;
 }
 
-interface SpeechRecognitionInstance {
+export interface SpeechRecognitionInstance {
 	lang: string;
 	interimResults: boolean;
 	onresult: ((event: DictationResultEvent) => void) | null;
@@ -257,8 +257,9 @@ type SpeechRecognitionCtor = new () => SpeechRecognitionInstance;
 function recognitionCtor(): SpeechRecognitionCtor | null {
 	try {
 		if (typeof window === "undefined") return null;
-		const w = window as unknown as Record<string, unknown>;
-		return (w["SpeechRecognition"] ?? w["webkitSpeechRecognition"] ?? null) as SpeechRecognitionCtor | null;
+		return (
+			(window.SpeechRecognition ?? window.webkitSpeechRecognition ?? null) as SpeechRecognitionCtor | null
+		);
 	} catch {
 		return null;
 	}

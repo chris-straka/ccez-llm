@@ -152,9 +152,7 @@ export function launchHandlingAvailable(): boolean {
 	try {
 		return (
 			typeof window !== "undefined" &&
-			!!(window as unknown as { launchQueue?: LaunchQueueLike }).launchQueue &&
-			typeof (window as unknown as { launchQueue?: LaunchQueueLike }).launchQueue
-				?.setConsumer === "function"
+			typeof window.launchQueue?.setConsumer === "function"
 		);
 	} catch {
 		return false;
@@ -251,8 +249,7 @@ export function fileSaveAccessAvailable(): boolean {
 	try {
 		return (
 			typeof window !== "undefined" &&
-			typeof (window as unknown as { showSaveFilePicker?: unknown }).showSaveFilePicker ===
-				"function"
+			typeof window.showSaveFilePicker === "function"
 		);
 	} catch {
 		return false;

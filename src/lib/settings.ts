@@ -202,8 +202,7 @@ function devEnv(): Record<string, string | undefined> {
 		globalThis as unknown as { process?: { env?: Record<string, string | undefined> } }
 	).process?.env;
 	try {
-		const viteEnv = (import.meta as unknown as { env?: Record<string, string | undefined> })
-			.env;
+		const viteEnv = import.meta.env;
 		return { ...(fromProcess ?? {}), ...(viteEnv ?? {}) };
 	} catch {
 		return { ...(fromProcess ?? {}) };
@@ -329,6 +328,16 @@ function browserStore(): KeyValueStore | null {
 	}
 }
 
+/**
+ * Drop retired keys from an older save (fresh defaults already filled
+ * the replacements). The delete needs one record cast; spreading it
+ * across every key would repeat that cast at each site.
+ */
+function dropRetiredKeys(merged: AppSettings, keys: string[]): void {
+	const record = merged as unknown as Record<string, unknown>;
+	for (const key of keys) delete record[key];
+}
+
 export function loadSettings(store?: KeyValueStore): AppSettings {
 	const backend = store ?? browserStore() ?? memoryStore;
 	const raw = backend.getItem(STORAGE_KEY) ?? backend.getItem(LEGACY_STORAGE_KEY);
@@ -342,11 +351,10 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 			version: 1,
 			providers: { ...fresh.providers, ...(parsed.providers ?? {}) }
 		};
-		// Drop the removed translate-target setting from older saves.
-		delete (merged as unknown as Record<string, unknown>).translateTarget;
-		// Drop the retired iOS native-bubble toggle the same way:
+		// Drop the removed translate-target setting from older saves,
+		// and the retired iOS native-bubble toggle the same way:
 		// Apple's callout now always stays, with Annotate above it.
-		delete (merged as unknown as Record<string, unknown>).iosNativeCallout;
+		dropRetiredKeys(merged, ["translateTarget", "iosNativeCallout"]);
 		// Backfill user-added providers on older saves.
 		if (!Array.isArray(merged.customProviders)) merged.customProviders = [];
 		// An active provider that no longer exists (deleted custom) falls
@@ -457,10 +465,8 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 		if (typeof parsed.hoverAssistantActions !== "boolean") {
 			merged.hoverAssistantActions = legacy.hoverActions === true;
 		}
-		delete (merged as unknown as Record<string, unknown>).hoverActions;
-		// The global reading-aids toggle is gone (per-message pins only):
-		// drop the retired key from older saves.
-		delete (merged as unknown as Record<string, unknown>).readingAids;
+		// The global reading-aids toggle is gone too (per-message pins only).
+		dropRetiredKeys(merged, ["hoverActions", "readingAids"]);
 		// The shared low/medium/high dial became per-provider native ids:
 		// Muse keeps its id, DeepSeek maps onto off/high/max. Saves that
 		// already carry the record keep it; anything else resolves to
@@ -483,7 +489,7 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 							? { muse: "low", deepseek: "high" }
 							: {};
 		}
-		delete (merged as unknown as Record<string, unknown>).thinkingLevel;
+		dropRetiredKeys(merged, ["thinkingLevel"]);
 		return merged;
 	} catch {
 		return defaultSettings();

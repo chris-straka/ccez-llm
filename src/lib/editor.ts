@@ -779,7 +779,7 @@ export function createPromptEditor(
 				// letting it through sends the message halfway. Defer to
 				// the composition instead (textarea path guards
 				// event.isComposing the same way).
-				const composing = (view as unknown as { composing?: boolean }).composing;
+				const composing = view.composing;
 				if (shouldDeferForComposition({ viewComposing: composing ?? false })) return false;
 				options.onSubmit("send");
 				return true;

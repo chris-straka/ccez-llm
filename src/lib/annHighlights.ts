@@ -11,14 +11,14 @@
  * yellow wash moves to highlights. Fallback is always the current
  * mark-DOM rendering.
  *
- * NOTE: Highlight/CSS.highlights have no TS lib types on all targets,
- * so both are reached via globalThis/CSS indexing, never bare names.
+ * NOTE: Highlight/CSS.highlights have no TS lib types, so both are
+ * declared in web-apis.d.ts and read here as ordinary globals.
  */
 
 /** Highlight name under which annotation washes are registered. */
 export const ANN_HIGHLIGHT_NAME = "ccez-ann";
 
-interface HighlightRegistry {
+export interface HighlightRegistry {
 	set(name: string, highlight: object): void;
 	delete(name: string): void;
 }
@@ -27,7 +27,7 @@ interface HighlightRegistry {
 export function highlightsSupported(): boolean {
 	try {
 		if (typeof CSS === "undefined" || !("highlights" in CSS)) return false;
-		return typeof (globalThis as Record<string, unknown>).Highlight === "function";
+		return typeof Highlight === "function";
 	} catch {
 		return false;
 	}
@@ -36,7 +36,7 @@ export function highlightsSupported(): boolean {
 function registry(): HighlightRegistry | null {
 	try {
 		if (!highlightsSupported()) return null;
-		return (CSS as unknown as { highlights: HighlightRegistry }).highlights;
+		return CSS.highlights ?? null;
 	} catch {
 		return null;
 	}
@@ -50,9 +50,8 @@ export function paintAnnotationWash(ranges: Range[]): boolean {
 	try {
 		const reg = registry();
 		if (!reg || ranges.length === 0) return false;
-		const Ctor = (globalThis as Record<string, unknown>).Highlight as new (
-			...ranges: Range[]
-		) => object;
+		const Ctor = Highlight;
+		if (typeof Ctor !== "function") return false;
 		reg.set(ANN_HIGHLIGHT_NAME, new Ctor(...ranges));
 		return true;
 	} catch {

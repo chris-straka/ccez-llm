@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
-import { consumeEvent, isEditableTarget, isFieldTarget } from "./events";
+import { closestFromTarget, consumeEvent, isEditableTarget, isFieldTarget } from "./events";
 
 describe("page event idioms", () => {
 	it("consumes both default and bubble", () => {
@@ -36,5 +36,15 @@ describe("page event idioms", () => {
 		expect(isEditableTarget(byId("d"))).toBe(true);
 		expect(isEditableTarget(byId("p"))).toBe(false);
 		expect(isEditableTarget(null)).toBe(false);
+	});
+
+	it("finds the closest ancestor without a cast at each call", () => {
+		document.body.innerHTML =
+			'<div class="outer"><p id="p">y</p></div>';
+		const byId = (id: string): Element | null => document.getElementById(id);
+		expect(closestFromTarget(byId("p"), ".outer")?.className).toBe("outer");
+		expect(closestFromTarget(byId("p"), ".missing")).toBe(null);
+		expect(closestFromTarget(null, ".outer")).toBe(null);
+		expect(closestFromTarget(undefined, ".outer")).toBe(null);
 	});
 });

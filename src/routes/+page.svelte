@@ -173,7 +173,7 @@
 	type FingerTrack
 } from "$lib/platform";
 import { desktopShortcuts, filteredShortcuts, touchShortcuts } from "$lib/shortcuts";
-import { consumeEvent, isEditableTarget, isFieldTarget } from "$lib/events";
+import { closestFromTarget, consumeEvent, isEditableTarget, isFieldTarget } from "$lib/events";
 	import {
 		detectScript,
 		detectScripts,
@@ -1463,9 +1463,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	async function exportOneChat(target: Chat): Promise<void> {
 		try {
 			const picker = fileSaveAccessAvailable()
-				? ((window as unknown as {
-						showSaveFilePicker?: (options: SavePickerOptions) => Promise<SaveHandleLike>;
-					}).showSaveFilePicker?.bind(window) ?? null)
+				? (window.showSaveFilePicker?.bind(window) ?? null)
 				: null;
 			const how = await exportChatMarkdown(target, {
 				picker,
@@ -1570,9 +1568,9 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	 * focusout the active element is already gone (relatedTarget reads
 	 * where focus is heading; null when it leaves the window).
 	 */
-	function hideForAlways(next: HTMLElement | null): void {
+	function hideForAlways(next: EventTarget | null): void {
 		if (settings.promptIdleSec !== PROMPT_IDLE_ALWAYS) return;
-		if (next?.closest(".prompt")) return;
+		if (closestFromTarget(next, ".prompt")) return;
 		if (viewChat.messages.length === 0) return;
 		const box = scrollBox;
 		if (box && contentFitsViewport(box.scrollHeight, box.clientHeight)) return;
@@ -1612,13 +1610,11 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		if (event.key !== "i" && event.key !== "I" && event.key !== "Enter" && event.key !== " ") {
 			return false;
 		}
-		const target = event.target as HTMLElement | null;
-		if (target?.closest(".prompt .cm-content, .prompt .ta-input")) {
+		if (closestFromTarget(event.target, ".prompt .cm-content, .prompt .ta-input")) {
 			// Stale send key: always-hide blurs the composer on send, so a
 			// keydown still targeted there but with focus already gone (the
 			// send Enter bubbling up) must not summon the prompt back.
-			const active = document.activeElement as HTMLElement | null;
-			if (!active?.closest(".prompt")) return false;
+			if (!closestFromTarget(document.activeElement, ".prompt")) return false;
 			return true;
 		}
 		// An open overlay owns bare keys (Enter activates, Space
@@ -1641,7 +1637,8 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		)
 			return false;
 		if (
-			target?.closest(
+			closestFromTarget(
+				event.target,
 				"input, textarea, select, [contenteditable], button, a, summary, aside, .modal, .modal-veil, .find-bar, .search-palette, .sel-menu, .review, .lang-menu"
 			)
 		) {
@@ -1754,12 +1751,11 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		 */
 		const onFocusInIdle = (event: FocusEvent): void => {
 			if (settings.promptIdleSec !== PROMPT_IDLE_ALWAYS) return;
-			const target = event.target as HTMLElement | null;
-			if (!target?.closest(".prompt .cm-content, .prompt .ta-input")) return;
+			if (!closestFromTarget(event.target, ".prompt .cm-content, .prompt .ta-input")) return;
 			restorePrompt();
 		};
 		const onFocusOutIdle = (event: FocusEvent): void => {
-			hideForAlways(event.relatedTarget as HTMLElement | null);
+			hideForAlways(event.relatedTarget);
 		};
 		window.addEventListener("pointermove", on, { passive: true });
 		window.addEventListener("focusin", onFocusInIdle);
@@ -1822,7 +1818,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	 */
 	$effect(() => {
 		void viewChat.messages.length;
-		hideForAlways(document.activeElement as HTMLElement | null);
+		hideForAlways(document.activeElement);
 	});
 	$effect(() => {
 		// Boot-park correction (see bootParked): a parked boot on a
@@ -1843,7 +1839,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	 * tail reaches the window's own bottom edge.
 	 */
 	$effect(() => {
-		const card = promptEl?.closest(".prompt") as HTMLElement | null;
+		const card = promptEl?.closest<HTMLElement>(".prompt") ?? null;
 		const box = scrollBox;
 		if (!card || !box) return;
 		const sync = (): void => {
@@ -2029,8 +2025,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	}
 	function toggleMessageActions(id: ChatMsgId, event: MouseEvent): void {
 		if (!settings.hideMessages && !(androidUI && settings.hideButtons)) return;
-		const target = event.target as HTMLElement | null;
-		if (target?.closest("button, a, input, textarea, select, summary")) return;
+		if (closestFromTarget(event.target, "button, a, input, textarea, select, summary")) return;
 		// Tapping a folded message unfolds it: its row is hidden, so no
 		// fold button exists to press. Android only — desktop hovers the
 		// row back into view.
@@ -2065,10 +2060,11 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 
 	/** Focus a sidebar chat button by list position (clamped). */
 	function focusSideChat(index: number): void {
-		const items = [...document.querySelectorAll("aside ul li button.side-chat")];
+		const items = [...document.querySelectorAll<HTMLElement>("aside ul li button.side-chat")];
 		if (items.length === 0) return;
 		sideIdx = Math.min(Math.max(index, 0), items.length - 1);
-		const el = items[sideIdx] as HTMLElement;
+		const el = items[sideIdx];
+		if (!el) return;
 		el.focus();
 		el.scrollIntoView({ block: "nearest", behavior: "smooth" });
 	}
@@ -4163,19 +4159,20 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		void tick().then(() => {
 			let frames = 0;
 			const land = (): void => {
-				const active = document.activeElement as HTMLElement | null;
+				const active = document.activeElement;
 				// A closing sidebar's row is not a settled home: entering
 				// from the list focuses the composer only after the
 				// collapse drops that row, so keep retrying through it.
 				const settled =
 					active && active !== document.body && !(settings.sidebarCollapsed && active.closest("aside"));
 				if (settled) return;
-				const node = document.querySelector(".prompt .cm-content") as HTMLElement | null;
+				const node = document.querySelector<HTMLElement>(".prompt .cm-content");
 				if (node && getComputedStyle(node).visibility !== "hidden") {
 					editor?.focus();
 					// A parked-composer focus no-ops silently: only stop
 					// when the caret actually landed.
-					const landed = (document.activeElement as HTMLElement | null)?.closest(
+					const landed = closestFromTarget(
+						document.activeElement,
 						".prompt .cm-content"
 					);
 					if (landed) return;
@@ -4801,8 +4798,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		// text); anything else rides the attachments path. Where
 		// launchQueue is missing no launch can arrive, and the
 		// consumer stays unset.
-		const launchQueue =
-			(window as unknown as { launchQueue?: LaunchQueueLike }).launchQueue ?? null;
+		const launchQueue = window.launchQueue ?? null;
 		consumeLaunchFiles(launchQueue, async (files) => {
 			const { markdown, rest } = splitLaunchFiles(files);
 			for (const file of markdown) {
@@ -5295,7 +5291,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 								lastTwoTapAt = 0;
 								if (iosUI) {
 									// The open keyboard would cover the sidebar.
-									(document.activeElement as HTMLElement | null)?.blur?.();
+									if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
 									toggleSidebar();
 								} else {
 									dropChat(chatState.activeChatId);
@@ -5439,7 +5435,8 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 					void tick().then(() => enterEditMode());
 					return;
 				}
-				const inHiddenEditor = (event.target as HTMLElement | null)?.closest(
+				const inHiddenEditor = closestFromTarget(
+					event.target,
 					".prompt .cm-content, .prompt .ta-input"
 				);
 				if (inHiddenEditor && swallowHiddenKeystroke(event)) {
@@ -5456,7 +5453,8 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				!event.metaKey &&
 				!event.ctrlKey &&
 				!event.altKey &&
-				!(event.target as HTMLElement | null)?.closest(
+				!closestFromTarget(
+					event.target,
 					"input, textarea, select, [contenteditable], .shortcuts-filter"
 				)
 			) {
@@ -5469,7 +5467,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			// keep theirs, both handled below. Modified chords pass
 			// through like any other input.
 			if (
-				(event.target as HTMLElement | null)?.closest(".shortcuts-filter") &&
+				closestFromTarget(event.target, ".shortcuts-filter") &&
 				event.key !== "Escape" &&
 				event.code !== "KeyF" &&
 				!event.metaKey &&
@@ -5495,7 +5493,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				editingMsgId === null &&
 				attachments.length === 0 &&
 				composerText() === "" &&
-				(event.target as HTMLElement | null)?.closest(".prompt .cm-content, .prompt .ta-input")
+				closestFromTarget(event.target, ".prompt .cm-content, .prompt .ta-input")
 			) {
 				event.preventDefault();
 				editor?.blur();
@@ -5504,7 +5502,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			if (
 				event.key === " " &&
 				event.repeat &&
-				(event.target as HTMLElement | null)?.closest(".prompt .cm-content, .prompt .ta-input")
+				closestFromTarget(event.target, ".prompt .cm-content, .prompt .ta-input")
 			) {
 				event.preventDefault();
 				return;
@@ -5514,7 +5512,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			// still dismisses exactly as today); the keyup handler
 			// exits fullscreen only past the hold threshold.
 			if (event.key === "Escape" && !event.repeat) escDownAt = Date.now();
-			const inEditor = (event.target as HTMLElement | null)?.closest(".cm-content, .ta-input");
+			const inEditor = closestFromTarget(event.target, ".cm-content, .ta-input");
 			if ((event.metaKey || event.ctrlKey) && (event.key === "t" || event.key === "T")) {
 				// Always the single-tab browser: it opens and lands
 				// focus in its address bar (a second press focuses
@@ -5878,7 +5876,8 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				!event.altKey &&
 				!event.shiftKey &&
 				escDownAt !== 0 &&
-				!(event.target as HTMLElement | null)?.closest(
+				!closestFromTarget(
+					event.target,
 					"input, textarea, select, [contenteditable], .shortcuts-filter"
 				)
 			) {
@@ -5952,7 +5951,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			!event.metaKey &&
 			!event.ctrlKey &&
 			!event.altKey &&
-			!(event.target as HTMLElement | null)?.closest("input, textarea, select, button, a, [contenteditable]")
+			!closestFromTarget(event.target, "input, textarea, select, button, a, [contenteditable]")
 		) {
 			// Shift+D drops the hovered message and copies nothing
 			// (X is the cut key). Bare Delete never deletes — too easy
@@ -5962,7 +5961,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			deleteMessage(chatState, hoveredIdx);
 			return;
 		}
-		const inSidebar = (event.target as HTMLElement | null)?.closest("aside");
+		const inSidebar = closestFromTarget(event.target, "aside");
 			if (!settings.sidebarCollapsed && inSidebar) {
 				// Open chat list owns its keys: j/k walks chats AND
 				// switches to each one (preview-as-you-go), space/l
@@ -6034,7 +6033,8 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				!shortcutsOpen &&
 				!searchOpen &&
 				!inspectChar &&
-				!(event.target as HTMLElement | null)?.closest(
+				!closestFromTarget(
+					event.target,
 					"input, textarea, select, [contenteditable], button, a, aside, .modal, .modal-veil, .find-bar, .search-palette, .sel-menu, .review"
 				)
 			) {
@@ -6061,7 +6061,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				// The shortcuts modal scrolls under j/k/u/d like the main
 				// chat, contained: the palette and Inspect keep their own
 				// keys, fields keep typing, and the main column never moves.
-				const modalBox = document.querySelector(".modal-veil .modal") as HTMLElement | null;
+				const modalBox = document.querySelector<HTMLElement>(".modal-veil .modal");
 				if (modalBox) {
 					const dy =
 						event.key === "j"
@@ -6081,10 +6081,9 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				// owning the screen, and no typing target under the
 				// key. Every existing binding above keeps its keys —
 				// this branch only claims otherwise-unbound bare keys.
-				const target = event.target as HTMLElement | null;
 				const modalOpen = shortcutsOpen || searchOpen || inspectChar;
 				const typing =
-					inEditor || isEditableTarget(target) || inSidebar;
+					inEditor || isEditableTarget(event.target) || inSidebar;
 				if (!modalOpen && !typing && !event.metaKey && event.ctrlKey && !event.altKey && !event.shiftKey) {
 					// Ctrl+U / Ctrl+D jump an instant half-page, vim-style
 					// (repeats jump again) — including with nothing selected.
@@ -6111,7 +6110,8 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 							altKey: event.altKey,
 							messageCount: viewChat.messages.length,
 							inInteractive:
-								(event.target as HTMLElement | null)?.closest(
+								closestFromTarget(
+									event.target,
 									"input, textarea, select, [contenteditable], button, a"
 								) !== null
 						})
@@ -6149,7 +6149,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				}
 			}
 			const inFind =
-				(event.target as HTMLElement | null)?.closest(".find-bar") !== null;
+				closestFromTarget(event.target, ".find-bar") !== null;
 			if (focusMode !== "scroll" || inEditor || inFind) return;
 			if (event.key === "j" || event.key === "ArrowDown") {
 				event.preventDefault();
@@ -6215,7 +6215,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			}
 		};
 		const onFocusIn = (event: FocusEvent) => {
-			if ((event.target as HTMLElement | null)?.closest(".cm-content")) {
+			if (closestFromTarget(event.target, ".cm-content")) {
 				focusMode = "edit";
 			}
 		};
@@ -6609,27 +6609,25 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			// label) toggles its fold here, never speech. Headless
 			// chrome has no fold bar, so the wrapper toggles directly;
 			// the copy and Run icons stay silent via the control check.
-			const codeBlock = target?.closest(".ccez-code");
+			const codeBlock = closestFromTarget(event.target, ".ccez-code");
 			if (codeBlock && body.contains(codeBlock) && !target?.closest("[data-code-copy], [data-code-run]")) {
 				// Right-click toggles the fold (a left click on the
 				// folded label opens it back up).
-				if ((codeBlock as HTMLElement).dataset.folded === "1")
-					(codeBlock as HTMLElement).removeAttribute("data-folded");
-				else (codeBlock as HTMLElement).dataset.folded = "1";
+				if (codeBlock.dataset.folded === "1") codeBlock.removeAttribute("data-folded");
+				else codeBlock.dataset.folded = "1";
 				return;
 			}
 			// Display math folds the same way. Inline math has no
 			// body chrome, so it falls through to speech below.
-			const mathWrap = target?.closest("[data-math-index]");
+			const mathWrap = closestFromTarget(event.target, "[data-math-index]");
 			if (
 				mathWrap &&
 				body.contains(mathWrap) &&
 				mathWrap.classList.contains("ccez-math") &&
 				!target?.closest(".ccez-math-copy, .ccez-math-tex")
 			) {
-				if ((mathWrap as HTMLElement).dataset.folded === "1")
-					(mathWrap as HTMLElement).removeAttribute("data-folded");
-				else (mathWrap as HTMLElement).dataset.folded = "1";
+				if (mathWrap.dataset.folded === "1") mathWrap.removeAttribute("data-folded");
+				else mathWrap.dataset.folded = "1";
 				return;
 			}
 			// Controls and links inside messages stay silent.
@@ -7143,8 +7141,9 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 							wpTouchY = null;
 							const end = e.changedTouches[0]?.clientY;
 							if (start == null || end == null) return;
-							const menu = e.currentTarget as HTMLElement;
-							if (menu.scrollTop <= 0 && end - start > 56) wpOpen = false;
+							const menu = e.currentTarget;
+							if (menu instanceof HTMLElement && menu.scrollTop <= 0 && end - start > 56)
+								wpOpen = false;
 						}}
 					>
 						<div class="wp-sheet-head">
@@ -7906,7 +7905,8 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				class="browser-resize"
 				aria-hidden="true"
 				onpointerdown={(event) => {
-					(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+					if (event.currentTarget instanceof HTMLElement)
+						event.currentTarget.setPointerCapture(event.pointerId);
 					sideviewDrag = { startX: event.clientX, startW: settings.sideviewWidthPx };
 				}}
 				onpointermove={(event) => {
