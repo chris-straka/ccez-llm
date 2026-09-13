@@ -60,6 +60,14 @@ Escape excluded (stays inline per below).
   spellings (`isFieldTarget`, `isEditableTarget`, and Shift+D's wider
   button/link selector): the facts snapshot must carry each one separately.
   M/N need no hover (center message); Esc+f needs neither hover nor editor.
+- Follow-ups for later slices: converge the per-slice facts objects into
+  one shared per-keydown context (built once, not one snapshot per
+  cluster); move the Shift+D and shortcuts-filter selector literals into
+  named `events.ts` predicates (`isInteractiveTarget`, `isFilterTarget`)
+  beside `isFieldTarget`/`isEditableTarget`. Beyond the idle-restore
+  allowlist above, the prompt-idle hide/show/park machine itself
+  (`promptIdle`, `bootParked`, mount migration, focus/pointer listeners —
+  24 `promptIdle` refs) wants the same decision/effect split.
 
 ## 2. Extract a speech controller (second-largest logic mass)
 
