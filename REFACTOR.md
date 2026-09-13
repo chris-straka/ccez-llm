@@ -19,6 +19,12 @@ modules — they never split the template for size alone.
 
 ### Remaining branch inventory (from the message-keys/Space/Delete slice)
 
+Rough scope: ~19 extraction units in the chord/fullscreen/shift/zoom
+list (12 chord table + 4 fullscreen/find + shift group + zoom +
+shift-comma), plus the 5-branch scroll/sidebar cluster and the
+idle-restore/inspect/filter items above — call it ~25 branches total,
+Escape excluded (stays inline per below).
+
 - Modifier-chord table, in current dispatch order: Cmd/Ctrl+Enter send
   (field carve-out), Ctrl+Alt+Arrows (provider/thinking cycle),
   Ctrl+Alt+N and Cmd/Ctrl+N (new chat; the Shift variant rides the plain
