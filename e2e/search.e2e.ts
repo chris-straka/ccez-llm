@@ -11,7 +11,7 @@ import { test, expect, type Page } from "@playwright/test";
 async function seedThreeChats(page: Page): Promise<void> {
 	await page.addInitScript(() => {
 		window.localStorage.setItem("ccez-mock-provider", "1");
-		window.localStorage.setItem("ccez-studio-settings-v1", JSON.stringify({}));
+		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
 		const msg = (id: string, content: string) => ({
 			id,
 			role: "assistant",
@@ -20,7 +20,7 @@ async function seedThreeChats(page: Page): Promise<void> {
 			error: null
 		});
 		window.localStorage.setItem(
-			"ccez-studio-chats-v1",
+			"ccez-llm-chats-v1",
 			JSON.stringify([
 				{ id: "chat-ramen", createdAt: 1, replyLang: null, messages: [msg("m1", "ramen recipe with miso broth")] },
 				{ id: "chat-sushi", createdAt: 2, replyLang: null, messages: [msg("m2", "sushi rice vinegar ratio")] },
@@ -67,7 +67,7 @@ test.describe("palette focus order", () => {
 	async function seedMiso(page: Page): Promise<void> {
 		await page.addInitScript(() => {
 			window.localStorage.setItem("ccez-mock-provider", "1");
-			window.localStorage.setItem("ccez-studio-settings-v1", JSON.stringify({}));
+			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
 			const msg = (id: string, content: string) => ({
 				id,
 				role: "assistant",
@@ -76,7 +76,7 @@ test.describe("palette focus order", () => {
 				error: null
 			});
 			window.localStorage.setItem(
-				"ccez-studio-chats-v1",
+				"ccez-llm-chats-v1",
 				JSON.stringify([
 					{ id: "chat-a", createdAt: 1, replyLang: null, messages: [msg("a1", "miso ramen broth"), msg("a2", "miso tare seasoning")] },
 					{ id: "chat-b", createdAt: 2, replyLang: null, messages: [msg("b1", "miso soup breakfast")] }
@@ -154,7 +154,7 @@ test.describe("find in chat", () => {
 	test("Ctrl+F finds text in the current chat, Enter cycles hits", async ({ page }) => {
 		await page.addInitScript(() => {
 			window.localStorage.setItem("ccez-mock-provider", "1");
-			window.localStorage.setItem("ccez-studio-settings-v1", JSON.stringify({}));
+			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
 			const msg = (id: string, content: string) => ({
 				id,
 				role: "assistant",
@@ -163,7 +163,7 @@ test.describe("find in chat", () => {
 				error: null
 			});
 			window.localStorage.setItem(
-				"ccez-studio-chats-v1",
+				"ccez-llm-chats-v1",
 				JSON.stringify([
 					{
 						id: "chat-a",
@@ -210,7 +210,7 @@ test.describe("find in chat", () => {
 	test("a lone find hit closes and deselects on Enter, Esc, repeat", async ({ page }) => {
 		await page.addInitScript(() => {
 			window.localStorage.setItem("ccez-mock-provider", "1");
-			window.localStorage.setItem("ccez-studio-settings-v1", JSON.stringify({}));
+			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
 			const msg = (id: string, content: string) => ({
 				id,
 				role: "assistant",
@@ -219,7 +219,7 @@ test.describe("find in chat", () => {
 				error: null
 			});
 			window.localStorage.setItem(
-				"ccez-studio-chats-v1",
+				"ccez-llm-chats-v1",
 				JSON.stringify([
 					{
 						id: "chat-a",
@@ -287,9 +287,9 @@ test.describe("find in chat", () => {
 	test("Shift+F never summons find, it types", async ({ page }) => {
 		await page.addInitScript(() => {
 			window.localStorage.setItem("ccez-mock-provider", "1");
-			window.localStorage.setItem("ccez-studio-settings-v1", JSON.stringify({}));
+			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
 			window.localStorage.setItem(
-				"ccez-studio-chats-v1",
+				"ccez-llm-chats-v1",
 				JSON.stringify([
 					{
 						id: "chat-a",

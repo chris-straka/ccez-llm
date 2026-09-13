@@ -8,7 +8,7 @@ async function openSettings(page: import("@playwright/test").Page): Promise<void
 
 async function activeProviderId(page: import("@playwright/test").Page): Promise<string> {
 	return page.evaluate(() => {
-		const raw = window.localStorage.getItem("ccez-studio-settings-v1");
+		const raw = window.localStorage.getItem("ccez-llm-settings-v1");
 		if (!raw) throw new Error("no settings saved");
 		return (JSON.parse(raw) as { activeProviderId: string }).activeProviderId;
 	});

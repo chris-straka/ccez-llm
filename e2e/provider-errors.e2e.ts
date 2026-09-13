@@ -16,7 +16,7 @@ async function seedKeyedProvider(page: Page): Promise<void> {
 	await seedChat(page, []);
 	await page.addInitScript((key: string) => {
 		window.localStorage.removeItem("ccez-mock-provider");
-		const stored = window.localStorage.getItem("ccez-studio-settings-v1");
+		const stored = window.localStorage.getItem("ccez-llm-settings-v1");
 		const parsed = stored ? (JSON.parse(stored) as Record<string, unknown>) : {};
 		parsed["activeProviderId"] = "deepseek";
 		parsed["providers"] = {
@@ -28,7 +28,7 @@ async function seedKeyedProvider(page: Page): Promise<void> {
 				models: []
 			}
 		};
-		window.localStorage.setItem("ccez-studio-settings-v1", JSON.stringify(parsed));
+		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify(parsed));
 	}, FAKE_KEY);
 }
 

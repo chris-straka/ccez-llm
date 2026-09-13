@@ -8,9 +8,9 @@ import { test, expect } from "@playwright/test";
 test("retry keeps previous articles mounted", async ({ page }) => {
 	await page.addInitScript(() => {
 		window.localStorage.setItem("ccez-mock-provider", "1");
-		window.localStorage.setItem("ccez-studio-settings-v1", JSON.stringify({}));
+		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
 		window.localStorage.setItem(
-			"ccez-studio-chats-v1",
+			"ccez-llm-chats-v1",
 			JSON.stringify([
 				{
 					id: "e2e-chat",

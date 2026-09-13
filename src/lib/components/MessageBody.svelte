@@ -337,7 +337,7 @@
 		}
 		// Display math chrome: `$` flips rendered/raw, the copy icon
 		// copies the TeX, and a left click on a folded block unfolds it
-		// (the reverse never folds — only right-click folds).
+		// (right-click toggles the fold).
 		const mathWrap = (event.target as HTMLElement).closest<HTMLElement>("[data-math-index]");
 		if (mathWrap && rendered) {
 			const index = Number(mathWrap.dataset.mathIndex ?? -1);
@@ -372,7 +372,7 @@
 		// Headless code chrome: the pre is a native selection surface,
 		// so clicks there never copy. Copy lives on the icon button
 		// alone (folding rides `data-folded`, wired elsewhere). A left
-		// click on a folded block unfolds it; the reverse never folds.
+		// click on a folded block unfolds it; right-click toggles.
 		const codeBlock = (event.target as HTMLElement).closest<HTMLElement>(".ccez-code");
 		if (!codeBlock || !rendered) return;
 		if (codeBlock.dataset.folded === "1") {

@@ -10,10 +10,10 @@ import { seedChat } from "./helpers";
 /** Pin the settings theme before boot (seedChat writes settings with no theme). */
 async function seedTheme(page: Page, theme: "light" | "dark"): Promise<void> {
 	await page.addInitScript((t: string) => {
-		const raw = window.localStorage.getItem("ccez-studio-settings-v1");
+		const raw = window.localStorage.getItem("ccez-llm-settings-v1");
 		const prev = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
 		window.localStorage.setItem(
-			"ccez-studio-settings-v1",
+			"ccez-llm-settings-v1",
 			JSON.stringify({ ...prev, theme: t })
 		);
 	}, theme);

@@ -93,7 +93,8 @@ describe("desktop seal", () => {
 
 	it("keeps the keyboard-shortcuts heading for desktop", () => {
 		const source = pageSource();
-		expect(source).toContain('"Touch gestures" : "Keyboard shortcuts"');
+		expect(source).toContain('{#if !androidUI}<h2 id="shortcuts-heading">Keyboard shortcuts</h2>{/if}');
+		expect(source).toContain('aria-label={androidUI ? "Touch gestures" : undefined}');
 	});
 
 	it("keeps selection auto-speak desktop-only (phones need the tap)", () => {

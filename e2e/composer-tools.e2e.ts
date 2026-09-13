@@ -56,11 +56,11 @@ test("idle-hide takes the attachment strip with the prompt", async ({ page }) =>
 	// Reseed: a long thread (overflow) plus a 2s idle timeout, then reload.
 	await page.addInitScript((msgs) => {
 		window.localStorage.setItem(
-			"ccez-studio-settings-v1",
+			"ccez-llm-settings-v1",
 			JSON.stringify({ hoverAssistantActions: true, hoverUserActions: true, promptIdleSec: 2 })
 		);
 		window.localStorage.setItem(
-			"ccez-studio-chats-v1",
+			"ccez-llm-chats-v1",
 			JSON.stringify([{ id: "e2e-chat", createdAt: 1, replyLang: null, messages: msgs }])
 		);
 	}, longThread());
@@ -102,11 +102,11 @@ test("empty chat never idle-hides the composer", async ({ page }) => {
 	// prompt and its strip stay put past the timeout.
 	await page.addInitScript(() => {
 		window.localStorage.setItem(
-			"ccez-studio-settings-v1",
+			"ccez-llm-settings-v1",
 			JSON.stringify({ hoverAssistantActions: true, hoverUserActions: true, promptIdleSec: 2 })
 		);
 		window.localStorage.setItem(
-			"ccez-studio-chats-v1",
+			"ccez-llm-chats-v1",
 			JSON.stringify([{ id: "e2e-chat", createdAt: 1, replyLang: null, messages: [] }])
 		);
 	});
@@ -129,11 +129,11 @@ test.describe("phone idle default", () => {
 		// Long thread (would hide on desktop) but NO stored timeout.
 		await page.addInitScript((msgs) => {
 			window.localStorage.setItem(
-				"ccez-studio-settings-v1",
+				"ccez-llm-settings-v1",
 				JSON.stringify({ hoverAssistantActions: true, hoverUserActions: true })
 			);
 			window.localStorage.setItem(
-				"ccez-studio-chats-v1",
+				"ccez-llm-chats-v1",
 				JSON.stringify([{ id: "e2e-chat", createdAt: 1, replyLang: null, messages: msgs }])
 			);
 		}, longThread());

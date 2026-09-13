@@ -88,7 +88,7 @@ test("chat width slider narrows the column and persists", async ({ page }) => {
 	// test's loadSettings clamp instead).
 	await expect
 		.poll(() =>
-			page.evaluate(() => window.localStorage.getItem("ccez-studio-settings-v1"))
+			page.evaluate(() => window.localStorage.getItem("ccez-llm-settings-v1"))
 		)
 		.toContain('"chatWidth":32');
 });

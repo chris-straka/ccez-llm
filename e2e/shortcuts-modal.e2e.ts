@@ -32,10 +32,11 @@ test("first entry toggles the modal; list is pithy with current keys", async ({ 
 	expect(await keys.locator("div > dt").first().innerText()).toBe("Shortcuts show/hide");
 	await expect(keys.locator("div").first()).toContainText("middle-click");
 	// Newer global keys are folded in.
-	for (const name of ["Send message", "New chat", "Edit own message", "Focus composer"]) {
+	for (const name of ["Scroll", "New chat", "Edit own message", "Focus composer"]) {
 		await expect(keys.locator("div > dt", { hasText: name })).toBeVisible();
 	}
-	// Right-click speak is listed: selection first, whole message, again stops.
+	await expect(keys.locator("div", { hasText: "ctrl+u/ctrl+d" })).toBeVisible();
+	// Right-click speak is listed (a second right-click restarts, never stops).
 	await expect(keys.locator("div > dt", { hasText: "Speak text aloud" })).toBeVisible();
 	// No paren spam in the entry copy (each dd reads flat).
 	const details = await keys.locator("dd").allInnerTexts();
@@ -88,13 +89,13 @@ test("modal j/k/u/d scroll contained", async ({ page }) => {
 	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(30);
 	await page.addInitScript((text: string) => {
 		window.localStorage.setItem("ccez-mock-provider", "1");
-		window.localStorage.setItem("ccez-studio-settings-v1", JSON.stringify({}));
+		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
 		const turns = [0, 1, 2, 3, 4, 5].flatMap((n) => [
 			{ id: `e2e-m${n}a`, role: "user", content: `question ${n} ${text}`, usage: null, error: null },
 			{ id: `e2e-m${n}b`, role: "assistant", content: `answer ${n} ${text}`, usage: null, error: null }
 		]);
 		window.localStorage.setItem(
-			"ccez-studio-chats-v1",
+			"ccez-llm-chats-v1",
 			JSON.stringify([{ id: "e2e-chat", createdAt: 1, replyLang: null, messages: turns }])
 		);
 	}, long);

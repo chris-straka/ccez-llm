@@ -25,7 +25,7 @@
 		idleSliderToSetting
 	} from "$lib/chrome";
 	import { thinkingFor, resolveThinkingId } from "$lib/providers/thinking";
-	import { ejectProvider, restoreProvider } from "$lib/session";
+	import { replyLanguageFor } from "$lib/languages";
 	import { hydrateSecrets, tauriBackendAvailable } from "$lib/secrets";
 	import { DEV_UPDATE_MESSAGE, updateRouteFor } from "$lib/updates";
 	import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -151,6 +151,12 @@
 	let voicesLoaded = $state(false);
 	/** Picker options follow the Latin-script voice language field. */
 	const voiceLangTag = $derived(settings.voiceLang?.trim() || "en-US");
+	/** Human language name for the empty-voice note (falls back to the tag). */
+	const voiceLangName = $derived(
+		replyLanguageFor(voiceLangTag)?.name ??
+			replyLanguageFor(voiceLangTag.split("-")[0] ?? "")?.name ??
+			voiceLangTag
+	);
 	const voiceOptions = $derived(voicesForLang(installedVoices, voiceLangTag));
 	/** Android picker: no quality gate — Android has no premium/enhanced tiers. */
 	const androidVoiceOptions = $derived(allVoicesForLang(installedVoices, voiceLangTag));
@@ -176,8 +182,6 @@
 	});
 	/** Per-provider "replace key" mode; otherwise a stored key shows masked. */
 	let editingKey: Record<string, boolean> = $state({});
-	/** Local mirror of the session module set, so eject/restore re-renders. */
-	let ejectedIds: string[] = $state([]);
 	const inShell = tauriBackendAvailable();
 
 	const allProviders = $derived(listProviders(settings.customProviders));
@@ -186,18 +190,7 @@
 		settings.customProviders.some((p) => p.id === settings.activeProviderId)
 	);
 	const active = $derived(activeProviderSettings(settings));
-	const ejected = $derived(ejectedIds.includes(settings.activeProviderId));
 	const showKeyField = $derived(!active.apiKey.trim() || editingKey[settings.activeProviderId]);
-
-	function eject() {
-		ejectProvider(settings.activeProviderId);
-		ejectedIds = [...ejectedIds, settings.activeProviderId];
-	}
-
-	function restore() {
-		restoreProvider(settings.activeProviderId);
-		ejectedIds = ejectedIds.filter((id) => id !== settings.activeProviderId);
-	}
 
 	/** Where "check for updates" goes: releases page, Tauri updater, or nowhere (web). */
 	const updateRoute = $derived(updateRouteFor(androidUI === true, inShell, import.meta.env.DEV));
@@ -643,11 +636,6 @@
 				onblur={() => (editingKey[settings.activeProviderId] = false)}
 			/>
 		</label>
-	{:else if ejected}
-		<p class="key-state" role="status">
-			Key set aside for this session — the saved key is untouched.
-			<button type="button" onclick={restore}>Restore</button>
-		</p>
 	{:else}
 		<p class="key-state" role="status">
 			Key loaded: <code>{maskKey(active.apiKey)}</code>
@@ -657,16 +645,11 @@
 			>
 				Replace
 			</button>
-			<button type="button" onclick={eject}>Eject for this session</button>
 		</p>
 	{/if}
 	<p class="note">
-		{#if inShell && !androidUI}
-			Keys stay in the macOS Keychain, never in a file. Eject sets a key
-			aside until you restore it or reopen the app.
-		{:else if inShell}
-			Keys stay in this app's secured storage, never in a file. Eject
-			sets a key aside until you restore it or reopen the app.
+		{#if inShell}
+			Keys stay in this app's secured storage, never in a file.
 		{:else}
 			Keys stay on this machine, in this app's local storage.
 		{/if}
@@ -791,10 +774,9 @@
 				</div>
 			{:else if voicesLoaded}
 				<p class="note voice-note">
-					No voices installed for {voiceLangTag} — Auto uses your
-					system default. Voices come from the system's
-					text-to-speech engine, not the keyboard: install one,
-					then check again.
+					No {voiceLangName} voices installed — Auto uses the system
+					default. Install one in the system settings, then check
+					again.
 				</p>
 			{/if}
 		{/if}
@@ -960,6 +942,7 @@
 			<output>{Math.round(settings.fontScale * 100)}%</output>
 		</span>
 	</label>
+	{#if !androidUI}
 	<label class="slider-row">
 		Background opacity
 		<button
@@ -985,6 +968,7 @@
 			<output>{Math.round((settings.bgOpacity ?? 1) * 100)}%</output>
 		</span>
 	</label>
+	{/if}
 	{#if !androidUI}
 		<label class="slider-row">
 			Chat width
@@ -1013,6 +997,7 @@
 			</span>
 		</label>
 	{/if}
+	{#if !androidUI}
 	<label class="slider-row">
 		Hide prompt after idle
 		<button
@@ -1039,6 +1024,7 @@
 			<output style="min-width: 3.6rem;">{formatIdleTimeout(settings.promptIdleSec ?? PROMPT_IDLE_DEFAULT)}</output>
 		</span>
 	</label>
+	{/if}
 </section>
 
 <section aria-labelledby="color-scheme-heading">

@@ -23,9 +23,9 @@ async function openSettings(page: import("@playwright/test").Page) {
 async function seedEmpty(page: import("@playwright/test").Page): Promise<void> {
 	await page.addInitScript(() => {
 		window.localStorage.setItem("ccez-mock-provider", "1");
-		window.localStorage.setItem("ccez-studio-settings-v1", JSON.stringify({}));
+		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
 		window.localStorage.setItem(
-			"ccez-studio-chats-v1",
+			"ccez-llm-chats-v1",
 			JSON.stringify([{ id: "e2e-chat", createdAt: 1, replyLang: null, messages: [] }])
 		);
 	});
@@ -70,10 +70,10 @@ test.describe("phone", () => {
 		test("rerun tooltip is just Rerun", async ({ page }) => {
 		await page.addInitScript(() => {
 			window.localStorage.setItem("ccez-mock-provider", "1");
-			window.localStorage.setItem("ccez-studio-settings-v1", JSON.stringify({}));
+			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
 			const msg = (id: string, role: string, content: string) => ({ id, role, content, usage: null, error: null });
 			window.localStorage.setItem(
-				"ccez-studio-chats-v1",
+				"ccez-llm-chats-v1",
 				JSON.stringify([
 					{ id: "chat-a", createdAt: 1, replyLang: null, messages: [msg("m1", "user", "do it")] }
 				])

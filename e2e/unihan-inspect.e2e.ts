@@ -16,10 +16,10 @@ async function seedWithInspect(page: Page, enabled: boolean, content: string): P
 	await seedChat(page, [{ role: "assistant", content }]);
 	await page.addInitScript((on: boolean) => {
 		try {
-			const raw = window.localStorage.getItem("ccez-studio-settings-v1");
+			const raw = window.localStorage.getItem("ccez-llm-settings-v1");
 			const parsed = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
 			parsed["inspectEnabled"] = on;
-			window.localStorage.setItem("ccez-studio-settings-v1", JSON.stringify(parsed));
+			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify(parsed));
 		} catch {
 			// Seed-order failure surfaces as a missing toggle below.
 		}

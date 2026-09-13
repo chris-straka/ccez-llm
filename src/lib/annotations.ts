@@ -817,7 +817,9 @@ export function withAnnotations(prompt: string, list: Annotation[]): string {
  * the way back in: corrupt entries drop, valid ones restore; quotes
  * that no longer match simply list without a badge, never an error.
  */
-const DRAFT_KEY = "ccez-studio-annotations-v1";
+const DRAFT_KEY = "ccez-llm-annotations-v1";
+/** Pre-rename key (ccez-studio era): read once, then saves move to DRAFT_KEY. */
+const LEGACY_DRAFT_KEY = "ccez-studio-annotations-v1";
 
 function cleanDraftList(raw: unknown): Annotation[] {
 	if (!Array.isArray(raw)) return [];
@@ -841,7 +843,7 @@ function cleanDraftList(raw: unknown): Annotation[] {
 export function loadDraftAnnotations(chatId: string): Annotation[] {
 	try {
 		if (typeof localStorage === "undefined") return [];
-		const raw = localStorage.getItem(DRAFT_KEY);
+		const raw = localStorage.getItem(DRAFT_KEY) ?? localStorage.getItem(LEGACY_DRAFT_KEY);
 		if (!raw) return [];
 		const record = JSON.parse(raw) as Record<string, unknown>;
 		return cleanDraftList(record?.[chatId]);
@@ -855,7 +857,7 @@ export function saveDraftAnnotations(chatId: string, list: Annotation[], knownId
 		if (typeof localStorage === "undefined") return;
 		let record: Record<string, unknown> = {};
 		try {
-			record = (JSON.parse(localStorage.getItem(DRAFT_KEY) ?? "{}") as Record<string, unknown>) ?? {};
+			record = (JSON.parse(localStorage.getItem(DRAFT_KEY) ?? localStorage.getItem(LEGACY_DRAFT_KEY) ?? "{}") as Record<string, unknown>) ?? {};
 		} catch {
 			record = {};
 		}

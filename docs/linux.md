@@ -55,7 +55,7 @@ Source: `packaging/aur/PKGBUILD`. Details:
 - `depends=('webkit2gtk-4.1' 'gtk3' 'libappindicator-gtk3' 'librsvg'
   'openssl')` — pacman cannot see .deb metadata, so the WebKitGTK runtime
   (mandatory for every Tauri v2 app) is declared explicitly.
-- Adds a `ccez-llm` → `ccez-studio` symlink in `/usr/bin` and installs the
+- Adds a `ccez-studio` → `ccez-llm` back-compat symlink in `/usr/bin` and installs the
   license under `/usr/share/licenses/ccez-llm-bin/`.
 - After bumping `pkgver`, regenerate AUR metadata on an Arch box:
   `makepkg --printsrcinfo > .SRCINFO` (cannot be done on macOS — no
@@ -293,8 +293,8 @@ secrets exist, else the `*.tar.gz.sig` glob silently matches nothing
 (`fail_on_unmatched_files: false`).
 
 Q6 — desktop-file / PKGBUILD nits (cosmetic, needs-runner).
-`packaging/ccez-llm.desktop:7` `Exec=ccez-studio %U` matches the
-`ccez-studio` binary (`src-tauri/Cargo.toml:2`) — good. But:
+`packaging/ccez-llm.desktop:7` `Exec=ccez-llm %U` matches the
+`ccez-llm` binary (`src-tauri/Cargo.toml:2`) — good. But:
 (a) `StartupWMClass=ccez-llm` (`:13`) vs the actual WM_CLASS WebKitGTK
 sets (usually the product name/binary id) — verify with `xprop`;
 wrong value only breaks dock grouping. Proposed patch: launch the .deb

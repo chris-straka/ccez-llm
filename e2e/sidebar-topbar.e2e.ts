@@ -15,7 +15,7 @@ async function seedTwoChats(page: Page): Promise<void> {
 				messages: [{ id: `${id}-m`, role: "assistant", content, usage: null, error: null }]
 			});
 			window.localStorage.setItem(
-				"ccez-studio-chats-v1",
+				"ccez-llm-chats-v1",
 				JSON.stringify([chat("chat-a", a), chat("chat-b", b)])
 			);
 		},
@@ -176,7 +176,7 @@ test("chat rows show 2-digit times with no message count", async ({ page }) => {
 test("space on an empty chat focuses the prompt", async ({ page }) => {
 	await page.addInitScript(() => {
 		window.localStorage.setItem("ccez-mock-provider", "1");
-		window.localStorage.setItem("ccez-studio-settings-v1", JSON.stringify({}));
+		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
 		const msg = (id: string, content: string) => ({
 			id,
 			role: "assistant",
@@ -185,7 +185,7 @@ test("space on an empty chat focuses the prompt", async ({ page }) => {
 			error: null
 		});
 		window.localStorage.setItem(
-			"ccez-studio-chats-v1",
+			"ccez-llm-chats-v1",
 			JSON.stringify([
 				{ id: "chat-full", createdAt: 2, replyLang: null, messages: [msg("f1", "hello there")] },
 				{ id: "chat-empty", createdAt: 1, replyLang: null, messages: [] }
@@ -226,9 +226,9 @@ there is nothing to scroll, so the key focuses the prompt instead. */
 test("space on an empty chat with focus outside focuses the prompt", async ({ page }) => {
 	await page.addInitScript(() => {
 		window.localStorage.setItem("ccez-mock-provider", "1");
-		window.localStorage.setItem("ccez-studio-settings-v1", JSON.stringify({}));
+		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
 		window.localStorage.setItem(
-			"ccez-studio-chats-v1",
+			"ccez-llm-chats-v1",
 			JSON.stringify([{ id: "chat-empty", createdAt: 1, replyLang: null, messages: [] }])
 		);
 	});

@@ -1,4 +1,4 @@
-# Ccez Studio
+# Ccez LLM
 
 A BYOK desktop + mobile chatbot built for language learning and general
 questions — a Tauri 2 app (macOS) with a touch-first Android UI, Svelte 5

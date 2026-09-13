@@ -1,4 +1,4 @@
-# Ccez Studio — agent handoff
+# Ccez LLM — agent handoff
 
 Tauri 2 + Svelte 5 (runes) + TypeScript desktop chatbot (macOS). BYOK chat with
 language-learner aids. Frontend owns UI/state; Rust backend is thin and
@@ -65,6 +65,15 @@ privileged (Keychain, updater, native TTS).
   system registry — not a folder scan. There is no user-visible voice
   directory to display.
 
+## Source control
+
+Standing authorization: commit and push without waiting for review —
+the user has granted this once for all future turns, so finished work
+goes straight to a commit and `origin/main` when green. Scope is commit + push only:
+never amend, rebase, force-push, tag, or cut a release without an
+explicit ask in that turn. Name committed files explicitly, never
+`git add -A`.
+
 ## Conventions
 
 - Settings: `src/lib/settings.ts` (`defaultSettings`, `saveSettings`); secrets
@@ -97,6 +106,13 @@ privileged (Keychain, updater, native TTS).
 - Agent-captured verification screenshots go in `.screenshots/` (gitignored),
   never the repo root.
 - UI copy: plain prose, no emojis. Enter sends, Shift+Enter newline.
+- Shortcuts menu (`desktopShortcuts()` in `src/routes/+page.svelte`): entries
+  stay pithy, `dd` copy never carries parentheses (pinned by
+  `e2e/shortcuts-modal.e2e.ts`). These rows were deliberately removed —
+  do not re-add them: New line, Stage message, Scroll messages, Export
+  chat, Translate selection, and the `· Enter cycles · repeat closes ·
+  1 hit closes bare`, `· past newest mints one`, `· again stops`
+  trailers. Phones show no `h2` (the filter owns the head row).
 - Spec history: `README.md` (what), `PLAN.md` (full plan), `TODO.md` (open
   work only — finished stages move to `DONE.md`, never deleted).
 

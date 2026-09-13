@@ -47,7 +47,7 @@ export interface ProviderDef {
 export const PROVIDERS: ProviderDef[] = [
 	{
 		id: builtin("muse"),
-		label: "Muse Spark 1.3",
+		label: "Muse",
 		defaultBaseUrl: "https://api.meta.ai/v1",
 		defaultModel: "muse-spark-1.3-contributor",
 		keyHint: "Meta Model API key"

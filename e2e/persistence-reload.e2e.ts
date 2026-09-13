@@ -10,8 +10,8 @@ import { expect, test, type Page } from "@playwright/test";
  * exactly like a real restart.
  */
 
-const CHATS_KEY = "ccez-studio-chats-v1";
-const SETTINGS_KEY = "ccez-studio-settings-v1";
+const CHATS_KEY = "ccez-llm-chats-v1";
+const SETTINGS_KEY = "ccez-llm-settings-v1";
 
 async function seedChats(page: Page): Promise<void> {
 	await page.evaluate((key: string) => {

@@ -252,3 +252,13 @@ export function contentSwipeTarget(
 	if (Math.abs(dx) < minDistance || Math.abs(dy) > Math.abs(dx)) return null;
 	return dx > 0 ? "chats" : "settings";
 }
+
+/**
+ * Where a single-finger tap began: "message" (an article body, never
+ * its action row or a control), "prompt" (the composer card outside any
+ * field or button), "empty" (dead main-column space), or "other"
+ * (controls, sidebars, modals — taps keep their native behavior).
+ * Double-tap on "empty" opens the chats list; everything else taps
+ * natively.
+ */
+export type FlickZone = "message" | "prompt" | "empty" | "other";

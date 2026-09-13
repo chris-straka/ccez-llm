@@ -75,3 +75,33 @@ export function contentFitsViewport(scrollHeight: number, clientHeight: number):
 export function draggedSliderPastTop(startY: number, endY: number): boolean {
 	return startY - endY >= SLIDER_DRAG_RESET_PX;
 }
+
+/**
+ * Which chrome can own the stage: every modal, palette, panel, docked
+ * view, and drawer that takes bare keys away from the main chat. One
+ * predicate so the keyboard router can't forget a newcomer in one
+ * guard list and remember it in another (a Space that summons the
+ * prompt from behind settings is the classic leak).
+ */
+export interface StageOwnerFlags {
+	shortcutsOpen: boolean;
+	searchOpen: boolean;
+	inspectOpen: boolean;
+	findOpen: boolean;
+	settingsOpen: boolean;
+	sideviewOpen: boolean;
+	sidebarOpen: boolean;
+}
+
+/** True when any stage owner is up: bare main-chat keys stand down. */
+export function stageOwnedByOverlay(flags: StageOwnerFlags): boolean {
+	return (
+		flags.shortcutsOpen ||
+		flags.searchOpen ||
+		flags.inspectOpen ||
+		flags.findOpen ||
+		flags.settingsOpen ||
+		flags.sideviewOpen ||
+		flags.sidebarOpen
+	);
+}

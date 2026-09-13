@@ -50,14 +50,14 @@ package() {
   bsdtar -xf "${_pkgdeb}-${pkgver}.deb" 'data.tar.*'
   bsdtar -xf data.tar.* -C "$pkgdir"
 
-  # The .deb ships /usr/bin/ccez-studio, /usr/share/applications/*.desktop
+  # The .deb ships /usr/bin/ccez-llm, /usr/share/applications/*.desktop
   # and /usr/share/icons/**. Fix up anything the bundler layouts leaves
   # slightly off for Arch conventions:
   #
-  # 1. Convenience symlink under the AUR package name.
+  # 1. Back-compat symlink under the pre-rename binary name.
   install -dm755 "$pkgdir/usr/bin"
-  if [ ! -e "$pkgdir/usr/bin/ccez-llm" ] && [ -e "$pkgdir/usr/bin/ccez-studio" ]; then
-    ln -s ccez-studio "$pkgdir/usr/bin/ccez-llm"
+  if [ ! -e "$pkgdir/usr/bin/ccez-studio" ] && [ -e "$pkgdir/usr/bin/ccez-llm" ]; then
+    ln -s ccez-llm "$pkgdir/usr/bin/ccez-studio"
   fi
 
   # 2. License (Tauri .debs do not ship one under /usr/share/licenses).

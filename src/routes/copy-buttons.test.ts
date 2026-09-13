@@ -31,22 +31,4 @@ describe("icon-only copy buttons", () => {
 		expect(offenders).toEqual([]);
 	});
 
-	it("gives the translation copy the shared glyph plus an accessible name", () => {
-		const source = pageSource();
-		const button = source.match(
-			/<button[^>]*aria-label="Copy translation"[^>]*>([\s\S]*?)<\/button>/
-		);
-		expect(button, "Copy translation button is gone or reshaped").toBeTruthy();
-		expect(button![1]).toContain('<ActionIcon kind="copy" />');
-		expect(button![1]).not.toContain("Copy\n");
-	});
-
-	it("keeps the icon-copy treatment ghosted, not pilled", () => {
-		const match = pageSource().match(/<style>([\s\S]*)<\/style>/);
-		if (!match) throw new Error("+page.svelte has no <style> block");
-		const css = match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
-		const rule = css.match(/\.review-edit-actions button\.icon-copy\s*\{([^}]*)\}/);
-		expect(rule, "icon-copy rule is gone — move it with the button").toBeTruthy();
-		expect(rule![1]).toMatch(/background\s*:\s*none/);
-	});
 });

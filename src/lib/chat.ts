@@ -89,7 +89,9 @@ export function isSending(state: ChatState, id?: ChatId): boolean {
 	return state.sendingChatIds.includes(id ?? state.activeChatId);
 }
 
-const STORAGE_KEY = "ccez-studio-chats-v1";
+const STORAGE_KEY = "ccez-llm-chats-v1";
+/** Pre-rename key (ccez-studio era): read once, then saves move to STORAGE_KEY. */
+const LEGACY_STORAGE_KEY = "ccez-studio-chats-v1";
 
 export function newChatId(): ChatId {
 	return crypto.randomUUID() as ChatId;
@@ -633,7 +635,7 @@ function persistChats(state: ChatState, store?: KeyValueStore): void {
 function loadChats(state: ChatState, store: KeyValueStore): void {
 	let raw: string | null;
 	try {
-		raw = store.getItem(STORAGE_KEY);
+		raw = store.getItem(STORAGE_KEY) ?? store.getItem(LEGACY_STORAGE_KEY);
 	} catch {
 		return;
 	}

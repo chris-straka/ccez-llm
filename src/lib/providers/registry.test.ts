@@ -30,7 +30,7 @@ describe("registry", () => {
 			"custom-kimi"
 		]);
 		expect(getProviderDef("custom-kimi", custom).label).toBe("Kimi");
-		expect(getProviderDef("muse", custom).label).toBe("Muse Spark 1.3");
+		expect(getProviderDef("muse", custom).label).toBe("Muse");
 		expect(() => getProviderDef("nope", custom)).toThrow("Unknown provider");
 		expect(
 			createProvider("custom-kimi", { baseUrl: "https://x", apiKey: "k", model: "m" }, custom)

@@ -11,7 +11,7 @@ async function seedPlain(page) {
 	// After seedChat: its init script overwrites this key, so ours
 	// must register later to win.
 	await page.addInitScript(() => {
-		localStorage.setItem("ccez-studio-settings-v1", JSON.stringify({ ownBubble: false }));
+		localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({ ownBubble: false }));
 	});
 }
 

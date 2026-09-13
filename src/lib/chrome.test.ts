@@ -9,7 +9,9 @@ import {
 	idleSettingToSlider,
 	idleSliderToSetting,
 	isPromptIdle,
-	SLIDER_DRAG_RESET_PX
+	SLIDER_DRAG_RESET_PX,
+	stageOwnedByOverlay,
+	type StageOwnerFlags
 } from "./chrome";
 import {
 	PROMPT_IDLE_ALWAYS,
@@ -98,5 +100,27 @@ describe("draggedSliderPastTop", () => {
 	it("ignores downward and sideways travel", () => {
 		expect(draggedSliderPastTop(200, 400)).toBe(false);
 		expect(draggedSliderPastTop(200, 200)).toBe(false);
+	});
+});
+
+const STAGE_CLEAR: StageOwnerFlags = {
+	shortcutsOpen: false,
+	searchOpen: false,
+	inspectOpen: false,
+	findOpen: false,
+	settingsOpen: false,
+	sideviewOpen: false,
+	sidebarOpen: false
+};
+
+describe("stageOwnedByOverlay", () => {
+	it("leaves bare keys with the main chat when nothing is up", () => {
+		expect(stageOwnedByOverlay(STAGE_CLEAR)).toBe(false);
+	});
+
+	it("hands the stage to any single owner", () => {
+		for (const key of Object.keys(STAGE_CLEAR) as (keyof StageOwnerFlags)[]) {
+			expect(stageOwnedByOverlay({ ...STAGE_CLEAR, [key]: true })).toBe(true);
+		}
 	});
 });

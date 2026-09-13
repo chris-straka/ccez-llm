@@ -548,6 +548,16 @@ describe("chat", () => {
 		expect(waypointLabel("   ")).toBe("");
 	});
 
+	it("loads chats saved under the pre-rename key", () => {
+		const store = freshStore();
+		store.setItem(
+			"ccez-studio-chats-v1",
+			JSON.stringify([{ id: "c1", createdAt: 1, replyLang: null, messages: [] }])
+		);
+		const state = createChatState(store);
+		expect(state.chats.map((c) => c.id)).toEqual(["c1"]);
+	});
+
 	it("keeps a reply pill per chat and persists it on load", async () => {
 		const { state, store } = stateWith(freshStore());
 		newChat(state, store);
@@ -562,11 +572,11 @@ describe("chat", () => {
 		expect(again.chats[0]?.replyLang).toBeNull();
 		expect(again.chats[1]?.replyLang).toBe("ar");
 		// Unknown codes from retired languages fall back to no pill.
-		const raw = JSON.parse(store.getItem("ccez-studio-chats-v1") as string) as Array<{
+		const raw = JSON.parse(store.getItem("ccez-llm-chats-v1") as string) as Array<{
 			replyLang: unknown;
 		}>;
 		raw[1]!.replyLang = "xx";
-		store.setItem("ccez-studio-chats-v1", JSON.stringify(raw));
+		store.setItem("ccez-llm-chats-v1", JSON.stringify(raw));
 		const healed = createChatState(store);
 		expect(healed.chats[1]?.replyLang).toBeNull();
 	});
@@ -595,11 +605,11 @@ describe("chat", () => {
 		setChatVoice(again, again.chats[0]!.id, null, store);
 		expect(chatVoiceReadback(again.chats[0]!, true)).toBe(true);
 		// Pre-override stores carry no flag: they follow the default.
-		const raw = JSON.parse(store.getItem("ccez-studio-chats-v1") as string) as Array<{
+		const raw = JSON.parse(store.getItem("ccez-llm-chats-v1") as string) as Array<{
 			voice: unknown;
 		}>;
 		for (const c of raw) delete c.voice;
-		store.setItem("ccez-studio-chats-v1", JSON.stringify(raw));
+		store.setItem("ccez-llm-chats-v1", JSON.stringify(raw));
 		const healed = createChatState(store);
 		expect(healed.chats[0]?.voice).toBeNull();
 		expect(chatVoiceReadback(healed.chats[0]!, true)).toBe(true);
@@ -612,7 +622,7 @@ describe("chat", () => {
 		const again = createChatState(store);
 		expect(activeChat(again).messages).toHaveLength(2);
 
-		store.setItem("ccez-studio-chats-v1", "garbage{");
+		store.setItem("ccez-llm-chats-v1", "garbage{");
 		const fresh = createChatState(store);
 		expect(activeChat(fresh).messages).toEqual([]);
 	});

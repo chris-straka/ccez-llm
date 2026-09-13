@@ -24,10 +24,10 @@ domes into an arch or squeezes the text into a padded tower. */
 test("own bubble stays intact at maximum text size", async ({ page }) => {
 	await seedChat(page, [{ role: "user", content: "Give me a paragraph in english" }]);
 	await page.addInitScript(() => {
-		const raw = window.localStorage.getItem("ccez-studio-settings-v1");
+		const raw = window.localStorage.getItem("ccez-llm-settings-v1");
 		const settings = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
 		window.localStorage.setItem(
-			"ccez-studio-settings-v1",
+			"ccez-llm-settings-v1",
 			JSON.stringify({ ...settings, ownBubble: true, fontScale: 6 })
 		);
 	});

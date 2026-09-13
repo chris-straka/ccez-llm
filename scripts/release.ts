@@ -84,7 +84,7 @@ if (!DRY) {
 	);
 	writeFileSync(
 		"src-tauri/Cargo.lock",
-		bumpTomlVersion("src-tauri/Cargo.lock", next, 'name = "ccez-studio"')
+		bumpTomlVersion("src-tauri/Cargo.lock", next, 'name = "ccez-llm"')
 	);
 }
 

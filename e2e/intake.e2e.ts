@@ -156,7 +156,7 @@ test("long paste collapses to a tag; Ctrl+O expands and re-collapses", async ({
 test("thoughts never render and Ctrl+O stays quiet without paste tags", async ({ page }) => {
 	await page.addInitScript(() => {
 		window.localStorage.setItem(
-			"ccez-studio-chats-v1",
+			"ccez-llm-chats-v1",
 			JSON.stringify([
 				{
 					id: "e2e-chat",

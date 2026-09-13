@@ -189,13 +189,18 @@ describe("draft annotation persistence", () => {
 
 	it("drops corrupt entries and survives corrupt storage", () => {
 		window.localStorage.setItem(
-			"ccez-studio-annotations-v1",
+			"ccez-llm-annotations-v1",
 			JSON.stringify({ c1: [ann(), null, "x", { id: 5 }, { ...ann(), at: "0" }] })
 		);
 		const loaded = loadDraftAnnotations("c1");
 		expect(loaded).toHaveLength(2);
 		expect(loaded[1]?.at).toBe(0);
-		window.localStorage.setItem("ccez-studio-annotations-v1", "not json{");
+		window.localStorage.setItem("ccez-llm-annotations-v1", "not json{");
 		expect(loadDraftAnnotations("c1")).toEqual([]);
+	});
+
+	it("reads drafts saved under the pre-rename key", () => {
+		window.localStorage.setItem("ccez-studio-annotations-v1", JSON.stringify({ c1: [ann()] }));
+		expect(loadDraftAnnotations("c1")).toEqual([ann()]);
 	});
 });

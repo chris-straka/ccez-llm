@@ -34,7 +34,7 @@ test("prompt slides away when idle and returns on keys", async ({ page }) => {
 	await seedChat(page, turns);
 	await page.addInitScript(() => {
 		window.localStorage.setItem(
-			"ccez-studio-settings-v1",
+			"ccez-llm-settings-v1",
 			JSON.stringify({ promptIdleSec: 2 })
 		);
 	});
@@ -68,7 +68,7 @@ test("button clicks leave the hidden prompt alone", async ({ page }) => {
 	await seedChat(page, turns);
 	await page.addInitScript(() => {
 		window.localStorage.setItem(
-			"ccez-studio-settings-v1",
+			"ccez-llm-settings-v1",
 			JSON.stringify({ promptIdleSec: 2 })
 		);
 	});
@@ -143,7 +143,7 @@ test("idle hide keeps every offset stable", async ({ page }) => {
 	await seedChat(page, turns);
 	await page.addInitScript(() => {
 		window.localStorage.setItem(
-			"ccez-studio-settings-v1",
+			"ccez-llm-settings-v1",
 			JSON.stringify({ promptIdleSec: 2 })
 		);
 	});
@@ -181,7 +181,7 @@ test("always-hide hides on blur and returns on i", async ({ page }) => {
 	await seedChat(page, turns);
 	await page.addInitScript(() => {
 		window.localStorage.setItem(
-			"ccez-studio-settings-v1",
+			"ccez-llm-settings-v1",
 			JSON.stringify({ promptIdleSec: -1 })
 		);
 	});
@@ -216,7 +216,7 @@ test("always-hide boots hidden", async ({ page }) => {
 	await seedChat(page, turns);
 	await page.addInitScript(() => {
 		window.localStorage.setItem(
-			"ccez-studio-settings-v1",
+			"ccez-llm-settings-v1",
 			JSON.stringify({ promptIdleSec: -1 })
 		);
 	});
@@ -282,7 +282,7 @@ test("always-hide click-off stays hidden until the next press", async ({ page })
 	await seedChat(page, turns);
 	await page.addInitScript(() => {
 		window.localStorage.setItem(
-			"ccez-studio-settings-v1",
+			"ccez-llm-settings-v1",
 			JSON.stringify({ promptIdleSec: -1 })
 		);
 	});
@@ -317,7 +317,7 @@ test("clearing a highlight never summons the prompt", async ({ page }) => {
 	]);
 	await seedChat(page, turns);
 	await page.addInitScript(() => {
-		window.localStorage.setItem("ccez-studio-settings-v1", JSON.stringify({ promptIdleSec: -1 }));
+		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({ promptIdleSec: -1 }));
 	});
 	await page.goto("/");
 	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
@@ -354,7 +354,7 @@ test("double-clicking text never flashes the prompt", async ({ page }) => {
 	]);
 	await seedChat(page, turns);
 	await page.addInitScript(() => {
-		window.localStorage.setItem("ccez-studio-settings-v1", JSON.stringify({ promptIdleSec: -1 }));
+		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({ promptIdleSec: -1 }));
 	});
 	await page.goto("/");
 	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
@@ -383,7 +383,7 @@ test("space dismisses an empty composer, types after text", async ({ page }) => 
 	]);
 	await seedChat(page, turns);
 	await page.addInitScript(() => {
-		window.localStorage.setItem("ccez-studio-settings-v1", JSON.stringify({ promptIdleSec: -1 }));
+		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({ promptIdleSec: -1 }));
 	});
 	await page.goto("/");
 	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
@@ -476,7 +476,7 @@ test("prompt hides while settings are open", async ({ page }) => {
 	// Timed idle: the always-hide default boots parked, which would
 	// fail the visible setup below (parking is what this tests).
 	await page.addInitScript(() => {
-		window.localStorage.setItem("ccez-studio-settings-v1", JSON.stringify({ promptIdleSec: 10 }));
+		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({ promptIdleSec: 10 }));
 	});
 	await page.goto("/");
 	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
@@ -496,7 +496,7 @@ test("prompt hides while the chats sidebar is open", async ({ page }) => {
 	// Timed idle: the always-hide default boots parked, which would
 	// fail the visible setup below (parking is what this tests).
 	await page.addInitScript(() => {
-		window.localStorage.setItem("ccez-studio-settings-v1", JSON.stringify({ promptIdleSec: 10 }));
+		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({ promptIdleSec: 10 }));
 	});
 	await page.goto("/");
 	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
@@ -565,7 +565,7 @@ test("sidebar outside-click never summons the prompt", async ({ page }) => {
 	]);
 	await seedChat(page, turns);
 	await page.addInitScript(() => {
-		window.localStorage.setItem("ccez-studio-settings-v1", JSON.stringify({ promptIdleSec: -1 }));
+		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({ promptIdleSec: -1 }));
 	});
 	await page.goto("/");
 	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
@@ -597,7 +597,7 @@ test("stepping past the end mints a chat with the prompt shown", async ({ page }
 	]);
 	await seedChat(page, turns);
 	await page.addInitScript(() => {
-		window.localStorage.setItem("ccez-studio-settings-v1", JSON.stringify({ promptIdleSec: -1 }));
+		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({ promptIdleSec: -1 }));
 	});
 	await page.goto("/");
 	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
@@ -619,7 +619,7 @@ test("always-hide hides after send", async ({ page }) => {
 	await seedChat(page, turns);
 	await page.addInitScript(() => {
 		window.localStorage.setItem(
-			"ccez-studio-settings-v1",
+			"ccez-llm-settings-v1",
 			JSON.stringify({ promptIdleSec: -1 })
 		);
 	});
@@ -650,15 +650,15 @@ test("idle timeout slider persists", async ({ page }) => {
 	await expect(slider).toHaveAttribute("max", "11");
 	await slider.fill("10");
 	await expect
-		.poll(() => page.evaluate(() => window.localStorage.getItem("ccez-studio-settings-v1")))
+		.poll(() => page.evaluate(() => window.localStorage.getItem("ccez-llm-settings-v1")))
 		.toContain('"promptIdleSec":10');
 	await slider.fill("11");
 	await expect
-		.poll(() => page.evaluate(() => window.localStorage.getItem("ccez-studio-settings-v1")))
+		.poll(() => page.evaluate(() => window.localStorage.getItem("ccez-llm-settings-v1")))
 		.toContain('"promptIdleSec":0');
 	await slider.fill("1");
 	await expect
-		.poll(() => page.evaluate(() => window.localStorage.getItem("ccez-studio-settings-v1")))
+		.poll(() => page.evaluate(() => window.localStorage.getItem("ccez-llm-settings-v1")))
 		.toContain('"promptIdleSec":-1');
 	await expect(
 		page.locator(".settings-panel output", { hasText: "always" })
@@ -678,14 +678,14 @@ test("chat width slider reaches past 80 rem", async ({ page }) => {
 	await slider.fill("100");
 	await expect(slider).toHaveValue("100");
 	await expect
-		.poll(() => page.evaluate(() => window.localStorage.getItem("ccez-studio-settings-v1")))
+		.poll(() => page.evaluate(() => window.localStorage.getItem("ccez-llm-settings-v1")))
 		.toContain('"chatWidth":100');
 });
 
 /** Fresh installs: plain user messages, hover-only buttons both roles. */
 test("fresh installs default to plain messages and hover-only buttons", async ({ page }) => {
 	await openWithMessages(page, [{ role: "user", content: "hi" }]);
-	await page.evaluate(() => window.localStorage.setItem("ccez-studio-settings-v1", "{}"));
+	await page.evaluate(() => window.localStorage.setItem("ccez-llm-settings-v1", "{}"));
 	await page.reload();
 	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
 	const main = page.locator("main");
@@ -731,7 +731,7 @@ test("short thread keeps the composer past the timeout", async ({ page }) => {
 	await seedChat(page, [{ role: "user", content: "hi" }]);
 	await page.addInitScript(() => {
 		window.localStorage.setItem(
-			"ccez-studio-settings-v1",
+			"ccez-llm-settings-v1",
 			JSON.stringify({ promptIdleSec: 2 })
 		);
 	});
@@ -772,7 +772,7 @@ test("shift-meta-plus widens the chat column", async ({ page }) => {
 	// Default 36 + one 2rem step.
 	await expect(page.locator(".toast")).toContainText("Chat width 38 rem");
 	await expect
-		.poll(() => page.evaluate(() => window.localStorage.getItem("ccez-studio-settings-v1")))
+		.poll(() => page.evaluate(() => window.localStorage.getItem("ccez-llm-settings-v1")))
 		.toContain('"chatWidth":38');
 });
 
@@ -819,7 +819,7 @@ test("new chat button shows and focuses the prompt", async ({ page }) => {
 	]);
 	await seedChat(page, turns);
 	await page.addInitScript(() => {
-		window.localStorage.setItem("ccez-studio-settings-v1", JSON.stringify({ promptIdleSec: -1 }));
+		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({ promptIdleSec: -1 }));
 	});
 	await page.goto("/");
 	const prompt = page.locator(".prompt");

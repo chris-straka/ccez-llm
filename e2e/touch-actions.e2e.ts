@@ -14,10 +14,10 @@ test.use({
 async function seedChat(page: Page, settings: Record<string, unknown>): Promise<void> {
 	await page.addInitScript((extra: Record<string, unknown>) => {
 		window.localStorage.setItem("ccez-mock-provider", "1");
-		window.localStorage.setItem("ccez-studio-settings-v1", JSON.stringify(extra));
+		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify(extra));
 		const msg = (id: string, role: string, content: string) => ({ id, role, content, usage: null, error: null });
 		window.localStorage.setItem(
-			"ccez-studio-chats-v1",
+			"ccez-llm-chats-v1",
 			JSON.stringify([
 				{ id: "e2e-chat", createdAt: 1, replyLang: null, messages: [msg("m1", "user", "do it with a much longer message so the bubble spans the full phone width"), msg("m2", "assistant", "done")] }
 			])

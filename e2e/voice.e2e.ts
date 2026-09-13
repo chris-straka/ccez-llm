@@ -46,7 +46,7 @@ test.describe("voice-error", () => {
 	async function webEngine(page: Parameters<typeof seedChat>[0]): Promise<void> {
 		await page.addInitScript(() => {
 			window.localStorage.setItem("ccez-mock-provider", "1");
-			window.localStorage.setItem("ccez-studio-settings-v1", JSON.stringify({ voiceEngine: "web" }));
+			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({ voiceEngine: "web" }));
 		});
 	}
 
@@ -75,7 +75,7 @@ test.describe("voice-error", () => {
 			// NOTE: voice itself can't be seeded — every boot resets it to
 			// false by design, so the test enables it post-boot below. Only
 			// the engine survives seeding.
-			window.localStorage.setItem("ccez-studio-settings-v1", JSON.stringify({ voiceEngine: "web" }));
+			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({ voiceEngine: "web" }));
 			// Count every banner appearance: the failure banner auto-expires,
 			// so a final absence proves nothing — only "never shown" does.
 			// Deferred past document readiness (init scripts can run before
@@ -253,17 +253,17 @@ test.describe("ios-voice", () => {
 		// Settings autosave debounces: let the pick land, then prove the save.
 		await page.waitForTimeout(700);
 		const saved = await page.evaluate(() =>
-			window.localStorage.getItem("ccez-studio-settings-v1")
+			window.localStorage.getItem("ccez-llm-settings-v1")
 		);
 		expect(saved).toContain("com.apple.ttsbundle.Daniel-compact");
 		// Reload with a stored pick (addInitScript re-seeds every navigation,
 		// so plain reload would wipe it like a fresh install): the picker
 		// restores it instead of resetting to Auto.
 		await page.addInitScript(() => {
-			const raw = window.localStorage.getItem("ccez-studio-settings-v1") ?? "{}";
+			const raw = window.localStorage.getItem("ccez-llm-settings-v1") ?? "{}";
 			const settings = JSON.parse(raw) as Record<string, unknown>;
 			settings.nativeVoiceId = "com.apple.ttsbundle.Daniel-compact";
-			window.localStorage.setItem("ccez-studio-settings-v1", JSON.stringify(settings));
+			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify(settings));
 		});
 		await page.reload();
 		await expect(page.locator("article.user")).toBeVisible({ timeout: 60_000 });

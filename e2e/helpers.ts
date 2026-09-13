@@ -29,11 +29,11 @@ export async function seedChat(
 	await page.addInitScript((seed: { messages: SeedMessage[]; replyLang: string | null }) => {
 		window.localStorage.setItem("ccez-mock-provider", "1");
 		window.localStorage.setItem(
-			"ccez-studio-settings-v1",
+			"ccez-llm-settings-v1",
 			JSON.stringify({ hoverAssistantActions: true, hoverUserActions: true })
 		);
 		window.localStorage.setItem(
-			"ccez-studio-chats-v1",
+			"ccez-llm-chats-v1",
 			JSON.stringify([
 				{
 					id: "e2e-chat",

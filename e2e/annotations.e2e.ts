@@ -284,21 +284,42 @@ async function openAnnotate(page: Page, quote: string): Promise<void> {
 	await expect(page.locator(".ann-pop")).toBeVisible();
 }
 
-/** File the open comment box (empty comment allowed) and submit it. */
-async function submitAnnotation(page: Page): Promise<void> {
-	await page.keyboard.press("Enter");
-	await page.locator(".cm-content").click();
-	await page.keyboard.type("go");
-	await page.keyboard.press("Enter");
-	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1);
-}
-
 /** Clicking off an empty draft cancels: no ghost annotation is filed. */
 test("clicking off an empty draft cancels the annotation", async ({ page }) => {
 	await openAnnotate(page, "確認しました");
 	await page.mouse.click(10, 300);
 	await expect(page.locator(".ann-pop")).toHaveCount(0);
 	await expect(page.locator(".prompt-tools .ann-pill")).toHaveCount(0);
+});
+
+/** Escape cancels the fresh pill: no badge, no pill. */
+test("escape cancels the fresh annotation pill", async ({ page }) => {
+	await openAnnotate(page, "確認しました");
+	await page.keyboard.press("Escape");
+	await expect(page.locator(".ann-pop")).toHaveCount(0);
+	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(0);
+});
+
+/** Escape closes the badge edit box without writing. */
+test("escape closes the badge edit without saving", async ({ page }) => {
+	await openAnnotate(page, "確認しました");
+	await page.locator(".ann-pop textarea").fill("go");
+	// File without sending: a send bakes annotations into the outgoing
+	// message and clears the live list (withAnnotations), so no badge
+	// survives it.
+	await page.keyboard.press("Enter");
+	const badge = page.locator("button.ccez-ann-badge").first();
+	await expect(badge).toHaveCount(1);
+	const box = await badge.boundingBox();
+	if (!box) throw new Error("badge has no box");
+	await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+	await expect(page.locator(".ann-pop")).toBeVisible();
+	await page.keyboard.type("scratch");
+	await page.keyboard.press("Escape");
+	await expect(page.locator(".ann-pop")).toHaveCount(0);
+	// The saved comment is untouched: reopening shows "go", not "goscratch".
+	await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+	await expect(page.locator(".ann-pop textarea")).toHaveValue("go");
 });
 
 /** Enter with no text files the (empty) annotation for submit. */
@@ -344,8 +365,12 @@ test("draft annotations survive a reload", async ({ page }) => {
 /** Re-pressing the open badge closes its edit menu like cancel. */
 test("badge re-press closes the edit menu", async ({ page }) => {
 	await openAnnotate(page, "確認しました");
-	await submitAnnotation(page);
+	// File without sending: a send bakes annotations into the outgoing
+	// message and clears the live list (withAnnotations), so no badge
+	// survives it.
+	await page.keyboard.press("Enter");
 	const badge = page.locator("button.ccez-ann-badge").first();
+	await expect(badge).toHaveCount(1);
 	const box = await badge.boundingBox();
 	if (!box) throw new Error("badge has no box");
 	await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
@@ -358,7 +383,9 @@ test("badge re-press closes the edit menu", async ({ page }) => {
 test("review popup uses note labels", async ({ page }) => {
 	await openAnnotate(page, "確認しました");
 	await page.keyboard.type("meaning?");
-	await submitAnnotation(page);
+	// File without sending: a send bakes annotations into the outgoing
+	// message and clears the live list, leaving no pill to hover.
+	await page.keyboard.press("Enter");
 	await hoverPromptPill(page);
 	const review = page.locator(".prompt-tools .review");
 	await expect(review).toContainText("note:");
@@ -819,7 +846,6 @@ test("create box centers over narrow highlights, cursor-places wide ones", async
 	await expect(para).toBeVisible({ timeout: 60_000 });
 	const box = await para.boundingBox();
 	if (!box) throw new Error("message has no box");
-	const y = box.y + box.height / 2;
 
 	// Narrow: double-click picks one word; the box centers over it
 	// while the Annotate button stays at the cursor end.
@@ -850,15 +876,22 @@ test("create box centers over narrow highlights, cursor-places wide ones", async
 	if (!menuBox) throw new Error("missing menu box");
 	expect(Math.abs(menuBox.x - (paraBox.x + 10 - 16))).toBeLessThanOrEqual(8);
 	await page.keyboard.press("Escape");
+	// Settle first: the pill fades out on a timer that unwraps its
+	// wash mark, and closing returns focus to the composer (which
+	// scrolls the list) — measuring or dragging mid-fade races both.
+	await expect(page.locator(".ann-pop")).toHaveCount(0);
 
 	// Wide: dragging the whole paragraph keeps the cursor placement —
 	// the box opens at the selection end, not the paragraph center.
-	await page.mouse.move(box.x + 10, y);
+	const wide = await para.boundingBox();
+	if (!wide) throw new Error("message lost its box");
+	const wideY = wide.y + wide.height / 2;
+	await page.mouse.move(wide.x + 10, wideY);
 	await page.mouse.down();
-	await page.mouse.move(box.x + box.width - 10, y, { steps: 8 });
+	await page.mouse.move(wide.x + wide.width - 10, wideY, { steps: 8 });
 	await page.mouse.up();
 	await expect(page.locator(".sel-menu")).toBeVisible();
-	const endX = box.x + box.width - 10;
+	const endX = wide.x + wide.width - 10;
 	await page.locator('.sel-menu button:has-text("Annotate")').click();
 	await expect(pop).toBeVisible();
 	const wideBox = await pop.boundingBox();

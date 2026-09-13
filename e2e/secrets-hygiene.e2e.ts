@@ -9,7 +9,7 @@ import { seedChat } from "./helpers";
  */
 
 const RAW = "sk-e2e-hygiene-PROBE-9f8c";
-const SETTINGS_KEY = "ccez-studio-settings-v1";
+const SETTINGS_KEY = "ccez-llm-settings-v1";
 const MIRROR_KEY = "ccez-keychain:provider:muse";
 
 test.beforeEach(async ({ page }) => {
@@ -67,7 +67,7 @@ test("provider key never lands in persisted chat history", async ({ page }) => {
 	// settings entry), then exercise a full send + reload cycle.
 	await page.evaluate(
 		({ raw }: { raw: string }) => {
-			const stored = window.localStorage.getItem("ccez-studio-settings-v1");
+			const stored = window.localStorage.getItem("ccez-llm-settings-v1");
 			const parsed = stored ? (JSON.parse(stored) as Record<string, unknown>) : {};
 			parsed["activeProviderId"] = "muse";
 			parsed["providers"] = {
@@ -79,7 +79,7 @@ test("provider key never lands in persisted chat history", async ({ page }) => {
 					models: []
 				}
 			};
-			window.localStorage.setItem("ccez-studio-settings-v1", JSON.stringify(parsed));
+			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify(parsed));
 		},
 		{ raw: RAW }
 	);
@@ -95,7 +95,7 @@ test("provider key never lands in persisted chat history", async ({ page }) => {
 	});
 	const history = await page.evaluate(
 		(k) => window.localStorage.getItem(k) ?? "",
-		"ccez-studio-chats-v1"
+		"ccez-llm-chats-v1"
 	);
 	expect(history).not.toContain(RAW);
 	expect(history).toContain("history hygiene check");

@@ -44,6 +44,7 @@
 		CHAT_WIDTH_MIN,
 		CHAT_WIDTH_MAX,
 		PROMPT_IDLE_ALWAYS,
+		PROMPT_IDLE_NEVER,
 		type AppSettings
 	} from "$lib/settings";
 	import { cycleThinkingId } from "$lib/providers/thinking";
@@ -92,7 +93,6 @@
 		stepScrollTop,
 		unselectedScrollIntent
 	} from "$lib/scrollkeys";
-	import { isEjected } from "$lib/session";
 	import { hydrateSecrets, persistSecrets, tauriBackendAvailable, withBlankedKeys } from "$lib/secrets";
 	import type { ChatProvider } from "$lib/providers/types";
 	import MessageBody from "$lib/components/MessageBody.svelte";
@@ -108,7 +108,6 @@
 		type Attachment
 	} from "$lib/attachments";
 		import {
-		addAnnotation,
 		duplicateAnnotationId,
 		editAnnotationComment,
 		deleteAnnotation,
@@ -137,7 +136,6 @@
 		type AnnotationMark
 	} from "$lib/annotations";
 	import { createRefMemo } from "$lib/aidLoading";
-	import { hoverTranslateWithProvider } from "$lib/builtinAi";
 	import { switchChatWithTransition } from "$lib/viewTransitions";
 	import {
 		decomposeTree,
@@ -171,6 +169,7 @@
 	contentSwipeTarget,
 	twoFingerSwipeDir,
 	isThreeFingerTap,
+	type FlickZone,
 	type EdgePanel,
 	type FingerTrack
 } from "$lib/platform";
@@ -200,11 +199,7 @@
 	import { isFuriganaCached } from "$lib/furigana";
 	import { buildSearchDocs, chatMatchesQuery, findMessageIndices, type SearchHit } from "$lib/chatSearch";
 	import { ChatSearchStore, createSearchWorker } from "$lib/chatSearchStore";
-	import {
-		clipboardReadAvailable,
-		readClipboardImageFiles,
-		type ClipboardItemLike
-	} from "$lib/touchPaste";
+
 	import {
 		consumeLaunchFiles,
 		downloadMarkdownFile,
@@ -218,7 +213,7 @@
 		type SavePickerOptions
 	} from "$lib/intake";
 	import { isKeyboardOpen, keyboardOverlapPx } from "$lib/viewportReflow";
-import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
+import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	import {
 		speakText,
 		speakMultilingual,
@@ -335,6 +330,38 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 	let selectedIdx = $state(-1);
 	let hoveredIdx = $state(-1);
 	let missingKey = $state(false);
+	/** Provider id already toasted for a missing key (one toast per episode). */
+	let keyToastFor: string | null = null;
+	/** Message ids already toasted for send errors (Android shows no inline error). */
+	const errorToasted = new SvelteSet<ChatMsgId>();
+	/**
+	 * Android reports errors as toasts, never inline chrome: a phone
+	 * column has no room for a persistent banner, and a font-scaled
+	 * error span blows the action row apart. Toasts auto-dismiss, so
+	 * the "set an API key" notice goes away on its own too.
+	 */
+	$effect(() => {
+		if (!androidUI) return;
+		if (!missingKey) {
+			keyToastFor = null;
+			return;
+		}
+		const id = settings.activeProviderId;
+		if (keyToastFor === id) return;
+		keyToastFor = id;
+		flashToast("No API key — open Settings to add one");
+	});
+	$effect(() => {
+		if (!androidUI) return;
+		const live = new Set(viewChat.messages.map((m) => m.id));
+		for (const id of errorToasted) if (!live.has(id)) errorToasted.delete(id);
+		for (const m of viewChat.messages) {
+			if (m.error && !errorToasted.has(m.id)) {
+				errorToasted.add(m.id);
+				flashToast(m.error);
+			}
+		}
+	});
 	let attachments = $state<Attachment[]>([]);
 	let attachError: string | null = $state(null);
 	let attachInput: HTMLInputElement | undefined = $state();
@@ -537,8 +564,6 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 	let searchStore: ChatSearchStore | null = null;
 	let searchIndexTimer: ReturnType<typeof setTimeout> | null = null;
 	let searchQueryTimer: ReturnType<typeof setTimeout> | null = null;
-	/** Touch paste-images in flight (Async Clipboard read). */
-	let pasting = $state(false);
 	let editingId: AnnotationId | null = $state(null);
 	let editDraft = $state("");
 	/** Own message under in-place edit (null when no edit is open).
@@ -737,15 +762,6 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 	function inspectTouch(event: TouchEvent): void {
 		menuBtnTouch(event, openInspect);
 	}
-	let translate = $state<{
-		quote: string;
-		messageId: ChatMsgId;
-		result: string | null;
-		error: string | null;
-		busy: boolean;
-		/** "builtin" = free on-device Translator served, no key spent. */
-		via: "builtin" | "fallback" | null;
-	} | null>(null);
 	let vocalized = $state<Record<string, string>>({});
 	let vocalizing = new SvelteSet<string>();
 	/** Aid runs clicked mid-flight that must pin on completion. */
@@ -861,9 +877,10 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 	/** Touch gestures list, data-driven so the modal filter can search it. */
 	function touchShortcuts(): ShortcutRow[] {
 		return [
-			{ name: "Chats list", keys: "Swipe right from the left edge or two-finger double-tap" },
+			{ name: "Chats list", keys: "Double-tap empty space" },
 			{ name: "Newer / older chat", keys: "Two-finger swipe right / left" },
-			{ name: "Delete current chat", keys: "Double three-finger tap" },
+			{ name: "Delete current chat", keys: "Double two-finger tap" },
+			{ name: "Delete every chat", keys: "Double three-finger tap" },
 			{ name: "Annotate", keys: "Select text · Annotate" },
 			{ name: "Message buttons", keys: "Tap a message" },
 			{ name: "Fold a message", keys: "Swipe right on it" }
@@ -874,49 +891,40 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 		const meta = isMac ? "⌘" : "Ctrl+";
 		return [
 			{ name: "Shortcuts show/hide", keys: `${isMac ? "⇧⌘/" : "Ctrl+Shift+/"} · middle-click` },
-			{ name: "New line", keys: "Shift+Enter" },
-			{ name: "Send message", keys: `Enter · ${meta}Enter anywhere` },
-			{ name: "Stage message", keys: `${altm}+Enter` },
 			{ name: "Focus composer", keys: `${isMac ? "⇧⌘Space" : "Ctrl+Shift+Space"}` },
 			{ name: "Switch model / key", keys: `Ctrl+${altm}+← / →` },
 			{ name: "Thinking level", keys: `Ctrl+${altm}+↓ / ↑` },
-			{ name: "Scroll messages", keys: "J / K walk · gg top · G bottom · U / D half-page" },
 			{
-				name: "Scroll chat (nothing selected)",
-				keys: "J / K glide on hold · U / D half-page · gg / G top / bottom · z / Z hovered edges"
+				name: "Scroll",
+				keys: "j/k, u/d, ctrl+u/ctrl+d, gg/G, z/Z, h/l"
 			},
 			{ name: "Exit fullscreen", keys: "Hold Esc 2s · Esc+F" },
 			{
 				name: "Chat list",
 				keys: `${isMac ? "⌘B / ⇧⌘H" : "Ctrl+B / Ctrl+Shift+H"} · J / K walk · Space enters`
 			},
-			{ name: "Export chat", keys: "Row icon, left of ×" },
 			{
 				name: "Search chats",
-				keys: `${meta}P · J / K move · Enter jumps unselected`
+				keys: `${meta}P`
 			},
 			{
 				name: "Find in chat",
-				keys: `${meta}F · Enter cycles · repeat closes · 1 hit closes bare`
+				keys: `${meta}F`
 			},
-			{ name: "Fullscreen", keys: `${isMac ? "⌘E or ⌃⌘F" : "Ctrl+Meta+F"} toggle` },
+			{ name: "Fullscreen", keys: `${isMac ? "⌘E, F" : "Ctrl+Meta+F"}` },
 			{
 				name: "Newer / older chat",
-				keys: `${isMac ? "⇧⌘J / ⇧⌘K" : "Ctrl+Shift+J / Ctrl+Shift+K"} · past newest mints one`
+				keys: `${isMac ? "⇧⌘J / ⇧⌘K" : "Ctrl+Shift+J / Ctrl+Shift+K"}`
 			},
 			{ name: "New chat", keys: `${isMac ? "⌘N or ⇧⌘N" : "Ctrl+N or Ctrl+Shift+N"}` },
 			{ name: "Voice readback on/off", keys: `Ctrl+${altm}+S` },
 			{ name: "Pasted text expand/collapse", keys: "Ctrl+O" },
 			{
-				name: "Translate selection",
-				keys: `${meta}T over text · feeds annotation`
-			},
-			{
 				name: "Browser side panel",
-				keys: `${meta}T · Esc closes`
+				keys: `${meta}T`
 			},
-			{ name: "Stop voice / close menus", keys: "Esc" },
-			{ name: "Speak text aloud", keys: "Right-click · again stops" },
+			{ name: "Stop voice / close", keys: "Esc" },
+			{ name: "Speak text aloud", keys: "Right-click" },
 			// ⌘D is meta-only (Ctrl+D fast-scrolls in scroll mode); Shift+D works everywhere.
 			{
 				name: "Delete a message",
@@ -928,19 +936,19 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 			},
 			{
 				name: "Fold / unfold code",
-				keys: "Right-click folds · left-click unfolds"
+				keys: "Right-click toggles · left-click unfolds"
 			},
 			{ name: "Rerun a prompt", keys: "Rerun button · deletes after" },
 			{
 				name: "Reply language",
-				keys: `${isMac ? "⌘1…⌘0" : "Ctrl+1…Ctrl+0"} · repeat a key to clear`
+				keys: `${isMac ? "⌘1, ⌘0" : "Ctrl+1, Ctrl+0"} · repeat to clear`
 			},
 			{ name: "Delete this chat", keys: `${meta}Delete` },
 			{ name: "Delete every chat", keys: `${isMac ? "⇧⌘Delete" : "Ctrl+Shift+Delete"}` },
-			{ name: "Cut / delete hovered message", keys: "X cuts · Shift+D deletes" },
-			{ name: "Edit own message", keys: "Hover own + E" },
+			{ name: "Cut message", keys: "x" },
+			{ name: "Edit own message", keys: "hover + e" },
 			{ name: "Reading aid toggle", keys: "Hover + A · M pinyin · N furigana" },
-			{ name: "Inspect stroke step", keys: "H / L while Inspect is open" },
+			{ name: "prev/next stroke step", keys: "H / L with Inspect open" },
 			{ name: "Text size up / down", keys: `${mod}+ / ${mod}−` },
 			{ name: "Chat width + / −", keys: `⇧${mod}+ / ⇧${mod}−` }
 		];
@@ -1412,7 +1420,7 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 	function transitionToChat(id: Parameters<typeof selectChat>[1]): void {
 		const from = chatState.activeChatId;
 		selPinyin = null;
-		void switchChatWithTransition(() => {
+		const mutate = (): void => {
 			// Draft annotations belong to one chat: file the leaving
 			// chat's away, then restore the entering chat's. Doing both
 			// inside the transition keeps the autosave effect (which
@@ -1421,7 +1429,15 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 			saveDraftAnnotations(from, annotations, chatState.chats.map((c) => c.id));
 			selectChat(chatState, id);
 			annotations = loadDraftAnnotations(id);
-		});
+		};
+		// Re-entering the live chat (preview-as-you-go already landed
+		// here, or Enter on the active row): identical end state, so
+		// skip the crossfade — it only flashes settled content.
+		if (id === from) {
+			mutate();
+			return;
+		}
+		void switchChatWithTransition(mutate);
 	}
 
 	/** Jump to a palette hit: its chat, scrolled to its message. */
@@ -1526,25 +1542,7 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 		editor?.focus();
 	}
 
-	/**
-	 * Touch paste-images button: reads images off the Async Clipboard
-	 * into the existing attachments path (`addFiles`). Text-only or
-	 * denied clipboards toast instead of failing silently.
-	 */
-	async function pasteImagesFromClipboard(): Promise<void> {
-		if (pasting) return;
-		pasting = true;
-		try {
-			const files = await readClipboardImageFiles(() =>
-				(navigator.clipboard as unknown as { read: () => Promise<ClipboardItemLike[]> }).read()
-			);
-			await addFiles(files);
-		} catch (error) {
-			attachError = error instanceof Error ? error.message : String(error);
-		} finally {
-			pasting = false;
-		}
-	}
+
 
 	/**
 	 * Export one sidebar chat as Markdown: File System Access picker
@@ -1595,7 +1593,9 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 	 */
 	const idleTimeoutCustomized: boolean = (() => {
 		try {
-			const raw = window.localStorage.getItem("ccez-studio-settings-v1");
+			const raw =
+				window.localStorage.getItem("ccez-llm-settings-v1") ??
+				window.localStorage.getItem("ccez-studio-settings-v1");
 			if (!raw) return false;
 			return typeof (JSON.parse(raw) as { promptIdleSec?: unknown }).promptIdleSec === "number";
 		} catch {
@@ -1715,19 +1715,23 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 		// A sidebar or panel owns the stage too (settings, chats list,
 		// docked browser): Space out there is a no-op, never a summon
 		// from behind it — focus may sit on the body while one is open.
+		// One predicate (see stageOwnedByOverlay) so no guard list can
+		// drift from the others.
 		if (
-			shortcutsOpen ||
-			searchOpen ||
-			inspectChar !== null ||
-			findOpen ||
-			settingsOpen ||
-			sideviewOpen ||
-			!settings.sidebarCollapsed
+			stageOwnedByOverlay({
+				shortcutsOpen,
+				searchOpen,
+				inspectOpen: inspectChar !== null,
+				findOpen,
+				settingsOpen,
+				sideviewOpen,
+				sidebarOpen: !settings.sidebarCollapsed
+			})
 		)
 			return false;
 		if (
 			target?.closest(
-				"input, textarea, select, [contenteditable], button, a, summary, aside, .modal, .modal-veil, .find-bar, .search-palette, .sel-menu, .review, .translate-panel, .lang-menu"
+				"input, textarea, select, [contenteditable], button, a, summary, aside, .modal, .modal-veil, .find-bar, .search-palette, .sel-menu, .review, .lang-menu"
 			)
 		) {
 			return false;
@@ -1736,7 +1740,9 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 	}
 	$effect(() => {
 		const setting = settings.promptIdleSec ?? 6;
-		const idleSec = !androidUI ? setting : idleTimeoutCustomized ? setting : 0;
+		// Phones never idle-hide (see the mount migration above): the
+		// prompt is a permanent fixture, like other chat apps.
+		const idleSec = !androidUI ? setting : 0;
 		const on = (): void => stampInput();
 		// A pointer press is a distinct gesture from the filing Enter,
 		// so it ends the anti-double-send window (see sendGuardUntil).
@@ -1776,11 +1782,12 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 		/**
 		 * Desktop clicks never restore the hidden prompt — summoning
 		 * is keys-only (bare i / Enter / Space) — so selecting,
-		 * double-clicking, and dismissing text never flash it. Phones
-		 * keep tap-to-summon (no keyboard to press i on): the guards
-		 * below are the old shared path, now phone-only. The visible
-		 * floor tap stays for both: with the prompt already up,
-		 * tapping its floor lands the caret.
+		 * double-clicking, and dismissing text never flash it. iOS
+		 * keeps tap-to-summon (no keyboard to press i on, no swipe
+		 * gestures there); Android summons with swipe-up instead, so
+		 * taps keep native behavior and buttons never fire behind a
+		 * summoned prompt. The visible floor tap stays for all: with
+		 * the prompt already up, tapping its floor lands the caret.
 		 */
 		const onIdleClick = (event: MouseEvent): void => {
 			const target = event.target instanceof Element ? event.target : null;
@@ -1792,8 +1799,9 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 				if (target?.closest(".prompt")) focusPromptFloor(event);
 				return;
 			}
-			// Hidden on desktop: no click summons, full stop.
-			if (!androidUI) return;
+			// Hidden on desktop: no click summons, full stop. Hidden on
+			// Android: swipe up summons, taps stay native.
+			if (!androidUI || !iosUI) return;
 			if (event.button !== 0) return;
 			const down = idleDown;
 			const downControl = idleDownControl;
@@ -2033,6 +2041,20 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 			settings.sidebarCollapsed = true;
 			persistSettings();
 		}
+		// The dismissing click means "back to the chat": when the prompt
+		// is already shown, land the caret in it — a visible-but-unfocused
+		// composer strands keyboard users (Space/i/Enter restore a hidden
+		// one, but nothing re-focuses a shown one). Focus only, never a
+		// mode flip: scroll mode survives the round trip. Controls keep
+		// their own clicks (same guard as the idle press path), drags
+		// were filtered above, and a hidden prompt stays keys-only. The
+		// unpark flushes async, so land after the tick — a sync focus
+		// would hit the still-parked composer and no-op.
+		const target = event.target instanceof Element ? event.target : null;
+		if (target?.closest("button, a, input, textarea, select, summary, [contenteditable], .ccez-code"))
+			return;
+		if (promptIdle) return;
+		void tick().then(() => editor?.focus());
 	}
 
 	/**
@@ -2098,6 +2120,15 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 		if (!settings.hideMessages && !(androidUI && settings.hideButtons)) return;
 		const target = event.target as HTMLElement | null;
 		if (target?.closest("button, a, input, textarea, select, summary")) return;
+		// Tapping a folded message unfolds it: its row is hidden, so no
+		// fold button exists to press. Android only — desktop hovers the
+		// row back into view.
+		if (androidUI && foldedIds.has(id)) {
+			shownActionsId = null;
+			actionsAbove = false;
+			toggleFold(id);
+			return;
+		}
 		if (shownActionsTimer) clearTimeout(shownActionsTimer);
 		shownActionsTimer = null;
 		if (shownActionsId === id) {
@@ -2263,7 +2294,6 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 			markerSyncMuted = false;
 		}
 		selMenu = null;
-		translate = null;
 	}
 
 	function doNewChat(): void {
@@ -2324,13 +2354,23 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 		return stripImageMarkers(editor?.getText() ?? "").trim();
 	}
 
+	/**
+	 * Attachment/OCR failure: inline under the composer on desktop, a
+	 * toast on Android (the composer sits behind the keyboard there, so
+	 * inline errors go unseen).
+	 */
+	function failAttach(message: string): void {
+		attachError = message;
+		if (androidUI) flashToast(message);
+	}
+
 	async function addFiles(files: File[]): Promise<void> {
 		attachError = null;
 		for (const file of files) {
 			try {
 				attachments = [...attachments, await fileToAttachment(file)];
 			} catch (error) {
-				attachError = error instanceof Error ? error.message : String(error);
+				failAttach(error instanceof Error ? error.message : String(error));
 			}
 		}
 	}
@@ -2433,13 +2473,13 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 			const result = await recognizeImageText(att.dataUrl, null);
 			const text = result.text.trim();
 			if (!text) {
-				attachError = "No text found in this image.";
+				failAttach("No text found in this image.");
 			} else {
 				editor?.insertText(`${text}\n`);
 				flashToast("Recognized text inserted");
 			}
 		} catch (error) {
-			attachError = friendlyOcrError(error instanceof Error ? error.message : String(error));
+			failAttach(friendlyOcrError(error instanceof Error ? error.message : String(error)));
 		} finally {
 			ocrBusyId = null;
 		}
@@ -2644,6 +2684,11 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 			messageId: found.messageId,
 			range: stored
 		};
+		// Phones dock Annotate in the composer tools: a highlight with a
+		// parked prompt would strand the menu off-screen, so summon the
+		// prompt (shown, unfocused — the keyboard waits for the pill).
+		// Desktop keeps keys-only restore; its menu floats already.
+		if (androidUI) restorePrompt();
 	}
 
 	/**
@@ -2781,6 +2826,10 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 		annDraft = "";
 		settleAnnPop();
 		annPop = { id: pending.id, x, y, fresh: true };
+		// The pill mounts async: land the caret once it flushes, or
+		// phone users get a comment box with no keyboard (and desktop
+		// users an extra click). Focus-only — selection is already filed.
+		void tick().then(() => annPopBox?.focus({ preventScroll: true }));
 		vibrateTick(6);
 	}
 
@@ -2946,6 +2995,10 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 			y = Math.max(8, window.innerHeight * 0.12);
 		}
 		annPop = { id, x, y, fresh: false };
+		// The box can morph from a still-fading fresh pill (same
+		// element, no remount, so growPill's mount focus never fires):
+		// land the caret explicitly, like the create path does.
+		void tick().then(() => annPopBox?.focus({ preventScroll: true }));
 	}
 
 	/**
@@ -2985,68 +3038,6 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 		reviewOpen = false;
 		editingId = null;
 		highlightAnnId = null;
-	}
-
-	async function openTranslate(): Promise<void> {
-		const found = currentQuote();
-		if (!found) return;
-		const provider = resolveProvider();
-		translate = {
-			quote: found.quote,
-			messageId: found.messageId,
-			result: null,
-			error: provider ? null : "Set an API key first — open Settings.",
-			busy: !!provider,
-			via: null
-		};
-		clearSelection();
-		selMenu = null;
-		if (!provider) return;
-		const controller = new AbortController();
-		const timer = setTimeout(() => controller.abort(), 30000);
-		try {
-			// Lookup targets English; anything else goes in the chat itself.
-			// Free on-device Translator serves where present; the keyed
-			// helper is the fallback (see builtinAi.hoverTranslate).
-			const hovered = await hoverTranslateWithProvider(
-				provider,
-				found.quote,
-				"English",
-				controller.signal
-			);
-			if (translate && translate.quote === found.quote) {
-				translate = { ...translate, result: hovered.text, via: hovered.via, busy: false };
-			}
-		} catch (error) {
-			if (translate && translate.quote === found.quote) {
-				translate = {
-					...translate,
-					error: error instanceof Error ? error.message : String(error),
-					busy: false
-				};
-			}
-		} finally {
-			clearTimeout(timer);
-		}
-	}
-
-	function annotateTranslation(): void {
-		if (!translate?.result) return;
-		const dupe = duplicateAnnotationId(annotations, translate.messageId, translate.quote, 0);
-		if (dupe) {
-			highlightAnnId = dupe;
-			translate = null;
-			reviewOpen = true;
-			editingId = null;
-			flashToast("Already annotated");
-			return;
-		}
-		annotations = addAnnotation(annotations, translate.messageId, translate.quote, translate.result);
-		const createdAnn = annotations[annotations.length - 1];
-		if (createdAnn) highlightAnnId = createdAnn.id;
-		translate = null;
-		reviewOpen = true;
-		editingId = null;
 	}
 
 	/**
@@ -3307,6 +3298,7 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 		const provider = resolveProvider();
 		if (!provider) {
 			vocalizeError = "Set an API key first — open Settings.";
+			if (androidUI) flashToast(vocalizeError);
 			return;
 		}
 		vocalizeError = null;
@@ -3336,6 +3328,7 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 			}
 		} catch (error) {
 			vocalizeError = error instanceof Error ? error.message : String(error);
+			if (androidUI) flashToast(vocalizeError);
 		} finally {
 			vocalizing.delete(msg.id);
 		}
@@ -3369,6 +3362,7 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 		if (voiceErrorTimer) clearTimeout(voiceErrorTimer);
 		voiceErrorTimer = null;
 		voiceError = message;
+		if (message && androidUI) flashToast(message);
 		if (message) {
 			voiceErrorTimer = setTimeout(() => {
 				if (voiceError === message) voiceError = null;
@@ -3756,7 +3750,6 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 
 	function resolveProvider(): ChatProvider | null {
 		if (useMock) return new MockProvider();
-		if (isEjected(settings.activeProviderId)) return null;
 		const conf = settings.providers[settings.activeProviderId];
 		// Keyless on-device endpoints carry no key by design.
 		const keyless =
@@ -3916,9 +3909,6 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 		void resend();
 	}
 
-	/** In-place editor placeholder for the cleared-message edge. */
-	const EDIT_PLACEHOLDER = "Editing message — Enter saves + resends, Esc cancels";
-
 	/**
 	 * Pencil (or E) on an own message: open it for in-place editing
 	 * where it sits (a second press toggles back off). The baked
@@ -4037,7 +4027,7 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 				insertInlineImageMarkers(1);
 			})
 			.catch((error: unknown) => {
-				attachError = error instanceof Error ? error.message : String(error);
+				failAttach(error instanceof Error ? error.message : String(error));
 			});
 	}
 
@@ -4105,7 +4095,7 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 		msgEditor = androidUI
 			? createTextareaEditor(node, inlineOptions())
 			: createPromptEditor(node, inlineOptions());
-		msgEditor.setPlaceholder(EDIT_PLACEHOLDER);
+		msgEditor.setPlaceholder("");
 		msgEditor.focus();
 		return {
 			destroy() {
@@ -4760,7 +4750,7 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 		if (!(target instanceof HTMLElement) || !scrollBox) return;
 		if (
 			target.closest(
-				"article, button, input, select, textarea, a, summary, details, .sel-menu, .translate-panel, .review, .ann-pop"
+				"article, button, input, select, textarea, a, summary, details, .sel-menu, .review, .ann-pop"
 			)
 		) {
 			return;
@@ -4822,6 +4812,16 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 		} catch {
 			androidUI = false;
 			iosUI = false;
+		}
+		// Phones keep the prompt on screen instead of idle-hiding it:
+		// there is no keyboard summon (i/Enter/Space) and the sliders
+		// are hidden, so migrate an uncustomized timeout to "never"
+		// and release any boot park before first paint.
+		if (androidUI && !idleTimeoutCustomized) {
+			settings.promptIdleSec = PROMPT_IDLE_NEVER;
+			persistSettings();
+			bootParked = false;
+			promptIdle = false;
 		}
 		// Chromium-only viewport key, appended at runtime on Android
 		// alone: a static tag makes WebKit log "not recognized" noise
@@ -4900,7 +4900,7 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 					if (!chatState.activeChatId) newChat(chatState);
 					editor?.setText(joinExternalDraft(editor?.getText() ?? "", text));
 				} catch (error) {
-					attachError = error instanceof Error ? error.message : String(error);
+					failAttach(error instanceof Error ? error.message : String(error));
 				}
 			}
 			if (markdown.length > 0) {
@@ -5010,10 +5010,39 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 			id: number;
 			x: number;
 			y: number;
+			at: number;
+			scrollTop: number;
 			clean: boolean;
 			rowSwipe: boolean;
 			msgId: ChatMsgId | null;
+			zone: FlickZone;
 		} | null = null;
+		/**
+		 * Where a single-finger stroke began, for the vertical-flick
+		 * gestures (message / prompt / empty). Controls, fields, and
+		 * chrome count as "other": taps there keep native behavior and
+		 * strokes there belong to their owner, never to a gesture.
+		 */
+		/** Last single-tap point: pairs into the double-tap sidebar open. */
+		let lastTapAt = 0;
+		let lastTapX = 0;
+		let lastTapY = 0;
+		function flickZoneOf(target: EventTarget | null): FlickZone {
+			const el = target instanceof Element ? target : null;
+			if (!el) return "other";
+			if (el.closest("button, a, input, textarea, select, summary, [contenteditable], .actions"))
+				return "other";
+			if (el.closest(".prompt")) return "prompt";
+			if (articleOf(el)) return "message";
+			if (
+				el.closest("main") &&
+				el.closest(
+					"aside, .modal, .modal-veil, .settings-panel, .find-bar, .search-palette, .sel-menu, .review, .lang-menu, .toast"
+				) === null
+			)
+				return "empty";
+			return "other";
+		}
 		window.addEventListener(
 			"touchstart",
 			(event) => {
@@ -5039,7 +5068,17 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 				// scroll: scrolling an overflowing row must never fold
 				// the message or summon a sidebar.
 				const rowSwipe = target instanceof Element && target.closest(".actions") !== null;
-				edgeTouch = { id: touch.identifier, x: touch.clientX, y: touch.clientY, clean, rowSwipe, msgId };
+				edgeTouch = {
+					id: touch.identifier,
+					x: touch.clientX,
+					y: touch.clientY,
+					at: Date.now(),
+					scrollTop: scrollBox?.scrollTop ?? 0,
+					clean,
+					rowSwipe,
+					msgId,
+					zone: flickZoneOf(target)
+				};
 			},
 			{ passive: true }
 		);
@@ -5073,10 +5112,52 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 					toggleFold(start.msgId);
 					return;
 				}
+				// Double-tap on empty space opens the chats list (Android):
+				// the only opener — edge strokes and prompt flicks below
+				// only ever dismiss. Taps are short, still, unscrolled
+				// strokes over dead space: text keeps native double-tap
+				// word select, controls keep their taps.
+				if (androidUI && !iosUI) {
+					const now = Date.now();
+					const tapped =
+						now - start.at <= 300 &&
+						Math.hypot(ended.clientX - start.x, ended.clientY - start.y) <= 12 &&
+						Math.abs((scrollBox?.scrollTop ?? 0) - start.scrollTop) <= 10 &&
+						start.zone === "empty" &&
+						window.getSelection()?.isCollapsed !== false;
+					const paired =
+						tapped &&
+						now - lastTapAt < 400 &&
+						Math.hypot(ended.clientX - lastTapX, ended.clientY - lastTapY) < 32;
+					if (tapped) {
+						lastTapAt = now;
+						lastTapX = ended.clientX;
+						lastTapY = ended.clientY;
+					}
+					if (paired) {
+						lastTapAt = 0;
+						if (settings.sidebarCollapsed) {
+							toggleSidebar();
+							if (!settings.sidebarCollapsed) focusActiveSideChat();
+						}
+						return;
+					}
+				}
 				const target = start.rowSwipe
 					? null
 					: (edgeSwipeTarget(start.x, start.y, ended.clientX, ended.clientY, window.innerWidth) ??
 						middleSwipeTarget(start, ended));
+				if (target === "chats" && androidUI && !iosUI) {
+					// Double-tap is the only sidebar opener on Android:
+					// rightward strokes only dismiss (settings, then the
+					// list itself), never open.
+					if (settingsOpen) settingsOpen = false;
+					else if (!settings.sidebarCollapsed) {
+						settings.sidebarCollapsed = true;
+						persistSettings();
+					}
+					return;
+				}
 				applyEdgeTarget(target);
 			},
 			{ passive: true }
@@ -5196,9 +5277,10 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 		});
 		// Two-finger horizontal swipe steps chats (right = newer, left =
 		// older, no focus: the keyboard stays down); a two-finger double
-		// tap toggles the chats sidebar on Android; a double three-finger
-		// tap deletes the current chat. All start away from controls,
-		// drawers, and the modal, and the swipe's pinch veto (see
+		// tap deletes the current chat on Android (sidebar toggle on
+		// iOS); a double three-finger tap deletes every chat on Android
+		// (current chat on iOS). All start away from controls, drawers,
+		// and the modal, and the swipe's pinch veto (see
 		// twoFingerSwipeDir) keeps page zoom.
 		let twoTrack: { start: [FingerTrack, FingerTrack]; end: [FingerTrack, FingerTrack] } | null =
 			null;
@@ -5293,14 +5375,21 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 						);
 						twoTrack = null;
 						if (dir !== null) stepChat(dir, false);
-						// Still two-finger taps pair into a sidebar toggle
-						// (Android): swipes take the step path instead.
+						// Still two-finger taps pair into a delete (Android:
+						// no keyboard for the Delete key, and the sidebar
+						// moved to swipe-up-from-prompt); swipes take the
+						// step path instead. iOS keeps the sidebar toggle.
 						else if (androidUI && twoTapAt > 0 && moved <= 12 && now - twoTapAt <= 400) {
 							if (now - lastTwoTapAt < 600) {
 								lastTwoTapAt = 0;
-								// The open keyboard would cover the sidebar.
-								(document.activeElement as HTMLElement | null)?.blur?.();
-								toggleSidebar();
+								if (iosUI) {
+									// The open keyboard would cover the sidebar.
+									(document.activeElement as HTMLElement | null)?.blur?.();
+									toggleSidebar();
+								} else {
+									dropChat(chatState.activeChatId);
+									flashToast("Chat deleted");
+								}
 							} else lastTwoTapAt = now;
 						}
 					}
@@ -5312,8 +5401,16 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 					if (isThreeFingerTap(3, track.moved, now - track.at)) {
 						if (now - lastThreeTapAt < 600) {
 							lastThreeTapAt = 0;
-							dropChat(chatState.activeChatId);
-							flashToast("Chat deleted");
+							// Android: three fingers clear everything (two
+							// already take the current chat). iOS keeps the
+							// single-chat delete.
+							if (iosUI) {
+								dropChat(chatState.activeChatId);
+								flashToast("Chat deleted");
+							} else {
+								dropAllChats();
+								flashToast("All chats deleted");
+							}
 						} else {
 							lastThreeTapAt = now;
 						}
@@ -5448,17 +5545,9 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 			if (event.key === "Escape" && !event.repeat) escDownAt = Date.now();
 			const inEditor = (event.target as HTMLElement | null)?.closest(".cm-content, .ta-input");
 			if ((event.metaKey || event.ctrlKey) && (event.key === "t" || event.key === "T")) {
-				// Over selected message text the combo feeds the
-				// translate lookup (S4 behavior, selection-triggered).
-				// Everywhere else — including the prompt — it opens
-				// the single-tab browser and lands focus in its
-				// address bar.
-				if (!inEditor && currentQuote()) {
-					event.preventDefault();
-					event.stopPropagation();
-					void openTranslate();
-					return;
-				}
+				// Always the single-tab browser: it opens and lands
+				// focus in its address bar (a second press focuses
+				// the bar again). Selections never divert it.
 				event.preventDefault();
 				event.stopPropagation();
 				if (!sideviewOpen) void setSideviewOpen(true, true);
@@ -5582,7 +5671,6 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 				editor?.blur();
 				selMenu = null;
 				selPinyin = null;
-				translate = null;
 				openLangMenu = null;
 				return;
 			}
@@ -5592,10 +5680,13 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 				// only way out. No text harm outside fields.
 				event.preventDefault();
 				event.stopPropagation();
+				// The pill's own Esc handler sits on its textarea
+				// (bubble phase), which this capture branch pre-empts —
+				// so close it here, or Esc strands an open box.
+				cancelAnnPop();
 				selMenu = null;
 				selPinyin = null;
 				inspectChar = null;
-				translate = null;
 				openLangMenu = null;
 				settingsOpen = false;
 				shortcutsOpen = false;
@@ -6075,7 +6166,7 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 				!searchOpen &&
 				!inspectChar &&
 				!(event.target as HTMLElement | null)?.closest(
-					"input, textarea, select, [contenteditable], button, a, aside, .modal, .modal-veil, .find-bar, .search-palette, .sel-menu, .review, .translate-panel"
+					"input, textarea, select, [contenteditable], button, a, aside, .modal, .modal-veil, .find-bar, .search-palette, .sel-menu, .review"
 				)
 			) {
 				// Ctrl+G outside the composer enters scroll mode at the
@@ -6126,6 +6217,18 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 				const modalOpen = shortcutsOpen || searchOpen || inspectChar;
 				const typing =
 					inEditor || target?.closest("input, textarea, select, [contenteditable]") || inSidebar;
+				if (!modalOpen && !typing && !event.metaKey && event.ctrlKey && !event.altKey && !event.shiftKey) {
+					// Ctrl+U / Ctrl+D jump an instant half-page, vim-style
+					// (repeats jump again) — including with nothing selected.
+					// Plain U/D glide instead; other ctrl chords keep theirs.
+					const lower = event.key.toLowerCase();
+					if ((lower === "u" || lower === "d") && scrollBox) {
+						event.preventDefault();
+						lastGAt = 0;
+						scrollChatBy(halfPageDy(scrollBox.clientHeight, lower === "u" ? -1 : 1));
+						return;
+					}
+				}
 				if (!modalOpen && !typing && !event.metaKey && !event.ctrlKey && !event.altKey) {
 					// Empty chat: bare Space has no scroll target, so it
 					// lands in the composer instead of scrolling nowhere
@@ -6210,18 +6313,22 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 				!event.altKey &&
 				(event.key === "u" || event.key === "U" || event.key === "d" || event.key === "D")
 			) {
-				// U/D fast-scroll a half page and never move the cursor:
+				// U/D glide a half page on hold and never move the cursor:
 				// message jumps stole the scroll position out from under
-				// the selected message. Ctrl may or may not ride along
-				// (vim muscle memory); Shift+D keeps its delete job above.
+				// the selected message. Shift+D keeps its delete job above.
 				// Held keys glide via the rAF loop — per-repeat smooth
 				// steps cancel-restart into a stutter instead (taps land
 				// one discrete half-page on release, same distance).
+				// Ctrl+U / Ctrl+D jump instead: one instant half-page per
+				// press, vim-style (repeats jump again).
 				event.preventDefault();
 				lastGAt = 0;
-				if (scrollBox && !event.repeat) {
-					const lower = event.key.toLowerCase();
-					startScrollHold(lower, (lower === "u" ? -1 : 1) * SCROLLKEY_DU_VELOCITY_PX_S);
+				const lower = event.key.toLowerCase();
+				const dir: 1 | -1 = lower === "u" ? -1 : 1;
+				if (event.ctrlKey) {
+					if (scrollBox) scrollChatBy(halfPageDy(scrollBox.clientHeight, dir));
+				} else if (scrollBox && !event.repeat) {
+					startScrollHold(lower, dir * SCROLLKEY_DU_VELOCITY_PX_S);
 				}
 			} else if (event.key === "i" || event.key === "Enter") {
 				event.preventDefault();
@@ -6280,7 +6387,7 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 			if (event.altKey) return false;
 			const target = event.target instanceof Element ? event.target : null;
 			if (
-				target?.closest(".cm-content, .sel-menu, .review, .translate-panel, button, input, textarea")
+				target?.closest(".cm-content, .sel-menu, .review, button, input, textarea")
 			) {
 				return false;
 			}
@@ -6455,7 +6562,7 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 			if (openLangMenu) {
 				if (!target?.closest(".lang-menu")) openLangMenu = null;
 			}
-			if (target?.closest(".cm-content, .sel-menu, .ann-dock, .review, .translate-panel, button, input, textarea")) {
+			if (target?.closest(".cm-content, .sel-menu, .ann-dock, .review, button, input, textarea")) {
 				// Clicking away into the prompt or a control clears a dead
 				// highlight's menu with it — but never the menu's own clicks:
 				// the Annotate button's click fires after this mouseup (the
@@ -6608,9 +6715,10 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 			placeSelPinyin(quoted, readings);
 		}
 		// Desktop right-click reads aloud (the selection, else the word
-		// under the cursor, else the whole message; a playing message
-		// stops) AND opens the native menu: no preventDefault here, so
-		// Copy stays available beside speech.
+		// under the cursor, else the whole message; a second
+		// right-click restarts it, never stops it) AND opens the
+		// native menu: no preventDefault here, so Copy stays
+		// available beside speech.
 		// (Android long-press never starts audio — it summons the menu.)
 		const onContextMenu = (event: MouseEvent) => {
 			const target = event.target as HTMLElement | null;
@@ -6635,9 +6743,11 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 			// the copy and Run icons stay silent via the control check.
 			const codeBlock = target?.closest(".ccez-code");
 			if (codeBlock && body.contains(codeBlock) && !target?.closest("[data-code-copy], [data-code-run]")) {
-				// Right-click folds only — never unfolds (a left click on
-				// the folded label opens it back up).
-				(codeBlock as HTMLElement).dataset.folded = "1";
+				// Right-click toggles the fold (a left click on the
+				// folded label opens it back up).
+				if ((codeBlock as HTMLElement).dataset.folded === "1")
+					(codeBlock as HTMLElement).removeAttribute("data-folded");
+				else (codeBlock as HTMLElement).dataset.folded = "1";
 				return;
 			}
 			// Display math folds the same way. Inline math has no
@@ -6649,20 +6759,13 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 				mathWrap.classList.contains("ccez-math") &&
 				!target?.closest(".ccez-math-copy, .ccez-math-tex")
 			) {
-				(mathWrap as HTMLElement).dataset.folded = "1";
+				if ((mathWrap as HTMLElement).dataset.folded === "1")
+					(mathWrap as HTMLElement).removeAttribute("data-folded");
+				else (mathWrap as HTMLElement).dataset.folded = "1";
 				return;
 			}
 			// Controls and links inside messages stay silent.
 			if (target?.closest("button, input, textarea, a, summary")) return;
-			// A playing message stops instead of restarting: either its
-			// whole-message readback or a selection read from it.
-			const stopIfPlaying = (id: ChatMsgId): boolean => {
-				if (speakingId === id || speakingSelection === id) {
-					stopVoice();
-					return true;
-				}
-				return false;
-			};
 			// Highlighted text wins: a right-click with a live message
 			// selection reads the whole selection (same per-quote
 			// language as the sel-menu button). On a Han character it
@@ -6672,7 +6775,6 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 			// char reads its locale from the surrounding sentence.
 			const quoted = currentQuote();
 			if (quoted) {
-				if (stopIfPlaying(quoted.messageId)) return;
 				const probe = sentenceForQuote(quoted.context, quoted.quote) ?? quoted.context;
 				if (hanCharUnderCursor(event, body)) {
 					if (
@@ -6689,13 +6791,11 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 				return;
 			}
 			// No selection: a word under the cursor reads just that word
-			// (same per-quote path as a selection, so a second
-			// right-click stops it); open message space reads the whole
-			// message. speakReply gates the voice.
+			// (same per-quote path as a selection); open message space
+			// reads the whole message. speakReply gates the voice.
 			const article = body.closest('article[id^="msg-"]');
 			const msg = article ? chat.messages[Number(article.id.slice(4))] : undefined;
 			if (!msg) return;
-			if (stopIfPlaying(msg.id)) return;
 			const word = wordUnderCursor(event, body);
 			if (word) {
 				void speakQuote(word, msg.id, false, speechText(msg.content));
@@ -6783,30 +6883,33 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 		// before the next keystroke).
 		let viewportTimer: number | undefined;
 		const onViewportResize = (): void => {
+			// Pin synchronously on every viewport frame: the old trailing
+			// debounce let the composer lag a beat behind the keyboard
+			// animation, then jump. Only the remeasure stays debounced.
+			// Phone keyboard without resizes-content: the layout
+			// viewport doesn't shrink, so the full-height flex
+			// column (and the latest messages) slides under the
+			// keyboard with no way to reach it. Pin .app to the
+			// visual height while the keyboard is open, and expose
+			// the overlap as --kb-height so the composer reflows
+			// just above it. Modern Chrome tracks via the viewport
+			// meta, so the heights agree and this stays inert — it
+			// is the pre-108 fallback. Desktop and keyboard-closed
+			// phones keep stylesheet height.
+			if (androidUI && appEl && window.visualViewport) {
+				const vv = window.visualViewport;
+				const overlap = keyboardOverlapPx(window.innerHeight, vv.height, vv.offsetTop);
+				if (isKeyboardOpen(window.innerHeight, vv.height, vv.offsetTop)) {
+					appEl.style.height = `${vv.height}px`;
+					appEl.style.setProperty("--kb-height", `${overlap}px`);
+				} else {
+					appEl.style.height = "";
+					appEl.style.setProperty("--kb-height", "0px");
+				}
+			}
 			if (viewportTimer !== undefined) window.clearTimeout(viewportTimer);
 			viewportTimer = window.setTimeout(() => {
 				viewportTimer = undefined;
-				// Phone keyboard without resizes-content: the layout
-				// viewport doesn't shrink, so the full-height flex
-				// column (and the latest messages) slides under the
-				// keyboard with no way to reach it. Pin .app to the
-				// visual height while the keyboard is open, and expose
-				// the overlap as --kb-height so the composer reflows
-				// just above it. Modern Chrome tracks via the viewport
-				// meta, so the heights agree and this stays inert — it
-				// is the pre-108 fallback. Desktop and keyboard-closed
-				// phones keep stylesheet height.
-				if (androidUI && appEl && window.visualViewport) {
-					const vv = window.visualViewport;
-					const overlap = keyboardOverlapPx(window.innerHeight, vv.height, vv.offsetTop);
-					if (isKeyboardOpen(window.innerHeight, vv.height, vv.offsetTop)) {
-						appEl.style.height = `${vv.height}px`;
-						appEl.style.setProperty("--kb-height", `${overlap}px`);
-					} else {
-						appEl.style.height = "";
-						appEl.style.setProperty("--kb-height", "0px");
-					}
-				}
 				editor?.remeasure();
 			}, 250);
 		};
@@ -7005,7 +7108,7 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 						onclick={() => {
 							dropChat(item.id);
 							requestAnimationFrame(() => focusSideChat(sideIdx));
-						}}>×</button
+						}}><ActionIcon kind="close" /></button
 					>
 				</li>
 			{/each}
@@ -7249,6 +7352,7 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 					class:user={msg.role === "user"}
 					class:assistant={msg.role === "assistant"}
 					class:selected={focusMode === "scroll" && selectedIdx === i}
+					class:folded-msg={isFolded}
 					class:speaking={speakingId === msg.id}
 					class:speaking-sel={speakingSelection === msg.id}
 					class:aid-loading={aidBusy.has(msg.id) || vocalizing.has(msg.id)}
@@ -7318,7 +7422,6 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 						<div class="msg-edit">
 							<div class="msg-edit-box" use:msgEditAction></div>
 							<div class="msg-edit-bar">
-								<span class="msg-edit-hint">Enter saves + resends · Alt+Enter saves · Esc cancels</span>
 								<button type="button" class="msg-edit-btn" onclick={() => commitMessageEdit()}>
 									Save + resend
 								</button>
@@ -7502,8 +7605,10 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 								<ActionIcon kind="rerun" />
 							</button>
 						{/if}
-						{#if msg.error}
+						{#if msg.error && !androidUI}
 							<span class="error">{msg.error}</span>
+						{/if}
+						{#if msg.error}
 							<button
 								type="button"
 								class="icon-btn"
@@ -7533,35 +7638,20 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 			{/if}
 		</div>
 
-		{#if missingKey}
+		{#if missingKey && !androidUI}
 			<p class="error-banner" role="alert">
-				{#if isEjected(settings.activeProviderId)}
-					Key ejected for this session — restore it in
-					<button
-						type="button"
-						class="link"
-						data-settings-toggle
-						onclick={() => {
-						openSettingsPanel();
-						pulseCursor();
-					}}
-					>
-						Settings</button
-					>.
-				{:else}
-					Set an API key first —
-					<button
-						type="button"
-						class="link"
-						data-settings-toggle
-						onclick={() => {
-						openSettingsPanel();
-						pulseCursor();
-					}}
-					>
-						open Settings</button
-					>.
-				{/if}
+				Set an API key first —
+				<button
+					type="button"
+					class="link"
+					data-settings-toggle
+					onclick={() => {
+					openSettingsPanel();
+					pulseCursor();
+				}}
+				>
+					open Settings</button
+				>.
 			</p>
 		{/if}
 
@@ -7625,7 +7715,7 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 					{/if}
 				{/each}
 			{/if}
-			{#if attachError}
+			{#if attachError && !androidUI}
 				<p class="error attach-error" class:composer-idle={promptIdle} role="alert">{attachError}</p>
 			{/if}
 		{/if}
@@ -7833,20 +7923,7 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 				>
 					<ActionIcon kind="attach" />
 				</button>
-				{#if androidUI && clipboardReadAvailable()}
-					<!-- Touch paste-images: no Ctrl+V on a phone, so the
-					Async Clipboard feeds the same attachments path. -->
-					<button
-						type="button"
-						class="paste-btn"
-						title="Paste images from the clipboard"
-						aria-label="Paste images from the clipboard"
-						disabled={pasting}
-						onclick={() => void pasteImagesFromClipboard()}
-					>
-						<ActionIcon kind="paste" />
-					</button>
-				{/if}
+
 				{#if canMic && settings.micEnabled}
 					<button
 						type="button"
@@ -7888,48 +7965,16 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 				{altHeld ? "Add +" : activeReplyLang ? activeReplyLang.badge : "↑"}
 			</button>
 		</div>
-		{#if vocalizeError}
+		{#if vocalizeError && !androidUI}
 			<p class="error-banner" role="alert">{vocalizeError}</p>
 		{/if}
 
-		{#if voiceError}
+		{#if voiceError && !androidUI}
 			<!-- Top notice, not the bottom banner: speech errors arrive
 			while the eyes are on the message, and a tap dismisses. -->
 			<button type="button" class="voice-error" title="Dismiss" transition:fade={{ duration: 160 }} onclick={() => setVoiceError(null)}>
 				<span role="alert">{voiceError}</span>
 			</button>
-		{/if}
-
-		{#if translate}
-			<div class="translate-panel" role="dialog" aria-label="Translate lookup">
-				<div class="review-head">
-					<span class="review-quote">“{translate.quote}”</span>
-					<button type="button" aria-label="Close translate" onclick={() => (translate = null)}>
-						×
-					</button>
-				</div>
-				{#if translate.busy}
-					<p class="muted">Translating to English…</p>
-				{:else if translate.error}
-					<p class="error" role="alert">{translate.error}</p>
-				{:else if translate.result}
-					<p class="translate-result">{translate.result}</p>
-					<div class="review-edit-actions">
-						<button type="button" onclick={annotateTranslation}>Add as annotation</button>
-						<button
-							type="button"
-							class="icon-copy"
-							title="Copy translation"
-							aria-label="Copy translation"
-							onclick={() => {
-								if (translate?.result) copyPlain(translate.result, "Copied");
-							}}
-						>
-							<ActionIcon kind="copy" />
-						</button>
-					</div>
-				{/if}
-			</div>
 		{/if}
 
 		{#if chat.messages.length === 0}
@@ -8216,9 +8261,9 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 				if (e.target === e.currentTarget) shortcutsOpen = false;
 			}}
 		>
-			<div class="modal" role="dialog" aria-modal="true" aria-labelledby="shortcuts-heading" data-fade-scroll>
+			<div class="modal" role="dialog" aria-modal="true" aria-labelledby={androidUI ? undefined : "shortcuts-heading"} aria-label={androidUI ? "Touch gestures" : undefined} data-fade-scroll>
 				<div class="modal-head">
-					<h2 id="shortcuts-heading">{androidUI ? "Touch gestures" : "Keyboard shortcuts"}</h2>
+					{#if !androidUI}<h2 id="shortcuts-heading">Keyboard shortcuts</h2>{/if}
 					<input
 						type="search"
 						class="shortcuts-filter"
@@ -8924,7 +8969,7 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 	}
 	.modal-head {
 		display: flex;
-		align-items: baseline;
+		align-items: center;
 		gap: 1rem;
 		margin-bottom: 0.35rem;
 	}
@@ -8935,6 +8980,9 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 	}
 	.modal-head button {
 		margin-left: auto;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
 		font-size: 1.1rem;
 		line-height: 1;
 		border: 1px solid #c7c7cc;
@@ -8968,6 +9016,14 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 	.modal-head .shortcuts-filter + button {
 		margin-left: 0;
 	}
+	/* The filter reads dead on focus without this: same ring as the
+	selected article, so keyboard users see where they are. */
+	.shortcuts-filter:focus-visible,
+	.search-input:focus-visible {
+		outline: 2px solid #3a3a3c;
+		outline-color: var(--focus);
+		outline-offset: 1px;
+	}
 	.keys-empty {
 		padding: 0.6rem 0;
 		color: var(--muted);
@@ -8980,9 +9036,6 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 		margin-top: 8vh;
 		margin-top: 8dvh;
 		padding: 0.7rem 0.9rem 0.8rem;
-	}
-	.search-palette .modal-head {
-		align-items: center;
 	}
 	.search-input {
 		flex: 1;
@@ -9592,8 +9645,57 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 		font-size: 16px;
 	}
 	.app[data-android] main:not(.empty) .prompt {
-		margin-bottom: 1.8rem;
+		/* Hug the keyboard: the old 1.8rem margin plus the 1.1rem base
+		offset stranded the composer ~3rem above it. */
+		margin-bottom: 0.6rem;
+		bottom: 0.6rem;
 		min-height: 7.25rem;
+	}
+	/* Phone composer: text on top, buttons below (other chat apps'
+	rhythm). The card becomes a plain column: the field grows to its
+	cap then scrolls, the tools row sits static underneath with the
+	send button pinned at its right end. Desktop keeps the overlaid
+	tools cluster and its measured reservations. */
+	.app[data-android] .prompt {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+		padding: 0.7rem 0.8rem 0.6rem;
+	}
+	.app[data-android] .prompt :global(.ta-input) {
+		padding: 0.1rem 0 0.2rem;
+		/* Never strand at zero height: one empty line plus padding
+		holds ~32px after the reply lands (the field owns its height
+		where supported, JS stands down). */
+		min-height: 2rem;
+		max-height: 7.5rem;
+	}
+	.app[data-android] .prompt-tools {
+		position: static;
+		order: 5;
+		width: auto;
+		margin-top: auto;
+		padding-right: 2.6rem;
+	}
+	.app[data-android] .send-btn {
+		bottom: 0.6rem;
+		right: 0.7rem;
+		/* Outranks the tools row: as a flex item it keeps the base
+		z-index 5, which creates a stacking context even with
+		position static — without this the row eats the send button's
+		taps where they overlap at the card's right end. */
+		z-index: 6;
+	}
+	/* Outranks the flex card above: the composer still gets out of the
+	way entirely while the annotation box owns the keyboard. */
+	.app[data-android] .prompt.prompt-hidden {
+		display: none;
+	}
+	/* Empty chat on phones: the pills row is the last in-flow child, so
+	a tall hero plus big fonts push it under the floating prompt card
+	(which then eats its taps). Reserve the prompt's footprint below. */
+	.app[data-android] main.empty {
+		padding-bottom: 9.5rem;
 	}
 	/* Touch has no hover: tooltips only ever appear as a clipped
 	flash on long-press (the fold button's runs off-screen). */
@@ -10303,16 +10405,40 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 	.msg-edit-box :global(.cm-scroller) {
 		max-height: 16rem;
 	}
+	/* In-place edit on phones: the textarea editor misses the
+	prompt-scoped textarea styles, so it falls back to native chrome;
+	and the desktop editing frame fights the bubble. Match the bubble
+	instead (same wash, radius, padding, right dock) with a bare
+	text field inside — the bar keeps the touch path (phones have no
+	Esc and no Enter-to-save). */
+	.app[data-android] article.user .msg-edit {
+		background: var(--bg-wash);
+		border: 0;
+		border-radius: calc(1.75rem * min(var(--font-scale, 1), 2));
+		padding:
+			calc(0.45rem * min(var(--font-scale, 1), 2))
+			calc(1rem * min(var(--font-scale, 1), 2))
+			calc(0.55rem * min(var(--font-scale, 1), 2));
+		width: 100%;
+		box-sizing: border-box;
+	}
+	.app[data-android] .msg-edit-box :global(.ta-input) {
+		width: 100%;
+		box-sizing: border-box;
+		border: 0;
+		background: transparent;
+		color: inherit;
+		font: inherit;
+		resize: none;
+		outline: none;
+		field-sizing: content;
+		padding: 0;
+	}
 	.msg-edit-bar {
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
 		padding-top: 0.35rem;
-	}
-	.msg-edit-hint {
-		flex: 1;
-		font-size: 0.75rem;
-		color: var(--muted);
 	}
 	.msg-edit-btn {
 		font: inherit;
@@ -10981,8 +11107,7 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 		font-size: 1rem;
 		padding: 0.15rem 0;
 	}
-	.review,
-	.translate-panel {
+	.review {
 		margin: 0.5rem 1.2rem 0;
 		border: 1px solid #e5e5ea;
 		border-color: var(--line-soft);
@@ -11118,26 +11243,6 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 		color: #1c1c1e;
 		color: var(--ink);
 		text-decoration: underline;
-	}
-	/* Icon-only copy (message-button copy glyph, no text): the pill
-	chrome above would box it, so it rides the muted ghost treatment. */
-	.review-edit-actions button.icon-copy {
-		border-color: transparent;
-		background: none;
-		padding: 0.15rem;
-		line-height: 0;
-		color: #6e6e73;
-		color: var(--muted);
-	}
-	.review-edit-actions button.icon-copy:hover {
-		opacity: 1;
-		color: #1c1c1e;
-		color: var(--ink);
-		text-decoration: none;
-	}
-	.review-edit-actions button.icon-copy :global(.action-glyph) {
-		height: 1rem;
-		width: 1rem;
 	}
 	/* Merged pill: the wrap carries the single border; the count and ×
 	buttons inside are bare segments. Later than the prompt tool buttons
@@ -11285,17 +11390,6 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 	it right so it covers the tools cluster instead of the draft. */
 	.app[data-android="true"] .ann-wrap .review {
 		right: -2.4rem;
-	}
-	.muted {
-		font-size: 0.82rem;
-		color: #6e6e73;
-		color: var(--muted);
-		margin: 0;
-	}
-	.translate-result {
-		font-size: 0.9rem;
-		margin: 0;
-		overflow-wrap: anywhere;
 	}
 	.actions {
 		display: flex;
@@ -11474,6 +11568,29 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 	.app[data-android] main.hide-buttons:not(.overlay-actions) article[data-actions-open="true"] .actions {
 		opacity: 1;
 		pointer-events: auto;
+	}
+	/* Folded messages show no row: the pill would float over the next
+	message's text. Tapping the folded body unfolds (see
+	toggleMessageActions) — the only press path, since the fold button
+	lives in the hidden row. */
+	.app[data-android] article.folded-msg .actions {
+		display: none;
+	}
+	/* The overlay pill keeps thumb-sized buttons at any text size: the
+	opt-in font scaling fits two buttons to a pill and strands the rest
+	in sideways scroll. Desktop keeps its scaling. */
+	.app[data-android]
+		main.hide-buttons.overlay-actions.scale-actions
+		.actions
+		button {
+		font-size: 0.75rem;
+	}
+	.app[data-android]
+		main.hide-buttons.overlay-actions.scale-actions
+		.actions
+		.icon-btn
+		:global(.action-glyph) {
+		height: 1.05rem;
 	}
 	/* No bubble, no bubble padding: text keeps its horizontal place
 	(only the background disappears), and the tighter vertical rhythm
@@ -11853,7 +11970,6 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 		gap: 0.35rem;
 	}
 	.attach-btn,
-	.paste-btn,
 	.voice-float,
 	.mic-btn,
 	.wp-jump {
@@ -11862,6 +11978,7 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 		justify-content: center;
 		line-height: 0;
 		color: #6e6e73;
+		color: var(--muted);
 		border: 0;
 		background: none;
 		cursor: pointer;
@@ -11877,10 +11994,7 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 	.prompt-tools :global(.action-glyph) {
 		height: 1.05em;
 	}
-	.paste-btn:disabled {
-		opacity: 0.4;
-		cursor: default;
-	}
+
 	/* iOS selection dock: the Annotate control lives in the composer
 	tools while a highlight is up (a floating menu fights the native
 	callout). Text treatment in the row's rhythm, action green so it
@@ -11897,18 +12011,30 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 		white-space: nowrap;
 	}
 	.attach-btn:hover,
-	.paste-btn:hover,
 	.voice-float:hover,
 	.wp-jump:hover,
 	.mic-btn:hover {
 		color: #1c1c1e;
 		color: var(--ink);
 	}
-	/* Split out of the shared tool rule below: attach/mic stay put
-	in dark, only the voice toggle lifts. */
-	.voice-float {
-		color: #6e6e73;
-		color: var(--muted);
+	@media (hover: none) {
+		/* Touch has no hover: a tap leaves :hover stuck, so the
+		last-tapped tool would keep its hover color while its
+		siblings don't. State colors still win. */
+		.attach-btn:hover,
+		.voice-float:hover,
+		.wp-jump:hover,
+		.mic-btn:hover {
+			color: #6e6e73;
+			color: var(--muted);
+		}
+		.voice-float.on:hover {
+			color: #1f7a4d;
+			color: var(--ok);
+		}
+		.mic-btn.recording:hover {
+			color: #c0362c;
+		}
 	}
 	.voice-float.on {
 		color: #1f7a4d;
@@ -12106,7 +12232,6 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 	.lang-menus,
 	.attachments,
 	.review,
-	.translate-panel,
 	.error-banner {
 		width: calc(100% - 2.4rem);
 		max-width: calc(var(--chat-width, 36) * 1rem);
@@ -12186,7 +12311,7 @@ import { contentFitsViewport, isPromptIdle } from "$lib/chrome";
 	/* .preview rides --line now. */
 	/* ann-wrap rides --line/--muted/--ink; review-tools ride --muted/--danger now. */
 	/* sel-menu rides --bg-raised/--line/--bg-wash/--ink;
-	ann-pop is dark-always; review/translate-panel ride --panel/--line-soft. */
+	ann-pop is dark-always; review rides --panel/--line-soft. */
 	/* .review-item.highlight rides --hl now. */
 	/* review-head/label ride --muted/--ink; review textarea rides --field/--line/--strong. */
 	/* Dark primary: light pill, dark text (mirrors the send

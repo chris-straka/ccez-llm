@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    ccez_studio_lib::run()
+    ccez_llm_lib::run()
 }

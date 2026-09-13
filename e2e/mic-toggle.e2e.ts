@@ -3,9 +3,9 @@ import { test, expect } from "@playwright/test";
 test("mic toggle hides prompt mic button", async ({ page }) => {
 	await page.addInitScript(() => {
 		window.localStorage.setItem("ccez-mock-provider", "1");
-		window.localStorage.setItem("ccez-studio-settings-v1", JSON.stringify({}));
+		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
 		window.localStorage.setItem(
-			"ccez-studio-chats-v1",
+			"ccez-llm-chats-v1",
 			JSON.stringify([{ id: "e2e-chat", createdAt: 1, replyLang: null, messages: [] }])
 		);
 	});
@@ -17,9 +17,9 @@ test("mic toggle hides prompt mic button", async ({ page }) => {
 	test.skip(!hasRecognition, "no speech recognition in this browser");
 	await expect(page.locator(".prompt .mic-btn")).toBeVisible();
 	await page.evaluate(() => {
-		const raw = JSON.parse(window.localStorage.getItem("ccez-studio-settings-v1") || "{}");
+		const raw = JSON.parse(window.localStorage.getItem("ccez-llm-settings-v1") || "{}");
 		window.localStorage.setItem(
-			"ccez-studio-settings-v1",
+			"ccez-llm-settings-v1",
 			JSON.stringify({ ...raw, micEnabled: false })
 		);
 		window.location.reload();

@@ -1,8 +1,9 @@
-# Ccez Studio — TODO (only open work)
+# Ccez LLM — TODO (only open work)
 
 Finished stages live in `DONE.md` (archive) — check items off by moving
 them there, never by deleting. Spec is `README.md`; agent handoff
 (commands, gates, architecture) is `AGENTS.md`.
+
 ## Goal + constraints
 
 macOS desktop chatbot (BYOK: DeepSeek + Muse Spark): clean chat with
@@ -28,6 +29,7 @@ same codebase via the Tauri mobile target.
   and renaming research->browser. Decide one direction before building.
 
 ## Pile: platform + release (needs hardware) (needs hardware)
+
 - [ ] Win/Linux/Android device proof for every shipped feature.
       (Status Sep 2026, stream-platform: unit-tested contracts only —
       `platform.ts` x31, `updates.ts` x5, `langId.ts` x4 + `langid.rs` x3,
@@ -60,12 +62,14 @@ same codebase via the Tauri mobile target.
       six gating cases. Nothing registers `local: true` yet — no bridge.)
 
 ## Pile: input + sidebar + shortcuts + extras (from PROMPT3) (needs hardware)
+
 - [ ] Android: voices button needs top/bottom spacing; system-voices auto
       element missing at startup; "build release" should read "Version";
       one-finger double-tap opens the sidebar when the chat is empty.
       (Blocked Sep 2026, stream-platform: all four need a real Android
       device to see/verify — untouched. Voice/chrome areas belong to
       sibling streams; coordinate before changing.)
+
 ## Non-goals
 
 - No app-build/agentic features. No cloud sync / sharing / plugins.

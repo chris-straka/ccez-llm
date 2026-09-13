@@ -31,14 +31,14 @@ fn sep<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<PredefinedMenuItem<R>> {
 pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let app_menu = Submenu::with_items(
         app,
-        "Ccez Studio",
+        "Ccez LLM",
         true,
         &[
             &PredefinedMenuItem::about(
                 app,
                 None,
                 Some(AboutMetadata {
-                    name: Some("Ccez Studio".into()),
+                    name: Some("Ccez LLM".into()),
                     ..Default::default()
                 }),
             )?,

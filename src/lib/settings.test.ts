@@ -70,6 +70,16 @@ describe("settings", () => {
 		expect(loadSettings(memoryStore).fontScale).toBe(1.2);
 	});
 
+	it("reads the pre-rename settings key", () => {
+		const data = new Map<string, string>();
+		const store = {
+			getItem: (k: string) => data.get(k) ?? null,
+			setItem: (k: string, v: string) => void data.set(k, v)
+		};
+		store.setItem("ccez-studio-settings-v1", JSON.stringify({ ...blankSettings(), fontScale: 1.5 }));
+		expect(loadSettings(store).fontScale).toBe(1.5);
+	});
+
 	it("persists text size up to 800% and resets strays", () => {
 		const max = blankSettings();
 		max.fontScale = 8;
@@ -391,7 +401,7 @@ describe("settings", () => {
 		const loaded = loadSettings(memoryStore);
 		expect(loaded.providers["muse"]!.apiKey).toBe("secret");
 
-		memoryStore.setItem("ccez-studio-settings-v1", "{not json");
+		memoryStore.setItem("ccez-llm-settings-v1", "{not json");
 		expect(loadSettings(memoryStore)).toEqual(defaultSettings());
 	});
 });

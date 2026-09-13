@@ -485,7 +485,7 @@ fn engage_sleep_guard(reason: &str) -> Result<(), String> {
         let child = std::process::Command::new("systemd-inhibit")
             .args([
                 "--what=sleep:idle",
-                "--who=Ccez Studio",
+                "--who=Ccez LLM",
                 "--why",
                 reason,
                 "--mode=block",
@@ -568,14 +568,14 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let menu = Menu::with_items(
         app,
         &[
-            &MenuItem::with_id(app, TRAY_SHOW_ID, "Show Ccez Studio", true, None::<&str>)?,
+            &MenuItem::with_id(app, TRAY_SHOW_ID, "Show Ccez LLM", true, None::<&str>)?,
             &MenuItem::with_id(app, TRAY_QUIT_ID, "Quit", true, None::<&str>)?,
         ],
     )?;
     let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/32x32.png"))?;
     TrayIconBuilder::with_id(TRAY_ID)
         .icon(icon)
-        .tooltip(format!("Ccez Studio ({SUMMON_SHORTCUT} to summon)"))
+        .tooltip(format!("Ccez LLM ({SUMMON_SHORTCUT} to summon)"))
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {

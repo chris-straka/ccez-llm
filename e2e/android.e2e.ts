@@ -10,9 +10,9 @@ test.use({
 async function seedEmpty(page: Page): Promise<void> {
 	await page.addInitScript(() => {
 		window.localStorage.setItem("ccez-mock-provider", "1");
-		window.localStorage.setItem("ccez-studio-settings-v1", JSON.stringify({}));
+		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
 		window.localStorage.setItem(
-			"ccez-studio-chats-v1",
+			"ccez-llm-chats-v1",
 			JSON.stringify([{ id: "e2e-chat", createdAt: 1, replyLang: null, messages: [] }])
 		);
 	});
@@ -23,10 +23,10 @@ async function seedEmpty(page: Page): Promise<void> {
 test.describe("gestures", () => {
 	/**
 	 * Android milestone (S24 Galaxy): key chords don't exist on a phone, so
-	 * the shortcuts modal teaches touch gestures. Since the gesture
-	 * redesign, rightward strokes never summon the chats sheet (two-finger
-	 * double-tap owns it) — they only dismiss settings. These specs pin the
-	 * UA-gated branches that ship on desktop today.
+	 * the shortcuts modal teaches touch gestures. Double-tap on empty
+	 * space is the only sidebar opener — rightward strokes only dismiss,
+	 * two-finger double-tap deletes. These specs pin the UA-gated
+	 * branches that ship on desktop today.
 	 */
 	test.beforeEach(async ({ page }) => {
 		await seedChat(page, [{ role: "assistant", content: "hello" }]);
@@ -58,15 +58,17 @@ test.describe("gestures", () => {
 	test("shortcuts modal teaches touch gestures on Android", async ({ page }) => {
 		await swipeFromRightEdge(page);
 		await page.locator('button:has-text("Show all gestures")').click();
-		await expect(page.locator("#shortcuts-heading")).toBeVisible();
-		await expect(page.locator("#shortcuts-heading")).toHaveText("Touch gestures");
+		// No title on phones: the filter owns the head row.
+		await expect(page.locator("#shortcuts-heading")).toHaveCount(0);
 		const modal = page.locator(".modal-veil");
 		await expect(modal.locator('dt:has-text("Chats list")')).toBeVisible();
-		await expect(modal.locator('dd:has-text("Two-finger double-tap")')).toBeVisible();
+		await expect(modal.locator('dd:has-text("Double-tap empty space")')).toBeVisible();
 		await expect(modal.locator('dt:has-text("Chats sidebar")')).toHaveCount(0);
 		await expect(modal.locator('dt:has-text("Newer / older chat")')).toBeVisible();
 		await expect(modal.locator('dd:has-text("Two-finger swipe right / left")')).toBeVisible();
 		await expect(modal.locator('dt:has-text("Delete current chat")')).toBeVisible();
+		await expect(modal.locator('dd:has-text("Double two-finger tap")')).toBeVisible();
+		await expect(modal.locator('dt:has-text("Delete every chat")')).toBeVisible();
 		await expect(modal.locator('dd:has-text("Double three-finger tap")')).toBeVisible();
 	});
 
@@ -90,22 +92,16 @@ test.describe("gestures", () => {
 		});
 	}
 
-	test("edge swipe from the left toggles the chat sidebar", async ({ page }) => {
+	test("edge swipe from the left never opens the chat sidebar", async ({ page }) => {
 		const aside = page.locator("aside:has(button.side-chat)");
 		const panel = page.locator(".settings-panel");
-		// State varies by persisted settings; read it, then prove the
-		// stroke toggles it — closed opens (onto the search box), open
-		// dismisses — and the same stroke toggles it back.
-		const startedOpen = !(await aside.getAttribute("class"))?.includes("collapsed");
+		// Double-tap is the only opener: a rightward stroke with
+		// everything shut changes nothing...
 		await swipeFromLeftEdge(page);
-		if (startedOpen) await expect(aside).toHaveClass(/collapsed/);
-		else await expect(aside).not.toHaveClass(/collapsed/);
+		await expect(aside).toHaveClass(/collapsed/);
 		await swipeFromLeftEdge(page);
-		if (startedOpen) await expect(aside).not.toHaveClass(/collapsed/);
-		else await expect(aside).toHaveClass(/collapsed/);
-		// Normalize shut: the settings half needs the sheet closed.
-		if (startedOpen) await swipeFromLeftEdge(page);
-		// Dismiss half still works: open settings from the right edge,
+		await expect(aside).toHaveClass(/collapsed/);
+		// ...but still dismisses: open settings from the right edge,
 		// then watch a rightward stroke close them (sheet stays shut).
 		await swipeFromRightEdge(page);
 		await expect(panel).not.toHaveClass(/closed/);
@@ -137,20 +133,15 @@ test.describe("gestures", () => {
 		);
 	}
 
-	test("mid-screen swipe right toggles the chat sidebar", async ({ page }) => {
+	test("mid-screen swipe right never opens the chat sidebar", async ({ page }) => {
 		const aside = page.locator("aside:has(button.side-chat)");
 		const panel = page.locator(".settings-panel");
-		// Same ownership as the edge rule: the stroke toggles the sheet
-		// in either state, and still dismisses an open settings.
-		const startedOpen = !(await aside.getAttribute("class"))?.includes("collapsed");
+		// Double-tap is the only opener: the stroke changes nothing with
+		// everything shut, and still dismisses an open settings.
 		await swipeMidScreen(page, 150, 260);
-		if (startedOpen) await expect(aside).toHaveClass(/collapsed/);
-		else await expect(aside).not.toHaveClass(/collapsed/);
+		await expect(aside).toHaveClass(/collapsed/);
 		await swipeMidScreen(page, 150, 260);
-		if (startedOpen) await expect(aside).not.toHaveClass(/collapsed/);
-		else await expect(aside).toHaveClass(/collapsed/);
-		// Normalize shut: the settings half needs the sheet closed.
-		if (startedOpen) await swipeMidScreen(page, 150, 260);
+		await expect(aside).toHaveClass(/collapsed/);
 		await swipeFromRightEdge(page);
 		await expect(panel).not.toHaveClass(/closed/);
 		await swipeMidScreen(page, 150, 260);
@@ -216,17 +207,18 @@ test.describe("share", () => {
 test.describe("touch", () => {
 	/**
 	 * Android touch batch: one-line region pills, bottom-sheet chats, the
-	 * touch selection menu with Speak, two-finger chat steps, three-finger
-	 * delete, sidebar mutual exclusion, and the theme pin. Same UA-gated
-	 * branches as android.e2e.ts, S24-class viewport.
+	 * touch selection menu with Speak, two-finger chat steps, two-finger
+	 * delete, three-finger delete-all, sidebar mutual exclusion, and the
+	 * theme pin. Same UA-gated branches as android.e2e.ts, S24-class
+	 * viewport.
 	 */
 	async function seedTwoChats(page: Page): Promise<void> {
 		await page.addInitScript(() => {
 			window.localStorage.setItem("ccez-mock-provider", "1");
-			window.localStorage.setItem("ccez-studio-settings-v1", JSON.stringify({}));
+			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
 			const msg = (id: string, content: string) => ({ id, role: "assistant", content, usage: null, error: null });
 			window.localStorage.setItem(
-				"ccez-studio-chats-v1",
+				"ccez-llm-chats-v1",
 				JSON.stringify([
 					{ id: "chat-a", createdAt: 1, replyLang: null, messages: [msg("m1", "alpha-aaa")] },
 					{ id: "chat-b", createdAt: 2, replyLang: null, messages: [msg("m2", "beta-bbb")] }
@@ -311,7 +303,7 @@ test.describe("touch", () => {
 		}
 	}
 
-	test("swipes dismiss before they summon on a phone", async ({ page }) => {
+	test("swipes dismiss but never summon on a phone", async ({ page }) => {
 		await seedEmpty(page);
 		const aside = page.locator("aside:has(button.new)");
 		const panel = page.locator(".settings-panel");
@@ -322,20 +314,17 @@ test.describe("touch", () => {
 		await swipeX(page, 4, 144);
 		await expect(panel).toHaveClass(/closed/);
 		await expect(aside).toHaveClass(/collapsed/);
-		// Since the toggle redesign, a rightward stroke with everything
-		// shut summons chats (and the same stroke dismisses them); a
-		// leftward stroke with the sheet open just closes it, and
-		// settings summon after that.
-		await swipeX(page, 4, 144);
-		await expect(aside).not.toHaveClass(/collapsed/);
+		// A rightward stroke with everything shut changes nothing now:
+		// double-tap is the only opener.
 		await swipeX(page, 4, 144);
 		await expect(aside).toHaveClass(/collapsed/);
-		// Two-finger double-tap still summons the sidebar too.
+		await swipeX(page, 4, 144);
+		await expect(aside).toHaveClass(/collapsed/);
+		// Two-finger double-tap deletes instead of summoning now.
 		await doubleTapTwoFinger(page);
-		await expect(aside).not.toHaveClass(/collapsed/);
-		await swipeX(page, 408, 268);
 		await expect(aside).toHaveClass(/collapsed/);
-		await expect(panel).toHaveClass(/closed/);
+		await expect(page.locator(".toast")).toHaveText("Chat deleted");
+		// Settings still summon from the right edge after that.
 		await swipeX(page, 408, 268);
 		await expect(panel).not.toHaveClass(/closed/);
 	});
@@ -370,11 +359,23 @@ test.describe("touch", () => {
 				})
 			);
 		});
-		const after = await page.locator("article .rendered").first().innerText();
-		expect(new Set([before, after]).size).toBe(2);
+		// The step lands through a view transition: poll instead of a
+		// one-shot read, or the assertion races the re-render and sees
+		// the old chat. A broken step still fails the poll honestly.
+		await expect
+			.poll(async () => page.locator("article .rendered").first().innerText(), { timeout: 10_000 })
+			.not.toBe(before);
 	});
 
-	test("double three-finger tap deletes the current chat", async ({ page }) => {
+	test("double two-finger tap deletes the current chat", async ({ page }) => {
+		await seedTwoChats(page);
+		expect(await page.locator("aside button.side-chat").count()).toBe(2);
+		await doubleTapTwoFinger(page);
+		await expect(page.locator("aside button.side-chat")).toHaveCount(1);
+		await expect(page.locator(".toast")).toHaveText("Chat deleted");
+	});
+
+	test("double three-finger tap deletes every chat", async ({ page }) => {
 		await seedTwoChats(page);
 		expect(await page.locator("aside button.side-chat").count()).toBe(2);
 		const tap = () =>
@@ -397,7 +398,8 @@ test.describe("touch", () => {
 		await tap();
 		await tap();
 		await expect(page.locator("aside button.side-chat")).toHaveCount(1);
-		await expect(page.locator(".toast")).toHaveText("Chat deleted");
+		await expect(page.locator("article")).toHaveCount(0);
+		await expect(page.locator(".toast")).toHaveText("All chats deleted");
 	});
 
 	test("touch selection docks Annotate in the composer, never floating", async ({ page }) => {
@@ -442,14 +444,14 @@ test.describe("touch", () => {
 	test("a long chat scrolls inside the list, never squeezing the prompt", async ({ page }) => {
 		await page.addInitScript(() => {
 			window.localStorage.setItem("ccez-mock-provider", "1");
-			window.localStorage.setItem("ccez-studio-settings-v1", JSON.stringify({}));
+			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
 			const messages = [];
 			for (let i = 0; i < 20; i++) {
 				messages.push({ id: `u${i}`, role: "user", content: `question ${i}`, usage: null, error: null });
 				messages.push({ id: `a${i}`, role: "assistant", content: `answer ${i}`, usage: null, error: null });
 			}
 			window.localStorage.setItem(
-				"ccez-studio-chats-v1",
+				"ccez-llm-chats-v1",
 				JSON.stringify([{ id: "chat-a", createdAt: 1, replyLang: null, messages }])
 			);
 		});
@@ -475,10 +477,10 @@ test.describe("touch", () => {
 	test("hide-messages mode reveals one message per tap", async ({ page }) => {
 		await page.addInitScript(() => {
 			window.localStorage.setItem("ccez-mock-provider", "1");
-			window.localStorage.setItem("ccez-studio-settings-v1", JSON.stringify({ hideMessages: true }));
+			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({ hideMessages: true }));
 			const msg = (id: string, role: string, content: string) => ({ id, role, content, usage: null, error: null });
 			window.localStorage.setItem(
-				"ccez-studio-chats-v1",
+				"ccez-llm-chats-v1",
 				JSON.stringify([
 					{ id: "chat-a", createdAt: 1, replyLang: null, messages: [msg("m1", "assistant", "hello-hidden")] }
 				])
@@ -513,9 +515,9 @@ test.describe("touch", () => {
 	test("theme pin holds dark under a light OS", async ({ page }) => {
 		await page.addInitScript(() => {
 			window.localStorage.setItem("ccez-mock-provider", "1");
-			window.localStorage.setItem("ccez-studio-settings-v1", JSON.stringify({ theme: "dark" }));
+			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({ theme: "dark" }));
 			window.localStorage.setItem(
-				"ccez-studio-chats-v1",
+				"ccez-llm-chats-v1",
 				JSON.stringify([{ id: "e2e-chat", createdAt: 1, replyLang: null, messages: [] }])
 			);
 		});
@@ -523,7 +525,14 @@ test.describe("touch", () => {
 		await expect(page.locator(".lang-menus")).toBeVisible();
 		expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe("dark");
 		const bg = await page.locator(".app").evaluate((el) => getComputedStyle(el).backgroundColor);
-		expect(bg).toBe("rgb(23, 23, 26)");
+		// Newer Chromium reports color(srgb …) floats instead of rgb()
+		// ints for the same paint: compare channels, not the string.
+		const channels = bg
+			.match(/[\d.]+/g)
+			?.map(Number)
+			.slice(0, 3)
+			.map((v) => Math.round(bg.startsWith("color") ? v * 255 : v));
+		expect(channels).toEqual([23, 23, 26]);
 	});
 
 	test.describe("dark phone", () => {
@@ -577,7 +586,9 @@ test.describe("touch", () => {
 			await swipeX(page, 356, 216);
 			await page.locator(".settings-panel").waitFor();
 			await page.locator('button:has-text("Show all gestures")').click();
-			await page.locator("#shortcuts-heading").waitFor();
+			// Phones have no modal heading by design (the filter owns
+			// the head row): wait for the gestures list itself.
+			await page.locator(".keys").waitFor();
 			const fit = await page.evaluate(() => {
 				const keys = document.querySelector(".keys");
 				const dd = document.querySelector(".keys dd");
@@ -651,9 +662,9 @@ test.describe("touch", () => {
 			const long = Array.from({ length: 60 }, (_, i) => `line ${i} of a very tall message`).join("\n");
 			await page.addInitScript((content: string) => {
 				window.localStorage.setItem("ccez-mock-provider", "1");
-				window.localStorage.setItem("ccez-studio-settings-v1", JSON.stringify({}));
+				window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
 				window.localStorage.setItem(
-					"ccez-studio-chats-v1",
+					"ccez-llm-chats-v1",
 					JSON.stringify([
 						{
 							id: "e2e-chat",
@@ -756,5 +767,155 @@ test.describe("touch", () => {
 		await page.locator(".settings-panel").waitFor();
 		const box = page.locator('label.check:has-text("Hide message buttons until tapped") input');
 		await expect(box).toBeChecked();
+	});
+});
+
+test.describe("always-visible prompt", () => {
+	test.use({ hasTouch: true, isMobile: true });
+
+	const LONG = "Line of chat text for height. ".repeat(120);
+
+	async function seed(
+		page: Page,
+		settings: Record<string, unknown>,
+		bodies: string[]
+	): Promise<void> {
+		await page.addInitScript(
+			({ s, texts }: { s: Record<string, unknown>; texts: string[] }) => {
+				window.localStorage.setItem("ccez-mock-provider", "1");
+				window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify(s));
+				window.localStorage.setItem(
+					"ccez-llm-chats-v1",
+					JSON.stringify(
+						texts.map((content, n) => ({
+							id: `chat-${n}`,
+							createdAt: n,
+							replyLang: null,
+							messages:
+								content === ""
+									? []
+									: [{ id: `m${n}`, role: "assistant", content, usage: null, error: null }]
+						}))
+					)
+				);
+			},
+			{ s: settings, texts: bodies }
+		);
+	}
+
+	const composer = (page: Page) => page.locator(".prompt .ta-input");
+
+	/** Synthetic single-finger stroke: the window touch handlers read real TouchEvents. */
+	async function flick(
+		page: Page,
+		targetSel: string,
+		x0: number,
+		y0: number,
+		x1: number,
+		y1: number
+	): Promise<void> {
+		await page.evaluate(
+			({ targetSel, x0, y0, x1, y1 }) => {
+				const target = document.querySelector(targetSel);
+				if (!target) throw new Error(`no flick target: ${targetSel}`);
+				const start = new Touch({ identifier: 7, target, clientX: x0, clientY: y0 });
+				target.dispatchEvent(
+					new TouchEvent("touchstart", { touches: [start], bubbles: true, cancelable: true })
+				);
+				const end = new Touch({ identifier: 7, target, clientX: x1, clientY: y1 });
+				target.dispatchEvent(
+					new TouchEvent("touchend", { touches: [], changedTouches: [end], bubbles: true, cancelable: true })
+				);
+			},
+			{ targetSel, x0, y0, x1, y1 }
+		);
+	}
+
+	/** Empty-state pills stay tappable at big fonts on small screens. */
+	test("language pills clear the floating prompt", async ({ page }) => {
+		await seed(page, { fontScale: 1.8 }, [""]);
+		await page.goto("/");
+		await page.setViewportSize({ width: 360, height: 640 });
+		await expect(page.locator(".lang-menus").first()).toBeVisible();
+		await page.locator(".lang-menu > button").nth(1).tap();
+		await expect(page.locator(".lang-list").first()).toBeVisible();
+		await page.locator(".lang-list button").first().tap();
+		await expect(page.locator(".lang-list")).toHaveCount(0);
+	});
+
+	/** The prompt is a permanent fixture on phones: never idle-hidden. */
+	test("prompt stays visible, swipes leave it alone", async ({ page }) => {
+		await seed(page, {}, [LONG]);
+		await page.goto("/");
+		await expect(page.locator("article .rendered").first()).toBeVisible();
+		await expect(page.locator(".prompt.prompt-idle")).toHaveCount(0);
+		await flick(page, "article.assistant .rendered", 200, 500, 200, 420);
+		await expect(page.locator(".prompt.prompt-idle")).toHaveCount(0);
+		await expect(composer(page)).not.toBeFocused();
+		await flick(page, "article.assistant .rendered", 200, 420, 200, 500);
+		await expect(page.locator(".prompt.prompt-idle")).toHaveCount(0);
+		await expect(composer(page)).not.toBeFocused();
+	});
+
+	/** A tap keeps native behavior: visible prompt, no focus steal. */
+	test("tap does not focus the prompt", async ({ page }) => {
+		await seed(page, {}, [LONG]);
+		await page.goto("/");
+		await expect(page.locator("article .rendered").first()).toBeVisible();
+		await flick(page, "article.assistant .rendered", 200, 500, 200, 502);
+		await expect(page.locator(".prompt.prompt-idle")).toHaveCount(0);
+		await expect(composer(page)).not.toBeFocused();
+	});
+
+	/** Composer stacks the field over the button row, send at its end. */
+	test("composer stacks text over buttons", async ({ page }) => {
+		await seed(page, {}, [LONG]);
+		await page.goto("/");
+		await expect(page.locator("article .rendered").first()).toBeVisible();
+		const boxes = (await page.evaluate(() => {
+			const rect = (sel: string) => {
+				const r = document.querySelector(sel)?.getBoundingClientRect();
+				return r ? { y: r.y, h: r.height } : null;
+			};
+			return {
+				ed: rect(".prompt .ta-input"),
+				tools: rect(".prompt .prompt-tools"),
+				send: rect(".prompt .send-btn")
+			};
+		})) as {
+			ed: { y: number; h: number } | null;
+			tools: { y: number; h: number } | null;
+			send: { y: number; h: number } | null;
+		};
+		expect(boxes.ed && boxes.tools && boxes.send).toBeTruthy();
+		if (!boxes.ed || !boxes.tools || !boxes.send) return;
+		expect(boxes.tools.y).toBeGreaterThan(boxes.ed.y + boxes.ed.h - 2);
+		expect(Math.abs(boxes.send.y + boxes.send.h - (boxes.tools.y + boxes.tools.h))).toBeLessThanOrEqual(4);
+	});
+
+	/** Double-tap on empty space is the only sidebar opener. */
+	test("double-tap empty space opens the sidebar", async ({ page }) => {
+		await seed(page, {}, [LONG]);
+		await page.goto("/");
+		await expect(page.locator("article .rendered").first()).toBeVisible();
+		const aside = page.locator("aside").first();
+		await expect(aside).toHaveClass(/collapsed/);
+		// One tap alone changes nothing: the pair is the gesture.
+		await flick(page, "main", 200, 120, 200, 121);
+		await expect(aside).toHaveClass(/collapsed/);
+		await page.waitForTimeout(120);
+		await flick(page, "main", 200, 120, 200, 121);
+		await expect(aside).not.toHaveClass(/collapsed/);
+	});
+
+	/** Rightward strokes never open the sidebar, only dismiss. */
+	test("edge swipe does not open the sidebar", async ({ page }) => {
+		await seed(page, {}, [LONG]);
+		await page.goto("/");
+		await expect(page.locator("article .rendered").first()).toBeVisible();
+		const aside = page.locator("aside").first();
+		await expect(aside).toHaveClass(/collapsed/);
+		await flick(page, "article.assistant .rendered", 30, 500, 220, 505);
+		await expect(aside).toHaveClass(/collapsed/);
 	});
 });

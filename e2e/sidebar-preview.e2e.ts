@@ -15,7 +15,7 @@ async function seedTwoChats(page: Page): Promise<void> {
 				messages: [{ id: `${id}-m`, role: "assistant", content, usage: null, error: null }]
 			});
 			window.localStorage.setItem(
-				"ccez-studio-chats-v1",
+				"ccez-llm-chats-v1",
 				JSON.stringify([chat("chat-a", a), chat("chat-b", b)])
 			);
 		},

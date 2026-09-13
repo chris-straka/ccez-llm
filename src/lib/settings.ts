@@ -156,7 +156,9 @@ export interface AppSettings {
 	inspectEnabled: boolean;
 }
 
-const STORAGE_KEY = "ccez-studio-settings-v1";
+const STORAGE_KEY = "ccez-llm-settings-v1";
+/** Pre-rename key (ccez-studio era): read once, then saves move to STORAGE_KEY. */
+const LEGACY_STORAGE_KEY = "ccez-studio-settings-v1";
 
 export const DEFAULT_SYSTEM_PROMPT = "";
 
@@ -329,7 +331,7 @@ function browserStore(): KeyValueStore | null {
 
 export function loadSettings(store?: KeyValueStore): AppSettings {
 	const backend = store ?? browserStore() ?? memoryStore;
-	const raw = backend.getItem(STORAGE_KEY);
+	const raw = backend.getItem(STORAGE_KEY) ?? backend.getItem(LEGACY_STORAGE_KEY);
 	if (!raw) return defaultSettings();
 	try {
 		const parsed = JSON.parse(raw) as Partial<AppSettings>;

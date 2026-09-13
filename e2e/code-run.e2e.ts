@@ -93,7 +93,7 @@ test("code clicks never summon the hidden prompt", async ({ page }) => {
 		{ role: "assistant", content: 'Run it:\n\n```python\nprint("hi")\n```\n\n' + "x".repeat(2000) }
 	]);
 	await page.addInitScript(() => {
-		window.localStorage.setItem("ccez-studio-settings-v1", JSON.stringify({ promptIdleSec: -1 }));
+		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({ promptIdleSec: -1 }));
 	});
 	await page.goto("/");
 	const block = page.locator(".ccez-code").first();
