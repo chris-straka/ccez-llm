@@ -2,11 +2,11 @@ import { expect, test } from "@playwright/test";
 import { seedChat } from "./helpers";
 
 /** Browser side panel contract (browser fallback: no Tauri shell
-here, so Cmd+T embeds the single tab as a viewport instead of a
-second OS webview — same open state, address-bar resolve, and Esc
-behavior; the shell-only webview dock is hand-verified in
-`tauri dev`). Shortcut-only: no toggle button exists. */
-test("meta+t toggles the browser, enter navigates, esc closes", async ({ page }) => {
+here, so Cmd+T docks a link strip instead of a second OS webview —
+same open state, address-bar resolve, and Esc behavior; the
+shell-only webview dock is hand-verified in `tauri dev`).
+Shortcut-only: no toggle button exists. */
+test("meta+t opens the browser strip, enter repoints its link, esc closes", async ({ page }) => {
 	await seedChat(page, []);
 	await page.goto("/");
 	await page.locator(".cm-content").first().waitFor({ timeout: 60_000 });
@@ -29,55 +29,32 @@ test("meta+t toggles the browser, enter navigates, esc closes", async ({ page })
 	// Cmd+T lands focus in the address bar, out of the prompt.
 	await expect(address).toBeFocused();
 
-	// Fresh tab shows the start page; the external link points home.
-	const frame = panel.locator('iframe[title="Browser view"]');
-	const openLink = panel.getByRole("link", { name: "Open in new tab" });
-	await expect(panel.getByText("Type an address or a search in the bar above")).toBeVisible();
-	await expect(frame).toHaveCount(0);
+	// Fresh strip explains itself; the single link points home.
+	const openLink = panel.getByRole("link", { name: "Open browser home in a browser tab" });
+	await expect(panel.getByText("needs the desktop app")).toBeVisible();
 	await expect(openLink).toHaveAttribute("href", "https://duckduckgo.com/");
 
-	// Typing alone never navigates (a browser commits on Enter).
+	// The link repoints live as you type (it derives from the address,
+	// so the home-name locator below only fits the fresh strip); Enter
+	// is a no-op in the fallback, where there is no tab to commit.
 	await address.fill("example.com");
-	await expect(frame).toHaveCount(0);
-	await expect(openLink).toHaveAttribute("href", "https://duckduckgo.com/");
-
-	// A bare host resolves to https and commits to the viewport.
+	const committed = panel.getByRole("link");
+	await expect(committed).toHaveAttribute("href", "https://example.com/");
+	await expect(committed).toContainText("https://example.com/");
 	await address.press("Enter");
-	await expect(frame).toHaveAttribute("src", "https://example.com/");
-	await expect(openLink).toHaveAttribute("href", "https://example.com/");
+	await expect(committed).toHaveAttribute("href", "https://example.com/");
 
 	// A phrase becomes a search commit.
 	await address.fill("cats and dogs");
 	await address.press("Enter");
-	await expect(frame).toHaveAttribute(
-		"src",
-		"https://duckduckgo.com/?q=cats%20and%20dogs"
-	);
+	await expect(committed).toHaveAttribute("href", "https://duckduckgo.com/?q=cats%20and%20dogs");
 
-	// Back/forward step through committed pages only.
-	const back = panel.getByRole("button", { name: "Back" });
-	const forward = panel.getByRole("button", { name: "Forward" });
-	await expect(back).toBeEnabled();
-	await back.click();
-	await expect(frame).toHaveAttribute("src", "https://example.com/");
-	await expect(forward).toBeEnabled();
-	await forward.click();
-	await expect(frame).toHaveAttribute(
-		"src",
-		"https://duckduckgo.com/?q=cats%20and%20dogs"
-	);
-
-	// Reload keeps the committed page.
-	await panel.getByRole("button", { name: "Reload" }).click();
-	await expect(frame).toHaveAttribute(
-		"src",
-		"https://duckduckgo.com/?q=cats%20and%20dogs"
-	);
-
-	// A second Cmd+T closes the tab it opened (toggle).
+	// A second Cmd+T never closes or duplicates: it refocuses the bar.
 	await page.locator('header[aria-label="App"]').click({ position: { x: 5, y: 5 } });
 	await page.keyboard.press("Meta+t");
-	await expect(panel).toHaveCount(0);
+	await expect(panel).toBeVisible();
+	await expect(page.locator(".sideview-fallback")).toHaveCount(1);
+	await expect(address).toBeFocused();
 
 	// Esc closes from anywhere; reopening never duplicates the strip.
 	await page.keyboard.press("Meta+t");
@@ -89,9 +66,9 @@ test("meta+t toggles the browser, enter navigates, esc closes", async ({ page })
 	await page.keyboard.press("Meta+t");
 	await expect(page.locator(".sideview-fallback")).toHaveCount(1);
 
-	// Reopening keeps the tab's page (no reset to the start page).
-	await expect(frame).toHaveAttribute(
-		"src",
+	// Reopening keeps the link (no reset to home).
+	await expect(panel.getByRole("link")).toHaveAttribute(
+		"href",
 		"https://duckduckgo.com/?q=cats%20and%20dogs"
 	);
 

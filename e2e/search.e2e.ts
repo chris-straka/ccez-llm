@@ -332,9 +332,11 @@ test.describe("touch paths", () => {
 		viewport: { width: 412, height: 915 }
 	});
 
-	test("left-to-right swipe opens the chats sidebar with its search box", async ({ page }) => {
+	test("left-to-right swipe never opens the chats sidebar", async ({ page }) => {
 		await seedThreeChats(page);
-		// The settings panel is a second aside: scope to the chats one.
+		// Double-tap empty space is the only sidebar opener on Android:
+		// rightward strokes only dismiss. (Double-tap open is covered
+		// in android.e2e.ts; this pins the dismiss-only half here.)
 		const sidebar = page.locator("aside:not(.settings-panel)");
 		await expect(sidebar).toHaveClass(/collapsed/);
 		await page.evaluate(() => {
@@ -347,8 +349,7 @@ test.describe("touch paths", () => {
 				new TouchEvent("touchend", { bubbles: true, cancelable: true, composed: true, touches: [], changedTouches: [touch(200, 604)] })
 			);
 		});
-		await expect(sidebar).not.toHaveClass(/collapsed/);
-		await expect(page.getByLabel("Search chats")).toBeVisible();
+		await expect(sidebar).toHaveClass(/collapsed/);
 	});
 
 	test("paste-images button appears with clipboard.read and reports an empty clipboard", async ({

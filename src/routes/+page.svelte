@@ -173,6 +173,7 @@
 	type FingerTrack
 } from "$lib/platform";
 import { desktopShortcuts, filteredShortcuts, touchShortcuts } from "$lib/shortcuts";
+import { consumeEvent, isEditableTarget, isFieldTarget } from "$lib/events";
 	import {
 		detectScript,
 		detectScripts,
@@ -5459,8 +5460,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 					"input, textarea, select, [contenteditable], .shortcuts-filter"
 				)
 			) {
-				event.preventDefault();
-				event.stopPropagation();
+								consumeEvent(event);
 				stepInspect(event.key === "l" ? 1 : -1);
 				return;
 			}
@@ -5519,8 +5519,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				// Always the single-tab browser: it opens and lands
 				// focus in its address bar (a second press focuses
 				// the bar again). Selections never divert it.
-				event.preventDefault();
-				event.stopPropagation();
+								consumeEvent(event);
 				if (!sideviewOpen) void setSideviewOpen(true, true);
 				else focusBrowserAddress();
 				return;
@@ -5528,8 +5527,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			if (event.key === "Escape") {
 				// One ladder for every layer (see dismissEscape):
 				// topmost first, exactly one per press.
-				event.preventDefault();
-				event.stopPropagation();
+								consumeEvent(event);
 				dismissEscape(inEditor);
 				return;
 			}
@@ -5542,8 +5540,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				// Full-text search palette across chats/annotations.
 				// Browsers reserve Ctrl+P for print and may keep it; the
 				// shell owns the combo and always delivers it.
-				event.preventDefault();
-				event.stopPropagation();
+								consumeEvent(event);
 				if (searchOpen) closeSearch();
 				else openSearch();
 				return;
@@ -5557,8 +5554,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 					// Fullscreen toggle: Cmd+E and Ctrl+Cmd+F. Claimed
 					// before find below, so the dual-modifier chord never
 					// reads as Cmd/Ctrl+F.
-					event.preventDefault();
-					event.stopPropagation();
+										consumeEvent(event);
 					void toggleFullscreen();
 					return;
 				}
@@ -5571,8 +5567,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 					// In-chat find across the visible messages, cycling hits.
 					// The fullscreen chords are claimed above, so
 					// Ctrl+Cmd+F never lands here.
-					event.preventDefault();
-					event.stopPropagation();
+										consumeEvent(event);
 					if (shortcutsOpen) {
 						// The modal owns ⌘F while open: it filters this
 						// list only, never the chat.
@@ -5591,8 +5586,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			// stays unbound so Ctrl+Shift+Space still types a
 			// non-breaking space; the OS-global half (desktop.rs)
 			// skips focused windows for the same reason.
-			event.preventDefault();
-			event.stopPropagation();
+						consumeEvent(event);
 			enterEditMode();
 			return;
 		}
@@ -5602,12 +5596,10 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				// style). Anywhere else the chord does nothing — still
 				// swallowed so the browser won't open a file.
 				if (inEditor && editor?.togglePastes()) {
-					event.preventDefault();
-					event.stopPropagation();
+										consumeEvent(event);
 					return;
 				}
-				event.preventDefault();
-				event.stopPropagation();
+								consumeEvent(event);
 				return;
 			}
 			if (
@@ -5618,17 +5610,15 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			) {
 				// ⌘Enter sends from anywhere — not just with the prompt
 				// focused. Settings fields keep ⌘Enter for themselves.
-				if ((event.target as HTMLElement | null)?.closest("input, textarea, select")) return;
-				event.preventDefault();
-				event.stopPropagation();
+				if (isFieldTarget(event.target)) return;
+								consumeEvent(event);
 				onSubmit("send");
 				return;
 			}
 			if (event.ctrlKey && event.altKey && event.key.startsWith("Arrow")) {
 				// Capture phase (see listener below): fires before CodeMirror can
 				// swallow the combo, so the shortcuts work from anywhere.
-				event.preventDefault();
-				event.stopPropagation();
+								consumeEvent(event);
 				if (event.key === "ArrowRight") cycleProvider(1);
 				else if (event.key === "ArrowLeft") cycleProvider(-1);
 				else if (event.key === "ArrowUp") cycleThinking(1);
@@ -5637,8 +5627,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			}
 			if (event.ctrlKey && event.altKey && event.code === "KeyN") {
 				// Physical key code: macOS Option+N reports key "~".
-				event.preventDefault();
-				event.stopPropagation();
+								consumeEvent(event);
 				doNewChat();
 				return;
 			}
@@ -5648,14 +5637,12 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				// window to open. Note: browsers reserve ⌘N for a new
 				// window, so in a plain browser tab this never arrives —
 				// the shell owns it.
-				event.preventDefault();
-				event.stopPropagation();
+								consumeEvent(event);
 				doNewChat();
 				return;
 			}
 			if (event.ctrlKey && event.altKey && event.code === "KeyS") {
-				event.preventDefault();
-				event.stopPropagation();
+								consumeEvent(event);
 				setVoiceEnabled(!voiceOn());
 				return;
 			}
@@ -5665,15 +5652,14 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				!event.altKey &&
 				(event.key === "Backspace" || event.key === "Delete") &&
 				!inEditor &&
-				!(event.target as HTMLElement | null)?.closest("input, textarea, select, [contenteditable]")
+				!isEditableTarget(event.target)
 			) {
 				// ⌘Delete drops the whole current chat (a blank one takes
 				// its place, so the composer never strands) and resets the
 				// voice language to the checked keyboard. Mac Delete-key
 				// reports Backspace; forward-delete reports Delete. Typing
 				// targets keep the chord for line-kill habits.
-				event.preventDefault();
-				event.stopPropagation();
+								consumeEvent(event);
 				dropChat(chat.id);
 				editor?.focus();
 				return;
@@ -5684,13 +5670,12 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				!event.altKey &&
 				(event.key === "Backspace" || event.key === "Delete") &&
 				!inEditor &&
-				!(event.target as HTMLElement | null)?.closest("input, textarea, select, [contenteditable]")
+				!isEditableTarget(event.target)
 			) {
 				// ⌘⇧Delete drops EVERY chat (a blank one takes their
 				// place, so the composer never strands) and resets the
 				// voice language to the checked keyboard.
-				event.preventDefault();
-				event.stopPropagation();
+								consumeEvent(event);
 				dropAllChats();
 				editor?.focus();
 				return;
@@ -5699,23 +5684,20 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				// Physical key codes: shifted brackets report layout-dependent
 				// `key` values ("{" / "}" on US), so match the code instead.
 				if (event.code === "BracketLeft") {
-					event.preventDefault();
-					event.stopPropagation();
+										consumeEvent(event);
 					toggleSidebar();
 					if (!settings.sidebarCollapsed) focusActiveSideChat();
 					return;
 				}
 				if (event.code === "BracketRight") {
-					event.preventDefault();
-					event.stopPropagation();
+										consumeEvent(event);
 					toggleSettingsPanel();
 					return;
 				}
 				if (event.code === "KeyH") {
 					// ⇧⌘H with settings open closes them and lands in the
 					// prompt; otherwise it mirrors ⌘B for the chat list.
-					event.preventDefault();
-					event.stopPropagation();
+										consumeEvent(event);
 					if (settingsOpen) {
 						settingsOpen = false;
 						enterEditMode();
@@ -5728,8 +5710,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				if (event.code === "KeyL") {
 					// ⇧⌘L with the chat list open closes it and lands in
 					// the prompt; otherwise it mirrors ⌘, for settings.
-					event.preventDefault();
-					event.stopPropagation();
+										consumeEvent(event);
 					if (!settings.sidebarCollapsed) {
 						settings.sidebarCollapsed = true;
 						persistSettings();
@@ -5741,8 +5722,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				}
 				if (event.code === "Slash") {
 					// ⇧⌘/ (the "?" chord) toggles the shortcuts modal.
-					event.preventDefault();
-					event.stopPropagation();
+										consumeEvent(event);
 					if (shortcutsOpen) shortcutsOpen = false;
 					else openShortcuts();
 					return;
@@ -5750,8 +5730,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				if (event.code === "KeyJ" || event.code === "KeyK") {
 					// ⇧⌘J steps down (newer chat, minting one past the
 					// newest end); ⇧⌘K steps up (older). Works sidebar-closed.
-					event.preventDefault();
-					event.stopPropagation();
+										consumeEvent(event);
 					stepChat(event.code === "KeyJ" ? 1 : -1);
 					return;
 				}
@@ -5767,8 +5746,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			// ⌘+ / ⌘- scales the whole UI (the app's own zoom — the
 			// shell has no browser-chrome zoom to fall back on). With Shift
 			// held the same chords widen/narrow the chat column instead.
-			event.preventDefault();
-			event.stopPropagation();
+						consumeEvent(event);
 			const narrow = event.key === "-" || event.key === "_";
 			if (event.shiftKey) adjustChatWidth(narrow ? -2 : 2);
 			else adjustFontScale(narrow ? -0.1 : 0.1);
@@ -5782,30 +5760,26 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		) {
 			// ⇧⌘, mirrors ⌘, (Shift turns the comma key into "<" on US
 			// layouts, so both spellings count) — toggles the panel.
-			event.preventDefault();
-			event.stopPropagation();
+						consumeEvent(event);
 			toggleSettingsPanel();
 			return;
 		}
 		if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey) {
 				const combo = event.key.toLowerCase();
 				if (combo === "b") {
-					event.preventDefault();
-					event.stopPropagation();
+										consumeEvent(event);
 					toggleSidebar();
 					if (!settings.sidebarCollapsed) focusActiveSideChat();
 					return;
 				}
 				if (event.key === ".") {
-					event.preventDefault();
-					event.stopPropagation();
+										consumeEvent(event);
 					toggleSettingsPanel();
 					return;
 				}
 				if (event.key === ",") {
 					// ⌘, — the macOS Settings shortcut — toggles the panel.
-					event.preventDefault();
-					event.stopPropagation();
+										consumeEvent(event);
 					toggleSettingsPanel();
 					return;
 				}
@@ -5815,8 +5789,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 					// pressing the active one's key clears it again.
 					const code = QUICK_LANG_CODES[quickIdx];
 					if (code) {
-						event.preventDefault();
-						event.stopPropagation();
+												consumeEvent(event);
 						if (activeReplyCode === code) clearReplyLang();
 						else setReplyLang(code);
 						return;
@@ -5830,15 +5803,14 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 					(event.key === "d" || event.key === "D") &&
 					!inEditor &&
 					hoveredIdx >= 0 &&
-					!(event.target as HTMLElement | null)?.closest("input, textarea, select")
+					!isFieldTarget(event.target)
 				) {
 					// ⌘D deletes the hovered message. Ctrl+D is deliberately
 					// excluded: the prompt keeps it for editing and scroll
 					// mode fast-scrolls on it instead.
 					const target = chat.messages[hoveredIdx];
 					if (target) {
-						event.preventDefault();
-						event.stopPropagation();
+												consumeEvent(event);
 						deleteMessage(chatState, hoveredIdx);
 						return;
 					}
@@ -5852,7 +5824,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				!event.ctrlKey &&
 				!event.altKey &&
 				!event.shiftKey &&
-				!(event.target as HTMLElement | null)?.closest("input, textarea, select")
+				!isFieldTarget(event.target)
 			) {
 				// A toggles every aid the hovered message offers — pinyin
 				// over Chinese lines, furigana over Japanese ones (dual
@@ -5863,8 +5835,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				const target = viewChat.messages[hoveredIdx];
 				const kinds = target ? offeredLocalAids(aidDisplayText(target)) : [];
 				if (target && kinds.length > 0) {
-					event.preventDefault();
-					event.stopPropagation();
+										consumeEvent(event);
 					const pinned = pinnedKinds(target.id);
 					if (kinds.every((kind) => pinned.includes(kind))) {
 						for (const kind of kinds) unpinLocalAid(target, kind);
@@ -5883,7 +5854,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				!event.ctrlKey &&
 				!event.altKey &&
 				!event.shiftKey &&
-				!(event.target as HTMLElement | null)?.closest("input, textarea, select")
+				!isFieldTarget(event.target)
 			) {
 				// M pins pinyin, N pins furigana on the message in the
 				// middle of the screen (toggle — a second press lifts it).
@@ -5894,8 +5865,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				const want: LocalAid = event.key === "m" ? "pinyin" : "furigana";
 				const kinds = target ? offeredLocalAids(aidDisplayText(target)) : [];
 				if (target && kinds.includes(want)) {
-					event.preventDefault();
-					event.stopPropagation();
+										consumeEvent(event);
 					if (pinnedKinds(target.id).includes(want)) unpinLocalAid(target, want);
 					else pinLocalAid(target, want);
 					return;
@@ -5914,8 +5884,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			) {
 				// Esc+f exits fullscreen — the only way out. Escape
 				// alone never exits (it keeps its dismiss job).
-				event.preventDefault();
-				event.stopPropagation();
+								consumeEvent(event);
 				escDownAt = 0;
 				void exitFullscreen();
 				return;
@@ -5928,7 +5897,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				!event.ctrlKey &&
 				!event.altKey &&
 				!event.shiftKey &&
-				!(event.target as HTMLElement | null)?.closest("input, textarea, select")
+				!isFieldTarget(event.target)
 			) {
 				// F folds/unfolds the hovered message. The prompt owns
 				// keystrokes inside it, so typing "f" there is untouched.
@@ -5947,7 +5916,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				!event.ctrlKey &&
 				!event.altKey &&
 				!event.shiftKey &&
-				!(event.target as HTMLElement | null)?.closest("input, textarea, select")
+				!isFieldTarget(event.target)
 			) {
 				// E pulls the hovered own message into the composer for
 				// editing — same ownership rule as F, own messages only.
@@ -5966,7 +5935,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			!event.ctrlKey &&
 			!event.altKey &&
 			!event.shiftKey &&
-			!(event.target as HTMLElement | null)?.closest("input, textarea, select, [contenteditable]")
+			!isEditableTarget(event.target)
 		) {
 				// X cuts the hovered message (copies, then deletes): Shift+D
 				// below deletes without touching the clipboard.
@@ -6087,7 +6056,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				!event.altKey &&
 				!event.shiftKey &&
 				(event.key === "j" || event.key === "k" || event.key === "u" || event.key === "d") &&
-				!(event.target as HTMLElement | null)?.closest("input, textarea, select, [contenteditable]")
+				!isEditableTarget(event.target)
 			) {
 				// The shortcuts modal scrolls under j/k/u/d like the main
 				// chat, contained: the palette and Inspect keep their own
@@ -6101,8 +6070,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 								? -SCROLLKEY_LINE_PX
 								: Math.max(1, Math.floor(modalBox.clientHeight / 2)) *
 									(event.key === "d" ? 1 : -1);
-					event.preventDefault();
-					event.stopPropagation();
+										consumeEvent(event);
 					modalBox.scrollBy({ top: dy, behavior: "smooth" });
 					return;
 				}
@@ -6116,7 +6084,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				const target = event.target as HTMLElement | null;
 				const modalOpen = shortcutsOpen || searchOpen || inspectChar;
 				const typing =
-					inEditor || target?.closest("input, textarea, select, [contenteditable]") || inSidebar;
+					inEditor || isEditableTarget(target) || inSidebar;
 				if (!modalOpen && !typing && !event.metaKey && event.ctrlKey && !event.altKey && !event.shiftKey) {
 					// Ctrl+U / Ctrl+D jump an instant half-page, vim-style
 					// (repeats jump again) — including with nothing selected.
