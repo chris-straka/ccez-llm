@@ -163,7 +163,6 @@
 	isCoarsePointer,
 	isTouchTablet,
 	currentPlatform,
-	modKeyLabel,
 	altKeyLabel,
 	edgeSwipeTarget,
 	contentSwipeTarget,
@@ -173,6 +172,7 @@
 	type EdgePanel,
 	type FingerTrack
 } from "$lib/platform";
+import { desktopShortcuts, filteredShortcuts, touchShortcuts } from "$lib/shortcuts";
 	import {
 		detectScript,
 		detectScripts,
@@ -870,95 +870,6 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	let shortcutQuery = $state("");
 	let shortcutInputEl: HTMLInputElement | null = $state(null);
 
-	interface ShortcutRow {
-		name: string;
-		keys: string;
-	}
-	/** Touch gestures list, data-driven so the modal filter can search it. */
-	function touchShortcuts(): ShortcutRow[] {
-		return [
-			{ name: "Chats list", keys: "Double-tap empty space" },
-			{ name: "Newer / older chat", keys: "Two-finger swipe right / left" },
-			{ name: "Delete current chat", keys: "Double two-finger tap" },
-			{ name: "Delete every chat", keys: "Double three-finger tap" },
-			{ name: "Annotate", keys: "Select text · Annotate" },
-			{ name: "Message buttons", keys: "Tap a message" },
-			{ name: "Fold a message", keys: "Swipe right on it" }
-		];
-	}
-	/** Desktop shortcuts, data-driven so the modal filter can search them. */
-	function desktopShortcuts(): ShortcutRow[] {
-		const meta = isMac ? "⌘" : "Ctrl+";
-		return [
-			{ name: "Shortcuts show/hide", keys: `${isMac ? "⇧⌘/" : "Ctrl+Shift+/"} · middle-click` },
-			{ name: "Focus composer", keys: `${isMac ? "⇧⌘Space" : "Ctrl+Shift+Space"}` },
-			{ name: "Switch model / key", keys: `Ctrl+${altm}+← / →` },
-			{ name: "Thinking level", keys: `Ctrl+${altm}+↓ / ↑` },
-			{
-				name: "Scroll",
-				keys: "j/k, u/d, ctrl+u/ctrl+d, gg/G, z/Z, h/l"
-			},
-			{ name: "Exit fullscreen", keys: "Hold Esc 2s · Esc+F" },
-			{
-				name: "Chat list",
-				keys: `${isMac ? "⌘B / ⇧⌘H" : "Ctrl+B / Ctrl+Shift+H"} · J / K walk · Space enters`
-			},
-			{
-				name: "Search chats",
-				keys: `${meta}P`
-			},
-			{
-				name: "Find in chat",
-				keys: `${meta}F`
-			},
-			{ name: "Fullscreen", keys: `${isMac ? "⌘E, F" : "Ctrl+Meta+F"}` },
-			{
-				name: "Newer / older chat",
-				keys: `${isMac ? "⇧⌘J / ⇧⌘K" : "Ctrl+Shift+J / Ctrl+Shift+K"}`
-			},
-			{ name: "New chat", keys: `${isMac ? "⌘N or ⇧⌘N" : "Ctrl+N or Ctrl+Shift+N"}` },
-			{ name: "Voice readback on/off", keys: `Ctrl+${altm}+S` },
-			{ name: "Pasted text expand/collapse", keys: "Ctrl+O" },
-			{
-				name: "Browser side panel",
-				keys: `${meta}T`
-			},
-			{ name: "Stop voice / close", keys: "Esc" },
-			{ name: "Speak text aloud", keys: "Right-click" },
-			// ⌘D is meta-only (Ctrl+D fast-scrolls in scroll mode); Shift+D works everywhere.
-			{
-				name: "Delete a message",
-				keys: isMac ? "Hover + ⌘D / Shift+D" : "Hover + Shift+D"
-			},
-			{
-				name: "Fold / unfold message",
-				keys: `Hover + F / ${isMac ? "Option" : "Alt"}-click`
-			},
-			{
-				name: "Fold / unfold code",
-				keys: "Right-click toggles · left-click unfolds"
-			},
-			{ name: "Rerun a prompt", keys: "Rerun button · deletes after" },
-			{
-				name: "Reply language",
-				keys: `${isMac ? "⌘1, ⌘0" : "Ctrl+1, Ctrl+0"} · repeat to clear`
-			},
-			{ name: "Delete this chat", keys: `${meta}Delete` },
-			{ name: "Delete every chat", keys: `${isMac ? "⇧⌘Delete" : "Ctrl+Shift+Delete"}` },
-			{ name: "Cut message", keys: "x" },
-			{ name: "Edit own message", keys: "hover + e" },
-			{ name: "Reading aid toggle", keys: "Hover + A · M pinyin · N furigana" },
-			{ name: "prev/next stroke step", keys: "H / L with Inspect open" },
-			{ name: "Text size up / down", keys: `${mod}+ / ${mod}−` },
-			{ name: "Chat width + / −", keys: `⇧${mod}+ / ⇧${mod}−` }
-		];
-	}
-	/** Modal filter: matches action or keys, case-insensitive. */
-	function filteredShortcuts(rows: ShortcutRow[]): ShortcutRow[] {
-		const q = shortcutQuery.trim().toLowerCase();
-		if (!q) return rows;
-		return rows.filter((row) => `${row.name} ${row.keys}`.toLowerCase().includes(q));
-	}
 	/** Open the shortcuts modal with a fresh filter. */
 	function openShortcuts(): void {
 		shortcutQuery = "";
@@ -1081,7 +992,6 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	 * default: set properly on mount from navigator (see below).
 	 */
 	let isMac = $state(true);
-	const mod = $derived(modKeyLabel(isMac));
 	const altm = $derived(altKeyLabel(isMac));
 	/** Composer hints: touch wording on phones, shortcut wording elsewhere. */
 	function promptPlaceholder(): string {
@@ -5452,6 +5362,67 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		// after paint, like the window-focus path does.
 		requestAnimationFrame(() => requestAnimationFrame(() => editor?.remeasure()));
 
+		/**
+		 * One Escape ladder for the whole app (capture phase, so it
+		 * pre-empts bubble-phase widget handlers like the pill's own
+		 * Esc): topmost layer first, exactly one layer per press.
+		 * Callers preventDefault + stopPropagation around it.
+		 */
+		const dismissEscape = (inEditor: Element | null | undefined): void => {
+			if (shortcutsOpen || inspectChar) {
+				// A modal always wins Esc, even from inside the prompt.
+				shortcutsOpen = false;
+				inspectChar = null;
+			} else if (searchOpen) {
+				// The search palette wins Esc next, even from its input.
+				// A first ESC moves DOM focus input -> list (the query
+				// stays, the highlight is already tracked); a second
+				// ESC — or one with no results — closes.
+				if (document.activeElement === searchInputEl && searchHits.length > 0) {
+					focusSearchHit(searchCursor);
+				} else closeSearch();
+			} else if (findOpen) {
+				// The find bar closes from anywhere (its input included).
+				closeFind();
+			} else if (sideviewOpen) {
+				// The docked browser panel closes next, from
+				// anywhere (it has no text worth cancelling).
+				void setSideviewOpen(false);
+			} else if (editingMsgId) {
+				// An in-progress message edit cancels from anywhere,
+				// including inside the prompt (capture phase pre-empts
+				// the editor, which binds nothing to Esc).
+				cancelMessageEdit();
+			} else if (inEditor) {
+				// ESC with the composer focused: drop the caret and
+				// dismiss composer-adjacent overlays. Voice keeps playing
+				// (it has its own toggle); modals, search, sideview, and
+				// message edits keep their earlier branches above.
+				editor?.blur();
+				selMenu = null;
+				selPinyin = null;
+				openLangMenu = null;
+			} else {
+				// A bare Esc must never reach the OS/browser default
+				// that exits native fullscreen — Esc+f is the only way
+				// out. No text harm outside fields.
+				// The pill's own Esc handler sits on its textarea
+				// (bubble phase), which this capture branch pre-empts —
+				// so close it here, or Esc strands an open box.
+				cancelAnnPop();
+				selMenu = null;
+				selPinyin = null;
+				inspectChar = null;
+				openLangMenu = null;
+				settingsOpen = false;
+				shortcutsOpen = false;
+				stopVoice();
+				// Scroll mode entered from a deactivated prompt steps
+				// back out on Esc (prompt-entry Esc keeps scroll mode).
+				if (focusMode === "scroll" && !scrollFromPrompt) exitScrollMode();
+			}
+		};
+
 		const onKey = (event: KeyboardEvent) => {
 			// Idle-prompt restore allowlist: while hidden, only bare
 			// i / Enter / Space bring the prompt back (never typed —
@@ -5554,39 +5525,12 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				else focusBrowserAddress();
 				return;
 			}
-			if (event.key === "Escape" && (shortcutsOpen || inspectChar)) {
-				// A modal always wins Esc, even from inside the prompt.
+			if (event.key === "Escape") {
+				// One ladder for every layer (see dismissEscape):
+				// topmost first, exactly one per press.
 				event.preventDefault();
 				event.stopPropagation();
-				shortcutsOpen = false;
-				inspectChar = null;
-				return;
-			}
-			if (event.key === "Escape" && searchOpen) {
-				// The search palette wins Esc next, even from its input.
-				// A first ESC moves DOM focus input -> list (the query
-				// stays, the highlight is already tracked); a second
-				// ESC — or one with no results — closes.
-				event.preventDefault();
-				event.stopPropagation();
-				if (document.activeElement === searchInputEl && searchHits.length > 0) {
-					focusSearchHit(searchCursor);
-				} else closeSearch();
-				return;
-			}
-				if (event.key === "Escape" && findOpen) {
-					// The find bar closes from anywhere (its input included).
-					event.preventDefault();
-					event.stopPropagation();
-					closeFind();
-					return;
-				}
-			if (event.key === "Escape" && sideviewOpen) {
-				// The docked browser panel closes next, from
-				// anywhere (it has no text worth cancelling).
-				event.preventDefault();
-				event.stopPropagation();
-				void setSideviewOpen(false);
+				dismissEscape(inEditor);
 				return;
 			}
 			if (
@@ -5652,50 +5596,6 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			enterEditMode();
 			return;
 		}
-		if (event.key === "Escape" && editingMsgId) {
-				// An in-progress message edit cancels from anywhere,
-				// including inside the prompt (capture phase pre-empts
-				// the editor, which binds nothing to Esc).
-				event.preventDefault();
-				event.stopPropagation();
-				cancelMessageEdit();
-				return;
-			}
-			if (event.key === "Escape" && inEditor) {
-				// ESC with the composer focused: drop the caret and
-				// dismiss composer-adjacent overlays. Voice keeps playing
-				// (it has its own toggle); modals, search, sideview, and
-				// message edits keep their earlier branches above.
-				event.preventDefault();
-				event.stopPropagation();
-				editor?.blur();
-				selMenu = null;
-				selPinyin = null;
-				openLangMenu = null;
-				return;
-			}
-		if (event.key === "Escape" && !inEditor) {
-				// Consumed: a bare Esc must never reach the OS/browser
-				// default that exits native fullscreen — Esc+f is the
-				// only way out. No text harm outside fields.
-				event.preventDefault();
-				event.stopPropagation();
-				// The pill's own Esc handler sits on its textarea
-				// (bubble phase), which this capture branch pre-empts —
-				// so close it here, or Esc strands an open box.
-				cancelAnnPop();
-				selMenu = null;
-				selPinyin = null;
-				inspectChar = null;
-				openLangMenu = null;
-				settingsOpen = false;
-				shortcutsOpen = false;
-				stopVoice();
-				// Scroll mode entered from a deactivated prompt steps
-				// back out on Esc (prompt-entry Esc keeps scroll mode).
-				if (focusMode === "scroll" && !scrollFromPrompt) exitScrollMode();
-				return;
-			}
 			if (event.ctrlKey && (event.key === "o" || event.key === "O")) {
 				// Pasted-text tags: with the prompt focused and tags
 				// present, Ctrl+O expands/collapses them all (Muse Code
@@ -8287,7 +8187,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 					<!-- Android milestone: key chords don't exist on a phone,
 					so the same modal teaches the touch equivalents. -->
 					<dl class="keys">
-						{#each filteredShortcuts(touchShortcuts()) as row (row.name)}
+						{#each filteredShortcuts(touchShortcuts(), shortcutQuery) as row (row.name)}
 							<div><dt>{row.name}</dt><dd>{row.keys}</dd></div>
 						{:else}
 							<div class="keys-empty">No matches</div>
@@ -8295,7 +8195,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 					</dl>
 				{:else}
 				<dl class="keys">
-					{#each filteredShortcuts(desktopShortcuts()) as row (row.name)}
+					{#each filteredShortcuts(desktopShortcuts(isMac), shortcutQuery) as row (row.name)}
 						<div><dt>{row.name}</dt><dd>{row.keys}</dd></div>
 					{:else}
 						<div class="keys-empty">No matches</div>
