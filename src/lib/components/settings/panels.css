@@ -457,11 +457,28 @@
 		margin-top: 0.55rem;
 	}
 	/* The hover toggles really share one row (the legend names the
-	behavior once); the stacked rhythm above stays out of the row. */
+	behavior once); the stacked rhythm above stays out of the row.
+	The fieldset carries no bottom margin itself, and neither do
+	the row's legend and labels (the generic label margin would
+	stretch the row, leaving the boxes centered with slack below
+	them inside the box). The gap below the row comes from the
+	check after it, sized to the section's rendered rhythm: stacked
+	checks collapse the generic 0.9rem label margin with their
+	0.55rem top margin to 0.9rem, so the row hands off the same. */
 	.settings-inner fieldset.hover-row {
 		display: flex;
 		gap: 1.25rem;
 		align-items: center;
+		margin-bottom: 0;
+	}
+	.settings-inner fieldset.hover-row legend {
+		margin-bottom: 0;
+	}
+	.settings-inner fieldset.hover-row .check {
+		margin-bottom: 0;
+	}
+	.settings-inner fieldset.hover-row + .check {
+		margin-top: 0.9rem;
 	}
 	.settings-inner fieldset.hover-row .check + .check {
 		margin-top: 0;
