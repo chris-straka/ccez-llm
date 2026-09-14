@@ -245,3 +245,36 @@ test("sidebar hover keeps a live highlight and its menu", async ({ page }) => {
 	await expect(page.locator("main .messages")).not.toContainText("other chat body");
 	expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).toContain("halo");
 });
+
+/** An empty chat never hides the composer: arriving with the flag set
+(parked on a previous thread under always-hide) clears it, or the one
+place that must compose stays stranded hidden. */
+test("empty chat restores an idle-hidden composer", async ({ page }) => {
+	await page.addInitScript(() => {
+		window.localStorage.setItem("ccez-mock-provider", "1");
+		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({ promptIdleSec: -1 }));
+		const chat = (id: string, messages: unknown[]) => ({ id, createdAt: 1, replyLang: null, messages });
+		const msg = (id: string, content: string) => ({ id, role: "assistant", content, usage: null, error: null });
+		window.localStorage.setItem(
+			"ccez-llm-chats-v1",
+			JSON.stringify([chat("chat-a", [msg("chat-a-m", "Alpha thread with a message.")]), chat("chat-b", [])])
+		);
+	});
+	await page.goto("/");
+	await expect(page.locator("article .rendered").first()).toBeVisible({ timeout: 60_000 });
+	const composer = page.locator("main .prompt");
+	await page.keyboard.press("Meta+b");
+	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
+	const rows = page.locator("aside ul li button.side-chat");
+	// Park it on the full chat first (always-hide drops the composer
+	// once focus leaves it).
+	await rows.nth(0).click();
+	await page.locator("article .rendered").first().click();
+	await expect(composer).toBeHidden();
+	// The empty chat's row restores the composer on switch (row
+	// picks collapse the sidebar, so reopen it first).
+	await page.keyboard.press("Meta+b");
+	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
+	await rows.nth(1).click();
+	await expect(composer).toBeVisible();
+});

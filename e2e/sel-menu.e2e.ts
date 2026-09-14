@@ -414,14 +414,23 @@ programmatic clears still dismiss (pinned by the tests around). */
 		const box2 = await second.boundingBox();
 		if (!box2) throw new Error("second message has no box");
 		// Drag well into the second message, then release there.
-		await page.mouse.move(start.x, Math.round(box2.y + box2.height / 2), { steps: 12 });
+		const releaseY = Math.round(box2.y + box2.height / 2);
+		await page.mouse.move(start.x, releaseY, { steps: 12 });
 		await page.mouse.up();
 		const quote = await page.evaluate(() => window.getSelection()?.toString() ?? "");
 		expect(quote).not.toBe("");
 		expect(quote).not.toContain("wizards");
 		const flat = (s: string): string => s.replace(/\s+/g, " ").trim();
 		expect(flat(M1)).toContain(flat(quote).slice(0, 30));
-		await expect(page.locator(".sel-menu")).toBeVisible();
+		const menu = page.locator(".sel-menu");
+		await expect(menu).toBeVisible();
+		// The menu docks to the quoted highlight, not the release
+		// point down in the second message: its bottom edge stays a
+		// full message above the release (viewport-top clamping can
+		// overlap it onto the highlight, never down at the cursor).
+		const menuBox = await menu.boundingBox();
+		if (!menuBox) throw new Error("menu has no box");
+		expect(menuBox.y + menuBox.height).toBeLessThan(releaseY - 20);
 	});
 });
 

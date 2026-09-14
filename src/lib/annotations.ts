@@ -1127,7 +1127,7 @@ export function selMenuPlacement(opts: {
 		// gesture (never below it), the menu riding just clear of
 		// it (a breath of gap), clamped to the viewport top.
 		const cy = cursorY ?? rectTop;
-		y = Math.max(8, cy - 44);
+		y = Math.max(8, cy - 48);
 	}
 	return { x, y };
 }

@@ -289,7 +289,7 @@ describe("selMenuPlacement", () => {
 				iosUI: false,
 				menuWidth: 120
 			})
-		).toEqual({ x: 584, y: 266 });
+		).toEqual({ x: 584, y: 262 });
 	});
 
 	it("falls back to the highlight when the cursor is gone (scroll track)", () => {
@@ -304,7 +304,7 @@ describe("selMenuPlacement", () => {
 				iosUI: false,
 				menuWidth: 120
 			})
-		).toEqual({ x: 484, y: 256 });
+		).toEqual({ x: 484, y: 252 });
 	});
 
 	it("clamps to the viewport edges", () => {
@@ -337,7 +337,7 @@ describe("selMenuPlacement", () => {
 				iosUI: false,
 				menuWidth: 120
 			})
-		).toEqual({ x: 1152, y: 266 });
+		).toEqual({ x: 1152, y: 262 });
 	});
 
 	it("docks Android below the handles, iOS above the bubble", () => {

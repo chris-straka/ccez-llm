@@ -1836,10 +1836,16 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * Late seeds re-evaluate the always-hide park: the mount pass can
 	 * run before the chat loads (an empty guard skips the hide), so
 	 * message arrival parks an unfocused composer instead of leaving
-	 * it stranded visible.
+	 * it stranded visible. The mirror case: arriving at an empty
+	 * chat with the flag set (parked on a previous thread) clears it,
+	 * or the composer stays stranded hidden where it must compose.
 	 */
 	$effect(() => {
 		void viewChat.messages.length;
+		if (!previewing && viewChat.messages.length === 0) {
+			promptIdle = false;
+			return;
+		}
 		hideForAlways(document.activeElement);
 	});
 	/**
@@ -2580,14 +2586,30 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			selMenu = null;
 			return;
 		}
+		// A release in another article than the highlight (the drag
+		// crossed messages) would dock the menu to the stray cursor,
+		// stranding Annotate on a message with no highlight: fall back
+		// to the highlight's own rect so the menu stays on the quoted
+		// message. Releases outside any article keep the cursor (the
+		// gap below a message still docks near the pointer).
+		let atX = cursorX;
+		let atY = cursorY;
+		if (atX !== undefined && atY !== undefined && live && live.rangeCount > 0) {
+			const at = document.elementFromPoint(atX, atY);
+			const quoteArticle = articleOf(live.anchorNode);
+			if (quoteArticle && at && articleOf(at) && articleOf(at) !== quoteArticle) {
+				atX = undefined;
+				atY = undefined;
+			}
+		}
 		// The live range, so menu hover can put the highlight back:
 		// WebKit empties the document selection when the pointer moves
 		// onto the floating menu (no DOM change, no press). Nothing
 		// mutates in that path, so these nodes stay valid.
 		const stored = live && live.rangeCount > 0 ? live.getRangeAt(0).cloneRange() : null;
 		const { x, y } = selMenuPlacement({
-			cursorX,
-			cursorY,
+			cursorX: atX,
+			cursorY: atY,
 			rectLeft: rect.left,
 			rectTop: rect.top,
 			rectBottom: rect.bottom,
