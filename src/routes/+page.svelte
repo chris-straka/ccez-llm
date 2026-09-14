@@ -232,6 +232,7 @@ import {
 	} from "$lib/reading";
 	import { isFuriganaCached } from "$lib/furigana";
 	import { buildSearchDocs, chatMatchesQuery, findMessageIndices, type SearchHit } from "$lib/chatSearch";
+	import { emptyFind, stepFindCursor, type FindState } from "$lib/find";
 	import { ChatSearchStore, createSearchWorker } from "$lib/chatSearchStore";
 
 	import {
@@ -1439,15 +1440,13 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	 * stays in the find field while cycling (the scroll-mode arrow
 	 * branch stands down inside .find-bar — see inFind below).
 	 */
-	let findOpen = $state(false);
-	let findQuery = $state("");
-	let findCursor = $state(0);
+	let find = $state<FindState>(emptyFind());
 	let findInputEl: HTMLInputElement | undefined = $state();
 	function currentFindHits(): number[] {
-		return findOpen ? findMessageIndices(viewChat.messages.map((m) => m.content), findQuery) : [];
+		return find.open ? findMessageIndices(viewChat.messages.map((m) => m.content), find.query) : [];
 	}
 	function landFindHit(): void {
-		const index = currentFindHits()[findCursor];
+		const index = currentFindHits()[find.cursor];
 		if (index === undefined) return;
 		enterScrollMode();
 		selectedIdx = index;
@@ -1460,22 +1459,19 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	function stepFind(delta: 1 | -1): void {
 		const hits = currentFindHits();
 		if (hits.length === 0) return;
-		findCursor =
-			((findCursor + delta) % hits.length + hits.length) % hits.length;
+		find.cursor = stepFindCursor(hits.length, find.cursor, delta);
 		landFindHit();
 	}
 	function openFind(): void {
-		findOpen = true;
-		findCursor = 0;
+		find.open = true;
+		find.cursor = 0;
 		requestAnimationFrame(() => {
 			findInputEl?.focus();
 			findInputEl?.select();
 		});
 	}
 	function closeFind(): void {
-		findOpen = false;
-		findQuery = "";
-		findCursor = 0;
+		find = emptyFind();
 		// The bar's cursor dies with it. landFindHit parked scroll mode
 		// on a hit, but composer focus flips mode to edit on the way in
 		// (see onFocusIn), so a stale selectedIdx would only strand the
@@ -1741,10 +1737,10 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		// summon — keys-only restore); the phone tap path keeps its
 		// own press guards below.
 		const onFindOutside = (event: PointerEvent): void => {
-			if (!findOpen) return;
+			if (!find.open) return;
 			const target = event.target instanceof Element ? event.target : null;
 			if (target?.closest(".find-bar")) return;
-			findOpen = false;
+			find.open = false;
 		};
 		window.addEventListener("pointerdown", onFindOutside, { passive: true });
 		window.addEventListener("keydown", on);
@@ -5351,7 +5347,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				if (document.activeElement === searchInputEl && searchHits.length > 0) {
 					focusSearchHit(searchCursor);
 				} else closeSearch();
-			} else if (findOpen) {
+			} else if (find.open) {
 				// The find bar closes from anywhere (its input included).
 				closeFind();
 			} else if (sideviewOpen) {
@@ -5410,7 +5406,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 						shortcutsOpen,
 						searchOpen,
 						inspectOpen: inspectChar !== null,
-						findOpen,
+						findOpen: find.open,
 						settingsOpen,
 						sideviewOpen,
 						sidebarOpen: !settings.sidebarCollapsed
@@ -5537,7 +5533,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 						return;
 					}
 					// Repeat ⌘F closes the bar it opened.
-					if (findOpen) closeFind();
+					if (find.open) closeFind();
 					else openFind();
 					return;
 				}
@@ -5926,7 +5922,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 					scrollable: true,
 					modalOpen,
 					typing,
-					findOpen,
+					findOpen: find.open,
 					emptyPromptSpace: spaceFocusesEmptyPrompt({
 						...keyFacts(event),
 						messageCount: viewChat.messages.length,
@@ -6914,14 +6910,14 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		</header>
 
 		<!-- In-chat find (Cmd/Ctrl+F): message-level cycling browser-style. -->
-		{#if findOpen && !androidUI}
+		{#if find.open && !androidUI}
 			<div class="find-bar" role="search" aria-label="Find in chat">
 				<input
 					type="search"
 					bind:this={findInputEl}
-					bind:value={findQuery}
+					bind:value={find.query}
 					oninput={() => {
-						findCursor = 0;
+						find.cursor = 0;
 						landFindHit();
 					}}
 					onkeydown={(e) => {
@@ -6941,10 +6937,10 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				/>
 				<span class="find-count" aria-live="polite">
 					{currentFindHits().length === 0
-						? findQuery.trim()
+						? find.query.trim()
 							? "No matches"
 							: ""
-						: `${Math.min(findCursor + 1, currentFindHits().length)}/${currentFindHits().length}`}
+						: `${Math.min(find.cursor + 1, currentFindHits().length)}/${currentFindHits().length}`}
 				</span>
 				<button type="button" aria-label="Previous match" title="Previous (Shift+Enter)" onclick={() => stepFind(-1)}>↑</button>
 				<button type="button" aria-label="Next match" title="Next (Enter)" onclick={() => stepFind(1)}>↓</button>

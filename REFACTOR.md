@@ -116,6 +116,12 @@ modules — they never split the template for size alone.
   annotation UI, sideview) with updater functions.
 - No behavior change; stops unrelated domains from sharing
   effect-subscription accidents.
+- Pilot shipped: the find bar is one `FindState` object (`src/lib/find.ts`
+  with `emptyFind` + the tested `stepFindCursor` cycle math); the open /
+  step / close functions and the template bind over `find.*`. The
+  outside-dismiss keeps its flag-only close verbatim. Next pilots in
+  size order: sideview open/width, then the search palette
+  (open/query/hits/cursor), then annotation UI.
 
 ## 5. New candidates (from the Sep 2026 slices)
 
