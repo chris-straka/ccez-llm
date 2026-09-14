@@ -105,7 +105,10 @@ export function rmsOf(samples: ArrayLike<number>): number {
 function mediaDevicesGetUserMedia(): unknown {
   try {
     if (typeof navigator === "undefined") return null;
-    return navigator.mediaDevices?.getUserMedia ?? null;
+    // Bound: an unbound extracted method loses its `this` for any
+    // future caller (getUserMedia requires its MediaDevices).
+    const devices = navigator.mediaDevices;
+    return devices?.getUserMedia?.bind(devices) ?? null;
   } catch {
     return null;
   }

@@ -29,10 +29,12 @@ modules — they never split the template for size alone.
   target-exists check kept in the body); `sidebarListAction` (walk/enter/
   delete-chat), `scrollEnterAction` (Ctrl+G entry), `modalScrollAction`
   (modal j/k/u/d with the box lookup and half-page sizing kept in the body);
-  `scrollModeAction` (step/park/go-top/go-bottom/half-jump/half-glide/
+  `scrollModeAction` (step/go-top/go-bottom/half-jump/half-glide/
   enter-edit/scroll-toggle with `lastGAt` updates, the lone-g arm, and the
   position/hold effects kept in the body — j/k/i/Enter carry no modifier
-  guards, matched verbatim).
+  guards, matched verbatim; j/Down at the newest returns `enter-edit`,
+  restoring the Sep-8 j-exits-scroll contract the scroll-mode slice had
+  regressed to `park-bottom`).
 - Every target read in the handler now goes through a named `events.ts`
   predicate (`isPromptEditorTarget`, `isComposerTarget`, `isFilterTarget`,
   `isFindBarTarget`, `isSidebarTarget`, `isPromptTarget`,
@@ -303,4 +305,7 @@ target pattern for no tested gain.
   idle trio, command chords, chrome cluster, sidebar/scroll-enter/modal,
   scroll-mode, unselected-scroll, message-actions, keyFacts convergence,
   events predicates; §4 find/palette pilots + annPop matrix; §5 new
-  candidates; Keychain bundle fix; §§2-3 marked design-stage)
+  candidates; Keychain bundle fix; §§2-3 marked design-stage;
+  failure triage: stale fold tests retargeted to toggle, j-exits
+  regression restored (park-bottom removed), attachment-strip
+  clearance moved to main padding, vite/gates/lint green)

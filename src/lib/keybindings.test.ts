@@ -536,10 +536,12 @@ const scrollBase: ScrollModeFacts = {
 };
 
 describe("scrollModeAction", () => {
-	it("steps, parks, and jumps in scroll mode", () => {
+	it("steps, exits past the newest, and jumps in scroll mode", () => {
 		expect(scrollModeAction(scrollBase)).toBe("step-down");
 		expect(scrollModeAction({ ...scrollBase, key: "ArrowDown" })).toBe("step-down");
-		expect(scrollModeAction({ ...scrollBase, atNewest: true })).toBe("park-bottom");
+		// Past the newest message drops back into the prompt (j-exits scroll).
+		expect(scrollModeAction({ ...scrollBase, atNewest: true })).toBe("enter-edit");
+		expect(scrollModeAction({ ...scrollBase, key: "ArrowDown", atNewest: true })).toBe("enter-edit");
 		expect(scrollModeAction({ ...scrollBase, key: "k" })).toBe("step-up");
 		expect(scrollModeAction({ ...scrollBase, key: "ArrowUp" })).toBe("step-up");
 		expect(scrollModeAction({ ...scrollBase, key: "g", gArmed: true })).toBe("go-top");

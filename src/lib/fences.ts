@@ -69,7 +69,7 @@ export function parseFences(doc: string): FenceBlock[] {
 	if (!doc.includes("```")) return out;
 	const lines = doc.split("\n");
 	// Line start offsets: line i starts at starts[i].
-	const starts: number[] = new Array(lines.length);
+	const starts: number[] = new Array<number>(lines.length);
 	let offset = 0;
 	for (let i = 0; i < lines.length; i++) {
 		starts[i] = offset;

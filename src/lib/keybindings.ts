@@ -493,8 +493,9 @@ export function modalScrollAction(facts: ModalScrollFacts): ModalScrollAction | 
  * Facts the scroll-mode tail reads. Modifier guards are the handler's
  * verbatim spellings — j/k/i/Enter carry none (scroll mode owns the
  * stage), while g/G/u/d keep theirs. `gArmed` is the handler's
- * `ggArmed(lastGAt, now)` beat; `atNewest` parks j on the last message
- * instead of stepping past it.
+ * `ggArmed(lastGAt, now)` beat; `atNewest` drops j back into the
+ * prompt instead of stepping past the last message (scroll mode is
+ * for visiting history, not parking).
  */
 export interface ScrollModeFacts {
 	key: string;
@@ -512,7 +513,6 @@ export interface ScrollModeFacts {
 export type ScrollModeAction =
 	| "step-down"
 	| "step-up"
-	| "park-bottom"
 	| "go-top"
 	| "arm-g"
 	| "go-bottom"
@@ -531,7 +531,8 @@ export type ScrollModeAction =
 export function scrollModeAction(facts: ScrollModeFacts): ScrollModeAction | null {
 	if (!facts.inScrollMode || facts.inEditor || facts.inFind) return null;
 	if (facts.key === "j" || facts.key === "ArrowDown") {
-		return facts.atNewest ? "park-bottom" : "step-down";
+		// Past the newest message drops back into the prompt.
+		return facts.atNewest ? "enter-edit" : "step-down";
 	}
 	if (facts.key === "k" || facts.key === "ArrowUp") return "step-up";
 	if (facts.key === "g" && !facts.metaKey && !facts.ctrlKey && !facts.altKey) {

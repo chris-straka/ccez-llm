@@ -338,9 +338,7 @@ type SpeechRecognitionCtor = new () => SpeechRecognitionInstance;
 function recognitionCtor(): SpeechRecognitionCtor | null {
 	try {
 		if (typeof window === "undefined") return null;
-		return (
-			(window.SpeechRecognition ?? window.webkitSpeechRecognition ?? null) as SpeechRecognitionCtor | null
-		);
+		return window.SpeechRecognition ?? window.webkitSpeechRecognition ?? null;
 	} catch {
 		return null;
 	}

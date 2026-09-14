@@ -261,14 +261,8 @@ import {
 	import { ChatSearchStore, createSearchWorker } from "$lib/chatSearchStore";
 
 	import { dropFilesFromDataTransfer, isPermissionDismissal } from "$lib/intake";
-	import { consumeLaunchFiles, splitLaunchFiles, type LaunchQueueLike } from "$lib/launchFiles";
-	import {
-		downloadMarkdownFile,
-		exportChatMarkdown,
-		fileSaveAccessAvailable,
-		type SaveHandleLike,
-		type SavePickerOptions
-	} from "$lib/chatExport";
+	import { consumeLaunchFiles, splitLaunchFiles } from "$lib/launchFiles";
+	import { downloadMarkdownFile, exportChatMarkdown, fileSaveAccessAvailable } from "$lib/chatExport";
 	import { nativeSaveMarkdown } from "$lib/nativeExport";
 	import { isKeyboardOpen, keyboardOverlapPx } from "$lib/viewportReflow";
 import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
@@ -1816,21 +1810,25 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			promptIdle = false;
 	});
 	/**
-	 * Tail clearance for the floating composer: content padding keeps
-	 * the last line above the card in every scroll position (a static
-	 * guess can't track a growing draft, and scroll-padding only
-	 * steers programmatic scrolls while clicks still land under the
-	 * card). Falls back to the stylesheet's 1rem while hidden, so the
-	 * tail reaches the window's own bottom edge.
+	 * Tail clearance for the floating composer: main-level padding
+	 * keeps the last line AND the in-flow attachment strip, preview,
+	 * and error above the card in every scroll position (a static
+	 * guess can't track a growing draft, scroll-padding only steers
+	 * programmatic scrolls, and padding inside the scroller leaves
+	 * the strip parked under the card eating its taps). Falls back
+	 * to the stylesheet while hidden, so the tail reaches the
+	 * window's own bottom edge. Composes with the Android safe-area
+	 * inset instead of clobbering it.
 	 */
 	$effect(() => {
 		const card = promptEl?.closest<HTMLElement>(".prompt") ?? null;
 		const box = scrollBox;
-		if (!card || !box) return;
+		const mainEl = box?.closest<HTMLElement>("main") ?? null;
+		if (!card || !box || !mainEl) return;
 		const sync = (): void => {
-			box.style.paddingBottom = promptParked()
+			mainEl.style.paddingBottom = promptParked()
 				? ""
-				: `${Math.ceil(card.getBoundingClientRect().height) + 24}px`;
+				: `calc(${Math.ceil(card.getBoundingClientRect().height) + 24}px + env(safe-area-inset-bottom, 0px))`;
 			// Scrollbar gutter the messages reserve (classic thin bar,
 			// zero with overlay scrollbars): the floating card centers in
 			// the full column, so it rides this much right of the
@@ -5538,8 +5536,14 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 					if (shortcutsOpen) {
 						// The modal owns ⌘F while open: it filters this
 						// list only, never the chat.
-						shortcutInputEl?.focus();
-						shortcutInputEl?.select();
+						const shortcutInput: HTMLInputElement | null = shortcutInputEl;
+						if (shortcutInput) {
+							/* eslint-disable @typescript-eslint/no-unsafe-call -- lint-program-only: the $state rune type
+							does not resolve under eslint's program here, but svelte-check (real tsc) types both calls. */
+							shortcutInput.focus();
+							shortcutInput.select();
+							/* eslint-enable @typescript-eslint/no-unsafe-call */
+						}
 						return;
 					}
 					// Repeat ⌘F closes the bar it opened.
@@ -6015,15 +6019,6 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				jumpTo(selectedIdx + 1);
 				return;
 			}
-			if (scrollAction === "park-bottom") {
-				// Past the newest message never leaves scroll mode: land
-				// the bottom in view (a no-op when already there) and stay
-				// parked on the last message.
-				event.preventDefault();
-				lastGAt = 0;
-				if (scrollBox && !nearBottom(scrollBox)) scrollChatBottom();
-				return;
-			}
 			if (scrollAction === "step-up") {
 				event.preventDefault();
 				lastGAt = 0;
@@ -6367,7 +6362,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			}
 			const node = range?.startContainer;
 			if (!node || !body.contains(node)) return false;
-			let ch = "";
+			let ch: string;
 			if (node.nodeType === Node.TEXT_NODE) {
 				ch = (node.textContent ?? "")[range?.startOffset ?? 0] ?? "";
 			} else {
@@ -6439,7 +6434,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			messageId: ChatMsgId;
 		}): Promise<void> {
 			placeSelPinyin(quoted, "…");
-			let html = "";
+			let html: string;
 			try {
 				html = await furiganaHtml(quoted.quote, "furigana");
 			} catch {
@@ -7916,7 +7911,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			class:above={selPinyin.above}
 			style="left: {selPinyin.x}px; top: {selPinyin.y}px"
 			aria-live="polite"
-		>{@html selPinyin.html}</div>
+		><!-- eslint-disable-line svelte/no-at-html-tags -- html is "…" or escapeHtml output (see readingsOnly) -->{@html selPinyin.html}</div>
 	{/if}
 
 	{#if annPop}
@@ -8007,8 +8002,8 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		</div>
 	{/if}
 
-	<!-- svelte-ignore a11y_no_static_element_interactions: double-click
-	on open space closes the panel; keyboard users keep Meta+,. -->
+	<!-- Double-click on open space closes the panel; keyboard users
+	keep Meta+,. -->
 	<aside
 		class="settings-panel"
 		class:closed={!settingsOpen}
@@ -8242,7 +8237,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 								role="img"
 								aria-label={`Stroke order for ${inspectChar}`}
 							>
-								{#each inspectStrokes as d, i}
+								{#each inspectStrokes as d, i (i)}
 									<path d={d} class:painted={i < strokeShown} />
 								{/each}
 							</svg>
@@ -8320,13 +8315,13 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 					<div class="inspect-decomp" aria-label="Character decomposition">
 						<span class="inspect-decomp-char root">{decompInspect.char}</span>
 						<span class="inspect-decomp-arrow" aria-hidden="true">→</span>
-						{#each decompInspect.children as child, ci}
+						{#each decompInspect.children as child, ci (ci)}
 							<span class="inspect-decomp-group">
 								<span class="inspect-decomp-char">{child.char}</span>
 								{#if child.children.length > 0}
 									<span class="inspect-decomp-sub">
 										<span class="inspect-decomp-arrow" aria-hidden="true">→</span>
-										{#each child.children as grand, gi}
+										{#each child.children as grand, gi (gi)}
 											<span class="inspect-decomp-char sub">{grand.char}</span>{#if gi < child.children.length - 1}<span
 													class="inspect-decomp-plus"
 													aria-hidden="true"
@@ -9682,10 +9677,11 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		strip's 1.75rem plus the old breathing room. */
 		scroll-padding-top: calc(1.75rem + 1rem);
 		/* Bottom clearance for the floating card is measured, not static
-		(see the ResizeObserver below): content padding physically keeps
-		the tail above the card in every scroll position (scroll-padding
-		only steers programmatic scrolls, and clicks still land under
-		the card). */
+		(see the ResizeObserver below): main-level padding physically
+		keeps the tail — and the in-flow attachment strip — above the
+		card in every scroll position (scroll-padding only steers
+		programmatic scrolls, and padding inside the scroller leaves
+		the strip under the card eating its taps). */
 	}
 	.messages {
 		/* Selection starts at message text only: dragging empty space

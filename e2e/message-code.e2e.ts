@@ -113,8 +113,8 @@ test("code body click selects without copying", async ({ page }) => {
 	expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("SENTINEL");
 });
 
-/** Right-click folds, left-click on the folded label unfolds, and neither starts audio. */
-test("right-click folds and left-click unfolds, staying silent", async ({ page }) => {
+/** Right-click toggles the fold, left-click on the folded label unfolds, and neither starts audio. */
+test("right-click toggles the code fold, left-click unfolds, staying silent", async ({ page }) => {
 	const block = page.locator(".ccez-code").first();
 	const pre = block.locator("pre");
 	await expect(pre).toBeVisible();
@@ -123,8 +123,12 @@ test("right-click folds and left-click unfolds, staying silent", async ({ page }
 	await expect(pre).toBeHidden();
 	await page.waitForTimeout(500);
 	await expect(page.locator("article.speaking, article.speaking-sel")).toHaveCount(0);
-	// A second right-click never unfolds.
+	// A second right-click toggles back open (shortcuts modal: "Right-click toggles").
 	await block.click({ button: "right" });
+	await expect(block).not.toHaveAttribute("data-folded", "1");
+	await expect(pre).toBeVisible();
+	// Fold once more so the left-click unfold below starts folded.
+	await pre.click({ button: "right" });
 	await expect(block).toHaveAttribute("data-folded", "1");
 	await expect(pre).toBeHidden();
 	// Left-click on the folded label unfolds.

@@ -5,7 +5,10 @@ import prettier from "eslint-config-prettier";
 import globals from "globals";
 
 export default [
-	{ ignores: ["build/", ".svelte-kit/", "dist/", "src-tauri/target/"] },
+	// .muse/ holds retained agent worktrees (no node_modules of their
+	// own): linting them spews thousands of phantom errors, the same
+	// reason the vitest config excludes **/.muse/**.
+	{ ignores: ["build/", ".svelte-kit/", "dist/", "src-tauri/target/", ".muse/"] },
 	js.configs.recommended,
 	// Type-checked rules (no-floating-promises, no-unsafe-*, ...) turn
 	// agent conventions (void your promises, narrow your JSON) into red.
@@ -17,7 +20,7 @@ export default [
 		// Build tooling, e2e helpers, and vendored code live outside the
 		// app tsconfig and lean on untyped Node/Vite APIs: base rules
 		// only, no type-aware set.
-		files: ["*.config.js", "*.config.ts", "playwright.config.ts", "e2e/**/*.ts", "vendor/**/*.ts"],
+		files: ["*.config.js", "*.config.ts", "playwright.config.ts", "e2e/**/*.ts", "vendor/**/*.ts", "scripts/**/*.ts"],
 		...tseslint.configs.disableTypeChecked
 	},
 	{
@@ -46,9 +49,13 @@ export default [
 						"eslint.config.js",
 						"playwright.config.ts",
 						"e2e/*.ts",
-						"vendor/*.ts"
+						"vendor/*.ts",
+						"scripts/*.ts"
 					],
-					maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 32
+					// Headroom over the ~60 e2e specs: these files run base
+					// rules only (disableTypeChecked above), so the
+					// program is parse-only and the extra cost is small.
+					maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 96
 				},
 				tsconfigRootDir: import.meta.dirname
 			}

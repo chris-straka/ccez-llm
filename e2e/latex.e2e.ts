@@ -97,7 +97,7 @@ test("composer does not render latex", async ({ page }) => {
 });
 
 /** Right-clicking the math block toggles the fold and never starts audio: zero speaking classes and the live highlight keeps. */
-test("right-click folds math, left-click unfolds, and both stay silent", async ({
+test("right-click toggles the math fold, left-click unfolds, and both stay silent", async ({
 	page
 }) => {
 	const para = page.locator("article .rendered p").first();
@@ -120,8 +120,12 @@ test("right-click folds math, left-click unfolds, and both stay silent", async (
 	await expect(page.locator("article.speaking, article.speaking-sel")).toHaveCount(0);
 	const selected = await page.evaluate(() => window.getSelection()?.toString() ?? "");
 	expect(selected).not.toBe("");
-	// A second right-click never unfolds.
+	// A second right-click toggles back open (shortcuts modal: "Right-click toggles").
 	await block.click({ button: "right" });
+	await expect(block).not.toHaveAttribute("data-folded", "1");
+	await expect(body).toBeVisible();
+	// Fold once more so the left-click unfold below starts folded.
+	await body.click({ button: "right" });
 	await expect(block).toHaveAttribute("data-folded", "1");
 	// Left-click on the folded label unfolds.
 	await block.locator(".ccez-math-foldedlabel").click();

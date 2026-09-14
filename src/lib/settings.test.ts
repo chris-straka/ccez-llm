@@ -47,7 +47,9 @@ describe("settings", () => {
 		expect(s.scaleActionsWithFont).toBe(false);
 		expect(s.promptIdleSec).toBe(PROMPT_IDLE_DEFAULT);
 		expect(s.voiceEngine).toBe("native");
-		expect(s.voiceLang).toBe("en-US");
+		// Locale-aware: defaultSettings() follows systemLocale() (OS locale),
+		// so this must track the helper, not a hardcoded tag.
+		expect(s.voiceLang).toBe(systemLocale());
 		expect(s.systemPrompt).toBe(DEFAULT_SYSTEM_PROMPT);
 		expect(s.providers["deepseek"]!.model).toBe("deepseek-flash");
 		expect(s.providers["muse"]!.model).toBe("muse-spark-1.3-contributor");

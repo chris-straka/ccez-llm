@@ -15,22 +15,22 @@ export const codeLanguages = [
 	LanguageDescription.of({
 		name: "javascript",
 		alias: ["js", "jsx", "ts", "tsx", "mjs", "cjs"],
-		load: async () => javascript()
+		load: () => Promise.resolve(javascript())
 	}),
 	LanguageDescription.of({
 		name: "python",
 		alias: ["py", "pyw", "python"],
-		load: async () => python()
+		load: () => Promise.resolve(python())
 	}),
 	LanguageDescription.of({
 		name: "rust",
 		alias: ["rs"],
-		load: async () => rust()
+		load: () => Promise.resolve(rust())
 	}),
 	LanguageDescription.of({
 		name: "cpp",
 		alias: ["c", "h", "cc", "cpp", "cxx", "hpp", "c++"],
-		load: async () => cpp()
+		load: () => Promise.resolve(cpp())
 	})
 ];
 

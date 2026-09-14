@@ -11,7 +11,7 @@ test("mic toggle hides prompt mic button", async ({ page }) => {
 	});
 	await page.goto("/");
 	const hasRecognition = await page.evaluate(
-		() => !!(window.SpeechRecognition || (window as any).webkitSpeechRecognition)
+		() => !!(window.SpeechRecognition || window.webkitSpeechRecognition)
 	);
 	console.log("recognition", hasRecognition);
 	test.skip(!hasRecognition, "no speech recognition in this browser");

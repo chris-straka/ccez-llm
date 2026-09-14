@@ -184,7 +184,12 @@ test.describe("desktop", () => {
 		// Same content, new nodes: what production swaps actually do.
 		await page.evaluate(() => {
 			const body = document.querySelector("article .rendered");
-			if (body) body.innerHTML = body.innerHTML;
+			// Same markup, fresh nodes (not a self-assign): what
+			// production swaps actually do under a live highlight.
+			if (body) {
+				const html = body.innerHTML;
+				body.innerHTML = html;
+			}
 		});
 		const after = await page.evaluate(() => {
 			const sel = window.getSelection();
