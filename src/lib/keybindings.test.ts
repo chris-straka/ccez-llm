@@ -4,6 +4,7 @@ import {
 	commandChord,
 	deleteChatScope,
 	inspectStepAction,
+	keyFacts,
 	messageKeyAction,
 	modalScrollAction,
 	promptIdleKeyAction,
@@ -613,6 +614,28 @@ describe("unselectedScrollAction", () => {
 		expect(unselectedScrollAction({ ...unselectedBase, altKey: true })).toBe(null);
 		expect(unselectedScrollAction({ ...unselectedBase, shiftKey: true })).toBe(null);
 		expect(unselectedScrollAction({ ...unselectedBase, ctrlKey: false })).toBe(null);
+	});
+});
+
+describe("keyFacts", () => {
+	it("reads the shared key, code, and modifiers off the event", () => {
+		expect(
+			keyFacts({
+				key: "t",
+				code: "KeyT",
+				metaKey: true,
+				ctrlKey: false,
+				altKey: false,
+				shiftKey: true
+			})
+		).toEqual({
+			key: "t",
+			code: "KeyT",
+			metaKey: true,
+			ctrlKey: false,
+			altKey: false,
+			shiftKey: true
+		});
 	});
 });
 

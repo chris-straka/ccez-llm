@@ -19,6 +19,33 @@ export interface KeyModifiers {
 	shiftKey: boolean;
 }
 
+/** Shared per-keydown base: the key, physical code, and modifiers. */
+export interface KeyEventFacts extends KeyModifiers {
+	key: string;
+	code: string;
+}
+
+/**
+ * Read the shared base once per snapshot: every facts object spreads
+ * this instead of repeating the literal, so the six fields can never
+ * drift between slices. Extra spread fields are fine — each slice
+ * interface picks what it declares. The parameter names only the six
+ * fields read, so tests pass plain literals and the handler passes the
+ * real event.
+ */
+export function keyFacts(
+	event: Pick<KeyboardEvent, "key" | "code" | "metaKey" | "ctrlKey" | "altKey" | "shiftKey">
+): KeyEventFacts {
+	return {
+		key: event.key,
+		code: event.code,
+		metaKey: event.metaKey,
+		ctrlKey: event.ctrlKey,
+		altKey: event.altKey,
+		shiftKey: event.shiftKey
+	};
+}
+
 /** Bare key: no modifier held. */
 function bare(mods: KeyModifiers): boolean {
 	return !mods.metaKey && !mods.ctrlKey && !mods.altKey && !mods.shiftKey;

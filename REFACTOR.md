@@ -66,9 +66,12 @@ modules — they never split the template for size alone.
   never a switch. The target spellings live exactly once each as named
   `events.ts` predicates — the facts snapshot carries the booleans, never
   the selectors.
-- Follow-ups for later slices: converge the per-slice facts objects into
-  one shared per-keydown context (built once, not one snapshot per
-  cluster). Beyond the idle-restore allowlist above, the prompt-idle
+- Every facts snapshot spreads the shared `keyFacts(event)` base (key,
+  code, modifiers) instead of repeating the literal — the six fields
+  cannot drift between slices. Full per-keydown context (target
+  booleans included) stays per-slice: one mega-context would couple
+  every decision function to every other for no tested gain.
+- Follow-ups for later slices: beyond the idle-restore allowlist above, the prompt-idle
   hide/show/park machine itself (`promptIdle`, `bootParked`, mount
   migration, focus/pointer listeners) wants the same decision/effect
   split. Next concrete slices: the message-key body effects

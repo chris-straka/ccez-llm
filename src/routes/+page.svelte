@@ -179,6 +179,7 @@ import { desktopShortcuts, filteredShortcuts, touchShortcuts } from "$lib/shortc
 		commandChord,
 		deleteChatScope,
 		inspectStepAction,
+		keyFacts,
 		messageKeyAction,
 		modalScrollAction,
 		promptIdleKeyAction,
@@ -5400,11 +5401,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			if (promptIdle) {
 				const inPromptEditor = isPromptEditorTarget(event.target);
 				const idleAction = promptIdleKeyAction({
-					key: event.key,
-					metaKey: event.metaKey,
-					ctrlKey: event.ctrlKey,
-					altKey: event.altKey,
-					shiftKey: event.shiftKey,
+					...keyFacts(event),
 					repeat: event.repeat,
 					isComposing: event.isComposing,
 					inPromptEditor,
@@ -5438,11 +5435,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			// (never leaves the menu): bare keys only, never from a
 			// field, and never with modifiers.
 			const inspectStep = inspectStepAction({
-				key: event.key,
-				metaKey: event.metaKey,
-				ctrlKey: event.ctrlKey,
-				altKey: event.altKey,
-				shiftKey: event.shiftKey,
+				...keyFacts(event),
 				inspectOpen: inspectChar !== null,
 				inField: isInspectFieldTarget(event.target)
 			});
@@ -5457,12 +5450,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			// through like any other input.
 			if (
 				shortcutsFilterBlocksKey({
-					key: event.key,
-					code: event.code,
-					metaKey: event.metaKey,
-					ctrlKey: event.ctrlKey,
-					altKey: event.altKey,
-					shiftKey: event.shiftKey,
+					...keyFacts(event),
 					inFilter: isFilterTarget(event.target)
 				})
 			) {
@@ -5476,11 +5464,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			// message edits and attachment drafts are exempt: clearing
 			// real work must stay explicit (Escape).
 			const spaceAction = spaceKeyAction({
-				key: event.key,
-				metaKey: event.metaKey,
-				ctrlKey: event.ctrlKey,
-				altKey: event.altKey,
-				shiftKey: event.shiftKey,
+				...keyFacts(event),
 				repeat: event.repeat,
 				isComposing: event.isComposing,
 				editing: editingMsgId !== null,
@@ -5506,14 +5490,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			// One snapshot for the whole modifier-chord table below (see
 			// commandChord): priority lives in the table, bodies stay here
 			// as `if (chord === ...)` chains, never a switch.
-			const chord = commandChord({
-				key: event.key,
-				code: event.code,
-				metaKey: event.metaKey,
-				ctrlKey: event.ctrlKey,
-				altKey: event.altKey,
-				shiftKey: event.shiftKey
-			});
+			const chord = commandChord(keyFacts(event));
 			if (chord === "open-browser") {
 				// Always the single-tab browser: it opens and lands
 				// focus in its address bar (a second press focuses
@@ -5623,11 +5600,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				return;
 			}
 			const delScope = deleteChatScope({
-				metaKey: event.metaKey,
-				ctrlKey: event.ctrlKey,
-				altKey: event.altKey,
-				shiftKey: event.shiftKey,
-				key: event.key,
+				...keyFacts(event),
 				inEditor: inEditor !== null,
 				inEditable: isEditableTarget(event.target)
 			});
@@ -5655,12 +5628,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			// chromeChord): same token across spellings, bodies stay
 			// here as `if (chrome === ...)` chains, never a switch.
 			const chrome = chromeChord({
-				key: event.key,
-				code: event.code,
-				metaKey: event.metaKey,
-				ctrlKey: event.ctrlKey,
-				altKey: event.altKey,
-				shiftKey: event.shiftKey,
+				...keyFacts(event),
 				inEditor: inEditor !== null,
 				hovered: hoveredIdx >= 0,
 				inField: isFieldTarget(event.target)
@@ -5756,12 +5724,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			// guards each walked the target themselves, so this is also
 			// fewer ancestor walks per keypress, not more.
 			const msgFacts = {
-				key: event.key,
-				code: event.code,
-				metaKey: event.metaKey,
-				ctrlKey: event.ctrlKey,
-				altKey: event.altKey,
-				shiftKey: event.shiftKey,
+				...keyFacts(event),
 				inEditor: inEditor !== null,
 				inField: isFieldTarget(event.target),
 				inEditable: isEditableTarget(event.target),
@@ -5861,11 +5824,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		// stay here as `if (sideAction === ...)` chains, never a switch.
 		const inSidebar = isSidebarTarget(event.target);
 		const sideAction = sidebarListAction({
-			key: event.key,
-			metaKey: event.metaKey,
-			ctrlKey: event.ctrlKey,
-			altKey: event.altKey,
-			shiftKey: event.shiftKey,
+			...keyFacts(event),
 			listOpen: !settings.sidebarCollapsed,
 			inSidebar
 		});
@@ -5907,11 +5866,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			// mode is entered with Ctrl+G only.
 			if (
 				scrollEnterAction({
-					key: event.key,
-					metaKey: event.metaKey,
-					ctrlKey: event.ctrlKey,
-					altKey: event.altKey,
-					shiftKey: event.shiftKey,
+					...keyFacts(event),
 					inScrollMode: focusMode === "scroll",
 					inEditor: inEditor !== null,
 					androidUI,
@@ -5929,11 +5884,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				return;
 			}
 			const modalScroll = modalScrollAction({
-				key: event.key,
-				metaKey: event.metaKey,
-				ctrlKey: event.ctrlKey,
-				altKey: event.altKey,
-				shiftKey: event.shiftKey,
+				...keyFacts(event),
 				shortcutsOpen,
 				searchOpen,
 				inspectOpen: inspectChar !== null,
@@ -5971,21 +5922,13 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				// unselectedScrollAction); the intent glide below keeps
 				// its own guard and extracted call.
 				const unselected = unselectedScrollAction({
-					key: event.key,
-					metaKey: event.metaKey,
-					ctrlKey: event.ctrlKey,
-					altKey: event.altKey,
-					shiftKey: event.shiftKey,
+					...keyFacts(event),
 					scrollable: true,
 					modalOpen,
 					typing,
 					findOpen,
 					emptyPromptSpace: spaceFocusesEmptyPrompt({
-						key: event.key,
-						shiftKey: event.shiftKey,
-						metaKey: event.metaKey,
-						ctrlKey: event.ctrlKey,
-						altKey: event.altKey,
+						...keyFacts(event),
 						messageCount: viewChat.messages.length,
 						inInteractive: isSpaceInteractiveTarget(event.target)
 					}),
@@ -6042,10 +5985,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			// `lastGAt` bookkeeping and every scroll effect stay here as
 			// `if` chains, never a switch.
 			const scrollAction = scrollModeAction({
-				key: event.key,
-				metaKey: event.metaKey,
-				ctrlKey: event.ctrlKey,
-				altKey: event.altKey,
+				...keyFacts(event),
 				inScrollMode: focusMode === "scroll",
 				inEditor: inEditor !== null,
 				inFind: isFindBarTarget(event.target),
