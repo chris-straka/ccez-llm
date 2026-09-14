@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
 	clampPromptIdleSec,
-	contentFitsViewport,
 	draggedSliderPastTop,
 	formatIdleTimeout,
 	IDLE_SLIDER_BOTTOM,
@@ -80,14 +79,6 @@ describe("idle slider mapping", () => {
 		expect(idleSliderToSetting(IDLE_SLIDER_BOTTOM)).toBe(PROMPT_IDLE_ALWAYS);
 		expect(idleSettingToSlider(PROMPT_IDLE_ALWAYS)).toBe(IDLE_SLIDER_BOTTOM);
 		expect(formatIdleTimeout(PROMPT_IDLE_ALWAYS)).toBe("always");
-	});
-});
-
-describe("contentFitsViewport", () => {
-	it("skips idle-hide when nothing scrolls", () => {
-		expect(contentFitsViewport(400, 600)).toBe(true);
-		expect(contentFitsViewport(600, 600)).toBe(true);
-		expect(contentFitsViewport(601, 600)).toBe(false);
 	});
 });
 

@@ -59,15 +59,6 @@ export function formatIdleTimeout(sec: number): string {
 }
 
 /**
- * True when the chat content fits without scrolling: idle-hide skips
- * then (with nothing to uncover, hiding the prompt only strands it).
- * Pure over measured pixels so the page feeds `scrollBox` rects.
- */
-export function contentFitsViewport(scrollHeight: number, clientHeight: number): boolean {
-	return scrollHeight <= clientHeight;
-}
-
-/**
  * Whether a pointer gesture on a slider counts as "dragged upward past
  * its top": released at least SLIDER_DRAG_RESET_PX above where the
  * press began (clientY grows downward, so up means endY < startY).
