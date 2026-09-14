@@ -425,3 +425,201 @@ export function vibrateTick(
     return false;
   }
 }
+
+/** Haptic beats: send taps, the first reply token rumbles, stream end thumps. */
+export type HapticBeat = "send" | "first" | "done";
+
+/**
+ * Vibration pattern per beat: a short single tap on send, a longer
+ * rumble as the reply starts arriving, a double thump when it is
+ * fully in. Kept small — these fire on every message.
+ */
+const HAPTIC_PATTERNS: Record<HapticBeat, number[]> = {
+  send: [20],
+  first: [70],
+  done: [35, 60, 110],
+};
+
+/**
+ * Fire one haptic beat. False when the caller disabled vibration or
+ * the runtime has no vibrator (desktops, browser preview without the
+ * API). Never throws.
+ */
+export function hapticBeat(
+  kind: HapticBeat,
+  opts: { enabled?: boolean; nav?: unknown } = {},
+): boolean {
+  if (opts.enabled === false) return false;
+  return vibrateTick(HAPTIC_PATTERNS[kind] ?? 10, opts.nav);
+}
+
+/** Structural slice of the Tauri haptics plugin (dynamic import). */
+export interface NativeHaptics {
+  vibrate?(duration: number): Promise<unknown>;
+  impactFeedback?(style: string): Promise<unknown>;
+  notificationFeedback?(type: string): Promise<unknown>;
+  selectionFeedback?(): Promise<unknown>;
+}
+
+/**
+ * Lazily load the haptics plugin. Dynamic so node/jsdom imports of
+ * this module never touch Tauri; null outside the shell or when the
+ * plugin is missing. Never throws.
+ */
+async function nativeHaptics(shell: boolean): Promise<NativeHaptics | null> {
+  if (!shell) return null;
+  try {
+    const mod = (await import(
+      "@tauri-apps/plugin-haptics"
+    )) as unknown as Record<string, unknown>;
+    if (
+      typeof mod["vibrate"] !== "function" &&
+      typeof mod["impactFeedback"] !== "function" &&
+      typeof mod["notificationFeedback"] !== "function" &&
+      typeof mod["selectionFeedback"] !== "function"
+    )
+      return null;
+    return mod;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Shell-aware haptic beat: the plugin drives the Taptic Engine on
+ * iOS and the vibrator on Android (`navigator.vibrate` does not
+ * exist on iPhones at all). Browser preview falls back to the Web
+ * vibrator. False when disabled or unsupported. Never throws.
+ */
+export async function hapticBeatAsync(
+  kind: HapticBeat,
+  opts: {
+    enabled?: boolean;
+    nav?: unknown;
+    shell?: boolean;
+    plugin?: NativeHaptics | null;
+  } = {},
+): Promise<boolean> {
+  if (opts.enabled === false) return false;
+  if (opts.shell) {
+    try {
+      const haptics = opts.plugin ?? (await nativeHaptics(true));
+      if (!haptics) return false;
+      // Send taps light, the first token rumbles medium, arrival
+      // thumps a success — the same three beats as the web patterns.
+      if (kind === "send" && haptics.selectionFeedback) {
+        await haptics.selectionFeedback();
+        return true;
+      }
+      if (kind === "first" && haptics.impactFeedback) {
+        await haptics.impactFeedback("medium");
+        return true;
+      }
+      if (kind === "done" && haptics.notificationFeedback) {
+        await haptics.notificationFeedback("success");
+        return true;
+      }
+      if (haptics.vibrate) {
+        await haptics.vibrate(kind === "send" ? 20 : kind === "first" ? 70 : 110);
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }
+  return hapticBeat(kind, opts);
+}
+
+/** Structural slice of the Tauri notification plugin (dynamic import). */
+export interface NativeNotifier {
+  isPermissionGranted(): Promise<boolean>;
+  requestPermission(): Promise<string>;
+  sendNotification(opts: { title: string; body?: string }): unknown;
+}
+
+/**
+ * Lazily load the notification plugin. Dynamic so node/jsdom imports
+ * of this module never touch Tauri; null outside the shell or when
+ * the plugin is missing. Never throws.
+ */
+async function nativeNotifier(shell: boolean): Promise<NativeNotifier | null> {
+  if (!shell) return null;
+  try {
+    const mod = (await import(
+      "@tauri-apps/plugin-notification"
+    )) as unknown as Record<string, unknown>;
+    if (
+      typeof mod["isPermissionGranted"] !== "function" ||
+      typeof mod["requestPermission"] !== "function" ||
+      typeof mod["sendNotification"] !== "function"
+    )
+      return null;
+    return mod as unknown as NativeNotifier;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Shell-aware permission ask: the plugin request on Android pops the
+ * OS notification prompt (the Web Notification ctor does not exist
+ * in the WebView). Web ask everywhere else. Never throws — call from
+ * a user gesture (send).
+ */
+export async function ensureReplyNotificationPermissionAsync(input?: {
+  source?: unknown;
+  shell?: boolean;
+  plugin?: NativeNotifier | null;
+}): Promise<string> {
+  if (input?.shell) {
+    try {
+      const plugin = input?.plugin ?? (await nativeNotifier(true));
+      if (!plugin) return "unsupported";
+      if (await plugin.isPermissionGranted()) return "granted";
+      const next = await plugin.requestPermission();
+      return typeof next === "string" ? next : "default";
+    } catch {
+      return "default";
+    }
+  }
+  return ensureReplyNotificationPermission(input?.source);
+}
+
+/**
+ * Finished-reply ping that also works in the shell: native
+ * notification first (the only channel inside the Android WebView),
+ * Web Notification fallback (browser preview, desktop shell).
+ * Silent (false) when foregrounded, short, unpermitted, or
+ * unsupported. Never throws.
+ */
+export async function notifyReplyDoneAsync(
+  title: string,
+  body: string,
+  input?: {
+    notif?: unknown;
+    hidden?: boolean;
+    focused?: boolean;
+    shell?: boolean;
+    plugin?: NativeNotifier | null;
+  },
+): Promise<boolean> {
+  const text = body.trim();
+  const hidden = input?.hidden ?? documentHiddenNow();
+  const focused = input?.focused ?? windowFocusedNow();
+  if (!(hidden || !focused)) return false;
+  if (text.length < LONG_REPLY_MIN_CHARS) return false;
+  if (input?.shell) {
+    try {
+      const plugin = input?.plugin ?? (await nativeNotifier(true));
+      if (plugin && (await plugin.isPermissionGranted())) {
+        await plugin.sendNotification({ title, body: text.slice(0, 160) });
+        return true;
+      }
+    } catch {
+      // Fall through to the Web channel below.
+    }
+    return notifyReplyDone(title, body, input);
+  }
+  return notifyReplyDone(title, body, input);
+}

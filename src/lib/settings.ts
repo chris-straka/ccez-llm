@@ -148,6 +148,12 @@ export interface AppSettings {
 	/** Touch only: read a fresh text selection aloud on release. */
 	autoSpeakSelection: boolean;
 	/**
+	 * Touch only: haptic beats on send, first reply token, and stream
+	 * end. Off silences every vibration. The checkbox lives in Messages
+	 * on phones.
+	 */
+	vibration: boolean;
+	/**
 	 * Character Inspect: a single kanji/hanzi highlight gains an
 	 * Inspect button (next to Annotate, desktop and mobile) opening
 	 * the radicals/stroke/definition overlay. Off = no Inspect UI
@@ -293,6 +299,7 @@ export function defaultSettings(): AppSettings {
 		hideButtons: true,
 		overlayActions: true,
 		autoSpeakSelection: true,
+		vibration: true,
 		inspectEnabled: false
 	};
 }
@@ -428,6 +435,7 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 		if (typeof merged.hideButtons !== "boolean") merged.hideButtons = true;
 		if (typeof merged.overlayActions !== "boolean") merged.overlayActions = true;
 		if (typeof merged.autoSpeakSelection !== "boolean") merged.autoSpeakSelection = true;
+		if (typeof merged.vibration !== "boolean") merged.vibration = true;
 		// Retire the old "Be brief, no summaries." default: profiles that
 		// never customized it inherit the new (empty) default instead.
 		if (merged.systemPrompt === "Be brief, no summaries.") {

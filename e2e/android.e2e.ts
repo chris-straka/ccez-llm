@@ -61,8 +61,15 @@ test.describe("gestures", () => {
 		// No title on phones: the filter owns the head row.
 		await expect(page.locator("#shortcuts-heading")).toHaveCount(0);
 		const modal = page.locator(".modal-veil");
-		await expect(modal.locator('dt:has-text("Chats list")')).toBeVisible();
+		// ":has-text" matches "Fold chats list" too: exact-match the row.
+		await expect(modal.locator('dt:text-is("Chats list")')).toBeVisible();
 		await expect(modal.locator('dd:has-text("Double-tap empty space")')).toBeVisible();
+		// The list row teaches both openers; fold and settings rows exist.
+		await expect(modal.locator('dd:has-text("Double-tap empty space")')).toHaveText(
+			"Double-tap empty space · swipe right"
+		);
+		await expect(modal.locator('dt:text-is("Fold chats list")')).toBeVisible();
+		await expect(modal.locator('dt:text-is("Settings")')).toBeVisible();
 		await expect(modal.locator('dt:has-text("Chats sidebar")')).toHaveCount(0);
 		await expect(modal.locator('dt:has-text("Newer / older chat")')).toBeVisible();
 		await expect(modal.locator('dd:has-text("Two-finger swipe right / left")')).toBeVisible();
@@ -92,17 +99,19 @@ test.describe("gestures", () => {
 		});
 	}
 
-	test("edge swipe from the left never opens the chat sidebar", async ({ page }) => {
+	test("edge swipes summon and fold the chat sidebar", async ({ page }) => {
 		const aside = page.locator("aside:has(button.side-chat)");
 		const panel = page.locator(".settings-panel");
-		// Double-tap is the only opener: a rightward stroke with
-		// everything shut changes nothing...
+		// A rightward stroke summons the list...
 		await swipeFromLeftEdge(page);
-		await expect(aside).toHaveClass(/collapsed/);
+		await expect(aside).not.toHaveClass(/collapsed/);
+		// ...and never toggles it shut: a repeat summon is a no-op.
 		await swipeFromLeftEdge(page);
+		await expect(aside).not.toHaveClass(/collapsed/);
+		// Only a leftward stroke folds the open list.
+		await swipeMidScreen(page, 260, 150);
 		await expect(aside).toHaveClass(/collapsed/);
-		// ...but still dismisses: open settings from the right edge,
-		// then watch a rightward stroke close them (sheet stays shut).
+		// ...but a rightward stroke still dismisses an open settings.
 		await swipeFromRightEdge(page);
 		await expect(panel).not.toHaveClass(/closed/);
 		await swipeFromLeftEdge(page);
@@ -133,15 +142,19 @@ test.describe("gestures", () => {
 		);
 	}
 
-	test("mid-screen swipe right never opens the chat sidebar", async ({ page }) => {
+	test("mid-screen swipe right opens the chat sidebar", async ({ page }) => {
 		const aside = page.locator("aside:has(button.side-chat)");
 		const panel = page.locator(".settings-panel");
-		// Double-tap is the only opener: the stroke changes nothing with
-		// everything shut, and still dismisses an open settings.
+		// Mid-screen rightward summons like the edge stroke, and never
+		// toggles the open list shut.
 		await swipeMidScreen(page, 150, 260);
-		await expect(aside).toHaveClass(/collapsed/);
+		await expect(aside).not.toHaveClass(/collapsed/);
 		await swipeMidScreen(page, 150, 260);
+		await expect(aside).not.toHaveClass(/collapsed/);
+		// A leftward stroke folds it back...
+		await swipeMidScreen(page, 260, 150);
 		await expect(aside).toHaveClass(/collapsed/);
+		// ...and a rightward stroke still dismisses an open settings.
 		await swipeFromRightEdge(page);
 		await expect(panel).not.toHaveClass(/closed/);
 		await swipeMidScreen(page, 150, 260);
@@ -303,7 +316,7 @@ test.describe("touch", () => {
 		}
 	}
 
-	test("swipes dismiss but never summon on a phone", async ({ page }) => {
+	test("swipes summon and fold on a phone", async ({ page }) => {
 		await seedEmpty(page);
 		const aside = page.locator("aside:has(button.new)");
 		const panel = page.locator(".settings-panel");
@@ -314,13 +327,15 @@ test.describe("touch", () => {
 		await swipeX(page, 4, 144);
 		await expect(panel).toHaveClass(/closed/);
 		await expect(aside).toHaveClass(/collapsed/);
-		// A rightward stroke with everything shut changes nothing now:
-		// double-tap is the only opener.
+		// A rightward stroke with everything shut summons the list...
 		await swipeX(page, 4, 144);
-		await expect(aside).toHaveClass(/collapsed/);
+		await expect(aside).not.toHaveClass(/collapsed/);
+		// ...and never toggles it shut; a leftward stroke folds it.
 		await swipeX(page, 4, 144);
+		await expect(aside).not.toHaveClass(/collapsed/);
+		await swipeX(page, 268, 128);
 		await expect(aside).toHaveClass(/collapsed/);
-		// Two-finger double-tap deletes instead of summoning now.
+		// Two-finger double-tap still deletes instead of summoning.
 		await doubleTapTwoFinger(page);
 		await expect(aside).toHaveClass(/collapsed/);
 		await expect(page.locator(".toast")).toHaveText("Chat deleted");
@@ -768,6 +783,42 @@ test.describe("touch", () => {
 		const box = page.locator('label.check:has-text("Hide message buttons until tapped") input');
 		await expect(box).toBeChecked();
 	});
+
+	test("vibration checkbox is checked by default", async ({ page }) => {
+		await seedEmpty(page);
+		await swipeX(page, 408, 268);
+		await page.locator(".settings-panel").waitFor();
+		const box = page.locator('label.check:has-text("Vibrate when messages send and arrive") input');
+		await expect(box).toBeChecked();
+		// Off persists through the next settings flush: dismiss settings,
+		// then summon the list (its toggle persists the whole object).
+		await box.click();
+		await expect(box).not.toBeChecked();
+		await swipeX(page, 4, 144);
+		await swipeX(page, 4, 144);
+		await expect(page.locator("aside:has(button.new)")).not.toHaveClass(/collapsed/);
+		// The flush is async: the stored flag (not a reload — the seed
+		// script resets settings on load) proves the off state sticks.
+		await expect
+			.poll(
+				async () =>
+					page.evaluate(() => window.localStorage.getItem("ccez-llm-settings-v1") ?? ""),
+				{ timeout: 5000 }
+			)
+			.toContain('"vibration":false');
+	});
+
+	test("settings button in the chats list opens settings", async ({ page }) => {
+		await seedEmpty(page);
+		const aside = page.locator("aside:has(button.new)");
+		const panel = page.locator(".settings-panel");
+		await swipeX(page, 4, 144);
+		await expect(aside).not.toHaveClass(/collapsed/);
+		await page.locator("aside .side-settings").click();
+		await expect(panel).not.toHaveClass(/closed/);
+		// The list folds away behind the opening panel.
+		await expect(aside).toHaveClass(/collapsed/);
+	});
 });
 
 test.describe("always-visible prompt", () => {
@@ -872,6 +923,9 @@ test.describe("always-visible prompt", () => {
 		await seed(page, {}, [LONG]);
 		await page.goto("/");
 		await expect(page.locator("article .rendered").first()).toBeVisible();
+		// Buttons live on the focused second line: tap in first.
+		await composer(page).click();
+		await expect(page.locator(".prompt .prompt-tools")).toBeVisible();
 		const boxes = (await page.evaluate(() => {
 			const rect = (sel: string) => {
 				const r = document.querySelector(sel)?.getBoundingClientRect();
@@ -893,7 +947,68 @@ test.describe("always-visible prompt", () => {
 		expect(Math.abs(boxes.send.y + boxes.send.h - (boxes.tools.y + boxes.tools.h))).toBeLessThanOrEqual(4);
 	});
 
-	/** Double-tap on empty space is the only sidebar opener. */
+	/** One line at rest, two on focus: the buttons ride the second line. */
+	test("composer rests at one line and grows on focus", async ({ page }) => {
+		await seed(page, {}, [LONG]);
+		await page.goto("/");
+		await expect(page.locator("article .rendered").first()).toBeVisible();
+		const box = composer(page);
+		const tools = page.locator(".prompt .prompt-tools");
+		const send = page.locator(".prompt .send-btn");
+		const height = () =>
+			box.evaluate((el) => (el instanceof HTMLElement ? el.getBoundingClientRect().height : -1));
+		// At rest: one line, buttons parked out of sight and reach.
+		const rest = await height();
+		expect(rest).toBeGreaterThan(20);
+		expect(rest).toBeLessThan(44);
+		await expect(tools).toBeHidden();
+		await expect(send).toBeHidden();
+		// Focused: two lines, buttons back on their second line.
+		await box.click();
+		await expect(tools).toBeVisible();
+		await expect(send).toBeVisible();
+		await expect.poll(height, { timeout: 5000 }).toBeGreaterThan(rest + 10);
+	});
+
+	/** Phones scroll by thumb: no scrollbar chrome, scrolling intact. */
+	test("no scrollbar chrome on a phone", async ({ page }) => {
+		await page.addInitScript(() => {
+			window.localStorage.setItem("ccez-mock-provider", "1");
+			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
+			const messages = [];
+			for (let i = 0; i < 20; i++) {
+				messages.push({ id: `u${i}`, role: "user", content: `question ${i}`, usage: null, error: null });
+				messages.push({ id: `a${i}`, role: "assistant", content: `answer ${i}`, usage: null, error: null });
+			}
+			window.localStorage.setItem(
+				"ccez-llm-chats-v1",
+				JSON.stringify([{ id: "chat-a", createdAt: 1, replyLang: null, messages }])
+			);
+		});
+		await page.goto("/");
+		await expect(page.locator("article .rendered").first()).toBeVisible();
+		for (const sel of ["main", "aside ul", ".prompt .ta-input", ".messages"]) {
+			const width = await page
+				.locator(sel)
+				.first()
+				.evaluate((el) => getComputedStyle(el).scrollbarWidth);
+			expect(width).toBe("none");
+		}
+		// The list still overflows with room to travel: the paint
+		// hides, the gesture stays. (No landing readback: the list
+		// scrolls smooth, so a set scrollTop animates instead.)
+		const travel = await page.evaluate(() => {
+			const list = document.querySelector(".messages") as HTMLElement;
+			return {
+				overflowing: list.scrollHeight > list.clientHeight + 1,
+				range: list.scrollHeight - list.clientHeight
+			};
+		});
+		expect(travel.overflowing).toBe(true);
+		expect(travel.range).toBeGreaterThan(1);
+	});
+
+	/** Double-tap on empty space opens the sidebar (swipe right is the other opener). */
 	test("double-tap empty space opens the sidebar", async ({ page }) => {
 		await seed(page, {}, [LONG]);
 		await page.goto("/");
@@ -908,8 +1023,8 @@ test.describe("always-visible prompt", () => {
 		await expect(aside).not.toHaveClass(/collapsed/);
 	});
 
-	/** Rightward strokes never open the sidebar, only dismiss. */
-	test("edge swipe does not open the sidebar", async ({ page }) => {
+	/** A rightward stroke starting on a message folds it, never summons. */
+	test("message swipe folds, never summons the sidebar", async ({ page }) => {
 		await seed(page, {}, [LONG]);
 		await page.goto("/");
 		await expect(page.locator("article .rendered").first()).toBeVisible();

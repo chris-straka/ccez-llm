@@ -390,12 +390,22 @@ export async function resendLast(
 	state: ChatState,
 	provider: ChatProvider,
 	systemPrompt: string,
-	opts: { store?: KeyValueStore | undefined; thinking?: string | undefined } = {}
+	opts: {
+		store?: KeyValueStore | undefined;
+		thinking?: string | undefined;
+		onFirstToken?: (() => void) | undefined;
+	} = {}
 ): Promise<void> {
 	const chat = activeChat(state);
 	const last = chat.messages[chat.messages.length - 1];
 	if (!last || last.role !== "user" || state.sendingChatIds.includes(chat.id)) return;
-	await streamAssistantReply(state, provider, systemPrompt, { thinking: opts.thinking }, opts.store);
+	await streamAssistantReply(
+		state,
+		provider,
+		systemPrompt,
+		{ thinking: opts.thinking, onFirstToken: opts.onFirstToken },
+		opts.store
+	);
 }
 
 export function tokenTotal(state: ChatState, chat?: Chat): number {
@@ -497,6 +507,7 @@ export async function sendMessage(
 		attachments?: Attachment[] | undefined;
 		thinking?: string | undefined;
 		pasteFolds?: PasteFold[] | undefined;
+		onFirstToken?: (() => void) | undefined;
 	} = {},
 	store?: KeyValueStore
 ): Promise<void> {
@@ -524,7 +535,7 @@ export async function sendMessage(
 		state,
 		provider,
 		systemPrompt,
-		{ signal: opts.signal, thinking: opts.thinking },
+		{ signal: opts.signal, thinking: opts.thinking, onFirstToken: opts.onFirstToken },
 		store
 	);
 }
@@ -540,7 +551,11 @@ export async function streamAssistantReply(
 	state: ChatState,
 	provider: ChatProvider,
 	systemPrompt: string,
-	opts: { signal?: AbortSignal | undefined; thinking?: string | undefined } = {},
+	opts: {
+		signal?: AbortSignal | undefined;
+		thinking?: string | undefined;
+		onFirstToken?: (() => void) | undefined;
+	} = {},
 	store?: KeyValueStore
 ): Promise<void> {
 	const chat = activeChat(state);
@@ -579,6 +594,10 @@ export async function streamAssistantReply(
 	try {
 		const result = await provider.stream(apiMessages, {
 			onToken: (token) => {
+				// First visible token: the reply has started arriving
+				// (haptic rumble, readback warm-up). Fires once — later
+				// tokens just extend the accumulator.
+				if (streamed === "" && token !== "") opts.onFirstToken?.();
 				streamed += token;
 				replaceReply({ content: streamed });
 			}

@@ -87,6 +87,8 @@ describe("shortcuts menu copy", () => {
 	it("pins the touch gestures list", () => {
 		expect(touchShortcuts().map((r) => r.name)).toEqual([
 			"Chats list",
+			"Fold chats list",
+			"Settings",
 			"Newer / older chat",
 			"Delete current chat",
 			"Delete every chat",

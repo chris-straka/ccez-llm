@@ -23,6 +23,9 @@ function fifteenTurns(): Array<{ role: "user" | "assistant"; content: string }> 
 test.beforeEach(async ({ page }) => {
 	await seedChat(page, fifteenTurns());
 	await page.goto("/");
+	// Composer tools (including the jump trigger) live on the focused
+	// second line: tap into the field first.
+	await page.locator(".prompt .ta-input").click();
 	await expect(page.locator(".wp-jump")).toBeVisible({ timeout: 60_000 });
 });
 
@@ -47,6 +50,9 @@ test("sheet item jumps and closes", async ({ page }) => {
 	await page.locator(".wp-jump").tap();
 	await page.locator('.wp-menu button[role="menuitem"]').last().tap();
 	await expect(page.locator(".wp-menu")).toBeHidden();
+	// Picking an item moves focus out, parking the tools: tapping back
+	// into the composer returns the trigger.
+	await page.locator(".prompt .ta-input").click();
 	await expect(page.locator(".wp-jump")).toBeVisible();
 });
 

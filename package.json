@@ -32,6 +32,8 @@
     "@codemirror/state": "^6.7.4",
     "@codemirror/view": "^6.43.11",
     "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-haptics": "^2",
+    "@tauri-apps/plugin-notification": "^2",
     "@tauri-apps/plugin-updater": "^2",
     "dompurify": "^3.4.15",
     "fflate": "^0.8.3",

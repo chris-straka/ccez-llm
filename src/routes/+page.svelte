@@ -284,8 +284,9 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	import {
 		acquireStudyWakeLock,
 		clearStudyBadge,
-		ensureReplyNotificationPermission,
-		notifyReplyDone,
+		ensureReplyNotificationPermissionAsync,
+		hapticBeatAsync,
+		notifyReplyDoneAsync,
 		releaseStudyWakeLock,
 		setStudyBadge,
 		vibrateTick,
@@ -2709,7 +2710,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		// phone users get a comment box with no keyboard (and desktop
 		// users an extra click). Focus-only — selection is already filed.
 		void tick().then(() => annPopBox?.focus({ preventScroll: true }));
-		vibrateTick(6);
+		if (settings.vibration) vibrateTick(6);
 	}
 
 	/** Submit the annotation being composed (Enter or Save). The id is
@@ -3370,7 +3371,13 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		if (!msg || msg.role !== "assistant" || msg.error) return;
 		const body = msg.content.trim();
 		if (!body) return;
-		if (notifyReplyDone("Reply finished", body)) setStudyBadge(1);
+		// Shell goes native (Android WebView has no Notification ctor);
+		// the async ping still fires when the reply lands backgrounded.
+		void notifyReplyDoneAsync("Reply finished", body, {
+			shell: tauriBackendAvailable()
+		}).then((pinged) => {
+			if (pinged) setStudyBadge(1);
+		});
 	}
 
 	/**
@@ -3589,12 +3596,16 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 
 	async function doSend() {
 		if (!canSubmit) return;
-		vibrateTick(8);
+		// Haptic tap on send (silenced by the vibration setting; native
+		// haptics in the shell, Web vibrator in the preview).
+		void hapticBeatAsync("send", { enabled: settings.vibration, shell: tauriBackendAvailable() });
 		clearStudyBadge();
 		// Permission-gated background ping: ask from the send gesture
 		// while the window is focused, so a later backgrounded long
-		// reply may notify. No-op unless undecided.
-		void ensureReplyNotificationPermission();
+		// reply may notify. Shell goes through the notification plugin
+		// (the only channel in the Android WebView); web asks the
+		// Notification ctor. No-op unless undecided.
+		void ensureReplyNotificationPermissionAsync({ shell: tauriBackendAvailable() });
 		if (editingMsgId) {
 			// Saving an edit rewrites the message in place and resends it:
 			// everything from the edited message on is answered fresh. If
@@ -3643,13 +3654,23 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			provider,
 			effectiveSystemPrompt(settings, activeReplyCode),
 			withAnnotations(text, outgoingAnnotations),
-			{ attachments: outgoing, thinking: activeThinkingId(settings), pasteFolds: folds }
+			{
+				attachments: outgoing,
+				thinking: activeThinkingId(settings),
+				pasteFolds: folds,
+				// Haptic rumble as the reply starts arriving.
+				onFirstToken: () => {
+					void hapticBeatAsync("first", { enabled: settings.vibration, shell: tauriBackendAvailable() });
+				}
+			}
 		);
 		scrollAfterRender();
 		await sending;
 		// Keep drafts when the reply failed so nothing silently drops.
 		const sent = chat.messages[chat.messages.length - 1];
 		if (sent?.role === "assistant" && !sent.error) {
+			// Haptic thump: everything has arrived.
+			void hapticBeatAsync("done", { enabled: settings.vibration, shell: tauriBackendAvailable() });
 			attachments = [];
 			previewId = null;
 			annotations = [];
@@ -3678,10 +3699,19 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		}
 		missingKey = false;
 		stopVoice();
+		// A resend is a send too: same tap, rumble, and thump as doSend.
+		void hapticBeatAsync("send", { enabled: settings.vibration, shell: tauriBackendAvailable() });
 		const resentFrom = chat;
 		await resendLast(chatState, provider, effectiveSystemPrompt(settings, activeReplyCode), {
-			thinking: activeThinkingId(settings)
+			thinking: activeThinkingId(settings),
+			onFirstToken: () => {
+				void hapticBeatAsync("first", { enabled: settings.vibration, shell: tauriBackendAvailable() });
+			}
 		});
+		const resent = chat.messages[chat.messages.length - 1];
+		if (resent?.role === "assistant" && !resent.error) {
+			void hapticBeatAsync("done", { enabled: settings.vibration, shell: tauriBackendAvailable() });
+		}
 		scrollToBottom();
 		maybeSpeakReply(resentFrom);
 		maybeNotifyReplyDone(chat.messages[chat.messages.length - 1]);
@@ -4786,9 +4816,13 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			if (target === "chats") {
 				if (settingsOpen) toggleSettingsPanel();
 				// Touch: a left-to-right swipe opens the chats sidebar
-				// (with its search box); the toggle still dismisses via
-				// the same stroke when already open.
-				else toggleSidebar();
+				// (with its search box) and never closes it — a
+				// rightward stroke only summons, the leftward stroke
+				// below folds.
+				else if (settings.sidebarCollapsed) {
+					settings.sidebarCollapsed = false;
+					persistSettings();
+				}
 			} else if (target === "settings") {
 				// A leftward stroke never closes settings once open —
 				// only a rightward stroke (the "chats" branch) dismisses.
@@ -4941,8 +4975,8 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 					return;
 				}
 				// Double-tap on empty space opens the chats list (Android):
-				// the only opener — edge strokes and prompt flicks below
-				// only ever dismiss. Taps are short, still, unscrolled
+				// one of two openers — the rightward stroke below summons
+				// too, and prompt flicks never count. Taps are short, still, unscrolled
 				// strokes over dead space: text keeps native double-tap
 				// word select, controls keep their taps.
 				if (androidUI && !iosUI) {
@@ -4976,12 +5010,13 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 					: (edgeSwipeTarget(start.x, start.y, ended.clientX, ended.clientY, window.innerWidth) ??
 						middleSwipeTarget(start, ended));
 				if (target === "chats" && androidUI && !iosUI) {
-					// Double-tap is the only sidebar opener on Android:
-					// rightward strokes only dismiss (settings, then the
-					// list itself), never open.
+					// A rightward stroke summons the chats list (double-tap
+					// stays as the other opener) and never dismisses it —
+					// only a settings panel yields to it, and only the
+					// leftward stroke below folds the list itself.
 					if (settingsOpen) settingsOpen = false;
-					else if (!settings.sidebarCollapsed) {
-						settings.sidebarCollapsed = true;
+					else if (settings.sidebarCollapsed) {
+						settings.sidebarCollapsed = false;
 						persistSettings();
 					}
 					return;
@@ -6802,6 +6837,19 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		>
 			+
 		</button>
+		{#if androidUI}
+			<!-- Touch settings entry: the edge swipe still works, but the
+			list owns a visible button (phones have no ⌘, to teach). -->
+			<button
+				type="button"
+				class="side-settings"
+				aria-label="Open settings"
+				title="Settings"
+				onclick={() => openSettingsPanel()}
+			>
+				Settings
+			</button>
+		{/if}
 	</aside>
 
 	<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions, a11y_no_noninteractive_element_interactions -->
@@ -8475,6 +8523,16 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			font-size: 1.15rem;
 			padding: 0.6rem;
 		}
+		/* Touch settings entry under it: same thumb target. */
+		aside .side-settings {
+			width: 100%;
+			min-height: 2.75rem;
+			margin-top: 0.4rem;
+			font-size: 0.95rem;
+			padding: 0.6rem;
+			border-color: #c7c7cc;
+			border-color: var(--line);
+		}
 	}
 	aside button {
 		font: inherit;
@@ -9367,6 +9425,76 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		position static — without this the row eats the send button's
 		taps where they overlap at the card's right end. */
 		z-index: 6;
+		transition:
+			opacity 0.18s ease,
+			visibility 0s;
+	}
+	/* Phones scroll by thumb: no scrollbar chrome anywhere. Touch
+	scrolling itself is untouched — only the track/thumb paint hides.
+	:global (not a bare *) so Svelte keeps the rule: it prunes vendor
+	pseudo-elements it cannot verify, which would drop the paint half. */
+	.app[data-android] :global(*) {
+		scrollbar-width: none;
+	}
+	.app[data-android] :global(*::-webkit-scrollbar) {
+		display: none;
+	}
+	/* Phone composer: one line at rest, two on focus. Unfocused the
+	field clamps to a single line and the tools row + send button park
+	invisible; focusing (tap or keyboard) grows the field to two lines
+	and slides the buttons into their second line. Live annotation UI
+	(the selection dock, the pill/review wrap) holds the row open —
+	parking it would strand the dock the tap just summoned. */
+	.app[data-android] .prompt :global(.ta-input) {
+		transition:
+			max-height 0.22s ease,
+			min-height 0.22s ease;
+	}
+	.app[data-android] .prompt:not(:focus-within) {
+		gap: 0;
+		/* Let the card hug the single line: the 7.25rem keyboard floor
+		below only applies while focused (typing). */
+		min-height: 0;
+	}
+	.app[data-android] .prompt:not(:focus-within) :global(.ta-input) {
+		max-height: 2rem;
+		overflow: hidden;
+	}
+	.app[data-android] .prompt:focus-within :global(.ta-input) {
+		min-height: 3.4rem;
+	}
+	/* The row snaps (no height ramp): ramping its height would slide
+	its buttons under tapping fingers mid-flight. The field above may
+	ramp freely — the row is bottom-anchored, so field growth never
+	moves it. */
+	.app[data-android] .prompt-tools {
+		max-height: 3rem;
+		overflow: hidden;
+		transition:
+			opacity 0.18s ease,
+			visibility 0s;
+	}
+	.app[data-android] .prompt:not(:focus-within):not(:has(.ann-dock, .ann-wrap)) .prompt-tools {
+		max-height: 0;
+		opacity: 0;
+		visibility: hidden;
+		transition:
+			opacity 0.18s ease,
+			visibility 0s linear 0.18s;
+	}
+	.app[data-android] .prompt:not(:focus-within):not(:has(.ann-dock, .ann-wrap)) .send-btn {
+		opacity: 0;
+		visibility: hidden;
+		transition:
+			opacity 0.18s ease,
+			visibility 0s linear 0.2s;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.app[data-android] .prompt :global(.ta-input),
+		.app[data-android] .prompt-tools,
+		.app[data-android] .send-btn {
+			transition: none;
+		}
 	}
 	/* Outranks the flex card above: the composer still gets out of the
 	way entirely while the annotation box owns the keyboard. */

@@ -332,11 +332,10 @@ test.describe("touch paths", () => {
 		viewport: { width: 412, height: 915 }
 	});
 
-	test("left-to-right swipe never opens the chats sidebar", async ({ page }) => {
+	test("left-to-right swipe summons the chats sidebar", async ({ page }) => {
 		await seedThreeChats(page);
-		// Double-tap empty space is the only sidebar opener on Android:
-		// rightward strokes only dismiss. (Double-tap open is covered
-		// in android.e2e.ts; this pins the dismiss-only half here.)
+		// Swipe right summons (double-tap open is covered in
+		// android.e2e.ts; this pins the swipe half here).
 		const sidebar = page.locator("aside:not(.settings-panel)");
 		await expect(sidebar).toHaveClass(/collapsed/);
 		await page.evaluate(() => {
@@ -349,7 +348,7 @@ test.describe("touch paths", () => {
 				new TouchEvent("touchend", { bubbles: true, cancelable: true, composed: true, touches: [], changedTouches: [touch(200, 604)] })
 			);
 		});
-		await expect(sidebar).toHaveClass(/collapsed/);
+		await expect(sidebar).not.toHaveClass(/collapsed/);
 	});
 
 	test("paste-images button appears with clipboard.read and reports an empty clipboard", async ({

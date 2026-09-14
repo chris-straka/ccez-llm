@@ -6,8 +6,12 @@ import {
   DEFAULT_VAD_OPTIONS,
   dictationCaptureMode,
   ensureReplyNotificationPermission,
+  ensureReplyNotificationPermissionAsync,
+  hapticBeat,
+  hapticBeatAsync,
   mediaRecorderSupported,
   notifyReplyDone,
+  notifyReplyDoneAsync,
   releaseStudyWakeLock,
   replyNotificationPermission,
   rmsOf,
@@ -288,6 +292,137 @@ describe("vibrate", () => {
         vibrate: () => {
           throw new Error("nope");
         },
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("hapticBeat", () => {
+  it("maps send/first/done to distinct patterns, gated by the setting", () => {
+    const vibrate = vi.fn();
+    const nav = { vibrate };
+    expect(hapticBeat("send", { nav })).toBe(true);
+    expect(hapticBeat("first", { nav })).toBe(true);
+    expect(hapticBeat("done", { nav })).toBe(true);
+    const patterns = vibrate.mock.calls.map((call) => JSON.stringify(call[0]));
+    expect(new Set(patterns).size).toBe(3);
+    // Disabled: silent without touching the vibrator.
+    vibrate.mockClear();
+    expect(hapticBeat("send", { enabled: false, nav })).toBe(false);
+    expect(hapticBeat("done", { enabled: false, nav })).toBe(false);
+    expect(vibrate).not.toHaveBeenCalled();
+  });
+
+  it("no-ops where vibration is unsupported", () => {
+    expect(hapticBeat("send", { nav: {} })).toBe(false);
+    expect(hapticBeat("first", { nav: null })).toBe(false);
+  });
+
+  it("routes shell beats through the native plugin", async () => {
+    const selectionFeedback = vi.fn(async () => null);
+    const impactFeedback = vi.fn(async () => null);
+    const notificationFeedback = vi.fn(async () => null);
+    const vibrate = vi.fn(async () => null);
+    const plugin = { selectionFeedback, impactFeedback, notificationFeedback, vibrate };
+    expect(await hapticBeatAsync("send", { shell: true, plugin })).toBe(true);
+    expect(selectionFeedback).toHaveBeenCalledTimes(1);
+    expect(await hapticBeatAsync("first", { shell: true, plugin })).toBe(true);
+    expect(impactFeedback).toHaveBeenCalledWith("medium");
+    expect(await hapticBeatAsync("done", { shell: true, plugin })).toBe(true);
+    expect(notificationFeedback).toHaveBeenCalledWith("success");
+    // Disabled: silent without touching the plugin.
+    expect(await hapticBeatAsync("send", { enabled: false, shell: true, plugin })).toBe(false);
+    expect(selectionFeedback).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to vibrate patterns without feedback entries", async () => {
+    const vibrate = vi.fn(async () => null);
+    expect(await hapticBeatAsync("send", { shell: true, plugin: { vibrate } })).toBe(true);
+    expect(vibrate).toHaveBeenCalledWith(20);
+    expect(await hapticBeatAsync("done", { shell: true, plugin: { vibrate } })).toBe(true);
+    expect(vibrate).toHaveBeenCalledWith(110);
+  });
+
+  it("stays silent when the shell plugin throws or is missing", async () => {
+    const throwing = {
+      selectionFeedback: async () => Promise.reject(new Error("denied"))
+    };
+    expect(await hapticBeatAsync("send", { shell: true, plugin: throwing })).toBe(false);
+    expect(await hapticBeatAsync("send", { shell: true, plugin: null })).toBe(false);
+  });
+
+  it("uses web patterns outside the shell", async () => {
+    const vibrate = vi.fn();
+    expect(await hapticBeatAsync("first", { nav: { vibrate } })).toBe(true);
+    expect(JSON.stringify(vibrate.mock.calls[0] ?? [])).toContain("70");
+  });
+});
+
+describe("shell-aware notifications", () => {
+  const long = "z".repeat(LONG_REPLY_MIN_CHARS);
+
+  function plugin(granted: boolean) {
+    return {
+      isPermissionGranted: vi.fn(async () => granted),
+      requestPermission: vi.fn(async () => "granted"),
+      sendNotification: vi.fn(),
+    };
+  }
+
+  it("asks through the plugin in the shell, web outside it", async () => {
+    const p = plugin(false);
+    expect(
+      await ensureReplyNotificationPermissionAsync({ shell: true, plugin: p }),
+    ).toBe("granted");
+    expect(p.requestPermission).toHaveBeenCalledTimes(1);
+    const known = plugin(true);
+    expect(
+      await ensureReplyNotificationPermissionAsync({ shell: true, plugin: known }),
+    ).toBe("granted");
+    expect(known.requestPermission).not.toHaveBeenCalled();
+    expect(
+      await ensureReplyNotificationPermissionAsync({ source: undefined }),
+    ).toBe("unsupported");
+  });
+
+  it("notifies natively when granted, silently otherwise", async () => {
+    const p = plugin(true);
+    expect(
+      await notifyReplyDoneAsync("Reply finished", long, {
+        shell: true,
+        plugin: p,
+        hidden: true,
+      }),
+    ).toBe(true);
+    expect(p.sendNotification).toHaveBeenCalledTimes(1);
+    // Focused: silent without touching the plugin sender.
+    p.sendNotification.mockClear();
+    expect(
+      await notifyReplyDoneAsync("Reply finished", long, {
+        shell: true,
+        plugin: p,
+        hidden: false,
+        focused: true,
+      }),
+    ).toBe(false);
+    expect(p.sendNotification).not.toHaveBeenCalled();
+    // Short: silent.
+    expect(
+      await notifyReplyDoneAsync("Reply finished", "short", {
+        shell: true,
+        plugin: p,
+        hidden: true,
+      }),
+    ).toBe(false);
+    // Ungranted shell without a web ctor: silent.
+    const denied = plugin(false);
+    denied.requestPermission = vi.fn(async () => "denied");
+    expect(
+      await notifyReplyDoneAsync("Reply finished", long, {
+        shell: true,
+        plugin: { ...denied, isPermissionGranted: async () => false },
+        notif: undefined,
+        hidden: true,
       }),
     ).toBe(false);
   });

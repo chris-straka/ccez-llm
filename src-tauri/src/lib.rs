@@ -177,6 +177,8 @@ pub fn run() {
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_haptics::init())
         .invoke_handler(tauri::generate_handler![
             annotate::drain_pending_external,
             desktop::desktop_sleep_block,

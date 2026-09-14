@@ -428,6 +428,7 @@ describe("touch toggles", () => {
 		expect(s.hideMessages).toBe(false);
 		expect(s.hideButtons).toBe(true);
 		expect(s.autoSpeakSelection).toBe(true);
+		expect(s.vibration).toBe(true);
 	});
 	it("defaults the overlay pill on", () => {
 		expect(blankSettings().overlayActions).toBe(true);
@@ -440,7 +441,8 @@ describe("touch toggles", () => {
 			hideMessages: "yes",
 			hideButtons: 0,
 			autoSpeakSelection: 0,
-			overlayActions: 0
+			overlayActions: 0,
+			vibration: "yes"
 		} as unknown as Record<string, unknown>;
 		stale.iosNativeCallout = true;
 		saveSettings(stale as unknown as AppSettings, store);
@@ -449,6 +451,7 @@ describe("touch toggles", () => {
 		expect(healed.hideButtons).toBe(true);
 		expect(healed.autoSpeakSelection).toBe(true);
 		expect(healed.overlayActions).toBe(true);
+		expect(healed.vibration).toBe(true);
 		expect("iosNativeCallout" in healed).toBe(false);
 	});
 });

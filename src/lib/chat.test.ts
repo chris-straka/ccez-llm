@@ -76,6 +76,18 @@ describe("chat", () => {
 		expect(state.sending).toBe(false);
 	});
 
+	it("fires onFirstToken once on the first visible token", async () => {
+		const { state, store } = stateWith(freshStore());
+		let firsts = 0;
+		await sendMessage(state, scriptedProvider(["", "hel", "lo"]), "sys", "hi", {
+			onFirstToken: () => {
+				firsts += 1;
+			}
+		}, store);
+		expect(firsts).toBe(1);
+		expect(activeChat(state).messages[1]?.content).toBe("hello");
+	});
+
 	it("splits tokens into input and output", async () => {
 		const { state, store } = stateWith(freshStore());
 		await sendMessage(state, scriptedProvider(["hi"], { prompt: 5, completion: 3, total: 8 }), "sys", "hello", {}, store);
