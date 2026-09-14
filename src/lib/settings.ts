@@ -300,7 +300,7 @@ export function defaultSettings(): AppSettings {
 		overlayActions: true,
 		autoSpeakSelection: true,
 		vibration: true,
-		inspectEnabled: false
+		inspectEnabled: true
 	};
 }
 
@@ -429,7 +429,7 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 		}
 		if (typeof merged.scaleActionsWithFont !== "boolean") merged.scaleActionsWithFont = false;
 		// Touch-only toggles postdate older saves the same way.
-		if (typeof merged.inspectEnabled !== "boolean") merged.inspectEnabled = false;
+		if (typeof merged.inspectEnabled !== "boolean") merged.inspectEnabled = true;
 		if (typeof merged.hideMessages !== "boolean") merged.hideMessages = false;
 		if (typeof merged.micEnabled !== "boolean") merged.micEnabled = true;
 		if (typeof merged.hideButtons !== "boolean") merged.hideButtons = true;

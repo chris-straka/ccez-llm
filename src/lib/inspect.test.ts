@@ -138,31 +138,31 @@ describe("getInspectData", () => {
 });
 
 describe("inspect setting", () => {
-	it("defaults off (opt-in)", () => {
-		expect(defaultSettings().inspectEnabled).toBe(false);
+	it("defaults on (fresh installs inspect single han highlights)", () => {
+		expect(defaultSettings().inspectEnabled).toBe(true);
 	});
 
-	it("backfills false on older saves and keeps an explicit on", () => {
+	it("backfills true on older saves, keeps an explicit off", () => {
 		const blank = defaultSettings();
 		blank.providers["deepseek"]!.apiKey = "";
 		blank.providers["muse"]!.apiKey = "";
 		delete (blank as unknown as Record<string, unknown>).inspectEnabled;
 		saveSettings(blank, memoryStore);
-		expect(loadSettings(memoryStore).inspectEnabled).toBe(false);
-
-		const on = defaultSettings();
-		on.providers["deepseek"]!.apiKey = "";
-		on.providers["muse"]!.apiKey = "";
-		on.inspectEnabled = true;
-		saveSettings(on, memoryStore);
 		expect(loadSettings(memoryStore).inspectEnabled).toBe(true);
+
+		const off = defaultSettings();
+		off.providers["deepseek"]!.apiKey = "";
+		off.providers["muse"]!.apiKey = "";
+		off.inspectEnabled = false;
+		saveSettings(off, memoryStore);
+		expect(loadSettings(memoryStore).inspectEnabled).toBe(false);
 
 		const junk = defaultSettings();
 		junk.providers["deepseek"]!.apiKey = "";
 		junk.providers["muse"]!.apiKey = "";
 		(junk as unknown as Record<string, unknown>).inspectEnabled = "yes";
 		saveSettings(junk, memoryStore);
-		expect(loadSettings(memoryStore).inspectEnabled).toBe(false);
+		expect(loadSettings(memoryStore).inspectEnabled).toBe(true);
 	});
 });
 

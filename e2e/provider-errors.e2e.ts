@@ -106,3 +106,40 @@ test("deleting the streaming chat aborts its reply, composer keeps working", asy
 	});
 	await expect(page.locator("article")).toHaveCount(2);
 });
+
+/** Row error text follows text size only with the button opt-in: at
+enlarged text it stays fixed until "Scale message buttons with text
+size" is checked. */
+test("row error text scales only with the button opt-in", async ({ page }) => {
+	await seedChat(page, []);
+	await page.addInitScript(() => {
+		window.localStorage.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify({ hoverAssistantActions: true, hoverUserActions: true, fontScale: 1.5 })
+		);
+		window.localStorage.setItem(
+			"ccez-llm-chats-v1",
+			JSON.stringify([
+				{
+					id: "e2e-err",
+					createdAt: 1,
+					replyLang: null,
+					messages: [{ id: "e2e-m0", role: "assistant", content: "stalled", usage: null, error: "Load failed" }]
+				}
+			])
+		);
+	});
+	await page.goto("/");
+	const err = page.locator("article.assistant .error");
+	await expect(err).toBeVisible({ timeout: 60_000 });
+	const px = (): Promise<number> =>
+		err.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+	expect(await px()).toBeLessThan(14);
+	await page.keyboard.press("Meta+,");
+	const check = page.locator(
+		'.settings-panel label:has-text("Scale message buttons with text size") input'
+	);
+	await expect(check).toBeVisible({ timeout: 5_000 });
+	await check.check();
+	expect(await px()).toBeGreaterThan(18);
+});

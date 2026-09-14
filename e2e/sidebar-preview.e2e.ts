@@ -79,6 +79,23 @@ test("row icon hover keeps the preview", async ({ page }) => {
 	await expect(main).not.toContainText(ALPHA);
 });
 
+/** Crossing the gap between rows keeps the last preview: the active
+chat never flashes in between while moving down the list. */
+test("gap crossing keeps the preview", async ({ page }) => {
+	await openSidebar(page);
+	const main = page.locator("main .messages");
+	const row = page.locator("aside ul li").nth(1);
+	await row.locator("button.side-chat").hover();
+	await expect(main).toContainText(BRAVO);
+	const box = await row.boundingBox();
+	if (!box) throw new Error("row has no box");
+	// Straight up off the row into the gap above it: inside the list,
+	// on no row — the last preview stands, active never flashes.
+	await page.mouse.move(box.x + box.width / 2, box.y - 1);
+	await expect(main).toContainText(BRAVO);
+	await expect(main).not.toContainText(ALPHA);
+});
+
 /** Clicking a hovered row selects it: the preview sticks after the hover leaves. */
 test("clicking a previewed row makes it the active chat", async ({ page }) => {
 	await openSidebar(page);

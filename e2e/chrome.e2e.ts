@@ -591,6 +591,36 @@ test("scrollbar fades out promptly after scrolling stops", async ({ page }) => {
 	expect(fade).toBeLessThanOrEqual(0.35);
 });
 
+/** Background opacity slider translucents the page: the html
+background resolves the alpha instead of staying fully opaque. */
+test("background opacity slider translucents the page", async ({ page }) => {
+	await seedChat(page, [{ role: "assistant", content: "hello" }]);
+	await page.goto("/");
+	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
+	// The background lives on .app (html itself stays unpainted).
+	const alphaOf = (): Promise<number> =>
+		page.evaluate(() => {
+			const bg = getComputedStyle(document.querySelector(".app") as Element).backgroundColor;
+			const nums = bg.match(/[\d.]+/g)?.map(Number) ?? [];
+			// rgb() carries no alpha (opaque); rgba()/color(srgb / a) do.
+			return nums.length === 4 ? (nums[3] ?? 1) : 1;
+		});
+	expect(await alphaOf()).toBe(1);
+	await page.keyboard.press("Meta+,");
+	const slider = page.locator(
+		'.settings-panel input[aria-label="Background opacity percent"]'
+	);
+	await expect(slider).toBeVisible({ timeout: 5_000 });
+	// Drive the slider like a real drag (fill() doesn't fire input on
+	// range inputs everywhere): set the value and dispatch input.
+	await slider.evaluate((el) => {
+		const input = el as HTMLInputElement;
+		input.value = "20";
+		input.dispatchEvent(new Event("input", { bubbles: true }));
+	});
+	expect(await alphaOf()).toBeLessThan(0.5);
+});
+
 /** "Scale message buttons with text size" multiplies button size by
 the Text size setting, live: at enlarged text the toggle visibly
 grows the buttons (at default size there is nothing to multiply,

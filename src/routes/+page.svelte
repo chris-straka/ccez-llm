@@ -6952,13 +6952,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			{#each sideVisibleChats() as item (item.id)}
 				<!-- Preview hover lives on the row, not the label: moving
 				within the row (label to export/delete and back) must not
-				drop the preview for the hovered chat. -->
-				<li
-					onmouseenter={() => previewHover(item.id)}
-					onmouseleave={() => {
-						if (previewChatId === item.id) previewChatId = null;
-					}}
-				>
+				drop the preview for the hovered chat. Rows clear nothing
+				on leave — the gaps between rows would flash the active
+				chat while crossing; only leaving the whole list (the ul
+				handler below) drops the preview. -->
+				<li onmouseenter={() => previewHover(item.id)}>
 					<button
 						type="button"
 						class="side-chat"
@@ -11701,9 +11699,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 	.error {
 		/* Same size as the status line, so error text and its retry
-		button row read as one row. */
-		font-size: calc(0.85rem * var(--font-scale, 1));
+		button row read as one row. Fixed unless the button opt-in
+		below says otherwise. */
+		font-size: 0.85rem;
 		color: #94250a;
+	}
+	/* Same opt-in as the message buttons: row error text follows the
+	text size only when message-button scaling is on. */
+	main.scale-actions .error {
+		font-size: calc(0.85rem * var(--font-scale, 1));
 	}
 	.sending {
 		color: #6e6e73;
