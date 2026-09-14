@@ -73,14 +73,17 @@ modules — they never split the template for size alone.
   cannot drift between slices. Full per-keydown context (target
   booleans included) stays per-slice: one mega-context would couple
   every decision function to every other for no tested gain.
-- Follow-ups for later slices: beyond the idle-restore allowlist above, the prompt-idle
-  hide/show/park machine itself (`promptIdle`, `bootParked`, mount
-  migration, focus/pointer listeners) wants the same decision/effect
-  split. Next concrete slices: the message-key body effects
-  (`message-actions.ts`, see §5) and the unselected-scroll bodies; the
-  three Space answers (`promptIdleKeyAction`, the `scrollEnterAction`
-  bare-Space note, `spaceFocusesEmptyPrompt`) could converge into one
-  Space dispatcher afterwards.
+- The prompt-idle machine contributes its guard chains (`src/lib/idle.ts`:
+  `shouldHideForAlways`, `shouldIdleHide`, `idleTapAction` with the
+  press-guard order, plus click-control/math/tap-overlay predicates) —
+  timers, press tracking, focus effects, and flag clearing stay in the
+  component verbatim. The remaining machine (ticker wiring, mount
+  migration, boot-park correction) is lifecycle, not decisions.
+- Follow-ups for later slices: the three Space answers
+  (`promptIdleKeyAction`, the `scrollEnterAction` bare-Space note,
+  `spaceFocusesEmptyPrompt`) could converge into one Space dispatcher;
+  the boot-park correction is three lines with no decision worth
+  pinning — leave it.
 
 ## 2. Extract a speech controller (second-largest logic mass)
 

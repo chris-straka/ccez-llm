@@ -194,6 +194,7 @@ import { desktopShortcuts, filteredShortcuts, touchShortcuts } from "$lib/shortc
 import {
 		closestFromTarget,
 		consumeEvent,
+		isClickControlTarget,
 		isEditableTarget,
 		isFieldTarget,
 		isFilterTarget,
@@ -201,11 +202,13 @@ import {
 		isIdleOwnedTarget,
 		isInspectFieldTarget,
 		isInteractiveTarget,
+		isMathTarget,
 		isPromptEditorTarget,
 		isPromptTarget,
 		isScrollEnterOwnedTarget,
 		isSidebarTarget,
-		isSpaceInteractiveTarget
+		isSpaceInteractiveTarget,
+		isTapOverlayTarget
 	} from "$lib/events";
 	import {
 		detectScript,
@@ -236,6 +239,7 @@ import {
 	import { emptyPalette, type PaletteState } from "$lib/palette";
 	import { draggedWidth, emptySideview, type SideviewState } from "$lib/sideview";
 	import { annPopBlurAction, annPopCancelKind, annPopSaveKind } from "$lib/annPop";
+	import { idleTapAction, shouldHideForAlways, shouldIdleHide } from "$lib/idle";
 	import { ChatSearchStore, createSearchWorker } from "$lib/chatSearchStore";
 
 	import {
@@ -1590,11 +1594,17 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	 * where focus is heading; null when it leaves the window).
 	 */
 	function hideForAlways(next: EventTarget | null): void {
-		if (settings.promptIdleSec !== PROMPT_IDLE_ALWAYS) return;
-		if (closestFromTarget(next, ".prompt")) return;
-		if (viewChat.messages.length === 0) return;
 		const box = scrollBox;
-		if (box && contentFitsViewport(box.scrollHeight, box.clientHeight)) return;
+		if (
+			!shouldHideForAlways({
+				alwaysMode: settings.promptIdleSec === PROMPT_IDLE_ALWAYS,
+				inPrompt: isPromptTarget(next),
+				emptyChat: viewChat.messages.length === 0,
+				fitsViewport:
+					box ? contentFitsViewport(box.scrollHeight, box.clientHeight) : false
+			})
+		)
+			return;
 		promptIdle = true;
 	}
 	/**
@@ -1642,11 +1652,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			// the click that clears it must not summon the prompt.
 			idleDownHadSel = event.button === 0 && (window.getSelection()?.toString() ?? "") !== "";
 			const downTarget = event.target instanceof Element ? event.target : null;
-			const downControl =
-				downTarget?.closest(
-					"button, a, input, textarea, select, summary, [contenteditable], .ccez-code"
-				) ?? null;
-			idleDownControl = event.button === 0 && downControl !== null;
+			idleDownControl = event.button === 0 && isClickControlTarget(downTarget);
 		};
 		/**
 		 * Desktop clicks never restore the hidden prompt — summoning
@@ -1680,25 +1686,26 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			idleDownControl = false;
 			idleDownVisible = false;
 			idleDownHadSel = false;
-			if (downControl) return;
-			// The dismissing gesture's own click: the blur it caused hid
-			// the prompt, and this click must not undo that.
-			if (downVisible) return;
-			// The press began on a live highlight: this click only clears
-			// it, and must not summon the prompt.
-			if (downHadSel) return;
-			if (down && Math.hypot(event.clientX - down.x, event.clientY - down.y) > 6) return;
-			if (target?.closest("[data-math-index]")) return;
-			// Controls act where they land, never summon: code copy/run,
-			// fold, icon buttons, and code bodies (click-to-edit lives
-			// there) keep their own behavior while the prompt is hidden
-			// (mirrors the key path's control guard).
-			if (
-				target?.closest("button, a, input, textarea, select, summary, [contenteditable], .ccez-code")
-			)
-				return;
+			// Press-guard order lives in idleTapAction: a press that
+			// traveled is a selection drag; a press that started on a
+			// control, a live highlight, or while visible is their
+			// dismissal, never a summon.
+			const tap = idleTapAction({
+				downControl,
+				downVisible,
+				downHadSel,
+				traveled:
+					down !== null && Math.hypot(event.clientX - down.x, event.clientY - down.y) > 6,
+				inMath: isMathTarget(target),
+				inClickControl: isClickControlTarget(target),
+				inOverlay: isTapOverlayTarget(target)
+			});
+			if (tap === null) return;
 			restorePrompt();
-			if (target?.closest("aside, .modal, .modal-veil, .find-bar, .search-palette")) return;
+			// Controls act where they land, never summon (see the
+			// press guard above); an overlay owns focus, so a summon
+			// behind one restores without landing.
+			if (tap === "summon-quiet") return;
 			// Same deferred landing as the key path: the composer is
 			// only focusable once the visibility flip flushes.
 			const floorEvent = event;
@@ -1746,12 +1753,16 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		if (typeof navigator !== "undefined" && !navigator.onLine) handleOffline();
 		const timer = window.setInterval(() => {
 			if (!isPromptIdle(lastInputAt, Date.now(), idleSec)) return;
-			if (viewChat.messages.length === 0) return;
-			// Short threads never hide: everything already fits, so
-			// hiding only strands the composer (see contentFitsViewport).
 			const box = scrollBox;
-			if (box && contentFitsViewport(box.scrollHeight, box.clientHeight)) return;
-			if (promptIdle) return;
+			if (
+				!shouldIdleHide({
+					emptyChat: viewChat.messages.length === 0,
+					fitsViewport:
+						box ? contentFitsViewport(box.scrollHeight, box.clientHeight) : false,
+					alreadyIdle: promptIdle
+				})
+			)
+				return;
 			promptIdle = true;
 		}, 500);
 		return () => {

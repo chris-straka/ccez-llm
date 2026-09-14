@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import {
 	closestFromTarget,
 	consumeEvent,
+	isClickControlTarget,
 	isComposerTarget,
 	isEditableTarget,
 	isFieldTarget,
@@ -11,11 +12,13 @@ import {
 	isIdleOwnedTarget,
 	isInspectFieldTarget,
 	isInteractiveTarget,
+	isMathTarget,
 	isPromptEditorTarget,
 	isPromptTarget,
 	isScrollEnterOwnedTarget,
 	isSidebarTarget,
-	isSpaceInteractiveTarget
+	isSpaceInteractiveTarget,
+	isTapOverlayTarget
 } from "./events";
 
 describe("page event idioms", () => {
@@ -106,6 +109,23 @@ describe("page event idioms", () => {
 		expect(isSpaceInteractiveTarget(byId("b"))).toBe(true);
 		expect(isSpaceInteractiveTarget(byId("f"))).toBe(true);
 		expect(isSpaceInteractiveTarget(byId("p"))).toBe(false);
+	});
+
+	it("spots click controls, math, and tap overlays", () => {
+		document.body.innerHTML =
+			'<button id="b">x</button><summary id="s">y</summary><div class="ccez-code" id="c">z</div>' +
+			'<div data-math-index="0" id="m">w</div><aside id="a">v</aside><div class="modal" id="mo">u</div><p id="p">t</p>';
+		const byId = (id: string): Element | null => document.getElementById(id);
+		expect(isClickControlTarget(byId("b"))).toBe(true);
+		expect(isClickControlTarget(byId("s"))).toBe(true);
+		expect(isClickControlTarget(byId("c"))).toBe(true);
+		expect(isClickControlTarget(byId("p"))).toBe(false);
+		expect(isMathTarget(byId("m"))).toBe(true);
+		expect(isMathTarget(byId("p"))).toBe(false);
+		expect(isTapOverlayTarget(byId("a"))).toBe(true);
+		expect(isTapOverlayTarget(byId("mo"))).toBe(true);
+		expect(isTapOverlayTarget(byId("b"))).toBe(false);
+		expect(isTapOverlayTarget(byId("p"))).toBe(false);
 	});
 
 	it("keeps the two owned-stage spellings deliberately apart", () => {

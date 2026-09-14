@@ -41,14 +41,16 @@ const SCROLL_ENTER_OWNED_SELECTOR =
 /**
  * Closest matching ancestor for an event target (or the focused
  * element). The one `as HTMLElement` in the codebase: EventTarget has
- * no `.closest`, so every handler would repeat this assertion.
+ * no `.closest`, so every handler would repeat this assertion
+ * (`closest` already answers `HTMLElement | null`, so no second
+ * assertion is needed on the way out).
  */
 export function closestFromTarget(
 	target: EventTarget | null | undefined,
 	selector: string
 ): HTMLElement | null {
 	const el = target as HTMLElement | null;
-	return (el?.closest?.(selector) ?? null) as HTMLElement | null;
+	return el?.closest?.(selector) ?? null;
 }
 
 /**
@@ -132,4 +134,29 @@ export function isIdleOwnedTarget(target: EventTarget | null): boolean {
 /** True where Ctrl+G must not enter scroll mode. */
 export function isScrollEnterOwnedTarget(target: EventTarget | null): boolean {
 	return closestFromTarget(target, SCROLL_ENTER_OWNED_SELECTOR) !== null;
+}
+
+/**
+ * Press-start control check (also the tap-landing guard): buttons and
+ * links, fields, summaries, rich editors, and code bodies keep their
+ * own behavior while the prompt is hidden. Wider than the key path's
+ * field guards on purpose — a mid-press re-render can retarget the
+ * click onto an ancestor, but the press is still a control press.
+ */
+const CLICK_CONTROL_SELECTOR =
+	"button, a, input, textarea, select, summary, [contenteditable], .ccez-code";
+
+/** True on controls (see above). */
+export function isClickControlTarget(target: EventTarget | null): boolean {
+	return closestFromTarget(target, CLICK_CONTROL_SELECTOR) !== null;
+}
+
+/** True inside rendered math (taps there never summon). */
+export function isMathTarget(target: EventTarget | null): boolean {
+	return closestFromTarget(target, "[data-math-index]") !== null;
+}
+
+/** True where a summon restores without landing focus (overlay owns it). */
+export function isTapOverlayTarget(target: EventTarget | null): boolean {
+	return closestFromTarget(target, "aside, .modal, .modal-veil, .find-bar, .search-palette") !== null;
 }
