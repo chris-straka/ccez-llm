@@ -23,6 +23,10 @@ function appHtml(): string {
 	return readFileSync(new URL("../app.html", import.meta.url), "utf8");
 }
 
+function annotationsSource(): string {
+	return readFileSync(new URL("../lib/annotations.ts", import.meta.url), "utf8");
+}
+
 describe("platform seal", () => {
 	it("defines androidUI as any phone, so data-android means phone", () => {
 		const source = pageSource();
@@ -39,7 +43,10 @@ describe("platform seal", () => {
 	});
 
 	it("keeps the iOS selection-menu slot split from Android's", () => {
-		const source = pageSource();
+		// The slot math lives in annotations.ts since selMenuPlacement
+		// moved there (unit-tested); the seal follows it so the split
+		// can't silently merge into the phone gate.
+		const source = annotationsSource();
 		expect(source).toContain("if (androidUI && !iosUI) {");
 		expect(source).toContain("} else if (iosUI) {");
 	});

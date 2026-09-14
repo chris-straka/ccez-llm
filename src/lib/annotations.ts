@@ -1064,6 +1064,69 @@ export function placeAnnPopX(opts: {
 }
 
 /**
+ * Selection-menu popup placement (pure): the menu docks near the
+ * cursor that finished the gesture, not the selection's start — a
+ * full-sentence pick shouldn't strand it lines above the pointer —
+ * clamped to the viewport. Phones dock around the native selection
+ * bubble instead (above on Android, below on iOS). placeSelMenu uses
+ * it at summon time; the scroll tracker re-runs it cursorless so the
+ * menu follows its highlight instead of dying on scroll.
+ */
+export function selMenuPlacement(opts: {
+	cursorX: number | undefined;
+	cursorY: number | undefined;
+	rectLeft: number;
+	rectTop: number;
+	rectBottom: number;
+	viewportWidth: number;
+	viewportHeight: number;
+	androidUI: boolean;
+	iosUI: boolean;
+}): { x: number; y: number } {
+	const {
+		cursorX,
+		cursorY,
+		rectLeft,
+		rectTop,
+		rectBottom,
+		viewportWidth,
+		viewportHeight,
+		androidUI,
+		iosUI
+	} = opts;
+	const width = 320;
+	const at = cursorX ?? rectLeft;
+	// The popup sits just below the cursor (never under it), still
+	// clamped to the viewport.
+	const x = Math.min(Math.max(8, at - 16), viewportWidth - width - 8);
+	// Android: the OS text toolbar (Copy / Translate / Read Aloud)
+	// docks above the selection, so ours goes below it instead of
+	// underneath it — except near the screen bottom, where above
+	// wins and may share space with the OS bar. iOS docks its
+	// bubble below the selection, so ours takes the above slot
+	// like desktop — one popup on each side, never stacked.
+	let y: number;
+	if (androidUI && !iosUI) {
+		// Well clear of the selection handles (~24px below text).
+		y = rectBottom + 30;
+		if (y + 44 > viewportHeight) y = Math.max(8, rectTop - 47);
+	} else if (iosUI) {
+		// Above slot (Apple's bubble owns below); only a cramped
+		// top edge drops it below, still clear of the handles and
+		// the native bubble, and clamped on screen.
+		y = rectTop - 47;
+		if (y < 8) y = rectBottom + 30;
+		if (y + 44 > viewportHeight) y = Math.max(8, viewportHeight - 52);
+	} else {
+		// Desktop: always above the cursor that finished the
+		// gesture (never below it), clamped to the viewport top.
+		const cy = cursorY ?? rectTop;
+		y = Math.max(8, cy - 48 - 8);
+	}
+	return { x, y };
+}
+
+/**
  * Start offset of the visual line holding `offset`: the index just
  * past the nearest preceding newline (0 when none). Lines come from
  * text alone so the rule unit-tests without layout.

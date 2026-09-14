@@ -13,6 +13,7 @@ import {
 	occurrenceAtPosition,
 	snapOffsetsToWordEdges,
 	placeAnnPopX,
+	selMenuPlacement,
 	lineStartOffset,
 	clampDragAnchorToFocusLine,
 	reviewEditKey,
@@ -268,6 +269,79 @@ describe("placeAnnPopX", () => {
 		expect(
 			placeAnnPopX({ cursorX: 2000, highlightLeft: 100, highlightWidth: 900, popWidth, viewportWidth })
 		).toBe(viewportWidth - popWidth - 8);
+	});
+});
+
+describe("selMenuPlacement", () => {
+	const viewportWidth = 1280;
+	const viewportHeight = 800;
+	const rect = { rectLeft: 500, rectTop: 300, rectBottom: 322 };
+
+	it("docks desktop above the finishing cursor", () => {
+		expect(
+			selMenuPlacement({
+				cursorX: 600,
+				cursorY: 310,
+				...rect,
+				viewportWidth,
+				viewportHeight,
+				androidUI: false,
+				iosUI: false
+			})
+		).toEqual({ x: 584, y: 254 });
+	});
+
+	it("falls back to the highlight when the cursor is gone (scroll track)", () => {
+		expect(
+			selMenuPlacement({
+				cursorX: undefined,
+				cursorY: undefined,
+				...rect,
+				viewportWidth,
+				viewportHeight,
+				androidUI: false,
+				iosUI: false
+			})
+		).toEqual({ x: 484, y: 244 });
+	});
+
+	it("clamps to the viewport edges", () => {
+		expect(
+			selMenuPlacement({
+				cursorX: 10,
+				cursorY: 4,
+				...rect,
+				viewportWidth,
+				viewportHeight,
+				androidUI: false,
+				iosUI: false
+			})
+		).toEqual({ x: 8, y: 8 });
+	});
+
+	it("docks Android below the handles, iOS above the bubble", () => {
+		expect(
+			selMenuPlacement({
+				cursorX: 600,
+				cursorY: 310,
+				...rect,
+				viewportWidth,
+				viewportHeight,
+				androidUI: true,
+				iosUI: false
+			})
+		).toEqual({ x: 584, y: 352 });
+		expect(
+			selMenuPlacement({
+				cursorX: 600,
+				cursorY: 310,
+				...rect,
+				viewportWidth,
+				viewportHeight,
+				androidUI: false,
+				iosUI: true
+			})
+		).toEqual({ x: 584, y: 253 });
 	});
 });
 

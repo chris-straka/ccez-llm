@@ -137,6 +137,7 @@ import {
 		quoteTextNodes,
 		occurrenceAtPosition,
 		snapSelectionToWordEdges,
+		selMenuPlacement,
 		placeAnnPopX,
 		REFS_ONLY_BODY,
 		lineStartOffset,
@@ -372,7 +373,9 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	let viewport = $state<ViewportState>(emptyViewport());
 	/** Scrollbar thumb shows while a scroll is in flight, then fades. */
 	function noteScrolling(): void {
-		selMenu = null;
+		// Desktop keeps its menu: trackSelMenu repositions it over the
+		// highlight instead. Phones dismiss the docked menu here.
+		if (androidUI) selMenu = null;
 		if (scrollBox) viewport.stick = nearBottom(scrollBox);
 		scrollBox?.classList.add("scrolling");
 		window.clearTimeout(viewport.idleTimer);
@@ -2221,6 +2224,18 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	 * still addresses the real chat.
 	 */
 	let previewChatId: ChatId | null = $state(null);
+	/**
+	 * Sidebar hover preview yields to a live highlight: swapping the
+	 * main column to another chat would pull the selection's nodes out
+	 * from under it (killing the highlight mid-drag) and unmount the
+	 * summoned menu via the preview gate. A deliberate highlight beats
+	 * a passing glance — the hover previews again once it clears.
+	 */
+	function previewHover(id: ChatId): void {
+		if (selMenu) return;
+		if ((window.getSelection()?.toString() ?? "") !== "") return;
+		previewChatId = id;
+	}
 	const previewChat = $derived(
 		previewChatId && previewChatId !== chatState.activeChatId
 			? (chatState.chats.find((c) => c.id === previewChatId) ?? null)
@@ -2513,6 +2528,14 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 
 	function placeSelMenu(cursorX?: number, cursorY?: number): void {
 		ensureSwapObserver();
+		// Never summon off preview content: the main column is showing
+		// another chat, so the quote would pair with the active chat's
+		// message id and Annotate would anchor garbage. The hover gate
+		// (previewHover) normally prevents reaching here mid-preview.
+		if (previewing) {
+			selMenu = null;
+			return;
+		}
 		const found = currentQuote();
 		if (!found) {
 			selMenu = null;
@@ -2529,38 +2552,17 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		// onto the floating menu (no DOM change, no press). Nothing
 		// mutates in that path, so these nodes stay valid.
 		const stored = live && live.rangeCount > 0 ? live.getRangeAt(0).cloneRange() : null;
-		const width = 320;
-		// The menu docks near the cursor that finished the gesture, not
-		// the selection's start — a full-sentence pick shouldn't strand
-		// it lines above where the pointer is.
-		const at = cursorX ?? rect.left;
-		// The popup sits just below the cursor (never under it), still
-		// clamped to the viewport.
-		const x = Math.min(Math.max(8, at - 16), window.innerWidth - width - 8);
-		// Android: the OS text toolbar (Copy / Translate / Read Aloud)
-		// docks above the selection, so ours goes below it instead of
-		// underneath it — except near the screen bottom, where above
-		// wins and may share space with the OS bar. iOS docks its
-		// bubble below the selection, so ours takes the above slot
-		// like desktop — one popup on each side, never stacked.
-		let y: number;
-		if (androidUI && !iosUI) {
-			// Well clear of the selection handles (~24px below text).
-			y = rect.bottom + 30;
-			if (y + 44 > window.innerHeight) y = Math.max(8, rect.top - 47);
-		} else if (iosUI) {
-			// Above slot (Apple's bubble owns below); only a cramped
-			// top edge drops it below, still clear of the handles and
-			// the native bubble, and clamped on screen.
-			y = rect.top - 47;
-			if (y < 8) y = rect.bottom + 30;
-			if (y + 44 > window.innerHeight) y = Math.max(8, window.innerHeight - 52);
-		} else {
-			// Desktop: always above the cursor that finished the
-			// gesture (never below it), clamped to the viewport top.
-			const cy = cursorY ?? rect.top;
-			y = Math.max(8, cy - 48 - 8);
-		}
+		const { x, y } = selMenuPlacement({
+			cursorX,
+			cursorY,
+			rectLeft: rect.left,
+			rectTop: rect.top,
+			rectBottom: rect.bottom,
+			viewportWidth: window.innerWidth,
+			viewportHeight: window.innerHeight,
+			androidUI,
+			iosUI
+		});
 		selMenu = {
 			x,
 			y,
@@ -5116,12 +5118,23 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			if (Date.now() - menuPressAt < 1000) return;
 			const live = window.getSelection();
 			if (!live || live.isCollapsed || live.toString() === "") {
+				const anchor = live?.anchorNode;
+				// No anchor at all (a bare removeAllRanges, no press
+				// behind it): a body swap always leaves a collapsed or
+				// detached anchor behind, so anchorless is a genuine
+				// clear and the menu drops at once. The pointer riding
+				// the menu stands down — WebKit empties the document
+				// selection on menu hover, and the enter restore below
+				// puts it back.
+				if (!anchor) {
+					if (!selMenuHover) selMenu = null;
+					return;
+				}
 				// A body swap under the highlight (stream chunk, aid
 				// rebuild, late enhancement) detaches the anchor node:
 				// the stored quote still stands, so the menu stands with
 				// it and Annotate keeps working...
-				const anchor = live?.anchorNode;
-				if (anchor && !document.contains(anchor)) return;
+				if (!document.contains(anchor)) return;
 				// ...or collapses it onto the attached container (WebKit
 				// fires selectionchange for this; Chromium stays silent):
 				// when the collapse is newer than the last press it is
@@ -6699,6 +6712,41 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		};
 		window.addEventListener("scroll", trackSelPinyin, true);
 		window.addEventListener("resize", trackSelPinyin);
+		// The selection menu tracks its highlight while it scrolls
+		// (same anchor math as the readings overlay above): the stored
+		// summon range repositions it cursorlessly, and a detached
+		// range dismisses it instead of stranding it. Scrolling never
+		// dismisses a live menu on desktop — a wheel mid-aim is still
+		// aiming. Phones keep the scroll dismiss in noteScrolling (the
+		// docked menu owns composer space the scroll needs back).
+		const trackSelMenu = (): void => {
+			if (androidUI || !selMenu?.range) return;
+			try {
+				const { range } = selMenu;
+				if (!document.contains(range.startContainer) || !document.contains(range.endContainer)) {
+					selMenu = null;
+					return;
+				}
+				const rect = range.getBoundingClientRect();
+				const { x, y } = selMenuPlacement({
+					cursorX: undefined,
+					cursorY: undefined,
+					rectLeft: rect.left,
+					rectTop: rect.top,
+					rectBottom: rect.bottom,
+					viewportWidth: window.innerWidth,
+					viewportHeight: window.innerHeight,
+					androidUI,
+					iosUI
+				});
+				if (selMenu.x !== x || selMenu.y !== y || selMenu.left !== rect.left || selMenu.w !== rect.width)
+					selMenu = { ...selMenu, x, y, left: rect.left, w: rect.width };
+			} catch {
+				selMenu = null;
+			}
+		};
+		window.addEventListener("scroll", trackSelMenu, true);
+		window.addEventListener("resize", trackSelMenu);
 		window.addEventListener("mouseup", onMouseUp);
 		window.addEventListener("dblclick", onDoubleClick);
 		// Middle-click anywhere opens the shortcuts modal (no autoscroll).
@@ -6725,6 +6773,8 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			window.removeEventListener("scroll", onFadeScroll, true);
 			window.removeEventListener("scroll", trackSelPinyin, true);
 			window.removeEventListener("resize", trackSelPinyin);
+			window.removeEventListener("scroll", trackSelMenu, true);
+			window.removeEventListener("resize", trackSelMenu);
 			window.removeEventListener("mouseup", onMouseUp);
 			window.removeEventListener("dblclick", onDoubleClick);
 			window.removeEventListener("auxclick", onMiddleClick);
@@ -6798,7 +6848,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 						type="button"
 						class="side-chat"
 						class:active={item.id === chatState.activeChatId}
-						onmouseenter={() => (previewChatId = item.id)}
+						onmouseenter={() => previewHover(item.id)}
 						onmouseleave={() => {
 							if (previewChatId === item.id) previewChatId = null;
 						}}

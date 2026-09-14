@@ -184,3 +184,57 @@ test("a cleared highlight drops the menu at once", async ({ page }) => {
 	await page.evaluate(() => window.getSelection()?.removeAllRanges());
 	await expect(menu).toHaveCount(0, { timeout: 1500 });
 });
+
+/** Scrolling never dismisses a live selection menu on desktop: the
+menu tracks its highlight (trackSelMenu) instead of dying in
+noteScrolling. */
+test("scrolling keeps a live selection menu", async ({ page }) => {
+	const history = Array.from({ length: 12 }, (_, i) => ({
+		role: i % 2 === 0 ? "user" : "assistant",
+		content: `history filler paragraph ${i} with enough words to wrap several lines on any phone or desktop column`
+	}));
+	await seedChat(page, [...history, { role: "assistant", content: "halo keeper" }]);
+	await page.goto("/");
+	await page.locator('article .rendered:has-text("halo keeper")').first().selectText();
+	await page.mouse.up();
+	const menu = page.locator(".sel-menu");
+	await expect(menu).toBeVisible();
+	await page.mouse.wheel(0, -400);
+	await page.waitForTimeout(600);
+	await expect(menu).toBeVisible();
+	expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).toContain("halo");
+});
+
+/** Sidebar hover preview yields to a live highlight: glancing at
+another chat neither swaps the column nor drops the menu. */
+test("sidebar hover keeps a live highlight and its menu", async ({ page }) => {
+	await page.addInitScript(() => {
+		window.localStorage.setItem("ccez-mock-provider", "1");
+		const chat = (id: string, content: string) => ({
+			id,
+			createdAt: 1,
+			replyLang: null,
+			messages: [{ id: `${id}-m0`, role: "assistant", content, usage: null, error: null }]
+		});
+		// The first chat is active on load.
+		window.localStorage.setItem(
+			"ccez-llm-chats-v1",
+			JSON.stringify([chat("e2e-active", "halo keeper"), chat("e2e-other", "other chat body")])
+		);
+	});
+	await page.goto("/");
+	await page.locator('article .rendered:has-text("halo keeper")').first().selectText();
+	await page.mouse.up();
+	const menu = page.locator(".sel-menu");
+	await expect(menu).toBeVisible();
+	await page.keyboard.press("Meta+b");
+	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
+	// The other chat's row: without the yield this previews it (menu
+	// gone, column swapped); with it, nothing moves.
+	await page.locator("aside ul li button.side-chat").nth(1).hover();
+	await page.waitForTimeout(400);
+	await expect(menu).toBeVisible();
+	await expect(page.locator("main .messages")).toContainText("halo keeper");
+	await expect(page.locator("main .messages")).not.toContainText("other chat body");
+	expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).toContain("halo");
+});
