@@ -235,12 +235,24 @@ modules — they never split the template for size alone.
   `htmlToText` + shiki highlight (639–710). New `render-math.ts` with
   the placeholder codec as its tested contract. Medium; the remaining
   file is still multi-concern but each cluster is small enough to leave.
+  (DONE — `src/lib/render-math.ts` owns the placeholder codec,
+  preview/copy text, fence de-duping, `mathHtml`, plus the two emission
+  helpers it needs (`escapeHtml`, `CODE_COPY_GLYPH`) so the dep runs one
+  way; `render.ts` re-exports `escapeHtml` for existing callers;
+  `MessageBody` imports math fns from `render-math`; tests split per
+  file, 50/50 green.)
 - Unified notice/banner queue. Five one-off error states each own a
   flag plus (sometimes) a timer: `attachError`, `vocalizeError`,
   `voiceError` + `voiceErrorTimer`, `toast` + `toastTimer` in the page,
   `updateStatus` / `modelError` in `SettingsPanel`. One tiny queue
   (message, kind, timeout; updater results ride it instead of the
   `onToast` prop) removes the timer bookkeeping duplication. Small.
+  (DONE — `src/lib/notices.ts`: one slot per visual kind
+  (inline/banner/voice/toast) with a `holdSeq`-style generation, so a
+  stale timer can never clear a newer notice and no `clearTimeout`
+  bookkeeping remains; `ProviderPanel.modelError`'s bare-setTimeout
+  race fixed the same way. `updateStatus`/`onToast` left alone — a
+  sticky note with no timer, nothing to unify.)
 - Extension-per-file split of `editor.ts` (878 lines). The pure
   paste/fold math is already extracted (`pasteSpans`,
   `pasteToggleAction`, `sendPasteFolds`, `trimPasteTail`); what remains
@@ -248,6 +260,11 @@ modules — they never split the template for size alone.
   extensions, fence fold/copy/run widgets, theme + `createPromptEditor`.
   One file per group, shared `StateEffect`s in a fourth. Small-medium;
   mostly import reshuffling, low decision value per line moved.
+  (DONE — `editorEffects.ts` (5 shared effects), `editorPaste.ts`
+  (paste wiring + its pure math, moved together for cohesion),
+  `editorFences.ts`, `editorTheme.ts`; `editor.ts` keeps
+  `createPromptEditor` + the public surface via re-exports, so the
+  page, `textarea-editor`, and tests keep their import paths.)
 
 Looked at and deliberately not adding: the Rust per-platform
 `tts_*`/`dictate_*`/`ocr_*` files each implement the same command

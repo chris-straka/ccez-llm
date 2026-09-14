@@ -9,6 +9,7 @@
 	} from "$lib/providers/registry";
 	import { maskKey, activeProviderSettings, type AppSettings } from "$lib/settings";
 	import { tauriBackendAvailable } from "$lib/secrets";
+	import { clearNotice, emptyNotices, flashNotice, MODEL_TIMEOUT_MS } from "$lib/notices";
 	import { onMount } from "svelte";
 	import "./panels.css";
 
@@ -18,12 +19,11 @@
 
 	let { settings }: Props = $props();
 	let modelLoading = $state(false);
-	let modelError = $state("");
+	let modelNotice = $state(emptyNotices());
 	async function refreshModels() {
-		modelError = "";
+		clearNotice(modelNotice, "banner");
 		if (!active.baseUrl.trim() || !active.apiKey.trim()) {
-			modelError = "Enter a base URL and API key first.";
-			setTimeout(() => (modelError = ""), 5000);
+			flashNotice(modelNotice, "banner", "Enter a base URL and API key first.", MODEL_TIMEOUT_MS);
 			return;
 		}
 		modelLoading = true;
@@ -34,8 +34,12 @@
 			settings.customProviders
 		).listModels();
 		} catch (error) {
-			modelError = error instanceof Error ? error.message : String(error);
-			setTimeout(() => (modelError = ""), 5000);
+			flashNotice(
+				modelNotice,
+				"banner",
+				error instanceof Error ? error.message : String(error),
+				MODEL_TIMEOUT_MS
+			);
 		} finally {
 			modelLoading = false;
 		}
@@ -208,7 +212,7 @@
 		<datalist id="model-list">
 			{#each active.models as id (id)}<option value={id}></option>{/each}
 		</datalist>
-		{#if modelError}<span class="hint" role="alert">{modelError}</span>{/if}
+		{#if modelNotice.banner.message}<span class="hint" role="alert">{modelNotice.banner.message}</span>{/if}
 	</label>
 	{#if activeDef.keyless}
 		<p class="key-state" role="status">No key needed — {activeDef.keyHint}.</p>

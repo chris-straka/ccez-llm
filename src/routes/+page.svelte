@@ -104,6 +104,14 @@
 	import ActionIcon from "$lib/components/ActionIcon.svelte";
 	import SettingsPanel from "$lib/components/SettingsPanel.svelte";
 	import { escapeHtml, plainBody, sourcesAsked } from "$lib/render";
+import {
+	clearNotice,
+	emptyNotices,
+	flashNotice,
+	showNotice,
+	TOAST_TIMEOUT_MS,
+	VOICE_TIMEOUT_MS
+} from "$lib/notices";
 	import {
 		fileToAttachment,
 		stripImageMarkers,
@@ -417,7 +425,6 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		}
 	});
 	let attachments = $state<Attachment[]>([]);
-	let attachError: string | null = $state(null);
 	let attachInput: HTMLInputElement | undefined = $state();
 	let foldedIds = new SvelteSet<string>();
 	let previewId: string | null = $state(null);
@@ -852,7 +859,8 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	function aidSeenKey(id: string, kind: LocalAid): string {
 		return `${id}:${kind}`;
 	}
-	let vocalizeError: string | null = $state(null);
+	/** Unified notice queue: inline/banner/voice/toast replace the five one-off flags. */
+	let notices = $state(emptyNotices());
 	let speakingId: string | null = $state(null);
 	/** Message a speak-aloud selection came from (tints its selection). */
 	let speakingSelection: string | null = $state(null);
@@ -863,24 +871,14 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		releaseStudyWakeLock(studyWakeLock);
 		studyWakeLock = null;
 	}
-	let voiceError: string | null = $state(null);
 	let canMic = $state(false);
 	let dictating = $state(false);
-	let toast: string | null = $state(null);
-	let toastTimer: ReturnType<typeof setTimeout> | null = null;
 	/** Transient top toast (mic errors, copy confirmations). */
 	function flashToast(message: string): void {
-		if (toastTimer) clearTimeout(toastTimer);
-		toast = message;
-		toastTimer = setTimeout(() => {
-			toast = null;
-			toastTimer = null;
-		}, 8000);
+		flashNotice(notices, "toast", message, TOAST_TIMEOUT_MS);
 	}
 	function dismissToast(): void {
-		if (toastTimer) clearTimeout(toastTimer);
-		toastTimer = null;
-		toast = null;
+		clearNotice(notices, "toast");
 	}
 	let stopDictation: (() => void) | null = null;
 	let openLangMenu: LanguageMenu["id"] | null = $state(null);
@@ -2249,12 +2247,12 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	 * inline errors go unseen).
 	 */
 	function failAttach(message: string): void {
-		attachError = message;
+		showNotice(notices, "inline", message);
 		if (androidUI) flashToast(message);
 	}
 
 	async function addFiles(files: File[]): Promise<void> {
-		attachError = null;
+		clearNotice(notices, "inline");
 		for (const file of files) {
 			try {
 				attachments = [...attachments, await fileToAttachment(file)];
@@ -2346,14 +2344,14 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	 * recognized text is inserted into the composer as selectable text,
 	 * so it flows into the existing pinyin/furigana pipeline when sent.
 	 * Outside the Mac shell the bridge rejects and the friendly error
-	 * lands in `attachError` — never a throw into UI teardown.
+	 * lands in the notice queue's inline slot — never a throw into UI teardown.
 	 */
 	let ocrBusyId: string | null = $state(null);
 
 	async function recognizeAttachment(att: Attachment): Promise<void> {
 		if (ocrBusyId !== null || att.kind !== "image" || !att.dataUrl) return;
 		ocrBusyId = att.id;
-		attachError = null;
+		clearNotice(notices, "inline");
 		try {
 			// No language hint: the backend's learner default covers
 			// English + CJK scripts. Passing the Latin TTS fallback
@@ -2430,14 +2428,14 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	copied. Failure still says so (guarded against clobbering a newer
 	toast that landed meanwhile). */
 	function copyToast(): void {
-		if (!toast) return;
-		const text = toast;
+		const text = notices.toast.message;
+		if (!text) return;
 		if (!navigator.clipboard) {
 			flashToast("Couldn't copy to the clipboard.");
 			return;
 		}
 		void navigator.clipboard.writeText(text).catch(() => {
-			if (toast === text) flashToast("Couldn't copy to the clipboard.");
+			if (notices.toast.message === text) flashToast("Couldn't copy to the clipboard.");
 		});
 	}
 
@@ -3166,11 +3164,12 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		}
 		const provider = resolveProvider();
 		if (!provider) {
-			vocalizeError = "Set an API key first — open Settings.";
-			if (androidUI) flashToast(vocalizeError);
+			const message = "Set an API key first — open Settings.";
+			showNotice(notices, "banner", message);
+			if (androidUI) flashToast(message);
 			return;
 		}
-		vocalizeError = null;
+		clearNotice(notices, "banner");
 		vocalizing.add(msg.id);
 		try {
 			// Multilingual messages vocalize Arabic lines only: the rest
@@ -3196,8 +3195,9 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				aidNoPeek.add(msg.id);
 			}
 		} catch (error) {
-			vocalizeError = error instanceof Error ? error.message : String(error);
-			if (androidUI) flashToast(vocalizeError);
+			const message = error instanceof Error ? error.message : String(error);
+			showNotice(notices, "banner", message);
+			if (androidUI) flashToast(message);
 		} finally {
 			vocalizing.delete(msg.id);
 		}
@@ -3222,18 +3222,13 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 
 	/** The error banner clears itself like the toast: a failed read
 	shouldn't lecture from the bottom of the screen forever. */
-	let voiceErrorTimer: ReturnType<typeof setTimeout> | null = null;
 	function setVoiceError(message: string | null): void {
-		if (voiceErrorTimer) clearTimeout(voiceErrorTimer);
-		voiceErrorTimer = null;
-		voiceError = message;
-		if (message && androidUI) flashToast(message);
-		if (message) {
-			voiceErrorTimer = setTimeout(() => {
-				if (voiceError === message) voiceError = null;
-				voiceErrorTimer = null;
-			}, 8000);
+		if (message === null) {
+			clearNotice(notices, "voice");
+			return;
 		}
+		flashNotice(notices, "voice", message, VOICE_TIMEOUT_MS);
+		if (androidUI) flashToast(message);
 	}
 
 	/**
@@ -6880,8 +6875,8 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		onpointerdown={noteMainDown}
 		onclick={closeSettingsFromMain}
 	>
-		{#if toast}
-			<button type="button" class="toast" title="Click to copy" aria-live="polite" transition:fade={{ duration: 160 }} onclick={copyToast}>{toast}</button>
+		{#if notices.toast.message}
+			<button type="button" class="toast" title="Click to copy" aria-live="polite" transition:fade={{ duration: 160 }} onclick={copyToast}>{notices.toast.message}</button>
 		{/if}
 		<!-- Empty drag strip: nothing but the traffic-light clearance (the
 		browser address bar only appears here while summoned; the
@@ -7397,7 +7392,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			</p>
 		{/if}
 
-		{#if attachments.length > 0 || attachError}
+		{#if attachments.length > 0 || notices.inline.message}
 			<ul class="attachments" class:composer-idle={promptIdle}>
 				{#each attachments as att (att.id)}
 					<li class:card={att.kind === "image" && !!att.dataUrl}>
@@ -7457,8 +7452,8 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 					{/if}
 				{/each}
 			{/if}
-			{#if attachError && !androidUI}
-				<p class="error attach-error" class:composer-idle={promptIdle} role="alert">{attachError}</p>
+			{#if notices.inline.message && !androidUI}
+				<p class="error attach-error" class:composer-idle={promptIdle} role="alert">{notices.inline.message}</p>
 			{/if}
 		{/if}
 
@@ -7707,15 +7702,15 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				{altHeld ? "Add +" : activeReplyLang ? activeReplyLang.badge : "↑"}
 			</button>
 		</div>
-		{#if vocalizeError && !androidUI}
-			<p class="error-banner" role="alert">{vocalizeError}</p>
+		{#if notices.banner.message && !androidUI}
+			<p class="error-banner" role="alert">{notices.banner.message}</p>
 		{/if}
 
-		{#if voiceError && !androidUI}
+		{#if notices.voice.message && !androidUI}
 			<!-- Top notice, not the bottom banner: speech errors arrive
 			while the eyes are on the message, and a tap dismisses. -->
 			<button type="button" class="voice-error" title="Dismiss" transition:fade={{ duration: 160 }} onclick={() => setVoiceError(null)}>
-				<span role="alert">{voiceError}</span>
+				<span role="alert">{notices.voice.message}</span>
 			</button>
 		{/if}
 
