@@ -234,6 +234,7 @@ import {
 	import { buildSearchDocs, chatMatchesQuery, findMessageIndices, type SearchHit } from "$lib/chatSearch";
 	import { emptyFind, stepFindCursor, type FindState } from "$lib/find";
 	import { emptyPalette, type PaletteState } from "$lib/palette";
+	import { annPopBlurAction, annPopCancelKind, annPopSaveKind } from "$lib/annPop";
 	import { ChatSearchStore, createSearchWorker } from "$lib/chatSearchStore";
 
 	import {
@@ -2743,7 +2744,10 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	function saveAnnPop(fromEnter = false): void {
 		if (!annPop || annPopClosing) return;
 		stopPillMic();
-		if (pendingAnn && annPop.id === pendingAnn.id) commitPending();
+		// The pop id decides (see annPopSaveKind): a pop still
+		// addressing its pending annotation commits it, otherwise the
+		// saved comment of the existing one is edited.
+		if (annPopSaveKind(annPop.id, pendingAnn?.id ?? null) === "commit-pending") commitPending();
 		else annotations = editAnnotationComment(annotations, annPop.id, annDraft);
 		hideAnnPop();
 		// Only the Enter key needs the anti-double-send guard: a click-away
@@ -2757,7 +2761,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	silently dropped. Enter with no text is the way to file an empty one. */
 	function blurAnnPop(): void {
 		if (!annPop || annPopClosing) return;
-		if (annDraft.trim() === "") cancelAnnPop();
+		if (annPopBlurAction(annDraft) === "cancel") cancelAnnPop();
 		else saveAnnPop();
 	}
 
@@ -2766,15 +2770,13 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		const { id, fresh } = annPop;
 		stopPillMic();
 		hideAnnPop();
-		if (pendingAnn && id === pendingAnn.id) {
-			// Never submitted: it never existed.
-			pendingAnn = null;
-		} else if (fresh) {
-			// Cancel means "as it was": a fresh annotation never
-			// existed, so it goes no matter what was typed; an existing
-			// one keeps its saved comment (nothing is written until Save).
-			annotations = deleteAnnotation(annotations, id);
-		}
+		// Cancel means "as it was" (see annPopCancelKind): a
+		// never-submitted pending never existed; a fresh annotation
+		// goes no matter what was typed; an existing one keeps its
+		// saved comment (nothing is written until Save).
+		const cancelKind = annPopCancelKind(id, fresh, pendingAnn?.id ?? null);
+		if (cancelKind === "drop-pending") pendingAnn = null;
+		else if (cancelKind === "delete-fresh") annotations = deleteAnnotation(annotations, id);
 		editor?.focus();
 	}
 

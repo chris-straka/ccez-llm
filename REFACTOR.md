@@ -121,9 +121,13 @@ modules — they never split the template for size alone.
   palette is one `PaletteState` object (`src/lib/palette.ts` with
   `emptyPalette` — open/query/hits/busy/cursor, timers/els/store stay
   out). Resets stay field-by-field where the original preserved a field
-  (palette close keeps the cursor, reopen resets it). Next pilots in
-  size order: sideview open/width (async shell paths need hand
-  verification — not a blind slice), then annotation UI.
+  (palette close keeps the cursor, reopen resets it). The annotation
+  pill contributes its save/cancel/blur matrix instead of a grouping
+  (`src/lib/annPop.ts`: pending-vs-fresh-vs-existing, empty-draft
+  cancel) — the full pop/badge/review/timer grouping stays put as too
+  wide for a blind slice. Next pilots in size order: sideview
+  open/width (async shell paths need hand verification — not a blind
+  slice), then whatever annotation-UI remainder still pays.
 
 ## 5. New candidates (from the Sep 2026 slices)
 
