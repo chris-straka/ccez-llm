@@ -10,6 +10,8 @@ import {
 	HAN_OVERLAY_LANG_TAG,
 	preferredLocalAid,
 	extractWordAt,
+	aidDisplayText,
+	offeredLocalAids,
 	ttsLangFor,
 	speakWord,
 	vocalizeArabic,
@@ -352,5 +354,37 @@ describe("code-aware aid lines", () => {
 	it("code-only Japanese summons no aid script", () => {
 		expect(detectScripts(stripCodeForDetection("```py\nprint('日本語')\n```"))).toEqual([]);
 		expect(detectScripts(stripCodeForDetection("見る\n```\n日本語\n```"))).toEqual(["ja"]);
+	});
+});
+
+describe("aidDisplayText", () => {
+	it("reads prose past baked annotation blocks", () => {
+		expect(aidDisplayText("見る日本語")).toBe("見る日本語");
+		// Baked blocks are metadata, not prose.
+		const baked = '見る\n\nAnnotated selections:\n1. "langue" — meaning?';
+		const text = aidDisplayText(baked);
+		expect(text).toContain("見る");
+		expect(text).not.toContain("Annotated selections");
+	});
+});
+
+describe("offeredLocalAids", () => {
+	it("offers every script's own aid", () => {
+		expect(offeredLocalAids("漢字を読む", null)).toEqual(["furigana"]);
+		expect(offeredLocalAids("你好世界", null)).toEqual(["pinyin"]);
+		expect(offeredLocalAids("hello", null)).toEqual([]);
+	});
+
+	it("code never summons reading aids", () => {
+		expect(offeredLocalAids("```py\nprint('日本語')\n```", null)).toEqual([]);
+	});
+
+	it("prefers the reply pill's aid for Han-only lines", () => {
+		// Kanji-only lines read as Chinese without kana or a pill.
+		expect(offeredLocalAids("漢字", null)).toEqual(["pinyin"]);
+		expect(offeredLocalAids("漢字", "ja")).toEqual(["furigana", "pinyin"]);
+		expect(offeredLocalAids("漢字", "zh")).toEqual(["pinyin"]);
+		// Kana is unambiguous: no pill ever overrides it.
+		expect(offeredLocalAids("漢字を読む", "zh")).toEqual(["furigana"]);
 	});
 });

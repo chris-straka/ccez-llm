@@ -211,11 +211,9 @@ import {
 		isTapOverlayTarget
 	} from "$lib/events";
 	import {
+		aidDisplayText,
 		detectScript,
-		detectScripts,
-		localAidsFor,
-		hasAmbiguousAidLine,
-		stripCodeForDetection,
+		offeredLocalAids,
 		preferredLocalAid,
 		LOCAL_AID_BUTTON,
 		LOCAL_AID_SHOW_ORIGINAL,
@@ -2960,36 +2958,15 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		return null;
 	}
 
-	/** Text the reading aids see: baked annotation blocks are metadata,
-	not prose — detecting or converting them would reserve ruby's room
-	for hidden text and grow annotated history. */
-	function aidDisplayText(msg: ChatMsg): string {
-		return annRefsFor(msg.content)?.text ?? msg.content;
-	}
-
 	/**
 	 * Local-aid overrides: pinned kinds render (each on its own lines),
 	 * plus a hover-peeked kind previewed alongside them; empty renders
 	 * the original (aids are per-message only). Kinds the message no
 	 * longer offers (edited text) filter out instead of lingering.
+	 * Offer computation lives in `offeredLocalAids` (`src/lib/reading.ts`,
+	 * shared by hotkeys, render, and vocalize); the display-text rule in
+	 * `aidDisplayText` beside it.
 	 */
-	/**
-	 * Local aids a message offers: every script's own aid, plus the
-	 * chat reply pill's aid when the text holds kanji-only lines no
-	 * script test can own (preferred first — it names the chat's
-	 * language). Without a pill, or without ambiguous lines, this is
-	 * exactly the script-only list as before.
-	 */
-	function offeredLocalAids(text: string): LocalAid[] {
-		// Code never summons reading aids: detection reads the prose
-		// with fenced blocks and inline spans stripped out.
-		const prose = stripCodeForDetection(text);
-		const kinds = localAidsFor(detectScripts(prose));
-		const preferred = preferredLocalAid(activeReplyCode);
-		if (preferred && hasAmbiguousAidLine(prose) && !kinds.includes(preferred)) kinds.unshift(preferred);
-		return kinds;
-	}
-
 	/**
 	 * Aid-kind arrays by message, memoized like the badge arrays: the
 	 * body effect subscribes to the array identity, so a fresh array
@@ -2999,7 +2976,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	 */
 	const memoAids = createRefMemo<LocalAid>((kind) => kind);
 	function localAidsOverrideFor(msg: ChatMsg): LocalAid[] {
-		const kinds = offeredLocalAids(aidDisplayText(msg));
+		const kinds = offeredLocalAids(aidDisplayText(msg.content), activeReplyCode);
 		const peek = aidPeek?.id === msg.id ? (aidPeek.kind ?? null) : null;
 		return memoAids(msg.id, resolveAidKinds(kinds, pinnedKinds(msg.id), peek));
 	}
@@ -3032,7 +3009,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			// First hover is color-only: previews start after that kind's
 			// first click (pin), never a sibling kind's.
 			if (kind === undefined || !aidSeen.has(aidSeenKey(msg.id, kind))) return;
-			if (kind === "furigana" && !isFuriganaCached(aidDisplayText(msg))) {
+			if (kind === "furigana" && !isFuriganaCached(aidDisplayText(msg.content))) {
 				return;
 			}
 		}
@@ -3188,7 +3165,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			// never crosses to the model (faster, cheaper), and the
 			// result splices back so other scripts stay byte-identical.
 			// A shape mismatch falls back to the whole-text replace.
-			const full = aidDisplayText(msg);
+			const full = aidDisplayText(msg.content);
 			const targets = aidTargetLines(full);
 			const lines = full.split("\n");
 			const partial = targets.length > 0 && targets.length < lines.length;
@@ -5742,7 +5719,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				// Same offers the buttons show: refs-stripped display
 				// text over the rendered list, never raw stored content.
 				const target = viewChat.messages[hoveredIdx];
-				const kinds = target ? offeredLocalAids(aidDisplayText(target)) : [];
+				const kinds = target ? offeredLocalAids(aidDisplayText(target.content), activeReplyCode) : [];
 				if (target && kinds.length > 0) {
 										consumeEvent(event);
 					const { pin, unpin } = toggleAidKinds(kinds, pinnedKinds(target.id));
@@ -5763,7 +5740,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				const toggle =
 					target ?
 						toggleSingleAid(
-							offeredLocalAids(aidDisplayText(target)),
+							offeredLocalAids(aidDisplayText(target.content), activeReplyCode),
 							pinnedKinds(target.id),
 							want
 						)
@@ -6511,7 +6488,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				if (hanCharUnderCursor(event, body)) {
 					if (
 						hanOverlayLangFor(probe) !== "ja" &&
-						offeredLocalAids(quoted.quote).includes("pinyin")
+						offeredLocalAids(quoted.quote, activeReplyCode).includes("pinyin")
 					) {
 						const readings = readingsOnly(pinyinRuby(quoted.quote), " ", "rt");
 						if (readings) placeSelPinyin(quoted, readings);
@@ -7071,7 +7048,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				{@const isFolded = foldedIds.has(msg.id)}
 				{@const script = detectScript(sentRefs ? sentRefs.text : msg.content)}
 				{@const aidId = script ? MODEL_AID_FOR_SCRIPT[script] : null}
-				{@const localKinds = offeredLocalAids(sentRefs ? sentRefs.text : msg.content)}
+				{@const localKinds = offeredLocalAids(sentRefs ? sentRefs.text : msg.content, activeReplyCode)}
 				{@const streamingThis =
 					chatState.sending &&
 					viewChat.id === chatState.sendingChatId &&

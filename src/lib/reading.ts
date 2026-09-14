@@ -1,4 +1,5 @@
 import type { ChatProvider } from "./providers/types";
+import { annRefsFor } from "./annotations";
 
 /**
  * Reading aids + speech, generalized across languages (A6).
@@ -355,6 +356,32 @@ export function resolveAidKinds(
 		return [...kept, peek];
 	}
 	return kept;
+}
+
+/**
+ * Text the reading aids see: baked annotation blocks are metadata, not
+ * prose — detecting or converting them would reserve ruby's room for
+ * hidden text and grow annotated history.
+ */
+export function aidDisplayText(content: string): string {
+	return annRefsFor(content)?.text ?? content;
+}
+
+/**
+ * Local aids a message offers: every script's own aid, plus the chat
+ * reply pill's aid when the text holds kanji-only lines no script test
+ * can own (preferred first — it names the chat's language). Without a
+ * pill, or without ambiguous lines, this is exactly the script-only
+ * list as before.
+ */
+export function offeredLocalAids(text: string, replyCode: string | null): LocalAid[] {
+	// Code never summons reading aids: detection reads the prose
+	// with fenced blocks and inline spans stripped out.
+	const prose = stripCodeForDetection(text);
+	const kinds = localAidsFor(detectScripts(prose));
+	const preferred = preferredLocalAid(replyCode);
+	if (preferred && hasAmbiguousAidLine(prose) && !kinds.includes(preferred)) kinds.unshift(preferred);
+	return kinds;
 }
 
 const aidCache = new Map<string, string>();

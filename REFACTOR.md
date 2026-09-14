@@ -115,9 +115,12 @@ modules — they never split the template for size alone.
 - Goal: one pipeline — per message, compute kinds → ruby HTML → speech lang
   once. Removes real duplication, not just moved code. Medium-large; needs
   care since aids interact with streaming replaces.
-- Status: design-stage. The hotkey-side toggle math already moved to
-  `message-actions.ts`; what remains is the render-path unification,
-  which needs streaming-careful redesign, not slicing.
+- Status: partially sliced. The hotkey-side toggle math moved to
+  `message-actions.ts`, and the offer computation is now shared:
+  `offeredLocalAids` / `aidDisplayText` live in `reading.ts` beside
+  the detection primitives (hotkeys, render, and vocalize call one
+  definition). What remains is the render-path unification, which
+  needs streaming-careful redesign, not slicing.
 
 ## 4. Domain-slice the `$state` scatter (small, incremental)
 
