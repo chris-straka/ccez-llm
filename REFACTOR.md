@@ -4,7 +4,7 @@ Standing constraint: `src/routes/+page.svelte` stays one file by explicit
 decision (P23 in TODO.md). The refactors below extract logic into tested
 modules — they never split the template for size alone.
 
-## 1. Hollow out `onKey` into `src/lib/keybindings.ts` (biggest win, in progress)
+## 1. Hollow out `onKey` into `src/lib/keybindings.ts` (biggest win, substantially complete)
 
 - `onKey` (in `src/routes/+page.svelte`) dispatches through extracted
   decision functions in `src/lib/keybindings.ts` (unit-tested in
@@ -49,11 +49,13 @@ modules — they never split the template for size alone.
   offer computation, and fall-through; the M/N kind comes from the
   token now, never a re-read key. Fold/cut/delete lookups stay inline
   (one line each, no logic to pin).
-- Still inline: the unselected-scroll intent glide (the jump and
-  empty-enter branches are extracted via `unselectedScrollAction`; the
-  `lastGAt` + rAF-hold dispatch keeps its guard and extracted
-  `unselectedScrollIntent` call), the summon body (`isSummonHotkey`
-  already wired).
+- Still inline by decision, not by omission: the unselected-scroll
+  intent glide (guard + extracted call is the finished shape —
+  extracting further would just rename the intent object), the summon
+  body (one effect behind an extracted chord), the fold/cut/delete
+  lookups (one line each, no logic to pin). Only new dispatcher
+  branches are unwritten — they follow the established split, no new
+  guard soup.
 - Leave inline: the bare `Escape` → `dismissEscape(inEditor)` branch and
   the `escDownAt` stamp line — single-condition, extraction adds a hop
   for no decision value.
@@ -94,6 +96,10 @@ modules — they never split the template for size alone.
   per-utterance id checks, progress callbacks). Page keeps only UI flags.
 - Also the best place to catch stale-cancels-newer-speech bugs in a unit
   test instead of by ear.
+- Status: design-stage, not slice-shaped. The cluster couples utterance
+  ids, wake locks, fallback chains, and error banners to component state
+  and verifies by ear/device — a controller here is an inversion of
+  control, not an extraction, and belongs in its own session with hardware.
 
 ## 3. Unify the reading-aids pipeline
 
@@ -106,6 +112,9 @@ modules — they never split the template for size alone.
 - Goal: one pipeline — per message, compute kinds → ruby HTML → speech lang
   once. Removes real duplication, not just moved code. Medium-large; needs
   care since aids interact with streaming replaces.
+- Status: design-stage. The hotkey-side toggle math already moved to
+  `message-actions.ts`; what remains is the render-path unification,
+  which needs streaming-careful redesign, not slicing.
 
 ## 4. Domain-slice the `$state` scatter (small, incremental)
 
@@ -169,5 +178,7 @@ modules — they never split the template for size alone.
 
 - 2026-09-13 — Muse Code: `01a09c11-282a-7023-9e5a-8461b7164df8`
 - 2026-09-14 — Muse Code: `01a09eb5-5649-73b2-a57e-19838c9b74d6` (§1 slices:
-  idle trio, command chords, chrome cluster, sidebar/scroll-enter/modal;
-  §5 new candidates; Keychain bundle fix)
+  idle trio, command chords, chrome cluster, sidebar/scroll-enter/modal,
+  scroll-mode, unselected-scroll, message-actions, keyFacts convergence,
+  events predicates; §4 find/palette pilots + annPop matrix; §5 new
+  candidates; Keychain bundle fix; §§2-3 marked design-stage)
