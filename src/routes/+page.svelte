@@ -8580,7 +8580,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	so the × stays in flow there. */
 	/* Row buttons share one fixed box: same size, centered glyph, so
 	hover states never shift layout. The × reads bigger in a smaller
-	button; export sits one box plus a gap left of it. */
+	button; export sits one box plus a gap left of it. will-change
+	pins the compositing layer across the opacity fade: without it
+	the layer promotes/drops mid-hover and fractional
+	translateY(-50%) paint-snaps a pixel on some engines — the
+	buttons must only ever fade in place, never travel. */
 	aside li .del {
 		position: absolute;
 		right: 0;
@@ -8596,6 +8600,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		line-height: 1;
 		opacity: 0;
 		pointer-events: none;
+		will-change: opacity;
 	}
 	aside li:hover .del,
 	aside li:focus-within .del {
@@ -8616,6 +8621,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		align-items: center;
 		justify-content: center;
 		opacity: 0;
+		will-change: opacity;
 		pointer-events: none;
 		border: 0;
 		background: none;
@@ -9869,6 +9875,21 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		/* Pairs hug: a message sits close to its reply; the wider
 		separation lands between pairs (see article.user below). */
 		gap: 0.35rem;
+	}
+	/* Chat-switch crossfade covers the messages only: an unscoped
+	transition snapshots the whole page, so the closing sidebar and
+	the parking prompt ghost mid-switch — the prompt reads as
+	summoned twice, flickering. The root pair cuts instantly while
+	message bodies keep the crossfade (:global — these pseudos live
+	on the document, and the scope hash would break them). No fixed
+	overlay lives inside .messages, so naming it re-contains
+	nothing. */
+	:global(::view-transition-old(root)),
+	:global(::view-transition-new(root)) {
+		animation: none;
+	}
+	.messages {
+		view-transition-name: messages;
 	}
 	/* The chat scrollbar stays out of the way: invisible until a scroll
 	is in flight (JS toggles .scrolling while scroll events land). */

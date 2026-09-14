@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { seedChat } from "./helpers";
+import { expectBoxesStable, seedChat } from "./helpers";
 
 /**
  * App chrome + settings (bucket chromesettings). NOT RUN in this
@@ -539,6 +539,34 @@ test("prompt hides while the chats sidebar is open", async ({ page }) => {
 	await page.keyboard.press("Meta+Shift+[");
 	await expect(sidebar).toHaveClass(/collapsed/, { timeout: 5_000 });
 	await expect(prompt).not.toHaveClass(/prompt-idle/, { timeout: 5_000 });
+});
+
+/** Sidebar row buttons never move on hover: export and delete
+fade in and out in place (opacity only) — hovering the row or the
+buttons themselves shifts no pixel. */
+test("sidebar export and delete never move on hover", async ({ page }) => {
+	await seedChat(page, [{ role: "assistant", content: "hello" }]);
+	await page.goto("/");
+	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
+	await page.keyboard.press("Meta+Shift+[");
+	const sidebar = page.locator("aside:not(.settings-panel)");
+	await expect(sidebar).not.toHaveClass(/collapsed/, { timeout: 5_000 });
+	// Outlast the 0.22s slide-in: measuring mid-slide reads off-screen boxes.
+	await page.waitForTimeout(400);
+	const row = sidebar.locator("ul li").first();
+	const exp = row.locator("button.exp");
+	const del = row.locator("button.del");
+	const boxOf = async () => [await exp.boundingBox(), await del.boundingBox()];
+	const before = await boxOf();
+	await row.hover();
+	await page.waitForTimeout(400);
+	expectBoxesStable(before, await boxOf());
+	await exp.hover();
+	await page.waitForTimeout(300);
+	expectBoxesStable(before, await boxOf());
+	await del.hover();
+	await page.waitForTimeout(300);
+	expectBoxesStable(before, await boxOf());
 });
 
 /** The top bar is an invisible gesture strip: fully transparent so
