@@ -262,6 +262,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		messageSpeechLang,
 		speechAttemptable,
 		speechLangsFor,
+		startSpeechError,
 		effectiveSpeechLang,
 		stopSpeaking,
 		micAvailable,
@@ -3306,14 +3307,14 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			resetVoice();
 			// An empty inventory means no TTS engine/data on the device
 			// (check the OS text-to-speech settings); voices present but
-			// throwing is a different fault. Say which.
-			if (!quiet) {
-				setVoiceError(
-					!useNative && webVoices().length === 0
-						? "No voices on this device — check its text-to-speech settings."
-						: "Voice not available."
-				);
-			}
+			// throwing is a different fault. Say which (see
+			// startSpeechError); quiet readbacks stay silent throughout.
+			const banner = startSpeechError({
+				quiet,
+				useNative,
+				inventoryEmpty: webVoices().length === 0
+			});
+			if (banner !== null) setVoiceError(banner);
 		}
 	}
 

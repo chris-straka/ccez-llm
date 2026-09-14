@@ -99,10 +99,12 @@ modules — they never split the template for size alone.
   per-utterance id checks, progress callbacks). Page keeps only UI flags.
 - Also the best place to catch stale-cancels-newer-speech bugs in a unit
   test instead of by ear.
-- Status: design-stage, not slice-shaped. The cluster couples utterance
-  ids, wake locks, fallback chains, and error banners to component state
-  and verifies by ear/device — a controller here is an inversion of
-  control, not an extraction, and belongs in its own session with hardware.
+- Status: language steps and the start-failure banner (`startSpeechError`)
+  extracted and tested; the engine pick, wake-lock timing, fallback
+  retry, and stale-cancel guards stay inline. A controller here is an
+  inversion of control, not an extraction — the remaining orchestration
+  verifies by ear/device, so it belongs in its own session with hardware
+  and a user at the loop.
 
 ## 3. Unify the reading-aids pipeline
 

@@ -7,6 +7,7 @@ import {
 	messageSpeechLang,
 	speechAttemptable,
 	speechLangsFor,
+	startSpeechError,
 	replyLangFor,
 	sentenceSpeechLang,
 	webVoiceAvailable,
@@ -208,5 +209,24 @@ describe("speechLangsFor", () => {
 	it("reads Latin with the Italian stand-in when no Latin voice exists", () => {
 		const langFor = speechLangsFor("la", [{ lang: "it-IT" }]);
 		expect(langFor("Hello world.")).toBe("it-IT");
+	});
+});
+
+describe("startSpeechError", () => {
+	it("banners start failures, naming the fault", () => {
+		expect(startSpeechError({ quiet: false, useNative: false, inventoryEmpty: true })).toBe(
+			"No voices on this device — check its text-to-speech settings."
+		);
+		expect(startSpeechError({ quiet: false, useNative: false, inventoryEmpty: false })).toBe(
+			"Voice not available."
+		);
+		expect(startSpeechError({ quiet: false, useNative: true, inventoryEmpty: true })).toBe(
+			"Voice not available."
+		);
+	});
+
+	it("keeps quiet background readbacks silent", () => {
+		expect(startSpeechError({ quiet: true, useNative: false, inventoryEmpty: true })).toBe(null);
+		expect(startSpeechError({ quiet: true, useNative: true, inventoryEmpty: false })).toBe(null);
 	});
 });

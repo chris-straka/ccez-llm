@@ -154,6 +154,25 @@ export function speechAttemptable(
 }
 
 /**
+ * Banner when an utterance never starts: quiet background readbacks
+ * stay silent throughout, otherwise an empty inventory means no TTS
+ * engine/data on the device (check the OS text-to-speech settings)
+ * while voices present but throwing is a different fault. Null says
+ * nothing failed loudly enough to banner.
+ */
+export function startSpeechError(facts: {
+	quiet: boolean;
+	useNative: boolean;
+	inventoryEmpty: boolean;
+}): string | null {
+	if (facts.quiet) return null;
+	if (!facts.useNative && facts.inventoryEmpty) {
+		return "No voices on this device — check its text-to-speech settings.";
+	}
+	return "Voice not available.";
+}
+
+/**
  * Voice locale per sentence: non-Latin scripts resolve sync from the
  * sentence itself (reliable, needs no bridge); Latin sentences share
  * one recognizer pass (`latinLang`), since French vs English look
