@@ -42,11 +42,18 @@ modules — they never split the template for size alone.
   element-valued walk `dismissEscape` needs. The idle and Ctrl+G
   owned-stage spellings differ on purpose (summary + language menu) and
   stay separate predicates, pinned apart in `events.test.ts`.
-- Still inline: the message-key bodies (aid pinning, fold/edit/cut/delete
-  with target-exists fall-through), the unselected-scroll bodies (the
-  `spaceFocusesEmptyPrompt` / `unselectedScrollIntent` decisions are
-  extracted, the rAF-hold effects are not), the summon body
-  (`isSummonHotkey` already wired).
+- Message-key body effects live in `src/lib/message-actions.ts`
+  (`toggleAidKinds` toggle-all math, `toggleSingleAid` with the
+  unoffered-null contract, `canEditMessage` own-message gate over
+  structural rows): the A/M/N/E bodies keep target resolution,
+  offer computation, and fall-through; the M/N kind comes from the
+  token now, never a re-read key. Fold/cut/delete lookups stay inline
+  (one line each, no logic to pin).
+- Still inline: the unselected-scroll intent glide (the jump and
+  empty-enter branches are extracted via `unselectedScrollAction`; the
+  `lastGAt` + rAF-hold dispatch keeps its guard and extracted
+  `unselectedScrollIntent` call), the summon body (`isSummonHotkey`
+  already wired).
 - Leave inline: the bare `Escape` → `dismissEscape(inEditor)` branch and
   the `escDownAt` stamp line — single-condition, extraction adds a hop
   for no decision value.

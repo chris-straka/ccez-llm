@@ -94,6 +94,7 @@
 		unselectedScrollIntent
 	} from "$lib/scrollkeys";
 	import { hydrateSecrets, persistSecrets, tauriBackendAvailable, withBlankedKeys } from "$lib/secrets";
+	import { canEditMessage, toggleAidKinds, toggleSingleAid } from "$lib/message-actions";
 	import type { ChatProvider } from "$lib/providers/types";
 	import MessageBody from "$lib/components/MessageBody.svelte";
 	import ActionIcon from "$lib/components/ActionIcon.svelte";
@@ -184,6 +185,7 @@ import { desktopShortcuts, filteredShortcuts, touchShortcuts } from "$lib/shortc
 		quickLangIndexForKey,
 		scrollEnterAction,
 		scrollModeAction,
+		unselectedScrollAction,
 		shortcutsFilterBlocksKey,
 		sidebarListAction,
 		spaceKeyAction
@@ -5780,14 +5782,9 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				const kinds = target ? offeredLocalAids(aidDisplayText(target)) : [];
 				if (target && kinds.length > 0) {
 										consumeEvent(event);
-					const pinned = pinnedKinds(target.id);
-					if (kinds.every((kind) => pinned.includes(kind))) {
-						for (const kind of kinds) unpinLocalAid(target, kind);
-					} else {
-						for (const kind of kinds) {
-							if (!pinned.includes(kind)) pinLocalAid(target, kind);
-						}
-					}
+					const { pin, unpin } = toggleAidKinds(kinds, pinnedKinds(target.id));
+					for (const kind of unpin) unpinLocalAid(target, kind);
+					for (const kind of pin) pinLocalAid(target, kind);
 					return;
 				}
 			}
@@ -5795,14 +5792,22 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				// M pins pinyin, N pins furigana on the message in the
 				// middle of the screen (toggle — a second press lifts it).
 				// Kinds the center message doesn't offer stay off, exactly
-				// like A on an unoffered hover.
+				// like A on an unoffered hover. The token names the kind,
+				// so the body never re-reads the key.
 				const idx = centerMessageIndex();
 				const target = idx >= 0 ? viewChat.messages[idx] : undefined;
-				const want: LocalAid = event.key === "m" ? "pinyin" : "furigana";
-				const kinds = target ? offeredLocalAids(aidDisplayText(target)) : [];
-				if (target && kinds.includes(want)) {
+				const want: LocalAid = msgAction === "pin-pinyin" ? "pinyin" : "furigana";
+				const toggle =
+					target ?
+						toggleSingleAid(
+							offeredLocalAids(aidDisplayText(target)),
+							pinnedKinds(target.id),
+							want
+						)
+					:	null;
+				if (target && toggle !== null) {
 										consumeEvent(event);
-					if (pinnedKinds(target.id).includes(want)) unpinLocalAid(target, want);
+					if (toggle === "unpin") unpinLocalAid(target, want);
 					else pinLocalAid(target, want);
 					return;
 				}
@@ -5828,8 +5833,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			if (msgAction === "edit-hovered") {
 				// E pulls the hovered own message into the composer for
 				// editing — same ownership rule as F, own messages only.
-				const target = chat.messages[hoveredIdx];
-				if (target?.role === "user") {
+				if (canEditMessage(chat.messages, hoveredIdx)) {
 					event.preventDefault();
 					editMessage(hoveredIdx);
 					return;
@@ -5961,42 +5965,52 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				// owning the screen, and no typing target under the
 				// key. Every existing binding above keeps its keys —
 				// this branch only claims otherwise-unbound bare keys.
-				const modalOpen = shortcutsOpen || searchOpen || inspectChar;
-				const typing =
-					inEditor || isEditableTarget(event.target) || inSidebar;
-				if (!modalOpen && !typing && !event.metaKey && event.ctrlKey && !event.altKey && !event.shiftKey) {
+				const modalOpen = Boolean(shortcutsOpen || searchOpen || inspectChar);
+				const typing = Boolean(inEditor || isEditableTarget(event.target) || inSidebar);
+				// Ctrl+U/D jumps and empty-chat Space (see
+				// unselectedScrollAction); the intent glide below keeps
+				// its own guard and extracted call.
+				const unselected = unselectedScrollAction({
+					key: event.key,
+					metaKey: event.metaKey,
+					ctrlKey: event.ctrlKey,
+					altKey: event.altKey,
+					shiftKey: event.shiftKey,
+					scrollable: true,
+					modalOpen,
+					typing,
+					findOpen,
+					emptyPromptSpace: spaceFocusesEmptyPrompt({
+						key: event.key,
+						shiftKey: event.shiftKey,
+						metaKey: event.metaKey,
+						ctrlKey: event.ctrlKey,
+						altKey: event.altKey,
+						messageCount: viewChat.messages.length,
+						inInteractive: isSpaceInteractiveTarget(event.target)
+					}),
+					hasScrollBox: scrollBox !== undefined
+				});
+				if (unselected === "half-jump-up" || unselected === "half-jump-down") {
 					// Ctrl+U / Ctrl+D jump an instant half-page, vim-style
 					// (repeats jump again) — including with nothing selected.
 					// Plain U/D glide instead; other ctrl chords keep theirs.
-					const lower = event.key.toLowerCase();
-					if ((lower === "u" || lower === "d") && scrollBox) {
-						event.preventDefault();
-						lastGAt = 0;
-						scrollChatBy(halfPageDy(scrollBox.clientHeight, lower === "u" ? -1 : 1));
-						return;
+					event.preventDefault();
+					lastGAt = 0;
+					if (scrollBox) {
+						scrollChatBy(
+							halfPageDy(scrollBox.clientHeight, unselected === "half-jump-up" ? -1 : 1)
+						);
 					}
+					return;
+				}
+				if (unselected === "empty-enter") {
+					event.preventDefault();
+					lastGAt = 0;
+					enterEditMode();
+					return;
 				}
 				if (!modalOpen && !typing && !event.metaKey && !event.ctrlKey && !event.altKey) {
-					// Empty chat: bare Space has no scroll target, so it
-					// lands in the composer instead of scrolling nowhere
-					// (fields and buttons keep their native Space).
-					if (
-						!findOpen &&
-						spaceFocusesEmptyPrompt({
-							key: event.key,
-							shiftKey: event.shiftKey,
-							metaKey: event.metaKey,
-							ctrlKey: event.ctrlKey,
-							altKey: event.altKey,
-							messageCount: viewChat.messages.length,
-							inInteractive: isSpaceInteractiveTarget(event.target)
-						})
-					) {
-						event.preventDefault();
-						lastGAt = 0;
-						enterEditMode();
-						return;
-					}
 					const intent = unselectedScrollIntent(event.key, ggArmed(lastGAt, Date.now()));
 					if (intent) {
 						if (intent.kind === "gg-prefix") {

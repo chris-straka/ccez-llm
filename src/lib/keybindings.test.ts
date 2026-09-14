@@ -10,6 +10,7 @@ import {
 	quickLangIndexForKey,
 	scrollEnterAction,
 	scrollModeAction,
+	unselectedScrollAction,
 	shortcutsFilterBlocksKey,
 	sidebarListAction,
 	spaceKeyAction,
@@ -22,6 +23,7 @@ import {
 	type PromptIdleFacts,
 	type ScrollEnterFacts,
 	type ScrollModeFacts,
+	type UnselectedScrollFacts,
 	type ShortcutsFilterFacts,
 	type SidebarListFacts,
 	type SpaceKeyFacts
@@ -565,6 +567,52 @@ describe("scrollModeAction", () => {
 		expect(scrollModeAction({ ...scrollBase, key: "u", metaKey: true })).toBe(null);
 		expect(scrollModeAction({ ...scrollBase, key: "j", metaKey: true })).toBe("step-down");
 		expect(scrollModeAction({ ...scrollBase, key: "x" })).toBe(null);
+	});
+});
+
+const unselectedBase: UnselectedScrollFacts = {
+	key: "u",
+	metaKey: false,
+	ctrlKey: true,
+	altKey: false,
+	shiftKey: false,
+	scrollable: true,
+	modalOpen: false,
+	typing: false,
+	findOpen: false,
+	emptyPromptSpace: false,
+	hasScrollBox: true
+};
+
+describe("unselectedScrollAction", () => {
+	it("jumps Ctrl+U/D a half page with a scroll box", () => {
+		expect(unselectedScrollAction(unselectedBase)).toBe("half-jump-up");
+		expect(unselectedScrollAction({ ...unselectedBase, key: "D" })).toBe("half-jump-down");
+		expect(unselectedScrollAction({ ...unselectedBase, key: "x" })).toBe(null);
+		expect(unselectedScrollAction({ ...unselectedBase, hasScrollBox: false })).toBe(null);
+	});
+
+	it("enters the composer on bare Space in an empty chat", () => {
+		const space = {
+			...unselectedBase,
+			key: " ",
+			ctrlKey: false,
+			emptyPromptSpace: true
+		};
+		expect(unselectedScrollAction(space)).toBe("empty-enter");
+		expect(unselectedScrollAction({ ...space, findOpen: true })).toBe(null);
+		expect(unselectedScrollAction({ ...space, emptyPromptSpace: false })).toBe(null);
+	});
+
+	it("yields while modal, typing, or unscrolled — and keeps guard spellings", () => {
+		expect(unselectedScrollAction({ ...unselectedBase, scrollable: false })).toBe(null);
+		expect(unselectedScrollAction({ ...unselectedBase, modalOpen: true })).toBe(null);
+		expect(unselectedScrollAction({ ...unselectedBase, typing: true })).toBe(null);
+		// The jump needs bare ctrl: meta, alt, and shift all release it.
+		expect(unselectedScrollAction({ ...unselectedBase, metaKey: true })).toBe(null);
+		expect(unselectedScrollAction({ ...unselectedBase, altKey: true })).toBe(null);
+		expect(unselectedScrollAction({ ...unselectedBase, shiftKey: true })).toBe(null);
+		expect(unselectedScrollAction({ ...unselectedBase, ctrlKey: false })).toBe(null);
 	});
 });
 

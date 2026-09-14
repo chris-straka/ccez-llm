@@ -528,6 +528,52 @@ export function scrollModeAction(facts: ScrollModeFacts): ScrollModeAction | nul
 	return null;
 }
 
+/**
+ * Facts the unselected-scroll block reads. `modalOpen` and `typing` keep
+ * the handler's truthiness exactly (`Boolean(...)` over the same
+ * expression); `emptyPromptSpace` is the already-extracted
+ * `spaceFocusesEmptyPrompt` verdict. The intent dispatch below these two
+ * branches keeps its own inline guard and the extracted
+ * `unselectedScrollIntent` call.
+ */
+export interface UnselectedScrollFacts extends KeyModifiers {
+	key: string;
+	scrollable: boolean;
+	modalOpen: boolean;
+	typing: boolean;
+	findOpen: boolean;
+	emptyPromptSpace: boolean;
+	hasScrollBox: boolean;
+}
+
+export type UnselectedScrollAction = "half-jump-up" | "half-jump-down" | "empty-enter";
+
+/**
+ * Ctrl+U / Ctrl+D jump an instant half-page, vim-style (repeats jump
+ * again); bare Space in an empty chat lands in the composer instead of
+ * scrolling nowhere. A ctrl chord that is neither U nor D, or a jump
+ * with no scroll box, matches nothing — the bare branch below still
+ * requires no ctrl, so those keys fall through exactly like before.
+ */
+export function unselectedScrollAction(facts: UnselectedScrollFacts): UnselectedScrollAction | null {
+	if (!facts.scrollable || facts.modalOpen || facts.typing) return null;
+	if (!facts.metaKey && facts.ctrlKey && !facts.altKey && !facts.shiftKey) {
+		const lower = facts.key.toLowerCase();
+		if (lower === "u" || lower === "d") {
+			if (!facts.hasScrollBox) return null;
+			return lower === "u" ? "half-jump-up" : "half-jump-down";
+		}
+		return null;
+	}
+	if (!facts.metaKey && !facts.ctrlKey && !facts.altKey) {
+		// Empty chat: bare Space has no scroll target, so it lands in
+		// the composer instead of scrolling nowhere (fields and buttons
+		// keep their native Space — decided in `spaceFocusesEmptyPrompt`).
+		if (!facts.findOpen && facts.emptyPromptSpace) return "empty-enter";
+	}
+	return null;
+}
+
 export interface DeleteKeyFacts extends KeyModifiers {
 	key: string;
 	inEditor: boolean;
