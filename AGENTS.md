@@ -126,8 +126,8 @@ explicit ask in that turn. Name committed files explicitly, never
 
 ## Known structural debt
 
-- `src/routes/+page.svelte` is ~12.2k lines (sidebar, messages, composer,
-  popovers in one file) and stays one file by explicit decision (Sep 2026):
+- `src/routes/+page.svelte` is sidebar, messages, composer, popovers in
+  one file and stays one file by explicit decision (Sep 2026):
   nothing fixed so far was caused by its size, it is AI-navigable via search,
   and a split buys no user-visible change for real regression risk. Instead
   the `onKey` dispatcher is being hollowed out branch by branch into

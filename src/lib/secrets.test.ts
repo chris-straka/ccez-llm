@@ -10,12 +10,17 @@ import {
 	withBlankedKeys,
 	secretAccount,
 	tauriBackendAvailable,
-	KEYCHAIN_SERVICE
+	KEYCHAIN_SERVICE,
+	SECRET_BUNDLE_ACCOUNT,
+	encodeSecretBundle,
+	decodeSecretBundle,
+	resetSecretCacheForTests
 } from "./secrets";
 import { defaultSettings } from "./settings";
 
 beforeEach(() => {
 	localStorage.clear();
+	resetSecretCacheForTests();
 });
 
 describe("secrets fallback (no Tauri shell)", () => {
@@ -107,10 +112,75 @@ describe("secrets fallback (no Tauri shell)", () => {
 	it("persists keys and blanks copies for shell storage", async () => {
 		const settings = defaultSettings();
 		settings.providers["deepseek"]!.apiKey = "sk-live";
+		settings.providers["muse"]!.apiKey = "";
 		await persistSecrets(settings);
-		expect(await getSecret(secretAccount("deepseek"))).toBe("sk-live");
+		expect(decodeSecretBundle(await getSecret(SECRET_BUNDLE_ACCOUNT))).toEqual({
+			deepseek: "sk-live"
+		});
+		// One item for all providers: no per-provider entries are created.
+		expect(await getSecret(secretAccount("deepseek"))).toBeNull();
 		const blanked = withBlankedKeys(settings);
 		expect(blanked.providers["deepseek"]!.apiKey).toBe("");
 		expect(settings.providers["deepseek"]!.apiKey).toBe("sk-live");
+	});
+
+	it("skips the write when nothing changed (no Keychain touch, no re-prompt)", async () => {
+		const settings = defaultSettings();
+		settings.providers["deepseek"]!.apiKey = "sk-live";
+		settings.providers["muse"]!.apiKey = "muse-live";
+		await persistSecrets(settings);
+		// Plant a sentinel over storage: a second identical persist must
+		// leave it alone, proving no write happened.
+		localStorage.setItem("ccez-keychain:providers", "sentinel");
+		await persistSecrets(settings);
+		expect(localStorage.getItem("ccez-keychain:providers")).toBe("sentinel");
+		// A changed key writes again.
+		resetSecretCacheForTests();
+		localStorage.removeItem("ccez-keychain:providers");
+		await persistSecrets(settings);
+		settings.providers["deepseek"]!.apiKey = "sk-rotated";
+		await persistSecrets(settings);
+		expect(decodeSecretBundle(await getSecret(SECRET_BUNDLE_ACCOUNT))).toEqual({
+			deepseek: "sk-rotated",
+			muse: "muse-live"
+		});
+	});
+
+	it("migrates legacy per-provider items into the bundle once", async () => {
+		await setSecret(secretAccount("muse"), "muse-test");
+		const settings = defaultSettings();
+		settings.providers["deepseek"]!.apiKey = "";
+		settings.providers["muse"]!.apiKey = "";
+		await expect(hydrateSecrets(settings)).resolves.toEqual(["muse"]);
+		expect(settings.providers["muse"]!.apiKey).toBe("muse-test");
+		expect(decodeSecretBundle(await getSecret(SECRET_BUNDLE_ACCOUNT))).toEqual({
+			muse: "muse-test"
+		});
+		expect(await getSecret(secretAccount("muse"))).toBeNull();
+		// Second launch reads the bundle: no legacy reads, same result.
+		const again = defaultSettings();
+		again.providers["muse"]!.apiKey = "";
+		await expect(hydrateSecrets(again)).resolves.toEqual(["muse"]);
+		expect(again.providers["muse"]!.apiKey).toBe("muse-test");
+	});
+
+	it("never clobbers a stored bundle with emptiness before first hydrate", async () => {
+		await setSecret(SECRET_BUNDLE_ACCOUNT, encodeSecretBundle({ muse: "muse-test" }));
+		const settings = defaultSettings();
+		settings.providers["deepseek"]!.apiKey = "";
+		settings.providers["muse"]!.apiKey = "";
+		await persistSecrets(settings);
+		expect(decodeSecretBundle(await getSecret(SECRET_BUNDLE_ACCOUNT))).toEqual({
+			muse: "muse-test"
+		});
+	});
+
+	it("encodes bundles canonically and reads corrupt payloads as empty", () => {
+		expect(encodeSecretBundle({ b: "2", a: "1" })).toBe('{"a":"1","b":"2"}');
+		expect(encodeSecretBundle({})).toBe("{}");
+		expect(decodeSecretBundle(null)).toEqual({});
+		expect(decodeSecretBundle("not json")).toEqual({});
+		expect(decodeSecretBundle("[1,2]")).toEqual({});
+		expect(decodeSecretBundle('{"a":1,"b":"","c":"x"}')).toEqual({ c: "x" });
 	});
 });

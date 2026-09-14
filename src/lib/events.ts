@@ -4,6 +4,39 @@
 
 const FIELD_SELECTOR = "input, textarea, select";
 const EDITABLE_SELECTOR = "input, textarea, select, [contenteditable]";
+/** The prompt's editor subtree (CodeMirror content or plain textarea). */
+const PROMPT_EDITOR_SELECTOR = ".prompt .cm-content, .prompt .ta-input";
+/** Any composer editor, prompt or message-edit. */
+const COMPOSER_SELECTOR = ".cm-content, .ta-input";
+const FILTER_SELECTOR = ".shortcuts-filter";
+const FIND_BAR_SELECTOR = ".find-bar";
+const SIDEBAR_SELECTOR = "aside";
+const PROMPT_SELECTOR = ".prompt";
+/**
+ * Shift+D's wider selector: buttons and links keep their own keys too,
+ * on top of every field and rich editor.
+ */
+const INTERACTIVE_SELECTOR = "input, textarea, select, button, a, [contenteditable]";
+/**
+ * The Inspect field guard (also the Esc+f filter carve-out): typing in
+ * the shortcuts filter must not step the preview or exit fullscreen.
+ */
+const INSPECT_FIELD_SELECTOR = "input, textarea, select, [contenteditable], .shortcuts-filter";
+/** Fields and buttons keep their native Space (empty-chat summon check). */
+const SPACE_INTERACTIVE_SELECTOR = "input, textarea, select, [contenteditable], button, a";
+/**
+ * Idle-restore owned stage: an open overlay, sidebar, or panel owns bare
+ * keys, so Space out there never summons the prompt from behind it.
+ */
+const IDLE_OWNED_SELECTOR =
+	"input, textarea, select, [contenteditable], button, a, summary, aside, .modal, .modal-veil, .find-bar, .search-palette, .sel-menu, .review, .lang-menu";
+/**
+ * Ctrl+G entry owned stage: same idea one branch below, minus summary
+ * and the language menu — the two spellings differ on purpose, so they
+ * stay separate predicates instead of sharing one.
+ */
+const SCROLL_ENTER_OWNED_SELECTOR =
+	"input, textarea, select, [contenteditable], button, a, aside, .modal, .modal-veil, .find-bar, .search-palette, .sel-menu, .review";
 
 /**
  * Closest matching ancestor for an event target (or the focused
@@ -41,4 +74,62 @@ export function isFieldTarget(target: EventTarget | null): boolean {
  */
 export function isEditableTarget(target: EventTarget | null): boolean {
 	return closestFromTarget(target, EDITABLE_SELECTOR) !== null;
+}
+
+/** True inside the prompt's editor subtree. */
+export function isPromptEditorTarget(target: EventTarget | null): boolean {
+	return closestFromTarget(target, PROMPT_EDITOR_SELECTOR) !== null;
+}
+
+/** True inside any composer editor (prompt or message-edit). */
+export function isComposerTarget(target: EventTarget | null): boolean {
+	return closestFromTarget(target, COMPOSER_SELECTOR) !== null;
+}
+
+/** True inside the shortcuts-modal filter input. */
+export function isFilterTarget(target: EventTarget | null): boolean {
+	return closestFromTarget(target, FILTER_SELECTOR) !== null;
+}
+
+/** True inside the in-chat find bar. */
+export function isFindBarTarget(target: EventTarget | null): boolean {
+	return closestFromTarget(target, FIND_BAR_SELECTOR) !== null;
+}
+
+/** True inside a sidebar drawer (chat list or settings panel). */
+export function isSidebarTarget(target: EventTarget | null): boolean {
+	return closestFromTarget(target, SIDEBAR_SELECTOR) !== null;
+}
+
+/** True anywhere inside the prompt subtree (editor or chrome). */
+export function isPromptTarget(target: EventTarget | null): boolean {
+	return closestFromTarget(target, PROMPT_SELECTOR) !== null;
+}
+
+/**
+ * True for Shift+D's wider keep-out: fields, rich editors, buttons,
+ * and links all keep their own keys.
+ */
+export function isInteractiveTarget(target: EventTarget | null): boolean {
+	return closestFromTarget(target, INTERACTIVE_SELECTOR) !== null;
+}
+
+/** True where Inspect stepping must not fire (fields and modal filter). */
+export function isInspectFieldTarget(target: EventTarget | null): boolean {
+	return closestFromTarget(target, INSPECT_FIELD_SELECTOR) !== null;
+}
+
+/** True where bare Space keeps its native behavior (fields, buttons). */
+export function isSpaceInteractiveTarget(target: EventTarget | null): boolean {
+	return closestFromTarget(target, SPACE_INTERACTIVE_SELECTOR) !== null;
+}
+
+/** True where a bare key must not summon the hidden idle prompt. */
+export function isIdleOwnedTarget(target: EventTarget | null): boolean {
+	return closestFromTarget(target, IDLE_OWNED_SELECTOR) !== null;
+}
+
+/** True where Ctrl+G must not enter scroll mode. */
+export function isScrollEnterOwnedTarget(target: EventTarget | null): boolean {
+	return closestFromTarget(target, SCROLL_ENTER_OWNED_SELECTOR) !== null;
 }

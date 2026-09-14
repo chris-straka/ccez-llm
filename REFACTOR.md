@@ -4,77 +4,78 @@ Standing constraint: `src/routes/+page.svelte` stays one file by explicit
 decision (P23 in TODO.md). The refactors below extract logic into tested
 modules — they never split the template for size alone.
 
-## 1. Finish hollowing out `onKey` into `src/lib/keybindings.ts` (biggest win)
+## 1. Hollow out `onKey` into `src/lib/keybindings.ts` (biggest win, in progress)
 
-- `onKey` (`src/routes/+page.svelte:5424`) is ~1,400 lines; only the first
-  branches (message keys, Space) are extracted so far (`keybindings.ts` is
-  164 lines).
-- Remaining inline guards all fit the established facts-snapshot →
-  action-token shape: idle-restore allowlist, inspect `h`/`l` stepping,
-  shortcuts-filter carve-out, Cmd+T, Cmd+P, the Escape ladder
-  (`dismissEscape`), fullscreen-hold tracking.
-- Each branch becomes a pure, unit-tested decision function; effects stay in
-  the component. Keyboard logic is where guard-ordering bugs live, and this
-  follows the "no new untested guard soup" rule.
-
-### Remaining branch inventory (from the message-keys/Space/Delete slice)
-
-Rough scope: ~19 extraction units in the chord/fullscreen/shift/zoom
-list (12 chord table + 4 fullscreen/find + shift group + zoom +
-shift-comma), plus the 5-branch scroll/sidebar cluster and the
-idle-restore/inspect/filter items above — call it ~25 branches total,
-Escape excluded (stays inline per below).
-
-- Modifier-chord table, in current dispatch order: Cmd/Ctrl+Enter send
-  (field carve-out), Ctrl+Alt+Arrows (provider/thinking cycle),
-  Ctrl+Alt+N and Cmd/Ctrl+N (new chat; the Shift variant rides the plain
-  branch), Ctrl+Alt+S (voice toggle), Cmd/Ctrl+B sidebar, Cmd/Ctrl+.
-  and Cmd/Ctrl+, (settings panel), Cmd/Ctrl+1..0 (quick-lang; body checks
-  the code exists first), Cmd+D on a hovered message (needs hoveredIdx,
-  outside the editor, outside fields, AND the message still present —
-  keep that target-exists check in the body), the summon chord
-  (`isSummonHotkey` already extracted — rewire only), Ctrl+O pastes
-  (fires only when `editor?.togglePastes()` succeeds).
-- Fullscreen/find chords: Cmd+E and Ctrl+Cmd+F (claimed before find so the
-  dual-modifier chord never reads as Cmd/Ctrl+F), Cmd/Ctrl+P (search
-  palette toggle), Cmd/Ctrl+F (body splits on `shortcutsOpen`: modal
-  filter focus vs find-bar toggle — keep the split in the body, extract
-  only the chord match).
-- Shift-modifier group (all physical `code`, one sub-dispatch):
-  BracketLeft/Right (sidebar/settings), KeyH/KeyL (close-and-land
-  variants), Slash (shortcuts modal), KeyJ/KeyK (step chat).
-- Zoom chords (`=`/`+`/`-`/`_` with the Shift-widens-column variant) and
-  Shift+Cmd+comma (both `,` and `<` spellings).
-- Scroll/sidebar cluster: the `inSidebar` block (open list owns j/k/space/l
-  with preview-as-you-go), the scroll-mode block (`focusMode`, `inFind`,
-  bare j/k/u/d/space plus Ctrl+U/D half-page via `spaceFocusesEmptyPrompt`
-  — already extracted), the shortcuts-modal scroll box, and the Cmd+T /
-  Ctrl+G entries.
+- `onKey` (in `src/routes/+page.svelte`) dispatches through extracted
+  decision functions in `src/lib/keybindings.ts` (unit-tested in
+  `keybindings.test.ts` — the suite grows with every slice, so no count
+  here).
+- Extracted so far (facts-snapshot → action-token, effects in the
+  component, bodies as `if (token === ...)` chains never a switch):
+  `messageKeyAction`, `spaceKeyAction`, `deleteChatScope` (first slice);
+  `promptIdleKeyAction` (idle-restore allowlist + hidden-keystroke swallow
+  combined — both walked the same `.prompt` editor selector, so one fact
+  serves both; local `idleRestoreKey`/`swallowHiddenKeystroke` deleted),
+  `inspectStepAction` (`h`/`l`), `shortcutsFilterBlocksKey` (filter
+  carve-out); `commandChord` (Cmd+T browser, Cmd+P palette, Cmd+E /
+  Ctrl+Cmd+F fullscreen, Cmd+F find with the `shortcutsOpen` split kept in
+  the body, Ctrl+O pastes, Cmd+Enter send with the field carve-out kept in
+  the body, Ctrl+Alt+Arrows provider/thinking cycle, both N spellings
+  merged to one `new-chat` body, Ctrl+Alt+S voice); `chromeChord` (shift
+  group, zoom with the Shift-widens derivation kept in the body, both
+  comma spellings, Cmd+B / `.` / `,` merged to shared tokens, quick-lang
+  with the `QUICK_LANG_CODES` lookup kept in the body via the shared
+  `quickLangIndexForKey`, meta-only hover-gated Cmd+D with the
+  target-exists check kept in the body); `sidebarListAction` (walk/enter/
+  delete-chat), `scrollEnterAction` (Ctrl+G entry), `modalScrollAction`
+  (modal j/k/u/d with the box lookup and half-page sizing kept in the body);
+  `scrollModeAction` (step/park/go-top/go-bottom/half-jump/half-glide/
+  enter-edit/scroll-toggle with `lastGAt` updates, the lone-g arm, and the
+  position/hold effects kept in the body — j/k/i/Enter carry no modifier
+  guards, matched verbatim).
+- Every target read in the handler now goes through a named `events.ts`
+  predicate (`isPromptEditorTarget`, `isComposerTarget`, `isFilterTarget`,
+  `isFindBarTarget`, `isSidebarTarget`, `isPromptTarget`,
+  `isInteractiveTarget`, `isInspectFieldTarget`, `isSpaceInteractiveTarget`,
+  `isIdleOwnedTarget`, `isScrollEnterOwnedTarget` beside `isFieldTarget` /
+  `isEditableTarget`) — no selector literals left except the one
+  element-valued walk `dismissEscape` needs. The idle and Ctrl+G
+  owned-stage spellings differ on purpose (summary + language menu) and
+  stay separate predicates, pinned apart in `events.test.ts`.
+- Still inline: the message-key bodies (aid pinning, fold/edit/cut/delete
+  with target-exists fall-through), the unselected-scroll bodies (the
+  `spaceFocusesEmptyPrompt` / `unselectedScrollIntent` decisions are
+  extracted, the rAF-hold effects are not), the summon body
+  (`isSummonHotkey` already wired).
 - Leave inline: the bare `Escape` → `dismissEscape(inEditor)` branch and
   the `escDownAt` stamp line — single-condition, extraction adds a hop
   for no decision value.
-- Transcription hazards (learned on the first slice): several bodies have
-  inner target-exists checks that fall through to later branches when the
-  target is gone (F fold, E edit, A aids, M/N pins, Cmd+D) — keep them as
-  `if (token === ...)` chains, never a switch. There are THREE field-guard
-  spellings (`isFieldTarget`, `isEditableTarget`, and Shift+D's wider
-  button/link selector): the facts snapshot must carry each one separately.
-  M/N need no hover (center message); Esc+f needs neither hover nor editor.
+- Transcription hazards (learned across slices, still binding): every
+  condition is the handler's verbatim guard — no narrowed re-spelling
+  (Ctrl+O ignores meta/shift, the T chord ignores alt/shift, shifted
+  arrows still walk the sidebar, CapsLock "B" still toggles it). Bodies
+  with inner target-exists checks fall through when the target is gone
+  (F fold, E edit, A aids, M/N pins, Cmd+D, modal box) — `if` chains,
+  never a switch. The target spellings live exactly once each as named
+  `events.ts` predicates — the facts snapshot carries the booleans, never
+  the selectors.
 - Follow-ups for later slices: converge the per-slice facts objects into
   one shared per-keydown context (built once, not one snapshot per
-  cluster); move the Shift+D and shortcuts-filter selector literals into
-  named `events.ts` predicates (`isInteractiveTarget`, `isFilterTarget`)
-  beside `isFieldTarget`/`isEditableTarget`. Beyond the idle-restore
-  allowlist above, the prompt-idle hide/show/park machine itself
-  (`promptIdle`, `bootParked`, mount migration, focus/pointer listeners —
-  24 `promptIdle` refs) wants the same decision/effect split.
+  cluster). Beyond the idle-restore allowlist above, the prompt-idle
+  hide/show/park machine itself (`promptIdle`, `bootParked`, mount
+  migration, focus/pointer listeners) wants the same decision/effect
+  split. Next concrete slices: the message-key body effects
+  (`message-actions.ts`, see §5) and the unselected-scroll bodies; the
+  three Space answers (`promptIdleKeyAction`, the `scrollEnterAction`
+  bare-Space note, `spaceFocusesEmptyPrompt`) could converge into one
+  Space dispatcher afterwards.
 
 ## 2. Extract a speech controller (second-largest logic mass)
 
-- Speech orchestration spans roughly `+page.svelte:3245–3620`
-  (`startSpeech`, `speakReply`, `maybeSpeakReply`, `speakQuote`,
-  `toggleMic`, `dictateNativeFirst`, plus `speakingId` /
-  `speakingSelection` / `vocalized` / `voiceError` state).
+- Speech orchestration spans the `startSpeech` / `speakReply` /
+  `maybeSpeakReply` / `speakQuote` / `toggleMic` / `dictateNativeFirst`
+  cluster in `+page.svelte` (plus `speakingId` / `speakingSelection` /
+  `vocalized` / `voiceError` state).
 - The two engines already share one callback contract (`SpeakCallbacks` —
   web in `src/lib/voice.ts`, native in `src/lib/nativeTts.ts`), but the page
   does the conducting: utterance ids, stale-cancel guards, quiet-vs-loud
@@ -106,6 +107,34 @@ Escape excluded (stays inline per below).
 - No behavior change; stops unrelated domains from sharing
   effect-subscription accidents.
 
+## 5. New candidates (from the Sep 2026 slices)
+
+- Message-key body effects (`toggleHoverAids`-style pin/unpin-all,
+  center-message pin, fold/edit/cut/delete dispatch) still walk
+  `viewChat.messages` / `chat.messages` inline behind the tokens. A
+  tested `message-actions.ts` (pure target resolution + pin-toggle math,
+  effects in the component) would finish §1's tail — needs care since
+  aids interact with streaming replaces.
+- `saveSettingsNow` fans out to every settings save; `persistSecrets` is
+  now bundle-cached and skips unchanged saves, so the fan-out is cheap —
+  no coalescing work needed unless a save path starts doing real I/O.
+- The secrets bundle is one opaque string: the Rust `keychain_*`
+  commands and the Android `Secrets.kt` path needed no changes and want
+  none (per-platform files stay look-first, per above).
+
+## Shipped alongside (not a refactor — user-facing bug)
+
+- 2026-09-14: macOS Keychain asked "allow" once per provider on every
+  hydrate and every settings save (`persistSecrets` rewrote all keys
+  unconditionally). Now one `providers` bundle item holds every key
+  (canonical JSON, legacy per-provider items migrate once then delete
+  best-effort), and persists/hydrates track the last-known bundle so an
+  unchanged save touches no Keychain item at all. A pre-hydrate save
+  never clobbers a stored bundle with emptiness. `secrets.test.ts`
+  pins bundle round-trip, write-skip, migration, and the race guard.
+  The `secretAccount` format freeze still holds (legacy reads depend on
+  it). No Rust changes — the commands already take opaque accounts.
+
 ## Deliberately not doing
 
 - Splitting `+page.svelte` for size alone (decided against; nothing fixed so
@@ -113,3 +142,10 @@ Escape excluded (stays inline per below).
 - Classes or method-bearing stores in `$state` (breaks re-render).
 - Touching the Rust per-platform `tts`/`dictate`/`ocr` files without first
   verifying they actually duplicate logic — look-first, lower priority.
+
+## Agent sessions
+
+- 2026-09-13 — Muse Code: `01a09c11-282a-7023-9e5a-8461b7164df8`
+- 2026-09-14 — Muse Code: `01a09eb5-5649-73b2-a57e-19838c9b74d6` (§1 slices:
+  idle trio, command chords, chrome cluster, sidebar/scroll-enter/modal;
+  §5 new candidates; Keychain bundle fix)

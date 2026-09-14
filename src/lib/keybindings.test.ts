@@ -1,10 +1,29 @@
 import { describe, it, expect } from "vitest";
 import {
+	chromeChord,
+	commandChord,
 	deleteChatScope,
+	inspectStepAction,
 	messageKeyAction,
+	modalScrollAction,
+	promptIdleKeyAction,
+	quickLangIndexForKey,
+	scrollEnterAction,
+	scrollModeAction,
+	shortcutsFilterBlocksKey,
+	sidebarListAction,
 	spaceKeyAction,
+	type ChromeChordFacts,
+	type CommandChordFacts,
 	type DeleteKeyFacts,
+	type InspectStepFacts,
 	type MessageKeyFacts,
+	type ModalScrollFacts,
+	type PromptIdleFacts,
+	type ScrollEnterFacts,
+	type ScrollModeFacts,
+	type ShortcutsFilterFacts,
+	type SidebarListFacts,
 	type SpaceKeyFacts
 } from "./keybindings";
 
@@ -147,5 +166,418 @@ describe("deleteChatScope", () => {
 		expect(deleteChatScope({ ...delBase, inEditor: true })).toBe(null);
 		expect(deleteChatScope({ ...delBase, inEditable: true })).toBe(null);
 		expect(deleteChatScope({ ...delBase, key: "d" })).toBe(null);
+	});
+});
+
+const idleBase: PromptIdleFacts = {
+	key: "i",
+	metaKey: false,
+	ctrlKey: false,
+	altKey: false,
+	shiftKey: false,
+	repeat: false,
+	isComposing: false,
+	inPromptEditor: false,
+	activeInPrompt: false,
+	overlayOpen: false,
+	inOwnedTarget: false
+};
+
+describe("promptIdleKeyAction", () => {
+	it("restores on bare i / I / Enter / Space in the open", () => {
+		expect(promptIdleKeyAction(idleBase)).toBe("restore");
+		expect(promptIdleKeyAction({ ...idleBase, key: "I", shiftKey: true })).toBe("restore");
+		expect(promptIdleKeyAction({ ...idleBase, key: "Enter" })).toBe("restore");
+		expect(promptIdleKeyAction({ ...idleBase, key: " " })).toBe("restore");
+		expect(promptIdleKeyAction({ ...idleBase, key: "x" })).toBe(null);
+	});
+
+	it("restores from the hidden editor only while focus is still there", () => {
+		expect(promptIdleKeyAction({ ...idleBase, inPromptEditor: true, activeInPrompt: true })).toBe(
+			"restore"
+		);
+		// Stale send key: targeted at the editor but focus already left
+		// on send — must not summon back (bare "i" swallows instead).
+		expect(promptIdleKeyAction({ ...idleBase, inPromptEditor: true })).toBe("swallow");
+	});
+
+	it("never summons from behind an overlay or an owned target", () => {
+		expect(promptIdleKeyAction({ ...idleBase, overlayOpen: true })).toBe(null);
+		expect(promptIdleKeyAction({ ...idleBase, inOwnedTarget: true })).toBe(null);
+	});
+
+	it("ignores repeats, IME, modifiers, and other keys", () => {
+		expect(promptIdleKeyAction({ ...idleBase, repeat: true })).toBe(null);
+		expect(promptIdleKeyAction({ ...idleBase, isComposing: true })).toBe(null);
+		expect(promptIdleKeyAction({ ...idleBase, metaKey: true })).toBe(null);
+		expect(promptIdleKeyAction({ ...idleBase, ctrlKey: true })).toBe(null);
+		expect(promptIdleKeyAction({ ...idleBase, key: "Tab" })).toBe(null);
+	});
+
+	it("swallows blind keystrokes into the hidden composer", () => {
+		expect(promptIdleKeyAction({ ...idleBase, key: "x", inPromptEditor: true })).toBe("swallow");
+		expect(promptIdleKeyAction({ ...idleBase, key: "Backspace", inPromptEditor: true })).toBe(
+			"swallow"
+		);
+		expect(promptIdleKeyAction({ ...idleBase, key: "?", shiftKey: true, inPromptEditor: true })).toBe(
+			"swallow"
+		);
+		// Outside the hidden editor there is nothing to swallow; chords,
+		// IME, and control keys keep their behavior everywhere.
+		expect(promptIdleKeyAction({ ...idleBase, key: "x" })).toBe(null);
+		expect(promptIdleKeyAction({ ...idleBase, key: "x", inPromptEditor: true, metaKey: true })).toBe(
+			null
+		);
+		expect(promptIdleKeyAction({ ...idleBase, key: "Tab", inPromptEditor: true })).toBe(null);
+	});
+
+	it("prefers restore when both halves match", () => {
+		expect(promptIdleKeyAction({ ...idleBase, key: " ", inPromptEditor: true, activeInPrompt: true })).toBe(
+			"restore"
+		);
+	});
+});
+
+const inspectBase: InspectStepFacts = {
+	key: "h",
+	metaKey: false,
+	ctrlKey: false,
+	altKey: false,
+	shiftKey: false,
+	inspectOpen: true,
+	inField: false
+};
+
+describe("inspectStepAction", () => {
+	it("steps on bare h/l while Inspect is open", () => {
+		expect(inspectStepAction(inspectBase)).toBe(-1);
+		expect(inspectStepAction({ ...inspectBase, key: "l" })).toBe(1);
+	});
+
+	it("stays out of fields, modifiers, other keys, and closed Inspect", () => {
+		expect(inspectStepAction({ ...inspectBase, inField: true })).toBe(null);
+		expect(inspectStepAction({ ...inspectBase, metaKey: true })).toBe(null);
+		expect(inspectStepAction({ ...inspectBase, ctrlKey: true })).toBe(null);
+		expect(inspectStepAction({ ...inspectBase, inspectOpen: false })).toBe(null);
+		expect(inspectStepAction({ ...inspectBase, key: "j" })).toBe(null);
+		// Shift rides the key value ("H" never equals "h").
+		expect(inspectStepAction({ ...inspectBase, key: "H", shiftKey: true })).toBe(null);
+	});
+});
+
+const filterBase: ShortcutsFilterFacts = {
+	key: "a",
+	code: "KeyA",
+	metaKey: false,
+	ctrlKey: false,
+	altKey: false,
+	shiftKey: false,
+	inFilter: true
+};
+
+const chordBase: CommandChordFacts = {
+	key: "",
+	code: "",
+	metaKey: false,
+	ctrlKey: false,
+	altKey: false,
+	shiftKey: false
+};
+
+describe("commandChord", () => {
+	it("matches every chord-table entry", () => {
+		expect(commandChord({ ...chordBase, metaKey: true, key: "t" })).toBe("open-browser");
+		expect(commandChord({ ...chordBase, ctrlKey: true, key: "T" })).toBe("open-browser");
+		expect(commandChord({ ...chordBase, metaKey: true, code: "KeyP" })).toBe("toggle-palette");
+		expect(commandChord({ ...chordBase, metaKey: true, code: "KeyE" })).toBe("toggle-fullscreen");
+		expect(commandChord({ ...chordBase, metaKey: true, code: "KeyF" })).toBe("find-toggle");
+		expect(commandChord({ ...chordBase, ctrlKey: true, key: "o" })).toBe("toggle-pastes");
+		expect(commandChord({ ...chordBase, metaKey: true, key: "Enter" })).toBe("send");
+		expect(commandChord({ ...chordBase, ctrlKey: true, altKey: true, key: "ArrowRight" })).toBe(
+			"provider-next"
+		);
+		expect(commandChord({ ...chordBase, ctrlKey: true, altKey: true, key: "ArrowLeft" })).toBe(
+			"provider-prev"
+		);
+		expect(commandChord({ ...chordBase, ctrlKey: true, altKey: true, key: "ArrowUp" })).toBe(
+			"thinking-next"
+		);
+		expect(commandChord({ ...chordBase, ctrlKey: true, altKey: true, key: "ArrowDown" })).toBe(
+			"thinking-prev"
+		);
+		expect(commandChord({ ...chordBase, ctrlKey: true, altKey: true, code: "KeyN" })).toBe(
+			"new-chat"
+		);
+		expect(commandChord({ ...chordBase, metaKey: true, code: "KeyN" })).toBe("new-chat");
+		expect(commandChord({ ...chordBase, ctrlKey: true, altKey: true, code: "KeyS" })).toBe(
+			"toggle-voice"
+		);
+	});
+
+	it("keeps handler priority (dual-modifier chords win their race)", () => {
+		// Ctrl+Cmd+F reads as fullscreen, never find.
+		expect(commandChord({ ...chordBase, metaKey: true, ctrlKey: true, code: "KeyF" })).toBe(
+			"toggle-fullscreen"
+		);
+		// Ctrl+Alt+N reads as new-chat on the Option spelling.
+		expect(commandChord({ ...chordBase, ctrlKey: true, altKey: true, code: "KeyN" })).toBe(
+			"new-chat"
+		);
+	});
+
+	it("keeps the verbatim guard spellings (no narrowed re-spelling)", () => {
+		// Ctrl+O ignores meta and shift, like the handler did.
+		expect(commandChord({ ...chordBase, ctrlKey: true, metaKey: true, key: "o" })).toBe(
+			"toggle-pastes"
+		);
+		expect(commandChord({ ...chordBase, ctrlKey: true, shiftKey: true, key: "O" })).toBe(
+			"toggle-pastes"
+		);
+		// The T chord ignores alt/shift; plain Cmd+O is not pastes.
+		expect(commandChord({ ...chordBase, metaKey: true, key: "o" })).toBe(null);
+		// Shift rides the new-chat branch (single window, no new window).
+		expect(commandChord({ ...chordBase, metaKey: true, shiftKey: true, code: "KeyN" })).toBe(
+			"new-chat"
+		);
+		// Alt/shift break the palette/fullscreen/find/send chords.
+		expect(commandChord({ ...chordBase, metaKey: true, altKey: true, code: "KeyP" })).toBe(null);
+		expect(commandChord({ ...chordBase, metaKey: true, shiftKey: true, code: "KeyE" })).toBe(null);
+		expect(commandChord({ ...chordBase, metaKey: true, shiftKey: true, code: "KeyF" })).toBe(null);
+		expect(commandChord({ ...chordBase, metaKey: true, shiftKey: true, key: "Enter" })).toBe(null);
+		// Bare keys and unknown arrows match nothing.
+		expect(commandChord({ ...chordBase, key: "t" })).toBe(null);
+		expect(commandChord({ ...chordBase, ctrlKey: true, altKey: true, key: "ArrowX" })).toBe(null);
+	});
+});
+
+const chromeBase: ChromeChordFacts = {
+	key: "",
+	code: "",
+	metaKey: true,
+	ctrlKey: false,
+	altKey: false,
+	shiftKey: false,
+	inEditor: false,
+	hovered: false,
+	inField: false
+};
+
+describe("chromeChord", () => {
+	it("reads the same token across spellings", () => {
+		expect(chromeChord({ ...chromeBase, shiftKey: true, code: "BracketLeft" })).toBe(
+			"toggle-sidebar"
+		);
+		expect(chromeChord({ ...chromeBase, key: "b", code: "KeyB" })).toBe("toggle-sidebar");
+		expect(chromeChord({ ...chromeBase, shiftKey: true, code: "BracketRight" })).toBe(
+			"toggle-settings"
+		);
+		expect(chromeChord({ ...chromeBase, key: ".", code: "Period" })).toBe("toggle-settings");
+		expect(chromeChord({ ...chromeBase, key: ",", code: "Comma" })).toBe("toggle-settings");
+		expect(chromeChord({ ...chromeBase, shiftKey: true, key: "<", code: "Comma" })).toBe(
+			"toggle-settings"
+		);
+	});
+
+	it("matches the shift group, zoom, quick-lang, and Cmd+D", () => {
+		expect(chromeChord({ ...chromeBase, shiftKey: true, code: "KeyH" })).toBe("dismiss-or-sidebar");
+		expect(chromeChord({ ...chromeBase, shiftKey: true, code: "KeyL" })).toBe("dismiss-or-settings");
+		expect(chromeChord({ ...chromeBase, shiftKey: true, code: "Slash" })).toBe("shortcuts-toggle");
+		expect(chromeChord({ ...chromeBase, shiftKey: true, code: "KeyJ" })).toBe("step-chat-newer");
+		expect(chromeChord({ ...chromeBase, shiftKey: true, code: "KeyK" })).toBe("step-chat-older");
+		expect(chromeChord({ ...chromeBase, key: "=", code: "Equal" })).toBe("zoom");
+		expect(chromeChord({ ...chromeBase, shiftKey: true, key: "+", code: "Equal" })).toBe("zoom");
+		expect(chromeChord({ ...chromeBase, key: "1", code: "Digit1" })).toBe("quick-lang");
+		expect(chromeChord({ ...chromeBase, key: "d", code: "KeyD", hovered: true })).toBe(
+			"delete-message"
+		);
+		expect(quickLangIndexForKey("1")).toBe(0);
+		expect(quickLangIndexForKey("0")).toBe(9);
+		expect(quickLangIndexForKey("x")).toBe(-1);
+	});
+
+	it("keeps the guard spellings (Cmd+D stays meta-only and hover-gated)", () => {
+		// Ctrl+D belongs to the prompt and scroll-mode fast-scroll.
+		expect(chromeChord({ ...chromeBase, metaKey: false, ctrlKey: true, key: "d", hovered: true })).toBe(
+			null
+		);
+		expect(chromeChord({ ...chromeBase, key: "d", hovered: true, inEditor: true })).toBe(null);
+		expect(chromeChord({ ...chromeBase, key: "d", hovered: true, inField: true })).toBe(null);
+		expect(chromeChord({ ...chromeBase, key: "d", code: "KeyD" })).toBe(null);
+		// Alt breaks every chord in the cluster.
+		expect(chromeChord({ ...chromeBase, altKey: true, key: "b" })).toBe(null);
+		expect(chromeChord({ ...chromeBase, altKey: true, shiftKey: true, code: "KeyJ" })).toBe(null);
+		expect(chromeChord({ ...chromeBase, altKey: true, key: "=" })).toBe(null);
+		// Shift picks the shift spelling (or nothing), never the plain one.
+		expect(chromeChord({ ...chromeBase, shiftKey: true, key: "b" })).toBe(null);
+		expect(chromeChord({ ...chromeBase, shiftKey: true, key: "1" })).toBe(null);
+		expect(chromeChord({ ...chromeBase, key: "x" })).toBe(null);
+	});
+});
+
+const sideBase: SidebarListFacts = {
+	key: "j",
+	metaKey: false,
+	ctrlKey: false,
+	altKey: false,
+	shiftKey: false,
+	listOpen: true,
+	inSidebar: true
+};
+
+describe("sidebarListAction", () => {
+	it("walks, enters, and deletes in the open list", () => {
+		expect(sidebarListAction(sideBase)).toBe("walk-down");
+		expect(sidebarListAction({ ...sideBase, key: "ArrowDown" })).toBe("walk-down");
+		expect(sidebarListAction({ ...sideBase, key: "k" })).toBe("walk-up");
+		expect(sidebarListAction({ ...sideBase, key: "ArrowUp" })).toBe("walk-up");
+		expect(sidebarListAction({ ...sideBase, key: " " })).toBe("enter");
+		expect(sidebarListAction({ ...sideBase, key: "l" })).toBe("enter");
+		expect(sidebarListAction({ ...sideBase, key: "Delete" })).toBe("delete-chat");
+		expect(sidebarListAction({ ...sideBase, key: "Backspace" })).toBe("delete-chat");
+	});
+
+	it("keeps the verbatim guard spellings", () => {
+		// Closed list or outside it: nothing owned.
+		expect(sidebarListAction({ ...sideBase, listOpen: false })).toBe(null);
+		expect(sidebarListAction({ ...sideBase, inSidebar: false })).toBe(null);
+		// Modifiers release every key; shifted Delete keeps its own.
+		expect(sidebarListAction({ ...sideBase, metaKey: true })).toBe(null);
+		expect(sidebarListAction({ ...sideBase, key: "Delete", shiftKey: true })).toBe(null);
+		// Shifted arrows still walk (no shift condition, like the handler).
+		expect(sidebarListAction({ ...sideBase, key: "ArrowDown", shiftKey: true })).toBe("walk-down");
+		expect(sidebarListAction({ ...sideBase, key: "x" })).toBe(null);
+	});
+});
+
+const enterBase: ScrollEnterFacts = {
+	key: "g",
+	metaKey: false,
+	ctrlKey: true,
+	altKey: false,
+	shiftKey: false,
+	inScrollMode: false,
+	inEditor: false,
+	androidUI: false,
+	shortcutsOpen: false,
+	searchOpen: false,
+	inspectOpen: false,
+	inOwnedTarget: false
+};
+
+describe("scrollEnterAction", () => {
+	it("enters scroll mode on Ctrl+G outside the composer", () => {
+		expect(scrollEnterAction(enterBase)).toBe(true);
+		expect(scrollEnterAction({ ...enterBase, key: "G", shiftKey: true })).toBe(true);
+	});
+
+	it("stays out of scroll mode, the editor, overlays, and owned targets", () => {
+		expect(scrollEnterAction({ ...enterBase, inScrollMode: true })).toBe(false);
+		expect(scrollEnterAction({ ...enterBase, inEditor: true })).toBe(false);
+		expect(scrollEnterAction({ ...enterBase, androidUI: true })).toBe(false);
+		expect(scrollEnterAction({ ...enterBase, shortcutsOpen: true })).toBe(false);
+		expect(scrollEnterAction({ ...enterBase, searchOpen: true })).toBe(false);
+		expect(scrollEnterAction({ ...enterBase, inspectOpen: true })).toBe(false);
+		expect(scrollEnterAction({ ...enterBase, inOwnedTarget: true })).toBe(false);
+		expect(scrollEnterAction({ ...enterBase, ctrlKey: false })).toBe(false);
+		expect(scrollEnterAction({ ...enterBase, metaKey: true })).toBe(false);
+		expect(scrollEnterAction({ ...enterBase, key: "j" })).toBe(false);
+	});
+});
+
+const modalBase: ModalScrollFacts = {
+	key: "j",
+	metaKey: false,
+	ctrlKey: false,
+	altKey: false,
+	shiftKey: false,
+	shortcutsOpen: true,
+	searchOpen: false,
+	inspectOpen: false,
+	inEditor: false,
+	androidUI: false,
+	inEditable: false
+};
+
+describe("modalScrollAction", () => {
+	it("scrolls the modal on j/k/u/d", () => {
+		expect(modalScrollAction(modalBase)).toBe("line-down");
+		expect(modalScrollAction({ ...modalBase, key: "k" })).toBe("line-up");
+		expect(modalScrollAction({ ...modalBase, key: "d" })).toBe("half-down");
+		expect(modalScrollAction({ ...modalBase, key: "u" })).toBe("half-up");
+		expect(modalScrollAction({ ...modalBase, key: "x" })).toBe(null);
+	});
+
+	it("yields to the palette, Inspect, fields, and modifiers", () => {
+		expect(modalScrollAction({ ...modalBase, shortcutsOpen: false })).toBe(null);
+		expect(modalScrollAction({ ...modalBase, searchOpen: true })).toBe(null);
+		expect(modalScrollAction({ ...modalBase, inspectOpen: true })).toBe(null);
+		expect(modalScrollAction({ ...modalBase, inEditor: true })).toBe(null);
+		expect(modalScrollAction({ ...modalBase, androidUI: true })).toBe(null);
+		expect(modalScrollAction({ ...modalBase, inEditable: true })).toBe(null);
+		expect(modalScrollAction({ ...modalBase, shiftKey: true })).toBe(null);
+		expect(modalScrollAction({ ...modalBase, ctrlKey: true })).toBe(null);
+	});
+});
+
+const scrollBase: ScrollModeFacts = {
+	key: "j",
+	metaKey: false,
+	ctrlKey: false,
+	altKey: false,
+	inScrollMode: true,
+	inEditor: false,
+	inFind: false,
+	gArmed: false,
+	atNewest: false,
+	scrollFromPrompt: false
+};
+
+describe("scrollModeAction", () => {
+	it("steps, parks, and jumps in scroll mode", () => {
+		expect(scrollModeAction(scrollBase)).toBe("step-down");
+		expect(scrollModeAction({ ...scrollBase, key: "ArrowDown" })).toBe("step-down");
+		expect(scrollModeAction({ ...scrollBase, atNewest: true })).toBe("park-bottom");
+		expect(scrollModeAction({ ...scrollBase, key: "k" })).toBe("step-up");
+		expect(scrollModeAction({ ...scrollBase, key: "ArrowUp" })).toBe("step-up");
+		expect(scrollModeAction({ ...scrollBase, key: "g", gArmed: true })).toBe("go-top");
+		expect(scrollModeAction({ ...scrollBase, key: "g" })).toBe("arm-g");
+		expect(scrollModeAction({ ...scrollBase, key: "G" })).toBe("go-bottom");
+		expect(scrollModeAction({ ...scrollBase, key: "i" })).toBe("enter-edit");
+		expect(scrollModeAction({ ...scrollBase, key: "Enter" })).toBe("enter-edit");
+	});
+
+	it("glides plain U/D and jumps Ctrl+U/D", () => {
+		expect(scrollModeAction({ ...scrollBase, key: "u" })).toBe("half-glide-up");
+		expect(scrollModeAction({ ...scrollBase, key: "D" })).toBe("half-glide-down");
+		expect(scrollModeAction({ ...scrollBase, key: "u", ctrlKey: true })).toBe("half-jump-up");
+		expect(scrollModeAction({ ...scrollBase, key: "d", ctrlKey: true })).toBe("half-jump-down");
+		expect(scrollModeAction({ ...scrollBase, key: "g", ctrlKey: true })).toBe("scroll-toggle");
+		expect(scrollModeAction({ ...scrollBase, key: "G", ctrlKey: true })).toBe("scroll-toggle");
+	});
+
+	it("stays out of scroll mode, the editor, and find — and keeps guard spellings", () => {
+		expect(scrollModeAction({ ...scrollBase, inScrollMode: false })).toBe(null);
+		expect(scrollModeAction({ ...scrollBase, inEditor: true })).toBe(null);
+		expect(scrollModeAction({ ...scrollBase, inFind: true })).toBe(null);
+		// g/G keep their guards; j/k/i/Enter carry none (scroll owns them).
+		expect(scrollModeAction({ ...scrollBase, key: "g", metaKey: true })).toBe(null);
+		expect(scrollModeAction({ ...scrollBase, key: "G", altKey: true })).toBe(null);
+		expect(scrollModeAction({ ...scrollBase, key: "u", metaKey: true })).toBe(null);
+		expect(scrollModeAction({ ...scrollBase, key: "j", metaKey: true })).toBe("step-down");
+		expect(scrollModeAction({ ...scrollBase, key: "x" })).toBe(null);
+	});
+});
+
+describe("shortcutsFilterBlocksKey", () => {
+	it("lets the filter type bare keys freely", () => {
+		expect(shortcutsFilterBlocksKey(filterBase)).toBe(true);
+		expect(shortcutsFilterBlocksKey({ ...filterBase, shiftKey: true })).toBe(true);
+	});
+
+	it("keeps Esc and Cmd+F global, passes chords through, ignores outsiders", () => {
+		expect(shortcutsFilterBlocksKey({ ...filterBase, key: "Escape" })).toBe(false);
+		expect(shortcutsFilterBlocksKey({ ...filterBase, code: "KeyF", metaKey: true })).toBe(false);
+		expect(shortcutsFilterBlocksKey({ ...filterBase, metaKey: true })).toBe(false);
+		expect(shortcutsFilterBlocksKey({ ...filterBase, inFilter: false })).toBe(false);
 	});
 });

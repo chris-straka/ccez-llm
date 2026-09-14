@@ -42,6 +42,60 @@ export function secretAccount(providerId: string): string {
 	return `provider:${providerId}`;
 }
 
+/**
+ * One Keychain item for every provider key (instead of one item per
+ * provider): macOS prompts once per item it cannot yet read, so N
+ * providers meant N consecutive "wants to use your confidential
+ * information" dialogs on every hydrate and every save. The bundle
+ * holds canonical JSON (`{[providerId]: key}`, sorted keys,
+ * non-empty values only). Legacy per-provider items are still read
+ * once for migration (see `hydrateSecrets`) and then removed.
+ */
+export const SECRET_BUNDLE_ACCOUNT = "providers";
+
+type SecretBundle = Record<string, string>;
+
+/** Canonical bundle encoding: sorted keys so string comparison is stable. */
+export function encodeSecretBundle(bundle: SecretBundle): string {
+	const sorted: SecretBundle = {};
+	for (const id of Object.keys(bundle).sort()) {
+		const value = bundle[id];
+		if (typeof value === "string" && value) sorted[id] = value;
+	}
+	return JSON.stringify(sorted);
+}
+
+/** Parse a stored bundle; corrupt or non-object payloads read as empty. */
+export function decodeSecretBundle(raw: string | null): SecretBundle {
+	if (!raw) return {};
+	try {
+		const parsed: unknown = JSON.parse(raw);
+		if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return {};
+		const out: SecretBundle = {};
+		for (const [id, value] of Object.entries(parsed as Record<string, unknown>)) {
+			if (typeof value === "string" && value) out[id] = value;
+		}
+		return out;
+	} catch {
+		return {};
+	}
+}
+
+/**
+ * Last bundle value known to match secret storage (populated by
+ * hydrate/persist). `persistSecrets` skips the write while the freshly
+ * built bundle still equals this — an unchanged save touches no
+ * Keychain item at all, so routine settings saves never re-prompt.
+ * `undefined` means no hydrate has completed yet this session (see the
+ * startup-race guard in `persistSecrets`).
+ */
+let lastKnownBundle: string | undefined = undefined;
+
+/** Test-only reset for the write-skip cache above. */
+export function resetSecretCacheForTests(): void {
+	lastKnownBundle = undefined;
+}
+
 /** True inside the Tauri webview, where the Rust commands exist. */
 export function tauriBackendAvailable(): boolean {
 	try {
@@ -293,22 +347,69 @@ export async function deleteSecret(account: string): Promise<void> {
 /**
  * Fill blank in-memory provider keys from secret storage. Returns the ids
  * that were hydrated (so callers can re-render). Never throws.
+ *
+ * One stored read (the bundle), so at most one Keychain prompt no matter
+ * how many providers exist. When no bundle is stored yet, legacy
+ * per-provider items migrate forward: they are read once, folded into
+ * the bundle, and removed best-effort.
  */
 export async function hydrateSecrets(settings: AppSettings): Promise<string[]> {
 	const hydrated: string[] = [];
+	const fill = (bundle: SecretBundle): void => {
+		for (const id of Object.keys(settings.providers)) {
+			const entry = settings.providers[id];
+			if (!entry) continue;
+			if (entry.apiKey.trim()) continue;
+			const secret = bundle[id];
+			if (secret) {
+				entry.apiKey = secret;
+				hydrated.push(id);
+			}
+		}
+	};
+	try {
+		const raw = await getSecret(SECRET_BUNDLE_ACCOUNT);
+		if (raw !== null) {
+			lastKnownBundle = encodeSecretBundle(decodeSecretBundle(raw));
+			fill(decodeSecretBundle(raw));
+			return hydrated;
+		}
+	} catch {
+		// Locked keychain: fall through to the legacy read below, which
+		// fails the same way — the user types the key instead.
+	}
+	const legacy: SecretBundle = {};
 	for (const id of Object.keys(settings.providers)) {
 		const entry = settings.providers[id];
 		if (!entry) continue;
 		if (entry.apiKey.trim()) continue;
 		try {
 			const secret = await getSecret(secretAccount(id));
-			if (secret) {
-				entry.apiKey = secret;
-				hydrated.push(id);
-			}
+			if (secret) legacy[id] = secret;
 		} catch {
 			// Locked keychain or missing entry: user types the key instead.
 		}
+	}
+	fill(legacy);
+	const migrated = encodeSecretBundle(legacy);
+	if (hydrated.length > 0) {
+		try {
+			await setSecret(SECRET_BUNDLE_ACCOUNT, migrated);
+			lastKnownBundle = migrated;
+		} catch {
+			// Keychain locked: keys stay session-only, migration retries
+			// on the next launch.
+		}
+		for (const id of hydrated) {
+			try {
+				await deleteSecret(secretAccount(id));
+			} catch {
+				// Stale legacy item survives; it is ignored once the
+				// bundle exists and re-migrates harmlessly if deleted.
+			}
+		}
+	} else {
+		lastKnownBundle = encodeSecretBundle({});
 	}
 	return hydrated;
 }
@@ -317,17 +418,46 @@ export async function hydrateSecrets(settings: AppSettings): Promise<string[]> {
  * Mirror non-empty in-memory keys into secret storage. In the Tauri shell
  * the stored settings must then be saved blank (see `withBlankedKeys`);
  * in the browser the settings file keeps working as before.
+ *
+ * Writes only when the bundle actually changed (tracked since the last
+ * hydrate/persist): saving an unrelated setting touches no Keychain
+ * item, so it can never re-prompt. Before the first hydrate of the
+ * session the stored bundle is compared instead, and an empty bundle
+ * is never written over a stored one — a save racing startup must not
+ * clobber keys hydrate has not read yet.
  */
 export async function persistSecrets(settings: AppSettings): Promise<void> {
+	const next: SecretBundle = {};
 	for (const id of Object.keys(settings.providers)) {
 		const key = settings.providers[id]?.apiKey.trim();
-		if (!key) continue;
+		if (key) next[id] = key;
+	}
+	const encoded = encodeSecretBundle(next);
+	if (lastKnownBundle !== undefined) {
+		if (encoded === lastKnownBundle) return;
+	} else {
 		try {
-			await setSecret(secretAccount(id), key);
+			const stored = await getSecret(SECRET_BUNDLE_ACCOUNT);
+			if (stored !== null && encodeSecretBundle(decodeSecretBundle(stored)) === encoded) {
+				lastKnownBundle = encoded;
+				return;
+			}
+			if (encoded === encodeSecretBundle({})) {
+				// Nothing to save and nothing learned: leave storage (and
+				// the cache) alone rather than writing an empty bundle.
+				return;
+			}
 		} catch {
-			// Keychain locked: nothing is stored, and the blanked settings
-			// save below drops it — the key stays session-only.
+			// Locked keychain: the write below fails the same way, and
+			// the blanked settings save drops the key — session-only.
 		}
+	}
+	try {
+		await setSecret(SECRET_BUNDLE_ACCOUNT, encoded);
+		lastKnownBundle = encoded;
+	} catch {
+		// Keychain locked: nothing is stored, and the blanked settings
+		// save below drops it — the key stays session-only.
 	}
 }
 
