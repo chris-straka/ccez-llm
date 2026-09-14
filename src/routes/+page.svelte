@@ -234,6 +234,7 @@ import {
 	import { buildSearchDocs, chatMatchesQuery, findMessageIndices, type SearchHit } from "$lib/chatSearch";
 	import { emptyFind, stepFindCursor, type FindState } from "$lib/find";
 	import { emptyPalette, type PaletteState } from "$lib/palette";
+	import { draggedWidth, emptySideview, type SideviewState } from "$lib/sideview";
 	import { annPopBlurAction, annPopCancelKind, annPopSaveKind } from "$lib/annPop";
 	import { ChatSearchStore, createSearchWorker } from "$lib/chatSearchStore";
 
@@ -1174,28 +1175,19 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	 * window width is tracked across resizes instead of re-read
 	 * (see below).
 	 */
-	let sideviewOpen = $state(false);
-	/** Address-bar text; the single tab's URL derives from it (empty = home). */
-	let browserAddress = $state("");
+	let sideview = $state<SideviewState>(emptySideview());
 	let browserInputEl: HTMLInputElement | null = $state(null);
-	/** Why the DOM fallback strip is showing (shell refusal); null when clean. */
-	let sideviewError: string | null = $state(null);
-	/** True while the native tab is docked (shell granted the webview). */
-	let sideviewHosted = $state(false);
-	/** DOM fallback strip when no shell webview is available. */
-	let sideviewFallback = $state(false);
 	let sideviewFullW: number | null = null;
 	let sideviewFullH: number | null = null;
 	let sideviewSideW = 0;
 	let sideviewOverlaid = false;
-	const sideviewUrl = $derived(resolveBrowserUrl(browserAddress));
-	/** Edge-drag resize in flight (fallback strip handle). */
-	let sideviewDrag: { startX: number; startW: number } | null = $state(null);
+	/** The single tab's URL derives from the address-bar text (empty = home). */
+	const sideviewUrl = $derived(resolveBrowserUrl(sideview.address));
 
 	/** Full window viewport, reconstructing the docked-off width. */
 	function sideviewViewport(): { width: number; height: number } {
 		const height = sideviewFullH ?? window.innerHeight;
-		if (!sideviewHosted || sideviewFullW === null) {
+		if (!sideview.hosted || sideviewFullW === null) {
 			return { width: window.innerWidth, height };
 		}
 		if (sideviewOverlaid) return { width: window.innerWidth, height: window.innerHeight };
@@ -1216,8 +1208,8 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	async function setSideviewOpen(open: boolean, focusAddress = false): Promise<void> {
 		try {
 			if (open) {
-				sideviewOpen = true;
-				sideviewError = null;
+				sideview.open = true;
+				sideview.error = null;
 				const viewport = sideviewViewport();
 				sideviewFullW = viewport.width;
 				sideviewFullH = viewport.height;
@@ -1228,21 +1220,21 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				);
 				const hosted = await openSideview(sideviewUrl, layout);
 				if (hosted) noteSideviewLayout(layout);
-				sideviewHosted = hosted;
-				sideviewFallback = !hosted;
+				sideview.hosted = hosted;
+				sideview.fallback = !hosted;
 				if (!hosted && tauriBackendAvailable()) {
 					// A shell exists but refused the webview: say so
 					// instead of failing silent. Plain browsers get
 					// the strip's static note, not an error.
-					sideviewError =
+					sideview.error =
 						"The desktop shell would not dock the browser tab, so this is a link strip instead.";
 				}
 				if (focusAddress) focusBrowserAddress();
 			} else {
-				sideviewOpen = false;
-				sideviewFallback = false;
-				if (sideviewHosted) {
-					sideviewHosted = false;
+				sideview.open = false;
+				sideview.fallback = false;
+				if (sideview.hosted) {
+					sideview.hosted = false;
 					await hideSideview(
 						sideviewFullW ?? window.innerWidth,
 						sideviewFullH ?? window.innerHeight
@@ -1255,11 +1247,11 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			// The panel never breaks the chat: fall back to the DOM
 			// strip on open, and drop state on close.
 			if (open) {
-				sideviewHosted = false;
-				sideviewFallback = true;
+				sideview.hosted = false;
+				sideview.fallback = true;
 			} else {
-				sideviewHosted = false;
-				sideviewFallback = false;
+				sideview.hosted = false;
+				sideview.fallback = false;
 				sideviewFullW = null;
 				sideviewFullH = null;
 			}
@@ -1272,9 +1264,9 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	 * URL); a shell refusal flips to the strip with the reason shown.
 	 */
 	async function submitBrowserAddress(): Promise<void> {
-		if (!sideviewOpen) return;
-		sideviewError = null;
-		if (!sideviewHosted) return;
+		if (!sideview.open) return;
+		sideview.error = null;
+		if (!sideview.hosted) return;
 		try {
 			const viewport = sideviewViewport();
 			sideviewFullW = viewport.width;
@@ -1290,15 +1282,15 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			if (hosted) {
 				noteSideviewLayout(layout);
 			} else {
-				sideviewHosted = false;
-				sideviewFallback = true;
-				sideviewError =
+				sideview.hosted = false;
+				sideview.fallback = true;
+				sideview.error =
 					"The desktop shell would not move the browser tab, so this is a link strip instead.";
 			}
 		} catch {
-			sideviewHosted = false;
-			sideviewFallback = true;
-			sideviewError =
+			sideview.hosted = false;
+			sideview.fallback = true;
+			sideview.error =
 				"The desktop shell would not move the browser tab, so this is a link strip instead.";
 		}
 	}
@@ -1309,16 +1301,15 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	 * pointerup) so a drag writes once.
 	 */
 	function dragSideviewTo(clientX: number): void {
-		if (!sideviewDrag) return;
-		settings.sideviewWidthPx = clampSideviewWidth(
-			sideviewDrag.startW + (sideviewDrag.startX - clientX)
-		);
+		const drag = sideview.drag;
+		if (!drag) return;
+		settings.sideviewWidthPx = clampSideviewWidth(draggedWidth(drag, clientX));
 	}
 
 	$effect(() => {
 		// Window resizes re-dock both webviews while the native tab
 		// is up. Browser fallback needs no geometry (plain DOM flow).
-		if (!sideviewOpen || !sideviewHosted) return;
+		if (!sideview.open || !sideview.hosted) return;
 		const onResize = () => {
 			const viewport = sideviewViewport();
 			sideviewFullW = viewport.width;
@@ -5352,7 +5343,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			} else if (find.open) {
 				// The find bar closes from anywhere (its input included).
 				closeFind();
-			} else if (sideviewOpen) {
+			} else if (sideview.open) {
 				// The docked browser panel closes next, from
 				// anywhere (it has no text worth cancelling).
 				void setSideviewOpen(false);
@@ -5410,7 +5401,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 						inspectOpen: inspectChar !== null,
 						findOpen: find.open,
 						settingsOpen,
-						sideviewOpen,
+						sideviewOpen: sideview.open,
 						sidebarOpen: !settings.sidebarCollapsed
 					}),
 					inOwnedTarget: isIdleOwnedTarget(event.target)
@@ -5494,7 +5485,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				// focus in its address bar (a second press focuses
 				// the bar again). Selections never divert it.
 								consumeEvent(event);
-				if (!sideviewOpen) void setSideviewOpen(true, true);
+				if (!sideview.open) void setSideviewOpen(true, true);
 				else focusBrowserAddress();
 				return;
 			}
@@ -6887,7 +6878,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			toggle button): the combo opens from anywhere, including
 			the prompt, and lands focus in the address bar. -->
 			<span class="sideview-bar">
-				{#if sideviewOpen}
+				{#if sideview.open}
 					<form
 						class="browser-address"
 						onsubmit={(event) => {
@@ -6903,7 +6894,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 							autocomplete="off"
 							autocapitalize="off"
 							spellcheck={false}
-							bind:value={browserAddress}
+							bind:value={sideview.address}
 						/>
 						<button type="submit" aria-label="Go to address">Go</button>
 					</form>
@@ -7755,7 +7746,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		{/if}
 	</main>
 
-	{#if sideviewOpen && sideviewFallback}
+	{#if sideview.open && sideview.fallback}
 		<!-- No Tauri shell here (plain browser dev, e2e): there is no
 		second-OS-webview host, so the panel degrades to a docked
 		strip with an external link instead of crashing. The link
@@ -7771,19 +7762,19 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				onpointerdown={(event) => {
 					if (event.currentTarget instanceof HTMLElement)
 						event.currentTarget.setPointerCapture(event.pointerId);
-					sideviewDrag = { startX: event.clientX, startW: settings.sideviewWidthPx };
+					sideview.drag = { startX: event.clientX, startW: settings.sideviewWidthPx };
 				}}
 				onpointermove={(event) => {
-					if (sideviewDrag) dragSideviewTo(event.clientX);
+					if (sideview.drag) dragSideviewTo(event.clientX);
 				}}
 				onpointerup={() => {
-					if (sideviewDrag) {
-						sideviewDrag = null;
+					if (sideview.drag) {
+						sideview.drag = null;
 						saveSettingsNow();
 					}
 				}}
 				onpointercancel={() => {
-					sideviewDrag = null;
+					sideview.drag = null;
 				}}
 			></div>
 			<div class="sideview-fallback-head">
@@ -7798,11 +7789,11 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				</button>
 			</div>
 			<p>The browser panel needs the desktop app for its second webview. Here it stays a link.</p>
-			{#if sideviewError}
-				<p class="browser-error">{sideviewError}</p>
+			{#if sideview.error}
+				<p class="browser-error">{sideview.error}</p>
 			{/if}
 			<a href={sideviewUrl} target="_blank" rel="external noopener noreferrer">
-				Open {browserAddress.trim() ? sideviewUrl : "browser home"} in a browser tab
+				Open {sideview.address.trim() ? sideviewUrl : "browser home"} in a browser tab
 			</a>
 		</aside>
 	{/if}

@@ -4,6 +4,8 @@ import {
 	BROWSER_SEARCH_PREFIX,
 	SIDE_VIEW_DOCK_WIDTH,
 	clampSideviewWidth,
+	draggedWidth,
+	emptySideview,
 	isSideviewUrlAllowed,
 	pushBrowserHistory,
 	resolveBrowserUrl,
@@ -167,5 +169,27 @@ describe("sideviewLayout", () => {
 		expect(layout.main.width).toBeGreaterThanOrEqual(0);
 		expect(layout.side.width).toBeGreaterThanOrEqual(0);
 		expect(sideviewLayout(-50, -20).side.width).toBe(0);
+	});
+});
+
+describe("emptySideview", () => {
+	it("starts closed and cleared", () => {
+		expect(emptySideview()).toEqual({
+			open: false,
+			address: "",
+			error: null,
+			hosted: false,
+			fallback: false,
+			drag: null
+		});
+	});
+});
+
+describe("draggedWidth", () => {
+	it("widens left of the grab point and narrows right of it", () => {
+		const grab = { startX: 900, startW: 360 };
+		expect(draggedWidth(grab, 900)).toBe(360);
+		expect(draggedWidth(grab, 800)).toBe(460);
+		expect(draggedWidth(grab, 1000)).toBe(260);
 	});
 });

@@ -134,9 +134,11 @@ modules — they never split the template for size alone.
   pill contributes its save/cancel/blur matrix instead of a grouping
   (`src/lib/annPop.ts`: pending-vs-fresh-vs-existing, empty-draft
   cancel) — the full pop/badge/review/timer grouping stays put as too
-  wide for a blind slice. Next pilots in size order: sideview
-  open/width (async shell paths need hand verification — not a blind
-  slice), then whatever annotation-UI remainder still pays.
+  wide for a blind slice. The sideview panel is one `SideviewState`
+  object (open/address/error/hosted/fallback/drag appended to the
+  existing shell-bridge module, plus the tested `draggedWidth` sign);
+  viewport caches and shell orchestration stay out. Shell dock/refusal
+  paths verify on device only — the fallback strip is e2e-pinned.
 
 ## 5. New candidates (from the Sep 2026 slices)
 

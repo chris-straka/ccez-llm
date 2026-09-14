@@ -308,3 +308,36 @@ export async function hideSideview(fullWidth: number, fullHeight: number): Promi
 	}
 }
 
+/**
+ * Panel UI state: the open flag, address-bar text, shell-refusal
+ * error, hosted/fallback flags, and edge-drag state live in one plain
+ * object (never a class in `$state`). Shell orchestration above reads
+ * and transitions it; viewport caches stay in the component.
+ */
+export interface SideviewDrag {
+	startX: number;
+	startW: number;
+}
+
+export interface SideviewState {
+	open: boolean;
+	address: string;
+	error: string | null;
+	hosted: boolean;
+	fallback: boolean;
+	drag: SideviewDrag | null;
+}
+
+/** Closed panel with cleared address, error, flags, and drag. */
+export function emptySideview(): SideviewState {
+	return { open: false, address: "", error: null, hosted: false, fallback: false, drag: null };
+}
+
+/**
+ * Edge-dragged width from the grab point: moving left of it widens the
+ * panel. The body clamps the result into settings.
+ */
+export function draggedWidth(drag: SideviewDrag, clientX: number): number {
+	return drag.startW + (drag.startX - clientX);
+}
+
