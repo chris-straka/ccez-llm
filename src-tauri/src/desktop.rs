@@ -655,17 +655,15 @@ fn handle_startup_args<R: Runtime>(app: &AppHandle<R>) {
     }
 }
 
-/// OS-global summon chord (⌘/Ctrl⇧Space): show/focus when hidden or
-/// behind another app, skip when ours is focused (the frontend owns
-/// the chord then — skipping keeps show/hide from fighting its
-/// focus-composer handling). Carbon hotkeys need no Accessibility
-/// grant (unlike the NSEvent tap this replaced, which also needed
-/// `mem::forget` lifetime games and a `block2` closure); a failed
-/// registration logs and the in-app chord still works. Desktop only:
-/// the plugin crate does not compile for mobile. UNVERIFIED ON
-/// DEVICE — no headless harness can press a system-wide chord.
-/// Summon from another app after granting nothing, with ours focused
-/// (must stay put), and with ours hidden (must show + focus).
+/// OS-global summon chord (⌘/Ctrl⇧Space) as a toggle: show + focus
+/// when hidden or behind another app, hide back when ours is focused
+/// (macOS activates the previous app, like a Spotlight toggle).
+/// Carbon hotkeys need no Accessibility grant (unlike the NSEvent tap
+/// this replaced, which also needed `mem::forget` lifetime games and
+/// a `block2` closure); a failed registration logs and the in-app
+/// chord still works. Desktop only: the plugin crate does not compile
+/// for mobile. UNVERIFIED ON DEVICE — no headless harness can press
+/// a system-wide chord.
 #[cfg(desktop)]
 fn install_summon_hotkey(app: &AppHandle) {
     use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
@@ -679,10 +677,10 @@ fn install_summon_hotkey(app: &AppHandle) {
             let Some(window) = handle.get_webview_window("main") else {
                 return;
             };
-            // Our window owns the chord while focused — skip so
-            // show/hide can't fight the frontend's focus-composer
-            // handling.
+            // Focused gets the toggle half: hide back to the
+            // previous app instead of skipping.
             if window.is_focused().unwrap_or(false) {
+                let _ = window.hide();
                 return;
             }
             if window.is_visible().unwrap_or(true) {

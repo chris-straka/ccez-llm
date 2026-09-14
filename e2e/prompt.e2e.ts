@@ -13,10 +13,8 @@ test("staging pins the scroller to the true bottom", async ({ page }) => {
 	}));
 	await seedChat(page, [...history, { role: "assistant", content: "ready" }]);
 	await page.goto("/");
-	// Thirteen messages overflow the viewport, so the always-hide boot
-	// park keeps the composer parked: wake it the way a user does.
-	await page.locator("article").last().waitFor({ timeout: 60_000 });
-	await page.keyboard.press("i");
+	// seedChat presets never-idle, so the composer is clickable even
+	// with thirteen messages overflowing the viewport.
 	await page.locator(".cm-content").click();
 	await page.keyboard.type("staged hello");
 	await page.keyboard.press("Alt+Enter");

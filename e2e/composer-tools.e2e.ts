@@ -41,7 +41,7 @@ test("annotation tracker is a count badge left of the paperclip", async ({
 	expect(await page.locator(".prompt-tools").innerText()).not.toContain("nnotation");
 });
 
-/** Long chat payload so the thread overflows the viewport (idle-hide only pays then). */
+/** Long chat payload so the thread overflows the viewport (idle-hide pays at any length now; overflow keeps it unambiguous). */
 function longThread() {
 	return Array.from({ length: 25 }, (_, i) => ({
 		id: `e2e-long-${i}`,

@@ -286,9 +286,10 @@ describe("selMenuPlacement", () => {
 				viewportWidth,
 				viewportHeight,
 				androidUI: false,
-				iosUI: false
+				iosUI: false,
+				menuWidth: 120
 			})
-		).toEqual({ x: 584, y: 254 });
+		).toEqual({ x: 584, y: 266 });
 	});
 
 	it("falls back to the highlight when the cursor is gone (scroll track)", () => {
@@ -300,9 +301,10 @@ describe("selMenuPlacement", () => {
 				viewportWidth,
 				viewportHeight,
 				androidUI: false,
-				iosUI: false
+				iosUI: false,
+				menuWidth: 120
 			})
-		).toEqual({ x: 484, y: 244 });
+		).toEqual({ x: 484, y: 256 });
 	});
 
 	it("clamps to the viewport edges", () => {
@@ -314,9 +316,28 @@ describe("selMenuPlacement", () => {
 				viewportWidth,
 				viewportHeight,
 				androidUI: false,
-				iosUI: false
+				iosUI: false,
+				menuWidth: 120
 			})
 		).toEqual({ x: 8, y: 8 });
+	});
+
+	it("clamps the right edge by menu width, not a phantom box", () => {
+		// Cursor near the right edge: the menu's right edge lands on
+		// the viewport's, keeping the button under the cursor instead
+		// of stranding it a phantom-box away to the left.
+		expect(
+			selMenuPlacement({
+				cursorX: 1200,
+				cursorY: 310,
+				...rect,
+				viewportWidth,
+				viewportHeight,
+				androidUI: false,
+				iosUI: false,
+				menuWidth: 120
+			})
+		).toEqual({ x: 1152, y: 266 });
 	});
 
 	it("docks Android below the handles, iOS above the bubble", () => {
@@ -328,7 +349,8 @@ describe("selMenuPlacement", () => {
 				viewportWidth,
 				viewportHeight,
 				androidUI: true,
-				iosUI: false
+				iosUI: false,
+				menuWidth: 120
 			})
 		).toEqual({ x: 584, y: 352 });
 		expect(
@@ -339,7 +361,8 @@ describe("selMenuPlacement", () => {
 				viewportWidth,
 				viewportHeight,
 				androidUI: false,
-				iosUI: true
+				iosUI: true,
+				menuWidth: 220
 			})
 		).toEqual({ x: 584, y: 253 });
 	});

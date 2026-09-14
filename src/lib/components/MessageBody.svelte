@@ -767,9 +767,11 @@
 		white-space: nowrap;
 	}
 	/* Folded code is label-only: no 12rem floor, so no dead space
-	sits right of the LOC. */
+	sits right of the LOC. The whole folded block is one affordance
+	(left-click unfolds), so it reads pointer, not the I-beam. */
 	.rendered :global(.ccez-code[data-folded="1"]) {
 		min-width: 0;
+		cursor: pointer;
 	}
 	.rendered :global(.ccez-code[data-folded="1"] pre) {
 		display: none;
@@ -798,9 +800,11 @@
 		min-width: min(12rem, 100%);
 	}
 	/* Folded math is label-only: no 12rem floor and no buttons, so no
-	dead space sits right of the LOC. */
+	dead space sits right of the LOC. Same single affordance as
+	folded code: pointer, not the I-beam. */
 	.rendered :global(.ccez-math[data-folded="1"]) {
 		min-width: 0;
+		cursor: pointer;
 	}
 	.rendered :global(.ccez-math-copy),
 	.rendered :global(.ccez-math-tex) {
@@ -886,6 +890,12 @@
 	}
 	.rendered :global(.ccez-math[data-math-raw="1"] .ccez-math-raw) {
 		display: block;
+	}
+	/* Folded wins over the raw-source view: folding a `$`-toggled
+	block leaves the label only, like any other fold (the raw-view
+	rule above would otherwise out-order the fold). */
+	.rendered :global(.ccez-math[data-folded="1"][data-math-raw="1"] .ccez-math-raw) {
+		display: none;
 	}
 	/* Inline math renders bare — no bar mid-sentence — so the line
 	keeps its rhythm; KaTeX inherits the message color and scale. */

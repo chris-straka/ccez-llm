@@ -54,15 +54,15 @@ web API already covers all three, the web API wins.
   Dynamic imports keep node/jsdom clean; unit-tested with injected
   handles, browser e2e pins the download fall-through.
 - `global-shortcut` — summon chord only (`CommandOrControl+Shift+
-  Space` in `desktop.rs install_summon_hotkey`, `on_shortcut` with
-  the same focused-window skip the NSEvent tap had). Carbon hotkeys
+  Space` in `desktop.rs install_summon_hotkey`, `on_shortcut` as a
+  toggle (unfocused shows + focuses, focused hides back). Carbon hotkeys
   need no Accessibility grant; failed registration logs and the
   in-app chord still works. Extends summon to Windows/Linux (was
   macOS-only). Desktop-gated at all three layers (crate
   `not(mobile)` upstream; dep + registration `cfg(desktop)`),
   no capability entry (pure-Rust registration, no JS commands).
   UNVERIFIED ON DEVICE — no headless harness can press a
-  system-wide chord; verify summon-from-elsewhere, focused-skip,
+  system-wide chord; verify summon-from-elsewhere, focused-hide,
   and hidden-show on the Mac.
 
 ## Candidates (ranked)

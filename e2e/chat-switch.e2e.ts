@@ -34,6 +34,7 @@ test("thinking stays in its own chat across a switch", async ({ page }) => {
 	// (Sidebar still open from the new-chat step above.)
 	const rows = page.locator("aside ul li button.side-chat");
 	await rows.first().click();
+
 	await expect(page.locator("article.user .rendered")).toContainText("please write", {
 		timeout: 10_000
 	});
@@ -43,4 +44,35 @@ test("thinking stays in its own chat across a switch", async ({ page }) => {
 	// Count matches visible: one user message, one assistant reply.
 	await expect(page.locator("article")).toHaveCount(2);
 	await expect(rows.first()).toContainText("2 msg");
+});
+
+/** The Thinking row keeps breathing room: explicit margins stand it
+off the last message above (never the pair-hug gap alone). */
+test("thinking row keeps breathing room", async ({ page }) => {
+	await seedChat(page, []);
+	await page.addInitScript(() => {
+		localStorage.setItem("ccez-mock-word-ms", "400");
+	});
+	await page.goto("/");
+	await expect(page.locator(".hero")).toBeVisible({ timeout: 60_000 });
+	await page.locator(".cm-content").click();
+	await page.keyboard.type("please write a reply");
+	await page.keyboard.press("Enter");
+	const sending = page.locator(".sending");
+	await expect(sending).toBeVisible({ timeout: 10_000 });
+	// Explicit margins, not UA happenstance.
+	const margins = await sending.evaluate((el) => {
+		const style = getComputedStyle(el);
+		return { top: parseFloat(style.marginTop), bottom: parseFloat(style.marginBottom) };
+	});
+	expect(margins.top).toBeGreaterThan(12);
+	expect(margins.bottom).toBeGreaterThan(12);
+	// And the visual gap above the last message shows it.
+	const above = await sending.evaluate((el) => {
+		const prev = el.previousElementSibling?.getBoundingClientRect();
+		if (!prev) return null;
+		return el.getBoundingClientRect().top - prev.bottom;
+	});
+	expect(above).not.toBeNull();
+	expect(above ?? 0).toBeGreaterThan(12);
 });

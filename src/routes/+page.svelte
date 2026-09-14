@@ -266,7 +266,7 @@ import {
 	import { downloadMarkdownFile, exportChatMarkdown, fileSaveAccessAvailable } from "$lib/chatExport";
 	import { nativeSaveMarkdown } from "$lib/nativeExport";
 	import { isKeyboardOpen, keyboardOverlapPx } from "$lib/viewportReflow";
-import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
+import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	import {
 		speakText,
 		speakMultilingual,
@@ -390,6 +390,14 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	let scrollFromPrompt = false;
 	let selectedIdx = $state(-1);
 	let hoveredIdx = $state(-1);
+	/**
+	 * Last hover-index change: hovering another message empties a live
+	 * selection on WebKit (engine, no press), so a selectionchange that
+	 * lands right after a hover change restores instead of dismissing
+	 * (see the dismiss below). Programmatic clears arrive with a stale
+	 * hover and keep dismissing.
+	 */
+	let lastHoverChangeAt = 0;
 	let missingKey = $state(false);
 	/** Provider id already toasted for a missing key (one toast per episode). */
 	let keyToastFor: string | null = null;
@@ -741,6 +749,19 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		};
 	});
 	/**
+	 * Right-edge truth: the placement estimate can't know the real
+	 * button widths (fonts, zoom), so after paint pull the menu back
+	 * on screen by its measured width. One-shot per placement — the
+	 * corrected x never re-triggers it.
+	 */
+	$effect(() => {
+		const menu = selMenu;
+		const el = selMenuEl;
+		if (!menu || !el) return;
+		const over = menu.x + el.offsetWidth + 8 - window.innerWidth;
+		if (over > 0) selMenu = { ...menu, x: Math.max(8, menu.x - over) };
+	});
+	/**
 	 * Last press that began inside the selection menu: whatever
 	 * selection churn follows belongs to the menu (button taps collapse
 	 * the highlight on release), so the selectionchange auto-dismiss
@@ -750,6 +771,44 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	function noteMenuPress(): void {
 		menuPressAt = Date.now();
 	}
+	/**
+	 * Last plain click-away that kept a live menu (see the mouseup
+	 * keep path): WebKit reports its engine collapse synchronously at
+	 * mousedown (before mouseup can restore) and again after mouseup,
+	 * so neither mouseup nor a ticket can cover it — the follow-up
+	 * selectionchange restores instead while this stamp is fresh.
+	 * Programmatic clears (Escape, pills, timers) never stamp it, so
+	 * they keep dismissing.
+	 */
+	let lastKeepClickAt = 0;
+	/**
+	 * Selection-menu open stamp: the rescue in the selectionchange
+	 * auto-dismiss below puts the stored range back while NEITHER a
+	 * press/key NOR a programmatic clear landed since the menu
+	 * opened. lastPressAt covers pointerdown AND keydown, and the
+	 * summoning drag's own press predates the open — so the rescue
+	 * fires exactly for press-less engine clears (the pointer
+	 * cruising other messages, the menu's own shadow), while
+	 * click-away, new drags, arrow-collapses, and Escape all stamp
+	 * newer and keep dismissing. Same-millisecond ties read as the
+	 * summoning gesture, never as a newer press.
+	 */
+	let selMenuOpenedAt = 0;
+	/** Last clearSelection() call: programmatic clears dismiss, engine
+	hover-clears rescue (see above). Every caller also drops the menu,
+	so this is belt-and-braces for future paths. */
+	let lastProgrammaticClearAt = 0;
+	/**
+	 * Width estimate (px) for the selection menu's right-edge clamp:
+	 * one padded button, two when Inspect joins Annotate. The
+	 * measured effect on the menu div corrects font/zoom variance.
+	 */
+	function selMenuWidthEstimate(quote: string): number {
+		return shouldShowInspect(quote, settings.inspectEnabled) ? 220 : 120;
+	}
+	/** The floating menu element: its measured width pulls the
+	estimated x back on screen (see the effect below). */
+	let selMenuEl: HTMLElement | null = $state(null);
 	/**
 	 * Swap-vs-press discrimination for the selectionchange
 	 * auto-dismiss below. Message bodies swap their HTML under a live
@@ -1559,18 +1618,15 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	 * wheel, control clicks, and other keys merely re-arm the timer.
 	 * The timeout and mobile reads subscribe the effect, so a
 	 * settings change or the phone detection landing re-arms the
-	 * ticker. An empty chat never hides, and neither does a thread
-	 * shorter than the viewport (contentFitsViewport, contract-tested
-	 * in chrome.test.ts): hiding frees no room, so a short thread
-	 * would only strand its composer.
+	 * ticker. An empty chat never hides; every other thread obeys
+	 * the timeout however short (summoning stays one keypress away).
 	 */
 	let lastInputAt = $state(Date.now());
 	/**
 	 * Boot parks hidden under always-hide when the synchronously loaded
 	 * chat already has messages: starting visible would flash the
-	 * composer for a frame before the late-seed effect hides it. Short
-	 * threads never hide, so the correction effect below releases the
-	 * park once measured (async loads keep today's hide-on-arrival).
+	 * composer for a frame before the late-seed effect hides it
+	 * (async loads keep today's hide-on-arrival).
 	 */
 	let bootParked =
 		settings.promptIdleSec === PROMPT_IDLE_ALWAYS &&
@@ -1596,20 +1652,17 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	}
 	/**
 	 * Always-hide park: hide unless focus is (or is heading) inside
-	 * the composer, with the same empty and short-thread guards as the
-	 * timed path. Takes the focus destination explicitly because during
-	 * focusout the active element is already gone (relatedTarget reads
-	 * where focus is heading; null when it leaves the window).
+	 * the composer, with the same empty-chat guard as the timed path.
+	 * Takes the focus destination explicitly because during focusout
+	 * the active element is already gone (relatedTarget reads where
+	 * focus is heading; null when it leaves the window).
 	 */
 	function hideForAlways(next: EventTarget | null): void {
-		const box = scrollBox;
 		if (
 			!shouldHideForAlways({
 				alwaysMode: settings.promptIdleSec === PROMPT_IDLE_ALWAYS,
 				inPrompt: isPromptTarget(next),
-				emptyChat: viewChat.messages.length === 0,
-				fitsViewport:
-					box ? contentFitsViewport(box.scrollHeight, box.clientHeight) : false
+				emptyChat: viewChat.messages.length === 0
 			})
 		)
 			return;
@@ -1761,12 +1814,9 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		if (typeof navigator !== "undefined" && !navigator.onLine) handleOffline();
 		const timer = window.setInterval(() => {
 			if (!isPromptIdle(lastInputAt, Date.now(), idleSec)) return;
-			const box = scrollBox;
 			if (
 				!shouldIdleHide({
 					emptyChat: viewChat.messages.length === 0,
-					fitsViewport:
-						box ? contentFitsViewport(box.scrollHeight, box.clientHeight) : false,
 					alreadyIdle: promptIdle
 				})
 			)
@@ -1799,16 +1849,6 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	$effect(() => {
 		void viewChat.messages.length;
 		hideForAlways(document.activeElement);
-	});
-	$effect(() => {
-		// Boot-park correction (see bootParked): a parked boot on a
-		// thread that fits the viewport was never meant to hide.
-		if (!bootParked) return;
-		bootParked = false;
-		const box = scrollBox;
-		if (!box) return;
-		if (viewChat.messages.length > 0 && contentFitsViewport(box.scrollHeight, box.clientHeight))
-			promptIdle = false;
 	});
 	/**
 	 * Tail clearance for the floating composer: main-level padding
@@ -2562,8 +2602,12 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			viewportWidth: window.innerWidth,
 			viewportHeight: window.innerHeight,
 			androidUI,
-			iosUI
+			iosUI,
+			menuWidth: selMenuWidthEstimate(found.quote)
 		});
+		// The rescue in the selectionchange auto-dismiss restores the
+		// stored range while nothing newer landed (see selMenuOpenedAt).
+		selMenuOpenedAt = Date.now();
 		selMenu = {
 			x,
 			y,
@@ -2606,6 +2650,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	}
 
 	function clearSelection(): void {
+		lastProgrammaticClearAt = Date.now();
 		window.getSelection()?.removeAllRanges();
 	}
 
@@ -3106,7 +3151,10 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	 * the row stuck visible on :focus-within with a stale preview.
 	 */
 	function onArticleLeave(event: MouseEvent, msg: ChatMsg, i: number): void {
-		if (hoveredIdx === i) hoveredIdx = -1;
+		if (hoveredIdx === i) {
+			hoveredIdx = -1;
+			lastHoverChangeAt = Date.now();
+		}
 		if (aidPeek?.id === msg.id) aidPeek = null;
 		// The pointer genuinely left: release the swap lock with it.
 		aidNoPeek.delete(msg.id);
@@ -4283,6 +4331,25 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			// Nothing fullscreen to exit.
 		}
 	}
+	/**
+	 * Summon toggle, in-app half (Cmd/Ctrl+Shift+Space outside the
+	 * editor): hide the window back to the previous app, mirroring
+	 * the OS-global half in `desktop.rs` (both fire on one press;
+	 * hide is idempotent so they never fight). The browser preview
+	 * has no window to hide, so it keeps the old focus-composer
+	 * behavior there.
+	 */
+	async function hideSummonWindow(): Promise<void> {
+		try {
+			if (tauriBackendAvailable()) {
+				await getCurrentWindow().hide();
+				return;
+			}
+		} catch {
+			// Fall through to focusing the composer.
+		}
+		enterEditMode();
+	}
 
 	function cycleProvider(direction: 1 | -1) {
 		const ids = listProviders(settings.customProviders).map((p) => p.id);
@@ -5117,6 +5184,58 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		document.addEventListener("selectionchange", () => {
 			if (!selMenu) return;
 			if (Date.now() - menuPressAt < 1000) return;
+			// A keep-click's engine collapse (sync at mousedown on
+			// WebKit, where mouseup never sees the menu): put the
+			// stored range back while the click is fresh, and the same
+			// for a hover transition (no press at all). Any other
+			// clear falls through to the dismiss below.
+			if (Date.now() - lastKeepClickAt < 750 || Date.now() - lastHoverChangeAt < 500) {
+				const liveKeep = window.getSelection();
+				if (selMenu?.range && (!liveKeep || liveKeep.toString() === "")) {
+					try {
+						liveKeep?.removeAllRanges();
+						liveKeep?.addRange(selMenu.range.cloneRange());
+					} catch {
+						// Detached since the click: fall through below.
+					}
+					if ((liveKeep?.toString() ?? "") !== "") return;
+				}
+			}
+			// Hover-shaped engine clear: no press, no key, no
+			// programmatic clear since the menu opened — the pointer
+			// cruising other messages (or the menu's own shadow) must
+			// not cost the highlight. Put the stored range back and
+			// keep the menu; detached nodes fall through to the
+			// dismiss below. Genuine clears always stamp newer (a
+			// click-away or fresh drag presses, an arrow-collapse
+			// keys, Escape/pills clear programmatically), so they
+			// keep dismissing.
+			// Only an empty live selection rescues: a live one is new
+			// work (reselects, swaps), never a hover-clear.
+			const liveBefore = window.getSelection();
+			const rescueRange =
+				!liveBefore || liveBefore.isCollapsed || liveBefore.toString() === ""
+					? selMenu?.range
+					: null;
+			if (
+				rescueRange &&
+				lastPressAt <= selMenuOpenedAt &&
+				lastProgrammaticClearAt <= selMenuOpenedAt
+			) {
+				const liveRescue = window.getSelection();
+				try {
+					if (
+						document.contains(rescueRange.startContainer) &&
+						document.contains(rescueRange.endContainer)
+					) {
+						liveRescue?.removeAllRanges();
+						liveRescue?.addRange(rescueRange.cloneRange());
+					}
+				} catch {
+					// Detached mid-hover: fall through to the dismiss below.
+				}
+				if ((liveRescue?.toString() ?? "") !== "") return;
+			}
 			const live = window.getSelection();
 			if (!live || live.isCollapsed || live.toString() === "") {
 				const anchor = live?.anchorNode;
@@ -5553,13 +5672,13 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 					return;
 				}
 			if (isSummonHotkey(event) && !inEditor) {
-			// Summon chord (Cmd/Ctrl+Shift+Space): focus the composer
-			// from anywhere outside it. Inside the editor the chord
-			// stays unbound so Ctrl+Shift+Space still types a
-			// non-breaking space; the OS-global half (desktop.rs)
-			// skips focused windows for the same reason.
+			// Summon chord (Cmd/Ctrl+Shift+Space) outside the editor:
+			// the toggle's hide half — back to the previous app (the
+			// OS-global half in desktop.rs fires too; hide is
+			// idempotent). Inside the editor the chord stays unbound
+			// so Ctrl+Shift+Space still types a non-breaking space.
 						consumeEvent(event);
-			enterEditMode();
+			void hideSummonWindow();
 			return;
 		}
 			if (chord === "toggle-pastes") {
@@ -6200,6 +6319,21 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		let downClient: { x: number; y: number } | null = null;
 		const noteDownPoint = (event: MouseEvent): void => {
 			downClient = event.button === 0 ? { x: event.clientX, y: event.clientY } : null;
+			// Keep-click stamp for the selectionchange restore (WebKit
+			// reports its engine collapse synchronously at mousedown,
+			// before mouseup can see the menu): plain message-text
+			// presses with a live menu. New drags overwrite the menu
+			// at mouseup, so a stale stamp never outlives its press.
+			const downTarget = event.target instanceof Element ? event.target : null;
+			if (
+				event.button === 0 &&
+				selMenu?.range &&
+				downTarget?.closest(".rendered") &&
+				!downTarget.closest(
+					"button, input, textarea, a, select, summary, .sel-menu, .ann-dock, .review, .prompt"
+				)
+			)
+				lastKeepClickAt = Date.now();
 		};
 		// A drag that starts in message text never highlights its
 		// neighbors: while the button is down, any selection escaping
@@ -6316,6 +6450,37 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			const dragged = downClient
 				? Math.hypot(event.clientX - downClient.x, event.clientY - downClient.y) > 4
 				: false;
+			// Plain click on message text while a menu stands: keep the
+			// in-flight selection instead of eating it just to read
+			// another message. Controls, the composer, links, and new
+			// drags keep their normal paths below, and Escape / the
+			// timer still dismiss. Two engine orders: Chromium collapses
+			// on mousedown (restore here), WebKit after mouseup (arm the
+			// one-shot ticket and let selectionchange restore).
+			const keepRange =
+				!dragged &&
+				selMenu?.range &&
+				target?.closest(".rendered") &&
+				!target.closest("button, input, textarea, a, select, summary, .sel-menu, .ann-dock, .review")
+					? selMenu.range
+					: null;
+			// A changed selection (multi-click reselect) is new work, not
+			// a collapse: fall through to the normal summon path below.
+			if (keepRange && (liveText === "" || liveText === downSel)) {
+				if (liveText === "") {
+					live?.removeAllRanges();
+					try {
+						live?.addRange(keepRange.cloneRange());
+					} catch {
+						// Detached by a body swap mid-click: fall through and
+						// let the stale-highlight path below dismiss.
+					}
+				}
+				if ((live?.toString() ?? "") !== "") {
+					lastKeepClickAt = Date.now();
+					return;
+				}
+			}
 			if (!dragged && liveText === downSel && (event.detail <= 1 || event.detail >= 4)) {
 				// A plain click changed nothing: blank space, a collapsed
 				// caret, or inside the old highlight (the engine collapses
@@ -6718,7 +6883,8 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 					viewportWidth: window.innerWidth,
 					viewportHeight: window.innerHeight,
 					androidUI,
-					iosUI
+					iosUI,
+					menuWidth: selMenuWidthEstimate(selMenu.quote)
 				});
 				if (selMenu.x !== x || selMenu.y !== y || selMenu.left !== rect.left || selMenu.w !== rect.width)
 					selMenu = { ...selMenu, x, y, left: rect.left, w: rect.width };
@@ -6837,11 +7003,13 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 							previewChatId = null;
 							sideIdx = chatState.chats.findIndex((c) => c.id === item.id);
 							transitionToChat(item.id);
-							// A picked chat closes the list and lands in its prompt,
-							// like keyboard Enter (enterSideChat) already does.
+							// A picked chat just closes the list: entering must
+							// not summon the composer (a parked prompt stays
+							// parked — summoning is one keypress away).
+							// Keyboard Enter (enterSideChat) still lands in
+							// the prompt; hands are already on keys there.
 							settings.sidebarCollapsed = true;
 							persistSettings();
-							enterEditMode();
 						}}
 					>
 						{chatLabel(item.createdAt)}
@@ -7130,7 +7298,10 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 						if (e.altKey) toggleFold(msg.id);
 						toggleMessageActions(msg.id, e);
 					}}
-					onmouseenter={() => (hoveredIdx = i)}
+					onmouseenter={() => {
+						hoveredIdx = i;
+						lastHoverChangeAt = Date.now();
+					}}
 					onmouseleave={(event) => onArticleLeave(event, msg, i)}
 				>
 					{#if msg.attachments && msg.attachments.length > 0}
@@ -7373,9 +7544,6 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 								<ActionIcon kind="rerun" />
 							</button>
 						{/if}
-						{#if msg.error && !androidUI}
-							<span class="error">{msg.error}</span>
-						{/if}
 						{#if msg.error}
 							<button
 								type="button"
@@ -7386,6 +7554,9 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 							>
 								<ActionIcon kind="rerun" />
 							</button>
+						{/if}
+						{#if msg.error && !androidUI}
+							<span class="error">{msg.error}</span>
 						{/if}
 						<!-- Last in the row, always mounted (hidden when idle)
 						so it never shoves the buttons around. -->
@@ -7448,6 +7619,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 							class="card-btn"
 							aria-label="Copy attachment"
 							title="Copy attachment"
+							onmousedown={(e) => e.preventDefault()}
 							onclick={() => copyAttachment(att)}
 						>
 							<ActionIcon kind="copy" />
@@ -7459,6 +7631,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 								aria-label="Recognize text in image"
 								title="Recognize text in image"
 								disabled={ocrBusyId === att.id}
+								onmousedown={(e) => e.preventDefault()}
 								onclick={() => void recognizeAttachment(att)}
 							>
 								{ocrBusyId === att.id ? "…" : "OCR"}
@@ -7469,6 +7642,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 							class="card-btn"
 							aria-label="Remove attachment"
 							title="Remove attachment"
+							onmousedown={(e) => e.preventDefault()}
 							onclick={() => removeAttachment(att.id)}
 						>
 							<ActionIcon kind="close" />
@@ -7847,6 +8021,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	{#if selMenu && !previewing && !androidUI}
 		<div
 			class="sel-menu"
+			bind:this={selMenuEl}
 			style="left: {selMenu.x}px; top: {selMenu.y}px"
 			role="menu"
 			tabindex="-1"
@@ -11549,6 +11724,9 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		color: #6e6e73;
 		/* Status reading text: tracks the text-size setting like messages. */
 		font-size: calc(0.85rem * var(--font-scale, 1));
+		/* Breathing room, explicit (never UA margins): the status
+		stands off the last message above and the composer below. */
+		margin: 0.9rem 0 1.1rem;
 	}
 	/* Loading dots exist only while busy, so an idle aid button is
 	exactly its visible label — hover and spacing never cover text

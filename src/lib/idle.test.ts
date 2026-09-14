@@ -11,37 +11,37 @@ import {
 const alwaysBase: AlwaysHideFacts = {
 	alwaysMode: true,
 	inPrompt: false,
-	emptyChat: false,
-	fitsViewport: false
+	emptyChat: false
 };
 
 describe("shouldHideForAlways", () => {
-	it("hides on focus-out in always mode with content to reveal", () => {
+	it("hides on focus-out in always mode, however short the thread", () => {
 		expect(shouldHideForAlways(alwaysBase)).toBe(true);
 	});
 
-	it("keeps the prompt for mode, focus, empty, and short threads", () => {
+	// No short-thread exemption: always-hide means always (the old
+	// fitsViewport guard kept the composer up on short threads against
+	// the explicit setting). Only an empty chat keeps the composer —
+	// with nothing to read, hiding strands it for good.
+	it("keeps the prompt for mode, focus, and empty chats", () => {
 		expect(shouldHideForAlways({ ...alwaysBase, alwaysMode: false })).toBe(false);
 		expect(shouldHideForAlways({ ...alwaysBase, inPrompt: true })).toBe(false);
 		expect(shouldHideForAlways({ ...alwaysBase, emptyChat: true })).toBe(false);
-		expect(shouldHideForAlways({ ...alwaysBase, fitsViewport: true })).toBe(false);
 	});
 });
 
 const hideBase: IdleHideFacts = {
 	emptyChat: false,
-	fitsViewport: false,
 	alreadyIdle: false
 };
 
 describe("shouldIdleHide", () => {
-	it("hides overflowing threads once", () => {
+	it("hides threads once, however short", () => {
 		expect(shouldIdleHide(hideBase)).toBe(true);
 	});
 
-	it("never hides empty, fitting, or already-hidden prompts", () => {
+	it("never hides empty or already-hidden prompts", () => {
 		expect(shouldIdleHide({ ...hideBase, emptyChat: true })).toBe(false);
-		expect(shouldIdleHide({ ...hideBase, fitsViewport: true })).toBe(false);
 		expect(shouldIdleHide({ ...hideBase, alreadyIdle: true })).toBe(false);
 	});
 });

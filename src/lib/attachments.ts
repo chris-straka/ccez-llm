@@ -174,7 +174,9 @@ export function stripImageMarkers(text: string): string {
 
 /**
  * Composer insertion for a newly pasted/dropped image: the marker tag on
- * its own line (one trailing space, then a newline), the caret landing on
+ * its own line (bare tag, then a newline — no trailing space: every
+ * consumer matches the trimmed line, and the phantom space only ate
+ * an arrow-key press when keying across the tag), the caret landing on
  * the fresh line below. Own-line placement is load-bearing twice over:
  * send-time stripping (`stripImageMarkers`) only drops whole marker
  * lines, and typing on the tag's line would absorb it — instantly
@@ -184,7 +186,7 @@ export function stripImageMarkers(text: string): string {
  */
 export function imageMarkerInsert(doc: string): string {
 	const prefix = doc === "" || doc.endsWith("\n") ? "" : "\n";
-	return `${prefix}${IMAGE_MARKER} \n`;
+	return `${prefix}${IMAGE_MARKER}\n`;
 }
 
 /** Remove one pasted-image marker line (pill → tag half of two-way removal). */

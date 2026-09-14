@@ -8,11 +8,15 @@
  * with `if` chains.
  */
 
-/** Shared hide preconditions: a chat must exist and overflow. */
-function hideGuardsMet(emptyChat: boolean, fitsViewport: boolean): boolean {
-	// An empty chat never hides, and neither does a thread that fits —
-	// hiding only strands the composer.
-	return !emptyChat && !fitsViewport;
+/** Shared hide precondition: a chat must exist. Thread length never
+matters — the setting says hide, so any non-empty thread hides (the
+old short-thread exemption kept the composer up against the explicit
+always-hide choice). */
+function hideGuardsMet(emptyChat: boolean): boolean {
+	// An empty chat never hides: with nothing to read, hiding strands
+	// the composer for good. Summoning stays one keypress away
+	// (i / Enter / Space) everywhere else.
+	return !emptyChat;
 }
 
 /** Facts the always-hide focus-out path reads. */
@@ -20,28 +24,25 @@ export interface AlwaysHideFacts {
 	alwaysMode: boolean;
 	inPrompt: boolean;
 	emptyChat: boolean;
-	fitsViewport: boolean;
 }
 
 /**
  * Always-hide park: hide unless focus is (or is heading) inside the
- * composer, with the same empty and short-thread guards as the timed
- * path.
+ * composer, with the same empty-chat guard as the timed path.
  */
 export function shouldHideForAlways(facts: AlwaysHideFacts): boolean {
-	return facts.alwaysMode && !facts.inPrompt && hideGuardsMet(facts.emptyChat, facts.fitsViewport);
+	return facts.alwaysMode && !facts.inPrompt && hideGuardsMet(facts.emptyChat);
 }
 
 /** Facts the hide ticker reads (the time beat stays extracted upstream). */
 export interface IdleHideFacts {
 	emptyChat: boolean;
-	fitsViewport: boolean;
 	alreadyIdle: boolean;
 }
 
-/** Timed hide: the guards above, plus never re-hide what is hidden. */
+/** Timed hide: the guard above, plus never re-hide what is hidden. */
 export function shouldIdleHide(facts: IdleHideFacts): boolean {
-	return hideGuardsMet(facts.emptyChat, facts.fitsViewport) && !facts.alreadyIdle;
+	return hideGuardsMet(facts.emptyChat) && !facts.alreadyIdle;
 }
 
 /**

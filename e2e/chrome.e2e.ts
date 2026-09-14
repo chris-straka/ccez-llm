@@ -225,8 +225,26 @@ test("always-hide boots hidden", async ({ page }) => {
 	await expect(page.locator(".prompt")).toHaveClass(/prompt-idle/, { timeout: 10_000 });
 });
 
+/** Always-hide covers short threads too: no viewport exemption. */
+test("always-hide boots hidden on a short thread", async ({ page }) => {
+	await seedChat(page, [
+		{ role: "user", content: "Give me a Chinese paragraph and a Japanese paragraph, both long." },
+		{ role: "assistant", content: "ready" }
+	]);
+	await page.addInitScript(() => {
+		window.localStorage.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify({ promptIdleSec: -1 })
+		);
+	});
+	await page.goto("/");
+	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".prompt")).toHaveClass(/prompt-idle/, { timeout: 10_000 });
+});
+
 /** Fresh installs boot hidden too: always-hide is the out-of-box
-default (seedChat presets no idle value, so this pins the default). */
+default (seedChat presets never-idle for clickability, so this pins
+the default by writing it explicitly). */
 test("default boots hidden (always-hide out of the box)", async ({ page }) => {
 	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(40);
 	const turns = [0, 1, 2, 3].flatMap((n) => [
@@ -234,6 +252,12 @@ test("default boots hidden (always-hide out of the box)", async ({ page }) => {
 		{ role: "assistant" as const, content: `answer ${n} ${long}` }
 	]);
 	await seedChat(page, turns);
+	await page.addInitScript(() => {
+		window.localStorage.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify({ promptIdleSec: -1 })
+		);
+	});
 	await page.goto("/");
 	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
 	await expect(page.locator(".prompt")).toHaveClass(/prompt-idle/, { timeout: 10_000 });
@@ -249,6 +273,12 @@ test("space with settings open never summons the prompt", async ({ page }) => {
 		{ role: "assistant" as const, content: `answer ${n} ${long}` }
 	]);
 	await seedChat(page, turns);
+	await page.addInitScript(() => {
+		window.localStorage.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify({ promptIdleSec: -1 })
+		);
+	});
 	await page.goto("/");
 	const prompt = page.locator(".prompt");
 	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
@@ -726,8 +756,9 @@ test("empty-state language buttons sit clear of the hero", async ({ page }) => {
 	// no overlap.
 });
 
-/** Short threads never idle-hide: nothing to uncover, prompt stays. */
-test("short thread keeps the composer past the timeout", async ({ page }) => {
+/** Short threads idle-hide like any other: the timeout says hide, so
+even a fitting thread parks (the old viewport exemption is gone). */
+test("short thread hides past the timeout", async ({ page }) => {
 	await seedChat(page, [{ role: "user", content: "hi" }]);
 	await page.addInitScript(() => {
 		window.localStorage.setItem(
@@ -743,9 +774,7 @@ test("short thread keeps the composer past the timeout", async ({ page }) => {
 		return box ? box.scrollHeight <= box.clientHeight : null;
 	});
 	expect(fits).toBe(true);
-	await expect(page.locator(".prompt")).not.toHaveClass(/prompt-idle/, { timeout: 2_000 });
-	await page.waitForTimeout(4000);
-	await expect(page.locator(".prompt")).not.toHaveClass(/prompt-idle/);
+	await expect(page.locator(".prompt")).toHaveClass(/prompt-idle/, { timeout: 15_000 });
 });
 
 /** Think blocks never render: only the answer shows, at chat text size. */

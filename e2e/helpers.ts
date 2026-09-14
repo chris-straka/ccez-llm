@@ -19,7 +19,9 @@ export interface SeedMessage {
 /**
  * Seed one chat (plus hover-reveal settings and the mock provider) before
  * the app boots, so e2e specs open on a deterministic conversation with
- * no API key and no typing.
+ * no API key and no typing. Idle-hide defaults to never here: most specs
+ * click the composer on short threads, and always-hide would park it —
+ * idle specs reseed with their own timeout explicitly.
  */
 export async function seedChat(
 	page: Page,
@@ -30,7 +32,7 @@ export async function seedChat(
 		window.localStorage.setItem("ccez-mock-provider", "1");
 		window.localStorage.setItem(
 			"ccez-llm-settings-v1",
-			JSON.stringify({ hoverAssistantActions: true, hoverUserActions: true })
+			JSON.stringify({ hoverAssistantActions: true, hoverUserActions: true, promptIdleSec: 0 })
 		);
 		window.localStorage.setItem(
 			"ccez-llm-chats-v1",

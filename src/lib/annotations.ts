@@ -1067,7 +1067,10 @@ export function placeAnnPopX(opts: {
  * Selection-menu popup placement (pure): the menu docks near the
  * cursor that finished the gesture, not the selection's start — a
  * full-sentence pick shouldn't strand it lines above the pointer —
- * clamped to the viewport. Phones dock around the native selection
+ * clamped to the viewport. The right clamp uses the caller's menu
+ * width estimate (one button vs Annotate+Inspect), never a
+ * one-size box: a wide phantom shoves the menu far left of picks
+ * near the right edge. Phones dock around the native selection
  * bubble instead (above on Android, below on iOS). placeSelMenu uses
  * it at summon time; the scroll tracker re-runs it cursorless so the
  * menu follows its highlight instead of dying on scroll.
@@ -1082,6 +1085,8 @@ export function selMenuPlacement(opts: {
 	viewportHeight: number;
 	androidUI: boolean;
 	iosUI: boolean;
+	/** Estimated menu width (px) for the right-edge clamp. */
+	menuWidth: number;
 }): { x: number; y: number } {
 	const {
 		cursorX,
@@ -1092,13 +1097,13 @@ export function selMenuPlacement(opts: {
 		viewportWidth,
 		viewportHeight,
 		androidUI,
-		iosUI
+		iosUI,
+		menuWidth
 	} = opts;
-	const width = 320;
 	const at = cursorX ?? rectLeft;
 	// The popup sits just below the cursor (never under it), still
 	// clamped to the viewport.
-	const x = Math.min(Math.max(8, at - 16), viewportWidth - width - 8);
+	const x = Math.min(Math.max(8, at - 16), Math.max(8, viewportWidth - menuWidth - 8));
 	// Android: the OS text toolbar (Copy / Translate / Read Aloud)
 	// docks above the selection, so ours goes below it instead of
 	// underneath it — except near the screen bottom, where above
@@ -1119,9 +1124,10 @@ export function selMenuPlacement(opts: {
 		if (y + 44 > viewportHeight) y = Math.max(8, viewportHeight - 52);
 	} else {
 		// Desktop: always above the cursor that finished the
-		// gesture (never below it), clamped to the viewport top.
+		// gesture (never below it), the menu riding just clear of
+		// it (a breath of gap), clamped to the viewport top.
 		const cy = cursorY ?? rectTop;
-		y = Math.max(8, cy - 48 - 8);
+		y = Math.max(8, cy - 44);
 	}
 	return { x, y };
 }

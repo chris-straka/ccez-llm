@@ -51,14 +51,14 @@ describe("image markers", () => {
 		expect(stripImageMarkers("no markers")).toBe("no markers");
 	});
 
-	it("says [Pasted image] with one trailing space and no leading blank line", () => {
+	it("says [Pasted image] with no trailing space and no leading blank line", () => {
 		expect(IMAGE_MARKER).toBe("[Pasted image]");
-		expect(imageMarkerInsert("")).toBe(`${IMAGE_MARKER} \n`);
-		expect(imageMarkerInsert("draft\n")).toBe(`${IMAGE_MARKER} \n`);
+		expect(imageMarkerInsert("")).toBe(`${IMAGE_MARKER}\n`);
+		expect(imageMarkerInsert("draft\n")).toBe(`${IMAGE_MARKER}\n`);
 		// Mid-line: own line, but no blank line before the tag.
-		expect(imageMarkerInsert("hello")).toBe(`\n${IMAGE_MARKER} \n`);
+		expect(imageMarkerInsert("hello")).toBe(`\n${IMAGE_MARKER}\n`);
 		// Stacked pastes: each tag keeps its own line.
-		expect(imageMarkerInsert(`${IMAGE_MARKER} \n`)).toBe(`${IMAGE_MARKER} \n`);
+		expect(imageMarkerInsert(`${IMAGE_MARKER}\n`)).toBe(`${IMAGE_MARKER}\n`);
 	});
 
 	it("removes one marker line at a time", () => {
@@ -67,7 +67,7 @@ describe("image markers", () => {
 		expect(removeMarkerLine("no markers")).toBe("no markers");
 	});
 
-	it("counts marker lines including trailing-space tags", () => {
+	it("counts marker lines including legacy trailing-space tags", () => {
 		expect(countMarkerLines(`${IMAGE_MARKER} \nhello\n${IMAGE_MARKER}`)).toBe(2);
 		expect(countMarkerLines("plain")).toBe(0);
 	});

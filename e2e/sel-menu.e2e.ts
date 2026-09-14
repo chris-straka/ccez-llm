@@ -44,6 +44,46 @@ test.describe("desktop", () => {
 		await expect(page.locator(".ann-pop")).toBeVisible();
 	});
 
+	/** A plain click on another message keeps the in-flight highlight
+	and menu: reading elsewhere never eats a selection (controls,
+	composer, and new drags keep their normal paths). */
+	test("clicking another message keeps the highlight and menu", async ({ page }) => {
+		await waitForToastToFade(page);
+		await page.addInitScript(() => {
+			window.localStorage.setItem(
+				"ccez-llm-chats-v1",
+				JSON.stringify([
+					{
+						id: "e2e-chat",
+						createdAt: 1,
+						replyLang: null,
+						messages: [
+							{ id: "e2e-m0", role: "user", content: "alpha beta gamma delta", usage: null, error: null },
+							{ id: "e2e-m1", role: "assistant", content: "zeta eta theta iota", usage: null, error: null }
+						]
+					}
+				])
+			);
+		});
+		await page.reload();
+		const first = page.locator("article .rendered p").first();
+		const box = await first.boundingBox();
+		if (!box) throw new Error("message has no box");
+		await page.mouse.dblclick(box.x + 20, box.y + box.height / 2);
+		const menu = page.locator(".sel-menu");
+		await expect(menu).toBeVisible();
+		const quote = await page.evaluate(() => window.getSelection()?.toString() ?? "");
+		expect(quote).not.toBe("");
+		const second = page.locator("article .rendered p").nth(1);
+		const box2 = await second.boundingBox();
+		if (!box2) throw new Error("second message has no box");
+		await page.mouse.click(box2.x + 20, box2.y + box2.height / 2);
+		await expect
+			.poll(() => page.evaluate(() => window.getSelection()?.toString() ?? ""))
+			.toBe(quote);
+		await expect(menu).toBeVisible();
+	});
+
 	test("pressing Annotate stands the menu through mousedown", async ({ page }) => {
 		await waitForToastToFade(page);
 		await selectWord(page);
@@ -230,6 +270,50 @@ test.describe("desktop", () => {
 		// Viewport clamping holds on both edges.
 		expect(menuBox.x).toBeGreaterThanOrEqual(0);
 		expect(menuBox.x + menuBox.width).toBeLessThanOrEqual(viewport);
+	});
+
+	/** Near the right edge the menu keeps its right edge on screen
+and stays a short trip from the cursor — the clamp follows the
+menu's own width, never a phantom box that strands it left. A
+short user bubble docks hard right, so its last word truly ends
+near the viewport edge at a narrow width. */
+	test("menu near the right edge stays under the cursor", async ({ page }) => {
+		await page.setViewportSize({ width: 500, height: 800 });
+		await seedChat(page, [{ role: "user", content: "alpha beta gamma delta" }]);
+		await page.goto("/");
+		const body = page.locator("article.user .rendered").first();
+		await expect(body).toBeVisible();
+		const box = await body.boundingBox();
+		if (!box) throw new Error("message has no box");
+		const cx = box.x + box.width - 10;
+		const cy = box.y + box.height / 2;
+		await page.mouse.dblclick(cx, cy);
+		const menu = page.locator(".sel-menu");
+		await expect(menu).toBeVisible();
+		const menuBox = await menu.boundingBox();
+		if (!menuBox) throw new Error("menu has no box");
+		const viewport = await page.evaluate(() => window.innerWidth);
+		expect(menuBox.x + menuBox.width).toBeLessThanOrEqual(viewport);
+		// A short trip: the button sits just left of the cursor.
+		expect(cx - menuBox.x).toBeLessThan(200);
+	});
+
+	/** A press-less selection clear never costs the menu: the engine
+(emptying the highlight while the pointer cruises other messages)
+puts nothing behind the clear, so the menu stands on its stored
+range and the highlight comes back. Presses, keys, and
+programmatic clears still dismiss (pinned by the tests around). */
+	test("menu survives a press-less selection clear", async ({ page }) => {
+		await selectWord(page);
+		const menu = page.locator(".sel-menu");
+		// Outlast the hover-change restore window: only the
+		// press/key/programmatic stamps stand the menu down now.
+		await page.waitForTimeout(600);
+		await page.evaluate(() => window.getSelection()?.removeAllRanges());
+		await expect
+			.poll(() => page.evaluate(() => window.getSelection()?.toString() ?? ""))
+			.not.toBe("");
+		await expect(menu).toBeVisible();
 	});
 
 	/** Right-clicking empty space never starts audio: nothing speaks and nothing selects. */
