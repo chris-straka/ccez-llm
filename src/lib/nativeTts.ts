@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { identifyLangOffline } from "./langId";
-import { ttsLangFor } from "./reading";
+import { hasPinyinTones, ttsLangFor } from "./reading";
 import { splitSentences, splitSpeechSegments, type SpeakCallbacks } from "./voice";
 
 /**
@@ -129,6 +129,11 @@ export function friendlyNativeError(message: string): string {
 export async function quoteLangFor(quote: string, fallback: string): Promise<string> {
 	const scriptLang = ttsLangFor(quote, "");
 	if (scriptLang) return scriptLang;
+	// Toned pinyin is Latin-script, so script detection stays silent —
+	// but the recognizer below reads it as Vietnamese (~0.98) and a
+	// highlighted pinyin line would speak with the Linh voice. The tone
+	// marks are pinyin-exclusive, so they route to Chinese first.
+	if (hasPinyinTones(quote)) return "zh-CN";
 	try {
 		const tag = await invoke<string | null>("tts_identify_lang", { text: quote });
 		if (tag?.trim()) return tag.trim();

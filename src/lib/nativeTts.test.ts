@@ -78,6 +78,16 @@ describe("quoteLangFor", () => {
 		);
 	});
 
+	it("routes toned pinyin to Chinese before the recognizer can say Vietnamese", async () => {
+		// Apple's recognizer reads toned pinyin as vi (~0.98); the guard
+		// must win even when the bridge would answer otherwise.
+		mockInvoke.mockResolvedValue("vi");
+		await expect(quoteLangFor("nǐ hǎo, wǒ shì xuéshēng, wǒ xuéxí zhōngwén", "en-US")).resolves.toBe(
+			"zh-CN"
+		);
+		expect(mockInvoke).not.toHaveBeenCalled();
+	});
+
 	it("falls back without a bridge for Latin text", async () => {
 		await expect(
 			quoteLangFor("this is a fairly long english sentence for testing", "en-US")

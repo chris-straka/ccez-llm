@@ -12,6 +12,7 @@ import {
 	extractWordAt,
 	aidDisplayText,
 	offeredLocalAids,
+	hasPinyinTones,
 	ttsLangFor,
 	speakWord,
 	vocalizeArabic,
@@ -193,6 +194,19 @@ describe("speech locales", () => {
 	it("reports unavailable synthesis without throwing", () => {
 		expect(speakWord("hello")).toEqual({ spoken: false, lang: "en-US" });
 		expect(speakWord("bonjour", "fr-FR")).toEqual({ spoken: false, lang: "fr-FR" });
+	});
+
+	it("spots pinyin tone marks and nothing else", () => {
+		// The exact misfire: Apple's recognizer reads this as Vietnamese.
+		expect(hasPinyinTones("nǐ hǎo, wǒ shì xuéshēng")).toBe(true);
+		expect(hasPinyinTones("lǚxíng")).toBe(true);
+		expect(hasPinyinTones("NǍN")).toBe(true);
+		// Vietnamese lookalikes carry other diacritics, never caron or ǖ.
+		expect(hasPinyinTones("xin chào, tôi là sinh viên")).toBe(false);
+		expect(hasPinyinTones("bonjour, je suis étudiant")).toBe(false);
+		// Toneless pinyin is genuinely ambiguous Latin: left alone.
+		expect(hasPinyinTones("ni hao, wo shi xuesheng")).toBe(false);
+		expect(hasPinyinTones("")).toBe(false);
 	});
 });
 

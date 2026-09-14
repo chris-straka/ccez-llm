@@ -210,6 +210,21 @@ export function ttsLangFor(word: string, fallback = "en-US"): string {
 	return fallback;
 }
 
+/**
+ * Whether `text` carries Hanyu pinyin tone marks: the caron vowels
+ * (ǎ ǐ ǒ ǔ ě) and the u-umlaut series (ǖ ǘ ǚ ǜ), in either case. Those
+ * marks occur in no other Latin orthography — Vietnamese, the closest
+ * lookalike, uses acute/grave/hook/tilde/dot but never caron or
+ * diaeresis-u — so toned pinyin is unambiguously Mandarin. Apple's
+ * language recognizer disagrees (it reads a toned-pinyin sentence as
+ * Vietnamese at ~0.98), so callers check this before the bridge and
+ * route pinyin to the Chinese voice. Toneless pinyin stays genuinely
+ * ambiguous Latin and is left alone. Pure.
+ */
+export function hasPinyinTones(text: string): boolean {
+	return /[ǎǍǐǏǒǑǔǓěĚǖǘǚǜǕǗǙǛ]/.test(text);
+}
+
 export interface SpeakResult {
 	spoken: boolean;
 	lang: string;
