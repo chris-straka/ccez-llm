@@ -74,18 +74,20 @@ export interface SaveHandleLike {
 
 /**
  * Export one chat as Markdown. Uses the File System Access picker
- * where available, otherwise the injected download fallback (an
- * anchor + blob URL in the real UI). Resolves `"picker"` or
- * `"download"` so callers can toast what happened. User aborts
- * propagate — callers stay silent via `isPermissionDismissal`.
+ * where available, then the injected native save (Tauri shell), then
+ * the injected download fallback (an anchor + blob URL in the real
+ * UI). Resolves `"picker"`, `"native"`, or `"download"` so callers
+ * can toast what happened. User aborts propagate — callers stay
+ * silent via `isPermissionDismissal`.
  */
 export async function exportChatMarkdown(
 	chat: ExportableChat,
 	deps: {
 		picker?: ((options: SavePickerOptions) => Promise<SaveHandleLike>) | null | undefined;
+		native?: ((filename: string, text: string) => Promise<"saved" | "dismissed" | null>) | null | undefined;
 		download?: ((text: string, filename: string) => void) | undefined;
 	} = {}
-): Promise<"picker" | "download"> {
+): Promise<"picker" | "native" | "download"> {
 	const text = chatToMarkdown(chat);
 	const filename = exportFilename();
 	const pick = deps.picker;
@@ -98,6 +100,14 @@ export async function exportChatMarkdown(
 		await writable.write(text);
 		await writable.close();
 		return "picker";
+	}
+	if (deps.native) {
+		const outcome = await deps.native(filename, text);
+		if (outcome === "saved") return "native";
+		// A dismissal stays silent like a picker abort: the AbortError
+		// below rides the caller's `isPermissionDismissal` path, and a
+		// missing native bridge falls through to the download.
+		if (outcome === "dismissed") throw new DOMException("Export dismissed.", "AbortError");
 	}
 	const download = deps.download;
 	if (!download) throw new Error("No export path available.");

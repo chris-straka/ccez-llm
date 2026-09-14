@@ -107,4 +107,50 @@ describe("exportChatMarkdown", () => {
 			})
 		).rejects.toBe(aborted);
 	});
+
+	it("prefers the picker over the native bridge", async () => {
+		const native = async () => "saved" as const;
+		const how = await exportChatMarkdown(chat, {
+			picker: async () => ({
+				createWritable: async () => ({ write: async () => {}, close: async () => {} })
+			}),
+			native
+		});
+		expect(how).toBe("picker");
+	});
+
+	it("resolves native on a completed shell save", async () => {
+		const seen: { filename: string; text: string }[] = [];
+		const how = await exportChatMarkdown(chat, {
+			picker: null,
+			native: async (filename, text) => {
+				seen.push({ filename, text });
+				return "saved";
+			}
+		});
+		expect(how).toBe("native");
+		expect(seen).toHaveLength(1);
+		expect(seen[0]?.text).toBe(chatToMarkdown(chat));
+		expect(seen[0]?.filename).toMatch(/^chat-\d{4}-\d{2}-\d{2}\.md$/);
+	});
+
+	it("throws AbortError on a dismissed native save", async () => {
+		const failure = exportChatMarkdown(chat, {
+			picker: null,
+			native: async () => "dismissed" as const
+		});
+		await expect(failure).rejects.toThrowError(DOMException);
+		await expect(failure).rejects.toMatchObject({ name: "AbortError" });
+	});
+
+	it("falls through to download when the native bridge is missing", async () => {
+		const downloads: { text: string; filename: string }[] = [];
+		const how = await exportChatMarkdown(chat, {
+			picker: null,
+			native: async () => null,
+			download: (text, filename) => void downloads.push({ text, filename })
+		});
+		expect(how).toBe("download");
+		expect(downloads).toHaveLength(1);
+	});
 });

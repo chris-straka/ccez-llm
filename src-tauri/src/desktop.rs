@@ -15,22 +15,21 @@
 //! unit-tested here, so `cargo test` covers the contracts on any host
 //! (including this Mac). The OS wiring itself is `#[cfg(desktop)]` —
 //! Windows/Linux-only paths are called out as unverified-on-device in
-//! the submit notes, never claimed green. No new crates: tray comes
-//! from the `tray-icon` feature on the existing `tauri` dep, the macOS
-//! hotkey from the already-vendored `objc2-app-kit` + `block2`, and
+//! the submit notes, never claimed green. Crates: tray comes from the
+//! `tray-icon` feature on the existing `tauri` dep, the summon chord
+//! from `tauri-plugin-global-shortcut` (desktop-only upstream), and
 //! everything else is `std` + `serde`.
 
 use std::sync::{Mutex, OnceLock};
 
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
-/// In-app/OS summon chord shown in help copy. The native macOS monitor
-/// watches this exact combo (space keyCode + Command + Shift); the
-/// frontend owns the same chord while its window is focused.
+/// In-app/OS summon chord shown in help copy. The global-shortcut
+/// plugin owns this combo system-wide ("CommandOrControl" maps to
+/// ⌘ on macOS, Ctrl elsewhere); the frontend owns the same chord
+/// while its window is focused.
 #[cfg(all(desktop, not(target_os = "macos")))]
 pub const SUMMON_SHORTCUT: &str = "CmdOrCtrl+Shift+Space";
-/// macOS virtual keyCode for space (the summon key).
-pub const SUMMON_KEY_CODE: u16 = 49;
 /// Custom URL scheme: `ccez://chat/<id>`, `ccez://chat?id=<id>`,
 /// `ccez://new`.
 pub const DEEP_LINK_SCHEME: &str = "ccez";
@@ -326,13 +325,6 @@ pub fn sanitize_file_stem(title: &str) -> String {
     } else {
         stem
     }
-}
-
-/// Pure summon matcher behind both the macOS global monitor and the
-/// frontend in-app chord: space + Command + Shift, no other modifiers
-/// implied (the frontend passes its own alt state separately).
-pub fn summon_match(key_code: u16, command: bool, shift: bool) -> bool {
-    key_code == SUMMON_KEY_CODE && command && shift
 }
 
 // ---------------------------------------------------------------------------
@@ -663,71 +655,47 @@ fn handle_startup_args<R: Runtime>(app: &AppHandle<R>) {
     }
 }
 
-/// OS-global summon chord (⌘⇧Space): show/focus when hidden or behind
-/// another app, hide when ours is focused (the frontend owns the chord
-/// then — the monitor skips focused windows so the two never fight).
-/// Needs Accessibility → the app in Settings; without it the monitor
-/// simply never fires and the in-app chord still works. macOS only:
-/// Windows/Linux keep the in-app chord (see follow-ups).
-#[cfg(all(desktop, target_os = "macos"))]
+/// OS-global summon chord (⌘/Ctrl⇧Space): show/focus when hidden or
+/// behind another app, skip when ours is focused (the frontend owns
+/// the chord then — skipping keeps show/hide from fighting its
+/// focus-composer handling). Carbon hotkeys need no Accessibility
+/// grant (unlike the NSEvent tap this replaced, which also needed
+/// `mem::forget` lifetime games and a `block2` closure); a failed
+/// registration logs and the in-app chord still works. Desktop only:
+/// the plugin crate does not compile for mobile. UNVERIFIED ON
+/// DEVICE — no headless harness can press a system-wide chord.
+/// Summon from another app after granting nothing, with ours focused
+/// (must stay put), and with ours hidden (must show + focus).
+#[cfg(desktop)]
 fn install_summon_hotkey(app: &AppHandle) {
-    use std::ptr::NonNull;
-
-    use block2::RcBlock;
-    use objc2_app_kit::{NSEvent, NSEventMask, NSEventModifierFlags};
+    use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
     let handle = app.clone();
-    let block = RcBlock::new(move |event: NonNull<NSEvent>| {
-        // SAFETY: the monitor only hands us live key-down events for
-        // the duration of this call.
-        let (flags, code) = unsafe {
-            (
-                event.as_ref().modifierFlags(),
-                event.as_ref().keyCode(),
-            )
-        };
-        if !summon_match(
-            code,
-            flags.contains(NSEventModifierFlags::Command),
-            flags.contains(NSEventModifierFlags::Shift),
-        ) {
-            return;
-        }
-        let Some(window) = handle.get_webview_window("main") else {
-            return;
-        };
-        // Our window owns the chord while focused — skip so show/hide
-        // can't fight the frontend's focus-composer handling.
-        if window.is_focused().unwrap_or(false) {
-            return;
-        }
-        if window.is_visible().unwrap_or(true) {
-            let _ = window.set_focus();
-        } else {
-            let _ = window.show();
-            let _ = window.set_focus();
-        }
-    });
-    match NSEvent::addGlobalMonitorForEventsMatchingMask_handler(
-        NSEventMask::KeyDown,
-        &block,
+    if let Err(error) = app.global_shortcut().on_shortcut(
+        "CommandOrControl+Shift+Space",
+        move |_app, _shortcut, event| {
+            if event.state != ShortcutState::Pressed {
+                return;
+            }
+            let Some(window) = handle.get_webview_window("main") else {
+                return;
+            };
+            // Our window owns the chord while focused — skip so
+            // show/hide can't fight the frontend's focus-composer
+            // handling.
+            if window.is_focused().unwrap_or(false) {
+                return;
+            }
+            if window.is_visible().unwrap_or(true) {
+                let _ = window.set_focus();
+            } else {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        },
     ) {
-        Some(token) => {
-            // `Retained<AnyObject>` is neither Send nor Sync, so it
-            // cannot live in a static — and dropping it might
-            // unregister the monitor. Forget both the token and the
-            // block instead: they live exactly as long as the app.
-            std::mem::forget(token);
-            std::mem::forget(block);
-        }
-        None => eprintln!("[desktop] global summon monitor unavailable"),
+        eprintln!("[desktop] global summon shortcut unavailable: {error}");
     }
 }
-
-/// No global monitor off macOS: the in-app chord still summons the
-/// composer. UNVERIFIED ON DEVICE for Windows/Linux global keys —
-/// see follow-ups.
-#[cfg(all(desktop, not(target_os = "macos")))]
-fn install_summon_hotkey(_app: &AppHandle) {}
 
 #[cfg(test)]
 mod tests {
@@ -840,14 +808,6 @@ mod tests {
         assert_eq!(sanitize_file_stem("French verbs: être!"), "french-verbs-tre");
         assert_eq!(sanitize_file_stem("???"), "chat");
         assert_eq!(sanitize_file_stem("  spaced  out  "), "spaced-out");
-    }
-
-    #[test]
-    fn summon_matches_space_cmd_shift_only() {
-        assert!(summon_match(49, true, true));
-        assert!(!summon_match(49, true, false));
-        assert!(!summon_match(49, false, true));
-        assert!(!summon_match(1, true, true));
     }
 
     #[test]

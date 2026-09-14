@@ -269,6 +269,7 @@ import {
 		type SaveHandleLike,
 		type SavePickerOptions
 	} from "$lib/chatExport";
+	import { nativeSaveMarkdown } from "$lib/nativeExport";
 	import { isKeyboardOpen, keyboardOverlapPx } from "$lib/viewportReflow";
 import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	import {
@@ -1493,8 +1494,8 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 
 	/**
 	 * Export one sidebar chat as Markdown: File System Access picker
-	 * where available, download blob fallback otherwise. A dismissed
-	 * picker stays silent.
+	 * where available, native save dialog in the shell, download blob
+	 * fallback otherwise. A dismissed picker stays silent.
 	 */
 	async function exportOneChat(target: Chat): Promise<void> {
 		try {
@@ -1503,9 +1504,10 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				: null;
 			const how = await exportChatMarkdown(target, {
 				picker,
+				native: (filename, text) => nativeSaveMarkdown(filename, text),
 				download: downloadMarkdownFile
 			});
-			flashToast(how === "picker" ? "Chat saved" : "Chat downloaded");
+			flashToast(how === "download" ? "Chat downloaded" : "Chat saved");
 		} catch (error) {
 			if (!isPermissionDismissal(error)) flashToast("Couldn't export this chat.");
 		}
