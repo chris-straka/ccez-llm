@@ -569,6 +569,28 @@ test("sidebar export and delete never move on hover", async ({ page }) => {
 	expectBoxesStable(before, await boxOf());
 });
 
+/** The scrollbar shows mid-scroll and fades out promptly after the
+stop: the hold is short and the fade quick, never lingering. */
+test("scrollbar fades out promptly after scrolling stops", async ({ page }) => {
+	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(40);
+	const turns = [0, 1, 2].flatMap((n) => [
+		{ role: "user" as const, content: `question ${n} ${long}` },
+		{ role: "assistant" as const, content: `answer ${n} ${long}` }
+	]);
+	await seedChat(page, turns);
+	await page.goto("/");
+	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
+	const box = page.locator(".messages");
+	const scrolling = (): Promise<boolean> =>
+		box.evaluate((el) => el.classList.contains("scrolling"));
+	await box.evaluate((el) => el.scrollTo({ top: 300 }));
+	await expect.poll(scrolling).toBe(true);
+	await expect.poll(scrolling).toBe(false);
+	// The settled fade itself is quick (not the old lingering drift).
+	const fade = await box.evaluate((el) => parseFloat(getComputedStyle(el).transitionDuration));
+	expect(fade).toBeLessThanOrEqual(0.35);
+});
+
 /** The top bar is an invisible gesture strip: fully transparent so
 messages bleed underneath it, still overlaid for window drag and
 double-click zoom. */

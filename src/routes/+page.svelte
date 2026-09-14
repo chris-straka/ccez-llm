@@ -367,7 +367,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	scroll effects stop sharing subscription accidents with unrelated
 	domains. The element and the wiring stay here. */
 	let viewport = $state<ViewportState>(emptyViewport());
-	/** Scrollbar thumb shows while a scroll is in flight, then fades. */
+	/** Scrollbar thumb shows while a scroll is in flight, then fades.
+	The stop hold is short (120ms): momentum scrolls land events in
+	tight bursts, so anything longer just delays the fadeout. */
 	function noteScrolling(): void {
 		// Desktop keeps its menu: trackSelMenu repositions it over the
 		// highlight instead. Phones dismiss the docked menu here.
@@ -378,7 +380,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		viewport.idleTimer = window.setTimeout(() => {
 			scrollBox?.classList.remove("scrolling");
 			updateWpPos();
-		}, 200);
+		}, 120);
 	}
 	let focusMode: "edit" | "scroll" = $state("edit");
 	/**
@@ -6827,7 +6829,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				window.setTimeout(() => {
 					box.classList.remove("scrolling");
 					fadeTimers.delete(box);
-				}, 350)
+				}, 120)
 			);
 		};
 		window.addEventListener("scroll", onFadeScroll, true);
@@ -9858,13 +9860,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		cursor: default;
 		/* Fast wheel, eased programmatic jumps. The scrollbar snaps in
 		(the .scrolling override below shortens the transition while
-		scroll events land) and drifts out slowly once they stop. */
+		scroll events land) and drifts out quickly once they stop. */
 		scroll-behavior: smooth;
 		scrollbar-width: thin;
 		scrollbar-color: transparent transparent;
 		/* Classic scrollbars never shove the column when they appear. */
 		scrollbar-gutter: stable;
-		transition: scrollbar-color 0.6s ease;
+		transition: scrollbar-color 0.3s ease;
 		/* Full bleed under the invisible drag strip: content starts at
 		the window's own top edge and stays visible behind the bar.
 		The strip's pixels don't take clicks, so scroll-padding-top
@@ -9902,7 +9904,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.messages::-webkit-scrollbar-thumb {
 		background: transparent;
 		border-radius: 4px;
-		transition: background-color 0.6s ease;
+		transition: background-color 0.3s ease;
 	}
 	.messages:global(.scrolling) {
 		scrollbar-color: rgba(142, 142, 147, 0.55) transparent;
@@ -9918,7 +9920,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	[data-fade-scroll] {
 		scrollbar-width: thin;
 		scrollbar-color: transparent transparent;
-		transition: scrollbar-color 0.6s ease;
+		transition: scrollbar-color 0.3s ease;
 	}
 	[data-fade-scroll]::-webkit-scrollbar {
 		width: 8px;
@@ -9930,7 +9932,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	[data-fade-scroll]::-webkit-scrollbar-thumb {
 		background: transparent;
 		border-radius: 4px;
-		transition: background-color 0.6s ease;
+		transition: background-color 0.3s ease;
 	}
 	[data-fade-scroll]:global(.scrolling) {
 		scrollbar-color: rgba(142, 142, 147, 0.55) transparent;
@@ -9951,7 +9953,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			opacity 0.22s ease,
 			padding 0.22s ease,
 			border-width 0.22s ease,
-			scrollbar-color 0.6s ease;
+			scrollbar-color 0.3s ease;
 	}
 	.settings-panel[data-fade-scroll] {
 		transition:
@@ -9960,7 +9962,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			opacity 0.22s ease,
 			padding 0.22s ease,
 			border-color 0.22s ease,
-			scrollbar-color 0.6s ease;
+			scrollbar-color 0.3s ease;
 	}
 	aside[data-fade-scroll]:global(.scrolling) {
 		transition:
@@ -9986,7 +9988,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.wp-btn[data-fade-scroll] {
 		transition:
 			opacity 0.18s ease,
-			scrollbar-color 0.6s ease;
+			scrollbar-color 0.3s ease;
 	}
 	.wp-btn[data-fade-scroll]:global(.scrolling) {
 		transition:
@@ -9997,7 +9999,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		transition:
 			opacity 0.18s ease,
 			visibility 0s linear 0.18s,
-			scrollbar-color 0.6s ease;
+			scrollbar-color 0.3s ease;
 	}
 	.wp-menu[data-fade-scroll]:global(.scrolling) {
 		transition:

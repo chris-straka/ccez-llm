@@ -87,28 +87,27 @@ modules — they never split the template for size alone.
   the boot-park correction is three lines with no decision worth
   pinning — leave it.
 
-## 2. Extract a speech controller (second-largest logic mass)
+## 2. Speech controller (not doing as framed)
 
 - Speech orchestration spans the `startSpeech` / `speakReply` /
   `maybeSpeakReply` / `speakQuote` / `toggleMic` / `dictateNativeFirst`
   cluster in `+page.svelte` (plus `speakingId` / `speakingSelection` /
   `vocalized` / `voiceError` state).
 - The two engines already share one callback contract (`SpeakCallbacks` —
-  web in `src/lib/voice.ts`, native in `src/lib/nativeTts.ts`), but the page
-  does the conducting: utterance ids, stale-cancel guards, quiet-vs-loud
-  paths.
-- New `src/lib/speech.ts`: engine-agnostic controller (pick engine, queue,
-  per-utterance id checks, progress callbacks). Page keeps only UI flags.
-- Also the best place to catch stale-cancels-newer-speech bugs in a unit
-  test instead of by ear.
-- Status: language steps and the start-failure banner (`startSpeechError`)
-  extracted and tested; the engine pick, wake-lock timing, fallback
-  retry, and stale-cancel guards stay inline. A controller here is an
-  inversion of control, not an extraction — the remaining orchestration
-  verifies by ear/device, so it belongs in its own session with hardware
-  and a user at the loop.
+  web in `src/lib/voice.ts`, native in `src/lib/nativeTts.ts`), and every
+  deterministic piece is extracted and tested (sentence splitting, speech
+  text, per-sentence language, mic errors, latin fallback).
+- A full engine-agnostic controller was proposed and rejected (Sep 2026):
+  it is an inversion of control, not an extraction — it would test call
+  sequencing, not the actual race bugs (those live in async timing across
+  two engines), while putting a seam across every future speech change.
+  The remaining orchestration verifies by ear/device.
+- Only endorsed future piece: if stale-cancel pain recurs, pull just the
+  utterance-id guard into a tiny pure generation-counter unit (the
+  `holdSeq` pattern `notices.ts` / `viewport.ts` already use) — no
+  controller, no seam.
 
-## 3. Unify the reading-aids pipeline
+## 3. Reading-aids pipeline (sliced as far as it goes)
 
 - Aid logic is scattered across `reading.ts`, `pinyin.ts`, `furigana.ts`,
   `furiganaRuby.ts`, `aidLoading.ts`, `annHighlights.ts`, plus inline page
@@ -119,16 +118,19 @@ modules — they never split the template for size alone.
 - Goal: one pipeline — per message, compute kinds → ruby HTML → speech lang
   once. Removes real duplication, not just moved code. Medium-large; needs
   care since aids interact with streaming replaces.
-- Status: partially sliced. The hotkey-side toggle math moved to
+- Status: sliced as far as it goes. The hotkey-side toggle math moved to
   `message-actions.ts`, and the offer computation is now shared:
   `offeredLocalAids` / `aidDisplayText` live in `reading.ts` beside
   the detection primitives (hotkeys, render, and vocalize call one
   definition). The speech language steps moved the same way
   (`latinFallback` / `messageSpeechLang` / `speechAttemptable` /
   `speechLangsFor` in `voice.ts`, call sites pass engine/fallback/
-  inventory explicitly). What remains is the render-path unification
-  and the engine-agnostic controller, which need streaming-careful
-  redesign and ears respectively — not slicing.
+  inventory explicitly). The render-path unification is rejected as a
+  candidate (Sep 2026): it is redesign, not slicing — ruby rebuilds,
+  language detection, and sentence splitting run mid-stream while
+  bodies swap underneath, so changing their ordering risks flicker,
+  detached anchors, and glued speech for code that is currently stable
+  and rarely touched. Revisit only if aids churn forces it.
 
 ## 4. Domain-slice the `$state` scatter (small, incremental)
 
@@ -298,7 +300,12 @@ target pattern for no tested gain.
   scroll / message-row / composer / sideview remainders are timers
   and DOM glue with nothing to pin, and the one pinnable pure slice
   (`readingsOnly` → `reading.ts`, inert-output unit-tested) is done.
-  §2 waits on hardware + ears, §3 on streaming-careful redesign.
+- The §2 full speech controller (inversion of control, tests sequencing
+  not races, seam across every speech change — verdict Sep 2026: no;
+  only a tiny generation-counter guard slice stays endorsed, on pain).
+- The §3 render-path unification (redesign, not slicing: mid-stream
+  ordering risks for stable, rarely-touched code — verdict Sep 2026:
+  no; revisit only if aids churn forces it).
 - Splitting `+page.svelte` for size alone (decided against; nothing fixed so
   far was caused by size).
 - Classes or method-bearing stores in `$state` (breaks re-render).
