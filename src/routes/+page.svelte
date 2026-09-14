@@ -5503,6 +5503,17 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				settingsOpen = false;
 				shortcutsOpen = false;
 				stopVoice();
+				// Bare Esc drops a lingering message highlight with the
+				// menu (click-away parity): editor and field selections
+				// are another gesture's business and keep theirs.
+				const liveEsc = window.getSelection();
+				const escAnchor =
+					liveEsc?.anchorNode instanceof Element
+						? liveEsc.anchorNode
+						: liveEsc?.anchorNode?.parentElement;
+				if (liveEsc && !liveEsc.isCollapsed && escAnchor?.closest(".messages .rendered")) {
+					clearSelection();
+				}
 				// Scroll mode entered from a deactivated prompt steps
 				// back out on Esc (prompt-entry Esc keeps scroll mode).
 				if (focusMode === "scroll" && !scrollFromPrompt) exitScrollMode();
@@ -6312,6 +6323,22 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		const noteDownPoint = (event: MouseEvent): void => {
 			downClient = event.button === 0 ? { x: event.clientX, y: event.clientY } : null;
 		};
+		/** Latest pointer point (drag-vs-click for the mid-drag
+		collapse restore below). Passive, one store per move. */
+		let lastMoveClient: { x: number; y: number } | null = null;
+		const noteMovePoint = (event: MouseEvent): void => {
+			if (!selectingInMessage && !offChatDragArmed) return;
+			lastMoveClient = { x: event.clientX, y: event.clientY };
+			// Silent engine collapses (no selectionchange fires) get
+			// restored here, synchronously before paint; evented ones
+			// go through trimMessageDrag below. Plain lets only — no
+			// re-render for pointer travel.
+			const live = window.getSelection();
+			if (live) {
+				restoreDragSelection(live);
+				trackDragSelection(live);
+			}
+		};
 		// A drag that starts in message text never highlights its
 		// neighbors: while the button is down, any selection escaping
 		// the anchor article trims back live (mouseup's lock only fixed
@@ -6322,6 +6349,89 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// button is down, an anchor end outside message text pins back
 		// to the focus line's start on every selection change.
 		let offChatDragArmed = false;
+		// Cross-message drag containment (WebKit): the engine re-anchors
+		// a drag into the next selectable block, and the flip fires no
+		// selectionchange the lock can see — post-flip both ends sit in
+		// one article, so the highlight visibly jumps messages and the
+		// quote lands on the wrong one. While a message drag is down,
+		// every other article's prose goes unselectable inline (a
+		// stylesheet can't reach the child component's .rendered past
+		// scoping): the engine clamps at the anchor article's edge
+		// instead of flipping, and mouseup's lock only ever sees one
+		// article. Always cleared on mouseup/blur — never a resting state.
+		let dragAnchorArticle: Element | null = null;
+		const containDragTo = (article: Element | null): void => {
+			if (dragAnchorArticle === article) return;
+			for (const el of document.querySelectorAll("[data-drag-none]")) {
+				if (el instanceof HTMLElement) {
+					el.style.userSelect = "";
+					el.style.removeProperty("-webkit-user-select");
+				}
+				el.removeAttribute("data-drag-none");
+			}
+			dragAnchorArticle?.removeAttribute("data-drag-anchor");
+			dragAnchorArticle = article;
+			if (!article) return;
+			article.setAttribute("data-drag-anchor", "1");
+			const scope = article.closest(".messages") ?? document;
+			for (const prose of scope.querySelectorAll(
+				'article[id^="msg-"]:not([data-drag-anchor]) .rendered'
+			)) {
+				if (prose instanceof HTMLElement) {
+					prose.setAttribute("data-drag-none", "1");
+					prose.style.userSelect = "none";
+					prose.style.setProperty("-webkit-user-select", "none");
+				}
+			}
+		};
+		// Last in-article drag selection (nodes + offsets): WebKit folds
+		// the whole drag when the focus crosses into unselectable
+		// content (gaps, contained articles), collapsing mid-gesture.
+		// While the button stays down and moving, that collapse is
+		// never intent — put the last good selection back before paint
+		// so the highlight freezes at the anchor article's edge instead
+		// of vanishing. Clicks never move (>4px, the onMouseUp line),
+		// so click-deselect still clears. Nodes are re-checked on every
+		// restore (stream swaps detach them).
+		let lastGoodDragRange: { an: Node; ao: number; fn: Node; fo: number } | null = null;
+		const movedSinceDown = (): boolean => {
+			if (!downClient || !lastMoveClient) return false;
+			return Math.hypot(lastMoveClient.x - downClient.x, lastMoveClient.y - downClient.y) > 4;
+		};
+		const trackDragSelection = (live: Selection): void => {
+			if (live.isCollapsed || live.rangeCount === 0) return;
+			const anchorNode = live.anchorNode;
+			const focusNode = live.focusNode;
+			if (!anchorNode || !focusNode) return;
+			const anchorArticle = articleOf(anchorNode);
+			if (anchorArticle && anchorArticle === dragAnchorArticle) {
+				lastGoodDragRange = { an: anchorNode, ao: live.anchorOffset, fn: focusNode, fo: live.focusOffset };
+			}
+		};
+		const restoreDragSelection = (live: Selection): boolean => {
+			if (!live.isCollapsed) return false;
+			if (!movedSinceDown() || !lastGoodDragRange) return false;
+			// Dragging home to the anchor point cancels: only resurrect
+			// collapses stranded outside the anchor article.
+			if (articleOf(live.anchorNode) === dragAnchorArticle) return false;
+			// Collapses inside the prompt or a control are that
+			// gesture's business (editor selections), never the
+			// message drag's.
+			const collapsedEl =
+				live.anchorNode instanceof Element ? live.anchorNode : live.anchorNode?.parentElement;
+			if (collapsedEl?.closest(".cm-content, input, textarea")) return false;
+			const { an, ao, fn, fo } = lastGoodDragRange;
+			if (!document.contains(an) || !document.contains(fn)) {
+				lastGoodDragRange = null;
+				return false;
+			}
+			try {
+				live.setBaseAndExtent(an, ao, fn, fo);
+				return true;
+			} catch {
+				return false;
+			}
+		};
 		const armMessageDrag = (event: MouseEvent): void => {
 			const target = event.target instanceof Element ? event.target : null;
 			// Clicking off dismisses the pinyin overlay even when the
@@ -6331,11 +6441,17 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			selPinyin = null;
 			selectingInMessage = event.button === 0 && !!target?.closest(".messages .rendered");
 			offChatDragArmed = event.button === 0 && !target?.closest(".messages .rendered");
+			lastGoodDragRange = null;
+			containDragTo(selectingInMessage ? articleOf(target) : null);
 		};
 		const trimMessageDrag = (): void => {
 			if (selectingInMessage) {
 				const live = window.getSelection();
-				if (live) lockSelectionToMessage(live, articleOf);
+				if (live) {
+					restoreDragSelection(live);
+					trackDragSelection(live);
+					lockSelectionToMessage(live, articleOf);
+				}
 				return;
 			}
 			clampOffChatDrag();
@@ -6352,17 +6468,31 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			if (!offChatDragArmed) return;
 			try {
 				const live = window.getSelection();
-				if (!live || live.isCollapsed || live.rangeCount === 0) return;
+				if (!live || live.rangeCount === 0) return;
+				// Mid-drag engine collapse first (same restore as the
+				// in-message path below): WebKit folds the drag when
+				// the focus crosses unselectable content.
+				restoreDragSelection(live);
+				if (live.isCollapsed) return;
 				const anchorNode = live.anchorNode;
 				const focusNode = live.focusNode;
 				if (!anchorNode || !focusNode) return;
 				const anchorEl = anchorNode instanceof Element ? anchorNode : anchorNode.parentElement;
 				const focusEl = focusNode instanceof Element ? focusNode : focusNode.parentElement;
 				if (!focusEl?.closest(".messages .rendered")) return;
-				// Anchors in controls or the prompt are their own
+				// Anchors in the prompt or a control are their own
 				// gesture (editor selections, button presses) — never
-				// an off-chat message drag.
-				if (anchorEl?.closest(".messages .rendered, .cm-content, input, textarea")) return;
+				// an off-chat message drag. An anchor stranded in
+				// ANOTHER message's prose (first contact grazed it on
+				// the way in) re-seats below instead of freezing: the
+				// highlight would span messages and mouseup's lock
+				// would quote text the pointer never settled on.
+				if (anchorEl?.closest(".cm-content, input, textarea")) return;
+				if (
+					anchorEl?.closest(".messages .rendered") &&
+					articleOf(anchorNode) === articleOf(focusNode)
+				)
+					return;
 				// Only the upward side clamps: an anchor below the
 				// cursor highlights below it, which is allowed.
 				let anchorAbove: boolean;
@@ -6370,13 +6500,37 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				else {
 					anchorAbove = !!(anchorNode.compareDocumentPosition(focusNode) & Node.DOCUMENT_POSITION_FOLLOWING);
 				}
-				if (!anchorAbove) return;
+				if (!anchorAbove) {
+					// An anchor below the cursor is allowed — unless it
+					// sits in another message's prose, where mouseup's
+					// lock would quote text the pointer never settled
+					// on. Re-seat it to the focus line like the upward
+					// side; anchors below in non-message content still
+					// highlight below them untouched.
+					if (
+						anchorEl?.closest(".messages .rendered") &&
+						articleOf(anchorNode) !== articleOf(focusNode) &&
+						focusNode instanceof Text
+					) {
+						containDragTo(articleOf(focusNode));
+						const text = focusNode.textContent ?? "";
+						const start = lineStartOffset(text, live.focusOffset);
+						live.setBaseAndExtent(focusNode, start, focusNode, live.focusOffset);
+						trackDragSelection(live);
+					}
+					return;
+				}
+				// First contact with message text anchors the drag: later
+				// moves into other articles clamp at this article's edge
+				// instead of flipping the anchor (see containDragTo).
+				containDragTo(articleOf(focusNode));
 				if (anchorNode instanceof Text && anchorNode === focusNode) {
 					const text = anchorNode.textContent ?? "";
 					const fixed = clampDragAnchorToFocusLine(text, live.anchorOffset, live.focusOffset);
 					if (fixed !== live.anchorOffset) {
 						live.setBaseAndExtent(anchorNode, fixed, focusNode, live.focusOffset);
 					}
+					trackDragSelection(live);
 					return;
 				}
 				// Cross-node: the anchor sits in earlier (or foreign)
@@ -6388,13 +6542,29 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					const start = lineStartOffset(text, live.focusOffset);
 					live.setBaseAndExtent(focusNode, start, focusNode, live.focusOffset);
 				}
+				trackDragSelection(live);
 			} catch {
 				// Selection trimming is cosmetic: never break the drag.
 			}
 		};
 		const onMouseUp = (event: MouseEvent) => {
+			// Release-restore before the clears below: a drag that died
+			// mid-gesture (WebKit folds it crossing unselectable
+			// content) summons off its last live selection instead of
+			// nothing. Clicks never moved (restore no-ops) so
+			// click-deselect still clears; releases outside the chat
+			// stay silent (sidebar release = cancel); right-click keeps
+			// its speak path.
+			const upTarget = event.target instanceof Element ? event.target : null;
+			if (event.button !== 2 && upTarget?.closest(".messages")) {
+				const liveUp = window.getSelection();
+				if (liveUp) restoreDragSelection(liveUp);
+			}
 			selectingInMessage = false;
 			offChatDragArmed = false;
+			lastGoodDragRange = null;
+			lastMoveClient = null;
+			containDragTo(null);
 			// Compat mouseup trailing a touch-handled selection: the menu
 			// is already up, and the staleness check below would clear it
 			// as a no-change click (touchMenuAt lives with the touchend
@@ -6666,6 +6836,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			altHeld = false;
 			escDownAt = 0;
 			stopScrollHold();
+			// A drag released off-window never sees mouseup: drop the
+			// containment so prose stays selectable on return.
+			lastGoodDragRange = null;
+			lastMoveClient = null;
+			containDragTo(null);
 		};
 		// Coming back to the window lands you in the prompt (pill box when
 		// annotating), so Tab continues from there. Never yank focus out of
@@ -6771,6 +6946,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		window.addEventListener("mousedown", snapSelection, true);
 		window.addEventListener("mousedown", noteDownPoint, true);
 		window.addEventListener("mousedown", armMessageDrag, true);
+		window.addEventListener("mousemove", noteMovePoint, { passive: true });
 		document.addEventListener("selectionchange", trimMessageDrag);
 		// Secondary scrollers share the main chat's fade: scroll events
 		// don't bubble, so catch them on the way down and toggle the
@@ -6876,6 +7052,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			window.removeEventListener("mousedown", snapSelection, true);
 			window.removeEventListener("mousedown", noteDownPoint, true);
 			window.removeEventListener("mousedown", armMessageDrag, true);
+			window.removeEventListener("mousemove", noteMovePoint);
 			document.removeEventListener("selectionchange", trimMessageDrag);
 			window.removeEventListener("scroll", onFadeScroll, true);
 			window.removeEventListener("scroll", trackSelPinyin, true);

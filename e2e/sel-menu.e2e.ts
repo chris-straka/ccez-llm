@@ -313,6 +313,20 @@ near the viewport edge at a narrow width. */
 		expect(cx - menuBox.x).toBeLessThan(200);
 	});
 
+	/** Bare Escape drops the highlight with the menu (click-away
+	parity): audio stops through the same ladder, and editor or
+	field selections are another gesture's business. */
+	test("escape clears the highlight and menu", async ({ page }) => {
+		await selectWord(page);
+		const menu = page.locator(".sel-menu");
+		await expect(menu).toBeVisible();
+		await page.keyboard.press("Escape");
+		await expect
+			.poll(() => page.evaluate(() => window.getSelection()?.toString() ?? ""))
+			.toBe("");
+		await expect(menu).toBeHidden();
+	});
+
 	/** A press-less selection clear never costs the menu: the engine
 (emptying the highlight while the pointer cruises other messages)
 puts nothing behind the clear, so the menu stands on its stored
@@ -358,6 +372,56 @@ programmatic clears still dismiss (pinned by the tests around). */
 		const selected = await page.evaluate(() => window.getSelection()?.toString() ?? "");
 		expect(selected).toContain("alpha");
 		expect(selected).not.toContain("•");
+	});
+
+	/** Dragging across messages keeps the anchor message's quote: the
+	gesture never spans articles (WebKit re-anchors a drag into the
+	next message with no selectionchange the trim can see), so the
+	highlight freezes at the anchor's edge and the menu quotes it —
+	never the message dragged into. Integer coords throughout
+	(fractional ones birth dead drags in the harness); the start row
+	retries past line boundaries, which also birth dead drags. */
+	test("cross-message drag keeps the anchor message's quote", async ({ page }) => {
+		const M1 = "The quick brown fox jumps over the lazy dog near the riverbank.";
+		const M2 = "The five boxing wizards jump quickly past the quiet village.";
+		await seedChat(page, [
+			{ role: "assistant", content: M1 },
+			{ role: "assistant", content: M2 }
+		]);
+		await page.goto("/");
+		const first = page.locator("article .rendered").first();
+		await expect(first).toBeVisible({ timeout: 60_000 });
+		// Living start: probe rows until one grows.
+		let start: { x: number; y: number } | null = null;
+		for (const frac of [0.3, 0.55, 0.75]) {
+			const g = await first.boundingBox();
+			if (!g) throw new Error("message has no box");
+			const x = Math.round(g.x + 30);
+			const y = Math.round(g.y + g.height * frac);
+			await page.mouse.move(x, y);
+			await page.mouse.down();
+			await page.mouse.move(x, y + 14, { steps: 3 });
+			const len = await page.evaluate(() => window.getSelection()?.toString().length ?? 0);
+			if (len > 0) {
+				start = { x, y };
+				break;
+			}
+			await page.mouse.up();
+			await page.evaluate(() => window.getSelection()?.removeAllRanges());
+		}
+		if (!start) throw new Error("no living drag start");
+		const second = page.locator("article .rendered").nth(1);
+		const box2 = await second.boundingBox();
+		if (!box2) throw new Error("second message has no box");
+		// Drag well into the second message, then release there.
+		await page.mouse.move(start.x, Math.round(box2.y + box2.height / 2), { steps: 12 });
+		await page.mouse.up();
+		const quote = await page.evaluate(() => window.getSelection()?.toString() ?? "");
+		expect(quote).not.toBe("");
+		expect(quote).not.toContain("wizards");
+		const flat = (s: string): string => s.replace(/\s+/g, " ").trim();
+		expect(flat(M1)).toContain(flat(quote).slice(0, 30));
+		await expect(page.locator(".sel-menu")).toBeVisible();
 	});
 });
 

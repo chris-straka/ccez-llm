@@ -28,3 +28,23 @@ describe("folded code chrome", () => {
 		expect(selectors).toContain(".ccez-code-run");
 	});
 });
+
+describe("math chrome alignment", () => {
+	/** The `$` source toggle sits upright in the copy glyph's zero line
+	box: italic skewed the mark and a taller line box offset its center. */
+	function texRule(): string {
+		const css = bodyStyle();
+		const rules = [...css.matchAll(/([^{}]*\.ccez-math-tex[^{}]*)\{([^}]*)\}/g)];
+		const own = rules.find(
+			(rule) => !rule[1]!.includes(".ccez-math-copy") && !/hover|data-folded/.test(rule[1]!)
+		);
+		if (!own) throw new Error("no base .ccez-math-tex rule");
+		return own[2]!;
+	}
+	it("keeps the source toggle upright", () => {
+		expect(texRule()).toMatch(/font-style\s*:\s*normal/);
+	});
+	it("shares the copy glyph's zero line box", () => {
+		expect(texRule()).toMatch(/line-height\s*:\s*0/);
+	});
+});

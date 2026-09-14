@@ -824,12 +824,16 @@
 		right: 0.3rem;
 		line-height: 0;
 	}
+	/* Upright `$`, same zero line box as the copy glyph: italic
+	skewed the mark and its taller line box sat it off the copy
+	icon's center. */
 	.rendered :global(.ccez-math-tex) {
 		right: 1.7rem;
 		font-family:
 			ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 		font-size: 0.85rem;
-		font-style: italic;
+		font-style: normal;
+		line-height: 0;
 	}
 	.rendered :global(.ccez-math-copy:hover),
 	.rendered :global(.ccez-math-tex:hover) {
