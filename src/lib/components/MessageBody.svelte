@@ -812,6 +812,13 @@
 		top: 0.3rem;
 		display: inline-flex;
 		align-items: center;
+		justify-content: center;
+		/* One shared box: the copy glyph brings its own 1rem height
+		while `$` is bare text, so equal height (not line-height
+		games — a zero line box collapses the button and the glyph
+		overflows upward) is what centers them on each other. */
+		height: 1.3rem;
+		min-width: 1.3rem;
 		border: 0;
 		background: none;
 		padding: 0.15rem;
@@ -824,16 +831,13 @@
 		right: 0.3rem;
 		line-height: 0;
 	}
-	/* Upright `$`, same zero line box as the copy glyph: italic
-	skewed the mark and its taller line box sat it off the copy
-	icon's center. */
+	/* Upright `$`: italic skewed the mark off the copy icon. */
 	.rendered :global(.ccez-math-tex) {
 		right: 1.7rem;
 		font-family:
 			ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 		font-size: 0.85rem;
 		font-style: normal;
-		line-height: 0;
 	}
 	.rendered :global(.ccez-math-copy:hover),
 	.rendered :global(.ccez-math-tex:hover) {

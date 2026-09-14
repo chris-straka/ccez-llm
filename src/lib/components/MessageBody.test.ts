@@ -30,8 +30,9 @@ describe("folded code chrome", () => {
 });
 
 describe("math chrome alignment", () => {
-	/** The `$` source toggle sits upright in the copy glyph's zero line
-	box: italic skewed the mark and a taller line box offset its center. */
+	/** Both chrome buttons share one box: the copy glyph brings its
+	own height while `$` is bare text, so equal height — not
+	line-height games — is what centers them on each other. */
 	function texRule(): string {
 		const css = bodyStyle();
 		const rules = [...css.matchAll(/([^{}]*\.ccez-math-tex[^{}]*)\{([^}]*)\}/g)];
@@ -41,10 +42,20 @@ describe("math chrome alignment", () => {
 		if (!own) throw new Error("no base .ccez-math-tex rule");
 		return own[2]!;
 	}
+	function sharedRule(): string {
+		const css = bodyStyle();
+		const rules = [...css.matchAll(/([^{}]*\.ccez-math-tex[^{}]*)\{([^}]*)\}/g)];
+		const shared = rules.find((rule) => rule[1]!.includes(".ccez-math-copy"));
+		if (!shared) throw new Error("no shared math chrome rule");
+		return shared[2]!;
+	}
 	it("keeps the source toggle upright", () => {
 		expect(texRule()).toMatch(/font-style\s*:\s*normal/);
 	});
-	it("shares the copy glyph's zero line box", () => {
-		expect(texRule()).toMatch(/line-height\s*:\s*0/);
+	it("leaves the toggle text on a real line box", () => {
+		expect(texRule()).not.toMatch(/line-height\s*:\s*0/);
+	});
+	it("sizes both buttons to one shared box", () => {
+		expect(sharedRule()).toMatch(/height\s*:\s*1\.3rem/);
 	});
 });

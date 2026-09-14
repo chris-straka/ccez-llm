@@ -3,11 +3,12 @@ import { describe, it, expect } from "vitest";
 
 /**
  * Hover-toggle row rhythm: the fieldset carries no bottom margin
- * itself (the legend's row margin would stretch the flex row, leaving
- * the labels centered with slack below them inside the box), the
- * legend sits margin-free in the row, and the stacked 0.55rem rhythm
- * resumes on the check after the row — so the gap below the row
- * matches every other checkbox gap.
+ * itself and neither do the row's labels (the generic label margin
+ * would stretch the flex row, leaving the boxes centered with slack
+ * below them inside the box), the legend keeps its own gap above
+ * the row, and the stacked 0.9rem rhythm resumes on the check after
+ * the row — so the gap below the row matches every other checkbox
+ * gap.
  *
  * Asserts on panels.css source because rhythm is a layout fact jsdom
  * cannot see (same reason MessageBody.test.ts reads <style>).
@@ -32,9 +33,6 @@ function ruleBody(css: string, selector: string): string {
 describe("hover-row rhythm", () => {
 	it("keeps the fieldset bottom margin at zero", () => {
 		expect(ruleBody(panelsCss(), "fieldset.hover-row")).toMatch(/margin-bottom\s*:\s*0/);
-	});
-	it("keeps the in-row legend margin-free", () => {
-		expect(ruleBody(panelsCss(), "fieldset.hover-row legend")).toMatch(/margin-bottom\s*:\s*0/);
 	});
 	it("keeps the row labels margin-free (generic label margin stretches the row)", () => {
 		const css = panelsCss();
