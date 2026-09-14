@@ -292,6 +292,13 @@ target pattern for no tested gain.
 
 ## Deliberately not doing
 
+- Big refactors beyond §§2–3 (reviewed Sep 14, two agents — verdict:
+  no). The annotation occurrence math is already extracted
+  (`locateQuote` / `occurrenceAtPosition` / `quoteTextNodes`), the
+  scroll / message-row / composer / sideview remainders are timers
+  and DOM glue with nothing to pin, and the one pinnable pure slice
+  (`readingsOnly` → `reading.ts`, inert-output unit-tested) is done.
+  §2 waits on hardware + ears, §3 on streaming-careful redesign.
 - Splitting `+page.svelte` for size alone (decided against; nothing fixed so
   far was caused by size).
 - Classes or method-bearing stores in `$state` (breaks re-render).
@@ -308,4 +315,6 @@ target pattern for no tested gain.
   candidates; Keychain bundle fix; §§2-3 marked design-stage;
   failure triage: stale fold tests retargeted to toggle, j-exits
   regression restored (park-bottom removed), attachment-strip
-  clearance moved to main padding, vite/gates/lint green)
+  clearance moved to main padding, vite/gates/lint green;
+  readingsOnly → reading.ts + inert-output tests, no-big-refactors
+  verdict recorded)

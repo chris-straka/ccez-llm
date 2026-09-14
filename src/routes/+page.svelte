@@ -103,7 +103,7 @@
 	import MessageBody from "$lib/components/MessageBody.svelte";
 	import ActionIcon from "$lib/components/ActionIcon.svelte";
 	import SettingsPanel from "$lib/components/SettingsPanel.svelte";
-	import { escapeHtml, plainBody, sourcesAsked } from "$lib/render";
+	import { plainBody, sourcesAsked } from "$lib/render";
 import {
 	clearNotice,
 	emptyNotices,
@@ -241,6 +241,7 @@ import {
 		aidTargetLines,
 		spliceAidResult,
 		resolveAidKinds,
+		readingsOnly,
 		type LocalAid,
 		type HanOverlayLang
 	} from "$lib/reading";
@@ -6371,23 +6372,6 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			}
 			return ch !== "" && isHanChar(ch);
 		}
-		/**
-		 * Readings alone from ruby markup: the characters are right
-		 * there in the highlight, so the overlay carries only their
-		 * pronunciations (pinyin space-joined, furigana run together).
-		 */
-		function readingsOnly(html: string, joiner: string, selector: string): string | null {
-			let doc: Document;
-			try {
-				doc = new DOMParser().parseFromString(html, "text/html");
-			} catch {
-				return null;
-			}
-			const parts = [...doc.querySelectorAll(selector)]
-				.map((el) => el.textContent?.trim() ?? "")
-				.filter((part) => part !== "");
-			return parts.length > 0 ? escapeHtml(parts.join(joiner)) : null;
-		}
 		/** Dock the readings overlay centered on the highlight, above
 		it (below only when the top edge leaves no room). Centering
 		rides CSS translateX so panel width — and font size — never
@@ -7911,7 +7895,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			class:above={selPinyin.above}
 			style="left: {selPinyin.x}px; top: {selPinyin.y}px"
 			aria-live="polite"
-		><!-- eslint-disable-line svelte/no-at-html-tags -- html is "…" or escapeHtml output (see readingsOnly) -->{@html selPinyin.html}</div>
+		><!-- eslint-disable-line svelte/no-at-html-tags -- html is "…" or readingsOnly output (inert by unit test, see reading.ts) -->{@html selPinyin.html}</div>
 	{/if}
 
 	{#if annPop}

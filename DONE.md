@@ -582,3 +582,20 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
       reproduce on the pristine tree (pre-existing). Remaining ~19 `onKey`
       branches (modifier chords, scroll/sidebar clusters) still inline —
       next slice when wanted.
+
+## Failure triage + gates (Sep 14, main)
+- [x] Stale specs retargeted, real regressions fixed: latex/message-code
+      fold tests now pin right-click toggle (ae72137's contract);
+      keybindings j/Down at newest returns enter-edit (Sep-8 j-exits
+      contract, park-bottom removed); staging test wakes the boot park;
+      settings test tracks systemLocale. Pre-existing suite fully green.
+- [x] Attachment strip unburied: floating-composer clearance moved from
+      scroller padding to main padding (pills/preview/error clickable,
+      composes with the Android safe-area inset). Intake pill X e2e green.
+- [x] Gates green: 896 unit, svelte-check 0/0 (vite skew contained with
+      a self-removing ts-expect-error), eslint clean (`.muse/` ignored,
+      e2e/scripts project coverage, all real findings fixed).
+- [x] Small slice: `readingsOnly` → `reading.ts` with inert-output unit
+      tests backing the overlay `{@html}` disable. No-big-refactors
+      verdict recorded (occurrence math already extracted; §§2–3 parked
+      on hardware/ears).

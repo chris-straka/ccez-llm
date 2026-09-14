@@ -29,7 +29,8 @@ import {
 	spliceAidResult,
 	resolveAidKinds,
 	codeAwareLines,
-	stripCodeForDetection
+	stripCodeForDetection,
+	readingsOnly
 } from "./reading";
 import { pinyinBlock, pinyinRuby } from "./pinyin";
 import { isFuriganaCached } from "./furigana";
@@ -386,5 +387,34 @@ describe("offeredLocalAids", () => {
 		expect(offeredLocalAids("漢字", "zh")).toEqual(["pinyin"]);
 		// Kana is unambiguous: no pill ever overrides it.
 		expect(offeredLocalAids("漢字を読む", "zh")).toEqual(["furigana"]);
+	});
+});
+
+describe("readingsOnly", () => {
+	it("joins matched readings with the joiner", () => {
+		const html = "<p>nihon<rt>にほん</rt>go<rt>ご</rt></p>";
+		expect(readingsOnly(html, " ", "rt")).toBe("にほん ご");
+		expect(readingsOnly(html, "", "rt")).toBe("にほんご");
+	});
+	it("supports class selectors for furigana spans", () => {
+		const html = '<span class="frt">かん</span><span class="frt">じ</span>';
+		expect(readingsOnly(html, "", ".frt")).toBe("かんじ");
+	});
+	it("returns null when nothing matches or parts are empty", () => {
+		expect(readingsOnly("<p>plain</p>", "", "rt")).toBe(null);
+		expect(readingsOnly("<p><rt>  </rt></p>", "", "rt")).toBe(null);
+		expect(readingsOnly("", "", "rt")).toBe(null);
+	});
+	it("output is inert: markup in readings is escaped, never live", () => {
+		// A hostile reading cannot smuggle elements into the overlay.
+		const html = "<p><rt>&lt;img src=x onerror=alert(1)&gt;</rt></p>";
+		const out = readingsOnly(html, "", "rt");
+		expect(out).not.toBe(null);
+		expect(out).not.toContain("<img");
+		expect(out).toContain("&lt;img");
+	});
+	it("trims each reading before joining", () => {
+		const html = "<p><rt>  a  </rt><rt>b</rt></p>";
+		expect(readingsOnly(html, "|", "rt")).toBe("a|b");
 	});
 });

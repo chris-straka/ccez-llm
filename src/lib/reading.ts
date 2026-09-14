@@ -1,5 +1,6 @@
 import type { ChatProvider } from "./providers/types";
 import { annRefsFor } from "./annotations";
+import { escapeHtml } from "./render-math";
 
 /**
  * Reading aids + speech, generalized across languages (A6).
@@ -435,4 +436,25 @@ export function vocalizeArabic(
 	signal?: AbortSignal
 ): Promise<string> {
 	return runModelAid(provider, "tashkeel", text, signal);
+}
+
+/**
+ * Readings alone from ruby markup: the characters are right there in
+ * the highlight, so the overlay carries only their pronunciations
+ * (pinyin space-joined, furigana run together). Pure over strings
+ * (parses, never touches live DOM). The result is always inert —
+ * `escapeHtml` over textContent, or null when nothing matches — so
+ * overlay `{@html}` sinks stay XSS-clean by construction.
+ */
+export function readingsOnly(html: string, joiner: string, selector: string): string | null {
+	let doc: Document;
+	try {
+		doc = new DOMParser().parseFromString(html, "text/html");
+	} catch {
+		return null;
+	}
+	const parts = [...doc.querySelectorAll(selector)]
+		.map((el) => el.textContent?.trim() ?? "")
+		.filter((part) => part !== "");
+	return parts.length > 0 ? escapeHtml(parts.join(joiner)) : null;
 }

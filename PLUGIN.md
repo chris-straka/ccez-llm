@@ -28,9 +28,15 @@ web API already covers all three, the web API wins.
   Web Notification fallback (the `Notification` ctor does not exist
   in the Android WebView), shell-aware via dynamic import. Tested in
   `studyMedia.test.ts`.
+  UNVERIFIED ON DEVICE — unit-tested only; verify the permission
+  flow and real delivery in the Mac shell and on Android (Web
+  Notification fallback path).
 - `haptics` — full. Send/first-token/done beats map to
   `selectionFeedback` / `impactFeedback`, `navigator.vibrate`
   fallback outside the shell.
+  UNVERIFIED ON DEVICE — unit-tested only; feel the
+  send/first-token/done beats on iPhone + Android, plus the
+  vibrate fallback in the browser preview.
 - `updater` — deliberately partial: `check()` only, then "download
   from the release page to install" (`SettingsPanel.svelte`
   `checkUpdates`). The plugin supports silent download+install+
