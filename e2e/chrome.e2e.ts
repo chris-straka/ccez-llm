@@ -591,6 +591,38 @@ test("scrollbar fades out promptly after scrolling stops", async ({ page }) => {
 	expect(fade).toBeLessThanOrEqual(0.35);
 });
 
+/** "Scale message buttons with text size" multiplies button size by
+the Text size setting, live: at enlarged text the toggle visibly
+grows the buttons (at default size there is nothing to multiply,
+so it correctly changes nothing). */
+test("scale buttons with text size applies immediately", async ({ page }) => {
+	await seedChat(page, [{ role: "assistant", content: "hello" }]);
+	await page.addInitScript(() => {
+		window.localStorage.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify({ hoverAssistantActions: true, hoverUserActions: true, fontScale: 1.5 })
+		);
+	});
+	await page.goto("/");
+	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
+	const button = page.locator("article.assistant .actions button").first();
+	const px = (): Promise<number> =>
+		button.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+	// Untoggled: the fixed button size, even at enlarged text.
+	expect(await px()).toBeLessThan(13);
+	// Toggling the checkbox applies on the spot — no reload, no save.
+	await page.keyboard.press("Meta+,");
+	const check = page.locator(
+		'.settings-panel label:has-text("Scale message buttons with text size") input'
+	);
+	await expect(check).toBeVisible({ timeout: 5_000 });
+	await check.check();
+	await expect(page.locator("main")).toHaveClass(/scale-actions/);
+	expect(await px()).toBeGreaterThan(16);
+	await check.uncheck();
+	expect(await px()).toBeLessThan(13);
+});
+
 /** The top bar is an invisible gesture strip: fully transparent so
 messages bleed underneath it, still overlaid for window drag and
 double-click zoom. */
