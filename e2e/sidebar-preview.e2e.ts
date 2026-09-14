@@ -63,6 +63,22 @@ test("preview hides the action row until the hover leaves", async ({ page }) => 
 	await expect(actions).toHaveCount(1);
 });
 
+/** Hovering a row's export/delete buttons keeps that chat's preview:
+moving within the row (label to icon) never drops back to active. */
+test("row icon hover keeps the preview", async ({ page }) => {
+	await openSidebar(page);
+	const main = page.locator("main .messages");
+	const row = page.locator("aside ul li").nth(1);
+	await row.locator("button.side-chat").hover();
+	await expect(main).toContainText(BRAVO);
+	await row.locator("button.exp").hover();
+	await expect(main).toContainText(BRAVO);
+	await expect(main).not.toContainText(ALPHA);
+	await row.locator("button.del").hover();
+	await expect(main).toContainText(BRAVO);
+	await expect(main).not.toContainText(ALPHA);
+});
+
 /** Clicking a hovered row selects it: the preview sticks after the hover leaves. */
 test("clicking a previewed row makes it the active chat", async ({ page }) => {
 	await openSidebar(page);

@@ -34,7 +34,7 @@ export function desktopShortcuts(isMac: boolean): ShortcutRow[] {
 	const meta = isMac ? "⌘" : "Ctrl+";
 	return [
 		{ name: "Shortcuts show/hide", keys: `${isMac ? "⇧⌘/" : "Ctrl+Shift+/"} · middle-click` },
-		{ name: "Focus composer", keys: `${isMac ? "⇧⌘Space" : "Ctrl+Shift+Space"}` },
+		{ name: "Summon / hide window", keys: `${isMac ? "⇧⌘Space" : "Ctrl+Shift+Space"}` },
 		{ name: "Switch model / key", keys: `Ctrl+${altm}+← / →` },
 		{ name: "Thinking level", keys: `Ctrl+${altm}+↓ / ↑` },
 		{

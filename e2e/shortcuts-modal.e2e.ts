@@ -32,7 +32,7 @@ test("first entry toggles the modal; list is pithy with current keys", async ({ 
 	expect(await keys.locator("div > dt").first().innerText()).toBe("Shortcuts show/hide");
 	await expect(keys.locator("div").first()).toContainText("middle-click");
 	// Newer global keys are folded in.
-	for (const name of ["Scroll", "New chat", "Edit own message", "Focus composer"]) {
+	for (const name of ["Scroll", "New chat", "Edit own message", "Summon / hide window"]) {
 		await expect(keys.locator("div > dt", { hasText: name })).toBeVisible();
 	}
 	await expect(keys.locator("div", { hasText: "ctrl+u/ctrl+d" })).toBeVisible();

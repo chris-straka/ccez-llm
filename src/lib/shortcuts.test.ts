@@ -9,7 +9,7 @@ import { desktopShortcuts, filteredShortcuts, touchShortcuts } from "./shortcuts
  */
 const MAC_NAMES = [
 	"Shortcuts show/hide",
-	"Focus composer",
+	"Summon / hide window",
 	"Switch model / key",
 	"Thinking level",
 	"Scroll",

@@ -774,16 +774,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		menuPressAt = Date.now();
 	}
 	/**
-	 * Last plain click-away that kept a live menu (see the mouseup
-	 * keep path): WebKit reports its engine collapse synchronously at
-	 * mousedown (before mouseup can restore) and again after mouseup,
-	 * so neither mouseup nor a ticket can cover it — the follow-up
-	 * selectionchange restores instead while this stamp is fresh.
-	 * Programmatic clears (Escape, pills, timers) never stamp it, so
-	 * they keep dismissing.
-	 */
-	let lastKeepClickAt = 0;
-	/**
 	 * Selection-menu open stamp: the rescue in the selectionchange
 	 * auto-dismiss below puts the stored range back while NEITHER a
 	 * press/key NOR a programmatic clear landed since the menu
@@ -5186,12 +5176,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		document.addEventListener("selectionchange", () => {
 			if (!selMenu) return;
 			if (Date.now() - menuPressAt < 1000) return;
-			// A keep-click's engine collapse (sync at mousedown on
-			// WebKit, where mouseup never sees the menu): put the
-			// stored range back while the click is fresh, and the same
-			// for a hover transition (no press at all). Any other
-			// clear falls through to the dismiss below.
-			if (Date.now() - lastKeepClickAt < 750 || Date.now() - lastHoverChangeAt < 500) {
+			// A hover transition's engine collapse (no press at all):
+			// put the stored range back while the hover change is
+			// fresh. Any other clear falls through to the dismiss
+			// below — plain clicks always press first, so they never
+			// land here.
+			if (Date.now() - lastHoverChangeAt < 500) {
 				const liveKeep = window.getSelection();
 				if (selMenu?.range && (!liveKeep || liveKeep.toString() === "")) {
 					try {
@@ -6321,21 +6311,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		let downClient: { x: number; y: number } | null = null;
 		const noteDownPoint = (event: MouseEvent): void => {
 			downClient = event.button === 0 ? { x: event.clientX, y: event.clientY } : null;
-			// Keep-click stamp for the selectionchange restore (WebKit
-			// reports its engine collapse synchronously at mousedown,
-			// before mouseup can see the menu): plain message-text
-			// presses with a live menu. New drags overwrite the menu
-			// at mouseup, so a stale stamp never outlives its press.
-			const downTarget = event.target instanceof Element ? event.target : null;
-			if (
-				event.button === 0 &&
-				selMenu?.range &&
-				downTarget?.closest(".rendered") &&
-				!downTarget.closest(
-					"button, input, textarea, a, select, summary, .sel-menu, .ann-dock, .review, .prompt"
-				)
-			)
-				lastKeepClickAt = Date.now();
 		};
 		// A drag that starts in message text never highlights its
 		// neighbors: while the button is down, any selection escaping
@@ -6435,12 +6410,22 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				if (!target?.closest(".lang-menu")) openLangMenu = null;
 			}
 			if (target?.closest(".cm-content, .sel-menu, .ann-dock, .review, button, input, textarea")) {
-				// Clicking away into the prompt or a control clears a dead
-				// highlight's menu with it — but never the menu's own clicks:
-				// the Annotate button's click fires after this mouseup (the
-				// phone composer's docked twin included).
-				if ((window.getSelection()?.toString() ?? "") === "" && !target?.closest(".sel-menu, .ann-dock")) {
-					selMenu = null;
+				// Clicking away into the prompt or a control clears the
+				// highlight and drops the menu with it — but never the
+				// menu's own clicks: the Annotate button's click fires
+				// after this mouseup (the phone composer's docked twin
+				// included). Drags ending on a control keep the old path
+				// (a selection drawn across into a button still summons).
+				if (!target?.closest(".sel-menu, .ann-dock")) {
+					const endedDrag = downClient
+						? Math.hypot(event.clientX - downClient.x, event.clientY - downClient.y) > 4
+						: false;
+					if (!endedDrag) {
+						window.getSelection()?.removeAllRanges();
+						selMenu = null;
+					} else if ((window.getSelection()?.toString() ?? "") === "") {
+						selMenu = null;
+					}
 				}
 				return;
 			}
@@ -6452,37 +6437,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			const dragged = downClient
 				? Math.hypot(event.clientX - downClient.x, event.clientY - downClient.y) > 4
 				: false;
-			// Plain click on message text while a menu stands: keep the
-			// in-flight selection instead of eating it just to read
-			// another message. Controls, the composer, links, and new
-			// drags keep their normal paths below, and Escape / the
-			// timer still dismiss. Two engine orders: Chromium collapses
-			// on mousedown (restore here), WebKit after mouseup (arm the
-			// one-shot ticket and let selectionchange restore).
-			const keepRange =
-				!dragged &&
-				selMenu?.range &&
-				target?.closest(".rendered") &&
-				!target.closest("button, input, textarea, a, select, summary, .sel-menu, .ann-dock, .review")
-					? selMenu.range
-					: null;
-			// A changed selection (multi-click reselect) is new work, not
-			// a collapse: fall through to the normal summon path below.
-			if (keepRange && (liveText === "" || liveText === downSel)) {
-				if (liveText === "") {
-					live?.removeAllRanges();
-					try {
-						live?.addRange(keepRange.cloneRange());
-					} catch {
-						// Detached by a body swap mid-click: fall through and
-						// let the stale-highlight path below dismiss.
-					}
-				}
-				if ((live?.toString() ?? "") !== "") {
-					lastKeepClickAt = Date.now();
-					return;
-				}
-			}
+			// A plain click anywhere dismisses: the stale-highlight path
+			// below clears it (a changed selection from a multi-click
+			// reselect is new work, not a collapse — it falls through to
+			// the normal summon path). Escape / the timer still dismiss.
 			if (!dragged && liveText === downSel && (event.detail <= 1 || event.detail >= 4)) {
 				// A plain click changed nothing: blank space, a collapsed
 				// caret, or inside the old highlight (the engine collapses
@@ -6992,15 +6950,19 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		</div>
 		<ul onmouseleave={() => (previewChatId = null)}>
 			{#each sideVisibleChats() as item (item.id)}
-				<li>
+				<!-- Preview hover lives on the row, not the label: moving
+				within the row (label to export/delete and back) must not
+				drop the preview for the hovered chat. -->
+				<li
+					onmouseenter={() => previewHover(item.id)}
+					onmouseleave={() => {
+						if (previewChatId === item.id) previewChatId = null;
+					}}
+				>
 					<button
 						type="button"
 						class="side-chat"
 						class:active={item.id === chatState.activeChatId}
-						onmouseenter={() => previewHover(item.id)}
-						onmouseleave={() => {
-							if (previewChatId === item.id) previewChatId = null;
-						}}
 						onclick={() => {
 							previewChatId = null;
 							sideIdx = chatState.chats.findIndex((c) => c.id === item.id);

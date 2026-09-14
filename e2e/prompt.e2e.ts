@@ -173,9 +173,11 @@ test("document scroll is locked", async ({ page }) => {
 	expect(overflow.body).toBe("hidden");
 });
 
-/** A cleared highlight drops the menu at once — taps elsewhere and
-handle collapses never pass through the summon paths, so without a
-selectionchange dismiss the menu stranded until the 2.5s timer. */
+/** A cleared highlight drops the menu at once — a real tap elsewhere
+(press-backed) dismisses through the click path, so without a
+selectionchange dismiss the menu would strand on a dead highlight.
+(Bare removeAllRanges with no press behind it is the engine
+hover-clear shape, which the menu survives — see sel-menu.) */
 test("a cleared highlight drops the menu at once", async ({ page }) => {
 	await seedChat(page, [{ role: "assistant", content: "prompt halo" }]);
 	await page.goto("/");
@@ -183,8 +185,11 @@ test("a cleared highlight drops the menu at once", async ({ page }) => {
 	await page.mouse.up();
 	const menu = page.locator(".sel-menu");
 	await expect(menu).toBeVisible();
-	await page.evaluate(() => window.getSelection()?.removeAllRanges());
+	await page.mouse.click(10, 300);
 	await expect(menu).toHaveCount(0, { timeout: 1500 });
+	await expect
+		.poll(() => page.evaluate(() => window.getSelection()?.toString() ?? ""))
+		.toBe("");
 });
 
 /** Scrolling never dismisses a live selection menu on desktop: the

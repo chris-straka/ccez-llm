@@ -44,10 +44,11 @@ test.describe("desktop", () => {
 		await expect(page.locator(".ann-pop")).toBeVisible();
 	});
 
-	/** A plain click on another message keeps the in-flight highlight
-	and menu: reading elsewhere never eats a selection (controls,
-	composer, and new drags keep their normal paths). */
-	test("clicking another message keeps the highlight and menu", async ({ page }) => {
+	/** A plain click on another message clears the in-flight highlight
+	and drops the menu: click-away always dismisses (controls,
+	composer, and message text alike — only menu presses, drags, and
+	multi-click reselections keep their paths). */
+	test("clicking another message clears the highlight and menu", async ({ page }) => {
 		await waitForToastToFade(page);
 		await page.addInitScript(() => {
 			window.localStorage.setItem(
@@ -80,8 +81,8 @@ test.describe("desktop", () => {
 		await page.mouse.click(box2.x + 20, box2.y + box2.height / 2);
 		await expect
 			.poll(() => page.evaluate(() => window.getSelection()?.toString() ?? ""))
-			.toBe(quote);
-		await expect(menu).toBeVisible();
+			.toBe("");
+		await expect(menu).toBeHidden();
 	});
 
 	test("pressing Annotate stands the menu through mousedown", async ({ page }) => {
@@ -137,6 +138,20 @@ test.describe("desktop", () => {
 		// Past the 6s desktop idle window the hovered menu still stands.
 		await page.waitForTimeout(7000);
 		await expect(menu).toBeVisible();
+	});
+
+	/** Clicking away at empty space clears the highlight and drops
+	the menu at once: a press-backed clear always dismisses, never
+	rescues. */
+	test("clicking away clears the highlight and menu", async ({ page }) => {
+		await selectWord(page);
+		const menu = page.locator(".sel-menu");
+		await expect(menu).toBeVisible();
+		await page.mouse.click(10, 300);
+		await expect
+			.poll(() => page.evaluate(() => window.getSelection()?.toString() ?? ""))
+			.toBe("");
+		await expect(menu).toBeHidden();
 	});
 
 	/** Pointer activity holds the menu without hovering it: an aimer
