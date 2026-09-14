@@ -34,7 +34,7 @@ chats stay local.
   streaming replaces message objects instead of mutating them.
 - Every Tauri call degrades cleanly across three runtimes: Tauri shell,
   plain browser, jsdom tests.
-- 896 colocated Vitest unit tests plus a Playwright e2e suite
+- Colocated Vitest unit tests plus a Playwright e2e suite
   (seeded, desktop + mobile viewports); `svelte-check` strict and
   type-aware lint gate the tree.
 
