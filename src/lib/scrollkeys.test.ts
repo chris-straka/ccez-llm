@@ -13,6 +13,7 @@ import {
 	indexAtViewportLine,
 	isEscapeHold,
 	messageEdgeScrollTop,
+	nearBottom,
 	resolveSidebarSpaceEnter,
 	scrollHoldVelocity,
 	spaceFocusesEmptyPrompt,
@@ -166,6 +167,15 @@ describe("holdIsTap", () => {
 		expect(holdIsTap(1000, 1000 + SCROLL_HOLD_TAP_MS)).toBe(false);
 		expect(holdIsTap(1000, 1500)).toBe(false);
 		expect(holdIsTap(0, 50)).toBe(false);
+	});
+});
+
+describe("nearBottom", () => {
+	it("pins within the slop and releases past it", () => {
+		expect(nearBottom({ scrollHeight: 1000, scrollTop: 900, clientHeight: 100 })).toBe(true);
+		expect(nearBottom({ scrollHeight: 1000, scrollTop: 836, clientHeight: 100 })).toBe(true);
+		expect(nearBottom({ scrollHeight: 1000, scrollTop: 835, clientHeight: 100 })).toBe(false);
+		expect(nearBottom({ scrollHeight: 1000, scrollTop: 0, clientHeight: 100 }, 1000)).toBe(true);
 	});
 });
 

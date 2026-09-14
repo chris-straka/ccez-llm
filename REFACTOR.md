@@ -167,6 +167,97 @@ modules — they never split the template for size alone.
   commands and the Android `Secrets.kt` path needed no changes and want
   none (per-platform files stay look-first, per above).
 
+## 6. New candidates (Sep 14 review — second pass, a–c done, d open)
+
+- Send/edit/retry controller (mirrors §1). `doSend` (3597) / `resend`
+  (3693) / `onSubmit` (3731) plus the edit/retry tail (`retryFailed`,
+  `rerunFrom`, `editMessage`, `resetInlineEdit`, `cancelMessageEdit`,
+  `saveMessageEdit`, `commitMessageEdit`, `onInlineImagePasted`,
+  `insertInlineImageMarkers`, ~3597–3950) mix guards (`canSubmit`,
+  `sendGuardUntil`, `editingMsgId`, missing-provider, `annPop` close,
+  idle-blur) with effects (`sendMessage` / `resendLast` in `chat.ts`
+  already own the streaming). Extract decision functions over a facts
+  snapshot (facts → action token, effects in the component) exactly like
+  `keybindings.ts` — the guard order is the contract to pin.
+  (DONE — `src/lib/submit.ts`: `submitAction` / `sendAction` /
+  `editMessageAction` / `commitEditTarget` + `submit.test.ts`;
+  `onSubmit` / `doSend` / `editMessage` / `commitMessageEdit` hollowed,
+  effects inline.)
+- Scroll/viewport state object (extends §4 + `scrollkeys.ts` math).
+  `noteScrolling` / `scrollToBottom` / `scrollAfterRender` / `jumpTo` /
+  `scrollToViewCursor` / `scrollChatBy` / `scrollChatTop` /
+  `scrollChatBottom` / `scrollHoveredEdge` (~3989–4230) own timers,
+  rAF handles, and viewport caches inline, while `scrollkeys.ts`
+  already owns the pure math (`halfPageDy`, `indexAtViewportLine`,
+  `stepScrollTop`, `holdIsTap`, velocities). Group the timers/handles/
+  caches into one `ViewportState` object (follow the `FindState` /
+  `PaletteState` / `SideviewState` pilots) — stops scroll effects from
+  sharing subscription accidents with unrelated domains.
+  (DONE — `src/lib/viewport.ts` held as `$state(emptyViewport())`;
+  `nearBottom` / `STICK_PX` moved to `scrollkeys.ts`; glide supersede
+  uses a `holdSeq` generation because `$state` proxies break identity
+  checks.)
+- Slice `SettingsPanel.svelte` (1,666 lines, ~15 functions — it is
+  template/style-heavy, not logic-heavy) and extract the page theme
+  style (~3,858 lines, `<style>` at 8304–12161, theme tokens as
+  `:global(html)` light/dark + print + android overrides +
+  reduced-motion). Provider/voice/appearance/update sections become
+  sub-panels; theme tokens move to `app.css`. Unlike the banned
+  `+page` split, component splits already happened (`MessageBody`,
+  `SettingsPanel` itself) — this continues that line. Mechanical, zero
+  behavior change, and it should improve HMR invalidation.
+  (DONE — `src/lib/components/settings/` holds `Provider` / `Defaults` /
+  `Voice` / `Appearance` / `Updates` panels + shared `panels.css`
+  mechanically scoped under `.settings-inner`; theme tokens + print
+  sheet moved to `src/app.css`; component dark overrides deliberately
+  stay co-located.)
+- Unify the attachment intake pipeline. `intake.ts` (317 lines) mixes
+  three unrelated intakes (screen capture, launch-queue/file split,
+  chat-export/markdown download) while `attachments.ts` (image
+  downscale, markers) + `attachExtract.ts` (pdf/docx) + `chat.ts`
+  `apiContent` (text fences, multimodal parts) form the file →
+  marker → API-payload chain across four files. Goal: one intake —
+  file → `Attachment` → marker → payload — with screen/launch/export
+  split back into their own modules. Smaller than §§2–3; needs care
+  around the marker/edit interplay.
+  (DONE — `intake.ts` keeps the shared kernel
+  (`isPermissionDismissal`, `dropFilesFromDataTransfer`); screen
+  capture → `screenCapture.ts`, launches → `launchFiles.ts`, export →
+  `chatExport.ts`, tests split per file, 18/18 green.)
+
+## 7. New candidates (third pass — all smaller than §§1–3, not started)
+
+- Split render-math out of `render.ts` (729 lines). The math cluster
+  (`extractMath` through `mathHtml`, ~135–430: placeholder codec,
+  preview/copy text, LaTeX fence de-duping, HTML emission) is
+  self-contained against the thoughts/sources prologue (19–65),
+  `sanitize` + `renderInto` (455–573), paste folds (574–637), and
+  `htmlToText` + shiki highlight (639–710). New `render-math.ts` with
+  the placeholder codec as its tested contract. Medium; the remaining
+  file is still multi-concern but each cluster is small enough to leave.
+- Unified notice/banner queue. Five one-off error states each own a
+  flag plus (sometimes) a timer: `attachError`, `vocalizeError`,
+  `voiceError` + `voiceErrorTimer`, `toast` + `toastTimer` in the page,
+  `updateStatus` / `modelError` in `SettingsPanel`. One tiny queue
+  (message, kind, timeout; updater results ride it instead of the
+  `onToast` prop) removes the timer bookkeeping duplication. Small.
+- Extension-per-file split of `editor.ts` (878 lines). The pure
+  paste/fold math is already extracted (`pasteSpans`,
+  `pasteToggleAction`, `sendPasteFolds`, `trimPasteTail`); what remains
+  is CodeMirror wiring in three interleaved groups — paste-collapse
+  extensions, fence fold/copy/run widgets, theme + `createPromptEditor`.
+  One file per group, shared `StateEffect`s in a fourth. Small-medium;
+  mostly import reshuffling, low decision value per line moved.
+
+Looked at and deliberately not adding: the Rust per-platform
+`tts_*`/`dictate_*`/`ocr_*` files each implement the same command
+surface (`supported`/`speak`/`stop`/`voices`) — that is the intended
+`#[cfg]`-gated architecture, not duplication. `ChatSearchStore` is a
+class but correctly held in a plain `let`, never `$state`.
+Splitting `chat.ts` streaming (`sendMessage`/`streamAssistantReply`)
+from state CRUD would churn the one module that already follows the
+target pattern for no tested gain.
+
 ## Shipped alongside (not a refactor — user-facing bug)
 
 - 2026-09-14: macOS Keychain asked "allow" once per provider on every

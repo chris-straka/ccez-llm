@@ -2,6 +2,9 @@
 	import { onMount, tick } from "svelte";
 	import { SvelteMap, SvelteSet } from "svelte/reactivity";
 	import { fade } from "svelte/transition";
+	// Document theme tokens + print sheet (REFACTOR §6): global CSS
+	// lives in src/app.css, imported here (single route).
+	import "../app.css";
 	import {
 		createChatState,
 		formatTokens,
@@ -87,6 +90,7 @@
 		indexAtViewportLine,
 		isEscapeHold,
 		messageEdgeScrollTop,
+		nearBottom,
 		resolveSidebarSpaceEnter,
 		scrollHoldVelocity,
 		spaceFocusesEmptyPrompt,
@@ -238,20 +242,24 @@ import {
 	import { draggedWidth, emptySideview, type SideviewState } from "$lib/sideview";
 	import { annPopBlurAction, annPopCancelKind, annPopSaveKind } from "$lib/annPop";
 	import { idleTapAction, shouldHideForAlways, shouldIdleHide } from "$lib/idle";
+	import {
+		submitAction,
+		sendAction,
+		editMessageAction,
+		commitEditTarget
+	} from "$lib/submit";
+	import { emptyViewport, type ViewportState } from "$lib/viewport";
 	import { ChatSearchStore, createSearchWorker } from "$lib/chatSearchStore";
 
+	import { dropFilesFromDataTransfer, isPermissionDismissal } from "$lib/intake";
+	import { consumeLaunchFiles, splitLaunchFiles, type LaunchQueueLike } from "$lib/launchFiles";
 	import {
-		consumeLaunchFiles,
 		downloadMarkdownFile,
-		dropFilesFromDataTransfer,
 		exportChatMarkdown,
 		fileSaveAccessAvailable,
-		isPermissionDismissal,
-		splitLaunchFiles,
-		type LaunchQueueLike,
 		type SaveHandleLike,
 		type SavePickerOptions
-	} from "$lib/intake";
+	} from "$lib/chatExport";
 	import { isKeyboardOpen, keyboardOverlapPx } from "$lib/viewportReflow";
 import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	import {
@@ -350,14 +358,17 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	let scrollBox: HTMLElement | undefined = $state();
 	/** App root (pinned to the visual height while the phone keyboard is up). */
 	let appEl: HTMLElement | undefined = $state();
+	/** Scroll/viewport values (REFACTOR §6): one grouped object, so
+	scroll effects stop sharing subscription accidents with unrelated
+	domains. The element and the wiring stay here. */
+	let viewport = $state<ViewportState>(emptyViewport());
 	/** Scrollbar thumb shows while a scroll is in flight, then fades. */
-	let scrollIdleTimer: number | undefined;
 	function noteScrolling(): void {
 		selMenu = null;
-		if (scrollBox) stick = nearBottom(scrollBox);
+		if (scrollBox) viewport.stick = nearBottom(scrollBox);
 		scrollBox?.classList.add("scrolling");
-		window.clearTimeout(scrollIdleTimer);
-		scrollIdleTimer = window.setTimeout(() => {
+		window.clearTimeout(viewport.idleTimer);
+		viewport.idleTimer = window.setTimeout(() => {
 			scrollBox?.classList.remove("scrolling");
 			updateWpPos();
 		}, 200);
@@ -584,8 +595,6 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	let sideSearchEl: HTMLInputElement | undefined = $state();
 	/** Last lone "g" timestamp (gg hops to the top of history). */
 	let lastGAt = 0;
-	/** Held scroll key (j/k/d/u glide): pacing state, null when idle. */
-	let scrollHold: { key: string; velocity: number; downAt: number; lastT: number; raf: number } | null = null;
 	/**
 	 * Escape keydown timestamp for the exit-fullscreen chord: F while
 	 * Escape is held exits fullscreen (Escape alone never does). 0
@@ -3595,7 +3604,10 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	}
 
 	async function doSend() {
-		if (!canSubmit) return;
+		// First step lives in sendAction (pinned in submit.test.ts);
+		// the preamble and both continuations stay here as effects.
+		const action = sendAction({ canSubmit, editing: editingMsgId !== null });
+		if (action === "ignore") return;
 		// Haptic tap on send (silenced by the vibration setting; native
 		// haptics in the shell, Web vibrator in the preview).
 		void hapticBeatAsync("send", { enabled: settings.vibration, shell: tauriBackendAvailable() });
@@ -3606,7 +3618,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		// (the only channel in the Android WebView); web asks the
 		// Notification ctor. No-op unless undecided.
 		void ensureReplyNotificationPermissionAsync({ shell: tauriBackendAvailable() });
-		if (editingMsgId) {
+		if (action === "commit-edit") {
 			// Saving an edit rewrites the message in place and resends it:
 			// everything from the edited message on is answered fresh. If
 			// the edited message vanished mid-edit, fall through below and
@@ -3730,21 +3742,21 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	}
 
 	function onSubmit(kind: SubmitKind) {
-		// The annotation pill owns Enter while open, and the Enter that
-		// saved it must not double as a send right after. A pill already
-		// fading out (data committed) owns nothing: the time guard below
-		// still eats a bare double-Enter, while a pointer press in between
-		// clears that guard as a distinct gesture.
-		if (annPop && !annPopClosing) return;
-		// Keyboard sends bypass the dead button: hold the draft while a
-		// reply streams (same gate the button uses — see canSubmit).
-		if (!canSubmit) return;
-		if (kind === "send" && Date.now() < sendGuardUntil) return;
+		// Guards live in submitAction (guard order pinned in
+		// submit.test.ts); the always-hide blur and both bodies stay
+		// here as effects.
+		const action = submitAction({
+			annPopOpen: annPop !== null && !annPopClosing,
+			canSubmit,
+			sendGuardTripped: Date.now() < sendGuardUntil,
+			kind
+		});
+		if (action === "ignore") return;
 		// Always-hide mode: sending yields focus, so the prompt hides
 		// behind the reply (the focusout below does the hiding; this
 		// just drops the caret).
 		if (settings.promptIdleSec === PROMPT_IDLE_ALWAYS) editor?.blur();
-		if (kind === "stage") {
+		if (action === "stage") {
 			// ⌥+Enter: most recent message, no reply; the next submit
 			// carries the full history in order.
 			stageMessage(chatState, composerText(), attachments);
@@ -3777,13 +3789,19 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	 * mid-send.
 	 */
 	function editMessage(index: number) {
-		if (chatState.sending) return;
-		const msg = chat.messages[index];
-		if (!msg || msg.role !== "user") return;
-		if (editingMsgId === msg.id) {
+		// Target gates live in editMessageAction (pinned in
+		// submit.test.ts); refs seeding and the edit effects stay here.
+		const editAction = editMessageAction(chat.messages, index, {
+			sending: chatState.sending,
+			editingId: editingMsgId
+		});
+		if (editAction === "ignore-sending" || editAction === "ignore-not-user") return;
+		if (editAction === "toggle-off") {
 			cancelMessageEdit();
 			return;
 		}
+		const msg = chat.messages[index];
+		if (!msg) return;
 		const refs = annRefsFor(msg.content);
 		annotations = refs
 			? refs.refs.map((r) => ({
@@ -3862,13 +3880,13 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	 * falls through to a fresh send.
 	 */
 	function commitMessageEdit(): boolean {
-		const id = editingMsgId;
-		const target = id ? chat.messages.find((m) => m.id === id) : undefined;
-		if (!target || target.role !== "user") {
+		// Target resolution lives in commitEditTarget (pinned in
+		// submit.test.ts); save and the resend/scroll fork stay here.
+		const index = commitEditTarget(chat.messages, editingMsgId);
+		if (index === null) {
 			resetInlineEdit();
 			return false;
 		}
-		const index = chat.messages.indexOf(target);
 		saveMessageEdit();
 		if (!chatState.sending) rerunFrom(index);
 		else scrollToBottom();
@@ -3963,34 +3981,23 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		};
 	}
 
-	/** Stick-to-bottom: submit/resend/stage pins the view to the newest
-	content; scrolling up unpins (history never yanks), coming back to
-	the bottom re-pins. A finger held on the messages freezes all
-	auto-scroll: the in-flight smooth scroll cancels in place and stream
-	growth never yanks mid-hold. Plain lets: nothing binds to them. */
-	let stick = true;
-	let holding = false;
-	const STICK_PX = 64;
-	function nearBottom(box: HTMLElement): boolean {
-		return box.scrollHeight - box.scrollTop - box.clientHeight <= STICK_PX;
-	}
 	/** Held finger freezes auto-scroll: cancel the in-flight smooth
 	scroll in place; stream growth queues nothing mid-hold. */
 	function freezeScroll(): void {
-		holding = true;
+		viewport.holding = true;
 		const box = scrollBox;
 		if (box) box.scrollTo({ top: box.scrollTop, behavior: "instant" });
 	}
 	/** Finger up: stay exactly where held (re-derive stick from the
 	real position, so a later stream can't yank from stale state). */
 	function releaseScroll(): void {
-		holding = false;
-		if (scrollBox) stick = nearBottom(scrollBox);
+		viewport.holding = false;
+		if (scrollBox) viewport.stick = nearBottom(scrollBox);
 	}
 	function scrollToBottom() {
-		stick = true;
+		viewport.stick = true;
 		// Resisted at submit: a held finger means stay, not scroll.
-		if (holding) return;
+		if (viewport.holding) return;
 		scrollBox?.scrollTo({ top: scrollBox.scrollHeight, behavior: "smooth" });
 	}
 	/**
@@ -4003,7 +4010,6 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	function scrollAfterRender(): void {
 		void tick().then(() => scrollToBottom());
 	}
-	let lastStreamLen = 0;
 	/** Stream-follow: while a reply streams into the visible chat, stay
 	pinned to the newest token — but only while stuck. Instant, never
 	queued behind the submit smooth-scroll. */
@@ -4012,13 +4018,14 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		const msgs = viewChat.messages;
 		const last = msgs[msgs.length - 1];
 		const len = sending && last?.role === "assistant" ? last.content.length : 0;
-		if (len <= lastStreamLen) {
-			lastStreamLen = len;
+		if (len <= viewport.lastStreamLen) {
+			viewport.lastStreamLen = len;
 			return;
 		}
-		lastStreamLen = len;
+		viewport.lastStreamLen = len;
 		const box = scrollBox;
-		if (stick && !holding && box) box.scrollTo({ top: box.scrollHeight, behavior: "instant" });
+		if (viewport.stick && !viewport.holding && box)
+			box.scrollTo({ top: box.scrollHeight, behavior: "instant" });
 	});
 
 	function jumpTo(index: number) {
@@ -4166,23 +4173,29 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		// smooth); per-frame glide sets need instant application, or the
 		// box chases a moving target and lags several-fold behind.
 		scrollBox.style.scrollBehavior = "auto";
-		const hold = { key, velocity, downAt: Date.now(), lastT: performance.now(), raf: 0 };
-		scrollHold = hold;
+		// Generation check, not identity: the tick closes over the raw
+		// hold while reads come back proxied, so only a primitive
+		// distinguishes a superseded glide (see ViewportState.holdSeq).
+		viewport.holdSeq += 1;
+		const seq = viewport.holdSeq;
+		viewport.hold = { key, velocity, downAt: Date.now(), lastT: performance.now(), raf: 0 };
 		const tick = (t: number) => {
-			if (scrollHold !== hold || !scrollBox) return;
+			const hold = viewport.hold;
+			if (!hold || viewport.holdSeq !== seq || !scrollBox) return;
 			scrollBox.scrollTop = stepScrollTop(scrollBox.scrollTop, hold.velocity, t - hold.lastT);
 			hold.lastT = t;
 			hold.raf = requestAnimationFrame(tick);
 		};
-		hold.raf = requestAnimationFrame(tick);
+		const first = viewport.hold;
+		if (first) first.raf = requestAnimationFrame(tick);
 	}
 	/** Release a held key: quick taps land one discrete step, holds just stop. */
 	function releaseScrollHold(event: KeyboardEvent): void {
-		const hold = scrollHold;
+		const hold = viewport.hold;
 		// Case-insensitive: a held Shift+D ("D") releases a "d" hold.
 		if (!hold || event.key.toLowerCase() !== hold.key.toLowerCase()) return;
 		cancelAnimationFrame(hold.raf);
-		scrollHold = null;
+		viewport.hold = null;
 		scrollBox?.style.removeProperty("scroll-behavior");
 		if (holdIsTap(hold.downAt, Date.now()) && scrollBox) {
 			scrollChatBy(
@@ -4193,8 +4206,8 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		}
 	}
 	function stopScrollHold(): void {
-		if (scrollHold) cancelAnimationFrame(scrollHold.raf);
-		scrollHold = null;
+		if (viewport.hold) cancelAnimationFrame(viewport.hold.raf);
+		viewport.hold = null;
 		scrollBox?.style.removeProperty("scroll-behavior");
 	}
 	function scrollChatTop(): void {
@@ -6721,7 +6734,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			window.removeEventListener("dblclick", onDoubleClick);
 			window.removeEventListener("auxclick", onMiddleClick);
 			window.removeEventListener("contextmenu", onContextMenu, true);
-			window.clearTimeout(scrollIdleTimer);
+			window.clearTimeout(viewport.idleTimer);
 			stopSpeaking();
 			stopNative();
 			releaseStudyWake();
@@ -8303,85 +8316,6 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 </div>
 
 <style>
-	/* Root opt-out of WebView algorithmic darkening: the page paints
-	its own dark theme (gated on html[data-theme] below), so an old
-	Android WebView must not "help" by darkening light text into
-	invisibility. Without this the chat list reads fine on desktop
-	but vanishes on the phone in dark mode. */
-	:global(html) {
-		--strong: #1c1c1e;
-		--sel-tint: rgba(99, 102, 241, 0.28);
-		--ok: #1f7a4d;
-		--hl: #eef4ff;
-		--hover-wash: #ececf1;
-		--dim: #6e6e73;
-		--alarm: #c0362c;
-		--panel: #fafafc;
-		--field: #fff;
-		--invert: #1c1c1e;
-		--invert-ink: #fff;
-		--danger: #94250a;
-		color-scheme: light dark;
-		--bg: #fff;
-		--bg-raised: #fff;
-		--bg-wash: #f1f1f4;
-		--ink: #1c1c1e;
-		--muted: #6e6e73;
-		--line: #c7c7cc;
-		--line-soft: #e5e5ea;
-		--line-hover: #8e8e93;
-		--focus: #3a3a3c;
-	}
-	:global(html[data-theme="light"]) {
-		--strong: #1c1c1e;
-		--sel-tint: rgba(99, 102, 241, 0.28);
-		--ok: #1f7a4d;
-		--hl: #eef4ff;
-		--hover-wash: #ececf1;
-		--dim: #6e6e73;
-		--alarm: #c0362c;
-		--panel: #fafafc;
-		--field: #fff;
-		--invert: #1c1c1e;
-		--invert-ink: #fff;
-		--danger: #94250a;
-		color-scheme: light;
-		--bg: #fff;
-		--bg-raised: #fff;
-		--bg-wash: #f1f1f4;
-		--ink: #1c1c1e;
-		--muted: #6e6e73;
-		--line: #c7c7cc;
-		--line-soft: #e5e5ea;
-		--line-hover: #8e8e93;
-		--focus: #3a3a3c;
-	}
-	:global(html[data-theme="dark"]) {
-		--strong: #aeaeb2;
-		--sel-tint: rgba(129, 140, 248, 0.4);
-		--ok: #7cc3a3;
-		--hl: #12233d;
-		--hover-wash: #2c2c2e;
-		--dim: #aeaeb2;
-		--alarm: #e89a90;
-		--panel: #1c1c1e;
-		--field: #101013;
-		--invert: #f2f2f7;
-		--invert-ink: #1c1c1e;
-		--danger: #e89a90;
-		--bg: #17171a;
-		--bg-raised: #1c1c1e;
-		--bg-wash: #2c2c2e;
-		--ink: #f2f2f7;
-		--muted: #98989f;
-		--line: #48484a;
-		--line-soft: #38383a;
-		--line-hover: #636366;
-		--focus: #aeaeb2;
-	}
-	:global(body) {
-		margin: 0;
-	}
 	.app {
 		display: flex;
 		height: 100vh;
@@ -8400,15 +8334,6 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		not a scroll (it used to open settings by accident). clip, not
 		hidden, so fixed drawers stay viewport-relative. */
 		overflow-x: clip;
-	}
-	:global(html),
-	:global(body) {
-		/* The document itself never scrolls: every pane (.messages,
-		drawers, sheets) scrolls inside .app. Without this, iOS pans
-		the whole page up to reveal the focused composer, parking the
-		header pill under the island until the keyboard closes. */
-		overflow: hidden;
-		height: 100%;
 	}
 	/* Overlay drawer: the chat list slides over the main column instead
 	of squeezing it — the main chat keeps full width whether sidebars
@@ -12136,32 +12061,5 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	shows only it — every other .app child hides. */
 	#study-sheet-print {
 		display: none;
-	}
-	@media print {
-		.app > *:not(#study-sheet-print) {
-			display: none !important;
-		}
-		#study-sheet-print {
-			display: block !important;
-			color: #000;
-			background: #fff;
-			padding: 24px;
-		}
-		#study-sheet-print h1 {
-			font-size: 20px;
-			margin: 0 0 4px;
-		}
-		#study-sheet-print .sheet-sub {
-			color: #444;
-			margin: 0 0 16px;
-		}
-		#study-sheet-print h2 {
-			font-size: 15px;
-			margin: 16px 0 4px;
-		}
-		#study-sheet-print p {
-			white-space: pre-wrap;
-			margin: 0 0 8px;
-		}
 	}
 </style>

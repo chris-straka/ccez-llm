@@ -8,7 +8,8 @@
  * delete the per-site `as unknown as {...}` repeats, never the guards.
  */
 import type { HighlightRegistry } from "./annHighlights";
-import type { LaunchQueueLike, SaveHandleLike, SavePickerOptions } from "./intake";
+import type { LaunchQueueLike } from "./launchFiles";
+import type { SaveHandleLike, SavePickerOptions } from "./chatExport";
 import type { SpeechRecognitionInstance } from "./voice";
 
 type SpeechRecognitionCtor = new () => SpeechRecognitionInstance;

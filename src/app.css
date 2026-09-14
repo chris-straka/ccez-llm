@@ -1,0 +1,124 @@
+/* App-wide document theme (moved out of +page.svelte, REFACTOR §6).
+ *
+ * Token definitions, document base rules, and the print sheet.
+ * These compiled unscoped already (:global), so the move is
+ * byte-identical at runtime. Component dark-theme overrides stay
+ * co-located with their components in +page.svelte.
+ */
+/* Root opt-out of WebView algorithmic darkening: the page paints
+its own dark theme (gated on html[data-theme] below), so an old
+Android WebView must not "help" by darkening light text into
+invisibility. Without this the chat list reads fine on desktop
+but vanishes on the phone in dark mode. */
+html {
+	--strong: #1c1c1e;
+	--sel-tint: rgba(99, 102, 241, 0.28);
+	--ok: #1f7a4d;
+	--hl: #eef4ff;
+	--hover-wash: #ececf1;
+	--dim: #6e6e73;
+	--alarm: #c0362c;
+	--panel: #fafafc;
+	--field: #fff;
+	--invert: #1c1c1e;
+	--invert-ink: #fff;
+	--danger: #94250a;
+	color-scheme: light dark;
+	--bg: #fff;
+	--bg-raised: #fff;
+	--bg-wash: #f1f1f4;
+	--ink: #1c1c1e;
+	--muted: #6e6e73;
+	--line: #c7c7cc;
+	--line-soft: #e5e5ea;
+	--line-hover: #8e8e93;
+	--focus: #3a3a3c;
+}
+html[data-theme="light"] {
+	--strong: #1c1c1e;
+	--sel-tint: rgba(99, 102, 241, 0.28);
+	--ok: #1f7a4d;
+	--hl: #eef4ff;
+	--hover-wash: #ececf1;
+	--dim: #6e6e73;
+	--alarm: #c0362c;
+	--panel: #fafafc;
+	--field: #fff;
+	--invert: #1c1c1e;
+	--invert-ink: #fff;
+	--danger: #94250a;
+	color-scheme: light;
+	--bg: #fff;
+	--bg-raised: #fff;
+	--bg-wash: #f1f1f4;
+	--ink: #1c1c1e;
+	--muted: #6e6e73;
+	--line: #c7c7cc;
+	--line-soft: #e5e5ea;
+	--line-hover: #8e8e93;
+	--focus: #3a3a3c;
+}
+html[data-theme="dark"] {
+	--strong: #aeaeb2;
+	--sel-tint: rgba(129, 140, 248, 0.4);
+	--ok: #7cc3a3;
+	--hl: #12233d;
+	--hover-wash: #2c2c2e;
+	--dim: #aeaeb2;
+	--alarm: #e89a90;
+	--panel: #1c1c1e;
+	--field: #101013;
+	--invert: #f2f2f7;
+	--invert-ink: #1c1c1e;
+	--danger: #e89a90;
+	--bg: #17171a;
+	--bg-raised: #1c1c1e;
+	--bg-wash: #2c2c2e;
+	--ink: #f2f2f7;
+	--muted: #98989f;
+	--line: #48484a;
+	--line-soft: #38383a;
+	--line-hover: #636366;
+	--focus: #aeaeb2;
+}
+body {
+	margin: 0;
+}
+
+html,
+body {
+	/* The document itself never scrolls: every pane (.messages,
+	drawers, sheets) scrolls inside .app. Without this, iOS pans
+	the whole page up to reveal the focused composer, parking the
+	header pill under the island until the keyboard closes. */
+	overflow: hidden;
+	height: 100%;
+}
+
+@media print {
+	.app > *:not(#study-sheet-print) {
+		display: none !important;
+	}
+	#study-sheet-print {
+		display: block !important;
+		color: #000;
+		background: #fff;
+		padding: 24px;
+	}
+	#study-sheet-print h1 {
+		font-size: 20px;
+		margin: 0 0 4px;
+	}
+	#study-sheet-print .sheet-sub {
+		color: #444;
+		margin: 0 0 16px;
+	}
+	#study-sheet-print h2 {
+		font-size: 15px;
+		margin: 16px 0 4px;
+	}
+	#study-sheet-print p {
+		white-space: pre-wrap;
+		margin: 0 0 8px;
+	}
+}

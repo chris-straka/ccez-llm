@@ -9,6 +9,21 @@
 /** One j/k step: a few lines, fixed so unit tests can pin it. */
 export const SCROLLKEY_LINE_PX = 72;
 
+/** Stick-to-bottom slop: within this of the bottom counts as bottom. */
+export const STICK_PX = 64;
+
+/**
+ * Whether a scroller sits at (or near) its bottom. Pure over the
+ * box metrics so the stick re-derives from the real position, never
+ * from stale state.
+ */
+export function nearBottom(
+  metrics: { scrollHeight: number; scrollTop: number; clientHeight: number },
+  slopPx = STICK_PX,
+): boolean {
+  return metrics.scrollHeight - metrics.scrollTop - metrics.clientHeight <= slopPx;
+}
+
 /** How long Escape must be held to exit fullscreen: two full seconds,
 Chrome parity — a tap or a firm press still only dismisses
 menus/overlays exactly as today. */

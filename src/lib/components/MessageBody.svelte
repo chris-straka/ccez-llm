@@ -13,10 +13,9 @@
 		foldSegments,
 		pasteFoldButton,
 		highlightRendered,
-		mathCopyText,
-		foldPreviewText,
 		type RenderedMessage
 	} from "$lib/render";
+	import { mathCopyText, foldPreviewText } from "$lib/render-math";
 	import { codeRunBody, runCodeBlock } from "$lib/coderun";
 	import { closestFromTarget } from "$lib/events";
 	import type { ChatMsg, ChatMsgId } from "$lib/chat";

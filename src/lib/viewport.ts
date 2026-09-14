@@ -1,0 +1,61 @@
+/**
+ * Viewport state object (scroll/viewport slice, REFACTOR §6).
+ *
+ * Stick-to-bottom, the held-finger freeze, the scroll-hold rAF loop,
+ * the scrollbar fade timer, and the stream-follow cache lived as
+ * scattered plain lets in the page. They group here as one
+ * `ViewportState` (following the `FindState` / `PaletteState` /
+ * `SideviewState` pilots): plain fields, nothing binds to them, so
+ * scroll effects stop sharing subscription accidents with unrelated
+ * domains. Element handles (`scrollBox`) and timer/frame wiring stay
+ * in the component — only the values move. Unit-tested in
+ * `viewport.test.ts`.
+ */
+
+/** One frame-paced scroll-hold glide (started by a held key). */
+export interface ScrollHold {
+  key: string;
+  velocity: number;
+  downAt: number;
+  lastT: number;
+  raf: number;
+}
+
+export interface ViewportState {
+  /**
+   * Stick-to-bottom: submit/resend/stage pins the view to the newest
+   * content; scrolling up unpins (history never yanks), coming back
+   * to the bottom re-pins.
+   */
+  stick: boolean;
+  /**
+   * A finger held on the messages freezes all auto-scroll: the
+   * in-flight smooth scroll cancels in place and stream growth never
+   * yanks mid-hold.
+   */
+  holding: boolean;
+  /** Active key-hold glide, if any. */
+  hold: ScrollHold | null;
+  /**
+   * Glide generation: the rAF tick captures the count at start and
+   * exits when it changes. Identity comparison cannot work here —
+   * `$state` proxies never equal the raw object the tick closed
+   * over — so a primitive generation does the supersede check.
+   */
+  holdSeq: number;
+  /** Scrollbar fade timer handle (thumb shows while scrolling). */
+  idleTimer: number | undefined;
+  /** Stream-follow cache: last streamed length already pinned. */
+  lastStreamLen: number;
+}
+
+export function emptyViewport(): ViewportState {
+  return {
+    stick: true,
+    holding: false,
+    hold: null,
+    holdSeq: 0,
+    idleTimer: undefined,
+    lastStreamLen: 0,
+  };
+}
