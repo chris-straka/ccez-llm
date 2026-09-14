@@ -116,12 +116,14 @@ modules — they never split the template for size alone.
   annotation UI, sideview) with updater functions.
 - No behavior change; stops unrelated domains from sharing
   effect-subscription accidents.
-- Pilot shipped: the find bar is one `FindState` object (`src/lib/find.ts`
-  with `emptyFind` + the tested `stepFindCursor` cycle math); the open /
-  step / close functions and the template bind over `find.*`. The
-  outside-dismiss keeps its flag-only close verbatim. Next pilots in
-  size order: sideview open/width, then the search palette
-  (open/query/hits/cursor), then annotation UI.
+- Pilots shipped: the find bar is one `FindState` object (`src/lib/find.ts`
+  with `emptyFind` + the tested `stepFindCursor` cycle math); the search
+  palette is one `PaletteState` object (`src/lib/palette.ts` with
+  `emptyPalette` — open/query/hits/busy/cursor, timers/els/store stay
+  out). Resets stay field-by-field where the original preserved a field
+  (palette close keeps the cursor, reopen resets it). Next pilots in
+  size order: sideview open/width (async shell paths need hand
+  verification — not a blind slice), then annotation UI.
 
 ## 5. New candidates (from the Sep 2026 slices)
 

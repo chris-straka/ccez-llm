@@ -233,6 +233,7 @@ import {
 	import { isFuriganaCached } from "$lib/furigana";
 	import { buildSearchDocs, chatMatchesQuery, findMessageIndices, type SearchHit } from "$lib/chatSearch";
 	import { emptyFind, stepFindCursor, type FindState } from "$lib/find";
+	import { emptyPalette, type PaletteState } from "$lib/palette";
 	import { ChatSearchStore, createSearchWorker } from "$lib/chatSearchStore";
 
 	import {
@@ -588,11 +589,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	 * Command palette (Ctrl+P / Cmd+P): full-text search across chats
 	 * and annotations. Null when closed.
 	 */
-	let searchOpen = $state(false);
-	let searchQuery = $state("");
-	let searchHits = $state<SearchHit[]>([]);
-	let searchBusy = $state(false);
-	let searchCursor = $state(0);
+	let palette = $state<PaletteState>(emptyPalette());
 	let searchInputEl: HTMLInputElement | undefined = $state();
 	let searchResultsEl: HTMLElement | undefined = $state();
 	/** Search documents snapshot (Worker + IndexedDB, in-memory fallback). */
@@ -1139,7 +1136,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 					// The palette may have queried before this snapshot
 					// landed (fast typists beat the 500ms debounce): an
 					// open query re-runs against the fresh snapshot.
-					if (searchOpen && searchQuery.trim()) runSearchQuery();
+					if (palette.open && palette.query.trim()) runSearchQuery();
 				});
 			} catch {
 				// Search never breaks the chat: stale snapshot stays live.
@@ -1148,17 +1145,19 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	}
 
 	function openSearch(): void {
-		searchOpen = true;
-		searchCursor = 0;
+		palette.open = true;
+		palette.cursor = 0;
 		scheduleSearchIndex();
 		requestAnimationFrame(() => searchInputEl?.focus());
 	}
 
 	function closeSearch(): void {
-		searchOpen = false;
-		searchQuery = "";
-		searchHits = [];
-		searchBusy = false;
+		// Field-by-field on purpose: closing preserves the cursor
+		// (reopen resets it), exactly like the scattered `$state` did.
+		palette.open = false;
+		palette.query = "";
+		palette.hits = [];
+		palette.busy = false;
 		if (searchQueryTimer) {
 			clearTimeout(searchQueryTimer);
 			searchQueryTimer = null;
@@ -1337,25 +1336,25 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 
 	function runSearchQuery(): void {
 		if (searchQueryTimer) clearTimeout(searchQueryTimer);
-		const query = searchQuery;
+		const query = palette.query;
 		if (!query.trim()) {
-			searchHits = [];
-			searchBusy = false;
+			palette.hits = [];
+			palette.busy = false;
 			return;
 		}
-		searchBusy = true;
+		palette.busy = true;
 		searchQueryTimer = setTimeout(() => {
 			searchQueryTimer = null;
 			void ensureSearchStore()
 				.query(query, 30)
 				.then((hits) => {
-					searchHits = hits;
-					searchCursor = 0;
-					searchBusy = false;
+					palette.hits = hits;
+					palette.cursor = 0;
+					palette.busy = false;
 				})
 				.catch(() => {
-					searchHits = [];
-					searchBusy = false;
+					palette.hits = [];
+					palette.busy = false;
 				});
 		}, 120);
 	}
@@ -1391,9 +1390,9 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		if (!chat) return;
 		previewChatId = null;
 		transitionToChat(chat.id);
-		searchOpen = false;
-		searchQuery = "";
-		searchHits = [];
+		palette.open = false;
+		palette.query = "";
+		palette.hits = [];
 		if (hit.doc.msgId) {
 			const index = chat.messages.findIndex((m) => m.id === hit.doc.msgId);
 			if (index >= 0) {
@@ -1417,9 +1416,10 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	}
 
 	function moveSearchCursor(delta: 1 | -1): void {
-		if (searchHits.length === 0) return;
-		searchCursor =
-			((searchCursor + delta) % searchHits.length + searchHits.length) % searchHits.length;
+		if (palette.hits.length === 0) return;
+		palette.cursor =
+			((palette.cursor + delta) % palette.hits.length + palette.hits.length) %
+			palette.hits.length;
 	}
 
 	/**
@@ -5339,13 +5339,13 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				// A modal always wins Esc, even from inside the prompt.
 				shortcutsOpen = false;
 				inspectChar = null;
-			} else if (searchOpen) {
+			} else if (palette.open) {
 				// The search palette wins Esc next, even from its input.
 				// A first ESC moves DOM focus input -> list (the query
 				// stays, the highlight is already tracked); a second
 				// ESC — or one with no results — closes.
-				if (document.activeElement === searchInputEl && searchHits.length > 0) {
-					focusSearchHit(searchCursor);
+				if (document.activeElement === searchInputEl && palette.hits.length > 0) {
+					focusSearchHit(palette.cursor);
 				} else closeSearch();
 			} else if (find.open) {
 				// The find bar closes from anywhere (its input included).
@@ -5404,7 +5404,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 					activeInPrompt: isPromptTarget(document.activeElement),
 					overlayOpen: stageOwnedByOverlay({
 						shortcutsOpen,
-						searchOpen,
+						searchOpen: palette.open,
 						inspectOpen: inspectChar !== null,
 						findOpen: find.open,
 						settingsOpen,
@@ -5508,7 +5508,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				// Browsers reserve Ctrl+P for print and may keep it; the
 				// shell owns the combo and always delivers it.
 								consumeEvent(event);
-				if (searchOpen) closeSearch();
+				if (palette.open) closeSearch();
 				else openSearch();
 				return;
 			}
@@ -5867,7 +5867,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 					inEditor: inEditor !== null,
 					androidUI,
 					shortcutsOpen,
-					searchOpen,
+					searchOpen: palette.open,
 					inspectOpen: inspectChar !== null,
 					inOwnedTarget: isScrollEnterOwnedTarget(event.target)
 				})
@@ -5882,7 +5882,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			const modalScroll = modalScrollAction({
 				...keyFacts(event),
 				shortcutsOpen,
-				searchOpen,
+				searchOpen: palette.open,
 				inspectOpen: inspectChar !== null,
 				inEditor: inEditor !== null,
 				androidUI,
@@ -5912,7 +5912,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 				// owning the screen, and no typing target under the
 				// key. Every existing binding above keeps its keys —
 				// this branch only claims otherwise-unbound bare keys.
-				const modalOpen = Boolean(shortcutsOpen || searchOpen || inspectChar);
+				const modalOpen = Boolean(shortcutsOpen || palette.open || inspectChar);
 				const typing = Boolean(inEditor || isEditableTarget(event.target) || inSidebar);
 				// Ctrl+U/D jumps and empty-chat Space (see
 				// unselectedScrollAction); the intent glide below keeps
@@ -8036,7 +8036,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		</div>
 	{/if}
 
-	{#if searchOpen}
+	{#if palette.open}
 		<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 		<!-- Command palette: full-text search across chats/annotations. -->
 		<div
@@ -8051,7 +8051,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 						type="search"
 						class="search-input"
 						bind:this={searchInputEl}
-						bind:value={searchQuery}
+						bind:value={palette.query}
 						oninput={runSearchQuery}
 						placeholder="Search chats and annotations"
 						aria-label="Search chats and annotations"
@@ -8067,7 +8067,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 								moveSearchCursor(-1);
 							} else if (e.key === "Enter") {
 								e.preventDefault();
-								const hit = searchHits[searchCursor];
+								const hit = palette.hits[palette.cursor];
 								if (hit) enterSearchHit(hit);
 							}
 						}}
@@ -8083,29 +8083,29 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 					role="listbox"
 					aria-label="Search results"
 				>
-					{#if searchBusy}
+					{#if palette.busy}
 						<p class="search-status" role="status">Searching…</p>
-					{:else if searchQuery.trim() && searchHits.length === 0}
+					{:else if palette.query.trim() && palette.hits.length === 0}
 						<p class="search-status">No matches.</p>
 					{:else}
-						{#each searchHits as hit, n (hit.doc.chatId + (hit.doc.msgId ?? "") + hit.doc.kind)}
+						{#each palette.hits as hit, n (hit.doc.chatId + (hit.doc.msgId ?? "") + hit.doc.kind)}
 							<button
 								type="button"
 								role="option"
-								aria-selected={n === searchCursor}
+								aria-selected={n === palette.cursor}
 								class="search-hit"
-								class:cursor={n === searchCursor}
-								onmouseenter={() => (searchCursor = n)}
+								class:cursor={n === palette.cursor}
+								onmouseenter={() => (palette.cursor = n)}
 								onclick={() => enterSearchHit(hit)}
 								onkeydown={(e) => {
 									if (e.key === "j" || e.key === "ArrowDown") {
 										e.preventDefault();
 										moveSearchCursor(1);
-										focusSearchHit(searchCursor);
+										focusSearchHit(palette.cursor);
 									} else if (e.key === "k" || e.key === "ArrowUp") {
 										e.preventDefault();
 										moveSearchCursor(-1);
-										focusSearchHit(searchCursor);
+										focusSearchHit(palette.cursor);
 									}
 								}}
 							>
