@@ -1,4 +1,5 @@
 import { ttsLangFor } from "./reading";
+import type { VoiceEngine } from "./settings";
 
 /**
  * Voice mode (Stage 6): sentence-chunked speech queue with skip-midway,
@@ -114,6 +115,67 @@ export function splitSpeechSegments(
 	langForSentence: (sentence: string) => string
 ): SpeechSegment[] {
 	return splitSentences(text).map((sentence) => ({ text: sentence, lang: langForSentence(sentence) }));
+}
+
+/** Latin-script fallback voice locale: the pinned voice language, else US English. */
+export function latinFallback(voiceLang: string | null | undefined): string {
+	return voiceLang?.trim() || "en-US";
+}
+
+/**
+ * Sync speech locale for message content: the same sentence routing
+ * speakReply uses, minus the async recognizer (Latin-script text
+ * lands on the voice-language fallback either way on devices
+ * without the bridge), resolved through the stand-in map (Latin
+ * reads Italian, Sanskrit Hindi). Feeds the no-voice gate below.
+ */
+export function messageSpeechLang(
+	content: string,
+	fallback: string,
+	voices: ReadonlyArray<{ lang: string }>
+): string {
+	return effectiveSpeechLang(replyLangFor(speechText(content), fallback), voices);
+}
+
+/**
+ * Whether attempting speech makes sense: the web engine with no
+ * installed voice for the locale (Latin with no Latin voice, …)
+ * would only raise the error banner, so callers disable or skip
+ * instead. Native availability is bridge-side and stays on the
+ * error path; an unloaded inventory never disables.
+ */
+export function speechAttemptable(
+	engine: VoiceEngine,
+	lang: string,
+	voices: ReadonlyArray<{ lang: string }>
+): boolean {
+	if (engine !== "web") return true;
+	return webVoiceAvailable(lang, voices);
+}
+
+/**
+ * Voice locale per sentence: non-Latin scripts resolve sync from the
+ * sentence itself (reliable, needs no bridge); Latin sentences share
+ * one recognizer pass (`latinLang`), since French vs English look
+ * alike. Results cache per sentence (a plain Map: the cache is never
+ * rendered, so no reactivity needed).
+ */
+export function speechLangsFor(
+	latinLang: string,
+	voices: ReadonlyArray<{ lang: string }>
+): (sentence: string) => string {
+	const cache = new Map<string, string>();
+	return (sentence: string) => {
+		const hit = cache.get(sentence);
+		if (hit !== undefined) return hit;
+		// Stand-ins resolve per sentence too: a Latin sentence with
+		// no Latin voice reads Italian rather than failing.
+		// Han-only fragments inherit the surrounding voice (see
+		// sentenceSpeechLang) instead of flipping to Chinese.
+		const lang = effectiveSpeechLang(sentenceSpeechLang(sentence, latinLang), voices);
+		cache.set(sentence, lang);
+		return lang;
+	};
 }
 
 export interface VoiceProgress {

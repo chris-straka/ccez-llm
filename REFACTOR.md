@@ -119,8 +119,12 @@ modules — they never split the template for size alone.
   `message-actions.ts`, and the offer computation is now shared:
   `offeredLocalAids` / `aidDisplayText` live in `reading.ts` beside
   the detection primitives (hotkeys, render, and vocalize call one
-  definition). What remains is the render-path unification, which
-  needs streaming-careful redesign, not slicing.
+  definition). The speech language steps moved the same way
+  (`latinFallback` / `messageSpeechLang` / `speechAttemptable` /
+  `speechLangsFor` in `voice.ts`, call sites pass engine/fallback/
+  inventory explicitly). What remains is the render-path unification
+  and the engine-agnostic controller, which need streaming-careful
+  redesign and ears respectively — not slicing.
 
 ## 4. Domain-slice the `$state` scatter (small, incremental)
 

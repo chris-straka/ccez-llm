@@ -258,9 +258,10 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		speakText,
 		speakMultilingual,
 		speechText,
-		replyLangFor,
-		sentenceSpeechLang,
-		webVoiceAvailable,
+		latinFallback,
+		messageSpeechLang,
+		speechAttemptable,
+		speechLangsFor,
 		effectiveSpeechLang,
 		stopSpeaking,
 		micAvailable,
@@ -3191,10 +3192,6 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		}
 	}
 
-	function latinFallback(): string {
-		return settings.voiceLang?.trim() || "en-US";
-	}
-
 	function resetVoice(): void {
 		speakingId = null;
 		speakingSelection = null;
@@ -3247,32 +3244,13 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		}
 	}
 
-	/**
-	 * Sync speech locale for a message: the same sentence routing
-	 * speakReply uses, minus the async recognizer (Latin-script text
-	 * lands on the voice-language fallback either way on devices
-	 * without the bridge), resolved through the stand-in map (Latin
-	 * reads Italian, Sanskrit Hindi). Feeds the no-voice gate below.
-	 */
-	function messageSpeechLang(msg: ChatMsg): string {
-		return effectiveSpeechLang(replyLangFor(speechText(msg.content), latinFallback()), webVoices());
-	}
-
-	/**
-	 * Whether attempting speech makes sense: the web engine with no
-	 * installed voice for the locale (Latin with no Latin voice, …)
-	 * would only raise the error banner, so callers disable or skip
-	 * instead. Native availability is bridge-side and stays on the
-	 * error path; an unloaded inventory never disables.
-	 */
-	function speechAttemptable(lang: string): boolean {
-		if (settings.voiceEngine !== "web") return true;
-		return webVoiceAvailable(lang, webVoices());
-	}
-
 	/** Speak-button state per message (a playing message always offers Stop). */
 	function messageSpeakable(msg: ChatMsg): boolean {
-		return speechAttemptable(messageSpeechLang(msg));
+		return speechAttemptable(
+			settings.voiceEngine,
+			messageSpeechLang(msg.content, latinFallback(settings.voiceLang), webVoices()),
+			webVoices()
+		);
 	}
 
 	function startSpeech(id: string, text: string, lang: string | ((sentence: string) => string), quiet = false): void {
@@ -3339,37 +3317,17 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		}
 	}
 
-	/**
-	 * Voice locale per sentence: non-Latin scripts resolve sync from the
-	 * sentence itself (reliable, needs no bridge); Latin sentences share
-	 * one recognizer pass (`latinLang`), since French vs English look
-	 * alike. The reply pill's voice never leaks here: an English message
-	 * with the Chinese pill on reads English.
-	 */
-	function speechLangsFor(latinLang: string): (sentence: string) => string {
-		const cache = new SvelteMap<string, string>();
-		return (sentence: string) => {
-			const hit = cache.get(sentence);
-			if (hit !== undefined) return hit;
-			// Stand-ins resolve per sentence too: a Latin sentence with
-			// no Latin voice reads Italian rather than failing.
-			// Han-only fragments inherit the surrounding voice (see
-			// sentenceSpeechLang) instead of flipping to Chinese.
-			const lang = effectiveSpeechLang(sentenceSpeechLang(sentence, latinLang), webVoices());
-			cache.set(sentence, lang);
-			return lang;
-		};
-	}
-
 	async function speakReply(msg: ChatMsg, quiet = false): Promise<void> {
 		const text = speechText(msg.content);
 		if (!text) return;
-		if (!speechAttemptable(messageSpeechLang(msg))) {
+		const fallback = latinFallback(settings.voiceLang);
+		const voices = webVoices();
+		if (!speechAttemptable(settings.voiceEngine, messageSpeechLang(msg.content, fallback, voices), voices)) {
 			if (!quiet) setVoiceError("No voice for this language.");
 			return;
 		}
 		const stripped = text.replace(/```[\s\S]*?```/g, " ");
-		startSpeech(msg.id, text, speechLangsFor(await quoteLangFor(stripped, latinFallback())), quiet);
+		startSpeech(msg.id, text, speechLangsFor(await quoteLangFor(stripped, fallback), voices), quiet);
 	}
 
 	/** Speak-button label. */
@@ -3388,7 +3346,15 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 			// Background readback stays silent throughout: no banner for
 			// something the user never asked to hear, including a runtime
 			// failure after an attemptable-looking voice.
-			if (!speechAttemptable(messageSpeechLang(last))) return;
+			const voices = webVoices();
+			if (
+				!speechAttemptable(
+					settings.voiceEngine,
+					messageSpeechLang(last.content, latinFallback(settings.voiceLang), voices),
+					voices
+				)
+			)
+				return;
 			void speakReply(last, true);
 		}
 	}
@@ -3460,15 +3426,19 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		// reads Japanese — the quote alone would read Chinese.
 		const sentence = sentenceForQuote(context, quote);
 		const probe = sentence ?? context;
-		const lang = effectiveSpeechLang(await quoteLangForContext(probe, context, latinFallback()), webVoices());
-		if (!speechAttemptable(lang)) {
+		const voices = webVoices();
+		const lang = effectiveSpeechLang(
+			await quoteLangForContext(probe, context, latinFallback(settings.voiceLang)),
+			voices
+		);
+		if (!speechAttemptable(settings.voiceEngine, lang, voices)) {
 			selMenu = null;
 			setVoiceError("No voice for this language.");
 			return;
 		}
 		if (!keepMenu) selMenu = null;
 		speakingSelection = messageId;
-		startSpeech("selection", quote, speechLangsFor(lang));
+		startSpeech("selection", quote, speechLangsFor(lang, voices));
 	}
 
 	/** Pill-mic dictation into the annotation comment box. */
@@ -3493,7 +3463,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 	): Promise<(() => void) | null> {
 		micStarting = true;
 		try {
-			const outcome = await startNativeDictation(latinFallback(), {
+			const outcome = await startNativeDictation(latinFallback(settings.voiceLang), {
 				onFinal: onResult,
 				onError
 			});
@@ -3507,7 +3477,7 @@ import { contentFitsViewport, isPromptIdle, stageOwnedByOverlay } from "$lib/chr
 		} finally {
 			micStarting = false;
 		}
-		return dictateOnce(latinFallback(), onResult, onError);
+		return dictateOnce(latinFallback(settings.voiceLang), onResult, onError);
 	}
 	async function togglePillMic(): Promise<void> {
 		if (micStarting) return;

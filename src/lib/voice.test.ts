@@ -3,6 +3,10 @@ import { describe, it, expect } from "vitest";
 import {
 	splitSentences,
 	speechText,
+	latinFallback,
+	messageSpeechLang,
+	speechAttemptable,
+	speechLangsFor,
 	replyLangFor,
 	sentenceSpeechLang,
 	webVoiceAvailable,
@@ -159,5 +163,50 @@ describe("friendlyMicError", () => {
 			delete (window.navigator as unknown as Record<string, unknown>).onLine;
 		}
 		expect(friendlyMicError("network")).toMatch(/transcription service/i);
+	});
+});
+
+describe("latinFallback", () => {
+	it("pins the voice language, else US English", () => {
+		expect(latinFallback("fr-FR ")).toBe("fr-FR");
+		expect(latinFallback("")).toBe("en-US");
+		expect(latinFallback(null)).toBe("en-US");
+		expect(latinFallback(undefined)).toBe("en-US");
+	});
+});
+
+describe("messageSpeechLang", () => {
+	const VOICES = [{ lang: "en-US" }, { lang: "ja-JP" }];
+	it("routes whole replies through the fallback and the stand-in map", () => {
+		expect(messageSpeechLang("Hello world", "en-US", VOICES)).toBe("en-US");
+		expect(messageSpeechLang("こんにちは。", "en-US", VOICES)).toBe("ja-JP");
+		expect(messageSpeechLang("Hello world", "de-DE", VOICES)).toBe("de-DE");
+		// Unloaded inventories pass everything through, never guess.
+		expect(messageSpeechLang("こんにちは。", "en-US", [])).toBe("ja-JP");
+	});
+});
+
+describe("speechAttemptable", () => {
+	const VOICES = [{ lang: "en-US" }];
+	it("gates the web engine on inventory, never native or unloaded lists", () => {
+		expect(speechAttemptable("native", "xx-YY", VOICES)).toBe(true);
+		expect(speechAttemptable("web", "en-US", VOICES)).toBe(true);
+		expect(speechAttemptable("web", "fr-FR", VOICES)).toBe(false);
+		expect(speechAttemptable("web", "fr-FR", [])).toBe(true);
+	});
+});
+
+describe("speechLangsFor", () => {
+	it("resolves each sentence once and caches the answer", () => {
+		const VOICES = [{ lang: "en-US" }, { lang: "ja-JP" }];
+		const langFor = speechLangsFor("en-US", VOICES);
+		expect(langFor("Hello world.")).toBe("en-US");
+		expect(langFor("Hello world.")).toBe("en-US");
+		expect(langFor("こんにちは。")).toBe("ja-JP");
+	});
+
+	it("reads Latin with the Italian stand-in when no Latin voice exists", () => {
+		const langFor = speechLangsFor("la", [{ lang: "it-IT" }]);
+		expect(langFor("Hello world.")).toBe("it-IT");
 	});
 });
