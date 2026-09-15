@@ -375,6 +375,10 @@ export function equationBodyOf(node: Node | null): Element | null {
 	if (element?.closest?.(".ccez-math-raw")) return null;
 	const wrap = element?.closest?.("[data-math-index]");
 	if (!(wrap instanceof Element)) return null;
+	// A folded label pick is already whole: expanding it onto the
+	// folded-away body (display:none) moves the paint where nothing
+	// can show and strands the menu the same way as the raw view.
+	if (wrap instanceof HTMLElement && wrap.dataset.folded === "1") return null;
 	const body = wrap.querySelector(".ccez-math-body");
 	return body instanceof Element ? body : wrap;
 }

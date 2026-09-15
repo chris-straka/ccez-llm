@@ -2581,11 +2581,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// article trims back to the anchor message's edge first.
 		const live = window.getSelection();
 		if (live) lockSelectionToMessage(live, articleOf);
-		// Triple-click paragraph picks grab the block terminator
-		// newline, painting the line beneath the highlight (the quote
-		// trims it anyway): drop it before the menu reads the quote.
-		// Deliberate drags into the next line keep theirs.
-		if (event.detail === 3 && live && live.rangeCount > 0) {
+		// Multi-click picks grab the block terminator newline,
+		// painting the line beneath the highlight (the quote trims it
+		// anyway): drop it before the menu reads the quote. A word
+		// pick with no trailing newline passes through untouched, so
+		// double-click stays safe. Deliberate drags into the next
+		// line keep theirs.
+		if (event.detail >= 2 && live && live.rangeCount > 0) {
 			try {
 				trimParagraphTerminator(live.getRangeAt(0));
 			} catch {
@@ -6408,6 +6410,16 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			if (!clickGuardsPass(event)) return;
 			const live = window.getSelection();
 			if (live) lockSelectionToMessage(live, articleOf);
+			// Word picks at a line's end grab the trailing newline,
+			// painting the line beneath (same terminator as triple-click
+			// paragraph picks, which trims in onSelectEnd instead).
+			if (live && live.rangeCount > 0) {
+				try {
+					trimParagraphTerminator(live.getRangeAt(0));
+				} catch {
+					// Cosmetic: the untrimmed pick still summons.
+				}
+			}
 			placeSelMenu(event.clientX, event.clientY);
 			if (androidUI) scrollActionsIntoView(event);
 		};
@@ -7679,11 +7691,17 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						/>
 					</div>
 					{/if}
-					{#if !(streamingThis && msg.content.trim() === "") && !previewing}
+					{#if !(streamingThis && msg.content.trim() === "")}
+					<!-- Preview renders the same row inert: the peek
+					reserves the row's space (opening the chat moves
+					nothing) and shows the same error text, while no
+					peek button can ever fire. -->
 					<div
 						class="actions"
 						role="group"
 						aria-label="Message actions"
+						inert={previewing}
+						style={previewing ? "opacity: 1" : undefined}
 						onmouseleave={releaseRowFocus}
 						onpointerdown={holdActionsOpen}
 						onpointerup={releaseActionsHold}
@@ -7855,7 +7873,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					{/if}
 				</article>
 			{/each}
-			{#if isSending(chatState)}
+			{#if isSending(chatState, viewChat.id)}
 				<p class="sending" role="status" aria-label="Waiting for a reply">
 					Thinking<span class="tdots" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>
 				</p>

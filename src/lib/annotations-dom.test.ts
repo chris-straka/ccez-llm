@@ -111,6 +111,22 @@ describe("equationBodyOf", () => {
 		expect(equationBodyOf(raw.firstChild)).toBeNull();
 		root.remove();
 	});
+
+	it("returns null on a folded label", () => {
+		// A folded label pick is already whole: expanding it onto the
+		// folded-away body (display:none) moves the paint where nothing
+		// can show, and the stranded menu dies on selectionchange.
+		const root = document.createElement("div");
+		root.innerHTML =
+			'<div class="ccez-math" data-math-index="0" data-folded="1"><span class="ccez-math-foldedlabel">latex · 1 LOC</span>' +
+			'<div class="ccez-math-body"><span class="katex">E</span></div></div>';
+		document.body.append(root);
+		const label = root.querySelector(".ccez-math-foldedlabel")!;
+		expect(equationBodyOf(label.firstChild)).toBeNull();
+		root.firstElementChild?.removeAttribute("data-folded");
+		expect(equationBodyOf(label.firstChild)?.classList.contains("ccez-math-body")).toBe(true);
+		root.remove();
+	});
 });
 
 describe("equationBodyRange", () => {

@@ -246,6 +246,48 @@ test("triple-click raw tex stops at the equation", async ({ page }) => {
 	await expect(page.locator(".sel-menu")).toBeVisible();
 });
 
+/** Double-clicking the end of raw TeX drops the word pick's trailing
+newline: the highlight stops at the equation instead of painting the
+line beneath. */
+test("double-click raw tex stops at the equation", async ({ page }) => {
+	const block = page.locator(".ccez-math").first();
+	await block.locator(".ccez-math-tex").click();
+	const raw = block.locator(".ccez-math-raw");
+	await expect(raw).toBeVisible();
+	const box = await raw.boundingBox();
+	if (!box) throw new Error("raw tex has no box");
+	await page.mouse.click(box.x + box.width - 4, box.y + box.height / 2, { clickCount: 2 });
+	// Range (not Selection) text: Selection.toString synthesizes block
+	// breaks, so it always trails one here — the range itself must stop
+	// at the equation, which is what paints the highlight.
+	const sel = await page.evaluate(() => {
+		const live = window.getSelection();
+		return live && live.rangeCount > 0 ? live.getRangeAt(0).toString() : "";
+	});
+	expect(sel.endsWith("\n")).toBe(false);
+	await expect(page.locator(".sel-menu")).toBeVisible();
+});
+
+/** Dragging the folded label keeps its highlight: selecting the label
+is a select, never an unfold, and the block stays folded. */
+test("folded label drag keeps its highlight", async ({ page }) => {
+	const block = page.locator(".ccez-math").first();
+	await block.locator(".ccez-math-body").click({ button: "right" });
+	await expect(block).toHaveAttribute("data-folded", "1");
+	const label = block.locator(".ccez-math-foldedlabel");
+	const box = await label.boundingBox();
+	if (!box) throw new Error("folded label has no box");
+	await page.mouse.move(box.x + 4, box.y + box.height / 2);
+	await page.mouse.down();
+	await page.mouse.move(box.x + box.width - 4, box.y + box.height / 2, { steps: 5 });
+	await page.mouse.up();
+	await expect
+		.poll(() => page.evaluate(() => window.getSelection()?.toString() ?? ""), { timeout: 8000 })
+		.not.toBe("");
+	await expect(block).toHaveAttribute("data-folded", "1");
+	await expect(page.locator(".sel-menu")).toBeVisible();
+});
+
 /** Hovering another chat previews its equations with settled chrome:
 no entrance animation runs over the copy button or its ancestors,
 and its box never moves. Both chats carry the same equation, so any

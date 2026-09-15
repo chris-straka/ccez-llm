@@ -246,6 +246,41 @@ test("sidebar hover keeps a live highlight and its menu", async ({ page }) => {
 	expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).toContain("halo");
 });
 
+/** A sidebar preview shows the same error text and the same action
+rows as the open chat: peeking never hides the failure, and opening
+the chat moves nothing. */
+test("sidebar preview shows the error and reserves action space", async ({ page }) => {
+	await page.addInitScript(() => {
+		window.localStorage.setItem("ccez-mock-provider", "1");
+		const msg = (id: string, content: string, error: string | null) => ({
+			id,
+			role: "assistant",
+			content,
+			usage: null,
+			error
+		});
+		window.localStorage.setItem(
+			"ccez-llm-chats-v1",
+			JSON.stringify([
+				{ id: "e2e-plain", createdAt: 1, replyLang: null, messages: [msg("e2e-plain-m", "plain thread", null)] },
+				{ id: "e2e-err", createdAt: 2, replyLang: null, messages: [msg("e2e-err-m", "failed thread", "Something broke")] }
+			])
+		);
+	});
+	await page.goto("/");
+	await expect(page.locator("article .rendered").first()).toBeVisible({ timeout: 60_000 });
+	await page.keyboard.press("Meta+b");
+	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
+	const rows = page.locator("aside ul li button.side-chat");
+	await rows.nth(1).hover();
+	await expect(page.locator("main .messages")).toContainText("Something broke");
+	const previewActions = await page.locator("main .messages .actions").count();
+	expect(previewActions).toBe(1);
+	await rows.nth(1).click();
+	await expect(page.locator("main .messages")).toContainText("Something broke");
+	expect(await page.locator("main .messages .actions").count()).toBe(previewActions);
+});
+
 /** An empty chat never hides the composer: arriving with the flag set
 (parked on a previous thread under always-hide) clears it, or the one
 place that must compose stays stranded hidden. */
