@@ -216,15 +216,18 @@ test("send clears pills and files a chip above the message", async ({ page }) =>
 test("popup touches the badge and clear-all lives inside it", async ({ page }) => {
 	const badge = await addAnnotation(page);
 
-	// Hover the badge: the popup opens flush against it, so the
-	// pointer reaches it without crossing dead hover space.
-	await badge.hover();
+	// The pill toggles the popup (hover never opens it): it floats
+	// just above the tools row with the pill left exposed, so the
+	// toggle stays clickable while open.
+	await page.locator(".prompt-tools .ann-pill").click();
 	const review = page.locator(".prompt-tools .review");
-	await expect(review).toBeVisible();
+	await expect(review).toHaveCSS("opacity", "1");
 	const reviewBox = await review.boundingBox();
 	const wrapBox = await page.locator(".prompt-tools .ann-wrap").boundingBox();
 	if (!reviewBox || !wrapBox) throw new Error("missing popup boxes");
-	expect(reviewBox.y + reviewBox.height).toBeGreaterThanOrEqual(wrapBox.y - 1);
+	const gap = wrapBox.y - (reviewBox.y + reviewBox.height);
+	expect(gap).toBeGreaterThanOrEqual(0);
+	expect(gap).toBeLessThanOrEqual(14);
 
 	// Clear-all is inside the popup now, not beside the badge.
 	await expect(page.locator(".prompt-tools .ann-clear")).toHaveCount(0);

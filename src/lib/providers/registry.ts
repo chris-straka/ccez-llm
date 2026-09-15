@@ -64,7 +64,7 @@ export const PROVIDERS: ProviderDef[] = [
 		label: "Gemma (on-device)",
 		defaultBaseUrl: "http://localhost:11434/v1",
 		defaultModel: "gemma4:latest",
-		keyHint: "served by Ollama on this device",
+		keyHint: "served on this device",
 		keyless: true
 	}
 ];

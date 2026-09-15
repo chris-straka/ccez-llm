@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
 	chatToMarkdown,
+	copyExportText,
 	exportChatMarkdown,
 	exportFilename,
 	type SavePickerOptions
@@ -152,5 +153,29 @@ describe("exportChatMarkdown", () => {
 		});
 		expect(how).toBe("download");
 		expect(downloads).toHaveLength(1);
+	});
+});
+
+describe("copyExportText", () => {
+	it("writes through an injected clipboard", async () => {
+		const seen: string[] = [];
+		await copyExportText("# Chat export", { writeText: async (text) => void seen.push(text) });
+		expect(seen).toEqual(["# Chat export"]);
+	});
+
+	it("throws when no clipboard is available", async () => {
+		await expect(copyExportText("x", null)).rejects.toThrowError("No export path available.");
+	});
+
+	it("serves as the awaited download fallback", async () => {
+		const seen: string[] = [];
+		const chat = { messages: [{ role: "user", content: "hi" }] };
+		const how = await exportChatMarkdown(chat, {
+			picker: null,
+			native: async () => null,
+			download: (text) => copyExportText(text, { writeText: async (t) => void seen.push(t) })
+		});
+		expect(how).toBe("download");
+		expect(seen).toEqual([chatToMarkdown(chat)]);
 	});
 });

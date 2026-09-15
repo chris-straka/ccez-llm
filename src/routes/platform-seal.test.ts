@@ -112,6 +112,6 @@ describe("desktop seal", () => {
 	it("keeps the badge click delegating to the toggle (desktop re-press closes)", () => {
 		const source = pageSource();
 		expect(source).toContain("function openBadgeClick(");
-		expect(source).toContain("openBadge(id, anchor);");
+		expect(source).toContain("openBadge(id);");
 	});
 });

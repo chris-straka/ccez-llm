@@ -2,6 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import { seedChat } from "./helpers";
 
 test.use({
+	hasTouch: true,
 	userAgent:
 		"Mozilla/5.0 (Linux; Android 14; SM-S921B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36",
 	viewport: { width: 412, height: 915 }
@@ -69,15 +70,16 @@ test.describe("gestures", () => {
 		// Exact-match the row (a substring match would also hit siblings).
 		await expect(modal.locator('dt:text-is("Chats list")')).toBeVisible();
 		await expect(modal.locator('dd:has-text("Double-tap empty space")')).toBeVisible();
-		// The list row teaches all three openers; fold and settings rows exist.
-		await expect(modal.locator('dd:has-text("Double-tap empty space")')).toHaveText(
-			"Double-tap empty space · swipe right · two-finger swipe right"
+		// The list row teaches its two openers; the switcher owns the
+		// double-tap now, and fold and settings rows exist.
+		await expect(modal.locator('dt:text-is("Chats list") + dd')).toHaveText(
+			"Swipe right · two-finger swipe right"
 		);
 		await expect(modal.locator('dt:text-is("fold chat msg")')).toBeVisible();
 		await expect(modal.locator('dt:text-is("Settings")')).toBeVisible();
 		await expect(modal.locator('dt:has-text("Chats sidebar")')).toHaveCount(0);
 		await expect(modal.locator('dd:has-text("Chats list button")')).toHaveText(
-			"Chats list button · two-finger swipe left"
+			"Swipe left off messages · chats list button · two-finger swipe left"
 		);
 		await expect(modal.locator('dt:text-is("Newer / older chat")')).toBeVisible();
 		await expect(modal.locator('dd:has-text("Three-finger swipe right")')).toHaveText(
@@ -92,7 +94,9 @@ test.describe("gestures", () => {
 			"Two-finger swipe down · G"
 		);
 		await expect(modal.locator('dt:text-is("Chat switcher")')).toBeVisible();
-		await expect(modal.locator('dd:has-text("Two-finger hold")')).toHaveText("Two-finger hold");
+		await expect(modal.locator('dt:text-is("Chat switcher") + dd')).toHaveText(
+			"Two-finger hold · double-tap empty space · swipe cycles · loops"
+		);
 		await expect(modal.locator('dt:has-text("Delete current chat")')).toBeVisible();
 		await expect(modal.locator('dd:has-text("Double two-finger tap")')).toBeVisible();
 		await expect(modal.locator('dt:has-text("Delete every chat")')).toBeVisible();
@@ -158,10 +162,12 @@ test.describe("gestures", () => {
 		// Only a leftward stroke folds the open list.
 		await swipeMidScreen(page, 260, 150);
 		await expect(aside).toHaveClass(/collapsed/);
-		// ...a one-finger swipe from the right edge never opens settings...
+		// ...a one-finger swipe from the right edge opens settings...
 		await swipeFromRightEdge(page);
+		await expect(panel).not.toHaveClass(/closed/);
+		// ...and so does a two-finger swipe left...
+		await swipeMidScreen(page, 4, 144);
 		await expect(panel).toHaveClass(/closed/);
-		// ...settings opens from a two-finger swipe left instead...
 		await swipeTwoFinger(page, 300, 150);
 		await expect(panel).not.toHaveClass(/closed/);
 		// ...but a rightward stroke still dismisses an open settings.
@@ -215,23 +221,24 @@ test.describe("gestures", () => {
 		await expect(aside).toHaveClass(/collapsed/);
 	});
 
-	test("mid-screen swipe left never opens the settings panel", async ({ page }) => {
+	test("mid-screen swipe left opens settings, folds the list", async ({ page }) => {
 		const panel = page.locator(".settings-panel");
 		const aside = page.locator("aside:has(button.side-chat)");
-		// Start shut (a rightward stroke dismisses a stray open settings).
+		// Fresh load starts shut: a leftward stroke opens settings...
+		await swipeMidScreen(page, 260, 150);
+		await expect(panel).not.toHaveClass(/closed/);
+		await expect(aside).toHaveClass(/collapsed/);
+		// ...a rightward stroke closes it...
 		await swipeMidScreen(page, 150, 260);
 		await expect(panel).toHaveClass(/closed/);
-		// Shut: a leftward stroke opens nothing...
-		await swipeMidScreen(page, 260, 150);
-		await expect(panel).toHaveClass(/closed/);
-		await expect(aside).toHaveClass(/collapsed/);
-		// ...but it still folds an open chats list...
+		// ...a rightward stroke with all shut summons the list...
 		await swipeMidScreen(page, 150, 260);
 		await expect(aside).not.toHaveClass(/collapsed/);
+		// ...and a leftward stroke folds the list instead of settings.
 		await swipeMidScreen(page, 260, 150);
 		await expect(aside).toHaveClass(/collapsed/);
 		await expect(panel).toHaveClass(/closed/);
-		// ...while settings opens from a two-finger swipe left.
+		// ...while settings also opens from a two-finger swipe left.
 		await swipeTwoFinger(page, 300, 150);
 		await expect(panel).not.toHaveClass(/closed/);
 	});
@@ -291,6 +298,38 @@ test.describe("touch", () => {
 	 * exclusion, and the theme pin. Same UA-gated branches as
 	 * android.e2e.ts, S24-class viewport.
 	 */
+	/** Touch-summon a highlight: a tap plus a programmatic range, the
+	same dance the dock tests below share (trusted taps only reach
+	button handlers; the selection itself is drawn by hand). */
+	async function summonTouchSelection(page: Page): Promise<void> {
+		const box = await page.locator("article .rendered").first().boundingBox();
+		if (!box) throw new Error("no message box");
+		await page.evaluate(
+			({ x, y }: { x: number; y: number }) => {
+				const touch = (id: number) => new Touch({ identifier: id, target: document.body, clientX: x, clientY: y });
+				window.dispatchEvent(
+					new TouchEvent("touchstart", { bubbles: true, cancelable: true, composed: true, touches: [touch(1)] })
+				);
+				const rendered = document.querySelector("article .rendered");
+				const sel = window.getSelection();
+				sel?.removeAllRanges();
+				const range = document.createRange();
+				if (rendered) range.selectNodeContents(rendered);
+				sel?.addRange(range);
+				window.dispatchEvent(
+					new TouchEvent("touchend", {
+						bubbles: true,
+						cancelable: true,
+						composed: true,
+						touches: [],
+						changedTouches: [touch(1)]
+					})
+				);
+			},
+			{ x: box.x + box.width / 2, y: box.y + box.height / 2 }
+		);
+	}
+
 	async function seedTwoChats(page: Page): Promise<void> {
 		await page.addInitScript(() => {
 			window.localStorage.setItem("ccez-mock-provider", "1");
@@ -420,24 +459,35 @@ test.describe("touch", () => {
 		await seedEmpty(page);
 		const aside = page.locator("aside:has(button.new)");
 		const panel = page.locator(".settings-panel");
-		// A one-finger swipe from the right edge never opens settings...
+		// A one-finger swipe from the right edge opens settings
+		// (anything off a message or the prompt does)...
 		await swipeX(page, 408, 268);
+		await expect(panel).not.toHaveClass(/closed/);
+		// ...a rightward stroke closes settings instead of summoning chats.
+		await swipeX(page, 4, 144);
 		await expect(panel).toHaveClass(/closed/);
 		// ...settings opens from a two-finger swipe left instead; a
 		// rightward stroke closes settings instead of summoning chats.
 		await swipeTwoFinger(page, 300, 150);
 		await expect(panel).not.toHaveClass(/closed/);
+		// The composer stays mounted under open drawers (no park
+		// slide): visible behind both the panel and the list below.
+		await expect(page.locator(".prompt")).toBeVisible();
 		await swipeX(page, 4, 144);
 		await expect(panel).toHaveClass(/closed/);
 		await expect(aside).toHaveClass(/collapsed/);
 		// A rightward stroke with everything shut summons the list...
 		await swipeX(page, 4, 144);
 		await expect(aside).not.toHaveClass(/collapsed/);
-		// ...and never toggles it shut; a leftward stroke folds it.
+		// ...and the composer stays up behind it too.
+		await expect(page.locator(".prompt")).toBeVisible();
+		// ...and never toggles it shut; a leftward stroke folds it
+		// without opening settings.
 		await swipeX(page, 4, 144);
 		await expect(aside).not.toHaveClass(/collapsed/);
 		await swipeX(page, 268, 128);
 		await expect(aside).toHaveClass(/collapsed/);
+		await expect(panel).toHaveClass(/closed/);
 		// Two-finger double-tap still deletes instead of summoning.
 		await doubleTapTwoFinger(page);
 		await expect(aside).toHaveClass(/collapsed/);
@@ -546,6 +596,41 @@ test.describe("touch", () => {
 			.poll(async () => page.locator("article .rendered").first().innerText(), { timeout: 10_000 })
 			.not.toBe(before);
 		await expect(veil).toBeVisible();
+		// Swipes anywhere on the veil cycle too, looping past either
+		// end: three leftward swipes over two chats must visit the far
+		// chat and come back (a stick or mint never returns).
+		const veilSwipe = (x0: number, x1: number) =>
+			veil.evaluate(
+				(el, [a, b]) => {
+					const touch = (x: number) =>
+						new Touch({ identifier: 11, target: el, clientX: x, clientY: 400 });
+					el.dispatchEvent(
+						new TouchEvent("touchstart", {
+							bubbles: true,
+							cancelable: true,
+							composed: true,
+							touches: [touch(a)]
+						})
+					);
+					el.dispatchEvent(
+						new TouchEvent("touchend", {
+							bubbles: true,
+							cancelable: true,
+							composed: true,
+							touches: [],
+							changedTouches: [touch(b)]
+						})
+					);
+				},
+				[x0, x1] as [number, number]
+			);
+		const pos = () => veil.locator(".switcher-pos").innerText();
+		const startPos = await pos();
+		await veilSwipe(300, 140);
+		await expect.poll(pos, { timeout: 10_000 }).not.toBe(startPos);
+		await veilSwipe(300, 140);
+		await expect.poll(pos, { timeout: 10_000 }).toBe(startPos);
+		await expect(veil).toBeVisible();
 		await page.keyboard.press("Escape");
 		await expect(veil).toHaveCount(0);
 	});
@@ -585,6 +670,37 @@ test.describe("touch", () => {
 			);
 		});
 		await expect(panel).not.toHaveClass(/closed/);
+	});
+
+	test("sidebar delete rumbles the triple thump", async ({ page }) => {
+		await seedTwoChats(page);
+		await swipeTwoFinger(page, 150, 310);
+		const aside = page.locator("aside:has(button.side-chat)");
+		await expect(aside).not.toHaveClass(/collapsed/);
+		// Spy the vibrator, then drop the first row: deletes thump
+		// triple (done), distinct from the ticks of opens and folds.
+		await page.evaluate(() => {
+			const w = window as unknown as { __vib: unknown[] };
+			w.__vib = [];
+			const nav = navigator as unknown as { vibrate: (pattern: unknown) => boolean };
+			nav.vibrate = (pattern: unknown) => {
+				w.__vib.push(pattern);
+				return true;
+			};
+		});
+		await aside.locator("li .del").first().evaluate((el) => {
+			// Wiring test, not a pointer test: the row × sits under the
+			// pill in headless hover (real thumbs tap it in flow).
+			(el as HTMLElement).click();
+		});
+		await expect
+			.poll(
+				async () =>
+					page.evaluate(
+						() => JSON.stringify((window as unknown as { __vib: unknown[] }).__vib)
+					),
+				{ timeout: 5000 }
+			).toBe(JSON.stringify([[35, 60, 110]]));
 	});
 
 	test("two-finger swipe left opens settings from the composer", async ({ page }) => {
@@ -682,13 +798,73 @@ test.describe("touch", () => {
 		);
 		// The floating menu is desktop-only now: nothing near the text.
 		await expect(page.locator(".sel-menu")).toHaveCount(0);
-		// The dock button lives in the composer tools, below the message.
+		// The dock buttons live in the composer tools, below the message:
+		// Annotate and Speak always, Inspect only for Han characters.
 		const dock = page.locator(".ann-dock");
-		await expect(dock).toHaveText("Annotate");
-		await expect(dock).toBeVisible();
+		await expect(dock).toHaveText(["Annotate", "Speak"]);
+		await expect(dock.first()).toBeVisible();
 		const msgBox = await page.locator("article .rendered").first().boundingBox();
-		const dockBox = await dock.boundingBox();
+		const dockBox = await dock.first().boundingBox();
 		expect(dockBox?.y ?? 0).toBeGreaterThan((msgBox?.y ?? 0) + (msgBox?.height ?? 0));
+	});
+
+	test("a tap on Speak reads the highlight and keeps the dock", async ({ page }) => {
+		await page.addInitScript(() => {
+			(window as unknown as { __spoken: string[] }).__spoken = [];
+			const synth = window.speechSynthesis;
+			if (synth) {
+				synth.speak = ((utterance: SpeechSynthesisUtterance) => {
+					(window as unknown as { __spoken: string[] }).__spoken.push(utterance.text);
+				}) as typeof synth.speak;
+			}
+		});
+		await seedTwoChats(page);
+		await summonTouchSelection(page);
+		await expect(page.locator(".ann-dock")).toHaveText(["Annotate", "Speak"]);
+		const btn = page.locator('.ann-dock:has-text("Speak")');
+		const btnBox = await btn.boundingBox();
+		if (!btnBox) throw new Error("no speak box");
+		await page.touchscreen.tap(btnBox.x + btnBox.width / 2, btnBox.y + btnBox.height / 2);
+		await expect
+			.poll(() => page.evaluate(() => (window as unknown as { __spoken: string[] }).__spoken ?? []), {
+				timeout: 10_000
+			})
+			.toContain("alpha-aaa");
+		// The dock stays put: Annotate is one tap away after listening.
+		await expect(page.locator('.ann-dock:has-text("Annotate")')).toBeVisible();
+	});
+
+	test("a Han highlight docks Inspect beside Speak with equal widths", async ({ page }) => {
+		await page.addInitScript(() => {
+			window.localStorage.setItem("ccez-mock-provider", "1");
+			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
+			window.localStorage.setItem(
+				"ccez-llm-chats-v1",
+				JSON.stringify([
+					{
+						id: "chat-han",
+						createdAt: 1,
+						replyLang: null,
+						messages: [{ id: "m1", role: "assistant", content: "語", usage: null, error: null }]
+					}
+				])
+			);
+		});
+		await page.goto("/");
+		await expect(page.locator("article .rendered").first()).toBeVisible();
+		await summonTouchSelection(page);
+		const dock = page.locator(".ann-dock");
+		await expect(dock).toHaveText(["Annotate", "Speak", "Inspect"]);
+		const boxes = await Promise.all(
+			["Annotate", "Speak", "Inspect"].map((label) =>
+				page.locator(`.ann-dock:has-text("${label}")`).boundingBox()
+			)
+		);
+		const widths = boxes.map((box) => {
+			if (!box) throw new Error("no dock box");
+			return box.width;
+		});
+		expect(Math.max(...widths) - Math.min(...widths)).toBeLessThanOrEqual(2);
 	});
 
 	test("a long chat scrolls inside the list, never squeezing the prompt", async ({ page }) => {
@@ -895,14 +1071,17 @@ test.describe("touch", () => {
 			const btnBox = await btn.boundingBox();
 			if (!btnBox) throw new Error("no annotate box");
 			await page.touchscreen.tap(btnBox.x + btnBox.width / 2, btnBox.y + btnBox.height / 2);
-			await expect(page.locator(".ann-pop")).toBeVisible();
-			// The composer gets out of the way while the box owns the
-			// keyboard, and comes back when the box closes.
-			await expect(page.locator(".prompt")).toHaveClass(/prompt-hidden/);
-			await expect(page.locator(".prompt")).not.toBeVisible();
-			await page.keyboard.press("Escape");
-			await expect(page.locator(".ann-pop")).toHaveCount(0);
-			await expect(page.locator(".prompt")).toBeVisible();
+			// Phones file the comment in the composer, never a floating
+			// box: the tap consumes the menu and the composer asks for
+			// the note instead.
+			await expect(page.locator(".ann-dock")).toHaveCount(0);
+			await expect(page.locator(".prompt textarea")).toHaveAttribute("placeholder", "Add a comment");
+			// Typing files through the send arrow: the pill counts it.
+			await page.locator(".prompt textarea").click();
+			await page.keyboard.type("nice point", { delay: 10 });
+			await page.locator(".send-btn").click();
+			await expect(page.locator(".toast")).toHaveText("Note saved");
+			await expect(page.locator(".ann-pill")).toBeVisible();
 		});
 
 		/** Double-tapping a message taller than the screen scrolls its
@@ -1294,18 +1473,22 @@ test.describe("always-visible prompt", () => {
 	});
 
 	/** Double-tap on empty space opens the sidebar (swipe right is the other opener). */
-	test("double-tap empty space opens the sidebar", async ({ page }) => {
+	test("double-tap empty space opens the quick switcher", async ({ page }) => {
 		await seed(page, {}, [LONG]);
 		await page.goto("/");
 		await expect(page.locator("article .rendered").first()).toBeVisible();
 		const aside = page.locator("aside").first();
+		const veil = page.locator(".chat-switcher");
 		await expect(aside).toHaveClass(/collapsed/);
 		// One tap alone changes nothing: the pair is the gesture.
 		await flick(page, "main", 200, 120, 200, 121);
 		await expect(aside).toHaveClass(/collapsed/);
+		await expect(veil).toHaveCount(0);
 		await page.waitForTimeout(120);
 		await flick(page, "main", 200, 120, 200, 121);
-		await expect(aside).not.toHaveClass(/collapsed/);
+		// The switcher opens; the list stays shut.
+		await expect(veil).toBeVisible();
+		await expect(aside).toHaveClass(/collapsed/);
 	});
 
 	test("tapping empty space focuses the composer in a new chat", async ({ page }) => {

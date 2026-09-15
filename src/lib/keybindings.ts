@@ -507,6 +507,8 @@ export interface ScrollModeFacts {
 	gArmed: boolean;
 	atNewest: boolean;
 	scrollFromPrompt: boolean;
+	/** Phones keep bare d/u dead (touch owns scrolling there). */
+	phoneUI: boolean;
 }
 
 export type ScrollModeAction =
@@ -540,11 +542,15 @@ export function scrollModeAction(facts: ScrollModeFacts): ScrollModeAction | nul
 	if (!facts.metaKey && !facts.altKey) {
 		const lower = facts.key.toLowerCase();
 		if (lower === "u" || lower === "d") {
-			// Only Ctrl+U / Ctrl+D jump (one instant half-page per
-			// press, vim-style); bare taps scroll nothing at all.
-			// Shift+D keeps its delete job in the message-keys
-			// slice above.
-			if (!facts.ctrlKey) return null;
+			// Ctrl+U / Ctrl+D jump one instant half-page per press,
+			// vim-style, everywhere. Bare taps fast-scroll a smooth
+			// half-page on desktop (the effect is shared: the column
+			// eases programmatic scrolls, so no jump); phones keep
+			// them dead. Shift+D keeps its delete job in the
+			// message-keys slice above (ScrollModeFacts carries no
+			// shiftKey on purpose): the uppercase key string itself
+			// is the shift signal.
+			if (!facts.ctrlKey && (facts.phoneUI || facts.key !== lower)) return null;
 			return lower === "u" ? "half-jump-up" : "half-jump-down";
 		}
 	}

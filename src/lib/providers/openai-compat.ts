@@ -34,11 +34,16 @@ export class OpenAICompatProvider implements ChatProvider {
 	}
 
 	/**
-	 * Fetch-level failure, translated: a dead loopback server names its
-	 * remedy (Ollama isn't running) instead of reading as generic net
-	 * trouble; remote endpoints keep the generic wording.
+	 * Fetch-level failure, translated: a user stop is never a network
+	 * error (the stop button would report one otherwise); a dead
+	 * loopback server names its remedy (Ollama isn't running) instead
+	 * of reading as generic net trouble; remote endpoints keep the
+	 * generic wording.
 	 */
 	private connectionError(error: unknown): ProviderError {
+		if (error instanceof Error && error.name === "AbortError") {
+			return new ProviderError("Reply stopped.");
+		}
 		if (isLoopbackBaseUrl(this.config.baseUrl)) {
 			return new ProviderError(
 				`${this.id} needs Ollama running on this device (start it with 'ollama serve'): ${messageOf(error)}`
@@ -124,23 +129,30 @@ export class OpenAICompatProvider implements ChatProvider {
 		}
 		let content = "";
 		let usage: TokenUsage | null = null;
-		for await (const event of readSse(res.body)) {
-			if (event === "[DONE]") break;
-			let parsed: {
-				choices?: Array<{ delta?: { content?: string } }>;
-				usage?: Parameters<typeof toUsage>[0];
-			};
-			try {
-				parsed = JSON.parse(event) as typeof parsed;
-			} catch {
-				continue;
+		// Mid-stream failures translate like fetch-level ones: a cut
+		// connection reads as a network error, a user stop as stopped
+		// (never the raw "This operation was aborted").
+		try {
+			for await (const event of readSse(res.body)) {
+				if (event === "[DONE]") break;
+				let parsed: {
+					choices?: Array<{ delta?: { content?: string } }>;
+					usage?: Parameters<typeof toUsage>[0];
+				};
+				try {
+					parsed = JSON.parse(event) as typeof parsed;
+				} catch {
+					continue;
+				}
+				const token = parsed.choices?.[0]?.delta?.content ?? "";
+				if (token) {
+					content += token;
+					callbacks.onToken(token);
+				}
+				if (parsed.usage) usage = toUsage(parsed.usage);
 			}
-			const token = parsed.choices?.[0]?.delta?.content ?? "";
-			if (token) {
-				content += token;
-				callbacks.onToken(token);
-			}
-			if (parsed.usage) usage = toUsage(parsed.usage);
+		} catch (error) {
+			throw this.connectionError(error);
 		}
 		return { content, usage };
 	}

@@ -532,7 +532,8 @@ const scrollBase: ScrollModeFacts = {
 	inFind: false,
 	gArmed: false,
 	atNewest: false,
-	scrollFromPrompt: false
+	scrollFromPrompt: false,
+	phoneUI: false
 };
 
 describe("scrollModeAction", () => {
@@ -551,8 +552,13 @@ describe("scrollModeAction", () => {
 		expect(scrollModeAction({ ...scrollBase, key: "Enter" })).toBe("enter-edit");
 	});
 
-	it("ignores bare U/D and jumps Ctrl+U/D", () => {
-		expect(scrollModeAction({ ...scrollBase, key: "u" })).toBe(null);
+	it("fast-scrolls bare U/D on desktop, ignores them on phones, jumps Ctrl+U/D", () => {
+		// Desktop bare taps ride the smooth half-page (never a jump).
+		expect(scrollModeAction({ ...scrollBase, key: "u" })).toBe("half-jump-up");
+		expect(scrollModeAction({ ...scrollBase, key: "d" })).toBe("half-jump-down");
+		// Phones keep bare taps dead; shifted bare keeps delete.
+		expect(scrollModeAction({ ...scrollBase, key: "u", phoneUI: true })).toBe(null);
+		expect(scrollModeAction({ ...scrollBase, key: "d", phoneUI: true })).toBe(null);
 		expect(scrollModeAction({ ...scrollBase, key: "D" })).toBe(null);
 		expect(scrollModeAction({ ...scrollBase, key: "u", ctrlKey: true })).toBe("half-jump-up");
 		expect(scrollModeAction({ ...scrollBase, key: "d", ctrlKey: true })).toBe("half-jump-down");

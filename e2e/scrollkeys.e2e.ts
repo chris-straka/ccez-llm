@@ -3,10 +3,10 @@ import { seedChat } from "./helpers";
 
 /**
  * Scrollkeys bucket (desktop, nothing selected): bare j/k
- * smooth-scroll the chat, gg goes to top, G to the bottom, and z/Z
- * land the hovered message's top/bottom. Bare d/u scroll nothing
- * anywhere — only Ctrl+U / Ctrl+D jump an instant half-page.
- * Holds glide at the scrollkeys.ts line velocity (j/k 720px/s);
+ * smooth-scroll the chat, bare d/u fast-scroll smooth half-pages
+ * (3x glide while held — never an instant jump), gg goes to top, G
+ * to the bottom, and z/Z land the hovered message's top/bottom.
+ * Ctrl+U / Ctrl+D jump an instant half-page.
  * Escape still dismisses overlays exactly as today and never exits
  * fullscreen (only the Esc+f chord does, which needs a real window
  * chrome that playwright cannot cover: see exitFullscreen in
@@ -74,26 +74,42 @@ test("j/k smooth-scroll down and back up with nothing selected", async ({ page }
 	expect(await scrollTop(page)).toBeLessThan(down);
 });
 
-test("bare d/u scroll nothing; ctrl+d jumps and ctrl+u climbs back", async ({ page }) => {
+test("bare d/u fast-scroll smooth half-pages; ctrl+d jumps and ctrl+u climbs back", async ({ page }) => {
 	const before = await scrollTop(page);
-	await page.keyboard.press("d");
-	await page.waitForTimeout(500);
-	expect(await scrollTop(page)).toBe(before);
-	await page.keyboard.press("u");
-	await page.waitForTimeout(500);
-	expect(await scrollTop(page)).toBe(before);
 	const half = await page.evaluate(() => {
 		const box = document.querySelector(".messages") as HTMLElement | null;
 		return box ? Math.floor(box.clientHeight / 2) : 0;
 	});
 	expect(half).toBeGreaterThan(0);
-	await page.keyboard.press("Control+d");
+	// A tap lands one smooth half-page (never an instant jump): poll
+	// past the ease instead of asserting a frozen frame.
+	await page.keyboard.press("d");
 	await page.waitForFunction(
 		({ prev, min }) => {
 			const box = document.querySelector(".messages") as HTMLElement | null;
 			return box !== null && box.scrollTop - prev >= min;
 		},
 		{ prev: before, min: half * 0.8 },
+		{ timeout: 10_000 }
+	);
+	const down = await scrollTop(page);
+	await page.keyboard.press("u");
+	await page.waitForFunction(
+		({ prev, min }) => {
+			const box = document.querySelector(".messages") as HTMLElement | null;
+			return box !== null && box.scrollTop < prev - min;
+		},
+		{ prev: down, min: half * 0.5 },
+		{ timeout: 10_000 }
+	);
+	const before2 = await scrollTop(page);
+	await page.keyboard.press("Control+d");
+	await page.waitForFunction(
+		({ prev, min }) => {
+			const box = document.querySelector(".messages") as HTMLElement | null;
+			return box !== null && box.scrollTop - prev >= min;
+		},
+		{ prev: before2, min: half * 0.8 },
 		{ timeout: 10_000 }
 	);
 	const jumped = await scrollTop(page);

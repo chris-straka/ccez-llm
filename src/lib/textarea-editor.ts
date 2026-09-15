@@ -174,6 +174,9 @@ export function createTextareaEditor(
 		clear() {
 			this.setText("");
 		},
+		caretToEnd() {
+			ta.setSelectionRange(ta.value.length, ta.value.length);
+		},
 		// preventScroll: refocusing must never yank the messages list.
 		focus: () => {
 			ta.focus({ preventScroll: true });

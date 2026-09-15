@@ -296,6 +296,7 @@ for (const t of THEMES) {
 		await expect(pop).toBeVisible();
 		await expect(pop).toHaveCSS("background-color", "rgb(28, 28, 30)");
 		await expect(pop).toHaveCSS("border-color", "rgb(56, 56, 58)");
+		await page.keyboard.type("note");
 		await page.keyboard.press("Enter");
 		const pill = page.locator(".prompt-tools .ann-pill");
 		await expect(pill).toBeVisible();
@@ -304,11 +305,9 @@ for (const t of THEMES) {
 			"background-color",
 			L ? "rgb(238, 244, 255)" : "rgb(18, 35, 61)"
 		);
-		// The card fades in on pill hover: open it before touching inside.
+		// The card toggles on pill click (hover never opens it).
 		const card = page.locator(".ann-wrap .review");
-		const box = await pill.boundingBox();
-		if (!box) throw new Error("pill has no box");
-		await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+		await pill.click();
 		await expect
 			.poll(() => card.evaluate((el) => getComputedStyle(el).opacity), { timeout: 2000 })
 			.toBe("1");
@@ -325,20 +324,18 @@ for (const t of THEMES) {
 		await expect(clear).toHaveCSS("color", v.muted);
 		await clear.hover();
 		await expect(clear).toHaveCSS("color", v.danger);
-		// Edit mode via the pencil: textarea plus Save/Cancel.
+		// Edit mode via the pencil: the comment loads into the composer
+		// (no inline box anywhere); clicking out cancels it back.
 		await page.locator('button[aria-label="Edit comment for annotation 1"]').click();
-		const area = page.locator(".review textarea");
-		await expect(area).toBeVisible();
-		await expect(area).toHaveCSS("background-color", v.field);
-		// The pencil parks focus in the box, so the rim starts focused.
-		await expect(area).toHaveCSS("border-color", v.strong);
-		const save = page.locator(".review-edit-actions button").first();
-		await expect(save).toHaveCSS("background-color", v.invert);
-		await expect(save).toHaveCSS("color", v.invertInk);
-		const cancel = page.locator(".review-edit-actions button").last();
-		await expect(cancel).toHaveCSS("color", v.muted);
-		await cancel.hover();
-		await expect(cancel).toHaveCSS("color", v.ink);
+		const draft = await page.evaluate(
+			() => document.querySelector(".prompt .cm-content")?.textContent ?? ""
+		);
+		expect(draft).not.toBe("");
+		await page.mouse.click(4, 300);
+		const kept = await page.evaluate(
+			() => document.querySelector(".prompt .cm-content")?.textContent ?? ""
+		);
+		expect(kept).toBe("");
 		// Send pill shares the inversion.
 		const send = page.locator(".send-btn");
 		await expect(send).toHaveCSS("background-color", v.invert);

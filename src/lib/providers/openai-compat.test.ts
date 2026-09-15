@@ -97,6 +97,72 @@ describe("chat", () => {
 	});
 });
 
+describe("user stops are never network errors", () => {
+	function abortFetch(): void {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => {
+				throw new DOMException("This operation was aborted", "AbortError");
+			})
+		);
+	}
+
+	it("reports a stopped chat() as stopped", async () => {
+		abortFetch();
+		const provider = new OpenAICompatProvider("probe", CONFIG);
+		const err = await provider.chat([{ role: "user", content: "x" }]).catch((e: unknown) => e);
+		expect(err).toBeInstanceOf(ProviderError);
+		expect(String((err as ProviderError).message)).toBe("Reply stopped.");
+	});
+
+	it("reports a pre-response stream abort as stopped", async () => {
+		abortFetch();
+		const provider = new OpenAICompatProvider("probe", CONFIG);
+		const err = await provider
+			.stream([{ role: "user", content: "x" }], { onToken: () => {} })
+			.catch((e: unknown) => e);
+		expect(err).toBeInstanceOf(ProviderError);
+		expect(String((err as ProviderError).message)).toBe("Reply stopped.");
+	});
+
+	it("reports a mid-stream abort as stopped", async () => {
+		const stream = new ReadableStream<Uint8Array>({
+			start(controller) {
+				controller.enqueue(new TextEncoder().encode(`data: {"choices":[{"delta":{"content":"hi"}}]}\n\n`));
+				controller.error(new DOMException("This operation was aborted", "AbortError"));
+			}
+		});
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => new Response(stream, { headers: { "Content-Type": "text/event-stream" } }))
+		);
+		const provider = new OpenAICompatProvider("probe", CONFIG);
+		const err = await provider
+			.stream([{ role: "user", content: "x" }], { onToken: () => {} })
+			.catch((e: unknown) => e);
+		expect(err).toBeInstanceOf(ProviderError);
+		expect(String((err as ProviderError).message)).toBe("Reply stopped.");
+	});
+
+	it("still reports a mid-stream cut as a network error", async () => {
+		const stream = new ReadableStream<Uint8Array>({
+			start(controller) {
+				controller.error(new TypeError("terminated"));
+			}
+		});
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => new Response(stream, { headers: { "Content-Type": "text/event-stream" } }))
+		);
+		const provider = new OpenAICompatProvider("probe", CONFIG);
+		const err = await provider
+			.stream([{ role: "user", content: "x" }], { onToken: () => {} })
+			.catch((e: unknown) => e);
+		expect(err).toBeInstanceOf(ProviderError);
+		expect(String((err as ProviderError).message)).toMatch(/Network error talking to probe/);
+	});
+});
+
 describe("stream", () => {
 	it("assembles tokens across split chunks and stops at [DONE]", async () => {
 		const seen: string[] = [];

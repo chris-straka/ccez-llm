@@ -205,7 +205,7 @@ pill, so the cursor is already inside it. */
 test("prompt review card opens up and to the left", async ({ page }) => {
 	await openAnnotate(page, "確認しました");
 	await page.keyboard.press("Enter");
-	await hoverPromptPill(page);
+	await openPromptReview(page);
 	const card = page.locator(".ann-wrap .review");
 	await expect(card).toBeVisible();
 	const boxes = await page.evaluate(() => {
@@ -247,11 +247,9 @@ test("message refs card opens over its number", async ({ page }) => {
 	await page.keyboard.press("Enter");
 	const pill = page.locator("article.user .ann-refs-pill");
 	await expect(pill).toHaveText("1");
-	const pillBox = await pill.boundingBox();
-	if (!pillBox) throw new Error("pill has no box");
-	await page.mouse.move(pillBox.x + pillBox.width / 2, pillBox.y + pillBox.height / 2);
+	await pill.click();
 	const card = page.locator("article.user .ann-refs-pop");
-	await expect(card).toBeVisible();
+	await expect(card).toHaveCSS("opacity", "1");
 	const inside = await page.evaluate(() => {
 		const rect = (sel: string) => document.querySelector(sel)?.getBoundingClientRect();
 		const c = rect("article.user .ann-refs-pop");
@@ -266,13 +264,11 @@ test("message refs card opens over its number", async ({ page }) => {
 
 /** Hover the prompt pill via coordinates: the open card covers the
 pill by design, so locator.hover() can't hit-target it afterwards. */
-async function hoverPromptPill(page: Page): Promise<void> {
+async function openPromptReview(page: Page): Promise<void> {
 	const pill = page.locator(".prompt-tools .ann-pill");
 	await expect(pill).toBeVisible();
-	const box = await pill.boundingBox();
-	if (!box) throw new Error("pill has no box");
-	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-	await expect(page.locator(".prompt-tools .review")).toBeVisible();
+	await pill.click();
+	await expect(page.locator(".prompt-tools .review")).toHaveCSS("opacity", "1");
 }
 
 /** Select a quote and open its comment box through the real UI. */
@@ -386,7 +382,7 @@ test("review popup uses note labels", async ({ page }) => {
 	// File without sending: a send bakes annotations into the outgoing
 	// message and clears the live list, leaving no pill to hover.
 	await page.keyboard.press("Enter");
-	await hoverPromptPill(page);
+	await openPromptReview(page);
 	const review = page.locator(".prompt-tools .review");
 	await expect(review).toContainText("note:");
 	await expect(review).not.toContainText("Selected text");
@@ -526,7 +522,7 @@ test("E key edits the hovered own message", async ({ page }) => {
 test("clear-all lives at the top right of the review", async ({ page }) => {
 	await openAnnotate(page, "確認しました");
 	await page.keyboard.press("Enter");
-	await hoverPromptPill(page);
+	await openPromptReview(page);
 	const review = page.locator(".prompt-tools .review");
 	const tools = review.locator(".review-tools");
 	await expect(tools).toContainText("Clear all");
@@ -773,9 +769,8 @@ test("sent-refs card copies one annotation", async ({ page }) => {
 		{ role: "user", content: 'explain this\n\nAnnotated selections:\n1. "bonjour" — greeting?' }
 	]);
 	await page.goto("/");
-	// Forced: the card opens overlapping its pill by design, so the
-	// pill itself never stays the hit target once the card is up.
-	await page.locator(".ann-refs-pill").first().hover({ force: true });
+	// Click-toggled (hover never opens it).
+	await page.locator(".ann-refs-pill").first().click();
 	await page.locator(".ann-refs-copy").first().click();
 	await expect(page.locator(".toast")).toHaveText("Copied", { timeout: 10_000 });
 	expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('"bonjour" — greeting?');
@@ -786,7 +781,7 @@ test("review panel copies one annotation", async ({ page }) => {
 	await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
 	await openAnnotate(page, "確認しました");
 	await page.keyboard.press("Enter");
-	await hoverPromptPill(page);
+	await openPromptReview(page);
 	await page.locator(".prompt-tools .review-copy").first().click();
 	await expect(page.locator(".toast")).toHaveText("Copied", { timeout: 10_000 });
 	const pasted = await page.evaluate(() => navigator.clipboard.readText());
@@ -936,10 +931,9 @@ test("empty annotations bake a question mark for the model", async ({ page }) =>
 	await page.keyboard.press("Enter");
 	const user = page.locator("article.user").first();
 	await expect(user).toBeVisible();
-	// The open card covers its own pill by design (copy lives inside),
-	// so a checked hover can never complete: force the real mouse over
-	// and prove the card genuinely opened via its opacity transition.
-	await user.locator(".ann-refs-pill").hover({ force: true });
+	// Click-toggled (hover never opens it): prove the toggle
+	// genuinely opened it via its opacity transition.
+	await user.locator(".ann-refs-pill").click();
 	await expect(user.locator(".ann-refs-pop")).toHaveCSS("opacity", "1");
 	await expect(user.locator(".ann-refs-comment").first()).toHaveText("?");
 });
@@ -968,7 +962,7 @@ test("annotations-only messages render as an em-dash with the count pill above",
 	expect(parseFloat(sizes.fontSize)).toBeGreaterThanOrEqual(13);
 });
 
-test("review edit box saves on Enter and stays readable", async ({ page }) => {
+test("review pencil files the edited comment on send", async ({ page }) => {
 	await seedChat(page, [{ role: "assistant", content: "alpha beta gamma delta" }]);
 	await page.goto("/");
 	const para = page.locator("article.assistant .rendered p").first();
@@ -978,25 +972,21 @@ test("review edit box saves on Enter and stays readable", async ({ page }) => {
 	await page.locator('.sel-menu button:has-text("Annotate")').click();
 	await page.keyboard.type("first");
 	await page.keyboard.press("Enter");
-	await page.locator(".prompt-tools .ann-wrap").hover();
-	await page.locator('.review-pencil').first().click();
-	const box = page.locator(".review textarea");
-	await expect(box).toBeVisible();
-	await box.fill("");
-	// The dark edit box is a raised surface, never near-black. Measure
-	// while the edit is open: Enter closes it, leaving nothing to read.
-	// (Transition symmetry is pinned in annotations-ux.test.ts against
-	// elements this flow never mounts.)
-	const darkField = await page.evaluate(() => {
-		document.documentElement.dataset.theme = "dark";
-		const ta = document.querySelector(".review textarea") as HTMLElement | null;
-		return ta ? getComputedStyle(ta).backgroundColor : null;
-	});
-	// #3a3a3c, not the near-black field #101013.
-	expect(darkField).not.toBe("rgb(16, 16, 19)");
-	await box.press("Enter");
-	// Enter saved instead of inserting a newline: the edit closed.
-	await expect(box).toHaveCount(0);
+	// The pill toggles the review (hover never opens it); the pencil
+	// loads the comment into the composer instead of an inline box.
+	await page.locator(".prompt-tools .ann-pill").click();
+	await expect(page.locator(".ann-wrap .review")).toHaveCSS("opacity", "1");
+	await page.locator(".review-pencil").first().click();
+	const draft = await page.evaluate(
+		() => document.querySelector(".prompt .cm-content")?.textContent ?? ""
+	);
+	expect(draft).toBe("first");
+	// Send files the note back (toast confirms the arrow didn't chat).
+	await page.keyboard.type("!");
+	await page.keyboard.press("Enter");
+	await expect(page.locator(".toast")).toContainText("Note saved");
+	await page.locator(".prompt-tools .ann-pill").click();
+	await expect(page.locator(".review-comment").first()).toHaveText("first!");
 });
 
 test("gutter drags never highlight above the cursor line", async ({ page }) => {

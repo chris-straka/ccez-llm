@@ -59,6 +59,8 @@ export interface PromptEditor {
 	setText(text: string): void;
 	/** Insert text at the cursor (used for pasted-image markers). */
 	insertText(text: string): void;
+	/** Move the caret to the document end (loading a note for editing). */
+	caretToEnd(): void;
 	clear(): void;
 	focus(): void;
 	/** Drop the caret (scroll mode must show no cursor in the prompt). */
@@ -170,6 +172,10 @@ export function createPromptEditor(
 		},
 		clear() {
 			this.setText("");
+		},
+		caretToEnd() {
+			const end = view.state.doc.length;
+			view.dispatch({ selection: { anchor: end } });
 		},
 		// preventScroll: refocusing (notably on window focus) must
 		// never yank the messages list — view.focus() scrolls.

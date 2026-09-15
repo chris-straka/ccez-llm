@@ -55,6 +55,21 @@ describe("phone composer two bars", () => {
 		expect(toolsRule?.[0]).not.toContain("border-top:");
 	});
 
+	it("never parks the composer for open drawers", () => {
+		const source = pageSource();
+		// The chats list and settings are overlays above the card, so
+		// hiding it under them only slid the thread: phones park for a
+		// real idle timeout alone, desktop keeps drawer parking.
+		expect(source).toMatch(/function promptParked\(\): boolean \{[\s\S]*?if \(androidUI\) return promptIdle;/);
+	});
+
+	it("grows the reading column with the chat-width setting", () => {
+		const source = pageSource();
+		// The old pin ignored the slider; phones floor at today's 46
+		// so only increases ever show (portrait columns already bleed).
+		expect(source).toContain("androidUI ? Math.max(46, settings.chatWidth ?? 36)");
+	});
+
 	it("never collapses the tools bar or its buttons while idle", () => {
 		const css = pageStyle();
 		// Idle single-bar mode is gone: no rule may hide the row or
@@ -81,14 +96,20 @@ describe("phone button parity", () => {
 });
 
 describe("phone highlight dock", () => {
-	it("makes Annotate/Inspect span both bars while a highlight is up", () => {
+	it("overlays both bars at 50/50 without resizing the card", () => {
 		const css = pageStyle();
+		// Card-sized overlay: the buttons split it evenly, so the
+		// card keeps its idle geometry to the pixel.
 		expect(css).toMatch(
-			/\.app\[data-android\] \.prompt:has\(\.ann-dock\) \.ann-dock\s*\{[^}]*min-height:\s*5rem/
+			/\.app\[data-android\] \.prompt:has\(\.ann-dock\) \.ann-dock-wrap\s*\{[^}]*position:\s*absolute[^}]*inset:\s*0[^}]*display:\s*flex/
 		);
-		// The tall dock must not clip inside the row's 3rem cap.
 		expect(css).toMatch(
-			/\.app\[data-android\] \.prompt:has\(\.ann-dock\) \.prompt-tools\s*\{[^}]*max-height:\s*none/
+			/\.app\[data-android\] \.prompt:has\(\.ann-dock\) \.ann-dock\s*\{[^}]*flex:\s*1 1 0[^}]*height:\s*100%/
+		);
+		// The row's overflow cap lifts while docked, or it clips the
+		// overlay to a strip.
+		expect(css).toMatch(
+			/\.app\[data-android\] \.prompt:has\(\.ann-dock\) \.prompt-tools\s*\{[^}]*overflow:\s*visible/
 		);
 	});
 
@@ -126,12 +147,14 @@ describe("phone annotation focus stability", () => {
 		);
 	});
 
-	it("re-pins the scroll behind phone pill focus (create, edit, mount)", () => {
+	it("re-pins the scroll behind phone pill focus (create, mount)", () => {
 		const source = pageSource();
-		// annotate(), openBadge(), and growPill each restore both the
-		// window and the chat scroller on the phone path only.
+		// The popover create path and growPill each restore both the
+		// window and the chat scroller on the phone path only. The
+		// in-prompt edit paths mount no pill, so there is nothing to
+		// re-pin behind them.
 		const restores = source.match(/box\.scrollTop = st;/g) ?? [];
-		expect(restores.length).toBeGreaterThanOrEqual(3);
+		expect(restores.length).toBeGreaterThanOrEqual(2);
 		expect(source).toContain("if (androidUI) {");
 	});
 

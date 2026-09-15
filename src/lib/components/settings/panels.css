@@ -106,7 +106,7 @@
 		min-width: 0;
 		margin-top: 0;
 		padding: 0;
-		accent-color: #1c1c1e;
+		accent-color: #6e6e73;
 		cursor: pointer;
 	}
 	.settings-inner .font-row output {
@@ -356,6 +356,11 @@
 		/* Long error strings must wrap, never shove the panel sideways. */
 		overflow-wrap: anywhere;
 	}
+	.settings-inner .provider-add label,
+	.settings-inner .provider-add input {
+		color: #1c1c1e;
+		color: var(--ink);
+	}
 	.settings-inner .note button {
 		font: inherit;
 		color: inherit;
@@ -439,8 +444,8 @@
 	.settings-inner .provider-row button.selected,
 	.settings-inner .segmented button.selected {
 		border-color: #1c1c1e;
-		background: #1c1c1e;
-		color: #fff;
+		background: #e6e6eb;
+		color: #1c1c1e;
 	}
 	.settings-inner .provider-row button:not(.selected):not(:disabled):hover,
 	.settings-inner .segmented button:not(.selected):not(:disabled):hover {

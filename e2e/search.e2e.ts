@@ -370,3 +370,32 @@ test.describe("touch paths", () => {
 		await expect(page.locator(".error").first()).toContainText("No images on the clipboard.");
 	});
 });
+
+test.describe("sidebar search focus", () => {
+	test("clicking the box keeps focus", async ({ page }) => {
+		await seedThreeChats(page);
+		await page.keyboard.press("Control+b");
+		const box = page.getByLabel("Search chats");
+		await expect(box).toBeVisible();
+		await page.evaluate(() => {
+			(window as unknown as { focusLog: string[] }).focusLog = [];
+			document.addEventListener("focusin", (e) => {
+				const t = e.target as HTMLElement | null;
+				(window as unknown as { focusLog: string[] }).focusLog.push(
+					t ? `${t.tagName}.${(t.className?.toString?.() ?? "").slice(0, 30)}` : "null"
+				);
+			});
+		});
+		await box.click();
+		await expect(box).toBeFocused();
+		// Typing filters the list; hovering rows previews chats.
+		await box.pressSequentially("s", { delay: 50 });
+		await page.locator("aside ul li").first().hover();
+		await page.waitForTimeout(1500);
+		const log = await page.evaluate(
+			() => (window as unknown as { focusLog: string[] }).focusLog
+		);
+		console.log(`focus trail: ${JSON.stringify(log)}`);
+		await expect(box).toBeFocused();
+	});
+});

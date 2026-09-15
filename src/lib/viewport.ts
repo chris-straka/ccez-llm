@@ -16,6 +16,8 @@
 export interface ScrollHold {
   key: string;
   velocity: number;
+  /** Discrete step a sub-150ms tap lands (line for j/k, half-page for d/u). */
+  tapDy: number;
   downAt: number;
   lastT: number;
   raf: number;

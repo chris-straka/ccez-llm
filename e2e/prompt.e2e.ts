@@ -111,9 +111,10 @@ test("long drafts cap the prompt height and scroll", async ({ page }) => {
 	expect(sizes.scroll).toBeGreaterThan(sizes.client);
 });
 
-/** The prompt review card fades in on hover and out on leave (opacity
-and visibility transition, never a display snap). */
-test("prompt review card fades in and out", async ({ page }) => {
+/** The prompt review card toggles on pill click (opacity and
+visibility transition, never a display snap): hover alone never
+opens it, and mouse travel never closes it. */
+test("prompt review card toggles on pill click", async ({ page }) => {
 	await seedChat(page, [{ role: "assistant", content: "fading review card" }]);
 	await page.goto("/");
 	await page.locator('article .rendered:has-text("fading review card")').first().selectText();
@@ -127,11 +128,20 @@ test("prompt review card fades in and out", async ({ page }) => {
 	const opacity = () => card.evaluate((el) => getComputedStyle(el).opacity);
 	// Closed: invisible but laid out (display fade needs the box).
 	expect(await opacity()).toBe("0");
+	// Hover alone opens nothing.
 	const box = await pill.boundingBox();
 	if (!box) throw new Error("pill has no box");
 	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+	await page.waitForTimeout(400);
+	expect(await opacity()).toBe("0");
+	// The click toggles open; wandering the mouse keeps it open.
+	await pill.click();
 	await expect.poll(opacity, { timeout: 2000 }).toBe("1");
 	await page.mouse.move(4, 300);
+	await page.waitForTimeout(400);
+	expect(await opacity()).toBe("1");
+	// And back shut.
+	await pill.click();
 	await expect.poll(opacity, { timeout: 2000 }).toBe("0");
 });
 

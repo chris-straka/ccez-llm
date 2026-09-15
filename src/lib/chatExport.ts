@@ -85,7 +85,7 @@ export async function exportChatMarkdown(
 	deps: {
 		picker?: ((options: SavePickerOptions) => Promise<SaveHandleLike>) | null | undefined;
 		native?: ((filename: string, text: string) => Promise<"saved" | "dismissed" | null>) | null | undefined;
-		download?: ((text: string, filename: string) => void) | undefined;
+		download?: ((text: string, filename: string) => void | Promise<void>) | undefined;
 	} = {}
 ): Promise<"picker" | "native" | "download"> {
 	const text = chatToMarkdown(chat);
@@ -111,8 +111,29 @@ export async function exportChatMarkdown(
 	}
 	const download = deps.download;
 	if (!download) throw new Error("No export path available.");
-	download(text, filename);
+	// Awaited: async fallbacks (clipboard) must finish — or throw
+	// into the caller's failure toast — before resolving.
+	await download(text, filename);
 	return "download";
+}
+
+/**
+ * Clipboard fallback for runtimes where a blob download goes nowhere
+ * (the Android shell webview has no download manager: the anchor
+ * click silently dies, or worse the webview tries to navigate). The
+ * caller toasts "copied" so the tap always lands somewhere visible.
+ * Throws like the download path when no clipboard exists, so the
+ * caller still toasts the failure honestly.
+ */
+export interface ClipboardLike {
+	writeText(text: string): Promise<void>;
+}
+
+export async function copyExportText(text: string, clipboard?: ClipboardLike | null): Promise<void> {
+	const target =
+		clipboard ?? (typeof navigator !== "undefined" ? (navigator.clipboard ?? null) : null);
+	if (!target) throw new Error("No export path available.");
+	await target.writeText(text);
 }
 
 /**

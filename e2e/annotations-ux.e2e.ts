@@ -142,10 +142,9 @@ test("empty annotations bake a question mark for the model", async ({ page }) =>
 	await page.keyboard.press("Enter");
 	const user = page.locator("article.user").first();
 	await expect(user).toBeVisible();
-	// The open card covers its own pill by design (copy lives inside),
-	// so a checked hover can never complete: force the real mouse over
-	// and prove the card genuinely opened via its opacity transition.
-	await user.locator(".ann-refs-pill").hover({ force: true });
+	// The card is click-toggled (hover never opens it): prove the
+	// toggle genuinely opened it via its opacity transition.
+	await user.locator(".ann-refs-pill").click();
 	await expect(user.locator(".ann-refs-pop")).toHaveCSS("opacity", "1");
 	await expect(user.locator(".ann-refs-comment").first()).toHaveText("?");
 });
@@ -174,7 +173,7 @@ test("annotations-only messages render as an em-dash with the count pill above",
 	expect(parseFloat(sizes.fontSize)).toBeGreaterThanOrEqual(13);
 });
 
-test("review edit box saves on Enter and stays readable", async ({ page }) => {
+test("review pencil edits in the composer and files on send", async ({ page }) => {
 	await seedChat(page, [{ role: "assistant", content: "alpha beta gamma delta" }]);
 	await page.goto("/");
 	const para = page.locator("article.assistant .rendered p").first();
@@ -184,25 +183,21 @@ test("review edit box saves on Enter and stays readable", async ({ page }) => {
 	await page.locator('.sel-menu button:has-text("Annotate")').click();
 	await page.keyboard.type("first");
 	await page.keyboard.press("Enter");
-	await page.locator(".prompt-tools .ann-wrap").hover();
-	await page.locator('.review-pencil').first().click();
-	const box = page.locator(".review textarea");
-	await expect(box).toBeVisible();
-	await box.fill("");
-	// The dark edit box is a raised surface, never near-black. Measure
-	// while the edit is open: Enter closes it, leaving nothing to read.
-	// (Transition symmetry is pinned in annotations-ux.test.ts against
-	// elements this flow never mounts.)
-	const darkField = await page.evaluate(() => {
-		document.documentElement.dataset.theme = "dark";
-		const ta = document.querySelector(".review textarea") as HTMLElement | null;
-		return ta ? getComputedStyle(ta).backgroundColor : null;
-	});
-	// #3a3a3c, not the near-black field #101013.
-	expect(darkField).not.toBe("rgb(16, 16, 19)");
-	await box.press("Enter");
-	// Enter saved instead of inserting a newline: the edit closed.
-	await expect(box).toHaveCount(0);
+	// The pill toggles the review (hover never opens it); the pencil
+	// loads the comment into the composer instead of an inline box.
+	await page.locator(".prompt-tools .ann-pill").click();
+	await expect(page.locator(".ann-wrap .review")).toHaveCSS("opacity", "1");
+	await page.locator(".review-pencil").first().click();
+	const draft = await page.evaluate(
+		() => document.querySelector(".prompt .cm-content")?.textContent ?? ""
+	);
+	expect(draft).toBe("first");
+	// Send files the note back (toast confirms the arrow didn't chat).
+	await page.keyboard.type("!");
+	await page.keyboard.press("Enter");
+	await expect(page.locator(".toast")).toContainText("Note saved");
+	await page.locator(".prompt-tools .ann-pill").click();
+	await expect(page.locator(".review-comment").first()).toHaveText("first!");
 });
 
 test("gutter drags never highlight above the cursor line", async ({ page }) => {

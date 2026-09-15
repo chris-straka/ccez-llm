@@ -90,11 +90,16 @@ test("scrolling the action row folds nothing and summons no sidebar", async ({ p
 	await swipeFrom(page, `${row} >> nth=0`, 150);
 	await expect(page.locator(".settings-panel")).toHaveClass(/closed/);
 	await expect(page.locator("article.assistant .actions .icon-btn").first()).not.toHaveClass(/folded/);
-	// Control: a leftward stroke off the row opens nothing either (one
-	// finger never opens settings), while a rightward stroke summons
-	// the chats list — proving the harness gesture reaches the app.
+	// Control: a leftward stroke off the row DOES open settings (the
+	// remap kept mid-screen one-finger left as the settings stroke —
+	// see the edge-swipes spec and the shortcuts menu), while a
+	// rightward stroke summons the chats list — proving the harness
+	// gesture reaches the app.
 	await swipeX(page, 300, 150);
-	await expect(page.locator(".settings-panel")).toHaveClass(/closed/);
+	await expect(page.locator(".settings-panel")).not.toHaveClass(/closed/);
+	// The first rightward stroke dismisses settings; the second
+	// summons the list (the chats stroke yields to an open panel).
+	await swipeX(page, 100, 250);
 	await swipeX(page, 100, 250);
 	await expect(page.locator("aside:has(button.side-chat)").first()).not.toHaveClass(/collapsed/);
 });
@@ -131,38 +136,48 @@ test("overlay checkbox ships checked under Messages", async ({ page }) => {
 	await expect(box).toBeChecked();
 });
 
-test("overlay pill hugs the buttons, anchored to the message side", async ({ page }) => {
+test("overlay pill centers on the tap, clamped to the viewport", async ({ page }) => {
 	await seedChat(page, {});
+	const userRendered = page.locator("article.user .rendered").first();
 	const userRow = page.locator("article.user .actions").first();
-	await page.locator("article.user .rendered").first().click();
+	const tap = await userRendered.boundingBox().then((b) => ({ x: (b?.x ?? 0) + (b?.width ?? 0) / 2, y: (b?.y ?? 0) + (b?.height ?? 0) / 2 }));
+	await userRendered.click();
 	await expect(userRow).toHaveCSS("opacity", "1");
 	await expect(userRow).toHaveCSS("position", "absolute");
 	const userFit = await userRow.evaluate((el) => {
 		const r = el.getBoundingClientRect();
 		const kids = [...el.children].filter((k) => getComputedStyle(k).display !== "none");
 		const last = kids[kids.length - 1]?.getBoundingClientRect();
-		const article = el.closest("article")?.getBoundingClientRect();
-		return { pillRight: r.x + r.width, lastRight: (last?.x ?? 0) + (last?.width ?? 0), articleRight: (article?.x ?? 0) + (article?.width ?? 0), pillW: r.width, articleW: article?.width ?? 0 };
+		return {
+			cx: r.x + r.width / 2,
+			top: r.y,
+			right: r.x + r.width,
+			pillRight: r.x + r.width,
+			lastRight: (last?.x ?? 0) + (last?.width ?? 0)
+		};
 	});
-	// No dead span past the last button; the pill is narrower than the article...
+	// Centered on the tap (a line below it), never past the screen edge...
+	expect(Math.abs(userFit.cx - tap.x)).toBeLessThanOrEqual(14);
+	expect(userFit.top).toBeGreaterThanOrEqual(tap.y);
+	expect(userFit.right).toBeLessThanOrEqual(412);
+	// ...and snug around the buttons with no dead span.
 	expect(userFit.pillRight - userFit.lastRight).toBeLessThanOrEqual(12);
-	expect(userFit.pillW).toBeLessThan(userFit.articleW - 20);
-	// ...and hugs the right edge for own rows.
-	expect(userFit.articleRight - userFit.pillRight).toBeLessThanOrEqual(8);
 	// The idle speaking dot takes no slot in the overlay.
 	const dot = await userRow.locator(".speaking-dot").evaluate((el) => getComputedStyle(el).display);
 	expect(dot).toBe("none");
-	// Assistant rows hug the left edge instead.
+	// Assistant rows center the same way (no side anchoring).
+	const asstRendered = page.locator("article.assistant .rendered").first();
 	const asstRow = page.locator("article.assistant .actions").first();
-	await page.locator("article.assistant .rendered").first().click();
+	const asstTap = await asstRendered.boundingBox().then((b) => ({ x: (b?.x ?? 0) + (b?.width ?? 0) / 2, y: (b?.y ?? 0) + (b?.height ?? 0) / 2 }));
+	await asstRendered.click();
 	await expect(asstRow).toHaveCSS("opacity", "1");
 	const asstFit = await asstRow.evaluate((el) => {
 		const r = el.getBoundingClientRect();
-		const article = el.closest("article")?.getBoundingClientRect();
-		return { pillX: r.x, articleX: article?.x ?? 0, pillW: r.width, articleW: article?.width ?? 0 };
+		return { cx: r.x + r.width / 2, top: r.y, x: r.x };
 	});
-	expect(asstFit.pillX - asstFit.articleX).toBeLessThanOrEqual(8);
-	expect(asstFit.pillW).toBeLessThan(asstFit.articleW - 20);
+	expect(Math.abs(asstFit.cx - asstTap.x)).toBeLessThanOrEqual(14);
+	expect(asstFit.top).toBeGreaterThanOrEqual(asstTap.y);
+	expect(asstFit.x).toBeGreaterThanOrEqual(0);
 });
 
 test("overlay open and close never move the chat", async ({ page }) => {
@@ -202,4 +217,53 @@ test("in-flow rows reserve space and wear no pill", async ({ page }) => {
 	expect(await top()).toBeCloseTo(before, 0);
 	// Fade only: every button keeps its box to the subpixel.
 	expect(await boxes()).toEqual(buttonsBefore);
+});
+
+test("refs-only messages show every pill button", async ({ page }) => {
+	await page.addInitScript(() => {
+		window.localStorage.setItem("ccez-mock-provider", "1");
+		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
+		const msg = (id: string, role: string, content: string) => ({ id, role, content, usage: null, error: null });
+		window.localStorage.setItem(
+			"ccez-llm-chats-v1",
+			JSON.stringify([
+				{
+					id: "e2e-chat",
+					createdAt: 1,
+					replyLang: null,
+					messages: [msg("m1", "user", "Annotated selections:\n1. \"first quote\"\n2. \"second quote\"")]
+				}
+			])
+		);
+	});
+	await page.goto("/");
+	await expect(page.locator("article .rendered").first()).toBeVisible({ timeout: 60_000 });
+	// The own row shrinks to its dash, but the floating pill sizes to
+	// its buttons — never to the article.
+	await page.locator("article.user .rendered").first().click();
+	const row = page.locator("article.user .actions").first();
+	await expect(row).toHaveCSS("opacity", "1");
+	const fit = await row.evaluate((el) => ({
+		scrollW: el.scrollWidth,
+		clientW: el.clientWidth,
+		buttons: [...el.querySelectorAll("button")].map((b) => Math.round(b.getBoundingClientRect().width))
+	}));
+	expect(fit.buttons.length).toBeGreaterThan(2);
+	expect(Math.min(...fit.buttons)).toBeGreaterThan(0);
+	expect(fit.scrollW).toBeLessThanOrEqual(fit.clientW + 1);
+});
+
+test("a second tap shuts the pill where it opened", async ({ page }) => {
+	await seedChat(page, {});
+	const article = page.locator("article.assistant").first();
+	await page.locator("article.assistant .rendered").first().click();
+	const row = page.locator("article.assistant .actions").first();
+	await expect(row).toHaveCSS("opacity", "1");
+	const anchored = await article.evaluate((el) => el.style.getPropertyValue("--actions-top"));
+	expect(anchored).not.toBe("");
+	// Toggle shut keeps the tap anchor for the fade: dropping it would
+	// yank the pill to the end-anchored fallback mid-fade.
+	await page.locator("article.assistant .rendered").first().click();
+	await expect(article).toHaveAttribute("data-actions-open", "false");
+	expect(await article.evaluate((el) => el.style.getPropertyValue("--actions-top"))).toBe(anchored);
 });

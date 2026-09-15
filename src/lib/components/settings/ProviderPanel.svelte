@@ -238,11 +238,15 @@
 			</button>
 		</p>
 	{/if}
-	<p class="note">
-		{#if inShell}
-			Keys stay in this app's secured storage, never in a file.
-		{:else}
-			Keys stay on this machine, in this app's local storage.
-		{/if}
-	</p>
+	{#if !activeDef.keyless}
+		<!-- Keyless providers (on-device Gemma) have no key to reassure
+		about: the note would read as if one were stored. -->
+		<p class="note">
+			{#if inShell}
+				Keys stay in this app's secured storage, never in a file.
+			{:else}
+				Keys stay on this machine, in this app's local storage.
+			{/if}
+		</p>
+	{/if}
 </section>

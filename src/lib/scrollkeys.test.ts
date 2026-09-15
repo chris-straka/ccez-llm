@@ -3,6 +3,7 @@ import {
 	ESCAPE_HOLD_MS,
 	GG_WINDOW_MS,
 	HOVER_EDGE_MARGIN_PX,
+	SCROLLKEY_DU_VELOCITY_PX_S,
 	SCROLLKEY_JK_VELOCITY_PX_S,
 	SCROLLKEY_LINE_PX,
 	SCROLL_HOLD_TAP_MS,
@@ -27,9 +28,11 @@ describe("unselectedScrollIntent", () => {
 		expect(SCROLLKEY_LINE_PX).toBeGreaterThan(0);
 	});
 
-	it("ignores bare d/u; only Ctrl+U / Ctrl+D jump", () => {
-		expect(unselectedScrollIntent("d", false)).toBe(null);
-		expect(unselectedScrollIntent("u", false)).toBe(null);
+	it("fast-scrolls a smooth half-page on bare d/u", () => {
+		// Phones gate this at the call site (bare taps stay dead
+		// there); the intent itself is desktop-bound.
+		expect(unselectedScrollIntent("d", false)).toEqual({ kind: "half-page", dir: 1 });
+		expect(unselectedScrollIntent("u", false)).toEqual({ kind: "half-page", dir: -1 });
 	});
 
 	it("arms gg on the first g, tops on the second", () => {
@@ -143,11 +146,15 @@ describe("isEscapeHold", () => {
 });
 
 describe("scrollHoldVelocity", () => {
-	it("glides j/k at line speed; d/u never glide", () => {
+	it("glides j/k at line speed and d/u three times faster", () => {
 		expect(scrollHoldVelocity("j")).toBe(SCROLLKEY_JK_VELOCITY_PX_S);
 		expect(scrollHoldVelocity("k")).toBe(-SCROLLKEY_JK_VELOCITY_PX_S);
-		expect(scrollHoldVelocity("d")).toBeNull();
-		expect(scrollHoldVelocity("u")).toBeNull();
+		expect(scrollHoldVelocity("d")).toBe(SCROLLKEY_DU_VELOCITY_PX_S);
+		expect(scrollHoldVelocity("u")).toBe(-SCROLLKEY_DU_VELOCITY_PX_S);
+		expect(SCROLLKEY_DU_VELOCITY_PX_S).toBe(3 * SCROLLKEY_JK_VELOCITY_PX_S);
+		// Shifted spellings keep their delete jobs: no glide.
+		expect(scrollHoldVelocity("D")).toBeNull();
+		expect(scrollHoldVelocity("U")).toBeNull();
 	});
 
 	it("leaves discrete keys alone", () => {

@@ -46,6 +46,8 @@
 		CHAT_WIDTH_DEFAULT,
 		CHAT_WIDTH_MIN,
 		CHAT_WIDTH_MAX,
+		FONT_SCALE_MIN,
+		FONT_SCALE_MAX,
 		PROMPT_IDLE_ALWAYS,
 		PROMPT_IDLE_NEVER,
 		type AppSettings
@@ -267,7 +269,7 @@ import {
 
 	import { dropFilesFromDataTransfer, isPermissionDismissal } from "$lib/intake";
 	import { consumeLaunchFiles, splitLaunchFiles } from "$lib/launchFiles";
-	import { downloadMarkdownFile, exportChatMarkdown, fileSaveAccessAvailable } from "$lib/chatExport";
+	import { copyExportText, downloadMarkdownFile, exportChatMarkdown, fileSaveAccessAvailable } from "$lib/chatExport";
 	import { nativeSaveMarkdown } from "$lib/nativeExport";
 	import { isKeyboardOpen, keyboardOverlapPx } from "$lib/viewportReflow";
 import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
@@ -489,10 +491,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 */
 	let pendingAnn = $state<Annotation | null>(null);
 	let reviewOpen = $state(false);
-	/** Focus refs: the review overlay opens through CSS :focus-within on
-	touch, so focus must always land on a live node inside .ann-wrap —
-	never on an unmounting button (focus drops to <body> and the whole
-	overlay closes). */
+	/** Focus refs: after a control unmounts mid-touch, focus must
+	land on a live node inside .ann-wrap — never on a dying button
+	(focus drops to <body> and strands the keyboard). */
 	let annPill: HTMLButtonElement | null = $state(null);
 	let editBox: HTMLTextAreaElement | null = $state(null);
 	function focusPill(): void {
@@ -645,6 +646,26 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	let searchQueryTimer: ReturnType<typeof setTimeout> | null = null;
 	let editingId: AnnotationId | null = $state(null);
 	let editDraft = $state("");
+	/**
+	 * Mobile in-prompt annotation edit: the composer holds the comment
+	 * (the transplanted popover textbox can't reliably summon the
+	 * phone keyboard), the send arrow files it, tapping out cancels.
+	 * Desktop never sets this — popover and review textarea stay. The
+	 * stash restores the drafted chat text on file and on cancel.
+	 */
+	let promptAnnEdit: { id: string } | { pending: true } | null = $state(null);
+	let promptAnnStash = $state("");
+	/**
+	 * Click-toggled overlays (desktop has no hover-open anywhere):
+	 * the sent-refs card opens per message (one at a time), the
+	 * composer review rides reviewOpen. Pills are plain disclosure
+	 * buttons — Enter/Space toggle like a click.
+	 */
+	let refsPopOpen: ChatMsgId | null = $state(null);
+	/** Jump-blink target: the wash shows while set (two slow blinks,
+	then cleared — hover previews own the wash again after). */
+	let annBlink: AnnotationId | null = $state(null);
+	let annBlinkTimer: ReturnType<typeof setTimeout> | null = null;
 	/** Own message under in-place edit (null when no edit is open).
 	Enter saves + resends; Alt+Enter saves without resending; Esc cancels. */
 	let editingMsgId: ChatMsgId | null = $state(null);
@@ -878,6 +899,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 	function annotateTouch(event: TouchEvent): void {
 		menuBtnTouch(event, annotate);
+	}
+	function speakTouch(event: TouchEvent): void {
+		menuBtnTouch(event, speakDockSelection);
+	}
+	/** Mobile dock Speak: read the highlight aloud, dock stays put
+	so Annotate (and Inspect) stay one tap away after listening. */
+	function speakDockSelection(): void {
+		if (!selMenu) return;
+		void speakQuote(selMenu.quote, selMenu.messageId, true, selMenu.context);
 	}
 	function inspectTouch(event: TouchEvent): void {
 		menuBtnTouch(event, openInspect);
@@ -1403,7 +1433,29 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			void layoutSideviewViews(layout);
 		};
 		window.addEventListener("resize", onResize);
-		return () => window.removeEventListener("resize", onResize);
+		// Desktop Cmd+scroll rides the app's text size in 0.1 steps
+		// (the browser's own page zoom would blur the shell and fight
+		// the layout; phones pinch instead, so this stays desktop).
+		// Non-passive: swallowing the gesture must also swallow the
+		// browser zoom it would otherwise trigger.
+		const onZoomWheel = (event: WheelEvent): void => {
+			if (androidUI || !event.metaKey) return;
+			event.preventDefault();
+			const delta = event.deltaY < 0 ? 0.1 : -0.1;
+			const next = Math.min(
+				FONT_SCALE_MAX,
+				Math.max(FONT_SCALE_MIN, Math.round((settings.fontScale + delta) * 100) / 100)
+			);
+			if (next !== settings.fontScale) {
+				settings.fontScale = next;
+				persistSettings();
+			}
+		};
+		window.addEventListener("wheel", onZoomWheel, { passive: false });
+		return () => {
+			window.removeEventListener("resize", onResize);
+			window.removeEventListener("wheel", onZoomWheel);
+		};
 	});
 
 	function runSearchQuery(): void {
@@ -1594,12 +1646,19 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			const picker = fileSaveAccessAvailable()
 				? (window.showSaveFilePicker?.bind(window) ?? null)
 				: null;
+			// The Android shell webview sinkholes blob downloads, so its
+			// fallback copies the markdown instead of dead-clicking an
+			// anchor. Browsers keep the file download (verified on the
+			// mobile emulation path).
+			const shellPhone = androidUI && tauriBackendAvailable();
 			const how = await exportChatMarkdown(target, {
 				picker,
 				native: (filename, text) => nativeSaveMarkdown(filename, text),
-				download: downloadMarkdownFile
+				download: shellPhone ? (text) => copyExportText(text) : downloadMarkdownFile
 			});
-			flashToast(how === "download" ? "Chat downloaded" : "Chat saved");
+			flashToast(
+				how === "download" ? (shellPhone ? "Chat copied to clipboard" : "Chat downloaded") : "Chat saved"
+			);
 		} catch (error) {
 			if (!isPermissionDismissal(error)) flashToast("Couldn't export this chat.");
 		}
@@ -1607,10 +1666,16 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 
 
 
-	/** Open the settings panel, dismissing the chats list on touch. */
-	function openSettingsPanel(): void {
-		if (androidUI) {
-			void hapticBeatAsync("send", {
+	/**
+	 * Open the settings panel, dismissing the chats list on touch.
+	 * Swipe openers pass silent: the stroke itself is the feedback,
+	 * so only button/menu/keyboard openings tick.
+	 */
+	function openSettingsPanel(silent = false): void {
+		// Openings tick medium (first): distinct from the light ticks
+		// of folds and steps and the triple thump of deletes.
+		if (androidUI && !silent) {
+			void hapticBeatAsync("first", {
 				enabled: settings.vibration,
 				shell: tauriBackendAvailable()
 			});
@@ -1694,6 +1759,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * idle state instead of summoning a hidden prompt.
 	 */
 	function promptParked(): boolean {
+		// Phones never park for drawers: the chats list and settings
+		// are overlays above the composer (z 55+ over 30), so hiding
+		// it under them only slid the thread and flickered the card.
+		// Only a real idle timeout parks. Desktop keeps drawer parking.
+		if (androidUI) return promptIdle;
 		return promptIdle || settingsOpen || !settings.sidebarCollapsed;
 	}
 	/**
@@ -1949,7 +2019,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * closing returns the prior idle state untouched.
 	 */
 	$effect(() => {
-		if (!promptParked()) return;
+		// Phones keep the composer mounted under open drawers, but an
+		// open drawer still drops the caret (typing behind the panel,
+		// keyboard over the drawer). Desktop blurs via promptParked.
+		const drawerOpen = androidUI && (settingsOpen || !settings.sidebarCollapsed);
+		if (!promptParked() && !drawerOpen) return;
 		const active = document.activeElement;
 		if (active instanceof HTMLElement && active.closest(".prompt")) editor?.blur();
 	});
@@ -2085,6 +2159,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	pop it where tapped instead of at their far end. Null keeps the
 	end-anchored pill (and every non-overlay row ignores it). */
 	let actionsTapY: number | null = $state(null);
+	/** Phone overlay only: article-relative px of the tap center the
+	pill hangs from (translateX(-50%) in CSS), viewport-clamped once
+	the pill has a measured width. Plain field beside the $state —
+	only the anchor function and the clamp below touch it. */
+	let actionsTapX: number | null = $state(null);
+	let lastTapX = 0;
 	/** Phone only: the second tap of a message double-tap pins the just
 	revealed row open — without this its click would toggle it shut
 	while scrolling to the message end. Stamped in the touchend below,
@@ -2095,11 +2175,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * chat opens it; swipes inside cycle chats, tapping away closes.
 	 */
 	let chatSwitcherOpen = $state(false);
-	/** Switcher card swipe anchor (lead touch x, null between strokes). */
-	let switcherTouchX: number | null = null;
 	function openChatSwitcher(): void {
 		chatSwitcherOpen = true;
-		void hapticBeatAsync("send", {
+		void hapticBeatAsync("first", {
 			enabled: settings.vibration,
 			shell: tauriBackendAvailable()
 		});
@@ -2112,9 +2190,18 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			shell: tauriBackendAvailable()
 		});
 	}
-	/** Cycle from inside the switcher (stays open across steps). */
+	/**
+	 * Cycle from inside the switcher (stays open across steps) with
+	 * wrap-around: past either end loops to the far chat instead of
+	 * minting or sticking. A lone chat falls through to the plain
+	 * step (past-newest still mints).
+	 */
 	function stepSwitcher(direction: 1 | -1): void {
-		stepChat(direction, false);
+		const ids = chatState.chats.map((c) => c.id);
+		const at = ids.indexOf(chatState.activeChatId);
+		const wrapped = at >= 0 && ids.length > 0 ? (ids[(at + direction + ids.length) % ids.length] ?? null) : null;
+		if (wrapped !== null && wrapped !== chatState.activeChatId) transitionToChat(wrapped);
+		else stepChat(direction, false);
 		void hapticBeatAsync("send", {
 			enabled: settings.vibration,
 			shell: tauriBackendAvailable()
@@ -2159,9 +2246,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// fold button exists to press. Android only — desktop hovers the
 		// row back into view.
 		if (androidUI && foldedIds.has(id)) {
+			// Keep the last tap anchor: clearing it here would
+			// yank an open overlay mid-fade to the end-anchored
+			// fallback (see the toggle-shut path below).
 			shownActionsId = null;
-			actionsAbove = false;
-			actionsTapY = null;
 			toggleFold(id);
 			return;
 		}
@@ -2171,15 +2259,21 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// The second tap of a message double-tap scrolls to the
 			// message end instead of toggling shut (see the touchend
 			// below): re-arm and re-anchor, never close. Desktop has
-			// no pin, so its toggle rhythm is untouched.
+			// no pin, so its toggle rhythm is untouched. Overlay
+			// mode never sets the pin (its double-tap is disabled),
+			// so a second tap always lands here and toggles shut.
 			if (msgDoubleTapPin?.id === id && Date.now() - msgDoubleTapPin.at < 500) {
 				anchorActionsToTap(id, event);
 				armActionsTimer(id);
 				return;
 			}
+			// Toggle shut keeps the last tap anchor: the pill fades
+			// for 0.18s, and dropping the var now would yank it to
+			// the end-anchored fallback mid-fade — the flash of
+			// buttons below the message. Stale anchors are
+			// harmless: the var only applies to the open message
+			// and every reveal re-anchors.
 			shownActionsId = null;
-			actionsAbove = false;
-			actionsTapY = null;
 			return;
 		}
 		shownActionsId = id;
@@ -2190,12 +2284,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			boxRect !== undefined &&
 			el.getBoundingClientRect().bottom + 64 > boxRect.bottom;
 		actionsTapY = null;
+		// No haptic on a single reveal tap: a reveal is a quiet UI
+		// affordance, not a sent action. Double-tap keeps its own
+		// beat (the message-end jump); the send paths keep theirs.
 		if (androidUI && settings.overlayActions && settings.hideButtons) {
 			anchorActionsToTap(id, event);
-			void hapticBeatAsync("send", {
-				enabled: settings.vibration,
-				shell: tauriBackendAvailable()
-			});
 		}
 		// The tap can land mid-frame with keyboard or viewport churn:
 		// settle a re-measure after paint (same settle the send paths
@@ -2206,11 +2299,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		armActionsTimer(id);
 	}
 	/**
-	 * Phone overlay only: anchor the revealed pill near the reveal tap
-	 * (clamped to the viewport) instead of the message end, so tapping
-	 * the top of a huge message pops it where tapped. Above the tap
-	 * when no room below, at the tap otherwise. No-op everywhere else:
-	 * desktop and in-flow rows keep their end-anchored pill.
+	 * Phone overlay only: the pill opens below the tap, horizontally
+	 * centered on it (~one line down, via CSS) — the same placement
+	 * for a one-word message and a four-line one. Only when the pill
+	 * wouldn't fit below does it go above the tap instead. The
+	 * horizontal center clamps to the viewport once the pill has a
+	 * measured width (next frame). No-op everywhere else: desktop
+	 * and in-flow rows keep their end-anchored pill.
 	 */
 	function anchorActionsToTap(id: ChatMsgId, event: MouseEvent): void {
 		if (shownActionsId !== id) return;
@@ -2219,18 +2314,32 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		if (!(el instanceof HTMLElement) || boxRect === undefined) return;
 		const artRect = el.getBoundingClientRect();
 		if (artRect.height <= 0) return;
-		// Pill footprint (matches the overlay pill padding + buttons).
-		const pillH = 56;
-		const tap = event.clientY;
-		const above = tap + pillH + 8 > boxRect.bottom && tap - pillH - 8 >= boxRect.top;
-		actionsAbove = above;
-		const anchorViewport = above
-			? tap
-			: Math.min(
-					Math.max(tap, boxRect.top + 4),
-					Math.max(boxRect.top + 4, boxRect.bottom - pillH - 4)
-				);
-		actionsTapY = Math.min(Math.max(anchorViewport - artRect.top, 0), artRect.height);
+		const tapX = event.clientX;
+		const tapY = event.clientY;
+		lastTapX = tapX;
+		// One text line plus the pill footprint plus a margin: when
+		// that doesn't fit below the tap, the pill goes above it
+		// (never when above doesn't fit either — overlapping the tap
+		// beats stranding the pill off-screen).
+		const needBelow = 28 + 56 + 12;
+		actionsAbove = tapY + needBelow > boxRect.bottom && tapY - 68 >= boxRect.top;
+		actionsTapY = Math.min(Math.max(tapY - artRect.top, 0), artRect.height);
+		actionsTapX = tapX - artRect.left;
+		requestAnimationFrame(() => centerActionsPill(id));
+	}
+
+	/** Clamp the open pill's tap-center into the viewport: same tap,
+	same pill, never past the screen edge. */
+	function centerActionsPill(id: ChatMsgId): void {
+		if (shownActionsId !== id) return;
+		const art = document.querySelector('article[data-actions-open="true"]');
+		const row = art?.querySelector(":scope > .actions, .actions");
+		if (!(art instanceof HTMLElement) || !(row instanceof HTMLElement)) return;
+		const w = row.offsetWidth;
+		if (w <= 0) return;
+		const half = w / 2 + 8;
+		const leftVp = Math.min(Math.max(lastTapX, half), window.innerWidth - half);
+		actionsTapX = leftVp - art.getBoundingClientRect().left;
 	}
 
 	/** Focus a sidebar chat button by list position (clamped). */
@@ -2385,8 +2494,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 
 	function doNewChat(): void {
+		// A fresh chat opens medium (first), like settings.
 		if (androidUI) {
-			void hapticBeatAsync("send", {
+			void hapticBeatAsync("first", {
 				enabled: settings.vibration,
 				shell: tauriBackendAvailable()
 			});
@@ -2928,6 +3038,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// Starting over submits whatever is being composed first: typed
 		// comments are never silently dropped.
 		if (pendingAnn) commitPending();
+		// An in-prompt note edit owns the composer: filing it first
+		// hands the draft back before the new annotation takes over.
+		if (promptAnnEdit) commitPromptAnnEdit();
 		const quote = selMenu.quote.trim();
 		// Repeats disambiguate here, from the live selection: the
 		// last "c" in "ccc" records occurrence 2, so its badge
@@ -2955,6 +3068,17 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		};
 		pendingAnn = pending;
 		clearSelection();
+		// Phones file the comment in the composer, never the
+		// transplanted pill (its textbox can't reliably summon the
+		// phone keyboard — see editAnnotationInPrompt). Desktop
+		// falls through to the popover below.
+		if (androidUI) {
+			selMenu = null;
+			highlightAnnId = pending.id;
+			editAnnotationInPrompt({ pending: true }, "");
+			if (settings.vibration) vibrateTick(6);
+			return;
+		}
 		const width = popWidth(true);
 		// The comment box sits a breath below the Annotate menu's
 		// anchor: sharing selMenu.y leaves it floating high above tall
@@ -3145,12 +3269,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 
 	/**
-	 * Badge click edits in place: the annotation popover opens at the
-	 * badge with the saved comment loaded. Cancel leaves it untouched,
-	 * Save writes, trash deletes. The wash shows while editing (it rides
-	 * the same highlight as a fresh annotation).
+	 * Badge click edits in the composer (see editAnnotationInPrompt):
+	 * the saved comment loads as the draft, the arrow files it back,
+	 * tapping out cancels. Re-pressing the editing badge cancels too.
 	 */
-	function openBadge(id: AnnotationId, anchor: { x: number; y: number }): void {
+	function openBadge(id: AnnotationId): void {
 		// Re-pressing the open badge closes it, like cancel: the edit
 		// menu toggles instead of reopening under the cursor.
 		if (annPop && !annPopClosing && annPop.id === id) {
@@ -3159,43 +3282,20 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		}
 		const current = annotations.find((a) => a.id === id);
 		if (!current) return;
+		// Every edit happens in the composer, never the card: the
+		// transplanted textbox can't reliably summon keyboards or
+		// hold focus (phones and desktop alike) — see
+		// editAnnotationInPrompt. Re-pressing the editing badge
+		// cancels back out (toggle).
+		if (promptAnnEdit && !("pending" in promptAnnEdit) && promptAnnEdit.id === id) {
+			cancelPromptAnnEdit();
+			return;
+		}
 		stopPillMic();
 		editingId = null;
 		highlightAnnId = id;
-		annDraft = current.comment;
-		settleAnnPop();
-		// Narrow phones are narrower than the desktop card: clamp first
-		// or x goes negative and the popover runs off-screen.
-		const width = popWidth(false);
-		let x = Math.min(Math.max(8, anchor.x - width / 2), window.innerWidth - width - 8);
-		const height = 240;
-		let y = anchor.y + 8;
-		if (y + height > window.innerHeight - 8) y = Math.max(8, anchor.y - height - 8);
-		if (androidUI) {
-			// Same keyboard rule as the create composer: high and
-			// centered, never under the keyboard.
-			x = Math.max(8, (window.innerWidth - width) / 2);
-			y = Math.max(8, window.innerHeight * 0.12);
-		}
-		annPop = { id, x, y, fresh: false };
-		// The box can morph from a still-fading fresh pill (same
-		// element, no remount, so growPill's mount focus never fires):
-		// land the caret explicitly, like the create path does.
-		// Phones re-pin the scroll behind the focus (same WebView pan
-		// as the create path); desktop keeps the single focus call.
-		if (androidUI) {
-			const sx = window.scrollX;
-			const sy = window.scrollY;
-			const box = scrollBox;
-			const st = box?.scrollTop ?? 0;
-			void tick().then(() => {
-				annPopBox?.focus({ preventScroll: true });
-				window.scrollTo(sx, sy);
-				if (box) box.scrollTop = st;
-			});
-		} else {
-			void tick().then(() => annPopBox?.focus({ preventScroll: true }));
-		}
+		editAnnotationInPrompt({ id }, current.comment);
+		return;
 	}
 
 	/**
@@ -3205,9 +3305,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * not a re-press: running the toggle would shut the menu the press
 	 * opened (the iOS tap bug). Anything else toggles as before.
 	 */
-	function openBadgeClick(id: AnnotationId, anchor: { x: number; y: number }): void {
+	function openBadgeClick(id: AnnotationId): void {
 		if (lastBadgePress && lastBadgePress.id === id && Date.now() - lastBadgePress.at < 800) return;
-		openBadge(id, anchor);
+		openBadge(id);
 	}
 
 	function saveEdit(id: string): void {
@@ -3227,6 +3327,131 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			settleAnnPop();
 			annPop = null;
 		}
+		if (promptAnnEdit && !("pending" in promptAnnEdit) && promptAnnEdit.id === id) {
+			exitPromptAnnEdit();
+		}
+	}
+
+	/**
+	 * Move an annotation comment into the composer (every edit on
+	 * every platform — the transplanted textboxes can't reliably
+	 * summon keyboards or hold focus): the pending annotation files
+	 * on the arrow, a saved one's comment rewrites. The review
+	 * closes so the composer owns the screen; the wash keeps the
+	 * quote visible.
+	 */
+	function editAnnotationInPrompt(target: { id: string } | { pending: true }, comment: string): void {
+		// A fresh popover open underneath files first: typed comments
+		// are never silently dropped (same rule as annotate()).
+		if (pendingAnn && !("pending" in target)) commitPending();
+		settleAnnPop();
+		annPop = null;
+		promptAnnStash = editor?.getText() ?? "";
+		promptAnnEdit = target;
+		reviewOpen = false;
+		editor?.setText(comment);
+		editor?.setPlaceholder("Add a comment");
+		editor?.caretToEnd();
+		// Best-effort: the opening tap's canceled gesture can block
+		// the summon on some WebViews, but a plain tap on the
+		// composer always works — it summons for chat typing today.
+		void tick().then(() => editor?.focus());
+	}
+
+	/** Send-arrow commit for an in-prompt note edit (see doSend). */
+	function commitPromptAnnEdit(): void {
+		const target = promptAnnEdit;
+		if (!target) return;
+		void hapticBeatAsync("send", { enabled: settings.vibration, shell: tauriBackendAvailable() });
+		const comment = editor?.getText() ?? "";
+		if ("pending" in target) {
+			if (pendingAnn) annotations = [...annotations, { ...pendingAnn, comment }];
+			pendingAnn = null;
+		} else {
+			annotations = editAnnotationComment(annotations, target.id, comment);
+		}
+		highlightAnnId = null;
+		exitPromptAnnEdit();
+		flashToast("Note saved");
+		void tick().then(() => editor?.focus());
+	}
+
+	/** Tapping out drops an in-prompt note edit: a pending filing
+	never existed, a saved note keeps its stored comment (typing only
+	lived in the composer — nothing writes until the arrow). */
+	function cancelPromptAnnEdit(): void {
+		if (!promptAnnEdit) return;
+		if ("pending" in promptAnnEdit) pendingAnn = null;
+		highlightAnnId = null;
+		exitPromptAnnEdit();
+	}
+
+	/** Leave in-prompt edit mode and give the composer back its
+	drafted chat text and placeholder. Focus stays where it is (the
+	commit path re-focuses explicitly; a tap-out cancel must not
+	steal it back). */
+	function exitPromptAnnEdit(): void {
+		promptAnnEdit = null;
+		editor?.setText(promptAnnStash);
+		promptAnnStash = "";
+		editor?.setPlaceholder(promptPlaceholder());
+	}
+
+	/**
+	 * Quote tap lands on the annotation's marker: the message scrolls
+	 * into view and its yellow wash blinks slowly twice, then clears
+	 * (hover previews own the wash again after). Only quote taps
+	 * navigate — notes, buttons, and fields never do.
+	 */
+	function gotoAnnotation(ann: { id: AnnotationId; messageId: ChatMsgId }): void {
+		highlightAnnId = ann.id;
+		const index = viewChat.messages.findIndex((m) => m.id === ann.messageId);
+		if (index >= 0) {
+			document
+				.querySelector(`#msg-${index}`)
+				?.scrollIntoView({ block: "center", behavior: "smooth" });
+		}
+		blinkAnnotation(ann.id);
+	}
+
+	/**
+	 * Sent-refs quote tap: the same jump when the annotation is still
+	 * live (blink included); a bare scroll when it was cleared after
+	 * sending (no badge left to blink).
+	 */
+	function gotoSentRef(messageId: ChatMsgId, quote: string): void {
+		const live = annotations.find((a) => a.messageId === messageId && a.quote === quote);
+		if (live) {
+			gotoAnnotation({ id: live.id, messageId });
+			return;
+		}
+		const index = viewChat.messages.findIndex((m) => m.id === messageId);
+		if (index >= 0) {
+			document
+				.querySelector(`#msg-${index}`)
+				?.scrollIntoView({ block: "center", behavior: "smooth" });
+		}
+	}
+
+	/** Blink a badge wash slowly twice, then hand the wash back. A
+	re-jump restarts the sequence; each phase flips state so Svelte
+	re-renders even for the same id twice running. */
+	function blinkAnnotation(id: AnnotationId): void {
+		if (annBlinkTimer) clearTimeout(annBlinkTimer);
+		annBlinkTimer = null;
+		annBlink = id;
+		let phase = 0;
+		const step = () => {
+			phase += 1;
+			if (phase >= 4) {
+				annBlink = null;
+				annBlinkTimer = null;
+				return;
+			}
+			annBlink = phase % 2 === 0 ? id : null;
+			annBlinkTimer = setTimeout(step, phase % 2 === 0 ? 700 : 350);
+		};
+		annBlinkTimer = setTimeout(step, 700);
 	}
 
 	function clearAllAnnotations(): void {
@@ -3235,6 +3460,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		reviewOpen = false;
 		editingId = null;
 		highlightAnnId = null;
+		// An in-prompt edit dies with the list: hand the composer
+		// back its drafted chat text instead of stranding the note.
+		if (promptAnnEdit) exitPromptAnnEdit();
+		// Clearing everything thumps like a delete (done): the same
+		// unmistakable triple against single-tap ticks.
+		void hapticBeatAsync("done", { enabled: settings.vibration, shell: tauriBackendAvailable() });
 	}
 
 	/**
@@ -3911,6 +4142,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 
 	async function doSend() {
+		// Mobile in-prompt note edit owns the send arrow: file the
+		// comment instead of sending a chat (see commitPromptAnnEdit).
+		if (promptAnnEdit) {
+			commitPromptAnnEdit();
+			return;
+		}
 		// First step lives in sendAction (pinned in submit.test.ts);
 		// the preamble and both continuations stay here as effects.
 		const action = sendAction({ canSubmit, editing: editingMsgId !== null });
@@ -4473,7 +4710,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * frame, so holding never fires the cancel-and-restart stutter that
 	 * per-keydown smooth scrollBy calls produce under key repeat.
 	 */
-	function startScrollHold(key: string, velocity: number): void {
+	function startScrollHold(key: string, velocity: number, tapDy?: number): void {
 		stopScrollHold();
 		if (!scrollBox) return;
 		// The .messages column eases programmatic jumps (scroll-behavior:
@@ -4485,7 +4722,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// distinguishes a superseded glide (see ViewportState.holdSeq).
 		viewport.holdSeq += 1;
 		const seq = viewport.holdSeq;
-		viewport.hold = { key, velocity, downAt: Date.now(), lastT: performance.now(), raf: 0 };
+		viewport.hold = {
+			key,
+			velocity,
+			tapDy: tapDy ?? Math.sign(velocity) * SCROLLKEY_LINE_PX,
+			downAt: Date.now(),
+			lastT: performance.now(),
+			raf: 0
+		};
 		const tick = (t: number) => {
 			const hold = viewport.hold;
 			if (!hold || viewport.holdSeq !== seq || !scrollBox) return;
@@ -4503,10 +4747,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		cancelAnimationFrame(hold.raf);
 		viewport.hold = null;
 		scrollBox?.style.removeProperty("scroll-behavior");
-		// Holds only ever start for line keys now (bare d/u scroll
-		// nothing), so a tap always lands one line step.
+		// A tap lands the hold's own step: one line for j/k, a smooth
+		// half-page for d/u (the shared scroll effect eases it — never
+		// a jump). Holds just stop.
 		if (holdIsTap(hold.downAt, Date.now()) && scrollBox) {
-			scrollChatBy(Math.sign(hold.velocity) * SCROLLKEY_LINE_PX);
+			scrollChatBy(hold.tapDy);
 		}
 	}
 	function stopScrollHold(): void {
@@ -4695,6 +4940,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * when nothing with a language is left (a single blank chat remains).
 	 */
 	function dropChat(id: ChatId): void {
+		// Deletes thump triple (done): unmistakable against the single
+		// ticks of opens and folds. Every delete path shares it — row ×,
+		// gestures, keyboard — so call sites carry no haptic of their own.
+		if (androidUI) {
+			void hapticBeatAsync("done", {
+				enabled: settings.vibration,
+				shell: tauriBackendAvailable()
+			});
+		}
 		stopVoice();
 		if (id === chatState.activeChatId) {
 			// Dropping the open chat discards its drafts (stored entry
@@ -4731,6 +4985,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 
 	/** Drop every chat, then reset the voice language to the keyboard. */
 	function dropAllChats(): void {
+		// Same triple thump as a single delete. Call sites carry no
+		// haptic of their own.
+		if (androidUI) {
+			void hapticBeatAsync("done", {
+				enabled: settings.vibration,
+				shell: tauriBackendAvailable()
+			});
+		}
 		stopVoice();
 		resetDraftExtras();
 		chatScrollTops.clear();
@@ -5166,6 +5428,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		 * open closes the sheet. Gutter double-click stays as-is.
 		 */
 		function applyEdgeTarget(target: EdgePanel | null): void {
+			// A summoned drawer replaces the phone switcher (never stack).
+			if (androidUI) chatSwitcherOpen = false;
 			if (target === "chats") {
 				if (settingsOpen) toggleSettingsPanel();
 				// Touch: a left-to-right swipe opens the chats sidebar
@@ -5232,6 +5496,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			msgId: ChatMsgId | null;
 			zone: FlickZone;
 			inSwitcher: boolean;
+			promptHadFocus: boolean;
 		} | null = null;
 		/**
 		 * Where a single-finger stroke began, for the vertical-flick
@@ -5269,9 +5534,31 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				return "empty";
 			return "other";
 		}
+		// Desktop twin of the tap-out rule below: a press starting
+		// outside the composer cancels an in-prompt note edit.
+		// Composer presses (typing, send arrow) keep it; the review
+		// itself lives inside .prompt, so its buttons never cancel.
+		window.addEventListener("mousedown", (event) => {
+			if (
+				promptAnnEdit &&
+				!(event.target instanceof Element && event.target.closest(".prompt"))
+			) {
+				cancelPromptAnnEdit();
+			}
+		});
 		window.addEventListener(
 			"touchstart",
 			(event) => {
+				// Mobile in-prompt note edit: a stroke starting outside
+				// the composer cancels it (tapping out drops the draft).
+				// Composer taps keep it; the send arrow commits instead
+				// (see doSend). Runs before every gesture below.
+				if (
+					promptAnnEdit &&
+					!(event.target instanceof Element && event.target.closest(".prompt"))
+				) {
+					cancelPromptAnnEdit();
+				}
 				if (event.touches.length > 1) {
 					edgeTouch = null;
 					return;
@@ -5297,6 +5584,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				// Strokes inside the chat switcher belong to the switcher
 				// card (cycle on swipe): the window paths below stay out.
 				const inSwitcher = target instanceof Element && target.closest(".chat-switcher") !== null;
+				// Snapshot before the tap blurs anything: a tap-away that
+				// dismisses the keyboard must not re-arm focus below.
+				const promptHadFocus =
+					document.activeElement instanceof Element &&
+					document.activeElement.closest(".prompt") !== null;
 				edgeTouch = {
 					id: touch.identifier,
 					x: touch.clientX,
@@ -5307,7 +5599,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					rowSwipe,
 					msgId,
 					zone: flickZoneOf(target),
-					inSwitcher
+					inSwitcher,
+					promptHadFocus
 				};
 			},
 			{ passive: true }
@@ -5318,15 +5611,23 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				const start = edgeTouch;
 				edgeTouch = null;
 				if (!start) return;
-				// The switcher card owns its own strokes (cycle on
-				// swipe, buttons to step): window gestures stay out.
-				if (start.inSwitcher) return;
 				let ended: { identifier: number; clientX: number; clientY: number } | null = null;
 				for (let i = 0; i < event.changedTouches.length; i++) {
 					const candidate = event.changedTouches[i];
 					if (candidate && candidate.identifier === start.id) ended = candidate;
 				}
 				if (!ended) return;
+				// Strokes on the switcher veil cycle chats anywhere on
+				// screen (taps still close via click): every other
+				// window gesture stays out.
+				if (start.inSwitcher) {
+					const dx = ended.clientX - start.x;
+					const dy = ended.clientY - start.y;
+					if (Math.abs(dx) >= 64 && Math.abs(dy) < Math.abs(dx)) {
+						stepSwitcher(dx > 0 ? 1 : -1);
+					}
+					return;
+				}
 				// Phone: a leftward stroke starting on a message folds it
 				// (a rightward stroke instead summons the chats list via
 				// the stroke below — the fold only wins on a leftward
@@ -5347,9 +5648,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					toggleFold(start.msgId);
 					return;
 				}
-				// Double-tap on empty space opens the chats list (Android):
-				// one of two openers — the rightward stroke below summons
-				// too, and prompt flicks never count. Taps are short, still, unscrolled
+				// Double-tap on empty space opens the quick switcher
+				// (Android): the list keeps its swipe and button openers,
+				// and prompt flicks never count. Taps are short, still, unscrolled
 				// strokes over dead space: text keeps native double-tap
 				// word select, controls keep their taps.
 				if (androidUI && !iosUI) {
@@ -5373,22 +5674,24 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						lastTapAt = 0;
 						// The second tap owns the gesture: a pending
 						// empty-tap focus must not pop the keyboard
-						// behind the opening list.
+						// behind the opening switcher.
 						if (emptyTapTimer) {
 							clearTimeout(emptyTapTimer);
 							emptyTapTimer = null;
 						}
-						if (settings.sidebarCollapsed) {
-							toggleSidebar();
-							if (!settings.sidebarCollapsed) focusActiveSideChat();
-						}
+						// Dead-space double-tap opens the quick switcher
+						// (the list keeps its swipe and button openers).
+						openChatSwitcher();
 						return;
 					}
 					// Single tap on the dead space of an empty new chat
 					// focuses the composer (phones have no i key). Fired
 					// past the double-tap window so the opener above wins
-					// the pair; chats with messages keep tap-to-peace.
-					if (tapped && !paired && viewChat.messages.length === 0) {
+					// the pair; chats with messages keep tap-to-peace. A
+					// tap that dismisses the keyboard never re-arms: the
+					// prompt had focus when the stroke began, so this tap
+					// is the way out, not the way in.
+					if (tapped && !paired && viewChat.messages.length === 0 && !start.promptHadFocus) {
 						if (emptyTapTimer) clearTimeout(emptyTapTimer);
 						emptyTapTimer = setTimeout(() => {
 							emptyTapTimer = null;
@@ -5423,6 +5726,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					if (msgPaired) {
 						lastMsgTapAt = 0;
 						lastMsgTapId = null;
+						// Overlay message buttons own the tap rhythm: a
+						// second tap toggles the pill shut (see
+						// toggleMessageActions), so the message-end
+						// jump stays off — no pin, no scroll, no
+						// haptic. Every other phone mode keeps it.
+						if (androidUI && settings.overlayActions && settings.hideButtons) return;
 						// Pin the revealed row open: the second tap's
 						// click would otherwise toggle it shut (see
 						// toggleMessageActions).
@@ -5445,6 +5754,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					? null
 					: (edgeSwipeTarget(start.x, start.y, ended.clientX, ended.clientY, window.innerWidth) ??
 						middleSwipeTarget(start, ended));
+				// The quick switcher owns every swipe while up: strokes
+				// on its veil cycle chats, and nothing may summon a
+				// sidebar behind it.
+				if (chatSwitcherOpen && (target === "chats" || target === "settings")) return;
 				if (target === "chats" && androidUI && !iosUI) {
 					// A rightward stroke summons the chats list (double-tap
 					// stays as the other opener) and never dismisses it —
@@ -5458,15 +5771,19 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					return;
 				}
 				if (target === "settings" && androidUI) {
-					// Phones: a one-finger swipe left never summons
-					// settings — it only folds an open chats list.
-					// Settings opens from the sidebar button or a
-					// two-finger swipe left instead. Desktop keeps the
-					// shared edge outcome below.
+					// Phones: a leftward stroke off messages and the
+					// prompt opens settings (message-start strokes fold
+					// via the branch above — or do nothing when short —
+					// and prompt-start strokes never reach here as
+					// unclean). An open chats list folds instead, and
+					// an open panel stays (rightward dismisses it).
+					// Desktop keeps the shared edge outcome below.
+					if (settingsOpen) return;
+					if (start.msgId || start.rowSwipe) return;
 					if (!settings.sidebarCollapsed) {
 						settings.sidebarCollapsed = true;
 						persistSettings();
-					}
+					} else openSettingsPanel(true);
 					return;
 				}
 				applyEdgeTarget(target);
@@ -5647,6 +5964,23 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				)
 					return;
 				selMenu = null;
+			}
+			// Live reselects refresh the stored quote in place
+			// (replacement, never mutation, so the dock re-renders):
+			// extending past one character hides Inspect, shrinking
+			// back restores it. Rescue paths returned above, so a live
+			// selection here is new work.
+			if (live && !live.isCollapsed && live.toString() !== "" && selMenu) {
+				const refreshed = currentQuote();
+				if (refreshed && refreshed.quote !== selMenu.quote) {
+					selMenu = {
+						...selMenu,
+						quote: refreshed.quote,
+						context: refreshed.context,
+						messageId: refreshed.messageId,
+						range: live.rangeCount > 0 ? live.getRangeAt(0).cloneRange() : selMenu.range
+					};
+				}
 			}
 		});
 		// Two-finger horizontal swipes open drawers (left = settings,
@@ -5915,7 +6249,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						// costs nothing. Every other direction keeps 96px.
 						if (dir === null && androidUI && !pinchMoved && !settingsOpen) {
 							if (twoFingerSwipeDir(twoStart, twoEnd, 64) === -1) {
-								openSettingsPanel();
+								openSettingsPanel(true);
 							}
 						}
 						if (dir !== null && !pinchMoved) {
@@ -5925,14 +6259,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							// chats list. Chat steps moved to three
 							// fingers; desktop keeps stepping both
 							// directions.
-							if (dir === -1 && androidUI && !settingsOpen) openSettingsPanel();
+							if (dir === -1 && androidUI && !settingsOpen) openSettingsPanel(true);
 							else if (dir === 1 && androidUI) {
 								if (settingsOpen) settingsOpen = false;
 								else if (settings.sidebarCollapsed) {
 									settings.sidebarCollapsed = false;
-									chatSwitcherOpen = false;
 									persistSettings();
 								}
+								chatSwitcherOpen = false;
 							} else stepChat(dir, false);
 						}
 						// Still two-finger taps pair into a delete (Android:
@@ -5957,12 +6291,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 									if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
 									toggleSidebar();
 								} else {
+									// Haptic lives inside dropChat (triple thump).
 									dropChat(chatState.activeChatId);
 									flashToast("Chat deleted");
-									void hapticBeatAsync("send", {
-										enabled: settings.vibration,
-										shell: tauriBackendAvailable()
-									});
 								}
 							} else lastTwoTapAt = now;
 						}
@@ -6020,19 +6351,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							// already take the current chat). iOS keeps the
 							// single-chat delete.
 							if (iosUI) {
+								// Haptic lives inside dropChat (triple thump).
 								dropChat(chatState.activeChatId);
 								flashToast("Chat deleted");
-								void hapticBeatAsync("send", {
-									enabled: settings.vibration,
-									shell: tauriBackendAvailable()
-								});
 							} else {
+								// Haptic lives inside dropAllChats (triple thump).
 								dropAllChats();
 								flashToast("All chats deleted");
-								void hapticBeatAsync("done", {
-									enabled: settings.vibration,
-									shell: tauriBackendAvailable()
-								});
 							}
 						} else {
 							lastThreeTapAt = now;
@@ -6696,7 +7021,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				if (unselected === "half-jump-up" || unselected === "half-jump-down") {
 					// Ctrl+U / Ctrl+D jump an instant half-page, vim-style
 					// (repeats jump again) — including with nothing selected.
-					// Bare U/D taps scroll nothing; other ctrl chords keep theirs.
+					// Bare d/u fast-scroll instead (desktop) or stay dead
+					// (phones); other ctrl chords keep theirs.
 					event.preventDefault();
 					lastGAt = 0;
 					if (scrollBox) {
@@ -6720,12 +7046,28 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						} else {
 							lastGAt = 0;
 							if (intent.kind === "line" || intent.kind === "half-page") {
+								// Bare d/u stay dead on phones (touch owns
+								// scrolling there); desktop fast-scrolls a
+								// smooth half-page per press and glides fast
+								// while held — never an instant jump.
+								if (intent.kind === "half-page" && androidUI) {
+									event.preventDefault();
+									return;
+								}
 								// Held keys glide via the rAF loop (no restart
 								// stutter); the loop owns repeats until keyup.
 								// Other line sources (arrows) keep stepping.
+								// Taps land the hold's own step (line for
+								// j/k, smooth half-page for d/u).
 								const velocity = scrollBox ? scrollHoldVelocity(event.key) : null;
 								if (velocity !== null) {
-									if (!event.repeat) startScrollHold(event.key, velocity);
+									if (!event.repeat && scrollBox) {
+										const tapDy =
+											intent.kind === "half-page"
+												? halfPageDy(scrollBox.clientHeight, intent.dir)
+												: Math.sign(velocity) * SCROLLKEY_LINE_PX;
+										startScrollHold(event.key, velocity, tapDy);
+									}
 								} else if (intent.kind === "line") scrollChatBy(intent.dy);
 								else if (scrollBox) scrollChatBy(halfPageDy(scrollBox.clientHeight, intent.dir));
 							} else if (intent.kind === "top") scrollChatTop();
@@ -6745,6 +7087,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// `if` chains, never a switch.
 			const scrollAction = scrollModeAction({
 				...keyFacts(event),
+				phoneUI: androidUI,
 				inScrollMode: focusMode === "scroll",
 				inEditor: inEditor !== null,
 				inFind: isFindBarTarget(event.target),
@@ -6788,8 +7131,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			}
 			if (scrollAction === "half-jump-up" || scrollAction === "half-jump-down") {
 				// Ctrl+U / Ctrl+D jump one instant half-page per press,
-				// vim-style (repeats jump again) — bare U/D taps scroll
-				// nothing at all. Shift+D keeps its delete job above.
+				// vim-style (repeats jump again); bare d/u arrive here on
+				// desktop only and ride the same smooth scroll — never a
+				// jump. Shift+D keeps its delete job above.
 				event.preventDefault();
 				lastGAt = 0;
 				const dir: 1 | -1 = scrollAction === "half-jump-up" ? -1 : 1;
@@ -6835,16 +7179,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			const badge = target?.closest<HTMLElement>("[data-ann-badge]");
 			if (!badge) return;
 			event.preventDefault();
-			const rect = badge.getBoundingClientRect();
 			const id = (badge.dataset.annBadge ?? "") as AnnotationId;
 			// A re-press toggles closed (cancel): saving first would
 			// restart the fade the toggle is about to cancel.
 			if (!(annPop && !annPopClosing && annPop.id === id)) saveAnnPop();
 			// Same boundary as MessageBody's badge click: stamped ids.
-			openBadge(id, {
-				x: rect.left + rect.width / 2,
-				y: rect.bottom
-			});
+			// Position arguments are retired with the card (edits live
+			// in the composer now).
+			openBadge(id);
 			lastBadgePress = { id, at: Date.now() };
 		};
 		// Double-click summons the menu for the native word pick (the
@@ -7709,7 +8051,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	data-shell={tauriBackendAvailable() ? "tauri" : "browser"}
 	data-android={androidUI || null}
 	data-ios={iosUI || null}
-	style="--font-scale: {androidUI ? Math.min(8, settings.fontScale) : settings.fontScale}; --chat-width: {androidUI ? 46 : (settings.chatWidth ?? 36)}; --bg-alpha: {settings.bgOpacity ?? 1}"
+	style="--font-scale: {androidUI ? Math.min(8, settings.fontScale) : settings.fontScale}; --chat-width: {androidUI ? Math.max(46, settings.chatWidth ?? 36) : (settings.chatWidth ?? 36)}; --bg-alpha: {settings.bgOpacity ?? 1}"
 	data-mac={isMac && !androidUI || null}
 >
 	<aside class:collapsed={settings.sidebarCollapsed} inert={settings.sidebarCollapsed} data-fade-scroll
@@ -8062,9 +8404,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					class:aid-loading={aidBusy.has(msg.id) || vocalizing.has(msg.id)}
 					data-actions-open={shownActionsId === msg.id}
 					data-actions-above={actionsAbove || null}
-					style={androidUI && shownActionsId === msg.id && actionsTapY !== null
-						? `--actions-top: ${actionsTapY}px`
-						: null}
+					style={androidUI && (actionsTapY !== null || actionsTapX !== null)
+						? `--actions-top: ${actionsTapY ?? 0}px; --actions-left: ${actionsTapX ?? 0}px`
+						: // The anchor outlives the reveal: a closing pill
+						// fades for 0.18s and must fade where it opened,
+						// not at the end-anchored fallback. Stale values
+						// are harmless — every reveal re-anchors, and
+						// closed rows are invisible either way.
+						null}
 					onclick={(e) => {
 						if (e.altKey) toggleFold(msg.id);
 						toggleMessageActions(msg.id, e);
@@ -8095,11 +8442,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						unaffected — only the display is redacted. A
 						refs-only message always shows the pill: unfolded,
 						its body is just an em-dash (see REFS_ONLY_BODY). -->
-						<div class="ann-refs">
+						<div class="ann-refs" class:open={refsPopOpen === msg.id}>
 							<button
 								type="button"
 								class="ann-refs-pill"
 								aria-label={sentRefs.refs.length === 1 ? "1 annotation" : `${sentRefs.refs.length} annotations`}
+								aria-expanded={refsPopOpen === msg.id}
+								onclick={() => (refsPopOpen = refsPopOpen === msg.id ? null : msg.id)}
 							>
 								{annotationCountLabel(sentRefs.refs.length)}
 							</button>
@@ -8107,10 +8456,17 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 								{#each sentRefs.refs as ref (ref.n)}
 									<div class="ann-refs-item">
 										<span class="ann-refs-num">{ref.n}.</span>
-										<span class="ann-refs-quote">“{ref.quote}”</span>
-										{#if ref.comment}
-											<span class="ann-refs-comment">{ref.comment}</span>
-										{/if}
+										<span class="ann-refs-body">
+											<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+											<span
+												class="ann-refs-quote"
+												title="Jump to this annotation in the chat"
+												onclick={() => gotoSentRef(msg.id, ref.quote)}>“{ref.quote}”</span
+											>
+											{#if ref.comment}
+												<span class="ann-refs-comment">{ref.comment}</span>
+											{/if}
+										</span>
 										<button
 											type="button"
 											class="ann-refs-copy"
@@ -8149,7 +8505,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							folded={isFolded}
 							foldPreview={refsOnly && sentRefs ? sentRefs.refs.map((r) => `"${r.quote}"`).join(" ") : null}
 							marks={marksFor(msg.id)}
-							washId={annPop?.id ?? editingId ?? hoverBadgeId}
+							washId={annPop?.id ?? editingId ?? annBlink ?? hoverBadgeId}
 						onBadgeHover={(id: string | null) => (hoverBadgeId = id)}
 							onBadgeClick={openBadgeClick}
 							onToast={flashToast}
@@ -8500,30 +8856,44 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					as the desktop floating menu it replaces — and the same
 					click-away exemption in onMouseUp, or the tap collapses
 					the highlight and clears the menu before onclick fires.
-					Inspect docks beside Annotate for single Han characters
-					with the setting on; anything else gets Annotate alone. -->
-					<button
-						type="button"
-						class="ann-dock"
-						aria-label="Annotate selection"
-						transition:fade={{ duration: 150 }}
-						onmousedown={noteMenuPress}
-						ontouchstart={noteMenuBtnTouch}
-						ontouchend={annotateTouch}
-						onclick={annotate}
-					>Annotate</button>
-					{#if shouldShowInspect(selMenu.quote, settings.inspectEnabled)}
+					Speak always docks between them; Inspect joins for
+					single Han characters with the setting on. The wrapper
+					overlays the whole card (see CSS): the buttons split it
+					evenly without resizing anything. -->
+					<div class="ann-dock-wrap">
 						<button
 							type="button"
 							class="ann-dock"
-							aria-label="Inspect character"
+							aria-label="Annotate selection"
 							transition:fade={{ duration: 150 }}
 							onmousedown={noteMenuPress}
 							ontouchstart={noteMenuBtnTouch}
-							ontouchend={inspectTouch}
-							onclick={openInspect}
-						>Inspect</button>
-					{/if}
+							ontouchend={annotateTouch}
+							onclick={annotate}
+						>Annotate</button>
+						<button
+							type="button"
+							class="ann-dock"
+							aria-label="Speak selection"
+							transition:fade={{ duration: 150 }}
+							onmousedown={noteMenuPress}
+							ontouchstart={noteMenuBtnTouch}
+							ontouchend={speakTouch}
+							onclick={speakDockSelection}
+						>Speak</button>
+						{#if shouldShowInspect(selMenu.quote, settings.inspectEnabled)}
+							<button
+								type="button"
+								class="ann-dock"
+								aria-label="Inspect character"
+								transition:fade={{ duration: 150 }}
+								onmousedown={noteMenuPress}
+								ontouchstart={noteMenuBtnTouch}
+								ontouchend={inspectTouch}
+								onclick={openInspect}
+							>Inspect</button>
+						{/if}
+					</div>
 
 				{/if}
 				{#if annotations.length > 0}
@@ -8535,6 +8905,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							title="Review annotations"
 							aria-label={annotations.length === 1 ? "1 annotation" : `${annotations.length} annotations`}
 							aria-expanded={reviewOpen}
+							onclick={() => (reviewOpen = !reviewOpen)}
 						>
 							{annotationCountLabel(annotations.length)}
 						</button>
@@ -8553,7 +8924,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 								<div class="review-item" class:highlight={highlightAnnId === ann.id}>
 									<div class="review-head">
 										<span class="review-num">{n + 1}.</span>
-										<span class="review-quote">“{ann.quote}”</span>
+										<!-- Only the quote navigates: notes, buttons,
+										and fields never jump (an edit tap must
+										stay exactly where it is). -->
+										<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+										<span
+											class="review-quote"
+											title="Jump to this annotation in the chat"
+											onclick={() => gotoAnnotation(ann)}>“{ann.quote}”</span
+										>
 										<button
 											type="button"
 											class="review-copy"
@@ -8615,16 +8994,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 												title="Edit comment"
 												aria-label="Edit comment for annotation {n + 1}"
 												onclick={() => {
-													editingId = ann.id;
-													editDraft = ann.comment;
-													// The pencil unmounts with the edit
-													// box: move focus into the new
-													// textarea or it drops to <body>
-													// and the overlay closes on touch.
-													void tick().then(() =>
-														editBox?.focus({ preventScroll: true })
-													);
-												}}
+												// Every edit happens in the composer
+												// (see editAnnotationInPrompt): the
+												// inline textarea below is retired.
+												highlightAnnId = ann.id;
+												editAnnotationInPrompt({ id: ann.id }, ann.comment);
+											}}
 											>
 												<ActionIcon kind="pencil" />
 											</button>
@@ -8870,7 +9245,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				rows={1}
 				bind:this={annPopBox}
 				bind:value={annDraft}
-				placeholder="Add an optional comment…"
+				placeholder="Add a comment"
 				aria-label="Annotation comment. Enter or clicking away saves, Escape cancels."
 				use:growPill
 				onkeydown={annPopKey}
@@ -8897,14 +9272,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				{#if androidUI}
 					<!-- Phones get a submit button at the pill's end: the
 					software keyboard's enter key is unreliable for filing
-					(desktop keeps Enter-only and the compact pill). -->
+					(desktop keeps Enter-only and the compact pill). Same
+					up-arrow face as the composer's send button. -->
 					<button
 						type="button"
 						class="ann-save ann-pill-save"
 						aria-label="Save annotation"
 						onmousedown={(e) => e.preventDefault()}
 						onclick={() => saveAnnPop()}
-					>Save</button>
+					>↑</button>
 				{/if}
 			{:else}
 			<div class="ann-pop-row">
@@ -9007,19 +9383,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				aria-modal="true"
 				aria-label="Switch chat"
 				tabindex="-1"
-				ontouchstart={(e) => {
-					const t = e.changedTouches[0];
-					switcherTouchX = t ? t.clientX : null;
-				}}
-				ontouchend={(e) => {
-					const t = e.changedTouches[0];
-					if (switcherTouchX !== null && t) {
-						const dx = t.clientX - switcherTouchX;
-						if (dx >= 64) stepSwitcher(1);
-						else if (dx <= -64) stepSwitcher(-1);
-					}
-					switcherTouchX = null;
-				}}
 			>
 				<button
 					type="button"
@@ -10554,19 +10917,34 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.app[data-android] .voice-float :global(.action-glyph) {
 		height: 1.15em;
 	}
-	/* Highlight up: Annotate/Inspect stand the height of both bars
-	while every other tool and the hint stand down (send steps
-	aside too, freeing the row), so the next tap can't miss.
-	Phones only; desktop keeps the floating menu rhythm. */
-	.app[data-android] .prompt:has(.ann-dock) .ann-dock {
-		font-size: 1.3rem;
-		padding: 0.55rem 1.2rem;
-		min-height: 5rem;
+	/* Highlight up: the dock wrapper overlays the whole card, so
+	Annotate/Inspect cover both bars at exactly 50/50 without
+	resizing anything (the card keeps its idle geometry to the
+	pixel). Every other tool stands down beneath the overlay;
+	visibility (not display) keeps their boxes, so the row holds
+	its height. Phones only; desktop keeps the floating menu. */
+	.app[data-android] .prompt:has(.ann-dock) .ann-dock-wrap {
+		position: absolute;
+		inset: 0;
+		z-index: 5;
+		display: flex;
+		gap: 0.5rem;
+		padding: 0.5rem;
+		border-radius: 12px;
+		background: #fff;
+		background: color-mix(in srgb, var(--bg-raised) calc(var(--bg-alpha, 1) * 100%), transparent);
 	}
-	/* The tall dock needs the row's full height: the 3rem cap would
-	clip it (the row still never ramps, so no tap ever chases it). */
+	.app[data-android] .prompt:has(.ann-dock) .ann-dock {
+		flex: 1 1 0;
+		min-height: 0;
+		height: 100%;
+		font-size: 1.3rem;
+		padding: 0.55rem 0.6rem;
+	}
+	/* The overlay escapes the row: its 3rem overflow cap would clip
+	the card-sized wrapper to a strip. */
 	.app[data-android] .prompt:has(.ann-dock) .prompt-tools {
-		max-height: none;
+		overflow: visible;
 	}
 	.app[data-android] .prompt:has(.ann-dock) .attach-btn,
 	.app[data-android] .prompt:has(.ann-dock) .mic-btn,
@@ -10574,7 +10952,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.app[data-android] .prompt:has(.ann-dock) .wp-jump,
 	.app[data-android] .prompt:has(.ann-dock) .send-btn,
 	.app[data-android] .prompt:has(.ann-dock) .ann-wrap {
-		display: none;
+		visibility: hidden;
+		pointer-events: none;
 	}
 	.app[data-android] .prompt:has(.ann-dock) :global(.ta-input::placeholder),
 	.app[data-android] .prompt:has(.ann-dock) :global(.cm-placeholder) {
@@ -10601,6 +10980,17 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.app[data-android] .ann-cancel,
 	.app[data-android] .ann-save {
 		min-height: 2.75rem;
+	}
+	/* The create pill's arrow rides round like the composer's send:
+	compact pill, compact button. */
+	.app[data-android] .ann-pop.fresh .ann-pill-save {
+		min-height: 0;
+		height: 2.2rem;
+		width: 2.2rem;
+		padding: 0;
+		border-radius: 50%;
+		font-size: 1.1rem;
+		line-height: 1;
 	}
 	.app[data-android] aside li .del {
 		padding: 0.6rem;
@@ -10654,6 +11044,33 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		font-size: 1.15rem;
 		min-height: 4.5rem;
 		padding: 0.8rem 2.2rem 0.8rem 0.8rem;
+	}
+	/* Counter pill rides right of the audio button (DOM-first, so
+	order pushes it past voice); the wrap goes static so the review
+	panel anchors to the card. Desktop keeps its left slot and its
+	inline review. */
+	.app[data-android] .prompt-tools .ann-wrap {
+		order: 4;
+		position: static;
+	}
+	.app[data-android] .prompt-tools .ann-wrap .review {
+		position: absolute;
+		left: 0.8rem;
+		right: 0.8rem;
+		bottom: calc(100% + 0.5rem);
+		width: auto;
+		max-height: min(26rem, 52dvh);
+		margin: 0;
+		overflow-y: auto;
+		z-index: 40;
+		font-size: calc(0.92rem * var(--font-scale, 1));
+		box-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
+	}
+	/* Annotation boxes read at the screen's message size on phones:
+	a fixed 1rem box next to 800% message type strands the eyes.
+	Desktop keeps its fixed overlay type. */
+	.app[data-android] .ann-pop textarea {
+		font-size: calc(0.92rem * var(--font-scale, 1));
 	}
 	.app[data-android] aside:not(.settings-panel) ul {
 		flex: 1 1 auto;
@@ -11584,7 +12001,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		border-radius: 10px;
 		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
 		padding: 0.55rem 0.75rem;
-		font-size: 0.8rem;
+		/* Tracks the chat text size like the count pill above it,
+		so the saved quotes never sit tiny under huge type. */
+		font-size: calc(0.8rem * var(--font-scale, 1));
 		line-height: 1.45;
 		opacity: 0;
 		pointer-events: none;
@@ -11604,8 +12023,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		bottom: 100%;
 		height: 0.5rem;
 	}
-	.ann-refs-pill:hover + .ann-refs-pop,
-	.ann-refs-pill:focus-visible + .ann-refs-pop,
+	/* Click-toggle only — no hover-open anywhere: hover flaps the
+	card while reaching for its buttons (a copy click reads as a
+	jump when the card reopens under the cursor). The pill is a
+	plain disclosure button, so Enter/Space toggle like a click. */
+	.ann-refs.open .ann-refs-pop,
 	.ann-refs-pop:hover {
 		opacity: 1;
 		pointer-events: auto;
@@ -11622,8 +12044,28 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		font-weight: 700;
 		flex-shrink: 0;
 	}
+	/* Quote stacks over its note: the note reads below the thing
+	annotated, never squeezed to its right. */
+	.ann-refs-body {
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+		flex: 1;
+		min-width: 0;
+	}
+	/* Only the quote navigates: unselectable with a pointer cursor,
+	so a click reads as a jump and never as a text pick. Notes stay
+	selectable for copying. */
 	.ann-refs-quote {
 		overflow-wrap: anywhere;
+		cursor: pointer;
+		user-select: none;
+		-webkit-user-select: none;
+		/* Same per-item cap as the composer card: wrap to the cap,
+		then scroll inside the quote. */
+		min-width: 0;
+		max-height: 8rem;
+		overflow-y: auto;
 	}
 	.ann-refs-comment {
 		color: #c7c7cc;
@@ -11644,7 +12086,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		border-radius: 6px;
 	}
 	.ann-refs-copy :global(.action-glyph) {
-		height: 0.75rem;
+		/* Same chat-text tracking as the card around it. */
+		height: calc(0.75rem * var(--font-scale, 1));
 	}
 	.ann-refs-copy:hover {
 		color: #fff;
@@ -12121,12 +12564,17 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		display: flex;
 		align-items: baseline;
 		gap: 0.45rem;
-		font-size: 0.82rem;
+		font-size: 1rem;
+	}
+	/* The note sits a breath below its quote: two stacked heads read
+	as one card, never one crowded line. */
+	.review-head + .review-head {
+		margin-top: 0.45rem;
 	}
 	.review-head button {
 		margin-left: auto;
 		flex-shrink: 0;
-		font-size: 0.75rem;
+		font-size: 0.85rem;
 		color: #6e6e73;
 		color: var(--muted);
 		border: 0;
@@ -12145,18 +12593,27 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.review-label {
 		color: #6e6e73;
 		color: var(--muted);
-		font-size: 0.75rem;
+		font-size: 0.85rem;
 	}
 	.review-quote {
 		font-weight: 550;
 		overflow-wrap: anywhere;
+		/* Long quotes wrap to a cap, then scroll per item: one huge
+		quote never shoves the rest of the card away. Pointer plus
+		no-select: the quote is the jump control, never a pick. */
+		min-width: 0;
+		max-height: 8rem;
+		overflow-y: auto;
+		cursor: pointer;
+		user-select: none;
+		-webkit-user-select: none;
 	}
 	.review-comment {
 		overflow-wrap: anywhere;
 	}
 	.review label {
 		display: block;
-		font-size: 0.82rem;
+		font-size: 1rem;
 		margin-top: 0.3rem;
 	}
 	.review textarea {
@@ -12276,7 +12733,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		border: 0;
 		background: none;
 		cursor: pointer;
-		font-size: 0.75rem;
+		font-size: 0.85rem;
 		color: #6e6e73;
 		color: var(--muted);
 		padding: 0.1rem 0.3rem;
@@ -12284,6 +12741,22 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.review-tools button:hover {
 		color: #94250a;
 		color: var(--danger);
+	}
+	/* Phones track the chat text size in the review card: every fixed
+	rem above scales with it (desktop keeps its compact sizes). */
+	.app[data-android] .review-head {
+		font-size: calc(0.82rem * var(--font-scale, 1));
+	}
+	.app[data-android] .review-head button,
+	.app[data-android] .review-tools button,
+	.app[data-android] .review-label {
+		font-size: calc(0.75rem * var(--font-scale, 1));
+	}
+	.app[data-android] .review label {
+		font-size: calc(0.82rem * var(--font-scale, 1));
+	}
+	.app[data-android] .review-head button.review-copy :global(.action-glyph) {
+		height: calc(0.8rem * var(--font-scale, 1));
 	}
 	/* Per-note edit is a pencil in the message-action style (same
 	stroke icon, same quiet gray) instead of a text button. It rides
@@ -12306,7 +12779,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			filter 0.15s ease;
 	}
 	.review-head button.review-pencil :global(.action-glyph) {
-		height: 0.8rem;
+		height: 0.95rem;
 	}
 	/* Per-note copy rides next to the quote in the pencil's style:
 	icon only, no text. margin-left:0 keeps it with the quote while
@@ -12321,7 +12794,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		border-radius: 6px;
 	}
 	.review-head button.review-copy :global(.action-glyph) {
-		height: 0.8rem;
+		height: 0.95rem;
 	}
 	.review-head button.review-copy:hover {
 		color: #1c1c1e;
@@ -12340,14 +12813,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	from badge to popup without crossing dead hover space. */
 	/* The pill sits at the prompt's right edge, so the card anchors
 	right and grows up-and-left — growing right would run it off the
-	column (and over the send button's airspace). It opens overlapping
-	the pill itself (a hair past the wrap's bottom edge), so the cursor
-	is already inside the card the moment it appears — no travel gap,
-	no bridge to cross. Hover, keyboard focus, and touch-tap all open
-	it through CSS alone; the pill button has no click action. */
+	column (and over the send button's airspace). The pill toggles
+	it (pinned): no hover-open anywhere, so reaching for its buttons
+	never flaps it shut. */
 	.ann-wrap .review {
 		position: absolute;
-		bottom: -0.1rem;
+		/* Floats above the tools row with the pill exposed: the open
+		card must never cover its own toggle (click-to-close would
+		have no target). */
+		bottom: calc(100% + 0.5rem);
 		right: 0;
 		z-index: 60;
 		width: max-content;
@@ -12358,7 +12832,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		margin: 0;
 		box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
 		/* display:none can't fade: the card always lays out but sits
-		invisible and untouchable until hover, focus, or pin. */
+		invisible and untouchable until the pill pins it. */
 		visibility: hidden;
 		opacity: 0;
 		pointer-events: none;
@@ -12369,8 +12843,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.ann-wrap .review-quote {
 		overflow-wrap: anywhere;
 	}
-	.ann-wrap:hover .review,
-	.ann-wrap:focus-within .review,
+	/* Click-toggle only, like the sent-refs card above: hover
+	flaps the panel while reaching for its buttons. The pill owns
+	the state, so tabbing through never strands it open-or-shut. */
 	.ann-wrap.pinned .review {
 		visibility: visible;
 		opacity: 1;
@@ -12497,16 +12972,24 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 	.app[data-android] main.hide-buttons.overlay-actions article .actions {
 		position: absolute;
-		/* Tap-anchored on reveal (--actions-top): end-anchored
-		otherwise, so rows revealed without a tap point keep
-		the old pill. Desktop never sets the var. */
-		top: var(--actions-top, 100%);
-		left: 0;
+		/* Tap-anchored on reveal (--actions-top/--actions-left):
+		one line below the tap, horizontally centered on it (the
+		+1.4em drops a text line; translateX centers). End-anchored
+		otherwise, so rows revealed without a tap point keep the
+		old pill. Desktop never sets the vars. */
+		top: calc(var(--actions-top, 100%) + 1.4em);
+		left: var(--actions-left, 0px);
 		right: auto;
+		transform: translateX(-50%);
 		/* Snug pill, not full width: with nothing left of the buttons
-		the bar collapses instead of holding a dead span. */
+		the bar collapses instead of holding a dead span. Capped to
+		the viewport, never the article: own rows shrink to their
+		content (a refs-only dash is ~45px), and 100% of that would
+		squeeze the pill to two buttons with the rest stranded in
+		its scroll. The pill floats above content below, so
+		outgrowing a narrow article is the point. */
 		width: fit-content;
-		max-width: 100%;
+		max-width: calc(100vw - 2rem);
 		z-index: 5;
 		margin-top: 0.15rem;
 		padding: 0.2rem 0.3rem;
@@ -12521,11 +13004,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		will-change: opacity;
 		transition: opacity 0.18s ease;
 	}
-	/* Own rows pack right, so their pill anchors right too. */
-	.app[data-android] main.hide-buttons.overlay-actions article.user .actions {
-		left: auto;
-		right: 0;
-	}
+	/* Own rows center on the tap like everyone else now (the old
+	right-anchored pill is retired): drop the override entirely. */
 	/* The idle speaking dot takes no slot in the overlay: it joins
 	the pill only while actually speaking (in-flow rows keep their
 	reserved slot, mirroring desktop). */
@@ -12544,9 +13024,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		article[data-actions-open="true"][data-actions-above="true"]
 		.actions {
 		top: auto;
-		/* Above the tap when tap-anchored, above the message
-		otherwise (the fallback keeps the old flip). */
-		bottom: calc(100% - var(--actions-top, 0px));
+		/* Above the tap when tap-anchored (a line up, mirroring the
+		below offset), above the message otherwise (the fallback
+		keeps the old flip). */
+		bottom: calc(100% - var(--actions-top, 0px) + 1.4em);
 		margin-top: 0;
 		margin-bottom: 0.15rem;
 	}
