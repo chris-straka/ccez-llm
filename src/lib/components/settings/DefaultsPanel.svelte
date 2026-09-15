@@ -161,7 +161,7 @@
 			<input
 				type="range"
 				min="80"
-				max={androidUI ? 400 : 800}
+				max={800}
 				step="5"
 				value={Math.round(settings.fontScale * 100)}
 				aria-label="Text size percent"

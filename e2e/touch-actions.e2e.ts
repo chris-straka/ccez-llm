@@ -85,19 +85,46 @@ test("scrolling the action row folds nothing and summons no sidebar", async ({ p
 	// Leftward (the overflow scroll that used to open settings)...
 	await swipeFrom(page, `${row} >> nth=0`, -150);
 	await expect(page.locator(".settings-panel")).toHaveClass(/closed/);
-	// ...and rightward (the same stroke used to fold the message).
+	// ...and rightward (message fold is the leftward stroke now; the
+	// row swipe folds nothing either way).
 	await swipeFrom(page, `${row} >> nth=0`, 150);
 	await expect(page.locator(".settings-panel")).toHaveClass(/closed/);
 	await expect(page.locator("article.assistant .actions .icon-btn").first()).not.toHaveClass(/folded/);
-	// Control: the same leftward stroke off the row still opens settings,
-	// proving the harness gesture reaches the app at all.
+	// Control: a leftward stroke off the row opens nothing either (one
+	// finger never opens settings), while a rightward stroke summons
+	// the chats list — proving the harness gesture reaches the app.
 	await swipeX(page, 300, 150);
-	await expect(page.locator(".settings-panel")).not.toHaveClass(/closed/);
+	await expect(page.locator(".settings-panel")).toHaveClass(/closed/);
+	await swipeX(page, 100, 250);
+	await expect(page.locator("aside:has(button.side-chat)").first()).not.toHaveClass(/collapsed/);
 });
+
+/** Synthetic two-finger swipe left: the phone gesture that opens settings. */
+async function swipeTwoFingerLeft(page: Page): Promise<void> {
+	await page.evaluate(() => {
+		const touch = (id: number, x: number, y: number) =>
+			new Touch({ identifier: id, target: document.body, clientX: x, clientY: y });
+		window.dispatchEvent(
+			new TouchEvent("touchstart", { bubbles: true, cancelable: true, composed: true, touches: [touch(1, 300, 500), touch(2, 340, 500)] })
+		);
+		window.dispatchEvent(
+			new TouchEvent("touchmove", { bubbles: true, cancelable: true, composed: true, touches: [touch(1, 150, 500), touch(2, 190, 500)] })
+		);
+		window.dispatchEvent(
+			new TouchEvent("touchend", {
+				bubbles: true,
+				cancelable: true,
+				composed: true,
+				touches: [],
+				changedTouches: [touch(1, 150, 500), touch(2, 190, 500)]
+			})
+		);
+	});
+}
 
 test("overlay checkbox ships checked under Messages", async ({ page }) => {
 	await seedChat(page, {});
-	await swipeX(page, 408, 268);
+	await swipeTwoFingerLeft(page);
 	await expect(page.locator(".settings-panel")).not.toHaveClass(/closed/);
 	const messages = page.locator("fieldset", { has: page.locator("legend", { hasText: "Messages" }) });
 	const box = messages.locator('label.check:has-text("Switch message buttons to overlay menu") input');

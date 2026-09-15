@@ -183,6 +183,7 @@ import {
 	contentSwipeTarget,
 	pinchZoomStep,
 	twoFingerSwipeDir,
+	twoFingerSlideDir,
 	isThreeFingerTap,
 	type FlickZone,
 	type EdgePanel,
@@ -1073,9 +1074,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 	/**
 	 * Android (phone) UI: the shortcuts modal shows touch gestures
-	 * instead of key chords, and edge swipes open the sidebars. Set
-	 * once on mount from the user agent — never reactive, never
-	 * persisted.
+	 * instead of key chords, and edge swipes open the chats list
+	 * (settings opens from the sidebar button or a two-finger swipe
+	 * left). Set once on mount from the user agent — never reactive,
+	 * never persisted.
 	 */
 	let androidUI = $state(false);
 	/**
@@ -1964,9 +1966,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			}
 		}
 	});
-	/** UI text scale in 10% steps (50–600% desktop, 50–400% phones). */
+	/** UI text scale in 10% steps (50–600% desktop, 50–800% phones). */
 	function adjustFontScale(delta: number, quiet = false): void {
-		const cap = androidUI ? 4 : 6;
+		const cap = androidUI ? 8 : 6;
 		const next = Math.min(cap, Math.max(0.5, Math.round((settings.fontScale + delta) * 10) / 10));
 		if (next === settings.fontScale) return;
 		settings.fontScale = next;
@@ -2060,6 +2062,16 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	/** The floating row flips above its message when the last rows have
 	no room below (scroll containers clip the overlay otherwise). */
 	let actionsAbove = $state(false);
+	/** Phone overlay only: article-relative px where the pill anchors,
+	set from the reveal tap (clamped to the viewport) so huge messages
+	pop it where tapped instead of at their far end. Null keeps the
+	end-anchored pill (and every non-overlay row ignores it). */
+	let actionsTapY: number | null = $state(null);
+	/** Phone only: the second tap of a message double-tap pins the just
+	revealed row open — without this its click would toggle it shut
+	while scrolling to the message end. Stamped in the touchend below,
+	consumed by the click's toggle path. */
+	let msgDoubleTapPin: { id: ChatMsgId; at: number } | null = null;
 	let shownActionsTimer: ReturnType<typeof setTimeout> | null = null;
 	/** (Re)arm the 3s auto-dismiss for one reveal. */
 	function armActionsTimer(id: ChatMsgId): void {
@@ -2101,14 +2113,25 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		if (androidUI && foldedIds.has(id)) {
 			shownActionsId = null;
 			actionsAbove = false;
+			actionsTapY = null;
 			toggleFold(id);
 			return;
 		}
 		if (shownActionsTimer) clearTimeout(shownActionsTimer);
 		shownActionsTimer = null;
 		if (shownActionsId === id) {
+			// The second tap of a message double-tap scrolls to the
+			// message end instead of toggling shut (see the touchend
+			// below): re-arm and re-anchor, never close. Desktop has
+			// no pin, so its toggle rhythm is untouched.
+			if (msgDoubleTapPin?.id === id && Date.now() - msgDoubleTapPin.at < 500) {
+				anchorActionsToTap(id, event);
+				armActionsTimer(id);
+				return;
+			}
 			shownActionsId = null;
 			actionsAbove = false;
+			actionsTapY = null;
 			return;
 		}
 		shownActionsId = id;
@@ -2118,6 +2141,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			el instanceof HTMLElement &&
 			boxRect !== undefined &&
 			el.getBoundingClientRect().bottom + 64 > boxRect.bottom;
+		actionsTapY = null;
+		if (androidUI && settings.overlayActions && settings.hideButtons) {
+			anchorActionsToTap(id, event);
+			void hapticBeatAsync("send", {
+				enabled: settings.vibration,
+				shell: tauriBackendAvailable()
+			});
+		}
 		// The tap can land mid-frame with keyboard or viewport churn:
 		// settle a re-measure after paint (same settle the send paths
 		// use) so the composer can't strand at zero height, and the
@@ -2125,6 +2156,33 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// on phone GPUs.
 		requestAnimationFrame(() => requestAnimationFrame(() => editor?.remeasure()));
 		armActionsTimer(id);
+	}
+	/**
+	 * Phone overlay only: anchor the revealed pill near the reveal tap
+	 * (clamped to the viewport) instead of the message end, so tapping
+	 * the top of a huge message pops it where tapped. Above the tap
+	 * when no room below, at the tap otherwise. No-op everywhere else:
+	 * desktop and in-flow rows keep their end-anchored pill.
+	 */
+	function anchorActionsToTap(id: ChatMsgId, event: MouseEvent): void {
+		if (shownActionsId !== id) return;
+		const el = event.currentTarget;
+		const boxRect = scrollBox?.getBoundingClientRect();
+		if (!(el instanceof HTMLElement) || boxRect === undefined) return;
+		const artRect = el.getBoundingClientRect();
+		if (artRect.height <= 0) return;
+		// Pill footprint (matches the overlay pill padding + buttons).
+		const pillH = 56;
+		const tap = event.clientY;
+		const above = tap + pillH + 8 > boxRect.bottom && tap - pillH - 8 >= boxRect.top;
+		actionsAbove = above;
+		const anchorViewport = above
+			? tap
+			: Math.min(
+					Math.max(tap, boxRect.top + 4),
+					Math.max(boxRect.top + 4, boxRect.bottom - pillH - 4)
+				);
+		actionsTapY = Math.min(Math.max(anchorViewport - artRect.top, 0), artRect.height);
 	}
 
 	/** Focus a sidebar chat button by list position (clamped). */
@@ -2867,7 +2925,21 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// The pill mounts async: land the caret once it flushes, or
 		// phone users get a comment box with no keyboard (and desktop
 		// users an extra click). Focus-only — selection is already filed.
-		void tick().then(() => annPopBox?.focus({ preventScroll: true }));
+		// Phones re-pin the scroll behind the focus: some WebViews pan
+		// on textbox focus despite preventScroll, snapping the thread.
+		if (androidUI) {
+			const sx = window.scrollX;
+			const sy = window.scrollY;
+			const box = scrollBox;
+			const st = box?.scrollTop ?? 0;
+			void tick().then(() => {
+				annPopBox?.focus({ preventScroll: true });
+				window.scrollTo(sx, sy);
+				if (box) box.scrollTop = st;
+			});
+		} else {
+			void tick().then(() => annPopBox?.focus({ preventScroll: true }));
+		}
 		if (settings.vibration) vibrateTick(6);
 	}
 
@@ -2954,8 +3026,20 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	/** Auto-grow action for the annotation pill. Focuses on open so Enter
 	saves immediately without a click. */
 	function growPill(node: HTMLTextAreaElement): { destroy(): void } {
-		// The insert cursor must never yank the messages list.
-		node.focus({ preventScroll: true });
+		// The insert cursor must never yank the messages list. Phones
+		// re-pin behind the mount focus too: the create/edit paths
+		// focus again on tick, and a WebView pan here would snap first.
+		if (androidUI) {
+			const sx = window.scrollX;
+			const sy = window.scrollY;
+			const box = scrollBox;
+			const st = box?.scrollTop ?? 0;
+			node.focus({ preventScroll: true });
+			window.scrollTo(sx, sy);
+			if (box) box.scrollTop = st;
+		} else {
+			node.focus({ preventScroll: true });
+		}
 		// field-sizing: content sizes the pill in CSS (capped at 168px
 		// there); only measure by hand where it is unsupported.
 		const cssOwnsHeight =
@@ -3037,7 +3121,21 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// The box can morph from a still-fading fresh pill (same
 		// element, no remount, so growPill's mount focus never fires):
 		// land the caret explicitly, like the create path does.
-		void tick().then(() => annPopBox?.focus({ preventScroll: true }));
+		// Phones re-pin the scroll behind the focus (same WebView pan
+		// as the create path); desktop keeps the single focus call.
+		if (androidUI) {
+			const sx = window.scrollX;
+			const sy = window.scrollY;
+			const box = scrollBox;
+			const st = box?.scrollTop ?? 0;
+			void tick().then(() => {
+				annPopBox?.focus({ preventScroll: true });
+				window.scrollTo(sx, sy);
+				if (box) box.scrollTop = st;
+			});
+		} else {
+			void tick().then(() => annPopBox?.focus({ preventScroll: true }));
+		}
 	}
 
 	/**
@@ -5073,6 +5171,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		let lastTapAt = 0;
 		let lastTapX = 0;
 		let lastTapY = 0;
+		/** Last single-tap point on a message: pairs into the double-tap
+		jump to that message's end (phones). Own pairing — empty-space
+		taps keep theirs above. */
+		let lastMsgTapAt = 0;
+		let lastMsgTapX = 0;
+		let lastMsgTapY = 0;
+		let lastMsgTapId: ChatMsgId | null = null;
 		function flickZoneOf(target: EventTarget | null): FlickZone {
 			const el = target instanceof Element ? target : null;
 			if (!el) return "other";
@@ -5140,22 +5245,26 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					if (candidate && candidate.identifier === start.id) ended = candidate;
 				}
 				if (!ended) return;
-				// Phone: a rightward stroke starting on a message folds it
-				// (a rightward stroke elsewhere dismisses settings or does
-				// nothing — the fold only wins on a message). An active
-				// text selection wins — folding mid-select would eat the
-				// highlight.
+				// Phone: a leftward stroke starting on a message folds it
+				// (a rightward stroke instead summons the chats list via
+				// the stroke below — the fold only wins on a leftward
+				// message stroke). An active text selection wins —
+				// folding mid-select would eat the highlight.
 				const foldDx = ended.clientX - start.x;
 				const foldDy = ended.clientY - start.y;
 				if (
 					androidUI &&
 					start.msgId &&
 					!start.rowSwipe &&
-					foldDx >= 64 &&
+					foldDx <= -64 &&
 					Math.abs(foldDy) < Math.abs(foldDx) &&
 					window.getSelection()?.isCollapsed !== false
 				) {
 					toggleFold(start.msgId);
+					void hapticBeatAsync("send", {
+						enabled: settings.vibration,
+						shell: tauriBackendAvailable()
+					});
 					return;
 				}
 				// Double-tap on empty space opens the chats list (Android):
@@ -5189,6 +5298,51 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						return;
 					}
 				}
+				// Double-tap on a message jumps to its end (phones):
+				// huge replies strand their buttons below the fold
+				// and phones have no End key. Text keeps native
+				// double-tap word select (a pick leaves a selection,
+				// failing the collapsed check); controls keep taps.
+				if (androidUI && start.msgId && !start.rowSwipe) {
+					const now = Date.now();
+					const msgTapped =
+						now - start.at <= 300 &&
+						Math.hypot(ended.clientX - start.x, ended.clientY - start.y) <= 12 &&
+						Math.abs((scrollBox?.scrollTop ?? 0) - start.scrollTop) <= 10 &&
+						start.zone === "message" &&
+						window.getSelection()?.isCollapsed !== false;
+					const msgPaired =
+						msgTapped &&
+						start.msgId === lastMsgTapId &&
+						now - lastMsgTapAt < 400 &&
+						Math.hypot(ended.clientX - lastMsgTapX, ended.clientY - lastMsgTapY) < 32;
+					if (msgTapped) {
+						lastMsgTapAt = now;
+						lastMsgTapX = ended.clientX;
+						lastMsgTapY = ended.clientY;
+						lastMsgTapId = start.msgId;
+					}
+					if (msgPaired) {
+						lastMsgTapAt = 0;
+						lastMsgTapId = null;
+						// Pin the revealed row open: the second tap's
+						// click would otherwise toggle it shut (see
+						// toggleMessageActions).
+						msgDoubleTapPin = { id: start.msgId, at: now };
+						const tapEl = document.elementFromPoint(ended.clientX, ended.clientY);
+						const art = tapEl ? articleOf(tapEl) : null;
+						if (art instanceof HTMLElement) {
+							art.scrollIntoView({ block: "end", behavior: "smooth" });
+						} else if (scrollBox) {
+							scrollBox.scrollTo({ top: scrollBox.scrollHeight, behavior: "smooth" });
+						}
+						void hapticBeatAsync("send", {
+							enabled: settings.vibration,
+							shell: tauriBackendAvailable()
+						});
+						return;
+					}
+				}
 				const target = start.rowSwipe
 					? null
 					: (edgeSwipeTarget(start.x, start.y, ended.clientX, ended.clientY, window.innerWidth) ??
@@ -5201,6 +5355,18 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					if (settingsOpen) settingsOpen = false;
 					else if (settings.sidebarCollapsed) {
 						settings.sidebarCollapsed = false;
+						persistSettings();
+					}
+					return;
+				}
+				if (target === "settings" && androidUI) {
+					// Phones: a one-finger swipe left never summons
+					// settings — it only folds an open chats list.
+					// Settings opens from the sidebar button or a
+					// two-finger swipe left instead. Desktop keeps the
+					// shared edge outcome below.
+					if (!settings.sidebarCollapsed) {
+						settings.sidebarCollapsed = true;
 						persistSettings();
 					}
 					return;
@@ -5386,7 +5552,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			}
 		});
 		// Two-finger horizontal swipe steps chats (right = newer, left =
-		// older, no focus: the keyboard stays down); a two-finger double
+		// older, no focus: the keyboard stays down); a vertical two-finger
+		// slide jumps the chat (up to the top, down to the bottom); a
+		// two-finger double
 		// tap deletes the current chat on Android (sidebar toggle on
 		// iOS); a double three-finger tap deletes every chat on Android
 		// (current chat on iOS). All start away from controls, drawers,
@@ -5533,6 +5701,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					}
 					if (event.touches.length === 0) {
 						const dir = twoFingerSwipeDir(twoTrack.start, twoTrack.end);
+						// Phones slide vertically too (handled below): compute
+						// while the tracks are alive; horizontal strokes read
+						// null here so the swipe step above keeps them.
+						const slide =
+							androidUI && dir === null ? twoFingerSlideDir(twoTrack.start, twoTrack.end) : null;
 						const now = Date.now();
 						const moved = Math.max(
 							Math.hypot(
@@ -5546,8 +5719,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						);
 						twoTrack = null;
 						// A pinch owns the gesture: spread motion vetoes
-						// both the swipe step and the tap pairing below.
-						if (dir !== null && !pinchMoved) stepChat(dir, false);
+						// the swipe step, the vertical slide, and the tap pairing below.
+						if (dir !== null && !pinchMoved) {
+							// Phones: a two-finger swipe left opens
+							// settings (the one-finger left stroke never
+							// does); right still steps. Desktop keeps
+							// stepping both directions.
+							if (dir === -1 && androidUI && !settingsOpen) openSettingsPanel();
+							else stepChat(dir, false);
+						}
 						// Still two-finger taps pair into a delete (Android:
 						// no keyboard for the Delete key, and the sidebar
 						// moved to swipe-up-from-prompt); swipes take the
@@ -5574,6 +5754,18 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 									});
 								}
 							} else lastTwoTapAt = now;
+						}
+						// Phones: a two-finger vertical slide jumps the chat —
+						// up to the top, down to the bottom (phones have no
+						// Home/End keys). Same pinch veto as the swipe step;
+						// desktop keeps swipes only.
+						if (slide !== null && !pinchMoved && scrollBox) {
+							if (slide === "top") scrollBox.scrollTo({ top: 0, behavior: "smooth" });
+							else scrollBox.scrollTo({ top: scrollBox.scrollHeight, behavior: "smooth" });
+							void hapticBeatAsync("send", {
+								enabled: settings.vibration,
+								shell: tauriBackendAvailable()
+							});
 						}
 						// Pinch zoom toasts once on release with the
 						// landed size (steps stay quiet mid-gesture).
@@ -7278,7 +7470,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	data-shell={tauriBackendAvailable() ? "tauri" : "browser"}
 	data-android={androidUI || null}
 	data-ios={iosUI || null}
-	style="--font-scale: {androidUI ? Math.min(4, settings.fontScale) : settings.fontScale}; --chat-width: {androidUI ? 46 : (settings.chatWidth ?? 36)}; --bg-alpha: {settings.bgOpacity ?? 1}"
+	style="--font-scale: {androidUI ? Math.min(8, settings.fontScale) : settings.fontScale}; --chat-width: {androidUI ? 46 : (settings.chatWidth ?? 36)}; --bg-alpha: {settings.bgOpacity ?? 1}"
 	data-mac={isMac && !androidUI || null}
 >
 	<aside class:collapsed={settings.sidebarCollapsed} inert={settings.sidebarCollapsed} data-fade-scroll
@@ -7379,8 +7571,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			+
 		</button>
 		{#if androidUI}
-			<!-- Touch settings entry: the edge swipe still works, but the
-			list owns a visible button (phones have no ⌘, to teach). -->
+			<!-- Touch settings entry: one-finger swipes never open
+			settings, so the list owns a visible button (phones have
+			no ⌘, to teach) next to the two-finger swipe left. -->
 			<button
 				type="button"
 				class="side-settings"
@@ -7628,6 +7821,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					class:aid-loading={aidBusy.has(msg.id) || vocalizing.has(msg.id)}
 					data-actions-open={shownActionsId === msg.id}
 					data-actions-above={actionsAbove || null}
+					style={androidUI && shownActionsId === msg.id && actionsTapY !== null
+						? `--actions-top: ${actionsTapY}px`
+						: null}
 					onclick={(e) => {
 						if (e.altKey) toggleFold(msg.id);
 						toggleMessageActions(msg.id, e);
@@ -9880,6 +10076,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		padding: 0.7rem 0.8rem 0.6rem;
 	}
 	.app[data-android] .prompt :global(.ta-input) {
+		/* Top bar is text-only: the tools live in the row below, so no
+		right-side reservation (desktop keeps its overlaid cluster). */
+		--tools-pad: 0rem;
+		--tools-extra: 0rem;
 		padding: 0.1rem 0 0.2rem;
 		/* Never strand at zero height: one empty line plus padding
 		holds ~32px after the reply lands (the field owns its height
@@ -9893,6 +10093,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		width: auto;
 		margin-top: auto;
 		padding-right: 2.6rem;
+		/* Bottom bar: one even row under the text, split from it. */
+		align-items: center;
+		border-top: 1px solid var(--line-soft);
+		padding-top: 0.35rem;
 	}
 	.app[data-android] .send-btn {
 		bottom: 0.6rem;
@@ -9938,7 +10142,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		overflow: hidden;
 	}
 	.app[data-android] .prompt:focus-within :global(.ta-input) {
-		min-height: 3.4rem;
+		/* Focus never inflates the field: height follows content up to
+		the same cap, so an empty tap stays one line tall. */
+		min-height: 2rem;
+		max-height: 7.5rem;
 	}
 	/* The row snaps (no height ramp): ramping its height would slide
 	its buttons under tapping fingers mid-flight. The field above may
@@ -9973,10 +10180,47 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			transition: none;
 		}
 	}
-	/* Outranks the flex card above: the composer still gets out of the
-	way entirely while the annotation box owns the keyboard. */
+	/* The composer stands down while the annotation box owns the
+	keyboard — but holds its space: unmounting the card collapses
+	the tail clearance and snaps the thread on focus. */
 	.app[data-android] .prompt.prompt-hidden {
+		visibility: hidden;
+		pointer-events: none;
+	}
+	/* Phone thumb row: attach, dictation, and voice match the send
+	button's seat — one even row, no small outlier. Desktop keeps its
+	optical sizes. */
+	.app[data-android] .attach-btn,
+	.app[data-android] .mic-btn,
+	.app[data-android] .voice-float {
+		width: 1.7rem;
+		height: 1.7rem;
+		padding: 0;
+		font-size: 1.15rem;
+	}
+	.app[data-android] .attach-btn :global(.action-glyph),
+	.app[data-android] .mic-btn :global(.action-glyph),
+	.app[data-android] .voice-float :global(.action-glyph) {
+		height: 1.15em;
+	}
+	/* Highlight up: Annotate/Inspect go big while every other tool and
+	the hint stand down, so the next tap can't miss. Phones only;
+	desktop keeps the floating menu rhythm. */
+	.app[data-android] .prompt:has(.ann-dock) .ann-dock {
+		font-size: 1.15rem;
+		padding: 0.55rem 1.1rem;
+		min-height: 2.75rem;
+	}
+	.app[data-android] .prompt:has(.ann-dock) .attach-btn,
+	.app[data-android] .prompt:has(.ann-dock) .mic-btn,
+	.app[data-android] .prompt:has(.ann-dock) .voice-float,
+	.app[data-android] .prompt:has(.ann-dock) .wp-jump,
+	.app[data-android] .prompt:has(.ann-dock) .ann-wrap {
 		display: none;
+	}
+	.app[data-android] .prompt:has(.ann-dock) :global(.ta-input::placeholder),
+	.app[data-android] .prompt:has(.ann-dock) :global(.cm-placeholder) {
+		color: transparent;
 	}
 	/* Empty chat on phones: the pills row is the last in-flow child, so
 	a tall hero plus big fonts push it under the floating prompt card
@@ -10007,25 +10251,38 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		/* The box grew already; the glyph itself stays text-sized. */
 		font-size: 1.15rem;
 	}
-	/* Phones thumb-reach the chat list: it slides up from the bottom
-	instead of in from the left. Desktop keeps the left drawer; the
-	settings panel keeps its right drawer (one sidebar at a time). */
+	/* Per-row export shares the delete box on phones: same thumb
+	target, so the two icons sit vertically aligned in the row.
+	Desktop keeps the overlaid icon pair. */
+	.app[data-android] aside li .exp {
+		padding: 0.6rem;
+		min-width: 2.75rem;
+		min-height: 2.75rem;
+	}
+	.app[data-android] aside li {
+		align-items: center;
+	}
+	/* Phones slide the chat list in from the left covering ~3/4 of
+	the width (thumb-reachable, main chat kept as a sliver behind).
+	Desktop keeps its left drawer; the settings panel keeps its
+	right drawer (one sidebar at a time). */
 	.app[data-android] aside:not(.settings-panel) {
 		left: 0;
-		right: 0;
-		top: auto;
+		right: auto;
+		top: 0;
 		bottom: 0;
-		width: auto;
-		max-height: 62vh;
+		width: min(78vw, 20rem);
+		max-height: none;
 		overflow-y: auto;
-		border-right: 0;
-		border-top: 1px solid #e5e5ea;
-		border-radius: 16px 16px 0 0;
-		box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.16);
+		border-right: 1px solid #e5e5ea;
+		border-right-color: var(--line-soft);
+		border-top: 0;
+		border-radius: 0;
+		box-shadow: 8px 0 24px rgba(0, 0, 0, 0.16);
 		padding-bottom: calc(0.8rem + env(safe-area-inset-bottom, 0px));
 	}
 	.app[data-android] aside:not(.settings-panel).collapsed {
-		transform: translateY(105%);
+		transform: translateX(-105%);
 	}
 	/* Four region menus share one row on a phone: no wrap, tighter
 	chrome. Desktop keeps the wrapping rhythm. */
@@ -10755,6 +11012,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			calc(0.55rem * min(var(--font-scale, 1), 2));
 		width: 100%;
 		box-sizing: border-box;
+		/* Same type as the message it replaces (see MessageBody's
+		.rendered): the bare textarea inherits this, so the draft
+		reads at exactly the message size. Desktop keeps its own
+		editing frame above. */
+		font-size: calc(0.92rem * var(--font-scale, 1));
+		line-height: 1.5;
 	}
 	.app[data-android] .msg-edit-box :global(.ta-input) {
 		width: 100%;
@@ -11841,7 +12104,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 	.app[data-android] main.hide-buttons.overlay-actions article .actions {
 		position: absolute;
-		top: 100%;
+		/* Tap-anchored on reveal (--actions-top): end-anchored
+		otherwise, so rows revealed without a tap point keep
+		the old pill. Desktop never sets the var. */
+		top: var(--actions-top, 100%);
 		left: 0;
 		right: auto;
 		/* Snug pill, not full width: with nothing left of the buttons
@@ -11885,7 +12151,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		article[data-actions-open="true"][data-actions-above="true"]
 		.actions {
 		top: auto;
-		bottom: 100%;
+		/* Above the tap when tap-anchored, above the message
+		otherwise (the fallback keeps the old flip). */
+		bottom: calc(100% - var(--actions-top, 0px));
 		margin-top: 0;
 		margin-bottom: 0.15rem;
 	}
@@ -11910,21 +12178,21 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.app[data-android] article.folded-msg .actions {
 		display: none;
 	}
-	/* The overlay pill keeps thumb-sized buttons at any text size: the
-	opt-in font scaling fits two buttons to a pill and strands the rest
-	in sideways scroll. Desktop keeps its scaling. */
+	/* The overlay pill scales with the text-size opt-in like the
+	desktop rows (same cap), so huge type never strands tiny
+	buttons — and never domes them past 200%. */
 	.app[data-android]
 		main.hide-buttons.overlay-actions.scale-actions
 		.actions
 		button {
-		font-size: 0.75rem;
+		font-size: calc(0.75rem * min(var(--font-scale, 1), 2));
 	}
 	.app[data-android]
 		main.hide-buttons.overlay-actions.scale-actions
 		.actions
 		.icon-btn
 		:global(.action-glyph) {
-		height: 1.05rem;
+		height: calc(1.05rem * min(var(--font-scale, 1), 2));
 	}
 	/* No bubble, no bubble padding: text keeps its horizontal place
 	(only the background disappears), and the tighter vertical rhythm
@@ -11932,10 +12200,27 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.app[data-android] main.plain-user article.user .bubble {
 		padding: 0.25rem 1rem 0;
 	}
+	/* My-message background OFF on phones: the edit box carries no
+	background either (it mirrors the plain text, not the bubble).
+	Desktop keeps its editing frame above. */
+	.app[data-android] main.plain-user article.user .msg-edit {
+		background: none;
+	}
 	/* Message text never spills sideways off a phone: inner scrollers
 	(code blocks, aid-label rows) keep their own axes. */
 	.app[data-android] .messages {
 		overflow-x: clip;
+	}
+	/* CJK wraps at the column edge on phones, like desktop: the shared
+	body rule uses word-break: break-word (legacy anywhere semantics),
+	which lets shrink-wrapped rows size to a narrow min-content and
+	wraps Chinese far too early at huge text sizes. Phones keep normal
+	character breaking with kinsoku (strict) while long Latin strings
+	still break via overflow-wrap — desktop keeps its own rule. */
+	.app[data-android] .messages :global(.rendered) {
+		line-break: strict;
+		word-break: normal;
+		overflow-wrap: break-word;
 	}
 	/* Chat-step slide: the incoming chat glides in from the swipe
 	side (newer from the right, older from the left). Phone-only;

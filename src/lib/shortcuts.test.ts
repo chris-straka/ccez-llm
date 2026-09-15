@@ -87,15 +87,21 @@ describe("shortcuts menu copy", () => {
 	it("pins the touch gestures list", () => {
 		expect(touchShortcuts().map((r) => r.name)).toEqual([
 			"Chats list",
-			"Fold chats list",
+			"fold chat msg",
 			"Settings",
-			"Newer / older chat",
+			"Newer chat",
 			"Delete current chat",
 			"Delete every chat",
 			"Annotate",
 			"Message buttons",
 			"Fold a message"
 		]);
+		// One-finger swipe left never opens settings: the Settings row
+		// teaches the sidebar button plus the two-finger swipe left, and
+		// the step row keeps the rightward (newer) direction only.
+		const byName = new Map(touchShortcuts().map((r) => [r.name, r.keys]));
+		expect(byName.get("Settings")).toBe("Chats list button · two-finger swipe left");
+		expect(byName.get("Newer chat")).toBe("Two-finger swipe right");
 	});
 
 	it("filters case-insensitively on name or keys", () => {

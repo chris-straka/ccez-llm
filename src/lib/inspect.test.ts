@@ -29,6 +29,13 @@ describe("isSingleHanChar", () => {
 		expect(isSingleHanChar("  ")).toBe(false);
 		expect(isSingleHanChar("語学")).toBe(false);
 	});
+
+	it("rejects multi-char highlights padded with whitespace or punctuation", () => {
+		expect(isSingleHanChar("漢字 ")).toBe(false);
+		expect(isSingleHanChar("\n好\n坏\n")).toBe(false);
+		expect(isSingleHanChar("好!")).toBe(false);
+		expect(isSingleHanChar("好，好")).toBe(false);
+	});
 });
 
 describe("inspectLangFor", () => {

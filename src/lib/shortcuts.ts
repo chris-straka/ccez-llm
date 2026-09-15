@@ -10,14 +10,14 @@ export interface ShortcutRow {
 export function touchShortcuts(): ShortcutRow[] {
 	return [
 		{ name: "Chats list", keys: "Double-tap empty space · swipe right" },
-		{ name: "Fold chats list", keys: "Swipe left" },
-		{ name: "Settings", keys: "Button in chats list" },
-		{ name: "Newer / older chat", keys: "Two-finger swipe right / left" },
+		{ name: "fold chat msg", keys: "Swipe left" },
+		{ name: "Settings", keys: "Chats list button · two-finger swipe left" },
+		{ name: "Newer chat", keys: "Two-finger swipe right" },
 		{ name: "Delete current chat", keys: "Double two-finger tap" },
 		{ name: "Delete every chat", keys: "Double three-finger tap" },
 		{ name: "Annotate", keys: "Select text · Annotate" },
-		{ name: "Message buttons", keys: "Tap a message" },
-		{ name: "Fold a message", keys: "Swipe right on it" }
+		{ name: "Message buttons", keys: "Tap a message · double-tap jumps to its end" },
+		{ name: "Fold a message", keys: "Swipe left on it" }
 	];
 }
 

@@ -15,6 +15,7 @@ import {
 	visibleProviderIds,
 	pinchZoomStep,
 	twoFingerSwipeDir,
+	twoFingerSlideDir,
 	isThreeFingerTap
 } from "./platform";
 
@@ -285,6 +286,33 @@ describe("twoFingerSwipeDir", () => {
 			{ id: 1, x: 340, y: 500 }
 		];
 		expect(twoFingerSwipeDir(spread, spreadEnd)).toBeNull(); // spread change = pinch
+	});
+});
+
+describe("twoFingerSlideDir", () => {
+	const grip = (x: number, y: number) =>
+		([
+			{ id: 0, x, y },
+			{ id: 1, x: x + 40, y }
+		] as [{ id: number; x: number; y: number }, { id: number; x: number; y: number }]);
+	it("slides up to the top, down to the bottom", () => {
+		expect(twoFingerSlideDir(grip(200, 600), grip(200, 400))).toBe("top");
+		expect(twoFingerSlideDir(grip(200, 400), grip(200, 600))).toBe("bottom");
+	});
+	it("rejects short slides, splits, diagonals, and pinches", () => {
+		expect(twoFingerSlideDir(grip(200, 600), grip(200, 560))).toBeNull(); // too short
+		const split = grip(200, 600);
+		const splitEnd = grip(200, 400);
+		splitEnd[1] = { ...splitEnd[1], y: 700 };
+		expect(twoFingerSlideDir(split, splitEnd)).toBeNull(); // fingers split
+		expect(twoFingerSlideDir(grip(200, 600), grip(400, 400))).toBeNull(); // diagonal
+		expect(twoFingerSlideDir(grip(100, 600), grip(300, 600))).toBeNull(); // horizontal
+		const spread = grip(200, 600);
+		const spreadEnd: typeof spread = [
+			{ id: 0, x: 160, y: 400 },
+			{ id: 1, x: 380, y: 400 }
+		];
+		expect(twoFingerSlideDir(spread, spreadEnd)).toBeNull(); // spread change = pinch
 	});
 });
 

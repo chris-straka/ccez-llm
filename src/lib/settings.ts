@@ -169,9 +169,9 @@ const LEGACY_STORAGE_KEY = "ccez-studio-settings-v1";
 export const DEFAULT_SYSTEM_PROMPT = "";
 
 /**
- * Text-size multiplier bounds (persisted): 50–400% on phones, up to
- * 800% on desktop — profiles roam across devices, so the stored range
- * fits the widest (desktop) cap and each UI clamps to its own max.
+ * Text-size multiplier bounds (persisted): 50–800% on phones and
+ * desktop alike — profiles roam across devices, so the stored range
+ * fits the widest cap and each UI clamps to its own max.
  */
 export const FONT_SCALE_MIN = 0.5;
 export const FONT_SCALE_MAX = 8;
@@ -377,8 +377,8 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 			if (!Array.isArray(entry.models)) entry.models = [];
 		}
 		// Clamp the text-size multiplier (range inputs persist strings).
-		// Up to 800% on desktop, 400% on phones (each UI clamps its own
-		// max; the stored range fits the widest so roamed profiles keep
+		// Up to 800% everywhere (each UI clamps its own max; the
+		// stored range fits the widest so roamed profiles keep
 		// working).
 		if (
 			typeof merged.fontScale !== "number" ||
