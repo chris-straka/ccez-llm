@@ -89,3 +89,14 @@ describe("math chrome alignment", () => {
 		expect(mathBodyRule()).not.toMatch(/3\.4rem/);
 	});
 });
+
+describe("preview mounts", () => {
+	it("renders settled bodies while sidebar-previewing (no entrance fade)", () => {
+		// The aid-swap fade replays on every mount, including hover
+		// previews — over latex chrome it reads as the buttons
+		// stirring. jsdom can't see the animation, so pin the wiring:
+		// previews skip the class entirely.
+		const source = readFileSync(new URL("./MessageBody.svelte", import.meta.url), "utf8");
+		expect(source).toContain("class:aid-swap={!preview}");
+	});
+});

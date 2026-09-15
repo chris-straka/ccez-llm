@@ -322,4 +322,11 @@ test("empty preview shows inert pills and composer", async ({ page }) => {
 	await expect(previewPrompt).toHaveAttribute("inert", "");
 	await expect(page.locator("main .lang-menus")).toHaveAttribute("inert", "");
 	await expect(page.locator("main .messages")).not.toContainText("Alpha thread");
+	// Clicking the previewed row lands directly: the preview clears
+	// inside the switch, so the column never flashes back to Alpha.
+	await page.locator("aside ul li button.side-chat").nth(1).click();
+	await expect(page.locator("aside").first()).toHaveClass(/collapsed/);
+	await expect(page.locator("main .hero")).toBeVisible();
+	await expect(page.locator("main .messages")).not.toContainText("Alpha thread");
+	await expect(page.locator("main .prompt")).toBeVisible();
 });

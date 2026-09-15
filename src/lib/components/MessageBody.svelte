@@ -97,6 +97,12 @@
 		 * left :hover paint stuck on assistant rows).
 		 */
 		aidPreview?: boolean;
+		/**
+		 * True when the whole chat is a sidebar hover preview: mount
+		 * settled (no aid-swap entrance fade), so chrome over the body
+		 * never visibly stirs while glancing at another chat.
+		 */
+		preview?: boolean;
 	}
 
 	let {
@@ -115,6 +121,7 @@
 		textOverride = null,
 		contentOverride = null,
 		aidPreview = false,
+		preview = false,
 		aidKinds = undefined,
 		aidPreferred = null,
 		onAidLoadingChange,
@@ -466,7 +473,7 @@
 		<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions, a11y_mouse_events_have_key_events -->
 		<!-- Badge wash is hover-only by decision (see onBadgeOver): Tab reaches markers, never highlights. -->
 		<!-- eslint-disable-next-line svelte/no-at-html-tags -- html is DOMPurify-sanitized in render.ts -->
-		<div class="rendered aid-swap" class:aid-space={aidSpace} bind:this={bodyEl} onclick={onBodyClick} onmouseover={onBadgeOver} onmouseout={onBadgeOut}>{@html html}</div>
+		<div class="rendered" class:aid-swap={!preview} class:aid-space={aidSpace} bind:this={bodyEl} onclick={onBodyClick} onmouseover={onBadgeOver} onmouseout={onBadgeOut}>{@html html}</div>
 	{/key}
 {/if}
 

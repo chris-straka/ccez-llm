@@ -1419,6 +1419,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		const from = chatState.activeChatId;
 		selPinyin = null;
 		const mutate = (): void => {
+			// The hover preview clears inside the transition, never
+			// before it: clearing first renders the old chat for a
+			// frame (and the view-transition snapshot catches it), so
+			// picking a previewed row flashes back before landing.
+			previewChatId = null;
 			// Draft annotations belong to one chat: file the leaving
 			// chat's away, then restore the entering chat's. Doing both
 			// inside the transition keeps the autosave effect (which
@@ -1435,6 +1440,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			mutate();
 			return;
 		}
+		// Leaving for another chat stops the voice: the readout
+		// belongs to the old chat, and a new chat never inherits it.
+		stopVoice();
 		void switchChatWithTransition(mutate);
 	}
 
@@ -1442,7 +1450,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	function enterSearchHit(hit: SearchHit): void {
 		const chat = chatState.chats.find((c) => c.id === hit.doc.chatId);
 		if (!chat) return;
-		previewChatId = null;
 		transitionToChat(chat.id);
 		palette.open = false;
 		palette.query = "";
@@ -2113,7 +2120,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * blanks.
 	 */
 	function stepChat(direction: 1 | -1, focus = true): void {
-		previewChatId = null;
 		const chats = chatState.chats;
 		if (chats.length === 0) return;
 		const at = Math.max(
@@ -2135,6 +2141,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// on return would come back blank).
 			saveDraftAnnotations(chatState.activeChatId, annotations, chats.map((c) => c.id));
 			resetDraftExtras();
+			// Minting switches without a transition, so the preview
+			// clears here (transitionToChat covers its own path).
+			previewChatId = null;
 			newChat(chatState);
 			scrollBox?.scrollTo({ top: 0, behavior: "smooth" });
 			// Minting brings you home (see doNewChat): an open
@@ -7168,7 +7177,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						class="side-chat"
 						class:active={item.id === chatState.activeChatId}
 						onclick={() => {
-							previewChatId = null;
+							// No preview clear here: transitionToChat clears
+							// it inside the transition (clearing first
+							// flashes the old chat before landing).
 							sideIdx = chatState.chats.findIndex((c) => c.id === item.id);
 							transitionToChat(item.id);
 							// A picked chat just closes the list: entering must
@@ -7555,6 +7566,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							textOverride={aidedTextFor(msg)}
 							contentOverride={sentRefs ? (refsOnly && !isFolded ? REFS_ONLY_BODY : sentRefs.text) : null}
 							aidPreview={aidPeek?.id === msg.id && !aidPin.has(msg.id)}
+							preview={previewing}
 							aidKinds={localAidsOverrideFor(msg)}
 							aidPreferred={preferredLocalAid(activeReplyCode)}
 							onAidLoadingChange={(loading: boolean) => setAidBusy(msg.id, loading)}
@@ -10046,8 +10058,20 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		display: flex;
 		flex-direction: column;
 		/* Pairs hug: a message sits close to its reply; the wider
-		separation lands between pairs (see article.user below). */
-		gap: 0.35rem;
+		separation lands between pairs (see article.user below).
+		Scales with the text size, so roomy type keeps airy gaps. */
+		gap: calc(0.6rem * var(--font-scale, 1));
+	}
+	/* Overscroll past the tail: the last message lifts a touch above
+	the composer instead of docking hard at the column's end, scaled
+	with the text size (capped like the bubble, so huge type doesn't
+	drown in spacer). Non-empty only: the empty hero centers in its
+	zone and must not drift. */
+	main:not(.empty) .messages::after {
+		content: "";
+		display: block;
+		flex: none;
+		height: calc(1.5rem * min(var(--font-scale, 1), 2));
 	}
 	/* Chat-switch crossfade covers the messages only: an unscoped
 	transition snapshots the whole page, so the closing sidebar and
@@ -10460,9 +10484,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		cursor: default;
 	}
 	/* A user message opens a new pair, so it carries the
-	between-pair separation on top; replies hug underneath. */
+	between-pair separation on top; replies hug underneath.
+	Scales with the text size like the list gap above. */
 	article.user {
-		margin-top: 0.45rem;
+		margin-top: calc(0.7rem * var(--font-scale, 1));
 	}
 	article:first-of-type {
 		margin-top: 0;

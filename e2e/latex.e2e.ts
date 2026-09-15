@@ -223,3 +223,64 @@ test("partial equation pick snaps to the whole equation", async ({ page }) => {
 		)
 		.toBe(flat(full));
 });
+
+/** Hovering another chat previews its equations with settled chrome:
+no entrance animation runs over the copy button or its ancestors,
+and its box never moves. Both chats carry the same equation, so any
+delta across the hover is pure chrome motion, never content. */
+test("preview settles latex chrome", async ({ page }) => {
+	await page.addInitScript(() => {
+		const msg = (id: string, content: string) => ({ id, role: "assistant", content, usage: null, error: null });
+		const eq = "$$\\sum_{i=0}^{n} \\frac{x_i^2}{\\sqrt{1 + x_i^2}}$$";
+		window.localStorage.setItem(
+			"ccez-llm-chats-v1",
+			JSON.stringify([
+				{ id: "chat-a", createdAt: 1, replyLang: null, messages: [msg("a-m", `Alpha.\n\n${eq}\n\ntail.`)] },
+				{ id: "chat-b", createdAt: 2, replyLang: null, messages: [msg("b-m", `Beta.\n\n${eq}\n\ntail.`)] }
+			])
+		);
+	});
+	await page.goto("/");
+	await expect(page.locator(".ccez-math-copy").first()).toBeVisible({ timeout: 60_000 });
+	await page.keyboard.press("Meta+b");
+	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
+	// Trace the chrome box at 60fps across the hover instant.
+	const tracePromise = page.evaluate(
+		() =>
+			new Promise((resolve: (samples: { x: number; y: number; chain: string[] }[]) => void) => {
+				const out: { x: number; y: number; chain: string[] }[] = [];
+				let n = 0;
+				const tick = (): void => {
+					const target = document.querySelector("main .ccez-math-copy");
+					if (target) {
+						const rect = target.getBoundingClientRect();
+						const chain: string[] = [];
+						let el: Element | null = target;
+						while (el && el !== document.body) {
+							for (const anim of document.getAnimations({ subtree: true })) {
+								const effectTarget = (anim.effect as KeyframeEffect | null)?.target ?? null;
+								if (effectTarget === el && anim instanceof CSSAnimation) chain.push(anim.animationName);
+							}
+							el = el.parentElement;
+						}
+						out.push({ x: rect.x, y: rect.y, chain });
+					}
+					if (++n < 40) requestAnimationFrame(tick);
+					else resolve(out);
+				};
+				requestAnimationFrame(tick);
+			})
+	);
+	await page.waitForTimeout(100);
+	await page.locator("aside ul li button.side-chat").nth(1).hover();
+	const trace = await tracePromise;
+	expect(trace.length).toBeGreaterThan(10);
+	// The preview mounts settled bodies: the aid-swap entrance fade
+	// stays off, so nothing animates over the chrome...
+	expect(trace.flatMap((sample) => sample.chain)).toEqual([]);
+	// ...and with identical equations the box sits perfectly still.
+	for (const sample of trace) {
+		expect(sample.x).toBe(trace[0]?.x ?? 0);
+		expect(sample.y).toBe(trace[0]?.y ?? 0);
+	}
+});

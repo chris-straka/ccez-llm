@@ -107,3 +107,59 @@ describe("hover-only message actions", () => {
 		expect(offenders).toEqual([]);
 	});
 });
+
+/**
+ * Chat-switch ordering: picking a previewed row must land directly,
+ * never flash the old chat first.
+ */
+function transitionBody(): string {
+	const fn = pageSource().match(
+		/function transitionToChat\(id: Parameters<typeof selectChat>\[1\]\): void \{([\s\S]*?)void switchChatWithTransition\(mutate\);/
+	);
+	expect(fn, "transitionToChat is gone or reshaped — keep the preview clear and voice stop in it").toBeTruthy();
+	return fn![1]!;
+}
+
+describe("chat-switch transition", () => {
+	it("clears the hover preview inside the switch, never before it", () => {
+		// Clearing first renders the old chat for a frame (and the
+		// view-transition snapshot catches it), so the mutate block
+		// owns the only switch-path clear.
+		expect(transitionBody()).toContain("previewChatId = null;");
+	});
+
+	it("stops the voice when leaving for another chat", () => {
+		expect(transitionBody()).toContain("stopVoice();");
+	});
+
+	it("passes previewing into message bodies", () => {
+		expect(pageSource()).toContain("preview={previewing}");
+	});
+});
+
+describe("message spacing and overscroll", () => {
+	it("scales the list gap with the text size", () => {
+		const css = pageStyle();
+		const gaps = [...css.matchAll(/\.messages\s*\{([^}]*)\}/g)]
+			.map((rule) => rule[1])
+			.filter((body) => /gap\s*:/.test(body ?? ""));
+		expect(gaps, "no .messages gap rule — move the scaled gap with it").not.toHaveLength(0);
+		for (const gap of gaps) expect(gap).toMatch(/gap\s*:\s*calc\([^;]*var\(--font-scale/);
+	});
+
+	it("scales the between-pair separation with the text size", () => {
+		const css = pageStyle();
+		const margins = [...css.matchAll(/article\.user\s*\{([^}]*)\}/g)]
+			.map((rule) => rule[1])
+			.filter((body) => /margin-top\s*:/.test(body ?? ""));
+		expect(margins, "no article.user margin-top rule — move the scaled margin with it").not.toHaveLength(0);
+		for (const margin of margins) expect(margin).toMatch(/margin-top\s*:\s*calc\([^;]*var\(--font-scale/);
+	});
+
+	it("reserves tail overscroll outside the empty hero's zone", () => {
+		const css = pageStyle();
+		const spacer = css.match(/main:not\(\.empty\) \.messages::after\s*\{([^}]*)\}/);
+		expect(spacer, "overscroll spacer is gone — the tail docks hard again").toBeTruthy();
+		expect(spacer![1]).toMatch(/height\s*:\s*calc\([^;]*var\(--font-scale/);
+	});
+});
