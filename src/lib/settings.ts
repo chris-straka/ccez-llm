@@ -100,11 +100,6 @@ export interface AppSettings {
 	 */
 	chatWidth: number;
 	/**
-	 * Browser side-panel width in px, memorized from the edge-drag
-	 * handle. Shell and fallback strip both honor it on open.
-	 */
-	sideviewWidthPx: number;
-	/**
 	 * The user explicitly picked the voice locale (voice-language field),
 	 * so restarts must keep it. Unset when a reply pill overrides the
 	 * voice: the next launch returns to the system default instead.
@@ -180,11 +175,6 @@ export const FONT_SCALE_MAX = 8;
 export const CHAT_WIDTH_DEFAULT = 36;
 export const CHAT_WIDTH_MIN = 28;
 export const CHAT_WIDTH_MAX = 120;
-
-/** Browser side-panel width in px: dock default, never under the overlay floor. */
-export const SIDEVIEW_WIDTH_DEFAULT = 420;
-export const SIDEVIEW_WIDTH_MIN = 280;
-export const SIDEVIEW_WIDTH_MAX = 720;
 
 /** Stored idle-hide value meaning "never hide" (see `isPromptIdle`). */
 export const PROMPT_IDLE_NEVER = 0;
@@ -286,7 +276,6 @@ export function defaultSettings(): AppSettings {
 		sidebarCollapsed: true,
 		fontScale: 1,
 		chatWidth: CHAT_WIDTH_DEFAULT,
-		sideviewWidthPx: SIDEVIEW_WIDTH_DEFAULT,
 		ownBubble: false,
 		hoverUserActions: true,
 		hoverAssistantActions: true,
@@ -398,16 +387,6 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 			merged.chatWidth = Math.min(
 				CHAT_WIDTH_MAX,
 				Math.max(CHAT_WIDTH_MIN, Math.round(merged.chatWidth))
-			);
-		}
-		// Backfill the memorized browser-panel width the same way
-		// (older saves predate the edge-drag handle; whole px).
-		if (typeof merged.sideviewWidthPx !== "number" || Number.isNaN(merged.sideviewWidthPx)) {
-			merged.sideviewWidthPx = SIDEVIEW_WIDTH_DEFAULT;
-		} else {
-			merged.sideviewWidthPx = Math.min(
-				SIDEVIEW_WIDTH_MAX,
-				Math.max(SIDEVIEW_WIDTH_MIN, Math.round(merged.sideviewWidthPx))
 			);
 		}
 		// Theme pins from older saves predate the switch: anything that

@@ -24,9 +24,9 @@ same codebase via the Tauri mobile target.
   needs real hardware — unit tests + honest unverified notes, never pass claims.
 - P23 (`+page.svelte` component split) stays its own future task.
 - Ghost features: user believes all fixed — verify, then drop this item.
-- Cmd+T tension unresolved: S4 shipped it as translate-lookup (NOT a
-  mini-browser); later requests ask for a single-tab browser window on Cmd+T
-  and renaming research->browser. Decide one direction before building.
+- Cmd+T browser removed (owner request, Sep 2026): the chord, sideview
+  webview, fallback strip, width setting, and shortcut row are gone;
+  Cmd+T returns to the OS/browser.
 
 ## Pile: platform + release (needs hardware) (needs hardware)
 

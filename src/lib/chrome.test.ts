@@ -100,7 +100,6 @@ const STAGE_CLEAR: StageOwnerFlags = {
 	inspectOpen: false,
 	findOpen: false,
 	settingsOpen: false,
-	sideviewOpen: false,
 	sidebarOpen: false
 };
 

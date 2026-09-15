@@ -65,10 +65,6 @@ export function desktopShortcuts(isMac: boolean): ShortcutRow[] {
 		{ name: "New chat", keys: `${isMac ? "⌘N or ⇧⌘N" : "Ctrl+N or Ctrl+Shift+N"}` },
 		{ name: "Voice readback on/off", keys: `Ctrl+${altm}+S` },
 		{ name: "Pasted text expand/collapse", keys: "Ctrl+O" },
-		{
-			name: "Browser side panel",
-			keys: `${meta}T`
-		},
 		{ name: "Stop voice / close", keys: "Esc" },
 		{ name: "Speak text aloud", keys: "Right-click" },
 		// ⌘D is meta-only (Ctrl+D fast-scrolls in scroll mode); Shift+D works everywhere.

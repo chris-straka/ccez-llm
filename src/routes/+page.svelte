@@ -166,15 +166,6 @@ import {
 	import { furiganaHtml } from "$lib/furigana";
 	import { fetchStrokePaths } from "$lib/kanjivg";
 	import {
-		clampSideviewWidth,
-		hideSideview,
-		layoutSideviewViews,
-		navigateSideview,
-		openSideview,
-		resolveBrowserUrl,
-		sideviewLayout
-	} from "$lib/sideview";
-	import {
 	isAndroidUserAgent,
 	isIOSUserAgent,
 	isCoarsePointer,
@@ -255,7 +246,6 @@ import {
 	import { buildSearchDocs, chatMatchesQuery, findMessageIndices, type SearchHit } from "$lib/chatSearch";
 	import { emptyFind, stepFindCursor, type FindState } from "$lib/find";
 	import { emptyPalette, type PaletteState } from "$lib/palette";
-	import { draggedWidth, emptySideview, type SideviewState } from "$lib/sideview";
 	import { annPopBlurAction, annPopCancelKind, annPopSaveKind } from "$lib/annPop";
 	import { idleTapAction, shouldHideForAlways, shouldIdleHide } from "$lib/idle";
 	import {
@@ -1277,162 +1267,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		editor?.focus();
 	}
 
-	/**
-	 * Browser side panel (Cmd+T): a second OS webview docked right
-	 * in the same Tauri window — exactly one tab, a plain browser
-	 * with an address bar, no Translate framing. Shrinking the main
-	 * webview changes what window.innerWidth reports, so the full
-	 * window width is tracked across resizes instead of re-read
-	 * (see below).
-	 */
-	let sideview = $state<SideviewState>(emptySideview());
-	let browserInputEl: HTMLInputElement | null = $state(null);
-	let sideviewFullW: number | null = null;
-	let sideviewFullH: number | null = null;
-	let sideviewSideW = 0;
-	let sideviewOverlaid = false;
-	/** The single tab's URL derives from the address-bar text (empty = home). */
-	const sideviewUrl = $derived(resolveBrowserUrl(sideview.address));
-
-	/** Full window viewport, reconstructing the docked-off width. */
-	function sideviewViewport(): { width: number; height: number } {
-		const height = sideviewFullH ?? window.innerHeight;
-		if (!sideview.hosted || sideviewFullW === null) {
-			return { width: window.innerWidth, height };
-		}
-		if (sideviewOverlaid) return { width: window.innerWidth, height: window.innerHeight };
-		return { width: window.innerWidth + sideviewSideW, height: window.innerHeight };
-	}
-
-	function noteSideviewLayout(layout: ReturnType<typeof sideviewLayout>): void {
-		sideviewSideW = layout.side.width;
-		sideviewOverlaid = layout.overlay;
-	}
-
-	/** Focus the address bar: Cmd+T lands typing there, out of the prompt. */
-	function focusBrowserAddress(): void {
-		browserInputEl?.focus();
-		browserInputEl?.select();
-	}
-
-	async function setSideviewOpen(open: boolean, focusAddress = false): Promise<void> {
-		try {
-			if (open) {
-				sideview.open = true;
-				sideview.error = null;
-				const viewport = sideviewViewport();
-				sideviewFullW = viewport.width;
-				sideviewFullH = viewport.height;
-				const layout = sideviewLayout(
-					viewport.width,
-					viewport.height,
-					settings.sideviewWidthPx
-				);
-				const hosted = await openSideview(sideviewUrl, layout);
-				if (hosted) noteSideviewLayout(layout);
-				sideview.hosted = hosted;
-				sideview.fallback = !hosted;
-				if (!hosted && tauriBackendAvailable()) {
-					// A shell exists but refused the webview: say so
-					// instead of failing silent. Plain browsers get
-					// the strip's static note, not an error.
-					sideview.error =
-						"The desktop shell would not dock the browser tab, so this is a link strip instead.";
-				}
-				if (focusAddress) focusBrowserAddress();
-			} else {
-				sideview.open = false;
-				sideview.fallback = false;
-				if (sideview.hosted) {
-					sideview.hosted = false;
-					await hideSideview(
-						sideviewFullW ?? window.innerWidth,
-						sideviewFullH ?? window.innerHeight
-					);
-				}
-				sideviewFullW = null;
-				sideviewFullH = null;
-			}
-		} catch {
-			// The panel never breaks the chat: fall back to the DOM
-			// strip on open, and drop state on close.
-			if (open) {
-				sideview.hosted = false;
-				sideview.fallback = true;
-			} else {
-				sideview.hosted = false;
-				sideview.fallback = false;
-				sideviewFullW = null;
-				sideviewFullH = null;
-			}
-		}
-	}
-
-	/**
-	 * Address-bar go: resolve the input and move the single tab to
-	 * it. The fallback strip just repoints its link (same derived
-	 * URL); a shell refusal flips to the strip with the reason shown.
-	 */
-	async function submitBrowserAddress(): Promise<void> {
-		if (!sideview.open) return;
-		sideview.error = null;
-		if (!sideview.hosted) return;
-		try {
-			const viewport = sideviewViewport();
-			sideviewFullW = viewport.width;
-			sideviewFullH = viewport.height;
-			const layout = sideviewLayout(
-				viewport.width,
-				viewport.height,
-				settings.sideviewWidthPx
-			);
-			// The JS Webview API exposes no navigate: recreate the
-			// single tab at the resolved URL.
-			const hosted = await navigateSideview(sideviewUrl, layout);
-			if (hosted) {
-				noteSideviewLayout(layout);
-			} else {
-				sideview.hosted = false;
-				sideview.fallback = true;
-				sideview.error =
-					"The desktop shell would not move the browser tab, so this is a link strip instead.";
-			}
-		} catch {
-			sideview.hosted = false;
-			sideview.fallback = true;
-			sideview.error =
-				"The desktop shell would not move the browser tab, so this is a link strip instead.";
-		}
-	}
-
-	/**
-	 * Memorize the edge-dragged panel width. Live-drags update the
-	 * setting; the save lands on release (see the handle's
-	 * pointerup) so a drag writes once.
-	 */
-	function dragSideviewTo(clientX: number): void {
-		const drag = sideview.drag;
-		if (!drag) return;
-		settings.sideviewWidthPx = clampSideviewWidth(draggedWidth(drag, clientX));
-	}
-
 	$effect(() => {
-		// Window resizes re-dock both webviews while the native tab
-		// is up. Browser fallback needs no geometry (plain DOM flow).
-		if (!sideview.open || !sideview.hosted) return;
-		const onResize = () => {
-			const viewport = sideviewViewport();
-			sideviewFullW = viewport.width;
-			sideviewFullH = viewport.height;
-			const layout = sideviewLayout(
-				viewport.width,
-				viewport.height,
-				settings.sideviewWidthPx
-			);
-			noteSideviewLayout(layout);
-			void layoutSideviewViews(layout);
-		};
-		window.addEventListener("resize", onResize);
 		// Desktop Cmd+scroll rides the app's text size in 0.1 steps
 		// (the browser's own page zoom would blur the shell and fight
 		// the layout; phones pinch instead, so this stays desktop).
@@ -1453,7 +1288,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		};
 		window.addEventListener("wheel", onZoomWheel, { passive: false });
 		return () => {
-			window.removeEventListener("resize", onResize);
 			window.removeEventListener("wheel", onZoomWheel);
 		};
 	});
@@ -3273,7 +3107,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * the saved comment loads as the draft, the arrow files it back,
 	 * tapping out cancels. Re-pressing the editing badge cancels too.
 	 */
-	function openBadge(id: AnnotationId): void {
+	function openBadge(id: AnnotationId, anchor?: { x: number; y: number }): void {
 		// Re-pressing the open badge closes it, like cancel: the edit
 		// menu toggles instead of reopening under the cursor.
 		if (annPop && !annPopClosing && annPop.id === id) {
@@ -3282,11 +3116,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		}
 		const current = annotations.find((a) => a.id === id);
 		if (!current) return;
-		// Every edit happens in the composer, never the card: the
-		// transplanted textbox can't reliably summon keyboards or
-		// hold focus (phones and desktop alike) — see
-		// editAnnotationInPrompt. Re-pressing the editing badge
-		// cancels back out (toggle).
+		// Phones edit in the composer, never the card: the transplanted
+		// textbox can't reliably summon the phone keyboard — see
+		// editAnnotationInPrompt. Re-pressing the editing badge cancels
+		// back out (toggle). Desktop keeps the floating edit menu.
 		if (promptAnnEdit && !("pending" in promptAnnEdit) && promptAnnEdit.id === id) {
 			cancelPromptAnnEdit();
 			return;
@@ -3294,8 +3127,25 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		stopPillMic();
 		editingId = null;
 		highlightAnnId = id;
-		editAnnotationInPrompt({ id }, current.comment);
-		return;
+		if (androidUI) {
+			editAnnotationInPrompt({ id }, current.comment);
+			return;
+		}
+		annDraft = current.comment;
+		settleAnnPop();
+		// Narrow viewports are narrower than the desktop card: clamp
+		// first or x goes negative and the popover runs off-screen.
+		const anchorAt = anchor ?? { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+		const width = popWidth(false);
+		const x = Math.min(Math.max(8, anchorAt.x - width / 2), window.innerWidth - width - 8);
+		const height = 240;
+		let y = anchorAt.y + 8;
+		if (y + height > window.innerHeight - 8) y = Math.max(8, anchorAt.y - height - 8);
+		annPop = { id, x, y, fresh: false };
+		// The box can morph from a still-fading fresh pill (same
+		// element, no remount, so growPill's mount focus never fires):
+		// land the caret explicitly, like the create path does.
+		void tick().then(() => annPopBox?.focus({ preventScroll: true }));
 	}
 
 	/**
@@ -3305,9 +3155,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * not a re-press: running the toggle would shut the menu the press
 	 * opened (the iOS tap bug). Anything else toggles as before.
 	 */
-	function openBadgeClick(id: AnnotationId): void {
+	function openBadgeClick(id: AnnotationId, anchor: { x: number; y: number }): void {
 		if (lastBadgePress && lastBadgePress.id === id && Date.now() - lastBadgePress.at < 800) return;
-		openBadge(id);
+		openBadge(id, anchor);
 	}
 
 	function saveEdit(id: string): void {
@@ -6427,10 +6277,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			} else if (find.open) {
 				// The find bar closes from anywhere (its input included).
 				closeFind();
-			} else if (sideview.open) {
-				// The docked browser panel closes next, from
-				// anywhere (it has no text worth cancelling).
-				void setSideviewOpen(false);
 			} else if (editingMsgId) {
 				// An in-progress message edit cancels from anywhere,
 				// including inside the prompt (capture phase pre-empts
@@ -6439,7 +6285,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			} else if (inEditor) {
 				// ESC with the composer focused: drop the caret and
 				// dismiss composer-adjacent overlays. Voice keeps playing
-				// (it has its own toggle); modals, search, sideview, and
+				// (it has its own toggle); modals, search, and
 				// message edits keep their earlier branches above.
 				editor?.blur();
 				selMenu = null;
@@ -6496,7 +6342,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						inspectOpen: inspectChar !== null,
 						findOpen: find.open,
 						settingsOpen,
-						sideviewOpen: sideview.open,
 						sidebarOpen: !settings.sidebarCollapsed
 					}),
 					inOwnedTarget: isIdleOwnedTarget(event.target)
@@ -6575,15 +6420,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// commandChord): priority lives in the table, bodies stay here
 			// as `if (chord === ...)` chains, never a switch.
 			const chord = commandChord(keyFacts(event));
-			if (chord === "open-browser") {
-				// Always the single-tab browser: it opens and lands
-				// focus in its address bar (a second press focuses
-				// the bar again). Selections never divert it.
-								consumeEvent(event);
-				if (!sideview.open) void setSideviewOpen(true, true);
-				else focusBrowserAddress();
-				return;
-			}
 			if (event.key === "Escape") {
 				// One ladder for every layer (see dismissEscape):
 				// topmost first, exactly one per press.
@@ -7184,9 +7020,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// restart the fade the toggle is about to cancel.
 			if (!(annPop && !annPopClosing && annPop.id === id)) saveAnnPop();
 			// Same boundary as MessageBody's badge click: stamped ids.
-			// Position arguments are retired with the card (edits live
-			// in the composer now).
-			openBadge(id);
+			// The press point anchors the desktop edit menu; phones
+			// edit in the composer and ignore it.
+			openBadge(id, { x: event.clientX, y: event.clientY });
 			lastBadgePress = { id, at: Date.now() };
 		};
 		// Double-click summons the menu for the native word pick (the
@@ -8187,9 +8023,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		{#if notices.toast.message}
 			<button type="button" class="toast" title="Click to copy" aria-live="polite" transition:fade={{ duration: 160 }} onclick={copyToast}>{notices.toast.message}</button>
 		{/if}
-		<!-- Empty drag strip: nothing but the traffic-light clearance (the
-		browser address bar only appears here while summoned; the
-		active reply language shows on the send button instead).
+		<!-- Empty drag strip: nothing but the traffic-light clearance
+		(the active reply language shows on the send button instead).
 		Double-click zooms. -->
 		<header role="toolbar" aria-label="App" tabindex="-1" onmousedown={dragWindow} ondblclick={zoomWindow}>
 			<!-- Traffic-light veil: the native Overlay buttons paint
@@ -8197,33 +8032,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			rest and fades on header hover (see CSS). Clicks always
 			pass through; the buttons stay live underneath. -->
 			<span class="traffic-veil" aria-hidden="true"></span>
-			<!-- Browser side panel: Cmd+T docks a single-tab browser
-			right in the same window. Shortcut-only on purpose (no
-			toggle button): the combo opens from anywhere, including
-			the prompt, and lands focus in the address bar. -->
-			<span class="sideview-bar">
-				{#if sideview.open}
-					<form
-						class="browser-address"
-						onsubmit={(event) => {
-							event.preventDefault();
-							void submitBrowserAddress();
-						}}
-					>
-						<input
-							bind:this={browserInputEl}
-							type="text"
-							aria-label="Browser address"
-							placeholder="Search or address"
-							autocomplete="off"
-							autocapitalize="off"
-							spellcheck={false}
-							bind:value={sideview.address}
-						/>
-						<button type="submit" aria-label="Go to address">Go</button>
-					</form>
-				{/if}
-			</span>
 		</header>
 
 		<!-- In-chat find (Cmd/Ctrl+F): message-level cycling browser-style. -->
@@ -9122,58 +8930,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			</div>
 		{/if}
 	</main>
-
-	{#if sideview.open && sideview.fallback}
-		<!-- No Tauri shell here (plain browser dev, e2e): there is no
-		second-OS-webview host, so the panel degrades to a docked
-		strip with an external link instead of crashing. The link
-		follows the same address-bar resolve as the native tab. -->
-		<aside
-			class="sideview-fallback"
-			aria-label="Browser panel"
-			style="width: {Math.round(settings.sideviewWidthPx)}px"
-		>
-			<div
-				class="browser-resize"
-				aria-hidden="true"
-				onpointerdown={(event) => {
-					if (event.currentTarget instanceof HTMLElement)
-						event.currentTarget.setPointerCapture(event.pointerId);
-					sideview.drag = { startX: event.clientX, startW: settings.sideviewWidthPx };
-				}}
-				onpointermove={(event) => {
-					if (sideview.drag) dragSideviewTo(event.clientX);
-				}}
-				onpointerup={() => {
-					if (sideview.drag) {
-						sideview.drag = null;
-						saveSettingsNow();
-					}
-				}}
-				onpointercancel={() => {
-					sideview.drag = null;
-				}}
-			></div>
-			<div class="sideview-fallback-head">
-				<strong>Browser</strong>
-				<button
-					type="button"
-					aria-label="Close browser panel"
-					title="Close (Esc)"
-					onclick={() => void setSideviewOpen(false)}
-				>
-					×
-				</button>
-			</div>
-			<p>The browser panel needs the desktop app for its second webview. Here it stays a link.</p>
-			{#if sideview.error}
-				<p class="browser-error">{sideview.error}</p>
-			{/if}
-			<a href={sideviewUrl} target="_blank" rel="external noopener noreferrer">
-				Open {sideview.address.trim() ? sideviewUrl : "browser home"} in a browser tab
-			</a>
-		</aside>
-	{/if}
 
 	{#if selMenu && !previewing && !androidUI}
 		<div
@@ -10525,20 +10281,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			opacity: 1;
 		}
 	}
-	/* Browser panel chrome: the bar docks right in the title strip;
-	the panel is shortcut-only, so this only shows the address bar
-	while it is open. */
-	.sideview-bar {
-		margin-left: auto;
-		display: inline-flex;
-		align-items: center;
-		gap: 0.5rem;
-	}
-	.browser-address {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.35rem;
-	}
 	.find-bar {
 		/* Floating overlay, never in-flow: opening find must not push
 		the column down. Upper half of the viewport (never dead
@@ -10592,78 +10334,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.find-bar button:hover {
 		background: rgba(120, 120, 128, 0.18);
 	}
-	.browser-address input {
-		font: inherit;
-		font-size: 0.78rem;
-		color: inherit;
-		background: none;
-		border: 1px solid #1c1c1e;
-		border-color: var(--strong);
-		border-radius: 999px;
-		padding: 0.2rem 0.6rem;
-		width: 13rem;
-		max-width: 38vw;
-	}
-	.browser-address input::placeholder {
-		opacity: 0.55;
-	}
-	.browser-address button {
-		font: inherit;
-		font-size: 0.78rem;
-		color: #1c1c1e;
-		color: var(--ink);
-		border: 1px solid #1c1c1e;
-		border-color: var(--strong);
-		border-radius: 999px;
-		background: none;
-		cursor: pointer;
-		padding: 0.2rem 0.7rem;
-		white-space: nowrap;
-		opacity: 0.55;
-		transition: opacity 0.18s ease;
-	}
-	.browser-address button:hover,
-	.browser-address button:focus-visible {
-		opacity: 1;
-	}
-	/* Fallback strip (browser dev, no shell webview): docks right
-	like the native tab does in the shell. Overrides the left
-	chat-list drawer above (same element, opposite edge). Width is
-	the memorized panel width (inline style); this is the floor. */
-	.sideview-fallback {
-		left: auto;
-		right: 0;
-		min-width: 17.5rem;
-		max-width: 90vw;
-		border-right: 0;
-		border-left: 1px solid #e5e5ea;
-		border-left-color: var(--line-soft);
-		box-shadow: -8px 0 24px rgba(0, 0, 0, 0.12);
-	}
-	/* Edge-drag resize handle: a slim strip on the panel's left
-	edge; dragging it memorizes the width into settings. */
-	.browser-resize {
-		position: absolute;
-		top: 0;
-		bottom: 0;
-		left: -5px;
-		width: 10px;
-		cursor: ew-resize;
-		touch-action: none;
-	}
-	.browser-error {
-		color: var(--danger, #b3261e);
-	}
-	.sideview-fallback-head {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-	}
-	.sideview-fallback p {
-		font-size: 0.85rem;
-		margin: 0;
-	}
-
 	button.link {
 		font: inherit;
 		color: inherit;

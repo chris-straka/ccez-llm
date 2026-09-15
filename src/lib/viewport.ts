@@ -4,8 +4,8 @@
  * Stick-to-bottom, the held-finger freeze, the scroll-hold rAF loop,
  * the scrollbar fade timer, and the stream-follow cache lived as
  * scattered plain lets in the page. They group here as one
- * `ViewportState` (following the `FindState` / `PaletteState` /
- * `SideviewState` pilots): plain fields, nothing binds to them, so
+ * `ViewportState` (following the `FindState` / `PaletteState`
+ * pilots): plain fields, nothing binds to them, so
  * scroll effects stop sharing subscription accidents with unrelated
  * domains. Element handles (`scrollBox`) and timer/frame wiring stay
  * in the component — only the values move. Unit-tested in

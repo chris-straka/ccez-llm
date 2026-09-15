@@ -289,8 +289,6 @@ const chordBase: CommandChordFacts = {
 
 describe("commandChord", () => {
 	it("matches every chord-table entry", () => {
-		expect(commandChord({ ...chordBase, metaKey: true, key: "t" })).toBe("open-browser");
-		expect(commandChord({ ...chordBase, ctrlKey: true, key: "T" })).toBe("open-browser");
 		expect(commandChord({ ...chordBase, metaKey: true, code: "KeyP" })).toBe("toggle-palette");
 		expect(commandChord({ ...chordBase, metaKey: true, code: "KeyE" })).toBe("toggle-fullscreen");
 		expect(commandChord({ ...chordBase, metaKey: true, code: "KeyF" })).toBe("find-toggle");
@@ -315,6 +313,13 @@ describe("commandChord", () => {
 		expect(commandChord({ ...chordBase, ctrlKey: true, altKey: true, code: "KeyS" })).toBe(
 			"toggle-voice"
 		);
+	});
+
+	it("releases Cmd/Ctrl+T to the OS (no in-app browser)", () => {
+		// The sideview browser is removed: T chords match nothing, so
+		// the shell keeps new-tab and the page never sees the combo.
+		expect(commandChord({ ...chordBase, metaKey: true, key: "t" })).toBe(null);
+		expect(commandChord({ ...chordBase, ctrlKey: true, key: "T" })).toBe(null);
 	});
 
 	it("keeps handler priority (dual-modifier chords win their race)", () => {

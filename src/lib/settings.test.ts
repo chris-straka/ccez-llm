@@ -10,9 +10,6 @@ import {
 	CHAT_WIDTH_DEFAULT,
 	CHAT_WIDTH_MAX,
 	CHAT_WIDTH_MIN,
-	SIDEVIEW_WIDTH_DEFAULT,
-	SIDEVIEW_WIDTH_MAX,
-	SIDEVIEW_WIDTH_MIN,
 	PROMPT_IDLE_ALWAYS,
 	PROMPT_IDLE_DEFAULT,
 	PROMPT_IDLE_MAX,
@@ -116,31 +113,6 @@ describe("settings", () => {
 		(junk as unknown as Record<string, unknown>).chatWidth = "wide";
 		saveSettings(junk, memoryStore);
 		expect(loadSettings(memoryStore).chatWidth).toBe(CHAT_WIDTH_DEFAULT);
-	});
-
-	it("backfills and clamps the memorized browser-panel width on old saves", () => {
-		expect(defaultSettings().sideviewWidthPx).toBe(420);
-		expect(SIDEVIEW_WIDTH_DEFAULT).toBe(420);
-		const s = blankSettings();
-		delete (s as unknown as Record<string, unknown>).sideviewWidthPx;
-		saveSettings(s, memoryStore);
-		expect(loadSettings(memoryStore).sideviewWidthPx).toBe(SIDEVIEW_WIDTH_DEFAULT);
-		const kept = blankSettings();
-		kept.sideviewWidthPx = 500;
-		saveSettings(kept, memoryStore);
-		expect(loadSettings(memoryStore).sideviewWidthPx).toBe(500);
-		const low = blankSettings();
-		low.sideviewWidthPx = SIDEVIEW_WIDTH_MIN - 10;
-		saveSettings(low, memoryStore);
-		expect(loadSettings(memoryStore).sideviewWidthPx).toBe(SIDEVIEW_WIDTH_MIN);
-		const high = blankSettings();
-		high.sideviewWidthPx = SIDEVIEW_WIDTH_MAX + 10;
-		saveSettings(high, memoryStore);
-		expect(loadSettings(memoryStore).sideviewWidthPx).toBe(SIDEVIEW_WIDTH_MAX);
-		const junk = blankSettings();
-		(junk as unknown as Record<string, unknown>).sideviewWidthPx = "wide";
-		saveSettings(junk, memoryStore);
-		expect(loadSettings(memoryStore).sideviewWidthPx).toBe(SIDEVIEW_WIDTH_DEFAULT);
 	});
 
 	it("hides the prompt whenever unfocused out of the box", () => {

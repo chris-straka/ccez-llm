@@ -80,7 +80,6 @@ export interface StageOwnerFlags {
 	inspectOpen: boolean;
 	findOpen: boolean;
 	settingsOpen: boolean;
-	sideviewOpen: boolean;
 	sidebarOpen: boolean;
 }
 
@@ -92,7 +91,6 @@ export function stageOwnedByOverlay(flags: StageOwnerFlags): boolean {
 		flags.inspectOpen ||
 		flags.findOpen ||
 		flags.settingsOpen ||
-		flags.sideviewOpen ||
 		flags.sidebarOpen
 	);
 }

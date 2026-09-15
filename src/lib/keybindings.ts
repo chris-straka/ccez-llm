@@ -269,7 +269,6 @@ export interface CommandChordFacts extends KeyModifiers {
 }
 
 export type CommandChord =
-	| "open-browser"
 	| "toggle-palette"
 	| "toggle-fullscreen"
 	| "find-toggle"
@@ -293,7 +292,6 @@ export type CommandChord =
  */
 export function commandChord(facts: CommandChordFacts): CommandChord | null {
 	const cmd = facts.metaKey || facts.ctrlKey;
-	if (cmd && (facts.key === "t" || facts.key === "T")) return "open-browser";
 	if (cmd && !facts.altKey && !facts.shiftKey && facts.code === "KeyP") return "toggle-palette";
 	if (
 		!facts.altKey &&

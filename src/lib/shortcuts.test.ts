@@ -22,7 +22,6 @@ const MAC_NAMES = [
 	"New chat",
 	"Voice readback on/off",
 	"Pasted text expand/collapse",
-	"Browser side panel",
 	"Stop voice / close",
 	"Speak text aloud",
 	"Delete a message",
