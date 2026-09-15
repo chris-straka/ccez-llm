@@ -1070,3 +1070,37 @@ test("gutter drags never highlight above the cursor line", async ({ page }) => {
 	expect(selected).not.toContain("aaa");
 	expect(selected).not.toContain("bbb");
 });
+
+/** Tabbing through the badge edit card keeps it open: blur-save only
+fires when focus leaves the card, not between its own buttons. */
+test("tab through the badge edit keeps the card open", async ({ page }) => {
+	await openAnnotate(page, "確認しました");
+	await page.keyboard.press("Enter");
+	const badge = page.locator("button.ccez-ann-badge").first();
+	await expect(badge).toHaveCount(1);
+	const box = await badge.boundingBox();
+	if (!box) throw new Error("badge has no box");
+	await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+	const pop = page.locator(".ann-pop");
+	await expect(pop).toBeVisible();
+	await expect(pop.locator("textarea")).toBeFocused();
+	await page.keyboard.press("Tab");
+	await expect(pop).toBeVisible();
+	await expect(pop.locator('button[aria-label="Delete annotation"]')).toBeFocused();
+	// Every further Tab walks the card's own row (dictation joins it
+	// when the mic is available) until Save; the card must never
+	// close under keyboard traversal.
+	const focusedName = (): Promise<string> =>
+		page.evaluate(() => {
+			const active = document.activeElement;
+			if (!(active instanceof HTMLElement)) return "none";
+			return (active.getAttribute("aria-label") ?? active.textContent ?? "").trim();
+		});
+	for (let n = 0; n < 6; n++) {
+		if ((await focusedName()) === "Save") break;
+		await page.keyboard.press("Tab");
+		await expect(pop).toBeVisible();
+	}
+	await expect(pop.locator(".ann-save")).toBeFocused();
+	await expect(pop).toBeVisible();
+});

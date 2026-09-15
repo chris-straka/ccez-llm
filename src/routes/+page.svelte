@@ -9100,7 +9100,16 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				aria-label="Annotation comment. Enter or clicking away saves, Escape cancels."
 				use:growPill
 				onkeydown={annPopKey}
-				onblur={() => blurAnnPop()}
+				onblur={(event) => {
+					// Tabbing between the card's own buttons is not
+					// leaving: only a departure blur-saves (clicking
+					// away saves, Escape cancels). Tab reports its
+					// destination reliably in every engine, unlike a
+					// WebKit button press (see onFocusOutIdle).
+					const next = event.relatedTarget;
+					if (next instanceof Element && next.closest(".ann-pop")) return;
+					blurAnnPop();
+				}}
 			></textarea>
 			{#if annPop.fresh}
 				{#if canMic && settings.micEnabled}
