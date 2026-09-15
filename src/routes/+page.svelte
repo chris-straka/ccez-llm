@@ -184,6 +184,7 @@ import {
 	pinchZoomStep,
 	twoFingerSwipeDir,
 	twoFingerSlideDir,
+	threeFingerSwipeDir,
 	isThreeFingerTap,
 	type FlickZone,
 	type EdgePanel,
@@ -1912,7 +1913,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		const mainEl = box?.closest<HTMLElement>("main") ?? null;
 		if (!card || !box || !mainEl) return;
 		const sync = (): void => {
-			mainEl.style.paddingBottom = promptParked() && !emptyReserve
+			// Phones never collapse the reserve while parked: the
+			// sidebar slide plus a padding yank scrolled the thread
+			// and threw the bottom-anchored card mid-screen for a
+			// frame. Desktop keeps the collapse (empty space back).
+			mainEl.style.paddingBottom = promptParked() && !emptyReserve && !androidUI
 				? ""
 				: `calc(${Math.ceil(card.getBoundingClientRect().height) + 24}px + env(safe-area-inset-bottom, 0px))`;
 			// Scrollbar gutter the messages reserve (classic thin bar,
@@ -4964,6 +4969,17 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			bootParked = false;
 			promptIdle = false;
 		}
+		// Phones stay portrait: the native shell pins it in the
+		// manifest (MainActivity screenOrientation); this runtime
+		// attempt covers browser-hosted runs, and rejects harmlessly
+		// where the API needs fullscreen first.
+		try {
+			if (androidUI && typeof screen.orientation?.lock === "function") {
+				void screen.orientation.lock("portrait").catch(() => {});
+			}
+		} catch {
+			// Orientation lock is best-effort outside the native shell.
+		}
 		// Chromium-only viewport key, appended at runtime on Android
 		// alone: a static tag makes WebKit log "not recognized" noise
 		// on every desktop/iOS load, and only the Android WebView
@@ -5188,7 +5204,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			if (
 				el.closest("main") &&
 				el.closest(
-					"aside, .modal, .modal-veil, .settings-panel, .find-bar, .search-palette, .sel-menu, .review, .lang-menu, .toast"
+					"aside, .modal, .modal-veil, .settings-panel, .find-bar, .search-palette, .sel-menu, .review, .lang-menu, .lang-menus, .hero, .toast"
 				) === null
 			)
 				return "empty";
@@ -5551,17 +5567,24 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				selMenu = null;
 			}
 		});
-		// Two-finger horizontal swipe steps chats (right = newer, left =
-		// older, no focus: the keyboard stays down); a vertical two-finger
-		// slide jumps the chat (up to the top, down to the bottom); a
-		// two-finger double
-		// tap deletes the current chat on Android (sidebar toggle on
-		// iOS); a double three-finger tap deletes every chat on Android
-		// (current chat on iOS). All start away from controls, drawers,
-		// and the modal, and the swipe's pinch veto (see
-		// twoFingerSwipeDir) keeps page zoom.
-		let twoTrack: { start: [FingerTrack, FingerTrack]; end: [FingerTrack, FingerTrack] } | null =
-			null;
+		// Two-finger horizontal swipes open drawers (left = settings,
+		// right = chats list); a vertical two-finger slide jumps the chat
+		// (up to the top, down to the bottom — gg and G); a three-finger
+		// horizontal swipe steps chats (right = newer, left = older, no
+		// focus: the keyboard stays down); a two-finger double tap deletes
+		// the current chat on Android (sidebar toggle on iOS); a double
+		// three-finger tap deletes every chat on Android (current chat on
+		// iOS). Taps start away from controls, drawers, and the modal;
+		// swipes and slides track from anywhere a modal isn't open, and
+		// the swipe's pinch veto (see twoFingerSwipeDir) keeps page zoom.
+		let twoTrack: {
+			start: [FingerTrack, FingerTrack];
+			end: [FingerTrack, FingerTrack];
+			/** False when a finger landed on a control: swipes and slides
+			still fire (settings from anywhere), but tap-pairing never
+			does (a double-tap on a button must not delete a chat). */
+			clean: boolean;
+		} | null = null;
 		// Main-chat pinch owns font size (both phone platforms; the
 		// sidebar keeps the default page zoom): while a clean
 		// two-finger press starts in the messages column, spread steps
@@ -5571,7 +5594,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		let pinchFont = false;
 		let pinchMoved = false;
 		let pinchStepped = false;
-		let threeTrack: { x: number; y: number; moved: number; at: number } | null = null;
+		let threeTrack: {
+			id: number;
+			x: number;
+			y: number;
+			cx: number;
+			cy: number;
+			moved: number;
+			at: number;
+		} | null = null;
 		let lastThreeTapAt = 0;
 		let twoTapAt = 0;
 		let lastTwoTapAt = 0;
@@ -5592,12 +5623,23 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				if (event.touches.length === 2) {
 					const a = event.touches[0];
 					const b = event.touches[1];
+					// Phones track from anywhere a modal isn't open and no
+					// text is picked: a finger landing on a button used to
+					// kill the whole gesture, which read as "swipe left
+					// sometimes doesn't open settings". Loose tracks still
+					// swipe and slide; only clean ones pair taps.
+					const modalBusy =
+						shortcutsOpen ||
+						palette.open ||
+						inspectChar !== null ||
+						window.getSelection()?.isCollapsed === false;
+					const clean = !modalBusy && gestureClean(event);
 					twoTrack =
-						a && b && gestureClean(event)
-							? { start: [trackOf(a), trackOf(b)], end: [trackOf(a), trackOf(b)] }
+						a && b && androidUI && !modalBusy
+							? { start: [trackOf(a), trackOf(b)], end: [trackOf(a), trackOf(b)], clean }
 							: null;
 					// A clean two-finger press starts the double-tap clock.
-					twoTapAt = twoTrack ? Date.now() : 0;
+					twoTapAt = twoTrack !== null && twoTrack.clean ? Date.now() : 0;
 					threeTrack = null;
 					// Pinch-to-font arms only in the messages column: the
 					// sidebar and sheets keep the default page zoom.
@@ -5614,7 +5656,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					const first = event.touches[0];
 					threeTrack =
 						first && gestureClean(event)
-							? { x: first.clientX, y: first.clientY, moved: 0, at: Date.now() }
+							? {
+									id: first.identifier,
+									x: first.clientX,
+									y: first.clientY,
+									cx: first.clientX,
+									cy: first.clientY,
+									moved: 0,
+									at: Date.now()
+								}
 							: null;
 					twoTrack = null;
 					pinchFont = false;
@@ -5631,12 +5681,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			"touchmove",
 			(event) => {
 				if (threeTrack) {
-					const first = event.touches[0];
-					if (first) {
+					const lead = Array.from(event.touches).find((t) => t.identifier === threeTrack?.id);
+					if (lead) {
 						threeTrack.moved = Math.max(
 							threeTrack.moved,
-							Math.hypot(first.clientX - threeTrack.x, first.clientY - threeTrack.y)
+							Math.hypot(lead.clientX - threeTrack.x, lead.clientY - threeTrack.y)
 						);
+						threeTrack.cx = lead.clientX;
+						threeTrack.cy = lead.clientY;
 					}
 				}
 				if (twoTrack) {
@@ -5723,10 +5775,18 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						if (dir !== null && !pinchMoved) {
 							// Phones: a two-finger swipe left opens
 							// settings (the one-finger left stroke never
-							// does); right still steps. Desktop keeps
-							// stepping both directions.
+							// does); a two-finger swipe right summons the
+							// chats list. Chat steps moved to three
+							// fingers; desktop keeps stepping both
+							// directions.
 							if (dir === -1 && androidUI && !settingsOpen) openSettingsPanel();
-							else stepChat(dir, false);
+							else if (dir === 1 && androidUI) {
+								if (settingsOpen) settingsOpen = false;
+								else if (settings.sidebarCollapsed) {
+									settings.sidebarCollapsed = false;
+									persistSettings();
+								}
+							} else stepChat(dir, false);
 						}
 						// Still two-finger taps pair into a delete (Android:
 						// no keyboard for the Delete key, and the sidebar
@@ -5779,7 +5839,26 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					const track = threeTrack;
 					threeTrack = null;
 					const now = Date.now();
-					if (isThreeFingerTap(3, track.moved, now - track.at)) {
+					// The lead finger's lift carries its last position:
+					// fold it in before judging, so a swipe released
+					// without a final move still measures full travel.
+					for (const t of Array.from(event.changedTouches)) {
+						if (t.identifier === track.id) {
+							track.cx = t.clientX;
+							track.cy = t.clientY;
+						}
+					}
+					// Phones step chats on a three-finger horizontal swipe
+					// (right = newer, left = older, keyboard stays down);
+					// a near-stationary trio still pairs into the tap below.
+					const swipe = androidUI ? threeFingerSwipeDir(track.x, track.y, track.cx, track.cy) : null;
+					if (swipe !== null) {
+						stepChat(swipe, false);
+						void hapticBeatAsync("send", {
+							enabled: settings.vibration,
+							shell: tauriBackendAvailable()
+						});
+					} else if (isThreeFingerTap(3, track.moved, now - track.at)) {
 						if (now - lastThreeTapAt < 600) {
 							lastThreeTapAt = 0;
 							// Android: three fingers clear everything (two
@@ -7510,7 +7589,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				>
 			{/if}
 		</div>
-		<ul onmouseleave={() => endPreview()}>
+		<ul onmouseleave={() => endPreview()} data-fade-scroll>
 			{#each sideVisibleChats() as item (item.id)}
 				<!-- Preview hover lives on the row, not the label: moving
 				within the row (label to export/delete and back) must not
@@ -10080,11 +10159,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		right-side reservation (desktop keeps its overlaid cluster). */
 		--tools-pad: 0rem;
 		--tools-extra: 0rem;
-		padding: 0.1rem 0 0.2rem;
-		/* Never strand at zero height: one empty line plus padding
-		holds ~32px after the reply lands (the field owns its height
-		where supported, JS stands down). */
-		min-height: 2rem;
+		padding: 0 0 0.1rem;
+		/* Small single line (~26px): the old 2rem floor read 60/40
+		against the button bar. The field owns its height where
+		supported, JS stands down. */
+		min-height: 1.5rem;
 		max-height: 7.5rem;
 	}
 	.app[data-android] .prompt-tools {
@@ -10093,9 +10172,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		width: auto;
 		margin-top: auto;
 		padding-right: 2.6rem;
-		/* Bottom bar: one even row under the text, split from it. */
+		/* Bottom bar: one even row under the text, no divider. */
 		align-items: center;
-		border-top: 1px solid var(--line-soft);
 		padding-top: 0.35rem;
 	}
 	.app[data-android] .send-btn {
@@ -10131,6 +10209,20 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			max-height 0.22s ease,
 			min-height 0.22s ease;
 	}
+	/* Sidebar parking parks and restores instantly on phones: the
+	0.35s slide plus a chat-switch re-render threw the card
+	mid-screen for a frame. Phones never idle-hide (migrated to
+	never), so the ramp serves nothing there; desktop keeps it. */
+	.app[data-android] .prompt {
+		transition:
+			border-color 0.18s ease,
+			visibility 0s;
+	}
+	.app[data-android] .prompt:not(.prompt-idle) {
+		transition:
+			border-color 0.18s ease,
+			visibility 0s;
+	}
 	.app[data-android] .prompt:not(:focus-within) {
 		gap: 0;
 		/* Let the card hug the single line: the 7.25rem keyboard floor
@@ -10138,40 +10230,26 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		min-height: 0;
 	}
 	.app[data-android] .prompt:not(:focus-within) :global(.ta-input) {
-		max-height: 2rem;
+		max-height: 1.5rem;
 		overflow: hidden;
 	}
 	.app[data-android] .prompt:focus-within :global(.ta-input) {
 		/* Focus never inflates the field: height follows content up to
 		the same cap, so an empty tap stays one line tall. */
-		min-height: 2rem;
+		min-height: 1.5rem;
 		max-height: 7.5rem;
 	}
 	/* The row snaps (no height ramp): ramping its height would slide
 	its buttons under tapping fingers mid-flight. The field above may
 	ramp freely — the row is bottom-anchored, so field growth never
 	moves it. */
+	/* The tools bar is always up on phones — idle single-bar mode is
+	gone, so the row never collapses, fades, or hides its buttons.
+	Highlight mode still stands the other tools down (see the
+	:has(.ann-dock) rules below). */
 	.app[data-android] .prompt-tools {
 		max-height: 3rem;
 		overflow: hidden;
-		transition:
-			opacity 0.18s ease,
-			visibility 0s;
-	}
-	.app[data-android] .prompt:not(:focus-within):not(:has(.ann-dock, .ann-wrap)) .prompt-tools {
-		max-height: 0;
-		opacity: 0;
-		visibility: hidden;
-		transition:
-			opacity 0.18s ease,
-			visibility 0s linear 0.18s;
-	}
-	.app[data-android] .prompt:not(:focus-within):not(:has(.ann-dock, .ann-wrap)) .send-btn {
-		opacity: 0;
-		visibility: hidden;
-		transition:
-			opacity 0.18s ease,
-			visibility 0s linear 0.2s;
 	}
 	@media (prefers-reduced-motion: reduce) {
 		.app[data-android] .prompt :global(.ta-input),
@@ -10273,13 +10351,42 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		bottom: 0;
 		width: min(78vw, 20rem);
 		max-height: none;
-		overflow-y: auto;
+		overflow: hidden;
 		border-right: 1px solid #e5e5ea;
 		border-right-color: var(--line-soft);
 		border-top: 0;
 		border-radius: 0;
 		box-shadow: 8px 0 24px rgba(0, 0, 0, 0.16);
 		padding-bottom: calc(0.8rem + env(safe-area-inset-bottom, 0px));
+		/* Thumb-first column: search, list, new, and settings pile at
+		the bottom and the list scrolls between them. Desktop keeps
+		its top-down drawer. */
+		display: flex;
+		flex-direction: column;
+	}
+	/* The search stands on the pile's top: pushing it down lands
+	everything below it at the bottom too. */
+	.app[data-android] aside:not(.settings-panel) .side-search-wrap {
+		margin-top: auto;
+	}
+	/* Twice the tap height with adult type. Desktop keeps the
+	compact filter. */
+	.app[data-android] aside:not(.settings-panel) .side-search {
+		font-size: 1.15rem;
+		min-height: 4.5rem;
+		padding: 0.8rem 2.2rem 0.8rem 0.8rem;
+	}
+	.app[data-android] aside:not(.settings-panel) ul {
+		flex: 0 1 auto;
+		min-height: 0;
+		overflow-y: auto;
+	}
+	/* Settings owns the bottom edge at double height: the last child
+	of the pile, impossible to miss. Desktop keeps its inline row. */
+	.app[data-android] aside:not(.settings-panel) .side-settings {
+		min-height: 5.5rem;
+		font-size: 1.15rem;
+		margin-top: 0.6rem;
 	}
 	.app[data-android] aside:not(.settings-panel).collapsed {
 		transform: translateX(-105%);

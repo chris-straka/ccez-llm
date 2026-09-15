@@ -39,15 +39,32 @@ describe("phone composer two bars", () => {
 		expect(focusRule?.[0]).toBeDefined();
 		expect(focusRule?.[0]).not.toContain("3.4rem");
 		expect(css).toMatch(
-			/\.app\[data-android\] \.prompt:focus-within :global\(\.ta-input\)\s*\{[^}]*min-height:\s*2rem[^}]*max-height:\s*7\.5rem/
+			/\.app\[data-android\] \.prompt:focus-within :global\(\.ta-input\)\s*\{[^}]*min-height:\s*1\.5rem[^}]*max-height:\s*7\.5rem/
 		);
 	});
 
 	it("keeps the tools row static below the text as its own bar", () => {
 		const css = pageStyle();
-		expect(css).toMatch(
-			/\.app\[data-android\] \.prompt-tools\s*\{[^}]*position:\s*static[^}]*border-top:/
-		);
+		expect(css).toMatch(/\.app\[data-android\] \.prompt-tools\s*\{[^}]*position:\s*static/);
+	});
+
+	it("draws no divider between the bars", () => {
+		const css = pageStyle();
+		const toolsRule = css.match(/\.app\[data-android\] \.prompt-tools\s*\{[^}]*\}/);
+		expect(toolsRule?.[0]).toBeDefined();
+		expect(toolsRule?.[0]).not.toContain("border-top:");
+	});
+
+	it("never collapses the tools bar or its buttons while idle", () => {
+		const css = pageStyle();
+		// Idle single-bar mode is gone: no rule may hide the row or
+		// the send button on :not(:focus-within) outside highlight mode.
+		for (const match of css.matchAll(
+			/\.app\[data-android\][^{]*:not\(:focus-within\)[^{]*\{[^}]*\}/g
+		)) {
+			expect(match[0]).not.toContain("max-height: 0");
+			expect(match[0]).not.toContain("visibility: hidden");
+		}
 	});
 });
 

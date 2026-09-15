@@ -216,6 +216,26 @@ export function twoFingerSwipeDir(
 }
 
 /**
+ * Three-finger horizontal swipe: the lead finger glides mostly
+ * horizontally past minDistance, and the trailing fingers must not
+ * wander vertically past half of that (a loose shape — three fingers
+ * never track evenly). Steps chats: right is newer (1), left older
+ * (-1). Pure so the rule unit-tests without touch hardware.
+ */
+export function threeFingerSwipeDir(
+	startX: number,
+	startY: number,
+	endX: number,
+	endY: number,
+	minDistance = 96
+): 1 | -1 | null {
+	const dx = endX - startX;
+	if (dx === 0 || Math.abs(dx) < minDistance) return null;
+	if (Math.abs(endY - startY) > Math.abs(dx) / 2) return null;
+	return dx > 0 ? 1 : -1;
+}
+
+/**
  * Three-finger double-tap delete: each tap is short, near-stationary, and
  * exactly three fingers. The pairing window lives at the call site (it
  * needs a clock); this judges one tap. Pure so the shape unit-tests

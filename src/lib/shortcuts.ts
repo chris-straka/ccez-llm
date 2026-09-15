@@ -9,10 +9,12 @@ export interface ShortcutRow {
 /** Touch gestures list, data-driven so the modal filter can search it. */
 export function touchShortcuts(): ShortcutRow[] {
 	return [
-		{ name: "Chats list", keys: "Double-tap empty space · swipe right" },
+		{ name: "Chats list", keys: "Double-tap empty space · swipe right · two-finger swipe right" },
 		{ name: "fold chat msg", keys: "Swipe left" },
 		{ name: "Settings", keys: "Chats list button · two-finger swipe left" },
-		{ name: "Newer chat", keys: "Two-finger swipe right" },
+		{ name: "Newer / older chat", keys: "Three-finger swipe right / left" },
+		{ name: "Top of chat", keys: "Two-finger swipe up · gg" },
+		{ name: "Bottom of chat", keys: "Two-finger swipe down · G" },
 		{ name: "Delete current chat", keys: "Double two-finger tap" },
 		{ name: "Delete every chat", keys: "Double three-finger tap" },
 		{ name: "Annotate", keys: "Select text · Annotate" },

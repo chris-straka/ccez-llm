@@ -16,7 +16,8 @@ import {
 	pinchZoomStep,
 	twoFingerSwipeDir,
 	twoFingerSlideDir,
-	isThreeFingerTap
+	isThreeFingerTap,
+	threeFingerSwipeDir
 } from "./platform";
 
 const ANDROID_UA =
@@ -286,6 +287,18 @@ describe("twoFingerSwipeDir", () => {
 			{ id: 1, x: 340, y: 500 }
 		];
 		expect(twoFingerSwipeDir(spread, spreadEnd)).toBeNull(); // spread change = pinch
+	});
+});
+
+describe("threeFingerSwipeDir", () => {
+	it("steps newer on swipe right, older on swipe left", () => {
+		expect(threeFingerSwipeDir(100, 600, 300, 600)).toBe(1);
+		expect(threeFingerSwipeDir(300, 600, 100, 600)).toBe(-1);
+	});
+	it("rejects short glides, still taps, and steep diagonals", () => {
+		expect(threeFingerSwipeDir(100, 600, 140, 600)).toBeNull(); // too short
+		expect(threeFingerSwipeDir(200, 500, 205, 502)).toBeNull(); // tap jitter
+		expect(threeFingerSwipeDir(100, 600, 300, 400)).toBeNull(); // diagonal
 	});
 });
 

@@ -69,9 +69,9 @@ test.describe("gestures", () => {
 		// Exact-match the row (a substring match would also hit siblings).
 		await expect(modal.locator('dt:text-is("Chats list")')).toBeVisible();
 		await expect(modal.locator('dd:has-text("Double-tap empty space")')).toBeVisible();
-		// The list row teaches both openers; fold and settings rows exist.
+		// The list row teaches all three openers; fold and settings rows exist.
 		await expect(modal.locator('dd:has-text("Double-tap empty space")')).toHaveText(
-			"Double-tap empty space · swipe right"
+			"Double-tap empty space · swipe right · two-finger swipe right"
 		);
 		await expect(modal.locator('dt:text-is("fold chat msg")')).toBeVisible();
 		await expect(modal.locator('dt:text-is("Settings")')).toBeVisible();
@@ -79,9 +79,17 @@ test.describe("gestures", () => {
 		await expect(modal.locator('dd:has-text("Chats list button")')).toHaveText(
 			"Chats list button · two-finger swipe left"
 		);
-		await expect(modal.locator('dt:text-is("Newer chat")')).toBeVisible();
-		await expect(modal.locator('dd:has-text("Two-finger swipe right")')).toHaveText(
-			"Two-finger swipe right"
+		await expect(modal.locator('dt:text-is("Newer / older chat")')).toBeVisible();
+		await expect(modal.locator('dd:has-text("Three-finger swipe right")')).toHaveText(
+			"Three-finger swipe right / left"
+		);
+		await expect(modal.locator('dt:text-is("Top of chat")')).toBeVisible();
+		await expect(modal.locator('dd:has-text("Two-finger swipe up")')).toHaveText(
+			"Two-finger swipe up · gg"
+		);
+		await expect(modal.locator('dt:text-is("Bottom of chat")')).toBeVisible();
+		await expect(modal.locator('dd:has-text("Two-finger swipe down")')).toHaveText(
+			"Two-finger swipe down · G"
 		);
 		await expect(modal.locator('dt:has-text("Delete current chat")')).toBeVisible();
 		await expect(modal.locator('dd:has-text("Double two-finger tap")')).toBeVisible();
@@ -275,11 +283,11 @@ test.describe("share", () => {
 
 test.describe("touch", () => {
 	/**
-	 * Android touch batch: one-line region pills, bottom-sheet chats, the
-	 * touch selection menu with Speak, two-finger chat steps, two-finger
-	 * delete, three-finger delete-all, sidebar mutual exclusion, and the
-	 * theme pin. Same UA-gated branches as android.e2e.ts, S24-class
-	 * viewport.
+	 * Android touch batch: one-line region pills, the chats drawer, the
+	 * touch selection menu with Speak, three-finger chat steps,
+	 * two-finger delete, three-finger delete-all, sidebar mutual
+	 * exclusion, and the theme pin. Same UA-gated branches as
+	 * android.e2e.ts, S24-class viewport.
 	 */
 	async function seedTwoChats(page: Page): Promise<void> {
 		await page.addInitScript(() => {
@@ -380,7 +388,7 @@ test.describe("touch", () => {
 		}
 	}
 
-	/** Synthetic two-finger swipe: left opens settings, right steps newer. */
+	/** Synthetic two-finger swipe: left opens settings, right summons the list. */
 	async function swipeTwoFinger(page: Page, x0: number, x1: number): Promise<void> {
 		await page.evaluate(
 			({ x0, x1 }: { x0: number; x1: number }) => {
@@ -444,24 +452,30 @@ test.describe("touch", () => {
 		await expect(panel).not.toHaveClass(/closed/);
 	});
 
-	test("two-finger swipe right steps to the newer chat", async ({ page }) => {
+	test("two-finger swipe right summons the chats list", async ({ page }) => {
+		await seedEmpty(page);
+		const aside = page.locator("aside:has(button.new)");
+		await expect(aside).toHaveClass(/collapsed/);
+		// Two fingers freed from chat steps now summon like the
+		// one-finger rightward stroke does.
+		await swipeTwoFinger(page, 150, 310);
+		await expect(aside).not.toHaveClass(/collapsed/);
+	});
+
+	test("three-finger swipe steps to the newer chat", async ({ page }) => {
 		await seedTwoChats(page);
 		const before = await page.locator("article .rendered").first().innerText();
-		// Since the gesture redesign, chat steps glide horizontally (the
-		// vertical stroke belongs to scrolling); right steps newer.
+		// Chat steps moved to three fingers (right steps newer); the
+		// lead finger's lift carries the travel, so no move event needed.
 		await page.evaluate(() => {
 			const touch = (id: number, x: number, y: number) =>
 				new Touch({ identifier: id, target: document.body, clientX: x, clientY: y });
-			const start = [touch(1, 150, 500), touch(2, 190, 500)];
 			window.dispatchEvent(
-				new TouchEvent("touchstart", { bubbles: true, cancelable: true, composed: true, touches: start })
-			);
-			window.dispatchEvent(
-				new TouchEvent("touchmove", {
+				new TouchEvent("touchstart", {
 					bubbles: true,
 					cancelable: true,
 					composed: true,
-					touches: [touch(1, 310, 500), touch(2, 350, 500)]
+					touches: [touch(1, 150, 500), touch(2, 190, 500), touch(3, 230, 500)]
 				})
 			);
 			window.dispatchEvent(
@@ -470,7 +484,7 @@ test.describe("touch", () => {
 					cancelable: true,
 					composed: true,
 					touches: [],
-					changedTouches: [touch(1, 310, 500), touch(2, 350, 500)]
+					changedTouches: [touch(1, 310, 500), touch(2, 350, 500), touch(3, 390, 500)]
 				})
 			);
 		});
@@ -480,6 +494,36 @@ test.describe("touch", () => {
 		await expect
 			.poll(async () => page.locator("article .rendered").first().innerText(), { timeout: 10_000 })
 			.not.toBe(before);
+	});
+
+	test("two-finger swipe left opens settings from the composer", async ({ page }) => {
+		await seedEmpty(page);
+		const panel = page.locator(".settings-panel");
+		await expect(panel).toHaveClass(/closed/);
+		// Loose tracking: the stroke starts on the send button
+		// itself (the old clean-only gate dropped exactly these).
+		await page.locator(".prompt .send-btn").evaluate((el) => {
+			const touch = (id: number, x: number, y: number) =>
+				new Touch({ identifier: id, target: el, clientX: x, clientY: y });
+			el.dispatchEvent(
+				new TouchEvent("touchstart", {
+					bubbles: true,
+					cancelable: true,
+					composed: true,
+					touches: [touch(1, 300, 500), touch(2, 340, 500)]
+				})
+			);
+			el.dispatchEvent(
+				new TouchEvent("touchend", {
+					bubbles: true,
+					cancelable: true,
+					composed: true,
+					touches: [],
+					changedTouches: [touch(1, 150, 500), touch(2, 190, 500)]
+				})
+			);
+		});
+		await expect(panel).not.toHaveClass(/closed/);
 	});
 
 	test("double two-finger tap deletes the current chat", async ({ page }) => {
@@ -821,9 +865,9 @@ test.describe("touch", () => {
 			const el = document.querySelector(".prompt .ta-input");
 			return el instanceof HTMLElement ? el.getBoundingClientRect().height : -1;
 		});
-		// One empty line plus the field's vertical padding (~40px): the
+		// One small empty line (~26px on the 1.5rem floor): the
 		// stranded state measured ~0 here with no placeholder at all.
-		expect(heights).toBeGreaterThan(30);
+		expect(heights).toBeGreaterThan(16);
 		expect(await box.getAttribute("placeholder")).toBeTruthy();
 		// A keyboard transition settles through the same re-measure path
 		// without disturbing the healthy composer.
@@ -833,7 +877,7 @@ test.describe("touch", () => {
 			const el = document.querySelector(".prompt .ta-input");
 			return el instanceof HTMLElement ? el.getBoundingClientRect().height : -1;
 		});
-		expect(after).toBeGreaterThan(30);
+		expect(after).toBeGreaterThan(16);
 	});
 
 	/** Buttons hide by default on phones: tap reveals one row, bodies stay
@@ -1096,7 +1140,7 @@ test.describe("always-visible prompt", () => {
 		expect(Math.abs(boxes.send.y + boxes.send.h - (boxes.tools.y + boxes.tools.h))).toBeLessThanOrEqual(4);
 	});
 
-	/** One line at rest and on focus: only typed text grows the field. */
+	/** Two bars at rest and on focus: only typed text grows the field. */
 	test("composer rests at one line and stays short on focus", async ({ page }) => {
 		await seed(page, {}, [LONG]);
 		await page.goto("/");
@@ -1106,17 +1150,14 @@ test.describe("always-visible prompt", () => {
 		const send = page.locator(".prompt .send-btn");
 		const height = () =>
 			box.evaluate((el) => (el instanceof HTMLElement ? el.getBoundingClientRect().height : -1));
-		// At rest: one line, buttons parked out of sight and reach.
+		// At rest: one small line with the button bar already up.
 		const rest = await height();
-		expect(rest).toBeGreaterThan(20);
+		expect(rest).toBeGreaterThan(16);
 		expect(rest).toBeLessThan(44);
-		await expect(tools).toBeHidden();
-		await expect(send).toBeHidden();
-		// Focused: still one line (an empty tap never inflates), buttons
-		// back on their second bar.
-		await box.click();
 		await expect(tools).toBeVisible();
 		await expect(send).toBeVisible();
+		// Focused: still one line (an empty tap never inflates).
+		await box.click();
 		await expect.poll(height, { timeout: 5000 }).toBeLessThan(rest + 10);
 		// Typed text grows the field toward its cap (wraps, never sends).
 		await box.pressSequentially("word ".repeat(60));
