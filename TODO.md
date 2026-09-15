@@ -72,12 +72,6 @@ same codebase via the Tauri mobile target.
 
 ## Pile: desktop composer reports (needs owner observables)
 
-- [ ] Badge edit loses focus "soon after" opening (desktop). Not
-      reproduced Sep 2026: the edit box holds focus for 2.4s+ in both
-      Chromium and WebKit, composer parked or open. Park machinery was
-      proven unable to steal popover focus. Needed: idle-hide setting,
-      sidebar open/closed, what was focused before the click, exact
-      delay, whether a reply lands mid-edit.
 - [ ] Attach/voice buttons shift apart a tiny amount after the summon
       rise (desktop). Not reproduced Sep 2026: zero shift across six
       configs (Chromium/WebKit, DPR 1/2, short/long chats, with/without

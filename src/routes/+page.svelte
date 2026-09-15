@@ -1840,6 +1840,17 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			find.open = false;
 		};
 		window.addEventListener("pointerdown", onFindOutside, { passive: true });
+		// Filed-annotations card dismiss: a press outside the card's
+		// own wrap closes it (capture, so the press never also acts
+		// behind the card). Presses on the pill or inside the card
+		// are the toggle and its buttons — never a dismissal.
+		const onRefsOutside = (event: PointerEvent): void => {
+			if (!refsPopOpen) return;
+			const target = event.target instanceof Element ? event.target : null;
+			if (target?.closest(".ann-refs")) return;
+			refsPopOpen = null;
+		};
+		window.addEventListener("pointerdown", onRefsOutside, { capture: true });
 		window.addEventListener("keydown", on);
 		window.addEventListener("wheel", on, { passive: true });
 		window.addEventListener("touchstart", on, { passive: true });
@@ -1868,6 +1879,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			window.removeEventListener("pointerdown", onIdleDown);
 			window.removeEventListener("pointerdown", onDown);
 			window.removeEventListener("pointerdown", onFindOutside);
+			window.removeEventListener("pointerdown", onRefsOutside, { capture: true });
 			window.removeEventListener("keydown", on);
 			window.removeEventListener("wheel", on);
 			window.removeEventListener("touchstart", on);
@@ -1894,15 +1906,16 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		hideForAlways(document.activeElement);
 	});
 	/**
-	 * Tail clearance for the floating composer: main-level padding
-	 * keeps the last line AND the in-flow attachment strip, preview,
-	 * and error above the card in every scroll position (a static
-	 * guess can't track a growing draft, scroll-padding only steers
-	 * programmatic scrolls, and padding inside the scroller leaves
-	 * the strip parked under the card eating its taps). The extra
+	 * Tail clearance for the floating composer: in-scroller padding
+	 * keeps the last line above the card in every scroll position (a
+	 * static guess can't track a growing draft, scroll-padding only
+	 * steers programmatic scrolls), while the thread runs full-height
+	 * behind the frosted card so mid-thread text bleeds through.
+	 * Main-level padding covers only the in-flow attachment strip,
+	 * preview, and error, which live outside the scroller. The extra
 	 * 54px also clears short last messages' badges, which float
-	 * above their quote and would otherwise park under the opaque
-	 * card, unclickable. The reserve NEVER collapses while parked:
+	 * above their quote and would otherwise park under the card,
+	 * unclickable. The reserve NEVER collapses while parked:
 	 * collapsing reclaimed the room but the summon then covered the
 	 * tail (or yanked it upward on re-stick) — both read as the
 	 * composer hiding text. Composes with the Android safe-area
@@ -1920,7 +1933,27 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		if (!card || !box || !mainEl) return;
 		const sync = (): void => {
 			const clearPx = Math.ceil(card.getBoundingClientRect().height) + 54;
-			mainEl.style.paddingBottom = `calc(${clearPx}px + env(safe-area-inset-bottom, 0px))`;
+			// Thread clearance lives INSIDE the scroller: the thread
+			// runs full-height behind the frosted card (bleed-through),
+			// and the tail still lands above it at the bottom.
+			// Main-level padding only shrank the scroller, so nothing
+			// could ever show through. Empty chats keep none: no tail
+			// to protect, hero owns the space per stylesheet.
+			const emptyChat = viewChat.messages.length === 0;
+			box.style.paddingBottom = emptyChat ? "0px" : `${clearPx}px`;
+			// The attachment strip, preview, and error sit in main flow
+			// between the scroller and the card: main-level padding
+			// lifts them above the card while any is rendered. Binary,
+			// so park/summon (transform-only, layout kept) never move
+			// anything; only attaching/removing shifts, which is the
+			// user's own gesture. Empty chats keep today's floor.
+			const stripOpen =
+				mainEl.querySelector(":scope > .attachments, :scope > .preview, :scope > .attach-error") !==
+				null;
+			mainEl.style.paddingBottom =
+				emptyChat || stripOpen
+					? `calc(${clearPx}px + env(safe-area-inset-bottom, 0px))`
+					: `env(safe-area-inset-bottom, 0px)`;
 			// Scrollbar gutter the messages reserve (classic thin bar,
 			// zero with overlay scrollbars): the floating card centers in
 			// the full column, so it rides this much right of the
@@ -6365,6 +6398,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				// textarea keeps its own Esc-to-cancel below).
 				reviewOpen = false;
 				editingId = null;
+			} else if (refsPopOpen) {
+				// A sent message's filed-annotations card sits below
+				// the review in z, so it dismisses right after it.
+				refsPopOpen = null;
 			} else if (editingMsgId) {
 				// An in-progress message edit cancels from anywhere,
 				// including inside the prompt (capture phase pre-empts
@@ -11040,11 +11077,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		strip's 1.75rem plus the old breathing room. */
 		scroll-padding-top: calc(1.75rem + 1rem);
 		/* Bottom clearance for the floating card is measured, not static
-		(see the ResizeObserver below): main-level padding physically
-		keeps the tail — and the in-flow attachment strip — above the
-		card in every scroll position (scroll-padding only steers
-		programmatic scrolls, and padding inside the scroller leaves
-		the strip under the card eating its taps). */
+		(see the ResizeObserver below): in-scroller padding physically
+		keeps the tail above the card while the thread runs full-height
+		behind it (bleed-through); the in-flow attachment strip keeps
+		its own main-level lift, since padding inside the scroller
+		would leave the strip parked under the card eating its taps. */
 	}
 	.messages {
 		/* Selection starts at message text only: dragging empty space
@@ -11772,7 +11809,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		font-weight: 650;
 		line-height: 1.4;
 		padding: 0 0.1rem;
-		cursor: default;
+		/* A disclosure button like any other: the hand invites the
+		click that toggles its card (in-text badges already point). */
+		cursor: pointer;
 	}
 	/* Opens overlapping its number pill (flush with the row's bottom
 	edge): the cursor is already inside the card the moment it
@@ -13161,6 +13200,19 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		background: #fff;
 		/* Raised, not flat: dark keeps the #1c1c1e card on the #17171a page. */
 		background: color-mix(in srgb, var(--bg-raised) calc(var(--bg-alpha, 1) * 100%), transparent);
+		/* Frosted: thread text bleeds through blurred instead of
+		hiding behind an opaque card (no structural change needed —
+		the filter applies to the existing card; the border keeps the
+		edge and the composer's own text paints above, crisp). Capped
+		at 75% so the bleed always reads; lower whole-app Transparency
+		still wins below that. */
+		background: color-mix(
+			in srgb,
+			var(--bg-raised) calc(min(0.75, var(--bg-alpha, 1)) * 100%),
+			transparent
+		);
+		-webkit-backdrop-filter: blur(18px) saturate(1.6);
+		backdrop-filter: blur(18px) saturate(1.6);
 		/* Fixed floor so mounting the editor never shifts layout.
 		CodeMirror itself sets no minimum — this floor is ours, at
 		about three text lines plus the tools row. */

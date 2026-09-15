@@ -36,12 +36,15 @@ line already clears the opaque card and the scroll position survives
 the summon untouched (the floating-card regression covered the tail,
 and re-sticking yanked it upward — both read as hiding text). */
 test("summoning the parked composer keeps the tail visible", async ({ page }) => {
-	const lines = Array.from(
+	// Thirty one-line messages (not one tall paragraph): the last line
+	// is fully viewable, so the parking click below never triggers the
+	// driver's scroll-into-view and the test reads the app, not the rig.
+	const bodies = Array.from(
 		{ length: 30 },
 		(_, i) => `tail line ${i} with enough words to wrap and overflow the viewport`
-	).join("\n");
+	);
 	await page.addInitScript(
-		(content: string) => {
+		(contents: string[]) => {
 			window.localStorage.setItem("ccez-mock-provider", "1");
 			window.localStorage.setItem(
 				"ccez-llm-settings-v1",
@@ -54,12 +57,18 @@ test("summoning the parked composer keeps the tail visible", async ({ page }) =>
 						id: "e2e-chat",
 						createdAt: 1,
 						replyLang: null,
-						messages: [{ id: "m", role: "assistant", content, usage: null, error: null }]
+						messages: contents.map((content, n) => ({
+							id: `m${n}`,
+							role: "assistant",
+							content,
+							usage: null,
+							error: null
+						}))
 					}
 				])
 			);
 		},
-		lines
+		bodies
 	);
 	await page.goto("/");
 	const last = page.locator("article .rendered").last();
@@ -113,6 +122,115 @@ test("summoning the parked composer keeps the tail visible", async ({ page }) =>
 	expect(
 		await page.evaluate((sel: string) => document.querySelector(sel)?.scrollTop ?? -1, scroller)
 	).toBe(parkedTop);
+});
+
+/** The composer is frosted, not opaque: thread text bleeds through
+blurred instead of hiding behind the card, while the composer's own
+text keeps a readable backing. */
+test("composer card is translucent with backdrop blur", async ({ page }) => {
+	const lines = Array.from(
+		{ length: 30 },
+		(_, i) => `tail line ${i} with enough words to wrap and overflow the viewport`
+	).join("\n");
+	await page.addInitScript(
+		(content: string) => {
+			window.localStorage.setItem("ccez-mock-provider", "1");
+			window.localStorage.setItem(
+				"ccez-llm-settings-v1",
+				JSON.stringify({ promptIdleSec: 0 })
+			);
+			window.localStorage.setItem(
+				"ccez-llm-chats-v1",
+				JSON.stringify([
+					{
+						id: "e2e-chat",
+						createdAt: 1,
+						replyLang: null,
+						messages: [{ id: "m", role: "assistant", content, usage: null, error: null }]
+					}
+				])
+			);
+		},
+		lines
+	);
+	await page.goto("/");
+	const composer = page.locator("main .prompt");
+	await expect(composer).toBeVisible({ timeout: 60_000 });
+	const glass = await page.evaluate(() => {
+		const el = document.querySelector("main .prompt") as HTMLElement | null;
+		if (!el) throw new Error("no composer");
+		const style = getComputedStyle(el);
+		// Computed colors serialize per engine (rgba() commas,
+		// space-separated rgb(), or color()): only a four-part comma
+		// form or a slash-alpha carries transparency.
+		let alpha = 1;
+		const inner = style.backgroundColor.match(/^(?:rgba?|color)\(([^)]+)\)$/);
+		if (inner) {
+			const body = inner[1]!;
+			if (body.includes(",")) {
+				const parts = body.split(",").map((part) => part.trim());
+				alpha = parts.length === 4 ? parseFloat(parts[3]!) : 1;
+			} else {
+				alpha = parseFloat(body.match(/\/\s*([\d.]+)\s*$/)?.[1] ?? "1");
+			}
+		}
+		return {
+			alpha,
+			blur: `${style.backdropFilter} ${style.getPropertyValue("-webkit-backdrop-filter")}`
+		};
+	});
+	expect(glass.alpha).toBeLessThan(1);
+	expect(glass.blur).toMatch(/blur\(/);
+});
+
+/** The thread runs full-height behind the frosted card: mid-thread
+text overlaps the composer's rect (the bleed the blur acts on). A
+main-level reserve would shrink the scroller and clip everything
+above the card instead. Measured synchronously so the stick glide
+can't re-pin between the scroll and the read. */
+test("thread paints behind the frosted composer", async ({ page }) => {
+	const lines = Array.from(
+		{ length: 30 },
+		(_, i) => `tail line ${i} with enough words to wrap and overflow the viewport`
+	).join("\n");
+	await page.addInitScript(
+		(content: string) => {
+			window.localStorage.setItem("ccez-mock-provider", "1");
+			window.localStorage.setItem(
+				"ccez-llm-settings-v1",
+				JSON.stringify({ promptIdleSec: 0 })
+			);
+			window.localStorage.setItem(
+				"ccez-llm-chats-v1",
+				JSON.stringify([
+					{
+						id: "e2e-chat",
+						createdAt: 1,
+						replyLang: null,
+						messages: [{ id: "m", role: "assistant", content, usage: null, error: null }]
+					}
+				])
+			);
+		},
+		lines
+	);
+	await page.goto("/");
+	await expect(page.locator("article .rendered").first()).toBeVisible({ timeout: 60_000 });
+	const overlap = await page.evaluate(() => {
+		const box = document.querySelector("main .messages") as HTMLElement | null;
+		const card = document.querySelector("main .prompt") as HTMLElement | null;
+		if (!box || !card) throw new Error("missing scroller or composer");
+		box.scrollTo({ top: box.scrollHeight - box.clientHeight - 600, behavior: "instant" });
+		const cardRect = card.getBoundingClientRect();
+		const paras = [...document.querySelectorAll("article .rendered")];
+		return Math.max(
+			...paras.map((p) => {
+				const rect = p.getBoundingClientRect();
+				return Math.min(rect.bottom, cardRect.bottom) - Math.max(rect.top, cardRect.top);
+			})
+		);
+	});
+	expect(overlap).toBeGreaterThan(0);
 });
 /** A press inside the composer outlives a focusout to nowhere: WebKit
 (the Tauri shell) never focuses the button being pressed, so the

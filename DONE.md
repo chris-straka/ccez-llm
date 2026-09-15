@@ -599,3 +599,18 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
       tests backing the overlay `{@html}` disable. No-big-refactors
       verdict recorded (occurrence math already extracted; §§2–3 parked
       on hardware/ears).
+
+## Composer frosted + annotation dismiss (Sep 15, main)
+- [x] Badge edit lost focus on Tab: the comment box blur-saved on any
+      blur, so Tab onto Delete closed the card. Departure blurs still
+      save/cancel; in-card moves are ignored (relatedTarget). Tab-order
+      e2e green in Chromium + WebKit.
+- [x] Sent-refs card dismiss: click toggled only. Now Escape (ladder,
+      below review) and outside pointerdown (capture) close it; pill
+      cursor default → pointer. Dismiss e2e green in Chromium + WebKit.
+- [x] Composer frosted: card 75%-capped color-mix + 18px backdrop blur
+      (webkit prefix first), thread reserve moved from main padding to
+      in-scroller padding so mid-thread text bleeds through (main-level
+      could only shrink the scroller — nothing ever showed through);
+      strip/preview/error keep a binary main lift. Tail/bleed/glass e2e
+      green in Chromium + WebKit, bleed verified on a real render.

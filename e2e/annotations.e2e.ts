@@ -1071,6 +1071,39 @@ test("gutter drags never highlight above the cursor line", async ({ page }) => {
 	expect(selected).not.toContain("bbb");
 });
 
+/** Filed-annotations card dismisses: Escape closes it, and so does a
+press anywhere outside the card (the pill alone toggles). The pill
+also shows the pointer hand. */
+test("sent refs card dismisses on Escape and outside press", async ({ page }) => {
+	await seedChat(page, [{ role: "assistant", content: "alpha beta gamma delta" }]);
+	await page.goto("/");
+	const para = page.locator("article.assistant .rendered p").first();
+	await expect(para).toBeVisible({ timeout: 60_000 });
+	await para.dblclick({ position: { x: 10, y: 10 } });
+	await expect(page.locator(".sel-menu")).toBeVisible();
+	await page.locator('.sel-menu button:has-text("Annotate")').click();
+	await page.keyboard.press("Enter");
+	await expect(page.locator(".prompt-tools .ann-wrap")).toBeVisible();
+	await page.locator(".cm-content").click();
+	await page.keyboard.press("Enter");
+	const user = page.locator("article.user").first();
+	await expect(user).toBeVisible();
+	const pill = user.locator(".ann-refs-pill");
+	const pop = user.locator(".ann-refs-pop");
+	await expect(pill).toHaveCSS("cursor", "pointer");
+	await pill.click();
+	await expect(pop).toHaveCSS("opacity", "1");
+	await page.keyboard.press("Escape");
+	// The card opens under the cursor, and hover alone holds opacity
+	// at 1: step off first — only a still-open card survives that.
+	await page.mouse.move(10, 300);
+	await expect(pop).toHaveCSS("opacity", "0");
+	await pill.click();
+	await expect(pop).toHaveCSS("opacity", "1");
+	await page.mouse.click(10, 300);
+	await expect(pop).toHaveCSS("opacity", "0");
+});
+
 /** Tabbing through the badge edit card keeps it open: blur-save only
 fires when focus leaves the card, not between its own buttons. */
 test("tab through the badge edit keeps the card open", async ({ page }) => {
