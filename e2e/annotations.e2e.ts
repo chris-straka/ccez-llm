@@ -1144,3 +1144,25 @@ test("tab through the badge edit keeps the card open", async ({ page }) => {
 	await expect(pop.locator(".ann-save")).toBeFocused();
 	await expect(pop).toBeVisible();
 });
+
+/** Badge-edit focus holds: the box keeps the caret a beat after open
+and after clicking back in (a delayed steal must fail this, not the
+instant assertion above). */
+test("badge edit keeps focus after open and re-click", async ({ page }) => {
+	await openAnnotate(page, "確認しました");
+	await page.keyboard.press("Enter");
+	const badge = page.locator("button.ccez-ann-badge").first();
+	await expect(badge).toHaveCount(1);
+	const box = await badge.boundingBox();
+	if (!box) throw new Error("badge has no box");
+	await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+	const pop = page.locator(".ann-pop");
+	await expect(pop).toBeVisible();
+	const area = pop.locator("textarea");
+	await expect(area).toBeFocused();
+	await page.waitForTimeout(800);
+	await expect(area).toBeFocused();
+	await area.click();
+	await page.waitForTimeout(800);
+	await expect(area).toBeFocused();
+});
