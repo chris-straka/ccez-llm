@@ -268,9 +268,10 @@ test("double-click raw tex stops at the equation", async ({ page }) => {
 	await expect(page.locator(".sel-menu")).toBeVisible();
 });
 
-/** Dragging the folded label keeps its highlight: selecting the label
-is a select, never an unfold, and the block stays folded. */
-test("folded label drag keeps its highlight", async ({ page }) => {
+/** Folded labels are chrome, not content: the label text itself never
+quotes (no `latex · N LOC` annotations) — a drag across it may catch
+neighboring content, but the block stays folded and clicks unfold. */
+test("folded label text never quotes", async ({ page }) => {
 	const block = page.locator(".ccez-math").first();
 	await block.locator(".ccez-math-body").click({ button: "right" });
 	await expect(block).toHaveAttribute("data-folded", "1");
@@ -281,11 +282,9 @@ test("folded label drag keeps its highlight", async ({ page }) => {
 	await page.mouse.down();
 	await page.mouse.move(box.x + box.width - 4, box.y + box.height / 2, { steps: 5 });
 	await page.mouse.up();
-	await expect
-		.poll(() => page.evaluate(() => window.getSelection()?.toString() ?? ""), { timeout: 8000 })
-		.not.toBe("");
+	await page.waitForTimeout(500);
+	expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).not.toContain("latex");
 	await expect(block).toHaveAttribute("data-folded", "1");
-	await expect(page.locator(".sel-menu")).toBeVisible();
 });
 
 /** Hovering another chat previews its equations with settled chrome:

@@ -10609,6 +10609,18 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		-webkit-user-select: none;
 		cursor: default;
 	}
+	/* Mid-drag containment covers the whole contained article: KaTeX
+	bodies and folded labels declare their own user-select:text,
+	which overrules the inline none containDragTo sets on the
+	article's .rendered — without this, off-window drags wander
+	into other messages' math. !important: only inline styles lose
+	to it, and the attribute lives for the drag alone (mouseup
+	clears it, so this is never a resting state). */
+	article :global(.rendered[data-drag-none]),
+	article :global(.rendered[data-drag-none] *) {
+		user-select: none !important;
+		-webkit-user-select: none !important;
+	}
 	/* A user message opens a new pair, so it carries the
 	between-pair separation on top; replies hug underneath.
 	Scales with the text size like the list gap above. */

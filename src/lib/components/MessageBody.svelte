@@ -799,11 +799,13 @@
 		font-size: 0.75rem;
 		color: #6e6e73;
 		white-space: nowrap;
-		/* Folded labels select like any text: they inherit the
-		messages' user-select:none otherwise, and dragging one would
-		die on the unfold below. */
-		user-select: text;
-		-webkit-user-select: text;
+		/* Folded labels are chrome, not content: quoting
+		`python · N LOC` annotates nothing, and a badge stamped on
+		the label orphans on unfold — so labels never select
+		(clicks still unfold), and picks start in the unfolded
+		body instead. */
+		user-select: none;
+		-webkit-user-select: none;
 	}
 	/* Folded code is label-only: no 12rem floor, so no dead space
 	sits right of the LOC. The whole folded block is one affordance
@@ -901,9 +903,10 @@
 		font-size: 0.75rem;
 		color: #6e6e73;
 		white-space: nowrap;
-		/* Same as code above: folded labels are selectable text. */
-		user-select: text;
-		-webkit-user-select: text;
+		/* Same as code above: folded labels are chrome, never
+		selectable text (clicks unfold; picks start unfolded). */
+		user-select: none;
+		-webkit-user-select: none;
 	}
 	.rendered :global(.ccez-math[data-folded="1"] .ccez-math-foldedlabel) {
 		display: block;

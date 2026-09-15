@@ -27,10 +27,10 @@ describe("folded code chrome", () => {
 		expect(selectors).toContain(".ccez-code-copy");
 		expect(selectors).toContain(".ccez-code-run");
 	});
-	it("keeps folded labels selectable text", () => {
-		// Labels inherit the messages' user-select:none; without
-		// this a label drag can never start, so folding reads
-		// as unhighlightable.
+	it("keeps folded labels non-selectable chrome", () => {
+		// Labels are chrome, not content: quoting `latex · N LOC`
+		// annotates nothing and badges orphan on unfold — so labels
+		// never select (clicks still unfold; picks start unfolded).
 		const css = bodyStyle();
 		for (const kind of ["code", "math"]) {
 			const end = new RegExp(`\\(\\.ccez-${kind}-foldedlabel\\)$`);
@@ -40,7 +40,7 @@ describe("folded code chrome", () => {
 			// layout of their own — only the base rule counts.
 			)].filter((rule) => end.test(rule[1]!.trim()) && !/html\[/.test(rule[1]!));
 			expect(rules, `no base .ccez-${kind}-foldedlabel rule`).not.toHaveLength(0);
-			for (const rule of rules) expect(rule[2]).toMatch(/user-select\s*:\s*text/);
+			for (const rule of rules) expect(rule[2]).toMatch(/user-select\s*:\s*none/);
 		}
 	});
 	it("never unfolds off a label drag", () => {
