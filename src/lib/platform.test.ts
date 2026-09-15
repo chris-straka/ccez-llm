@@ -13,6 +13,7 @@ import {
 	edgeSwipeTarget,
 	contentSwipeTarget,
 	visibleProviderIds,
+	pinchZoomStep,
 	twoFingerSwipeDir,
 	isThreeFingerTap
 } from "./platform";
@@ -240,6 +241,19 @@ describe("visibleProviderIds", () => {
 		const all = [...CLOUD, "local-gemma"];
 		expect(visibleProviderIds(all, { android: true, online: false, local: true })).toEqual(["local-gemma"]);
 		expect(visibleProviderIds(all, { android: true, online: false, local: false })).toEqual([]);
+	});
+});
+
+describe("pinchZoomStep", () => {
+	it("steps out on spread, in on pinch, holds inside the step", () => {
+		expect(pinchZoomStep(200, 260)).toBe(1);
+		expect(pinchZoomStep(200, 140)).toBe(-1);
+		expect(pinchZoomStep(200, 230)).toBe(0);
+		expect(pinchZoomStep(200, 180)).toBe(0);
+	});
+	it("fires exactly at the step boundary", () => {
+		expect(pinchZoomStep(200, 248)).toBe(1);
+		expect(pinchZoomStep(200, 152)).toBe(-1);
 	});
 });
 

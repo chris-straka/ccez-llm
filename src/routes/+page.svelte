@@ -130,6 +130,7 @@ import {
 		withAnnotations,
 		quoteFragmentText,
 		equationBodyOf,
+		equationBodyRange,
 		redactedCopyText,
 		newAnnotationId,
 		annRefsFor,
@@ -180,6 +181,7 @@ import {
 	altKeyLabel,
 	edgeSwipeTarget,
 	contentSwipeTarget,
+	pinchZoomStep,
 	twoFingerSwipeDir,
 	isThreeFingerTap,
 	type FlickZone,
@@ -1931,13 +1933,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		}
 	});
 	/** UI text scale in 10% steps (50–600% desktop, 50–400% phones). */
-	function adjustFontScale(delta: number): void {
+	function adjustFontScale(delta: number, quiet = false): void {
 		const cap = androidUI ? 4 : 6;
 		const next = Math.min(cap, Math.max(0.5, Math.round((settings.fontScale + delta) * 10) / 10));
 		if (next === settings.fontScale) return;
 		settings.fontScale = next;
 		persistSettings();
-		flashToast(`Text size ${Math.round(next * 100)}%`);
+		// Pinch zoom toasts once on release (see the touchend below),
+		// not per step — a held pinch would strobe the toast.
+		if (!quiet) flashToast(`Text size ${Math.round(next * 100)}%`);
 	}
 	/** Chat-column width in 2rem steps (desktop only — phones fix it
 	at 46rem). Shift siblings of the text-size chords, above. */
@@ -2151,12 +2155,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			settings.sidebarCollapsed = true;
 			persistSettings();
 			if (focus) enterEditMode();
+			void hapticBeatAsync("send", { enabled: settings.vibration, shell: tauriBackendAvailable() });
 			restartStepSlide(direction);
 			return;
 		}
 		const target = chats[next];
 		if (!target) return;
 		sideIdx = next;
+		void hapticBeatAsync("send", { enabled: settings.vibration, shell: tauriBackendAvailable() });
 		transitionToChat(target.id);
 		// Every switch lands at the top the same way minting one does —
 		// stepping older used to jump with no motion at all.
@@ -2538,8 +2544,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		const anchorBody = equationBodyOf(selection.anchorNode);
 		if (anchorBody && equationBodyOf(selection.focusNode) === anchorBody) {
 			try {
-				const whole = document.createRange();
-				whole.selectNodeContents(anchorBody);
+				const whole = equationBodyRange(anchorBody);
+				if (!whole) return null;
 				selection.removeAllRanges();
 				selection.addRange(whole);
 			} catch {
@@ -5318,6 +5324,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// twoFingerSwipeDir) keeps page zoom.
 		let twoTrack: { start: [FingerTrack, FingerTrack]; end: [FingerTrack, FingerTrack] } | null =
 			null;
+		// Main-chat pinch owns font size (both phone platforms; the
+		// sidebar keeps the default page zoom): while a clean
+		// two-finger press starts in the messages column, spread steps
+		// scale the text and veto the swipe/tap paths at release.
+		let pinchBaseline = 0;
+		let pinchStartSpread = 0;
+		let pinchFont = false;
+		let pinchMoved = false;
+		let pinchStepped = false;
 		let threeTrack: { x: number; y: number; moved: number; at: number } | null = null;
 		let lastThreeTapAt = 0;
 		let twoTapAt = 0;
@@ -5346,6 +5361,17 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					// A clean two-finger press starts the double-tap clock.
 					twoTapAt = twoTrack ? Date.now() : 0;
 					threeTrack = null;
+					// Pinch-to-font arms only in the messages column: the
+					// sidebar and sheets keep the default page zoom.
+					const target = event.target;
+					pinchFont =
+						twoTrack !== null &&
+						target instanceof Element &&
+						target.closest("main .messages") !== null;
+					pinchBaseline = pinchStartSpread =
+						a && b ? Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) : 0;
+					pinchMoved = false;
+					pinchStepped = false;
 				} else if (event.touches.length === 3) {
 					const first = event.touches[0];
 					threeTrack =
@@ -5353,8 +5379,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							? { x: first.clientX, y: first.clientY, moved: 0, at: Date.now() }
 							: null;
 					twoTrack = null;
+					pinchFont = false;
+					pinchMoved = false;
 				} else {
 					twoTrack = null;
+					pinchFont = false;
+					pinchMoved = false;
 				}
 			},
 			{ passive: true }
@@ -5380,9 +5410,46 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						}
 					}
 				}
+				// Main-chat pinch steps the text size live: re-baseline
+				// per step so a held pinch keeps scaling, one haptic
+				// tick per step. Any real spread change vetoes the
+				// swipe/tap paths at release below.
+				if (pinchFont && event.touches.length === 2) {
+					const a = event.touches[0];
+					const b = event.touches[1];
+					if (a && b) {
+						const spread = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+						if (Math.abs(spread - pinchStartSpread) > 12) pinchMoved = true;
+						const step = pinchZoomStep(pinchBaseline, spread);
+						if (step !== 0) {
+							pinchBaseline = spread;
+							pinchStepped = true;
+							adjustFontScale(step * 0.1, true);
+							void hapticBeatAsync("send", {
+								enabled: settings.vibration,
+								shell: tauriBackendAvailable()
+							});
+						}
+					}
+				}
 			},
 			{ passive: true }
 		);
+		// Main-chat pinch owns its gesture: block the default page zoom
+		// while both fingers are down in the messages column (a separate
+		// non-passive listener — the tracker above stays passive).
+		window.addEventListener(
+			"touchmove",
+			(event) => {
+				if (pinchFont && event.touches.length === 2) event.preventDefault();
+			},
+			{ passive: false }
+		);
+		// iOS ignores touchmove prevention for pinch zoom: its gesture
+		// event must preventDefault instead (a no-op everywhere else).
+		document.addEventListener("gesturestart", (event) => {
+			if (pinchFont) event.preventDefault();
+		});
 		window.addEventListener(
 			"touchend",
 			(event) => {
@@ -5408,12 +5475,20 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							)
 						);
 						twoTrack = null;
-						if (dir !== null) stepChat(dir, false);
+						// A pinch owns the gesture: spread motion vetoes
+						// both the swipe step and the tap pairing below.
+						if (dir !== null && !pinchMoved) stepChat(dir, false);
 						// Still two-finger taps pair into a delete (Android:
 						// no keyboard for the Delete key, and the sidebar
 						// moved to swipe-up-from-prompt); swipes take the
 						// step path instead. iOS keeps the sidebar toggle.
-						else if (androidUI && twoTapAt > 0 && moved <= 12 && now - twoTapAt <= 400) {
+						else if (
+							!pinchMoved &&
+							androidUI &&
+							twoTapAt > 0 &&
+							moved <= 12 &&
+							now - twoTapAt <= 400
+						) {
 							if (now - lastTwoTapAt < 600) {
 								lastTwoTapAt = 0;
 								if (iosUI) {
@@ -5423,9 +5498,19 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 								} else {
 									dropChat(chatState.activeChatId);
 									flashToast("Chat deleted");
+									void hapticBeatAsync("send", {
+										enabled: settings.vibration,
+										shell: tauriBackendAvailable()
+									});
 								}
 							} else lastTwoTapAt = now;
 						}
+						// Pinch zoom toasts once on release with the
+						// landed size (steps stay quiet mid-gesture).
+						if (pinchStepped) flashToast(`Text size ${Math.round(settings.fontScale * 100)}%`);
+						pinchFont = false;
+						pinchMoved = false;
+						pinchStepped = false;
 					}
 				}
 				if (threeTrack && event.touches.length === 0) {
@@ -5441,9 +5526,17 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							if (iosUI) {
 								dropChat(chatState.activeChatId);
 								flashToast("Chat deleted");
+								void hapticBeatAsync("send", {
+									enabled: settings.vibration,
+									shell: tauriBackendAvailable()
+								});
 							} else {
 								dropAllChats();
 								flashToast("All chats deleted");
+								void hapticBeatAsync("done", {
+									enabled: settings.vibration,
+									shell: tauriBackendAvailable()
+								});
 							}
 						} else {
 							lastThreeTapAt = now;

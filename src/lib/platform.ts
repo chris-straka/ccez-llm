@@ -152,6 +152,18 @@ export interface FingerTrack {
  * right steps newer (+1), swipe left steps older (-1). One finger still
  * scrolls, so the spare second finger owns navigation.
  */
+/**
+ * Pinch-zoom font step: the finger spread moved a full step since the
+ * baseline — +1 spread apart, -1 pinched together, 0 inside the step.
+ * The caller re-baselines on nonzero so a held pinch keeps stepping.
+ * Pure so the step unit-tests without touch hardware.
+ */
+export function pinchZoomStep(baseline: number, current: number, stepPx = 48): 1 | -1 | 0 {
+	if (current - baseline >= stepPx) return 1;
+	if (baseline - current >= stepPx) return -1;
+	return 0;
+}
+
 export function twoFingerSwipeDir(
 	start: [FingerTrack, FingerTrack],
 	end: [FingerTrack, FingerTrack],

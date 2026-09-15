@@ -368,10 +368,39 @@ export function quoteFragmentText(frag: DocumentFragment): string {
  */
 export function equationBodyOf(node: Node | null): Element | null {
 	const element = node instanceof Element ? node : node?.parentElement;
+	// Raw source view selects as plain text: the `$` toggle shows the
+	// TeX in a pre of whole text nodes (no KaTeX glyph shards), so the
+	// expansion must not fire — it would move the highlight onto the
+	// hidden rendered body, deleting it and stranding the menu.
+	if (element?.closest?.(".ccez-math-raw")) return null;
 	const wrap = element?.closest?.("[data-math-index]");
 	if (!(wrap instanceof Element)) return null;
 	const body = wrap.querySelector(".ccez-math-body");
 	return body instanceof Element ? body : wrap;
+}
+
+/**
+ * Whole-equation range for the quote expansion, trimmed of blank edge
+ * text: the markdown pipeline's trailing newline inside the body would
+ * otherwise paint the line beneath a one-line equation on
+ * double-click select. Null when the range can't build (engines
+ * disagree; the caller keeps the partial pick).
+ */
+export function equationBodyRange(body: Element): Range | null {
+	try {
+		const range = document.createRange();
+		range.selectNodeContents(body);
+		const kids = [...body.childNodes];
+		const first = kids.find((kid) => !(kid instanceof Text && /^\s*$/.test(kid.textContent ?? "")));
+		const last = [...kids]
+			.reverse()
+			.find((kid) => !(kid instanceof Text && /^\s*$/.test(kid.textContent ?? "")));
+		if (first) range.setStartBefore(first);
+		if (last) range.setEndAfter(last);
+		return range;
+	} catch {
+		return null;
+	}
 }
 
 export function quoteTextNodes(root: Node): Text[] {

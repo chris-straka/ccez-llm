@@ -27,6 +27,28 @@ describe("folded code chrome", () => {
 		expect(selectors).toContain(".ccez-code-copy");
 		expect(selectors).toContain(".ccez-code-run");
 	});
+	it("keeps folded labels selectable text", () => {
+		// Labels inherit the messages' user-select:none; without
+		// this a label drag can never start, so folding reads
+		// as unhighlightable.
+		const css = bodyStyle();
+		for (const kind of ["code", "math"]) {
+			const end = new RegExp(`\\(\\.ccez-${kind}-foldedlabel\\)$`);
+			const rules = [...css.matchAll(
+				new RegExp(`([^{}]*\\.ccez-${kind}-foldedlabel[^{}]*)\\{([^}]*)\\}`, "g")
+			// Theme overrides share the tail selector but carry no
+			// layout of their own — only the base rule counts.
+			)].filter((rule) => end.test(rule[1]!.trim()) && !/html\[/.test(rule[1]!));
+			expect(rules, `no base .ccez-${kind}-foldedlabel rule`).not.toHaveLength(0);
+			for (const rule of rules) expect(rule[2]).toMatch(/user-select\s*:\s*text/);
+		}
+	});
+	it("never unfolds off a label drag", () => {
+		// Unfolding detaches the just-drawn highlight (and strands
+		// the menu): only true clicks unfold, drags keep selecting.
+		const source = readFileSync(new URL("./MessageBody.svelte", import.meta.url), "utf8");
+		expect(source).toContain("if (unfoldedDrag) return;");
+	});
 });
 
 describe("math chrome alignment", () => {

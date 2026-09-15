@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import {
 	quoteFragmentText,
 	equationBodyOf,
+	equationBodyRange,
 	loadDraftAnnotations,
 	saveDraftAnnotations,
 	snapSelectionToWordEdges,
@@ -93,6 +94,42 @@ describe("equationBodyOf", () => {
 		const root = mathDoc();
 		expect(equationBodyOf(root.querySelector("p"))).toBeNull();
 		expect(equationBodyOf(null)).toBeNull();
+		root.remove();
+	});
+
+	it("returns null inside the raw source view", () => {
+		// Dragging raw TeX must keep the live highlight: expanding
+		// onto the hidden rendered body deletes the selection and
+		// strands the menu.
+		const root = document.createElement("div");
+		root.innerHTML =
+			'<div class="ccez-math" data-math-index="0"><div class="ccez-math-body"><span class="katex">E</span></div>' +
+			'<pre class="ccez-math-raw">E_n</pre></div>';
+		document.body.append(root);
+		const raw = root.querySelector(".ccez-math-raw")!;
+		expect(equationBodyOf(raw.firstChild)).toBeNull();
+		root.remove();
+	});
+});
+
+describe("equationBodyRange", () => {
+	it("trims blank edge text so one-line equations stop at their line", () => {
+		const root = document.createElement("div");
+		root.innerHTML =
+			'<div class="ccez-math-body">\n<span class="katex">E_n</span>\n</div>';
+		document.body.append(root);
+		const body = root.querySelector(".ccez-math-body")!;
+		const range = equationBodyRange(body);
+		expect(range?.toString()).toBe("E_n");
+		root.remove();
+	});
+
+	it("keeps the whole body when nothing is blank", () => {
+		const root = document.createElement("div");
+		root.innerHTML = '<div class="ccez-math-body"><span class="katex">E_n</span></div>';
+		document.body.append(root);
+		const body = root.querySelector(".ccez-math-body")!;
+		expect(equationBodyRange(body)?.toString()).toBe("E_n");
 		root.remove();
 	});
 });

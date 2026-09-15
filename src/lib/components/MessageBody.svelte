@@ -324,7 +324,16 @@
 		onBadgeHover?.(null);
 	}
 
+	/** Press point for the unfold below: a drag that ends on a folded
+	block selected its label — unfolding would detach the highlight
+	(only true clicks unfold). Keyboard clicks carry no press point
+	(detail 0) and always unfold. */
+	let chromeDown: { x: number; y: number } | null = null;
 	function onBodyClick(event: MouseEvent): void {
+		const unfoldedDrag =
+			event.detail > 0 &&
+			chromeDown !== null &&
+			Math.hypot(event.clientX - chromeDown.x, event.clientY - chromeDown.y) > 4;
 		const badge = closestFromTarget(event.target, "[data-ann-badge]");
 		if (badge) {
 			const rect = badge.getBoundingClientRect();
@@ -365,6 +374,9 @@
 				return;
 			}
 			if (mathWrap.classList.contains("ccez-math") && mathWrap.dataset.folded === "1") {
+				// A drag ending here selected the folded label: unfolding
+				// would detach that highlight (see chromeDown above).
+				if (unfoldedDrag) return;
 				mathWrap.removeAttribute("data-folded");
 				return;
 			}
@@ -382,6 +394,7 @@
 		const codeBlock = closestFromTarget(event.target, ".ccez-code");
 		if (!codeBlock || !rendered) return;
 		if (codeBlock.dataset.folded === "1") {
+			if (unfoldedDrag) return;
 			codeBlock.removeAttribute("data-folded");
 			return;
 		}
@@ -473,7 +486,7 @@
 		<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions, a11y_mouse_events_have_key_events -->
 		<!-- Badge wash is hover-only by decision (see onBadgeOver): Tab reaches markers, never highlights. -->
 		<!-- eslint-disable-next-line svelte/no-at-html-tags -- html is DOMPurify-sanitized in render.ts -->
-		<div class="rendered" class:aid-swap={!preview} class:aid-space={aidSpace} bind:this={bodyEl} onclick={onBodyClick} onmouseover={onBadgeOver} onmouseout={onBadgeOut}>{@html html}</div>
+		<div class="rendered" class:aid-swap={!preview} class:aid-space={aidSpace} bind:this={bodyEl} onmousedown={(e) => (chromeDown = { x: e.clientX, y: e.clientY })} onclick={onBodyClick} onmouseover={onBadgeOver} onmouseout={onBadgeOut}>{@html html}</div>
 	{/key}
 {/if}
 
@@ -772,6 +785,11 @@
 		font-size: 0.75rem;
 		color: #6e6e73;
 		white-space: nowrap;
+		/* Folded labels select like any text: they inherit the
+		messages' user-select:none otherwise, and dragging one would
+		die on the unfold below. */
+		user-select: text;
+		-webkit-user-select: text;
 	}
 	/* Folded code is label-only: no 12rem floor, so no dead space
 	sits right of the LOC. The whole folded block is one affordance
@@ -869,6 +887,9 @@
 		font-size: 0.75rem;
 		color: #6e6e73;
 		white-space: nowrap;
+		/* Same as code above: folded labels are selectable text. */
+		user-select: text;
+		-webkit-user-select: text;
 	}
 	.rendered :global(.ccez-math[data-folded="1"] .ccez-math-foldedlabel) {
 		display: block;

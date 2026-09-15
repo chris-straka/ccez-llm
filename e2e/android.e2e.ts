@@ -882,6 +882,55 @@ test.describe("always-visible prompt", () => {
 		);
 	}
 
+	/** Synthetic two-finger pinch: the window touch handlers read real TouchEvents. */
+	async function pinch(
+		page: Page,
+		targetSel: string,
+		spread0: number,
+		spread1: number
+	): Promise<void> {
+		await page.evaluate(
+			({ targetSel, spread0, spread1 }) => {
+				const target = document.querySelector(targetSel);
+				if (!target) throw new Error(`no pinch target: ${targetSel}`);
+				const cx = 200;
+				const cy = 400;
+				const finger = (id: number, dx: number) =>
+					new Touch({ identifier: id, target, clientX: cx + dx, clientY: cy });
+				const a0 = finger(1, -spread0 / 2);
+				const b0 = finger(2, spread0 / 2);
+				target.dispatchEvent(
+					new TouchEvent("touchstart", { touches: [a0, b0], bubbles: true, cancelable: true })
+				);
+				const a1 = finger(1, -spread1 / 2);
+				const b1 = finger(2, spread1 / 2);
+				target.dispatchEvent(
+					new TouchEvent("touchmove", { touches: [a1, b1], bubbles: true, cancelable: true })
+				);
+				target.dispatchEvent(
+					new TouchEvent("touchend", { touches: [], changedTouches: [a1, b1], bubbles: true, cancelable: true })
+				);
+			},
+			{ targetSel, spread0, spread1 }
+		);
+	}
+
+	/** Pinch apart in the messages grows the text; together shrinks it. */
+	test("pinch in messages scales the text size", async ({ page }) => {
+		await seed(page, { fontScale: 1 }, [LONG]);
+		await page.goto("/");
+		await expect(page.locator("article .rendered").first()).toBeVisible();
+		const px = () =>
+			page.evaluate(() => parseFloat(getComputedStyle(document.querySelector("article .rendered")!).fontSize));
+		const before = await px();
+		await pinch(page, "article.assistant .rendered", 200, 320);
+		// Two 48px spread steps: 100% -> 120%, live per step.
+		await expect.poll(px, { timeout: 5000 }).toBeGreaterThan(before);
+		const grown = await px();
+		await pinch(page, "article.assistant .rendered", 320, 200);
+		await expect.poll(px, { timeout: 5000 }).toBeLessThan(grown);
+	});
+
 	/** Empty-state pills stay tappable at big fonts on small screens. */
 	test("language pills clear the floating prompt", async ({ page }) => {
 		await seed(page, { fontScale: 1.8 }, [""]);
