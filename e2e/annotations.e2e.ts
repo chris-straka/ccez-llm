@@ -375,6 +375,59 @@ test("badge re-press closes the edit menu", async ({ page }) => {
 	await expect(page.locator(".ann-pop")).toHaveCount(0);
 });
 
+/** Saving the badge edit writes the new comment back to the annotation. */
+test("badge save files the edited comment", async ({ page }) => {
+	await openAnnotate(page, "確認しました");
+	await page.keyboard.press("Enter");
+	const badge = page.locator("button.ccez-ann-badge").first();
+	await expect(badge).toHaveCount(1);
+	const openMenu = async (): Promise<void> => {
+		const box = await badge.boundingBox();
+		if (!box) throw new Error("badge has no box");
+		await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+		await expect(page.locator(".ann-pop")).toBeVisible();
+	};
+	await openMenu();
+	await page.locator(".ann-pop textarea").fill("edited note");
+	await page.locator(".ann-pop .ann-save").click();
+	await expect(page.locator(".ann-pop")).toHaveCount(0);
+	await openMenu();
+	await expect(page.locator(".ann-pop textarea")).toHaveValue("edited note");
+});
+
+/** Keyboard Enter on a focused badge opens the edit (click dedup uninvolved). */
+test("keyboard enter opens the badge edit", async ({ page }) => {
+	await openAnnotate(page, "確認しました");
+	await page.locator(".ann-pop textarea").fill("typed");
+	await page.keyboard.press("Enter");
+	const badge = page.locator("button.ccez-ann-badge").first();
+	await expect(badge).toHaveCount(1);
+	await badge.focus();
+	await page.keyboard.press("Enter");
+	await expect(page.locator(".ann-pop")).toBeVisible();
+	await expect(page.locator(".ann-pop textarea")).toHaveValue("typed");
+});
+
+/** Cancel drops the badge edit without touching the saved comment. */
+test("badge cancel drops the edit", async ({ page }) => {
+	await openAnnotate(page, "確認しました");
+	await page.locator(".ann-pop textarea").fill("kept");
+	await page.keyboard.press("Enter");
+	const badge = page.locator("button.ccez-ann-badge").first();
+	await expect(badge).toHaveCount(1);
+	const box = await badge.boundingBox();
+	if (!box) throw new Error("badge has no box");
+	await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+	await expect(page.locator(".ann-pop")).toBeVisible();
+	await page.locator(".ann-pop textarea").fill("scratch");
+	await page.locator(".ann-pop .ann-cancel").click();
+	await expect(page.locator(".ann-pop")).toHaveCount(0);
+	const reopened = await badge.boundingBox();
+	if (!reopened) throw new Error("badge has no box");
+	await page.mouse.click(reopened.x + reopened.width / 2, reopened.y + reopened.height / 2);
+	await expect(page.locator(".ann-pop textarea")).toHaveValue("kept");
+});
+
 /** The review popup shows quotes with note: labels, no Selected text. */
 test("review popup uses note labels", async ({ page }) => {
 	await openAnnotate(page, "確認しました");
