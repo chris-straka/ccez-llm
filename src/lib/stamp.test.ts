@@ -7,14 +7,14 @@ import { applyMarks, type AnnotationMark, type AnnotationId } from "./annotation
  * badge position (the reported bug: the 2nd marker never appears).
  * The <em> forces the first badge mid-paragraph with text after it.
  */
-function arabicBody(): Element {
+function arabicBody(): HTMLElement {
 	const root = document.createElement("div");
 	root.innerHTML =
 		"<p>تم استلام الاختبار، <em>وأنا متصل</em> وجاهز الآن. كيف يمكنني مساعدتك؟</p>";
 	return root;
 }
 
-function badges(root: Element): string[] {
+function badges(root: HTMLElement): string[] {
 	return [...root.querySelectorAll("[data-ann-badge]")].map(
 		(b) => b.textContent ?? ""
 	);

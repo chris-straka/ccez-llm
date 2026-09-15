@@ -606,7 +606,7 @@ export function restoreSelection(root: Node, saved: SavedSelection): void {
 }
 
 export function applyMarks(
-	root: Element,
+	root: HTMLElement,
 	items: AnnotationMark[],
 	skip: boolean,
 	wash: string | null
@@ -622,7 +622,7 @@ export function applyMarks(
 	}
 }
 
-function stampMarks(root: Element, items: AnnotationMark[], skip: boolean, wash: string | null): void {
+function stampMarks(root: HTMLElement, items: AnnotationMark[], skip: boolean, wash: string | null): void {
 	// Ids already on screen: re-stamping them (every render unwraps and
 	// re-locates) must not replay the mount fade — only new badges are fresh.
 	const settled = new Set(
@@ -641,7 +641,7 @@ function stampMarks(root: Element, items: AnnotationMark[], skip: boolean, wash:
 	}
 	// The wash whose marks are currently mounted ("" when none): a steady
 	// wash re-stamps without replaying its fade-in, like settled badges.
-	const prevWash = (root as HTMLElement).dataset.washStamped || null;
+	const prevWash = root.dataset.washStamped || null;
 	// A cleared wash fades out: unwrap now (badges need clean text to
 	// anchor beside, never inside, a mark), stamp badges normally, then
 	// re-wrap the old range as leaving marks below.
@@ -659,7 +659,7 @@ function stampMarks(root: Element, items: AnnotationMark[], skip: boolean, wash:
 	// without this, every re-stamp fragments the text further and later
 	// washes span (and count) fragments instead of quotes.
 	root.normalize();
-	(root as HTMLElement).dataset.washStamped = wash ?? "";
+	root.dataset.washStamped = wash ?? "";
 	if (skip || items.length === 0) return;
 	// A newly arrived wash fades in; a steady one re-mounts silently.
 	const freshWash = !!wash && wash !== prevWash;

@@ -26,6 +26,7 @@ import {
 	type PasteCollapse
 } from "./editorEffects";
 import { IMAGE_MARKER } from "./attachments";
+import { closestFromTarget } from "./events";
 
 /** Pastes longer than this collapse to a `[Pasted content N chars]` marker. */
 export const PASTE_THRESHOLD = 100;
@@ -155,14 +156,14 @@ export function pastePlaceholders(): Extension {
 			mousedown: (event) => {
 				// Same guard as the fence bars: keep CodeMirror selection
 				// from swallowing the marker click that follows.
-				if ((event.target as HTMLElement).closest("[data-paste-expand]")) {
+				if (closestFromTarget(event.target, "[data-paste-expand]")) {
 					event.preventDefault();
 					return true;
 				}
 				return false;
 			},
 			click: (event, view) => {
-				const target = (event.target as HTMLElement).closest("[data-paste-expand]");
+				const target = closestFromTarget(event.target, "[data-paste-expand]");
 				if (!target) return false;
 				view.dispatch({ effects: expandPaste.of(Number(target.getAttribute("data-paste-expand"))) });
 				return true;

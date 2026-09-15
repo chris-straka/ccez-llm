@@ -583,6 +583,20 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
       branches (modifier chords, scroll/sidebar clusters) still inline —
       next slice when wanted.
 
+## Cast-cleanup tail (Sep 15, main)
+- [x] Finished the unfinished tail of the types refactor (0b28f3d):
+      `onContextMenu` still asserted `event.target as HTMLElement`
+      (predates the convention), the fade-scroll listener asserted
+      `as Element`, and `editorPaste` asserted twice — all now use
+      `closestFromTarget` / `instanceof Element` narrowing like the
+      ten sibling handlers. `applyMarks`/`stampMarks` take
+      `HTMLElement` (the sole caller passes a div; both
+      `as HTMLElement` casts deleted) and `stamp.test.ts` helpers
+      typed up to match. Remaining `as` casts are narrow platform
+      boundaries (deep-link `ChatId`, stamped `AnnotationId`,
+      EditContext IDL, workers, dynamic imports). 954 unit,
+      check 0/0, eslint clean.
+
 ## Failure triage + gates (Sep 14, main)
 - [x] Stale specs retargeted, real regressions fixed: latex/message-code
       fold tests now pin right-click toggle (ae72137's contract);

@@ -7725,7 +7725,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// available beside speech.
 		// (Android long-press never starts audio — it summons the menu.)
 		const onContextMenu = (event: MouseEvent) => {
-			const target = event.target as HTMLElement | null;
+			const target = event.target instanceof Element ? event.target : null;
 			// Android long-press fires contextmenu mid-hold, before
 			// touchend: summon the menu off the live selection without
 			// consuming the event, so the native callout (Copy) still
@@ -7944,7 +7944,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// same .scrolling class with the same short hold.
 		const fadeTimers = new WeakMap<Element, number>();
 		const onFadeScroll = (event: Event) => {
-			const box = (event.target as Element | null)?.closest?.("[data-fade-scroll]");
+			const box = closestFromTarget(event.target, "[data-fade-scroll]");
 			if (!box || box === scrollBox) return;
 			box.classList.add("scrolling");
 			const pending = fadeTimers.get(box);
