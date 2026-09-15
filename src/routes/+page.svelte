@@ -6399,12 +6399,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		/**
 		 * Middle-click toggles the shortcuts modal from anywhere
 		 * (links included — the app has no external links worth a
-		 * new tab): open when closed, close when open.
+		 * new tab): open when closed, close when open. Either way
+		 * it interrupts speech like Esc does — a modal over talking
+		 * is never what the click meant.
 		 */
 		const onMiddleClick = (event: MouseEvent) => {
 			if (event.button !== 1) return;
 			event.preventDefault();
 			shortcutsOpen = !shortcutsOpen;
+			stopVoice();
 		};
 		const onDoubleClick = (event: MouseEvent) => {
 			if (!clickGuardsPass(event)) return;
