@@ -24,7 +24,7 @@
 		androidUI: boolean;
 	}
 
-	let { settings, androidUI }: Props = $props();
+	let { settings = $bindable(), androidUI }: Props = $props();
 	/**
 	 * Slider reset gestures (text size, chat width, idle timeout): only
 	 * the inner reset buttons and an upward drag past the slider's top

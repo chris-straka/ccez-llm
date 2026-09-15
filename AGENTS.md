@@ -20,8 +20,8 @@ privileged (Keychain, updater, native TTS).
   `scripts/sign-dev-binary.sh` when prompts return.
 - `bun run test` — Vitest, colocated `*.test.ts`. Safe anytime.
 - `bun run check` / `lint` / `build` — run `svelte-kit sync` and/or invalidate
-  HMR. Never run these while a dev server is up and someone is looking at it;
-  batch them when the servers are idle.
+  HMR. Per owner instruction (Sep 2026): run these whenever needed, dev
+  servers or not — no idle batching.
 
 ## Verification economy (slow gates, run once)
 

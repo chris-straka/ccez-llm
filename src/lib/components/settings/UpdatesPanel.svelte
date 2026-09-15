@@ -28,12 +28,6 @@
 	async function checkUpdates() {
 		checkingUpdate = true;
 		const route = updateRoute;
-		if (route.kind === "none") {
-			// Web build: a redeploy updates the site, so there is nothing to check.
-			sayUpdate("This web build updates with the site — nothing to check.");
-			checkingUpdate = false;
-			return;
-		}
 		if (route.kind === "releases") {
 			// No Tauri auto-updater on Android: open the Releases page instead.
 			try {
@@ -74,14 +68,13 @@
 	}
 </script>
 
-	<section aria-labelledby="updates-heading">
-		<h2 id="updates-heading">Updates</h2>
-		{#if updateRoute.kind === "none"}
-			<p class="result">This web build updates with the site — nothing to check.</p>
-		{:else}
+	<!-- Web builds have no updater shell: the whole section stays out. -->
+	{#if updateRoute.kind !== "none"}
+		<section aria-labelledby="updates-heading">
+			<h2 id="updates-heading">Updates</h2>
 			<button type="button" onclick={() => void checkUpdates()} disabled={checkingUpdate}>
 				{checkingUpdate ? "Checking…" : "Check for updates"}
 			</button>
 			{#if updateStatus && !onToast}<p class="note" role="status">{updateStatus}</p>{/if}
-		{/if}
-	</section>
+		</section>
+	{/if}

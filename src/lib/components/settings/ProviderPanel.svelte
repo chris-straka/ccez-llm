@@ -17,7 +17,7 @@
 		settings: AppSettings;
 	}
 
-	let { settings }: Props = $props();
+	let { settings = $bindable() }: Props = $props();
 	let modelLoading = $state(false);
 	let modelNotice = $state(emptyNotices());
 	async function refreshModels() {

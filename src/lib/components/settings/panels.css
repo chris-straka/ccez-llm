@@ -158,20 +158,18 @@
 		/* Short label now: never wrap onto a second line. */
 		white-space: nowrap;
 	}
-	.settings-inner .keys-updates > section:last-of-type > h2 {
+	/* Scoped to the updates section (not :last-of-type): on web
+	builds the section stays out and the keys block must not slide
+	into column 2 by matching :last-of-type itself. */
+	.settings-inner .keys-updates > section[aria-labelledby="updates-heading"] > h2 {
 		grid-area: 1 / 2;
 		justify-self: center;
 	}
-	.settings-inner .keys-updates > section:last-of-type > button {
+	.settings-inner .keys-updates > section[aria-labelledby="updates-heading"] > button {
 		grid-area: 2 / 2;
 		justify-self: center;
 	}
 	.settings-inner .keys-updates h2 {
-		margin: 0;
-	}
-	.settings-inner .keys-updates .result {
-		grid-area: 3 / 2;
-		justify-self: center;
 		margin: 0;
 	}
 	.settings-inner h2 {

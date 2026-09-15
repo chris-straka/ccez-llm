@@ -6,7 +6,7 @@
 		settings: AppSettings;
 	}
 
-	let { settings }: Props = $props();
+	let { settings = $bindable() }: Props = $props();
 </script>
 
 <section aria-labelledby="color-scheme-heading">
