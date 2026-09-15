@@ -147,28 +147,39 @@ describe("chat-switch transition", () => {
 });
 
 describe("message spacing and overscroll", () => {
-	it("scales the list gap with the text size", () => {
+	it("fixes the list gap unless button scaling opts into growth", () => {
 		const css = pageStyle();
-		const gaps = [...css.matchAll(/\.messages\s*\{([^}]*)\}/g)]
-			.map((rule) => rule[1])
-			.filter((body) => /gap\s*:/.test(body ?? ""));
-		expect(gaps, "no .messages gap rule — move the scaled gap with it").not.toHaveLength(0);
-		for (const gap of gaps) expect(gap).toMatch(/gap\s*:\s*calc\([^;]*var\(--font-scale/);
+		// Non-opt-in rules only: the scale-actions twin matches the
+		// same tail selector and must not trip the fixed assertion.
+		const gaps = [...css.matchAll(/([^{}]*)\.messages\s*\{([^}]*)\}/g)]
+			.filter((rule) => /gap\s*:/.test(rule[2] ?? "") && !(rule[1] ?? "").includes("scale-actions"))
+			.map((rule) => rule[2]);
+		expect(gaps, "no .messages gap rule").not.toHaveLength(0);
+		for (const gap of gaps) expect(gap).not.toMatch(/var\(--font-scale/);
+		const scaled = css.match(/main\.scale-actions \.messages\s*\{([^}]*)\}/);
+		expect(scaled, "opt-in scaled gap is gone — huge type domes the air").toBeTruthy();
+		expect(scaled![1]).toMatch(/gap\s*:\s*calc\([^;]*var\(--font-scale/);
 	});
 
-	it("scales the between-pair separation with the text size", () => {
+	it("fixes the between-pair separation unless button scaling opts in", () => {
 		const css = pageStyle();
-		const margins = [...css.matchAll(/article\.user\s*\{([^}]*)\}/g)]
-			.map((rule) => rule[1])
-			.filter((body) => /margin-top\s*:/.test(body ?? ""));
-		expect(margins, "no article.user margin-top rule — move the scaled margin with it").not.toHaveLength(0);
-		for (const margin of margins) expect(margin).toMatch(/margin-top\s*:\s*calc\([^;]*var\(--font-scale/);
+		const margins = [...css.matchAll(/([^{}]*?)article\.user\s*\{([^}]*)\}/g)]
+			.filter((rule) => /margin-top\s*:/.test(rule[2] ?? "") && !(rule[1] ?? "").includes("scale-actions"))
+			.map((rule) => rule[2]);
+		expect(margins, "no article.user margin-top rule").not.toHaveLength(0);
+		for (const margin of margins) expect(margin).not.toMatch(/var\(--font-scale/);
+		const scaled = css.match(/main\.scale-actions article\.user\s*\{([^}]*)\}/);
+		expect(scaled, "opt-in scaled separation is gone").toBeTruthy();
+		expect(scaled![1]).toMatch(/margin-top\s*:\s*calc\([^;]*var\(--font-scale/);
 	});
 
 	it("reserves tail overscroll outside the empty hero's zone", () => {
 		const css = pageStyle();
 		const spacer = css.match(/main:not\(\.empty\) \.messages::after\s*\{([^}]*)\}/);
 		expect(spacer, "overscroll spacer is gone — the tail docks hard again").toBeTruthy();
-		expect(spacer![1]).toMatch(/height\s*:\s*calc\([^;]*var\(--font-scale/);
+		expect(spacer![1]).not.toMatch(/var\(--font-scale/);
+		const scaled = css.match(/main\.scale-actions:not\(\.empty\) \.messages::after\s*\{([^}]*)\}/);
+		expect(scaled, "opt-in scaled spacer is gone").toBeTruthy();
+		expect(scaled![1]).toMatch(/height\s*:\s*calc\([^;]*var\(--font-scale/);
 	});
 });

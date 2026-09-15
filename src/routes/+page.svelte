@@ -46,6 +46,7 @@
 		CHAT_WIDTH_DEFAULT,
 		CHAT_WIDTH_MIN,
 		CHAT_WIDTH_MAX,
+		effectiveChatWidth,
 		FONT_SCALE_MIN,
 		FONT_SCALE_MAX,
 		PROMPT_IDLE_ALWAYS,
@@ -3247,6 +3248,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 
 	function removeAnnotation(id: string): void {
+		// Annotation deletes thump like message deletes (the shared
+		// triple-beat contract: call sites carry no haptic of their own).
+		if (androidUI) {
+			void hapticBeatAsync("done", {
+				enabled: settings.vibration,
+				shell: tauriBackendAvailable()
+			});
+		}
 		annotations = deleteAnnotation(annotations, id);
 		if (editingId === id) editingId = null;
 		if (highlightAnnId === id) highlightAnnId = null;
@@ -3844,6 +3853,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * when focused, silent for short replies and failures.
 	 */
 	function maybeNotifyReplyDone(msg: ChatMsg | undefined): void {
+		if (!settings.replyNotifications) return;
 		if (!msg || msg.role !== "assistant" || msg.error) return;
 		const body = msg.content.trim();
 		if (!body) return;
@@ -4089,8 +4099,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// while the window is focused, so a later backgrounded long
 		// reply may notify. Shell goes through the notification plugin
 		// (the only channel in the Android WebView); web asks the
-		// Notification ctor. No-op unless undecided.
-		void ensureReplyNotificationPermissionAsync({ shell: tauriBackendAvailable() });
+		// Notification ctor. No-op unless undecided — and never asked
+		// when the ping itself is off.
+		if (settings.replyNotifications) {
+			void ensureReplyNotificationPermissionAsync({ shell: tauriBackendAvailable() });
+		}
 		if (action === "commit-edit") {
 			// Saving an edit rewrites the message in place, never
 			// resends — and the composer text below still sends as a
@@ -4142,8 +4155,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				attachments: outgoing,
 				thinking: activeThinkingId(settings),
 				pasteFolds: folds,
-				// Haptic rumble as the reply starts arriving.
+				// Haptic rumble as the reply starts arriving — only while
+				// its chat is still open. A mid-stream switch must not
+				// rumble the new chat for the old one's reply.
 				onFirstToken: () => {
+					if (chat.id !== sentFrom.id) return;
 					void hapticBeatAsync("first", { enabled: settings.vibration, shell: tauriBackendAvailable() });
 				}
 			}
@@ -4151,10 +4167,18 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		scrollAfterRender();
 		await sending;
 		// Keep drafts when the reply failed so nothing silently drops.
-		const sent = chat.messages[chat.messages.length - 1];
+		// Read the reply off the ORIGIN chat, never the live one: a
+		// mid-stream switch leaves `chat` pointing at the new thread.
+		const origin = chatState.chats.find((c) => c.id === sentFrom.id) ?? sentFrom;
+		const sent = origin.messages[origin.messages.length - 1];
+		const stillHere = sentFrom.id === chat.id;
 		if (sent?.role === "assistant" && !sent.error) {
-			// Haptic thump: everything has arrived.
-			void hapticBeatAsync("done", { enabled: settings.vibration, shell: tauriBackendAvailable() });
+			// Haptic thump: everything has arrived. Same-chat only —
+			// the new chat must not thump for the old one's reply (a
+			// genuinely missed finish is the background ping's job).
+			if (stillHere) {
+				void hapticBeatAsync("done", { enabled: settings.vibration, shell: tauriBackendAvailable() });
+			}
 			attachments = [];
 			previewId = null;
 			annotations = [];
@@ -4167,7 +4191,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		}
 		scrollToBottom();
 		maybeSpeakReply(sentFrom);
-		maybeNotifyReplyDone(chat.messages[chat.messages.length - 1]);
+		maybeNotifyReplyDone(sent);
 		// The reply's layout churn (hero unmount, list growth, keyboard
 		// transitions on phones) can strand the emptied composer's cached
 		// line boxes at zero height: settle a re-measure after paint, like
@@ -4189,16 +4213,22 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		await resendLast(chatState, provider, effectiveSystemPrompt(settings, activeReplyCode), {
 			thinking: activeThinkingId(settings),
 			onFirstToken: () => {
+				if (chat.id !== resentFrom.id) return;
 				void hapticBeatAsync("first", { enabled: settings.vibration, shell: tauriBackendAvailable() });
 			}
 		});
-		const resent = chat.messages[chat.messages.length - 1];
+		// Same origin-chat discipline as a fresh send (see above): the
+		// live `chat` may point at a new thread by now.
+		const resentOrigin = chatState.chats.find((c) => c.id === resentFrom.id) ?? resentFrom;
+		const resent = resentOrigin.messages[resentOrigin.messages.length - 1];
 		if (resent?.role === "assistant" && !resent.error) {
-			void hapticBeatAsync("done", { enabled: settings.vibration, shell: tauriBackendAvailable() });
+			if (resentFrom.id === chat.id) {
+				void hapticBeatAsync("done", { enabled: settings.vibration, shell: tauriBackendAvailable() });
+			}
 		}
 		scrollToBottom();
 		maybeSpeakReply(resentFrom);
-		maybeNotifyReplyDone(chat.messages[chat.messages.length - 1]);
+		maybeNotifyReplyDone(resent);
 		// Same settle as a fresh send: the reply's layout churn can
 		// strand the composer's cached line boxes at zero height.
 		requestAnimationFrame(() => requestAnimationFrame(() => editor?.remeasure()));
@@ -8040,7 +8070,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	data-shell={tauriBackendAvailable() ? "tauri" : "browser"}
 	data-android={androidUI || null}
 	data-ios={iosUI || null}
-	style="--font-scale: {androidUI ? Math.min(8, settings.fontScale) : settings.fontScale}; --chat-width: {androidUI ? Math.max(46, settings.chatWidth ?? 36) : (settings.chatWidth ?? 36)}; --bg-alpha: {settings.bgOpacity ?? 1}; --prompt-alpha: {settings.composerOpacity ?? 1}"
+	style="--font-scale: {androidUI ? Math.min(8, settings.fontScale) : settings.fontScale}; --chat-width: {effectiveChatWidth(androidUI, settings.fontScale, settings.chatWidth ?? 36)}; --bg-alpha: {settings.bgOpacity ?? 1}; --prompt-alpha: {settings.composerOpacity ?? 1}"
 	data-mac={isMac && !androidUI || null}
 >
 	<aside class:collapsed={settings.sidebarCollapsed} inert={settings.sidebarCollapsed} data-fade-scroll
@@ -8485,16 +8515,21 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						onpointerup={releaseActionsHold}
 						onpointercancel={releaseActionsHold}
 					>
-						<button
-							type="button"
-							class="icon-btn"
-							class:folded={isFolded}
-							data-tip={tip(isMac ? "Fold this message (F or Option-click)" : "Fold this message (F or Alt-click)", "Fold this message")}
-							aria-label={isFolded ? "Unfold this message" : "Fold this message"}
-							onclick={() => toggleFold(msg.id)}
-						>
-							<ActionIcon kind="fold" />
-						</button>
+						{#if !androidUI}
+							<!-- Desktop only: phones fold by swipe and unfold
+							by tapping the folded body (its row stays hidden),
+							so the chevron would be dead chrome in the row. -->
+							<button
+								type="button"
+								class="icon-btn"
+								class:folded={isFolded}
+								data-tip={tip(isMac ? "Fold this message (F or Option-click)" : "Fold this message (F or Alt-click)", "Fold this message")}
+								aria-label={isFolded ? "Unfold this message" : "Fold this message"}
+								onclick={() => toggleFold(msg.id)}
+							>
+								<ActionIcon kind="fold" />
+							</button>
+						{/if}
 						<button
 							type="button"
 							class="icon-btn"
@@ -8902,7 +8937,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 									</div>
 									{#if editingId === ann.id}
 										<label>
-											<span class="review-label">note:</span>
+											<span class="review-label">-</span>
 											<textarea rows="2" bind:this={editBox} bind:value={editDraft} placeholder="Add an optional comment…"
 												aria-label="Edit annotation note. Enter saves, Shift+Enter adds a line, Escape cancels."
 												onkeydown={(e) => {
@@ -8935,7 +8970,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 										</div>
 									{:else}
 										<div class="review-head">
-											<span class="review-label">note:</span>
+											<span class="review-label">-</span>
 											<span class="review-comment">{ann.comment || "—"}</span>
 											<button
 												type="button"
@@ -11103,18 +11138,29 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		flex-direction: column;
 		/* Pairs hug: a message sits close to its reply; the wider
 		separation lands between pairs (see article.user below).
-		Scales with the text size, so roomy type keeps airy gaps. */
+		Base gap is fixed — the text-size growth below belongs to
+		the button-scaling opt-in, so huge type with the opt-in off
+		keeps tight gaps (the buttons stay small too). */
+		gap: 0.6rem;
+	}
+	/* Button-scaling opt-in: roomy type keeps airy gaps. */
+	main.scale-actions .messages {
 		gap: calc(0.6rem * var(--font-scale, 1));
 	}
 	/* Overscroll past the tail: the last message lifts a touch above
-	the composer instead of docking hard at the column's end, scaled
-	with the text size (capped like the bubble, so huge type doesn't
-	drown in spacer). Non-empty only: the empty hero centers in its
-	zone and must not drift. */
+	the composer instead of docking hard at the column's end. Fixed
+	unless the opt-in below says otherwise (capped like the bubble,
+	so huge type doesn't drown in spacer). Non-empty only: the empty
+	hero centers in its zone and must not drift. */
 	main:not(.empty) .messages::after {
 		content: "";
 		display: block;
 		flex: none;
+		height: 2rem;
+	}
+	/* Same opt-in as the list gap: the tail spacer grows with the
+	text size only when message-button scaling is on. */
+	main.scale-actions:not(.empty) .messages::after {
 		height: calc(2rem * min(var(--font-scale, 1), 2));
 	}
 	/* Chat-switch crossfade covers the messages only: an unscoped
@@ -11544,8 +11590,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 	/* A user message opens a new pair, so it carries the
 	between-pair separation on top; replies hug underneath.
-	Scales with the text size like the list gap above. */
+	Fixed unless the button-scaling opt-in says otherwise (same
+	contract as the list gap above). */
 	article.user {
+		margin-top: 0.7rem;
+	}
+	main.scale-actions article.user {
 		margin-top: calc(0.7rem * var(--font-scale, 1));
 	}
 	article:first-of-type {
@@ -12478,7 +12528,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		user-select: none;
 		-webkit-user-select: none;
 	}
+	/* The note reads like a previous message's annotation
+	(same grey, italic): it is a gloss on the quote, not body text. */
 	.review-comment {
+		color: #c7c7cc;
+		font-style: italic;
 		overflow-wrap: anywhere;
 	}
 	.review label {

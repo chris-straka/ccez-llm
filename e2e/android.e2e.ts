@@ -1516,3 +1516,73 @@ test.describe("always-visible prompt", () => {
 		await expect(aside).toHaveClass(/collapsed/);
 	});
 });
+
+test.describe("message chrome", () => {
+	function seedScript(s: Record<string, unknown>): void {
+		window.localStorage.setItem("ccez-mock-provider", "1");
+		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify(s));
+		const msg = (id: string, content: string) => ({ id, role: "assistant", content, usage: null, error: null });
+		window.localStorage.setItem(
+			"ccez-llm-chats-v1",
+			JSON.stringify([
+				{ id: "e2e-chat", createdAt: 1, replyLang: null, messages: [msg("m1", "first message here"), msg("m2", "second message here")] }
+			])
+		);
+	}
+
+	async function seedChrome(page: Page, settings: Record<string, unknown>): Promise<void> {
+		await page.addInitScript(seedScript, settings);
+		await page.goto("/");
+		await expect(page.locator("article .rendered").first()).toBeVisible({ timeout: 60_000 });
+	}
+
+	// Init scripts re-run on every navigation (reload included), so a
+	// later leg must re-register the full settings — patching storage
+	// alone gets overwritten by the original seed.
+	async function reseed(page: Page, settings: Record<string, unknown>): Promise<void> {
+		await page.addInitScript(seedScript, settings);
+		await page.reload();
+		await expect(page.locator("article .rendered").first()).toBeVisible({ timeout: 60_000 });
+	}
+
+	/** Huge type with button scaling off keeps tight gaps; the opt-in
+	restores airy ones. Same engine, same thread — only the toggle flips. */
+	test("button scaling toggle owns the message gaps", async ({ page }) => {
+		await seedChrome(page, { fontScale: 4 });
+		const listGap = (): Promise<number> =>
+			page.evaluate(() => {
+				const articles = [...document.querySelectorAll("main .messages article")];
+				if (articles.length < 2) throw new Error("need two articles");
+				const first = articles[0]!.getBoundingClientRect();
+				const second = articles[1]!.getBoundingClientRect();
+				return second.top - first.bottom;
+			});
+		const off = await listGap();
+		await reseed(page, { fontScale: 4, scaleActionsWithFont: true });
+		const on = await listGap();
+		expect(off).toBeLessThan(20);
+		expect(on).toBeGreaterThan(off * 2);
+	});
+
+	/** No fold chevron on phones: swipe folds, body tap unfolds. */
+	test("fold button stays off the mobile row", async ({ page }) => {
+		await seedChrome(page, { hideButtons: false, hoverAssistantActions: false, hoverUserActions: false });
+		const row = page.locator("article.assistant .actions").first();
+		await expect(row.locator("button").first()).toBeVisible();
+		await expect(row.locator('button[aria-label="Fold this message"]')).toHaveCount(0);
+	});
+
+	/** Huge phone type goes full-bleed; normal type keeps the floor. */
+	test("phone chat width blooms at 360 percent", async ({ page }) => {
+		await seedChrome(page, { fontScale: 3.6 });
+		const chatVar = (): Promise<string> =>
+			page.evaluate(() =>
+				getComputedStyle(document.querySelector(".app") as Element)
+					.getPropertyValue("--chat-width")
+					.trim()
+			);
+		expect(await chatVar()).toBe("999");
+		await reseed(page, { fontScale: 1 });
+		expect(await chatVar()).toBe("46");
+	});
+});

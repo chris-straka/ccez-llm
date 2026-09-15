@@ -431,8 +431,10 @@ test("badge cancel drops the edit", async ({ page }) => {
 	await expect(page.locator(".ann-pop textarea")).toHaveValue("kept");
 });
 
-/** The review popup shows quotes with note: labels, no Selected text. */
-test("review popup uses note labels", async ({ page }) => {
+/** The review popup shows quotes with hyphen labels (never "note:"),
+no Selected text. The note itself reads italic grey like a sent
+annotation's comment. */
+test("review popup uses hyphen labels", async ({ page }) => {
 	await openAnnotate(page, "確認しました");
 	await page.keyboard.type("meaning?");
 	// File without sending: a send bakes annotations into the outgoing
@@ -440,9 +442,14 @@ test("review popup uses note labels", async ({ page }) => {
 	await page.keyboard.press("Enter");
 	await openPromptReview(page);
 	const review = page.locator(".prompt-tools .review");
-	await expect(review).toContainText("note:");
+	await expect(review.locator(".review-label").first()).toHaveText("-");
+	await expect(review).not.toContainText("note:");
 	await expect(review).not.toContainText("Selected text");
 	await expect(review).not.toContainText("User comment");
+	const comment = review.locator(".review-comment").first();
+	await expect(comment).toHaveText("meaning?");
+	await expect(comment).toHaveCSS("font-style", "italic");
+	await expect(comment).toHaveCSS("color", "rgb(199, 199, 204)");
 });
 
 /** An annotations-only message renders unfolded (em-dash plus the count)

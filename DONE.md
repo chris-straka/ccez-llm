@@ -660,6 +660,36 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
       clippy clean for the file. Hover pixels + seat position await
       owner eyes on next launch.
 
+## Android message chrome + reply signals (Sep 15, main)
+- [x] `bun run tauri:dev` package script for the sign wrapper (was
+      shell-file-only).
+- [x] Button-scaling toggle owns the gaps: the list gap, pair margin,
+      and tail spacer rode raw font-scale while the toggle touched only
+      button sizes. Base is now fixed; the scaled rules live under
+      `main.scale-actions`. Real-layout android e2e (off < 20px,
+      on > 2x off at 400%) green; stylesheet unit tests rewritten to
+      the opt-in contract.
+- [x] Fold chevron off mobile rows (swipe folds, body tap unfolds).
+- [x] Review card `note:` labels are now `-`, and the note reads italic
+      `#c7c7cc` like a sent annotation's comment. Hyphen/style e2e green.
+- [x] Annotation deletes thump the shared delete beat (inside
+      `removeAnnotation`, all paths).
+- [x] Phone chat goes full-bleed at fontScale >= 3.6
+      (`effectiveChatWidth` pure helper + unit tests + --chat-width e2e).
+- [x] Mid-stream chat switch no longer misattributes: first-token/done
+      thumps fire only while the origin chat is still open, and the
+      completion read + background ping use the origin chat's message
+      (the live `chat` pointed at the new thread). Verdict: no, the new
+      chat should not thump for the old one's reply. (Untouched
+      follow-up noticed: the shared composer/draft resets in the same
+      completion block still run after a switch.)
+- [x] Reply-finished notification when backgrounded + opt-out checkbox
+      ("Notify when replies finish in the background", default on, both
+      branches): infra already pinged on full receipt; added the setting
+      gate on the ping and the send-time permission ask. Checkbox
+      persistence e2e green. (d)/(f) wiring has no committed test:
+      hardware-gated, pure beat/gate logic already unit-tested.
+
 ## Dev Keychain silence (Sep 15, main)
 - [x] Mass password prompts in dev: every unsigned `tauri dev` rebuild
       ships a fresh code identity, so macOS re-prompted once per

@@ -65,9 +65,10 @@ describe("phone composer two bars", () => {
 
 	it("grows the reading column with the chat-width setting", () => {
 		const source = pageSource();
-		// The old pin ignored the slider; phones floor at today's 46
-		// so only increases ever show (portrait columns already bleed).
-		expect(source).toContain("androidUI ? Math.max(46, settings.chatWidth ?? 36)");
+		// The old pin ignored the slider; the width expression now runs
+		// through the helper (phone floor, full-bleed at huge type —
+		// pinned unit-side in settings.test.ts).
+		expect(source).toContain("effectiveChatWidth(androidUI, settings.fontScale, settings.chatWidth ?? 36)");
 	});
 
 	it("never collapses the tools bar or its buttons while idle", () => {

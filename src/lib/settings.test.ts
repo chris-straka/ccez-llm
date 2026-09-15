@@ -10,6 +10,8 @@ import {
 	CHAT_WIDTH_DEFAULT,
 	CHAT_WIDTH_MAX,
 	CHAT_WIDTH_MIN,
+	CHAT_WIDTH_FULLBLEED_REM,
+	effectiveChatWidth,
 	PROMPT_IDLE_ALWAYS,
 	PROMPT_IDLE_DEFAULT,
 	PROMPT_IDLE_MAX,
@@ -172,6 +174,27 @@ describe("settings", () => {
 		kept.chatWidth = 100;
 		saveSettings(kept, memoryStore);
 		expect(loadSettings(memoryStore).chatWidth).toBe(100);
+	});
+
+	it("defaults background reply pings on and clamps old saves", () => {
+		expect(defaultSettings().replyNotifications).toBe(true);
+		const kept = blankSettings();
+		kept.replyNotifications = false;
+		saveSettings(kept, memoryStore);
+		expect(loadSettings(memoryStore).replyNotifications).toBe(false);
+		const old = blankSettings();
+		(old as unknown as Record<string, unknown>).replyNotifications = "yes";
+		saveSettings(old, memoryStore);
+		expect(loadSettings(memoryStore).replyNotifications).toBe(true);
+	});
+
+	it("sizes the chat column full-bleed on huge phone type", () => {
+		expect(effectiveChatWidth(false, 4, 36)).toBe(36);
+		expect(effectiveChatWidth(false, 8, 120)).toBe(120);
+		expect(effectiveChatWidth(true, 1, 36)).toBe(46);
+		expect(effectiveChatWidth(true, 3.59, 36)).toBe(46);
+		expect(effectiveChatWidth(true, 3.6, 36)).toBe(CHAT_WIDTH_FULLBLEED_REM);
+		expect(effectiveChatWidth(true, 8, 120)).toBe(CHAT_WIDTH_FULLBLEED_REM);
 	});
 
 	it("defaults mic dictation on and keeps an explicit off", () => {

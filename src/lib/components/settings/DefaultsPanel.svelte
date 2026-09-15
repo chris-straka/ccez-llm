@@ -97,6 +97,10 @@
 				<input type="checkbox" bind:checked={settings.vibration} />
 				Vibrate when messages send and arrive
 			</label>
+			<label class="check">
+				<input type="checkbox" bind:checked={settings.replyNotifications} />
+				Notify when replies finish in the background
+			</label>
 		</fieldset>
 	{:else}
 		<!-- One row for both hover toggles: the label names the behavior once,
@@ -124,6 +128,10 @@
 		<label class="check">
 			<input type="checkbox" bind:checked={settings.inspectEnabled} />
 			Show Inspect for single kanji/hanzi highlights
+		</label>
+		<label class="check">
+			<input type="checkbox" bind:checked={settings.replyNotifications} />
+			Notify when replies finish in the background
 		</label>
 	{/if}	<VoicePanel settings={settings} androidUI={androidUI} />
 	<!-- Study-fonts and lesson-audio sections removed (lesson-audio

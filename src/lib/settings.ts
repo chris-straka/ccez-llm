@@ -146,6 +146,13 @@ export interface AppSettings {
 	 */
 	vibration: boolean;
 	/**
+	 * Ping when a finished reply lands while the window is backgrounded
+	 * (hidden or unfocused). Off silences the finished-reply ping
+	 * entirely — no notification, no permission ask. The checkbox lives
+	 * in Messages.
+	 */
+	replyNotifications: boolean;
+	/**
 	 * Character Inspect: a single kanji/hanzi highlight gains an
 	 * Inspect button (next to Annotate, desktop and mobile) opening
 	 * the radicals/stroke/definition overlay. Off = no Inspect UI
@@ -172,6 +179,23 @@ export const FONT_SCALE_MAX = 8;
 export const CHAT_WIDTH_DEFAULT = 36;
 export const CHAT_WIDTH_MIN = 28;
 export const CHAT_WIDTH_MAX = 120;
+/** Phone font scale at/above which the chat goes full-bleed. */
+export const FULLBLEED_FONT_SCALE = 3.6;
+/** Absurdly wide column: min(100%, …) consumers read it as full width. */
+export const CHAT_WIDTH_FULLBLEED_REM = 999;
+/** Phone floor: the column never narrows past this, however small. */
+export const CHAT_WIDTH_PHONE_MIN_REM = 46;
+
+/**
+ * Effective chat column width (rem) for the --chat-width var. Phones
+ * go full-bleed once huge type needs the room, and never narrower
+ * than the touch floor; desktop rides the slider raw. Pure.
+ */
+export function effectiveChatWidth(androidUI: boolean, fontScale: number, chatWidth: number): number {
+	if (!androidUI) return chatWidth;
+	if (fontScale >= FULLBLEED_FONT_SCALE) return CHAT_WIDTH_FULLBLEED_REM;
+	return Math.max(CHAT_WIDTH_PHONE_MIN_REM, chatWidth);
+}
 
 /** Stored idle-hide value meaning "never hide" (see `isPromptIdle`). */
 export const PROMPT_IDLE_NEVER = 0;
@@ -286,6 +310,7 @@ export function defaultSettings(): AppSettings {
 		hideButtons: true,
 		autoSpeakSelection: true,
 		vibration: true,
+		replyNotifications: true,
 		inspectEnabled: true
 	};
 }
@@ -422,6 +447,7 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 		if (typeof merged.hideButtons !== "boolean") merged.hideButtons = true;
 		if (typeof merged.autoSpeakSelection !== "boolean") merged.autoSpeakSelection = true;
 		if (typeof merged.vibration !== "boolean") merged.vibration = true;
+		if (typeof merged.replyNotifications !== "boolean") merged.replyNotifications = true;
 		// Retire the old "Be brief, no summaries." default: profiles that
 		// never customized it inherit the new (empty) default instead.
 		if (merged.systemPrompt === "Be brief, no summaries.") {

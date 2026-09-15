@@ -252,3 +252,17 @@ test("composer transparency slider applies and resets", async ({ page }) => {
 	await expect(page.locator(".app")).toHaveAttribute("style", /--prompt-alpha: 1/);
 	await expect(page.locator("main .prompt")).not.toHaveClass(/glass/);
 });
+
+/** Background reply ping has an opt-out, on by default, persisted. */
+test("reply notification toggle persists", async ({ page }) => {
+	const box = page.locator(".settings-panel label", { hasText: "Notify when replies finish in the background" }).locator("input");
+	await expect(box).toBeChecked();
+	await box.uncheck();
+	await expect
+		.poll(() => page.evaluate(() => window.localStorage.getItem("ccez-llm-settings-v1")))
+		.toContain('"replyNotifications":false');
+	await box.check();
+	await expect
+		.poll(() => page.evaluate(() => window.localStorage.getItem("ccez-llm-settings-v1")))
+		.toContain('"replyNotifications":true');
+});
