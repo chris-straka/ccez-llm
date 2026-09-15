@@ -15,6 +15,7 @@ export function touchShortcuts(): ShortcutRow[] {
 		{ name: "Newer / older chat", keys: "Three-finger swipe right / left" },
 		{ name: "Top of chat", keys: "Two-finger swipe up · gg" },
 		{ name: "Bottom of chat", keys: "Two-finger swipe down · G" },
+		{ name: "Chat switcher", keys: "Two-finger hold" },
 		{ name: "Delete current chat", keys: "Double two-finger tap" },
 		{ name: "Delete every chat", keys: "Double three-finger tap" },
 		{ name: "Annotate", keys: "Select text · Annotate" },

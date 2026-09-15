@@ -91,6 +91,8 @@ test.describe("gestures", () => {
 		await expect(modal.locator('dd:has-text("Two-finger swipe down")')).toHaveText(
 			"Two-finger swipe down · G"
 		);
+		await expect(modal.locator('dt:text-is("Chat switcher")')).toBeVisible();
+		await expect(modal.locator('dd:has-text("Two-finger hold")')).toHaveText("Two-finger hold");
 		await expect(modal.locator('dt:has-text("Delete current chat")')).toBeVisible();
 		await expect(modal.locator('dd:has-text("Double two-finger tap")')).toBeVisible();
 		await expect(modal.locator('dt:has-text("Delete every chat")')).toBeVisible();
@@ -500,6 +502,89 @@ test.describe("touch", () => {
 		await expect
 			.poll(async () => page.locator("article .rendered").first().innerText(), { timeout: 10_000 })
 			.not.toBe(before);
+	});
+
+	test("two-finger hold opens the chat switcher", async ({ page }) => {
+		await seedTwoChats(page);
+		const veil = page.locator(".chat-switcher");
+		await expect(veil).toHaveCount(0);
+		const before = await page.locator("article .rendered").first().innerText();
+		// Both fingers rest on the chat: the 500ms hold fires while
+		// down, and the release after it must not swipe or delete.
+		await page.evaluate(() => {
+			const touch = (id: number, x: number, y: number) =>
+				new Touch({ identifier: id, target: document.body, clientX: x, clientY: y });
+			window.dispatchEvent(
+				new TouchEvent("touchstart", {
+					bubbles: true,
+					cancelable: true,
+					composed: true,
+					touches: [touch(1, 200, 500), touch(2, 240, 500)]
+				})
+			);
+		});
+		await page.waitForTimeout(700);
+		await page.evaluate(() => {
+			const touch = (id: number, x: number, y: number) =>
+				new Touch({ identifier: id, target: document.body, clientX: x, clientY: y });
+			window.dispatchEvent(
+				new TouchEvent("touchend", {
+					bubbles: true,
+					cancelable: true,
+					composed: true,
+					touches: [],
+					changedTouches: [touch(1, 200, 500), touch(2, 240, 500)]
+				})
+			);
+		});
+		await expect(veil).toBeVisible();
+		// The release paired nothing: same chat still showing.
+		expect(await page.locator("article .rendered").first().innerText()).toBe(before);
+		// Newer arrow cycles without closing; Escape closes.
+		await veil.locator('button[aria-label="Newer chat"]').click();
+		await expect
+			.poll(async () => page.locator("article .rendered").first().innerText(), { timeout: 10_000 })
+			.not.toBe(before);
+		await expect(veil).toBeVisible();
+		await page.keyboard.press("Escape");
+		await expect(veil).toHaveCount(0);
+	});
+
+	test("two-finger swipe left opens settings from a highlight", async ({ page }) => {
+		await seedTwoChats(page);
+		const panel = page.locator(".settings-panel");
+		await expect(panel).toHaveClass(/closed/);
+		// A live highlight used to self-veto message-start swipes (the
+		// swipe picks text on the way down): settings still opens.
+		await page.locator("article.assistant .rendered").first().evaluate((el) => {
+			const selection = window.getSelection();
+			if (selection) {
+				const range = document.createRange();
+				range.selectNodeContents(el);
+				selection.removeAllRanges();
+				selection.addRange(range);
+			}
+			const touch = (id: number, x: number, y: number) =>
+				new Touch({ identifier: id, target: el, clientX: x, clientY: y });
+			el.dispatchEvent(
+				new TouchEvent("touchstart", {
+					bubbles: true,
+					cancelable: true,
+					composed: true,
+					touches: [touch(1, 300, 500), touch(2, 340, 500)]
+				})
+			);
+			el.dispatchEvent(
+				new TouchEvent("touchend", {
+					bubbles: true,
+					cancelable: true,
+					composed: true,
+					touches: [],
+					changedTouches: [touch(1, 150, 500), touch(2, 190, 500)]
+				})
+			);
+		});
+		await expect(panel).not.toHaveClass(/closed/);
 	});
 
 	test("two-finger swipe left opens settings from the composer", async ({ page }) => {
@@ -1221,6 +1306,16 @@ test.describe("always-visible prompt", () => {
 		await page.waitForTimeout(120);
 		await flick(page, "main", 200, 120, 200, 121);
 		await expect(aside).not.toHaveClass(/collapsed/);
+	});
+
+	test("tapping empty space focuses the composer in a new chat", async ({ page }) => {
+		await seedEmpty(page);
+		await page.goto("/");
+		await expect(page.locator(".prompt")).toBeVisible();
+		// Dead space below the hero: past the 380ms double-tap window
+		// the single tap lands the caret (a pair would open the list).
+		await flick(page, "main", 200, 600, 200, 601);
+		await expect(composer(page)).toBeFocused({ timeout: 5000 });
 	});
 
 	/** A leftward stroke starting on a message folds it, never summons. */

@@ -92,6 +92,7 @@ describe("shortcuts menu copy", () => {
 			"Newer / older chat",
 			"Top of chat",
 			"Bottom of chat",
+			"Chat switcher",
 			"Delete current chat",
 			"Delete every chat",
 			"Annotate",
@@ -110,6 +111,7 @@ describe("shortcuts menu copy", () => {
 		expect(byName.get("Newer / older chat")).toBe("Three-finger swipe right / left");
 		expect(byName.get("Top of chat")).toBe("Two-finger swipe up · gg");
 		expect(byName.get("Bottom of chat")).toBe("Two-finger swipe down · G");
+		expect(byName.get("Chat switcher")).toBe("Two-finger hold");
 	});
 
 	it("filters case-insensitively on name or keys", () => {

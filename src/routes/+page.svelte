@@ -1126,6 +1126,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 
 	function toggleSidebar(): void {
 		settings.sidebarCollapsed = !settings.sidebarCollapsed;
+		// One overlay at a time: the switcher yields to the list.
+		if (!settings.sidebarCollapsed) chatSwitcherOpen = false;
 		persistSettings();
 		// Touch draws one sidebar at a time: an opening chats list
 		// dismisses the settings panel (and vice versa below).
@@ -1607,6 +1609,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 
 	/** Open the settings panel, dismissing the chats list on touch. */
 	function openSettingsPanel(): void {
+		if (androidUI) {
+			void hapticBeatAsync("send", {
+				enabled: settings.vibration,
+				shell: tauriBackendAvailable()
+			});
+		}
+		// One overlay at a time: the switcher yields to settings.
+		chatSwitcherOpen = false;
 		settingsOpen = true;
 		if (androidUI && !settings.sidebarCollapsed) {
 			settings.sidebarCollapsed = true;
@@ -2037,7 +2047,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		if (target?.closest("button, a, input, textarea, select, summary, [contenteditable], .ccez-code"))
 			return;
 		if (promptIdle) return;
-		void tick().then(() => editor?.focus());
+		// Phones never land the caret on dismiss: the tap means "back
+		// to the chat", and focusing pops the keyboard over it. Desktop
+		// keeps the caret landing for keyboard users.
+		if (!androidUI) void tick().then(() => editor?.focus());
 	}
 
 	/**
@@ -2077,6 +2090,36 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	while scrolling to the message end. Stamped in the touchend below,
 	consumed by the click's toggle path. */
 	let msgDoubleTapPin: { id: ChatMsgId; at: number } | null = null;
+	/**
+	 * Chat switcher overlay (phones): a two-finger hold on the main
+	 * chat opens it; swipes inside cycle chats, tapping away closes.
+	 */
+	let chatSwitcherOpen = $state(false);
+	/** Switcher card swipe anchor (lead touch x, null between strokes). */
+	let switcherTouchX: number | null = null;
+	function openChatSwitcher(): void {
+		chatSwitcherOpen = true;
+		void hapticBeatAsync("send", {
+			enabled: settings.vibration,
+			shell: tauriBackendAvailable()
+		});
+	}
+	function closeChatSwitcher(): void {
+		if (!chatSwitcherOpen) return;
+		chatSwitcherOpen = false;
+		void hapticBeatAsync("send", {
+			enabled: settings.vibration,
+			shell: tauriBackendAvailable()
+		});
+	}
+	/** Cycle from inside the switcher (stays open across steps). */
+	function stepSwitcher(direction: 1 | -1): void {
+		stepChat(direction, false);
+		void hapticBeatAsync("send", {
+			enabled: settings.vibration,
+			shell: tauriBackendAvailable()
+		});
+	}
 	let shownActionsTimer: ReturnType<typeof setTimeout> | null = null;
 	/** (Re)arm the 3s auto-dismiss for one reveal. */
 	function armActionsTimer(id: ChatMsgId): void {
@@ -2342,6 +2385,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 
 	function doNewChat(): void {
+		if (androidUI) {
+			void hapticBeatAsync("send", {
+				enabled: settings.vibration,
+				shell: tauriBackendAvailable()
+			});
+		}
 		// File the abandoned chat's scroll before the fresh chat
 		// resets the box: returning later lands where it was left.
 		saveChatScroll();
@@ -2566,6 +2615,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 
 	function toggleFold(id: ChatMsgId): void {
+		if (androidUI) {
+			void hapticBeatAsync("send", {
+				enabled: settings.vibration,
+				shell: tauriBackendAvailable()
+			});
+		}
 		if (foldedIds.has(id)) foldedIds.delete(id);
 		else foldedIds.add(id);
 	}
@@ -5176,6 +5231,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			rowSwipe: boolean;
 			msgId: ChatMsgId | null;
 			zone: FlickZone;
+			inSwitcher: boolean;
 		} | null = null;
 		/**
 		 * Where a single-finger stroke began, for the vertical-flick
@@ -5187,6 +5243,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		let lastTapAt = 0;
 		let lastTapX = 0;
 		let lastTapY = 0;
+		/** Pending empty-tap focus (new chat): fired unless the second
+		tap pairs into the sidebar open instead. */
+		let emptyTapTimer: ReturnType<typeof setTimeout> | null = null;
 		/** Last single-tap point on a message: pairs into the double-tap
 		jump to that message's end (phones). Own pairing — empty-space
 		taps keep theirs above. */
@@ -5235,6 +5294,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				// scroll: scrolling an overflowing row must never fold
 				// the message or summon a sidebar.
 				const rowSwipe = target instanceof Element && target.closest(".actions") !== null;
+				// Strokes inside the chat switcher belong to the switcher
+				// card (cycle on swipe): the window paths below stay out.
+				const inSwitcher = target instanceof Element && target.closest(".chat-switcher") !== null;
 				edgeTouch = {
 					id: touch.identifier,
 					x: touch.clientX,
@@ -5244,7 +5306,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					clean,
 					rowSwipe,
 					msgId,
-					zone: flickZoneOf(target)
+					zone: flickZoneOf(target),
+					inSwitcher
 				};
 			},
 			{ passive: true }
@@ -5255,6 +5318,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				const start = edgeTouch;
 				edgeTouch = null;
 				if (!start) return;
+				// The switcher card owns its own strokes (cycle on
+				// swipe, buttons to step): window gestures stay out.
+				if (start.inSwitcher) return;
 				let ended: { identifier: number; clientX: number; clientY: number } | null = null;
 				for (let i = 0; i < event.changedTouches.length; i++) {
 					const candidate = event.changedTouches[i];
@@ -5276,11 +5342,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					Math.abs(foldDy) < Math.abs(foldDx) &&
 					window.getSelection()?.isCollapsed !== false
 				) {
+					// Haptic lives inside toggleFold (every fold path
+					// shares it — swipe, alt-click, action button).
 					toggleFold(start.msgId);
-					void hapticBeatAsync("send", {
-						enabled: settings.vibration,
-						shell: tauriBackendAvailable()
-					});
 					return;
 				}
 				// Double-tap on empty space opens the chats list (Android):
@@ -5307,11 +5371,29 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					}
 					if (paired) {
 						lastTapAt = 0;
+						// The second tap owns the gesture: a pending
+						// empty-tap focus must not pop the keyboard
+						// behind the opening list.
+						if (emptyTapTimer) {
+							clearTimeout(emptyTapTimer);
+							emptyTapTimer = null;
+						}
 						if (settings.sidebarCollapsed) {
 							toggleSidebar();
 							if (!settings.sidebarCollapsed) focusActiveSideChat();
 						}
 						return;
+					}
+					// Single tap on the dead space of an empty new chat
+					// focuses the composer (phones have no i key). Fired
+					// past the double-tap window so the opener above wins
+					// the pair; chats with messages keep tap-to-peace.
+					if (tapped && !paired && viewChat.messages.length === 0) {
+						if (emptyTapTimer) clearTimeout(emptyTapTimer);
+						emptyTapTimer = setTimeout(() => {
+							emptyTapTimer = null;
+							editor?.focus();
+						}, 380);
 					}
 				}
 				// Double-tap on a message jumps to its end (phones):
@@ -5606,6 +5688,35 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		let lastThreeTapAt = 0;
 		let twoTapAt = 0;
 		let lastTwoTapAt = 0;
+		/**
+		 * Chat switcher overlay (phones): a two-finger hold on the main
+		 * chat opens it; swipes inside cycle chats, tapping away closes.
+		 * The flag itself is top-level state (runes can't live in
+		 * onMount); only the hold timer lives here.
+		 */
+		/** Two-finger hold: armed while both fingers rest, fired once. */
+		let holdTimer: ReturnType<typeof setTimeout> | null = null;
+		let holdFired = false;
+		function clearHoldTimer(): void {
+			if (holdTimer) {
+				clearTimeout(holdTimer);
+				holdTimer = null;
+			}
+		}
+		/** Lead-finger travel of the live two-finger press, if any. */
+		function twoFingerHeldStill(maxMove = 12): boolean {
+			if (!twoTrack) return false;
+			return (
+				Math.hypot(
+					twoTrack.end[0].x - twoTrack.start[0].x,
+					twoTrack.end[0].y - twoTrack.start[0].y
+				) <= maxMove &&
+				Math.hypot(
+					twoTrack.end[1].x - twoTrack.start[1].x,
+					twoTrack.end[1].y - twoTrack.start[1].y
+				) <= maxMove
+			);
+		}
 		const gestureClean = (event: TouchEvent): boolean => {
 			if (!androidUI || shortcutsOpen) return false;
 			const target = event.target;
@@ -5623,16 +5734,16 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				if (event.touches.length === 2) {
 					const a = event.touches[0];
 					const b = event.touches[1];
-					// Phones track from anywhere a modal isn't open and no
-					// text is picked: a finger landing on a button used to
-					// kill the whole gesture, which read as "swipe left
-					// sometimes doesn't open settings". Loose tracks still
-					// swipe and slide; only clean ones pair taps.
-					const modalBusy =
-						shortcutsOpen ||
-						palette.open ||
-						inspectChar !== null ||
-						window.getSelection()?.isCollapsed === false;
+					// Phones track from anywhere a modal isn't open: a
+					// finger landing on a button used to kill the whole
+					// gesture, which read as "swipe left sometimes
+					// doesn't open settings". A live highlight no longer
+					// vetoes either — the swipe itself picks text on the
+					// way down, which self-vetoed message-start swipes
+					// almost every time. Loose tracks still swipe and
+					// slide; only clean ones pair taps, and taps never
+					// pair mid-select (see the guards below).
+					const modalBusy = shortcutsOpen || palette.open || inspectChar !== null;
 					const clean = !modalBusy && gestureClean(event);
 					twoTrack =
 						a && b && androidUI && !modalBusy
@@ -5652,6 +5763,21 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						a && b ? Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) : 0;
 					pinchMoved = false;
 					pinchStepped = false;
+					// Two-finger hold opens the chat switcher: both fingers
+					// resting on the main chat (not controls, drawers, or a
+					// modal) for half a second. Movement or release cancels
+					// before it fires; firing consumes the release below.
+					clearHoldTimer();
+					holdFired = false;
+					if (twoTrack !== null && twoTrack.clean && !chatSwitcherOpen) {
+						holdTimer = setTimeout(() => {
+							holdTimer = null;
+							if (twoTrack !== null && twoFingerHeldStill()) {
+								holdFired = true;
+								openChatSwitcher();
+							}
+						}, 500);
+					}
 				} else if (event.touches.length === 3) {
 					const first = event.touches[0];
 					threeTrack =
@@ -5667,10 +5793,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 								}
 							: null;
 					twoTrack = null;
+					clearHoldTimer();
 					pinchFont = false;
 					pinchMoved = false;
 				} else {
 					twoTrack = null;
+					clearHoldTimer();
 					pinchFont = false;
 					pinchMoved = false;
 				}
@@ -5699,6 +5827,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							slot.y = t.clientY;
 						}
 					}
+					// A wandering hold is a swipe-in-progress, not a hold.
+					if (holdTimer && !twoFingerHeldStill()) clearHoldTimer();
 				}
 				// Main-chat pinch steps the text size live: re-baseline
 				// per step so a held pinch keeps scaling, one haptic
@@ -5743,7 +5873,18 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		window.addEventListener(
 			"touchend",
 			(event) => {
+				clearHoldTimer();
 				if (twoTrack) {
+					// A fired hold owns the release: no swipe, slide, or
+					// tap pairing after the switcher opens.
+					if (holdFired && event.touches.length === 0) {
+						holdFired = false;
+						twoTrack = null;
+						pinchFont = false;
+						pinchMoved = false;
+						pinchStepped = false;
+						return;
+					}
 					for (const t of Array.from(event.changedTouches)) {
 						const slot = twoTrack.end.find((e) => e.id === t.identifier);
 						if (slot) {
@@ -5752,26 +5893,31 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						}
 					}
 					if (event.touches.length === 0) {
-						const dir = twoFingerSwipeDir(twoTrack.start, twoTrack.end);
+						const twoStart = twoTrack.start;
+						const twoEnd = twoTrack.end;
+						const dir = twoFingerSwipeDir(twoStart, twoEnd);
 						// Phones slide vertically too (handled below): compute
 						// while the tracks are alive; horizontal strokes read
 						// null here so the swipe step above keeps them.
 						const slide =
-							androidUI && dir === null ? twoFingerSlideDir(twoTrack.start, twoTrack.end) : null;
+							androidUI && dir === null ? twoFingerSlideDir(twoStart, twoEnd) : null;
 						const now = Date.now();
 						const moved = Math.max(
-							Math.hypot(
-								twoTrack.end[0].x - twoTrack.start[0].x,
-								twoTrack.end[0].y - twoTrack.start[0].y
-							),
-							Math.hypot(
-								twoTrack.end[1].x - twoTrack.start[1].x,
-								twoTrack.end[1].y - twoTrack.start[1].y
-							)
+							Math.hypot(twoEnd[0].x - twoStart[0].x, twoEnd[0].y - twoStart[0].y),
+							Math.hypot(twoEnd[1].x - twoStart[1].x, twoEnd[1].y - twoStart[1].y)
 						);
 						twoTrack = null;
 						// A pinch owns the gesture: spread motion vetoes
 						// the swipe step, the vertical slide, and the tap pairing below.
+						// Settings opens on a shorter leftward glide (64px):
+						// message-start swipes run short on thumbs, and the
+						// panel dismisses with one tap, so a hair-trigger
+						// costs nothing. Every other direction keeps 96px.
+						if (dir === null && androidUI && !pinchMoved && !settingsOpen) {
+							if (twoFingerSwipeDir(twoStart, twoEnd, 64) === -1) {
+								openSettingsPanel();
+							}
+						}
 						if (dir !== null && !pinchMoved) {
 							// Phones: a two-finger swipe left opens
 							// settings (the one-finger left stroke never
@@ -5784,6 +5930,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 								if (settingsOpen) settingsOpen = false;
 								else if (settings.sidebarCollapsed) {
 									settings.sidebarCollapsed = false;
+									chatSwitcherOpen = false;
 									persistSettings();
 								}
 							} else stepChat(dir, false);
@@ -5792,12 +5939,16 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						// no keyboard for the Delete key, and the sidebar
 						// moved to swipe-up-from-prompt); swipes take the
 						// step path instead. iOS keeps the sidebar toggle.
+						// Never mid-select: opening settings stopped
+						// vetoing on a highlight, but a delete must not
+						// fire under one.
 						else if (
 							!pinchMoved &&
 							androidUI &&
 							twoTapAt > 0 &&
 							moved <= 12 &&
-							now - twoTapAt <= 400
+							now - twoTapAt <= 400 &&
+							window.getSelection()?.isCollapsed !== false
 						) {
 							if (now - lastTwoTapAt < 600) {
 								lastTwoTapAt = 0;
@@ -5858,7 +6009,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							enabled: settings.vibration,
 							shell: tauriBackendAvailable()
 						});
-					} else if (isThreeFingerTap(3, track.moved, now - track.at)) {
+					// Never mid-select, like the two-finger delete above.
+					} else if (
+						isThreeFingerTap(3, track.moved, now - track.at) &&
+						window.getSelection()?.isCollapsed !== false
+					) {
 						if (now - lastThreeTapAt < 600) {
 							lastThreeTapAt = 0;
 							// Android: three fingers clear everything (two
@@ -5892,6 +6047,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			() => {
 				twoTrack = null;
 				threeTrack = null;
+				clearHoldTimer();
+				holdFired = false;
 			},
 			{ passive: true }
 		);
@@ -5931,6 +6088,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				// A modal always wins Esc, even from inside the prompt.
 				shortcutsOpen = false;
 				inspectChar = null;
+			} else if (chatSwitcherOpen) {
+				// The phone switcher dismisses like any modal.
+				closeChatSwitcher();
 			} else if (palette.open) {
 				// The search palette wins Esc next, even from its input.
 				// A first ESC moves DOM focus input -> list (the query
@@ -8830,6 +8990,59 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		</div>
 	</aside>
 
+	{#if androidUI && chatSwitcherOpen}
+		<!-- Phone chat switcher: opened by a two-finger hold on the main
+		chat. Swipes (and arrows) cycle chats without closing; tapping
+		away or Esc closes. Desktop never renders it. -->
+		<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+		<div
+			class="modal-veil chat-switcher"
+			onclick={(e) => {
+				if (e.target === e.currentTarget) closeChatSwitcher();
+			}}
+		>
+			<div
+				class="modal switcher-card"
+				role="dialog"
+				aria-modal="true"
+				aria-label="Switch chat"
+				tabindex="-1"
+				ontouchstart={(e) => {
+					const t = e.changedTouches[0];
+					switcherTouchX = t ? t.clientX : null;
+				}}
+				ontouchend={(e) => {
+					const t = e.changedTouches[0];
+					if (switcherTouchX !== null && t) {
+						const dx = t.clientX - switcherTouchX;
+						if (dx >= 64) stepSwitcher(1);
+						else if (dx <= -64) stepSwitcher(-1);
+					}
+					switcherTouchX = null;
+				}}
+			>
+				<button
+					type="button"
+					class="switcher-arrow"
+					aria-label="Older chat"
+					onclick={() => stepSwitcher(-1)}>‹</button
+				>
+				<div class="switcher-mid">
+					<div class="switcher-title">{chatLabel(activeChat(chatState)?.createdAt ?? Date.now())}</div>
+					<div class="switcher-pos">
+						{chatState.chats.findIndex((c) => c.id === chatState.activeChatId) + 1} / {chatState.chats.length}
+					</div>
+				</div>
+				<button
+					type="button"
+					class="switcher-arrow"
+					aria-label="Newer chat"
+					onclick={() => stepSwitcher(1)}>›</button
+				>
+			</div>
+		</div>
+	{/if}
+
 	{#if shortcutsOpen}
 		<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 		<!-- Backdrop click only; keyboard users get Esc and the × button. -->
@@ -9618,6 +9831,47 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	facts, schematic stroke progress below. */
 	.inspect-modal {
 		width: min(28rem, calc(100vw - 3rem));
+	}
+	/* Phone chat switcher card: title plus position between two thumb
+	arrows. Rendered only on phones (androidUI gate in markup), so no
+	platform prefix is needed; desktop never sees it. */
+	.switcher-card {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+		width: min(22rem, calc(100vw - 3rem));
+		padding: 1rem 1.2rem;
+	}
+	.switcher-mid {
+		flex: 1;
+		min-width: 0;
+		text-align: center;
+	}
+	.switcher-title {
+		font-weight: 650;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.switcher-pos {
+		color: #6e6e73;
+		color: var(--dim);
+		font-size: 0.85rem;
+		font-variant-numeric: tabular-nums;
+	}
+	.switcher-arrow {
+		flex: none;
+		min-width: 2.75rem;
+		min-height: 2.75rem;
+		font-size: 1.5rem;
+		line-height: 1;
+		background: none;
+		border: 1px solid #c7c7cc;
+		border: 1px solid var(--line);
+		border-radius: 12px;
+		color: #1c1c1e;
+		color: var(--ink);
+		cursor: pointer;
 	}
 	/* Reading-locale toggle: small JP/中文 pair for ambiguous Han text. */
 	.inspect-lang {
