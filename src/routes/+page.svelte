@@ -4170,23 +4170,29 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// Keep drafts when the reply failed so nothing silently drops.
 		const { sent, stillHere } = resolveSendCompletion(chatState, sentFrom.id, chat.id);
 		if (sent?.role === "assistant" && !sent.error) {
-			// Haptic thump: everything has arrived. Same-chat only —
-			// the new chat must not thump for the old one's reply (a
-			// genuinely missed finish is the background ping's job).
+			// Same-chat only: the new chat must not thump for the old
+			// one's reply (a genuinely missed finish is the background
+			// ping's job) — and every reset below touches live component
+			// state, which now belongs to the ACTIVE chat. After a
+			// switch that is the new chat's staged files, draft notes,
+			// and open review: clearing would eat in-progress work
+			// there. The origin's baked state already rode the send.
 			if (stillHere) {
 				void hapticBeatAsync("done", { enabled: settings.vibration, shell: tauriBackendAvailable() });
+				attachments = [];
+				previewId = null;
+				annotations = [];
+				pendingAnn = null;
+				reviewOpen = false;
+				editingId = null;
+				highlightAnnId = null;
+				settleAnnPop();
+				annPop = null;
 			}
-			attachments = [];
-			previewId = null;
-			annotations = [];
-			pendingAnn = null;
-			reviewOpen = false;
-			editingId = null;
-			highlightAnnId = null;
-			settleAnnPop();
-			annPop = null;
 		}
-		scrollToBottom();
+		// Follow the stream only while its chat is open: after a switch
+		// the new chat keeps its own scroll position.
+		if (stillHere) scrollToBottom();
 		maybeSpeakReply(sentFrom);
 		maybeNotifyReplyDone(sent);
 		// The reply's layout churn (hero unmount, list growth, keyboard
@@ -4225,7 +4231,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				void hapticBeatAsync("done", { enabled: settings.vibration, shell: tauriBackendAvailable() });
 			}
 		}
-		scrollToBottom();
+		// Same stillHere discipline as a fresh send: the scroller
+		// belongs to whoever is open now.
+		if (resentHere) scrollToBottom();
 		maybeSpeakReply(resentFrom);
 		maybeNotifyReplyDone(resent);
 		// Same settle as a fresh send: the reply's layout churn can

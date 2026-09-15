@@ -697,6 +697,16 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
       the refactors" question: no — the round's additions follow the
       file's conventions (scale-actions twins, androidUI guards, shared
       haptic call shapes); this was the only real duplication.
+- [x] Finished the origin routing: the success resets (attachments,
+      draft annotations, open review/edit UI) and both scrollToBottom
+      calls now run only while the origin chat is still open — after a
+      switch they were wiping the new chat's staged work and yanking
+      its scroll. Deterministic mid-stream e2e (slow mock cadence,
+      draft + pinned scroll survive, reply proven landed) green, and
+      red-without-the-fix via stash rerun. The keybindings hollowing,
+      by contrast, is complete: onKey's only remaining raw key reads
+      are effects (Esc timestamp/Alt tracker/zoom derivation), so no
+      slice is left to take.
 
 ## Dev Keychain silence (Sep 15, main)
 - [x] Mass password prompts in dev: every unsigned `tauri dev` rebuild

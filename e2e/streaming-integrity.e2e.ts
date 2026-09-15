@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { seedChat } from "./helpers";
 
 /**
@@ -49,3 +49,101 @@ test("visible stream text grows monotonically, never flickers", async ({ page })
 	expect(final).toBe("Mock reply to: monotonic stream sampling probe");
 	await expect(page.locator("article.assistant")).toHaveCount(1);
 });
+
+/** A reply that finishes after a chat switch leaves the new chat
+alone: its draft annotations survive (the origin's resets must not
+run there) and its scroll never yanks to the bottom. The slow mock
+cadence makes the mid-stream switch deterministic. */
+test("mid-stream switch keeps the new chat's drafts and scroll", async ({ page }) => {
+	const long = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. ".repeat(6);
+	const bodies = Array.from({ length: 30 }, (_, i) => `filler message number ${i}: ${long}`);
+	await page.addInitScript(
+		({ filler }: { filler: string[] }) => {
+			window.localStorage.setItem("ccez-mock-provider", "1");
+			window.localStorage.setItem("ccez-mock-word-ms", "1000");
+			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({ promptIdleSec: 0 }));
+			const msg = (id: string, content: string) => ({ id, role: "assistant", content, usage: null, error: null });
+			window.localStorage.setItem(
+				"ccez-llm-chats-v1",
+				JSON.stringify([
+					{ id: "chat-1", createdAt: 1, replyLang: null, messages: [msg("m1", "origin chat opener")] },
+					{ id: "chat-2", createdAt: 2, replyLang: null, messages: filler.map((content, n) => msg(`f${n}`, content)) }
+				])
+			);
+		},
+		{ filler: bodies }
+	);
+	await page.goto("/");
+	await expect(page.locator("article .rendered").first()).toContainText("origin chat opener", { timeout: 60_000 });
+
+	// Draft (filed, unsent) annotation in chat 1, then send slow.
+	await annotateDraft(page, "origin chat opener", "origin note");
+	await page.locator(".cm-content").click();
+	await page.keyboard.type("go slow");
+	await page.keyboard.press("Enter");
+
+	// Switch to chat 2 mid-stream and draft an annotation there too,
+	// then pin its scroll at the top: the annotate flow itself scrolls
+	// message 5 into view, so the pin must come after it — anything
+	// that moves scroll past this point is the completion under test.
+	await switchChat(page, 1);
+	await expect(page.locator("article .rendered").first()).toContainText("filler message number 0");
+	await annotateDraft(page, "filler message number 5", "keep me");
+	await page.evaluate(() => {
+		document.querySelector("main .messages")?.scrollTo({ top: 0 });
+	});
+
+	// Chat 1's reply lands while chat 2 is open (read off storage —
+	// the suite's proof the finish happened mid-test, not after).
+	await expect
+		.poll(
+			() =>
+				page.evaluate(() => {
+					const chats = JSON.parse(window.localStorage.getItem("ccez-llm-chats-v1") ?? "[]") as {
+						id: string;
+						messages: unknown[];
+					}[];
+					return chats.find((c) => c.id === "chat-1")?.messages.length ?? 0;
+				}),
+			{ timeout: 30_000 }
+		)
+		.toBe(3);
+	// Chat 2's draft survived the foreign completion (the old code
+	// cleared it) and its scroll never yanked.
+	await expect(page.locator(".prompt-tools .ann-wrap")).toHaveCount(1);
+	const scroller = () =>
+		page.evaluate(() => {
+			const el = document.querySelector("main .messages") as HTMLElement | null;
+			if (!el) throw new Error("no scroller");
+			return { top: el.scrollTop, max: el.scrollHeight - el.clientHeight };
+		});
+	const { top, max } = await scroller();
+	expect(max).toBeGreaterThan(500);
+	expect(top).toBeLessThan(100);
+	// And the reply really did land back home.
+	await switchChat(page, 0);
+	await expect(page.locator("article.assistant .rendered").nth(1)).toContainText("Mock reply to: go slow");
+});
+
+/** Open the chat list if it closed itself, then pick a row. */
+async function switchChat(page: Page, nth: number): Promise<void> {
+	await page.locator(".cm-content").click();
+	const aside = page.locator("aside").first();
+	if (await aside.evaluate((el) => el.classList.contains("collapsed"))) {
+		await page.keyboard.press("Meta+b");
+	}
+	const row = page.locator("aside ul li button.side-chat").nth(nth);
+	await expect(row).toBeVisible();
+	await row.click();
+}
+
+/** File one draft annotation (unsent) on the first quote match. */
+async function annotateDraft(page: Page, quote: string, note: string): Promise<void> {
+	await page.locator(`article .rendered:has-text("${quote}")`).first().dblclick({ position: { x: 10, y: 10 } });
+	await expect(page.locator(".sel-menu")).toBeVisible();
+	await page.locator('.sel-menu button:has-text("Annotate")').click();
+	await expect(page.locator(".ann-pop")).toBeVisible();
+	await page.keyboard.type(note);
+	await page.keyboard.press("Enter");
+	await expect(page.locator(".prompt-tools .ann-wrap")).toHaveCount(1);
+}
