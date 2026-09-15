@@ -380,6 +380,76 @@ export function equationBodyOf(node: Node | null): Element | null {
 }
 
 /**
+ * Triple-click paragraph picks grab the block's terminator newline,
+ * painting the line beneath the highlight (the quote trims it anyway,
+ * so only the visual suffers). Drop it from the live range; every
+ * other pick passes through untouched. Two shapes: the end sits past
+ * newline text, or parked at the next block's start (a triple-click
+ * lands its focus there) — the latter pulls back to the previous
+ * text's end. Returns true when the range moved. Never throws
+ * (selection APIs disagree across engines; paint must survive).
+ */
+export function trimParagraphTerminator(range: Range): boolean {
+	try {
+		// Nothing serialized past the content, nothing to drop: picks
+		// already stopping at text pass through untouched.
+		if (!/(\r\n|\n|\r)$/.test(range.toString())) return false;
+		const trimTextTail = (): boolean => {
+			const node = range.endContainer;
+			if (!(node instanceof Text)) return false;
+			const text = node.textContent ?? "";
+			const head = text.slice(0, Math.min(range.endOffset, text.length));
+			const cut = head.replace(/(\r\n|\n|\r)+$/, "");
+			if (cut.length === head.length) return false;
+			// Never collapse into the start: a pick that is only a
+			// newline keeps its shape (nothing meaningful to drop).
+			const startEdge = range.startContainer === node ? range.startOffset : -1;
+			if (cut.length <= startEdge) return false;
+			range.setEnd(node, cut.length);
+			return true;
+		};
+		if (trimTextTail()) return true;
+		// End at a text start (or parked at a block start, where a
+		// triple-click lands its focus): pull back to the previous
+		// text's end without climbing above their common ancestor. An
+		// end mid-text with no tail is already clean.
+		const endNode = range.endContainer;
+		if (endNode instanceof Text && range.endOffset > 0) return false;
+		const stop = range.commonAncestorContainer;
+		const origEnd = { node: range.endContainer, offset: range.endOffset };
+		let node: Node = endNode;
+		let idx = endNode instanceof Text ? 0 : range.endOffset;
+		for (;;) {
+			const kids = node.childNodes;
+			let deep: Node | null = idx > 0 ? (kids[idx - 1] ?? null) : null;
+			while (deep && !(deep instanceof Text)) {
+				const inner = deep.childNodes;
+				deep = inner.length > 0 ? (inner[inner.length - 1] ?? null) : null;
+			}
+			if (deep instanceof Text && (deep.textContent?.length ?? 0) > 0) {
+				range.setEnd(deep, deep.textContent?.length ?? 0);
+				if (range.collapsed) {
+					range.setEnd(origEnd.node, origEnd.offset);
+					return false;
+				}
+				// That text may itself end with newlines: trim those too.
+				trimTextTail();
+				return true;
+			}
+			if (node === stop) return false;
+			const parent = node.parentNode;
+			if (!parent || !(parent instanceof Node)) return false;
+			const at: number = Array.prototype.indexOf.call(parent.childNodes, node);
+			if (at < 0) return false;
+			idx = at;
+			node = parent;
+		}
+	} catch {
+		return false;
+	}
+}
+
+/**
  * Whole-equation range for the quote expansion, trimmed of blank edge
  * text: the markdown pipeline's trailing newline inside the body would
  * otherwise paint the line beneath a one-line equation on

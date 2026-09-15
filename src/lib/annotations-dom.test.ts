@@ -4,6 +4,7 @@ import {
 	quoteFragmentText,
 	equationBodyOf,
 	equationBodyRange,
+	trimParagraphTerminator,
 	loadDraftAnnotations,
 	saveDraftAnnotations,
 	snapSelectionToWordEdges,
@@ -130,6 +131,59 @@ describe("equationBodyRange", () => {
 		document.body.append(root);
 		const body = root.querySelector(".ccez-math-body")!;
 		expect(equationBodyRange(body)?.toString()).toBe("E_n");
+		root.remove();
+	});
+});
+
+describe("trimParagraphTerminator", () => {
+	function pick(html: string): { range: Range; root: HTMLElement } {
+		const root = document.createElement("div");
+		root.innerHTML = html;
+		document.body.append(root);
+		const range = document.createRange();
+		range.selectNodeContents(root);
+		return { range, root };
+	}
+	it("drops a trailing newline run from a paragraph pick", () => {
+		const { range, root } = pick("<pre>$$a^2$$</pre>\n");
+		expect(trimParagraphTerminator(range)).toBe(true);
+		expect(range.toString()).toBe("$$a^2$$");
+		root.remove();
+	});
+	it("leaves deliberate picks untouched", () => {
+		const { range, root } = pick("<p>plain line</p>");
+		expect(trimParagraphTerminator(range)).toBe(false);
+		expect(range.toString()).toBe("plain line");
+		root.remove();
+	});
+	it("pulls an end parked at the next block back to content", () => {
+		// Triple-click lands its focus at the following paragraph's
+		// start (jsdom never synthesizes that block break, so the
+		// inter-block newline stands in for it here; the live shape
+		// is pinned by the triple-click e2e instead).
+		const root = document.createElement("div");
+		root.innerHTML = "<pre>$$a^2$$</pre>\n<p>tail</p>";
+		document.body.append(root);
+		const preText = root.querySelector("pre")!.firstChild!;
+		const tail = root.querySelector("p")!;
+		const range = document.createRange();
+		range.setStart(preText, 0);
+		range.setEnd(tail, 0);
+		expect(range.toString()).toBe("$$a^2$$\n");
+		expect(trimParagraphTerminator(range)).toBe(true);
+		expect(range.toString()).toBe("$$a^2$$");
+		root.remove();
+	});
+	it("never collapses a newline-only pick", () => {
+		const root = document.createElement("div");
+		root.innerHTML = "<p>\n</p>";
+		document.body.append(root);
+		const text = root.querySelector("p")!.firstChild!;
+		const range = document.createRange();
+		range.setStart(text, 0);
+		range.setEnd(text, 1);
+		expect(trimParagraphTerminator(range)).toBe(false);
+		expect(range.toString()).toBe("\n");
 		root.remove();
 	});
 });

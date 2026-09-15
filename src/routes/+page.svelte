@@ -131,6 +131,7 @@ import {
 		quoteFragmentText,
 		equationBodyOf,
 		equationBodyRange,
+		trimParagraphTerminator,
 		redactedCopyText,
 		newAnnotationId,
 		annRefsFor,
@@ -2580,6 +2581,17 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// article trims back to the anchor message's edge first.
 		const live = window.getSelection();
 		if (live) lockSelectionToMessage(live, articleOf);
+		// Triple-click paragraph picks grab the block terminator
+		// newline, painting the line beneath the highlight (the quote
+		// trims it anyway): drop it before the menu reads the quote.
+		// Deliberate drags into the next line keep theirs.
+		if (event.detail === 3 && live && live.rangeCount > 0) {
+			try {
+				trimParagraphTerminator(live.getRangeAt(0));
+			} catch {
+				// Cosmetic: the untrimmed pick still summons.
+			}
+		}
 		// The create marker never splits a word in half: boundaries cut
 		// mid-word snap out to the word's edges before the menu reads
 		// the quote (CJK has no word characters, so it never snaps).
@@ -10164,7 +10176,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		content: "";
 		display: block;
 		flex: none;
-		height: calc(1.5rem * min(var(--font-scale, 1), 2));
+		height: calc(2rem * min(var(--font-scale, 1), 2));
 	}
 	/* Chat-switch crossfade covers the messages only: an unscoped
 	transition snapshots the whole page, so the closing sidebar and
@@ -11985,14 +11997,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		text-decoration: none;
 	}
 	/* Opt-in (Settings): message buttons grow with the text-size
-	setting instead of holding their fixed 0.75rem. */
+	setting instead of holding their fixed 0.75rem — capped like the
+	bubble, so huge type doesn't dome them into towers. */
 	main.scale-actions .actions button {
-		font-size: calc(0.75rem * var(--font-scale, 1));
+		font-size: calc(0.75rem * min(var(--font-scale, 1), 2));
 	}
 	/* Same opt-in for the logo icons: the glyph holds its fixed
 	1.05rem height otherwise, so larger text leaves tiny icons. */
 	main.scale-actions .actions .icon-btn :global(.action-glyph) {
-		height: calc(1.05rem * var(--font-scale, 1));
+		height: calc(1.05rem * min(var(--font-scale, 1), 2));
 	}
 	/* Loading buttons hold their look while the dots pulse. */
 	.actions button:disabled {
@@ -12040,9 +12053,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		color: #94250a;
 	}
 	/* Same opt-in as the message buttons: row error text follows the
-	text size only when message-button scaling is on. */
+	text size only when message-button scaling is on (same cap). */
 	main.scale-actions .error {
-		font-size: calc(0.85rem * var(--font-scale, 1));
+		font-size: calc(0.85rem * min(var(--font-scale, 1), 2));
 	}
 	.sending {
 		color: #6e6e73;

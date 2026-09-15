@@ -92,7 +92,16 @@ describe("hover-only message actions", () => {
 			/main\.scale-actions \.actions \.icon-btn[^{]*\{([^}]*)\}/
 		);
 		expect(glyph, "scale-actions glyph rule is gone — move it with the text rule").toBeTruthy();
-		expect(glyph![1]).toMatch(/height\s*:\s*calc\(1\.05rem \* var\(--font-scale/);
+		expect(glyph![1]).toMatch(/height\s*:\s*calc\(1\.05rem \* min\(var\(--font-scale/);
+	});
+
+	it("caps opt-in button scaling like the bubble", () => {
+		// Uncapped, 800% type domes the buttons into towers; the cap
+		// keeps them proportional past 200%.
+		const css = pageStyle();
+		const button = css.match(/main\.scale-actions \.actions button\s*\{([^}]*)\}/);
+		expect(button, "scale-actions button rule is gone").toBeTruthy();
+		expect(button![1]).toMatch(/min\(var\(--font-scale/);
 	});
 
 	it("never moves the buttons with transform, translate, or animation", () => {

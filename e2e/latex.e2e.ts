@@ -224,6 +224,28 @@ test("partial equation pick snaps to the whole equation", async ({ page }) => {
 		.toBe(flat(full));
 });
 
+/** Triple-clicking raw TeX drops the paragraph terminator: the highlight
+stops at the equation instead of painting the line beneath. */
+test("triple-click raw tex stops at the equation", async ({ page }) => {
+	const block = page.locator(".ccez-math").first();
+	await block.locator(".ccez-math-tex").click();
+	const raw = block.locator(".ccez-math-raw");
+	await expect(raw).toBeVisible();
+	const box = await raw.boundingBox();
+	if (!box) throw new Error("raw tex has no box");
+	await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2, { clickCount: 3 });
+	// Range (not Selection) text: Selection.toString synthesizes block
+	// breaks, so it always trails one here — the range itself must stop
+	// at the equation, which is what paints the highlight.
+	const sel = await page.evaluate(() => {
+		const live = window.getSelection();
+		return live && live.rangeCount > 0 ? live.getRangeAt(0).toString() : "";
+	});
+	expect(sel).toContain("E_n");
+	expect(sel.endsWith("\n")).toBe(false);
+	await expect(page.locator(".sel-menu")).toBeVisible();
+});
+
 /** Hovering another chat previews its equations with settled chrome:
 no entrance animation runs over the copy button or its ancestors,
 and its box never moves. Both chats carry the same equation, so any
@@ -242,6 +264,10 @@ test("preview settles latex chrome", async ({ page }) => {
 	});
 	await page.goto("/");
 	await expect(page.locator(".ccez-math-copy").first()).toBeVisible({ timeout: 60_000 });
+	// KaTeX webfonts shift equation widths (and the centered chrome
+	// with them) while loading: settle first so any delta across the
+	// hover is chrome motion, never a font swap.
+	await page.evaluate(() => document.fonts.ready);
 	await page.keyboard.press("Meta+b");
 	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
 	// Trace the chrome box at 60fps across the hover instant.

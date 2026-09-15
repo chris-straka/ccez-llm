@@ -45,9 +45,11 @@ describe("folded code chrome", () => {
 	});
 	it("never unfolds off a label drag", () => {
 		// Unfolding detaches the just-drawn highlight (and strands
-		// the menu): only true clicks unfold, drags keep selecting.
+		// the menu): drags and clicks over a live highlight keep
+		// selecting, only selection-free clicks unfold.
 		const source = readFileSync(new URL("./MessageBody.svelte", import.meta.url), "utf8");
-		expect(source).toContain("if (unfoldedDrag) return;");
+		expect(source).toContain("if (unfoldedDrag || blockHoldsHighlight(mathWrap)) return;");
+		expect(source).toContain("if (unfoldedDrag || blockHoldsHighlight(codeBlock)) return;");
 	});
 });
 

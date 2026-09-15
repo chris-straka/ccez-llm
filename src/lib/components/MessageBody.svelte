@@ -329,6 +329,20 @@
 	(only true clicks unfold). Keyboard clicks carry no press point
 	(detail 0) and always unfold. */
 	let chromeDown: { x: number; y: number } | null = null;
+	/** A live highlight inside this block owns the click: unfolding
+	would detach it (label drags end selected), so clicks over a
+	highlight keep selecting and only selection-free clicks unfold. */
+	function blockHoldsHighlight(block: Element): boolean {
+		try {
+			const live = window.getSelection();
+			if (!live || live.isCollapsed || live.toString() === "") return false;
+			const anchor = live.anchorNode;
+			const focus = live.focusNode;
+			return (!!anchor && block.contains(anchor)) || (!!focus && block.contains(focus));
+		} catch {
+			return false;
+		}
+	}
 	function onBodyClick(event: MouseEvent): void {
 		const unfoldedDrag =
 			event.detail > 0 &&
@@ -376,7 +390,7 @@
 			if (mathWrap.classList.contains("ccez-math") && mathWrap.dataset.folded === "1") {
 				// A drag ending here selected the folded label: unfolding
 				// would detach that highlight (see chromeDown above).
-				if (unfoldedDrag) return;
+				if (unfoldedDrag || blockHoldsHighlight(mathWrap)) return;
 				mathWrap.removeAttribute("data-folded");
 				return;
 			}
@@ -394,7 +408,7 @@
 		const codeBlock = closestFromTarget(event.target, ".ccez-code");
 		if (!codeBlock || !rendered) return;
 		if (codeBlock.dataset.folded === "1") {
-			if (unfoldedDrag) return;
+			if (unfoldedDrag || blockHoldsHighlight(codeBlock)) return;
 			codeBlock.removeAttribute("data-folded");
 			return;
 		}
