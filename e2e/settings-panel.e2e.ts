@@ -182,3 +182,15 @@ test("transparency slider applies and resets", async ({ page }) => {
 	await page.locator('.settings-panel button[title="Reset to fully opaque"]').click();
 	await expect(page.locator(".app")).toHaveAttribute("style", /--bg-alpha: 1/);
 });
+
+/** Composer transparency slider applies the prompt var and resets. */
+test("composer transparency slider applies and resets", async ({ page }) => {
+	const slider = page.locator('.settings-panel input[aria-label="Composer transparency percent"]');
+	await expect(slider).toHaveAttribute("max", "80");
+	await slider.fill("50");
+	await expect(page.locator(".app")).toHaveAttribute("style", /--prompt-alpha: 0\.5/);
+	await expect(page.locator("main .prompt")).toHaveClass(/glass/);
+	await page.locator('.settings-panel button[title="Reset composer to fully opaque"]').click();
+	await expect(page.locator(".app")).toHaveAttribute("style", /--prompt-alpha: 1/);
+	await expect(page.locator("main .prompt")).not.toHaveClass(/glass/);
+});

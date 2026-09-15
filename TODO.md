@@ -70,16 +70,6 @@ same codebase via the Tauri mobile target.
       device to see/verify — untouched. Voice/chrome areas belong to
       sibling streams; coordinate before changing.)
 
-## Pile: desktop composer reports (needs owner observables)
-
-- [ ] Attach/voice buttons shift apart a tiny amount after the summon
-      rise (desktop). Not reproduced Sep 2026: zero shift across six
-      configs (Chromium/WebKit, DPR 1/2, short/long chats, with/without
-      annotations, mic on/off, first and second summon, frame-by-frame
-      traces of attach/voice/pill/prompt rects). Needed: window size,
-      chat-width slider, font scale, sidebar state, annotation count,
-      whether it also happens keyboard-summoned with the mouse untouched.
-
 ## Non-goals
 
 - No app-build/agentic features. No cloud sync / sharing / plugins.

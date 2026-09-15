@@ -614,3 +614,17 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
       could only shrink the scroller — nothing ever showed through);
       strip/preview/error keep a binary main lift. Tail/bleed/glass e2e
       green in Chromium + WebKit, bleed verified on a real render.
+- [x] Attach/voice post-rise shift: owner-confirmed gone after the
+      frosted composer landed (ten headless probes had measured zero
+      throughout; likely a subpixel settle the translucency masks).
+- [x] Composer opaque by default + desktop-only Composer transparency
+      slider (`composerOpacity`, clamped 0.2–1, glass class only below
+      full opacity so the blur costs nothing when off). Opaque-default,
+      slider-apply/reset, and settings-clamp tests green.
+- [x] Desktop rise honors Reduce Motion (was covered only on phones):
+      card + strip transitions go none under the query. Emulation e2e
+      green in Chromium + WebKit.
+- [x] Traffic lights hover-reveal (macOS): overlay-titlebar buttons
+      fade to 0 at rest via button-relative tracking areas, back on
+      hover, forced visible in fullscreen; pure `target_alpha` unit
+      tests, cargo check/clippy/test green. Pixels await owner eyes.

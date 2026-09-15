@@ -121,6 +121,9 @@ export interface AppSettings {
 	/** Whole-app background opacity, 0.2–1 (1 = fully opaque).
 	Shown in settings as Transparency, 0–80%. */
 	bgOpacity: number;
+	/** Composer card opacity, 0.2–1 (1 = fully opaque, the default).
+	Shown in settings as Composer transparency, 0–80%, desktop only. */
+	composerOpacity: number;
 	/** Color-scheme override (system follows the OS). */
 	theme: ThemeMode;
 	/**
@@ -276,6 +279,7 @@ export function defaultSettings(): AppSettings {
 		scaleActionsWithFont: false,
 		promptIdleSec: PROMPT_IDLE_DEFAULT,
 		bgOpacity: 1,
+		composerOpacity: 1,
 		voiceLangPinned: false,
 		theme: "system",
 		hideMessages: false,
@@ -374,6 +378,14 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 		// (shown as Transparency, 0–80%).
 		if (typeof merged.bgOpacity !== "number" || !(merged.bgOpacity >= 0.2 && merged.bgOpacity <= 1)) {
 			merged.bgOpacity = 1;
+		}
+		// Clamp the composer opacity into its slider range
+		// (shown as Composer transparency, 0–80%, desktop only).
+		if (
+			typeof merged.composerOpacity !== "number" ||
+			!(merged.composerOpacity >= 0.2 && merged.composerOpacity <= 1)
+		) {
+			merged.composerOpacity = 1;
 		}
 		// Backfill the desktop chat width on older saves; clamp strays
 		// into range (rounded to whole rem, the slider's step).

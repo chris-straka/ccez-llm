@@ -18,6 +18,8 @@ mod keyboard;
 mod langid;
 #[cfg(desktop)]
 mod menu;
+#[cfg(target_os = "macos")]
+mod trafficlights;
 mod tts;
 #[cfg(target_os = "android")]
 mod tts_android;
@@ -217,6 +219,11 @@ pub fn run() {
             #[cfg(all(target_os = "macos", debug_assertions))]
             if let Some(window) = tauri::Manager::get_webview_window(_app.handle(), "main") {
                 dev_icon::watch(window);
+            }
+            // Hover-reveal traffic lights (macOS overlay titlebar).
+            #[cfg(target_os = "macos")]
+            if let Some(window) = tauri::Manager::get_webview_window(_app.handle(), "main") {
+                trafficlights::watch(window);
             }
             // Native menu bar (desktop only; mobile has no menu bar).
             #[cfg(desktop)]

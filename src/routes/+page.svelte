@@ -8027,7 +8027,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	data-shell={tauriBackendAvailable() ? "tauri" : "browser"}
 	data-android={androidUI || null}
 	data-ios={iosUI || null}
-	style="--font-scale: {androidUI ? Math.min(8, settings.fontScale) : settings.fontScale}; --chat-width: {androidUI ? Math.max(46, settings.chatWidth ?? 36) : (settings.chatWidth ?? 36)}; --bg-alpha: {settings.bgOpacity ?? 1}"
+	style="--font-scale: {androidUI ? Math.min(8, settings.fontScale) : settings.fontScale}; --chat-width: {androidUI ? Math.max(46, settings.chatWidth ?? 36) : (settings.chatWidth ?? 36)}; --bg-alpha: {settings.bgOpacity ?? 1}; --prompt-alpha: {settings.composerOpacity ?? 1}"
 	data-mac={isMac && !androidUI || null}
 >
 	<aside class:collapsed={settings.sidebarCollapsed} inert={settings.sidebarCollapsed} data-fade-scroll
@@ -8752,6 +8752,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			class="prompt"
 			class:has-anns={annotations.length > 0}
 			class:has-mic={canMic && settings.micEnabled}
+			class:glass={Math.min(settings.composerOpacity ?? 1, settings.bgOpacity ?? 1) < 1}
 			class:prompt-hidden={!!annPop && androidUI && !iosUI}
 			class:prompt-idle={promptParked()}
 			class:prompt-preview={previewing && viewChat.messages.length === 0}
@@ -13200,19 +13201,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		background: #fff;
 		/* Raised, not flat: dark keeps the #1c1c1e card on the #17171a page. */
 		background: color-mix(in srgb, var(--bg-raised) calc(var(--bg-alpha, 1) * 100%), transparent);
-		/* Frosted: thread text bleeds through blurred instead of
-		hiding behind an opaque card (no structural change needed —
-		the filter applies to the existing card; the border keeps the
-		edge and the composer's own text paints above, crisp). Capped
-		at 75% so the bleed always reads; lower whole-app Transparency
-		still wins below that. */
-		background: color-mix(
-			in srgb,
-			var(--bg-raised) calc(min(0.75, var(--bg-alpha, 1)) * 100%),
-			transparent
-		);
-		-webkit-backdrop-filter: blur(18px) saturate(1.6);
-		backdrop-filter: blur(18px) saturate(1.6);
 		/* Fixed floor so mounting the editor never shifts layout.
 		CodeMirror itself sets no minimum — this floor is ours, at
 		about three text lines plus the tools row. */
@@ -13226,6 +13214,20 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			transform 0.35s ease,
 			opacity 0.35s ease,
 			visibility 0s linear 0.35s;
+	}
+	/* Frosted composer (see the Composer transparency slider, desktop
+	only): thread text bleeds through blurred instead of hiding behind
+	an opaque card. The border keeps the edge and the composer's own
+	text paints above, crisp; lower whole-app Transparency still wins
+	below the slider. No blur at full opacity (GPU stays out of it). */
+	.prompt.glass {
+		background: color-mix(
+			in srgb,
+			var(--bg-raised) calc(min(var(--prompt-alpha, 1), var(--bg-alpha, 1)) * 100%),
+			transparent
+		);
+		-webkit-backdrop-filter: blur(18px) saturate(1.6);
+		backdrop-filter: blur(18px) saturate(1.6);
 	}
 	/* Restoring from idle drops the class on the input event itself:
 	visibility must flip at once (no delay), while the slide and
@@ -13274,6 +13276,20 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			transform 0.35s ease,
 			opacity 0.35s ease,
 			visibility 0s linear 0.35s;
+	}
+	/* Reduced motion settles the summon instantly: no slide, no fade
+	ramp on the card or its strip — what lands is the final frame.
+	After every ramp above (equal specificity, later wins), so the
+	desktop rise honors the OS setting like the drawers already do. */
+	@media (prefers-reduced-motion: reduce) {
+		.prompt,
+		.prompt:not(.prompt-idle),
+		.prompt.prompt-idle.prompt-preview,
+		.attachments,
+		.preview,
+		.attach-error {
+			transition: none;
+		}
 	}
 	/* No entrance animation on the composer: it used to glide down on the
 	first message, exactly while the first tokens streamed in — on a slow

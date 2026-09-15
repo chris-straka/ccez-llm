@@ -90,6 +90,18 @@ describe("settings", () => {
 		expect(loadSettings(memoryStore).fontScale).toBe(1);
 	});
 
+	it("defaults the composer to opaque and clamps its slider range", () => {
+		expect(defaultSettings().composerOpacity).toBe(1);
+		const kept = blankSettings();
+		kept.composerOpacity = 0.5;
+		saveSettings(kept, memoryStore);
+		expect(loadSettings(memoryStore).composerOpacity).toBe(0.5);
+		const over = blankSettings();
+		over.composerOpacity = 0.1;
+		saveSettings(over, memoryStore);
+		expect(loadSettings(memoryStore).composerOpacity).toBe(1);
+	});
+
 	it("defaults chat width to the legacy column and clamps strays", () => {
 		expect(defaultSettings().chatWidth).toBe(36);
 		expect(CHAT_WIDTH_DEFAULT).toBe(36);

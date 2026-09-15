@@ -137,7 +137,7 @@ test("composer card is translucent with backdrop blur", async ({ page }) => {
 			window.localStorage.setItem("ccez-mock-provider", "1");
 			window.localStorage.setItem(
 				"ccez-llm-settings-v1",
-				JSON.stringify({ promptIdleSec: 0 })
+				JSON.stringify({ promptIdleSec: 0, composerOpacity: 0.5 })
 			);
 			window.localStorage.setItem(
 				"ccez-llm-chats-v1",
@@ -181,6 +181,45 @@ test("composer card is translucent with backdrop blur", async ({ page }) => {
 	});
 	expect(glass.alpha).toBeLessThan(1);
 	expect(glass.blur).toMatch(/blur\(/);
+});
+
+/** The composer is opaque by default: no glass class, full alpha,
+no backdrop filter (the transparency slider opts in). */
+test("composer card is opaque by default", async ({ page }) => {
+	await page.addInitScript(() => {
+		window.localStorage.setItem("ccez-mock-provider", "1");
+		window.localStorage.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify({ promptIdleSec: 0 })
+		);
+		window.localStorage.setItem(
+			"ccez-llm-chats-v1",
+			JSON.stringify([
+				{
+					id: "e2e-chat",
+					createdAt: 1,
+					replyLang: null,
+					messages: [{ id: "m", role: "assistant", content: "hi", usage: null, error: null }]
+				}
+			])
+		);
+	});
+	await page.goto("/");
+	const composer = page.locator("main .prompt");
+	await expect(composer).toBeVisible({ timeout: 60_000 });
+	await expect(composer).not.toHaveClass(/glass/);
+	const glass = await page.evaluate(() => {
+		const el = document.querySelector("main .prompt") as HTMLElement | null;
+		if (!el) throw new Error("no composer");
+		const style = getComputedStyle(el);
+		return {
+			bg: style.backgroundColor,
+			blur: `${style.backdropFilter} ${style.getPropertyValue("-webkit-backdrop-filter")}`
+		};
+	});
+	expect(glass.bg).not.toMatch(/\/\s*0\./);
+	// Absent filters serialize as "none" (either prefix), never blur().
+	expect(glass.blur).not.toMatch(/blur\(/);
 });
 
 /** The thread runs full-height behind the frosted card: mid-thread
@@ -231,6 +270,45 @@ test("thread paints behind the frosted composer", async ({ page }) => {
 		);
 	});
 	expect(overlap).toBeGreaterThan(0);
+});
+
+/** Reduced motion settles the summon instantly: the card and its
+strip run no transition, so the landed frame is the final one. */
+test("reduced motion settles the composer instantly", async ({ page }) => {
+	await page.addInitScript(() => {
+		window.localStorage.setItem("ccez-mock-provider", "1");
+		window.localStorage.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify({ promptIdleSec: -1 })
+		);
+		window.localStorage.setItem(
+			"ccez-llm-chats-v1",
+			JSON.stringify([
+				{
+					id: "e2e-chat",
+					createdAt: 1,
+					replyLang: null,
+					messages: [{ id: "m", role: "assistant", content: "hi", usage: null, error: null }]
+				}
+			])
+		);
+	});
+	await page.goto("/");
+	const composer = page.locator("main .prompt");
+	await expect(composer).toBeAttached({ timeout: 60_000 });
+	await page.emulateMedia({ reducedMotion: "reduce" });
+	await page.keyboard.press("i");
+	await expect(composer).not.toHaveClass(/prompt-idle/, { timeout: 10_000 });
+	const durations = await page.evaluate(() => {
+		const el = document.querySelector("main .prompt") as HTMLElement | null;
+		if (!el) throw new Error("no composer");
+		return getComputedStyle(el)
+			.transitionDuration.split(",")
+			.map((part) => parseFloat(part));
+	});
+	expect(durations.length).toBeGreaterThan(0);
+	for (const seconds of durations) expect(seconds).toBe(0);
+	await page.emulateMedia({ reducedMotion: "no-preference" });
 });
 /** A press inside the composer outlives a focusout to nowhere: WebKit
 (the Tauri shell) never focuses the button being pressed, so the
