@@ -455,11 +455,17 @@ test.describe("touch", () => {
 	test("two-finger swipe right summons the chats list", async ({ page }) => {
 		await seedEmpty(page);
 		const aside = page.locator("aside:has(button.new)");
+		const panel = page.locator(".settings-panel");
 		await expect(aside).toHaveClass(/collapsed/);
 		// Two fingers freed from chat steps now summon like the
 		// one-finger rightward stroke does.
 		await swipeTwoFinger(page, 150, 310);
 		await expect(aside).not.toHaveClass(/collapsed/);
+		// ...and close an open settings panel instead of stacking.
+		await swipeTwoFinger(page, 300, 150);
+		await expect(panel).not.toHaveClass(/closed/);
+		await swipeTwoFinger(page, 150, 310);
+		await expect(panel).toHaveClass(/closed/);
 	});
 
 	test("three-finger swipe steps to the newer chat", async ({ page }) => {

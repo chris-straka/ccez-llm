@@ -81,10 +81,14 @@ describe("phone button parity", () => {
 });
 
 describe("phone highlight dock", () => {
-	it("makes Annotate/Inspect big while a highlight is up", () => {
+	it("makes Annotate/Inspect span both bars while a highlight is up", () => {
 		const css = pageStyle();
 		expect(css).toMatch(
-			/\.app\[data-android\] \.prompt:has\(\.ann-dock\) \.ann-dock\s*\{[^}]*min-height:\s*2\.75rem/
+			/\.app\[data-android\] \.prompt:has\(\.ann-dock\) \.ann-dock\s*\{[^}]*min-height:\s*5rem/
+		);
+		// The tall dock must not clip inside the row's 3rem cap.
+		expect(css).toMatch(
+			/\.app\[data-android\] \.prompt:has\(\.ann-dock\) \.prompt-tools\s*\{[^}]*max-height:\s*none/
 		);
 	});
 
@@ -94,6 +98,7 @@ describe("phone highlight dock", () => {
 		expect(css).toContain(".app[data-android] .prompt:has(.ann-dock) .mic-btn");
 		expect(css).toContain(".app[data-android] .prompt:has(.ann-dock) .voice-float");
 		expect(css).toContain(".app[data-android] .prompt:has(.ann-dock) .wp-jump");
+		expect(css).toContain(".app[data-android] .prompt:has(.ann-dock) .send-btn");
 		expect(css).toContain(".app[data-android] .prompt:has(.ann-dock) .ann-wrap");
 	});
 

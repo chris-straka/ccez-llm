@@ -65,6 +65,18 @@ describe("annotation create wiring", () => {
 		const source = pageSource();
 		expect(source).toContain("placeAnnPopX({");
 	});
+
+	it("ends the phone create pill with a Save button", () => {
+		const source = pageSource();
+		// The fresh pill is textarea + mic only on desktop (Enter
+		// files); phones get an explicit submit at the end because
+		// the software enter key is unreliable for filing.
+		const fresh = source.match(/#if annPop\.fresh\}[\s\S]*?\{:else\}/);
+		expect(fresh?.[0]).toBeDefined();
+		expect(fresh?.[0]).toContain("{#if androidUI}");
+		expect(fresh?.[0]).toContain("ann-pill-save");
+		expect(fresh?.[0]).toContain("saveAnnPop()");
+	});
 });
 
 describe("annotations-only messages", () => {

@@ -7617,7 +7617,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							persistSettings();
 						}}
 					>
-						{chatLabel(item.createdAt)}
+						{chatLabel(item.createdAt)}{#if androidUI} <span class="side-count"
+							>· {item.messages.length > 99 ? "99+" : item.messages.length}</span
+						>{/if}
 					</button>
 					<button
 						type="button"
@@ -8732,6 +8734,18 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						<ActionIcon kind="mic" />
 					</button>
 				{/if}
+				{#if androidUI}
+					<!-- Phones get a submit button at the pill's end: the
+					software keyboard's enter key is unreliable for filing
+					(desktop keeps Enter-only and the compact pill). -->
+					<button
+						type="button"
+						class="ann-save ann-pill-save"
+						aria-label="Save annotation"
+						onmousedown={(e) => e.preventDefault()}
+						onclick={() => saveAnnPop()}
+					>Save</button>
+				{/if}
 			{:else}
 			<div class="ann-pop-row">
 				<button
@@ -9293,6 +9307,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		border: 1px solid transparent;
 		border-radius: 8px;
 		background: transparent;
+		/* Same ButtonText trap as side-chat below: old phone WebViews
+		resolve unpinned button colors against the wrong scheme and the
+		text vanishes (Settings and + went invisible in light theme). */
+		color: #1c1c1e;
+		color: var(--ink);
 		cursor: pointer;
 		/* Never wrap mid-collapse: clip instead of reflowing over itself. */
 		white-space: nowrap;
@@ -10281,18 +10300,25 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.app[data-android] .voice-float :global(.action-glyph) {
 		height: 1.15em;
 	}
-	/* Highlight up: Annotate/Inspect go big while every other tool and
-	the hint stand down, so the next tap can't miss. Phones only;
-	desktop keeps the floating menu rhythm. */
+	/* Highlight up: Annotate/Inspect stand the height of both bars
+	while every other tool and the hint stand down (send steps
+	aside too, freeing the row), so the next tap can't miss.
+	Phones only; desktop keeps the floating menu rhythm. */
 	.app[data-android] .prompt:has(.ann-dock) .ann-dock {
-		font-size: 1.15rem;
-		padding: 0.55rem 1.1rem;
-		min-height: 2.75rem;
+		font-size: 1.3rem;
+		padding: 0.55rem 1.2rem;
+		min-height: 5rem;
+	}
+	/* The tall dock needs the row's full height: the 3rem cap would
+	clip it (the row still never ramps, so no tap ever chases it). */
+	.app[data-android] .prompt:has(.ann-dock) .prompt-tools {
+		max-height: none;
 	}
 	.app[data-android] .prompt:has(.ann-dock) .attach-btn,
 	.app[data-android] .prompt:has(.ann-dock) .mic-btn,
 	.app[data-android] .prompt:has(.ann-dock) .voice-float,
 	.app[data-android] .prompt:has(.ann-dock) .wp-jump,
+	.app[data-android] .prompt:has(.ann-dock) .send-btn,
 	.app[data-android] .prompt:has(.ann-dock) .ann-wrap {
 		display: none;
 	}
@@ -10358,16 +10384,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		border-radius: 0;
 		box-shadow: 8px 0 24px rgba(0, 0, 0, 0.16);
 		padding-bottom: calc(0.8rem + env(safe-area-inset-bottom, 0px));
-		/* Thumb-first column: search, list, new, and settings pile at
-		the bottom and the list scrolls between them. Desktop keeps
-		its top-down drawer. */
+		/* Thumb-first column: search alone at the top with breathing
+		room, the list fills the middle, and new + settings ride the
+		bottom edge. Desktop keeps its top-down drawer. */
 		display: flex;
 		flex-direction: column;
+		padding-top: calc(2.5rem + env(safe-area-inset-top, 0px));
 	}
-	/* The search stands on the pile's top: pushing it down lands
-	everything below it at the bottom too. */
 	.app[data-android] aside:not(.settings-panel) .side-search-wrap {
-		margin-top: auto;
+		margin-top: 0;
 	}
 	/* Twice the tap height with adult type. Desktop keeps the
 	compact filter. */
@@ -10377,7 +10402,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		padding: 0.8rem 2.2rem 0.8rem 0.8rem;
 	}
 	.app[data-android] aside:not(.settings-panel) ul {
-		flex: 0 1 auto;
+		flex: 1 1 auto;
 		min-height: 0;
 		overflow-y: auto;
 	}
@@ -10387,6 +10412,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		min-height: 5.5rem;
 		font-size: 1.15rem;
 		margin-top: 0.6rem;
+	}
+	/* The per-chat message counter rides dim beside the label, so the
+	date column keeps its alignment. Phone-only markup; desktop rows
+	never render it. */
+	.side-count {
+		color: #6e6e73;
+		color: var(--dim);
 	}
 	.app[data-android] aside:not(.settings-panel).collapsed {
 		transform: translateX(-105%);

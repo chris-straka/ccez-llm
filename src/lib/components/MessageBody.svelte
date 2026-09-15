@@ -669,6 +669,7 @@
 	}
 	.rendered :global(pre) {
 		background: #f1f1f4;
+		background: var(--bg-wash);
 		border-radius: 8px;
 		padding: 0.6rem 0.8rem;
 		overflow-x: auto;
@@ -682,6 +683,7 @@
 	}
 	.rendered :global(:not(pre) > code) {
 		background: #f1f1f4;
+		background: var(--bg-wash);
 		border-radius: 5px;
 		padding: 0.05rem 0.3rem;
 		font-size: 0.85em;
@@ -693,6 +695,7 @@
 	.rendered :global(th),
 	.rendered :global(td) {
 		border: 1px solid #c7c7cc;
+		border: 1px solid var(--line);
 		padding: 0.25rem 0.6rem;
 	}
 	.rendered :global(blockquote) {
@@ -1001,6 +1004,12 @@
 		margin: 0 -1px;
 		color: inherit;
 	}
+	/* The pale wash turns to mud in dark mode (and swallows the
+	selection tint stacked on annotated CJK): a translucent amber
+	keeps annotated text readable in both themes. */
+	:global(html[data-theme="dark"]) .rendered :global(mark.ccez-ann) {
+		background: rgba(245, 158, 11, 0.3);
+	}
 	/* The wash mounts/unmounts imperatively (applyMarks), so a plain
 	transition has nothing to run between: fade-in plays on mount for
 	newly arrived washes only, and fade-out plays on .leaving marks
@@ -1016,6 +1025,17 @@
 	.rendered :global(mark.ccez-ann.fresh) {
 		animation: ann-wash-in 0.12s ease;
 	}
+	@keyframes ann-wash-in-dark {
+		from {
+			background-color: transparent;
+		}
+		to {
+			background-color: rgba(245, 158, 11, 0.3);
+		}
+	}
+	:global(html[data-theme="dark"]) .rendered :global(mark.ccez-ann.fresh) {
+		animation-name: ann-wash-in-dark;
+	}
 	@keyframes ann-wash-out {
 		from {
 			background-color: #fff3b0;
@@ -1027,6 +1047,17 @@
 	.rendered :global(mark.ccez-ann.leaving) {
 		animation: ann-wash-out 0.18s ease forwards;
 	}
+	@keyframes ann-wash-out-dark {
+		from {
+			background-color: rgba(245, 158, 11, 0.3);
+		}
+		to {
+			background-color: transparent;
+		}
+	}
+	:global(html[data-theme="dark"]) .rendered :global(mark.ccez-ann.leaving) {
+		animation-name: ann-wash-out-dark;
+	}
 	/* Custom Highlight API wash (see annHighlights.paintAnnotationWash):
 	paints the same yellow over untouched DOM where CSS.highlights is
 	supported, so future stamps can skip mark-DOM wrapping. The mark
@@ -1034,6 +1065,15 @@
 	.rendered::highlight(ccez-ann) {
 		background-color: #fff3b0;
 		color: inherit;
+	}
+	:global(html[data-theme="dark"]) .rendered::highlight(ccez-ann) {
+		background-color: rgba(245, 158, 11, 0.3);
+	}
+	/* Ruby base text paints the selection tint explicitly: without
+	this some phone WebViews leave ruby-annotated CJK highlights
+	invisible (the readings themselves stay unselectable by design). */
+	.rendered :global(ruby::selection) {
+		background: var(--sel-tint);
 	}
 	/* Reading-aid text is overlay, not content: never selectable,
 	so it stays out of selections and selection-copies. */
