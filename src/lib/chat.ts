@@ -622,6 +622,24 @@ export async function streamAssistantReply(
 }
 
 /**
+ * Completion context for a finished send or resend: the origin chat's
+ * last message plus whether that chat is still open. Reads pin to the
+ * origin id, never the live chat — a mid-stream switch repoints the
+ * active chat at the new thread, and the new thread must not thump,
+ * speak, or ping for the old one's reply. A deleted origin matches
+ * nothing (same rule as the streaming replace above). Pure.
+ */
+export function resolveSendCompletion(
+	state: ChatState,
+	originId: ChatId,
+	activeId: ChatId
+): { sent: ChatMsg | undefined; stillHere: boolean } {
+	const origin = state.chats.find((c) => c.id === originId);
+	const messages = origin ? origin.messages : [];
+	return { sent: messages[messages.length - 1], stillHere: originId === activeId };
+}
+
+/**
  * Sidebar label count for one chat: the in-flight assistant placeholder
  * carries no text yet (nothing visible to count), so it joins the total
  * only once tokens — or an error — land. Keeps the "N msg" label equal

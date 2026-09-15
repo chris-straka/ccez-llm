@@ -30,6 +30,7 @@
 		sendMessage,
 		setPasteFold,
 		isSending,
+		resolveSendCompletion,
 		type Chat,
 		type ChatMsg,
 		type ChatId,
@@ -4167,11 +4168,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		scrollAfterRender();
 		await sending;
 		// Keep drafts when the reply failed so nothing silently drops.
-		// Read the reply off the ORIGIN chat, never the live one: a
-		// mid-stream switch leaves `chat` pointing at the new thread.
-		const origin = chatState.chats.find((c) => c.id === sentFrom.id) ?? sentFrom;
-		const sent = origin.messages[origin.messages.length - 1];
-		const stillHere = sentFrom.id === chat.id;
+		const { sent, stillHere } = resolveSendCompletion(chatState, sentFrom.id, chat.id);
 		if (sent?.role === "assistant" && !sent.error) {
 			// Haptic thump: everything has arrived. Same-chat only —
 			// the new chat must not thump for the old one's reply (a
@@ -4217,12 +4214,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				void hapticBeatAsync("first", { enabled: settings.vibration, shell: tauriBackendAvailable() });
 			}
 		});
-		// Same origin-chat discipline as a fresh send (see above): the
-		// live `chat` may point at a new thread by now.
-		const resentOrigin = chatState.chats.find((c) => c.id === resentFrom.id) ?? resentFrom;
-		const resent = resentOrigin.messages[resentOrigin.messages.length - 1];
+		// Same origin-chat discipline as a fresh send (see
+		// resolveSendCompletion): the live `chat` may point at a new
+		// thread by now.
+		const { sent: resent, stillHere: resentHere } = resolveSendCompletion(chatState, resentFrom.id, chat.id);
 		if (resent?.role === "assistant" && !resent.error) {
-			if (resentFrom.id === chat.id) {
+			// Same-chat only: a new thread never thumps for the old
+			// one's reply (see the fresh-send twin above).
+			if (resentHere) {
 				void hapticBeatAsync("done", { enabled: settings.vibration, shell: tauriBackendAvailable() });
 			}
 		}

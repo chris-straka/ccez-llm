@@ -689,6 +689,14 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
       gate on the ping and the send-time permission ask. Checkbox
       persistence e2e green. (d)/(f) wiring has no committed test:
       hardware-gated, pure beat/gate logic already unit-tested.
+- [x] Post-round micro-refactor: the origin-chat lookup the switch fix
+      duplicated across doSend/resend is now `resolveSendCompletion`
+      in chat.ts (mirrors the streaming replace's find rule; deleted
+      origin matches nothing), both call sites collapsed onto it, unit
+      test covers open/switched/deleted. Verdict on the "did we mess up
+      the refactors" question: no — the round's additions follow the
+      file's conventions (scale-actions twins, androidUI guards, shared
+      haptic call shapes); this was the only real duplication.
 
 ## Dev Keychain silence (Sep 15, main)
 - [x] Mass password prompts in dev: every unsigned `tauri dev` rebuild

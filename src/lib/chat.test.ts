@@ -4,6 +4,7 @@ import {
 	activeChat,
 	abortSend,
 	newChat,
+	newChatMsgId,
 	selectChat,
 	setChatReplyLang,
 	chatVoiceReadback,
@@ -25,6 +26,7 @@ import {
 	waypointLabel,
 	sendMessage,
 	setPasteFold,
+	resolveSendCompletion,
 	buildApiMessages,
 	visibleMessageCount,
 	isSending,
@@ -750,5 +752,32 @@ describe("resendLast identity", () => {
 		expect(messages.map((m) => m.role)).toEqual(["user", "assistant"]);
 		expect(messages[0]?.id).toBe(userId);
 		expect(messages[1]?.content).toBe("two");
+	});
+});
+
+describe("resolveSendCompletion", () => {
+	it("reads the origin chat and flags the open one", () => {
+		const { state } = stateWith(freshStore());
+		newChat(state);
+		const first = activeChat(state);
+		first.messages = [
+			{ id: newChatMsgId(), role: "user", content: "q", usage: null, error: null },
+			{ id: newChatMsgId(), role: "assistant", content: "old reply", usage: null, error: null }
+		];
+		newChat(state);
+		const second = activeChat(state);
+		second.messages = [
+			{ id: newChatMsgId(), role: "user", content: "new question", usage: null, error: null }
+		];
+		const open = resolveSendCompletion(state, first.id, first.id);
+		expect(open.sent?.content).toBe("old reply");
+		expect(open.stillHere).toBe(true);
+		const switched = resolveSendCompletion(state, first.id, second.id);
+		expect(switched.sent?.content).toBe("old reply");
+		expect(switched.stillHere).toBe(false);
+		deleteChat(state, first.id);
+		const gone = resolveSendCompletion(state, first.id, second.id);
+		expect(gone.sent).toBeUndefined();
+		expect(gone.stillHere).toBe(false);
 	});
 });
