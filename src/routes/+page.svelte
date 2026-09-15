@@ -89,11 +89,11 @@
 		holdIsTap,
 		indexAtViewportLine,
 		isEscapeHold,
+		keyFocusesEmptyPrompt,
 		messageEdgeScrollTop,
 		nearBottom,
 		resolveSidebarSpaceEnter,
 		scrollHoldVelocity,
-		spaceFocusesEmptyPrompt,
 		stepScrollTop,
 		unselectedScrollIntent
 	} from "$lib/scrollkeys";
@@ -1860,12 +1860,16 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * inset instead of clobbering it.
 	 */
 	$effect(() => {
+		// Empty chats reserve the prompt's room even while it parks
+		// (or previews): the hero and pills sit above a fixed floor,
+		// so the prompt appearing never shoves them upward.
+		const emptyReserve = viewChat.messages.length === 0;
 		const card = promptEl?.closest<HTMLElement>(".prompt") ?? null;
 		const box = scrollBox;
 		const mainEl = box?.closest<HTMLElement>("main") ?? null;
 		if (!card || !box || !mainEl) return;
 		const sync = (): void => {
-			mainEl.style.paddingBottom = promptParked()
+			mainEl.style.paddingBottom = promptParked() && !emptyReserve
 				? ""
 				: `calc(${Math.ceil(card.getBoundingClientRect().height) + 24}px + env(safe-area-inset-bottom, 0px))`;
 			// Scrollbar gutter the messages reserve (classic thin bar,
@@ -2273,6 +2277,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	function previewHover(id: ChatId): void {
 		if (selMenu) return;
 		if ((window.getSelection()?.toString() ?? "") !== "") return;
+		// The preview renders its own inert copy of the empty chrome
+		// below, so a live-open language list must not linger over it.
+		openLangMenu = null;
 		previewChatId = id;
 	}
 	const previewChat = $derived(
@@ -6073,7 +6080,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				// this branch only claims otherwise-unbound bare keys.
 				const modalOpen = Boolean(shortcutsOpen || palette.open || inspectChar);
 				const typing = Boolean(inEditor || isEditableTarget(event.target) || inSidebar);
-				// Ctrl+U/D jumps and empty-chat Space (see
+				// Ctrl+U/D jumps and empty-chat Space/Enter/i (see
 				// unselectedScrollAction); the intent glide below keeps
 				// its own guard and extracted call.
 				const unselected = unselectedScrollAction({
@@ -6082,7 +6089,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					modalOpen,
 					typing,
 					findOpen: find.open,
-					emptyPromptSpace: spaceFocusesEmptyPrompt({
+					emptyPromptSpace: keyFocusesEmptyPrompt({
 						...keyFacts(event),
 						messageCount: viewChat.messages.length,
 						inInteractive: isSpaceInteractiveTarget(event.target)
@@ -7842,7 +7849,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			class:has-mic={canMic && settings.micEnabled}
 			class:prompt-hidden={!!annPop && androidUI && !iosUI}
 			class:prompt-idle={promptParked()}
+			class:prompt-preview={previewing && viewChat.messages.length === 0}
 			data-empty={!hasText}
+			inert={previewing && viewChat.messages.length === 0}
 			bind:this={promptEl}
 			onclick={focusPromptFloor}
 			ondragover={(e) => e.preventDefault()}
@@ -8080,8 +8089,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			</button>
 		{/if}
 
-		{#if chat.messages.length === 0}
-			<div class="lang-menus" aria-label="Reply language">
+		{#if viewChat.messages.length === 0}
+			<!-- A hover preview of an empty chat shows the same pills,
+			inert: they preview the empty state, but every tap belongs
+			to the active chat — hovering away restores it. -->
+			<div class="lang-menus" aria-label="Reply language" inert={previewing}>
 				{#each LANGUAGE_MENUS as menu (menu.id)}
 					<div class="lang-menu">
 						<button
@@ -10274,6 +10286,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		below the fold of the hero, neither middle nor bottom. */
 		max-height: 60%;
 	}
+	main.empty .lang-menus {
+		/* Docked above the prompt's reserved floor, never mid-page:
+		the auto margin eats the free space between the hero zone
+		and the pills, so the row sits just over the composer. */
+		margin-top: auto;
+	}
 	.empty-state {
 		display: flex;
 		flex-direction: column;
@@ -12015,6 +12033,22 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	visibility must flip at once (no delay), while the slide and
 	fade still ramp back in. */
 	.prompt:not(.prompt-idle) {
+		transition:
+			border-color 0.18s ease,
+			transform 0.35s ease,
+			opacity 0.35s ease,
+			visibility 0s;
+	}
+	/* Empty-chat hover preview: the prompt shows although the open
+	sidebar parks it, inert (see the markup) so every tap and key
+	still belongs to the active chat. Triple class outranks the
+	idle hide above regardless of rule order, with the same instant
+	visibility timing as a restore. */
+	.prompt.prompt-idle.prompt-preview {
+		transform: none;
+		opacity: 1;
+		visibility: visible;
+		pointer-events: none;
 		transition:
 			border-color 0.18s ease,
 			transform 0.35s ease,

@@ -816,9 +816,11 @@
 		/* One shared box: the copy glyph brings its own 1rem height
 		while `$` is bare text, so equal height (not line-height
 		games — a zero line box collapses the button and the glyph
-		overflows upward) is what centers them on each other. */
+		overflows upward) is what centers them on each other. Exact
+		equal widths too, so the centered pair below is truly centered. */
 		height: 1.3rem;
-		min-width: 1.3rem;
+		width: 1.3rem;
+		box-sizing: border-box;
 		border: 0;
 		background: none;
 		padding: 0.15rem;
@@ -827,13 +829,16 @@
 		color: var(--muted);
 		cursor: pointer;
 	}
+	/* Top-centered pair: chrome position never depends on the
+	equation's width, so buttons sit still across renders instead
+	of riding the block's right edge. */
 	.rendered :global(.ccez-math-copy) {
-		right: 0.3rem;
+		left: calc(50% + 0.2rem);
 		line-height: 0;
 	}
 	/* Upright `$`: italic skewed the mark off the copy icon. */
 	.rendered :global(.ccez-math-tex) {
-		right: 1.7rem;
+		right: calc(50% + 0.2rem);
 		font-family:
 			ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 		font-size: 0.85rem;
@@ -868,9 +873,10 @@
 		display: none;
 	}
 	.rendered :global(.ccez-math-body) {
-		/* Right gutter clears the `$` + copy icons pinned top-right,
-		so equations never slide underneath them. */
-		padding: 0.6rem 3.4rem 0.6rem 0.8rem;
+		/* Top room clears the centered `$` + copy pair, so equations
+		never slide underneath them — and no right gutter, so the
+		block's width is the equation's own. */
+		padding: 2.2rem 0.8rem 0.6rem;
 		background: #fff;
 		overflow-x: auto;
 		cursor: text;
@@ -882,7 +888,9 @@
 	.rendered :global(.ccez-math-raw) {
 		display: none;
 		margin: 0;
-		padding: 0.6rem 3.4rem 0.6rem 0.8rem;
+		/* Same top room as the body: the chrome pair stays put when
+		`$` flips rendered to source. */
+		padding: 2.2rem 0.8rem 0.6rem;
 		background: #fff;
 		font-family:
 			ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;

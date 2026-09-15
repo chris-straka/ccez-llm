@@ -92,12 +92,15 @@ export function resolveSidebarSpaceEnter(sideIdx: number, chatCount: number): Si
 }
 
 /**
- * Bare Space on an empty chat focuses the composer: with no messages
- * there is nothing to scroll, so the key lands in the prompt instead
- * of scrolling nowhere. Never fires with a modifier, inside a field
- * or button (Space types and clicks there), or on a chat with history.
+ * Bare Space / Enter / i on an empty chat focuses the composer: with
+ * no messages there is nothing to scroll, so the key lands in the
+ * prompt instead of scrolling nowhere (or doing nothing — neither
+ * Enter nor i scrolls anywhere either). The key is a summon, never
+ * typed. Never fires with a modifier, inside a field or button
+ * (Space types and clicks, Enter clicks, there), or on a chat with
+ * history.
  */
-export function spaceFocusesEmptyPrompt(args: {
+export function keyFocusesEmptyPrompt(args: {
 	key: string;
 	shiftKey: boolean;
 	metaKey: boolean;
@@ -107,7 +110,7 @@ export function spaceFocusesEmptyPrompt(args: {
 	inInteractive: boolean;
 }): boolean {
 	return (
-		args.key === " " &&
+		(args.key === " " || args.key === "Enter" || args.key === "i") &&
 		!args.shiftKey &&
 		!args.metaKey &&
 		!args.ctrlKey &&

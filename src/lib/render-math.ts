@@ -310,10 +310,12 @@ export function mathHtml(entry: MathEntry, index: number): string {
 		// Unknown/invalid math keeps plain rendering, never fatal.
 		return escapeHtml(entry.raw);
 	}
-	// Display math carries the code-style head: copy top-right, a `$`
-	// toggle left of it flipping rendered/raw, and a `latex · N LOC`
-	// folded label (folding rides `data-folded`, wired elsewhere). A
-	// body click still copies the TeX with its `$$` delimiters (see
+	// Display math carries centered top chrome: a `$` toggle and copy
+	// button side by side over the equation's middle, flipping
+	// rendered/raw, plus a `latex · N LOC` folded label (folding rides
+	// `data-folded`, wired elsewhere). Chrome never sizes off the
+	// equation's width, so buttons sit still across renders. A body
+	// click still copies the TeX with its `$$` delimiters (see
 	// mathCopyText). Inline math renders bare (no chrome at all): a bar
 	// mid-sentence would break the line's rhythm, and its TeX stays one
 	// message-copy away. `.ccez-math-body` and `data-math-index` are the

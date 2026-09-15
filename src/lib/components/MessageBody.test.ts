@@ -49,6 +49,27 @@ describe("math chrome alignment", () => {
 		if (!shared) throw new Error("no shared math chrome rule");
 		return shared[2]!;
 	}
+	function copyRule(): string {
+		const css = bodyStyle();
+		const rules = [...css.matchAll(/([^{}]*\.ccez-math-copy[^{}]*)\{([^}]*)\}/g)];
+		const own = rules.find(
+			(rule) => !rule[1]!.includes(".ccez-math-tex") && !/hover|data-folded/.test(rule[1]!)
+		);
+		if (!own) throw new Error("no base .ccez-math-copy rule");
+		return own[2]!;
+	}
+	/** Base display-body rule (not the folded, raw-view, or inline overrides). */
+	function mathBodyRule(): string {
+		const css = bodyStyle();
+		const rules = [...css.matchAll(/([^{}]*\.ccez-math-body[^{}]*)\{([^}]*)\}/g)];
+		const base = rules.find(
+			(rule) =>
+				/\(\.ccez-math-body\)$/.test(rule[1]!.trim()) &&
+				!/inline|data-folded|data-math-raw/.test(rule[1]!)
+		);
+		if (!base) throw new Error("no base .ccez-math-body rule");
+		return base[2]!;
+	}
 	it("keeps the source toggle upright", () => {
 		expect(texRule()).toMatch(/font-style\s*:\s*normal/);
 	});
@@ -57,5 +78,14 @@ describe("math chrome alignment", () => {
 	});
 	it("sizes both buttons to one shared box", () => {
 		expect(sharedRule()).toMatch(/height\s*:\s*1\.3rem/);
+		expect(sharedRule()).toMatch(/width\s*:\s*1\.3rem/);
+	});
+	it("centers the chrome pair on top instead of pinning the right edge", () => {
+		expect(copyRule()).toMatch(/left\s*:\s*calc\(50%/);
+		expect(texRule()).toMatch(/right\s*:\s*calc\(50%/);
+	});
+	it("clears the chrome with top room, not a right gutter", () => {
+		expect(mathBodyRule()).toMatch(/padding\s*:\s*2\.2rem/);
+		expect(mathBodyRule()).not.toMatch(/3\.4rem/);
 	});
 });

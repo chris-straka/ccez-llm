@@ -12,11 +12,11 @@ import {
 	holdIsTap,
 	indexAtViewportLine,
 	isEscapeHold,
+	keyFocusesEmptyPrompt,
 	messageEdgeScrollTop,
 	nearBottom,
 	resolveSidebarSpaceEnter,
 	scrollHoldVelocity,
-	spaceFocusesEmptyPrompt,
 	stepScrollTop,
 	unselectedScrollIntent
 } from "./scrollkeys";
@@ -96,7 +96,7 @@ describe("resolveSidebarSpaceEnter", () => {
 	});
 });
 
-describe("spaceFocusesEmptyPrompt", () => {
+describe("keyFocusesEmptyPrompt", () => {
 	const bare = {
 		key: " ",
 		shiftKey: false,
@@ -106,16 +106,23 @@ describe("spaceFocusesEmptyPrompt", () => {
 		messageCount: 0,
 		inInteractive: false
 	};
-	it("lands bare Space in the composer on an empty chat", () => {
-		expect(spaceFocusesEmptyPrompt(bare)).toBe(true);
+	it("lands bare Space, Enter, and i in the composer on an empty chat", () => {
+		expect(keyFocusesEmptyPrompt(bare)).toBe(true);
+		expect(keyFocusesEmptyPrompt({ ...bare, key: "Enter" })).toBe(true);
+		expect(keyFocusesEmptyPrompt({ ...bare, key: "i" })).toBe(true);
 	});
 
-	it("stays native with history, modifiers, or an interactive target", () => {
-		expect(spaceFocusesEmptyPrompt({ ...bare, messageCount: 1 })).toBe(false);
-		expect(spaceFocusesEmptyPrompt({ ...bare, shiftKey: true })).toBe(false);
-		expect(spaceFocusesEmptyPrompt({ ...bare, ctrlKey: true })).toBe(false);
-		expect(spaceFocusesEmptyPrompt({ ...bare, inInteractive: true })).toBe(false);
-		expect(spaceFocusesEmptyPrompt({ ...bare, key: "Enter" })).toBe(false);
+	it("stays native with history, modifiers, an interactive target, or other keys", () => {
+		expect(keyFocusesEmptyPrompt({ ...bare, messageCount: 1 })).toBe(false);
+		expect(keyFocusesEmptyPrompt({ ...bare, key: "Enter", messageCount: 1 })).toBe(false);
+		expect(keyFocusesEmptyPrompt({ ...bare, key: "i", messageCount: 2 })).toBe(false);
+		expect(keyFocusesEmptyPrompt({ ...bare, shiftKey: true })).toBe(false);
+		expect(keyFocusesEmptyPrompt({ ...bare, key: "Enter", shiftKey: true })).toBe(false);
+		expect(keyFocusesEmptyPrompt({ ...bare, ctrlKey: true })).toBe(false);
+		expect(keyFocusesEmptyPrompt({ ...bare, inInteractive: true })).toBe(false);
+		expect(keyFocusesEmptyPrompt({ ...bare, key: "Enter", inInteractive: true })).toBe(false);
+		expect(keyFocusesEmptyPrompt({ ...bare, key: "j" })).toBe(false);
+		expect(keyFocusesEmptyPrompt({ ...bare, key: "I" })).toBe(false);
 	});
 });
 

@@ -278,3 +278,48 @@ test("empty chat restores an idle-hidden composer", async ({ page }) => {
 	await rows.nth(1).click();
 	await expect(composer).toBeVisible();
 });
+
+/** On an empty chat, bare Space, Enter, and i all land in the composer:
+there is nothing to scroll, so each is a summon (never typed). */
+test("empty chat Space Enter i focus the composer", async ({ page }) => {
+	await seedChat(page, []);
+	await page.goto("/");
+	await expect(page.locator(".hero")).toBeVisible({ timeout: 60_000 });
+	const inPrompt = () => page.evaluate(() => !!document.activeElement?.closest?.(".prompt"));
+	for (const key of ["Space", "Enter", "i"]) {
+		// The hero takes focus back to the body without summoning.
+		await page.locator(".hero").click();
+		expect(await inPrompt()).toBe(false);
+		await page.keyboard.press(key);
+		await expect.poll(inPrompt, { timeout: 5000 }).toBe(true);
+	}
+});
+
+/** Hovering an empty chat previews its full empty state — hero, language
+pills, and composer — inert, so every tap still belongs to the active chat. */
+test("empty preview shows inert pills and composer", async ({ page }) => {
+	await page.addInitScript(() => {
+		window.localStorage.setItem("ccez-mock-provider", "1");
+		const chat = (id: string, messages: unknown[]) => ({ id, createdAt: 1, replyLang: null, messages });
+		const msg = (id: string, content: string) => ({ id, role: "assistant", content, usage: null, error: null });
+		window.localStorage.setItem(
+			"ccez-llm-chats-v1",
+			JSON.stringify([chat("chat-a", [msg("chat-a-m", "Alpha thread with a message.")]), chat("chat-b", [])])
+		);
+	});
+	await page.goto("/");
+	await expect(page.locator("article .rendered").first()).toBeVisible({ timeout: 60_000 });
+	await page.keyboard.press("Meta+b");
+	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
+	// The open sidebar parks the live composer...
+	await expect(page.locator("main .prompt")).toBeHidden();
+	// ...but hovering the empty row previews it back, with the pills.
+	await page.locator("aside ul li button.side-chat").nth(1).hover();
+	await expect(page.locator("main .hero")).toBeVisible();
+	await expect(page.locator("main .lang-menus")).toBeVisible();
+	const previewPrompt = page.locator("main .prompt.prompt-preview");
+	await expect(previewPrompt).toBeVisible();
+	await expect(previewPrompt).toHaveAttribute("inert", "");
+	await expect(page.locator("main .lang-menus")).toHaveAttribute("inert", "");
+	await expect(page.locator("main .messages")).not.toContainText("Alpha thread");
+});
