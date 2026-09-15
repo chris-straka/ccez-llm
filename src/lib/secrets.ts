@@ -34,7 +34,8 @@ const ENVELOPE_V1 = "gcm1:";
  * re-prompt symptom as the ad-hoc dev-rebuild issue. Dev rebuilds
  * must be re-signed with the persistent local self-signed "Ccez Dev"
  * cert (`codesign -s`); that identity lives only on the dev machine
- * and is never committed.
+ * and is never committed. Automated by `scripts/tauri-dev.sh` (launch)
+ * and `scripts/sign-dev-binary.sh` (re-sign after Rust rebuilds).
  */
 export const KEYCHAIN_SERVICE = "studio.ccez.app";
 

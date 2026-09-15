@@ -11,6 +11,13 @@ privileged (Keychain, updater, native TTS).
 - `bun run tauri dev` — full shell: Vite on :1420 + Rust backend + app window.
   Use this when touching `src-tauri/` or Tauri invokes. First build compiles
   ~400 crates; be patient.
+- Dev Keychain (macOS): unsigned rebuilds get a fresh code identity, so the
+  shell re-prompts once per Keychain item on every backend rebuild. Prefer
+  `scripts/tauri-dev.sh` — it re-signs the dev binary with the persistent
+  local self-signed "Ccez Dev" cert (login keychain, dev machine only, never
+  committed), and one round of Always Allow per item then sticks across
+  rebuilds. Mid-session Rust rebuilds relink unsigned: re-run
+  `scripts/sign-dev-binary.sh` when prompts return.
 - `bun run test` — Vitest, colocated `*.test.ts`. Safe anytime.
 - `bun run check` / `lint` / `build` — run `svelte-kit sync` and/or invalidate
   HMR. Never run these while a dev server is up and someone is looking at it;

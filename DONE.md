@@ -659,3 +659,22 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
       Linux-only check is what let the exit bug ship); 68 cargo tests,
       clippy clean for the file. Hover pixels + seat position await
       owner eyes on next launch.
+
+## Dev Keychain silence (Sep 15, main)
+- [x] Mass password prompts in dev: every unsigned `tauri dev` rebuild
+      ships a fresh code identity, so macOS re-prompted once per
+      Keychain item (bundle + legacy migration touches ≈ the reported
+      5 dialogs) on every backend round — not tests (nothing in the
+      gates reaches the login Keychain) and not retry-spam (prompts
+      are per-item ACL checks). Hooked up the documented "Ccez Dev"
+      workflow for real: persistent local self-signed Code Signing
+      cert created in the login keychain (openssl, codeSigning EKU;
+      key material deleted after import), `scripts/sign-dev-binary.sh`
+      re-signs `src-tauri/target/debug/ccez-llm` (proven live on the
+      real binary: signs + verifies), `scripts/tauri-dev.sh` launches
+      with launch-time signing. `codesign -s` resolves the identity
+      even though `find-identity` declines to list it. One round of
+      Always Allow per item now sticks across rebuilds; mid-session
+      Rust relinks need a re-sign. AGENTS.md + secrets.ts pointer
+      updated. No committed test (shell wrapper + machine-local cert;
+      verification is the live sign/verify smoke, re-runnable).
