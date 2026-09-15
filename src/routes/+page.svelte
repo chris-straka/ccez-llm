@@ -2116,6 +2116,19 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	});
 
 	/**
+	 * Whole-window alpha rides on <html> too: the root paints beneath
+	 * .app, so the Transparency slider must thin every layer down to
+	 * the webview canvas. An opaque <html> caps the effect — and on a
+	 * mismatched OS/app theme it reads as darkening instead of
+	 * thinning. .app keeps its own copy (see the root div style, which
+	 * the settings tests pin) — same source value, inherited by
+	 * everything between.
+	 */
+	$effect(() => {
+		document.documentElement.style.setProperty("--bg-alpha", String(settings.bgOpacity ?? 1));
+	});
+
+	/**
 	 * Hide-messages mode (touch): every body stays hidden until its
 	 * message is tapped — the open one shows text and buttons, then
 	 * closes itself after 3s. Tapping controls never toggles.
@@ -8168,11 +8181,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		(the active reply language shows on the send button instead).
 		Double-click zooms. -->
 		<header role="toolbar" aria-label="App" tabindex="-1" onmousedown={dragWindow} ondblclick={zoomWindow}>
-			<!-- Traffic-light veil: the native Overlay buttons paint
-			above the webview, so this bg-colored patch hides them at
-			rest and fades on header hover (see CSS). Clicks always
-			pass through; the buttons stay live underneath. -->
-			<span class="traffic-veil" aria-hidden="true"></span>
 		</header>
 
 		<!-- In-chat find (Cmd/Ctrl+F): message-level cycling browser-style. -->
@@ -9914,6 +9922,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		overflow-x: hidden;
 		background: #fff;
 		background: var(--bg);
+		/* Full-height drawer: rides whole-window Transparency like
+		the chat list, so the slider thins the entire window. */
+		background: color-mix(in srgb, var(--bg) calc(var(--bg-alpha, 1) * 100%), transparent);
 		/* Same drawer contract as the chat list (see aside): the
 		fade used to finish first and swallow the closing slide. */
 		transition:
@@ -9948,6 +9959,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		overflow-y: auto;
 		background: #fff;
 		background: var(--bg);
+		/* Transient overlay, still part of the window: rides
+		whole-window Transparency (the dim veil stays). */
+		background: color-mix(in srgb, var(--bg) calc(var(--bg-alpha, 1) * 100%), transparent);
 		color: #1c1c1e;
 		color: var(--ink);
 		border: 1px solid #e5e5ea;
@@ -10516,32 +10530,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		margin-left: 5.75rem;
 		margin-top: 0.35rem;
 	}
-	/* Traffic-light hover fade: Tauri Overlay chrome paints the
-	native buttons above the webview (x:20-72, y:26), so CSS cannot
-	fade the buttons themselves. Instead this app-background patch
-	covers them at rest and fades out while the pointer is over the
-	title strip, fading back in on leave. pointer-events:none, so
-	the live buttons take clicks even while covered. macOS shell
-	only — Android and plain browsers have no lights to veil. */
-	.traffic-veil {
-		display: none;
-	}
-	.app[data-shell="tauri"]:not([data-android]) .traffic-veil {
-		display: block;
-		position: absolute;
-		left: 12px;
-		top: 17px;
-		width: 68px;
-		height: 20px;
-		border-radius: 10px;
-		background: color-mix(in srgb, var(--bg) calc(var(--bg-alpha, 1) * 100%), transparent);
-		opacity: 1;
-		transition: opacity 0.25s ease;
-		pointer-events: none;
-	}
-	.app[data-shell="tauri"]:not([data-android]) header:hover .traffic-veil {
-		opacity: 0;
-	}
+	/* Traffic-light hover fade lives in the shell (see
+	src-tauri/src/trafficlights.rs): the native Overlay buttons paint
+	above the webview, so no web patch can fade them — the stale
+	bg-colored cover that sat here fought the native fade and ghosted
+	the cluster, and is gone. */
 	/* Android is a Tauri shell with no traffic lights and no window
 	drag: drop the desktop clearance and the empty drag strip. */
 	.app[data-android] header {

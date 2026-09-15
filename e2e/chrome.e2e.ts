@@ -927,28 +927,12 @@ test("viewport meta stays Chromium-key-free on desktop", async ({ page }) => {
 	expect(content).not.toContain("interactive-widget");
 });
 
-/** Traffic-light veil: shell-only patch over the native buttons, fades out on strip hover. */
-test("traffic veil hides at rest and fades on header hover", async ({ page }) => {
+/** No traffic-light veil: the shell owns the hover fade natively, so
+no web patch may cover the lights — the stale bg-colored cover sat at
+the old button spot and ghosted the cluster once the lights moved. */
+test("no traffic veil element remains", async ({ page }) => {
 	await openWithMessages(page, [{ role: "user", content: "hi" }]);
-	const veil = page.locator(".traffic-veil");
-	await expect(veil).toHaveCount(1);
-	// Plain browser dev has no native lights: the veil stays off.
-	await expect(veil).toBeHidden();
-	// Flip to shell chrome to exercise the real fade rule end to end.
-	await page.evaluate(() => {
-		document.querySelector(".app")?.setAttribute("data-shell", "tauri");
-	});
-	await expect(veil).toBeVisible();
-	const opacity = () => veil.evaluate((el) => getComputedStyle(el).opacity);
-	expect(await opacity()).toBe("1");
-	await page.locator("header[aria-label='App']").hover({ position: { x: 200, y: 5 } });
-	await expect.poll(opacity, { timeout: 5000 }).toBe("0");
-	// Leaving the strip fades the cover back in.
-	await page.mouse.move(400, 400);
-	await expect.poll(opacity, { timeout: 5000 }).toBe("1");
-	await page.evaluate(() => {
-		document.querySelector(".app")?.setAttribute("data-shell", "browser");
-	});
+	await expect(page.locator(".traffic-veil")).toHaveCount(0);
 });
 
 /** Minting a chat from a shelved prompt shows the composer focused

@@ -11,6 +11,13 @@ Android WebView must not "help" by darkening light text into
 invisibility. Without this the chat list reads fine on desktop
 but vanishes on the phone in dark mode. */
 html {
+	/* Whole-window Transparency bottoms out on the themed root
+	(below, per data-theme): the root paints beneath .app, so an
+	opaque root caps the slider — and on a mismatched OS/app theme
+	it reads as darkening, not thinning. --bg-alpha is synced onto
+	<html> by the theme effect; the plain var(--bg) line keeps old
+	engines opaque. Scoped to data-theme so first paint keeps
+	app.html's cold-start background. */
 	--strong: #1c1c1e;
 	--sel-tint: rgba(99, 102, 241, 0.28);
 	--ok: #1f7a4d;
@@ -35,6 +42,8 @@ html {
 	--focus: #3a3a3c;
 }
 html[data-theme="light"] {
+	background: var(--bg);
+	background: color-mix(in srgb, var(--bg) calc(var(--bg-alpha, 1) * 100%), transparent);
 	--strong: #1c1c1e;
 	--sel-tint: rgba(99, 102, 241, 0.28);
 	--ok: #1f7a4d;
@@ -59,6 +68,8 @@ html[data-theme="light"] {
 	--focus: #3a3a3c;
 }
 html[data-theme="dark"] {
+	background: var(--bg);
+	background: color-mix(in srgb, var(--bg) calc(var(--bg-alpha, 1) * 100%), transparent);
 	--strong: #aeaeb2;
 	--sel-tint: rgba(129, 140, 248, 0.4);
 	--ok: #7cc3a3;

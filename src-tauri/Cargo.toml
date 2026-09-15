@@ -58,9 +58,10 @@ objc2-foundation = "0.3"
 objc2-avf-audio = "0.3"
 objc2-natural-language = "0.3"
 [target.'cfg(target_os = "macos")'.dependencies]
-# No block2 feature: the removed summon monitor was its only user
-# (dictate/tts use block2 directly, not through AppKit types).
-objc2-app-kit = "0.3"
+# block2 feature: the traffic-light hover monitor passes a block to
+# NSEvent's local monitor (dictate/tts use block2 directly, not
+# through AppKit types).
+objc2-app-kit = { version = "0.3", features = ["block2"] }
 # Speech-recognition authorization callback (dictate_macos only).
 block2 = "0.6"
 # On-device text recognition (Vision VNRecognizeTextRequest, ocr.rs).

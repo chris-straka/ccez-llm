@@ -309,6 +309,17 @@ test("reduced motion settles the composer instantly", async ({ page }) => {
 	expect(durations.length).toBeGreaterThan(0);
 	for (const seconds of durations) expect(seconds).toBe(0);
 	await page.emulateMedia({ reducedMotion: "no-preference" });
+	// The ramp comes back with the setting: the summon slides again
+	// (the visibility flip legitimately stays instant, so the longest
+	// ramp — not every entry — must be positive).
+	const live = await page.evaluate(() => {
+		const el = document.querySelector("main .prompt") as HTMLElement | null;
+		if (!el) throw new Error("no composer");
+		return getComputedStyle(el)
+			.transitionDuration.split(",")
+			.map((part) => parseFloat(part));
+	});
+	expect(Math.max(...live)).toBeGreaterThan(0);
 });
 /** A press inside the composer outlives a focusout to nowhere: WebKit
 (the Tauri shell) never focuses the button being pressed, so the

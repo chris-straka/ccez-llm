@@ -628,3 +628,34 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
       fade to 0 at rest via button-relative tracking areas, back on
       hover, forced visible in fullscreen; pure `target_alpha` unit
       tests, cargo check/clippy/test green. Pixels await owner eyes.
+- [x] Prompt slide "lost" (Sep 15 report): not a regression — 0748feb
+      only added the reduce-motion query (base ramps untouched, proven
+      by a new no-preference-durations e2e). Instant summon = the OS
+      Reduce Motion switch left on from the experiment + the desktop
+      rise now honoring it. Devtools Rendering emulation suffices for
+      experiments, no system change needed.
+- [x] Whole-window Transparency dead (Sep 15 report): the color math
+      was innocent (probed real Chromium: color-mix preserves hue) —
+      the opaque `<html>` root capped the slider, and on a mismatched
+      OS/app theme it read as darkening. --bg-alpha now syncs onto
+      documentElement, the themed root + settings drawer + modal ride
+      it (bubbles/menus/inputs stay opaque); wry already runs a
+      transparent webview, so wallpaper should show. New root-thinning
+      e2e (alpha reaches html, hue steady vs opaque baseline) green.
+- [x] Traffic lights fade-in-never-out + ghost move + no cursor (Sep 15
+      report): three causes, one package. (1) Tracking areas must never
+      hang off NSButtons — NSControl rebuilds them on state change, so
+      the fade-in ate its own exit events; hover is now recomputed from
+      live button geometry on every mouse move (local monitor, blocks
+      via the objc2-app-kit block2 feature) + a content-view enter/exit
+      refresh, change-only fades, Reduce-Motion snap. Pure hit-test
+      units added. (2) The HTML veil sat at the stale (12,14) spot
+      while the lights had moved to (20,26) in 2409f3c with no noted
+      reason — veil removed (a web patch can never fade native chrome
+      anyway), position restored to (12,14); veil e2e replaced with an
+      absence guard. Buttons are never repositioned or overlaid, so
+      stock hover glyphs + arrow cursor are untouched. macOS module
+      compile-checked for real (aarch64-apple-darwin check green —
+      Linux-only check is what let the exit bug ship); 68 cargo tests,
+      clippy clean for the file. Hover pixels + seat position await
+      owner eyes on next launch.
