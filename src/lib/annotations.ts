@@ -352,7 +352,16 @@ export interface AnnotationMark {
  */
 export function quoteFragmentText(frag: DocumentFragment): string {
 	frag
-		.querySelectorAll("[data-ann-badge], rt, rp, .frt, .ccez-math-head, .ccez-code-head")
+		.querySelectorAll(
+			"[data-ann-badge], rt, rp, .frt, .ccez-math-head, .ccez-code-head," +
+				// Chrome buttons and folded labels are UI, not message
+				// text (a spanning drag still includes them in the range
+				// even where user-select keeps them out of the paint).
+				" .ccez-math-tex, .ccez-math-copy, .ccez-math-foldedlabel, .ccez-code-foldedlabel," +
+				// Folded-away bodies quote nothing: their text is hidden.
+				' .ccez-math[data-folded="1"] .ccez-math-body,' +
+				` .ccez-math[data-folded="1"] .ccez-math-raw, .ccez-code[data-folded="1"] pre`
+		)
 		.forEach((el) => el.remove());
 	return frag.textContent?.trim() ?? "";
 }
@@ -389,9 +398,11 @@ export function equationBodyOf(node: Node | null): Element | null {
  * so only the visual suffers). Drop it from the live range; every
  * other pick passes through untouched. Two shapes: the end sits past
  * newline text, or parked at the next block's start (a triple-click
- * lands its focus there) — the latter pulls back to the previous
- * text's end. Returns true when the range moved. Never throws
- * (selection APIs disagree across engines; paint must survive).
+ * lands its focus there — often on chrome like the `$` button) — the
+ * latter pulls back to the last text with real content, skipping the
+ * empty paragraphs and newline glue between blocks. Returns true when
+ * the range moved. Never throws (selection APIs disagree across
+ * engines; paint must survive).
  */
 export function trimParagraphTerminator(range: Range): boolean {
 	try {
@@ -413,41 +424,43 @@ export function trimParagraphTerminator(range: Range): boolean {
 			return true;
 		};
 		if (trimTextTail()) return true;
-		// End at a text start (or parked at a block start, where a
-		// triple-click lands its focus): pull back to the previous
-		// text's end without climbing above their common ancestor. An
-		// end mid-text with no tail is already clean.
+		// End parked at an element boundary (a triple-click lands its
+		// focus at the next block's start — often on chrome like the
+		// `$` button): pull back to the last text with real content at
+		// or before the end. Empty paragraphs and newline-only glue
+		// the pipeline leaves between blocks quote nothing, so the
+		// walk skips them instead of landing inside them (landing
+		// there repaints the line beneath). An end mid-text with no
+		// tail is already clean. Never climbs above the common
+		// ancestor; never collapses into the start.
 		const endNode = range.endContainer;
 		if (endNode instanceof Text && range.endOffset > 0) return false;
 		const stop = range.commonAncestorContainer;
 		const origEnd = { node: range.endContainer, offset: range.endOffset };
-		let node: Node = endNode;
-		let idx = endNode instanceof Text ? 0 : range.endOffset;
-		for (;;) {
-			const kids = node.childNodes;
-			let deep: Node | null = idx > 0 ? (kids[idx - 1] ?? null) : null;
-			while (deep && !(deep instanceof Text)) {
-				const inner = deep.childNodes;
-				deep = inner.length > 0 ? (inner[inner.length - 1] ?? null) : null;
-			}
-			if (deep instanceof Text && (deep.textContent?.length ?? 0) > 0) {
-				range.setEnd(deep, deep.textContent?.length ?? 0);
-				if (range.collapsed) {
-					range.setEnd(origEnd.node, origEnd.offset);
-					return false;
-				}
-				// That text may itself end with newlines: trim those too.
-				trimTextTail();
-				return true;
-			}
-			if (node === stop) return false;
-			const parent = node.parentNode;
-			if (!parent || !(parent instanceof Node)) return false;
-			const at: number = Array.prototype.indexOf.call(parent.childNodes, node);
-			if (at < 0) return false;
-			idx = at;
-			node = parent;
+		const walker = document.createTreeWalker(stop, NodeFilter.SHOW_TEXT);
+		const texts: Text[] = [];
+		while (walker.nextNode()) {
+			const node = walker.currentNode;
+			if (node instanceof Text) texts.push(node);
 		}
+		for (let i = texts.length - 1; i >= 0; i--) {
+			const text = texts[i];
+			if (!text) continue;
+			const content = text.textContent ?? "";
+			if (content === "" || /^[\r\n]+$/.test(content)) continue;
+			// Outside the pick (past its end, or before its start) is
+			// another gesture's text.
+			if (!range.intersectsNode(text)) continue;
+			range.setEnd(text, content.length);
+			if (range.collapsed) {
+				range.setEnd(origEnd.node, origEnd.offset);
+				return false;
+			}
+			// That text may itself end with newlines: trim those too.
+			trimTextTail();
+			return true;
+		}
+		return false;
 	} catch {
 		return false;
 	}

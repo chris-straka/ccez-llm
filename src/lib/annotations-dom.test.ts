@@ -55,6 +55,41 @@ describe("quoteFragmentText", () => {
 		);
 		expect(text).toBe("x = 1");
 	});
+
+	it("drops math chrome buttons, keeping the equation body", () => {
+		// A spanning drag includes the `$` toggle and copy button in
+		// its range even where user-select keeps them out of the
+		// paint: neither may bake into the quote.
+		const text = quoteFragmentText(
+			fragment(
+				'<div class="ccez-math" data-math-index="0"><button type="button" class="ccez-math-tex">$</button>' +
+					'<button type="button" class="ccez-math-copy">copy</button>' +
+					'<div class="ccez-math-body"><span class="katex">E</span></div></div>'
+			)
+		);
+		expect(text).toBe("E");
+	});
+
+	it("drops folded labels and folded-away bodies", () => {
+		// Folded labels are chrome and folded bodies are hidden: a
+		// drag spanning a folded block quotes neither.
+		const math = quoteFragmentText(
+			fragment(
+				'<div class="ccez-math" data-math-index="0" data-folded="1">' +
+					'<span class="ccez-math-foldedlabel">latex · 1 LOC</span>' +
+					'<div class="ccez-math-body"><span class="katex">E</span></div>' +
+					"<pre class=\"ccez-math-raw\">E_n</pre></div>"
+			)
+		);
+		expect(math).toBe("");
+		const code = quoteFragmentText(
+			fragment(
+				'<div class="ccez-code" data-folded="1"><span class="ccez-code-foldedlabel">python · 2 LOC</span>' +
+					"<pre><code>x = 1</code></pre></div>"
+			)
+		);
+		expect(code).toBe("");
+	});
 });
 
 describe("equationBodyOf", () => {
@@ -172,6 +207,28 @@ describe("trimParagraphTerminator", () => {
 		expect(range.toString()).toBe("plain line");
 		root.remove();
 	});
+	it("skips empty paragraphs and chrome parking past the pick", () => {
+		// Triple-clicking a heading parks its focus at the next
+		// block's start — on the `$` chrome — with the pipeline's
+		// empty paragraphs and newline glue between: the walk must
+		// pull back to the heading, not land in the glue (which
+		// repaints the line beneath).
+		const root = document.createElement("div");
+		root.innerHTML =
+			"<h2>1. Pythagorean Theorem</h2>\n<p></p>" +
+			'<div class="ccez-math" data-math-index="0"><button type="button" class="ccez-math-tex">$</button>' +
+			'<div class="ccez-math-body"><span>E</span></div></div>';
+		document.body.append(root);
+		const text = root.querySelector("h2")!.firstChild!;
+		const button = root.querySelector("button")!;
+		const range = document.createRange();
+		range.setStart(text, 0);
+		range.setEnd(button, 0);
+		expect(trimParagraphTerminator(range)).toBe(true);
+		expect(range.toString()).toBe("1. Pythagorean Theorem");
+		root.remove();
+	});
+
 	it("pulls an end parked at the next block back to content", () => {
 		// Triple-click lands its focus at the following paragraph's
 		// start (jsdom never synthesizes that block break, so the

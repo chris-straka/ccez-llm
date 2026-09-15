@@ -83,7 +83,7 @@ test("Cmd+F focuses the modal filter, never chat find", async ({ page }) => {
 
 /** j/k/u/d scroll the open modal like the main chat, contained: the
 messages column never moves. */
-test("modal j/k/u/d scroll contained", async ({ page }) => {
+test("modal j/k scroll contained; d/u stay put", async ({ page }) => {
 	// Long thread behind a short viewport: the main column scrolls,
 	// so containment (it never moves) actually proves something.
 	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(30);
@@ -110,13 +110,15 @@ test("modal j/k/u/d scroll contained", async ({ page }) => {
 	const boxTop = await page.evaluate(() => document.querySelector(".messages")?.scrollTop ?? -1);
 	const half = await modal.evaluate((el) => Math.floor(el.clientHeight / 2));
 	expect(half).toBeGreaterThan(0);
+	// Bare d/u scroll nothing anywhere (only Ctrl+U / Ctrl+D jump,
+	// in scroll mode): the modal and the chat both stay put.
 	await page.keyboard.press("d");
-	await expect
-		.poll(() => modal.evaluate((el) => el.scrollTop), { timeout: 10_000 })
-		.toBeGreaterThan(half * 0.8);
+	await page.waitForTimeout(500);
+	expect(await modal.evaluate((el) => el.scrollTop)).toBe(0);
 	expect(await page.evaluate(() => document.querySelector(".messages")?.scrollTop ?? -2)).toBe(boxTop);
 	await page.keyboard.press("u");
-	await expect.poll(() => modal.evaluate((el) => el.scrollTop), { timeout: 10_000 }).toBe(0);
+	await page.waitForTimeout(500);
+	expect(await modal.evaluate((el) => el.scrollTop)).toBe(0);
 	await page.keyboard.press("j");
 	await expect.poll(() => modal.evaluate((el) => el.scrollTop), { timeout: 10_000 }).toBeGreaterThan(0);
 	expect(await page.evaluate(() => document.querySelector(".messages")?.scrollTop ?? -2)).toBe(boxTop);

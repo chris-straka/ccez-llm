@@ -57,10 +57,8 @@ export function unselectedScrollIntent(key: string, gArmed: boolean): Unselected
 			return { kind: "line", dy: SCROLLKEY_LINE_PX };
 		case "k":
 			return { kind: "line", dy: -SCROLLKEY_LINE_PX };
-		case "d":
-			return { kind: "half-page", dir: 1 };
-		case "u":
-			return { kind: "half-page", dir: -1 };
+		// Bare d/u scroll nothing: only Ctrl+U / Ctrl+D jump (handled
+		// in the keybindings slice, which owns modifiers).
 		case "g":
 			return gArmed ? { kind: "top" } : { kind: "gg-prefix" };
 		case "G":
@@ -160,9 +158,6 @@ export function isEscapeHold(downAt: number, now: number, thresholdMs = ESCAPE_H
 /** Hold-to-glide velocity for j/k: continuous pixels per second. */
 export const SCROLLKEY_JK_VELOCITY_PX_S = 720;
 
-/** Hold-to-glide velocity for d/u: deliberately faster than j/k. */
-export const SCROLLKEY_DU_VELOCITY_PX_S = 2520;
-
 /** A hold shorter than this is a tap: it lands one discrete step. */
 export const SCROLL_HOLD_TAP_MS = 150;
 
@@ -202,7 +197,8 @@ export function indexAtViewportLine(rects: MessageRect[], line: number): number 
 
 /**
  * Glide velocity for a held scroll key, or null for keys that do not
- * glide (gg/G/z/Z and everything else keep their discrete behavior).
+ * glide (gg/G/z/Z, bare d/u, and everything else keep their discrete
+ * behavior — only Ctrl+U / Ctrl+D jump, never on hold).
  */
 export function scrollHoldVelocity(key: string): number | null {
 	switch (key) {
@@ -210,10 +206,6 @@ export function scrollHoldVelocity(key: string): number | null {
 			return SCROLLKEY_JK_VELOCITY_PX_S;
 		case "k":
 			return -SCROLLKEY_JK_VELOCITY_PX_S;
-		case "d":
-			return SCROLLKEY_DU_VELOCITY_PX_S;
-		case "u":
-			return -SCROLLKEY_DU_VELOCITY_PX_S;
 		default:
 			return null;
 	}

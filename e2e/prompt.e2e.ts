@@ -246,10 +246,12 @@ test("sidebar hover keeps a live highlight and its menu", async ({ page }) => {
 	expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).toContain("halo");
 });
 
-/** A sidebar preview shows the same error text and the same action
-rows as the open chat: peeking never hides the failure, and opening
-the chat moves nothing. */
-test("sidebar preview shows the error and reserves action space", async ({ page }) => {
+/** A sidebar preview reserves the same action rows as the open chat
+without showing them: under hover-only rhythm the peek takes up the
+row's space (opening the chat moves nothing) while the buttons —
+and any error text riding with them — stay hidden until hovered in
+the open chat. */
+test("sidebar preview reserves action space without showing the row", async ({ page }) => {
 	await page.addInitScript(() => {
 		window.localStorage.setItem("ccez-mock-provider", "1");
 		const msg = (id: string, content: string, error: string | null) => ({
@@ -273,12 +275,51 @@ test("sidebar preview shows the error and reserves action space", async ({ page 
 	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
 	const rows = page.locator("aside ul li button.side-chat");
 	await rows.nth(1).hover();
-	await expect(page.locator("main .messages")).toContainText("Something broke");
-	const previewActions = await page.locator("main .messages .actions").count();
-	expect(previewActions).toBe(1);
+	// The row is mounted (its space reserved) but invisible under
+	// hover-only rhythm; the error rides with it, also mounted.
+	const previewRow = page.locator("main .messages .actions");
+	await expect(previewRow).toHaveCount(1);
+	await expect(previewRow).toHaveCSS("opacity", "0");
+	await expect(page.locator("main .messages .error")).toHaveCount(1);
 	await rows.nth(1).click();
-	await expect(page.locator("main .messages")).toContainText("Something broke");
-	expect(await page.locator("main .messages .actions").count()).toBe(previewActions);
+	await expect(page.locator("main .messages .actions")).toHaveCount(1);
+	await expect(page.locator("main .messages .error")).toHaveCount(1);
+});
+
+/** Returning to a chat restores where you left: every switch files
+the leaving chat's scroll position, and the landing puts it back —
+chats with nothing filed still start at the top. */
+test("returning to a chat restores its scroll position", async ({ page }) => {
+	await page.addInitScript(() => {
+		window.localStorage.setItem("ccez-mock-provider", "1");
+		const lines = (tag: string) => Array.from({ length: 120 }, (_, i) => `${tag} line ${i}`).join("\n");
+		const msg = (id: string, content: string) => ({ id, role: "assistant", content, usage: null, error: null });
+		window.localStorage.setItem(
+			"ccez-llm-chats-v1",
+			JSON.stringify([
+				{ id: "e2e-a", createdAt: 1, replyLang: null, messages: [msg("e2e-a-m", lines("Alpha"))] },
+				{ id: "e2e-b", createdAt: 2, replyLang: null, messages: [msg("e2e-b-m", lines("Beta"))] }
+			])
+		);
+	});
+	await page.goto("/");
+	await expect(page.locator("article .rendered").first()).toBeVisible({ timeout: 60_000 });
+	const box = page.locator("main .messages");
+	await box.evaluate((el) => el.scrollTo({ top: 300 }));
+	await page.waitForTimeout(300);
+	await page.keyboard.press("Meta+b");
+	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
+	const rows = page.locator("aside ul li button.side-chat");
+	// The unvisited chat starts at the top like today.
+	await rows.nth(1).click();
+	await expect.poll(() => box.evaluate((el) => el.scrollTop), { timeout: 8000 }).toBe(0);
+	// Back on the first chat: where it was left, not the top.
+	await page.keyboard.press("Meta+b");
+	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
+	await rows.nth(0).click();
+	await expect
+		.poll(() => box.evaluate((el) => el.scrollTop), { timeout: 8000 })
+		.toBeGreaterThan(200);
 });
 
 /** An empty chat never hides the composer: arriving with the flag set

@@ -469,13 +469,14 @@ export interface ModalScrollFacts extends KeyModifiers {
 	inEditable: boolean;
 }
 
-export type ModalScrollAction = "line-up" | "line-down" | "half-up" | "half-down";
+export type ModalScrollAction = "line-up" | "line-down";
 
 /**
- * The shortcuts modal scrolls under j/k/u/d like the main chat,
+ * The shortcuts modal scrolls under j/k like the main chat,
  * contained: the palette and Inspect keep their own keys, fields keep
  * typing, and the main column never moves. The body keeps the modal-box
- * lookup (a missing box falls through) and the half-page sizing.
+ * lookup (a missing box falls through). Bare d/u scroll nothing
+ * anywhere — only Ctrl+U / Ctrl+D jump, in scroll mode.
  */
 export function modalScrollAction(facts: ModalScrollFacts): ModalScrollAction | null {
 	if (!facts.shortcutsOpen || facts.searchOpen || facts.inspectOpen) return null;
@@ -484,17 +485,15 @@ export function modalScrollAction(facts: ModalScrollFacts): ModalScrollAction | 
 	if (facts.inEditable) return null;
 	if (facts.key === "j") return "line-down";
 	if (facts.key === "k") return "line-up";
-	if (facts.key === "d") return "half-down";
-	if (facts.key === "u") return "half-up";
 	return null;
 }
 
 /**
  * Facts the scroll-mode tail reads. Modifier guards are the handler's
  * verbatim spellings — j/k/i/Enter carry none (scroll mode owns the
- * stage), while g/G/u/d keep theirs. `gArmed` is the handler's
- * `ggArmed(lastGAt, now)` beat; `atNewest` drops j back into the
- * prompt instead of stepping past the last message (scroll mode is
+ * stage), while g/G keep theirs and u/d require Ctrl. `gArmed` is the
+ * handler's `ggArmed(lastGAt, now)` beat; `atNewest` drops j back into
+ * the prompt instead of stepping past the last message (scroll mode is
  * for visiting history, not parking).
  */
 export interface ScrollModeFacts {
@@ -518,8 +517,6 @@ export type ScrollModeAction =
 	| "go-bottom"
 	| "half-jump-up"
 	| "half-jump-down"
-	| "half-glide-up"
-	| "half-glide-down"
 	| "enter-edit"
 	| "scroll-toggle";
 
@@ -543,12 +540,12 @@ export function scrollModeAction(facts: ScrollModeFacts): ScrollModeAction | nul
 	if (!facts.metaKey && !facts.altKey) {
 		const lower = facts.key.toLowerCase();
 		if (lower === "u" || lower === "d") {
-			// U/D glide a half page on hold and never move the cursor;
-			// Ctrl+U / Ctrl+D jump instead, vim-style. Shift+D keeps
-			// its delete job in the message-keys slice above.
-			const up = lower === "u";
-			if (facts.ctrlKey) return up ? "half-jump-up" : "half-jump-down";
-			return up ? "half-glide-up" : "half-glide-down";
+			// Only Ctrl+U / Ctrl+D jump (one instant half-page per
+			// press, vim-style); bare taps scroll nothing at all.
+			// Shift+D keeps its delete job in the message-keys
+			// slice above.
+			if (!facts.ctrlKey) return null;
+			return lower === "u" ? "half-jump-up" : "half-jump-down";
 		}
 	}
 	if (facts.key === "i" || facts.key === "Enter") return "enter-edit";

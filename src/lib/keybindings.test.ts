@@ -502,11 +502,11 @@ const modalBase: ModalScrollFacts = {
 };
 
 describe("modalScrollAction", () => {
-	it("scrolls the modal on j/k/u/d", () => {
+	it("scrolls the modal on j/k only; bare d/u stay put", () => {
 		expect(modalScrollAction(modalBase)).toBe("line-down");
 		expect(modalScrollAction({ ...modalBase, key: "k" })).toBe("line-up");
-		expect(modalScrollAction({ ...modalBase, key: "d" })).toBe("half-down");
-		expect(modalScrollAction({ ...modalBase, key: "u" })).toBe("half-up");
+		expect(modalScrollAction({ ...modalBase, key: "d" })).toBe(null);
+		expect(modalScrollAction({ ...modalBase, key: "u" })).toBe(null);
 		expect(modalScrollAction({ ...modalBase, key: "x" })).toBe(null);
 	});
 
@@ -551,9 +551,9 @@ describe("scrollModeAction", () => {
 		expect(scrollModeAction({ ...scrollBase, key: "Enter" })).toBe("enter-edit");
 	});
 
-	it("glides plain U/D and jumps Ctrl+U/D", () => {
-		expect(scrollModeAction({ ...scrollBase, key: "u" })).toBe("half-glide-up");
-		expect(scrollModeAction({ ...scrollBase, key: "D" })).toBe("half-glide-down");
+	it("ignores bare U/D and jumps Ctrl+U/D", () => {
+		expect(scrollModeAction({ ...scrollBase, key: "u" })).toBe(null);
+		expect(scrollModeAction({ ...scrollBase, key: "D" })).toBe(null);
 		expect(scrollModeAction({ ...scrollBase, key: "u", ctrlKey: true })).toBe("half-jump-up");
 		expect(scrollModeAction({ ...scrollBase, key: "d", ctrlKey: true })).toBe("half-jump-down");
 		expect(scrollModeAction({ ...scrollBase, key: "g", ctrlKey: true })).toBe("scroll-toggle");

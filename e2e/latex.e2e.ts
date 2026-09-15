@@ -196,6 +196,48 @@ test("folded math hugs its label", async ({ page }) => {
 	expect(widths.block).toBeLessThan(widths.label + 8);
 });
 
+/** Hovering the latex chrome changes color only: neither button moves
+nor resizes under the pointer. */
+test("latex chrome holds still on hover", async ({ page }) => {
+	for (const sel of [".ccez-math-copy", ".ccez-math-tex"]) {
+		const button = page.locator(sel).first();
+		const before = await button.boundingBox();
+		if (!before) throw new Error(`${sel} has no box`);
+		await button.hover({ force: true });
+		await page.waitForTimeout(300);
+		expect(await button.boundingBox()).toEqual(before);
+	}
+});
+
+/** The latex `$` + copy pair follows the "Scale message buttons with
+text size" opt-in: at 2x text the chrome doubles instead of reading
+tiny next to scaled message buttons. A fresh context carries the
+scaled seed (init scripts re-run on reload, so a reload would wipe
+a mid-test settings write back to the seed). */
+test("math chrome follows the message-button scale opt-in", async ({ page, browser }) => {
+	const before = await page.locator(".ccez-math-copy").first().boundingBox();
+	if (!before) throw new Error("copy button has no box");
+	const scaled = await browser.newContext();
+	const second = await scaled.newPage();
+	await seedChat(second, [
+		{ role: "user", content: "show me the levels" },
+		{ role: "assistant", content: "Levels:\n\n$$E_n = x$$" }
+	]);
+	await second.addInitScript(() => {
+		const raw = window.localStorage.getItem("ccez-llm-settings-v1") ?? "{}";
+		window.localStorage.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify({ ...JSON.parse(raw), scaleActionsWithFont: true, fontScale: 2 })
+		);
+	});
+	await second.goto("/");
+	await expect(second.locator(".ccez-math").first()).toBeVisible({ timeout: 60_000 });
+	const after = await second.locator(".ccez-math-copy").first().boundingBox();
+	await scaled.close();
+	if (!after) throw new Error("scaled copy button has no box");
+	expect(after.width).toBeGreaterThan(before.width * 1.5);
+});
+
 /** Equation granularity decision: a partial pick inside one equation
 snaps to the whole equation (a glyph shard never re-matches, so the
 entry point expands the range before quoting). Stale-highlight and

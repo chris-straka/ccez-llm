@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, tick } from "svelte";
+	import { flushSync, onMount, tick } from "svelte";
 	import { SvelteMap, SvelteSet } from "svelte/reactivity";
 	import { fade } from "svelte/transition";
 	// Document theme tokens + print sheet (REFACTOR §6): global CSS
@@ -82,7 +82,6 @@
 	} from "$lib/editor";
 	import { createTextareaEditor } from "$lib/textarea-editor";
 	import {
-		SCROLLKEY_DU_VELOCITY_PX_S,
 		SCROLLKEY_LINE_PX,
 		ggArmed,
 		halfPageDy,
@@ -373,10 +372,21 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	/** Scrollbar thumb shows while a scroll is in flight, then fades.
 	The stop hold is short (120ms): momentum scrolls land events in
 	tight bursts, so anything longer just delays the fadeout. */
+	/** Filed scroll positions, one per chat: switching back lands
+	where you left instead of at the top. Session memory only —
+	never persisted (reloads boot at the fresh-box top like today).
+	Previews never file: mid-peek the box shows another chat. */
+	const chatScrollTops = new SvelteMap<ChatId, number>();
+	/** File the active chat's scroll position (see chatScrollTops). */
+	function saveChatScroll(): void {
+		if (previewChatId !== null || !scrollBox) return;
+		chatScrollTops.set(chatState.activeChatId, scrollBox.scrollTop);
+	}
 	function noteScrolling(): void {
 		// Desktop keeps its menu: trackSelMenu repositions it over the
 		// highlight instead. Phones dismiss the docked menu here.
 		if (androidUI) selMenu = null;
+		saveChatScroll();
 		if (scrollBox) viewport.stick = nearBottom(scrollBox);
 		scrollBox?.classList.add("scrolling");
 		window.clearTimeout(viewport.idleTimer);
@@ -1422,10 +1432,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		const from = chatState.activeChatId;
 		selPinyin = null;
 		const mutate = (): void => {
-			// The hover preview clears inside the transition, never
-			// before it: clearing first renders the old chat for a
-			// frame (and the view-transition snapshot catches it), so
-			// picking a previewed row flashes back before landing.
+			// File the leaving chat's scroll first (a no-op mid-peek,
+			// where the box shows another chat), then clear the hover
+			// preview inside the transition, never before it: clearing
+			// first renders the old chat for a frame (and the
+			// view-transition snapshot catches it), so picking a
+			// previewed row flashes back before landing.
+			saveChatScroll();
 			previewChatId = null;
 			// Draft annotations belong to one chat: file the leaving
 			// chat's away, then restore the entering chat's. Doing both
@@ -1435,6 +1448,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			saveDraftAnnotations(from, annotations, chatState.chats.map((c) => c.id));
 			selectChat(chatState, id);
 			annotations = loadDraftAnnotations(id);
+			restoreChatScroll(id);
 		};
 		// Re-entering the live chat (preview-as-you-go already landed
 		// here, or Enter on the active row): identical end state, so
@@ -1447,6 +1461,23 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// belongs to the old chat, and a new chat never inherits it.
 		stopVoice();
 		void switchChatWithTransition(mutate);
+	}
+
+	// Every chat switch lands the box: chats with a filed scroll
+	// position (see saveChatScroll) return where you left, and chats
+	// with nothing filed start at the top like today. Streaming chats
+	// always follow the reply bottom. Search-hit jumps register their
+	// own scroll after this, so they still win. Runs inside the
+	// switch mutation (flushed first): a frame callback lands too
+	// late — the transition swaps content after it.
+	function restoreChatScroll(id: ChatId): void {
+		if (isSending(chatState, id)) return;
+		const saved = chatScrollTops.get(id);
+		flushSync();
+		if (!scrollBox || chatState.activeChatId !== id) return;
+		// Instant: the column eases programmatic jumps, and a smooth
+		// restore retargets (or dies) across the switch transition.
+		scrollBox.scrollTo({ top: saved ?? 0, behavior: "instant" });
 	}
 
 	/** Jump to a palette hit: its chat, scrolled to its message. */
@@ -2148,6 +2179,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			resetDraftExtras();
 			// Minting switches without a transition, so the preview
 			// clears here (transitionToChat covers its own path).
+			// File first: returning to the abandoned chat later must
+			// still land where it was left.
+			saveChatScroll();
 			previewChatId = null;
 			newChat(chatState);
 			scrollBox?.scrollTo({ top: 0, behavior: "smooth" });
@@ -2165,9 +2199,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		sideIdx = next;
 		void hapticBeatAsync("send", { enabled: settings.vibration, shell: tauriBackendAvailable() });
 		transitionToChat(target.id);
-		// Every switch lands at the top the same way minting one does —
-		// stepping older used to jump with no motion at all.
-		scrollBox?.scrollTo({ top: 0, behavior: "smooth" });
+		// Landing is the switch effect's job (filed position, else
+		// top): a smooth top-scroll here would fight the restore.
 		if (focus) enterEditMode();
 		restartStepSlide(direction);
 	}
@@ -2246,6 +2279,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 
 	function doNewChat(): void {
+		// File the abandoned chat's scroll before the fresh chat
+		// resets the box: returning later lands where it was left.
+		saveChatScroll();
 		previewChatId = null;
 		stopVoice();
 		selPinyin = null;
@@ -2296,7 +2332,24 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// The preview renders its own inert copy of the empty chrome
 		// below, so a live-open language list must not linger over it.
 		openLangMenu = null;
+		// File first: the peek swaps the box (whose empty-container
+		// transient clamps to the top), and the leaving position must
+		// survive both the peek and picking the peeked row.
+		saveChatScroll();
 		previewChatId = id;
+	}
+
+	/** End a hover preview, putting the box back where the active chat
+	was left: the swap transient clamps to the top, and that clamp
+	must neither file as the chat's position nor strand the box. */
+	function endPreview(): void {
+		if (previewChatId === null) return;
+		previewChatId = null;
+		const saved = chatScrollTops.get(chatState.activeChatId);
+		if (saved === undefined || !scrollBox) return;
+		flushSync();
+		if (previewChatId === null && scrollBox)
+			scrollBox.scrollTo({ top: saved, behavior: "instant" });
 	}
 	const previewChat = $derived(
 		previewChatId && previewChatId !== chatState.activeChatId
@@ -4288,17 +4341,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	/** Release a held key: quick taps land one discrete step, holds just stop. */
 	function releaseScrollHold(event: KeyboardEvent): void {
 		const hold = viewport.hold;
-		// Case-insensitive: a held Shift+D ("D") releases a "d" hold.
 		if (!hold || event.key.toLowerCase() !== hold.key.toLowerCase()) return;
 		cancelAnimationFrame(hold.raf);
 		viewport.hold = null;
 		scrollBox?.style.removeProperty("scroll-behavior");
+		// Holds only ever start for line keys now (bare d/u scroll
+		// nothing), so a tap always lands one line step.
 		if (holdIsTap(hold.downAt, Date.now()) && scrollBox) {
-			scrollChatBy(
-				hold.key === "d" || hold.key === "u"
-					? halfPageDy(scrollBox.clientHeight, hold.velocity > 0 ? 1 : -1)
-					: Math.sign(hold.velocity) * SCROLLKEY_LINE_PX
-			);
+			scrollChatBy(Math.sign(hold.velocity) * SCROLLKEY_LINE_PX);
 		}
 	}
 	function stopScrollHold(): void {
@@ -4491,7 +4541,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		if (id === chatState.activeChatId) {
 			// Dropping the open chat discards its drafts (stored entry
 			// pruned via the empty save), then the neighbor that slides
-			// into its place restores its own filed drafts.
+			// into its place restores its own filed drafts — and its
+			// filed scroll position, via the switch effect.
+			saveChatScroll();
 			saveDraftAnnotations(
 				id,
 				[],
@@ -4499,12 +4551,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			);
 			resetDraftExtras();
 			deleteChat(chatState, id);
+			chatScrollTops.delete(id);
 			annotations = loadDraftAnnotations(chatState.activeChatId);
+			restoreChatScroll(chatState.activeChatId);
 		} else {
 			// Dropping a background chat must not touch the open
 			// composer's in-memory drafts or attachments: only prune the
 			// deleted id out of storage.
 			deleteChat(chatState, id);
+			chatScrollTops.delete(id);
 			saveDraftAnnotations(
 				chatState.activeChatId,
 				annotations,
@@ -4520,6 +4575,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	function dropAllChats(): void {
 		stopVoice();
 		resetDraftExtras();
+		chatScrollTops.clear();
 		deleteAllChats(chatState);
 		// Every filed draft died with its chat: prune the whole record
 		// so the fresh blank starts clean even in storage.
@@ -6171,18 +6227,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				inEditable: isEditableTarget(event.target)
 			});
 			if (modalScroll !== null) {
-				// The shortcuts modal scrolls under j/k/u/d like the main
+				// The shortcuts modal scrolls under j/k like the main
 				// chat, contained: the palette and Inspect keep their own
 				// keys, fields keep typing, and the main column never moves.
 				const modalBox = document.querySelector<HTMLElement>(".modal-veil .modal");
 				if (modalBox) {
-					const dy =
-						modalScroll === "line-down"
-							? SCROLLKEY_LINE_PX
-							: modalScroll === "line-up"
-								? -SCROLLKEY_LINE_PX
-								: Math.max(1, Math.floor(modalBox.clientHeight / 2)) *
-									(modalScroll === "half-down" ? 1 : -1);
+					const dy = modalScroll === "line-down" ? SCROLLKEY_LINE_PX : -SCROLLKEY_LINE_PX;
 										consumeEvent(event);
 					modalBox.scrollBy({ top: dy, behavior: "smooth" });
 					return;
@@ -6215,7 +6265,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				if (unselected === "half-jump-up" || unselected === "half-jump-down") {
 					// Ctrl+U / Ctrl+D jump an instant half-page, vim-style
 					// (repeats jump again) — including with nothing selected.
-					// Plain U/D glide instead; other ctrl chords keep theirs.
+					// Bare U/D taps scroll nothing; other ctrl chords keep theirs.
 					event.preventDefault();
 					lastGAt = 0;
 					if (scrollBox) {
@@ -6305,29 +6355,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				jumpTo(chat.messages.length - 1);
 				return;
 			}
-			if (
-				scrollAction === "half-jump-up" ||
-				scrollAction === "half-jump-down" ||
-				scrollAction === "half-glide-up" ||
-				scrollAction === "half-glide-down"
-			) {
-				// U/D glide a half page on hold and never move the cursor:
-				// message jumps stole the scroll position out from under
-				// the selected message. Shift+D keeps its delete job above.
-				// Held keys glide via the rAF loop — per-repeat smooth
-				// steps cancel-restart into a stutter instead (taps land
-				// one discrete half-page on release, same distance).
-				// Ctrl+U / Ctrl+D jump instead: one instant half-page per
-				// press, vim-style (repeats jump again).
+			if (scrollAction === "half-jump-up" || scrollAction === "half-jump-down") {
+				// Ctrl+U / Ctrl+D jump one instant half-page per press,
+				// vim-style (repeats jump again) — bare U/D taps scroll
+				// nothing at all. Shift+D keeps its delete job above.
 				event.preventDefault();
 				lastGAt = 0;
-				const dir: 1 | -1 =
-					scrollAction === "half-jump-up" || scrollAction === "half-glide-up" ? -1 : 1;
-				if (scrollAction === "half-jump-up" || scrollAction === "half-jump-down") {
-					if (scrollBox) scrollChatBy(halfPageDy(scrollBox.clientHeight, dir));
-				} else if (scrollBox && !event.repeat) {
-					startScrollHold(event.key.toLowerCase(), dir * SCROLLKEY_DU_VELOCITY_PX_S);
-				}
+				const dir: 1 | -1 = scrollAction === "half-jump-up" ? -1 : 1;
+				if (scrollBox) scrollChatBy(halfPageDy(scrollBox.clientHeight, dir));
 				return;
 			}
 			if (scrollAction === "enter-edit") {
@@ -7283,7 +7318,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				>
 			{/if}
 		</div>
-		<ul onmouseleave={() => (previewChatId = null)}>
+		<ul onmouseleave={() => endPreview()}>
 			{#each sideVisibleChats() as item (item.id)}
 				<!-- Preview hover lives on the row, not the label: moving
 				within the row (label to export/delete and back) must not
@@ -7697,14 +7732,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					{#if !(streamingThis && msg.content.trim() === "")}
 					<!-- Preview renders the same row inert: the peek
 					reserves the row's space (opening the chat moves
-					nothing) and shows the same error text, while no
-					peek button can ever fire. -->
+					nothing) while honoring the hover-only rhythm, so
+					no peek button is ever visible or firing. -->
 					<div
 						class="actions"
 						role="group"
 						aria-label="Message actions"
 						inert={previewing}
-						style={previewing ? "opacity: 1" : undefined}
 						onmouseleave={releaseRowFocus}
 						onpointerdown={holdActionsOpen}
 						onpointerup={releaseActionsHold}
@@ -12089,6 +12123,20 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	text size only when message-button scaling is on (same cap). */
 	main.scale-actions .error {
 		font-size: calc(0.85rem * min(var(--font-scale, 1), 2));
+	}
+	/* Same opt-in for the latex chrome: the `$` toggle and copy button
+	scale with the text size like the message buttons (same cap), so the
+	pair never reads tiny under huge type. Box, `$` type, and glyph
+	scale together, keeping the shared-box centering. */
+	main.scale-actions :global(.ccez-math-tex),
+	main.scale-actions :global(.ccez-math-copy) {
+		height: calc(1.3rem * min(var(--font-scale, 1), 2));
+		width: calc(1.3rem * min(var(--font-scale, 1), 2));
+		font-size: calc(0.85rem * min(var(--font-scale, 1), 2));
+	}
+	main.scale-actions :global(.ccez-math-copy .action-glyph) {
+		height: calc(1rem * min(var(--font-scale, 1), 2));
+		width: calc(1rem * min(var(--font-scale, 1), 2));
 	}
 	.sending {
 		color: #6e6e73;

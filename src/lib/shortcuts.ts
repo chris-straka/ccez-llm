@@ -39,7 +39,7 @@ export function desktopShortcuts(isMac: boolean): ShortcutRow[] {
 		{ name: "Thinking level", keys: `Ctrl+${altm}+↓ / ↑` },
 		{
 			name: "Scroll",
-			keys: "j/k, u/d, ctrl+u/ctrl+d, gg/G, z/Z, h/l"
+			keys: "j/k, ctrl+u/ctrl+d, gg/G, z/Z, h/l"
 		},
 		{ name: "Exit fullscreen", keys: "Hold Esc 2s · Esc+F" },
 		{

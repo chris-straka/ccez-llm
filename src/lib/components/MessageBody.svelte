@@ -885,6 +885,17 @@
 		font-size: 0.85rem;
 		font-style: normal;
 	}
+	/* Chrome buttons never join a text selection: dragging across a
+	block would otherwise bake `$` and icon-button text into the
+	highlight and the quote. Clicks still work — this only opts out
+	of selection. */
+	.rendered :global(.ccez-math-tex),
+	.rendered :global(.ccez-math-copy),
+	.rendered :global(.ccez-code-copy),
+	.rendered :global(.ccez-code-run) {
+		user-select: none;
+		-webkit-user-select: none;
+	}
 	.rendered :global(.ccez-math-copy:hover),
 	.rendered :global(.ccez-math-tex:hover) {
 		color: #1c1c1e;

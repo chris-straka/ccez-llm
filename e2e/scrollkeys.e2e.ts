@@ -3,13 +3,14 @@ import { seedChat } from "./helpers";
 
 /**
  * Scrollkeys bucket (desktop, nothing selected): bare j/k
- * smooth-scroll the chat, d/u fast smooth-scroll, gg goes to top,
- * G to the bottom, and z/Z land the hovered message's top/bottom.
- * Holds glide at the scrollkeys.ts velocities (j/k 720px/s, d/u
- * 2520px/s — d/u deliberately faster); Escape still dismisses
- * overlays exactly as today and never exits fullscreen (only the
- * Esc+f chord does, which needs a real window chrome that
- * playwright cannot cover: see exitFullscreen in +page.svelte).
+ * smooth-scroll the chat, gg goes to top, G to the bottom, and z/Z
+ * land the hovered message's top/bottom. Bare d/u scroll nothing
+ * anywhere — only Ctrl+U / Ctrl+D jump an instant half-page.
+ * Holds glide at the scrollkeys.ts line velocity (j/k 720px/s);
+ * Escape still dismisses overlays exactly as today and never exits
+ * fullscreen (only the Esc+f chord does, which needs a real window
+ * chrome that playwright cannot cover: see exitFullscreen in
+ * +page.svelte).
  *
  * Editor selector note: desktop composes in CodeMirror
  * (`.cm-content`); the plain textarea (`.ta-input`,
@@ -73,30 +74,34 @@ test("j/k smooth-scroll down and back up with nothing selected", async ({ page }
 	expect(await scrollTop(page)).toBeLessThan(down);
 });
 
-test("d fast-scrolls further than j, u climbs back", async ({ page }) => {
+test("bare d/u scroll nothing; ctrl+d jumps and ctrl+u climbs back", async ({ page }) => {
 	const before = await scrollTop(page);
-	await page.keyboard.press("j");
-	await page.waitForFunction((prev) => {
-		const box = document.querySelector(".messages") as HTMLElement | null;
-		return box !== null && box.scrollTop > prev;
-	}, before, { timeout: 10_000 });
-	const stepped = (await scrollTop(page)) - before;
 	await page.keyboard.press("d");
+	await page.waitForTimeout(500);
+	expect(await scrollTop(page)).toBe(before);
+	await page.keyboard.press("u");
+	await page.waitForTimeout(500);
+	expect(await scrollTop(page)).toBe(before);
+	const half = await page.evaluate(() => {
+		const box = document.querySelector(".messages") as HTMLElement | null;
+		return box ? Math.floor(box.clientHeight / 2) : 0;
+	});
+	expect(half).toBeGreaterThan(0);
+	await page.keyboard.press("Control+d");
 	await page.waitForFunction(
-		({ prev, step }) => {
+		({ prev, min }) => {
 			const box = document.querySelector(".messages") as HTMLElement | null;
-			return box !== null && box.scrollTop - prev > step * 2;
+			return box !== null && box.scrollTop - prev >= min;
 		},
-		{ prev: before, step: stepped },
+		{ prev: before, min: half * 0.8 },
 		{ timeout: 10_000 }
 	);
-	const fast = await scrollTop(page);
-	expect(fast - before).toBeGreaterThan(stepped * 2);
-	await page.keyboard.press("u");
+	const jumped = await scrollTop(page);
+	await page.keyboard.press("Control+u");
 	await page.waitForFunction((prev) => {
 		const box = document.querySelector(".messages") as HTMLElement | null;
-		return box !== null && box.scrollTop < prev;
-	}, fast, { timeout: 10_000 });
+		return box !== null && box.scrollTop < prev - 50;
+	}, jumped, { timeout: 10_000 });
 });
 
 test("j hold glides near SCROLLKEY_JK_VELOCITY_PX_S with no discrete jump", async ({ page }) => {
@@ -116,27 +121,20 @@ test("j hold glides near SCROLLKEY_JK_VELOCITY_PX_S with no discrete jump", asyn
 	expect(dist).toBeLessThan(720);
 });
 
-test("d hold glides near SCROLLKEY_DU_VELOCITY_PX_S, well past j", async ({ page }) => {
+test("d hold moves nothing (j hold still glides)", async ({ page }) => {
 	const HOLD_MS = 400;
-	// j leg first, from the top, so both legs share one page.
 	const top = await scrollTop(page);
 	await page.keyboard.down("j");
 	await page.waitForTimeout(HOLD_MS);
 	await page.keyboard.up("j");
 	await page.waitForTimeout(400);
-	const jDist = (await scrollTop(page)) - top;
-	expect(jDist).toBeGreaterThan(0);
-	// d leg from wherever j parked (far from the bottom: 12 long
-	// messages, ~1k px of travel total).
+	expect((await scrollTop(page)) - top).toBeGreaterThan(0);
 	const mid = await scrollTop(page);
 	await page.keyboard.down("d");
 	await page.waitForTimeout(HOLD_MS);
 	await page.keyboard.up("d");
 	await page.waitForTimeout(400);
-	const dDist = (await scrollTop(page)) - mid;
-	// 2520px/s vs 720px/s over equal holds: 3.5x expected; 2x
-	// absorbs headless rAF slop without hiding a velocity swap.
-	expect(dDist).toBeGreaterThan(jDist * 2);
+	expect(Math.abs((await scrollTop(page)) - mid)).toBeLessThan(8);
 });
 
 test("gg goes to top, G to the bottom", async ({ page }) => {
@@ -273,13 +271,15 @@ test("j on the last message scrolls to the bottom, never the prompt", async ({ p
 	await expect(page.locator("#msg-11.selected")).toBeVisible();
 });
 
-/** u/d in scroll mode fast-scroll a half page and never move the
-message cursor (the old ±4 message jumps are gone). */
-test("u/d fast-scroll in scroll mode without moving the cursor", async ({ page }) => {
-	// Park mid-chat first so both directions have room.
+/** Bare u/d in scroll mode scroll nothing and never move the
+message cursor; Ctrl+U / Ctrl+D jump an instant half-page each. */
+test("bare u/d stay put in scroll mode; ctrl jumps, cursor stays", async ({ page }) => {
+	// Park mid-chat first so both directions have room (instant: the
+	// column eases programmatic jumps, and a smooth park would still
+	// be animating under the assertions below).
 	await page.evaluate(() => {
 		const box = document.querySelector(".messages") as HTMLElement | null;
-		if (box) box.scrollTop = Math.max(0, box.scrollHeight - box.clientHeight * 2);
+		if (box) box.scrollTo({ top: Math.max(0, box.scrollHeight - box.clientHeight * 2), behavior: "instant" });
 	});
 	await page.keyboard.press("Control+g");
 	await expect(page.locator(".app[data-focus-mode='scroll']")).toHaveCount(1, { timeout: 5_000 });
@@ -292,6 +292,13 @@ test("u/d fast-scroll in scroll mode without moving the cursor", async ({ page }
 	expect(half).toBeGreaterThan(0);
 	const before = await scrollTop(page);
 	await page.keyboard.press("d");
+	await page.waitForTimeout(500);
+	expect(await scrollTop(page)).toBe(before);
+	await page.keyboard.press("u");
+	await page.waitForTimeout(500);
+	expect(await scrollTop(page)).toBe(before);
+	expect(await page.evaluate(() => document.querySelector("article.selected")?.id ?? null)).toBe(sel);
+	await page.keyboard.press("Control+d");
 	await page.waitForFunction(
 		({ prev, min }) => {
 			const box = document.querySelector(".messages") as HTMLElement | null;
@@ -302,7 +309,7 @@ test("u/d fast-scroll in scroll mode without moving the cursor", async ({ page }
 	);
 	expect(await page.evaluate(() => document.querySelector("article.selected")?.id ?? null)).toBe(sel);
 	const down = await scrollTop(page);
-	await page.keyboard.press("u");
+	await page.keyboard.press("Control+u");
 	await page.waitForFunction(
 		(prev) => {
 			const box = document.querySelector(".messages") as HTMLElement | null;
@@ -314,12 +321,15 @@ test("u/d fast-scroll in scroll mode without moving the cursor", async ({ page }
 	expect(await page.evaluate(() => document.querySelector("article.selected")?.id ?? null)).toBe(sel);
 });
 
-/** Held u/d in scroll mode glide at half-page velocity without moving
-the cursor (taps land one discrete half-page on release). */
-test("u/d hold glides in scroll mode, cursor stays put", async ({ page }) => {
+/** Held u/d in scroll mode move nothing; the cursor stays put
+(taps land no step — only Ctrl+U / Ctrl+D jump). */
+test("u/d hold moves nothing in scroll mode, cursor stays put", async ({ page }) => {
+	// Park mid-chat first so both directions have room (instant: the
+	// column eases programmatic jumps, and a smooth park would still
+	// be animating under the assertions below).
 	await page.evaluate(() => {
 		const box = document.querySelector(".messages") as HTMLElement | null;
-		if (box) box.scrollTop = Math.max(0, box.scrollHeight - box.clientHeight * 2);
+		if (box) box.scrollTo({ top: Math.max(0, box.scrollHeight - box.clientHeight * 2), behavior: "instant" });
 	});
 	await page.keyboard.press("Control+g");
 	await expect(page.locator(".app[data-focus-mode='scroll']")).toHaveCount(1, { timeout: 5_000 });
@@ -331,7 +341,6 @@ test("u/d hold glides in scroll mode, cursor stays put", async ({ page }) => {
 	await page.keyboard.up("d");
 	await page.waitForTimeout(400);
 	const dist = (await scrollTop(page)) - before;
-	// A 400ms hold at 2520px/s glides ~1k px: far past one tap step.
-	expect(dist).toBeGreaterThan(400);
+	expect(Math.abs(dist)).toBeLessThan(8);
 	expect(await page.evaluate(() => document.querySelector("article.selected")?.id ?? null)).toBe(sel);
 });
