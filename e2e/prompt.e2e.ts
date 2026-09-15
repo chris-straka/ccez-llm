@@ -30,6 +30,145 @@ test("staging pins the scroller to the true bottom", async ({ page }) => {
 		.toBeLessThanOrEqual(2);
 });
 
+/** Summoning the parked composer neither hides the tail nor moves the
+thread: the tail reserve never collapses while parked, so the last
+line already clears the opaque card and the scroll position survives
+the summon untouched (the floating-card regression covered the tail,
+and re-sticking yanked it upward — both read as hiding text). */
+test("summoning the parked composer keeps the tail visible", async ({ page }) => {
+	const lines = Array.from(
+		{ length: 30 },
+		(_, i) => `tail line ${i} with enough words to wrap and overflow the viewport`
+	).join("\n");
+	await page.addInitScript(
+		(content: string) => {
+			window.localStorage.setItem("ccez-mock-provider", "1");
+			window.localStorage.setItem(
+				"ccez-llm-settings-v1",
+				JSON.stringify({ promptIdleSec: -1 })
+			);
+			window.localStorage.setItem(
+				"ccez-llm-chats-v1",
+				JSON.stringify([
+					{
+						id: "e2e-chat",
+						createdAt: 1,
+						replyLang: null,
+						messages: [{ id: "m", role: "assistant", content, usage: null, error: null }]
+					}
+				])
+			);
+		},
+		lines
+	);
+	await page.goto("/");
+	const last = page.locator("article .rendered").last();
+	await expect(last).toBeVisible({ timeout: 60_000 });
+	// Settle webfonts first: a mid-test font swap changes line heights
+	// and re-clamps scrollTop, which reads as the summon moving text.
+	await page.evaluate(() => document.fonts.ready);
+	// Read at the bottom like a real tail reader: pin the scroller to
+	// the true bottom, instantly (the box is smooth-scrolled, so a
+	// gliding pin would still be moving under later reads; scrolling
+	// the whole-message div is a no-op — it is always partially
+	// visible — so drive the box directly).
+	await page.evaluate(() => {
+		const box = document.querySelector("main .messages") as HTMLElement;
+		box.scrollTo({ top: box.scrollHeight, behavior: "instant" });
+	});
+	await expect
+		.poll(async () =>
+			page.evaluate(() => {
+				const box = document.querySelector("main .messages") as HTMLElement;
+				return box.scrollHeight - box.scrollTop - box.clientHeight;
+			})
+		)
+		.toBeLessThanOrEqual(2);
+	// Park it: clicking the already-visible last line drops composer
+	// focus without moving the scroll, and always-hide takes the card
+	// away, uncovering the tail.
+	await page.locator("article .rendered p").last().click();
+	const composer = page.locator("main .prompt");
+	await expect(composer).toHaveClass(/prompt-idle/, { timeout: 10_000 });
+	// Summon it back: the tail must already clear the card (the reserve
+	// never collapsed), and the scroll position must survive untouched.
+	const scroller = "main .messages";
+	const parkedTop = await page.evaluate(
+		(sel: string) => document.querySelector(sel)?.scrollTop ?? -1,
+		scroller
+	);
+	await page.keyboard.press("i");
+	await expect(composer).not.toHaveClass(/prompt-idle/, { timeout: 10_000 });
+	await expect
+		.poll(async () =>
+			page.evaluate(() => {
+				const paras = [...document.querySelectorAll("article .rendered p")];
+				const tail = paras[paras.length - 1]?.getBoundingClientRect();
+				const card = document.querySelector("main .prompt")?.getBoundingClientRect();
+				if (!tail || !card) return 9999;
+				return tail.bottom - card.top;
+			})
+		)
+		.toBeLessThanOrEqual(0);
+	expect(
+		await page.evaluate((sel: string) => document.querySelector(sel)?.scrollTop ?? -1, scroller)
+	).toBe(parkedTop);
+});
+/** A press inside the composer outlives a focusout to nowhere: WebKit
+(the Tauri shell) never focuses the button being pressed, so the
+editor blurs with a null target where Chromium reports the button
+itself. Parking there would hide the composer and eat the press's
+click behind pointer-events:none — tools buttons and the pill review
+toggle silently die. The idle ticker still re-parks a genuinely
+unfocused composer, so the guard only bridges the press in flight. */
+test("in-prompt press outlives a focusout to nowhere", async ({ page }) => {
+	await page.addInitScript(
+		(content: string) => {
+			window.localStorage.setItem("ccez-mock-provider", "1");
+			window.localStorage.setItem(
+				"ccez-llm-settings-v1",
+				JSON.stringify({ promptIdleSec: -1 })
+			);
+			window.localStorage.setItem(
+				"ccez-llm-chats-v1",
+				JSON.stringify([
+					{
+						id: "e2e-chat",
+						createdAt: 1,
+						replyLang: null,
+						messages: [{ id: "m", role: "assistant", content, usage: null, error: null }]
+					}
+				])
+			);
+		},
+		"stuck composer probe with enough words to render"
+	);
+	await page.goto("/");
+	await expect(page.locator("article .rendered").first()).toBeVisible({ timeout: 60_000 });
+	const composer = page.locator("main .prompt");
+	await page.keyboard.press("i");
+	await expect(composer).not.toHaveClass(/prompt-idle/, { timeout: 10_000 });
+	const editor = page.locator(".prompt .cm-content");
+	await editor.click();
+	// WebKit button press: a real mousedown inside the composer (stamps
+	// the press), then the editor blurs to nowhere (relatedTarget null)
+	// because WebKit never focuses the button. Release off-button so no
+	// file picker opens.
+	const attachBox = await page.locator(".prompt-tools .attach-btn").boundingBox();
+	if (!attachBox) throw new Error("attach button has no box");
+	await page.mouse.move(attachBox.x + attachBox.width / 2, attachBox.y + attachBox.height / 2);
+	await page.mouse.down();
+	// A real FocusEvent (Playwright's dispatchEvent builds a generic
+	// Event for focusout, whose relatedTarget reads undefined): WebKit
+	// delivers null when the press focuses no button.
+	await editor.evaluate((el) => {
+		el.dispatchEvent(new FocusEvent("focusout", { bubbles: true, relatedTarget: null }));
+	});
+	await page.mouse.move(8, 8);
+	await page.mouse.up();
+	await page.waitForTimeout(600);
+	await expect(composer).not.toHaveClass(/prompt-idle/);
+});
 /** The composer box dwarfs a one-line draft: tapping its empty floor
 focuses the editor instead of dying on the container. */
 test("clicking the composer floor focuses and types", async ({ page }) => {

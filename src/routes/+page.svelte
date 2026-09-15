@@ -691,6 +691,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * window and the send is silently eaten.
 	 */
 	let sendGuardUntil = 0;
+	/**
+	 * Last pointerdown inside the composer (any button, field, or floor),
+	 * as a timestamp. WebKit (the Tauri shell) doesn't move focus to
+	 * buttons on press, so the editor blurs to nowhere (relatedTarget
+	 * null) instead of onto the button — see onFocusOutIdle, which
+	 * reads this to tell a still-in-flight control press from a real
+	 * departure. Plain timestamp, never state: no render may hinge on it.
+	 */
+	let promptPressAt = 0;
 	let selMenu = $state<{
 		x: number;
 		y: number;
@@ -1710,6 +1719,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		let idleDownVisible = false;
 		let idleDownHadSel = false;
 		const onIdleDown = (event: PointerEvent): void => {
+			const downTarget = event.target instanceof Element ? event.target : null;
+			if (event.button === 0) {
+				// Stamp composer presses for onFocusOutIdle's WebKit
+				// guard (see promptPressAt): a press inside the composer
+				// whose focusout lands nowhere is still in flight.
+				if (downTarget?.closest(".prompt")) promptPressAt = Date.now();
+			}
 			idleDown = event.button === 0 ? { x: event.clientX, y: event.clientY } : null;
 			// Summonable only from a fully shown prompt: a press that
 			// starts idle-hidden OR sidebar-parked (e.g. the click that
@@ -1718,7 +1734,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// A press that starts on a live highlight is its dismissal —
 			// the click that clears it must not summon the prompt.
 			idleDownHadSel = event.button === 0 && (window.getSelection()?.toString() ?? "") !== "";
-			const downTarget = event.target instanceof Element ? event.target : null;
 			idleDownControl = event.button === 0 && isClickControlTarget(downTarget);
 		};
 		/**
@@ -1790,7 +1805,23 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			restorePrompt();
 		};
 		const onFocusOutIdle = (event: FocusEvent): void => {
-			hideForAlways(event.relatedTarget);
+			// A press that started inside the composer is still in
+			// flight when its focusout lands with nowhere to go
+			// (null/body): WebKit never focuses the button being
+			// pressed, so this fires where Chromium reports the button
+			// itself. Parking here would hide the composer and eat the
+			// press's click behind pointer-events:none — the button
+			// (or pill review toggle) never runs. Skip the hide; the
+			// idle ticker re-parks a genuinely unfocused composer
+			// within half a second, so an over-skip self-heals.
+			const next: EventTarget | null = event.relatedTarget ?? null;
+			if (
+				(next === null || next === document.body) &&
+				Date.now() - promptPressAt < 1500
+			) {
+				return;
+			}
+			hideForAlways(next);
 		};
 		window.addEventListener("pointermove", on, { passive: true });
 		window.addEventListener("focusin", onFocusInIdle);
@@ -1871,32 +1902,46 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * the strip parked under the card eating its taps). The extra
 	 * 54px also clears short last messages' badges, which float
 	 * above their quote and would otherwise park under the opaque
-	 * card, unclickable. Falls back to the stylesheet while hidden,
-	 * so the tail reaches the window's own bottom edge. Composes
-	 * with the Android safe-area inset instead of clobbering it.
+	 * card, unclickable. The reserve NEVER collapses while parked:
+	 * collapsing reclaimed the room but the summon then covered the
+	 * tail (or yanked it upward on re-stick) — both read as the
+	 * composer hiding text. Composes with the Android safe-area
+	 * inset instead of clobbering it.
 	 */
+	// Last applied tail clearance in px (-1 until the first sync, and
+	// component-scoped so effect re-runs never reset the edge: only
+	// genuine GROWTH (a lengthening draft) re-sticks, so boot, park,
+	// summon, and scroll restores keep whatever position they landed.
+	let lastClearPx = -1;
 	$effect(() => {
-		// Empty chats reserve the prompt's room even while it parks
-		// (or previews): the hero and pills sit above a fixed floor,
-		// so the prompt appearing never shoves them upward.
-		const emptyReserve = viewChat.messages.length === 0;
 		const card = promptEl?.closest<HTMLElement>(".prompt") ?? null;
 		const box = scrollBox;
 		const mainEl = box?.closest<HTMLElement>("main") ?? null;
 		if (!card || !box || !mainEl) return;
 		const sync = (): void => {
-			// Phones never collapse the reserve while parked: the
-			// sidebar slide plus a padding yank scrolled the thread
-			// and threw the bottom-anchored card mid-screen for a
-			// frame. Desktop keeps the collapse (empty space back).
-			mainEl.style.paddingBottom = promptParked() && !emptyReserve && !androidUI
-				? ""
-				: `calc(${Math.ceil(card.getBoundingClientRect().height) + 54}px + env(safe-area-inset-bottom, 0px))`;
+			const clearPx = Math.ceil(card.getBoundingClientRect().height) + 54;
+			mainEl.style.paddingBottom = `calc(${clearPx}px + env(safe-area-inset-bottom, 0px))`;
 			// Scrollbar gutter the messages reserve (classic thin bar,
 			// zero with overlay scrollbars): the floating card centers in
 			// the full column, so it rides this much right of the
 			// articles without compensation (see --sbw on .prompt).
 			card.style.setProperty("--sbw", `${Math.max(0, box.offsetWidth - box.clientWidth)}px`);
+			// A lengthening draft grows the reserve under the card:
+			// when stuck to the bottom, re-stick past it or the tail
+			// slides under the opaque card as you type. Park, summon,
+			// and restores never change the reserve, so they never
+			// move the thread; mid-thread readers and touch holds
+			// never move either; phones keep their bottom-anchored card.
+			if (
+				!androidUI &&
+				lastClearPx >= 0 &&
+				clearPx > lastClearPx &&
+				viewport.stick &&
+				!viewport.holding
+			) {
+				box.scrollTo({ top: box.scrollHeight, behavior: "instant" });
+			}
+			lastClearPx = clearPx;
 		};
 		sync();
 		const ro = new ResizeObserver(sync);
