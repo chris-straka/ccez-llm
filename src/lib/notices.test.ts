@@ -37,6 +37,17 @@ describe("notice queue", () => {
     expect(state.toast.message).toBeNull();
   });
 
+  it("error toasts live apart from info toasts", () => {
+    const state = emptyNotices();
+    showNotice(state, "toast", "copied");
+    showNotice(state, "errorToast", "export failed");
+    expect(state.toast.message).toBe("copied");
+    expect(state.errorToast.message).toBe("export failed");
+    clearNotice(state, "errorToast");
+    expect(state.errorToast.message).toBeNull();
+    expect(state.toast.message).toBe("copied");
+  });
+
   it("flashNotice self-clears after the timeout", () => {
     vi.useFakeTimers();
     try {

@@ -118,7 +118,8 @@ export interface AppSettings {
 	 * slides down out of view (any input restores it instantly).
 	 */
 	promptIdleSec: number;
-	/** Whole-app background opacity, 0.2–1 (1 = fully opaque). */
+	/** Whole-app background opacity, 0.2–1 (1 = fully opaque).
+	Shown in settings as Transparency, 0–80%. */
 	bgOpacity: number;
 	/** Color-scheme override (system follows the OS). */
 	theme: ThemeMode;
@@ -133,13 +134,6 @@ export interface AppSettings {
 	 * chrome on a phone. The checkbox lives in Messages on phones.
 	 */
 	hideButtons: boolean;
-	/**
-	 * Touch only: revealed rows float over the chat as their own pill
-	 * instead of sitting in flow. On by default (current look); off
-	 * keeps the in-flow row that reserves its space while hidden.
-	 * The checkbox lives in Messages on phones, under the heading.
-	 */
-	overlayActions: boolean;
 	/** Touch only: read a fresh text selection aloud on release. */
 	autoSpeakSelection: boolean;
 	/**
@@ -286,7 +280,6 @@ export function defaultSettings(): AppSettings {
 		theme: "system",
 		hideMessages: false,
 		hideButtons: true,
-		overlayActions: true,
 		autoSpeakSelection: true,
 		vibration: true,
 		inspectEnabled: true
@@ -348,9 +341,11 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 			providers: { ...fresh.providers, ...(parsed.providers ?? {}) }
 		};
 		// Drop the removed translate-target setting from older saves,
-		// and the retired iOS native-bubble toggle the same way:
-		// Apple's callout now always stays, with Annotate above it.
-		dropRetiredKeys(merged, ["translateTarget", "iosNativeCallout"]);
+		// the retired iOS native-bubble toggle the same way (Apple's
+		// callout now always stays, with Annotate above it), and the
+		// retired overlay message-buttons pill (rows are always in
+		// flow now).
+		dropRetiredKeys(merged, ["translateTarget", "iosNativeCallout", "overlayActions"]);
 		// Backfill user-added providers on older saves.
 		if (!Array.isArray(merged.customProviders)) merged.customProviders = [];
 		// An active provider that no longer exists (deleted custom) falls
@@ -375,7 +370,8 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 		) {
 			merged.fontScale = 1;
 		}
-		// Clamp the background opacity into its slider range.
+		// Clamp the background opacity into its slider range
+		// (shown as Transparency, 0–80%).
 		if (typeof merged.bgOpacity !== "number" || !(merged.bgOpacity >= 0.2 && merged.bgOpacity <= 1)) {
 			merged.bgOpacity = 1;
 		}
@@ -412,7 +408,6 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 		if (typeof merged.hideMessages !== "boolean") merged.hideMessages = false;
 		if (typeof merged.micEnabled !== "boolean") merged.micEnabled = true;
 		if (typeof merged.hideButtons !== "boolean") merged.hideButtons = true;
-		if (typeof merged.overlayActions !== "boolean") merged.overlayActions = true;
 		if (typeof merged.autoSpeakSelection !== "boolean") merged.autoSpeakSelection = true;
 		if (typeof merged.vibration !== "boolean") merged.vibration = true;
 		// Retire the old "Be brief, no summaries." default: profiles that

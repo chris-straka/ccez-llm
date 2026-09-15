@@ -627,6 +627,19 @@ describe("chat", () => {
 		expect(chatVoiceReadback(healed.chats[0]!, true)).toBe(true);
 	});
 
+	it("stamps a missing chat timestamp instead of showing Invalid Date", () => {
+		const { store } = stateWith(freshStore());
+		const before = Date.now();
+		store.setItem(
+			"ccez-llm-chats-v1",
+			JSON.stringify([{ id: "old", messages: [], replyLang: null, voice: null }])
+		);
+		const healed = createChatState(store);
+		const stamped = healed.chats[0]?.createdAt ?? 0;
+		expect(stamped).toBeGreaterThanOrEqual(before);
+		expect(stamped).toBeLessThanOrEqual(Date.now());
+	});
+
 	it("persists across instances and tolerates corruption", async () => {
 		const store = freshStore();
 		const first = createChatState(store);

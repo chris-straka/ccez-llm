@@ -173,10 +173,10 @@ test("own-bubble switch keeps left alignment, background follows", async ({ page
 	await expect(bubble).toHaveCSS("text-align", "left");
 });
 
-/** Background opacity slider applies the alpha var and resets to opaque. */
-test("background opacity slider applies and resets", async ({ page }) => {
-	const slider = page.locator('.settings-panel input[aria-label="Background opacity percent"]');
-	await expect(slider).toHaveAttribute("max", "100");
+/** Transparency slider applies the alpha var and resets to opaque. */
+test("transparency slider applies and resets", async ({ page }) => {
+	const slider = page.locator('.settings-panel input[aria-label="Background transparency percent"]');
+	await expect(slider).toHaveAttribute("max", "80");
 	await slider.fill("50");
 	await expect(page.locator(".app")).toHaveAttribute("style", /--bg-alpha: 0\.5/);
 	await page.locator('.settings-panel button[title="Reset to fully opaque"]').click();

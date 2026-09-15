@@ -591,9 +591,9 @@ test("scrollbar fades out promptly after scrolling stops", async ({ page }) => {
 	expect(fade).toBeLessThanOrEqual(0.35);
 });
 
-/** Background opacity slider translucents the page: the html
+/** Transparency slider translucents the page: the html
 background resolves the alpha instead of staying fully opaque. */
-test("background opacity slider translucents the page", async ({ page }) => {
+test("transparency slider translucents the page", async ({ page }) => {
 	await seedChat(page, [{ role: "assistant", content: "hello" }]);
 	await page.goto("/");
 	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
@@ -608,14 +608,15 @@ test("background opacity slider translucents the page", async ({ page }) => {
 	expect(await alphaOf()).toBe(1);
 	await page.keyboard.press("Meta+,");
 	const slider = page.locator(
-		'.settings-panel input[aria-label="Background opacity percent"]'
+		'.settings-panel input[aria-label="Background transparency percent"]'
 	);
 	await expect(slider).toBeVisible({ timeout: 5_000 });
 	// Drive the slider like a real drag (fill() doesn't fire input on
 	// range inputs everywhere): set the value and dispatch input.
+	// Transparency runs 0 (opaque) to 80, so 80 resolves alpha 0.2.
 	await slider.evaluate((el) => {
 		const input = el as HTMLInputElement;
-		input.value = "20";
+		input.value = "80";
 		input.dispatchEvent(new Event("input", { bubbles: true }));
 	});
 	expect(await alphaOf()).toBeLessThan(0.5);

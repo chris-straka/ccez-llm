@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { joinExternalDraft } from "./externalText";
+import { cleanExternalAction, joinExternalDraft, routeExternalText } from "./externalText";
 
 describe("joinExternalDraft", () => {
 	it("fills an empty draft", () => {
@@ -21,5 +21,38 @@ describe("joinExternalDraft", () => {
 		expect(joinExternalDraft("what is this?", "Look at this\nhttps://example.com/menu")).toBe(
 			"what is this?\n\nLook at this\nhttps://example.com/menu"
 		);
+	});
+});
+
+describe("cleanExternalAction", () => {
+	it("keeps the tapped entry", () => {
+		expect(cleanExternalAction("annotate")).toBe("annotate");
+		expect(cleanExternalAction("speak")).toBe("speak");
+		expect(cleanExternalAction("inspect")).toBe("inspect");
+	});
+
+	it("falls back to annotate", () => {
+		expect(cleanExternalAction(null)).toBe("annotate");
+		expect(cleanExternalAction(undefined)).toBe("annotate");
+		expect(cleanExternalAction("delete")).toBe("annotate");
+		expect(cleanExternalAction("")).toBe("annotate");
+	});
+});
+
+describe("routeExternalText", () => {
+	it("prefills foreign shares", () => {
+		expect(routeExternalText("annotate", "from another app", "")).toBe("prefill");
+		expect(routeExternalText("speak", "from another app", "other")).toBe("prefill");
+	});
+
+	it("runs the tapped action on matching text", () => {
+		expect(routeExternalText("annotate", "same", "same")).toBe("annotate");
+		expect(routeExternalText("speak", "same", "  same  ")).toBe("speak");
+		expect(routeExternalText("inspect", "same", "same")).toBe("inspect");
+	});
+
+	it("runs the action when no text crosses (in-app tap)", () => {
+		expect(routeExternalText("speak", null, "")).toBe("speak");
+		expect(routeExternalText(null, null, "")).toBe("annotate");
 	});
 });

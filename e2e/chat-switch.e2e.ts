@@ -31,7 +31,10 @@ test("thinking stays in its own chat across a switch", async ({ page }) => {
 	await expect(page.locator(".sending")).toHaveCount(0);
 	await expect(page.locator("article")).toHaveCount(0);
 	// Back: the origin kept streaming (or finished) in place.
-	// (Sidebar still open from the new-chat step above.)
+	// (Minting brings you home, so the list closed like a row-pick:
+	// reopen it first — a lingering open list would park the prompt.)
+	await page.keyboard.press("Meta+b");
+	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
 	const rows = page.locator("aside ul li button.side-chat");
 	await rows.first().click();
 
@@ -41,9 +44,13 @@ test("thinking stays in its own chat across a switch", async ({ page }) => {
 	await expect(page.locator("article.assistant .rendered")).toContainText("Mock reply to:", {
 		timeout: 15_000
 	});
-	// Count matches visible: one user message, one assistant reply.
+	// Count matches visible: one user message, one assistant reply, and
+	// the list holds both chats with the origin back on top and active.
+	// (Desktop rows carry no per-chat count — the span is phone-only —
+	// so the contract here is row presence, order, and active state.)
 	await expect(page.locator("article")).toHaveCount(2);
-	await expect(rows.first()).toContainText("2 msg");
+	await expect(page.locator("aside ul li button.side-chat")).toHaveCount(2);
+	await expect(rows.first()).toHaveClass(/active/);
 });
 
 /** Entering another chat never summons the prompt: the parked
@@ -74,6 +81,29 @@ test("entering another chat never summons the prompt", async ({ page }) => {
 			])
 		);
 	});
+	// Record the snapshot scope at capture time: the `messages` name
+	// must be on exactly while a transition snapshots (sidebar +
+	// prompt cut), and off at rest (a standing name traps annotation
+	// badges under the header strip).
+	await page.addInitScript(() => {
+		const seen: string[] = [];
+		(window as unknown as Record<string, unknown>).__vtNames = seen;
+		const proto = Document.prototype as unknown as {
+			startViewTransition?: (opts: { update: () => void }) => { finished: Promise<unknown> };
+		};
+		const real = proto.startViewTransition;
+		if (typeof real === "function") {
+			proto.startViewTransition = function (
+				this: Document,
+				opts: { update: () => void }
+			): { finished: Promise<unknown> } {
+				seen.push(
+					getComputedStyle(document.querySelector(".messages")!).viewTransitionName
+				);
+				return real.call(this, opts);
+			};
+		}
+	});
 	await page.goto("/");
 	await expect(page.locator("article .rendered")).toBeVisible({ timeout: 60_000 });
 	await expect(page.locator(".prompt")).toHaveClass(/prompt-idle/, { timeout: 10_000 });
@@ -89,11 +119,17 @@ test("entering another chat never summons the prompt", async ({ page }) => {
 	await expect(page.locator(".prompt")).toHaveClass(/prompt-idle/);
 	const focused = await page.evaluate(() => !!document.activeElement?.closest?.(".prompt"));
 	expect(focused).toBe(false);
-	// The crossfade is scoped to the messages: sidebar + prompt cut.
-	const vtName = await page.evaluate(
+	// The crossfade was scoped to the messages (every snapshot saw
+	// the name), and the scope is off again at rest.
+	const vtNames = await page.evaluate(
+		() => (window as unknown as Record<string, unknown>).__vtNames as string[]
+	);
+	expect(vtNames.length).toBeGreaterThan(0);
+	for (const name of vtNames) expect(name).toBe("messages");
+	const vtRest = await page.evaluate(
 		() => getComputedStyle(document.querySelector(".messages") as Element).viewTransitionName
 	);
-	expect(vtName).toBe("messages");
+	expect(vtRest).toBe("none");
 });
 
 /** The Thinking row keeps breathing room: explicit margins stand it

@@ -8,12 +8,9 @@ import process from "node:process";
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
-// @ts-expect-error — svelte-check only: sveltekit()'s Plugin<any>
-// (from kit's own vite copy under Bun's pnpm layout) never compares
-// clean against this tree's Vite 8 PluginOption, so overload
-// resolution blows the stack. Runtime shape is correct and verified
-// (dev/build/e2e run through this file). If a vite/kit upgrade turns
-// this directive unused, delete it — that means the skew is gone.
+// (A @ts-expect-error lived here while kit's own vite copy skewed
+// against this tree's Vite 8 PluginOption; the skew is gone, so the
+// directive was deleted as the note instructed.)
 export default defineConfig(() => ({
   plugins: [sveltekit()],
   resolve: {

@@ -36,16 +36,40 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
-        <!-- OS text-selection menu ("Annotate" entry, ChatGPT-style):
-        the system owns this item, so it survives the menu rebuilds
-        that drop code-added entries (AppCompat never consults the
-        activity for floating toolbars). Tapping it delivers the
-        selection here (see MainActivity.handleProcessText); the
-        frontend annotates text picked in-app and prefills shares
-        from other apps. -->
+        <!-- OS text-selection menu ("Annotate"/"Speak"/"Inspect"
+        entries, ChatGPT-style): the system owns these items, so they
+        survive the menu rebuilds that drop code-added entries
+        (AppCompat never consults the activity for floating toolbars).
+        They render in the toolbar's overflow (triple-dot) menu — the
+        main pill's buttons are system-fixed and no app can move them.
+        Tapping one delivers the selection here (see
+        MainActivity.handleProcessText): the frontend runs the action
+        on text picked in-app and prefills shares from other apps. -->
         <activity-alias
             android:name=".AnnotateAction"
             android:label="Annotate"
+            android:targetActivity=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".SpeakAction"
+            android:label="Speak"
+            android:targetActivity=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity-alias>
+        <activity-alias
+            android:name=".InspectAction"
+            android:label="Inspect"
             android:targetActivity=".MainActivity"
             android:exported="true">
             <intent-filter>

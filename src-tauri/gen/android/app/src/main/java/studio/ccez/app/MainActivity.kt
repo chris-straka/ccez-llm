@@ -34,7 +34,7 @@ class MainActivity : TauriActivity() {
     // Dictation bridge: system SpeechRecognizer behind dictate_start/stop.
     Dictation.init(this)
     if (isAliasLaunch(intent)) {
-      // The AnnotateAction alias always starts a NEW activity record
+      // An alias launch always starts a NEW activity record
       // (launchMode lives on the activity element and never applies to
       // alias launches). While running, hand the share to the real
       // singleTask instance — onNewIntent, no second init — and get out
@@ -55,8 +55,9 @@ class MainActivity : TauriActivity() {
 
   /**
    * True when another of our tasks already tops a real MainActivity.
-   * The alias task itself never matches (its top is AnnotateAction),
-   * so this is only true while the app is already running.
+   * The alias task itself never matches (its top is one of the
+   * *Action aliases), so this is only true while the app is already
+   * running.
    */
   private fun hasLiveMainTask(): Boolean {
     return try {
@@ -68,8 +69,18 @@ class MainActivity : TauriActivity() {
     }
   }
 
+  /** Which native menu entry was tapped (Annotate/Speak/Inspect). */
+  private fun aliasAction(intent: Intent?): String? {
+    return when (intent?.component?.className) {
+      "${packageName}.AnnotateAction" -> "annotate"
+      "${packageName}.SpeakAction" -> "speak"
+      "${packageName}.InspectAction" -> "inspect"
+      else -> null
+    }
+  }
+
   private fun isAliasLaunch(intent: Intent?): Boolean {
-    return intent?.component?.className == "${packageName}.AnnotateAction"
+    return aliasAction(intent) != null
   }
 
   private fun forwardAliasShare(intent: Intent?) {
@@ -80,10 +91,16 @@ class MainActivity : TauriActivity() {
         Intent.EXTRA_PROCESS_TEXT,
         intent?.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)
       )
+      forward.putExtra(EXTERNAL_ACTION_EXTRA, aliasAction(intent))
       forward.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
       startActivity(forward)
     } catch (_: Exception) {
     }
+  }
+
+  companion object {
+    /** Extra naming the tapped native menu entry for handleProcessText. */
+    const val EXTERNAL_ACTION_EXTRA = "studio.ccez.app.EXTERNAL_ACTION"
   }
 
   override fun onNewIntent(intent: Intent) {
@@ -94,19 +111,22 @@ class MainActivity : TauriActivity() {
     handleSend(intent)
   }
 
-  private external fun nativeOnExternalText(text: String?)
+  private external fun nativeOnExternalText(text: String?, action: String?)
 
   /**
    * Text shared from another app (OS selection menu → this app):
    * forward to Rust, which emits `annotate-external` for the
-   * frontend's composer prefill. Never throws: a foreign intent
-   * must not crash the app.
+   * frontend's action dispatch. The action names the tapped alias
+   * entry (annotate/speak/inspect, null for a direct launch, which
+   * behaves as annotate). Never throws: a foreign intent must not
+   * crash the app.
    */
   private fun handleProcessText(intent: Intent?) {
     try {
       if (intent?.action != Intent.ACTION_PROCESS_TEXT) return
       val text = intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString()
-      nativeOnExternalText(text)
+      val action = intent.getStringExtra(EXTERNAL_ACTION_EXTRA) ?: aliasAction(intent)
+      nativeOnExternalText(text, action)
     } catch (_: Exception) {
     }
   }
@@ -128,19 +148,20 @@ class MainActivity : TauriActivity() {
       val text = intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()
         ?.takeIf { it.isNotBlank() }
         ?: intent.getCharSequenceExtra(Intent.EXTRA_SUBJECT)?.toString()
-      nativeOnExternalText(text)
+      nativeOnExternalText(text, null)
     } catch (_: Exception) {
     }
   }
 
-  // OS selection toolbar: the "Annotate" entry comes from the
-  // AnnotateAction activity-alias in the manifest, not from code.
+  // OS selection toolbar: the Annotate/Speak/Inspect entries come
+  // from the activity-aliases in the manifest, not from code.
   // Code-added items cannot survive here — AppCompat never consults
   // the activity for floating toolbars (no onActionModeStarted, no
   // usable onWindowStarting* hook), and the menu is rebuilt on every
-  // invalidate. The system owns the alias entry, so it is always
+  // invalidate. The system owns the alias entries (overflow menu —
+  // the main pill's buttons are system-fixed), so they are always
   // present; taps forward above into the running singleTask
   // instance when there is one (cold starts become the instance),
-  // and the frontend annotates text picked in-app versus
-  // prefilling outside shares.
+  // and the frontend runs the tapped action on text picked in-app
+  // versus prefilling outside shares.
 }

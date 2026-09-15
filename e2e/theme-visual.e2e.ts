@@ -187,6 +187,16 @@ for (const t of THEMES) {
 		await expect(page.locator(".settings-panel")).not.toHaveClass(/closed/);
 		await expect(page.locator(".settings-panel")).toHaveCSS("background-color", t.bg);
 		await expect(page.locator(".settings-panel")).toHaveCSS("border-left-color", t.softLine);
+		// Provider selected pill: light blue on light, inverted on dark.
+		const selected = page.locator(".settings-inner .provider-row button.selected");
+		await expect(selected).toHaveCSS(
+			"background-color",
+			t.name === "light" ? "rgb(229, 240, 255)" : "rgb(242, 242, 247)"
+		);
+		await expect(selected).toHaveCSS(
+			"border-color",
+			t.name === "light" ? "rgb(0, 122, 255)" : "rgb(242, 242, 247)"
+		);
 	});
 
 	test(`composer paints ${t.name}`, async ({ page }) => {
@@ -290,12 +300,12 @@ for (const t of THEMES) {
 		await expect(annBtn).toHaveCSS("color", v.ink);
 		await annBtn.hover();
 		await expect(annBtn).toHaveCSS("background-color", t.wash);
-		// Annotation popover: dark in both themes.
+		// Annotation popover: light card on light, dark card on dark.
 		await annBtn.click();
 		const pop = page.locator(".ann-pop");
 		await expect(pop).toBeVisible();
-		await expect(pop).toHaveCSS("background-color", "rgb(28, 28, 30)");
-		await expect(pop).toHaveCSS("border-color", "rgb(56, 56, 58)");
+		await expect(pop).toHaveCSS("background-color", L ? "rgb(255, 255, 255)" : "rgb(28, 28, 30)");
+		await expect(pop).toHaveCSS("border-color", L ? "rgb(229, 229, 234)" : "rgb(56, 56, 58)");
 		await page.keyboard.type("note");
 		await page.keyboard.press("Enter");
 		const pill = page.locator(".prompt-tools .ann-pill");
@@ -330,16 +340,22 @@ for (const t of THEMES) {
 		const draft = await page.evaluate(
 			() => document.querySelector(".prompt .cm-content")?.textContent ?? ""
 		);
-		expect(draft).not.toBe("");
+		expect(draft).toContain("note");
 		await page.mouse.click(4, 300);
-		const kept = await page.evaluate(
-			() => document.querySelector(".prompt .cm-content")?.textContent ?? ""
-		);
+		// The hint renders inside .cm-content, so strip it: only real
+		// draft text counts.
+		const kept = await page.evaluate(() => {
+			const box = document.querySelector(".prompt .cm-content");
+			if (!box) return "<missing>";
+			const clone = box.cloneNode(true) as HTMLElement;
+			clone.querySelectorAll(".cm-placeholder").forEach((n) => n.remove());
+			return clone.textContent ?? "";
+		});
 		expect(kept).toBe("");
-		// Send pill shares the inversion.
+		// Send button: system blue on light, the inversion on dark.
 		const send = page.locator(".send-btn");
-		await expect(send).toHaveCSS("background-color", v.invert);
-		await expect(send).toHaveCSS("color", v.invertInk);
+		await expect(send).toHaveCSS("background-color", L ? "rgb(0, 122, 255)" : v.invert);
+		await expect(send).toHaveCSS("color", L ? "rgb(255, 255, 255)" : v.invertInk);
 	});
 
 	test(`action buttons paint ${t.name}`, async ({ page }) => {

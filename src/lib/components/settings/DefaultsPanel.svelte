@@ -78,10 +78,6 @@
 		<fieldset>
 			<legend>Messages</legend>
 			<label class="check">
-				<input type="checkbox" bind:checked={settings.overlayActions} />
-				Switch message buttons to overlay menu
-			</label>
-			<label class="check">
 				<input type="checkbox" bind:checked={settings.scaleActionsWithFont} />
 				Scale message buttons with text size
 			</label>
@@ -176,28 +172,28 @@
 	</label>
 	{#if !androidUI}
 	<label class="slider-row">
-		Background opacity
+		Transparency
 		<button
 			type="button"
 			class="reset-width"
 			title="Reset to fully opaque"
-			onclick={() => (settings.bgOpacity = 1)}>(100%)</button
+			onclick={() => (settings.bgOpacity = 1)}>(0%)</button
 		>
 		<span class="font-row">
 			<input
 				type="range"
-				min="20"
-				max="100"
+				min="0"
+				max="80"
 				step="5"
-				value={Math.round((settings.bgOpacity ?? 1) * 100)}
-				aria-label="Background opacity percent"
+				value={Math.round((1 - (settings.bgOpacity ?? 1)) * 100)}
+				aria-label="Background transparency percent"
 				onpointerdown={noteSliderPress}
 				onpointerup={(e) => sliderRelease(e, () => (settings.bgOpacity = 1))}
 				oninput={(e) => {
-					settings.bgOpacity = Number(e.currentTarget.value) / 100;
+					settings.bgOpacity = 1 - Number(e.currentTarget.value) / 100;
 				}}
 			/>
-			<output>{Math.round((settings.bgOpacity ?? 1) * 100)}%</output>
+			<output>{Math.round((1 - (settings.bgOpacity ?? 1)) * 100)}%</output>
 		</span>
 	</label>
 	{/if}

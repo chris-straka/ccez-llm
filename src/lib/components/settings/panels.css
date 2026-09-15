@@ -106,8 +106,23 @@
 		min-width: 0;
 		margin-top: 0;
 		padding: 0;
-		accent-color: #6e6e73;
+		accent-color: #007aff;
 		cursor: pointer;
+	}
+	/* One track color, not two: the native fill (accent left, gray
+	right) reads as a broken half-toggle in light theme, so the
+	track renders uniform and the thumb keeps the accent. */
+	.settings-inner .font-row input[type="range"]::-webkit-slider-runnable-track {
+		background: #c7c7cc;
+		border-radius: 999px;
+	}
+	.settings-inner .font-row input[type="range"]::-moz-range-track {
+		background: #c7c7cc;
+		border-radius: 999px;
+	}
+	.settings-inner .font-row input[type="range"]::-moz-range-progress {
+		background: #c7c7cc;
+		border-radius: 999px;
 	}
 	.settings-inner .font-row output {
 		font-size: 0.83rem;
@@ -443,9 +458,10 @@
 	}
 	.settings-inner .provider-row button.selected,
 	.settings-inner .segmented button.selected {
-		border-color: #1c1c1e;
-		background: #e6e6eb;
+		border-color: #007aff;
+		background: #e5f0ff;
 		color: #1c1c1e;
+		font-weight: 600;
 	}
 	.settings-inner .provider-row button:not(.selected):not(:disabled):hover,
 	.settings-inner .segmented button:not(.selected):not(:disabled):hover {
@@ -612,6 +628,18 @@
 	}
 	html[data-theme="dark"] .settings-inner .font-row input[type="range"] {
 		accent-color: #f2f2f7;
+	}
+	html[data-theme="dark"] .settings-inner .font-row input[type="range"]::-webkit-slider-runnable-track {
+		background: #48484a;
+		border-radius: 999px;
+	}
+	html[data-theme="dark"] .settings-inner .font-row input[type="range"]::-moz-range-track {
+		background: #48484a;
+		border-radius: 999px;
+	}
+	html[data-theme="dark"] .settings-inner .font-row input[type="range"]::-moz-range-progress {
+		background: #48484a;
+		border-radius: 999px;
 	}
 	html[data-theme="dark"] .settings-inner .model-row button {
 		background: #1c1c1e;

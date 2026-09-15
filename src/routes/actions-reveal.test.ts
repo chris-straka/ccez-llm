@@ -123,7 +123,7 @@ describe("hover-only message actions", () => {
  */
 function transitionBody(): string {
 	const fn = pageSource().match(
-		/function transitionToChat\(id: Parameters<typeof selectChat>\[1\]\): void \{([\s\S]*?)void switchChatWithTransition\(mutate\);/
+		/function transitionToChat\(id: Parameters<typeof selectChat>\[1\]\): void \{([\s\S]*?)switchChatWithTransition\(mutate/
 	);
 	expect(fn, "transitionToChat is gone or reshaped — keep the preview clear and voice stop in it").toBeTruthy();
 	return fn![1]!;

@@ -228,11 +228,14 @@ test("prompt review card opens up and to the left", async ({ page }) => {
 	// Grows upward from the pill, right-aligned with it.
 	expect(boxes.cardTop).toBeLessThan(boxes.wrapTop);
 	expect(Math.abs(boxes.cardRight - boxes.wrapRight)).toBeLessThanOrEqual(2);
-	// The pill's center sits inside the open card (zero travel gap).
+	// The pill stays exposed below the open card (the card must never
+	// cover its own toggle, or click-to-close has no target): the gap
+	// is the 0.5rem offset, horizontally the pill sits under the card.
 	expect(boxes.pillCX).toBeGreaterThanOrEqual(boxes.card.x);
 	expect(boxes.pillCX).toBeLessThanOrEqual(boxes.card.x + boxes.card.w);
-	expect(boxes.pillCY).toBeGreaterThanOrEqual(boxes.card.y);
-	expect(boxes.pillCY).toBeLessThanOrEqual(boxes.card.y + boxes.card.h);
+	const gap = boxes.wrapTop - (boxes.card.y + boxes.card.h);
+	expect(gap).toBeGreaterThan(0);
+	expect(gap).toBeLessThanOrEqual(24);
 });
 
 /** The sent message's refs card opens covering its number pill. */
@@ -504,7 +507,7 @@ test("sending clears pending annotations immediately", async ({ page }) => {
 
 /** The pencil edits an own message, then resends it: the message
 rewrites and the stale reply is replaced by a fresh one. */
-test("pencil edit saves and resends", async ({ page }) => {
+test("pencil edit saves without resending", async ({ page }) => {
 	await seedChat(page, [
 		{ role: "user", content: "helo world" },
 		{ role: "assistant", content: "hi" }
@@ -521,8 +524,8 @@ test("pencil edit saves and resends", async ({ page }) => {
 	await expect(page.locator("article.user")).toHaveCount(1);
 	await expect(page.locator("article.assistant")).toHaveCount(1);
 	await expect(page.locator(".prompt .cm-content")).not.toContainText("helo world");
-	// Fix the typo and save: the message rewrites, the stale reply is
-	// replaced by a fresh answer to the edit.
+	// Fix the typo and save: the message rewrites in place, nothing
+	// resends — the old reply stands untouched.
 	await inline.click();
 	await page.keyboard.press("Control+a");
 	await page.keyboard.type("hello world");
@@ -530,7 +533,8 @@ test("pencil edit saves and resends", async ({ page }) => {
 	await expect(page.locator("article.user .rendered")).toContainText("hello world");
 	await expect(page.locator("article.user")).toHaveCount(1);
 	await expect(page.locator("article.assistant")).toHaveCount(1);
-	await expect(page.locator("article.assistant .rendered")).toContainText("Mock reply");
+	await expect(page.locator("article.assistant .rendered")).toContainText("hi");
+	await expect(page.locator(".sending")).toHaveCount(0);
 });
 
 /** The in-place edit keeps syntax colors: fenced code highlights. */

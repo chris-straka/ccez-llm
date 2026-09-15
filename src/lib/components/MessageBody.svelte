@@ -998,6 +998,9 @@
 	.rendered :global(mark.ccez-ann) {
 		background: #fff3b0;
 		border-radius: 3px;
+		/* Annotated text reads interactive (the badge above it opens
+		the edit); clicks still select normally. */
+		cursor: pointer;
 		/* 1px of visual bleed each side, paid back with negative margin
 		so the wash never reflows the line when it appears. */
 		padding: 0 1px;
@@ -1130,7 +1133,10 @@
 		bottom: 100%;
 		left: 100%;
 		transform: translate(-40%, 10%);
-		z-index: 2;
+		/* Above the floating header strip (z-35) and composer card
+		(z-30): badges at the viewport edges stay clickable instead
+		of dropping hits (and focus) onto the chrome beneath. */
+		z-index: 36;
 		user-select: none;
 		-webkit-user-select: none;
 		/* Dampened text-size tracking (≈30% of the message scale, so a

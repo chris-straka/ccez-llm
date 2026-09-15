@@ -677,6 +677,11 @@ function loadChats(state: ChatState, store: KeyValueStore): void {
 					// voice flag: they follow the global default, never a
 					// guessed value.
 					if (typeof c.voice !== "boolean") c.voice = null;
+					// A missing timestamp renders "Invalid Date" in the
+					// sidebar and switcher: stamp it now instead.
+					if (typeof c.createdAt !== "number" || Number.isNaN(c.createdAt)) {
+						c.createdAt = Date.now();
+					}
 					return c;
 				});
 			if (state.chats.length > 0) {

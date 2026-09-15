@@ -404,8 +404,15 @@ describe("touch toggles", () => {
 		expect(s.autoSpeakSelection).toBe(true);
 		expect(s.vibration).toBe(true);
 	});
-	it("defaults the overlay pill on", () => {
-		expect(blankSettings().overlayActions).toBe(true);
+	it("drops the retired overlay pill from older saves", () => {
+		const store = memoryStore;
+		const stale = {
+			...blankSettings(),
+			overlayActions: true
+		} as unknown as Record<string, unknown>;
+		saveSettings(stale as unknown as AppSettings, store);
+		const healed = loadSettings(store);
+		expect("overlayActions" in healed).toBe(false);
 	});
 	it("drops the retired iOS bubble toggle from older saves", () => {
 		const store = memoryStore;
@@ -415,17 +422,17 @@ describe("touch toggles", () => {
 			hideMessages: "yes",
 			hideButtons: 0,
 			autoSpeakSelection: 0,
-			overlayActions: 0,
 			vibration: "yes"
 		} as unknown as Record<string, unknown>;
 		stale.iosNativeCallout = true;
+		stale.overlayActions = 0;
 		saveSettings(stale as unknown as AppSettings, store);
 		const healed = loadSettings(store);
 		expect(healed.hideMessages).toBe(false);
 		expect(healed.hideButtons).toBe(true);
 		expect(healed.autoSpeakSelection).toBe(true);
-		expect(healed.overlayActions).toBe(true);
 		expect(healed.vibration).toBe(true);
 		expect("iosNativeCallout" in healed).toBe(false);
+		expect("overlayActions" in healed).toBe(false);
 	});
 });

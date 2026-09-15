@@ -16,7 +16,7 @@
  */
 
 /** Visual slot a notice renders in (each renders independently). */
-export type NoticeKind = "inline" | "banner" | "voice" | "toast";
+export type NoticeKind = "inline" | "banner" | "voice" | "toast" | "errorToast";
 
 /** Conventional self-clear delays (the page passed these as literals). */
 export const TOAST_TIMEOUT_MS = 8000;
@@ -38,6 +38,8 @@ export interface NoticeState {
   voice: NoticeSlot;
   /** Self-clearing top toast (`toast`). */
   toast: NoticeSlot;
+  /** Self-clearing top error toast (red pairing, both themes). */
+  errorToast: NoticeSlot;
 }
 
 function emptySlot(): NoticeSlot {
@@ -49,7 +51,8 @@ export function emptyNotices(): NoticeState {
     inline: emptySlot(),
     banner: emptySlot(),
     voice: emptySlot(),
-    toast: emptySlot()
+    toast: emptySlot(),
+    errorToast: emptySlot()
   };
 }
 
