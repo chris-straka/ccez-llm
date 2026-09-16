@@ -98,6 +98,14 @@ platforms can't share one vendor's identity. So the palette is
 
 ## Log
 
+- **2026-09-16 — Destination mark flash + sidebar tips.** The sent
+  jump now wraps the quote in a draft-yellow `mark.ccez-ann-flash`
+  (same phases as the wash): plain DOM renders in every engine, where
+  the `::highlight` wash demonstrably didn't for some sessions. New
+  `wrapRangeInMark`/`unwrapMark` in annotations.ts (unit-tested,
+  collapsed ranges refuse). Sidebar rows pop message counts plus the
+  you/assistant split on hover/focus (in-memory only — drafts live
+  per-chat in storage).
 - **2026-09-16 — Sent wash re-locates per phase.** Each blink phase
   re-runs the quote locator and paints a fresh range: a chat re-render
   mid-scroll detaches the old range, and the registry keeps dead ranges

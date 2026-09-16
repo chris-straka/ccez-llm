@@ -877,6 +877,17 @@ test("sent-refs quote jumps to the quoted text with a flash", async ({ page }) =
 			{ timeout: 5_000 }
 		)
 		.toBe(true);
+	// The DOM twin paints with the wash: a draft-yellow mark on the
+	// quote, in every engine (polled — either paint phase counts).
+	await expect
+		.poll(
+			() =>
+				page.evaluate(
+					() => document.querySelector("mark.ccez-ann-flash")?.textContent ?? null
+				),
+			{ timeout: 5_000 }
+		)
+		.toBe("spring");
 	await page.waitForTimeout(800);
 	const after = await page.evaluate(() => document.querySelector(".messages")?.scrollTop ?? 0);
 	expect(after).toBeLessThan(top - 50);
@@ -896,6 +907,8 @@ test("sent-refs quote jumps to the quoted text with a flash", async ({ page }) =
 			return ranges.length > 0 && ranges.every((r) => document.contains(r.startContainer));
 		});
 	await expect.poll(alive, { timeout: 5_000 }).toBe(true);
+	// Both twins release themselves: no mark lingers in the message.
+	await expect(page.locator("mark.ccez-ann-flash")).toHaveCount(0, { timeout: 5_000 });
 });
 
 /** The pressed sent row blinks like a draft row (same phases), so the

@@ -1014,6 +1014,20 @@
 	:global(html[data-theme="dark"]) .rendered :global(mark.ccez-ann) {
 		background: rgba(245, 158, 11, 0.3);
 	}
+	/* Sent-jump destination flash: the same draft yellow, so arriving
+	from history reads exactly like arriving from a draft. Plain DOM
+	(not the Highlight API) so it renders in every engine; the caller
+	wraps and unwraps it around the blink. */
+	.rendered :global(mark.ccez-ann-flash) {
+		background: #fff3b0;
+		border-radius: 3px;
+		padding: 0 1px;
+		margin: 0 -1px;
+		color: inherit;
+	}
+	:global(html[data-theme="dark"]) .rendered :global(mark.ccez-ann-flash) {
+		background: rgba(245, 158, 11, 0.3);
+	}
 	/* The wash mounts/unmounts imperatively (applyMarks), so a plain
 	transition has nothing to run between: fade-in plays on mount for
 	newly arrived washes only, and fade-out plays on .leaving marks

@@ -140,6 +140,8 @@ import {
 		newAnnotationId,
 		rewriteAnnotationComment,
 		quoteRange,
+		wrapRangeInMark,
+		unwrapMark,
 		findQuotedMessage,
 		annRefsFor,
 		lockSelectionToMessage,
@@ -676,6 +678,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	/** Sent-jump flash timer: re-jumps restart it, expiry releases the
 	highlight (self-clearing — no chat-switch hook to forget). */
 	let jumpBlinkTimer: ReturnType<typeof setTimeout> | null = null;
+	/** Destination mark-flash timer: same schedule, DOM-backed twin. */
+	let jumpMarkTimer: ReturnType<typeof setTimeout> | null = null;
 	/** Sent-row blink: the pressed row flashes like a draft row (same
 	phases), so the press reads even where the highlight wash can't
 	paint. Keyed by message + number, not id — baked refs have none. */
@@ -3524,6 +3528,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		const range = locate();
 		if (range) {
 			scrollRectIntoClear(range.getBoundingClientRect());
+			flashJumpMark(locate);
 			blinkJumpWash(locate);
 		} else if (index >= 0) {
 			const article = document.querySelector(`#msg-${index}`);
@@ -3531,6 +3536,52 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				article.scrollIntoView({ block: "center", behavior: "smooth" });
 			}
 		}
+	}
+
+	/** Unwrap every destination flash mark (re-jump pre-clear and
+	expiry share it; a re-render that already dropped them no-ops). */
+	function clearJumpMarks(): void {
+		try {
+			document
+				.querySelectorAll("mark.ccez-ann-flash")
+				.forEach((m) => unwrapMark(m as HTMLElement));
+		} catch {
+			// Cosmetic: never break the jump.
+		}
+	}
+
+	/** Flash the destination quote twice in draft yellow, then release
+	it (a re-jump restarts the schedule; expiry clears itself). Plain
+	DOM marks render in every engine — the guaranteed half of the
+	signal, alongside the Highlight wash where supported. Every paint
+	re-locates for the same re-render reason as the wash below. */
+	function flashJumpMark(locate: () => Range | null): void {
+		if (jumpMarkTimer) clearTimeout(jumpMarkTimer);
+		jumpMarkTimer = null;
+		clearJumpMarks();
+		const paintFresh = (): boolean => {
+			const range = locate();
+			if (!range) return false;
+			return wrapRangeInMark(range, "ccez-ann-flash") !== null;
+		};
+		if (!paintFresh()) return;
+		let phase = 0;
+		const step = (): void => {
+			phase += 1;
+			if (phase >= 4) {
+				clearJumpMarks();
+				jumpMarkTimer = null;
+				return;
+			}
+			if (phase % 2 === 0) {
+				if (!paintFresh()) {
+					jumpMarkTimer = null;
+					return;
+				}
+			} else clearJumpMarks();
+			jumpMarkTimer = setTimeout(step, phase % 2 === 0 ? 700 : 350);
+		};
+		jumpMarkTimer = setTimeout(step, 700);
 	}
 
 	/** Flash a located quote twice, then release the highlight (a
@@ -5262,6 +5313,17 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// so the fresh blank starts clean even in storage.
 		saveDraftAnnotations(chatState.activeChatId, [], [chatState.activeChatId]);
 		void resetVoiceLangFromKeyboard();
+	}
+
+	/** Sidebar hover tip: message count plus the you/assistant split
+	(in-memory only — drafts live per-chat in storage, so counting
+	them here would read localStorage on every row render). */
+	function sideTip(item: (typeof chatState.chats)[number]): string {
+		const n = item.messages.length;
+		const you = item.messages.filter((m) => m.role === "user").length;
+		const msgs = n === 1 ? "1 message" : `${n} messages`;
+		if (n === 0) return msgs;
+		return `${msgs} · you ${you} · assistant ${n - you}`;
 	}
 
 	function chatLabel(createdAt: number): string {
@@ -8524,6 +8586,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							requestAnimationFrame(() => focusSideChat(sideIdx));
 						}}><ActionIcon kind="close" /></button
 					>
+					<span class="side-tip" role="tooltip">{sideTip(item)}</span>
 				</li>
 			{/each}
 		</ul>
@@ -10157,6 +10220,36 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		display: flex;
 		gap: 0.25rem;
 		position: relative;
+	}
+	/* Hover tip: message counts under the row, inside the drawer
+	(the list scrolls, so nothing may stick out sideways). Inverted
+	pill voice, pointer-transparent so the preview and row buttons
+	never notice it. */
+	.side-tip {
+		position: absolute;
+		top: calc(100% + 2px);
+		left: 0;
+		z-index: 5;
+		max-width: 100%;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		background: #1c1c1e;
+		background: var(--invert);
+		color: #fff;
+		color: var(--invert-ink);
+		font-size: 0.72rem;
+		font-weight: 600;
+		border-radius: 6px;
+		padding: 0.2rem 0.5rem;
+		box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+		opacity: 0;
+		pointer-events: none;
+		transition: opacity 0.15s ease;
+	}
+	aside li:hover .side-tip,
+	aside li:focus-within .side-tip {
+		opacity: 1;
 	}
 	aside li button:first-child {
 		flex: 1;

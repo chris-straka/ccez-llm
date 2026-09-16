@@ -9,6 +9,8 @@ import {
 	saveDraftAnnotations,
 	snapSelectionToWordEdges,
 	quoteRange,
+	wrapRangeInMark,
+	unwrapMark,
 	type Annotation
 } from "./annotations";
 
@@ -397,6 +399,60 @@ describe("quoteRange", () => {
 		const range = quoteRange(root, "Kyoto in spring");
 		expect(range?.startContainer.textContent).toBe("Kyoto");
 		expect(range?.endContainer.textContent).toBe(" in spring");
+		root.remove();
+	});
+});
+
+describe("wrapRangeInMark / unwrapMark", () => {
+	it("wraps a mid-node range, keeping the text", () => {
+		const root = document.createElement("div");
+		root.innerHTML = "<p>The quick brown fox</p>";
+		document.body.appendChild(root);
+		const range = quoteRange(root, "quick brown")!;
+		const mark = wrapRangeInMark(range, "ccez-ann-flash");
+		expect(mark?.tagName).toBe("MARK");
+		expect(mark?.className).toBe("ccez-ann-flash");
+		expect(mark?.textContent).toBe("quick brown");
+		expect(root.textContent).toBe("The quick brown fox");
+		unwrapMark(mark!);
+		expect(root.querySelector("mark")).toBeNull();
+		expect(root.textContent).toBe("The quick brown fox");
+		root.remove();
+	});
+
+	it("wraps ranges spanning elements without throwing", () => {
+		const root = document.createElement("div");
+		root.innerHTML = "<p>Kyoto <strong>in spring</strong> and more</p>";
+		document.body.appendChild(root);
+		const range = quoteRange(root, "Kyoto in spring")!;
+		const mark = wrapRangeInMark(range, "ccez-ann-flash");
+		expect(mark?.textContent).toBe("Kyoto in spring");
+		unwrapMark(mark!);
+		expect(root.textContent).toBe("Kyoto in spring and more");
+		root.remove();
+	});
+
+	it("refuses a range collapsed by a removal", () => {
+		const root = document.createElement("div");
+		root.textContent = "gone after rerender";
+		document.body.appendChild(root);
+		const range = document.createRange();
+		range.selectNodeContents(root);
+		root.remove();
+		// The removal collapses the range to (parent, index): wrapping
+		// that would plant an empty live mark, so it refuses and the
+		// document stays clean for the next blink phase.
+		expect(wrapRangeInMark(range, "ccez-ann-flash")).toBeNull();
+		expect(document.querySelector("mark")).toBeNull();
+	});
+
+	it("unwrap tolerates an already-dropped mark", () => {
+		const root = document.createElement("div");
+		root.innerHTML = "<p>plain</p>";
+		document.body.appendChild(root);
+		const orphan = document.createElement("mark");
+		orphan.textContent = "ghost";
+		expect(() => unwrapMark(orphan)).not.toThrow();
 		root.remove();
 	});
 });

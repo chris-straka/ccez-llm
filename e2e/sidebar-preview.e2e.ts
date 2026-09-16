@@ -49,6 +49,22 @@ test("sidebar hover previews the chat and restores on leave", async ({ page }) =
 	await expect(main).not.toContainText(BRAVO);
 });
 
+/** Hovering a row pops its counts: messages plus the you/assistant split. */
+test("sidebar hover shows the chat counts tip", async ({ page }) => {
+	await openSidebar(page);
+	const row = page.locator("aside ul li").first();
+	await row.hover();
+	const tip = row.locator(".side-tip");
+	// Opacity, not visibility: the tip keeps its box while faded.
+	await expect(tip).toHaveCSS("opacity", "1");
+	await expect(tip).toHaveText("1 message · you 0 · assistant 1");
+	// Leaving drops hover; the row button also holds keyboard focus,
+	// so click out to clear focus-within too.
+	await page.mouse.move(600, 500);
+	await page.locator("article .rendered").first().click();
+	await expect(tip).toHaveCSS("opacity", "0");
+});
+
 /** The preview is read-only: no action row, no selection menu while hovering. */
 test("preview hides the action row until the hover leaves", async ({ page }) => {
 	await openSidebar(page);

@@ -304,6 +304,43 @@ export function quoteRange(root: HTMLElement, quote: string, occurrence = 0): Ra
 }
 
 /**
+ * Wrap a range in a highlight mark (sent-jump destination flash):
+ * extract handles every boundary shape (mid-node, cross-element),
+ * so callers never juggle split points. Returns the mark, or null
+ * when the range can't extract. The mark is transient — the caller
+ * unwraps it after the blink.
+ */
+export function wrapRangeInMark(range: Range, cls: string): HTMLElement | null {
+	try {
+		// A removal collapses ranges to (parent, index): wrapping those
+		// would plant an empty live mark, so collapsed ranges refuse.
+		// Fresh ranges come from locate() each phase, so they are current
+		// by construction; any other detached shape still extracts
+		// harmlessly (mutating a dead tree), and the next phase wraps fresh.
+		if (range.collapsed) return null;
+		const doc = range.startContainer.ownerDocument;
+		if (!doc) return null;
+		const mark = doc.createElement("mark");
+		mark.className = cls;
+		mark.appendChild(range.extractContents());
+		range.insertNode(mark);
+		return mark;
+	} catch {
+		return null;
+	}
+}
+
+/** Release a transient highlight mark, restoring its text in place.
+Safe when a re-render already dropped it (nothing to restore). */
+export function unwrapMark(mark: HTMLElement): void {
+	try {
+		if (mark.isConnected) mark.replaceWith(...[...mark.childNodes]);
+	} catch {
+		mark.remove();
+	}
+}
+
+/**
  * Owner of a baked quote: first message (not the sender — its baked
  * block quotes it too, so including it lands every jump on the sender)
  * whose content holds the quote, badge-matching rules included.
