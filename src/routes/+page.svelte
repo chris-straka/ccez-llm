@@ -7646,7 +7646,17 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							target: describeFocusTarget(event.target),
 							active: describeActiveElement()
 						});
-						window.getSelection()?.removeAllRanges();
+						// WebKit: clearing the selection on mouseup after a
+						// field took focus destroys the just-placed caret —
+						// later keystrokes dispatch yet never become text.
+						// Clicks into editables already moved the selection
+						// there natively, so wipe only for non-editable
+						// targets (buttons, review chrome).
+						if (
+							!target?.closest(".cm-content, input, textarea, select, [contenteditable]")
+						) {
+							window.getSelection()?.removeAllRanges();
+						}
 						selMenu = null;
 					} else if ((window.getSelection()?.toString() ?? "") === "") {
 						selMenu = null;
@@ -12360,6 +12370,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		animation: none;
 		opacity: 0;
 		transition: opacity 0.16s ease;
+		/* A fading card must not stay hit-testable: a badge click
+		inside the 160ms window would land on the dying textarea
+		instead of the badge, so the open never runs and the timer
+		unmounts the focused node from under the caret. Clicks pass
+		through to the badge and the normal press path morphs back. */
+		pointer-events: none;
 	}
 	/* :global — toggled from growPill via classList (see the tall
 	flag there), so the compiler can't see the use site. Covers the

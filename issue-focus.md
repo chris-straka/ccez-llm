@@ -316,3 +316,92 @@ exactly which letters die (hotkey letters = tails still firing =
 fix not live; all letters + caret held = sub-app key eating);
 (c) badge-edit morph path (`bind:this` staleness on mid-fade
 re-open) — next dig, never probed (audit cleared it by reasoning).
+
+## Third-agent findings: save-fade click race (2026-09-16,
+reproduced in-harness, fix NOT applied)
+
+Method: read-only source audit plus `/tmp/focus-probe2/` scratch
+probes (repo untouched) — Always `promptIdleSec: -1`, non-empty
+chat, harness Chromium, real first-annotation flow (drag-select →
+Annotate → type → Enter-save → badge click → re-click → type),
+doc-level focusin/focusout/mousedown log with stacks and
+`isTrusted`, activeElement polls, correlated against Playwright's
+own input-dispatch log.
+
+Repro (flaky by timing): drop runs log badge click as
+`down:TEXTAREA prev=false` (the click missed the badge and hit the
+fading create card), then ~160ms after the Enter-save
+`out:TEXTAREA -> null` with a Svelte teardown stack
+(`remove_effect_dom <- destroy_effect`), then polls stuck at BODY
+and the popover gone (`boundingBox` timeout). Unmount time minus
+save time is exactly 160ms. Hold runs log the same click as
+`down:BUTTON.ccez-ann-badge.fresh prev=true`, the fade cancels,
+focus holds, typed text persists.
+
+Root cause: `hideAnnPop` (`+page.svelte` ~3071) fades 160ms before
+unmounting, and `.ann-pop.closing` (same file, ~12359) has no
+`pointer-events: none` — the dying card stays hit-testable for the
+whole fade. A badge click inside that window lands on the fading
+textarea instead of the badge, so `onBadgePress` (~7247) finds no
+`[data-ann-badge]`, `openBadge` (~3206) never runs, `settleAnnPop`
+(~3085) never cancels the fade (`saveAnnPop` early-returns while
+closing, ~3091), and the timer unmounts the focused textarea from
+under the caret → focus falls back to `<body>`. Flakiness is just
+the Enter-to-click gap versus the 160ms window.
+
+Fits every card symptom: the blink is `growPill`'s mount focus;
+fast typing sneaks a char in inside the window; selecting text
+first outlasts the fade; "drops again" on re-press is partly the
+*intended* badge toggle (`cancelAnnPop` on re-press of the open
+badge) plus the invisible focus cue (`textarea:focus` is
+`outline: none` over `border: 0`) — do not "fix" the toggle.
+
+Overturns the audit-round-2 dismissal ("Stuck invisible
+`.ann-pop.closing` eating clicks: killed by inspection ... No
+probe needed") — the strand path is Enter-save followed by a
+sub-160ms badge click, and the missing `pointer-events: none` is
+exactly the hole the audit spotted but cleared.
+
+Relation to the other sections: distinct mechanism from 65a8af8
+(that fix is keystroke-eating with focus held; this is focus lost
+to `<body>` via unmount — both can be real at once). Adjacent to
+the second agent's residual (c) but different: theirs is
+`bind:this` staleness when re-open *hits* mid-fade; this is the
+click *missing* the badge because of the fade. Same family as
+their save/cancel-focuses-parked-composer residual (focus to BODY
+after unmount), different trigger.
+
+Fix (one line, NOT applied — left for the write slot): add
+`pointer-events: none;` to `.ann-pop.closing`. Clicks during the
+fade then pass through to the badge, the normal press path runs,
+and the existing morph cancels the fade. Verify with the rapid
+Enter-then-badge-click flow (`/tmp/focus-probe2/probe.e2e.ts`,
+kept), then `e2e/annotations.e2e.ts`, full unit + `check` once.
+
+Out of scope here: Base URL / Model / System prompt / composer
+placeholder all HOLD in-harness (focus lands, typed text
+persists) — no unmount or steal found on those paths, so those
+drops need the owner-side `isConnected`/focusout probes above,
+not this fix.
+
+## Fix slot verdict (2026-09-16 — applied, green, pushed)
+
+Proposal 1 VERIFIED and fixed: `e2e/scroll-field.e2e.ts` failed 0/3
+on WebKit pre-fix (typed text missing with focus held; Chromium
+green throughout) and passes 3/3 on both engines post-fix. Edit:
+`onMouseUp` skips `removeAllRanges()` for editable targets
+(`.cm-content, input, textarea, select, [contenteditable]`).
+Committed coverage extended to WebKit (`playwright.config.ts`
+webkit `testMatch` += `scroll-field.e2e.ts` — Chromium cannot see
+this bug class). Save/toggle/delete close paths probed on both
+engines: focus always rescues to `body` in-harness, no strand —
+the screenshot's detached node needs system-WebKit to reproduce.
+Third-agent fade race: rapid Enter→badge-click holds at Playwright
+speed on both engines (roundtrips exceed the 160ms window, which
+itself explains harness-green/human-red); applied the one-line
+`pointer-events: none` on `.ann-pop.closing` anyway — clicks pass
+through to the badge and the morph path settles, nothing else
+reads the fading card. Verified: rapid probe holds both engines,
+`e2e/annotations.e2e.ts` 44/44, full unit 962 green, lint clean,
+`check` still the same 8 pre-existing errors in untouched
+editor*.ts (dup @codemirror tree).
