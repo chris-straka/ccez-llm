@@ -530,11 +530,12 @@
 		cursor: pointer;
 	}
 	/* Injected paste-fold marker (sanitized HTML): inline bold text in
-	badge blue, never a pill — still a button, so it clicks to expand. */
+	accent blue, never a pill — still a button, so it clicks to expand. */
 	.rendered :global(button.paste-fold) {
 		font: inherit;
 		font-weight: 700;
-		color: #5a9bf7;
+		color: #007aff;
+		color: var(--accent);
 		background: none;
 		border: 0;
 		padding: 0;
@@ -1157,8 +1158,10 @@
 		padding: 0 0.25rem;
 		border: 0;
 		border-radius: 999px;
-		background: #5a9bf7;
+		background: #007aff;
+		background: var(--accent);
 		color: #fff;
+		color: var(--accent-ink);
 		font-size: calc(0.7rem * (1 + (var(--font-scale, 1) - 1) * 0.3));
 		font-weight: 700;
 		line-height: calc(1.15rem * (1 + (var(--font-scale, 1) - 1) * 0.3));

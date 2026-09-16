@@ -10252,7 +10252,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		width: 0.22rem;
 		height: 1.05rem;
 		border-radius: 999px;
-		background: #5a9bf7;
+		background: #007aff;
+		background: var(--accent);
 	}
 	aside ul button:hover {
 		background: #ececf1;
@@ -10263,8 +10264,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		border-color: var(--focus);
 	}
 	aside .del:hover {
-		color: #c0362c;
-		color: var(--alarm);
+		color: #94250a;
+		color: var(--danger);
 	}
 
 	aside .new {
@@ -10845,7 +10846,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		border-radius: 50%;
 		margin-right: 0.55rem;
 		transform: translateY(-1px);
-		background: #0a84ff;
+		background: #007aff;
+		background: var(--accent);
 	}
 	.wp-dot[data-role="assistant"] {
 		background: #30d158;
@@ -12549,17 +12551,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		cursor: pointer;
 		white-space: nowrap;
 	}
-	/* Error toasts pair red both ways (same pairings as the banner
-	and voice error): light red on light theme, dark red on dark. */
+	/* Error toasts pair red both ways (same pairings as the banner):
+	the tokens already resolve per theme, so no dark override block. */
 	.toast.error {
 		background: #fdecea;
+		background: var(--error-bg);
 		color: #94250a;
+		color: var(--error-ink);
 		border-color: #e0a392;
-	}
-	:global(html[data-theme="dark"]) .toast.error {
-		background: #3d1008;
-		color: #ffb4a2;
-		border-color: #7a2a1c;
+		border-color: var(--error-line);
 	}
 	/* Speech errors ride under the toast: top of the screen, big
 	enough to notice, same dark-red pairing as the old banner so it
@@ -12608,7 +12608,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 	/* Pretty default text selection in both themes… */
 	:global(::selection) {
-		background: rgba(99, 102, 241, 0.28);
+		background: rgba(0, 122, 255, 0.28);
 		background: var(--sel-tint);
 	}
 	/* …tinted amber on the message a speak-aloud selection came from,
@@ -12824,6 +12824,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 	.ann-tool.recording {
 		color: #ff6b62;
+		color: var(--alarm);
 	}
 	.ann-tool :global(.action-glyph) {
 		height: 1.25rem;
@@ -12887,6 +12888,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 	:global(html[data-theme="light"]) .ann-pop .ann-tool.recording {
 		color: #ff3b30;
+		color: var(--alarm);
 	}
 	:global(html[data-theme="light"]) .ann-pop .ann-cancel {
 		border-color: #c7c7cc;
@@ -12897,7 +12899,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 	:global(html[data-theme="light"]) .ann-pop .ann-save {
 		border-color: #007aff;
+		border-color: var(--accent);
 		background: #007aff;
+		background: var(--accent);
 		color: #fff;
 	}
 	/* Fresh pill keeps the mic mounted and cross-fades it, so the
@@ -13086,11 +13090,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.review-edit-actions button:hover {
 		opacity: 0.8;
 	}
-	/* Light theme Save: system blue like the send button (dark keeps
+	/* Light theme Save: the accent fill like the send button (dark keeps
 	the inverted fill). Cancel rides the quiet rule below, untouched. */
 	:global(html[data-theme="light"]) .review-edit-actions button:not(:last-child) {
 		border-color: #007aff;
+		border-color: var(--accent);
 		background: #007aff;
+		background: var(--accent);
 		color: #fff;
 	}
 	.review-edit-actions button:last-child {
@@ -13276,7 +13282,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	no background, no glow, no underline: the signal stays inside the
 	glyph's own box. */
 	.review-head button.review-pencil:hover {
-		color: #5a9bf7;
+		color: #007aff;
+		color: var(--accent);
 		text-decoration: none;
 	}
 	/* Annotation popover: collapsed to the pill, expands on hover,
@@ -13743,7 +13750,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		padding: 0.6rem 0.8rem;
 		border-radius: 8px;
 		background: #fdecea;
+		background: var(--error-bg);
 		color: #94250a;
+		color: var(--error-ink);
 	}
 	.prompt.prompt-hidden {
 		/* Annotating on Android: the comment box owns the keyboard,
@@ -13907,11 +13916,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.send-btn:hover:not(:disabled) {
 		opacity: 0.8;
 	}
-	/* Light theme submit: system blue instead of the pitch-black
+	/* Light theme submit: the accent fill instead of the pitch-black
 	inversion (dark keeps the inverted fill). */
 	:global(html[data-theme="light"]) .send-btn {
 		border-color: #007aff;
+		border-color: var(--accent);
 		background: #007aff;
+		background: var(--accent);
 		color: #fff;
 	}
 	.send-btn:disabled {
@@ -14002,16 +14013,19 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			color: var(--ok);
 		}
 		.mic-btn.recording:hover {
-			color: #c0362c;
+			color: #ff3b30;
+			color: var(--alarm);
 		}
 	}
 	.voice-float.on {
 		color: #1f7a4d;
 		color: var(--ok);
 	}
-	/* Dictation in progress reads red, like the old pill's dot. */
+	/* Dictation in progress reads alarm red, like the popover's
+	recording dot. */
 	.mic-btn.recording {
-		color: #c0362c;
+		color: #ff3b30;
+		color: var(--alarm);
 	}
 	.file-kind {
 		font-size: 0.68rem;
@@ -14268,10 +14282,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		color: #7cc3a3;
 	}
 	/* tool-icon hovers ride --ink now. */
-	:global(html[data-theme="dark"]) .error-banner {
-		background: #3d1008;
-		color: #ffb4a2;
-	}
+	/* .error-banner rides --error-bg/--error-ink now: no dark override needed. */
 	/* sent-files/tok ride --muted; attachment pills ride --hl now.
 	The pill × keeps its rule: light --focus against dark --ink. */
 	:global(html[data-theme="dark"]) .attachments button {

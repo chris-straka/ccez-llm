@@ -19,12 +19,23 @@ html {
 	engines opaque. Scoped to data-theme so first paint keeps
 	app.html's cold-start background. */
 	--strong: #1c1c1e;
-	--sel-tint: rgba(99, 102, 241, 0.28);
+	/* One accent blue both themes (see docs/colors.md): the old
+	indigo selection tint died here. sel-tint repeats the accent
+	as plain rgba (not color-mix) so computed styles serialize to
+	rgba everywhere — Chromium leaves color-mix() unresolved. */
+	--accent: #007aff;
+	--accent-ink: #fff;
+	--sel-tint: rgba(0, 122, 255, 0.28);
 	--ok: #1f7a4d;
 	--hl: #eef4ff;
 	--hover-wash: #ececf1;
 	--dim: #6e6e73;
-	--alarm: #c0362c;
+	/* Alarm is the live-signal red (recording states), not the old
+	brick: deletes ride --danger. */
+	--alarm: #ff3b30;
+	--error-bg: #fdecea;
+	--error-ink: #94250a;
+	--error-line: #e0a392;
 	--panel: #fafafc;
 	--field: #fff;
 	--invert: #1c1c1e;
@@ -45,12 +56,17 @@ html[data-theme="light"] {
 	background: var(--bg);
 	background: color-mix(in srgb, var(--bg) calc(var(--bg-alpha, 1) * 100%), transparent);
 	--strong: #1c1c1e;
-	--sel-tint: rgba(99, 102, 241, 0.28);
+	--accent: #007aff;
+	--accent-ink: #fff;
+	--sel-tint: rgba(0, 122, 255, 0.28);
 	--ok: #1f7a4d;
 	--hl: #eef4ff;
 	--hover-wash: #ececf1;
 	--dim: #6e6e73;
-	--alarm: #c0362c;
+	--alarm: #ff3b30;
+	--error-bg: #fdecea;
+	--error-ink: #94250a;
+	--error-line: #e0a392;
 	--panel: #fafafc;
 	--field: #fff;
 	--invert: #1c1c1e;
@@ -71,12 +87,17 @@ html[data-theme="dark"] {
 	background: var(--bg);
 	background: color-mix(in srgb, var(--bg) calc(var(--bg-alpha, 1) * 100%), transparent);
 	--strong: #aeaeb2;
-	--sel-tint: rgba(129, 140, 248, 0.4);
+	--accent: #0a84ff;
+	--accent-ink: #fff;
+	--sel-tint: rgba(10, 132, 255, 0.4);
 	--ok: #7cc3a3;
 	--hl: #12233d;
 	--hover-wash: #2c2c2e;
 	--dim: #aeaeb2;
-	--alarm: #e89a90;
+	--alarm: #ff6b62;
+	--error-bg: #3d1008;
+	--error-ink: #ffb4a2;
+	--error-line: #7a2a1c;
 	--panel: #1c1c1e;
 	--field: #101013;
 	--invert: #f2f2f7;

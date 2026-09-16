@@ -143,7 +143,7 @@ for (const t of THEMES) {
 		const del = row.locator(".del");
 		await expect(del).toHaveCSS("color", L ? "rgb(110, 110, 115)" : "rgb(174, 174, 178)");
 		await del.hover();
-		await expect(del).toHaveCSS("color", L ? "rgb(192, 54, 44)" : "rgb(232, 154, 144)");
+		await expect(del).toHaveCSS("color", L ? "rgb(148, 37, 10)" : "rgb(232, 154, 144)");
 	});
 
 	test(`sidebar paints ${t.name}`, async ({ page }) => {
@@ -480,7 +480,7 @@ for (const t of THEMES) {
 		const tint = await page.evaluate(
 			() => getComputedStyle(document.querySelector("article .rendered")!, "::selection").backgroundColor
 		);
-		expect(tint).toBe(L ? "rgba(99, 102, 241, 0.28)" : "rgba(129, 140, 248, 0.4)");
+		expect(tint).toBe(L ? "rgba(0, 122, 255, 0.28)" : "rgba(10, 132, 255, 0.4)");
 		// The floating nav carries border: 0, so neither the old dark
 		// border rule nor its token line ever paints — nothing to pin.
 		await expect(page.locator('nav[aria-label="Waypoints"]')).toHaveCount(1);

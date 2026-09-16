@@ -107,6 +107,7 @@
 		margin-top: 0;
 		padding: 0;
 		accent-color: #007aff;
+		accent-color: var(--accent);
 		cursor: pointer;
 	}
 	/* One track color, not two: the native fill (accent left, gray
@@ -457,6 +458,7 @@
 	.settings-inner .provider-row button.selected,
 	.settings-inner .segmented button.selected {
 		border-color: #007aff;
+		border-color: var(--accent);
 		background: #e5f0ff;
 		color: #1c1c1e;
 		font-weight: 600;

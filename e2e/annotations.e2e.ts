@@ -1317,7 +1317,7 @@ test("review pencil hover moves no icons", async ({ page }) => {
 	expect(paint).toEqual({
 		copyDeco: "none",
 		pencilDeco: "none",
-		pencilColor: "rgb(90, 155, 247)",
+		pencilColor: "rgb(0, 122, 255)",
 		pencilBg: "rgba(0, 0, 0, 0)",
 		pencilFilter: "none",
 		itemCursor: "auto",
