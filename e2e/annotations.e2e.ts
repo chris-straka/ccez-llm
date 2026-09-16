@@ -1288,18 +1288,24 @@ test("review pencil hover moves no icons", async ({ page }) => {
 			};
 		});
 	const before = await boxes();
+	// Copy and delete share one vertical middle at rest (the old text
+	// × sat low on its font bearings).
+	expect(Math.abs(before.copy.y + before.copy.h / 2 - (before.del.y + before.del.h / 2))).toBeLessThanOrEqual(
+		1
+	);
 	await page.locator(".review-pencil").first().hover();
 	// Hover transitions run 0.15s; measure past them.
 	await page.waitForTimeout(400);
 	expect(await boxes()).toEqual(before);
 	// And the hover paints no box-bleeding artifacts: icon buttons
-	// never underline, the pencil signals with a flat tint instead
-	// of a drop-shadow glow (the glow reads as the row jumping).
+	// never underline, the pencil signals with color alone (no
+	// background, no glow).
 	const paint = await page.evaluate(() => {
 		const style = (sel: string) => getComputedStyle(document.querySelector(sel) as HTMLElement);
 		return {
 			copyDeco: style(".review-copy").textDecorationLine,
 			pencilDeco: style(".review-pencil").textDecorationLine,
+			pencilColor: style(".review-pencil").color,
 			pencilBg: style(".review-pencil").backgroundColor,
 			pencilFilter: style(".review-pencil").filter
 		};
@@ -1307,9 +1313,20 @@ test("review pencil hover moves no icons", async ({ page }) => {
 	expect(paint).toEqual({
 		copyDeco: "none",
 		pencilDeco: "none",
-		pencilBg: "rgba(90, 155, 247, 0.16)",
+		pencilColor: "rgb(90, 155, 247)",
+		pencilBg: "rgba(0, 0, 0, 0)",
 		pencilFilter: "none"
 	});
+	// The delete icon goes Clear-all red, never underlined — and holds
+	// its box like the rest.
+	await page.locator(".review-del").first().hover();
+	await page.waitForTimeout(400);
+	expect(await boxes()).toEqual(before);
+	const delPaint = await page.evaluate(() => {
+		const style = getComputedStyle(document.querySelector(".review-del") as HTMLElement);
+		return { color: style.color, deco: style.textDecorationLine };
+	});
+	expect(delPaint).toEqual({ color: "rgb(255, 69, 58)", deco: "none" });
 });
 
 test("gutter drags never highlight above the cursor line", async ({ page }) => {

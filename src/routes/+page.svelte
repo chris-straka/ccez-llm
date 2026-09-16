@@ -9307,11 +9307,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 										</button>
 										<button
 											type="button"
+											class="review-del"
 											aria-label="Delete annotation {n + 1}"
 											title="Delete annotation"
 											onclick={() => removeAnnotation(ann.id)}
 										>
-											×
+											<ActionIcon kind="close" />
 										</button>
 									</div>
 									{#if editingId === ann.id}
@@ -13166,6 +13167,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.app[data-android] .review-head button.review-copy :global(.action-glyph) {
 		height: calc(0.8rem * var(--font-scale, 1));
 	}
+	.app[data-android] .review-head button.review-del :global(.action-glyph) {
+		height: calc(0.8rem * var(--font-scale, 1));
+	}
 	/* Per-note edit is a pencil in the message-action style (same
 	stroke icon, same quiet gray) instead of a text button. It rides
 	right after the note text — not margin-left:auto at the card's far
@@ -13181,11 +13185,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		color: var(--muted);
 		padding: 0.15rem;
 		border-radius: 6px;
-		/* On the base (not :hover) so the tint animates symmetrically
+		/* On the base (not :hover) so the color animates symmetrically
 		in and back out, instead of snapping one way. */
-		transition:
-			color 0.15s ease,
-			background-color 0.15s ease;
+		transition: color 0.15s ease;
 	}
 	.review-head button.review-pencil :global(.action-glyph) {
 		height: 0.95rem;
@@ -13198,6 +13200,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.review-head button.review-copy {
 		display: inline-flex;
 		align-items: center;
+		align-self: center;
 		margin-left: 0;
 		flex-shrink: 0;
 		color: #6e6e73;
@@ -13216,6 +13219,28 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		reads as the row jumping. */
 		text-decoration: none;
 	}
+	/* Delete rides the row's far edge as a geometric X (same icon
+	voice as copy), never a text × whose font bearings sit it low.
+	All three icons self-center against the row's baseline text.
+	Hover goes Clear-all red, never underlined. */
+	.review-head button.review-del {
+		margin-left: auto;
+		flex: none;
+		align-self: center;
+		display: inline-flex;
+		align-items: center;
+		color: #6e6e73;
+		color: var(--muted);
+		padding: 0.15rem;
+		border-radius: 6px;
+	}
+	.review-head button.review-del :global(.action-glyph) {
+		height: 0.95rem;
+	}
+	.review-head button.review-del:hover {
+		color: #ff453a;
+		text-decoration: none;
+	}
 	/* The quote is a button (keyboard reachable) but reads as plain
 	text: opt out of the generic head-button voice (far-edge auto
 	margin, small muted type, hover underline) the icon buttons use. */
@@ -13228,13 +13253,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		color: inherit;
 		text-decoration: none;
 	}
-	/* Hover tints accent-blue instead of going ink: the pencil is small
-	and quiet-gray, so an ink hover read as disappearing. A flat tint,
-	never a drop-shadow glow — the glow bloomed past the glyph's box
-	and shimmered the row under the cursor without moving any box. */
+	/* Hover goes accent-blue instead of going ink: the pencil is small
+	and quiet-gray, so an ink hover read as disappearing. Color only —
+	no background, no glow, no underline: the signal stays inside the
+	glyph's own box. */
 	.review-head button.review-pencil:hover {
 		color: #5a9bf7;
-		background-color: rgba(90, 155, 247, 0.16);
 		text-decoration: none;
 	}
 	/* Annotation popover: collapsed to the pill, expands on hover,

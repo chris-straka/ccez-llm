@@ -87,14 +87,28 @@ describe("annotations-only messages", () => {
 });
 
 describe("review pencil hover", () => {
-	it("tints flat accent-blue instead of glowing or underlining", () => {
+	it("signals with color only — no background, glow, or underline", () => {
 		const css = pageStyle();
 		expect(css).toMatch(/button\.review-pencil\s*\{[^}]*transition:/);
 		const hover = css.match(/button\.review-pencil:hover\s*\{[^}]*\}/)?.[0] ?? "";
-		expect(hover).toContain("background-color");
+		expect(hover).toContain("color:");
+		expect(hover).not.toContain("background");
 		expect(hover).not.toContain("drop-shadow");
 		expect(hover).not.toContain("filter");
 		expect(css).toMatch(/button\.review-copy:hover\s*\{[^}]*text-decoration:\s*none/);
+	});
+});
+
+describe("review delete button", () => {
+	it("is a centered close icon going Clear-all red, never underlined", () => {
+		const source = pageSource();
+		expect(source).toContain('class="review-del"');
+		expect(source).toContain('kind="close"');
+		const css = pageStyle();
+		expect(css).toMatch(/button\.review-del\s*\{[^}]*align-self:\s*center/);
+		const hover = css.match(/button\.review-del:hover\s*\{[^}]*\}/)?.[0] ?? "";
+		expect(hover).toContain("#ff453a");
+		expect(hover).toMatch(/text-decoration:\s*none/);
 	});
 });
 
