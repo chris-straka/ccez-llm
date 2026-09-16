@@ -6927,7 +6927,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		const sideAction = sidebarListAction({
 			...keyFacts(event),
 			listOpen: !settings.sidebarCollapsed,
-			inSidebar
+			inSidebar,
+			inField: isFieldTarget(event.target)
 		});
 			if (sideAction === "walk-down" || sideAction === "walk-up") {
 				// Walking switches to each chat (preview-as-you-go).
@@ -7102,6 +7103,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				inScrollMode: focusMode === "scroll",
 				inEditor: inEditor !== null,
 				inFind: isFindBarTarget(event.target),
+				inField: isFieldTarget(event.target),
 				gArmed: ggArmed(lastGAt, Date.now()),
 				atNewest: selectedIdx >= chat.messages.length - 1,
 				scrollFromPrompt

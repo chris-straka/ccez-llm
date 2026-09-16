@@ -429,7 +429,8 @@ const sideBase: SidebarListFacts = {
 	altKey: false,
 	shiftKey: false,
 	listOpen: true,
-	inSidebar: true
+	inSidebar: true,
+	inField: false
 };
 
 describe("sidebarListAction", () => {
@@ -448,6 +449,12 @@ describe("sidebarListAction", () => {
 		// Closed list or outside it: nothing owned.
 		expect(sidebarListAction({ ...sideBase, listOpen: false })).toBe(null);
 		expect(sidebarListAction({ ...sideBase, inSidebar: false })).toBe(null);
+		// Fields keep their keys even inside the open list (settings
+		// inputs, the list's own search box: j/k type, Backspace edits).
+		expect(sidebarListAction({ ...sideBase, inField: true })).toBe(null);
+		expect(sidebarListAction({ ...sideBase, inField: true, key: "k" })).toBe(null);
+		expect(sidebarListAction({ ...sideBase, inField: true, key: " " })).toBe(null);
+		expect(sidebarListAction({ ...sideBase, inField: true, key: "Backspace" })).toBe(null);
 		// Modifiers release every key; shifted Delete keeps its own.
 		expect(sidebarListAction({ ...sideBase, metaKey: true })).toBe(null);
 		expect(sidebarListAction({ ...sideBase, key: "Delete", shiftKey: true })).toBe(null);
@@ -535,6 +542,7 @@ const scrollBase: ScrollModeFacts = {
 	inScrollMode: true,
 	inEditor: false,
 	inFind: false,
+	inField: false,
 	gArmed: false,
 	atNewest: false,
 	scrollFromPrompt: false,
@@ -575,6 +583,11 @@ describe("scrollModeAction", () => {
 		expect(scrollModeAction({ ...scrollBase, inScrollMode: false })).toBe(null);
 		expect(scrollModeAction({ ...scrollBase, inEditor: true })).toBe(null);
 		expect(scrollModeAction({ ...scrollBase, inFind: true })).toBe(null);
+		expect(scrollModeAction({ ...scrollBase, inField: true })).toBe(null);
+		expect(scrollModeAction({ ...scrollBase, inField: true, key: "d" })).toBe(null);
+		expect(scrollModeAction({ ...scrollBase, inField: true, key: "i" })).toBe(null);
+		expect(scrollModeAction({ ...scrollBase, inField: true, key: "Enter" })).toBe(null);
+		expect(scrollModeAction({ ...scrollBase, inField: true, key: "g", gArmed: true })).toBe(null);
 		// g/G keep their guards; j/k/i/Enter carry none (scroll owns them).
 		expect(scrollModeAction({ ...scrollBase, key: "g", metaKey: true })).toBe(null);
 		expect(scrollModeAction({ ...scrollBase, key: "G", altKey: true })).toBe(null);

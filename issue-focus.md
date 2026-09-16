@@ -142,6 +142,37 @@ Seeded harness (`bunx playwright test`, own E2E_PORT each):
   Detached-or-2 = swap hunt (what re-creates the textarea);
   attached-and-1 = key-path hunt (keydown logging).
 
+## Resolution (fix slot, 2026-09-16 — reproduced in-harness, fixed)
+
+Root cause (app-side, proven): two key-dispatch decisions had no field
+guard, so hotkeys fired from inside native text fields:
+
+1. `scrollModeAction` (`src/lib/keybindings.ts`) exempted only the
+   composer (`.cm-content`/`.ta-input`) + find bar. With
+   `focusMode === "scroll"` (stuck after find-cycling/Ctrl+G — nothing
+   clears it on field focus), typing j/k/d/u/g/G/Ctrl+G in settings
+   inputs, selects, or the EDIT card was swallowed (d→half-jump,
+   j/k→step), and i/Enter yanked focus into the composer via
+   `enterEditMode`. Pre-fix probe: "dijk"→"jk", "dudg"→"g".
+2. `sidebarListAction` matched ANY `<aside>`, settings panel included.
+   With the chats list open, j/k/l/Space/Delete/Backspace in a settings
+   field walked/entered/deleted chats (l/Space yanked focus the same
+   way). Pre-fix probe: "jkl"→"".
+
+Fix: `inField: isFieldTarget(event.target)` wired into both tails
+(one line each), guards inside the pure decisions, unit cases in
+`src/lib/keybindings.test.ts`, committed `e2e/scroll-field.e2e.ts`
+(3 tests, green). Full unit 959 green, lint clean, scrollkeys.e2e.ts
+4 smooth-scroll timing failures proven pre-existing by pristine-tree
+rerun (fail identically stashed). `bun run check` still 8 errors, all
+in untouched editor*.ts (duplicated @codemirror versions — the queued
+`overrides` cleanup).
+
+Residual, NOT claimed fixed: composer placeholder-vs-floor split
+(onMouseUp `removeAllRanges` theory, unprobed) and the invisible-focus
+confound (`.ann-pop textarea:focus { outline: none }`). Owner probes
+(isConnected/count, OS-vs-app fork) still wanted if symptoms persist.
+
 ## Next (owner)
 
 1. Owner runs the focusmon snippet (doc-level focusin/focusout +

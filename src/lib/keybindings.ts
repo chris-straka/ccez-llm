@@ -407,6 +407,8 @@ export interface SidebarListFacts extends KeyModifiers {
 	key: string;
 	listOpen: boolean;
 	inSidebar: boolean;
+	/** Fields keep their keys (the list's own search box types, never walks). */
+	inField: boolean;
 }
 
 export type SidebarListAction = "walk-up" | "walk-down" | "enter" | "delete-chat";
@@ -419,7 +421,7 @@ export type SidebarListAction = "walk-up" | "walk-down" | "enter" | "delete-chat
  * letters, and shifted arrows still walk), while Delete keeps its own.
  */
 export function sidebarListAction(facts: SidebarListFacts): SidebarListAction | null {
-	if (!facts.listOpen || !facts.inSidebar) return null;
+	if (!facts.listOpen || !facts.inSidebar || facts.inField) return null;
 	if (facts.metaKey || facts.ctrlKey || facts.altKey) return null;
 	if (facts.key === "j" || facts.key === "ArrowDown") return "walk-down";
 	if (facts.key === "k" || facts.key === "ArrowUp") return "walk-up";
@@ -502,6 +504,8 @@ export interface ScrollModeFacts {
 	inScrollMode: boolean;
 	inEditor: boolean;
 	inFind: boolean;
+	/** Native fields keep their keys: scroll mode owns the stage, not typing. */
+	inField: boolean;
 	gArmed: boolean;
 	atNewest: boolean;
 	scrollFromPrompt: boolean;
@@ -526,7 +530,7 @@ export type ScrollModeAction =
  * beat without consuming the key. Callers chain `if` — never a switch.
  */
 export function scrollModeAction(facts: ScrollModeFacts): ScrollModeAction | null {
-	if (!facts.inScrollMode || facts.inEditor || facts.inFind) return null;
+	if (!facts.inScrollMode || facts.inEditor || facts.inFind || facts.inField) return null;
 	if (facts.key === "j" || facts.key === "ArrowDown") {
 		// Past the newest message drops back into the prompt.
 		return facts.atNewest ? "enter-edit" : "step-down";
