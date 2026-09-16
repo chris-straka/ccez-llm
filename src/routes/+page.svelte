@@ -8949,13 +8949,49 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					onmouseleave={(event) => onArticleLeave(event, msg, i)}
 				>
 					{#if msg.attachments && msg.attachments.length > 0}
-					<!-- Sent-message attachment chips: above the message
-					and before (left of) the annotation marker, so files
-					sent with the turn read as its head, not its tail. -->
-					<div class="sent-files">
+					<!-- Sent-message attachment tags: the marker text the
+					turn was sent with, rebuilt from the attachments (send
+					strips the literals, so history has no tag positions
+					left). Above the message like the chips were; hovering
+					previews the composer card, and clicks stop at the tag
+					so the message actions stay shut. A long turn scrolls
+					sideways in place (about three tags at a time) instead
+					of stretching. -->
+					<div class="sent-tags">
 						{#each msg.attachments as att (att.id)}
-							<span class="sent-chip" title="{att.name} · ~{att.tokens} tokens">
-								<ActionIcon kind="attach" /> {att.name}
+							<span class="sent-tag" onclick={(e) => e.stopPropagation()}>
+								{att.kind === "image" ? IMAGE_MARKER : FILE_MARKER}
+								<span class="sent-preview" aria-hidden="true">
+									{#if att.kind === "image" && att.dataUrl}
+										<img class="sent-img" src={att.dataUrl} alt="" />
+									{:else if att.kind === "text" && att.text !== null}
+										<span class="sent-excerpt">{fileExcerpt(att.text)}</span>
+									{/if}
+									<span class="sent-meta">{att.name} · ≈{att.tokens} tokens</span>
+									<span class="sent-actions">
+										<button
+											type="button"
+											class="sent-btn"
+											aria-label="Copy attachment"
+											title="Copy attachment"
+											onclick={() => copyAttachment(att)}
+										>
+											Copy
+										</button>
+										{#if att.kind === "image" && att.dataUrl}
+											<button
+												type="button"
+												class="sent-btn"
+												aria-label="Recognize text in image"
+												title="Recognize text in image"
+												disabled={ocrBusyId === att.id}
+												onclick={() => void recognizeAttachment(att)}
+											>
+												{ocrBusyId === att.id ? "…" : "OCR"}
+											</button>
+										{/if}
+									</span>
+								</span>
 							</span>
 						{/each}
 					</div>
@@ -12449,33 +12485,81 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	main.alt article * {
 		cursor: pointer;
 	}
-	.sent-files {
+	/* Sent-message attachment tags: marker text as links in a
+	sideways-scrolling row (about three tags at a time) — long turns
+	scroll in place instead of stretching. The hover card mirrors the
+	composer popup token for token, so history previews read exactly
+	like the draft did. */
+	.sent-tags {
 		display: flex;
-		flex-wrap: wrap;
-		gap: 0.4rem;
+		gap: 0.35rem 0.6rem;
+		overflow-x: auto;
 		margin-bottom: 0.35rem;
-		font-size: 0.75rem;
-		color: #6e6e73;
-		color: var(--muted);
+		padding-bottom: 0.15rem;
 	}
-	/* Attachment chips: icon + name in a quiet pill (no emoji — the
-	attach glyph matches the composer's icon-only treatment). */
-	.sent-chip {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.3rem;
+	.sent-tag {
+		position: relative;
+		flex: none;
+		text-decoration: underline;
+		cursor: default;
+	}
+	.sent-preview {
+		display: none;
+		position: absolute;
+		top: 100%;
+		left: 0;
+		z-index: 30;
+		margin-top: 0.25rem;
+		padding: 0.5rem;
+		max-width: 16rem;
+		background: #fff;
+		background: var(--bg-raised);
 		border: 1px solid #c7c7cc;
 		border-color: var(--line);
-		border-radius: 999px;
-		padding: 0.15rem 0.6rem;
-		max-width: 100%;
-		overflow: hidden;
-		text-overflow: ellipsis;
+		border-radius: 8px;
+	}
+	.sent-tag:hover .sent-preview {
+		display: block;
+	}
+	.sent-img {
+		display: block;
+		max-width: 14rem;
+		max-height: 10rem;
+		border-radius: 6px;
+	}
+	.sent-excerpt {
+		display: block;
+		max-height: 8rem;
+		overflow: auto;
+		white-space: pre-wrap;
+		font-size: 0.75rem;
+		color: #1c1c1e;
+		color: var(--ink);
+	}
+	.sent-meta {
+		display: block;
+		margin-top: 0.3rem;
+		font-size: 0.72rem;
+		color: #6e6e73;
+		color: var(--muted);
 		white-space: nowrap;
 	}
-	.sent-chip :global(.action-glyph) {
-		height: 0.85em;
-		flex-shrink: 0;
+	.sent-actions {
+		display: flex;
+		gap: 0.4rem;
+		margin-top: 0.3rem;
+	}
+	.sent-btn {
+		border: 0;
+		background: none;
+		padding: 0.15rem 0.3rem;
+		font-size: 0.72rem;
+		font-weight: 700;
+		letter-spacing: 0.04em;
+		color: #1c1c1e;
+		color: var(--ink);
+		cursor: pointer;
+		text-decoration: underline;
 	}
 	/* Sent-message annotation refs: the baked block collapses to the
 	count (like the composer pill); hover or Tab reveals the saved
@@ -14650,7 +14734,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 	/* tool-icon hovers ride --ink now. */
 	/* .error-banner rides --error-bg/--error-ink now: no dark override needed. */
-	/* sent-files/tok ride --muted; attachment pills ride --hl now.
+	/* sent-meta rides --muted; attachment pills ride --hl now.
 	The pill × keeps its rule: light --focus against dark --ink. */
 	:global(html[data-theme="dark"]) .attachments button {
 		color: #f2f2f7;
