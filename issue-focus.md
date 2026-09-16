@@ -106,8 +106,9 @@ Seeded harness (`bunx playwright test`, own E2E_PORT each):
 
 ## Next (owner)
 
-1. Paste the doc-level focusin/focusout log from a reproducing
-   browser window (snippet supplied in chat).
+1. Owner runs the focusmon snippet (doc-level focusin/focusout +
+   mousedown + 250ms activeElement poll + focusout stack) in a
+   reproducing browser window and pastes the `[focusmon]` lines.
 2. Private-window repro: REFUSED by owner ("would never matter") —
    extension/state fork stays open instead.
 3. OS-vs-app fork (asked, pending): do text fields work in other
