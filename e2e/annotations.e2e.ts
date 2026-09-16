@@ -1190,6 +1190,62 @@ test("review pencil edits at the mark in the floating card", async ({ page }) =>
 	expect(draft).toBe("chat draft");
 });
 
+/** Hovering the review pencil moves nothing: the row's icons keep
+their boxes (a hover style that grows the box jitters the whole
+card under the cursor). */
+test("review pencil hover moves no icons", async ({ page }) => {
+	await seedChat(page, [{ role: "assistant", content: "alpha beta gamma delta" }]);
+	await page.goto("/");
+	const para = page.locator("article.assistant .rendered p").first();
+	await expect(para).toBeVisible({ timeout: 60_000 });
+	await para.dblclick({ position: { x: 10, y: 10 } });
+	await expect(page.locator(".sel-menu")).toBeVisible();
+	await page.locator('.sel-menu button:has-text("Annotate")').click();
+	await page.keyboard.type("first");
+	await page.keyboard.press("Enter");
+	await page.locator(".prompt-tools .ann-pill").click();
+	await expect(page.locator(".ann-wrap .review")).toHaveCSS("opacity", "1");
+	const boxes = () =>
+		page.evaluate(() => {
+			const box = (sel: string) => {
+				const el = document.querySelector(sel);
+				if (!(el instanceof HTMLElement)) throw new Error(`missing ${sel}`);
+				const b = el.getBoundingClientRect();
+				return { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height) };
+			};
+			return {
+				copy: box(".review-copy"),
+				del: box('.review-head button[title="Delete annotation"]'),
+				pencil: box(".review-pencil"),
+				quote: box(".review-quote"),
+				comment: box(".review-comment")
+			};
+		});
+	const before = await boxes();
+	await page.locator(".review-pencil").first().hover();
+	// Hover transitions run 0.15s; measure past them.
+	await page.waitForTimeout(400);
+	expect(await boxes()).toEqual(before);
+	// And the hover paints no box-bleeding artifacts: icon buttons
+	// never underline, the pencil signals with a flat tint instead
+	// of a drop-shadow glow (the glow reads as the row jumping).
+	const paint = await page.evaluate(() => {
+		const style = (sel: string) => getComputedStyle(document.querySelector(sel) as HTMLElement);
+		return {
+			copyDeco: style(".review-copy").textDecorationLine,
+			pencilDeco: style(".review-pencil").textDecorationLine,
+			pencilBg: style(".review-pencil").backgroundColor,
+			pencilFilter: style(".review-pencil").filter
+		};
+	});
+	expect(paint).toEqual({
+		copyDeco: "none",
+		pencilDeco: "none",
+		pencilBg: "rgba(90, 155, 247, 0.16)",
+		pencilFilter: "none"
+	});
+});
+
 test("gutter drags never highlight above the cursor line", async ({ page }) => {
 	await seedChat(page, [
 		{ role: "assistant", content: "aaa one\n\nbbb two\n\nccc three" }
