@@ -432,8 +432,8 @@ test("badge cancel drops the edit", async ({ page }) => {
 });
 
 /** The review popup shows quotes with hyphen labels (never "note:"),
-no Selected text. The note itself reads italic grey like a sent
-annotation's comment. */
+no Selected text. The note itself reads italic in the quiet voice,
+like the cancel and icon buttons. */
 test("review popup uses hyphen labels", async ({ page }) => {
 	await openAnnotate(page, "確認しました");
 	await page.keyboard.type("meaning?");
@@ -449,7 +449,7 @@ test("review popup uses hyphen labels", async ({ page }) => {
 	const comment = review.locator(".review-comment").first();
 	await expect(comment).toHaveText("meaning?");
 	await expect(comment).toHaveCSS("font-style", "italic");
-	await expect(comment).toHaveCSS("color", "rgb(199, 199, 204)");
+	await expect(comment).toHaveCSS("color", "rgb(110, 110, 115)");
 });
 
 /** An annotations-only message renders unfolded (em-dash plus the count)

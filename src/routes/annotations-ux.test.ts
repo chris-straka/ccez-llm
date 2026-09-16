@@ -107,7 +107,7 @@ describe("review delete button", () => {
 		const css = pageStyle();
 		expect(css).toMatch(/button\.review-del\s*\{[^}]*align-self:\s*center/);
 		const hover = css.match(/button\.review-del:hover\s*\{[^}]*\}/)?.[0] ?? "";
-		expect(hover).toContain("#ff453a");
+		expect(hover).toContain("var(--danger)");
 		expect(hover).toMatch(/text-decoration:\s*none/);
 	});
 });
