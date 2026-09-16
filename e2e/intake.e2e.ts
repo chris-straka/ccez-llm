@@ -93,8 +93,70 @@ test("dropped images land as cards with a [Pasted image] tag", async ({ page }) 
 	await expect(
 		card.locator('button[aria-label="Remove attachment"] svg')
 	).toHaveCount(1);
-	// The tag reads [Pasted image] on its own line, cursor after it.
+	// The tag stays on the current line with one trailing space.
 	await expect(page.locator(".cm-content")).toContainText("[Pasted image]");
+});
+
+test("pasted tag leaves the caret after its space, same line", async ({ page }) => {
+	await dropImage(page);
+	const content = page.locator(".cm-content");
+	await expect(content).toContainText("[Pasted image]", { timeout: 15_000 });
+	// End takes the caret to the tag line's end, then type: the word
+	// must land beside the tag (old own-line placement parked the
+	// caret below, so typing opened a second line).
+	await content.click();
+	await page.keyboard.press("End");
+	await page.keyboard.type("hi");
+	await expect(content).toHaveText("[Pasted image] hi");
+});
+
+test("removing the pill collapses the strip and clears its error", async ({ page }) => {
+	await dropImage(page);
+	const card = page.locator(".attachments li.card");
+	await expect(card).toBeVisible({ timeout: 15_000 });
+	// No bridge in the preview: OCR fails into the inline slot.
+	await card.locator('button[aria-label="Recognize text in image"]').click();
+	await expect(page.locator(".attach-error")).toBeVisible({ timeout: 15_000 });
+	// The X takes the pill, its tag, the strip, and the stale error —
+	// nothing lingers over the next draft.
+	await card.locator('button[aria-label="Remove attachment"]').click();
+	await expect(page.locator(".attachments")).toHaveCount(0);
+	await expect(page.locator(".attach-error")).toHaveCount(0);
+});
+
+test("attachment strip never covers message text", async ({ page }) => {
+	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(40);
+	const turns = [0, 1, 2].flatMap((n) => [
+		{ role: "user" as const, content: `question ${n} ${long}` },
+		{ role: "assistant" as const, content: `answer ${n} ${long}` }
+	]);
+	await seedChat(page, turns);
+	await page.goto("/");
+	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
+	await dropImage(page);
+	const strip = page.locator(".attachments");
+	await expect(strip).toBeVisible({ timeout: 15_000 });
+	// Worst case: scrolled to the very bottom with the strip open (and
+	// the tall preview too) — the last article still ends above it.
+	await page.locator(".attachments .thumb").click();
+	await expect(page.locator("img.preview")).toBeVisible();
+	// Instant (not the eased smooth scroll): measure only once the
+	// scroller has settled at the bottom.
+	await page.evaluate(() => {
+		document.querySelector(".messages")?.scrollTo({ top: 1e9, behavior: "instant" });
+	});
+	await expect
+		.poll(() =>
+			page.evaluate(() => {
+				const box = document.querySelector(".messages");
+				return box ? box.scrollHeight - box.scrollTop - box.clientHeight : 99;
+			})
+		)
+		.toBeLessThanOrEqual(1);
+	const stripBox = await strip.boundingBox();
+	const lastBox = await page.locator("article").last().boundingBox();
+	if (!stripBox || !lastBox) throw new Error("missing boxes");
+	expect(stripBox.y).toBeGreaterThanOrEqual(lastBox.y + lastBox.height - 1);
 });
 
 test("image pill and tag remove each other", async ({ page }) => {
@@ -112,9 +174,11 @@ test("deleting the tag drops the pill", async ({ page }) => {
 	const card = page.locator(".attachments li.card");
 	await expect(card).toBeVisible({ timeout: 15_000 });
 	// Tag → pill: replacing the whole draft (markers included) drops
-	// the image attachment, like hand-deleting the tag line.
+	// the image attachment, like hand-deleting the tag. Meta+A: the
+	// macOS select-all — Control+A only jumps to the line start in
+	// the editor, so typing would prepend instead of replacing.
 	await page.locator(".cm-content").click();
-	await page.keyboard.press("Control+a");
+	await page.keyboard.press("Meta+a");
 	await page.keyboard.type("hello");
 	await expect(card).toHaveCount(0);
 	await expect(page.locator(".cm-content")).toContainText("hello");

@@ -120,8 +120,8 @@ import {
 		fileToAttachment,
 		stripImageMarkers,
 		imageMarkerInsert,
-		countMarkerLines,
-		removeMarkerLine,
+		countMarkers,
+		removeMarker,
 		type Attachment
 	} from "$lib/attachments";
 		import {
@@ -2438,7 +2438,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// reconcile away the next chat's first image.
 		markerSyncMuted = true;
 		try {
-			if (editor && countMarkerLines(editor.getText()) > 0) {
+			if (editor && countMarkers(editor.getText()) > 0) {
 				editor.setText(stripImageMarkers(editor.getText()));
 			}
 			prevMarkerCount = 0;
@@ -2584,7 +2584,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			for (let i = 0; i < count; i++) {
 				editor.insertText(imageMarkerInsert(editor.getText()));
 			}
-			prevMarkerCount = countMarkerLines(editor.getText());
+			prevMarkerCount = countMarkers(editor.getText());
 		} finally {
 			markerSyncMuted = false;
 		}
@@ -2592,10 +2592,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 
 	/**
 	 * Image pill <-> `[Pasted image]` tag two-way removal. Pill → tag:
-	 * dropping the pill removes one marker line from the draft. Tag →
-	 * pill lives in `promptOptions().onDocChange`: when the marker count
-	 * falls, the newest image attachments go with it. `markerSyncMuted`
-	 * bridges the two (programmatic edits must not reconcile against
+	 * dropping the pill removes one marker tag from the draft (prose
+	 * typed beside it survives). Tag → pill lives in
+	 * `promptOptions().onDocChange`: when the marker count falls, the
+	 * newest image attachments go with it. `markerSyncMuted` bridges
+	 * the two (programmatic edits must not reconcile against
 	 * themselves); `prevMarkerCount` is the last reconciled count.
 	 */
 	let markerSyncMuted = false;
@@ -2638,11 +2639,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		const removed = attachments.find((a) => a.id === id);
 		attachments = attachments.filter((a) => a.id !== id);
 		if (previewId === id) previewId = null;
+		// Attachment-scoped errors (a failed OCR read) die with the
+		// attachment — otherwise the red line dangles over the next
+		// draft with nothing left to explain.
+		clearNotice(notices, "inline");
 		if (removed?.kind === "image" && editor) {
 			markerSyncMuted = true;
 			try {
-				editor.setText(removeMarkerLine(editor.getText()));
-				prevMarkerCount = countMarkerLines(editor.getText());
+				editor.setText(removeMarker(editor.getText()));
+				prevMarkerCount = countMarkers(editor.getText());
 			} finally {
 				markerSyncMuted = false;
 			}
@@ -2670,7 +2675,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			const result = await recognizeImageText(att.dataUrl, null);
 			const text = result.text.trim();
 			if (!text) {
-				failAttach("No text found in this image.");
+				// A miss is routine feedback (wrong crop, handwriting),
+				// not a composer-blocking fault: toast, never the inline
+				// slot, so nothing red lingers over the next draft.
+				flashErrorToast("No text found in this image.");
 			} else {
 				editor?.insertText(`${text}\n`);
 				flashToast("Recognized text inserted");
@@ -4689,7 +4697,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// or the message's own image attachments would drop as
 		// "deleted tags".
 		editingSeed = refs ? refs.text : msg.content;
-		editingPrevMarkers = countMarkerLines(editingSeed);
+		editingPrevMarkers = countMarkers(editingSeed);
 		reviewOpen = false;
 		editingId = null;
 		highlightAnnId = null;
@@ -4784,7 +4792,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			for (let i = 0; i < count; i++) {
 				msgEditor.insertText(imageMarkerInsert(msgEditor.getText()));
 			}
-			editingPrevMarkers = countMarkerLines(msgEditor.getText());
+			editingPrevMarkers = countMarkers(msgEditor.getText());
 		} finally {
 			editingMarkerMuted = false;
 		}
@@ -4813,7 +4821,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				// from the composer: deleting marker lines by hand drops
 				// the newest image attachments first.
 				if (editingMarkerMuted) return;
-				const now = countMarkerLines(text);
+				const now = countMarkers(text);
 				if (now < editingPrevMarkers) {
 					let drop = editingPrevMarkers - now;
 					const kept = [...editingAttachments];
@@ -5364,7 +5372,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				// marker lines by hand, so the newest image attachments
 				// go with them (newest first — pastes stack in order).
 				if (markerSyncMuted) return;
-				const now = countMarkerLines(text);
+				const now = countMarkers(text);
 				if (now < prevMarkerCount) {
 					let drop = prevMarkerCount - now;
 					const kept = [...attachments];

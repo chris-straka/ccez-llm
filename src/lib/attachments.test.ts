@@ -3,12 +3,12 @@ import {
 	IMAGE_MARKER,
 	IMAGE_MAX_DIM,
 	MAX_FILE_CHARS,
-	countMarkerLines,
+	countMarkers,
 	fitDimensions,
 	imageMarkerInsert,
 	imageTokens,
 	isTextFile,
-	removeMarkerLine,
+	removeMarker,
 	stripImageMarkers
 } from "./attachments";
 import { estimateTextTokens } from "./render";
@@ -45,31 +45,44 @@ describe("text file detection", () => {
 });
 
 describe("image markers", () => {
-	it("strips pasted-image marker lines on send", () => {
+	it("strips pasted-image marker tags on send, keeping prose and blank lines", () => {
 		const text = `hello\n${IMAGE_MARKER}\nworld`;
 		expect(stripImageMarkers(text)).toBe("hello\nworld");
 		expect(stripImageMarkers("no markers")).toBe("no markers");
+		// Tags typed beside prose strip; the user's words and blank
+		// lines survive.
+		expect(stripImageMarkers(`${IMAGE_MARKER} describe this`)).toBe("describe this");
+		expect(stripImageMarkers(`look ${IMAGE_MARKER} here`)).toBe("look here");
+		expect(stripImageMarkers(`hello\n\n${IMAGE_MARKER} \nworld`)).toBe("hello\n\nworld");
+		// Stacked tags on one line all go.
+		expect(stripImageMarkers(`${IMAGE_MARKER} ${IMAGE_MARKER} `)).toBe("");
 	});
 
-	it("says [Pasted image] with no trailing space and no leading blank line", () => {
+	it("says [Pasted image] plus one space, caret staying on the line", () => {
 		expect(IMAGE_MARKER).toBe("[Pasted image]");
-		expect(imageMarkerInsert("")).toBe(`${IMAGE_MARKER}\n`);
-		expect(imageMarkerInsert("draft\n")).toBe(`${IMAGE_MARKER}\n`);
-		// Mid-line: own line, but no blank line before the tag.
-		expect(imageMarkerInsert("hello")).toBe(`\n${IMAGE_MARKER}\n`);
-		// Stacked pastes: each tag keeps its own line.
-		expect(imageMarkerInsert(`${IMAGE_MARKER}\n`)).toBe(`${IMAGE_MARKER}\n`);
+		expect(imageMarkerInsert("")).toBe(`${IMAGE_MARKER} `);
+		expect(imageMarkerInsert("draft\n")).toBe(`${IMAGE_MARKER} `);
+		// Mid-draft: no blank line before the tag, still no newline
+		// after it — the caret lands after the space, same line.
+		expect(imageMarkerInsert("hello")).toBe(`\n${IMAGE_MARKER} `);
+		expect(imageMarkerInsert("hello\n")).toBe(`${IMAGE_MARKER} `);
 	});
 
-	it("removes one marker line at a time", () => {
+	it("removes one marker tag at a time, sparing beside-prose", () => {
 		const text = `hello\n${IMAGE_MARKER}\n${IMAGE_MARKER}\nworld`;
-		expect(removeMarkerLine(text)).toBe(`hello\n${IMAGE_MARKER}\nworld`);
-		expect(removeMarkerLine("no markers")).toBe("no markers");
+		expect(removeMarker(text)).toBe(`hello\n${IMAGE_MARKER}\nworld`);
+		expect(removeMarker("no markers")).toBe("no markers");
+		// Pill → tag on a lived-in line: the tag goes, the words stay.
+		expect(removeMarker(`${IMAGE_MARKER} describe this`)).toBe("describe this");
+		expect(removeMarker(`look ${IMAGE_MARKER} here`)).toBe("look here");
+		expect(removeMarker(`${IMAGE_MARKER} `)).toBe("");
 	});
 
-	it("counts marker lines including legacy trailing-space tags", () => {
-		expect(countMarkerLines(`${IMAGE_MARKER} \nhello\n${IMAGE_MARKER}`)).toBe(2);
-		expect(countMarkerLines("plain")).toBe(0);
+	it("counts marker tags, even stacked on one line", () => {
+		expect(countMarkers(`${IMAGE_MARKER} \nhello\n${IMAGE_MARKER}`)).toBe(2);
+		expect(countMarkers(`${IMAGE_MARKER} ${IMAGE_MARKER} `)).toBe(2);
+		expect(countMarkers(`look ${IMAGE_MARKER} here`)).toBe(1);
+		expect(countMarkers("plain")).toBe(0);
 	});
 });
 

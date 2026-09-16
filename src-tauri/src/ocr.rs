@@ -84,7 +84,15 @@ pub fn recognition_languages(hint: Option<&str>) -> Vec<String> {
         .trim()
         .to_lowercase();
     if primary.is_empty() {
-        return ["en-US", "zh-Hans", "zh-Hant", "ja-JP"]
+        // Order is load-bearing: Vision runs the first recognition
+        // language as its primary script model, and a Latin-only model
+        // never reports CJK observations at all. Probed on-device (Sep
+        // 2026): en-US first read English perfectly and returned zero
+        // Japanese lines from a trilingual image; ja-JP first reads
+        // Japanese, English, and Chinese (occasional kanji-variant
+        // misreads), while zh-led drops kana outright. So the learner
+        // default leads CJK — English still reads through it.
+        return ["ja-JP", "zh-Hans", "zh-Hant", "en-US"]
             .iter()
             .map(|s| s.to_string())
             .collect();
@@ -299,14 +307,16 @@ mod tests {
 
     #[test]
     fn missing_or_unknown_hint_falls_back() {
-        // No hint: the learner default covers English + CJK scripts.
+        // No hint: the learner default covers English + CJK scripts,
+        // CJK-led (Vision runs the first language as its primary
+        // script model — English-first returned zero CJK).
         assert_eq!(
             recognition_languages(None),
-            vec!["en-US", "zh-Hans", "zh-Hant", "ja-JP"]
+            vec!["ja-JP", "zh-Hans", "zh-Hant", "en-US"]
         );
         assert_eq!(
             recognition_languages(Some("   ")),
-            vec!["en-US", "zh-Hans", "zh-Hant", "ja-JP"]
+            vec!["ja-JP", "zh-Hans", "zh-Hant", "en-US"]
         );
         // Unknown language: English alone, never an invalid Vision code.
         assert_eq!(recognition_languages(Some("xx")), vec!["en-US"]);

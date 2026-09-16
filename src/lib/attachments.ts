@@ -164,40 +164,62 @@ export async function fileToAttachment(file: File): Promise<Attachment> {
 	throw new Error(`Unsupported attachment: ${file.name || file.type || "unknown file"}`);
 }
 
-/** Drop pasted-image marker lines; the images travel as attachments. */
+/**
+ * Drop pasted-image marker tags; the images travel as attachments.
+ * Every occurrence goes (tag plus one following space), so tags typed
+ * beside prose strip cleanly at send; a host line left blank by the
+ * removal drops, while the user's own blank lines stay put.
+ */
 export function stripImageMarkers(text: string): string {
 	return text
 		.split("\n")
-		.filter((line) => line.trim() !== IMAGE_MARKER)
+		.flatMap((line) => {
+			if (!line.includes(IMAGE_MARKER)) return [line];
+			let out = line;
+			while (out.includes(IMAGE_MARKER)) {
+				out = out.includes(`${IMAGE_MARKER} `)
+					? out.replace(`${IMAGE_MARKER} `, "")
+					: out.replace(IMAGE_MARKER, "");
+			}
+			return out.trim() === "" ? [] : [out];
+		})
 		.join("\n");
 }
 
 /**
- * Composer insertion for a newly pasted/dropped image: the marker tag on
- * its own line (bare tag, then a newline — no trailing space: every
- * consumer matches the trimmed line, and the phantom space only ate
- * an arrow-key press when keying across the tag), the caret landing on
- * the fresh line below. Own-line placement is load-bearing twice over:
- * send-time stripping (`stripImageMarkers`) only drops whole marker
- * lines, and typing on the tag's line would absorb it — instantly
- * detaching the pill through two-way removal. Never a leading blank
- * line: the prefix newline only starts the tag's own line mid-draft.
- * Pure and unit-tested.
+ * Composer insertion for a newly pasted/dropped image: the tag stays on
+ * the current line with one trailing space, the caret landing right
+ * after it — the user types beside the tag, never below it. Consumers
+ * match the tag text itself (never the whole line), so typing beside it
+ * neither absorbs it nor detaches the pill. Never a leading blank
+ * line: the prefix newline only starts the tag mid-draft. Pure and
+ * unit-tested.
  */
 export function imageMarkerInsert(doc: string): string {
 	const prefix = doc === "" || doc.endsWith("\n") ? "" : "\n";
-	return `${prefix}${IMAGE_MARKER}\n`;
+	return `${prefix}${IMAGE_MARKER} `;
 }
 
-/** Remove one pasted-image marker line (pill → tag half of two-way removal). */
-export function removeMarkerLine(text: string): string {
+/**
+ * Remove one marker tag (pill → tag half of two-way removal): the first
+ * occurrence goes with one adjacent space; a host line left blank by
+ * the removal drops, so bare tags vanish exactly as before — while
+ * prose typed beside the tag survives. Pure and unit-tested.
+ */
+export function removeMarker(text: string): string {
 	const lines = text.split("\n");
-	const at = lines.findIndex((line) => line.trim() === IMAGE_MARKER);
+	const at = lines.findIndex((line) => line.includes(IMAGE_MARKER));
 	if (at === -1) return text;
-	return [...lines.slice(0, at), ...lines.slice(at + 1)].join("\n");
+	const raw = lines[at] ?? "";
+	const noTag = (
+		raw.includes(`${IMAGE_MARKER} `) ? raw.replace(`${IMAGE_MARKER} `, "") : raw.replace(IMAGE_MARKER, "")
+	).trimEnd();
+	const next = [...lines.slice(0, at), ...lines.slice(at + 1)];
+	if (noTag.trim() !== "") next.splice(at, 0, noTag);
+	return next.join("\n");
 }
 
-/** How many marker lines a draft holds (tag → pill reconciliation). */
-export function countMarkerLines(text: string): number {
-	return text.split("\n").filter((line) => line.trim() === IMAGE_MARKER).length;
+/** How many marker tags a draft holds (tag → pill reconciliation). */
+export function countMarkers(text: string): number {
+	return text.split(IMAGE_MARKER).length - 1;
 }
