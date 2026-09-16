@@ -47,9 +47,21 @@ export const appTheme = EditorView.theme({
 	// border of its own, just muted text (Muse Code style).
 	".cm-paste-marker": {
 		display: "inline-block",
-		fontSize: "0.78rem",
+		// Body-size like the sent-message tags: the marker is text, not
+		// chrome, and must not shrink beside the draft.
+		fontSize: "1em",
 		color: "#6e6e73",
 		cursor: "pointer"
+	},
+	// Expanded-paste collapse brackets: the sent-message twin of
+	// history's fold brackets (same blue, same ride-high nudge).
+	".cm-paste-bracket": {
+		color: "#007aff",
+		fontWeight: "700",
+		cursor: "pointer",
+		padding: "0 0.1em",
+		position: "relative",
+		top: "-0.07em"
 	},
 	// Fence bars echo the message code-head: label left, icon buttons
 	// right. Only the two bar lines are widgets — body rows stay real

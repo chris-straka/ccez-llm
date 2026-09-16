@@ -127,7 +127,6 @@ import {
 		stripAttachmentMarkers,
 		imageMarkerInsert,
 		countMarkers,
-		removeMarker,
 		leftoverAttachments,
 		type Attachment,
 		type AttachmentKind,
@@ -2003,6 +2002,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	// genuine GROWTH (a lengthening draft) re-sticks, so boot, park,
 	// summon, and scroll restores keep whatever position they landed.
 	let lastClearPx = -1;
+	// Last written reserve values: the observer watches the card and
+	// the box it writes to, so an unconditional write on every fire
+	// feeds its own notifications (the "ResizeObserver loop" console
+	// error). Identical values write nothing — the loop starves.
+	let lastBoxPad = "";
+	let lastMainPad = "";
+	let lastSbw = "";
 	$effect(() => {
 		const card = promptEl?.closest<HTMLElement>(".prompt") ?? null;
 		const box = scrollBox;
@@ -2017,7 +2023,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// could ever show through. Empty chats keep none: no tail
 			// to protect, hero owns the space per stylesheet.
 			const emptyChat = viewChat.messages.length === 0;
-			box.style.paddingBottom = emptyChat ? "0px" : `${clearPx}px`;
+			const boxPad = emptyChat ? "0px" : `${clearPx}px`;
+			if (boxPad !== lastBoxPad) {
+				box.style.paddingBottom = boxPad;
+				lastBoxPad = boxPad;
+			}
 			// The attachment strip, preview, and error sit in main flow
 			// between the scroller and the card: main-level padding
 			// lifts them above the card while any is rendered. Binary,
@@ -2027,15 +2037,23 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			const stripOpen =
 				mainEl.querySelector(":scope > .attachments, :scope > .preview, :scope > .attach-error") !==
 				null;
-			mainEl.style.paddingBottom =
+			const mainPad =
 				emptyChat || stripOpen
 					? `calc(${clearPx}px + env(safe-area-inset-bottom, 0px))`
 					: `env(safe-area-inset-bottom, 0px)`;
+			if (mainPad !== lastMainPad) {
+				mainEl.style.paddingBottom = mainPad;
+				lastMainPad = mainPad;
+			}
 			// Scrollbar gutter the messages reserve (classic thin bar,
 			// zero with overlay scrollbars): the floating card centers in
 			// the full column, so it rides this much right of the
 			// articles without compensation (see --sbw on .prompt).
-			card.style.setProperty("--sbw", `${Math.max(0, box.offsetWidth - box.clientWidth)}px`);
+			const sbw = `${Math.max(0, box.offsetWidth - box.clientWidth)}px`;
+			if (sbw !== lastSbw) {
+				card.style.setProperty("--sbw", sbw);
+				lastSbw = sbw;
+			}
 			// A lengthening draft grows the reserve under the card:
 			// when stuck to the bottom, re-stick past it or the tail
 			// slides under the opaque card as you type. Park, summon,
@@ -2725,9 +2743,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		if (removed && editor) {
 			markerSyncMuted = true;
 			try {
-				editor.setText(
-					removeMarker(editor.getText(), removed.kind === "image" ? IMAGE_MARKER : FILE_MARKER)
-				);
+				// Minimal cut, never a full rewrite: a rewrite drops the
+				// paste-marker decorations and unfolds the draft's folds.
+				editor.exciseMarker(removed.kind === "image" ? IMAGE_MARKER : FILE_MARKER);
 				prevMarkerCount = countMarkers(editor.getText());
 				prevFileMarkerCount = countMarkers(editor.getText(), FILE_MARKER);
 			} finally {
@@ -9009,9 +9027,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							instead, so each file shows exactly once). Above
 							the message as body-size blue fold buttons like
 							pasted content; clicking floats the composer-pill
-							card (below the tag here, above it inline), X /
-							click-away / ESC closes. A long turn scrolls
-							sideways in place instead of stretching. -->
+							card above the tag, X / click-away / ESC closes.
+							A long turn scrolls sideways in place instead of
+							stretching. -->
 							<div
 								class="sent-tags"
 								class:pop-open={leftoverModels.some((m) => m.open)}
@@ -9435,7 +9453,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			<ul
 				class="attachments"
 				class:composer-idle={promptIdle}
-				class:glass={Math.min(settings.composerOpacity ?? 1, settings.bgOpacity ?? 1) < 1}
 			>
 				{#each attachments as att (att.id)}
 					<li class:card={att.kind === "image" && !!att.dataUrl}>
@@ -12577,6 +12594,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		overflow-x: auto;
 		margin-bottom: 0.35rem;
 		padding-bottom: 0.15rem;
+		/* Body-size like the inline tags (the strip sits outside
+		.rendered, whose 0.92rem the buttons would otherwise miss). */
+		font-size: calc(0.92rem * var(--font-scale, 1));
+	}
+	/* Own messages pack to the right edge: the strip hugs it too. */
+	article.user .sent-tags {
+		justify-content: flex-end;
 	}
 	/* Leftover-strip folds reuse the pasted-content look (the fold
 	stylesheet lives on the message body, outside this tree). */
@@ -12609,11 +12633,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		z-index: 20;
 		margin-bottom: 0.3rem;
 	}
-	:global(.sent-tags .sent-open) {
-		top: 100%;
-		bottom: auto;
-		margin: 0.3rem 0 0;
-	}
+	/* Strip popups open upward like inline ones (above the tag, never
+	covering the message below). Near the viewport top the card can
+	reach the header — accepted: downward covered content instead. */
 	/* Unclipped while a popup floats: the strip only scrolls collapsed
 	tags; an open popup must escape its box. */
 	.sent-tags.pop-open {
@@ -12621,8 +12643,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 	:global(.sent-card) {
 		display: block;
-		width: max-content;
-		max-width: 16rem;
+		/* Uniform width: every preview card matches, whatever its
+		excerpt length (narrow viewports still clear the edges). */
+		width: 16rem;
+		max-width: calc(100vw - 2rem);
 		padding: 0.4rem 0.5rem;
 		font-size: 0.78rem;
 		background: #eef4ff;
@@ -12995,7 +13019,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		flex-wrap: nowrap;
 		gap: 0.4rem;
 		margin: 0 1.2rem;
-		padding: 0.5rem 0 0.25rem;
+		padding: 0.3rem 0 0.15rem;
 		box-sizing: border-box;
 		max-width: calc(100% - 2.4rem);
 		overflow-x: auto;
@@ -13040,7 +13064,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 	/* Image cards: thumbnail preview up top, token/copy/OCR/X footer
 	below (the strip itself stays one scrolling row — only the card
-	wraps internally). */
+	wraps internally). No wash block: the card floats bare over the
+	thread, text visible between and around the previews (the thumbnail
+	itself is the only cover). */
 	.attachments li.card {
 		flex-wrap: wrap;
 		row-gap: 0.3rem;
@@ -13048,6 +13074,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		padding: 0.4rem 0.5rem;
 		max-width: 12rem;
 		align-items: center;
+		background: none;
 	}
 	.attachments li.card .thumb {
 		flex: 1 1 100%;
@@ -13081,23 +13108,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		opacity: 0.45;
 		cursor: default;
 	}
-	.attachments.glass {
-		background: color-mix(
-			in srgb,
-			var(--bg-raised) calc(min(var(--prompt-alpha, 1), var(--bg-alpha, 1)) * 100%),
-			transparent
-		);
-		-webkit-backdrop-filter: blur(18px) saturate(1.6);
-		backdrop-filter: blur(18px) saturate(1.6);
-		border-radius: 12px;
-	}
-	.attachments.glass li {
-		background: color-mix(
-			in srgb,
-			var(--hl) calc(min(var(--prompt-alpha, 1), var(--bg-alpha, 1)) * 100%),
-			transparent
-		);
-	}
+	/* The tray never takes the composer's glass: pills float over the
+	thread with the text visible between them (the frosted prompt card
+	below owns the bleed). A veil here read as a white block occluding
+	the messages, so the strip stays transparent at any opacity. */
 	.preview {
 		display: block;
 		max-width: 16rem;

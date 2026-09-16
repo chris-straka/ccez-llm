@@ -23,6 +23,7 @@ import {
 	expandPaste,
 	expandAllPastes,
 	collapseAllPastes,
+	collapsePaste,
 	type PasteCollapse
 } from "./editorEffects";
 import { FILE_MARKER, IMAGE_MARKER, removeTags } from "./attachments";
@@ -69,6 +70,50 @@ class PasteMarker extends WidgetType {
 }
 
 /**
+ * Collapse bracket for one expanded paste (the sent-message twin of
+ * history's fold brackets: same blue, same ride-high nudge, clicking
+ * either contracts the paste back to its marker). Brackets are derived
+ * at provide time from the open spans — never stored — so they track
+ * edits and expand/collapse transitions for free.
+ */
+class PasteBracket extends WidgetType {
+	constructor(
+		readonly pasteId: number,
+		readonly glyph: "[" | "]"
+	) {
+		super();
+	}
+
+	eq(other: PasteBracket): boolean {
+		return other.pasteId === this.pasteId && other.glyph === this.glyph;
+	}
+
+	override ignoreEvent(): boolean {
+		return false;
+	}
+
+	toDOM(): HTMLElement {
+		const bracket = document.createElement("span");
+		bracket.className = "cm-paste-bracket";
+		bracket.dataset.pasteCollapse = String(this.pasteId);
+		bracket.textContent = this.glyph;
+		return bracket;
+	}
+}
+
+/** Merge open-span brackets over the stored decorations (pure). */
+function withPasteBrackets(field: PasteField): DecorationSet {
+	if (field.open.length === 0) return field.deco;
+	const extra: Range<Decoration>[] = [];
+	for (const rec of field.open) {
+		if (rec.from >= rec.to) continue;
+		extra.push(Decoration.widget({ widget: new PasteBracket(rec.id, "["), side: -1 }).range(rec.from));
+		extra.push(Decoration.widget({ widget: new PasteBracket(rec.id, "]"), side: 1 }).range(rec.to));
+	}
+	return field.deco.update({ add: extra });
+}
+
+/**
  * The paste-decoration field of the live composer (single instance).
  * Read it with pasteSpans — never touch it directly.
  */
@@ -110,6 +155,19 @@ export function pastePlaceholders(): Extension {
 		create: () => ({ deco: Decoration.none, open: [] }),
 		update: (value, tr) => {
 			let deco = value.deco.map(tr.changes);
+			// A cut through a collapsed span (marker excision, or typing
+			// across it) degenerates its widget: forget it rather than
+			// pinning the label over nothing.
+			const kept: Range<Decoration>[] = [];
+			let degenerated = false;
+			const probe = deco.iter();
+			while (probe.value) {
+				const widget = (probe.value.spec as { widget?: unknown }).widget;
+				if (widget instanceof PasteMarker && !(probe.from < probe.to)) degenerated = true;
+				else kept.push(probe.value.range(probe.from, probe.to));
+				probe.next();
+			}
+			if (degenerated) deco = Decoration.set(kept);
 			let open = value.open;
 			if (open.length > 0) {
 				const mapped: PasteCollapse[] = [];
@@ -145,24 +203,40 @@ export function pastePlaceholders(): Extension {
 						deco = deco.update({ add: [marker.range(rec.from, rec.to)] });
 					}
 					open = [];
+				} else if (effect.is(collapsePaste)) {
+					const rec = open.find((span) => span.id === effect.value);
+					if (rec && rec.from >= 0 && rec.to <= tr.newDoc.length && rec.from < rec.to) {
+						const marker = Decoration.replace({
+							widget: new PasteMarker(rec.id, rec.chars)
+						});
+						deco = deco.update({ add: [marker.range(rec.from, rec.to)] });
+						open = open.filter((span) => span.id !== rec.id);
+					}
 				}
 			}
 			return { deco, open };
 		},
-		provide: (f) => EditorView.decorations.from(f, (value) => value.deco)
+		provide: (f) => EditorView.decorations.from(f, withPasteBrackets)
 	});
 	const clicks = Prec.high(
 		EditorView.domEventHandlers({
 			mousedown: (event) => {
 				// Same guard as the fence bars: keep CodeMirror selection
-				// from swallowing the marker click that follows.
-				if (closestFromTarget(event.target, "[data-paste-expand]")) {
+				// from swallowing the marker/bracket click that follows.
+				if (closestFromTarget(event.target, "[data-paste-expand],[data-paste-collapse]")) {
 					event.preventDefault();
 					return true;
 				}
 				return false;
 			},
 			click: (event, view) => {
+				const collapse = closestFromTarget(event.target, "[data-paste-collapse]");
+				if (collapse) {
+					view.dispatch({
+						effects: collapsePaste.of(Number(collapse.getAttribute("data-paste-collapse")))
+					});
+					return true;
+				}
 				const target = closestFromTarget(event.target, "[data-paste-expand]");
 				if (!target) return false;
 				view.dispatch({ effects: expandPaste.of(Number(target.getAttribute("data-paste-expand"))) });
@@ -293,6 +367,72 @@ export function sendPasteFolds(doc: string, spans: PasteSpan[]): { text: string;
 	}
 	folds.sort((a, b) => a.start - b.start);
 	return { text, folds };
+}
+
+/** One marker-tag excision in document coordinates (pure). */
+export interface MarkerCut {
+	from: number;
+	to: number;
+	insert: string;
+}
+
+/**
+ * Locate the cut `removeMarker` would make (pure, unit-tested): the
+ * first line holding the tag loses the tag plus one following space
+ * (plus the trailing run, like trimEnd), while a host line left blank
+ * drops with its newline. Null when the tag is absent. A parity test
+ * pins applying the cut equals `removeMarker` on every battery doc.
+ */
+export function markerCut(doc: string, marker: string): MarkerCut | null {
+	const lines = doc.split("\n");
+	const at = lines.findIndex((line) => line.includes(marker));
+	if (at === -1) return null;
+	let lineStart = 0;
+	for (let i = 0; i < at; i++) lineStart += (lines[i] ?? "").length + 1;
+	const raw = lines[at] ?? "";
+	const tagged = `${marker} `;
+	const cutStr = raw.includes(tagged) ? tagged : marker;
+	const tagAt = raw.indexOf(cutStr);
+	const rawTrimmedEnd = raw.trimEnd().length;
+	const keepAfter = raw.slice(tagAt + cutStr.length, rawTrimmedEnd);
+	if ((raw.slice(0, tagAt) + keepAfter).trim() === "") {
+		const isLast = at === lines.length - 1;
+		if (!isLast) return { from: lineStart, to: lineStart + raw.length + 1, insert: "" };
+		if (at === 0) return { from: 0, to: raw.length, insert: "" };
+		return { from: lineStart - 1, to: lineStart + raw.length, insert: "" };
+	}
+	// To the line end: trimEnd applies to the whole remainder, so a
+	// pre-existing trailing run goes with the tag (between the cut end
+	// and the line end is whitespace by trimmed-end construction).
+	// With nothing after the tag, trimEnd eats into the pre-tag run too.
+	const before = raw.slice(0, tagAt);
+	if (keepAfter === "") {
+		return { from: lineStart + before.trimEnd().length, to: lineStart + raw.length, insert: "" };
+	}
+	return { from: lineStart + tagAt, to: lineStart + raw.length, insert: keepAfter };
+}
+
+/**
+ * Remove one attachment marker tag through a minimal cut (not a full
+ * rewrite): collapsed paste markers and open spans map through the
+ * change untouched, so deleting an image never unfolds the draft's
+ * folds. False when the tag is absent (nothing dispatched). Never
+ * throws.
+ */
+export function exciseMarkerText(view: EditorView, marker: string): boolean {
+	let cut: MarkerCut | null;
+	try {
+		cut = markerCut(view.state.doc.toString(), marker);
+	} catch {
+		return false;
+	}
+	if (!cut) return false;
+	try {
+		view.dispatch({ changes: { from: cut.from, to: cut.to, insert: cut.insert } });
+	} catch {
+		return false;
+	}
+	return true;
 }
 
 /**

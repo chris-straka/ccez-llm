@@ -5,6 +5,7 @@ import {
 } from "./editor";
 import { attachEditContext, shouldDeferForComposition } from "./editContext";
 import { fenceAtOffset, parseFences, shiftEnterAction } from "./fences";
+import { removeMarker } from "./attachments";
 
 /**
  * Plain-textarea PromptEditor for Android (see `createPromptEditor` in
@@ -156,6 +157,14 @@ export function createTextareaEditor(
 		getPastes: () => [],
 		// No tags to toggle: Ctrl+O falls through to the thoughts toggle.
 		togglePastes: () => false,
+		// No collapsing here either: the plain rewrite loses nothing.
+		exciseMarker: (marker: string) => {
+			const next = removeMarker(ta.value, marker);
+			if (next === ta.value) return false;
+			ta.value = next;
+			notify();
+			return true;
+		},
 		setText: (text: string) => {
 			ta.value = text;
 			notify();

@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { trimPasteTail, sendPasteFolds, pasteToggleAction } from "./editor";
-import { stripAttachmentMarkers, IMAGE_MARKER, FILE_MARKER } from "./attachments";
+import { trimPasteTail, sendPasteFolds, pasteToggleAction, markerCut } from "./editor";
+import {
+	stripAttachmentMarkers,
+	removeMarker,
+	IMAGE_MARKER,
+	FILE_MARKER
+} from "./attachments";
 
 describe("trimPasteTail", () => {
 	it("strips trailing newlines but keeps content and interior breaks", () => {
@@ -99,5 +104,53 @@ describe("pasteToggleAction", () => {
 
 	it("claims nothing with no tags, so Ctrl+O keeps its thoughts toggle", () => {
 		expect(pasteToggleAction(0, 0)).toBe("none");
+	});
+});
+
+describe("markerCut", () => {
+	const docs = [
+		"hello world",
+		`\n\nhello\n\n`,
+		`before\n${IMAGE_MARKER}\nafter`,
+		`${IMAGE_MARKER}\nonly text`,
+		`text\n${IMAGE_MARKER}\n`,
+		`${IMAGE_MARKER} describe this`,
+		`look ${IMAGE_MARKER} here`,
+		`hello\n\n${IMAGE_MARKER} \nworld`,
+		`${IMAGE_MARKER} ${IMAGE_MARKER} `,
+		`${FILE_MARKER} read this`,
+		`look ${FILE_MARKER} here`,
+		`${IMAGE_MARKER} ${FILE_MARKER} `,
+		`trailing ${IMAGE_MARKER}   `,
+		""
+	];
+	it("returns null with no tag", () => {
+		expect(markerCut("hello world", IMAGE_MARKER)).toBeNull();
+		expect(markerCut("", FILE_MARKER)).toBeNull();
+	});
+	it("applying the cut equals removeMarker on every battery doc", () => {
+		for (const marker of [IMAGE_MARKER, FILE_MARKER]) {
+			for (const doc of docs) {
+				const cut = markerCut(doc, marker);
+				const expected = removeMarker(doc, marker);
+				if (expected === doc) {
+					expect(cut).toBeNull();
+				} else {
+					expect(cut).not.toBeNull();
+					const applied = doc.slice(0, cut!.from) + cut!.insert + doc.slice(cut!.to);
+					expect(applied).toBe(expected);
+				}
+			}
+		}
+	});
+	it("drops a blank host line with its newline, keeps beside-prose", () => {
+		const cut = markerCut(`a\n${IMAGE_MARKER}\nb`, IMAGE_MARKER);
+		expect(cut).toEqual({ from: 2, to: 2 + IMAGE_MARKER.length + 1, insert: "" });
+		const kept = markerCut(`${IMAGE_MARKER} describe`, IMAGE_MARKER);
+		expect(kept).toEqual({
+			from: 0,
+			to: IMAGE_MARKER.length + 1 + "describe".length,
+			insert: "describe"
+		});
 	});
 });

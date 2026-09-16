@@ -19,6 +19,7 @@ import {
 	pasteHandling,
 	togglePastes,
 	pasteSpans,
+	exciseMarkerText,
 	type PasteSpan
 } from "./editorPaste";
 import { fenceWidgets, runFenceShiftEnter } from "./editorFences";
@@ -32,6 +33,8 @@ export {
 	pasteToggleAction,
 	sendPasteFolds,
 	trimPasteTail,
+	markerCut,
+	type MarkerCut,
 	type PasteSpan,
 	type SendFold
 } from "./editorPaste";
@@ -56,6 +59,10 @@ export interface PromptEditor {
 	/** Ctrl+O: expand every paste tag, or re-collapse expanded ones.
 	 * True when it did anything (the caller then owns the keystroke). */
 	togglePastes(): boolean;
+	/** Remove one attachment marker tag through a minimal cut, keeping
+	 * paste folds (a full setText rewrite would unfold them). False
+	 * when the tag is absent. */
+	exciseMarker(marker: string): boolean;
 	setText(text: string): void;
 	/** Insert text at the cursor (used for pasted-image markers). */
 	insertText(text: string): void;
@@ -158,6 +165,7 @@ export function createPromptEditor(
 		getText: () => view.state.doc.toString(),
 		getPastes: () => pasteSpans(view.state),
 		togglePastes: () => togglePastes(view),
+		exciseMarker: (marker: string) => exciseMarkerText(view, marker),
 		setText: (text: string) =>
 			view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } }),
 		insertText: (text: string) => {

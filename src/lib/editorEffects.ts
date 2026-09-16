@@ -19,4 +19,6 @@ export const addPaste = StateEffect.define<PasteCollapse>();
 export const expandPaste = StateEffect.define<number>();
 export const expandAllPastes = StateEffect.define<void>();
 export const collapseAllPastes = StateEffect.define<void>();
+/** Collapse one expanded paste back to its marker (composer brackets). */
+export const collapsePaste = StateEffect.define<number>();
 export const toggleFence = StateEffect.define<string>();
