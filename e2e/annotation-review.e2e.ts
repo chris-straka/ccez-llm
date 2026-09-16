@@ -1,14 +1,55 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { seedChat } from "./helpers";
 
 const SENTENCE = "The quick brown fox jumps over the lazy dog near the riverbank.";
 
-/** Word-pick, Annotate, file: leaves one live annotation with a badge. */
-async function annotateWord(page: Page): Promise<void> {
-	const body = page.locator("article .rendered").first();
-	const box = await body.boundingBox();
-	if (!box) throw new Error("message has no box");
-	await page.mouse.dblclick(box.x + 100, box.y + box.height / 2);
+/** Viewport center of the first real word inside a rendered message.
+Callers scroll first; measuring never moves anything. */
+async function wordCenter(target: Locator): Promise<{ x: number; y: number }> {
+	const word = await target.evaluate((el) => {
+		const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+		let node = walker.nextNode();
+		while (node) {
+			const text = node as Text;
+			const m = /[A-Za-z]{4,}/.exec(text.data);
+			if (m) {
+				const range = document.createRange();
+				range.setStart(text, m.index);
+				range.setEnd(text, m.index + m[0].length);
+				const r = range.getBoundingClientRect();
+				if (r.width > 0 && r.height > 0)
+					return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+			}
+			node = walker.nextNode();
+		}
+		throw new Error("no word found");
+	});
+	return word;
+}
+
+/** Double-click a real word inside a rendered message. Fixed offsets
+keep landing on inter-word gaps, which pick a space and summon no menu. */
+async function dblclickWord(page: Page, target: Locator): Promise<void> {
+	await target.scrollIntoViewIfNeeded();
+	const word = await wordCenter(target);
+	await page.mouse.dblclick(word.x, word.y);
+}
+
+/** Three short messages: annotating the middle one parks its badge
+clear of both chrome strips (badges under the header or composer
+take no hits by design). */
+async function seedTriple(page: Page): Promise<void> {
+	await seedChat(page, [
+		{ role: "assistant", content: SENTENCE },
+		{ role: "assistant", content: SENTENCE },
+		{ role: "assistant", content: SENTENCE }
+	]);
+	await page.goto("/");
+	await expect(page.locator("article .rendered").first()).toBeVisible();
+}
+
+/** Annotate the live pick and file it: menu, card, Enter, badge. */
+async function filePickedAnnotation(page: Page): Promise<void> {
 	await expect(page.locator(".sel-menu")).toBeVisible({ timeout: 5_000 });
 	await page.locator('.sel-menu button:has-text("Annotate")').click();
 	await expect(page.locator(".ann-pop")).toBeVisible({ timeout: 5_000 });
@@ -17,6 +58,19 @@ async function annotateWord(page: Page): Promise<void> {
 	// The filing pill fades out over the badge: wait it out or the
 	// click below lands on the dying pill instead of the marker.
 	await expect(page.locator(".ann-pop")).toHaveCount(0, { timeout: 5_000 });
+}
+
+/** Word-pick, Annotate, file in the middle message: leaves one live
+annotation with a badge in the clickable zone. */
+async function annotateMiddle(page: Page): Promise<void> {
+	await dblclickWord(page, page.locator("article .rendered").nth(1));
+	await filePickedAnnotation(page);
+}
+
+/** Word-pick, Annotate, file: leaves one live annotation with a badge. */
+async function annotateWord(page: Page): Promise<void> {
+	await dblclickWord(page, page.locator("article .rendered").first());
+	await filePickedAnnotation(page);
 }
 
 async function badgeCenter(page: Page): Promise<{ x: number; y: number }> {
@@ -34,7 +88,8 @@ test.beforeEach(async ({ page }) => {
 
 /** Badges and their quote washes read interactive on hover. */
 test("annotation markers show a pointer cursor", async ({ page }) => {
-	await annotateWord(page);
+	await seedTriple(page);
+	await annotateMiddle(page);
 	const at = await badgeCenter(page);
 	await page.mouse.move(at.x, at.y);
 	const cursor = await page.evaluate(
@@ -44,10 +99,67 @@ test("annotation markers show a pointer cursor", async ({ page }) => {
 	expect(cursor).toBe("pointer");
 });
 
-/** Badge clicks reach the marker (not the header strip) and the edit
-card keeps textarea focus instead of dropping it. */
+/** The composer wins over badges: a badge scrolled beneath it takes
+no hits — elementFromPoint finds the composer, and clicking there
+opens no edit card. */
+test("badges slide beneath the composer", async ({ page }) => {
+	const para = "The quick brown fox jumps over the lazy dog near the riverbank. ";
+	await seedChat(
+		page,
+		Array.from({ length: 8 }, (_, i) => ({
+			role: "assistant" as const,
+			content: `Message ${i + 1}: ` + para.repeat(6)
+		}))
+	);
+	await page.goto("/");
+	const body = page.locator("article .rendered").last();
+	await body.scrollIntoViewIfNeeded();
+	// The scrolled-to message can rest under the floating composer:
+	// lift it clear, then measure and click with no scroll between.
+	await page.evaluate(() => {
+		document.querySelector(".messages")!.scrollTop -= 250;
+	});
+	const word = await wordCenter(body);
+	await page.mouse.dblclick(word.x, word.y);
+	await filePickedAnnotation(page);
+	const probe = await page.evaluate(() => {
+		const msgs = document.querySelector(".messages") as HTMLElement | null;
+		const badge = document.querySelector("button.ccez-ann-badge") as HTMLElement | null;
+		const prompt = document.querySelector(".prompt") as HTMLElement | null;
+		if (!msgs || !badge || !prompt) throw new Error("missing layer");
+		msgs.scrollTop = msgs.scrollHeight;
+		const b = badge.getBoundingClientRect();
+		const p = prompt.getBoundingClientRect();
+		// Nudge so the badge center sits mid-composer, then ask the
+		// hit tree who owns that pixel.
+		msgs.scrollTop += b.top + b.height / 2 - (p.top + p.height / 2);
+		const c = badge.getBoundingClientRect();
+		const x = c.left + c.width / 2;
+		const y = c.top + c.height / 2;
+		const el = document.elementFromPoint(x, y);
+		return {
+			x,
+			y,
+			hitPrompt: !!el?.closest(".prompt"),
+			hitBadge: !!el?.closest("button.ccez-ann-badge")
+		};
+	});
+	expect({ hitPrompt: probe.hitPrompt, hitBadge: probe.hitBadge }).toEqual({
+		hitPrompt: true,
+		hitBadge: false
+	});
+	await page.mouse.click(probe.x, probe.y);
+	await expect(page.locator(".ann-pop")).toHaveCount(0);
+	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1);
+});
+
+/** Badge clicks reach the marker and the edit card keeps textarea
+focus instead of dropping it. The badge sits mid-thread: edge badges
+park under the chrome and take no hits by design (see the composer
+test above). */
 test("badge click opens the edit card with stable focus", async ({ page }) => {
-	await annotateWord(page);
+	await seedTriple(page);
+	await annotateMiddle(page);
 	const at = await badgeCenter(page);
 	await page.mouse.click(at.x, at.y);
 	const box = page.locator(".ann-pop textarea");

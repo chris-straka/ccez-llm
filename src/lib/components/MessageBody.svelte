@@ -1144,10 +1144,11 @@
 		bottom: 100%;
 		left: 100%;
 		transform: translate(-40%, 10%);
-		/* Above the floating header strip (z-35) and composer card
-		(z-30): badges at the viewport edges stay clickable instead
-		of dropping hits (and focus) onto the chrome beneath. */
-		z-index: 36;
+		/* Below the composer card (z-30): scrolled-under badges take
+		no hits — the chrome owns those pixels. The edit card (z-60)
+		and refs popover (z-40) still open above everything, so a
+		covered badge is one scroll away from clickable. */
+		z-index: 20;
 		user-select: none;
 		-webkit-user-select: none;
 		/* Dampened text-size tracking (≈30% of the message scale, so a
