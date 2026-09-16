@@ -24,9 +24,11 @@ export interface Attachment {
 	tokens: number;
 }
 
-/** Marker line inserted in the prompt when an image is pasted. The composer
- * strips these lines on send — the image travels as an attachment instead. */
+/** Marker tag inserted in the prompt when an image is pasted. The composer
+ * strips these tags on send — the image travels as an attachment instead. */
 export const IMAGE_MARKER = "[Pasted image]";
+/** Marker tag for attached files (text, PDF, …): same contract as images. */
+export const FILE_MARKER = "[Pasted Attachment]";
 
 /** Max side (px) for images before upload. */
 export const IMAGE_MAX_DIM = 1568;
@@ -164,23 +166,55 @@ export async function fileToAttachment(file: File): Promise<Attachment> {
 	throw new Error(`Unsupported attachment: ${file.name || file.type || "unknown file"}`);
 }
 
+/** Every attachment tag (they never overlap, so scan order only reads). */
+const ATTACHMENT_TAGS = [IMAGE_MARKER, FILE_MARKER];
+
+/** Earliest tag occurrence at or after `from`, or null. Pure. */
+function nextTag(line: string, from: number): { at: number; tag: string } | null {
+	let found: { at: number; tag: string } | null = null;
+	for (const tag of ATTACHMENT_TAGS) {
+		const at = line.indexOf(tag, from);
+		if (at !== -1 && (found === null || at < found.at)) found = { at, tag };
+	}
+	return found;
+}
+
 /**
- * Drop pasted-image marker tags; the images travel as attachments.
- * Every occurrence goes (tag plus one following space), so tags typed
- * beside prose strip cleanly at send; a host line left blank by the
- * removal drops, while the user's own blank lines stay put.
+ * Remove every attachment tag from one line (tag plus one following
+ * space), with line-relative cut ranges for send-time fold mapping.
+ * Shared by the send strip and the fold math so the two can't drift.
+ * Pure and unit-tested.
  */
-export function stripImageMarkers(text: string): string {
+export function removeTags(line: string): {
+	text: string;
+	cuts: Array<{ start: number; end: number }>;
+} {
+	let out = "";
+	const cuts: Array<{ start: number; end: number }> = [];
+	let cursor = 0;
+	let hit = nextTag(line, cursor);
+	while (hit !== null) {
+		out += line.slice(cursor, hit.at);
+		const end = hit.at + hit.tag.length + (line[hit.at + hit.tag.length] === " " ? 1 : 0);
+		cuts.push({ start: hit.at, end });
+		cursor = end;
+		hit = nextTag(line, cursor);
+	}
+	out += line.slice(cursor);
+	return { text: out, cuts };
+}
+
+/**
+ * Drop attachment marker tags; the files travel as attachments. A host
+ * line left blank by the removal drops, while the user's own blank
+ * lines stay put.
+ */
+export function stripAttachmentMarkers(text: string): string {
 	return text
 		.split("\n")
 		.flatMap((line) => {
-			if (!line.includes(IMAGE_MARKER)) return [line];
-			let out = line;
-			while (out.includes(IMAGE_MARKER)) {
-				out = out.includes(`${IMAGE_MARKER} `)
-					? out.replace(`${IMAGE_MARKER} `, "")
-					: out.replace(IMAGE_MARKER, "");
-			}
+			if (!line.includes(IMAGE_MARKER) && !line.includes(FILE_MARKER)) return [line];
+			const { text: out } = removeTags(line);
 			return out.trim() === "" ? [] : [out];
 		})
 		.join("\n");
@@ -201,25 +235,46 @@ export function imageMarkerInsert(doc: string): string {
 }
 
 /**
- * Remove one marker tag (pill → tag half of two-way removal): the first
- * occurrence goes with one adjacent space; a host line left blank by
- * the removal drops, so bare tags vanish exactly as before — while
- * prose typed beside the tag survives. Pure and unit-tested.
+ * Composer insertion for a newly attached file: same contract as the
+ * image tag (same line, one trailing space, caret after it).
  */
-export function removeMarker(text: string): string {
+export function fileMarkerInsert(doc: string): string {
+	const prefix = doc === "" || doc.endsWith("\n") ? "" : "\n";
+	return `${prefix}${FILE_MARKER} `;
+}
+
+/**
+ * How many tags of one kind a draft holds (tag → attachment
+ * reconciliation counts images and files separately). Pure.
+ */
+export function countMarkers(text: string, marker: string = IMAGE_MARKER): number {
+	return text.split(marker).length - 1;
+}
+
+/**
+ * Remove one marker tag (pill → tag half of two-way removal, still live
+ * on Android where pills survive): the first occurrence goes with one
+ * following space; a host line left blank by the removal drops, so bare
+ * tags vanish — while prose typed beside the tag survives. Pure and
+ * unit-tested.
+ */
+export function removeMarker(text: string, marker: string = IMAGE_MARKER): string {
 	const lines = text.split("\n");
-	const at = lines.findIndex((line) => line.includes(IMAGE_MARKER));
+	const at = lines.findIndex((line) => line.includes(marker));
 	if (at === -1) return text;
 	const raw = lines[at] ?? "";
-	const noTag = (
-		raw.includes(`${IMAGE_MARKER} `) ? raw.replace(`${IMAGE_MARKER} `, "") : raw.replace(IMAGE_MARKER, "")
-	).trimEnd();
+	const tagged = `${marker} `;
+	const noTag = (raw.includes(tagged) ? raw.replace(tagged, "") : raw.replace(marker, "")).trimEnd();
 	const next = [...lines.slice(0, at), ...lines.slice(at + 1)];
 	if (noTag.trim() !== "") next.splice(at, 0, noTag);
 	return next.join("\n");
 }
 
-/** How many marker tags a draft holds (tag → pill reconciliation). */
-export function countMarkers(text: string): number {
-	return text.split(IMAGE_MARKER).length - 1;
+/**
+ * Leading file text for a marker popup: first lines up to the cap,
+ * cut mid-line with an ellipsis. Pure and unit-tested.
+ */
+export function fileExcerpt(text: string, maxChars = 240): string {
+	const excerpt = text.slice(0, maxChars);
+	return text.length > maxChars ? `${excerpt.trimEnd()}…` : excerpt;
 }

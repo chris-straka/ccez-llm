@@ -25,7 +25,7 @@ import {
 	collapseAllPastes,
 	type PasteCollapse
 } from "./editorEffects";
-import { IMAGE_MARKER } from "./attachments";
+import { FILE_MARKER, IMAGE_MARKER, removeTags } from "./attachments";
 import { closestFromTarget } from "./events";
 
 /** Pastes longer than this collapse to a `[Pasted content N chars]` marker. */
@@ -236,24 +236,38 @@ export function togglePastes(view: EditorView): boolean {
 
 /**
  * Map document-coordinate paste spans into send-text coordinates, applying
- * exactly the send transforms (drop IMAGE_MARKER lines like
+ * exactly the send transforms (drop IMAGE_MARKER tags like
  * stripImageMarkers, then trim like composerText). A span touched by either
  * transform is dropped — sent unfolded — rather than misplaced. Pure and
  * unit-tested.
  */
 export function sendPasteFolds(doc: string, spans: PasteSpan[]): { text: string; folds: SendFold[] } {
-	// Drop marker lines, tracking dropped document ranges. Mirrors
-	// stripImageMarkers line for line (split/filter/join); a parity test
-	// below pins the text output to that function.
+	// Drop marker tags, tracking dropped document ranges. Excisions come
+	// from the shared removeTags primitive, so this mirrors
+	// stripAttachmentMarkers by construction (a parity test still pins
+	// the text output); a host line left blank drops with its newline.
+	// Ranges stay ascending and disjoint so the fold shift below holds.
 	const dropped: Array<{ start: number; end: number }> = [];
 	const kept: string[] = [];
 	let offset = 0;
 	const lines = doc.split("\n");
 	for (let i = 0; i < lines.length; i++) {
 		const line = lines[i] ?? "";
-		const chunk = line + (i < lines.length - 1 ? "\n" : "");
-		if (line.trim() === IMAGE_MARKER) dropped.push({ start: offset, end: offset + chunk.length });
-		else kept.push(chunk);
+		const newline = i < lines.length - 1 ? "\n" : "";
+		const chunk = line + newline;
+		if (!line.includes(IMAGE_MARKER) && !line.includes(FILE_MARKER)) {
+			kept.push(chunk);
+		} else {
+			const { text: out, cuts } = removeTags(line);
+			if (out.trim() === "") {
+				dropped.push({ start: offset, end: offset + chunk.length });
+			} else {
+				for (const cut of cuts) {
+					dropped.push({ start: offset + cut.start, end: offset + cut.end });
+				}
+				kept.push(out + newline);
+			}
+		}
 		offset += chunk.length;
 	}
 	const joined = kept.join("");

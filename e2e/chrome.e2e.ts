@@ -330,6 +330,37 @@ test("space with settings open never summons the prompt", async ({ page }) => {
 	await expect(prompt).not.toHaveClass(/prompt-idle/, { timeout: 5_000 });
 });
 
+/** Backslash is Space-equivalent: hidden it summons, on an empty
+composer it stows (blur, and always-hide hides on blur). */
+test("backslash summons and stows like Space", async ({ page }) => {
+	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(40);
+	const turns = [0, 1, 2, 3].flatMap((n) => [
+		{ role: "user" as const, content: `question ${n} ${long}` },
+		{ role: "assistant" as const, content: `answer ${n} ${long}` }
+	]);
+	await seedChat(page, turns);
+	await page.addInitScript(() => {
+		window.localStorage.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify({ promptIdleSec: -1 })
+		);
+	});
+	await page.goto("/");
+	const prompt = page.locator(".prompt");
+	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
+	await expect(prompt).toHaveClass(/prompt-idle/, { timeout: 10_000 });
+	await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
+	await page.keyboard.press("\\");
+	await expect(prompt).not.toHaveClass(/prompt-idle/, { timeout: 5_000 });
+	// Restore lands focus in the composer on a tick — wait for it,
+	// then backslash stows instead of typing.
+	await expect
+		.poll(() => page.evaluate(() => !!document.activeElement?.closest?.(".prompt")))
+		.toBe(true);
+	await page.keyboard.press("\\");
+	await expect(prompt).toHaveClass(/prompt-idle/, { timeout: 5_000 });
+});
+
 /** Always-hide: the click that dismisses the prompt must not re-summon it.
 A click-off hides and stays hidden; the i key restores. */
 test("always-hide click-off stays hidden until the next press", async ({ page }) => {

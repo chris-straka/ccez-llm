@@ -52,7 +52,7 @@ function longThread() {
 	}));
 }
 
-test("idle-hide takes the attachment strip with the prompt", async ({ page }) => {
+test("idle-hide takes the attachment link with the prompt", async ({ page }) => {
 	// Reseed: a long thread (overflow) plus a 2s idle timeout, then reload.
 	await page.addInitScript((msgs) => {
 		window.localStorage.setItem(
@@ -68,7 +68,8 @@ test("idle-hide takes the attachment strip with the prompt", async ({ page }) =>
 	await expect(page.locator("article.assistant .rendered").first()).toBeVisible({
 		timeout: 60_000
 	});
-	// A dropped file lands as an attachment pill above the composer.
+	// A dropped file lands as an attachment link in the draft (no
+	// tray on desktop).
 	await page.evaluate(() => {
 		const transfer = new DataTransfer();
 		transfer.items.add(new File(["# hello"], "notes.md", { type: "text/markdown" }));
@@ -78,23 +79,20 @@ test("idle-hide takes the attachment strip with the prompt", async ({ page }) =>
 			new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: transfer })
 		);
 	});
-	await expect(page.locator(".attachments .name")).toHaveText("notes.md", {
-		timeout: 15_000
-	});
+	const marker = page.locator(".cm-attach-marker").first();
+	await expect(marker).toContainText("[Pasted Attachment]", { timeout: 15_000 });
 	const prompt = page.locator(".prompt");
-	const strip = page.locator(".attachments");
-	// No input for 2s (+ticker): the prompt slides away and the image
-	// bubble goes with it — no pill lingers over the chat.
+	// No input for 2s (+ticker): the prompt slides away with the link
+	// inside it — no attachment lingers over the chat.
 	await expect(prompt).toHaveClass(/prompt-idle/, { timeout: 15_000 });
-	await expect(strip).toHaveClass(/composer-idle/);
-	await expect(strip).toHaveCSS("opacity", "0");
+	await expect(prompt).toHaveCSS("opacity", "0");
 	// A summon key restores both together (pointer travel alone only
 	// re-arms the timer, never restores).
 	await page.mouse.move(400, 200);
 	await expect(prompt).toHaveClass(/prompt-idle/);
 	await page.keyboard.press("i");
 	await expect(prompt).not.toHaveClass(/prompt-idle/, { timeout: 5_000 });
-	await expect(strip).not.toHaveClass(/composer-idle/, { timeout: 5_000 });
+	await expect(marker).toBeVisible({ timeout: 5_000 });
 });
 
 test("empty chat never idle-hides the composer", async ({ page }) => {
@@ -156,13 +154,17 @@ test("ESC in the composer drops focus", async ({ page }) => {
 });
 
 test("composer text clears the tools cluster", async ({ page }) => {
-	// Remeasured reservation: the Shot text button never fit the old
-	// 4.6rem base, so draft text slid under the cluster.
+	// First-line reservation holds the icon cluster clear: padding
+	// meets the row's live width (the old >100px constant dated to
+	// the Shot text-button era; the icon cluster is narrower, so the
+	// invariant — never the number — is what pins the regression).
 	const pad = await page
 		.locator(".cm-content")
 		.first()
 		.evaluate((el) => parseFloat(getComputedStyle(el).paddingRight));
-	expect(pad).toBeGreaterThan(100);
+	const toolsBox = await page.locator(".prompt-tools").boundingBox();
+	if (!toolsBox) throw new Error("missing tools box");
+	expect(pad).toBeGreaterThanOrEqual(toolsBox.width);
 });
 
 /** Drop a canvas-painted PNG onto the composer (in-page DataTransfer). */
@@ -195,18 +197,18 @@ async function dropImage(page: Page): Promise<void> {
 	});
 }
 
-test("send clears pills and files a chip above the message", async ({ page }) => {
+test("send clears tags and files a chip above the message", async ({ page }) => {
 	await dropImage(page);
-	const card = page.locator(".attachments li.card");
-	await expect(card).toBeVisible({ timeout: 15_000 });
+	const marker = page.locator(".cm-attach-marker").first();
+	await expect(marker).toBeVisible({ timeout: 15_000 });
 	// Down to the tag's fresh line below (the click can land mid-tag,
-	// and typing on the tag line would absorb it and drop the pill),
+	// and typing on the tag line would absorb it and drop the marker),
 	// then send through the mock provider.
 	await page.locator(".cm-content").first().click();
 	await page.keyboard.press("ArrowDown");
 	await page.keyboard.type("hello");
 	await page.keyboard.press("Enter");
-	// Pills empty with the prompt at send time…
+	// No pill tray on desktop with the prompt at send time…
 	await expect(page.locator(".attachments")).toHaveCount(0);
 	// …and the sent turn carries an attachment chip above its text.
 	const chip = page.locator(".sent-chip").last();

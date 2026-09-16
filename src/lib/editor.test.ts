@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { trimPasteTail, sendPasteFolds, pasteToggleAction } from "./editor";
-import { stripImageMarkers, IMAGE_MARKER } from "./attachments";
+import { stripAttachmentMarkers, IMAGE_MARKER, FILE_MARKER } from "./attachments";
 
 describe("trimPasteTail", () => {
 	it("strips trailing newlines but keeps content and interior breaks", () => {
@@ -34,11 +34,20 @@ describe("sendPasteFolds", () => {
 			`before\n${IMAGE_MARKER}\nafter`,
 			`${IMAGE_MARKER}\nonly text`,
 			`text\n${IMAGE_MARKER}\n`,
+			// Same-line tags (composer inserts beside the caret): the
+			// tag strips, beside-prose and blank lines survive.
+			`${IMAGE_MARKER} describe this`,
+			`look ${IMAGE_MARKER} here`,
+			`hello\n\n${IMAGE_MARKER} \nworld`,
+			`${IMAGE_MARKER} ${IMAGE_MARKER} `,
+			`${FILE_MARKER} read this`,
+			`look ${FILE_MARKER} here`,
+			`${IMAGE_MARKER} ${FILE_MARKER} `,
 			""
 		];
 		for (const doc of docs) {
 			const { text, folds } = sendPasteFolds(doc, []);
-			expect(text).toBe(stripImageMarkers(doc).trim());
+			expect(text).toBe(stripAttachmentMarkers(doc).trim());
 			expect(folds).toEqual([]);
 		}
 	});

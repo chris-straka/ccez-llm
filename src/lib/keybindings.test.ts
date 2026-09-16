@@ -154,6 +154,14 @@ describe("spaceKeyAction", () => {
 		expect(spaceKeyAction({ ...spaceBase, repeat: true, inPrompt: false })).toBe(null);
 		expect(spaceKeyAction({ ...spaceBase, key: "Enter" })).toBe(null);
 	});
+
+	it("treats backslash as Space: stow on empty, swallow repeats", () => {
+		const slash = { ...spaceBase, key: "\\" };
+		expect(spaceKeyAction(slash)).toBe("dismiss-composer");
+		expect(spaceKeyAction({ ...slash, repeat: true })).toBe("swallow-repeat");
+		expect(spaceKeyAction({ ...slash, composerEmpty: false })).toBe(null);
+		expect(spaceKeyAction({ ...slash, hasAttachments: true })).toBe(null);
+	});
 });
 
 describe("deleteChatScope", () => {
@@ -187,11 +195,12 @@ const idleBase: PromptIdleFacts = {
 };
 
 describe("promptIdleKeyAction", () => {
-	it("restores on bare i / I / Enter / Space in the open", () => {
+	it("restores on bare i / I / Enter / Space / backslash in the open", () => {
 		expect(promptIdleKeyAction(idleBase)).toBe("restore");
 		expect(promptIdleKeyAction({ ...idleBase, key: "I", shiftKey: true })).toBe("restore");
 		expect(promptIdleKeyAction({ ...idleBase, key: "Enter" })).toBe("restore");
 		expect(promptIdleKeyAction({ ...idleBase, key: " " })).toBe("restore");
+		expect(promptIdleKeyAction({ ...idleBase, key: "\\" })).toBe("restore");
 		expect(promptIdleKeyAction({ ...idleBase, key: "x" })).toBe(null);
 	});
 

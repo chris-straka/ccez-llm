@@ -80,6 +80,8 @@
 		ANDROID_PROMPT_PLACEHOLDER,
 		ANDROID_SCROLL_PLACEHOLDER,
 		sendPasteFolds,
+		type MarkerAction,
+		type MarkerModel,
 		type PromptEditor,
 		type PromptEditorOptions,
 		type SubmitKind
@@ -117,12 +119,17 @@ import {
 	VOICE_TIMEOUT_MS
 } from "$lib/notices";
 	import {
+		FILE_MARKER,
+		IMAGE_MARKER,
+		fileExcerpt,
+		fileMarkerInsert,
 		fileToAttachment,
-		stripImageMarkers,
+		stripAttachmentMarkers,
 		imageMarkerInsert,
 		countMarkers,
 		removeMarker,
-		type Attachment
+		type Attachment,
+		type AttachmentKind
 	} from "$lib/attachments";
 		import {
 		duplicateAnnotationId,
@@ -697,8 +704,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	let editingSeed = $state("");
 	/** Attachments of the message under edit (the composer's own stay untouched). */
 	let editingAttachments = $state<Attachment[]>([]);
-	/** Last reconciled marker count inside the in-place editor. */
+	/** Last reconciled marker counts inside the in-place editor (images, files). */
 	let editingPrevMarkers = 0;
+	let editingPrevFileMarkers = 0;
 	/** Programmatic inline edits must not reconcile against themselves. */
 	let editingMarkerMuted = false;
 	let highlightAnnId: AnnotationId | null = $state(null);
@@ -2438,10 +2446,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// reconcile away the next chat's first image.
 		markerSyncMuted = true;
 		try {
-			if (editor && countMarkers(editor.getText()) > 0) {
-				editor.setText(stripImageMarkers(editor.getText()));
+			if (
+				editor &&
+				(countMarkers(editor.getText()) > 0 || countMarkers(editor.getText(), FILE_MARKER) > 0)
+			) {
+				editor.setText(stripAttachmentMarkers(editor.getText()));
 			}
 			prevMarkerCount = 0;
+			prevFileMarkerCount = 0;
 		} finally {
 			markerSyncMuted = false;
 		}
@@ -2545,7 +2557,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 
 	/** Prompt text minus pasted-image marker lines (images travel as attachments). */
 	function composerText(): string {
-		return stripImageMarkers(editor?.getText() ?? "").trim();
+		return stripAttachmentMarkers(editor?.getText() ?? "").trim();
 	}
 
 	/**
@@ -2558,49 +2570,76 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		if (androidUI) flashErrorToast(message);
 	}
 
-	async function addFiles(files: File[]): Promise<void> {
+	/**
+	 * Intake for dropped/picked/pasted files: every file that survives
+	 * becomes an attachment and earns its composer tag (`[Pasted
+	 * image]` / `[Pasted Attachment]`, caret after each tag's space),
+	 * so attachments always read as links — never pills. Resolves with
+	 * the added kinds in order for tag insertion.
+	 */
+	async function addFiles(files: File[]): Promise<AttachmentKind[]> {
 		clearNotice(notices, "inline");
+		const added: AttachmentKind[] = [];
 		for (const file of files) {
 			attachBusy += 1;
 			try {
-				attachments = [...attachments, await fileToAttachment(file)];
+				const att = await fileToAttachment(file);
+				attachments = [...attachments, att];
+				added.push(att.kind);
 			} catch (error) {
 				failAttach(error instanceof Error ? error.message : String(error));
 			} finally {
 				attachBusy -= 1;
 			}
 		}
+		return added;
 	}
 
 	function onImagePasted(file: File): void {
-		void addFiles([file]).then(() => insertImageMarkers(1));
+		void addFiles([file]).then((kinds) => insertAttachmentMarkers(kinds));
 	}
 
-	/** One `[Pasted image]` tag per fresh image, caret after each tag's space. */
-	function insertImageMarkers(count: number): void {
-		if (!editor || count <= 0) return;
+	/** Drop the `n` newest attachments of one kind (tag → attachment reconciliation). */
+	function dropNewestAttachments(list: Attachment[], kind: AttachmentKind, n: number): Attachment[] {
+		const kept = [...list];
+		for (let i = kept.length - 1; i >= 0 && n > 0; i--) {
+			if (kept[i]?.kind === kind) {
+				kept.splice(i, 1);
+				n--;
+			}
+		}
+		return kept;
+	}
+
+	/** One tag per fresh attachment, caret after each tag's space. */
+	function insertAttachmentMarkers(kinds: AttachmentKind[]): void {
+		if (!editor || kinds.length === 0) return;
 		markerSyncMuted = true;
 		try {
-			for (let i = 0; i < count; i++) {
-				editor.insertText(imageMarkerInsert(editor.getText()));
+			for (const kind of kinds) {
+				editor.insertText(
+					kind === "image" ? imageMarkerInsert(editor.getText()) : fileMarkerInsert(editor.getText())
+				);
 			}
 			prevMarkerCount = countMarkers(editor.getText());
+			prevFileMarkerCount = countMarkers(editor.getText(), FILE_MARKER);
 		} finally {
 			markerSyncMuted = false;
 		}
 	}
 
 	/**
-	 * Image pill <-> `[Pasted image]` tag two-way removal. Pill → tag:
-	 * dropping the pill removes one marker tag from the draft (prose
-	 * typed beside it survives). Tag → pill lives in
-	 * `promptOptions().onDocChange`: when the marker count falls, the
-	 * newest image attachments go with it. `markerSyncMuted` bridges
-	 * the two (programmatic edits must not reconcile against
-	 * themselves); `prevMarkerCount` is the last reconciled count.
+	 * Tag <-> attachment two-way removal (images and files; pills are
+	 * gone, links do their job). Intake adds one tag per attachment;
+	 * tag → attachment lives in `promptOptions().onDocChange`: when a
+	 * kind's tag count falls, its newest attachments go with it.
+	 * `markerSyncMuted` bridges the two (programmatic edits must not
+	 * reconcile against themselves); the `prev*Count` pair is the last
+	 * reconciled state.
 	 */
 	let markerSyncMuted = false;
 	let prevMarkerCount = 0;
+	let prevFileMarkerCount = 0;
 
 	/**
 	 * Attachment-card copy (icon-only, reusing the message-button copy
@@ -2635,19 +2674,52 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		flashToast("Nothing to copy yet.");
 	}
 
+	/**
+	 * Popup view models for the composer link widgets: the Nth tag of a
+	 * kind pairs with the Nth attachment of that kind (see
+	 * editorImageMarkers). Images carry their thumbnail; files carry a
+	 * leading excerpt plus the token cost the pills used to show.
+	 */
+	function composerMarkerModels(): MarkerModel[] {
+		return attachments.map((att) => ({
+			id: att.id,
+			kind: att.kind,
+			name: att.name,
+			tokens: att.tokens,
+			dataUrl: att.kind === "image" ? att.dataUrl : null,
+			excerpt: att.kind === "text" && att.text !== null ? fileExcerpt(att.text) : "",
+			busy: ocrBusyId === att.id
+		}));
+	}
+
+	/** Popup Copy/OCR clicks, resolved against live attachments. */
+	function onComposerMarkerAction(action: MarkerAction, id: string): void {
+		const att = attachments.find((a) => a.id === id);
+		if (!att) return;
+		if (action === "ocr") {
+			if (att.kind === "image") void recognizeAttachment(att);
+			return;
+		}
+		copyAttachment(att);
+	}
+
+	/**
+	 * Pill X (Android only — desktop removes via tag deletion): drop the
+	 * pill plus one of its tags, and any attachment-scoped error with it.
+	 */
 	function removeAttachment(id: string): void {
 		const removed = attachments.find((a) => a.id === id);
 		attachments = attachments.filter((a) => a.id !== id);
 		if (previewId === id) previewId = null;
-		// Attachment-scoped errors (a failed OCR read) die with the
-		// attachment — otherwise the red line dangles over the next
-		// draft with nothing left to explain.
 		clearNotice(notices, "inline");
-		if (removed?.kind === "image" && editor) {
+		if (removed && editor) {
 			markerSyncMuted = true;
 			try {
-				editor.setText(removeMarker(editor.getText()));
+				editor.setText(
+					removeMarker(editor.getText(), removed.kind === "image" ? IMAGE_MARKER : FILE_MARKER)
+				);
 				prevMarkerCount = countMarkers(editor.getText());
+				prevFileMarkerCount = countMarkers(editor.getText(), FILE_MARKER);
 			} finally {
 				markerSyncMuted = false;
 			}
@@ -2666,6 +2738,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	async function recognizeAttachment(att: Attachment): Promise<void> {
 		if (ocrBusyId !== null || att.kind !== "image" || !att.dataUrl) return;
 		ocrBusyId = att.id;
+		editor?.refreshMarkers();
 		clearNotice(notices, "inline");
 		try {
 			// No language hint: the backend's learner default covers
@@ -2691,6 +2764,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			failAttach(friendlyOcrError(error instanceof Error ? error.message : String(error)));
 		} finally {
 			ocrBusyId = null;
+			editor?.refreshMarkers();
 		}
 	}
 
@@ -4702,6 +4776,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// "deleted tags".
 		editingSeed = refs ? refs.text : msg.content;
 		editingPrevMarkers = countMarkers(editingSeed);
+		editingPrevFileMarkers = countMarkers(editingSeed, FILE_MARKER);
 		reviewOpen = false;
 		editingId = null;
 		highlightAnnId = null;
@@ -4820,24 +4895,23 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				enterScrollMode();
 			},
 			onImagePaste: onInlineImagePasted,
+			markerModels: editMarkerModels,
 			onDocChange: (text) => {
 				// Tag → attachment half of two-way removal, mirrored
-				// from the composer: deleting marker lines by hand drops
-				// the newest image attachments first.
+				// from the composer: deleting tags by hand drops the
+				// newest attachments of that kind first.
 				if (editingMarkerMuted) return;
-				const now = countMarkers(text);
-				if (now < editingPrevMarkers) {
-					let drop = editingPrevMarkers - now;
-					const kept = [...editingAttachments];
-					for (let i = kept.length - 1; i >= 0 && drop > 0; i--) {
-						if (kept[i]?.kind === "image") {
-							kept.splice(i, 1);
-							drop--;
-						}
-					}
+				const imagesNow = countMarkers(text);
+				const filesNow = countMarkers(text, FILE_MARKER);
+				if (imagesNow < editingPrevMarkers || filesNow < editingPrevFileMarkers) {
+					let kept = dropNewestAttachments(editingAttachments, "image", editingPrevMarkers - imagesNow);
+					kept = dropNewestAttachments(kept, "text", editingPrevFileMarkers - filesNow);
 					editingAttachments = kept;
+					// Attachment-scoped errors die with the attachment.
+					clearNotice(notices, "inline");
 				}
-				editingPrevMarkers = now;
+				editingPrevMarkers = imagesNow;
+				editingPrevFileMarkers = filesNow;
 			}
 		};
 	}
@@ -5362,6 +5436,22 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		return `${day} ${time}`;
 	}
 
+	/**
+	 * Popup view models for the in-place link widgets (info-only: the
+	 * edit flow never had OCR).
+	 */
+	function editMarkerModels(): MarkerModel[] {
+		return editingAttachments.map((att) => ({
+			id: att.id,
+			kind: att.kind,
+			name: att.name,
+			tokens: att.tokens,
+			dataUrl: att.kind === "image" ? att.dataUrl : null,
+			excerpt: att.kind === "text" && att.text !== null ? fileExcerpt(att.text) : "",
+			busy: false
+		}));
+	}
+
 	function promptOptions(): PromptEditorOptions {
 		return {
 			onSubmit,
@@ -5370,28 +5460,28 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				enterScrollMode();
 			},
 			onImagePaste: onImagePasted,
+			markerModels: composerMarkerModels,
+			onMarkerAction: onComposerMarkerAction,
 			onDocChange: (text) => {
 				hasText = text.trim().length > 0;
-				// Tag → pill half of two-way removal: the user deleted
-				// marker lines by hand, so the newest image attachments
-				// go with them (newest first — pastes stack in order).
+				// Tag → attachment half of two-way removal: the user
+				// deleted tags by hand, so the newest attachments of
+				// that kind go with them (newest first — pastes stack
+				// in order).
 				if (markerSyncMuted) return;
-				const now = countMarkers(text);
-				if (now < prevMarkerCount) {
-					let drop = prevMarkerCount - now;
-					const kept = [...attachments];
-					for (let i = kept.length - 1; i >= 0 && drop > 0; i--) {
-						if (kept[i]?.kind === "image") {
-							kept.splice(i, 1);
-							drop--;
-						}
-					}
+				const imagesNow = countMarkers(text);
+				const filesNow = countMarkers(text, FILE_MARKER);
+				if (imagesNow < prevMarkerCount || filesNow < prevFileMarkerCount) {
+					let kept = dropNewestAttachments(attachments, "image", prevMarkerCount - imagesNow);
+					kept = dropNewestAttachments(kept, "text", prevFileMarkerCount - filesNow);
 					attachments = kept;
-					if (previewId && !attachments.some((a) => a.id === previewId)) {
-						previewId = null;
-					}
+					// Attachment-scoped errors die with the attachment —
+					// otherwise the red line dangles over the next draft
+					// with nothing left to explain.
+					clearNotice(notices, "inline");
 				}
-				prevMarkerCount = now;
+				prevMarkerCount = imagesNow;
+				prevFileMarkerCount = filesNow;
 			}
 		};
 	}
@@ -5744,7 +5834,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						: "Opened files in the composer"
 				);
 			}
-			if (rest.length > 0) await addFiles(rest);
+			if (rest.length > 0) {
+				const kinds = await addFiles(rest);
+				insertAttachmentMarkers(kinds);
+			}
 		});
 		// A pill-owned voice must not leak past its chat: when the
 		// launch chat carries no reply pill and nobody pinned the
@@ -6891,9 +6984,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 
 		const onKey = (event: KeyboardEvent) => {
 			// Idle-prompt restore allowlist: while hidden, only bare
-			// i / Enter / Space bring the prompt back (never typed —
-			// the key is a summon, like scroll mode's i). Every other
-			// key merely re-arms the hide timer via the stamp listener.
+			// i / Enter / Space / backslash bring the prompt back
+			// (never typed — the key is a summon, like scroll mode's
+			// i). Every other key merely re-arms the hide timer via
+			// the stamp listener.
 			if (promptIdle) {
 				const inPromptEditor = isPromptEditorTarget(event.target);
 				const idleAction = promptIdleKeyAction({
@@ -6961,11 +7055,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			) {
 				return;
 			}
-			// Bare Space on an empty composer dismisses: no message
-			// starts with a space, so it is never content — blur (and
+			// Bare Space or backslash on an empty composer dismisses:
+			// no message starts with a space, so it is never content
+			// (backslash rides as the Space-equivalent) — blur (and
 			// always-hide hides on blur). Repeats are swallowed while
 			// focused; the restore path above already ignores repeats,
-			// so a held Space can't bounce the prompt back open. Own-
+			// so a held key can't bounce the prompt back open. Own-
 			// message edits and attachment drafts are exempt: clearing
 			// real work must stay explicit (Escape).
 			const spaceAction = spaceKeyAction({
@@ -9217,7 +9312,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			</p>
 		{/if}
 
-		{#if attachments.length > 0 || notices.inline.message}
+		<!-- Pills survive on Android only: the plain-textarea composer
+		cannot host marker popups, so the tray stays its attachment UI
+		(remove/OCR/copy/preview). Everywhere else attachments read as
+		links in the draft with hover-preview popups — no strip, no
+		occlusion, nothing lingering after delete. -->
+		{#if androidUI && attachments.length > 0}
 			<ul class="attachments" class:composer-idle={promptIdle}>
 				{#each attachments as att (att.id)}
 					<li class:card={att.kind === "image" && !!att.dataUrl}>
@@ -9280,9 +9380,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					{/if}
 				{/each}
 			{/if}
-			{#if notices.inline.message && !androidUI}
-				<p class="error attach-error" class:composer-idle={promptIdle} role="alert">{notices.inline.message}</p>
-			{/if}
+		{/if}
+		{#if notices.inline.message && !androidUI}
+			<p class="error attach-error" class:composer-idle={promptIdle} role="alert">{notices.inline.message}</p>
 		{/if}
 
 		<input
@@ -9294,7 +9394,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			onchange={(e) => {
 				const files = [...(e.currentTarget.files ?? [])];
 				e.currentTarget.value = "";
-				if (files.length > 0) void addFiles(files);
+				if (files.length > 0) void addFiles(files).then((kinds) => insertAttachmentMarkers(kinds));
 			}}
 		/>
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -9315,8 +9415,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				e.preventDefault();
 				const files = dropFilesFromDataTransfer(e.dataTransfer);
 				if (files.length > 0) {
-					const images = files.filter((f) => f.type.startsWith("image/")).length;
-					void addFiles(files).then(() => insertImageMarkers(images));
+					void addFiles(files).then((kinds) => insertAttachmentMarkers(kinds));
 				}
 			}}
 		>
@@ -14016,6 +14115,22 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		visibility: hidden;
 		pointer-events: none;
 	}
+	/* The idle slide carries the whole card — the desktop tools
+	cluster counter-slides so attach/voice hold their screen seat
+	while the card settles (the fade still reads; the buttons never
+	twitch). Scoped off phones: their idle has no slide to cancel.
+	The empty-chat preview cancels the card slide, so it cancels
+	the counter-slide too. */
+	.app:not([data-android]) .prompt-tools {
+		transition: transform 0.25s ease;
+	}
+	.app:not([data-android]) .prompt.prompt-idle .prompt-tools {
+		transform: translateY(-0.75rem);
+	}
+	.app:not([data-android]) .prompt.prompt-idle.prompt-preview .prompt-tools {
+		transform: none;
+		transition: transform 0.35s ease;
+	}
 	.prompt {
 		/* Floating card, always: same geometry hidden or shown, so the
 		messages run full-bleed underneath and text is cut only by the
@@ -14124,6 +14239,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		.prompt,
 		.prompt:not(.prompt-idle),
 		.prompt.prompt-idle.prompt-preview,
+		.app:not([data-android]) .prompt-tools,
 		.attachments,
 		.preview,
 		.attach-error {

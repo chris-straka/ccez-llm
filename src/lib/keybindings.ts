@@ -138,8 +138,9 @@ export function messageKeyAction(facts: MessageKeyFacts): MessageKeyAction | nul
 	return null;
 }
 
-/** Facts the Space guards read. Note the dismiss has no shiftKey
- * condition: Shift+Space on an empty composer still dismisses. */
+/** Facts the Space/backslash guards read. Backslash is Space-equivalent
+ * here (summon + stow); note the dismiss has no shiftKey condition:
+ * Shift+Space on an empty composer still dismisses. */
 export interface SpaceKeyFacts extends KeyModifiers {
 	key: string;
 	repeat: boolean;
@@ -152,11 +153,14 @@ export interface SpaceKeyFacts extends KeyModifiers {
 
 export type SpaceKeyAction = "dismiss-composer" | "swallow-repeat";
 
-/** Space on the composer: a first press on empty text dismisses (no
- * message starts with a space, so it is never content); repeats are
- * swallowed so a held Space can't bounce the prompt back open. */
+/** Space or backslash on the composer: a first press on empty text
+ * dismisses (no message starts with a space, so it is never content;
+ * backslash rides along as the requested Space-equivalent, so a
+ * message opening with a backslash now stows instead of typing it);
+ * repeats are swallowed so a held key can't bounce the prompt back
+ * open. */
 export function spaceKeyAction(facts: SpaceKeyFacts): SpaceKeyAction | null {
-	if (facts.key !== " ") return null;
+	if (facts.key !== " " && facts.key !== "\\") return null;
 	if (
 		!facts.repeat &&
 		!facts.isComposing &&
@@ -191,12 +195,13 @@ export interface PromptIdleFacts extends KeyModifiers {
 export type PromptIdleAction = "restore" | "swallow";
 
 /**
- * While the prompt idles hidden, bare i / Enter / Space summon it back
- * (never typed — the key is a summon); blind keystrokes into the hidden
- * composer die silently instead. Restore wins when both match ("i" and
- * Space are single chars too). The stale-send guard stays: a keydown
- * still targeted at the editor after always-hide blurred it on send
- * must not summon the prompt straight back.
+ * While the prompt idles hidden, bare i / Enter / Space / backslash
+ * summon it back (never typed — the key is a summon); blind keystrokes
+ * into the hidden composer die silently instead. Restore wins when both
+ * match ("i", Space, and backslash are single chars too). The
+ * stale-send guard stays: a keydown still targeted at the editor after
+ * always-hide blurred it on send must not summon the prompt straight
+ * back.
  */
 export function promptIdleKeyAction(facts: PromptIdleFacts): PromptIdleAction | null {
 	const unmodified = !facts.metaKey && !facts.ctrlKey && !facts.altKey;
@@ -204,7 +209,11 @@ export function promptIdleKeyAction(facts: PromptIdleFacts): PromptIdleAction | 
 		!facts.isComposing &&
 		!facts.repeat &&
 		unmodified &&
-		(facts.key === "i" || facts.key === "I" || facts.key === "Enter" || facts.key === " ")
+		(facts.key === "i" ||
+			facts.key === "I" ||
+			facts.key === "Enter" ||
+			facts.key === " " ||
+			facts.key === "\\")
 	) {
 		if (facts.inPromptEditor) {
 			if (facts.activeInPrompt) return "restore";
