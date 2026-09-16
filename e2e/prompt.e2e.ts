@@ -183,9 +183,11 @@ test("composer card is translucent with backdrop blur", async ({ page }) => {
 	expect(glass.blur).toMatch(/blur\(/);
 });
 
-/** The composer is opaque by default: no glass class, full alpha,
-no backdrop filter (the transparency slider opts in). */
-test("composer card is opaque by default", async ({ page }) => {
+/** The composer is frosted by default: capped 75% alpha with blur,
+so thread text bleeds through (an opaque default buried the bleed;
+the slider only deepens below the cap, and the glass class still
+gates that slider state). */
+test("composer card is frosted by default", async ({ page }) => {
 	await page.addInitScript(() => {
 		window.localStorage.setItem("ccez-mock-provider", "1");
 		window.localStorage.setItem(
@@ -212,14 +214,25 @@ test("composer card is opaque by default", async ({ page }) => {
 		const el = document.querySelector("main .prompt") as HTMLElement | null;
 		if (!el) throw new Error("no composer");
 		const style = getComputedStyle(el);
+		let alpha = 1;
+		const inner = style.backgroundColor.match(/^(?:rgba?|color)\(([^)]+)\)$/);
+		if (inner) {
+			const body = inner[1]!;
+			if (body.includes(",")) {
+				const parts = body.split(",").map((part) => part.trim());
+				alpha = parts.length === 4 ? parseFloat(parts[3]!) : 1;
+			} else {
+				alpha = parseFloat(body.match(/\/\s*([\d.]+)\s*$/)?.[1] ?? "1");
+			}
+		}
 		return {
-			bg: style.backgroundColor,
+			alpha,
 			blur: `${style.backdropFilter} ${style.getPropertyValue("-webkit-backdrop-filter")}`
 		};
 	});
-	expect(glass.bg).not.toMatch(/\/\s*0\./);
-	// Absent filters serialize as "none" (either prefix), never blur().
-	expect(glass.blur).not.toMatch(/blur\(/);
+	expect(glass.alpha).toBeGreaterThan(0);
+	expect(glass.alpha).toBeLessThanOrEqual(0.75);
+	expect(glass.blur).toMatch(/blur\(/);
 });
 
 /** The thread runs full-height behind the frosted card: mid-thread

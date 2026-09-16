@@ -2056,7 +2056,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			}
 			// A lengthening draft grows the reserve under the card:
 			// when stuck to the bottom, re-stick past it or the tail
-			// slides under the opaque card as you type. Park, summon,
+			// slides under the frosted card as you type. Park, summon,
 			// and restores never change the reserve, so they never
 			// move the thread; mid-thread readers and touch holds
 			// never move either; phones keep their bottom-anchored card.
@@ -14411,6 +14411,19 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		background: #fff;
 		/* Raised, not flat: dark keeps the #1c1c1e card on the #17171a page. */
 		background: color-mix(in srgb, var(--bg-raised) calc(var(--bg-alpha, 1) * 100%), transparent);
+		/* Frosted, always: thread text bleeds through blurred instead
+		of hiding behind an opaque card (no structural change needed —
+		the filter applies to the existing card; the border keeps the
+		edge and the composer's own text paints above, crisp). Capped
+		at 75% so the bleed always reads, slider or not; lower
+		whole-app Transparency still wins below that. */
+		background: color-mix(
+			in srgb,
+			var(--bg-raised) calc(min(0.75, var(--bg-alpha, 1)) * 100%),
+			transparent
+		);
+		-webkit-backdrop-filter: blur(18px) saturate(1.6);
+		backdrop-filter: blur(18px) saturate(1.6);
 		/* Fixed floor so mounting the editor never shifts layout.
 		CodeMirror itself sets no minimum — this floor is ours, at
 		about three text lines plus the tools row. */
@@ -14425,11 +14438,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			opacity 0.25s ease,
 			visibility 0s linear 0.25s;
 	}
-	/* Frosted composer (see the Composer transparency slider, desktop
-	only): thread text bleeds through blurred instead of hiding behind
-	an opaque card. The border keeps the edge and the composer's own
-	text paints above, crisp; lower whole-app Transparency still wins
-	below the slider. No blur at full opacity (GPU stays out of it). */
+	/* Slider-deepened frost (see the Composer transparency slider,
+	desktop only): below the always-on 75% cap the card goes more
+	transparent still. Lower whole-app Transparency wins below the
+	slider either way. */
 	.prompt.glass {
 		background: color-mix(
 			in srgb,
