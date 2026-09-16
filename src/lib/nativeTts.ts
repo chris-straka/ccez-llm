@@ -2,7 +2,13 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { identifyLangOffline } from "./langId";
 import { hasPinyinTones, ttsLangFor } from "./reading";
-import { splitSentences, splitSpeechSegments, type SpeakCallbacks } from "./voice";
+import {
+	effectiveSpeechLang,
+	speechLangsFor,
+	splitSentences,
+	splitSpeechSegments,
+	type SpeakCallbacks
+} from "./voice";
 
 /**
  * Native macOS voice engine (Stage 6 / A4): thin invoke wrapper over the
@@ -141,6 +147,65 @@ export async function quoteLangFor(quote: string, fallback: string): Promise<str
 		// Bridge unavailable (browser preview, tests): offline scorer below.
 	}
 	return identifyLangOffline(quote) ?? fallback;
+}
+
+/**
+ * Language seed for the Latin-script sentences inside `text` (feeds
+ * `speechLangsFor`): whole-text script detection returns the CJK voice
+ * for mixed content (first non-Latin script wins), which used to seed
+ * every Latin sentence — a Japanese+English reply read its English
+ * sentences in the Japanese voice, and an English highlight inside a
+ * Japanese message never stood a chance. The recognizer only ever
+ * sees the Latin sentences, so each keeps its own language; with no
+ * Latin content the fallback (the whole-text voice) rides through for
+ * Han-fragment inheritance. Never throws.
+ */
+export async function latinSentencesLang(text: string, fallback: string): Promise<string> {
+	const latin = splitSentences(text)
+		.filter((sentence) => ttsLangFor(sentence, "") === "")
+		.join(" ")
+		.trim();
+	if (!latin) return fallback;
+	return quoteLangFor(latin, fallback);
+}
+
+/**
+ * Per-sentence voice resolver for a whole utterance — message or
+ * highlight — in every language the device has a voice for. Unambiguous
+ * scripts resolve sync from the sentence itself (Japanese, Arabic,
+ * Korean, Russian, Greek, Hebrew, Thai, Hindi, … need no bridge), and
+ * every Latin-script sentence gets its own recognizer pass, so a
+ * Japanese+English+French highlight reads each part in the right voice
+ * instead of sharing one. Short or ambiguous Latin sentences land on
+ * the whole-Latin seed (which falls back to `fallback`, the
+ * message/surrounding voice, so Han fragments keep their
+ * inheritance). Resolves before speech starts; callers pass the result
+ * straight to startSpeech. Never throws — per-sentence misses keep the
+ * seed through quoteLangFor's own fallback.
+ */
+export async function sentenceLangsFor(
+	text: string,
+	fallback: string,
+	voices: ReadonlyArray<{ lang: string }>
+): Promise<(sentence: string) => string> {
+	const latin = splitSentences(text).filter((sentence) => ttsLangFor(sentence, "") === "");
+	const seed = latin.length > 0 ? await latinSentencesLang(text, fallback) : fallback;
+	const perSentence = new Map<string, string>();
+	await Promise.all(
+		latin.map(async (sentence) => {
+			perSentence.set(sentence, await quoteLangFor(sentence, seed));
+		})
+	);
+	const base = speechLangsFor(seed, voices);
+	const cache = new Map<string, string>();
+	return (sentence: string) => {
+		const hit = cache.get(sentence);
+		if (hit !== undefined) return hit;
+		const tag = perSentence.get(sentence);
+		const lang = tag === undefined ? base(sentence) : effectiveSpeechLang(tag, voices);
+		cache.set(sentence, lang);
+		return lang;
+	};
 }
 
 /**

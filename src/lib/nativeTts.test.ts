@@ -6,6 +6,8 @@ import {
 	friendlyNativeError,
 	quoteLangFor,
 	quoteLangForContext,
+	latinSentencesLang,
+	sentenceLangsFor,
 	sentenceForQuote,
 	speakNative,
 	speakNativeMulti,
@@ -143,6 +145,78 @@ describe("quoteLangForContext", () => {
 		await expect(
 			quoteLangForContext("this is a fairly long english sentence", JA, "en-US")
 		).resolves.toBe("en-US");
+	});
+});
+
+/** Payload text of a mocked `tts_identify_lang` call. */
+function identifyText(args: unknown): string {
+	if (typeof args !== "object" || args === null) return "";
+	const text = (args as Record<string, unknown>)["text"];
+	return typeof text === "string" ? text : "";
+}
+
+describe("latinSentencesLang", () => {
+	it("recognizes only the Latin sentences in mixed text", async () => {
+		// The bridge routes the whole message's Latin part: per-sentence
+		// English must not inherit the Japanese voice (the read-aloud
+		// bug), and the recognizer must never see the kana.
+		mockInvoke.mockImplementation(async (cmd: string, args?: unknown) => {
+			if (cmd !== "tts_identify_lang") throw new Error(`unmocked command: ${cmd}`);
+			return identifyText(args).includes("Bonjour") ? "fr-FR" : "en-US";
+		});
+		await expect(
+			latinSentencesLang("今日はいい天気ですね。Hello world, how are you today.", "ja-JP")
+		).resolves.toBe("en-US");
+		for (const [, args] of mockInvoke.mock.calls) {
+			expect(String((args as Record<string, string>)?.["text"] ?? "")).not.toMatch(
+				/[\u3040-\u30FF]/
+			);
+		}
+	});
+
+	it("returns the fallback without a bridge when nothing is Latin", async () => {
+		await expect(latinSentencesLang("今日はいい天気ですね。", "ja-JP")).resolves.toBe("ja-JP");
+		expect(mockInvoke).not.toHaveBeenCalled();
+	});
+});
+
+describe("sentenceLangsFor", () => {
+	// Four languages in one highlight: kana and Arabic resolve by
+	// script with no bridge; each Latin sentence gets its own
+	// recognizer pass instead of sharing one voice.
+	const MIXED =
+		"今日はいい天気ですね。Hello world, how are you doing today. " +
+		"Bonjour le monde, comment allez-vous aujourd'hui. مرحبا بك في هذا الاختبار الطويل.";
+	const route = async (cmd: string, args?: unknown): Promise<string> => {
+		if (cmd !== "tts_identify_lang") throw new Error(`unmocked command: ${cmd}`);
+		const text = identifyText(args);
+		if (/[\u3040-\u30FF\u0600-\u06FF]/.test(text)) throw new Error("script text hit the bridge");
+		return text.includes("Bonjour") ? "fr-FR" : "en-US";
+	};
+
+	it("gives every sentence its own voice", async () => {
+		mockInvoke.mockImplementation(route);
+		const langFor = await sentenceLangsFor(MIXED, "en-US", []);
+		expect(langFor("今日はいい天気ですね。")).toBe("ja-JP");
+		expect(langFor("Hello world, how are you doing today.")).toBe("en-US");
+		expect(langFor("Bonjour le monde, comment allez-vous aujourd'hui.")).toBe("fr-FR");
+		expect(langFor("مرحبا بك في هذا الاختبار الطويل.")).toBe("ar-SA");
+	});
+
+	it("lands ambiguous Latin on the surrounding voice, not a guess", async () => {
+		// The bridge abstains everywhere: the whole-Latin seed and every
+		// per-sentence pass fall back, so a bare "OK" inside Japanese
+		// keeps the message voice instead of flipping to English.
+		mockInvoke.mockResolvedValue(null);
+		const langFor = await sentenceLangsFor("そうですね。OK.", "ja-JP", []);
+		expect(langFor("そうですね。")).toBe("ja-JP");
+		expect(langFor("OK.")).toBe("ja-JP");
+	});
+
+	it("returns the fallback without a bridge when nothing is Latin", async () => {
+		const langFor = await sentenceLangsFor("今日はいい天気ですね。", "ja-JP", []);
+		expect(langFor("今日はいい天気ですね。")).toBe("ja-JP");
+		expect(mockInvoke).not.toHaveBeenCalled();
 	});
 });
 

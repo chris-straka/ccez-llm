@@ -22,6 +22,11 @@
 const FADE_SECS: f64 = 0.18;
 /// Hover margin around each button, points.
 const HOVER_PAD: f64 = 10.0;
+/// Exit margin, points — deliberately wider than the enter pad. A slow
+/// pointer straddling one threshold flipped show/hide on every mouse
+/// move, strobing the fade (reads as a dark flash on hover-out); the
+/// pointer must clearly leave before hiding.
+const HOVER_EXIT_PAD: f64 = 24.0;
 
 /// Which alpha the buttons want: hidden at rest, shown on hover,
 /// always shown in fullscreen (the OS owns hover chrome there).
@@ -30,6 +35,17 @@ pub fn target_alpha(hovered: bool, fullscreen: bool) -> f64 {
         1.0
     } else {
         0.0
+    }
+}
+
+/// Padded hit-test margin for the current state: the enter pad to
+/// show, the wider exit pad to hide (hysteresis against boundary
+/// jitter — see HOVER_EXIT_PAD).
+pub fn hover_pad(shown: bool) -> f64 {
+    if shown {
+        HOVER_EXIT_PAD
+    } else {
+        HOVER_PAD
     }
 }
 
@@ -70,7 +86,7 @@ mod imp {
     use objc2_app_kit::{NSTrackingArea, NSTrackingAreaOptions};
     use objc2_foundation::{NSPoint, NSRect, NSObjectProtocol};
 
-    use super::{FADE_SECS, HOVER_PAD, ScreenRect, target_alpha};
+    use super::{FADE_SECS, ScreenRect, hover_pad, target_alpha};
 
     /// Live AppKit handle plus the last shown state (change-only
     /// fades: setting the animator target on every mouse move would
@@ -139,7 +155,7 @@ mod imp {
         })
     }
 
-    fn hovered(window: &NSWindow) -> bool {
+    fn hovered(window: &NSWindow, pad: f64) -> bool {
         let at: NSPoint = NSEvent::mouseLocation();
         [
             NSWindowButton::CloseButton,
@@ -148,18 +164,21 @@ mod imp {
         ]
         .into_iter()
         .filter_map(|kind| button_rect(window, kind))
-        .any(|rect| rect.contains(at.x, at.y, HOVER_PAD))
+        .any(|rect| rect.contains(at.x, at.y, pad))
     }
 
     /// Absolute refresh: read hover + fullscreen + motion state and
-    /// fade only when the shown state actually flips.
+    /// fade only when the shown state actually flips. The hit test
+    /// rides the current state's own pad (wide to hide, tight to
+    /// show) so boundary jitter can't strobe the fade.
     fn refresh() {
         let Some(state) = STATE.get() else {
             return;
         };
         // SAFETY: main thread, window outlives the app.
         let window = unsafe { &*state.window };
-        let show = target_alpha(hovered(window), is_fullscreen(window)) > 0.5;
+        let shown = state.shown.load(Ordering::SeqCst);
+        let show = target_alpha(hovered(window, hover_pad(shown)), is_fullscreen(window)) > 0.5;
         if show != state.shown.swap(show, Ordering::SeqCst) {
             fade(if show { 1.0 } else { 0.0 });
         }
@@ -272,7 +291,7 @@ pub use imp::watch;
 
 #[cfg(test)]
 mod tests {
-    use super::{ScreenRect, target_alpha};
+    use super::{ScreenRect, hover_pad, target_alpha};
 
     #[test]
     fn resting_buttons_hide() {
@@ -288,6 +307,23 @@ mod tests {
     fn fullscreen_always_shows() {
         assert_eq!(target_alpha(false, true), 1.0);
         assert_eq!(target_alpha(true, true), 1.0);
+    }
+
+    #[test]
+    fn exit_pad_exceeds_enter_pad() {
+        // Hysteresis: hiding needs a clearly-departed pointer, so a
+        // resting pointer near the edge can't strobe the fade.
+        assert!(hover_pad(true) > hover_pad(false));
+        let rect = ScreenRect {
+            x: 100.0,
+            y: 100.0,
+            w: 14.0,
+            h: 16.0,
+        };
+        // 15pt past the left edge: outside the enter pad, inside
+        // the exit pad.
+        assert!(!rect.contains(85.0, 108.0, hover_pad(false)));
+        assert!(rect.contains(85.0, 108.0, hover_pad(true)));
     }
 
     #[test]

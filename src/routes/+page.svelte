@@ -281,7 +281,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		latinFallback,
 		messageSpeechLang,
 		speechAttemptable,
-		speechLangsFor,
 		startSpeechError,
 		effectiveSpeechLang,
 		stopSpeaking,
@@ -298,6 +297,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		quoteLangFor,
 		quoteLangForContext,
 		sentenceForQuote,
+		sentenceLangsFor,
 		currentKeyboardInputSource
 	} from "$lib/nativeTts";
 	import { startNativeDictation } from "$lib/nativeDictate";
@@ -4170,7 +4170,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			return;
 		}
 		const stripped = text.replace(/```[\s\S]*?```/g, " ");
-		startSpeech(msg.id, text, speechLangsFor(await quoteLangFor(stripped, fallback), voices), quiet);
+		// Whole-message voice seeds the Latin sentences; each one then
+		// resolves its own language, so four languages read in four
+		// voices (see sentenceLangsFor).
+		const seed = await quoteLangFor(stripped, fallback);
+		startSpeech(msg.id, text, await sentenceLangsFor(stripped, seed, voices), quiet);
 	}
 
 	/** Speak-button label. */
@@ -4288,7 +4292,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		}
 		if (!keepMenu) selMenu = null;
 		speakingSelection = messageId;
-		startSpeech("selection", quote, speechLangsFor(lang, voices));
+		// The surrounding voice seeds; each Latin sentence in the
+		// highlight still resolves its own language (see
+		// sentenceLangsFor), so a mixed highlight reads each part
+		// correctly and a kanji-only one keeps its context voice.
+		startSpeech("selection", quote, await sentenceLangsFor(quote, lang, voices));
 	}
 
 	/** Pill-mic dictation into the annotation comment box. */
@@ -14030,9 +14038,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		ramp reads, instant on restore). */
 		transition:
 			border-color 0.18s ease,
-			transform 0.35s ease,
-			opacity 0.35s ease,
-			visibility 0s linear 0.35s;
+			transform 0.25s ease,
+			opacity 0.25s ease,
+			visibility 0s linear 0.25s;
 	}
 	/* Frosted composer (see the Composer transparency slider, desktop
 	only): thread text bleeds through blurred instead of hiding behind
@@ -14054,8 +14062,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.prompt:not(.prompt-idle) {
 		transition:
 			border-color 0.18s ease,
-			transform 0.35s ease,
-			opacity 0.35s ease,
+			transform 0.25s ease,
+			opacity 0.25s ease,
 			visibility 0s;
 	}
 	/* Empty-chat hover preview: the prompt shows although the open
