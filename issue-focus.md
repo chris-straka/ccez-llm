@@ -104,6 +104,44 @@ Seeded harness (`bunx playwright test`, own E2E_PORT each):
 3. Persisted-state poison (real chats/annotations/drafts vs seeds)
    — needs a state export or a bisect against seed shapes.
 
+## This session (chat probes, owner live browser)
+
+- Doc-level focusin/focusout around badge-edit open: exactly one
+  `focusin TEXTAREA`, no `focusout` after. DOM focus lands and stays
+  (matches harness probe).
+- activeElement sampler (250ms, 8s) on badge click: BODY x5, then
+  TEXTAREA solid to the end. No steal, no blur in the edit card.
+- `.ann-pop textarea:focus` is `outline: none` over
+  `border: 0; background: none` — zero visible focus cue. The edit
+  card "drop" is consistent with invisible focus, not lost focus.
+- Keydown probe in Base URL ("edafafafasdf"): every key reaches
+  INPUT with `defaultPrevented=false` — the capture dispatcher is
+  innocent for plain letters.
+- Input-event probe: insertions DO fire and values grow
+  (`.../f`, `f`, `ff`; screenshot shows `ff` persisted). Chars land
+  intermittently; spam-click racing sneaks them in.
+- No `beforeinput` listeners anywhere; no readonly flags in
+  components. FIELD_SELECTOR covers input/textarea/select;
+  scrollModeAction only consumes j/k/g/G/i/Enter/u/d/Ctrl+G and
+  exempts composer + find — plain letters should type even with
+  Always on.
+- Open: focus timeline in Base URL *with typing* (drop on click or
+  on first keystroke?); node-identity check for input remount;
+  focusout destination if it fires.
+- Screenshot session (owner Brave @ :1420, edit card open): badge
+  mousedown `prev=true`, one `focusin TEXTAREA`, `POLL BODY ->
+  TEXTAREA`, then seven textarea mousedowns `prev=false` with NO
+  `focusout` and NO further POLL change. Focus holds through
+  repeated clicks — no steal visible. Combined with "typing does
+  nothing", the fork is now: node swap (focused node detached,
+  reports as activeElement, eats keys silently) vs keystroke
+  eating with focus genuinely held.
+- Pending owner probe (no timing needed, run while broken):
+  `document.activeElement.isConnected` +
+  `document.querySelectorAll(".ann-pop textarea").length`.
+  Detached-or-2 = swap hunt (what re-creates the textarea);
+  attached-and-1 = key-path hunt (keydown logging).
+
 ## Next (owner)
 
 1. Owner runs the focusmon snippet (doc-level focusin/focusout +
