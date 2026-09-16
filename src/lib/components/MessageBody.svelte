@@ -18,6 +18,7 @@
 	import { mathCopyText, foldPreviewText } from "$lib/render-math";
 	import { codeRunBody, runCodeBlock } from "$lib/coderun";
 	import { closestFromTarget } from "$lib/events";
+	import type { AttachTagModel } from "$lib/attachments";
 	import type { ChatMsg, ChatMsgId } from "$lib/chat";
 	import { applyMarks, annRefsFor, type AnnotationMark, type AnnotationId } from "$lib/annotations";
 
@@ -53,6 +54,8 @@
 		onToast?: (message: string) => void;
 		/** Paste-fold marker click (parent replaces the message). */
 		onFoldToggle?: (index: number) => void;
+		/** Sent-tag popup action (Copy/OCR): the parent owns attachments. */
+		onAttachAction?: (action: "copy" | "ocr", id: string) => void;
 		/**
 		 * Folded-preview click: the preview is the unfold affordance (a
 		 * folded equation leaves nothing else clickable). Undefined keeps
@@ -116,6 +119,7 @@
 		onBadgeClick,
 		onToast,
 		onFoldToggle,
+		onAttachAction,
 		onUnfold,
 		onBadgeHover,
 		textOverride = null,
@@ -272,10 +276,24 @@
 		if (furiganaKey !== null) furiganaKey = null;
 		reportAidLoading(false);
 		aidRun++; // invalidate any in-flight furigana conversion
+		// Sent tags pair against this message's attachments (Nth of a
+		// kind to Nth of a kind); assistant output carries none, so an
+		// echoed literal there stays plain text.
+		const tagModels = (): AttachTagModel[] | undefined => {
+			if (message.role !== "user" || !message.attachments?.length) return undefined;
+			return message.attachments.map((att) => ({
+				id: att.id,
+				kind: att.kind,
+				name: att.name,
+				tokens: att.tokens,
+				dataUrl: att.dataUrl,
+				text: att.text
+			}));
+		};
 		const snapshot: RenderedMessage =
 			message.role === "assistant"
 				? renderMessage(content, sourcesWanted)
-				: renderMarkdown(content);
+				: renderMarkdown(content, tagModels());
 		rendered = snapshot;
 		html = snapshot.html;
 		if (!streaming && snapshot.codes.length > 0) {
@@ -362,6 +380,15 @@
 		const fold = closestFromTarget(event.target, "[data-paste-fold]");
 		if (fold) {
 			onFoldToggle?.(Number(fold.dataset.pasteFold ?? -1));
+			return;
+		}
+		// Sent-tag popup actions (Copy/OCR): the parent owns attachments,
+		// so the body only forwards which button fired.
+		const sentButton = closestFromTarget(event.target, "[data-sent-action]");
+		if (sentButton) {
+			const action = sentButton.dataset.sentAction;
+			const id = sentButton.dataset.sentId ?? "";
+			if ((action === "copy" || action === "ocr") && id) onAttachAction?.(action, id);
 			return;
 		}
 		// Display math chrome: `$` flips rendered/raw, the copy icon

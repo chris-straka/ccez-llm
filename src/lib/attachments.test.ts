@@ -1,19 +1,24 @@
 import { describe, it, expect } from "vitest";
 import {
+	ATTACH_TAG_RE,
 	FILE_MARKER,
 	IMAGE_MARKER,
 	IMAGE_MAX_DIM,
 	MAX_FILE_CHARS,
 	countMarkers,
+	extractAttachmentTags,
 	fileExcerpt,
 	fileMarkerInsert,
 	fitDimensions,
 	imageMarkerInsert,
 	imageTokens,
 	isTextFile,
+	leftoverAttachments,
 	removeMarker,
 	removeTags,
-	stripAttachmentMarkers
+	stripAttachmentMarkers,
+	tagPlaceholder,
+	type Attachment
 } from "./attachments";
 import { estimateTextTokens } from "./render";
 
@@ -124,5 +129,91 @@ describe("attachment budgets", () => {
 	it("text attachments cost ~4 chars per token, capped by MAX_FILE_CHARS", () => {
 		expect(MAX_FILE_CHARS).toBe(100_000);
 		expect(estimateTextTokens("a".repeat(400))).toBe(100);
+	});
+});
+
+function testAttachment(partial: Partial<Attachment> & { kind: Attachment["kind"] }): Attachment {
+	return {
+		id: partial.id ?? Math.random().toString(36),
+		name: "file",
+		mime: "text/plain",
+		dataUrl: null,
+		text: null,
+		width: null,
+		height: null,
+		tokens: 1,
+		...partial
+	};
+}
+
+describe("extractAttachmentTags", () => {
+	it("replaces literals with kind-indexed placeholders in order", () => {
+		const doc = `${IMAGE_MARKER} what do you see here?\n${FILE_MARKER} notes`;
+		const { stripped, tags } = extractAttachmentTags(doc);
+		expect(tags).toEqual([
+			{ kind: "image", index: 0 },
+			{ kind: "text", index: 0 }
+		]);
+		expect(stripped).toBe(
+			`${tagPlaceholder("image", 0)} what do you see here?\n${tagPlaceholder("text", 0)} notes`
+		);
+		// Placeholders round-trip through the matcher.
+		const kinds: string[] = [];
+		stripped.replace(ATTACH_TAG_RE, (_m, kind: string) => {
+			kinds.push(kind);
+			return "";
+		});
+		expect(kinds).toEqual(["i", "f"]);
+	});
+
+	it("indexes each kind separately", () => {
+		const { tags } = extractAttachmentTags(
+			`${IMAGE_MARKER} ${FILE_MARKER} ${IMAGE_MARKER}`
+		);
+		expect(tags).toEqual([
+			{ kind: "image", index: 0 },
+			{ kind: "text", index: 0 },
+			{ kind: "image", index: 1 }
+		]);
+	});
+
+	it("leaves fenced blocks and code spans alone", () => {
+		const doc = [
+			"```",
+			`${IMAGE_MARKER} in a fence`,
+			"```",
+			`talk about \`${FILE_MARKER}\` inline`
+		].join("\n");
+		const { stripped, tags } = extractAttachmentTags(doc);
+		expect(tags).toEqual([]);
+		expect(stripped).toBe(doc);
+	});
+});
+
+describe("leftoverAttachments", () => {
+	const img = (id: string) => testAttachment({ id, kind: "image" });
+	const file = (id: string) => testAttachment({ id, kind: "text" });
+
+	it("consumes the first attachments of each kind per literal", () => {
+		const atts = [img("a"), img("b"), file("c")];
+		expect(leftoverAttachments(atts, `${IMAGE_MARKER} hi`).map((a) => a.id)).toEqual([
+			"b",
+			"c"
+		]);
+		expect(leftoverAttachments(atts, "plain text").map((a) => a.id)).toEqual([
+			"a",
+			"b",
+			"c"
+		]);
+		expect(
+			leftoverAttachments(atts, `${IMAGE_MARKER} ${IMAGE_MARKER} ${FILE_MARKER}`).map(
+				(a) => a.id
+			)
+		).toEqual([]);
+	});
+
+	it("ignores literals inside code", () => {
+		const atts = [img("a")];
+		expect(leftoverAttachments(atts, `\`${IMAGE_MARKER}\``).map((a) => a.id)).toEqual(["a"]);
 	});
 });

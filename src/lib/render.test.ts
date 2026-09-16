@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
 import {
+	attachTagHtml,
 	extractThoughts,
 	stripSourcesIfUnasked,
 	sourcesAsked,
@@ -13,6 +14,7 @@ import {
 	htmlToText,
 	highlightRendered,
 } from "./render";
+import type { AttachTagModel } from "./attachments";
 
 describe("thoughts", () => {
 	it("extracts closed think blocks, joining multiples", () => {
@@ -88,6 +90,12 @@ describe("markdown rendering", () => {
 		expect(html).toContain("js · 3 LOC");
 	});
 
+	it("leaves attachment literals as plain text without models", () => {
+		const { html } = renderMarkdown("[Pasted image] what do you see here?");
+		expect(html).toContain("[Pasted image]");
+		expect(html).not.toContain("sent-tag");
+	});
+
 	it("renders body-only display math: no fold bar, body kept for fold/copy", () => {
 		const { html } = renderMarkdown("Here:\n\n$$x^2$$\n\ndone");
 		expect(html).not.toContain("ccez-math-head");
@@ -161,6 +169,69 @@ describe("markdown rendering", () => {
 		expect(text).toContain("bold");
 		expect(text).not.toContain("**");
 		expect(text).not.toContain("<h1>");
+	});
+});
+
+describe("sent-message tags", () => {
+	const img: AttachTagModel = {
+		id: "img-1",
+		kind: "image",
+		name: "shot.png",
+		tokens: 255,
+		dataUrl: "data:image/png;base64,AAA",
+		text: null
+	};
+	const file: AttachTagModel = {
+		id: "file-1",
+		kind: "text",
+		name: "notes.md",
+		tokens: 8,
+		dataUrl: null,
+		text: "# hello"
+	};
+
+	it("rebuilds literals as preview links paired by kind order", () => {
+		const { html } = renderMarkdown("[Pasted image] what do you see here?", [img]);
+		expect(html).toContain('class="sent-tag"');
+		expect(html).toContain('class="sent-preview"');
+		expect(html).toContain('src="data:image/png;base64,AAA"');
+		expect(html).toContain("shot.png · ≈255 tokens");
+		expect(html).toContain('data-sent-action="copy"');
+		expect(html).toContain('data-sent-action="ocr"');
+		expect(html).toContain('data-sent-id="img-1"');
+		expect(html).toContain("what do you see here?");
+	});
+
+	it("previews file excerpts without an OCR button", () => {
+		const { html } = renderMarkdown("[Pasted Attachment] notes", [file]);
+		expect(html).toContain('class="sent-excerpt"');
+		expect(html).toContain("# hello");
+		expect(html).toContain('data-sent-action="copy"');
+		expect(html).not.toContain('data-sent-action="ocr"');
+	});
+
+	it("falls back to plain text past the end of the models", () => {
+		const { html } = renderMarkdown("[Pasted image] one [Pasted image] two", [img]);
+		expect(html).toContain('class="sent-tag"');
+		expect(html).toContain("[Pasted image] two");
+	});
+
+	it("leaves literals inside code alone", () => {
+		const { html } = renderMarkdown("`[Pasted image]`", [img]);
+		expect(html).not.toContain("sent-tag");
+	});
+
+	it("escapes hostile names", () => {
+		const hostile: AttachTagModel = { ...img, name: '<img src=x onerror="1">' };
+		const { html } = renderMarkdown("[Pasted image]", [hostile]);
+		expect(html).not.toContain('<img src=x onerror="1">');
+		expect(html).toContain("&lt;img");
+	});
+
+	it("builds the tag card directly", () => {
+		expect(attachTagHtml(null, "i")).toBe("[Pasted image]");
+		expect(attachTagHtml(null, "f")).toBe("[Pasted Attachment]");
+		expect(attachTagHtml(img, "i")).toContain('aria-label="Copy attachment"');
 	});
 });
 

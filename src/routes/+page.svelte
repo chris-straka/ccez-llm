@@ -128,6 +128,7 @@ import {
 		imageMarkerInsert,
 		countMarkers,
 		removeMarker,
+		leftoverAttachments,
 		type Attachment,
 		type AttachmentKind
 	} from "$lib/attachments";
@@ -2695,6 +2696,17 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	/** Popup Copy/OCR clicks, resolved against live attachments. */
 	function onComposerMarkerAction(action: MarkerAction, id: string): void {
 		const att = attachments.find((a) => a.id === id);
+		if (!att) return;
+		if (action === "ocr") {
+			if (att.kind === "image") void recognizeAttachment(att);
+			return;
+		}
+		copyAttachment(att);
+	}
+
+	/** Sent-tag popup Copy/OCR clicks, resolved against the owning message. */
+	function sentTagAction(msg: ChatMsg, action: "copy" | "ocr", id: string): void {
+		const att = msg.attachments?.find((a) => a.id === id);
 		if (!att) return;
 		if (action === "ocr") {
 			if (att.kind === "image") void recognizeAttachment(att);
@@ -8917,6 +8929,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				{@const sentRefs = annRefsFor(msg.content)}
 				{@const refsOnly = sentRefs ? sentRefs.text.trim() === "" : false}
 				{@const isFolded = foldedIds.has(msg.id)}
+				{@const tagBase = (sentRefs ? (refsOnly && !isFolded ? REFS_ONLY_BODY : sentRefs.text) : null) ?? msg.content}
+				{@const tagLeftovers = msg.attachments ? leftoverAttachments(msg.attachments, tagBase) : []}
 				{@const script = detectScript(sentRefs ? sentRefs.text : msg.content)}
 				{@const aidId = script ? MODEL_AID_FOR_SCRIPT[script] : null}
 				{@const localKinds = offeredLocalAids(sentRefs ? sentRefs.text : msg.content, activeReplyCode)}
@@ -8940,6 +8954,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					data-actions-open={shownActionsId === msg.id}
 					onclick={(e) => {
 						if (e.altKey) toggleFold(msg.id);
+						// Sent-tag clicks are a no-op (their popup buttons
+						// delegate inside MessageBody first): the actions
+						// row stays shut, like the composer links.
+						const target = e.target instanceof Element ? e.target : null;
+						if (target?.closest(".sent-tag")) return;
 						toggleMessageActions(msg.id, e);
 					}}
 					onmouseenter={() => {
@@ -8948,17 +8967,18 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					}}
 					onmouseleave={(event) => onArticleLeave(event, msg, i)}
 				>
-					{#if msg.attachments && msg.attachments.length > 0}
-					<!-- Sent-message attachment tags: the marker text the
-					turn was sent with, rebuilt from the attachments (send
-					strips the literals, so history has no tag positions
-					left). Above the message like the chips were; hovering
-					previews the composer card, and clicks stop at the tag
-					so the message actions stay shut. A long turn scrolls
-					sideways in place (about three tags at a time) instead
-					of stretching. -->
+					{#if tagLeftovers.length > 0}
+					<!-- Sent-message attachment tags: leftovers with no
+					literal left in the message text (send strips tags, so
+					fresh turns pair nothing here — history pairs its
+					literals inline instead, and each attachment shows
+					exactly once). Above the message; hovering previews
+					the composer card, and clicks stop at the tag so the
+					message actions stay shut. A long turn scrolls sideways
+					in place (about three tags at a time) instead of
+					stretching. -->
 					<div class="sent-tags">
-						{#each msg.attachments as att (att.id)}
+						{#each tagLeftovers as att (att.id)}
 							<span class="sent-tag" onclick={(e) => e.stopPropagation()}>
 								{att.kind === "image" ? IMAGE_MARKER : FILE_MARKER}
 								<span class="sent-preview" aria-hidden="true">
@@ -9126,6 +9146,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							onBadgeClick={openBadgeClick}
 							onToast={flashToast}
 							onFoldToggle={(index: number) => togglePasteFold(msg, index)}
+							onAttachAction={(action: "copy" | "ocr", id: string) =>
+								sentTagAction(msg, action, id)
+							}
 						onUnfold={() => toggleFold(msg.id)}
 							textOverride={aidedTextFor(msg)}
 							contentOverride={sentRefs ? (refsOnly && !isFolded ? REFS_ONLY_BODY : sentRefs.text) : null}

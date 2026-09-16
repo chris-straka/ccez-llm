@@ -297,6 +297,67 @@ test("sent turns with many attachments scroll their tags", async ({ page }) => {
 	expect(overflow).toBeGreaterThan(0);
 });
 
+test("a stored literal renders inline with no strip duplicate", async ({ page }) => {
+	// Turns stored before send-time stripping keep the literal in
+	// their text: it rebuilds as a link in place, paired against the
+	// attachment, and the strip above stays empty — each file shows
+	// exactly once.
+	const pixel =
+		"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+	await page.addInitScript((url) => {
+		window.localStorage.setItem(
+			"ccez-llm-chats-v1",
+			JSON.stringify([
+				{
+					id: "e2e-chat",
+					createdAt: 1,
+					replyLang: null,
+					messages: [
+						{
+							id: "e2e-m0",
+							role: "user",
+							content: "[Pasted image] what do you see here?",
+							usage: null,
+							error: null,
+							attachments: [
+								{
+									id: "e2e-img-0",
+									name: "shot.png",
+									mime: "image/png",
+									kind: "image",
+									dataUrl: url,
+									text: null,
+									width: 1,
+									height: 1,
+									tokens: 85
+								}
+							]
+						},
+						{ id: "e2e-m1", role: "assistant", content: "a picture", usage: null, error: null }
+					]
+				}
+			])
+		);
+	}, pixel);
+	await page.reload();
+	const body = page.locator("article.user .rendered").first();
+	await expect(body).toBeVisible({ timeout: 60_000 });
+	// One tag, inline where typed — and no strip above it.
+	await expect(page.locator("article.user .sent-tag")).toHaveCount(1);
+	await expect(page.locator("article.user .sent-tags")).toHaveCount(0);
+	await expect(body).toContainText("what do you see here?");
+	// Hovering the inline tag previews the image with its meta.
+	const tag = page.locator("article.user .sent-tag").first();
+	await tag.hover();
+	const preview = page.locator("article.user .sent-preview").first();
+	await expect(preview).toBeVisible();
+	await expect(preview.locator(".sent-img")).toBeVisible();
+	await expect(preview.locator(".sent-meta")).toContainText("shot.png");
+	// Clicking it is a no-op: the message actions stay shut.
+	await tag.click();
+	await expect(page.locator("article.user").last()).toHaveAttribute("data-actions-open", "false");
+});
+
 test("popup touches the badge and clear-all lives inside it", async ({ page }) => {
 	const badge = await addAnnotation(page);
 
