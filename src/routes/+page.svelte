@@ -203,6 +203,7 @@ import { desktopShortcuts, filteredShortcuts, touchShortcuts } from "$lib/shortc
 		sidebarListAction,
 		spaceKeyAction
 	} from "$lib/keybindings";
+import { describeActiveElement, describeFocusTarget, focusLog } from "$lib/focusDebug";
 import {
 		closestFromTarget,
 		consumeEvent,
@@ -1650,6 +1651,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 	/** Allowlisted restore: show the hidden prompt again. */
 	function restorePrompt(): void {
+		focusLog("restore-prompt", { active: describeActiveElement(), wasIdle: promptIdle });
 		stampInput();
 		promptIdle = false;
 	}
@@ -1684,6 +1686,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		)
 			return;
 		promptIdle = true;
+		focusLog("hide-for-always", {
+			next: describeFocusTarget(next),
+			active: describeActiveElement()
+		});
 	}
 	/**
 	 * Idle-prompt key decisions live in `promptIdleKeyAction`
@@ -1804,6 +1810,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		const onFocusInIdle = (event: FocusEvent): void => {
 			if (settings.promptIdleSec !== PROMPT_IDLE_ALWAYS) return;
 			if (!closestFromTarget(event.target, ".prompt .cm-content, .prompt .ta-input")) return;
+			focusLog("focusin-idle", {
+				target: describeFocusTarget(event.target),
+				active: describeActiveElement()
+			});
 			restorePrompt();
 		};
 		const onFocusOutIdle = (event: FocusEvent): void => {
@@ -1817,6 +1827,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// idle ticker re-parks a genuinely unfocused composer
 			// within half a second, so an over-skip self-heals.
 			const next: EventTarget | null = event.relatedTarget ?? null;
+			focusLog("focusout-idle", {
+				target: describeFocusTarget(event.target),
+				next: describeFocusTarget(next),
+				active: describeActiveElement(),
+				promptIdle,
+				pressAgeMs: Date.now() - promptPressAt
+			});
 			if (
 				(next === null || next === document.body) &&
 				Date.now() - promptPressAt < 1500
@@ -4608,6 +4625,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 
 	function enterEditMode() {
+		focusLog("enter-edit-mode", { from: focusMode, active: describeActiveElement() });
 		focusMode = "edit";
 		editor?.setPlaceholder(promptPlaceholder());
 		// A fresh editing context always shows the prompt: a minted
@@ -4652,6 +4670,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * deactivated state (nothing selected, no focus stolen).
 	 */
 	function exitScrollMode(): void {
+		focusLog("exit-scroll-mode", { from: focusMode, active: describeActiveElement() });
 		focusMode = "edit";
 		selectedIdx = -1;
 		if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
@@ -6522,6 +6541,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					inOwnedTarget: isIdleOwnedTarget(event.target)
 				});
 				if (idleAction === "restore") {
+					focusLog("key-idle-restore", {
+						key: event.key,
+						target: describeFocusTarget(event.target),
+						active: describeActiveElement()
+					});
 					event.preventDefault();
 					restorePrompt();
 					// The visibility flip flushes async: focusing now
@@ -6531,6 +6555,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					return;
 				}
 				if (idleAction === "swallow") {
+					focusLog("key-idle-swallow", {
+						key: event.key,
+						target: describeFocusTarget(event.target),
+						active: describeActiveElement()
+					});
 					event.preventDefault();
 					return;
 				}
@@ -6924,12 +6953,29 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// it owns j/k/space/l/Delete with preview-as-you-go. Bodies
 		// stay here as `if (sideAction === ...)` chains, never a switch.
 		const inSidebar = isSidebarTarget(event.target);
+		if (isFieldTarget(event.target)) {
+			focusLog("key-in-field", {
+				key: event.key,
+				target: describeFocusTarget(event.target),
+				active: describeActiveElement(),
+				focusMode,
+				promptIdle
+			});
+		}
 		const sideAction = sidebarListAction({
 			...keyFacts(event),
 			listOpen: !settings.sidebarCollapsed,
 			inSidebar,
 			inField: isFieldTarget(event.target)
 		});
+			if (sideAction !== null) {
+				focusLog("key-sidebar-consume", {
+					key: event.key,
+					action: sideAction,
+					target: describeFocusTarget(event.target),
+					active: describeActiveElement()
+				});
+			}
 			if (sideAction === "walk-down" || sideAction === "walk-up") {
 				// Walking switches to each chat (preview-as-you-go).
 				event.preventDefault();
@@ -7113,6 +7159,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				if (isFindBarTarget(event.target)) return;
 				return;
 			}
+			focusLog("key-scroll-consume", {
+				key: event.key,
+				action: scrollAction,
+				target: describeFocusTarget(event.target),
+				active: describeActiveElement(),
+				focusMode
+			});
 			if (scrollAction === "arm-g") {
 				// A lone g starts the gg beat without consuming the key.
 				lastGAt = Date.now();
@@ -7173,6 +7226,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			}
 		};
 		const onFocusIn = (event: FocusEvent) => {
+			focusLog("focusin", {
+				target: describeFocusTarget(event.target),
+				active: describeActiveElement(),
+				focusMode
+			});
 			if (closestFromTarget(event.target, ".cm-content")) {
 				focusMode = "edit";
 			}
@@ -7199,6 +7257,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// Same boundary as MessageBody's badge click: stamped ids.
 			// The press point anchors the desktop edit menu; phones
 			// edit in the composer and ignore it.
+			focusLog("badge-press", { id, active: describeActiveElement() });
 			openBadge(id, { x: event.clientX, y: event.clientY });
 			lastBadgePress = { id, at: Date.now() };
 		};
@@ -7583,6 +7642,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						? Math.hypot(event.clientX - downClient.x, event.clientY - downClient.y) > 4
 						: false;
 					if (!endedDrag) {
+						focusLog("mouseup-clear-on-control", {
+							target: describeFocusTarget(event.target),
+							active: describeActiveElement()
+						});
 						window.getSelection()?.removeAllRanges();
 						selMenu = null;
 					} else if ((window.getSelection()?.toString() ?? "") === "") {
