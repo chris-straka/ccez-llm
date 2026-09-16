@@ -231,11 +231,18 @@ if (!endedDrag) {
     selMenu = null;
 }
 ```
-Consider also gating on `document.activeElement` outside an
-editable, for mousedown-`preventDefault` button presses that keep
-field focus (ann-pop mic/save): their mouseup currently wipes the
-kept caret. Regression pin must run in WebKit (the webkit project
-currently matches only sel-menu; Chromium cannot see this bug):
+Follow-up applied 2026-09-16 (same session): the `activeElement`
+gate is in, as `mouseupKeepsSelection(target, active)` in
+`src/lib/events.ts` (pure, unit-pinned in `events.test.ts`) wired
+into the `onMouseUp` branch — plain buttons drop focus to `body`,
+so the focus half specifically covers mousedown-`preventDefault`
+presses that keep field focus (ann-pop mic/save). An e2e pin for
+that half was attempted and reverted: no harness-reachable button
+keeps a field alive and focused in both engines (radio clicks drop
+focus to `body` even in WebKit), so the unit predicate is the pin;
+the WebKit e2e pins the target half. Regression pin must run in WebKit
+(the webkit project now matches scroll-field; Chromium cannot see
+this bug):
 click each field, `keyboard.type`, assert value — assert TYPED
 TEXT, not just focus (the old sel probe was green-but-wrong: it
 checked `activeElement`, which holds throughout). Loose end: the

@@ -18,7 +18,8 @@ import {
 	isScrollEnterOwnedTarget,
 	isSidebarTarget,
 	isSpaceInteractiveTarget,
-	isTapOverlayTarget
+	isTapOverlayTarget,
+	mouseupKeepsSelection
 } from "./events";
 
 describe("page event idioms", () => {
@@ -126,6 +127,22 @@ describe("page event idioms", () => {
 		expect(isTapOverlayTarget(byId("mo"))).toBe(true);
 		expect(isTapOverlayTarget(byId("b"))).toBe(false);
 		expect(isTapOverlayTarget(byId("p"))).toBe(false);
+	});
+
+	it("keeps the selection for editable press targets and focused fields", () => {
+		document.body.innerHTML =
+			'<input id="i"><div id="d" contenteditable="true">x</div><button id="b">y</button><p id="p">z</p>';
+		const byId = (id: string): Element | null => document.getElementById(id);
+		// A press into a field: the caret just landed there.
+		expect(mouseupKeepsSelection(byId("i"), byId("p"))).toBe(true);
+		expect(mouseupKeepsSelection(byId("d"), byId("p"))).toBe(true);
+		// A button press while a field holds focus (preventDefault
+		// presses keep it there): spare the kept caret.
+		expect(mouseupKeepsSelection(byId("b"), byId("i"))).toBe(true);
+		// Ordinary control presses still clear.
+		expect(mouseupKeepsSelection(byId("b"), byId("p"))).toBe(false);
+		expect(mouseupKeepsSelection(byId("b"), null)).toBe(false);
+		expect(mouseupKeepsSelection(null, null)).toBe(false);
 	});
 
 	it("keeps the two owned-stage spellings deliberately apart", () => {

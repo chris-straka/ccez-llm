@@ -137,6 +137,22 @@ export function isScrollEnterOwnedTarget(target: EventTarget | null): boolean {
 }
 
 /**
+ * True when a plain (non-drag) mouseup must keep the window selection:
+ * the press landed in an editable, or focus sits in one. Clicks into
+ * editables already moved the selection there natively; a press that
+ * kept field focus (buttons with mousedown-preventDefault) keeps a
+ * live caret too — and that caret is never a stale message highlight.
+ * Clearing under a focused field destroys the just-placed caret on
+ * WebKit: later keystrokes dispatch yet never become text.
+ */
+export function mouseupKeepsSelection(
+	target: EventTarget | null,
+	active: EventTarget | null
+): boolean {
+	return isEditableTarget(target) || isEditableTarget(active);
+}
+
+/**
  * Press-start control check (also the tap-landing guard): buttons and
  * links, fields, summaries, rich editors, and code bodies keep their
  * own behavior while the prompt is hidden. Wider than the key path's

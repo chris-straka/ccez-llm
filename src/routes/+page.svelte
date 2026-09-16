@@ -221,7 +221,8 @@ import {
 		isScrollEnterOwnedTarget,
 		isSidebarTarget,
 		isSpaceInteractiveTarget,
-		isTapOverlayTarget
+		isTapOverlayTarget,
+		mouseupKeepsSelection
 	} from "$lib/events";
 	import {
 		aidDisplayText,
@@ -7648,13 +7649,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						});
 						// WebKit: clearing the selection on mouseup after a
 						// field took focus destroys the just-placed caret —
-						// later keystrokes dispatch yet never become text.
-						// Clicks into editables already moved the selection
-						// there natively, so wipe only for non-editable
-						// targets (buttons, review chrome).
-						if (
-							!target?.closest(".cm-content, input, textarea, select, [contenteditable]")
-						) {
+						// later keystrokes dispatch yet never become text
+						// (see mouseupKeepsSelection: clicks into editables
+						// already moved the selection there, and presses
+						// that keep field focus keep a live caret too).
+						if (!mouseupKeepsSelection(event.target, document.activeElement)) {
 							window.getSelection()?.removeAllRanges();
 						}
 						selMenu = null;
