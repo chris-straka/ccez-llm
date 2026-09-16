@@ -51,62 +51,6 @@ export const appTheme = EditorView.theme({
 		color: "#6e6e73",
 		cursor: "pointer"
 	},
-	// Attachment links read like app links (underline, inherit the
-	// text color) with a default cursor: hovering previews, clicking
-	// does nothing. The popup is a small card under the link, app
-	// tokens throughout so both themes hold.
-	".cm-attach-marker": {
-		position: "relative",
-		textDecoration: "underline",
-		cursor: "default"
-	},
-	".cm-attach-preview": {
-		display: "none",
-		position: "absolute",
-		top: "100%",
-		left: "0",
-		zIndex: "30",
-		marginTop: "0.25rem",
-		padding: "0.5rem",
-		maxWidth: "16rem",
-		backgroundColor: "var(--bg-raised)",
-		border: "1px solid var(--line)",
-		borderRadius: "8px"
-	},
-	".cm-attach-marker:hover .cm-attach-preview": { display: "block" },
-	".cm-attach-img": {
-		display: "block",
-		maxWidth: "14rem",
-		maxHeight: "10rem",
-		borderRadius: "6px"
-	},
-	".cm-attach-excerpt": {
-		display: "block",
-		maxHeight: "8rem",
-		overflow: "auto",
-		whiteSpace: "pre-wrap",
-		fontSize: "0.75rem",
-		color: "var(--ink)"
-	},
-	".cm-attach-meta": {
-		display: "block",
-		marginTop: "0.3rem",
-		fontSize: "0.72rem",
-		color: "var(--muted)",
-		whiteSpace: "nowrap"
-	},
-	".cm-attach-actions": { display: "flex", gap: "0.4rem", marginTop: "0.3rem" },
-	".cm-attach-btn": {
-		border: "0",
-		background: "none",
-		padding: "0.15rem 0.3rem",
-		fontSize: "0.72rem",
-		fontWeight: "700",
-		letterSpacing: "0.04em",
-		color: "var(--ink)",
-		cursor: "pointer",
-		textDecoration: "underline"
-	},
 	// Fence bars echo the message code-head: label left, icon buttons
 	// right. Only the two bar lines are widgets — body rows stay real
 	// text so the caret and IME never sit on a replacement.

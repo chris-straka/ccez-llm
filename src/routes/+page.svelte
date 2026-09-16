@@ -80,8 +80,6 @@
 		ANDROID_PROMPT_PLACEHOLDER,
 		ANDROID_SCROLL_PLACEHOLDER,
 		sendPasteFolds,
-		type MarkerAction,
-		type MarkerModel,
 		type PromptEditor,
 		type PromptEditorOptions,
 		type SubmitKind
@@ -121,14 +119,12 @@ import {
 	import {
 		FILE_MARKER,
 		IMAGE_MARKER,
-		fileExcerpt,
 		fileMarkerInsert,
 		fileToAttachment,
 		stripAttachmentMarkers,
 		imageMarkerInsert,
 		countMarkers,
 		removeMarker,
-		leftoverAttachments,
 		type Attachment,
 		type AttachmentKind
 	} from "$lib/attachments";
@@ -1969,7 +1965,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * steers programmatic scrolls), while the thread runs full-height
 	 * behind the frosted card so mid-thread text bleeds through.
 	 * Main-level padding covers only the in-flow attachment strip,
-	 * preview, desktop cards, and error, which live outside the scroller. The extra
+	 * preview, and error, which live outside the scroller. The extra
 	 * 54px also clears short last messages' badges, which float
 	 * above their quote and would otherwise park under the card,
 	 * unclickable. The reserve NEVER collapses while parked:
@@ -1998,18 +1994,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// to protect, hero owns the space per stylesheet.
 			const emptyChat = viewChat.messages.length === 0;
 			box.style.paddingBottom = emptyChat ? "0px" : `${clearPx}px`;
-			// The attachment strip, preview, cards, and error sit in main
-			// flow between the scroller and the card: main-level padding
+			// The attachment strip, preview, and error sit in main flow
+			// between the scroller and the card: main-level padding
 			// lifts them above the card while any is rendered. Binary,
 			// so park/summon (transform-only, layout kept) never move
 			// anything; only attaching/removing shifts, which is the
-			// user's own gesture. Empty chats keep today's floor. The
-			// intake read subscribes the lift (the DOM query alone would
-			// miss the attach that just rendered it).
+			// user's own gesture. Empty chats keep today's floor.
 			const stripOpen =
-				mainEl.querySelector(
-					":scope > .attachments, :scope > .preview, :scope > .composer-shots, :scope > .attach-error"
-				) !== null || attachments.some((a) => a.kind === "image" && a.dataUrl);
+				mainEl.querySelector(":scope > .attachments, :scope > .preview, :scope > .attach-error") !==
+				null;
 			mainEl.style.paddingBottom =
 				emptyChat || stripOpen
 					? `calc(${clearPx}px + env(safe-area-inset-bottom, 0px))`
@@ -2578,8 +2571,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * Intake for dropped/picked/pasted files: every file that survives
 	 * becomes an attachment and earns its composer tag (`[Pasted
 	 * image]` / `[Pasted Attachment]`, caret after each tag's space),
-	 * so attachments always read as links — never pills. Resolves with
-	 * the added kinds in order for tag insertion.
+	 * mirroring the pill. Resolves with the added kinds in order for
+	 * tag insertion.
 	 */
 	async function addFiles(files: File[]): Promise<AttachmentKind[]> {
 		clearNotice(notices, "inline");
@@ -2633,13 +2626,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 
 	/**
-	 * Tag <-> attachment two-way removal (images and files; pills are
-	 * gone, links do their job). Intake adds one tag per attachment;
-	 * tag → attachment lives in `promptOptions().onDocChange`: when a
-	 * kind's tag count falls, its newest attachments go with it.
-	 * `markerSyncMuted` bridges the two (programmatic edits must not
-	 * reconcile against themselves); the `prev*Count` pair is the last
-	 * reconciled state.
+	 * Attachment pill <-> tag two-way removal (images and files).
+	 * Pill → tag: dropping the pill removes one marker tag from the
+	 * draft (prose typed beside it survives). Tag → pill lives in
+	 * `promptOptions().onDocChange`: when a kind's tag count falls,
+	 * its newest attachments go with it. `markerSyncMuted` bridges
+	 * the two (programmatic edits must not reconcile against
+	 * themselves); the `prev*Count` pair is the last reconciled
+	 * state.
 	 */
 	let markerSyncMuted = false;
 	let prevMarkerCount = 0;
@@ -2679,48 +2673,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 
 	/**
-	 * Popup view models for the composer link widgets: the Nth tag of a
-	 * kind pairs with the Nth attachment of that kind (see
-	 * editorImageMarkers). Images carry their thumbnail; files carry a
-	 * leading excerpt plus the token cost the pills used to show.
-	 */
-	function composerMarkerModels(): MarkerModel[] {
-		return attachments.map((att) => ({
-			id: att.id,
-			kind: att.kind,
-			name: att.name,
-			tokens: att.tokens,
-			dataUrl: att.kind === "image" ? att.dataUrl : null,
-			excerpt: att.kind === "text" && att.text !== null ? fileExcerpt(att.text) : "",
-			busy: ocrBusyId === att.id
-		}));
-	}
-
-	/** Popup Copy/OCR clicks, resolved against live attachments. */
-	function onComposerMarkerAction(action: MarkerAction, id: string): void {
-		const att = attachments.find((a) => a.id === id);
-		if (!att) return;
-		if (action === "ocr") {
-			if (att.kind === "image") void recognizeAttachment(att);
-			return;
-		}
-		copyAttachment(att);
-	}
-
-	/** Sent-tag popup Copy/OCR clicks, resolved against the owning message. */
-	function sentTagAction(msg: ChatMsg, action: "copy" | "ocr", id: string): void {
-		const att = msg.attachments?.find((a) => a.id === id);
-		if (!att) return;
-		if (action === "ocr") {
-			if (att.kind === "image") void recognizeAttachment(att);
-			return;
-		}
-		copyAttachment(att);
-	}
-
-	/**
-	 * Pill X (Android only — desktop removes via tag deletion): drop the
-	 * pill plus one of its tags, and any attachment-scoped error with it.
+	 * Pill X: drop the pill plus one of its tags, and any
+	 * attachment-scoped error with it.
 	 */
 	function removeAttachment(id: string): void {
 		const removed = attachments.find((a) => a.id === id);
@@ -2753,7 +2707,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	async function recognizeAttachment(att: Attachment): Promise<void> {
 		if (ocrBusyId !== null || att.kind !== "image" || !att.dataUrl) return;
 		ocrBusyId = att.id;
-		editor?.refreshMarkers();
 		clearNotice(notices, "inline");
 		try {
 			// No language hint: the backend's learner default covers
@@ -2779,7 +2732,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			failAttach(friendlyOcrError(error instanceof Error ? error.message : String(error)));
 		} finally {
 			ocrBusyId = null;
-			editor?.refreshMarkers();
 		}
 	}
 
@@ -4910,7 +4862,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				enterScrollMode();
 			},
 			onImagePaste: onInlineImagePasted,
-			markerModels: editMarkerModels,
 			onDocChange: (text) => {
 				// Tag → attachment half of two-way removal, mirrored
 				// from the composer: deleting tags by hand drops the
@@ -5451,22 +5402,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		return `${day} ${time}`;
 	}
 
-	/**
-	 * Popup view models for the in-place link widgets (info-only: the
-	 * edit flow never had OCR).
-	 */
-	function editMarkerModels(): MarkerModel[] {
-		return editingAttachments.map((att) => ({
-			id: att.id,
-			kind: att.kind,
-			name: att.name,
-			tokens: att.tokens,
-			dataUrl: att.kind === "image" ? att.dataUrl : null,
-			excerpt: att.kind === "text" && att.text !== null ? fileExcerpt(att.text) : "",
-			busy: false
-		}));
-	}
-
 	function promptOptions(): PromptEditorOptions {
 		return {
 			onSubmit,
@@ -5475,8 +5410,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				enterScrollMode();
 			},
 			onImagePaste: onImagePasted,
-			markerModels: composerMarkerModels,
-			onMarkerAction: onComposerMarkerAction,
 			onDocChange: (text) => {
 				hasText = text.trim().length > 0;
 				// Tag → attachment half of two-way removal: the user
@@ -5490,6 +5423,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					let kept = dropNewestAttachments(attachments, "image", prevMarkerCount - imagesNow);
 					kept = dropNewestAttachments(kept, "text", prevFileMarkerCount - filesNow);
 					attachments = kept;
+					if (previewId && !attachments.some((a) => a.id === previewId)) {
+						previewId = null;
+					}
 					// Attachment-scoped errors die with the attachment —
 					// otherwise the red line dangles over the next draft
 					// with nothing left to explain.
@@ -8932,8 +8868,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				{@const sentRefs = annRefsFor(msg.content)}
 				{@const refsOnly = sentRefs ? sentRefs.text.trim() === "" : false}
 				{@const isFolded = foldedIds.has(msg.id)}
-				{@const tagBase = (sentRefs ? (refsOnly && !isFolded ? REFS_ONLY_BODY : sentRefs.text) : null) ?? msg.content}
-				{@const tagLeftovers = msg.attachments ? leftoverAttachments(msg.attachments, tagBase) : []}
 				{@const script = detectScript(sentRefs ? sentRefs.text : msg.content)}
 				{@const aidId = script ? MODEL_AID_FOR_SCRIPT[script] : null}
 				{@const localKinds = offeredLocalAids(sentRefs ? sentRefs.text : msg.content, activeReplyCode)}
@@ -8957,11 +8891,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					data-actions-open={shownActionsId === msg.id}
 					onclick={(e) => {
 						if (e.altKey) toggleFold(msg.id);
-						// Sent-tag clicks are a no-op (their popup buttons
-						// delegate inside MessageBody first): the actions
-						// row stays shut, like the composer links.
-						const target = e.target instanceof Element ? e.target : null;
-						if (target?.closest(".sent-tag")) return;
 						toggleMessageActions(msg.id, e);
 					}}
 					onmouseenter={() => {
@@ -8970,51 +8899,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					}}
 					onmouseleave={(event) => onArticleLeave(event, msg, i)}
 				>
-					{#if tagLeftovers.length > 0}
-					<!-- Sent-message attachment tags: leftovers with no
-					literal left in the message text (send strips tags, so
-					fresh turns pair nothing here — history pairs its
-					literals inline instead, and each attachment shows
-					exactly once). Above the message; hovering previews
-					the composer card, and clicks stop at the tag so the
-					message actions stay shut. A long turn scrolls sideways
-					in place (about three tags at a time) instead of
-					stretching. -->
-					<div class="sent-tags">
-						{#each tagLeftovers as att (att.id)}
-							<span class="sent-tag" onclick={(e) => e.stopPropagation()}>
-								{att.kind === "image" ? IMAGE_MARKER : FILE_MARKER}
-								<span class="sent-preview" aria-hidden="true">
-									{#if att.kind === "image" && att.dataUrl}
-										<img class="sent-img" src={att.dataUrl} alt="" />
-									{:else if att.kind === "text" && att.text !== null}
-										<span class="sent-excerpt">{fileExcerpt(att.text)}</span>
-									{/if}
-									<span class="sent-meta">{att.name} · ≈{att.tokens} tokens</span>
-									<span class="sent-actions">
-										<button
-											type="button"
-											class="sent-btn"
-											aria-label="Copy attachment"
-											title="Copy attachment"
-											onclick={() => copyAttachment(att)}
-										>
-											Copy
-										</button>
-										{#if att.kind === "image" && att.dataUrl}
-											<button
-												type="button"
-												class="sent-btn"
-												aria-label="Recognize text in image"
-												title="Recognize text in image"
-												disabled={ocrBusyId === att.id}
-												onclick={() => void recognizeAttachment(att)}
-											>
-												{ocrBusyId === att.id ? "…" : "OCR"}
-											</button>
-										{/if}
-									</span>
-								</span>
+					{#if msg.attachments && msg.attachments.length > 0}
+					<!-- Sent-message attachment chips: above the message
+					and before (left of) the annotation marker, so files
+					sent with the turn read as its head, not its tail. -->
+					<div class="sent-files">
+						{#each msg.attachments as att (att.id)}
+							<span class="sent-chip" title="{att.name} · ~{att.tokens} tokens">
+								<ActionIcon kind="attach" /> {att.name}
 							</span>
 						{/each}
 					</div>
@@ -9149,9 +9041,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							onBadgeClick={openBadgeClick}
 							onToast={flashToast}
 							onFoldToggle={(index: number) => togglePasteFold(msg, index)}
-							onAttachAction={(action: "copy" | "ocr", id: string) =>
-								sentTagAction(msg, action, id)
-							}
 						onUnfold={() => toggleFold(msg.id)}
 							textOverride={aidedTextFor(msg)}
 							contentOverride={sentRefs ? (refsOnly && !isFolded ? REFS_ONLY_BODY : sentRefs.text) : null}
@@ -9374,12 +9263,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			</p>
 		{/if}
 
-		<!-- Pills survive on Android only: the plain-textarea composer
-		cannot host marker popups, so the tray stays its attachment UI
-		(remove/OCR/copy/preview). Everywhere else attachments read as
-		links in the draft with hover-preview popups — no strip, no
-		occlusion, nothing lingering after delete. -->
-		{#if androidUI && attachments.length > 0}
+		{#if attachments.length > 0 || notices.inline.message}
 			<ul class="attachments" class:composer-idle={promptIdle}>
 				{#each attachments as att (att.id)}
 					<li class:card={att.kind === "image" && !!att.dataUrl}>
@@ -9442,22 +9326,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					{/if}
 				{/each}
 			{/if}
-		{/if}
-		{#if notices.inline.message && !androidUI}
-			<p class="error attach-error" class:composer-idle={promptIdle} role="alert">{notices.inline.message}</p>
-		{/if}
-		{#if !androidUI && attachments.some((a) => a.kind === "image" && a.dataUrl)}
-			<!-- Desktop image cards above the prompt: the persistent
-			preview — thumbnail only, no pill chrome (Copy/OCR live in
-			the tag's hover popup; deleting the tag drops the card).
-			Rides the prompt's idle-hide; clicks land nowhere. -->
-			<div class="composer-shots" class:composer-idle={promptIdle}>
-				{#each attachments.filter((a) => a.kind === "image") as att (att.id)}
-					{#if att.dataUrl}
-						<img class="composer-shot" src={att.dataUrl} alt={att.name} />
-					{/if}
-				{/each}
-			</div>
+			{#if notices.inline.message && !androidUI}
+				<p class="error attach-error" class:composer-idle={promptIdle} role="alert">{notices.inline.message}</p>
+			{/if}
 		{/if}
 
 		<input
@@ -12524,81 +12395,33 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	main.alt article * {
 		cursor: pointer;
 	}
-	/* Sent-message attachment tags: marker text as links in a
-	sideways-scrolling row (about three tags at a time) — long turns
-	scroll in place instead of stretching. The hover card mirrors the
-	composer popup token for token, so history previews read exactly
-	like the draft did. */
-	.sent-tags {
+	.sent-files {
 		display: flex;
-		gap: 0.35rem 0.6rem;
-		overflow-x: auto;
+		flex-wrap: wrap;
+		gap: 0.4rem;
 		margin-bottom: 0.35rem;
-		padding-bottom: 0.15rem;
-	}
-	.sent-tag {
-		position: relative;
-		flex: none;
-		text-decoration: underline;
-		cursor: default;
-	}
-	.sent-preview {
-		display: none;
-		position: absolute;
-		top: 100%;
-		left: 0;
-		z-index: 30;
-		margin-top: 0.25rem;
-		padding: 0.5rem;
-		max-width: 16rem;
-		background: #fff;
-		background: var(--bg-raised);
-		border: 1px solid #c7c7cc;
-		border-color: var(--line);
-		border-radius: 8px;
-	}
-	.sent-tag:hover .sent-preview {
-		display: block;
-	}
-	.sent-img {
-		display: block;
-		max-width: 14rem;
-		max-height: 10rem;
-		border-radius: 6px;
-	}
-	.sent-excerpt {
-		display: block;
-		max-height: 8rem;
-		overflow: auto;
-		white-space: pre-wrap;
 		font-size: 0.75rem;
-		color: #1c1c1e;
-		color: var(--ink);
-	}
-	.sent-meta {
-		display: block;
-		margin-top: 0.3rem;
-		font-size: 0.72rem;
 		color: #6e6e73;
 		color: var(--muted);
+	}
+	/* Attachment chips: icon + name in a quiet pill (no emoji — the
+	attach glyph matches the composer's icon-only treatment). */
+	.sent-chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+		border: 1px solid #c7c7cc;
+		border-color: var(--line);
+		border-radius: 999px;
+		padding: 0.15rem 0.6rem;
+		max-width: 100%;
+		overflow: hidden;
+		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
-	.sent-actions {
-		display: flex;
-		gap: 0.4rem;
-		margin-top: 0.3rem;
-	}
-	.sent-btn {
-		border: 0;
-		background: none;
-		padding: 0.15rem 0.3rem;
-		font-size: 0.72rem;
-		font-weight: 700;
-		letter-spacing: 0.04em;
-		color: #1c1c1e;
-		color: var(--ink);
-		cursor: pointer;
-		text-decoration: underline;
+	.sent-chip :global(.action-glyph) {
+		height: 0.85em;
+		flex-shrink: 0;
 	}
 	/* Sent-message annotation refs: the baked block collapses to the
 	count (like the composer pill); hover or Tab reveals the saved
@@ -12984,27 +12807,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		max-width: 16rem;
 		max-height: 12rem;
 		margin: 0.4rem 1.2rem 0;
-		border-radius: 8px;
-		border: 1px solid #c7c7cc;
-		border-color: var(--line);
-	}
-	/* Desktop image cards: the persistent preview above the prompt.
-	Same card language as the old preview (radius, line border), one
-	scrolling row when many — never pills, never an overlay. */
-	.composer-shots {
-		display: flex;
-		gap: 0.5rem;
-		margin: 0.4rem 1.2rem 0;
-		max-width: calc(100% - 2.4rem);
-		overflow-x: auto;
-		scrollbar-width: thin;
-		box-sizing: border-box;
-	}
-	.composer-shot {
-		display: block;
-		flex: none;
-		max-width: 16rem;
-		max-height: 12rem;
 		border-radius: 8px;
 		border: 1px solid #c7c7cc;
 		border-color: var(--line);
@@ -14354,19 +14156,18 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			visibility 0s;
 	}
 	/* Idle-hide covers the attachment strip too (pills, preview
-	image, desktop cards, error): it rides the same slide/fade as the
-	prompt so no image bubble lingers over the chat, and restores with
-	it on the next input (the class drops together with prompt-idle). */
+	image, error): it rides the same slide/fade as the prompt so no
+	image bubble lingers over the chat, and restores with it on the
+	next input (the class drops together with prompt-idle). */
 	.attachments,
 	.preview,
-	.composer-shots,
 	.attach-error {
 		transition:
 			transform 0.35s ease,
 			opacity 0.35s ease,
 			visibility 0s;
 	}
-	:is(.attachments, .preview, .composer-shots, .attach-error).composer-idle {
+	:is(.attachments, .preview, .attach-error).composer-idle {
 		transform: translateY(calc(100% + 2rem));
 		opacity: 0;
 		visibility: hidden;
@@ -14387,7 +14188,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		.app:not([data-android]) .prompt-tools,
 		.attachments,
 		.preview,
-		.composer-shots,
 		.attach-error {
 			transition: none;
 		}
@@ -14796,7 +14596,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 	/* tool-icon hovers ride --ink now. */
 	/* .error-banner rides --error-bg/--error-ink now: no dark override needed. */
-	/* sent-meta rides --muted; attachment pills ride --hl now.
+	/* sent-files/tok ride --muted; attachment pills ride --hl now.
 	The pill × keeps its rule: light --focus against dark --ink. */
 	:global(html[data-theme="dark"]) .attachments button {
 		color: #f2f2f7;

@@ -52,7 +52,7 @@ function longThread() {
 	}));
 }
 
-test("idle-hide takes the attachment link with the prompt", async ({ page }) => {
+test("idle-hide takes the attachment strip with the prompt", async ({ page }) => {
 	// Reseed: a long thread (overflow) plus a 2s idle timeout, then reload.
 	await page.addInitScript((msgs) => {
 		window.localStorage.setItem(
@@ -68,8 +68,7 @@ test("idle-hide takes the attachment link with the prompt", async ({ page }) => 
 	await expect(page.locator("article.assistant .rendered").first()).toBeVisible({
 		timeout: 60_000
 	});
-	// A dropped file lands as an attachment link in the draft (no
-	// tray on desktop).
+	// A dropped file lands as an attachment pill above the composer.
 	await page.evaluate(() => {
 		const transfer = new DataTransfer();
 		transfer.items.add(new File(["# hello"], "notes.md", { type: "text/markdown" }));
@@ -79,27 +78,23 @@ test("idle-hide takes the attachment link with the prompt", async ({ page }) => 
 			new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: transfer })
 		);
 	});
-	const marker = page.locator(".cm-attach-marker").first();
-	await expect(marker).toContainText("[Pasted Attachment]", { timeout: 15_000 });
-	// An image alongside: its card rides above the prompt.
-	await dropImage(page);
-	const shots = page.locator(".composer-shots");
-	await expect(shots.locator("img.composer-shot")).toHaveCount(1, { timeout: 15_000 });
+	await expect(page.locator(".attachments .name")).toHaveText("notes.md", {
+		timeout: 15_000
+	});
 	const prompt = page.locator(".prompt");
-	// No input for 2s (+ticker): the prompt slides away with the link
-	// inside it and the card with it — no attachment lingers over
-	// the chat.
+	const strip = page.locator(".attachments");
+	// No input for 2s (+ticker): the prompt slides away and the image
+	// bubble goes with it — no pill lingers over the chat.
 	await expect(prompt).toHaveClass(/prompt-idle/, { timeout: 15_000 });
-	await expect(prompt).toHaveCSS("opacity", "0");
-	await expect(shots).toHaveCSS("opacity", "0");
-	// A summon key restores everything together (pointer travel alone
-	// only re-arms the timer, never restores).
+	await expect(strip).toHaveClass(/composer-idle/);
+	await expect(strip).toHaveCSS("opacity", "0");
+	// A summon key restores both together (pointer travel alone only
+	// re-arms the timer, never restores).
 	await page.mouse.move(400, 200);
 	await expect(prompt).toHaveClass(/prompt-idle/);
 	await page.keyboard.press("i");
 	await expect(prompt).not.toHaveClass(/prompt-idle/, { timeout: 5_000 });
-	await expect(marker).toBeVisible({ timeout: 5_000 });
-	await expect(shots).toHaveCSS("opacity", "1", { timeout: 5_000 });
+	await expect(strip).not.toHaveClass(/composer-idle/, { timeout: 5_000 });
 });
 
 test("empty chat never idle-hides the composer", async ({ page }) => {
@@ -204,165 +199,22 @@ async function dropImage(page: Page): Promise<void> {
 	});
 }
 
-test("send clears tags and files tag links above the message", async ({ page }) => {
+test("send clears pills and files a chip above the message", async ({ page }) => {
 	await dropImage(page);
-	const marker = page.locator(".cm-attach-marker").first();
-	await expect(marker).toBeVisible({ timeout: 15_000 });
+	const card = page.locator(".attachments li.card");
+	await expect(card).toBeVisible({ timeout: 15_000 });
 	// Down to the tag's fresh line below (the click can land mid-tag,
-	// and typing on the tag line would absorb it and drop the marker),
+	// and typing on the tag line would absorb it and drop the pill),
 	// then send through the mock provider.
 	await page.locator(".cm-content").first().click();
 	await page.keyboard.press("ArrowDown");
 	await page.keyboard.type("hello");
 	await page.keyboard.press("Enter");
-	// No pill tray on desktop with the prompt at send time…
+	// Pills empty with the prompt at send time…
 	await expect(page.locator(".attachments")).toHaveCount(0);
-	// …and the sent turn carries the marker text as a link above its
-	// text, with the same hover preview as the composer.
-	const tag = page.locator("article.user .sent-tag").last();
-	await expect(tag).toContainText("[Pasted image]", { timeout: 30_000 });
-	await tag.hover();
-	const preview = page.locator("article.user .sent-preview").last();
-	await expect(preview).toBeVisible();
-	await expect(preview.locator(".sent-img")).toBeVisible();
-	await expect(preview.locator(".sent-meta")).toContainText("blue.png");
-	// Clicking the tag is a no-op: the message actions stay shut.
-	await tag.click();
-	await expect(page.locator("article.user").last()).toHaveAttribute("data-actions-open", "false");
-});
-
-test("sent turns with many attachments scroll their tags", async ({ page }) => {
-	// History rebuilds tags from the attachments (send strips the
-	// literals): fourteen files ride one turn, far more than fit, so
-	// the strip scrolls sideways instead of stretching the message.
-	const pixel =
-		"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
-	const attachments = Array.from({ length: 14 }, (_, n) =>
-		n % 2 === 0
-			? {
-					id: `e2e-img-${n}`,
-					name: `shot-${n}.png`,
-					mime: "image/png",
-					kind: "image",
-					dataUrl: pixel,
-					text: null,
-					width: 1,
-					height: 1,
-					tokens: 85
-				}
-			: {
-					id: `e2e-file-${n}`,
-					name: `notes-${n}.md`,
-					mime: "text/markdown",
-					kind: "text",
-					dataUrl: null,
-					text: `# notes ${n}`,
-					width: null,
-					height: null,
-					tokens: 8
-				}
-	);
-	await page.addInitScript((atts) => {
-		window.localStorage.setItem(
-			"ccez-llm-chats-v1",
-			JSON.stringify([
-				{
-					id: "e2e-chat",
-					createdAt: 1,
-					replyLang: null,
-					messages: [
-						{
-							id: "e2e-m0",
-							role: "user",
-							content: "many files",
-							usage: null,
-							error: null,
-							attachments: atts
-						},
-						{ id: "e2e-m1", role: "assistant", content: "got them", usage: null, error: null }
-					]
-				}
-			])
-		);
-	}, attachments);
-	await page.reload();
-	const strip = page.locator("article.user .sent-tags").first();
-	await expect(strip).toBeVisible({ timeout: 60_000 });
-	const tags = page.locator("article.user .sent-tag");
-	await expect(tags).toHaveCount(14);
-	await expect(tags.first()).toContainText("[Pasted image]");
-	await expect(tags.nth(1)).toContainText("[Pasted Attachment]");
-	// Image tags preview thumbnails, file tags preview excerpts.
-	await tags.first().hover();
-	await expect(page.locator("article.user .sent-preview .sent-img").first()).toBeVisible();
-	await tags.nth(1).hover();
-	await expect(page.locator("article.user .sent-preview .sent-excerpt").first()).toContainText(
-		"# notes 1"
-	);
-	// The strip scrolls: content wider than its box.
-	const overflow = await strip.evaluate((el) => el.scrollWidth - el.clientWidth);
-	expect(overflow).toBeGreaterThan(0);
-});
-
-test("a stored literal renders inline with no strip duplicate", async ({ page }) => {
-	// Turns stored before send-time stripping keep the literal in
-	// their text: it rebuilds as a link in place, paired against the
-	// attachment, and the strip above stays empty — each file shows
-	// exactly once.
-	const pixel =
-		"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
-	await page.addInitScript((url) => {
-		window.localStorage.setItem(
-			"ccez-llm-chats-v1",
-			JSON.stringify([
-				{
-					id: "e2e-chat",
-					createdAt: 1,
-					replyLang: null,
-					messages: [
-						{
-							id: "e2e-m0",
-							role: "user",
-							content: "[Pasted image] what do you see here?",
-							usage: null,
-							error: null,
-							attachments: [
-								{
-									id: "e2e-img-0",
-									name: "shot.png",
-									mime: "image/png",
-									kind: "image",
-									dataUrl: url,
-									text: null,
-									width: 1,
-									height: 1,
-									tokens: 85
-								}
-							]
-						},
-						{ id: "e2e-m1", role: "assistant", content: "a picture", usage: null, error: null }
-					]
-				}
-			])
-		);
-	}, pixel);
-	await page.reload();
-	const body = page.locator("article.user .rendered").first();
-	await expect(body).toBeVisible({ timeout: 60_000 });
-	// One tag, inline where typed — and no strip above it.
-	await expect(page.locator("article.user .sent-tag")).toHaveCount(1);
-	await expect(page.locator("article.user .sent-tags")).toHaveCount(0);
-	await expect(body).toContainText("what do you see here?");
-	// Hovering the inline tag previews the image with its meta.
-	const tag = page.locator("article.user .sent-tag").first();
-	await tag.hover();
-	const preview = page.locator("article.user .sent-preview").first();
-	await expect(preview).toBeVisible();
-	await expect(preview.locator(".sent-img")).toBeVisible();
-	await expect(preview.locator(".sent-meta")).toContainText("shot.png");
-	// Clicking it is a no-op: the message actions stay shut.
-	await tag.click();
-	await expect(page.locator("article.user").last()).toHaveAttribute("data-actions-open", "false");
+	// …and the sent turn carries an attachment chip above its text.
+	const chip = page.locator(".sent-chip").last();
+	await expect(chip).toContainText("blue.png", { timeout: 30_000 });
 });
 
 test("popup touches the badge and clear-all lives inside it", async ({ page }) => {

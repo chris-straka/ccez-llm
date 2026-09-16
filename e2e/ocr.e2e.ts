@@ -18,24 +18,20 @@ test.beforeEach(async ({ page }) => {
 
 test("image attachments offer text recognition", async ({ page }) => {
 	await page.locator('input[type="file"]').setInputFiles("e2e/fixtures/attach.bmp");
-	const marker = page.locator(".cm-attach-marker").first();
-	await expect(marker).toBeVisible({ timeout: 10_000 });
-	await marker.hover();
-	await expect(
-		page.locator('.cm-attach-preview button[aria-label="Recognize text in image"]').first()
-	).toBeVisible();
+	const item = page.locator(".attachments li").first();
+	await expect(item).toBeVisible({ timeout: 10_000 });
+	await expect(item.locator('button[aria-label="Recognize text in image"]')).toBeVisible();
 });
 
 test("recognition degrades cleanly without the Mac shell", async ({ page }) => {
 	await page.locator('input[type="file"]').setInputFiles("e2e/fixtures/attach.bmp");
-	const marker = page.locator(".cm-attach-marker").first();
-	await expect(marker).toBeVisible({ timeout: 10_000 });
-	await marker.hover();
-	const ocr = page.locator('.cm-attach-preview button[aria-label="Recognize text in image"]').first();
+	const item = page.locator(".attachments li").first();
+	await expect(item).toBeVisible({ timeout: 10_000 });
+	const ocr = item.locator('button[aria-label="Recognize text in image"]');
 	await ocr.click();
 	// No shell here: the bridge rejects, the friendly error renders in
-	// the inline slot under the composer, and the button re-enables —
-	// no stuck busy state, no throw into teardown.
+	// the attachments block, and the button re-enables — no stuck
+	// busy state, no throw into teardown.
 	await expect(page.locator('p.error[role="alert"]')).toBeVisible({ timeout: 10_000 });
 	await expect(ocr).toBeEnabled({ timeout: 10_000 });
 });

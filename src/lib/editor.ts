@@ -22,11 +22,6 @@ import {
 	type PasteSpan
 } from "./editorPaste";
 import { fenceWidgets, runFenceShiftEnter } from "./editorFences";
-import {
-	attachmentMarkers,
-	type MarkerAction,
-	type MarkerModel
-} from "./editorImageMarkers";
 import { codeLanguages, appTheme } from "./editorTheme";
 import { shouldDeferForComposition } from "./editContext";
 
@@ -40,13 +35,6 @@ export {
 	type PasteSpan,
 	type SendFold
 } from "./editorPaste";
-
-export {
-	markerPlacements,
-	placeMarkers,
-	type MarkerAction,
-	type MarkerModel
-} from "./editorImageMarkers";
 
 export type SubmitKind = "send" | "stage";
 
@@ -81,8 +69,6 @@ export interface PromptEditor {
 	setPlaceholder(text: string): void;
 	/** Re-run layout measurement (stale caches after occlusion/DPR change). */
 	remeasure(): void;
-	/** Rebuild marker widgets without a document change (host-side state). */
-	refreshMarkers(): void;
 	destroy(): void;
 }
 
@@ -95,17 +81,6 @@ export interface PromptEditorOptions {
 	onImagePaste?: (file: File) => void;
 	/** Document text changed (drives the submit button's faded state). */
 	onDocChange?: (text: string) => void;
-	/**
-	 * Attachments backing `[Pasted image]` / `[Pasted Attachment]` link
-	 * widgets (hover preview popups). The Nth tag of a kind pairs with
-	 * the Nth model of that kind.
-	 */
-	markerModels?: () => MarkerModel[];
-	/**
-	 * Popup Copy/OCR clicks, by attachment id. Absent, popups render
-	 * info-only (the in-place editor never had OCR).
-	 */
-	onMarkerAction?: (action: MarkerAction, id: string) => void;
 }
 
 export function createPromptEditor(
@@ -170,7 +145,6 @@ export function createPromptEditor(
 			fenceWidgets(),
 			pastePlaceholders(),
 			pasteHandling(options.onImagePaste),
-			attachmentMarkers(options.markerModels ?? (() => []), options.onMarkerAction),
 			appTheme,
 			EditorView.lineWrapping
 		]
@@ -216,9 +190,6 @@ export function createPromptEditor(
 		},
 		remeasure: () => {
 			view.requestMeasure();
-		},
-		refreshMarkers: () => {
-			view.dispatch({});
 		},
 		destroy() {
 			view.destroy();

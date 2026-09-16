@@ -384,29 +384,23 @@ for (const t of THEMES) {
 		await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
 		const L = t.name === "light";
 		const muted = L ? "rgb(110, 110, 115)" : "rgb(152, 152, 159)";
+		const hl = L ? "rgb(238, 244, 255)" : "rgb(18, 35, 61)";
 		await page.locator('input[type="file"]').setInputFiles("e2e/fixtures/attach.bmp");
-		const marker = page.locator(".cm-attach-marker").first();
-		await expect(marker).toBeVisible({ timeout: 10_000 });
-		await expect(marker).toHaveCSS("text-decoration-line", "underline");
-		await marker.hover();
-		const preview = page.locator(".cm-attach-preview").first();
-		await expect(preview).toBeVisible({ timeout: 10_000 });
-		await expect(preview).toHaveCSS(
-			"background-color",
-			L ? "rgb(255, 255, 255)" : "rgb(28, 28, 30)"
-		);
-		await expect(preview).toHaveCSS(
+		const item = page.locator(".attachments li").first();
+		await expect(item).toBeVisible({ timeout: 10_000 });
+		await expect(item).toHaveCSS("background-color", hl);
+		await expect(item.locator(".tok")).toHaveCSS("color", muted);
+		await item.locator(".thumb").click();
+		await expect(page.locator(".preview")).toHaveCSS(
 			"border-color",
 			L ? "rgb(199, 199, 204)" : "rgb(72, 72, 74)"
 		);
-		await expect(preview.locator(".cm-attach-meta")).toHaveCSS("color", muted);
 		await page.locator(".cm-content").click();
 		await page.keyboard.type("file attached");
 		await page.keyboard.press("Enter");
-		const tags = page.locator(".sent-tags").first();
-		await expect(tags).toBeVisible({ timeout: 30_000 });
-		await expect(tags.locator(".sent-tag").first()).toContainText("[Pasted image]");
-		await expect(tags.locator(".sent-meta").first()).toHaveCSS("color", muted);
+		const sent = page.locator(".sent-files").first();
+		await expect(sent).toBeVisible({ timeout: 30_000 });
+		await expect(sent).toHaveCSS("color", muted);
 	});
 
 	// No failed-send test: without the mock the dev backend still

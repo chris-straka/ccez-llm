@@ -50,8 +50,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("composer accepts dropped files into the attachments path", async ({ page }) => {
-	// A .md drop lands as a [Pasted Attachment] link in the draft (no
-	// pill tray on desktop); its popup names the file.
+	// A .md drop lands as a text attachment pill under the composer.
 	// The event is dispatched in-page: DataTransfer is not serializable
 	// across the protocol, so dispatchEvent cannot carry it.
 	await page.evaluate(() => {
@@ -63,12 +62,9 @@ test("composer accepts dropped files into the attachments path", async ({ page }
 			new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: transfer })
 		);
 	});
-	const marker = page.locator(".cm-attach-marker").first();
-	await expect(marker).toContainText("[Pasted Attachment]", { timeout: 15_000 });
-	await marker.hover();
-	await expect(page.locator(".cm-attach-preview .cm-attach-meta").first()).toContainText(
-		"notes.md"
-	);
+	await expect(page.locator(".attachments .name")).toHaveText("notes.md", {
+		timeout: 15_000
+	});
 });
 
 test("sidebar row export button downloads the chat as markdown", async ({ page }) => {
@@ -87,26 +83,18 @@ test("sidebar row export button downloads the chat as markdown", async ({ page }
 	expect(path).toBeTruthy();
 });
 
-test("dropped images land as links with a hover preview", async ({ page }) => {
+test("dropped images land as cards with a [Pasted image] tag", async ({ page }) => {
 	await dropImage(page);
-	const marker = page.locator(".cm-attach-marker").first();
-	await expect(marker).toBeVisible({ timeout: 15_000 });
-	await expect(marker).toContainText("[Pasted image]");
-	// Hover reveals the preview: thumbnail, file meta, and Copy/OCR.
-	await marker.hover();
-	const preview = page.locator(".cm-attach-preview").first();
-	await expect(preview).toBeVisible();
-	await expect(preview.locator(".cm-attach-img")).toBeVisible();
-	await expect(preview.locator(".cm-attach-meta")).toContainText("blue.png");
-	await expect(preview.locator('button[aria-label="Copy attachment"]')).toBeVisible();
-	await expect(preview.locator('button[aria-label="Recognize text in image"]')).toBeVisible();
-	// Clicking the link itself is a no-op: the tag stays, the draft
-	// keeps its text, and nothing navigates.
-	const url = page.url();
-	await marker.click();
-	await expect(page.locator(".cm-attach-marker")).toHaveCount(1);
+	const card = page.locator(".attachments li.card");
+	await expect(card).toBeVisible({ timeout: 15_000 });
+	await expect(card.locator(".thumb img")).toBeVisible();
+	await expect(card.locator(".tok")).toBeVisible();
+	await expect(card.locator('button[aria-label="Copy attachment"] svg')).toHaveCount(1);
+	await expect(
+		card.locator('button[aria-label="Remove attachment"] svg')
+	).toHaveCount(1);
+	// The tag stays on the current line with one trailing space.
 	await expect(page.locator(".cm-content")).toContainText("[Pasted image]");
-	expect(page.url()).toBe(url);
 });
 
 test("pasted tag leaves the caret after its space, same line", async ({ page }) => {
@@ -115,87 +103,84 @@ test("pasted tag leaves the caret after its space, same line", async ({ page }) 
 	await expect(content).toContainText("[Pasted image]", { timeout: 15_000 });
 	// End takes the caret to the tag line's end, then type: the word
 	// must land beside the tag (old own-line placement parked the
-	// caret below, so typing opened a second line). The marker's
-	// popup contributes its own text nodes, so same-line reads off
-	// the rendered line, not the whole editor text.
+	// caret below, so typing opened a second line).
 	await content.click();
 	await page.keyboard.press("End");
 	await page.keyboard.type("hi");
+	await expect(content).toHaveText("[Pasted image] hi");
+});
+
+test("removing the pill collapses the strip and clears its error", async ({ page }) => {
+	await dropImage(page);
+	const card = page.locator(".attachments li.card");
+	await expect(card).toBeVisible({ timeout: 15_000 });
+	// No bridge in the preview: OCR fails into the inline slot.
+	await card.locator('button[aria-label="Recognize text in image"]').click();
+	await expect(page.locator(".attach-error")).toBeVisible({ timeout: 15_000 });
+	// The X takes the pill, its tag, the strip, and the stale error —
+	// nothing lingers over the next draft.
+	await card.locator('button[aria-label="Remove attachment"]').click();
+	await expect(page.locator(".attachments")).toHaveCount(0);
+	await expect(page.locator(".attach-error")).toHaveCount(0);
+});
+
+test("attachment strip never covers message text", async ({ page }) => {
+	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(40);
+	const turns = [0, 1, 2].flatMap((n) => [
+		{ role: "user" as const, content: `question ${n} ${long}` },
+		{ role: "assistant" as const, content: `answer ${n} ${long}` }
+	]);
+	await seedChat(page, turns);
+	await page.goto("/");
+	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
+	await dropImage(page);
+	const strip = page.locator(".attachments");
+	await expect(strip).toBeVisible({ timeout: 15_000 });
+	// Worst case: scrolled to the very bottom with the strip open (and
+	// the tall preview too) — the last article still ends above it.
+	await page.locator(".attachments .thumb").click();
+	await expect(page.locator("img.preview")).toBeVisible();
+	// Instant (not the eased smooth scroll): measure only once the
+	// scroller has settled at the bottom.
+	await page.evaluate(() => {
+		document.querySelector(".messages")?.scrollTo({ top: 1e9, behavior: "instant" });
+	});
 	await expect
 		.poll(() =>
-			content.evaluate((el) => {
-				const line = el.querySelector(".cm-attach-marker")?.closest(".cm-line");
-				return !!line && (line.textContent ?? "").endsWith("hi");
+			page.evaluate(() => {
+				const box = document.querySelector(".messages");
+				return box ? box.scrollHeight - box.scrollTop - box.clientHeight : 99;
 			})
 		)
-		.toBe(true);
+		.toBeLessThanOrEqual(1);
+	const stripBox = await strip.boundingBox();
+	const lastBox = await page.locator("article").last().boundingBox();
+	if (!stripBox || !lastBox) throw new Error("missing boxes");
+	expect(stripBox.y).toBeGreaterThanOrEqual(lastBox.y + lastBox.height - 1);
 });
 
-test("failed OCR surfaces inline, tag deletion clears it", async ({ page }) => {
+test("image pill and tag remove each other", async ({ page }) => {
 	await dropImage(page);
-	const marker = page.locator(".cm-attach-marker").first();
-	await expect(marker).toBeVisible({ timeout: 15_000 });
-	// No bridge in the preview: OCR fails into the inline slot under
-	// the composer.
-	await marker.hover();
-	await page
-		.locator('.cm-attach-preview button[aria-label="Recognize text in image"]')
-		.first()
-		.click();
-	await expect(page.locator(".attach-error")).toBeVisible({ timeout: 15_000 });
-	// Deleting the tag drops the marker and the stale error with it —
-	// nothing lingers over the next draft.
+	const card = page.locator(".attachments li.card");
+	await expect(card).toBeVisible({ timeout: 15_000 });
+	// Pill → tag: the pill's X takes the marker line with it.
+	await page.locator('.attachments button[aria-label="Remove attachment"]').click();
+	await expect(card).toHaveCount(0);
+	await expect(page.locator(".cm-content")).not.toContainText("[Pasted image]");
+});
+
+test("deleting the tag drops the pill", async ({ page }) => {
+	await dropImage(page);
+	const card = page.locator(".attachments li.card");
+	await expect(card).toBeVisible({ timeout: 15_000 });
+	// Tag → pill: replacing the whole draft (markers included) drops
+	// the image attachment, like hand-deleting the tag. Meta+A: the
+	// macOS select-all — Control+A only jumps to the line start in
+	// the editor, so typing would prepend instead of replacing.
 	await page.locator(".cm-content").click();
 	await page.keyboard.press("Meta+a");
 	await page.keyboard.type("hello");
-	await expect(page.locator(".cm-attach-marker")).toHaveCount(0);
-	await expect(page.locator(".attach-error")).toHaveCount(0);
-	await expect(page.locator(".cm-content")).toContainText("hello");
-});
-
-test("composer shows image cards above the prompt", async ({ page }) => {
-	await dropImage(page);
-	// The persistent preview: thumbnail only, no pill chrome — one
-	// card per image, stacked above the prompt, never overlapping it.
-	const shots = page.locator(".composer-shots");
-	await expect(shots).toBeVisible({ timeout: 15_000 });
-	const shot = shots.locator("img.composer-shot").first();
-	await expect(shot).toBeVisible();
-	expect(await shot.getAttribute("src")).toMatch(/^data:image\//);
-	const shotsBox = await shots.boundingBox();
-	const promptBox = await page.locator(".prompt").boundingBox();
-	if (!shotsBox || !promptBox) throw new Error("missing boxes");
-	expect(shotsBox.y + shotsBox.height).toBeLessThanOrEqual(promptBox.y + 1);
-});
-
-test("attachment links never cover message text", async ({ page }) => {
-	await dropImage(page);
-	const marker = page.locator(".cm-attach-marker").first();
-	await expect(marker).toBeVisible({ timeout: 15_000 });
-	// No tray on desktop: the link lives in-flow inside the composer,
-	// so it cannot occlude the thread — it sits within the prompt box.
-	await expect(page.locator(".attachments")).toHaveCount(0);
-	const markerBox = await marker.boundingBox();
-	const promptBox = await page.locator(".prompt").boundingBox();
-	if (!markerBox || !promptBox) throw new Error("missing boxes");
-	expect(markerBox.y).toBeGreaterThanOrEqual(promptBox.y);
-	expect(markerBox.y + markerBox.height).toBeLessThanOrEqual(
-		promptBox.y + promptBox.height + 1
-	);
-});
-
-test("deleting the tag drops the attachment", async ({ page }) => {
-	await dropImage(page);
-	const marker = page.locator(".cm-attach-marker").first();
-	await expect(marker).toBeVisible({ timeout: 15_000 });
-	// Replacing the whole draft (markers included) drops the image
-	// attachment, like hand-deleting the tag. Meta+A: the macOS
-	// select-all — Control+A only jumps to the line start in the
-	// editor, so typing would prepend instead of replacing.
-	await page.locator(".cm-content").click();
-	await page.keyboard.press("Meta+a");
-	await page.keyboard.type("hello");
-	await expect(page.locator(".cm-attach-marker")).toHaveCount(0);
+	await expect(card).toHaveCount(0);
 	await expect(page.locator(".cm-content")).toContainText("hello");
 });
 test("long paste collapses to a tag; Ctrl+O expands and re-collapses", async ({

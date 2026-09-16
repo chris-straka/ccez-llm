@@ -187,8 +187,6 @@ export function createTextareaEditor(
 		},
 		// Nothing cached: there is no stale measurement to settle.
 		remeasure: () => {},
-		// Plain textarea renders no marker widgets; nothing to refresh.
-		refreshMarkers: () => {},
 		destroy() {
 			ta.removeEventListener("input", onInput);
 			ta.removeEventListener("keydown", onKeyDown);
