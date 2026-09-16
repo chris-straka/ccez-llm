@@ -676,6 +676,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	/** Sent-jump flash timer: re-jumps restart it, expiry releases the
 	highlight (self-clearing — no chat-switch hook to forget). */
 	let jumpBlinkTimer: ReturnType<typeof setTimeout> | null = null;
+	/** Sent-row blink: the pressed row flashes like a draft row (same
+	phases), so the press reads even where the highlight wash can't
+	paint. Keyed by message + number, not id — baked refs have none. */
+	let refsBlink: { messageId: ChatMsgId; n: number } | null = $state(null);
+	let refsBlinkTimer: ReturnType<typeof setTimeout> | null = null;
 	/** Own message under in-place edit (null when no edit is open).
 	Enter saves + resends; Alt+Enter saves without resending; Esc cancels. */
 	let editingMsgId: ChatMsgId | null = $state(null);
@@ -3448,12 +3453,35 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * lands on the quoted message with a flash when it still holds the
 	 * quote, or on the sending message when the quote is gone.
 	 */
-	function refsQuoteClick(messageId: ChatMsgId, quote: string): void {
+	function refsQuoteClick(messageId: ChatMsgId, quote: string, n: number): void {
 		// A row edit owns its row: quote taps must not yank the chat
 		// out from under the caret.
 		if (refsEditing) return;
 		if (!window.getSelection()?.isCollapsed) return;
+		blinkRefsRow(messageId, n);
 		gotoSentRef(messageId, quote);
+	}
+
+	/** Flash the pressed sent row twice, then release it (a re-press
+	restarts the schedule; expiry clears itself). Same phases as the
+	draft row blink — see blinkAnnotation. */
+	function blinkRefsRow(messageId: ChatMsgId, n: number): void {
+		if (refsBlinkTimer) clearTimeout(refsBlinkTimer);
+		refsBlinkTimer = null;
+		const key = { messageId, n };
+		refsBlink = key;
+		let phase = 0;
+		const step = (): void => {
+			phase += 1;
+			if (phase >= 4) {
+				refsBlink = null;
+				refsBlinkTimer = null;
+				return;
+			}
+			refsBlink = phase % 2 === 0 ? key : null;
+			refsBlinkTimer = setTimeout(step, phase % 2 === 0 ? 700 : 350);
+		};
+		refsBlinkTimer = setTimeout(step, 700);
 	}
 
 	function gotoSentRef(messageId: ChatMsgId, quote: string): void {
@@ -8756,14 +8784,17 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 									the text itself. The note stays selectable,
 									buttons keep their clicks (see
 									refsQuoteClick), drag-selects stay picks. -->
-									<div class="ann-refs-item">
+									<div
+									class="ann-refs-item"
+									class:blink={refsBlink?.messageId === msg.id && refsBlink?.n === ref.n}
+								>
 										<span class="ann-refs-num">{ref.n}.</span>
 										<span class="ann-refs-body">
 											<button
 												type="button"
 												class="ann-refs-quote"
 												title="Jump to this annotation in the chat"
-												onclick={() => refsQuoteClick(msg.id, ref.quote)}
+												onclick={() => refsQuoteClick(msg.id, ref.quote, ref.n)}
 											>
 												“{ref.quote}”
 											</button>
@@ -12255,6 +12286,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		max-width: 24rem;
 		background: #1c1c1e;
 		color: #f2f2f7;
+		/* Transparent by default so the light theme can paint just
+		the edge without shifting geometry on theme switch. */
+		border: 1px solid transparent;
 		border-radius: 10px;
 		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
 		padding: 0.55rem 0.75rem;
@@ -12298,11 +12332,20 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		display: flex;
 		gap: 0.45rem;
 		padding: 0.2rem 0;
-		/* The whole item jumps on a clean press. */
-		cursor: pointer;
+		/* Default cursor on the row: only the quote points (like the
+		draft card). The row still jumps on a clean press — the quote
+		is the promise, the row keeps the target generous. */
+		cursor: default;
 	}
 	.ann-refs-item + .ann-refs-item {
 		border-top: 1px solid rgba(255, 255, 255, 0.14);
+	}
+	/* Pressed-row blink: same wash as the draft rows, so a sent
+	jump reads even where the highlight wash can't paint. */
+	.ann-refs-item.blink {
+		background: #eef4ff;
+		background: var(--hl);
+		border-radius: 6px;
 	}
 	.ann-refs-num {
 		font-weight: 700;
@@ -12317,10 +12360,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		flex: 1;
 		min-width: 0;
 	}
-	/* The whole item navigates on a clean press (see refsItemClick):
-	unselectable quote with a pointer cursor, so a click reads as a
-	jump and never as a text pick. The quote is one line, cut with
-	an ellipsis — the full text lives at the mark. Notes stay
+	/* Only the quote navigates (see refsQuoteClick): unselectable
+	quote with a pointer cursor, so a click reads as a jump and
+	never as a text pick. The quote is one line, cut with an
+	ellipsis — the full text lives at the mark. Notes stay
 	selectable for copying, on one line that scrolls sideways. */
 	.ann-refs-quote {
 		/* A real button (keyboard reachable), reset to text. */
@@ -12330,6 +12373,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		font: inherit;
 		color: inherit;
 		text-align: left;
+		text-decoration: underline;
+		text-decoration-color: transparent;
+		transition: text-decoration-color 0.15s ease;
 		cursor: pointer;
 		user-select: none;
 		-webkit-user-select: none;
@@ -12338,14 +12384,16 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}
-	/* Same link contract as the composer card's quote. */
+	/* Same link contract as the composer card's quote — including
+	the fading underline (line always drawn, transparent at rest). */
 	.ann-refs-quote:hover {
 		text-decoration: underline;
+		text-decoration-color: currentcolor;
 	}
-	/* Pale grey italic gloss on the quote — this card stays dark in
-	both themes, so the pale grey holds here (the light drafting
-	card's note rides the quiet voice instead, see .review-comment).
-	The row editor below stays roman, like every other field. */
+	/* Italic gloss on the quote: pale grey on the dark card, the
+	quiet voice on light (see the theme block below) — same role as
+	the draft card's note. The row editor below stays roman, like
+	every other field. */
 	.ann-refs-comment {
 		color: #c7c7cc;
 		font-style: italic;
@@ -12426,6 +12474,56 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 	.ann-refs-edit-btn:hover {
 		border-color: #aeaeb2;
+	}
+	/* Light theme: the sent card matches the draft card (panel
+	surface, soft edge, ink text) instead of floating dark. */
+	:global(html[data-theme="light"]) .ann-refs-pop {
+		background: #fafafc;
+		background: var(--panel);
+		color: #1c1c1e;
+		color: var(--ink);
+		border-color: #e5e5ea;
+		border-color: var(--line-soft);
+	}
+	:global(html[data-theme="light"]) .ann-refs-item + .ann-refs-item {
+		border-top-color: #e5e5ea;
+		border-top-color: var(--line-soft);
+	}
+	:global(html[data-theme="light"]) .ann-refs-comment {
+		color: #6e6e73;
+		color: var(--muted);
+	}
+	:global(html[data-theme="light"]) .ann-refs-copy,
+	:global(html[data-theme="light"]) .ann-refs-pencil {
+		color: #6e6e73;
+		color: var(--muted);
+	}
+	:global(html[data-theme="light"]) .ann-refs-copy:hover,
+	:global(html[data-theme="light"]) .ann-refs-pencil:hover {
+		color: #1c1c1e;
+		color: var(--ink);
+	}
+	:global(html[data-theme="light"]) .ann-refs-input {
+		color: #1c1c1e;
+		color: var(--ink);
+		background: #fff;
+		background: var(--field);
+		border-color: #c7c7cc;
+		border-color: var(--line);
+	}
+	:global(html[data-theme="light"]) .ann-refs-input:focus {
+		border-color: #8e8e93;
+		border-color: var(--line-hover);
+	}
+	:global(html[data-theme="light"]) .ann-refs-edit-btn {
+		border-color: #c7c7cc;
+		border-color: var(--line);
+		color: #1c1c1e;
+		color: var(--ink);
+	}
+	:global(html[data-theme="light"]) .ann-refs-edit-btn:hover {
+		border-color: #3a3a3c;
+		border-color: var(--focus);
 	}
 	/* Attachment strip: same 1.2rem column edges as the composer (never
 	a full-bleed row), one scrolling row when many — pills never wrap
@@ -13269,6 +13367,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		flex-shrink: 1;
 		font-size: inherit;
 		color: inherit;
+		/* The underline fades in instead of snapping: the line is
+		always drawn but transparent until hover (color, unlike the
+		line itself, ramps on the icon beat). */
+		text-decoration: underline;
+		text-decoration-color: transparent;
+		transition: text-decoration-color 0.15s ease;
 	}
 	/* The quote navigates, so it links: underline on hover like any
 	jump control. (Icon buttons never underline — a line under a tiny
@@ -13276,6 +13380,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.review-head button.review-quote:hover {
 		color: inherit;
 		text-decoration: underline;
+		text-decoration-color: currentcolor;
 	}
 	/* Hover goes accent-blue instead of going ink: the pencil is small
 	and quiet-gray, so an ink hover read as disappearing. Color only —

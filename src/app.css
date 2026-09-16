@@ -25,6 +25,7 @@ html {
 	rgba everywhere — Chromium leaves color-mix() unresolved. */
 	--accent: #007aff;
 	--accent-ink: #fff;
+	--ok-wash: #e6f4ea;
 	--sel-tint: rgba(0, 122, 255, 0.28);
 	--ok: #1f7a4d;
 	--hl: #eef4ff;
@@ -58,6 +59,7 @@ html[data-theme="light"] {
 	--strong: #1c1c1e;
 	--accent: #007aff;
 	--accent-ink: #fff;
+	--ok-wash: #e6f4ea;
 	--sel-tint: rgba(0, 122, 255, 0.28);
 	--ok: #1f7a4d;
 	--hl: #eef4ff;
@@ -89,6 +91,7 @@ html[data-theme="dark"] {
 	--strong: #aeaeb2;
 	--accent: #0a84ff;
 	--accent-ink: #fff;
+	--ok-wash: #12351f;
 	--sel-tint: rgba(10, 132, 255, 0.4);
 	--ok: #7cc3a3;
 	--hl: #12233d;

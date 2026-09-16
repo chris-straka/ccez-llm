@@ -574,6 +574,7 @@
 		padding: 0.6rem 0.8rem;
 		border-radius: 8px;
 		background: #e6f4ea;
+		background: var(--ok-wash);
 		overflow-wrap: anywhere;
 	}
 	/* Dark theme, gated on the resolved scheme (<html data-theme>)
@@ -665,6 +666,4 @@
 	html[data-theme="dark"] .settings-inner .build-stamp {
 		color: #98989f;
 	}
-	html[data-theme="dark"] .settings-inner .result {
-		background: #12351f;
-	}
+	/* .result rides --ok-wash now: no dark override needed. */

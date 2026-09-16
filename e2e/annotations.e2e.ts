@@ -882,6 +882,79 @@ test("sent-refs quote jumps to the quoted text with a flash", async ({ page }) =
 	expect(after).toBeLessThan(top - 50);
 });
 
+/** The pressed sent row blinks like a draft row (same phases), so the
+jump reads even where the highlight wash can't paint. */
+test("sent-refs quote blinks its row", async ({ page }) => {
+	await seedChat(page, [
+		{ role: "assistant", content: "Kyoto in spring is lovely and bright" },
+		{ role: "user", content: 'explain this\n\nAnnotated selections:\n1. "spring" — ?' }
+	]);
+	await page.goto("/");
+	await expect(page.locator("article .rendered").first()).toBeVisible();
+	await page.locator(".ann-refs-pill").first().click();
+	await page.locator(".ann-refs-quote").first().click();
+	const row = page.locator(".ann-refs-item").first();
+	await expect(row).toHaveClass(/blink/);
+	await expect(row).not.toHaveClass(/blink/, { timeout: 5_000 });
+});
+
+/** Sent rows point only on the quote: number and note read default,
+like the draft card. */
+test("sent-refs rows point only on the quote", async ({ page }) => {
+	await seedChat(page, [
+		{ role: "assistant", content: "Kyoto in spring is lovely and bright" },
+		{ role: "user", content: 'explain this\n\nAnnotated selections:\n1. "spring" — ?' }
+	]);
+	await page.goto("/");
+	await expect(page.locator("article .rendered").first()).toBeVisible();
+	await page.locator(".ann-refs-pill").first().click();
+	const cursors = await page.evaluate(() => {
+		const style = (sel: string) =>
+			getComputedStyle(document.querySelector(sel) as HTMLElement).cursor;
+		return {
+			item: style(".ann-refs-item"),
+			quote: style(".ann-refs-quote"),
+			num: style(".ann-refs-num"),
+			note: style(".ann-refs-comment")
+		};
+	});
+	expect(cursors).toEqual({ item: "default", quote: "pointer", num: "default", note: "default" });
+});
+
+/** The sent card follows the theme: panel surface and quiet note on
+light, dark card and pale note on dark. */
+for (const theme of ["light", "dark"] as const) {
+	test(`sent-refs card themes on ${theme}`, async ({ page }) => {
+		await seedChat(page, [
+			{ role: "assistant", content: "Kyoto in spring is lovely and bright" },
+			{ role: "user", content: 'explain this\n\nAnnotated selections:\n1. "spring" — ?' }
+		]);
+		await page.addInitScript(
+			(name: string) => {
+				const raw = window.localStorage.getItem("ccez-llm-settings-v1") ?? "{}";
+				window.localStorage.setItem(
+					"ccez-llm-settings-v1",
+					JSON.stringify({ ...JSON.parse(raw), theme: name })
+				);
+			},
+			theme
+		);
+		await page.goto("/");
+		await expect(page.locator("article .rendered").first()).toBeVisible();
+		await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+		await page.locator(".ann-refs-pill").first().click();
+		const card = page.locator(".ann-refs-pop").first();
+		await expect(card).toHaveCSS(
+			"background-color",
+			theme === "light" ? "rgb(250, 250, 252)" : "rgb(28, 28, 30)"
+		);
+		await expect(page.locator(".ann-refs-comment").first()).toHaveCSS(
+			"color",
+			theme === "light" ? "rgb(110, 110, 115)" : "rgb(199, 199, 204)"
+		);
+	});
+}
+
 /** A sent quote edited away everywhere falls back to the sending
 message (cleared refs have no badge left to blink). Long messages
 fold, so the landing reads off the scroll call itself, not movement. */

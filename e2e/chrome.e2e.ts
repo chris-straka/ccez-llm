@@ -53,6 +53,35 @@ test("prompt slides away when idle and returns on keys", async ({ page }) => {
 	await expect(prompt).not.toHaveClass(/prompt-idle/, { timeout: 5_000 });
 });
 
+/** Summoning fades the composer back: opacity ramps instead of
+snapping to 1 on the restoring keystroke. */
+test("summoned prompt fades in instead of popping", async ({ page }) => {
+	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(40);
+	const turns = [0, 1, 2, 3, 4, 5].flatMap((n) => [
+		{ role: "user" as const, content: `question ${n} ${long}` },
+		{ role: "assistant" as const, content: `answer ${n} ${long}` }
+	]);
+	await seedChat(page, turns);
+	await page.addInitScript(() => {
+		window.localStorage.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify({ promptIdleSec: 2 })
+		);
+	});
+	await page.goto("/");
+	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	const prompt = page.locator(".prompt");
+	await expect(prompt).toHaveClass(/prompt-idle/, { timeout: 15_000 });
+	const opacity = (): Promise<number> =>
+		prompt.evaluate((el) => parseFloat(getComputedStyle(el).opacity));
+	// The class lands before the hide ramp settles: wait for parked.
+	await expect.poll(opacity, { timeout: 5_000 }).toBe(0);
+	await page.keyboard.press("i");
+	// Mid-ramp: still climbing toward 1, not snapped there.
+	expect(await opacity()).toBeLessThan(0.9);
+	await expect.poll(opacity, { timeout: 5_000 }).toBe(1);
+});
+
 /** Button clicks never summon the hidden prompt (copy, run, fold). */
 test("button clicks leave the hidden prompt alone", async ({ page }) => {
 	await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);

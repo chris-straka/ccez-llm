@@ -28,7 +28,10 @@ const PAIRED = [
 	"ffb4a2",
 	"e0a392",
 	"7a2a1c",
-	"c0362c"
+	"c0362c",
+	"fafafc",
+	"e6f4ea",
+	"12351f"
 ];
 
 /** Lines carrying a paired hex whose next line is not the var() twin. */
@@ -69,7 +72,8 @@ describe("color tokens", () => {
 			"--error-line:",
 			"--alarm:",
 			"--danger:",
-			"--sel-tint:"
+			"--sel-tint:",
+			"--ok-wash:"
 		]) {
 			expect(app).toContain(token);
 		}
@@ -93,7 +97,8 @@ describe("color tokens", () => {
 			"var(--error-ink)",
 			"var(--error-line)",
 			"var(--alarm)",
-			"var(--sel-tint)"
+			"var(--sel-tint)",
+			"var(--ok-wash)"
 		]) {
 			expect(all).toContain(token);
 		}

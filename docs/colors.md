@@ -59,6 +59,7 @@ platforms can't share one vendor's identity. So the palette is
 | `--ink`        | `#1c1c1e`   | `#f2f2f7`   | Body text |
 | `--muted`      | `#6e6e73`   | `#98989f`   | Quiet voice: notes, cancel, icon buttons at rest |
 | `--ok`         | `#1f7a4d`   | `#7cc3a3`   | Success / TTS-active states |
+| `--ok-wash`    | `#e6f4ea`   | `#12351f`   | Success surface (settings result wash) |
 | `--alarm`      | `#ff3b30`   | `#ff6b62`   | Live signals: recording states (popover tools, mic button) |
 | `--danger`     | `#94250a`   | `#e89a90`   | All deletes: Clear-all, per-draft delete, sidebar chat delete. Deeper cut than alarm — small text needs the contrast |
 | `--error-bg`   | `#fdecea`   | `#3d1008`   | Error toast / banner surface |
@@ -97,6 +98,14 @@ platforms can't share one vendor's identity. So the palette is
 
 ## Log
 
+- **2026-09-16 — Overlay + settings pass.** Sent-refs card follows the
+  theme (panel surface, quiet note, ink icons on light; dark untouched),
+  quote underlines fade via `text-decoration-color` on both cards, sent
+  rows point only on the quote, pressed sent rows blink `--hl` like
+  draft rows (the `::highlight` wash is engine-fragile, so the row blink
+  is the guaranteed signal), new `--ok-wash` for the settings result.
+  Summon fade measured working on the idle-restore path (pinned in
+  chrome.e2e.ts) — instant-pops elsewhere need the summon identified.
 - **2026-09-16 — Token pass.** New tokens `--accent`, `--accent-ink`,
   `--error-bg/ink/line`; `--alarm` redefined from `#c0362c`/`#e89a90`
   to the recording reds `#ff3b30`/`#ff6b62`; `--sel-tint` moved off

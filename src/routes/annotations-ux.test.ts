@@ -122,6 +122,20 @@ describe("review quote clipping and link contract", () => {
 		expect(css).toMatch(/\.ann-refs-quote:hover\s*\{[^}]*text-decoration:\s*underline/);
 	});
 
+	it("fades quote underlines instead of snapping them", () => {
+		const css = pageStyle();
+		// The line is always drawn but transparent at rest: color (not
+		// the line) ramps on hover, on both cards.
+		for (const sel of ["button\\.review-quote", "\\.ann-refs-quote"]) {
+			expect(css).toMatch(
+				new RegExp(`${sel}\\s*\\{[^}]*text-decoration-color:\\s*transparent`)
+			);
+			expect(css).toMatch(
+				new RegExp(`${sel}:hover\\s*\\{[^}]*text-decoration-color:\\s*currentcolor`)
+			);
+		}
+	});
+
 	it("lights all three icons on the same color beat", () => {
 		const css = pageStyle();
 		for (const sel of ["button\\.review-copy", "button\\.review-del", "button\\.review-pencil"]) {
