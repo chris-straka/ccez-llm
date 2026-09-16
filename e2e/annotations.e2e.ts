@@ -1130,7 +1130,7 @@ test("review pencil files the edited comment on send", async ({ page }) => {
 	// Send files the note back (toast confirms the arrow didn't chat).
 	await page.keyboard.type("!");
 	await page.keyboard.press("Enter");
-	await expect(page.locator(".toast")).toContainText("Note saved");
+	await expect(page.locator(".toast")).toContainText("Draft annotation edited");
 	await page.locator(".prompt-tools .ann-pill").click();
 	await expect(page.locator(".review-comment").first()).toHaveText("first!");
 });

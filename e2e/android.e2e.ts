@@ -1080,7 +1080,7 @@ test.describe("touch", () => {
 			await page.locator(".prompt textarea").click();
 			await page.keyboard.type("nice point", { delay: 10 });
 			await page.locator(".send-btn").click();
-			await expect(page.locator(".toast")).toHaveText("Note saved");
+			await expect(page.locator(".toast")).toHaveText("Draft annotation saved");
 			await expect(page.locator(".ann-pill")).toBeVisible();
 		});
 

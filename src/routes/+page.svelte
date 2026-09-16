@@ -3334,8 +3334,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			annotations = editAnnotationComment(annotations, target.id, comment);
 		}
 		highlightAnnId = null;
+		// Pending filings save for the first time; a saved draft's
+		// comment rewrites — the toast names which happened (a bare
+		// "Note saved" never said).
+		const savedToast = "pending" in target ? "Draft annotation saved" : "Draft annotation edited";
 		exitPromptAnnEdit();
-		flashToast("Note saved");
+		flashToast(savedToast);
 		void tick().then(() => editor?.focus());
 	}
 
