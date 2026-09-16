@@ -72,6 +72,26 @@ Seeded harness (`bunx playwright test`, own E2E_PORT each):
   queued for an idle window, then commit the lockfile (currently
   modified, uncommitted).
 
+## Audit round 2 (global handlers, all read)
+
+- Every window/document mousedown, mouseup, click, focusin/focusout
+  handler read end to end (`onBadgePress`, `dismissReview`,
+  `clickGuardsPass`, `armMessageDrag`, `snapSelection`,
+  `preserveMessageHighlight`, `noteDownPoint`, `onMouseUp` incl. the
+  control early-return + `onSelectEnd` tail, `onIdleClick`,
+  `onFocusIn`, `onFocusInIdle`/`onFocusOutIdle`, `trimMessageDrag`,
+  `clampOffChatDrag`, `restoreDragSelection`, parking `$effect`).
+  No global mousedown `preventDefault`, no global blur/focus, no
+  state-object replacement on click paths.
+- Stuck invisible `.ann-pop.closing` eating clicks: killed by
+  inspection — `.closing` has no `pointer-events: none`, BUT no path
+  strands it (`settleAnnPop` always resets `closing=false`; open
+  during fade morphs back to visible). No probe needed.
+- `exitScrollMode` / iOS-sidebar `activeElement.blur()` calls are
+  scoped to their gestures, not global.
+- Sidebar-dismiss caret landing (tick `editor.focus`) is guarded by
+  the control allowlist + `promptIdle`; not global.
+
 ## Standing suspects
 
 1. System-WebKit selection/focus coupling newer than the harness
@@ -88,7 +108,13 @@ Seeded harness (`bunx playwright test`, own E2E_PORT each):
 
 1. Paste the doc-level focusin/focusout log from a reproducing
    browser window (snippet supplied in chat).
-2. Private-window repro: works or drops?
-3. If (1) shows `focusin` then `focusout ... -> BODY`: silent reset
+2. Private-window repro: REFUSED by owner ("would never matter") —
+   extension/state fork stays open instead.
+3. OS-vs-app fork (asked, pending): do text fields work in other
+   Mac apps right now? Broken everywhere = OS-level (restart /
+   Accessibility), not a patch.
+4. Post-drop Tab probe (asked, pending): Tab after a drop reveals
+   the hidden focus (composer jump = focus was body).
+5. If (1) shows `focusin` then `focusout ... -> BODY`: silent reset
    — suspect 1. If it shows the field itself yet typing dies:
    key-swallowing, not focus — suspect the capture key dispatcher.
