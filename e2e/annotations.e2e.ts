@@ -1333,6 +1333,53 @@ test("review pencil hover moves no icons", async ({ page }) => {
 		return { color: style.color, deco: style.textDecorationLine };
 	});
 	expect(delPaint).toEqual({ color: "rgb(255, 69, 58)", deco: "none" });
+	// The quote navigates, so it links: underline on hover.
+	await page.locator(".review-quote").first().hover();
+	await page.waitForTimeout(400);
+	expect(await boxes()).toEqual(before);
+	const quoteDeco = await page.evaluate(() =>
+		getComputedStyle(document.querySelector(".review-quote") as HTMLElement).textDecorationLine
+	);
+	expect(quoteDeco).toBe("underline");
+});
+
+/** A long review quote clips with an ellipsis inside the row: the card
+never scrolls sideways (a flex-shrink regression once stretched the
+whole overlay instead). */
+test("long review quote truncates with an ellipsis", async ({ page }) => {
+	await seedChat(page, [{ role: "assistant", content: "alpha beta gamma delta" }]);
+	await page.addInitScript(() => {
+		window.localStorage.setItem(
+			"ccez-llm-annotations-v1",
+			JSON.stringify({
+				"e2e-chat": [
+					{
+						id: "ann-long",
+						messageId: "e2e-m0",
+						quote:
+							"栄養バランスが良いとされています最近では健康志向の高まりから和食の見直しが進み若い世代にも伝統が受け継がれています",
+						comment: "note"
+					}
+				]
+			})
+		);
+	});
+	await page.goto("/");
+	await expect(page.locator("article .rendered").first()).toBeVisible();
+	await page.locator(".prompt-tools .ann-pill").click();
+	await expect(page.locator(".ann-wrap .review")).toHaveCSS("opacity", "1");
+	const sizes = await page.evaluate(() => {
+		const quote = document.querySelector(".review-quote") as HTMLElement;
+		const card = document.querySelector(".ann-wrap .review") as HTMLElement;
+		const qr = quote.getBoundingClientRect();
+		const cr = card.getBoundingClientRect();
+		return {
+			quoteClipped: quote.scrollWidth > quote.clientWidth + 1,
+			quoteFits: qr.right <= cr.right + 1,
+			cardScrolls: card.scrollWidth > card.clientWidth + 1
+		};
+	});
+	expect(sizes).toEqual({ quoteClipped: true, quoteFits: true, cardScrolls: false });
 });
 
 test("gutter drags never highlight above the cursor line", async ({ page }) => {

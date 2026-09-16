@@ -12336,6 +12336,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}
+	/* Same link contract as the composer card's quote. */
+	.ann-refs-quote:hover {
+		text-decoration: underline;
+	}
 	/* Same voice as the composer card's note (see .review-comment):
 	grey italic gloss on the quote — the row editor below stays
 	roman, like every other field. */
@@ -13206,6 +13210,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		color: var(--muted);
 		padding: 0.15rem;
 		border-radius: 6px;
+		/* Same 0.15s color beat as the pencil: all three icons light
+		up together instead of the copy snapping first. */
+		transition: color 0.15s ease;
 	}
 	.review-head button.review-copy :global(.action-glyph) {
 		height: 0.95rem;
@@ -13232,6 +13239,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		color: var(--muted);
 		padding: 0.15rem;
 		border-radius: 6px;
+		/* Same 0.15s color beat as copy and pencil. */
+		transition: color 0.15s ease;
 	}
 	.review-head button.review-del :global(.action-glyph) {
 		height: 0.95rem;
@@ -13242,15 +13251,21 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 	/* The quote is a button (keyboard reachable) but reads as plain
 	text: opt out of the generic head-button voice (far-edge auto
-	margin, small muted type, hover underline) the icon buttons use. */
+	margin, small muted type) the icon buttons use. flex-shrink
+	re-opts into shrinking — the generic rule pins it off, which
+	once let long quotes stretch the whole card instead of clipping. */
 	.review-head button.review-quote {
 		margin-left: 0;
+		flex-shrink: 1;
 		font-size: inherit;
 		color: inherit;
 	}
+	/* The quote navigates, so it links: underline on hover like any
+	jump control. (Icon buttons never underline — a line under a tiny
+	glyph reads as the row jumping.) */
 	.review-head button.review-quote:hover {
 		color: inherit;
-		text-decoration: none;
+		text-decoration: underline;
 	}
 	/* Hover goes accent-blue instead of going ink: the pencil is small
 	and quiet-gray, so an ink hover read as disappearing. Color only —

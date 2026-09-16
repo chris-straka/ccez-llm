@@ -112,6 +112,24 @@ describe("review delete button", () => {
 	});
 });
 
+describe("review quote clipping and link contract", () => {
+	it("lets the quote button shrink so long quotes clip, and links it on hover", () => {
+		const css = pageStyle();
+		// flex-shrink re-opts out of the generic head-button pin —
+		// without it the quote stretched the card instead of clipping.
+		expect(css).toMatch(/button\.review-quote\s*\{[^}]*flex-shrink:\s*1/);
+		expect(css).toMatch(/button\.review-quote:hover\s*\{[^}]*text-decoration:\s*underline/);
+		expect(css).toMatch(/\.ann-refs-quote:hover\s*\{[^}]*text-decoration:\s*underline/);
+	});
+
+	it("lights all three icons on the same color beat", () => {
+		const css = pageStyle();
+		for (const sel of ["button\\.review-copy", "button\\.review-del", "button\\.review-pencil"]) {
+			expect(css).toMatch(new RegExp(`${sel}\\s*\\{[^}]*transition:\\s*color`));
+		}
+	});
+});
+
 describe("sent-message annotation count", () => {
 	it("scales the refs count with the message font size", () => {
 		const css = pageStyle();
