@@ -3388,17 +3388,34 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			return;
 		}
 		highlightAnnId = ann.id;
-		document
-			.querySelector(`#msg-${index}`)
-			?.scrollIntoView({ block: "center", behavior: "smooth" });
+		// Scroll the mark itself, minimally: nearest leaves an already
+		// visible annotation exactly where it is, while center-scrolling
+		// a long message overshoots past the mark. Fall back to the
+		// message when the badge is somehow missing.
+		const badge = document.querySelector(`[data-ann-badge="${ann.id}"]`);
+		if (badge instanceof HTMLElement) badge.scrollIntoView({ block: "nearest", behavior: "smooth" });
+		else {
+			document.querySelector(`#msg-${index}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+		}
 		blinkAnnotation(ann.id);
 	}
 
 	/**
-	 * Sent-refs quote tap: the same jump when the annotation is still
-	 * live (blink included); a bare scroll when it was cleared after
-	 * sending (no badge left to blink).
+	 * Previous-annotations item press: the same one-jump contract as
+	 * the composer card (see reviewItemClick) — buttons keep their
+	 * clicks, and a drag-select ending here is a pick, so only clean
+	 * presses with a collapsed selection navigate. No edit state
+	 * lives in this card. The jump itself lands like a quote tap:
+	 * full goto when the annotation is still live (blink included),
+	 * a bare scroll when it was cleared after sending.
 	 */
+	function refsItemClick(event: MouseEvent, messageId: ChatMsgId, quote: string): void {
+		const target = event.target instanceof Element ? event.target : null;
+		if (target?.closest("button, input, textarea, select, a")) return;
+		if (!window.getSelection()?.isCollapsed) return;
+		gotoSentRef(messageId, quote);
+	}
+
 	function gotoSentRef(messageId: ChatMsgId, quote: string): void {
 		const live = annotations.find((a) => a.messageId === messageId && a.quote === quote);
 		if (live) {
@@ -3406,11 +3423,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			return;
 		}
 		const index = viewChat.messages.findIndex((m) => m.id === messageId);
-		if (index >= 0) {
-			document
-				.querySelector(`#msg-${index}`)
-				?.scrollIntoView({ block: "center", behavior: "smooth" });
+		if (index < 0) {
+			flashErrorToast("Annotation no longer exists");
+			return;
 		}
+		document
+			.querySelector(`#msg-${index}`)
+			?.scrollIntoView({ block: "center", behavior: "smooth" });
 	}
 
 	/** Blink a badge wash slowly twice, then hand the wash back. A
@@ -8517,8 +8536,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					</div>
 				{/if}
 				{#if sentRefs}
-						<!-- Baked annotation block, collapsed above the
-						message: the count stays visible like the composer
+						<!-- Previous-annotations card: filed annotations
+						baked onto a sent message, collapsed above it.
+						The count stays visible like the composer
 						pill; hovering (or tabbing to) the number itself
 						reveals the saved quotes. Provider context is
 						unaffected — only the display is redacted. A
@@ -8536,15 +8556,19 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							</button>
 							<div class="ann-refs-pop" role="tooltip">
 								{#each sentRefs.refs as ref (ref.n)}
-									<div class="ann-refs-item">
+									<!-- The whole item navigates, like the
+									composer card: one jump per annotation.
+									Buttons keep their clicks (see
+									refsItemClick), drag-selects stay picks. -->
+									<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+									<div
+										class="ann-refs-item"
+										title="Jump to this annotation in the chat"
+										onclick={(event) => refsItemClick(event, msg.id, ref.quote)}
+									>
 										<span class="ann-refs-num">{ref.n}.</span>
 										<span class="ann-refs-body">
-											<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-											<span
-												class="ann-refs-quote"
-												title="Jump to this annotation in the chat"
-												onclick={() => gotoSentRef(msg.id, ref.quote)}>“{ref.quote}”</span
-											>
+											<span class="ann-refs-quote">“{ref.quote}”</span>
 											{#if ref.comment}
 												<span class="ann-refs-comment">{ref.comment}</span>
 											{/if}
@@ -8985,13 +9009,17 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 
 				{/if}
 				{#if annotations.length > 0}
+					<!-- New-annotations dock: unsent drafts filed from
+					this chat, reviewed before sending (the filed half
+					lives in the previous-annotations sent-refs card on
+					sent messages). -->
 					<div class="ann-wrap" class:pinned={reviewOpen}>
 						<button
 							type="button"
 							class="ann-pill"
 							bind:this={annPill}
 							title="Review annotations"
-							aria-label={annotations.length === 1 ? "1 annotation" : `${annotations.length} annotations`}
+							aria-label={annotations.length === 1 ? "1 unsent annotation" : `${annotations.length} unsent annotations`}
 							aria-expanded={reviewOpen}
 							onclick={() => (reviewOpen = !reviewOpen)}
 						>
@@ -9022,19 +9050,17 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 									onclick={(event) => reviewItemClick(event, ann)}
 								>
 									<div class="review-head">
-										<span class="review-numcol">
-											<span class="review-num">{n + 1}.</span>
-											<button
-												type="button"
-												class="review-copy"
-												title="Copy annotation"
-												aria-label="Copy annotation {n + 1}"
-												onclick={() => copyAnnotation(ann.quote, ann.comment)}
-											>
-												<ActionIcon kind="copy" />
-											</button>
-										</span>
+										<span class="review-num">{n + 1}.</span>
 										<span class="review-quote">“{ann.quote}”</span>
+										<button
+											type="button"
+											class="review-copy"
+											title="Copy annotation"
+											aria-label="Copy annotation {n + 1}"
+											onclick={() => copyAnnotation(ann.quote, ann.comment)}
+										>
+											<ActionIcon kind="copy" />
+										</button>
 										<button
 											type="button"
 											aria-label="Delete annotation {n + 1}"
@@ -11986,6 +12012,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		so the saved quotes never sit tiny under huge type. */
 		font-size: calc(0.8rem * var(--font-scale, 1));
 		line-height: 1.45;
+		/* Notes stay selectable for copying: the article disables
+		selection outside .rendered, so re-enable it here (the quote
+		keeps its own none as the jump control). */
+		user-select: text;
+		-webkit-user-select: text;
 		opacity: 0;
 		pointer-events: none;
 		transition: opacity 0.15s ease;
@@ -12017,6 +12048,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		display: flex;
 		gap: 0.45rem;
 		padding: 0.2rem 0;
+		/* The whole item jumps on a clean press. */
+		cursor: pointer;
 	}
 	.ann-refs-item + .ann-refs-item {
 		border-top: 1px solid rgba(255, 255, 255, 0.14);
@@ -12034,23 +12067,25 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		flex: 1;
 		min-width: 0;
 	}
-	/* Only the quote navigates: unselectable with a pointer cursor,
-	so a click reads as a jump and never as a text pick. Notes stay
-	selectable for copying. */
+	/* The whole item navigates on a clean press (see refsItemClick):
+	unselectable quote with a pointer cursor, so a click reads as a
+	jump and never as a text pick. The quote is one line, cut with
+	an ellipsis — the full text lives at the mark. Notes stay
+	selectable for copying, on one line that scrolls sideways. */
 	.ann-refs-quote {
-		overflow-wrap: anywhere;
 		cursor: pointer;
 		user-select: none;
 		-webkit-user-select: none;
-		/* Same per-item cap as the composer card: wrap to the cap,
-		then scroll inside the quote. */
 		min-width: 0;
-		max-height: 8rem;
-		overflow-y: auto;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 	.ann-refs-comment {
 		color: #c7c7cc;
-		overflow-wrap: anywhere;
+		white-space: nowrap;
+		overflow-x: auto;
+		min-width: 0;
 	}
 	/* Per-annotation copy in the sent-refs card: icon only, no text,
 	pushed to the row's end like the panel's delete button. */
@@ -12628,41 +12663,35 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.review-num {
 		font-weight: 700;
 	}
-	/* The number column stacks the copy icon under the number: a
-	huge note no longer strands a tiny button floating mid-row —
-	the gutter space was reserved anyway. First-baseline alignment
-	keeps the number level with the quote text. */
-	.review-numcol {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 0.15rem;
-		flex-shrink: 0;
-	}
 	.review-label {
 		color: #6e6e73;
 		color: var(--muted);
 		font-size: 0.85rem;
 	}
+	/* The quote is one line, cut with an ellipsis: long quotes
+	never stretch the row (the full text lives at the mark — click
+	to jump there). Pointer plus no-select: the quote is the jump
+	control, never a pick. */
 	.review-quote {
 		font-weight: 550;
-		overflow-wrap: anywhere;
-		/* Long quotes wrap to a cap, then scroll per item: one huge
-		quote never shoves the rest of the card away. Pointer plus
-		no-select: the quote is the jump control, never a pick. */
 		min-width: 0;
-		max-height: 8rem;
-		overflow-y: auto;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 		cursor: pointer;
 		user-select: none;
 		-webkit-user-select: none;
 	}
 	/* The note reads like a previous message's annotation
-	(same grey, italic): it is a gloss on the quote, not body text. */
+	(same grey, italic): it is a gloss on the quote, not body text.
+	One line that scrolls sideways, so the full note fits without
+	stretching the row. */
 	.review-comment {
 		color: #c7c7cc;
 		font-style: italic;
-		overflow-wrap: anywhere;
+		white-space: nowrap;
+		overflow-x: auto;
+		min-width: 0;
 	}
 	.review label {
 		display: block;
@@ -12842,9 +12871,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.review-head button.review-pencil :global(.action-glyph) {
 		height: 0.95rem;
 	}
-	/* Per-note copy rides under the number in the pencil's style:
-	icon only, no text. margin-left:0 keeps it in the gutter while
-	the delete button's auto margin holds the row's right edge. */
+	/* Per-note copy rides at the row's end in the pencil's style:
+	icon only, no text. margin-left:0 keeps it with the quote while
+	the delete button's auto margin holds the row's right edge.
+	Rows stay one line tall, so the icon never floats in dead
+	space. */
 	.review-head button.review-copy {
 		display: inline-flex;
 		align-items: center;

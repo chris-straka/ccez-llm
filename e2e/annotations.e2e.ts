@@ -840,6 +840,88 @@ test("sent-refs card copies one annotation", async ({ page }) => {
 	expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('"bonjour" — greeting?');
 });
 
+/** Sent-refs item body click jumps to the message (cleared refs
+have no badge left to blink): the sent message scrolls by center.
+Clicking the comment used to do nothing at all. Long messages fold,
+so the landing reads off the scroll call itself, not movement. */
+test("sent-refs item click jumps to the message", async ({ page }) => {
+	await page.addInitScript(() => {
+		const seen: string[] = [];
+		const orig = Element.prototype.scrollIntoView;
+		Element.prototype.scrollIntoView = function (
+			opts?: ScrollIntoViewOptions | boolean
+		): void {
+			seen.push(`${(this as Element).id}:${JSON.stringify(opts)}`);
+			(window as unknown as { __siv?: string[] }).__siv = seen;
+			orig.call(this, opts);
+		};
+	});
+	await seedChat(page, [
+		{ role: "assistant", content: "noted" },
+		{ role: "user", content: 'explain this\n\nAnnotated selections:\n1. "bonjour" — greeting?' }
+	]);
+	await page.goto("/");
+	await page.locator(".ann-refs-pill").first().click();
+	await page.locator(".ann-refs-comment").first().click();
+	await page.waitForTimeout(500);
+	const seen = await page.evaluate(
+		() => (window as unknown as { __siv?: string[] }).__siv ?? []
+	);
+	expect(seen).toContain('msg-1:{"block":"center","behavior":"smooth"}');
+});
+
+/** Picks rooted in the sent-refs card are never annotatable:
+selecting saved text summons no menu and keeps the pick. */
+test("selecting sent-refs text summons no menu", async ({ page }) => {
+	await seedChat(page, [
+		{ role: "assistant", content: "noted" },
+		{ role: "user", content: 'explain this\n\nAnnotated selections:\n1. "bonjour" — greeting?' }
+	]);
+	await page.goto("/");
+	await page.locator(".ann-refs-pill").first().click();
+	const comment = page.locator(".ann-refs-comment").first();
+	const cbox = await comment.boundingBox();
+	if (!cbox) throw new Error("comment has no box");
+	await page.mouse.move(cbox.x + 2, cbox.y + cbox.height / 2);
+	await page.mouse.down();
+	await page.mouse.move(cbox.x + cbox.width - 2, cbox.y + cbox.height / 2, { steps: 6 });
+	await page.mouse.up();
+	await expect(page.locator(".sel-menu")).toHaveCount(0);
+	expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).not.toBe("");
+});
+
+/** Sent-refs rows stay one line like the composer card: quote cuts
+with an ellipsis, note scrolls sideways, copy rides the row's end. */
+test("sent-refs rows are one line with copy at the end", async ({ page }) => {
+	await seedChat(page, [
+		{ role: "assistant", content: "noted" },
+		{ role: "user", content: 'explain this\n\nAnnotated selections:\n1. "bonjour" — greeting?' }
+	]);
+	await page.goto("/");
+	await page.locator(".ann-refs-pill").first().click();
+	const style = await page.evaluate(() => {
+		const q = document.querySelector(".ann-refs-quote") as HTMLElement | null;
+		const c = document.querySelector(".ann-refs-comment") as HTMLElement | null;
+		const qs = q ? getComputedStyle(q) : null;
+		const cs = c ? getComputedStyle(c) : null;
+		return {
+			quote:
+				qs?.whiteSpace === "nowrap" &&
+				qs?.textOverflow === "ellipsis" &&
+				qs?.overflow === "hidden",
+			note: cs?.whiteSpace === "nowrap" && cs?.overflowX === "auto"
+		};
+	});
+	expect(style).toEqual({ quote: true, note: true });
+	const order = await page.evaluate(() => {
+		const item = document.querySelector(".ann-refs-item");
+		const copy = item?.querySelector(".ann-refs-copy")?.getBoundingClientRect();
+		const quote = item?.querySelector(".ann-refs-quote")?.getBoundingClientRect();
+		return copy && quote ? copy.x > quote.x : false;
+	});
+	expect(order).toBe(true);
+});
+
 /** Each draft annotation copies from the review panel's icon button. */
 test("review panel copies one annotation", async ({ page }) => {
 	await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);

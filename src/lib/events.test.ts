@@ -149,10 +149,12 @@ describe("page event idioms", () => {
 	it("keeps annotation-UI picks out of the menu", () => {
 		document.body.innerHTML =
 			'<div class="review"><span id="r">note</span></div><div class="ann-pop"><span id="p">draft</span></div>' +
+			'<div class="ann-refs-pop"><span id="s">saved</span></div>' +
 			'<article><div class="rendered" id="m">prose</div></article><p id="x">other</p>';
 		const byId = (id: string): Element | null => document.getElementById(id);
 		expect(isAnnotationUiTarget(byId("r"))).toBe(true);
 		expect(isAnnotationUiTarget(byId("p"))).toBe(true);
+		expect(isAnnotationUiTarget(byId("s"))).toBe(true);
 		expect(isAnnotationUiTarget(byId("m"))).toBe(false);
 		expect(isAnnotationUiTarget(byId("x"))).toBe(false);
 		expect(isAnnotationUiTarget(null)).toBe(false);

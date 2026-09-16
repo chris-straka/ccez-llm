@@ -178,12 +178,14 @@ export function isTapOverlayTarget(target: EventTarget | null): boolean {
 }
 
 /**
- * True inside the annotation UI (review card, pill): picks rooted
+ * True inside the annotation UI — the new-annotations composer card
+ * (`.review`), the filing pill (`.ann-pop`), and the
+ * previous-annotations sent-refs pop (`.ann-refs-pop`): picks rooted
  * there are never annotatable, and presses there never summon the
  * menu. Callers pass the selection anchor's element (text nodes
  * carry no `closest`).
  */
-const ANNOTATION_UI_SELECTOR = ".review, .ann-pop";
+const ANNOTATION_UI_SELECTOR = ".review, .ann-pop, .ann-refs-pop";
 
 /** True inside the annotation UI (see above). */
 export function isAnnotationUiTarget(target: EventTarget | null): boolean {

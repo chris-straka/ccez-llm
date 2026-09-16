@@ -166,6 +166,71 @@ test("selecting review text summons no menu and stays put", async ({ page }) => 
 	await expect(page.locator(".review-item.highlight")).toHaveCount(0);
 });
 
+/** Review rows stay one line: the quote cuts with an ellipsis,
+the note scrolls sideways, and the copy icon sits at the row's
+end (no dead space for it to float in). */
+test("review rows are one line with copy at the end", async ({ page }) => {
+	await annotateWord(page);
+	await page.locator(".prompt-tools .ann-pill").click();
+	await expect(page.locator(".ann-wrap.pinned .review")).toBeVisible();
+	const style = await page.evaluate(() => {
+		const q = document.querySelector(".review-quote") as HTMLElement | null;
+		const c = document.querySelector(".review-comment") as HTMLElement | null;
+		const qs = q ? getComputedStyle(q) : null;
+		const cs = c ? getComputedStyle(c) : null;
+		return {
+			quote:
+				qs?.whiteSpace === "nowrap" &&
+				qs?.textOverflow === "ellipsis" &&
+				qs?.overflow === "hidden",
+			note: cs?.whiteSpace === "nowrap" && cs?.overflowX === "auto"
+		};
+	});
+	expect(style).toEqual({ quote: true, note: true });
+	const order = await page.evaluate(() => {
+		const head = document.querySelector(".review-head");
+		const copy = head?.querySelector(".review-copy")?.getBoundingClientRect();
+		const quote = head?.querySelector(".review-quote")?.getBoundingClientRect();
+		return copy && quote ? copy.x > quote.x : false;
+	});
+	expect(order).toBe(true);
+});
+
+/** A jump scrolls the mark itself, minimally: the badge goes by
+`nearest` (an already-visible mark stays put), never by message
+`center` (which overshoots past the mark in a long message). The
+item click fires programmatically here — a real click would first
+scroll the card itself into view and confound the reading. */
+test("jump scrolls the badge itself, minimally", async ({ page }) => {
+	await page.addInitScript(() => {
+		const seen: string[] = [];
+		const orig = Element.prototype.scrollIntoView;
+		Element.prototype.scrollIntoView = function (
+			opts?: ScrollIntoViewOptions | boolean
+		): void {
+			seen.push(
+				`${(this as Element).matches?.("button.ccez-ann-badge")}:${JSON.stringify(opts)}`
+			);
+			(window as unknown as { __siv?: string[] }).__siv = seen;
+			orig.call(this, opts);
+		};
+	});
+	await page.reload();
+	await expect(page.locator("article .rendered").first()).toBeVisible();
+	await annotateWord(page);
+	await page.locator(".prompt-tools .ann-pill").click();
+	await expect(page.locator(".ann-wrap.pinned .review")).toBeVisible();
+	// Drop the filing word-pick: a live selection would (correctly)
+	// make the item press read as a pick instead of a jump.
+	await page.evaluate(() => window.getSelection()?.removeAllRanges());
+	await page.evaluate(() => (document.querySelector(".review-comment") as HTMLElement | null)?.click());
+	await page.waitForTimeout(500);
+	const seen = await page.evaluate(
+		() => (window as unknown as { __siv?: string[] }).__siv ?? []
+	);
+	expect(seen).toContain('true:{"block":"nearest","behavior":"smooth"}');
+});
+
 /** A quote whose message is gone toasts instead of jumping nowhere. */
 test("orphaned review quote toasts that the annotation is gone", async ({ page }) => {
 	await page.addInitScript(() => {
