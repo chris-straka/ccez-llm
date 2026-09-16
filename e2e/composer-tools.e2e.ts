@@ -199,7 +199,7 @@ async function dropImage(page: Page): Promise<void> {
 	});
 }
 
-test("send clears pills and files a chip above the message", async ({ page }) => {
+test("send clears pills and files a tag above the message", async ({ page }) => {
 	await dropImage(page);
 	const card = page.locator(".attachments li.card");
 	await expect(card).toBeVisible({ timeout: 15_000 });
@@ -212,9 +212,148 @@ test("send clears pills and files a chip above the message", async ({ page }) =>
 	await page.keyboard.press("Enter");
 	// Pills empty with the prompt at send time…
 	await expect(page.locator(".attachments")).toHaveCount(0);
-	// …and the sent turn carries an attachment chip above its text.
-	const chip = page.locator(".sent-chip").last();
-	await expect(chip).toContainText("blue.png", { timeout: 30_000 });
+	// …and the sent turn carries one tag above its text (send strips
+	// the literal), hovering previews the big card.
+	const tag = page.locator("article.user .sent-tags .sent-tag").last();
+	await expect(tag).toContainText("[Pasted image]", { timeout: 30_000 });
+	await tag.hover();
+	const preview = page.locator("article.user .sent-tags .sent-preview").last();
+	await expect(preview).toBeVisible();
+	await expect(preview.locator(".sent-img")).toBeVisible();
+});
+
+test("a stored literal renders inline at body size with no duplicate", async ({ page }) => {
+	// Turns stored before send-time stripping keep the literal: it
+	// rebuilds in place, paired against the attachment, and the strip
+	// above stays empty — each file shows exactly once, at the same
+	// size as the surrounding text.
+	const pixel =
+		"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+	await page.addInitScript((url) => {
+		window.localStorage.setItem(
+			"ccez-llm-chats-v1",
+			JSON.stringify([
+				{
+					id: "e2e-chat",
+					createdAt: 1,
+					replyLang: null,
+					messages: [
+						{
+							id: "e2e-m0",
+							role: "user",
+							content: "[Pasted image] what do you see here?",
+							usage: null,
+							error: null,
+							attachments: [
+								{
+									id: "e2e-img-0",
+									name: "shot.png",
+									mime: "image/png",
+									kind: "image",
+									dataUrl: url,
+									text: null,
+									width: 1,
+									height: 1,
+									tokens: 85
+								}
+							]
+						},
+						{ id: "e2e-m1", role: "assistant", content: "a picture", usage: null, error: null }
+					]
+				}
+			])
+		);
+	}, pixel);
+	await page.reload();
+	const body = page.locator("article.user .rendered").first();
+	await expect(body).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article.user .sent-tag")).toHaveCount(1);
+	await expect(page.locator("article.user .sent-tags")).toHaveCount(0);
+	// Same size as the message text around it — not chip-small.
+	const tag = page.locator("article.user .sent-tag").first();
+	const sizes = await tag.evaluate((el) => {
+		const p = el.closest("article")?.querySelector(".rendered p");
+		if (!p) throw new Error("missing body paragraph");
+		return {
+			tag: getComputedStyle(el).fontSize,
+			body: getComputedStyle(p).fontSize
+		};
+	});
+	expect(sizes.tag).toBe(sizes.body);
+	// Hovering previews the big card with the image.
+	await tag.hover();
+	const preview = page.locator("article.user .sent-preview").first();
+	await expect(preview).toBeVisible();
+	await expect(preview.locator(".sent-img")).toBeVisible();
+});
+
+test("sent turns with many attachments scroll their tags", async ({ page }) => {
+	// Fourteen files ride one stripped turn, far more than fit, so
+	// the tag row scrolls sideways instead of stretching the message.
+	const pixel =
+		"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+	const attachments = Array.from({ length: 14 }, (_, n) =>
+		n % 2 === 0
+			? {
+					id: `e2e-img-${n}`,
+					name: `shot-${n}.png`,
+					mime: "image/png",
+					kind: "image",
+					dataUrl: pixel,
+					text: null,
+					width: 1,
+					height: 1,
+					tokens: 85
+				}
+			: {
+					id: `e2e-file-${n}`,
+					name: `notes-${n}.md`,
+					mime: "text/markdown",
+					kind: "text",
+					dataUrl: null,
+					text: `# notes ${n}`,
+					width: null,
+					height: null,
+					tokens: 8
+				}
+	);
+	await page.addInitScript((atts) => {
+		window.localStorage.setItem(
+			"ccez-llm-chats-v1",
+			JSON.stringify([
+				{
+					id: "e2e-chat",
+					createdAt: 1,
+					replyLang: null,
+					messages: [
+						{
+							id: "e2e-m0",
+							role: "user",
+							content: "many files",
+							usage: null,
+							error: null,
+							attachments: atts
+						},
+						{ id: "e2e-m1", role: "assistant", content: "got them", usage: null, error: null }
+					]
+				}
+			])
+		);
+	}, attachments);
+	await page.reload();
+	const strip = page.locator("article.user .sent-tags").first();
+	await expect(strip).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article.user .sent-tag")).toHaveCount(14);
+	// Image tags preview thumbnails, file tags preview excerpts.
+	await page.locator("article.user .sent-tag").first().hover();
+	await expect(page.locator("article.user .sent-preview .sent-img").first()).toBeVisible();
+	await page.locator("article.user .sent-tag").nth(1).hover();
+	await expect(page.locator("article.user .sent-preview .sent-excerpt").first()).toContainText(
+		"# notes 1"
+	);
+	// The strip scrolls: content wider than its box.
+	const overflow = await strip.evaluate((el) => el.scrollWidth - el.clientWidth);
+	expect(overflow).toBeGreaterThan(0);
 });
 
 test("popup touches the badge and clear-all lives inside it", async ({ page }) => {

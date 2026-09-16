@@ -398,9 +398,9 @@ for (const t of THEMES) {
 		await page.locator(".cm-content").click();
 		await page.keyboard.type("file attached");
 		await page.keyboard.press("Enter");
-		const sent = page.locator(".sent-files").first();
-		await expect(sent).toBeVisible({ timeout: 30_000 });
-		await expect(sent).toHaveCSS("color", muted);
+		const tags = page.locator(".sent-tags").first();
+		await expect(tags).toBeVisible({ timeout: 30_000 });
+		await expect(tags.locator(".sent-tag").first()).toContainText("[Pasted image]");
 	});
 
 	// No failed-send test: without the mock the dev backend still

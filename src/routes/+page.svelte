@@ -119,14 +119,17 @@ import {
 	import {
 		FILE_MARKER,
 		IMAGE_MARKER,
+		fileExcerpt,
 		fileMarkerInsert,
 		fileToAttachment,
 		stripAttachmentMarkers,
 		imageMarkerInsert,
 		countMarkers,
 		removeMarker,
+		leftoverAttachments,
 		type Attachment,
-		type AttachmentKind
+		type AttachmentKind,
+		type AttachTagModel
 	} from "$lib/attachments";
 		import {
 		duplicateAnnotationId,
@@ -2670,6 +2673,20 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			return;
 		}
 		flashToast("Nothing to copy yet.");
+	}
+
+	/**
+	 * Preview models for the leftovers strip: one per attachment with
+	 * no literal left in the message text (literals rebuild inline
+	 * instead, so each file shows exactly once).
+	 */
+	function sentTagModels(msg: ChatMsg, base: string): AttachTagModel[] {
+		return leftoverAttachments(msg.attachments ?? [], base).map((att) => ({
+			id: att.id,
+			kind: att.kind,
+			dataUrl: att.dataUrl,
+			text: att.text
+		}));
 	}
 
 	/**
@@ -8900,17 +8917,37 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					onmouseleave={(event) => onArticleLeave(event, msg, i)}
 				>
 					{#if msg.attachments && msg.attachments.length > 0}
-					<!-- Sent-message attachment chips: above the message
-					and before (left of) the annotation marker, so files
-					sent with the turn read as its head, not its tail. -->
-					<div class="sent-files">
-						{#each msg.attachments as att (att.id)}
-							<span class="sent-chip" title="{att.name} · ~{att.tokens} tokens">
-								<ActionIcon kind="attach" /> {att.name}
-							</span>
-						{/each}
-					</div>
-				{/if}
+						{@const leftoverModels = sentTagModels(
+							msg,
+							(sentRefs ? (refsOnly && !isFolded ? REFS_ONLY_BODY : sentRefs.text) : null) ??
+								msg.content
+						)}
+						{#if leftoverModels.length > 0}
+							<!-- Sent-message tags: one per attachment with no
+							literal left in the text (literals rebuild inline
+							instead, so each file shows exactly once). Above
+							the message; hovering previews the big card, the
+							same picture the composer showed before sending.
+							A long turn scrolls sideways in place instead of
+							stretching. -->
+							<div class="sent-tags">
+								{#each leftoverModels as m (m.id)}
+									<span class="sent-tag"
+										>{m.kind === "text" ? FILE_MARKER : IMAGE_MARKER}<span
+											class="sent-preview"
+											aria-hidden="true"
+										>
+											{#if m.kind === "image" && m.dataUrl?.startsWith("data:image/")}
+												<img class="sent-img" src={m.dataUrl} alt="" />
+											{:else if m.kind === "text" && m.text !== null}
+												<span class="sent-excerpt">{fileExcerpt(m.text)}</span>
+											{/if}
+										</span></span
+									>
+								{/each}
+							</div>
+						{/if}
+					{/if}
 				{#if sentRefs}
 						<!-- Previous-annotations card: filed annotations
 						baked onto a sent message, collapsed above it.
@@ -12395,33 +12432,55 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	main.alt article * {
 		cursor: pointer;
 	}
-	.sent-files {
+	/* Sent-message tags: the marker text as links — body-size type,
+	underlined, in a sideways-scrolling row when many. Hovering shows
+	the composer's big preview card (image or file excerpt). History
+	is read-only: no buttons, no meta lines, just the picture. */
+	.sent-tags {
 		display: flex;
-		flex-wrap: wrap;
-		gap: 0.4rem;
+		gap: 0.35rem 0.6rem;
+		overflow-x: auto;
 		margin-bottom: 0.35rem;
-		font-size: 0.75rem;
-		color: #6e6e73;
-		color: var(--muted);
+		padding-bottom: 0.15rem;
 	}
-	/* Attachment chips: icon + name in a quiet pill (no emoji — the
-	attach glyph matches the composer's icon-only treatment). */
-	.sent-chip {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.3rem;
+	.sent-tag {
+		position: relative;
+		flex: none;
+		text-decoration: underline;
+		cursor: default;
+	}
+	.sent-preview {
+		display: none;
+		position: absolute;
+		top: 100%;
+		left: 0;
+		z-index: 30;
+		margin-top: 0.25rem;
+		padding: 0.5rem;
+		max-width: 16rem;
+		background: #fff;
+		background: var(--bg-raised);
 		border: 1px solid #c7c7cc;
 		border-color: var(--line);
-		border-radius: 999px;
-		padding: 0.15rem 0.6rem;
-		max-width: 100%;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
+		border-radius: 8px;
 	}
-	.sent-chip :global(.action-glyph) {
-		height: 0.85em;
-		flex-shrink: 0;
+	.sent-tag:hover .sent-preview {
+		display: block;
+	}
+	.sent-img {
+		display: block;
+		max-width: 14rem;
+		max-height: 10rem;
+		border-radius: 6px;
+	}
+	.sent-excerpt {
+		display: block;
+		max-height: 8rem;
+		overflow: auto;
+		white-space: pre-wrap;
+		font-size: 0.75rem;
+		color: #1c1c1e;
+		color: var(--ink);
 	}
 	/* Sent-message annotation refs: the baked block collapses to the
 	count (like the composer pill); hover or Tab reveals the saved
@@ -14596,7 +14655,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 	/* tool-icon hovers ride --ink now. */
 	/* .error-banner rides --error-bg/--error-ink now: no dark override needed. */
-	/* sent-files/tok ride --muted; attachment pills ride --hl now.
+	/* sent tags inherit body type; attachment pills ride --hl now.
 	The pill × keeps its rule: light --focus against dark --ink. */
 	:global(html[data-theme="dark"]) .attachments button {
 		color: #f2f2f7;

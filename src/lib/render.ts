@@ -4,6 +4,14 @@ import { createHighlighter, type Highlighter } from "shiki";
 import { RUBY_SCRIPT_RE } from "./reading";
 import { runnerFor } from "./coderun";
 import {
+	ATTACH_TAG_RE,
+	FILE_MARKER,
+	IMAGE_MARKER,
+	extractAttachmentTags,
+	fileExcerpt,
+	type AttachTagModel
+} from "./attachments";
+import {
 	CODE_COPY_GLYPH,
 	escapeHtml,
 	extractMath,
@@ -85,22 +93,56 @@ export interface RenderedMessage {
 	maths: MathEntry[];
 }
 
+/**
+ * Sent-message tag: the marker text as a link with the composer's big
+ * image preview on hover (thumbnail for images, excerpt for files).
+ * History is read-only, so there are no buttons and no meta line —
+ * just the picture. No model (more literals than attachments, e.g.
+ * hand-typed): the plain marker text. Pure and unit-tested.
+ */
+export function attachTagHtml(model: AttachTagModel | null, kindLetter: string): string {
+	const label = kindLetter === "f" ? FILE_MARKER : IMAGE_MARKER;
+	if (!model) return escapeHtml(label);
+	const visual =
+		model.kind === "image" && model.dataUrl?.startsWith("data:image/")
+			? `<img class="sent-img" src="${model.dataUrl}" alt="">`
+			: model.kind === "text" && model.text !== null
+				? `<span class="sent-excerpt">${escapeHtml(fileExcerpt(model.text))}</span>`
+				: "";
+	if (!visual) return escapeHtml(label);
+	return (
+		`<span class="sent-tag">${escapeHtml(label)}` +
+		`<span class="sent-preview" aria-hidden="true">${visual}</span></span>`
+	);
+}
+
 /** Synchronous render: markdown → sanitized HTML with plain (unhighlighted)
- * code blocks. Safe to call on every streamed token. */
-export function renderMarkdown(markdownText: string): RenderedMessage {
+ * code blocks. Safe to call on every streamed token. `attachModels`
+ * rebuilds attachment-tag literals as preview links (paired by kind
+ * order); omitted, literals render as plain text. */
+export function renderMarkdown(
+	markdownText: string,
+	attachModels?: AttachTagModel[]
+): RenderedMessage {
 	const rendered: RenderedMessage = { html: "", codes: [], maths: [] };
-	rendered.html = sanitize(renderInto(markdownText, rendered.codes, rendered.maths));
+	rendered.html = sanitize(
+		renderInto(markdownText, rendered.codes, rendered.maths, attachModels)
+	);
 	return rendered;
 }
 
 /** Render a full assistant message: thoughts stripped, body only. */
-export function renderMessage(markdownText: string, sourcesWanted: boolean): RenderedMessage {
+export function renderMessage(
+	markdownText: string,
+	sourcesWanted: boolean,
+	attachModels?: AttachTagModel[]
+): RenderedMessage {
 	// Thoughts never display; extraction still strips them (and unasked
 	// sources) so only the answer renders. Copy uses the same strip.
 	const { body } = extractThoughts(markdownText);
 	const clean = stripSourcesIfUnasked(body, sourcesWanted);
 	const rendered: RenderedMessage = { html: "", codes: [], maths: [] };
-	rendered.html = sanitize(renderInto(clean, rendered.codes, rendered.maths));
+	rendered.html = sanitize(renderInto(clean, rendered.codes, rendered.maths, attachModels));
 	return rendered;
 }
 
@@ -138,14 +180,19 @@ const CODE_RUN_GLYPH =
 function renderInto(
 	markdownText: string,
 	codes: Array<{ lang: string; code: string }>,
-	maths: MathEntry[]
+	maths: MathEntry[],
+	attachModels?: AttachTagModel[]
 ): string {
+	// Attachment tags leave first (code fences/spans excluded there),
+	// so marked never splits a literal and the preview HTML below never
+	// passes through it — same extract-then-substitute shape as math.
+	const extracted = extractAttachmentTags(markdownText);
 	// A ```latex fence duplicating its neighboring `$$` block goes first
 	// (the display block stays), so each equation renders exactly once.
 	// Math leaves the source next (code fences/spans excluded there), so
 	// marked never sees the delimiters and KaTeX tags never pass through it.
 	const base = maths.length;
-	const { stripped, maths: found } = extractMath(stripLatexFenceDupes(markdownText));
+	const { stripped, maths: found } = extractMath(stripLatexFenceDupes(extracted.stripped));
 	for (const entry of found) maths.push(entry);
 	const instance = new Marked({ breaks: true });
 	instance.use({
@@ -220,7 +267,20 @@ function renderInto(
 		if (!entry) return _match;
 		return mathHtml(entry, index);
 	});
-	return withMath.replace(DIR_AUTO_BLOCKS, "<$1 dir=\"auto\"");
+	// Tag placeholders resolve against the message's attachments (Nth
+	// of a kind to Nth of a kind); without models — or past the end
+	// of them — the literal stays, exactly as before tags existed.
+	const models = attachModels ?? [];
+	const seen = { image: 0, text: 0 };
+	const withTags = withMath.replace(ATTACH_TAG_RE, (_match, kind: string) => {
+		const isFile = kind === "f";
+		const index = isFile ? seen.text++ : seen.image++;
+		const model =
+			models.filter((m) => (isFile ? m.kind === "text" : m.kind === "image"))[index] ??
+			null;
+		return attachTagHtml(model, kind);
+	});
+	return withTags.replace(DIR_AUTO_BLOCKS, "<$1 dir=\"auto\"");
 }
 
 let purifier: ReturnType<typeof DOMPurify> | null = null;

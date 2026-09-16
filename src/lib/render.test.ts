@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
 import {
+	attachTagHtml,
 	extractThoughts,
 	stripSourcesIfUnasked,
 	sourcesAsked,
@@ -13,6 +14,7 @@ import {
 	htmlToText,
 	highlightRendered,
 } from "./render";
+import type { AttachTagModel } from "./attachments";
 
 describe("thoughts", () => {
 	it("extracts closed think blocks, joining multiples", () => {
@@ -161,6 +163,54 @@ describe("markdown rendering", () => {
 		expect(text).toContain("bold");
 		expect(text).not.toContain("**");
 		expect(text).not.toContain("<h1>");
+	});
+});
+
+describe("sent-message tags", () => {
+	const img: AttachTagModel = {
+		id: "img-1",
+		kind: "image",
+		dataUrl: "data:image/png;base64,AAA",
+		text: null
+	};
+	const file: AttachTagModel = {
+		id: "file-1",
+		kind: "text",
+		dataUrl: null,
+		text: "# hello"
+	};
+
+	it("rebuilds literals as preview links paired by kind order", () => {
+		const { html } = renderMarkdown("[Pasted image] what do you see here?", [img]);
+		expect(html).toContain('class="sent-tag"');
+		expect(html).toContain('class="sent-preview"');
+		expect(html).toContain('src="data:image/png;base64,AAA"');
+		expect(html).not.toContain("sent-meta");
+		expect(html).not.toContain("data-sent-action");
+		expect(html).toContain("what do you see here?");
+	});
+
+	it("previews file excerpts without buttons", () => {
+		const { html } = renderMarkdown("[Pasted Attachment] notes", [file]);
+		expect(html).toContain('class="sent-excerpt"');
+		expect(html).toContain("# hello");
+	});
+
+	it("falls back to plain text past the end of the models", () => {
+		const { html } = renderMarkdown("[Pasted image] one [Pasted image] two", [img]);
+		expect(html).toContain('class="sent-tag"');
+		expect(html).toContain("[Pasted image] two");
+	});
+
+	it("leaves literals inside code alone", () => {
+		const { html } = renderMarkdown("`[Pasted image]`", [img]);
+		expect(html).not.toContain("sent-tag");
+	});
+
+	it("builds the tag card directly", () => {
+		expect(attachTagHtml(null, "i")).toBe("[Pasted image]");
+		expect(attachTagHtml(null, "f")).toBe("[Pasted Attachment]");
+		expect(attachTagHtml(img, "i")).toContain('class="sent-img"');
 	});
 });
 

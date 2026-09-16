@@ -18,6 +18,7 @@
 	import { mathCopyText, foldPreviewText } from "$lib/render-math";
 	import { codeRunBody, runCodeBlock } from "$lib/coderun";
 	import { closestFromTarget } from "$lib/events";
+	import type { AttachTagModel } from "$lib/attachments";
 	import type { ChatMsg, ChatMsgId } from "$lib/chat";
 	import { applyMarks, annRefsFor, type AnnotationMark, type AnnotationId } from "$lib/annotations";
 
@@ -272,10 +273,22 @@
 		if (furiganaKey !== null) furiganaKey = null;
 		reportAidLoading(false);
 		aidRun++; // invalidate any in-flight furigana conversion
+		// Sent tags pair against this message's attachments (Nth of a
+		// kind to Nth of a kind); assistant output carries none, so an
+		// echoed literal there stays plain text.
+		const tagModels = (): AttachTagModel[] | undefined => {
+			if (message.role !== "user" || !message.attachments?.length) return undefined;
+			return message.attachments.map((att) => ({
+				id: att.id,
+				kind: att.kind,
+				dataUrl: att.dataUrl,
+				text: att.text
+			}));
+		};
 		const snapshot: RenderedMessage =
 			message.role === "assistant"
 				? renderMessage(content, sourcesWanted)
-				: renderMarkdown(content);
+				: renderMarkdown(content, tagModels());
 		rendered = snapshot;
 		html = snapshot.html;
 		if (!streaming && snapshot.codes.length > 0) {
