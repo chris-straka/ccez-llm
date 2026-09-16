@@ -81,18 +81,25 @@ test("idle-hide takes the attachment link with the prompt", async ({ page }) => 
 	});
 	const marker = page.locator(".cm-attach-marker").first();
 	await expect(marker).toContainText("[Pasted Attachment]", { timeout: 15_000 });
+	// An image alongside: its card rides above the prompt.
+	await dropImage(page);
+	const shots = page.locator(".composer-shots");
+	await expect(shots.locator("img.composer-shot")).toHaveCount(1, { timeout: 15_000 });
 	const prompt = page.locator(".prompt");
 	// No input for 2s (+ticker): the prompt slides away with the link
-	// inside it — no attachment lingers over the chat.
+	// inside it and the card with it — no attachment lingers over
+	// the chat.
 	await expect(prompt).toHaveClass(/prompt-idle/, { timeout: 15_000 });
 	await expect(prompt).toHaveCSS("opacity", "0");
-	// A summon key restores both together (pointer travel alone only
-	// re-arms the timer, never restores).
+	await expect(shots).toHaveCSS("opacity", "0");
+	// A summon key restores everything together (pointer travel alone
+	// only re-arms the timer, never restores).
 	await page.mouse.move(400, 200);
 	await expect(prompt).toHaveClass(/prompt-idle/);
 	await page.keyboard.press("i");
 	await expect(prompt).not.toHaveClass(/prompt-idle/, { timeout: 5_000 });
 	await expect(marker).toBeVisible({ timeout: 5_000 });
+	await expect(shots).toHaveCSS("opacity", "1", { timeout: 5_000 });
 });
 
 test("empty chat never idle-hides the composer", async ({ page }) => {

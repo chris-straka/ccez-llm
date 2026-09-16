@@ -153,6 +153,21 @@ test("failed OCR surfaces inline, tag deletion clears it", async ({ page }) => {
 	await expect(page.locator(".cm-content")).toContainText("hello");
 });
 
+test("composer shows image cards above the prompt", async ({ page }) => {
+	await dropImage(page);
+	// The persistent preview: thumbnail only, no pill chrome — one
+	// card per image, stacked above the prompt, never overlapping it.
+	const shots = page.locator(".composer-shots");
+	await expect(shots).toBeVisible({ timeout: 15_000 });
+	const shot = shots.locator("img.composer-shot").first();
+	await expect(shot).toBeVisible();
+	expect(await shot.getAttribute("src")).toMatch(/^data:image\//);
+	const shotsBox = await shots.boundingBox();
+	const promptBox = await page.locator(".prompt").boundingBox();
+	if (!shotsBox || !promptBox) throw new Error("missing boxes");
+	expect(shotsBox.y + shotsBox.height).toBeLessThanOrEqual(promptBox.y + 1);
+});
+
 test("attachment links never cover message text", async ({ page }) => {
 	await dropImage(page);
 	const marker = page.locator(".cm-attach-marker").first();

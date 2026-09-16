@@ -1969,7 +1969,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * steers programmatic scrolls), while the thread runs full-height
 	 * behind the frosted card so mid-thread text bleeds through.
 	 * Main-level padding covers only the in-flow attachment strip,
-	 * preview, and error, which live outside the scroller. The extra
+	 * preview, desktop cards, and error, which live outside the scroller. The extra
 	 * 54px also clears short last messages' badges, which float
 	 * above their quote and would otherwise park under the card,
 	 * unclickable. The reserve NEVER collapses while parked:
@@ -1998,15 +1998,18 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// to protect, hero owns the space per stylesheet.
 			const emptyChat = viewChat.messages.length === 0;
 			box.style.paddingBottom = emptyChat ? "0px" : `${clearPx}px`;
-			// The attachment strip, preview, and error sit in main flow
-			// between the scroller and the card: main-level padding
+			// The attachment strip, preview, cards, and error sit in main
+			// flow between the scroller and the card: main-level padding
 			// lifts them above the card while any is rendered. Binary,
 			// so park/summon (transform-only, layout kept) never move
 			// anything; only attaching/removing shifts, which is the
-			// user's own gesture. Empty chats keep today's floor.
+			// user's own gesture. Empty chats keep today's floor. The
+			// intake read subscribes the lift (the DOM query alone would
+			// miss the attach that just rendered it).
 			const stripOpen =
-				mainEl.querySelector(":scope > .attachments, :scope > .preview, :scope > .attach-error") !==
-				null;
+				mainEl.querySelector(
+					":scope > .attachments, :scope > .preview, :scope > .composer-shots, :scope > .attach-error"
+				) !== null || attachments.some((a) => a.kind === "image" && a.dataUrl);
 			mainEl.style.paddingBottom =
 				emptyChat || stripOpen
 					? `calc(${clearPx}px + env(safe-area-inset-bottom, 0px))`
@@ -9443,6 +9446,19 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		{#if notices.inline.message && !androidUI}
 			<p class="error attach-error" class:composer-idle={promptIdle} role="alert">{notices.inline.message}</p>
 		{/if}
+		{#if !androidUI && attachments.some((a) => a.kind === "image" && a.dataUrl)}
+			<!-- Desktop image cards above the prompt: the persistent
+			preview — thumbnail only, no pill chrome (Copy/OCR live in
+			the tag's hover popup; deleting the tag drops the card).
+			Rides the prompt's idle-hide; clicks land nowhere. -->
+			<div class="composer-shots" class:composer-idle={promptIdle}>
+				{#each attachments.filter((a) => a.kind === "image") as att (att.id)}
+					{#if att.dataUrl}
+						<img class="composer-shot" src={att.dataUrl} alt={att.name} />
+					{/if}
+				{/each}
+			</div>
+		{/if}
 
 		<input
 			type="file"
@@ -12972,6 +12988,27 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		border: 1px solid #c7c7cc;
 		border-color: var(--line);
 	}
+	/* Desktop image cards: the persistent preview above the prompt.
+	Same card language as the old preview (radius, line border), one
+	scrolling row when many — never pills, never an overlay. */
+	.composer-shots {
+		display: flex;
+		gap: 0.5rem;
+		margin: 0.4rem 1.2rem 0;
+		max-width: calc(100% - 2.4rem);
+		overflow-x: auto;
+		scrollbar-width: thin;
+		box-sizing: border-box;
+	}
+	.composer-shot {
+		display: block;
+		flex: none;
+		max-width: 16rem;
+		max-height: 12rem;
+		border-radius: 8px;
+		border: 1px solid #c7c7cc;
+		border-color: var(--line);
+	}
 	.toast {
 		position: fixed;
 		/* Clear of the camera hole even when the WebView reports no
@@ -14317,18 +14354,19 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			visibility 0s;
 	}
 	/* Idle-hide covers the attachment strip too (pills, preview
-	image, error): it rides the same slide/fade as the prompt so no
-	image bubble lingers over the chat, and restores with it on the
-	next input (the class drops together with prompt-idle). */
+	image, desktop cards, error): it rides the same slide/fade as the
+	prompt so no image bubble lingers over the chat, and restores with
+	it on the next input (the class drops together with prompt-idle). */
 	.attachments,
 	.preview,
+	.composer-shots,
 	.attach-error {
 		transition:
 			transform 0.35s ease,
 			opacity 0.35s ease,
 			visibility 0s;
 	}
-	:is(.attachments, .preview, .attach-error).composer-idle {
+	:is(.attachments, .preview, .composer-shots, .attach-error).composer-idle {
 		transform: translateY(calc(100% + 2rem));
 		opacity: 0;
 		visibility: hidden;
@@ -14349,6 +14387,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		.app:not([data-android]) .prompt-tools,
 		.attachments,
 		.preview,
+		.composer-shots,
 		.attach-error {
 			transition: none;
 		}
