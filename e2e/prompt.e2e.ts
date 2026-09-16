@@ -124,10 +124,11 @@ test("summoning the parked composer keeps the tail visible", async ({ page }) =>
 	).toBe(parkedTop);
 });
 
-/** The composer is frosted, not opaque: thread text bleeds through
-blurred instead of hiding behind the card, while the composer's own
-text keeps a readable backing. */
-test("composer card is translucent with backdrop blur", async ({ page }) => {
+/** The composer is solid and opaque: no translucency, no backdrop
+blur anywhere (legacy opacity keys in older saves purge unread).
+The thread still runs full-height behind the floating card — the
+tail reserve keeps it clear — but nothing ghosts through. */
+test("composer card is solid with no backdrop blur", async ({ page }) => {
 	const lines = Array.from(
 		{ length: 30 },
 		(_, i) => `tail line ${i} with enough words to wrap and overflow the viewport`
@@ -137,7 +138,7 @@ test("composer card is translucent with backdrop blur", async ({ page }) => {
 			window.localStorage.setItem("ccez-mock-provider", "1");
 			window.localStorage.setItem(
 				"ccez-llm-settings-v1",
-				JSON.stringify({ promptIdleSec: 0, composerOpacity: 0.5 })
+				JSON.stringify({ promptIdleSec: 0, composerOpacity: 0.5, bgOpacity: 0.5 })
 			);
 			window.localStorage.setItem(
 				"ccez-llm-chats-v1",
@@ -179,15 +180,15 @@ test("composer card is translucent with backdrop blur", async ({ page }) => {
 			blur: `${style.backdropFilter} ${style.getPropertyValue("-webkit-backdrop-filter")}`
 		};
 	});
-	expect(glass.alpha).toBeLessThan(1);
-	expect(glass.blur).toMatch(/blur\(/);
+	expect(glass.alpha).toBe(1);
+	// Absent filters serialize as "none" (either prefix), never blur().
+	expect(glass.blur).not.toMatch(/blur\(/);
 });
 
-/** The composer is frosted by default: capped 75% alpha with blur,
-so thread text bleeds through (an opaque default buried the bleed;
-the slider only deepens below the cap, and the glass class still
-gates that slider state). */
-test("composer card is frosted by default", async ({ page }) => {
+/** The composer is solid by default: fully opaque, no backdrop blur
+(the frost experiments are gone; the card floats over the thread on
+the tail reserve, never ghosts through it). */
+test("composer card is solid by default", async ({ page }) => {
 	await page.addInitScript(() => {
 		window.localStorage.setItem("ccez-mock-provider", "1");
 		window.localStorage.setItem(
@@ -230,17 +231,18 @@ test("composer card is frosted by default", async ({ page }) => {
 			blur: `${style.backdropFilter} ${style.getPropertyValue("-webkit-backdrop-filter")}`
 		};
 	});
-	expect(glass.alpha).toBeGreaterThan(0);
-	expect(glass.alpha).toBeLessThanOrEqual(0.75);
-	expect(glass.blur).toMatch(/blur\(/);
+	expect(glass.alpha).toBe(1);
+	// Absent filters serialize as "none" (either prefix), never blur().
+	expect(glass.blur).not.toMatch(/blur\(/);
 });
 
-/** The thread runs full-height behind the frosted card: mid-thread
-text overlaps the composer's rect (the bleed the blur acts on). A
-main-level reserve would shrink the scroller and clip everything
-above the card instead. Measured synchronously so the stick glide
-can't re-pin between the scroll and the read. */
-test("thread paints behind the frosted composer", async ({ page }) => {
+/** The thread runs full-height behind the floating card: mid-thread
+text overlaps the composer's rect (the solid card covers it; the
+tail reserve keeps the last line clear). A main-level reserve would
+shrink the scroller and clip everything above the card instead.
+Measured synchronously so the stick glide can't re-pin between the
+scroll and the read. */
+test("thread paints behind the floating composer", async ({ page }) => {
 	const lines = Array.from(
 		{ length: 30 },
 		(_, i) => `tail line ${i} with enough words to wrap and overflow the viewport`

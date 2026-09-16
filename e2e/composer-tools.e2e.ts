@@ -29,6 +29,22 @@ test("voice toggle is an icon with no text", async ({ page }) => {
 	expect(await voice.locator("svg").count()).toBe(1);
 });
 
+test("paperclip opens the file picker and files a card", async ({ page }) => {
+	// The button itself fires (drop coverage never touches it): the
+	// native picker opens, and choosing the bmp fixture runs the full
+	// attach path to a tray card with its composer tag.
+	const btn = page.locator(".prompt-tools .attach-btn");
+	await expect(btn).toBeVisible();
+	const [chooser] = await Promise.all([
+		page.waitForEvent("filechooser", { timeout: 10_000 }),
+		btn.click()
+	]);
+	await chooser.setFiles("e2e/fixtures/attach.bmp");
+	const card = page.locator(".attachments li");
+	await expect(card).toBeVisible({ timeout: 15_000 });
+	await expect(page.locator(".cm-content")).toContainText("[Pasted image]");
+});
+
 test("annotation tracker is a count badge left of the paperclip", async ({
 	page
 }) => {

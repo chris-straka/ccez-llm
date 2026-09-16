@@ -2056,7 +2056,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			}
 			// A lengthening draft grows the reserve under the card:
 			// when stuck to the bottom, re-stick past it or the tail
-			// slides under the frosted card as you type. Park, summon,
+			// slides under the solid card as you type. Park, summon,
 			// and restores never change the reserve, so they never
 			// move the thread; mid-thread readers and touch holds
 			// never move either; phones keep their bottom-anchored card.
@@ -2208,19 +2208,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		apply();
 		if (mode === "system") query.addEventListener("change", apply);
 		return () => query.removeEventListener("change", apply);
-	});
-
-	/**
-	 * Whole-window alpha rides on <html> too: the root paints beneath
-	 * .app, so the Transparency slider must thin every layer down to
-	 * the webview canvas. An opaque <html> caps the effect — and on a
-	 * mismatched OS/app theme it reads as darkening instead of
-	 * thinning. .app keeps its own copy (see the root div style, which
-	 * the settings tests pin) — same source value, inherited by
-	 * everything between.
-	 */
-	$effect(() => {
-		document.documentElement.style.setProperty("--bg-alpha", String(settings.bgOpacity ?? 1));
 	});
 
 	/**
@@ -8683,7 +8670,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	data-shell={tauriBackendAvailable() ? "tauri" : "browser"}
 	data-android={androidUI || null}
 	data-ios={iosUI || null}
-	style="--font-scale: {androidUI ? Math.min(8, settings.fontScale) : settings.fontScale}; --chat-width: {effectiveChatWidth(androidUI, settings.fontScale, settings.chatWidth ?? 36)}; --bg-alpha: {settings.bgOpacity ?? 1}; --prompt-alpha: {settings.composerOpacity ?? 1}"
+	style="--font-scale: {androidUI ? Math.min(8, settings.fontScale) : settings.fontScale}; --chat-width: {effectiveChatWidth(androidUI, settings.fontScale, settings.chatWidth ?? 36)}"
 	data-mac={isMac && !androidUI || null}
 >
 	<aside class:collapsed={settings.sidebarCollapsed} inert={settings.sidebarCollapsed} data-fade-scroll
@@ -9537,7 +9524,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			class="prompt"
 			class:has-anns={annotations.length > 0}
 			class:has-mic={canMic && settings.micEnabled}
-			class:glass={Math.min(settings.composerOpacity ?? 1, settings.bgOpacity ?? 1) < 1}
 			class:prompt-hidden={!!annPop && androidUI && !iosUI}
 			class:prompt-idle={promptParked()}
 			class:prompt-preview={previewing && viewChat.messages.length === 0}
@@ -10439,10 +10425,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		color: #1c1c1e;
 		color: var(--ink);
 		background: #fff;
-		/* Whole-app opacity rides --bg-alpha (fully opaque reads
-		exactly as before; lower values need a transparent window to
-		show the wallpaper through). */
-		background: color-mix(in srgb, var(--bg) calc(var(--bg-alpha, 1) * 100%), transparent);
+		background: var(--bg);
 		color-scheme: light dark;
 		/* Phones never pan sideways: a horizontal drift is a gesture,
 		not a scroll (it used to open settings by accident). clip, not
@@ -10460,7 +10443,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		width: 13rem;
 		z-index: 55;
 		background: #fff;
-		background: color-mix(in srgb, var(--bg) calc(var(--bg-alpha, 1) * 100%), transparent);
+		background: var(--bg);
 		box-shadow: 8px 0 24px rgba(0, 0, 0, 0.12);
 		border-right: 1px solid #e5e5ea;
 		border-right-color: var(--line-soft);
@@ -10745,9 +10728,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		overflow-x: hidden;
 		background: #fff;
 		background: var(--bg);
-		/* Full-height drawer: rides whole-window Transparency like
-		the chat list, so the slider thins the entire window. */
-		background: color-mix(in srgb, var(--bg) calc(var(--bg-alpha, 1) * 100%), transparent);
 		/* Same drawer contract as the chat list (see aside): the
 		fade used to finish first and swallow the closing slide. */
 		transition:
@@ -10782,9 +10762,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		overflow-y: auto;
 		background: #fff;
 		background: var(--bg);
-		/* Transient overlay, still part of the window: rides
-		whole-window Transparency (the dim veil stays). */
-		background: color-mix(in srgb, var(--bg) calc(var(--bg-alpha, 1) * 100%), transparent);
 		color: #1c1c1e;
 		color: var(--ink);
 		border: 1px solid #e5e5ea;
@@ -11573,7 +11550,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		padding: 0.5rem;
 		border-radius: 12px;
 		background: #fff;
-		background: color-mix(in srgb, var(--bg-raised) calc(var(--bg-alpha, 1) * 100%), transparent);
+		background: var(--bg-raised);
 	}
 	.app[data-android] .prompt:has(.ann-dock) .ann-dock {
 		flex: 1 1 0;
@@ -13108,10 +13085,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		opacity: 0.45;
 		cursor: default;
 	}
-	/* The tray never takes the composer's glass: pills float over the
-	thread with the text visible between them (the frosted prompt card
-	below owns the bleed). A veil here read as a white block occluding
-	the messages, so the strip stays transparent at any opacity. */
+	/* The tray paints no background of its own: pills float over the
+	thread with the text visible between them (a veil here read as a
+	white block occluding the messages). Surfaces are solid now —
+	no frost anywhere — so the strip simply stays transparent. */
 	.preview {
 		display: block;
 		max-width: 16rem;
@@ -14410,20 +14387,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		padding: 0 0.8rem 2.3rem;
 		background: #fff;
 		/* Raised, not flat: dark keeps the #1c1c1e card on the #17171a page. */
-		background: color-mix(in srgb, var(--bg-raised) calc(var(--bg-alpha, 1) * 100%), transparent);
-		/* Frosted, always: thread text bleeds through blurred instead
-		of hiding behind an opaque card (no structural change needed —
-		the filter applies to the existing card; the border keeps the
-		edge and the composer's own text paints above, crisp). Capped
-		at 75% so the bleed always reads, slider or not; lower
-		whole-app Transparency still wins below that. */
-		background: color-mix(
-			in srgb,
-			var(--bg-raised) calc(min(0.75, var(--bg-alpha, 1)) * 100%),
-			transparent
-		);
-		-webkit-backdrop-filter: blur(18px) saturate(1.6);
-		backdrop-filter: blur(18px) saturate(1.6);
+		background: var(--bg-raised);
 		/* Fixed floor so mounting the editor never shifts layout.
 		CodeMirror itself sets no minimum — this floor is ours, at
 		about three text lines plus the tools row. */
@@ -14437,19 +14401,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			transform 0.25s ease,
 			opacity 0.25s ease,
 			visibility 0s linear 0.25s;
-	}
-	/* Slider-deepened frost (see the Composer transparency slider,
-	desktop only): below the always-on 75% cap the card goes more
-	transparent still. Lower whole-app Transparency wins below the
-	slider either way. */
-	.prompt.glass {
-		background: color-mix(
-			in srgb,
-			var(--bg-raised) calc(min(var(--prompt-alpha, 1), var(--bg-alpha, 1)) * 100%),
-			transparent
-		);
-		-webkit-backdrop-filter: blur(18px) saturate(1.6);
-		backdrop-filter: blur(18px) saturate(1.6);
 	}
 	/* Restoring from idle drops the class on the input event itself:
 	visibility must flip at once (no delay), while the slide and

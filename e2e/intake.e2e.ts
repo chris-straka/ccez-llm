@@ -315,37 +315,27 @@ test("expanded pasted content contracts from either blue bracket", async ({ page
 	await expect(body.locator("button.paste-fold", { hasText: "[paste 4 chars]" })).toBeVisible();
 });
 
-test("tray stays transparent below full composer opacity", async ({ page }) => {
-	// The frosted prompt card owns the bleed; the pill tray above it
-	// never takes the glass veil (it read as a white block occluding
-	// thread text — pills float with the text visible between them).
-	await page.addInitScript(() => {
-		window.localStorage.setItem(
-			"ccez-llm-settings-v1",
-			JSON.stringify({
-				hoverAssistantActions: true,
-				hoverUserActions: true,
-				promptIdleSec: 0,
-				composerOpacity: 0.7,
-				bgOpacity: 1
-			})
-		);
-	});
+test("tray stays background-free under a solid prompt", async ({ page }) => {
+	// Surfaces are solid now (no frost anywhere): the prompt card is
+	// opaque, while the pill tray above it paints no background —
+	// pills float with the thread visible between them, and image
+	// cards float bare with no wash block behind the thumbnails.
 	await page.reload();
 	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
 	await dropImage(page);
 	const tray = page.locator("ul.attachments").first();
 	await expect(tray).toBeVisible({ timeout: 15_000 });
-	await expect(tray).not.toHaveClass(/glass/);
 	const style = await tray.evaluate((el) => {
 		const css = getComputedStyle(el);
 		return { bg: css.backgroundColor, blur: css.backdropFilter };
 	});
 	expect(style.bg).toBe("rgba(0, 0, 0, 0)");
 	expect(style.blur).toBe("none");
-	// The prompt card itself still bleeds frosted.
-	await expect(page.locator("main .prompt")).toHaveClass(/glass/);
-	// Image cards float bare: no wash block behind the thumbnails.
+	const prompt = await page.locator("main .prompt").evaluate((el) => {
+		const css = getComputedStyle(el);
+		return { bg: css.backgroundColor, blur: css.backdropFilter };
+	});
+	expect(prompt.blur).toBe("none");
 	const cardBg = await page
 		.locator("ul.attachments li.card")
 		.first()

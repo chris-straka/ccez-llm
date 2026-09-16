@@ -92,16 +92,18 @@ describe("settings", () => {
 		expect(loadSettings(memoryStore).fontScale).toBe(1);
 	});
 
-	it("defaults the composer to opaque and clamps its slider range", () => {
-		expect(defaultSettings().composerOpacity).toBe(1);
-		const kept = blankSettings();
-		kept.composerOpacity = 0.5;
-		saveSettings(kept, memoryStore);
-		expect(loadSettings(memoryStore).composerOpacity).toBe(0.5);
-		const over = blankSettings();
-		over.composerOpacity = 0.1;
-		saveSettings(over, memoryStore);
-		expect(loadSettings(memoryStore).composerOpacity).toBe(1);
+	it("drops legacy transparency keys from older saves", () => {
+		// The opacity sliders are gone (surfaces are solid now): stored
+		// values purge on load like other retired keys.
+		const s = blankSettings() as unknown as Record<string, unknown>;
+		s.bgOpacity = 0.5;
+		s.composerOpacity = 0.5;
+		saveSettings(s as never, memoryStore);
+		const loaded = loadSettings(memoryStore) as unknown as Record<string, unknown>;
+		expect("bgOpacity" in loaded).toBe(false);
+		expect("composerOpacity" in loaded).toBe(false);
+		expect("bgOpacity" in defaultSettings()).toBe(false);
+		expect("composerOpacity" in defaultSettings()).toBe(false);
 	});
 
 	it("defaults chat width to the legacy column and clamps strays", () => {

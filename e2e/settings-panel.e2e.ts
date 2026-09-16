@@ -173,84 +173,34 @@ test("own-bubble switch keeps left alignment, background follows", async ({ page
 	await expect(bubble).toHaveCSS("text-align", "left");
 });
 
-/** Transparency slider applies the alpha var and resets to opaque. */
-test("transparency slider applies and resets", async ({ page }) => {
-	const slider = page.locator('.settings-panel input[aria-label="Background transparency percent"]');
-	await expect(slider).toHaveAttribute("max", "80");
-	await slider.fill("50");
-	await expect(page.locator(".app")).toHaveAttribute("style", /--bg-alpha: 0\.5/);
-	await page.locator('.settings-panel button[title="Reset to fully opaque"]').click();
-	await expect(page.locator(".app")).toHaveAttribute("style", /--bg-alpha: 1/);
-});
-
-/** Transparency slider thins the root without recoloring: the alpha
-reaches <html> (the layer beneath .app), and the hue channels hold
-steady against the opaque baseline. An opaque root used to cap the
-slider — and on a mismatched OS/app theme it read as darkening. */
-test("transparency slider thins the root without recoloring", async ({ page }) => {
-	const slider = page.locator('.settings-panel input[aria-label="Background transparency percent"]');
-	// Channels normalize to 0-255: engines serialize the same color
-	// as rgba() commas, space-separated rgb(), or color(srgb …) unit
-	// floats, so compare numerically, never as strings.
-	const parse = (color: string): { channels: number[]; alpha: number } => {
-		const inner = color.match(/^(?:rgba?|color)\(([^)]+)\)$/)?.[1] ?? "";
-		if (inner.includes(",")) {
-			const parts = inner.split(",").map((part) => parseFloat(part.trim()));
-			return { channels: parts.slice(0, 3), alpha: parts.length === 4 ? parts[3]! : 1 };
-		}
-		const [left = "", right = "1"] = inner.split("/");
-		const unit = left.includes("srgb");
-		const channels = left
-			.replace(/^[a-z]+\s+/, "")
-			.trim()
-			.split(/\s+/)
-			.filter((part) => part.length > 0)
-			.map((part) => parseFloat(part) * (unit ? 255 : 1));
-		return { channels, alpha: parseFloat(right) };
-	};
-	const sameHue = (a: number[], b: number[]): void => {
-		expect(a.length).toBe(3);
-		expect(b.length).toBe(3);
-		for (const [i, v] of a.entries()) expect(v).toBeCloseTo(b[i]!, 0);
-	};
-	await expect(slider).toHaveAttribute("max", "80");
-	await slider.fill("50");
-	const thinned = await page.evaluate(() => {
-		const bg = (el: Element | null): string =>
-			el ? getComputedStyle(el).backgroundColor : "";
+/** No transparency sliders: surfaces are solid, so neither control
+exists and no alpha vars reach the app root. */
+test("transparency sliders are gone and surfaces stay solid", async ({ page }) => {
+	await expect(
+		page.locator('.settings-panel input[aria-label="Background transparency percent"]')
+	).toHaveCount(0);
+	await expect(
+		page.locator('.settings-panel input[aria-label="Composer transparency percent"]')
+	).toHaveCount(0);
+	const style = await page.locator(".app").getAttribute("style");
+	expect(style ?? "").not.toMatch(/--bg-alpha|--prompt-alpha/);
+	const solid = await page.evaluate(() => {
+		const alpha = (el: Element | null): number => {
+			const bg = el ? getComputedStyle(el).backgroundColor : "";
+			const inner = bg.match(/^(?:rgba?|color)\(([^)]+)\)$/)?.[1] ?? "";
+			if (inner.includes(",")) {
+				const parts = inner.split(",").map((part) => part.trim());
+				return parts.length === 4 ? parseFloat(parts[3]!) : 1;
+			}
+			return parseFloat(inner.match(/\/\s*([\d.]+)\s*$/)?.[1] ?? "1");
+		};
 		return {
-			app: bg(document.querySelector(".app")),
-			root: bg(document.documentElement)
+			app: alpha(document.querySelector(".app")),
+			prompt: alpha(document.querySelector("main .prompt"))
 		};
 	});
-	expect(parse(thinned.app).alpha).toBeCloseTo(0.5, 1);
-	expect(parse(thinned.root).alpha).toBeCloseTo(0.5, 1);
-	await page.locator('.settings-panel button[title="Reset to fully opaque"]').click();
-	const opaque = await page.evaluate(() => {
-		const bg = (el: Element | null): string =>
-			el ? getComputedStyle(el).backgroundColor : "";
-		return {
-			app: bg(document.querySelector(".app")),
-			root: bg(document.documentElement)
-		};
-	});
-	// Same hue top to bottom, then and now: only the alpha moved.
-	sameHue(parse(thinned.app).channels, parse(opaque.app).channels);
-	sameHue(parse(thinned.root).channels, parse(opaque.root).channels);
-	expect(parse(opaque.app).alpha).toBeCloseTo(1, 1);
-	expect(parse(opaque.root).alpha).toBeCloseTo(1, 1);
-});
-
-/** Composer transparency slider applies the prompt var and resets. */
-test("composer transparency slider applies and resets", async ({ page }) => {
-	const slider = page.locator('.settings-panel input[aria-label="Composer transparency percent"]');
-	await expect(slider).toHaveAttribute("max", "80");
-	await slider.fill("50");
-	await expect(page.locator(".app")).toHaveAttribute("style", /--prompt-alpha: 0\.5/);
-	await expect(page.locator("main .prompt")).toHaveClass(/glass/);
-	await page.locator('.settings-panel button[title="Reset composer to fully opaque"]').click();
-	await expect(page.locator(".app")).toHaveAttribute("style", /--prompt-alpha: 1/);
-	await expect(page.locator("main .prompt")).not.toHaveClass(/glass/);
+	expect(solid.app).toBe(1);
+	expect(solid.prompt).toBe(1);
 });
 
 /** Background reply ping has an opt-out, on by default, persisted. */

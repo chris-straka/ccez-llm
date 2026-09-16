@@ -179,60 +179,6 @@
 		</span>
 	</label>
 	{#if !androidUI}
-	<label class="slider-row">
-		Transparency
-		<button
-			type="button"
-			class="reset-width"
-			title="Reset to fully opaque"
-			onclick={() => (settings.bgOpacity = 1)}>(0%)</button
-		>
-		<span class="font-row">
-			<input
-				type="range"
-				min="0"
-				max="80"
-				step="5"
-				value={Math.round((1 - (settings.bgOpacity ?? 1)) * 100)}
-				aria-label="Background transparency percent"
-				onpointerdown={noteSliderPress}
-				onpointerup={(e) => sliderRelease(e, () => (settings.bgOpacity = 1))}
-				oninput={(e) => {
-					settings.bgOpacity = 1 - Number(e.currentTarget.value) / 100;
-				}}
-			/>
-			<output>{Math.round((1 - (settings.bgOpacity ?? 1)) * 100)}%</output>
-		</span>
-	</label>
-	{/if}
-	{#if !androidUI}
-		<label class="slider-row">
-			Composer transparency
-			<button
-				type="button"
-				class="reset-width"
-				title="Reset composer to fully opaque"
-				onclick={() => (settings.composerOpacity = 1)}>(0%)</button
-			>
-			<span class="font-row">
-				<input
-					type="range"
-					min="0"
-					max="80"
-					step="5"
-					value={Math.round((1 - (settings.composerOpacity ?? 1)) * 100)}
-					aria-label="Composer transparency percent"
-					onpointerdown={noteSliderPress}
-					onpointerup={(e) => sliderRelease(e, () => (settings.composerOpacity = 1))}
-					oninput={(e) => {
-						settings.composerOpacity = 1 - Number(e.currentTarget.value) / 100;
-					}}
-				/>
-				<output>{Math.round((1 - (settings.composerOpacity ?? 1)) * 100)}%</output>
-			</span>
-		</label>
-	{/if}
-	{#if !androidUI}
 		<label class="slider-row">
 			Chat width
 			<button

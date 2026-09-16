@@ -118,12 +118,6 @@ export interface AppSettings {
 	 * slides down out of view (any input restores it instantly).
 	 */
 	promptIdleSec: number;
-	/** Whole-app background opacity, 0.2–1 (1 = fully opaque).
-	Shown in settings as Transparency, 0–80%. */
-	bgOpacity: number;
-	/** Composer card opacity, 0.2–1 (1 = fully opaque, the default).
-	Shown in settings as Composer transparency, 0–80%, desktop only. */
-	composerOpacity: number;
 	/** Color-scheme override (system follows the OS). */
 	theme: ThemeMode;
 	/**
@@ -302,8 +296,6 @@ export function defaultSettings(): AppSettings {
 		hoverAssistantActions: true,
 		scaleActionsWithFont: false,
 		promptIdleSec: PROMPT_IDLE_DEFAULT,
-		bgOpacity: 1,
-		composerOpacity: 1,
 		voiceLangPinned: false,
 		theme: "system",
 		hideMessages: false,
@@ -374,7 +366,13 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 		// callout now always stays, with Annotate above it), and the
 		// retired overlay message-buttons pill (rows are always in
 		// flow now).
-		dropRetiredKeys(merged, ["translateTarget", "iosNativeCallout", "overlayActions"]);
+		dropRetiredKeys(merged, [
+			"translateTarget",
+			"iosNativeCallout",
+			"overlayActions",
+			"bgOpacity",
+			"composerOpacity"
+		]);
 		// Backfill user-added providers on older saves.
 		if (!Array.isArray(merged.customProviders)) merged.customProviders = [];
 		// An active provider that no longer exists (deleted custom) falls
@@ -398,19 +396,6 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 			!(merged.fontScale >= FONT_SCALE_MIN && merged.fontScale <= FONT_SCALE_MAX)
 		) {
 			merged.fontScale = 1;
-		}
-		// Clamp the background opacity into its slider range
-		// (shown as Transparency, 0–80%).
-		if (typeof merged.bgOpacity !== "number" || !(merged.bgOpacity >= 0.2 && merged.bgOpacity <= 1)) {
-			merged.bgOpacity = 1;
-		}
-		// Clamp the composer opacity into its slider range
-		// (shown as Composer transparency, 0–80%, desktop only).
-		if (
-			typeof merged.composerOpacity !== "number" ||
-			!(merged.composerOpacity >= 0.2 && merged.composerOpacity <= 1)
-		) {
-			merged.composerOpacity = 1;
 		}
 		// Backfill the desktop chat width on older saves; clamp strays
 		// into range (rounded to whole rem, the slider's step).
