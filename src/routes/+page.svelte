@@ -12937,9 +12937,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.review-item {
 		border-radius: 8px;
 		padding: 0.35rem 0.5rem;
-		/* The whole item jumps on a clean press: the pointer says so
-		(buttons and fields keep their own cursors underneath). */
-		cursor: pointer;
+		/* Default cursor throughout: only the quote button points (see
+		.review-quote) — the row itself navigates nowhere. */
 	}
 	.review-item.highlight {
 		background: #eef4ff;

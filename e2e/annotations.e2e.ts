@@ -1307,7 +1307,11 @@ test("review pencil hover moves no icons", async ({ page }) => {
 			pencilDeco: style(".review-pencil").textDecorationLine,
 			pencilColor: style(".review-pencil").color,
 			pencilBg: style(".review-pencil").backgroundColor,
-			pencilFilter: style(".review-pencil").filter
+			pencilFilter: style(".review-pencil").filter,
+			// The row itself navigates nowhere: default cursor on the
+			// item, pointer only on the quote button.
+			itemCursor: style(".review-item").cursor,
+			quoteCursor: style(".review-quote").cursor
 		};
 	});
 	expect(paint).toEqual({
@@ -1315,7 +1319,9 @@ test("review pencil hover moves no icons", async ({ page }) => {
 		pencilDeco: "none",
 		pencilColor: "rgb(90, 155, 247)",
 		pencilBg: "rgba(0, 0, 0, 0)",
-		pencilFilter: "none"
+		pencilFilter: "none",
+		itemCursor: "auto",
+		quoteCursor: "pointer"
 	});
 	// The delete icon goes Clear-all red, never underlined — and holds
 	// its box like the rest.
