@@ -17,3 +17,8 @@ test-results/*
 # Local pnpm runs regenerate this; the committed lockfile is bun.lock.
 # (A committed pnpm-lock.yaml breaks Cloudflare Pages frozen installs.)
 pnpm-lock.yaml
+# Same family, also local-only: pnpm's release-age exemptions declare
+# no workspaces (no packages: key), and .mise.toml pins a node the
+# bun-run toolchain never reads.
+pnpm-workspace.yaml
+.mise.toml
