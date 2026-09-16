@@ -257,6 +257,34 @@ test("review rows are one line with copy at the end", async ({ page }) => {
 	expect(order).toBe(true);
 });
 
+/** The note stays readable on both themes: it rides the quiet voice
+(#6e6e73 on the white light card, #98989f on the dark card) instead
+of the pale dark-card grey, which washes out on white. */
+for (const theme of ["light", "dark"] as const) {
+	test(`review note reads on ${theme}`, async ({ page }) => {
+		await page.addInitScript(
+			(name: string) => {
+				const raw = window.localStorage.getItem("ccez-llm-settings-v1") ?? "{}";
+				window.localStorage.setItem(
+					"ccez-llm-settings-v1",
+					JSON.stringify({ ...JSON.parse(raw), theme: name })
+				);
+			},
+			theme
+		);
+		await page.goto("/");
+		await expect(page.locator("article .rendered").first()).toBeVisible();
+		await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+		await annotateWord(page);
+		await page.locator(".prompt-tools .ann-pill").click();
+		await expect(page.locator(".ann-wrap.pinned .review")).toBeVisible();
+		await expect(page.locator(".review-comment").first()).toHaveCSS(
+			"color",
+			theme === "light" ? "rgb(110, 110, 115)" : "rgb(152, 152, 159)"
+		);
+	});
+}
+
 /** A jump leaves an already-clear mark exactly where it is: no scroll
 fires at all, but the wash still blinks (the jump happened). Never by
 message `center` (which overshoots past the mark in a long message).

@@ -12340,9 +12340,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.ann-refs-quote:hover {
 		text-decoration: underline;
 	}
-	/* Same voice as the composer card's note (see .review-comment):
-	grey italic gloss on the quote — the row editor below stays
-	roman, like every other field. */
+	/* Pale grey italic gloss on the quote — this card stays dark in
+	both themes, so the pale grey holds here (the light drafting
+	card's note rides the quiet voice instead, see .review-comment).
+	The row editor below stays roman, like every other field. */
 	.ann-refs-comment {
 		color: #c7c7cc;
 		font-style: italic;
@@ -13006,11 +13007,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		-webkit-user-select: none;
 	}
 	/* The note reads like a previous message's annotation
-	(same grey, italic): it is a gloss on the quote, not body text.
-	One line that scrolls sideways, so the full note fits without
-	stretching the row. */
+	(italic gloss on the quote, not body text): it rides the quiet
+	voice so it stays readable on the white light-theme card, where
+	the pale dark-card grey washes out. One line that scrolls
+	sideways, so the full note fits without stretching the row. */
 	.review-comment {
-		color: #c7c7cc;
+		color: #6e6e73;
+		color: var(--muted);
 		font-style: italic;
 		white-space: nowrap;
 		overflow-x: auto;
