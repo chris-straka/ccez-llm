@@ -87,6 +87,7 @@
 	import { createTextareaEditor } from "$lib/textarea-editor";
 	import {
 		SCROLLKEY_LINE_PX,
+		SCROLLKEY_SKIP_PX,
 		ggArmed,
 		halfPageDy,
 		holdIsTap,
@@ -5202,9 +5203,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		cancelAnimationFrame(hold.raf);
 		viewport.hold = null;
 		scrollBox?.style.removeProperty("scroll-behavior");
-		// A tap lands the hold's own step: one line for j/k, a smooth
-		// half-page for d/u (the shared scroll effect eases it — never
-		// a jump). Holds just stop.
+		// A tap lands the hold's own step: one line for j/k, the skip
+		// step for d/u (the shared scroll effect eases it — never a
+		// jump). Holds just stop.
 		if (holdIsTap(hold.downAt, Date.now()) && scrollBox) {
 			scrollChatBy(hold.tapDy);
 		}
@@ -7603,11 +7604,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							lastGAt = Date.now();
 						} else {
 							lastGAt = 0;
-							if (intent.kind === "line" || intent.kind === "half-page") {
+							if (
+								intent.kind === "line" ||
+								intent.kind === "half-page" ||
+								intent.kind === "skip"
+							) {
 								// Bare d/u stay dead on phones (touch owns
-								// scrolling there); desktop fast-scrolls a
-								// smooth half-page per press and glides fast
-								// while held — never an instant jump.
+								// scrolling there); desktop skips a smooth
+								// fixed step per tap and glides fast while
+								// held — never an instant jump.
 								if (intent.kind === "half-page" && androidUI) {
 									event.preventDefault();
 									return;
@@ -7616,14 +7621,16 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 								// stutter); the loop owns repeats until keyup.
 								// Other line sources (arrows) keep stepping.
 								// Taps land the hold's own step (line for
-								// j/k, smooth half-page for d/u).
+								// j/k, skip step for d/u).
 								const velocity = scrollBox ? scrollHoldVelocity(event.key) : null;
 								if (velocity !== null) {
 									if (!event.repeat && scrollBox) {
 										const tapDy =
 											intent.kind === "half-page"
 												? halfPageDy(scrollBox.clientHeight, intent.dir)
-												: Math.sign(velocity) * SCROLLKEY_LINE_PX;
+												: intent.kind === "skip"
+													? intent.dir * SCROLLKEY_SKIP_PX
+													: Math.sign(velocity) * SCROLLKEY_LINE_PX;
 										startScrollHold(event.key, velocity, tapDy);
 									}
 								} else if (intent.kind === "line") scrollChatBy(intent.dy);
@@ -7697,13 +7704,21 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			}
 			if (scrollAction === "half-jump-up" || scrollAction === "half-jump-down") {
 				// Ctrl+U / Ctrl+D jump one instant half-page per press,
-				// vim-style (repeats jump again); bare d/u arrive here on
-				// desktop only and ride the same smooth scroll — never a
-				// jump. Shift+D keeps its delete job above.
+				// vim-style (repeats jump again). Shift+D keeps its
+				// delete job above.
 				event.preventDefault();
 				lastGAt = 0;
 				const dir: 1 | -1 = scrollAction === "half-jump-up" ? -1 : 1;
 				if (scrollBox) scrollChatBy(halfPageDy(scrollBox.clientHeight, dir));
+				return;
+			}
+			if (scrollAction === "skip-down" || scrollAction === "skip-up") {
+				// Bare d/u taps skip one smooth fixed step (a little,
+				// never a half-page) — repeats skip again.
+				event.preventDefault();
+				lastGAt = 0;
+				const dir: 1 | -1 = scrollAction === "skip-up" ? -1 : 1;
+				if (scrollBox) scrollChatBy(dir * SCROLLKEY_SKIP_PX);
 				return;
 			}
 			if (scrollAction === "enter-edit") {

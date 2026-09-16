@@ -609,6 +609,13 @@
 		padding: 0;
 		cursor: pointer;
 	}
+	/* Collapse brackets ride a hair high: the tall bracket glyphs
+	otherwise sit bottom-heavy beside x-height text. em-based, so
+	font scaling carries the nudge. */
+	.rendered :global(button.paste-fold-bracket) {
+		position: relative;
+		top: -0.07em;
+	}
 	/* Aid swaps fade the incoming body in, and fresh readings fade in
 	where they land: the model key remounts on tashkeel flips, while
 	local ruby renders in place so the base text never flashes. */

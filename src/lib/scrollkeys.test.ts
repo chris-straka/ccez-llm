@@ -6,6 +6,7 @@ import {
 	SCROLLKEY_DU_VELOCITY_PX_S,
 	SCROLLKEY_JK_VELOCITY_PX_S,
 	SCROLLKEY_LINE_PX,
+	SCROLLKEY_SKIP_PX,
 	SCROLL_HOLD_TAP_MS,
 	ggArmed,
 	halfPageDy,
@@ -28,11 +29,13 @@ describe("unselectedScrollIntent", () => {
 		expect(SCROLLKEY_LINE_PX).toBeGreaterThan(0);
 	});
 
-	it("fast-scrolls a smooth half-page on bare d/u", () => {
+	it("skips a fixed step on bare d/u (never a half-page)", () => {
 		// Phones gate this at the call site (bare taps stay dead
-		// there); the intent itself is desktop-bound.
-		expect(unselectedScrollIntent("d", false)).toEqual({ kind: "half-page", dir: 1 });
-		expect(unselectedScrollIntent("u", false)).toEqual({ kind: "half-page", dir: -1 });
+		// there); the intent itself is desktop-bound. The skip is
+		// three line steps: quick, but a little.
+		expect(SCROLLKEY_SKIP_PX).toBe(SCROLLKEY_LINE_PX * 3);
+		expect(unselectedScrollIntent("d", false)).toEqual({ kind: "skip", dir: 1 });
+		expect(unselectedScrollIntent("u", false)).toEqual({ kind: "skip", dir: -1 });
 	});
 
 	it("arms gg on the first g, tops on the second", () => {

@@ -282,7 +282,7 @@ describe("applyPasteFolds", () => {
 		expect(out).toContain("[paste 4 chars]");
 		expect(out).toContain(
 			'data-paste-fold="1" title="Collapse pasted content">[</button>DDDD' +
-				'<button type="button" class="paste-fold" data-paste-fold="1" title="Collapse pasted content">]</button>'
+				'<button type="button" class="paste-fold paste-fold-bracket" data-paste-fold="1" title="Collapse pasted content">]</button>'
 		);
 		expect(out).not.toContain("BBBB");
 		expect(out.startsWith("aa ")).toBe(true);
@@ -320,7 +320,7 @@ describe("foldSegments", () => {
 
 	it("builds collapse brackets carrying the fold toggle", () => {
 		expect(foldBracket(2, "data-paste-fold", "[")).toBe(
-			'<button type="button" class="paste-fold" data-paste-fold="2" title="Collapse pasted content">[</button>'
+			'<button type="button" class="paste-fold paste-fold-bracket" data-paste-fold="2" title="Collapse pasted content">[</button>'
 		);
 	});
 

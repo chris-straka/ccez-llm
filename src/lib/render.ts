@@ -417,7 +417,7 @@ export function foldSegments(
  */
 export function foldBracket(index: number, toggleAttr: string, bracket: "[" | "]"): string {
 	return (
-		`<button type="button" class="paste-fold" ${toggleAttr}="${index}" ` +
+		`<button type="button" class="paste-fold paste-fold-bracket" ${toggleAttr}="${index}" ` +
 		`title="Collapse pasted content">${bracket}</button>`
 	);
 }

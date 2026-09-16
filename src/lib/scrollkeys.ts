@@ -9,6 +9,13 @@
 /** One j/k step: a few lines, fixed so unit tests can pin it. */
 export const SCROLLKEY_LINE_PX = 72;
 
+/**
+ * One bare d/u tap: three j/k steps — quick without jumping a
+ * half-page per tap. Fixed like the line step so tests can pin it;
+ * held d/u still glide fast, Ctrl+U / Ctrl+D still jump half-pages.
+ */
+export const SCROLLKEY_SKIP_PX = SCROLLKEY_LINE_PX * 3;
+
 /** Stick-to-bottom slop: within this of the bottom counts as bottom. */
 export const STICK_PX = 64;
 
@@ -41,6 +48,7 @@ outside the prompt/fields/menus — the page owns the guards). */
 export type UnselectedScrollIntent =
 	| { kind: "line"; dy: number }
 	| { kind: "half-page"; dir: 1 | -1 }
+	| { kind: "skip"; dir: 1 | -1 }
 	| { kind: "gg-prefix" }
 	| { kind: "top" }
 	| { kind: "bottom" }
@@ -57,13 +65,13 @@ export function unselectedScrollIntent(key: string, gArmed: boolean): Unselected
 			return { kind: "line", dy: SCROLLKEY_LINE_PX };
 		case "k":
 			return { kind: "line", dy: -SCROLLKEY_LINE_PX };
-		// Bare d/u fast-scroll a smooth half-page on desktop (the call
-		// site gates phones, where bare taps stay dead and only
-		// Ctrl+U / Ctrl+D jump).
+		// Bare d/u skip a smooth fixed step on desktop (the call site
+		// gates phones, where bare taps stay dead and only Ctrl+U /
+		// Ctrl+D jump) — taps scroll a little, never a half-page.
 		case "d":
-			return { kind: "half-page", dir: 1 };
+			return { kind: "skip", dir: 1 };
 		case "u":
-			return { kind: "half-page", dir: -1 };
+			return { kind: "skip", dir: -1 };
 		case "g":
 			return gArmed ? { kind: "top" } : { kind: "gg-prefix" };
 		case "G":

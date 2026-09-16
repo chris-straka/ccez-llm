@@ -574,10 +574,10 @@ describe("scrollModeAction", () => {
 		expect(scrollModeAction({ ...scrollBase, key: "Enter" })).toBe("enter-edit");
 	});
 
-	it("fast-scrolls bare U/D on desktop, ignores them on phones, jumps Ctrl+U/D", () => {
-		// Desktop bare taps ride the smooth half-page (never a jump).
-		expect(scrollModeAction({ ...scrollBase, key: "u" })).toBe("half-jump-up");
-		expect(scrollModeAction({ ...scrollBase, key: "d" })).toBe("half-jump-down");
+	it("skips bare U/D on desktop, ignores them on phones, jumps Ctrl+U/D", () => {
+		// Desktop bare taps skip one fixed step (never a half-page).
+		expect(scrollModeAction({ ...scrollBase, key: "u" })).toBe("skip-up");
+		expect(scrollModeAction({ ...scrollBase, key: "d" })).toBe("skip-down");
 		// Phones keep bare taps dead; shifted bare keeps delete.
 		expect(scrollModeAction({ ...scrollBase, key: "u", phoneUI: true })).toBe(null);
 		expect(scrollModeAction({ ...scrollBase, key: "d", phoneUI: true })).toBe(null);
