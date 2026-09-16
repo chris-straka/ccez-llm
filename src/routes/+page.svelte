@@ -3516,23 +3516,37 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 */
 	function jumpToQuotedText(messageId: ChatMsgId, quote: string): void {
 		const index = viewChat.messages.findIndex((m) => m.id === messageId);
-		const article = index >= 0 ? document.querySelector(`#msg-${index}`) : null;
-		const root = article?.querySelector(".rendered") ?? article;
-		const range = root instanceof HTMLElement ? quoteRange(root, quote) : null;
+		const locate = (): Range | null => {
+			const article = index >= 0 ? document.querySelector(`#msg-${index}`) : null;
+			const root = article?.querySelector(".rendered") ?? article;
+			return root instanceof HTMLElement ? quoteRange(root, quote) : null;
+		};
+		const range = locate();
 		if (range) {
 			scrollRectIntoClear(range.getBoundingClientRect());
-			blinkJumpWash(range);
-		} else if (article instanceof HTMLElement) {
-			article.scrollIntoView({ block: "center", behavior: "smooth" });
+			blinkJumpWash(locate);
+		} else if (index >= 0) {
+			const article = document.querySelector(`#msg-${index}`);
+			if (article instanceof HTMLElement) {
+				article.scrollIntoView({ block: "center", behavior: "smooth" });
+			}
 		}
 	}
 
 	/** Flash a located quote twice, then release the highlight (a
-	re-jump restarts the schedule; expiry clears itself). */
-	function blinkJumpWash(range: Range): void {
+	re-jump restarts the schedule; expiry clears itself). Every paint
+	re-locates: a chat re-render mid-scroll (scroll-driven state swaps
+	the text nodes) detaches the old range, and repainting the same
+	dead range would blink nothing — the registry keeps it, so only a
+	fresh range keeps the flash alive. */
+	function blinkJumpWash(locate: () => Range | null): void {
 		if (jumpBlinkTimer) clearTimeout(jumpBlinkTimer);
 		jumpBlinkTimer = null;
-		if (!paintJumpWash(range)) return;
+		const paintFresh = (): boolean => {
+			const range = locate();
+			return range ? paintJumpWash(range) : false;
+		};
+		if (!paintFresh()) return;
 		let phase = 0;
 		const step = (): void => {
 			phase += 1;
@@ -3541,8 +3555,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				jumpBlinkTimer = null;
 				return;
 			}
-			if (phase % 2 === 0) paintJumpWash(range);
-			else clearJumpWash();
+			if (phase % 2 === 0) {
+				if (!paintFresh()) {
+					jumpBlinkTimer = null;
+					return;
+				}
+			} else clearJumpWash();
 			jumpBlinkTimer = setTimeout(step, phase % 2 === 0 ? 700 : 350);
 		};
 		jumpBlinkTimer = setTimeout(step, 700);

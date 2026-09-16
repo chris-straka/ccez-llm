@@ -880,6 +880,22 @@ test("sent-refs quote jumps to the quoted text with a flash", async ({ page }) =
 	await page.waitForTimeout(800);
 	const after = await page.evaluate(() => document.querySelector(".messages")?.scrollTop ?? 0);
 	expect(after).toBeLessThan(top - 50);
+	// Past the first clear: the second paint must hold a live range
+	// (each phase re-locates, so a mid-scroll re-render can't leave
+	// the registry blinking a detached range).
+	await page.waitForTimeout(300);
+	const alive = (): Promise<boolean> =>
+		page.evaluate(() => {
+			const reg = (
+				window as unknown as {
+					CSS?: { highlights?: { get(name: string): Set<Range> | undefined } };
+				}
+			).CSS?.highlights;
+			const set = reg?.get("ccez-ann-jump");
+			const ranges = set ? [...set] : [];
+			return ranges.length > 0 && ranges.every((r) => document.contains(r.startContainer));
+		});
+	await expect.poll(alive, { timeout: 5_000 }).toBe(true);
 });
 
 /** The pressed sent row blinks like a draft row (same phases), so the

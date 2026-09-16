@@ -98,6 +98,11 @@ platforms can't share one vendor's identity. So the palette is
 
 ## Log
 
+- **2026-09-16 — Sent wash re-locates per phase.** Each blink phase
+  re-runs the quote locator and paints a fresh range: a chat re-render
+  mid-scroll detaches the old range, and the registry keeps dead ranges
+  — repainting the same range blinks nothing while every probe stays
+  green. Pinned via a live-range poll in the flash test.
 - **2026-09-16 — Overlay + settings pass.** Sent-refs card follows the
   theme (panel surface, quiet note, ink icons on light; dark untouched),
   quote underlines fade via `text-decoration-color` on both cards, sent
