@@ -104,6 +104,7 @@
 	import { canEditMessage, toggleAidKinds, toggleSingleAid } from "$lib/message-actions";
 	import type { ChatProvider } from "$lib/providers/types";
 	import MessageBody from "$lib/components/MessageBody.svelte";
+	import { paintJumpWash, clearJumpWash } from "$lib/annHighlights";
 	import ActionIcon from "$lib/components/ActionIcon.svelte";
 	import SettingsPanel from "$lib/components/SettingsPanel.svelte";
 	import { plainBody, sourcesAsked } from "$lib/render";
@@ -138,6 +139,8 @@ import {
 		redactedCopyText,
 		newAnnotationId,
 		rewriteAnnotationComment,
+		quoteRange,
+		findQuotedMessage,
 		annRefsFor,
 		lockSelectionToMessage,
 		quoteTextNodes,
@@ -670,6 +673,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	then cleared — hover previews own the wash again after). */
 	let annBlink: AnnotationId | null = $state(null);
 	let annBlinkTimer: ReturnType<typeof setTimeout> | null = null;
+	/** Sent-jump flash timer: re-jumps restart it, expiry releases the
+	highlight (self-clearing — no chat-switch hook to forget). */
+	let jumpBlinkTimer: ReturnType<typeof setTimeout> | null = null;
 	/** Own message under in-place edit (null when no edit is open).
 	Enter saves + resends; Alt+Enter saves without resending; Esc cancels. */
 	let editingMsgId: ChatMsgId | null = $state(null);
@@ -3382,17 +3388,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * navigate — notes, buttons, and fields never do.
 	 */
 	/**
-	 * Whole-item press jumps to the mark (one navigation per item, not
-	 * one per control): buttons and fields keep their own behavior, an
-	 * in-progress edit never jumps from under the caret, and a
-	 * drag-select ending here is a pick — the click still fires — so
-	 * only clean presses with a collapsed selection navigate.
+	 * Quote-tap jumps to the mark — and only the quote taps: the note
+	 * stays selectable text, buttons keep their clicks, and the row's
+	 * dead space navigates nowhere. A drag-select ending here is a pick
+	 * (the click still fires), so only collapsed selections navigate.
+	 * The review closes so the landing clears the composer dock.
 	 */
-	function reviewItemClick(event: MouseEvent, ann: { id: AnnotationId; messageId: ChatMsgId }): void {
-		if (editingId === ann.id) return;
-		const target = event.target instanceof Element ? event.target : null;
-		if (target?.closest("button, input, textarea, select, a")) return;
+	function reviewQuoteClick(ann: { id: AnnotationId; messageId: ChatMsgId }): void {
 		if (!window.getSelection()?.isCollapsed) return;
+		reviewOpen = false;
 		gotoAnnotation(ann);
 	}
 
@@ -3403,12 +3407,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			return;
 		}
 		highlightAnnId = ann.id;
-		// Scroll the mark itself, minimally: nearest leaves an already
-		// visible annotation exactly where it is, while center-scrolling
-		// a long message overshoots past the mark. Fall back to the
-		// message when the badge is somehow missing.
+		// Scroll the mark itself, clear of the composer dock: an
+		// already-clear mark never moves (like nearest), but a covered
+		// one lands in the open instead of stranding behind the dock
+		// (nearest's down-landing trap). Fall back to the message when
+		// the badge is somehow missing.
 		const badge = document.querySelector(`[data-ann-badge="${ann.id}"]`);
-		if (badge instanceof HTMLElement) badge.scrollIntoView({ block: "nearest", behavior: "smooth" });
+		if (badge instanceof HTMLElement) scrollRectIntoClear(badge.getBoundingClientRect());
 		else {
 			document.querySelector(`#msg-${index}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
 		}
@@ -3416,21 +3421,37 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 
 	/**
-	 * Previous-annotations item press: the same one-jump contract as
-	 * the composer card (see reviewItemClick) — buttons keep their
-	 * clicks, and a drag-select ending here is a pick, so only clean
-	 * presses with a collapsed selection navigate. No edit state
-	 * lives in this card. The jump itself lands like a quote tap:
-	 * full goto when the annotation is still live (blink included),
-	 * a bare scroll when it was cleared after sending.
+	 * Land a located rect where it stays visible: inside the chat
+	 * column, above the composer dock (prompt plus the open review).
+	 * Already-clear rects never move; covered ones settle at a third
+	 * of the clear height so the quote reads with context around it.
 	 */
-	function refsItemClick(event: MouseEvent, messageId: ChatMsgId, quote: string): void {
+	function scrollRectIntoClear(rect: DOMRect): void {
+		const scroller = document.querySelector(".messages");
+		if (!(scroller instanceof HTMLElement)) return;
+		const area = scroller.getBoundingClientRect();
+		const prompt = document.querySelector(".prompt")?.getBoundingClientRect().height ?? 0;
+		const review = reviewOpen
+			? (document.querySelector(".ann-wrap .review")?.getBoundingClientRect().height ?? 0)
+			: 0;
+		const dock = prompt + review + 16;
+		if (rect.top >= area.top && rect.bottom <= area.bottom - dock) return;
+		const landing = area.top + Math.max(0, area.height - dock) * 0.3;
+		scroller.scrollBy({ top: rect.top - landing, behavior: "smooth" });
+	}
+
+	/**
+	 * Previous-annotations quote press: only the quote text navigates
+	 * (see reviewQuoteClick) — the note stays selectable, buttons keep
+	 * their clicks, dead space navigates nowhere. A drag-select ending
+	 * here is a pick, so only collapsed selections navigate. The jump
+	 * lands on the quoted message with a flash when it still holds the
+	 * quote, or on the sending message when the quote is gone.
+	 */
+	function refsQuoteClick(messageId: ChatMsgId, quote: string): void {
 		// A row edit owns its row: quote taps must not yank the chat
-		// out from under the caret (buttons and fields are already
-		// exempt above — this covers the quote itself).
+		// out from under the caret.
 		if (refsEditing) return;
-		const target = event.target instanceof Element ? event.target : null;
-		if (target?.closest("button, input, textarea, select, a")) return;
 		if (!window.getSelection()?.isCollapsed) return;
 		gotoSentRef(messageId, quote);
 	}
@@ -3441,6 +3462,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			gotoAnnotation({ id: live.id, messageId });
 			return;
 		}
+		// The quote lives in the message it was taken from: jump there
+		// with a flash, not to the message that sent it.
+		const quotedId = findQuotedMessage(viewChat.messages, messageId, quote);
+		if (quotedId) {
+			jumpToQuotedText(quotedId, quote);
+			return;
+		}
+		// Edited away everywhere: fall back to the sender, as before.
 		const index = viewChat.messages.findIndex((m) => m.id === messageId);
 		if (index < 0) {
 			flashErrorToast("Annotation no longer exists");
@@ -3449,6 +3478,46 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		document
 			.querySelector(`#msg-${index}`)
 			?.scrollIntoView({ block: "center", behavior: "smooth" });
+	}
+
+	/**
+	 * Sent-annotation landing: locate the quote in its owner's rendered
+	 * text, land it clear of the dock, and flash it twice like a badge
+	 * blink (same phases — see blinkAnnotation). A folded message hides
+	 * its text from the locator: land on the message itself instead.
+	 */
+	function jumpToQuotedText(messageId: ChatMsgId, quote: string): void {
+		const index = viewChat.messages.findIndex((m) => m.id === messageId);
+		const article = index >= 0 ? document.querySelector(`#msg-${index}`) : null;
+		const root = article?.querySelector(".rendered") ?? article;
+		const range = root instanceof HTMLElement ? quoteRange(root, quote) : null;
+		if (range) {
+			scrollRectIntoClear(range.getBoundingClientRect());
+			blinkJumpWash(range);
+		} else if (article instanceof HTMLElement) {
+			article.scrollIntoView({ block: "center", behavior: "smooth" });
+		}
+	}
+
+	/** Flash a located quote twice, then release the highlight (a
+	re-jump restarts the schedule; expiry clears itself). */
+	function blinkJumpWash(range: Range): void {
+		if (jumpBlinkTimer) clearTimeout(jumpBlinkTimer);
+		jumpBlinkTimer = null;
+		if (!paintJumpWash(range)) return;
+		let phase = 0;
+		const step = (): void => {
+			phase += 1;
+			if (phase >= 4) {
+				clearJumpWash();
+				jumpBlinkTimer = null;
+				return;
+			}
+			if (phase % 2 === 0) paintJumpWash(range);
+			else clearJumpWash();
+			jumpBlinkTimer = setTimeout(step, phase % 2 === 0 ? 700 : 350);
+		};
+		jumpBlinkTimer = setTimeout(step, 700);
 	}
 
 	/**
@@ -8682,19 +8751,22 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							</button>
 							<div class="ann-refs-pop" role="tooltip">
 								{#each sentRefs.refs as ref (ref.n)}
-									<!-- The whole item navigates, like the
-									composer card: one jump per annotation.
-									Buttons keep their clicks (see
-									refsItemClick), drag-selects stay picks. -->
-									<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-									<div
-										class="ann-refs-item"
-										title="Jump to this annotation in the chat"
-										onclick={(event) => refsItemClick(event, msg.id, ref.quote)}
-									>
+									<!-- Only the quote navigates, like the
+									composer card: one jump per annotation, on
+									the text itself. The note stays selectable,
+									buttons keep their clicks (see
+									refsQuoteClick), drag-selects stay picks. -->
+									<div class="ann-refs-item">
 										<span class="ann-refs-num">{ref.n}.</span>
 										<span class="ann-refs-body">
-											<span class="ann-refs-quote">“{ref.quote}”</span>
+											<button
+												type="button"
+												class="ann-refs-quote"
+												title="Jump to this annotation in the chat"
+												onclick={() => refsQuoteClick(msg.id, ref.quote)}
+											>
+												“{ref.quote}”
+											</button>
 											{#if refsEditing?.messageId === msg.id && refsEditing.n === ref.n}
 												<!-- Desktop row edit (see startRefsEdit):
 												a single-line field — newlines would
@@ -9206,21 +9278,24 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 								</button>
 							</div>
 							{#each annotations as ann, n (ann.id)}
-								<!-- The whole item navigates: one jump per
-								annotation, not one per control. Buttons and
-								fields keep their own clicks (see
-								reviewItemClick), drag-selects stay picks,
-								and an edit tap stays exactly where it is. -->
-								<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+								<!-- Only the quote navigates: one jump per
+								annotation, on the text itself. The note stays
+								selectable, buttons keep their clicks (see
+								reviewQuoteClick), drag-selects stay picks. -->
 								<div
 									class="review-item"
 									class:highlight={highlightAnnId === ann.id}
-									title="Jump to this annotation in the chat"
-									onclick={(event) => reviewItemClick(event, ann)}
 								>
 									<div class="review-head">
 										<span class="review-num">{n + 1}.</span>
-										<span class="review-quote">“{ann.quote}”</span>
+										<button
+											type="button"
+											class="review-quote"
+											title="Jump to this annotation in the chat"
+											onclick={() => reviewQuoteClick(ann)}
+										>
+											“{ann.quote}”
+										</button>
 										<button
 											type="button"
 											class="review-copy"
@@ -12245,6 +12320,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	an ellipsis — the full text lives at the mark. Notes stay
 	selectable for copying, on one line that scrolls sideways. */
 	.ann-refs-quote {
+		/* A real button (keyboard reachable), reset to text. */
+		border: 0;
+		background: none;
+		padding: 0;
+		font: inherit;
+		color: inherit;
+		text-align: left;
 		cursor: pointer;
 		user-select: none;
 		-webkit-user-select: none;
@@ -12902,7 +12984,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	to jump there). Pointer plus no-select: the quote is the jump
 	control, never a pick. */
 	.review-quote {
+		/* A real button (keyboard reachable), reset to text: the UA
+		button face must not leak into the row. */
+		border: 0;
+		background: none;
+		padding: 0;
+		font: inherit;
 		font-weight: 550;
+		color: inherit;
+		text-align: left;
 		min-width: 0;
 		white-space: nowrap;
 		overflow: hidden;
@@ -13124,6 +13214,18 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		/* Icon buttons never underline: the generic button hover above
 		draws a line under the glyph that flashes during traversal and
 		reads as the row jumping. */
+		text-decoration: none;
+	}
+	/* The quote is a button (keyboard reachable) but reads as plain
+	text: opt out of the generic head-button voice (far-edge auto
+	margin, small muted type, hover underline) the icon buttons use. */
+	.review-head button.review-quote {
+		margin-left: 0;
+		font-size: inherit;
+		color: inherit;
+	}
+	.review-head button.review-quote:hover {
+		color: inherit;
 		text-decoration: none;
 	}
 	/* Hover tints accent-blue instead of going ink: the pencil is small

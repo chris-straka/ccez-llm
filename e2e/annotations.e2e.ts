@@ -840,11 +840,52 @@ test("sent-refs card copies one annotation", async ({ page }) => {
 	expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('"bonjour" — greeting?');
 });
 
-/** Sent-refs item body click jumps to the message (cleared refs
-have no badge left to blink): the sent message scrolls by center.
-Clicking the comment used to do nothing at all. Long messages fold,
-so the landing reads off the scroll call itself, not movement. */
-test("sent-refs item click jumps to the message", async ({ page }) => {
+/** Sent-refs quote jumps to the quoted message — not the sender — and
+flashes the quote like a draft wash (a separate highlight name, so it
+never clobbers a badge wash). */
+test("sent-refs quote jumps to the quoted text with a flash", async ({ page }) => {
+	const sentence = "The quick brown fox jumps over the lazy dog near the riverbank.";
+	const filler = Array.from({ length: 10 }, (_, i) => `Filler ${i}. ${sentence} ${sentence}`).join("\n\n");
+	await seedChat(page, [
+		{ role: "assistant", content: `Kyoto in spring is lovely and bright\n\n${filler}` },
+		{ role: "user", content: 'explain this\n\nAnnotated selections:\n1. "spring" — ?' }
+	]);
+	await page.goto("/");
+	await expect(page.locator("article .rendered").first()).toBeVisible();
+	// Park at the bottom (on the sender) so the jump travels back up.
+	await page.evaluate(() => {
+		const box = document.querySelector(".messages") as HTMLElement;
+		box.style.scrollBehavior = "auto";
+		box.scrollTo({ top: 999999 });
+	});
+	const top = await page.evaluate(() => document.querySelector(".messages")?.scrollTop ?? 0);
+	expect(top).toBeGreaterThan(100);
+	await page.locator(".ann-refs-pill").first().click();
+	await page.locator(".ann-refs-quote").first().click();
+	// The flash paints on the jump (poll the registry like the wash).
+	await expect
+		.poll(
+			() =>
+				page.evaluate(
+					() =>
+						(
+							window as unknown as {
+								CSS?: { highlights?: { has(name: string): boolean } };
+							}
+						).CSS?.highlights?.has("ccez-ann-jump") ?? false
+				),
+			{ timeout: 5_000 }
+		)
+		.toBe(true);
+	await page.waitForTimeout(800);
+	const after = await page.evaluate(() => document.querySelector(".messages")?.scrollTop ?? 0);
+	expect(after).toBeLessThan(top - 50);
+});
+
+/** A sent quote edited away everywhere falls back to the sending
+message (cleared refs have no badge left to blink). Long messages
+fold, so the landing reads off the scroll call itself, not movement. */
+test("sent-refs missing quote falls back to the sender", async ({ page }) => {
 	await page.addInitScript(() => {
 		const seen: string[] = [];
 		const orig = Element.prototype.scrollIntoView;
@@ -862,12 +903,37 @@ test("sent-refs item click jumps to the message", async ({ page }) => {
 	]);
 	await page.goto("/");
 	await page.locator(".ann-refs-pill").first().click();
-	await page.locator(".ann-refs-comment").first().click();
+	await page.locator(".ann-refs-quote").first().click();
 	await page.waitForTimeout(500);
 	const seen = await page.evaluate(
 		() => (window as unknown as { __siv?: string[] }).__siv ?? []
 	);
 	expect(seen).toContain('msg-1:{"block":"center","behavior":"smooth"}');
+});
+
+/** Only the sent quote navigates: note and number clicks jump nowhere
+— no scroll, no flash, the card stays open. */
+test("sent-refs note click does not jump", async ({ page }) => {
+	await seedChat(page, [
+		{ role: "assistant", content: "Kyoto in spring is lovely and bright" },
+		{ role: "user", content: 'explain this\n\nAnnotated selections:\n1. "spring" — ?' }
+	]);
+	await page.goto("/");
+	await expect(page.locator("article .rendered").first()).toBeVisible();
+	await page.locator(".ann-refs-pill").first().click();
+	const top = await page.evaluate(() => document.querySelector(".messages")?.scrollTop ?? 0);
+	await page.locator(".ann-refs-comment").first().click();
+	await page.locator(".ann-refs-num").first().click();
+	await page.waitForTimeout(500);
+	expect(await page.evaluate(() => document.querySelector(".messages")?.scrollTop ?? 0)).toBe(top);
+	const flashed = await page.evaluate(
+		() =>
+			(window as unknown as { CSS?: { highlights?: { has(name: string): boolean } } }).CSS?.highlights?.has(
+				"ccez-ann-jump"
+			) ?? false
+	);
+	expect(flashed).toBe(false);
+	await expect(page.locator(".ann-refs-pop").first()).toHaveCSS("opacity", "1");
 });
 
 /** Picks rooted in the sent-refs card are never annotatable:

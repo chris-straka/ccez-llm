@@ -9,6 +9,7 @@ import {
 	formatAnnotations,
 	withAnnotations,
 	rewriteAnnotationComment,
+	findQuotedMessage,
 	splitAnnotationBlock,
 	locateQuote,
 	occurrenceAtPosition,
@@ -444,5 +445,32 @@ describe("refs-only display", () => {
 	it("copies refs-only quotes instead of an empty string", () => {
 		const list = addAnnotation([], "m1" as ChatMsgId, "langue", "meaning?");
 		expect(redactedCopyText(withAnnotations("", list))).toBe("langue");
+	});
+});
+
+describe("findQuotedMessage", () => {
+	const m1 = "m1" as ChatMsgId;
+	const m2 = "m2" as ChatMsgId;
+	const messages = [
+		{ id: m1, content: "Kyoto in spring is lovely" },
+		{ id: m2, content: 'explain this\n\nAnnotated selections:\n1. "spring" — ?' }
+	];
+
+	it("finds the quoted message, never the sender", () => {
+		// The sender's baked block quotes it too — including it would
+		// land every jump on the sender.
+		expect(findQuotedMessage(messages, m2, "spring")).toBe(m1);
+	});
+
+	it("returns null when only the sender holds the quote", () => {
+		expect(findQuotedMessage(messages, m1, "lovely")).toBeNull();
+	});
+
+	it("returns null when the quote is gone everywhere", () => {
+		expect(findQuotedMessage(messages, m2, "osaka")).toBeNull();
+	});
+
+	it("matches badge-insensitively across whitespace", () => {
+		expect(findQuotedMessage(messages, m2, "  Kyoto   in  spring ")).toBe(m1);
 	});
 });

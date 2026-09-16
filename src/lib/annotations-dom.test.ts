@@ -8,6 +8,7 @@ import {
 	loadDraftAnnotations,
 	saveDraftAnnotations,
 	snapSelectionToWordEdges,
+	quoteRange,
 	type Annotation
 } from "./annotations";
 
@@ -366,5 +367,36 @@ describe("draft annotation persistence", () => {
 	it("reads drafts saved under the pre-rename key", () => {
 		window.localStorage.setItem("ccez-studio-annotations-v1", JSON.stringify({ c1: [ann()] }));
 		expect(loadDraftAnnotations("c1")).toEqual([ann()]);
+	});
+});
+
+describe("quoteRange", () => {
+	it("returns a range spanning the quote text", () => {
+		const root = document.createElement("div");
+		root.innerHTML = "<p>Kyoto in <em>spring</em> is lovely</p>";
+		document.body.appendChild(root);
+		const range = quoteRange(root, "spring is");
+		expect(range?.toString()).toBe("spring is");
+		root.remove();
+	});
+
+	it("returns null when the quote is absent", () => {
+		const root = document.createElement("div");
+		root.textContent = "nothing here";
+		document.body.appendChild(root);
+		expect(quoteRange(root, "osaka")).toBeNull();
+		root.remove();
+	});
+
+	it("skips badge numbers like badge stamping does", () => {
+		const root = document.createElement("div");
+		root.innerHTML = '<p>Kyoto<button data-ann-badge="a1">1</button> in spring</p>';
+		document.body.appendChild(root);
+		// Without the skip the "1" fuses the haystack ("Kyoto1 in…")
+		// and nothing matches: endpoints on either side prove it.
+		const range = quoteRange(root, "Kyoto in spring");
+		expect(range?.startContainer.textContent).toBe("Kyoto");
+		expect(range?.endContainer.textContent).toBe(" in spring");
+		root.remove();
 	});
 });

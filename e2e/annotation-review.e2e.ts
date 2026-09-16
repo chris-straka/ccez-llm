@@ -96,6 +96,8 @@ test("review quote jumps to the message with a wash blink", async ({ page }) => 
 	await page.locator(".prompt-tools .ann-pill").click();
 	await expect(page.locator(".ann-wrap.pinned .review")).toBeVisible();
 	await page.locator(".review-quote").first().click();
+	// The review closes so the landing clears the composer dock.
+	await expect(page.locator(".ann-wrap .review")).toHaveCSS("opacity", "0");
 	// The wash blinks: poll through the cycle until a lit phase shows.
 	await expect
 		.poll(
@@ -112,15 +114,58 @@ test("review quote jumps to the message with a wash blink", async ({ page }) => 
 	expect(after).toBeLessThan(top - 50);
 });
 
-/** A click anywhere on the item (not just the quote) jumps: the
-comment body navigates with the same wash blink. Buttons keep
-their own clicks, drag-selects stay picks (covered below). */
-test("review item body click jumps to the mark", async ({ page }) => {
-	await annotateWord(page);
+/** Down-jumps land clear of the composer dock: from the top of a long
+chat, the quote settles above the prompt (nearest used to strand it
+behind the dock) — then a second jump restarts the blink for the
+wash read, since the landing outlasts one blink cycle. */
+test("down jump lands the quote clear of the dock", async ({ page }) => {
+	const para = `${SENTENCE} `.repeat(6);
+	const content = Array.from({ length: 12 }, (_, i) => `Paragraph ${i}. ${para}`).join("\n\n");
+	await seedChat(page, [{ role: "assistant", content }]);
+	// A live draft on the last paragraph (seeded in storage — the UI
+	// filing path is covered elsewhere, this test owns the jump).
+	await page.addInitScript(() => {
+		window.localStorage.setItem(
+			"ccez-llm-annotations-v1",
+			JSON.stringify({
+				"e2e-chat": [{ id: "ann-late", messageId: "e2e-m0", quote: "Paragraph 11", comment: "" }]
+			})
+		);
+	});
+	await page.goto("/");
+	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1);
+	// Park at the top: the badge must start below the viewport.
+	await page.evaluate(() => {
+		const box = document.querySelector(".messages") as HTMLElement;
+		box.style.scrollBehavior = "auto";
+		box.scrollTo({ top: 0 });
+	});
+	const start = await page.evaluate(() => {
+		const badge = document.querySelector("button.ccez-ann-badge");
+		return badge instanceof HTMLElement ? badge.getBoundingClientRect().top : -1;
+	});
+	expect(start).toBeGreaterThan(600);
 	await page.locator(".prompt-tools .ann-pill").click();
 	await expect(page.locator(".ann-wrap.pinned .review")).toBeVisible();
-	await page.locator(".review-comment").first().click();
-	// The wash blinks: poll through the cycle until a lit phase shows.
+	await page.locator(".review-quote").first().click();
+	// The badge settles fully above the prompt (smooth scroll takes a
+	// while over eleven paragraphs).
+	await expect
+		.poll(
+			() =>
+				page.evaluate(() => {
+					const badge = document.querySelector("button.ccez-ann-badge");
+					const prompt = document.querySelector(".prompt");
+					if (!(badge instanceof HTMLElement) || !(prompt instanceof HTMLElement)) return 999999;
+					return badge.getBoundingClientRect().bottom - prompt.getBoundingClientRect().top;
+				}),
+			{ timeout: 10_000 }
+		)
+		.toBeLessThanOrEqual(0);
+	// A second jump restarts the blink for the wash read.
+	await page.locator(".prompt-tools .ann-pill").click();
+	await expect(page.locator(".ann-wrap.pinned .review")).toBeVisible();
+	await page.locator(".review-quote").first().click();
 	await expect
 		.poll(
 			() =>
@@ -131,6 +176,22 @@ test("review item body click jumps to the mark", async ({ page }) => {
 			{ timeout: 4_000 }
 		)
 		.toBe("rgb(255, 243, 176)");
+});
+
+/** Only the quote navigates: clicking the note (or the row's number)
+jumps nowhere — no wash, no scroll, the review stays open. */
+test("review note click does not jump", async ({ page }) => {
+	await annotateWord(page);
+	await page.locator(".prompt-tools .ann-pill").click();
+	await expect(page.locator(".ann-wrap.pinned .review")).toBeVisible();
+	const top = await page.evaluate(() => document.querySelector(".messages")?.scrollTop ?? 0);
+	await page.locator(".review-comment").first().click();
+	await page.locator(".review-num").first().click();
+	await page.waitForTimeout(500);
+	expect(await page.evaluate(() => document.querySelector(".messages")?.scrollTop ?? 0)).toBe(top);
+	await expect(page.locator("mark.ccez-ann")).toHaveCount(0);
+	await expect(page.locator(".review-item.highlight")).toHaveCount(0);
+	await expect(page.locator(".ann-wrap.pinned .review")).toBeVisible();
 });
 
 /** Picks rooted in the review card are never annotatable: selecting
@@ -196,39 +257,34 @@ test("review rows are one line with copy at the end", async ({ page }) => {
 	expect(order).toBe(true);
 });
 
-/** A jump scrolls the mark itself, minimally: the badge goes by
-`nearest` (an already-visible mark stays put), never by message
-`center` (which overshoots past the mark in a long message). The
-item click fires programmatically here — a real click would first
+/** A jump leaves an already-clear mark exactly where it is: no scroll
+fires at all, but the wash still blinks (the jump happened). Never by
+message `center` (which overshoots past the mark in a long message).
+The quote click fires programmatically here — a real click would first
 scroll the card itself into view and confound the reading. */
-test("jump scrolls the badge itself, minimally", async ({ page }) => {
-	await page.addInitScript(() => {
-		const seen: string[] = [];
-		const orig = Element.prototype.scrollIntoView;
-		Element.prototype.scrollIntoView = function (
-			opts?: ScrollIntoViewOptions | boolean
-		): void {
-			seen.push(
-				`${(this as Element).matches?.("button.ccez-ann-badge")}:${JSON.stringify(opts)}`
-			);
-			(window as unknown as { __siv?: string[] }).__siv = seen;
-			orig.call(this, opts);
-		};
-	});
+test("jump leaves a clear mark exactly where it is", async ({ page }) => {
 	await page.reload();
 	await expect(page.locator("article .rendered").first()).toBeVisible();
 	await annotateWord(page);
 	await page.locator(".prompt-tools .ann-pill").click();
 	await expect(page.locator(".ann-wrap.pinned .review")).toBeVisible();
 	// Drop the filing word-pick: a live selection would (correctly)
-	// make the item press read as a pick instead of a jump.
+	// make the quote press read as a pick instead of a jump.
 	await page.evaluate(() => window.getSelection()?.removeAllRanges());
-	await page.evaluate(() => (document.querySelector(".review-comment") as HTMLElement | null)?.click());
-	await page.waitForTimeout(500);
-	const seen = await page.evaluate(
-		() => (window as unknown as { __siv?: string[] }).__siv ?? []
-	);
-	expect(seen).toContain('true:{"block":"nearest","behavior":"smooth"}');
+	const top = await page.evaluate(() => document.querySelector(".messages")?.scrollTop ?? 0);
+	await page.evaluate(() => (document.querySelector(".review-quote") as HTMLElement | null)?.click());
+	// The wash still blinks: the jump happened, it just had nowhere to go.
+	await expect
+		.poll(
+			() =>
+				page.evaluate(() => {
+					const mark = document.querySelector("mark.ccez-ann");
+					return mark ? getComputedStyle(mark).backgroundColor : "none";
+				}),
+			{ timeout: 4_000 }
+		)
+		.toBe("rgb(255, 243, 176)");
+	expect(await page.evaluate(() => document.querySelector(".messages")?.scrollTop ?? 0)).toBe(top);
 });
 
 /** A quote whose message is gone toasts instead of jumping nowhere. */

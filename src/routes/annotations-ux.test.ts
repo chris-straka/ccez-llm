@@ -87,10 +87,14 @@ describe("annotations-only messages", () => {
 });
 
 describe("review pencil hover", () => {
-	it("glows accent-blue instead of going ink", () => {
+	it("tints flat accent-blue instead of glowing or underlining", () => {
 		const css = pageStyle();
 		expect(css).toMatch(/button\.review-pencil\s*\{[^}]*transition:/);
-		expect(css).toMatch(/button\.review-pencil:hover\s*\{[^}]*drop-shadow/);
+		const hover = css.match(/button\.review-pencil:hover\s*\{[^}]*\}/)?.[0] ?? "";
+		expect(hover).toContain("background-color");
+		expect(hover).not.toContain("drop-shadow");
+		expect(hover).not.toContain("filter");
+		expect(css).toMatch(/button\.review-copy:hover\s*\{[^}]*text-decoration:\s*none/);
 	});
 });
 

@@ -274,6 +274,52 @@ export function locateQuote(nodeTexts: string[], quote: string, occurrence = 0):
 }
 
 /**
+ * DOM Range for a quote inside a rendered root (sent-annotation jumps):
+ * same node collection and matching as badge stamping (badges, ruby,
+ * and readings stay out via quoteTextNodes), but no DOM mutation — the
+ * caller scrolls to the rect and flashes it via the Highlight API.
+ * Null when the quote isn't in this root (folded, edited away).
+ */
+export function quoteRange(root: HTMLElement, quote: string, occurrence = 0): Range | null {
+	try {
+		const nodes = quoteTextNodes(root);
+		const loc = locateQuote(
+			nodes.map((n) => n.textContent ?? ""),
+			quote,
+			occurrence
+		);
+		if (!loc) return null;
+		const first = nodes[loc.startNode];
+		const last = nodes[loc.endNode];
+		if (!first || !last) return null;
+		const from = Math.min(loc.startOffset, first.textContent?.length ?? 0);
+		const to = Math.min(loc.endOffset, last.textContent?.length ?? 0);
+		const range = document.createRange();
+		range.setStart(first, from);
+		range.setEnd(last, Math.max(to, from));
+		return range.collapsed ? null : range;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Owner of a baked quote: first message (not the sender — its baked
+ * block quotes it too, so including it lands every jump on the sender)
+ * whose content holds the quote, badge-matching rules included.
+ * Null when the quote was edited away everywhere: the caller falls
+ * back to the sending message.
+ */
+export function findQuotedMessage(
+	messages: { id: ChatMsgId; content: string }[],
+	senderId: ChatMsgId,
+	quote: string
+): ChatMsgId | null {
+	const hit = messages.find((m) => m.id !== senderId && locateQuote([m.content], quote) !== null);
+	return hit?.id ?? null;
+}
+
+/**
  * Which occurrence of a quote holds a node position: counts full,
  * non-overlapping occurrences of the stripped quote in the stripped
  * haystack and returns the index of the one containing the stripped
