@@ -525,6 +525,10 @@ for (const t of THEMES) {
 			"color",
 			t.name === "light" ? "rgb(28, 28, 30)" : "rgb(242, 242, 247)"
 		);
+		await expect(quote).toHaveCSS(
+			"border-left-color",
+			t.name === "light" ? "rgb(142, 142, 147)" : "rgb(99, 99, 102)"
+		);
 	});
 }
 

@@ -100,7 +100,9 @@ platforms can't share one vendor's identity. So the palette is
 
 - **2026-09-16 — Blockquotes read as body text.** Quoted passages
   (translations, citations) were muted like metadata; the bar alone
-  now carries the quote signal, text rides `--ink` both themes.
+  now carries the quote signal, text rides `--ink` both themes. Bar
+  deepened one step to `--line-hover` for structure (still neutral —
+  no accent bar).
 - **2026-09-16 — Destination mark flash + sidebar tips.** The sent
   jump now wraps the quote in a draft-yellow `mark.ccez-ann-flash`
   (same phases as the wash): plain DOM renders in every engine, where

@@ -705,8 +705,8 @@
 	.rendered :global(blockquote) {
 		margin: 0.4em 0;
 		padding-left: 0.7rem;
-		border-left: 3px solid #c7c7cc;
-		border-color: var(--line);
+		border-left: 3px solid #8e8e93;
+		border-color: var(--line-hover);
 		color: #1c1c1e;
 		color: var(--ink);
 	}
@@ -1259,7 +1259,8 @@
 		border-color: #48484a;
 	}
 	:global(html[data-theme="dark"]) .rendered :global(blockquote) {
-		border-color: #48484a;
+		border-color: #636366;
+		border-color: var(--line-hover);
 		color: #f2f2f7;
 		color: var(--ink);
 	}
