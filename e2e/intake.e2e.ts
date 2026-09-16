@@ -124,10 +124,10 @@ test("removing the pill collapses the strip", async ({ page }) => {
 	await dropImage(page);
 	const card = page.locator(".attachments li.card");
 	await expect(card).toBeVisible({ timeout: 15_000 });
-	// No bridge in the preview: OCR explains in a calm toast, never
-	// the red inline slot.
+	// No bridge in the preview: the fallback runs on the solid square
+	// and reports the miss, never the red inline slot.
 	await card.locator('button[aria-label="Recognize text in image"]').click();
-	await expect(page.locator(".toast")).toContainText("needs the Mac app", { timeout: 15_000 });
+	await expect(page.locator(".toast")).toContainText("No text found", { timeout: 120_000 });
 	await expect(page.locator(".attach-error")).toHaveCount(0);
 	// The X takes the pill, its tag, and the strip — nothing lingers
 	// over the next draft.
@@ -313,4 +313,30 @@ test("expanded pasted content contracts from either blue bracket", async ({ page
 	await open.click();
 	await expect(body).not.toContainText("BBBB");
 	await expect(body.locator("button.paste-fold", { hasText: "[paste 4 chars]" })).toBeVisible();
+});
+
+test("tray bleeds frosted with the composer below full opacity", async ({ page }) => {
+	// The pill tray rides outside the frosted prompt card: below full
+	// composer opacity it takes the same glass treatment, or pills
+	// float opaque over thread text while the composer bleeds.
+	await page.addInitScript(() => {
+		window.localStorage.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify({
+				hoverAssistantActions: true,
+				hoverUserActions: true,
+				promptIdleSec: 0,
+				composerOpacity: 0.7,
+				bgOpacity: 1
+			})
+		);
+	});
+	await page.reload();
+	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await dropImage(page);
+	const tray = page.locator("ul.attachments").first();
+	await expect(tray).toBeVisible({ timeout: 15_000 });
+	await expect(tray).toHaveClass(/glass/);
+	const blur = await tray.evaluate((el) => getComputedStyle(el).backdropFilter);
+	expect(blur).not.toBe("none");
 });

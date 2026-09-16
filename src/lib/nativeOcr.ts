@@ -63,10 +63,115 @@ export async function recognizeImageText(
 
 /**
  * True for rejections that mean "no on-device OCR in this build" — the
- * caller explains instead of retrying. Pure and unit-tested.
+ * caller falls back instead of retrying. Pure and unit-tested.
  */
 export function isOcrUnsupported(message: string): boolean {
 	return /requires macos|not supported|no on-device ocr/i.test(message);
+}
+
+/**
+ * Tesseract traineddata for a reply-language code (`zh`/`ja`/`ko` per
+ * `languages.ts`; everything else reads Latin script). English always
+ * rides along — pasted UI and mixed text are rarely script-pure. Pure
+ * and unit-tested.
+ */
+export function ocrFallbackLangs(code: string | null): string[] {
+	switch (code) {
+		case "ja":
+			return ["jpn", "eng"];
+		case "zh":
+			return ["chi_sim", "eng"];
+		case "ko":
+			return ["kor", "eng"];
+		default:
+			return ["eng"];
+	}
+}
+
+/**
+ * Minimal worker surface the fallback uses (the real `Worker` type
+ * stays behind the lazy import, so node/Vitest never loads the
+ * engine at module scope).
+ */
+interface FallbackWorker {
+	recognize(
+		image: string,
+		options?: Record<string, unknown>,
+		output?: Record<string, unknown>
+	): Promise<{
+		data: {
+			text: string;
+			confidence?: number;
+			lines?: Array<{ text: string; confidence: number }>;
+		};
+	}>;
+	terminate(): Promise<unknown>;
+}
+
+/** One warm worker per language set (creating one downloads the WASM
+ * core plus traineddata; IndexedDB caches both after first use). */
+const fallbackWorkers = new Map<string, Promise<FallbackWorker>>();
+
+/**
+ * In-client OCR for runtimes with no native bridge (browser preview,
+ * Android WebView, Linux without the system Tesseract): Tesseract WASM,
+ * lazily imported so only fallback clicks ever load it. First use needs
+ * one connection for the engine + language data; after that it is
+ * cached offline. Resolves with the shaped text; rejects when the
+ * engine or its data cannot load.
+ */
+export async function recognizeFallbackText(
+	image: string,
+	langs: string[] = ["eng"]
+): Promise<OcrResult> {
+	const key = [...langs].sort().join("+");
+	let pending = fallbackWorkers.get(key);
+	if (!pending) {
+		pending = (async () => {
+			const { createWorker } = await import("tesseract.js");
+			// v7 shapes page/line output richer than the surface below;
+			// the double cast keeps the narrow contract without
+			// importing engine types at module scope.
+			const worker = (await createWorker(langs)) as unknown as FallbackWorker;
+			return worker;
+		})().catch((error: unknown) => {
+			// A failed load must not poison the slot: dropping it lets
+			// the next click retry (transient offline, CDN hiccup).
+			fallbackWorkers.delete(key);
+			throw error;
+		});
+		fallbackWorkers.set(key, pending);
+	}
+	const worker = await pending;
+	// v7 returns text alone unless block output is asked for (lines
+	// carry the per-line confidence the native shape promises).
+	const { text, confidence, lines } = (
+		await worker.recognize(image, {}, { blocks: true })
+	).data;
+	const kept = (lines ?? [])
+		.map((line) => ({ text: line.text.trim(), confidence: line.confidence / 100 }))
+		.filter((line) => line.text !== "");
+	return {
+		text: text.trim(),
+		lines: kept,
+		confidence: kept.length > 0 ? (confidence ?? 0) / 100 : 0
+	};
+}
+
+/**
+ * Fallback-engine failures translated into something actionable: the
+ * engine/data download is the only network the feature needs, so a
+ * load failure reads as offline rather than broken. Pure and
+ * unit-tested.
+ */
+export function friendlyFallbackError(message: string): string {
+	if (/failed to fetch|networkerror|network request failed|load failed|offline/i.test(message)) {
+		return "Couldn't fetch the text engine (one connection, then it works offline) — check the network and retry.";
+	}
+	if (/no text found/i.test(message)) {
+		return "No text found in this image.";
+	}
+	return message;
 }
 
 /**

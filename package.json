@@ -45,6 +45,7 @@
     "marked": "^18.0.13",
     "pinyin-pro": "^3.29.4",
     "shiki": "^4.4.3",
+    "tesseract.js": "^7.0.0",
     "wanakana": "^5.3.1"
   },
   "devDependencies": {

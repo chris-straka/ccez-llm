@@ -94,23 +94,40 @@ export interface RenderedMessage {
 	maths: MathEntry[];
 }
 
+/** Copy glyph for the popup footer (same strokes as the composer's
+ * pill button — raw `{@html}` carries no Svelte components). */
+const SENT_COPY_GLYPH =
+	'<svg class="sent-glyph" viewBox="0 0 16 16" fill="none" stroke="currentColor" ' +
+	'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+	'<rect x="6" y="6" width="7" height="7" rx="1.5" />' +
+	'<path d="M9.5 6V4.2A1.2 1.2 0 0 0 8.3 3H4.2A1.2 1.2 0 0 0 3 4.2v4.1a1.2 1.2 0 0 0 1.2 1.2H6" />' +
+	"</svg>";
+
+/** Close glyph for the popup footer (same strokes as `close`). */
+const SENT_CLOSE_GLYPH =
+	'<svg class="sent-glyph" viewBox="0 0 16 16" fill="none" stroke="currentColor" ' +
+	'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+	"<path d=\"M4 4l8 8M12 4l-8 8\" />" +
+	"</svg>";
+
 /**
  * Sent-message tag: collapsed it is the same blue fold button as
  * pasted content (body-size text, aligned with the line); expanded it
- * shows the card in place (thumbnail or excerpt, name and compact
- * token count, Copy plus OCR for images) framed by blue collapse
- * brackets — clicking the tag or either bracket toggles. History stays
- * read-only, so there is no remove button. No model (more literals
- * than attachments, e.g. hand-typed): the plain marker text. Pure and
- * unit-tested.
+ * floats the composer-pill card above the tag (thumbnail or excerpt,
+ * name and compact token count, copy icon plus OCR for images, X to
+ * close) — an overlay, so opening never moves message content, and
+ * the tag stays visible right below it. Clicking away or ESC closes
+ * it. History stays read-only, so X only closes. No model (more
+ * literals than attachments, e.g. hand-typed): the plain marker text.
+ * Pure and unit-tested.
  */
 export function attachTagHtml(model: AttachTagModel | null, kindLetter: string): string {
 	const label = kindLetter === "f" ? FILE_MARKER : IMAGE_MARKER;
 	if (!model) return escapeHtml(label);
 	if (!model.open) {
 		return (
-			`<button type="button" class="paste-fold sent-fold" data-sent-toggle="${model.id}">` +
-			`${escapeHtml(label)}</button>`
+			`<span class="sent-wrap"><button type="button" class="paste-fold sent-fold" data-sent-toggle="${model.id}">` +
+			`${escapeHtml(label)}</button></span>`
 		);
 	}
 	const visual =
@@ -125,14 +142,17 @@ export function attachTagHtml(model: AttachTagModel | null, kindLetter: string):
 			? `<button type="button" class="sent-btn" data-sent-action="ocr" data-attach-id="${model.id}">OCR</button>`
 			: "";
 	return (
+		`<span class="sent-wrap">` +
+		`<button type="button" class="paste-fold sent-fold" data-sent-toggle="${model.id}">` +
+		`${escapeHtml(label)}</button>` +
 		`<span class="sent-open">` +
-		`<button type="button" class="paste-fold" data-sent-toggle="${model.id}" title="Collapse attachment">[</button>` +
 		`<span class="sent-card">${visual}` +
-		`<span class="sent-meta">${escapeHtml(model.name)} · ${formatTokenCount(model.tokens)} tokens</span>` +
-		`<span class="sent-actions"><button type="button" class="sent-btn" data-sent-action="copy" data-attach-id="${model.id}">Copy</button>${ocr}</span>` +
-		`</span>` +
-		`<button type="button" class="paste-fold" data-sent-toggle="${model.id}" title="Collapse attachment">]</button>` +
-		`</span>`
+		`<span class="sent-foot"><span class="sent-name">${escapeHtml(model.name)}</span>` +
+		`<span class="sent-tok" title="${model.tokens} tokens">${formatTokenCount(model.tokens)}</span>` +
+		`<button type="button" class="sent-icobtn" data-sent-action="copy" data-attach-id="${model.id}" aria-label="Copy attachment" title="Copy attachment">${SENT_COPY_GLYPH}</button>` +
+		ocr +
+		`<button type="button" class="sent-icobtn" data-sent-toggle="${model.id}" aria-label="Close preview" title="Close preview">${SENT_CLOSE_GLYPH}</button>` +
+		`</span></span></span></span>`
 	);
 }
 

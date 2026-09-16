@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
 import {
+	friendlyFallbackError,
 	friendlyOcrError,
 	isOcrUnsupported,
+	ocrFallbackLangs,
 	ocrSupported,
 	recognizeImageText,
 	type OcrResult
@@ -87,5 +89,38 @@ describe("friendlyOcrError", () => {
 
 	it("passes unknown errors through untouched", () => {
 		expect(friendlyOcrError("boom")).toBe("boom");
+	});
+});
+
+describe("ocrFallbackLangs", () => {
+	it("pairs CJK replies with their traineddata plus English", () => {
+		expect(ocrFallbackLangs("ja")).toEqual(["jpn", "eng"]);
+		expect(ocrFallbackLangs("zh")).toEqual(["chi_sim", "eng"]);
+		expect(ocrFallbackLangs("ko")).toEqual(["kor", "eng"]);
+	});
+
+	it("reads Latin-script replies with English alone", () => {
+		expect(ocrFallbackLangs(null)).toEqual(["eng"]);
+		expect(ocrFallbackLangs("fr")).toEqual(["eng"]);
+		expect(ocrFallbackLangs("")).toEqual(["eng"]);
+	});
+});
+
+describe("friendlyFallbackError", () => {
+	it("reads engine-download failures as offline", () => {
+		expect(friendlyFallbackError("Failed to fetch dynamically imported module")).toContain(
+			"check the network"
+		);
+		expect(friendlyFallbackError("Network request failed")).toContain("check the network");
+	});
+
+	it("keeps the no-text message user-facing", () => {
+		expect(friendlyFallbackError("no text found in this image")).toBe(
+			"No text found in this image."
+		);
+	});
+
+	it("passes unknown errors through untouched", () => {
+		expect(friendlyFallbackError("boom")).toBe("boom");
 	});
 });

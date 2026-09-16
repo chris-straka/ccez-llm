@@ -740,3 +740,18 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
       Rust relinks need a re-sign. AGENTS.md + secrets.ts pointer
       updated. No committed test (shell wrapper + machine-local cert;
       verification is the live sign/verify smoke, re-runnable).
+
+## Cross-platform OCR fallback (Sep 16, main)
+- [x] Runtimes with no native bridge (browser preview, Android WebView,
+      Linux without system Tesseract) no longer toast "needs the Mac
+      app": `recognizeAttachment` runs the in-client Tesseract WASM
+      fallback behind the `ocrSupported()` probe (native stays first:
+      macOS Vision, Windows WinRT, Linux system Tesseract — all three
+      already wired in `src-tauri/src/ocr*.rs`). Lazy import (only
+      fallback clicks load the engine), one warm worker per language
+      set, reply-language traineddata (`jpn`/`chi_sim`/`kor` + `eng`),
+      IndexedDB-cached engine+data after one download, CJK accuracy on
+      real hardware unverified by design. Unit (langs, error mapping)
+      + live e2e (canvas text inserts; textless image reports the miss)
+      green. No bundled `tesseract` package needed on this path — the
+      npm WASM build is the engine (on-device, no server, no fees).

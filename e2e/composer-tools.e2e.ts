@@ -216,18 +216,48 @@ test("send clears pills and files a tag above the message", async ({ page }) => 
 	// the literal): a body-size blue fold button like pasted content.
 	const tag = page.locator("article.user .sent-tags .sent-fold").last();
 	await expect(tag).toContainText("[Pasted image]", { timeout: 30_000 });
-	// Clicking expands the card in place with the image, name, and
-	// Copy/OCR; either blue bracket contracts it again.
+	// Clicking floats the composer-pill popup below the tag (image,
+	// name, compact tokens, copy icon, OCR, X) without moving any
+	// message content.
+	const article = page.locator("article.user").last();
+	const before = await article.boundingBox();
 	await tag.click();
-	const fold = page.locator("article.user .sent-tags .sent-open").last();
-	await expect(fold).toBeVisible();
-	await expect(fold.locator(".sent-img")).toBeVisible();
-	await expect(fold).toContainText("tokens");
-	await expect(fold.locator("button", { hasText: "Copy" })).toBeVisible();
-	await expect(fold.locator("button", { hasText: "OCR" })).toBeVisible();
-	await fold.locator("button", { hasText: "[" }).first().click();
-	await expect(fold).toBeHidden();
-	// The message actions never open for tag presses.
+	const popup = page.locator("article.user .sent-tags .sent-open").last();
+	await expect(popup).toBeVisible();
+	await expect(popup.locator(".sent-img")).toBeVisible();
+	await expect(popup).toContainText("blue.png");
+	await expect(popup.locator(".sent-tok")).toHaveAttribute("title", /tokens/);
+	await expect(popup.locator('button[aria-label="Copy attachment"] svg')).toBeVisible();
+	await expect(popup.locator("button", { hasText: "OCR" })).toBeVisible();
+	await expect(popup.locator('button[aria-label="Close preview"] svg')).toBeVisible();
+	// Overlay by construction: opening moves nothing visible (1px
+	// covers sub-pixel line-box noise, not content reflow).
+	const after = await article.boundingBox();
+	expect(Math.abs((after?.height ?? 0) - (before?.height ?? 0))).toBeLessThanOrEqual(1);
+	// Below the tag (strip tags sit atop the message), above the
+	// messages but under the floating composer in z.
+	const boxes = await popup.evaluate((el) => {
+		const tagEl = el.closest(".sent-wrap")?.querySelector(".sent-fold");
+		const prompt = document.querySelector(".prompt");
+		const r = el.getBoundingClientRect();
+		const t = tagEl?.getBoundingClientRect();
+		if (!t || !prompt) throw new Error("missing tag or prompt");
+		return {
+			popupTop: r.y,
+			tagBottom: t.y + t.height,
+			popupZ: getComputedStyle(el).zIndex,
+			promptZ: getComputedStyle(prompt).zIndex
+		};
+	});
+	expect(boxes.popupTop).toBeGreaterThanOrEqual(boxes.tagBottom - 1);
+	expect(Number(boxes.popupZ)).toBeLessThan(Number(boxes.promptZ));
+	// X closes; clicking away closes; the message actions never open.
+	await popup.locator('button[aria-label="Close preview"]').click();
+	await expect(popup).toBeHidden();
+	await tag.click();
+	await expect(popup).toBeVisible();
+	await page.locator(".cm-content").first().click();
+	await expect(popup).toBeHidden();
 	await expect(page.locator('article.user [data-actions-open="true"]')).toHaveCount(0);
 });
 
@@ -289,14 +319,29 @@ test("a stored literal renders inline at body size with no duplicate", async ({ 
 		};
 	});
 	expect(sizes.tag).toBe(sizes.body);
-	// Clicking expands the card in place; the ] bracket contracts it.
+	// Clicking floats the popup ABOVE the tag (inline tags carry
+	// text above them) with the tag still visible right below it —
+	// and message content never moves.
+	const article = page.locator("article.user").first();
+	const before = await article.boundingBox();
 	await tag.click();
-	const card = page.locator("article.user .sent-open").first();
-	await expect(card).toBeVisible();
-	await expect(card.locator(".sent-img")).toBeVisible();
-	await expect(card).toContainText("shot.png");
-	await card.locator("button", { hasText: "]" }).click();
-	await expect(card).toBeHidden();
+	const popup = page.locator("article.user .sent-open").first();
+	await expect(popup).toBeVisible();
+	await expect(popup.locator(".sent-img")).toBeVisible();
+	await expect(popup).toContainText("shot.png");
+	const after = await article.boundingBox();
+	expect(Math.abs((after?.height ?? 0) - (before?.height ?? 0))).toBeLessThanOrEqual(1);
+	const boxes = await popup.evaluate((el) => {
+		const tagEl = el.closest(".sent-wrap")?.querySelector(".sent-fold");
+		const r = el.getBoundingClientRect();
+		const t = tagEl?.getBoundingClientRect();
+		if (!t) throw new Error("missing tag");
+		return { popupBottom: r.y + r.height, tagTop: t.y };
+	});
+	expect(boxes.popupBottom).toBeLessThanOrEqual(boxes.tagTop + 1);
+	// ESC closes the popup.
+	await page.keyboard.press("Escape");
+	await expect(popup).toBeHidden();
 });
 
 test("sent turns with many attachments scroll their tags", async ({ page }) => {
@@ -356,13 +401,12 @@ test("sent turns with many attachments scroll their tags", async ({ page }) => {
 	const strip = page.locator("article.user .sent-tags").first();
 	await expect(strip).toBeVisible({ timeout: 60_000 });
 	await expect(page.locator("article.user .sent-fold")).toHaveCount(14);
-	// Image tags expand thumbnails, file tags expand excerpts (the
-	// collapsed list shifts as folds open, so first() tracks the
-	// next collapsed tag: image first, then the file behind it).
+	// Image tags float thumbnails, file tags float excerpts (tags stay
+	// mounted beside their popups, so indices hold while open).
 	const folds = page.locator("article.user .sent-fold");
-	await folds.first().click();
+	await folds.nth(0).click();
 	await expect(page.locator("article.user .sent-open .sent-img").first()).toBeVisible();
-	await folds.first().click();
+	await folds.nth(1).click();
 	const excerpt = page.locator("article.user .sent-open .sent-excerpt").first();
 	await expect(excerpt).toBeVisible();
 	await expect(excerpt).toContainText("# notes 1");

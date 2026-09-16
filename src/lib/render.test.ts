@@ -196,21 +196,27 @@ describe("sent-message tags", () => {
 		expect(html).toContain("what do you see here?");
 	});
 
-	it("expands open tags in place between collapse brackets", () => {
+	it("floats open tags as pill popups with icon buttons", () => {
 		const { html } = renderMarkdown("[Pasted image] what do you see here?", [{ ...img, open: true }]);
 		expect(html).toContain('class="sent-open"');
+		// The tag stays mounted below its popup.
+		expect(html).toContain('class="paste-fold sent-fold"');
 		expect(html).toContain('src="data:image/png;base64,AAA"');
-		expect(html).toContain("shot.png · ~85 tokens");
+		expect(html).toContain("shot.png");
+		expect(html).toContain("~85");
 		expect(html).toContain('data-sent-action="copy"');
 		expect(html).toContain('data-sent-action="ocr"');
+		expect(html).toContain('aria-label="Copy attachment"');
+		expect(html).toContain('aria-label="Close preview"');
 		expect(html).not.toContain("Remove");
+		expect(html).not.toContain("Collapse attachment");
 	});
 
-	it("expands file excerpts with copy but no OCR", () => {
+	it("floats file excerpts with copy but no OCR", () => {
 		const { html } = renderMarkdown("[Pasted Attachment] notes", [{ ...file, open: true }]);
 		expect(html).toContain('class="sent-excerpt"');
 		expect(html).toContain("# hello");
-		expect(html).toContain("notes.md · ~12 tokens");
+		expect(html).toContain("notes.md");
 		expect(html).toContain('data-sent-action="copy"');
 		expect(html).not.toContain('data-sent-action="ocr"');
 	});

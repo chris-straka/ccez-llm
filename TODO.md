@@ -30,12 +30,6 @@ same codebase via the Tauri mobile target.
 
 ## Pile: platform + release (needs hardware) (needs hardware)
 
-- [ ] Cross-platform OCR fallback (Windows/Linux/Android): on-device
-      Vision is macOS-only, so other shells get a calm
-      "needs the Mac app" toast today (Sep 2026). Wire a real
-      offline fallback (Tesseract-class, no paid services per standing
-      decisions) behind the `ocrSupported()` probe in
-      `recognizeAttachment`.
 - [ ] Win/Linux/Android device proof for every shipped feature.
       (Status Sep 2026, stream-platform: unit-tested contracts only —
       `platform.ts` x31, `updates.ts` x5, `langId.ts` x4 + `langid.rs` x3,

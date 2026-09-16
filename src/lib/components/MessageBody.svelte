@@ -398,11 +398,11 @@
 			event.detail > 0 &&
 			chromeDown !== null &&
 			Math.hypot(event.clientX - chromeDown.x, event.clientY - chromeDown.y) > 4;
-		// History tag fold: buttons act (delegated Copy/OCR — raw {@html}
-		// carries no Svelte handlers), the collapsed tag and both
-		// collapse brackets toggle the fold. Buttons win over the
-		// toggle; both stay below in the article, which ignores tag
-		// presses entirely.
+		// History tag popup: buttons act (delegated Copy/OCR — raw
+		// {@html} carries no Svelte handlers), the collapsed tag and
+		// the X toggle the popup. Buttons win over the toggle; both
+		// stay below in the article, which ignores tag presses
+		// entirely (click-away and ESC close from the parent).
 		const sentButton = closestFromTarget(event.target, "[data-sent-action]");
 		if (sentButton) {
 			onAttachAction?.(

@@ -321,7 +321,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		vibrateTick,
 		type WakeLockRelease
 	} from "$lib/studyMedia";
-	import { recognizeImageText, friendlyOcrError, ocrSupported } from "$lib/nativeOcr";
+	import {
+		recognizeImageText,
+		recognizeFallbackText,
+		ocrFallbackLangs,
+		friendlyOcrError,
+		friendlyFallbackError,
+		ocrSupported
+	} from "$lib/nativeOcr";
 	import { voiceLocaleForInputSource } from "$lib/keyboardLang";
 	import { joinExternalDraft, routeExternalText } from "$lib/externalText";
 	import {
@@ -1909,6 +1916,16 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			refsPopOpen = null;
 		};
 		window.addEventListener("pointerdown", onRefsOutside, { capture: true });
+		// History tag popup dismiss: a press outside any tag wrap
+		// closes every open popup (capture, so the press never also
+		// acts behind the popup). Presses on a tag or inside its
+		// popup are the toggle and its buttons — never a dismissal.
+		const onSentTagOutside = (event: PointerEvent): void => {
+			const target = event.target instanceof Element ? event.target : null;
+			if (target?.closest(".sent-wrap")) return;
+			if (expandedTags.length > 0) expandedTags = [];
+		};
+		window.addEventListener("pointerdown", onSentTagOutside, { capture: true });
 		window.addEventListener("keydown", on);
 		window.addEventListener("wheel", on, { passive: true });
 		window.addEventListener("touchstart", on, { passive: true });
@@ -1938,6 +1955,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			window.removeEventListener("pointerdown", onDown);
 			window.removeEventListener("pointerdown", onFindOutside);
 			window.removeEventListener("pointerdown", onRefsOutside, { capture: true });
+			window.removeEventListener("pointerdown", onSentTagOutside, { capture: true });
 			window.removeEventListener("keydown", on);
 			window.removeEventListener("wheel", on);
 			window.removeEventListener("touchstart", on);
@@ -2728,21 +2746,22 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 
 	async function recognizeAttachment(att: Attachment): Promise<void> {
 		if (ocrBusyId !== null || att.kind !== "image" || !att.dataUrl) return;
-		if (!(await ocrSupported())) {
-			// No on-device OCR in this build (Windows/Linux, browser
-			// preview): explain instead of erroring, with nothing
-			// busy and nothing red.
-			flashToast("Text recognition needs the Mac app.");
-			return;
-		}
+		// Native first (macOS Vision, Windows WinRT, Linux system
+		// Tesseract); anywhere else the WASM fallback runs in-client
+		// (one download, cached offline after).
+		const native = await ocrSupported();
+		const fallbackLangs = native ? null : ocrFallbackLangs(activeReplyCode);
 		ocrBusyId = att.id;
 		clearNotice(notices, "inline");
 		try {
 			// No language hint: the backend's learner default covers
 			// English + CJK scripts. Passing the Latin TTS fallback
 			// here restricted Vision to English, so Chinese paragraphs
-			// missed entirely and surfaced as red errors.
-			const result = await recognizeImageText(att.dataUrl, null);
+			// missed entirely and surfaced as red errors. The WASM
+			// fallback takes the reply's traineddata instead.
+			const result = fallbackLangs
+				? await recognizeFallbackText(att.dataUrl, fallbackLangs)
+				: await recognizeImageText(att.dataUrl, null);
 			const text = result.text.trim();
 			if (!text) {
 				// A miss is routine feedback (wrong crop, handwriting),
@@ -2758,7 +2777,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				flashToast("Recognized text inserted");
 			}
 		} catch (error) {
-			failAttach(friendlyOcrError(error instanceof Error ? error.message : String(error)));
+			const message = error instanceof Error ? error.message : String(error);
+			failAttach(fallbackLangs ? friendlyFallbackError(message) : friendlyOcrError(message));
 		} finally {
 			ocrBusyId = null;
 		}
@@ -6944,6 +6964,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				// open (a second Esc closes it).
 				if (refsEditing) cancelRefsEdit();
 				else refsPopOpen = null;
+			} else if (expandedTags.length > 0) {
+				// A history attachment popup is Svelte state (not DOM),
+				// so it sits in the ladder beside the filed-annotations
+				// card: Esc closes it.
+				expandedTags = [];
 			} else if (editingMsgId) {
 				// An in-progress message edit cancels from anywhere,
 				// including inside the prompt (capture phase pre-empts
@@ -8968,64 +8993,70 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							literal left in the text (literals rebuild inline
 							instead, so each file shows exactly once). Above
 							the message as body-size blue fold buttons like
-							pasted content; clicking expands the card in
-							place, either blue bracket contracts. A long
-							turn scrolls sideways in place instead of
-							stretching. -->
-							<div class="sent-tags">
+							pasted content; clicking floats the composer-pill
+							card (below the tag here, above it inline), X /
+							click-away / ESC closes. A long turn scrolls
+							sideways in place instead of stretching. -->
+							<div
+								class="sent-tags"
+								class:pop-open={leftoverModels.some((m) => m.open)}
+							>
 								{#each leftoverModels as m (m.id)}
 									{@const att = msg.attachments?.find((a) => a.id === m.id)}
-									{#if !m.open}
+									<span class="sent-wrap">
 										<button
 											type="button"
 											class="paste-fold sent-fold"
 											onclick={() => toggleSentTag(msg, m.id)}
 											>{m.kind === "text" ? FILE_MARKER : IMAGE_MARKER}</button
 										>
-									{:else}
-										<span class="sent-open"
-											><button
-												type="button"
-												class="paste-fold"
-												title="Collapse attachment"
-												onclick={() => toggleSentTag(msg, m.id)}>[</button
-											><span class="sent-card">
-												{#if m.kind === "image" && m.dataUrl?.startsWith("data:image/")}
-													<img class="sent-img" src={m.dataUrl} alt="" />
-												{:else if m.kind === "text" && m.text !== null}
-													<span class="sent-excerpt">{fileExcerpt(m.text)}</span>
-												{/if}
-												<span class="sent-meta" title="{m.name} · {m.tokens} tokens">{m.name} · {formatTokenCount(m.tokens)} tokens</span>
-												{#if att}
-													<span class="sent-actions">
-														<button
-															type="button"
-															class="sent-btn"
-															onclick={(e) => {
-																e.stopPropagation();
-																copyAttachment(att);
-															}}>Copy</button
-															>
-														{#if att.kind === "image" && att.dataUrl}
+										{#if m.open}
+											<span class="sent-open">
+												<span class="sent-card">
+													{#if m.kind === "image" && m.dataUrl?.startsWith("data:image/")}
+														<img class="sent-img" src={m.dataUrl} alt="" />
+													{:else if m.kind === "text" && m.text !== null}
+														<span class="sent-excerpt">{fileExcerpt(m.text)}</span>
+													{/if}
+													<span class="sent-foot">
+														<span class="sent-name">{m.name}</span>
+														<span class="sent-tok" title="{m.tokens} tokens">{formatTokenCount(m.tokens)}</span>
+														{#if att}
 															<button
 																type="button"
-																class="sent-btn"
-																disabled={ocrBusyId === att.id}
+																class="sent-icobtn"
+																aria-label="Copy attachment"
+																title="Copy attachment"
 																onclick={(e) => {
 																	e.stopPropagation();
-																	void recognizeAttachment(att);
-																}}>{ocrBusyId === att.id ? "…" : "OCR"}</button
+																	copyAttachment(att);
+																}}><ActionIcon kind="copy" /></button
+															>
+															{#if att.kind === "image" && att.dataUrl}
+																<button
+																	type="button"
+																	class="sent-btn"
+																	disabled={ocrBusyId === att.id}
+																	onclick={(e) => {
+																		e.stopPropagation();
+																		void recognizeAttachment(att);
+																	}}>{ocrBusyId === att.id ? "\u2026" : "OCR"}</button
 																>
+															{/if}
+															<button
+																type="button"
+																class="sent-icobtn"
+																aria-label="Close preview"
+																title="Close preview"
+																onclick={() => toggleSentTag(msg, m.id)}
+																><ActionIcon kind="close" /></button
+															>
 														{/if}
 													</span>
-												{/if}
-											</span><button
-												type="button"
-												class="paste-fold"
-												title="Collapse attachment"
-												onclick={() => toggleSentTag(msg, m.id)}>]</button>
-										</span>
-									{/if}
+												</span>
+											</span>
+										{/if}
+									</span>
 								{/each}
 							</div>
 						{/if}
@@ -12545,60 +12576,107 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		padding: 0;
 		cursor: pointer;
 	}
-	/* Expanded tag card: in-flow figure between blue collapse
-	brackets (inline and strip alike), never an overlay. */
-	.sent-open .paste-fold {
-		font: inherit;
-		font-weight: 700;
-		color: #007aff;
-		color: var(--accent);
-		background: none;
-		border: 0;
-		padding: 0 0.15rem;
-		cursor: pointer;
-	}
-	.sent-card {
+	/* Expanded tag popup: overlay above the tag (below for strip
+	tags, which sit atop the message), so opening never moves message
+	content and the tag stays visible right below it. Below the
+	floating composer in z (prompt is 30), above message chrome.
+	Global: half the tags ride raw `{@html}`, which carries no Svelte
+	scope hash, so scoped selectors never reach them. */
+	:global(.sent-wrap) {
+		position: relative;
 		display: inline-block;
-		vertical-align: top;
-		padding: 0.5rem;
+	}
+	:global(.sent-open) {
+		display: block;
+		position: absolute;
+		bottom: 100%;
+		left: 0;
+		z-index: 20;
+		margin-bottom: 0.3rem;
+	}
+	:global(.sent-tags .sent-open) {
+		top: 100%;
+		bottom: auto;
+		margin: 0.3rem 0 0;
+	}
+	/* Unclipped while a popup floats: the strip only scrolls collapsed
+	tags; an open popup must escape its box. */
+	.sent-tags.pop-open {
+		overflow: visible;
+	}
+	:global(.sent-card) {
+		display: block;
+		width: max-content;
 		max-width: 16rem;
-		background: #fff;
-		background: var(--bg-raised);
+		padding: 0.4rem 0.5rem;
+		font-size: 0.78rem;
+		background: #eef4ff;
+		background: var(--hl);
 		border: 1px solid #c7c7cc;
 		border-color: var(--line);
-		border-radius: 8px;
+		border-radius: 12px;
+		box-shadow: 0 4px 16px rgb(0 0 0 / 0.18);
 	}
-	.sent-meta {
-		display: block;
-		margin-top: 0.35rem;
-		white-space: nowrap;
-		font-size: 0.72rem;
-		color: #3a3a3c;
-		color: var(--ink-soft);
-	}
-	.sent-actions {
+	:global(.sent-foot) {
 		display: flex;
+		align-items: center;
 		gap: 0.25rem;
-		margin-top: 0.35rem;
+		margin-top: 0.3rem;
 	}
-	.sent-btn {
-		padding: 0.15rem 0.5rem;
-		font-size: 0.72rem;
-		line-height: 1.3;
-		text-decoration: underline;
+	:global(.sent-name) {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	:global(.sent-tok) {
+		flex: none;
+		white-space: nowrap;
+		color: #6e6e73;
+		color: var(--muted);
+	}
+	:global(.sent-icobtn) {
+		display: inline-flex;
+		align-items: center;
+		flex: none;
+		padding: 0.1rem;
 		background: none;
 		border: 0;
 		cursor: pointer;
 		color: #3a3a3c;
 		color: var(--ink-soft);
 	}
-	.sent-img {
+	/* The glyphs ride raw `{@html}` (no static markup carries the
+	class), so the rule is global; strip icons size below. */
+	:global(.sent-glyph) {
+		height: 1em;
+	}
+	:global(.sent-icobtn .action-glyph) {
+		height: 1em;
+	}
+	:global(.sent-btn) {
+		flex: none;
+		padding: 0.1rem 0.25rem;
+		font-size: 0.72rem;
+		font-weight: 700;
+		letter-spacing: 0.04em;
+		background: none;
+		border: 0;
+		border-radius: 6px;
+		cursor: pointer;
+		color: #3a3a3c;
+		color: var(--ink-soft);
+	}
+	:global(.sent-btn:disabled) {
+		opacity: 0.45;
+		cursor: default;
+	}
+	:global(.sent-img) {
 		display: block;
 		max-width: 14rem;
 		max-height: 10rem;
 		border-radius: 6px;
 	}
-	.sent-excerpt {
+	:global(.sent-excerpt) {
 		display: block;
 		max-height: 8rem;
 		overflow: auto;
