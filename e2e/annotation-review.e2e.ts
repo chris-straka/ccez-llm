@@ -112,6 +112,60 @@ test("review quote jumps to the message with a wash blink", async ({ page }) => 
 	expect(after).toBeLessThan(top - 50);
 });
 
+/** A click anywhere on the item (not just the quote) jumps: the
+comment body navigates with the same wash blink. Buttons keep
+their own clicks, drag-selects stay picks (covered below). */
+test("review item body click jumps to the mark", async ({ page }) => {
+	await annotateWord(page);
+	await page.locator(".prompt-tools .ann-pill").click();
+	await expect(page.locator(".ann-wrap.pinned .review")).toBeVisible();
+	await page.locator(".review-comment").first().click();
+	// The wash blinks: poll through the cycle until a lit phase shows.
+	await expect
+		.poll(
+			() =>
+				page.evaluate(() => {
+					const mark = document.querySelector("mark.ccez-ann");
+					return mark ? getComputedStyle(mark).backgroundColor : "none";
+				}),
+			{ timeout: 4_000 }
+		)
+		.toBe("rgb(255, 243, 176)");
+});
+
+/** Picks rooted in the review card are never annotatable: selecting
+note text summons no menu, leaves the native pick exactly as drawn
+(stays copyable), and the trailing click does not jump (a live
+selection is a pick, not a press). */
+test("selecting review text summons no menu and stays put", async ({ page }) => {
+	const body = page.locator("article .rendered").first();
+	const box = await body.boundingBox();
+	if (!box) throw new Error("message has no box");
+	await page.mouse.dblclick(box.x + 100, box.y + box.height / 2);
+	await expect(page.locator(".sel-menu")).toBeVisible({ timeout: 5_000 });
+	await page.locator('.sel-menu button:has-text("Annotate")').click();
+	const draft = page.locator(".ann-pop textarea");
+	await expect(draft).toBeVisible({ timeout: 5_000 });
+	await draft.fill("a note worth keeping");
+	await page.keyboard.press("Enter");
+	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1);
+	// The filing pill fades first (see annotateWord): clicking
+	// through the fade would hit the badge instead of the pill.
+	await expect(page.locator(".ann-pop")).toHaveCount(0, { timeout: 5_000 });
+	await page.locator(".prompt-tools .ann-pill").click();
+	await expect(page.locator(".ann-wrap.pinned .review")).toBeVisible();
+	const comment = page.locator(".review-comment").first();
+	const cbox = await comment.boundingBox();
+	if (!cbox) throw new Error("comment has no box");
+	await page.mouse.move(cbox.x + 2, cbox.y + cbox.height / 2);
+	await page.mouse.down();
+	await page.mouse.move(cbox.x + cbox.width - 2, cbox.y + cbox.height / 2, { steps: 6 });
+	await page.mouse.up();
+	await expect(page.locator(".sel-menu")).toHaveCount(0);
+	expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).not.toBe("");
+	await expect(page.locator(".review-item.highlight")).toHaveCount(0);
+});
+
 /** A quote whose message is gone toasts instead of jumping nowhere. */
 test("orphaned review quote toasts that the annotation is gone", async ({ page }) => {
 	await page.addInitScript(() => {

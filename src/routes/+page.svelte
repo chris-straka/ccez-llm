@@ -222,7 +222,8 @@ import {
 		isSidebarTarget,
 		isSpaceInteractiveTarget,
 		isTapOverlayTarget,
-		mouseupKeepsSelection
+		mouseupKeepsSelection,
+		isAnnotationUiTarget
 	} from "$lib/events";
 	import {
 		aidDisplayText,
@@ -2789,9 +2790,16 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 
 	function onSelectEnd(event: MouseEvent, cursorX?: number): void {
 		if (event.altKey) return; // Option-click folds; never a menu.
+		const live = window.getSelection();
+		// Picks rooted in the annotation UI (review card, pill) are
+		// never annotatable: skip the message locks and snaps so the
+		// native pick stays exactly as drawn (stays copyable), and
+		// summon nothing.
+		const anchorEl =
+			live?.anchorNode instanceof Element ? live.anchorNode : live?.anchorNode?.parentElement;
+		if (anchorEl && isAnnotationUiTarget(anchorEl)) return;
 		// Selections never span messages: a drag crossing into another
 		// article trims back to the anchor message's edge first.
-		const live = window.getSelection();
 		if (live) lockSelectionToMessage(live, articleOf);
 		// Multi-click picks grab the block terminator newline,
 		// painting the line beneath the highlight (the quote trims it
@@ -3358,6 +3366,21 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * (hover previews own the wash again after). Only quote taps
 	 * navigate — notes, buttons, and fields never do.
 	 */
+	/**
+	 * Whole-item press jumps to the mark (one navigation per item, not
+	 * one per control): buttons and fields keep their own behavior, an
+	 * in-progress edit never jumps from under the caret, and a
+	 * drag-select ending here is a pick — the click still fires — so
+	 * only clean presses with a collapsed selection navigate.
+	 */
+	function reviewItemClick(event: MouseEvent, ann: { id: AnnotationId; messageId: ChatMsgId }): void {
+		if (editingId === ann.id) return;
+		const target = event.target instanceof Element ? event.target : null;
+		if (target?.closest("button, input, textarea, select, a")) return;
+		if (!window.getSelection()?.isCollapsed) return;
+		gotoAnnotation(ann);
+	}
+
 	function gotoAnnotation(ann: { id: AnnotationId; messageId: ChatMsgId }): void {
 		const index = viewChat.messages.findIndex((m) => m.id === ann.messageId);
 		if (index < 0) {
@@ -8986,27 +9009,32 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 								</button>
 							</div>
 							{#each annotations as ann, n (ann.id)}
-								<div class="review-item" class:highlight={highlightAnnId === ann.id}>
+								<!-- The whole item navigates: one jump per
+								annotation, not one per control. Buttons and
+								fields keep their own clicks (see
+								reviewItemClick), drag-selects stay picks,
+								and an edit tap stays exactly where it is. -->
+								<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+								<div
+									class="review-item"
+									class:highlight={highlightAnnId === ann.id}
+									title="Jump to this annotation in the chat"
+									onclick={(event) => reviewItemClick(event, ann)}
+								>
 									<div class="review-head">
-										<span class="review-num">{n + 1}.</span>
-										<!-- Only the quote navigates: notes, buttons,
-										and fields never jump (an edit tap must
-										stay exactly where it is). -->
-										<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-										<span
-											class="review-quote"
-											title="Jump to this annotation in the chat"
-											onclick={() => gotoAnnotation(ann)}>“{ann.quote}”</span
-										>
-										<button
-											type="button"
-											class="review-copy"
-											title="Copy annotation"
-											aria-label="Copy annotation {n + 1}"
-											onclick={() => copyAnnotation(ann.quote, ann.comment)}
-										>
-											<ActionIcon kind="copy" />
-										</button>
+										<span class="review-numcol">
+											<span class="review-num">{n + 1}.</span>
+											<button
+												type="button"
+												class="review-copy"
+												title="Copy annotation"
+												aria-label="Copy annotation {n + 1}"
+												onclick={() => copyAnnotation(ann.quote, ann.comment)}
+											>
+												<ActionIcon kind="copy" />
+											</button>
+										</span>
+										<span class="review-quote">“{ann.quote}”</span>
 										<button
 											type="button"
 											aria-label="Delete annotation {n + 1}"
@@ -12562,6 +12590,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.review-item {
 		border-radius: 8px;
 		padding: 0.35rem 0.5rem;
+		/* The whole item jumps on a clean press: the pointer says so
+		(buttons and fields keep their own cursors underneath). */
+		cursor: pointer;
 	}
 	.review-item.highlight {
 		background: #eef4ff;
@@ -12596,6 +12627,17 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 	.review-num {
 		font-weight: 700;
+	}
+	/* The number column stacks the copy icon under the number: a
+	huge note no longer strands a tiny button floating mid-row —
+	the gutter space was reserved anyway. First-baseline alignment
+	keeps the number level with the quote text. */
+	.review-numcol {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.15rem;
+		flex-shrink: 0;
 	}
 	.review-label {
 		color: #6e6e73;
@@ -12800,8 +12842,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.review-head button.review-pencil :global(.action-glyph) {
 		height: 0.95rem;
 	}
-	/* Per-note copy rides next to the quote in the pencil's style:
-	icon only, no text. margin-left:0 keeps it with the quote while
+	/* Per-note copy rides under the number in the pencil's style:
+	icon only, no text. margin-left:0 keeps it in the gutter while
 	the delete button's auto margin holds the row's right edge. */
 	.review-head button.review-copy {
 		display: inline-flex;

@@ -176,3 +176,16 @@ export function isMathTarget(target: EventTarget | null): boolean {
 export function isTapOverlayTarget(target: EventTarget | null): boolean {
 	return closestFromTarget(target, "aside, .modal, .modal-veil, .find-bar, .search-palette") !== null;
 }
+
+/**
+ * True inside the annotation UI (review card, pill): picks rooted
+ * there are never annotatable, and presses there never summon the
+ * menu. Callers pass the selection anchor's element (text nodes
+ * carry no `closest`).
+ */
+const ANNOTATION_UI_SELECTOR = ".review, .ann-pop";
+
+/** True inside the annotation UI (see above). */
+export function isAnnotationUiTarget(target: EventTarget | null): boolean {
+	return closestFromTarget(target, ANNOTATION_UI_SELECTOR) !== null;
+}
