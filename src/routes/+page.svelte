@@ -137,6 +137,7 @@ import {
 		trimParagraphTerminator,
 		redactedCopyText,
 		newAnnotationId,
+		rewriteAnnotationComment,
 		annRefsFor,
 		lockSelectionToMessage,
 		quoteTextNodes,
@@ -657,6 +658,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * buttons — Enter/Space toggle like a click.
 	 */
 	let refsPopOpen: ChatMsgId | null = $state(null);
+	/**
+	 * Previous-menu row under note edit (desktop only — phones have no
+	 * row pencil): message plus ref number, null when browsing. One
+	 * card opens at a time (see refsPopOpen), so one edit slots in.
+	 */
+	let refsEditing: { messageId: ChatMsgId; n: number } | null = $state(null);
+	let refsEditDraft = $state("");
+	let refsEditBox: HTMLInputElement | null = $state(null);
 	/** Jump-blink target: the wash shows while set (two slow blinks,
 	then cleared — hover previews own the wash again after). */
 	let annBlink: AnnotationId | null = $state(null);
@@ -3208,8 +3217,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 
 	/**
-	 * Badge click edits in the composer (see editAnnotationInPrompt):
-	 * the saved comment loads as the draft, the arrow files it back,
+	 * Badge click edits in the floating card on desktop, in the
+	 * composer on phones (see editAnnotationInPrompt): the saved
+	 * comment loads as the draft, Enter or the arrow files it back,
 	 * tapping out cancels. Re-pressing the editing badge cancels too.
 	 */
 	function openBadge(id: AnnotationId, anchor?: { x: number; y: number }): void {
@@ -3296,9 +3306,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 
 	/**
-	 * Move an annotation comment into the composer (every edit on
-	 * every platform — the transplanted textboxes can't reliably
-	 * summon keyboards or hold focus): the pending annotation files
+	 * Move an annotation comment into the composer (every phone edit —
+	 * the transplanted textboxes can't reliably summon keyboards or
+	 * hold focus; desktop edits at the mark instead, see
+	 * editAnnotationAtMark): the pending annotation files
 	 * on the arrow, a saved one's comment rewrites. The review
 	 * closes so the composer owns the screen; the wash keeps the
 	 * quote visible.
@@ -3414,6 +3425,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * a bare scroll when it was cleared after sending.
 	 */
 	function refsItemClick(event: MouseEvent, messageId: ChatMsgId, quote: string): void {
+		// A row edit owns its row: quote taps must not yank the chat
+		// out from under the caret (buttons and fields are already
+		// exempt above — this covers the quote itself).
+		if (refsEditing) return;
 		const target = event.target instanceof Element ? event.target : null;
 		if (target?.closest("button, input, textarea, select, a")) return;
 		if (!window.getSelection()?.isCollapsed) return;
@@ -3434,6 +3449,110 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		document
 			.querySelector(`#msg-${index}`)
 			?.scrollIntoView({ block: "center", behavior: "smooth" });
+	}
+
+	/**
+	 * Pencil edit at the mark (new-overlay rows, desktop): jump to the
+	 * quote, then open the same floating edit card a badge tap summons
+	 * — one edit UI on desktop. Phones keep the composer path (the
+	 * transplanted textbox can't reliably summon the phone keyboard —
+	 * see editAnnotationInPrompt).
+	 */
+	function editAnnotationAtMark(id: AnnotationId): void {
+		const current = annotations.find((a) => a.id === id);
+		if (!current) {
+			flashErrorToast("Annotation no longer exists");
+			return;
+		}
+		if (androidUI) {
+			editAnnotationInPrompt({ id }, current.comment);
+			return;
+		}
+		gotoAnnotation({ id, messageId: current.messageId });
+		openEditCardAtSettledBadge(id);
+	}
+
+	/**
+	 * Open the desktop edit card once the jump's scroll settles. The
+	 * card is fixed-position, so anchoring mid-scroll strands it away
+	 * from the quote: scroll events re-arm a short settle timer, and
+	 * an already-visible mark (no scroll at all) opens on a near tick.
+	 */
+	function openEditCardAtSettledBadge(id: AnnotationId): void {
+		let done = false;
+		let timer: ReturnType<typeof setTimeout> | null = null;
+		const onScroll = (): void => {
+			if (timer !== null) clearTimeout(timer);
+			timer = setTimeout(finish, 150);
+		};
+		const finish = (): void => {
+			if (done) return;
+			done = true;
+			if (timer !== null) clearTimeout(timer);
+			window.removeEventListener("scroll", onScroll, true);
+			const badge = document.querySelector(`[data-ann-badge="${id}"]`);
+			const rect = badge instanceof HTMLElement ? badge.getBoundingClientRect() : null;
+			openBadge(id, rect ? { x: rect.left + rect.width / 2, y: rect.bottom } : undefined);
+		};
+		window.addEventListener("scroll", onScroll, true);
+		timer = setTimeout(finish, 80);
+	}
+
+	/**
+	 * Previous-menu pencil (desktop): the row swaps its note for a
+	 * single-line field — the card's rows stay one line, so the editor
+	 * is an <input>, never a textarea (Enter saves, Escape cancels via
+	 * the global dismiss below; newlines would break the baked block
+	 * shape the render parses back).
+	 */
+	function startRefsEdit(messageId: ChatMsgId, ref: { n: number; comment: string }): void {
+		refsEditing = { messageId, n: ref.n };
+		refsEditDraft = ref.comment;
+		void tick().then(() => {
+			refsEditBox?.focus();
+			refsEditBox?.select();
+		});
+	}
+
+	/**
+	 * Focus back on a row's pencil after the edit unmounts: the save
+	 * (and the cancel) re-renders the row, so the opening button is a
+	 * fresh node — focusing it synchronously strands on the detached
+	 * one. The data hook finds the remounted row.
+	 */
+	function parkRefsEditFocus(n: number): void {
+		void tick().then(() => {
+			const pencil = document.querySelector(`.ann-refs-pop [data-refs-pencil="${n}"]`);
+			if (pencil instanceof HTMLElement) pencil.focus();
+		});
+	}
+
+	/**
+	 * Row-edit commit: rebake the message with the one comment swapped
+	 * (see rewriteAnnotationComment) — history rewrites in place, like
+	 * an own-message edit, with no resend. An unparseable block reads
+	 * as gone; an untouched draft writes nothing.
+	 */
+	function saveRefsEdit(): void {
+		const editing = refsEditing;
+		refsEditing = null;
+		if (!editing) return;
+		const msg = viewChat.messages.find((m) => m.id === editing.messageId);
+		const next = msg ? rewriteAnnotationComment(msg.content, editing.n, refsEditDraft) : null;
+		if (next === null) flashErrorToast("Annotation no longer exists");
+		else if (msg && next !== msg.content) editMessageContent(chatState, editing.messageId, next);
+		refsEditDraft = "";
+		parkRefsEditFocus(editing.n);
+	}
+
+	/** Row-edit cancel: the stored comment stands, focus parks back on
+	the pencil that opened the field. */
+	function cancelRefsEdit(): void {
+		if (!refsEditing) return;
+		const n = refsEditing.n;
+		refsEditing = null;
+		refsEditDraft = "";
+		parkRefsEditFocus(n);
 	}
 
 	/** Blink a badge wash slowly twice, then hand the wash back. A
@@ -6516,8 +6635,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				editingId = null;
 			} else if (refsPopOpen) {
 				// A sent message's filed-annotations card sits below
-				// the review in z, so it dismisses right after it.
-				refsPopOpen = null;
+				// the review in z, so it dismisses right after it —
+				// but a row edit cancels first and the card stays
+				// open (a second Esc closes it).
+				if (refsEditing) cancelRefsEdit();
+				else refsPopOpen = null;
 			} else if (editingMsgId) {
 				// An in-progress message edit cancels from anywhere,
 				// including inside the prompt (capture phase pre-empts
@@ -8573,19 +8695,62 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 										<span class="ann-refs-num">{ref.n}.</span>
 										<span class="ann-refs-body">
 											<span class="ann-refs-quote">“{ref.quote}”</span>
-											{#if ref.comment}
+											{#if refsEditing?.messageId === msg.id && refsEditing.n === ref.n}
+												<!-- Desktop row edit (see startRefsEdit):
+												a single-line field — newlines would
+												break the baked block shape. Enter
+												saves, Escape cancels (global). -->
+												<input
+													type="text"
+													class="ann-refs-input"
+													bind:this={refsEditBox}
+													bind:value={refsEditDraft}
+													aria-label="Edit note {ref.n}. Enter saves, Escape cancels."
+													onkeydown={(e) => {
+														if (e.key === "Enter") {
+															e.preventDefault();
+															saveRefsEdit();
+														}
+													}}
+												/>
+											{:else if ref.comment}
 												<span class="ann-refs-comment">{ref.comment}</span>
 											{/if}
 										</span>
-										<button
-											type="button"
-											class="ann-refs-copy"
-											title="Copy annotation"
-											aria-label="Copy annotation {ref.n}"
-											onclick={() => copyAnnotation(ref.quote, ref.comment)}
-										>
-											<ActionIcon kind="copy" />
-										</button>
+										{#if refsEditing?.messageId === msg.id && refsEditing.n === ref.n}
+											<button type="button" class="ann-refs-edit-btn" onclick={saveRefsEdit}>
+												Save
+											</button>
+											<button type="button" class="ann-refs-edit-btn" onclick={cancelRefsEdit}>
+												Cancel
+											</button>
+										{:else}
+											<button
+												type="button"
+												class="ann-refs-copy"
+												title="Copy annotation"
+												aria-label="Copy annotation {ref.n}"
+												onclick={() => copyAnnotation(ref.quote, ref.comment)}
+											>
+												<ActionIcon kind="copy" />
+											</button>
+											{#if !androidUI}
+												<!-- Desktop only: phones never edited
+												previous notes in place (no pencil
+												there today), and the row stays a
+												clean jump target. -->
+												<button
+													type="button"
+													class="ann-refs-pencil"
+													data-refs-pencil={ref.n}
+													title="Edit note"
+													aria-label="Edit note {ref.n}"
+													onclick={() => startRefsEdit(msg.id, ref)}
+												>
+													<ActionIcon kind="pencil" />
+												</button>
+											{/if}
+										{/if}
 									</div>
 								{/each}
 							</div>
@@ -9117,11 +9282,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 												title="Edit comment"
 												aria-label="Edit comment for annotation {n + 1}"
 												onclick={() => {
-												// Every edit happens in the composer
-												// (see editAnnotationInPrompt): the
-												// inline textarea below is retired.
+												// Desktop edits at the mark in the
+												// floating card, phones in the
+												// composer (see
+												// editAnnotationAtMark) — the
+												// inline textarea below stays
+												// retired.
 												highlightAnnId = ann.id;
-												editAnnotationInPrompt({ id: ann.id }, ann.comment);
+												editAnnotationAtMark(ann.id);
 											}}
 											>
 												<ActionIcon kind="pencil" />
@@ -12111,6 +12279,59 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 	.ann-refs-copy:hover {
 		color: #fff;
+	}
+	/* Row pencil: same icon-only voice as the copy button beside it
+	(the copy button's own auto margin pushes the pair to the end). */
+	.ann-refs-pencil {
+		flex: none;
+		align-self: center;
+		display: inline-flex;
+		border: 0;
+		background: none;
+		color: #c7c7cc;
+		cursor: pointer;
+		padding: 0.1rem;
+		border-radius: 6px;
+	}
+	.ann-refs-pencil :global(.action-glyph) {
+		height: calc(0.75rem * var(--font-scale, 1));
+	}
+	.ann-refs-pencil:hover {
+		color: #fff;
+	}
+	/* Row note editor: a single-line field in the comment's slot, so
+	the row never grows — long drafts scroll sideways like the note
+	they replace. */
+	.ann-refs-input {
+		width: 100%;
+		box-sizing: border-box;
+		font: inherit;
+		color: #f2f2f7;
+		background: rgba(255, 255, 255, 0.08);
+		border: 1px solid rgba(255, 255, 255, 0.2);
+		border-radius: 6px;
+		padding: 0.15rem 0.4rem;
+		min-width: 0;
+	}
+	.ann-refs-input:focus {
+		outline: none;
+		border-color: rgba(255, 255, 255, 0.45);
+	}
+	/* Save/Cancel take the icon buttons' slots at the row's end. */
+	.ann-refs-edit-btn {
+		flex: none;
+		align-self: center;
+		border: 1px solid rgba(255, 255, 255, 0.25);
+		border-radius: 6px;
+		background: none;
+		color: #f2f2f7;
+		font: inherit;
+		font-size: 0.85em;
+		padding: 0.15rem 0.5rem;
+		cursor: pointer;
+	}
+	.ann-refs-edit-btn:hover {
+		border-color: #aeaeb2;
 	}
 	/* Attachment strip: same 1.2rem column edges as the composer (never
 	a full-bleed row), one scrolling row when many — pills never wrap

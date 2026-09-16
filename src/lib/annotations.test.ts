@@ -8,6 +8,7 @@ import {
 	annotationNumber,
 	formatAnnotations,
 	withAnnotations,
+	rewriteAnnotationComment,
 	splitAnnotationBlock,
 	locateQuote,
 	occurrenceAtPosition,
@@ -97,6 +98,36 @@ describe("annotations", () => {
 		const split = splitAnnotationBlock(withAnnotations("", list));
 		expect(split?.text).toBe("");
 		expect(split?.refs).toEqual([{ n: 1, quote: "風に舞う", comment: "What does this mean?" }]);
+	});
+});
+
+describe("rewriteAnnotationComment", () => {
+	const baked = 'explain this\n\nAnnotated selections:\n1. "bonjour" — greeting?\n2. "merci" — ?';
+
+	it("swaps one ref's comment and keeps the rest", () => {
+		expect(rewriteAnnotationComment(baked, 2, "thanks")).toBe(
+			'explain this\n\nAnnotated selections:\n1. "bonjour" — greeting?\n2. "merci" — thanks'
+		);
+	});
+
+	it("rebakes byte-for-byte when the comment is unchanged", () => {
+		expect(rewriteAnnotationComment(baked, 1, "greeting?")).toBe(baked);
+	});
+
+	it("files an empty comment as the ? marker, like the bake", () => {
+		expect(rewriteAnnotationComment(baked, 1, "  ")).toBe(
+			'explain this\n\nAnnotated selections:\n1. "bonjour" — ?\n2. "merci" — ?'
+		);
+	});
+
+	it("keeps the refs-only shape (no prompt text, no leading blank)", () => {
+		const only = 'Annotated selections:\n1. "bonjour" — greeting?';
+		expect(rewriteAnnotationComment(only, 1, "hi")).toBe('Annotated selections:\n1. "bonjour" — hi');
+	});
+
+	it("returns null for a missing number or no clean block", () => {
+		expect(rewriteAnnotationComment(baked, 9, "x")).toBeNull();
+		expect(rewriteAnnotationComment("just a prompt", 1, "x")).toBeNull();
 	});
 });
 

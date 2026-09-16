@@ -1084,6 +1084,35 @@ test.describe("touch", () => {
 			await expect(page.locator(".ann-pill")).toBeVisible();
 		});
 
+		/** The review pencil keeps the composer path on phones: the
+		saved comment loads into the comment box instead of a floating
+		card (the transplanted textbox can't summon the keyboard). The
+		draft is seeded in storage — filing it by touch is covered by
+		the Annotate test above. */
+		test("review pencil loads the comment into the composer", async ({ page }) => {
+			await seedChat(page, [{ role: "assistant", content: "alpha beta gamma delta" }]);
+			await page.addInitScript(() => {
+				window.localStorage.setItem(
+					"ccez-llm-annotations-v1",
+					JSON.stringify({
+						"e2e-chat": [{ id: "ann-1", messageId: "e2e-m0", quote: "beta", comment: "first" }]
+					})
+				);
+			});
+			await page.goto("/");
+			await expect(page.locator(".ann-pill")).toBeVisible();
+			await page.locator(".prompt-tools .ann-pill").click();
+			await expect(page.locator(".ann-wrap .review")).toHaveCSS("opacity", "1");
+			await page.locator(".review-pencil").first().click();
+			// No floating card on phones — the composer asks for the note.
+			await expect(page.locator(".ann-pop")).toHaveCount(0);
+			await expect(page.locator(".prompt textarea")).toHaveAttribute(
+				"placeholder",
+				"Add a comment"
+			);
+			await expect(page.locator(".prompt textarea")).toHaveValue("first");
+		});
+
 		/** Double-tapping a message taller than the screen scrolls its
 		action row into view: phones have no hover to reveal it. Rows
 		already visible never move. */

@@ -922,6 +922,50 @@ test("sent-refs rows are one line with copy at the end", async ({ page }) => {
 	expect(order).toBe(true);
 });
 
+/** The sent-refs pencil edits the note in the row (desktop): Enter
+rebakes the message in place — no resend, no composer detour — and
+focus parks back on the pencil. */
+test("sent-refs pencil edits the note in the row", async ({ page }) => {
+	await seedChat(page, [
+		{ role: "assistant", content: "noted" },
+		{ role: "user", content: 'explain this\n\nAnnotated selections:\n1. "bonjour" — greeting?' }
+	]);
+	await page.goto("/");
+	await page.locator(".ann-refs-pill").first().click();
+	await page.locator(".ann-refs-pencil").first().click();
+	const field = page.locator(".ann-refs-input");
+	await expect(field).toHaveValue("greeting?");
+	await field.click();
+	await page.keyboard.press("End");
+	await page.keyboard.type("!!");
+	await page.keyboard.press("Enter");
+	await expect(page.locator(".ann-refs-comment").first()).toHaveText("greeting?!!");
+	// The pill count stands, focus is back on the pencil, nothing resent.
+	await expect(page.locator(".ann-refs-pencil").first()).toBeFocused();
+	await expect(page.locator(".ann-refs-pill").first()).toHaveText("1");
+	await expect(page.locator("article.assistant")).toHaveCount(1);
+});
+
+/** Escape cancels the sent-refs row edit: the stored note stands and
+the card stays open for a second Esc. */
+test("sent-refs row edit cancels on Escape", async ({ page }) => {
+	await seedChat(page, [
+		{ role: "assistant", content: "noted" },
+		{ role: "user", content: 'explain this\n\nAnnotated selections:\n1. "bonjour" — greeting?' }
+	]);
+	await page.goto("/");
+	await page.locator(".ann-refs-pill").first().click();
+	await page.locator(".ann-refs-pencil").first().click();
+	const field = page.locator(".ann-refs-input");
+	await expect(field).toHaveValue("greeting?");
+	await field.click();
+	await page.keyboard.type("!!");
+	await page.keyboard.press("Escape");
+	await expect(field).toHaveCount(0);
+	await expect(page.locator(".ann-refs-comment").first()).toHaveText("greeting?");
+	await expect(page.locator(".ann-refs-pop").first()).toHaveCSS("opacity", "1");
+});
+
 /** Each draft annotation copies from the review panel's icon button. */
 test("review panel copies one annotation", async ({ page }) => {
 	await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
@@ -1108,7 +1152,7 @@ test("annotations-only messages render as an em-dash with the count pill above",
 	expect(parseFloat(sizes.fontSize)).toBeGreaterThanOrEqual(13);
 });
 
-test("review pencil files the edited comment on send", async ({ page }) => {
+test("review pencil edits at the mark in the floating card", async ({ page }) => {
 	await seedChat(page, [{ role: "assistant", content: "alpha beta gamma delta" }]);
 	await page.goto("/");
 	const para = page.locator("article.assistant .rendered p").first();
@@ -1118,21 +1162,29 @@ test("review pencil files the edited comment on send", async ({ page }) => {
 	await page.locator('.sel-menu button:has-text("Annotate")').click();
 	await page.keyboard.type("first");
 	await page.keyboard.press("Enter");
+	// A chat draft is already underway: the card edit must not clobber it.
+	await page.locator(".prompt .cm-content").click();
+	await page.keyboard.type("chat draft");
 	// The pill toggles the review (hover never opens it); the pencil
-	// loads the comment into the composer instead of an inline box.
+	// jumps to the mark and opens the floating edit card there.
 	await page.locator(".prompt-tools .ann-pill").click();
 	await expect(page.locator(".ann-wrap .review")).toHaveCSS("opacity", "1");
 	await page.locator(".review-pencil").first().click();
+	const card = page.locator('.ann-pop[aria-label="Edit annotation"]');
+	await expect(card).toBeVisible();
+	await expect(card.locator("textarea")).toHaveValue("first");
+	// Enter files the note back into the draft (the guard swallows the
+	// keypress so it never doubles as a send).
+	await card.locator("textarea").click();
+	await page.keyboard.type("!");
+	await page.keyboard.press("Enter");
+	await expect(card).toHaveCount(0);
+	await expect(page.locator(".review-comment").first()).toHaveText("first!");
+	// The composer draft survived untouched.
 	const draft = await page.evaluate(
 		() => document.querySelector(".prompt .cm-content")?.textContent ?? ""
 	);
-	expect(draft).toBe("first");
-	// Send files the note back (toast confirms the arrow didn't chat).
-	await page.keyboard.type("!");
-	await page.keyboard.press("Enter");
-	await expect(page.locator(".toast")).toContainText("Draft annotation edited");
-	await page.locator(".prompt-tools .ann-pill").click();
-	await expect(page.locator(".review-comment").first()).toHaveText("first!");
+	expect(draft).toBe("chat draft");
 });
 
 test("gutter drags never highlight above the cursor line", async ({ page }) => {

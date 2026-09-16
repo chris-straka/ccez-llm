@@ -173,7 +173,7 @@ test("annotations-only messages render as an em-dash with the count pill above",
 	expect(parseFloat(sizes.fontSize)).toBeGreaterThanOrEqual(13);
 });
 
-test("review pencil edits in the composer and files on send", async ({ page }) => {
+test("review pencil card cancels on Escape", async ({ page }) => {
 	await seedChat(page, [{ role: "assistant", content: "alpha beta gamma delta" }]);
 	await page.goto("/");
 	const para = page.locator("article.assistant .rendered p").first();
@@ -184,20 +184,21 @@ test("review pencil edits in the composer and files on send", async ({ page }) =
 	await page.keyboard.type("first");
 	await page.keyboard.press("Enter");
 	// The pill toggles the review (hover never opens it); the pencil
-	// loads the comment into the composer instead of an inline box.
+	// opens the floating edit card at the mark.
 	await page.locator(".prompt-tools .ann-pill").click();
 	await expect(page.locator(".ann-wrap .review")).toHaveCSS("opacity", "1");
 	await page.locator(".review-pencil").first().click();
-	const draft = await page.evaluate(
-		() => document.querySelector(".prompt .cm-content")?.textContent ?? ""
-	);
-	expect(draft).toBe("first");
-	// Send files the note back (toast confirms the arrow didn't chat).
+	const card = page.locator('.ann-pop[aria-label="Edit annotation"]');
+	await expect(card).toBeVisible();
+	// Escape cancels the card (the open review closes with it, per the
+	// global ladder): the saved comment stands.
+	await card.locator("textarea").click();
 	await page.keyboard.type("!");
-	await page.keyboard.press("Enter");
-	await expect(page.locator(".toast")).toContainText("Draft annotation edited");
+	await page.keyboard.press("Escape");
+	await expect(card).toHaveCount(0);
 	await page.locator(".prompt-tools .ann-pill").click();
-	await expect(page.locator(".review-comment").first()).toHaveText("first!");
+	await expect(page.locator(".ann-wrap .review")).toHaveCSS("opacity", "1");
+	await expect(page.locator(".review-comment").first()).toHaveText("first");
 });
 
 test("gutter drags never highlight above the cursor line", async ({ page }) => {

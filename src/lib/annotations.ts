@@ -909,7 +909,7 @@ function wrapRange(nodes: Text[], loc: QuoteLocation, extraClass?: string): HTML
  * Render annotations for the prompt tail, matching the review-panel shape:
  * numbered quote plus comment.
  */
-export function formatAnnotations(list: Annotation[]): string {
+export function formatAnnotations(list: { quote: string; comment: string }[]): string {
 	return list
 		.map((a, i) => {
 			const head = `${i + 1}. "${a.quote}"`;
@@ -921,10 +921,27 @@ export function formatAnnotations(list: Annotation[]): string {
 }
 
 /** Append the annotation block to outgoing prompt text. */
-export function withAnnotations(prompt: string, list: Annotation[]): string {
+export function withAnnotations(prompt: string, list: { quote: string; comment: string }[]): string {
 	if (list.length === 0) return prompt;
 	const block = `Annotated selections:\n${formatAnnotations(list)}`;
 	return prompt ? `${prompt}\n\n${block}` : block;
+}
+
+/**
+ * Rewrite one baked ref's comment (the previous-menu pencil save):
+ * parse the trailing block, swap ref n's comment, rebake. Null when
+ * the content holds no clean block or n isn't in it — the caller
+ * treats that as gone. Numbering re-sequences from the kept order,
+ * so an unchanged comment rebakes byte-for-byte.
+ */
+export function rewriteAnnotationComment(content: string, n: number, comment: string): string | null {
+	const split = splitAnnotationBlock(content);
+	if (!split) return null;
+	if (!split.refs.some((ref) => ref.n === n)) return null;
+	return withAnnotations(
+		split.text,
+		split.refs.map((ref) => (ref.n === n ? { quote: ref.quote, comment } : ref))
+	);
 }
 
 /**
