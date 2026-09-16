@@ -759,7 +759,10 @@ test("first message clears the top strip", async ({ page }) => {
 });
 
 /** Always-hide: dismissing a sidebar by outside click never summons
-the prompt — neither from visible nor from already-hidden. */
+the prompt — neither from visible nor from already-hidden. Keys
+summon (clicks never do on desktop), and an outside click from a
+visible prompt click-off hides (always-hide) without summoning
+back — the dismissing gesture leaves no summons behind. */
 test("sidebar outside-click never summons the prompt", async ({ page }) => {
 	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(40);
 	const turns = [0, 1, 2, 3].flatMap((n) => [
@@ -780,14 +783,16 @@ test("sidebar outside-click never summons the prompt", async ({ page }) => {
 	await page.locator("article.assistant .rendered").nth(1).click();
 	await expect(sidebar).toHaveClass(/collapsed/, { timeout: 5_000 });
 	await expect(prompt).toHaveClass(/prompt-idle/);
-	// From visible: stays visible, never toggled by the dismiss.
-	await page.locator("article.assistant .rendered").first().click();
+	// From visible: restore with the sanctioned keys-only path, then
+	// the dismissing click click-off hides (always-hide) and stays
+	// hidden — never toggled or summoned back by the dismiss.
+	await page.keyboard.press("i");
 	await expect(prompt).not.toHaveClass(/prompt-idle/, { timeout: 5_000 });
 	await page.keyboard.press("Meta+Shift+[");
 	await expect(sidebar).not.toHaveClass(/collapsed/, { timeout: 5_000 });
 	await page.locator("article.assistant .rendered").nth(1).click();
 	await expect(sidebar).toHaveClass(/collapsed/, { timeout: 5_000 });
-	await expect(prompt).not.toHaveClass(/prompt-idle/);
+	await expect(prompt).toHaveClass(/prompt-idle/);
 });
 
 /** Always-hide: stepping past the newest chat mints one with the
