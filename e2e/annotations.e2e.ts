@@ -1332,7 +1332,7 @@ test("review pencil hover moves no icons", async ({ page }) => {
 		const style = getComputedStyle(document.querySelector(".review-del") as HTMLElement);
 		return { color: style.color, deco: style.textDecorationLine };
 	});
-	expect(delPaint).toEqual({ color: "rgb(255, 69, 58)", deco: "none" });
+	expect(delPaint).toEqual({ color: "rgb(148, 37, 10)", deco: "none" });
 	// The quote navigates, so it links: underline on hover.
 	await page.locator(".review-quote").first().hover();
 	await page.waitForTimeout(400);

@@ -13249,7 +13249,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		height: 0.95rem;
 	}
 	.review-head button.review-del:hover {
-		color: #ff453a;
+		color: #94250a;
+		color: var(--danger);
 		text-decoration: none;
 	}
 	/* The quote is a button (keyboard reachable) but reads as plain
