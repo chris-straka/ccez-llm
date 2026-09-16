@@ -9,6 +9,7 @@ import {
 	renderMarkdown,
 	renderMessage,
 	applyPasteFolds,
+	foldBracket,
 	foldSegments,
 	pasteFoldButton,
 	htmlToText,
@@ -170,35 +171,53 @@ describe("sent-message tags", () => {
 	const img: AttachTagModel = {
 		id: "img-1",
 		kind: "image",
+		name: "shot.png",
+		tokens: 85,
+		open: false,
 		dataUrl: "data:image/png;base64,AAA",
 		text: null
 	};
 	const file: AttachTagModel = {
 		id: "file-1",
 		kind: "text",
+		name: "notes.md",
+		tokens: 12,
+		open: false,
 		dataUrl: null,
 		text: "# hello"
 	};
 
-	it("rebuilds literals as preview links paired by kind order", () => {
+	it("rebuilds literals as fold buttons paired by kind order", () => {
 		const { html } = renderMarkdown("[Pasted image] what do you see here?", [img]);
-		expect(html).toContain('class="sent-tag"');
-		expect(html).toContain('class="sent-preview"');
-		expect(html).toContain('src="data:image/png;base64,AAA"');
-		expect(html).not.toContain("sent-meta");
-		expect(html).not.toContain("data-sent-action");
+		expect(html).toContain('class="paste-fold sent-fold"');
+		expect(html).toContain('data-sent-toggle="img-1"');
+		expect(html).toContain("[Pasted image]");
+		expect(html).not.toContain("sent-card");
 		expect(html).toContain("what do you see here?");
 	});
 
-	it("previews file excerpts without buttons", () => {
-		const { html } = renderMarkdown("[Pasted Attachment] notes", [file]);
+	it("expands open tags in place between collapse brackets", () => {
+		const { html } = renderMarkdown("[Pasted image] what do you see here?", [{ ...img, open: true }]);
+		expect(html).toContain('class="sent-open"');
+		expect(html).toContain('src="data:image/png;base64,AAA"');
+		expect(html).toContain("shot.png · ~85 tokens");
+		expect(html).toContain('data-sent-action="copy"');
+		expect(html).toContain('data-sent-action="ocr"');
+		expect(html).not.toContain("Remove");
+	});
+
+	it("expands file excerpts with copy but no OCR", () => {
+		const { html } = renderMarkdown("[Pasted Attachment] notes", [{ ...file, open: true }]);
 		expect(html).toContain('class="sent-excerpt"');
 		expect(html).toContain("# hello");
+		expect(html).toContain("notes.md · ~12 tokens");
+		expect(html).toContain('data-sent-action="copy"');
+		expect(html).not.toContain('data-sent-action="ocr"');
 	});
 
 	it("falls back to plain text past the end of the models", () => {
 		const { html } = renderMarkdown("[Pasted image] one [Pasted image] two", [img]);
-		expect(html).toContain('class="sent-tag"');
+		expect(html).toContain('data-sent-toggle="img-1"');
 		expect(html).toContain("[Pasted image] two");
 	});
 
@@ -207,10 +226,11 @@ describe("sent-message tags", () => {
 		expect(html).not.toContain("sent-tag");
 	});
 
-	it("builds the tag card directly", () => {
+	it("builds the tag fold directly", () => {
 		expect(attachTagHtml(null, "i")).toBe("[Pasted image]");
 		expect(attachTagHtml(null, "f")).toBe("[Pasted Attachment]");
-		expect(attachTagHtml(img, "i")).toContain('class="sent-img"');
+		expect(attachTagHtml(img, "i")).toContain('data-sent-toggle="img-1"');
+		expect(attachTagHtml({ ...img, open: true }, "i")).toContain('class="sent-img"');
 	});
 });
 
@@ -247,14 +267,17 @@ describe("applyPasteFolds", () => {
 		expect(applyPasteFolds("hello", [])).toBe("hello");
 	});
 
-	it("splices closed folds into marker buttons, keeps open ones inline", () => {
+	it("splices closed folds into marker buttons, frames open ones in brackets", () => {
 		const out = applyPasteFolds("aa BBBB cc DDDD ee", [
 			{ start: 3, end: 7, chars: 4 },
 			{ start: 11, end: 15, chars: 4, open: true }
 		]);
 		expect(out).toContain('data-paste-fold="0"');
 		expect(out).toContain("[paste 4 chars]");
-		expect(out).toContain("DDDD");
+		expect(out).toContain(
+			'data-paste-fold="1" title="Collapse pasted content">[</button>DDDD' +
+				'<button type="button" class="paste-fold" data-paste-fold="1" title="Collapse pasted content">]</button>'
+		);
 		expect(out).not.toContain("BBBB");
 		expect(out.startsWith("aa ")).toBe(true);
 		expect(out.endsWith(" ee")).toBe(true);
@@ -273,7 +296,7 @@ describe("applyPasteFolds", () => {
 });
 
 describe("foldSegments", () => {
-	it("splits visible runs from closed-fold markers, merging open folds", () => {
+	it("splits visible runs from closed-fold markers, opening folds apart", () => {
 		expect(foldSegments("hello", undefined)).toEqual([{ kind: "text", text: "hello" }]);
 		expect(
 			foldSegments("aa BBBB cc DDDD ee", [
@@ -283,8 +306,16 @@ describe("foldSegments", () => {
 		).toEqual([
 			{ kind: "text", text: "aa " },
 			{ kind: "marker", index: 0, chars: 4 },
-			{ kind: "text", text: " cc DDDD ee" }
+			{ kind: "text", text: " cc " },
+			{ kind: "open", index: 1, chars: 4, text: "DDDD" },
+			{ kind: "text", text: " ee" }
 		]);
+	});
+
+	it("builds collapse brackets carrying the fold toggle", () => {
+		expect(foldBracket(2, "data-paste-fold", "[")).toBe(
+			'<button type="button" class="paste-fold" data-paste-fold="2" title="Collapse pasted content">[</button>'
+		);
 	});
 
 	it("emits the same markers applyPasteFolds splices", () => {

@@ -213,13 +213,22 @@ test("send clears pills and files a tag above the message", async ({ page }) => 
 	// Pills empty with the prompt at send time…
 	await expect(page.locator(".attachments")).toHaveCount(0);
 	// …and the sent turn carries one tag above its text (send strips
-	// the literal), hovering previews the big card.
-	const tag = page.locator("article.user .sent-tags .sent-tag").last();
+	// the literal): a body-size blue fold button like pasted content.
+	const tag = page.locator("article.user .sent-tags .sent-fold").last();
 	await expect(tag).toContainText("[Pasted image]", { timeout: 30_000 });
-	await tag.hover();
-	const preview = page.locator("article.user .sent-tags .sent-preview").last();
-	await expect(preview).toBeVisible();
-	await expect(preview.locator(".sent-img")).toBeVisible();
+	// Clicking expands the card in place with the image, name, and
+	// Copy/OCR; either blue bracket contracts it again.
+	await tag.click();
+	const fold = page.locator("article.user .sent-tags .sent-open").last();
+	await expect(fold).toBeVisible();
+	await expect(fold.locator(".sent-img")).toBeVisible();
+	await expect(fold).toContainText("tokens");
+	await expect(fold.locator("button", { hasText: "Copy" })).toBeVisible();
+	await expect(fold.locator("button", { hasText: "OCR" })).toBeVisible();
+	await fold.locator("button", { hasText: "[" }).first().click();
+	await expect(fold).toBeHidden();
+	// The message actions never open for tag presses.
+	await expect(page.locator('article.user [data-actions-open="true"]')).toHaveCount(0);
 });
 
 test("a stored literal renders inline at body size with no duplicate", async ({ page }) => {
@@ -267,10 +276,10 @@ test("a stored literal renders inline at body size with no duplicate", async ({ 
 	await page.reload();
 	const body = page.locator("article.user .rendered").first();
 	await expect(body).toBeVisible({ timeout: 60_000 });
-	await expect(page.locator("article.user .sent-tag")).toHaveCount(1);
+	await expect(page.locator("article.user .sent-fold")).toHaveCount(1);
 	await expect(page.locator("article.user .sent-tags")).toHaveCount(0);
 	// Same size as the message text around it — not chip-small.
-	const tag = page.locator("article.user .sent-tag").first();
+	const tag = page.locator("article.user .sent-fold").first();
 	const sizes = await tag.evaluate((el) => {
 		const p = el.closest("article")?.querySelector(".rendered p");
 		if (!p) throw new Error("missing body paragraph");
@@ -280,11 +289,14 @@ test("a stored literal renders inline at body size with no duplicate", async ({ 
 		};
 	});
 	expect(sizes.tag).toBe(sizes.body);
-	// Hovering previews the big card with the image.
-	await tag.hover();
-	const preview = page.locator("article.user .sent-preview").first();
-	await expect(preview).toBeVisible();
-	await expect(preview.locator(".sent-img")).toBeVisible();
+	// Clicking expands the card in place; the ] bracket contracts it.
+	await tag.click();
+	const card = page.locator("article.user .sent-open").first();
+	await expect(card).toBeVisible();
+	await expect(card.locator(".sent-img")).toBeVisible();
+	await expect(card).toContainText("shot.png");
+	await card.locator("button", { hasText: "]" }).click();
+	await expect(card).toBeHidden();
 });
 
 test("sent turns with many attachments scroll their tags", async ({ page }) => {
@@ -343,14 +355,17 @@ test("sent turns with many attachments scroll their tags", async ({ page }) => {
 	await page.reload();
 	const strip = page.locator("article.user .sent-tags").first();
 	await expect(strip).toBeVisible({ timeout: 60_000 });
-	await expect(page.locator("article.user .sent-tag")).toHaveCount(14);
-	// Image tags preview thumbnails, file tags preview excerpts.
-	await page.locator("article.user .sent-tag").first().hover();
-	await expect(page.locator("article.user .sent-preview .sent-img").first()).toBeVisible();
-	await page.locator("article.user .sent-tag").nth(1).hover();
-	await expect(page.locator("article.user .sent-preview .sent-excerpt").first()).toContainText(
-		"# notes 1"
-	);
+	await expect(page.locator("article.user .sent-fold")).toHaveCount(14);
+	// Image tags expand thumbnails, file tags expand excerpts (the
+	// collapsed list shifts as folds open, so first() tracks the
+	// next collapsed tag: image first, then the file behind it).
+	const folds = page.locator("article.user .sent-fold");
+	await folds.first().click();
+	await expect(page.locator("article.user .sent-open .sent-img").first()).toBeVisible();
+	await folds.first().click();
+	const excerpt = page.locator("article.user .sent-open .sent-excerpt").first();
+	await expect(excerpt).toBeVisible();
+	await expect(excerpt).toContainText("# notes 1");
 	// The strip scrolls: content wider than its box.
 	const overflow = await strip.evaluate((el) => el.scrollWidth - el.clientWidth);
 	expect(overflow).toBeGreaterThan(0);

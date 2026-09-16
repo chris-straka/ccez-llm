@@ -9,6 +9,7 @@ import {
 	IMAGE_MARKER,
 	extractAttachmentTags,
 	fileExcerpt,
+	formatTokenCount,
 	type AttachTagModel
 } from "./attachments";
 import {
@@ -94,15 +95,24 @@ export interface RenderedMessage {
 }
 
 /**
- * Sent-message tag: the marker text as a link with the composer's big
- * image preview on hover (thumbnail for images, excerpt for files).
- * History is read-only, so there are no buttons and no meta line —
- * just the picture. No model (more literals than attachments, e.g.
- * hand-typed): the plain marker text. Pure and unit-tested.
+ * Sent-message tag: collapsed it is the same blue fold button as
+ * pasted content (body-size text, aligned with the line); expanded it
+ * shows the card in place (thumbnail or excerpt, name and compact
+ * token count, Copy plus OCR for images) framed by blue collapse
+ * brackets — clicking the tag or either bracket toggles. History stays
+ * read-only, so there is no remove button. No model (more literals
+ * than attachments, e.g. hand-typed): the plain marker text. Pure and
+ * unit-tested.
  */
 export function attachTagHtml(model: AttachTagModel | null, kindLetter: string): string {
 	const label = kindLetter === "f" ? FILE_MARKER : IMAGE_MARKER;
 	if (!model) return escapeHtml(label);
+	if (!model.open) {
+		return (
+			`<button type="button" class="paste-fold sent-fold" data-sent-toggle="${model.id}">` +
+			`${escapeHtml(label)}</button>`
+		);
+	}
 	const visual =
 		model.kind === "image" && model.dataUrl?.startsWith("data:image/")
 			? `<img class="sent-img" src="${model.dataUrl}" alt="">`
@@ -110,9 +120,19 @@ export function attachTagHtml(model: AttachTagModel | null, kindLetter: string):
 				? `<span class="sent-excerpt">${escapeHtml(fileExcerpt(model.text))}</span>`
 				: "";
 	if (!visual) return escapeHtml(label);
+	const ocr =
+		model.kind === "image"
+			? `<button type="button" class="sent-btn" data-sent-action="ocr" data-attach-id="${model.id}">OCR</button>`
+			: "";
 	return (
-		`<span class="sent-tag">${escapeHtml(label)}` +
-		`<span class="sent-preview" aria-hidden="true">${visual}</span></span>`
+		`<span class="sent-open">` +
+		`<button type="button" class="paste-fold" data-sent-toggle="${model.id}" title="Collapse attachment">[</button>` +
+		`<span class="sent-card">${visual}` +
+		`<span class="sent-meta">${escapeHtml(model.name)} · ${formatTokenCount(model.tokens)} tokens</span>` +
+		`<span class="sent-actions"><button type="button" class="sent-btn" data-sent-action="copy" data-attach-id="${model.id}">Copy</button>${ocr}</span>` +
+		`</span>` +
+		`<button type="button" class="paste-fold" data-sent-toggle="${model.id}" title="Collapse attachment">]</button>` +
+		`</span>`
 	);
 }
 
@@ -313,10 +333,12 @@ export function sanitize(dirty: string): string {
 	});
 }
 
-/** One visible run: body text, or a closed-fold marker button. */
+/** One visible run: body text, a closed-fold marker button, or an
+ * open fold's text (renderers frame it in collapse brackets). */
 export type FoldSegment =
 	| { kind: "text"; text: string }
-	| { kind: "marker"; index: number; chars: number };
+	| { kind: "marker"; index: number; chars: number }
+	| { kind: "open"; index: number; chars: number; text: string };
 
 /** Marker button HTML (same label as the composer). Chars/index are numbers — nothing to escape. */
 export function pasteFoldButton(index: number, chars: number): string {
@@ -349,8 +371,15 @@ export function foldSegments(
 	for (const fold of ordered) {
 		if (fold.start < cursor) continue; // overlapping: keep the earliest
 		run += content.slice(cursor, fold.start);
-		if (fold.open) run += content.slice(fold.start, fold.end);
-		else {
+		if (fold.open) {
+			flush();
+			segments.push({
+				kind: "open",
+				index: fold.index,
+				chars: fold.chars,
+				text: content.slice(fold.start, fold.end)
+			});
+		} else {
 			flush();
 			segments.push({ kind: "marker", index: fold.index, chars: fold.chars });
 		}
@@ -362,19 +391,38 @@ export function foldSegments(
 }
 
 /**
- * Splice closed paste folds into display text: each becomes a
+ * Collapse bracket for an expanded run (paste fold or attachment):
+ * blue like the marker, clicking contracts back to the tag. Pure and
+ * unit-tested.
+ */
+export function foldBracket(index: number, toggleAttr: string, bracket: "[" | "]"): string {
+	return (
+		`<button type="button" class="paste-fold" ${toggleAttr}="${index}" ` +
+		`title="Collapse pasted content">${bracket}</button>`
+	);
+}
+
+/**
+ * Splice paste folds into display text: closed folds become a
  * `<button data-paste-fold>` marker carrying the composer's
- * `[Pasted content N chars]` label; open folds stay inline. Clicks
- * delegate in MessageBody like code-block buttons. Pure and unit-tested.
+ * `[paste N chars]` label; open folds render inline framed by blue
+ * collapse brackets (clicking either contracts). Clicks delegate in
+ * MessageBody like code-block buttons. Pure and unit-tested.
  */
 export function applyPasteFolds(
 	content: string,
 	folds: Array<{ start: number; end: number; chars: number; open?: boolean }> | undefined
 ): string {
 	return foldSegments(content, folds)
-		.map((segment) =>
-			segment.kind === "text" ? segment.text : pasteFoldButton(segment.index, segment.chars)
-		)
+		.map((segment) => {
+			if (segment.kind === "text") return segment.text;
+			if (segment.kind === "marker") return pasteFoldButton(segment.index, segment.chars);
+			return (
+				foldBracket(segment.index, "data-paste-fold", "[") +
+				segment.text +
+				foldBracket(segment.index, "data-paste-fold", "]")
+			);
+		})
 		.join("");
 }
 

@@ -225,17 +225,27 @@ export function stripAttachmentMarkers(text: string): string {
 }
 
 /**
+ * Fresh-line prefix for a marker tag: empty and newline-ended drafts
+ * take the tag as-is, a tag chained right after another tag's trailing
+ * space stays on that line (repeat pastes ride one line), and mid-prose
+ * starts a fresh line so typed text never glues onto the tag. Pure and
+ * unit-tested.
+ */
+function markerPrefix(doc: string): string {
+	if (doc === "" || doc.endsWith("\n")) return "";
+	if (doc.endsWith(`${IMAGE_MARKER} `) || doc.endsWith(`${FILE_MARKER} `)) return "";
+	return "\n";
+}
+
+/**
  * Composer insertion for a newly pasted/dropped image: the tag stays on
  * the current line with one trailing space, the caret landing right
  * after it — the user types beside the tag, never below it. Consumers
  * match the tag text itself (never the whole line), so typing beside it
- * neither absorbs it nor detaches the pill. Never a leading blank
- * line: the prefix newline only starts the tag mid-draft. Pure and
- * unit-tested.
+ * neither absorbs it nor detaches the pill. Pure and unit-tested.
  */
 export function imageMarkerInsert(doc: string): string {
-	const prefix = doc === "" || doc.endsWith("\n") ? "" : "\n";
-	return `${prefix}${IMAGE_MARKER} `;
+	return `${markerPrefix(doc)}${IMAGE_MARKER} `;
 }
 
 /**
@@ -243,8 +253,25 @@ export function imageMarkerInsert(doc: string): string {
  * image tag (same line, one trailing space, caret after it).
  */
 export function fileMarkerInsert(doc: string): string {
-	const prefix = doc === "" || doc.endsWith("\n") ? "" : "\n";
-	return `${prefix}${FILE_MARKER} `;
+	return `${markerPrefix(doc)}${FILE_MARKER} `;
+}
+
+/**
+ * Compact token count for pill chrome (`~1.1k`, `~2.3M`): full digits
+ * wrap the pill footer onto a second line past four figures, so counts
+ * stay short while exact figures live in the title attribute. Pure and
+ * unit-tested.
+ */
+export function formatTokenCount(tokens: number): string {
+	if (tokens < 1000) return `~${tokens}`;
+	if (tokens < 1_000_000) return `~${trimCompact(tokens / 1000)}k`;
+	return `~${trimCompact(tokens / 1_000_000)}M`;
+}
+
+/** One decimal, trimmed (`1.0` → `1`): the compact count's fraction. */
+function trimCompact(value: number): string {
+	const rounded = Math.round(value * 10) / 10;
+	return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
 }
 
 /**
@@ -397,12 +424,22 @@ export function leftoverAttachments(attachments: Attachment[], text: string): At
 	});
 }
 
-/** Preview data for one sent-message tag: history shows the image
- * itself, never names or token costs, so the model carries only
- * bytes and text. Callers pair by kind order. */
+/** History tag popup action (delegated in MessageBody — raw `{@html}`
+ * markup carries no Svelte handlers). */
+export type SentTagAction = "copy" | "ocr";
+
+/** Preview data for one sent-message tag: the expanded card names
+ * the file and its token cost, so the model carries those plus bytes,
+ * text, and its fold-open state. Callers pair by kind order. */
 export interface AttachTagModel {
 	id: string;
 	kind: AttachmentKind;
+	/** Original file name, shown in the expanded card. */
+	name: string;
+	/** Estimated tokens, shown in the expanded card. */
+	tokens: number;
+	/** True while the tag is expanded in place (fold-open). */
+	open: boolean;
 	/** Downscaled data URL (images with bytes only). */
 	dataUrl: string | null;
 	/** Full file text (text kind only; the builder excerpts it). */

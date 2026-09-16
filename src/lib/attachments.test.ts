@@ -9,6 +9,7 @@ import {
 	extractAttachmentTags,
 	fileExcerpt,
 	fileMarkerInsert,
+	formatTokenCount,
 	fitDimensions,
 	imageMarkerInsert,
 	imageTokens,
@@ -78,6 +79,9 @@ describe("attachment markers", () => {
 		// after it — the caret lands after the space, same line.
 		expect(imageMarkerInsert("hello")).toBe(`\n${IMAGE_MARKER} `);
 		expect(imageMarkerInsert("hello\n")).toBe(`${IMAGE_MARKER} `);
+		// Chained right after another tag: repeat pastes ride one line.
+		expect(imageMarkerInsert(`${IMAGE_MARKER} `)).toBe(`${IMAGE_MARKER} `);
+		expect(imageMarkerInsert(`${FILE_MARKER} hello`)).toBe(`\n${IMAGE_MARKER} `);
 	});
 
 	it("says [Pasted Attachment] under the same contract", () => {
@@ -85,6 +89,17 @@ describe("attachment markers", () => {
 		expect(fileMarkerInsert("")).toBe(`${FILE_MARKER} `);
 		expect(fileMarkerInsert("hello")).toBe(`\n${FILE_MARKER} `);
 		expect(fileMarkerInsert("hello\n")).toBe(`${FILE_MARKER} `);
+		expect(fileMarkerInsert(`${IMAGE_MARKER} `)).toBe(`${FILE_MARKER} `);
+	});
+
+	it("compacts token counts past four figures", () => {
+		expect(formatTokenCount(0)).toBe("~0");
+		expect(formatTokenCount(85)).toBe("~85");
+		expect(formatTokenCount(999)).toBe("~999");
+		expect(formatTokenCount(1105)).toBe("~1.1k");
+		expect(formatTokenCount(12000)).toBe("~12k");
+		expect(formatTokenCount(100000)).toBe("~100k");
+		expect(formatTokenCount(2500000)).toBe("~2.5M");
 	});
 
 	it("removes one marker tag at a time, sparing beside-prose", () => {

@@ -122,6 +122,7 @@ import {
 		fileExcerpt,
 		fileMarkerInsert,
 		fileToAttachment,
+		formatTokenCount,
 		stripAttachmentMarkers,
 		imageMarkerInsert,
 		countMarkers,
@@ -129,7 +130,8 @@ import {
 		leftoverAttachments,
 		type Attachment,
 		type AttachmentKind,
-		type AttachTagModel
+		type AttachTagModel,
+		type SentTagAction
 	} from "$lib/attachments";
 		import {
 		duplicateAnnotationId,
@@ -319,7 +321,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		vibrateTick,
 		type WakeLockRelease
 	} from "$lib/studyMedia";
-	import { recognizeImageText, friendlyOcrError } from "$lib/nativeOcr";
+	import { recognizeImageText, friendlyOcrError, ocrSupported } from "$lib/nativeOcr";
 	import { voiceLocaleForInputSource } from "$lib/keyboardLang";
 	import { joinExternalDraft, routeExternalText } from "$lib/externalText";
 	import {
@@ -2684,6 +2686,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		return leftoverAttachments(msg.attachments ?? [], base).map((att) => ({
 			id: att.id,
 			kind: att.kind,
+			name: att.name,
+			tokens: att.tokens,
+			open: expandedTags.includes(`${msg.id}:${att.id}`),
 			dataUrl: att.dataUrl,
 			text: att.text
 		}));
@@ -2723,6 +2728,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 
 	async function recognizeAttachment(att: Attachment): Promise<void> {
 		if (ocrBusyId !== null || att.kind !== "image" || !att.dataUrl) return;
+		if (!(await ocrSupported())) {
+			// No on-device OCR in this build (Windows/Linux, browser
+			// preview): explain instead of erroring, with nothing
+			// busy and nothing red.
+			flashToast("Text recognition needs the Mac app.");
+			return;
+		}
 		ocrBusyId = att.id;
 		clearNotice(notices, "inline");
 		try {
@@ -2750,6 +2762,34 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		} finally {
 			ocrBusyId = null;
 		}
+	}
+
+	/** Delegated history-tag popup action: the inline card's
+	 * Copy/OCR buttons carry data attributes (raw `{@html}` holds no
+	 * Svelte handlers). Missing attachments stay silent — a card can
+	 * outlive its message's files across a restore.
+	 */
+	function sentTagAction(action: SentTagAction, id: string): void {
+		const stored =
+			activeChat(chatState)?.messages.flatMap((m) => m.attachments ?? []) ?? [];
+		const att = stored.find((a) => a.id === id);
+		if (!att) return;
+		if (action === "ocr") void recognizeAttachment(att);
+		else copyAttachment(att);
+	}
+
+	/** Expanded history attachment tags (fold-open), ephemeral UI state
+	 * keyed `${message.id}:${attachment.id}` — collapsed by default on
+	 * every mount, unlike paste folds which persist open on the message.
+	 */
+	let expandedTags = $state<string[]>([]);
+
+	/** History tag fold toggle: replace the key list (never mutate). */
+	function toggleSentTag(msg: ChatMsg, attId: string): void {
+		const key = `${msg.id}:${attId}`;
+		expandedTags = expandedTags.includes(key)
+			? expandedTags.filter((k) => k !== key)
+			: [...expandedTags, key];
 	}
 
 	function toggleFold(id: ChatMsgId): void {
@@ -8907,6 +8947,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					class:aid-loading={aidBusy.has(msg.id) || vocalizing.has(msg.id)}
 					data-actions-open={shownActionsId === msg.id}
 					onclick={(e) => {
+						if (e.target instanceof Element && e.target.closest(".sent-fold,.sent-open")) return;
 						if (e.altKey) toggleFold(msg.id);
 						toggleMessageActions(msg.id, e);
 					}}
@@ -8926,24 +8967,65 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							<!-- Sent-message tags: one per attachment with no
 							literal left in the text (literals rebuild inline
 							instead, so each file shows exactly once). Above
-							the message; hovering previews the big card, the
-							same picture the composer showed before sending.
-							A long turn scrolls sideways in place instead of
+							the message as body-size blue fold buttons like
+							pasted content; clicking expands the card in
+							place, either blue bracket contracts. A long
+							turn scrolls sideways in place instead of
 							stretching. -->
 							<div class="sent-tags">
 								{#each leftoverModels as m (m.id)}
-									<span class="sent-tag"
-										>{m.kind === "text" ? FILE_MARKER : IMAGE_MARKER}<span
-											class="sent-preview"
-											aria-hidden="true"
+									{@const att = msg.attachments?.find((a) => a.id === m.id)}
+									{#if !m.open}
+										<button
+											type="button"
+											class="paste-fold sent-fold"
+											onclick={() => toggleSentTag(msg, m.id)}
+											>{m.kind === "text" ? FILE_MARKER : IMAGE_MARKER}</button
 										>
-											{#if m.kind === "image" && m.dataUrl?.startsWith("data:image/")}
-												<img class="sent-img" src={m.dataUrl} alt="" />
-											{:else if m.kind === "text" && m.text !== null}
-												<span class="sent-excerpt">{fileExcerpt(m.text)}</span>
-											{/if}
-										</span></span
-									>
+									{:else}
+										<span class="sent-open"
+											><button
+												type="button"
+												class="paste-fold"
+												title="Collapse attachment"
+												onclick={() => toggleSentTag(msg, m.id)}>[</button
+											><span class="sent-card">
+												{#if m.kind === "image" && m.dataUrl?.startsWith("data:image/")}
+													<img class="sent-img" src={m.dataUrl} alt="" />
+												{:else if m.kind === "text" && m.text !== null}
+													<span class="sent-excerpt">{fileExcerpt(m.text)}</span>
+												{/if}
+												<span class="sent-meta" title="{m.name} · {m.tokens} tokens">{m.name} · {formatTokenCount(m.tokens)} tokens</span>
+												{#if att}
+													<span class="sent-actions">
+														<button
+															type="button"
+															class="sent-btn"
+															onclick={(e) => {
+																e.stopPropagation();
+																copyAttachment(att);
+															}}>Copy</button
+															>
+														{#if att.kind === "image" && att.dataUrl}
+															<button
+																type="button"
+																class="sent-btn"
+																disabled={ocrBusyId === att.id}
+																onclick={(e) => {
+																	e.stopPropagation();
+																	void recognizeAttachment(att);
+																}}>{ocrBusyId === att.id ? "…" : "OCR"}</button
+																>
+														{/if}
+													</span>
+												{/if}
+											</span><button
+												type="button"
+												class="paste-fold"
+												title="Collapse attachment"
+												onclick={() => toggleSentTag(msg, m.id)}>]</button>
+										</span>
+									{/if}
 								{/each}
 							</div>
 						{/if}
@@ -9076,6 +9158,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							washId={annPop?.id ?? editingId ?? annBlink ?? hoverBadgeId}
 						onBadgeHover={(id: string | null) => (hoverBadgeId = id)}
 							onBadgeClick={openBadgeClick}
+							onAttachAction={sentTagAction}
+							expandedTags={expandedTags}
+							onTagToggle={(id: string) => toggleSentTag(msg, id)}
 							onToast={flashToast}
 							onFoldToggle={(index: number) => togglePasteFold(msg, index)}
 						onUnfold={() => toggleFold(msg.id)}
@@ -9301,7 +9386,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		{/if}
 
 		{#if attachments.length > 0 || notices.inline.message}
-			<ul class="attachments" class:composer-idle={promptIdle}>
+			<ul
+				class="attachments"
+				class:composer-idle={promptIdle}
+				class:glass={Math.min(settings.composerOpacity ?? 1, settings.bgOpacity ?? 1) < 1}
+			>
 				{#each attachments as att (att.id)}
 					<li class:card={att.kind === "image" && !!att.dataUrl}>
 						{#if att.kind === "image" && att.dataUrl}
@@ -9319,7 +9408,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							<span class="file-kind" aria-hidden="true">FILE</span>
 						{/if}
 						<span class="name" title="{att.name} · ~{att.tokens} tokens">{att.name}</span>
-						<span class="tok">~{att.tokens}</span>
+						<span class="tok" title="{att.tokens} tokens">{formatTokenCount(att.tokens)}</span>
 						<button
 							type="button"
 							class="card-btn"
@@ -12443,19 +12532,34 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		margin-bottom: 0.35rem;
 		padding-bottom: 0.15rem;
 	}
-	.sent-tag {
-		position: relative;
+	/* Leftover-strip folds reuse the pasted-content look (the fold
+	stylesheet lives on the message body, outside this tree). */
+	.sent-tags .paste-fold {
 		flex: none;
-		text-decoration: underline;
-		cursor: default;
+		font: inherit;
+		font-weight: 700;
+		color: #007aff;
+		color: var(--accent);
+		background: none;
+		border: 0;
+		padding: 0;
+		cursor: pointer;
 	}
-	.sent-preview {
-		display: none;
-		position: absolute;
-		top: 100%;
-		left: 0;
-		z-index: 30;
-		margin-top: 0.25rem;
+	/* Expanded tag card: in-flow figure between blue collapse
+	brackets (inline and strip alike), never an overlay. */
+	.sent-open .paste-fold {
+		font: inherit;
+		font-weight: 700;
+		color: #007aff;
+		color: var(--accent);
+		background: none;
+		border: 0;
+		padding: 0 0.15rem;
+		cursor: pointer;
+	}
+	.sent-card {
+		display: inline-block;
+		vertical-align: top;
 		padding: 0.5rem;
 		max-width: 16rem;
 		background: #fff;
@@ -12464,8 +12568,29 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		border-color: var(--line);
 		border-radius: 8px;
 	}
-	.sent-tag:hover .sent-preview {
+	.sent-meta {
 		display: block;
+		margin-top: 0.35rem;
+		white-space: nowrap;
+		font-size: 0.72rem;
+		color: #3a3a3c;
+		color: var(--ink-soft);
+	}
+	.sent-actions {
+		display: flex;
+		gap: 0.25rem;
+		margin-top: 0.35rem;
+	}
+	.sent-btn {
+		padding: 0.15rem 0.5rem;
+		font-size: 0.72rem;
+		line-height: 1.3;
+		text-decoration: underline;
+		background: none;
+		border: 0;
+		cursor: pointer;
+		color: #3a3a3c;
+		color: var(--ink-soft);
 	}
 	.sent-img {
 		display: block;
@@ -12786,7 +12911,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.attachments li {
 		display: flex;
 		align-items: center;
-		gap: 0.4rem;
+		gap: 0.25rem;
 		flex-shrink: 0;
 		font-size: 0.78rem;
 		background: #eef4ff;
@@ -12802,6 +12927,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		max-width: 16rem;
 	}
 	.attachments .tok {
+		flex: none;
+		white-space: nowrap;
 		color: #6e6e73;
 		color: var(--muted);
 	}
@@ -12844,7 +12971,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.attachments .card-btn {
 		display: inline-flex;
 		align-items: center;
-		padding: 0.15rem;
+		padding: 0.1rem;
 		font-size: 0.78rem;
 	}
 	.attachments .card-btn :global(.action-glyph) {
@@ -12854,12 +12981,29 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		font-size: 0.72rem;
 		font-weight: 700;
 		letter-spacing: 0.04em;
-		padding: 0.15rem 0.3rem;
+		padding: 0.1rem 0.25rem;
 		border-radius: 6px;
 	}
 	.attachments .ocr-btn:disabled {
 		opacity: 0.45;
 		cursor: default;
+	}
+	.attachments.glass {
+		background: color-mix(
+			in srgb,
+			var(--bg-raised) calc(min(var(--prompt-alpha, 1), var(--bg-alpha, 1)) * 100%),
+			transparent
+		);
+		-webkit-backdrop-filter: blur(18px) saturate(1.6);
+		backdrop-filter: blur(18px) saturate(1.6);
+		border-radius: 12px;
+	}
+	.attachments.glass li {
+		background: color-mix(
+			in srgb,
+			var(--hl) calc(min(var(--prompt-alpha, 1), var(--bg-alpha, 1)) * 100%),
+			transparent
+		);
 	}
 	.preview {
 		display: block;

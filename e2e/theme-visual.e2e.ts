@@ -400,7 +400,7 @@ for (const t of THEMES) {
 		await page.keyboard.press("Enter");
 		const tags = page.locator(".sent-tags").first();
 		await expect(tags).toBeVisible({ timeout: 30_000 });
-		await expect(tags.locator(".sent-tag").first()).toContainText("[Pasted image]");
+		await expect(tags.locator(".sent-fold").first()).toContainText("[Pasted image]");
 	});
 
 	// No failed-send test: without the mock the dev backend still

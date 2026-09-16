@@ -11,6 +11,7 @@
 		renderMarkdown,
 		applyPasteFolds,
 		foldSegments,
+		foldBracket,
 		pasteFoldButton,
 		highlightRendered,
 		type RenderedMessage
@@ -18,7 +19,7 @@
 	import { mathCopyText, foldPreviewText } from "$lib/render-math";
 	import { codeRunBody, runCodeBlock } from "$lib/coderun";
 	import { closestFromTarget } from "$lib/events";
-	import type { AttachTagModel } from "$lib/attachments";
+	import type { AttachTagModel, SentTagAction } from "$lib/attachments";
 	import type { ChatMsg, ChatMsgId } from "$lib/chat";
 	import { applyMarks, annRefsFor, type AnnotationMark, type AnnotationId } from "$lib/annotations";
 
@@ -47,6 +48,24 @@
 		washId?: string | null;
 		/** Badge click (opens the edit popover at the badge). */
 		onBadgeClick?: (id: AnnotationId, anchor: { x: number; y: number }) => void;
+		/**
+		 * History tag popup action (Copy/OCR buttons in the raw `{@html}`
+		 * card carry data attributes, not Svelte handlers). Undefined
+		 * leaves the buttons inert.
+		 */
+		onAttachAction?: (action: SentTagAction, id: string) => void;
+		/**
+		 * Expanded attachment-tag ids for this message (fold-open):
+		 * `${message.id}:${attachment.id}` keys owned by the parent.
+		 * Empty keeps every tag collapsed.
+		 */
+		expandedTags?: string[];
+		/**
+		 * Collapsed tag / collapse-bracket press (raw `{@html}` carries
+		 * `data-sent-toggle`, not Svelte handlers). Undefined leaves
+		 * tags stuck in their current fold.
+		 */
+		onTagToggle?: (id: string) => void;
 		/**
 		 * Toast text for chrome feedback the body owns (math/code copy
 		 * outcome): the parent flashes it. Undefined stays silent.
@@ -115,6 +134,9 @@
 		marks = [],
 		washId = null,
 		onBadgeClick,
+		onAttachAction,
+		expandedTags = [],
+		onTagToggle,
 		onToast,
 		onFoldToggle,
 		onUnfold,
@@ -212,11 +234,16 @@
 			// Aid-visible text only, so a pinned aid can't resurrect the
 			// redacted refs block.
 			html = foldSegments(aidBase, message.pasteFolds)
-				.map((segment) =>
-					segment.kind === "text"
-						? plainParagraphs(pinyinBlock(segment.text, aidPreferred), segment.text)
-						: pasteFoldButton(segment.index, segment.chars)
-				)
+				.map((segment) => {
+					if (segment.kind === "marker") return pasteFoldButton(segment.index, segment.chars);
+					const converted = plainParagraphs(pinyinBlock(segment.text, aidPreferred), segment.text);
+					if (segment.kind === "text") return converted;
+					return (
+						foldBracket(segment.index, "data-paste-fold", "[") +
+						converted +
+						foldBracket(segment.index, "data-paste-fold", "]")
+					);
+				})
 				.join("");
 			stamp();
 			return;
@@ -241,11 +268,18 @@
 			const convert = (text: string): Promise<string> =>
 				pinyin && furigana ? dualAidHtml(text, aidPreferred) : furiganaHtml(text, aidPreferred);
 			void Promise.all(
-				segments.map((segment) =>
-					segment.kind === "text"
-						? convert(segment.text)
-						: Promise.resolve(pasteFoldButton(segment.index, segment.chars))
-				)
+				segments.map((segment) => {
+					if (segment.kind === "marker")
+						return Promise.resolve(pasteFoldButton(segment.index, segment.chars));
+					if (segment.kind === "text") return convert(segment.text);
+					const converted = convert(segment.text);
+					return converted.then(
+						(text) =>
+							foldBracket(segment.index, "data-paste-fold", "[") +
+							text +
+							foldBracket(segment.index, "data-paste-fold", "]")
+					);
+				})
 			)
 				.then(
 					(parts) => {
@@ -281,6 +315,9 @@
 			return message.attachments.map((att) => ({
 				id: att.id,
 				kind: att.kind,
+				name: att.name,
+				tokens: att.tokens,
+				open: expandedTags.includes(`${message.id}:${att.id}`),
 				dataUrl: att.dataUrl,
 				text: att.text
 			}));
@@ -361,6 +398,24 @@
 			event.detail > 0 &&
 			chromeDown !== null &&
 			Math.hypot(event.clientX - chromeDown.x, event.clientY - chromeDown.y) > 4;
+		// History tag fold: buttons act (delegated Copy/OCR — raw {@html}
+		// carries no Svelte handlers), the collapsed tag and both
+		// collapse brackets toggle the fold. Buttons win over the
+		// toggle; both stay below in the article, which ignores tag
+		// presses entirely.
+		const sentButton = closestFromTarget(event.target, "[data-sent-action]");
+		if (sentButton) {
+			onAttachAction?.(
+				(sentButton.dataset.sentAction ?? "copy") as SentTagAction,
+				sentButton.dataset.attachId ?? ""
+			);
+			return;
+		}
+		const sentToggle = closestFromTarget(event.target, "[data-sent-toggle]");
+		if (sentToggle) {
+			onTagToggle?.(sentToggle.dataset.sentToggle ?? "");
+			return;
+		}
 		const badge = closestFromTarget(event.target, "[data-ann-badge]");
 		if (badge) {
 			const rect = badge.getBoundingClientRect();

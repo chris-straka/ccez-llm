@@ -110,18 +110,29 @@ test("pasted tag leaves the caret after its space, same line", async ({ page }) 
 	await expect(content).toHaveText("[Pasted image] hi");
 });
 
-test("removing the pill collapses the strip and clears its error", async ({ page }) => {
+test("a second pasted image chains onto the same line", async ({ page }) => {
+	await dropImage(page);
+	const content = page.locator(".cm-content");
+	await expect(content).toContainText("[Pasted image]", { timeout: 15_000 });
+	// The second paste lands beside the first tag (the old prefix
+	// newline parked the caret below, splitting repeat pastes).
+	await dropImage(page);
+	await expect(content).toHaveText("[Pasted image] [Pasted image] ");
+});
+
+test("removing the pill collapses the strip", async ({ page }) => {
 	await dropImage(page);
 	const card = page.locator(".attachments li.card");
 	await expect(card).toBeVisible({ timeout: 15_000 });
-	// No bridge in the preview: OCR fails into the inline slot.
+	// No bridge in the preview: OCR explains in a calm toast, never
+	// the red inline slot.
 	await card.locator('button[aria-label="Recognize text in image"]').click();
-	await expect(page.locator(".attach-error")).toBeVisible({ timeout: 15_000 });
-	// The X takes the pill, its tag, the strip, and the stale error —
-	// nothing lingers over the next draft.
+	await expect(page.locator(".toast")).toContainText("needs the Mac app", { timeout: 15_000 });
+	await expect(page.locator(".attach-error")).toHaveCount(0);
+	// The X takes the pill, its tag, and the strip — nothing lingers
+	// over the next draft.
 	await card.locator('button[aria-label="Remove attachment"]').click();
 	await expect(page.locator(".attachments")).toHaveCount(0);
-	await expect(page.locator(".attach-error")).toHaveCount(0);
 });
 
 test("attachment strip never covers message text", async ({ page }) => {
@@ -261,4 +272,45 @@ test("screenshot-to-chat is gone, paste still takes images", async ({ page }) =>
 	await expect(
 		page.locator('.prompt-tools button[aria-label="Attach images or text files"]')
 	).toBeVisible();
+});
+
+test("expanded pasted content contracts from either blue bracket", async ({ page }) => {
+	// A stored closed fold expands in place framed by blue collapse
+	// brackets; clicking either bracket contracts back to the tag.
+	await page.addInitScript(() => {
+		window.localStorage.setItem(
+			"ccez-llm-chats-v1",
+			JSON.stringify([
+				{
+					id: "e2e-chat",
+					createdAt: 1,
+					replyLang: null,
+					messages: [
+						{
+							id: "e2e-m0",
+							role: "user",
+							content: "aa BBBB cc",
+							pasteFolds: [{ start: 3, end: 7, chars: 4 }],
+							usage: null,
+							error: null
+						},
+						{ id: "e2e-m1", role: "assistant", content: "got it", usage: null, error: null }
+					]
+				}
+			])
+		);
+	});
+	await page.reload();
+	const body = page.locator("article.user .rendered").first();
+	await expect(body).toBeVisible({ timeout: 60_000 });
+	const marker = body.locator("button.paste-fold", { hasText: "[paste 4 chars]" });
+	await expect(marker).toBeVisible();
+	await expect(body).not.toContainText("BBBB");
+	await marker.click();
+	await expect(body).toContainText("BBBB");
+	const open = body.locator("button.paste-fold", { hasText: "[" }).first();
+	await expect(open).toBeVisible();
+	await open.click();
+	await expect(body).not.toContainText("BBBB");
+	await expect(body.locator("button.paste-fold", { hasText: "[paste 4 chars]" })).toBeVisible();
 });
