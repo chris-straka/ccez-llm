@@ -699,11 +699,16 @@
 		border: 1px solid var(--line);
 		padding: 0.25rem 0.6rem;
 	}
+	/* Quoted passages are reading material (translations, cited
+	text), not metadata: body ink, with the bar as the quote signal.
+	Muting them washed out long passages on light theme. */
 	.rendered :global(blockquote) {
 		margin: 0.4em 0;
 		padding-left: 0.7rem;
 		border-left: 3px solid #c7c7cc;
-		color: #6e6e73;
+		border-color: var(--line);
+		color: #1c1c1e;
+		color: var(--ink);
 	}
 	.rendered :global(.ccez-code code) {
 		cursor: text;
@@ -1255,7 +1260,8 @@
 	}
 	:global(html[data-theme="dark"]) .rendered :global(blockquote) {
 		border-color: #48484a;
-		color: #98989f;
+		color: #f2f2f7;
+		color: var(--ink);
 	}
 	:global(html[data-theme="dark"]) .rendered :global(.ccez-code) {
 		border-color: #38383a;

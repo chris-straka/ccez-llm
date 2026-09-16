@@ -510,6 +510,24 @@ for (const t of THEMES) {
 	});
 }
 
+/** Quoted passages read as body text (the bar carries the quote
+signal): muting them washed out long passages on light theme. */
+for (const t of THEMES) {
+	test(`blockquote reads as body text on ${t.name}`, async ({ page }) => {
+		await seedChat(page, [
+			{ role: "assistant", content: "As the saying goes:\n\n> The quick brown fox jumps." }
+		]);
+		await seedTheme(page, t.name);
+		await page.goto("/");
+		const quote = page.locator("article .rendered blockquote").first();
+		await expect(quote).toBeVisible({ timeout: 60_000 });
+		await expect(quote).toHaveCSS(
+			"color",
+			t.name === "light" ? "rgb(28, 28, 30)" : "rgb(242, 242, 247)"
+		);
+	});
+}
+
 test("composer holds its first line clear of the tools", async ({ page }) => {
 	await seedChat(page, []);
 	await page.goto("/");
