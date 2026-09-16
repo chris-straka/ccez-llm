@@ -452,6 +452,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		}
 	});
 	let attachments = $state<Attachment[]>([]);
+	/** In-flight attachment reads (counter: multi-file drops overlap).
+	While nonzero the paperclip dims and reports progress. */
+	let attachBusy = $state(0);
 	let attachInput: HTMLInputElement | undefined = $state();
 	let foldedIds = new SvelteSet<string>();
 	let previewId: string | null = $state(null);
@@ -2558,10 +2561,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	async function addFiles(files: File[]): Promise<void> {
 		clearNotice(notices, "inline");
 		for (const file of files) {
+			attachBusy += 1;
 			try {
 				attachments = [...attachments, await fileToAttachment(file)];
 			} catch (error) {
 				failAttach(error instanceof Error ? error.message : String(error));
+			} finally {
+				attachBusy -= 1;
 			}
 		}
 	}
@@ -9492,8 +9498,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				<button
 					type="button"
 					class="attach-btn"
+					class:busy={attachBusy > 0}
 					title="Attach images or text files"
 					aria-label="Attach images or text files"
+					aria-busy={attachBusy > 0}
 					onclick={() => attachInput?.click()}
 				>
 					<ActionIcon kind="attach" />
@@ -14183,6 +14191,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		tools row, not whatever font lands on the button. */
 		font-size: 1rem;
 		transition: color 0.18s ease;
+	}
+	/* While files read in, the paperclip dims and reports progress
+	instead of sitting silent: no spinner glyph, no motion, just the
+	waiting state (motion would fight the composer's own ramps). */
+	.attach-btn.busy {
+		cursor: progress;
+		opacity: 0.55;
 	}
 	/* Tool glyphs ride the row's font size (em, not the component's
 	fixed rem): paperclip, mic, voice, and jump icons scale with the
