@@ -2680,7 +2680,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				// slot, so nothing red lingers over the next draft.
 				flashErrorToast("No text found in this image.");
 			} else {
-				editor?.insertText(`${text}\n`);
+				// Same-line landing like the image tag: trailing space,
+				// never a newline — the caret stays beside the text so
+				// the next keystroke continues it instead of opening a
+				// fresh line below.
+				editor?.insertText(`${text} `);
 				flashToast("Recognized text inserted");
 			}
 		} catch (error) {
