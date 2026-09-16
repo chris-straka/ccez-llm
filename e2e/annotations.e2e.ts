@@ -909,7 +909,10 @@ test("sent-refs rows are one line with copy at the end", async ({ page }) => {
 				qs?.whiteSpace === "nowrap" &&
 				qs?.textOverflow === "ellipsis" &&
 				qs?.overflow === "hidden",
-			note: cs?.whiteSpace === "nowrap" && cs?.overflowX === "auto"
+			note:
+				cs?.whiteSpace === "nowrap" &&
+				cs?.overflowX === "auto" &&
+				cs?.fontStyle === "italic"
 		};
 	});
 	expect(style).toEqual({ quote: true, note: true });

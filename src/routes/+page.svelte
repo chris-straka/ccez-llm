@@ -12253,8 +12253,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}
+	/* Same voice as the composer card's note (see .review-comment):
+	grey italic gloss on the quote — the row editor below stays
+	roman, like every other field. */
 	.ann-refs-comment {
 		color: #c7c7cc;
+		font-style: italic;
 		white-space: nowrap;
 		overflow-x: auto;
 		min-width: 0;
