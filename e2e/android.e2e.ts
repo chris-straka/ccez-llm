@@ -1615,3 +1615,41 @@ test.describe("message chrome", () => {
 		expect(await chatVar()).toBe("46");
 	});
 });
+
+test.describe("toasts", () => {
+	/** Long errors fit the phone column at text size: the nowrap
+	desktop pill stretched full-width on Android. Forced through the
+	message copy path with no clipboard (same trigger as
+	error-toast.e2e.ts, under the Android UA). */
+	test("error toast fits the phone column and reads at text size", async ({ page }) => {
+		await seedChat(page, [{ role: "assistant", content: "copy me" }]);
+		await page.addInitScript(() => {
+			Object.defineProperty(window.navigator, "clipboard", { value: null, configurable: true });
+		});
+		await page.goto("/");
+		await expect(page.locator("article .rendered").first()).toBeVisible({ timeout: 60_000 });
+		const row = page.locator("article.assistant").first();
+		await row.click();
+		await expect(row).toHaveAttribute("data-actions-open", "true");
+		await row.locator('button[aria-label="Copy as plain text"]').click();
+		const toast = page.locator(".toast.error");
+		await expect(toast).toContainText("Couldn't copy to the clipboard.", { timeout: 10_000 });
+		const style = await toast.evaluate((el) => {
+			const s = getComputedStyle(el);
+			return {
+				size: s.fontSize,
+				white: s.whiteSpace,
+				maxWidth: s.maxWidth,
+				maxHeight: s.maxHeight,
+				overflow: s.overflowY,
+				width: el.getBoundingClientRect().width
+			};
+		});
+		expect(style.size).toBe("15.2px");
+		expect(style.white).toBe("normal");
+		expect(style.maxWidth).not.toBe("none");
+		expect(style.maxHeight).not.toBe("none");
+		expect(style.overflow).toBe("auto");
+		expect(style.width).toBeLessThanOrEqual(412);
+	});
+});

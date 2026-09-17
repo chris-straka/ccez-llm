@@ -13812,6 +13812,16 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		border-color: #e0a392;
 		border-color: var(--error-line);
 	}
+	/* Android toasts read at default text size, wrap, and scroll: a
+	long error on a phone column blew the nowrap pill full-width.
+	Plain and error share the base size, matching the voice error. */
+	.app[data-android] .toast {
+		font-size: 0.95rem;
+		white-space: normal;
+		max-width: calc(100vw - 2rem);
+		max-height: 30vh;
+		overflow-y: auto;
+	}
 	/* Speech errors ride under the toast: top of the screen, big
 	enough to notice, same dark-red pairing as the old banner so it
 	reads in both themes. A tap dismisses; silence still expires it. */
