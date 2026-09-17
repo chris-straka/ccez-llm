@@ -7,6 +7,9 @@ import { describe, expect, it } from 'vitest';
 // A `$` self-reference is npm's supported way to pin transitive copies
 // onto the root's version, and bun honors it the same way.
 const pkg = JSON.parse(
+  // Default-project linting can't resolve node:fs/URL types here; the
+  // cast below re-establishes the shape regardless.
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call
   readFileSync(new URL('./package.json', import.meta.url), 'utf8')
 ) as {
   dependencies?: Record<string, string>;

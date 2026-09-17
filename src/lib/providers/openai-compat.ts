@@ -349,7 +349,6 @@ export class OpenAICompatProvider implements ChatProvider {
 				content: assistantText,
 				tool_calls: pending.map((entry) => entry.raw)
 			});
-			assistantText = "";
 			for (const entry of pending) {
 				if (opts.signal?.aborted) throw new ProviderError("Reply stopped.");
 				history.push({

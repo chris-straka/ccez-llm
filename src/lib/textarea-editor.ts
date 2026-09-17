@@ -1,6 +1,7 @@
 import {
 	PASTE_THRESHOLD,
 	dataUrlsToImageFiles,
+	expandDeletionUnits,
 	removedMarkerIndexes,
 	tagCopyIndexes,
 	tagCopyPlan,
@@ -207,6 +208,37 @@ export function createTextareaEditor(
 			} else {
 				ranges.push({ from: Math.max(0, start - 1), to: start });
 			}
+		}
+		// Atomic markers: a deletion touching a marker or pasted-text
+		// tag takes the whole tag — Backspace nibbling one char leaves
+		// a half-tag that reads as prose and strands its attachment.
+		// Expanded ranges apply here (one undo step); untouched ones
+		// ride the native path with its snapshot below.
+		const expanded = expandDeletionUnits(before, [], ranges);
+		const grown =
+			expanded.length !== ranges.length ||
+			expanded.some(
+				(range, i) => range.from !== ranges[i]?.from || range.to !== ranges[i]?.to
+			);
+		if (grown) {
+			event.preventDefault();
+			const ordered = [...expanded].sort((a, b) => b.from - a.from);
+			let next = before;
+			for (const range of ordered) {
+				next = next.slice(0, range.from) + next.slice(range.to);
+			}
+			ta.value = next;
+			const caret = expanded[0]?.from ?? 0;
+			ta.setSelectionRange(caret, caret);
+			autogrow();
+			let removed: RemovedMarkerTags | undefined;
+			try {
+				removed = removedMarkerIndexes(before, expanded);
+			} catch {
+				removed = undefined;
+			}
+			options.onDocChange?.(ta.value, removed);
+			return;
 		}
 		pendingDelete = { before, ranges };
 	};

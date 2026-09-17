@@ -161,6 +161,54 @@ describe("createTextareaEditor", () => {
 	});
 });
 
+describe("atomic marker deletion", () => {
+	function backspace(ta: HTMLTextAreaElement, at: number): void {
+		ta.setSelectionRange(at, at);
+		ta.dispatchEvent(
+			new InputEvent("beforeinput", {
+				bubbles: true,
+				cancelable: true,
+				inputType: "deleteContentBackward"
+			})
+		);
+	}
+
+	it("Backspace after an image tag takes the whole tag", () => {
+		const { editor, ta, options } = setup();
+		editor.setText("see [Pasted image] now");
+		backspace(ta, 18);
+		expect(editor.getText()).toBe("see  now");
+		expect(ta.selectionStart).toBe(4);
+		expect(options.onDocChange).toHaveBeenCalled();
+	});
+
+	it("Delete before an image tag takes the whole tag", () => {
+		const { editor, ta } = setup();
+		editor.setText("see [Pasted image] now");
+		ta.setSelectionRange(4, 4);
+		ta.dispatchEvent(
+			new InputEvent("beforeinput", {
+				bubbles: true,
+				cancelable: true,
+				inputType: "deleteContentForward"
+			})
+		);
+		expect(editor.getText()).toBe("see  now");
+		expect(ta.selectionStart).toBe(4);
+	});
+
+	it("Backspace in plain prose keeps the native path", () => {
+		const { editor, ta, options } = setup();
+		editor.setText("hello");
+		(options.onDocChange as ReturnType<typeof vi.fn>).mockClear();
+		backspace(ta, 5);
+		// Untouched: no manual edit, no change report (the native
+		// keystroke owns the deletion from here).
+		expect(editor.getText()).toBe("hello");
+		expect(options.onDocChange).not.toHaveBeenCalled();
+	});
+});
+
 describe("image-tag copy/cut roundtrip", () => {
 	const TAG = "[Pasted image] ";
 	const blob = () => new Blob(["img"], { type: "image/png" });

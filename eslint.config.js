@@ -48,6 +48,7 @@ export default [
 						"svelte.config.js",
 						"eslint.config.js",
 						"playwright.config.ts",
+						"package-overrides.test.ts",
 						"e2e/*.ts",
 						"vendor/*.ts",
 						"scripts/*.ts"
