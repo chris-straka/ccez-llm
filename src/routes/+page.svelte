@@ -5237,6 +5237,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		if (!el || !box) return;
 		const boxRect = box.getBoundingClientRect();
 		const elRect = el.getBoundingClientRect();
+		// The floating card covers the box bottom: landing the message
+		// end there slides it (buttons included — the row lives in the
+		// article) underneath. Reserve the card plus a gap instead.
+		const card = document.querySelector<HTMLElement>("main .prompt");
+		const bottomReserve =
+			edge === "end" && card ? Math.ceil(card.getBoundingClientRect().height) + 8 : 0;
 		box.scrollTo({
 			top: messageEdgeScrollTop({
 				scrollTop: box.scrollTop,
@@ -5244,7 +5250,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				elTop: elRect.top,
 				elHeight: elRect.height,
 				viewH: box.clientHeight,
-				edge
+				edge,
+				bottomReserve
 			}),
 			behavior: "smooth"
 		});
@@ -12611,7 +12618,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		display: block;
 		position: absolute;
 		bottom: 100%;
-		left: 0;
+		/* Centered over the tag (static transform, no motion): the
+		card straddles its anchor instead of spilling right. */
+		left: 50%;
+		transform: translateX(-50%);
 		z-index: 20;
 		margin-bottom: 0.3rem;
 	}
@@ -12625,12 +12635,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 	:global(.sent-card) {
 		display: block;
-		/* Uniform width: every preview card matches, whatever its
-		excerpt length (narrow viewports still clear the edges).
-		Contents center, so a short preview never strands wash on
-		one side: the image rides the middle, the footer beneath it. */
-		width: 16rem;
-		max-width: calc(100vw - 2rem);
+		/* Hug the content (capped for huge previews and narrow
+		viewports): no stranded wash beside a short preview. Contents
+		center, so the image rides the middle with the footer beneath
+		it even when the footer is the narrower run. */
+		width: max-content;
+		max-width: min(16rem, calc(100vw - 2rem));
 		padding: 0.4rem 0.5rem;
 		font-size: 0.78rem;
 		text-align: center;
@@ -12652,6 +12662,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+		/* Shrink-to-fit cards need a bound: long names ellipsize
+		instead of stretching the card past its cap. */
+		min-width: 0;
+		max-width: 12rem;
 	}
 	:global(.sent-tok) {
 		flex: none;
@@ -13010,7 +13024,22 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		box-sizing: border-box;
 		max-width: calc(100% - 2.4rem);
 		overflow-x: auto;
+		/* Plain scrolling row: the bar stays hidden until the strip
+		is in use (hover, keyboard, or touch), then reads thin. */
+		scrollbar-width: none;
+	}
+	.attachments:hover,
+	.attachments:focus-within,
+	.attachments:active {
 		scrollbar-width: thin;
+	}
+	.attachments::-webkit-scrollbar {
+		height: 0;
+	}
+	.attachments:hover::-webkit-scrollbar,
+	.attachments:focus-within::-webkit-scrollbar,
+	.attachments:active::-webkit-scrollbar {
+		height: 6px;
 	}
 	.attachments li {
 		display: flex;
@@ -13051,9 +13080,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 	/* Image cards: thumbnail preview up top, token/copy/OCR/X footer
 	below (the strip itself stays one scrolling row — only the card
-	wraps internally). No wash block: the card floats bare over the
-	thread, text visible between and around the previews (the thumbnail
-	itself is the only cover). */
+	wraps internally). The blue wash is back on the card: it reads
+	as one basic pill-card over the thread, text visible between
+	the cards. */
 	.attachments li.card {
 		flex-wrap: wrap;
 		row-gap: 0.3rem;
@@ -13061,7 +13090,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		padding: 0.4rem 0.5rem;
 		max-width: 12rem;
 		align-items: center;
-		background: none;
+		background: #eef4ff;
+		background: var(--hl);
 	}
 	.attachments li.card .thumb {
 		flex: 1 1 100%;

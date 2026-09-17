@@ -241,14 +241,19 @@ test("z/Z land the hovered message top/bottom", async ({ page }) => {
 	);
 	await page.locator("article#msg-3").hover();
 	await page.keyboard.press("Z");
+	// The bottom (action row included — it lives in the article) rides
+	// just above the floating prompt card, never underneath it: the
+	// card height plus the 8px gap plus the 16px edge margin.
 	await page.waitForFunction(
-		({ top, viewH }) => {
+		() => {
 			const msg = document.querySelector("article#msg-3") as HTMLElement | null;
-			if (!msg) return false;
+			const card = document.querySelector("main .prompt") as HTMLElement | null;
+			if (!msg || !card) return false;
 			const r = msg.getBoundingClientRect();
-			return Math.abs(r.bottom - (top + viewH) + 16) <= 32;
+			const c = card.getBoundingClientRect();
+			return Math.abs(r.bottom - (c.top - 24)) <= 28;
 		},
-		{ top: box!.top, viewH: box!.viewH },
+		null,
 		{ timeout: 10_000 }
 	);
 });

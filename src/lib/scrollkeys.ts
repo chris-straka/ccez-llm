@@ -141,7 +141,10 @@ export function halfPageDy(viewH: number, dir: 1 | -1): number {
  * or bottom (`end`, Z) in view. All inputs are measured pixels:
  * the chat box's current scrollTop, the box and message top edges
  * in the same (viewport) coordinate space, the message height, and
- * the visible chat height.
+ * the visible chat height. `bottomReserve` (end edge only) is the
+ * floating composer's height plus a gap: the box runs full-height
+ * behind the card, so an unreserved landing parks the message
+ * bottom underneath it instead of above it.
  */
 export function messageEdgeScrollTop(args: {
 	scrollTop: number;
@@ -151,11 +154,13 @@ export function messageEdgeScrollTop(args: {
 	viewH: number;
 	edge: "start" | "end";
 	margin?: number;
+	bottomReserve?: number;
 }): number {
 	const margin = args.margin ?? HOVER_EDGE_MARGIN_PX;
 	const elTopInBox = args.scrollTop + (args.elTop - args.boxTop);
 	if (args.edge === "start") return elTopInBox - margin;
-	return elTopInBox + args.elHeight - args.viewH + margin;
+	const reserve = args.bottomReserve ?? 0;
+	return elTopInBox + args.elHeight - args.viewH + reserve + margin;
 }
 
 /**

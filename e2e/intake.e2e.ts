@@ -318,8 +318,8 @@ test("expanded pasted content contracts from either blue bracket", async ({ page
 test("tray stays background-free under a solid prompt", async ({ page }) => {
 	// Surfaces are solid now (no frost anywhere): the prompt card is
 	// opaque, while the pill tray above it paints no background —
-	// pills float with the thread visible between them, and image
-	// cards float bare with no wash block behind the thumbnails.
+	// pills float with the thread visible between them, and draft
+	// image cards wear the blue wash again as basic pill-cards.
 	await page.reload();
 	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
 	await dropImage(page);
@@ -340,31 +340,44 @@ test("tray stays background-free under a solid prompt", async ({ page }) => {
 		.locator("ul.attachments li.card")
 		.first()
 		.evaluate((el) => window.getComputedStyle(el).backgroundColor);
-	expect(cardBg).toBe("rgba(0, 0, 0, 0)");
+	expect(cardBg).toBe("rgb(238, 244, 255)");
 });
 
 /** One-pixel attachment seed (leftover-strip turns carry no literal). */
 const PIXEL =
 	"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
-async function seedStripTurn(page: Page, count: number): Promise<void> {
-	await page.addInitScript((args: { url: string; count: number }) => {
+async function seedStripTurn(page: Page, imageCount: number, textBodies: string[] = []): Promise<void> {
+	await page.addInitScript((args: { url: string; imageCount: number; textBodies: string[] }) => {
 		window.localStorage.setItem("ccez-mock-provider", "1");
 		window.localStorage.setItem(
 			"ccez-llm-settings-v1",
 			JSON.stringify({ hoverAssistantActions: true, hoverUserActions: true, promptIdleSec: 0 })
 		);
-		const attachments = Array.from({ length: args.count }, (_, i) => ({
-			id: `e2e-img-${i}`,
-			name: `shot-${i}.png`,
-			mime: "image/png",
-			kind: "image",
-			dataUrl: args.url,
-			text: null,
-			width: 1,
-			height: 1,
-			tokens: 85
-		}));
+		const attachments = [
+			...Array.from({ length: args.imageCount }, (_, i) => ({
+				id: `e2e-img-${i}`,
+				name: `shot-${i}.png`,
+				mime: "image/png",
+				kind: "image",
+				dataUrl: args.url,
+				text: null,
+				width: 1,
+				height: 1,
+				tokens: 85
+			})),
+			...args.textBodies.map((text, i) => ({
+				id: `e2e-txt-${i}`,
+				name: `notes-${i}.md`,
+				mime: "text/markdown",
+				kind: "text",
+				dataUrl: null,
+				text,
+				width: null,
+				height: null,
+				tokens: 85
+			}))
+		];
 		window.localStorage.setItem(
 			"ccez-llm-chats-v1",
 			JSON.stringify([
@@ -392,7 +405,7 @@ async function seedStripTurn(page: Page, count: number): Promise<void> {
 				}
 			])
 		);
-	}, { url: PIXEL, count });
+	}, { url: PIXEL, imageCount, textBodies });
 	await page.reload();
 }
 
@@ -425,7 +438,7 @@ test("leftover strip tag matches body size and hugs the own-message edge", async
 	expect(Math.abs(edges.stripRight - edges.bodyRight)).toBeLessThanOrEqual(2);
 });
 
-test("strip popup opens above the tag", async ({ page }) => {
+test("strip popup opens above the tag, centered on it", async ({ page }) => {
 	await seedStripTurn(page, 1);
 	const article = page.locator("article.user").last();
 	const tag = article.locator(".sent-tags .paste-fold").first();
@@ -437,16 +450,26 @@ test("strip popup opens above the tag", async ({ page }) => {
 		const t = root.querySelector(".sent-tags .paste-fold") as HTMLElement | null;
 		const c = root.querySelector(".sent-open") as HTMLElement | null;
 		if (!t || !c) throw new Error("missing tag or card");
+		const tb = t.getBoundingClientRect();
+		const cb = c.getBoundingClientRect();
 		return {
-			tagTop: t.getBoundingClientRect().top,
-			cardBottom: c.getBoundingClientRect().bottom
+			tagTop: tb.top,
+			cardBottom: cb.bottom,
+			tagCenterX: tb.left + tb.width / 2,
+			cardCenterX: cb.left + cb.width / 2
 		};
 	});
 	expect(geometry.cardBottom).toBeLessThanOrEqual(geometry.tagTop + 1);
+	// Straddles its anchor instead of spilling right.
+	expect(Math.abs(geometry.cardCenterX - geometry.tagCenterX)).toBeLessThanOrEqual(6);
 });
 
-test("preview cards share one width whatever the excerpt", async ({ page }) => {
-	await seedStripTurn(page, 2);
+test("preview cards hug their content", async ({ page }) => {
+	// Shrink-to-fit (capped), not one fixed width: a pixel thumbnail
+	// rides narrow while a long excerpt fills the cap.
+	await seedStripTurn(page, 1, [
+		"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor. ".repeat(6)
+	]);
 	const article = page.locator("article.user").last();
 	const tags = article.locator(".sent-tags .paste-fold");
 	await expect(tags.first()).toBeVisible({ timeout: 60_000 });
@@ -454,14 +477,37 @@ test("preview cards share one width whatever the excerpt", async ({ page }) => {
 	const widths: number[] = [];
 	for (let i = 0; i < 2; i++) {
 		await tags.nth(i).click();
-		const card = article.locator(".sent-open").first();
+		const card = article.locator(".sent-card").first();
 		await expect(card).toBeVisible();
-		const width = await card.evaluate((el) => el.getBoundingClientRect().width);
-		widths.push(width);
+		widths.push(await card.evaluate((el) => el.getBoundingClientRect().width));
 		await page.keyboard.press("Escape");
-		await expect(card).toBeHidden();
+		await expect(article.locator(".sent-open")).toBeHidden();
 	}
-	expect(widths[0]).toBe(widths[1]);
+	expect(widths[0]).toBeLessThan(256);
+	expect(widths[1]).toBeGreaterThan(widths[0]!);
+});
+
+test("tray card thumbnail never covers its footer", async ({ page }) => {
+	// The tall thumbnail must not overlap the name/token/buttons row
+	// it carries: geometry plus a hit test at the filename's center.
+	await dropImage(page);
+	const card = page.locator(".attachments li.card");
+	await expect(card).toBeVisible({ timeout: 15_000 });
+	const geometry = await card.evaluate((el) => {
+		const img = el.querySelector(".thumb img") as HTMLElement | null;
+		const name = el.querySelector(".name") as HTMLElement | null;
+		if (!img || !name) throw new Error("missing thumb or name");
+		const ir = img.getBoundingClientRect();
+		const nr = name.getBoundingClientRect();
+		const hit = document.elementFromPoint(nr.left + nr.width / 2, nr.top + nr.height / 2);
+		return {
+			imgBottom: ir.bottom,
+			nameTop: nr.top,
+			hitImg: hit instanceof Element && hit.closest("img") !== null
+		};
+	});
+	expect(geometry.imgBottom).toBeLessThanOrEqual(geometry.nameTop + 1);
+	expect(geometry.hitImg).toBe(false);
 });
 
 test("one preview per message, contents centered", async ({ page }) => {

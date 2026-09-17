@@ -86,6 +86,34 @@ describe("messageEdgeScrollTop", () => {
 			messageEdgeScrollTop({ scrollTop: 200, boxTop: 100, elTop: 300, elHeight: 60, viewH: 600, edge: "end" })
 		).toBe(200 + 200 + 60 - 600 + HOVER_EDGE_MARGIN_PX);
 	});
+
+	it("lifts the end landing above the floating composer reserve", () => {
+		expect(
+			messageEdgeScrollTop({
+				scrollTop: 200,
+				boxTop: 100,
+				elTop: 300,
+				elHeight: 60,
+				viewH: 600,
+				edge: "end",
+				bottomReserve: 120
+			})
+		).toBe(200 + 200 + 60 - 600 + 120 + HOVER_EDGE_MARGIN_PX);
+	});
+
+	it("ignores the reserve on the start edge", () => {
+		expect(
+			messageEdgeScrollTop({
+				scrollTop: 200,
+				boxTop: 100,
+				elTop: 300,
+				elHeight: 60,
+				viewH: 600,
+				edge: "start",
+				bottomReserve: 120
+			})
+		).toBe(200 + 200 - HOVER_EDGE_MARGIN_PX);
+	});
 });
 
 describe("resolveSidebarSpaceEnter", () => {
