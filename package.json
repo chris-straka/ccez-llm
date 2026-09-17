@@ -23,8 +23,8 @@
   },
   "license": "MIT",
   "overrides": {
-    "@codemirror/state": "6.7.5",
-    "@codemirror/view": "6.43.12"
+    "@codemirror/state": "$@codemirror/state",
+    "@codemirror/view": "$@codemirror/view"
   },
   "dependencies": {
     "@codemirror/commands": "^6.11.1",
