@@ -60,16 +60,32 @@ same codebase via the Tauri mobile target.
       but it is in maintenance mode and the owner's S24 is on the
       AICore supported list — ML Kit it is. Foundation SHIPS
       (`src/lib/ondevice/` seam + `ondevice.rs`/`OnDevice.kt` bridge +
-      Gradle dep, 23 seam tests + clamp test green; keyless, Gemma-pill
+      Gradle dep, 34 seam tests + clamp test green; keyless, Gemma-pill
       only, settings picker shows live readiness). WIRED (owner-approved
       Sep 2026): `local-gemma` resolves to `OnDeviceChatProvider`
       (one-shot stream, flattened prompt, short-copy errors toast via
-      the normal error slot). Needs the S24 install +
-      kotlin-gradle-plugin 2.x bump flagged in the Gradle comment, then
-      a device run: unsupported/wrong-device paths are covered by unit
-      tests + honest unverified notes only. `visibleProviderIds` lists
-      `local-gemma` only on offline Android and hides it elsewhere;
-      `platform.test.ts` pins all six gating cases.)
+      the normal error slot). SHIPPED Sep 2026 (owner-approved
+      follow-ups): mount probe hides the Gemma radio on unsupported
+      Android hardware (`onDeviceUnsupported` + panel verdict, cached
+      across opens); settings note shows whole-MB downloaded-so-far
+      while downloading (the API reports no total, so no percent is
+      fabricated) with a 3s re-probe that terminal states stop;
+      `PromptEditor` contract lives in `textarea-editor.ts` (`editor.ts`
+      is a pure barrel, dead `createPromptEditor` alias gone); mic/ann
+      seating rides `:has()` alone (JS classes removed). NATIVE BUILD
+      FIXES Sep 2026 (v0.4.7/v0.4.8 Android legs were red): `ondevice.rs`
+      JString by-value fix, dep pinned to genai-prompt beta3 (beta4's
+      Kotlin 2.3 metadata needs KGP 2.3, which Tauri's own bundled
+      script rejects — upstream tauri#15694, unreleased), KGP 2.2.21,
+      minSdk 26 (ML Kit requires it), `kotlinOptions` -> `compilerOptions`
+      DSL, `DownloadStatus`/`FeatureStatus` imports corrected to
+      `genai.common`, beta3 response read via `candidates.first text`.
+      Rust android-target check + kotlinc both compile locally. STILL
+      NEEDS the S24 install + device run: unsupported/wrong-device
+      paths are covered by unit tests + honest unverified notes only.
+      `visibleProviderIds` lists `local-gemma` only on offline Android
+      and hides it elsewhere; `platform.test.ts` pins all six gating
+      cases.)
 
 ## Pile: input + sidebar + shortcuts + extras (from PROMPT3) (needs hardware)
 

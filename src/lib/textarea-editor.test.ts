@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { createTextareaEditor } from "./textarea-editor";
-import type { PromptEditorOptions } from "./editor";
+import type { PromptEditorOptions } from "./textarea-editor";
 
 function setup(overrides: Partial<PromptEditorOptions> = {}) {
 	const parent = document.createElement("div");

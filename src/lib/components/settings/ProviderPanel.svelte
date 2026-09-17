@@ -1,3 +1,12 @@
+<script lang="ts" module>
+	/**
+	 * Last AICore support verdict, kept across panel opens so a
+	 * reopen doesn't re-flash the Gemma radio on unsupported
+	 * hardware. Unknown until the first mount probe resolves.
+	 */
+	let lastGemmaSupport: boolean | null = null;
+</script>
+
 <script lang="ts">
 	import {
 		asProviderId,
@@ -10,9 +19,12 @@
 	import { maskKey, activeProviderSettings, type AppSettings } from "$lib/settings";
 	import { tauriBackendAvailable } from "$lib/secrets";
 	import {
+		downloadedMB,
 		isOnDeviceProvider,
 		onDeviceErrorCopy,
-		onDeviceStatus
+		onDeviceStatus,
+		onDeviceUnsupported,
+		type OnDeviceStatus
 	} from "$lib/ondevice/bridge";
 	import { isAndroidUserAgent, visibleProviderIds } from "$lib/platform";
 	import { clearNotice, emptyNotices, flashNotice, MODEL_TIMEOUT_MS } from "$lib/notices";
@@ -66,6 +78,13 @@
 	 */
 	const androidBridge = isAndroidUserAgent(navigator.userAgent);
 	let online = $state(navigator.onLine);
+	/**
+	 * Mount-probe verdict on AICore support (Android only): false
+	 * hides the Gemma radio on hardware that can never run it, so it
+	 * fails nowhere — not even at send time. Null (unknown) lists it,
+	 * the pre-probe behavior.
+	 */
+	let gemmaSupported = $state(lastGemmaSupport);
 	const listedProviders = $derived.by(() => {
 		const visible = new Set(
 			visibleProviderIds(
@@ -73,7 +92,9 @@
 				{ android: androidBridge, online, local: androidBridge }
 			)
 		);
-		return allProviders.filter((p) => visible.has(p.id));
+		return allProviders.filter(
+			(p) => visible.has(p.id) && (gemmaSupported !== false || !isOnDeviceProvider(p.id))
+		);
 	});
 	const activeDef = $derived(getProviderDef(settings.activeProviderId, settings.customProviders));
 	const activeCustom = $derived(
@@ -87,29 +108,57 @@
 		void probeOnDevice();
 	}
 	/**
-	 * On-device readiness under the Gemma pill: ready, downloading,
-	 * or the short reason copy (wrong device, no model yet). Probed
-	 * when the panel opens on Gemma and on every switch to it — never
-	 * polled, so a mid-download count never flickers the settings.
+	 * On-device readiness under the Gemma pill: ready, downloading
+	 * with the MB count, or the short reason copy (wrong device, no
+	 * model yet). Probed when the panel opens (every switch too); the
+	 * only poll in settings re-probes while a download runs so the
+	 * count moves, and terminal states stop it.
 	 */
 	let onDeviceNote = $state("");
 	let onDeviceProbing = $state(false);
+	let downloadTimer: number | undefined;
+	function clearDownloadTimer(): void {
+		if (downloadTimer !== undefined) {
+			window.clearTimeout(downloadTimer);
+			downloadTimer = undefined;
+		}
+	}
+	/** Downloading copy with the MB count when the probe carries one. */
+	function downloadNote(status: OnDeviceStatus): string {
+		const mb = downloadedMB(status.downloadedBytes);
+		return mb === null
+			? "Downloading the on-device model — it works offline after this once."
+			: `Downloading the on-device model — ${mb} so far. It works offline after this once.`;
+	}
 	async function probeOnDevice(): Promise<void> {
-		if (!isOnDeviceProvider(settings.activeProviderId)) {
+		clearDownloadTimer();
+		const wantNote = isOnDeviceProvider(settings.activeProviderId);
+		if (!androidBridge && !wantNote) {
 			onDeviceNote = "";
 			return;
 		}
-		onDeviceProbing = true;
+		if (wantNote) onDeviceProbing = true;
 		try {
 			const status = await onDeviceStatus();
+			if (androidBridge) {
+				gemmaSupported = !onDeviceUnsupported(status);
+				lastGemmaSupport = gemmaSupported;
+			}
+			if (!wantNote) {
+				onDeviceNote = "";
+				return;
+			}
 			onDeviceNote =
 				status.state === "ready"
 					? "On-device model ready — replies never leave this phone."
 					: status.state === "downloading"
-						? "Downloading the on-device model — it works offline after this once."
+						? downloadNote(status)
 						: onDeviceErrorCopy(status.reason ?? "unsupported");
+			if (status.state === "downloading") {
+				downloadTimer = window.setTimeout(() => void probeOnDevice(), 3000);
+			}
 		} catch {
-			onDeviceNote = onDeviceErrorCopy("unsupported");
+			if (wantNote) onDeviceNote = onDeviceErrorCopy("unsupported");
 		} finally {
 			onDeviceProbing = false;
 		}
@@ -175,6 +224,7 @@
 		return () => {
 			window.removeEventListener("online", updateOnline);
 			window.removeEventListener("offline", updateOnline);
+			clearDownloadTimer();
 		};
 	});
 </script>

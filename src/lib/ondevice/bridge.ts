@@ -28,10 +28,12 @@ import { tauriBackendAvailable } from "../secrets";
  * is already granted; AICore downloads through Play) and no settings
  * change (keyless — Gemini Nano needs no API key).
  *
- * Field note: genai-prompt ships Kotlin 2.x metadata, but the Android
- * shell still pins kotlin-gradle-plugin 1.9.25 — the Gradle dep needs
- * that bump before the native leg compiles (unverified in this
- * harness; see `OnDevice.kt`).
+ * Field note: the dep is pinned to genai-prompt beta3, not beta4 —
+ * beta4's Kotlin 2.3 metadata needs kotlin-gradle-plugin 2.3, which
+ * rejects Tauri's own bundled script (upstream tauri#15694,
+ * unreleased). beta3 reads cleanly under KGP 2.2.21. Native leg
+ * compiles locally but is still unverified on device (see
+ * `OnDevice.kt`).
  *
  * Every function degrades cleanly across the three runtimes: outside
  * the Tauri shell (browser preview, jsdom/node tests) status reads
@@ -54,8 +56,33 @@ export interface OnDeviceStatus {
 	state: OnDeviceState;
 	/** 0..1 model-download progress; present only while downloading. */
 	progress?: number;
+	/**
+	 * Bytes downloaded so far; present only while downloading. The
+	 * native API reports no total, so no percent exists — the UI
+	 * renders whole megabytes, never a fabricated fraction.
+	 */
+	downloadedBytes?: number;
 	/** Machine-readable reason; UI shows `onDeviceErrorCopy` of it. */
 	reason?: string;
+}
+
+/**
+ * True when the probe positively reports an unsupported device (no
+ * AICore / no Gemini Nano): callers hide the Gemma entry instead of
+ * letting it fail at send time. Anything else — no model yet,
+ * mid-download, probe garbage — keeps the entry listed. Pure.
+ */
+export function onDeviceUnsupported(status: OnDeviceStatus): boolean {
+	return status.state === "unavailable" && status.reason === "unsupported";
+}
+
+/**
+ * Whole-megabyte copy for the settings note (`"48 MB"`); null when
+ * the count is missing or nonsense. Pure.
+ */
+export function downloadedMB(bytes: unknown): string | null {
+	if (typeof bytes !== "number" || !Number.isFinite(bytes) || bytes < 0) return null;
+	return `${Math.floor(bytes / 1048576)} MB`;
 }
 
 export interface OnDeviceGenerateOpts {
@@ -95,8 +122,8 @@ function liveInvoke(cmd: string, args?: Record<string, unknown>): Promise<unknow
 
 /**
  * Normalize a native status payload. Accepts the `{state, progress?,
- * reason?}` object or a bare state string; anything else is an
- * error (bridge bug, never a crash). Pure.
+ * downloadedBytes?, reason?}` object or a bare state string; anything
+ * else is an error (bridge bug, never a crash). Pure.
  */
 export function parseOnDeviceStatus(payload: unknown): OnDeviceStatus {
 	const states: OnDeviceState[] = ["unavailable", "downloading", "ready", "error"];
@@ -115,6 +142,15 @@ export function parseOnDeviceStatus(payload: unknown): OnDeviceStatus {
 		const out: OnDeviceStatus = { state };
 		const progress = clampProgress(raw["progress"]);
 		if (state === "downloading" && progress !== undefined) out.progress = progress;
+		const downloaded = raw["downloadedBytes"];
+		if (
+			state === "downloading" &&
+			typeof downloaded === "number" &&
+			Number.isFinite(downloaded) &&
+			downloaded >= 0
+		) {
+			out.downloadedBytes = Math.floor(downloaded);
+		}
 		if (typeof raw["reason"] === "string" && raw["reason"]) out.reason = raw["reason"];
 		if (state === "error" && out.reason === undefined) out.reason = "bad-status";
 		return out;

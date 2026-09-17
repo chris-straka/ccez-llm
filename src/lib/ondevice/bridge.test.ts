@@ -1,11 +1,13 @@
 import { describe, it, expect, vi } from "vitest";
 import {
 	clampMaxTokens,
+	downloadedMB,
 	generateOnDevice,
 	isOnDeviceProvider,
 	ONDEVICE_PROVIDER_ID,
 	onDeviceErrorCopy,
 	onDeviceStatus,
+	onDeviceUnsupported,
 	parseOnDeviceStatus,
 	type OnDeviceDeps
 } from "./bridge";
@@ -152,5 +154,54 @@ describe("generateOnDevice", () => {
 		await expect(generateOnDevice("hi", undefined, other.deps)).rejects.toThrow(
 			"On-device chat failed. Try again."
 		);
+	});
+});
+
+describe("parseOnDeviceStatus downloadedBytes", () => {
+	it("keeps whole bytes while downloading, floors fractions", () => {
+		expect(parseOnDeviceStatus({ state: "downloading", downloadedBytes: 50331648 })).toEqual({
+			state: "downloading",
+			downloadedBytes: 50331648
+		});
+		expect(parseOnDeviceStatus({ state: "downloading", downloadedBytes: 10.9 })).toEqual({
+			state: "downloading",
+			downloadedBytes: 10
+		});
+	});
+
+	it("drops the count outside downloading and drops nonsense", () => {
+		expect(parseOnDeviceStatus({ state: "ready", downloadedBytes: 7 })).toEqual({
+			state: "ready"
+		});
+		expect(parseOnDeviceStatus({ state: "downloading", downloadedBytes: -1 })).toEqual({
+			state: "downloading"
+		});
+		expect(parseOnDeviceStatus({ state: "downloading", downloadedBytes: Number.NaN })).toEqual({
+			state: "downloading"
+		});
+		expect(parseOnDeviceStatus({ state: "downloading", downloadedBytes: "48 MB" })).toEqual({
+			state: "downloading"
+		});
+	});
+});
+
+describe("onDeviceUnsupported", () => {
+	it("hides the entry only on a positive unsupported verdict", () => {
+		expect(onDeviceUnsupported({ state: "unavailable", reason: "unsupported" })).toBe(true);
+		expect(onDeviceUnsupported({ state: "unavailable", reason: "no-model" })).toBe(false);
+		expect(onDeviceUnsupported({ state: "unavailable", reason: "no-bridge" })).toBe(false);
+		expect(onDeviceUnsupported({ state: "downloading" })).toBe(false);
+		expect(onDeviceUnsupported({ state: "ready" })).toBe(false);
+		expect(onDeviceUnsupported({ state: "error", reason: "unsupported" })).toBe(false);
+	});
+});
+
+describe("downloadedMB", () => {
+	it("renders whole megabytes, null for nonsense", () => {
+		expect(downloadedMB(50331648)).toBe("48 MB");
+		expect(downloadedMB(0)).toBe("0 MB");
+		expect(downloadedMB(undefined)).toBe(null);
+		expect(downloadedMB(-5)).toBe(null);
+		expect(downloadedMB(Number.NaN)).toBe(null);
 	});
 });

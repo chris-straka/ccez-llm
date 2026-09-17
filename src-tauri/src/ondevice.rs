@@ -3,7 +3,8 @@
 //!
 //! Two Tauri commands form the whole contract with the frontend seam
 //! (`src/lib/ondevice/bridge.ts`): `ondevice_status` reports readiness
-//! as a `{state, progress?, reason?}` payload, and `ondevice_generate`
+//! as a `{state, downloadedBytes?, reason?}` payload (extra native
+//! fields pass through; the seam validates), and `ondevice_generate`
 //! resolves one completion as text. Native availability maps onto the
 //! four existing bridge states — no new states: AICore AVAILABLE ->
 //! ready, DOWNLOADING -> downloading, DOWNLOADABLE ->
@@ -171,7 +172,7 @@ mod ondevice_android {
         Ok(JObject::from(s))
     }
 
-    fn jstring_result(env: &mut JNIEnv, out: &JObject, ctx: &str) -> Result<String, String> {
+    fn jstring_result(env: &mut JNIEnv, out: JObject, ctx: &str) -> Result<String, String> {
         if out.as_raw().is_null() {
             return Err(format!("{ctx} returned null"));
         }
@@ -233,7 +234,7 @@ mod ondevice_android {
             let obj: JObject = out
                 .l()
                 .map_err(|e| format!("bad status() return: {e:?}"))?;
-            jstring_result(env, &obj, "status")
+            jstring_result(env, obj, "status")
         })
     }
 
@@ -256,7 +257,7 @@ mod ondevice_android {
             let obj: JObject = out
                 .l()
                 .map_err(|e| format!("bad generate() return: {e:?}"))?;
-            jstring_result(env, &obj, "generate")
+            jstring_result(env, obj, "generate")
         })
     }
 }

@@ -20,7 +20,9 @@ android {
     defaultConfig {
         manifestPlaceholders["usesCleartextTraffic"] = "false"
         applicationId = "studio.ccez.app"
-        minSdk = 24
+        // 26, not the Tauri default 24: the ML Kit GenAI Prompt API
+        // requires API 26+ (below that the manifest merger fails).
+        minSdk = 26
         targetSdk = 36
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
         versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")
@@ -62,9 +64,9 @@ android {
             )
         }
     }
-    kotlinOptions {
-        jvmTarget = "1.8"
-    }
+    // (jvmTarget moved to the top-level kotlin block: kotlinOptions
+    // was removed in Kotlin 2.3. Target stays 1.8.)
+
     buildFeatures {
         buildConfig = true
     }
@@ -74,6 +76,15 @@ rust {
     rootDirRel = "../../../"
 }
 
+// kotlinOptions was removed in Kotlin 2.3: the JVM target rides the
+// compilerOptions DSL. Stays 1.8 (the widest the shell's desugaring
+// covers).
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8)
+    }
+}
+
 dependencies {
     implementation("androidx.webkit:webkit:1.14.0")
     implementation("androidx.appcompat:appcompat:1.7.1")
@@ -81,11 +92,12 @@ dependencies {
     implementation("com.google.android.material:material:1.12.0")
     implementation("androidx.lifecycle:lifecycle-process:2.10.0")
     // On-device chat: ML Kit GenAI Prompt API over the AICore system app
-    // (Gemini Nano — no bundled weights, no API key). BUILD NOTE: this
-    // artifact ships Kotlin 2.x metadata but the shell still pins
-    // kotlin-gradle-plugin 1.9.25 (../build.gradle.kts); bump that
-    // plugin to 2.x before the first Android build with this dep.
-    implementation("com.google.mlkit:genai-prompt:1.0.0-beta4")
+    // (Gemini Nano — no bundled weights, no API key). Pinned to beta3,
+    // NOT beta4: beta4's Kotlin 2.3 metadata needs kotlin-gradle-plugin
+    // 2.3, which Tauri's own bundled script rejects (upstream
+    // tauri#15694, unreleased). beta3 reads under the KGP 2.2.21 pinned
+    // in ../build.gradle.kts.
+    implementation("com.google.mlkit:genai-prompt:1.0.0-beta3")
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.4")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.0")

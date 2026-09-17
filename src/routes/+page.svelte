@@ -10216,8 +10216,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
 			class="prompt"
-			class:has-anns={annotations.length > 0}
-			class:has-mic={canMic && settings.micEnabled}
 			class:prompt-hidden={!!annPop && androidUI && !iosUI}
 			class:prompt-idle={promptParked()}
 			class:prompt-preview={previewing && viewChat.messages.length === 0}
@@ -15555,15 +15553,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		engine's own placeholder metrics. */
 		line-height: 1.5;
 	}
-	.prompt.has-mic :global(.ta-input) {
-		--tools-pad: 8.6rem;
-	}
-	.prompt.has-anns :global(.ta-input) {
-		--tools-pad: 9.5rem;
-	}
-	.prompt.has-mic.has-anns :global(.ta-input) {
-		--tools-pad: 11.5rem;
-	}
+	/* Tool seating rides the DOM, not JS classes: .mic-btn renders
+	exactly when dictation is available and .ann-wrap exactly when
+	drafts exist, so :has() below is the single source of truth. */
 	.prompt:has(.mic-btn) :global(.ta-input) {
 		--tools-pad: 8.6rem;
 	}

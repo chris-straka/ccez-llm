@@ -2,12 +2,13 @@ package studio.ccez.app
 
 import android.app.Activity
 import android.content.Context
-import com.google.mlkit.genai.prompt.DownloadStatus
-import com.google.mlkit.genai.prompt.FeatureStatus
+import com.google.mlkit.genai.common.DownloadStatus
+import com.google.mlkit.genai.common.FeatureStatus
 import com.google.mlkit.genai.prompt.Generation
 import com.google.mlkit.genai.prompt.TextPart
 import com.google.mlkit.genai.prompt.generateContentRequest
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -30,7 +31,8 @@ import org.json.JSONObject
  * Both entries block the caller and return JSON strings (same trick as
  * `Tts.voices`, dodging JNI exception plumbing):
  * - [status] -> `{"state": <ready|downloading|unavailable|error>,
- *   "reason"?: <no-model|unsupported|failed>}`. DOWNLOADABLE reports
+ *   "reason"?: <no-model|unsupported|failed>,
+ *   "downloadedBytes"?: <bytes so far, downloading only>}`. DOWNLOADABLE reports
  *   unavailable/no-model AND starts the download in the background, so
  *   the next polls read downloading, then ready — "reconnect once,
  *   then it works offline".
@@ -45,19 +47,28 @@ import org.json.JSONObject
  * (the Rust side also guards with an atomic); a download watcher is
  * fire-and-forget on Dispatchers.IO.
  *
- * CODE-ONLY, UNVERIFIED ON DEVICE (no Android hardware or SDK ran in
- * this harness — see the report). Against
- * `com.google.mlkit:genai-prompt:1.0.0-beta4` ([official get-started
- * guide](https://developers.google.com/ml-kit/genai/prompt/android/get-started)):
- * `Generation.getClient()`, `checkStatus()` -> [FeatureStatus],
- * `download()` Flow<[DownloadStatus]>, and
+ * Download progress: the API reports bytes downloaded but no total,
+ * so no 0..1 fraction exists — [status] reports `downloadedBytes`
+ * while DOWNLOADING and the UI renders whole megabytes ("48 MB so
+ * far"), never a fabricated percent.
+ *
+ * CODE-ONLY, UNVERIFIED ON DEVICE (no device ran in this harness;
+ * the Kotlin compiles locally — see the report). Pinned to
+ * `com.google.mlkit:genai-prompt:1.0.0-beta3`, NOT beta4: beta4 ships
+ * Kotlin 2.3 metadata, which needs kotlin-gradle-plugin 2.3 — and 2.3
+ * turns Tauri's own bundled `kotlinOptions` script into a hard error
+ * (fixed upstream in tauri#15694, unreleased). beta3 reads cleanly
+ * under KGP 2.2.21. Against the [official get-started
+ * guide](https://developers.google.com/ml-kit/genai/prompt/android/get-started)
+ * (beta4): `Generation.getClient()`, `checkStatus()` ->
+ * [FeatureStatus], `download()` Flow<[DownloadStatus]>, and
  * `generateContent(generateContentRequest(TextPart) {
- * maxOutputTokens })` -> response `.text` are taken straight from that
- * page, but the beta surface may have drifted — re-check the page
- * before the first device run. BUILD NOTE: genai-prompt ships Kotlin
- * 2.x metadata while this shell pins kotlin-gradle-plugin 1.9.25
- * (`gen/android/build.gradle.kts`); the plugin must be bumped to 2.x
- * before this compiles.
+ * maxOutputTokens })` are taken straight from that page — except the
+ * response read: beta3 has no response-level `.text`, so this reads
+ * `candidates.firstOrNull()?.text`. The beta surface may have drifted;
+ * re-check the page before the first device run.
+ * `DownloadStatus`/`FeatureStatus` live in `genai.common` (not
+ * `genai.prompt`).
  */
 object OnDevice {
     private lateinit var appContext: Context
@@ -66,6 +77,9 @@ object OnDevice {
 
     /** Guard so repeated status polls start only one download watcher. */
     private val downloadWatch = AtomicBoolean(false)
+
+    /** Bytes downloaded so far (no API total exists); read by [status]. */
+    private val downloadedBytes = AtomicLong(0)
 
     /** AICore Prompt client; first use binds it (may throw: no AICore). */
     private val client by lazy { Generation.getClient() }
@@ -87,9 +101,10 @@ object OnDevice {
         nativeInit(activity)
     }
 
-    private fun json(state: String, reason: String?): String {
+    private fun json(state: String, reason: String?, downloaded: Long? = null): String {
         val o = JSONObject().put("state", state)
         if (reason != null) o.put("reason", reason)
+        if (downloaded != null) o.put("downloadedBytes", downloaded)
         return o.toString()
     }
 
@@ -106,6 +121,8 @@ object OnDevice {
             try {
                 client.download().collect { status ->
                     when (status) {
+                        is DownloadStatus.DownloadProgress ->
+                            downloadedBytes.set(status.totalBytesDownloaded)
                         is DownloadStatus.DownloadCompleted -> downloadWatch.set(false)
                         is DownloadStatus.DownloadFailed -> downloadWatch.set(false)
                         else -> {}
@@ -125,7 +142,8 @@ object OnDevice {
                 withTimeout(STATUS_TIMEOUT_MS) {
                     when (client.checkStatus()) {
                         FeatureStatus.AVAILABLE -> json("ready", null)
-                        FeatureStatus.DOWNLOADING -> json("downloading", null)
+                        FeatureStatus.DOWNLOADING ->
+                            json("downloading", null, downloadedBytes.get())
                         FeatureStatus.DOWNLOADABLE -> {
                             kickDownloadOnce()
                             json("unavailable", "no-model")
@@ -162,7 +180,10 @@ object OnDevice {
                             maxOutputTokens = cap
                         }
                     )
-                    val text = response.text
+                    // beta3 has no response-level `.text` (that
+                    // convenience arrived in beta4): read the first
+                    // candidate's text instead.
+                    val text = response.candidates.firstOrNull()?.text
                     if (text.isNullOrEmpty()) json("error", "failed")
                     else JSONObject().put("text", text).toString()
                 }
