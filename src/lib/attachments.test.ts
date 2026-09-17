@@ -90,6 +90,9 @@ describe("attachment markers", () => {
 		// Chained right after another tag: repeat pastes ride one line.
 		expect(imageMarkerInsert(`${IMAGE_MARKER} `)).toBe(`${IMAGE_MARKER} `);
 		expect(imageMarkerInsert(`${FILE_MARKER} hello`)).toBe(`\n${IMAGE_MARKER} `);
+		// Prose typed beside a tag ends spaced: the next tag stays on
+		// the line instead of dropping below it.
+		expect(imageMarkerInsert(`${IMAGE_MARKER} test `)).toBe(`${IMAGE_MARKER} `);
 	});
 
 	it("says [Pasted Attachment] under the same contract", () => {
@@ -98,6 +101,7 @@ describe("attachment markers", () => {
 		expect(fileMarkerInsert("hello")).toBe(`\n${FILE_MARKER} `);
 		expect(fileMarkerInsert("hello\n")).toBe(`${FILE_MARKER} `);
 		expect(fileMarkerInsert(`${IMAGE_MARKER} `)).toBe(`${FILE_MARKER} `);
+		expect(fileMarkerInsert(`${IMAGE_MARKER} test `)).toBe(`${FILE_MARKER} `);
 	});
 
 	it("appends one image literal per image attachment for sent text", () => {

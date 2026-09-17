@@ -832,6 +832,10 @@ test("backspace on a collapsed paste takes the whole fold", async ({ page }) => 
 	await expect(marker).toBeVisible();
 	await page.locator(".prompt .cm-content").click();
 	await page.keyboard.press("End");
+	// The first Backspace eats the separator space past the tag; the
+	// second takes the whole fold, never one hidden char of it.
+	await page.keyboard.press("Backspace");
+	await expect(marker).toHaveCount(1);
 	await page.keyboard.press("Backspace");
 	await expect(marker).toHaveCount(0);
 	await expect(page.locator(".prompt .cm-content").first()).not.toContainText("lorem ipsum");
@@ -964,6 +968,52 @@ test("enter after a paste tag sends the message", async ({ page }) => {
 	await page.keyboard.press("Enter");
 	const user = page.locator("article.user").last();
 	await expect(user.locator(".rendered")).toContainText("lorem ipsum", { timeout: 15_000 });
+});
+
+/** Collapsed pastes land one space past the tag: pasting long text
+leaves the caret separated from the marker, so continued typing
+starts after a space rather than jammed against the tag. */
+test("collapsed paste leaves one space after the tag", async ({ page }) => {
+	const pasted = "lorem ipsum dolor sit amet ".repeat(20);
+	await page.locator(".cm-content").first().click();
+	await page.evaluate((text) => {
+		const target = document.querySelector(".cm-content");
+		if (!target) throw new Error("missing editor");
+		const transfer = new DataTransfer();
+		transfer.setData("text/plain", text);
+		const event = new ClipboardEvent("paste", { bubbles: true, cancelable: true });
+		Object.defineProperty(event, "clipboardData", { value: transfer });
+		target.dispatchEvent(event);
+	}, pasted);
+	const marker = page.locator(".cm-paste-marker");
+	await expect(marker).toBeVisible();
+	// Text past the marker, skipping CodeMirror's aria-hidden widget
+	// buffers: one separator space, with typed text riding after it.
+	const afterMarker = (el: Element): string => {
+		let out = "";
+		let node = el.nextSibling;
+		while (node) {
+			out += node.textContent ?? "";
+			node = node.nextSibling;
+		}
+		return out;
+	};
+	expect(await marker.evaluate(afterMarker)).toBe(" ");
+	await page.keyboard.type("x");
+	expect(await marker.evaluate(afterMarker)).toBe(" x");
+});
+
+/** A second image tag after typed prose stays on the line: drop, type
+"test ", drop again — both tags read on one composer line, the second
+never stranded below the first. */
+test("second image tag rides the typed line", async ({ page }) => {
+	await dropImage(page, "first.png");
+	await page.locator(".prompt .cm-content").click();
+	await page.keyboard.type("test ");
+	await dropImage(page, "second.png");
+	const lines = page.locator(".prompt .cm-line");
+	await expect(lines).toHaveCount(1);
+	await expect(lines.first()).toContainText("[Pasted image] test [Pasted image]");
 });
 
 test("sent images ride inline with the text", async ({ page }) => {

@@ -240,9 +240,10 @@ export function stripAttachmentMarkers(text: string): string {
 /**
  * Fresh-line prefix for a marker tag: empty and newline-ended drafts
  * take the tag as-is, a tag chained right after another tag's trailing
- * space stays on that line (repeat pastes ride one line), and mid-prose
- * starts a fresh line so typed text never glues onto the tag. Pure and
- * unit-tested.
+ * space stays on that line (repeat pastes ride one line), prose ending
+ * in a space stays on its line (typed beside a tag), and spaceless
+ * mid-prose starts a fresh line so typed text never glues onto the
+ * tag. Pure and unit-tested.
  */
 function markerPrefix(doc: string, afterPaste = false): string {
 	if (doc === "" || doc.endsWith("\n")) return "";
@@ -250,6 +251,10 @@ function markerPrefix(doc: string, afterPaste = false): string {
 	// Right after a collapsed paste: the tag rides the same line, one
 	// space apart (never a newline of its own).
 	if (afterPaste) return doc.endsWith(" ") ? "" : " ";
+	// Prose already spaced (typed beside a tag): the separation exists,
+	// so the tag stays on the line instead of dropping below it. Only
+	// spaceless mid-prose takes the fresh line, where it would glue.
+	if (doc.endsWith(" ")) return "";
 	return "\n";
 }
 

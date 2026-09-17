@@ -1,11 +1,22 @@
 import { describe, it, expect } from "vitest";
-import { trimPasteTail, sendPasteFolds, pasteToggleAction, markerCut, markerCutAt, attachTagRanges, tagCopyPlan, tagCopyIndexes, removedMarkerIndexes, dataUrlsToImageFiles, expandDeletionUnits } from "./editor";
+import { trimPasteTail, sendPasteFolds, pasteToggleAction, markerCut, markerCutAt, attachTagRanges, tagCopyPlan, tagCopyIndexes, removedMarkerIndexes, dataUrlsToImageFiles, expandDeletionUnits, collapsedPasteInsert } from "./editor";
 import {
 	stripAttachmentMarkers,
 	removeMarker,
 	IMAGE_MARKER,
 	FILE_MARKER
 } from "./attachments";
+
+describe("collapsedPasteInsert", () => {
+	it("lands one trailing space past the collapsed span", () => {
+		const text = "lorem ipsum dolor sit amet";
+		const collapsed = collapsedPasteInsert(7, text);
+		expect(collapsed.insert).toBe(`${text} `);
+		expect([collapsed.pasteFrom, collapsed.pasteTo]).toEqual([7, 7 + text.length]);
+		expect(collapsed.chars).toBe(text.length);
+		expect(collapsed.anchor).toBe(7 + text.length + 1);
+	});
+});
 
 describe("trimPasteTail", () => {
 	it("strips trailing newlines but keeps content and interior breaks", () => {

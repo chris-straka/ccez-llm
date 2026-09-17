@@ -34,6 +34,7 @@ import { shouldDeferForComposition } from "./editContext";
 
 export {
 	PASTE_THRESHOLD,
+	collapsedPasteInsert,
 	pastedLabel,
 	pasteSpans,
 	pasteToggleAction,
@@ -50,6 +51,7 @@ export {
 	removedMarkerIndexes,
 	expandDeletionUnits,
 	type AttachTagRange,
+	type CollapsedPaste,
 	type DeletionRange,
 	type MarkerCut,
 	type PasteSpan,

@@ -641,6 +641,31 @@ function escapeHtml(text: string): string {
 	return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+/**
+ * Collapsed-paste insertion shape (pure, unit-tested): the pasted text
+ * lands with one trailing space, like attachment tags (`[Pasted image] `
+ * inserts with its space), so continued typing starts separated from
+ * the marker. The collapse span covers the pasted text only — never
+ * the space — and the caret lands past the space.
+ */
+export interface CollapsedPaste {
+	insert: string;
+	pasteFrom: number;
+	pasteTo: number;
+	chars: number;
+	anchor: number;
+}
+
+export function collapsedPasteInsert(from: number, text: string): CollapsedPaste {
+	return {
+		insert: `${text} `,
+		pasteFrom: from,
+		pasteTo: from + text.length,
+		chars: text.length,
+		anchor: from + text.length + 1
+	};
+}
+
 /** Plain-text paste insertion: short text, trimmed tails, long folds. */
 function insertTextPaste(view: EditorView, raw: string): boolean {
 	const text = trimPasteTail(raw);
@@ -661,10 +686,16 @@ function insertTextPaste(view: EditorView, raw: string): boolean {
 	}
 	const { from, to } = view.state.selection.main;
 	const id = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
+	const collapsed = collapsedPasteInsert(from, text);
 	view.dispatch({
-		changes: { from, to, insert: text },
-		effects: addPaste.of({ id, from, to: from + text.length, chars: text.length }),
-		selection: { anchor: from + text.length }
+		changes: { from, to, insert: collapsed.insert },
+		effects: addPaste.of({
+			id,
+			from: collapsed.pasteFrom,
+			to: collapsed.pasteTo,
+			chars: collapsed.chars
+		}),
+		selection: { anchor: collapsed.anchor }
 	});
 	return true;
 }
