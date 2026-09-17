@@ -18,8 +18,11 @@
 /** Visual slot a notice renders in (each renders independently). */
 export type NoticeKind = "inline" | "banner" | "voice" | "toast" | "errorToast";
 
-/** Conventional self-clear delays (the page passed these as literals). */
-export const TOAST_TIMEOUT_MS = 8000;
+/** Conventional self-clear delays (the page passed these as literals).
+ * Plain toasts clear fast (confirmations, not reading material);
+ * error toasts hold the long delay so failures can actually be read. */
+export const TOAST_TIMEOUT_MS = 3000;
+export const ERROR_TOAST_TIMEOUT_MS = 8000;
 export const VOICE_TIMEOUT_MS = 8000;
 export const MODEL_TIMEOUT_MS = 5000;
 

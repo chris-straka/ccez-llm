@@ -5,7 +5,8 @@ import {
   expireNotice,
   clearNotice,
   flashNotice,
-  TOAST_TIMEOUT_MS
+  TOAST_TIMEOUT_MS,
+  ERROR_TOAST_TIMEOUT_MS
 } from "./notices";
 
 describe("notice queue", () => {
@@ -59,6 +60,11 @@ describe("notice queue", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("plain toasts clear fast while error toasts hold the long delay", () => {
+    expect(TOAST_TIMEOUT_MS).toBe(3000);
+    expect(ERROR_TOAST_TIMEOUT_MS).toBe(8000);
   });
 
   it("re-flashing disarms the older timer without clearTimeout", () => {

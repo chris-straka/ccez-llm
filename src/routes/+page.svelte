@@ -116,6 +116,7 @@ import {
 	flashNotice,
 	showNotice,
 	TOAST_TIMEOUT_MS,
+	ERROR_TOAST_TIMEOUT_MS,
 	VOICE_TIMEOUT_MS
 } from "$lib/notices";
 	import {
@@ -1057,7 +1058,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	/** Transient top error toast: action failures (send errors, export,
 	attach, mic) render in the red pairing, themed both ways. */
 	function flashErrorToast(message: string): void {
-		flashNotice(notices, "errorToast", message, TOAST_TIMEOUT_MS);
+		flashNotice(notices, "errorToast", message, ERROR_TOAST_TIMEOUT_MS);
 	}
 	function dismissErrorToast(): void {
 		clearNotice(notices, "errorToast");
