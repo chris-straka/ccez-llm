@@ -182,6 +182,153 @@ describe("stream", () => {
 		expect(result.content).toBe("hello!");
 		expect(seen.join("")).toBe("hello!");
 	});
+
+	it("offers fetch_url on the first request, one round trip when unused", async () => {
+		const fetchMock = vi.fn(async () =>
+			sseResponse([`data: {"choices":[{"delta":{"content":"plain"}}]}\n\ndata: [DONE]\n\n`])
+		);
+		vi.stubGlobal("fetch", fetchMock);
+		const provider = new OpenAICompatProvider("probe", CONFIG, {
+			fetchPage: vi.fn(async () => {
+				throw new Error("must not be called");
+			})
+		});
+		const result = await provider.stream([{ role: "user", content: "x" }], {
+			onToken: () => {}
+		});
+		expect(result.content).toBe("plain");
+		expect(fetchMock).toHaveBeenCalledOnce();
+		const [, firstInit] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+		const body = JSON.parse(firstInit.body as string) as {
+			tools?: Array<{ function?: { name?: string } }>;
+		};
+		expect(body.tools?.[0]?.function?.name).toBe("fetch_url");
+	});
+
+	it("assembles fragmented tool calls, fetches, then streams the answer", async () => {
+		const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+			const body = JSON.parse(init.body as string) as { stream?: boolean };
+			// First: streaming tool call split across two deltas. Then:
+			// non-streaming follow-up with no calls. Last: the answer.
+			if (fetchMock.mock.calls.length === 1) {
+				// Built, not hand-spliced, so the JSON is valid; split
+				// mid-arguments to prove fragmented deltas join.
+				const wire =
+					`data: ${JSON.stringify({
+						choices: [
+							{
+								delta: {
+									tool_calls: [
+										{
+											index: 0,
+											id: "call_1",
+											function: {
+												name: "fetch_url",
+												arguments: JSON.stringify({ url: "https://example.com/" })
+											}
+										}
+									]
+								}
+							}
+						]
+					})}`;
+				const cutAt = wire.indexOf("example") - 2;
+				return sseResponse([
+					wire.slice(0, cutAt),
+					`${wire.slice(cutAt)}\n\ndata: [DONE]\n\n`
+				]);
+			}
+			if (body.stream === false) {
+				return jsonResponse({ choices: [{ message: { content: "" } }] });
+			}
+			return sseResponse([
+				`data: {"choices":[{"delta":{"content":"fetched!"}}]}\n\ndata: [DONE]\n\n`
+			]);
+		});
+		vi.stubGlobal("fetch", fetchMock);
+		const fetchPage = vi.fn(async (url: string) => `text of ${url}`);
+		const provider = new OpenAICompatProvider("probe", CONFIG, { fetchPage });
+		const seen: string[] = [];
+		const result = await provider.stream([{ role: "user", content: "x" }], {
+			onToken: (t) => void seen.push(t)
+		});
+		expect(fetchPage).toHaveBeenCalledOnce();
+		expect(fetchPage.mock.calls[0]?.[0]).toBe("https://example.com/");
+		expect(result.content).toBe("fetched!");
+		expect(seen.join("")).toBe("fetched!");
+		expect(fetchMock.mock.calls.length).toBe(3);
+		// The follow-up carries the assistant call plus the tool result.
+		const [, followInit] = fetchMock.mock.calls[1] as unknown as [string, RequestInit];
+		const followBody = JSON.parse(followInit.body as string) as {
+			messages: Array<{ role?: string; tool_calls?: unknown[]; tool_call_id?: string }>;
+		};
+		const roles = followBody.messages.map((m) => m.role);
+		expect(roles).toEqual(["user", "assistant", "tool"]);
+		expect(followBody.messages[2]).toMatchObject({
+			tool_call_id: "call_1",
+			content: "text of https://example.com/"
+		});
+	});
+
+	it("falls back to a plain stream when the provider rejects tools", async () => {
+		const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+			const body = JSON.parse(init.body as string) as { tools?: unknown };
+			if (body.tools !== undefined) return jsonResponse({ error: "no tools" }, 400);
+			return sseResponse([
+				`data: {"choices":[{"delta":{"content":"plain"}}]}\n\ndata: [DONE]\n\n`
+			]);
+		});
+		vi.stubGlobal("fetch", fetchMock);
+		const provider = new OpenAICompatProvider("probe", CONFIG);
+		const result = await provider.stream([{ role: "user", content: "x" }], {
+			onToken: () => {}
+		});
+		expect(result.content).toBe("plain");
+		expect(fetchMock.mock.calls.length).toBe(2);
+		const [, retryInit] = fetchMock.mock.calls[1] as unknown as [string, RequestInit];
+		const retry = JSON.parse(retryInit.body as string) as Record<string, unknown>;
+		expect("tools" in retry).toBe(false);
+	});
+
+	it("never executes unknown tool names and never loops on them", async () => {
+		const fetchMock = vi.fn(async () =>
+			sseResponse([
+				`data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c9","function":{"name":"other","arguments":"{}"}}]}}]}\n\ndata: [DONE]\n\n`
+			])
+		);
+		vi.stubGlobal("fetch", fetchMock);
+		const fetchPage = vi.fn(async () => "must not run");
+		const provider = new OpenAICompatProvider("probe", CONFIG, { fetchPage });
+		const result = await provider.stream([{ role: "user", content: "x" }], {
+			onToken: () => {}
+		});
+		expect(result.content).toBe("");
+		expect(fetchPage).not.toHaveBeenCalled();
+		expect(fetchMock).toHaveBeenCalledOnce();
+	});
+
+	it("a stop before the fetch aborts the turn", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () =>
+				sseResponse([
+					`data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c1","function":{"name":"fetch_url","arguments":"{\\"url\\":\\"https://example.com/\\"}"}}]}}]}\n\ndata: [DONE]\n\n`
+				])
+			)
+		);
+		const controller = new AbortController();
+		controller.abort();
+		const provider = new OpenAICompatProvider("probe", CONFIG, {
+			fetchPage: vi.fn(async () => "late")
+		});
+		await expect(
+			provider.stream(
+				[{ role: "user", content: "x" }],
+				{ onToken: () => {} },
+				{ signal: controller.signal }
+			)
+		).rejects.toThrow("Reply stopped.");
+	});
 });
 
 describe("readSse", () => {

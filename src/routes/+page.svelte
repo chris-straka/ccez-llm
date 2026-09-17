@@ -234,7 +234,8 @@ import { desktopShortcuts, filteredShortcuts, touchShortcuts } from "$lib/shortc
 		unselectedScrollAction,
 		shortcutsFilterBlocksKey,
 		sidebarListAction,
-		spaceKeyAction
+		spaceKeyAction,
+		enterKeyAction
 	} from "$lib/keybindings";
 import { describeActiveElement, describeFocusTarget, focusLog } from "$lib/focusDebug";
 import {
@@ -7590,6 +7591,23 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			}
 			if (spaceAction === "swallow-repeat") {
 				event.preventDefault();
+				return;
+			}
+			// Bare Enter on an empty composer dismisses like Space
+			// (Shift+Enter stays a newline); text still sends below.
+			if (
+				enterKeyAction({
+					...keyFacts(event),
+					repeat: event.repeat,
+					isComposing: event.isComposing,
+					editing: editingMsgId !== null,
+					hasAttachments: attachments.length > 0,
+					composerEmpty: composerText() === "",
+					inPrompt: isPromptEditorTarget(event.target)
+				}) === "dismiss-composer"
+			) {
+				event.preventDefault();
+				editor?.blur();
 				return;
 			}
 			// Fullscreen-hold tracking rides above every Escape path:

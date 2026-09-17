@@ -197,6 +197,30 @@ export interface SpaceKeyFacts extends KeyModifiers {
 
 export type SpaceKeyAction = "dismiss-composer" | "swallow-repeat";
 
+export type EnterKeyAction = "dismiss-composer";
+
+/** Bare Enter on an empty composer dismisses, exactly like Space —
+ * except Shift+Enter, which stays a newline (Space has no such
+ * second job, so its guard ignores shift and this one must not).
+ * Text, modifiers, attachments, and message edits all fall through
+ * to send/newline as before. */
+export function enterKeyAction(facts: SpaceKeyFacts): EnterKeyAction | null {
+	if (facts.key !== "Enter" || facts.shiftKey) return null;
+	if (
+		!facts.repeat &&
+		!facts.isComposing &&
+		!facts.metaKey &&
+		!facts.ctrlKey &&
+		!facts.altKey &&
+		!facts.editing &&
+		!facts.hasAttachments &&
+		facts.composerEmpty &&
+		facts.inPrompt
+	)
+		return "dismiss-composer";
+	return null;
+}
+
 /** Space or backslash on the composer: a first press on empty text
  * dismisses (no message starts with a space, so it is never content;
  * backslash rides along as the requested Space-equivalent, so a

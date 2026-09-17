@@ -8,6 +8,8 @@ import {
 	ProviderError
 } from "./types";
 import { thinkingFor, resolveThinkingId } from "./thinking";
+import { fetchToolDef, parseFetchCall } from "../tools";
+import { fetchPageText } from "../fetchPage";
 
 export interface OpenAICompatConfig {
 	baseUrl: string;
@@ -18,6 +20,33 @@ export interface OpenAICompatConfig {
 	mobile?: boolean;
 }
 
+/** Injected seams (tests); the live default fetches real pages. */
+export interface OpenAICompatDeps {
+	fetchPage?: (url: string, signal?: AbortSignal) => Promise<string>;
+}
+
+/** One model tool call off the wire. */
+interface WireToolCall {
+	id: string;
+	type: string;
+	function: { name: string; arguments: string };
+}
+
+/**
+ * History entries the tool loop appends: plain turns plus the
+ * assistant `tool_calls` message and `tool` results. UI messages never
+ * carry these — the loop works on its own copy.
+ */
+type WireMessage =
+	| ChatMessage
+	| { role: "assistant"; content: string; tool_calls: WireToolCall[] }
+	| { role: "tool"; content: string; tool_call_id: string };
+
+/** Tool rounds per streamed turn (each may fetch several pages). */
+const MAX_TOOL_ROUNDS = 3;
+/** Fetches executed per round (serially, abort-aware). */
+const MAX_CALLS_PER_ROUND = 3;
+
 /**
  * Minimal OpenAI-compatible chat client used by every provider in this app
  * (DeepSeek and Meta's Model API both speak this protocol — verified live
@@ -26,10 +55,12 @@ export interface OpenAICompatConfig {
 export class OpenAICompatProvider implements ChatProvider {
 	readonly id: string;
 	private readonly config: OpenAICompatConfig;
+	private readonly deps: OpenAICompatDeps;
 
-	constructor(id: string, config: OpenAICompatConfig) {
+	constructor(id: string, config: OpenAICompatConfig, deps?: OpenAICompatDeps) {
 		this.id = id;
 		this.config = { ...config, baseUrl: config.baseUrl.replace(/\/+$/, "") };
+		this.deps = deps ?? {};
 	}
 
 	private url(path: string): string {
@@ -71,12 +102,25 @@ export class OpenAICompatProvider implements ChatProvider {
 		};
 	}
 
-	private body(messages: ChatMessage[], stream: boolean, thinking?: string): string {
+	private body(
+		messages: WireMessage[],
+		stream: boolean,
+		thinking?: string,
+		tools?: boolean
+	): string {
 		// Native thinking knob for this provider + model (unknown ids and
 		// knob-less providers resolve to no extra fields).
 		const support = thinkingFor(this.id, this.config.model);
 		const extra = support.wireFields(resolveThinkingId(support, thinking));
-		return JSON.stringify({ model: this.config.model, messages, stream, ...extra });
+		const toolFields =
+			tools === true ? { tools: [fetchToolDef()], tool_choice: "auto" } : {};
+		return JSON.stringify({
+			model: this.config.model,
+			messages,
+			stream,
+			...extra,
+			...toolFields
+		});
 	}
 
 	async chat(messages: ChatMessage[], opts: ChatOptions = {}): Promise<ChatResult> {
@@ -113,17 +157,83 @@ export class OpenAICompatProvider implements ChatProvider {
 		};
 	}
 
-	async stream(
-		messages: ChatMessage[],
+	/**
+	 * One non-streaming turn with tools offered. Resolves the text plus
+	 * the raw tool calls (transport only — no token output).
+	 */
+	private async complete(
+		history: WireMessage[],
+		opts: ChatOptions,
+		tools: boolean
+	): Promise<{ content: string; calls: WireToolCall[]; usage: TokenUsage | null }> {
+		let res: Response;
+		try {
+			res = await fetch(this.url("/chat/completions"), {
+				method: "POST",
+				headers: this.headers(),
+				body: this.body(history, false, opts.thinking, tools),
+				// DOM takes null for absent, not undefined.
+				signal: opts.signal ?? null
+			});
+		} catch (error) {
+			throw this.connectionError(error);
+		}
+		if (!res.ok) {
+			throw new ProviderError(
+				`${this.id} request failed (HTTP ${res.status}): ${(await safeText(res)).slice(0, 300)}`,
+				res.status
+			);
+		}
+		const json = (await res.json()) as {
+			choices?: Array<{
+				message?: { content?: string | null; tool_calls?: WireToolCall[] };
+			}>;
+			usage?: Parameters<typeof toUsage>[0];
+		};
+		const message = json.choices?.[0]?.message;
+		return {
+			content: message?.content ?? "",
+			calls: Array.isArray(message?.tool_calls) ? (message.tool_calls ?? []) : [],
+			usage: toUsage(json.usage)
+		};
+	}
+
+	/**
+	 * One fetch call run to text. Page failures read as one-line
+	 * results (the model reports them in its reply); a user stop
+	 * still stops.
+	 */
+	private async runFetch(
+		call: { id: string; url: string },
+		signal: AbortSignal | undefined
+	): Promise<string> {
+		const run = this.deps.fetchPage ?? fetchPageText;
+		try {
+			return await run(call.url, signal);
+		} catch (error) {
+			if (error instanceof Error && error.name === "AbortError") throw error;
+			return error instanceof Error ? error.message : "Page fetch failed.";
+		}
+	}
+
+	/**
+	 * One streaming turn, optionally offering tools. Resolves the
+	 * streamed text plus any tool calls the model assembled in the
+	 * deltas (streaming tool calls arrive fragmented by index and are
+	 * joined here). Token output flows through `callbacks` as before.
+	 */
+	private async streamOnce(
+		history: WireMessage[],
 		callbacks: StreamCallbacks,
-		opts: ChatOptions = {}
-	): Promise<ChatResult> {
+		opts: ChatOptions,
+		tools: boolean
+	): Promise<{ content: string; calls: WireToolCall[]; usage: TokenUsage | null }> {
 		let res: Response;
 		try {
 			res = await fetch(this.url("/chat/completions"), {
 				method: "POST",
 				headers: { ...this.headers(), Accept: "text/event-stream" },
-				body: this.body(messages, true, opts.thinking),
+				body: this.body(history, true, opts.thinking, tools),
 				// DOM takes null for absent, not undefined.
 				signal: opts.signal ?? null
 			});
@@ -138,6 +248,10 @@ export class OpenAICompatProvider implements ChatProvider {
 		}
 		let content = "";
 		let usage: TokenUsage | null = null;
+		const fragments = new Map<
+			number,
+			{ id: string; name: string; args: string }
+		>();
 		// Mid-stream failures translate like fetch-level ones: a cut
 		// connection reads as a network error, a user stop as stopped
 		// (never the raw "This operation was aborted").
@@ -145,7 +259,16 @@ export class OpenAICompatProvider implements ChatProvider {
 			for await (const event of readSse(res.body)) {
 				if (event === "[DONE]") break;
 				let parsed: {
-					choices?: Array<{ delta?: { content?: string } }>;
+					choices?: Array<{
+						delta?: {
+							content?: string;
+							tool_calls?: Array<{
+								index?: number;
+								id?: string;
+								function?: { name?: string; arguments?: string };
+							}>;
+						};
+					}>;
 					usage?: Parameters<typeof toUsage>[0];
 				};
 				try {
@@ -153,17 +276,98 @@ export class OpenAICompatProvider implements ChatProvider {
 				} catch {
 					continue;
 				}
-				const token = parsed.choices?.[0]?.delta?.content ?? "";
+				const delta = parsed.choices?.[0]?.delta;
+				const token = delta?.content ?? "";
 				if (token) {
 					content += token;
 					callbacks.onToken(token);
+				}
+				for (const call of delta?.tool_calls ?? []) {
+					const index = call.index ?? 0;
+					const slot = fragments.get(index) ?? { id: "", name: "", args: "" };
+					if (call.id) slot.id = call.id;
+					if (call.function?.name) slot.name += call.function.name;
+					if (call.function?.arguments) slot.args += call.function.arguments;
+					fragments.set(index, slot);
 				}
 				if (parsed.usage) usage = toUsage(parsed.usage);
 			}
 		} catch (error) {
 			throw this.connectionError(error);
 		}
-		return { content, usage };
+		const calls: WireToolCall[] = [...fragments.values()]
+			.filter((slot) => slot.id && slot.name)
+			.map((slot) => ({
+				id: slot.id,
+				type: "function",
+				function: { name: slot.name, arguments: slot.args }
+			}));
+		return { content, calls, usage };
+	}
+
+	/** Fetch calls worth executing from one round's raw calls (capped). */
+	private executableCalls(calls: WireToolCall[]): Array<{
+		raw: WireToolCall;
+		parsed: { id: string; url: string };
+	}> {
+		return calls
+			.map((raw) => ({ raw, parsed: parseFetchCall(raw) }))
+			.filter(
+				(entry): entry is { raw: WireToolCall; parsed: { id: string; url: string } } =>
+					entry.parsed !== null
+			)
+			.slice(0, MAX_CALLS_PER_ROUND);
+	}
+
+	async stream(
+		messages: ChatMessage[],
+		callbacks: StreamCallbacks,
+		opts: ChatOptions = {}
+	): Promise<ChatResult> {
+		// Model-driven lookup: the first request streams WITH tools, so
+		// a no-fetch turn costs exactly one request, like before. When
+		// the model calls fetch_url, the calls run serially into the
+		// history and the answer streams after (follow-up fetches ride
+		// capped non-streaming rounds). Providers that reject `tools`
+		// fall back to a plain turn once; anything else throws exactly
+		// as before.
+		const history: WireMessage[] = [...messages];
+		let first: Awaited<ReturnType<OpenAICompatProvider["streamOnce"]>>;
+		try {
+			first = await this.streamOnce(history, callbacks, opts, true);
+		} catch (error) {
+			if (!(error instanceof ProviderError) || error.status !== 400) throw error;
+			return this.streamOnce(history, callbacks, opts, false);
+		}
+		let pending = this.executableCalls(first.calls);
+		if (pending.length === 0) return { content: first.content, usage: first.usage };
+		let usage: TokenUsage | null = first.usage;
+		let assistantText = first.content;
+		for (let round = 0; round < MAX_TOOL_ROUNDS && pending.length > 0; round++) {
+			history.push({
+				role: "assistant",
+				content: assistantText,
+				tool_calls: pending.map((entry) => entry.raw)
+			});
+			assistantText = "";
+			for (const entry of pending) {
+				if (opts.signal?.aborted) throw new ProviderError("Reply stopped.");
+				history.push({
+					role: "tool",
+					content: await this.runFetch(entry.parsed, opts.signal),
+					tool_call_id: entry.parsed.id
+				});
+			}
+			// Follow-up fetches ride capped non-streaming rounds; the
+			// answer itself always streams last.
+			if (round + 1 >= MAX_TOOL_ROUNDS) break;
+			const follow = await this.complete(history, opts, true);
+			if (follow.usage) usage = follow.usage;
+			assistantText = follow.content;
+			pending = this.executableCalls(follow.calls);
+		}
+		const final = await this.streamOnce(history, callbacks, opts, false);
+		return { content: final.content, usage: final.usage ?? usage };
 	}
 
 	/**

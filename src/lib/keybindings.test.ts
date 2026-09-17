@@ -3,6 +3,7 @@ import {
 	chromeChord,
 	commandChord,
 	deleteChatScope,
+	enterKeyAction,
 	inspectStepAction,
 	keyFacts,
 	messageKeyAction,
@@ -194,6 +195,26 @@ describe("spaceKeyAction", () => {
 		expect(spaceKeyAction({ ...slash, repeat: true })).toBe("swallow-repeat");
 		expect(spaceKeyAction({ ...slash, composerEmpty: false })).toBe(null);
 		expect(spaceKeyAction({ ...slash, hasAttachments: true })).toBe(null);
+	});
+});
+
+describe("enterKeyAction", () => {
+	const enterBase = { ...spaceBase, key: "Enter" };
+	it("dismisses a bare Enter on empty text, like Space", () => {
+		expect(enterKeyAction(enterBase)).toBe("dismiss-composer");
+	});
+
+	it("keeps Shift+Enter a newline and guards the rest like Space", () => {
+		expect(enterKeyAction({ ...enterBase, shiftKey: true })).toBe(null);
+		expect(enterKeyAction({ ...enterBase, repeat: true })).toBe(null);
+		expect(enterKeyAction({ ...enterBase, metaKey: true })).toBe(null);
+		expect(enterKeyAction({ ...enterBase, ctrlKey: true })).toBe(null);
+		expect(enterKeyAction({ ...enterBase, editing: true })).toBe(null);
+		expect(enterKeyAction({ ...enterBase, hasAttachments: true })).toBe(null);
+		expect(enterKeyAction({ ...enterBase, composerEmpty: false })).toBe(null);
+		expect(enterKeyAction({ ...enterBase, isComposing: true })).toBe(null);
+		expect(enterKeyAction({ ...enterBase, inPrompt: false })).toBe(null);
+		expect(enterKeyAction({ ...spaceBase })).toBe(null);
 	});
 });
 

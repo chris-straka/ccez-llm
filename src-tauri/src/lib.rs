@@ -6,6 +6,7 @@ mod annotate;
 mod coderun;
 mod desktop;
 mod dictation;
+mod fetch;
 mod ocr;
 #[cfg(target_os = "windows")]
 mod ocr_windows;
@@ -211,6 +212,7 @@ pub fn run() {
             dictate_start,
             dictate_stop,
             coderun::run_code,
+            fetch::fetch_page,
             ondevice::ondevice_status,
             ondevice::ondevice_generate
         ])

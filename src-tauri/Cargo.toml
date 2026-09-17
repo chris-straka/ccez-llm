@@ -21,7 +21,7 @@ tauri-build = { version = "2", features = [] }
 # tray-icon + image-png feed the desktop summon kit (desktop.rs tray):
 # both crates already sit in Cargo.lock as transitive deps, so no new
 # crate is vendored by enabling them here.
-tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri = { version = "2", features = ["macos-private-api", "tray-icon", "image-png"] }
 # Triage 2026-09-12 (Dependabot #2, glib VariantStrIter unsoundness,
 # moderate): the gtk 0.18 stack under tauri/wry pulls glib 0.18 (fixed
 # only in glib >= 0.20). A solo bump is rejected by the solver, verified
@@ -48,6 +48,10 @@ base64 = "0.22"
 # handler builds a reqwest client that panics without one — see
 # install_tls_provider in lib.rs.
 rustls = { version = "0.23", default-features = false, features = ["std", "ring"] }
+# Page fetch for the model's fetch_url tool (fetch.rs). rustls TLS +
+# webpki roots work on every target including Android (native-tls does
+# not). Version pins against the copy already in Cargo.lock.
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-webpki-roots"] }
 
 # Native TTS (AVSpeechSynthesizer) on macOS and iOS. Pure-Rust
 # bindings via objc2 — no Objective-C is written anywhere in this
