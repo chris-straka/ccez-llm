@@ -596,10 +596,11 @@ test("expanded paste shows collapse brackets that re-collapse it", async ({ page
 	await expect(page.locator(".cm-content").first()).not.toContainText("lorem ipsum");
 });
 
-test("tray parks just over the prompt", async ({ page }) => {
-	// The reserve observer watches the box it writes to: unconditional
-	// writes fed their own notifications (the "ResizeObserver loop"
-	// console error), so the attach window must stay quiet.
+test("tray docks a fixed margin above the prompt", async ({ page }) => {
+	// The tray is bottom-anchored, not reserve-riding: a constant gap
+	// whatever the thread length. The reserve observer watches the
+	// box it writes to, so the attach window must also stay free of
+	// "ResizeObserver loop" console errors.
 	const roLoops: string[] = [];
 	page.on("console", (msg) => {
 		if (msg.type() === "error" && msg.text().includes("ResizeObserver loop")) {
@@ -616,9 +617,69 @@ test("tray parks just over the prompt", async ({ page }) => {
 			if (!strip || !prompt) throw new Error("missing tray or prompt");
 			return prompt.getBoundingClientRect().top - strip.getBoundingClientRect().bottom;
 		});
-	// The reserve sync lands a frame after the attach: poll past the
-	// transient (a stuck negative would park the tray under the card).
+	// The dock lands a frame after the attach: poll past the transient
+	// (a stuck negative would park the tray under the card).
 	await expect.poll(gap, { timeout: 5_000 }).toBeGreaterThan(0);
-	expect(await gap()).toBeLessThan(80);
+	expect(await gap()).toBeLessThan(24);
 	expect(roLoops).toEqual([]);
+});
+
+test("thread text flows beside the floating tray", async ({ page }) => {
+	// Long thread, image attached, scrolled mid-thread: message text
+	// stays visible beside the cards (the tray overlays the thread
+	// instead of squeezing it out of the bottom third).
+	await page.addInitScript(() => {
+		window.localStorage.setItem("ccez-mock-provider", "1");
+		window.localStorage.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify({ hoverAssistantActions: true, hoverUserActions: true, promptIdleSec: 0 })
+		);
+		const msgs = [];
+		for (let i = 0; i < 20; i++) {
+			msgs.push({
+				id: `e2e-fill-${i}`,
+				role: i % 2 === 0 ? "assistant" : "user",
+				content: `Filler message ${i} with enough words to wrap lines and fill the thread column.`,
+				usage: null,
+				error: null
+			});
+		}
+		window.localStorage.setItem(
+			"ccez-llm-chats-v1",
+			JSON.stringify([{ id: "e2e-chat", createdAt: 1, replyLang: null, messages: msgs }])
+		);
+	});
+	await page.reload();
+	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
+	await dropImage(page);
+	await expect(page.locator(".attachments li.card")).toBeVisible({ timeout: 15_000 });
+	const hits = await page.evaluate(() => {
+		const box = document.querySelector(".messages") as HTMLElement | null;
+		if (!box) throw new Error("missing scroller");
+		box.scrollTo({ top: box.scrollHeight / 2, behavior: "instant" });
+		const rect = (el: Element | null): { top: number; bottom: number; left: number; right: number } | null => {
+			if (!el) return null;
+			const r = el.getBoundingClientRect();
+			return { top: r.top, bottom: r.bottom, left: r.left, right: r.right };
+		};
+		const boxRect = rect(box);
+		const tray = rect(document.querySelector("ul.attachments"));
+		if (!boxRect || !tray) throw new Error("missing box or tray");
+		let count = 0;
+		document.querySelectorAll("article").forEach((art) => {
+			const a = rect(art);
+			if (!a) return;
+			const visTop = Math.max(a.top, boxRect.top);
+			const visBottom = Math.min(a.bottom, boxRect.bottom);
+			if (visBottom - visTop <= 1) return;
+			if (
+				Math.min(visBottom, tray.bottom) - Math.max(visTop, tray.top) > 1 &&
+				Math.min(a.right, tray.right) - Math.max(a.left, tray.left) > 1
+			) {
+				count++;
+			}
+		});
+		return count;
+	});
+	expect(hits).toBeGreaterThan(0);
 });

@@ -2009,36 +2009,55 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	let lastBoxPad = "";
 	let lastMainPad = "";
 	let lastSbw = "";
+	let lastTrayBottom = "";
 	$effect(() => {
+		// Tracked so attaching/removing re-runs the reserve past the
+		// ResizeObserver (the tray is absolute now: it resizes nothing,
+		// so no notification would ever fire for it).
+		void attachments.length;
+		void notices.inline.message;
 		const card = promptEl?.closest<HTMLElement>(".prompt") ?? null;
 		const box = scrollBox;
 		const mainEl = box?.closest<HTMLElement>("main") ?? null;
 		if (!card || !box || !mainEl) return;
 		const sync = (): void => {
-			const clearPx = Math.ceil(card.getBoundingClientRect().height) + 54;
+			const cardH = Math.ceil(card.getBoundingClientRect().height);
+			const cardBottom = Number.parseFloat(window.getComputedStyle(card).bottom) || 0;
+			const clearPx = cardH + 54;
+			// The tray floats over the thread (absolute, transparent),
+			// so the thread runs full-height behind and beside it: the
+			// tail clearance covers the tray too, and the tray docks a
+			// fixed margin above the card (tracking draft growth via
+			// the measured height) instead of riding the reserve high.
+			const tray = mainEl.querySelector<HTMLElement>(":scope > .attachments");
+			const trayH = tray ? Math.ceil(tray.getBoundingClientRect().height) : 0;
+			const trayGap = trayH > 0 ? 8 : 0;
 			// Thread clearance lives INSIDE the scroller: the thread
-			// runs full-height behind the frosted card (bleed-through),
-			// and the tail still lands above it at the bottom.
-			// Main-level padding only shrank the scroller, so nothing
-			// could ever show through. Empty chats keep none: no tail
-			// to protect, hero owns the space per stylesheet.
+			// runs full-height behind the solid card, and the tail
+			// still lands above it at the bottom. Empty chats keep
+			// none: no tail to protect, hero owns the space.
 			const emptyChat = viewChat.messages.length === 0;
-			const boxPad = emptyChat ? "0px" : `${clearPx}px`;
+			const boxPad = emptyChat ? "0px" : `${clearPx + trayH + trayGap}px`;
 			if (boxPad !== lastBoxPad) {
 				box.style.paddingBottom = boxPad;
 				lastBoxPad = boxPad;
 			}
-			// The attachment strip, preview, and error sit in main flow
-			// between the scroller and the card: main-level padding
-			// lifts them above the card while any is rendered. Binary,
-			// so park/summon (transform-only, layout kept) never move
-			// anything; only attaching/removing shifts, which is the
-			// user's own gesture. Empty chats keep today's floor.
-			const stripOpen =
-				mainEl.querySelector(":scope > .attachments, :scope > .preview, :scope > .attach-error") !==
-				null;
+			if (tray && trayH > 0) {
+				const trayBottom = `${cardBottom + cardH + trayGap}px`;
+				if (trayBottom !== lastTrayBottom) {
+					tray.style.bottom = trayBottom;
+					lastTrayBottom = trayBottom;
+				}
+			}
+			// Preview and error stay in main flow after the scroller:
+			// main-level padding lifts them above the card while
+			// either is rendered (the absolute tray needs no lift).
+			// Binary, so park/summon (transform-only, layout kept)
+			// never move anything. Empty chats keep today's floor.
+			const chromeOpen =
+				mainEl.querySelector(":scope > .preview, :scope > .attach-error") !== null;
 			const mainPad =
-				emptyChat || stripOpen
+				emptyChat || chromeOpen
 					? `calc(${clearPx}px + env(safe-area-inset-bottom, 0px))`
 					: `env(safe-area-inset-bottom, 0px)`;
 			if (mainPad !== lastMainPad) {
@@ -13013,8 +13032,19 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 	/* Attachment strip: same 1.2rem column edges as the composer (never
 	a full-bleed row), one scrolling row when many — pills never wrap
-	into a tall stack and never spill past the column. */
+	into a tall stack and never spill past the column. The strip is a
+	positioned overlay, exactly as wide as the prompt but only as tall
+	as its cards: it docks a fixed margin above the card while the
+	thread runs full-height behind and beside it, text visible around
+	the pills. */
 	.attachments {
+		position: absolute;
+		left: 1.2rem;
+		right: 1.2rem;
+		z-index: 25;
+		/* Gaps stay thread territory (selectable, scrollable): only
+		the pills and cards take pointer events. */
+		pointer-events: none;
 		list-style: none;
 		display: flex;
 		flex-wrap: nowrap;
@@ -13044,6 +13074,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.attachments li {
 		display: flex;
 		align-items: center;
+		pointer-events: auto;
 		gap: 0.25rem;
 		flex-shrink: 0;
 		font-size: 0.78rem;
