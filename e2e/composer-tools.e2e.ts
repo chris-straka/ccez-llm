@@ -104,6 +104,23 @@ test("idle-hide takes the attachment strip with the prompt", async ({ page }) =>
 	await expect(prompt).toHaveClass(/prompt-idle/, { timeout: 15_000 });
 	await expect(strip).toHaveClass(/composer-idle/);
 	await expect(strip).toHaveCSS("opacity", "0");
+	// Strip and card park as one unit: same settled translate and same
+	// ramp (a taller tray on its own slide outran the prompt).
+	await expect
+		.poll(
+			async () =>
+				page.evaluate(() => {
+					const motion = (sel: string): string => {
+						const el = document.querySelector(sel);
+						if (!el) return "missing";
+						const css = getComputedStyle(el);
+						return `${css.transform} ## ${css.transitionDuration}`;
+					};
+					return `${motion("ul.attachments")} @@ ${motion("main .prompt")}`;
+				}),
+			{ timeout: 5_000 }
+		)
+		.toMatch(/^matrix\(1, 0, 0, 1, 0, 12\) ## 0\.25s, 0\.25s, 0s @@ matrix\(1, 0, 0, 1, 0, 12\)/);
 	// A summon key restores both together (pointer travel alone only
 	// re-arms the timer, never restores).
 	await page.mouse.move(400, 200);

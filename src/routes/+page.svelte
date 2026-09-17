@@ -14507,19 +14507,22 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.preview,
 	.attach-error {
 		transition:
-			transform 0.35s ease,
-			opacity 0.35s ease,
+			transform 0.25s ease,
+			opacity 0.25s ease,
 			visibility 0s;
 	}
 	:is(.attachments, .preview, .attach-error).composer-idle {
-		transform: translateY(calc(100% + 2rem));
+		/* Same 0.75rem settle and ramp as the card: the old
+		full-height slide outran the prompt — taller trays visibly
+		faster. The fade does the hiding; the slide just settles. */
+		transform: translateY(0.75rem);
 		opacity: 0;
 		visibility: hidden;
 		pointer-events: none;
 		transition:
-			transform 0.35s ease,
-			opacity 0.35s ease,
-			visibility 0s linear 0.35s;
+			transform 0.25s ease,
+			opacity 0.25s ease,
+			visibility 0s linear 0.25s;
 	}
 	/* Reduced motion settles the summon instantly: no slide, no fade
 	ramp on the card or its strip — what lands is the final frame.
