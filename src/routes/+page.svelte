@@ -15473,8 +15473,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		font-weight: 700;
 	}
 	/* Dark twin of the light tag look: gray + bold, same for every
-	pasted tag kind (see .cm-attach-tag in editorTheme.ts). */
-	:global(html[data-theme="dark"]) :global(.cm-attach-tag) {
+	pasted tag kind (see .cm-attach-tag in editorTheme.ts). Inner
+	spans ride along (matched structurally: the highlight's class
+	names are obfuscated per build): the mark's own rules can't clear
+	their underline or muted-gray brackets. */
+	:global(html[data-theme="dark"]) :global(.cm-attach-tag),
+	:global(html[data-theme="dark"]) :global(.cm-attach-tag span) {
 		color: #98989f !important;
 		font-weight: 700;
 		text-decoration: none !important;

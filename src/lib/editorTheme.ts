@@ -60,9 +60,18 @@ export const appTheme = EditorView.theme({
 	".cm-attach-tag": {
 		fontWeight: "700",
 		color: "inherit",
-		// !important: the markdown highlight paints `[..]` as tok-link
-		// (underline) from a runtime-injected sheet that lands after
-		// this one — only importance beats it deterministically.
+		// !important: the markdown highlight paints the tag's inner
+		// spans (underline, muted-gray brackets) from a
+		// runtime-injected sheet that lands after this one — only
+		// importance beats it deterministically.
+		textDecoration: "none !important"
+	},
+	// The highlight paints the tag's inside, never the mark: link text
+	// takes an underline class, brackets a muted-gray one, and both
+	// class names are obfuscated per build — so every inner span takes
+	// the tag look, matched structurally instead of by name.
+	".cm-attach-tag span": {
+		color: "inherit !important",
 		textDecoration: "none !important"
 	},
 	// Expanded-paste collapse brackets: the sent-message twin of

@@ -998,4 +998,20 @@ test("composer attachment tags read bold", async ({ page }) => {
 	expect(deco.decoration).not.toContain("underline");
 	// Bold body text, not muted gray.
 	expect(deco.color).not.toBe("rgb(110, 110, 115)");
+	// The markdown highlight paints the tag's inside, not the mark
+	// (its class names are obfuscated per build, so match spans
+	// structurally): no inner span underlines, and every one —
+	// brackets included — reads as tag text.
+	const inner = await tag.evaluate((el) => {
+		const spans = [...el.querySelectorAll("span")].map((s) => {
+			const style = getComputedStyle(s);
+			return { decoration: style.textDecorationLine, color: style.color };
+		});
+		return { tagColor: getComputedStyle(el).color, spans };
+	});
+	expect(inner.spans.length).toBeGreaterThan(0);
+	for (const s of inner.spans) {
+		expect(s.decoration).not.toContain("underline");
+		expect(s.color).toBe(inner.tagColor);
+	}
 });
