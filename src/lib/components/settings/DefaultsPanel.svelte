@@ -3,6 +3,9 @@
 		CHAT_WIDTH_DEFAULT,
 		CHAT_WIDTH_MAX,
 		CHAT_WIDTH_MIN,
+		MESSAGE_GAP_DEFAULT,
+		MESSAGE_GAP_MAX,
+		MESSAGE_GAP_MIN,
 		PROMPT_IDLE_DEFAULT,
 		activeProviderSettings,
 		type AppSettings
@@ -86,6 +89,10 @@
 				Hide message buttons until tapped
 			</label>
 			<label class="check">
+				<input type="checkbox" bind:checked={settings.showMessageButtons} />
+				Show message buttons
+			</label>
+			<label class="check">
 				<input type="checkbox" bind:checked={settings.ownBubble} />
 				Enable background on my messages
 			</label>
@@ -124,6 +131,10 @@
 		<label class="check">
 			<input type="checkbox" bind:checked={settings.scaleActionsWithFont} />
 			Scale message buttons with text size
+		</label>
+		<label class="check">
+			<input type="checkbox" bind:checked={settings.showMessageButtons} />
+			Show message buttons
 		</label>
 		<label class="check">
 			<input type="checkbox" bind:checked={settings.inspectEnabled} />
@@ -176,6 +187,32 @@
 				}}
 			/>
 			<output>{Math.round(settings.fontScale * 100)}%</output>
+		</span>
+	</label>
+	<label class="slider-row">
+		Gap size
+		<button
+			type="button"
+			class="reset-width"
+			title="Reset to the default gap"
+			onclick={() => (settings.messageGap = MESSAGE_GAP_DEFAULT)}
+			>({MESSAGE_GAP_DEFAULT})</button
+		>
+		<span class="font-row">
+			<input
+				type="range"
+				min={MESSAGE_GAP_MIN}
+				max={MESSAGE_GAP_MAX}
+				step="0.05"
+				value={settings.messageGap ?? MESSAGE_GAP_DEFAULT}
+				aria-label="Gap size in rem"
+				onpointerdown={noteSliderPress}
+				onpointerup={(e) => sliderRelease(e, () => (settings.messageGap = MESSAGE_GAP_DEFAULT))}
+				oninput={(e) => {
+					settings.messageGap = Number(e.currentTarget.value);
+				}}
+			/>
+			<output style="min-width: 3.6rem;">{settings.messageGap ?? MESSAGE_GAP_DEFAULT} rem</output>
 		</span>
 	</label>
 	{#if !androidUI}

@@ -63,6 +63,8 @@ export interface MessageKeyFacts extends KeyModifiers {
 	inEditable: boolean;
 	inInteractive: boolean;
 	inFieldOrFilter: boolean;
+	/** A text selection is live: hovered copy yields to it. */
+	hasSelection: boolean;
 	hoveredIdx: number;
 	escDownAt: number;
 }
@@ -74,8 +76,11 @@ export type MessageKeyAction =
 	| "exit-fullscreen"
 	| "fold-hovered"
 	| "edit-hovered"
+	| "copy-hovered"
 	| "cut-hovered"
-	| "delete-hovered";
+	| "delete-hovered"
+	| "branch-hovered"
+	| "speak-hovered";
 
 /** Hovered-message hotkey for this keypress, in handler priority
  * order (Esc+f before F fold, single-key before shifted). */
@@ -116,6 +121,19 @@ export function messageKeyAction(facts: MessageKeyFacts): MessageKeyAction | nul
 		!facts.inField
 	)
 		return "edit-hovered";
+	// Bare C copies the hovered message — but only with nothing
+	// selected (a live selection keeps its keys: the copy would
+	// otherwise eat the selection menu's own C). Rich editors own
+	// their keystrokes the same way X yields to them.
+	if (
+		(facts.key === "c" || facts.key === "C") &&
+		hovered &&
+		bare(facts) &&
+		!facts.inField &&
+		!facts.inEditable &&
+		!facts.hasSelection
+	)
+		return "copy-hovered";
 	if (
 		(facts.key === "x" || facts.key === "X") &&
 		hovered &&
@@ -135,6 +153,32 @@ export function messageKeyAction(facts: MessageKeyFacts): MessageKeyAction | nul
 		!facts.inInteractive
 	)
 		return "delete-hovered";
+	// Shift+C branches from the hovered message, Shift+R reads it
+	// aloud. Physical codes like Shift+D, so any layout's keys work
+	// (Shift+CapsLock spellings included); fields and rich editors
+	// keep their keystrokes.
+	if (
+		facts.code === "KeyC" &&
+		facts.shiftKey &&
+		!facts.metaKey &&
+		!facts.ctrlKey &&
+		!facts.altKey &&
+		hovered &&
+		!facts.inField &&
+		!facts.inEditable
+	)
+		return "branch-hovered";
+	if (
+		facts.code === "KeyR" &&
+		facts.shiftKey &&
+		!facts.metaKey &&
+		!facts.ctrlKey &&
+		!facts.altKey &&
+		hovered &&
+		!facts.inField &&
+		!facts.inEditable
+	)
+		return "speak-hovered";
 	return null;
 }
 

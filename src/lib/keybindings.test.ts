@@ -42,6 +42,7 @@ const msgBase: MessageKeyFacts = {
 	inEditable: false,
 	inInteractive: false,
 	inFieldOrFilter: false,
+	hasSelection: false,
 	hoveredIdx: 2,
 	escDownAt: 0
 };
@@ -77,7 +78,39 @@ describe("messageKeyAction", () => {
 		expect(messageKeyAction({ ...msgBase, key: "n", code: "KeyN" })).toBe("pin-furigana");
 		expect(messageKeyAction({ ...msgBase, key: "f", code: "KeyF" })).toBe("fold-hovered");
 		expect(messageKeyAction({ ...msgBase, key: "e", code: "KeyE" })).toBe("edit-hovered");
+		expect(messageKeyAction({ ...msgBase, key: "c", code: "KeyC" })).toBe("copy-hovered");
 		expect(messageKeyAction({ ...msgBase, key: "x", code: "KeyX" })).toBe("cut-hovered");
+	});
+
+	it("copies only with nothing selected, and never shifted", () => {
+		expect(messageKeyAction({ ...msgBase, key: "c", code: "KeyC" })).toBe("copy-hovered");
+		// CapsLock spells it "C" with no shift: still a copy.
+		expect(messageKeyAction({ ...msgBase, key: "C", code: "KeyC" })).toBe("copy-hovered");
+		// A live selection keeps its keys (the selection menu's own C).
+		expect(messageKeyAction({ ...msgBase, key: "c", code: "KeyC", hasSelection: true })).toBe(null);
+		// Shift+C is the branch key, never a copy.
+		expect(messageKeyAction({ ...msgBase, key: "C", code: "KeyC", shiftKey: true })).toBe(
+			"branch-hovered"
+		);
+		expect(messageKeyAction({ ...msgBase, key: "c", code: "KeyC", inField: true })).toBe(null);
+		expect(messageKeyAction({ ...msgBase, key: "c", code: "KeyC", inEditable: true })).toBe(null);
+		expect(messageKeyAction({ ...msgBase, key: "c", code: "KeyC", hoveredIdx: -1 })).toBe(null);
+	});
+
+	it("branches on Shift+C and speaks on Shift+R from any layout", () => {
+		const shifted = { ...msgBase, shiftKey: true };
+		expect(messageKeyAction({ ...shifted, key: "C", code: "KeyC" })).toBe("branch-hovered");
+		expect(messageKeyAction({ ...shifted, key: "R", code: "KeyR" })).toBe("speak-hovered");
+		// CapsLock+Shift spells them lowercase: the codes still match.
+		expect(messageKeyAction({ ...shifted, key: "c", code: "KeyC" })).toBe("branch-hovered");
+		expect(messageKeyAction({ ...shifted, key: "r", code: "KeyR" })).toBe("speak-hovered");
+		// Bare letters are never branch/speak.
+		expect(messageKeyAction({ ...msgBase, key: "r", code: "KeyR" })).toBe(null);
+		// Chords, fields, editors, and no hover all yield.
+		expect(messageKeyAction({ ...shifted, key: "C", code: "KeyC", metaKey: true })).toBe(null);
+		expect(messageKeyAction({ ...shifted, key: "C", code: "KeyC", inField: true })).toBe(null);
+		expect(messageKeyAction({ ...shifted, key: "R", code: "KeyR", inEditable: true })).toBe(null);
+		expect(messageKeyAction({ ...shifted, key: "R", code: "KeyR", hoveredIdx: -1 })).toBe(null);
 	});
 
 	it("rejects modifiers, the editor, fields, and no hover", () => {

@@ -47,6 +47,7 @@
 		CHAT_WIDTH_DEFAULT,
 		CHAT_WIDTH_MIN,
 		CHAT_WIDTH_MAX,
+		MESSAGE_GAP_DEFAULT,
 		effectiveChatWidth,
 		FONT_SCALE_MIN,
 		FONT_SCALE_MAX,
@@ -2312,6 +2313,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		armActionsTimer(shownActionsId);
 	}
 	function toggleMessageActions(id: ChatMsgId, event: MouseEvent): void {
+		if (!settings.showMessageButtons) return;
 		if (!settings.hideMessages && !(androidUI && settings.hideButtons)) return;
 		if (closestFromTarget(event.target, "button, a, input, textarea, select, summary")) return;
 		// Tapping a folded message unfolds it: its row is hidden, so no
@@ -7441,6 +7443,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				inEditable: isEditableTarget(event.target),
 				inInteractive: isInteractiveTarget(event.target),
 				inFieldOrFilter: isInspectFieldTarget(event.target),
+				hasSelection: (window.getSelection()?.toString() ?? "") !== "",
 				hoveredIdx,
 				escDownAt
 			};
@@ -7529,6 +7532,39 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			event.preventDefault();
 			deleteMessage(chatState, hoveredIdx);
 			return;
+		}
+		if (msgAction === "copy-hovered") {
+			// C copies the hovered message as plain text (the row
+			// button's own path, toast included) — only with nothing
+			// selected, so a live selection keeps its keys.
+			const target = viewChat.messages[hoveredIdx];
+			if (target) {
+				consumeEvent(event);
+				copyText(target.content, target.role);
+				return;
+			}
+		}
+		if (msgAction === "branch-hovered") {
+			// Shift+C branches from the hovered message, same as its
+			// row button.
+			const target = viewChat.messages[hoveredIdx];
+			if (target) {
+				consumeEvent(event);
+				branchFrom(chatState, hoveredIdx);
+				return;
+			}
+		}
+		if (msgAction === "speak-hovered") {
+			// Shift+R reads the hovered message aloud (Stop when it is
+			// the one playing) — the row button's toggle, gated the
+			// same way, so languageless text stays silent.
+			const target = viewChat.messages[hoveredIdx];
+			if (target && messageSpeakable(target)) {
+				consumeEvent(event);
+				if (speakingId === target.id) stopVoice();
+				else void speakReply(target);
+				return;
+			}
 		}
 		// One snapshot for the open chat list (see sidebarListAction):
 		// it owns j/k/space/l/Delete with preview-as-you-go. Bodies
@@ -8745,7 +8781,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	data-shell={tauriBackendAvailable() ? "tauri" : "browser"}
 	data-android={androidUI || null}
 	data-ios={iosUI || null}
-	style="--font-scale: {androidUI ? Math.min(8, settings.fontScale) : settings.fontScale}; --chat-width: {effectiveChatWidth(androidUI, settings.fontScale, settings.chatWidth ?? 36)}"
+	style="--font-scale: {androidUI ? Math.min(8, settings.fontScale) : settings.fontScale}; --chat-width: {effectiveChatWidth(androidUI, settings.fontScale, settings.chatWidth ?? 36)}; --msg-gap: {settings.messageGap ?? MESSAGE_GAP_DEFAULT}rem"
 	data-mac={isMac && !androidUI || null}
 >
 	<aside class:collapsed={settings.sidebarCollapsed} inert={settings.sidebarCollapsed} data-fade-scroll
@@ -9301,11 +9337,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						/>
 					</div>
 					{/if}
-					{#if !(streamingThis && msg.content.trim() === "")}
+					{#if settings.showMessageButtons && !(streamingThis && msg.content.trim() === "")}
 					<!-- Preview renders the same row inert: the peek
 					reserves the row's space (opening the chat moves
 					nothing) while honoring the hover-only rhythm, so
-					no peek button is ever visible or firing. -->
+					no peek button is ever visible or firing. The
+					Messages toggle removes the row outright (its
+					shortcuts keep working on hover). -->
 					<div
 						class="actions"
 						role="group"
@@ -11974,15 +12012,16 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		display: flex;
 		flex-direction: column;
 		/* Pairs hug: a message sits close to its reply; the wider
-		separation lands between pairs (see article.user below).
-		Base gap is fixed — the text-size growth below belongs to
-		the button-scaling opt-in, so huge type with the opt-in off
-		keeps tight gaps (the buttons stay small too). */
-		gap: 0.6rem;
+		separation lands between pairs (see article.user below). The
+		base gap rides the Gap size slider — the text-size growth
+		below belongs to the button-scaling opt-in, so huge type
+		with the opt-in off keeps tight gaps (the buttons stay
+		small too). */
+		gap: var(--msg-gap, 0.35rem);
 	}
 	/* Button-scaling opt-in: roomy type keeps airy gaps. */
 	main.scale-actions .messages {
-		gap: calc(0.6rem * var(--font-scale, 1));
+		gap: calc(var(--msg-gap, 0.35rem) * var(--font-scale, 1));
 	}
 	/* Overscroll past the tail: the last message lifts a touch above
 	the composer instead of docking hard at the column's end. Fixed
@@ -12427,13 +12466,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 	/* A user message opens a new pair, so it carries the
 	between-pair separation on top; replies hug underneath.
-	Fixed unless the button-scaling opt-in says otherwise (same
-	contract as the list gap above). */
+	The Gap size slider plus a hair, unless the button-scaling
+	opt-in says otherwise (same contract as the list gap above). */
 	article.user {
-		margin-top: 0.7rem;
+		margin-top: calc(var(--msg-gap, 0.35rem) + 0.1rem);
 	}
 	main.scale-actions article.user {
-		margin-top: calc(0.7rem * var(--font-scale, 1));
+		margin-top: calc((var(--msg-gap, 0.35rem) + 0.1rem) * var(--font-scale, 1));
 	}
 	article:first-of-type {
 		margin-top: 0;

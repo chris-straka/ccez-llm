@@ -114,6 +114,16 @@ export interface AppSettings {
 	/** Message action buttons grow with the text-size setting. Off = fixed size. */
 	scaleActionsWithFont: boolean;
 	/**
+	 * Message action rows render at all, desktop and mobile alike.
+	 * Off = keyboard shortcuts only (C copies, Shift+C branches,
+	 * Shift+R speaks, F folds, X cuts, Shift+D deletes, E edits,
+	 * A/M/N toggle aids).
+	 */
+	showMessageButtons: boolean;
+	/** Gap between messages in rem (the Gap size slider); pair
+	 * separation rides 0.1rem above whatever it holds. */
+	messageGap: number;
+	/**
 	 * Seconds of no mouse/keyboard/touch input before the main prompt
 	 * slides down out of view (any input restores it instantly).
 	 */
@@ -173,6 +183,14 @@ export const FONT_SCALE_MAX = 8;
 export const CHAT_WIDTH_DEFAULT = 36;
 export const CHAT_WIDTH_MIN = 28;
 export const CHAT_WIDTH_MAX = 120;
+/**
+ * Gap between messages in rem: 0.35 is the default (tighter than the
+ * legacy 0.6); the Gap size slider runs 0–1.5, and pair separation
+ * rides 0.1rem above whatever it holds.
+ */
+export const MESSAGE_GAP_DEFAULT = 0.35;
+export const MESSAGE_GAP_MIN = 0;
+export const MESSAGE_GAP_MAX = 1.5;
 /** Phone font scale at/above which the chat goes full-bleed. */
 export const FULLBLEED_FONT_SCALE = 3.6;
 /** Absurdly wide column: min(100%, …) consumers read it as full width. */
@@ -295,6 +313,8 @@ export function defaultSettings(): AppSettings {
 		hoverUserActions: true,
 		hoverAssistantActions: true,
 		scaleActionsWithFont: false,
+		showMessageButtons: true,
+		messageGap: MESSAGE_GAP_DEFAULT,
 		promptIdleSec: PROMPT_IDLE_DEFAULT,
 		voiceLangPinned: false,
 		theme: "system",
@@ -433,6 +453,17 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 		if (typeof merged.autoSpeakSelection !== "boolean") merged.autoSpeakSelection = true;
 		if (typeof merged.vibration !== "boolean") merged.vibration = true;
 		if (typeof merged.replyNotifications !== "boolean") merged.replyNotifications = true;
+		if (typeof merged.showMessageButtons !== "boolean") merged.showMessageButtons = true;
+		// Backfill the message gap on older saves; clamp strays into
+		// range (the slider persists exact decimals, so no rounding).
+		if (typeof merged.messageGap !== "number" || Number.isNaN(merged.messageGap)) {
+			merged.messageGap = MESSAGE_GAP_DEFAULT;
+		} else {
+			merged.messageGap = Math.min(
+				MESSAGE_GAP_MAX,
+				Math.max(MESSAGE_GAP_MIN, merged.messageGap)
+			);
+		}
 		// Retire the old "Be brief, no summaries." default: profiles that
 		// never customized it inherit the new (empty) default instead.
 		if (merged.systemPrompt === "Be brief, no summaries.") {

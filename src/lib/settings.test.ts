@@ -11,6 +11,9 @@ import {
 	CHAT_WIDTH_MAX,
 	CHAT_WIDTH_MIN,
 	CHAT_WIDTH_FULLBLEED_REM,
+	MESSAGE_GAP_DEFAULT,
+	MESSAGE_GAP_MAX,
+	MESSAGE_GAP_MIN,
 	effectiveChatWidth,
 	PROMPT_IDLE_ALWAYS,
 	PROMPT_IDLE_DEFAULT,
@@ -176,6 +179,43 @@ describe("settings", () => {
 		kept.chatWidth = 100;
 		saveSettings(kept, memoryStore);
 		expect(loadSettings(memoryStore).chatWidth).toBe(100);
+	});
+
+	it("shows message buttons out of the box and keeps an explicit off", () => {
+		expect(defaultSettings().showMessageButtons).toBe(true);
+		const off = blankSettings();
+		off.showMessageButtons = false;
+		saveSettings(off, memoryStore);
+		expect(loadSettings(memoryStore).showMessageButtons).toBe(false);
+		const junk = blankSettings();
+		(junk as unknown as Record<string, unknown>).showMessageButtons = "no";
+		saveSettings(junk, memoryStore);
+		expect(loadSettings(memoryStore).showMessageButtons).toBe(true);
+	});
+
+	it("defaults the message gap tight and clamps strays", () => {
+		expect(MESSAGE_GAP_DEFAULT).toBe(0.35);
+		expect(defaultSettings().messageGap).toBe(MESSAGE_GAP_DEFAULT);
+		const missing = blankSettings();
+		delete (missing as unknown as Record<string, unknown>).messageGap;
+		saveSettings(missing, memoryStore);
+		expect(loadSettings(memoryStore).messageGap).toBe(MESSAGE_GAP_DEFAULT);
+		const kept = blankSettings();
+		kept.messageGap = 0.8;
+		saveSettings(kept, memoryStore);
+		expect(loadSettings(memoryStore).messageGap).toBe(0.8);
+		const low = blankSettings();
+		low.messageGap = MESSAGE_GAP_MIN - 0.1;
+		saveSettings(low, memoryStore);
+		expect(loadSettings(memoryStore).messageGap).toBe(MESSAGE_GAP_MIN);
+		const high = blankSettings();
+		high.messageGap = MESSAGE_GAP_MAX + 1;
+		saveSettings(high, memoryStore);
+		expect(loadSettings(memoryStore).messageGap).toBe(MESSAGE_GAP_MAX);
+		const junk = blankSettings();
+		(junk as unknown as Record<string, unknown>).messageGap = "roomy";
+		saveSettings(junk, memoryStore);
+		expect(loadSettings(memoryStore).messageGap).toBe(MESSAGE_GAP_DEFAULT);
 	});
 
 	it("defaults background reply pings on and clamps old saves", () => {
