@@ -626,6 +626,46 @@ test("tray docks a fixed margin above the prompt", async ({ page }) => {
 	expect(roLoops).toEqual([]);
 });
 
+test("tray re-docks above the prompt after cut and paste", async ({ page }) => {
+	// Cut empties the tray (unmount); pasting the tags back remounts
+	// it with the composer at the same height — the dock write must
+	// not be skipped as "unchanged", or the tray parks at the top.
+	await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+	await dropImage(page);
+	const tray = page.locator("ul.attachments").first();
+	await expect(tray).toBeVisible({ timeout: 15_000 });
+	const gap = async (): Promise<number> =>
+		page.evaluate(() => {
+			const strip = document.querySelector("ul.attachments");
+			const prompt = document.querySelector("main .prompt");
+			if (!strip || !prompt) throw new Error("missing tray or prompt");
+			return prompt.getBoundingClientRect().top - strip.getBoundingClientRect().bottom;
+		});
+	await expect.poll(gap, { timeout: 5_000 }).toBeGreaterThan(0);
+	await page.locator(".prompt .cm-content").click();
+	await page.keyboard.press("Meta+a");
+	await page.keyboard.press("Meta+x");
+	await expect(tray).toHaveCount(0);
+	// The enriched clipboard write is async (blob fetch + PNG
+	// convert): wait for the picture before pasting it back.
+	await expect
+		.poll(
+			() =>
+				page.evaluate(() =>
+					navigator.clipboard
+						.read()
+						.then((items) => items.flatMap((item) => item.types))
+						.catch(() => [])
+				),
+			{ timeout: 10_000 }
+		)
+		.toContain("image/png");
+	await page.keyboard.press("Meta+v");
+	await expect(tray).toBeVisible({ timeout: 15_000 });
+	await expect.poll(gap, { timeout: 5_000 }).toBeGreaterThan(0);
+	expect(await gap()).toBeLessThan(24);
+});
+
 test("thread text flows beside the floating tray", async ({ page }) => {
 	// Long thread, image attached, scrolled mid-thread: message text
 	// stays visible beside the cards (the tray overlays the thread

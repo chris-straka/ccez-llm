@@ -2051,6 +2051,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					tray.style.bottom = trayBottom;
 					lastTrayBottom = trayBottom;
 				}
+			} else {
+				// The tray remounts fresh on every attach cycle with no
+				// inline bottom (the CSS carries none): forget the last
+				// write while it is gone, or a remount at the same
+				// composer height reads as "unchanged" and the tray
+				// parks at the top.
+				lastTrayBottom = "";
 			}
 			// The error stays in main flow after the scroller:
 			// main-level padding lifts it above the card while
