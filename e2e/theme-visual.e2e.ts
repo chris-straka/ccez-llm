@@ -160,10 +160,9 @@ for (const t of THEMES) {
 		await seedChat(page, [{ role: "user", content: "bubble me" }]);
 		await seedTheme(page, t.name);
 		await page.goto("/");
-		await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
-		await page.keyboard.press("Meta+,");
-		await page.locator(".settings-panel").getByText("Enable background on my messages").click();
+		// Off by default (ownBubble: false): no click needed.
 		const bubble = page.locator("article.user .bubble").first();
+		await expect(bubble).toBeVisible({ timeout: 60_000 });
 		await expect(bubble).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
 	});
 
@@ -171,7 +170,9 @@ for (const t of THEMES) {
 		await seedChat(page, [{ role: "user", content: "bubble me" }]);
 		await seedTheme(page, t.name);
 		await page.goto("/");
-		await expect(page.locator("article.user .bubble").first()).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+		await page.keyboard.press("Meta+,");
+		await page.locator(".settings-panel").getByText("Enable background on my messages").click();
 		await expect(page.locator("article.user .bubble").first()).toHaveCSS(
 			"background-color",
 			t.wash
@@ -210,14 +211,20 @@ for (const t of THEMES) {
 			t.name === "light" ? t.bg : "rgb(28, 28, 30)"
 		);
 		// The editor autofocuses on boot, so the rim starts focused.
-		await page.locator(".cm-content").first().click();
+		await page.locator(".prompt .cm-content").click();
+		await expect(page.locator(".prompt .cm-editor")).toHaveClass(/cm-focused/);
 		await expect(prompt).toHaveCSS(
 			"border-color",
 			t.name === "light" ? "rgb(58, 58, 60)" : "rgb(174, 174, 178)"
 		);
-		const editor = page.locator(".prompt .cm-content");
-		await expect(editor).toHaveCSS(
-			"caret-color",
+		// The visible caret is CodeMirror's drawn cursor, not the
+		// native one: CM pins `caret-color: transparent !important`
+		// on .cm-content (its `:focus` restore only matches
+		// descendants, never the content host), so pin the drawn
+		// spine's ink instead. It mounts only while focused (proven
+		// above); an emptied, unfocused composer hides it by design.
+		await expect(page.locator(".prompt .cm-cursor").first()).toHaveCSS(
+			"border-left-color",
 			t.name === "light" ? "rgb(28, 28, 30)" : "rgb(242, 242, 247)"
 		);
 		const hint = await page.evaluate(
@@ -398,17 +405,22 @@ for (const t of THEMES) {
 		await expect(item).toBeVisible({ timeout: 10_000 });
 		await expect(item).toHaveCSS("background-color", hl);
 		await expect(item.locator(".tok")).toHaveCSS("color", muted);
+		// The composer thumb is inert by design (the big peek is gone):
+		// clicking previews nothing, so there is no popup to pin here.
 		await item.locator(".thumb").click();
-		await expect(page.locator(".preview")).toHaveCSS(
-			"border-color",
-			L ? "rgb(199, 199, 204)" : "rgb(72, 72, 74)"
-		);
+		await expect(page.locator(".sent-card")).toHaveCount(0);
 		await page.locator(".cm-content").click();
 		await page.keyboard.type("file attached");
 		await page.keyboard.press("Enter");
-		const tags = page.locator(".sent-tags").first();
-		await expect(tags).toBeVisible({ timeout: 30_000 });
-		await expect(tags.locator(".sent-fold").first()).toContainText("[Pasted image]");
+		// Sent images ride the text flow as collapsed [Pasted image]
+		// tags; clicking floats the preview card (line-token border).
+		const tag = page.locator("article.user .rendered .sent-fold").first();
+		await expect(tag).toContainText("[Pasted image]", { timeout: 30_000 });
+		await tag.click();
+		await expect(page.locator("article.user .rendered .sent-card").first()).toHaveCSS(
+			"border-color",
+			L ? "rgb(199, 199, 204)" : "rgb(72, 72, 74)"
+		);
 	});
 
 	// No failed-send test: without the mock the dev backend still
@@ -426,7 +438,12 @@ for (const t of THEMES) {
 		await page.keyboard.press("Control+g");
 		const current = page.locator("article.selected");
 		await expect(current).toHaveCount(1);
-		await expect(current).toHaveCSS(
+		// Hover-only button modes keep the row in the layout, so the
+		// article ring would box the buttons' empty floor: the article
+		// stays quiet and the text body carries the ring instead
+		// (bubble on own messages, rendered on LLM ones).
+		await expect(current).toHaveCSS("outline-color", "rgba(0, 0, 0, 0)");
+		await expect(current.locator(".bubble, .rendered").first()).toHaveCSS(
 			"outline-color",
 			t.name === "light" ? "rgb(58, 58, 60)" : "rgb(174, 174, 178)"
 		);

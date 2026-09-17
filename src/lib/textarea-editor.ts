@@ -155,6 +155,7 @@ export function createTextareaEditor(
 		getText: () => ta.value,
 		// No collapsing here: everything sends unfolded.
 		getPastes: () => [],
+		selectionHead: () => ta.selectionStart ?? ta.value.length,
 		// No tags to toggle: Ctrl+O falls through to the thoughts toggle.
 		togglePastes: () => false,
 		// No collapsing here either: the plain rewrite loses nothing.

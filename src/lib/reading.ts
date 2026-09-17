@@ -211,6 +211,21 @@ export function ttsLangFor(word: string, fallback = "en-US"): string {
 }
 
 /**
+ * Script-run key for one character: Latin letters report `"latin"`;
+ * kana and Han share `"han"` (a kanji mid-Japanese must not split the
+ * run — kana presence already decides Japanese at the sentence
+ * level); every other non-Latin script keeps its own key; anything
+ * scriptless (space, punctuation, digits, emoji) reports `"other"`
+ * for callers to glue onto the current run.
+ */
+export function scriptRunKey(ch: string): string {
+	if (/\p{Script=Latin}/u.test(ch)) return "latin";
+	const lang = ttsLangFor(ch, "");
+	if (lang === "ja-JP" || lang === "zh-CN") return "han";
+	return lang === "" ? "other" : lang;
+}
+
+/**
  * Whether `text` carries Hanyu pinyin tone marks: the caron vowels
  * (ǎ ǐ ǒ ǔ ě) and the u-umlaut series (ǖ ǘ ǚ ǜ), in either case. Those
  * marks occur in no other Latin orthography — Vietnamese, the closest

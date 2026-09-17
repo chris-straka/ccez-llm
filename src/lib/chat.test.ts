@@ -27,6 +27,7 @@ import {
 	sendMessage,
 	setPasteFold,
 	resolveSendCompletion,
+	apiContent,
 	buildApiMessages,
 	visibleMessageCount,
 	isSending,
@@ -752,6 +753,37 @@ describe("resendLast identity", () => {
 		expect(messages.map((m) => m.role)).toEqual(["user", "assistant"]);
 		expect(messages[0]?.id).toBe(userId);
 		expect(messages[1]?.content).toBe("two");
+	});
+});
+
+describe("apiContent", () => {
+	it("strips stored image literals, keeping clean prose plus image parts", () => {
+		const out = apiContent({
+			id: newChatMsgId(),
+			role: "user",
+			content: "look [Pasted image]",
+			usage: null,
+			error: null,
+			attachments: [
+				{
+					id: "a1",
+					kind: "image",
+					name: "solo.png",
+					mime: "image/png",
+					tokens: 0,
+					dataUrl: "data:image/png;base64,AAA",
+					text: null,
+					width: 8,
+					height: 8
+				}
+			]
+		});
+		if (typeof out === "string") throw new Error("expected multimodal parts");
+		expect(out[0]).toEqual({ type: "text", text: "look " });
+		expect(out[1]).toEqual({
+			type: "image_url",
+			image_url: { url: "data:image/png;base64,AAA" }
+		});
 	});
 });
 

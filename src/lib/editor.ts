@@ -75,6 +75,8 @@ export interface PromptEditor {
 	getText(): string;
 	/** Collapsed-paste spans in document coordinates (for send-time folds). */
 	getPastes(): PasteSpan[];
+	/** Collapsed caret offset (paste-adjacent marker placement reads it). */
+	selectionHead(): number;
 	/** Ctrl+O: expand every paste tag, or re-collapse expanded ones.
 	 * True when it did anything (the caller then owns the keystroke). */
 	togglePastes(): boolean;
@@ -226,6 +228,7 @@ export function createPromptEditor(
 	return {
 		getText: () => view.state.doc.toString(),
 		getPastes: () => pasteSpans(view.state),
+		selectionHead: () => view.state.selection.main.head,
 		togglePastes: () => togglePastes(view),
 		exciseMarker: (marker: string) => exciseMarkerText(view, marker),
 		exciseMarkerAt: (marker: string, index: number) => exciseMarkerTextAt(view, marker, index),

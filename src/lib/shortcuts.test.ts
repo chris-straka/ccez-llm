@@ -7,41 +7,43 @@ import { desktopShortcuts, filteredShortcuts, touchShortcuts } from "./shortcuts
  * addition to the e2e pithiness spec. Edit this file deliberately when
  * the menu intentionally changes.
  */
+// A-Z (case-insensitive): shortcuts.ts sorts at return, so this pins
+// the sorted order, not the source order.
 const MAC_NAMES = [
-	"Shortcuts show/hide",
-	"Summon / hide window",
-	"Switch model / key",
-	"Thinking level",
-	"Scroll",
-	"Exit fullscreen",
+	"Branch from here",
 	"Chat list",
-	"Search chats",
-	"Find in chat",
-	"Fullscreen",
-	"Newer / older chat",
-	"New chat",
-	"Voice readback on/off",
-	"Pasted text expand/collapse",
-	"Stop voice / close",
-	"Speak text aloud",
+	"Chat width + / −",
+	"Copy message",
+	"Cut message",
 	"Delete a message",
+	"Delete every chat",
+	"Delete this chat",
+	"Edit own message",
+	"Exit fullscreen",
+	"Find in chat",
+	"Fold / unfold code",
 	"Fold / unfold message",
 	"Fold message by drag",
-	"Switch chat by drag",
-	"Fold / unfold code",
-	"Rerun a prompt",
-	"Reply language",
-	"Delete this chat",
-	"Delete every chat",
-	"Cut message",
-	"Edit own message",
-	"Copy message",
-	"Branch from here",
-	"Speak message",
-	"Reading aid toggle",
+	"Fullscreen",
+	"New chat",
+	"Newer / older chat",
+	"Pasted text expand/collapse",
 	"prev/next stroke step",
+	"Reading aid toggle",
+	"Reply language",
+	"Rerun a prompt",
+	"Scroll",
+	"Search chats",
+	"Shortcuts show/hide",
+	"Speak message",
+	"Speak text aloud",
+	"Stop voice / close",
+	"Summon / hide window",
+	"Switch chat by drag",
+	"Switch model / key",
 	"Text size up / down",
-	"Chat width + / −"
+	"Thinking level",
+	"Voice readback on/off"
 ];
 
 /** Rows deliberately removed — asserting absence, not presence. */
@@ -57,7 +59,7 @@ describe("shortcuts menu copy", () => {
 	it("pins the exact mac list in order", () => {
 		const rows = desktopShortcuts(true);
 		expect(rows.map((r) => r.name)).toEqual(MAC_NAMES);
-		expect(rows[0]?.keys).toContain("middle-click");
+		expect(rows.find((r) => r.name === "Shortcuts show/hide")?.keys).toContain("middle-click");
 		expect(rows.find((r) => r.name === "Scroll")?.keys).toContain("h/l");
 		expect(rows.find((r) => r.name === "Reply language")?.keys).toContain("⌘1, ⌘0");
 		expect(rows.find((r) => r.name === "Speak text aloud")?.keys).toBe("Right-click");
@@ -66,7 +68,7 @@ describe("shortcuts menu copy", () => {
 	it("uses Ctrl labels off-mac with the same row names", () => {
 		const rows = desktopShortcuts(false);
 		expect(rows.map((r) => r.name)).toEqual(MAC_NAMES);
-		expect(rows[0]?.keys).toContain("Ctrl+Shift+/");
+		expect(rows.find((r) => r.name === "Shortcuts show/hide")?.keys).toContain("Ctrl+Shift+/");
 		expect(rows.find((r) => r.name === "Search chats")?.keys).toBe("Ctrl+P");
 		expect(rows.find((r) => r.name === "Delete a message")?.keys).toBe("Hover + Shift+D");
 	});
@@ -90,18 +92,18 @@ describe("shortcuts menu copy", () => {
 
 	it("pins the touch gestures list", () => {
 		expect(touchShortcuts().map((r) => r.name)).toEqual([
-			"Chats list",
-			"fold chat msg",
-			"Settings",
-			"Newer / older chat",
-			"Top of chat",
+			"Annotate",
 			"Bottom of chat",
 			"Chat switcher",
+			"Chats list",
 			"Delete current chat",
 			"Delete every chat",
-			"Annotate",
+			"Fold a message",
+			"fold chat msg",
 			"Message buttons",
-			"Fold a message"
+			"Newer / older chat",
+			"Settings",
+			"Top of chat"
 		]);
 		// Message-start left strokes fold (never settings); everywhere
 		// else one finger opens it too. Chat steps moved to three

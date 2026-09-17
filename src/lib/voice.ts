@@ -1,4 +1,4 @@
-import { ttsLangFor } from "./reading";
+import { ttsLangFor, scriptRunKey } from "./reading";
 import type { VoiceEngine } from "./settings";
 
 /**
@@ -42,7 +42,7 @@ export function speechText(markdown: string): string {
 			.replace(/!?\[[^\]]*\]\([^)]*\)/g, " ")
 			.replace(/\[Pasted an image\]/g, " ")
 			.replace(/\[Pasted \d+ chars\]/g, "pasted content")
-			.replace(/\[Pasted content \d+ chars\]/g, "pasted content")
+			.replace(/\[Pasted image\]/g, "pasted image")
 			.split("\n")
 			.map((line) => line.replace(/^#{1,6}\s+/, "").replace(/^>\s?/, "").replace(/^[-*]\s+/, ""))
 			.join("\n")
@@ -119,16 +119,73 @@ export function sentenceSpeechLang(sentence: string, fallbackLang: string): stri
 }
 
 /**
+ * Split one sentence into maximal script runs (pure, unit-tested):
+ * Latin letters break runs, kana/Han share one, every other non-Latin
+ * script breaks on change, and scriptless characters (spaces,
+ * punctuation, digits, emoji) glue onto the current run. Trimmed and
+ * non-empty; a single-script sentence returns itself untouched.
+ */
+export function splitScriptRuns(sentence: string): string[] {
+	const runs: string[] = [];
+	let current = "";
+	let key = "";
+	const flush = (): void => {
+		const trimmed = current.trim();
+		if (trimmed) runs.push(trimmed);
+		current = "";
+		key = "";
+	};
+	for (const ch of sentence) {
+		const next = scriptRunKey(ch);
+		if (next === "other") {
+			current += ch;
+			continue;
+		}
+		if (key === "") {
+			key = next;
+			current += ch;
+		} else if (next === key) {
+			current += ch;
+		} else {
+			flush();
+			key = next;
+			current = ch;
+		}
+	}
+	flush();
+	return runs;
+}
+
+/**
  * Split text into per-sentence voice runs: every sentence resolves its
  * own locale (non-Latin scripts by Unicode, Latin by the shared
  * `langForSentence` fallback), so a Japanese+Chinese+English reply reads
- * each part in the right voice instead of the whole thing in one.
+ * each part in the right voice instead of the whole thing in one. A
+ * sentence whose script runs resolve to different locales splits
+ * further (no line break or punctuation needed between halves); runs
+ * resolving alike stay one utterance with the sentence's exact text.
  */
 export function splitSpeechSegments(
 	text: string,
 	langForSentence: (sentence: string) => string
 ): SpeechSegment[] {
-	return splitSentences(text).map((sentence) => ({ text: sentence, lang: langForSentence(sentence) }));
+	const out: SpeechSegment[] = [];
+	for (const sentence of splitSentences(text)) {
+		const runs = splitScriptRuns(sentence);
+		if (runs.length < 2) {
+			out.push({ text: sentence, lang: langForSentence(sentence) });
+			continue;
+		}
+		const langs = runs.map((run) => langForSentence(run));
+		if (langs.every((lang) => lang === langs[0])) {
+			out.push({ text: sentence, lang: langs[0] ?? langForSentence(sentence) });
+			continue;
+		}
+		for (let i = 0; i < runs.length; i++) {
+			out.push({ text: runs[i] ?? "", lang: langs[i] ?? langForSentence(sentence) });
+		}
+	}
+	return out;
 }
 
 /** Latin-script fallback voice locale: the pinned voice language, else US English. */

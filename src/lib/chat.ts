@@ -5,6 +5,7 @@ import type {
 	TokenUsage
 } from "./providers/types";
 import type { Attachment } from "./attachments";
+import { stripAttachmentMarkers } from "./attachments";
 import type { KeyValueStore } from "./settings";
 import { memoryStore } from "./settings";
 import { replyLanguageFor } from "./languages";
@@ -484,7 +485,9 @@ export function buildApiMessages(chat: Chat, systemPrompt: string): ChatMessage[
  */
 export function apiContent(message: ChatMsg): string | ContentPart[] {
 	const images = (message.attachments ?? []).filter((a) => a.kind === "image" && a.dataUrl);
-	let text = message.content;
+	// Stored image literals are display tags (paired back to the parts
+	// below by kind order) — the provider sees clean prose plus parts.
+	let text = stripAttachmentMarkers(message.content);
 	for (const a of message.attachments ?? []) {
 		if (a.kind === "text" && a.text !== null) {
 			text += `\n\n\`\`\`${a.name}\n${a.text}\n\`\`\``;

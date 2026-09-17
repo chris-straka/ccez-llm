@@ -45,7 +45,7 @@ export const appTheme = EditorView.theme({
 	".cm-focused": { outline: "none" },
 	// One tag look for every pasted thing (light theme): bold body
 	// text, never muted gray and never the markdown link underline —
-	// image/file tags and `[Pasted content N chars]` read the same.
+	// image/file tags and `[Pasted N chars]` read the same.
 	// Dark theme rides gray + bold instead (see the pinned dark rules
 	// in +page.svelte: the theme object can't do @media reliably).
 	".cm-paste-marker": {
@@ -60,7 +60,10 @@ export const appTheme = EditorView.theme({
 	".cm-attach-tag": {
 		fontWeight: "700",
 		color: "inherit",
-		textDecoration: "none"
+		// !important: the markdown highlight paints `[..]` as tok-link
+		// (underline) from a runtime-injected sheet that lands after
+		// this one — only importance beats it deterministically.
+		textDecoration: "none !important"
 	},
 	// Expanded-paste collapse brackets: the sent-message twin of
 	// history's fold brackets (same blue, same ride-high nudge).

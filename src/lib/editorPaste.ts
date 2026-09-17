@@ -44,11 +44,11 @@ import {
 } from "./attachments";
 import { closestFromTarget } from "./events";
 
-/** Pastes longer than this collapse to a `[Pasted content N chars]` marker. */
+/** Pastes longer than this collapse to a `[Pasted N chars]` marker. */
 export const PASTE_THRESHOLD = 100;
 
 export function pastedLabel(chars: number): string {
-	return `[Pasted content ${chars} chars]`;
+	return `[Pasted ${chars} chars]`;
 }
 
 /**

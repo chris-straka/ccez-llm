@@ -49,8 +49,6 @@
 		CHAT_WIDTH_MAX,
 		MESSAGE_GAP_DEFAULT,
 		effectiveChatWidth,
-		FONT_SCALE_MIN,
-		FONT_SCALE_MAX,
 		PROMPT_IDLE_ALWAYS,
 		PROMPT_IDLE_NEVER,
 		type AppSettings
@@ -121,6 +119,7 @@ import {
 	VOICE_TIMEOUT_MS
 } from "$lib/notices";
 	import {
+		appendImageMarkers,
 		FILE_MARKER,
 		IMAGE_MARKER,
 		fileExcerpt,
@@ -1386,15 +1385,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		const onZoomWheel = (event: WheelEvent): void => {
 			if (androidUI || !event.metaKey) return;
 			event.preventDefault();
-			const delta = event.deltaY < 0 ? 0.1 : -0.1;
-			const next = Math.min(
-				FONT_SCALE_MAX,
-				Math.max(FONT_SCALE_MIN, Math.round((settings.fontScale + delta) * 100) / 100)
-			);
-			if (next !== settings.fontScale) {
-				settings.fontScale = next;
-				persistSettings();
-			}
+			// Rides adjustFontScale so the wheel toasts the new size
+			// like pinch/keyboard steps do (the toast re-arms per tick,
+			// so a held scroll reads live, then dismisses on idle).
+			adjustFontScale(event.deltaY < 0 ? 0.1 : -0.1);
 		};
 		window.addEventListener("wheel", onZoomWheel, { passive: false });
 		return () => {
@@ -2710,15 +2704,25 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		return kept;
 	}
 
+	/**
+	 * Marker text for one fresh attachment: right after a collapsed
+	 * paste the tag rides the same line, one space apart (caret one
+	 * space past the tag) — anywhere else the usual prefix applies.
+	 */
+	function attachmentMarkerFor(ed: PromptEditor, kind: AttachmentKind): string {
+		const doc = ed.getText();
+		const caret = ed.selectionHead();
+		const afterPaste = ed.getPastes().some((s) => caret === s.to);
+		return kind === "image" ? imageMarkerInsert(doc, afterPaste) : fileMarkerInsert(doc, afterPaste);
+	}
+
 	/** One tag per fresh attachment, caret after each tag's space. */
 	function insertAttachmentMarkers(kinds: AttachmentKind[]): void {
 		if (!editor || kinds.length === 0) return;
 		markerSyncMuted = true;
 		try {
 			for (const kind of kinds) {
-				editor.insertText(
-					kind === "image" ? imageMarkerInsert(editor.getText()) : fileMarkerInsert(editor.getText())
-				);
+				editor.insertText(attachmentMarkerFor(editor, kind));
 			}
 			prevMarkerCount = countMarkers(editor.getText());
 			prevFileMarkerCount = countMarkers(editor.getText(), FILE_MARKER);
@@ -4927,11 +4931,18 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// sendMessage appends the user message (plus the thinking
 		// placeholder) synchronously; the scroll waits a tick for the
 		// render, or it measures the old height and lands short.
+		// Image literals ride the stored text (the tag reads as message
+		// text, paired back to its attachment by kind order); the
+		// provider payload strips them again in apiContent.
+		const stored = appendImageMarkers(
+			text,
+			outgoing.filter((a) => a.kind === "image").length
+		);
 		const sending = sendMessage(
 			chatState,
 			provider,
 			effectiveSystemPrompt(settings, activeReplyCode),
-			withAnnotations(text, outgoingAnnotations),
+			withAnnotations(stored, outgoingAnnotations),
 			{
 				attachments: outgoing,
 				thinking: activeThinkingId(settings),
@@ -5047,7 +5058,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		if (action === "stage") {
 			// ⌥+Enter: most recent message, no reply; the next submit
 			// carries the full history in order.
-			stageMessage(chatState, composerText(), attachments);
+			stageMessage(
+				chatState,
+				appendImageMarkers(composerText(), attachments.filter((a) => a.kind === "image").length),
+				attachments
+			);
 			attachments = [];
 			editor?.clear();
 			scrollAfterRender();
@@ -5152,7 +5167,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		if (id) {
 			const src = msgEditor ?? editor;
 			const { text, folds } = sendPasteFolds(src?.getText() ?? "", src?.getPastes() ?? []);
-			editMessageContent(chatState, id, withAnnotations(text, annotations), {
+			const stored = appendImageMarkers(
+				text,
+				editingAttachments.filter((a) => a.kind === "image").length
+			);
+			editMessageContent(chatState, id, withAnnotations(stored, annotations), {
 				attachments: editingAttachments,
 				pasteFolds: folds
 			});
@@ -5203,7 +5222,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		editingMarkerMuted = true;
 		try {
 			for (let i = 0; i < count; i++) {
-				msgEditor.insertText(imageMarkerInsert(msgEditor.getText()));
+				msgEditor.insertText(attachmentMarkerFor(msgEditor, "image"));
 			}
 			editingPrevMarkers = countMarkers(msgEditor.getText());
 		} finally {
@@ -5762,7 +5781,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		void resetVoiceLangFromKeyboard();
 	}
 
-	/** Sidebar hover tip: message count plus the you/assistant split
+	/** Sidebar hover tip: message count plus the you/AI split
 	(in-memory only — drafts live per-chat in storage, so counting
 	them here would read localStorage on every row render). */
 	function sideTip(item: (typeof chatState.chats)[number]): string {
@@ -5772,7 +5791,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		if (n === 0) return "";
 		const you = item.messages.filter((m) => m.role === "user").length;
 		const msgs = n === 1 ? "1 message" : `${n} messages`;
-		return `${msgs} · you ${you} · assistant ${n - you}`;
+		return `${msgs} · you ${you} · AI ${n - you}`;
 	}
 
 	function chatLabel(createdAt: number): string {
@@ -9659,42 +9678,65 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							<!-- Sent images ride in the text with the prose (below
 							the body, above the action row), never in the strip
 							above: a pasted picture reads where it was pasted. Each
-							card shows its preview and footer inline — copy and OCR
-							ride the footer like the strip cards. -->
+							image is a collapsed [Pasted image] fold tag like the
+							pasted-chars tag — clicking floats the preview card
+							above it (copy and OCR ride the footer), X /
+							click-away / ESC closes, history stays read-only. -->
 							<div class="sent-inline">
 								{#each inlineImages as m (m.id)}
 								{@const att = msg.attachments?.find((a) => a.id === m.id)}
-								<span class="sent-card sent-inline-card">
-									{#if m.dataUrl?.startsWith("data:image/")}
-										<img class="sent-img" src={m.dataUrl} alt="" />
+								<span class="sent-wrap">
+									<button
+										type="button"
+										class="paste-fold sent-fold"
+										aria-expanded={m.open}
+										onclick={() => toggleSentTag(msg, m.id)}
+										>{IMAGE_MARKER}</button
+									>
+									{#if m.open}
+										<span class="sent-open">
+											<span class="sent-card">
+												{#if m.dataUrl?.startsWith("data:image/")}
+													<img class="sent-img" src={m.dataUrl} alt="" />
+												{/if}
+												<span class="sent-foot">
+													<span class="sent-name">{m.name}</span>
+													<span class="sent-tok" title="{m.tokens} tokens">{formatTokenCount(m.tokens)}</span>
+													{#if att}
+														<button
+															type="button"
+															class="sent-icobtn"
+															aria-label="Copy attachment"
+															title="Copy attachment"
+															onclick={(e) => {
+																e.stopPropagation();
+																copyAttachment(att);
+															}}><ActionIcon kind="copy" /></button
+														>
+														{#if att.kind === "image" && att.dataUrl}
+															<button
+																type="button"
+																class="sent-btn"
+																disabled={ocrBusyId === att.id}
+																onclick={(e) => {
+																	e.stopPropagation();
+																	void recognizeAttachment(att);
+																}}>{ocrBusyId === att.id ? "…" : "OCR"}</button
+															>
+														{/if}
+														<button
+															type="button"
+															class="sent-icobtn"
+															aria-label="Close preview"
+															title="Close preview"
+															onclick={() => toggleSentTag(msg, m.id)}
+															><ActionIcon kind="close" /></button
+														>
+													{/if}
+												</span>
+											</span>
+										</span>
 									{/if}
-									<span class="sent-foot">
-										<span class="sent-name">{m.name}</span>
-										<span class="sent-tok" title="{m.tokens} tokens">{formatTokenCount(m.tokens)}</span>
-										{#if att}
-											<button
-												type="button"
-												class="sent-icobtn"
-												aria-label="Copy attachment"
-												title="Copy attachment"
-												onclick={(e) => {
-													e.stopPropagation();
-													copyAttachment(att);
-												}}><ActionIcon kind="copy" /></button
-											>
-											{#if att.kind === "image" && att.dataUrl}
-												<button
-													type="button"
-													class="sent-btn"
-													disabled={ocrBusyId === att.id}
-													onclick={(e) => {
-														e.stopPropagation();
-														void recognizeAttachment(att);
-													}}>{ocrBusyId === att.id ? "…" : "OCR"}</button
-												>
-											{/if}
-										{/if}
-									</span>
 								</span>
 							{/each}
 							</div>
@@ -9741,15 +9783,18 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						>
 							<ActionIcon kind="copy" />
 						</button>
-						<button
-							type="button"
-							class="icon-btn"
-							data-tip="Branch from here"
-							aria-label="Branch from here"
-							onclick={() => branchFrom(chatState, i)}
-						>
-							<ActionIcon kind="branch" />
-						</button>
+						{#if msg.role !== "user"}
+							<!-- Assistant rows keep branch before audio. -->
+							<button
+								type="button"
+								class="icon-btn"
+								data-tip="Branch from here"
+								aria-label="Branch from here"
+								onclick={() => branchFrom(chatState, i)}
+							>
+								<ActionIcon kind="branch" />
+							</button>
+						{/if}
 						{#if msg.role !== "user"}
 							<button
 								type="button"
@@ -9777,8 +9822,18 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							<ActionIcon kind="speak" />
 						</button>
 						{#if msg.role === "user"}
-							<!-- Own messages: audio before delete (assistant
-							rows keep delete first). -->
+							<!-- Own messages: audio before branch before
+							delete (assistant rows keep branch, delete,
+							then audio). -->
+							<button
+								type="button"
+								class="icon-btn"
+								data-tip="Branch from here"
+								aria-label="Branch from here"
+								onclick={() => branchFrom(chatState, i)}
+							>
+								<ActionIcon kind="branch" />
+							</button>
 							<button
 								type="button"
 								class="icon-btn"
@@ -10951,24 +11006,29 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		gap: 0.25rem;
 		position: relative;
 	}
-	/* Hover tip: message counts under the row, inside the drawer
-	(the list scrolls, so nothing may stick out sideways). Inverted
-	pill voice, pointer-transparent so the preview and row buttons
-	never notice it. Scoped to the row button itself: hovering the
-	export/delete buttons must not summon it. */
+	/* Hover tip: message counts above the row, inside the drawer
+	(the list scrolls, so nothing may stick out sideways). Theme
+	surfaces with a hairline ring (never the inverted pill, which
+	reads as light-theme chrome in dark mode), pointer-transparent
+	so the preview and row buttons never notice it. Scoped to the
+	row button itself: hovering the export/delete buttons must not
+	summon it. Hover waits 3s before showing (a passing glance
+	shouldn't pop it); keyboard focus shows at once. */
 	.side-tip {
 		position: absolute;
-		top: calc(100% + 2px);
+		bottom: calc(100% + 2px);
 		left: 0;
 		z-index: 5;
 		max-width: 100%;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
-		background: #1c1c1e;
-		background: var(--invert);
-		color: #fff;
-		color: var(--invert-ink);
+		background: #fff;
+		background: var(--bg-raised);
+		color: #1c1c1e;
+		color: var(--ink);
+		border: 1px solid #e5e5ea;
+		border-color: var(--line-soft);
 		font-size: 0.72rem;
 		font-weight: 600;
 		border-radius: 6px;
@@ -10978,7 +11038,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		pointer-events: none;
 		transition: opacity 0.15s ease;
 	}
-	aside .side-chat:hover ~ .side-tip,
+	aside .side-chat:hover ~ .side-tip {
+		opacity: 1;
+		transition-delay: 3s;
+	}
 	aside .side-chat:focus-visible ~ .side-tip {
 		opacity: 1;
 	}
@@ -13073,38 +13136,51 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		.rendered, whose 0.92rem the buttons would otherwise miss). */
 		font-size: calc(0.92rem * var(--font-scale, 1));
 	}
-	/* Own messages pack to the right edge: the strip hugs it too. */
+	/* Own messages pack to the right edge: the strip hugs it too.
+	`safe` keeps the packing when the row fits while overflowing to
+	the reachable end when it doesn't (plain flex-end strands the
+	first tags off the unreachable start and starves scrollWidth). */
 	article.user .sent-tags {
-		justify-content: flex-end;
+		justify-content: safe flex-end;
 	}
 	/* Sent images ride in the text with the prose (below the body,
-	above the action row): an in-flow wrap of the same cards the
-	strip pops up, always expanded, never overlay. Own messages hug
-	the right edge like the strip. */
+	above the action row): collapsed fold tags that pop the same
+	overlay card the strip uses. Own messages hug the right edge
+	like the strip. */
 	.sent-inline {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 0.5rem;
 		margin: 0.5rem 0 0.15rem;
+		font-size: calc(0.92rem * var(--font-scale, 1));
 	}
 	article.user .sent-inline {
 		justify-content: flex-end;
 	}
-	.sent-inline .sent-inline-card {
-		flex: none;
-	}
-	/* Leftover-strip folds reuse the pasted-content look (the fold
-	stylesheet lives on the message body, outside this tree). */
-	.sent-tags .paste-fold {
+	/* Leftover-strip and inline-image folds reuse the pasted-content
+	look (the fold stylesheet lives on the message body, outside
+	this tree). */
+	.sent-tags .paste-fold,
+	.sent-inline .paste-fold {
 		flex: none;
 		font: inherit;
 		font-weight: 700;
-		color: #007aff;
-		color: var(--accent);
+		color: #1c1c1e;
+		color: var(--ink);
 		background: none;
 		border: 0;
 		padding: 0;
 		cursor: pointer;
+		/* Never wrap mid-tag: the strip scrolls sideways, and a
+		wrapped fold would defeat its overflow (many tags must
+		scroll, not cloud). Inline tags share the rule so both
+		fold kinds read as one line. */
+		white-space: nowrap;
+	}
+	:global(html[data-theme="dark"]) .sent-tags .paste-fold,
+	:global(html[data-theme="dark"]) .sent-inline .paste-fold {
+		color: #98989f;
+		color: var(--muted);
 	}
 	/* Expanded tag popup: overlay above the tag (below for strip
 	tags, which sit atop the message), so opening never moves message
@@ -14529,12 +14605,19 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		margin-top: 0.35rem;
 		transition: opacity 0.18s ease;
 	}
-	/* Desktop rows may outgrow the column at very large text sizes
-	(400%): wrap instead of clipping. Phones keep their own sideways
-	scroll treatment below, so this stays off the touch rules. */
+	/* Desktop rows scroll sideways inside themselves instead of
+	wrapping: aid labels (show original) can outgrow the message at
+	large text sizes, and a wrapped second line reads as a second
+	row. Matches the touch treatment below. */
 	.app:not([data-android]) .actions {
-		flex-wrap: wrap;
-		row-gap: 0.35rem;
+		flex-wrap: nowrap;
+		max-width: 100%;
+		overflow-x: auto;
+		overscroll-behavior-x: contain;
+		scrollbar-width: none;
+	}
+	.app:not([data-android]) .actions::-webkit-scrollbar {
+		display: none;
 	}
 	@media (hover: none) {
 		/* Aid labels (show original) can outgrow the message: the row
@@ -15394,7 +15477,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	:global(html[data-theme="dark"]) :global(.cm-attach-tag) {
 		color: #98989f !important;
 		font-weight: 700;
-		text-decoration: none;
+		text-decoration: none !important;
 	}
 	/* Centered reading column on wide screens (DeepSeek-web rhythm).
 	The cap rides --chat-width off .app (desktop slider, 36 = the default

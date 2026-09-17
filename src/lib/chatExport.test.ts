@@ -12,6 +12,21 @@ describe("chatToMarkdown", () => {
 		expect(chatToMarkdown({ messages: [] })).toBe("# Chat export\n\n(empty chat)\n");
 	});
 
+	it("strips stored image literals, leaving the attachment list", () => {
+		const md = chatToMarkdown({
+			messages: [
+				{
+					role: "user",
+					content: "look [Pasted image]",
+					attachments: [{ name: "solo.png" }]
+				}
+			]
+		});
+		expect(md).toContain("look\n");
+		expect(md).not.toContain("[Pasted image]");
+		expect(md).toContain("- Attachment: solo.png");
+	});
+
 	it("sections roles, trims trailing space, and lists attachments", () => {
 		const md = chatToMarkdown({
 			messages: [

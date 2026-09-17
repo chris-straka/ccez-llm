@@ -14,6 +14,7 @@ import {
 	offeredLocalAids,
 	hasPinyinTones,
 	ttsLangFor,
+	scriptRunKey,
 	speakWord,
 	vocalizeArabic,
 	buildVocalizeMessages,
@@ -189,6 +190,18 @@ describe("speech locales", () => {
 		expect(ttsLangFor("hello")).toBe("en-US");
 		expect(ttsLangFor("bonjour", "fr-FR")).toBe("fr-FR");
 		expect(ttsLangFor("verstehen", "de-DE")).toBe("de-DE");
+	});
+
+	it("keys script runs: latin, shared kana/Han, glued scriptless", () => {
+		expect(scriptRunKey("a")).toBe("latin");
+		expect(scriptRunKey("é")).toBe("latin");
+		expect(scriptRunKey("あ")).toBe("han");
+		expect(scriptRunKey("漢")).toBe("han");
+		expect(scriptRunKey("한")).toBe("ko-KR");
+		expect(scriptRunKey("б")).toBe("ru-RU");
+		expect(scriptRunKey(" ")).toBe("other");
+		expect(scriptRunKey("5")).toBe("other");
+		expect(scriptRunKey("。")).toBe("other");
 	});
 
 	it("reports unavailable synthesis without throwing", () => {

@@ -2,10 +2,11 @@ import { expect, test } from "@playwright/test";
 import { seedChat } from "./helpers";
 
 /**
- * Shortcuts-modal pile: the first entry names the modal toggle
- * ("Shortcuts show/hide" + middle-click), the list stays pithy
- * with no parentheticals, right-click speak is listed again,
- * and middle-click anywhere opens the modal.
+ * Shortcuts-modal pile: the list runs A-Z (first entry is
+ * "Branch from here"; the modal toggle "Shortcuts show/hide" +
+ * middle-click sits in place), stays pithy with no parentheticals,
+ * right-click speak is listed again, and middle-click anywhere
+ * opens the modal.
  */
 test.setTimeout(90_000);
 
@@ -25,12 +26,18 @@ async function openShortcuts(page): Promise<void> {
 	});
 }
 
-test("first entry toggles the modal; list is pithy with current keys", async ({ page }) => {
+test("list runs A-Z; modal toggle sits in place", async ({ page }) => {
 	await openShortcuts(page);
 	const keys = page.locator(".modal .keys");
-	// First entry owns the modal toggle.
-	expect(await keys.locator("div > dt").first().innerText()).toBe("Shortcuts show/hide");
-	await expect(keys.locator("div").first()).toContainText("middle-click");
+	// A-Z: "Branch from here" leads; the names read sorted.
+	const names = await keys.locator("div > dt").allInnerTexts();
+	const sorted = [...names].sort((a, b) =>
+		a.toLowerCase() < b.toLowerCase() ? -1 : a.toLowerCase() > b.toLowerCase() ? 1 : 0
+	);
+	expect(names).toEqual(sorted);
+	// The modal toggle still lists middle-click, in place.
+	const toggle = keys.locator("div", { hasText: "Shortcuts show/hide" });
+	await expect(toggle).toContainText("middle-click");
 	// Newer global keys are folded in.
 	for (const name of ["Scroll", "New chat", "Edit own message", "Summon / hide window", "Fold message by drag", "Switch chat by drag"]) {
 		await expect(keys.locator("div > dt", { hasText: name })).toBeVisible();

@@ -213,7 +213,7 @@ test("long paste collapses to a tag; Ctrl+O expands and re-collapses", async ({
 	}, pasted);
 	const marker = page.locator(".cm-paste-marker");
 	await expect(marker).toBeVisible();
-	await expect(marker).toContainText("Pasted content");
+	await expect(marker).toContainText("[Pasted");
 	// Bold body text, no own background: the tag is not a code block.
 	await expect(marker).toHaveCSS("font-weight", "700");
 	const box = await marker.evaluate((el) => {
@@ -308,8 +308,9 @@ test("expanded pasted content contracts from either blue bracket", async ({ page
 	await expect(body).toBeVisible({ timeout: 60_000 });
 	const marker = body.locator("button.paste-fold", { hasText: "[Pasted 4 chars]" });
 	await expect(marker).toBeVisible();
-	// Link voice, not heading: accent color carries the click affordance.
-	await expect(marker).toHaveCSS("font-weight", "400");
+	// Composer-tag voice (ink bold), not link blue: the tag reads as
+	// message text that happens to click. Collapse brackets keep blue.
+	await expect(marker).toHaveCSS("font-weight", "700");
 	await expect(body).not.toContainText("BBBB");
 	await marker.click();
 	await expect(body).toContainText("BBBB");
@@ -348,7 +349,9 @@ test("tray stays background-free under a solid prompt", async ({ page }) => {
 	expect(cardBg).toBe("rgb(238, 244, 255)");
 });
 
-/** One-pixel attachment seed (leftover-strip turns carry no literal). */
+/** Strip-turn seed: image attachments carry no literal (they ride the
+inline flow since sends store literals), so strip tests seed file
+attachments, which are the strip's only residents. */
 const PIXEL =
 	"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
@@ -418,7 +421,7 @@ test("leftover strip tag matches body size and hugs the own-message edge", async
 	// The strip sits outside .rendered, whose 0.92rem the fold buttons
 	// otherwise miss (they rendered at the 16px root size beside
 	// 14.72px body text); own-message strips pack right like the text.
-	await seedStripTurn(page, 1);
+	await seedStripTurn(page, 0, ["What do you see here?"]);
 	const article = page.locator("article.user").last();
 	const tag = article.locator(".sent-tags .paste-fold").first();
 	await expect(tag).toBeVisible({ timeout: 60_000 });
@@ -444,7 +447,7 @@ test("leftover strip tag matches body size and hugs the own-message edge", async
 });
 
 test("strip popup opens above the tag, centered on it", async ({ page }) => {
-	await seedStripTurn(page, 1);
+	await seedStripTurn(page, 0, ["What do you see here?"]);
 	const article = page.locator("article.user").last();
 	const tag = article.locator(".sent-tags .paste-fold").first();
 	await expect(tag).toBeVisible({ timeout: 60_000 });
@@ -470,9 +473,10 @@ test("strip popup opens above the tag, centered on it", async ({ page }) => {
 });
 
 test("preview cards hug their content", async ({ page }) => {
-	// Shrink-to-fit (capped), not one fixed width: a pixel thumbnail
+	// Shrink-to-fit (capped), not one fixed width: a short excerpt
 	// rides narrow while a long excerpt fills the cap.
-	await seedStripTurn(page, 1, [
+	await seedStripTurn(page, 0, [
+		"Tiny note.",
 		"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor. ".repeat(6)
 	]);
 	const article = page.locator("article.user").last();
@@ -519,7 +523,7 @@ test("one preview per message, contents centered", async ({ page }) => {
 	// Opening a second tag closes the first (stacked popups jar), and
 	// the uniform card centers its contents: no stranded wash on one
 	// side, footer riding the middle beneath the preview.
-	await seedStripTurn(page, 2);
+	await seedStripTurn(page, 0, ["alpha", "beta"]);
 	const article = page.locator("article.user").last();
 	const tags = article.locator(".sent-tags .paste-fold");
 	await expect(tags.first()).toBeVisible({ timeout: 60_000 });
@@ -934,8 +938,34 @@ test("cut pastes back previews when rich clipboard writes fail", async ({ page }
 	await expect(cards.nth(1).locator(".thumb img")).toBeVisible();
 });
 
-/** Sent images ride inline with the text: the user message shows the
-preview below its prose, never a strip tag above it. */
+/** Sent images ride the text flow as collapsed tags: the user message
+shows a [Pasted image] fold tag in its prose, never a strip tag above
+it and never a separate block below it; clicking the tag floats the
+preview card. */
+/** Enter with the caret after a tag sends: pasting long text (marker)
+then an image (tag) leaves the caret pasted against the tag, and
+Enter must send the turn — never drop a newline into the draft. */
+test("enter after a paste tag sends the message", async ({ page }) => {
+	const pasted = "lorem ipsum dolor sit amet ".repeat(20);
+	await page.locator(".cm-content").first().click();
+	await page.evaluate((text) => {
+		const target = document.querySelector(".cm-content");
+		if (!target) throw new Error("missing editor");
+		const transfer = new DataTransfer();
+		transfer.setData("text/plain", text);
+		const event = new ClipboardEvent("paste", { bubbles: true, cancelable: true });
+		Object.defineProperty(event, "clipboardData", { value: transfer });
+		target.dispatchEvent(event);
+	}, pasted);
+	await expect(page.locator(".cm-paste-marker")).toBeVisible();
+	await dropImage(page, "after-paste.png");
+	const tag = page.locator(".prompt").getByText("[Pasted image]", { exact: false });
+	await expect(tag).toBeVisible({ timeout: 15_000 });
+	await page.keyboard.press("Enter");
+	const user = page.locator("article.user").last();
+	await expect(user.locator(".rendered")).toContainText("lorem ipsum", { timeout: 15_000 });
+});
+
 test("sent images ride inline with the text", async ({ page }) => {
 	await dropImage(page, "first.png");
 	await page.locator(".prompt .cm-content").click();
@@ -943,8 +973,12 @@ test("sent images ride inline with the text", async ({ page }) => {
 	await page.keyboard.press("Enter");
 	const user = page.locator("article.user");
 	await expect(user.locator(".rendered")).toContainText("look at this", { timeout: 15_000 });
-	await expect(user.locator(".sent-inline img.sent-img")).toBeVisible({ timeout: 15_000 });
-	await expect(user.locator(".sent-inline .sent-name")).toContainText("first.png");
+	const tag = user.locator(".rendered .sent-fold");
+	await expect(tag).toContainText("[Pasted image]", { timeout: 15_000 });
+	await expect(user.locator(".rendered img.sent-img")).toHaveCount(0);
+	await tag.click();
+	await expect(user.locator(".rendered img.sent-img")).toBeVisible({ timeout: 15_000 });
+	await expect(user.locator(".rendered .sent-name")).toContainText("first.png");
 	// No strip for images: the above-message tags are files only.
 	await expect(user.locator(".sent-tags")).toHaveCount(0);
 });

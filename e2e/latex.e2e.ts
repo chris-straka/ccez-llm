@@ -58,13 +58,30 @@ test("body click selects without copying", async ({ page }) => {
 	expect(selected).not.toBe("");
 });
 
-/** Inline math renders bare with no chrome at all. */
-test("inline math renders with no chrome", async ({ page }) => {
+/** Inline math carries line-sized $ + copy chrome: $ flips to source,
+copy writes the TeX wrapped in single dollars. */
+test("inline math carries $ toggle and copy", async ({ page }) => {
 	const inline = page.locator(".ccez-math-inline").first();
 	await expect(inline).toBeVisible();
 	await expect(inline.locator(".ccez-math-head")).toHaveCount(0);
-	await expect(inline.locator("button")).toHaveCount(0);
 	expect(await inline.locator(".katex").count()).toBeGreaterThan(0);
+	const tex = inline.locator(".ccez-math-tex");
+	const copy = inline.locator(".ccez-math-copy");
+	await expect(tex).toBeVisible();
+	await expect(copy).toBeVisible();
+	await expect(inline.locator(".ccez-math-raw")).toBeHidden();
+	await tex.click();
+	await expect(inline.locator(".ccez-math-body")).toBeHidden();
+	const raw = inline.locator(".ccez-math-raw");
+	await expect(raw).toBeVisible();
+	await expect(raw).toContainText("n = 1");
+	await tex.click();
+	await expect(inline.locator(".ccez-math-body")).toBeVisible();
+	await page.evaluate(() => navigator.clipboard.writeText("SENTINEL"));
+	await copy.click();
+	await expect
+		.poll(() => page.evaluate(() => navigator.clipboard.readText()), { timeout: 10_000 })
+		.toContain("$n = 1");
 });
 
 /** Single-dollar inline math renders with KaTeX; prices stay plain text. */

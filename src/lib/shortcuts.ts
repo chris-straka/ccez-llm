@@ -6,6 +6,13 @@ export interface ShortcutRow {
 	keys: string;
 }
 
+/** Alphabetical by name (case-insensitive): the modal lists both menus A-Z. */
+function byName(a: ShortcutRow, b: ShortcutRow): number {
+	const x = a.name.toLowerCase();
+	const y = b.name.toLowerCase();
+	return x < y ? -1 : x > y ? 1 : 0;
+}
+
 /** Touch gestures list, data-driven so the modal filter can search it. */
 export function touchShortcuts(): ShortcutRow[] {
 	return [
@@ -21,7 +28,7 @@ export function touchShortcuts(): ShortcutRow[] {
 		{ name: "Annotate", keys: "Select text · Annotate" },
 		{ name: "Message buttons", keys: "Tap a message · double-tap jumps to its end" },
 		{ name: "Fold a message", keys: "Swipe left on it" }
-	];
+	].sort(byName);
 }
 
 /**
@@ -29,7 +36,8 @@ export function touchShortcuts(): ShortcutRow[] {
  * Modifier labels derive from isMac so the modal never drifts from the
  * keyboard router. Rows deliberately removed (New line, Stage message,
  * Scroll messages, Export chat, Translate selection) must stay out —
- * shortcuts.test.ts pins the full list.
+ * shortcuts.test.ts pins the full list. Returned A-Z (byName), so new
+ * rows land sorted without hand-placement.
  */
 export function desktopShortcuts(isMac: boolean): ShortcutRow[] {
 	const altm = altKeyLabel(isMac);
@@ -98,7 +106,7 @@ export function desktopShortcuts(isMac: boolean): ShortcutRow[] {
 		{ name: "prev/next stroke step", keys: "H / L with Inspect open" },
 		{ name: "Text size up / down", keys: `${mod}+ / ${mod}−` },
 		{ name: "Chat width + / −", keys: `⇧${mod}+ / ⇧${mod}−` }
-	];
+	].sort(byName);
 }
 
 /** Modal filter: matches action or keys, case-insensitive. */

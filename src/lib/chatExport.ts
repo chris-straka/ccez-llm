@@ -7,6 +7,8 @@
  * `downloadMarkdownFile` needs a live browser. User aborts propagate
  * — callers stay silent via `isPermissionDismissal` from `./intake`.
  */
+import { stripAttachmentMarkers } from "./attachments";
+
 /** Chat narrowed to what the exporter reads. */
 export interface ExportableMessage {
 	role: string;
@@ -33,7 +35,9 @@ export function chatToMarkdown(chat: ExportableChat): string {
 	chat.messages.forEach((message, index) => {
 		if (index > 0) lines.push("---", "");
 		lines.push(message.role === "assistant" ? "## Assistant" : "## You", "");
-		const text = message.content.replace(/\s+$/, "");
+		// Stored image literals are display tags; the attachment list
+		// below names the files, so the prose exports clean.
+		const text = stripAttachmentMarkers(message.content).replace(/\s+$/, "");
 		lines.push(text ? text : "(no text)", "");
 		for (const attachment of message.attachments ?? []) {
 			lines.push(`- Attachment: ${attachment.name}`);

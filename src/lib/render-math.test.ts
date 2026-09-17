@@ -57,13 +57,16 @@ describe("latex math", () => {
 		expect(html).not.toContain("ccez-code");
 	});
 
-	it("renders inline math bare, with no chrome at all", () => {
+	it("renders inline math with line-sized $ and copy chrome", () => {
 		const { html, maths } = renderMarkdown("slope \\(m = \\frac{a}{b}\\) here");
 		expect(maths).toHaveLength(1);
 		expect(maths[0]?.kind).toBe("inline");
 		expect(html).toContain("ccez-math-inline");
 		expect(html).not.toContain("ccez-math-head");
 		expect(html).not.toContain("data-math-action");
+		expect(html).toContain("ccez-math-tex");
+		expect(html).toContain("ccez-math-copy");
+		expect(html).toContain("ccez-math-raw");
 		expect(html).toContain("katex");
 	});
 
@@ -89,6 +92,10 @@ describe("latex math", () => {
 	it("previews plain text as the first line, as before", () => {
 		expect(foldPreviewText("hello world", null)).toBe("hello world");
 		expect(foldPreviewText(`${"a".repeat(200)}\nsecond`, null)).toBe(`${"a".repeat(140)}…`);
+		// Short first line, more below: the fold still reads truncated.
+		expect(foldPreviewText("Sure!\nA whole essay follows.", null)).toBe("Sure!…");
+		// Trailing blank lines are not "more".
+		expect(foldPreviewText("Done.\n\n", null)).toBe("Done.");
 	});
 
 	it("cuts long folded previews with an ellipsis in every script", () => {
@@ -152,12 +159,14 @@ describe("latex math", () => {
 		expect(html).not.toContain('data-math-index="2"');
 	});
 
-	it("renders single-dollar inline math bare like paren inline math", () => {
+	it("renders single-dollar inline math with chrome like paren inline math", () => {
 		const { html, maths } = renderMarkdown("slope $m = \\frac{a}{b}$ here");
 		expect(maths).toEqual([{ kind: "inline", tex: "m = \\frac{a}{b}", raw: "$m = \\frac{a}{b}$" }]);
 		expect(html).toContain("ccez-math-inline");
 		expect(html).not.toContain("ccez-math-head");
 		expect(html).not.toContain("data-math-action");
+		expect(html).toContain("ccez-math-tex");
+		expect(html).toContain("ccez-math-copy");
 		expect(html).toContain("katex");
 	});
 
@@ -202,5 +211,9 @@ describe("mathCopyText", () => {
 		expect(mathCopyText("x^2 + y^2")).toBe("$$x^2 + y^2$$");
 		expect(mathCopyText("\nx\n")).toBe("$$\nx\n$$");
 		expect(mathCopyText("")).toBe("$$$$");
+	});
+
+	it("wraps inline TeX in single dollars", () => {
+		expect(mathCopyText("x^2", "inline")).toBe("$x^2$");
 	});
 });

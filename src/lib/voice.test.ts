@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
 import {
+	splitScriptRuns,
 	splitSentences,
 	speechText,
 	latinFallback,
@@ -57,7 +58,7 @@ describe("speechText", () => {
 
 	it("names pasted content instead of reading markers", () => {
 		expect(speechText("[Pasted 250 chars]")).toBe("pasted content");
-		expect(speechText("[Pasted content 250 chars]")).toBe("pasted content");
+		expect(speechText("look [Pasted image]")).toBe("look pasted image");
 	});
 });
 
@@ -100,6 +101,22 @@ describe("speech unavailability", () => {
 	});
 });
 
+describe("splitScriptRuns", () => {
+	it("keeps single-script sentences whole", () => {
+		expect(splitScriptRuns("Hello world.")).toEqual(["Hello world."]);
+		expect(splitScriptRuns("日本語です。")).toEqual(["日本語です。"]);
+		expect(splitScriptRuns("...")).toEqual(["..."]);
+	});
+	it("breaks on script change, gluing spaces and digits", () => {
+		expect(splitScriptRuns("Hello世界")).toEqual(["Hello", "世界"]);
+		expect(splitScriptRuns("2024年 Report")).toEqual(["2024年", "Report"]);
+		expect(splitScriptRuns("aبc")).toEqual(["a", "ب", "c"]);
+	});
+	it("shares one run for kana and Han", () => {
+		expect(splitScriptRuns("漢字ひらがな")).toEqual(["漢字ひらがな"]);
+	});
+});
+
 describe("splitSpeechSegments", () => {
 	const langFor = (sentence: string): string => ttsLangFor(sentence, "en-US");
 	it("resolves a voice locale per sentence", () => {
@@ -111,6 +128,32 @@ describe("splitSpeechSegments", () => {
 	});
 	it("returns no segments for blank text", () => {
 		expect(splitSpeechSegments("   ", langFor)).toEqual([]);
+	});
+	it("splits same-sentence script runs with no break between halves", () => {
+		expect(splitSpeechSegments("Hello世界。", langFor)).toEqual([
+			{ text: "Hello", lang: "en-US" },
+			{ text: "世界。", lang: "zh-CN" }
+		]);
+	});
+	it("keeps same-locale runs one utterance with exact text", () => {
+		// ttsLangFor reads the Han fragment as Chinese, but the real
+		// callback (sentenceSpeechLang) inherits the fallback for
+		// unterminated fragments — pin both contracts.
+		expect(splitSpeechSegments("Hello世界", langFor)).toEqual([
+			{ text: "Hello", lang: "en-US" },
+			{ text: "世界", lang: "zh-CN" }
+		]);
+		expect(
+			splitSpeechSegments("Hello世界", (s) => sentenceSpeechLang(s, "en-US"))
+		).toEqual([{ text: "Hello世界", lang: "en-US" }]);
+		expect(
+			splitSpeechSegments("Hello世界。Goodbye宇宙。", (s) => sentenceSpeechLang(s, "en-US"))
+		).toEqual([
+			{ text: "Hello", lang: "en-US" },
+			{ text: "世界。", lang: "zh-CN" },
+			{ text: "Goodbye", lang: "en-US" },
+			{ text: "宇宙。", lang: "zh-CN" }
+		]);
 	});
 });
 

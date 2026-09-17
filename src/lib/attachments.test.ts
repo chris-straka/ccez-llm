@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
 	ATTACH_TAG_RE,
+	appendImageMarkers,
 	FILE_MARKER,
 	IMAGE_MARKER,
 	IMAGE_MAX_DIM,
@@ -97,6 +98,27 @@ describe("attachment markers", () => {
 		expect(fileMarkerInsert("hello")).toBe(`\n${FILE_MARKER} `);
 		expect(fileMarkerInsert("hello\n")).toBe(`${FILE_MARKER} `);
 		expect(fileMarkerInsert(`${IMAGE_MARKER} `)).toBe(`${FILE_MARKER} `);
+	});
+
+	it("appends one image literal per image attachment for sent text", () => {
+		expect(appendImageMarkers("look", 0)).toBe("look");
+		expect(appendImageMarkers("", 0)).toBe("");
+		expect(appendImageMarkers("", 1)).toBe(`${IMAGE_MARKER}`);
+		expect(appendImageMarkers("look", 1)).toBe(`look ${IMAGE_MARKER}`);
+		expect(appendImageMarkers("look", 2)).toBe(`look ${IMAGE_MARKER} ${IMAGE_MARKER}`);
+	});
+
+	it("rides the paste's line one space apart right after a collapsed paste", () => {
+		// Same line, single-space separation, caret after the space.
+		expect(imageMarkerInsert("pasted words", true)).toBe(` ${IMAGE_MARKER} `);
+		expect(fileMarkerInsert("pasted words", true)).toBe(` ${FILE_MARKER} `);
+		// Already spaced: no doubling.
+		expect(imageMarkerInsert("pasted words ", true)).toBe(`${IMAGE_MARKER} `);
+		// Elsewhere the usual prefix applies even with the flag set.
+		expect(imageMarkerInsert("", true)).toBe(`${IMAGE_MARKER} `);
+		expect(imageMarkerInsert("draft\n", true)).toBe(`${IMAGE_MARKER} `);
+		// Without the flag prose still breaks its own line.
+		expect(imageMarkerInsert("pasted words", false)).toBe(`\n${IMAGE_MARKER} `);
 	});
 
 	it("compacts token counts past four figures", () => {

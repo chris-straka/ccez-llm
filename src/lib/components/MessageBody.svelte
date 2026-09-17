@@ -474,7 +474,7 @@
 			if (closestFromTarget(event.target, ".ccez-math-copy")) {
 				if (!navigator.clipboard) onToast?.("Couldn't copy to the clipboard.");
 				else
-					void navigator.clipboard.writeText(mathCopyText(entry.tex)).then(
+					void navigator.clipboard.writeText(mathCopyText(entry.tex, entry.kind)).then(
 						() => onToast?.("Copied"),
 						() => onToast?.("Couldn't copy to the clipboard.")
 					);
@@ -489,9 +489,8 @@
 			}
 			// Bodies never copy: rendered and raw TeX are plain
 			// I-beam selection surfaces (annotatable like any text),
-			// and the copy icon is the only clipboard path. Inline
-			// math stays bare and copies nothing (its TeX is one
-			// message-copy away).
+			// and the copy icon is the only clipboard path (inline
+			// wraps `$`, display `$$`).
 			return;
 		}
 		// Headless code chrome: the pre is a native selection surface,
@@ -622,25 +621,35 @@
 		text-overflow: ellipsis;
 		cursor: pointer;
 	}
-	/* Injected paste-fold marker (sanitized HTML): inline text in accent
-	blue, never a pill — it reads like a link because it acts like one
-	(clicks to expand). Bold at body size shouted like a heading. */
+	/* Injected paste-fold marker (sanitized HTML): the composer's tag
+	look (body ink bold on light, muted bold on dark), never a pill
+	and never link blue — it reads as message text that happens to
+	click. Collapse brackets keep their blue (they frame expanded
+	text, a different signal). */
 	.rendered :global(button.paste-fold) {
 		font: inherit;
-		font-weight: 400;
-		color: #007aff;
-		color: var(--accent);
+		font-weight: 700;
+		color: #1c1c1e;
+		color: var(--ink);
 		background: none;
 		border: 0;
 		padding: 0;
 		cursor: pointer;
 	}
+	:global(html[data-theme="dark"]) .rendered :global(button.paste-fold:not(.paste-fold-bracket)) {
+		color: #98989f;
+		color: var(--muted);
+	}
 	/* Collapse brackets ride a hair high: the tall bracket glyphs
 	otherwise sit bottom-heavy beside x-height text. em-based, so
-	font scaling carries the nudge. */
+	font scaling carries the nudge. Blue stays: brackets frame
+	expanded text, unlike the collapsed tags above. */
 	.rendered :global(button.paste-fold-bracket) {
 		position: relative;
 		top: -0.07em;
+		font-weight: 400;
+		color: #007aff;
+		color: var(--accent);
 	}
 	/* Aid swaps fade the incoming body in, and fresh readings fade in
 	where they land: the model key remounts on tashkeel flips, while
@@ -1110,6 +1119,44 @@
 		background: none;
 		overflow: visible;
 		cursor: text;
+	}
+	/* Inline chrome rides the line: static pair after the equation
+	(no absolute top bar mid-sentence), cap-height so the row keeps
+	its rhythm. Same muted voice as the block pair, same no-select
+	and hover-ink treatment above. */
+	.rendered :global(.ccez-math-inline .ccez-math-copy),
+	.rendered :global(.ccez-math-inline .ccez-math-tex) {
+		position: static;
+		height: 1em;
+		width: 1em;
+		padding: 0 0.1em;
+		margin-left: 0.25em;
+		line-height: 1;
+		vertical-align: baseline;
+	}
+	.rendered :global(.ccez-math-inline .ccez-math-copy .action-glyph) {
+		height: 0.85em;
+		width: 0.85em;
+	}
+	.rendered :global(.ccez-math-inline .ccez-math-tex) {
+		font-size: 0.85em;
+	}
+	/* Inline raw source: hidden until `$` flips it, then monospace
+	in place of the rendered equation (no block padding mid-line). */
+	.rendered :global(.ccez-math-inline .ccez-math-raw) {
+		display: none;
+		padding: 0;
+		margin: 0;
+		background: none;
+		font-size: 0.85em;
+		white-space: normal;
+		word-break: break-word;
+	}
+	.rendered :global(.ccez-math-inline[data-math-raw="1"] .ccez-math-body) {
+		display: none;
+	}
+	.rendered :global(.ccez-math-inline[data-math-raw="1"] .ccez-math-raw) {
+		display: inline;
 	}
 	/* KaTeX inherits the theme ink and is never colorized: a second
 	math palette would fight the theme and hurt readability, so

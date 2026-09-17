@@ -755,3 +755,38 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
       + live e2e (canvas text inserts; textless image reports the miss)
       green. No bundled `tesseract` package needed on this path — the
       npm WASM build is the engine (on-device, no server, no fees).
+
+## Post-v0.4.4 batch (Sep 17, main)
+- [x] Same-sentence mixed-language speech: `splitScriptRuns` groups
+      maximal script runs (Latin breaks, kana+Han share, scriptless
+      glues on), `splitSpeechSegments` splits sentences whose runs
+      resolve differently (single-locale sentences byte-identical).
+      Both TTS engines ride it with no caller changes. Unit
+      (voice/reading) green.
+- [x] Stale `theme-visual` paint expectations refreshed to the UI truth:
+      own-bubble default off, focused-drawn-cursor caret (CM pins the
+      native caret transparent), hover-mode selected ring on the text
+      body, inert composer thumb, inline sent-image tags. Full file
+      green (36 tests).
+- [x] `bun run check` skew fixed: `package.json` overrides pin single
+      `@codemirror/state`/`view` copies; clean reinstall from the
+      frozen lock. `check` 0 errors (was 8 environmental).
+- [x] Shortcuts + gestures menus A-Z (runtime `byName` sort, pinned
+      unit + e2e order).
+- [x] Sidebar hover tip: 3s hover delay, theme surfaces, you/AI split,
+      floats above the row. Pre-existing stale preview test refreshed
+      to the inert-row contract (fails on pristine HEAD as count-0).
+- [x] Own-message actions: audio before branch (assistant rows
+      unchanged); desktop action rows scroll sideways instead of
+      wrapping; Cmd+wheel font steps toast via `adjustFontScale`.
+- [x] Composer tags: `[Pasted N chars]` label, attach-tag underline
+      killed (`!important` over tok-link), image tags ride the paste's
+      line one space apart (`selectionHead` + `afterPaste` prefix).
+- [x] Sent tags read as message text: sends/edits/stages store image
+      literals (inline render path, old literal-less turns still via
+      leftovers), API/voice/export strip at the boundary; collapsed
+      tags wear the composer look (ink/muted bold, blue brackets stay).
+- [x] Strip repairs found en route: folds `nowrap`, `safe flex-end`
+      packing (first tags were unreachable + starved scrollWidth).
+- [x] Folded multi-line previews earn `…`; inline LaTeX gains line-sized
+      `$` + copy (`$tex$` delimiters).

@@ -256,8 +256,13 @@ export function foldPreviewText(content: string, override: string | null): strin
 	const tex = mathPreviewInner(lines);
 	if (tex !== null) return `\\(${mathTexPreview(tex, 120)}\\)`;
 	// Long first lines cut with the ellipsis marker (never a silent
-	// crop): length reads bounded in every script.
-	return cutPreview(lines[0] ?? "", 140);
+	// crop): length reads bounded in every script. A short first line
+	// with more below still earns the marker — otherwise a folded
+	// multi-line message reads complete when it is not.
+	const first = lines[0] ?? "";
+	const cut = cutPreview(first, 140);
+	if (cut === first && lines.slice(1).join("\n").trim() !== "") return `${first}…`;
+	return cut;
 }
 
 /**
@@ -270,12 +275,12 @@ export function foldedCodeLabel(lang: string, loc: number): string {
 }
 
 /**
- * Clipboard text for a math block: the TeX wrapped in its `$$` display
- * delimiters, so a paste recompiles to the same equation. Pure and
- * unit-tested.
+ * Clipboard text for a math run: the TeX wrapped in its own
+ * delimiters (`$$` display, `$` inline), so a paste recompiles to the
+ * same equation. Pure and unit-tested.
  */
-export function mathCopyText(tex: string): string {
-	return `$$${tex}$$`;
+export function mathCopyText(tex: string, kind: "display" | "inline" = "display"): string {
+	return kind === "inline" ? `$${tex}$` : `$$${tex}$$`;
 }
 
 /** Outer `$$…$$` delimiters off a fenced-latex body, when present. */
@@ -330,13 +335,13 @@ export function mathHtml(entry: MathEntry, index: number): string {
 	// `data-folded`, wired elsewhere). Chrome never sizes off the
 	// equation's width, so buttons sit still across renders. A body
 	// click still copies the TeX with its `$$` delimiters (see
-	// mathCopyText). Inline math renders bare (no chrome at all): a bar
-	// mid-sentence would break the line's rhythm, and its TeX stays one
-	// message-copy away. `.ccez-math-body` and `data-math-index` are the
-	// annotation contract (see equationBodyOf) and stay put. KaTeX is
-	// never colorized here — it inherits the theme ink, which keeps
-	// equations readable in both themes without a second palette to
-	// maintain.
+	// mathCopyText). Inline math carries the same `$`/copy pair,
+	// sized to the line so the sentence keeps its rhythm (its copy
+	// wraps `$` delimiters, not `$$`). `.ccez-math-body` and
+	// `data-math-index` are the annotation contract (see
+	// equationBodyOf) and stay put. KaTeX is never colorized here —
+	// it inherits the theme ink, which keeps equations readable in
+	// both themes without a second palette to maintain.
 	if (entry.kind === "display") {
 		const loc = entry.raw.split("\n").length;
 		return (
@@ -352,6 +357,11 @@ export function mathHtml(entry: MathEntry, index: number): string {
 	}
 	return (
 		`<span class="ccez-math-inline" data-math-index="${index}">` +
-		`<span class="ccez-math-body">${inner}</span></span>`
+		`<span class="ccez-math-body">${inner}</span>` +
+		`<button type="button" class="ccez-math-tex" ` +
+		`aria-label="Show math source" title="Show source">$</button>` +
+		`<button type="button" class="ccez-math-copy" ` +
+		`aria-label="Copy equation" title="Copy">${CODE_COPY_GLYPH}</button>` +
+		`<span class="ccez-math-raw">${escapeHtml(entry.raw)}</span></span>`
 	);
 }

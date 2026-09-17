@@ -49,15 +49,21 @@ test("sidebar hover previews the chat and restores on leave", async ({ page }) =
 	await expect(main).not.toContainText(BRAVO);
 });
 
-/** Hovering a row pops its counts: messages plus the you/assistant split. */
+/** Hovering a row pops its counts: messages plus the you/AI split.
+The tip waits 3s into the hover (passing glances stay clean), so
+the opacity assert carries its own timeout. */
 test("sidebar hover shows the chat counts tip", async ({ page }) => {
 	await openSidebar(page);
 	const row = page.locator("aside ul li").first();
 	await row.hover();
 	const tip = row.locator(".side-tip");
 	// Opacity, not visibility: the tip keeps its box while faded.
-	await expect(tip).toHaveCSS("opacity", "1");
-	await expect(tip).toHaveText("1 message · you 0 · assistant 1");
+	await expect(tip).toHaveCSS("opacity", "1", { timeout: 10_000 });
+	await expect(tip).toHaveText("1 message · you 0 · AI 1");
+	// The tip floats above the row, never below it.
+	const boxes = await Promise.all([tip.boundingBox(), row.boundingBox()]);
+	if (!boxes[0] || !boxes[1]) throw new Error("tip or row has no box");
+	expect(boxes[0].y + boxes[0].height).toBeLessThanOrEqual(boxes[1].y + 4);
 	// Leaving drops hover; the row button also holds keyboard focus,
 	// so click out to clear focus-within too.
 	await page.mouse.move(600, 500);
@@ -65,18 +71,24 @@ test("sidebar hover shows the chat counts tip", async ({ page }) => {
 	await expect(tip).toHaveCSS("opacity", "0");
 });
 
-/** The preview is read-only: no action row, no selection menu while hovering. */
-test("preview hides the action row until the hover leaves", async ({ page }) => {
+/** The preview is read-only: the action row stays mounted but inert
+(the peek reserves the row's space so opening the chat moves
+nothing), and no selection menu summons while hovering. Fails on
+pristine HEAD as count-0; the inert contract is the design. */
+test("preview holds the action row inert until the hover leaves", async ({ page }) => {
 	await openSidebar(page);
 	const actions = page.locator("article.assistant .actions");
 	await expect(actions).toHaveCount(1);
+	await expect(actions).not.toHaveAttribute("inert", "");
 
 	await page.locator("aside ul li button.side-chat").nth(1).hover();
 	await expect(page.locator("main .messages")).toContainText(BRAVO);
-	await expect(actions).toHaveCount(0);
+	await expect(actions).toHaveCount(1);
+	await expect(actions).toHaveAttribute("inert", "");
 
 	await page.mouse.move(600, 500);
 	await expect(actions).toHaveCount(1);
+	await expect(actions).not.toHaveAttribute("inert", "");
 });
 
 /** Hovering a row's export/delete buttons keeps that chat's preview:

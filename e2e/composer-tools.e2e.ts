@@ -232,7 +232,7 @@ async function dropImage(page: Page): Promise<void> {
 	});
 }
 
-test("send clears pills and files a tag above the message", async ({ page }) => {
+test("send clears pills and files an inline tag in the message", async ({ page }) => {
 	await dropImage(page);
 	const card = page.locator(".attachments li.card");
 	await expect(card).toBeVisible({ timeout: 15_000 });
@@ -245,17 +245,17 @@ test("send clears pills and files a tag above the message", async ({ page }) => 
 	await page.keyboard.press("Enter");
 	// Pills empty with the prompt at send time…
 	await expect(page.locator(".attachments")).toHaveCount(0);
-	// …and the sent turn carries one tag above its text (send strips
-	// the literal): a body-size blue fold button like pasted content.
-	const tag = page.locator("article.user .sent-tags .sent-fold").last();
+	// …and the sent turn carries the tag in its text flow (sends store
+	// the literal): a body-size ink fold button like the composer tag.
+	const tag = page.locator("article.user .rendered .sent-fold").last();
 	await expect(tag).toContainText("[Pasted image]", { timeout: 30_000 });
-	// Clicking floats the composer-pill popup below the tag (image,
-	// name, compact tokens, copy icon, OCR, X) without moving any
-	// message content.
+	// Clicking floats the preview popup above the tag (image, name,
+	// compact tokens, copy icon, OCR, X) without moving any message
+	// content.
 	const article = page.locator("article.user").last();
 	const before = await article.boundingBox();
 	await tag.click();
-	const popup = page.locator("article.user .sent-tags .sent-open").last();
+	const popup = page.locator("article.user .rendered .sent-open").last();
 	await expect(popup).toBeVisible();
 	await expect(popup.locator(".sent-img")).toBeVisible();
 	await expect(popup).toContainText("blue.png");
@@ -267,7 +267,7 @@ test("send clears pills and files a tag above the message", async ({ page }) => 
 	// covers sub-pixel line-box noise, not content reflow).
 	const after = await article.boundingBox();
 	expect(Math.abs((after?.height ?? 0) - (before?.height ?? 0))).toBeLessThanOrEqual(1);
-	// Below the tag (strip tags sit atop the message), above the
+	// Above the tag (inline tags carry text above them), above the
 	// messages but under the floating composer in z.
 	const boxes = await popup.evaluate((el) => {
 		const tagEl = el.closest(".sent-wrap")?.querySelector(".sent-fold");
@@ -276,13 +276,13 @@ test("send clears pills and files a tag above the message", async ({ page }) => 
 		const t = tagEl?.getBoundingClientRect();
 		if (!t || !prompt) throw new Error("missing tag or prompt");
 		return {
-			popupTop: r.y,
-			tagBottom: t.y + t.height,
+			popupBottom: r.y + r.height,
+			tagTop: t.y,
 			popupZ: getComputedStyle(el).zIndex,
 			promptZ: getComputedStyle(prompt).zIndex
 		};
 	});
-	expect(boxes.popupTop).toBeGreaterThanOrEqual(boxes.tagBottom - 1);
+	expect(boxes.popupBottom).toBeLessThanOrEqual(boxes.tagTop + 1);
 	expect(Number(boxes.popupZ)).toBeLessThan(Number(boxes.promptZ));
 	// X closes; clicking away closes; the message actions never open.
 	await popup.locator('button[aria-label="Close preview"]').click();
@@ -378,35 +378,35 @@ test("a stored literal renders inline at body size with no duplicate", async ({ 
 });
 
 test("sent turns with many attachments scroll their tags", async ({ page }) => {
-	// Fourteen files ride one stripped turn, far more than fit, so
-	// the tag row scrolls sideways instead of stretching the message.
+	// Fourteen files ride one stripped turn, far more than fit, so the
+	// file-tag row scrolls sideways instead of stretching the message;
+	// the image rides the inline flow (sends store its literal).
 	const pixel =
 		"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
-	const attachments = Array.from({ length: 14 }, (_, n) =>
-		n % 2 === 0
-			? {
-					id: `e2e-img-${n}`,
-					name: `shot-${n}.png`,
-					mime: "image/png",
-					kind: "image",
-					dataUrl: pixel,
-					text: null,
-					width: 1,
-					height: 1,
-					tokens: 85
-				}
-			: {
-					id: `e2e-file-${n}`,
-					name: `notes-${n}.md`,
-					mime: "text/markdown",
-					kind: "text",
-					dataUrl: null,
-					text: `# notes ${n}`,
-					width: null,
-					height: null,
-					tokens: 8
-				}
-	);
+	const attachments = [
+		{
+			id: "e2e-img-0",
+			name: "shot-0.png",
+			mime: "image/png",
+			kind: "image",
+			dataUrl: pixel,
+			text: null,
+			width: 1,
+			height: 1,
+			tokens: 85
+		},
+		...Array.from({ length: 14 }, (_, n) => ({
+			id: `e2e-file-${n}`,
+			name: `notes-${n}.md`,
+			mime: "text/markdown",
+			kind: "text",
+			dataUrl: null,
+			text: `# notes ${n}`,
+			width: null,
+			height: null,
+			tokens: 8
+		}))
+	];
 	await page.addInitScript((atts) => {
 		window.localStorage.setItem(
 			"ccez-llm-chats-v1",
@@ -433,17 +433,27 @@ test("sent turns with many attachments scroll their tags", async ({ page }) => {
 	await page.reload();
 	const strip = page.locator("article.user .sent-tags").first();
 	await expect(strip).toBeVisible({ timeout: 60_000 });
-	await expect(page.locator("article.user .sent-fold")).toHaveCount(14);
-	// Image tags float thumbnails, file tags float excerpts (tags stay
-	// mounted beside their popups, so indices hold while open).
-	const folds = page.locator("article.user .sent-fold");
-	await folds.nth(0).click();
+	// Fourteen file folds in the strip plus the image fold inline (tags
+	// stay mounted beside their popups, so indices hold while open).
+	await expect(page.locator("article.user .sent-fold")).toHaveCount(15);
+	await page.locator("article.user .sent-inline .sent-fold").first().click();
 	await expect(page.locator("article.user .sent-open .sent-img").first()).toBeVisible();
-	await folds.nth(1).click();
+	// Close the image popup before reaching into the scrolled strip:
+	// the overlay floats over the message and can cover the scrolled
+	// row's folds.
+	await page.keyboard.press("Escape");
+	const folds = page.locator("article.user .sent-tags .sent-fold");
+	// The strip scrolls sideways, and the runner's auto-scroll cannot
+	// reach folds parked outside the viewport: click by dispatch
+	// (the popup behavior below is the subject, not click mechanics).
+	await folds.nth(1).evaluate((el) => (el as HTMLElement).click());
 	const excerpt = page.locator("article.user .sent-open .sent-excerpt").first();
 	await expect(excerpt).toBeVisible();
 	await expect(excerpt).toContainText("# notes 1");
-	// The strip scrolls: content wider than its box.
+	// The strip scrolls: content wider than its box. Measure with
+	// popups closed (an open popup flips the strip to visible
+	// overflow, which reads zero by construction).
+	await page.keyboard.press("Escape");
 	const overflow = await strip.evaluate((el) => el.scrollWidth - el.clientWidth);
 	expect(overflow).toBeGreaterThan(0);
 });

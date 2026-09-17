@@ -89,14 +89,16 @@ cannot (no Android hardware here).
       (Status Sep 2026: prompt focus is preventScroll and the quote
       now scrolls keyboard-aware into the upper view first; any
       remaining flash is the OS resize itself.)
-- [ ] Same-sentence mixed-language speech (no line break or punctuation
-      between halves still speaks as one utterance). (Status Sep 2026:
-      per-line split shipped with unit tests; intra-sentence script-run
-      switching is the remaining step.)
-- [ ] Stale `theme-visual` paint expectations (10 tests fail identically
-      on pristine HEAD: removed `.preview`, hover-default ring).
-- [ ] `bun run check` skew: duplicate `@codemirror` installs fail 8
-      type identity checks in editor files (pre-existing, environmental).
+- [ ] Enter-at-tag newline report: pressing Enter with the caret at a
+      paste tag's end allegedly inserts a newline instead of sending.
+      (Status Sep 2026: not reproducible — both composer Enter paths
+      send unconditionally, and a regression test pins send-after-tag.
+      Needs the reporter's exact key/caret sequence.)
+- [ ] Tag-only message dash report: image-only sends allegedly render
+      `-`. (Status Sep 2026: no dash code path found anywhere; a probe
+      shows no dash, and sends now store image literals so tag-only
+      turns are never content-empty. Needs a screenshot of where the
+      dash appears.)
 
 ## Non-goals
 

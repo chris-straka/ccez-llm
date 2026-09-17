@@ -209,6 +209,19 @@ export function removeTags(line: string): {
 }
 
 /**
+ * Sent-message image literals: one `[Pasted image]` per image
+ * attachment, appended in attachment order so the render pairs them
+ * back (Nth of a kind to Nth of a kind). The tag rides the text flow
+ * — part of the message, never a separate block — while the stored
+ * attachments still carry the bytes. Pure and unit-tested.
+ */
+export function appendImageMarkers(text: string, imageCount: number): string {
+	if (imageCount <= 0) return text;
+	const tags = Array.from({ length: imageCount }, () => IMAGE_MARKER).join(" ");
+	return text === "" ? tags : `${text} ${tags}`;
+}
+
+/**
  * Drop attachment marker tags; the files travel as attachments. A host
  * line left blank by the removal drops, while the user's own blank
  * lines stay put.
@@ -231,9 +244,12 @@ export function stripAttachmentMarkers(text: string): string {
  * starts a fresh line so typed text never glues onto the tag. Pure and
  * unit-tested.
  */
-function markerPrefix(doc: string): string {
+function markerPrefix(doc: string, afterPaste = false): string {
 	if (doc === "" || doc.endsWith("\n")) return "";
 	if (doc.endsWith(`${IMAGE_MARKER} `) || doc.endsWith(`${FILE_MARKER} `)) return "";
+	// Right after a collapsed paste: the tag rides the same line, one
+	// space apart (never a newline of its own).
+	if (afterPaste) return doc.endsWith(" ") ? "" : " ";
 	return "\n";
 }
 
@@ -244,16 +260,16 @@ function markerPrefix(doc: string): string {
  * match the tag text itself (never the whole line), so typing beside it
  * neither absorbs it nor detaches the pill. Pure and unit-tested.
  */
-export function imageMarkerInsert(doc: string): string {
-	return `${markerPrefix(doc)}${IMAGE_MARKER} `;
+export function imageMarkerInsert(doc: string, afterPaste = false): string {
+	return `${markerPrefix(doc, afterPaste)}${IMAGE_MARKER} `;
 }
 
 /**
  * Composer insertion for a newly attached file: same contract as the
  * image tag (same line, one trailing space, caret after it).
  */
-export function fileMarkerInsert(doc: string): string {
-	return `${markerPrefix(doc)}${FILE_MARKER} `;
+export function fileMarkerInsert(doc: string, afterPaste = false): string {
+	return `${markerPrefix(doc, afterPaste)}${FILE_MARKER} `;
 }
 
 /**
