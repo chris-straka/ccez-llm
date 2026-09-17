@@ -2,6 +2,9 @@ import {
 	PASTE_THRESHOLD,
 	dataUrlsToImageFiles,
 	expandDeletionUnits,
+	markerCut,
+	markerCutAt,
+	pastedCutAt,
 	removedMarkerIndexes,
 	tagCopyIndexes,
 	tagCopyPlan,
@@ -11,13 +14,7 @@ import {
 } from "./editorPaste";
 import { attachEditContext, shouldDeferForComposition } from "./editContext";
 import { fenceAtOffset, parseFences, shiftEnterAction } from "./fences";
-import {
-	blobToDataUrl,
-	clipboardPngBlob,
-	removeMarker,
-	removeMarkerAt,
-	removePastedAt
-} from "./attachments";
+import { blobToDataUrl, clipboardPngBlob } from "./attachments";
 import { escapeHtml } from "./render";
 
 /**
@@ -180,6 +177,30 @@ export function createTextareaEditor(
 	 * selection otherwise). A canceled beforeinput leaves no input
 	 * behind — the next keydown clears the stale snapshot first.
 	 */
+	/**
+	 * Undo-safe replacement for tag edits: the editing engine's own
+	 * delete/insert joins the native undo stack (Cmd+Z restores the
+	 * tag), while value writes — and, in practice, setRangeText —
+	 * break it. The nested input event owns notify/autogrow from
+	 * there; where no editing engine exists (jsdom tests) it falls
+	 * back to setRangeText with the manual notify. True when the
+	 * engine ran.
+	 */
+	function undoableReplace(from: number, to: number, insert: string): boolean {
+		if (typeof document.execCommand !== "function") return false;
+		ta.setSelectionRange(from, to);
+		try {
+			if (insert === "") {
+				if (!document.execCommand("delete")) return false;
+			} else if (!document.execCommand("insertText", false, insert)) {
+				return false;
+			}
+		} catch {
+			return false;
+		}
+		return true;
+	}
+
 	let pendingDelete: {
 		before: string;
 		ranges: { from: number; to: number }[];
@@ -223,21 +244,30 @@ export function createTextareaEditor(
 		if (grown) {
 			event.preventDefault();
 			const ordered = [...expanded].sort((a, b) => b.from - a.from);
-			let next = before;
+			let engine = true;
 			for (const range of ordered) {
-				next = next.slice(0, range.from) + next.slice(range.to);
+				// One undo step per range; the nested input events
+				// own autogrow + the change report from here.
+				engine = undoableReplace(range.from, range.to, "") && engine;
 			}
-			ta.value = next;
-			const caret = expanded[0]?.from ?? 0;
-			ta.setSelectionRange(caret, caret);
-			autogrow();
-			let removed: RemovedMarkerTags | undefined;
-			try {
-				removed = removedMarkerIndexes(before, expanded);
-			} catch {
-				removed = undefined;
+			if (!engine) {
+				for (const range of ordered) {
+					ta.setRangeText("", range.from, range.to, "end");
+				}
+				const caret = expanded[0]?.from ?? 0;
+				ta.setSelectionRange(caret, caret);
+				autogrow();
+				let removed: RemovedMarkerTags | undefined;
+				try {
+					removed = removedMarkerIndexes(before, expanded);
+				} catch {
+					removed = undefined;
+				}
+				options.onDocChange?.(ta.value, removed);
+			} else {
+				const caret = expanded[0]?.from ?? 0;
+				ta.setSelectionRange(caret, caret);
 			}
-			options.onDocChange?.(ta.value, removed);
 			return;
 		}
 		pendingDelete = { before, ranges };
@@ -502,10 +532,11 @@ export function createTextareaEditor(
 		event.preventDefault();
 		const start = ta.selectionStart ?? ta.value.length;
 		const end = ta.selectionEnd ?? ta.value.length;
-		ta.value = ta.value.slice(0, start) + text + ta.value.slice(end);
-		const caret = start + text.length;
-		ta.setSelectionRange(caret, caret);
-		notify();
+		if (!undoableReplace(start, end, text)) {
+			ta.setRangeText(text, start, end, "end");
+			notify();
+		}
+		// Engine path: the nested input event owns notify/autogrow.
 	};
 
 	ta.addEventListener("input", onInput);
@@ -525,30 +556,39 @@ export function createTextareaEditor(
 		selectionHead: () => ta.selectionStart ?? ta.value.length,
 		// No tags to toggle: Ctrl+O falls through to the thoughts toggle.
 		togglePastes: () => false,
-		// No collapsing here either: the plain rewrite loses nothing.
+		// A pill drops its tag through the same cut the pure helpers
+		// apply (parity-tested), through the editing engine so Cmd+Z
+		// restores it; tag→pill still reconciles newest-first (the
+		// input event carries no change ranges).
 		exciseMarker: (marker: string) => {
-			const next = removeMarker(ta.value, marker);
-			if (next === ta.value) return false;
-			ta.value = next;
-			notify();
+			const cut = markerCut(ta.value, marker);
+			if (!cut) return false;
+			if (!undoableReplace(cut.from, cut.to, cut.insert)) {
+				ta.setRangeText(cut.insert, cut.from, cut.to, "end");
+				notify();
+			}
 			return true;
 		},
 		// Indexed cut (a pill drops its own tag); tag→pill still
 		// reconciles newest-first (the input event carries no change
 		// ranges).
 		exciseMarkerAt: (marker: string, index: number) => {
-			const next = removeMarkerAt(ta.value, marker, index);
-			if (next === ta.value) return false;
-			ta.value = next;
-			notify();
+			const cut = markerCutAt(ta.value, marker, index);
+			if (!cut) return false;
+			if (!undoableReplace(cut.from, cut.to, cut.insert)) {
+				ta.setRangeText(cut.insert, cut.from, cut.to, "end");
+				notify();
+			}
 			return true;
 		},
 		// Pasted-text pill drops its own `[Pasted N chars]` tag.
 		excisePastedAt: (index: number) => {
-			const next = removePastedAt(ta.value, index);
-			if (next === ta.value) return false;
-			ta.value = next;
-			notify();
+			const cut = pastedCutAt(ta.value, index);
+			if (!cut) return false;
+			if (!undoableReplace(cut.from, cut.to, cut.insert)) {
+				ta.setRangeText(cut.insert, cut.from, cut.to, "end");
+				notify();
+			}
 			return true;
 		},
 		setText: (text: string) => {
@@ -558,9 +598,15 @@ export function createTextareaEditor(
 		insertText: (text: string) => {
 			const start = ta.selectionStart ?? ta.value.length;
 			const end = ta.selectionEnd ?? ta.value.length;
-			ta.value = ta.value.slice(0, start) + text + ta.value.slice(end);
-			const caret = start + text.length;
-			ta.setSelectionRange(caret, caret);
+			// Image markers land here: the editing engine keeps
+			// native undo so Cmd+Z takes the tag back out.
+			if (undoableReplace(start, end, text)) {
+				// Nested input owns the report; keep the messages
+				// list steady all the same.
+				ta.focus({ preventScroll: true });
+				return;
+			}
+			ta.setRangeText(text, start, end, "end");
 			// Insertions (dictation, image markers) take the cursor
 			// without yanking the messages list.
 			ta.focus({ preventScroll: true });

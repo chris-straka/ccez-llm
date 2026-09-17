@@ -197,6 +197,39 @@ describe("atomic marker deletion", () => {
 		expect(ta.selectionStart).toBe(4);
 	});
 
+	it("tag edits prefer the editing engine, falling back to setRangeText", () => {
+		const { editor, ta } = setup();
+		// No engine here (jsdom): the setRangeText fallback applies.
+		const spy = vi.spyOn(ta, "setRangeText");
+		editor.setText("see [Pasted image] now");
+		backspace(ta, 18);
+		expect(spy).toHaveBeenCalledWith("", 4, 18, "end");
+		spy.mockClear();
+		editor.insertText("[Pasted image] ");
+		expect(spy).toHaveBeenCalledWith("[Pasted image] ", 4, 4, "end");
+		spy.mockClear();
+		expect(editor.exciseMarker("[Pasted image]")).toBe(true);
+		expect(spy).toHaveBeenCalledOnce();
+		expect(editor.getText()).toBe("see  now");
+		spy.mockRestore();
+	});
+
+	it("an editing engine takes the delete without the fallback", () => {
+		const { editor, ta } = setup();
+		const exec = vi.fn(() => true);
+		Object.defineProperty(document, "execCommand", { value: exec, configurable: true });
+		try {
+			const spy = vi.spyOn(ta, "setRangeText");
+			editor.setText("see [Pasted image] now");
+			backspace(ta, 18);
+			expect(exec).toHaveBeenCalledWith("delete");
+			expect(spy).not.toHaveBeenCalled();
+			spy.mockRestore();
+		} finally {
+			Object.defineProperty(document, "execCommand", { value: undefined, configurable: true });
+		}
+	});
+
 	it("Backspace in plain prose keeps the native path", () => {
 		const { editor, ta, options } = setup();
 		editor.setText("hello");
