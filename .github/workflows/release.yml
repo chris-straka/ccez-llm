@@ -468,7 +468,7 @@ jobs:
           import json
           import os
           import subprocess
-          repo = "chris-straka/personalized-llm-client"
+          repo = "chris-straka/ccez-llm"
           cur = os.environ["GITHUB_REF_NAME"]
           out = subprocess.run(
               ["gh", "release", "list", "--repo", repo,
