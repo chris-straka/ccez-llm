@@ -8,13 +8,27 @@ import type { VoiceEngine } from "./settings";
  * is missing (SSR, tests, unsupported browsers).
  */
 
-/** Split text into speakable sentences (keeps delimiters, drops empties). */
+/**
+ * Split text into speakable sentences (keeps delimiters, drops
+ * empties), line by line: an English line and a Japanese line stay
+ * separate utterances in their own voices.
+ */
 export function splitSentences(text: string): string[] {
-	const cleaned = text.replace(/\s+/g, " ").trim();
-	if (!cleaned) return [];
-	const matches = cleaned.match(/[^.!?…。！？؛\n]+[.!?…。！？؛]+["»”’)]?|\S[^.!?…。！？；]*$/g);
-	if (!matches) return [cleaned];
-	return matches.map((s) => s.trim()).filter(Boolean);
+	const out: string[] = [];
+	// Line by line: collapsing newlines first would fuse an English
+	// line and a Japanese line into one utterance in a single voice —
+	// a line split keeps each half's own language (blank lines skip,
+	// punctuated lines split exactly as before).
+	for (const line of text.split("\n")) {
+		const cleaned = line.replace(/\s+/g, " ").trim();
+		if (!cleaned) continue;
+		const matches = cleaned.match(/[^.!?…。！？؛\n]+[.!?…。！？؛]+["»”’)]?|\S[^.!?…。！？；]*$/g);
+		for (const match of matches ?? [cleaned]) {
+			const trimmed = match.trim();
+			if (trimmed) out.push(trimmed);
+		}
+	}
+	return out;
 }
 
 /**

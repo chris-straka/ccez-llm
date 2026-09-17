@@ -858,6 +858,71 @@ test("sent-refs card copies one annotation", async ({ page }) => {
 	expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('"bonjour" — greeting?');
 });
 
+/** Sent-refs rows read like the draft card: quote + copy up top,
+note + pencil below, Clear-all top-right of the card. */
+test("sent-refs card lays out quote, copy, note, pencil in order", async ({ page }) => {
+	await seedChat(page, [
+		{ role: "assistant", content: "noted" },
+		{ role: "user", content: 'explain this\n\nAnnotated selections:\n1. "bonjour" — greeting?' }
+	]);
+	await page.goto("/");
+	await page.locator(".ann-refs-pill").first().click();
+	const pop = page.locator(".ann-refs-pop").first();
+	await expect(pop).toBeVisible();
+	const box = async (sel: string) => {
+		const rect = await pop.locator(sel).first().boundingBox();
+		if (!rect) throw new Error(`no box for ${sel}`);
+		return rect;
+	};
+	const quote = await box(".ann-refs-quote");
+	const copy = await box(".ann-refs-copy");
+	const note = await box(".ann-refs-comment");
+	const pencil = await box(".ann-refs-pencil");
+	const clear = await box(".ann-refs-clear");
+	// Copy rides the quote line; the pencil rides the note line.
+	expect(Math.abs(copy.y - quote.y)).toBeLessThan(10);
+	expect(copy.x).toBeGreaterThan(quote.x);
+	expect(note.y).toBeGreaterThan(quote.y);
+	expect(Math.abs(pencil.y - note.y)).toBeLessThan(10);
+	expect(pencil.x).toBeGreaterThan(note.x);
+	// Clear-all sits top-right, above the first row (inside the
+	// card's own padding, like the draft tools row).
+	const popBox = await pop.boundingBox();
+	if (!popBox) throw new Error("no pop box");
+	expect(clear.y + clear.height).toBeLessThanOrEqual(quote.y + 4);
+	expect(clear.x + clear.width).toBeGreaterThanOrEqual(popBox.x + popBox.width - 16);
+});
+
+/** Sent-refs Clear-all strips the baked block, keeping the prompt. */
+test("sent-refs Clear-all strips the baked block", async ({ page }) => {
+	await seedChat(page, [
+		{ role: "assistant", content: "noted" },
+		{ role: "user", content: 'explain this\n\nAnnotated selections:\n1. "bonjour" — greeting?' }
+	]);
+	await page.goto("/");
+	await page.locator(".ann-refs-pill").first().click();
+	await page.locator(".ann-refs-clear").first().click();
+	await expect(page.locator(".toast")).toHaveText("Sent annotations cleared", { timeout: 10_000 });
+	await expect(page.locator(".ann-refs-pill")).toHaveCount(0);
+	const body = await page.locator("article.user .rendered").first().innerText();
+	expect(body).toContain("explain this");
+	expect(body).not.toContain("Annotated selections");
+});
+
+/** Sent-refs Clear-all on a refs-only message deletes the message. */
+test("sent-refs Clear-all deletes a refs-only message", async ({ page }) => {
+	await seedChat(page, [
+		{ role: "assistant", content: "noted" },
+		{ role: "user", content: 'Annotated selections:\n1. "bonjour" — greeting?' }
+	]);
+	await page.goto("/");
+	await expect(page.locator("article.user")).toHaveCount(1);
+	await page.locator(".ann-refs-pill").first().click();
+	await page.locator(".ann-refs-clear").first().click();
+	await expect(page.locator(".toast")).toHaveText("Sent annotations cleared", { timeout: 10_000 });
+	await expect(page.locator("article.user")).toHaveCount(0);
+});
+
 /** Sent-refs quote jumps to the quoted message — not the sender — and
 flashes the quote like a draft wash (a separate highlight name, so it
 never clobbers a badge wash). */

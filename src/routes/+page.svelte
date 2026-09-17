@@ -143,6 +143,7 @@ import {
 		import {
 		duplicateAnnotationId,
 		aidMarkVisible,
+		clearBakedAnnotations,
 		editAnnotationComment,
 		deleteAnnotation,
 		clearAnnotations,
@@ -246,7 +247,8 @@ import {
 		isSpaceInteractiveTarget,
 		isTapOverlayTarget,
 		mouseupKeepsSelection,
-		isAnnotationUiTarget
+		isAnnotationUiTarget,
+		middleDragGesture
 	} from "$lib/events";
 	import {
 		aidDisplayText,
@@ -3661,10 +3663,66 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		editor?.setText(comment);
 		editor?.setPlaceholder("Add a comment");
 		editor?.caretToEnd();
+		// Phones scroll the quote into the upper clear area first (the
+		// keyboard plus composer own the bottom): no manual scroll is
+		// needed to see the highlighted text, so the scroll gesture
+		// never cancels the edit out from under the typing.
+		if (androidUI) {
+			const lookup =
+				"pending" in target
+					? pendingAnn
+						? {
+								messageId: pendingAnn.messageId,
+								quote: pendingAnn.quote,
+								at: pendingAnn.at ?? 0
+							}
+						: null
+					: (() => {
+							const current = annotations.find((a) => a.id === target.id);
+							return current
+								? { messageId: current.messageId, quote: current.quote, at: current.at ?? 0 }
+								: null;
+						})();
+			if (lookup) scrollQuoteIntoEditView(lookup.messageId, lookup.quote, lookup.at);
+		}
 		// Best-effort: the opening tap's canceled gesture can block
 		// the summon on some WebViews, but a plain tap on the
 		// composer always works — it summons for chat typing today.
 		void tick().then(() => editor?.focus());
+	}
+
+	/**
+	 * Scroll a quote into the upper clear area for in-prompt note
+	 * edits (phones): the keyboard plus composer own the bottom, so
+	 * the only visible space while typing is at the top. Lands the
+	 * quote a fifth down the visible chat; already-visible quotes
+	 * never move.
+	 */
+	function scrollQuoteIntoEditView(messageId: ChatMsgId, quote: string, at: number): void {
+		if (!scrollBox) return;
+		const index = viewChat.messages.findIndex((m) => m.id === messageId);
+		if (index < 0) return;
+		const article = document.querySelector(`#msg-${index}`);
+		const root = article?.querySelector(".rendered") ?? article;
+		if (!(root instanceof HTMLElement)) return;
+		let range: Range | null;
+		try {
+			range = quoteRange(root, quote, at);
+		} catch {
+			return;
+		}
+		if (!range) return;
+		const area = scrollBox.getBoundingClientRect();
+		const appEl = document.querySelector(".app");
+		const kb = appEl
+			? Number.parseFloat(getComputedStyle(appEl).getPropertyValue("--kb-height")) || 0
+			: 0;
+		const promptH = document.querySelector(".prompt")?.getBoundingClientRect().height ?? 0;
+		const visibleBottom = area.bottom - promptH - kb;
+		if (visibleBottom <= area.top) return;
+		const landing = area.top + (visibleBottom - area.top) * 0.2;
+		const dy = range.getBoundingClientRect().top - landing;
+		if (Math.abs(dy) > 8) scrollBox.scrollBy({ top: dy, behavior: "smooth" });
 	}
 
 	/** Send-arrow commit for an in-prompt note edit (see doSend). */
@@ -4055,6 +4113,28 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		refsEditing = null;
 		refsEditDraft = "";
 		parkRefsEditFocus(n);
+	}
+
+	/**
+	 * Sent-card Clear-all: strip the baked block, keeping the bare
+	 * prompt (see clearBakedAnnotations). A refs-only message clears
+	 * to nothing — delete it instead of keeping an empty one. Own
+	 * messages only: baked blocks ride the outgoing prompt.
+	 */
+	function clearSentRefs(messageId: ChatMsgId): void {
+		const index = viewChat.messages.findIndex((m) => m.id === messageId);
+		if (index < 0) return;
+		const msg = viewChat.messages[index];
+		if (!msg || msg.role !== "user") return;
+		const bare = clearBakedAnnotations(msg.content);
+		if (bare === null) {
+			flashErrorToast("Annotation no longer exists");
+			return;
+		}
+		refsPopOpen = null;
+		if (bare.trim() === "") deleteMessage(chatState, index);
+		else editMessageContent(chatState, messageId, bare);
+		flashToast("Sent annotations cleared");
 	}
 
 	/** Blink a badge wash slowly twice, then hand the wash back. A
@@ -6503,8 +6583,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						msgDoubleTapPin = { id: start.msgId, at: now };
 						const tapEl = document.elementFromPoint(ended.clientX, ended.clientY);
 						const art = tapEl ? articleOf(tapEl) : null;
-						if (art instanceof HTMLElement) {
-							art.scrollIntoView({ block: "end", behavior: "smooth" });
+						// Message end lands above the composer dock (prompt
+						// plus the message's own buttons row, which sits
+						// below its text): a bare scrollIntoView strands
+						// both behind the dock.
+						const dockReserve = (document.querySelector(".prompt")?.getBoundingClientRect().height ?? 0) + 48;
+						if (art instanceof HTMLElement && scrollBox) {
+							const area = scrollBox.getBoundingClientRect();
+							const dy = art.getBoundingClientRect().bottom - (area.bottom - dockReserve);
+							if (dy > 0) scrollBox.scrollBy({ top: dy, behavior: "smooth" });
 						} else if (scrollBox) {
 							scrollBox.scrollTo({ top: scrollBox.scrollHeight, behavior: "smooth" });
 						}
@@ -8086,6 +8173,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		 */
 		const onMiddleClick = (event: MouseEvent) => {
 			if (event.button !== 1) return;
+			// A middle-drag just acted: the release is the gesture's
+			// end, never a shortcuts toggle.
+			if (midDragged) {
+				midDragged = false;
+				midDown = null;
+				midActed = false;
+				return;
+			}
 			event.preventDefault();
 			shortcutsOpen = !shortcutsOpen;
 			stopVoice();
@@ -8161,6 +8256,52 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		let downClient: { x: number; y: number } | null = null;
 		const noteDownPoint = (event: MouseEvent): void => {
 			downClient = event.button === 0 ? { x: event.clientX, y: event.clientY } : null;
+		};
+		/**
+		 * Middle-drag on a message: press (button 1) records the point
+		 * and owning message; a horizontal run folds it, a vertical run
+		 * switches chats (up older, down newer). One action per press —
+		 * `midActed` latches so a long stroke never folds twice. Below
+		 * the arming distance the press stays a click and auxclick keeps
+		 * its shortcuts toggle (see onMiddleClick); `midDragged` tells
+		 * it to stand down instead.
+		 */
+		let midDown: { x: number; y: number; id: ChatMsgId } | null = null;
+		let midDragged = false;
+		let midActed = false;
+		const noteMiddleDown = (event: MouseEvent): void => {
+			midDown = null;
+			midDragged = false;
+			midActed = false;
+			if (event.button !== 1) return;
+			const target = event.target instanceof Element ? event.target : null;
+			if (!target || target.closest("button, a, input, textarea, select, summary, [contenteditable], .cm-content, .prompt, aside, .modal")) return;
+			const article = target.closest('article[id^="msg-"]');
+			if (!article) return;
+			const index = Number(article.id.slice(4));
+			const id = chat.messages[index]?.id;
+			if (!id) return;
+			midDown = { x: event.clientX, y: event.clientY, id };
+		};
+		const noteMiddleMove = (event: MouseEvent): void => {
+			if (!midDown || midActed) return;
+			// Middle button held (buttons bitmask 4): a move without it
+			// is a stray, never a gesture.
+			if ((event.buttons & 4) === 0) return;
+			const gesture = middleDragGesture(event.clientX - midDown.x, event.clientY - midDown.y);
+			if (!gesture) return;
+			midDragged = true;
+			midActed = true;
+			if (gesture === "fold-message") toggleFold(midDown.id);
+			else stepChat(gesture === "older-chat" ? -1 : 1, false);
+		};
+		/** Release clears an unacted press (the click's auxclick owns
+		the toggle and needs no state); an acted drag persists until
+		auxclick consumes it above. */
+		const clearMiddleDown = (event: MouseEvent): void => {
+			if (event.button !== 1 || midDragged) return;
+			midDown = null;
+			midActed = false;
 		};
 		/** Latest pointer point (drag-vs-click for the mid-drag
 		collapse restore below). Passive, one store per move. */
@@ -8798,7 +8939,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		window.addEventListener("mousedown", snapSelection, true);
 		window.addEventListener("mousedown", noteDownPoint, true);
 		window.addEventListener("mousedown", armMessageDrag, true);
+		window.addEventListener("mousedown", noteMiddleDown, true);
 		window.addEventListener("mousemove", noteMovePoint, { passive: true });
+		window.addEventListener("mousemove", noteMiddleMove, { passive: true });
+		window.addEventListener("mouseup", clearMiddleDown);
 		document.addEventListener("selectionchange", trimMessageDrag);
 		// Secondary scrollers share the main chat's fade: scroll events
 		// don't bubble, so catch them on the way down and toggle the
@@ -8905,7 +9049,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			window.removeEventListener("mousedown", snapSelection, true);
 			window.removeEventListener("mousedown", noteDownPoint, true);
 			window.removeEventListener("mousedown", armMessageDrag, true);
+			window.removeEventListener("mousedown", noteMiddleDown, true);
 			window.removeEventListener("mousemove", noteMovePoint);
+			window.removeEventListener("mousemove", noteMiddleMove);
+			window.removeEventListener("mouseup", clearMiddleDown);
 			document.removeEventListener("selectionchange", trimMessageDrag);
 			window.removeEventListener("scroll", onFadeScroll, true);
 			window.removeEventListener("scroll", trackSelPinyin, true);
@@ -9361,6 +9508,22 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 								{annotationCountLabel(sentRefs.refs.length)}
 							</button>
 							<div class="ann-refs-pop" role="tooltip">
+								{#if msg.role === "user"}
+									<!-- Sent-card Clear-all: strip the baked block,
+									keeping the bare prompt (a refs-only message
+									clears to nothing and is deleted). -->
+									<div class="ann-refs-head">
+										<button
+											type="button"
+											class="ann-refs-clear"
+											title="Remove every baked annotation from this message"
+											aria-label="Clear all sent annotations"
+											onclick={() => clearSentRefs(msg.id)}
+										>
+											Clear all
+										</button>
+									</div>
+								{/if}
 								{#each sentRefs.refs as ref (ref.n)}
 									<!-- Only the quote navigates, like the
 									composer card: one jump per annotation, on
@@ -9587,15 +9750,17 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						>
 							<ActionIcon kind="branch" />
 						</button>
-						<button
-							type="button"
-							class="icon-btn"
-							data-tip={tip(isMac ? "Delete this message (⌘D)" : "Delete this message", "Delete this message")}
-							aria-label={tip(isMac ? "Delete this message (⌘D)" : "Delete this message", "Delete this message")}
-							onclick={() => deleteMessage(chatState, i)}
-						>
-							<ActionIcon kind="delete" />
-						</button>
+						{#if msg.role !== "user"}
+							<button
+								type="button"
+								class="icon-btn"
+								data-tip={tip(isMac ? "Delete this message (⌘D)" : "Delete this message", "Delete this message")}
+								aria-label={tip(isMac ? "Delete this message (⌘D)" : "Delete this message", "Delete this message")}
+								onclick={() => deleteMessage(chatState, i)}
+							>
+								<ActionIcon kind="delete" />
+							</button>
+						{/if}
 						<button
 							type="button"
 							class="icon-btn"
@@ -9611,6 +9776,19 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						>
 							<ActionIcon kind="speak" />
 						</button>
+						{#if msg.role === "user"}
+							<!-- Own messages: audio before delete (assistant
+							rows keep delete first). -->
+							<button
+								type="button"
+								class="icon-btn"
+								data-tip={tip(isMac ? "Delete this message (⌘D)" : "Delete this message", "Delete this message")}
+								aria-label={tip(isMac ? "Delete this message (⌘D)" : "Delete this message", "Delete this message")}
+								onclick={() => deleteMessage(chatState, i)}
+							>
+								<ActionIcon kind="delete" />
+							</button>
+						{/if}
 						{#if msg.role === "assistant" && !streamingThis}
 							<!-- Reading aids live here, right of speak: hover
 							previews, click pins (show original unpins). Model
@@ -11236,6 +11414,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		gap: 1rem;
 		width: min(22rem, calc(100vw - 3rem));
 		padding: 1rem 1.2rem;
+		/* A menu, not a document: its title and position never
+		select (long-presses there summon handles otherwise). */
+		user-select: none;
+		-webkit-user-select: none;
 	}
 	.switcher-mid {
 		flex: 1;
@@ -11672,6 +11854,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	gap was never worth chasing. */
 	.app[data-android] .messages {
 		padding-top: calc(1rem + env(safe-area-inset-top, 0px));
+		/* Hairline side gutters (the 1.2rem desktop gutters read as
+		notable margins on narrow phones): the thread runs ~99% wide
+		with 0.5% kept on each side. */
+		padding-left: 0.5%;
+		padding-right: 0.5%;
 	}
 	/* Full-width settings sheet on phones: no sliver to tap, no
 	weird one-tap-close strip. left+right with auto width fills
@@ -11827,12 +12014,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		visibility: hidden;
 		pointer-events: none;
 	}
-	/* Phone thumb row: attach, dictation, and voice match the send
-	button's seat — one even row, no small outlier. Desktop keeps its
-	optical sizes. */
+	/* Phone thumb row: attach, dictation, voice, and the jump
+	trigger match the send button's seat — one even row, no small
+	outlier. Desktop keeps its optical sizes. */
 	.app[data-android] .attach-btn,
 	.app[data-android] .mic-btn,
-	.app[data-android] .voice-float {
+	.app[data-android] .voice-float,
+	.app[data-android] .wp-jump {
 		width: 1.7rem;
 		height: 1.7rem;
 		padding: 0;
@@ -11840,7 +12028,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 	.app[data-android] .attach-btn :global(.action-glyph),
 	.app[data-android] .mic-btn :global(.action-glyph),
-	.app[data-android] .voice-float :global(.action-glyph) {
+	.app[data-android] .voice-float :global(.action-glyph),
+	.app[data-android] .wp-jump :global(.action-glyph) {
 		height: 1.15em;
 	}
 	/* Highlight up: the dock wrapper overlays the whole card, so
@@ -13081,8 +13270,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		bottom: 0;
 		left: 0;
 		z-index: 40;
-		min-width: 14rem;
-		max-width: 24rem;
+		min-width: min(14rem, calc(100vw - 2rem));
+		/* Never wider than the viewport: huge annotations on narrow
+		phones spilled past the screen's left edge. */
+		max-width: min(24rem, calc(100vw - 2rem));
 		background: #1c1c1e;
 		color: #f2f2f7;
 		/* Transparent by default so the light theme can paint just
@@ -13128,8 +13319,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		pointer-events: auto;
 	}
 	.ann-refs-item {
-		display: flex;
-		gap: 0.45rem;
+		/* Draft-card order per line (quote + copy up top, note +
+		pencil below): the DOM keeps body grouping, so the grid
+		flattens it (display: contents below) and places each
+		control into its line/column explicitly. */
+		display: grid;
+		grid-template-columns: auto minmax(0, 1fr) auto auto;
+		column-gap: 0.45rem;
+		row-gap: 0.3rem;
+		align-items: center;
 		padding: 0.2rem 0;
 		/* Default cursor on the row: only the quote points (like the
 		draft card). The row still jumps on a clean press — the quote
@@ -13149,15 +13347,42 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.ann-refs-num {
 		font-weight: 700;
 		flex-shrink: 0;
+		grid-column: 1;
+		grid-row: 1 / span 2;
 	}
-	/* Quote stacks over its note: the note reads below the thing
-	annotated, never squeezed to its right. */
+	/* Quote line then note line: the note reads below the thing
+	annotated, never squeezed to its right. The body is layout
+	transparent (contents) so the item grid places the quote,
+	copy, note, and pencil into their own cells. */
 	.ann-refs-body {
-		display: flex;
-		flex-direction: column;
-		gap: 0.3rem;
-		flex: 1;
-		min-width: 0;
+		display: contents;
+	}
+	.ann-refs-quote {
+		grid-column: 2;
+		grid-row: 1;
+	}
+	.ann-refs-comment,
+	.ann-refs-input {
+		grid-column: 2;
+		grid-row: 2;
+	}
+	.ann-refs-copy {
+		grid-column: 3;
+		grid-row: 1;
+		margin-left: 0;
+	}
+	.ann-refs-pencil {
+		grid-column: 3;
+		grid-row: 2;
+	}
+	/* Edit mode: Save takes the copy slot, Cancel the cell after
+	(Save-then-Cancel like the draft card). */
+	.ann-refs-edit-btn {
+		grid-column: 3;
+		grid-row: 1;
+	}
+	button.ann-refs-edit-btn + button.ann-refs-edit-btn {
+		grid-column: 4;
 	}
 	/* Only the quote navigates (see refsQuoteClick): unselectable
 	quote with a pointer cursor, so a click reads as a jump and
@@ -13201,9 +13426,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		min-width: 0;
 	}
 	/* Per-annotation copy in the sent-refs card: icon only, no text,
-	pushed to the row's end like the panel's delete button. */
+	in the quote line's end cell (see the item grid above). */
 	.ann-refs-copy {
-		margin-left: auto;
 		flex: none;
 		align-self: center;
 		display: inline-flex;
@@ -13221,8 +13445,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.ann-refs-copy:hover {
 		color: #fff;
 	}
-	/* Row pencil: same icon-only voice as the copy button beside it
-	(the copy button's own auto margin pushes the pair to the end). */
+	/* Row pencil: same icon-only voice as the copy button, in the
+	note line's end cell (see the item grid above). */
 	.ann-refs-pencil {
 		flex: none;
 		align-self: center;
@@ -13273,6 +13497,25 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 	.ann-refs-edit-btn:hover {
 		border-color: #aeaeb2;
+	}
+	/* Sent-card head: Clear-all rides top-right like the draft
+	card's tools row (same quiet voice, danger on hover). */
+	.ann-refs-head {
+		display: flex;
+		justify-content: flex-end;
+		padding: 0.15rem 0.1rem 0.05rem;
+	}
+	.ann-refs-clear {
+		border: 0;
+		background: none;
+		cursor: pointer;
+		font-size: 0.85rem;
+		color: #c7c7cc;
+		padding: 0.1rem 0.3rem;
+	}
+	.ann-refs-clear:hover {
+		color: #ff6961;
+		color: var(--danger);
 	}
 	/* Light theme: the sent card matches the draft card (panel
 	surface, soft edge, ink text) instead of floating dark. */
@@ -14124,7 +14367,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.review-head button.review-pencil {
 		display: inline-flex;
 		align-items: center;
-		align-self: center;
+		/* Top of the note line, not the row's middle: centered sits
+		a breath low next to the italic note. */
+		align-self: flex-start;
+		margin-top: 0.2em;
 		margin-left: 0;
 		flex-shrink: 0;
 		color: #6e6e73;

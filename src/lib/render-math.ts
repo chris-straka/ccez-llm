@@ -197,9 +197,21 @@ export function extractMath(markdownText: string): { stripped: string; maths: Ma
  * fold bar — display math is body-only (folding rides `data-folded`,
  * wired elsewhere).
  */
+/**
+ * Grapheme-safe cut with an ellipsis marker: slice() counts UTF-16
+ * units and splits astral characters (emoji, CJK Ext-B) into lone
+ * surrogates — Array.from counts code points instead, so Japanese,
+ * Ukrainian, and emoji previews cut cleanly. BMP text cuts exactly
+ * where slice would.
+ */
+export function cutPreview(text: string, max: number): string {
+	const chars = Array.from(text);
+	return chars.length > max ? `${chars.slice(0, max).join("")}…` : text;
+}
+
 export function mathTexPreview(tex: string, max = 48): string {
 	const flat = tex.replace(/\s+/g, " ").trim();
-	return flat.length > max ? `${flat.slice(0, max)}…` : flat;
+	return cutPreview(flat, max);
 }
 
 /**
@@ -243,7 +255,9 @@ export function foldPreviewText(content: string, override: string | null): strin
 	const lines = content.split("\n");
 	const tex = mathPreviewInner(lines);
 	if (tex !== null) return `\\(${mathTexPreview(tex, 120)}\\)`;
-	return (lines[0] ?? "").slice(0, 140);
+	// Long first lines cut with the ellipsis marker (never a silent
+	// crop): length reads bounded in every script.
+	return cutPreview(lines[0] ?? "", 140);
 }
 
 /**

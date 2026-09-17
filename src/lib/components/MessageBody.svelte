@@ -714,8 +714,9 @@
 		left: 50%;
 		transform: translateX(-50%);
 		/* Optical: readings sit right of their kanji, so pull back
-		(absolute, never layout). */
-		margin-left: -3px;
+		(absolute, never layout). Em, not px: the pull scales with
+		the reading on every client (see the per-OS lines below). */
+		margin-left: -0.3em;
 		white-space: nowrap;
 		font-size: 0.62em;
 		line-height: 1.2;
@@ -731,16 +732,16 @@
 	}
 	/* Per-platform nudge: kana bearings differ per OS font (Hiragino
 	on iOS needs a stronger pull than desktop). Scoped so each
-	platform keeps its own tuned value — Android gets its line here
-	once it's eyeballed on-device. */
+	platform keeps its own tuned value — every pull rides em so it
+	scales with the reading at any font size. */
 	:global(.app[data-ios]) .rendered :global(.frt) {
-		margin-left: -9px;
+		margin-left: -0.9em;
 	}
 	/* Same leftward pull on Android (eyeballed on-device to match
-	iOS). data-android is also set on iPhones (any phone), so iOS
-	is excluded — it keeps its own line above. */
+	iOS), in em like the rest. data-android is also set on iPhones
+	(any phone), so iOS is excluded — it keeps its own line above. */
 	:global(.app[data-android]:not([data-ios])) .rendered :global(.frt) {
-		margin-left: -9px;
+		margin-left: -0.9em;
 	}
 	/* Same pull on macOS desktop: its kana also renders in Hiragino
 	with the same left bearing. Calibrated in-browser at 16–48px
@@ -1241,6 +1242,12 @@
 	}
 	.rendered :global(rt) {
 		font-size: 0.62em;
+		/* Readings are paint, never picks: keep the touch landing
+		on the Hanzi like the furigana overlay (pointer-events
+		there), or Android long-press snaps to the reading with
+		handles and no highlight. */
+		pointer-events: none;
+		-webkit-touch-callout: none;
 		/* Zero strut: the annotation's line box contributes nothing, so
 		no engine grows the line for it — glyphs paint into the
 		aid-space leading reserved above. No entrance fade: it read as

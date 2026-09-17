@@ -191,3 +191,31 @@ const ANNOTATION_UI_SELECTOR = ".review, .ann-pop, .ann-refs-pop";
 export function isAnnotationUiTarget(target: EventTarget | null): boolean {
 	return closestFromTarget(target, ANNOTATION_UI_SELECTOR) !== null;
 }
+
+/** Middle-drag arming distance: below this a middle press is still a
+click (the shortcuts toggle), never a gesture. Matches the left-drag
+4px click-vs-drag precedent with room for wheel-button slop. */
+export const MIDDLE_DRAG_PX = 8;
+
+/** Horizontal run that folds a message once the dominant-axis test
+passes. Past a word nudge, short of a sidebar stroke. */
+export const MIDDLE_FOLD_PX = 28;
+
+/** Vertical run that switches chats once the dominant-axis test
+passes. Past a line nudge, short of a full swipe. */
+export const MIDDLE_CHAT_PX = 36;
+
+/** What a middle-drag displacement means, or null while still a
+press. Pure over dx/dy so the gesture unit-tests without a mouse. */
+export type MiddleDragGesture = "fold-message" | "older-chat" | "newer-chat";
+
+export function middleDragGesture(dx: number, dy: number): MiddleDragGesture | null {
+	const ax = Math.abs(dx);
+	const ay = Math.abs(dy);
+	if (ax < MIDDLE_DRAG_PX && ay < MIDDLE_DRAG_PX) return null;
+	// Dominant axis wins with margin: diagonals near 45° stay a
+	// press, so a shaky hand never folds and switches at once.
+	if (ax > MIDDLE_FOLD_PX && ax > ay * 1.2) return "fold-message";
+	if (ay > MIDDLE_CHAT_PX && ay > ax * 1.2) return dy < 0 ? "older-chat" : "newer-chat";
+	return null;
+}

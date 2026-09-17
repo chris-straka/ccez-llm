@@ -88,7 +88,18 @@ describe("latex math", () => {
 
 	it("previews plain text as the first line, as before", () => {
 		expect(foldPreviewText("hello world", null)).toBe("hello world");
-		expect(foldPreviewText(`${"a".repeat(200)}\nsecond`, null)).toBe("a".repeat(140));
+		expect(foldPreviewText(`${"a".repeat(200)}\nsecond`, null)).toBe(`${"a".repeat(140)}…`);
+	});
+
+	it("cuts long folded previews with an ellipsis in every script", () => {
+		// Japanese (BMP): 140 chars plus the marker, never a silent crop.
+		const ja = foldPreviewText(`${"あ".repeat(200)}\nsecond`, null);
+		expect(ja).toBe(`${"あ".repeat(140)}…`);
+		// Astral emoji: the cut counts code points, so no half of a
+		// surrogate pair leaks in before the marker.
+		const emoji = foldPreviewText("😀".repeat(200), null);
+		expect(emoji).toBe(`${"😀".repeat(140)}…`);
+		expect(emoji).not.toContain("�");
 	});
 
 	it("folds display math into parenthesized latex", () => {

@@ -1335,6 +1335,18 @@ export function splitAnnotationBlock(
 }
 
 /**
+ * Strip every baked annotation from sent content, returning the bare
+ * prompt text (or null when no clean block closes the content): the
+ * sent-refs card's Clear-all. Refs-only content clears to "" — the
+ * caller deletes that message instead of keeping an empty one.
+ */
+export function clearBakedAnnotations(content: string): string | null {
+	const split = splitAnnotationBlock(content);
+	if (!split) return null;
+	return split.text;
+}
+
+/**
  * Baked annotation refs by exact message content, memoized: sent
  * messages render redacted (count pill instead of the full block), so
  * this runs per render and must never re-parse. Display-only — results

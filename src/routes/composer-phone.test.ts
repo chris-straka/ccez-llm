@@ -85,14 +85,16 @@ describe("phone composer two bars", () => {
 });
 
 describe("phone button parity", () => {
-	it("sizes attach, dictation, and voice to the send seat on phones", () => {
+	it("sizes attach, dictation, voice, and the jump trigger to the send seat on phones", () => {
 		const css = pageStyle();
 		expect(css).toContain(".app[data-android] .attach-btn");
 		expect(css).toContain(".app[data-android] .mic-btn");
 		expect(css).toContain(".app[data-android] .voice-float");
+		expect(css).toContain(".app[data-android] .wp-jump");
 		expect(css).toMatch(
-			/\.app\[data-android\] \.voice-float\s*\{[^}]*width:\s*1\.7rem[^}]*height:\s*1\.7rem/
+			/\.app\[data-android\] \.wp-jump\s*\{[^}]*width:\s*1\.7rem[^}]*height:\s*1\.7rem/
 		);
+		expect(css).toContain(".app[data-android] .wp-jump :global(.action-glyph)");
 	});
 });
 

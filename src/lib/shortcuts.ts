@@ -76,6 +76,8 @@ export function desktopShortcuts(isMac: boolean): ShortcutRow[] {
 			name: "Fold / unfold message",
 			keys: `Hover + F / ${isMac ? "Option" : "Alt"}-click`
 		},
+		{ name: "Fold message by drag", keys: "Middle-drag left / right" },
+		{ name: "Switch chat by drag", keys: "Middle-drag up / down" },
 		{
 			name: "Fold / unfold code",
 			keys: "Right-click toggles · left-click unfolds"

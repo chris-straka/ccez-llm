@@ -462,7 +462,11 @@ export function waypoints(state: ChatState, chat?: Chat): number[] {
  * callers fall back).
  */
 export function waypointLabel(content: string, max = 60): string {
-	return content.replace(/\s+/g, " ").trim().slice(0, max);
+	// Code-point cut (see cutPreview in render-math): slice() would
+	// split astral characters into lone surrogates. No marker here —
+	// the waypoint menu has no room for one — so overlong labels
+	// crop silently exactly as before for BMP text.
+	return Array.from(content.replace(/\s+/g, " ").trim()).slice(0, max).join("");
 }
 
 export function buildApiMessages(chat: Chat, systemPrompt: string): ChatMessage[] {

@@ -1602,8 +1602,8 @@ test.describe("message chrome", () => {
 	});
 
 	/** Huge phone type goes full-bleed; normal type keeps the floor. */
-	test("phone chat width blooms at 360 percent", async ({ page }) => {
-		await seedChrome(page, { fontScale: 3.6 });
+	test("phone chat width blooms at 260 percent", async ({ page }) => {
+		await seedChrome(page, { fontScale: 2.6 });
 		const chatVar = (): Promise<string> =>
 			page.evaluate(() =>
 				getComputedStyle(document.querySelector(".app") as Element)

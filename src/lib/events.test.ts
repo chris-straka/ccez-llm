@@ -20,7 +20,8 @@ import {
 	isSpaceInteractiveTarget,
 	isTapOverlayTarget,
 	mouseupKeepsSelection,
-	isAnnotationUiTarget
+	isAnnotationUiTarget,
+	middleDragGesture
 } from "./events";
 
 describe("page event idioms", () => {
@@ -175,5 +176,20 @@ describe("page event idioms", () => {
 		expect(isScrollEnterOwnedTarget(byId("s"))).toBe(false);
 		expect(isScrollEnterOwnedTarget(byId("m"))).toBe(true);
 		expect(isScrollEnterOwnedTarget(byId("p"))).toBe(false);
+	});
+
+	it("classifies middle-drag displacements by dominant axis", () => {
+		// Still a press: the shortcuts toggle owns it.
+		expect(middleDragGesture(0, 0)).toBeNull();
+		expect(middleDragGesture(5, -4)).toBeNull();
+		// Horizontal run folds either way.
+		expect(middleDragGesture(40, 3)).toBe("fold-message");
+		expect(middleDragGesture(-60, -8)).toBe("fold-message");
+		// Vertical run switches: up goes older, down newer.
+		expect(middleDragGesture(4, -50)).toBe("older-chat");
+		expect(middleDragGesture(-6, 80)).toBe("newer-chat");
+		// Near-diagonal stays a press: never fold and switch at once.
+		expect(middleDragGesture(40, 38)).toBeNull();
+		expect(middleDragGesture(30, 60)).toBe("newer-chat");
 	});
 });

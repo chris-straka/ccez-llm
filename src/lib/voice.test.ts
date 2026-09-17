@@ -38,6 +38,11 @@ describe("splitSentences", () => {
 		expect(splitSentences("   ")).toEqual([]);
 		expect(splitSentences("")).toEqual([]);
 	});
+
+	it("keeps halves on separate lines in their own voices", () => {
+		expect(splitSentences("Hello world\nこんにちは世界")).toEqual(["Hello world", "こんにちは世界"]);
+		expect(splitSentences("First.\n\nSecond line")).toEqual(["First.", "Second line"]);
+	});
 });
 
 describe("speechText", () => {

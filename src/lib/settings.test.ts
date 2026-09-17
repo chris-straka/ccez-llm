@@ -234,8 +234,8 @@ describe("settings", () => {
 		expect(effectiveChatWidth(false, 4, 36)).toBe(36);
 		expect(effectiveChatWidth(false, 8, 120)).toBe(120);
 		expect(effectiveChatWidth(true, 1, 36)).toBe(46);
-		expect(effectiveChatWidth(true, 3.59, 36)).toBe(46);
-		expect(effectiveChatWidth(true, 3.6, 36)).toBe(CHAT_WIDTH_FULLBLEED_REM);
+		expect(effectiveChatWidth(true, 2.59, 36)).toBe(46);
+		expect(effectiveChatWidth(true, 2.6, 36)).toBe(CHAT_WIDTH_FULLBLEED_REM);
 		expect(effectiveChatWidth(true, 8, 120)).toBe(CHAT_WIDTH_FULLBLEED_REM);
 	});
 

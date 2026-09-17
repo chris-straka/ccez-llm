@@ -121,7 +121,7 @@
 			</label>
 			<label class="check">
 				<input type="checkbox" bind:checked={settings.hoverAssistantActions} />
-				AI messages
+				LLM messages
 			</label>
 		</fieldset>
 		<label class="check">

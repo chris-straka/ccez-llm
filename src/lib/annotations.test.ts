@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
 	addAnnotation,
+	clearBakedAnnotations,
 	duplicateAnnotationId,
 	aidMarkVisible,
 	editAnnotationComment,
@@ -93,6 +94,14 @@ describe("annotations", () => {
 		expect(splitAnnotationBlock("just a prompt")).toBeNull();
 		expect(splitAnnotationBlock("explain\n\nAnnotated selections:\n")).toBeNull();
 		expect(splitAnnotationBlock("I typed\n\nAnnotated selections:\nnot a list")).toBeNull();
+	});
+
+	it("clears baked blocks back to the bare prompt", () => {
+		const list = addAnnotation([], "m1" as ChatMsgId, "langue", "meaning?");
+		expect(clearBakedAnnotations(withAnnotations("explain", list))).toBe("explain");
+		expect(clearBakedAnnotations(withAnnotations("", list))).toBe("");
+		expect(clearBakedAnnotations("just a prompt")).toBeNull();
+		expect(clearBakedAnnotations("I typed\n\nAnnotated selections:\nnot a list")).toBeNull();
 	});
 
 	it("parses an annotations-only message to empty text plus refs", () => {

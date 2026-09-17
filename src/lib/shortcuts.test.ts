@@ -26,6 +26,8 @@ const MAC_NAMES = [
 	"Speak text aloud",
 	"Delete a message",
 	"Fold / unfold message",
+	"Fold message by drag",
+	"Switch chat by drag",
 	"Fold / unfold code",
 	"Rerun a prompt",
 	"Reply language",
