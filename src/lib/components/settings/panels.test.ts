@@ -88,3 +88,15 @@ describe("hover-row rhythm", () => {
 		expect(sibling[0]![2]).toMatch(/margin-top\s*:\s*0\.9rem/);
 	});
 });
+
+describe("provider gating wiring", () => {
+	// The platform.ts contract is unit-tested pure; these pin that both
+	// listing sites actually route through it — otherwise local-gemma
+	// lists on desktops that can never run it.
+	it("settings radios iterate the gated list, not the raw registry", () => {
+		const source = panelSource("ProviderPanel.svelte");
+		expect(source).toContain("visibleProviderIds(");
+		expect(source).toMatch(/\{#each listedProviders as/);
+		expect(source).not.toMatch(/\{#each allProviders as/);
+	});
+});

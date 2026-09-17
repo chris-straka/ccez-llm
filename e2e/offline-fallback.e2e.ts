@@ -14,21 +14,52 @@ async function activeProviderId(page: import("@playwright/test").Page): Promise<
 	});
 }
 
-/** Gemma (on-device) sits beside the cloud options and asks for no key. */
-test("on-device Gemma is a keyless provider option", async ({ page }) => {
+/** Desktop has no on-device bridge, so the picker hides the Gemma pill. */
+test("desktop settings hide the Gemma pill", async ({ page }) => {
 	await seedChat(page, [{ role: "user", content: "hi" }]);
 	await page.goto("/");
 	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 	await openSettings(page);
-	const gemma = page.locator('.settings-panel [role="radiogroup"][aria-label="Active provider"] button', {
-		hasText: "Gemma (on-device)"
+	await expect(
+		page.locator('.settings-panel [role="radiogroup"][aria-label="Active provider"] button', {
+			hasText: "Gemma (on-device)"
+		})
+	).toHaveCount(0);
+});
+
+/** Android lists Gemma beside the cloud options: keyless, with a
+readiness note (browser dev has no bridge, so the note names that). */
+test("android Gemma is keyless with a readiness note", async ({ browser }) => {
+	const ctx = await browser.newContext({
+		userAgent:
+			"Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36"
 	});
-	await expect(gemma).toBeVisible();
-	await gemma.click();
-	await expect(gemma).toHaveAttribute("aria-checked", "true");
-	// Keyless: the hint replaces the password field, not supplements it.
-	await expect(page.locator(".settings-panel").getByText(/No key needed/)).toBeVisible();
-	await expect(page.locator('.settings-panel input[type="password"]')).toHaveCount(0);
+	const page = await ctx.newPage();
+	try {
+		await seedChat(page, [{ role: "user", content: "hi" }]);
+		await page.goto("/");
+		await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+		await openSettings(page);
+		const gemma = page.locator(
+			'.settings-panel [role="radiogroup"][aria-label="Active provider"] button',
+			{ hasText: "Gemma (on-device)" }
+		);
+		await expect(gemma).toBeVisible();
+		await gemma.click();
+		await expect(gemma).toHaveAttribute("aria-checked", "true");
+		// Keyless: the hint replaces the password field, not supplements it.
+		await expect(page.locator(".settings-panel").getByText(/No key needed/)).toBeVisible();
+		await expect(page.locator('.settings-panel input[type="password"]')).toHaveCount(0);
+		// No shell here: the note says on-device chat is unavailable.
+		await expect(page.locator(".settings-panel").getByText(/isn't available on this device/)).toBeVisible();
+		// Offline narrows the picker to Gemma alone.
+		await ctx.setOffline(true);
+		await expect(
+			page.locator('.settings-panel [role="radiogroup"][aria-label="Active provider"] button')
+		).toHaveCount(1);
+	} finally {
+		await ctx.close();
+	}
 });
 
 /** Dropping offline parks a cloud provider on Gemma; reconnecting restores it. */

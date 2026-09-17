@@ -253,17 +253,17 @@ export function isThreeFingerTap(
 
 /**
  * Provider ids visible under the platform caps. `local-gemma` is the
- * future on-device entry: it lists only on Android (nowhere else has
+ * on-device entry: it lists only on Android (nowhere else has
  * its bridge), and it is the ONLY entry when Android is offline —
  * cloud models can't answer without a connection. Desktop and online
  * phones see everything. Pure so the contract unit-tests without a
  * device; call sites feed `navigator.onLine` plus online/offline
- * events when the bridge lands.
+ * events (settings radios track while open, the cycle reads live).
  */
-export function visibleProviderIds(
-	all: string[],
+export function visibleProviderIds<T extends string>(
+	all: T[],
 	caps: { android: boolean; online: boolean; local: boolean }
-): string[] {
+): T[] {
 	const listed = all.filter((id) => id !== "local-gemma" || (caps.android && caps.local));
 	if (caps.android && !caps.online) return listed.filter((id) => id === "local-gemma");
 	return listed;

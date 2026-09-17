@@ -90,6 +90,11 @@ describe("desktop seal", () => {
 		expect(source).not.toContain("createPromptEditor(");
 		expect(source).not.toContain("cm-content");
 	});
+	it("routes provider cycling through the gating contract", () => {
+		const source = pageSource();
+		const body = source.match(/function cycleProvider[\s\S]*?\n\t\}/)?.[0] ?? "";
+		expect(body).toContain("visibleProviderIds(");
+	});
 
 	it("keeps desktop autofocus (phones never pop the keyboard on launch)", () => {
 		const source = pageSource();

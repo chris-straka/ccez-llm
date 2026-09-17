@@ -14,6 +14,7 @@
 		onDeviceErrorCopy,
 		onDeviceStatus
 	} from "$lib/ondevice/bridge";
+	import { isAndroidUserAgent, visibleProviderIds } from "$lib/platform";
 	import { clearNotice, emptyNotices, flashNotice, MODEL_TIMEOUT_MS } from "$lib/notices";
 	import { onMount } from "svelte";
 	import "./panels.css";
@@ -56,6 +57,24 @@
 	const inShell = tauriBackendAvailable();
 
 	const allProviders = $derived(listProviders(settings.customProviders));
+	/**
+	 * Radios follow the provider gating contract (platform.ts):
+	 * local-gemma lists only where its bridge ships (Android shell —
+	 * not iOS, not desktop), and offline Android narrows to Gemma
+	 * alone. Online state tracks the window events while the panel
+	 * is open, so an offline drop re-narrows without a reopen.
+	 */
+	const androidBridge = isAndroidUserAgent(navigator.userAgent);
+	let online = $state(navigator.onLine);
+	const listedProviders = $derived.by(() => {
+		const visible = new Set(
+			visibleProviderIds(
+				allProviders.map((p) => p.id),
+				{ android: androidBridge, online, local: androidBridge }
+			)
+		);
+		return allProviders.filter((p) => visible.has(p.id));
+	});
 	const activeDef = $derived(getProviderDef(settings.activeProviderId, settings.customProviders));
 	const activeCustom = $derived(
 		settings.customProviders.some((p) => p.id === settings.activeProviderId)
@@ -148,13 +167,22 @@
 	onMount(() => {
 		maybeFetchModels();
 		void probeOnDevice();
+		const updateOnline = (): void => {
+			online = navigator.onLine;
+		};
+		window.addEventListener("online", updateOnline);
+		window.addEventListener("offline", updateOnline);
+		return () => {
+			window.removeEventListener("online", updateOnline);
+			window.removeEventListener("offline", updateOnline);
+		};
 	});
 </script>
 
 <section aria-labelledby="provider-heading">
 	<h2 id="provider-heading">Model provider</h2>
 	<div class="provider-row" role="radiogroup" aria-label="Active provider">
-		{#each allProviders as def (def.id)}
+		{#each listedProviders as def (def.id)}
 			<button
 				type="button"
 				role="radio"

@@ -213,6 +213,7 @@ import {
 	twoFingerSlideDir,
 	threeFingerSwipeDir,
 	isThreeFingerTap,
+	visibleProviderIds,
 	type FlickZone,
 	type EdgePanel,
 	type FingerTrack
@@ -5755,7 +5756,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 
 	function cycleProvider(direction: 1 | -1) {
-		const ids = listProviders(settings.customProviders).map((p) => p.id);
+		// Same gating contract as the settings radios: Gemma lists
+		// only where its bridge ships, offline Android narrows to it.
+		const androidBridge = isAndroidUserAgent(navigator.userAgent);
+		const ids = visibleProviderIds(
+			listProviders(settings.customProviders).map((p) => p.id),
+			{ android: androidBridge, online: navigator.onLine, local: androidBridge }
+		);
 		const next = (ids.indexOf(settings.activeProviderId) + direction + ids.length) % ids.length;
 		const id = ids[next];
 		if (id === undefined) return;
