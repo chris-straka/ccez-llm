@@ -278,6 +278,50 @@ function trimCompact(value: number): string {
  * How many tags of one kind a draft holds (tag → attachment
  * reconciliation counts images and files separately). Pure.
  */
+/**
+ * Blobs for the `count` newest image attachments (composer tag
+ * copy/cut supplier): the same end the tag→pill reconciliation drops,
+ * so what leaves the tray is what lands on the clipboard. Unreadable
+ * entries are skipped, never fatal.
+ */
+export async function attachmentImageBlobs(
+	list: Attachment[],
+	count: number
+): Promise<Blob[]> {
+	if (count <= 0) return [];
+	const imgs = list.filter((att) => att.kind === "image" && att.dataUrl).slice(-count);
+	const settled = await Promise.allSettled(
+		imgs.map((att) => fetch(att.dataUrl as string).then((res) => res.blob()))
+	);
+	return settled.flatMap((s) => (s.status === "fulfilled" ? [s.value] : []));
+}
+
+/**
+ * Clipboard-safe PNG for an image blob: Chromium's clipboard.write
+ * rejects anything but image/png ("Type image/jpeg not supported on
+ * write"), while attachments store JPEG data URLs. Falls back to the
+ * original blob when conversion is unavailable (Safari writes JPEG).
+ */
+export async function clipboardPngBlob(blob: Blob): Promise<Blob> {
+	if (blob.type === "image/png") return blob;
+	let bitmap: ImageBitmap | null = null;
+	try {
+		bitmap = await createImageBitmap(blob);
+		const canvas = document.createElement("canvas");
+		canvas.width = bitmap.width;
+		canvas.height = bitmap.height;
+		const ctx = canvas.getContext("2d");
+		if (!ctx) return blob;
+		ctx.drawImage(bitmap, 0, 0);
+		const png = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+		return png ?? blob;
+	} catch {
+		return blob;
+	} finally {
+		bitmap?.close();
+	}
+}
+
 export function countMarkers(text: string, marker: string = IMAGE_MARKER): number {
 	return text.split(marker).length - 1;
 }

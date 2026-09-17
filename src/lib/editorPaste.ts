@@ -26,7 +26,7 @@ import {
 	collapsePaste,
 	type PasteCollapse
 } from "./editorEffects";
-import { FILE_MARKER, IMAGE_MARKER, removeTags } from "./attachments";
+import { FILE_MARKER, IMAGE_MARKER, countMarkers, removeTags } from "./attachments";
 import { closestFromTarget } from "./events";
 
 /** Pastes longer than this collapse to a `[Pasted content N chars]` marker. */
@@ -487,6 +487,85 @@ export function pasteHandling(onImage: ((file: File) => void) | undefined): Exte
 				});
 				return true;
 			}
+		})
+	);
+}
+
+/** Enriched tag copy/cut: the selected text plus its image-tag count. */
+export interface TagCopyPlan {
+	text: string;
+	imageTags: number;
+}
+
+/**
+ * Copy/cut plan for a composer selection (pure, unit-tested): null
+ * when the default clipboard path owns it (empty selection, no image
+ * tags, or no ClipboardItem support); otherwise the selected text plus
+ * the image-tag count the host maps onto its newest image attachments.
+ */
+export function tagCopyPlan(selectedText: string, clipboardWrite: boolean): TagCopyPlan | null {
+	if (selectedText === "" || !clipboardWrite) return null;
+	const imageTags = countMarkers(selectedText);
+	if (imageTags === 0) return null;
+	return { text: selectedText, imageTags };
+}
+
+/**
+ * Copy/cut enrichment for image tags: the clipboard gets the picture
+ * bytes (dual text+image ClipboardItems) so pasting in another chat
+ * lands images, not dead tags. The host maps the tag count onto its
+ * newest image attachments (mirroring the tag→pill reconciliation that
+ * drops the same end on delete); the read happens synchronously at
+ * call time so a cut's own deletion can't race it. Selections without
+ * image tags fall through to the default handler, and a failed
+ * enriched write falls back to plain text rather than stranding the
+ * copy.
+ */
+export function imageTagClipboard(
+	takeImageBlobs: ((count: number) => Promise<Blob[]>) | undefined
+): Extension {
+	const handle =
+		(isCut: boolean) =>
+		(event: ClipboardEvent, view: EditorView): boolean => {
+			if (!takeImageBlobs) return false;
+			if (typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) return false;
+			const sel = view.state.selection.main;
+			if (sel.empty) return false;
+			const plan = tagCopyPlan(view.state.sliceDoc(sel.from, sel.to), true);
+			if (!plan) return false;
+			event.preventDefault();
+			// Snapshot the blobs before a cut deletes its own tags.
+			const pending = takeImageBlobs(plan.imageTags);
+			if (isCut) view.dispatch({ changes: { from: sel.from, to: sel.to } });
+			void (async () => {
+				try {
+					const blobs = await pending;
+					if (blobs.length === 0) throw new Error("no image data");
+					const textBlob = new Blob([plan.text], { type: "text/plain" });
+					await navigator.clipboard.write(
+						blobs.map(
+							(blob) =>
+								new ClipboardItem({
+									"text/plain": textBlob,
+									[blob.type || "image/jpeg"]: blob
+								})
+						)
+					);
+				} catch {
+					try {
+						await navigator.clipboard.writeText(plan.text);
+					} catch {
+						// Clipboard unavailable: a cut already deleted (native
+						// cut deletes the same way when its own write fails).
+					}
+				}
+			})();
+			return true;
+		};
+	return Prec.high(
+		EditorView.domEventHandlers({
+			copy: handle(false),
+			cut: handle(true)
 		})
 	);
 }

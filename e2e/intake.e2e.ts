@@ -710,3 +710,26 @@ test("overflowing strip drag-pans under a grab cursor", async ({ page }) => {
 	await page.mouse.up();
 	await expect.poll(() => strip.evaluate((el) => el.scrollLeft)).not.toBe(before);
 });
+
+test("cutting an image tag keeps its bytes for another chat", async ({ page }) => {
+	await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+	await dropImage(page);
+	const card = page.locator(".attachments li.card");
+	await expect(card).toBeVisible({ timeout: 15_000 });
+	// Cut the tag in the composer: the tray empties with it...
+	await page.locator(".prompt .cm-content").click();
+	await page.keyboard.press("Meta+a");
+	await page.keyboard.press("Meta+x");
+	await expect(card).toHaveCount(0);
+	// ...but the clipboard kept the picture: a new chat pastes it back
+	// as a live image, not a dead tag.
+	await page.keyboard.press("Meta+b");
+	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/, { timeout: 10_000 });
+	await page.locator('button[aria-label="New chat"]').click();
+	await page.locator(".prompt .cm-content").click();
+	await page.keyboard.press("Meta+v");
+	const fresh = page.locator(".attachments li.card");
+	await expect(fresh).toBeVisible({ timeout: 15_000 });
+	await expect(fresh.locator(".thumb img")).toBeVisible();
+	await expect(page.locator(".prompt .cm-content").first()).toContainText("[Pasted image]");
+});

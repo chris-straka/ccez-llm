@@ -19,6 +19,8 @@ import {
 	removeTags,
 	stripAttachmentMarkers,
 	tagPlaceholder,
+	attachmentImageBlobs,
+	clipboardPngBlob,
 	type Attachment
 } from "./attachments";
 import { estimateTextTokens } from "./render";
@@ -229,5 +231,53 @@ describe("leftoverAttachments", () => {
 	it("ignores literals inside code", () => {
 		const atts = [img("a")];
 		expect(leftoverAttachments(atts, `\`${IMAGE_MARKER}\``).map((a) => a.id)).toEqual(["a"]);
+	});
+});
+
+describe("attachmentImageBlobs", () => {
+	const PNG =
+		"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+	const png = (id: string, dataUrl: string | null = PNG) =>
+		testAttachment({ id, kind: "image", mime: "image/png", dataUrl });
+
+	it("hands the newest image attachments as blobs", async () => {
+		// The 5-byte entry is oldest: newest-two slicing skips it (an
+		// oldest-first take would lead with it).
+		const tiny = testAttachment({
+			id: "a",
+			kind: "image",
+			mime: "image/png",
+			dataUrl: "data:,hello"
+		});
+		const blobs = await attachmentImageBlobs([tiny, png("b"), png("c")], 2);
+		const pngSize = (await (await fetch(PNG)).blob()).size;
+		expect(blobs.map((b) => b.size)).toEqual([pngSize, pngSize]);
+		expect(blobs.map((b) => b.type)).toEqual(["image/png", "image/png"]);
+	});
+
+	it("skips text attachments, dataless images, and dead counts", async () => {
+		const atts = [testAttachment({ id: "t", kind: "text", text: "hi" }), png("nodata", null), png("a")];
+		expect(await attachmentImageBlobs(atts, 5)).toHaveLength(1);
+		expect(await attachmentImageBlobs(atts, 0)).toEqual([]);
+		expect(await attachmentImageBlobs([], 2)).toEqual([]);
+	});
+
+	it("skips unreadable entries instead of failing", async () => {
+		const atts = [png("bad", "http://127.0.0.1:1/unreachable.png"), png("good")];
+		expect(await attachmentImageBlobs(atts, 2)).toHaveLength(1);
+	});
+});
+
+describe("clipboardPngBlob", () => {
+	it("passes PNG through untouched", async () => {
+		const blob = new Blob(["png-bytes"], { type: "image/png" });
+		await expect(clipboardPngBlob(blob)).resolves.toBe(blob);
+	});
+
+	it("falls back to the original without a converter", async () => {
+		// No createImageBitmap outside browsers: the JPEG survives for
+		// engines that write it (Safari), instead of throwing.
+		const blob = new Blob(["jpeg-bytes"], { type: "image/jpeg" });
+		await expect(clipboardPngBlob(blob)).resolves.toBe(blob);
 	});
 });

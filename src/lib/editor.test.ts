@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { trimPasteTail, sendPasteFolds, pasteToggleAction, markerCut } from "./editor";
+import { trimPasteTail, sendPasteFolds, pasteToggleAction, markerCut, tagCopyPlan } from "./editor";
 import {
 	stripAttachmentMarkers,
 	removeMarker,
@@ -152,5 +152,25 @@ describe("markerCut", () => {
 			to: IMAGE_MARKER.length + 1 + "describe".length,
 			insert: "describe"
 		});
+	});
+});
+
+describe("tagCopyPlan", () => {
+	it("stays out of plain selections", () => {
+		expect(tagCopyPlan("", true)).toBeNull();
+		expect(tagCopyPlan("hello", true)).toBeNull();
+		expect(tagCopyPlan(`${FILE_MARKER} notes`, true)).toBeNull();
+	});
+
+	it("yields without ClipboardItem support", () => {
+		expect(tagCopyPlan(`${IMAGE_MARKER} `, false)).toBeNull();
+	});
+
+	it("plans the text plus the image-tag count", () => {
+		expect(tagCopyPlan(`${IMAGE_MARKER} `, true)).toEqual({
+			text: `${IMAGE_MARKER} `,
+			imageTags: 1
+		});
+		expect(tagCopyPlan(`see ${IMAGE_MARKER} and ${IMAGE_MARKER} end`, true)?.imageTags).toBe(2);
 	});
 });

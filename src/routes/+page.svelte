@@ -128,6 +128,8 @@ import {
 		formatTokenCount,
 		stripAttachmentMarkers,
 		imageMarkerInsert,
+		attachmentImageBlobs,
+		clipboardPngBlob,
 		countMarkers,
 		leftoverAttachments,
 		type Attachment,
@@ -2689,6 +2691,18 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	let prevFileMarkerCount = 0;
 
 	/**
+	 * Clipboard supplier for composer tag copy/cut: the `count` newest
+	 * image attachments as clipboard-safe PNG blobs (Chromium writes
+	 * PNG only — see clipboardPngBlob). The list read runs synchronously
+	 * at call time so a cut's own deletion can't race it.
+	 */
+	function copyImageTagBlobs(list: Attachment[], count: number): Promise<Blob[]> {
+		return attachmentImageBlobs(list, count).then((blobs) =>
+			Promise.all(blobs.map((blob) => clipboardPngBlob(blob)))
+		);
+	}
+
+	/**
 	 * Attachment-card copy (icon-only, reusing the message-button copy
 	 * glyph): text attachments copy their inlined text; images copy the
 	 * image bytes (ClipboardItem) so a paste lands the picture, not a
@@ -5019,6 +5033,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				enterScrollMode();
 			},
 			onImagePaste: onInlineImagePasted,
+			onCopyImageTags: (count) => copyImageTagBlobs(editingAttachments, count),
 			onDocChange: (text) => {
 				// Tag → attachment half of two-way removal, mirrored
 				// from the composer: deleting tags by hand drops the
@@ -5574,6 +5589,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				enterScrollMode();
 			},
 			onImagePaste: onImagePasted,
+			onCopyImageTags: (count) => copyImageTagBlobs(attachments, count),
 			onDocChange: (text) => {
 				hasText = text.trim().length > 0;
 				// Tag → attachment half of two-way removal: the user

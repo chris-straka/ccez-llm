@@ -17,6 +17,7 @@ import { defaultHighlightStyle, syntaxHighlighting } from "@codemirror/language"
 import {
 	pastePlaceholders,
 	pasteHandling,
+	imageTagClipboard,
 	togglePastes,
 	pasteSpans,
 	exciseMarkerText,
@@ -34,9 +35,11 @@ export {
 	sendPasteFolds,
 	trimPasteTail,
 	markerCut,
+	tagCopyPlan,
 	type MarkerCut,
 	type PasteSpan,
-	type SendFold
+	type SendFold,
+	type TagCopyPlan
 } from "./editorPaste";
 
 export type SubmitKind = "send" | "stage";
@@ -86,6 +89,13 @@ export interface PromptEditorOptions {
 	onHopOut: () => void;
 	/** An image was pasted or dropped; the host turns it into an attachment. */
 	onImagePaste?: (file: File) => void;
+	/**
+	 * A composer selection holding image tags is copied/cut: the host
+	 * supplies the `count` newest image attachments as blobs (the same
+	 * end the tag→pill reconciliation drops), read synchronously so a
+	 * cut's own deletion can't race it. Absent, tags copy as plain text.
+	 */
+	onCopyImageTags?: (count: number) => Promise<Blob[]>;
 	/** Document text changed (drives the submit button's faded state). */
 	onDocChange?: (text: string) => void;
 }
@@ -152,6 +162,7 @@ export function createPromptEditor(
 			fenceWidgets(),
 			pastePlaceholders(),
 			pasteHandling(options.onImagePaste),
+			imageTagClipboard(options.onCopyImageTags),
 			appTheme,
 			EditorView.lineWrapping
 		]
