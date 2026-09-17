@@ -5,7 +5,7 @@ import {
 } from "./editor";
 import { attachEditContext, shouldDeferForComposition } from "./editContext";
 import { fenceAtOffset, parseFences, shiftEnterAction } from "./fences";
-import { removeMarker } from "./attachments";
+import { removeMarker, removeMarkerAt } from "./attachments";
 
 /**
  * Plain-textarea PromptEditor for Android (see `createPromptEditor` in
@@ -160,6 +160,16 @@ export function createTextareaEditor(
 		// No collapsing here either: the plain rewrite loses nothing.
 		exciseMarker: (marker: string) => {
 			const next = removeMarker(ta.value, marker);
+			if (next === ta.value) return false;
+			ta.value = next;
+			notify();
+			return true;
+		},
+		// Same indexed cut as the CodeMirror path (a pill drops its
+		// own tag); tag→pill here still reconciles newest-first (the
+		// plain input event carries no change ranges).
+		exciseMarkerAt: (marker: string, index: number) => {
+			const next = removeMarkerAt(ta.value, marker, index);
 			if (next === ta.value) return false;
 			ta.value = next;
 			notify();

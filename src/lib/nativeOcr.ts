@@ -70,10 +70,13 @@ export function isOcrUnsupported(message: string): boolean {
 }
 
 /**
- * Tesseract traineddata for a reply-language code (`zh`/`ja`/`ko` per
- * `languages.ts`, plus Cyrillic `uk`/`ru`; everything else reads Latin
- * script). English always rides along — pasted UI and mixed text are
- * rarely script-pure. Pure and unit-tested.
+ * Tesseract traineddata for a reply-language code (per
+ * `languages.ts`): every non-Latin script the menu offers maps to its
+ * model — Devanagari, Arabic-script, Thai, Hebrew, Greek, Armenian,
+ * Ethiopic, Cyrillic dialects, CJK — while Latin-script replies read
+ * through English alone. English always rides along otherwise —
+ * pasted UI and mixed text are rarely script-pure. Pure and
+ * unit-tested.
  */
 export function ocrFallbackLangs(code: string | null): string[] {
 	switch (code) {
@@ -81,31 +84,145 @@ export function ocrFallbackLangs(code: string | null): string[] {
 			return ["jpn", "eng"];
 		case "zh":
 			return ["chi_sim", "eng"];
+		case "yue":
+			return ["chi_tra", "eng"];
 		case "ko":
 			return ["kor", "eng"];
 		case "uk":
 			return ["ukr", "eng"];
 		case "ru":
 			return ["rus", "eng"];
+		case "bg":
+			return ["bul", "eng"];
+		case "sr":
+			return ["srp", "eng"];
+		case "ar":
+			return ["ara", "eng"];
+		case "fa":
+			return ["fas", "eng"];
+		case "ur":
+			return ["urd", "eng"];
+		case "he":
+			return ["heb", "eng"];
+		case "hi":
+			return ["hin", "eng"];
+		case "sa":
+			return ["san", "eng"];
+		case "bn":
+			return ["ben", "eng"];
+		case "ta":
+			return ["tam", "eng"];
+		case "th":
+			return ["tha", "eng"];
+		case "vi":
+			return ["vie", "eng"];
+		case "hy":
+			return ["hye", "eng"];
+		case "am":
+			return ["amh", "eng"];
+		case "el":
+			return ["ell", "eng"];
+		case "grc":
+			return ["grc", "eng"];
 		default:
 			return ["eng"];
 	}
 }
 
 /**
+ * Vision recognition-language primaries, probe-verified on-device
+ * (macOS 26 accurate revision, Sep 2026): `supportedRecognitionLanguages`
+ * reports ar ar-SA/ars-SA cs da de en es fr id it ja ko ms nb nl nn
+ * no pl pt-BR ro ru sv th tr uk vi-VT yue zh-Hans/Hant. Notably
+ * absent: Hindi, Hebrew, Greek, Persian, Bengali, Tamil, Armenian,
+ * Amharic, Mongolian, Sanskrit — those scripts have no Vision model
+ * at all, so the caller routes them to the WASM fallback instead of
+ * a doomed native pass.
+ */
+const VISION_PRIMARIES = new Set([
+	"ar",
+	"ars",
+	"cs",
+	"da",
+	"de",
+	"en",
+	"es",
+	"fr",
+	"id",
+	"it",
+	"ja",
+	"ko",
+	"ms",
+	"nb",
+	"nl",
+	"nn",
+	"no",
+	"pl",
+	"pt",
+	"ro",
+	"ru",
+	"sv",
+	"th",
+	"tr",
+	"uk",
+	"vi",
+	"yue",
+	"zh"
+]);
+
+/** Reply codes in Latin script with no dedicated Vision model — the
+ * default pass reads them through its English model. */
+const LATIN_SCRIPT_CODES = new Set(["hu", "fi", "sk", "tl", "sw", "la"]);
+
+/** Reply codes in Cyrillic with no dedicated Vision model — the
+ * shared Cyrillic base (ru/uk request) reads them on retry. */
+const CYRILLIC_BASE_CODES = new Set(["bg", "sr"]);
+
+/** BCP-47 primary subtag, lowercased, for menu codes and tags. */
+function primaryOf(code: string): string {
+	return code.split(/[-_]/)[0]?.toLowerCase().trim() ?? "";
+}
+
+/**
+ * True when a native OCR pass can read the reply language's script:
+ * a Vision model exists, or the default pass covers it (Latin through
+ * English, unmodeled Cyrillic through the shared base). False for
+ * scripts Vision lacks entirely (Devanagari, Hebrew, Greek, …) —
+ * the caller reads those through the WASM fallback's matching
+ * traineddata instead. Null/empty means no reply language: the
+ * learner default covers English + CJK. Pure and unit-tested.
+ */
+export function visionSupports(code: string | null): boolean {
+	if (code === null || code.trim() === "") return true;
+	const primary = primaryOf(code);
+	return (
+		VISION_PRIMARIES.has(primary) ||
+		LATIN_SCRIPT_CODES.has(primary) ||
+		CYRILLIC_BASE_CODES.has(primary)
+	);
+}
+
+/**
  * Mean-confidence floor for a native first pass: below it the
  * default (CJK-led) models may be reading the wrong script —
  * Cyrillic screenshots come back as punctuation fragments — so the
- * caller retries once with a Cyrillic-led hint and keeps the better
+ * caller retries once with a reply-led hint and keeps the better
  * pass. Pure and unit-tested.
  */
 export const OCR_RETRY_BELOW = 0.6;
 
-/** Backend hint for the retry pass: Russian stays Russian, everything
- * else retries Ukrainian (its model reads the shared Cyrillic base
- * well enough for a learner pass). Pure and unit-tested. */
+/** Backend hint for the retry pass: lead with the reply's own
+ * language (Cyrillic without its own model shares the Ukrainian
+ * base; Russian stays Russian). Scripts Vision lacks never reach the
+ * native path (see `visionSupports`) — passing them through is
+ * harmless (`recognition_languages` maps unknown to English). Pure
+ * and unit-tested. */
 export function ocrRetryHint(code: string | null): string {
-	return code === "ru" ? "ru" : "uk";
+	if (code === null || code.trim() === "") return "uk";
+	const primary = primaryOf(code);
+	if (primary === "ru") return "ru";
+	if (primary === "bg" || primary === "sr") return "uk";
+	return primary || "uk";
 }
 
 /**

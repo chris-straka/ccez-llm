@@ -74,7 +74,18 @@ pub fn split_data_url(input: &str) -> &str {
 /// script variants (a photo rarely declares its script), Cantonese to its
 /// pair; anything unknown or missing falls back to English alone, except
 /// the no-hint default which covers the learner case (English plus the
-/// two CJK scripts) instead of guessing wrong. Pure and unit-tested.
+/// two CJK scripts) instead of guessing wrong.
+///
+/// Coverage is every script Vision ships a model for, probe-verified
+/// on-device (`supportedRecognitionLanguages`, macOS 26 accurate
+/// revision): Arabic, Thai, Vietnamese, Turkish, Polish, Czech, and the
+/// rest below. Notably absent from Vision — Hindi, Hebrew, Greek,
+/// Persian, Bengali, Tamil, Armenian, Amharic, Mongolian, Sanskrit —
+/// never appears here: emitting an unmodeled code risks the whole
+/// request, so those reply languages route to the WASM fallback
+/// (`visionSupports` in `src/lib/nativeOcr.ts`) and unknown hints stay
+/// English. Latin-script replies without their own model (Hungarian,
+/// Finnish, …) read through English deliberately. Pure and unit-tested.
 pub fn recognition_languages(hint: Option<&str>) -> Vec<String> {
     let primary = hint
         .unwrap_or("")
@@ -110,6 +121,22 @@ pub fn recognition_languages(hint: Option<&str>) -> Vec<String> {
         "pt" => &["pt-BR"],
         "ru" => &["ru-RU"],
         "uk" => &["uk-UA"],
+        // Cyrillic without its own Vision model: the shared base.
+        "bg" | "sr" => &["uk-UA"],
+        // Every other modeled script (probe-verified above).
+        "ar" | "ars" => &["ar-SA"],
+        "cs" => &["cs-CZ"],
+        "da" => &["da-DK"],
+        "id" => &["id-ID"],
+        "ms" => &["ms-MY"],
+        "nb" | "nn" | "no" => &["nb-NO"],
+        "nl" => &["nl-NL"],
+        "pl" => &["pl-PL"],
+        "ro" => &["ro-RO"],
+        "sv" => &["sv-SE"],
+        "th" => &["th-TH"],
+        "tr" => &["tr-TR"],
+        "vi" => &["vi-VT"],
         _ => &["en-US"],
     };
     mapped.iter().map(|s| s.to_string()).collect()
@@ -306,6 +333,29 @@ mod tests {
     }
 
     #[test]
+    fn modeled_scripts_map_to_probe_verified_codes() {
+        // Every script Vision models (supportedRecognitionLanguages,
+        // macOS 26 accurate revision) is addressable; Cyrillic without
+        // its own model shares the Ukrainian base.
+        assert_eq!(recognition_languages(Some("ar")), vec!["ar-SA"]);
+        assert_eq!(recognition_languages(Some("ar-SA")), vec!["ar-SA"]);
+        assert_eq!(recognition_languages(Some("th-TH")), vec!["th-TH"]);
+        assert_eq!(recognition_languages(Some("vi")), vec!["vi-VT"]);
+        assert_eq!(recognition_languages(Some("tr-TR")), vec!["tr-TR"]);
+        assert_eq!(recognition_languages(Some("pl")), vec!["pl-PL"]);
+        assert_eq!(recognition_languages(Some("cs")), vec!["cs-CZ"]);
+        assert_eq!(recognition_languages(Some("da")), vec!["da-DK"]);
+        assert_eq!(recognition_languages(Some("nl")), vec!["nl-NL"]);
+        assert_eq!(recognition_languages(Some("sv")), vec!["sv-SE"]);
+        assert_eq!(recognition_languages(Some("ro")), vec!["ro-RO"]);
+        assert_eq!(recognition_languages(Some("id")), vec!["id-ID"]);
+        assert_eq!(recognition_languages(Some("ms-MY")), vec!["ms-MY"]);
+        assert_eq!(recognition_languages(Some("no")), vec!["nb-NO"]);
+        assert_eq!(recognition_languages(Some("bg")), vec!["uk-UA"]);
+        assert_eq!(recognition_languages(Some("sr")), vec!["uk-UA"]);
+    }
+
+    #[test]
     fn missing_or_unknown_hint_falls_back() {
         // No hint: the learner default covers English + CJK scripts,
         // CJK-led (Vision runs the first language as its primary
@@ -318,9 +368,14 @@ mod tests {
             recognition_languages(Some("   ")),
             vec!["ja-JP", "zh-Hans", "zh-Hant", "en-US"]
         );
-        // Unknown language: English alone, never an invalid Vision code.
+        // Unknown language — and scripts Vision has no model for
+        // (Hindi, Hebrew, Greek, …): English alone, never an invalid
+        // Vision code. Those replies route to the WASM fallback
+        // frontend-side instead of a doomed native pass.
         assert_eq!(recognition_languages(Some("xx")), vec!["en-US"]);
-        assert_eq!(recognition_languages(Some("ar-SA")), vec!["en-US"]);
+        assert_eq!(recognition_languages(Some("hi")), vec!["en-US"]);
+        assert_eq!(recognition_languages(Some("he")), vec!["en-US"]);
+        assert_eq!(recognition_languages(Some("el")), vec!["en-US"]);
     }
 
     #[test]

@@ -290,10 +290,64 @@ export async function attachmentImageBlobs(
 ): Promise<Blob[]> {
 	if (count <= 0) return [];
 	const imgs = list.filter((att) => att.kind === "image" && att.dataUrl).slice(-count);
+	return fetchAttachmentBlobs(imgs);
+}
+
+/** Shared fetch: unreadable entries skipped, never fatal. */
+async function fetchAttachmentBlobs(picks: Attachment[]): Promise<Blob[]> {
 	const settled = await Promise.allSettled(
-		imgs.map((att) => fetch(att.dataUrl as string).then((res) => res.blob()))
+		picks.map((att) => fetch(att.dataUrl as string).then((res) => res.blob()))
 	);
 	return settled.flatMap((s) => (s.status === "fulfilled" ? [s.value] : []));
+}
+
+/**
+ * Blobs for the image attachments at these document-order indexes
+ * (Nth image tag pairs with the Nth image attachment — the composer
+ * contract). Indexing rides kind order, not read success: entries
+ * without bytes are skipped in place, so survivors keep tag order.
+ * Pure apart from fetch.
+ */
+export async function attachmentImageBlobsAt(
+	list: Attachment[],
+	indexes: number[]
+): Promise<Blob[]> {
+	const imgs = list.filter((att) => att.kind === "image");
+	const picks: Attachment[] = [];
+	for (const i of indexes) {
+		const att = imgs[i];
+		if (att !== undefined && att.dataUrl !== null) picks.push(att);
+	}
+	return fetchAttachmentBlobs(picks);
+}
+
+/**
+ * Data URLs for the image attachments at these document-order
+ * indexes, read synchronously for same-event clipboard setData.
+ * Null entries (no bytes) are skipped downstream. Pure.
+ */
+export function attachmentDataUrlsAt(list: Attachment[], indexes: number[]): (string | null)[] {
+	const imgs = list.filter((att) => att.kind === "image");
+	return indexes.map((i) => imgs[i]?.dataUrl ?? null);
+}
+
+/**
+ * Drop the attachments of one kind at these document-order indexes
+ * (tag deletions carry their positions now, not just counts).
+ * Out-of-range and negative indexes drop nothing. Pure.
+ */
+export function dropAttachmentsAtIndexes(
+	list: Attachment[],
+	kind: AttachmentKind,
+	indexes: number[]
+): Attachment[] {
+	const drop = new Set(indexes.filter((i) => i >= 0));
+	let seen = -1;
+	return list.filter((att) => {
+		if (att.kind !== kind) return true;
+		seen++;
+		return !drop.has(seen);
+	});
 }
 
 /**
@@ -359,12 +413,48 @@ export function countMarkers(text: string, marker: string = IMAGE_MARKER): numbe
  * unit-tested.
  */
 export function removeMarker(text: string, marker: string = IMAGE_MARKER): string {
+	return removeMarkerAt(text, marker, 0);
+}
+
+/**
+ * Remove the index-th global occurrence of a marker tag (a pill drops
+ * its own tag now, not the first of its kind): same line surgery as
+ * the first-occurrence path, anchored at that occurrence's span. The
+ * occurrence takes one following space with it when present; a host
+ * line left blank drops with its newline. Out-of-range indexes leave
+ * the text untouched. Pure and unit-tested.
+ */
+export function removeMarkerAt(
+	text: string,
+	marker: string = IMAGE_MARKER,
+	index: number = 0
+): string {
+	if (index < 0) return text;
 	const lines = text.split("\n");
-	const at = lines.findIndex((line) => line.includes(marker));
-	if (at === -1) return text;
+	let seen = -1;
+	let at = -1;
+	let tagAt = -1;
+	for (let i = 0; i < lines.length; i++) {
+		const raw = lines[i] ?? "";
+		let from = 0;
+		for (;;) {
+			const found = raw.indexOf(marker, from);
+			if (found < 0) break;
+			seen++;
+			if (seen === index) {
+				at = i;
+				tagAt = found;
+				break;
+			}
+			from = found + marker.length;
+		}
+		if (at >= 0) break;
+	}
+	if (at < 0) return text;
 	const raw = lines[at] ?? "";
-	const tagged = `${marker} `;
-	const noTag = (raw.includes(tagged) ? raw.replace(tagged, "") : raw.replace(marker, "")).trimEnd();
+	const after = raw.slice(tagAt + marker.length);
+	const cutEnd = tagAt + marker.length + (after.startsWith(" ") ? 1 : 0);
+	const noTag = (raw.slice(0, tagAt) + raw.slice(cutEnd)).trimEnd();
 	const next = [...lines.slice(0, at), ...lines.slice(at + 1)];
 	if (noTag.trim() !== "") next.splice(at, 0, noTag);
 	return next.join("\n");

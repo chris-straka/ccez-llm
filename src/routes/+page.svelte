@@ -83,6 +83,7 @@
 		sendPasteFolds,
 		type PromptEditor,
 		type PromptEditorOptions,
+		type RemovedMarkerTags,
 		type SubmitKind
 	} from "$lib/editor";
 	import { createTextareaEditor } from "$lib/textarea-editor";
@@ -128,8 +129,9 @@ import {
 		formatTokenCount,
 		stripAttachmentMarkers,
 		imageMarkerInsert,
-		attachmentImageBlobs,
+		attachmentImageBlobsAt,
 		clipboardPngBlob,
+		dropAttachmentsAtIndexes,
 		reconcileDropCount,
 		countMarkers,
 		leftoverAttachments,
@@ -332,6 +334,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		ocrFallbackLangs,
 		keepBestRecognition,
 		ocrRetryHint,
+		visionSupports,
 		OCR_RETRY_BELOW,
 		friendlyOcrError,
 		friendlyFallbackError,
@@ -2674,6 +2677,36 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		return kept;
 	}
 
+	/**
+	 * Tag → attachment reconciliation with positions: deleted tag
+	 * occurrences carry their document-order indexes, so the matching
+	 * attachments go with them (Nth tag pairs with the Nth
+	 * attachment). Indexed drops consume their tags, so the count path
+	 * anchors past them — position-less leftovers and pre-existing
+	 * orphans still reconcile newest-first without double-dropping.
+	 */
+	function reconcileTagRemovals(
+		list: Attachment[],
+		imagesNow: number,
+		filesNow: number,
+		prevImages: number,
+		prevFiles: number,
+		removed: RemovedMarkerTags | undefined
+	): Attachment[] {
+		const rImg = removed?.image ?? [];
+		const rFile = removed?.file ?? [];
+		let kept = dropAttachmentsAtIndexes(list, "image", rImg);
+		kept = dropAttachmentsAtIndexes(kept, "text", rFile);
+		const imageAtts = kept.filter((a) => a.kind === "image").length;
+		const dropImages = reconcileDropCount(imageAtts, imagesNow, prevImages - rImg.length);
+		const dropFiles = reconcileDropCount(kept.length - imageAtts, filesNow, prevFiles - rFile.length);
+		if (dropImages > 0 || dropFiles > 0) {
+			kept = dropNewestAttachments(kept, "image", dropImages);
+			kept = dropNewestAttachments(kept, "text", dropFiles);
+		}
+		return kept;
+	}
+
 	/** One tag per fresh attachment, caret after each tag's space. */
 	function insertAttachmentMarkers(kinds: AttachmentKind[]): void {
 		if (!editor || kinds.length === 0) return;
@@ -2693,26 +2726,30 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 
 	/**
 	 * Attachment pill <-> tag two-way removal (images and files).
-	 * Pill → tag: dropping the pill removes one marker tag from the
-	 * draft (prose typed beside it survives). Tag → pill lives in
-	 * `promptOptions().onDocChange`: when a kind's tag count falls,
-	 * its newest attachments go with it. `markerSyncMuted` bridges
-	 * the two (programmatic edits must not reconcile against
-	 * themselves); the `prev*Count` pair is the last reconciled
-	 * state.
+	 * Nth tag pairs with the Nth attachment of its kind, both ways.
+	 * Pill → tag: dropping the pill removes its own marker tag from
+	 * the draft (prose typed beside it survives). Tag → pill lives in
+	 * `promptOptions().onDocChange`: deleted occurrences carry their
+	 * document-order indexes, so the matching attachments go with
+	 * them (position-less paths fall back to newest-first).
+	 * `markerSyncMuted` bridges the two (programmatic edits must not
+	 * reconcile against themselves); the `prev*Count` pair is the last
+	 * reconciled state.
 	 */
 	let markerSyncMuted = false;
 	let prevMarkerCount = 0;
 	let prevFileMarkerCount = 0;
 
 	/**
-	 * Clipboard supplier for composer tag copy/cut: the `count` newest
-	 * image attachments as clipboard-safe PNG blobs (Chromium writes
-	 * PNG only — see clipboardPngBlob). The list read runs synchronously
-	 * at call time so a cut's own deletion can't race it.
+	 * Clipboard supplier for composer tag copy/cut: the image
+	 * attachments at these document-order indexes as clipboard-safe
+	 * PNG blobs (Chromium writes PNG only — see clipboardPngBlob). Nth
+	 * tag pairs with the Nth attachment, so a middle cut carries its
+	 * own pictures. The list read runs synchronously at call time so
+	 * a cut's own deletion can't race it.
 	 */
-	function copyImageTagBlobs(list: Attachment[], count: number): Promise<Blob[]> {
-		return attachmentImageBlobs(list, count).then((blobs) =>
+	function copyImageTagBlobs(list: Attachment[], indexes: number[]): Promise<Blob[]> {
+		return attachmentImageBlobsAt(list, indexes).then((blobs) =>
 			Promise.all(blobs.map((blob) => clipboardPngBlob(blob)))
 		);
 	}
@@ -2821,19 +2858,31 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		event.preventDefault();
 	}
 	/**
-	 * Pill X: drop the pill plus one of its tags, and any
-	 * attachment-scoped error with it.
+	 * Pill X: drop the pill plus its own tag, and any
+	 * attachment-scoped error with it. The pill's index among its
+	 * kind (Nth pill pairs with the Nth tag) picks the tag — never
+	 * the first of its kind, so deleting the first of two images
+	 * keeps the second's preview.
 	 */
 	function removeAttachment(id: string): void {
-		const removed = attachments.find((a) => a.id === id);
+		const at = attachments.findIndex((a) => a.id === id);
+		if (at < 0) return;
+		const removed = attachments[at];
+		if (!removed) return;
+		const kindIndex = attachments
+			.slice(0, at)
+			.filter((a) => a.kind === removed.kind).length;
 		attachments = attachments.filter((a) => a.id !== id);
 		clearNotice(notices, "inline");
-		if (removed && editor) {
+		if (editor) {
 			markerSyncMuted = true;
 			try {
 				// Minimal cut, never a full rewrite: a rewrite drops the
 				// paste-marker decorations and unfolds the draft's folds.
-				editor.exciseMarker(removed.kind === "image" ? IMAGE_MARKER : FILE_MARKER);
+				editor.exciseMarkerAt(
+					removed.kind === "image" ? IMAGE_MARKER : FILE_MARKER,
+					kindIndex
+				);
 				prevMarkerCount = countMarkers(editor.getText());
 				prevFileMarkerCount = countMarkers(editor.getText(), FILE_MARKER);
 			} finally {
@@ -2857,7 +2906,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// Tesseract); anywhere else the WASM fallback runs in-client
 		// (one download, cached offline after).
 		const native = await ocrSupported();
-		const fallbackLangs = native ? null : ocrFallbackLangs(activeReplyCode);
+		// Vision ships no model for some scripts (Devanagari, Hebrew,
+		// Greek, … — probe-verified on-device): those skip the doomed
+		// native pass and read through the WASM fallback's matching
+		// traineddata instead of English-shaped fragments.
+		const fallbackLangs =
+			!native || !visionSupports(activeReplyCode) ? ocrFallbackLangs(activeReplyCode) : null;
 		ocrBusyId = att.id;
 		clearNotice(notices, "inline");
 		try {
@@ -2871,7 +2925,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				: await recognizeImageText(att.dataUrl, null);
 			// A weak native pass may be the wrong script (Cyrillic under
 			// the CJK-led default comes back as fragments): one
-			// Cyrillic-led retry, keep the better pass. Retry errors
+			// reply-led retry, keep the better pass. Retry errors
 			// never sink the first observation.
 			if (!fallbackLangs && result.confidence < OCR_RETRY_BELOW) {
 				try {
@@ -5065,17 +5119,23 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				enterScrollMode();
 			},
 			onImagesPasted: onInlineImagesPasted,
-			onCopyImageTags: (count) => copyImageTagBlobs(editingAttachments, count),
-			onDocChange: (text) => {
+			onCopyImageTags: (indexes) => copyImageTagBlobs(editingAttachments, indexes),
+			onDocChange: (text, removed) => {
 				// Tag → attachment half of two-way removal, mirrored
-				// from the composer: deleting tags by hand drops the
-				// newest attachments of that kind first.
+				// from the composer: deleted occurrences drop the
+				// matching attachments by index.
 				if (editingMarkerMuted) return;
 				const imagesNow = countMarkers(text);
 				const filesNow = countMarkers(text, FILE_MARKER);
-				if (imagesNow < editingPrevMarkers || filesNow < editingPrevFileMarkers) {
-					let kept = dropNewestAttachments(editingAttachments, "image", editingPrevMarkers - imagesNow);
-					kept = dropNewestAttachments(kept, "text", editingPrevFileMarkers - filesNow);
+				const kept = reconcileTagRemovals(
+					editingAttachments,
+					imagesNow,
+					filesNow,
+					editingPrevMarkers,
+					editingPrevFileMarkers,
+					removed
+				);
+				if (kept.length !== editingAttachments.length) {
 					editingAttachments = kept;
 					// Attachment-scoped errors die with the attachment.
 					clearNotice(notices, "inline");
@@ -5623,24 +5683,26 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				enterScrollMode();
 			},
 			onImagesPasted: onImagesPasted,
-			onCopyImageTags: (count) => copyImageTagBlobs(attachments, count),
-			onDocChange: (text) => {
+			onCopyImageTags: (indexes) => copyImageTagBlobs(attachments, indexes),
+			onDocChange: (text, removed) => {
 				hasText = text.trim().length > 0;
 				// Tag → attachment half of two-way removal: tags are the
-				// expressed intent, so falls drop the difference and
-				// orphans (attachments with no tags, from undo and
-				// cross-editor flows) drop the excess — newest first,
-				// since pastes stack in order.
+				// expressed intent, so deleted occurrences drop the
+				// matching attachments by index, and orphans
+				// (attachments with no tags, from undo and cross-editor
+				// flows) drop the excess newest-first.
 				if (markerSyncMuted) return;
 				const imagesNow = countMarkers(text);
 				const filesNow = countMarkers(text, FILE_MARKER);
-				const imageAtts = attachments.filter((a) => a.kind === "image").length;
-				const fileAtts = attachments.length - imageAtts;
-				const dropImages = reconcileDropCount(imageAtts, imagesNow, prevMarkerCount);
-				const dropFiles = reconcileDropCount(fileAtts, filesNow, prevFileMarkerCount);
-				if (dropImages > 0 || dropFiles > 0) {
-					let kept = dropNewestAttachments(attachments, "image", dropImages);
-					kept = dropNewestAttachments(kept, "text", dropFiles);
+				const kept = reconcileTagRemovals(
+					attachments,
+					imagesNow,
+					filesNow,
+					prevMarkerCount,
+					prevFileMarkerCount,
+					removed
+				);
+				if (kept.length !== attachments.length) {
 					attachments = kept;
 					// Attachment-scoped errors die with the attachment —
 					// otherwise the red line dangles over the next draft

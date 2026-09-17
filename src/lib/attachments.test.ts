@@ -16,6 +16,10 @@ import {
 	isTextFile,
 	leftoverAttachments,
 	removeMarker,
+	removeMarkerAt,
+	dropAttachmentsAtIndexes,
+	attachmentImageBlobsAt,
+	attachmentDataUrlsAt,
 	removeTags,
 	stripAttachmentMarkers,
 	tagPlaceholder,
@@ -117,6 +121,25 @@ describe("attachment markers", () => {
 		expect(removeMarker(`${FILE_MARKER} read this`, FILE_MARKER)).toBe("read this");
 		expect(removeMarker(`${IMAGE_MARKER} ${FILE_MARKER}`, FILE_MARKER)).toBe(`${IMAGE_MARKER}`);
 		expect(removeMarker(`${IMAGE_MARKER} x`, FILE_MARKER)).toBe(`${IMAGE_MARKER} x`);
+	});
+
+	it("removes the index-th tag, so a pill drops its own", () => {
+		const two = `${IMAGE_MARKER} one\n${IMAGE_MARKER} two`;
+		// Index 0 is the legacy path exactly.
+		expect(removeMarkerAt(two, IMAGE_MARKER, 0)).toBe(removeMarker(two));
+		// Deleting one tag keeps the other's line (beside-prose
+		// survives on the edited line, as in the legacy path).
+		expect(removeMarkerAt(two, IMAGE_MARKER, 0)).toBe(`one\n${IMAGE_MARKER} two`);
+		expect(removeMarkerAt(two, IMAGE_MARKER, 1)).toBe(`${IMAGE_MARKER} one\ntwo`);
+		// Stacked on one line index by occurrence, not by line.
+		const stacked = `${IMAGE_MARKER} ${IMAGE_MARKER} end`;
+		expect(removeMarkerAt(stacked, IMAGE_MARKER, 1)).toBe(`${IMAGE_MARKER} end`);
+		// Kinds index separately; out-of-range leaves text untouched.
+		const mixed = `${IMAGE_MARKER} ${FILE_MARKER} ${IMAGE_MARKER}`;
+		expect(removeMarkerAt(mixed, FILE_MARKER, 0)).toBe(`${IMAGE_MARKER} ${IMAGE_MARKER}`);
+		expect(removeMarkerAt(two, IMAGE_MARKER, 2)).toBe(two);
+		expect(removeMarkerAt(two, IMAGE_MARKER, -1)).toBe(two);
+		expect(removeMarkerAt("no markers", IMAGE_MARKER, 0)).toBe("no markers");
 	});
 
 	it("counts marker tags per kind, even stacked on one line", () => {
@@ -266,6 +289,42 @@ describe("attachmentImageBlobs", () => {
 	it("skips unreadable entries instead of failing", async () => {
 		const atts = [png("bad", "http://127.0.0.1:1/unreachable.png"), png("good")];
 		expect(await attachmentImageBlobs(atts, 2)).toHaveLength(1);
+	});
+});
+
+describe("indexed attachment access", () => {
+	const PNG =
+		"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+	const png = (id: string, dataUrl: string | null = PNG) =>
+		testAttachment({ id, kind: "image", mime: "image/png", dataUrl });
+	const pngSize = async (): Promise<number> => (await (await fetch(PNG)).blob()).size;
+
+	it("reads blobs for the indexed attachments, skipping dataless ones in place", async () => {
+		const atts = [png("a"), testAttachment({ id: "t", kind: "text", text: "hi" }), png("nodata", null), png("c")];
+		// Indexes ride image order (text attachments don't shift them).
+		const blobs = await attachmentImageBlobsAt(atts, [0, 1, 2]);
+		expect(blobs.map((b) => b.size)).toEqual([await pngSize(), await pngSize()]);
+		expect(await attachmentImageBlobsAt(atts, [5, -1])).toEqual([]);
+	});
+
+	it("reads data URLs synchronously for same-event clipboard writes", () => {
+		const atts = [png("a"), testAttachment({ id: "t", kind: "text", text: "hi" }), png("nodata", null)];
+		expect(attachmentDataUrlsAt(atts, [0])).toEqual([PNG]);
+		expect(attachmentDataUrlsAt(atts, [1])).toEqual([null]);
+		expect(attachmentDataUrlsAt(atts, [9])).toEqual([null]);
+	});
+
+	it("drops one kind's attachments at document-order indexes", () => {
+		const img = (id: string) => testAttachment({ id, kind: "image" });
+		const file = (id: string) => testAttachment({ id, kind: "text" });
+		const atts = [img("a"), file("f"), img("b"), img("c")];
+		// Deleting the first tag drops the first image, files untouched.
+		expect(dropAttachmentsAtIndexes(atts, "image", [0]).map((a) => a.id)).toEqual(["f", "b", "c"]);
+		expect(dropAttachmentsAtIndexes(atts, "image", [1]).map((a) => a.id)).toEqual(["a", "f", "c"]);
+		expect(dropAttachmentsAtIndexes(atts, "text", [0]).map((a) => a.id)).toEqual(["a", "b", "c"]);
+		// Out-of-range and negative indexes drop nothing.
+		expect(dropAttachmentsAtIndexes(atts, "image", [9, -1])).toHaveLength(4);
+		expect(dropAttachmentsAtIndexes([], "image", [0])).toEqual([]);
 	});
 });
 

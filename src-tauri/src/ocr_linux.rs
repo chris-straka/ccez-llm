@@ -38,6 +38,22 @@ pub fn tesseract_code_for(tag: &str) -> &'static str {
         "pt-BR" => "por",
         "ru-RU" => "rus",
         "uk-UA" => "ukr",
+        // Modeled scripts the frontend can now request (mirroring the
+        // expanded `recognition_languages`): distro packs gate at
+        // `usable_codes`, so an unmapped tag still lands on English.
+        "ar-SA" => "ara",
+        "cs-CZ" => "ces",
+        "da-DK" => "dan",
+        "id-ID" => "ind",
+        "ms-MY" => "msa",
+        "nb-NO" => "nor",
+        "nl-NL" => "nld",
+        "pl-PL" => "pol",
+        "ro-RO" => "ron",
+        "sv-SE" => "swe",
+        "th-TH" => "tha",
+        "tr-TR" => "tur",
+        "vi-VT" => "vie",
         _ => "eng",
     }
 }
@@ -160,6 +176,19 @@ mod tesseract_tests {
         assert_eq!(tesseract_code_for("en-US"), "eng");
         assert_eq!(tesseract_code_for("fr-FR"), "fra");
         assert_eq!(tesseract_code_for("xx"), "eng");
+    }
+
+    #[test]
+    fn maps_expanded_script_tags_to_tesseract_codes() {
+        assert_eq!(tesseract_code_for("ar-SA"), "ara");
+        assert_eq!(tesseract_code_for("th-TH"), "tha");
+        assert_eq!(tesseract_code_for("vi-VT"), "vie");
+        assert_eq!(tesseract_code_for("tr-TR"), "tur");
+        assert_eq!(tesseract_code_for("pl-PL"), "pol");
+        assert_eq!(tesseract_code_for("cs-CZ"), "ces");
+        assert_eq!(tesseract_code_for("id-ID"), "ind");
+        assert_eq!(tesseract_code_for("ms-MY"), "msa");
+        assert_eq!(tesseract_code_for("nb-NO"), "nor");
     }
 
     #[test]

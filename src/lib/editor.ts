@@ -22,7 +22,10 @@ import {
 	togglePastes,
 	pasteSpans,
 	exciseMarkerText,
-	type PasteSpan
+	exciseMarkerTextAt,
+	removedMarkerIndexes,
+	type PasteSpan,
+	type RemovedMarkerTags
 } from "./editorPaste";
 import { fenceWidgets, runFenceShiftEnter } from "./editorFences";
 import { codeLanguages, appTheme } from "./editorTheme";
@@ -36,11 +39,17 @@ export {
 	sendPasteFolds,
 	trimPasteTail,
 	markerCut,
+	markerCutAt,
 	tagCopyPlan,
+	tagCopyIndexes,
+	dataUrlsToImageFiles,
+	exciseMarkerTextAt,
+	removedMarkerIndexes,
 	expandDeletionUnits,
 	type DeletionRange,
 	type MarkerCut,
 	type PasteSpan,
+	type RemovedMarkerTags,
 	type SendFold,
 	type TagCopyPlan
 } from "./editorPaste";
@@ -69,6 +78,10 @@ export interface PromptEditor {
 	 * paste folds (a full setText rewrite would unfold them). False
 	 * when the tag is absent. */
 	exciseMarker(marker: string): boolean;
+	/** Remove the index-th tag of a kind (a pill drops its own tag,
+	 * not the first of its kind): same minimal cut, anchored at that
+	 * occurrence. False when out of range. */
+	exciseMarkerAt(marker: string, index: number): boolean;
 	setText(text: string): void;
 	/** Insert text at the cursor (used for pasted-image markers). */
 	insertText(text: string): void;
@@ -94,13 +107,20 @@ export interface PromptEditorOptions {
 	onImagesPasted?: (files: File[]) => void;
 	/**
 	 * A composer selection holding image tags is copied/cut: the host
-	 * supplies the `count` newest image attachments as blobs (the same
-	 * end the tag→pill reconciliation drops), read synchronously so a
-	 * cut's own deletion can't race it. Absent, tags copy as plain text.
+	 * supplies the image attachments at these document-order indexes
+	 * as blobs (Nth tag pairs with the Nth attachment, so a middle cut
+	 * carries its own pictures), read synchronously so a cut's own
+	 * deletion can't race it. Absent, tags copy as plain text.
 	 */
-	onCopyImageTags?: (count: number) => Promise<Blob[]>;
-	/** Document text changed (drives the submit button's faded state). */
-	onDocChange?: (text: string) => void;
+	onCopyImageTags?: (indexes: number[]) => Promise<Blob[]>;
+	/**
+	 * Document text changed (drives the submit button's faded state).
+	 * `removed` carries the deleted tag occurrences' document-order
+	 * indexes (CodeMirror path) so the host drops the matching
+	 * attachments; undefined where change ranges are unavailable
+	 * (plain textarea), where the host falls back to newest-first.
+	 */
+	onDocChange?: (text: string, removed?: RemovedMarkerTags) => void;
 }
 
 export function createPromptEditor(
@@ -156,7 +176,24 @@ export function createPromptEditor(
 			placeholderCompartment.of(placeholder(PROMPT_PLACEHOLDER)),
 			submitKeys,
 			EditorView.updateListener.of((update) => {
-				if (update.docChanged) options.onDocChange?.(update.state.doc.toString());
+				if (!update.docChanged) return;
+				// Deleted tag occurrences in pre-change coordinates, so
+				// the host drops the matching attachments (a pill's own
+				// tag, not the newest of its kind). Guarded: a range
+				// walk must never break typing.
+				let removed: RemovedMarkerTags | undefined;
+				try {
+					const ranges: { from: number; to: number }[] = [];
+					update.changes.iterChanges((fromA, toA) => {
+						if (toA > fromA) ranges.push({ from: fromA, to: toA });
+					});
+					if (ranges.length > 0) {
+						removed = removedMarkerIndexes(update.startState.doc.toString(), ranges);
+					}
+				} catch {
+					removed = undefined;
+				}
+				options.onDocChange?.(update.state.doc.toString(), removed);
 			}),
 			history(),
 			keymap.of([...defaultKeymap, ...historyKeymap]),
@@ -186,6 +223,7 @@ export function createPromptEditor(
 		getPastes: () => pasteSpans(view.state),
 		togglePastes: () => togglePastes(view),
 		exciseMarker: (marker: string) => exciseMarkerText(view, marker),
+		exciseMarkerAt: (marker: string, index: number) => exciseMarkerTextAt(view, marker, index),
 		setText: (text: string) =>
 			view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } }),
 		insertText: (text: string) => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { trimPasteTail, sendPasteFolds, pasteToggleAction, markerCut, tagCopyPlan, expandDeletionUnits } from "./editor";
+import { trimPasteTail, sendPasteFolds, pasteToggleAction, markerCut, markerCutAt, tagCopyPlan, tagCopyIndexes, removedMarkerIndexes, dataUrlsToImageFiles, expandDeletionUnits } from "./editor";
 import {
 	stripAttachmentMarkers,
 	removeMarker,
@@ -153,6 +153,20 @@ describe("markerCut", () => {
 			insert: "describe"
 		});
 	});
+
+	it("anchors the cut at the index-th occurrence", () => {
+		const two = `${IMAGE_MARKER} one\n${IMAGE_MARKER} two`;
+		// Index 0 is the legacy cut exactly.
+		expect(markerCutAt(two, IMAGE_MARKER, 0)).toEqual(markerCut(two, IMAGE_MARKER));
+		const second = markerCutAt(two, IMAGE_MARKER, 1);
+		expect(second).not.toBeNull();
+		const applied = two.slice(0, second!.from) + second!.insert + two.slice(second!.to);
+		expect(applied).toBe(`${IMAGE_MARKER} one\ntwo`);
+		// Out-of-range indexes cut nothing.
+		expect(markerCutAt(two, IMAGE_MARKER, 2)).toBeNull();
+		expect(markerCutAt(two, IMAGE_MARKER, -1)).toBeNull();
+		expect(markerCutAt("no markers", IMAGE_MARKER, 0)).toBeNull();
+	});
 });
 
 describe("tagCopyPlan", () => {
@@ -172,6 +186,75 @@ describe("tagCopyPlan", () => {
 			imageTags: 1
 		});
 		expect(tagCopyPlan(`see ${IMAGE_MARKER} and ${IMAGE_MARKER} end`, true)?.imageTags).toBe(2);
+	});
+});
+
+describe("tagCopyIndexes", () => {
+	it("addresses a selection's tags in global document order", () => {
+		const doc = `${IMAGE_MARKER} one\n${IMAGE_MARKER} two\n${IMAGE_MARKER} three`;
+		const firstEnd = `${IMAGE_MARKER} one`.length;
+		// First tag alone, middle tag alone, whole doc.
+		expect(tagCopyIndexes(doc, 0, firstEnd)).toEqual([0]);
+		const secondStart = firstEnd + 1;
+		const secondEnd = secondStart + `${IMAGE_MARKER} two`.length;
+		expect(tagCopyIndexes(doc, secondStart, secondEnd)).toEqual([1]);
+		expect(tagCopyIndexes(doc, 0, doc.length)).toEqual([0, 1, 2]);
+	});
+
+	it("stays empty without image tags or with an empty range", () => {
+		expect(tagCopyIndexes("plain text", 0, 11)).toEqual([]);
+		expect(tagCopyIndexes(`${FILE_MARKER} notes`, 0, 20)).toEqual([]);
+		expect(tagCopyIndexes(`${IMAGE_MARKER} `, 3, 3)).toEqual([]);
+		expect(tagCopyIndexes(`${IMAGE_MARKER} `, 5, 2)).toEqual([]);
+	});
+});
+
+describe("removedMarkerIndexes", () => {
+	const two = `${IMAGE_MARKER} one\n${IMAGE_MARKER} two`;
+
+	it("reports deleted occurrences per kind in document order", () => {
+		// Deleting the first tag's span reports image index 0 …
+		const firstEnd = two.indexOf("\n");
+		expect(removedMarkerIndexes(two, [{ from: 0, to: firstEnd }])).toEqual({
+			image: [0],
+			file: []
+		});
+		// … and the second reports index 1 (the desync fix: the host
+		// drops the matching attachment, not the newest).
+		const secondStart = firstEnd + 1;
+		expect(removedMarkerIndexes(two, [{ from: secondStart, to: two.length }])).toEqual({
+			image: [1],
+			file: []
+		});
+	});
+
+	it("separates kinds and spans whole-document wipes", () => {
+		const mixed = `${IMAGE_MARKER} ${FILE_MARKER} ${IMAGE_MARKER}`;
+		expect(removedMarkerIndexes(mixed, [{ from: 0, to: mixed.length }])).toEqual({
+			image: [0, 1],
+			file: [0]
+		});
+		// Empty and inverted ranges remove nothing.
+		expect(removedMarkerIndexes(two, [])).toEqual({ image: [], file: [] });
+		expect(removedMarkerIndexes(two, [{ from: 4, to: 4 }])).toEqual({ image: [], file: [] });
+	});
+});
+
+describe("dataUrlsToImageFiles", () => {
+	const PNG =
+		"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+
+	it("rehydrates data URLs into paste-ready files in order", async () => {
+		const files = await dataUrlsToImageFiles([PNG, PNG]);
+		expect(files.map((f) => f.name)).toEqual(["pasted-image-0.png", "pasted-image-1.png"]);
+		expect(files[0]?.type).toBe("image/png");
+		expect(files[0]?.size).toBeGreaterThan(0);
+	});
+
+	it("skips non-data and unreadable entries", async () => {
+		await expect(dataUrlsToImageFiles(["https://example.com/a.png"])).resolves.toEqual([]);
+		await expect(dataUrlsToImageFiles(["data:image/png;base64,!!!"])).resolves.toEqual([]);
+		await expect(dataUrlsToImageFiles([])).resolves.toEqual([]);
 	});
 });
 

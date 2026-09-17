@@ -487,17 +487,46 @@ export interface MarkerCut {
  * pins applying the cut equals `removeMarker` on every battery doc.
  */
 export function markerCut(doc: string, marker: string): MarkerCut | null {
+	return markerCutAt(doc, marker, 0);
+}
+
+/**
+ * Locate the cut `removeMarkerAt` would make for the index-th global
+ * tag occurrence (pure, unit-tested): same line surgery as the
+ * first-occurrence path, anchored at that occurrence's span. Null
+ * when the occurrence is absent. Index 0 behaves exactly like
+ * `markerCut` (the parity battery pins it).
+ */
+export function markerCutAt(doc: string, marker: string, index: number): MarkerCut | null {
+	if (index < 0) return null;
 	const lines = doc.split("\n");
-	const at = lines.findIndex((line) => line.includes(marker));
-	if (at === -1) return null;
+	let seen = -1;
+	let at = -1;
+	let tagAt = -1;
 	let lineStart = 0;
-	for (let i = 0; i < at; i++) lineStart += (lines[i] ?? "").length + 1;
+	for (let i = 0; i < lines.length; i++) {
+		const raw = lines[i] ?? "";
+		let from = 0;
+		for (;;) {
+			const found = raw.indexOf(marker, from);
+			if (found < 0) break;
+			seen++;
+			if (seen === index) {
+				at = i;
+				tagAt = found;
+				break;
+			}
+			from = found + marker.length;
+		}
+		if (at >= 0) break;
+		lineStart += (lines[i] ?? "").length + 1;
+	}
+	if (at < 0) return null;
 	const raw = lines[at] ?? "";
-	const tagged = `${marker} `;
-	const cutStr = raw.includes(tagged) ? tagged : marker;
-	const tagAt = raw.indexOf(cutStr);
+	const after = raw.slice(tagAt + marker.length);
+	const cutLen = marker.length + (after.startsWith(" ") ? 1 : 0);
 	const rawTrimmedEnd = raw.trimEnd().length;
-	const keepAfter = raw.slice(tagAt + cutStr.length, rawTrimmedEnd);
+	const keepAfter = raw.slice(tagAt + cutLen, rawTrimmedEnd);
 	if ((raw.slice(0, tagAt) + keepAfter).trim() === "") {
 		const isLast = at === lines.length - 1;
 		if (!isLast) return { from: lineStart, to: lineStart + raw.length + 1, insert: "" };
@@ -523,9 +552,19 @@ export function markerCut(doc: string, marker: string): MarkerCut | null {
  * throws.
  */
 export function exciseMarkerText(view: EditorView, marker: string): boolean {
+	return exciseMarkerTextAt(view, marker, 0);
+}
+
+/**
+ * Pill removal for the index-th tag of a kind (a pill drops its own
+ * tag now, not the first of its kind): the same guarded minimal cut,
+ * anchored at that occurrence. False when out of range. Pure apart
+ * from the guarded dispatch.
+ */
+export function exciseMarkerTextAt(view: EditorView, marker: string, index: number): boolean {
 	let cut: MarkerCut | null;
 	try {
-		cut = markerCut(view.state.doc.toString(), marker);
+		cut = markerCutAt(view.state.doc.toString(), marker, index);
 	} catch {
 		return false;
 	}
@@ -536,6 +575,38 @@ export function exciseMarkerText(view: EditorView, marker: string): boolean {
 		return false;
 	}
 	return true;
+}
+
+/** Removed marker-tag occurrences in pre-change document order. */
+export interface RemovedMarkerTags {
+	image: number[];
+	file: number[];
+}
+
+/**
+ * Which tag occurrences a change set deleted (pure, unit-tested):
+ * per-kind document-order indexes over the pre-change text, so the
+ * host drops the matching attachments (Nth tag pairs with the Nth
+ * attachment). Ranges arrive in pre-change coordinates.
+ */
+export function removedMarkerIndexes(
+	beforeText: string,
+	removed: { from: number; to: number }[]
+): RemovedMarkerTags {
+	const image: number[] = [];
+	const file: number[] = [];
+	const tagRe = new RegExp(`${escapeRegExp(IMAGE_MARKER)}|${escapeRegExp(FILE_MARKER)}`, "g");
+	for (const { from, to } of removed) {
+		if (to <= from) continue;
+		const slice = beforeText.slice(from, to);
+		let seenImage = countMarkers(beforeText.slice(0, from));
+		let seenFile = countMarkers(beforeText.slice(0, from), FILE_MARKER);
+		for (const m of slice.matchAll(tagRe)) {
+			if (m[0] === IMAGE_MARKER) image.push(seenImage++);
+			else file.push(seenFile++);
+		}
+	}
+	return { image, file };
 }
 
 /**
@@ -598,30 +669,40 @@ export function pasteHandling(onImages: ((files: File[]) => void) | undefined): 
 			paste: (event, view) => {
 				const clipboard = event.clipboardData;
 				if (!clipboard) return false;
-				// The cut's own image set first (every picture, one
+				const raw = clipboard.getData("text/plain");
+				// The in-app roundtrip first: an exact-text paste of a
+				// session copy/cut rehydrates from the stash, so runtimes
+				// whose clipboard dropped the rich item still land the
+				// pictures (with their preview cards, via onImages) —
+				// never dead tags. One-shot: the match consumes it.
+				const stash = cutImageStash;
+				if (stash && raw === stash.text && onImages) {
+					cutImageStash = null;
+					event.preventDefault();
+					void (async () => {
+						try {
+							const files = await dataUrlsToImageFiles(await stash.urls);
+							if (files.length === 0) insertTextPaste(view, raw);
+							else onImages(files);
+						} catch {
+							insertTextPaste(view, raw);
+						}
+					})();
+					return true;
+				}
+				// The cut's own image set next (every picture, one
 				// rich-text item): data URLs survive the paste read
 				// that custom clipboard types don't.
 				const html = clipboard.getData("text/html");
 				if (html.includes(IMAGE_SET_MARKER) && onImages) {
 					event.preventDefault();
-					const raw = clipboard.getData("text/plain");
 					void (async () => {
 						try {
 							const doc = new DOMParser().parseFromString(html, "text/html");
 							const urls = [...doc.querySelectorAll("img")]
 								.map((img) => img.getAttribute("src") ?? "")
 								.filter((src) => src.startsWith("data:"));
-							const files: File[] = [];
-							for (const [i, url] of urls.entries()) {
-								try {
-									const blob = await (await fetch(url)).blob();
-									files.push(
-										new File([blob], `pasted-image-${i}.png`, { type: blob.type || "image/png" })
-									);
-								} catch {
-									// Unreadable entry skipped; the rest land.
-								}
-							}
+							const files = await dataUrlsToImageFiles(urls);
 							if (files.length === 0) return;
 							onImages(files);
 						} catch {
@@ -638,7 +719,6 @@ export function pasteHandling(onImages: ((files: File[]) => void) | undefined): 
 					onImages(images);
 					return true;
 				}
-				const raw = clipboard.getData("text/plain");
 				const handled = insertTextPaste(view, raw);
 				if (handled) event.preventDefault();
 				return handled;
@@ -657,7 +737,9 @@ export interface TagCopyPlan {
  * Copy/cut plan for a composer selection (pure, unit-tested): null
  * when the default clipboard path owns it (empty selection, no image
  * tags, or no ClipboardItem support); otherwise the selected text plus
- * the image-tag count the host maps onto its newest image attachments.
+ * the image-tag count. The host maps the count's global indexes (see
+ * `tagCopyIndexes`) onto its attachments — Nth tag pairs with the Nth
+ * attachment, so a middle cut carries its own pictures.
  */
 export function tagCopyPlan(selectedText: string, clipboardWrite: boolean): TagCopyPlan | null {
 	if (selectedText === "" || !clipboardWrite) return null;
@@ -667,30 +749,94 @@ export function tagCopyPlan(selectedText: string, clipboardWrite: boolean): TagC
 }
 
 /**
+ * Global document-order indexes of the image tags in `[from, to)`
+ * (pure, unit-tested): the tags before the range set the base, so a
+ * selection's tags address the host's attachments directly. Empty
+ * when the range holds no image tags.
+ */
+export function tagCopyIndexes(doc: string, from: number, to: number): number[] {
+	if (from >= to) return [];
+	const base = countMarkers(doc.slice(0, Math.max(0, from)));
+	const count = countMarkers(doc.slice(from, to));
+	return Array.from({ length: count }, (_, i) => base + i);
+}
+
+/**
+ * In-app roundtrip for a tag copy/cut: the pictures as data URLs
+ * beside the exact selected text. The clipboard HTML item carries
+ * the same set for foreign apps, but runtimes whose clipboard
+ * rejects rich writes (notably the app shell) would otherwise paste
+ * dead tags — an exact-text paste in this session rehydrates from
+ * here instead. One-shot: the first matching paste consumes it, and
+ * a newer copy/cut overwrites it. Module-scoped on purpose (both
+ * composer and inline editor share one clipboard).
+ */
+interface CutImageStash {
+	text: string;
+	urls: Promise<string[]>;
+}
+
+let cutImageStash: CutImageStash | null = null;
+
+/**
+ * Data URLs back into paste-ready image files, unreadable entries
+ * skipped (pure apart from fetch). Shared by the clipboard image-set
+ * read and the in-app stash read so both land identically named.
+ */
+export async function dataUrlsToImageFiles(urls: string[]): Promise<File[]> {
+	const files: File[] = [];
+	for (const [i, url] of urls.entries()) {
+		if (!url.startsWith("data:")) continue;
+		try {
+			const blob = await (await fetch(url)).blob();
+			files.push(new File([blob], `pasted-image-${i}.png`, { type: blob.type || "image/png" }));
+		} catch {
+			// Unreadable entry skipped; the rest land.
+		}
+	}
+	return files;
+}
+
+/**
  * Copy/cut enrichment for image tags: the clipboard gets the pictures
  * (one rich-text item with embedded images, then per-image items,
  * then plain text) so pasting in another chat lands images, not dead
- * tags. The host maps the tag count onto its newest image attachments
- * (mirroring the tag→pill reconciliation that drops the same end on
- * delete); the read happens synchronously at call time so a cut's own
- * deletion can't race it. Selections without image tags fall through
- * to the default handler.
+ * tags. The host maps the selection's global tag indexes onto its
+ * attachments (Nth tag pairs with the Nth attachment); the read runs
+ * synchronously at call time so a cut's own deletion can't race it.
+ * An in-app stash carries the same pictures for pastes whose
+ * clipboard lost the rich item. Selections without image tags fall
+ * through to the default handler.
  */
 export function imageTagClipboard(
-	takeImageBlobs: ((count: number) => Promise<Blob[]>) | undefined
+	takeImageBlobs: ((indexes: number[]) => Promise<Blob[]>) | undefined
 ): Extension {
 	const handle =
 		(isCut: boolean) =>
 		(event: ClipboardEvent, view: EditorView): boolean => {
 			if (!takeImageBlobs) return false;
-			if (typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) return false;
 			const sel = view.state.selection.main;
 			if (sel.empty) return false;
-			const plan = tagCopyPlan(view.state.sliceDoc(sel.from, sel.to), true);
+			const doc = view.state.doc.toString();
+			const plan = tagCopyPlan(doc.slice(sel.from, sel.to), true);
 			if (!plan) return false;
+			// Snapshot the blobs before a cut deletes its own tags;
+			// the stash resolves the same pictures to data URLs for
+			// the in-app roundtrip (never rejects — an empty set just
+			// falls through to the clipboard items at paste time).
+			// First, before the ClipboardItem gate: the stash needs no
+			// clipboard API, so runtimes without rich writes still
+			// paste their previews back from a native cut.
+			const pending = takeImageBlobs(tagCopyIndexes(doc, sel.from, sel.to));
+			cutImageStash = {
+				text: plan.text,
+				urls: pending.then(
+					(blobs) => Promise.all(blobs.map((blob) => blobToDataUrl(blob))),
+					() => []
+				)
+			};
+			if (typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) return false;
 			event.preventDefault();
-			// Snapshot the blobs before a cut deletes its own tags.
-			const pending = takeImageBlobs(plan.imageTags);
 			if (isCut) view.dispatch({ changes: { from: sel.from, to: sel.to } });
 			void (async () => {
 				const textBlob = new Blob([plan.text], { type: "text/plain" });

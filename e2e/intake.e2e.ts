@@ -854,3 +854,81 @@ test("cutting an image tag keeps its bytes for another chat", async ({ page }) =
 	await expect(fresh.locator(".thumb img")).toBeVisible();
 	await expect(page.locator(".prompt .cm-content").first()).toContainText("[Pasted image]");
 });
+
+test("deleting the first of two tags drops its own preview", async ({ page }) => {
+	// Indexed pairing (Nth tag owns the Nth attachment): removing the
+	// first tag used to drop the second image's preview instead.
+	await dropImage(page, "first.png");
+	await page.locator(".prompt .cm-content").click();
+	await page.keyboard.press("Shift+Enter");
+	await dropImage(page, "second.png");
+	const cards = page.locator(".attachments li.card");
+	await expect(cards).toHaveCount(2, { timeout: 15_000 });
+	// Caret sits after the second tag: up a line, select the first
+	// line's tag, delete it.
+	await page.keyboard.press("ArrowUp");
+	await page.keyboard.press("Home");
+	await page.keyboard.down("Shift");
+	await page.keyboard.press("End");
+	await page.keyboard.up("Shift");
+	await page.keyboard.press("Backspace");
+	await expect(cards).toHaveCount(1);
+	await expect(cards.first().locator(".name")).toContainText("second.png");
+	await expect(cards.first().locator(".thumb img")).toBeVisible();
+});
+
+test("removing the first pill keeps the second preview", async ({ page }) => {
+	// Pill → tag by kind index, never the first of its kind.
+	await dropImage(page, "first.png");
+	await dropImage(page, "second.png");
+	const cards = page.locator(".attachments li.card");
+	await expect(cards).toHaveCount(2, { timeout: 15_000 });
+	await cards.first().locator('button[aria-label="Remove attachment"]').click();
+	await expect(cards).toHaveCount(1);
+	await expect(cards.first().locator(".name")).toContainText("second.png");
+	await expect(cards.first().locator(".thumb img")).toBeVisible();
+	await expect(page.locator(".prompt .cm-content").first()).toContainText("[Pasted image]");
+});
+
+test("cut pastes back previews when rich clipboard writes fail", async ({ page }) => {
+	// Shell behavior: the enriched clipboard write rejects, so the
+	// paste lands as plain text — the in-app stash still rehydrates
+	// the pictures with their preview cards, never dead tags.
+	await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+	await dropImage(page, "first.png");
+	await dropImage(page, "second.png");
+	const cards = page.locator(".attachments li.card");
+	await expect(cards).toHaveCount(2, { timeout: 15_000 });
+	// The exact selected text, read back from a working copy first
+	// (the enriched copy writes async — poll for it like the
+	// three-tag roundtrip spec does, or the capture races empty).
+	await page.locator(".prompt .cm-content").click();
+	await page.keyboard.press("Meta+a");
+	await page.keyboard.press("Meta+c");
+	await expect
+		.poll(() => page.evaluate(() => navigator.clipboard.readText()), { timeout: 10_000 })
+		.toContain("[Pasted image]");
+	const cutText = await page.evaluate(() => navigator.clipboard.readText());
+	// Now every clipboard write rejects (the shell's rich-write wall).
+	await page.evaluate(() => {
+		const denied = () => Promise.reject(new DOMException("denied", "NotAllowedError"));
+		Object.defineProperty(navigator.clipboard, "write", { value: denied, configurable: true });
+		Object.defineProperty(navigator.clipboard, "writeText", {
+			value: denied,
+			configurable: true
+		});
+	});
+	await page.keyboard.press("Meta+x");
+	await expect(cards).toHaveCount(0);
+	// Plain-text clipboard, as the shell leaves it: restore the text
+	// write only, so the paste carries words without pictures.
+	await page.evaluate((text) => {
+		const clipboard = navigator.clipboard as unknown as Record<string, unknown>;
+		delete clipboard["writeText"];
+		return (navigator.clipboard.writeText as (s: string) => Promise<void>)(text);
+	}, cutText);
+	await page.keyboard.press("Meta+v");
+	await expect(cards).toHaveCount(2, { timeout: 15_000 });
+	await expect(cards.first().locator(".thumb img")).toBeVisible();
+	await expect(cards.nth(1).locator(".thumb img")).toBeVisible();
+});

@@ -7,6 +7,7 @@ import {
 	keepBestRecognition,
 	ocrFallbackLangs,
 	ocrRetryHint,
+	visionSupports,
 	OCR_RETRY_BELOW,
 	ocrSupported,
 	recognizeImageText,
@@ -111,15 +112,67 @@ describe("ocrFallbackLangs", () => {
 	it("pairs Cyrillic replies with their traineddata plus English", () => {
 		expect(ocrFallbackLangs("uk")).toEqual(["ukr", "eng"]);
 		expect(ocrFallbackLangs("ru")).toEqual(["rus", "eng"]);
+		expect(ocrFallbackLangs("bg")).toEqual(["bul", "eng"]);
+		expect(ocrFallbackLangs("sr")).toEqual(["srp", "eng"]);
+	});
+
+	it("pairs every other non-Latin script with its traineddata plus English", () => {
+		expect(ocrFallbackLangs("ar")).toEqual(["ara", "eng"]);
+		expect(ocrFallbackLangs("fa")).toEqual(["fas", "eng"]);
+		expect(ocrFallbackLangs("ur")).toEqual(["urd", "eng"]);
+		expect(ocrFallbackLangs("he")).toEqual(["heb", "eng"]);
+		expect(ocrFallbackLangs("hi")).toEqual(["hin", "eng"]);
+		expect(ocrFallbackLangs("sa")).toEqual(["san", "eng"]);
+		expect(ocrFallbackLangs("bn")).toEqual(["ben", "eng"]);
+		expect(ocrFallbackLangs("ta")).toEqual(["tam", "eng"]);
+		expect(ocrFallbackLangs("th")).toEqual(["tha", "eng"]);
+		expect(ocrFallbackLangs("vi")).toEqual(["vie", "eng"]);
+		expect(ocrFallbackLangs("hy")).toEqual(["hye", "eng"]);
+		expect(ocrFallbackLangs("am")).toEqual(["amh", "eng"]);
+		expect(ocrFallbackLangs("el")).toEqual(["ell", "eng"]);
+		expect(ocrFallbackLangs("grc")).toEqual(["grc", "eng"]);
+		expect(ocrFallbackLangs("yue")).toEqual(["chi_tra", "eng"]);
+	});
+});
+
+describe("visionSupports", () => {
+	it("covers the learner default and every modeled script", () => {
+		expect(visionSupports(null)).toBe(true);
+		expect(visionSupports("")).toBe(true);
+		for (const code of ["en", "zh", "ja", "ko", "yue", "uk", "ru", "ar", "th", "vi", "tr", "pl", "id", "ms", "no", "pt"]) {
+			expect(visionSupports(code)).toBe(true);
+		}
+		// Latin without its own model reads through English …
+		for (const code of ["hu", "fi", "sk", "tl", "sw", "la"]) {
+			expect(visionSupports(code)).toBe(true);
+		}
+		// … as does unmodeled Cyrillic through the shared base.
+		expect(visionSupports("bg")).toBe(true);
+		expect(visionSupports("sr")).toBe(true);
+	});
+
+	it("rejects scripts Vision has no model for", () => {
+		// Probe-verified absent (supportedRecognitionLanguages,
+		// macOS 26): these route to the WASM fallback instead.
+		for (const code of ["hi", "sa", "he", "el", "grc", "fa", "ur", "bn", "ta", "hy", "am"]) {
+			expect(visionSupports(code)).toBe(false);
+		}
 	});
 });
 
 describe("ocrRetryHint", () => {
-	it("retries Russian as Russian, everything else as Ukrainian", () => {
+	it("leads the retry with the reply's own language", () => {
 		expect(ocrRetryHint("ru")).toBe("ru");
 		expect(ocrRetryHint("uk")).toBe("uk");
+		expect(ocrRetryHint("ar")).toBe("ar");
+		expect(ocrRetryHint("th")).toBe("th");
+		expect(ocrRetryHint("en")).toBe("en");
+		expect(ocrRetryHint("fr")).toBe("fr");
+		// Cyrillic without its own model shares the Ukrainian base.
+		expect(ocrRetryHint("bg")).toBe("uk");
+		expect(ocrRetryHint("sr")).toBe("uk");
+		// No reply language: the legacy Ukrainian guess stands.
 		expect(ocrRetryHint(null)).toBe("uk");
-		expect(ocrRetryHint("en")).toBe("uk");
 	});
 });
 
