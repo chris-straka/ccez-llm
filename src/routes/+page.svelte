@@ -14924,6 +14924,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		/* !important: CodeMirror injects its own cursor styles at runtime,
 		   after this stylesheet — only importance wins deterministically. */
 		border-left-color: #1c1c1e !important;
+		/* 2px spine: the 1.2px default reads anemic beside message text. */
+		border-left-width: 2px !important;
 	}
 	.app[data-focus-mode="scroll"] :global(.cm-cursorLayer) {
 		/* Scroll mode shows no prompt cursor at all (see enterScrollMode). */

@@ -33,6 +33,13 @@ test("visible-phase delete leaves one owned caret, native caret suppressed", asy
 		() => getComputedStyle(document.querySelector(".cm-content") as HTMLElement).caretColor
 	);
 	expect(caretColor).toBe("rgba(0, 0, 0, 0)");
+	// Drawn caret spine: 2px, not the 1.2px default.
+	const spine = await page.evaluate(
+		() =>
+			getComputedStyle(document.querySelector(".prompt .cm-cursor-primary") as HTMLElement)
+				.borderLeftWidth
+	);
+	expect(spine).toBe("2px");
 	// Model state is sane: empty doc, selection collapsed at zero.
 	const sel = await page.evaluate(() => {
 		const s = window.getSelection();
