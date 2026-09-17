@@ -5791,14 +5791,16 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * the nearby sidebar: left gutter the chat list, right gutter
 	 * settings. Clicks on messages and controls keep their own
 	 * actions (double-click still selects words); clicks inside the
-	 * column but between messages do nothing.
+	 * column but between messages do nothing. Lives on <main> (not
+	 * .messages): on empty chats the messages pane caps at 60% height
+	 * and the lower zone would otherwise be dead.
 	 */
 	function gutterDoubleClick(event: MouseEvent): void {
 		const target = event.target;
 		if (!(target instanceof HTMLElement) || !scrollBox) return;
 		if (
 			target.closest(
-				"article, button, input, select, textarea, a, summary, details, .sel-menu, .review, .ann-pop"
+				"article, button, input, select, textarea, a, summary, details, header, .prompt, .lang-menus, .attachments, .sel-menu, .review, .ann-pop"
 			)
 		) {
 			return;
@@ -8948,6 +8950,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		class:alt={altHeld}
 		onpointerdown={noteMainDown}
 		onclick={closeSettingsFromMain}
+		ondblclick={gutterDoubleClick}
 	>
 		{#if notices.errorToast.message}
 			<button type="button" class="toast error" title="Dismiss" aria-live="polite" transition:fade={{ duration: 160 }} onclick={dismissErrorToast}>{notices.errorToast.message}</button>
@@ -9099,7 +9102,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			ontouchstart={freezeScroll}
 			ontouchend={releaseScroll}
 			ontouchcancel={releaseScroll}
-			ondblclick={gutterDoubleClick}
 			onanimationend={(e) => {
 				if (e.target === e.currentTarget) chatStepDir = null;
 			}}

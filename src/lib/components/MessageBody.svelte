@@ -597,11 +597,12 @@
 		text-overflow: ellipsis;
 		cursor: pointer;
 	}
-	/* Injected paste-fold marker (sanitized HTML): inline bold text in
-	accent blue, never a pill — still a button, so it clicks to expand. */
+	/* Injected paste-fold marker (sanitized HTML): inline text in accent
+	blue, never a pill — it reads like a link because it acts like one
+	(clicks to expand). Bold at body size shouted like a heading. */
 	.rendered :global(button.paste-fold) {
 		font: inherit;
-		font-weight: 700;
+		font-weight: 400;
 		color: #007aff;
 		color: var(--accent);
 		background: none;
@@ -776,11 +777,13 @@
 	}
 	/* Quoted passages are reading material (translations, cited
 	text), not metadata: body ink, with the bar as the quote signal.
-	Muting them washed out long passages on light theme. */
+	Muting them washed out long passages on light theme. The 4px bar
+	plus airy margins sets the passage apart as a block — no wash, no
+	accent bar, no italics (they degrade CJK). */
 	.rendered :global(blockquote) {
-		margin: 0.4em 0;
-		padding-left: 0.7rem;
-		border-left: 3px solid #8e8e93;
+		margin: 0.6em 0;
+		padding-left: 0.9rem;
+		border-left: 4px solid #8e8e93;
 		border-color: var(--line-hover);
 		color: #1c1c1e;
 		color: var(--ink);

@@ -307,6 +307,8 @@ test("expanded pasted content contracts from either blue bracket", async ({ page
 	await expect(body).toBeVisible({ timeout: 60_000 });
 	const marker = body.locator("button.paste-fold", { hasText: "[Pasted 4 chars]" });
 	await expect(marker).toBeVisible();
+	// Link voice, not heading: accent color carries the click affordance.
+	await expect(marker).toHaveCSS("font-weight", "400");
 	await expect(body).not.toContainText("BBBB");
 	await marker.click();
 	await expect(body).toContainText("BBBB");

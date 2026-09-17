@@ -529,6 +529,7 @@ for (const t of THEMES) {
 			"border-left-color",
 			t.name === "light" ? "rgb(142, 142, 147)" : "rgb(99, 99, 102)"
 		);
+		await expect(quote).toHaveCSS("border-left-width", "4px");
 	});
 }
 
