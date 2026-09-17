@@ -473,7 +473,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	let attachBusy = $state(0);
 	let attachInput: HTMLInputElement | undefined = $state();
 	let foldedIds = new SvelteSet<string>();
-	let previewId: string | null = $state(null);
 	/**
 	 * Draft annotations for the active chat, restored from storage on
 	 * launch: unsent quotes survive a restart (sending still bakes and
@@ -2049,13 +2048,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					lastTrayBottom = trayBottom;
 				}
 			}
-			// Preview and error stay in main flow after the scroller:
-			// main-level padding lifts them above the card while
-			// either is rendered (the absolute tray needs no lift).
+			// The error stays in main flow after the scroller:
+			// main-level padding lifts it above the card while
+			// rendered (the absolute tray needs no lift).
 			// Binary, so park/summon (transform-only, layout kept)
 			// never move anything. Empty chats keep today's floor.
-			const chromeOpen =
-				mainEl.querySelector(":scope > .preview, :scope > .attach-error") !== null;
+			const chromeOpen = mainEl.querySelector(":scope > .attach-error") !== null;
 			const mainPad =
 				emptyChat || chromeOpen
 					? `calc(${clearPx}px + env(safe-area-inset-bottom, 0px))`
@@ -2737,6 +2735,59 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		}));
 	}
 
+	// Tray drag-to-scroll (mouse only; touch scrolls natively): with
+	// many cards the strip overflows, so a press-drag pans it. Past a
+	// small slop the gesture owns the click — the capture gate below
+	// swallows it, so a drag ending on OCR or X never fires either.
+	let stripDragX = 0;
+	let stripDragLeft = 0;
+	let stripDragArmed = false;
+	let stripDragMoved = false;
+	let stripDragging = $state(false);
+	function stripDragStart(event: PointerEvent): void {
+		if (!event.isPrimary || event.pointerType === "touch" || event.button !== 0) return;
+		const ul = event.currentTarget;
+		if (!(ul instanceof HTMLElement)) return;
+		stripDragX = event.clientX;
+		stripDragLeft = ul.scrollLeft;
+		stripDragArmed = true;
+		stripDragMoved = false;
+		// Native image drag would fight the pan: claim the gesture.
+		event.preventDefault();
+	}
+	function stripDragMove(event: PointerEvent): void {
+		if (!stripDragArmed) return;
+		const ul = event.currentTarget;
+		if (!(ul instanceof HTMLElement)) return;
+		const dx = event.clientX - stripDragX;
+		if (!stripDragMoved && Math.abs(dx) < 6) return;
+		stripDragMoved = true;
+		stripDragging = true;
+		// Capture only once the gesture is really a pan: capturing on
+		// press would retarget pointerup to the row, and plain clicks
+		// on the card buttons would never reach them.
+		try {
+			ul.setPointerCapture(event.pointerId);
+		} catch {
+			// Pointer already gone (cancel raced us): the pan still
+			// applied above, and pointerup has nothing to retarget.
+		}
+		ul.scrollLeft = stripDragLeft - dx;
+	}
+	function stripDragEnd(event: Event): void {
+		stripDragging = false;
+		stripDragArmed = false;
+		// A cancel fires no click, so only it resets here: pointerup
+		// leaves the flag for the gate below (keyboard clicks need no
+		// pointerdown, so a stale flag must never survive one).
+		if (event.type === "pointercancel" || event.type === "cancel") stripDragMoved = false;
+	}
+	function stripClickGate(event: MouseEvent): void {
+		if (!stripDragMoved) return;
+		stripDragMoved = false;
+		event.stopPropagation();
+		event.preventDefault();
+	}
 	/**
 	 * Pill X: drop the pill plus one of its tags, and any
 	 * attachment-scoped error with it.
@@ -2744,7 +2795,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	function removeAttachment(id: string): void {
 		const removed = attachments.find((a) => a.id === id);
 		attachments = attachments.filter((a) => a.id !== id);
-		if (previewId === id) previewId = null;
 		clearNotice(notices, "inline");
 		if (removed && editor) {
 			markerSyncMuted = true;
@@ -4656,7 +4706,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// with it (`outgoing` already captured them for the send).
 		editor?.clear();
 		attachments = [];
-		previewId = null;
 		annotations = [];
 		pendingAnn = null;
 		reviewOpen = false;
@@ -4703,7 +4752,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			if (stillHere) {
 				void hapticBeatAsync("done", { enabled: settings.vibration, shell: tauriBackendAvailable() });
 				attachments = [];
-				previewId = null;
 				annotations = [];
 				pendingAnn = null;
 				reviewOpen = false;
@@ -4793,7 +4841,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// carries the full history in order.
 			stageMessage(chatState, composerText(), attachments);
 			attachments = [];
-			previewId = null;
 			editor?.clear();
 			scrollAfterRender();
 			return;
@@ -5537,9 +5584,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					let kept = dropNewestAttachments(attachments, "image", prevMarkerCount - imagesNow);
 					kept = dropNewestAttachments(kept, "text", prevFileMarkerCount - filesNow);
 					attachments = kept;
-					if (previewId && !attachments.some((a) => a.id === previewId)) {
-						previewId = null;
-					}
 					// Attachment-scoped errors die with the attachment —
 					// otherwise the red line dangles over the next draft
 					// with nothing left to explain.
@@ -9471,20 +9515,23 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			<ul
 				class="attachments"
 				class:composer-idle={promptIdle}
+				class:dragging={stripDragging}
+				onpointerdown={stripDragStart}
+				onpointermove={stripDragMove}
+				onpointerup={stripDragEnd}
+				oncancel={stripDragEnd}
+				onpointercancel={stripDragEnd}
+				ondragstart={(event) => event.preventDefault()}
+				onclickcapture={stripClickGate}
 			>
 				{#each attachments as att (att.id)}
 					<li class:card={att.kind === "image" && !!att.dataUrl}>
 						{#if att.kind === "image" && att.dataUrl}
-							<button
-								type="button"
-								class="thumb"
-								title="Toggle preview"
-								aria-label="Toggle image preview"
-								aria-pressed={previewId === att.id}
-								onclick={() => (previewId = previewId === att.id ? null : att.id)}
-							>
-								<img src={att.dataUrl} alt="" />
-							</button>
+							<!-- Inert thumbnail: clicking previews nothing
+							(the big peek is gone) — it only drags the row. -->
+							<span class="thumb" aria-hidden="true">
+								<img src={att.dataUrl} alt="" draggable="false" />
+							</span>
 						{:else}
 							<span class="file-kind" aria-hidden="true">FILE</span>
 						{/if}
@@ -9526,13 +9573,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					</li>
 				{/each}
 			</ul>
-			{#if previewId}
-				{#each attachments.filter((a) => a.id === previewId) as att (att.id)}
-					{#if att.dataUrl}
-						<img class="preview" class:composer-idle={promptIdle} src={att.dataUrl} alt={att.name} />
-					{/if}
-				{/each}
-			{/if}
 			{#if notices.inline.message && !androidUI}
 				<p class="error attach-error" class:composer-idle={promptIdle} role="alert">{notices.inline.message}</p>
 			{/if}
@@ -13054,22 +13094,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		box-sizing: border-box;
 		max-width: calc(100% - 2.4rem);
 		overflow-x: auto;
-		/* Plain scrolling row: the bar stays hidden until the strip
-		is in use (hover, keyboard, or touch), then reads thin. */
+		/* Plain scrolling row, never a bar: revealing one on hover
+		reshapes the row on classic scrollbars, so every card jumps
+		a few pixels. Scroll still works (wheel, touch, drag, keys);
+		clipped cards are the affordance. */
 		scrollbar-width: none;
 	}
-	.attachments:hover,
-	.attachments:focus-within,
-	.attachments:active {
-		scrollbar-width: thin;
-	}
 	.attachments::-webkit-scrollbar {
+		width: 0;
 		height: 0;
-	}
-	.attachments:hover::-webkit-scrollbar,
-	.attachments:focus-within::-webkit-scrollbar,
-	.attachments:active::-webkit-scrollbar {
-		height: 6px;
 	}
 	.attachments li {
 		display: flex;
@@ -13083,6 +13116,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		border-radius: 999px;
 		padding: 0.25rem 0.3rem 0.25rem 0.7rem;
 		max-width: 100%;
+		/* Overflowing rows pan by hand: the card is the grip. */
+		cursor: grab;
+	}
+	/* While the pan owns the gesture every card shows the fist. */
+	.attachments.dragging li,
+	.attachments.dragging li button {
+		cursor: grabbing;
 	}
 	.attachments .name {
 		overflow: hidden;
@@ -13105,7 +13145,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.attachments .thumb {
 		border: 0;
 		background: none;
-		cursor: pointer;
 		line-height: 0;
 		padding: 0;
 	}
@@ -13160,15 +13199,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	thread with the text visible between them (a veil here read as a
 	white block occluding the messages). Surfaces are solid now —
 	no frost anywhere — so the strip simply stays transparent. */
-	.preview {
-		display: block;
-		max-width: 16rem;
-		max-height: 12rem;
-		margin: 0.4rem 1.2rem 0;
-		border-radius: 8px;
-		border: 1px solid #c7c7cc;
-		border-color: var(--line);
-	}
 	.toast {
 		position: fixed;
 		/* Clear of the camera hole even when the WebView reports no
@@ -14504,14 +14534,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	image bubble lingers over the chat, and restores with it on the
 	next input (the class drops together with prompt-idle). */
 	.attachments,
-	.preview,
 	.attach-error {
 		transition:
 			transform 0.25s ease,
 			opacity 0.25s ease,
 			visibility 0s;
 	}
-	:is(.attachments, .preview, .attach-error).composer-idle {
+	:is(.attachments, .attach-error).composer-idle {
 		/* Same 0.75rem settle and ramp as the card: the old
 		full-height slide outran the prompt — taller trays visibly
 		faster. The fade does the hiding; the slide just settles. */
@@ -14534,7 +14563,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		.prompt.prompt-idle.prompt-preview,
 		.app:not([data-android]) .prompt-tools,
 		.attachments,
-		.preview,
 		.attach-error {
 			transition: none;
 		}
@@ -14948,7 +14976,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	:global(html[data-theme="dark"]) .attachments button {
 		color: #f2f2f7;
 	}
-	/* .preview rides --line now. */
 	/* ann-wrap rides --line/--muted/--ink; review-tools ride --muted/--danger now. */
 	/* sel-menu rides --bg-raised/--line/--bg-wash/--ink;
 	ann-pop is dark-always; review rides --panel/--line-soft. */

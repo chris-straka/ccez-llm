@@ -147,10 +147,12 @@ test("attachment strip never covers message text", async ({ page }) => {
 	await dropImage(page);
 	const strip = page.locator(".attachments");
 	await expect(strip).toBeVisible({ timeout: 15_000 });
-	// Worst case: scrolled to the very bottom with the strip open (and
-	// the tall preview too) — the last article still ends above it.
+	// Worst case: scrolled to the very bottom with the strip open —
+	// the last article still ends above it. The thumbnail is inert
+	// (the big preview is gone): clicking it opens nothing.
 	await page.locator(".attachments .thumb").click();
-	await expect(page.locator("img.preview")).toBeVisible();
+	await expect(page.locator("img.preview")).toHaveCount(0);
+	await expect(strip).toBeVisible();
 	// Instant (not the eased smooth scroll): measure only once the
 	// scroller has settled at the bottom.
 	await page.evaluate(() => {
@@ -682,4 +684,29 @@ test("thread text flows beside the floating tray", async ({ page }) => {
 		return count;
 	});
 	expect(hits).toBeGreaterThan(0);
+});
+
+test("overflowing strip drag-pans under a grab cursor", async ({ page }) => {
+	for (let i = 0; i < 8; i++) await dropImage(page, `shot-${i}.png`);
+	const strip = page.locator("ul.attachments").first();
+	await expect(strip).toBeVisible({ timeout: 15_000 });
+	// The row really overflows: without that the pan has nothing to do.
+	await expect.poll(() => strip.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeGreaterThan(50);
+	// Cards show the hand, never the bar: scrollbars stay hidden.
+	const cursor = await page
+		.locator("ul.attachments li.card")
+		.first()
+		.evaluate((el) => window.getComputedStyle(el).cursor);
+	expect(cursor).toBe("grab");
+	// A press-drag across a card pans the row (no scrollbar needed).
+	const box = await strip.boundingBox();
+	if (!box) throw new Error("missing strip box");
+	const startX = box.x + box.width / 2;
+	const startY = box.y + box.height / 2;
+	const before = await strip.evaluate((el) => el.scrollLeft);
+	await page.mouse.move(startX, startY);
+	await page.mouse.down();
+	await page.mouse.move(startX - 160, startY, { steps: 8 });
+	await page.mouse.up();
+	await expect.poll(() => strip.evaluate((el) => el.scrollLeft)).not.toBe(before);
 });
