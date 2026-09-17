@@ -1,6 +1,6 @@
 [package]
 name = "ccez-llm"
-version = "0.4.8"
+version = "0.4.9"
 description = "A personalized/opinionated LLM client"
 authors = ["ccez"]
 edition = "2021"
