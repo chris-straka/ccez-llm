@@ -51,7 +51,7 @@ describe("speechText", () => {
 	});
 
 	it("names pasted content instead of reading markers", () => {
-		expect(speechText("[paste 250 chars]")).toBe("pasted content");
+		expect(speechText("[Pasted 250 chars]")).toBe("pasted content");
 		expect(speechText("[Pasted content 250 chars]")).toBe("pasted content");
 	});
 });

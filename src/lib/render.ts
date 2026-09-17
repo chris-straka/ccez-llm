@@ -362,7 +362,7 @@ export type FoldSegment =
 
 /** Marker button HTML (same label as the composer). Chars/index are numbers — nothing to escape. */
 export function pasteFoldButton(index: number, chars: number): string {
-	return `<button type="button" class="paste-fold" data-paste-fold="${index}">[paste ${chars} chars]</button>`;
+	return `<button type="button" class="paste-fold" data-paste-fold="${index}">[Pasted ${chars} chars]</button>`;
 }
 
 /**
@@ -425,7 +425,7 @@ export function foldBracket(index: number, toggleAttr: string, bracket: "[" | "]
 /**
  * Splice paste folds into display text: closed folds become a
  * `<button data-paste-fold>` marker carrying the composer's
- * `[paste N chars]` label; open folds render inline framed by blue
+ * `[Pasted N chars]` label; open folds render inline framed by blue
  * collapse brackets (clicking either contracts). Clicks delegate in
  * MessageBody like code-block buttons. Pure and unit-tested.
  */

@@ -27,7 +27,7 @@ export function speechText(markdown: string): string {
 			.replace(/```[\s\S]*?```/g, " ")
 			.replace(/!?\[[^\]]*\]\([^)]*\)/g, " ")
 			.replace(/\[Pasted an image\]/g, " ")
-			.replace(/\[paste \d+ chars\]/g, "pasted content")
+			.replace(/\[Pasted \d+ chars\]/g, "pasted content")
 			.replace(/\[Pasted content \d+ chars\]/g, "pasted content")
 			.split("\n")
 			.map((line) => line.replace(/^#{1,6}\s+/, "").replace(/^>\s?/, "").replace(/^[-*]\s+/, ""))

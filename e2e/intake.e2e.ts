@@ -303,7 +303,7 @@ test("expanded pasted content contracts from either blue bracket", async ({ page
 	await page.reload();
 	const body = page.locator("article.user .rendered").first();
 	await expect(body).toBeVisible({ timeout: 60_000 });
-	const marker = body.locator("button.paste-fold", { hasText: "[paste 4 chars]" });
+	const marker = body.locator("button.paste-fold", { hasText: "[Pasted 4 chars]" });
 	await expect(marker).toBeVisible();
 	await expect(body).not.toContainText("BBBB");
 	await marker.click();
@@ -312,7 +312,7 @@ test("expanded pasted content contracts from either blue bracket", async ({ page
 	await expect(open).toBeVisible();
 	await open.click();
 	await expect(body).not.toContainText("BBBB");
-	await expect(body.locator("button.paste-fold", { hasText: "[paste 4 chars]" })).toBeVisible();
+	await expect(body.locator("button.paste-fold", { hasText: "[Pasted 4 chars]" })).toBeVisible();
 });
 
 test("tray stays background-free under a solid prompt", async ({ page }) => {
