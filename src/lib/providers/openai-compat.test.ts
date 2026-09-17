@@ -337,6 +337,24 @@ describe("loopback failures", () => {
 		);
 	});
 
+	it("serves a mobile message on phones, never Ollama", async () => {
+		deadFetch();
+		const local = new OpenAICompatProvider("local-gemma", {
+			baseUrl: "http://localhost:11434/v1",
+			apiKey: "",
+			model: "gemma4:latest",
+			mobile: true
+		});
+		const message = await local
+			.chat([{ role: "user", content: "hi" }])
+			.then(
+				() => "",
+				(error: unknown) => (error instanceof Error ? error.message : String(error))
+			);
+		expect(message).toContain("on this phone");
+		expect(message).not.toMatch(/ollama/i);
+	});
+
 	it("classifies loopback hosts, never the open net", async () => {
 		expect(isLoopbackBaseUrl("http://localhost:11434/v1")).toBe(true);
 		expect(isLoopbackBaseUrl("http://127.0.0.1:11434/v1")).toBe(true);

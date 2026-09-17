@@ -49,6 +49,31 @@ test("long folded preview cuts with an ellipsis", async ({ page }) => {
 	await expect(preview).toContainText(`${"あ".repeat(140)}…`);
 });
 
+test("long folded preview stays inside the message column", async ({ page }) => {
+	await seedChat(page, [{ role: "assistant", content: `${"あ".repeat(200)}` }]);
+	await page.goto("/");
+	const article = page.locator("article.assistant").first();
+	await expect(article.locator(".rendered")).toBeVisible();
+	await article.locator('.actions button[aria-label="Fold this message"]').click();
+	const preview = article.locator(".folded-preview");
+	await expect(preview).toBeVisible();
+	// The 140-char preview must clip with an ellipsis, never stretch
+	// its container: no page-level horizontal overflow, and the button
+	// stays inside its own article.
+	const layout = await preview.evaluate((el) => {
+		const rect = el.getBoundingClientRect();
+		const articleRect = el.closest("article")?.getBoundingClientRect();
+		return {
+			right: rect.right,
+			articleRight: articleRect?.right ?? Number.POSITIVE_INFINITY,
+			pageOverflow:
+				document.documentElement.scrollWidth - document.documentElement.clientWidth
+		};
+	});
+	expect(layout.pageOverflow).toBeLessThanOrEqual(1);
+	expect(layout.right).toBeLessThanOrEqual(layout.articleRight + 1);
+});
+
 test("middle-drag left on a message folds it", async ({ page }) => {
 	await seedChat(page, [{ role: "assistant", content: "hello world, drag me" }]);
 	await page.goto("/");

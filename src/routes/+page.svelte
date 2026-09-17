@@ -4863,7 +4863,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			getProviderDef(settings.activeProviderId, settings.customProviders).keyless === true;
 		if (!keyless && !conf?.apiKey.trim()) return null;
 		if (!conf) return null;
-		return createProvider(settings.activeProviderId, conf, settings.customProviders);
+		return createProvider(
+			settings.activeProviderId,
+			{ ...conf, mobile: androidUI },
+			settings.customProviders
+		);
 	}
 
 	async function doSend() {

@@ -13,6 +13,9 @@ export interface OpenAICompatConfig {
 	baseUrl: string;
 	apiKey: string;
 	model: string;
+	/** Runtime-only, never persisted: phones run no loopback server, so
+	a dead on-device endpoint reads differently there (never Ollama). */
+	mobile?: boolean;
 }
 
 /**
@@ -37,14 +40,20 @@ export class OpenAICompatProvider implements ChatProvider {
 	 * Fetch-level failure, translated: a user stop is never a network
 	 * error (the stop button would report one otherwise); a dead
 	 * loopback server names its remedy (Ollama isn't running) instead
-	 * of reading as generic net trouble; remote endpoints keep the
-	 * generic wording.
+	 * of reading as generic net trouble — except on phones, where no
+	 * loopback server can run and the message says so without naming
+	 * Ollama; remote endpoints keep the generic wording.
 	 */
 	private connectionError(error: unknown): ProviderError {
 		if (error instanceof Error && error.name === "AbortError") {
 			return new ProviderError("Reply stopped.");
 		}
 		if (isLoopbackBaseUrl(this.config.baseUrl)) {
+			if (this.config.mobile) {
+				return new ProviderError(
+					`${this.id} can't use an on-device model on this phone (phones run no local server): ${messageOf(error)}`
+				);
+			}
 			return new ProviderError(
 				`${this.id} needs Ollama running on this device (start it with 'ollama serve'): ${messageOf(error)}`
 			);

@@ -87,7 +87,7 @@ export function getProviderDef(id: string, custom: ProviderDef[] = []): Provider
 
 export function createProvider(
 	id: string,
-	opts: { baseUrl: string; apiKey: string; model: string },
+	opts: { baseUrl: string; apiKey: string; model: string; mobile?: boolean },
 	custom: ProviderDef[] = []
 ): OpenAICompatProvider {
 	getProviderDef(id, custom); // throws on unknown ids

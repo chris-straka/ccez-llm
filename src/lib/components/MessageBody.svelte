@@ -619,6 +619,10 @@
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
+		/* Cap at the container: as a flex item the button sized to
+		its nowrap content and ran past the article (long CJK first
+		lines reached full screen width) instead of clipping. */
+		max-width: 100%;
 		cursor: pointer;
 	}
 	/* Injected paste-fold marker (sanitized HTML): the composer's tag
