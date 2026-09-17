@@ -535,16 +535,14 @@ test("empty focused composer shows its cursor", async ({ page }) => {
 	await seedChat(page, [{ role: "assistant", content: `answer ${long}` }]);
 	await page.goto("/");
 	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
-	const caret = () =>
-		page.evaluate(
-			() => getComputedStyle(document.querySelector(".prompt .cm-content") as Element).caretColor
-		);
 	await page.locator(".cm-content").click();
 	await expect
 		.poll(() => page.evaluate(() => !!document.activeElement?.closest?.(".prompt")))
 		.toBe(true);
-	// Focused + empty: caret blinks (not transparent).
-	expect(await caret()).not.toBe("rgba(0, 0, 0, 0)");
+	// Focused + empty: the owned drawn caret mounts. The native caret
+	// stays suppressed by design (drawSelection paints the caret, the
+	// browser doesn't) — so this pins the node, not the caret-color.
+	await expect(page.locator(".prompt .cm-cursor-primary")).toHaveCount(1);
 	// Blurred + empty: no stray caret (CodeMirror drops .cm-focused
 	// async, so wait for the unfocused state first).
 	await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
@@ -555,7 +553,7 @@ test("empty focused composer shows its cursor", async ({ page }) => {
 			)
 		)
 		.toBe(false);
-	expect(await caret()).toBe("rgba(0, 0, 0, 0)");
+	await expect(page.locator(".prompt .cm-cursor")).toBeHidden();
 });
 
 /** The prompt parks while a sidebar owns the stage: settings open
@@ -1029,6 +1027,25 @@ test("new chat button shows and focuses the prompt", async ({ page }) => {
 			{ timeout: 10_000 }
 		)
 		.toBe(true);
+});
+
+/** Parking never moves the tools: the card fade is the whole idle
+signal, so the attach/voice pair can't wander on focus changes. */
+test("idle parking leaves the prompt tools in place", async ({ page }) => {
+	await seedChat(page, [{ role: "user", content: "hi" }]);
+	await page.addInitScript(() => {
+		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({ promptIdleSec: -1 }));
+	});
+	await page.goto("/");
+	const tools = page.locator(".prompt .prompt-tools");
+	await expect(page.locator("article.user").first()).toBeVisible({ timeout: 60_000 });
+	// Bare i restores the always-hidden prompt into the composer.
+	await page.keyboard.press("i");
+	await expect(page.locator(".prompt")).not.toHaveClass(/prompt-idle/, { timeout: 10_000 });
+	// Blur into the thread: always-hide parks at once.
+	await page.locator("article.user").first().click();
+	await expect(page.locator(".prompt")).toHaveClass(/prompt-idle/, { timeout: 10_000 });
+	await expect(tools).toHaveCSS("transform", "none");
 });
 
 /** A short thread never hides at boot: nothing to uncover. */

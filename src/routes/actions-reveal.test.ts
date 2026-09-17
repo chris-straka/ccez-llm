@@ -87,12 +87,15 @@ describe("hover-only message actions", () => {
 		const css = pageStyle();
 		expect(css).toContain("main.scale-actions .actions button");
 		// Text buttons already grow under the opt-in; the logo icons
-		// must follow, or larger text leaves tiny icons.
+		// must follow, or larger text leaves tiny icons. Growth damps
+		// a fifth on both — full tracking overshoots the text.
 		const glyph = css.match(
 			/main\.scale-actions \.actions \.icon-btn[^{]*\{([^}]*)\}/
 		);
 		expect(glyph, "scale-actions glyph rule is gone — move it with the text rule").toBeTruthy();
-		expect(glyph![1]).toMatch(/height\s*:\s*calc\(1\.05rem \* min\(var\(--font-scale/);
+		expect(glyph![1]).toMatch(
+			/height\s*:\s*calc\(1\.05rem \* \(1 \+ \(min\(var\(--font-scale/
+		);
 	});
 
 	it("caps opt-in button scaling like the bubble", () => {

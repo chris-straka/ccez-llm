@@ -2552,6 +2552,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		persistSettings();
 		if (!androidUI) enterEditMode();
 		else restorePrompt();
+		// Every caller is an explicit user action (button, menu,
+		// deep link, chord) — never the auto-mint — so this never
+		// fires uninvited.
+		flashToast("Chat created");
 	}
 
 	const useMock = mockProviderEnabled();
@@ -5577,10 +5581,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	(in-memory only — drafts live per-chat in storage, so counting
 	them here would read localStorage on every row render). */
 	function sideTip(item: (typeof chatState.chats)[number]): string {
+		// Empty chats report nothing: a "0 messages" tip is pure noise
+		// (and pops on every keyboard-opened sidebar via the focus tip).
 		const n = item.messages.length;
+		if (n === 0) return "";
 		const you = item.messages.filter((m) => m.role === "user").length;
 		const msgs = n === 1 ? "1 message" : `${n} messages`;
-		if (n === 0) return msgs;
 		return `${msgs} · you ${you} · assistant ${n - you}`;
 	}
 
@@ -8908,7 +8914,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							requestAnimationFrame(() => focusSideChat(sideIdx));
 						}}><ActionIcon kind="close" /></button
 					>
-					<span class="side-tip" role="tooltip">{sideTip(item)}</span>
+					{#if item.messages.length > 0}
+						<span class="side-tip" role="tooltip">{sideTip(item)}</span>
+					{/if}
 				</li>
 			{/each}
 		</ul>
@@ -10615,7 +10623,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	/* Hover tip: message counts under the row, inside the drawer
 	(the list scrolls, so nothing may stick out sideways). Inverted
 	pill voice, pointer-transparent so the preview and row buttons
-	never notice it. */
+	never notice it. Scoped to the row button itself: hovering the
+	export/delete buttons must not summon it. */
 	.side-tip {
 		position: absolute;
 		top: calc(100% + 2px);
@@ -10638,8 +10647,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		pointer-events: none;
 		transition: opacity 0.15s ease;
 	}
-	aside li:hover .side-tip,
-	aside li:focus-within .side-tip {
+	aside .side-chat:hover ~ .side-tip,
+	aside .side-chat:focus-visible ~ .side-tip {
 		opacity: 1;
 	}
 	aside li button:first-child {
@@ -13297,6 +13306,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		cursor: pointer;
 		white-space: nowrap;
 	}
+	/* Light plain toast (dark-always above): white card, ink text,
+	quiet border — the same surface as the light edit card. Raw
+	values like that card, not tokens: there is no surface token. */
+	:global(html[data-theme="light"]) .toast:not(.error) {
+		background: #fff;
+		color: #1c1c1e;
+		border-color: #e5e5ea;
+	}
 	/* Error toasts pair red both ways (same pairings as the banner):
 	the tokens already resolve per theme, so no dark override block. */
 	.toast.error {
@@ -14385,14 +14402,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 	/* Opt-in (Settings): message buttons grow with the text-size
 	setting instead of holding their fixed 0.75rem — capped like the
-	bubble, so huge type doesn't dome them into towers. */
+	bubble, so huge type doesn't dome them into towers. Growth is
+	damped a fifth: full tracking overshoots the text beside it. */
 	main.scale-actions .actions button {
-		font-size: calc(0.75rem * min(var(--font-scale, 1), 2));
+		font-size: calc(0.75rem * (1 + (min(var(--font-scale, 1), 2) - 1) * 0.8));
 	}
 	/* Same opt-in for the logo icons: the glyph holds its fixed
 	1.05rem height otherwise, so larger text leaves tiny icons. */
 	main.scale-actions .actions .icon-btn :global(.action-glyph) {
-		height: calc(1.05rem * min(var(--font-scale, 1), 2));
+		height: calc(1.05rem * (1 + (min(var(--font-scale, 1), 2) - 1) * 0.8));
 	}
 	/* Loading buttons hold their look while the dots pulse. */
 	.actions button:disabled {
@@ -14531,15 +14549,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	twitch). Scoped off phones: their idle has no slide to cancel.
 	The empty-chat preview cancels the card slide, so it cancels
 	the counter-slide too. */
+	/* The tools ride the card rigidly: the old idle slide moved the
+	attach/voice pair on every focus change (always-hide parks on
+	blur), reading as wandering buttons. The card fade below is the
+	whole idle signal now. */
 	.app:not([data-android]) .prompt-tools {
-		transition: transform 0.25s ease;
-	}
-	.app:not([data-android]) .prompt.prompt-idle .prompt-tools {
-		transform: translateY(-0.75rem);
-	}
-	.app:not([data-android]) .prompt.prompt-idle.prompt-preview .prompt-tools {
 		transform: none;
-		transition: transform 0.35s ease;
 	}
 	.prompt {
 		/* Floating card, always: same geometry hidden or shown, so the
@@ -14705,6 +14720,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		display: flex;
 		align-items: center;
 		gap: 0.35rem;
+	}
+	/* The editor mounts one frame after first paint (effect, not
+	markup): until its node lands, the tools and send button stay
+	hidden so they never flash ahead of the editable text. No layout
+	risk — both are absolutely positioned. */
+	.prompt:not(:has(.cm-editor)):not(:has(.ta-input)) .prompt-tools,
+	.prompt:not(:has(.cm-editor)):not(:has(.ta-input)) .send-btn {
+		visibility: hidden;
 	}
 	.attach-btn,
 	.voice-float,
