@@ -645,33 +645,42 @@ test("multi-paragraph wash paints no gaps and keeps the highlight", async ({ pag
 	const snapshot = () =>
 		page.evaluate(() => {
 			const root = document.querySelector("article .rendered");
-			const marks = [...(root?.querySelectorAll("mark.ccez-ann") ?? [])].map((m) => m.textContent);
+			// The preview wash paints Highlight ranges (no DOM marks).
+			const reg = (
+				window as unknown as {
+					CSS?: { highlights?: { get(name: string): Set<Range> | undefined } };
+				}
+			).CSS?.highlights;
+			const ranges = [...(reg?.get("ccez-ann") ?? [])].map((r) => r.toString());
 			const box = root?.querySelector("button.ccez-ann-badge")?.getBoundingClientRect();
 			return {
-				blankMarks: marks.filter((text) => !/\S/.test(text ?? "")).length,
+				rangeCount: ranges.length,
+				blankRanges: ranges.filter((text) => !/\S/.test(text ?? "")).length,
 				badgeY: box ? Math.round(box.y) : -1,
 				height: root?.getBoundingClientRect().height
 			};
 		});
 	const washed = await snapshot();
-	expect(washed.blankMarks).toBe(0);
-	// A live highlight inside the washed region survives hover on/off.
-	// (The preview wash split the paragraphs at the first selection's
-	// edges, so re-anchor by content, not by node order.)
+	expect(washed.rangeCount).toBeGreaterThan(0);
+	expect(washed.blankRanges).toBe(0);
+	// A live highlight inside the washed region survives hover on/off
+	// (re-anchor by content: the badge anchor splits text nodes, so
+	// node order never survives stamping).
 	const reselected = await page.evaluate(() => {
-		const texts: Text[] = [];
 		const walker = document.createTreeWalker(
 			document.querySelector("article .rendered"),
 			NodeFilter.SHOW_TEXT
 		);
 		while (walker.nextNode()) {
 			const node = walker.currentNode;
-			if (node instanceof Text && node.textContent === "paragraph here.") texts.push(node);
+			const text = node instanceof Text ? (node.textContent ?? "") : "";
+			const at = text.indexOf("paragraph here.");
+			if (at >= 0) {
+				window.getSelection()?.setBaseAndExtent(node, at, node, at + 9);
+				return window.getSelection()?.toString() ?? "";
+			}
 		}
-		const target = texts[0];
-		if (!target) throw new Error("no target");
-		window.getSelection()?.setBaseAndExtent(target, 0, target, 9);
-		return window.getSelection()?.toString() ?? "";
+		throw new Error("no target");
 	});
 	expect(reselected).toBe("paragraph");
 	const box = await badge.boundingBox();
@@ -679,7 +688,8 @@ test("multi-paragraph wash paints no gaps and keeps the highlight", async ({ pag
 	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
 	await page.waitForTimeout(300);
 	const hovered = await snapshot();
-	expect(hovered.blankMarks).toBe(0);
+	expect(hovered.rangeCount).toBeGreaterThan(0);
+	expect(hovered.blankRanges).toBe(0);
 	expect(hovered.height).toBe(washed.height);
 	expect(hovered.badgeY).toBe(washed.badgeY);
 	expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).toBe("paragraph");
@@ -753,12 +763,20 @@ test("annotating bullets and saving with Enter clears the highlight", async ({ p
 	// The save itself worked: one badge stamped on the quote, and the
 	// steady state carries no wash — badges alone mark saved quotes.
 	expect(await page.locator("article .rendered [data-ann-badge]").count()).toBe(1);
-	// Past both fade windows (pill 160ms, wash 180ms): steady state
-	// carries no wash — badges alone mark saved quotes.
+	// Past the pill fade (160ms): steady state carries no wash —
+	// badges alone mark saved quotes (the Highlight wash clears
+	// instantly, no fade-out).
 	await page.waitForTimeout(600);
 	expect(
-		await page.evaluate(() => document.querySelectorAll("article .rendered mark.ccez-ann").length)
-	).toBe(0);
+		await page.evaluate(
+			() =>
+				(
+					window as unknown as {
+						CSS?: { highlights?: { has(name: string): boolean } };
+					}
+				).CSS?.highlights?.has("ccez-ann") ?? false
+		)
+	).toBe(false);
 });
 
 /** A press outside message text that drags into the chat keeps the
@@ -1216,9 +1234,14 @@ test("create box centers over narrow highlights, wide ones open at the cursor", 
 	const popBox = await pop.boundingBox();
 	const highlight = await page.evaluate(() => {
 		// Annotate consumed the live highlight, so read the pending
-		// wash mark it stamped instead.
-		const mark = document.querySelector("article.assistant mark.ccez-ann");
-		const r = mark?.getBoundingClientRect();
+		// wash range it painted instead (Highlight API: no DOM marks).
+		const reg = (
+			window as unknown as {
+				CSS?: { highlights?: { get(name: string): Set<Range> | undefined } };
+			}
+		).CSS?.highlights;
+		const ranges = [...(reg?.get("ccez-ann") ?? [])];
+		const r = ranges[0]?.getBoundingClientRect();
 		if (!r) return null;
 		return { left: r.left, width: r.width };
 	});

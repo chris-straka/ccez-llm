@@ -26,3 +26,24 @@ test("gutter double-click opens the chat list anywhere left of the column", asyn
 	await page.mouse.dblclick(box.x + 10, box.y + 120);
 	await expect(aside).not.toHaveClass(/collapsed/, { timeout: 10_000 });
 });
+
+/** Double-clicking open space below the thread focuses the composer:
+margins hit-test to the scroller, so the gap past the last message
+summons the prompt (a real text pick lands on text instead). */
+test("double-clicking below the thread focuses the composer", async ({ page }) => {
+	await seedChat(page, [
+		{ role: "user", content: "one" },
+		{ role: "assistant", content: "two" }
+	]);
+	await page.goto("/");
+	const last = page.locator("article.assistant");
+	await expect(last).toBeVisible({ timeout: 60_000 });
+	const box = await last.boundingBox();
+	if (!box) throw new Error("no article box");
+	await page.mouse.dblclick(box.x + box.width / 2, box.y + box.height + 6);
+	await expect
+		.poll(() => page.evaluate(() => !!document.activeElement?.closest?.(".prompt")), {
+			timeout: 10_000
+		})
+		.toBe(true);
+});

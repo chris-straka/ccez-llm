@@ -541,21 +541,29 @@ for (const t of THEMES) {
 	});
 }
 
-/** The font-tracking opt-in damps growth a fifth: full tracking
-overshoots the text beside the buttons. */
-test("action buttons damp their font tracking", async ({ page }) => {
+/** Message buttons read 85% of the message size, tracking the
+text-size setting instead of holding a fixed size. */
+test("action buttons read 85 percent of message size", async ({ page }) => {
 	await seedChat(page, [{ role: "assistant", content: "hello" }]);
 	await page.addInitScript(() => {
 		window.localStorage.setItem(
 			"ccez-llm-settings-v1",
-			JSON.stringify({ scaleActionsWithFont: true, fontScale: 2, promptIdleSec: 0 })
+			JSON.stringify({ fontScale: 2, promptIdleSec: 0 })
 		);
 	});
 	await page.goto("/");
 	const btn = page.locator("article.assistant .actions button").first();
 	await expect(btn).toHaveCount(1, { timeout: 60_000 });
-	// 0.75rem * (1 + (2 - 1) * 0.8) = 1.35rem = 21.6px at the 16px root.
-	await expect(btn).toHaveCSS("font-size", "21.6px");
+	const sizes = await page.evaluate(() => {
+		const button = document.querySelector("article.assistant .actions button");
+		const body = document.querySelector("article.assistant .rendered");
+		if (!button || !body) throw new Error("missing action row");
+		return {
+			button: parseFloat(getComputedStyle(button).fontSize),
+			body: parseFloat(getComputedStyle(body).fontSize)
+		};
+	});
+	expect(sizes.button / sizes.body).toBeCloseTo(0.85, 2);
 });
 
 test("composer holds its first line clear of the tools", async ({ page }) => {

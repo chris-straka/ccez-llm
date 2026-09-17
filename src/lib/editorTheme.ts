@@ -43,15 +43,24 @@ export const appTheme = EditorView.theme({
 	// the hidden lines.
 	".cm-scroller": { maxHeight: "12rem", overflowY: "auto" },
 	".cm-focused": { outline: "none" },
-	// Grey shade, never a code block: the tag carries no background or
-	// border of its own, just muted text (Muse Code style).
+	// One tag look for every pasted thing (light theme): bold body
+	// text, never muted gray and never the markdown link underline —
+	// image/file tags and `[Pasted content N chars]` read the same.
+	// Dark theme rides gray + bold instead (see the pinned dark rules
+	// in +page.svelte: the theme object can't do @media reliably).
 	".cm-paste-marker": {
 		display: "inline-block",
 		// Body-size like the sent-message tags: the marker is text, not
 		// chrome, and must not shrink beside the draft.
 		fontSize: "1em",
-		color: "#6e6e73",
+		fontWeight: "700",
+		color: "inherit",
 		cursor: "pointer"
+	},
+	".cm-attach-tag": {
+		fontWeight: "700",
+		color: "inherit",
+		textDecoration: "none"
 	},
 	// Expanded-paste collapse brackets: the sent-message twin of
 	// history's fold brackets (same blue, same ride-high nudge).

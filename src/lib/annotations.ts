@@ -5,6 +5,11 @@
  * restarts (see load/saveDraftAnnotations); the baked blocks never do.
  */
 import type { ChatMsgId } from "./chat";
+import {
+	clearAnnotationWash,
+	highlightsSupported,
+	paintAnnotationWash
+} from "./annHighlights";
 
 /** Opaque annotation identifier (see ChatId/ChatMsgId in chat.ts). */
 export type AnnotationId = string & { readonly kind: "annotation" };
@@ -15,6 +20,13 @@ export interface Annotation {
 	messageId: ChatMsgId;
 	quote: string;
 	comment: string;
+	/**
+	 * Aid text the quote was selected from (tashkeel vocalization):
+	 * the badge only shows while that aid is on for the message —
+	 * the quote locates against vocalized text, never the bare form.
+	 * Memory-only like `at` (badges stamp from live annotations).
+	 */
+	aidScope?: "tashkeel";
 	/**
 	 * Which repeat of the quote was selected (0-based, default 0):
 	 * annotating the last "c" in "ccc" stores 2, so the badge lands
@@ -41,6 +53,17 @@ export function addAnnotation(
 }
 
 /**
+ * True when an aid-scoped quote may stamp its badge: tashkeel quotes
+ * locate against vocalized text, so on the bare form they'd badge the
+ * wrong words — they show only while the aid is on for the message.
+ * Unscoped quotes always show. Pure so the message-badge filter
+ * unit-tests without the component.
+ */
+export function aidMarkVisible(aidScope: Annotation["aidScope"], tashkeelOn: boolean): boolean {
+	return aidScope !== "tashkeel" || tashkeelOn;
+}
+
+/**
  * Id of the saved annotation already quoting the same span of the same
  * message (same text, same repeat), if any: annotating it again would
  * stack two badges on one anchor, and hovering them oscillates as the
@@ -51,12 +74,17 @@ export function duplicateAnnotationId(
 	list: Annotation[],
 	messageId: ChatMsgId,
 	quote: string,
-	at = 0
+	at = 0,
+	aidScope?: "tashkeel"
 ): AnnotationId | null {
 	const trimmed = quote.trim();
 	if (!trimmed) return null;
 	const found = list.find(
-		(a) => a.messageId === messageId && a.quote === trimmed && (a.at ?? 0) === at
+		(a) =>
+			a.messageId === messageId &&
+			a.quote === trimmed &&
+			(a.at ?? 0) === at &&
+			(a.aidScope ?? null) === (aidScope ?? null)
 	);
 	return found ? found.id : null;
 }
@@ -296,7 +324,12 @@ export function quoteRange(root: HTMLElement, quote: string, occurrence = 0): Ra
 		const to = Math.min(loc.endOffset, last.textContent?.length ?? 0);
 		const range = document.createRange();
 		range.setStart(first, from);
-		range.setEnd(last, Math.max(to, from));
+		// Same-node only: an end before its start inverts, so pin it.
+		// Across nodes the offsets live in different texts (a badge
+		// anchor splitting a quote leaves the last node short while
+		// the first runs long) — maxing there overshoots the last
+		// node and throws.
+		range.setEnd(last, first === last ? Math.max(to, from) : to);
 		return range.collapsed ? null : range;
 	} catch {
 		return null;
@@ -413,6 +446,8 @@ export interface AnnotationMark {
 	quote: string;
 	/** Repeat of the quote to stamp (see Annotation.at). */
 	at?: number;
+	/** Aid text the quote locates against (see Annotation.aidScope). */
+	aidScope?: "tashkeel";
 	/**
 	 * Preview (unsaved) annotation: washes like a real mark when it is
 	 * the open one, but stamps no badge — badges appear on submit only.
@@ -705,7 +740,126 @@ export function applyMarks(
 	}
 }
 
-function stampMarks(root: HTMLElement, items: AnnotationMark[], skip: boolean, wash: string | null): void {
+/**
+ * Stamp signature: badge placement depends on items + skip only. A
+ * wash-only change (badge hover, draft click) re-stamps marks without
+ * touching badges or anchors — see stampWashOnly below.
+ */
+function stampSignature(items: AnnotationMark[], skip: boolean): string {
+	return `${skip ? 1 : 0}|${items
+		.map(
+			(i) => `${i.id}:${i.number}:${i.quote}:${i.at ?? 0}:${i.preview === true ? 1 : 0}:${i.aidScope ?? ""}`
+		)
+		.join(",")}`;
+}
+
+/**
+ * Re-wrap a cleared wash so CSS can ramp it to transparent; unwrap
+ * once the fade plays out. Runs in the same task as the unwrap, so
+ * no unwashed frame ever paints. A superseding stamp unwraps these
+ * early and the sweep no-ops (replaceWith on a detached node does
+ * nothing).
+ */
+function wrapLeaving(root: HTMLElement, items: AnnotationMark[], fading: string): void {
+	const gone = items.find((item) => item.id === fading);
+	if (!gone) return;
+	const fnodes = quoteTextNodes(root);
+	const floc = locateQuote(
+		fnodes.map((node) => node.textContent ?? ""),
+		gone.quote,
+		gone.at ?? 0
+	);
+	if (!floc) return;
+	wrapRange(fnodes, floc, "leaving");
+	const doomed = [...root.querySelectorAll("mark.ccez-ann.leaving")];
+	setTimeout(() => {
+		// A live highlight owns the DOM under it: unwrapping now would
+		// pull the range's nodes out from under the cursor (and no
+		// post-hoc check can tell our disturbance from a redraw the
+		// user started in the meantime), so leave the transparent mark
+		// for the next stamp, which unwraps it under save/restore like
+		// any other mark.
+		const live = document.getSelection();
+		if (live && live.rangeCount > 0 && !live.isCollapsed) return;
+		for (const mark of doomed) {
+			if (mark.classList.contains("leaving")) {
+				mark.replaceWith(document.createTextNode(mark.textContent ?? ""));
+			}
+		}
+	}, WASH_FADE_MS);
+}
+
+/**
+ * DOM ranges for the washed quote (cluster-snapped, never through a
+ * cluster): the Highlight-API wash paints these over the untouched
+ * DOM — no wrapping, no text-node splits, no shaping breaks.
+ */
+function washRanges(root: HTMLElement, items: AnnotationMark[], wash: string): Range[] {
+	const item = items.find((i) => i.id === wash);
+	if (!item) return [];
+	const nodes = quoteTextNodes(root);
+	const loc = locateQuote(
+		nodes.map((n) => n.textContent ?? ""),
+		item.quote,
+		item.at ?? 0
+	);
+	if (!loc) return [];
+	try {
+		const startNode = nodes[loc.startNode];
+		const endNode = nodes[loc.endNode];
+		if (!startNode || !endNode) return [];
+		const startText = startNode.textContent ?? "";
+		const endText = endNode.textContent ?? "";
+		const range = root.ownerDocument.createRange();
+		range.setStart(startNode, expandWrapStart(startText, Math.min(loc.startOffset, startText.length)));
+		range.setEnd(endNode, expandWrapEnd(endText, Math.min(loc.endOffset, endText.length)));
+		if (range.collapsed) return [];
+		return [range];
+	} catch {
+		return [];
+	}
+}
+
+/**
+ * Paint the wash through the Highlight API: ranges over the untouched
+ * DOM — hovering a badge or opening a draft moves zero DOM nodes, so
+ * markers never flicker and shaping never breaks. No fade ramps (the
+ * registry paints instantly); the DOM-mark fallback below keeps them.
+ */
+function paintWashHighlight(
+	root: HTMLElement,
+	items: AnnotationMark[],
+	skip: boolean,
+	wash: string | null
+): void {
+	root.dataset.washStamped = wash ?? "";
+	// One wash shows at a time (a single wash id feeds every body):
+	// painting clears the registry first so a jump never double-paints.
+	if (!skip && wash) {
+		const ranges = washRanges(root, items, wash);
+		if (ranges.length > 0) {
+			clearAnnotationWash();
+			root.dataset.washPainted = "1";
+			paintAnnotationWash(ranges);
+			return;
+		}
+	}
+	// Nothing to show here: clear only a wash this body painted — a
+	// stamp from any other body must not wipe the live wash.
+	if (root.dataset.washPainted === "1") {
+		root.dataset.washPainted = "";
+		clearAnnotationWash();
+	}
+}
+
+/**
+ * Badge + anchor re-stamp (placement depends on items + skip): unwrap
+ * everything, relocate on clean text, reuse live button nodes. Runs
+ * only when the badge set changed — wash-only changes never reach
+ * here, so hovering can no longer drop every marker's :hover
+ * mid-flight and flicker the row.
+ */
+function stampBadges(root: HTMLElement, items: AnnotationMark[], skip: boolean): void {
 	// Ids already on screen: re-stamping them (every render unwraps and
 	// re-locates) must not replay the mount fade — only new badges are fresh.
 	const settled = new Set(
@@ -722,13 +876,8 @@ function stampMarks(root: HTMLElement, items: AnnotationMark[], skip: boolean, w
 		if (badge instanceof HTMLButtonElement) live.set(badge.dataset.annBadge ?? "", badge);
 		badge.remove();
 	}
-	// The wash whose marks are currently mounted ("" when none): a steady
-	// wash re-stamps without replaying its fade-in, like settled badges.
-	const prevWash = root.dataset.washStamped || null;
-	// A cleared wash fades out: unwrap now (badges need clean text to
-	// anchor beside, never inside, a mark), stamp badges normally, then
-	// re-wrap the old range as leaving marks below.
-	const fading = !skip && !wash && prevWash ? prevWash : null;
+	// Wash marks unwrap first (badges are already out, so textContent
+	// is safe), then anchors: re-renders never nest or accumulate.
 	for (const mark of root.querySelectorAll("mark.ccez-ann")) {
 		mark.replaceWith(document.createTextNode(mark.textContent ?? ""));
 	}
@@ -740,7 +889,70 @@ function stampMarks(root: HTMLElement, items: AnnotationMark[], skip: boolean, w
 	}
 	// Wrapping splits text nodes and unwrapping never merges them back:
 	// without this, every re-stamp fragments the text further and later
-	// washes span (and count) fragments instead of quotes.
+	// locates span (and count) fragments instead of quotes.
+	root.normalize();
+	if (skip || items.length === 0) return;
+	for (const item of items) {
+		// Preview (unsaved) annotations wash when open but stamp no
+		// badge: badges appear on submit only.
+		if (item.preview) continue;
+		// Fresh snapshot per item: the previous anchor splits text
+		// nodes, so earlier indices go stale — nested quotes (a
+		// sentence and its parts) only locate on the current DOM.
+		const nodes = quoteTextNodes(root);
+		const loc = locateQuote(
+			nodes.map((node) => node.textContent ?? ""),
+			item.quote,
+			item.at ?? 0
+		);
+		if (!loc) continue;
+		const anchor = anchorSpan(nodes, loc);
+		if (!anchor) continue;
+		// Reuse the live button when one is already on screen: same
+		// node, same anchor, same stacking — a hover can never catch
+		// the swap mid-flight and oscillate.
+		const badge = live.get(item.id) ?? document.createElement("button");
+		badge.type = "button";
+		badge.className = "ccez-ann-badge";
+		if (!settled.has(item.id)) badge.classList.add("fresh");
+		else badge.classList.remove("fresh");
+		badge.dataset.annBadge = item.id;
+		badge.textContent = String(item.number);
+		badge.title = "Open annotation";
+		anchor.append(badge);
+	}
+}
+
+/**
+ * Legacy full stamp (engines without the Highlight API): unwrap
+ * everything, wrap the wash first, then anchor badges onto the washed
+ * DOM. Frozen semantics — jsdom pins this path, so it never changes
+ * out from under the unit suite.
+ */
+function stampLegacy(root: HTMLElement, items: AnnotationMark[], skip: boolean, wash: string | null): void {
+	const settled = new Set(
+		[...root.querySelectorAll("[data-ann-badge]")].map((el) =>
+			el instanceof HTMLElement ? (el.dataset.annBadge ?? "") : ""
+		)
+	);
+	const live = new Map<string, HTMLButtonElement>();
+	for (const badge of root.querySelectorAll("[data-ann-badge]")) {
+		if (badge instanceof HTMLButtonElement) live.set(badge.dataset.annBadge ?? "", badge);
+		badge.remove();
+	}
+	// The wash whose marks are currently mounted ("" when none): a steady
+	// wash re-stamps without replaying its fade-in, like settled badges.
+	const prevWash = root.dataset.washStamped || null;
+	// A cleared wash fades out: unwrap now (badges need clean text to
+	// anchor beside, never inside, a mark), stamp badges normally, then
+	// re-wrap the old range as leaving marks below.
+	const fading = !skip && !wash && prevWash ? prevWash : null;
+	for (const mark of root.querySelectorAll("mark.ccez-ann")) {
+		mark.replaceWith(document.createTextNode(mark.textContent ?? ""));
+	}
+	for (const anchor of root.querySelectorAll("span.ccez-ann-anchor")) {
+		anchor.replaceWith(document.createTextNode(anchor.textContent ?? ""));
+	}
 	root.normalize();
 	root.dataset.washStamped = wash ?? "";
 	if (skip || items.length === 0) return;
@@ -771,9 +983,6 @@ function stampMarks(root: HTMLElement, items: AnnotationMark[], skip: boolean, w
 		if (!freshLoc) continue;
 		const anchor = anchorSpan(freshNodes, freshLoc);
 		if (!anchor) continue;
-		// Reuse the live button when one is already on screen: same
-		// node, same anchor, same stacking — a hover can never catch
-		// the swap mid-flight and oscillate.
 		const badge = live.get(item.id) ?? document.createElement("button");
 		badge.type = "button";
 		badge.className = "ccez-ann-badge";
@@ -784,41 +993,31 @@ function stampMarks(root: HTMLElement, items: AnnotationMark[], skip: boolean, w
 		badge.title = "Open annotation";
 		anchor.append(badge);
 	}
-	if (fading) {
-		// Re-wrap the cleared wash so CSS can ramp it to transparent;
-		// unwrap once the fade plays out. Runs in the same task as the
-		// unwrap above, so no unwashed frame ever paints. A superseding
-		// stamp unwraps these early and the sweep no-ops (replaceWith on
-		// a detached node does nothing).
-		const gone = items.find((item) => item.id === fading);
-		if (gone) {
-			const fnodes = quoteTextNodes(root);
-			const floc = locateQuote(
-				fnodes.map((node) => node.textContent ?? ""),
-				gone.quote,
-				gone.at ?? 0
-			);
-			if (floc) {
-				wrapRange(fnodes, floc, "leaving");
-				const doomed = [...root.querySelectorAll("mark.ccez-ann.leaving")];
-				setTimeout(() => {
-					// A live highlight owns the DOM under it: unwrapping
-					// now would pull the range's nodes out from under the
-					// cursor (and no post-hoc check can tell our disturbance
-					// from a redraw the user started in the meantime), so
-					// leave the transparent mark for the next stamp, which
-					// unwraps it under save/restore like any other mark.
-					const live = document.getSelection();
-					if (live && live.rangeCount > 0 && !live.isCollapsed) return;
-					for (const mark of doomed) {
-						if (mark.classList.contains("leaving")) {
-							mark.replaceWith(document.createTextNode(mark.textContent ?? ""));
-						}
-					}
-				}, WASH_FADE_MS);
-			}
-		}
+	if (fading) wrapLeaving(root, items, fading);
+}
+
+/**
+ * Full stamp driver: engines without the Highlight API take the frozen
+ * legacy path; everywhere else badges re-stamp only when the badge set
+ * changed (new/submitted/deleted annotation, fold/stream toggle, or an
+ * html swap that wiped the DOM) while washes paint through the
+ * registry — hovering a badge or opening a draft moves zero DOM nodes.
+ */
+function stampMarks(root: HTMLElement, items: AnnotationMark[], skip: boolean, wash: string | null): void {
+	if (!highlightsSupported()) {
+		stampLegacy(root, items, skip, wash);
+		return;
 	}
+	const sig = stampSignature(items, skip);
+	const wantBadges = skip ? 0 : items.filter((i) => !i.preview).length;
+	const badgesCurrent =
+		root.dataset.marksStamped === sig &&
+		root.querySelectorAll("[data-ann-badge]").length === wantBadges;
+	if (!badgesCurrent) {
+		root.dataset.marksStamped = sig;
+		stampBadges(root, items, skip);
+	}
+	paintWashHighlight(root, items, skip, wash);
 }
 
 /**

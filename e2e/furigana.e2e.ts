@@ -156,6 +156,25 @@ test.describe("pinning", () => {
 		await expect(body.locator(".frb").first()).toBeVisible({ timeout: 60_000 });
 		await expect(body).toContainText("けいさつ");
 	});
+
+	/** Pinning furigana keeps code and math blocks: ruby stamps onto
+	the rendered HTML, so fences stay fenced and equations stay KaTeX
+	(never raw source text). */
+	test("pinning furigana keeps code and math blocks", async ({ page }) => {
+		await seedChat(page, [
+			{ role: "assistant", content: "漢字を読む\n\n```python\nprint('hi')\n```\n\n$$E = mc^2$$" }
+		]);
+		await page.goto("/");
+		const actions = page.locator("article.assistant .actions");
+		const body = page.locator("article.assistant .rendered");
+		await expect(actions).toBeVisible({ timeout: 60_000 });
+		await actions.locator('button:has-text("読み仮名")').click();
+		await expect(body.locator(".frb").first()).toBeVisible({ timeout: 60_000 });
+		await expect(body.locator(".ccez-code pre code")).toBeVisible();
+		expect(await body.locator(".ccez-math .katex").count()).toBeGreaterThan(0);
+		await expect(body.locator(".ccez-math-raw")).toBeHidden();
+		await expect(body).not.toContainText("```python");
+	});
 });
 
 test.describe("hover", () => {

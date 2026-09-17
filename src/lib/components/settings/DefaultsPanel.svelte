@@ -82,7 +82,7 @@
 			<legend>Messages</legend>
 			<label class="check">
 				<input type="checkbox" bind:checked={settings.scaleActionsWithFont} />
-				Scale message buttons with text size
+				Scale message icons with text size
 			</label>
 			<label class="check">
 				<input type="checkbox" bind:checked={settings.hideButtons} />
@@ -130,7 +130,7 @@
 		</label>
 		<label class="check">
 			<input type="checkbox" bind:checked={settings.scaleActionsWithFont} />
-			Scale message buttons with text size
+			Scale message icons with text size
 		</label>
 		<label class="check">
 			<input type="checkbox" bind:checked={settings.showMessageButtons} />

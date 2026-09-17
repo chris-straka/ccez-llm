@@ -105,3 +105,24 @@ test("a trilingual message offers tashkeel, furigana, and pinyin", async ({
 	await expect(actions.locator('button:has-text("読み仮名")')).toBeVisible();
 	await expect(actions.locator('button:has-text("拼音")')).toBeVisible();
 });
+
+/** Pinning pinyin keeps code and math blocks: ruby stamps onto the
+rendered HTML, so equations stay rendered and fences stay fenced. */
+test("pinyin keeps code and math blocks", async ({ page }) => {
+	await seedChat(page, [
+		{ role: "assistant", content: "中文段落在这里。\n\n```python\nprint('你好')\n```\n\n$$E = mc^2$$" }
+	]);
+	await page.goto("/");
+	const actions = page.locator(`${ARTICLE} .actions`);
+	const body = page.locator(`${ARTICLE} .rendered`);
+	await expect(actions).toBeVisible({ timeout: 60_000 });
+	await actions.locator('button:has-text("拼音")').click();
+	await expect(body.locator("ruby").first()).toBeVisible({ timeout: 60_000 });
+	// The fence is still a code block and the equation still KaTeX —
+	// never raw source text (the hidden raw pre keeps the TeX for
+	// copy, so assert renderedness, not absence).
+	await expect(body.locator(".ccez-code pre code")).toBeVisible();
+	expect(await body.locator(".ccez-math .katex").count()).toBeGreaterThan(0);
+	await expect(body.locator(".ccez-math-raw")).toBeHidden();
+	await expect(body).not.toContainText("```python");
+});

@@ -18,7 +18,14 @@ import {
 	Transaction,
 	type Extension
 } from "@codemirror/state";
-import { EditorView, Decoration, WidgetType, type DecorationSet } from "@codemirror/view";
+import {
+	EditorView,
+	Decoration,
+	ViewPlugin,
+	WidgetType,
+	type DecorationSet,
+	type ViewUpdate
+} from "@codemirror/view";
 import {
 	addPaste,
 	expandPaste,
@@ -660,6 +667,56 @@ function insertTextPaste(view: EditorView, raw: string): boolean {
 		selection: { anchor: from + text.length }
 	});
 	return true;
+}
+
+/**
+ * Attachment-tag spans in a document (pure, unit-tested): every
+ * IMAGE_MARKER / FILE_MARKER occurrence's range, in document order.
+ * The composer styles them as one tag look (bold, never the markdown
+ * link underline the raw `[Pasted image]` text would otherwise take).
+ */
+export interface AttachTagRange {
+	from: number;
+	to: number;
+}
+
+export function attachTagRanges(text: string): AttachTagRange[] {
+	const ranges: AttachTagRange[] = [];
+	const tagRe = new RegExp(`${escapeRegExp(IMAGE_MARKER)}|${escapeRegExp(FILE_MARKER)}`, "g");
+	for (const m of text.matchAll(tagRe)) {
+		const from = m.index ?? 0;
+		ranges.push({ from, to: from + m[0].length });
+	}
+	return ranges;
+}
+
+/**
+ * Attachment-tag styling: mark decorations over every tag span so
+ * pasted-image and pasted-file tags read as one bold tag look in
+ * both themes (light: bold body text; dark: bold gray — see the
+ * `.cm-attach-tag` theme rules). Rebuilt on doc or viewport change;
+ * the composer is short, so whole-doc scans stay cheap.
+ */
+export function attachTagDecorations(): Extension {
+	const build = (view: EditorView): DecorationSet => {
+		const text = view.state.doc.toString();
+		const deco = attachTagRanges(text).map((range) =>
+			Decoration.mark({ class: "cm-attach-tag" }).range(range.from, range.to)
+		);
+		return Decoration.set(deco);
+	};
+	return ViewPlugin.fromClass(
+		class {
+			decorations: DecorationSet;
+			constructor(view: EditorView) {
+				this.decorations = build(view);
+			}
+			update(update: ViewUpdate): void {
+				if (update.docChanged || update.viewportChanged) this.decorations = build(update.view);
+			}
+		},
+		{ decorations: (v) => v.decorations }
+	);
 }
 
 /** Paste hook: images become attachments, long text collapses to a marker. */

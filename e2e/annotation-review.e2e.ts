@@ -210,12 +210,12 @@ test("review quote jumps to the message with a wash blink", async ({ page }) => 
 	await page.locator(".review-quote").first().click();
 	// The review closes so the landing clears the composer dock.
 	await expect(page.locator(".ann-wrap .review")).toHaveCSS("opacity", "0");
-	// The wash blinks: poll through the cycle until a lit phase shows.
+	// The flash blinks: poll through the cycle until a lit phase shows.
 	await expect
 		.poll(
 			() =>
 				page.evaluate(() => {
-					const mark = document.querySelector("mark.ccez-ann");
+					const mark = document.querySelector("mark.ccez-ann-flash");
 					return mark ? getComputedStyle(mark).backgroundColor : "none";
 				}),
 			{ timeout: 4_000 }
@@ -282,7 +282,7 @@ test("down jump lands the quote clear of the dock", async ({ page }) => {
 		.poll(
 			() =>
 				page.evaluate(() => {
-					const mark = document.querySelector("mark.ccez-ann");
+					const mark = document.querySelector("mark.ccez-ann-flash");
 					return mark ? getComputedStyle(mark).backgroundColor : "none";
 				}),
 			{ timeout: 4_000 }
@@ -302,6 +302,17 @@ test("review note click does not jump", async ({ page }) => {
 	await page.waitForTimeout(500);
 	expect(await page.evaluate(() => document.querySelector(".messages")?.scrollTop ?? 0)).toBe(top);
 	await expect(page.locator("mark.ccez-ann")).toHaveCount(0);
+	// No Highlight wash either (the wash paints through the registry).
+	expect(
+		await page.evaluate(
+			() =>
+				(
+					window as unknown as {
+						CSS?: { highlights?: { has(name: string): boolean } };
+					}
+				).CSS?.highlights?.has("ccez-ann") ?? false
+		)
+	).toBe(false);
 	await expect(page.locator(".review-item.highlight")).toHaveCount(0);
 	await expect(page.locator(".ann-wrap.pinned .review")).toBeVisible();
 });
@@ -413,12 +424,12 @@ test("jump leaves a clear mark exactly where it is", async ({ page }) => {
 	await page.evaluate(() => window.getSelection()?.removeAllRanges());
 	const top = await page.evaluate(() => document.querySelector(".messages")?.scrollTop ?? 0);
 	await page.evaluate(() => (document.querySelector(".review-quote") as HTMLElement | null)?.click());
-	// The wash still blinks: the jump happened, it just had nowhere to go.
+	// The flash still blinks: the jump happened, it just had nowhere to go.
 	await expect
 		.poll(
 			() =>
 				page.evaluate(() => {
-					const mark = document.querySelector("mark.ccez-ann");
+					const mark = document.querySelector("mark.ccez-ann-flash");
 					return mark ? getComputedStyle(mark).backgroundColor : "none";
 				}),
 			{ timeout: 4_000 }

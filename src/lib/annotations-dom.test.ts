@@ -401,6 +401,21 @@ describe("quoteRange", () => {
 		expect(range?.endContainer.textContent).toBe(" in spring");
 		root.remove();
 	});
+
+	it("locates a quote split by a stamped badge anchor", () => {
+		const root = document.createElement("div");
+		// A mid-quote anchor leaves the last node short while the
+		// first runs long: end offsets must stay in their own node,
+		// or setEnd overshoots and the range throws to null (the
+		// sent-jump flash never painted).
+		root.innerHTML =
+			'<p>Paragraph 0. wo<span class="ccez-ann-anchor">r<button data-ann-badge="a1">1</button></span>d here.</p>';
+		document.body.appendChild(root);
+		const range = quoteRange(root, "word");
+		expect(range?.startContainer.textContent).toBe("Paragraph 0. wo");
+		expect(range?.endContainer.textContent).toBe("d here.");
+		root.remove();
+	});
 });
 
 describe("wrapRangeInMark / unwrapMark", () => {

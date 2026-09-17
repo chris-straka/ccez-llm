@@ -120,6 +120,19 @@ async function fragment(line: string): Promise<string> {
 	return raw;
 }
 
+/**
+ * One line's furigana conversion (worker-cached): kana-owned lines
+ * convert, everything else passes through escaped. Aid mode renders
+ * markdown first and converts prose text nodes in place (so code and
+ * math blocks survive pinning) — this is the per-node unit the DOM
+ * walk calls. Blank lines convert to nothing.
+ */
+export async function furiganaLine(line: string, preferred: LocalAid | null = null): Promise<string> {
+	if (!line.trim()) return "";
+	if (classifyAidLine(line, preferred) !== "furigana") return escapeHtml(line);
+	return fragment(line);
+}
+
 export async function furiganaHtml(text: string, preferred: LocalAid | null = null): Promise<string> {
 	// Line by line: tokenization must never see (or eat) a newline, so
 	// multi-line messages keep their line structure no matter what the

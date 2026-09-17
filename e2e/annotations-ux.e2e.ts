@@ -66,9 +66,14 @@ test("create box centers over narrow highlights, wide ones open at the cursor", 
 	const popBox = await pop.boundingBox();
 	const highlight = await page.evaluate(() => {
 		// Annotate consumed the live highlight, so read the pending
-		// wash mark it stamped instead.
-		const mark = document.querySelector("article.assistant mark.ccez-ann");
-		const r = mark?.getBoundingClientRect();
+		// wash range it painted instead (Highlight API: no DOM marks).
+		const reg = (
+			window as unknown as {
+				CSS?: { highlights?: { get(name: string): Set<Range> | undefined } };
+			}
+		).CSS?.highlights;
+		const ranges = [...(reg?.get("ccez-ann") ?? [])];
+		const r = ranges[0]?.getBoundingClientRect();
 		if (!r) return null;
 		return { left: r.left, width: r.width };
 	});
@@ -224,4 +229,54 @@ test("gutter drags never highlight above the cursor line", async ({ page }) => {
 	// Nothing above the cursor's line ("aaa", "bbb") may highlight.
 	expect(selected).not.toContain("aaa");
 	expect(selected).not.toContain("bbb");
+});
+
+/** Badge hover moves no DOM nodes: the wash paints through the
+Highlight registry, so the hovered marker keeps its node (and its
+:hover) while every other marker sits still. */
+test("badge hover moves no DOM nodes", async ({ page }) => {
+	await seedChat(page, [{ role: "assistant", content: "hello world from Kyoto" }]);
+	await page.goto("/");
+	const body = page.locator("article.assistant .rendered").first();
+	await expect(body).toBeVisible({ timeout: 60_000 });
+	const box = await body.boundingBox();
+	if (!box) throw new Error("message has no box");
+	// Word-pick "world", file it, submit.
+	await page.evaluate(() => {
+		const text = document.querySelector("article.assistant .rendered p")?.firstChild;
+		if (!(text instanceof Text)) throw new Error("no message text");
+		window.getSelection()?.setBaseAndExtent(text, 6, text, 11);
+	});
+	await page.mouse.up();
+	await expect(page.locator(".sel-menu")).toBeVisible();
+	await page.locator('.sel-menu button:has-text("Annotate")').click();
+	await expect(page.locator(".ann-pop")).toBeVisible();
+	await page.keyboard.press("Enter");
+	const badge = page.locator("button.ccez-ann-badge");
+	await expect(badge).toHaveCount(1, { timeout: 10_000 });
+	await page.evaluate(() => {
+		(window as unknown as { __badge?: Element | null }).__badge =
+			document.querySelector("button.ccez-ann-badge");
+	});
+	// A synthetic mouseover (a real hover can't land: the scroller
+	// parks the badge under the sticky header, which eats the
+	// pointer). The wash path is identical — onBadgeOver reads the
+	// bubbled target, not :hover state.
+	await badge.evaluate((el) =>
+		el.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }))
+	);
+	await page.waitForTimeout(300);
+	const state = await page.evaluate(() => ({
+		same: document.querySelector("button.ccez-ann-badge") ===
+			(window as unknown as { __badge?: Element | null }).__badge,
+		marks: document.querySelectorAll("mark.ccez-ann").length,
+		washed:
+			(window as unknown as { CSS?: { highlights?: { has(n: string): boolean } } }).CSS
+				?.highlights?.has("ccez-ann") ?? false
+	}));
+	// Same button node (no remove + re-append), no DOM wash marks, and
+	// the registry wash actually painted.
+	expect(state.same).toBe(true);
+	expect(state.marks).toBe(0);
+	expect(state.washed).toBe(true);
 });

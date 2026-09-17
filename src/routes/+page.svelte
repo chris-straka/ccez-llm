@@ -142,6 +142,7 @@ import {
 	} from "$lib/attachments";
 		import {
 		duplicateAnnotationId,
+		aidMarkVisible,
 		editAnnotationComment,
 		deleteAnnotation,
 		clearAnnotations,
@@ -3324,10 +3325,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// lands where the highlight was. Anything unresolvable
 		// keeps 0 (first match, the old behavior).
 		const at = occurrenceFromSelection(selMenu.messageId, quote);
+		// A quote picked from vocalized (tashkeel) text locates against
+		// that text only: its badge shows while the aid is on, never on
+		// the bare form.
+		const aidScope = aidModelPin.has(selMenu.messageId) ? ("tashkeel" as const) : undefined;
 		// Same span twice would stack two badges on one anchor (and
 		// hovering them oscillates): open the review on the existing
 		// one instead of filing a twin.
-		const dupe = duplicateAnnotationId(annotations, selMenu.messageId, quote, at);
+		const dupe = duplicateAnnotationId(annotations, selMenu.messageId, quote, at, aidScope);
 		if (dupe) {
 			clearSelection();
 			selMenu = null;
@@ -3341,7 +3346,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			messageId: selMenu.messageId,
 			quote,
 			comment: "",
-			at
+			at,
+			...(aidScope ? { aidScope } : {})
 		};
 		pendingAnn = pending;
 		clearSelection();
@@ -3741,6 +3747,22 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			document.querySelector(`#msg-${index}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
 		}
 		blinkAnnotation(ann.id);
+		// The quote flashes twice like a sent jump (same guaranteed
+		// DOM-mark half + Highlight wash): the badge scroll lands the
+		// eye nearby, the flash lands it on the words. Every paint
+		// re-locates against the repeat it was filed from.
+		const current = annotations.find((a) => a.id === ann.id);
+		if (current) {
+			const quote = current.quote;
+			const at = current.at ?? 0;
+			const locate = (): Range | null => {
+				const article = document.querySelector(`#msg-${index}`);
+				const root = article?.querySelector(".rendered") ?? article;
+				return root instanceof HTMLElement ? quoteRange(root, quote, at) : null;
+			};
+			flashJumpMark(locate);
+			blinkJumpWash(locate);
+		}
 	}
 
 	/**
@@ -4076,12 +4098,23 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * render would re-run every message body on any parent change.
 	 */
 	const memoMarks = createRefMemo<AnnotationMark>(
-		(m) => `${m.id}:${m.number}:${m.quote}:${m.at ?? 0}:${m.preview === true ? "preview" : "saved"}`
+		(m) =>
+			`${m.id}:${m.number}:${m.quote}:${m.at ?? 0}:${m.preview === true ? "preview" : "saved"}:${m.aidScope ?? ""}`
 	);
 	function marksFor(messageId: ChatMsgId): AnnotationMark[] {
+		// Aid-scoped quotes (tashkeel vocalization) only show while the
+		// aid is on: they locate against vocalized text, so on the bare
+		// form they'd badge the wrong words.
+		const tashkeelOn = aidModelPin.has(messageId);
 		const saved: AnnotationMark[] = annotations
-			.filter((a) => a.messageId === messageId)
-			.map((a) => ({ id: a.id, number: annotationNumber(annotations, a.id), quote: a.quote, at: a.at ?? 0 }));
+			.filter((a) => a.messageId === messageId && aidMarkVisible(a.aidScope, tashkeelOn))
+			.map((a) => ({
+				id: a.id,
+				number: annotationNumber(annotations, a.id),
+				quote: a.quote,
+				at: a.at ?? 0,
+				...(a.aidScope ? { aidScope: a.aidScope } : {})
+			}));
 		// A composed-but-unsubmitted annotation washes while its pill is
 		// open, but stamps no badge (badges appear on submit only).
 		if (pendingAnn && pendingAnn.messageId === messageId) {
@@ -4134,36 +4167,33 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 
 	/**
-	 * Hover in: preview the aid, but only when it is already here (cached
-	 * model aid, cached furigana, kind clicked before). Pinyin never
-	 * previews on hover — its swap looped show/hide forever, so it is
-	 * click-to-show only. Fetching happens on click alone — hovering
-	 * must never spend a model call or start furigana's dictionary load
-	 * (that work now runs in a worker, but the rule stands: hover
-	 * previews, click fetches). The swap lock wins over everything:
-	 * right after a click the button under a stationary cursor
-	 * is new, not hovered.
+	 * Hover in: preview a local aid, but only when it is already here
+	 * (cached furigana, kind clicked before). Pinyin never previews on
+	 * hover — its swap looped show/hide forever, so it is click-to-show
+	 * only — and the model aid (tashkeel) never previews either:
+	 * hovering its button must neither show nor remove the vocalized
+	 * text. Fetching happens on click alone — hovering must never
+	 * spend a model call or start furigana's dictionary load (that work
+	 * now runs in a worker, but the rule stands: hover previews, click
+	 * fetches). The swap lock wins over everything: right after a click
+	 * the button under a stationary cursor is new, not hovered.
 	 */
-	function peekAid(msg: ChatMsg, aidId: string | null, kind?: LocalAid): void {
+	function peekAid(msg: ChatMsg, kind?: LocalAid): void {
 		// A live selection menu owns the highlight: hover previews swap
 		// the body HTML, which collapses the selection (and strands the
 		// menu) mid-slide toward Annotate. Previews resume on close.
 		if (selMenu) return;
 		if (aidNoPeek.has(msg.id)) return;
-		if (aidId) {
-			if (vocalized[msg.id] === undefined) return;
-		} else {
-			// Pinyin previews on click alone, never hover: after its
-			// readings render, the button under a stationary cursor is
-			// a new node, and hover-out/in around the swap looped
-			// show/hide forever. Pinyin hovers stay color-only.
-			if (kind === "pinyin") return;
-			// First hover is color-only: previews start after that kind's
-			// first click (pin), never a sibling kind's.
-			if (kind === undefined || !aidSeen.has(aidSeenKey(msg.id, kind))) return;
-			if (kind === "furigana" && !isFuriganaCached(aidDisplayText(msg.content))) {
-				return;
-			}
+		// Pinyin previews on click alone, never hover: after its
+		// readings render, the button under a stationary cursor is
+		// a new node, and hover-out/in around the swap looped
+		// show/hide forever. Pinyin hovers stay color-only.
+		if (kind === "pinyin") return;
+		// First hover is color-only: previews start after that kind's
+		// first click (pin), never a sibling kind's.
+		if (kind === undefined || !aidSeen.has(aidSeenKey(msg.id, kind))) return;
+		if (kind === "furigana" && !isFuriganaCached(aidDisplayText(msg.content))) {
+			return;
 		}
 		// Same preview already showing: re-assigning a fresh object
 		// re-renders every body for nothing (hovering near the button
@@ -5903,6 +5933,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			}
 		} else if (event.clientX > right) {
 			if (!settingsOpen) openSettingsPanel();
+		} else if (target === scrollBox || target.closest(".empty-state") === target) {
+			// Open space in the column (the scroller's own padding past
+			// the last message, or the empty-state box itself):
+			// double-clicking summons the composer. Between-message gaps
+			// land here too (margins hit-test to the scroller) — safe,
+			// because a real text pick lands on text, never the scroller.
+			editor?.focus();
 		}
 	}
 
@@ -9241,34 +9278,35 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							(sentRefs ? (refsOnly && !isFolded ? REFS_ONLY_BODY : sentRefs.text) : null) ??
 								msg.content
 						)}
-						{#if leftoverModels.length > 0}
-							<!-- Sent-message tags: one per attachment with no
-							literal left in the text (literals rebuild inline
-							instead, so each file shows exactly once). Above
-							the message as body-size blue fold buttons like
-							pasted content; clicking floats the composer-pill
-							card above the tag, X / click-away / ESC closes.
-							A long turn scrolls sideways in place instead of
-							stretching. -->
+						{@const leftoverFiles = leftoverModels.filter((m) => m.kind === "text")}
+						{#if leftoverFiles.length > 0}
+							<!-- Sent-message file tags: one per text attachment
+							with no literal left in the text (literals rebuild
+							inline instead, so each file shows exactly once).
+							Above the message as body-size blue fold buttons
+							like pasted content; clicking floats the
+							composer-pill card above the tag, X / click-away
+							/ ESC closes. A long turn scrolls sideways in
+							place instead of stretching. Pasted images ride
+							inline below the text instead (see .sent-inline).
+							-->
 							<div
 								class="sent-tags"
-								class:pop-open={leftoverModels.some((m) => m.open)}
+								class:pop-open={leftoverFiles.some((m) => m.open)}
 							>
-								{#each leftoverModels as m (m.id)}
+								{#each leftoverFiles as m (m.id)}
 									{@const att = msg.attachments?.find((a) => a.id === m.id)}
 									<span class="sent-wrap">
 										<button
 											type="button"
 											class="paste-fold sent-fold"
 											onclick={() => toggleSentTag(msg, m.id)}
-											>{m.kind === "text" ? FILE_MARKER : IMAGE_MARKER}</button
+											>{FILE_MARKER}</button
 										>
 										{#if m.open}
 											<span class="sent-open">
 												<span class="sent-card">
-													{#if m.kind === "image" && m.dataUrl?.startsWith("data:image/")}
-														<img class="sent-img" src={m.dataUrl} alt="" />
-													{:else if m.kind === "text" && m.text !== null}
+													{#if m.text !== null}
 														<span class="sent-excerpt">{fileExcerpt(m.text)}</span>
 													{/if}
 													<span class="sent-foot">
@@ -9285,17 +9323,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 																	copyAttachment(att);
 																}}><ActionIcon kind="copy" /></button
 															>
-															{#if att.kind === "image" && att.dataUrl}
-																<button
-																	type="button"
-																	class="sent-btn"
-																	disabled={ocrBusyId === att.id}
-																	onclick={(e) => {
-																		e.stopPropagation();
-																		void recognizeAttachment(att);
-																	}}>{ocrBusyId === att.id ? "\u2026" : "OCR"}</button
-																>
-															{/if}
 															<button
 																type="button"
 																class="sent-icobtn"
@@ -9459,6 +9486,57 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						/>
 					</div>
 					{/if}
+					{#if msg.attachments && msg.attachments.length > 0}
+						{@const inlineImages = sentTagModels(
+							msg,
+							(sentRefs ? (refsOnly && !isFolded ? REFS_ONLY_BODY : sentRefs.text) : null) ??
+								msg.content
+						).filter((m) => m.kind === "image")}
+						{#if inlineImages.length > 0}
+							<!-- Sent images ride in the text with the prose (below
+							the body, above the action row), never in the strip
+							above: a pasted picture reads where it was pasted. Each
+							card shows its preview and footer inline — copy and OCR
+							ride the footer like the strip cards. -->
+							<div class="sent-inline">
+								{#each inlineImages as m (m.id)}
+								{@const att = msg.attachments?.find((a) => a.id === m.id)}
+								<span class="sent-card sent-inline-card">
+									{#if m.dataUrl?.startsWith("data:image/")}
+										<img class="sent-img" src={m.dataUrl} alt="" />
+									{/if}
+									<span class="sent-foot">
+										<span class="sent-name">{m.name}</span>
+										<span class="sent-tok" title="{m.tokens} tokens">{formatTokenCount(m.tokens)}</span>
+										{#if att}
+											<button
+												type="button"
+												class="sent-icobtn"
+												aria-label="Copy attachment"
+												title="Copy attachment"
+												onclick={(e) => {
+													e.stopPropagation();
+													copyAttachment(att);
+												}}><ActionIcon kind="copy" /></button
+											>
+											{#if att.kind === "image" && att.dataUrl}
+												<button
+													type="button"
+													class="sent-btn"
+													disabled={ocrBusyId === att.id}
+													onclick={(e) => {
+														e.stopPropagation();
+														void recognizeAttachment(att);
+													}}>{ocrBusyId === att.id ? "…" : "OCR"}</button
+												>
+											{/if}
+										{/if}
+									</span>
+								</span>
+							{/each}
+							</div>
+						{/if}
+					{/if}
 					{#if settings.showMessageButtons && !(streamingThis && msg.content.trim() === "")}
 					<!-- Preview renders the same row inert: the peek
 					reserves the row's space (opening the chat moves
@@ -9558,8 +9636,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 												data-tip={aid.title}
 												disabled={vocalizing.has(msg.id)}
 												aria-busy={vocalizing.has(msg.id)}
-												onmouseenter={() => peekAid(msg, aidId)}
-												onmouseleave={() => unpeekAid(msg)}
 												onclick={() => void runModelAidFor(msg, aidId, true)}
 											>
 													{#if vocalizing.has(msg.id)}
@@ -9590,7 +9666,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 										<button
 											type="button"
 											data-tip={LOCAL_AID_ADD_TITLE[localKind]}
-											onmouseenter={() => peekAid(msg, null, localKind)}
+											onmouseenter={() => peekAid(msg, localKind)}
 											onmouseleave={() => unpeekAid(msg)}
 											onclick={() => pinLocalAid(msg, localKind)}
 										>
@@ -12812,6 +12888,22 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	article.user .sent-tags {
 		justify-content: flex-end;
 	}
+	/* Sent images ride in the text with the prose (below the body,
+	above the action row): an in-flow wrap of the same cards the
+	strip pops up, always expanded, never overlay. Own messages hug
+	the right edge like the strip. */
+	.sent-inline {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		margin: 0.5rem 0 0.15rem;
+	}
+	article.user .sent-inline {
+		justify-content: flex-end;
+	}
+	.sent-inline .sent-inline-card {
+		flex: none;
+	}
 	/* Leftover-strip folds reuse the pasted-content look (the fold
 	stylesheet lives on the message body, outside this tree). */
 	.sent-tags .paste-fold {
@@ -14463,7 +14555,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	and no box property changes between states — hovering can't nudge
 	the row. */
 	.actions button {
-		font-size: 0.75rem;
+		/* 85% of the message size (see .rendered's 0.92rem): the row
+		reads quieter than the text it acts on, tracking text-size
+		growth instead of holding a fixed size. */
+		font-size: calc(0.92rem * var(--font-scale, 1) * 0.85);
 		line-height: 1.5;
 		color: #6e6e73;
 		color: var(--muted);
@@ -14479,13 +14574,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		color: var(--ink);
 		text-decoration: none;
 	}
-	/* Opt-in (Settings): message buttons grow with the text-size
-	setting instead of holding their fixed 0.75rem — capped like the
-	bubble, so huge type doesn't dome them into towers. Growth is
-	damped a fifth: full tracking overshoots the text beside it. */
-	main.scale-actions .actions button {
-		font-size: calc(0.75rem * (1 + (min(var(--font-scale, 1), 2) - 1) * 0.8));
-	}
+	/* Opt-in (Settings): the logo icons grow with the text-size
+	setting (text buttons track at 85% by default now, so only the
+	fixed-size glyphs need the opt-in) — capped like the bubble, so
+	huge type doesn't dome them into towers. Growth is damped a
+	fifth: full tracking overshoots the text beside it. */
 	/* Same opt-in for the logo icons: the glyph holds its fixed
 	1.05rem height otherwise, so larger text leaves tiny icons. */
 	main.scale-actions .actions .icon-btn :global(.action-glyph) {
@@ -15048,6 +15141,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	light rules after this stylesheet, so only importance wins. */
 	:global(html[data-theme="dark"]) :global(.cm-paste-marker) {
 		color: #98989f !important;
+		font-weight: 700;
+	}
+	/* Dark twin of the light tag look: gray + bold, same for every
+	pasted tag kind (see .cm-attach-tag in editorTheme.ts). */
+	:global(html[data-theme="dark"]) :global(.cm-attach-tag) {
+		color: #98989f !important;
+		font-weight: 700;
+		text-decoration: none;
 	}
 	/* Centered reading column on wide screens (DeepSeek-web rhythm).
 	The cap rides --chat-width off .app (desktop slider, 36 = the default

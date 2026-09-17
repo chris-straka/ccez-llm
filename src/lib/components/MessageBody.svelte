@@ -1,18 +1,15 @@
 <script lang="ts">
 	import { tick, untrack } from "svelte";
+	import { SvelteSet } from "svelte/reactivity";
 	// KaTeX stylesheet (fonts bundle relative to it, so math renders offline).
 	import "katex/dist/katex.min.css";
 	import { createAidLoadingReporter, furiganaRequestKey } from "$lib/aidLoading";
 	import { detectScripts, localAidsFor, type LocalAid } from "$lib/reading";
-	import { pinyinBlock, plainParagraphs } from "$lib/pinyin";
-	import { dualAidHtml, furiganaHtml } from "$lib/furigana";
+	import { aidHtml, aidPinyinHtml, type AidHtmlMode } from "$lib/aidHtml";
 	import {
 		renderMessage,
 		renderMarkdown,
 		applyPasteFolds,
-		foldSegments,
-		foldBracket,
-		pasteFoldButton,
 		highlightRendered,
 		type RenderedMessage
 	} from "$lib/render";
@@ -161,6 +158,14 @@
 	let highlightRun = 0;
 	let aidRun = 0;
 	/**
+	 * Raw-toggled math blocks, by data-math-index: async html swaps
+	 * (shiki enhance, aid conversion) rebuild the DOM and would snap
+	 * raw TeX back to rendered — stamp re-applies the toggle after
+	 * every swap. Instance state (resets with the message); nothing
+	 * subscribes to it, the Set is only read by stamp.
+	 */
+	const rawMaths = new SvelteSet<number>();
+	/**
 	 * Key of the furigana conversion whose ruby is shown (or loading).
 	 * Spurious re-runs (new marks array, new callback identity from the
 	 * parent) carry the same key: they re-stamp, never reconvert, so
@@ -213,100 +218,15 @@
 		const items = marks;
 		const wash = washId;
 		const skipMarks = streaming || folded;
-		// Aids render from raw text (markdown set aside); model-aid text
-		// (e.g. tashkeel) arrives via textOverride and composes with
-		// pinned local kinds, each rendering its own lines onto it.
+		// Aid-visible source: the refs block stays redacted (a pinned
+		// aid can't resurrect metadata); folds stay aligned — redaction
+		// only ever trims the trailing block, so prefix offsets hold.
+		const aidContent = textOverride ?? applyPasteFolds(aidBase, message.pasteFolds);
+		// Aids render onto the real markdown HTML (code and math blocks
+		// survive pinning); model-aid text (e.g. tashkeel) arrives via
+		// textOverride and composes with pinned local kinds, each
+		// converting its own prose nodes onto it.
 		const localAids = !streaming && aidKindList.length > 0 ? aidKindList : [];
-		const furigana = localAids.includes("furigana");
-		const pinyin = localAids.includes("pinyin");
-		// Marks apply after Svelte flushes the new HTML (see applyMarks).
-		const stamp = () =>
-		void tick().then(() => {
-			if (!bodyEl) return;
-			applyMarks(bodyEl, items, skipMarks, wash);
-			stampRunOutputs();
-		});
-		if (pinyin && !furigana) {
-			rendered = null;
-			furiganaKey = null;
-			reportAidLoading(false);
-			// Ruby lands on visible runs only; folded-away text stays bare.
-			// Aid-visible text only, so a pinned aid can't resurrect the
-			// redacted refs block.
-			html = foldSegments(aidBase, message.pasteFolds)
-				.map((segment) => {
-					if (segment.kind === "marker") return pasteFoldButton(segment.index, segment.chars);
-					const converted = plainParagraphs(pinyinBlock(segment.text, aidPreferred), segment.text);
-					if (segment.kind === "text") return converted;
-					return (
-						foldBracket(segment.index, "data-paste-fold", "[") +
-						converted +
-						foldBracket(segment.index, "data-paste-fold", "]")
-					);
-				})
-				.join("");
-			stamp();
-			return;
-		}
-		if (furigana) {
-			rendered = null;
-			// The kinds join the key: furigana-only and dual share text
-			// and folds but render differently, so switching between them
-			// must reconvert, never replay the other's HTML.
-			const key = furiganaRequestKey(`${[...localAids].sort().join("+")}\n${aidBase}`, message.pasteFolds);
-			if (key === furiganaKey) {
-				// Same conversion already shown or loading: badges may
-				// have changed, so re-stamp, but never reconvert and
-				// never touch parent busy state.
-				stamp();
-				return;
-			}
-			furiganaKey = key;
-			reportAidLoading(true);
-			const run = ++aidRun;
-			const segments = foldSegments(aidBase, message.pasteFolds);
-			const convert = (text: string): Promise<string> =>
-				pinyin && furigana ? dualAidHtml(text, aidPreferred) : furiganaHtml(text, aidPreferred);
-			void Promise.all(
-				segments.map((segment) => {
-					if (segment.kind === "marker")
-						return Promise.resolve(pasteFoldButton(segment.index, segment.chars));
-					if (segment.kind === "text") return convert(segment.text);
-					const converted = convert(segment.text);
-					return converted.then(
-						(text) =>
-							foldBracket(segment.index, "data-paste-fold", "[") +
-							text +
-							foldBracket(segment.index, "data-paste-fold", "]")
-					);
-				})
-			)
-				.then(
-					(parts) => {
-						if (run !== aidRun) return;
-						html = parts.join("");
-						stamp();
-					},
-					(error: unknown) => {
-						// Conversion failed: unpin via the caller. The
-						// two-arg form keeps stamp() errors out of here.
-						// Async reads never subscribe the effect, so the
-						// callback identity is safe to touch here.
-						if (run !== aidRun) return;
-						console.warn("[furigana] conversion failed:", error);
-						const first =
-							error instanceof Error ? error.message.split("\n")[0] : String(error);
-						onAidError?.(message.id, (first ?? "").slice(0, 140) || undefined);
-					}
-				)
-				.finally(() => {
-					if (run === aidRun) reportAidLoading(false);
-				});
-			return;
-		}
-		if (furiganaKey !== null) furiganaKey = null;
-		reportAidLoading(false);
-		aidRun++; // invalidate any in-flight furigana conversion
 		// Sent tags pair against this message's attachments (Nth of a
 		// kind to Nth of a kind); assistant output carries none, so an
 		// echoed literal there stays plain text.
@@ -322,10 +242,108 @@
 				text: att.text
 			}));
 		};
-		const snapshot: RenderedMessage =
+		const renderBaseSnapshot = (source: string): RenderedMessage =>
 			message.role === "assistant"
-				? renderMessage(content, sourcesWanted)
-				: renderMarkdown(content, tagModels());
+				? renderMessage(source, sourcesWanted)
+				: renderMarkdown(source, tagModels());
+		// Shiki enhance sharing the caller's aid run: null when a newer
+		// render superseded it (or the enhance itself failed, falling
+		// back to the unenhanced HTML instead of hanging on loading).
+		const enhanceBase = (snapshot: RenderedMessage, run: number): Promise<string | null> => {
+			if (streaming || snapshot.codes.length === 0) return Promise.resolve(snapshot.html);
+			const highlight = ++highlightRun;
+			const fresh = (): boolean => run === aidRun && highlight === highlightRun;
+			return highlightRendered(snapshot).then(
+				(enhanced) => (fresh() ? enhanced : null),
+				() => (fresh() ? snapshot.html : null)
+			);
+		};
+		const furigana = localAids.includes("furigana");
+		const pinyin = localAids.includes("pinyin");
+		// Marks apply after Svelte flushes the new HTML (see applyMarks).
+		const stamp = () =>
+		void tick().then(() => {
+			if (!bodyEl) return;
+			applyMarks(bodyEl, items, skipMarks, wash);
+			stampRunOutputs();
+			for (const wrap of bodyEl.querySelectorAll("[data-math-index]")) {
+				if (!(wrap instanceof HTMLElement)) continue;
+				const index = Number(wrap.dataset.mathIndex ?? "-1");
+				// "1", matching the toggle below (presence alone would
+				// desync its value check).
+				if (rawMaths.has(index)) wrap.setAttribute("data-math-raw", "1");
+				else wrap.removeAttribute("data-math-raw");
+			}
+		});
+		if (pinyin && !furigana) {
+			const snapshot = renderBaseSnapshot(aidContent);
+			rendered = snapshot;
+			furiganaKey = null;
+			reportAidLoading(false);
+			// Ruby stamps onto the rendered HTML (sync, no worker), so
+			// code and math blocks stay blocks. The shiki pass only
+			// repaints code: reconvert after it anyway (whole-html swap).
+			const run = aidRun;
+			html = aidPinyinHtml(snapshot.html, aidPreferred);
+			void enhanceBase(snapshot, run).then((base) => {
+				if (base === null) {
+					stamp();
+					return;
+				}
+				if (base !== snapshot.html) html = aidPinyinHtml(base, aidPreferred);
+				stamp();
+			});
+			return;
+		}
+		if (furigana) {
+			const mode: AidHtmlMode = pinyin ? "dual" : "furigana";
+			// The kinds join the key: furigana-only and dual share text
+			// and folds but render differently, so switching between them
+			// must reconvert, never replay the other's HTML.
+			const key = furiganaRequestKey(`${[...localAids].sort().join("+")}\n${aidBase}`, message.pasteFolds);
+			if (key === furiganaKey) {
+				// Same conversion already shown or loading: badges may
+				// have changed, so re-stamp, but never reconvert and
+				// never touch parent busy state.
+				stamp();
+				return;
+			}
+			furiganaKey = key;
+			reportAidLoading(true);
+			const run = ++aidRun;
+			const snapshot = renderBaseSnapshot(aidContent);
+			rendered = snapshot;
+			void enhanceBase(snapshot, run)
+				.then((base) => {
+					if (run !== aidRun || base === null) return;
+					return aidHtml(base, mode, aidPreferred).then(
+						(aided) => {
+							if (run !== aidRun) return;
+							html = aided;
+							stamp();
+						},
+						(error: unknown) => {
+							// Conversion failed: unpin via the caller. The
+							// two-arg form keeps stamp() errors out of here.
+							// Async reads never subscribe the effect, so the
+							// callback identity is safe to touch here.
+							if (run !== aidRun) return;
+							console.warn("[furigana] conversion failed:", error);
+							const first =
+								error instanceof Error ? error.message.split("\n")[0] : String(error);
+							onAidError?.(message.id, (first ?? "").slice(0, 140) || undefined);
+						}
+					);
+				})
+				.finally(() => {
+					if (run === aidRun) reportAidLoading(false);
+				});
+			return;
+		}
+		if (furiganaKey !== null) furiganaKey = null;
+		reportAidLoading(false);
+		aidRun++; // invalidate any in-flight furigana conversion
+		const snapshot = renderBaseSnapshot(content);
 		rendered = snapshot;
 		html = snapshot.html;
 		if (!streaming && snapshot.codes.length > 0) {
@@ -442,8 +460,15 @@
 			// Entry lookup stays: copy needs the TeX.
 			if (!entry) return;
 			if (closestFromTarget(event.target, ".ccez-math-tex")) {
-				if (mathWrap.dataset.mathRaw === "1") mathWrap.removeAttribute("data-math-raw");
-				else mathWrap.dataset.mathRaw = "1";
+				// Recorded alongside the toggle: stamp re-applies it
+				// after async html swaps (shiki, aids) rebuild the DOM.
+				if (mathWrap.dataset.mathRaw === "1") {
+					mathWrap.removeAttribute("data-math-raw");
+					rawMaths.delete(index);
+				} else {
+					mathWrap.dataset.mathRaw = "1";
+					rawMaths.add(index);
+				}
 				return;
 			}
 			if (closestFromTarget(event.target, ".ccez-math-copy")) {
@@ -964,13 +989,16 @@
 		left: calc(50% + 0.2rem);
 		line-height: 0;
 	}
-	/* Upright `$`: italic skewed the mark off the copy icon. */
+	/* Upright `$`: italic skewed the mark off the copy icon. Bold,
+	so the thin monospace mark reads at the copy glyph's weight
+	instead of washing out beside it. */
 	.rendered :global(.ccez-math-tex) {
 		right: calc(50% + 0.2rem);
 		font-family:
 			ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 		font-size: 0.85rem;
 		font-style: normal;
+		font-weight: 700;
 	}
 	/* Chrome buttons never join a text selection: dragging across a
 	block would otherwise bake `$` and icon-button text into the
@@ -982,6 +1010,16 @@
 	.rendered :global(.ccez-code-run) {
 		user-select: none;
 		-webkit-user-select: none;
+	}
+	/* … nor paint selected: a range crossing into the next block
+	paints its highlight rect over these buttons too (user-select
+	only keeps them out of the copied text), so their selection
+	paints transparent. */
+	.rendered :global(.ccez-math-tex::selection),
+	.rendered :global(.ccez-math-copy::selection),
+	.rendered :global(.ccez-code-copy::selection),
+	.rendered :global(.ccez-code-run::selection) {
+		background: transparent;
 	}
 	.rendered :global(.ccez-math-copy:hover),
 	.rendered :global(.ccez-math-tex:hover) {

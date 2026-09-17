@@ -199,7 +199,7 @@ test("deleting the tag drops the pill", async ({ page }) => {
 test("long paste collapses to a tag; Ctrl+O expands and re-collapses", async ({
 	page
 }) => {
-	// A >100-char paste renders as one grey tag, not the raw text.
+	// A >100-char paste renders as one bold tag, not the raw text.
 	const pasted = "lorem ipsum dolor sit amet ".repeat(20);
 	await page.locator(".cm-content").first().click();
 	await page.evaluate((text) => {
@@ -214,7 +214,8 @@ test("long paste collapses to a tag; Ctrl+O expands and re-collapses", async ({
 	const marker = page.locator(".cm-paste-marker");
 	await expect(marker).toBeVisible();
 	await expect(marker).toContainText("Pasted content");
-	// Grey shade, no own background: the tag is not a code block.
+	// Bold body text, no own background: the tag is not a code block.
+	await expect(marker).toHaveCSS("font-weight", "700");
 	const box = await marker.evaluate((el) => {
 		const style = getComputedStyle(el);
 		return { background: style.backgroundColor, borderWidth: style.borderWidth };
@@ -931,4 +932,36 @@ test("cut pastes back previews when rich clipboard writes fail", async ({ page }
 	await expect(cards).toHaveCount(2, { timeout: 15_000 });
 	await expect(cards.first().locator(".thumb img")).toBeVisible();
 	await expect(cards.nth(1).locator(".thumb img")).toBeVisible();
+});
+
+/** Sent images ride inline with the text: the user message shows the
+preview below its prose, never a strip tag above it. */
+test("sent images ride inline with the text", async ({ page }) => {
+	await dropImage(page, "first.png");
+	await page.locator(".prompt .cm-content").click();
+	await page.keyboard.type("look at this");
+	await page.keyboard.press("Enter");
+	const user = page.locator("article.user");
+	await expect(user.locator(".rendered")).toContainText("look at this", { timeout: 15_000 });
+	await expect(user.locator(".sent-inline img.sent-img")).toBeVisible({ timeout: 15_000 });
+	await expect(user.locator(".sent-inline .sent-name")).toContainText("first.png");
+	// No strip for images: the above-message tags are files only.
+	await expect(user.locator(".sent-tags")).toHaveCount(0);
+});
+
+/** Composer tags share one bold look: the pasted-image tag reads at
+the same weight as the pasted-content tag (bold body text, never the
+markdown link underline, never muted gray on light theme). */
+test("composer attachment tags read bold", async ({ page }) => {
+	await dropImage(page, "first.png");
+	const tag = page.locator(".prompt .cm-attach-tag").first();
+	await expect(tag).toBeVisible({ timeout: 15_000 });
+	await expect(tag).toHaveCSS("font-weight", "700");
+	const deco = await tag.evaluate((el) => {
+		const style = getComputedStyle(el);
+		return { decoration: style.textDecorationLine, color: style.color };
+	});
+	expect(deco.decoration).not.toContain("underline");
+	// Bold body text, not muted gray.
+	expect(deco.color).not.toBe("rgb(110, 110, 115)");
 });

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
 	addAnnotation,
 	duplicateAnnotationId,
+	aidMarkVisible,
 	editAnnotationComment,
 	deleteAnnotation,
 	clearAnnotations,
@@ -24,7 +25,7 @@ import {
 	redactedCopyText
 } from "./annotations";
 import type { ChatMsgId } from "./chat";
-import type { AnnotationId } from "./annotations";
+import type { Annotation, AnnotationId } from "./annotations";
 
 describe("annotations", () => {
 	it("adds, edits, deletes, and clears", () => {
@@ -146,6 +147,31 @@ describe("duplicateAnnotationId", () => {
 		expect(duplicateAnnotationId(list, "m2" as ChatMsgId, "Kyoto", 0)).toBeNull();
 		// Blank quotes never match.
 		expect(duplicateAnnotationId(list, msg, "   ", 0)).toBeNull();
+	});
+
+	it("treats aid scope as part of span identity", () => {
+		const msg = "m1" as ChatMsgId;
+		const scoped: Annotation[] = [
+			{ id: "a1" as AnnotationId, messageId: msg, quote: "Kyoto", comment: "", aidScope: "tashkeel" }
+		];
+		// Same span in the bare text is not a twin of the vocalized one.
+		expect(duplicateAnnotationId(scoped, msg, "Kyoto", 0)).toBeNull();
+		expect(duplicateAnnotationId(scoped, msg, "Kyoto", 0, "tashkeel")).toBe("a1");
+		// Unscoped lists match unscoped lookups, as before.
+		const plain = addAnnotation([], msg, "Kyoto");
+		expect(duplicateAnnotationId(plain, msg, "Kyoto", 0)).toBe(plain[0]?.id ?? null);
+		expect(duplicateAnnotationId(plain, msg, "Kyoto", 0, "tashkeel")).toBeNull();
+	});
+});
+
+describe("aidMarkVisible", () => {
+	it("shows tashkeel-scoped quotes only while the aid is on", () => {
+		expect(aidMarkVisible("tashkeel", true)).toBe(true);
+		expect(aidMarkVisible("tashkeel", false)).toBe(false);
+	});
+	it("always shows unscoped quotes", () => {
+		expect(aidMarkVisible(undefined, true)).toBe(true);
+		expect(aidMarkVisible(undefined, false)).toBe(true);
 	});
 });
 

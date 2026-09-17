@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { trimPasteTail, sendPasteFolds, pasteToggleAction, markerCut, markerCutAt, tagCopyPlan, tagCopyIndexes, removedMarkerIndexes, dataUrlsToImageFiles, expandDeletionUnits } from "./editor";
+import { trimPasteTail, sendPasteFolds, pasteToggleAction, markerCut, markerCutAt, attachTagRanges, tagCopyPlan, tagCopyIndexes, removedMarkerIndexes, dataUrlsToImageFiles, expandDeletionUnits } from "./editor";
 import {
 	stripAttachmentMarkers,
 	removeMarker,
@@ -186,6 +186,21 @@ describe("tagCopyPlan", () => {
 			imageTags: 1
 		});
 		expect(tagCopyPlan(`see ${IMAGE_MARKER} and ${IMAGE_MARKER} end`, true)?.imageTags).toBe(2);
+	});
+});
+
+describe("attachTagRanges", () => {
+	it("spans every tag occurrence in document order", () => {
+		expect(attachTagRanges("no tags")).toEqual([]);
+		expect(attachTagRanges("")).toEqual([]);
+		const doc = `see ${IMAGE_MARKER} and ${FILE_MARKER} end`;
+		const ranges = attachTagRanges(doc);
+		expect(ranges).toHaveLength(2);
+		expect(doc.slice(ranges[0]?.from, ranges[0]?.to)).toBe(IMAGE_MARKER);
+		expect(doc.slice(ranges[1]?.from, ranges[1]?.to)).toBe(FILE_MARKER);
+		expect(ranges[0]?.from).toBeLessThan(ranges[1]?.from ?? 0);
+		// Stacked tags index separately.
+		expect(attachTagRanges(`${IMAGE_MARKER}${IMAGE_MARKER}`)).toHaveLength(2);
 	});
 });
 

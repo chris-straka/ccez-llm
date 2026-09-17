@@ -43,6 +43,10 @@ test("body click selects without copying", async ({ page }) => {
 	expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("SENTINEL");
 	await expect(page.locator(".toast")).toHaveCount(0);
 	// The body is an I-beam surface: a drag selects equation text.
+	// Same shiki-settle wait as the snap test below: the fixture's
+	// code fence swaps the HTML once after mount (attached, not
+	// visible — the block renders empty).
+	await expect(page.locator(".ccez-code code.shiki").first()).toBeAttached({ timeout: 20_000 });
 	const body = block.locator(".ccez-math-body");
 	const box = await body.boundingBox();
 	if (!box) throw new Error("math body has no box");
@@ -243,14 +247,23 @@ snaps to the whole equation (a glyph shard never re-matches, so the
 entry point expands the range before quoting). Stale-highlight and
 double-highlight rendering stay with the annotation/render lanes. */
 test("partial equation pick snaps to the whole equation", async ({ page }) => {
+	// The fixture carries a code fence, so shiki swaps the whole HTML
+	// once after mount — a drag drawn before that swap loses its live
+	// selection when the nodes detach. Settle it first (attached, not
+	// visible: this fence's block renders empty, so it has no box).
+	await expect(page.locator(".ccez-code code.shiki").first()).toBeAttached({ timeout: 20_000 });
 	const body = page.locator(".ccez-math-body").first();
 	const box = await body.boundingBox();
 	if (!box) throw new Error("math body has no box");
-	const y = box.y + box.height / 2;
-	// A short drag covering only the left part of the equation.
-	await page.mouse.move(box.x + 8, y);
+	// A short drag covering only the left part of the equation's
+	// denominator row: numerator-zone drags never extend natively in
+	// Chromium (fraction struts swallow the gesture and leave a bare
+	// caret), so the snap's entry point needs a row whose glyphs the
+	// engine actually selects.
+	const yy = box.y + box.height * 0.6;
+	await page.mouse.move(box.x + 8, yy);
 	await page.mouse.down();
-	await page.mouse.move(box.x + box.width * 0.4, y, { steps: 5 });
+	await page.mouse.move(box.x + box.width * 0.4, yy, { steps: 5 });
 	await page.mouse.up();
 	const full = await body.evaluate((el) => el.textContent ?? "");
 	expect(full.trim().length).toBeGreaterThan(0);
@@ -392,4 +405,52 @@ test("preview settles latex chrome", async ({ page }) => {
 		expect(sample.x).toBe(trace[0]?.x ?? 0);
 		expect(sample.y).toBe(trace[0]?.y ?? 0);
 	}
+});
+
+/** Math chrome matches the code chrome: same muted rest color on the
+`$` toggle and copy button (the thin `$` only looked wrong beside the
+glyph — it now reads at the same weight). */
+test("math chrome matches the code chrome", async ({ page }) => {
+	await seedChat(page, [
+		{ role: "assistant", content: "$$E = mc^2$$\n\n```python\nprint('hi')\n```" }
+	]);
+	await page.goto("/");
+	await expect(page.locator(".ccez-math-tex").first()).toBeVisible({ timeout: 60_000 });
+	const chrome = await page.evaluate(() => {
+		const pick = (sel: string): { color: string; weight: string } => {
+			const el = document.querySelector(sel);
+			if (!el) throw new Error(`missing ${sel}`);
+			const style = getComputedStyle(el);
+			return { color: style.color, weight: style.fontWeight };
+		};
+		return {
+			tex: pick(".ccez-math-tex"),
+			mathCopy: pick(".ccez-math-copy"),
+			codeCopy: pick(".ccez-code-copy")
+		};
+	});
+	expect(chrome.tex.color).toBe(chrome.codeCopy.color);
+	expect(chrome.mathCopy.color).toBe(chrome.codeCopy.color);
+	expect(chrome.tex.weight).toBe("700");
+});
+
+/** Raw latex survives annotating: filing an annotation off the raw
+TeX must not snap the block back to rendered math. */
+test("raw latex survives annotating", async ({ page }) => {
+	const block = page.locator(".ccez-math").first();
+	const raw = block.locator(".ccez-math-raw");
+	await block.locator(".ccez-math-tex").click();
+	await expect(raw).toBeVisible();
+	// Select a word of the raw TeX and file it as an annotation.
+	await raw.dblclick();
+	await expect(page.locator(".sel-menu")).toBeVisible({ timeout: 10_000 });
+	await page.locator('.sel-menu button:has-text("Annotate")').click();
+	await expect(page.locator(".ann-pop")).toBeVisible();
+	// The wash paints through the registry (no DOM swap): raw stays raw.
+	await expect(raw).toBeVisible();
+	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(0);
+	// Submitting stamps a badge without re-rendering the block either.
+	await page.keyboard.press("Enter");
+	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1, { timeout: 10_000 });
+	await expect(raw).toBeVisible();
 });

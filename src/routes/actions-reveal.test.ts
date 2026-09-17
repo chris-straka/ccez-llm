@@ -85,10 +85,12 @@ describe("hover-only message actions", () => {
 
 	it("scales the icon glyphs with the text-size opt-in", () => {
 		const css = pageStyle();
-		expect(css).toContain("main.scale-actions .actions button");
-		// Text buttons already grow under the opt-in; the logo icons
-		// must follow, or larger text leaves tiny icons. Growth damps
-		// a fifth on both — full tracking overshoots the text.
+		// Text buttons track at 85% of the message size by default
+		// (user decision: the row reads quieter than its text), so
+		// only the fixed-size logo icons still need the opt-in — and
+		// they must follow it, or larger text leaves tiny icons.
+		// Growth damps a fifth — full tracking overshoots the text.
+		expect(css).toContain("calc(0.92rem * var(--font-scale, 1) * 0.85)");
 		const glyph = css.match(
 			/main\.scale-actions \.actions \.icon-btn[^{]*\{([^}]*)\}/
 		);
@@ -98,13 +100,15 @@ describe("hover-only message actions", () => {
 		);
 	});
 
-	it("caps opt-in button scaling like the bubble", () => {
-		// Uncapped, 800% type domes the buttons into towers; the cap
-		// keeps them proportional past 200%.
+	it("caps opt-in glyph scaling like the bubble", () => {
+		// Uncapped, 800% type domes the glyphs into towers; the cap
+		// keeps them proportional past 200%. Text buttons need no
+		// cap: at 85% of the message size they scale WITH the text,
+		// never past it.
 		const css = pageStyle();
-		const button = css.match(/main\.scale-actions \.actions button\s*\{([^}]*)\}/);
-		expect(button, "scale-actions button rule is gone").toBeTruthy();
-		expect(button![1]).toMatch(/min\(var\(--font-scale/);
+		const glyph = css.match(/main\.scale-actions \.actions \.icon-btn[^{]*\{([^}]*)\}/);
+		expect(glyph, "scale-actions glyph rule is gone").toBeTruthy();
+		expect(glyph![1]).toMatch(/min\(var\(--font-scale/);
 	});
 
 	it("never moves the buttons with transform, translate, or animation", () => {
