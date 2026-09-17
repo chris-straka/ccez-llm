@@ -10,7 +10,7 @@
  * `textarea-editor`, tests) keep their paths.
  */
 import { Compartment, EditorState } from "@codemirror/state";
-import { EditorView, keymap, placeholder } from "@codemirror/view";
+import { EditorView, drawSelection, keymap, placeholder } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
 import { defaultHighlightStyle, syntaxHighlighting } from "@codemirror/language";
@@ -167,6 +167,11 @@ export function createPromptEditor(
 			pasteHandling(options.onImagesPasted),
 			atomicMarkerDeletion(),
 			imageTagClipboard(options.onCopyImageTags),
+			// Single CodeMirror-owned caret: the bare native caret's paint
+			// can go stale when a visible-phase delete empties the box,
+			// leaving a frozen second caret beside the live one. This also
+			// lights up the .cm-cursor rules (empty-box, scroll mode, dark).
+			drawSelection(),
 			appTheme,
 			EditorView.lineWrapping
 		]

@@ -115,5 +115,10 @@ export const appTheme = EditorView.theme({
 	},
 	// Insert-mode caret (light scheme; dark lives in +page.svelte global
 	// CSS because @media inside a CM theme object is unreliable).
-	".cm-cursor": { borderLeftColor: "#1c1c1e" }
+	".cm-cursor": { borderLeftColor: "#1c1c1e" },
+	// Selection wash rides the OS Highlight, not CM's lavender default:
+	// the composer keeps its native look in both schemes (same keyword
+	// the native wash used, so pinned-dark matches too). !important:
+	// the base theme's &light/&dark selectors outrank a plain rule.
+	".cm-selectionBackground": { backgroundColor: "Highlight !important" }
 });
