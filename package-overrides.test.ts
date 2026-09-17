@@ -21,4 +21,10 @@ describe('package.json overrides', () => {
       }
     }
   });
+  // Pinned while CodeMirror is gone: the overrides block left with
+  // its deps, so any re-add must update this test — and obey the
+  // self-reference rule above.
+  it('carries no overrides', () => {
+    expect(pkg.overrides ?? {}).toEqual({});
+  });
 });

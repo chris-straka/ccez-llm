@@ -11,13 +11,16 @@ privileged (Keychain, updater, native TTS).
 - `bun run tauri dev` — full shell: Vite on :1420 + Rust backend + app window.
   Use this when touching `src-tauri/` or Tauri invokes. First build compiles
   ~400 crates; be patient.
-- Dev Keychain (macOS): unsigned rebuilds get a fresh code identity, so the
-  shell re-prompts once per Keychain item on every backend rebuild. Prefer
-  `scripts/tauri-dev.sh` — it re-signs the dev binary with the persistent
-  local self-signed "Ccez Dev" cert (login keychain, dev machine only, never
-  committed), and one round of Always Allow per item then sticks across
-  rebuilds. Mid-session Rust rebuilds relink unsigned: re-run
-  `scripts/sign-dev-binary.sh` when prompts return.
+- Dev Keychain (macOS): unsigned relinks get a fresh code identity, so the
+  shell re-prompts once per Keychain item on every backend rebuild — and
+  no watcher can close that race (the app hits the Keychain before any
+  poll re-signs). `scripts/tauri-dev.sh` is the only supported launch:
+  it builds first, signs the fresh binary with the persistent local
+  self-signed "Ccez Dev" cert (login keychain, dev machine only, never
+  committed), then runs with `--no-watch` so no mid-session rebuild
+  disturbs the identity. Rust edits need Ctrl-C plus relaunch. Click
+  Always Allow, never Allow (Allow is single-use and repeats every
+  launch). `scripts/sign-dev-binary.sh` remains for manual use.
 - `bun run test` — Vitest, colocated `*.test.ts`. Safe anytime.
 - `bun run check` / `lint` / `build` — run `svelte-kit sync` and/or invalidate
   HMR. Per owner instruction (Sep 2026): run these whenever needed, dev
