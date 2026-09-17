@@ -70,6 +70,34 @@ same codebase via the Tauri mobile target.
       device to see/verify — untouched. Voice/chrome areas belong to
       sibling streams; coordinate before changing.)
 
+## Pile: annotation + Android follow-ups (from Sep 2026 batch)
+
+Left over from the sent-refs/middle-drag/Android batch (shipped as v0.4.4):
+verified in unit tests + e2e where the harness can reach, open where it
+cannot (no Android hardware here).
+
+- [ ] Verify Annotate/Speak/Inspect entries in the Android native text
+      menu on a real device build. (Status Sep 2026: manifest aliases +
+      Rust bridge + frontend routing all present and unit-covered; the
+      entries never surfaced in the reporter's build — needs an
+      installed device build to confirm, nothing to change blind.)
+- [ ] Desktop j/k/u/d scroll smoothness under key repeat. (Status Sep
+      2026: physics already smooth animated steps with velocity
+      coalescing; left untouched — reporter suspected their mouse.
+      Revisit only with a repro on known hardware.)
+- [ ] Tap-marker edit viewport flash when the OS keyboard resizes.
+      (Status Sep 2026: prompt focus is preventScroll and the quote
+      now scrolls keyboard-aware into the upper view first; any
+      remaining flash is the OS resize itself.)
+- [ ] Same-sentence mixed-language speech (no line break or punctuation
+      between halves still speaks as one utterance). (Status Sep 2026:
+      per-line split shipped with unit tests; intra-sentence script-run
+      switching is the remaining step.)
+- [ ] Stale `theme-visual` paint expectations (10 tests fail identically
+      on pristine HEAD: removed `.preview`, hover-default ring).
+- [ ] `bun run check` skew: duplicate `@codemirror` installs fail 8
+      type identity checks in editor files (pre-existing, environmental).
+
 ## Non-goals
 
 - No app-build/agentic features. No cloud sync / sharing / plugins.
