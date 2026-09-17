@@ -646,20 +646,25 @@ test("tray re-docks above the prompt after cut and paste", async ({ page }) => {
 	await page.keyboard.press("Meta+a");
 	await page.keyboard.press("Meta+x");
 	await expect(tray).toHaveCount(0);
-	// The enriched clipboard write is async (blob fetch + PNG
-	// convert): wait for the picture before pasting it back.
+	// The enriched clipboard write is async (blob fetch + HTML
+	// encode): wait for the picture before pasting it back.
 	await expect
 		.poll(
 			() =>
 				page.evaluate(() =>
 					navigator.clipboard
 						.read()
-						.then((items) => items.flatMap((item) => item.types))
-						.catch(() => [])
+						.then(async (items) => {
+							const html = items.find((item) => item.types.includes("text/html"));
+							if (!html) return -1;
+							const text = await (await html.getType("text/html")).text();
+							return text.split("<img").length - 1;
+						})
+						.catch(() => -1)
 				),
 			{ timeout: 10_000 }
 		)
-		.toContain("image/png");
+		.toBe(1);
 	await page.keyboard.press("Meta+v");
 	await expect(tray).toBeVisible({ timeout: 15_000 });
 	await expect.poll(gap, { timeout: 5_000 }).toBeGreaterThan(0);
@@ -749,6 +754,80 @@ test("overflowing strip drag-pans under a grab cursor", async ({ page }) => {
 	await page.mouse.move(startX - 160, startY, { steps: 8 });
 	await page.mouse.up();
 	await expect.poll(() => strip.evaluate((el) => el.scrollLeft)).not.toBe(before);
+});
+
+test("cutting three tags pastes back three images, not one", async ({ page }) => {
+	// Multi-tag cuts carry every picture (clipboard order); the paste
+	// hook used to take only the first file and strand the rest.
+	await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+	for (const name of ["shot-0.png", "shot-1.png", "shot-2.png"]) await dropImage(page, name);
+	await expect(page.locator(".attachments li.card")).toHaveCount(3, { timeout: 15_000 });
+	await page.locator(".prompt .cm-content").click();
+	await page.keyboard.press("Meta+a");
+	await page.keyboard.press("Meta+x");
+	await expect(page.locator(".attachments li.card")).toHaveCount(0);
+	// The enriched clipboard write is async (blob fetch + HTML
+	// encode): wait for all three pictures before pasting back.
+	await expect
+		.poll(
+			() =>
+				page.evaluate(() =>
+					navigator.clipboard
+						.read()
+						.then(async (items) => {
+							const html = items.find((item) => item.types.includes("text/html"));
+							if (!html) return -1;
+							const text = await (await html.getType("text/html")).text();
+							return text.split("<img").length - 1;
+						})
+						.catch(() => -1)
+				),
+			{ timeout: 10_000 }
+		)
+		.toBe(3);
+	await page.keyboard.press("Meta+v");
+	await expect(page.locator(".attachments li.card")).toHaveCount(3, { timeout: 15_000 });
+	const tags = await page.evaluate(
+		() =>
+			(document.querySelector(".prompt .cm-content")?.textContent?.match(/\[Pasted image\]/g) ??
+				[]).length
+	);
+	expect(tags).toBe(3);
+});
+
+test("backspace inside an image tag takes the whole tag", async ({ page }) => {
+	// Tags are atomic units: no half-tag may survive to read as prose
+	// while its attachment drops.
+	await dropImage(page);
+	await expect(page.locator(".attachments li.card")).toBeVisible({ timeout: 15_000 });
+	await page.locator(".prompt .cm-content").click();
+	await page.keyboard.press("End");
+	await page.keyboard.press("ArrowLeft");
+	await page.keyboard.press("ArrowLeft");
+	await page.keyboard.press("ArrowLeft");
+	await page.keyboard.press("Backspace");
+	await expect(page.locator(".attachments li.card")).toHaveCount(0);
+	await expect(page.locator(".prompt .cm-content").first()).not.toContainText("[Pasted image]");
+});
+
+test("backspace on a collapsed paste takes the whole fold", async ({ page }) => {
+	const pasted = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(4);
+	await page.evaluate((text) => {
+		const target = document.querySelector(".cm-content");
+		if (!target) throw new Error("missing editor");
+		const transfer = new DataTransfer();
+		transfer.setData("text/plain", text);
+		const event = new ClipboardEvent("paste", { bubbles: true, cancelable: true });
+		Object.defineProperty(event, "clipboardData", { value: transfer });
+		target.dispatchEvent(event);
+	}, pasted);
+	const marker = page.locator(".cm-paste-marker");
+	await expect(marker).toBeVisible();
+	await page.locator(".prompt .cm-content").click();
+	await page.keyboard.press("End");
+	await page.keyboard.press("Backspace");
+	await expect(marker).toHaveCount(0);
+	await expect(page.locator(".prompt .cm-content").first()).not.toContainText("lorem ipsum");
 });
 
 test("cutting an image tag keeps its bytes for another chat", async ({ page }) => {

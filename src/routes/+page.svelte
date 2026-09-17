@@ -130,6 +130,7 @@ import {
 		imageMarkerInsert,
 		attachmentImageBlobs,
 		clipboardPngBlob,
+		reconcileDropCount,
 		countMarkers,
 		leftoverAttachments,
 		type Attachment,
@@ -2650,8 +2651,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		return added;
 	}
 
-	function onImagePasted(file: File): void {
-		void addFiles([file]).then((kinds) => insertAttachmentMarkers(kinds));
+	function onImagesPasted(files: File[]): void {
+		void addFiles(files).then((kinds) => insertAttachmentMarkers(kinds));
 	}
 
 	/** Drop the `n` newest attachments of one kind (tag → attachment reconciliation). */
@@ -4994,18 +4995,23 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		return true;
 	}
 
-	/** Pasted image while in-place editing: joins the edit's attachments. */
-	function onInlineImagePasted(file: File): void {
+	/** Pasted images while in-place editing: join the edit's attachments. */
+	function onInlineImagesPasted(files: File[]): void {
 		if (!editingMsgId) return;
-		void fileToAttachment(file)
-			.then((att) => {
-				if (!editingMsgId) return;
-				editingAttachments = [...editingAttachments, att];
-				insertInlineImageMarkers(1);
-			})
-			.catch((error: unknown) => {
-				failAttach(error instanceof Error ? error.message : String(error));
-			});
+		void (async () => {
+			let added = 0;
+			for (const file of files) {
+				try {
+					const att = await fileToAttachment(file);
+					if (!editingMsgId) return;
+					editingAttachments = [...editingAttachments, att];
+					added += 1;
+				} catch (error: unknown) {
+					failAttach(error instanceof Error ? error.message : String(error));
+				}
+			}
+			insertInlineImageMarkers(added);
+		})();
 	}
 
 	/** One `[Pasted image]` tag per fresh image, caret after each tag's space. */
@@ -5039,7 +5045,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				msgEditor?.blur();
 				enterScrollMode();
 			},
-			onImagePaste: onInlineImagePasted,
+			onImagesPasted: onInlineImagesPasted,
 			onCopyImageTags: (count) => copyImageTagBlobs(editingAttachments, count),
 			onDocChange: (text) => {
 				// Tag → attachment half of two-way removal, mirrored
@@ -5595,20 +5601,25 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				scrollFromPrompt = true;
 				enterScrollMode();
 			},
-			onImagePaste: onImagePasted,
+			onImagesPasted: onImagesPasted,
 			onCopyImageTags: (count) => copyImageTagBlobs(attachments, count),
 			onDocChange: (text) => {
 				hasText = text.trim().length > 0;
-				// Tag → attachment half of two-way removal: the user
-				// deleted tags by hand, so the newest attachments of
-				// that kind go with them (newest first — pastes stack
-				// in order).
+				// Tag → attachment half of two-way removal: tags are the
+				// expressed intent, so falls drop the difference and
+				// orphans (attachments with no tags, from undo and
+				// cross-editor flows) drop the excess — newest first,
+				// since pastes stack in order.
 				if (markerSyncMuted) return;
 				const imagesNow = countMarkers(text);
 				const filesNow = countMarkers(text, FILE_MARKER);
-				if (imagesNow < prevMarkerCount || filesNow < prevFileMarkerCount) {
-					let kept = dropNewestAttachments(attachments, "image", prevMarkerCount - imagesNow);
-					kept = dropNewestAttachments(kept, "text", prevFileMarkerCount - filesNow);
+				const imageAtts = attachments.filter((a) => a.kind === "image").length;
+				const fileAtts = attachments.length - imageAtts;
+				const dropImages = reconcileDropCount(imageAtts, imagesNow, prevMarkerCount);
+				const dropFiles = reconcileDropCount(fileAtts, filesNow, prevFileMarkerCount);
+				if (dropImages > 0 || dropFiles > 0) {
+					let kept = dropNewestAttachments(attachments, "image", dropImages);
+					kept = dropNewestAttachments(kept, "text", dropFiles);
 					attachments = kept;
 					// Attachment-scoped errors die with the attachment —
 					// otherwise the red line dangles over the next draft

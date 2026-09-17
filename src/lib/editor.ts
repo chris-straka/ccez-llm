@@ -17,6 +17,7 @@ import { defaultHighlightStyle, syntaxHighlighting } from "@codemirror/language"
 import {
 	pastePlaceholders,
 	pasteHandling,
+	atomicMarkerDeletion,
 	imageTagClipboard,
 	togglePastes,
 	pasteSpans,
@@ -36,6 +37,8 @@ export {
 	trimPasteTail,
 	markerCut,
 	tagCopyPlan,
+	expandDeletionUnits,
+	type DeletionRange,
 	type MarkerCut,
 	type PasteSpan,
 	type SendFold,
@@ -87,8 +90,8 @@ export interface PromptEditorOptions {
 	onSubmit: (kind: SubmitKind) => void;
 	/** Ctrl+G: leave the editor for J/K message-scroll mode. */
 	onHopOut: () => void;
-	/** An image was pasted or dropped; the host turns it into an attachment. */
-	onImagePaste?: (file: File) => void;
+	/** Images were pasted or dropped; the host turns each into an attachment. */
+	onImagesPasted?: (files: File[]) => void;
 	/**
 	 * A composer selection holding image tags is copied/cut: the host
 	 * supplies the `count` newest image attachments as blobs (the same
@@ -161,7 +164,8 @@ export function createPromptEditor(
 			syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
 			fenceWidgets(),
 			pastePlaceholders(),
-			pasteHandling(options.onImagePaste),
+			pasteHandling(options.onImagesPasted),
+			atomicMarkerDeletion(),
 			imageTagClipboard(options.onCopyImageTags),
 			appTheme,
 			EditorView.lineWrapping

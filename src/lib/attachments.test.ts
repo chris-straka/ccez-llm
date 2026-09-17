@@ -21,6 +21,7 @@ import {
 	tagPlaceholder,
 	attachmentImageBlobs,
 	clipboardPngBlob,
+	reconcileDropCount,
 	type Attachment
 } from "./attachments";
 import { estimateTextTokens } from "./render";
@@ -265,6 +266,21 @@ describe("attachmentImageBlobs", () => {
 	it("skips unreadable entries instead of failing", async () => {
 		const atts = [png("bad", "http://127.0.0.1:1/unreachable.png"), png("good")];
 		expect(await attachmentImageBlobs(atts, 2)).toHaveLength(1);
+	});
+});
+
+describe("reconcileDropCount", () => {
+	it("drops the fall and heals orphans, never more", () => {
+		// Synced fall: the difference goes.
+		expect(reconcileDropCount(3, 1, 3)).toBe(2);
+		// Rise or dead tags: nothing moves.
+		expect(reconcileDropCount(1, 2, 1)).toBe(0);
+		expect(reconcileDropCount(1, 3, 2)).toBe(0);
+		// Orphan: attachments with no tags drop the excess.
+		expect(reconcileDropCount(2, 0, 0)).toBe(2);
+		expect(reconcileDropCount(2, 1, 1)).toBe(1);
+		// Empty stays empty.
+		expect(reconcileDropCount(0, 0, 0)).toBe(0);
 	});
 });
 

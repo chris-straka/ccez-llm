@@ -19,7 +19,7 @@ import { removeMarker } from "./attachments";
  * while typing, undo history, and long-paste collapsing (pastes send
  * unfolded). Image attach still works — the paperclip button and drop
  * handling live outside the editor — and pasted images still become
- * attachments via `onImagePaste`.
+ * attachments via `onImagesPasted`.
  */
 export function createTextareaEditor(
 	parent: HTMLElement,
@@ -122,10 +122,10 @@ export function createTextareaEditor(
 	const onPaste = (event: ClipboardEvent): void => {
 		const clipboard = event.clipboardData;
 		if (!clipboard) return;
-		const image = [...clipboard.files].find((f) => f.type.startsWith("image/"));
-		if (image && options.onImagePaste) {
+		const images = [...clipboard.files].filter((f) => f.type.startsWith("image/"));
+		if (images.length > 0 && options.onImagesPasted) {
 			event.preventDefault();
-			options.onImagePaste(image);
+			options.onImagesPasted(images);
 			return;
 		}
 		const raw = clipboard.getData("text/plain");

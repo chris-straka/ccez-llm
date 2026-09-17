@@ -15,6 +15,7 @@ import {
 	StateField,
 	Range,
 	Prec,
+	Transaction,
 	type Extension
 } from "@codemirror/state";
 import { EditorView, Decoration, WidgetType, type DecorationSet } from "@codemirror/view";
@@ -26,7 +27,14 @@ import {
 	collapsePaste,
 	type PasteCollapse
 } from "./editorEffects";
-import { FILE_MARKER, IMAGE_MARKER, countMarkers, removeTags } from "./attachments";
+import {
+	FILE_MARKER,
+	IMAGE_MARKER,
+	blobToDataUrl,
+	clipboardPngBlob,
+	countMarkers,
+	removeTags
+} from "./attachments";
 import { closestFromTarget } from "./events";
 
 /** Pastes longer than this collapse to a `[Pasted content N chars]` marker. */
@@ -292,6 +300,43 @@ export function pasteToggleAction(collapsed: number, open: number): "expand" | "
 	return "none";
 }
 
+/**
+ * Atomic tag/fold deletion: Backspace/Delete touching a marker tag or
+ * a collapsed paste span takes the whole unit (see
+ * expandDeletionUnits). Only the editor's own delete keystrokes filter
+ * — programmatic edits, undo/redo, and replacements pass through, so
+ * history stays exact and typing over a selection keeps its bounds.
+ */
+export function atomicMarkerDeletion(): Extension {
+	return EditorState.transactionFilter.of((tr) => {
+		if (!tr.docChanged) return tr;
+		const userEvent = tr.annotation(Transaction.userEvent);
+		if (typeof userEvent !== "string" || !userEvent.startsWith("delete")) return tr;
+		let spans: PasteSpan[];
+		try {
+			spans = pasteSpans(tr.startState);
+		} catch {
+			return tr;
+		}
+		const deletions: DeletionRange[] = [];
+		let pure = true;
+		tr.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
+			if (inserted.length > 0) pure = false;
+			else deletions.push({ from: fromA, to: toA });
+		});
+		if (!pure || deletions.length === 0) return tr;
+		const expanded = expandDeletionUnits(tr.startState.doc.toString(), spans, deletions);
+		const same =
+			expanded.length === deletions.length &&
+			expanded.every((range, i) => range.from === deletions[i]?.from && range.to === deletions[i]?.to);
+		if (same) return tr;
+		return {
+			changes: expanded.map((range) => ({ from: range.from, to: range.to })),
+			annotations: Transaction.userEvent.of(userEvent)
+		};
+	});
+}
+
 /** Expand every paste tag, or re-collapse expanded ones. Never throws. */
 export function togglePastes(view: EditorView): boolean {
 	let field: PasteField | null;
@@ -367,6 +412,64 @@ export function sendPasteFolds(doc: string, spans: PasteSpan[]): { text: string;
 	}
 	folds.sort((a, b) => a.start - b.start);
 	return { text, folds };
+}
+
+/** One pure-deletion range in document coordinates. */
+export interface DeletionRange {
+	from: number;
+	to: number;
+}
+
+/** Escape a literal for RegExp (marker tags carry brackets). */
+function escapeRegExp(literal: string): string {
+	return literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Expand pure-deletion ranges over whole tag/fold units (pure,
+ * unit-tested): Backspace/Delete touching an image/file marker tag or
+ * a collapsed paste span takes the whole unit, so edits never leave
+ * half-tags the reconciliation can't match (a dropped half-tag reads
+ * as prose, stranding its attachment accounting). Ranges touching
+ * only prose pass through; overlapping expansions merge.
+ */
+export function expandDeletionUnits(
+	docText: string,
+	spans: PasteSpan[],
+	deletions: DeletionRange[]
+): DeletionRange[] {
+	const units: DeletionRange[] = [];
+	const tagRe = new RegExp(`${escapeRegExp(IMAGE_MARKER)}|${escapeRegExp(FILE_MARKER)}`, "g");
+	for (const match of docText.matchAll(tagRe)) {
+		const from = match.index ?? 0;
+		units.push({ from, to: from + match[0].length });
+	}
+	for (const span of spans) {
+		if (span.from < 0 || span.to > docText.length || span.from >= span.to) continue;
+		units.push({ from: span.from, to: span.to });
+	}
+	units.sort((a, b) => a.from - b.from);
+	const out: DeletionRange[] = [];
+	for (const del of deletions) {
+		if (del.from >= del.to) {
+			out.push({ ...del });
+			continue;
+		}
+		let from = del.from;
+		let to = del.to;
+		for (const unit of units) {
+			if (unit.to <= from || unit.from >= to) continue;
+			if (unit.from < from) from = unit.from;
+			if (unit.to > to) to = unit.to;
+		}
+		const last = out[out.length - 1];
+		if (last && from <= last.to) {
+			if (to > last.to) last.to = to;
+		} else {
+			out.push({ from, to });
+		}
+	}
+	return out;
 }
 
 /** One marker-tag excision in document coordinates (pure). */
@@ -445,47 +548,100 @@ export function trimPasteTail(text: string): string {
 	return text.replace(/(\r\n|\r|\n)+$/, "");
 }
 
+/**
+ * Marker comment in the copied HTML carrying a multi-tag cut's whole
+ * image set as embedded data-URL pictures. One rich-text item holds
+ * every picture (custom clipboard types don't survive a Chromium
+ * paste read, and engines reject multi-item writes), while foreign
+ * apps paste the same item as text plus images. Only HTML carrying
+ * this marker is ever mined for pictures — web copies stay untouched.
+ */
+const IMAGE_SET_MARKER = "<!--ccez-image-set-->";
+
+/** Escape selected text for the copied HTML paragraph. */
+function escapeHtml(text: string): string {
+	return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/** Plain-text paste insertion: short text, trimmed tails, long folds. */
+function insertTextPaste(view: EditorView, raw: string): boolean {
+	const text = trimPasteTail(raw);
+	// Nothing but newlines: swallow, don't insert an empty line.
+	if (!text) {
+		return true;
+	}
+	if (text.length <= PASTE_THRESHOLD) {
+		// Untrimmed short paste: the default handler is exact.
+		// Trimmed: it would reinsert the raw tail, so insert here.
+		if (text === raw) return false;
+		const { from, to } = view.state.selection.main;
+		view.dispatch({
+			changes: { from, to, insert: text },
+			selection: { anchor: from + text.length }
+		});
+		return true;
+	}
+	const { from, to } = view.state.selection.main;
+	const id = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
+	view.dispatch({
+		changes: { from, to, insert: text },
+		effects: addPaste.of({ id, from, to: from + text.length, chars: text.length }),
+		selection: { anchor: from + text.length }
+	});
+	return true;
+}
+
 /** Paste hook: images become attachments, long text collapses to a marker. */
-export function pasteHandling(onImage: ((file: File) => void) | undefined): Extension {
+export function pasteHandling(onImages: ((files: File[]) => void) | undefined): Extension {
 	return Prec.high(
 		EditorView.domEventHandlers({
 			paste: (event, view) => {
 				const clipboard = event.clipboardData;
 				if (!clipboard) return false;
-				const image = [...clipboard.files].find((f) => f.type.startsWith("image/"));
-				if (image && onImage) {
+				// The cut's own image set first (every picture, one
+				// rich-text item): data URLs survive the paste read
+				// that custom clipboard types don't.
+				const html = clipboard.getData("text/html");
+				if (html.includes(IMAGE_SET_MARKER) && onImages) {
 					event.preventDefault();
-					onImage(image);
+					const raw = clipboard.getData("text/plain");
+					void (async () => {
+						try {
+							const doc = new DOMParser().parseFromString(html, "text/html");
+							const urls = [...doc.querySelectorAll("img")]
+								.map((img) => img.getAttribute("src") ?? "")
+								.filter((src) => src.startsWith("data:"));
+							const files: File[] = [];
+							for (const [i, url] of urls.entries()) {
+								try {
+									const blob = await (await fetch(url)).blob();
+									files.push(
+										new File([blob], `pasted-image-${i}.png`, { type: blob.type || "image/png" })
+									);
+								} catch {
+									// Unreadable entry skipped; the rest land.
+								}
+							}
+							if (files.length === 0) return;
+							onImages(files);
+						} catch {
+							insertTextPaste(view, raw);
+						}
+					})();
+					return true;
+				}
+				// Every image file, not just the first: pastes from
+				// outside the app carry no set, but still land whole.
+				const images = [...clipboard.files].filter((f) => f.type.startsWith("image/"));
+				if (images.length > 0 && onImages) {
+					event.preventDefault();
+					onImages(images);
 					return true;
 				}
 				const raw = clipboard.getData("text/plain");
-				const text = trimPasteTail(raw);
-				// Nothing but newlines: swallow, don't insert an empty line.
-				if (!text) {
-					event.preventDefault();
-					return true;
-				}
-				if (text.length <= PASTE_THRESHOLD) {
-					// Untrimmed short paste: the default handler is exact.
-					// Trimmed: it would reinsert the raw tail, so insert here.
-					if (text === raw) return false;
-					event.preventDefault();
-					const { from, to } = view.state.selection.main;
-					view.dispatch({
-						changes: { from, to, insert: text },
-						selection: { anchor: from + text.length }
-					});
-					return true;
-				}
-				event.preventDefault();
-				const { from, to } = view.state.selection.main;
-				const id = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
-				view.dispatch({
-					changes: { from, to, insert: text },
-					effects: addPaste.of({ id, from, to: from + text.length, chars: text.length }),
-					selection: { anchor: from + text.length }
-				});
-				return true;
+				const handled = insertTextPaste(view, raw);
+				if (handled) event.preventDefault();
+				return handled;
 			}
 		})
 	);
@@ -511,15 +667,14 @@ export function tagCopyPlan(selectedText: string, clipboardWrite: boolean): TagC
 }
 
 /**
- * Copy/cut enrichment for image tags: the clipboard gets the picture
- * bytes (dual text+image ClipboardItems) so pasting in another chat
- * lands images, not dead tags. The host maps the tag count onto its
- * newest image attachments (mirroring the tag→pill reconciliation that
- * drops the same end on delete); the read happens synchronously at
- * call time so a cut's own deletion can't race it. Selections without
- * image tags fall through to the default handler, and a failed
- * enriched write falls back to plain text rather than stranding the
- * copy.
+ * Copy/cut enrichment for image tags: the clipboard gets the pictures
+ * (one rich-text item with embedded images, then per-image items,
+ * then plain text) so pasting in another chat lands images, not dead
+ * tags. The host maps the tag count onto its newest image attachments
+ * (mirroring the tag→pill reconciliation that drops the same end on
+ * delete); the read happens synchronously at call time so a cut's own
+ * deletion can't race it. Selections without image tags fall through
+ * to the default handler.
  */
 export function imageTagClipboard(
 	takeImageBlobs: ((count: number) => Promise<Blob[]>) | undefined
@@ -538,20 +693,44 @@ export function imageTagClipboard(
 			const pending = takeImageBlobs(plan.imageTags);
 			if (isCut) view.dispatch({ changes: { from: sel.from, to: sel.to } });
 			void (async () => {
+				const textBlob = new Blob([plan.text], { type: "text/plain" });
+				// 1. One rich-text item carrying text plus the whole
+				// image set as embedded pictures: multi-tag cuts paste
+				// back complete, and foreign apps get text plus images.
 				try {
 					const blobs = await pending;
 					if (blobs.length === 0) throw new Error("no image data");
-					const textBlob = new Blob([plan.text], { type: "text/plain" });
+					const urls = await Promise.all(blobs.map((blob) => blobToDataUrl(blob)));
+					const imgs = urls.map((url) => `<img src="${url}">`).join("");
+					const html = new Blob(
+						[`${IMAGE_SET_MARKER}<p>${escapeHtml(plan.text)}</p>${imgs}`],
+						{ type: "text/html" }
+					);
+					await navigator.clipboard.write([
+						new ClipboardItem({ "text/plain": textBlob, "text/html": html })
+					]);
+					return;
+				} catch {
+					// Fall through to per-image items below.
+				}
+				// 2. One item per image (single-image universal; several
+				// items only where the engine allows them).
+				try {
+					const blobs = await pending;
+					if (blobs.length === 0) throw new Error("no image data");
+					const pngs = await Promise.all(blobs.map((blob) => clipboardPngBlob(blob)));
 					await navigator.clipboard.write(
-						blobs.map(
-							(blob) =>
+						pngs.map(
+							(png) =>
 								new ClipboardItem({
 									"text/plain": textBlob,
-									[blob.type || "image/jpeg"]: blob
+									[png.type || "image/jpeg"]: png
 								})
 						)
 					);
+					return;
 				} catch {
+					// 3. Plain text, like any other copy.
 					try {
 						await navigator.clipboard.writeText(plan.text);
 					} catch {

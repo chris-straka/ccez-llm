@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { trimPasteTail, sendPasteFolds, pasteToggleAction, markerCut, tagCopyPlan } from "./editor";
+import { trimPasteTail, sendPasteFolds, pasteToggleAction, markerCut, tagCopyPlan, expandDeletionUnits } from "./editor";
 import {
 	stripAttachmentMarkers,
 	removeMarker,
@@ -172,5 +172,65 @@ describe("tagCopyPlan", () => {
 			imageTags: 1
 		});
 		expect(tagCopyPlan(`see ${IMAGE_MARKER} and ${IMAGE_MARKER} end`, true)?.imageTags).toBe(2);
+	});
+});
+
+describe("expandDeletionUnits", () => {
+	const tag = IMAGE_MARKER; // "[Pasted image]", 14 chars
+	it("leaves prose deletions alone", () => {
+		expect(expandDeletionUnits("hello world", [], [{ from: 5, to: 6 }])).toEqual([
+			{ from: 5, to: 6 }
+		]);
+		expect(expandDeletionUnits("", [], [])).toEqual([]);
+	});
+
+	it("takes the whole tag from any touch", () => {
+		const doc = `${tag} `;
+		// Backspace inside, Delete at the start, Backspace at the end.
+		expect(expandDeletionUnits(doc, [], [{ from: 5, to: 6 }])).toEqual([{ from: 0, to: 14 }]);
+		expect(expandDeletionUnits(doc, [], [{ from: 0, to: 1 }])).toEqual([{ from: 0, to: 14 }]);
+		expect(expandDeletionUnits(doc, [], [{ from: 13, to: 14 }])).toEqual([{ from: 0, to: 14 }]);
+	});
+
+	it("spares neighbors the tag merely borders", () => {
+		const doc = `${tag} x`;
+		expect(expandDeletionUnits(doc, [], [{ from: 14, to: 15 }])).toEqual([{ from: 14, to: 15 }]);
+		expect(expandDeletionUnits(doc, [], [{ from: 15, to: 16 }])).toEqual([{ from: 15, to: 16 }]);
+	});
+
+	it("covers file tags and tag-plus-prose selections", () => {
+		const doc = `a${FILE_MARKER}b`;
+		expect(expandDeletionUnits(doc, [], [{ from: 2, to: 3 }])).toEqual([
+			{ from: 1, to: 20 }
+		]);
+		const mixed = `ab${tag}cd`;
+		expect(expandDeletionUnits(mixed, [], [{ from: 1, to: 19 }])).toEqual([{ from: 1, to: 19 }]);
+	});
+
+	it("takes a whole collapsed span, ignoring bad ones", () => {
+		const doc = "x".repeat(120);
+		expect(
+			expandDeletionUnits(doc, [{ from: 0, to: 100, chars: 100 }], [{ from: 50, to: 51 }])
+		).toEqual([{ from: 0, to: 100 }]);
+		expect(
+			expandDeletionUnits(
+				doc,
+				[
+					{ from: 5, to: 5, chars: 0 },
+					{ from: -4, to: 900, chars: 9 }
+				],
+				[{ from: 50, to: 51 }]
+			)
+		).toEqual([{ from: 50, to: 51 }]);
+	});
+
+	it("merges expansions that meet", () => {
+		const doc = `${tag}${tag}`;
+		expect(
+			expandDeletionUnits(doc, [], [
+				{ from: 5, to: 6 },
+				{ from: 19, to: 20 }
+			])
+		).toEqual([{ from: 0, to: 28 }]);
 	});
 });

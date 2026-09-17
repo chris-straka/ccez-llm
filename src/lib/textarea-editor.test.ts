@@ -9,7 +9,7 @@ function setup(overrides: Partial<PromptEditorOptions> = {}) {
 	const options: PromptEditorOptions = {
 		onSubmit: vi.fn(),
 		onHopOut: vi.fn(),
-		onImagePaste: vi.fn(),
+		onImagesPasted: vi.fn(),
 		onDocChange: vi.fn(),
 		...overrides
 	};
@@ -90,17 +90,18 @@ describe("createTextareaEditor", () => {
 		expect(editor.getText()).toBe("aXb");
 	});
 
-	it("forwards pasted images to onImagePaste", () => {
+	it("forwards every pasted image to onImagesPasted", () => {
 		const { ta, options } = setup();
-		const file = new File(["x"], "pic.png", { type: "image/png" });
+		const first = new File(["x"], "one.png", { type: "image/png" });
+		const second = new File(["y"], "two.png", { type: "image/png" });
 		const event = new Event("paste", { bubbles: true }) as ClipboardEvent & {
 			clipboardData: DataTransfer;
 		};
 		Object.defineProperty(event, "clipboardData", {
-			value: { files: [file], getData: () => "" }
+			value: { files: [first, second], getData: () => "" }
 		});
 		ta.dispatchEvent(event);
-		expect(options.onImagePaste).toHaveBeenCalledWith(file);
+		expect(options.onImagesPasted).toHaveBeenCalledWith([first, second]);
 	});
 
 	it("sends unfolded: getPastes is always empty", () => {

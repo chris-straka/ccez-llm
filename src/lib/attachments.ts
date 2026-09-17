@@ -302,6 +302,19 @@ export async function attachmentImageBlobs(
  * write"), while attachments store JPEG data URLs. Falls back to the
  * original blob when conversion is unavailable (Safari writes JPEG).
  */
+/**
+ * Data URL for a blob (clipboard image-set JSON). FileReader needs a
+ * browser; unit tests never call this (e2e covers the round trip).
+ */
+export function blobToDataUrl(blob: Blob): Promise<string> {
+	return new Promise((resolve, reject) => {
+		const reader = new FileReader();
+		reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+		reader.onerror = () => reject(reader.error ?? new Error("blob read failed"));
+		reader.readAsDataURL(blob);
+	});
+}
+
 export async function clipboardPngBlob(blob: Blob): Promise<Blob> {
 	if (blob.type === "image/png") return blob;
 	let bitmap: ImageBitmap | null = null;
@@ -320,6 +333,18 @@ export async function clipboardPngBlob(blob: Blob): Promise<Blob> {
 	} finally {
 		bitmap?.close();
 	}
+}
+
+/**
+ * Tag-count reconciliation (pure, unit-tested): how many newest
+ * attachments of a kind to drop when the draft holds `tags` markers
+ * for `atts` attachments after previously holding `prev` markers.
+ * Falls drop the difference; orphans (attachments with no tags, from
+ * undo and cross-editor flows) drop the excess. Tags are the expressed
+ * intent: never deleted silently here, never resurrected.
+ */
+export function reconcileDropCount(atts: number, tags: number, prev: number): number {
+	return Math.max(0, prev - tags, atts - tags);
 }
 
 export function countMarkers(text: string, marker: string = IMAGE_MARKER): number {
