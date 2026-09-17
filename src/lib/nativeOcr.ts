@@ -71,9 +71,9 @@ export function isOcrUnsupported(message: string): boolean {
 
 /**
  * Tesseract traineddata for a reply-language code (`zh`/`ja`/`ko` per
- * `languages.ts`; everything else reads Latin script). English always
- * rides along — pasted UI and mixed text are rarely script-pure. Pure
- * and unit-tested.
+ * `languages.ts`, plus Cyrillic `uk`/`ru`; everything else reads Latin
+ * script). English always rides along — pasted UI and mixed text are
+ * rarely script-pure. Pure and unit-tested.
  */
 export function ocrFallbackLangs(code: string | null): string[] {
 	switch (code) {
@@ -83,9 +83,41 @@ export function ocrFallbackLangs(code: string | null): string[] {
 			return ["chi_sim", "eng"];
 		case "ko":
 			return ["kor", "eng"];
+		case "uk":
+			return ["ukr", "eng"];
+		case "ru":
+			return ["rus", "eng"];
 		default:
 			return ["eng"];
 	}
+}
+
+/**
+ * Mean-confidence floor for a native first pass: below it the
+ * default (CJK-led) models may be reading the wrong script —
+ * Cyrillic screenshots come back as punctuation fragments — so the
+ * caller retries once with a Cyrillic-led hint and keeps the better
+ * pass. Pure and unit-tested.
+ */
+export const OCR_RETRY_BELOW = 0.6;
+
+/** Backend hint for the retry pass: Russian stays Russian, everything
+ * else retries Ukrainian (its model reads the shared Cyrillic base
+ * well enough for a learner pass). Pure and unit-tested. */
+export function ocrRetryHint(code: string | null): string {
+	return code === "ru" ? "ru" : "uk";
+}
+
+/**
+ * Keep-best merge for the retry pass: a good first pass stands (no
+ * contest), otherwise the higher mean confidence wins, ties keeping
+ * the first observation — observed text is never discarded. Pure
+ * and unit-tested.
+ */
+export function keepBestRecognition(first: OcrResult, second: OcrResult): OcrResult {
+	if (first.confidence >= OCR_RETRY_BELOW) return first;
+	if (second.confidence > first.confidence) return second;
+	return first;
 }
 
 /**

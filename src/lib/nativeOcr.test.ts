@@ -4,7 +4,10 @@ import {
 	friendlyFallbackError,
 	friendlyOcrError,
 	isOcrUnsupported,
+	keepBestRecognition,
 	ocrFallbackLangs,
+	ocrRetryHint,
+	OCR_RETRY_BELOW,
 	ocrSupported,
 	recognizeImageText,
 	type OcrResult
@@ -103,6 +106,46 @@ describe("ocrFallbackLangs", () => {
 		expect(ocrFallbackLangs(null)).toEqual(["eng"]);
 		expect(ocrFallbackLangs("fr")).toEqual(["eng"]);
 		expect(ocrFallbackLangs("")).toEqual(["eng"]);
+	});
+
+	it("pairs Cyrillic replies with their traineddata plus English", () => {
+		expect(ocrFallbackLangs("uk")).toEqual(["ukr", "eng"]);
+		expect(ocrFallbackLangs("ru")).toEqual(["rus", "eng"]);
+	});
+});
+
+describe("ocrRetryHint", () => {
+	it("retries Russian as Russian, everything else as Ukrainian", () => {
+		expect(ocrRetryHint("ru")).toBe("ru");
+		expect(ocrRetryHint("uk")).toBe("uk");
+		expect(ocrRetryHint(null)).toBe("uk");
+		expect(ocrRetryHint("en")).toBe("uk");
+	});
+});
+
+describe("keepBestRecognition", () => {
+	const res = (text: string, confidence: number): OcrResult => ({
+		text,
+		lines: [{ text, confidence }],
+		confidence
+	});
+
+	it("lets a good first pass stand without contest", () => {
+		const first = res("hello", OCR_RETRY_BELOW);
+		const second = res("different", 0.99);
+		expect(keepBestRecognition(first, second)).toBe(first);
+	});
+
+	it("takes the retry when it reads better", () => {
+		const first = res(",_ i", 0.3);
+		const second = res("Ранковий туман", 0.92);
+		expect(keepBestRecognition(first, second)).toBe(second);
+	});
+
+	it("keeps the first observation on ties and empty retries", () => {
+		const first = res(",_ i", 0.3);
+		expect(keepBestRecognition(first, res("alt", 0.3))).toBe(first);
+		expect(keepBestRecognition(first, res("", 0))).toBe(first);
 	});
 });
 

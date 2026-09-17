@@ -63,7 +63,7 @@ describe("notice queue", () => {
   });
 
   it("plain toasts clear fast while error toasts hold the long delay", () => {
-    expect(TOAST_TIMEOUT_MS).toBe(3000);
+    expect(TOAST_TIMEOUT_MS).toBe(2500);
     expect(ERROR_TOAST_TIMEOUT_MS).toBe(8000);
   });
 

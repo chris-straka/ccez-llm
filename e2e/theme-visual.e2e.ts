@@ -290,12 +290,14 @@ for (const t of THEMES) {
 		await page.mouse.up();
 		const menu = page.locator(".sel-menu");
 		await expect(menu).toBeVisible();
-		// Frosted pill by design (backdrop blur over the page): the
-		// shadow draws the edge, so the menu carries no border.
+		// Frosted pill by design (backdrop blur over the page), with a
+		// hairline ring: blur + shadow alone read as a smudge over text.
 		await expect(menu).toHaveCSS(
 			"background-color",
 			L ? "rgba(255, 255, 255, 0.88)" : "rgba(30, 30, 32, 0.88)"
 		);
+		await expect(menu).toHaveCSS("border-top-width", "1px");
+		await expect(menu).toHaveCSS("border-top-color", v.softLine);
 		const annBtn = menu.locator('button:has-text("Annotate")');
 		await expect(annBtn).toHaveCSS("color", v.ink);
 		await annBtn.hover();
@@ -323,24 +325,30 @@ for (const t of THEMES) {
 			.toBe("1");
 		await expect(card).toHaveCSS("background-color", v.panel);
 		await expect(card).toHaveCSS("border-color", v.softLine);
+		// Park the cursor clear of the card: the pill click that opened
+		// it can leave it hovering the delete button, which then reads
+		// ink instead of rest.
+		await page.mouse.move(8, 8);
 		await expect(page.locator(".review-label").first()).toHaveCSS("color", v.muted);
-		const del = page.locator(".review-head button:not(.review-pencil)").first();
+		const del = page.locator(".review-head button.review-del").first();
 		await expect(del).toHaveCSS("color", v.muted);
 		await del.hover();
-		await expect(del).toHaveCSS("color", v.ink);
+		// Deletes hover danger, like the sidebar × and Clear all —
+		// never ink.
+		await expect(del).toHaveCSS("color", v.danger);
 		await expect(page.locator(".ann-wrap")).toHaveCSS("border-color", v.line);
 		await expect(pill).toHaveCSS("color", v.muted);
 		const clear = page.locator(".review-tools button");
 		await expect(clear).toHaveCSS("color", v.muted);
 		await clear.hover();
 		await expect(clear).toHaveCSS("color", v.danger);
-		// Edit mode via the pencil: the comment loads into the composer
-		// (no inline box anywhere); clicking out cancels it back.
+		// Edit mode via the pencil: desktop edits at the mark in the
+		// floating card (phones use the composer) — the card opens
+		// carrying the comment, and the composer stays empty.
 		await page.locator('button[aria-label="Edit comment for annotation 1"]').click();
-		const draft = await page.evaluate(
-			() => document.querySelector(".prompt .cm-content")?.textContent ?? ""
-		);
-		expect(draft).toContain("note");
+		const editPop = page.locator(".ann-pop");
+		await expect(editPop).toBeVisible({ timeout: 10_000 });
+		await expect(editPop.locator("textarea")).toHaveValue("note");
 		await page.mouse.click(4, 300);
 		// The hint renders inside .cm-content, so strip it: only real
 		// draft text counts.

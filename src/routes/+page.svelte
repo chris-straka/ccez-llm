@@ -330,6 +330,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		recognizeImageText,
 		recognizeFallbackText,
 		ocrFallbackLangs,
+		keepBestRecognition,
+		ocrRetryHint,
+		OCR_RETRY_BELOW,
 		friendlyOcrError,
 		friendlyFallbackError,
 		ocrSupported
@@ -2863,9 +2866,21 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// here restricted Vision to English, so Chinese paragraphs
 			// missed entirely and surfaced as red errors. The WASM
 			// fallback takes the reply's traineddata instead.
-			const result = fallbackLangs
+			let result = fallbackLangs
 				? await recognizeFallbackText(att.dataUrl, fallbackLangs)
 				: await recognizeImageText(att.dataUrl, null);
+			// A weak native pass may be the wrong script (Cyrillic under
+			// the CJK-led default comes back as fragments): one
+			// Cyrillic-led retry, keep the better pass. Retry errors
+			// never sink the first observation.
+			if (!fallbackLangs && result.confidence < OCR_RETRY_BELOW) {
+				try {
+					const retry = await recognizeImageText(att.dataUrl, ocrRetryHint(activeReplyCode));
+					result = keepBestRecognition(result, retry);
+				} catch {
+					// First pass stands.
+				}
+			}
 			const text = result.text.trim();
 			if (!text) {
 				// A miss is routine feedback (wrong crop, handwriting),
@@ -13385,14 +13400,16 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	/* System-callout look: one translucent pill, hairline dividers, no
 	gaps. On iOS this IS the selection menu (the native callout is
 	suppressed over messages), so it should feel at home there — a
-	generic pill with text buttons, no Apple marks. */
+	generic pill with text buttons, no Apple marks. The ring seats it
+	on white: blur + shadow alone read as a smudge over text. */
 	.sel-menu {
 		position: fixed;
 		z-index: 50;
 		display: flex;
 		align-items: stretch;
 		padding: 0;
-		border: 0;
+		border: 1px solid #e5e5ea;
+		border-color: var(--line-soft);
 		border-radius: 12px;
 		background: rgba(255, 255, 255, 0.88);
 		-webkit-backdrop-filter: blur(18px) saturate(1.6);
