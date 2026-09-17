@@ -33,6 +33,8 @@ class MainActivity : TauriActivity() {
     Secrets.init(this)
     // Dictation bridge: system SpeechRecognizer behind dictate_start/stop.
     Dictation.init(this)
+    // On-device chat bridge: ML Kit Prompt API over AICore (see OnDevice).
+    OnDevice.init(this)
     if (isAliasLaunch(intent)) {
       // An alias launch always starts a NEW activity record
       // (launchMode lives on the activity element and never applies to

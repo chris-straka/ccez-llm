@@ -54,12 +54,19 @@ same codebase via the Tauri mobile target.
       `annotate-external` prefill; PROCESS_TEXT alias alongside). Keystore
       fallback SHIPS (`Secrets.kt` AES/GCM envelope + `secrets_android.rs`,
       fail-closed without init, unit-tested). Device verify blocked.)
-- [ ] On-device Gemma via MediaPipe LLM Inference (sanctioned Kotlin
-      exception); provider gating contract already ships + unit-tested.
-      (Report-only Sep 2026, stream-platform — NOT built per DO LAST:
-      `visibleProviderIds` in `platform.ts` lists `local-gemma` only on
-      offline Android and hides it elsewhere; `platform.test.ts` pins all
-      six gating cases. Nothing registers `local: true` yet — no bridge.)
+- [ ] On-device Gemma via ML Kit GenAI Prompt API (AICore/Gemini Nano);
+      provider gating contract already ships + unit-tested. (Verdict Sep
+      2026, corrected: the first spike picked MediaPipe LLM Inference,
+      but it is in maintenance mode and the owner's S24 is on the
+      AICore supported list — ML Kit it is. Foundation SHIPS
+      (`src/lib/ondevice/` seam + `ondevice.rs`/`OnDevice.kt` bridge +
+      Gradle dep, 23 seam tests + clamp test green; keyless, Gemma-pill
+      only, no settings changes). NOT WIRED: the send path still parks
+      on the loopback error until a device run proves readiness —
+      needs the S24 install + kotlin-gradle-plugin 2.x bump flagged in
+      the Gradle comment. `visibleProviderIds` lists `local-gemma` only
+      on offline Android and hides it elsewhere; `platform.test.ts` pins
+      all six gating cases.)
 
 ## Pile: input + sidebar + shortcuts + extras (from PROMPT3) (needs hardware)
 

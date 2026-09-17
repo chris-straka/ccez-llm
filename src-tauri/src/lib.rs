@@ -16,6 +16,7 @@ mod dictate_macos;
 mod dictate_windows;
 mod keyboard;
 mod langid;
+mod ondevice;
 #[cfg(desktop)]
 mod menu;
 #[cfg(target_os = "macos")]
@@ -209,7 +210,9 @@ pub fn run() {
             ocr::ocr_recognize,
             dictate_start,
             dictate_stop,
-            coderun::run_code
+            coderun::run_code,
+            ondevice::ondevice_status,
+            ondevice::ondevice_generate
         ])
         .setup(|_app| {
             // External-text bridge (Android PROCESS_TEXT / action-mode):

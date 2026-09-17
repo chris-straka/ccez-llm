@@ -80,6 +80,12 @@ dependencies {
     implementation("androidx.activity:activity-ktx:1.10.1")
     implementation("com.google.android.material:material:1.12.0")
     implementation("androidx.lifecycle:lifecycle-process:2.10.0")
+    // On-device chat: ML Kit GenAI Prompt API over the AICore system app
+    // (Gemini Nano — no bundled weights, no API key). BUILD NOTE: this
+    // artifact ships Kotlin 2.x metadata but the shell still pins
+    // kotlin-gradle-plugin 1.9.25 (../build.gradle.kts); bump that
+    // plugin to 2.x before the first Android build with this dep.
+    implementation("com.google.mlkit:genai-prompt:1.0.0-beta4")
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.4")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.0")
