@@ -327,13 +327,28 @@ export function defaultSettings(): AppSettings {
 	};
 }
 
+/**
+ * Lookup capability line: without it the model answers from training
+ * habits ("I can't browse") and never touches the tool it was given.
+ * Tool-capable (cloud) providers only — the on-device entry has no
+ * tools, and telling it otherwise breeds hallucinated fetches.
+ */
+export const LOOKUP_CAPABILITY_HINT =
+	"You can look up current information with the fetch_url tool instead of refusing: " +
+	"fetch pages or feeds (RSS/Atom) and answer from what they return.";
+
 /** Base prompt + thinking hint (generic providers only) + reply-language suffix. */
-export function effectiveSystemPrompt(settings: AppSettings, replyCode?: string | null): string {
+export function effectiveSystemPrompt(
+	settings: AppSettings,
+	replyCode?: string | null,
+	lookupTools = false
+): string {
 	const parts = [settings.systemPrompt.trim()];
 	const hint = activeThinkingSupport(settings).promptHint(activeThinkingId(settings));
 	if (hint) parts.push(hint);
 	const lang = replyLanguageFor(replyCode ?? settings.replyLang);
 	if (lang) parts.push(lang.prompt);
+	if (lookupTools) parts.push(LOOKUP_CAPABILITY_HINT);
 	return parts.filter(Boolean).join(" ");
 }
 

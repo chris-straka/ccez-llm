@@ -5068,7 +5068,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		const sending = sendMessage(
 			chatState,
 			provider,
-			effectiveSystemPrompt(settings, activeReplyCode),
+			effectiveSystemPrompt(
+				settings,
+				activeReplyCode,
+				!isOnDeviceProvider(settings.activeProviderId)
+			),
 			withAnnotations(stored, outgoingAnnotations),
 			{
 				attachments: kept,

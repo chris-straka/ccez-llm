@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { formatOnDevicePrompt, OnDeviceChatProvider } from "./provider";
+import { firstUrl, formatOnDevicePrompt, OnDeviceChatProvider } from "./provider";
 import type { OnDeviceDeps } from "./bridge";
 
 function depsWith(result: unknown): { deps: OnDeviceDeps; invoke: ReturnType<typeof vi.fn> } {
@@ -81,5 +81,45 @@ describe("OnDeviceChatProvider", () => {
 		await expect(provider.chat([{ role: "user", content: "hi" }])).rejects.toThrow(
 			"On-device model is still downloading. Try again in a bit."
 		);
+	});
+});
+
+describe("firstUrl", () => {
+	it("finds the first link and nothing else", () => {
+		expect(firstUrl("read https://example.com/a and https://example.com/b")).toBe(
+			"https://example.com/a"
+		);
+		expect(firstUrl("no links here")).toBe(null);
+		expect(firstUrl("")).toBe(null);
+	});
+});
+
+describe("OnDeviceChatProvider URL fallback", () => {
+	it("fetches a shared URL into context", async () => {
+		const { deps, invoke } = depsWith("done");
+		const fetchPage = vi.fn(async (url: string) => `text of ${url}`);
+		const provider = new OnDeviceChatProvider({ ...deps, fetchPage });
+		const result = await provider.chat([{ role: "user", content: "read https://example.com/x" }]);
+		expect(result.content).toBe("done");
+		expect(fetchPage).toHaveBeenCalledOnce();
+		expect(invoke).toHaveBeenCalledWith("ondevice_generate", {
+			prompt:
+				"user: read https://example.com/x\n\nuser: Fetched page text for https://example.com/x:\ntext of https://example.com/x",
+			maxTokens: 512
+		});
+	});
+
+	it("falls back to plain history when the fetch fails", async () => {
+		const { deps, invoke } = depsWith("done");
+		const fetchPage = vi.fn(async () => {
+			throw new Error("offline");
+		});
+		const provider = new OnDeviceChatProvider({ ...deps, fetchPage });
+		const result = await provider.chat([{ role: "user", content: "read https://example.com/x" }]);
+		expect(result.content).toBe("done");
+		expect(invoke).toHaveBeenCalledWith("ondevice_generate", {
+			prompt: "user: read https://example.com/x",
+			maxTokens: 512
+		});
 	});
 });

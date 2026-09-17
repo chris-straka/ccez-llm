@@ -4,6 +4,7 @@ import {
 	onDeviceErrorCopy,
 	type OnDeviceDeps
 } from "./bridge";
+import { fetchPageText } from "../fetchPage";
 import {
 	messageText,
 	type ChatMessage,
@@ -25,20 +26,53 @@ import {
  * right after) the native call, but a mid-flight generation cannot be
  * cancelled — the model finishes unseen and the reply reports stopped.
  */
+/** First http(s) URL in a text, if any. Pure. */
+export function firstUrl(text: string): string | null {
+	const match = /https?:\/\/[^\s)]+/.exec(text);
+	return match ? match[0] : null;
+}
+
+export interface OnDeviceFetchDeps {
+	fetchPage?: (url: string, signal?: AbortSignal) => Promise<string>;
+}
+
 export class OnDeviceChatProvider implements ChatProvider {
 	readonly id = ONDEVICE_PROVIDER_ID;
 
-	constructor(private readonly deps?: OnDeviceDeps) {}
+	constructor(private readonly deps?: OnDeviceDeps & OnDeviceFetchDeps) {}
 
 	async chat(messages: ChatMessage[], opts: ChatOptions = {}): Promise<ChatResult> {
 		throwIfAborted(opts.signal);
 		const content = await generateOnDevice(
-			formatOnDevicePrompt(messages),
+			formatOnDevicePrompt(await this.maybeEnrich(messages, opts.signal)),
 			undefined,
 			this.deps
 		);
 		throwIfAborted(opts.signal);
 		return { content, usage: null };
+	}
+
+	/**
+	 * The tool-less fallback: Gemini Nano can't call fetch_url, but
+	 * when the user's own message carries a URL the app fetches it
+	 * into context anyway. Fetch failures (offline especially) fall
+	 * back to the plain history — never an error turn.
+	 */
+	private async maybeEnrich(
+		messages: ChatMessage[],
+		signal: AbortSignal | undefined
+	): Promise<ChatMessage[]> {
+		const last = messages[messages.length - 1];
+		if (!last || last.role !== "user") return messages;
+		const url = firstUrl(messageText(last.content));
+		if (!url) return messages;
+		try {
+			const run = this.deps?.fetchPage ?? fetchPageText;
+			const text = await run(url, signal);
+			return [...messages, { role: "user", content: `Fetched page text for ${url}:\n${text}` }];
+		} catch {
+			return messages;
+		}
 	}
 
 	async stream(

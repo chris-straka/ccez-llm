@@ -21,6 +21,7 @@ import {
 	PROMPT_IDLE_MIN,
 	activeThinkingId,
 	effectiveSystemPrompt,
+	LOOKUP_CAPABILITY_HINT,
 	systemLocale,
 	resolveTheme,
 	type AppSettings
@@ -300,6 +301,14 @@ describe("settings", () => {
 		const s = defaultSettings();
 		expect(s.activeProviderId).toBe("muse");
 		expect(s.systemPrompt).toBe("");
+	});
+
+	it("adds the lookup line only for tool-capable providers", () => {
+		const s = defaultSettings();
+		s.systemPrompt = "Be brief.";
+		expect(effectiveSystemPrompt(s)).toBe("Be brief.");
+		expect(effectiveSystemPrompt(s, null, false)).toBe("Be brief.");
+		expect(effectiveSystemPrompt(s, null, true)).toBe(`Be brief. ${LOOKUP_CAPABILITY_HINT}`);
 	});
 
 	it("drops the retired global reading-aids key", () => {
