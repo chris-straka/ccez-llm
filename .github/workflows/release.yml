@@ -154,12 +154,18 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-      - uses: android-actions/setup-android@v3
-        if: matrix.android == true
+      # No setup-android action on purpose: android-actions/setup-android
+      # installs the long-removed legacy `tools` SDK package by default
+      # (`sdkmanager tools` -> "Failed to find package 'tools'", exit 1),
+      # which broke the v0.4.4 release. ubuntu-latest already ships the
+      # SDK + cmdline-tools, so install just the platform and NDK directly.
       - name: Install Android platform and NDK
         if: matrix.android == true
         run: |
-          sdkmanager "platforms;android-36" "ndk;30.0.16138531"
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          [ -x "$SDKMANAGER" ] || SDKMANAGER="$(echo "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | cut -d' ' -f1)"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" "platforms;android-36" "ndk;30.0.16138531"
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/30.0.16138531" >> "$GITHUB_ENV"
       - run: bun install
       - name: Write keystore.properties from secrets
