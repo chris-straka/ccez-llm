@@ -15,7 +15,7 @@ const MIRROR_KEY = "ccez-keychain:provider:muse";
 test.beforeEach(async ({ page }) => {
 	await seedChat(page, []);
 	await page.goto("/");
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 });
 
 async function typeKey(page: import("@playwright/test").Page): Promise<void> {
@@ -87,7 +87,7 @@ test("provider key never lands in persisted chat history", async ({ page }) => {
 	// every navigation and would restore the seed. The storage entry IS
 	// the persisted history; asserting on it directly is the honest check
 	// (genuine reload cycles live in persistence-reload.e2e.ts).
-	await page.locator(".cm-content").click();
+	await page.locator(".ta-input").click();
 	await page.keyboard.type("history hygiene check");
 	await page.keyboard.press("Enter");
 	await expect(page.locator("article.assistant .rendered")).toContainText("Mock reply to:", {

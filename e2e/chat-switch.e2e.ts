@@ -10,7 +10,7 @@ test("thinking stays in its own chat across a switch", async ({ page }) => {
 	});
 	await page.goto("/");
 	await expect(page.locator(".hero")).toBeVisible({ timeout: 60_000 });
-	await page.locator(".cm-content").click();
+	await page.locator(".ta-input").click();
 	await page.keyboard.type("please write a long slow reply for this prompt");
 	await page.keyboard.press("Enter");
 	// Thinking shows in the sending chat.
@@ -18,10 +18,10 @@ test("thinking stays in its own chat across a switch", async ({ page }) => {
 	// Locked while thinking: the send button is dead, and Enter keeps
 	// the draft (user + empty placeholder = 2 articles, nothing more).
 	await expect(page.locator("button.send-btn")).toBeDisabled();
-	await page.locator(".cm-content").click();
+	await page.locator(".ta-input").click();
 	await page.keyboard.type("second draft");
 	await page.keyboard.press("Enter");
-	await expect(page.locator(".cm-content")).toContainText("second draft");
+	await expect(page.locator(".ta-input")).toHaveValue("second draft");
 	await expect(page.locator("article")).toHaveCount(2);
 	// Away: the new chat is pristine — no borrowed Thinking.
 	await page.keyboard.press("Meta+b");
@@ -141,7 +141,7 @@ test("thinking row keeps breathing room", async ({ page }) => {
 	});
 	await page.goto("/");
 	await expect(page.locator(".hero")).toBeVisible({ timeout: 60_000 });
-	await page.locator(".cm-content").click();
+	await page.locator(".ta-input").click();
 	await page.keyboard.type("please write a reply");
 	await page.keyboard.press("Enter");
 	const sending = page.locator(".sending");

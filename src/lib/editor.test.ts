@@ -1,8 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { trimPasteTail, sendPasteFolds, pasteToggleAction, markerCut, markerCutAt, attachTagRanges, tagCopyPlan, tagCopyIndexes, removedMarkerIndexes, dataUrlsToImageFiles, expandDeletionUnits, collapsedPasteInsert } from "./editor";
+import { trimPasteTail, sendPasteFolds, pasteToggleAction, markerCut, markerCutAt, pastedCutAt, attachTagRanges, tagCopyPlan, tagCopyIndexes, removedMarkerIndexes, dataUrlsToImageFiles, expandDeletionUnits, collapsedPasteInsert } from "./editor";
 import {
 	stripAttachmentMarkers,
 	removeMarker,
+	removePastedAt,
+	countPastedTags,
+	pastedTextMarker,
 	IMAGE_MARKER,
 	FILE_MARKER
 } from "./attachments";
@@ -341,5 +344,70 @@ describe("expandDeletionUnits", () => {
 				{ from: 19, to: 20 }
 			])
 		).toEqual([{ from: 0, to: 28 }]);
+	});
+
+	it("takes a whole pasted-text tag from any touch", () => {
+		const paste = pastedTextMarker(120); // "[Pasted 120 chars]", 18 chars
+		const doc = `${paste} `;
+		expect(expandDeletionUnits(doc, [], [{ from: 5, to: 6 }])).toEqual([
+			{ from: 0, to: paste.length }
+		]);
+		expect(expandDeletionUnits(doc, [], [{ from: 0, to: 1 }])).toEqual([
+			{ from: 0, to: paste.length }
+		]);
+		// Fixed-marker lookalikes still match only themselves.
+		expect(expandDeletionUnits(`${tag} x`, [], [{ from: 15, to: 16 }])).toEqual([
+			{ from: 15, to: 16 }
+		]);
+	});
+});
+
+describe("pastedCutAt", () => {
+	const battery = [
+		"plain text",
+		`look ${pastedTextMarker(12)} here`,
+		`${pastedTextMarker(7)} `,
+		`before\n${pastedTextMarker(200)} \nafter`,
+		`a ${pastedTextMarker(9)} b ${pastedTextMarker(44)}`,
+		`${IMAGE_MARKER} ${pastedTextMarker(5)}`
+	];
+
+	it("matches removePastedAt on every battery doc and index", () => {
+		for (const doc of battery) {
+			const count = countPastedTags(doc);
+			for (let index = 0; index < count + 1; index++) {
+				const cut = pastedCutAt(doc, index);
+				if (index >= count) {
+					expect(cut).toBeNull();
+					continue;
+				}
+				expect(cut).not.toBeNull();
+				const applied = doc.slice(0, cut?.from) + (cut?.insert ?? "") + doc.slice(cut?.to);
+				expect(applied).toBe(removePastedAt(doc, index));
+			}
+		}
+		expect(pastedCutAt(pastedTextMarker(5), -1)).toBeNull();
+	});
+});
+
+describe("pasted tags in shared tag flows", () => {
+	it("removedMarkerIndexes reports pasted occurrences per order", () => {
+		const doc = `${IMAGE_MARKER} ${pastedTextMarker(10)} ${pastedTextMarker(20)}`;
+		const secondStart = doc.indexOf(pastedTextMarker(20));
+		expect(removedMarkerIndexes(doc, [{ from: secondStart, to: doc.length }])).toEqual({
+			image: [],
+			file: [],
+			pasted: [1]
+		});
+		// Docs without pastes keep the exact old shape.
+		expect(removedMarkerIndexes(`${IMAGE_MARKER} x`, [])).toEqual({ image: [], file: [] });
+	});
+
+	it("attachTagRanges spans pasted tags in document order", () => {
+		const doc = `see ${IMAGE_MARKER} and ${pastedTextMarker(33)} end`;
+		const ranges = attachTagRanges(doc);
+		expect(ranges).toHaveLength(2);
+		expect(doc.slice(ranges[0]?.from, ranges[0]?.to)).toBe(IMAGE_MARKER);
+		expect(doc.slice(ranges[1]?.from, ranges[1]?.to)).toBe(pastedTextMarker(33));
 	});
 });

@@ -259,7 +259,6 @@ test.describe("share", () => {
 	 * web-reachable equivalent: shared text arriving in the phone
 	 * composer lands verbatim, stays editable, and sends as a message.
 	 */
-	/** Android composes in a plain textarea, not CodeMirror. */
 	const SHARE = "Look at this\nhttps://example.com/menu";
 
 	test("shared text lands verbatim in an empty phone composer", async ({ page }) => {
@@ -1154,7 +1153,6 @@ test.describe("touch", () => {
 	the emptied editor at zero height until the next keystroke heals it. */
 	test("composer holds one line after the reply lands", async ({ page }) => {
 		await seedEmpty(page);
-		// Android composes in a plain textarea, not CodeMirror.
 		const box = page.locator(".prompt .ta-input");
 		await box.click();
 		await page.keyboard.type("hello world");

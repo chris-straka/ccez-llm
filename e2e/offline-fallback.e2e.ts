@@ -18,7 +18,7 @@ async function activeProviderId(page: import("@playwright/test").Page): Promise<
 test("on-device Gemma is a keyless provider option", async ({ page }) => {
 	await seedChat(page, [{ role: "user", content: "hi" }]);
 	await page.goto("/");
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 	await openSettings(page);
 	const gemma = page.locator('.settings-panel [role="radiogroup"][aria-label="Active provider"] button', {
 		hasText: "Gemma (on-device)"
@@ -35,7 +35,7 @@ test("on-device Gemma is a keyless provider option", async ({ page }) => {
 test("offline parks on Gemma and online restores", async ({ page, context }) => {
 	await seedChat(page, [{ role: "user", content: "hi" }]);
 	await page.goto("/");
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 	expect(await activeProviderId(page)).toBe("muse");
 	await context.setOffline(true);
 	await expect.poll(() => activeProviderId(page), { timeout: 10_000 }).toBe("local-gemma");

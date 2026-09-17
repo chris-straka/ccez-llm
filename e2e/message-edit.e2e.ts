@@ -20,12 +20,12 @@ async function openUserEdit(page: Page): Promise<void> {
 	const article = page.locator("article.user").first();
 	await article.hover();
 	await article.locator('button[aria-label="Edit this message"]').click();
-	await expect(page.locator(".msg-edit .cm-content").first()).toBeVisible({ timeout: 10_000 });
+	await expect(page.locator(".msg-edit .ta-input").first()).toBeVisible({ timeout: 10_000 });
 }
 
 test("saving an edit rewrites in place without resending", async ({ page }) => {
 	await openUserEdit(page);
-	await page.locator(".msg-edit .cm-content").first().click();
+	await page.locator(".msg-edit .ta-input").first().click();
 	await page.keyboard.press("ControlOrMeta+a");
 	await page.keyboard.type("edited question");
 	await page.locator('.msg-edit-bar button:has-text("Save")').click();

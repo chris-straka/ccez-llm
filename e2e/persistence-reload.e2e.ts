@@ -65,7 +65,7 @@ test("sent messages persist across a reload", async ({ page }) => {
 	});
 	await page.goto("/");
 	await expect(page.locator(".hero")).toBeVisible({ timeout: 60_000 });
-	await page.locator(".cm-content").click();
+	await page.locator(".ta-input").click();
 	await page.keyboard.type("a message that must survive reload");
 	await page.keyboard.press("Enter");
 	// Gate on completion, not first tokens: the finished reply persists
@@ -91,7 +91,7 @@ test("sent messages persist across a reload", async ({ page }) => {
 
 test("theme choice survives a reload", async ({ page }) => {
 	await page.goto("/");
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 	// NOTE: sidebar collapse is NOT covered here on purpose — the app
 	// forces `sidebarCollapsed = true` at boot by design ("always starts
 	// closed"), so it can never survive a reload. Theme is a genuinely
@@ -114,6 +114,6 @@ test("theme choice survives a reload", async ({ page }) => {
 		.toBe("dark");
 	await page.keyboard.press("Escape");
 	await page.reload();
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 	await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 });

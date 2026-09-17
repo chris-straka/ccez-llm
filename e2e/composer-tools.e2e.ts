@@ -42,7 +42,7 @@ test("paperclip opens the file picker and files a card", async ({ page }) => {
 	await chooser.setFiles("e2e/fixtures/attach.bmp");
 	const card = page.locator(".attachments li");
 	await expect(card).toBeVisible({ timeout: 15_000 });
-	await expect(page.locator(".cm-content")).toContainText("[Pasted image]");
+	await expect(page.locator(".ta-input")).toHaveValue(/\[Pasted image\]/);
 });
 
 test("annotation tracker is a count badge left of the paperclip", async ({
@@ -181,7 +181,7 @@ test.describe("phone idle default", () => {
 });
 
 test("ESC in the composer drops focus", async ({ page }) => {
-	const editor = page.locator(".cm-content").first();
+	const editor = page.locator(".ta-input").first();
 	await editor.click();
 	await expect(editor).toBeFocused();
 	await page.keyboard.press("Escape");
@@ -194,7 +194,7 @@ test("composer text clears the tools cluster", async ({ page }) => {
 	// the Shot text-button era; the icon cluster is narrower, so the
 	// invariant — never the number — is what pins the regression).
 	const pad = await page
-		.locator(".cm-content")
+		.locator(".ta-input")
 		.first()
 		.evaluate((el) => parseFloat(getComputedStyle(el).paddingRight));
 	const toolsBox = await page.locator(".prompt-tools").boundingBox();
@@ -239,7 +239,7 @@ test("send clears pills and files an inline tag in the message", async ({ page }
 	// Down to the tag's fresh line below (the click can land mid-tag,
 	// and typing on the tag line would absorb it and drop the pill),
 	// then send through the mock provider.
-	await page.locator(".cm-content").first().click();
+	await page.locator(".ta-input").first().click();
 	await page.keyboard.press("ArrowDown");
 	await page.keyboard.type("hello");
 	await page.keyboard.press("Enter");
@@ -289,7 +289,7 @@ test("send clears pills and files an inline tag in the message", async ({ page }
 	await expect(popup).toBeHidden();
 	await tag.click();
 	await expect(popup).toBeVisible();
-	await page.locator(".cm-content").first().click();
+	await page.locator(".ta-input").first().click();
 	await expect(popup).toBeHidden();
 	await expect(page.locator('article.user [data-actions-open="true"]')).toHaveCount(0);
 });

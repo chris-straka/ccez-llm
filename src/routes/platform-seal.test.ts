@@ -84,10 +84,11 @@ describe("android seal", () => {
 });
 
 describe("desktop seal", () => {
-	it("keeps the CodeMirror composer for non-phone UAs", () => {
+	it("keeps the textarea composer for every UA (no CodeMirror branch)", () => {
 		const source = pageSource();
-		expect(source).toContain("? createTextareaEditor(promptEl, promptOptions())");
-		expect(source).toContain(": createPromptEditor(promptEl, promptOptions())");
+		expect(source).toContain("editor = createTextareaEditor(promptEl, promptOptions());");
+		expect(source).not.toContain("createPromptEditor(");
+		expect(source).not.toContain("cm-content");
 	});
 
 	it("keeps desktop autofocus (phones never pop the keyboard on launch)", () => {

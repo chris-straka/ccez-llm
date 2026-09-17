@@ -12,7 +12,7 @@ test("CJK composition Enter does not half-send the composer", async ({ page }) =
 	await seedChat(page, []);
 	await page.goto("/");
 	await expect(page.locator(".hero")).toBeVisible({ timeout: 60_000 });
-	const composer = page.locator(".cm-content");
+	const composer = page.locator(".ta-input");
 	await composer.click();
 	await page.keyboard.type("nihongo");
 	// Mid-composition Enter must not submit: no user message appears.
@@ -31,7 +31,7 @@ test("chat switching lands on the target chat", async ({ page }) => {
 	await seedChat(page, [{ role: "user", content: "first chat marker" }]);
 	await page.goto("/");
 	await expect(page.locator(".hero")).toBeHidden({ timeout: 60_000 });
-	await page.locator(".cm-content").click();
+	await page.locator(".ta-input").click();
 	await page.keyboard.press("Meta+b");
 	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
 	await page.locator('button[aria-label="New chat"]').click();

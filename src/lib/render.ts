@@ -188,7 +188,7 @@ export function renderMessage(
 
 /**
  * LaTeX math in MAIN CHAT messages only (never the composer prompt, which
- * stays plain CodeMirror text): display `$$…$$` and inline `\(…\)` / `$…$`
+ * stays plain textarea text): display `$$…$$` and inline `\(…\)` / `$…$`
  * render via KaTeX (bundled, offline). Unknown/invalid math keeps its plain
  * source rendering, never fatal. Unclosed delimiters (mid-stream) stay
  * literal. Fenced code blocks and inline code spans never become math.

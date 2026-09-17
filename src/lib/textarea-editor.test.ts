@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { createTextareaEditor } from "./textarea-editor";
 import type { PromptEditorOptions } from "./editor";
 
@@ -110,6 +110,44 @@ describe("createTextareaEditor", () => {
 		expect(editor.getPastes()).toEqual([]);
 	});
 
+	it("routes over-threshold pastes to onLongTextPasted, trimmed", () => {
+		const { ta, options } = setup({ onLongTextPasted: vi.fn() });
+		const long = `x${"y".repeat(120)}\n\n`;
+		const event = new Event("paste", { bubbles: true }) as ClipboardEvent & {
+			clipboardData: DataTransfer;
+		};
+		Object.defineProperty(event, "clipboardData", {
+			value: { files: [], getData: () => long }
+		});
+		ta.dispatchEvent(event);
+		expect(options.onLongTextPasted).toHaveBeenCalledWith(long.replace(/\n+$/, ""));
+		expect(ta.value).toBe("");
+	});
+
+	it("inserts long pastes inline without a host", () => {
+		// Trailing newlines take the manual-insert branch (jsdom runs
+		// no default paste insertion, so the clean-default path is
+		// unobservable here — the browser owns it).
+		const { ta } = setup();
+		const long = `z${"w".repeat(120)}\n\n`;
+		const event = new Event("paste", { bubbles: true }) as ClipboardEvent & {
+			clipboardData: DataTransfer;
+		};
+		Object.defineProperty(event, "clipboardData", {
+			value: { files: [], getData: () => long }
+		});
+		ta.dispatchEvent(event);
+		expect(ta.value).toBe(long.replace(/\n+$/, ""));
+	});
+
+	it("excisePastedAt drops the indexed tag", () => {
+		const { editor } = setup();
+		editor.setText(`a [Pasted 120 chars] b [Pasted 130 chars]`);
+		expect(editor.excisePastedAt(1)).toBe(true);
+		expect(editor.getText()).toBe("a [Pasted 120 chars] b");
+		expect(editor.excisePastedAt(5)).toBe(false);
+	});
+
 	it("setPlaceholder swaps the hint", () => {
 		const { editor, ta } = setup();
 		editor.setPlaceholder("Tap to write again");
@@ -120,5 +158,107 @@ describe("createTextareaEditor", () => {
 		const { parent, editor } = setup();
 		editor.destroy();
 		expect(parent.querySelector("textarea")).toBeNull();
+	});
+});
+
+describe("image-tag copy/cut roundtrip", () => {
+	const TAG = "[Pasted image] ";
+	const blob = () => new Blob(["img"], { type: "image/png" });
+
+	function richClipboard(write: ReturnType<typeof vi.fn>) {
+		vi.stubGlobal(
+			"ClipboardItem",
+			class {
+				constructor(public data: Record<string, Blob>) {}
+			}
+		);
+		Object.defineProperty(window.navigator, "clipboard", {
+			value: { write, writeText: vi.fn() },
+			configurable: true
+		});
+	}
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	it("leaves selections without image tags to the native handler", () => {
+		const take = vi.fn(async () => []);
+		const { ta } = setup({ onCopyImageTags: take });
+		ta.value = "hello";
+		ta.setSelectionRange(0, 5);
+		const event = new Event("copy", { bubbles: true, cancelable: true });
+		ta.dispatchEvent(event);
+		expect(event.defaultPrevented).toBe(false);
+		expect(take).not.toHaveBeenCalled();
+	});
+
+	it("copy enriches the clipboard and a later exact-text paste rehydrates", async () => {
+		const write = vi.fn(async () => {});
+		richClipboard(write);
+		const take = vi.fn(async () => [blob()]);
+		const { ta, options } = setup({ onCopyImageTags: take });
+		ta.value = TAG;
+		ta.setSelectionRange(0, TAG.length);
+		const copy = new Event("copy", { bubbles: true, cancelable: true });
+		ta.dispatchEvent(copy);
+		expect(copy.defaultPrevented).toBe(true);
+		expect(take).toHaveBeenCalledWith([0]);
+		await vi.waitFor(() => expect(write).toHaveBeenCalled());
+		// New chat, plain-text clipboard (rich item lost): the stash
+		// rehydrates the picture instead of landing a dead tag.
+		ta.value = "";
+		const paste = new Event("paste", { bubbles: true, cancelable: true }) as ClipboardEvent & {
+			clipboardData: DataTransfer;
+		};
+		Object.defineProperty(paste, "clipboardData", {
+			value: { files: [], getData: () => TAG }
+		});
+		ta.dispatchEvent(paste);
+		expect(paste.defaultPrevented).toBe(true);
+		await vi.waitFor(() => expect(options.onImagesPasted).toHaveBeenCalled());
+		const files = (options.onImagesPasted as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as File[];
+		expect(files.length).toBe(1);
+		expect(ta.value).toBe("");
+	});
+
+	it("reports precise tag indexes for keyboard range deletions", () => {
+		// Middle delete (first of two tags): the host drops index 0,
+		// never newest-first. jsdom runs no default deletion, so the
+		// test applies the keystroke's own edit between the events.
+		const { ta, options } = setup();
+		ta.value = "[Pasted image] [Pasted image] ";
+		ta.setSelectionRange(0, 15);
+		ta.dispatchEvent(
+			new InputEvent("beforeinput", {
+				bubbles: true,
+				cancelable: true,
+				inputType: "deleteContentBackward"
+			})
+		);
+		ta.value = "[Pasted image] ";
+		ta.dispatchEvent(new Event("input", { bubbles: true }));
+		expect(options.onDocChange).toHaveBeenCalledWith("[Pasted image] ", {
+			image: [0],
+			file: []
+		});
+	});
+
+	it("cut deletes the range and reports precise tag indexes", async () => {
+		const write = vi.fn(async () => {});
+		richClipboard(write);
+		const take = vi.fn(async () => [blob()]);
+		const { ta, options } = setup({ onCopyImageTags: take });
+		ta.value = TAG;
+		ta.setSelectionRange(0, TAG.length);
+		const cut = new Event("cut", { bubbles: true, cancelable: true });
+		ta.dispatchEvent(cut);
+		expect(cut.defaultPrevented).toBe(true);
+		expect(ta.value).toBe("");
+		// Middle-cut precision survives the textarea (the input event
+		// carries no change ranges): the host drops index 0, not newest.
+		await vi.waitFor(() =>
+			expect(options.onDocChange).toHaveBeenCalledWith("", { image: [0], file: [] })
+		);
 	});
 });

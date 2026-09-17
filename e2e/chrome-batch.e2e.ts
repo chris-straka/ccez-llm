@@ -44,7 +44,7 @@ async function seedIdleChat(page: Page, messages: SeedMessage[]) {
 		);
 	}, { messages });
 	await page.goto("/");
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 }
 
 function idleTurns(): SeedMessage[] {
@@ -70,7 +70,7 @@ async function clickLabelText(page: Page, sliderLabel: string) {
 test("slider label text never resets any row", async ({ page }) => {
 	await seedChat(page, [{ role: "user", content: "hi" }]);
 	await page.goto("/");
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 	await openSettings(page);
 
 	const text = page.locator('.settings-panel input[aria-label="Text size percent"]');
@@ -184,7 +184,7 @@ test("idle prompt ignores drags, clicks, and math, answers keys", async ({ page 
 /** Idle hide uncovers the tail: the prompt leaves the flow and stuck readers pin to the bottom. */
 test("idle hide floats and moves nothing", async ({ page }) => {
 	await seedIdleChat(page, idleTurns());
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 	const geometry = () =>
 		page.evaluate(() => {
 			const box = document.querySelector(".messages") as HTMLElement | null;
@@ -213,7 +213,7 @@ test("idle hide floats and moves nothing", async ({ page }) => {
 test("middle-click toggles the shortcuts modal", async ({ page }) => {
 	await seedChat(page, [{ role: "user", content: "hi" }]);
 	await page.goto("/");
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 	const box = await page.locator(".messages").boundingBox();
 	expect(box).toBeTruthy();
 	const x = box!.x + box!.width / 2;
@@ -226,17 +226,19 @@ test("middle-click toggles the shortcuts modal", async ({ page }) => {
 	await expect(page.locator("#shortcuts-heading")).toHaveCount(0);
 });
 
-/** Paste-then-delete-all leaves no stray caret in the emptied composer. */
-test("clearing the composer leaves no visible cursor", async ({ page }) => {
+/** Paste-then-delete-all flags the composer empty and keeps focus
+with a live caret (the native blink is the only focus signal). */
+test("clearing the composer keeps focus with a live caret", async ({ page }) => {
 	await seedChat(page, [{ role: "user", content: "hi" }]);
 	await page.goto("/");
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
-	await page.locator(".cm-content").first().click();
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await page.locator(".ta-input").first().click();
 
-	// A long paste collapses to a tag (same dispatch as the intake spec).
+	// A long paste becomes a pill plus a positional tag (same dispatch
+	// as the intake spec).
 	const pasted = "lorem ipsum dolor sit amet ".repeat(20);
 	await page.evaluate((text) => {
-		const target = document.querySelector(".cm-content");
+		const target = document.querySelector(".ta-input");
 		if (!target) throw new Error("missing editor");
 		const transfer = new DataTransfer();
 		transfer.setData("text/plain", text);
@@ -244,29 +246,24 @@ test("clearing the composer leaves no visible cursor", async ({ page }) => {
 		Object.defineProperty(event, "clipboardData", { value: transfer });
 		target.dispatchEvent(event);
 	}, pasted);
-	await expect(page.locator(".cm-paste-marker")).toBeVisible();
+	await expect(page.locator(".attachments .paste-body")).toBeVisible();
+	await expect(page.locator(".prompt .ta-input")).toHaveValue(/\[Pasted 540 chars\]/);
 
-	// Cursor is drawn while the draft has content.
-	const cursorBefore = await page.evaluate(() => {
-		const c = document.querySelector(".prompt .cm-cursor");
-		if (!c) return "absent";
-		return getComputedStyle(c).display;
-	});
-	expect(cursorBefore).not.toBe("none");
+	// Caret shows while the draft has content.
+	const caretColor = (): Promise<string> =>
+		page.evaluate(
+			() => getComputedStyle(document.querySelector(".prompt .ta-input") as HTMLElement).caretColor
+		);
+	await expect.poll(caretColor).not.toBe("rgba(0, 0, 0, 0)");
 
-	// Delete everything: the box flags empty and shows no caret,
-	// while keeping focus (hidden, not blurred away). (execCommand:
-	// the editor's Mod-a binding doesn't take in this harness, so
-	// select natively — the delete-all path under test is identical.)
+	// Delete everything: the box flags empty and keeps focus (parked,
+	// not blurred away) with its blink — the cursor is the only focus
+	// signal. (execCommand: select natively — the delete-all path
+	// under test is identical.)
 	await page.evaluate(() => document.execCommand("selectAll"));
 	await page.keyboard.press("Backspace");
 	await expect(page.locator(".prompt")).toHaveAttribute("data-empty", "true");
-	const cursorAfter = await page.evaluate(() => {
-		const c = document.querySelector(".prompt .cm-cursor");
-		if (!c) return "absent";
-		return getComputedStyle(c).display;
-	});
-	expect(["absent", "none"]).toContain(cursorAfter);
+	await expect.poll(caretColor).not.toBe("rgba(0, 0, 0, 0)");
 	const stillFocused = await page.evaluate(
 		() => !!document.activeElement?.closest?.(".prompt")
 	);

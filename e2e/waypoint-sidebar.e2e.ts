@@ -100,7 +100,7 @@ test("space with no selection focuses the prompt", async ({ page }) => {
 	await expect
 		.poll(() =>
 			page.evaluate(
-				() => document.activeElement?.closest(".cm-content") !== null
+				() => document.activeElement?.closest(".ta-input") !== null
 			)
 		)
 		.toBe(true);
@@ -127,7 +127,7 @@ test("message counter caps at 99+", async ({ page }) => {
 test("row buttons share a fixed box", async ({ page }) => {
 	await seedChat(page, [{ role: "user", content: "hi" }]);
 	await page.goto("/");
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 	await openSidebar(page);
 	const row = page.locator("aside ul li").first();
 	await row.hover();

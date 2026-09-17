@@ -73,7 +73,6 @@
 	import { invoke } from "@tauri-apps/api/core";
 	import { listen } from "@tauri-apps/api/event";
 	import {
-		createPromptEditor,
 		PROMPT_PLACEHOLDER,
 		SCROLL_PLACEHOLDER,
 		ANDROID_PROMPT_PLACEHOLDER,
@@ -131,8 +130,16 @@ import {
 		attachmentImageBlobsAt,
 		clipboardPngBlob,
 		dropAttachmentsAtIndexes,
+		dropFileAttachmentsAtIndexes,
+		dropPastedAttachmentsAtIndexes,
 		reconcileDropCount,
 		countMarkers,
+		countPastedTags,
+		isPastedTextAttachment,
+		makePastedTextAttachment,
+		pastedMarkerInsert,
+		splicePastedText,
+		stripPastedMarkers,
 		leftoverAttachments,
 		type Attachment,
 		type AttachmentKind,
@@ -725,9 +732,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	let editingSeed = $state("");
 	/** Attachments of the message under edit (the composer's own stay untouched). */
 	let editingAttachments = $state<Attachment[]>([]);
-	/** Last reconciled marker counts inside the in-place editor (images, files). */
+	/** Last reconciled marker counts inside the in-place editor (images, files, pastes). */
 	let editingPrevMarkers = 0;
 	let editingPrevFileMarkers = 0;
+	let editingPrevPasted = 0;
 	/** Programmatic inline edits must not reconcile against themselves. */
 	let editingMarkerMuted = false;
 	let highlightAnnId: AnnotationId | null = $state(null);
@@ -1862,7 +1870,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		 */
 		const onFocusInIdle = (event: FocusEvent): void => {
 			if (settings.promptIdleSec !== PROMPT_IDLE_ALWAYS) return;
-			if (!closestFromTarget(event.target, ".prompt .cm-content, .prompt .ta-input")) return;
+			if (!closestFromTarget(event.target, ".prompt .ta-input")) return;
 			focusLog("focusin-idle", {
 				target: describeFocusTarget(event.target),
 				active: describeActiveElement()
@@ -2501,18 +2509,24 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		annPop = null;
 		annDraft = "";
 		attachments = [];
+		expandedPastes = [];
 		// Pills are gone: their tags go too, or a stale marker would
 		// reconcile away the next chat's first image.
 		markerSyncMuted = true;
 		try {
-			if (
-				editor &&
-				(countMarkers(editor.getText()) > 0 || countMarkers(editor.getText(), FILE_MARKER) > 0)
-			) {
-				editor.setText(stripAttachmentMarkers(editor.getText()));
+			if (editor) {
+				const doc = editor.getText();
+				if (
+					countMarkers(doc) > 0 ||
+					countMarkers(doc, FILE_MARKER) > 0 ||
+					countPastedTags(doc) > 0
+				) {
+					editor.setText(stripPastedMarkers(stripAttachmentMarkers(doc)));
+				}
 			}
 			prevMarkerCount = 0;
 			prevFileMarkerCount = 0;
+			prevPastedCount = 0;
 		} finally {
 			markerSyncMuted = false;
 		}
@@ -2624,6 +2638,28 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 
 	/**
+	 * Outgoing send payload from the composer draft: pasted-text pills
+	 * splice back inline at their tag positions (Nth tag pairs with
+	 * the Nth pasted attachment — the send-time mirror of render.ts
+	 * kind-order pairing); leftovers end-append like files. Pasted
+	 * attachments are composer vehicles — the stored message keeps
+	 * the spliced prose, not the pills.
+	 */
+	function splicedSendText(
+		foldText: string,
+		outgoing: Attachment[]
+	): { stored: string; kept: Attachment[] } {
+		const pastedTexts = outgoing.filter(isPastedTextAttachment).map((a) => a.text ?? "");
+		const spliced = splicePastedText(foldText, pastedTexts);
+		const kept = outgoing.filter((a) => !isPastedTextAttachment(a));
+		const stored = appendImageMarkers(
+			spliced,
+			kept.filter((a) => a.kind === "image").length
+		);
+		return { stored, kept };
+	}
+
+	/**
 	 * Attachment/OCR failure: inline under the composer on desktop, a
 	 * toast on Android (the composer sits behind the keyboard there, so
 	 * inline errors go unseen).
@@ -2662,11 +2698,43 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		void addFiles(files).then((kinds) => insertAttachmentMarkers(kinds));
 	}
 
-	/** Drop the `n` newest attachments of one kind (tag → attachment reconciliation). */
-	function dropNewestAttachments(list: Attachment[], kind: AttachmentKind, n: number): Attachment[] {
+	/**
+	 * Over-threshold clipboard text (both editors): the text becomes a
+	 * pasted-text attachment and earns its positional `[Pasted N chars]`
+	 * tag at the caret, mirroring the file/image flow.
+	 */
+	function onLongTextPasted(text: string): void {
+		if (!editor) return;
+		const att = makePastedTextAttachment(text);
+		attachments = [...attachments, att];
+		markerSyncMuted = true;
+		try {
+			editor.insertText(pastedMarkerFor(editor, att.text?.length ?? text.length));
+			syncMarkerCounts();
+		} finally {
+			markerSyncMuted = false;
+		}
+	}
+
+	/** Re-anchor all three tag counts to the live draft (after programmatic edits). */
+	function syncMarkerCounts(): void {
+		if (!editor) return;
+		const doc = editor.getText();
+		prevMarkerCount = countMarkers(doc);
+		prevFileMarkerCount = countMarkers(doc, FILE_MARKER);
+		prevPastedCount = countPastedTags(doc);
+	}
+
+	/** Drop the `n` newest attachments matching `match` (tag → attachment reconciliation). */
+	function dropNewestWhere(
+		list: Attachment[],
+		match: (att: Attachment) => boolean,
+		n: number
+	): Attachment[] {
 		const kept = [...list];
 		for (let i = kept.length - 1; i >= 0 && n > 0; i--) {
-			if (kept[i]?.kind === kind) {
+			const att = kept[i];
+			if (att !== undefined && match(att)) {
 				kept.splice(i, 1);
 				n--;
 			}
@@ -2681,6 +2749,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * attachment). Indexed drops consume their tags, so the count path
 	 * anchors past them — position-less leftovers and pre-existing
 	 * orphans still reconcile newest-first without double-dropping.
+	 * File tags pair with file drops only: pasted-text attachments
+	 * share kind "text" but pair with `[Pasted N chars]` tags.
 	 */
 	function reconcileTagRemovals(
 		list: Attachment[],
@@ -2688,18 +2758,30 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		filesNow: number,
 		prevImages: number,
 		prevFiles: number,
-		removed: RemovedMarkerTags | undefined
+		removed: RemovedMarkerTags | undefined,
+		pastedNow: number,
+		prevPasted: number
 	): Attachment[] {
 		const rImg = removed?.image ?? [];
 		const rFile = removed?.file ?? [];
+		const rPasted = removed?.pasted ?? [];
 		let kept = dropAttachmentsAtIndexes(list, "image", rImg);
-		kept = dropAttachmentsAtIndexes(kept, "text", rFile);
+		kept = dropFileAttachmentsAtIndexes(kept, rFile);
+		kept = dropPastedAttachmentsAtIndexes(kept, rPasted);
 		const imageAtts = kept.filter((a) => a.kind === "image").length;
+		const fileAtts = kept.filter((a) => a.kind === "text" && !isPastedTextAttachment(a)).length;
+		const pastedAtts = kept.length - imageAtts - fileAtts;
 		const dropImages = reconcileDropCount(imageAtts, imagesNow, prevImages - rImg.length);
-		const dropFiles = reconcileDropCount(kept.length - imageAtts, filesNow, prevFiles - rFile.length);
-		if (dropImages > 0 || dropFiles > 0) {
-			kept = dropNewestAttachments(kept, "image", dropImages);
-			kept = dropNewestAttachments(kept, "text", dropFiles);
+		const dropFiles = reconcileDropCount(fileAtts, filesNow, prevFiles - rFile.length);
+		const dropPasted = reconcileDropCount(pastedAtts, pastedNow, prevPasted - rPasted.length);
+		if (dropImages > 0 || dropFiles > 0 || dropPasted > 0) {
+			kept = dropNewestWhere(kept, (a) => a.kind === "image", dropImages);
+			kept = dropNewestWhere(
+				kept,
+				(a) => a.kind === "text" && !isPastedTextAttachment(a),
+				dropFiles
+			);
+			kept = dropNewestWhere(kept, isPastedTextAttachment, dropPasted);
 		}
 		return kept;
 	}
@@ -2724,11 +2806,21 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			for (const kind of kinds) {
 				editor.insertText(attachmentMarkerFor(editor, kind));
 			}
-			prevMarkerCount = countMarkers(editor.getText());
-			prevFileMarkerCount = countMarkers(editor.getText(), FILE_MARKER);
+			syncMarkerCounts();
 		} finally {
 			markerSyncMuted = false;
 		}
+	}
+
+	/**
+	 * Marker text for one fresh pasted-text attachment: same caret
+	 * contract as file/image tags (see attachmentMarkerFor).
+	 */
+	function pastedMarkerFor(ed: PromptEditor, chars: number): string {
+		const doc = ed.getText();
+		const caret = ed.selectionHead();
+		const afterPaste = ed.getPastes().some((s) => caret === s.to);
+		return pastedMarkerInsert(doc, chars, afterPaste);
 	}
 
 	/**
@@ -2746,6 +2838,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	let markerSyncMuted = false;
 	let prevMarkerCount = 0;
 	let prevFileMarkerCount = 0;
+	let prevPastedCount = 0;
 
 	/**
 	 * Clipboard supplier for composer tag copy/cut: the image
@@ -2869,33 +2962,56 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * attachment-scoped error with it. The pill's index among its
 	 * kind (Nth pill pairs with the Nth tag) picks the tag — never
 	 * the first of its kind, so deleting the first of two images
-	 * keeps the second's preview.
+	 * keeps the second's preview. Pasted-text pills drop their own
+	 * `[Pasted N chars]` tag the same way.
 	 */
 	function removeAttachment(id: string): void {
 		const at = attachments.findIndex((a) => a.id === id);
 		if (at < 0) return;
 		const removed = attachments[at];
 		if (!removed) return;
-		const kindIndex = attachments
-			.slice(0, at)
-			.filter((a) => a.kind === removed.kind).length;
 		attachments = attachments.filter((a) => a.id !== id);
+		expandedPastes = expandedPastes.filter((k) => k !== id);
 		clearNotice(notices, "inline");
 		if (editor) {
 			markerSyncMuted = true;
 			try {
 				// Minimal cut, never a full rewrite: a rewrite drops the
 				// paste-marker decorations and unfolds the draft's folds.
-				editor.exciseMarkerAt(
-					removed.kind === "image" ? IMAGE_MARKER : FILE_MARKER,
-					kindIndex
-				);
-				prevMarkerCount = countMarkers(editor.getText());
-				prevFileMarkerCount = countMarkers(editor.getText(), FILE_MARKER);
+				if (isPastedTextAttachment(removed)) {
+					const pastedIndex = attachments
+						.slice(0, at)
+						.filter(isPastedTextAttachment).length;
+					editor.excisePastedAt(pastedIndex);
+				} else {
+					// File pills count file drops only (pasted-text pills
+					// share kind "text" but own no FILE_MARKER tag).
+					const kindIndex =
+						removed.kind === "image"
+							? attachments.slice(0, at).filter((a) => a.kind === "image").length
+							: attachments
+									.slice(0, at)
+									.filter((a) => a.kind === "text" && !isPastedTextAttachment(a)).length;
+					editor.exciseMarkerAt(
+						removed.kind === "image" ? IMAGE_MARKER : FILE_MARKER,
+						kindIndex
+					);
+				}
+				syncMarkerCounts();
 			} finally {
 				markerSyncMuted = false;
 			}
 		}
+	}
+
+	/** Expanded pasted-text pills (excerpt ↔ full text), ephemeral UI state. */
+	let expandedPastes = $state<string[]>([]);
+
+	/** Pasted-text pill excerpt toggle (independent across pills). */
+	function togglePastedExpand(id: string): void {
+		expandedPastes = expandedPastes.includes(id)
+			? expandedPastes.filter((k) => k !== id)
+			: [...expandedPastes, id];
 	}
 
 	/**
@@ -4922,6 +5038,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// with it (`outgoing` already captured them for the send).
 		editor?.clear();
 		attachments = [];
+		expandedPastes = [];
 		annotations = [];
 		pendingAnn = null;
 		reviewOpen = false;
@@ -4937,18 +5054,17 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// render, or it measures the old height and lands short.
 		// Image literals ride the stored text (the tag reads as message
 		// text, paired back to its attachment by kind order); the
-		// provider payload strips them again in apiContent.
-		const stored = appendImageMarkers(
-			text,
-			outgoing.filter((a) => a.kind === "image").length
-		);
+		// provider payload strips them again in apiContent. Pasted-text
+		// pills splice back inline at their tags (kept attachments ride
+		// along; pasted ones are already prose).
+		const { stored, kept } = splicedSendText(text, outgoing);
 		const sending = sendMessage(
 			chatState,
 			provider,
 			effectiveSystemPrompt(settings, activeReplyCode),
 			withAnnotations(stored, outgoingAnnotations),
 			{
-				attachments: outgoing,
+				attachments: kept,
 				thinking: activeThinkingId(settings),
 				pasteFolds: folds,
 				// Haptic rumble as the reply starts arriving — only while
@@ -5062,12 +5178,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		if (action === "stage") {
 			// ⌥+Enter: most recent message, no reply; the next submit
 			// carries the full history in order.
-			stageMessage(
-				chatState,
-				appendImageMarkers(composerText(), attachments.filter((a) => a.kind === "image").length),
-				attachments
-			);
+			const { stored: staged, kept: stagedKept } = splicedSendText(composerText(), attachments);
+			stageMessage(chatState, staged, stagedKept);
 			attachments = [];
+			expandedPastes = [];
 			editor?.clear();
 			scrollAfterRender();
 			return;
@@ -5125,6 +5239,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		editingSeed = refs ? refs.text : msg.content;
 		editingPrevMarkers = countMarkers(editingSeed);
 		editingPrevFileMarkers = countMarkers(editingSeed, FILE_MARKER);
+		editingPrevPasted = countPastedTags(editingSeed);
 		reviewOpen = false;
 		editingId = null;
 		highlightAnnId = null;
@@ -5260,13 +5375,16 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				if (editingMarkerMuted) return;
 				const imagesNow = countMarkers(text);
 				const filesNow = countMarkers(text, FILE_MARKER);
+				const pastedNow = countPastedTags(text);
 				const kept = reconcileTagRemovals(
 					editingAttachments,
 					imagesNow,
 					filesNow,
 					editingPrevMarkers,
 					editingPrevFileMarkers,
-					removed
+					removed,
+					pastedNow,
+					editingPrevPasted
 				);
 				if (kept.length !== editingAttachments.length) {
 					editingAttachments = kept;
@@ -5275,19 +5393,17 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				}
 				editingPrevMarkers = imagesNow;
 				editingPrevFileMarkers = filesNow;
+				editingPrevPasted = pastedNow;
 			}
 		};
 	}
 
 	/**
-	 * Svelte action mounting the in-place editor inside the message.
-	 * Android gets the plain textarea (same WebView measurement reason
-	 * as the composer); desktop gets CodeMirror with markdown colors.
+	 * Svelte action mounting the in-place editor inside the message
+	 * (the plain textarea, like the composer).
 	 */
 	function msgEditAction(node: HTMLElement): { destroy(): void } {
-		msgEditor = androidUI
-			? createTextareaEditor(node, inlineOptions())
-			: createPromptEditor(node, inlineOptions());
+		msgEditor = createTextareaEditor(node, inlineOptions());
 		msgEditor.setPlaceholder("");
 		msgEditor.focus();
 		return {
@@ -5442,15 +5558,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				const settled =
 					active && active !== document.body && !(settings.sidebarCollapsed && active.closest("aside"));
 				if (settled) return;
-				const node = document.querySelector<HTMLElement>(".prompt .cm-content");
+				const node = document.querySelector<HTMLElement>(".prompt .ta-input");
 				if (node && getComputedStyle(node).visibility !== "hidden") {
 					editor?.focus();
 					// A parked-composer focus no-ops silently: only stop
 					// when the caret actually landed.
-					const landed = closestFromTarget(
-						document.activeElement,
-						".prompt .cm-content"
-					);
+					const landed = closestFromTarget(document.activeElement, ".prompt .ta-input");
 					if (landed) return;
 				}
 				if (++frames < 60) requestAnimationFrame(land);
@@ -5816,6 +5929,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				enterScrollMode();
 			},
 			onImagesPasted: onImagesPasted,
+			onLongTextPasted: onLongTextPasted,
 			onCopyImageTags: (indexes) => copyImageTagBlobs(attachments, indexes),
 			onDocChange: (text, removed) => {
 				hasText = text.trim().length > 0;
@@ -5827,13 +5941,16 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				if (markerSyncMuted) return;
 				const imagesNow = countMarkers(text);
 				const filesNow = countMarkers(text, FILE_MARKER);
+				const pastedNow = countPastedTags(text);
 				const kept = reconcileTagRemovals(
 					attachments,
 					imagesNow,
 					filesNow,
 					prevMarkerCount,
 					prevFileMarkerCount,
-					removed
+					removed,
+					pastedNow,
+					prevPastedCount
 				);
 				if (kept.length !== attachments.length) {
 					attachments = kept;
@@ -5844,6 +5961,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				}
 				prevMarkerCount = imagesNow;
 				prevFileMarkerCount = filesNow;
+				prevPastedCount = pastedNow;
 			}
 		};
 	}
@@ -6293,7 +6411,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			const clean =
 				!(target instanceof Element) ||
 				target.closest(
-					".cm-content, input, textarea, select, [contenteditable='true'], button, a"
+					"input, textarea, select, [contenteditable='true'], button, a"
 				) === null;
 			edgeMouse = {
 				x: event.clientX,
@@ -6407,7 +6525,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				const target = event.target;
 				const clean =
 					!(target instanceof Element) ||
-					target.closest(".cm-content, input, textarea, select, [contenteditable='true']") === null;
+					target.closest("input, textarea, select, [contenteditable='true']") === null;
 				// Message the stroke starts on (for swipe-to-fold). The
 				// article id carries the viewChat index (see msg-{i}).
 				const art = target instanceof Element ? articleOf(target) : null;
@@ -6932,7 +7050,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			return (
 				!(target instanceof Element) ||
 				target.closest(
-					".cm-content, input, textarea, select, [contenteditable='true'], button, aside, .settings-panel, .modal, .sel-menu"
+					"input, textarea, select, [contenteditable='true'], button, aside, .settings-panel, .modal, .sel-menu"
 				) === null
 			);
 		};
@@ -7253,11 +7371,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			{ passive: true }
 		);
 		if (!promptEl) return;
-		// Android gets the plain-textarea composer: no measurement cache
-		// (no collapse) and no compositor layer games (no tap ghost).
-		editor = androidUI
-			? createTextareaEditor(promptEl, promptOptions())
-			: createPromptEditor(promptEl, promptOptions());
+		// Plain-textarea composer: no measurement cache (no collapse)
+		// and no compositor layer games (no tap ghost).
+		editor = createTextareaEditor(promptEl, promptOptions());
 		editor.setPlaceholder(promptPlaceholder());
 		// Desktop lands in the prompt on launch; phones don't — popping
 		// the keyboard on every cold start is the mobile annoyance.
@@ -7469,7 +7585,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// still dismisses exactly as today); the keyup handler
 			// exits fullscreen only past the hold threshold.
 			if (event.key === "Escape" && !event.repeat) escDownAt = Date.now();
-			const inEditor = closestFromTarget(event.target, ".cm-content, .ta-input");
+			const inEditor = closestFromTarget(event.target, ".ta-input");
 			// One snapshot for the whole modifier-chord table below (see
 			// commandChord): priority lives in the table, bodies stay here
 			// as `if (chord === ...)` chains, never a switch.
@@ -7532,10 +7648,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			return;
 		}
 			if (chord === "toggle-pastes") {
-				// Pasted-text tags: with the prompt focused and tags
-				// present, Ctrl+O expands/collapses them all (Muse Code
-				// style). Anywhere else the chord does nothing — still
-				// swallowed so the browser won't open a file.
+				// The textarea composer never folds (long pastes become
+				// pills), so Ctrl+O does nothing — still swallowed so
+				// the browser won't open a file.
 				if (inEditor) editor?.togglePastes();
 								consumeEvent(event);
 				return;
@@ -7554,7 +7669,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				chord === "thinking-next" ||
 				chord === "thinking-prev"
 			) {
-				// Capture phase (see listener below): fires before CodeMirror can
+				// Capture phase (see listener below): fires before the editor can
 				// swallow the combo, so the shortcuts work from anywhere.
 								consumeEvent(event);
 				if (chord === "provider-next") cycleProvider(1);
@@ -8129,7 +8244,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				active: describeActiveElement(),
 				focusMode
 			});
-			if (closestFromTarget(event.target, ".cm-content")) {
+			if (closestFromTarget(event.target, ".ta-input")) {
 				focusMode = "edit";
 			}
 		};
@@ -8181,7 +8296,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			if (event.altKey) return false;
 			const target = event.target instanceof Element ? event.target : null;
 			if (
-				target?.closest(".cm-content, .sel-menu, .review, button, input, textarea")
+				target?.closest(".sel-menu, .review, button, input, textarea")
 			) {
 				return false;
 			}
@@ -8298,7 +8413,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			midActed = false;
 			if (event.button !== 1) return;
 			const target = event.target instanceof Element ? event.target : null;
-			if (!target || target.closest("button, a, input, textarea, select, summary, [contenteditable], .cm-content, .prompt, aside, .modal")) return;
+			if (!target || target.closest("button, a, input, textarea, select, summary, [contenteditable], .prompt, aside, .modal")) return;
 			const article = target.closest('article[id^="msg-"]');
 			if (!article) return;
 			const index = Number(article.id.slice(4));
@@ -8422,7 +8537,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// message drag's.
 			const collapsedEl =
 				live.anchorNode instanceof Element ? live.anchorNode : live.anchorNode?.parentElement;
-			if (collapsedEl?.closest(".cm-content, input, textarea")) return false;
+			if (collapsedEl?.closest("input, textarea")) return false;
 			const { an, ao, fn, fo } = lastGoodDragRange;
 			if (!document.contains(an) || !document.contains(fn)) {
 				lastGoodDragRange = null;
@@ -8490,7 +8605,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				// the way in) re-seats below instead of freezing: the
 				// highlight would span messages and mouseup's lock
 				// would quote text the pointer never settled on.
-				if (anchorEl?.closest(".cm-content, input, textarea")) return;
+				if (anchorEl?.closest("input, textarea")) return;
 				if (
 					anchorEl?.closest(".messages .rendered") &&
 					articleOf(anchorNode) === articleOf(focusNode)
@@ -8582,7 +8697,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			if (openLangMenu) {
 				if (!target?.closest(".lang-menu")) openLangMenu = null;
 			}
-			if (target?.closest(".cm-content, .sel-menu, .ann-dock, .review, button, input, textarea")) {
+			if (target?.closest(".sel-menu, .ann-dock, .review, button, input, textarea")) {
 				// Clicking away into the prompt or a control clears the
 				// highlight and drops the menu with it — but never the
 				// menu's own clicks: the Annotate button's click fires
@@ -8877,11 +8992,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			}
 			if (annPop && annPopBox) annPopBox.focus({ preventScroll: true });
 			else if (settings.promptIdleSec !== PROMPT_IDLE_ALWAYS) {
-				// Remeasure first: occlusion or a DPR change while away
-				// leaves CodeMirror's cached line boxes stale, and the
-				// first keystroke would snap the prompt to a new height.
-				// Always-hide mode skips the focus steal: returning to the
-				// window must not summon a hidden prompt.
+				// Remeasure first (a no-op for the textarea composer, kept
+				// for the interface): occlusion or a DPR change while away
+				// can leave layout caches stale. Always-hide mode skips
+				// the focus steal: returning to the window must not summon
+				// a hidden prompt.
 				editor?.remeasure();
 				editor?.focus();
 			}
@@ -8908,11 +9023,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		window.addEventListener("focus", onWinFocus);
 		// Soft-keyboard transitions resize the visual viewport without
 		// ever touching the document, and old phone WebViews time
-		// CodeMirror's own ResizeObserver unreliably around them — the
-		// emptied composer can strand at zero height after send until
-		// the next keystroke re-measures. A settled viewport re-measures
-		// up front instead (typing would heal it anyway; this heals it
-		// before the next keystroke).
+		// resizes unreliably around them — the emptied composer can
+		// strand at zero height after send until the next keystroke
+		// re-grows it. A settled viewport re-measures up front instead
+		// (typing would heal it anyway; this heals it before the next
+		// keystroke).
 		let viewportTimer: number | undefined;
 		const onViewportResize = (): void => {
 			// Pin synchronously on every viewport frame: the old trailing
@@ -9998,6 +10113,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				onclickcapture={stripClickGate}
 			>
 				{#each attachments as att (att.id)}
+					{@const pasted = isPastedTextAttachment(att) && att.text !== null}
+					{@const pastedBody = att.text ?? ""}
+					{@const pastedOpen = expandedPastes.includes(att.id)}
 					<li class:card={att.kind === "image" && !!att.dataUrl}>
 						{#if att.kind === "image" && att.dataUrl}
 							<!-- Inert thumbnail: clicking previews nothing
@@ -10005,11 +10123,31 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							<span class="thumb" aria-hidden="true">
 								<img src={att.dataUrl} alt="" draggable="false" />
 							</span>
+						{:else if pasted}
+							<span class="file-kind" aria-hidden="true">PASTE</span>
 						{:else}
 							<span class="file-kind" aria-hidden="true">FILE</span>
 						{/if}
-						<span class="name" title="{att.name} · ~{att.tokens} tokens">{att.name}</span>
-						<span class="tok" title="{att.tokens} tokens">{formatTokenCount(att.tokens)}</span>
+						{#if pasted}
+							<!-- Pasted-text pill: excerpt preview plus char
+							count; the excerpt toggles the full text. Copy
+							and remove below are the shared card buttons. -->
+							<button
+								type="button"
+								class="paste-body"
+								class:open={pastedOpen}
+								aria-expanded={pastedOpen}
+								aria-label={pastedOpen ? "Collapse pasted text" : "Expand pasted text"}
+								onmousedown={(e) => e.preventDefault()}
+								onclick={() => togglePastedExpand(att.id)}
+							>
+								{pastedOpen ? pastedBody : fileExcerpt(pastedBody)}
+							</button>
+							<span class="tok" title="{att.tokens} tokens">{pastedBody.length} chars</span>
+						{:else}
+							<span class="name" title="{att.name} · ~{att.tokens} tokens">{att.name}</span>
+							<span class="tok" title="{att.tokens} tokens">{formatTokenCount(att.tokens)}</span>
+						{/if}
 						<button
 							type="button"
 							class="card-btn"
@@ -11943,9 +12081,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		margin-right: auto;
 	}
 	/* Chats with messages lift the composer off the bottom and give
-	it more rows: the empty state's hero layout keeps its own rhythm.
-	No font-size here — CodeMirror caches line metrics, and a size
-	change out from under it collapses the editor to zero height. */
+	it more rows: the empty state's hero layout keeps its own rhythm. */
 	/* iOS zooms into any text field under 16px on focus (and the
 	zoom is what unlocks sideways panning): phone fields floor at
 	16px. Desktop keeps its optical sizes. */
@@ -12137,8 +12273,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		visibility: hidden;
 		pointer-events: none;
 	}
-	.app[data-android] .prompt:has(.ann-dock) :global(.ta-input::placeholder),
-	.app[data-android] .prompt:has(.ann-dock) :global(.cm-placeholder) {
+	.app[data-android] .prompt:has(.ann-dock) :global(.ta-input::placeholder) {
 		color: transparent;
 	}
 	/* Empty chat on phones: the pills row is the last in-flow child, so
@@ -13001,11 +13136,16 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		margin-left: auto;
 		text-align: left;
 	}
-	.msg-edit-box :global(.cm-editor) {
+	.msg-edit-box :global(.ta-input) {
 		background: none;
-	}
-	.msg-edit-box :global(.cm-scroller) {
 		max-height: 16rem;
+		width: 100%;
+		box-sizing: border-box;
+		border: 0;
+		color: inherit;
+		font: inherit;
+		resize: none;
+		outline: none;
 	}
 	/* In-place edit on phones: the textarea editor misses the
 	prompt-scoped textarea styles, so it falls back to native chrome;
@@ -13712,6 +13852,26 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		white-space: nowrap;
 		color: #6e6e73;
 		color: var(--muted);
+	}
+	/* Pasted-text pill body: excerpt preview, single-line like the
+	file name; expanded it scrolls in place instead of growing the
+	strip. */
+	.attachments .paste-body {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		max-width: 16rem;
+		text-align: left;
+		border-radius: 0.5rem;
+		padding: 0.1rem 0.3rem;
+	}
+	.attachments .paste-body.open {
+		white-space: pre-wrap;
+		word-break: break-word;
+		max-height: 8rem;
+		max-width: 20rem;
+		overflow: auto;
+		text-overflow: clip;
 	}
 	.attachments button {
 		border: 0;
@@ -15095,8 +15255,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		background: #fff;
 		/* Raised, not flat: dark keeps the #1c1c1e card on the #17171a page. */
 		background: var(--bg-raised);
-		/* Fixed floor so mounting the editor never shifts layout.
-		CodeMirror itself sets no minimum — this floor is ours, at
+		/* Fixed floor so mounting the editor never shifts layout:
 		about three text lines plus the tools row. */
 		min-height: 6.4rem;
 		box-sizing: border-box;
@@ -15240,8 +15399,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	markup): until its node lands, the tools and send button stay
 	hidden so they never flash ahead of the editable text. No layout
 	risk — both are absolutely positioned. */
-	.prompt:not(:has(.cm-editor)):not(:has(.ta-input)) .prompt-tools,
-	.prompt:not(:has(.cm-editor)):not(:has(.ta-input)) .send-btn {
+	.prompt:not(:has(.ta-input)) .prompt-tools,
+	.prompt:not(:has(.ta-input)) .send-btn {
 		visibility: hidden;
 	}
 	.attach-btn,
@@ -15335,74 +15494,21 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		letter-spacing: 0.05em;
 		color: #6e6e73;
 	}
-	/* Prompt editor legibility (global: CodeMirror owns these nodes).
-	   Dark rules live here — not in the CM theme object — because real
-	   media queries are the only reliable switch. */
-	.prompt :global(.cm-content) {
-		/* Same stack as the chat text — the draft should look like the
-		message it becomes, not a terminal. */
-		font-family:
-			-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
-		padding-right: calc(var(--tools-pad) + var(--tools-extra));
-		caret-color: #1c1c1e;
-		caret-color: var(--ink);
-	}
 	/* Emptied composer: no stray caret while UNFOCUSED. Clearing the
 	draft (paste then delete-all, or a send) leaves focus in place —
 	but a focused empty box keeps its blink: the cursor is the only
 	focus signal, and hiding it strands the caret invisibly.
-	(data-empty rides hasText, which onDocChange maintains; .cm-focused
-	is CodeMirror's own focus mark, so no JS watches this.) */
-	.prompt[data-empty="true"] :global(.cm-editor:not(.cm-focused)) :global(.cm-content) {
-		caret-color: transparent;
-	}
-	.prompt[data-empty="true"] :global(.cm-editor:not(.cm-focused)) :global(.cm-cursor) {
-		display: none;
-	}
+	(data-empty rides hasText, which onDocChange maintains.) */
 	.prompt[data-empty="true"] :global(.ta-input:not(:focus)) {
 		caret-color: transparent;
-	}
-	/* The mic icon widens the tools cluster: hold the first line clear
-	of it, but only while it is actually mounted. */
-	.prompt.has-mic :global(.cm-content) {
-		--tools-pad: 5.8rem;
-	}
-	/* Annotation count badge joins the tools cluster: hold the first
-	line clear of the wider row while any annotations exist. */
-	.prompt.has-anns :global(.cm-content) {
-		--tools-pad: 9.5rem;
-	}
-	.prompt.has-mic.has-anns :global(.cm-content) {
-		--tools-pad: 8.5rem;
-	}
-	/* Declarative mirrors of the has-mic/has-anns classes above: same
-	seats, no JS. The classes stay as fallback. */
-	.prompt:has(.mic-btn) :global(.cm-content) {
-		--tools-pad: 5.8rem;
-	}
-	.prompt:has(.ann-wrap) :global(.cm-content) {
-		--tools-pad: 9.5rem;
-	}
-	.prompt:has(.mic-btn):has(.ann-wrap) :global(.cm-content) {
-		--tools-pad: 8.5rem;
 	}
 	/* Jump trigger joins the cluster in long threads: reserve its seat
 	on top of whichever combo is live (var composition, not ×4 rules). */
 	.prompt:has(.wp-jump) {
 		--tools-extra: 1.8rem;
 	}
-	.prompt :global(.cm-editor) {
-		/* Beats the CodeMirror theme's own font-size on specificity.
-		Fixed size on purpose: the text-size setting scales reading
-		(messages), never the input — typing at 400%+ shows a word or
-		two per line. */
-		font-size: 0.95rem;
-		/* The prompt grows with typing, but never eats the messages:
-		past this the editor scrolls internally. */
-		max-height: 40vh;
-	}
-	/* Android textarea composer: fixed like the CodeMirror input above —
-	the text-size setting scales reading, never typing. */
+	/* Textarea composer: fixed size on purpose — the text-size setting
+	scales reading, never typing. */
 	.prompt :global(.ta-input) {
 		font-family:
 			-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
@@ -15446,57 +15552,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.prompt:has(.mic-btn):has(.ann-wrap) :global(.ta-input) {
 		--tools-pad: 11.5rem;
 	}
-	.prompt :global(.cm-placeholder) {
-		color: #8e8e93;
-		color: var(--line-hover);
-		/* Clicks pass through to the editor so the caret lands by
-		   coordinates (start of the empty prompt), not after the hint. */
-		pointer-events: none;
-		/* Hint text, not content: never part of a selection. */
-		user-select: none;
-		-webkit-user-select: none;
-	}
-	:global(.cm-editor.cm-focused) {
-		/* Kills the dotted focus outline some Chromium builds draw. */
-		outline: none !important;
-	}
-	:global(.cm-editor .cm-cursor) {
-		/* !important: CodeMirror injects its own cursor styles at runtime,
-		   after this stylesheet — only importance wins deterministically. */
-		border-left-color: #1c1c1e !important;
-		/* 2px spine: the 1.2px default reads anemic beside message text. */
-		border-left-width: 2px !important;
-	}
-	.app[data-focus-mode="scroll"] :global(.cm-cursorLayer) {
-		/* Scroll mode shows no prompt cursor at all (see enterScrollMode). */
-		display: none;
-	}
 	/* Dark theme, gated on the resolved scheme (<html data-theme>)
 	instead of the OS query, so the settings switch can pin it. */
-	/* Caret rides --ink, placeholders ride --line-hover. The ta-input
-	twins are Android-only nodes with identical pairs. */
-	/* The CM cursor node only mounts while focused, so its dark shade
-	stays a pinned rule rather than an untestable token. */
-	:global(html[data-theme="dark"]) :global(.cm-editor .cm-cursor) {
-		border-left-color: #f2f2f7 !important;
-	}
-	/* !important throughout: the CodeMirror theme object injects its
-	light rules after this stylesheet, so only importance wins. */
-	:global(html[data-theme="dark"]) :global(.cm-paste-marker) {
-		color: #98989f !important;
-		font-weight: 700;
-	}
-	/* Dark twin of the light tag look: gray + bold, same for every
-	pasted tag kind (see .cm-attach-tag in editorTheme.ts). Inner
-	spans ride along (matched structurally: the highlight's class
-	names are obfuscated per build): the mark's own rules can't clear
-	their underline or muted-gray brackets. */
-	:global(html[data-theme="dark"]) :global(.cm-attach-tag),
-	:global(html[data-theme="dark"]) :global(.cm-attach-tag span) {
-		color: #98989f !important;
-		font-weight: 700;
-		text-decoration: none !important;
-	}
+	/* Caret rides --ink, placeholders ride --line-hover. */
 	/* Centered reading column on wide screens (DeepSeek-web rhythm).
 	The cap rides --chat-width off .app (desktop slider, 36 = the default
 	fixed width); the fallback keeps phones and older saves identical. */

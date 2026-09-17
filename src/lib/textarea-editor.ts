@@ -1,26 +1,60 @@
 import {
+	PASTE_THRESHOLD,
+	dataUrlsToImageFiles,
+	removedMarkerIndexes,
+	tagCopyIndexes,
+	tagCopyPlan,
 	trimPasteTail,
-	type PromptEditor,
-	type PromptEditorOptions
-} from "./editor";
+	type RemovedMarkerTags
+} from "./editorPaste";
+import type { PromptEditor, PromptEditorOptions } from "./editor";
 import { attachEditContext, shouldDeferForComposition } from "./editContext";
 import { fenceAtOffset, parseFences, shiftEnterAction } from "./fences";
-import { removeMarker, removeMarkerAt } from "./attachments";
+import {
+	blobToDataUrl,
+	clipboardPngBlob,
+	removeMarker,
+	removeMarkerAt,
+	removePastedAt
+} from "./attachments";
+import { escapeHtml } from "./render";
 
 /**
- * Plain-textarea PromptEditor for Android (see `createPromptEditor` in
- * `./editor` for the CodeMirror version used everywhere else).
+ * Plain-textarea PromptEditor, the only composer (desktop and phone).
  *
- * Why this exists: on phone WebViews CodeMirror can cache stale line-box
- * measurements (composer collapses to ~0 height) and the tap-to-reveal row
- * fade never repaints the composer region (stale-tile ghost). A native
- * textarea has no measurement cache and no compositor layer games, so both
- * failure modes disappear. What it deliberately drops: markdown coloring
- * while typing, undo history, and long-paste collapsing (pastes send
+ * Why a native textarea: rich editors cache stale line-box measurements
+ * (composer collapses to ~0 height on phone WebViews) and the
+ * tap-to-reveal row fade never repaints the composer region
+ * (stale-tile ghost). A textarea has no measurement cache and no
+ * compositor layer games, so both failure modes disappear. What it
+ * deliberately drops: markdown coloring while typing, undo history,
+ * and collapsed-paste folds (long pastes become pasted-text pills via
+ * `onLongTextPasted` — without a host they insert inline and send
  * unfolded). Image attach still works — the paperclip button and drop
  * handling live outside the editor — and pasted images still become
  * attachments via `onImagesPasted`.
  */
+/** Marker heading the enriched clipboard HTML for an image-tag
+copy/cut (same marker the paste read looks for). */
+const IMAGE_SET_MARKER = "<!--ccez-image-set-->";
+
+/**
+ * In-app roundtrip for a tag copy/cut: the pictures as data URLs
+ * beside the exact selected text. The clipboard HTML item carries
+ * the same set for foreign apps, but runtimes whose clipboard
+ * rejects rich writes (notably the app shell) would otherwise paste
+ * dead tags — an exact-text paste in this session rehydrates from
+ * here instead. One-shot: the first matching paste consumes it, and
+ * a newer copy/cut overwrites it. Module-scoped on purpose (both
+ * composer and inline editor share one clipboard).
+ */
+interface CutImageStash {
+	text: string;
+	urls: Promise<string[]>;
+}
+
+let cutImageStash: CutImageStash | null = null;
+
 export function createTextareaEditor(
 	parent: HTMLElement,
 	options: PromptEditorOptions
@@ -50,7 +84,61 @@ export function createTextareaEditor(
 	};
 
 	const onInput = (): void => {
-		notify();
+		// Keyboard/native deletion snapshot (see onBeforeInput):
+		// report precise tag ranges so a middle delete drops its own
+		// attachments instead of newest-first.
+		const pending = pendingDelete;
+		pendingDelete = null;
+		if (!pending) {
+			notify();
+			return;
+		}
+		autogrow();
+		let removed: RemovedMarkerTags | undefined;
+		try {
+			removed = removedMarkerIndexes(pending.before, pending.ranges);
+		} catch {
+			removed = undefined;
+		}
+		options.onDocChange?.(ta.value, removed);
+	};
+	/**
+	 * Pending keyboard deletion: the input event carries no change
+	 * ranges, so deletions snapshot their before-text + ranges here
+	 * (target ranges where the engine reports them, the live
+	 * selection otherwise). A canceled beforeinput leaves no input
+	 * behind — the next keydown clears the stale snapshot first.
+	 */
+	let pendingDelete: {
+		before: string;
+		ranges: { from: number; to: number }[];
+	} | null = null;
+	const onBeforeInput = (event: InputEvent): void => {
+		if (!event.inputType.startsWith("delete")) return;
+		const before = ta.value;
+		const ranges: { from: number; to: number }[] = [];
+		try {
+			const targets =
+				typeof event.getTargetRanges === "function" ? event.getTargetRanges() : [];
+			for (const range of targets) {
+				const from = range.startOffset;
+				const to = range.endOffset;
+				if (to > from) ranges.push({ from, to });
+			}
+		} catch {
+			// Fall through to the selection-derived range below.
+		}
+		if (ranges.length === 0) {
+			const start = ta.selectionStart ?? 0;
+			const end = ta.selectionEnd ?? 0;
+			if (start !== end) ranges.push({ from: start, to: end });
+			else if (event.inputType === "deleteContentForward") {
+				ranges.push({ from: start, to: start + 1 });
+			} else {
+				ranges.push({ from: Math.max(0, start - 1), to: start });
+			}
+		}
+		pendingDelete = { before, ranges };
 	};
 	/**
 	 * Fence Shift+Enter for the plain textarea: ```py + Shift+Enter
@@ -91,13 +179,17 @@ export function createTextareaEditor(
 		return true;
 	};
 	const onKeyDown = (event: KeyboardEvent): void => {
+		// A canceled delete leaves its snapshot with no input behind;
+		// drop it here so the next keystroke never misattributes it
+		// (its own beforeinput re-snapshots when it really deletes).
+		pendingDelete = null;
 		// IME composition (notably pinyin) confirms with Enter — never
 		// hijack that keystroke or typing CJK sends the message halfway.
 		// An attached EditContext (where supported) sharpens the range
 		// tracking behind this flag; the fallback is this check itself.
 		if (shouldDeferForComposition({ isComposing: event.isComposing })) return;
-		// Shift+Enter on a fence line closes/exits the fence (mirrors
-		// the CodeMirror composer); anywhere else it is a newline.
+		// Shift+Enter on a fence line closes/exits the fence;
+		// anywhere else it is a newline.
 		if (event.key === "Enter" && event.shiftKey && !event.altKey) {
 			if (fenceShiftEnter()) event.preventDefault();
 			return;
@@ -119,24 +211,192 @@ export function createTextareaEditor(
 			options.onHopOut();
 		}
 	};
+	/**
+	 * Copy/cut enrichment for image tags: the clipboard gets the
+	 * pictures (one rich-text item with embedded images, then
+	 * per-image items, then plain text) so pasting in another chat
+	 * lands images, not dead tags. The host maps the selection's
+	 * global tag indexes onto its attachments (Nth tag pairs with the
+	 * Nth attachment); the read runs synchronously at call time so a
+	 * cut's own deletion can't race it. An in-app stash carries the
+	 * same pictures for pastes whose clipboard lost the rich item.
+	 * Selections without image tags fall through to the default
+	 * handler.
+	 */
+	/** Plain-text insert at a snapshot range (clipboard failure
+	paths land the words; the host reconciles the tags). */
+	const insertPlain = (text: string, start: number, end: number): void => {
+		ta.setRangeText(text, start, end, "end");
+		notify();
+	};
+	const onCopyCut =
+		(isCut: boolean) =>
+		(event: ClipboardEvent): void => {
+			const takeImageBlobs = options.onCopyImageTags;
+			if (!takeImageBlobs) return;
+			const start = ta.selectionStart ?? 0;
+			const end = ta.selectionEnd ?? 0;
+			if (start >= end) return;
+			const doc = ta.value;
+			const clipboardWrite =
+				typeof ClipboardItem !== "undefined" && !!navigator.clipboard?.write;
+			const plan = tagCopyPlan(doc.slice(start, end), clipboardWrite);
+			if (!plan) return;
+			// Snapshot the blobs before a cut deletes its own tags;
+			// the stash resolves the same pictures to data URLs for
+			// the in-app roundtrip (never rejects — an empty set just
+			// falls through to the clipboard items at paste time).
+			// First, before the ClipboardItem gate: the stash needs no
+			// clipboard API, so runtimes without rich writes still
+			// paste their previews back from a native cut.
+			const pending = takeImageBlobs(tagCopyIndexes(doc, start, end));
+			cutImageStash = {
+				text: plan.text,
+				urls: pending.then(
+					(blobs) => Promise.all(blobs.map((blob) => blobToDataUrl(blob))),
+					() => []
+				)
+			};
+			if (!clipboardWrite) return;
+			event.preventDefault();
+			if (isCut) {
+				// Precise tag indexes (the input event carries no change
+				// ranges), so a middle cut drops its own attachments.
+				const before = doc;
+				ta.setRangeText("", start, end, "end");
+				autogrow();
+				let removed: RemovedMarkerTags | undefined;
+				try {
+					removed = removedMarkerIndexes(before, [{ from: start, to: end }]);
+				} catch {
+					removed = undefined;
+				}
+				options.onDocChange?.(ta.value, removed);
+			}
+			void (async () => {
+				const textBlob = new Blob([plan.text], { type: "text/plain" });
+				// 1. One rich-text item carrying text plus the whole
+				// image set as embedded pictures: multi-tag cuts paste
+				// back complete, and foreign apps get text plus images.
+				try {
+					const blobs = await pending;
+					if (blobs.length === 0) throw new Error("no image data");
+					const urls = await Promise.all(blobs.map((blob) => blobToDataUrl(blob)));
+					const imgs = urls.map((url) => `<img src="${url}">`).join("");
+					const html = new Blob(
+						[`${IMAGE_SET_MARKER}<p>${escapeHtml(plan.text)}</p>${imgs}`],
+						{ type: "text/html" }
+					);
+					await navigator.clipboard.write([
+						new ClipboardItem({ "text/plain": textBlob, "text/html": html })
+					]);
+					return;
+				} catch {
+					// Fall through to per-image items below.
+				}
+				// 2. One item per image (single-image universal; several
+				// items only where the engine allows them).
+				try {
+					const blobs = await pending;
+					if (blobs.length === 0) throw new Error("no image data");
+					const pngs = await Promise.all(blobs.map((blob) => clipboardPngBlob(blob)));
+					await navigator.clipboard.write(
+						pngs.map(
+							(png) =>
+								new ClipboardItem({
+									"text/plain": textBlob,
+									[png.type || "image/jpeg"]: png
+								})
+						)
+					);
+					return;
+				} catch {
+					// Fall through to plain text below.
+				}
+				// 3. Plain text, like any other copy.
+				try {
+					await navigator.clipboard.writeText(plan.text);
+				} catch {
+					// Clipboard unavailable: a cut already deleted (native
+					// cut deletes the same way when its own write fails).
+				}
+			})();
+		};
 	const onPaste = (event: ClipboardEvent): void => {
 		const clipboard = event.clipboardData;
 		if (!clipboard) return;
+		const raw = clipboard.getData("text/plain");
+		// The in-app roundtrip first: an exact-text paste of a
+		// session copy/cut rehydrates from the stash, so runtimes
+		// whose clipboard dropped the rich item still land the
+		// pictures (with their preview cards, via onImagesPasted) —
+		// never dead tags. One-shot: the match consumes it.
+		const stash = cutImageStash;
+		const stashImages = options.onImagesPasted;
+		if (stash && raw === stash.text && stashImages) {
+			cutImageStash = null;
+			event.preventDefault();
+			const start = ta.selectionStart ?? ta.value.length;
+			const end = ta.selectionEnd ?? ta.value.length;
+			void (async () => {
+				try {
+					const files = await dataUrlsToImageFiles(await stash.urls);
+					if (files.length === 0) insertPlain(raw, start, end);
+					else stashImages(files);
+				} catch {
+					insertPlain(raw, start, end);
+				}
+			})();
+			return;
+		}
+		// The cut's own image set next (every picture, one
+		// rich-text item): data URLs survive the paste read
+		// that custom clipboard types don't.
+		const html = clipboard.getData("text/html");
+		const htmlImages = options.onImagesPasted;
+		if (html.includes(IMAGE_SET_MARKER) && htmlImages) {
+			event.preventDefault();
+			void (async () => {
+				try {
+					const doc = new DOMParser().parseFromString(html, "text/html");
+					const urls = [...doc.querySelectorAll("img")]
+						.map((img) => img.getAttribute("src") ?? "")
+						.filter((src) => src.startsWith("data:"));
+					const files = await dataUrlsToImageFiles(urls);
+					if (files.length === 0) return;
+					htmlImages(files);
+				} catch {
+					const start = ta.selectionStart ?? ta.value.length;
+					const end = ta.selectionEnd ?? ta.value.length;
+					insertPlain(raw, start, end);
+				}
+			})();
+			return;
+		}
+		// Every image file, not just the first: pastes from
+		// outside the app carry no set, but still land whole.
 		const images = [...clipboard.files].filter((f) => f.type.startsWith("image/"));
 		if (images.length > 0 && options.onImagesPasted) {
 			event.preventDefault();
 			options.onImagesPasted(images);
 			return;
 		}
-		const raw = clipboard.getData("text/plain");
 		const text = trimPasteTail(raw);
-		// Clean short paste: the default handler inserts it exactly.
-		if (text === raw) return;
 		// Newlines-only: swallow, don't grow an empty line.
 		if (!text) {
 			event.preventDefault();
 			return;
 		}
+		// Over-threshold paste: the host turns it into a pasted-text
+		// attachment. Without a host the text inserts inline — the
+		// editor never collapses, so everything still sends unfolded.
+		if (text.length > PASTE_THRESHOLD && options.onLongTextPasted) {
+			event.preventDefault();
+			options.onLongTextPasted(text);
+			return;
+		}
+		// Clean short paste: the default handler inserts it exactly.
+		if (text === raw) return;
 		event.preventDefault();
 		const start = ta.selectionStart ?? ta.value.length;
 		const end = ta.selectionEnd ?? ta.value.length;
@@ -148,7 +408,12 @@ export function createTextareaEditor(
 
 	ta.addEventListener("input", onInput);
 	ta.addEventListener("keydown", onKeyDown);
+	ta.addEventListener("beforeinput", onBeforeInput as EventListener);
 	ta.addEventListener("paste", onPaste);
+	const onCopy = onCopyCut(false);
+	const onCut = onCopyCut(true);
+	ta.addEventListener("copy", onCopy);
+	ta.addEventListener("cut", onCut);
 	autogrow();
 
 	return {
@@ -166,11 +431,19 @@ export function createTextareaEditor(
 			notify();
 			return true;
 		},
-		// Same indexed cut as the CodeMirror path (a pill drops its
-		// own tag); tag→pill here still reconciles newest-first (the
-		// plain input event carries no change ranges).
+		// Indexed cut (a pill drops its own tag); tag→pill still
+		// reconciles newest-first (the input event carries no change
+		// ranges).
 		exciseMarkerAt: (marker: string, index: number) => {
 			const next = removeMarkerAt(ta.value, marker, index);
+			if (next === ta.value) return false;
+			ta.value = next;
+			notify();
+			return true;
+		},
+		// Pasted-text pill drops its own `[Pasted N chars]` tag.
+		excisePastedAt: (index: number) => {
+			const next = removePastedAt(ta.value, index);
 			if (next === ta.value) return false;
 			ta.value = next;
 			notify();
@@ -210,7 +483,10 @@ export function createTextareaEditor(
 		destroy() {
 			ta.removeEventListener("input", onInput);
 			ta.removeEventListener("keydown", onKeyDown);
+			ta.removeEventListener("beforeinput", onBeforeInput as EventListener);
 			ta.removeEventListener("paste", onPaste);
+			ta.removeEventListener("copy", onCopy);
+			ta.removeEventListener("cut", onCut);
 			ta.remove();
 		}
 	};

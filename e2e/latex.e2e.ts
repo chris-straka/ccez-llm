@@ -110,7 +110,7 @@ test("invalid math and code fences stay plain", async ({ page }) => {
 
 /** The composer prompt never renders math: typed $$ stays plain text. */
 test("composer does not render latex", async ({ page }) => {
-	const composer = page.locator(".cm-content").first();
+	const composer = page.locator(".ta-input").first();
 	await composer.click();
 	await page.keyboard.type("$$x^2$$");
 	await expect(composer.locator(".ccez-math")).toHaveCount(0);

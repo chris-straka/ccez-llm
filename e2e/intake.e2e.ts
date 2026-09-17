@@ -94,30 +94,30 @@ test("dropped images land as cards with a [Pasted image] tag", async ({ page }) 
 		card.locator('button[aria-label="Remove attachment"] svg')
 	).toHaveCount(1);
 	// The tag stays on the current line with one trailing space.
-	await expect(page.locator(".cm-content")).toContainText("[Pasted image]");
+	await expect(page.locator(".ta-input")).toHaveValue(/\[Pasted image\]/);
 });
 
 test("pasted tag leaves the caret after its space, same line", async ({ page }) => {
 	await dropImage(page);
-	const content = page.locator(".cm-content");
-	await expect(content).toContainText("[Pasted image]", { timeout: 15_000 });
+	const content = page.locator(".ta-input");
+	await expect(content).toHaveValue(/\[Pasted image\]/, { timeout: 15_000 });
 	// End takes the caret to the tag line's end, then type: the word
 	// must land beside the tag (old own-line placement parked the
 	// caret below, so typing opened a second line).
 	await content.click();
 	await page.keyboard.press("End");
 	await page.keyboard.type("hi");
-	await expect(content).toHaveText("[Pasted image] hi");
+	await expect(content).toHaveValue("[Pasted image] hi");
 });
 
 test("a second pasted image chains onto the same line", async ({ page }) => {
 	await dropImage(page);
-	const content = page.locator(".cm-content");
-	await expect(content).toContainText("[Pasted image]", { timeout: 15_000 });
+	const content = page.locator(".ta-input");
+	await expect(content).toHaveValue(/\[Pasted image\]/, { timeout: 15_000 });
 	// The second paste lands beside the first tag (the old prefix
 	// newline parked the caret below, splitting repeat pastes).
 	await dropImage(page);
-	await expect(content).toHaveText("[Pasted image] [Pasted image] ");
+	await expect(content).toHaveValue("[Pasted image] [Pasted image] ");
 });
 
 test("removing the pill collapses the strip", async ({ page }) => {
@@ -179,7 +179,7 @@ test("image pill and tag remove each other", async ({ page }) => {
 	// Pill → tag: the pill's X takes the marker line with it.
 	await page.locator('.attachments button[aria-label="Remove attachment"]').click();
 	await expect(card).toHaveCount(0);
-	await expect(page.locator(".cm-content")).not.toContainText("[Pasted image]");
+	await expect(page.locator(".ta-input")).not.toHaveValue(/\[Pasted image\]/);
 });
 
 test("deleting the tag drops the pill", async ({ page }) => {
@@ -190,20 +190,20 @@ test("deleting the tag drops the pill", async ({ page }) => {
 	// the image attachment, like hand-deleting the tag. Meta+A: the
 	// macOS select-all — Control+A only jumps to the line start in
 	// the editor, so typing would prepend instead of replacing.
-	await page.locator(".cm-content").click();
+	await page.locator(".ta-input").click();
 	await page.keyboard.press("Meta+a");
 	await page.keyboard.type("hello");
 	await expect(card).toHaveCount(0);
-	await expect(page.locator(".cm-content")).toContainText("hello");
+	await expect(page.locator(".ta-input")).toHaveValue("hello");
 });
-test("long paste collapses to a tag; Ctrl+O expands and re-collapses", async ({
-	page
-}) => {
-	// A >100-char paste renders as one bold tag, not the raw text.
+test("long paste becomes a pill with a positional tag", async ({ page }) => {
+	// A >100-char paste becomes a text pill above the composer plus a
+	// positional [Pasted N chars] tag where the caret was — never raw
+	// text in the box.
 	const pasted = "lorem ipsum dolor sit amet ".repeat(20);
-	await page.locator(".cm-content").first().click();
+	await page.locator(".ta-input").first().click();
 	await page.evaluate((text) => {
-		const target = document.querySelector(".cm-content");
+		const target = document.querySelector(".ta-input");
 		if (!target) throw new Error("missing editor");
 		const transfer = new DataTransfer();
 		transfer.setData("text/plain", text);
@@ -211,24 +211,27 @@ test("long paste collapses to a tag; Ctrl+O expands and re-collapses", async ({
 		Object.defineProperty(event, "clipboardData", { value: transfer });
 		target.dispatchEvent(event);
 	}, pasted);
-	const marker = page.locator(".cm-paste-marker");
-	await expect(marker).toBeVisible();
-	await expect(marker).toContainText("[Pasted");
-	// Bold body text, no own background: the tag is not a code block.
-	await expect(marker).toHaveCSS("font-weight", "700");
-	const box = await marker.evaluate((el) => {
-		const style = getComputedStyle(el);
-		return { background: style.backgroundColor, borderWidth: style.borderWidth };
-	});
-	expect(box.background).toBe("rgba(0, 0, 0, 0)");
-	expect(box.borderWidth).toBe("0px");
-	// Ctrl+O expands every tag…
+	// PASTE-kind pill with excerpt preview plus char count…
+	const pill = page.locator(".attachments .paste-body");
+	await expect(pill).toBeVisible();
+	await expect(page.locator(".attachments .file-kind")).toHaveText("PASTE");
+	await expect(page.locator(".attachments .tok")).toHaveText("540 chars");
+	// …and the tag rides the caret line with one trailing space.
+	const box = page.locator(".ta-input").first();
+	await expect(box).toHaveValue("[Pasted 540 chars] ");
+	// Tap toggles the full scrollable text…
+	const excerpt = `${pasted.slice(0, 240).trimEnd()}…`;
+	await expect(pill).toHaveText(excerpt);
+	await pill.click();
+	await expect(pill).toHaveAttribute("aria-expanded", "true");
+	await expect(pill).toHaveText(pasted);
+	await pill.click();
+	await expect(pill).toHaveAttribute("aria-expanded", "false");
+	await expect(pill).toHaveText(excerpt);
+	// …while Ctrl+O leaves the tag alone (no in-box collapse to toggle).
+	await box.click();
 	await page.keyboard.press("Control+o");
-	await expect(marker).toHaveCount(0);
-	await expect(page.locator(".cm-content").first()).toContainText("lorem ipsum");
-	// …and again re-collapses.
-	await page.keyboard.press("Control+o");
-	await expect(marker).toBeVisible();
+	await expect(box).toHaveValue("[Pasted 540 chars] ");
 });
 
 test("thoughts never render and Ctrl+O stays quiet without paste tags", async ({ page }) => {
@@ -260,7 +263,7 @@ test("thoughts never render and Ctrl+O stays quiet without paste tags", async ({
 	await expect(body).not.toContainText("quiet plan");
 	await expect(page.locator("article.assistant .ccez-thoughts")).toHaveCount(0);
 	// Ctrl+O with no paste tags does nothing (and opens no file dialog).
-	await page.locator(".cm-content").first().click();
+	await page.locator(".ta-input").first().click();
 	await page.keyboard.press("Control+o");
 	await expect(page.locator("article.assistant .ccez-thoughts")).toHaveCount(0);
 	await expect(body).toContainText("Final answer");
@@ -327,7 +330,7 @@ test("tray stays background-free under a solid prompt", async ({ page }) => {
 	// pills float with the thread visible between them, and draft
 	// image cards wear the blue wash again as basic pill-cards.
 	await page.reload();
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 	await dropImage(page);
 	const tray = page.locator("ul.attachments").first();
 	await expect(tray).toBeVisible({ timeout: 15_000 });
@@ -546,14 +549,12 @@ test("one preview per message, contents centered", async ({ page }) => {
 	await expect(cards).toHaveCount(0);
 });
 
-test("removing the pill keeps pasted folds collapsed", async ({ page }) => {
-	// Long paste folds, then the image pill goes: the fold must stay a
-	// marker (the old full-rewrite excision dropped the decorations and
-	// divulged the whole paste).
+test("removing the image pill keeps the pasted-text pill", async ({ page }) => {
+	// Long paste first: text pill plus positional tag…
 	const pasted = "lorem ipsum dolor sit amet ".repeat(20);
-	await page.locator(".cm-content").first().click();
+	await page.locator(".ta-input").first().click();
 	await page.evaluate((text) => {
-		const target = document.querySelector(".cm-content");
+		const target = document.querySelector(".ta-input");
 		if (!target) throw new Error("missing editor");
 		const transfer = new DataTransfer();
 		transfer.setData("text/plain", text);
@@ -561,27 +562,28 @@ test("removing the pill keeps pasted folds collapsed", async ({ page }) => {
 		Object.defineProperty(event, "clipboardData", { value: transfer });
 		target.dispatchEvent(event);
 	}, pasted);
-	const marker = page.locator(".cm-paste-marker");
-	await expect(marker).toBeVisible();
-	const label = await marker.textContent();
+	const pill = page.locator(".attachments .paste-body");
+	await expect(pill).toBeVisible();
+	const box = page.locator(".ta-input").first();
+	await expect(box).toHaveValue("[Pasted 540 chars] ");
+	// …then an image: its own card joins the strip…
 	await dropImage(page);
 	const card = page.locator(".attachments li.card");
 	await expect(card).toBeVisible({ timeout: 15_000 });
-	await page.locator('.attachments button[aria-label="Remove attachment"]').click();
+	// …and removing the image pill keeps the pasted-text pill and tag.
+	await card.locator('button[aria-label="Remove attachment"]').click();
 	await expect(card).toHaveCount(0);
-	await expect(page.locator(".cm-content").first()).not.toContainText("[Pasted image]");
-	await expect(marker).toBeVisible();
-	await expect(marker).toHaveText(label ?? "");
-	// The full text is still in the draft: expanding shows it.
-	await marker.click();
-	await expect(page.locator(".cm-content").first()).toContainText("lorem ipsum");
+	await expect(box).not.toHaveValue(/\[Pasted image\]/);
+	await expect(pill).toBeVisible();
+	// The image tag (and its seat) is gone; the pasted-text tag stays.
+	await expect(box).toHaveValue("[Pasted 540 chars]");
 });
 
-test("expanded paste shows collapse brackets that re-collapse it", async ({ page }) => {
+test("pasted-text pill expands to the full text and back", async ({ page }) => {
 	const pasted = "lorem ipsum dolor sit amet ".repeat(20);
-	await page.locator(".cm-content").first().click();
+	await page.locator(".ta-input").first().click();
 	await page.evaluate((text) => {
-		const target = document.querySelector(".cm-content");
+		const target = document.querySelector(".ta-input");
 		if (!target) throw new Error("missing editor");
 		const transfer = new DataTransfer();
 		transfer.setData("text/plain", text);
@@ -589,20 +591,19 @@ test("expanded paste shows collapse brackets that re-collapse it", async ({ page
 		Object.defineProperty(event, "clipboardData", { value: transfer });
 		target.dispatchEvent(event);
 	}, pasted);
-	const marker = page.locator(".cm-paste-marker");
-	await expect(marker).toBeVisible();
-	await marker.click();
-	const brackets = page.locator(".cm-paste-bracket");
-	await expect(brackets).toHaveCount(2);
-	await expect(brackets.first()).toHaveText("[");
-	await expect(brackets.last()).toHaveText("]");
-	// Blue like history's brackets, not the marker's grey.
-	const color = await brackets.first().evaluate((el) => window.getComputedStyle(el).color);
-	expect(color).not.toBe("rgb(110, 110, 115)");
-	await brackets.first().click();
-	await expect(marker).toBeVisible();
-	await expect(brackets).toHaveCount(0);
-	await expect(page.locator(".cm-content").first()).not.toContainText("lorem ipsum");
+	const pill = page.locator(".attachments .paste-body");
+	await expect(pill).toBeVisible();
+	// Collapsed: the 240-char excerpt preview, not the whole paste.
+	const excerpt = `${pasted.slice(0, 240).trimEnd()}…`;
+	await expect(pill).toHaveText(excerpt);
+	// Tap: the full scrollable text.
+	await pill.click();
+	await expect(pill).toHaveAttribute("aria-expanded", "true");
+	await expect(pill).toHaveText(pasted);
+	// Tap again: back to the excerpt.
+	await pill.click();
+	await expect(pill).toHaveAttribute("aria-expanded", "false");
+	await expect(pill).toHaveText(excerpt);
 });
 
 test("tray docks a fixed margin above the prompt", async ({ page }) => {
@@ -649,7 +650,7 @@ test("tray re-docks above the prompt after cut and paste", async ({ page }) => {
 			return prompt.getBoundingClientRect().top - strip.getBoundingClientRect().bottom;
 		});
 	await expect.poll(gap, { timeout: 5_000 }).toBeGreaterThan(0);
-	await page.locator(".prompt .cm-content").click();
+	await page.locator(".prompt .ta-input").click();
 	await page.keyboard.press("Meta+a");
 	await page.keyboard.press("Meta+x");
 	await expect(tray).toHaveCount(0);
@@ -769,7 +770,7 @@ test("cutting three tags pastes back three images, not one", async ({ page }) =>
 	await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
 	for (const name of ["shot-0.png", "shot-1.png", "shot-2.png"]) await dropImage(page, name);
 	await expect(page.locator(".attachments li.card")).toHaveCount(3, { timeout: 15_000 });
-	await page.locator(".prompt .cm-content").click();
+	await page.locator(".prompt .ta-input").click();
 	await page.keyboard.press("Meta+a");
 	await page.keyboard.press("Meta+x");
 	await expect(page.locator(".attachments li.card")).toHaveCount(0);
@@ -796,31 +797,35 @@ test("cutting three tags pastes back three images, not one", async ({ page }) =>
 	await expect(page.locator(".attachments li.card")).toHaveCount(3, { timeout: 15_000 });
 	const tags = await page.evaluate(
 		() =>
-			(document.querySelector(".prompt .cm-content")?.textContent?.match(/\[Pasted image\]/g) ??
-				[]).length
+			(
+				(document.querySelector(".prompt .ta-input") as HTMLTextAreaElement | null)?.value.match(
+					/\[Pasted image\]/g
+				) ?? []
+			).length
 	);
 	expect(tags).toBe(3);
 });
 
-test("backspace inside an image tag takes the whole tag", async ({ page }) => {
-	// Tags are atomic units: no half-tag may survive to read as prose
-	// while its attachment drops.
+test("breaking an image tag drops its pill", async ({ page }) => {
+	// Tags are plain text now (no atomic unit): damaging the tag text
+	// still drops the attachment, never a half-tag reading as prose.
 	await dropImage(page);
 	await expect(page.locator(".attachments li.card")).toBeVisible({ timeout: 15_000 });
-	await page.locator(".prompt .cm-content").click();
+	await page.locator(".prompt .ta-input").click();
 	await page.keyboard.press("End");
 	await page.keyboard.press("ArrowLeft");
 	await page.keyboard.press("ArrowLeft");
 	await page.keyboard.press("ArrowLeft");
 	await page.keyboard.press("Backspace");
 	await expect(page.locator(".attachments li.card")).toHaveCount(0);
-	await expect(page.locator(".prompt .cm-content").first()).not.toContainText("[Pasted image]");
+	await expect(page.locator(".prompt .ta-input").first()).not.toHaveValue(/\[Pasted image\]/);
 });
 
-test("backspace on a collapsed paste takes the whole fold", async ({ page }) => {
+test("backspacing a pasted-text tag drops its pill", async ({ page }) => {
+	// Over-threshold paste: pill plus positional tag, not a fold.
 	const pasted = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(4);
 	await page.evaluate((text) => {
-		const target = document.querySelector(".cm-content");
+		const target = document.querySelector(".ta-input");
 		if (!target) throw new Error("missing editor");
 		const transfer = new DataTransfer();
 		transfer.setData("text/plain", text);
@@ -828,17 +833,21 @@ test("backspace on a collapsed paste takes the whole fold", async ({ page }) => 
 		Object.defineProperty(event, "clipboardData", { value: transfer });
 		target.dispatchEvent(event);
 	}, pasted);
-	const marker = page.locator(".cm-paste-marker");
-	await expect(marker).toBeVisible();
-	await page.locator(".prompt .cm-content").click();
+	const pill = page.locator(".attachments .paste-body");
+	await expect(pill).toBeVisible();
+	const box = page.locator(".prompt .ta-input");
+	await expect(box).toHaveValue("[Pasted 220 chars] ");
+	await box.click();
 	await page.keyboard.press("End");
 	// The first Backspace eats the separator space past the tag; the
-	// second takes the whole fold, never one hidden char of it.
+	// tag still matches, so the pill stays…
 	await page.keyboard.press("Backspace");
-	await expect(marker).toHaveCount(1);
+	await expect(box).toHaveValue("[Pasted 220 chars]");
+	await expect(pill).toBeVisible();
+	// …the second breaks the tag text, and the pill goes with it.
 	await page.keyboard.press("Backspace");
-	await expect(marker).toHaveCount(0);
-	await expect(page.locator(".prompt .cm-content").first()).not.toContainText("lorem ipsum");
+	await expect(pill).toHaveCount(0);
+	await expect(box).not.toHaveValue(/\[Pasted 220 chars\]/);
 });
 
 test("cutting an image tag keeps its bytes for another chat", async ({ page }) => {
@@ -847,7 +856,7 @@ test("cutting an image tag keeps its bytes for another chat", async ({ page }) =
 	const card = page.locator(".attachments li.card");
 	await expect(card).toBeVisible({ timeout: 15_000 });
 	// Cut the tag in the composer: the tray empties with it...
-	await page.locator(".prompt .cm-content").click();
+	await page.locator(".prompt .ta-input").click();
 	await page.keyboard.press("Meta+a");
 	await page.keyboard.press("Meta+x");
 	await expect(card).toHaveCount(0);
@@ -856,29 +865,33 @@ test("cutting an image tag keeps its bytes for another chat", async ({ page }) =
 	await page.keyboard.press("Meta+b");
 	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/, { timeout: 10_000 });
 	await page.locator('button[aria-label="New chat"]').click();
-	await page.locator(".prompt .cm-content").click();
+	await page.locator(".prompt .ta-input").click();
 	await page.keyboard.press("Meta+v");
 	const fresh = page.locator(".attachments li.card");
 	await expect(fresh).toBeVisible({ timeout: 15_000 });
 	await expect(fresh.locator(".thumb img")).toBeVisible();
-	await expect(page.locator(".prompt .cm-content").first()).toContainText("[Pasted image]");
+	await expect(page.locator(".prompt .ta-input").first()).toHaveValue(/\[Pasted image\]/);
 });
 
 test("deleting the first of two tags drops its own preview", async ({ page }) => {
 	// Indexed pairing (Nth tag owns the Nth attachment): removing the
 	// first tag used to drop the second image's preview instead.
 	await dropImage(page, "first.png");
-	await page.locator(".prompt .cm-content").click();
+	await page.locator(".prompt .ta-input").click();
+	// Tags are plain text (no atomic unit): park the caret past the
+	// tag first, or the newline splits it mid-token.
+	await page.keyboard.press("End");
 	await page.keyboard.press("Shift+Enter");
 	await dropImage(page, "second.png");
 	const cards = page.locator(".attachments li.card");
 	await expect(cards).toHaveCount(2, { timeout: 15_000 });
 	// Caret sits after the second tag: up a line, select the first
-	// line's tag, delete it.
+	// line's tag, delete it. (Shift+End reaches text end in this
+	// harness, so take the line with Shift+Down instead.)
 	await page.keyboard.press("ArrowUp");
 	await page.keyboard.press("Home");
 	await page.keyboard.down("Shift");
-	await page.keyboard.press("End");
+	await page.keyboard.press("ArrowDown");
 	await page.keyboard.up("Shift");
 	await page.keyboard.press("Backspace");
 	await expect(cards).toHaveCount(1);
@@ -896,7 +909,7 @@ test("removing the first pill keeps the second preview", async ({ page }) => {
 	await expect(cards).toHaveCount(1);
 	await expect(cards.first().locator(".name")).toContainText("second.png");
 	await expect(cards.first().locator(".thumb img")).toBeVisible();
-	await expect(page.locator(".prompt .cm-content").first()).toContainText("[Pasted image]");
+	await expect(page.locator(".prompt .ta-input").first()).toHaveValue(/\[Pasted image\]/);
 });
 
 test("cut pastes back previews when rich clipboard writes fail", async ({ page }) => {
@@ -911,7 +924,7 @@ test("cut pastes back previews when rich clipboard writes fail", async ({ page }
 	// The exact selected text, read back from a working copy first
 	// (the enriched copy writes async — poll for it like the
 	// three-tag roundtrip spec does, or the capture races empty).
-	await page.locator(".prompt .cm-content").click();
+	await page.locator(".prompt .ta-input").click();
 	await page.keyboard.press("Meta+a");
 	await page.keyboard.press("Meta+c");
 	await expect
@@ -946,14 +959,14 @@ test("cut pastes back previews when rich clipboard writes fail", async ({ page }
 shows a [Pasted image] fold tag in its prose, never a strip tag above
 it and never a separate block below it; clicking the tag floats the
 preview card. */
-/** Enter with the caret after a tag sends: pasting long text (marker)
-then an image (tag) leaves the caret pasted against the tag, and
-Enter must send the turn — never drop a newline into the draft. */
+/** Enter with the caret after a tag sends: pasting long text (pill +
+tag) then an image (tag) leaves the caret pasted against the tag,
+and Enter must send the turn — never drop a newline into the draft. */
 test("enter after a paste tag sends the message", async ({ page }) => {
 	const pasted = "lorem ipsum dolor sit amet ".repeat(20);
-	await page.locator(".cm-content").first().click();
+	await page.locator(".ta-input").first().click();
 	await page.evaluate((text) => {
-		const target = document.querySelector(".cm-content");
+		const target = document.querySelector(".ta-input");
 		if (!target) throw new Error("missing editor");
 		const transfer = new DataTransfer();
 		transfer.setData("text/plain", text);
@@ -961,23 +974,24 @@ test("enter after a paste tag sends the message", async ({ page }) => {
 		Object.defineProperty(event, "clipboardData", { value: transfer });
 		target.dispatchEvent(event);
 	}, pasted);
-	await expect(page.locator(".cm-paste-marker")).toBeVisible();
+	await expect(page.locator(".attachments .paste-body")).toBeVisible();
 	await dropImage(page, "after-paste.png");
-	const tag = page.locator(".prompt").getByText("[Pasted image]", { exact: false });
-	await expect(tag).toBeVisible({ timeout: 15_000 });
+	const box = page.locator(".prompt .ta-input");
+	await expect(box).toHaveValue(/\[Pasted 540 chars\] \[Pasted image\] /, { timeout: 15_000 });
 	await page.keyboard.press("Enter");
 	const user = page.locator("article.user").last();
 	await expect(user.locator(".rendered")).toContainText("lorem ipsum", { timeout: 15_000 });
 });
 
-/** Collapsed pastes land one space past the tag: pasting long text
-leaves the caret separated from the marker, so continued typing
-starts after a space rather than jammed against the tag. */
-test("collapsed paste leaves one space after the tag", async ({ page }) => {
+/** Pasted-text tags land one space past the tag: pasting long text
+leaves the caret separated from the tag, so continued typing starts
+after a space rather than jammed against it. */
+test("pasted-text tag leaves one space after it", async ({ page }) => {
 	const pasted = "lorem ipsum dolor sit amet ".repeat(20);
-	await page.locator(".cm-content").first().click();
+	const box = page.locator(".ta-input").first();
+	await box.click();
 	await page.evaluate((text) => {
-		const target = document.querySelector(".cm-content");
+		const target = document.querySelector(".ta-input");
 		if (!target) throw new Error("missing editor");
 		const transfer = new DataTransfer();
 		transfer.setData("text/plain", text);
@@ -985,22 +999,9 @@ test("collapsed paste leaves one space after the tag", async ({ page }) => {
 		Object.defineProperty(event, "clipboardData", { value: transfer });
 		target.dispatchEvent(event);
 	}, pasted);
-	const marker = page.locator(".cm-paste-marker");
-	await expect(marker).toBeVisible();
-	// Text past the marker, skipping CodeMirror's aria-hidden widget
-	// buffers: one separator space, with typed text riding after it.
-	const afterMarker = (el: Element): string => {
-		let out = "";
-		let node = el.nextSibling;
-		while (node) {
-			out += node.textContent ?? "";
-			node = node.nextSibling;
-		}
-		return out;
-	};
-	expect(await marker.evaluate(afterMarker)).toBe(" ");
+	await expect(box).toHaveValue("[Pasted 540 chars] ");
 	await page.keyboard.type("x");
-	expect(await marker.evaluate(afterMarker)).toBe(" x");
+	await expect(box).toHaveValue("[Pasted 540 chars] x");
 });
 
 /** A second image tag after typed prose stays on the line: drop, type
@@ -1008,17 +1009,18 @@ test("collapsed paste leaves one space after the tag", async ({ page }) => {
 never stranded below the first. */
 test("second image tag rides the typed line", async ({ page }) => {
 	await dropImage(page, "first.png");
-	await page.locator(".prompt .cm-content").click();
+	const box = page.locator(".prompt .ta-input");
+	await box.click();
+	await page.keyboard.press("End");
 	await page.keyboard.type("test ");
 	await dropImage(page, "second.png");
-	const lines = page.locator(".prompt .cm-line");
-	await expect(lines).toHaveCount(1);
-	await expect(lines.first()).toContainText("[Pasted image] test [Pasted image]");
+	// One composer line: both tags plus the prose, no newline anywhere.
+	await expect(box).toHaveValue("[Pasted image] test [Pasted image] ");
 });
 
 test("sent images ride inline with the text", async ({ page }) => {
 	await dropImage(page, "first.png");
-	await page.locator(".prompt .cm-content").click();
+	await page.locator(".prompt .ta-input").click();
 	await page.keyboard.type("look at this");
 	await page.keyboard.press("Enter");
 	const user = page.locator("article.user");
@@ -1033,35 +1035,13 @@ test("sent images ride inline with the text", async ({ page }) => {
 	await expect(user.locator(".sent-tags")).toHaveCount(0);
 });
 
-/** Composer tags share one bold look: the pasted-image tag reads at
-the same weight as the pasted-content tag (bold body text, never the
-markdown link underline, never muted gray on light theme). */
-test("composer attachment tags read bold", async ({ page }) => {
+/** Composer tags are plain textarea text: no decoration machinery
+paints them (the CodeMirror highlight spans are gone with it). */
+test("composer attachment tags are plain text", async ({ page }) => {
 	await dropImage(page, "first.png");
-	const tag = page.locator(".prompt .cm-attach-tag").first();
-	await expect(tag).toBeVisible({ timeout: 15_000 });
-	await expect(tag).toHaveCSS("font-weight", "700");
-	const deco = await tag.evaluate((el) => {
-		const style = getComputedStyle(el);
-		return { decoration: style.textDecorationLine, color: style.color };
-	});
-	expect(deco.decoration).not.toContain("underline");
-	// Bold body text, not muted gray.
-	expect(deco.color).not.toBe("rgb(110, 110, 115)");
-	// The markdown highlight paints the tag's inside, not the mark
-	// (its class names are obfuscated per build, so match spans
-	// structurally): no inner span underlines, and every one —
-	// brackets included — reads as tag text.
-	const inner = await tag.evaluate((el) => {
-		const spans = [...el.querySelectorAll("span")].map((s) => {
-			const style = getComputedStyle(s);
-			return { decoration: style.textDecorationLine, color: style.color };
-		});
-		return { tagColor: getComputedStyle(el).color, spans };
-	});
-	expect(inner.spans.length).toBeGreaterThan(0);
-	for (const s of inner.spans) {
-		expect(s.decoration).not.toContain("underline");
-		expect(s.color).toBe(inner.tagColor);
-	}
+	const box = page.locator(".prompt .ta-input");
+	await expect(box).toHaveValue(/\[Pasted image\]/, { timeout: 15_000 });
+	// No inner spans anywhere inside the composer input: the tag is
+	// characters in the textarea value, not styled nodes.
+	expect(await box.evaluate((el) => el.querySelectorAll("span").length)).toBe(0);
 });

@@ -21,7 +21,7 @@ test("annotation drafts stay with their chat", async ({ page }) => {
 	await expect(draft).toHaveCount(1);
 
 	// New chat B: composer starts clean.
-	await page.locator(".cm-content").click();
+	await page.locator(".ta-input").click();
 	await page.keyboard.press("Meta+b");
 	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
 	await page.locator('button[aria-label="New chat"]').click();

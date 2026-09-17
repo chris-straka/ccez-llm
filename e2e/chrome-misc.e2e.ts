@@ -13,7 +13,7 @@ async function openWithMessages(
 ) {
 	await seedChat(page, messages);
 	await page.goto("/");
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 }
 
 async function openSettings(page: import("@playwright/test").Page) {

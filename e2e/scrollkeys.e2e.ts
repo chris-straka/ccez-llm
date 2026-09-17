@@ -12,10 +12,9 @@ import { seedChat } from "./helpers";
  * chrome that playwright cannot cover: see exitFullscreen in
  * +page.svelte).
  *
- * Editor selector note: desktop composes in CodeMirror
- * (`.cm-content`); the plain textarea (`.ta-input`,
- * textarea-editor.ts) is androidUI-only, so this desktop spec must
- * wait for `.cm-content`, never `.ta-input`.
+ * Editor selector note: every platform composes in the plain
+ * textarea (`.ta-input`, textarea-editor.ts) — CodeMirror is gone —
+ * so this spec waits for `.ta-input`.
  */
 test.setTimeout(90_000);
 
@@ -44,9 +43,8 @@ async function deselectToBody(page): Promise<void> {
 test.beforeEach(async ({ page }) => {
 	await seedChat(page, turns());
 	await page.goto("/");
-	// Desktop composer is CodeMirror — `.ta-input` only exists on
-	// androidUI (see the editor branch in +page.svelte).
-	await page.locator(".prompt .cm-content").waitFor({ timeout: 60_000 });
+	// The composer is a plain textarea on every platform now.
+	await page.locator(".prompt .ta-input").waitFor({ timeout: 60_000 });
 	await page.waitForFunction(
 		() => {
 			const box = document.querySelector(".messages") as HTMLElement | null;
@@ -291,7 +289,7 @@ test("j on the last message lands in the composer", async ({ page }) => {
 	await expect(page.locator(".app[data-focus-mode='scroll']")).toHaveCount(0, { timeout: 10_000 });
 	await page.waitForFunction(() => {
 		const box = document.querySelector(".messages") as HTMLElement | null;
-		const editor = document.querySelector(".prompt .cm-content");
+		const editor = document.querySelector(".prompt .ta-input");
 		return box !== null && editor !== null && editor.contains(document.activeElement);
 	}, undefined, { timeout: 10_000 });
 });

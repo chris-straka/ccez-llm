@@ -16,7 +16,7 @@ test.beforeEach(async ({ page }) => {
 		{ role: "assistant", content: "hi there" }
 	]);
 	await page.goto("/");
-	await page.locator(".prompt .cm-content").waitFor({ timeout: 60_000 });
+	await page.locator(".prompt .ta-input").waitFor({ timeout: 60_000 });
 });
 
 async function openShortcuts(page): Promise<void> {

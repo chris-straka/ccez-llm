@@ -1,266 +1,27 @@
 /**
- * Paste-collapse extensions (editor slice, REFACTOR §7).
+ * Paste pure helpers (editor slice, REFACTOR §7).
  *
- * Long pastes stay in the document but render as one collapsed marker
- * line (click to expand). The full text is always what gets sent.
- * Verbatim move out of `editor.ts`: the marker widget, the
- * paste-decoration field, the paste hook, the Ctrl+O toggle, and the
- * send-time fold math (`sendPasteFolds`, `trimPasteTail`,
- * `pasteToggleAction` — the already-extracted pure cluster moves with
- * its wiring so the group stays cohesive). Effects come from
- * `editorEffects`; `editor.ts` re-exports the names its importers use.
+ * The textarea composer never collapses: long pastes become
+ * pasted-text pills via `onLongTextPasted`, so everything sends
+ * unfolded. What stays here is the pure math the composer, the send
+ * path, and the pill/tag reconciliation share — thresholds, send
+ * folds, deletion units, marker cuts, tag ranges, copy plans.
+ * `editor.ts` re-exports the names its importers use.
  */
-import {
-	EditorState,
-	StateField,
-	Range,
-	Prec,
-	Transaction,
-	type Extension
-} from "@codemirror/state";
-import {
-	EditorView,
-	Decoration,
-	ViewPlugin,
-	WidgetType,
-	type DecorationSet,
-	type ViewUpdate
-} from "@codemirror/view";
-import {
-	addPaste,
-	expandPaste,
-	expandAllPastes,
-	collapseAllPastes,
-	collapsePaste,
-	type PasteCollapse
-} from "./editorEffects";
 import {
 	FILE_MARKER,
 	IMAGE_MARKER,
-	blobToDataUrl,
-	clipboardPngBlob,
+	PASTED_TAG_RE,
 	countMarkers,
+	countPastedTags,
 	removeTags
 } from "./attachments";
-import { closestFromTarget } from "./events";
 
-/** Pastes longer than this collapse to a `[Pasted N chars]` marker. */
+/** Pastes longer than this become a pasted-text pill via `onLongTextPasted`. */
 export const PASTE_THRESHOLD = 100;
 
 export function pastedLabel(chars: number): string {
 	return `[Pasted ${chars} chars]`;
-}
-
-/**
- * Long pastes stay in the document but render as one collapsed marker line
- * (click to expand). The full text is always what gets sent.
- */
-class PasteMarker extends WidgetType {
-	constructor(
-		readonly pasteId: number,
-		private readonly chars: number
-	) {
-		super();
-	}
-
-	get charCount(): number {
-		return this.chars;
-	}
-
-	eq(other: PasteMarker): boolean {
-		return other.pasteId === this.pasteId && other.chars === this.chars;
-	}
-
-	override ignoreEvent(): boolean {
-		return false;
-	}
-
-	toDOM(): HTMLElement {
-		const marker = document.createElement("span");
-		marker.className = "cm-paste-marker";
-		marker.dataset.pasteExpand = String(this.pasteId);
-		marker.textContent = pastedLabel(this.chars);
-		return marker;
-	}
-}
-
-/**
- * Collapse bracket for one expanded paste (the sent-message twin of
- * history's fold brackets: same blue, same ride-high nudge, clicking
- * either contracts the paste back to its marker). Brackets are derived
- * at provide time from the open spans — never stored — so they track
- * edits and expand/collapse transitions for free.
- */
-class PasteBracket extends WidgetType {
-	constructor(
-		readonly pasteId: number,
-		readonly glyph: "[" | "]"
-	) {
-		super();
-	}
-
-	eq(other: PasteBracket): boolean {
-		return other.pasteId === this.pasteId && other.glyph === this.glyph;
-	}
-
-	override ignoreEvent(): boolean {
-		return false;
-	}
-
-	toDOM(): HTMLElement {
-		const bracket = document.createElement("span");
-		bracket.className = "cm-paste-bracket";
-		bracket.dataset.pasteCollapse = String(this.pasteId);
-		bracket.textContent = this.glyph;
-		return bracket;
-	}
-}
-
-/** Merge open-span brackets over the stored decorations (pure). */
-function withPasteBrackets(field: PasteField): DecorationSet {
-	if (field.open.length === 0) return field.deco;
-	const extra: Range<Decoration>[] = [];
-	for (const rec of field.open) {
-		if (rec.from >= rec.to) continue;
-		extra.push(Decoration.widget({ widget: new PasteBracket(rec.id, "["), side: -1 }).range(rec.from));
-		extra.push(Decoration.widget({ widget: new PasteBracket(rec.id, "]"), side: 1 }).range(rec.to));
-	}
-	return field.deco.update({ add: extra });
-}
-
-/**
- * The paste-decoration field of the live composer (single instance).
- * Read it with pasteSpans — never touch it directly.
- */
-let pasteFieldRef: StateField<PasteField> | null = null;
-
-/**
- * Paste-tag field: collapsed markers as decorations, plus the spans
- * expanded out of them (single click or Ctrl+O) so a later collapse can
- * put the tags back. Positions on both sides remap through edits; a span
- * that stops being a valid range is forgotten, never re-marked.
- */
-interface PasteField {
-	deco: DecorationSet;
-	open: PasteCollapse[];
-}
-
-/** Drop one collapsed marker, remembering its span for re-collapse. */
-function openMarker(deco: DecorationSet, open: PasteCollapse[], pasteId: number): PasteField {
-	const ranges: Range<Decoration>[] = [];
-	let opened: PasteCollapse | null = null;
-	const cursor = deco.iter();
-	while (cursor.value) {
-		const widget = (cursor.value.spec as { widget?: unknown }).widget;
-		if (widget instanceof PasteMarker && widget.pasteId === pasteId) {
-			opened = { id: pasteId, from: cursor.from, to: cursor.to, chars: widget.charCount };
-		} else {
-			ranges.push(cursor.value.range(cursor.from, cursor.to));
-		}
-		cursor.next();
-	}
-	return {
-		deco: Decoration.set(ranges),
-		open: opened ? [...open, opened] : open
-	};
-}
-
-export function pastePlaceholders(): Extension {
-	const field = StateField.define<PasteField>({
-		create: () => ({ deco: Decoration.none, open: [] }),
-		update: (value, tr) => {
-			let deco = value.deco.map(tr.changes);
-			// A cut through a collapsed span (marker excision, or typing
-			// across it) degenerates its widget: forget it rather than
-			// pinning the label over nothing.
-			const kept: Range<Decoration>[] = [];
-			let degenerated = false;
-			const probe = deco.iter();
-			while (probe.value) {
-				const widget = (probe.value.spec as { widget?: unknown }).widget;
-				if (widget instanceof PasteMarker && !(probe.from < probe.to)) degenerated = true;
-				else kept.push(probe.value.range(probe.from, probe.to));
-				probe.next();
-			}
-			if (degenerated) deco = Decoration.set(kept);
-			let open = value.open;
-			if (open.length > 0) {
-				const mapped: PasteCollapse[] = [];
-				for (const rec of open) {
-					const from = tr.changes.mapPos(rec.from, 1);
-					const to = tr.changes.mapPos(rec.to, -1);
-					if (from < to) mapped.push({ ...rec, from, to });
-				}
-				open = mapped;
-			}
-			for (const effect of tr.effects) {
-				if (effect.is(addPaste)) {
-					const { id, from, to, chars } = effect.value;
-					const marker = Decoration.replace({ widget: new PasteMarker(id, chars) });
-					deco = deco.update({ add: [marker.range(from, to)] });
-				} else if (effect.is(expandPaste)) {
-					({ deco, open } = openMarker(deco, open, effect.value));
-				} else if (effect.is(expandAllPastes)) {
-					const ids: number[] = [];
-					const cursor = deco.iter();
-					while (cursor.value) {
-						const widget = (cursor.value.spec as { widget?: unknown }).widget;
-						if (widget instanceof PasteMarker) ids.push(widget.pasteId);
-						cursor.next();
-					}
-					for (const id of ids) ({ deco, open } = openMarker(deco, open, id));
-				} else if (effect.is(collapseAllPastes)) {
-					for (const rec of open) {
-						if (rec.from < 0 || rec.to > tr.newDoc.length || rec.from >= rec.to) continue;
-						const marker = Decoration.replace({
-							widget: new PasteMarker(rec.id, rec.chars)
-						});
-						deco = deco.update({ add: [marker.range(rec.from, rec.to)] });
-					}
-					open = [];
-				} else if (effect.is(collapsePaste)) {
-					const rec = open.find((span) => span.id === effect.value);
-					if (rec && rec.from >= 0 && rec.to <= tr.newDoc.length && rec.from < rec.to) {
-						const marker = Decoration.replace({
-							widget: new PasteMarker(rec.id, rec.chars)
-						});
-						deco = deco.update({ add: [marker.range(rec.from, rec.to)] });
-						open = open.filter((span) => span.id !== rec.id);
-					}
-				}
-			}
-			return { deco, open };
-		},
-		provide: (f) => EditorView.decorations.from(f, withPasteBrackets)
-	});
-	const clicks = Prec.high(
-		EditorView.domEventHandlers({
-			mousedown: (event) => {
-				// Same guard as the fence bars: keep CodeMirror selection
-				// from swallowing the marker/bracket click that follows.
-				if (closestFromTarget(event.target, "[data-paste-expand],[data-paste-collapse]")) {
-					event.preventDefault();
-					return true;
-				}
-				return false;
-			},
-			click: (event, view) => {
-				const collapse = closestFromTarget(event.target, "[data-paste-collapse]");
-				if (collapse) {
-					view.dispatch({
-						effects: collapsePaste.of(Number(collapse.getAttribute("data-paste-collapse")))
-					});
-					return true;
-				}
-				const target = closestFromTarget(event.target, "[data-paste-expand]");
-				if (!target) return false;
-				view.dispatch({ effects: expandPaste.of(Number(target.getAttribute("data-paste-expand"))) });
-				return true;
-			}
-		})
-	);
-	pasteFieldRef = field;
-	return [field, clicks];
 }
 
 export interface PasteSpan {
@@ -273,27 +34,6 @@ export interface SendFold {
 	start: number;
 	end: number;
 	chars: number;
-}
-
-/** Current collapsed-paste spans in document coordinates. Never throws. */
-export function pasteSpans(state: EditorState): PasteSpan[] {
-	let set: DecorationSet;
-	try {
-		if (!pasteFieldRef) return [];
-		set = state.field(pasteFieldRef).deco;
-	} catch {
-		return [];
-	}
-	const out: PasteSpan[] = [];
-	const cursor = set.iter();
-	while (cursor.value) {
-		const widget = (cursor.value.spec as { widget?: unknown }).widget;
-		if (widget instanceof PasteMarker) {
-			out.push({ from: cursor.from, to: cursor.to, chars: widget.charCount });
-		}
-		cursor.next();
-	}
-	return out;
 }
 
 /**
@@ -314,52 +54,6 @@ export function pasteToggleAction(collapsed: number, open: number): "expand" | "
  * — programmatic edits, undo/redo, and replacements pass through, so
  * history stays exact and typing over a selection keeps its bounds.
  */
-export function atomicMarkerDeletion(): Extension {
-	return EditorState.transactionFilter.of((tr) => {
-		if (!tr.docChanged) return tr;
-		const userEvent = tr.annotation(Transaction.userEvent);
-		if (typeof userEvent !== "string" || !userEvent.startsWith("delete")) return tr;
-		let spans: PasteSpan[];
-		try {
-			spans = pasteSpans(tr.startState);
-		} catch {
-			return tr;
-		}
-		const deletions: DeletionRange[] = [];
-		let pure = true;
-		tr.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
-			if (inserted.length > 0) pure = false;
-			else deletions.push({ from: fromA, to: toA });
-		});
-		if (!pure || deletions.length === 0) return tr;
-		const expanded = expandDeletionUnits(tr.startState.doc.toString(), spans, deletions);
-		const same =
-			expanded.length === deletions.length &&
-			expanded.every((range, i) => range.from === deletions[i]?.from && range.to === deletions[i]?.to);
-		if (same) return tr;
-		return {
-			changes: expanded.map((range) => ({ from: range.from, to: range.to })),
-			annotations: Transaction.userEvent.of(userEvent)
-		};
-	});
-}
-
-/** Expand every paste tag, or re-collapse expanded ones. Never throws. */
-export function togglePastes(view: EditorView): boolean {
-	let field: PasteField | null;
-	try {
-		field = pasteFieldRef ? view.state.field(pasteFieldRef) : null;
-	} catch {
-		return false;
-	}
-	if (!field) return false;
-	const action = pasteToggleAction(pasteSpans(view.state).length, field.open.length);
-	if (action === "expand") view.dispatch({ effects: expandAllPastes.of(undefined) });
-	else if (action === "collapse") view.dispatch({ effects: collapseAllPastes.of(undefined) });
-	else return false;
-	return true;
-}
-
 /**
  * Map document-coordinate paste spans into send-text coordinates, applying
  * exactly the send transforms (drop IMAGE_MARKER tags like
@@ -434,11 +128,12 @@ function escapeRegExp(literal: string): string {
 
 /**
  * Expand pure-deletion ranges over whole tag/fold units (pure,
- * unit-tested): Backspace/Delete touching an image/file marker tag or
- * a collapsed paste span takes the whole unit, so edits never leave
- * half-tags the reconciliation can't match (a dropped half-tag reads
- * as prose, stranding its attachment accounting). Ranges touching
- * only prose pass through; overlapping expansions merge.
+ * unit-tested): Backspace/Delete touching an image/file marker tag, a
+ * pasted-text tag, or a collapsed paste span takes the whole unit, so
+ * edits never leave half-tags the reconciliation can't match (a
+ * dropped half-tag reads as prose, stranding its attachment
+ * accounting). Ranges touching only prose pass through; overlapping
+ * expansions merge.
  */
 export function expandDeletionUnits(
 	docText: string,
@@ -448,6 +143,12 @@ export function expandDeletionUnits(
 	const units: DeletionRange[] = [];
 	const tagRe = new RegExp(`${escapeRegExp(IMAGE_MARKER)}|${escapeRegExp(FILE_MARKER)}`, "g");
 	for (const match of docText.matchAll(tagRe)) {
+		const from = match.index ?? 0;
+		units.push({ from, to: from + match[0].length });
+	}
+	// Pasted-text tags delete atomically too, or Backspace leaves a
+	// half-tag that reads as prose and strands its attachment.
+	for (const match of docText.matchAll(PASTED_TAG_RE)) {
 		const from = match.index ?? 0;
 		units.push({ from, to: from + match[0].length });
 	}
@@ -532,10 +233,27 @@ export function markerCutAt(doc: string, marker: string, index: number): MarkerC
 	const raw = lines[at] ?? "";
 	const after = raw.slice(tagAt + marker.length);
 	const cutLen = marker.length + (after.startsWith(" ") ? 1 : 0);
+	return markerCutSpan(raw, tagAt, cutLen, lineStart, at, lines.length);
+}
+
+/**
+ * Shared minimal-cut math for one tag excision (pure): the host line
+ * loses the tag plus one following space (plus the trailing run,
+ * like trimEnd), while a host line left blank drops with its newline.
+ * `at` is the host line number, `lineCount` the document's.
+ */
+function markerCutSpan(
+	raw: string,
+	tagAt: number,
+	cutLen: number,
+	lineStart: number,
+	at: number,
+	lineCount: number
+): MarkerCut {
 	const rawTrimmedEnd = raw.trimEnd().length;
 	const keepAfter = raw.slice(tagAt + cutLen, rawTrimmedEnd);
 	if ((raw.slice(0, tagAt) + keepAfter).trim() === "") {
-		const isLast = at === lines.length - 1;
+		const isLast = at === lineCount - 1;
 		if (!isLast) return { from: lineStart, to: lineStart + raw.length + 1, insert: "" };
 		if (at === 0) return { from: 0, to: raw.length, insert: "" };
 		return { from: lineStart - 1, to: lineStart + raw.length, insert: "" };
@@ -552,42 +270,35 @@ export function markerCutAt(doc: string, marker: string, index: number): MarkerC
 }
 
 /**
- * Remove one attachment marker tag through a minimal cut (not a full
- * rewrite): collapsed paste markers and open spans map through the
- * change untouched, so deleting an image never unfolds the draft's
- * folds. False when the tag is absent (nothing dispatched). Never
- * throws.
+ * Locate the cut `removePastedAt` would make for the index-th
+ * pasted-text tag in document order (pure, unit-tested): same line
+ * surgery as the fixed-marker path, anchored at that tag's span.
+ * Null when the occurrence is absent.
  */
-export function exciseMarkerText(view: EditorView, marker: string): boolean {
-	return exciseMarkerTextAt(view, marker, 0);
-}
-
-/**
- * Pill removal for the index-th tag of a kind (a pill drops its own
- * tag now, not the first of its kind): the same guarded minimal cut,
- * anchored at that occurrence. False when out of range. Pure apart
- * from the guarded dispatch.
- */
-export function exciseMarkerTextAt(view: EditorView, marker: string, index: number): boolean {
-	let cut: MarkerCut | null;
-	try {
-		cut = markerCutAt(view.state.doc.toString(), marker, index);
-	} catch {
-		return false;
-	}
-	if (!cut) return false;
-	try {
-		view.dispatch({ changes: { from: cut.from, to: cut.to, insert: cut.insert } });
-	} catch {
-		return false;
-	}
-	return true;
+export function pastedCutAt(doc: string, index: number): MarkerCut | null {
+	if (index < 0) return null;
+	const matches = [...doc.matchAll(PASTED_TAG_RE)];
+	const found = matches[index];
+	if (!found || found.index === undefined) return null;
+	const absStart = found.index;
+	const marker = found[0];
+	const lineStart = doc.lastIndexOf("\n", absStart - 1) + 1;
+	const at = doc.slice(0, absStart).split("\n").length - 1;
+	const lineCount = doc.split("\n").length;
+	const lineEnd = doc.indexOf("\n", absStart);
+	const raw = doc.slice(lineStart, lineEnd === -1 ? doc.length : lineEnd);
+	const tagAt = absStart - lineStart;
+	const cutLen = marker.length + (raw.slice(tagAt + marker.length).startsWith(" ") ? 1 : 0);
+	return markerCutSpan(raw, tagAt, cutLen, lineStart, at, lineCount);
 }
 
 /** Removed marker-tag occurrences in pre-change document order. */
 export interface RemovedMarkerTags {
 	image: number[];
 	file: number[];
+	/** Deleted pasted-text tag occurrences (present only when nonempty,
+	 * so kind-separated assertions without pastes still hold). */
+	pasted?: number[];
 }
 
 /**
@@ -602,18 +313,24 @@ export function removedMarkerIndexes(
 ): RemovedMarkerTags {
 	const image: number[] = [];
 	const file: number[] = [];
-	const tagRe = new RegExp(`${escapeRegExp(IMAGE_MARKER)}|${escapeRegExp(FILE_MARKER)}`, "g");
+	const pasted: number[] = [];
+	const tagRe = new RegExp(
+		`${escapeRegExp(IMAGE_MARKER)}|${escapeRegExp(FILE_MARKER)}|\\[Pasted \\d+ chars\\]`,
+		"g"
+	);
 	for (const { from, to } of removed) {
 		if (to <= from) continue;
 		const slice = beforeText.slice(from, to);
 		let seenImage = countMarkers(beforeText.slice(0, from));
 		let seenFile = countMarkers(beforeText.slice(0, from), FILE_MARKER);
+		let seenPasted = countPastedTags(beforeText.slice(0, from));
 		for (const m of slice.matchAll(tagRe)) {
 			if (m[0] === IMAGE_MARKER) image.push(seenImage++);
-			else file.push(seenFile++);
+			else if (m[0] === FILE_MARKER) file.push(seenFile++);
+			else pasted.push(seenPasted++);
 		}
 	}
-	return { image, file };
+	return pasted.length > 0 ? { image, file, pasted } : { image, file };
 }
 
 /**
@@ -624,21 +341,6 @@ export function removedMarkerIndexes(
  */
 export function trimPasteTail(text: string): string {
 	return text.replace(/(\r\n|\r|\n)+$/, "");
-}
-
-/**
- * Marker comment in the copied HTML carrying a multi-tag cut's whole
- * image set as embedded data-URL pictures. One rich-text item holds
- * every picture (custom clipboard types don't survive a Chromium
- * paste read, and engines reject multi-item writes), while foreign
- * apps paste the same item as text plus images. Only HTML carrying
- * this marker is ever mined for pictures — web copies stay untouched.
- */
-const IMAGE_SET_MARKER = "<!--ccez-image-set-->";
-
-/** Escape selected text for the copied HTML paragraph. */
-function escapeHtml(text: string): string {
-	return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 /**
@@ -666,40 +368,6 @@ export function collapsedPasteInsert(from: number, text: string): CollapsedPaste
 	};
 }
 
-/** Plain-text paste insertion: short text, trimmed tails, long folds. */
-function insertTextPaste(view: EditorView, raw: string): boolean {
-	const text = trimPasteTail(raw);
-	// Nothing but newlines: swallow, don't insert an empty line.
-	if (!text) {
-		return true;
-	}
-	if (text.length <= PASTE_THRESHOLD) {
-		// Untrimmed short paste: the default handler is exact.
-		// Trimmed: it would reinsert the raw tail, so insert here.
-		if (text === raw) return false;
-		const { from, to } = view.state.selection.main;
-		view.dispatch({
-			changes: { from, to, insert: text },
-			selection: { anchor: from + text.length }
-		});
-		return true;
-	}
-	const { from, to } = view.state.selection.main;
-	const id = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
-	const collapsed = collapsedPasteInsert(from, text);
-	view.dispatch({
-		changes: { from, to, insert: collapsed.insert },
-		effects: addPaste.of({
-			id,
-			from: collapsed.pasteFrom,
-			to: collapsed.pasteTo,
-			chars: collapsed.chars
-		}),
-		selection: { anchor: collapsed.anchor }
-	});
-	return true;
-}
-
 /**
  * Attachment-tag spans in a document (pure, unit-tested): every
  * IMAGE_MARKER / FILE_MARKER occurrence's range, in document order.
@@ -718,101 +386,13 @@ export function attachTagRanges(text: string): AttachTagRange[] {
 		const from = m.index ?? 0;
 		ranges.push({ from, to: from + m[0].length });
 	}
+	// Pasted-text tags read as the same bold tag look in the composer.
+	for (const m of text.matchAll(PASTED_TAG_RE)) {
+		const from = m.index ?? 0;
+		ranges.push({ from, to: from + m[0].length });
+	}
+	ranges.sort((a, b) => a.from - b.from);
 	return ranges;
-}
-
-/**
- * Attachment-tag styling: mark decorations over every tag span so
- * pasted-image and pasted-file tags read as one bold tag look in
- * both themes (light: bold body text; dark: bold gray — see the
- * `.cm-attach-tag` theme rules). Rebuilt on doc or viewport change;
- * the composer is short, so whole-doc scans stay cheap.
- */
-export function attachTagDecorations(): Extension {
-	const build = (view: EditorView): DecorationSet => {
-		const text = view.state.doc.toString();
-		const deco = attachTagRanges(text).map((range) =>
-			Decoration.mark({ class: "cm-attach-tag" }).range(range.from, range.to)
-		);
-		return Decoration.set(deco);
-	};
-	return ViewPlugin.fromClass(
-		class {
-			decorations: DecorationSet;
-			constructor(view: EditorView) {
-				this.decorations = build(view);
-			}
-			update(update: ViewUpdate): void {
-				if (update.docChanged || update.viewportChanged) this.decorations = build(update.view);
-			}
-		},
-		{ decorations: (v) => v.decorations }
-	);
-}
-
-/** Paste hook: images become attachments, long text collapses to a marker. */
-export function pasteHandling(onImages: ((files: File[]) => void) | undefined): Extension {
-	return Prec.high(
-		EditorView.domEventHandlers({
-			paste: (event, view) => {
-				const clipboard = event.clipboardData;
-				if (!clipboard) return false;
-				const raw = clipboard.getData("text/plain");
-				// The in-app roundtrip first: an exact-text paste of a
-				// session copy/cut rehydrates from the stash, so runtimes
-				// whose clipboard dropped the rich item still land the
-				// pictures (with their preview cards, via onImages) —
-				// never dead tags. One-shot: the match consumes it.
-				const stash = cutImageStash;
-				if (stash && raw === stash.text && onImages) {
-					cutImageStash = null;
-					event.preventDefault();
-					void (async () => {
-						try {
-							const files = await dataUrlsToImageFiles(await stash.urls);
-							if (files.length === 0) insertTextPaste(view, raw);
-							else onImages(files);
-						} catch {
-							insertTextPaste(view, raw);
-						}
-					})();
-					return true;
-				}
-				// The cut's own image set next (every picture, one
-				// rich-text item): data URLs survive the paste read
-				// that custom clipboard types don't.
-				const html = clipboard.getData("text/html");
-				if (html.includes(IMAGE_SET_MARKER) && onImages) {
-					event.preventDefault();
-					void (async () => {
-						try {
-							const doc = new DOMParser().parseFromString(html, "text/html");
-							const urls = [...doc.querySelectorAll("img")]
-								.map((img) => img.getAttribute("src") ?? "")
-								.filter((src) => src.startsWith("data:"));
-							const files = await dataUrlsToImageFiles(urls);
-							if (files.length === 0) return;
-							onImages(files);
-						} catch {
-							insertTextPaste(view, raw);
-						}
-					})();
-					return true;
-				}
-				// Every image file, not just the first: pastes from
-				// outside the app carry no set, but still land whole.
-				const images = [...clipboard.files].filter((f) => f.type.startsWith("image/"));
-				if (images.length > 0 && onImages) {
-					event.preventDefault();
-					onImages(images);
-					return true;
-				}
-				const handled = insertTextPaste(view, raw);
-				if (handled) event.preventDefault();
-				return handled;
-			}
-		})
-	);
 }
 
 /** Enriched tag copy/cut: the selected text plus its image-tag count. */
@@ -850,26 +430,8 @@ export function tagCopyIndexes(doc: string, from: number, to: number): number[] 
 }
 
 /**
- * In-app roundtrip for a tag copy/cut: the pictures as data URLs
- * beside the exact selected text. The clipboard HTML item carries
- * the same set for foreign apps, but runtimes whose clipboard
- * rejects rich writes (notably the app shell) would otherwise paste
- * dead tags — an exact-text paste in this session rehydrates from
- * here instead. One-shot: the first matching paste consumes it, and
- * a newer copy/cut overwrites it. Module-scoped on purpose (both
- * composer and inline editor share one clipboard).
- */
-interface CutImageStash {
-	text: string;
-	urls: Promise<string[]>;
-}
-
-let cutImageStash: CutImageStash | null = null;
-
-/**
  * Data URLs back into paste-ready image files, unreadable entries
- * skipped (pure apart from fetch). Shared by the clipboard image-set
- * read and the in-app stash read so both land identically named.
+ * skipped (pure apart from fetch).
  */
 export async function dataUrlsToImageFiles(urls: string[]): Promise<File[]> {
 	const files: File[] = [];
@@ -883,102 +445,4 @@ export async function dataUrlsToImageFiles(urls: string[]): Promise<File[]> {
 		}
 	}
 	return files;
-}
-
-/**
- * Copy/cut enrichment for image tags: the clipboard gets the pictures
- * (one rich-text item with embedded images, then per-image items,
- * then plain text) so pasting in another chat lands images, not dead
- * tags. The host maps the selection's global tag indexes onto its
- * attachments (Nth tag pairs with the Nth attachment); the read runs
- * synchronously at call time so a cut's own deletion can't race it.
- * An in-app stash carries the same pictures for pastes whose
- * clipboard lost the rich item. Selections without image tags fall
- * through to the default handler.
- */
-export function imageTagClipboard(
-	takeImageBlobs: ((indexes: number[]) => Promise<Blob[]>) | undefined
-): Extension {
-	const handle =
-		(isCut: boolean) =>
-		(event: ClipboardEvent, view: EditorView): boolean => {
-			if (!takeImageBlobs) return false;
-			const sel = view.state.selection.main;
-			if (sel.empty) return false;
-			const doc = view.state.doc.toString();
-			const plan = tagCopyPlan(doc.slice(sel.from, sel.to), true);
-			if (!plan) return false;
-			// Snapshot the blobs before a cut deletes its own tags;
-			// the stash resolves the same pictures to data URLs for
-			// the in-app roundtrip (never rejects — an empty set just
-			// falls through to the clipboard items at paste time).
-			// First, before the ClipboardItem gate: the stash needs no
-			// clipboard API, so runtimes without rich writes still
-			// paste their previews back from a native cut.
-			const pending = takeImageBlobs(tagCopyIndexes(doc, sel.from, sel.to));
-			cutImageStash = {
-				text: plan.text,
-				urls: pending.then(
-					(blobs) => Promise.all(blobs.map((blob) => blobToDataUrl(blob))),
-					() => []
-				)
-			};
-			if (typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) return false;
-			event.preventDefault();
-			if (isCut) view.dispatch({ changes: { from: sel.from, to: sel.to } });
-			void (async () => {
-				const textBlob = new Blob([plan.text], { type: "text/plain" });
-				// 1. One rich-text item carrying text plus the whole
-				// image set as embedded pictures: multi-tag cuts paste
-				// back complete, and foreign apps get text plus images.
-				try {
-					const blobs = await pending;
-					if (blobs.length === 0) throw new Error("no image data");
-					const urls = await Promise.all(blobs.map((blob) => blobToDataUrl(blob)));
-					const imgs = urls.map((url) => `<img src="${url}">`).join("");
-					const html = new Blob(
-						[`${IMAGE_SET_MARKER}<p>${escapeHtml(plan.text)}</p>${imgs}`],
-						{ type: "text/html" }
-					);
-					await navigator.clipboard.write([
-						new ClipboardItem({ "text/plain": textBlob, "text/html": html })
-					]);
-					return;
-				} catch {
-					// Fall through to per-image items below.
-				}
-				// 2. One item per image (single-image universal; several
-				// items only where the engine allows them).
-				try {
-					const blobs = await pending;
-					if (blobs.length === 0) throw new Error("no image data");
-					const pngs = await Promise.all(blobs.map((blob) => clipboardPngBlob(blob)));
-					await navigator.clipboard.write(
-						pngs.map(
-							(png) =>
-								new ClipboardItem({
-									"text/plain": textBlob,
-									[png.type || "image/jpeg"]: png
-								})
-						)
-					);
-					return;
-				} catch {
-					// 3. Plain text, like any other copy.
-					try {
-						await navigator.clipboard.writeText(plan.text);
-					} catch {
-						// Clipboard unavailable: a cut already deleted (native
-						// cut deletes the same way when its own write fails).
-					}
-				}
-			})();
-			return true;
-		};
-	return Prec.high(
-		EditorView.domEventHandlers({
-			copy: handle(false),
-			cut: handle(true)
-		})
-	);
 }

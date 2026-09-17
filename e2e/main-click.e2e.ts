@@ -10,7 +10,7 @@ import { seedChat } from "./helpers";
 test.beforeEach(async ({ page }) => {
 	await seedChat(page, []);
 	await page.goto("/");
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 });
 
 test("clicking the main chat collapses the chats sidebar", async ({ page }) => {
@@ -58,9 +58,9 @@ test("clicking the main chat closes the settings panel mid-stream", async ({ pag
 		{ msgs: filler }
 	);
 	await page.reload();
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 	const panel = page.locator(".settings-panel");
-	await page.locator(".cm-content").first().click();
+	await page.locator(".ta-input").first().click();
 	await page.keyboard.type("mid-stream close probe");
 	await page.keyboard.press("Enter");
 	const body = page.locator("article.assistant .rendered").last();

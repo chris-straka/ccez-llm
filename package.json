@@ -22,20 +22,7 @@
     "cjkdecomp-subset": "bun scripts/cjkdecomp-subset.ts --data /tmp/cjk-decomp/cjk-decomp.txt --out src/lib/cjkdecomp-subset.generated.ts"
   },
   "license": "MIT",
-  "overrides": {
-    "@codemirror/state": "$@codemirror/state",
-    "@codemirror/view": "$@codemirror/view"
-  },
   "dependencies": {
-    "@codemirror/commands": "^6.11.1",
-    "@codemirror/lang-cpp": "^6.0.3",
-    "@codemirror/lang-javascript": "^6.2.5",
-    "@codemirror/lang-markdown": "^6.5.2",
-    "@codemirror/lang-python": "^6.2.1",
-    "@codemirror/lang-rust": "^6.0.2",
-    "@codemirror/language": "^6.12.4",
-    "@codemirror/state": "^6.7.5",
-    "@codemirror/view": "^6.43.12",
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-dialog": "^2.7.3",
     "@tauri-apps/plugin-fs": "^2.5.2",

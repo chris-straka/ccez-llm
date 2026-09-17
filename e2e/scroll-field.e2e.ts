@@ -8,12 +8,12 @@ test.beforeEach(async ({ page }) => {
 	await seedChat(page, [{ role: "assistant", content: "alpha beta gamma delta" }]);
 	await page.goto("/");
 	await expect(page.locator("article .rendered").first()).toBeVisible();
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 });
 
 /** Enter scroll mode from the composer (mount focuses it: seeds run idle-hide off). */
 async function enterScroll(page: Page): Promise<void> {
-	await page.locator(".cm-content").first().click();
+	await page.locator(".ta-input").first().click();
 	await page.keyboard.press("Control+g");
 	await expect(page.locator("article.selected")).toHaveCount(1);
 }

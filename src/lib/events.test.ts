@@ -72,14 +72,14 @@ describe("page event idioms", () => {
 
 	it("spots the prompt editor, composer, and prompt chrome", () => {
 		document.body.innerHTML =
-			'<div class="prompt"><div class="cm-content" id="cm">x</div><button id="pb">y</button></div>' +
-			'<div class="ta-input" id="ta">z</div><p id="p">w</p>';
+			'<div class="prompt"><div class="ta-input" id="ta">x</div><button id="pb">y</button></div>' +
+			'<div class="ta-input" id="loose">z</div><p id="p">w</p>';
 		const byId = (id: string): Element | null => document.getElementById(id);
-		expect(isPromptEditorTarget(byId("cm"))).toBe(true);
-		expect(isPromptEditorTarget(byId("ta"))).toBe(false);
+		expect(isPromptEditorTarget(byId("ta"))).toBe(true);
+		expect(isPromptEditorTarget(byId("loose"))).toBe(false);
 		expect(isPromptEditorTarget(byId("pb"))).toBe(false);
-		expect(isComposerTarget(byId("cm"))).toBe(true);
 		expect(isComposerTarget(byId("ta"))).toBe(true);
+		expect(isComposerTarget(byId("loose"))).toBe(true);
 		expect(isComposerTarget(byId("p"))).toBe(false);
 		expect(isPromptTarget(byId("pb"))).toBe(true);
 		expect(isPromptTarget(byId("p"))).toBe(false);

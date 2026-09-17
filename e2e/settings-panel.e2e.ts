@@ -5,7 +5,7 @@ import { seedChat } from "./helpers";
 test.beforeEach(async ({ page }) => {
 	await seedChat(page, [{ role: "user", content: "hi" }]);
 	await page.goto("/");
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 	await page.keyboard.press("Meta+,");
 	await expect(page.locator(".settings-panel")).not.toHaveClass(/closed/);
 });
@@ -102,7 +102,7 @@ test("gutter double-click recomputes from the live width", async ({ page }) => {
 		{ role: "assistant", content: "hello there, this is a reply" }
 	]);
 	await page.goto("/");
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 	await page.keyboard.press("Meta+,");
 	const slider = page.locator('.settings-panel input[aria-label="Chat width in rem"]');
 	const sidebar = page.locator("aside:not(.settings-panel)");

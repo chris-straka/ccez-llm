@@ -2,11 +2,10 @@
  * EditContext support for CJK composition in the composer.
  *
  * The half-sent CJK problem: Enter during IME composition (notably pinyin)
- * confirms the composition AND submits the message halfway. The plain
- * textarea path already guards `event.isComposing`; the CodeMirror path
- * needs the same guard. Where the browser exposes the EditContext API,
- * we additionally attach it to the textarea so composition events carry
- * precise ranges instead of the legacy `isComposing` fallback.
+ * confirms the composition AND submits the message halfway. The composer
+ * guards `event.isComposing`; where the browser exposes the EditContext
+ * API, we additionally attach it to the textarea so composition events
+ * carry precise ranges instead of the legacy `isComposing` fallback.
  *
  * Pure decision helpers live here for Vitest; DOM attachment is a thin,
  * never-throwing wrapper. Fallback is always the current path.
@@ -31,9 +30,7 @@ export function editContextSupported(): boolean {
 
 /**
  * Whether an Enter keydown must be ignored because an IME composition is
- * in flight. `isComposing` covers the textarea path; CodeMirror exposes
- * the in-flight state on the view instead of the keyboard event. Either
- * signal defers the submit.
+ * in flight. Either signal defers the submit.
  */
 export function shouldDeferForComposition(input: {
 	isComposing?: boolean;

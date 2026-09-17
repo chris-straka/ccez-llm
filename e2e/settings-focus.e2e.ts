@@ -36,7 +36,7 @@ async function seed(page: Page, settings: Record<string, unknown>, texts: string
 
 const vtCalls = (page: Page): Promise<number> =>
 	page.evaluate(() => (window as unknown as { __vtCalls: number }).__vtCalls ?? -1);
-const composer = (page: Page) => page.locator(".prompt .cm-content");
+const composer = (page: Page) => page.locator(".prompt .ta-input");
 const settingsPanel = (page: Page) => page.locator(".settings-panel");
 
 /** Dead message-area point: inside the text run, clear of the action

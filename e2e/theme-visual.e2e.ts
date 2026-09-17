@@ -23,7 +23,7 @@ test("light theme paints light surfaces", async ({ page }) => {
 	await seedChat(page, [{ role: "user", content: "hi" }]);
 	await seedTheme(page, "light");
 	await page.goto("/");
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 	await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
 	await expect(page.locator(".app")).toHaveCSS("background-color", "rgb(255, 255, 255)");
 	await expect(page.locator(".app")).toHaveCSS("color", "rgb(28, 28, 30)");
@@ -33,7 +33,7 @@ test("dark theme paints dark surfaces", async ({ page }) => {
 	await seedChat(page, [{ role: "user", content: "hi" }]);
 	await seedTheme(page, "dark");
 	await page.goto("/");
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 	await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 	await expect(page.locator(".app")).toHaveCSS("background-color", "rgb(23, 23, 26)");
 	await expect(page.locator(".app")).toHaveCSS("color", "rgb(242, 242, 247)");
@@ -43,7 +43,7 @@ test("dark theme paints dark surfaces", async ({ page }) => {
 test("app fills the viewport height", async ({ page }) => {
 	await seedChat(page, [{ role: "user", content: "hi" }]);
 	await page.goto("/");
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 	const { app, viewport } = await page.evaluate(() => ({
 		app: document.querySelector(".app")?.getBoundingClientRect().height ?? 0,
 		viewport: window.innerHeight
@@ -57,7 +57,7 @@ test("page never scrolls sideways", async ({ page }) => {
 		{ role: "assistant", content: "reply with enough text to wrap a few lines in the pane" }
 	]);
 	await page.goto("/");
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 	const overflow = await page.evaluate(
 		() => document.documentElement.scrollWidth - document.documentElement.clientWidth
 	);
@@ -71,7 +71,7 @@ test("message list scrolls inside its pane", async ({ page }) => {
 	}));
 	await seedChat(page, msgs);
 	await page.goto("/");
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 	const sizes = await page.evaluate(() => {
 		const list = document.querySelector(".messages");
 		const root = document.scrollingElement;
@@ -115,7 +115,7 @@ for (const t of THEMES) {
 		await seedChat(page, [{ role: "user", content: "hi" }]);
 		await seedTheme(page, t.name);
 		await page.goto("/");
-		await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 		const L = t.name === "light";
 		// The list always boots closed; ⌘B opens it for real.
 		await page.keyboard.press("Meta+b");
@@ -150,7 +150,7 @@ for (const t of THEMES) {
 		await seedChat(page, [{ role: "user", content: "hi" }]);
 		await seedTheme(page, t.name);
 		await page.goto("/");
-		await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 		const sidebar = page.locator("aside:has(button.side-chat)");
 		await expect(sidebar).toHaveCSS("background-color", t.bg);
 		await expect(sidebar).toHaveCSS("border-right-color", t.softLine);
@@ -170,7 +170,7 @@ for (const t of THEMES) {
 		await seedChat(page, [{ role: "user", content: "bubble me" }]);
 		await seedTheme(page, t.name);
 		await page.goto("/");
-		await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 		await page.keyboard.press("Meta+,");
 		await page.locator(".settings-panel").getByText("Enable background on my messages").click();
 		await expect(page.locator("article.user .bubble").first()).toHaveCSS(
@@ -183,7 +183,7 @@ for (const t of THEMES) {
 		await seedChat(page, [{ role: "user", content: "hi" }]);
 		await seedTheme(page, t.name);
 		await page.goto("/");
-		await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 		await page.keyboard.press("Meta+,");
 		await expect(page.locator(".settings-panel")).not.toHaveClass(/closed/);
 		await expect(page.locator(".settings-panel")).toHaveCSS("background-color", t.bg);
@@ -204,37 +204,32 @@ for (const t of THEMES) {
 		await seedChat(page, [{ role: "user", content: "hi" }]);
 		await seedTheme(page, t.name);
 		await page.goto("/");
-		await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 		const prompt = page.locator(".prompt");
 		await expect(prompt).toHaveCSS(
 			"background-color",
 			t.name === "light" ? t.bg : "rgb(28, 28, 30)"
 		);
 		// The editor autofocuses on boot, so the rim starts focused.
-		await page.locator(".prompt .cm-content").click();
-		await expect(page.locator(".prompt .cm-editor")).toHaveClass(/cm-focused/);
+		await page.locator(".prompt .ta-input").click();
+		await expect(page.locator(".prompt .ta-input")).toBeFocused();
 		await expect(prompt).toHaveCSS(
 			"border-color",
 			t.name === "light" ? "rgb(58, 58, 60)" : "rgb(174, 174, 178)"
 		);
-		// The visible caret is CodeMirror's drawn cursor, not the
-		// native one: CM pins `caret-color: transparent !important`
-		// on .cm-content (its `:focus` restore only matches
-		// descendants, never the content host), so pin the drawn
-		// spine's ink instead. It mounts only while focused (proven
-		// above); an emptied, unfocused composer hides it by design.
-		await expect(page.locator(".prompt .cm-cursor").first()).toHaveCSS(
-			"border-left-color",
+		// The visible caret is the native one: pin its ink, which
+		// rides --ink in both themes.
+		await expect(page.locator(".prompt .ta-input")).toHaveCSS(
+			"caret-color",
 			t.name === "light" ? "rgb(28, 28, 30)" : "rgb(242, 242, 247)"
 		);
 		const hint = await page.evaluate(
-			() => getComputedStyle(document.querySelector(".prompt .cm-placeholder")!).color
+			() =>
+				getComputedStyle(document.querySelector(".prompt .ta-input")!, "::placeholder").color
 		);
 		expect(hint).toBe(
 			t.name === "light" ? "rgb(142, 142, 147)" : "rgb(99, 99, 102)"
 		);
-		// No .cm-cursor assert: CodeMirror only mounts the cursor node
-		// while focused, so its dark shade stays a pinned rule.
 		// Resting/hover rims share the same tokens; the app holds editor
 		// focus while typing, so e2e can't isolate those two states
 		// without fighting focus management — bg + focus rim pin the theme.
@@ -277,7 +272,7 @@ for (const t of THEMES) {
 		await seedChat(page, [{ role: "assistant", content: "paintable annotation target" }]);
 		await seedTheme(page, t.name);
 		await page.goto("/");
-		await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 		const L = t.name === "light";
 		const v = {
 			ink: L ? "rgb(28, 28, 30)" : "rgb(242, 242, 247)",
@@ -357,16 +352,9 @@ for (const t of THEMES) {
 		await expect(editPop).toBeVisible({ timeout: 10_000 });
 		await expect(editPop.locator("textarea")).toHaveValue("note");
 		await page.mouse.click(4, 300);
-		// The hint renders inside .cm-content, so strip it: only real
-		// draft text counts.
-		const kept = await page.evaluate(() => {
-			const box = document.querySelector(".prompt .cm-content");
-			if (!box) return "<missing>";
-			const clone = box.cloneNode(true) as HTMLElement;
-			clone.querySelectorAll(".cm-placeholder").forEach((n) => n.remove());
-			return clone.textContent ?? "";
-		});
-		expect(kept).toBe("");
+		// The hint is a placeholder attribute, never draft text:
+		// only a real value counts.
+		await expect(page.locator(".prompt .ta-input")).toHaveValue("");
 		// Send button: system blue on light, the inversion on dark.
 		const send = page.locator(".send-btn");
 		await expect(send).toHaveCSS("background-color", L ? "rgb(0, 122, 255)" : v.invert);
@@ -377,7 +365,7 @@ for (const t of THEMES) {
 		await seedChat(page, [{ role: "assistant", content: "button paint check" }]);
 		await seedTheme(page, t.name);
 		await page.goto("/");
-		await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 		const L = t.name === "light";
 		const muted = L ? "rgb(110, 110, 115)" : "rgb(152, 152, 159)";
 		const ink = L ? "rgb(28, 28, 30)" : "rgb(242, 242, 247)";
@@ -396,7 +384,7 @@ for (const t of THEMES) {
 		await seedChat(page, []);
 		await seedTheme(page, t.name);
 		await page.goto("/");
-		await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 		const L = t.name === "light";
 		const muted = L ? "rgb(110, 110, 115)" : "rgb(152, 152, 159)";
 		const hl = L ? "rgb(238, 244, 255)" : "rgb(18, 35, 61)";
@@ -409,7 +397,7 @@ for (const t of THEMES) {
 		// clicking previews nothing, so there is no popup to pin here.
 		await item.locator(".thumb").click();
 		await expect(page.locator(".sent-card")).toHaveCount(0);
-		await page.locator(".cm-content").click();
+		await page.locator(".ta-input").click();
 		await page.keyboard.type("file attached");
 		await page.keyboard.press("Enter");
 		// Sent images ride the text flow as collapsed [Pasted image]
@@ -433,8 +421,8 @@ for (const t of THEMES) {
 		]);
 		await seedTheme(page, t.name);
 		await page.goto("/");
-		await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
-		await page.locator(".cm-content").click();
+		await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+		await page.locator(".ta-input").click();
 		await page.keyboard.press("Control+g");
 		const current = page.locator("article.selected");
 		await expect(current).toHaveCount(1);
@@ -453,7 +441,7 @@ for (const t of THEMES) {
 		await seedChat(page, [{ role: "user", content: "hi" }]);
 		await seedTheme(page, t.name);
 		await page.goto("/");
-		await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 		await page.keyboard.press("Shift+Meta+/");
 		await expect(page.locator(".modal")).toBeVisible();
 		await expect(page.locator(".modal")).toHaveCSS("background-color", t.bg);
@@ -487,7 +475,7 @@ for (const t of THEMES) {
 		await seedChat(page, msgs);
 		await seedTheme(page, t.name);
 		await page.goto("/");
-		await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 		const L = t.name === "light";
 		const muted = L ? "rgb(110, 110, 115)" : "rgb(152, 152, 159)";
 		const ink = L ? "rgb(28, 28, 30)" : "rgb(242, 242, 247)";
@@ -586,9 +574,9 @@ test("action buttons read 85 percent of message size", async ({ page }) => {
 test("composer holds its first line clear of the tools", async ({ page }) => {
 	await seedChat(page, []);
 	await page.goto("/");
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 	const pad = await page.evaluate(() => {
-		const el = document.querySelector(".prompt .cm-content");
+		const el = document.querySelector(".prompt .ta-input");
 		return el ? parseFloat(getComputedStyle(el).paddingRight) : 0;
 	});
 	// 4.6rem ≈ 74px at the default root size; tools must never overlap text.

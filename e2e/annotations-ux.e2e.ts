@@ -143,7 +143,7 @@ test("empty annotations bake a question mark for the model", async ({ page }) =>
 	await page.keyboard.press("Enter");
 	await expect(page.locator(".prompt-tools .ann-wrap")).toBeVisible();
 	// Send the empty prompt with the annotation attached (mock provider).
-	await page.locator(".cm-content").click();
+	await page.locator(".ta-input").click();
 	await page.keyboard.press("Enter");
 	const user = page.locator("article.user").first();
 	await expect(user).toBeVisible();

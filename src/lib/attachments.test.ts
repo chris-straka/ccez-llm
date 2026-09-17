@@ -6,7 +6,11 @@ import {
 	IMAGE_MARKER,
 	IMAGE_MAX_DIM,
 	MAX_FILE_CHARS,
+	PASTED_TAG_RE,
 	countMarkers,
+	countPastedTags,
+	dropFileAttachmentsAtIndexes,
+	dropPastedAttachmentsAtIndexes,
 	extractAttachmentTags,
 	fileExcerpt,
 	fileMarkerInsert,
@@ -14,15 +18,22 @@ import {
 	fitDimensions,
 	imageMarkerInsert,
 	imageTokens,
+	isPastedTextAttachment,
 	isTextFile,
 	leftoverAttachments,
+	makePastedTextAttachment,
+	pastedMarkerInsert,
+	pastedTextMarker,
 	removeMarker,
 	removeMarkerAt,
+	removePastedAt,
 	dropAttachmentsAtIndexes,
 	attachmentImageBlobsAt,
 	attachmentDataUrlsAt,
 	removeTags,
+	splicePastedText,
 	stripAttachmentMarkers,
+	stripPastedMarkers,
 	tagPlaceholder,
 	attachmentImageBlobs,
 	clipboardPngBlob,
@@ -380,5 +391,111 @@ describe("clipboardPngBlob", () => {
 		// engines that write it (Safari), instead of throwing.
 		const blob = new Blob(["jpeg-bytes"], { type: "image/jpeg" });
 		await expect(clipboardPngBlob(blob)).resolves.toBe(blob);
+	});
+});
+
+describe("pasted-text tags", () => {
+	it("labels the stored char count and counts tags", () => {
+		expect(pastedTextMarker(512)).toBe("[Pasted 512 chars]");
+		expect(countPastedTags("plain text")).toBe(0);
+		expect(countPastedTags(`a ${pastedTextMarker(10)} b ${pastedTextMarker(20)}`)).toBe(2);
+		// Fixed markers never read as pasted tags.
+		expect(countPastedTags(`${IMAGE_MARKER} ${FILE_MARKER}`)).toBe(0);
+		expect(countMarkers(pastedTextMarker(10))).toBe(0);
+	});
+
+	it("inserts with the same caret contract as image/file tags", () => {
+		// Empty and newline-ended drafts take the tag as-is.
+		expect(pastedMarkerInsert("", 10)).toBe("[Pasted 10 chars] ");
+		expect(pastedMarkerInsert("notes\n", 10)).toBe("[Pasted 10 chars] ");
+		// Chained after another tag's trailing space: same line.
+		expect(pastedMarkerInsert(`${IMAGE_MARKER} `, 10)).toBe("[Pasted 10 chars] ");
+		// Spaceless mid-prose starts a fresh line, never glues.
+		expect(pastedMarkerInsert("hello", 10)).toBe("\n[Pasted 10 chars] ");
+		// Prose already spaced stays on its line.
+		expect(pastedMarkerInsert("hello ", 10)).toBe("[Pasted 10 chars] ");
+	});
+});
+
+describe("makePastedTextAttachment", () => {
+	it("builds a flagged text attachment with token cost", () => {
+		const text = "pasted body";
+		const att = makePastedTextAttachment(text);
+		expect(att.kind).toBe("text");
+		expect(att.text).toBe(text);
+		expect(att.pastedText).toBe(true);
+		expect(att.tokens).toBe(Math.max(1, Math.ceil(text.length / 4)));
+		expect(isPastedTextAttachment(att)).toBe(true);
+	});
+
+	it("caps like file drops and leaves files unflagged", () => {
+		const att = makePastedTextAttachment("a".repeat(MAX_FILE_CHARS + 10));
+		expect(att.text?.length).toBe(MAX_FILE_CHARS);
+		expect(pastedTextMarker(att.text?.length ?? 0)).toBe(`[Pasted ${MAX_FILE_CHARS} chars]`);
+		expect(isPastedTextAttachment(testAttachment({ kind: "text" }))).toBe(false);
+		expect(isPastedTextAttachment(testAttachment({ kind: "image" }))).toBe(false);
+	});
+});
+
+describe("removePastedAt", () => {
+	it("drops the indexed tag, never the first of its kind by accident", () => {
+		const doc = `a ${pastedTextMarker(10)} b ${pastedTextMarker(20)}`;
+		expect(removePastedAt(doc, 1)).toBe(`a ${pastedTextMarker(10)} b`);
+		expect(removePastedAt(doc, 0)).toBe(`a b ${pastedTextMarker(20)}`);
+	});
+
+	it("keeps prose typed beside the tag and drops bare host lines", () => {
+		expect(removePastedAt(`look ${pastedTextMarker(5)} here`, 0)).toBe("look here");
+		expect(removePastedAt(`before\n${pastedTextMarker(5)} \nafter`, 0)).toBe("before\nafter");
+	});
+
+	it("leaves text untouched out of range", () => {
+		expect(removePastedAt("plain", 0)).toBe("plain");
+		expect(removePastedAt(pastedTextMarker(5), 3)).toBe(pastedTextMarker(5));
+		expect(removePastedAt(pastedTextMarker(5), -1)).toBe(pastedTextMarker(5));
+	});
+});
+
+describe("stripPastedMarkers", () => {
+	it("drops every pasted tag without touching prose spacing", () => {
+		expect(stripPastedMarkers(`a  b ${pastedTextMarker(3)} c`)).toBe("a  b c");
+		expect(stripPastedMarkers(`keep\n${pastedTextMarker(3)}\nkeep`)).toBe("keep\nkeep");
+		expect(stripPastedMarkers("plain")).toBe("plain");
+		// Fixed markers stay for their own strip.
+		expect(stripPastedMarkers(`${IMAGE_MARKER} hi`)).toBe(`${IMAGE_MARKER} hi`);
+	});
+});
+
+describe("splicePastedText", () => {
+	it("splices stored text at tag positions index-matched", () => {
+		const doc = `intro ${pastedTextMarker(3)} middle ${pastedTextMarker(3)} end`;
+		expect(splicePastedText(doc, ["AAA", "BBB"])).toBe("intro AAA middle BBB end");
+	});
+
+	it("leaves tags without text literal and end-appends texts without tags", () => {
+		// Fewer texts than tags: the orphan tag stays (hand-typed or
+		// resurrected by undo), exactly like an unmatched literal.
+		expect(splicePastedText(`a ${pastedTextMarker(3)}`, [])).toBe(`a ${pastedTextMarker(3)}`);
+		// More texts than tags: leftovers end-append like files.
+		expect(splicePastedText("hi", ["AAA", "BBB"])).toBe("hi\n\nAAA\n\nBBB");
+		expect(splicePastedText("", ["AAA"])).toBe("AAA");
+		expect(splicePastedText("hi", [])).toBe("hi");
+	});
+});
+
+describe("pasted-aware index drops", () => {
+	const pasted = (id: string) => ({ ...testAttachment({ id, kind: "text" }), pastedText: true });
+	const file = (id: string) => testAttachment({ id, kind: "text" });
+
+	it("pairs file tags with file drops and pasted tags with pasted drops", () => {
+		const list = [file("f"), pasted("p"), file("g")];
+		expect(dropFileAttachmentsAtIndexes(list, [0]).map((a) => a.id)).toEqual(["p", "g"]);
+		expect(dropFileAttachmentsAtIndexes(list, [1]).map((a) => a.id)).toEqual(["f", "p"]);
+		expect(dropPastedAttachmentsAtIndexes(list, [0]).map((a) => a.id)).toEqual(["f", "g"]);
+		expect(dropPastedAttachmentsAtIndexes(list, [4]).map((a) => a.id)).toEqual(["f", "p", "g"]);
+	});
+
+	it("never mistakes fixed markers for pasted tags", () => {
+		expect(`${IMAGE_MARKER} ${FILE_MARKER}`.match(PASTED_TAG_RE)).toBeNull();
 	});
 });

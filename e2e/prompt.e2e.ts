@@ -15,7 +15,7 @@ test("staging pins the scroller to the true bottom", async ({ page }) => {
 	await page.goto("/");
 	// seedChat presets never-idle, so the composer is clickable even
 	// with thirteen messages overflowing the viewport.
-	await page.locator(".cm-content").click();
+	await page.locator(".ta-input").click();
 	await page.keyboard.type("staged hello");
 	await page.keyboard.press("Alt+Enter");
 	await expect(page.locator("article.user").last()).toContainText("staged hello");
@@ -370,7 +370,7 @@ test("in-prompt press outlives a focusout to nowhere", async ({ page }) => {
 	const composer = page.locator("main .prompt");
 	await page.keyboard.press("i");
 	await expect(composer).not.toHaveClass(/prompt-idle/, { timeout: 10_000 });
-	const editor = page.locator(".prompt .cm-content");
+	const editor = page.locator(".prompt .ta-input");
 	await editor.click();
 	// WebKit button press: a real mousedown inside the composer (stamps
 	// the press), then the editor blurs to nowhere (relatedTarget null)
@@ -397,12 +397,12 @@ test("clicking the composer floor focuses and types", async ({ page }) => {
 	await seedChat(page, []);
 	await page.goto("/");
 	// Mounted only — never clicked, so only the floor tap can focus.
-	await page.locator(".cm-content").first().waitFor({ timeout: 60_000 });
+	await page.locator(".ta-input").first().waitFor({ timeout: 60_000 });
 	const box = await page.locator(".prompt").boundingBox();
 	if (!box) throw new Error("composer lost its box");
 	await page.mouse.click(box.x + 30, box.y + box.height - 12);
 	await page.keyboard.type("floor tap");
-	await expect(page.locator(".cm-content")).toContainText("floor tap");
+	await expect(page.locator(".ta-input")).toHaveValue("floor tap");
 });
 
 test("phone floor tap focuses the textarea", async ({ browser }) => {
@@ -414,7 +414,10 @@ test("phone floor tap focuses the textarea", async ({ browser }) => {
 		await page.locator(".ta-input").first().waitFor({ timeout: 60_000 });
 		const box = await page.locator(".prompt").boundingBox();
 		if (!box) throw new Error("composer lost its box");
-		await page.touchscreen.tap(box.x + 30, box.y + box.height - 12);
+		// Right of the tools cluster: the prompt-tools container, not
+		// a button (the paperclip owns the left edge) — the floor tap
+		// focuses the editor instead of dying on the container.
+		await page.touchscreen.tap(box.x + 250, box.y + box.height - 20);
 		await expect(page.locator(".ta-input")).toBeFocused();
 	} finally {
 		await ctx.close();
@@ -424,15 +427,15 @@ test("phone floor tap focuses the textarea", async ({ browser }) => {
 test("prompt types and sends without vim", async ({ page }) => {
 	await seedChat(page, []);
 	await page.goto("/");
-	await page.locator(".cm-content").click();
+	await page.locator(".ta-input").click();
 	await page.keyboard.type("hello world");
-	await expect(page.locator(".cm-content")).toContainText("hello world");
+	await expect(page.locator(".ta-input")).toHaveValue("hello world");
 	await page.keyboard.press("Enter");
 	await expect(page.locator("article.user .rendered")).toContainText("hello world");
 	// Ctrl+G still hops out to scroll mode.
-	await page.locator(".cm-content").click();
+	await page.locator(".ta-input").click();
 	await page.keyboard.press("Control+g");
-	await expect(page.locator(".cm-content")).toContainText("ctrl+g to hop back in");
+	await expect(page.locator(".ta-input")).toHaveAttribute("placeholder", "ctrl+g to hop back in");
 });
 
 /** j past the newest message drops back into the prompt. */
@@ -442,7 +445,7 @@ test("j on the newest message returns to the prompt", async ({ page }) => {
 		{ role: "assistant", content: "two" }
 	]);
 	await page.goto("/");
-	await page.locator(".cm-content").click();
+	await page.locator(".ta-input").click();
 	await page.keyboard.press("Control+g");
 	await expect(page.locator('.app[data-focus-mode="scroll"]')).toHaveCount(1);
 	// G lands on the newest message; j past it hops back to edit mode.
@@ -455,20 +458,25 @@ test("j on the newest message returns to the prompt", async ({ page }) => {
 test("long drafts cap the prompt height and scroll", async ({ page }) => {
 	await seedChat(page, []);
 	await page.goto("/");
-	await page.locator(".cm-content").click();
+	await page.locator(".ta-input").click();
 	for (let i = 0; i < 15; i++) {
 		await page.keyboard.type(`draft line ${i + 1}`);
 		await page.keyboard.press("Shift+Enter");
 	}
 	const sizes = await page.evaluate(() => {
-		const scroller = document.querySelector(".prompt .cm-scroller");
-		if (!(scroller instanceof HTMLElement)) return null;
-		return { client: scroller.clientHeight, scroll: scroller.scrollHeight };
+		// The plain textarea scrolls itself: no inner scroller node.
+		const box = document.querySelector(".prompt .ta-input");
+		if (!(box instanceof HTMLElement)) return null;
+		return {
+			client: box.clientHeight,
+			scroll: box.scrollHeight,
+			cap: Math.round(window.innerHeight * 0.4)
+		};
 	});
-	if (!sizes) throw new Error("prompt scroller missing");
-	// 12rem cap ≈ 192px at the default root size; stay well under it
-	// while the content overflows into a scroll.
-	expect(sizes.client).toBeLessThanOrEqual(210);
+	if (!sizes) throw new Error("prompt box missing");
+	// max-height: 40vh caps the growth while the content overflows
+	// into an internal scroll.
+	expect(sizes.client).toBeLessThanOrEqual(sizes.cap + 2);
 	expect(sizes.scroll).toBeGreaterThan(sizes.client);
 });
 
@@ -513,10 +521,10 @@ test("prompt typeface matches the chat typeface", async ({ page }) => {
 	await page.goto("/");
 	// Raw evaluate does not auto-wait like locators do: hold for
 	// hydration before reading computed styles.
-	await page.locator(".prompt .cm-content").waitFor();
+	await page.locator(".prompt .ta-input").waitFor();
 	await page.locator('article[id^="msg-"] .rendered').waitFor();
 	const fonts = await page.evaluate(() => {
-		const cm = document.querySelector(".prompt .cm-content");
+		const cm = document.querySelector(".prompt .ta-input");
 		const msg = document.querySelector('article[id^="msg-"] .rendered');
 		if (!(cm instanceof HTMLElement) || !(msg instanceof HTMLElement)) return null;
 		return {
@@ -535,7 +543,7 @@ Real keyboard travel is device-only; this pins the rule. */
 test("document scroll is locked", async ({ page }) => {
 	await seedChat(page, []);
 	await page.goto("/");
-	await page.locator(".cm-content").first().waitFor({ timeout: 60_000 });
+	await page.locator(".ta-input").first().waitFor({ timeout: 60_000 });
 	const overflow = await page.evaluate(() => ({
 		html: getComputedStyle(document.documentElement).overflow,
 		body: getComputedStyle(document.body).overflow

@@ -11,7 +11,7 @@ test("stream renders exactly one reply with the full text", async ({ page }) => 
 	await seedChat(page, []);
 	await page.goto("/");
 	await expect(page.locator(".hero")).toBeVisible({ timeout: 60_000 });
-	await page.locator(".cm-content").click();
+	await page.locator(".ta-input").click();
 	await page.keyboard.type("integrity check");
 	await page.keyboard.press("Enter");
 	const body = page.locator("article.assistant .rendered");
@@ -27,7 +27,7 @@ test("visible stream text grows monotonically, never flickers", async ({ page })
 	});
 	await page.goto("/");
 	await expect(page.locator(".hero")).toBeVisible({ timeout: 60_000 });
-	await page.locator(".cm-content").click();
+	await page.locator(".ta-input").click();
 	await page.keyboard.type("monotonic stream sampling probe");
 	await page.keyboard.press("Enter");
 	const body = page.locator("article.assistant .rendered");
@@ -78,7 +78,7 @@ test("mid-stream switch keeps the new chat's drafts and scroll", async ({ page }
 
 	// Draft (filed, unsent) annotation in chat 1, then send slow.
 	await annotateDraft(page, "origin chat opener", "origin note");
-	await page.locator(".cm-content").click();
+	await page.locator(".ta-input").click();
 	await page.keyboard.type("go slow");
 	await page.keyboard.press("Enter");
 
@@ -127,7 +127,7 @@ test("mid-stream switch keeps the new chat's drafts and scroll", async ({ page }
 
 /** Open the chat list if it closed itself, then pick a row. */
 async function switchChat(page: Page, nth: number): Promise<void> {
-	await page.locator(".cm-content").click();
+	await page.locator(".ta-input").click();
 	const aside = page.locator("aside").first();
 	if (await aside.evaluate((el) => el.classList.contains("collapsed"))) {
 		await page.keyboard.press("Meta+b");

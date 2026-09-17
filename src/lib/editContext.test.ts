@@ -6,7 +6,7 @@ describe("shouldDeferForComposition", () => {
 	it("defers on textarea isComposing", () => {
 		expect(shouldDeferForComposition({ isComposing: true })).toBe(true);
 	});
-	it("defers on CodeMirror view.composing", () => {
+	it("defers on the view-composing signal", () => {
 		expect(shouldDeferForComposition({ viewComposing: true })).toBe(true);
 	});
 	it("submits when neither signal is set", () => {

@@ -38,7 +38,7 @@ test("gutter double-click opens the nearby sidebar", async ({ page }) => {
 test("command plus and minus scale text", async ({ page }) => {
 	await seedChat(page, []);
 	await page.goto("/");
-	await expect(page.locator(".cm-content").first()).toBeVisible();
+	await expect(page.locator(".ta-input").first()).toBeVisible();
 	await page.keyboard.press("Meta+=");
 	await expect(page.locator(".toast")).toContainText("Text size 110%");
 	await page.keyboard.press("Meta+-");
@@ -49,7 +49,7 @@ test("command plus and minus scale text", async ({ page }) => {
 test("shift command plus and minus scale chat width", async ({ page }) => {
 	await seedChat(page, []);
 	await page.goto("/");
-	await expect(page.locator(".cm-content").first()).toBeVisible();
+	await expect(page.locator(".ta-input").first()).toBeVisible();
 	await page.keyboard.press("Meta+Shift+=");
 	await expect(page.locator(".toast")).toContainText("Chat width 38 rem");
 	await page.keyboard.press("Meta+Shift+-");
@@ -77,11 +77,11 @@ test("text size scales messages and badges, not the composer", async ({ page }) 
 		rendered?.appendChild(badge);
 	});
 	const msgBefore = await px("article .rendered");
-	const editorBefore = await px(".prompt .cm-editor");
+	const editorBefore = await px(".prompt .ta-input");
 	const badgeBefore = await px("button.ccez-ann-badge");
 	await page.keyboard.press("Meta+=");
 	await expect(page.locator(".toast")).toContainText("Text size 110%");
 	expect(await px("article .rendered")).toBeCloseTo(msgBefore * 1.1, 1);
-	expect(await px(".prompt .cm-editor")).toBeCloseTo(editorBefore, 1);
+	expect(await px(".prompt .ta-input")).toBeCloseTo(editorBefore, 1);
 	expect(await px("button.ccez-ann-badge")).toBeCloseTo(badgeBefore * 1.03, 1);
 });

@@ -48,7 +48,7 @@ async function dropTextImage(page: Page, text: string): Promise<void> {
 test.beforeEach(async ({ page }) => {
 	await seedChat(page, [{ role: "assistant", content: "alpha beta gamma delta" }]);
 	await page.goto("/");
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 });
 
 test("image attachments offer text recognition", async ({ page }) => {
@@ -127,7 +127,7 @@ test("recognition falls back live without the Mac shell", async ({ page }) => {
 	// No shell here, so the in-client fallback runs (engine fetch on
 	// first use — generous timeout): the words land in the composer
 	// and the button re-enables, no stuck busy state.
-	await expect(page.locator(".cm-content").first()).toContainText("hello", {
+	await expect(page.locator(".ta-input").first()).toHaveValue(/hello/, {
 		ignoreCase: true,
 		timeout: 120_000
 	});

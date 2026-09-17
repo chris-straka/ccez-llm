@@ -12,7 +12,7 @@ async function openWithMessages(
 ) {
 	await seedChat(page, messages);
 	await page.goto("/");
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 }
 
 async function openSettings(page: import("@playwright/test").Page) {
@@ -39,7 +39,7 @@ test("prompt slides away when idle and returns on keys", async ({ page }) => {
 		);
 	});
 	await page.goto("/");
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 	const prompt = page.locator(".prompt");
 	// No input for 2s (+ticker): the idle class lands and the
 	// composer fades out of hit-testing.
@@ -69,7 +69,7 @@ test("summoned prompt fades in instead of popping", async ({ page }) => {
 		);
 	});
 	await page.goto("/");
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 	const prompt = page.locator(".prompt");
 	await expect(prompt).toHaveClass(/prompt-idle/, { timeout: 15_000 });
 	const opacity = (): Promise<number> =>
@@ -102,7 +102,7 @@ test("button clicks leave the hidden prompt alone", async ({ page }) => {
 		);
 	});
 	await page.goto("/");
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 	const prompt = page.locator(".prompt");
 	await expect(prompt).toHaveClass(/prompt-idle/, { timeout: 15_000 });
 	const block = page.locator(".ccez-code").first();
@@ -177,7 +177,7 @@ test("idle hide keeps every offset stable", async ({ page }) => {
 		);
 	});
 	await page.goto("/");
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 	const offsets = () =>
 		page.evaluate(() => ({
 			prompt: document.querySelector(".prompt")?.offsetTop ?? -1,
@@ -221,7 +221,7 @@ test("always-hide hides on blur and returns on i", async ({ page }) => {
 	// (the restore focus lands on a tick — assert it before blurring).
 	await page.keyboard.press("i");
 	await expect(prompt).not.toHaveClass(/prompt-idle/, { timeout: 5_000 });
-	await page.locator(".cm-content").click();
+	await page.locator(".ta-input").click();
 	await expect
 		.poll(() => page.evaluate(() => !!document.activeElement?.closest?.(".prompt")))
 		.toBe(true);
@@ -381,7 +381,7 @@ test("always-hide click-off stays hidden until the next press", async ({ page })
 	const prompt = page.locator(".prompt");
 	await page.keyboard.press("i");
 	await expect(prompt).not.toHaveClass(/prompt-idle/, { timeout: 5_000 });
-	await page.locator(".cm-content").click();
+	await page.locator(".ta-input").click();
 	await expect
 		.poll(() => page.evaluate(() => !!document.activeElement?.closest?.(".prompt")))
 		.toBe(true);
@@ -528,32 +528,26 @@ test("prompt centers on the message column", async ({ page }) => {
 });
 
 /** An empty focused composer still blinks: the native caret is the
-only focus signal (CodeMirror draws no cursor node here), so the
-empty-box caret hiding applies unfocused only. */
+only focus signal, so the empty-box caret hiding applies unfocused only. */
 test("empty focused composer shows its cursor", async ({ page }) => {
 	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(40);
 	await seedChat(page, [{ role: "assistant", content: `answer ${long}` }]);
 	await page.goto("/");
 	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
-	await page.locator(".cm-content").click();
+	await page.locator(".ta-input").click();
 	await expect
 		.poll(() => page.evaluate(() => !!document.activeElement?.closest?.(".prompt")))
 		.toBe(true);
-	// Focused + empty: the owned drawn caret mounts. The native caret
-	// stays suppressed by design (drawSelection paints the caret, the
-	// browser doesn't) — so this pins the node, not the caret-color.
-	await expect(page.locator(".prompt .cm-cursor-primary")).toHaveCount(1);
-	// Blurred + empty: no stray caret (CodeMirror drops .cm-focused
-	// async, so wait for the unfocused state first).
+	// Focused + empty: the native caret blinks (the cursor is the only
+	// focus signal), so pin the caret-color, not a cursor node.
+	const caretColor = (): Promise<string> =>
+		page.evaluate(
+			() => getComputedStyle(document.querySelector(".prompt .ta-input") as HTMLElement).caretColor
+		);
+	await expect.poll(caretColor).not.toBe("rgba(0, 0, 0, 0)");
+	// Blurred + empty: no stray caret (the data-empty rule parks it).
 	await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
-	await expect
-		.poll(() =>
-			page.evaluate(
-				() => document.querySelector(".prompt .cm-editor")?.classList.contains("cm-focused") ?? false
-			)
-		)
-		.toBe(false);
-	await expect(page.locator(".prompt .cm-cursor")).toBeHidden();
+	await expect.poll(caretColor).toBe("rgba(0, 0, 0, 0)");
 });
 
 /** The prompt parks while a sidebar owns the stage: settings open
@@ -834,7 +828,7 @@ test("always-hide hides after send", async ({ page }) => {
 	const prompt = page.locator(".prompt");
 	await page.keyboard.press("i");
 	await expect(prompt).not.toHaveClass(/prompt-idle/, { timeout: 5_000 });
-	await page.locator(".cm-content").click();
+	await page.locator(".ta-input").click();
 	await expect
 		.poll(() => page.evaluate(() => !!document.activeElement?.closest?.(".prompt")))
 		.toBe(true);
@@ -893,7 +887,7 @@ test("fresh installs default to plain messages and hover-only buttons", async ({
 	await openWithMessages(page, [{ role: "user", content: "hi" }]);
 	await page.evaluate(() => window.localStorage.setItem("ccez-llm-settings-v1", "{}"));
 	await page.reload();
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 	const main = page.locator("main");
 	await expect(main).toHaveClass(/plain-user/);
 	await expect(main).toHaveClass(/hover-user/);
@@ -943,7 +937,7 @@ test("short thread hides past the timeout", async ({ page }) => {
 		);
 	});
 	await page.goto("/");
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 	await expect(page.locator(".messages")).toBeVisible();
 	const fits = await page.evaluate(() => {
 		const box = document.querySelector(".messages") as HTMLElement | null;
@@ -968,7 +962,7 @@ test("think blocks stay hidden", async ({ page }) => {
 /** Shift+Meta+plus/minus widen/narrow the chat column. */
 test("shift-meta-plus widens the chat column", async ({ page }) => {
 	await openWithMessages(page, [{ role: "user", content: "hi" }]);
-	await page.locator(".cm-content").first().click();
+	await page.locator(".ta-input").first().click();
 	await page.keyboard.down("Shift");
 	await page.keyboard.down("Meta");
 	await page.keyboard.press("Equal");
@@ -1022,7 +1016,7 @@ test("new chat button shows and focuses the prompt", async ({ page }) => {
 		.poll(
 			() =>
 				page.evaluate(
-					() => !!(document.activeElement as HTMLElement | null)?.closest(".prompt .cm-content")
+					() => !!(document.activeElement as HTMLElement | null)?.closest(".prompt .ta-input")
 				),
 			{ timeout: 10_000 }
 		)
@@ -1071,7 +1065,7 @@ test("language re-pick updates send instantly and focuses prompt", async ({ page
 	const pill = page.locator(".lang-menus .lang-menu button").first();
 	const focusedComposer = () =>
 		page.evaluate(
-			() => !!(document.activeElement as HTMLElement | null)?.closest(".prompt .cm-content")
+			() => !!(document.activeElement as HTMLElement | null)?.closest(".prompt .ta-input")
 		);
 	await pill.click();
 	await page.locator('.lang-list button:has-text("Bulgarian")').click();

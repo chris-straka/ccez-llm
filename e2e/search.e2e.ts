@@ -302,11 +302,12 @@ test.describe("find in chat", () => {
 		});
 		await page.goto("/");
 		await expect(page.locator("article .rendered").first()).toBeVisible({ timeout: 60_000 });
-		await page.locator(".cm-content").click();
+		await page.locator(".ta-input").click();
 		await page.keyboard.press("Shift+f");
 		await expect(page.locator(".find-bar")).toHaveCount(0);
 		const draft = await page.evaluate(
-			() => document.querySelector(".prompt .cm-content")?.textContent ?? ""
+			() =>
+				(document.querySelector(".prompt .ta-input") as HTMLTextAreaElement | null)?.value ?? ""
 		);
 		expect(draft.toLowerCase()).toContain("f");
 	});

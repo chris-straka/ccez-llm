@@ -41,7 +41,7 @@ async function vibrateCalls(page: Page): Promise<Array<number | number[]>> {
 }
 
 async function sendHello(page: Page): Promise<void> {
-  await page.locator(".cm-content").click();
+  await page.locator(".ta-input").click();
   await page.keyboard.type("hello");
   await page.keyboard.press("Enter");
   await expect(page.locator("article.user .rendered")).toContainText("hello");
@@ -51,7 +51,7 @@ test("sending ticks haptics", async ({ page }) => {
   await stubVibrate(page);
   await seedChat(page, []);
   await page.goto("/");
-  await page.locator(".cm-content").first().waitFor({ timeout: 60_000 });
+  await page.locator(".ta-input").first().waitFor({ timeout: 60_000 });
   await sendHello(page);
   await expect.poll(() => vibrateCalls(page)).toEqual([8]);
 });
@@ -142,7 +142,7 @@ test("short backgrounded reply stays silent (no notification, no badge)", async 
   });
   await seedChat(page, []);
   await page.goto("/");
-  await page.locator(".cm-content").first().waitFor({ timeout: 60_000 });
+  await page.locator(".ta-input").first().waitFor({ timeout: 60_000 });
   // Background the window after boot: the mock reply is short, so a
   // correct gate stays silent even here (long-reply firing is pinned
   // by unit tests on shouldNotifyReplyDone).

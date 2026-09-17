@@ -24,13 +24,6 @@ process.env.VITE_BUILD_STAMP ??=
 // directive was deleted as the note instructed.)
 export default defineConfig(() => ({
   plugins: [sveltekit()],
-  resolve: {
-    // Bun's pnpm-style layout leaves several physical copies of the
-    // CodeMirror singletons (top-level real dirs plus .pnpm symlinks).
-    // Without dedupe, esbuild/rollup can bundle two copies and
-    // cross-copy `instanceof` checks fail.
-    dedupe: ["@codemirror/state", "@codemirror/view"]
-  },
   // Staleness marker (settings footer): installed builds show when
   // they were compiled, so "am I behind?" is one glance. Dev shows
   // "live" instead (HMR is always fresh; a server-start stamp would lie).

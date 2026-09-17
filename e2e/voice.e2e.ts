@@ -114,7 +114,7 @@ test.describe("voice-error", () => {
 		// Readback on, through the same toggle a user would press.
 		await page.locator(".prompt-tools .voice-float").click();
 		await expect(page.locator(".prompt-tools .voice-float")).toHaveAttribute("aria-pressed", "true");
-		await page.locator(".prompt .cm-content").click();
+		await page.locator(".prompt .ta-input").click();
 		await page.keyboard.type("say hi");
 		await page.keyboard.press("Enter");
 		await expect(page.locator("article.assistant .rendered")).toBeVisible({ timeout: 60_000 });

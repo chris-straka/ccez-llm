@@ -10,7 +10,7 @@ test("gutter double-click opens the chat list anywhere left of the column", asyn
 }) => {
 	await seedChat(page, []);
 	await page.goto("/");
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 	const aside = page.locator("aside:not(.settings-panel)");
 	await expect(aside).toHaveClass(/collapsed/);
 	// Below the hero zone: bare <main>, past the messages pane's cap.

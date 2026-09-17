@@ -214,7 +214,7 @@ test("space on an empty chat focuses the prompt", async ({ page }) => {
 		.poll(
 			() =>
 				page.evaluate(
-					() => !!(document.activeElement as HTMLElement | null)?.closest(".prompt .cm-content")
+					() => !!(document.activeElement as HTMLElement | null)?.closest(".prompt .ta-input")
 				),
 			{ timeout: 10_000 }
 		)
@@ -233,7 +233,7 @@ test("space on an empty chat with focus outside focuses the prompt", async ({ pa
 		);
 	});
 	await page.goto("/");
-	await expect(page.locator(".prompt .cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".prompt .ta-input").first()).toBeVisible({ timeout: 60_000 });
 	// Leave the composer: the empty chat has nowhere to scroll.
 	await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
 	await expect
@@ -247,7 +247,7 @@ test("space on an empty chat with focus outside focuses the prompt", async ({ pa
 		.poll(
 			() =>
 				page.evaluate(
-					() => !!(document.activeElement as HTMLElement | null)?.closest(".prompt .cm-content")
+					() => !!(document.activeElement as HTMLElement | null)?.closest(".prompt .ta-input")
 				),
 			{ timeout: 10_000 }
 		)

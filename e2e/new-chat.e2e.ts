@@ -12,7 +12,7 @@ async function openSidebar(page: Page): Promise<void> {
 test("minting a chat toasts Chat created", async ({ page }) => {
 	await seedChat(page, [{ role: "user", content: "hi" }]);
 	await page.goto("/");
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 	await openSidebar(page);
 	await page.locator('aside:not(.settings-panel) button[aria-label="New chat"]').click();
 	await expect(page.locator(".toast")).toHaveText("Chat created");
@@ -23,7 +23,7 @@ test("minting a chat toasts Chat created", async ({ page }) => {
 test("empty chats render no hover tip", async ({ page }) => {
 	await seedChat(page, [{ role: "user", content: "hi" }]);
 	await page.goto("/");
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 	await openSidebar(page);
 	await page.locator('aside:not(.settings-panel) button[aria-label="New chat"]').click();
 	await openSidebar(page);
@@ -36,7 +36,7 @@ test("empty chats render no hover tip", async ({ page }) => {
 test("row tip answers the row button, not its action buttons", async ({ page }) => {
 	await seedChat(page, [{ role: "user", content: "hi" }]);
 	await page.goto("/");
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 	await openSidebar(page);
 	const row = page.locator("aside:not(.settings-panel) li:has(.side-tip)").first();
 	const tip = row.locator(".side-tip");

@@ -4,10 +4,10 @@
 
 const FIELD_SELECTOR = "input, textarea, select";
 const EDITABLE_SELECTOR = "input, textarea, select, [contenteditable]";
-/** The prompt's editor subtree (CodeMirror content or plain textarea). */
-const PROMPT_EDITOR_SELECTOR = ".prompt .cm-content, .prompt .ta-input";
+/** The prompt's editor subtree (the plain-textarea composer). */
+const PROMPT_EDITOR_SELECTOR = ".prompt .ta-input";
 /** Any composer editor, prompt or message-edit. */
-const COMPOSER_SELECTOR = ".cm-content, .ta-input";
+const COMPOSER_SELECTOR = ".ta-input";
 const FILTER_SELECTOR = ".shortcuts-filter";
 const FIND_BAR_SELECTOR = ".find-bar";
 const SIDEBAR_SELECTOR = "aside";

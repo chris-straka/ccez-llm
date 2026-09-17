@@ -20,7 +20,7 @@ test.beforeEach(async ({ page }) => {
 		{ role: "assistant", content: "Être means to be." }
 	]);
 	await page.goto("/");
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 });
 
 test("study sheet section stays out of layout on screen", async ({ page }) => {

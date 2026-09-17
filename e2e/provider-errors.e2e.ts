@@ -33,7 +33,7 @@ async function seedKeyedProvider(page: Page): Promise<void> {
 }
 
 async function send(page: Page, text: string): Promise<void> {
-	await page.locator(".cm-content").click();
+	await page.locator(".ta-input").click();
 	await page.keyboard.type(text);
 	await page.keyboard.press("Enter");
 }
@@ -48,7 +48,7 @@ test("401 surfaces the provider error with a retry", async ({ page }) => {
 	);
 	await seedKeyedProvider(page);
 	await page.goto("/");
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 	await send(page, "hello provider");
 	const err = page.locator("article.assistant .error").first();
 	await expect(err).toContainText("HTTP 401", { timeout: 30_000 });
@@ -68,7 +68,7 @@ test("429 rate-limit retries without duplicating the reply", async ({ page }) =>
 	);
 	await seedKeyedProvider(page);
 	await page.goto("/");
-	await expect(page.locator(".cm-content").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
 	await send(page, "hello rate limit");
 	const err = page.locator("article.assistant .error").first();
 	await expect(err).toContainText("HTTP 429", { timeout: 30_000 });

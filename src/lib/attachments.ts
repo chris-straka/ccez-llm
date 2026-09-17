@@ -26,6 +26,10 @@ export interface Attachment {
 	height: number | null;
 	/** Estimated tokens this attachment adds to the request. */
 	tokens: number;
+	/** Long-paste source: text captured from an over-threshold clipboard
+	 * paste, paired with a positional `[Pasted N chars]` tag and spliced
+	 * inline at send. Absent/false = file or image drop. */
+	pastedText?: boolean;
 }
 
 /** Marker tag inserted in the prompt when an image is pasted. The composer
@@ -278,6 +282,129 @@ export function fileMarkerInsert(doc: string, afterPaste = false): string {
 }
 
 /**
+ * Positional tag for a pasted-text attachment: the stored char count
+ * rides the tag (same `[Pasted N chars]` label the old collapsed
+ * markers used — now real document text, paired Nth-to-Nth with the
+ * composer's pasted-text attachments). Pure and unit-tested.
+ */
+export function pastedTextMarker(chars: number): string {
+	return `[Pasted ${chars} chars]`;
+}
+
+/** Global matcher for pasted-text tags (char count captured). Never
+ * `.test()` the shared instance (global regexes hold lastIndex) —
+ * `matchAll`/fresh literals only. */
+export const PASTED_TAG_RE = /\[Pasted (\d+) chars\]/g;
+
+/** How many pasted-text tags a draft holds. Pure. */
+export function countPastedTags(text: string): number {
+	return text.match(PASTED_TAG_RE)?.length ?? 0;
+}
+
+/**
+ * Composer insertion for a newly pasted long text: same contract as
+ * the image/file tags (same line, one trailing space, caret after
+ * it). Pure and unit-tested.
+ */
+export function pastedMarkerInsert(doc: string, chars: number, afterPaste = false): string {
+	return `${markerPrefix(doc, afterPaste)}${pastedTextMarker(chars)} `;
+}
+
+/** Constructor for long-paste attachments (clipboard text only — the
+ * caller already holds the string, so this stays synchronous). Text
+ * caps like file drops so one paste can't blow the context window. */
+export function makePastedTextAttachment(text: string): Attachment {
+	const capped = text.length > MAX_FILE_CHARS ? text.slice(0, MAX_FILE_CHARS) : text;
+	return {
+		id: newId(),
+		name: "Pasted text",
+		mime: "text/plain",
+		kind: "text",
+		dataUrl: null,
+		text: capped,
+		width: null,
+		height: null,
+		tokens: estimateTextTokens(capped),
+		pastedText: true
+	};
+}
+
+/** True for long-paste text attachments (spliced inline at send, never
+ * fenced like file drops). Missing flag = file/image drop. */
+export function isPastedTextAttachment(att: Attachment): boolean {
+	return att.kind === "text" && att.pastedText === true;
+}
+
+/**
+ * Drop every pasted-text tag (reset path: pills are gone, so their
+ * tags go too). A host line left blank by the removal drops, while
+ * the user's own blank lines stay put. Pure and unit-tested.
+ */
+export function stripPastedMarkers(text: string): string {
+	// One exact surgery per tag (same helper the pill uses), so prose
+	// spacing elsewhere on the line is untouched.
+	let out = text;
+	let guard = countPastedTags(out);
+	while (guard > 0 && countPastedTags(out) > 0) {
+		out = removePastedAt(out, 0);
+		guard--;
+	}
+	return out;
+}
+
+/**
+ * Splice stored pasted text back at tag positions (pure,
+ * unit-tested): the Nth `[Pasted N chars]` tag in document order is
+ * replaced by the Nth entry of `texts` — the send-time mirror of
+ * render.ts kind-order pairing. Tags without a text stay literal
+ * (hand-typed, or resurrected by undo after the pill dropped);
+ * texts without a tag end-append blank-line separated, like files.
+ */
+export function splicePastedText(doc: string, texts: string[]): string {
+	let at = 0;
+	const out = doc.replace(PASTED_TAG_RE, (match) => {
+		if (at >= texts.length) return match;
+		const stored = texts[at] ?? "";
+		at++;
+		return stored;
+	});
+	const rest = texts.slice(at).filter((t) => t !== "");
+	if (rest.length === 0) return out;
+	const tail = rest.join("\n\n");
+	return out === "" ? tail : `${out}\n\n${tail}`;
+}
+
+/**
+ * Drop pasted-text attachments at these pasted-tag document-order
+ * indexes (tag deletions carry their positions now, not just counts).
+ * Out-of-range and negative indexes drop nothing. Pure.
+ */
+export function dropPastedAttachmentsAtIndexes(list: Attachment[], indexes: number[]): Attachment[] {
+	const drop = new Set(indexes.filter((i) => i >= 0));
+	let seen = -1;
+	return list.filter((att) => {
+		if (!isPastedTextAttachment(att)) return true;
+		seen++;
+		return !drop.has(seen);
+	});
+}
+
+/**
+ * Drop file (non-pasted) text attachments at these FILE_MARKER
+ * document-order indexes. Pasted-text attachments share kind "text"
+ * but pair with `[Pasted N chars]` tags, never file tags. Pure.
+ */
+export function dropFileAttachmentsAtIndexes(list: Attachment[], indexes: number[]): Attachment[] {
+	const drop = new Set(indexes.filter((i) => i >= 0));
+	let seen = -1;
+	return list.filter((att) => {
+		if (att.kind !== "text" || isPastedTextAttachment(att)) return true;
+		seen++;
+		return !drop.has(seen);
+	});
+}
+
+/**
  * Compact token count for pill chrome (`~1.1k`, `~2.3M`): full digits
  * wrap the pill footer onto a second line past four figures, so counts
  * stay short while exact figures live in the title attribute. Pure and
@@ -479,6 +606,39 @@ export function removeMarkerAt(
 	const next = [...lines.slice(0, at), ...lines.slice(at + 1)];
 	if (noTag.trim() !== "") next.splice(at, 0, noTag);
 	return next.join("\n");
+}
+
+/**
+ * Remove the index-th pasted-text tag in document order (a pill drops
+ * its own tag now, not the first): same line surgery as
+ * `removeMarkerAt` — the tag takes one following space with it when
+ * present, a host line left blank drops with its newline, prose typed
+ * beside the tag survives. Out-of-range indexes leave the text
+ * untouched. Pure and unit-tested.
+ */
+export function removePastedAt(text: string, index: number = 0): string {
+	if (index < 0) return text;
+	const matches = [...text.matchAll(PASTED_TAG_RE)];
+	const found = matches[index];
+	if (!found || found.index === undefined) return text;
+	const absStart = found.index;
+	const marker = found[0];
+	const lines = text.split("\n");
+	let offset = 0;
+	for (let i = 0; i < lines.length; i++) {
+		const raw = lines[i] ?? "";
+		if (absStart >= offset && absStart < offset + raw.length) {
+			const tagAt = absStart - offset;
+			const after = raw.slice(tagAt + marker.length);
+			const cutEnd = tagAt + marker.length + (after.startsWith(" ") ? 1 : 0);
+			const noTag = (raw.slice(0, tagAt) + raw.slice(cutEnd)).trimEnd();
+			const next = [...lines.slice(0, i), ...lines.slice(i + 1)];
+			if (noTag.trim() !== "") next.splice(i, 0, noTag);
+			return next.join("\n");
+		}
+		offset += raw.length + 1;
+	}
+	return text;
 }
 
 /**

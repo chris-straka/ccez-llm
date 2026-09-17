@@ -244,7 +244,7 @@ test("message refs card opens over its number", async ({ page }) => {
 	await page.keyboard.type("meaning?");
 	await page.keyboard.press("Enter");
 	await expect(page.locator(".prompt-tools .ann-pill")).toHaveText("1");
-	await page.locator(".cm-content").click();
+	await page.locator(".ta-input").click();
 	await page.keyboard.type("go");
 	await page.waitForTimeout(600);
 	await page.keyboard.press("Enter");
@@ -499,7 +499,7 @@ test("sending clears pending annotations immediately", async ({ page }) => {
 	await page.keyboard.type("meaning?");
 	await page.keyboard.press("Enter");
 	await expect(page.locator(".prompt-tools .ann-pill")).toHaveText("1");
-	await page.locator(".cm-content").click();
+	await page.locator(".ta-input").click();
 	await page.keyboard.type("go");
 	// The Enter that filed the annotation must not double as a send.
 	await page.waitForTimeout(600);
@@ -526,11 +526,11 @@ test("pencil edit saves without resending", async ({ page }) => {
 	await article.locator('.actions button[aria-label="Edit this message"]').click();
 	// Nothing is deleted; the text opens in an in-place editor where the
 	// message sat (the composer keeps its own empty draft).
-	const inline = page.locator(".msg-edit .cm-content");
-	await expect(inline).toContainText("helo world");
+	const inline = page.locator(".msg-edit .ta-input");
+	await expect(inline).toHaveValue(/helo world/);
 	await expect(page.locator("article.user")).toHaveCount(1);
 	await expect(page.locator("article.assistant")).toHaveCount(1);
-	await expect(page.locator(".prompt .cm-content")).not.toContainText("helo world");
+	await expect(page.locator(".prompt .ta-input")).not.toHaveValue(/helo world/);
 	// Fix the typo and save: the message rewrites in place, nothing
 	// resends — the old reply stands untouched.
 	await inline.click();
@@ -544,19 +544,17 @@ test("pencil edit saves without resending", async ({ page }) => {
 	await expect(page.locator(".sending")).toHaveCount(0);
 });
 
-/** The in-place edit keeps syntax colors: fenced code highlights. */
-test("in-place edit keeps code highlighting", async ({ page }) => {
+/** The in-place edit keeps the raw text: fenced code edits plain (the
+composer is a textarea now — highlighting lives in history only). */
+test("in-place edit keeps the raw fence text", async ({ page }) => {
 	await seedChat(page, [{ role: "user", content: "```python\nprint('hi')\n```" }]);
 	await page.reload();
 	const article = page.locator("article.user");
 	await expect(article).toBeVisible();
 	await article.hover();
 	await article.locator('.actions button[aria-label="Edit this message"]').click();
-	const inline = page.locator(".msg-edit .cm-content");
-	await expect(inline).toContainText("print");
-	// Highlighting is active: markdown decorates fence markers and code
-	// tokens with styled spans (plain text renders as bare text nodes).
-	await expect(inline.locator(".cm-line span").first()).toBeVisible();
+	const inline = page.locator(".msg-edit .ta-input");
+	await expect(inline).toHaveValue("```python\nprint('hi')\n```");
 	// Cancel keeps history untouched.
 	await page.keyboard.press("Escape");
 	await expect(page.locator(".msg-edit")).toHaveCount(0);
@@ -573,12 +571,12 @@ test("E key edits the hovered own message", async ({ page }) => {
 	await article.locator(".rendered").click();
 	await article.hover();
 	await page.keyboard.press("e");
-	await expect(page.locator(".msg-edit .cm-content")).toContainText("helo world");
+	await expect(page.locator(".msg-edit .ta-input")).toHaveValue("helo world");
 	// Esc cancels: history untouched, the inline editor unmounts, the
 	// composer stays empty.
 	await page.keyboard.press("Escape");
 	await expect(page.locator(".msg-edit")).toHaveCount(0);
-	await expect(page.locator(".prompt .cm-content")).not.toContainText("helo world");
+	await expect(page.locator(".prompt .ta-input")).not.toHaveValue(/helo world/);
 	await expect(page.locator("article.user .rendered")).toContainText("helo world");
 });
 
@@ -1376,7 +1374,7 @@ test("empty annotations bake a question mark for the model", async ({ page }) =>
 	await page.keyboard.press("Enter");
 	await expect(page.locator(".prompt-tools .ann-wrap")).toBeVisible();
 	// Send the empty prompt with the annotation attached (mock provider).
-	await page.locator(".cm-content").click();
+	await page.locator(".ta-input").click();
 	await page.keyboard.press("Enter");
 	const user = page.locator("article.user").first();
 	await expect(user).toBeVisible();
@@ -1422,7 +1420,7 @@ test("review pencil edits at the mark in the floating card", async ({ page }) =>
 	await page.keyboard.type("first");
 	await page.keyboard.press("Enter");
 	// A chat draft is already underway: the card edit must not clobber it.
-	await page.locator(".prompt .cm-content").click();
+	await page.locator(".prompt .ta-input").click();
 	await page.keyboard.type("chat draft");
 	// The pill toggles the review (hover never opens it); the pencil
 	// jumps to the mark and opens the floating edit card there.
@@ -1441,7 +1439,8 @@ test("review pencil edits at the mark in the floating card", async ({ page }) =>
 	await expect(page.locator(".review-comment").first()).toHaveText("first!");
 	// The composer draft survived untouched.
 	const draft = await page.evaluate(
-		() => document.querySelector(".prompt .cm-content")?.textContent ?? ""
+		() =>
+			(document.querySelector(".prompt .ta-input") as HTMLTextAreaElement | null)?.value ?? ""
 	);
 	expect(draft).toBe("chat draft");
 });
@@ -1610,7 +1609,7 @@ test("sent refs card dismisses on Escape and outside press", async ({ page }) =>
 	await page.locator('.sel-menu button:has-text("Annotate")').click();
 	await page.keyboard.press("Enter");
 	await expect(page.locator(".prompt-tools .ann-wrap")).toBeVisible();
-	await page.locator(".cm-content").click();
+	await page.locator(".ta-input").click();
 	await page.keyboard.press("Enter");
 	const user = page.locator("article.user").first();
 	await expect(user).toBeVisible();

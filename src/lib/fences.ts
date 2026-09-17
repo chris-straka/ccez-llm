@@ -1,13 +1,11 @@
 /**
  * Fenced code blocks in the prompt composer: pure document parser behind
- * the CodeMirror fence widgets in `editor.ts` (same split as the paste
- * spans — pure here, decorations there).
+ * the textarea Shift+Enter handling in `textarea-editor` (pure here,
+ * effects there).
  *
  * A fence opens on a ```lang line and closes on the next bare ``` line.
  * Only backtick fences count; body rows are never rewritten by the
- * parser, so the cursor and IME always sit on real text (the parked
- * block-widget bugs came from replacing body rows — only the two fence
- * bar lines ever become widgets).
+ * parser, so the cursor and IME always sit on real text.
  */
 
 export interface FenceBlock {
