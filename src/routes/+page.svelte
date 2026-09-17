@@ -2810,12 +2810,17 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 */
 	let expandedTags = $state<string[]>([]);
 
-	/** History tag fold toggle: replace the key list (never mutate). */
+	/** History tag fold toggle: replace the key list (never mutate).
+	One preview per message — opening a tag closes its siblings, so
+	popups never stack over each other. */
 	function toggleSentTag(msg: ChatMsg, attId: string): void {
 		const key = `${msg.id}:${attId}`;
-		expandedTags = expandedTags.includes(key)
-			? expandedTags.filter((k) => k !== key)
-			: [...expandedTags, key];
+		if (expandedTags.includes(key)) {
+			expandedTags = expandedTags.filter((k) => k !== key);
+			return;
+		}
+		const prefix = `${msg.id}:`;
+		expandedTags = [...expandedTags.filter((k) => !k.startsWith(prefix)), key];
 	}
 
 	function toggleFold(id: ChatMsgId): void {
@@ -12621,11 +12626,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	:global(.sent-card) {
 		display: block;
 		/* Uniform width: every preview card matches, whatever its
-		excerpt length (narrow viewports still clear the edges). */
+		excerpt length (narrow viewports still clear the edges).
+		Contents center, so a short preview never strands wash on
+		one side: the image rides the middle, the footer beneath it. */
 		width: 16rem;
 		max-width: calc(100vw - 2rem);
 		padding: 0.4rem 0.5rem;
 		font-size: 0.78rem;
+		text-align: center;
 		background: #eef4ff;
 		background: var(--hl);
 		border: 1px solid #c7c7cc;
@@ -12636,6 +12644,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	:global(.sent-foot) {
 		display: flex;
 		align-items: center;
+		justify-content: center;
 		gap: 0.25rem;
 		margin-top: 0.3rem;
 	}
@@ -12690,6 +12699,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		display: block;
 		max-width: 14rem;
 		max-height: 10rem;
+		margin: 0 auto;
 		border-radius: 6px;
 	}
 	:global(.sent-excerpt) {

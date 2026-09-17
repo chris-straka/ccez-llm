@@ -464,6 +464,33 @@ test("preview cards share one width whatever the excerpt", async ({ page }) => {
 	expect(widths[0]).toBe(widths[1]);
 });
 
+test("one preview per message, contents centered", async ({ page }) => {
+	// Opening a second tag closes the first (stacked popups jar), and
+	// the uniform card centers its contents: no stranded wash on one
+	// side, footer riding the middle beneath the preview.
+	await seedStripTurn(page, 2);
+	const article = page.locator("article.user").last();
+	const tags = article.locator(".sent-tags .paste-fold");
+	await expect(tags.first()).toBeVisible({ timeout: 60_000 });
+	await tags.nth(0).click();
+	await expect(article.locator(".sent-open")).toHaveCount(1);
+	await tags.nth(1).click();
+	const cards = article.locator(".sent-open");
+	await expect(cards).toHaveCount(1);
+	const centered = await article.locator(".sent-card").first().evaluate((el) => {
+		const foot = el.querySelector(".sent-foot") as HTMLElement | null;
+		return {
+			card: window.getComputedStyle(el).textAlign,
+			foot: foot ? window.getComputedStyle(foot).justifyContent : "missing"
+		};
+	});
+	expect(centered.card).toBe("center");
+	expect(centered.foot).toBe("center");
+	// Toggling the open tag still closes it.
+	await tags.nth(1).click();
+	await expect(cards).toHaveCount(0);
+});
+
 test("removing the pill keeps pasted folds collapsed", async ({ page }) => {
 	// Long paste folds, then the image pill goes: the fold must stay a
 	// marker (the old full-rewrite excision dropped the decorations and
