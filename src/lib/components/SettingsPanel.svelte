@@ -39,8 +39,8 @@
 		onToast,
 		onExpand
 	}: Props = $props();
-	const buildStamp = globalThis.__BUILD_STAMP__ ?? "release";
-	const appVersion = globalThis.__APP_VERSION__ ?? "";
+	const buildStamp = import.meta.env.VITE_BUILD_STAMP ?? "release";
+	const appVersion = import.meta.env.VITE_APP_VERSION ?? "";
 	const showStamp = !import.meta.env.DEV;
 	onMount(() => {
 		// Pull Keychain keys into memory (Tauri shell); no-op elsewhere.

@@ -35,10 +35,6 @@ declare global {
 
 	/** CSS Custom Highlights constructor (Chromium only). */
 	var Highlight: (new (...ranges: Range[]) => object) | undefined;
-
-	/** Compile-time stamps via vite `define` (absent under tests). */
-	var __BUILD_STAMP__: string | undefined;
-	var __APP_VERSION__: string | undefined;
 }
 
 export {};

@@ -64,9 +64,12 @@ same codebase via the Tauri mobile target.
 ## Pile: input + sidebar + shortcuts + extras (from PROMPT3) (needs hardware)
 
 - [ ] Android: voices button needs top/bottom spacing; system-voices auto
-      element missing at startup; "build release" should read "Version";
-      one-finger double-tap opens the sidebar when the chat is empty.
-      (Blocked Sep 2026, stream-platform: all four need a real Android
+      element missing at startup; one-finger double-tap opens the sidebar
+      when the chat is empty. ("build release" stamp fixed in tree Sep 2026:
+      the old vite `define` globals never reached the Svelte bundle, so every
+      release build printed the fallback; version/stamp now ride import.meta.env
+      defaulted from package.json — needs an on-device install past v0.4.6 to
+      confirm. Blocked Sep 2026, stream-platform: the rest need a real Android
       device to see/verify — untouched. Voice/chrome areas belong to
       sibling streams; coordinate before changing.)
 

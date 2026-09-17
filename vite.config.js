@@ -4,8 +4,19 @@ import { sveltekit } from "@sveltejs/kit/vite";
 // `types: []`, @types/node stays out of the frontend, where no
 // process object exists at runtime.
 import process from "node:process";
+import { readFileSync } from "node:fs";
 
 const host = process.env.TAURI_DEV_HOST;
+
+// Settings-footer stamps (see SettingsPanel): Vite statically replaces
+// import.meta.env.VITE_* at build time. Explicit CI env wins when set;
+// otherwise the version reads package.json directly so no runner env
+// is required, and the stamp is the build start.
+const pkgVersion =
+  readFileSync("package.json", "utf8").match(/"version":\s*"([^"]+)"/)?.[1] ?? "0.0.0";
+process.env.VITE_APP_VERSION ??= pkgVersion;
+process.env.VITE_BUILD_STAMP ??=
+  new Date().toISOString().slice(0, 16).replace("T", " ") + "Z";
 
 // https://vite.dev/config/
 // (A @ts-expect-error lived here while kit's own vite copy skewed
@@ -23,10 +34,9 @@ export default defineConfig(() => ({
   // Staleness marker (settings footer): installed builds show when
   // they were compiled, so "am I behind?" is one glance. Dev shows
   // "live" instead (HMR is always fresh; a server-start stamp would lie).
-  define: {
-    __BUILD_STAMP__: JSON.stringify(new Date().toISOString().slice(0, 16).replace("T", " ") + "Z"),
-    __APP_VERSION__: JSON.stringify(process.env.npm_package_version ?? "0.0.0")
-  },
+  // A previous `define`-globals revision never reached the Svelte
+  // bundle — release builds printed the "build release" fallback on
+  // every platform — so the stamps ride import.meta.env (above) now.
   optimizeDeps: {
     // lindera-wasm resolves its .wasm sibling via `new URL(..., import.meta.url)`;
     // pre-bundling would relocate the glue and break that link (per its docs).
