@@ -13143,6 +13143,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 	.msg-edit-box :global(.ta-input) {
 		background: none;
+		line-height: 1.5;
 		max-height: 16rem;
 		width: 100%;
 		box-sizing: border-box;
@@ -15519,6 +15520,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		font-family:
 			-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
 		font-size: 0.95rem;
+		/* Pinned (not normal): the placeholder resolves its own
+		metrics in some engines and rides above the caret otherwise —
+		both share this exact box. */
+		line-height: 1.5;
 		padding: 0.6rem calc(var(--tools-pad) + var(--tools-extra)) 0.6rem 0;
 		caret-color: #1c1c1e;
 		/* Mechanical twin of the cm rules: same pairs, Android-only node. */
@@ -15539,6 +15544,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.prompt :global(.ta-input::placeholder) {
 		color: #8e8e93;
 		color: var(--line-hover);
+		/* Same box as the text (see the textarea rule): never the
+		engine's own placeholder metrics. */
+		line-height: 1.5;
 	}
 	.prompt.has-mic :global(.ta-input) {
 		--tools-pad: 8.6rem;

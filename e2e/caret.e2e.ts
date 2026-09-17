@@ -40,3 +40,20 @@ test("emptied composer keeps a live caret while focused, parks it on blur", asyn
 	);
 	expect(parkedColor).toBe("rgba(0, 0, 0, 0)");
 });
+
+/** Placeholder rides the text's line box: some engines resolve
+`::placeholder` metrics on their own and float the hint above the
+caret otherwise — both must compute the identical height. */
+test("placeholder shares the text line-height", async ({ page }) => {
+	await page.goto("/");
+	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	const heights = await page.evaluate(() => {
+		const box = document.querySelector(".ta-input") as HTMLElement;
+		return {
+			text: getComputedStyle(box).lineHeight,
+			hint: getComputedStyle(box, "::placeholder").lineHeight
+		};
+	});
+	expect(heights.text).not.toBe("normal");
+	expect(heights.hint).toBe(heights.text);
+});
