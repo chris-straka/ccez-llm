@@ -643,42 +643,26 @@ test("scrollbar fades out promptly after scrolling stops", async ({ page }) => {
 	expect(fade).toBeLessThanOrEqual(0.35);
 });
 
-/** Transparency slider translucents the page: the html
-background resolves the alpha instead of staying fully opaque. */
-test("transparency slider translucents the page", async ({ page }) => {
+/** Surfaces stay solid: both transparency sliders were removed by
+decision (the settings carry no transparency control anymore), so
+the page background stays opaque. */
+test("page background stays opaque", async ({ page }) => {
 	await seedChat(page, [{ role: "assistant", content: "hello" }]);
 	await page.goto("/");
 	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
 	// The background lives on .app (html itself stays unpainted).
-	const alphaOf = (): Promise<number> =>
-		page.evaluate(() => {
-			const bg = getComputedStyle(document.querySelector(".app") as Element).backgroundColor;
-			const nums = bg.match(/[\d.]+/g)?.map(Number) ?? [];
-			// rgb() carries no alpha (opaque); rgba()/color(srgb / a) do.
-			return nums.length === 4 ? (nums[3] ?? 1) : 1;
-		});
-	expect(await alphaOf()).toBe(1);
-	await page.keyboard.press("Meta+,");
-	const slider = page.locator(
-		'.settings-panel input[aria-label="Background transparency percent"]'
+	const bg = await page.evaluate(
+		() => getComputedStyle(document.querySelector(".app") as Element).backgroundColor
 	);
-	await expect(slider).toBeVisible({ timeout: 5_000 });
-	// Drive the slider like a real drag (fill() doesn't fire input on
-	// range inputs everywhere): set the value and dispatch input.
-	// Transparency runs 0 (opaque) to 80, so 80 resolves alpha 0.2.
-	await slider.evaluate((el) => {
-		const input = el as HTMLInputElement;
-		input.value = "80";
-		input.dispatchEvent(new Event("input", { bubbles: true }));
-	});
-	expect(await alphaOf()).toBeLessThan(0.5);
+	const nums = bg.match(/[\d.]+/g)?.map(Number) ?? [];
+	// rgb() carries no alpha (opaque); rgba()/color(srgb / a) do.
+	expect(nums.length === 4 ? (nums[3] ?? 1) : 1).toBe(1);
 });
 
-/** "Scale message buttons with text size" multiplies button size by
-the Text size setting, live: at enlarged text the toggle visibly
-grows the buttons (at default size there is nothing to multiply,
-so it correctly changes nothing). */
-test("scale buttons with text size applies immediately", async ({ page }) => {
+/** Message buttons track text size outright (85% of message size);
+"Scale message icons with text size" grows only the icon glyphs,
+live: toggling the checkbox applies on the spot — no reload, no save. */
+test("scale icons with text size applies immediately", async ({ page }) => {
 	await seedChat(page, [{ role: "assistant", content: "hello" }]);
 	await page.addInitScript(() => {
 		window.localStorage.setItem(
@@ -689,21 +673,27 @@ test("scale buttons with text size applies immediately", async ({ page }) => {
 	await page.goto("/");
 	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
 	const button = page.locator("article.assistant .actions button").first();
+	const glyph = page.locator("article.assistant .actions .icon-btn .action-glyph").first();
 	const px = (): Promise<number> =>
 		button.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
-	// Untoggled: the fixed button size, even at enlarged text.
-	expect(await px()).toBeLessThan(13);
-	// Toggling the checkbox applies on the spot — no reload, no save.
+	const glyphPx = (): Promise<number> =>
+		glyph.evaluate((el) => parseFloat(getComputedStyle(el).height));
+	// Buttons track the text (0.92rem × 1.5 × 0.85 ≈ 18.8px) with no opt-in.
+	expect(await px()).toBeGreaterThan(16);
+	// Icons hold their fixed height until the opt-in.
+	expect(await glyphPx()).toBeLessThan(18);
 	await page.keyboard.press("Meta+,");
 	const check = page.locator(
-		'.settings-panel label:has-text("Scale message buttons with text size") input'
+		'.settings-panel label:has-text("Scale message icons with text size") input'
 	);
 	await expect(check).toBeVisible({ timeout: 5_000 });
 	await check.check();
 	await expect(page.locator("main")).toHaveClass(/scale-actions/);
-	expect(await px()).toBeGreaterThan(16);
+	// 1.05rem × (1 + 0.5 × 0.8) ≈ 23.5px at 150%: visibly grown.
+	expect(await glyphPx()).toBeGreaterThan(22);
 	await check.uncheck();
-	expect(await px()).toBeLessThan(13);
+	await expect(page.locator("main")).not.toHaveClass(/scale-actions/);
+	expect(await glyphPx()).toBeLessThan(18);
 });
 
 /** The top bar is an invisible gesture strip: fully transparent so
@@ -902,10 +892,10 @@ test("message buttons scale with text size when enabled", async ({ page }) => {
 	]);
 	await openSettings(page);
 	await page.locator('.settings-panel input[aria-label="Text size percent"]').fill("200");
-	const button = page.locator("article.assistant .actions button").first();
-	const fixed = await button.evaluate((el) => getComputedStyle(el).fontSize);
-	await page.locator(".settings-panel").getByText("Scale message buttons with text size").click();
-	const scaled = await button.evaluate((el) => getComputedStyle(el).fontSize);
+	const glyph = page.locator("article.assistant .actions .icon-btn .action-glyph").first();
+	const fixed = await glyph.evaluate((el) => getComputedStyle(el).height);
+	await page.locator(".settings-panel").getByText("Scale message icons with text size").click();
+	const scaled = await glyph.evaluate((el) => getComputedStyle(el).height);
 	expect(parseFloat(scaled)).toBeGreaterThan(parseFloat(fixed));
 });
 

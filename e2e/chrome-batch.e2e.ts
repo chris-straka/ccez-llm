@@ -96,8 +96,9 @@ test("slider label text never resets any row", async ({ page }) => {
 	await expect(idle).toHaveValue("10");
 	await clickLabelText(page, "Idle seconds before the prompt hides (bottom is always, top is never)");
 	await expect(idle).toHaveValue("10");
-	await page.locator(".settings-panel button", { hasText: "(6s)" }).click();
-	await expect(idle).toHaveValue("6");
+	// The idle default is always-on (bottom of the slider), not 6s.
+	await page.locator(".settings-panel button", { hasText: "(always)" }).click();
+	await expect(idle).toHaveValue("1");
 });
 
 /** Idle prompt restores on i, Enter, and Space — and on nothing else key- or pointer-wise. */

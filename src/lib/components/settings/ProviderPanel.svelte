@@ -9,6 +9,11 @@
 	} from "$lib/providers/registry";
 	import { maskKey, activeProviderSettings, type AppSettings } from "$lib/settings";
 	import { tauriBackendAvailable } from "$lib/secrets";
+	import {
+		isOnDeviceProvider,
+		onDeviceErrorCopy,
+		onDeviceStatus
+	} from "$lib/ondevice/bridge";
 	import { clearNotice, emptyNotices, flashNotice, MODEL_TIMEOUT_MS } from "$lib/notices";
 	import { onMount } from "svelte";
 	import "./panels.css";
@@ -60,6 +65,35 @@
 	function switchProvider(id: ProviderId) {
 		settings.activeProviderId = id;
 		maybeFetchModels();
+		void probeOnDevice();
+	}
+	/**
+	 * On-device readiness under the Gemma pill: ready, downloading,
+	 * or the short reason copy (wrong device, no model yet). Probed
+	 * when the panel opens on Gemma and on every switch to it — never
+	 * polled, so a mid-download count never flickers the settings.
+	 */
+	let onDeviceNote = $state("");
+	let onDeviceProbing = $state(false);
+	async function probeOnDevice(): Promise<void> {
+		if (!isOnDeviceProvider(settings.activeProviderId)) {
+			onDeviceNote = "";
+			return;
+		}
+		onDeviceProbing = true;
+		try {
+			const status = await onDeviceStatus();
+			onDeviceNote =
+				status.state === "ready"
+					? "On-device model ready — replies never leave this phone."
+					: status.state === "downloading"
+						? "Downloading the on-device model — it works offline after this once."
+						: onDeviceErrorCopy(status.reason ?? "unsupported");
+		} catch {
+			onDeviceNote = onDeviceErrorCopy("unsupported");
+		} finally {
+			onDeviceProbing = false;
+		}
 	}
 	let customName = $state("");
 	let customBaseUrl = $state("");
@@ -113,6 +147,7 @@
 	}
 	onMount(() => {
 		maybeFetchModels();
+		void probeOnDevice();
 	});
 </script>
 
@@ -216,6 +251,11 @@
 	</label>
 	{#if activeDef.keyless}
 		<p class="key-state" role="status">No key needed — {activeDef.keyHint}.</p>
+		{#if isOnDeviceProvider(settings.activeProviderId)}
+			<p class="note" role="status">
+				{onDeviceProbing ? "Checking on-device model…" : onDeviceNote}
+			</p>
+		{/if}
 	{:else if showKeyField}
 		<label>
 			API key <span class="hint">{activeDef.keyHint}</span>

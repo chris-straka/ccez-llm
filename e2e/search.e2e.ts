@@ -287,7 +287,9 @@ test.describe("find in chat", () => {
 	test("Shift+F never summons find, it types", async ({ page }) => {
 		await page.addInitScript(() => {
 			window.localStorage.setItem("ccez-mock-provider", "1");
-			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
+			// Never idle-hide: the always-on default parks the composer
+			// on load and the click below needs it mounted.
+			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({ promptIdleSec: 0 }));
 			window.localStorage.setItem(
 				"ccez-llm-chats-v1",
 				JSON.stringify([

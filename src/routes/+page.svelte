@@ -69,6 +69,8 @@
 	} from "$lib/providers/registry";
 	import { offlineTarget, onlineRestore } from "$lib/offline";
 	import { MockProvider, mockProviderEnabled } from "$lib/providers/mock";
+	import { isOnDeviceProvider } from "$lib/ondevice/bridge";
+	import { OnDeviceChatProvider } from "$lib/ondevice/provider";
 	import { getCurrentWindow } from "@tauri-apps/api/window";
 	import { invoke } from "@tauri-apps/api/core";
 	import { listen } from "@tauri-apps/api/event";
@@ -4973,6 +4975,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 
 	function resolveProvider(): ChatProvider | null {
 		if (useMock) return new MockProvider();
+		// On-device Gemini Nano: keyless, conf-free, Gemma pill only —
+		// failures throw the seam's short copy, never a reroute.
+		if (isOnDeviceProvider(settings.activeProviderId)) return new OnDeviceChatProvider();
 		const conf = settings.providers[settings.activeProviderId];
 		// Keyless on-device endpoints carry no key by design.
 		const keyless =
@@ -13878,6 +13883,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		background: none;
 		cursor: pointer;
 		color: #3a3a3c;
+		color: var(--ink);
 	}
 	.attachments .thumb {
 		border: 0;

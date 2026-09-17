@@ -61,12 +61,15 @@ same codebase via the Tauri mobile target.
       AICore supported list — ML Kit it is. Foundation SHIPS
       (`src/lib/ondevice/` seam + `ondevice.rs`/`OnDevice.kt` bridge +
       Gradle dep, 23 seam tests + clamp test green; keyless, Gemma-pill
-      only, no settings changes). NOT WIRED: the send path still parks
-      on the loopback error until a device run proves readiness —
-      needs the S24 install + kotlin-gradle-plugin 2.x bump flagged in
-      the Gradle comment. `visibleProviderIds` lists `local-gemma` only
-      on offline Android and hides it elsewhere; `platform.test.ts` pins
-      all six gating cases.)
+      only, settings picker shows live readiness). WIRED (owner-approved
+      Sep 2026): `local-gemma` resolves to `OnDeviceChatProvider`
+      (one-shot stream, flattened prompt, short-copy errors toast via
+      the normal error slot). Needs the S24 install +
+      kotlin-gradle-plugin 2.x bump flagged in the Gradle comment, then
+      a device run: unsupported/wrong-device paths are covered by unit
+      tests + honest unverified notes only. `visibleProviderIds` lists
+      `local-gemma` only on offline Android and hides it elsewhere;
+      `platform.test.ts` pins all six gating cases.)
 
 ## Pile: input + sidebar + shortcuts + extras (from PROMPT3) (needs hardware)
 

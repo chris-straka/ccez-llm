@@ -230,7 +230,7 @@ test("latex chrome holds still on hover", async ({ page }) => {
 	}
 });
 
-/** The latex `$` + copy pair follows the "Scale message buttons with
+/** The latex `$` + copy pair follows the "Scale message icons with
 text size" opt-in: at 2x text the chrome doubles instead of reading
 tiny next to scaled message buttons. A fresh context carries the
 scaled seed (init scripts re-run on reload, so a reload would wipe
