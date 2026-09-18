@@ -321,7 +321,8 @@ import {
 		keyboardOverlapPx,
 		nativeResizeActive,
 		nextPinArm,
-		pinArmStart
+		pinArmStart,
+		settlePin
 	} from "$lib/viewportReflow";
 import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	import {
@@ -9259,6 +9260,28 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			if (viewportTimer !== undefined) window.clearTimeout(viewportTimer);
 			viewportTimer = window.setTimeout(() => {
 				viewportTimer = undefined;
+				// Settle with fresh geometry: a close sequence can end on
+				// a lagging open frame, leaving the pin armed at a stale
+				// height — the next focus then unpins mid-open and the
+				// composer visibly moves twice. Closed geometry releases
+				// the pin and refreshes the baseline; open geometry keeps
+				// everything, including the no-shrink fallback pin.
+				if (androidUI && appEl && window.visualViewport) {
+					const vv = window.visualViewport;
+					const settled = settlePin(
+						kbPin,
+						fullInnerHeight,
+						window.innerHeight,
+						isKeyboardOpen(window.innerHeight, vv.height, vv.offsetTop)
+					);
+					const wasArmed = kbPin.armed;
+					kbPin = settled.pin;
+					fullInnerHeight = settled.fullHeight;
+					if (wasArmed && !kbPin.armed) {
+						appEl.style.height = "";
+						appEl.style.setProperty("--kb-height", "0px");
+					}
+				}
 				editor?.remeasure();
 			}, 250);
 		};
@@ -15195,11 +15218,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		:global(.action-glyph) {
 		height: calc(1.05rem * min(var(--font-scale, 1), 2));
 	}
-	/* No bubble, no bubble padding: text keeps its horizontal place
-	(only the background disappears), and the tighter vertical rhythm
-	drops the text closer to its buttons. */
+	/* No bubble, no bubble padding: the text's right edge lands on the
+	row's right edge, so the last button never hangs past short text.
+	(The 1rem side pad only makes sense with a visible bubble behind
+	it; without one it strands the text a full pad left of its own
+	buttons.) */
 	.app[data-android] main.plain-user article.user .bubble {
-		padding: 0.25rem 1rem 0;
+		padding: 0.25rem 0 0;
 	}
 	/* My-message background OFF on phones: the edit box carries no
 	background either (it mirrors the plain text, not the bubble).

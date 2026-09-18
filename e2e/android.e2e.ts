@@ -1864,6 +1864,38 @@ test.describe("message chrome", () => {
 		await expect(row.locator('button[aria-label="Fold this message"]')).toHaveCount(0);
 	});
 
+	/** Short own messages dock hard right: the last row button (Rerun)
+	shares the text's right edge instead of hanging past it. */
+	test("short own message shares its right edge with the row", async ({ page }) => {
+		await page.addInitScript(() => {
+			window.localStorage.setItem("ccez-mock-provider", "1");
+			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
+			window.localStorage.setItem(
+				"ccez-llm-chats-v1",
+				JSON.stringify([
+					{
+						id: "e2e-chat",
+						createdAt: 1,
+						replyLang: null,
+						messages: [{ id: "m1", role: "user", content: "Test", usage: null, error: null }]
+					}
+				])
+			);
+		});
+		await page.goto("/");
+		await expect(page.locator("article.user .bubble").first()).toBeVisible({ timeout: 60_000 });
+		const edges = await page.evaluate(() => {
+			const text = document.querySelector("article.user .bubble .rendered");
+			const rerun = document.querySelector('article.user .actions button[data-tip="Rerun"]');
+			if (!text || !rerun) throw new Error("missing text or rerun");
+			return {
+				textRight: text.getBoundingClientRect().right,
+				rerunRight: rerun.getBoundingClientRect().right
+			};
+		});
+		expect(Math.abs(edges.textRight - edges.rerunRight)).toBeLessThanOrEqual(2);
+	});
+
 	/** Huge phone type goes full-bleed; normal type keeps the floor. */
 	test("phone chat width blooms at 330 percent", async ({ page }) => {
 		await seedChrome(page, { fontScale: 3.3 });

@@ -4,7 +4,8 @@ import {
 	keyboardOverlapPx,
 	nativeResizeActive,
 	nextPinArm,
-	pinArmStart
+	pinArmStart,
+	settlePin
 } from "./viewportReflow";
 
 describe("keyboardOverlapPx", () => {
@@ -66,5 +67,35 @@ describe("nativeResizeActive", () => {
 
 	it("never fires when the layout grew", () => {
 		expect(nativeResizeActive(800, 900)).toBe(false);
+	});
+});
+
+describe("settlePin", () => {
+	it("releases a stale armed pin once geometry reads closed", () => {
+		const armed = nextPinArm(nextPinArm(pinArmStart(), true), true);
+		expect(armed.armed).toBe(true);
+		const settled = settlePin(armed, 800, 800, false);
+		expect(settled.pin).toEqual({ armed: false, sawOpen: false });
+		expect(settled.fullHeight).toBe(800);
+	});
+
+	it("refreshes a stale baseline on closed geometry (rotation)", () => {
+		const settled = settlePin(pinArmStart(), 800, 900, false);
+		expect(settled.fullHeight).toBe(900);
+		expect(settled.pin.armed).toBe(false);
+	});
+
+	it("keeps the pin and baseline while open", () => {
+		const armed = nextPinArm(nextPinArm(pinArmStart(), true), true);
+		const settled = settlePin(armed, 800, 500, true);
+		expect(settled.pin).toBe(armed);
+		expect(settled.fullHeight).toBe(800);
+	});
+
+	it("keeps the adjustPan fallback pin while open without shrinkage", () => {
+		const armed = nextPinArm(nextPinArm(pinArmStart(), true), true);
+		const settled = settlePin(armed, 800, 800, true);
+		expect(settled.pin).toBe(armed);
+		expect(settled.fullHeight).toBe(800);
 	});
 });

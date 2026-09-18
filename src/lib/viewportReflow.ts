@@ -63,3 +63,27 @@ export function nextPinArm(state: PinArmState, open: boolean): PinArmState {
 export function nativeResizeActive(fullHeight: number, innerHeight: number, minShrink = 100): boolean {
 	return fullHeight - innerHeight >= minShrink;
 }
+
+export interface PinSettle {
+	pin: PinArmState;
+	fullHeight: number;
+}
+
+/**
+ * Settle step, run with fresh geometry once viewport events stop. A
+ * close sequence can end on a lagging open frame (the visual viewport
+ * trails the layout), leaving the pin armed at a stale height — the
+ * next focus then unpins mid-open and the composer visibly moves
+ * twice. Re-reading here heals it: closed geometry releases the pin
+ * and refreshes the baseline (rotation-safe); open geometry keeps
+ * everything, including the adjustPan fallback pin.
+ */
+export function settlePin(
+	pin: PinArmState,
+	fullHeight: number,
+	innerHeight: number,
+	open: boolean
+): PinSettle {
+	if (open) return { pin, fullHeight };
+	return { pin: pinArmStart(), fullHeight: innerHeight };
+}
