@@ -37,3 +37,33 @@ describe("sending chip elapsed count", () => {
 		expect(touch![1]).toContain("display: inline");
 	});
 });
+
+describe("sending chip restyle", () => {
+	/** Plain status text, no backplate: the pill is gone on purpose
+	(instant-reading chrome the owner rejected), and the color lives
+	on the dots instead — a three-hue sequence in both themes. */
+	it("carries no backplate", () => {
+		const css = pageStyle();
+		const chip = css.match(/\.sending-chip\s*\{([^}]*)\}/);
+		expect(chip, "no .sending-chip rule — the chip lost its layout").toBeTruthy();
+		expect(chip![1], ".sending-chip regained a background — the pill must stay gone").not.toMatch(
+			/background/,
+		);
+	});
+	it("names dot colors as tokens (dot 1 is the accent)", () => {
+		// Palette rule (see docs/colors.md): components name tokens,
+		// never bare accent hexes — dot 1 rides var(--accent), dots 2-3
+		// the per-theme thinking tokens with hex fallback lines.
+		const css = pageStyle();
+		const rule = (n: number) => {
+			const match = css.match(
+				new RegExp(`\\.sending \\.tdots span:nth-child\\(${n}\\)\\s*\\{([^}]*)\\}`),
+			);
+			expect(match, `dot ${n} has no color rule`).toBeTruthy();
+			return match![1]!;
+		};
+		expect(rule(1)).toMatch(/color\s*:\s*var\(--accent\)/);
+		expect(rule(2)).toMatch(/color\s*:\s*var\(--thinking-2\)/);
+		expect(rule(3)).toMatch(/color\s*:\s*var\(--thinking-3\)/);
+	});
+});

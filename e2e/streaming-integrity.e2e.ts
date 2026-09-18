@@ -202,12 +202,14 @@ test("thinking chip localizes, counts up, and tints", async ({ page }) => {
 	await expect(elapsed).toBeHidden();
 	await sending.locator(".sending-chip").hover();
 	await expect(elapsed).toBeVisible();
-	const tinted = await page.evaluate(() => {
-		const chip = document.querySelector(".sending-chip");
-		if (!(chip instanceof HTMLElement)) return false;
-		return getComputedStyle(chip).backgroundColor !== "rgba(0, 0, 0, 0)";
+	// No backplate: the chip is plain status text and the color lives
+	// on the dots — three distinct hues in a blue-teal-green run.
+	const dotColors = await page.evaluate(() => {
+		const dots = [...document.querySelectorAll(".sending .tdots span")];
+		return dots.map((d) => (d instanceof HTMLElement ? getComputedStyle(d).color : ""));
 	});
-	expect(tinted).toBe(true);
+	expect(dotColors).toHaveLength(3);
+	expect(new Set(dotColors).size).toBe(3);
 	await expect(page.locator("article.assistant .rendered")).toContainText("Mock reply to: tell me about foxes", {
 		timeout: 30_000
 	});

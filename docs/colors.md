@@ -69,6 +69,8 @@ platforms can't share one vendor's identity. So the palette is
 | `--hl`         | `#eef4ff`   | `#12233d`   | Attachment pills, jump highlight wash |
 | `--hover-wash` | `#ececf1`   | `#2c2c2e`   | Row hovers |
 | `--focus`      | `#3a3a3c`   | `#aeaeb2`   | Focus rings, selected-row marker |
+| `--thinking-2` | `#5ac8fa`   | `#64d2ff`   | Thinking dots middle step (sky; dot 1 rides `--accent`) |
+| `--thinking-3` | `#34c759`   | `#30d158`   | Thinking dots last step (green) |
 
 ## Exceptions (raw hex allowed, documented here)
 
@@ -98,6 +100,11 @@ platforms can't share one vendor's identity. So the palette is
 
 ## Log
 
+- **2026-09-18 — Thinking dots go tricolor, pill removed.** The
+  sending chip's blue backplate is gone (plain status text); the
+  three dots run accent blue → `--thinking-2` sky → `--thinking-3`
+  green, per theme, so the dark override blocks delete. Dot 1 names
+  `var(--accent)` directly — no second blue.
 - **2026-09-16 — Blockquotes read as body text.** Quoted passages
   (translations, citations) were muted like metadata; the bar alone
   now carries the quote signal, text rides `--ink` both themes. Bar

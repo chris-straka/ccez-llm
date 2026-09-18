@@ -60,6 +60,8 @@ html[data-theme="light"] {
 	--hl: #eef4ff;
 	--hover-wash: #ececf1;
 	--dim: #6e6e73;
+	--thinking-2: #5ac8fa;
+	--thinking-3: #34c759;
 	--alarm: #ff3b30;
 	--error-bg: #fdecea;
 	--error-ink: #94250a;
@@ -91,6 +93,8 @@ html[data-theme="dark"] {
 	--hl: #12233d;
 	--hover-wash: #2c2c2e;
 	--dim: #aeaeb2;
+	--thinking-2: #64d2ff;
+	--thinking-3: #30d158;
 	--alarm: #ff6b62;
 	--error-bg: #3d1008;
 	--error-ink: #ffb4a2;
@@ -166,6 +170,23 @@ body {
 	background-color: #fff3b0;
 	color: inherit;
 }
+/* Graded dimmers for the wash fade ramp (see washRampSchedule in
+annHighlights.ts): same hue stepping down — the eye reads the steps
+as a fade. Keep both forms declaring the same colors. */
+::highlight(ccez-ann-dim) {
+	background-color: rgba(255, 243, 176, 0.55);
+	color: inherit;
+}
+::highlight(ccez-ann-faint) {
+	background-color: rgba(255, 243, 176, 0.22);
+	color: inherit;
+}
 html[data-theme="dark"] ::highlight(ccez-ann) {
 	background-color: rgba(245, 158, 11, 0.3);
+}
+html[data-theme="dark"] ::highlight(ccez-ann-dim) {
+	background-color: rgba(245, 158, 11, 0.18);
+}
+html[data-theme="dark"] ::highlight(ccez-ann-faint) {
+	background-color: rgba(245, 158, 11, 0.08);
 }

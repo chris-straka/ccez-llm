@@ -15215,25 +15215,25 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		stands off the last message above and the composer below. */
 		margin: 0.9rem 0 1.1rem;
 	}
-	/* The wait reads as one moment: a solid accent-tinted backplate
-	hugs the label, dots, and count (flex gap is the only spacing —
-	no literal spaces in the markup). No gradients, no glow. */
+	/* The wait reads as plain status text — no backplate. The three
+	dots carry the color instead: accent blue, then the thinking
+	sky/green tokens (per-theme, so no dark override block). Scoped
+	here: bare .tdots stays ink-colored on aid buttons. */
 	.sending-chip {
 		display: inline-flex;
 		align-items: baseline;
 		gap: 0.35em;
-		background: rgba(0, 122, 255, 0.1);
-		border-radius: 999px;
-		padding: 0.3em 0.8em;
 	}
-	:global(html[data-theme="dark"]) .sending-chip {
-		background: rgba(10, 132, 255, 0.18);
-	}
-	/* The dots carry the accent so the pulse reads in color even
-	before the first token lands. Scoped here: bare .tdots stays
-	ink-colored on aid buttons. */
-	.sending .tdots span {
+	.sending .tdots span:nth-child(1) {
 		color: var(--accent);
+	}
+	.sending .tdots span:nth-child(2) {
+		color: #5ac8fa;
+		color: var(--thinking-2);
+	}
+	.sending .tdots span:nth-child(3) {
+		color: #34c759;
+		color: var(--thinking-3);
 	}
 	.sending-elapsed {
 		font-variant-numeric: tabular-nums;
