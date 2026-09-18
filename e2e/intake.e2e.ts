@@ -926,7 +926,7 @@ test("deleting the first of two tags drops its own preview", async ({ page }) =>
 	await dropImage(page, "first.png");
 	await page.locator(".prompt .ta-input").click();
 	// Tags are plain text (no atomic unit): park the caret past the
-	// tag first, or the newline splits it mid-token.
+	// tag first, or the edit splits it mid-token.
 	await page.keyboard.press("End");
 	await page.keyboard.press("Shift+Enter");
 	await dropImage(page, "second.png");

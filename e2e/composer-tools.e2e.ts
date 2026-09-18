@@ -236,9 +236,11 @@ test("send clears pills and files an inline tag in the message", async ({ page }
 	await dropImage(page);
 	const card = page.locator(".attachments li.card");
 	await expect(card).toBeVisible({ timeout: 15_000 });
-	// Down to the tag's fresh line below (the click can land mid-tag,
-	// and typing on the tag line would absorb it and drop the pill),
-	// then send through the mock provider.
+	// Off the tag itself (the click can land mid-tag, and typing
+	// inside it would damage it and drop the pill) — ArrowDown is a
+	// no-op in the one-line box, so typing lands beside the tag,
+	// which the marker contract keeps safe — then send through the
+	// mock provider.
 	await page.locator(".ta-input").first().click();
 	await page.keyboard.press("ArrowDown");
 	await page.keyboard.type("hello");
