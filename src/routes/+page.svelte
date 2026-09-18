@@ -9405,18 +9405,24 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						}}
 					>
 						{chatLabel(item.createdAt)}{#if androidUI} <span class="side-count"
-							>· {item.messages.length > 99 ? "99+" : item.messages.length}</span
+							>· {sideTip(item) || `${item.messages.length}`}</span
 						>{/if}
 					</button>
-					<button
-						type="button"
-						class="exp"
-						title="Export chat as Markdown"
-						aria-label="Export chat as Markdown"
-						onclick={() => void exportOneChat(item)}
-					>
-						<ActionIcon kind="export" />
-					</button>
+					<!-- No export path works in the shell phone (no picker,
+					no native dialog bridge, clipboard denied): the button
+					hides there instead of toasting failure. Mobile browsers
+					keep the download, desktop keeps everything. -->
+					{#if !(androidUI && tauriBackendAvailable())}
+						<button
+							type="button"
+							class="exp"
+							title="Export chat as Markdown"
+							aria-label="Export chat as Markdown"
+							onclick={() => void exportOneChat(item)}
+						>
+							<ActionIcon kind="export" />
+						</button>
+					{/if}
 					<button
 						type="button"
 						class="del"
@@ -12525,9 +12531,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		font-size: 1.15rem;
 		margin-top: 0.6rem;
 	}
-	/* The per-chat message counter rides dim beside the label, so the
-	date column keeps its alignment. Phone-only markup; desktop rows
-	never render it. */
+	/* The per-chat breakdown rides dim beside the label, so the
+	date column keeps its alignment (the hover tooltip's text, inline
+	where touch has no hover). Phone-only markup; desktop rows never
+	render it. */
 	.side-count {
 		color: #6e6e73;
 		color: var(--dim);

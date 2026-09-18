@@ -369,6 +369,19 @@ test.describe("touch", () => {
 		);
 	}
 
+	/** Touch has no hover, so each chat row prints the tooltip's
+	breakdown inline after the timestamp. */
+	test("chat rows print the message breakdown on a phone", async ({ page }) => {
+		await seedChat(page, [
+			{ role: "user", content: "hi" },
+			{ role: "assistant", content: "hello back" }
+		]);
+		await page.goto("/");
+		const row = page.locator("aside ul li .side-chat").first();
+		await expect(row).toBeVisible({ timeout: 15_000 });
+		await expect(row).toContainText("2 messages · you 1 · AI 1");
+	});
+
 	test("region menus share one row on a phone", async ({ page }) => {
 		await seedEmpty(page);
 		const wrap = await page.locator(".lang-menus").evaluate((el) => getComputedStyle(el).flexWrap);
