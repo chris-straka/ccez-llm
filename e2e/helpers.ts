@@ -63,6 +63,65 @@ export async function rowBoxes(page: Page, article: string): Promise<Array<{ x: 
 	return boxes;
 }
 
+/** Rect of a quote's visible text inside one article's rendered body
+(badge chrome excluded so node offsets map onto visible text). */
+export async function quoteRect(
+	page: Page,
+	article: number,
+	quote: string
+): Promise<{ x: number; y: number; width: number; height: number }> {
+	return page.evaluate(
+		([n, text]: [number, string]) => {
+			const root = document.querySelectorAll("article .rendered")[n];
+			if (!root) throw new Error("no article");
+			const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+			const texts: Text[] = [];
+			while (walker.nextNode()) {
+				const node = walker.currentNode;
+				const parent = node.parentNode;
+				if (parent instanceof Element && parent.closest("[data-ann-badge]")) continue;
+				if (node instanceof Text) texts.push(node);
+			}
+			const hay = texts.map((t) => t.textContent ?? "").join("");
+			const at = hay.indexOf(text);
+			if (at < 0) throw new Error(`quote missing: ${text}`);
+			const nodeAt = (flat: number): [Text, number] => {
+				let rest = flat;
+				for (const t of texts) {
+					const len = (t.textContent ?? "").length;
+					if (rest <= len) return [t, rest];
+					rest -= len;
+				}
+				const last = texts[texts.length - 1];
+				if (!last) throw new Error("no text");
+				return [last, (last.textContent ?? "").length];
+			};
+			const [startNode, startOff] = nodeAt(at);
+			const [endNode, endOff] = nodeAt(at + text.length);
+			const range = document.createRange();
+			range.setStart(startNode, startOff);
+			range.setEnd(endNode, endOff);
+			return range.getBoundingClientRect().toJSON() as {
+				x: number;
+				y: number;
+				width: number;
+				height: number;
+			};
+		},
+		[article, quote] as [number, string]
+	);
+}
+
+/** True drag-select of a quote inside one article: the release point
+stays inside the message, never on a control that would clear it. */
+export async function dragQuote(page: Page, article: number, quote: string): Promise<void> {
+	const rect = await quoteRect(page, article, quote);
+	await page.mouse.move(rect.x + 1, rect.y + rect.height / 2);
+	await page.mouse.down();
+	await page.mouse.move(rect.x + rect.width - 1, rect.y + rect.height / 2, { steps: 8 });
+	await page.mouse.up();
+}
+
 /** Assert two box snapshots match within a pixel (no hover nudges). */
 export function expectBoxesStable(
 	before: Array<{ x: number; y: number; width: number; height: number } | null>,

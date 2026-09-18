@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { Buffer } from "node:buffer";
-import { seedChat } from "./helpers";
+import { dragQuote, quoteRect, seedChat } from "./helpers";
 
 const SENTENCE = "テストを確認しました。何かお手伝いできることはありますか？";
 
@@ -1677,53 +1677,8 @@ test("badge hover washes every quote across both messages", async ({ page }) => 
 	]);
 	await page.goto("/");
 	await expect(page.locator("article .rendered").first()).toBeVisible();
-	// True drag-select inside one article (badge chrome excluded so
-	// node offsets map onto visible text): the release point stays
-	// inside the message, never on a control that would clear it.
-	const dragQuote = async (article: number, quote: string): Promise<void> => {
-		const rect = await page.evaluate(
-			([n, text]: [number, string]) => {
-				const root = document.querySelectorAll("article .rendered")[n];
-				if (!root) throw new Error("no article");
-				const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-				const texts: Text[] = [];
-				while (walker.nextNode()) {
-					const node = walker.currentNode;
-					const parent = node.parentNode;
-					if (parent instanceof Element && parent.closest("[data-ann-badge]")) continue;
-					if (node instanceof Text) texts.push(node);
-				}
-				const hay = texts.map((t) => t.textContent ?? "").join("");
-				const at = hay.indexOf(text);
-				if (at < 0) throw new Error(`quote missing: ${text}`);
-				const nodeAt = (flat: number): [Text, number] => {
-					let rest = flat;
-					for (const t of texts) {
-						const len = (t.textContent ?? "").length;
-						if (rest <= len) return [t, rest];
-						rest -= len;
-					}
-					const last = texts[texts.length - 1];
-					if (!last) throw new Error("no text");
-					return [last, (last.textContent ?? "").length];
-				};
-				const [startNode, startOff] = nodeAt(at);
-				const [endNode, endOff] = nodeAt(at + text.length);
-				const range = document.createRange();
-				range.setStart(startNode, startOff);
-				range.setEnd(endNode, endOff);
-				const box = range.getBoundingClientRect().toJSON();
-				return { x: box.x, y: box.y, width: box.width, height: box.height };
-			},
-			[article, quote] as [number, string]
-		);
-		await page.mouse.move(rect.x + 1, rect.y + rect.height / 2);
-		await page.mouse.down();
-		await page.mouse.move(rect.x + rect.width - 1, rect.y + rect.height / 2, { steps: 8 });
-		await page.mouse.up();
-	};
 	const annotate = async (article: number, quote: string): Promise<void> => {
-		await dragQuote(article, quote);
+		await dragQuote(page, article, quote);
 		await expect(page.locator(".sel-menu")).toBeVisible();
 		await page.locator('.sel-menu button:has-text("Annotate")').click();
 		await expect(page.locator(".ann-pop")).toBeVisible();
@@ -1757,50 +1712,7 @@ test("badge hover washes every quote across both messages", async ({ page }) => 
 				.map((r) => r.toString().replace(/\d/g, ""))
 				.join(" ");
 		});
-	// Rect of a quote's text (badge chrome excluded), for clipping
-	// screenshots to the washed lines.
-	const quoteRect = (article: number, quote: string) =>
-		page.evaluate(
-			([n, text]: [number, string]) => {
-				const root = document.querySelectorAll("article .rendered")[n];
-				if (!root) throw new Error("no article");
-				const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-				const texts: Text[] = [];
-				while (walker.nextNode()) {
-					const node = walker.currentNode;
-					const parent = node.parentNode;
-					if (parent instanceof Element && parent.closest("[data-ann-badge]")) continue;
-					if (node instanceof Text) texts.push(node);
-				}
-				const hay = texts.map((t) => t.textContent ?? "").join("");
-				const at = hay.indexOf(text);
-				if (at < 0) throw new Error(`quote missing: ${text}`);
-				const nodeAt = (flat: number): [Text, number] => {
-					let rest = flat;
-					for (const t of texts) {
-						const len = (t.textContent ?? "").length;
-						if (rest <= len) return [t, rest];
-						rest -= len;
-					}
-					const last = texts[texts.length - 1];
-					if (!last) throw new Error("no text");
-					return [last, (last.textContent ?? "").length];
-				};
-				const [startNode, startOff] = nodeAt(at);
-				const [endNode, endOff] = nodeAt(at + text.length);
-				const range = document.createRange();
-				range.setStart(startNode, startOff);
-				range.setEnd(endNode, endOff);
-				return range.getBoundingClientRect().toJSON() as {
-					x: number;
-					y: number;
-					width: number;
-					height: number;
-				};
-			},
-			[article, quote] as [number, string]
-		);
-	const hoverBadge = async (
+const hoverBadge = async (
 		role: "user" | "assistant",
 		nth: number,
 		word: string,
@@ -1811,7 +1723,7 @@ test("badge hover washes every quote across both messages", async ({ page }) => 
 			// lines unhovered, then hovered — the wash must change
 			// pixels (badges carry no :hover styling, so any change in
 			// the static clip is the yellow).
-			const clip = await quoteRect(visible.article, visible.quote);
+			const clip = await quoteRect(page, visible.article, visible.quote);
 			await page.mouse.move(4, 4);
 			await page.waitForTimeout(400);
 			const bare = await page.screenshot({ clip });

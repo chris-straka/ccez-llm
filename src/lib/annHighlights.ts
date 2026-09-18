@@ -18,13 +18,6 @@
 /** Highlight name under which annotation washes are registered. */
 export const ANN_HIGHLIGHT_NAME = "ccez-ann";
 
-/**
- * Highlight name for sent-annotation jump flashes. Separate from the
- * badge wash so a jump never clobbers a hover wash (or the reverse) —
- * both paint at once on different ranges.
- */
-export const JUMP_HIGHLIGHT_NAME = "ccez-ann-jump";
-
 export interface HighlightRegistry {
 	set(name: string, highlight: object): void;
 	delete(name: string): void;
@@ -72,33 +65,6 @@ export function clearAnnotationWash(): void {
 		registry()?.delete(ANN_HIGHLIGHT_NAME);
 	} catch {
 		// Clearing is cosmetic: never break the stamp.
-	}
-}
-
-/**
- * Paint a sent-jump flash range. No-op (returns false) where
- * unsupported — the caller still scrolls, just without the flash.
- * Never throws.
- */
-export function paintJumpWash(range: Range): boolean {
-	try {
-		const reg = registry();
-		if (!reg) return false;
-		const Ctor = Highlight;
-		if (typeof Ctor !== "function") return false;
-		reg.set(JUMP_HIGHLIGHT_NAME, new Ctor(range));
-		return true;
-	} catch {
-		return false;
-	}
-}
-
-/** Clear a jump flash. Never throws. */
-export function clearJumpWash(): void {
-	try {
-		registry()?.delete(JUMP_HIGHLIGHT_NAME);
-	} catch {
-		// Clearing is cosmetic: never break the jump.
 	}
 }
 

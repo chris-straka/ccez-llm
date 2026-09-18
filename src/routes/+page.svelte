@@ -186,6 +186,7 @@ import {
 		type AnnotationId,
 		type AnnotationMark
 	} from "$lib/annotations";
+	import { startBlink } from "$lib/blink";
 	import { createRefMemo } from "$lib/aidLoading";
 	import { scopeMessagesTransition, switchChatWithTransition } from "$lib/viewTransitions";
 	import {
@@ -719,12 +720,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	releases the highlight (self-clearing — no chat-switch hook to
 	forget). Jumps flash marks only, never layered with a Highlight
 	wash twin. */
-	let jumpMarkTimer: ReturnType<typeof setTimeout> | null = null;
+	let stopJumpFlash: (() => void) | null = null;
 	/** Sent-row blink: the pressed row flashes like a draft row (same
 	phases), so the press reads even where the highlight wash can't
 	paint. Keyed by message + number, not id — baked refs have none. */
 	let refsBlink: { messageId: ChatMsgId; n: number } | null = $state(null);
-	let refsBlinkTimer: ReturnType<typeof setTimeout> | null = null;
+	let stopRefsBlink: (() => void) | null = null;
 	/** Own message under in-place edit (null when no edit is open).
 	Enter saves + resends; Alt+Enter saves without resending; Esc cancels. */
 	let editingMsgId: ChatMsgId | null = $state(null);
@@ -4001,22 +4002,19 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	restarts the schedule; expiry clears itself). Same 700/350 phases
 	as the quote flash below. */
 	function blinkRefsRow(messageId: ChatMsgId, n: number): void {
-		if (refsBlinkTimer) clearTimeout(refsBlinkTimer);
-		refsBlinkTimer = null;
+		stopRefsBlink?.();
+		stopRefsBlink = null;
 		const key = { messageId, n };
 		refsBlink = key;
-		let phase = 0;
-		const step = (): void => {
-			phase += 1;
-			if (phase >= 4) {
+		stopRefsBlink = startBlink(
+			() => {
+				refsBlink = key;
+				return true;
+			},
+			() => {
 				refsBlink = null;
-				refsBlinkTimer = null;
-				return;
 			}
-			refsBlink = phase % 2 === 0 ? key : null;
-			refsBlinkTimer = setTimeout(step, phase % 2 === 0 ? 700 : 350);
-		};
-		refsBlinkTimer = setTimeout(step, 700);
+		);
 	}
 
 	function gotoSentRef(messageId: ChatMsgId, quote: string): void {
@@ -4091,8 +4089,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	than abandoning: the quote is gone, so nothing must linger.
 	Yellow must never stick. */
 	function flashJumpMark(locate: () => Range | null): void {
-		if (jumpMarkTimer) clearTimeout(jumpMarkTimer);
-		jumpMarkTimer = null;
+		stopJumpFlash?.();
+		stopJumpFlash = null;
 		clearJumpMarks();
 		const paintFresh = (): boolean => {
 			const range = locate();
@@ -4100,24 +4098,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			return wrapRangeInMark(range, "ccez-ann-flash") !== null;
 		};
 		if (!paintFresh()) return;
-		let phase = 0;
-		const step = (): void => {
-			phase += 1;
-			if (phase >= 4) {
-				clearJumpMarks();
-				jumpMarkTimer = null;
-				return;
-			}
-			if (phase % 2 === 0) {
-				if (!paintFresh()) {
-					clearJumpMarks();
-					jumpMarkTimer = null;
-					return;
-				}
-			} else clearJumpMarks();
-			jumpMarkTimer = setTimeout(step, phase % 2 === 0 ? 700 : 350);
-		};
-		jumpMarkTimer = setTimeout(step, 700);
+		stopJumpFlash = startBlink(paintFresh, clearJumpMarks);
 	}
 
 	/**

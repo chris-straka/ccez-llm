@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { seedChat } from "./helpers";
+import { dragQuote, seedChat } from "./helpers";
 
 /**
  * Streaming integrity on the mock provider: the reply lands exactly
@@ -166,41 +166,7 @@ test("mid-stream annotation on the sent message survives the reply", async ({ pa
 	// The stream crawls (800ms a word): drag-select the just-sent
 	// message and file an annotation before the reply lands.
 	await expect(page.locator("article.assistant .rendered")).toBeVisible({ timeout: 15_000 });
-	const rect = await page.evaluate(() => {
-		const root = document.querySelectorAll("article .rendered")[0];
-		if (!root) throw new Error("no user article");
-		const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-		const texts: Text[] = [];
-		while (walker.nextNode()) {
-			const node = walker.currentNode;
-			if (node instanceof Text) texts.push(node);
-		}
-		const hay = texts.map((t) => t.textContent ?? "").join("");
-		const quote = "quick brown fox";
-		const at = hay.indexOf(quote);
-		if (at < 0) throw new Error("quote missing");
-		const nodeAt = (flat: number): [Text, number] => {
-			let rest = flat;
-			for (const t of texts) {
-				const len = (t.textContent ?? "").length;
-				if (rest <= len) return [t, rest];
-				rest -= len;
-			}
-			const last = texts[texts.length - 1];
-			if (!last) throw new Error("no text");
-			return [last, (last.textContent ?? "").length];
-		};
-		const [startNode, startOff] = nodeAt(at);
-		const [endNode, endOff] = nodeAt(at + quote.length);
-		const range = document.createRange();
-		range.setStart(startNode, startOff);
-		range.setEnd(endNode, endOff);
-		return range.getBoundingClientRect().toJSON() as { x: number; y: number; width: number; height: number };
-	});
-	await page.mouse.move(rect.x + 1, rect.y + rect.height / 2);
-	await page.mouse.down();
-	await page.mouse.move(rect.x + rect.width - 1, rect.y + rect.height / 2, { steps: 8 });
-	await page.mouse.up();
+	await dragQuote(page, 0, "quick brown fox");
 	await expect(page.locator(".sel-menu")).toBeVisible();
 	await page.locator('.sel-menu button:has-text("Annotate")').click();
 	await expect(page.locator(".ann-pop")).toBeVisible();
