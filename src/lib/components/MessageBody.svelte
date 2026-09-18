@@ -1293,16 +1293,6 @@
 	:global(html[data-theme="dark"]) .rendered::highlight(ccez-ann) {
 		background-color: rgba(245, 158, 11, 0.3);
 	}
-	/* Sent-jump flash (see annHighlights.paintJumpWash): same yellow as
-	the badge wash, so arriving from history reads like arriving from
-	a draft. Separate highlight name — never the badge's own. */
-	.rendered::highlight(ccez-ann-jump) {
-		background-color: #fff3b0;
-		color: inherit;
-	}
-	:global(html[data-theme="dark"]) .rendered::highlight(ccez-ann-jump) {
-		background-color: rgba(245, 158, 11, 0.3);
-	}
 	/* Ruby base text paints the selection tint explicitly: without
 	this some phone WebViews leave ruby-annotated CJK highlights
 	invisible (the readings themselves stay unselectable by design). */

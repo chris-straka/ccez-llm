@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { Buffer } from "node:buffer";
 import { seedChat } from "./helpers";
 
 const SENTENCE = "テストを確認しました。何かお手伝いできることはありますか？";
@@ -922,8 +923,8 @@ test("sent-refs Clear-all deletes a refs-only message", async ({ page }) => {
 });
 
 /** Sent-refs quote jumps to the quoted message — not the sender — and
-flashes the quote like a draft wash (a separate highlight name, so it
-never clobbers a badge wash). */
+flashes the quote with one DOM mark (never layered with a Highlight
+wash twin, so the flash keeps its rounded mark shape). */
 test("sent-refs quote jumps to the quoted text with a flash", async ({ page }) => {
 	const sentence = "The quick brown fox jumps over the lazy dog near the riverbank.";
 	const filler = Array.from({ length: 10 }, (_, i) => `Filler ${i}. ${sentence} ${sentence}`).join("\n\n");
@@ -943,23 +944,8 @@ test("sent-refs quote jumps to the quoted text with a flash", async ({ page }) =
 	expect(top).toBeGreaterThan(100);
 	await page.locator(".ann-refs-pill").first().click();
 	await page.locator(".ann-refs-quote").first().click();
-	// The flash paints on the jump (poll the registry like the wash).
-	await expect
-		.poll(
-			() =>
-				page.evaluate(
-					() =>
-						(
-							window as unknown as {
-								CSS?: { highlights?: { has(name: string): boolean } };
-							}
-						).CSS?.highlights?.has("ccez-ann-jump") ?? false
-				),
-			{ timeout: 5_000 }
-		)
-		.toBe(true);
-	// The DOM twin paints with the wash: a draft-yellow mark on the
-	// quote, in every engine (polled — either paint phase counts).
+	// The flash paints on the jump: a draft-yellow mark on the quote,
+	// in every engine (polled — either paint phase counts).
 	await expect
 		.poll(
 			() =>
@@ -969,26 +955,19 @@ test("sent-refs quote jumps to the quoted text with a flash", async ({ page }) =
 			{ timeout: 5_000 }
 		)
 		.toBe("spring");
+	// No Highlight twin layers under the mark (one flash, one shape).
+	const jumped = await page.evaluate(
+		() =>
+			(window as unknown as { CSS?: { highlights?: { has(name: string): boolean } } }).CSS?.highlights?.has(
+				"ccez-ann-jump"
+			) ?? false
+	);
+	expect(jumped).toBe(false);
 	await page.waitForTimeout(800);
 	const after = await page.evaluate(() => document.querySelector(".messages")?.scrollTop ?? 0);
 	expect(after).toBeLessThan(top - 50);
-	// Past the first clear: the second paint must hold a live range
-	// (each phase re-locates, so a mid-scroll re-render can't leave
-	// the registry blinking a detached range).
-	await page.waitForTimeout(300);
-	const alive = (): Promise<boolean> =>
-		page.evaluate(() => {
-			const reg = (
-				window as unknown as {
-					CSS?: { highlights?: { get(name: string): Set<Range> | undefined } };
-				}
-			).CSS?.highlights;
-			const set = reg?.get("ccez-ann-jump");
-			const ranges = set ? [...set] : [];
-			return ranges.length > 0 && ranges.every((r) => document.contains(r.startContainer));
-		});
-	await expect.poll(alive, { timeout: 5_000 }).toBe(true);
-	// Both twins release themselves: no mark lingers in the message.
+	// The flash releases itself: no mark lingers in the message, and
+	// a failed re-locate clears rather than stranding yellow.
 	await expect(page.locator("mark.ccez-ann-flash")).toHaveCount(0, { timeout: 5_000 });
 });
 
@@ -1778,7 +1757,74 @@ test("badge hover washes every quote across both messages", async ({ page }) => 
 				.map((r) => r.toString().replace(/\d/g, ""))
 				.join(" ");
 		});
-	const hoverBadge = async (role: "user" | "assistant", nth: number, word: string): Promise<void> => {
+	// Rect of a quote's text (badge chrome excluded), for clipping
+	// screenshots to the washed lines.
+	const quoteRect = (article: number, quote: string) =>
+		page.evaluate(
+			([n, text]: [number, string]) => {
+				const root = document.querySelectorAll("article .rendered")[n];
+				if (!root) throw new Error("no article");
+				const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+				const texts: Text[] = [];
+				while (walker.nextNode()) {
+					const node = walker.currentNode;
+					const parent = node.parentNode;
+					if (parent instanceof Element && parent.closest("[data-ann-badge]")) continue;
+					if (node instanceof Text) texts.push(node);
+				}
+				const hay = texts.map((t) => t.textContent ?? "").join("");
+				const at = hay.indexOf(text);
+				if (at < 0) throw new Error(`quote missing: ${text}`);
+				const nodeAt = (flat: number): [Text, number] => {
+					let rest = flat;
+					for (const t of texts) {
+						const len = (t.textContent ?? "").length;
+						if (rest <= len) return [t, rest];
+						rest -= len;
+					}
+					const last = texts[texts.length - 1];
+					if (!last) throw new Error("no text");
+					return [last, (last.textContent ?? "").length];
+				};
+				const [startNode, startOff] = nodeAt(at);
+				const [endNode, endOff] = nodeAt(at + text.length);
+				const range = document.createRange();
+				range.setStart(startNode, startOff);
+				range.setEnd(endNode, endOff);
+				return range.getBoundingClientRect().toJSON() as {
+					x: number;
+					y: number;
+					width: number;
+					height: number;
+				};
+			},
+			[article, quote] as [number, string]
+		);
+	const hoverBadge = async (
+		role: "user" | "assistant",
+		nth: number,
+		word: string,
+		visible: { article: number; quote: string } | null = null
+	): Promise<void> => {
+		if (visible) {
+			// Registry ranges are not visible paint: clip the quote's
+			// lines unhovered, then hovered — the wash must change
+			// pixels (badges carry no :hover styling, so any change in
+			// the static clip is the yellow).
+			const clip = await quoteRect(visible.article, visible.quote);
+			await page.mouse.move(4, 4);
+			await page.waitForTimeout(400);
+			const bare = await page.screenshot({ clip });
+			const badge = badges(role).nth(nth);
+			const box = await badge.boundingBox();
+			if (!box) throw new Error("badge has no box");
+			await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+			await page.waitForTimeout(300);
+			expect(await washedText()).toContain(word);
+			const washed = await page.screenshot({ clip });
+			expect(Buffer.compare(bare, washed) !== 0).toBe(true);
+			return;
+		}
 		const badge = badges(role).nth(nth);
 		const box = await badge.boundingBox();
 		if (!box) throw new Error("badge has no box");
@@ -1787,8 +1833,10 @@ test("badge hover washes every quote across both messages", async ({ page }) => 
 		expect(await washedText()).toContain(word);
 	};
 	// User to assistant, then back: every slide must wash its quote.
-	await hoverBadge("user", 0, "quick brown fox");
-	await hoverBadge("assistant", 0, "five dozen");
+	// The first slide on each side also proves visible paint, not
+	// just registry ranges.
+	await hoverBadge("user", 0, "quick brown fox", { article: 0, quote: "quick brown fox" });
+	await hoverBadge("assistant", 0, "five dozen", { article: 1, quote: "five dozen liquor" });
 	await hoverBadge("assistant", 1, "winter voyage");
 	await hoverBadge("user", 1, "lazy dog");
 	// No badge node churned under the hovers.
@@ -1798,4 +1846,9 @@ test("badge hover washes every quote across both messages", async ({ page }) => 
 		)
 	);
 	expect(probes).toEqual(["badge-0", "badge-1", "badge-2", "badge-3"]);
+	// Hovering off clears the wash: park away past the hysteresis
+	// window and the registry must hold nothing.
+	await page.mouse.move(4, 4);
+	await page.waitForTimeout(600);
+	expect(await washedText()).toBe("");
 });

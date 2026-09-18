@@ -151,3 +151,21 @@ body {
 		margin: 0 0 8px;
 	}
 }
+
+/* Bare Custom Highlight rule for the badge hover wash (see
+ * paintAnnotationWash in annotations.ts, ANN_HIGHLIGHT_NAME in
+ * annHighlights.ts). The component-scoped twin
+ * (.rendered::highlight(...)) carries the same declarations and
+ * stays the primary path where the engine applies compound
+ * highlight selectors; the bare form covers engines that only match
+ * ::highlight() alone (desktop-shell invisible washes with a
+ * populated registry). The name is app-unique, so document-wide
+ * match paints exactly the washed ranges. Jumps flash DOM marks
+ * only, never this name. Keep both forms declaring the same colors. */
+::highlight(ccez-ann) {
+	background-color: #fff3b0;
+	color: inherit;
+}
+html[data-theme="dark"] ::highlight(ccez-ann) {
+	background-color: rgba(245, 158, 11, 0.3);
+}

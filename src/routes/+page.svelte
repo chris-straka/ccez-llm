@@ -107,7 +107,6 @@
 	import { canEditMessage, toggleAidKinds, toggleSingleAid } from "$lib/message-actions";
 	import type { ChatProvider } from "$lib/providers/types";
 	import MessageBody from "$lib/components/MessageBody.svelte";
-	import { paintJumpWash, clearJumpWash } from "$lib/annHighlights";
 	import ActionIcon from "$lib/components/ActionIcon.svelte";
 	import SettingsPanel from "$lib/components/SettingsPanel.svelte";
 	import { plainBody, sourcesAsked } from "$lib/render";
@@ -716,14 +715,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	let refsEditing: { messageId: ChatMsgId; n: number } | null = $state(null);
 	let refsEditDraft = $state("");
 	let refsEditBox: HTMLInputElement | null = $state(null);
-	/** Jump-blink target: the wash shows while set (two slow blinks,
-	then cleared — hover previews own the wash again after). */
-	let annBlink: AnnotationId | null = $state(null);
-	let annBlinkTimer: ReturnType<typeof setTimeout> | null = null;
-	/** Sent-jump flash timer: re-jumps restart it, expiry releases the
-	highlight (self-clearing — no chat-switch hook to forget). */
-	let jumpBlinkTimer: ReturnType<typeof setTimeout> | null = null;
-	/** Destination mark-flash timer: same schedule, DOM-backed twin. */
+	/** Destination mark-flash timer: re-jumps restart it, expiry
+	releases the highlight (self-clearing — no chat-switch hook to
+	forget). Jumps flash marks only, never layered with a Highlight
+	wash twin. */
 	let jumpMarkTimer: ReturnType<typeof setTimeout> | null = null;
 	/** Sent-row blink: the pressed row flashes like a draft row (same
 	phases), so the press reads even where the highlight wash can't
@@ -3947,11 +3942,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		else {
 			document.querySelector(`#msg-${index}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
 		}
-		blinkAnnotation(ann.id);
-		// The quote flashes twice like a sent jump (same guaranteed
-		// DOM-mark half + Highlight wash): the badge scroll lands the
-		// eye nearby, the flash lands it on the words. Every paint
-		// re-locates against the repeat it was filed from.
+		// The quote flashes twice like a sent jump (one DOM-mark
+		// flash, never layered with a Highlight wash twin): the badge
+		// scroll lands the eye nearby, the flash lands it on the
+		// words. Every paint re-locates against the repeat it was
+		// filed from.
 		const current = annotations.find((a) => a.id === ann.id);
 		if (current) {
 			const quote = current.quote;
@@ -3962,7 +3957,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				return root instanceof HTMLElement ? quoteRange(root, quote, at) : null;
 			};
 			flashJumpMark(locate);
-			blinkJumpWash(locate);
 		}
 	}
 
@@ -4004,8 +3998,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 
 	/** Flash the pressed sent row twice, then release it (a re-press
-	restarts the schedule; expiry clears itself). Same phases as the
-	draft row blink — see blinkAnnotation. */
+	restarts the schedule; expiry clears itself). Same 700/350 phases
+	as the quote flash below. */
 	function blinkRefsRow(messageId: ChatMsgId, n: number): void {
 		if (refsBlinkTimer) clearTimeout(refsBlinkTimer);
 		refsBlinkTimer = null;
@@ -4051,9 +4045,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 
 	/**
 	 * Sent-annotation landing: locate the quote in its owner's rendered
-	 * text, land it clear of the dock, and flash it twice like a badge
-	 * blink (same phases — see blinkAnnotation). A folded message hides
-	 * its text from the locator: land on the message itself instead.
+	 * text, land it clear of the dock, and flash the DOM mark twice
+	 * (never layered with a Highlight wash twin). A folded message
+	 * hides its text from the locator: land on the message itself
+	 * instead.
 	 */
 	function jumpToQuotedText(messageId: ChatMsgId, quote: string): void {
 		const index = viewChat.messages.findIndex((m) => m.id === messageId);
@@ -4066,7 +4061,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		if (range) {
 			scrollRectIntoClear(range.getBoundingClientRect());
 			flashJumpMark(locate);
-			blinkJumpWash(locate);
 		} else if (index >= 0) {
 			const article = document.querySelector(`#msg-${index}`);
 			if (article instanceof HTMLElement) {
@@ -4089,9 +4083,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 
 	/** Flash the destination quote twice in draft yellow, then release
 	it (a re-jump restarts the schedule; expiry clears itself). Plain
-	DOM marks render in every engine — the guaranteed half of the
-	signal, alongside the Highlight wash where supported. Every paint
-	re-locates for the same re-render reason as the wash below. */
+	DOM marks render in every engine, so the mark alone carries the
+	flash — never layered with a Highlight wash twin. Every paint
+	re-locates: a chat re-render mid-scroll (scroll-driven state swaps
+	the text nodes) detaches the old range, and repainting the same
+	dead range would blink nothing. A failed re-locate clears rather
+	than abandoning: the quote is gone, so nothing must linger.
+	Yellow must never stick. */
 	function flashJumpMark(locate: () => Range | null): void {
 		if (jumpMarkTimer) clearTimeout(jumpMarkTimer);
 		jumpMarkTimer = null;
@@ -4112,6 +4110,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			}
 			if (phase % 2 === 0) {
 				if (!paintFresh()) {
+					clearJumpMarks();
 					jumpMarkTimer = null;
 					return;
 				}
@@ -4119,39 +4118,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			jumpMarkTimer = setTimeout(step, phase % 2 === 0 ? 700 : 350);
 		};
 		jumpMarkTimer = setTimeout(step, 700);
-	}
-
-	/** Flash a located quote twice, then release the highlight (a
-	re-jump restarts the schedule; expiry clears itself). Every paint
-	re-locates: a chat re-render mid-scroll (scroll-driven state swaps
-	the text nodes) detaches the old range, and repainting the same
-	dead range would blink nothing — the registry keeps it, so only a
-	fresh range keeps the flash alive. */
-	function blinkJumpWash(locate: () => Range | null): void {
-		if (jumpBlinkTimer) clearTimeout(jumpBlinkTimer);
-		jumpBlinkTimer = null;
-		const paintFresh = (): boolean => {
-			const range = locate();
-			return range ? paintJumpWash(range) : false;
-		};
-		if (!paintFresh()) return;
-		let phase = 0;
-		const step = (): void => {
-			phase += 1;
-			if (phase >= 4) {
-				clearJumpWash();
-				jumpBlinkTimer = null;
-				return;
-			}
-			if (phase % 2 === 0) {
-				if (!paintFresh()) {
-					jumpBlinkTimer = null;
-					return;
-				}
-			} else clearJumpWash();
-			jumpBlinkTimer = setTimeout(step, phase % 2 === 0 ? 700 : 350);
-		};
-		jumpBlinkTimer = setTimeout(step, 700);
 	}
 
 	/**
@@ -4278,27 +4244,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		if (bare.trim() === "") deleteMessage(chatState, index);
 		else editMessageContent(chatState, messageId, bare);
 		flashToast("Sent annotations cleared");
-	}
-
-	/** Blink a badge wash slowly twice, then hand the wash back. A
-	re-jump restarts the sequence; each phase flips state so Svelte
-	re-renders even for the same id twice running. */
-	function blinkAnnotation(id: AnnotationId): void {
-		if (annBlinkTimer) clearTimeout(annBlinkTimer);
-		annBlinkTimer = null;
-		annBlink = id;
-		let phase = 0;
-		const step = () => {
-			phase += 1;
-			if (phase >= 4) {
-				annBlink = null;
-				annBlinkTimer = null;
-				return;
-			}
-			annBlink = phase % 2 === 0 ? id : null;
-			annBlinkTimer = setTimeout(step, phase % 2 === 0 ? 700 : 350);
-		};
-		annBlinkTimer = setTimeout(step, 700);
 	}
 
 	function clearAllAnnotations(): void {
@@ -9819,7 +9764,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							folded={isFolded}
 							foldPreview={refsOnly && sentRefs ? sentRefs.refs.map((r) => `"${r.quote}"`).join(" ") : null}
 							marks={marksFor(msg.id)}
-							washId={annPop?.id ?? promptAnnWashId() ?? editingId ?? annBlink ?? hoverBadgeId}
+							washId={annPop?.id ?? promptAnnWashId() ?? editingId ?? hoverBadgeId}
 						onBadgeHover={(id: string | null) => (hoverBadgeId = id)}
 							onBadgeClick={openBadgeClick}
 							onAttachAction={sentTagAction}
