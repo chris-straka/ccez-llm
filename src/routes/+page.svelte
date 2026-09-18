@@ -316,15 +316,7 @@ import {
 	import { consumeLaunchFiles, splitLaunchFiles } from "$lib/launchFiles";
 	import { copyExportText, downloadMarkdownFile, exportChatMarkdown, fileSaveAccessAvailable } from "$lib/chatExport";
 	import { nativeSaveMarkdown } from "$lib/nativeExport";
-	import {
-		isKeyboardOpen,
-		keyboardOverlapPx,
-		learnKbHeight,
-		pinArmStart,
-		pinNow,
-		predictAppHeight,
-		settlePin
-	} from "$lib/viewportReflow";
+	import { isKeyboardOpen, keyboardOverlapPx, pinArmStart, settlePin } from "$lib/viewportReflow";
 import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	import {
 		speakText,
@@ -9222,77 +9214,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		let viewportTimer: number | undefined;
 		let kbPin = pinArmStart();
 		let fullInnerHeight = window.innerHeight;
-		/**
-		 * Last seen keyboard height, for the focus-ahead prediction.
-		 * Restored from storage so even the first open in a fresh
-		 * process predicts; re-learned live every cycle (a stored
-		 * portrait height in landscape merely corrects via frames).
-		 */
-		let lastKbHeight = 0;
-		try {
-			const stored = Number(window.localStorage.getItem("ccez-kb-height-px") ?? 0);
-			if (Number.isFinite(stored) && stored > 0 && stored < window.innerHeight) {
-				lastKbHeight = stored;
-			}
-		} catch {
-			// Private-mode storage throws: prediction simply starts cold.
-		}
-		/** Watchdog standing a prediction down when no keyboard follows. */
-		let kbPredictTimer: number | undefined;
-		/**
-		 * Composer focused ahead of the keyboard: the layout trails the
-		 * keyboard window by a frame or two, during which the keyboard
-		 * covers the composer. Pre-reserve the last known height so the
-		 * composer is already clear when the keyboard arrives; real
-		 * geometry corrects the guess frame by frame, and the watchdog
-		 * stands it down when nothing follows (hardware keyboard).
-		 */
-		const predictKeyboard = (): void => {
-			if (!androidUI || !appEl || !window.visualViewport) return;
-			if (kbPin.armed) return;
-			const vv = window.visualViewport;
-			if (isKeyboardOpen(window.innerHeight, vv.height, vv.offsetTop)) return;
-			const predicted = predictAppHeight(window.innerHeight, lastKbHeight);
-			if (predicted === null) return;
-			kbPin = pinNow();
-			appEl.style.height = `${predicted}px`;
-			appEl.style.setProperty("--kb-height", `${lastKbHeight}px`);
-			if (kbPredictTimer !== undefined) window.clearTimeout(kbPredictTimer);
-			kbPredictTimer = window.setTimeout(() => {
-				kbPredictTimer = undefined;
-				if (!kbPin.armed || !appEl) return;
-				const v = window.visualViewport;
-				if (v && isKeyboardOpen(window.innerHeight, v.height, v.offsetTop)) return;
-				kbPin = pinArmStart();
-				appEl.style.height = "";
-				appEl.style.setProperty("--kb-height", "0px");
-			}, 800);
-		};
-		/** Focus leaving the composer: drop any pin at once instead of
-		riding the lagging close geometry down. */
-		const releaseKeyboardPin = (): void => {
-			if (kbPredictTimer !== undefined) {
-				window.clearTimeout(kbPredictTimer);
-				kbPredictTimer = undefined;
-			}
-			if (!kbPin.armed || !appEl) {
-				kbPin = pinArmStart();
-				return;
-			}
-			kbPin = pinArmStart();
-			appEl.style.height = "";
-			appEl.style.setProperty("--kb-height", "0px");
-		};
-		const onKbFocusIn = (event: FocusEvent): void => {
-			if (!isPromptTarget(event.target)) return;
-			predictKeyboard();
-		};
-		const onKbFocusOut = (event: FocusEvent): void => {
-			// Focus moving inside the composer (note edits, pill fields)
-			// keeps the reservation; leaving it drops it.
-			if (isPromptTarget(event.relatedTarget)) return;
-			releaseKeyboardPin();
-		};
 		const onViewportResize = (): void => {
 			// Pin synchronously on every viewport frame: the old trailing
 			// debounce let the composer lag a beat behind the keyboard
@@ -9315,30 +9236,19 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// phones keep stylesheet height.
 			if (androidUI && appEl && window.visualViewport) {
 				const vv = window.visualViewport;
-				const overlap = keyboardOverlapPx(window.innerHeight, vv.height, vv.offsetTop);
 				const open = isKeyboardOpen(window.innerHeight, vv.height, vv.offsetTop);
-				// Learn the keyboard height from every frame: the layout
-				// shrink under a native resize, else the visual overlap.
-				lastKbHeight = learnKbHeight(lastKbHeight, fullInnerHeight, window.innerHeight, overlap);
-				if (open) {
-					// Real geometry arrived: a pending prediction stands
-					// confirmed, never watched down.
-					if (kbPredictTimer !== undefined) {
-						window.clearTimeout(kbPredictTimer);
-						kbPredictTimer = undefined;
-					}
-					if (kbPin.armed) {
-						// Settle-armed fallback pin tracks per frame.
-						appEl.style.height = `${vv.height}px`;
-						appEl.style.setProperty("--kb-height", `${overlap}px`);
-					}
-				} else {
+				if (!open) {
 					fullInnerHeight = window.innerHeight;
 					if (kbPin.armed) {
 						kbPin = pinArmStart();
 						appEl.style.height = "";
 						appEl.style.setProperty("--kb-height", "0px");
 					}
+				} else if (kbPin.armed) {
+					// Settle-armed fallback pin tracks per frame.
+					const overlap = keyboardOverlapPx(window.innerHeight, vv.height, vv.offsetTop);
+					appEl.style.height = `${vv.height}px`;
+					appEl.style.setProperty("--kb-height", `${overlap}px`);
 				}
 			}
 			if (viewportTimer !== undefined) window.clearTimeout(viewportTimer);
@@ -9353,19 +9263,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				if (androidUI && appEl && window.visualViewport) {
 					const vv = window.visualViewport;
 					const overlap = keyboardOverlapPx(window.innerHeight, vv.height, vv.offsetTop);
-					const open = isKeyboardOpen(window.innerHeight, vv.height, vv.offsetTop);
-					if (open && lastKbHeight > 0) {
-						try {
-							window.localStorage.setItem("ccez-kb-height-px", String(Math.round(lastKbHeight)));
-						} catch {
-							// Private-mode storage throws: prediction stays in-memory.
-						}
-					}
 					const settled = settlePin(
 						kbPin,
 						fullInnerHeight,
 						window.innerHeight,
-						open
+						isKeyboardOpen(window.innerHeight, vv.height, vv.offsetTop)
 					);
 					const wasArmed = kbPin.armed;
 					kbPin = settled.pin;
@@ -9383,11 +9285,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		};
 		window.visualViewport?.addEventListener("resize", onViewportResize);
 		window.visualViewport?.addEventListener("scroll", onViewportResize);
-		// Focus-ahead keyboard prediction (see predictKeyboard): focus
-		// lands ~100ms before the keyboard window, so reserve the last
-		// known height up front; leaving the composer drops it at once.
-		window.addEventListener("focusin", onKbFocusIn);
-		window.addEventListener("focusout", onKbFocusOut);
 		void listenMenuActions();
 		void wireDeepLinks();
 		window.addEventListener("keydown", onKey, true);
@@ -9498,10 +9395,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		return () => {
 			window.visualViewport?.removeEventListener("resize", onViewportResize);
 			window.visualViewport?.removeEventListener("scroll", onViewportResize);
-			window.removeEventListener("focusin", onKbFocusIn);
-			window.removeEventListener("focusout", onKbFocusOut);
 			if (viewportTimer !== undefined) window.clearTimeout(viewportTimer);
-			if (kbPredictTimer !== undefined) window.clearTimeout(kbPredictTimer);
 			window.removeEventListener("focus", onWinFocus);
 			window.removeEventListener("keydown", onKey, true);
 			window.removeEventListener("keydown", onAlt);

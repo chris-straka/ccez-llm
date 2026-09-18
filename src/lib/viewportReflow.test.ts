@@ -2,11 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
 	isKeyboardOpen,
 	keyboardOverlapPx,
-	learnKbHeight,
 	nativeResizeActive,
 	pinArmStart,
 	pinNow,
-	predictAppHeight,
 	settlePin
 } from "./viewportReflow";
 
@@ -78,36 +76,4 @@ describe("settlePin", () => {
 	});
 });
 
-describe("learnKbHeight", () => {
-	it("learns the layout shrink under a native resize", () => {
-		expect(learnKbHeight(0, 2400, 1517, 0)).toBe(883);
-	});
 
-	it("learns the visual overlap without a resize", () => {
-		expect(learnKbHeight(0, 2400, 2400, 883)).toBe(883);
-	});
-
-	it("keeps the running max across cycles", () => {
-		expect(learnKbHeight(883, 2400, 1600, 0)).toBe(883);
-	});
-
-	it("prefers the layout shrink over a stale overlap", () => {
-		expect(learnKbHeight(0, 2400, 2000, 850)).toBe(400);
-	});
-
-	it("ignores noise below the floor", () => {
-		expect(learnKbHeight(0, 2400, 2350, 30)).toBe(0);
-	});
-});
-
-describe("predictAppHeight", () => {
-	it("reserves the learned height up front", () => {
-		expect(predictAppHeight(2400, 883)).toBe(1517);
-	});
-
-	it("refuses without a learned height or on a collapsing guess", () => {
-		expect(predictAppHeight(2400, 0)).toBeNull();
-		expect(predictAppHeight(2400, -5)).toBeNull();
-		expect(predictAppHeight(800, 700)).toBeNull();
-	});
-});
