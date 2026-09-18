@@ -1742,11 +1742,79 @@ export function snapOffsetsToWordEdges(
 }
 
 /**
+ * Text node adjacent to `node` across badge-anchor chrome only: a
+ * badge anchor wraps one mid-word character (plus its button), so a
+ * double-click pick stops at the anchor's node edge while the word
+ * runs through it. This steps over the anchor (never into its
+ * button) to the quotable text on the other side. Every other
+ * element boundary — marks, blocks, readings — stays a wall, as
+ * before. Null when no quotable neighbor lies that way, or when
+ * `node` itself lives inside button/reading chrome. Never throws.
+ */
+function anchorNeighborText(node: Text, dir: 1 | -1): Text | null {
+	try {
+		if (node.parentElement?.closest("button[data-ann-badge], rt, rp, .frt")) return null;
+		// Badge buttons are UI chrome, never quotable text: step past them.
+		const pastButtons = (n: Node | null): Node | null => {
+			while (n instanceof Element && n.hasAttribute("data-ann-badge")) {
+				n = dir === 1 ? n.nextSibling : n.previousSibling;
+			}
+			return n;
+		};
+		// First quotable text child of an anchor span (its wrapped
+		// character); null for any other element. Buttons inside are
+		// skipped, anything else stops the walk.
+		const anchorText = (n: Node | null): Text | null => {
+			if (!(n instanceof Element) || n.localName !== "span") return null;
+			if (!n.classList.contains("ccez-ann-anchor")) return null;
+			const kids = dir === 1 ? [...n.childNodes] : [...n.childNodes].reverse();
+			for (const kid of kids) {
+				if (kid instanceof Text) return kid;
+				if (!(kid instanceof Element) || !kid.hasAttribute("data-ann-badge")) return null;
+			}
+			return null;
+		};
+		if (dir === 1) {
+			let sib = pastButtons(node.nextSibling);
+			if (!sib) {
+				// At the edge of an anchor-wrapped character: climb
+				// out through the anchor, never through anything else.
+				const parent = node.parentNode;
+				if (!(parent instanceof Element)) return null;
+				const inner = anchorText(parent);
+				if (!inner || inner !== node) return null;
+				sib = pastButtons(parent.nextSibling);
+				if (!sib) return null;
+			}
+			if (sib instanceof Text) return sib;
+			return anchorText(sib);
+		}
+		let sib = pastButtons(node.previousSibling);
+		if (!sib) {
+			const parent = node.parentNode;
+			if (!(parent instanceof Element)) return null;
+			const inner = anchorText(parent);
+			if (!inner || inner !== node) return null;
+			sib = pastButtons(parent.previousSibling);
+			if (!sib) return null;
+		}
+		if (sib instanceof Text) return sib;
+		return anchorText(sib);
+	} catch {
+		return null;
+	}
+}
+
+/**
  * Expand a live selection to word edges (same rule as
  * snapOffsetsToWordEdges, applied per boundary text node so
- * multi-node selections snap too). Preserves the drag direction.
- * Returns true when the range moved. Never throws (selection APIs
- * disagree across engines; paint must survive).
+ * multi-node selections snap too). Boundaries parked at a
+ * badge-anchor split keep walking while the word continues through
+ * the anchor, so a double-click beside a marker still picks the
+ * whole word (the button's number never joins: traversal never
+ * enters it). Preserves the drag direction. Returns true when the
+ * range moved. Never throws (selection APIs disagree across
+ * engines; paint must survive).
  */
 export function snapSelectionToWordEdges(selection: Selection): boolean {
 	try {
@@ -1756,24 +1824,71 @@ export function snapSelectionToWordEdges(selection: Selection): boolean {
 		const ec = range.endContainer;
 		const so0 = range.startOffset;
 		const eo0 = range.endOffset;
+		let scN: Node | null = sc;
+		let ecN: Node | null = ec;
 		let so = so0;
 		let eo = eo0;
-		if (sc instanceof Text) {
-			const text = sc.textContent ?? "";
+		if (scN instanceof Text) {
+			const text = scN.textContent ?? "";
 			let s = Math.max(0, Math.min(so, text.length));
 			while (s > 0 && isWordChar(text[s - 1] ?? "") && isWordChar(text[s] ?? "")) s -= 1;
 			so = s;
 		}
-		if (ec instanceof Text) {
-			const text = ec.textContent ?? "";
+		if (ecN instanceof Text) {
+			const text = ecN.textContent ?? "";
 			let e = Math.max(0, Math.min(eo, text.length));
 			while (e < text.length && isWordChar(text[e - 1] ?? "") && isWordChar(text[e] ?? "")) e += 1;
 			eo = e;
 		}
-		if (so === so0 && eo === eo0) return false;
+		let guard = 0;
+		while (
+			guard++ < 8 &&
+			scN instanceof Text &&
+			so === 0 &&
+			ecN instanceof Text &&
+			so < (scN.textContent ?? "").length
+		) {
+			const prev = anchorNeighborText(scN, -1);
+			if (!prev) break;
+			const left = prev.textContent ?? "";
+			const right = scN.textContent ?? "";
+			if (!isWordChar(left[left.length - 1] ?? "") || !isWordChar(right[0] ?? "")) break;
+			scN = prev;
+			let s = left.length;
+			while (
+				s > 0 &&
+				isWordChar(left[s - 1] ?? "") &&
+				isWordChar(s === left.length ? (right[0] ?? "") : (left[s] ?? ""))
+			)
+				s -= 1;
+			so = s;
+		}
+		while (
+			guard++ < 16 &&
+			ecN instanceof Text &&
+			eo === (ecN.textContent ?? "").length &&
+			scN instanceof Text &&
+			eo > 0
+		) {
+			const next = anchorNeighborText(ecN, 1);
+			if (!next) break;
+			const left = ecN.textContent ?? "";
+			const right = next.textContent ?? "";
+			if (!isWordChar(left[left.length - 1] ?? "") || !isWordChar(right[0] ?? "")) break;
+			ecN = next;
+			let e = 0;
+			while (
+				e < right.length &&
+				isWordChar(e === 0 ? (left[left.length - 1] ?? "") : (right[e - 1] ?? "")) &&
+				isWordChar(right[e] ?? "")
+			)
+				e += 1;
+			eo = e;
+		}
+		if (scN === sc && ecN === ec && so === so0 && eo === eo0) return false;
 		const anchorFirst = selection.anchorNode === sc && selection.anchorOffset === so0;
-		if (anchorFirst) selection.setBaseAndExtent(sc, so, ec, eo);
-		else selection.setBaseAndExtent(ec, eo, sc, so);
+		if (anchorFirst) selection.setBaseAndExtent(scN, so, ecN, eo);
+		else selection.setBaseAndExtent(ecN, eo, scN, so);
 		return true;
 	} catch {
 		return false;

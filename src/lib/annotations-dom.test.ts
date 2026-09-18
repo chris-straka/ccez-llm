@@ -326,6 +326,55 @@ describe("snapSelectionToWordEdges", () => {
 		expect(snapSelectionToWordEdges(sel)).toBe(true);
 		expect(sel.toString()).toBe("alpha beta gamma");
 	});
+
+	it("crosses badge anchors to complete a split word", () => {
+		// A badge anchor wraps one mid-word character: a double-click
+		// pick stops at the anchor's node edge ("automatisiert"),
+		// while the word runs through it ("automatisierten").
+		document.body.innerHTML =
+			'<p>automatisiert<span class="ccez-ann-anchor">e<button data-ann-badge="a1">1</button></span>n words</p>';
+		const first = document.querySelector("p")?.firstChild;
+		if (!(first instanceof Text)) throw new Error("no text");
+		const sel = selectIn(first, 0, 13);
+		expect(snapSelectionToWordEdges(sel)).toBe(true);
+		const range = sel.getRangeAt(0);
+		expect(range.startContainer).toBe(first);
+		expect(range.startOffset).toBe(0);
+		const end = range.endContainer;
+		if (!(end instanceof Text)) throw new Error("no end text");
+		expect(end.textContent).toBe("n words");
+		expect(range.endOffset).toBe(1);
+	});
+
+	it("crosses badge anchors backward, preserving direction", () => {
+		document.body.innerHTML =
+			'<p>automatisiert<span class="ccez-ann-anchor">e<button data-ann-badge="a1">1</button></span>n words</p>';
+		const last = document.querySelector("span.ccez-ann-anchor")?.nextSibling;
+		if (!(last instanceof Text)) throw new Error("no text");
+		const sel = window.getSelection();
+		if (!sel) throw new Error("no selection");
+		sel.setBaseAndExtent(last, 1, last, 0);
+		expect(snapSelectionToWordEdges(sel)).toBe(true);
+		const range = sel.getRangeAt(0);
+		expect(range.startContainer.textContent).toBe("automatisiert");
+		expect(range.startOffset).toBe(0);
+		expect(range.endContainer).toBe(last);
+		expect(range.endOffset).toBe(1);
+		// Backward stays backward: the anchor never moves.
+		expect(sel.anchorNode).toBe(last);
+		expect(sel.anchorOffset).toBe(1);
+		expect(sel.focusNode?.textContent).toBe("automatisiert");
+	});
+
+	it("stops at anchors when the word does not continue", () => {
+		document.body.innerHTML =
+			'<p>hi <span class="ccez-ann-anchor">a<button data-ann-badge="a1">1</button></span>bc</p>';
+		const first = document.querySelector("p")?.firstChild;
+		if (!(first instanceof Text)) throw new Error("no text");
+		const sel = selectIn(first, 0, 3);
+		expect(snapSelectionToWordEdges(sel)).toBe(false);
+		expect(sel.toString()).toBe("hi ");
+	});
 });
 
 describe("draft annotation persistence", () => {
