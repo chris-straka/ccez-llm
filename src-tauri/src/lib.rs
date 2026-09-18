@@ -194,7 +194,7 @@ pub fn run() {
     // entirely; localhost bind, never the default all-interfaces).
     // Lets an MCP driver session inspect the running app (screenshots,
     // DOM, console) while debugging UI reports.
-    #[cfg(debug_assertions)]
+    #[cfg(all(debug_assertions, desktop))]
     let builder = builder.plugin(
         tauri_plugin_mcp_bridge::Builder::new()
             .bind_address("127.0.0.1")
