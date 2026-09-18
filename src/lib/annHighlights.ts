@@ -17,6 +17,28 @@
 
 /** Highlight name under which annotation washes are registered. */
 export const ANN_HIGHLIGHT_NAME = "ccez-ann";
+/**
+ * Graded dimmer names for the wash fade ramp: the Highlight pseudo
+ * can't transition (probed: transitions and keyframes on
+ * ::highlight() are ignored in Chromium and WebKit), so the fade
+ * steps live → dim → faint → clear ~50ms apart instead. Same ranges,
+ * zero DOM churn — the eye reads the steps as a fade.
+ */
+export const ANN_HIGHLIGHT_DIM = "ccez-ann-dim";
+export const ANN_HIGHLIGHT_FAINT = "ccez-ann-faint";
+/** One ramp step: a graded name to paint, or null to clear. */
+export type WashRampStep = string | null;
+/**
+ * Pure fade schedule both directions. In runs faint → live (~100ms:
+ * fast enough to feel responsive); out runs dim → faint → clear
+ * (~150ms on top of the hover hysteresis). The walker lives in
+ * annotations.ts next to the registry ownership.
+ */
+export function washRampSchedule(ramp: "in" | "out"): WashRampStep[] {
+	return ramp === "in"
+		? [ANN_HIGHLIGHT_FAINT, ANN_HIGHLIGHT_NAME]
+		: [ANN_HIGHLIGHT_DIM, ANN_HIGHLIGHT_FAINT, null];
+}
 
 export interface HighlightRegistry {
 	set(name: string, highlight: object): void;
@@ -43,29 +65,37 @@ function registry(): HighlightRegistry | null {
 }
 
 /**
- * Paint wash ranges via CSS.highlights. No-op (returns false) where
- * unsupported — the caller keeps the mark-DOM path. Never throws.
+ * Paint wash ranges via CSS.highlights under one graded name
+ * (default live). No-op (returns false) where unsupported — the
+ * caller keeps the mark-DOM path. Never throws.
  */
-export function paintAnnotationWash(ranges: Range[]): boolean {
+export function paintAnnotationWash(ranges: Range[], name: string = ANN_HIGHLIGHT_NAME): boolean {
 	try {
 		const reg = registry();
 		if (!reg || ranges.length === 0) return false;
 		const Ctor = Highlight;
 		if (typeof Ctor !== "function") return false;
-		reg.set(ANN_HIGHLIGHT_NAME, new Ctor(...ranges));
+		reg.set(name, new Ctor(...ranges));
 		return true;
 	} catch {
 		return false;
 	}
 }
 
-/** Clear a previously painted annotation wash. Never throws. */
-export function clearAnnotationWash(): void {
+/** Clear one graded wash name (default live). Never throws. */
+export function clearAnnotationWash(name: string = ANN_HIGHLIGHT_NAME): void {
 	try {
-		registry()?.delete(ANN_HIGHLIGHT_NAME);
+		registry()?.delete(name);
 	} catch {
 		// Clearing is cosmetic: never break the stamp.
 	}
+}
+
+/** Clear every graded wash name (a fresh paint supersedes a mid-ramp fade). Never throws. */
+export function clearAnnotationWashes(): void {
+	clearAnnotationWash(ANN_HIGHLIGHT_NAME);
+	clearAnnotationWash(ANN_HIGHLIGHT_DIM);
+	clearAnnotationWash(ANN_HIGHLIGHT_FAINT);
 }
 
 /**

@@ -66,13 +66,15 @@ test("create box centers over narrow highlights, wide ones open at the cursor", 
 	const popBox = await pop.boundingBox();
 	const highlight = await page.evaluate(() => {
 		// Annotate consumed the live highlight, so read the pending
-		// wash range it painted instead (Highlight API: no DOM marks).
+		// wash range it painted instead (Highlight API: no DOM marks) —
+		// under any graded ramp name mid-fade, so union all three.
 		const reg = (
 			window as unknown as {
 				CSS?: { highlights?: { get(name: string): Set<Range> | undefined } };
 			}
 		).CSS?.highlights;
-		const ranges = [...(reg?.get("ccez-ann") ?? [])];
+		const names = ["ccez-ann", "ccez-ann-dim", "ccez-ann-faint"];
+		const ranges = names.flatMap((n) => [...(reg?.get(n) ?? [])]);
 		const r = ranges[0]?.getBoundingClientRect();
 		if (!r) return null;
 		return { left: r.left, width: r.width };

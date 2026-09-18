@@ -7,8 +7,10 @@
 import type { ChatMsgId } from "./chat";
 import {
 	clearAnnotationWash,
+	clearAnnotationWashes,
 	highlightsSupported,
-	paintAnnotationWash
+	paintAnnotationWash,
+	washRampSchedule
 } from "./annHighlights";
 
 /** Opaque annotation identifier (see ChatId/ChatMsgId in chat.ts). */
@@ -835,11 +837,31 @@ function washRanges(root: HTMLElement, items: AnnotationMark[], wash: string): R
  */
 let liveWashId: string | null = null;
 
+/** Step interval for the wash fade ramp (~100ms in, ~150ms out). */
+const WASH_FADE_STEP_MS = 50;
+/** The one in-flight ramp timer, if any (a single wash id feeds every body). */
+let washRampTimer: ReturnType<typeof setTimeout> | null = null;
+function cancelWashRamp(): void {
+	if (washRampTimer !== null) clearTimeout(washRampTimer);
+	washRampTimer = null;
+}
+/** Reduced-motion (or no matchMedia at all, e.g. tests) snaps instead of ramping. */
+function washSnaps(): boolean {
+	try {
+		if (typeof matchMedia !== "function") return true;
+		return matchMedia("(prefers-reduced-motion: reduce)").matches;
+	} catch {
+		return true;
+	}
+}
+
 /**
  * Paint the wash through the Highlight API: ranges over the untouched
  * DOM — hovering a badge or opening a draft moves zero DOM nodes, so
- * markers never flicker and shaping never breaks. No fade ramps (the
- * registry paints instantly); the DOM-mark fallback below keeps them.
+ * markers never flicker and shaping never breaks. The fade ramps
+ * through the graded registry names (faint → live in, live → dim →
+ * faint → clear out) because the pseudo itself can't transition;
+ * the DOM-mark fallback below keeps its own keyframed fades.
  */
 function paintWashHighlight(
 	root: HTMLElement,
@@ -849,14 +871,28 @@ function paintWashHighlight(
 ): void {
 	root.dataset.washStamped = wash ?? "";
 	// One wash shows at a time (a single wash id feeds every body):
-	// painting clears the registry first so a jump never double-paints.
+	// a fresh paint owns the registry, so it drops any mid-ramp fade
+	// first — otherwise the stale fade's last step wipes the new wash.
 	if (!skip && wash) {
 		const ranges = washRanges(root, items, wash);
 		if (ranges.length > 0) {
-			clearAnnotationWash();
+			cancelWashRamp();
+			clearAnnotationWashes();
 			root.dataset.washPainted = wash;
 			liveWashId = wash;
-			paintAnnotationWash(ranges);
+			if (washSnaps()) {
+				paintAnnotationWash(ranges);
+			} else {
+				// Faint lands now (no extra lag), live follows a step later.
+				const [first, second] = washRampSchedule("in");
+				paintAnnotationWash(ranges, first!);
+				washRampTimer = setTimeout(() => {
+					washRampTimer = null;
+					// Re-hovered or cleared mid-step: the fresh paint owns it now.
+					if (liveWashId !== wash) return;
+					paintAnnotationWash(ranges, second!);
+				}, WASH_FADE_STEP_MS);
+			}
 			return;
 		}
 	}
@@ -867,8 +903,38 @@ function paintWashHighlight(
 	const painted = root.dataset.washPainted || null;
 	root.dataset.washPainted = "";
 	if (painted !== null && painted === liveWashId) {
-		liveWashId = null;
-		clearAnnotationWash();
+		cancelWashRamp();
+		if (washSnaps()) {
+			liveWashId = null;
+			clearAnnotationWash();
+		} else {
+			// Live is already on screen — step dim → faint → clear.
+			const ranges = washRanges(root, items, painted);
+			if (ranges.length === 0) {
+				liveWashId = null;
+				clearAnnotationWash();
+			} else {
+				const schedule = washRampSchedule("out");
+				let step = 0;
+				const tick = (): void => {
+					washRampTimer = setTimeout(() => {
+						washRampTimer = null;
+						// A superseding paint already replaced it — stopping
+						// now never wipes the live wash.
+						if (liveWashId !== painted) return;
+						const name = schedule[step++]!;
+						if (name === null) {
+							liveWashId = null;
+							clearAnnotationWash();
+						} else {
+							paintAnnotationWash(ranges, name);
+							tick();
+						}
+					}, WASH_FADE_STEP_MS);
+				};
+				tick();
+			}
+		}
 	}
 }
 

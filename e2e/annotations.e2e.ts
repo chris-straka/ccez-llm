@@ -644,13 +644,15 @@ test("multi-paragraph wash paints no gaps and keeps the highlight", async ({ pag
 	const snapshot = () =>
 		page.evaluate(() => {
 			const root = document.querySelector("article .rendered");
-			// The preview wash paints Highlight ranges (no DOM marks).
+			// The preview wash paints Highlight ranges (no DOM marks) —
+		// under any graded ramp name mid-fade, so union all three.
 			const reg = (
 				window as unknown as {
 					CSS?: { highlights?: { get(name: string): Set<Range> | undefined } };
 				}
 			).CSS?.highlights;
-			const ranges = [...(reg?.get("ccez-ann") ?? [])].map((r) => r.toString());
+			const names = ["ccez-ann", "ccez-ann-dim", "ccez-ann-faint"];
+		const ranges = names.flatMap((n) => [...(reg?.get(n) ?? [])]).map((r) => r.toString());
 			const box = root?.querySelector("button.ccez-ann-badge")?.getBoundingClientRect();
 			return {
 				rangeCount: ranges.length,
