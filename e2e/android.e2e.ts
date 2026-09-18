@@ -1107,7 +1107,7 @@ test.describe("touch", () => {
 			await expect(page.locator(".ann-pop")).toHaveCount(0);
 			await expect(page.locator(".prompt textarea")).toHaveAttribute(
 				"placeholder",
-				"Add a comment"
+				"Edit annotation"
 			);
 			await expect(page.locator(".prompt textarea")).toHaveValue("first");
 		});
@@ -1133,7 +1133,7 @@ test.describe("touch", () => {
 			if (!bbox) throw new Error("badge has no box");
 			await page.touchscreen.tap(bbox.x + bbox.width / 2, bbox.y + bbox.height / 2);
 			const composer = page.locator(".prompt textarea");
-			await expect(composer).toHaveAttribute("placeholder", "Add a comment");
+			await expect(composer).toHaveAttribute("placeholder", "Edit annotation");
 			await expect(composer).toHaveValue("");
 			await composer.click();
 			await page.keyboard.type("revised", { delay: 10 });
@@ -1225,6 +1225,32 @@ test.describe("touch", () => {
 			]);
 			if (!col || !box) throw new Error("thread has no boxes");
 			expect(box.width).toBeLessThan(col.width - 10);
+		});
+
+		/** At the full-bleed text size the thread drops its rem gutter
+		and short assistant messages run ~99% wide, so huge type keeps
+		context instead of squeezing into the phone column. */
+		test("assistant messages go full-bleed at the full-bleed size", async ({ page }) => {
+			await seedChat(page, [
+				{ role: "user", content: "hi" },
+				{ role: "assistant", content: "hello back" }
+			]);
+			await page.addInitScript(() => {
+				window.localStorage.setItem(
+					"ccez-llm-settings-v1",
+					JSON.stringify({ hoverAssistantActions: true, hoverUserActions: true, promptIdleSec: 0, fontScale: 2.6 })
+				);
+			});
+			await page.goto("/");
+			await expect(page.locator(".app")).toHaveAttribute("data-fullbleed", "true");
+			const article = page.locator("article.assistant").first();
+			await expect(article).toBeVisible({ timeout: 15_000 });
+			const [col, box] = await Promise.all([
+				page.locator(".messages").boundingBox(),
+				article.boundingBox()
+			]);
+			if (!col || !box) throw new Error("thread has no boxes");
+			expect(box.width).toBeGreaterThan(col.width - 8);
 		});
 
 		/** Double-tapping a message taller than the screen scrolls its

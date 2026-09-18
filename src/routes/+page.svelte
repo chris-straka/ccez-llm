@@ -3817,7 +3817,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		promptAnnEdit = target;
 		reviewOpen = false;
 		editor?.setText(comment);
-		editor?.setPlaceholder("Add a comment");
+		// A saved note being revised says so; a fresh filing asks.
+		editor?.setPlaceholder("pending" in target ? "Add a comment" : "Edit annotation");
 		editor?.caretToEnd();
 		// Phones scroll the quote into the upper clear area first (the
 		// keyboard plus composer own the bottom): no manual scroll is
@@ -12181,6 +12182,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		edge: a rem floor keeps a real gutter on narrow phones. */
 		padding-left: max(0.5%, 1rem);
 		padding-right: max(0.5%, 1rem);
+	}
+	/* Full-bleed trades the gutter back for reading room: at huge
+	type the thread runs ~99% wide so giant glyphs keep context. */
+	.app[data-android][data-fullbleed] .messages {
+		padding-left: 0.5%;
+		padding-right: 0.5%;
 	}
 	/* Full-width settings sheet on phones: no sliver to tap, no
 	weird one-tap-close strip. left+right with auto width fills

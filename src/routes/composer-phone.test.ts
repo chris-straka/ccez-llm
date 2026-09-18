@@ -75,11 +75,23 @@ describe("phone composer two bars", () => {
 		const css = pageStyle();
 		// Assistant articles carry no side padding, so the thread
 		// gutter alone separates AI text from the edge: a bare 0.5%
-		// hairline (~2px) reads as edge-to-edge on phones.
-		expect(css).not.toMatch(/padding-left:\s*0\.5%;/);
-		expect(css).not.toMatch(/padding-right:\s*0\.5%;/);
-		expect(css).toContain("padding-left: max(0.5%, 1rem)");
-		expect(css).toContain("padding-right: max(0.5%, 1rem)");
+		// hairline (~2px) reads as edge-to-edge on phones. Full-bleed
+		// huge type is the one exception (reading room beats gutter).
+		const rules = [...css.matchAll(/\.app\[data-android\][^{]*\.messages\s*\{[^}]*\}/g)];
+		const plain = rules.filter(
+			(rule) => !rule[0].includes("[data-fullbleed]") && rule[0].includes("padding-left:")
+		);
+		expect(plain, "no plain android thread rule").not.toHaveLength(0);
+		for (const rule of plain) {
+			expect(rule[0]).toContain("padding-left: max(0.5%, 1rem)");
+			expect(rule[0]).toContain("padding-right: max(0.5%, 1rem)");
+		}
+		const fullbleed = rules.filter((rule) => rule[0].includes("[data-fullbleed]"));
+		expect(fullbleed, "no full-bleed thread rule").not.toHaveLength(0);
+		for (const rule of fullbleed) {
+			expect(rule[0]).toMatch(/padding-left:\s*0\.5%/);
+			expect(rule[0]).toMatch(/padding-right:\s*0\.5%/);
+		}
 	});
 
 	it("never collapses the tools bar or its buttons while idle", () => {
