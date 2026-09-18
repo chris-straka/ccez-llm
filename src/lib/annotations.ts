@@ -858,6 +858,16 @@ function washSnaps(): boolean {
 		return true;
 	}
 }
+/**
+ * Force layout on the message root after a terminal clear. Deleting
+ * registry names does not always invalidate the highlight overlay
+ * paint (the shell keeps the pixels until the next incidental
+ * repaint: select, blur, tab-switch). Sync reflow, wash-clear paths
+ * only — never on paint.
+ */
+function invalidateWashPaint(root: HTMLElement): void {
+	void root.offsetWidth;
+}
 
 /**
  * Paint the wash through the Highlight API: ranges over the untouched
@@ -903,6 +913,9 @@ function paintWashHighlight(
 				paintAnnotationWash(ranges);
 			} else {
 				// First grade lands now (no extra lag), the rest walk in.
+				// Every step re-locates: a mid-ramp re-stamp (streaming
+				// tokens) detaches the captured ranges, and repainting
+				// dead ranges would blink nothing.
 				const schedule = washRampSchedule("in");
 				paintAnnotationWash(ranges, schedule[0]!);
 				let step = 1;
@@ -911,7 +924,14 @@ function paintWashHighlight(
 						washRampTimer = null;
 						// Re-hovered or cleared mid-step: the fresh paint owns it now.
 						if (liveWashId !== wash) return;
-						paintAnnotationWash(ranges, schedule[step++]!);
+						const fresh = washRanges(root, items, wash);
+						if (fresh.length === 0) {
+							liveWashId = null;
+							clearAnnotationWashes();
+							invalidateWashPaint(root);
+							return;
+						}
+						paintAnnotationWash(fresh, schedule[step++]!);
 						if (step < schedule.length) tick();
 						else {
 							// Settled on live: drop the twins so only the live
@@ -941,12 +961,15 @@ function paintWashHighlight(
 		if (washSnaps()) {
 			liveWashId = null;
 			clearAnnotationWashes();
+			invalidateWashPaint(root);
 		} else {
 			// Live is already on screen — step dim → faint → clear.
+			// Every step re-locates (see the fade-in walker above).
 			const ranges = washRanges(root, items, painted);
 			if (ranges.length === 0) {
 				liveWashId = null;
 				clearAnnotationWashes();
+				invalidateWashPaint(root);
 			} else {
 				const schedule = washRampSchedule("out");
 				let step = 0;
@@ -960,9 +983,17 @@ function paintWashHighlight(
 						if (name === null) {
 							liveWashId = null;
 							clearAnnotationWashes();
+							invalidateWashPaint(root);
 						} else {
-							paintAnnotationWash(ranges, name);
-							tick();
+							const fresh = washRanges(root, items, painted);
+							if (fresh.length === 0) {
+								liveWashId = null;
+								clearAnnotationWashes();
+								invalidateWashPaint(root);
+							} else {
+								paintAnnotationWash(fresh, name);
+								tick();
+							}
 						}
 					}, WASH_FADE_STEP_MS);
 				};
