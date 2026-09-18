@@ -22,6 +22,8 @@ privileged (Keychain, updater, native TTS).
   Always Allow, never Allow (Allow is single-use and repeats every
   launch). `scripts/sign-dev-binary.sh` remains for manual use.
 - `bun run test` — Vitest, colocated `*.test.ts`. Safe anytime.
+- Spec-only changes (`e2e/`, `*.test.ts`) never touch the running app:
+  no restart, reload, or rerun needed — say so instead of implying one.
 - `bun run check` / `lint` / `build` — run `svelte-kit sync` and/or invalidate
   HMR. Per owner instruction (Sep 2026): run these whenever needed, dev
   servers or not — no idle batching.
@@ -82,7 +84,8 @@ the user has granted this once for all future turns, so finished work
 goes straight to a commit and `origin/main` when green. Scope is commit + push only:
 never amend, rebase, force-push, tag, or cut a release without an
 explicit ask in that turn. Name committed files explicitly, never
-`git add -A`.
+`git add -A`. One shared local checkout: a commit is already on the
+user's disk, so never say "pull" — report it as in place.
 
 ## Conventions
 
