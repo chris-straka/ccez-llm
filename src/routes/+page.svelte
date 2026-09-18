@@ -60,6 +60,7 @@
 		QUICK_LANG_CODES,
 		quickKeyFor,
 		replyLanguageFor,
+		thinkingLabelFor,
 		type LanguageMenu
 	} from "$lib/languages";
 	import {
@@ -4937,6 +4938,34 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			settings.customProviders
 		);
 	}
+
+	/** Seconds since the viewed chat started sending (the Thinking
+	chip counts the wait up). No cleanup return on purpose: token
+	updates may re-run this watcher mid-send, and tearing the
+	interval down there would stall the count — the branches below
+	own it for both send paths, so neither doSend nor resend
+	touches it. */
+	let sendElapsed = $state(0);
+	let sendTick: ReturnType<typeof setInterval> | null = null;
+	let wasSending = false;
+	$effect(() => {
+		const sending = isSending(chatState, viewChat.id);
+		if (sending && !wasSending) {
+			wasSending = true;
+			sendElapsed = 0;
+			const t0 = Date.now();
+			if (sendTick !== null) clearInterval(sendTick);
+			sendTick = setInterval(() => {
+				sendElapsed = Math.floor((Date.now() - t0) / 1000);
+			}, 1000);
+		} else if (!sending && wasSending) {
+			wasSending = false;
+			if (sendTick !== null) {
+				clearInterval(sendTick);
+				sendTick = null;
+			}
+		}
+	});
 
 	async function doSend() {
 		// Mobile in-prompt note edit owns the send arrow: file the
@@ -10055,7 +10084,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			{/each}
 			{#if isSending(chatState, viewChat.id)}
 				<p class="sending" role="status" aria-label="Waiting for a reply">
-					Thinking<span class="tdots" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>
+					<span class="sending-chip"
+						>{thinkingLabelFor(activeReplyCode ?? settings.replyLang)}<span class="tdots" aria-hidden="true"
+							><span>.</span><span>.</span><span>.</span></span
+						>{#if sendElapsed > 0}<span class="sending-elapsed" aria-hidden="true"
+								>· {sendElapsed}s</span
+							>{/if}</span
+					>
 				</p>
 			{/if}
 		</div>
@@ -15179,6 +15214,30 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		/* Breathing room, explicit (never UA margins): the status
 		stands off the last message above and the composer below. */
 		margin: 0.9rem 0 1.1rem;
+	}
+	/* The wait reads as one moment: a solid accent-tinted backplate
+	hugs the label, dots, and count (flex gap is the only spacing —
+	no literal spaces in the markup). No gradients, no glow. */
+	.sending-chip {
+		display: inline-flex;
+		align-items: baseline;
+		gap: 0.35em;
+		background: rgba(0, 122, 255, 0.1);
+		border-radius: 999px;
+		padding: 0.3em 0.8em;
+	}
+	:global(html[data-theme="dark"]) .sending-chip {
+		background: rgba(10, 132, 255, 0.18);
+	}
+	/* The dots carry the accent so the pulse reads in color even
+	before the first token lands. Scoped here: bare .tdots stays
+	ink-colored on aid buttons. */
+	.sending .tdots span {
+		color: var(--accent);
+	}
+	.sending-elapsed {
+		font-variant-numeric: tabular-nums;
+		opacity: 0.8;
 	}
 	/* Loading dots exist only while busy, so an idle aid button is
 	exactly its visible label — hover and spacing never cover text

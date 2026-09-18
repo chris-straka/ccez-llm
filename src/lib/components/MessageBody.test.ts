@@ -133,18 +133,27 @@ describe("badge hover hysteresis", () => {
 	/** Edge tremor fires over/out crossings tens of ms apart; an
 	instant clear flashes the wash (reads as the marker flickering).
 	The null wash waits out the tremor while badge-to-badge slides
-	stay instant. Asserts on source: jsdom sees no hover. */
+	stay instant — owned once for all bodies (see hoverWash), so a
+	gapped cross-message slide can't clobber the fresh wash. Asserts
+	on source: jsdom sees no hover (behavior lives in
+	hoverWash.test.ts). */
+	function washSource(): string {
+		return readFileSync(new URL("../hoverWash.ts", import.meta.url), "utf8");
+	}
 	function bodySource(): string {
 		return readFileSync(new URL("./MessageBody.svelte", import.meta.url), "utf8");
 	}
 	it("delays the null wash instead of clearing on mouseout", () => {
-		const source = bodySource();
+		const source = washSource();
 		expect(source).toMatch(/HOVER_WASH_CLEAR_MS\s*=\s*\d+/);
-		expect(source).toMatch(/hoverClearTimer\s*=\s*setTimeout/);
+		expect(source).toMatch(/timer\s*=\s*setTimeout/);
 	});
 	it("cancels the pending clear on re-enter", () => {
-		const source = bodySource();
-		expect(source).toMatch(/clearTimeout\(hoverClearTimer\)/);
+		const source = washSource();
+		expect(source).toMatch(/clearTimeout\(timer\)/);
+	});
+	it("bodies route hover through the shared machine", () => {
+		expect(bodySource()).toContain("$lib/hoverWash");
 	});
 });
 

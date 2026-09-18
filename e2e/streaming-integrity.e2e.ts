@@ -180,3 +180,32 @@ test("mid-stream annotation on the sent message survives the reply", async ({ pa
 	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1);
 	await expect(page.locator(".prompt-tools .ann-wrap")).toHaveCount(1);
 });
+
+/** The sending chip localizes to the chat reply language, counts the
+wait up in seconds, and wears its accent tint (all inside one slow
+mock stream). */
+test("thinking chip localizes, counts up, and tints", async ({ page }) => {
+	await page.addInitScript(() => {
+		window.localStorage.setItem("ccez-mock-provider", "1");
+		window.localStorage.setItem("ccez-mock-word-ms", "800");
+	});
+	await seedChat(page, [{ role: "user", content: "The quick brown fox jumps over the lazy dog." }], "ja");
+	await page.goto("/");
+	await expect(page.locator("article .rendered").first()).toBeVisible();
+	await page.locator(".ta-input").click();
+	await page.keyboard.type("tell me about foxes");
+	await page.keyboard.press("Enter");
+	const sending = page.locator(".sending");
+	await expect(sending).toContainText("考え中", { timeout: 15_000 });
+	await expect(sending.locator(".sending-elapsed")).toContainText(/· \d+s/, { timeout: 12_000 });
+	const tinted = await page.evaluate(() => {
+		const chip = document.querySelector(".sending-chip");
+		if (!(chip instanceof HTMLElement)) return false;
+		return getComputedStyle(chip).backgroundColor !== "rgba(0, 0, 0, 0)";
+	});
+	expect(tinted).toBe(true);
+	await expect(page.locator("article.assistant .rendered")).toContainText("Mock reply to: tell me about foxes", {
+		timeout: 30_000
+	});
+	await expect(sending).toHaveCount(0);
+});

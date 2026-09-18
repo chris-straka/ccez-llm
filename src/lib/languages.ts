@@ -133,3 +133,60 @@ export function quickKeyFor(code: string): string | null {
 	if (idx < 0) return null;
 	return idx === 9 ? "⌘0" : `⌘${idx + 1}`;
 }
+
+/**
+ * Sending-status "thinking" in the reply language (short status
+ * forms, not dictionary headwords — native speakers: corrections
+ * welcome). Unknown codes fall back to English.
+ */
+const THINKING_LABEL: Record<string, string> = {
+	fr: "Réflexion",
+	de: "Denken",
+	es: "Pensando",
+	pt: "Pensando",
+	ru: "Думаю",
+	pl: "Myślę",
+	it: "Pensando",
+	no: "Tenker",
+	cs: "Myslím",
+	el: "Σκέφτομαι",
+	ro: "Mă gândesc",
+	bg: "Мисля",
+	hu: "Gondolkodom",
+	uk: "Думаю",
+	nl: "Denken",
+	sv: "Tänker",
+	da: "Tænker",
+	fi: "Mietin",
+	sr: "Мислим",
+	sk: "Myslím",
+	zh: "思考中",
+	ja: "考え中",
+	ko: "생각 중",
+	ar: "تفكير",
+	hi: "सोच रहे हैं",
+	id: "Berpikir",
+	tr: "Düşünüyor",
+	fa: "تفکر",
+	th: "กำลังคิด",
+	vi: "Đang nghĩ",
+	hy: "Մտածում եմ",
+	ur: "سوچ رہے ہیں",
+	he: "חושב",
+	bn: "ভাবছি",
+	ta: "யோசிக்கிறேன்",
+	tl: "Nag-iisip",
+	ms: "Berfikir",
+	sw: "Inafikiria",
+	am: "እያሰብኩ",
+	yue: "諗緊",
+	la: "Cogito",
+	grc: "Φρονῶ",
+	sa: "चिन्तयामि"
+};
+
+/** Sending-status label for a reply-language code; English fallback. */
+export function thinkingLabelFor(code: string | null): string {
+	if (!code) return "Thinking";
+	return THINKING_LABEL[code] ?? "Thinking";
+}

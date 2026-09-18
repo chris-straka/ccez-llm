@@ -7,7 +7,8 @@ import {
 	CLASSICAL_LANGUAGES,
 	QUICK_LANG_CODES,
 	quickKeyFor,
-	replyLanguageFor
+	replyLanguageFor,
+	thinkingLabelFor
 } from "./languages";
 
 describe("reply languages", () => {
@@ -126,5 +127,25 @@ describe("reply languages", () => {
 		expect(quickKeyFor("ru")).toBe("⌘0");
 		expect(quickKeyFor("it")).toBeNull();
 		expect(quickKeyFor("xx")).toBeNull();
+	});
+
+	it("labels thinking in every reply language, English fallback", () => {
+		const all = [
+			...EUROPEAN_LANGUAGES,
+			...ASIAN_LANGUAGES,
+			...AFRICAN_LANGUAGES,
+			...CLASSICAL_LANGUAGES
+		];
+		expect(all.length).toBeGreaterThan(0);
+		for (const lang of all) {
+			const label = thinkingLabelFor(lang.code);
+			expect(label.length).toBeGreaterThan(0);
+			expect(label).not.toBe(lang.code);
+		}
+		expect(thinkingLabelFor(null)).toBe("Thinking");
+		expect(thinkingLabelFor("xx")).toBe("Thinking");
+		expect(thinkingLabelFor("ja")).toBe("考え中");
+		expect(thinkingLabelFor("ar")).toBe("تفكير");
+		expect(thinkingLabelFor("fr")).toBe("Réflexion");
 	});
 });

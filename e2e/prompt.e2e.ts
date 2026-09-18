@@ -435,7 +435,7 @@ test("prompt types and sends without vim", async ({ page }) => {
 	// Ctrl+G still hops out to scroll mode.
 	await page.locator(".ta-input").click();
 	await page.keyboard.press("Control+g");
-	await expect(page.locator(".ta-input")).toHaveAttribute("placeholder", "ctrl+g to hop back in");
+	await expect(page.locator(".ta-input")).toHaveAttribute("placeholder", " Ctrl+G to hop back in");
 });
 
 /** j past the newest message drops back into the prompt. */

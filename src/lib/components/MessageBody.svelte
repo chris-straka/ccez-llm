@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onDestroy, tick, untrack } from "svelte";
+	import { tick, untrack } from "svelte";
 	import { SvelteSet } from "svelte/reactivity";
 	// KaTeX stylesheet (fonts bundle relative to it, so math renders offline).
 	import "katex/dist/katex.min.css";
@@ -16,6 +16,7 @@
 	import { mathCopyText, foldPreviewText } from "$lib/render-math";
 	import { codeRunBody, runCodeBlock } from "$lib/coderun";
 	import { closestFromTarget } from "$lib/events";
+	import { badgeHover } from "$lib/hoverWash";
 	import type { AttachTagModel, SentTagAction } from "$lib/attachments";
 	import type { ChatMsg, ChatMsgId } from "$lib/chat";
 	import { applyMarks, annRefsFor, type AnnotationMark, type AnnotationId } from "$lib/annotations";
@@ -367,58 +368,25 @@
 	 * wash-free on purpose: Tab reaches the markers, never the highlights.
 	 */
 	/**
-	 * Null washes already reported: mouseovers fire for every child
-	 * under the cursor, so re-reporting null while pointed at plain
-	 * text bounced the parent (and every body) for nothing — hovering
-	 * near the pinyin button flickered mounted marks. Non-null ids
-	 * always report: suppressing a repeat could strand a wash the
-	 * parent cleared another way. Starts sent: the parent opens null.
-	 */
-	/**
 	 * Wash-clear hysteresis, in ms: a hand trembles at the badge's
 	 * edge, and every over/out crossing repaints instantly — rapid
-	 * paint/clear reads as the marker flickering. A null wash waits
-	 * out the tremor (a re-enter cancels it); genuine leaves still
-	 * clear faster than perception. Non-null washes always report
-	 * at once, so badge-to-badge slides never lag.
+	 * paint/clear reads as the marker flickering. The hysteresis lives
+	 * once for all bodies (see hoverWash): a per-body null timer lets
+	 * a gapped badge-to-badge slide clobber the fresh wash, reading
+	 * as flicker on multi-annotation chats.
 	 */
-	const HOVER_WASH_CLEAR_MS = 120;
-	let hoverClearTimer: ReturnType<typeof setTimeout> | null = null;
-	onDestroy(() => {
-		if (hoverClearTimer !== null) clearTimeout(hoverClearTimer);
-	});
-	let hoverNullSent = true;
 	function onBadgeOver(event: MouseEvent): void {
 		const id = badgeIdOf(event.target);
-		if (id !== null) {
-			if (hoverClearTimer !== null) {
-				clearTimeout(hoverClearTimer);
-				hoverClearTimer = null;
-			}
-			hoverNullSent = false;
-			onBadgeHover?.(id);
-			return;
-		}
 		// Pointed at plain text: a pending clear owns the null
 		// report (mouseout always lands before this mouseover, so
 		// the timer is already armed) — reporting here too would
 		// clear inside the hysteresis window it just opened.
-		if (hoverClearTimer !== null) return;
-		if (hoverNullSent) return;
-		hoverNullSent = true;
-		onBadgeHover?.(null);
+		badgeHover((wash) => onBadgeHover?.(wash), id);
 	}
 
 	function onBadgeOut(event: MouseEvent): void {
 		const to = closestFromTarget(event.relatedTarget, "[data-ann-badge]");
-		if (to) return;
-		if (hoverNullSent) return;
-		hoverNullSent = true;
-		if (hoverClearTimer !== null) clearTimeout(hoverClearTimer);
-		hoverClearTimer = setTimeout(() => {
-			hoverClearTimer = null;
-			onBadgeHover?.(null);
-		}, HOVER_WASH_CLEAR_MS);
+		badgeHover((wash) => onBadgeHover?.(wash), null, { toBadge: to !== null });
 	}
 
 	/** Press point for the unfold below: a drag that ends on a folded
