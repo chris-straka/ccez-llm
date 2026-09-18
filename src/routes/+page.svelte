@@ -169,6 +169,7 @@ import {
 		newAnnotationId,
 		rewriteAnnotationComment,
 		quoteRange,
+		rangesExcludingReadings,
 		wrapRangeExcludingBadges,
 		unwrapMark,
 		invalidateWashPaint,
@@ -4138,7 +4139,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				const range = locate();
 				if (!range) return false;
 				root = rootOf(range);
-				return paintAnnotationWash([range], ANN_FLASH_NAME);
+				return paintAnnotationWash(rangesExcludingReadings(range), ANN_FLASH_NAME);
 			};
 			const nudgeLiveRoot = (): void => {
 				// Resolve the root fresh: a re-render mid-scroll
@@ -4165,7 +4166,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			stopJumpFlash = startHighlightFade({
 				locate,
 				paint: (range, name) => {
-					paintAnnotationWash([range], name);
+					paintAnnotationWash(rangesExcludingReadings(range), name);
 				},
 				clear: (name) => clearAnnotationWash(name),
 				full: ANN_FLASH_NAME,

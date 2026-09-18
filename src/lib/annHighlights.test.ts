@@ -95,6 +95,21 @@ describe("CSS.highlights annotation wash", () => {
 		expect(sameWashRanges([at(1, 5)], [at(0, 5)])).toBe(false);
 		expect(sameWashRanges([], [])).toBe(true);
 		expect(sameWashRanges([at(0, 5)], [])).toBe(false);
+		// Multi-range washes (readings split one quote): pairwise,
+		// so a relocated streaming re-stamp never reads as same.
+		expect(
+			sameWashRanges(
+				[at(0, 2), at(3, 5)],
+				[at(0, 2), at(3, 5)]
+			)
+		).toBe(true);
+		expect(
+			sameWashRanges(
+				[at(0, 2), at(3, 5)],
+				[at(0, 2), at(3, 6)]
+			)
+		).toBe(false);
+		expect(sameWashRanges([at(0, 2)], [at(0, 2), at(3, 5)])).toBe(false);
 		root.remove();
 	});
 	it("liveWashRanges is empty where unsupported", () => {

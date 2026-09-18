@@ -10,6 +10,7 @@ import {
 	saveDraftAnnotations,
 	snapSelectionToWordEdges,
 	quoteRange,
+	rangesExcludingReadings,
 	wrapRangeInMark,
 	wrapRangeExcludingBadges,
 	unwrapMark,
@@ -479,6 +480,55 @@ describe("quoteRange", () => {
 		const range = quoteRange(root, "word");
 		expect(range?.startContainer.textContent).toBe("Paragraph 0. wo");
 		expect(range?.endContainer.textContent).toBe("d here.");
+		root.remove();
+	});
+});
+
+describe("rangesExcludingReadings", () => {
+	/** Wash-style range: text-node endpoints, like every wash path builds. */
+	function textRange(first: Node, last: Node): Range {
+		if (!(first instanceof Text) || !(last instanceof Text)) throw new Error("fixture shape");
+		const range = document.createRange();
+		range.setStart(first, 0);
+		range.setEnd(last, last.textContent?.length ?? 0);
+		return range;
+	}
+
+	it("splits overlay furigana out, keeping every base run", () => {
+		const root = document.createElement("div");
+		root.innerHTML =
+			'<p><span class="frb">漢字<span class="frt">かんじ</span></span>を読む</p>';
+		document.body.appendChild(root);
+		const base = root.querySelector(".frb")!.firstChild!;
+		const tail = root.querySelector("p")!.lastChild!;
+		const parts = rangesExcludingReadings(textRange(base, tail));
+		// Joined sub-range text proves both halves at once: every
+		// base run covered, no reading text inside any range.
+		expect(parts.map((r) => r.toString()).join("")).toBe("漢字を読む");
+		expect(parts).toHaveLength(2);
+		root.remove();
+	});
+
+	it("splits native ruby readings out the same way", () => {
+		const root = document.createElement("div");
+		root.innerHTML = "<p><ruby>秋<rt>あき</rt></ruby>の朝</p>";
+		document.body.appendChild(root);
+		const base = root.querySelector("ruby")!.firstChild!;
+		const tail = root.querySelector("p")!.lastChild!;
+		const parts = rangesExcludingReadings(textRange(base, tail));
+		expect(parts.map((r) => r.toString()).join("")).toBe("秋の朝");
+		expect(parts).toHaveLength(2);
+		root.remove();
+	});
+
+	it("leaves a reading-free range whole", () => {
+		const root = document.createElement("div");
+		root.innerHTML = "<p>say hello world today</p>";
+		document.body.appendChild(root);
+		const p = root.querySelector("p")!;
+		const parts = rangesExcludingReadings(textRange(p.firstChild!, p.lastChild!));
+		expect(parts).toHaveLength(1);
+		expect(parts[0]?.toString()).toBe("say hello world today");
 		root.remove();
 	});
 });

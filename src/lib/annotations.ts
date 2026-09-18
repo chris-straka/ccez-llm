@@ -879,6 +879,61 @@ function wrapLeaving(root: HTMLElement, items: AnnotationMark[], fading: string)
  * cluster): the Highlight-API wash paints these over the untouched
  * DOM — no wrapping, no text-node splits, no shaping breaks.
  */
+/** Reading overlays a wash must never cover: native ruby (rt/rp)
+ * and overlay readings (.frt) are paint, never content. */
+const WASH_READING_SELECTOR = "rt, rp, .frt";
+
+/**
+ * Split a wash range around reading overlays. The Highlight registry
+ * paints every text node a range touches — endpoints alone can't
+ * exclude the readings physically between two base runs, so hovering
+ * a Japanese or Chinese quote double-highlights its furigana/pinyin.
+ * Returns sub-ranges covering exactly the non-reading text (empty
+ * when nothing quotable lies inside). Falls back to the input range
+ * rather than breaking the paint. Never throws.
+ */
+export function rangesExcludingReadings(range: Range): Range[] {
+	try {
+		if (range.collapsed) return [];
+		const doc = range.startContainer.ownerDocument ?? null;
+		if (!doc) return [range];
+		const scope =
+			range.commonAncestorContainer instanceof Element
+				? range.commonAncestorContainer
+				: range.commonAncestorContainer.parentElement;
+		if (!scope) return [range];
+		const out: Range[] = [];
+		const walker = doc.createTreeWalker(scope, NodeFilter.SHOW_TEXT);
+		while (walker.nextNode()) {
+			const node = walker.currentNode;
+			if (!(node instanceof Text)) continue;
+			let inside = false;
+			try {
+				inside = range.intersectsNode(node);
+			} catch {
+				inside = false;
+			}
+			if (!inside) continue;
+			if (node.parentElement?.closest(WASH_READING_SELECTOR) !== null) continue;
+			const len = node.textContent?.length ?? 0;
+			let from = 0;
+			let to = len;
+			if (node === range.startContainer) from = range.startOffset;
+			if (node === range.endContainer) to = range.endOffset;
+			from = Math.max(0, Math.min(from, len));
+			to = Math.max(0, Math.min(to, len));
+			if (to <= from) continue;
+			const sub = doc.createRange();
+			sub.setStart(node, from);
+			sub.setEnd(node, to);
+			if (!sub.collapsed) out.push(sub);
+		}
+		return out;
+	} catch {
+		return [range];
+	}
+}
+
 function washRanges(root: HTMLElement, items: AnnotationMark[], wash: string): Range[] {
 	const item = items.find((i) => i.id === wash);
 	if (!item) return [];
@@ -899,7 +954,10 @@ function washRanges(root: HTMLElement, items: AnnotationMark[], wash: string): R
 		range.setStart(startNode, expandWrapStart(startText, Math.min(loc.startOffset, startText.length)));
 		range.setEnd(endNode, expandWrapEnd(endText, Math.min(loc.endOffset, endText.length)));
 		if (range.collapsed) return [];
-		return [range];
+		// One range spans every reading physically between the base
+		// runs — split them out so the registry never paints overlay
+		// text (readings stay gray while the base washes yellow).
+		return rangesExcludingReadings(range);
 	} catch {
 		return [];
 	}

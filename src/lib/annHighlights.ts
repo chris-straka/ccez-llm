@@ -148,15 +148,20 @@ export function liveWashRanges(): AbstractRange[] {
  * while a same-content re-stamp does not. Pure — unit-tested.
  */
 export function sameWashRanges(a: AbstractRange[], b: AbstractRange[]): boolean {
-	if (a.length !== 1 || b.length !== 1) return a.length === b.length;
-	const x = a[0]!;
-	const y = b[0]!;
-	return (
-		x.startContainer === y.startContainer &&
-		x.startOffset === y.startOffset &&
-		x.endContainer === y.endContainer &&
-		x.endOffset === y.endOffset
-	);
+	// Multi-range washes (readings split one quote into several):
+	// equal counts alone must not read as same — a streaming
+	// re-stamp relocates every endpoint, and skipping that repaint
+	// leaves the wash stuck on dead nodes. Compare pairwise.
+	if (a.length !== b.length) return false;
+	return a.every((x, i) => {
+		const y = b[i]!;
+		return (
+			x.startContainer === y.startContainer &&
+			x.startOffset === y.startOffset &&
+			x.endContainer === y.endContainer &&
+			x.endOffset === y.endOffset
+		);
+	});
 }
 
 /**
