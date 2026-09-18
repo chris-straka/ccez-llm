@@ -27,24 +27,6 @@ android {
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
         versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")
     }
-    // Side-by-side installs: the dev flavor is a separate app
-    // (studio.ccez.app.dev, "Ccez LLM Dev") with its own data, so a
-    // dev build never clobbers the release install. Install it with
-    // `./gradlew :app:installArm64DevDebug`; the prod flavor keeps the
-    // identifier above for `tauri android build` and the store.
-    flavorDimensions += "tier"
-    productFlavors {
-        create("dev") {
-            dimension = "tier"
-            applicationIdSuffix = ".dev"
-            versionNameSuffix = "-dev"
-            resValue("string", "app_name", "Ccez LLM Dev")
-            resValue("string", "main_activity_title", "Ccez LLM Dev")
-        }
-        create("prod") {
-            dimension = "tier"
-        }
-    }
     // Release signing from keystore.properties (written by CI from secrets).
     // Absent locally, so unsigned local builds keep working untouched.
     val keystorePropertiesFile = rootProject.file("keystore.properties")
@@ -62,6 +44,13 @@ android {
     }
     buildTypes {
         getByName("debug") {
+            applicationIdSuffix = ".debug"
+            // Debug installs next to release (see debugApplicationIdSuffix
+            // in tauri.conf.json): its own launcher label tells the two
+            // icons apart. The CLI owns the suffix line above; it leaves
+            // these alone.
+            resValue("string", "app_name", "Ccez LLM Dev")
+            resValue("string", "main_activity_title", "Ccez LLM Dev")
             manifestPlaceholders["usesCleartextTraffic"] = "true"
             isDebuggable = true
             isJniDebuggable = true
@@ -87,24 +76,6 @@ android {
 
     buildFeatures {
         buildConfig = true
-    }
-}
-
-// `tauri android dev` invokes bare per-arch tasks (assembleArm64Debug);
-// with the tier dimension those names are ambiguous, which breaks the
-// normal dev workflow. Alias them to the dev flavor so the same command
-// keeps working and installs studio.ccez.app.dev ("Ccez LLM Dev")
-// next to the release app instead of clobbering it.
-listOf("Arm64", "Arm", "X86", "X86_64").forEach { arch ->
-    tasks.register("assemble${arch}Debug") {
-        dependsOn("assemble${arch}DevDebug")
-        group = "build"
-        description = "Alias for the dev flavor (tauri android dev entry point)."
-    }
-    tasks.register("install${arch}Debug") {
-        dependsOn("install${arch}DevDebug")
-        group = "install"
-        description = "Alias for the dev flavor install."
     }
 }
 
