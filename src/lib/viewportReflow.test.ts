@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { isKeyboardOpen, keyboardOverlapPx, nextPinArm, pinArmStart } from "./viewportReflow";
+import {
+	isKeyboardOpen,
+	keyboardOverlapPx,
+	nativeResizeActive,
+	nextPinArm,
+	pinArmStart
+} from "./viewportReflow";
 
 describe("keyboardOverlapPx", () => {
 	it("is zero when the viewport fills the window", () => {
@@ -47,5 +53,18 @@ describe("nextPinArm", () => {
 			state = nextPinArm(state, open);
 			expect(state.armed).toBe(false);
 		}
+	});
+});
+
+describe("nativeResizeActive", () => {
+	it("is true once the layout shrank past the floor", () => {
+		expect(nativeResizeActive(800, 800)).toBe(false);
+		expect(nativeResizeActive(800, 750)).toBe(false);
+		expect(nativeResizeActive(800, 700)).toBe(true);
+		expect(nativeResizeActive(800, 500)).toBe(true);
+	});
+
+	it("never fires when the layout grew", () => {
+		expect(nativeResizeActive(800, 900)).toBe(false);
 	});
 });

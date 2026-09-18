@@ -52,3 +52,14 @@ export function nextPinArm(state: PinArmState, open: boolean): PinArmState {
 	if (state.sawOpen) return { armed: true, sawOpen: true };
 	return { armed: false, sawOpen: true };
 }
+
+/**
+ * True when the layout viewport itself shrank well below its
+ * keyboard-closed height — i.e. the native resize (adjustResize) is
+ * already gliding the layout and a JS height pin would only fight it
+ * with coarser snapshots. The caller tracks the keyboard-closed
+ * baseline and passes it as fullHeight.
+ */
+export function nativeResizeActive(fullHeight: number, innerHeight: number, minShrink = 100): boolean {
+	return fullHeight - innerHeight >= minShrink;
+}
