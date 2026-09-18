@@ -90,6 +90,7 @@
 		type SubmitKind
 	} from "$lib/editor";
 	import { createTextareaEditor } from "$lib/textarea-editor";
+	import { errorMessage } from "$lib/errors";
 	import {
 		SCROLLKEY_LINE_PX,
 		SCROLLKEY_SKIP_PX,
@@ -6202,13 +6203,16 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		try {
 			drag = getCurrentWindow().startDragging();
 		} catch (error) {
-			drag = Promise.reject(error instanceof Error ? error : new Error(String(error)));
+			drag = Promise.reject(error instanceof Error ? error : new Error(errorMessage(error)));
 		}
 		drag.catch((error: unknown) => {
 			// A denial here once meant a silently immovable window (the
 			// capability missed `core:window:allow-start-dragging`). Never
-			// silent again: log always, toast once per session.
-			const message = error instanceof Error ? error.message : String(error);
+			// silent again: log always, toast once per session. The
+			// rejection is often a plain object, never an Error, so the
+			// message goes through errorMessage — String() printed
+			// "[object Object]" into this toast.
+			const message = errorMessage(error);
 			console.warn("Window drag failed:", message);
 			if (!dragWarned) {
 				dragWarned = true;
