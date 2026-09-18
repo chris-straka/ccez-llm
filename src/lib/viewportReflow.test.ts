@@ -15,9 +15,12 @@ describe("keyboardOverlapPx", () => {
 		expect(keyboardOverlapPx(800, 800)).toBe(0);
 	});
 
-	it("measures the covered pixels minus the viewport offset", () => {
+	it("measures the covered pixels, ignoring any focus pan offset", () => {
+		// A panned-open keyboard (visual viewport shrunk AND shifted)
+		// still reads fully open: the pan moves toward the keyboard,
+		// never away from it.
 		expect(keyboardOverlapPx(800, 500)).toBe(300);
-		expect(keyboardOverlapPx(800, 500, 20)).toBe(280);
+		expect(isKeyboardOpen(800, 500)).toBe(true);
 	});
 
 	it("never goes negative", () => {

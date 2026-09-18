@@ -2,17 +2,19 @@
  * Viewport reflow helpers (search-mobile bucket): pure math for the
  * VisualViewport-based composer reflow above the Android keyboard.
  * Call sites feed `window.innerHeight` plus the visual viewport's
- * height/offsetTop; tests pass explicit values — Vitest runs in node,
- * where no viewport exists.
+ * height; tests pass explicit values — Vitest runs in node, where no
+ * viewport exists.
  */
 
-/** Pixels of the layout viewport covered by the keyboard (0 when closed). */
-export function keyboardOverlapPx(
-	innerHeight: number,
-	viewportHeight: number,
-	viewportOffsetTop = 0
-): number {
-	return Math.max(0, innerHeight - viewportHeight - viewportOffsetTop);
+/**
+ * Pixels of the layout viewport covered by the keyboard (0 when
+ * closed). Deliberately ignores the visual viewport's offset: on
+ * phones the viewport only ever offsets as a focus pan *toward* the
+ * just-opened keyboard, so subtracting it hides real opens and
+ * strands the composer underneath.
+ */
+export function keyboardOverlapPx(innerHeight: number, viewportHeight: number): number {
+	return Math.max(0, innerHeight - viewportHeight);
 }
 
 /**
@@ -23,10 +25,9 @@ export function keyboardOverlapPx(
 export function isKeyboardOpen(
 	innerHeight: number,
 	viewportHeight: number,
-	viewportOffsetTop = 0,
 	minOverlap = 100
 ): boolean {
-	return keyboardOverlapPx(innerHeight, viewportHeight, viewportOffsetTop) >= minOverlap;
+	return keyboardOverlapPx(innerHeight, viewportHeight) >= minOverlap;
 }
 
 /**

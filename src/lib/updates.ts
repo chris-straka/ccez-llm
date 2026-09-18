@@ -5,7 +5,7 @@
 // at all) there is nothing to check — a redeploy updates the site, so the
 // updater stays disabled.
 export const RELEASES_URL =
-	"https://github.com/chris-straka/personalized-llm-client/releases/latest";
+	"https://github.com/chris-straka/ccez-llm/releases/latest";
 
 export type UpdateRoute =
 	| { kind: "updater" }

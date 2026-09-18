@@ -8498,8 +8498,37 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			});
 			if (closestFromTarget(event.target, ".ta-input")) {
 				focusMode = "edit";
+				// A frame later, like the annotation pill paths: the
+				// pan lands with or just after the focus event.
+				void tick().then(repinThreadBehindPromptFocus);
 			}
 		};
+		/** Thread position stamped on a composer press (the focus pan
+		reads it back). Null outside composer presses. */
+		let promptPressSt: { sx: number; sy: number; st: number } | null = null;
+		/**
+		 * Phones re-pin the thread behind composer focus: the WebView
+		 * pans on textbox focus (same quirk the annotation pill paths
+		 * work around), snapping the thread even though the
+		 * bottom-docked field was already visible — worst mid keyboard
+		 * transition, when the pan targets stale geometry and the
+		 * thread jumps, the keyboard covers, and the native resize
+		 * jumps again. Restore only when the field landed on screen;
+		 * a genuinely hidden field keeps its browser scroll.
+		 */
+		function repinThreadBehindPromptFocus(): void {
+			if (!androidUI || !promptPressSt) return;
+			const { sx, sy, st } = promptPressSt;
+			promptPressSt = null;
+			const field = document.querySelector(".prompt .ta-input");
+			const box = scrollBox;
+			if (!(field instanceof HTMLElement) || !box || !window.visualViewport) return;
+			const r = field.getBoundingClientRect();
+			const vv = window.visualViewport;
+			if (r.top < 0 || r.left < 0 || r.bottom > vv.height || r.right > vv.width) return;
+			if (window.scrollX !== sx || window.scrollY !== sy) window.scrollTo(sx, sy);
+			if (box.scrollTop !== st) box.scrollTop = st;
+		}
 		// Badge press switches the edit box directly (A → B in one
 		// click). Mousedown with preventDefault runs before the open
 		// textarea's blur-save can fire, so the current pop saves and
@@ -9308,8 +9337,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// phones keep stylesheet height.
 			if (androidUI && appEl && window.visualViewport) {
 				const vv = window.visualViewport;
-				const overlap = keyboardOverlapPx(window.innerHeight, vv.height, vv.offsetTop);
-				const open = isKeyboardOpen(window.innerHeight, vv.height, vv.offsetTop);
+				const overlap = keyboardOverlapPx(window.innerHeight, vv.height);
+				const open = isKeyboardOpen(window.innerHeight, vv.height);
 				if (kbFreshOpen(kbClosedFrames, open)) {
 					// Fresh episode starts clean like the first tap: a
 					// leaked armed pin (or a baseline refreshed mid-close)
@@ -9349,12 +9378,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				// no-shrink fallback: arm here, on stable heights.
 				if (androidUI && appEl && window.visualViewport) {
 					const vv = window.visualViewport;
-					const overlap = keyboardOverlapPx(window.innerHeight, vv.height, vv.offsetTop);
+					const overlap = keyboardOverlapPx(window.innerHeight, vv.height);
 					const settled = settlePin(
 						kbPin,
 						fullInnerHeight,
 						window.innerHeight,
-						isKeyboardOpen(window.innerHeight, vv.height, vv.offsetTop)
+						isKeyboardOpen(window.innerHeight, vv.height)
 					);
 					const wasArmed = kbPin.armed;
 					kbPin = settled.pin;
@@ -9381,6 +9410,26 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		window.addEventListener("keyup", releaseScrollHold);
 		window.addEventListener("blur", onBlur);
 		window.addEventListener("focusin", onFocusIn);
+		// Stamp the thread position on every composer press (capture:
+		// the stamp must predate the focus pan). The focusin guard
+		// reads it back a frame after focus lands in the field.
+		const onPromptPress = (event: PointerEvent): void => {
+			if (!androidUI || event.button !== 0) {
+				promptPressSt = null;
+				return;
+			}
+			const target = event.target instanceof Element ? event.target : null;
+			if (!target?.closest(".prompt")) {
+				promptPressSt = null;
+				return;
+			}
+			promptPressSt = {
+				sx: window.scrollX,
+				sy: window.scrollY,
+				st: scrollBox?.scrollTop ?? 0
+			};
+		};
+		window.addEventListener("pointerdown", onPromptPress, true);
 		window.addEventListener("mousedown", dismissReview, true);
 		window.addEventListener("mousedown", onBadgePress, true);
 		window.addEventListener("mousedown", preserveMessageHighlight, true);
@@ -9491,6 +9540,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		window.removeEventListener("keyup", releaseScrollHold);
 			window.removeEventListener("blur", onBlur);
 			window.removeEventListener("focusin", onFocusIn);
+			window.removeEventListener("pointerdown", onPromptPress, true);
 			window.removeEventListener("mousedown", dismissReview, true);
 			window.removeEventListener("mousedown", onBadgePress, true);
 			window.removeEventListener("mousedown", preserveMessageHighlight, true);
