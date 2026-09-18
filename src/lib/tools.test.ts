@@ -20,6 +20,11 @@ describe("fetchToolDef", () => {
 		expect(def.function.name).toBe(FETCH_TOOL_NAME);
 		expect(def.function.parameters.required).toEqual(["url"]);
 	});
+	it("never invites the model to self-test the tool", () => {
+		// A bare "test" once came back as a narrated fetch: the tool
+		// fires only for asked external information, never itself.
+		expect(fetchToolDef().function.description).toContain("Never call it to test itself");
+	});
 });
 
 describe("validFetchUrl", () => {

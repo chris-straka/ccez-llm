@@ -1079,7 +1079,7 @@ test.describe("touch", () => {
 			await page.locator(".prompt textarea").click();
 			await page.keyboard.type("nice point", { delay: 10 });
 			await page.locator(".send-btn").click();
-			await expect(page.locator(".toast")).toHaveText("Draft annotation saved");
+			await expect(page.locator(".toast")).toHaveText("Annotation saved");
 			await expect(page.locator(".ann-pill")).toBeVisible();
 		});
 
@@ -1110,6 +1110,121 @@ test.describe("touch", () => {
 				"Add a comment"
 			);
 			await expect(page.locator(".prompt textarea")).toHaveValue("first");
+		});
+
+		/** Tapping a badge edits its note through the composer: the tap
+		must survive the tap-out rule (capture press opens before the
+		bubble tap-out check), the composer starts empty, and the send
+		arrow files the note instead of sending a chat. */
+		test("tapping a badge rewrites its note through the composer", async ({ page }) => {
+			await seedChat(page, [{ role: "assistant", content: "alpha beta gamma delta" }]);
+			await page.addInitScript(() => {
+				window.localStorage.setItem(
+					"ccez-llm-annotations-v1",
+					JSON.stringify({
+						"e2e-chat": [{ id: "ann-1", messageId: "e2e-m0", quote: "beta", comment: "first" }]
+					})
+				);
+			});
+			await page.goto("/");
+			const badge = page.locator("[data-ann-badge]").first();
+			await expect(badge).toBeVisible({ timeout: 15_000 });
+			const bbox = await badge.boundingBox();
+			if (!bbox) throw new Error("badge has no box");
+			await page.touchscreen.tap(bbox.x + bbox.width / 2, bbox.y + bbox.height / 2);
+			const composer = page.locator(".prompt textarea");
+			await expect(composer).toHaveAttribute("placeholder", "Add a comment");
+			await expect(composer).toHaveValue("");
+			await composer.click();
+			await page.keyboard.type("revised", { delay: 10 });
+			const before = await page.evaluate(
+				() =>
+					(JSON.parse(window.localStorage.getItem("ccez-llm-chats-v1") ?? "[]") as Array<{ messages: unknown[] }>)[0]
+						?.messages.length ?? -1
+			);
+			await page.locator(".send-btn").click();
+			await expect(page.locator(".toast")).toHaveText("Annotation edited");
+			const after = await page.evaluate(() => ({
+				annotations: window.localStorage.getItem("ccez-llm-annotations-v1"),
+				messages:
+					(JSON.parse(window.localStorage.getItem("ccez-llm-chats-v1") ?? "[]") as Array<{ messages: unknown[] }>)[0]
+						?.messages.length ?? -1
+			}));
+			expect(after.annotations).toContain('"comment":"revised"');
+			expect(after.messages).toBe(before);
+		});
+
+		/** Entering a note edit washes its quote: creating washes the
+		pending preview, review-pencil washes the saved quote — the
+		comment box otherwise floats over an unmarked thread. */
+		test("note edits wash their quote in the thread", async ({ page }) => {
+			await seedChat(page, [{ role: "assistant", content: "alpha beta gamma delta" }]);
+			await page.addInitScript(() => {
+				window.localStorage.setItem(
+					"ccez-llm-annotations-v1",
+					JSON.stringify({
+						"e2e-chat": [{ id: "ann-1", messageId: "e2e-m0", quote: "beta", comment: "first" }]
+					})
+				);
+			});
+			await page.goto("/");
+			const badge = page.locator("[data-ann-badge]").first();
+			await expect(badge).toBeVisible({ timeout: 15_000 });
+			const hasWash = () =>
+				page.evaluate(
+					() =>
+						(CSS as unknown as { highlights: { has(x: string): boolean } }).highlights.has("ccez-ann")
+				);
+			const bbox = await badge.boundingBox();
+			if (!bbox) throw new Error("badge has no box");
+			await page.touchscreen.tap(bbox.x + bbox.width / 2, bbox.y + bbox.height / 2);
+			await expect.poll(hasWash, { timeout: 10_000 }).toBe(true);
+		});
+
+		/** The annotate dock survives scrolling a live selection: the
+		native highlight and its OS menu stay up across scrolls, so
+		ours must too — only a collapsed selection dismisses it. */
+		test("the annotate dock survives scrolling a live selection", async ({ page }) => {
+			const filler = Array.from({ length: 30 }, (_, i) => `filler paragraph ${i} pads the thread.`).join("\n\n");
+			await seedChat(page, [{ role: "assistant", content: `${filler}\n\nhello world from Kyoto harbor\n\n${filler}` }]);
+			await page.goto("/");
+			const quote = page.locator("article.assistant .rendered p", { hasText: "Kyoto harbor" }).first();
+			await expect(quote).toBeVisible({ timeout: 15_000 });
+			await quote.evaluate((el) => el.scrollIntoView({ block: "center" }));
+			await page.waitForTimeout(600);
+			const qbox = await quote.boundingBox();
+			if (!qbox) throw new Error("quote has no box");
+			const y = qbox.y + qbox.height / 2;
+			await page.mouse.move(qbox.x + 30, y);
+			await page.mouse.down();
+			await page.mouse.move(qbox.x + 200, y, { steps: 8 });
+			await page.mouse.up();
+			const dock = page.locator('.ann-dock[aria-label="Annotate selection"]');
+			await expect(dock).toBeVisible();
+			await page.evaluate(() => {
+				document.querySelector(".messages")?.scrollBy({ top: 400 });
+			});
+			await page.waitForTimeout(400);
+			expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).not.toBe("");
+			await expect(dock).toBeVisible();
+		});
+
+		/** Below the full-bleed text size, short assistant messages
+		shrink-wrap like own bubbles instead of running the column. */
+		test("assistant messages shrink-wrap below full-bleed", async ({ page }) => {
+			await seedChat(page, [
+				{ role: "user", content: "hi" },
+				{ role: "assistant", content: "hello back" }
+			]);
+			await page.goto("/");
+			const article = page.locator("article.assistant").first();
+			await expect(article).toBeVisible({ timeout: 15_000 });
+			const [col, box] = await Promise.all([
+				page.locator(".messages").boundingBox(),
+				article.boundingBox()
+			]);
+			if (!col || !box) throw new Error("thread has no boxes");
+			expect(box.width).toBeLessThan(col.width - 10);
 		});
 
 		/** Double-tapping a message taller than the screen scrolls its

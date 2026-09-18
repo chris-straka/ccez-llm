@@ -49,6 +49,7 @@
 		CHAT_WIDTH_MAX,
 		MESSAGE_GAP_DEFAULT,
 		effectiveChatWidth,
+		FULLBLEED_FONT_SCALE,
 		PROMPT_IDLE_ALWAYS,
 		PROMPT_IDLE_NEVER,
 		type AppSettings
@@ -428,9 +429,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		chatScrollTops.set(chatState.activeChatId, scrollBox.scrollTop);
 	}
 	function noteScrolling(): void {
-		// Desktop keeps its menu: trackSelMenu repositions it over the
-		// highlight instead. Phones dismiss the docked menu here.
-		if (androidUI) selMenu = null;
+		// The menu tracks its highlight through scrolls (trackSelMenu
+		// repositions it) instead of dismissing: on phones the native
+		// selection and its OS menu stay up across scrolls, so ours
+		// must too. Only a collapsed selection dismisses the menu.
+		if (!androidUI || (window.getSelection()?.toString() ?? "") === "") selMenu = null;
 		saveChatScroll();
 		if (scrollBox) viewport.stick = nearBottom(scrollBox);
 		scrollBox?.classList.add("scrolling");
@@ -3704,7 +3707,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		editingId = null;
 		highlightAnnId = id;
 		if (androidUI) {
-			editAnnotationInPrompt({ id }, current.comment);
+			// Marker taps start the note empty (the quote's wash shows
+			// what is being rewritten): typing then files through the
+			// arrow, like a fresh annotation. Review-pencil edits keep
+			// loading the saved comment — see editAnnotationInPrompt.
+			editAnnotationInPrompt({ id }, "");
 			return;
 		}
 		annDraft = current.comment;
@@ -3775,6 +3782,17 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * closes so the composer owns the screen; the wash keeps the
 	 * quote visible.
 	 */
+	/**
+	 * Wash id for an in-prompt note edit (phones): the composer owns
+	 * the screen while editing, so the quote washes like any draft —
+	 * a pending filing washes its preview, a saved note its quote.
+	 * Without this the comment box floats over an unmarked thread.
+	 */
+	function promptAnnWashId(): string | null {
+		if (!promptAnnEdit) return null;
+		if ("pending" in promptAnnEdit) return pendingAnn?.id ?? null;
+		return promptAnnEdit.id;
+	}
 	function editAnnotationInPrompt(target: { id: string } | { pending: true }, comment: string): void {
 		// A fresh popover open underneath files first: typed comments
 		// are never silently dropped (same rule as annotate()).
@@ -3864,8 +3882,16 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		highlightAnnId = null;
 		// Pending filings save for the first time; a saved draft's
 		// comment rewrites — the toast names which happened (a bare
-		// "Note saved" never said).
-		const savedToast = "pending" in target ? "Draft annotation saved" : "Draft annotation edited";
+		// "Note saved" never said). Phones say it plain: no draft
+		// vocabulary there, the note files straight from the composer.
+		const savedToast =
+			"pending" in target
+				? androidUI
+					? "Annotation saved"
+					: "Draft annotation saved"
+				: androidUI
+					? "Annotation edited"
+					: "Draft annotation edited";
 		exitPromptAnnEdit();
 		flashToast(savedToast);
 		void tick().then(() => editor?.focus());
@@ -6510,10 +6536,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// Composer presses (typing, send arrow) keep it; the review
 		// itself lives inside .prompt, so its buttons never cancel.
 		window.addEventListener("mousedown", (event) => {
-			if (
-				promptAnnEdit &&
-				!(event.target instanceof Element && event.target.closest(".prompt"))
-			) {
+			// Badge presses never tap out: the capture-phase press
+			// opens (or toggles) the edit before this bubble check
+			// runs, so without the carve-out every marker tap would
+			// open its edit and cancel it in the same gesture.
+			const target = event.target instanceof Element ? event.target : null;
+			if (promptAnnEdit && !target?.closest(".prompt") && !target?.closest("[data-ann-badge]")) {
 				cancelPromptAnnEdit();
 			}
 		});
@@ -6524,9 +6552,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				// the composer cancels it (tapping out drops the draft).
 				// Composer taps keep it; the send arrow commits instead
 				// (see doSend). Runs before every gesture below.
+				// Badges never tap out either (see the mousedown twin):
+				// re-press toggles through openBadge, and switching
+				// markers opens the next edit directly.
+				const tapTarget = event.target instanceof Element ? event.target : null;
 				if (
 					promptAnnEdit &&
-					!(event.target instanceof Element && event.target.closest(".prompt"))
+					!tapTarget?.closest(".prompt") &&
+					!tapTarget?.closest("[data-ann-badge]")
 				) {
 					cancelPromptAnnEdit();
 				}
@@ -9166,11 +9199,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// (same anchor math as the readings overlay above): the stored
 		// summon range repositions it cursorlessly, and a detached
 		// range dismisses it instead of stranding it. Scrolling never
-		// dismisses a live menu on desktop — a wheel mid-aim is still
-		// aiming. Phones keep the scroll dismiss in noteScrolling (the
-		// docked menu owns composer space the scroll needs back).
+		// dismisses a live menu — a wheel mid-aim is still aiming,
+		// and on phones the native selection outlives the scroll, so
+		// the dock does too (collapse still clears it at once).
 		const trackSelMenu = (): void => {
-			if (androidUI || !selMenu?.range) return;
+			if (!selMenu?.range) return;
 			try {
 				const { range } = selMenu;
 				if (!document.contains(range.startContainer) || !document.contains(range.endContainer)) {
@@ -9257,6 +9290,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	data-shell={tauriBackendAvailable() ? "tauri" : "browser"}
 	data-android={androidUI || null}
 	data-ios={iosUI || null}
+	data-fullbleed={androidUI && settings.fontScale >= FULLBLEED_FONT_SCALE || null}
 	style="--font-scale: {androidUI ? Math.min(8, settings.fontScale) : settings.fontScale}; --chat-width: {effectiveChatWidth(androidUI, settings.fontScale, settings.chatWidth ?? 36)}; --msg-gap: {settings.messageGap ?? MESSAGE_GAP_DEFAULT}rem"
 	data-mac={isMac && !androidUI || null}
 >
@@ -9801,7 +9835,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							folded={isFolded}
 							foldPreview={refsOnly && sentRefs ? sentRefs.refs.map((r) => `"${r.quote}"`).join(" ") : null}
 							marks={marksFor(msg.id)}
-							washId={annPop?.id ?? editingId ?? annBlink ?? hoverBadgeId}
+							washId={annPop?.id ?? promptAnnWashId() ?? editingId ?? annBlink ?? hoverBadgeId}
 						onBadgeHover={(id: string | null) => (hoverBadgeId = id)}
 							onBadgeClick={openBadgeClick}
 							onAttachAction={sentTagAction}
@@ -15016,6 +15050,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		line-break: strict;
 		word-break: normal;
 		overflow-wrap: break-word;
+	}
+	/* Below the full-bleed text size, assistant messages shrink-wrap
+	to their text like own bubbles instead of running the full
+	column — short replies read at the same width on both sides,
+	while long ones still fill to the cap. At the full-bleed size
+	and past it the column goes wide so huge text stays readable. */
+	.app[data-android]:not([data-fullbleed]) article.assistant {
+		width: fit-content;
 	}
 	/* Chat-step slide: the incoming chat glides in from the swipe
 	side (newer from the right, older from the left). Phone-only;
