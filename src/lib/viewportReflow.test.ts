@@ -3,8 +3,8 @@ import {
 	isKeyboardOpen,
 	keyboardOverlapPx,
 	nativeResizeActive,
-	nextPinArm,
 	pinArmStart,
+	pinNow,
 	settlePin
 } from "./viewportReflow";
 
@@ -31,29 +31,9 @@ describe("isKeyboardOpen", () => {
 	});
 });
 
-describe("nextPinArm", () => {
-	it("needs two consecutive open frames before arming", () => {
-		let state = pinArmStart();
-		state = nextPinArm(state, true);
-		expect(state.armed).toBe(false);
-		state = nextPinArm(state, true);
-		expect(state.armed).toBe(true);
-	});
-
-	it("stays armed while open, releases on the first closed frame", () => {
-		let state = nextPinArm(nextPinArm(pinArmStart(), true), true);
-		state = nextPinArm(state, true);
-		expect(state.armed).toBe(true);
-		state = nextPinArm(state, false);
-		expect(state).toEqual({ armed: false, sawOpen: false });
-	});
-
-	it("never arms on open-closed-open flicker", () => {
-		let state = pinArmStart();
-		for (const open of [true, false, true, false, true]) {
-			state = nextPinArm(state, open);
-			expect(state.armed).toBe(false);
-		}
+describe("pinNow", () => {
+	it("arms in one step for settled geometry", () => {
+		expect(pinNow()).toEqual({ armed: true, sawOpen: true });
 	});
 });
 
@@ -72,9 +52,7 @@ describe("nativeResizeActive", () => {
 
 describe("settlePin", () => {
 	it("releases a stale armed pin once geometry reads closed", () => {
-		const armed = nextPinArm(nextPinArm(pinArmStart(), true), true);
-		expect(armed.armed).toBe(true);
-		const settled = settlePin(armed, 800, 800, false);
+		const settled = settlePin(pinNow(), 800, 800, false);
 		expect(settled.pin).toEqual({ armed: false, sawOpen: false });
 		expect(settled.fullHeight).toBe(800);
 	});
@@ -85,17 +63,15 @@ describe("settlePin", () => {
 		expect(settled.pin.armed).toBe(false);
 	});
 
-	it("keeps the pin and baseline while open", () => {
-		const armed = nextPinArm(nextPinArm(pinArmStart(), true), true);
-		const settled = settlePin(armed, 800, 500, true);
-		expect(settled.pin).toBe(armed);
+	it("stays disarmed while the native resize glides", () => {
+		const settled = settlePin(pinNow(), 800, 500, true);
+		expect(settled.pin).toEqual({ armed: false, sawOpen: false });
 		expect(settled.fullHeight).toBe(800);
 	});
 
-	it("keeps the adjustPan fallback pin while open without shrinkage", () => {
-		const armed = nextPinArm(nextPinArm(pinArmStart(), true), true);
-		const settled = settlePin(armed, 800, 800, true);
-		expect(settled.pin).toBe(armed);
+	it("arms the no-shrink fallback pin on stable open geometry", () => {
+		const settled = settlePin(pinArmStart(), 800, 800, true);
+		expect(settled.pin).toEqual({ armed: true, sawOpen: true });
 		expect(settled.fullHeight).toBe(800);
 	});
 });

@@ -316,14 +316,7 @@ import {
 	import { consumeLaunchFiles, splitLaunchFiles } from "$lib/launchFiles";
 	import { copyExportText, downloadMarkdownFile, exportChatMarkdown, fileSaveAccessAvailable } from "$lib/chatExport";
 	import { nativeSaveMarkdown } from "$lib/nativeExport";
-	import {
-		isKeyboardOpen,
-		keyboardOverlapPx,
-		nativeResizeActive,
-		nextPinArm,
-		pinArmStart,
-		settlePin
-	} from "$lib/viewportReflow";
+	import { isKeyboardOpen, keyboardOverlapPx, pinArmStart, settlePin } from "$lib/viewportReflow";
 import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	import {
 		speakText,
@@ -9225,17 +9218,16 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// Pin synchronously on every viewport frame: the old trailing
 			// debounce let the composer lag a beat behind the keyboard
 			// animation, then jump. Only the remeasure stays debounced.
-			// The pin arms after two consecutive open frames — mid-animation
-			// the layout height and the visual viewport update at different
-			// rates, so a lone frame can cross the open gate and flick the
-			// pin on for a frame against the native adjustResize. Release
-			// stays immediate. Hands off entirely while the native resize
-			// is gliding the layout itself: viewport events fire coarsely,
-			// so pinning mid-animation grabs a transitional height and the
-			// composer visibly moves twice. Phone keyboard without
-			// resizes-content: the layout viewport doesn't shrink, so the
-			// full-height flex column (and the latest messages) slides
-			// under the keyboard with no way to reach it. Pin .app to the
+			// Animation frames never engage the pin — only the settle
+			// step below does, on stable geometry. Mid-animation the
+			// layout height and the visual viewport update at different
+			// rates, so engaging here grabs a transitional height and
+			// the composer visibly moves twice (settle then releases
+			// mid-flight). Frames only release on closed geometry.
+			// Phone keyboard without resizes-content: the layout
+			// viewport doesn't shrink, so the full-height flex
+			// column (and the latest messages) slides under the
+			// keyboard with no way to reach it. Pin .app to the
 			// visual height while the keyboard is open, and expose
 			// the overlap as --kb-height so the composer reflows
 			// just above it. Modern Chrome tracks via the viewport
@@ -9244,30 +9236,33 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// phones keep stylesheet height.
 			if (androidUI && appEl && window.visualViewport) {
 				const vv = window.visualViewport;
-				const overlap = keyboardOverlapPx(window.innerHeight, vv.height, vv.offsetTop);
 				const open = isKeyboardOpen(window.innerHeight, vv.height, vv.offsetTop);
-				if (!open) fullInnerHeight = window.innerHeight;
-				const handsOff = nativeResizeActive(fullInnerHeight, window.innerHeight);
-				kbPin = nextPinArm(kbPin, open && !handsOff);
-				if (kbPin.armed) {
+				if (!open) {
+					fullInnerHeight = window.innerHeight;
+					if (kbPin.armed) {
+						kbPin = pinArmStart();
+						appEl.style.height = "";
+						appEl.style.setProperty("--kb-height", "0px");
+					}
+				} else if (kbPin.armed) {
+					// Settle-armed fallback pin tracks per frame.
+					const overlap = keyboardOverlapPx(window.innerHeight, vv.height, vv.offsetTop);
 					appEl.style.height = `${vv.height}px`;
 					appEl.style.setProperty("--kb-height", `${overlap}px`);
-				} else {
-					appEl.style.height = "";
-					appEl.style.setProperty("--kb-height", "0px");
 				}
 			}
 			if (viewportTimer !== undefined) window.clearTimeout(viewportTimer);
 			viewportTimer = window.setTimeout(() => {
 				viewportTimer = undefined;
-				// Settle with fresh geometry: a close sequence can end on
-				// a lagging open frame, leaving the pin armed at a stale
-				// height — the next focus then unpins mid-open and the
-				// composer visibly moves twice. Closed geometry releases
-				// the pin and refreshes the baseline; open geometry keeps
-				// everything, including the no-shrink fallback pin.
+				// Settle with fresh geometry — the ONLY place the pin
+				// engages. Closed geometry releases the pin and refreshes
+				// the baseline (rotation-safe). Open geometry with a
+				// shrunken layout means the native resize glides: stay
+				// disarmed. Open geometry with a full layout is the
+				// no-shrink fallback: arm here, on stable heights.
 				if (androidUI && appEl && window.visualViewport) {
 					const vv = window.visualViewport;
+					const overlap = keyboardOverlapPx(window.innerHeight, vv.height, vv.offsetTop);
 					const settled = settlePin(
 						kbPin,
 						fullInnerHeight,
@@ -9277,7 +9272,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					const wasArmed = kbPin.armed;
 					kbPin = settled.pin;
 					fullInnerHeight = settled.fullHeight;
-					if (wasArmed && !kbPin.armed) {
+					if (kbPin.armed && !wasArmed) {
+						appEl.style.height = `${vv.height}px`;
+						appEl.style.setProperty("--kb-height", `${overlap}px`);
+					} else if (wasArmed && !kbPin.armed) {
 						appEl.style.height = "";
 						appEl.style.setProperty("--kb-height", "0px");
 					}

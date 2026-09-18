@@ -45,12 +45,15 @@ export function pinArmStart(): PinArmState {
 	return { armed: false, sawOpen: false };
 }
 
-/** Feed each viewport frame's open reading; pin only while armed. */
-export function nextPinArm(state: PinArmState, open: boolean): PinArmState {
-	if (!open) return { armed: false, sawOpen: false };
-	if (state.armed) return state;
-	if (state.sawOpen) return { armed: true, sawOpen: true };
-	return { armed: false, sawOpen: true };
+/**
+ * Arm immediately. Only the settle step calls this: engaging on
+ * animation frames grabs a transitional height (the visual viewport
+ * leads the layout for a few frames on warm opens), then releases
+ * mid-flight — the composer visibly moves twice. Stable geometry
+ * never has that problem.
+ */
+export function pinNow(): PinArmState {
+	return { armed: true, sawOpen: true };
 }
 
 /**
@@ -70,20 +73,23 @@ export interface PinSettle {
 }
 
 /**
- * Settle step, run with fresh geometry once viewport events stop. A
- * close sequence can end on a lagging open frame (the visual viewport
- * trails the layout), leaving the pin armed at a stale height — the
- * next focus then unpins mid-open and the composer visibly moves
- * twice. Re-reading here heals it: closed geometry releases the pin
- * and refreshes the baseline (rotation-safe); open geometry keeps
- * everything, including the adjustPan fallback pin.
+ * Settle step, run with fresh geometry once viewport events stop — the
+ * ONLY place the pin engages. Closed geometry releases the pin and
+ * refreshes the baseline (rotation-safe). Open geometry with a shrunken
+ * layout means the native resize is gliding: stay disarmed. Open
+ * geometry with a full layout is the no-shrink fallback (old WebViews,
+ * adjustPan): arm here, on stable heights, never mid-animation.
  */
 export function settlePin(
 	pin: PinArmState,
 	fullHeight: number,
 	innerHeight: number,
-	open: boolean
+	open: boolean,
+	minShrink = 100
 ): PinSettle {
-	if (open) return { pin, fullHeight };
-	return { pin: pinArmStart(), fullHeight: innerHeight };
+	if (!open) return { pin: pinArmStart(), fullHeight: innerHeight };
+	if (nativeResizeActive(fullHeight, innerHeight, minShrink)) {
+		return { pin: pinArmStart(), fullHeight };
+	}
+	return { pin: pinNow(), fullHeight };
 }
