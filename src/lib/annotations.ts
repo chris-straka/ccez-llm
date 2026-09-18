@@ -826,6 +826,16 @@ function washRanges(root: HTMLElement, items: AnnotationMark[], wash: string): R
 }
 
 /**
+ * Wash id last painted into the shared registry, across all bodies: a
+ * single wash id feeds every message, so one body's paint supersedes
+ * every other's. A body clears only the wash it painted (see
+ * paintWashHighlight) — without this, a body holding a stale painted
+ * flag wipes a wash another body just painted, and cross-message
+ * badge slides leave every quote dark.
+ */
+let liveWashId: string | null = null;
+
+/**
  * Paint the wash through the Highlight API: ranges over the untouched
  * DOM — hovering a badge or opening a draft moves zero DOM nodes, so
  * markers never flicker and shaping never breaks. No fade ramps (the
@@ -844,15 +854,20 @@ function paintWashHighlight(
 		const ranges = washRanges(root, items, wash);
 		if (ranges.length > 0) {
 			clearAnnotationWash();
-			root.dataset.washPainted = "1";
+			root.dataset.washPainted = wash;
+			liveWashId = wash;
 			paintAnnotationWash(ranges);
 			return;
 		}
 	}
-	// Nothing to show here: clear only a wash this body painted — a
-	// stamp from any other body must not wipe the live wash.
-	if (root.dataset.washPainted === "1") {
-		root.dataset.washPainted = "";
+	// Nothing to show here: clear only while the registry still holds
+	// the wash this body painted. A superseding paint (another body's
+	// hover, a jump flash) already replaced it — clearing now would
+	// wipe someone else's live wash.
+	const painted = root.dataset.washPainted || null;
+	root.dataset.washPainted = "";
+	if (painted !== null && painted === liveWashId) {
+		liveWashId = null;
 		clearAnnotationWash();
 	}
 }

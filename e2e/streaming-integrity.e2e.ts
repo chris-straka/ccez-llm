@@ -147,3 +147,70 @@ async function annotateDraft(page: Page, quote: string, note: string): Promise<v
 	await page.keyboard.press("Enter");
 	await expect(page.locator(".prompt-tools .ann-wrap")).toHaveCount(1);
 }
+
+/** Annotating the just-sent message mid-stream survives the reply: the
+post-send reset drops the baked pills only, never notes filed while
+the reply was still arriving. The slow mock cadence makes the
+mid-stream annotate deterministic. */
+test("mid-stream annotation on the sent message survives the reply", async ({ page }) => {
+	await page.addInitScript(() => {
+		window.localStorage.setItem("ccez-mock-provider", "1");
+		window.localStorage.setItem("ccez-mock-word-ms", "800");
+	});
+	await seedChat(page, [{ role: "user", content: "The quick brown fox jumps over the lazy dog." }]);
+	await page.goto("/");
+	await expect(page.locator("article .rendered").first()).toBeVisible();
+	await page.locator(".ta-input").click();
+	await page.keyboard.type("tell me about foxes");
+	await page.keyboard.press("Enter");
+	// The stream crawls (800ms a word): drag-select the just-sent
+	// message and file an annotation before the reply lands.
+	await expect(page.locator("article.assistant .rendered")).toBeVisible({ timeout: 15_000 });
+	const rect = await page.evaluate(() => {
+		const root = document.querySelectorAll("article .rendered")[0];
+		if (!root) throw new Error("no user article");
+		const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+		const texts: Text[] = [];
+		while (walker.nextNode()) {
+			const node = walker.currentNode;
+			if (node instanceof Text) texts.push(node);
+		}
+		const hay = texts.map((t) => t.textContent ?? "").join("");
+		const quote = "quick brown fox";
+		const at = hay.indexOf(quote);
+		if (at < 0) throw new Error("quote missing");
+		const nodeAt = (flat: number): [Text, number] => {
+			let rest = flat;
+			for (const t of texts) {
+				const len = (t.textContent ?? "").length;
+				if (rest <= len) return [t, rest];
+				rest -= len;
+			}
+			const last = texts[texts.length - 1];
+			if (!last) throw new Error("no text");
+			return [last, (last.textContent ?? "").length];
+		};
+		const [startNode, startOff] = nodeAt(at);
+		const [endNode, endOff] = nodeAt(at + quote.length);
+		const range = document.createRange();
+		range.setStart(startNode, startOff);
+		range.setEnd(endNode, endOff);
+		return range.getBoundingClientRect().toJSON() as { x: number; y: number; width: number; height: number };
+	});
+	await page.mouse.move(rect.x + 1, rect.y + rect.height / 2);
+	await page.mouse.down();
+	await page.mouse.move(rect.x + rect.width - 1, rect.y + rect.height / 2, { steps: 8 });
+	await page.mouse.up();
+	await expect(page.locator(".sel-menu")).toBeVisible();
+	await page.locator('.sel-menu button:has-text("Annotate")').click();
+	await expect(page.locator(".ann-pop")).toBeVisible();
+	await page.keyboard.type("mid-stream note");
+	await page.keyboard.press("Enter");
+	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1);
+	// The reply lands after the note was filed: the note survives it.
+	await expect(page.locator("article.assistant .rendered")).toContainText("Mock reply to: tell me about foxes", {
+		timeout: 30_000
+	});
+	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1);
+	await expect(page.locator(".prompt-tools .ann-wrap")).toHaveCount(1);
+});

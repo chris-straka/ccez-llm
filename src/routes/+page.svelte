@@ -5113,21 +5113,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		if (sent?.role === "assistant" && !sent.error) {
 			// Same-chat only: the new chat must not thump for the old
 			// one's reply (a genuinely missed finish is the background
-			// ping's job) — and every reset below touches live component
-			// state, which now belongs to the ACTIVE chat. After a
-			// switch that is the new chat's staged files, draft notes,
-			// and open review: clearing would eat in-progress work
-			// there. The origin's baked state already rode the send.
+			// ping's job). The send-time reset above already dropped
+			// the baked pills, so nothing resets here: annotations
+			// filed (or pills staged, reviews opened) while the reply
+			// streamed in are post-send work and survive its landing.
 			if (stillHere) {
 				void hapticBeatAsync("done", { enabled: settings.vibration, shell: tauriBackendAvailable() });
-				attachments = [];
-				annotations = [];
-				pendingAnn = null;
-				reviewOpen = false;
-				editingId = null;
-				highlightAnnId = null;
-				settleAnnPop();
-				annPop = null;
 			}
 		}
 		// Follow the stream only while its chat is open: after a switch

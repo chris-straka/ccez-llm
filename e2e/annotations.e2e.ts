@@ -1684,3 +1684,118 @@ test("badge edit keeps focus after open and re-click", async ({ page }) => {
 	await page.waitForTimeout(800);
 	await expect(area).toBeFocused();
 });
+
+/** Hovering badges across two messages washes every quote: the shared
+Highlight registry is painted by every message body, so a body holding
+no ranges for the hovered id must never clear a wash another body
+painted (assistant-to-user slides left the user quote dark), and
+hovering must never re-stamp badges (rebuilt nodes read as marker
+flicker). */
+test("badge hover washes every quote across both messages", async ({ page }) => {
+	await seedChat(page, [
+		{ role: "user", content: "The quick brown fox jumps over the lazy dog near the river bank." },
+		{ role: "assistant", content: "Pack my box with five dozen liquor jugs before the long winter voyage ends." }
+	]);
+	await page.goto("/");
+	await expect(page.locator("article .rendered").first()).toBeVisible();
+	// True drag-select inside one article (badge chrome excluded so
+	// node offsets map onto visible text): the release point stays
+	// inside the message, never on a control that would clear it.
+	const dragQuote = async (article: number, quote: string): Promise<void> => {
+		const rect = await page.evaluate(
+			([n, text]: [number, string]) => {
+				const root = document.querySelectorAll("article .rendered")[n];
+				if (!root) throw new Error("no article");
+				const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+				const texts: Text[] = [];
+				while (walker.nextNode()) {
+					const node = walker.currentNode;
+					const parent = node.parentNode;
+					if (parent instanceof Element && parent.closest("[data-ann-badge]")) continue;
+					if (node instanceof Text) texts.push(node);
+				}
+				const hay = texts.map((t) => t.textContent ?? "").join("");
+				const at = hay.indexOf(text);
+				if (at < 0) throw new Error(`quote missing: ${text}`);
+				const nodeAt = (flat: number): [Text, number] => {
+					let rest = flat;
+					for (const t of texts) {
+						const len = (t.textContent ?? "").length;
+						if (rest <= len) return [t, rest];
+						rest -= len;
+					}
+					const last = texts[texts.length - 1];
+					if (!last) throw new Error("no text");
+					return [last, (last.textContent ?? "").length];
+				};
+				const [startNode, startOff] = nodeAt(at);
+				const [endNode, endOff] = nodeAt(at + text.length);
+				const range = document.createRange();
+				range.setStart(startNode, startOff);
+				range.setEnd(endNode, endOff);
+				const box = range.getBoundingClientRect().toJSON();
+				return { x: box.x, y: box.y, width: box.width, height: box.height };
+			},
+			[article, quote] as [number, string]
+		);
+		await page.mouse.move(rect.x + 1, rect.y + rect.height / 2);
+		await page.mouse.down();
+		await page.mouse.move(rect.x + rect.width - 1, rect.y + rect.height / 2, { steps: 8 });
+		await page.mouse.up();
+	};
+	const annotate = async (article: number, quote: string): Promise<void> => {
+		await dragQuote(article, quote);
+		await expect(page.locator(".sel-menu")).toBeVisible();
+		await page.locator('.sel-menu button:has-text("Annotate")').click();
+		await expect(page.locator(".ann-pop")).toBeVisible();
+		await page.keyboard.press("Enter");
+	};
+	const badges = (role: "user" | "assistant") => page.locator(`article.${role} button.ccez-ann-badge`);
+	await annotate(0, "quick brown fox");
+	await annotate(0, "lazy dog");
+	await annotate(1, "five dozen liquor");
+	await annotate(1, "winter voyage");
+	await expect(badges("user")).toHaveCount(2);
+	await expect(badges("assistant")).toHaveCount(2);
+	// Tag the live badge nodes: any re-stamp (the flicker) swaps
+	// nodes and drops the tags.
+	await page.evaluate(() => {
+		document.querySelectorAll("button.ccez-ann-badge").forEach((b, i) => {
+			if (b instanceof HTMLElement) b.dataset.probe = `badge-${i}`;
+		});
+	});
+	const washedText = () =>
+		page.evaluate(() => {
+			const reg = (
+				window as unknown as {
+					CSS?: { highlights?: { get(name: string): Set<Range> | undefined } };
+				}
+			).CSS?.highlights;
+			// The badge anchors mid-quote, so its digit rides inside
+			// the washed range text ("quick br1own fox"): strip digits
+			// before matching the quote back.
+			return [...(reg?.get("ccez-ann") ?? [])]
+				.map((r) => r.toString().replace(/\d/g, ""))
+				.join(" ");
+		});
+	const hoverBadge = async (role: "user" | "assistant", nth: number, word: string): Promise<void> => {
+		const badge = badges(role).nth(nth);
+		const box = await badge.boundingBox();
+		if (!box) throw new Error("badge has no box");
+		await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+		await page.waitForTimeout(300);
+		expect(await washedText()).toContain(word);
+	};
+	// User to assistant, then back: every slide must wash its quote.
+	await hoverBadge("user", 0, "quick brown fox");
+	await hoverBadge("assistant", 0, "five dozen");
+	await hoverBadge("assistant", 1, "winter voyage");
+	await hoverBadge("user", 1, "lazy dog");
+	// No badge node churned under the hovers.
+	const probes = await page.evaluate(() =>
+		[...document.querySelectorAll("button.ccez-ann-badge")].map((b) =>
+			b instanceof HTMLElement ? (b.dataset.probe ?? "") : ""
+		)
+	);
+	expect(probes).toEqual(["badge-0", "badge-1", "badge-2", "badge-3"]);
+});
