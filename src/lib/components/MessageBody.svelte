@@ -1518,6 +1518,19 @@
 		background: inherit;
 		clip-path: polygon(38% 0, 100% 0, 0 100%);
 	}
+	/* RTL quotes: mirror the whole badge geometry — the badge parks
+	past the visual quote end on the left, tail tip pointing back
+	down-right at it. */
+	.rendered :global(button.ccez-ann-badge.rtl) {
+		left: auto;
+		right: 100%;
+		transform: translate(40%, 10%);
+	}
+	.rendered :global(button.ccez-ann-badge.rtl::after) {
+		left: auto;
+		right: 14%;
+		clip-path: polygon(62% 0, 0 0, 100% 100%);
+	}
 	/* Newly stamped badges fade in; re-stamps skip the class so steady
 	marks never flicker on re-render. */
 	@keyframes ann-badge-in {

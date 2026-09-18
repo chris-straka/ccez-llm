@@ -33,6 +33,15 @@ describe("annotation badge font-size tracking", () => {
 	});
 });
 
+describe("annotation badge RTL mirror", () => {
+	it("mirrors badge geometry and tail for RTL quotes", () => {
+		const css = messageBodyStyle();
+		expect(css).toContain("button.ccez-ann-badge.rtl");
+		expect(css).toContain("right: 100%");
+		expect(css).toContain("polygon(62% 0, 0 0, 100% 100%)");
+	});
+});
+
 describe("annotation edit Save animation", () => {
 	it("animates the popover Save symmetrically on hover in/out", () => {
 		const css = pageStyle();

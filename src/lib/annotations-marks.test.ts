@@ -222,6 +222,16 @@ describe("applyMarks badges over reading overlays", () => {
 		expect(baseText(root)).toBe("say hello world today");
 	});
 
+	it("mirrors the badge for RTL quotes, nowhere else", () => {
+		const rtl = document.createElement("div");
+		rtl.innerHTML = '<p dir="rtl">قال اليوم مودعا</p>';
+		applyMarks(rtl, [{ id: "a1" as AnnotationId, number: 1, quote: "اليوم" }], false, null);
+		expect(rtl.querySelector("[data-ann-badge]")?.classList.contains("rtl")).toBe(true);
+		const ltr = rootWith("say hello world today");
+		applyMarks(ltr, [{ id: "a1" as AnnotationId, number: 1, quote: "world" }], false, null);
+		expect(ltr.querySelector("[data-ann-badge]")?.classList.contains("rtl")).toBe(false);
+	});
+
 	it("parks a lone word in its neighboring gap", () => {
 		const root = rootWith("say hello world today");
 		applyMarks(root, [{ id: "a1" as AnnotationId, number: 1, quote: "world" }], false, null);

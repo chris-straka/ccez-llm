@@ -1180,6 +1180,26 @@ function paintWashHighlight(
  * here, so hovering can no longer drop every marker's :hover
  * mid-flight and flicker the row.
  */
+/**
+ * Mirror the badge for right-to-left quotes: the tail leans down-left
+ * toward the quote in LTR, so RTL quotes get the mirrored geometry
+ * (badge past the visual quote end, tail pointing back at it).
+ * Resolved from the nearest explicit dir, else the computed
+ * direction (dir=auto paragraphs resolve per content). Toggle, never
+ * add-only, so reused buttons unmirror. Never throws.
+ */
+function mirrorBadgeForDirection(badge: HTMLButtonElement, anchor: HTMLElement): void {
+	let rtl = false;
+	try {
+		const explicit = anchor.closest("[dir]")?.getAttribute("dir");
+		if (explicit === "rtl") rtl = true;
+		else if (explicit !== "ltr") rtl = getComputedStyle(anchor).direction === "rtl";
+	} catch {
+		rtl = false;
+	}
+	badge.classList.toggle("rtl", rtl);
+}
+
 function stampBadges(root: HTMLElement, items: AnnotationMark[], skip: boolean): void {
 	// Ids already on screen: re-stamping them (every render unwraps and
 	// re-locates) must not replay the mount fade — only new badges are fresh.
@@ -1240,6 +1260,7 @@ function stampBadges(root: HTMLElement, items: AnnotationMark[], skip: boolean):
 		badge.dataset.annBadge = item.id;
 		badge.textContent = String(item.number);
 		badge.title = "Open annotation";
+		mirrorBadgeForDirection(badge, anchor);
 		anchor.append(badge);
 	}
 }
@@ -1312,6 +1333,7 @@ function stampLegacy(root: HTMLElement, items: AnnotationMark[], skip: boolean, 
 		badge.dataset.annBadge = item.id;
 		badge.textContent = String(item.number);
 		badge.title = "Open annotation";
+		mirrorBadgeForDirection(badge, anchor);
 		anchor.append(badge);
 	}
 	if (fading) wrapLeaving(root, items, fading);
