@@ -1512,10 +1512,13 @@ function anchorSpan(nodes: Text[], loc: QuoteLocation): HTMLElement | null {
 	// live in it; both fence edges land on word boundaries, so
 	// double-clicks keep selecting whole words. Combining marks and
 	// surrogate halves never border the gap (a base letter split from
-	// its tashkeel, or a split pair, breaks shaping while mounted);
-	// spaceless scripts (CJK) have no word gaps at all. Both fall
-	// through to the legacy mid-character wrap below.
-	const gap = gapOffsetForAnchor(chars.map((c) => c.ch).join(""));
+	// its tashkeel, or a split pair, breaks shaping while mounted).
+	// Spaceless scripts (CJK) have no word gaps: they fall back to
+	// punctuation-adjacent boundaries, then the quote's own edge —
+	// only a degenerate quote with no clean edge keeps the legacy
+	// mid-character wrap below.
+	const flat = chars.map((c) => c.ch).join("");
+	const gap = gapOffsetForAnchor(flat) ?? edgeOffsetForAnchor(flat);
 	if (gap !== null) {
 		try {
 			const anchor = document.createElement("span");
@@ -1542,9 +1545,9 @@ function anchorSpan(nodes: Text[], loc: QuoteLocation): HTMLElement | null {
 			return null;
 		}
 	}
-	// Legacy mid-character wrap (spaceless scripts, combining-heavy
-	// quotes with no clean gap): nearest non-space character to the
-	// middle keeps the badge over long wrapped quotes.
+	// Legacy mid-character wrap (degenerate quotes with no clean
+	// edge): nearest non-space character to the middle keeps the
+	// badge over long wrapped quotes.
 	const mid = Math.floor(chars.length / 2);
 	let pick: { node: Text; at: number } | null = null;
 	for (let d = 0; d < chars.length && !pick; d++) {
@@ -1831,6 +1834,8 @@ export function isRefsOnly(content: string): boolean {
 const WORD_CHAR_RE = /[\p{L}\p{N}_]/u;
 const COMBINING_RE = /\p{M}/u;
 const SURROGATE_RE = /[\uD800-\uDFFF]/u;
+const PUNCT_RE = /\p{P}/u;
+const SPACE_RE = /\s/;
 /**
  * Spaceless scripts have no words to pick: every character is a
  * letter (Lo), so snapping would glue whole sentences together.
@@ -1881,6 +1886,40 @@ export function gapOffsetForAnchor(text: string): number | null {
 		const touchesWord = (k > 0 && isWordChar(left)) || (k < len && isWordChar(right));
 		const splitsWords = k === 0 || k === len || !isWordChar(left) || !isWordChar(right);
 		if (!touchesWord || !splitsWords) continue;
+		if (COMBINING_RE.test(left) || COMBINING_RE.test(right)) continue;
+		if (SURROGATE_RE.test(left) || SURROGATE_RE.test(right)) continue;
+		const dist = Math.abs(k - mid);
+		if (dist < bestDist || (dist === bestDist && (best === null || k > best))) {
+			best = k;
+			bestDist = dist;
+		}
+	}
+	return best;
+}
+
+/**
+ * Fallback gap for spaceless scripts (CJK): word gaps don't exist,
+ * but a letter-wrap paints one fragment short (the seam), so the
+ * anchor still holds no text. Punctuation-adjacent boundaries nearest
+ * the middle win (a fence beside 。、never splits a pick); otherwise
+ * the quote's own end edge, so lone quotes park after themselves like
+ * spaced words do. Combining marks and surrogate halves never border
+ * the gap. Null when nothing qualifies. Pure and unit-tested.
+ */
+export function edgeOffsetForAnchor(text: string): number | null {
+	const len = text.length;
+	if (len === 0) return null;
+	const mid = len / 2;
+	let best: number | null = null;
+	let bestDist = Infinity;
+	for (let k = 0; k <= len; k++) {
+		const left = k > 0 ? (text[k - 1] ?? "") : "";
+		const right = k < len ? (text[k] ?? "") : "";
+		const touchesContent =
+			(k > 0 && !SPACE_RE.test(left)) || (k < len && !SPACE_RE.test(right));
+		if (!touchesContent) continue;
+		const punct = PUNCT_RE.test(left) || PUNCT_RE.test(right);
+		if (k !== 0 && k !== len && !punct) continue;
 		if (COMBINING_RE.test(left) || COMBINING_RE.test(right)) continue;
 		if (SURROGATE_RE.test(left) || SURROGATE_RE.test(right)) continue;
 		const dist = Math.abs(k - mid);

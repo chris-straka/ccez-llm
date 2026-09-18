@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
 	applyMarks,
 	annotationCountLabel,
+	edgeOffsetForAnchor,
 	gapOffsetForAnchor,
 	locateQuote,
 	lockSelectionToMessage,
@@ -156,8 +157,10 @@ describe("applyMarks badges over reading overlays", () => {
 		expect(badge?.closest(".frb")).toBeNull();
 		const anchor = badge?.parentElement;
 		expect(anchor?.classList.contains("ccez-ann-anchor")).toBe(true);
-		// 漢字を読む is five chars: the middle one (を) carries the badge.
-		expect(anchor?.textContent).toBe("を1");
+		// Spaceless quote: the anchor parks after the quote holding
+		// no letters (the badge's own label is UI, never wash text).
+		const letterKids = [...(anchor?.childNodes ?? [])].filter((n) => n instanceof Text);
+		expect(letterKids).toEqual([]);
 		// Stamping moved nothing: base text and readings intact.
 		expect(baseText(root)).toBe("漢字を読む");
 		expect(root.querySelector(".frt")?.textContent).toBe("かんじ");
@@ -199,11 +202,12 @@ describe("applyMarks badges over reading overlays", () => {
 		const root = readingBody();
 		applyMarks(root, one, false, "a1");
 		const badge = root.querySelector("[data-ann-badge]");
-		// Same mid-quote anchor as the unwashed state (hovering the wash
-		// on and off never moves the badge); nested in the wash marks.
-		// Spaceless quote: legacy mid-character wrap still applies.
-		expect(badge?.parentElement?.tagName).toBe("SPAN");
-		expect(badge?.parentElement?.classList.contains("ccez-ann-anchor")).toBe(true);
+		// Same quote-edge anchor as the unwashed state (hovering the
+		// wash on and off never moves the badge); nested in the wash
+		// marks. Spaceless quote: the anchor parks after the quote,
+		// still inside the wash marks.
+		const washAnchor = root.querySelector(".ccez-ann-anchor");
+		expect(badge?.parentElement).toBe(washAnchor);
 		expect(badge?.closest("mark.ccez-ann")).not.toBeNull();
 		expect(baseText(root)).toBe("漢字を読む");
 		expect(root.querySelector(".frt")?.textContent).toBe("かんじ");
@@ -265,6 +269,34 @@ describe("gapOffsetForAnchor", () => {
 	it("finds no gap in spaceless or empty text", () => {
 		expect(gapOffsetForAnchor("漢字を読む")).toBeNull();
 		expect(gapOffsetForAnchor("")).toBeNull();
+	});
+});
+
+describe("edgeOffsetForAnchor", () => {
+	it("parks a lone spaceless quote after itself", () => {
+		expect(edgeOffsetForAnchor("読む午")).toBe(3);
+		expect(edgeOffsetForAnchor("漢字を読む")).toBe(5);
+	});
+
+	it("prefers punctuation nearest the middle", () => {
+		expect(edgeOffsetForAnchor("一年の中でも、この短い")).toBe(6);
+	});
+
+	it("never borders a combining mark", () => {
+		expect(edgeOffsetForAnchor("áb")).toBe(3);
+	});
+
+	it("finds no edge in empty text", () => {
+		expect(edgeOffsetForAnchor("")).toBeNull();
+	});
+
+	it("wraps no letters on a spaceless stamp", () => {
+		const root = rootWith("に本を読む午後の時間は");
+		applyMarks(root, [{ id: "a1" as AnnotationId, number: 1, quote: "読む午" }], false, null);
+		const anchor = root.querySelector(".ccez-ann-anchor");
+		const letterKids = [...(anchor?.childNodes ?? [])].filter((n) => n instanceof Text);
+		expect(letterKids).toEqual([]);
+		expect(baseText(root)).toBe("に本を読む午後の時間は");
 	});
 });
 
