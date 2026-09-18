@@ -183,6 +183,13 @@ export const SCROLLKEY_DU_VELOCITY_PX_S = 2160;
 export const SCROLL_HOLD_TAP_MS = 150;
 
 /**
+ * Hold-glide ramp: ms from key-down speed to peak velocity. Short
+ * enough that a deliberate hold still gets fast quickly; long
+ * enough that engaging the hold never kicks.
+ */
+export const SCROLL_HOLD_RAMP_MS = 300;
+
+/**
  * Viewport-space rect of one message, for the screen-center pick.
  * Missing nodes never reach here (the caller skips them).
  */
@@ -240,6 +247,23 @@ export function scrollHoldVelocity(key: string): number | null {
 /** Advance a glide by one frame: pure so tests can pin the pacing. */
 export function stepScrollTop(current: number, velocityPxS: number, dtMs: number): number {
 	return current + (velocityPxS * Math.max(0, dtMs)) / 1000;
+}
+
+/**
+ * Glide velocity for a hold `holdMs` milliseconds old: j/k cruise
+ * at their flat speed, while d/u start there and accelerate to
+ * peak over SCROLL_HOLD_RAMP_MS — the hold engages without a kick
+ * and still gets fast. Pure over the key and hold age so tests can
+ * pin the pacing; the tick feeds rAF-clock age (never the wall
+ * clock, which ticks a different clock than the frame callback).
+ */
+export function holdGlideVelocity(key: string, holdMs: number): number {
+	const peak = scrollHoldVelocity(key);
+	if (peak === null) return 0;
+	const base = Math.sign(peak) * SCROLLKEY_JK_VELOCITY_PX_S;
+	if (Math.abs(peak) <= SCROLLKEY_JK_VELOCITY_PX_S) return peak;
+	const t = Math.min(Math.max(holdMs, 0), SCROLL_HOLD_RAMP_MS) / SCROLL_HOLD_RAMP_MS;
+	return base + (peak - base) * t;
 }
 
 /** True when a key hold was really a tap (lands one discrete step). */

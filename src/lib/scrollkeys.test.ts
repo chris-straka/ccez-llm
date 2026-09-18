@@ -7,9 +7,11 @@ import {
 	SCROLLKEY_JK_VELOCITY_PX_S,
 	SCROLLKEY_LINE_PX,
 	SCROLLKEY_SKIP_PX,
+	SCROLL_HOLD_RAMP_MS,
 	SCROLL_HOLD_TAP_MS,
 	ggArmed,
 	halfPageDy,
+	holdGlideVelocity,
 	holdIsTap,
 	indexAtViewportLine,
 	isEscapeHold,
@@ -210,6 +212,28 @@ describe("holdIsTap", () => {
 		expect(holdIsTap(1000, 1000 + SCROLL_HOLD_TAP_MS)).toBe(false);
 		expect(holdIsTap(1000, 1500)).toBe(false);
 		expect(holdIsTap(0, 50)).toBe(false);
+	});
+});
+
+describe("holdGlideVelocity", () => {
+	it("cruises j/k flat at any hold age", () => {
+		expect(holdGlideVelocity("j", 0)).toBe(SCROLLKEY_JK_VELOCITY_PX_S);
+		expect(holdGlideVelocity("j", 10_000)).toBe(SCROLLKEY_JK_VELOCITY_PX_S);
+		expect(holdGlideVelocity("k", 150)).toBe(-SCROLLKEY_JK_VELOCITY_PX_S);
+	});
+	it("ramps d/u from j/k speed to peak over the ramp window", () => {
+		expect(holdGlideVelocity("d", 0)).toBe(SCROLLKEY_JK_VELOCITY_PX_S);
+		expect(holdGlideVelocity("d", SCROLL_HOLD_RAMP_MS / 2)).toBe(
+			(SCROLLKEY_JK_VELOCITY_PX_S + SCROLLKEY_DU_VELOCITY_PX_S) / 2
+		);
+		expect(holdGlideVelocity("d", SCROLL_HOLD_RAMP_MS)).toBe(SCROLLKEY_DU_VELOCITY_PX_S);
+		expect(holdGlideVelocity("d", 10_000)).toBe(SCROLLKEY_DU_VELOCITY_PX_S);
+		expect(holdGlideVelocity("u", 0)).toBe(-SCROLLKEY_JK_VELOCITY_PX_S);
+		expect(holdGlideVelocity("u", SCROLL_HOLD_RAMP_MS)).toBe(-SCROLLKEY_DU_VELOCITY_PX_S);
+	});
+	it("clamps negative ages and returns zero for non-gliding keys", () => {
+		expect(holdGlideVelocity("d", -50)).toBe(SCROLLKEY_JK_VELOCITY_PX_S);
+		expect(holdGlideVelocity("g", 500)).toBe(0);
 	});
 });
 

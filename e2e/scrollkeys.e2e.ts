@@ -4,9 +4,10 @@ import { seedChat } from "./helpers";
 /**
  * Scrollkeys bucket (desktop, nothing selected): bare j/k
  * smooth-scroll the chat, bare d/u skip one smooth fixed step per
- * tap (216px — quick, never a half-page jump; 3x glide while held),
- * gg goes to top, G to the bottom, and z/Z land the hovered
- * message's top/bottom. Ctrl+U / Ctrl+D jump an instant half-page.
+ * tap (216px — quick, never a half-page jump; holds ramp from j/k
+ * speed to 3x), gg goes to top, G to the bottom, and z/Z land the
+ * hovered message's top/bottom. Ctrl+U / Ctrl+D jump an instant
+ * half-page.
  * Escape still dismisses overlays exactly as today and never exits
  * fullscreen (only the Esc+f chord does, which needs a real window
  * chrome that playwright cannot cover: see exitFullscreen in
@@ -153,22 +154,27 @@ test("j hold glides near SCROLLKEY_JK_VELOCITY_PX_S with no discrete jump", asyn
 	expect(dist).toBeLessThan(720);
 });
 
-test("d hold glides 3x faster than j hold (bounds wide for headless rAF)", async ({ page }) => {
-	const HOLD_MS = 400;
-	const top = await scrollTop(page);
-	await page.keyboard.down("j");
-	await page.waitForTimeout(HOLD_MS);
-	await page.keyboard.up("j");
-	await page.waitForTimeout(400);
-	const jDist = (await scrollTop(page)) - top;
-	expect(jDist).toBeGreaterThan(0);
-	const mid = await scrollTop(page);
+test("d hold ramps: second window outruns the first, then cruises fast", async ({ page }) => {
+	// Park mid-chat first so both windows have room below.
+	await page.evaluate(() => {
+		const box = document.querySelector(".messages") as HTMLElement | null;
+		if (box) box.scrollTo({ top: Math.max(0, box.scrollHeight - box.clientHeight * 2), behavior: "instant" });
+	});
+	const start = await scrollTop(page);
 	await page.keyboard.down("d");
-	await page.waitForTimeout(HOLD_MS);
+	await page.waitForTimeout(250);
+	const m1 = await scrollTop(page);
+	await page.waitForTimeout(250);
+	const m2 = await scrollTop(page);
 	await page.keyboard.up("d");
-	await page.waitForTimeout(400);
-	const dDist = (await scrollTop(page)) - mid;
-	expect(dDist).toBeGreaterThan(jDist);
+	// First window rides the ramp (starts at j/k speed), the second
+	// cruises near peak: the hold accelerates instead of kicking.
+	// Bounds stay wide for headless rAF pacing.
+	const w1 = m1 - start;
+	const w2 = m2 - m1;
+	expect(w1).toBeGreaterThan(0);
+	expect(w2).toBeGreaterThan(w1);
+	expect(w2).toBeGreaterThan(300);
 });
 
 test("gg goes to top, G to the bottom", async ({ page }) => {
@@ -375,9 +381,10 @@ test("bare u/d skip in scroll mode; ctrl jumps, cursor stays", async ({ page }) 
 	expect(await page.evaluate(() => document.querySelector("article.selected")?.id ?? null)).toBe(sel);
 });
 
-/** A held d in scroll mode lands its initial skip (repeats skip
-again); the cursor stays put — only Ctrl+U / Ctrl+D jump. */
-test("d hold lands one skip in scroll mode, cursor stays put", async ({ page }) => {
+/** A held d in scroll mode glides with the same ramp as
+unselected (repeats belong to the loop now, not discrete skips);
+the cursor stays put — only Ctrl+U / Ctrl+D jump. */
+test("d hold glides in scroll mode, cursor stays put", async ({ page }) => {
 	// Park mid-chat first so both directions have room (instant: the
 	// column eases programmatic jumps, and a smooth park would still
 	// be animating under the assertions below).
@@ -394,10 +401,38 @@ test("d hold lands one skip in scroll mode, cursor stays put", async ({ page }) 
 	await page.waitForTimeout(400);
 	await page.keyboard.up("d");
 	await page.waitForTimeout(400);
-	// The initial press skips one step (repeats may add more within
-	// the hold window — bounds stay wide); the cursor never moves.
+	// A 400ms hold ramps then cruises (~650px: past one 216 skip,
+	// proving the loop owns the hold); the cursor never moves.
 	const dist = (await scrollTop(page)) - before;
-	expect(dist).toBeGreaterThanOrEqual(100);
-	expect(dist).toBeLessThan(1200);
+	expect(dist).toBeGreaterThanOrEqual(300);
+	expect(dist).toBeLessThan(1000);
+	expect(await page.evaluate(() => document.querySelector("article.selected")?.id ?? null)).toBe(sel);
+});
+
+/** A quick d tap in scroll mode still lands exactly one skip step —
+the hold loop owns repeats, taps stay discrete. */
+test("d tap lands one skip in scroll mode", async ({ page }) => {
+	await page.evaluate(() => {
+		const box = document.querySelector(".messages") as HTMLElement | null;
+		if (box) box.scrollTo({ top: Math.max(0, box.scrollHeight - box.clientHeight * 2), behavior: "instant" });
+	});
+	await page.keyboard.press("Control+g");
+	await expect(page.locator(".app[data-focus-mode='scroll']")).toHaveCount(1, { timeout: 5_000 });
+	const sel = await page.evaluate(() => document.querySelector("article.selected")?.id ?? null);
+	expect(sel).not.toBeNull();
+	const before = await scrollTop(page);
+	await page.keyboard.press("d");
+	await page.waitForFunction(
+		(prev) => {
+			const box = document.querySelector(".messages") as HTMLElement | null;
+			return box !== null && box.scrollTop - prev >= 150;
+		},
+		before,
+		{ timeout: 10_000 }
+	);
+	await page.waitForTimeout(500);
+	const dist = (await scrollTop(page)) - before;
+	expect(dist).toBeGreaterThanOrEqual(150);
+	expect(dist).toBeLessThan(300);
 	expect(await page.evaluate(() => document.querySelector("article.selected")?.id ?? null)).toBe(sel);
 });

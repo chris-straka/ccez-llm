@@ -95,6 +95,7 @@
 		SCROLLKEY_SKIP_PX,
 		ggArmed,
 		halfPageDy,
+		holdGlideVelocity,
 		holdIsTap,
 		indexAtViewportLine,
 		isEscapeHold,
@@ -5784,7 +5785,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	/**
 	 * Start a frame-paced glide: pixels accrue per rAF tick from the first
 	 * frame, so holding never fires the cancel-and-restart stutter that
-	 * per-keydown smooth scrollBy calls produce under key repeat.
+	 * per-keydown smooth scrollBy calls produce under key repeat. d/u
+	 * ramps from j/k speed to peak over SCROLL_HOLD_RAMP_MS (see
+	 * holdGlideVelocity) instead of kicking at full speed; j/k cruise.
 	 */
 	function startScrollHold(key: string, velocity: number, tapDy?: number): void {
 		stopScrollHold();
@@ -5793,6 +5796,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// smooth); per-frame glide sets need instant application, or the
 		// box chases a moving target and lags several-fold behind.
 		scrollBox.style.scrollBehavior = "auto";
+		// The thumb stays up for the whole hold, not just while scroll
+		// events stream: a hold clamped at an edge fires none, and a
+		// stale fade timer must not strip it mid-hold.
+		window.clearTimeout(viewport.idleTimer);
+		scrollBox.classList.add("scrolling");
 		// Generation check, not identity: the tick closes over the raw
 		// hold while reads come back proxied, so only a primitive
 		// distinguishes a superseded glide (see ViewportState.holdSeq).
@@ -5803,13 +5811,18 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			velocity,
 			tapDy: tapDy ?? Math.sign(velocity) * SCROLLKEY_LINE_PX,
 			downAt: Date.now(),
+			startT: performance.now(),
 			lastT: performance.now(),
 			raf: 0
 		};
 		const tick = (t: number) => {
 			const hold = viewport.hold;
 			if (!hold || viewport.holdSeq !== seq || !scrollBox) return;
-			scrollBox.scrollTop = stepScrollTop(scrollBox.scrollTop, hold.velocity, t - hold.lastT);
+			scrollBox.scrollTop = stepScrollTop(
+				scrollBox.scrollTop,
+				holdGlideVelocity(hold.key, t - hold.startT),
+				t - hold.lastT
+			);
 			hold.lastT = t;
 			hold.raf = requestAnimationFrame(tick);
 		};
@@ -5823,6 +5836,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		cancelAnimationFrame(hold.raf);
 		viewport.hold = null;
 		scrollBox?.style.removeProperty("scroll-behavior");
+		scrollBox?.classList.remove("scrolling");
 		// A tap lands the hold's own step: one line for j/k, the skip
 		// step for d/u (the shared scroll effect eases it — never a
 		// jump). Holds just stop.
@@ -5834,6 +5848,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		if (viewport.hold) cancelAnimationFrame(viewport.hold.raf);
 		viewport.hold = null;
 		scrollBox?.style.removeProperty("scroll-behavior");
+		scrollBox?.classList.remove("scrolling");
 	}
 	function scrollChatTop(): void {
 		scrollBox?.scrollTo({ top: 0, behavior: "smooth" });
@@ -8439,11 +8454,17 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			}
 			if (scrollAction === "skip-down" || scrollAction === "skip-up") {
 				// Bare d/u taps skip one smooth fixed step (a little,
-				// never a half-page) — repeats skip again.
+				// never a half-page); holds glide with the same ramp as
+				// unselected — repeats belong to the loop, never restart
+				// it (that would reset the ramp and stutter).
 				event.preventDefault();
 				lastGAt = 0;
 				const dir: 1 | -1 = scrollAction === "skip-up" ? -1 : 1;
-				if (scrollBox) scrollChatBy(dir * SCROLLKEY_SKIP_PX);
+				if (scrollBox && !event.repeat) {
+					const velocity = scrollHoldVelocity(event.key);
+					if (velocity !== null) startScrollHold(event.key, velocity, dir * SCROLLKEY_SKIP_PX);
+					else scrollChatBy(dir * SCROLLKEY_SKIP_PX);
+				}
 				return;
 			}
 			if (scrollAction === "enter-edit") {

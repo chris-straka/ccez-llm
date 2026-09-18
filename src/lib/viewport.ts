@@ -16,9 +16,11 @@
 export interface ScrollHold {
   key: string;
   velocity: number;
-  /** Discrete step a sub-150ms tap lands (line for j/k, half-page for d/u). */
+  /** Discrete step a sub-150ms tap lands (line for j/k, skip step for d/u). */
   tapDy: number;
   downAt: number;
+  /** rAF-clock start: the velocity ramp reads age off this, never the wall clock. */
+  startT: number;
   lastT: number;
   raf: number;
 }
