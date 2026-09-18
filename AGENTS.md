@@ -90,6 +90,14 @@ never amend, rebase, force-push, tag, or cut a release without an
 explicit ask in that turn. Name committed files explicitly, never
 `git add -A`. One shared local checkout: a commit is already on the
 user's disk, so never say "pull" — report it as in place.
+Credentials: the user hates typing passwords — git must never prompt
+interactively. The remote stays HTTPS authed through the `gh` token
+(`gh auth setup-git`, osxkeychain-backed). If a push would prompt,
+stop and report instead of asking for a password.
+Automation browsers must never touch the login keychain either:
+Playwright Chromium launches with `--use-mock-keychain` (see
+`playwright.config.ts`; same flag for any `/tmp` browser probe),
+or every fresh profile pops a password prompt per launch.
 
 ## Conventions
 

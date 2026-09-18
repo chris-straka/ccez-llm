@@ -37,7 +37,17 @@ export default defineConfig({
 		trace: "retain-on-failure"
 	},
 	projects: [
-		{ name: "chromium", use: { browserName: "chromium" } },
+		{
+			name: "chromium",
+			use: {
+				browserName: "chromium",
+				// macOS: each fresh browser profile touches the login
+				// keychain ("Safe Storage") and pops a password prompt
+				// per launch — dozens per session. The mock keychain
+				// silences it; automation never stores real secrets.
+				launchOptions: { args: ["--use-mock-keychain"] }
+			}
+		},
 		// Shell-engine coverage: the Tauri app is WebKit (WKWebView),
 		// which fires selectionchange on body swaps where Chromium stays
 		// silent — the Annotate menu strand only reproduced there.
