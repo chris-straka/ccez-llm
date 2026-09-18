@@ -57,7 +57,18 @@ open class RustPlugin : Plugin<Project> {
                     description = "Build dynamic library in $profile mode for all targets"
                 }
 
-                tasks["mergeUniversal${profileCapitalized}JniLibFolders"].dependsOn(buildTask)
+                // Extra product flavors (e.g. a dev/prod tier) multiply
+                // the variant names (mergeArm64DevDebug...), so match
+                // every merge task for this profile and ABI instead of
+                // the single no-flavor name. The build-all task gates
+                // only the universal merges; per-arch merges below take
+                // just their own target, so an arm64 assembly never
+                // builds armv7.
+                tasks.matching {
+                    it.name.startsWith("merge") &&
+                        it.name.contains("Universal${profileCapitalized}") &&
+                        it.name.endsWith("JniLibFolders")
+                }.configureEach { dependsOn(buildTask) }
 
                 for (targetPair in targetsList.withIndex()) {
                     val targetName = targetPair.value
@@ -75,9 +86,11 @@ open class RustPlugin : Plugin<Project> {
                     }
 
                     buildTask.dependsOn(targetBuildTask)
-                    tasks["merge$targetArchCapitalized${profileCapitalized}JniLibFolders"].dependsOn(
-                        targetBuildTask
-                    )
+                    tasks.matching {
+                        it.name.startsWith("merge") &&
+                            it.name.contains("$targetArchCapitalized${profileCapitalized}") &&
+                            it.name.endsWith("JniLibFolders")
+                    }.configureEach { dependsOn(targetBuildTask) }
                 }
             }
         }

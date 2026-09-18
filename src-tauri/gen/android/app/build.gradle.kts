@@ -27,6 +27,24 @@ android {
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
         versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")
     }
+    // Side-by-side installs: the dev flavor is a separate app
+    // (studio.ccez.app.dev, "Ccez LLM Dev") with its own data, so a
+    // dev build never clobbers the release install. Install it with
+    // `./gradlew :app:installArm64DevDebug`; the prod flavor keeps the
+    // identifier above for `tauri android build` and the store.
+    flavorDimensions += "tier"
+    productFlavors {
+        create("dev") {
+            dimension = "tier"
+            applicationIdSuffix = ".dev"
+            versionNameSuffix = "-dev"
+            resValue("string", "app_name", "Ccez LLM Dev")
+            resValue("string", "main_activity_title", "Ccez LLM Dev")
+        }
+        create("prod") {
+            dimension = "tier"
+        }
+    }
     // Release signing from keystore.properties (written by CI from secrets).
     // Absent locally, so unsigned local builds keep working untouched.
     val keystorePropertiesFile = rootProject.file("keystore.properties")
