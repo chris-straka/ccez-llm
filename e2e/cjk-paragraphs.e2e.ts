@@ -51,11 +51,11 @@ test("cjk paragraphs break visibly", async ({ page }) => {
 	expect(lastMargin).toBe("0px");
 });
 
-/** Numbered-list items hold still across the furigana toggle: the
-markdown path marks them like the aid path, so line-height never jumps
-normal-to-tall and nothing below moves. Needs the real worker, so it
-lives with the e2e (90s budget for first-run dictionary build). */
-test("numbered-list items hold still on furigana toggle", async ({ page }) => {
+/** Latched tall leading: CJK starts tight, jumps once when readings
+land (masked by the ruby appearing), then stays tall when the toggle
+goes back off — no oscillation. Needs the real worker, so it lives
+with the e2e (90s budget for first-run dictionary build). */
+test("numbered-list items latch tall across the furigana toggle", async ({ page }) => {
 	test.setTimeout(90_000);
 	await seedChat(page, [
 		{ role: "assistant", content: "3. 漢字を読むテスト\n4. 空が高くなる" }
@@ -71,15 +71,26 @@ test("numbered-list items hold still on furigana toggle", async ({ page }) => {
 				return { top: r.top, lh: getComputedStyle(el).lineHeight };
 			});
 		});
+	const toggle = page.locator('article.assistant .actions button:has-text("読み仮名")');
+	const ruby = page.locator("article.assistant .rendered .frb");
+	// Tight before anything renders: the tall reservation is latched,
+	// not reserved up front.
 	const before = await geom();
-	await page.locator('article.assistant .actions button:has-text("読み仮名")').click();
-	await expect(page.locator("article.assistant .rendered .frb").first()).toBeVisible({
-		timeout: 60_000
-	});
-	const after = await geom();
-	expect(after).toHaveLength(before.length);
-	for (let i = 0; i < before.length; i++) {
-		expect(Math.abs(after[i]!.top - before[i]!.top)).toBeLessThanOrEqual(1);
-		expect(after[i]!.lh).toBe(before[i]!.lh);
+	await toggle.click();
+	await expect(ruby.first()).toBeVisible({ timeout: 60_000 });
+	const on = await geom();
+	expect(on).toHaveLength(before.length);
+	// The one allowed jump: readings landed, leading went tall.
+	expect(parseFloat(on[0]!.lh)).toBeGreaterThan(parseFloat(before[0]!.lh));
+	// Toggling back off removes the ruby but keeps the tall leading —
+	// tops match the ON geometry, not the before one. (Once pinned,
+	// the row button becomes the show-original toggle.)
+	await page.locator('article.assistant .actions button:has-text("オリジナル")').click();
+	await expect(ruby).toHaveCount(0, { timeout: 60_000 });
+	const off = await geom();
+	expect(off).toHaveLength(on.length);
+	for (let i = 0; i < on.length; i++) {
+		expect(Math.abs(off[i]!.top - on[i]!.top)).toBeLessThanOrEqual(1);
+		expect(off[i]!.lh).toBe(on[i]!.lh);
 	}
 });

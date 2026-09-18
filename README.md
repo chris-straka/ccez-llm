@@ -1,7 +1,6 @@
 # Ccez LLM
 
-A BYOK desktop + mobile chatbot built for language learning and general
-questions — a Tauri 2 app (macOS) with a touch-first Android UI, Svelte 5
+A private BYOK desktop + mobile chatbot for everyday questions, with built-in language-learner aids — a Tauri 2 app (macOS) with a touch-first Android UI, Svelte 5
 runes + TypeScript frontend, and a thin Rust backend (Keychain, updater,
 native TTS). No accounts, no cloud sync, no agents: keys stay on-device,
 chats stay local.

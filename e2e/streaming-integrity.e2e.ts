@@ -198,6 +198,10 @@ test("thinking chip localizes, counts up, and tints", async ({ page }) => {
 	const sending = page.locator(".sending");
 	await expect(sending).toContainText("考え中", { timeout: 15_000 });
 	await expect(sending.locator(".sending-elapsed")).toContainText(/· \d+s/, { timeout: 12_000 });
+	const elapsed = sending.locator(".sending-elapsed");
+	await expect(elapsed).toBeHidden();
+	await sending.locator(".sending-chip").hover();
+	await expect(elapsed).toBeVisible();
 	const tinted = await page.evaluate(() => {
 		const chip = document.querySelector(".sending-chip");
 		if (!(chip instanceof HTMLElement)) return false;

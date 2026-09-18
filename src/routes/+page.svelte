@@ -15239,6 +15239,20 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		font-variant-numeric: tabular-nums;
 		opacity: 0.8;
 	}
+	/* The count stays out of the way until asked: hover the chip to
+	reveal it. Touch clients have no hover, so it always shows
+	there. (Visibility only — the text still ticks for tests.) */
+	.sending-chip .sending-elapsed {
+		display: none;
+	}
+	.sending-chip:hover .sending-elapsed {
+		display: inline;
+	}
+	@media (hover: none) {
+		.sending-chip .sending-elapsed {
+			display: inline;
+		}
+	}
 	/* Loading dots exist only while busy, so an idle aid button is
 	exactly its visible label — hover and spacing never cover text
 	that isn't there. */

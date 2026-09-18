@@ -208,6 +208,12 @@
 	own lines. Keyed off the aid-visible text, so hidden refs can't
 	reserve room (or grow history). */
 	const aidSpace = $derived(localAidsFor(detectScripts(aidBase)).length > 0);
+	/** Latched tall leading: CJK stays tight until readings first render,
+	then 2.7 stays put — toggling aids back off never oscillates the
+	leading. The one jump lands with the readings appearing, so it reads
+	as reflow, not jank. Per mount: a remount re-latches silently on
+	first paint when kinds are still on. */
+	let aidTall = $state(false);
 
 	$effect(() => {
 		// Paste folds splice before render (reading aids keep full text).
@@ -228,6 +234,9 @@
 		// textOverride and composes with pinned local kinds, each
 		// converting its own prose nodes onto it.
 		const localAids = !streaming && aidKindList.length > 0 ? aidKindList : [];
+		// Latch the tall leading the moment ruby actually lands (not on
+		// prop flip mid-stream, where nothing renders yet).
+		if (localAids.length > 0) aidTall = true;
 		// Sent tags pair against this message's attachments (Nth of a
 		// kind to Nth of a kind); assistant output carries none, so an
 		// echoed literal there stays plain text.
@@ -589,7 +598,7 @@
 		<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions, a11y_mouse_events_have_key_events -->
 		<!-- Badge wash is hover-only by decision (see onBadgeOver): Tab reaches markers, never highlights. -->
 		<!-- eslint-disable-next-line svelte/no-at-html-tags -- html is DOMPurify-sanitized in render.ts -->
-		<div class="rendered" class:aid-swap={!preview} class:aid-space={aidSpace} bind:this={bodyEl} onmousedown={(e) => (chromeDown = { x: e.clientX, y: e.clientY })} onclick={onBodyClick} onmouseover={onBadgeOver} onmouseout={onBadgeOut}>{@html html}</div>
+		<div class="rendered" class:aid-swap={!preview} class:aid-space={aidSpace} class:aid-tall={aidSpace && aidTall} bind:this={bodyEl} onmousedown={(e) => (chromeDown = { x: e.clientX, y: e.clientY })} onclick={onBodyClick} onmouseover={onBadgeOver} onmouseout={onBadgeOut}>{@html html}</div>
 	{/key}
 {/if}
 
@@ -666,23 +675,27 @@
 	.rendered.aid-swap {
 		animation: aid-swap 0.18s ease;
 	}
-	/* Ruby's vertical room is always reserved where a local aid exists,
-	so previewing or pinning it never reflows the message — but only on
-	blocks that can actually carry ruby (marked cjk at render, including
-	list items now that aids keep list structure). An English paragraph
-	in a mixed message keeps its normal leading, so its selection
-	highlight hugs the text instead of spanning the ruby void above.
+	/* Aid-space marks blocks that can carry ruby (marked cjk at render,
+	including list items now that aids keep list structure). An English
+	paragraph in a mixed message keeps its normal leading, so its
+	selection highlight hugs the text instead of spanning the ruby
+	void above.
 	WebKit sizes in-flow ruby annotations by glyphs (no line-height
-	trick contains them), so the reservation itself must cover base
-	plus annotation: 2.7 swallows the measured overhang with headroom
-	for other stacks. */
+	trick contains them), so the tall reservation itself must cover
+	base plus annotation once readings land: 2.7 swallows the measured
+	overhang with headroom for other stacks. It latches (aid-tall)
+	instead of following the toggle — tight until readings first
+	render, tall ever after, so enabling never oscillates the lines. */
 	.rendered.aid-space :global(p.cjk),
 	.rendered.aid-space :global(li.cjk) {
-		line-height: 2.7;
 		/* pretty rebalances CJK lines short and uneven across
 		paragraphs (kinsoku + ruby spans confuse it): fill the column
 		with plain wrapping like before. */
 		text-wrap: auto;
+	}
+	.rendered.aid-tall :global(p.cjk),
+	.rendered.aid-tall :global(li.cjk) {
+		line-height: 2.7;
 	}
 	.rendered.aid-space :global(p.cjk) {
 		/* Tall lines swallow the base 0.4em gap, so CJK paragraphs get

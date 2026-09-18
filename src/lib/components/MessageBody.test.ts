@@ -167,3 +167,32 @@ describe("preview mounts", () => {
 		expect(source).toContain("class:aid-swap={!preview}");
 	});
 });
+
+describe("latched CJK leading", () => {
+	/** Tight until readings first render, tall ever after: the 2.7
+	reservation must live on aid-tall (latched), never on aid-space
+	(availability) — or untoggled CJK goes tall again. jsdom has no
+	layout, so pin the wiring on source like the folded-chrome
+	tests above. */
+	it("binds the tall class on availability AND the latch", () => {
+		const source = readFileSync(new URL("./MessageBody.svelte", import.meta.url), "utf8");
+		expect(source).toContain("class:aid-tall={aidSpace && aidTall}");
+	});
+	it("latches the moment ruby actually renders", () => {
+		const source = readFileSync(new URL("./MessageBody.svelte", import.meta.url), "utf8");
+		expect(source).toMatch(/if \(localAids\.length > 0\) aidTall = true;/);
+	});
+	it("keeps line-height off the availability rule and on the latch rule", () => {
+		const css = bodyStyle();
+		const tall = [...css.matchAll(/([^{}]*\.rendered\.aid-tall[^{}]*)\{([^}]*)\}/g)];
+		expect(tall, "no .rendered.aid-tall rule — tall CJK leading has nowhere to live").not.toHaveLength(0);
+		for (const rule of tall) expect(rule[2]).toMatch(/line-height\s*:\s*2\.7/);
+		const space = [...css.matchAll(/([^{}]*\.rendered\.aid-space[^{}]*)\{([^}]*)\}/g)];
+		expect(space, "no .rendered.aid-space rules — availability marks nothing").not.toHaveLength(0);
+		for (const rule of space)
+			expect(
+				rule[2],
+				`${rule[1]!.trim()} sets line-height — untoggled CJK goes tall again`,
+			).not.toMatch(/line-height/);
+	});
+});

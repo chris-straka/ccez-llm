@@ -1751,6 +1751,17 @@ const hoverBadge = async (
 	await hoverBadge("assistant", 0, "five dozen", { article: 1, quote: "five dozen liquor" });
 	await hoverBadge("assistant", 1, "winter voyage");
 	await hoverBadge("user", 1, "lazy dog");
+	// Gapped slide across plain text: the stepped cursor crosses
+	// non-badge ground between the messages, arming the shared
+	// hysteresis mid-slide — the arrival must cancel it, so the
+	// fresh wash survives past the clear window.
+	const slideFrom = await badges("user").nth(1).boundingBox();
+	const slideTo = await badges("assistant").nth(1).boundingBox();
+	if (!slideFrom || !slideTo) throw new Error("slide badges have no box");
+	await page.mouse.move(slideFrom.x + slideFrom.width / 2, slideFrom.y + slideFrom.height / 2);
+	await page.mouse.move(slideTo.x + slideTo.width / 2, slideTo.y + slideTo.height / 2, { steps: 12 });
+	await page.waitForTimeout(400);
+	expect(await washedText()).toContain("winter voyage");
 	// No badge node churned under the hovers.
 	const probes = await page.evaluate(() =>
 		[...document.querySelectorAll("button.ccez-ann-badge")].map((b) =>
