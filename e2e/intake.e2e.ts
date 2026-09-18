@@ -120,6 +120,16 @@ test("a second pasted image chains onto the same line", async ({ page }) => {
 	await expect(content).toHaveValue("[Pasted image] [Pasted image] ");
 });
 
+test("an image pasted after typed text stays on the same line", async ({ page }) => {
+	const content = page.locator(".ta-input").first();
+	await content.click();
+	await page.keyboard.type("jj");
+	// Spaceless mid-prose earns one separating space, never a fresh
+	// line for the tag.
+	await dropImage(page);
+	await expect(content).toHaveValue("jj [Pasted image] ", { timeout: 15_000 });
+});
+
 test("removing the pill collapses the strip", async ({ page }) => {
 	await dropImage(page);
 	const card = page.locator(".attachments li.card");
@@ -232,6 +242,42 @@ test("long paste becomes a pill with a positional tag", async ({ page }) => {
 	await box.click();
 	await page.keyboard.press("Control+o");
 	await expect(box).toHaveValue("[Pasted 540 chars] ");
+});
+
+test("pasted text renders as an image-sized card", async ({ page }) => {
+	const pasted = "lorem ipsum dolor sit amet ".repeat(20);
+	await page.locator(".ta-input").first().click();
+	await page.evaluate((text) => {
+		const target = document.querySelector(".ta-input");
+		if (!target) throw new Error("missing editor");
+		const transfer = new DataTransfer();
+		transfer.setData("text/plain", text);
+		const event = new ClipboardEvent("paste", { bubbles: true, cancelable: true });
+		Object.defineProperty(event, "clipboardData", { value: transfer });
+		target.dispatchEvent(event);
+	}, pasted);
+	// The pill is a card now, like images — same row shape.
+	const pill = page.locator(".attachments li.card .paste-body");
+	await expect(pill).toBeVisible();
+	await dropImage(page);
+	const cards = page.locator(".attachments li.card");
+	await expect(cards).toHaveCount(2);
+	const pasteBox = await cards.nth(0).boundingBox();
+	const imgBox = await cards.nth(1).boundingBox();
+	if (!pasteBox || !imgBox) throw new Error("cards have no boxes");
+	// Never wider than the image card beside it.
+	expect(pasteBox.width).toBeLessThanOrEqual(imgBox.width + 1);
+	// The text fills the thumbnail's seat: same height as the image.
+	const previewBox = await pill.boundingBox();
+	const thumbBox = await page.locator(".attachments .thumb img").boundingBox();
+	if (!previewBox || !thumbBox) throw new Error("preview or thumb has no box");
+	expect(Math.abs(previewBox.height - thumbBox.height)).toBeLessThanOrEqual(2);
+	// Expanding scrolls in place: the card keeps its footprint.
+	await pill.click();
+	await expect(pill).toHaveAttribute("aria-expanded", "true");
+	const openBox = await pill.boundingBox();
+	if (!openBox) throw new Error("open preview has no box");
+	expect(Math.abs(openBox.height - previewBox.height)).toBeLessThanOrEqual(2);
 });
 
 test("thoughts never render and Ctrl+O stays quiet without paste tags", async ({ page }) => {
@@ -566,9 +612,10 @@ test("removing the image pill keeps the pasted-text pill", async ({ page }) => {
 	await expect(pill).toBeVisible();
 	const box = page.locator(".ta-input").first();
 	await expect(box).toHaveValue("[Pasted 540 chars] ");
-	// …then an image: its own card joins the strip…
+	// …then an image: its own card joins the strip (the text pill
+	// is a card too now, so scope to the thumbnail card)…
 	await dropImage(page);
-	const card = page.locator(".attachments li.card");
+	const card = page.locator(".attachments li.card", { has: page.locator(".thumb") });
 	await expect(card).toBeVisible({ timeout: 15_000 });
 	// …and removing the image pill keeps the pasted-text pill and tag.
 	await card.locator('button[aria-label="Remove attachment"]').click();

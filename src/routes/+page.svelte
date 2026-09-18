@@ -10150,22 +10150,22 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					{@const pasted = isPastedTextAttachment(att) && att.text !== null}
 					{@const pastedBody = att.text ?? ""}
 					{@const pastedOpen = expandedPastes.includes(att.id)}
-					<li class:card={att.kind === "image" && !!att.dataUrl}>
+					<li class:card={(att.kind === "image" && !!att.dataUrl) || pasted}>
 						{#if att.kind === "image" && att.dataUrl}
 							<!-- Inert thumbnail: clicking previews nothing
 							(the big peek is gone) — it only drags the row. -->
 							<span class="thumb" aria-hidden="true">
 								<img src={att.dataUrl} alt="" draggable="false" />
 							</span>
-						{:else if pasted}
-							<span class="file-kind" aria-hidden="true">PASTE</span>
-						{:else}
+						{:else if !pasted}
 							<span class="file-kind" aria-hidden="true">FILE</span>
 						{/if}
 						{#if pasted}
-							<!-- Pasted-text pill: excerpt preview plus char
-							count; the excerpt toggles the full text. Copy
-							and remove below are the shared card buttons. -->
+							<!-- Pasted-text card: same card as images, with
+							the text filling the thumbnail's seat (clamped,
+							ellipsis) instead of a picture. The preview
+							toggles the full text; copy and remove below are
+							the shared card buttons. -->
 							<button
 								type="button"
 								class="paste-body"
@@ -10177,6 +10177,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							>
 								{pastedOpen ? pastedBody : fileExcerpt(pastedBody)}
 							</button>
+							<span class="file-kind" aria-hidden="true">PASTE</span>
 							<span class="tok" title="{att.tokens} tokens">{pastedBody.length} chars</span>
 						{:else}
 							<span class="name" title="{att.name} · ~{att.tokens} tokens">{att.name}</span>
@@ -13837,6 +13838,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		pointer-events: none;
 		list-style: none;
 		display: flex;
+		/* Cards set the row height; lesser pills center instead of
+		stretching into tall capsules beside them. */
+		align-items: center;
 		flex-wrap: nowrap;
 		gap: 0.4rem;
 		margin: 0 1.2rem;
@@ -13943,6 +13947,37 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		height: 4.5rem;
 		object-fit: cover;
 		border-radius: 8px;
+	}
+	/* Pasted-text cards: the same 12rem card as images, with the
+	pasted text filling the thumbnail's seat (same 4.5rem) instead
+	of a picture — four clamped lines with an ellipsis, never a
+	tall pill. The footer (PASTE, chars, copy, X) matches the image
+	card's row. */
+	.attachments li.card .paste-body {
+		flex: 1 1 100%;
+		max-width: none;
+		height: 4.5rem;
+		line-height: 1.4;
+		display: -webkit-box;
+		-webkit-line-clamp: 4;
+		line-clamp: 4;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+		white-space: normal;
+		text-align: left;
+		border-radius: 8px;
+		padding: 0.1rem 0.3rem;
+	}
+	/* Expanded preview scrolls in place like the old pill: same
+	card footprint, full text, no strip growth. */
+	.attachments li.card .paste-body.open {
+		display: block;
+		max-width: none;
+		max-height: none;
+		white-space: pre-wrap;
+		word-break: break-word;
+		overflow-y: auto;
+		text-overflow: clip;
 	}
 	/* Card buttons are icon-only (message-button copy glyph, close
 	glyph), sized to the card's font so they track it. */

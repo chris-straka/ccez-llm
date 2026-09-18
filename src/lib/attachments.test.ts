@@ -94,13 +94,13 @@ describe("attachment markers", () => {
 		expect(IMAGE_MARKER).toBe("[Pasted image]");
 		expect(imageMarkerInsert("")).toBe(`${IMAGE_MARKER} `);
 		expect(imageMarkerInsert("draft\n")).toBe(`${IMAGE_MARKER} `);
-		// Mid-draft: no blank line before the tag, still no newline
-		// after it — the caret lands after the space, same line.
-		expect(imageMarkerInsert("hello")).toBe(`\n${IMAGE_MARKER} `);
+		// Mid-draft: one separating space before the tag, still no
+		// newline after it — the caret lands after the space, same line.
+		expect(imageMarkerInsert("hello")).toBe(` ${IMAGE_MARKER} `);
 		expect(imageMarkerInsert("hello\n")).toBe(`${IMAGE_MARKER} `);
 		// Chained right after another tag: repeat pastes ride one line.
 		expect(imageMarkerInsert(`${IMAGE_MARKER} `)).toBe(`${IMAGE_MARKER} `);
-		expect(imageMarkerInsert(`${FILE_MARKER} hello`)).toBe(`\n${IMAGE_MARKER} `);
+		expect(imageMarkerInsert(`${FILE_MARKER} hello`)).toBe(` ${IMAGE_MARKER} `);
 		// Prose typed beside a tag ends spaced: the next tag stays on
 		// the line instead of dropping below it.
 		expect(imageMarkerInsert(`${IMAGE_MARKER} test `)).toBe(`${IMAGE_MARKER} `);
@@ -109,7 +109,7 @@ describe("attachment markers", () => {
 	it("says [Pasted Attachment] under the same contract", () => {
 		expect(FILE_MARKER).toBe("[Pasted Attachment]");
 		expect(fileMarkerInsert("")).toBe(`${FILE_MARKER} `);
-		expect(fileMarkerInsert("hello")).toBe(`\n${FILE_MARKER} `);
+		expect(fileMarkerInsert("hello")).toBe(` ${FILE_MARKER} `);
 		expect(fileMarkerInsert("hello\n")).toBe(`${FILE_MARKER} `);
 		expect(fileMarkerInsert(`${IMAGE_MARKER} `)).toBe(`${FILE_MARKER} `);
 		expect(fileMarkerInsert(`${IMAGE_MARKER} test `)).toBe(`${FILE_MARKER} `);
@@ -132,8 +132,9 @@ describe("attachment markers", () => {
 		// Elsewhere the usual prefix applies even with the flag set.
 		expect(imageMarkerInsert("", true)).toBe(`${IMAGE_MARKER} `);
 		expect(imageMarkerInsert("draft\n", true)).toBe(`${IMAGE_MARKER} `);
-		// Without the flag prose still breaks its own line.
-		expect(imageMarkerInsert("pasted words", false)).toBe(`\n${IMAGE_MARKER} `);
+		// Without the flag spaceless prose still takes the tag on
+		// its line, one space apart — never a line of its own.
+		expect(imageMarkerInsert("pasted words", false)).toBe(` ${IMAGE_MARKER} `);
 	});
 
 	it("compacts token counts past four figures", () => {
@@ -410,8 +411,9 @@ describe("pasted-text tags", () => {
 		expect(pastedMarkerInsert("notes\n", 10)).toBe("[Pasted 10 chars] ");
 		// Chained after another tag's trailing space: same line.
 		expect(pastedMarkerInsert(`${IMAGE_MARKER} `, 10)).toBe("[Pasted 10 chars] ");
-		// Spaceless mid-prose starts a fresh line, never glues.
-		expect(pastedMarkerInsert("hello", 10)).toBe("\n[Pasted 10 chars] ");
+		// Spaceless mid-prose takes the tag on its line, one space
+		// apart — never glues, never a line of its own.
+		expect(pastedMarkerInsert("hello", 10)).toBe(" [Pasted 10 chars] ");
 		// Prose already spaced stays on its line.
 		expect(pastedMarkerInsert("hello ", 10)).toBe("[Pasted 10 chars] ");
 	});
