@@ -38,3 +38,6 @@ chats stay local.
   type-aware lint gate the tree.
 
 `TODO.md` is the working checklist, `DONE.md` the archive of finished work.
+
+Known-good revert points: gap parking `18dab6e` (Sep 2026) — annotation
+badges park in word gaps; fade re-fire `5437c7c`.
