@@ -234,6 +234,10 @@ trusted taps count.
    (blur/select/tab-switch ALL force repaints — matches symptom 5
    exactly). Still needs the smoking gun: yellow pixels on screen
    WITH an empty registry (one capture attempt came back clean).
+   MITIGATION SHIPPED (unverified in shell): terminal clears now
+   force a sync reflow on the message root (`invalidateWashPaint`),
+   and every ramp step re-locates its ranges instead of repainting
+   captured (possibly detached) ones. Verify pixels post-reload.
 2. **Real-mouse leave aftermath unmeasured**: post-leave registry was
    verified after SYNTHETIC mouseout only. Capture graded-name counts
    1–2s after a REAL mouse-out.
