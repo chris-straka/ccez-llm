@@ -21,6 +21,10 @@ privileged (Keychain, updater, native TTS).
   disturbs the identity. Rust edits need Ctrl-C plus relaunch. Click
   Always Allow, never Allow (Allow is single-use and repeats every
   launch). `scripts/sign-dev-binary.sh` remains for manual use.
+- MCP driver sessions (see the running app like the user does):
+  `tauri-plugin-mcp-bridge` is debug-only and localhost-bound, so it
+  never ships — but it only loads after a dev-shell relaunch. Attach
+  with a driver `start`, verify with `status`, `stop` when done.
 - `bun run test` — Vitest, colocated `*.test.ts`. Safe anytime.
 - Spec-only changes (`e2e/`, `*.test.ts`) never touch the running app:
   no restart, reload, or rerun needed — say so instead of implying one.

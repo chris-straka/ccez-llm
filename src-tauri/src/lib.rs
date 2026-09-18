@@ -189,6 +189,17 @@ pub fn run() {
     // compile for mobile; same shape as the on_menu_event link below).
     #[cfg(desktop)]
     let builder = builder.plugin(tauri_plugin_global_shortcut::Builder::new().build());
+    // MCP automation bridge (debug builds only — the WebSocket it
+    // opens must never ship, so release builds skip registration
+    // entirely; localhost bind, never the default all-interfaces).
+    // Lets an MCP driver session inspect the running app (screenshots,
+    // DOM, console) while debugging UI reports.
+    #[cfg(debug_assertions)]
+    let builder = builder.plugin(
+        tauri_plugin_mcp_bridge::Builder::new()
+            .bind_address("127.0.0.1")
+            .build(),
+    );
     let builder = builder
         .invoke_handler(tauri::generate_handler![
             annotate::drain_pending_external,
