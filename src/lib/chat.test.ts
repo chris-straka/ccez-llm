@@ -31,6 +31,7 @@ import {
 	buildApiMessages,
 	visibleMessageCount,
 	isSending,
+	hasReplyStarted,
 	type ChatState
 } from "./chat";
 import type { ChatProvider, ChatResult } from "./providers/types";
@@ -89,6 +90,21 @@ describe("chat", () => {
 		}, store);
 		expect(firsts).toBe(1);
 		expect(activeChat(state).messages[1]?.content).toBe("hello");
+	});
+
+	it("marks the reply started on first token, clears it on settle", async () => {
+		// The thinking chip reads these two flags: sending (still
+		// running) without reply-started (nothing printed yet).
+		const { state, store } = stateWith(freshStore());
+		let during: boolean[] = [];
+		await sendMessage(state, scriptedProvider(["", "hel", "lo"]), "sys", "hi", {
+			onFirstToken: () => {
+				during = [isSending(state, state.activeChatId), hasReplyStarted(state, state.activeChatId)];
+			}
+		}, store);
+		expect(during).toEqual([true, true]);
+		expect(isSending(state, state.activeChatId)).toBe(false);
+		expect(hasReplyStarted(state, state.activeChatId)).toBe(false);
 	});
 
 	it("splits tokens into input and output", async () => {

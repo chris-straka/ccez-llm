@@ -30,6 +30,7 @@
 		sendMessage,
 		setPasteFold,
 		isSending,
+		hasReplyStarted,
 		resolveSendCompletion,
 		type Chat,
 		type ChatMsg,
@@ -10082,7 +10083,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					{/if}
 				</article>
 			{/each}
-			{#if isSending(chatState, viewChat.id)}
+			{#if isSending(chatState, viewChat.id) && !hasReplyStarted(chatState, viewChat.id)}
 				<p class="sending" role="status" aria-label="Waiting for a reply">
 					<span class="sending-chip"
 						>{thinkingLabelFor(activeReplyCode ?? settings.replyLang)}<span class="tdots" aria-hidden="true"

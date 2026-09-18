@@ -203,13 +203,43 @@ test("mid-stream annotation on the sent message survives the reply", async ({ pa
 	await expect(page.locator(".prompt-tools .ann-wrap")).toHaveCount(1);
 });
 
-/** The sending chip localizes to the chat reply language, counts the
-wait up in seconds, and wears its accent tint (all inside one slow
-mock stream). */
-test("thinking chip localizes, counts up, and tints", async ({ page }) => {
+/** The thinking chip localizes to the chat reply language while the
+reply is still on its way — then retires the moment tokens print
+(thinking is over when printing starts, even though the send runs
+on). Slow mock cadence makes both sides deterministic. */
+test("thinking chip shows while waiting, hides on first token", async ({ page }) => {
 	await page.addInitScript(() => {
 		window.localStorage.setItem("ccez-mock-provider", "1");
 		window.localStorage.setItem("ccez-mock-word-ms", "800");
+	});
+	await seedChat(page, [{ role: "user", content: "The quick brown fox jumps over the lazy dog." }], "ja");
+	await page.goto("/");
+	await expect(page.locator("article .rendered").first()).toBeVisible();
+	await page.locator(".ta-input").click();
+	await page.keyboard.type("tell me about foxes");
+	await page.keyboard.press("Enter");
+	const sending = page.locator(".sending");
+	await expect(sending).toContainText("考え中", { timeout: 15_000 });
+	// First tokens print while the reply still streams: the chip is
+	// gone even though the send has not settled.
+	await expect(page.locator("article.assistant .rendered")).toContainText("Mock reply to:", {
+		timeout: 30_000
+	});
+	await expect(sending).toHaveCount(0);
+	// The stream itself runs on to the full reply.
+	await expect(page.locator("article.assistant .rendered")).toContainText(
+		"Mock reply to: tell me about foxes",
+		{ timeout: 30_000 }
+	);
+});
+
+/** The waiting chip counts the wait up in seconds (hover-revealed),
+with the color living on the dots. The mock never answers (60s word
+cadence), so the chip stays up for the whole probe. */
+test("thinking chip counts up and tints", async ({ page }) => {
+	await page.addInitScript(() => {
+		window.localStorage.setItem("ccez-mock-provider", "1");
+		window.localStorage.setItem("ccez-mock-word-ms", "60000");
 	});
 	await seedChat(page, [{ role: "user", content: "The quick brown fox jumps over the lazy dog." }], "ja");
 	await page.goto("/");
@@ -232,8 +262,6 @@ test("thinking chip localizes, counts up, and tints", async ({ page }) => {
 	});
 	expect(dotColors).toHaveLength(3);
 	expect(new Set(dotColors).size).toBe(3);
-	await expect(page.locator("article.assistant .rendered")).toContainText("Mock reply to: tell me about foxes", {
-		timeout: 30_000
-	});
-	await expect(sending).toHaveCount(0);
+	// The mock still has not answered: the chip waits on.
+	await expect(sending).toContainText("考え中");
 });

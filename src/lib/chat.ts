@@ -83,11 +83,23 @@ export interface ChatState {
 	 * persisted: reloads always boot idle.
 	 */
 	sendingChatIds: ChatId[];
+	/**
+	 * Every sending chat whose reply visibly started (first token
+	 * landed). The thinking chip shows only before this: once tokens
+	 * print, thinking is over even though the send still runs. Never
+	 * persisted, cleared with the send.
+	 */
+	replyStartedChatIds: ChatId[];
 }
 
 /** True when the given chat (default: active) has a reply streaming. */
 export function isSending(state: ChatState, id?: ChatId): boolean {
 	return state.sendingChatIds.includes(id ?? state.activeChatId);
+}
+
+/** True when the given chat's reply visibly started (first token landed). */
+export function hasReplyStarted(state: ChatState, id?: ChatId): boolean {
+	return state.replyStartedChatIds.includes(id ?? state.activeChatId);
 }
 
 const STORAGE_KEY = "ccez-llm-chats-v1";
@@ -121,7 +133,8 @@ export function createChatState(store?: KeyValueStore): ChatState {
 		activeChatId: "" as ChatId,
 		sending: false,
 		sendingChatId: null,
-		sendingChatIds: []
+		sendingChatIds: [],
+		replyStartedChatIds: []
 	};
 	loadChats(state, store ?? browserStore() ?? memoryStore);
 	if (state.chats.length === 0) {
@@ -602,9 +615,14 @@ export async function streamAssistantReply(
 		const result = await provider.stream(apiMessages, {
 			onToken: (token) => {
 				// First visible token: the reply has started arriving
-				// (haptic rumble, readback warm-up). Fires once — later
-				// tokens just extend the accumulator.
-				if (streamed === "" && token !== "") opts.onFirstToken?.();
+				// (thinking chip retires, haptic rumble, readback
+				// warm-up). Fires once — later tokens just extend the
+				// accumulator.
+				if (streamed === "" && token !== "") {
+					if (!state.replyStartedChatIds.includes(chatId))
+						state.replyStartedChatIds = [...state.replyStartedChatIds, chatId];
+					opts.onFirstToken?.();
+				}
 				streamed += token;
 				replaceReply({ content: streamed });
 			}
@@ -618,6 +636,7 @@ export async function streamAssistantReply(
 	} finally {
 		if (inflightByChat.get(chatId) === controller) inflightByChat.delete(chatId);
 		state.sendingChatIds = state.sendingChatIds.filter((id) => id !== chatId);
+		state.replyStartedChatIds = state.replyStartedChatIds.filter((id) => id !== chatId);
 		state.sending = state.sendingChatIds.length > 0;
 		// sendingChatId tracks the most recent in-flight chat for the
 		// legacy global readers: fall back to a still-streaming one.
