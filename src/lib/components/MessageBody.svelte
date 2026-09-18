@@ -1184,7 +1184,7 @@
 		color: inherit;
 	}
 	.rendered :global(mark.ccez-ann) {
-		background: #fff3b0;
+		background: #ffe066;
 		border-radius: 3px;
 		/* Annotated text reads interactive (the badge above it opens
 		the edit); clicks still select normally. */
@@ -1206,14 +1206,14 @@
 	(not the Highlight API) so it renders in every engine; the caller
 	wraps and unwraps it around the blink. */
 	.rendered :global(mark.ccez-ann-flash) {
-		background: #fff3b0;
+		background: #ffe066;
 		border-radius: 3px;
 		padding: 0 1px;
 		margin: 0 -1px;
 		color: inherit;
 	}
 	:global(html[data-theme="dark"]) .rendered :global(mark.ccez-ann-flash) {
-		background: rgba(245, 158, 11, 0.3);
+		background: rgba(245, 158, 11, 0.45);
 	}
 	/* The wash mounts/unmounts imperatively (applyMarks), so a plain
 	transition has nothing to run between: fade-in plays on mount for
@@ -1224,7 +1224,7 @@
 			background-color: transparent;
 		}
 		to {
-			background-color: #fff3b0;
+			background-color: #ffe066;
 		}
 	}
 	.rendered :global(mark.ccez-ann.fresh) {
@@ -1243,7 +1243,7 @@
 	}
 	@keyframes ann-wash-out {
 		from {
-			background-color: #fff3b0;
+			background-color: #ffe066;
 		}
 		to {
 			background-color: transparent;
@@ -1268,31 +1268,31 @@
 	supported, so future stamps can skip mark-DOM wrapping. The mark
 	path above stays the live fallback. */
 	.rendered::highlight(ccez-ann) {
-		background-color: #fff3b0;
+		background-color: #ffe066;
 		color: inherit;
 	}
 	/* Graded dimmers for the wash fade ramp (see washRampSchedule):
 	same hue stepping down — the eye reads the steps as a fade. */
 	.rendered::highlight(ccez-ann-d1) {
-		background-color: rgba(255, 243, 176, 0.78);
+		background-color: rgba(255, 224, 102, 0.72);
 		color: inherit;
 	}
 	.rendered::highlight(ccez-ann-d2) {
-		background-color: rgba(255, 243, 176, 0.55);
+		background-color: rgba(255, 224, 102, 0.45);
 		color: inherit;
 	}
 	.rendered::highlight(ccez-ann-d3) {
-		background-color: rgba(255, 243, 176, 0.32);
+		background-color: rgba(255, 224, 102, 0.18);
 		color: inherit;
 	}
 	:global(html[data-theme="dark"]) .rendered::highlight(ccez-ann) {
-		background-color: rgba(245, 158, 11, 0.3);
+		background-color: rgba(245, 158, 11, 0.45);
 	}
 	:global(html[data-theme="dark"]) .rendered::highlight(ccez-ann-d1) {
-		background-color: rgba(245, 158, 11, 0.23);
+		background-color: rgba(245, 158, 11, 0.3);
 	}
 	:global(html[data-theme="dark"]) .rendered::highlight(ccez-ann-d2) {
-		background-color: rgba(245, 158, 11, 0.15);
+		background-color: rgba(245, 158, 11, 0.18);
 	}
 	:global(html[data-theme="dark"]) .rendered::highlight(ccez-ann-d3) {
 		background-color: rgba(245, 158, 11, 0.08);

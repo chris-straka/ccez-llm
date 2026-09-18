@@ -220,7 +220,7 @@ test("review quote jumps to the message with a wash blink", async ({ page }) => 
 				}),
 			{ timeout: 4_000 }
 		)
-		.toBe("rgb(255, 243, 176)");
+		.toBe("rgb(255, 224, 102)");
 	await page.waitForTimeout(800);
 	const after = await page.evaluate(() => document.querySelector(".messages")?.scrollTop ?? 0);
 	expect(after).toBeLessThan(top - 50);
@@ -287,7 +287,7 @@ test("down jump lands the quote clear of the dock", async ({ page }) => {
 				}),
 			{ timeout: 4_000 }
 		)
-		.toBe("rgb(255, 243, 176)");
+		.toBe("rgb(255, 224, 102)");
 });
 
 /** Only the quote navigates: clicking the note (or the row's number)
@@ -434,7 +434,7 @@ test("jump leaves a clear mark exactly where it is", async ({ page }) => {
 				}),
 			{ timeout: 4_000 }
 		)
-		.toBe("rgb(255, 243, 176)");
+		.toBe("rgb(255, 224, 102)");
 	expect(await page.evaluate(() => document.querySelector(".messages")?.scrollTop ?? 0)).toBe(top);
 });
 
