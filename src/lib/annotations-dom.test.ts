@@ -531,6 +531,21 @@ describe("rangesExcludingReadings", () => {
 		expect(parts[0]?.toString()).toBe("say hello world today");
 		root.remove();
 	});
+
+	it("never stretches a short spaceless quote across its line", () => {
+		const root = document.createElement("div");
+		root.innerHTML =
+			'<p>に本を<span class="frb">読<span class="frt">よ</span></span>む午後の時間は</p>';
+		document.body.appendChild(root);
+		// The full locate-then-split pipeline, as the wash walker runs it.
+		const located = quoteRange(root, "読む午")!;
+		// The raw range spans the reading between its base endpoints:
+		// this is the text the registry used to paint yellow.
+		expect(located.toString()).toBe("読よむ午");
+		const parts = rangesExcludingReadings(located);
+		expect(parts.map((r) => r.toString()).join("")).toBe("読む午");
+		root.remove();
+	});
 });
 
 describe("wrapRangeInMark / unwrapMark", () => {
