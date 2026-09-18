@@ -318,6 +318,19 @@ describe("snapSelectionToWordEdges", () => {
 		expect(snapSelectionToWordEdges(sel)).toBe(false);
 	});
 
+	it("never stretches an Arabic word selection to the line", () => {
+		// RTL drags that jump to the visual line end do it natively:
+		// the word snap only ever stops at word edges, never extends.
+		document.body.innerHTML = "<p>صباحات الخريف تتميز بهواء نقي</p>";
+		const node = document.querySelector("p")?.firstChild;
+		if (!(node instanceof Text)) throw new Error("no text");
+		const text = node.textContent ?? "";
+		const end = text.indexOf(" ");
+		const sel = selectIn(node, 0, end);
+		expect(snapSelectionToWordEdges(sel)).toBe(false);
+		expect(sel.toString()).toBe("صباحات");
+	});
+
 	it("snaps both ends of a multi-node selection", () => {
 		document.body.innerHTML = "<p>alpha <b>beta gamma</b></p>";
 		const first = document.querySelector("p")?.firstChild;
