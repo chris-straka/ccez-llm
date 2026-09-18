@@ -28,3 +28,27 @@ export function isKeyboardOpen(
 ): boolean {
 	return keyboardOverlapPx(innerHeight, viewportHeight, viewportOffsetTop) >= minOverlap;
 }
+
+/**
+ * Arming state for the `.app` height pin. The pin must hold for two
+ * consecutive open frames before engaging: mid-animation the layout
+ * height and the visual viewport update at different rates, so a lone
+ * frame can cross the open gate and flick the pin on for a frame
+ * against the native resize. Release is always immediate.
+ */
+export interface PinArmState {
+	armed: boolean;
+	sawOpen: boolean;
+}
+
+export function pinArmStart(): PinArmState {
+	return { armed: false, sawOpen: false };
+}
+
+/** Feed each viewport frame's open reading; pin only while armed. */
+export function nextPinArm(state: PinArmState, open: boolean): PinArmState {
+	if (!open) return { armed: false, sawOpen: false };
+	if (state.armed) return state;
+	if (state.sawOpen) return { armed: true, sawOpen: true };
+	return { armed: false, sawOpen: true };
+}

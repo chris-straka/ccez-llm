@@ -316,7 +316,7 @@ import {
 	import { consumeLaunchFiles, splitLaunchFiles } from "$lib/launchFiles";
 	import { copyExportText, downloadMarkdownFile, exportChatMarkdown, fileSaveAccessAvailable } from "$lib/chatExport";
 	import { nativeSaveMarkdown } from "$lib/nativeExport";
-	import { isKeyboardOpen, keyboardOverlapPx } from "$lib/viewportReflow";
+	import { isKeyboardOpen, keyboardOverlapPx, nextPinArm, pinArmStart } from "$lib/viewportReflow";
 import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	import {
 		speakText,
@@ -9212,12 +9212,17 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// (typing would heal it anyway; this heals it before the next
 		// keystroke).
 		let viewportTimer: number | undefined;
+		let kbPin = pinArmStart();
 		const onViewportResize = (): void => {
 			// Pin synchronously on every viewport frame: the old trailing
 			// debounce let the composer lag a beat behind the keyboard
 			// animation, then jump. Only the remeasure stays debounced.
-			// Phone keyboard without resizes-content: the layout
-			// viewport doesn't shrink, so the full-height flex
+			// The pin arms after two consecutive open frames — mid-animation
+			// the layout height and the visual viewport update at different
+			// rates, so a lone frame can cross the open gate and flick the
+			// pin on for a frame against the native adjustResize. Release
+			// stays immediate. Phone keyboard without resizes-content: the
+			// layout viewport doesn't shrink, so the full-height flex
 			// column (and the latest messages) slides under the
 			// keyboard with no way to reach it. Pin .app to the
 			// visual height while the keyboard is open, and expose
@@ -9229,7 +9234,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			if (androidUI && appEl && window.visualViewport) {
 				const vv = window.visualViewport;
 				const overlap = keyboardOverlapPx(window.innerHeight, vv.height, vv.offsetTop);
-				if (isKeyboardOpen(window.innerHeight, vv.height, vv.offsetTop)) {
+				kbPin = nextPinArm(kbPin, isKeyboardOpen(window.innerHeight, vv.height, vv.offsetTop));
+				if (kbPin.armed) {
 					appEl.style.height = `${vv.height}px`;
 					appEl.style.setProperty("--kb-height", `${overlap}px`);
 				} else {
