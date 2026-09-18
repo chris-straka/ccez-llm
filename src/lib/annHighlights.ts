@@ -44,6 +44,7 @@ export function washRampSchedule(ramp: "in" | "out"): WashRampStep[] {
 export interface HighlightRegistry {
 	set(name: string, highlight: object): void;
 	delete(name: string): void;
+	get(name: string): Highlight | undefined;
 }
 
 /** True when CSS.highlights with Highlight construction exists. */
@@ -98,6 +99,34 @@ export function clearAnnotationWashes(): void {
 	clearAnnotationWash(ANN_HIGHLIGHT_D1);
 	clearAnnotationWash(ANN_HIGHLIGHT_D2);
 	clearAnnotationWash(ANN_HIGHLIGHT_D3);
+}
+
+/** Ranges currently registered under the live name (empty where unsupported). Never throws. */
+export function liveWashRanges(): AbstractRange[] {
+	try {
+		const reg = registry();
+		if (!reg) return [];
+		return [...(reg.get(ANN_HIGHLIGHT_NAME) ?? [])];
+	} catch {
+		return [];
+	}
+}
+
+/**
+ * True when two single-range paints cover the same endpoints: a
+ * re-stamp over replaced DOM (streaming tokens) relocates the quote,
+ * while a same-content re-stamp does not. Pure — unit-tested.
+ */
+export function sameWashRanges(a: AbstractRange[], b: AbstractRange[]): boolean {
+	if (a.length !== 1 || b.length !== 1) return a.length === b.length;
+	const x = a[0]!;
+	const y = b[0]!;
+	return (
+		x.startContainer === y.startContainer &&
+		x.startOffset === y.startOffset &&
+		x.endContainer === y.endContainer &&
+		x.endOffset === y.endOffset
+	);
 }
 
 /**

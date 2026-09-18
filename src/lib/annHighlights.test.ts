@@ -6,9 +6,11 @@ import {
 	ANN_HIGHLIGHT_D3,
 	ANN_HIGHLIGHT_NAME,
 	highlightsSupported,
+	liveWashRanges,
 	paintAnnotationWash,
 	clearAnnotationWash,
 	clearAnnotationWashes,
+	sameWashRanges,
 	selectionRanges,
 	washRampSchedule
 } from "./annHighlights";
@@ -59,6 +61,27 @@ describe("CSS.highlights annotation wash", () => {
 		expect(paintAnnotationWash([range], ANN_HIGHLIGHT_D2)).toBe(false);
 		expect(() => clearAnnotationWash(ANN_HIGHLIGHT_D3)).not.toThrow();
 		expect(() => clearAnnotationWashes()).not.toThrow();
+	});
+	it("sameWashRanges matches identical endpoints only", () => {
+		const root = document.createElement("div");
+		root.textContent = "hello world";
+		document.body.appendChild(root);
+		const text = root.firstChild!;
+		const at = (a: number, b: number) => {
+			const r = document.createRange();
+			r.setStart(text, a);
+			r.setEnd(text, b);
+			return r;
+		};
+		expect(sameWashRanges([at(0, 5)], [at(0, 5)])).toBe(true);
+		expect(sameWashRanges([at(0, 5)], [at(0, 6)])).toBe(false);
+		expect(sameWashRanges([at(1, 5)], [at(0, 5)])).toBe(false);
+		expect(sameWashRanges([], [])).toBe(true);
+		expect(sameWashRanges([at(0, 5)], [])).toBe(false);
+		root.remove();
+	});
+	it("liveWashRanges is empty where unsupported", () => {
+		expect(liveWashRanges()).toEqual([]);
 	});
 	it("selectionRanges is empty with no live selection", () => {
 		const root = document.createElement("div");

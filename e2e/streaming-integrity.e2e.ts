@@ -173,6 +173,28 @@ test("mid-stream annotation on the sent message survives the reply", async ({ pa
 	await page.keyboard.type("mid-stream note");
 	await page.keyboard.press("Enter");
 	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1);
+	// Hover the badge mid-stream: tokens keep re-stamping while the
+	// reply crawls, but a settled wash must not re-ramp — the live
+	// name stays populated on every sample (a restart would empty it
+	// for the ramp window each token: the streaming flicker).
+	const badgeBox = await page.locator("button.ccez-ann-badge").first().boundingBox();
+	if (!badgeBox) throw new Error("badge has no box");
+	await page.mouse.move(badgeBox.x + badgeBox.width / 2, badgeBox.y + badgeBox.height / 2);
+	await page.waitForTimeout(300);
+	const emptySamples = await page.evaluate(async () => {
+		const reg = (
+			window as unknown as {
+				CSS?: { highlights?: { get(name: string): Set<Range> | undefined } };
+			}
+		).CSS?.highlights;
+		let empty = 0;
+		for (let i = 0; i < 40; i++) {
+			if ([...(reg?.get("ccez-ann") ?? [])].length === 0) empty++;
+			await new Promise((r) => setTimeout(r, 50));
+		}
+		return empty;
+	});
+	expect(emptySamples).toBe(0);
 	// The reply lands after the note was filed: the note survives it.
 	await expect(page.locator("article.assistant .rendered")).toContainText("Mock reply to: tell me about foxes", {
 		timeout: 30_000

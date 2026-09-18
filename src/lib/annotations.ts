@@ -11,7 +11,9 @@ import {
 	clearAnnotationWash,
 	clearAnnotationWashes,
 	highlightsSupported,
+	liveWashRanges,
 	paintAnnotationWash,
+	sameWashRanges,
 	washRampSchedule
 } from "./annHighlights";
 
@@ -878,6 +880,21 @@ function paintWashHighlight(
 	if (!skip && wash) {
 		const ranges = washRanges(root, items, wash);
 		if (ranges.length > 0) {
+			// Same wash, no ramp in flight: a refresh, not a
+			// transition — snap the (possibly relocated) ranges live
+			// with no ramp. Ramping here is the streaming flicker:
+			// every token re-stamps, so the fade never settles and
+			// hover catches it dim. Identical endpoints skip the
+			// registry entirely.
+			if (wash === liveWashId && washRampTimer === null) {
+				if (!sameWashRanges(ranges, liveWashRanges())) {
+					clearAnnotationWashes();
+					paintAnnotationWash(ranges);
+				}
+				root.dataset.washStamped = wash;
+				root.dataset.washPainted = wash;
+				return;
+			}
 			cancelWashRamp();
 			clearAnnotationWashes();
 			root.dataset.washPainted = wash;
