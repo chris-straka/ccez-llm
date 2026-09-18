@@ -1958,8 +1958,18 @@ test.describe("message chrome", () => {
 		// At rest while textless the card already fills the column.
 		const rest = await geom();
 		expect(Math.abs(rest.w - full(rest))).toBeLessThanOrEqual(4);
+		// No focus-dependent field clamp: the old rest-only 1.5rem cap
+		// clipped scaled text and released it on focus, growing the
+		// card under the placeholder on every tap.
+		const fieldMax = (): Promise<string> =>
+			page.evaluate(() => {
+				const el = document.querySelector(".prompt .ta-input");
+				return el instanceof HTMLElement ? getComputedStyle(el).maxHeight : "missing";
+			});
+		const restClamp = await fieldMax();
 		await page.locator(".prompt .ta-input").click();
 		await page.waitForTimeout(400);
+		expect(await fieldMax()).toBe(restClamp);
 		// Focused: same width, same height — nothing moves.
 		const focused = await geom();
 		expect(Math.abs(focused.w - full(focused))).toBeLessThanOrEqual(4);

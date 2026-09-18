@@ -12500,29 +12500,24 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 	.app[data-android] .prompt:not(:focus-within) {
 		gap: 0;
-		/* Let the card hug the single line: the 7.25rem keyboard floor
-		below only applies while focused (typing). */
+		/* Let the card hug the single line: the non-empty 7.25rem
+		keyboard floor below never applies here. */
 		min-height: 0;
-	}
-	.app[data-android] .prompt:not(:focus-within) :global(.ta-input) {
-		max-height: 1.5rem;
-		overflow: hidden;
 	}
 	/* Empty-chat phone composer holds its small rest height on focus:
 	the rest-to-focus growth raced the keyboard glide and moved the
-	thread twice. Width animates instead — 80% at rest while
-	textless, full on focus or once text lands. Chats with messages
-	keep the 7.25rem floor above. */
+	thread twice. Chats with messages keep the 7.25rem floor above. */
 	.app[data-android] main.empty .prompt {
 		min-height: 0;
 		/* ...and no focus gap either: the rest-to-focus gap ramp
-		(0 to 0.35rem) moved the card by ~6px on its own. Full width
-		throughout — the 80% rest width experiment is reverted. */
+		(0 to 0.35rem) moved the card by ~6px on its own. */
 		gap: 0;
 	}
-	.app[data-android] .prompt:focus-within :global(.ta-input) {
-		/* Focus never inflates the field: height follows content up to
-		the same cap, so an empty tap stays one line tall. */
+	/* The field is content-sized in every state: the old rest-only
+	1.5rem clamp clipped any line taller than exactly that (scaled
+	text) and released it on focus, so the card grew on every tap
+	and the placeholder rode up. One floor, one cap, focused or not. */
+	.app[data-android] .prompt :global(.ta-input) {
 		min-height: 1.5rem;
 		max-height: 7.5rem;
 	}
