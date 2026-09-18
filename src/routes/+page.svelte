@@ -12470,15 +12470,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.app[data-android] .prompt {
 		transition:
 			border-color 0.18s ease,
-			left 0.22s ease,
-			right 0.22s ease,
 			visibility 0s;
 	}
 	.app[data-android] .prompt:not(.prompt-idle) {
 		transition:
 			border-color 0.18s ease,
-			left 0.22s ease,
-			right 0.22s ease,
 			visibility 0s;
 	}
 	.app[data-android] .prompt:not(:focus-within) {
@@ -12499,16 +12495,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.app[data-android] main.empty .prompt {
 		min-height: 0;
 		/* ...and no focus gap either: the rest-to-focus gap ramp
-		(0 to 0.35rem) moved the card by ~6px on its own. */
+		(0 to 0.35rem) moved the card by ~6px on its own. Full width
+		throughout — the 80% rest width experiment is reverted. */
 		gap: 0;
-	}
-	.app[data-android] main.empty .prompt[data-empty="true"]:not(:focus-within) {
-		left: 10%;
-		right: 10%;
-		/* The scrollbar-compensation rule below sets an explicit
-		width: without auto the box is over-constrained and keeps
-		full width (dropped right), never the 80%. */
-		width: auto;
 	}
 	.app[data-android] .prompt:focus-within :global(.ta-input) {
 		/* Focus never inflates the field: height follows content up to
@@ -12529,7 +12518,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		overflow: hidden;
 	}
 	@media (prefers-reduced-motion: reduce) {
-		.app[data-android] .prompt,
 		.app[data-android] .prompt :global(.ta-input),
 		.app[data-android] .prompt-tools,
 		.app[data-android] .send-btn {

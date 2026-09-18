@@ -1937,39 +1937,39 @@ test.describe("message chrome", () => {
 		expect(lastBox!.y + lastBox!.height).toBeLessThanOrEqual(vh);
 	});
 
-	/** The empty-chat phone composer widens on focus instead of
-	growing taller (the height growth raced the keyboard glide and
-	moved the thread twice): 80% wide at rest while textless, full
-	on focus, same height throughout. */
-	test("empty phone composer widens on focus, never grows", async ({ page }) => {
+	/** The empty-chat phone composer never grows on focus (the
+	height growth raced the keyboard glide and moved the thread
+	twice): full width and the same small height at rest, focused,
+	and with text. */
+	test("empty phone composer stays full-width, never grows", async ({ page }) => {
 		await seedEmpty(page);
 		await page.goto("/");
 		await expect(page.locator(".prompt")).toBeVisible();
-		// Let the editor mount settle (data-empty flips restart the
-		// width ramp mid-flight and read as a wrong rest width).
+		// Let the editor mount settle before measuring.
 		await page.waitForTimeout(500);
-		const geom = (): Promise<{ mainW: number; rem: number; w: number; h: number; l: number }> =>
+		const geom = (): Promise<{ mainW: number; rem: number; w: number; h: number }> =>
 			page.evaluate(() => {
 				const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
 				const mainW = document.querySelector("main")!.getBoundingClientRect().width;
 				const r = document.querySelector(".prompt")!.getBoundingClientRect();
-				return { mainW, rem, w: r.width, h: r.height, l: r.left };
+				return { mainW, rem, w: r.width, h: r.height };
 			});
-		// At rest while textless the card holds 80% of the column.
+		const full = (g: { mainW: number; rem: number }): number => g.mainW - 2 * 1.2 * g.rem;
+		// At rest while textless the card already fills the column.
 		const rest = await geom();
-		expect(Math.abs(rest.w - 0.8 * rest.mainW)).toBeLessThanOrEqual(4);
+		expect(Math.abs(rest.w - full(rest))).toBeLessThanOrEqual(4);
 		await page.locator(".prompt .ta-input").click();
 		await page.waitForTimeout(400);
-		// Focused it fills the column (the 1.2rem card insets); the
-		// height never moves — width does the talking now.
+		// Focused: same width, same height — nothing moves.
 		const focused = await geom();
-		expect(Math.abs(focused.w - (focused.mainW - 2 * 1.2 * focused.rem))).toBeLessThanOrEqual(4);
+		expect(Math.abs(focused.w - full(focused))).toBeLessThanOrEqual(4);
 		expect(Math.abs(focused.h - rest.h)).toBeLessThanOrEqual(2);
-		// Once text lands the card stays full-width even unfocused.
+		// With text and unfocused: still the same geometry.
 		await page.locator(".prompt .ta-input").pressSequentially("hello");
 		await page.locator(".hero").click();
 		const typed = await geom();
 		expect(Math.abs(typed.w - focused.w)).toBeLessThanOrEqual(2);
+		expect(Math.abs(typed.h - focused.h)).toBeLessThanOrEqual(2);
 	});
 
 	/** Huge phone type goes full-bleed; normal type keeps the floor. */
