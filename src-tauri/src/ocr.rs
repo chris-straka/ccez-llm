@@ -144,6 +144,9 @@ pub fn recognition_languages(hint: Option<&str>) -> Vec<String> {
 
 /// Shape raw top-candidates into an [`OcrOutput`]: trim, drop empties,
 /// join with newlines, average the confidence. Pure and unit-tested.
+/// Compiled on desktop (its only callers) and under test — mobile
+/// builds neither call nor test it, so leaving it ungated warns there.
+#[cfg(any(test, desktop))]
 pub fn shape_result(candidates: Vec<(String, f32)>) -> OcrOutput {
     let lines: Vec<OcrLine> = candidates
         .into_iter()

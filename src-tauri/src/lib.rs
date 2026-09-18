@@ -4,6 +4,7 @@
 mod dev_icon;
 mod annotate;
 mod coderun;
+#[cfg(desktop)]
 mod desktop;
 mod dictation;
 mod fetch;
@@ -203,9 +204,13 @@ pub fn run() {
     let builder = builder
         .invoke_handler(tauri::generate_handler![
             annotate::drain_pending_external,
+            #[cfg(desktop)]
             desktop::desktop_sleep_block,
+            #[cfg(desktop)]
             desktop::desktop_sleep_unblock,
+            #[cfg(desktop)]
             desktop::desktop_export_study_sheet,
+            #[cfg(desktop)]
             desktop::desktop_drain_pending_link,
             keychain_get,
             keychain_set,
