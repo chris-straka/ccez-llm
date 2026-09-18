@@ -32,15 +32,15 @@ describe("phone composer two bars", () => {
 
 	it("caps the field and never inflates it on focus", () => {
 		const css = pageStyle();
-		const focusRule = css.match(
-			/\.app\[data-android\] \.prompt:focus-within :global\(\.ta-input\)\s*\{[^}]*\}/
-		);
-		// The old focus rule forced two lines on every tap.
-		expect(focusRule?.[0]).toBeDefined();
-		expect(focusRule?.[0]).not.toContain("3.4rem");
+		// One floor, one cap, focused or not: the old rest-only clamp
+		// clipped scaled text and released it on focus, growing the
+		// card under the placeholder on every tap.
 		expect(css).toMatch(
-			/\.app\[data-android\] \.prompt:focus-within :global\(\.ta-input\)\s*\{[^}]*min-height:\s*1\.5rem[^}]*max-height:\s*7\.5rem/
+			/\.app\[data-android\] \.prompt :global\(\.ta-input\)\s*\{[^}]*min-height:\s*1\.5rem[^}]*max-height:\s*7\.5rem/
 		);
+		// No focus-scoped field rule may exist: focus must never resize.
+		expect(css).not.toMatch(/\.app\[data-android\] \.prompt:focus-within :global\(\.ta-input\)/);
+		expect(css).not.toMatch(/\.app\[data-android\] \.prompt:not\(:focus-within\) :global\(\.ta-input\)/);
 	});
 
 	it("keeps the tools row static below the text as its own bar", () => {

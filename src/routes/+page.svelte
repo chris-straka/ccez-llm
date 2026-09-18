@@ -12459,7 +12459,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		padding: 0 0 0.1rem;
 		/* Small single line (~26px): the old 2rem floor read 60/40
 		against the button bar. The field owns its height where
-		supported, JS stands down. */
+		supported, JS stands down. Floor and cap stay focus-independent:
+		a rest-only clamp clipped scaled text and released it on focus,
+		growing the card under the placeholder on every tap. */
 		min-height: 1.5rem;
 		max-height: 7.5rem;
 	}
@@ -12534,14 +12536,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		/* ...and no focus gap either: the rest-to-focus gap ramp
 		(0 to 0.35rem) moved the card by ~6px on its own. */
 		gap: 0;
-	}
-	/* The field is content-sized in every state: the old rest-only
-	1.5rem clamp clipped any line taller than exactly that (scaled
-	text) and released it on focus, so the card grew on every tap
-	and the placeholder rode up. One floor, one cap, focused or not. */
-	.app[data-android] .prompt :global(.ta-input) {
-		min-height: 1.5rem;
-		max-height: 7.5rem;
 	}
 	/* The row snaps (no height ramp): ramping its height would slide
 	its buttons under tapping fingers mid-flight. The field above may
