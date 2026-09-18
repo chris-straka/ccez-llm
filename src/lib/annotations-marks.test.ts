@@ -691,6 +691,26 @@ describe("refresh sweep of orphaned fade grades (Highlight path)", () => {
 		expect(store.get(ANN_HIGHLIGHT_D1)).toBeUndefined();
 	});
 
+	it("routes ruby washes to legacy marks, registry untouched", () => {
+		// The shell registry never paints over reading markup
+		// (device-verified): DOM marks carry those washes instead.
+		const root = document.createElement("div");
+		root.innerHTML =
+			"<p><ruby>静<rt>jìng</rt></ruby><ruby>读<rt>dú</rt></ruby></p>";
+		const marks: AnnotationMark[] = [{ id: "w1" as AnnotationId, number: 1, quote: "静读" }];
+		applyMarks(root, marks, false, "w1");
+		expect(store.get(ANN_HIGHLIGHT_NAME)).toBeUndefined();
+		const washed = [...root.querySelectorAll("mark.ccez-ann")]
+			.map((m) => {
+				const clone = m.cloneNode(true) as HTMLElement;
+				clone.querySelectorAll("[data-ann-badge]").forEach((b) => b.remove());
+				return clone.textContent ?? "";
+			})
+			.join("");
+		expect(washed).toBe("静读");
+		root.remove();
+	});
+
 	it("forces every fade step to display, not just the settle", () => {
 		// Motion allowed so the arrival takes the graded ramp.
 		vi.stubGlobal("matchMedia", () => ({ matches: false }));

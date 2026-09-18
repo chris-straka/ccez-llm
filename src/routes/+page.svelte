@@ -14940,6 +14940,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		flex-wrap: nowrap;
 		max-width: 100%;
 		overflow-x: auto;
+		/* Tooltips below the row must never make it scrollable
+		up and down: clip the axis (never scrolls) while the paint
+		margin lets them show anyway. Horizontal only, at any size. */
+		overflow-y: clip;
+		overflow-clip-margin: 4rem;
 		overscroll-behavior-x: contain;
 		scrollbar-width: none;
 	}
@@ -14954,6 +14959,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		.actions {
 			max-width: 100%;
 			overflow-x: auto;
+			overflow-y: clip;
+			overflow-clip-margin: 4rem;
 			overscroll-behavior-x: contain;
 			scrollbar-width: none;
 		}

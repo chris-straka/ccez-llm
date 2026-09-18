@@ -189,4 +189,16 @@ describe("message spacing and overscroll", () => {
 		expect(scaled, "opt-in scaled spacer is gone").toBeTruthy();
 		expect(scaled![1]).toMatch(/height\s*:\s*calc\([^;]*var\(--font-scale/);
 	});
+
+	it("never scrolls the row vertically, at any text size", () => {
+		const css = pageStyle();
+		// Both row rules (desktop nowrap + touch): tooltips below the
+		// row must not make it scrollable up and down — clip the axis
+		// (never scrolls) while the paint margin lets them show.
+		const desktop = css.match(/\.app:not\(\[data-android\]\) \.actions\s*\{([^}]*)\}/);
+		expect(desktop, "desktop actions rule is gone").toBeTruthy();
+		expect(desktop![1]).toMatch(/overflow-y\s*:\s*clip/);
+		expect(desktop![1]).toMatch(/overflow-clip-margin/);
+		expect(css).toMatch(/@media \(hover: none\)\s*\{[^}]*\.actions\s*\{[^}]*overflow-y\s*:\s*clip/);
+	});
 });

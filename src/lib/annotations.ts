@@ -1404,8 +1404,20 @@ function stampLegacy(root: HTMLElement, items: AnnotationMark[], skip: boolean, 
  * html swap that wiped the DOM) while washes paint through the
  * registry — hovering a badge or opening a draft moves zero DOM nodes.
  */
+/**
+ * Reading markup under a wash (native ruby, overlay furigana): the
+ * Highlight registry does not paint there in the app shell
+ * (verified on device: badges stamp, locate succeeds, yet no wash
+ * ever shows), while DOM marks wrap base runs per text node in every
+ * engine. Route those washes through the frozen legacy path; bare
+ * text keeps the registry with its fades.
+ */
+function hasReadingMarkup(root: HTMLElement): boolean {
+	return root.querySelector("ruby, rt, rp, .frt") !== null;
+}
+
 function stampMarks(root: HTMLElement, items: AnnotationMark[], skip: boolean, wash: string | null): void {
-	if (!highlightsSupported()) {
+	if (!highlightsSupported() || hasReadingMarkup(root)) {
 		stampLegacy(root, items, skip, wash);
 		return;
 	}
