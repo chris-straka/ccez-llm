@@ -17,11 +17,15 @@ if ! security find-certificate -c "Ccez Dev" >/dev/null 2>&1; then
   echo "sign-dev-binary: create it once (self-signed Code Signing cert named exactly 'Ccez Dev'), then re-run." >&2
   exit 1
 fi
-if ! security find-identity -v -p codesigning 2>/dev/null | grep -q "Ccez Dev"; then
-  echo "sign-dev-binary: 'Ccez Dev' is not offered as a codesigning identity." >&2
-  echo "sign-dev-binary: the keypair lost its partition grant. Re-grant once" >&2
-  echo "sign-dev-binary: (one login-password auth, then silent forever):" >&2
+# NOTE: no `security find-identity` gate here on purpose — it does not
+# list this identity (p12-imported self-signed certs stay invisible to
+# it on macOS 26) even though codesign uses it fine. The signing below
+# IS the check: it fails loud when the keypair is genuinely unusable.
+if ! codesign -f -s "Ccez Dev" "$BIN"; then
+  echo "sign-dev-binary: codesign with 'Ccez Dev' failed." >&2
+  echo "sign-dev-binary: the keypair lost its codesign grant. Re-import it" >&2
+  echo "sign-dev-binary: pre-authorized (openssl pkcs12 -export -legacy," >&2
+  echo "sign-dev-binary: security import -T /usr/bin/codesign), or one-time:" >&2
   echo "sign-dev-binary:   security set-key-partition-list -S apple-tool:,apple:,codesign: -s ~/Library/Keychains/login.keychain-db" >&2
   exit 1
 fi
-exec codesign -f -s "Ccez Dev" "$BIN"
