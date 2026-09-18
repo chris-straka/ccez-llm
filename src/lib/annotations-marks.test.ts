@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
 	applyMarks,
 	annotationCountLabel,
@@ -11,6 +11,11 @@ import {
 	type AnnotationMark,
 	type AnnotationId
 } from "./annotations";
+import {
+	ANN_HIGHLIGHT_D1,
+	ANN_HIGHLIGHT_NAME,
+	paintAnnotationWash
+} from "./annHighlights";
 
 function rootWith(text: string): HTMLDivElement {
 	const root = document.createElement("div");
@@ -541,5 +546,56 @@ describe("grapheme-cluster-safe stamping", () => {
 		applyMarks(root, marks, false, null);
 		expect(baseText(root)).toBe(original);
 		expect(strandedMarks(root)).toEqual([]);
+	});
+});
+
+describe("refresh sweep of orphaned fade grades (Highlight path)", () => {
+	/** Minimal CSS.highlights stand-in: jsdom has no Highlight API. */
+	class MockHighlight extends Array<Range> {
+		constructor(...ranges: Range[]) {
+			super(...ranges);
+		}
+	}
+
+	let store: Map<string, unknown>;
+
+	beforeEach(() => {
+		store = new Map<string, unknown>();
+		vi.stubGlobal("Highlight", MockHighlight);
+		vi.stubGlobal("CSS", {
+			highlights: {
+				set(name: string, highlight: object): void {
+					store.set(name, highlight);
+				},
+				delete(name: string): void {
+					store.delete(name);
+				},
+				get(name: string): object | undefined {
+					return store.get(name) as object | undefined;
+				}
+			}
+		});
+	});
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	it("a re-stamp clears a stranded dim grade beside the live wash", () => {
+		const root = rootWith("say hello world today");
+		const marks: AnnotationMark[] = [{ id: "w1" as AnnotationId, number: 1, quote: "hello world" }];
+		applyMarks(root, marks, false, "w1");
+		expect(store.get(ANN_HIGHLIGHT_NAME)).toBeDefined();
+		// A preempted ramp's dim grade, stranded in the registry.
+		const stray = document.createRange();
+		stray.selectNodeContents(root);
+		paintAnnotationWash([stray], ANN_HIGHLIGHT_D1);
+		expect(store.get(ANN_HIGHLIGHT_D1)).toBeDefined();
+		// Shift the text so the re-stamp relocates the wash.
+		root.insertBefore(document.createTextNode("well, "), root.firstChild);
+		applyMarks(root, marks, false, "w1");
+		// Live wash repainted, orphan grade swept: no dim twin survives.
+		expect(store.get(ANN_HIGHLIGHT_NAME)).toBeDefined();
+		expect(store.get(ANN_HIGHLIGHT_D1)).toBeUndefined();
 	});
 });

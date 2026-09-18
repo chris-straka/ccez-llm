@@ -7,6 +7,7 @@
 import type { ChatMsgId } from "./chat";
 import {
 	ANN_HIGHLIGHT_D1,
+	ANN_HIGHLIGHT_D2,
 	ANN_HIGHLIGHT_D3,
 	ANN_HIGHLIGHT_NAME,
 	clearAnnotationWash,
@@ -1011,6 +1012,15 @@ function paintWashHighlight(
 			// hover catches it dim. Identical endpoints skip the
 			// registry entirely.
 			if (wash === liveWashId && washRamp === null) {
+				// Sweep orphaned fade grades: a preempted ramp leaves
+				// its dims registered (only its timer dies), and the
+				// re-set below never touches them — the stale grade
+				// twins the live wash as a dim offset band until
+				// something else clears it. No ramp is in flight here,
+				// so no live fade can own these names.
+				clearAnnotationWash(ANN_HIGHLIGHT_D1);
+				clearAnnotationWash(ANN_HIGHLIGHT_D2);
+				clearAnnotationWash(ANN_HIGHLIGHT_D3);
 				if (!sameWashRanges(ranges, liveWashRanges())) {
 					// No clear first: Highlight.set replaces the named
 					// ranges atomically, while a delete-then-set in one
@@ -1069,9 +1079,14 @@ function paintWashHighlight(
 						else {
 							// Settled on live: drop the twins so only the live
 							// name holds ranges (a leftover twin reads as a
-							// stuck wash and blinks on the next paint).
+							// stuck wash and blinks on the next paint), then
+							// force the repaint: registry deletes alone don't
+							// invalidate the shell overlay, so a stale twin
+							// sliver would stick above the wash until the next
+							// incidental repaint (scroll, hover, selection).
 							clearAnnotationWash(ANN_HIGHLIGHT_D3);
 							clearAnnotationWash(ANN_HIGHLIGHT_D1);
+							invalidateWashPaint(root);
 						}
 						}, WASH_FADE_STEP_MS),
 						root,
