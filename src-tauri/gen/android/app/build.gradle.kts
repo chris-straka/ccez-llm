@@ -90,6 +90,24 @@ android {
     }
 }
 
+// `tauri android dev` invokes bare per-arch tasks (assembleArm64Debug);
+// with the tier dimension those names are ambiguous, which breaks the
+// normal dev workflow. Alias them to the dev flavor so the same command
+// keeps working and installs studio.ccez.app.dev ("Ccez LLM Dev")
+// next to the release app instead of clobbering it.
+listOf("Arm64", "Arm", "X86", "X86_64").forEach { arch ->
+    tasks.register("assemble${arch}Debug") {
+        dependsOn("assemble${arch}DevDebug")
+        group = "build"
+        description = "Alias for the dev flavor (tauri android dev entry point)."
+    }
+    tasks.register("install${arch}Debug") {
+        dependsOn("install${arch}DevDebug")
+        group = "install"
+        description = "Alias for the dev flavor install."
+    }
+}
+
 rust {
     rootDirRel = "../../../"
 }
