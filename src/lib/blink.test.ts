@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { startBlink } from "./blink";
+import { startBlink, startHighlightFade } from "./blink";
 
 describe("startBlink", () => {
 	afterEach(() => {
@@ -95,3 +95,79 @@ describe("startBlink", () => {
 function advance(ms: number): void {
 	vi.advanceTimersByTime(ms);
 }
+
+describe("startHighlightFade", () => {
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	function harness(): {
+		calls: string[];
+		fade: Parameters<typeof startHighlightFade>[0];
+	} {
+		const calls: string[] = [];
+		return {
+			calls,
+			fade: {
+				locate: () => ({} as Range),
+				paint: (_range: Range, name: string) => calls.push(`paint:${name}`),
+				clear: (name: string) => calls.push(`clear:${name}`),
+				full: "flash",
+				grades: ["d1", "d2"],
+				holdMs: 700,
+				stepMs: 50,
+				onDone: () => calls.push("done")
+			}
+		};
+	}
+
+	it("holds full, steps grades paint-before-clear, ends cleared", () => {
+		vi.useFakeTimers();
+		const { calls, fade } = harness();
+		startHighlightFade(fade);
+		expect(calls).toEqual([]);
+		advance(700);
+		expect(calls).toEqual(["paint:d1", "clear:flash"]);
+		advance(50);
+		expect(calls).toEqual(["paint:d1", "clear:flash", "paint:d2", "clear:d1"]);
+		advance(50);
+		expect(calls).toEqual([
+			"paint:d1",
+			"clear:flash",
+			"paint:d2",
+			"clear:d1",
+			"clear:flash",
+			"clear:d1",
+			"clear:d2",
+			"done"
+		]);
+		// Expired: further time does nothing.
+		advance(10_000);
+		expect(calls).toHaveLength(8);
+	});
+
+	it("a lost quote mid-fade clears everything, never stranding a grade", () => {
+		vi.useFakeTimers();
+		const { calls, fade } = harness();
+		let alive = true;
+		fade.locate = () => (alive ? ({} as Range) : null);
+		startHighlightFade(fade);
+		advance(700);
+		expect(calls).toEqual(["paint:d1", "clear:flash"]);
+		alive = false;
+		advance(50);
+		expect(calls).toEqual(["paint:d1", "clear:flash", "clear:flash", "clear:d1", "clear:d2", "done"]);
+		advance(10_000);
+		expect(calls).toHaveLength(6);
+	});
+
+	it("stop cancels a run in flight", () => {
+		vi.useFakeTimers();
+		const { calls, fade } = harness();
+		const stop = startHighlightFade(fade);
+		advance(700);
+		stop();
+		advance(10_000);
+		expect(calls).toEqual(["paint:d1", "clear:flash"]);
+	});
+});

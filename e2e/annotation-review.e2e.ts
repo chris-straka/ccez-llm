@@ -190,7 +190,7 @@ test("review card closes on click-off and Escape", async ({ page }) => {
 
 /** A review quote click scrolls to the message and blinks the yellow
 wash on the annotated text. */
-test("review quote jumps to the message with a wash blink", async ({ page }) => {
+test("review quote jumps to the message with a wash flash", async ({ page }) => {
 	const para = `${SENTENCE} `.repeat(6);
 	const content = Array.from({ length: 12 }, (_, i) => `Paragraph ${i}. ${para}`).join("\n\n");
 	await seedChat(page, [{ role: "assistant", content }]);
@@ -210,7 +210,7 @@ test("review quote jumps to the message with a wash blink", async ({ page }) => 
 	await page.locator(".review-quote").first().click();
 	// The review closes so the landing clears the composer dock.
 	await expect(page.locator(".ann-wrap .review")).toHaveCSS("opacity", "0");
-	// The flash blinks: poll through the cycle until a lit phase shows
+	// The flash holds, then fades: poll until a lit phase shows
 	// (registry paint — zero DOM churn, so no mark ever mounts).
 	await expect
 		.poll(
@@ -233,8 +233,8 @@ test("review quote jumps to the message with a wash blink", async ({ page }) => 
 
 /** Down-jumps land clear of the composer dock: from the top of a long
 chat, the quote settles above the prompt (nearest used to strand it
-behind the dock) — then a second jump restarts the blink for the
-wash read, since the landing outlasts one blink cycle. */
+behind the dock) — then a second jump restarts the flash for the
+wash read, since the landing outlasts one fade cycle. */
 test("down jump lands the quote clear of the dock", async ({ page }) => {
 	const para = `${SENTENCE} `.repeat(6);
 	const content = Array.from({ length: 12 }, (_, i) => `Paragraph ${i}. ${para}`).join("\n\n");
@@ -279,7 +279,7 @@ test("down jump lands the quote clear of the dock", async ({ page }) => {
 			{ timeout: 10_000 }
 		)
 		.toBeLessThanOrEqual(0);
-	// A second jump restarts the blink for the wash read.
+	// A second jump restarts the flash for the wash read.
 	await page.locator(".prompt-tools .ann-pill").click();
 	await expect(page.locator(".ann-wrap.pinned .review")).toBeVisible();
 	await page.locator(".review-quote").first().click();

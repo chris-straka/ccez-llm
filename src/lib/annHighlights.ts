@@ -27,6 +27,27 @@ export const ANN_HIGHLIGHT_NAME = "ccez-ann";
  */
 export const ANN_FLASH_NAME = "ccez-ann-flash";
 /**
+ * Graded dimmers for the jump-landing fade: the flash holds full,
+ * then steps down these (never the shared wash grades — a hover
+ * ramp mid-fade would steal a shared name and twin the two).
+ */
+export const ANN_FLASH_D1 = "ccez-ann-flash-d1";
+export const ANN_FLASH_D2 = "ccez-ann-flash-d2";
+export const ANN_FLASH_D3 = "ccez-ann-flash-d3";
+/** Fade-out order after the full-bright hold, then clear. */
+export function flashFadeSchedule(): string[] {
+	return [ANN_FLASH_D1, ANN_FLASH_D2, ANN_FLASH_D3];
+}
+/** True when motion should snap instead of fade (tests count as snap). Never throws. */
+export function prefersReducedMotion(): boolean {
+	try {
+		if (typeof matchMedia !== "function") return true;
+		return matchMedia("(prefers-reduced-motion: reduce)").matches;
+	} catch {
+		return true;
+	}
+}
+/**
  * Graded dimmer names for the wash fade ramp: the Highlight pseudo
  * can't transition (probed: transitions and keyframes on
  * ::highlight() are ignored in Chromium and WebKit), so the fade

@@ -193,11 +193,13 @@ import {
 	import {
 		ANN_FLASH_NAME,
 		clearAnnotationWash,
+		flashFadeSchedule,
 		highlightsSupported,
-		paintAnnotationWash
+		paintAnnotationWash,
+		prefersReducedMotion
 	} from "$lib/annHighlights";
 	import { badgeHover } from "$lib/hoverWash";
-	import { startBlink } from "$lib/blink";
+	import { startBlink, startHighlightFade } from "$lib/blink";
 	import { createRefMemo } from "$lib/aidLoading";
 	import { scopeMessagesTransition, switchChatWithTransition } from "$lib/viewTransitions";
 	import {
@@ -3924,8 +3926,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 
 	/**
 	 * Quote tap lands on the annotation's marker: the message scrolls
-	 * into view and its yellow wash blinks slowly twice, then clears
-	 * (hover previews own the wash again after). Only quote taps
+	 * into view and its yellow wash holds, then fades out (hover
+	 * previews own the wash again after). Only quote taps
 	 * navigate — notes, buttons, and fields never do.
 	 */
 	/**
@@ -4096,18 +4098,18 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		}
 	}
 
-	/** Flash the destination quote once in draft yellow, then release
-	it (a re-jump restarts the schedule; expiry clears itself). The
-	flash paints through the Highlight registry: zero DOM nodes move,
-	so the mid-quote badge anchor never shifts and text never
-	reflows — the whole point of leaving DOM marks behind. The DOM
-	path below runs only where the Highlight API is missing. Single
-	phase on purpose (one paint, one clear). Every paint re-locates:
-	a chat re-render mid-scroll (scroll-driven state swaps the text
-	nodes) detaches the old range, and repainting the same dead
-	range would blink nothing. A failed re-locate clears rather
-	than abandoning: the quote is gone, so nothing must linger.
-	Yellow must never stick. */
+	/** Flash the destination quote in draft yellow, hold it, then
+	fade it out through the flash grades (a re-jump restarts the
+	schedule; expiry clears itself). The flash paints through the
+	Highlight registry: zero DOM nodes move, so the mid-quote badge
+	anchor never shifts and text never reflows — the whole point of
+	leaving DOM marks behind. The DOM path below runs only where
+	the Highlight API is missing. Every paint re-locates: a chat
+	re-render mid-scroll (scroll-driven state swaps the text nodes)
+	detaches the old range, and repainting the same dead range
+	would fade nothing. A failed re-locate clears rather than
+	abandoning: the quote is gone, so nothing must linger. Yellow
+	must never stick. */
 	function flashJumpMark(locate: () => Range | null): void {
 		stopJumpFlash?.();
 		stopJumpFlash = null;
@@ -4119,6 +4121,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		badgeHover((id: string | null) => (hoverBadgeId = id), null);
 		if (highlightsSupported()) {
 			clearAnnotationWash(ANN_FLASH_NAME);
+			for (const grade of flashFadeSchedule()) clearAnnotationWash(grade);
 			let root: HTMLElement | null = null;
 			const rootOf = (range: Range): HTMLElement | null => {
 				const el =
@@ -4134,22 +4137,37 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				root = rootOf(range);
 				return paintAnnotationWash([range], ANN_FLASH_NAME);
 			};
+			const release = (): void => {
+				clearAnnotationWash(ANN_FLASH_NAME);
+				for (const grade of flashFadeSchedule()) clearAnnotationWash(grade);
+				// Resolve the root fresh: a re-render mid-scroll
+				// (scroll-driven state swaps the text nodes) can
+				// detach the root captured at paint time, and
+				// nudging a detached tree repaints nothing — the
+				// flash pixels stick. Fall back to the capture.
+				const live = locate();
+				const target = (live ? rootOf(live) : null) ?? root;
+				if (target) invalidateWashPaint(target);
+			};
 			if (!paintFresh()) return;
-			stopJumpFlash = startBlink(
-				paintFresh,
-				() => {
-					clearAnnotationWash(ANN_FLASH_NAME);
-					// Resolve the root fresh: a re-render mid-scroll
-					// (scroll-driven state swaps the text nodes) can
-					// detach the root captured at paint time, and
-					// nudging a detached tree repaints nothing — the
-					// flash pixels stick. Fall back to the capture.
-					const live = locate();
-					const target = (live ? rootOf(live) : null) ?? root;
-					if (target) invalidateWashPaint(target);
+			// Reduced motion keeps the old blink-off; everyone else
+			// gets hold-then-fade, never an instant vanish.
+			if (prefersReducedMotion()) {
+				stopJumpFlash = startBlink(paintFresh, release, { phases: 2 });
+				return;
+			}
+			stopJumpFlash = startHighlightFade({
+				locate,
+				paint: (range, name) => {
+					paintAnnotationWash([range], name);
 				},
-				{ phases: 2 }
-			);
+				clear: (name) => clearAnnotationWash(name),
+				full: ANN_FLASH_NAME,
+				grades: flashFadeSchedule(),
+				holdMs: 700,
+				stepMs: 50,
+				onDone: release
+			});
 			return;
 		}
 		const paintFresh = (): boolean => {

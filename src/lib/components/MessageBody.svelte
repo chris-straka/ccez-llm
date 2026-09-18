@@ -1355,6 +1355,41 @@
 			background-color: #ffe066;
 		}
 	}
+	/* Jump-landing fade grades (see flashFadeSchedule): the landing
+	holds full, then steps down these to clear — a fade-out, never a
+	blink-off. Same hue as the flash, stepping down like the wash. */
+	.rendered::highlight(ccez-ann-flash-d1) {
+		background-color: rgba(255, 243, 176, 0.72);
+		color: inherit;
+	}
+	.rendered::highlight(ccez-ann-flash-d2) {
+		background-color: rgba(255, 243, 176, 0.45);
+		color: inherit;
+	}
+	.rendered::highlight(ccez-ann-flash-d3) {
+		background-color: rgba(255, 243, 176, 0.18);
+		color: inherit;
+	}
+	:global(html[data-theme="dark"]) .rendered::highlight(ccez-ann-flash-d1) {
+		background-color: rgba(245, 158, 11, 0.3);
+	}
+	:global(html[data-theme="dark"]) .rendered::highlight(ccez-ann-flash-d2) {
+		background-color: rgba(245, 158, 11, 0.18);
+	}
+	:global(html[data-theme="dark"]) .rendered::highlight(ccez-ann-flash-d3) {
+		background-color: rgba(245, 158, 11, 0.08);
+	}
+	@media (prefers-contrast: more) {
+		.rendered::highlight(ccez-ann-flash-d1) {
+			background-color: rgba(255, 224, 102, 0.72);
+		}
+		.rendered::highlight(ccez-ann-flash-d2) {
+			background-color: rgba(255, 224, 102, 0.45);
+		}
+		.rendered::highlight(ccez-ann-flash-d3) {
+			background-color: rgba(255, 224, 102, 0.18);
+		}
+	}
 	/* Ruby base text paints the selection tint explicitly: without
 	this some phone WebViews leave ruby-annotated CJK highlights
 	invisible (the readings themselves stay unselectable by design). */

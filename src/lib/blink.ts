@@ -16,6 +16,71 @@ export interface BlinkOptions {
 	offMs?: number;
 }
 
+/**
+ * Fade-out driver for highlight landings (jump flash): holds the
+ * full grade, steps down the dim grades paint-before-clear (the
+ * same pattern as the wash out-ramp — the registry never sits
+ * empty mid-fade), then clears everything and reports done. A
+ * failed locate mid-fade clears rather than stranding a grade.
+ * Restarting stops the previous run first; the stop is idempotent.
+ */
+export interface HighlightFade {
+	locate: () => Range | null;
+	paint: (range: Range, name: string) => void;
+	clear: (name: string) => void;
+	/** Registry name holding full brightness (painted by the caller). */
+	full: string;
+	/** Dim grades in fade order, then terminal clear. */
+	grades: string[];
+	/** Ms of full-bright hold before the first step (default 700). */
+	holdMs?: number;
+	/** Ms between fade steps (default 50). */
+	stepMs?: number;
+	/** Runs once after the terminal clear (repaint nudge). */
+	onDone?: () => void;
+}
+
+export function startHighlightFade(fade: HighlightFade): () => void {
+	let timer: ReturnType<typeof setTimeout> | null = null;
+	let stopped = false;
+	let step = 0;
+	const stop = (): void => {
+		stopped = true;
+		if (timer !== null) clearTimeout(timer);
+		timer = null;
+	};
+	const clearAll = (): void => {
+		fade.clear(fade.full);
+		for (const grade of fade.grades) fade.clear(grade);
+	};
+	const tick = (delay: number): void => {
+		timer = setTimeout(() => {
+			timer = null;
+			if (stopped) return;
+			const range = fade.locate();
+			if (!range) {
+				clearAll();
+				stop();
+				fade.onDone?.();
+				return;
+			}
+			if (step < fade.grades.length) {
+				const name = fade.grades[step]!;
+				fade.paint(range, name);
+				fade.clear(step === 0 ? fade.full : fade.grades[step - 1]!);
+				step += 1;
+				tick(fade.stepMs ?? 50);
+			} else {
+				clearAll();
+				stop();
+				fade.onDone?.();
+			}
+		}, delay);
+	};
+	tick(fade.holdMs ?? 700);
+	return stop;
+}
+
 export function startBlink(
 	paint: () => boolean,
 	clear: () => void,

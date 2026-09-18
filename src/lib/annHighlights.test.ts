@@ -6,7 +6,12 @@ import {
 	ANN_HIGHLIGHT_D3,
 	ANN_HIGHLIGHT_NAME,
 	ANN_FLASH_NAME,
+	ANN_FLASH_D1,
+	ANN_FLASH_D2,
+	ANN_FLASH_D3,
+	flashFadeSchedule,
 	highlightsSupported,
+	prefersReducedMotion,
 	liveWashRanges,
 	paintAnnotationWash,
 	clearAnnotationWash,
@@ -101,5 +106,15 @@ describe("CSS.highlights annotation wash", () => {
 		document.body.appendChild(root);
 		expect(selectionRanges(root)).toEqual([]);
 		root.remove();
+	});
+	it("jump fade steps down dedicated flash grades, never wash grades", () => {
+		expect(flashFadeSchedule()).toEqual([ANN_FLASH_D1, ANN_FLASH_D2, ANN_FLASH_D3]);
+		for (const grade of flashFadeSchedule()) {
+			expect(grade).not.toBe(ANN_HIGHLIGHT_NAME);
+			expect(grade.startsWith(`${ANN_FLASH_NAME}-`)).toBe(true);
+		}
+	});
+	it("snaps where matchMedia is missing (tests, SSR)", () => {
+		expect(prefersReducedMotion()).toBe(true);
 	});
 });
