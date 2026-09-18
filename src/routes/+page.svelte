@@ -318,7 +318,7 @@ import {
 	import { consumeLaunchFiles, splitLaunchFiles } from "$lib/launchFiles";
 	import { copyExportText, downloadMarkdownFile, exportChatMarkdown, fileSaveAccessAvailable } from "$lib/chatExport";
 	import { nativeSaveMarkdown } from "$lib/nativeExport";
-	import { isKeyboardOpen, keyboardOverlapPx, pinArmStart, settlePin } from "$lib/viewportReflow";
+	import { isKeyboardOpen, kbFreshOpen, keyboardOverlapPx, pinArmStart, settlePin } from "$lib/viewportReflow";
 import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	import {
 		speakText,
@@ -9283,6 +9283,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		let viewportTimer: number | undefined;
 		let kbPin = pinArmStart();
 		let fullInnerHeight = window.innerHeight;
+		// Consecutive firmly-closed frames (see kbFreshOpen): a fresh
+		// open episode resets to the clean disarmed state.
+		let kbClosedFrames = 0;
 		const onViewportResize = (): void => {
 			// Pin synchronously on every viewport frame: the old trailing
 			// debounce let the composer lag a beat behind the keyboard
@@ -9305,9 +9308,25 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// phones keep stylesheet height.
 			if (androidUI && appEl && window.visualViewport) {
 				const vv = window.visualViewport;
+				const overlap = keyboardOverlapPx(window.innerHeight, vv.height, vv.offsetTop);
 				const open = isKeyboardOpen(window.innerHeight, vv.height, vv.offsetTop);
+				if (kbFreshOpen(kbClosedFrames, open)) {
+					// Fresh episode starts clean like the first tap: a
+					// leaked armed pin (or a baseline refreshed mid-close)
+					// would otherwise engage on transitional heights and
+					// move the composer twice. Settle re-arms on stable
+					// geometry if the fallback is truly needed.
+					kbPin = pinArmStart();
+					appEl.style.height = "";
+					appEl.style.setProperty("--kb-height", "0px");
+				}
+				kbClosedFrames = open ? 0 : kbClosedFrames + 1;
 				if (!open) {
-					fullInnerHeight = window.innerHeight;
+					// No baseline refresh here: closed frames include the
+					// close animation, and stamping a mid-close height as
+					// the baseline poisons the next open's settle (native
+					// resize reads as full layout, the pin mis-arms).
+					// Stable closed settles below own the baseline.
 					if (kbPin.armed) {
 						kbPin = pinArmStart();
 						appEl.style.height = "";
@@ -9315,7 +9334,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					}
 				} else if (kbPin.armed) {
 					// Settle-armed fallback pin tracks per frame.
-					const overlap = keyboardOverlapPx(window.innerHeight, vv.height, vv.offsetTop);
 					appEl.style.height = `${vv.height}px`;
 					appEl.style.setProperty("--kb-height", `${overlap}px`);
 				}

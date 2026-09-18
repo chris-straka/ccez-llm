@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
 	isKeyboardOpen,
+	KB_EDGE_CLOSED_FRAMES,
+	kbFreshOpen,
 	keyboardOverlapPx,
 	nativeResizeActive,
 	pinArmStart,
@@ -34,6 +36,18 @@ describe("isKeyboardOpen", () => {
 describe("pinNow", () => {
 	it("arms in one step for settled geometry", () => {
 		expect(pinNow()).toEqual({ armed: true, sawOpen: true });
+	});
+});
+
+describe("kbFreshOpen", () => {
+	it("fires on an open gate after firmly closed frames", () => {
+		expect(kbFreshOpen(KB_EDGE_CLOSED_FRAMES, true)).toBe(true);
+		expect(kbFreshOpen(KB_EDGE_CLOSED_FRAMES + 40, true)).toBe(true);
+	});
+	it("ignores closed gates and lone-frame dips", () => {
+		expect(kbFreshOpen(KB_EDGE_CLOSED_FRAMES, false)).toBe(false);
+		expect(kbFreshOpen(0, true)).toBe(false);
+		expect(kbFreshOpen(KB_EDGE_CLOSED_FRAMES - 1, true)).toBe(false);
 	});
 });
 

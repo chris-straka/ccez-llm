@@ -73,6 +73,28 @@ export interface PinSettle {
 }
 
 /**
+ * Consecutive firmly-closed frames that mark the keyboard as really
+ * gone between open episodes. A lone frame dipping under the open
+ * gate mid-glide is noise, not a close — resetting the pin on it
+ * would drop fallback tracking mid-flight and strand the composer
+ * under the keyboard until the next settle.
+ */
+export const KB_EDGE_CLOSED_FRAMES = 2;
+
+/**
+ * True on the first open frame of a fresh keyboard episode: the
+ * keyboard sat firmly closed (KB_EDGE_CLOSED_FRAMES consecutive
+ * closed frames) before the gate crossed. The caller resets to the
+ * clean disarmed state here, so every open starts like the first
+ * tap; the settle step re-arms on stable geometry if truly needed.
+ * Pure over the closed-frame count and the gate verdict so tests
+ * can pin the edge.
+ */
+export function kbFreshOpen(closedFrames: number, open: boolean): boolean {
+	return open && closedFrames >= KB_EDGE_CLOSED_FRAMES;
+}
+
+/**
  * Settle step, run with fresh geometry once viewport events stop — the
  * ONLY place the pin engages. Closed geometry releases the pin and
  * refreshes the baseline (rotation-safe). Open geometry with a shrunken
