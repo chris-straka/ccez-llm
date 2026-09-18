@@ -93,3 +93,40 @@ export function settlePin(
 	}
 	return { pin: pinNow(), fullHeight };
 }
+
+/**
+ * Learn the keyboard height from live geometry. Under a native resize
+ * the layout shrink IS the keyboard (the visual overlap reads near
+ * zero there); without one the visual overlap is. Returns the running
+ * max — a height once seen stays known for the focus prediction.
+ */
+export function learnKbHeight(
+	prev: number,
+	fullHeight: number,
+	innerHeight: number,
+	overlap: number,
+	minLearn = 100
+): number {
+	const shrink = fullHeight - innerHeight;
+	if (shrink > minLearn) return Math.max(prev, shrink);
+	if (overlap > minLearn) return Math.max(prev, overlap);
+	return prev;
+}
+
+/**
+ * App height to pre-reserve when the composer focuses ahead of the
+ * keyboard. The layout trails the keyboard window by a frame or two,
+ * during which the keyboard covers the composer; reserving the last
+ * known height up front closes that window. Null when the guess is
+ * unsafe (nothing learned yet, or it would collapse the app) — the
+ * caller then waits for real geometry.
+ */
+export function predictAppHeight(
+	innerHeight: number,
+	kbHeight: number,
+	minAppHeight = 200
+): number | null {
+	if (kbHeight <= 0) return null;
+	const predicted = innerHeight - kbHeight;
+	return predicted >= minAppHeight ? predicted : null;
+}
