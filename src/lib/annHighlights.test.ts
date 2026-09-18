@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
 import {
-	ANN_HIGHLIGHT_DIM,
-	ANN_HIGHLIGHT_FAINT,
+	ANN_HIGHLIGHT_D1,
+	ANN_HIGHLIGHT_D2,
+	ANN_HIGHLIGHT_D3,
 	ANN_HIGHLIGHT_NAME,
 	highlightsSupported,
 	paintAnnotationWash,
@@ -30,22 +31,33 @@ describe("CSS.highlights annotation wash", () => {
 	it("clear is a safe no-op where unsupported", () => {
 		expect(() => clearAnnotationWash()).not.toThrow();
 	});
-	it("fade-in lands faint then live (fast, ~100ms)", () => {
-		expect(washRampSchedule("in")).toEqual([ANN_HIGHLIGHT_FAINT, ANN_HIGHLIGHT_NAME]);
+	it("fade-in walks D3, D1, then live (fast, ~100ms)", () => {
+		expect(washRampSchedule("in")).toEqual([
+			ANN_HIGHLIGHT_D3,
+			ANN_HIGHLIGHT_D1,
+			ANN_HIGHLIGHT_NAME
+		]);
 	});
-	it("fade-out steps dim, faint, then clears (~150ms)", () => {
-		expect(washRampSchedule("out")).toEqual([ANN_HIGHLIGHT_DIM, ANN_HIGHLIGHT_FAINT, null]);
+	it("fade-out walks D1, D2, D3, then clears (~140ms)", () => {
+		expect(washRampSchedule("out")).toEqual([
+			ANN_HIGHLIGHT_D1,
+			ANN_HIGHLIGHT_D2,
+			ANN_HIGHLIGHT_D3,
+			null
+		]);
 	});
 	it("graded names stay distinct from the live name", () => {
-		expect(new Set([ANN_HIGHLIGHT_NAME, ANN_HIGHLIGHT_DIM, ANN_HIGHLIGHT_FAINT]).size).toBe(3);
+		expect(
+			new Set([ANN_HIGHLIGHT_NAME, ANN_HIGHLIGHT_D1, ANN_HIGHLIGHT_D2, ANN_HIGHLIGHT_D3]).size
+		).toBe(4);
 	});
 	it("paint/clear accept a graded name, clear-all never throws", () => {
 		const root = document.createElement("div");
 		root.textContent = "hello world";
 		const range = document.createRange();
 		range.selectNodeContents(root);
-		expect(paintAnnotationWash([range], ANN_HIGHLIGHT_DIM)).toBe(false);
-		expect(() => clearAnnotationWash(ANN_HIGHLIGHT_FAINT)).not.toThrow();
+		expect(paintAnnotationWash([range], ANN_HIGHLIGHT_D2)).toBe(false);
+		expect(() => clearAnnotationWash(ANN_HIGHLIGHT_D3)).not.toThrow();
 		expect(() => clearAnnotationWashes()).not.toThrow();
 	});
 	it("selectionRanges is empty with no live selection", () => {

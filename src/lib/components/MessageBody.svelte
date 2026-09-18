@@ -1273,21 +1273,28 @@
 	}
 	/* Graded dimmers for the wash fade ramp (see washRampSchedule):
 	same hue stepping down — the eye reads the steps as a fade. */
-	.rendered::highlight(ccez-ann-dim) {
+	.rendered::highlight(ccez-ann-d1) {
+		background-color: rgba(255, 243, 176, 0.78);
+		color: inherit;
+	}
+	.rendered::highlight(ccez-ann-d2) {
 		background-color: rgba(255, 243, 176, 0.55);
 		color: inherit;
 	}
-	.rendered::highlight(ccez-ann-faint) {
-		background-color: rgba(255, 243, 176, 0.22);
+	.rendered::highlight(ccez-ann-d3) {
+		background-color: rgba(255, 243, 176, 0.32);
 		color: inherit;
 	}
 	:global(html[data-theme="dark"]) .rendered::highlight(ccez-ann) {
 		background-color: rgba(245, 158, 11, 0.3);
 	}
-	:global(html[data-theme="dark"]) .rendered::highlight(ccez-ann-dim) {
-		background-color: rgba(245, 158, 11, 0.18);
+	:global(html[data-theme="dark"]) .rendered::highlight(ccez-ann-d1) {
+		background-color: rgba(245, 158, 11, 0.23);
 	}
-	:global(html[data-theme="dark"]) .rendered::highlight(ccez-ann-faint) {
+	:global(html[data-theme="dark"]) .rendered::highlight(ccez-ann-d2) {
+		background-color: rgba(245, 158, 11, 0.15);
+	}
+	:global(html[data-theme="dark"]) .rendered::highlight(ccez-ann-d3) {
 		background-color: rgba(245, 158, 11, 0.08);
 	}
 	/* Ruby base text paints the selection tint explicitly: without

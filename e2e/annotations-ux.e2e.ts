@@ -73,7 +73,7 @@ test("create box centers over narrow highlights, wide ones open at the cursor", 
 				CSS?: { highlights?: { get(name: string): Set<Range> | undefined } };
 			}
 		).CSS?.highlights;
-		const names = ["ccez-ann", "ccez-ann-dim", "ccez-ann-faint"];
+		const names = ["ccez-ann", "ccez-ann-d1", "ccez-ann-d2", "ccez-ann-d3"];
 		const ranges = names.flatMap((n) => [...(reg?.get(n) ?? [])]);
 		const r = ranges[0]?.getBoundingClientRect();
 		if (!r) return null;

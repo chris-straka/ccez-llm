@@ -21,23 +21,24 @@ export const ANN_HIGHLIGHT_NAME = "ccez-ann";
  * Graded dimmer names for the wash fade ramp: the Highlight pseudo
  * can't transition (probed: transitions and keyframes on
  * ::highlight() are ignored in Chromium and WebKit), so the fade
- * steps live → dim → faint → clear ~50ms apart instead. Same ranges,
- * zero DOM churn — the eye reads the steps as a fade.
+ * walks down shared grades ~35ms apart instead. Same ranges, zero
+ * DOM churn — at four steps the eye reads it as a fade, not a blink.
  */
-export const ANN_HIGHLIGHT_DIM = "ccez-ann-dim";
-export const ANN_HIGHLIGHT_FAINT = "ccez-ann-faint";
+export const ANN_HIGHLIGHT_D1 = "ccez-ann-d1";
+export const ANN_HIGHLIGHT_D2 = "ccez-ann-d2";
+export const ANN_HIGHLIGHT_D3 = "ccez-ann-d3";
 /** One ramp step: a graded name to paint, or null to clear. */
 export type WashRampStep = string | null;
 /**
- * Pure fade schedule both directions. In runs faint → live (~100ms:
- * fast enough to feel responsive); out runs dim → faint → clear
- * (~150ms on top of the hover hysteresis). The walker lives in
- * annotations.ts next to the registry ownership.
+ * Pure fade schedule both directions. In runs D3 → D1 → live
+ * (~100ms: fast enough to feel responsive); out runs D1 → D2 → D3
+ * → clear (~140ms on top of the hover hysteresis). The walker lives
+ * in annotations.ts next to the registry ownership.
  */
 export function washRampSchedule(ramp: "in" | "out"): WashRampStep[] {
 	return ramp === "in"
-		? [ANN_HIGHLIGHT_FAINT, ANN_HIGHLIGHT_NAME]
-		: [ANN_HIGHLIGHT_DIM, ANN_HIGHLIGHT_FAINT, null];
+		? [ANN_HIGHLIGHT_D3, ANN_HIGHLIGHT_D1, ANN_HIGHLIGHT_NAME]
+		: [ANN_HIGHLIGHT_D1, ANN_HIGHLIGHT_D2, ANN_HIGHLIGHT_D3, null];
 }
 
 export interface HighlightRegistry {
@@ -94,8 +95,9 @@ export function clearAnnotationWash(name: string = ANN_HIGHLIGHT_NAME): void {
 /** Clear every graded wash name (a fresh paint supersedes a mid-ramp fade). Never throws. */
 export function clearAnnotationWashes(): void {
 	clearAnnotationWash(ANN_HIGHLIGHT_NAME);
-	clearAnnotationWash(ANN_HIGHLIGHT_DIM);
-	clearAnnotationWash(ANN_HIGHLIGHT_FAINT);
+	clearAnnotationWash(ANN_HIGHLIGHT_D1);
+	clearAnnotationWash(ANN_HIGHLIGHT_D2);
+	clearAnnotationWash(ANN_HIGHLIGHT_D3);
 }
 
 /**

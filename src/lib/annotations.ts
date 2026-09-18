@@ -6,7 +6,8 @@
  */
 import type { ChatMsgId } from "./chat";
 import {
-	ANN_HIGHLIGHT_FAINT,
+	ANN_HIGHLIGHT_D1,
+	ANN_HIGHLIGHT_D3,
 	clearAnnotationWash,
 	clearAnnotationWashes,
 	highlightsSupported,
@@ -838,8 +839,8 @@ function washRanges(root: HTMLElement, items: AnnotationMark[], wash: string): R
  */
 let liveWashId: string | null = null;
 
-/** Step interval for the wash fade ramp (~100ms in, ~150ms out). */
-const WASH_FADE_STEP_MS = 50;
+/** Step interval for the wash fade ramp (~100ms in, ~140ms out). */
+const WASH_FADE_STEP_MS = 35;
 /** The one in-flight ramp timer, if any (a single wash id feeds every body). */
 let washRampTimer: ReturnType<typeof setTimeout> | null = null;
 function cancelWashRamp(): void {
@@ -859,10 +860,10 @@ function washSnaps(): boolean {
 /**
  * Paint the wash through the Highlight API: ranges over the untouched
  * DOM — hovering a badge or opening a draft moves zero DOM nodes, so
- * markers never flicker and shaping never breaks. The fade ramps
- * through the graded registry names (faint → live in, live → dim →
- * faint → clear out) because the pseudo itself can't transition;
- * the DOM-mark fallback below keeps its own keyframed fades.
+ * markers never flicker and shaping never breaks. The fade walks
+ * the graded registry names (D3 → D1 → live in, D1 → D2 → D3 →
+ * clear out) because the pseudo itself can't transition; the
+ * DOM-mark fallback below keeps its own keyframed fades.
  */
 function paintWashHighlight(
 	root: HTMLElement,
@@ -884,19 +885,27 @@ function paintWashHighlight(
 			if (washSnaps()) {
 				paintAnnotationWash(ranges);
 			} else {
-				// Faint lands now (no extra lag), live follows a step later.
-				const [first, second] = washRampSchedule("in");
-				paintAnnotationWash(ranges, first!);
-				washRampTimer = setTimeout(() => {
-					washRampTimer = null;
-					// Re-hovered or cleared mid-step: the fresh paint owns it now.
-					if (liveWashId !== wash) return;
-					paintAnnotationWash(ranges, second!);
-					// The ramp's faint twin served its step: drop it so only
-					// the live name holds ranges (a leftover twin reads as a
-					// stuck wash and blinks on the next paint).
-					clearAnnotationWash(ANN_HIGHLIGHT_FAINT);
-				}, WASH_FADE_STEP_MS);
+				// First grade lands now (no extra lag), the rest walk in.
+				const schedule = washRampSchedule("in");
+				paintAnnotationWash(ranges, schedule[0]!);
+				let step = 1;
+				const tick = (): void => {
+					washRampTimer = setTimeout(() => {
+						washRampTimer = null;
+						// Re-hovered or cleared mid-step: the fresh paint owns it now.
+						if (liveWashId !== wash) return;
+						paintAnnotationWash(ranges, schedule[step++]!);
+						if (step < schedule.length) tick();
+						else {
+							// Settled on live: drop the twins so only the live
+							// name holds ranges (a leftover twin reads as a
+							// stuck wash and blinks on the next paint).
+							clearAnnotationWash(ANN_HIGHLIGHT_D3);
+							clearAnnotationWash(ANN_HIGHLIGHT_D1);
+						}
+					}, WASH_FADE_STEP_MS);
+				};
+				tick();
 			}
 			return;
 		}

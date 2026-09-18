@@ -309,7 +309,7 @@ test("escape cancels the fresh annotation pill", async ({ page }) => {
 				CSS?: { highlights?: { get(name: string): Set<Range> | undefined } };
 			}
 		).CSS?.highlights;
-		const names = ["ccez-ann", "ccez-ann-dim", "ccez-ann-faint"];
+		const names = ["ccez-ann", "ccez-ann-d1", "ccez-ann-d2", "ccez-ann-d3"];
 		return {
 			ranges: names.flatMap((n) => [...(reg?.get(n) ?? [])]).length,
 			marks: document.querySelectorAll("mark.ccez-ann").length
@@ -339,6 +339,23 @@ test("escape closes the badge edit without saving", async ({ page }) => {
 	// The saved comment is untouched: reopening shows "go", not "goscratch".
 	await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
 	await expect(page.locator(".ann-pop textarea")).toHaveValue("go");
+	await page.keyboard.press("Escape");
+	await expect(page.locator(".ann-pop")).toHaveCount(0);
+	// Click off the badge (the click that opened it left the mouse
+	// hovering it, which legitimately keeps the hover wash): closing
+	// the edit and leaving must unwash.
+	await page.mouse.move(4, 4);
+	await page.waitForTimeout(600);
+	const leftover = await page.evaluate(() => {
+		const reg = (
+			window as unknown as {
+				CSS?: { highlights?: { get(name: string): Set<Range> | undefined } };
+			}
+		).CSS?.highlights;
+		const names = ["ccez-ann", "ccez-ann-d1", "ccez-ann-d2", "ccez-ann-d3"];
+		return names.flatMap((n) => [...(reg?.get(n) ?? [])]).length;
+	});
+	expect(leftover).toBe(0);
 });
 
 /** Enter with no text files the (empty) annotation for submit. */
@@ -670,7 +687,7 @@ test("multi-paragraph wash paints no gaps and keeps the highlight", async ({ pag
 					CSS?: { highlights?: { get(name: string): Set<Range> | undefined } };
 				}
 			).CSS?.highlights;
-			const names = ["ccez-ann", "ccez-ann-dim", "ccez-ann-faint"];
+			const names = ["ccez-ann", "ccez-ann-d1", "ccez-ann-d2", "ccez-ann-d3"];
 		const ranges = names.flatMap((n) => [...(reg?.get(n) ?? [])]).map((r) => r.toString());
 			const box = root?.querySelector("button.ccez-ann-badge")?.getBoundingClientRect();
 			return {
