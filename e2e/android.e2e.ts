@@ -1896,6 +1896,22 @@ test.describe("message chrome", () => {
 		expect(Math.abs(edges.textRight - edges.rerunRight)).toBeLessThanOrEqual(2);
 	});
 
+	/** Phone language pills hang under the hero, never docked over
+	the composer (desktop keeps the dock). */
+	test("empty-state language buttons sit under the hero", async ({ page }) => {
+		await seedEmpty(page);
+		await page.goto("/");
+		const hero = page.locator(".hero");
+		const menus = page.locator(".empty-state .lang-menus");
+		await expect(hero).toBeVisible({ timeout: 60_000 });
+		await expect(menus).toBeVisible();
+		const heroBox = await hero.boundingBox();
+		const menusBox = await menus.boundingBox();
+		expect(heroBox).toBeTruthy();
+		expect(menusBox).toBeTruthy();
+		expect(menusBox!.y).toBeGreaterThanOrEqual(heroBox!.y + heroBox!.height);
+	});
+
 	/** Huge phone type goes full-bleed; normal type keeps the floor. */
 	test("phone chat width blooms at 330 percent", async ({ page }) => {
 		await seedChrome(page, { fontScale: 3.3 });

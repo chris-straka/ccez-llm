@@ -9589,6 +9589,56 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		onclick={closeSettingsFromMain}
 		ondblclick={gutterDoubleClick}
 	>
+		{#snippet langMenus()}
+			<!-- A hover preview of an empty chat shows the same pills,
+			inert: they preview the empty state, but every tap belongs
+			to the active chat — hovering away restores it. Rendered
+			under the hero on phones, docked over the composer
+			elsewhere (see the two call sites). -->
+			<div class="lang-menus" aria-label="Reply language" inert={previewing}>
+				{#each LANGUAGE_MENUS as menu (menu.id)}
+					<div class="lang-menu">
+						<button
+							type="button"
+							aria-haspopup="true"
+							aria-expanded={openLangMenu === menu.id}
+							title="Reply in a {menu.label.toLowerCase()} language"
+							onclick={() => (openLangMenu = openLangMenu === menu.id ? null : menu.id)}
+						>
+							<span aria-hidden="true">{menu.marker}</span>
+							{menu.label}
+						</button>
+						{#if openLangMenu === menu.id}
+							<div class="lang-list" role="menu">
+								<!-- Menu-click clears only languages without a number key
+								(keyed ones clear by repeating the key). -->
+								{#each [...menu.languages].sort((a, b) => a.name.localeCompare(b.name, "en")) as lang (lang.code)}
+									{@const quickKey = quickKeyFor(lang.code)}
+									<button
+										type="button"
+										role="menuitem"
+										class:selected={activeReplyCode === lang.code}
+										title={quickKey ? `${lang.name} (${quickKey})` : lang.name}
+										onclick={() => {
+										if (activeReplyCode === lang.code && !quickKey) clearReplyLang();
+										else setReplyLang(lang.code);
+										// Picking a language hands focus to the composer:
+										// typing starts there next, and focus never
+										// lingers on the unmounted option (which left
+										// a stuck pointer behind).
+										editor?.focus();
+									}}
+									>
+										<span class="badge" aria-hidden="true">{lang.badge}</span>
+										{lang.name}
+									</button>
+								{/each}
+							</div>
+						{/if}
+					</div>
+				{/each}
+			</div>
+		{/snippet}
 		{#if notices.errorToast.message}
 			<button type="button" class="toast error" title="Dismiss" aria-live="polite" transition:fade={{ duration: 160 }} onclick={dismissErrorToast}>{notices.errorToast.message}</button>
 		{:else if notices.toast.message}
@@ -9748,6 +9798,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					<h1 class="hero">What can I do for you?</h1>
 					{#if useMock}
 						<p class="mock-note"><strong>Mock provider active.</strong></p>
+					{/if}
+					{#if androidUI}
+						{@render langMenus()}
 					{/if}
 				</div>
 			{/if}
@@ -10717,53 +10770,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			</button>
 		{/if}
 
-		{#if viewChat.messages.length === 0}
-			<!-- A hover preview of an empty chat shows the same pills,
-			inert: they preview the empty state, but every tap belongs
-			to the active chat — hovering away restores it. -->
-			<div class="lang-menus" aria-label="Reply language" inert={previewing}>
-				{#each LANGUAGE_MENUS as menu (menu.id)}
-					<div class="lang-menu">
-						<button
-							type="button"
-							aria-haspopup="true"
-							aria-expanded={openLangMenu === menu.id}
-							title="Reply in a {menu.label.toLowerCase()} language"
-							onclick={() => (openLangMenu = openLangMenu === menu.id ? null : menu.id)}
-						>
-							<span aria-hidden="true">{menu.marker}</span>
-							{menu.label}
-						</button>
-						{#if openLangMenu === menu.id}
-							<div class="lang-list" role="menu">
-								<!-- Menu-click clears only languages without a number key
-								(keyed ones clear by repeating the key). -->
-								{#each [...menu.languages].sort((a, b) => a.name.localeCompare(b.name, "en")) as lang (lang.code)}
-									{@const quickKey = quickKeyFor(lang.code)}
-									<button
-										type="button"
-										role="menuitem"
-										class:selected={activeReplyCode === lang.code}
-										title={quickKey ? `${lang.name} (${quickKey})` : lang.name}
-										onclick={() => {
-										if (activeReplyCode === lang.code && !quickKey) clearReplyLang();
-										else setReplyLang(lang.code);
-										// Picking a language hands focus to the composer:
-										// typing starts there next, and focus never
-										// lingers on the unmounted option (which left
-										// a stuck pointer behind).
-										editor?.focus();
-									}}
-									>
-										<span class="badge" aria-hidden="true">{lang.badge}</span>
-										{lang.name}
-									</button>
-								{/each}
-							</div>
-						{/if}
-					</div>
-				{/each}
-			</div>
+		{#if !androidUI && viewChat.messages.length === 0}
+			{@render langMenus()}
 		{/if}
 	</main>
 
@@ -12664,6 +12672,19 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		flex-wrap: nowrap;
 		gap: 0.4rem;
 	}
+	/* Phones hang the row under the hero instead of docking it over
+	the composer: kill the bottom-dock margin and its padding (the
+	empty-state gap owns the rhythm now). Desktop keeps the dock. */
+	.app[data-android] main.empty .lang-menus {
+		margin-top: 0;
+		padding: 0;
+	}
+	/* Under-hero pills open downward; desktop keeps opening upward
+	over the messages. The phone sheet cap below still bounds it. */
+	.app[data-android] .lang-menu .lang-list {
+		top: calc(100% + 0.35rem);
+		bottom: auto;
+	}
 	.app[data-android] .lang-menu > button {
 		font-size: 0.75rem;
 		padding: 0.3rem 0.55rem;
@@ -13179,7 +13200,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.lang-list {
 		position: absolute;
 		z-index: 40;
-		/* Open upward over the composer, never down past it. */
+		/* Desktop opens upward over the composer, never down past it
+		(phones override below: their pills hang under the hero). */
 		bottom: calc(100% + 0.35rem);
 		left: 0;
 		/* Shrink-wrap the longest name: a fixed min-width leaves dead
