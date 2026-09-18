@@ -5,6 +5,7 @@ import {
 	ANN_HIGHLIGHT_D2,
 	ANN_HIGHLIGHT_D3,
 	ANN_HIGHLIGHT_NAME,
+	ANN_FLASH_NAME,
 	highlightsSupported,
 	liveWashRanges,
 	paintAnnotationWash,
@@ -52,6 +53,17 @@ describe("CSS.highlights annotation wash", () => {
 		expect(
 			new Set([ANN_HIGHLIGHT_NAME, ANN_HIGHLIGHT_D1, ANN_HIGHLIGHT_D2, ANN_HIGHLIGHT_D3]).size
 		).toBe(4);
+	});
+	it("flash name stays distinct from every wash name", () => {
+		expect(
+			new Set([
+				ANN_HIGHLIGHT_NAME,
+				ANN_HIGHLIGHT_D1,
+				ANN_HIGHLIGHT_D2,
+				ANN_HIGHLIGHT_D3,
+				ANN_FLASH_NAME
+			]).size
+		).toBe(5);
 	});
 	it("paint/clear accept a graded name, clear-all never throws", () => {
 		const root = document.createElement("div");

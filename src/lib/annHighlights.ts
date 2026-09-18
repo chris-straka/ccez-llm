@@ -18,6 +18,15 @@
 /** Highlight name under which annotation washes are registered. */
 export const ANN_HIGHLIGHT_NAME = "ccez-ann";
 /**
+ * Highlight name for the jump-landing flash (draft-menu and sent-ref
+ * jumps). A registry paint moves zero DOM nodes, so the mid-quote
+ * badge anchor never shifts and text never reflows — the DOM-mark
+ * fallback below exists only where the Highlight API is missing.
+ * Separate name from the wash grades: the flash must clear without
+ * touching a live hover wash, and vice versa.
+ */
+export const ANN_FLASH_NAME = "ccez-ann-flash";
+/**
  * Graded dimmer names for the wash fade ramp: the Highlight pseudo
  * can't transition (probed: transitions and keyframes on
  * ::highlight() are ignored in Chromium and WebKit), so the fade

@@ -210,17 +210,22 @@ test("review quote jumps to the message with a wash blink", async ({ page }) => 
 	await page.locator(".review-quote").first().click();
 	// The review closes so the landing clears the composer dock.
 	await expect(page.locator(".ann-wrap .review")).toHaveCSS("opacity", "0");
-	// The flash blinks: poll through the cycle until a lit phase shows.
+	// The flash blinks: poll through the cycle until a lit phase shows
+	// (registry paint — zero DOM churn, so no mark ever mounts).
 	await expect
 		.poll(
 			() =>
 				page.evaluate(() => {
-					const mark = document.querySelector("mark.ccez-ann-flash");
-					return mark ? getComputedStyle(mark).backgroundColor : "none";
+					const reg = (
+						window.CSS as unknown as {
+							highlights?: { get(n: string): { size: number } | undefined };
+						}
+					).highlights;
+					return reg?.get("ccez-ann-flash")?.size ?? 0;
 				}),
 			{ timeout: 4_000 }
 		)
-		.toBe("rgb(255, 224, 102)");
+		.toBeGreaterThan(0);
 	await page.waitForTimeout(800);
 	const after = await page.evaluate(() => document.querySelector(".messages")?.scrollTop ?? 0);
 	expect(after).toBeLessThan(top - 50);
@@ -282,12 +287,16 @@ test("down jump lands the quote clear of the dock", async ({ page }) => {
 		.poll(
 			() =>
 				page.evaluate(() => {
-					const mark = document.querySelector("mark.ccez-ann-flash");
-					return mark ? getComputedStyle(mark).backgroundColor : "none";
+					const reg = (
+						window.CSS as unknown as {
+							highlights?: { get(n: string): { size: number } | undefined };
+						}
+					).highlights;
+					return reg?.get("ccez-ann-flash")?.size ?? 0;
 				}),
 			{ timeout: 4_000 }
 		)
-		.toBe("rgb(255, 224, 102)");
+		.toBeGreaterThan(0);
 });
 
 /** Only the quote navigates: clicking the note (or the row's number)
@@ -429,12 +438,16 @@ test("jump leaves a clear mark exactly where it is", async ({ page }) => {
 		.poll(
 			() =>
 				page.evaluate(() => {
-					const mark = document.querySelector("mark.ccez-ann-flash");
-					return mark ? getComputedStyle(mark).backgroundColor : "none";
+					const reg = (
+						window.CSS as unknown as {
+							highlights?: { get(n: string): { size: number } | undefined };
+						}
+					).highlights;
+					return reg?.get("ccez-ann-flash")?.size ?? 0;
 				}),
 			{ timeout: 4_000 }
 		)
-		.toBe("rgb(255, 224, 102)");
+		.toBeGreaterThan(0);
 	expect(await page.evaluate(() => document.querySelector(".messages")?.scrollTop ?? 0)).toBe(top);
 });
 

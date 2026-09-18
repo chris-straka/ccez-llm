@@ -168,8 +168,9 @@ import {
 		newAnnotationId,
 		rewriteAnnotationComment,
 		quoteRange,
-		wrapRangeInMark,
+		wrapRangeExcludingBadges,
 		unwrapMark,
+		invalidateWashPaint,
 		findQuotedMessage,
 		annRefsFor,
 		lockSelectionToMessage,
@@ -188,6 +189,13 @@ import {
 		type AnnotationId,
 		type AnnotationMark
 	} from "$lib/annotations";
+	import {
+		ANN_FLASH_NAME,
+		clearAnnotationWash,
+		highlightsSupported,
+		paintAnnotationWash
+	} from "$lib/annHighlights";
+	import { badgeHover } from "$lib/hoverWash";
 	import { startBlink } from "$lib/blink";
 	import { createRefMemo } from "$lib/aidLoading";
 	import { scopeMessagesTransition, switchChatWithTransition } from "$lib/viewTransitions";
@@ -3945,8 +3953,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		else {
 			document.querySelector(`#msg-${index}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
 		}
-		// The quote flashes once like a sent jump (one DOM-mark
-		// flash, never layered with a Highlight wash twin): the badge
+		// The quote flashes once like a sent jump (one registry
+		// flash; the jump clears the hover wash first, so no twin
+		// layers under it): the badge
 		// scroll lands the eye nearby, the flash lands it on the
 		// words. Every paint re-locates against the repeat it was
 		// filed from.
@@ -4045,8 +4054,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 
 	/**
 	 * Sent-annotation landing: locate the quote in its owner's rendered
-	 * text, land it clear of the dock, and flash the DOM mark once
-	 * (never layered with a Highlight wash twin). A folded message
+	 * text, land it clear of the dock, and flash the quote once
+	 * through the Highlight registry (the jump clears the hover wash
+	 * first, so no twin layers under it). A folded message
 	 * hides its text from the locator: land on the message itself
 	 * instead.
 	 */
@@ -4082,24 +4092,57 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 
 	/** Flash the destination quote once in draft yellow, then release
-	it (a re-jump restarts the schedule; expiry clears itself). Plain
-	DOM marks render in every engine, so the mark alone carries the
-	flash — never layered with a Highlight wash twin. Single phase on
-	purpose: every wrap/unwrap churns the text nodes around the
-	mid-quote badge anchor, so a double blink shakes the marker four
-	times with the wash. Every paint re-locates: a chat re-render
-	mid-scroll (scroll-driven state swaps the text nodes) detaches the
-	old range, and repainting the same dead range would blink nothing.
-	A failed re-locate clears rather than abandoning: the quote is
-	gone, so nothing must linger. Yellow must never stick. */
+	it (a re-jump restarts the schedule; expiry clears itself). The
+	flash paints through the Highlight registry: zero DOM nodes move,
+	so the mid-quote badge anchor never shifts and text never
+	reflows — the whole point of leaving DOM marks behind. The DOM
+	path below runs only where the Highlight API is missing. Single
+	phase on purpose (one paint, one clear). Every paint re-locates:
+	a chat re-render mid-scroll (scroll-driven state swaps the text
+	nodes) detaches the old range, and repainting the same dead
+	range would blink nothing. A failed re-locate clears rather
+	than abandoning: the quote is gone, so nothing must linger.
+	Yellow must never stick. */
 	function flashJumpMark(locate: () => Range | null): void {
 		stopJumpFlash?.();
 		stopJumpFlash = null;
 		clearJumpMarks();
+		// One landing, one highlight: a hover wash alive under the
+		// cursor (the jump scrolled the message beneath it) would
+		// twin the flash with offset edges. Route the clear through
+		// the shared machine so a later re-hover still reports.
+		badgeHover((id: string | null) => (hoverBadgeId = id), null);
+		if (highlightsSupported()) {
+			clearAnnotationWash(ANN_FLASH_NAME);
+			let root: HTMLElement | null = null;
+			const paintFresh = (): boolean => {
+				const range = locate();
+				if (!range) return false;
+				const el =
+					range.startContainer instanceof Element
+						? range.startContainer
+						: range.startContainer.parentElement;
+				root = el?.closest(".rendered") ?? null;
+				return paintAnnotationWash([range], ANN_FLASH_NAME);
+			};
+			if (!paintFresh()) return;
+			stopJumpFlash = startBlink(
+				paintFresh,
+				() => {
+					clearAnnotationWash(ANN_FLASH_NAME);
+					if (root) invalidateWashPaint(root);
+				},
+				{ phases: 2 }
+			);
+			return;
+		}
 		const paintFresh = (): boolean => {
 			const range = locate();
 			if (!range) return false;
-			return wrapRangeInMark(range, "ccez-ann-flash") !== null;
+			// Badge carve-out: a whole-range extract would drag the
+			// mid-quote anchor into the mark and back out, shaking
+			// the marker once per phase beside the quote flash.
+			return wrapRangeExcludingBadges(range, "ccez-ann-flash").length > 0;
 		};
 		if (!paintFresh()) return;
 		stopJumpFlash = startBlink(paintFresh, clearJumpMarks, { phases: 2 });

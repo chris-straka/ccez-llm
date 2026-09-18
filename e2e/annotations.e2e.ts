@@ -961,8 +961,9 @@ test("sent-refs Clear-all deletes a refs-only message", async ({ page }) => {
 });
 
 /** Sent-refs quote jumps to the quoted message — not the sender — and
-flashes the quote with one DOM mark (never layered with a Highlight
-wash twin, so the flash keeps its rounded mark shape). */
+flashes the quote through the Highlight registry (zero DOM churn, so
+the badge anchor never moves; the jump clears the hover wash first,
+so no twin layers under the flash). */
 test("sent-refs quote jumps to the quoted text with a flash", async ({ page }) => {
 	const sentence = "The quick brown fox jumps over the lazy dog near the riverbank.";
 	const filler = Array.from({ length: 10 }, (_, i) => `Filler ${i}. ${sentence} ${sentence}`).join("\n\n");
@@ -982,30 +983,39 @@ test("sent-refs quote jumps to the quoted text with a flash", async ({ page }) =
 	expect(top).toBeGreaterThan(100);
 	await page.locator(".ann-refs-pill").first().click();
 	await page.locator(".ann-refs-quote").first().click();
-	// The flash paints on the jump: a draft-yellow mark on the quote,
-	// in every engine (polled — either paint phase counts).
-	await expect
-		.poll(
-			() =>
-				page.evaluate(
-					() => document.querySelector("mark.ccez-ann-flash")?.textContent ?? null
-				),
-			{ timeout: 5_000 }
-		)
-		.toBe("spring");
-	// No Highlight twin layers under the mark (one flash, one shape).
-	const jumped = await page.evaluate(
-		() =>
-			(window as unknown as { CSS?: { highlights?: { has(name: string): boolean } } }).CSS?.highlights?.has(
-				"ccez-ann-jump"
-			) ?? false
-	);
-	expect(jumped).toBe(false);
+	// The flash paints on the jump: a draft-yellow registry highlight
+	// on the quote (polled — the lit phase counts). No DOM mark ever
+	// mounts, so the badge anchor cannot move mid-blink.
+	const flashSize = (): Promise<number> =>
+		page.evaluate(() => {
+			const reg = (
+				window.CSS as unknown as {
+					highlights?: { get(n: string): { size: number } | undefined };
+				}
+			).highlights;
+			return reg?.get("ccez-ann-flash")?.size ?? 0;
+		});
+	await expect.poll(flashSize, { timeout: 5_000 }).toBeGreaterThan(0);
+	// No Highlight twin layers under the flash (one landing, one shape):
+	// the jump clears the hover wash first.
+	const washed = await page.evaluate(() => {
+		const reg = (
+			window.CSS as unknown as {
+				highlights?: { get(n: string): { size: number } | undefined };
+			}
+		).highlights;
+		return ["ccez-ann", "ccez-ann-d1", "ccez-ann-d2", "ccez-ann-d3"].some(
+			(name) => (reg?.get(name)?.size ?? 0) > 0
+		);
+	});
+	expect(washed).toBe(false);
 	await page.waitForTimeout(800);
 	const after = await page.evaluate(() => document.querySelector(".messages")?.scrollTop ?? 0);
 	expect(after).toBeLessThan(top - 50);
-	// The flash releases itself: no mark lingers in the message, and
-	// a failed re-locate clears rather than stranding yellow.
+	// The flash releases itself: no highlight lingers in the registry
+	// and no mark lingers in the message, and a failed re-locate
+	// clears rather than stranding yellow.
+	await expect.poll(flashSize, { timeout: 5_000 }).toBe(0);
 	await expect(page.locator("mark.ccez-ann-flash")).toHaveCount(0, { timeout: 5_000 });
 });
 

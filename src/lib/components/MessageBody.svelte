@@ -1184,7 +1184,7 @@
 		color: inherit;
 	}
 	.rendered :global(mark.ccez-ann) {
-		background: #ffe066;
+		background: #fff3b0;
 		border-radius: 3px;
 		/* Annotated text reads interactive (the badge above it opens
 		the edit); clicks still select normally. */
@@ -1206,7 +1206,7 @@
 	(not the Highlight API) so it renders in every engine; the caller
 	wraps and unwraps it around the blink. */
 	.rendered :global(mark.ccez-ann-flash) {
-		background: #ffe066;
+		background: #fff3b0;
 		border-radius: 3px;
 		padding: 0 1px;
 		margin: 0 -1px;
@@ -1224,7 +1224,41 @@
 			background-color: transparent;
 		}
 		to {
-			background-color: #ffe066;
+			background-color: #fff3b0;
+		}
+	}
+	@keyframes ann-wash-out {
+		from {
+			background-color: #fff3b0;
+		}
+		to {
+			background-color: transparent;
+		}
+	}
+	/* More-contrast fallback path (see the highlight rules below):
+	stronger marker yellow on marks, flash, and keyframes. */
+	@media (prefers-contrast: more) {
+		.rendered :global(mark.ccez-ann) {
+			background: #ffe066;
+		}
+		.rendered :global(mark.ccez-ann-flash) {
+			background: #ffe066;
+		}
+		@keyframes ann-wash-in {
+			from {
+				background-color: transparent;
+			}
+			to {
+				background-color: #ffe066;
+			}
+		}
+		@keyframes ann-wash-out {
+			from {
+				background-color: #ffe066;
+			}
+			to {
+				background-color: transparent;
+			}
 		}
 	}
 	.rendered :global(mark.ccez-ann.fresh) {
@@ -1240,14 +1274,6 @@
 	}
 	:global(html[data-theme="dark"]) .rendered :global(mark.ccez-ann.fresh) {
 		animation-name: ann-wash-in-dark;
-	}
-	@keyframes ann-wash-out {
-		from {
-			background-color: #ffe066;
-		}
-		to {
-			background-color: transparent;
-		}
 	}
 	.rendered :global(mark.ccez-ann.leaving) {
 		animation: ann-wash-out 0.18s ease forwards;
@@ -1268,22 +1294,38 @@
 	supported, so future stamps can skip mark-DOM wrapping. The mark
 	path above stays the live fallback. */
 	.rendered::highlight(ccez-ann) {
-		background-color: #ffe066;
+		background-color: #fff3b0;
 		color: inherit;
 	}
 	/* Graded dimmers for the wash fade ramp (see washRampSchedule):
 	same hue stepping down — the eye reads the steps as a fade. */
 	.rendered::highlight(ccez-ann-d1) {
-		background-color: rgba(255, 224, 102, 0.72);
+		background-color: rgba(255, 243, 176, 0.72);
 		color: inherit;
 	}
 	.rendered::highlight(ccez-ann-d2) {
-		background-color: rgba(255, 224, 102, 0.45);
+		background-color: rgba(255, 243, 176, 0.45);
 		color: inherit;
 	}
 	.rendered::highlight(ccez-ann-d3) {
-		background-color: rgba(255, 224, 102, 0.18);
+		background-color: rgba(255, 243, 176, 0.18);
 		color: inherit;
+	}
+	/* More-contrast users get the stronger marker yellow (dark
+	scoped rules win on specificity, so dark is untouched). */
+	@media (prefers-contrast: more) {
+		.rendered::highlight(ccez-ann) {
+			background-color: #ffe066;
+		}
+		.rendered::highlight(ccez-ann-d1) {
+			background-color: rgba(255, 224, 102, 0.72);
+		}
+		.rendered::highlight(ccez-ann-d2) {
+			background-color: rgba(255, 224, 102, 0.45);
+		}
+		.rendered::highlight(ccez-ann-d3) {
+			background-color: rgba(255, 224, 102, 0.18);
+		}
 	}
 	:global(html[data-theme="dark"]) .rendered::highlight(ccez-ann) {
 		background-color: rgba(245, 158, 11, 0.45);
@@ -1296,6 +1338,21 @@
 	}
 	:global(html[data-theme="dark"]) .rendered::highlight(ccez-ann-d3) {
 		background-color: rgba(245, 158, 11, 0.08);
+	}
+	/* Jump-landing flash (see ANN_FLASH_NAME in annHighlights.ts):
+	same draft yellow as the live wash — the jump clears the hover
+	wash first, so one landing paints exactly one highlight. */
+	.rendered::highlight(ccez-ann-flash) {
+		background-color: #fff3b0;
+		color: inherit;
+	}
+	:global(html[data-theme="dark"]) .rendered::highlight(ccez-ann-flash) {
+		background-color: rgba(245, 158, 11, 0.45);
+	}
+	@media (prefers-contrast: more) {
+		.rendered::highlight(ccez-ann-flash) {
+			background-color: #ffe066;
+		}
 	}
 	/* Ruby base text paints the selection tint explicitly: without
 	this some phone WebViews leave ruby-annotated CJK highlights

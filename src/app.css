@@ -167,23 +167,39 @@ body {
  * match paints exactly the washed ranges. Jumps flash DOM marks
  * only, never this name. Keep both forms declaring the same colors. */
 ::highlight(ccez-ann) {
-	background-color: #ffe066;
+	background-color: #fff3b0;
 	color: inherit;
 }
 /* Graded dimmers for the wash fade ramp (see washRampSchedule in
 annHighlights.ts): same hue stepping down — the eye reads the steps
 as a fade. Keep both forms declaring the same colors. */
 ::highlight(ccez-ann-d1) {
-	background-color: rgba(255, 224, 102, 0.72);
+	background-color: rgba(255, 243, 176, 0.72);
 	color: inherit;
 }
 ::highlight(ccez-ann-d2) {
-	background-color: rgba(255, 224, 102, 0.45);
+	background-color: rgba(255, 243, 176, 0.45);
 	color: inherit;
 }
 ::highlight(ccez-ann-d3) {
-	background-color: rgba(255, 224, 102, 0.18);
+	background-color: rgba(255, 243, 176, 0.18);
 	color: inherit;
+}
+/* More-contrast users get the stronger marker yellow on the light
+wash (dark rules below win on specificity, so dark is untouched). */
+@media (prefers-contrast: more) {
+	::highlight(ccez-ann) {
+		background-color: #ffe066;
+	}
+	::highlight(ccez-ann-d1) {
+		background-color: rgba(255, 224, 102, 0.72);
+	}
+	::highlight(ccez-ann-d2) {
+		background-color: rgba(255, 224, 102, 0.45);
+	}
+	::highlight(ccez-ann-d3) {
+		background-color: rgba(255, 224, 102, 0.18);
+	}
 }
 html[data-theme="dark"] ::highlight(ccez-ann) {
 	background-color: rgba(245, 158, 11, 0.45);
@@ -196,4 +212,19 @@ html[data-theme="dark"] ::highlight(ccez-ann-d2) {
 }
 html[data-theme="dark"] ::highlight(ccez-ann-d3) {
 	background-color: rgba(245, 158, 11, 0.08);
+}
+/* Jump-landing flash (see ANN_FLASH_NAME): same draft yellow as the
+live wash, never stacked with it — the jump clears the hover wash
+first, so one landing paints exactly one highlight. */
+::highlight(ccez-ann-flash) {
+	background-color: #fff3b0;
+	color: inherit;
+}
+html[data-theme="dark"] ::highlight(ccez-ann-flash) {
+	background-color: rgba(245, 158, 11, 0.45);
+}
+@media (prefers-contrast: more) {
+	::highlight(ccez-ann-flash) {
+		background-color: #ffe066;
+	}
 }

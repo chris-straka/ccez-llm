@@ -11,6 +11,7 @@ import {
 	snapSelectionToWordEdges,
 	quoteRange,
 	wrapRangeInMark,
+	wrapRangeExcludingBadges,
 	unwrapMark,
 	type Annotation
 } from "./annotations";
@@ -484,5 +485,60 @@ describe("wrapRangeInMark / unwrapMark", () => {
 		orphan.textContent = "ghost";
 		expect(() => unwrapMark(orphan)).not.toThrow();
 		root.remove();
+	});
+});
+
+describe("wrapRangeExcludingBadges", () => {
+	it("carves out the badge anchor: the marker never moves", () => {
+		const root = document.createElement("div");
+		root.innerHTML =
+			'<p>Paragraph 0. wo<span class="ccez-ann-anchor">r<button data-ann-badge="a1">1</button></span>d here.</p>';
+		document.body.appendChild(root);
+		const badge = root.querySelector('[data-ann-badge="a1"]')!;
+		const anchor = badge.parentElement!;
+		const range = quoteRange(root, "word")!;
+		const marks = wrapRangeExcludingBadges(range, "ccez-ann-flash");
+		// Text runs on both sides flash, the badge label never does
+		// (marks paint back-to-front, so order is positional, not
+		// document).
+		expect(marks).toHaveLength(2);
+		expect(new Set(marks.map((m) => m.textContent))).toEqual(new Set(["wor", "d"]));
+		for (const mark of marks) {
+			expect(mark.querySelector("[data-ann-badge]")).toBeNull();
+		}
+		// Same badge node, same anchor, anchor outside every mark.
+		expect(root.querySelector('[data-ann-badge="a1"]')).toBe(badge);
+		expect(badge.parentElement).toBe(anchor);
+		expect(anchor.closest("mark")).toBeNull();
+		for (const mark of marks) unwrapMark(mark);
+		expect(root.querySelector("mark")).toBeNull();
+		expect(root.querySelector('[data-ann-badge="a1"]')).toBe(badge);
+		// textContent counts the badge's own "1" label: quote text
+		// plus marker, exactly as mounted.
+		expect(root.textContent).toBe("Paragraph 0. wor1d here.");
+		root.remove();
+	});
+
+	it("wraps a badge-free range in one mark", () => {
+		const root = document.createElement("div");
+		root.innerHTML = "<p>The quick brown fox</p>";
+		document.body.appendChild(root);
+		const range = quoteRange(root, "quick brown")!;
+		const marks = wrapRangeExcludingBadges(range, "ccez-ann-flash");
+		expect(marks).toHaveLength(1);
+		expect(marks[0]?.textContent).toBe("quick brown");
+		unwrapMark(marks[0]!);
+		expect(root.textContent).toBe("The quick brown fox");
+		root.remove();
+	});
+
+	it("paints nothing for a collapsed range", () => {
+		const root = document.createElement("div");
+		root.textContent = "gone after rerender";
+		document.body.appendChild(root);
+		const range = document.createRange();
+		range.selectNodeContents(root);
+		root.remove();
+		expect(wrapRangeExcludingBadges(range, "ccez-ann-flash")).toEqual([]);
 	});
 });

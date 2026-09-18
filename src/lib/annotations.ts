@@ -370,6 +370,78 @@ export function wrapRangeInMark(range: Range, cls: string): HTMLElement | null {
 	}
 }
 
+/**
+ * Wrap a range in highlight marks, carving out badge anchors: the
+ * jump flash must never move the marker — a whole-range extract
+ * would pull the mid-quote anchor (button included) into the mark
+ * and back out, shaking the badge once per blink phase. Text runs
+ * around each intersecting badge wrap separately while the anchor
+ * subtree is never touched. Returns the painted marks (empty when
+ * nothing painted). Never throws.
+ */
+export function wrapRangeExcludingBadges(range: Range, cls: string): HTMLElement[] {
+	const painted: HTMLElement[] = [];
+	try {
+		if (range.collapsed) return painted;
+		const doc = range.startContainer.ownerDocument ?? null;
+		if (!doc) return painted;
+		const scope =
+			range.commonAncestorContainer instanceof Element
+				? range.commonAncestorContainer
+				: range.commonAncestorContainer.parentElement;
+		if (!scope) return painted;
+		// Snapshot the endpoints up front: later wraps split nodes
+		// after these points, never the points themselves.
+		const startNode = range.startContainer;
+		const startOff = range.startOffset;
+		const endNode = range.endContainer;
+		const endOff = range.endOffset;
+		const walker = doc.createTreeWalker(scope, NodeFilter.SHOW_TEXT);
+		const runs: Text[][] = [];
+		let current: Text[] | null = null;
+		const flush = (): void => {
+			if (current !== null && current.length > 0) runs.push(current);
+			current = null;
+		};
+		while (walker.nextNode()) {
+			const node = walker.currentNode;
+			if (!(node instanceof Text)) continue;
+			let inside = false;
+			try {
+				inside = range.intersectsNode(node);
+			} catch {
+				inside = false;
+			}
+			// Badge labels are UI, never flash: skipping them also
+			// splits the runs around the anchor, which stays put.
+			if (!inside || node.parentElement?.closest("[data-ann-badge]") !== null) {
+				flush();
+				continue;
+			}
+			if (!current) current = [];
+			current.push(node);
+		}
+		flush();
+		// Back-to-front: wrapping a later run splits nodes no earlier
+		// run's points at or after.
+		const textLen = (node: Text): number => node.textContent?.length ?? 0;
+		for (let i = runs.length - 1; i >= 0; i--) {
+			const run = runs[i]!;
+			const first = run[0]!;
+			const last = run[run.length - 1]!;
+			const sub = doc.createRange();
+			sub.setStart(first, first === startNode ? Math.min(startOff, textLen(first)) : 0);
+			sub.setEnd(last, last === endNode ? Math.min(endOff, textLen(last)) : textLen(last));
+			if (sub.collapsed) continue;
+			const mark = wrapRangeInMark(sub, cls);
+			if (mark) painted.push(mark);
+		}
+	} catch {
+		// Transient cosmetic: partial paints clear with the blink.
+	}
+	return painted;
+}
+
 /** Release a transient highlight mark, restoring its text in place.
 Safe when a re-render already dropped it (nothing to restore). */
 export function unwrapMark(mark: HTMLElement): void {
@@ -860,7 +932,9 @@ function washSnaps(): boolean {
 	}
 }
 /**
- * Force a genuine repaint of the message root after a terminal clear.
+ * Force a genuine repaint of a highlight-hosting message root after
+ * a terminal clear. Shared by the wash ramp and the jump flash (both
+ * delete registry names the shell may not repaint on its own).
  * Deleting registry names does not always invalidate the highlight
  * overlay paint in the shell (pixels stick until the next incidental
  * repaint: select, blur, tab-switch) — and a read-only flush
@@ -870,7 +944,7 @@ function washSnaps(): boolean {
  * the restore lands after that paint. Wash-clear paths only — never
  * on paint. Never throws.
  */
-function invalidateWashPaint(root: HTMLElement): void {
+export function invalidateWashPaint(root: HTMLElement): void {
 	try {
 		root.style.setProperty("opacity", "0.999");
 		void root.offsetWidth;
