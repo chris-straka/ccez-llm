@@ -70,6 +70,19 @@ describe("latex math", () => {
 		expect(html).toContain("katex");
 	});
 
+	it("trails inline chrome after the raw source (same side in both views)", () => {
+		// Raw view shows source-then-buttons; rendered hides the
+		// source, so buttons-after-source keeps `$`/copy on the
+		// right in both instead of swapping ends on toggle.
+		const html = mathHtml({ kind: "inline", tex: "m", raw: "\\(m\\)" }, 0);
+		const rawAt = html.indexOf("ccez-math-raw");
+		const texAt = html.indexOf("ccez-math-tex");
+		const copyAt = html.indexOf("ccez-math-copy");
+		expect(rawAt).toBeGreaterThan(-1);
+		expect(texAt).toBeGreaterThan(rawAt);
+		expect(copyAt).toBeGreaterThan(texAt);
+	});
+
 	it("keeps the inline wrapper free of block elements (divs would be ejected from the paragraph)", () => {
 		const html = mathHtml({ kind: "inline", tex: "m", raw: "\\(m\\)" }, 0);
 		const inner = html.slice(html.indexOf(">") + 1, html.lastIndexOf("<"));

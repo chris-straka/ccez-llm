@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { tick, untrack } from "svelte";
+	import { onDestroy, tick, untrack } from "svelte";
 	import { SvelteSet } from "svelte/reactivity";
 	// KaTeX stylesheet (fonts bundle relative to it, so math renders offline).
 	import "katex/dist/katex.min.css";
@@ -374,14 +374,39 @@
 	 * always report: suppressing a repeat could strand a wash the
 	 * parent cleared another way. Starts sent: the parent opens null.
 	 */
+	/**
+	 * Wash-clear hysteresis, in ms: a hand trembles at the badge's
+	 * edge, and every over/out crossing repaints instantly — rapid
+	 * paint/clear reads as the marker flickering. A null wash waits
+	 * out the tremor (a re-enter cancels it); genuine leaves still
+	 * clear faster than perception. Non-null washes always report
+	 * at once, so badge-to-badge slides never lag.
+	 */
+	const HOVER_WASH_CLEAR_MS = 120;
+	let hoverClearTimer: ReturnType<typeof setTimeout> | null = null;
+	onDestroy(() => {
+		if (hoverClearTimer !== null) clearTimeout(hoverClearTimer);
+	});
 	let hoverNullSent = true;
 	function onBadgeOver(event: MouseEvent): void {
 		const id = badgeIdOf(event.target);
-		if (id === null) {
-			if (hoverNullSent) return;
-			hoverNullSent = true;
-		} else hoverNullSent = false;
-		onBadgeHover?.(id);
+		if (id !== null) {
+			if (hoverClearTimer !== null) {
+				clearTimeout(hoverClearTimer);
+				hoverClearTimer = null;
+			}
+			hoverNullSent = false;
+			onBadgeHover?.(id);
+			return;
+		}
+		// Pointed at plain text: a pending clear owns the null
+		// report (mouseout always lands before this mouseover, so
+		// the timer is already armed) — reporting here too would
+		// clear inside the hysteresis window it just opened.
+		if (hoverClearTimer !== null) return;
+		if (hoverNullSent) return;
+		hoverNullSent = true;
+		onBadgeHover?.(null);
 	}
 
 	function onBadgeOut(event: MouseEvent): void {
@@ -389,7 +414,11 @@
 		if (to) return;
 		if (hoverNullSent) return;
 		hoverNullSent = true;
-		onBadgeHover?.(null);
+		if (hoverClearTimer !== null) clearTimeout(hoverClearTimer);
+		hoverClearTimer = setTimeout(() => {
+			hoverClearTimer = null;
+			onBadgeHover?.(null);
+		}, HOVER_WASH_CLEAR_MS);
 	}
 
 	/** Press point for the unfold below: a drag that ends on a folded
@@ -1136,7 +1165,11 @@
 		padding: 0 0.1em;
 		margin-left: 0.25em;
 		line-height: 1;
-		vertical-align: baseline;
+		/* The row aligns on the equation's baseline, but the `$`
+		text button and the svg copy button baseline differently —
+		self-centering both boxes puts the pair on each other while
+		the equation keeps the line's rhythm. */
+		align-self: center;
 	}
 	.rendered :global(.ccez-math-inline .ccez-math-copy .action-glyph) {
 		height: 0.85em;

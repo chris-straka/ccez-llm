@@ -618,8 +618,13 @@ export function quoteTextNodes(root: Node): Text[] {
 		// Badge buttons are UI chrome, and ruby readings are overlay:
 		// neither is message text. A reading left in the haystack
 		// mis-anchors badges (or wraps the reading itself and corrupts
-		// the ruby), so both stay out.
-		if (parent instanceof Element && parent.closest("[data-ann-badge], rt, rp, .frt")) continue;
+		// the ruby), so both stay out. Math `$`/copy buttons are the
+		// same kind of chrome (their `$` text is never quotable).
+		if (
+			parent instanceof Element &&
+			parent.closest("[data-ann-badge], rt, rp, .frt, .ccez-math-tex, .ccez-math-copy")
+		)
+			continue;
 		nodes.push(node);
 	}
 	return nodes;

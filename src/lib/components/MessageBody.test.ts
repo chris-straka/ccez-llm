@@ -112,6 +112,40 @@ describe("math chrome alignment", () => {
 		expect(mathBodyRule()).toMatch(/padding\s*:\s*2\.2rem/);
 		expect(mathBodyRule()).not.toMatch(/3\.4rem/);
 	});
+	/** Inline chrome rule (not the absolute display pair): both
+	buttons self-center on the line, so the `$` text button and the
+	svg copy button sit on each other while the equation keeps the
+	row's baseline rhythm. */
+	function inlineChromeRule(): string {
+		const css = bodyStyle();
+		const rules = [...css.matchAll(/([^{}]*\.ccez-math-inline[^{}]*\.ccez-math-tex[^{}]*)\{([^}]*)\}/g)];
+		const own = rules.find((rule) => rule[1]!.includes(".ccez-math-copy"));
+		if (!own) throw new Error("no inline math chrome rule");
+		return own[2]!;
+	}
+	it("self-centers the inline pair instead of baselining them", () => {
+		expect(inlineChromeRule()).toMatch(/align-self\s*:\s*center/);
+		expect(inlineChromeRule()).not.toMatch(/vertical-align\s*:\s*baseline/);
+	});
+});
+
+describe("badge hover hysteresis", () => {
+	/** Edge tremor fires over/out crossings tens of ms apart; an
+	instant clear flashes the wash (reads as the marker flickering).
+	The null wash waits out the tremor while badge-to-badge slides
+	stay instant. Asserts on source: jsdom sees no hover. */
+	function bodySource(): string {
+		return readFileSync(new URL("./MessageBody.svelte", import.meta.url), "utf8");
+	}
+	it("delays the null wash instead of clearing on mouseout", () => {
+		const source = bodySource();
+		expect(source).toMatch(/HOVER_WASH_CLEAR_MS\s*=\s*\d+/);
+		expect(source).toMatch(/hoverClearTimer\s*=\s*setTimeout/);
+	});
+	it("cancels the pending clear on re-enter", () => {
+		const source = bodySource();
+		expect(source).toMatch(/clearTimeout\(hoverClearTimer\)/);
+	});
 });
 
 describe("preview mounts", () => {

@@ -355,13 +355,16 @@ export function mathHtml(entry: MathEntry, index: number): string {
 			`<pre class="ccez-math-raw">${escapeHtml(entry.raw)}</pre></div>`
 		);
 	}
+	// Inline chrome trails the equation: the raw source sits before
+	// the buttons, so `$`/copy ride the same (right) side in both
+	// rendered and raw views instead of swapping ends on toggle.
 	return (
 		`<span class="ccez-math-inline" data-math-index="${index}">` +
 		`<span class="ccez-math-body">${inner}</span>` +
+		`<span class="ccez-math-raw">${escapeHtml(entry.raw)}</span>` +
 		`<button type="button" class="ccez-math-tex" ` +
 		`aria-label="Show math source" title="Show source">$</button>` +
 		`<button type="button" class="ccez-math-copy" ` +
-		`aria-label="Copy equation" title="Copy">${CODE_COPY_GLYPH}</button>` +
-		`<span class="ccez-math-raw">${escapeHtml(entry.raw)}</span></span>`
+		`aria-label="Copy equation" title="Copy">${CODE_COPY_GLYPH}</button></span>`
 	);
 }

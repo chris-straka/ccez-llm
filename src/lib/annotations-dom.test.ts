@@ -2,6 +2,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
 	quoteFragmentText,
+	quoteTextNodes,
 	equationBodyOf,
 	equationBodyRange,
 	trimParagraphTerminator,
@@ -35,6 +36,20 @@ describe("quoteFragmentText", () => {
 			fragment('<p>Kyoto<button data-ann-badge="a1">1</button> in two sentences</p>')
 		);
 		expect(text).toBe("Kyoto in two sentences");
+	});
+
+	it("skips math chrome buttons when collecting quotable text", () => {
+		// The `$` toggle text is UI, never quotable: leaving it in
+		// the haystack mis-anchors badges beside equations (and the
+		// chrome reorder stays offset-neutral).
+		const nodes = quoteTextNodes(
+			fragment(
+				'<p>slope <span class="ccez-math-inline"><span class="ccez-math-body">m</span>' +
+					'<button type="button" class="ccez-math-tex">$</button>' +
+					'<button type="button" class="ccez-math-copy">x</button></span> here</p>'
+			)
+		);
+		expect(nodes.map((node) => node.textContent).join("")).toBe("slope m here");
 	});
 
 	it("trims plain selections untouched", () => {
