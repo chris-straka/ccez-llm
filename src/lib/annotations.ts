@@ -8,6 +8,7 @@ import type { ChatMsgId } from "./chat";
 import {
 	ANN_HIGHLIGHT_D1,
 	ANN_HIGHLIGHT_D3,
+	ANN_HIGHLIGHT_NAME,
 	clearAnnotationWash,
 	clearAnnotationWashes,
 	highlightsSupported,
@@ -859,14 +860,33 @@ function washSnaps(): boolean {
 	}
 }
 /**
- * Force layout on the message root after a terminal clear. Deleting
- * registry names does not always invalidate the highlight overlay
- * paint (the shell keeps the pixels until the next incidental
- * repaint: select, blur, tab-switch). Sync reflow, wash-clear paths
- * only — never on paint.
+ * Force a genuine repaint of the message root after a terminal clear.
+ * Deleting registry names does not always invalidate the highlight
+ * overlay paint in the shell (pixels stick until the next incidental
+ * repaint: select, blur, tab-switch) — and a read-only flush
+ * (`void root.offsetWidth`) dirties nothing, so the engine skips that
+ * too. Toggle a visually identical property for exactly one frame:
+ * the style mutation schedules real paint work (overlay included) and
+ * the restore lands after that paint. Wash-clear paths only — never
+ * on paint. Never throws.
  */
 function invalidateWashPaint(root: HTMLElement): void {
-	void root.offsetWidth;
+	try {
+		root.style.setProperty("opacity", "0.999");
+		void root.offsetWidth;
+		const restore = (): void => {
+			try {
+				root.style.removeProperty("opacity");
+				void root.offsetWidth;
+			} catch {
+				// Cosmetic: the 0.999 frame is invisible either way.
+			}
+		};
+		if (typeof requestAnimationFrame === "function") requestAnimationFrame(restore);
+		else setTimeout(restore, 16);
+	} catch {
+		// Clearing is cosmetic: never break the stamp.
+	}
 }
 
 /**
@@ -918,6 +938,10 @@ function paintWashHighlight(
 				// dead ranges would blink nothing.
 				const schedule = washRampSchedule("in");
 				paintAnnotationWash(ranges, schedule[0]!);
+				// One grade on screen at a time: stacked twins overlap
+				// each other and read as a stuck dim copy that blinks on
+				// the next paint — each step drops the grade it replaces.
+				let prev = schedule[0]!;
 				let step = 1;
 				const tick = (): void => {
 					washRampTimer = setTimeout(() => {
@@ -931,7 +955,10 @@ function paintWashHighlight(
 							invalidateWashPaint(root);
 							return;
 						}
-						paintAnnotationWash(fresh, schedule[step++]!);
+						const name = schedule[step++]!;
+						paintAnnotationWash(fresh, name);
+						if (prev !== name) clearAnnotationWash(prev);
+						prev = name;
 						if (step < schedule.length) tick();
 						else {
 							// Settled on live: drop the twins so only the live
@@ -971,6 +998,11 @@ function paintWashHighlight(
 				clearAnnotationWashes();
 				invalidateWashPaint(root);
 			} else {
+				// Drop live first: the dims replace it, they never stack
+				// over it — a bright wash under dim twins never visibly
+				// fades, and its leftover reads as stuck.
+				clearAnnotationWash(ANN_HIGHLIGHT_NAME);
+				let prev: string | null = ANN_HIGHLIGHT_NAME;
 				const schedule = washRampSchedule("out");
 				let step = 0;
 				const tick = (): void => {
@@ -992,6 +1024,8 @@ function paintWashHighlight(
 								invalidateWashPaint(root);
 							} else {
 								paintAnnotationWash(fresh, name);
+								if (prev !== null) clearAnnotationWash(prev);
+								prev = name;
 								tick();
 							}
 						}
