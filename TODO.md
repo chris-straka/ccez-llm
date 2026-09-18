@@ -128,6 +128,12 @@ cannot (no Android hardware here).
       shows no dash, and sends now store image literals so tag-only
       turns are never content-empty. Needs a screenshot of where the
       dash appears.)
+- [ ] Floating badge pins (far goal): position badges from quote range
+      rects with no anchor spans, following scroll/resize/re-stamp and
+      hiding while streaming. (Status Sep 2026: gap parking ships the
+      cheap version — empty anchors on word boundaries, zero fence
+      issues for spaced scripts; floating pins remain the full fix,
+      needed only if gap parking stops being enough.)
 
 ## Non-goals
 

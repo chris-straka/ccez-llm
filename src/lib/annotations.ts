@@ -1426,9 +1426,45 @@ function anchorSpan(nodes: Text[], loc: QuoteLocation): HTMLElement | null {
 		for (let at = from; at < to; at++) chars.push({ node, at, ch: text[at] ?? "" });
 	}
 	if (chars.length === 0) return null;
-	// Nearest non-space character to the middle: middle placement keeps
-	// the badge over long wrapped quotes, and skipping whitespace never
-	// anchors the gap between two words.
+	// Gap parking: the anchor is an empty span at the word gap nearest
+	// the quote's middle — never around a letter. Text inside the box
+	// paints one highlight fragment short (the seam), so no text may
+	// live in it; both fence edges land on word boundaries, so
+	// double-clicks keep selecting whole words. Combining marks and
+	// surrogate halves never border the gap (a base letter split from
+	// its tashkeel, or a split pair, breaks shaping while mounted);
+	// spaceless scripts (CJK) have no word gaps at all. Both fall
+	// through to the legacy mid-character wrap below.
+	const gap = gapOffsetForAnchor(chars.map((c) => c.ch).join(""));
+	if (gap !== null) {
+		try {
+			const anchor = document.createElement("span");
+			anchor.className = "ccez-ann-anchor";
+			let node: Text;
+			let offset: number;
+			if (gap === 0) {
+				node = chars[0]!.node;
+				offset = chars[0]!.at;
+			} else if (gap >= chars.length) {
+				const last = chars[chars.length - 1]!;
+				node = last.node;
+				offset = last.at + 1;
+			} else {
+				node = chars[gap]!.node;
+				offset = chars[gap]!.at;
+			}
+			const range = document.createRange();
+			range.setStart(node, splitSafeOffset(node.textContent ?? "", offset));
+			range.collapse(true);
+			range.insertNode(anchor);
+			return anchor;
+		} catch {
+			return null;
+		}
+	}
+	// Legacy mid-character wrap (spaceless scripts, combining-heavy
+	// quotes with no clean gap): nearest non-space character to the
+	// middle keeps the badge over long wrapped quotes.
 	const mid = Math.floor(chars.length / 2);
 	let pick: { node: Text; at: number } | null = null;
 	for (let d = 0; d < chars.length && !pick; d++) {
@@ -1713,6 +1749,8 @@ export function isRefsOnly(content: string): boolean {
 }
 
 const WORD_CHAR_RE = /[\p{L}\p{N}_]/u;
+const COMBINING_RE = /\p{M}/u;
+const SURROGATE_RE = /[\uD800-\uDFFF]/u;
 /**
  * Spaceless scripts have no words to pick: every character is a
  * letter (Lo), so snapping would glue whole sentences together.
@@ -1723,6 +1761,55 @@ const SPACELESS_RE = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u;
 
 function isWordChar(ch: string): boolean {
 	return WORD_CHAR_RE.test(ch) && !SPACELESS_RE.test(ch);
+}
+
+/**
+ * Split-safe offset into `nodeText`: a node split must never leave a
+ * combining mark or a low surrogate first on the right side, so
+ * advance past them. The slice a gap was picked on can end before its
+ * node does (wash marks expand to the cluster end), and splitting
+ * there would strand the mark. Anchors land on the true cluster edge,
+ * still quote-adjacent. Pure and unit-tested via stamping.
+ */
+function splitSafeOffset(nodeText: string, offset: number): number {
+	let o = Math.min(Math.max(0, offset), nodeText.length);
+	while (o < nodeText.length) {
+		const ch = nodeText[o] ?? "";
+		if (!COMBINING_RE.test(ch) && !/[\uDC00-\uDFFF]/u.test(ch)) break;
+		o += 1;
+	}
+	return o;
+}
+
+/**
+ * Offset (0..text.length) of the word gap nearest the middle of `text`:
+ * a position touching a word character where words split (an edge or a
+ * word/non-word transition), never beside a combining mark or a
+ * surrogate half. Ties prefer the later gap, so a lone word parks
+ * after itself with its tail pointing back at it. Null when no gap
+ * qualifies (spaceless scripts, empty input). Pure and unit-tested.
+ */
+export function gapOffsetForAnchor(text: string): number | null {
+	const len = text.length;
+	if (len === 0) return null;
+	const mid = len / 2;
+	let best: number | null = null;
+	let bestDist = Infinity;
+	for (let k = 0; k <= len; k++) {
+		const left = k > 0 ? (text[k - 1] ?? "") : "";
+		const right = k < len ? (text[k] ?? "") : "";
+		const touchesWord = (k > 0 && isWordChar(left)) || (k < len && isWordChar(right));
+		const splitsWords = k === 0 || k === len || !isWordChar(left) || !isWordChar(right);
+		if (!touchesWord || !splitsWords) continue;
+		if (COMBINING_RE.test(left) || COMBINING_RE.test(right)) continue;
+		if (SURROGATE_RE.test(left) || SURROGATE_RE.test(right)) continue;
+		const dist = Math.abs(k - mid);
+		if (dist < bestDist || (dist === bestDist && (best === null || k > best))) {
+			best = k;
+			bestDist = dist;
+		}
+	}
+	return best;
 }
 
 /**
@@ -1751,13 +1838,16 @@ export function snapOffsetsToWordEdges(
 
 /**
  * Text node adjacent to `node` across badge-anchor chrome only: a
- * badge anchor wraps one mid-word character (plus its button), so a
+ * legacy anchor wraps one mid-word character (plus its button), so a
  * double-click pick stops at the anchor's node edge while the word
  * runs through it. This steps over the anchor (never into its
- * button) to the quotable text on the other side. Every other
- * element boundary — marks, blocks, readings — stays a wall, as
- * before. Null when no quotable neighbor lies that way, or when
- * `node` itself lives inside button/reading chrome. Never throws.
+ * button) to the quotable text on the other side. Gap-parked anchors
+ * hold no text, so the walk finds no quotable child and treats them
+ * as walls — correct, since they sit on word boundaries the native
+ * pick already honors. Every other element boundary — marks, blocks,
+ * readings — stays a wall, as before. Null when no quotable neighbor
+ * lies that way, or when `node` itself lives inside button/reading
+ * chrome. Never throws.
  */
 function anchorNeighborText(node: Text, dir: 1 | -1): Text | null {
 	try {

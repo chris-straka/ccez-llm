@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
 	applyMarks,
 	annotationCountLabel,
+	gapOffsetForAnchor,
 	locateQuote,
 	lockSelectionToMessage,
 	saveSelection,
@@ -200,11 +201,60 @@ describe("applyMarks badges over reading overlays", () => {
 		const badge = root.querySelector("[data-ann-badge]");
 		// Same mid-quote anchor as the unwashed state (hovering the wash
 		// on and off never moves the badge); nested in the wash marks.
+		// Spaceless quote: legacy mid-character wrap still applies.
 		expect(badge?.parentElement?.tagName).toBe("SPAN");
 		expect(badge?.parentElement?.classList.contains("ccez-ann-anchor")).toBe(true);
 		expect(badge?.closest("mark.ccez-ann")).not.toBeNull();
 		expect(baseText(root)).toBe("漢字を読む");
 		expect(root.querySelector(".frt")?.textContent).toBe("かんじ");
+	});
+
+	it("parks a spaced quote in a word gap, wrapping no letters", () => {
+		const root = rootWith("say hello world today");
+		applyMarks(root, [{ id: "a1" as AnnotationId, number: 1, quote: "hello world" }], false, null);
+		const badge = root.querySelector("[data-ann-badge]");
+		const anchor = root.querySelector(".ccez-ann-anchor");
+		expect(badge?.parentElement).toBe(anchor);
+		// No letters live in the box (the badge's own label is UI,
+		// never wash text): nothing to paint short.
+		const letterKids = [...(anchor?.childNodes ?? [])].filter((n) => n instanceof Text);
+		expect(letterKids).toEqual([]);
+		expect(baseText(root)).toBe("say hello world today");
+	});
+
+	it("parks a lone word in its neighboring gap", () => {
+		const root = rootWith("say hello world today");
+		applyMarks(root, [{ id: "a1" as AnnotationId, number: 1, quote: "world" }], false, null);
+		const anchor = root.querySelector(".ccez-ann-anchor");
+		const letterKids = [...(anchor?.childNodes ?? [])].filter((n) => n instanceof Text);
+		expect(letterKids).toEqual([]);
+		// After the word (ties prefer later): the fence edges sit on
+		// the word's own boundaries.
+		expect(anchor?.previousSibling?.textContent).toContain("world");
+		expect(baseText(root)).toBe("say hello world today");
+	});
+});
+
+describe("gapOffsetForAnchor", () => {
+	it("picks the word gap nearest the middle", () => {
+		expect(gapOffsetForAnchor("hello world")).toBe(6);
+		expect(gapOffsetForAnchor("hi to you")).toBe(5);
+	});
+
+	it("parks a lone word after itself", () => {
+		expect(gapOffsetForAnchor("world")).toBe(5);
+		expect(gapOffsetForAnchor("hi")).toBe(2);
+	});
+
+	it("never borders a combining mark", () => {
+		// a + combining acute + b, then a spaced word: the only
+		// nearby clean gap is the space, not either side of the mark.
+		expect(gapOffsetForAnchor("áb c")).toBe(3);
+	});
+
+	it("finds no gap in spaceless or empty text", () => {
+		expect(gapOffsetForAnchor("漢字を読む")).toBeNull();
+		expect(gapOffsetForAnchor("")).toBeNull();
 	});
 });
 
