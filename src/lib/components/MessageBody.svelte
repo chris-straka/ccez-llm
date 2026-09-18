@@ -1216,6 +1216,25 @@
 	:global(html[data-theme="dark"]) .rendered :global(mark.ccez-ann-flash) {
 		background: rgba(245, 158, 11, 0.45);
 	}
+	/* Jump-landing fade-out for engines whose highlight overlay never
+	repaints between registry writes (the app shell): real marks with
+	a plain background animation, which every engine displays. Light
+	and contrast reuse the wash-out keyframes (same start color);
+	dark starts from the flash amber, not the wash yellow. */
+	.rendered :global(mark.ccez-ann-flash.fading) {
+		animation: ann-wash-out 0.25s ease forwards;
+	}
+	@keyframes ann-flash-out-dark {
+		from {
+			background-color: rgba(245, 158, 11, 0.45);
+		}
+		to {
+			background-color: transparent;
+		}
+	}
+	:global(html[data-theme="dark"]) .rendered :global(mark.ccez-ann-flash.fading) {
+		animation-name: ann-flash-out-dark;
+	}
 	/* The wash mounts/unmounts imperatively (applyMarks), so a plain
 	transition has nothing to run between: fade-in plays on mount for
 	newly arrived washes only, and fade-out plays on .leaving marks

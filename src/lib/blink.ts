@@ -84,6 +84,58 @@ export function startHighlightFade(fade: HighlightFade): () => void {
 	return stop;
 }
 
+/**
+ * Mark-element fade driver (jump flash where the highlight overlay
+ * can't be trusted to repaint between registry writes): holds the
+ * wrapped marks full-bright, adds the fade class, then reports done
+ * (the caller unwraps). Reduced motion passes fadeMs 0 to skip the
+ * animation and release after the hold. Restart safe via stop.
+ */
+export interface MarkFade {
+	marks: HTMLElement[];
+	/** Class starting the fade animation (default "fading"). */
+	fadeClass?: string;
+	/** Ms of full-bright hold (default 700). */
+	holdMs?: number;
+	/** Ms of fade before done; <= 0 skips the class (default 250). */
+	fadeMs?: number;
+	onDone?: () => void;
+}
+
+export function startMarkFade(fade: MarkFade): () => void {
+	let hold: ReturnType<typeof setTimeout> | null = null;
+	let tail: ReturnType<typeof setTimeout> | null = null;
+	let stopped = false;
+	const stop = (): void => {
+		stopped = true;
+		if (hold !== null) clearTimeout(hold);
+		if (tail !== null) clearTimeout(tail);
+		hold = null;
+		tail = null;
+	};
+	const finish = (): void => {
+		stop();
+		fade.onDone?.();
+	};
+	const fadeMs = fade.fadeMs ?? 250;
+	hold = setTimeout(
+		() => {
+			hold = null;
+			if (stopped) return;
+			if (fadeMs <= 0) {
+				finish();
+				return;
+			}
+			for (const mark of fade.marks) {
+				if (mark.isConnected) mark.classList.add(fade.fadeClass ?? "fading");
+			}
+			tail = setTimeout(finish, fadeMs);
+		},
+		fade.holdMs ?? 700
+	);
+	return stop;
+}
+
 export function startBlink(
 	paint: () => boolean,
 	clear: () => void,

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { startBlink, startHighlightFade } from "./blink";
+import { startBlink, startHighlightFade, startMarkFade } from "./blink";
 
 describe("startBlink", () => {
 	afterEach(() => {
@@ -181,5 +181,62 @@ describe("startHighlightFade", () => {
 		advance(50);
 		expect(calls).toContain("step");
 		expect(calls.filter((c) => c === "step")).toHaveLength(2);
+	});
+});
+
+describe("startMarkFade", () => {
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	function mark(connected = true): HTMLElement {
+		const classes: string[] = [];
+		return {
+			isConnected: connected,
+			classList: { add: (c: string) => classes.push(c) },
+			classes
+		} as unknown as HTMLElement & { classes: string[] };
+	}
+
+	it("holds full, fades the marks, then reports done", () => {
+		vi.useFakeTimers();
+		const calls: string[] = [];
+		const m = mark();
+		startMarkFade({ marks: [m], holdMs: 700, fadeMs: 250, onDone: () => calls.push("done") });
+		expect(calls).toEqual([]);
+		advance(700);
+		expect((m as unknown as { classes: string[] }).classes).toEqual(["fading"]);
+		expect(calls).toEqual([]);
+		advance(250);
+		expect(calls).toEqual(["done"]);
+		advance(10_000);
+		expect(calls).toEqual(["done"]);
+	});
+
+	it("skips the fade class when fadeMs is zero", () => {
+		vi.useFakeTimers();
+		const calls: string[] = [];
+		const m = mark();
+		startMarkFade({ marks: [m], holdMs: 700, fadeMs: 0, onDone: () => calls.push("done") });
+		advance(700);
+		expect((m as unknown as { classes: string[] }).classes).toEqual([]);
+		expect(calls).toEqual(["done"]);
+	});
+
+	it("stop cancels before the hold elapses", () => {
+		vi.useFakeTimers();
+		const calls: string[] = [];
+		const m = mark();
+		const stop = startMarkFade({
+			marks: [m],
+			holdMs: 700,
+			fadeMs: 250,
+			onDone: () => calls.push("done")
+		});
+		advance(100);
+		stop();
+		advance(10_000);
+		expect((m as unknown as { classes: string[] }).classes).toEqual([]);
+		expect(calls).toEqual([]);
 	});
 });

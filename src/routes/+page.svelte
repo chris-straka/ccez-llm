@@ -199,7 +199,7 @@ import {
 		prefersReducedMotion
 	} from "$lib/annHighlights";
 	import { badgeHover } from "$lib/hoverWash";
-	import { startBlink, startHighlightFade } from "$lib/blink";
+	import { startBlink, startHighlightFade, startMarkFade } from "$lib/blink";
 	import { createRefMemo } from "$lib/aidLoading";
 	import { scopeMessagesTransition, switchChatWithTransition } from "$lib/viewTransitions";
 	import {
@@ -4103,8 +4103,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	schedule; expiry clears itself). The flash paints through the
 	Highlight registry: zero DOM nodes move, so the mid-quote badge
 	anchor never shifts and text never reflows — the whole point of
-	leaving DOM marks behind. The DOM path below runs only where
-	the Highlight API is missing. Every paint re-locates: a chat
+	leaving DOM marks behind. The DOM path below runs in the shell
+	(whose overlay ignores registry writes between forced repaints)
+	and where the Highlight API is missing. Every paint re-locates: a chat
 	re-render mid-scroll (scroll-driven state swaps the text nodes)
 	detaches the old range, and repainting the same dead range
 	would fade nothing. A failed re-locate clears rather than
@@ -4119,7 +4120,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// twin the flash with offset edges. Route the clear through
 		// the shared machine so a later re-hover still reports.
 		badgeHover((id: string | null) => (hoverBadgeId = id), null);
-		if (highlightsSupported()) {
+		// Registry fade everywhere but the shell: its overlay only
+		// repaints on forced frames, so grades never show there.
+		if (highlightsSupported() && !tauriBackendAvailable()) {
 			clearAnnotationWash(ANN_FLASH_NAME);
 			for (const grade of flashFadeSchedule()) clearAnnotationWash(grade);
 			let root: HTMLElement | null = null;
@@ -4178,16 +4181,23 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			});
 			return;
 		}
-		const paintFresh = (): boolean => {
-			const range = locate();
-			if (!range) return false;
-			// Badge carve-out: a whole-range extract would drag the
-			// mid-quote anchor into the mark and back out, shaking
-			// the marker once per phase beside the quote flash.
-			return wrapRangeExcludingBadges(range, "ccez-ann-flash").length > 0;
-		};
-		if (!paintFresh()) return;
-		stopJumpFlash = startBlink(paintFresh, clearJumpMarks, { phases: 2 });
+		// DOM fade for the shell (and engines without Highlights):
+		// the shell's highlight overlay ignores registry writes
+		// between forced repaints, so graded registry fades show
+		// only their hold and snap off — real marks with a plain
+		// CSS fade display on every engine. Badge carve-out: a
+		// whole-range extract would drag the mid-quote anchor
+		// into the mark and back out, shaking the marker.
+		const range = locate();
+		if (!range) return;
+		const parts = wrapRangeExcludingBadges(range, "ccez-ann-flash");
+		if (parts.length === 0) return;
+		stopJumpFlash = startMarkFade({
+			marks: parts,
+			holdMs: 700,
+			fadeMs: prefersReducedMotion() ? 0 : 250,
+			onDone: clearJumpMarks
+		});
 	}
 
 	/**
