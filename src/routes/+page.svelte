@@ -4137,9 +4137,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				root = rootOf(range);
 				return paintAnnotationWash([range], ANN_FLASH_NAME);
 			};
-			const release = (): void => {
-				clearAnnotationWash(ANN_FLASH_NAME);
-				for (const grade of flashFadeSchedule()) clearAnnotationWash(grade);
+			const nudgeLiveRoot = (): void => {
 				// Resolve the root fresh: a re-render mid-scroll
 				// (scroll-driven state swaps the text nodes) can
 				// detach the root captured at paint time, and
@@ -4148,6 +4146,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				const live = locate();
 				const target = (live ? rootOf(live) : null) ?? root;
 				if (target) invalidateWashPaint(target);
+			};
+			const release = (): void => {
+				clearAnnotationWash(ANN_FLASH_NAME);
+				for (const grade of flashFadeSchedule()) clearAnnotationWash(grade);
+				nudgeLiveRoot();
 			};
 			if (!paintFresh()) return;
 			// Reduced motion keeps the old blink-off; everyone else
@@ -4166,6 +4169,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				grades: flashFadeSchedule(),
 				holdMs: 700,
 				stepMs: 50,
+				// The shell may not repaint on a registry write
+				// alone, so intermediate grades would never show
+				// and the landing would snap off instead of
+				// fading — force each step to display.
+				onStep: nudgeLiveRoot,
 				onDone: release
 			});
 			return;

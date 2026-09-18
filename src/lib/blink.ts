@@ -36,6 +36,8 @@ export interface HighlightFade {
 	holdMs?: number;
 	/** Ms between fade steps (default 50). */
 	stepMs?: number;
+	/** Runs after every grade paint (per-step repaint nudge). */
+	onStep?: () => void;
 	/** Runs once after the terminal clear (repaint nudge). */
 	onDone?: () => void;
 }
@@ -68,6 +70,7 @@ export function startHighlightFade(fade: HighlightFade): () => void {
 				const name = fade.grades[step]!;
 				fade.paint(range, name);
 				fade.clear(step === 0 ? fade.full : fade.grades[step - 1]!);
+				fade.onStep?.();
 				step += 1;
 				tick(fade.stepMs ?? 50);
 			} else {

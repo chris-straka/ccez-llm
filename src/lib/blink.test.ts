@@ -170,4 +170,16 @@ describe("startHighlightFade", () => {
 		advance(10_000);
 		expect(calls).toEqual(["paint:d1", "clear:flash"]);
 	});
+
+	it("reports every grade paint through onStep", () => {
+		vi.useFakeTimers();
+		const { calls, fade } = harness();
+		fade.onStep = () => calls.push("step");
+		startHighlightFade(fade);
+		advance(700);
+		advance(50);
+		advance(50);
+		expect(calls).toContain("step");
+		expect(calls.filter((c) => c === "step")).toHaveLength(2);
+	});
 });
