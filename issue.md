@@ -175,3 +175,105 @@ trusted taps count.
    'article').length` should equal the real message count.
 3. If state bug: add `page.touchscreen.tap` Playwright test asserting
    `article` count and tail-string occurrences stay at seed values after tap.
+
+---
+
+# Annotation hover wash sticks / flashes (Mac app shell, both themes)
+
+## Plain terms used below
+- **Badge / marker**: the numbered blue button stamped on an annotated quote.
+- **Draft card**: the editor popup for writing/saving a note.
+- **Filed pill**: after filing, the note waits as a chip in the composer
+  (prompt-tools area) until its message sends.
+
+## Symptoms (owner-observed, Mac Tauri shell)
+1. Dark theme: hovering a badge paints a DARK yellow wash; moving off
+   paints a BRIGHT yellow wash that STAYS.
+2. Light theme: click/hover wash stays after hover-off AND after ESC.
+3. Draft-card click (light): the marker BLINKS on every wash on/off; no
+   black-box occlusion in light.
+4. Prompt-pill click (dark): the highlight flickers plus a transient BLACK
+   BOX covers the bottom of the marker mid-flash; gone when done.
+5. A stuck wash clears on: selecting text, tab-out + wait + back,
+   "randomly".
+6. macOS reduce-motion is OFF. Dark and light both affected.
+7. (Separate, already fixed: the Thinking chip stayed up while the reply
+   printed — now retires on first token, commit `2b62e87`.)
+
+## Timing architecture (current)
+- 120ms hover-clear hysteresis, one shared machine (`src/lib/hoverWash.ts`).
+- Fade ramp through graded registry names: in D3→D1→live (~100ms), out
+  D1→D2→D3→clear (~140ms), 35ms steps, timers in `paintWashHighlight`
+  (`src/lib/annotations.ts`).
+- Same-wash refresh snaps with no ramp (streaming anti-flicker,
+  commit `22c843f`); terminal clears wipe all graded names (orphan fix,
+  commit `35b3103`).
+- Washes paint ONLY via `CSS.highlights` registry names
+  `ccez-ann`, `ccez-ann-d1/d2/d3` (`src/lib/annHighlights.ts`).
+  Transitions/keyframes on `::highlight()` PROBED ignored in Chromium
+  AND WebKit — the ramp exists because the pseudo cannot fade.
+
+## Ruled out (with proof)
+- **Registry state**: live-shell bridge dumps show the correct timeline
+  (graded in, settled live, stepped out, all empty ≤800ms after leave).
+  Lab Chromium and Playwright WebKit behave identically.
+- **Overlap order**: later-registered highlight paints on top in BOTH
+  engines (screenshot pixel probes).
+- **DOM marks**: zero `mark.ccez-ann` in stuck captures; fallback not
+  engaged (`Highlights` supported in the shell).
+- **Orphan ramp twins**: terminal clears wipe all names; fade-in drops
+  twins on settle.
+- **Real-mouse event path**: owner-driven wiggle log shows paint-on-hover
+  correctly with real `mouseout` (relatedTarget = paragraph element).
+- **Pre-existing switch-test intercept flake**: fails pristine too,
+  unrelated.
+
+## Prime suspects (unchecked)
+1. **Stale highlight paint**: registry empties on schedule but the
+   shell's WKWebView does not repaint the overlay until forced
+   (blur/select/tab-switch ALL force repaints — matches symptom 5
+   exactly). Still needs the smoking gun: yellow pixels on screen
+   WITH an empty registry (one capture attempt came back clean).
+2. **Real-mouse leave aftermath unmeasured**: post-leave registry was
+   verified after SYNTHETIC mouseout only. Capture graded-name counts
+   1–2s after a REAL mouse-out.
+3. **Stale frontend in the running shell** (HMR hiccup): early
+   screenshots may predate the orphan fix, whose symptoms (stuck dim
+   copies, blink on repaint, random clears) match 1:1. Always hard
+   reload before a repro round.
+4. **Jump-flash compositor glitch** (symptom 4): mark wrap/unwrap churn
+   around the badge during the prompt-pill jump blink; transient,
+   dark-theme only so far.
+
+## Repro in this repo (all clean — bug is shell-only so far)
+```bash
+E2E_PORT=5299 bunx playwright test e2e/annotations.e2e.ts
+```
+Pins: multi-paragraph wash, cross-message badge hover, escape-cancel
+registry-empty, badge-edit ESC + click-away registry-empty, plus
+`annHighlights.test.ts` (schedules, `sameWashRanges`, clear-all).
+
+## Live inspection (debug bridge, for other bots)
+- App opens a JSON-over-WebSocket bridge on `ws://127.0.0.1:9223`
+  (debug builds only, `tauri-plugin-mcp-bridge`, see
+  `src-tauri/src/lib.rs`). Envelope `{id, command, args}` →
+  `{id, success, data?, error?}`.
+- Useful commands: `execute_js {script}` (eval in the webview, result
+  in `data`), `capture_native_screenshot {format}` (data URL),
+  `list_windows`.
+- Wash-state one-liner for `execute_js`: read `window.CSS.highlights`
+  names `ccez-ann`, `ccez-ann-d1/d2/d3` (range counts/texts) plus
+  `document.querySelectorAll("mark.ccez-ann").length`.
+- Synthetic hover that exercises the real paint path:
+  `dispatchEvent(new MouseEvent("mouseover", {bubbles:true}))` on a
+  `button.ccez-ann-badge` (and `mouseout` with
+  `relatedTarget: document.body`).
+
+## What is needed to close this
+1. Hard reload the shell, then reproduce on demand (exact clicks/keys).
+2. At the stuck moment: registry dump + native screenshot TOGETHER.
+   Yellow pixels + empty registry = suspect 1 proven (stale paint);
+   populated registry = suspect 2/3 territory (state).
+3. If suspect 1: force-invalidation fix (restyle/reflow nudge scoped to
+   the message root after terminal clear) and re-verify pixels, not
+   just registry counts.
