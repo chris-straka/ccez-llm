@@ -9222,8 +9222,21 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		let viewportTimer: number | undefined;
 		let kbPin = pinArmStart();
 		let fullInnerHeight = window.innerHeight;
-		/** Last seen keyboard height, for the focus-ahead prediction. */
+		/**
+		 * Last seen keyboard height, for the focus-ahead prediction.
+		 * Restored from storage so even the first open in a fresh
+		 * process predicts; re-learned live every cycle (a stored
+		 * portrait height in landscape merely corrects via frames).
+		 */
 		let lastKbHeight = 0;
+		try {
+			const stored = Number(window.localStorage.getItem("ccez-kb-height-px") ?? 0);
+			if (Number.isFinite(stored) && stored > 0 && stored < window.innerHeight) {
+				lastKbHeight = stored;
+			}
+		} catch {
+			// Private-mode storage throws: prediction simply starts cold.
+		}
 		/** Watchdog standing a prediction down when no keyboard follows. */
 		let kbPredictTimer: number | undefined;
 		/**
@@ -9340,11 +9353,19 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				if (androidUI && appEl && window.visualViewport) {
 					const vv = window.visualViewport;
 					const overlap = keyboardOverlapPx(window.innerHeight, vv.height, vv.offsetTop);
+					const open = isKeyboardOpen(window.innerHeight, vv.height, vv.offsetTop);
+					if (open && lastKbHeight > 0) {
+						try {
+							window.localStorage.setItem("ccez-kb-height-px", String(Math.round(lastKbHeight)));
+						} catch {
+							// Private-mode storage throws: prediction stays in-memory.
+						}
+					}
 					const settled = settlePin(
 						kbPin,
 						fullInnerHeight,
 						window.innerHeight,
-						isKeyboardOpen(window.innerHeight, vv.height, vv.offsetTop)
+						open
 					);
 					const wasArmed = kbPin.armed;
 					kbPin = settled.pin;
