@@ -598,4 +598,24 @@ describe("refresh sweep of orphaned fade grades (Highlight path)", () => {
 		expect(store.get(ANN_HIGHLIGHT_NAME)).toBeDefined();
 		expect(store.get(ANN_HIGHLIGHT_D1)).toBeUndefined();
 	});
+
+	it("arrivals snap in the shell instead of grading in bands", () => {
+		(window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {};
+		// Motion allowed: without the shell gate this would take the ramp.
+		vi.stubGlobal("matchMedia", () => ({ matches: false }));
+		try {
+			vi.useFakeTimers();
+			const root = rootWith("say hello world today");
+			const marks: AnnotationMark[] = [{ id: "s9" as AnnotationId, number: 1, quote: "hello world" }];
+			applyMarks(root, marks, false, "s9");
+			expect(store.get(ANN_HIGHLIGHT_NAME)).toBeDefined();
+			// No graded arrival ever paints, however long the run waits.
+			vi.advanceTimersByTime(10_000);
+			expect(store.get(ANN_HIGHLIGHT_D1)).toBeUndefined();
+			expect(store.get(ANN_HIGHLIGHT_NAME)).toBeDefined();
+		} finally {
+			delete (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__;
+			vi.useRealTimers();
+		}
+	});
 });

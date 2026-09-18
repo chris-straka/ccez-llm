@@ -5,6 +5,7 @@
  * restarts (see load/saveDraftAnnotations); the baked blocks never do.
  */
 import type { ChatMsgId } from "./chat";
+import { tauriBackendAvailable } from "./secrets";
 import {
 	ANN_HIGHLIGHT_D1,
 	ANN_HIGHLIGHT_D2,
@@ -944,6 +945,16 @@ function cancelWashRamp(root?: HTMLElement): void {
 	}
 }
 /** Reduced-motion (or no matchMedia at all, e.g. tests) snaps instead of ramping. */
+/**
+ * Arrivals and departures snap instead of grading when the engine
+ * won't show the steps: reduced motion anywhere, or the app shell,
+ * whose overlay repaints only on forced frames — graded steps there
+ * surface as bottom-up bands, never as a fade.
+ */
+function shellSnaps(): boolean {
+	return washSnaps() || tauriBackendAvailable();
+}
+
 function washSnaps(): boolean {
 	try {
 		if (typeof matchMedia !== "function") return true;
@@ -1036,7 +1047,7 @@ function paintWashHighlight(
 			clearAnnotationWashes();
 			root.dataset.washPainted = wash;
 			liveWashId = wash;
-			if (washSnaps()) {
+			if (shellSnaps()) {
 				paintAnnotationWash(ranges);
 				// Same-body slides land here too: the clear above
 				// drops the old id's ranges, which this paint never
@@ -1109,7 +1120,7 @@ function paintWashHighlight(
 		// Terminal clears wipe every graded name: the ramp may have left
 		// dim/faint twins behind, and an orphaned twin reads as a stuck
 		// wash that blinks on the next paint.
-		if (washSnaps()) {
+		if (shellSnaps()) {
 			liveWashId = null;
 			clearAnnotationWashes();
 			invalidateWashPaint(root);
