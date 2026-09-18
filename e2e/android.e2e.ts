@@ -1912,6 +1912,66 @@ test.describe("message chrome", () => {
 		expect(menusBox!.y).toBeGreaterThanOrEqual(heroBox!.y + heroBox!.height);
 	});
 
+	/** The open phone sheet escapes the thread scroller: every option
+	fits on screen and stays reachable (the scroller used to clip
+	Europe's list to five languages, cut by a rectangle). */
+	test("open language sheet shows every option above the composer", async ({ page }) => {
+		await seedEmpty(page);
+		await page.goto("/");
+		await page.locator(".lang-menu > button").first().tap();
+		const list = page.locator(".lang-list");
+		await expect(list).toBeVisible();
+		const vh = await page.evaluate(() => window.innerHeight);
+		const box = await list.boundingBox();
+		expect(box).toBeTruthy();
+		expect(box!.y + box!.height).toBeLessThanOrEqual(vh);
+		const items = list.locator("button");
+		// The reported symptom was five visible languages: the sheet
+		// must hold more than that, and the last option must be
+		// reachable and on screen.
+		expect(await items.count()).toBeGreaterThan(5);
+		await items.last().scrollIntoViewIfNeeded();
+		await expect(items.last()).toBeVisible();
+		const lastBox = await items.last().boundingBox();
+		expect(lastBox).toBeTruthy();
+		expect(lastBox!.y + lastBox!.height).toBeLessThanOrEqual(vh);
+	});
+
+	/** The empty-chat phone composer widens on focus instead of
+	growing taller (the height growth raced the keyboard glide and
+	moved the thread twice): 80% wide at rest while textless, full
+	on focus, same height throughout. */
+	test("empty phone composer widens on focus, never grows", async ({ page }) => {
+		await seedEmpty(page);
+		await page.goto("/");
+		await expect(page.locator(".prompt")).toBeVisible();
+		// Let the editor mount settle (data-empty flips restart the
+		// width ramp mid-flight and read as a wrong rest width).
+		await page.waitForTimeout(500);
+		const geom = (): Promise<{ mainW: number; rem: number; w: number; h: number; l: number }> =>
+			page.evaluate(() => {
+				const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
+				const mainW = document.querySelector("main")!.getBoundingClientRect().width;
+				const r = document.querySelector(".prompt")!.getBoundingClientRect();
+				return { mainW, rem, w: r.width, h: r.height, l: r.left };
+			});
+		// At rest while textless the card holds 80% of the column.
+		const rest = await geom();
+		expect(Math.abs(rest.w - 0.8 * rest.mainW)).toBeLessThanOrEqual(4);
+		await page.locator(".prompt .ta-input").click();
+		await page.waitForTimeout(400);
+		// Focused it fills the column (the 1.2rem card insets); the
+		// height never moves — width does the talking now.
+		const focused = await geom();
+		expect(Math.abs(focused.w - (focused.mainW - 2 * 1.2 * focused.rem))).toBeLessThanOrEqual(4);
+		expect(Math.abs(focused.h - rest.h)).toBeLessThanOrEqual(2);
+		// Once text lands the card stays full-width even unfocused.
+		await page.locator(".prompt .ta-input").pressSequentially("hello");
+		await page.locator(".hero").click();
+		const typed = await geom();
+		expect(Math.abs(typed.w - focused.w)).toBeLessThanOrEqual(2);
+	});
+
 	/** Huge phone type goes full-bleed; normal type keeps the floor. */
 	test("phone chat width blooms at 330 percent", async ({ page }) => {
 		await seedChrome(page, { fontScale: 3.3 });

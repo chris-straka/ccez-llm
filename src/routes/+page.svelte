@@ -448,6 +448,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// selection and its OS menu stay up across scrolls, so ours
 		// must too. Only a collapsed selection dismisses the menu.
 		if (!androidUI || (window.getSelection()?.toString() ?? "") === "") selMenu = null;
+		/* The phone language sheet is fitted to its open-frame geometry:
+		a thread scroll invalidates the fit, so it closes instead of
+		floating mis-anchored. Desktop keeps its in-flow list. */
+		if (androidUI && openLangMenu) openLangMenu = null;
 		saveChatScroll();
 		if (scrollBox) viewport.stick = nearBottom(scrollBox);
 		scrollBox?.classList.add("scrolling");
@@ -1101,6 +1105,46 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 	let stopDictation: (() => void) | null = null;
 	let openLangMenu: LanguageMenu["id"] | null = $state(null);
+	/* Phone sheet anchor: the open list escapes the thread scroller
+	(fixed, fitted to the space above the composer) because inside
+	.messages anything past its box clips — Europe's 20-item list
+	read as five languages cut by a rectangle. Null on desktop,
+	which keeps the in-flow upward list. */
+	let langMenuAnchor: { top: number; left: number; maxH: number } | null = $state(null);
+	function toggleLangMenu(id: LanguageMenu["id"], btn: HTMLElement): void {
+		if (openLangMenu === id) {
+			openLangMenu = null;
+			return;
+		}
+		openLangMenu = id;
+		if (!androidUI) {
+			langMenuAnchor = null;
+			return;
+		}
+		const r = btn.getBoundingClientRect();
+		const composerTop = promptEl?.getBoundingClientRect().top ?? window.innerHeight;
+		langMenuAnchor = {
+			top: Math.round(r.bottom + 6),
+			// Pill-anchored when it fits, shifted left to stay on-screen
+			// otherwise (right-edge menus).
+			left: Math.round(Math.max(8, Math.min(r.left, window.innerWidth - 8 - 180))),
+			maxH: Math.max(140, Math.round(composerTop - r.bottom - 14))
+		};
+	}
+	$effect(() => {
+		if (!openLangMenu) langMenuAnchor = null;
+	});
+	/* A fitted box goes stale on any geometry change (rotation,
+	keyboard glide): phones close it instead of wearing a
+	mis-anchored sheet. Desktop keeps its in-flow list. */
+	$effect(() => {
+		if (!androidUI || !openLangMenu) return;
+		const close = (): void => {
+			openLangMenu = null;
+		};
+		window.addEventListener("resize", close);
+		return () => window.removeEventListener("resize", close);
+	});
 	const activeReplyCode = $derived(
 		chatState.chats.find((c) => c.id === chatState.activeChatId)?.replyLang ?? null
 	);
@@ -9603,13 +9647,22 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							aria-haspopup="true"
 							aria-expanded={openLangMenu === menu.id}
 							title="Reply in a {menu.label.toLowerCase()} language"
-							onclick={() => (openLangMenu = openLangMenu === menu.id ? null : menu.id)}
+							onclick={(e) => toggleLangMenu(menu.id, e.currentTarget)}
 						>
 							<span aria-hidden="true">{menu.marker}</span>
 							{menu.label}
 						</button>
 						{#if openLangMenu === menu.id}
-							<div class="lang-list" role="menu">
+							<div
+								class="lang-list"
+								class:lang-list-fixed={androidUI && langMenuAnchor !== null}
+								role="menu"
+								style={
+									androidUI && langMenuAnchor
+										? `top: ${langMenuAnchor.top}px; left: ${langMenuAnchor.left}px; max-height: ${langMenuAnchor.maxH}px;`
+										: undefined
+								}
+							>
 								<!-- Menu-click clears only languages without a number key
 								(keyed ones clear by repeating the key). -->
 								{#each [...menu.languages].sort((a, b) => a.name.localeCompare(b.name, "en")) as lang (lang.code)}
@@ -12417,11 +12470,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.app[data-android] .prompt {
 		transition:
 			border-color 0.18s ease,
+			left 0.22s ease,
+			right 0.22s ease,
 			visibility 0s;
 	}
 	.app[data-android] .prompt:not(.prompt-idle) {
 		transition:
 			border-color 0.18s ease,
+			left 0.22s ease,
+			right 0.22s ease,
 			visibility 0s;
 	}
 	.app[data-android] .prompt:not(:focus-within) {
@@ -12433,6 +12490,25 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.app[data-android] .prompt:not(:focus-within) :global(.ta-input) {
 		max-height: 1.5rem;
 		overflow: hidden;
+	}
+	/* Empty-chat phone composer holds its small rest height on focus:
+	the rest-to-focus growth raced the keyboard glide and moved the
+	thread twice. Width animates instead — 80% at rest while
+	textless, full on focus or once text lands. Chats with messages
+	keep the 7.25rem floor above. */
+	.app[data-android] main.empty .prompt {
+		min-height: 0;
+		/* ...and no focus gap either: the rest-to-focus gap ramp
+		(0 to 0.35rem) moved the card by ~6px on its own. */
+		gap: 0;
+	}
+	.app[data-android] main.empty .prompt[data-empty="true"]:not(:focus-within) {
+		left: 10%;
+		right: 10%;
+		/* The scrollbar-compensation rule below sets an explicit
+		width: without auto the box is over-constrained and keeps
+		full width (dropped right), never the 80%. */
+		width: auto;
 	}
 	.app[data-android] .prompt:focus-within :global(.ta-input) {
 		/* Focus never inflates the field: height follows content up to
@@ -12453,6 +12529,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		overflow: hidden;
 	}
 	@media (prefers-reduced-motion: reduce) {
+		.app[data-android] .prompt,
 		.app[data-android] .prompt :global(.ta-input),
 		.app[data-android] .prompt-tools,
 		.app[data-android] .send-btn {
@@ -12684,6 +12761,19 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.app[data-android] .lang-menu .lang-list {
 		top: calc(100% + 0.35rem);
 		bottom: auto;
+	}
+	/* The open sheet escapes the thread scroller as a fitted fixed
+	panel (top/left/max-height ride inline from the pill rect): the
+	scroller clips anything past its box, which read as five
+	languages cut by a rectangle. Above the composer (z-30), below
+	nothing it needs; the phone centering translate stands down. */
+	.app[data-android] .lang-list-fixed {
+		position: fixed;
+		right: auto;
+		bottom: auto;
+		transform: none;
+		z-index: 60;
+		overflow-y: auto;
 	}
 	.app[data-android] .lang-menu > button {
 		font-size: 0.75rem;
