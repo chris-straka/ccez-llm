@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from "vitest";
 import {
+	applyMarks,
 	quoteFragmentText,
 	quoteTextNodes,
 	equationBodyOf,
@@ -14,7 +15,9 @@ import {
 	wrapRangeInMark,
 	wrapRangeExcludingBadges,
 	unwrapMark,
-	type Annotation
+	type Annotation,
+	type AnnotationId,
+	type AnnotationMark
 } from "./annotations";
 
 function fragment(html: string): DocumentFragment {
@@ -529,6 +532,33 @@ describe("rangesExcludingReadings", () => {
 		const parts = rangesExcludingReadings(textRange(p.firstChild!, p.lastChild!));
 		expect(parts).toHaveLength(1);
 		expect(parts[0]?.toString()).toBe("say hello world today");
+		root.remove();
+	});
+
+	it("keeps the wash across a pinyin aid swap", () => {
+		const root = document.createElement("div");
+		root.textContent = "静静读书";
+		const marks: AnnotationMark[] = [{ id: "a1" as AnnotationId, number: 1, quote: "静静读书" }];
+		applyMarks(root, marks, false, "a1");
+		expect(root.querySelector("mark.ccez-ann")).not.toBeNull();
+		// Pinning pinyin swaps the whole HTML for native ruby on the
+		// same root: the wash must re-locate onto the new DOM, not die
+		// with the detached nodes.
+		root.innerHTML =
+			"<p><ruby>静<rt>jìng</rt></ruby><ruby>静<rt>jìng</rt></ruby>" +
+			"<ruby>读<rt>dú</rt></ruby><ruby>书<rt>shū</rt></ruby></p>";
+		applyMarks(root, marks, false, "a1");
+		const marksAfter = [...root.querySelectorAll("mark.ccez-ann")];
+		expect(marksAfter.length).toBeGreaterThan(0);
+		const washed = marksAfter
+			.map((m) => {
+				const clone = m.cloneNode(true) as HTMLElement;
+				clone.querySelectorAll("[data-ann-badge]").forEach((b) => b.remove());
+				return clone.textContent ?? "";
+			})
+			.join("");
+		expect(washed).toBe("静静读书");
+		expect(root.querySelector("[data-ann-badge]")).not.toBeNull();
 		root.remove();
 	});
 
