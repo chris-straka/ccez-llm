@@ -191,8 +191,8 @@ export const CHAT_WIDTH_MAX = 120;
 export const MESSAGE_GAP_DEFAULT = 0.35;
 export const MESSAGE_GAP_MIN = 0;
 export const MESSAGE_GAP_MAX = 1.5;
-/** Phone font scale at/above which the chat goes full-bleed. */
-export const FULLBLEED_FONT_SCALE = 2.6;
+/** Phone font scale at/above which the chat goes full-bleed (330%). */
+export const FULLBLEED_FONT_SCALE = 3.3;
 /** Absurdly wide column: min(100%, …) consumers read it as full width. */
 export const CHAT_WIDTH_FULLBLEED_REM = 999;
 /** Phone floor: the column never narrows past this, however small. */

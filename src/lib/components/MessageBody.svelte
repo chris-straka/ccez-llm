@@ -619,6 +619,12 @@
 		background: none;
 		border: 0;
 		padding: 0;
+		/* Phones truncate folded messages to ~three words: the full
+		first line is a paragraph on a 360px column. Desktop keeps
+		the whole line under its ellipsis. */
+		:global(.app[data-android]) & {
+			max-width: 22ch;
+		}
 		font-family: inherit;
 		color: #6e6e73;
 		font-size: 0.85rem;

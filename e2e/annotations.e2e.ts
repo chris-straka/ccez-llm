@@ -1823,3 +1823,65 @@ const hoverBadge = async (
 	await page.waitForTimeout(600);
 	expect(await washedText()).toBe("");
 });
+
+/** RTL quotes wash through DOM marks, Latin through the registry: the
+shell overlay paints a tight RTL registry range past its end, so the
+wash must never reach the registry for those quotes. */
+test("rtl quotes wash through dom marks, latin through the registry", async ({ page }) => {
+	await seedChat(page, [
+		{ role: "assistant", content: "Tall filler so badges can scroll clear of the sticky header. ".repeat(60) },
+		{ role: "assistant", content: "اللغة العربية من أجمل لغات العالم" },
+		{ role: "assistant", content: "the quick brown fox jumps" }
+	]);
+	await page.addInitScript(() => {
+		window.localStorage.setItem(
+			"ccez-llm-annotations-v1",
+			JSON.stringify({
+				"e2e-chat": [
+					{ id: "ann-ar", messageId: "e2e-m1", quote: "اللغة العربية", comment: "" },
+					{ id: "ann-en", messageId: "e2e-m2", quote: "quick brown", comment: "" }
+				]
+			})
+		);
+	});
+	await page.goto("/");
+	await expect(page.locator("article .rendered").first()).toBeVisible();
+	const badges = page.locator("button.ccez-ann-badge");
+	await expect(badges).toHaveCount(2);
+	const paint = () =>
+		page.evaluate(() => {
+			const reg = (
+				window as unknown as {
+					CSS?: { highlights?: { get(name: string): Set<Range> | undefined } };
+				}
+			).CSS?.highlights;
+			const names = ["ccez-ann", "ccez-ann-d1", "ccez-ann-d2", "ccez-ann-d3"];
+			return {
+				ranges: names.flatMap((n) => [...(reg?.get(n) ?? [])]).length,
+				marks: [...document.querySelectorAll("mark.ccez-ann")].map((m) =>
+					(m.textContent ?? "").replace(/\d/g, "")
+				)
+			};
+		});
+	const hover = async (nth: number): Promise<void> => {
+		// Center-scroll first: a top badge hides under the sticky
+		// header, and the pointer would land on chrome instead. The
+		// scroll glides (smooth behavior), so read the box only after
+		// it settles or the pointer chases a stale position.
+		await badges.nth(nth).evaluate((b) => b.scrollIntoView({ block: "center" }));
+		await page.waitForTimeout(600);
+		await badges.nth(nth).hover({ timeout: 8_000 });
+		await page.waitForTimeout(400);
+	};
+	// Arabic first in document order: its wash wraps the quote in
+	// marks and never touches the registry.
+	await hover(0);
+	const arabic = await paint();
+	expect(arabic.ranges).toBe(0);
+	expect(arabic.marks.join("")).toBe("اللغة العربية");
+	// Latin washes the registry way, and the Arabic marks unwrap.
+	await hover(1);
+	const latin = await paint();
+	expect(latin.ranges).toBeGreaterThan(0);
+	expect(latin.marks).toEqual([]);
+});

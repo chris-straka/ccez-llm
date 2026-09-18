@@ -3840,7 +3840,18 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 								? { messageId: current.messageId, quote: current.quote, at: current.at ?? 0 }
 								: null;
 						})();
-			if (lookup) scrollQuoteIntoEditView(lookup.messageId, lookup.quote, lookup.at);
+			if (lookup) {
+				// Land the quote only after the focus growth settles:
+				// measuring against the small at-rest card strands the
+				// smooth scroll mid-flight when the card grows and the
+				// keyboard opens (top-of-screen flash). A re-tap
+				// retargets: the stale timer no-ops on the new edit.
+				const landed = promptAnnEdit;
+				setTimeout(() => {
+					if (promptAnnEdit !== landed) return;
+					scrollQuoteIntoEditView(lookup.messageId, lookup.quote, lookup.at);
+				}, 350);
+			}
 		}
 		// Best-effort: the opening tap's canceled gesture can block
 		// the summon on some WebViews, but a plain tap on the
@@ -3996,9 +4007,24 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			? (document.querySelector(".ann-wrap .review")?.getBoundingClientRect().height ?? 0)
 			: 0;
 		const dock = prompt + review + 16;
-		if (rect.top >= area.top && rect.bottom <= area.bottom - dock) return;
+		if (rectInClearView(rect, area, dock)) return;
 		const landing = area.top + Math.max(0, area.height - dock) * 0.3;
 		scroller.scrollBy({ top: rect.top - landing, behavior: "smooth" });
+	}
+
+	/** True when a rect already reads in the clear viewport (same geometry
+	as the scroll landing above): the jump flash gates on this, so its
+	hold only burns once the eye can land on it. */
+	function rectInClearView(rect: DOMRect, area?: DOMRect, dock?: number): boolean {
+		const scroller = document.querySelector(".messages");
+		if (!(scroller instanceof HTMLElement)) return true;
+		const box = area ?? scroller.getBoundingClientRect();
+		const prompt = document.querySelector(".prompt")?.getBoundingClientRect().height ?? 0;
+		const review = reviewOpen
+			? (document.querySelector(".ann-wrap .review")?.getBoundingClientRect().height ?? 0)
+			: 0;
+		const clear = dock ?? prompt + review + 16;
+		return rect.top >= box.top && rect.bottom <= box.bottom - clear;
 	}
 
 	/**
@@ -4100,6 +4126,43 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		}
 	}
 
+	/** Jump flash entry: the hold only burns once the quote reads in
+	the clear viewport. A far jump paints at once when already clear;
+	otherwise the paint waits for scroll settle (same re-arm pattern
+	as the edit card), capped so a stalled scroll still lands. A
+	re-jump cancels the wait through the shared stopper. */
+	function flashJumpMark(locate: () => Range | null): void {
+		stopJumpFlash?.();
+		stopJumpFlash = null;
+		const first = locate();
+		if (!first || rectInClearView(first.getBoundingClientRect())) {
+			flashJumpMarkNow(locate);
+			return;
+		}
+		let done = false;
+		let timer: ReturnType<typeof setTimeout> | null = null;
+		const finish = (): void => {
+			if (done) return;
+			done = true;
+			if (timer !== null) clearTimeout(timer);
+			window.removeEventListener("scroll", onScroll, true);
+			flashJumpMarkNow(locate);
+		};
+		const onScroll = (): void => {
+			if (done) return;
+			if (timer !== null) clearTimeout(timer);
+			timer = setTimeout(finish, 150);
+		};
+		window.addEventListener("scroll", onScroll, true);
+		timer = setTimeout(finish, 2000);
+		stopJumpFlash = () => {
+			done = true;
+			if (timer !== null) clearTimeout(timer);
+			window.removeEventListener("scroll", onScroll, true);
+			stopJumpFlash = null;
+		};
+	}
+
 	/** Flash the destination quote in draft yellow, hold it, then
 	fade it out through the flash grades (a re-jump restarts the
 	schedule; expiry clears itself). The flash paints through the
@@ -4113,7 +4176,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	would fade nothing. A failed re-locate clears rather than
 	abandoning: the quote is gone, so nothing must linger. Yellow
 	must never stick. */
-	function flashJumpMark(locate: () => Range | null): void {
+	function flashJumpMarkNow(locate: () => Range | null): void {
 		stopJumpFlash?.();
 		stopJumpFlash = null;
 		clearJumpMarks();
@@ -6525,6 +6588,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			scrollTop: number;
 			clean: boolean;
 			rowSwipe: boolean;
+			codeSwipe: boolean;
 			msgId: ChatMsgId | null;
 			zone: FlickZone;
 			inSwitcher: boolean;
@@ -6630,6 +6694,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				// scroll: scrolling an overflowing row must never fold
 				// the message or summon a sidebar.
 				const rowSwipe = target instanceof Element && target.closest(".actions") !== null;
+				// Same for sideways pans inside code and latex blocks: the
+				// inner scroller owns the stroke, so it folds neither the
+				// block nor the message around it.
+				const codeSwipe =
+					target instanceof Element && target.closest(".ccez-code, .ccez-math") !== null;
 				// Strokes inside the chat switcher belong to the switcher
 				// card (cycle on swipe): the window paths below stay out.
 				const inSwitcher = target instanceof Element && target.closest(".chat-switcher") !== null;
@@ -6646,6 +6715,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					scrollTop: scrollBox?.scrollTop ?? 0,
 					clean,
 					rowSwipe,
+					codeSwipe,
 					msgId,
 					zone: flickZoneOf(target),
 					inSwitcher,
@@ -6725,6 +6795,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					androidUI &&
 					start.msgId &&
 					!start.rowSwipe &&
+					!start.codeSwipe &&
 					foldDx <= -64 &&
 					Math.abs(foldDy) < Math.abs(foldDx) &&
 					window.getSelection()?.isCollapsed !== false
@@ -10347,25 +10418,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			}}
 		>
 			<div class="prompt-tools">
-				{#if androidUI && points.length > 3 && !selMenu}
-					<!-- Touch-only jump-to-message trigger: an icon in the
-					tools cluster, styled like attach/mic. Desktop and web
-					keep the far-right tick control instead — one owner
-					for jumps. On phones the selection dock takes this
-					slot instead — both side by side crowd the
-					placeholder. -->
-					<button
-						type="button"
-						class="wp-jump"
-						title="Jump to a message"
-						aria-label="Jump to a message"
-						aria-haspopup="true"
-						aria-expanded={wpOpen}
-						onclick={() => (wpOpen = !wpOpen)}
-					>
-						<ActionIcon kind="jump" />
-					</button>
-				{/if}
 				{#if androidUI && selMenu && !previewing}
 					<!-- Phone selection dock: the highlight menu lives in the
 					composer tools, not floating over the text (the native
@@ -10577,6 +10629,25 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				>
 					<ActionIcon kind="speak" />
 				</button>
+				{#if androidUI && points.length > 3 && !selMenu}
+					<!-- Touch-only jump-to-message trigger, right of the
+					audio button like the other tools: DOM order matches the
+					visual row (attach, audio, jump). Desktop and web keep
+					the far-right tick control instead — one owner for
+					jumps. On phones the selection dock takes this slot
+					instead — both side by side crowd the placeholder. -->
+					<button
+						type="button"
+						class="wp-jump"
+						title="Jump to a message"
+						aria-label="Jump to a message"
+						aria-haspopup="true"
+						aria-expanded={wpOpen}
+						onclick={() => (wpOpen = !wpOpen)}
+					>
+						<ActionIcon kind="jump" />
+					</button>
+				{/if}
 			</div>
 			<button
 				type="button"
@@ -12357,6 +12428,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		width: 1.7rem;
 		height: 1.7rem;
 		padding: 0;
+		/* Same box as its siblings: the touch rule pads the jump icon
+		fat and pulls it back with negative margins, which eats the row
+		gap unevenly (jump crowds attach). DOM order is now attach,
+		audio, jump, so the flex gap spaces all three evenly. */
+		margin: 0;
 		font-size: 1.15rem;
 	}
 	.app[data-android] .attach-btn :global(.action-glyph),
@@ -13592,6 +13668,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		left: 0.8rem;
 		display: flex;
 		margin: 0;
+	}
+	/* The pill floats above its message into the gap: a refs-carrying
+	article stands further off the previous message so the count never
+	crowds the row above. */
+	article:has(.ann-refs) {
+		margin-top: calc(var(--msg-gap, 0.35rem) + 1.1rem);
 	}
 	article.user .ann-refs {
 		left: auto;
@@ -15130,6 +15212,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.app[data-android]:not([data-fullbleed]) article.assistant {
 		width: fit-content;
 	}
+	/* Full-bleed keeps the article full width while the bubble stays
+	shrink-wrapped: short notes dock hard right (a full-width own
+	column reads left-anchored like a reply) and long ones still
+	fill to the cap. */
+	.app[data-android][data-fullbleed] article.user {
+		width: 100%;
+	}
 	/* Chat-step slide: the incoming chat glides in from the swipe
 	side (newer from the right, older from the left). Phone-only;
 	reduced-motion keeps the instant switch. */
@@ -15179,6 +15268,25 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	own rows, mirroring the far-right slot on assistant rows. */
 	article.user .speaking-dot {
 		order: -1;
+	}
+	/* Audio before copy on own rows (phones): the mic-side thumb hits
+	play first. DOM order stays copy-first for keyboard and readers;
+	the audio button keeps the default seat (right after the speaking
+	slot) while everything else files behind it by hook. */
+	.app[data-android] article.user .actions button[data-tip="Copy as plain text"] {
+		order: 2;
+	}
+	.app[data-android] article.user .actions button[data-tip="Branch from here"] {
+		order: 3;
+	}
+	.app[data-android] article.user .actions button[data-tip^="Delete this message"] {
+		order: 4;
+	}
+	.app[data-android] article.user .actions button[data-tip="Edit"] {
+		order: 5;
+	}
+	.app[data-android] article.user .actions button[data-tip="Rerun"] {
+		order: 6;
 	}
 	/* Row tooltips hang below the buttons and render in one rise-and-settle
 	(single-run keyframes on a static transform): unlike the native title

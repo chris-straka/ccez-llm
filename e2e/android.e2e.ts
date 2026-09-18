@@ -1251,7 +1251,7 @@ test.describe("touch", () => {
 			await page.addInitScript(() => {
 				window.localStorage.setItem(
 					"ccez-llm-settings-v1",
-					JSON.stringify({ hoverAssistantActions: true, hoverUserActions: true, promptIdleSec: 0, fontScale: 2.6 })
+					JSON.stringify({ hoverAssistantActions: true, hoverUserActions: true, promptIdleSec: 0, fontScale: 3.3 })
 				);
 			});
 			await page.goto("/");
@@ -1264,6 +1264,16 @@ test.describe("touch", () => {
 			]);
 			if (!col || !box) throw new Error("thread has no boxes");
 			expect(box.width).toBeGreaterThan(col.width - 8);
+			// Own messages keep their alignment: the article spans the
+			// column while the bubble stays shrink-wrapped and docked
+			// hard right — no left-anchored full-width own column, and
+			// the hairline gutter leaves no room on its right.
+			const userBox = await page.locator("article.user").first().boundingBox();
+			const userBubble = await page.locator("article.user .bubble").first().boundingBox();
+			if (!userBox || !userBubble) throw new Error("own message has no box");
+			expect(userBox.width).toBeGreaterThan(col.width - 8);
+			expect(userBubble.width).toBeLessThan(userBox.width - 10);
+			expect(userBox.x + userBox.width - (userBubble.x + userBubble.width)).toBeLessThan(3);
 		});
 
 		/** Double-tapping a message taller than the screen scrolls its
@@ -1696,6 +1706,107 @@ test.describe("always-visible prompt", () => {
 		await expect(article).toHaveClass(/folded-msg/);
 		await expect(aside).toHaveClass(/collapsed/);
 	});
+
+	/** Sideways pans inside code and latex blocks belong to the inner
+	scroller: they fold neither the block nor the message around it. */
+	test("code and latex pans never fold the message", async ({ page }) => {
+		const code = "```python\nx = '" + "y".repeat(220) + "'\n```";
+		const math = "$$\nE_{n} = " + "a".repeat(60) + " + " + "b".repeat(60) + "\n$$";
+		await seed(page, {}, [`${code}\n\n${math}`]);
+		await page.goto("/");
+		const article = page.locator("article.assistant").first();
+		await expect(article).toBeVisible({ timeout: 15_000 });
+		const pre = article.locator(".ccez-code pre");
+		await expect(pre).toBeVisible({ timeout: 20_000 });
+		const pan = async (sel: string): Promise<void> => {
+			const box = await page.locator(sel).first().boundingBox();
+			if (!box) throw new Error(`no pan target: ${sel}`);
+			await flick(page, sel, box.x + box.width - 30, box.y + box.height / 2, box.x + 30, box.y + box.height / 2);
+		};
+		await pan("article.assistant .rendered .ccez-code pre");
+		await expect(article).not.toHaveClass(/folded-msg/);
+		await expect(article.locator(".ccez-code")).not.toHaveAttribute("data-folded", "1");
+		const block = article.locator(".ccez-math");
+		await expect(block).toBeVisible({ timeout: 60_000 });
+		await pan("article.assistant .rendered .ccez-math");
+		await expect(article).not.toHaveClass(/folded-msg/);
+		await expect(block).not.toHaveAttribute("data-folded", "1");
+	});
+
+	/** Own rows read audio before copy on phones (DOM stays copy-first
+	for keyboard and readers): assert the visual left-to-right order. */
+	test("own message buttons order audio before copy on a phone", async ({ page }) => {
+		await seedChat(page, [{ role: "user", content: "hi" }]);
+		await page.goto("/");
+		const row = page.locator("article.user .actions").first();
+		await expect(row).toBeVisible({ timeout: 15_000 });
+		const order = await row.locator("button").evaluateAll((btns) =>
+			btns
+				.map((b) => ({
+					label: b.getAttribute("aria-label") ?? "",
+					x: b.getBoundingClientRect().x
+				}))
+				.sort((a, b) => a.x - b.x)
+				.map((b) =>
+					b.label.includes("Copy")
+						? "copy"
+						: b.label.includes("Branch")
+							? "branch"
+							: b.label.includes("Delete")
+								? "delete"
+								: b.label.includes("Edit")
+									? "edit"
+									: b.label.includes("Rerun")
+										? "rerun"
+										: "audio"
+				)
+		);
+		expect(order).toEqual(["audio", "copy", "branch", "delete", "edit", "rerun"]);
+	});
+
+	/** Composer tools share one even rhythm on phones: attach, audio,
+	jump, and the annotations pill with the same gaps between each
+	pair (the jump icon used to crowd attach with negative margins). */
+	test("composer tools space evenly on a phone", async ({ page }) => {
+		await seedChat(page, [
+			{ role: "user", content: "one" },
+			{ role: "assistant", content: "two" },
+			{ role: "user", content: "three" },
+			{ role: "assistant", content: "four" },
+			{ role: "user", content: "five" },
+			{ role: "assistant", content: "six" },
+			{ role: "user", content: "seven" },
+			{ role: "assistant", content: "eight" }
+		]);
+		await page.addInitScript(() => {
+			window.localStorage.setItem(
+				"ccez-llm-annotations-v1",
+				JSON.stringify({ "e2e-chat": [{ id: "ann-1", messageId: "e2e-m0", quote: "two", comment: "" }] })
+			);
+		});
+		await page.goto("/");
+		const tools = page.locator(".prompt-tools");
+		await expect(tools).toBeVisible({ timeout: 15_000 });
+		// Jump sits right of audio in DOM order, matching the row.
+		const order = await tools.evaluate((row) =>
+			[...row.children]
+				.filter((el) => (el as HTMLElement).offsetParent !== null)
+				.map((el) => el.className)
+		);
+		const voiceAt = order.findIndex((c) => String(c).includes("voice-float"));
+		const jumpAt = order.findIndex((c) => String(c).includes("wp-jump"));
+		expect(voiceAt).toBeGreaterThanOrEqual(0);
+		expect(jumpAt).toBe(voiceAt + 1);
+		// Pairwise gaps match within rounding.
+		const gaps = await tools.evaluate((row) => {
+			const boxes = [...row.children]
+				.filter((el) => (el as HTMLElement).offsetParent !== null)
+				.map((el) => el.getBoundingClientRect())
+				.sort((a, b) => a.x - b.x);
+			return boxes.slice(1).map((b, i) => b.x - (boxes[i]!.x + boxes[i]!.width));
+		});
+		expect(Math.max(...gaps) - Math.min(...gaps)).toBeLessThan(1.5);
+	});
 });
 
 test.describe("message chrome", () => {
@@ -1754,8 +1865,8 @@ test.describe("message chrome", () => {
 	});
 
 	/** Huge phone type goes full-bleed; normal type keeps the floor. */
-	test("phone chat width blooms at 260 percent", async ({ page }) => {
-		await seedChrome(page, { fontScale: 2.6 });
+	test("phone chat width blooms at 330 percent", async ({ page }) => {
+		await seedChrome(page, { fontScale: 3.3 });
 		const chatVar = (): Promise<string> =>
 			page.evaluate(() =>
 				getComputedStyle(document.querySelector(".app") as Element)

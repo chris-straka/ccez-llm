@@ -27,6 +27,13 @@ describe("folded code chrome", () => {
 		expect(selectors).toContain(".ccez-code-copy");
 		expect(selectors).toContain(".ccez-code-run");
 	});
+	it("caps folded previews to a few words on phones", () => {
+		// A full first line is a paragraph on a 360px column: phones
+		// clip the preview far earlier, desktop keeps the whole line.
+		const css = bodyStyle();
+		expect(css).toMatch(/\.folded-preview[\s\S]*?22ch/);
+		expect(css).toContain(".app[data-android]");
+	});
 	it("keeps folded labels non-selectable chrome", () => {
 		// Labels are chrome, not content: quoting `latex · N LOC`
 		// annotates nothing and badges orphan on unfold — so labels

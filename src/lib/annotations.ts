@@ -1416,8 +1416,33 @@ function hasReadingMarkup(root: HTMLElement): boolean {
 	return root.querySelector("ruby, rt, rp, .frt") !== null;
 }
 
+/**
+ * Right-to-left quote (Hebrew and Arabic blocks, presentation forms
+ * included): the shell's highlight overlay paints a tight RTL registry
+ * range past its end (probed in WebKit: a 2-word Arabic range paints
+ * its line's rest while Latin stays tight), so registry washes stretch
+ * on exactly the quotes the locator proves tight. DOM marks wrap the
+ * located span itself (cluster-snapped, never through tashkeel), like
+ * the reading-markup routing above. Pure (takes the quote, no DOM).
+ */
+const RTL_QUOTE_RE = /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/u;
+export function hasRtlQuote(quote: string): boolean {
+	return RTL_QUOTE_RE.test(quote);
+}
+
 function stampMarks(root: HTMLElement, items: AnnotationMark[], skip: boolean, wash: string | null): void {
-	if (!highlightsSupported() || hasReadingMarkup(root)) {
+	if (!highlightsSupported() || hasReadingMarkup(root) || items.some((i) => hasRtlQuote(i.quote))) {
+		// Leaving the registry path: drop a wash this body painted, or
+		// its pixels ghost under the marks (same stuck overlay behind
+		// every terminal clear). Another body's live wash is untouched.
+		const painted = root.dataset.washPainted || null;
+		if (painted !== null && painted === liveWashId) {
+			cancelWashRamp(root);
+			liveWashId = null;
+			clearAnnotationWashes();
+			invalidateWashPaint(root);
+		}
+		root.dataset.washPainted = "";
 		stampLegacy(root, items, skip, wash);
 		return;
 	}

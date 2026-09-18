@@ -5,6 +5,7 @@ import {
 	annotationCountLabel,
 	edgeOffsetForAnchor,
 	gapOffsetForAnchor,
+	hasRtlQuote,
 	locateQuote,
 	lockSelectionToMessage,
 	saveSelection,
@@ -709,6 +710,39 @@ describe("refresh sweep of orphaned fade grades (Highlight path)", () => {
 			.join("");
 		expect(washed).toBe("静读");
 		root.remove();
+	});
+
+	it("routes rtl quotes to legacy marks, registry untouched", () => {
+		// The shell overlay paints a tight RTL registry range past its
+		// end (probed in WebKit: a 2-word Arabic range paints extra
+		// words while Latin stays tight): DOM marks wrap the located
+		// span itself instead, badge and all.
+		const root = rootWith("اللغة العربية من أجمل لغات العالم");
+		document.body.appendChild(root);
+		try {
+			const marks: AnnotationMark[] = [{ id: "w1" as AnnotationId, number: 1, quote: "اللغة العربية" }];
+			applyMarks(root, marks, false, "w1");
+			applyMarks(root, marks, false, "w1");
+			expect(store.get(ANN_HIGHLIGHT_NAME)).toBeUndefined();
+			const washed = [...root.querySelectorAll("mark.ccez-ann")]
+				.map((m) => {
+					const clone = m.cloneNode(true) as HTMLElement;
+					clone.querySelectorAll("[data-ann-badge]").forEach((b) => b.remove());
+					return clone.textContent ?? "";
+				})
+				.join("");
+			expect(washed).toBe("اللغة العربية");
+		} finally {
+			root.remove();
+		}
+	});
+
+	it("detects rtl quotes by script, not by aid state", () => {
+		expect(hasRtlQuote("اللغة العربية")).toBe(true);
+		expect(hasRtlQuote("שלום")).toBe(true);
+		expect(hasRtlQuote("hello world")).toBe(false);
+		expect(hasRtlQuote("漢字を読む")).toBe(false);
+		expect(hasRtlQuote("")).toBe(false);
 	});
 
 	it("forces every fade step to display, not just the settle", () => {
