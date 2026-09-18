@@ -599,22 +599,29 @@ describe("refresh sweep of orphaned fade grades (Highlight path)", () => {
 		expect(store.get(ANN_HIGHLIGHT_D1)).toBeUndefined();
 	});
 
-	it("arrivals snap in the shell instead of grading in bands", () => {
-		(window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {};
-		// Motion allowed: without the shell gate this would take the ramp.
+	it("forces every fade step to display, not just the settle", () => {
+		// Motion allowed so the arrival takes the graded ramp.
 		vi.stubGlobal("matchMedia", () => ({ matches: false }));
 		try {
 			vi.useFakeTimers();
 			const root = rootWith("say hello world today");
+			let nudges = 0;
+			const orig = root.style.setProperty.bind(root.style);
+			root.style.setProperty = (prop, value, priority) => {
+				if (prop === "opacity") nudges += 1;
+				return orig(prop, value, priority);
+			};
 			const marks: AnnotationMark[] = [{ id: "s9" as AnnotationId, number: 1, quote: "hello world" }];
 			applyMarks(root, marks, false, "s9");
+			// First grade plus one nudge per walked step: un-nudged
+			// steps surface late and partial in the shell (bands).
+			vi.advanceTimersByTime(35);
+			vi.advanceTimersByTime(35);
+			vi.advanceTimersByTime(500);
+			expect(nudges).toBeGreaterThanOrEqual(3);
 			expect(store.get(ANN_HIGHLIGHT_NAME)).toBeDefined();
-			// No graded arrival ever paints, however long the run waits.
-			vi.advanceTimersByTime(10_000);
 			expect(store.get(ANN_HIGHLIGHT_D1)).toBeUndefined();
-			expect(store.get(ANN_HIGHLIGHT_NAME)).toBeDefined();
 		} finally {
-			delete (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__;
 			vi.useRealTimers();
 		}
 	});

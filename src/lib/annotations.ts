@@ -5,7 +5,6 @@
  * restarts (see load/saveDraftAnnotations); the baked blocks never do.
  */
 import type { ChatMsgId } from "./chat";
-import { tauriBackendAvailable } from "./secrets";
 import {
 	ANN_HIGHLIGHT_D1,
 	ANN_HIGHLIGHT_D2,
@@ -945,16 +944,6 @@ function cancelWashRamp(root?: HTMLElement): void {
 	}
 }
 /** Reduced-motion (or no matchMedia at all, e.g. tests) snaps instead of ramping. */
-/**
- * Arrivals and departures snap instead of grading when the engine
- * won't show the steps: reduced motion anywhere, or the app shell,
- * whose overlay repaints only on forced frames — graded steps there
- * surface as bottom-up bands, never as a fade.
- */
-function shellSnaps(): boolean {
-	return washSnaps() || tauriBackendAvailable();
-}
-
 function washSnaps(): boolean {
 	try {
 		if (typeof matchMedia !== "function") return true;
@@ -1047,7 +1036,7 @@ function paintWashHighlight(
 			clearAnnotationWashes();
 			root.dataset.washPainted = wash;
 			liveWashId = wash;
-			if (shellSnaps()) {
+			if (washSnaps()) {
 				paintAnnotationWash(ranges);
 				// Same-body slides land here too: the clear above
 				// drops the old id's ranges, which this paint never
@@ -1085,6 +1074,11 @@ function paintWashHighlight(
 						const name = schedule[step++]!;
 						paintAnnotationWash(fresh, name);
 						if (prev !== name) clearAnnotationWash(prev);
+						// Force every step to display: the shell
+						// overlay repaints only on forced frames, so
+						// un-nudged steps surface late and partial —
+						// bottom-up bands, never a fade.
+						invalidateWashPaint(root);
 						prev = name;
 						if (step < schedule.length) tick();
 						else {
@@ -1120,7 +1114,7 @@ function paintWashHighlight(
 		// Terminal clears wipe every graded name: the ramp may have left
 		// dim/faint twins behind, and an orphaned twin reads as a stuck
 		// wash that blinks on the next paint.
-		if (shellSnaps()) {
+		if (washSnaps()) {
 			liveWashId = null;
 			clearAnnotationWashes();
 			invalidateWashPaint(root);
@@ -1161,6 +1155,9 @@ function paintWashHighlight(
 							} else {
 								paintAnnotationWash(fresh, name);
 								if (prev !== null) clearAnnotationWash(prev);
+								// Same forced display as the fade-in
+								// walker above: un-nudged steps band.
+								invalidateWashPaint(root);
 								prev = name;
 								tick();
 							}
