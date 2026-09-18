@@ -6,6 +6,7 @@
  */
 import type { ChatMsgId } from "./chat";
 import {
+	ANN_HIGHLIGHT_FAINT,
 	clearAnnotationWash,
 	clearAnnotationWashes,
 	highlightsSupported,
@@ -891,6 +892,10 @@ function paintWashHighlight(
 					// Re-hovered or cleared mid-step: the fresh paint owns it now.
 					if (liveWashId !== wash) return;
 					paintAnnotationWash(ranges, second!);
+					// The ramp's faint twin served its step: drop it so only
+					// the live name holds ranges (a leftover twin reads as a
+					// stuck wash and blinks on the next paint).
+					clearAnnotationWash(ANN_HIGHLIGHT_FAINT);
 				}, WASH_FADE_STEP_MS);
 			}
 			return;
@@ -904,15 +909,18 @@ function paintWashHighlight(
 	root.dataset.washPainted = "";
 	if (painted !== null && painted === liveWashId) {
 		cancelWashRamp();
+		// Terminal clears wipe every graded name: the ramp may have left
+		// dim/faint twins behind, and an orphaned twin reads as a stuck
+		// wash that blinks on the next paint.
 		if (washSnaps()) {
 			liveWashId = null;
-			clearAnnotationWash();
+			clearAnnotationWashes();
 		} else {
 			// Live is already on screen — step dim → faint → clear.
 			const ranges = washRanges(root, items, painted);
 			if (ranges.length === 0) {
 				liveWashId = null;
-				clearAnnotationWash();
+				clearAnnotationWashes();
 			} else {
 				const schedule = washRampSchedule("out");
 				let step = 0;
@@ -925,7 +933,7 @@ function paintWashHighlight(
 						const name = schedule[step++]!;
 						if (name === null) {
 							liveWashId = null;
-							clearAnnotationWash();
+							clearAnnotationWashes();
 						} else {
 							paintAnnotationWash(ranges, name);
 							tick();

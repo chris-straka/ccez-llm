@@ -298,6 +298,25 @@ test("escape cancels the fresh annotation pill", async ({ page }) => {
 	await page.keyboard.press("Escape");
 	await expect(page.locator(".ann-pop")).toHaveCount(0);
 	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(0);
+	// Cancel must not strand a wash: the fade ramp settles (hysteresis
+	// plus ramp), then no graded name may hold ranges and no DOM marks
+	// may remain — an orphaned dim/faint twin reads as a stuck wash
+	// and blinks on the next paint.
+	await page.waitForTimeout(600);
+	const leftover = await page.evaluate(() => {
+		const reg = (
+			window as unknown as {
+				CSS?: { highlights?: { get(name: string): Set<Range> | undefined } };
+			}
+		).CSS?.highlights;
+		const names = ["ccez-ann", "ccez-ann-dim", "ccez-ann-faint"];
+		return {
+			ranges: names.flatMap((n) => [...(reg?.get(n) ?? [])]).length,
+			marks: document.querySelectorAll("mark.ccez-ann").length
+		};
+	});
+	expect(leftover.ranges).toBe(0);
+	expect(leftover.marks).toBe(0);
 });
 
 /** Escape closes the badge edit box without writing. */
