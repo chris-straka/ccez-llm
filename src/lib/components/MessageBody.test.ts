@@ -43,6 +43,19 @@ describe("folded code chrome", () => {
 			for (const rule of rules) expect(rule[2]).toMatch(/user-select\s*:\s*none/);
 		}
 	});
+	it("hides the run button on Android but keeps it on iOS and desktop", () => {
+		// No usable local runner in the Android sandbox: runnable
+		// fences keep copy alone there. iOS keeps the button (the
+		// browser fallback stamps the no-runner reason instead).
+		const css = bodyStyle();
+		const hiding = [...css.matchAll(/([^{}]*\.ccez-code-run[^{}]*)\{([^}]*)\}/g)].filter(
+			(rule) => /display\s*:\s*none/.test(rule[2]!)
+		);
+		const android = hiding.filter((rule) => rule[1]!.includes(".app[data-android]"));
+		expect(android, "no android-gated rule hides .ccez-code-run").not.toHaveLength(0);
+		for (const rule of android)
+			expect(rule[1], "android run-button rule must spare iOS").toContain(":not([data-ios])");
+	});
 	it("never unfolds off a label drag", () => {
 		// Unfolding detaches the just-drawn highlight (and strands
 		// the menu): drags and clicks over a live highlight keep
@@ -168,21 +181,22 @@ describe("preview mounts", () => {
 	});
 });
 
-describe("latched CJK leading", () => {
-	/** Tight until readings first render, tall ever after: the 2.7
-	reservation must live on aid-tall (latched), never on aid-space
+describe("CJK leading follows rendered readings", () => {
+	/** Tall while ruby renders, tight when aids toggle off: the 2.7
+	reservation must live on aid-tall (rendered), never on aid-space
 	(availability) — or untoggled CJK goes tall again. jsdom has no
 	layout, so pin the wiring on source like the folded-chrome
 	tests above. */
-	it("binds the tall class on availability AND the latch", () => {
+	it("binds the tall class on availability AND the rendered flag", () => {
 		const source = readFileSync(new URL("./MessageBody.svelte", import.meta.url), "utf8");
 		expect(source).toContain("class:aid-tall={aidSpace && aidTall}");
 	});
-	it("latches the moment ruby actually renders", () => {
+	it("tracks rendered readings instead of latching", () => {
 		const source = readFileSync(new URL("./MessageBody.svelte", import.meta.url), "utf8");
-		expect(source).toMatch(/if \(localAids\.length > 0\) aidTall = true;/);
+		expect(source).toMatch(/aidTall = localAids\.length > 0;/);
+		expect(source).not.toMatch(/if \(localAids\.length > 0\) aidTall = true;/);
 	});
-	it("keeps line-height off the availability rule and on the latch rule", () => {
+	it("keeps line-height off the availability rule and on the tall rule", () => {
 		const css = bodyStyle();
 		const tall = [...css.matchAll(/([^{}]*\.rendered\.aid-tall[^{}]*)\{([^}]*)\}/g)];
 		expect(tall, "no .rendered.aid-tall rule — tall CJK leading has nowhere to live").not.toHaveLength(0);

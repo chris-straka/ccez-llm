@@ -208,11 +208,11 @@
 	own lines. Keyed off the aid-visible text, so hidden refs can't
 	reserve room (or grow history). */
 	const aidSpace = $derived(localAidsFor(detectScripts(aidBase)).length > 0);
-	/** Latched tall leading: CJK stays tight until readings first render,
-	then 2.7 stays put — toggling aids back off never oscillates the
-	leading. The one jump lands with the readings appearing, so it reads
-	as reflow, not jank. Per mount: a remount re-latches silently on
-	first paint when kinds are still on. */
+	/** Tall leading follows the rendered readings: on while ruby is in
+	the DOM, off when aids toggle off. Toggling on can step the lines
+	twice (toggle, then readings landing) — accepted: stuck-tall after
+	off was worse. Keyed off rendered kinds, not the toggle, so failed
+	readings never reserve room. */
 	let aidTall = $state(false);
 
 	$effect(() => {
@@ -234,9 +234,10 @@
 		// textOverride and composes with pinned local kinds, each
 		// converting its own prose nodes onto it.
 		const localAids = !streaming && aidKindList.length > 0 ? aidKindList : [];
-		// Latch the tall leading the moment ruby actually lands (not on
-		// prop flip mid-stream, where nothing renders yet).
-		if (localAids.length > 0) aidTall = true;
+		// Tall leading tracks the rendered readings (not the prop flip
+		// mid-stream, where nothing renders yet): off collapses back
+		// to tight.
+		aidTall = localAids.length > 0;
 		// Sent tags pair against this message's attachments (Nth of a
 		// kind to Nth of a kind); assistant output carries none, so an
 		// echoed literal there stays plain text.
@@ -684,9 +685,8 @@
 	WebKit sizes in-flow ruby annotations by glyphs (no line-height
 	trick contains them), so the tall reservation itself must cover
 	base plus annotation once readings land: 2.7 swallows the measured
-	overhang with headroom for other stacks. It latches (aid-tall)
-	instead of following the toggle — tight until readings first
-	render, tall ever after, so enabling never oscillates the lines. */
+	overhang with headroom for other stacks. aid-tall tracks the
+	rendered readings, so toggling off collapses back to tight. */
 	.rendered.aid-space :global(p.cjk),
 	.rendered.aid-space :global(li.cjk) {
 		/* pretty rebalances CJK lines short and uneven across
@@ -962,6 +962,13 @@
 	collapsed label. */
 	.rendered :global(.ccez-code[data-folded="1"] .ccez-code-copy),
 	.rendered :global(.ccez-code[data-folded="1"] .ccez-code-run) {
+		display: none;
+	}
+	/* No local runner in the Android shell, so runnable fences keep
+	copy alone there: display:none drops the button from taps, tabs,
+	and the accessibility tree alike. iOS keeps it (browser fallback
+	stamps the no-runner reason instead of breaking). */
+	:global(.app[data-android]:not([data-ios])) .rendered :global(.ccez-code-run) {
 		display: none;
 	}
 	/* LaTeX math (main chat only): display blocks carry copy + `$`
