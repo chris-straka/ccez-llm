@@ -3945,7 +3945,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		else {
 			document.querySelector(`#msg-${index}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
 		}
-		// The quote flashes twice like a sent jump (one DOM-mark
+		// The quote flashes once like a sent jump (one DOM-mark
 		// flash, never layered with a Highlight wash twin): the badge
 		// scroll lands the eye nearby, the flash lands it on the
 		// words. Every paint re-locates against the repeat it was
@@ -4045,7 +4045,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 
 	/**
 	 * Sent-annotation landing: locate the quote in its owner's rendered
-	 * text, land it clear of the dock, and flash the DOM mark twice
+	 * text, land it clear of the dock, and flash the DOM mark once
 	 * (never layered with a Highlight wash twin). A folded message
 	 * hides its text from the locator: land on the message itself
 	 * instead.
@@ -4081,15 +4081,17 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		}
 	}
 
-	/** Flash the destination quote twice in draft yellow, then release
+	/** Flash the destination quote once in draft yellow, then release
 	it (a re-jump restarts the schedule; expiry clears itself). Plain
 	DOM marks render in every engine, so the mark alone carries the
-	flash — never layered with a Highlight wash twin. Every paint
-	re-locates: a chat re-render mid-scroll (scroll-driven state swaps
-	the text nodes) detaches the old range, and repainting the same
-	dead range would blink nothing. A failed re-locate clears rather
-	than abandoning: the quote is gone, so nothing must linger.
-	Yellow must never stick. */
+	flash — never layered with a Highlight wash twin. Single phase on
+	purpose: every wrap/unwrap churns the text nodes around the
+	mid-quote badge anchor, so a double blink shakes the marker four
+	times with the wash. Every paint re-locates: a chat re-render
+	mid-scroll (scroll-driven state swaps the text nodes) detaches the
+	old range, and repainting the same dead range would blink nothing.
+	A failed re-locate clears rather than abandoning: the quote is
+	gone, so nothing must linger. Yellow must never stick. */
 	function flashJumpMark(locate: () => Range | null): void {
 		stopJumpFlash?.();
 		stopJumpFlash = null;
@@ -4100,7 +4102,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			return wrapRangeInMark(range, "ccez-ann-flash") !== null;
 		};
 		if (!paintFresh()) return;
-		stopJumpFlash = startBlink(paintFresh, clearJumpMarks);
+		stopJumpFlash = startBlink(paintFresh, clearJumpMarks, { phases: 2 });
 	}
 
 	/**
