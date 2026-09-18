@@ -12176,11 +12176,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	gap was never worth chasing. */
 	.app[data-android] .messages {
 		padding-top: calc(1rem + env(safe-area-inset-top, 0px));
-		/* Hairline side gutters (the 1.2rem desktop gutters read as
-		notable margins on narrow phones): the thread runs ~99% wide
-		with 0.5% kept on each side. */
-		padding-left: 0.5%;
-		padding-right: 0.5%;
+		/* Assistant articles carry no side padding, so the thread
+		gutter is the only thing between AI text and the screen
+		edge: a rem floor keeps a real gutter on narrow phones. */
+		padding-left: max(0.5%, 1rem);
+		padding-right: max(0.5%, 1rem);
 	}
 	/* Full-width settings sheet on phones: no sliver to tap, no
 	weird one-tap-close strip. left+right with auto width fills

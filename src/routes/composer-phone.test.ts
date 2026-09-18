@@ -71,6 +71,17 @@ describe("phone composer two bars", () => {
 		expect(source).toContain("effectiveChatWidth(androidUI, settings.fontScale, settings.chatWidth ?? 36)");
 	});
 
+	it("keeps AI text off the screen edge with a rem-floor thread gutter", () => {
+		const css = pageStyle();
+		// Assistant articles carry no side padding, so the thread
+		// gutter alone separates AI text from the edge: a bare 0.5%
+		// hairline (~2px) reads as edge-to-edge on phones.
+		expect(css).not.toMatch(/padding-left:\s*0\.5%;/);
+		expect(css).not.toMatch(/padding-right:\s*0\.5%;/);
+		expect(css).toContain("padding-left: max(0.5%, 1rem)");
+		expect(css).toContain("padding-right: max(0.5%, 1rem)");
+	});
+
 	it("never collapses the tools bar or its buttons while idle", () => {
 		const css = pageStyle();
 		// Idle single-bar mode is gone: no rule may hide the row or
