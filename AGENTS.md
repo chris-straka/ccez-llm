@@ -20,7 +20,12 @@ privileged (Keychain, updater, native TTS).
   committed), then runs with `--no-watch` so no mid-session rebuild
   disturbs the identity. Rust edits need Ctrl-C plus relaunch. Click
   Always Allow, never Allow (Allow is single-use and repeats every
-  launch). `scripts/sign-dev-binary.sh` remains for manual use.
+  launch). Deny never sticks — each new access re-prompts, so
+  deny-clicking loops forever; quit the app instead and Always Allow
+  on relaunch (2 items: `provider:muse`, `providers`). Re-minting the
+  "Ccez Dev" keypair voids old grants (same name, new identity), so
+  never re-mint once grants exist. `scripts/sign-dev-binary.sh`
+  remains for manual use.
 - MCP driver sessions (see the running app like the user does):
   `tauri-plugin-mcp-bridge` is debug-only and localhost-bound, so it
   never ships — but it only loads after a dev-shell relaunch. Attach
