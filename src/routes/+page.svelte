@@ -298,7 +298,7 @@ import {
 	import { buildSearchDocs, chatMatchesQuery, findMessageIndices, type SearchHit } from "$lib/chatSearch";
 	import { emptyFind, stepFindCursor, type FindState } from "$lib/find";
 	import { emptyPalette, type PaletteState } from "$lib/palette";
-	import { annPopBlurAction, annPopCancelKind, annPopSaveKind } from "$lib/annPop";
+	import { annPopBlurAction, annPopCancelKind, annPopSaveKind, pillWashId } from "$lib/annPop";
 	import { idleTapAction, shouldHideForAlways, shouldIdleHide } from "$lib/idle";
 	import {
 		submitAction,
@@ -9831,7 +9831,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							folded={isFolded}
 							foldPreview={refsOnly && sentRefs ? sentRefs.refs.map((r) => `"${r.quote}"`).join(" ") : null}
 							marks={marksFor(msg.id)}
-							washId={annPop?.id ?? promptAnnWashId() ?? editingId ?? hoverBadgeId}
+							washId={pillWashId(annPop, annPopClosing) ?? promptAnnWashId() ?? editingId ?? hoverBadgeId}
 						onBadgeHover={(id: string | null) => (hoverBadgeId = id)}
 							onBadgeClick={openBadgeClick}
 							onAttachAction={sentTagAction}

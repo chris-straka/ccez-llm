@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { annPopBlurAction, annPopCancelKind, annPopSaveKind } from "./annPop";
+import { annPopBlurAction, annPopCancelKind, annPopSaveKind, pillWashId } from "./annPop";
 
 describe("annPopSaveKind", () => {
 	it("commits the pending annotation, else edits the saved comment", () => {
@@ -32,5 +32,14 @@ describe("annPopBlurAction", () => {
 		expect(annPopBlurAction("   ")).toBe("cancel");
 		expect(annPopBlurAction("note")).toBe("save");
 		expect(annPopBlurAction(" ?")).toBe("save");
+	});
+});
+
+describe("pillWashId", () => {
+	it("holds the wash while open and releases it as the pill closes", () => {
+		expect(pillWashId({ id: "a" }, false)).toBe("a");
+		expect(pillWashId({ id: "a" }, true)).toBeNull();
+		expect(pillWashId(null, false)).toBeNull();
+		expect(pillWashId(null, true)).toBeNull();
 	});
 });

@@ -45,3 +45,13 @@ export function annPopCancelKind(
 export function annPopBlurAction(draft: string): "cancel" | "save" {
 	return draft.trim() === "" ? "cancel" : "save";
 }
+
+/**
+ * Wash ownership for the open pill: the wash releases the moment the
+ * pill starts closing (save or cancel), not 160ms later when it
+ * unmounts — the fade then starts at the click, so filing never holds
+ * a full-bright wash through the pill fade before clearing it.
+ */
+export function pillWashId(pop: { id: string } | null, closing: boolean): string | null {
+	return pop && !closing ? pop.id : null;
+}
