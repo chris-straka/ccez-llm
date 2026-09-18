@@ -3880,18 +3880,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			annotations = editAnnotationComment(annotations, target.id, comment);
 		}
 		highlightAnnId = null;
-		// Pending filings save for the first time; a saved draft's
+		// Pending filings save for the first time; a saved note's
 		// comment rewrites — the toast names which happened (a bare
-		// "Note saved" never said). Phones say it plain: no draft
-		// vocabulary there, the note files straight from the composer.
-		const savedToast =
-			"pending" in target
-				? androidUI
-					? "Annotation saved"
-					: "Draft annotation saved"
-				: androidUI
-					? "Annotation edited"
-					: "Draft annotation edited";
+		// "Note saved" never said). Plain on every platform: no draft
+		// vocabulary, the note files straight from the composer.
+		const savedToast = "pending" in target ? "Annotation saved" : "Annotation edited";
 		exitPromptAnnEdit();
 		flashToast(savedToast);
 		void tick().then(() => editor?.focus());
