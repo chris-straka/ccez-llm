@@ -17,4 +17,11 @@ if ! security find-certificate -c "Ccez Dev" >/dev/null 2>&1; then
   echo "sign-dev-binary: create it once (self-signed Code Signing cert named exactly 'Ccez Dev'), then re-run." >&2
   exit 1
 fi
+if ! security find-identity -v -p codesigning 2>/dev/null | grep -q "Ccez Dev"; then
+  echo "sign-dev-binary: 'Ccez Dev' is not offered as a codesigning identity." >&2
+  echo "sign-dev-binary: the keypair lost its partition grant. Re-grant once" >&2
+  echo "sign-dev-binary: (one login-password auth, then silent forever):" >&2
+  echo "sign-dev-binary:   security set-key-partition-list -S apple-tool:,apple:,codesign: -s ~/Library/Keychains/login.keychain-db" >&2
+  exit 1
+fi
 exec codesign -f -s "Ccez Dev" "$BIN"
