@@ -652,12 +652,13 @@
 	}
 	/* Collapse brackets ride a hair high: the tall bracket glyphs
 	otherwise sit bottom-heavy beside x-height text. em-based, so
-	font scaling carries the nudge. Blue stays: brackets frame
-	expanded text, unlike the collapsed tags above. */
+	font scaling carries the nudge. Blue stays, and bold like the
+	tags: brackets frame expanded text, unlike the collapsed tags
+	above, but at body size regular blue reads washed out. */
 	.rendered :global(button.paste-fold-bracket) {
 		position: relative;
 		top: -0.07em;
-		font-weight: 400;
+		font-weight: 700;
 		color: #007aff;
 		color: var(--accent);
 	}

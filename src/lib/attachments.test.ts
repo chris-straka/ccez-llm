@@ -32,6 +32,7 @@ import {
 	attachmentDataUrlsAt,
 	removeTags,
 	splicePastedText,
+	splicePastedFolds,
 	stripAttachmentMarkers,
 	stripPastedMarkers,
 	tagPlaceholder,
@@ -482,6 +483,39 @@ describe("splicePastedText", () => {
 		expect(splicePastedText("hi", ["AAA", "BBB"])).toBe("hi\n\nAAA\n\nBBB");
 		expect(splicePastedText("", ["AAA"])).toBe("AAA");
 		expect(splicePastedText("hi", [])).toBe("hi");
+	});
+});
+
+describe("splicePastedFolds", () => {
+	it("splices prose and folds it so the tag comes back on send", () => {
+		const doc = `intro ${pastedTextMarker(3)} middle ${pastedTextMarker(3)} end`;
+		const { text, folds } = splicePastedFolds(doc, ["AAA", "BBB"]);
+		expect(text).toBe("intro AAA middle BBB end");
+		expect(folds).toEqual([
+			{ start: 6, end: 9, chars: 3 },
+			{ start: 17, end: 20, chars: 3 }
+		]);
+		// Every fold slices exactly its prose back out.
+		for (const fold of folds) {
+			expect(text.slice(fold.start, fold.end)).toHaveLength(fold.chars);
+		}
+	});
+
+	it("leaves textless tags literal with no fold and ignores tagless docs", () => {
+		expect(splicePastedFolds(`a ${pastedTextMarker(3)}`, [])).toEqual({
+			text: `a ${pastedTextMarker(3)}`,
+			folds: []
+		});
+		expect(splicePastedFolds("plain", [])).toEqual({ text: "plain", folds: [] });
+	});
+
+	it("clamps folds into the trimmed send text", () => {
+		// Trailing-space prose (the usual paste tail): the stored
+		// text trims it, so the fold must end where storage ends or
+		// the renderer drops it and the tag is lost.
+		const { text, folds } = splicePastedFolds(`${pastedTextMarker(3)} `, ["AAA "]);
+		expect(text).toBe("AAA");
+		expect(folds).toEqual([{ start: 0, end: 3, chars: 3 }]);
 	});
 });
 

@@ -86,6 +86,7 @@
 		type PromptEditor,
 		type PromptEditorOptions,
 		type RemovedMarkerTags,
+		type SendFold,
 		type SubmitKind
 	} from "$lib/editor";
 	import { createTextareaEditor } from "$lib/textarea-editor";
@@ -142,7 +143,7 @@ import {
 		isPastedTextAttachment,
 		makePastedTextAttachment,
 		pastedMarkerInsert,
-		splicePastedText,
+		splicePastedFolds,
 		stripPastedMarkers,
 		leftoverAttachments,
 		type Attachment,
@@ -2654,22 +2655,26 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * Outgoing send payload from the composer draft: pasted-text pills
 	 * splice back inline at their tag positions (Nth tag pairs with
 	 * the Nth pasted attachment — the send-time mirror of render.ts
-	 * kind-order pairing); leftovers end-append like files. Pasted
-	 * attachments are composer vehicles — the stored message keeps
-	 * the spliced prose, not the pills.
+	 * kind-order pairing) AND refold over the inserted prose, so the
+	 * sent message keeps the collapsed `[Pasted N chars]` tag until
+	 * opened; leftovers end-append like files. Pasted attachments are
+	 * composer vehicles — the stored message keeps the spliced prose
+	 * plus folds, not the pills. (The textarea composer tracks no
+	 * paste spans, so span-based folds alone would store unfolded
+	 * prose with no marker at all.)
 	 */
 	function splicedSendText(
 		foldText: string,
 		outgoing: Attachment[]
-	): { stored: string; kept: Attachment[] } {
+	): { stored: string; kept: Attachment[]; pastedFolds: SendFold[] } {
 		const pastedTexts = outgoing.filter(isPastedTextAttachment).map((a) => a.text ?? "");
-		const spliced = splicePastedText(foldText, pastedTexts);
+		const { text: spliced, folds: pastedFolds } = splicePastedFolds(foldText, pastedTexts);
 		const kept = outgoing.filter((a) => !isPastedTextAttachment(a));
 		const stored = appendImageMarkers(
 			spliced,
 			kept.filter((a) => a.kind === "image").length
 		);
-		return { stored, kept };
+		return { stored, kept, pastedFolds };
 	}
 
 	/**
@@ -5084,7 +5089,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// provider payload strips them again in apiContent. Pasted-text
 		// pills splice back inline at their tags (kept attachments ride
 		// along; pasted ones are already prose).
-		const { stored, kept } = splicedSendText(text, outgoing);
+		const { stored, kept, pastedFolds } = splicedSendText(text, outgoing);
 		const sending = sendMessage(
 			chatState,
 			provider,
@@ -5097,7 +5102,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			{
 				attachments: kept,
 				thinking: activeThinkingId(settings),
-				pasteFolds: folds,
+				pasteFolds: [...folds, ...pastedFolds].sort((a, b) => a.start - b.start),
 				// Haptic rumble as the reply starts arriving — only while
 				// its chat is still open. A mid-stream switch must not
 				// rumble the new chat for the old one's reply.
@@ -5312,9 +5317,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				text,
 				editingAttachments.filter((a) => a.kind === "image").length
 			);
+			// Untouched text keeps its folds: recomputing from an
+			// empty span set would silently unfold the message's
+			// pasted tags on a no-op save.
+			const prev = activeChat(chatState).messages.find((m) => m.id === id);
+			const keepFolds = text === editingSeed ? (prev?.pasteFolds ?? folds) : folds;
 			editMessageContent(chatState, id, withAnnotations(stored, annotations), {
 				attachments: editingAttachments,
-				pasteFolds: folds
+				pasteFolds: keepFolds
 			});
 		}
 		resetInlineEdit();
@@ -7756,7 +7766,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				// its place, so the composer never strands) and resets the
 				// voice language to the checked keyboard. Mac Delete-key
 				// reports Backspace; forward-delete reports Delete. Typing
-				// targets keep the chord for line-kill habits.
+				// targets keep the plain chord for line-kill habits; the
+				// Shift variant below works everywhere.
 								consumeEvent(event);
 				dropChat(chat.id);
 				editor?.focus();

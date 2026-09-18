@@ -916,11 +916,31 @@ let liveWashId: string | null = null;
 
 /** Step interval for the wash fade ramp (~100ms in, ~140ms out). */
 const WASH_FADE_STEP_MS = 35;
-/** The one in-flight ramp timer, if any (a single wash id feeds every body). */
-let washRampTimer: ReturnType<typeof setTimeout> | null = null;
-function cancelWashRamp(): void {
-	if (washRampTimer !== null) clearTimeout(washRampTimer);
-	washRampTimer = null;
+/**
+ * The one in-flight ramp, if any (a single wash id feeds every
+ * body), tracked with its owning root: a preempting paint must
+ * repaint the owner it displaces. Without this, a badge-to-badge
+ * slide murders the old body's out-ramp mid-flight — its terminal
+ * repaint never fires and the shell keeps the first wash's pixels
+ * stuck under the second wash.
+ */
+let washRamp: {
+	timer: ReturnType<typeof setTimeout>;
+	root: HTMLElement;
+	wash: string;
+} | null = null;
+/**
+ * Drop the in-flight ramp. When another root preempts it, repaint
+ * the displaced owner: its overlay would otherwise keep pixels the
+ * registry no longer owns. Same-root restarts skip the nudge —
+ * that root repaints through its own ops below.
+ */
+function cancelWashRamp(root?: HTMLElement): void {
+	if (washRamp !== null) {
+		clearTimeout(washRamp.timer);
+		if (root !== undefined && washRamp.root !== root) invalidateWashPaint(washRamp.root);
+		washRamp = null;
+	}
 }
 /** Reduced-motion (or no matchMedia at all, e.g. tests) snaps instead of ramping. */
 function washSnaps(): boolean {
@@ -990,21 +1010,28 @@ function paintWashHighlight(
 			// every token re-stamps, so the fade never settles and
 			// hover catches it dim. Identical endpoints skip the
 			// registry entirely.
-			if (wash === liveWashId && washRampTimer === null) {
+			if (wash === liveWashId && washRamp === null) {
 				if (!sameWashRanges(ranges, liveWashRanges())) {
-					clearAnnotationWashes();
+					// No clear first: Highlight.set replaces the named
+					// ranges atomically, while a delete-then-set in one
+					// task blinks off/on in engines that process the
+					// registry writes separately (commit-save flicker).
 					paintAnnotationWash(ranges);
 				}
 				root.dataset.washStamped = wash;
 				root.dataset.washPainted = wash;
 				return;
 			}
-			cancelWashRamp();
+			cancelWashRamp(root);
 			clearAnnotationWashes();
 			root.dataset.washPainted = wash;
 			liveWashId = wash;
 			if (washSnaps()) {
 				paintAnnotationWash(ranges);
+				// Same-body slides land here too: the clear above
+				// drops the old id's ranges, which this paint never
+				// repaints — force the whole root so no ghost survives.
+				invalidateWashPaint(root);
 			} else {
 				// First grade lands now (no extra lag), the rest walk in.
 				// Every step re-locates: a mid-ramp re-stamp (streaming
@@ -1012,16 +1039,21 @@ function paintWashHighlight(
 				// dead ranges would blink nothing.
 				const schedule = washRampSchedule("in");
 				paintAnnotationWash(ranges, schedule[0]!);
+				// The clear above drops the old id's ranges, which this
+				// paint never repaints — force the whole root so a
+				// same-body slide leaves no ghost of the old wash.
+				invalidateWashPaint(root);
 				// One grade on screen at a time: stacked twins overlap
 				// each other and read as a stuck dim copy that blinks on
 				// the next paint — each step drops the grade it replaces.
 				let prev = schedule[0]!;
 				let step = 1;
 				const tick = (): void => {
-					washRampTimer = setTimeout(() => {
-						washRampTimer = null;
-						// Re-hovered or cleared mid-step: the fresh paint owns it now.
-						if (liveWashId !== wash) return;
+					washRamp = {
+						timer: setTimeout(() => {
+							washRamp = null;
+							// Re-hovered or cleared mid-step: the fresh paint owns it now.
+							if (liveWashId !== wash) return;
 						const fresh = washRanges(root, items, wash);
 						if (fresh.length === 0) {
 							liveWashId = null;
@@ -1041,7 +1073,10 @@ function paintWashHighlight(
 							clearAnnotationWash(ANN_HIGHLIGHT_D3);
 							clearAnnotationWash(ANN_HIGHLIGHT_D1);
 						}
-					}, WASH_FADE_STEP_MS);
+						}, WASH_FADE_STEP_MS),
+						root,
+						wash
+					};
 				};
 				tick();
 			}
@@ -1055,7 +1090,7 @@ function paintWashHighlight(
 	const painted = root.dataset.washPainted || null;
 	root.dataset.washPainted = "";
 	if (painted !== null && painted === liveWashId) {
-		cancelWashRamp();
+		cancelWashRamp(root);
 		// Terminal clears wipe every graded name: the ramp may have left
 		// dim/faint twins behind, and an orphaned twin reads as a stuck
 		// wash that blinks on the next paint.
@@ -1072,19 +1107,20 @@ function paintWashHighlight(
 				clearAnnotationWashes();
 				invalidateWashPaint(root);
 			} else {
-				// Drop live first: the dims replace it, they never stack
-				// over it — a bright wash under dim twins never visibly
-				// fades, and its leftover reads as stuck.
-				clearAnnotationWash(ANN_HIGHLIGHT_NAME);
+				// Each step paints its grade BEFORE dropping the
+				// previous one: the registry never sits empty mid-fade
+				// (an empty frame reads as a blink), and paint+clear
+				// land in one task so no two grades visibly stack.
 				let prev: string | null = ANN_HIGHLIGHT_NAME;
 				const schedule = washRampSchedule("out");
 				let step = 0;
 				const tick = (): void => {
-					washRampTimer = setTimeout(() => {
-						washRampTimer = null;
-						// A superseding paint already replaced it — stopping
-						// now never wipes the live wash.
-						if (liveWashId !== painted) return;
+					washRamp = {
+						timer: setTimeout(() => {
+							washRamp = null;
+							// A superseding paint already replaced it — stopping
+							// now never wipes the live wash.
+							if (liveWashId !== painted) return;
 						const name = schedule[step++]!;
 						if (name === null) {
 							liveWashId = null;
@@ -1103,7 +1139,10 @@ function paintWashHighlight(
 								tick();
 							}
 						}
-					}, WASH_FADE_STEP_MS);
+						}, WASH_FADE_STEP_MS),
+						root,
+						wash: painted
+					};
 				};
 				tick();
 			}

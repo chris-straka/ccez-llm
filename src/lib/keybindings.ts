@@ -696,10 +696,11 @@ export interface DeleteKeyFacts extends KeyModifiers {
 export type DeleteChatScope = "chat" | "all";
 
 /** Cmd/Ctrl+Delete drops the current chat; with Shift it drops every
- * chat. Typing targets keep the chord for line-kill habits. */
+ * chat — including from typing targets, where the plain chord stays
+ * reserved for line-kill habits (Shift has no line-kill meaning). */
 export function deleteChatScope(facts: DeleteKeyFacts): DeleteChatScope | null {
 	if (!(facts.metaKey || facts.ctrlKey) || facts.altKey) return null;
 	if (facts.key !== "Backspace" && facts.key !== "Delete") return null;
-	if (facts.inEditor || facts.inEditable) return null;
+	if ((facts.inEditor || facts.inEditable) && !facts.shiftKey) return null;
 	return facts.shiftKey ? "all" : "chat";
 }

@@ -225,12 +225,17 @@ describe("deleteChatScope", () => {
 		expect(deleteChatScope({ ...delBase, key: "Delete" })).toBe("chat");
 	});
 
-	it("keeps the chord for typing and line-kill habits", () => {
+	it("keeps the plain chord for typing and line-kill habits", () => {
 		expect(deleteChatScope({ ...delBase, altKey: true })).toBe(null);
 		expect(deleteChatScope({ ...delBase, metaKey: false, ctrlKey: false })).toBe(null);
 		expect(deleteChatScope({ ...delBase, inEditor: true })).toBe(null);
 		expect(deleteChatScope({ ...delBase, inEditable: true })).toBe(null);
 		expect(deleteChatScope({ ...delBase, key: "d" })).toBe(null);
+	});
+
+	it("Shift drops every chat even from typing targets", () => {
+		expect(deleteChatScope({ ...delBase, shiftKey: true, inEditor: true })).toBe("all");
+		expect(deleteChatScope({ ...delBase, shiftKey: true, inEditable: true })).toBe("all");
 	});
 });
 

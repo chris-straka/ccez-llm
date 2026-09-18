@@ -336,6 +336,51 @@ export function isPastedTextAttachment(att: Attachment): boolean {
 }
 
 /**
+ * Splice pasted-text attachments inline AND record folds over the
+ * inserted prose (pure, unit-tested): the sent message keeps the
+ * full text but displays the collapsed `[Pasted N chars]` tag until
+ * opened. The textarea composer tracks no paste spans, so without
+ * this the send stores unfolded prose with no marker at all. Tags
+ * without a stored text stay literal with no fold (hand-typed, or
+ * resurrected by undo after the pill dropped).
+ */
+export function splicePastedFolds(
+	doc: string,
+	texts: string[]
+): { text: string; folds: Array<{ start: number; end: number; chars: number }> } {
+	const folds: Array<{ start: number; end: number; chars: number }> = [];
+	let out = "";
+	let last = 0;
+	let index = 0;
+	for (const match of doc.matchAll(PASTED_TAG_RE)) {
+		const at = match.index ?? 0;
+		const prose = index < texts.length ? texts[index] : undefined;
+		index++;
+		if (prose === undefined) continue;
+		out += doc.slice(last, at);
+		const start = out.length;
+		out += prose;
+		folds.push({ start, end: start + prose.length, chars: prose.length });
+		last = at + match[0].length;
+	}
+	out += doc.slice(last);
+	// The send stores trimmed text: shift folds past leading
+	// whitespace and clamp trailing, or foldSegments drops the
+	// out-of-range fold silently and the tag is lost (pasted prose
+	// routinely ends mid-space, exactly like the tag it replaces).
+	const leading = out.length - out.trimStart().length;
+	const trimmedLen = out.trim().length;
+	const kept: Array<{ start: number; end: number; chars: number }> = [];
+	for (const fold of folds) {
+		const start = fold.start - leading;
+		const end = Math.min(fold.end - leading, trimmedLen);
+		if (start < 0 || start >= end) continue;
+		kept.push({ start, end, chars: end - start });
+	}
+	return { text: out.trim(), folds: kept };
+}
+
+/**
  * Drop every pasted-text tag (reset path: pills are gone, so their
  * tags go too). A host line left blank by the removal drops, while
  * the user's own blank lines stay put. Pure and unit-tested.

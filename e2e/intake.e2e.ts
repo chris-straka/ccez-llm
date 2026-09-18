@@ -1026,8 +1026,40 @@ test("enter after a paste tag sends the message", async ({ page }) => {
 	const box = page.locator(".prompt .ta-input");
 	await expect(box).toHaveValue(/\[Pasted 540 chars\] \[Pasted image\] /, { timeout: 15_000 });
 	await page.keyboard.press("Enter");
-	const user = page.locator("article.user").last();
+	// First, not last: the mock assistant echo streams in after and
+	// would swallow the locator. The sent tag reads 539: the stored
+	// text trims the paste tail the composer pill still counts.
+	const user = page.locator("article.user").first();
+	const tag = user.locator("button.paste-fold", { hasText: "[Pasted 539 chars]" });
+	await expect(tag).toBeVisible({ timeout: 15_000 });
+	await tag.click();
 	await expect(user.locator(".rendered")).toContainText("lorem ipsum", { timeout: 15_000 });
+});
+
+/** Sent pastes keep the tag: a pill-backed long paste sends as
+collapsed prose — the user message shows the [Pasted N chars] fold
+button, never unfolded prose — and opens in place on click. */
+test("sent pasted text keeps its collapsed tag", async ({ page }) => {
+	const pasted = "lorem ipsum dolor sit amet ".repeat(20);
+	await page.locator(".ta-input").first().click();
+	await page.evaluate((text) => {
+		const target = document.querySelector(".ta-input");
+		if (!target) throw new Error("missing editor");
+		const transfer = new DataTransfer();
+		transfer.setData("text/plain", text);
+		const event = new ClipboardEvent("paste", { bubbles: true, cancelable: true });
+		Object.defineProperty(event, "clipboardData", { value: transfer });
+		target.dispatchEvent(event);
+	}, pasted);
+	await expect(page.locator(".attachments .paste-body")).toBeVisible();
+	await expect(page.locator(".ta-input").first()).toHaveValue("[Pasted 540 chars] ");
+	await page.keyboard.press("Enter");
+	const user = page.locator("article.user").first();
+	const tag = user.locator("button.paste-fold", { hasText: "[Pasted 539 chars]" });
+	await expect(tag).toBeVisible({ timeout: 15_000 });
+	await expect(user.locator(".rendered")).not.toContainText("lorem ipsum");
+	await tag.click();
+	await expect(user.locator(".rendered")).toContainText("lorem ipsum");
 });
 
 /** Pasted-text tags land one space past the tag: pasting long text
