@@ -4120,14 +4120,18 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		if (highlightsSupported()) {
 			clearAnnotationWash(ANN_FLASH_NAME);
 			let root: HTMLElement | null = null;
-			const paintFresh = (): boolean => {
-				const range = locate();
-				if (!range) return false;
+			const rootOf = (range: Range): HTMLElement | null => {
 				const el =
 					range.startContainer instanceof Element
 						? range.startContainer
 						: range.startContainer.parentElement;
-				root = el?.closest(".rendered") ?? null;
+				const found = el?.closest(".rendered") ?? null;
+				return found instanceof HTMLElement ? found : null;
+			};
+			const paintFresh = (): boolean => {
+				const range = locate();
+				if (!range) return false;
+				root = rootOf(range);
 				return paintAnnotationWash([range], ANN_FLASH_NAME);
 			};
 			if (!paintFresh()) return;
@@ -4135,7 +4139,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				paintFresh,
 				() => {
 					clearAnnotationWash(ANN_FLASH_NAME);
-					if (root) invalidateWashPaint(root);
+					// Resolve the root fresh: a re-render mid-scroll
+					// (scroll-driven state swaps the text nodes) can
+					// detach the root captured at paint time, and
+					// nudging a detached tree repaints nothing — the
+					// flash pixels stick. Fall back to the capture.
+					const live = locate();
+					const target = (live ? rootOf(live) : null) ?? root;
+					if (target) invalidateWashPaint(target);
 				},
 				{ phases: 2 }
 			);
