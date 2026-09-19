@@ -223,6 +223,17 @@ test("switcher actions float centered below the card", async ({ page }) => {
 	expect(layout.btnWidth).toBeLessThanOrEqual(40);
 });
 
+test("tapping the actions row dead space dismisses", async ({ page }) => {
+	await seedTwo(page);
+	await openSwitcher(page);
+	// The row's center falls between the + and trash buttons: dead
+	// space there must fall through to the veil and dismiss, not die
+	// silently on the container. Forced: the veil intercepts the hit
+	// by design (that IS the fix), so the rig must not hit-test.
+	await page.locator(".switcher-actions").click({ force: true });
+	await expect(page.locator(".modal-veil.chat-switcher")).toHaveCount(0);
+});
+
 test("composer refocuses and types after the first reply", async ({ page }) => {
 	await seedChat(page, []);
 	await page.goto("/");

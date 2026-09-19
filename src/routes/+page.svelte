@@ -12078,8 +12078,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		gap: 0.75rem;
 		user-select: none;
 		-webkit-user-select: none;
+		/* Dead space between the round buttons belongs to the veil:
+		taps there dismiss like any tap-away instead of dying on the
+		container (only the buttons themselves keep pointer events). */
+		pointer-events: none;
 	}
 	.switcher-act {
+		pointer-events: auto;
 		flex: none;
 		display: flex;
 		align-items: center;
@@ -12668,14 +12673,17 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		min-height: 0;
 	}
 	/* Emptied phone composer holds its fresh-chat size on focus:
-	an empty box is gapless focused or not, so a send returns the
-	card to its reference height and only text grows it. (The old
-	empty-only carve-out let the rest-to-focus gap ramp move the
-	card ~6px under the keyboard glide; scoping gaplessness to
-	data-empty keeps that guard for every empty box, fresh chat
-	or post-send.) */
+	an empty box is gapless AND floorless focused or not, so a tap
+	never grows it and a send returns the card to its reference
+	height — only text grows it. (The old empty-only carve-out let
+	the rest-to-focus gap ramp move the card ~6px under the
+	keyboard glide; scoping both guards to data-empty keeps them
+	for every empty box, fresh chat or post-send. Without the
+	min-height half, the base 6.4rem desktop floor applies on focus
+	and the card jumps ~21px on every tap.) */
 	.app[data-android] .prompt[data-empty="true"] {
 		gap: 0;
+		min-height: 0;
 	}
 	/* The row snaps (no height ramp): ramping its height would slide
 	its buttons under tapping fingers mid-flight. The field above may

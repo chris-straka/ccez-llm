@@ -35,6 +35,24 @@ test("emptied composer matches its fresh height", async ({ page }) => {
 	expect(Math.abs(after - fresh)).toBeLessThanOrEqual(4);
 });
 
+test("tapping the empty composer never grows it", async ({ page }) => {
+	await seedChat(page, []);
+	await page.goto("/");
+	await expect(page.locator(".hero")).toBeVisible({ timeout: 60_000 });
+	const prompt = page.locator(".prompt");
+	const fresh = (await prompt.boundingBox())?.height ?? -1;
+	expect(fresh).toBeGreaterThan(0);
+	await page.locator(".prompt .ta-input").click();
+	await expect(page.locator(".prompt .ta-input")).toBeFocused();
+	const focused = await page.evaluate(() => {
+		const el = document.querySelector(".prompt");
+		return el ? el.getBoundingClientRect().height : -1;
+	});
+	// No gap ramp, no base min-height floor on focus: an empty box
+	// holds its fresh-chat size until text grows it.
+	expect(Math.abs(focused - fresh)).toBeLessThanOrEqual(2);
+});
+
 test("phone Enter inserts a newline instead of sending", async ({ page }) => {
 	await seedChat(page, []);
 	await page.goto("/");
