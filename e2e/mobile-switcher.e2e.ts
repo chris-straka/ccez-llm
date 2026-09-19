@@ -230,7 +230,8 @@ test("composer refocuses and types after the first reply", async ({ page }) => {
 	const box = page.locator(".prompt .ta-input");
 	await box.click();
 	await page.keyboard.type("hello android");
-	await page.keyboard.press("Enter");
+	// Phones never send from the keyboard: the send button submits.
+	await page.locator(".send-btn").click();
 	await expect(page.locator("article.assistant .rendered").first()).toBeVisible({ timeout: 30_000 });
 	await expect(page.locator(".sending")).toHaveCount(0, { timeout: 30_000 });
 	await box.click();

@@ -244,7 +244,8 @@ test("send clears pills and files an inline tag in the message", async ({ page }
 	await page.locator(".ta-input").first().click();
 	await page.keyboard.press("ArrowDown");
 	await page.keyboard.type("hello");
-	await page.keyboard.press("Enter");
+	// The send button submits (phone keyboards never send).
+	await page.locator(".send-btn").click();
 	// Pills empty with the prompt at send time…
 	await expect(page.locator(".attachments")).toHaveCount(0);
 	// …and the sent turn carries the tag in its text flow (sends store

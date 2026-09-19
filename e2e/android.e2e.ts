@@ -1320,7 +1320,8 @@ test.describe("touch", () => {
 		const box = page.locator(".prompt .ta-input");
 		await box.click();
 		await page.keyboard.type("hello world");
-		await page.keyboard.press("Enter");
+		// Phones never send from the keyboard: the send button submits.
+		await page.locator(".send-btn").click();
 		await expect(page.locator('article .rendered:has-text("Mock reply to:")')).toBeVisible({ timeout: 15000 });
 		const heights = await page.evaluate(() => {
 			const el = document.querySelector(".prompt .ta-input");
@@ -1980,6 +1981,44 @@ test.describe("message chrome", () => {
 		const typed = await geom();
 		expect(Math.abs(typed.w - focused.w)).toBeLessThanOrEqual(2);
 		expect(Math.abs(typed.h - focused.h)).toBeLessThanOrEqual(2);
+	});
+
+	/** Tapping the phone composer never moves a settled thread: the
+	WebView pans on textbox focus, and the focusin guard re-pins
+	behind it when the field was already on screen. Force-click skips
+	Playwright's own scroll-into-view so the tap is all app. */
+	test("composer tap preserves a scrolled thread", async ({ page }) => {
+		const body = "Line of chat text for height. ".repeat(120);
+		await seedChat(page, [
+			{ role: "user", content: `q ${body}` },
+			{ role: "assistant", content: `a ${body}` },
+			{ role: "user", content: `q2 ${body}` },
+			{ role: "assistant", content: `a2 ${body}` }
+		]);
+		await page.goto("/");
+		await expect(page.locator(".prompt")).toBeVisible();
+		await page.waitForFunction(
+			() => {
+				const box = document.querySelector(".messages") as HTMLElement | null;
+				return box !== null && box.scrollHeight > box.clientHeight + 800;
+			},
+			undefined,
+			{ timeout: 15_000 }
+		);
+		const top = await page.evaluate(() => {
+			const box = document.querySelector(".messages") as HTMLElement | null;
+			if (!box) return -1;
+			box.scrollTop = Math.max(0, box.scrollHeight - box.clientHeight - 600);
+			return box.scrollTop;
+		});
+		expect(top).toBeGreaterThan(100);
+		await page.locator(".prompt .ta-input").click({ force: true });
+		await expect(page.locator(".prompt .ta-input")).toBeFocused();
+		await page.waitForTimeout(400);
+		const after = await page.evaluate(
+			() => (document.querySelector(".messages") as HTMLElement | null)?.scrollTop ?? -1
+		);
+		expect(after).toBe(top);
 	});
 
 	/** Huge phone type goes full-bleed; normal type keeps the floor. */

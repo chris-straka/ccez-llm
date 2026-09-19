@@ -2,9 +2,10 @@ import { expect, test } from "@playwright/test";
 import { seedChat } from "./helpers";
 
 /**
- * Phone composer size discipline: a fresh chat's prompt is the
- * reference size, and text alone may grow it. Sending must return
- * the emptied composer to that reference — never strand it taller.
+ * Phone composer discipline: Enter is a carriage return (only the
+ * send button submits), and a fresh chat's prompt is the reference
+ * size — text alone may grow it, and sending must return the
+ * emptied composer to that reference, never strand it taller.
  */
 test.use({
 	hasTouch: true,
@@ -23,7 +24,8 @@ test("emptied composer matches its fresh height", async ({ page }) => {
 	const box = page.locator(".prompt .ta-input");
 	await box.click();
 	await page.keyboard.type("hello android");
-	await page.keyboard.press("Enter");
+	// Phones never send from the keyboard: the send button submits.
+	await page.locator(".send-btn").click();
 	await expect(page.locator("article.assistant .rendered").first()).toBeVisible({ timeout: 30_000 });
 	await expect(page.locator(".sending")).toHaveCount(0, { timeout: 30_000 });
 	const after = await page.evaluate(() => {
@@ -31,4 +33,17 @@ test("emptied composer matches its fresh height", async ({ page }) => {
 		return el ? el.getBoundingClientRect().height : -1;
 	});
 	expect(Math.abs(after - fresh)).toBeLessThanOrEqual(4);
+});
+
+test("phone Enter inserts a newline instead of sending", async ({ page }) => {
+	await seedChat(page, []);
+	await page.goto("/");
+	await expect(page.locator(".hero")).toBeVisible({ timeout: 60_000 });
+	const box = page.locator(".prompt .ta-input");
+	await box.click();
+	await page.keyboard.type("one");
+	await page.keyboard.press("Enter");
+	await page.keyboard.type("two");
+	await expect(box).toHaveValue("one\ntwo");
+	await expect(page.locator("article.user")).toHaveCount(0);
 });

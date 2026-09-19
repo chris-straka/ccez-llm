@@ -38,6 +38,23 @@ describe("createTextareaEditor", () => {
 		expect(options.onSubmit).not.toHaveBeenCalled();
 	});
 
+	it("Alt+Enter stages by default", () => {
+		const { ta, options } = setup();
+		key(ta, { key: "Enter", altKey: true });
+		expect(options.onSubmit).toHaveBeenCalledWith("stage");
+	});
+
+	it("enterSubmits false leaves Enter and Alt+Enter dead", () => {
+		const { ta, options } = setup({ enterSubmits: false });
+		key(ta, { key: "Enter" });
+		expect(options.onSubmit).not.toHaveBeenCalled();
+		key(ta, { key: "Enter", altKey: true });
+		expect(options.onSubmit).not.toHaveBeenCalled();
+		// Shift+Enter still falls through untouched.
+		key(ta, { key: "Enter", shiftKey: true });
+		expect(options.onSubmit).not.toHaveBeenCalled();
+	});
+
 	it("Shift-Enter on a fence opener completes the fence with the caret between", () => {
 		const { editor, ta } = setup();
 		editor.setText("```py");

@@ -95,6 +95,13 @@ export interface PromptEditor {
 export interface PromptEditorOptions {
 	initialDoc?: string;
 	onSubmit: (kind: SubmitKind) => void;
+	/**
+	 * Enter submits (send, Alt+Enter stages). False leaves Enter as a
+	 * plain carriage return and Alt+Enter dead: the host's submit
+	 * button alone sends. Phones set false — a software Enter must
+	 * never fire a message. Defaults to true (desktop keymap).
+	 */
+	enterSubmits?: boolean;
 	/** Ctrl+G: leave the editor for J/K message-scroll mode. */
 	onHopOut: () => void;
 	/** Images were pasted or dropped; the host turns each into an attachment. */
@@ -326,13 +333,17 @@ export function createTextareaEditor(
 			if (fenceShiftEnter()) event.preventDefault();
 			return;
 		}
-		// Enter and Mod-Enter send; Shift-Enter falls through to newline.
+		// Enter and Alt+Enter send; Shift-Enter falls through to newline.
+		// Where enterSubmits is false (phone composer) both fall through:
+		// Enter is a carriage return there and the send button alone sends.
 		if (event.key === "Enter" && !event.shiftKey && !event.altKey) {
+			if (options.enterSubmits === false) return;
 			event.preventDefault();
 			options.onSubmit("send");
 			return;
 		}
 		if (event.key === "Enter" && event.altKey) {
+			if (options.enterSubmits === false) return;
 			event.preventDefault();
 			options.onSubmit("stage");
 			return;

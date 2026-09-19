@@ -6135,6 +6135,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	function promptOptions(): PromptEditorOptions {
 		return {
 			onSubmit,
+			// Phones never send from the keyboard: Enter is a carriage
+			// return there and the send button alone submits. Desktop
+			// keeps Enter/Alt+Enter. (Snapshot-safe: the UA detection
+			// above runs in this same mount, before the editor builds.)
+			enterSubmits: !androidUI,
 			onHopOut: () => {
 				scrollFromPrompt = true;
 				enterScrollMode();
@@ -10914,10 +10919,16 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				class:wide={altHeld}
 				disabled={!canSubmit}
 				title={altHeld
-					? `Stage (${altm}+Enter)`
+					? androidUI
+						? "Stage"
+						: `Stage (${altm}+Enter)`
 					: activeReplyLang
-						? `Send in ${activeReplyLang.name} (Enter) — repeat its number key to clear`
-						: "Send (Enter)"}
+						? androidUI
+							? `Send in ${activeReplyLang.name} — repeat its number key to clear`
+							: `Send in ${activeReplyLang.name} (Enter) — repeat its number key to clear`
+						: androidUI
+							? "Send"
+							: "Send (Enter)"}
 				aria-label={altHeld ? "Stage" : activeReplyLang ? `Send in ${activeReplyLang.name}` : "Send"}
 				onclick={(event) => onSubmit(altHeld || event.altKey ? "stage" : "send")}
 			>
