@@ -32,6 +32,17 @@ test("europe list stays inside a phone viewport", async ({ page }) => {
 	expect(box!.y + box!.height).toBeLessThanOrEqual(915);
 });
 
+/** Picking a language must not hand focus to the composer on phones:
+auto-focus pops the keyboard over it instead of pushing it up. */
+test("picking a language leaves the composer unfocused", async ({ page }) => {
+	await page.locator('.lang-menu button:has-text("Europe")').click();
+	const list = page.locator(".lang-list");
+	await expect(list).toBeVisible();
+	await list.getByRole("menuitem", { name: "French" }).click();
+	await expect(list).toHaveCount(0);
+	await expect(page.locator(".prompt .ta-input")).not.toBeFocused();
+});
+
 /** The last menu hugs the right edge: its long nowrap names used to
 trail off the page (left-anchored like the rest). */
 test("classics list stays inside a phone viewport", async ({ page }) => {

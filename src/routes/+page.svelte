@@ -9784,11 +9784,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 										onclick={() => {
 										if (activeReplyCode === lang.code && !quickKey) clearReplyLang();
 										else setReplyLang(lang.code);
-										// Picking a language hands focus to the composer:
-										// typing starts there next, and focus never
-										// lingers on the unmounted option (which left
-										// a stuck pointer behind).
-										editor?.focus();
+										// Picking a language hands focus to the
+										// composer on desktop: typing starts there
+										// next, and focus never lingers on the
+										// unmounted option (which left a stuck
+										// pointer behind). Phones stay unfocused:
+										// auto-focus pops the keyboard over the
+										// composer instead of pushing it up. Tap
+										// in when ready.
+										if (!androidUI) editor?.focus();
 									}}
 									>
 										<span class="badge" aria-hidden="true">{lang.badge}</span>
