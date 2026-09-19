@@ -10,7 +10,8 @@ import { messageText } from "./types";
 /**
  * Dev/test-only provider: streams a canned reply so the chat UI (streaming
  * display, token meter, retry) can be exercised in a browser without API keys.
- * Enabled in the UI only when localStorage `ccez-mock-provider` is "1".
+ * Enabled in the UI only when localStorage `ccez-mock-provider` is "1" and
+ * the page is not inside the Tauri shell (see mockProviderEnabled).
  */
 export class MockProvider implements ChatProvider {
 	readonly id = "mock";
@@ -58,6 +59,18 @@ function canned(messages: ChatMessage[]): string {
 
 export function mockProviderEnabled(): boolean {
 	try {
+		// Dev/test-only affordance: never inside the Tauri shell, where
+		// a stray persisted flag would stick the real app (phone or
+		// desktop) on canned replies under a "Mock provider active"
+		// note. Same probe as tauriBackendAvailable in secrets.ts, kept
+		// local so this module stays Tauri-import-free; the browser
+		// preview and specs keep working.
+		if (
+			typeof window !== "undefined" &&
+			(window.__TAURI_INTERNALS__ !== undefined || window.__TAURI__ !== undefined)
+		) {
+			return false;
+		}
 		return localStorage.getItem("ccez-mock-provider") === "1";
 	} catch {
 		return false;
