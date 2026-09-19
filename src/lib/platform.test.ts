@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
 	isAndroidUserAgent,
 	isIOSUserAgent,
+	canWindowDrag,
 	isCoarsePointer,
 	isIPadDesktopMode,
 	isTouchTablet,
@@ -52,6 +53,16 @@ describe("isIOSUserAgent", () => {
 		expect(isIOSUserAgent(ANDROID_UA)).toBe(false);
 		expect(isIOSUserAgent(MAC_UA)).toBe(false);
 		expect(isIOSUserAgent("")).toBe(false);
+	});
+});
+
+describe("canWindowDrag", () => {
+	it("refuses mobile shells whose drag would only reject into a toast", () => {
+		expect(canWindowDrag(ANDROID_UA)).toBe(false);
+		expect(canWindowDrag(IPHONE_UA)).toBe(false);
+	});
+	it("allows desktop agents (the backend gate still applies)", () => {
+		expect(canWindowDrag(MAC_UA)).toBe(true);
 	});
 });
 

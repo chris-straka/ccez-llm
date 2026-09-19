@@ -20,6 +20,16 @@ export function isIOSUserAgent(ua: string): boolean {
 }
 
 /**
+ * Native window dragging needs a desktop shell: mobile shells have no
+ * draggable window, so `startDragging` there only rejects (once per
+ * session, into an error toast). Desktop browsers keep their own
+ * backend gate at the call site.
+ */
+export function canWindowDrag(ua: string): boolean {
+	return !isAndroidUserAgent(ua) && !isIOSUserAgent(ua);
+}
+
+/**
  * Primary input is touch (no hover to wait for). The query runner is
  * injected so tests can stub it: pass `(q) => window.matchMedia(q)`.
  */
