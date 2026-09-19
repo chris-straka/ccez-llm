@@ -52,6 +52,9 @@ class MainActivity : TauriActivity() {
     handleSend(intent)
   }
 
+  /** Last dispatched IME height; -1 until the first dispatch lands. */
+  private var lastImeBottom = -1
+
   /**
    * Native half of the keyboard reflow: with edge-to-edge the
    * framework never resizes the window, so feed the IME inset back
@@ -64,9 +67,6 @@ class MainActivity : TauriActivity() {
    * failure logs — a silent catch here once shipped a dead bridge
    * with an "unfixable" overlap.
    */
-  /** Last dispatched IME height; -1 until the first dispatch lands. */
-  private var lastImeBottom = -1
-
   private fun attachImeInsetBridge(retry: Int = 0): Unit {
     val content = findViewById<android.view.View>(android.R.id.content)
     if (content == null) {
