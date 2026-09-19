@@ -6,6 +6,7 @@ import {
 	setSecret,
 	deleteSecret,
 	hydrateSecrets,
+	migrateLegacySecret,
 	persistSecrets,
 	withBlankedKeys,
 	secretAccount,
@@ -75,8 +76,8 @@ describe("secrets fallback (no Tauri shell)", () => {
 		}
 	});
 
-	it("hydrates blank settings keys from storage", async () => {
-		await setSecret(secretAccount("muse"), "muse-test");
+	it("hydrates blank settings keys from the bundle only", async () => {
+		await setSecret(SECRET_BUNDLE_ACCOUNT, encodeSecretBundle({ muse: "muse-test" }));
 		const settings = defaultSettings();
 		settings.providers["deepseek"]!.apiKey = "";
 		settings.providers["muse"]!.apiKey = "";
@@ -87,6 +88,16 @@ describe("secrets fallback (no Tauri shell)", () => {
 		settings.providers["deepseek"]!.apiKey = "keep";
 		await expect(hydrateSecrets(settings)).resolves.toEqual([]);
 		expect(settings.providers["deepseek"]!.apiKey).toBe("keep");
+	});
+
+	it("launch never touches legacy per-provider items", async () => {
+		await setSecret(secretAccount("muse"), "muse-test");
+		const settings = defaultSettings();
+		settings.providers["muse"]!.apiKey = "";
+		await expect(hydrateSecrets(settings)).resolves.toEqual([]);
+		expect(settings.providers["muse"]!.apiKey).toBe("");
+		// The legacy item survives for on-demand migration.
+		expect(await getSecret(secretAccount("muse"))).toBe("muse-test");
 	});
 
 	it("freezes the secretAccount format (renaming orphans stored secrets)", () => {
@@ -146,22 +157,33 @@ describe("secrets fallback (no Tauri shell)", () => {
 		});
 	});
 
-	it("migrates legacy per-provider items into the bundle once", async () => {
+	it("migrates one legacy item on demand, once", async () => {
 		await setSecret(secretAccount("muse"), "muse-test");
 		const settings = defaultSettings();
 		settings.providers["deepseek"]!.apiKey = "";
 		settings.providers["muse"]!.apiKey = "";
-		await expect(hydrateSecrets(settings)).resolves.toEqual(["muse"]);
+		await expect(migrateLegacySecret(settings, "muse")).resolves.toBe(true);
 		expect(settings.providers["muse"]!.apiKey).toBe("muse-test");
 		expect(decodeSecretBundle(await getSecret(SECRET_BUNDLE_ACCOUNT))).toEqual({
 			muse: "muse-test"
 		});
 		expect(await getSecret(secretAccount("muse"))).toBeNull();
-		// Second launch reads the bundle: no legacy reads, same result.
+		// Nothing left to migrate: second call is a no-op.
+		await expect(migrateLegacySecret(settings, "muse")).resolves.toBe(false);
+		// Later launches read the bundle: same result, no legacy reads.
 		const again = defaultSettings();
 		again.providers["muse"]!.apiKey = "";
 		await expect(hydrateSecrets(again)).resolves.toEqual(["muse"]);
 		expect(again.providers["muse"]!.apiKey).toBe("muse-test");
+	});
+
+	it("on-demand migration skips filled keys and missing items", async () => {
+		const settings = defaultSettings();
+		settings.providers["muse"]!.apiKey = "keep";
+		await expect(migrateLegacySecret(settings, "muse")).resolves.toBe(false);
+		settings.providers["muse"]!.apiKey = "";
+		await expect(migrateLegacySecret(settings, "muse")).resolves.toBe(false);
+		await expect(migrateLegacySecret(settings, "nope")).resolves.toBe(false);
 	});
 
 	it("never clobbers a stored bundle with emptiness before first hydrate", async () => {

@@ -108,7 +108,7 @@
 		stepScrollTop,
 		unselectedScrollIntent
 	} from "$lib/scrollkeys";
-	import { hydrateSecrets, persistSecrets, tauriBackendAvailable, withBlankedKeys } from "$lib/secrets";
+	import { hydrateSecrets, migrateLegacySecret, persistSecrets, tauriBackendAvailable, withBlankedKeys } from "$lib/secrets";
 	import { canEditMessage, toggleAidKinds, toggleSingleAid } from "$lib/message-actions";
 	import type { ChatProvider } from "$lib/providers/types";
 	import MessageBody from "$lib/components/MessageBody.svelte";
@@ -4697,7 +4697,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			if (pin) pendingPin.add(msg.id);
 			return;
 		}
-		const provider = resolveProvider();
+		const provider = await resolveProviderActive();
 		if (!provider) {
 			const message = "Set an API key first — open Settings.";
 			showNotice(notices, "banner", message);
@@ -5149,6 +5149,23 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		);
 	}
 
+	/**
+	 * resolveProvider plus one legacy migration attempt: when the active
+	 * provider's key is blank, a pre-bundle per-provider item may still
+	 * hold it — read that single item, fold it into the bundle, and
+	 * re-resolve before concluding the key is missing. The launch path
+	 * never does this fan-out; it fires only here, in the user's send
+	 * context, at most once per legacy key.
+	 */
+	async function resolveProviderActive(): Promise<ChatProvider | null> {
+		const direct = resolveProvider();
+		if (direct) return direct;
+		if (await migrateLegacySecret(settings, settings.activeProviderId)) {
+			return resolveProvider();
+		}
+		return null;
+	}
+
 	/** Seconds since the viewed chat started sending (the Thinking
 	chip counts the wait up). No cleanup return on purpose: token
 	updates may re-run this watcher mid-send, and tearing the
@@ -5208,7 +5225,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// reset the placeholder, then send fresh either way.
 			if (!commitMessageEdit()) editor?.setPlaceholder(promptPlaceholder());
 		}
-		const provider = resolveProvider();
+		const provider = await resolveProviderActive();
 		if (!provider) {
 			missingKey = true;
 			return;
@@ -5299,7 +5316,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 
 	async function resend() {
-		const provider = resolveProvider();
+		const provider = await resolveProviderActive();
 		if (!provider) {
 			missingKey = true;
 			return;

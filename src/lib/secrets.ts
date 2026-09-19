@@ -349,70 +349,68 @@ export async function deleteSecret(account: string): Promise<void> {
  * Fill blank in-memory provider keys from secret storage. Returns the ids
  * that were hydrated (so callers can re-render). Never throws.
  *
- * One stored read (the bundle), so at most one Keychain prompt no matter
- * how many providers exist. When no bundle is stored yet, legacy
- * per-provider items migrate forward: they are read once, folded into
- * the bundle, and removed best-effort.
+ * One stored read (the bundle), so at most one Keychain prompt at launch
+ * no matter how many providers exist — never a per-provider fan-out.
+ * Legacy per-provider items are NOT touched here; they migrate on demand
+ * via migrateLegacySecret when their provider is actually used.
  */
 export async function hydrateSecrets(settings: AppSettings): Promise<string[]> {
 	const hydrated: string[] = [];
-	const fill = (bundle: SecretBundle): void => {
-		for (const id of Object.keys(settings.providers)) {
-			const entry = settings.providers[id];
-			if (!entry) continue;
-			if (entry.apiKey.trim()) continue;
-			const secret = bundle[id];
-			if (secret) {
-				entry.apiKey = secret;
-				hydrated.push(id);
-			}
-		}
-	};
 	try {
 		const raw = await getSecret(SECRET_BUNDLE_ACCOUNT);
 		if (raw !== null) {
-			lastKnownBundle = encodeSecretBundle(decodeSecretBundle(raw));
-			fill(decodeSecretBundle(raw));
+			const bundle = decodeSecretBundle(raw);
+			lastKnownBundle = encodeSecretBundle(bundle);
+			for (const id of Object.keys(settings.providers)) {
+				const entry = settings.providers[id];
+				if (!entry) continue;
+				if (entry.apiKey.trim()) continue;
+				const secret = bundle[id];
+				if (secret) {
+					entry.apiKey = secret;
+					hydrated.push(id);
+				}
+			}
 			return hydrated;
 		}
 	} catch {
-		// Locked keychain: fall through to the legacy read below, which
-		// fails the same way — the user types the key instead.
+		// Locked keychain: the user types the key instead.
 	}
-	const legacy: SecretBundle = {};
-	for (const id of Object.keys(settings.providers)) {
-		const entry = settings.providers[id];
-		if (!entry) continue;
-		if (entry.apiKey.trim()) continue;
-		try {
-			const secret = await getSecret(secretAccount(id));
-			if (secret) legacy[id] = secret;
-		} catch {
-			// Locked keychain or missing entry: user types the key instead.
-		}
-	}
-	fill(legacy);
-	const migrated = encodeSecretBundle(legacy);
-	if (hydrated.length > 0) {
-		try {
-			await setSecret(SECRET_BUNDLE_ACCOUNT, migrated);
-			lastKnownBundle = migrated;
-		} catch {
-			// Keychain locked: keys stay session-only, migration retries
-			// on the next launch.
-		}
-		for (const id of hydrated) {
-			try {
-				await deleteSecret(secretAccount(id));
-			} catch {
-				// Stale legacy item survives; it is ignored once the
-				// bundle exists and re-migrates harmlessly if deleted.
-			}
-		}
-	} else {
-		lastKnownBundle = encodeSecretBundle({});
-	}
+	lastKnownBundle = encodeSecretBundle({});
 	return hydrated;
+}
+
+/**
+ * One legacy per-provider item, migrated the moment its provider is
+ * actually used: read once, folded into the bundle, removed
+ * best-effort. Returns true when a key was recovered. Never throws.
+ * This is the only path that ever reads a legacy item, so upgraders
+ * meet at most one prompt per legacy key, in context — never a
+ * launch-time fan-out across providers they may never use.
+ */
+export async function migrateLegacySecret(settings: AppSettings, id: string): Promise<boolean> {
+	const entry = settings.providers[id];
+	if (!entry || entry.apiKey.trim()) return false;
+	let secret: string | null = null;
+	try {
+		secret = await getSecret(secretAccount(id));
+	} catch {
+		return false;
+	}
+	if (!secret) return false;
+	entry.apiKey = secret;
+	try {
+		await deleteSecret(secretAccount(id));
+	} catch {
+		// Stale legacy item survives; it is ignored once the bundle
+		// holds the key and re-migrates harmlessly if deleted.
+	}
+	try {
+		await persistSecrets(settings);
+	} catch {
+		// Keychain locked: the key stays session-only.
+	}
+	return true;
 }
 
 /**
