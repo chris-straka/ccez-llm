@@ -9379,11 +9379,23 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				if (androidUI && appEl && window.visualViewport) {
 					const vv = window.visualViewport;
 					const overlap = keyboardOverlapPx(window.innerHeight, vv.height);
+					// Baseline discipline (see settlePin): a focused
+					// editable means the keyboard may be up with both
+					// viewports shrunk (reads closed) — grow the
+					// baseline only, never stamp the glide low.
+					const ae = document.activeElement;
+					const editableFocused =
+						ae instanceof HTMLElement &&
+						ae.closest(
+							'textarea, input:not([type="checkbox"]):not([type="radio"]), [contenteditable="true"]'
+						) !== null;
 					const settled = settlePin(
 						kbPin,
 						fullInnerHeight,
 						window.innerHeight,
-						isKeyboardOpen(window.innerHeight, vv.height)
+						isKeyboardOpen(window.innerHeight, vv.height),
+						100,
+						!editableFocused
 					);
 					const wasArmed = kbPin.armed;
 					kbPin = settled.pin;

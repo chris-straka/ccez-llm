@@ -98,19 +98,31 @@ export function kbFreshOpen(closedFrames: number, open: boolean): boolean {
 /**
  * Settle step, run with fresh geometry once viewport events stop — the
  * ONLY place the pin engages. Closed geometry releases the pin and
- * refreshes the baseline (rotation-safe). Open geometry with a shrunken
- * layout means the native resize is gliding: stay disarmed. Open
- * geometry with a full layout is the no-shrink fallback (old WebViews,
- * adjustPan): arm here, on stable heights, never mid-animation.
+ * refreshes the baseline. Open geometry with a shrunken layout means
+ * the native resize is gliding: stay disarmed. Open geometry with a
+ * full layout is the no-shrink fallback (old WebViews, adjustPan):
+ * arm here, on stable heights, never mid-animation.
+ *
+ * exactBaseline must be false while an editable is focused: with the
+ * native resize gliding, open geometry reads closed (both viewports
+ * shrink together), and stamping that shrunken height as the baseline
+ * poisons the NEXT episode — a later transitional settle then reads
+ * "full layout" and arms the pin mid-flight, the second pop. While
+ * focused the baseline only ever grows (genuine resizes still track
+ * up); the exact stamp returns once nothing is focused.
  */
 export function settlePin(
 	pin: PinArmState,
 	fullHeight: number,
 	innerHeight: number,
 	open: boolean,
-	minShrink = 100
+	minShrink = 100,
+	exactBaseline = true
 ): PinSettle {
-	if (!open) return { pin: pinArmStart(), fullHeight: innerHeight };
+	if (!open) {
+		const baseline = exactBaseline ? innerHeight : Math.max(fullHeight, innerHeight);
+		return { pin: pinArmStart(), fullHeight: baseline };
+	}
 	if (nativeResizeActive(fullHeight, innerHeight, minShrink)) {
 		return { pin: pinArmStart(), fullHeight };
 	}

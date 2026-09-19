@@ -13,19 +13,15 @@ class MainActivity : TauriActivity() {
     // Edge-to-edge above opts the window out of the framework's
     // adjustResize: the keyboard would overlay the WebView with both
     // viewports never shrinking, stranding the composer underneath
-    // it (and the WebView's own caret-reveal pan shoves content to
-    // the top on tap). Feed the IME inset back as content padding
-    // instead, so the WebView reflows above the keyboard. Only the
-    // IME inset applies — system bars stay the CSS safe-area's job,
-    // so closed-keyboard layout never moves.
+    // it. Feed the IME inset back as content padding instead, so the
+    // WebView reflows above the keyboard. Only the IME inset applies
+    // — system bars stay the CSS safe-area's job, so closed-keyboard
+    // layout never moves. Failures must stay loud (a silent catch
+    // here once shipped a dead bridge and an "unfixable" overlap).
     try {
-      val content = findViewById<android.view.View>(android.R.id.content)
-      ViewCompat.setOnApplyWindowInsetsListener(content) { v, insets ->
-        val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
-        v.setPadding(v.paddingLeft, v.paddingTop, v.paddingRight, ime.bottom)
-        insets
-      }
-    } catch (_: Exception) {
+      attachImeInsetBridge()
+    } catch (e: Exception) {
+      android.util.Log.w("CcezMain", "IME inset bridge failed: ${e.message}")
     }
     // Voice bridge: the Rust side calls Tts without passing contexts.
     Tts.init(this)
@@ -53,6 +49,38 @@ class MainActivity : TauriActivity() {
     }
     handleProcessText(intent)
     handleSend(intent)
+  }
+
+  /**
+   * Native half of the keyboard reflow: with edge-to-edge the
+   * framework never resizes the window, so feed the IME inset back
+   * as content padding and the WebView glides above the keyboard
+   * instead of popping. The web-side visualViewport pin then sees
+   * tracked heights and stays out of the way; it remains the
+   * fallback for WebViews whose own viewport never shrinks.
+   * Retries post-layout when the content view is not ready yet
+   * (capped: a missing bridge must log, never spin), and every
+   * failure logs — a silent catch here once shipped a dead bridge
+   * with an "unfixable" overlap.
+   */
+  private fun attachImeInsetBridge(retry: Int = 0): Unit {
+    val content = findViewById<android.view.View>(android.R.id.content)
+    if (content == null) {
+      if (retry < 10 && window?.peekDecorView() != null) {
+        android.util.Log.w("CcezMain", "IME inset bridge: content view missing, retrying post-layout")
+        window.peekDecorView()?.post { attachImeInsetBridge(retry + 1) }
+      } else {
+        android.util.Log.e("CcezMain", "IME inset bridge: no content view, keyboard will overlay")
+      }
+      return
+    }
+    ViewCompat.setOnApplyWindowInsetsListener(content) { v, insets ->
+      val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
+      v.setPadding(v.paddingLeft, v.paddingTop, v.paddingRight, ime.bottom)
+      insets
+    }
+    ViewCompat.requestApplyInsets(content)
+    android.util.Log.i("CcezMain", "IME inset bridge attached")
   }
 
   /**

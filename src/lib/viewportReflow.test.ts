@@ -91,6 +91,24 @@ describe("settlePin", () => {
 		expect(settled.pin).toEqual({ armed: true, sawOpen: true });
 		expect(settled.fullHeight).toBe(800);
 	});
+
+	it("never stamps a shrunken baseline while an editable is focused", () => {
+		// Native glide reads closed with the layout shrunk: stamping
+		// it would poison the next episode into a mid-flight arm.
+		const settled = settlePin(pinArmStart(), 800, 500, false, 100, false);
+		expect(settled.pin.armed).toBe(false);
+		expect(settled.fullHeight).toBe(800);
+	});
+
+	it("still tracks genuine growth while focused", () => {
+		const settled = settlePin(pinArmStart(), 800, 900, false, 100, false);
+		expect(settled.fullHeight).toBe(900);
+	});
+
+	it("stamps exactly once nothing is focused (the default)", () => {
+		const settled = settlePin(pinArmStart(), 800, 500, false);
+		expect(settled.fullHeight).toBe(500);
+	});
 });
 
 
