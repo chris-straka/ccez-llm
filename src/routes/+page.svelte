@@ -12593,7 +12593,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.app[data-android] .prompt {
 		display: flex;
 		flex-direction: column;
-		gap: 0.35rem;
+		/* One geometry, every state: no gap, no min-height floor, so
+		focus, first character, and send all hold the fresh-chat size
+		and only text lines grow the card. (The old focus/empty-scoped
+		gap and the desktop 6.4rem floor each moved the card under the
+		glide: ~6px and ~21px.) Separation between the bars rides the
+		existing paddings, not the gap. */
+		gap: 0;
+		min-height: 0;
 		padding: 0.7rem 0.8rem 0.6rem;
 	}
 	.app[data-android] .prompt :global(.ta-input) {
@@ -12667,24 +12674,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			border-color 0.18s ease,
 			visibility 0s;
 	}
-	.app[data-android] .prompt:not(:focus-within) {
-		gap: 0;
-		/* Let the card hug the single line. */
-		min-height: 0;
-	}
-	/* Emptied phone composer holds its fresh-chat size on focus:
-	an empty box is gapless AND floorless focused or not, so a tap
-	never grows it and a send returns the card to its reference
-	height — only text grows it. (The old empty-only carve-out let
-	the rest-to-focus gap ramp move the card ~6px under the
-	keyboard glide; scoping both guards to data-empty keeps them
-	for every empty box, fresh chat or post-send. Without the
-	min-height half, the base 6.4rem desktop floor applies on focus
-	and the card jumps ~21px on every tap.) */
-	.app[data-android] .prompt[data-empty="true"] {
-		gap: 0;
-		min-height: 0;
-	}
+	/* (No focus/empty-scoped prompt sizing: the base rule above holds
+	one geometry for every state.) */
 	/* The row snaps (no height ramp): ramping its height would slide
 	its buttons under tapping fingers mid-flight. The field above may
 	ramp freely — the row is bottom-anchored, so field growth never

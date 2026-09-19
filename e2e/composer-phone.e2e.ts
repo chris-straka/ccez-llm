@@ -53,6 +53,26 @@ test("tapping the empty composer never grows it", async ({ page }) => {
 	expect(Math.abs(focused - fresh)).toBeLessThanOrEqual(2);
 });
 
+test("typing the first character never grows the card", async ({ page }) => {
+	await seedChat(page, []);
+	await page.goto("/");
+	await expect(page.locator(".hero")).toBeVisible({ timeout: 60_000 });
+	const prompt = page.locator(".prompt");
+	await page.locator(".prompt .ta-input").click();
+	await expect(page.locator(".prompt .ta-input")).toBeFocused();
+	const focused = (await prompt.boundingBox())?.height ?? -1;
+	expect(focused).toBeGreaterThan(0);
+	await page.keyboard.type("x");
+	await expect(page.locator(".prompt .ta-input")).toHaveValue("x");
+	const typed = await page.evaluate(() => {
+		const el = document.querySelector(".prompt");
+		return el ? el.getBoundingClientRect().height : -1;
+	});
+	// No gap ramp, no min-height floor when data-empty flips: one
+	// character holds the fresh-chat size; only text lines grow it.
+	expect(Math.abs(typed - focused)).toBeLessThanOrEqual(2);
+});
+
 test("phone Enter inserts a newline instead of sending", async ({ page }) => {
 	await seedChat(page, []);
 	await page.goto("/");
