@@ -12561,10 +12561,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 	.app[data-android] main:not(.empty) .prompt {
 		/* Hug the keyboard: the old 1.8rem margin plus the 1.1rem base
-		offset stranded the composer ~3rem above it. */
+		offset stranded the composer ~3rem above it. No min-height
+		floor: an emptied composer returns to its fresh-chat size,
+		and only text grows it (the old 7.25rem floor stranded
+		~35px of dead space after every send). */
 		margin-bottom: 0.6rem;
 		bottom: 0.6rem;
-		min-height: 7.25rem;
+		min-height: 0;
 	}
 	/* Phone composer: text on top, buttons below (other chat apps'
 	rhythm). The card becomes a plain column: the field grows to its
@@ -12650,17 +12653,17 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 	.app[data-android] .prompt:not(:focus-within) {
 		gap: 0;
-		/* Let the card hug the single line: the non-empty 7.25rem
-		keyboard floor below never applies here. */
+		/* Let the card hug the single line. */
 		min-height: 0;
 	}
-	/* Empty-chat phone composer holds its small rest height on focus:
-	the rest-to-focus growth raced the keyboard glide and moved the
-	thread twice. Chats with messages keep the 7.25rem floor above. */
-	.app[data-android] main.empty .prompt {
-		min-height: 0;
-		/* ...and no focus gap either: the rest-to-focus gap ramp
-		(0 to 0.35rem) moved the card by ~6px on its own. */
+	/* Emptied phone composer holds its fresh-chat size on focus:
+	an empty box is gapless focused or not, so a send returns the
+	card to its reference height and only text grows it. (The old
+	empty-only carve-out let the rest-to-focus gap ramp move the
+	card ~6px under the keyboard glide; scoping gaplessness to
+	data-empty keeps that guard for every empty box, fresh chat
+	or post-send.) */
+	.app[data-android] .prompt[data-empty="true"] {
 		gap: 0;
 	}
 	/* The row snaps (no height ramp): ramping its height would slide
