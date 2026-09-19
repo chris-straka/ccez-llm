@@ -8,11 +8,13 @@ const FURIGANA_TIP = "Add furigana";
 const PINYIN_ORIGINAL = "显示原件";
 
 /**
- * Pinyin is click-to-show only: no hover ever reveals its readings
- * (the hover preview looped show/hide forever). Other kinds unlock
- * per kind, not per message: pinning (clicking) furigana must never
- * let a pinyin hover reveal readings. Pinyin converts synchronously,
- * so this needs no dictionary wait.
+ * All reading aids are click-to-show only: no hover ever reveals
+ * readings. Pinyin has always been hover-free (its preview looped
+ * show/hide forever); furigana joined it by decision (Sep 2026) —
+ * hovering its button is color-only even after a pin+unpin, when the
+ * readings sit cached and the old preview path would have rendered
+ * them. Pinyin converts synchronously, so only furigana needs a
+ * dictionary wait.
  */
 test.beforeEach(async ({ page }) => {
 	await seedChat(page, [{ role: "assistant", content: "你好世界\n漢字を読む" }]);
@@ -27,6 +29,34 @@ test("hovering pinyin before any click previews nothing", async ({ page }) => {
 	await expect(pinyinBtn).toBeVisible();
 
 	await pinyinBtn.hover();
+	await page.waitForTimeout(400);
+	expect(await body.locator(".frb, .frt, ruby, rt").count()).toBe(0);
+	expect(await body.innerHTML()).toBe(before);
+});
+
+test("furigana hover never previews, even after its click", async ({ page }) => {
+	const body = page.locator(BODY);
+	const before = await body.innerHTML();
+	const furiganaBtn = page.locator(`${ARTICLE} .actions button[data-tip="${FURIGANA_TIP}"]`);
+
+	// Click furigana (pins; the dictionary conversion is async), then
+	// unpin so the button is back to hover-only.
+	await furiganaBtn.click();
+	await expect(body.locator("ruby, rt, .frb, .frt").first()).toBeVisible({ timeout: 30_000 });
+	const showOriginal = page.locator(`${ARTICLE} .actions button:has-text("オリジナルを表示")`);
+	await expect(showOriginal).toBeVisible();
+	await showOriginal.click();
+	await expect(furiganaBtn).toBeVisible();
+	await page.mouse.move(2, 2);
+
+	// Click-to-show only: hover reveals nothing and the body stays put.
+	await furiganaBtn.hover();
+	await page.waitForTimeout(600);
+	expect(await body.locator(".frb, .frt, ruby, rt").count()).toBe(0);
+	expect(await body.innerHTML()).toBe(before);
+	// A second enter still shows nothing.
+	await page.mouse.move(2, 2);
+	await furiganaBtn.hover();
 	await page.waitForTimeout(400);
 	expect(await body.locator(".frb, .frt, ruby, rt").count()).toBe(0);
 	expect(await body.innerHTML()).toBe(before);

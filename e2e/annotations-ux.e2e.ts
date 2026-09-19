@@ -17,6 +17,76 @@ import { seedChat } from "./helpers";
  * 7. off-chat drags never highlight above the cursor's current line.
  */
 
+test("annotation card widens with font size up to its cap", async ({ page }) => {
+	const sentence = "Kyoto is an old capital with many temples near the riverbank.";
+	await seedChat(page, [
+		{ role: "assistant", content: sentence },
+		{ role: "assistant", content: sentence },
+		{ role: "assistant", content: sentence }
+	]);
+	await page.addInitScript(() => {
+		const raw = window.localStorage.getItem("ccez-llm-settings-v1");
+		const prev = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+		window.localStorage.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify({ ...prev, fontScale: 2 })
+		);
+	});
+	await page.goto("/");
+	// The middle message: badges at either chrome edge take no hits.
+	const body = page.locator("article.assistant .rendered").nth(1);
+	await expect(body).toBeVisible({ timeout: 60_000 });
+	const box = await body.boundingBox();
+	if (!box) throw new Error("message has no box");
+	const y = box.y + box.height / 2;
+	await page.mouse.click(box.x + 10, y);
+	await page.mouse.move(box.x + box.width - 2, y);
+	await page.mouse.down();
+	await page.evaluate(() => {
+		const text = document.querySelectorAll("article.assistant .rendered p")[1]?.firstChild;
+		if (!(text instanceof Text)) throw new Error("no message text");
+		window.getSelection()?.setBaseAndExtent(text, 0, text, 5);
+	});
+	await page.mouse.up();
+	await expect(page.locator(".sel-menu")).toBeVisible();
+	await page.locator('.sel-menu button:has-text("Annotate")').click();
+	const pop = page.locator(".ann-pop");
+	await expect(pop).toBeVisible();
+	// The create box is the fixed 19rem fresh pill; file a note and
+	// reopen the review card to measure the scaled menu.
+	await pop.locator("textarea").fill("riverbank note");
+	await page.keyboard.press("Enter");
+	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1);
+	await expect(pop).toHaveCount(0, { timeout: 5_000 });
+	await page.locator("button.ccez-ann-badge").click();
+	const card = page.locator(".ann-pop:not(.fresh)");
+	await expect(card).toBeVisible();
+	// 24rem at 200% would be 768px: capped at 32rem (512px).
+	const width = await card.evaluate((el) => el.getBoundingClientRect().width);
+	expect(width).toBeGreaterThan(384);
+	expect(width).toBeLessThanOrEqual(514);
+});
+
+test("desktop right-click never opens the native menu", async ({ page }) => {
+	await seedChat(page, [{ role: "assistant", content: "hello world from Kyoto" }]);
+	await page.goto("/");
+	const body = page.locator("article.assistant .rendered").first();
+	await expect(body).toBeVisible({ timeout: 60_000 });
+	const suppressed = await body.evaluate((el) => {
+		const event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+		el.dispatchEvent(event);
+		return event.defaultPrevented;
+	});
+	expect(suppressed).toBe(true);
+	// Editable fields keep theirs (spellcheck, copy/paste).
+	const kept = await page.locator(".prompt .ta-input").evaluate((el) => {
+		const event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+		el.dispatchEvent(event);
+		return event.defaultPrevented;
+	});
+	expect(kept).toBe(false);
+});
+
 test("mid-word drags snap out to whole words", async ({ page }) => {
 	await seedChat(page, [{ role: "assistant", content: "hello world from Kyoto" }]);
 	await page.goto("/");

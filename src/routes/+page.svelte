@@ -3733,12 +3733,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 
 	/** Annotation popover width: the desktop card, clamped to fit narrow
-	phones — without the clamp x goes negative and it runs off-screen. */
+	phones — without the clamp x goes negative and it runs off-screen.
+	The card scales with font size up to 32rem (see .ann-pop); the
+	fresh pill stays 19rem. Mirror that math here (16px root) or the
+	centering lands on the wrong middle (see annotations-ux
+	centering spec). */
 	function popWidth(fresh: boolean): number {
-		// CSS widths (16px root): .ann-pop is 24rem, .ann-pop.fresh is
-		// 19rem. Measuring the nominal 384 for a fresh box centers on
-		// the wrong middle (see annotations-ux centering spec).
-		return Math.min(fresh ? 19 * 16 : 24 * 16, window.innerWidth - 16);
+		if (fresh) return Math.min(19 * 16, window.innerWidth - 16);
+		const scale = androidUI ? Math.min(8, settings.fontScale) : settings.fontScale;
+		return Math.min(Math.min(24 * scale, 32) * 16, window.innerWidth - 16);
 	}
 
 	/**
@@ -4555,12 +4558,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		if (kind === "furigana" && !isFuriganaCached(aidDisplayText(msg.content))) {
 			return;
 		}
-		// Same preview already showing: re-assigning a fresh object
-		// re-renders every body for nothing (hovering near the button
-		// re-fires enter without leaving).
-		const nextKind = kind ?? null;
-		if (aidPeek?.id === msg.id && (aidPeek.kind ?? null) === nextKind) return;
-		aidPeek = kind === undefined ? { id: msg.id } : { id: msg.id, kind };
+		// Hover is color-only by decision (Sep 2026): readings render
+		// on click (pin) alone, never on hover — so the preview is
+		// never assigned here and aidPeek stays null. The guards above
+		// and every clear site stay as-is (harmless no-ops), documenting
+		// the retired preview path without touching render logic.
+		return;
 	}
 
 	/**
@@ -9173,6 +9176,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// (Android long-press never starts audio — it summons the menu.)
 		const onContextMenu = (event: MouseEvent) => {
 			const target = event.target instanceof Element ? event.target : null;
+			// The native menu never appears on desktop: right-click
+			// belongs to the app (speech, folds), never the webview.
+			// preventDefault suppresses only the native menu — every
+			// branch below still runs. Editable fields keep theirs
+			// (spellcheck, copy/paste), and phones keep the long-press
+			// native callout on purpose (see below).
+			if (!androidUI && !isFieldTarget(event.target)) event.preventDefault();
 			// Android long-press fires contextmenu mid-hold, before
 			// touchend: summon the menu off the live selection without
 			// consuming the event, so the native callout (Copy) still
@@ -14732,7 +14742,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		the rounded corners on phones. Shadows paint outside, so they
 		are unaffected. */
 		overflow: hidden;
-		width: 24rem;
+		/* Font-scaled, capped: roomier text at large sizes, never past
+		32rem (popWidth mirrors this math for centering). */
+		width: min(32rem, calc(24rem * var(--font-scale, 1)));
 		/* Border-box: without it the padding and border stack outside
 		the rem width and the vw clamp (content-box), spilling past
 		the viewport edge on phones. The responsive units only
