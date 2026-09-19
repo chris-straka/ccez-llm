@@ -38,10 +38,7 @@ export function fetchToolDef(): FetchToolDef {
 				"itself or when the message needs no external information. Returns the page text " +
 				"(truncated when long) or a one-line error — never raw HTML. " +
 				"RSS/Atom feeds work too and are the best route to recent news: a feed returns its latest " +
-				"headlines as one line each. Known-good feeds: BBC UK news " +
-				"https://feeds.bbci.co.uk/news/uk/rss.xml, BBC world news " +
-				"https://feeds.bbci.co.uk/news/world/rss.xml, Wikipedia current events " +
-				"https://en.wikipedia.org/wiki/Portal:Current_events.",
+				"headlines as one line each. Prefer a feed URL you know for the outlet asked about.",
 			parameters: {
 				type: "object",
 				properties: {
