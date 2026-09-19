@@ -19,9 +19,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Frontend unit gate (colocated Vitest, no Tauri build): fast signal
+  # Frontend gates (colocated Vitest, no Tauri build): fast signal
   # while the Rust jobs compile. The bun install cache below is keyed by
-  # bun.lock, so dependency-only reruns skip the registry.
+  # bun.lock, so dependency-only reruns skip the registry. The production
+  # build rides along because dev and svelte-check resolve the working
+  # tree: only `vite build` (what the release runs as beforeBuildCommand)
+  # fails on a missing export whose implementation never got committed —
+  # exactly how v0.4.11 shipped unbuildable while every gate stayed green.
   web:
     runs-on: ubuntu-latest
     steps:
@@ -36,6 +40,7 @@ jobs:
             bun-${{ runner.os }}-
       - run: bun install --frozen-lockfile
       - run: bun run test
+      - run: bun run build
 
   rust-macos:
     runs-on: macos-latest
