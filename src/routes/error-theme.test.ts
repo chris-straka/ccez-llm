@@ -9,7 +9,10 @@ import { describe, it, expect } from "vitest";
  * the crash route.
  */
 function errorStyle(): string {
-	const source = readFileSync(new URL("./+error.svelte", import.meta.url), "utf8");
+	const source = readFileSync(
+		new URL("./+error.svelte", import.meta.url),
+		"utf8"
+	);
 	const match = source.match(/<style>([\s\S]*)<\/style>/);
 	if (!match) throw new Error("+error.svelte has no <style> block");
 	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");

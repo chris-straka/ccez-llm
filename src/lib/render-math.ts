@@ -53,12 +53,16 @@ export function mathPlaceholder(index: number): string {
  * backtick code spans. Pure and unit-tested. Returns the source with
  * placeholders plus the math entries in document order.
  */
-export function extractMath(markdownText: string): { stripped: string; maths: MathEntry[] } {
+export function extractMath(markdownText: string): {
+	stripped: string;
+	maths: MathEntry[];
+} {
 	const maths: MathEntry[] = [];
 	let out = "";
 	let i = 0;
 	const len = markdownText.length;
-	const lineStart = (pos: number): boolean => pos === 0 || markdownText[pos - 1] === "\n";
+	const lineStart = (pos: number): boolean =>
+		pos === 0 || markdownText[pos - 1] === "\n";
 	while (i < len) {
 		// Fenced code block: skip whole lines from opener to closer (or EOF).
 		if (lineStart(i) && markdownText.startsWith("```", i)) {
@@ -141,7 +145,11 @@ export function extractMath(markdownText: string): { stripped: string; maths: Ma
 		if (ch === "$") {
 			const prev = i === 0 ? "" : markdownText[i - 1];
 			const next = markdownText[i + 1];
-			if (next !== undefined && !/\s/.test(next) && !/[A-Za-z0-9]/.test(prev ?? "")) {
+			if (
+				next !== undefined &&
+				!/\s/.test(next) &&
+				!/[A-Za-z0-9]/.test(prev ?? "")
+			) {
 				let j = i + 1;
 				let close = -1;
 				while (j < len) {
@@ -259,7 +267,11 @@ const MIN_SENTENCE_CHARS = 8;
  */
 function firstSentence(line: string): string | null {
 	const pattern = /[。！？．]|[.!?](?=\s|$)/g;
-	for (let match = pattern.exec(line); match !== null; match = pattern.exec(line)) {
+	for (
+		let match = pattern.exec(line);
+		match !== null;
+		match = pattern.exec(line)
+	) {
 		const end = match.index + match[0].length;
 		if (Array.from(line.slice(0, end)).length < MIN_SENTENCE_CHARS) continue;
 		return line.slice(0, end);
@@ -274,7 +286,10 @@ function firstSentence(line: string): string | null {
  * as latex — and the preview button keeps it clickable. Pure and
  * unit-tested.
  */
-export function foldPreviewText(content: string, override: string | null): string {
+export function foldPreviewText(
+	content: string,
+	override: string | null
+): string {
 	if (override !== null) return override;
 	const lines = content.split("\n");
 	const tex = mathPreviewInner(lines);
@@ -291,7 +306,8 @@ export function foldPreviewText(content: string, override: string | null): strin
 	// with more below still earns the marker — otherwise a folded
 	// multi-line message reads complete when it is not.
 	const cut = cutPreview(first, 140);
-	if (cut === first && lines.slice(1).join("\n").trim() !== "") return `${first}…`;
+	if (cut === first && lines.slice(1).join("\n").trim() !== "")
+		return `${first}…`;
 	return cut;
 }
 
@@ -309,14 +325,18 @@ export function foldedCodeLabel(lang: string, loc: number): string {
  * delimiters (`$$` display, `$` inline), so a paste recompiles to the
  * same equation. Pure and unit-tested.
  */
-export function mathCopyText(tex: string, kind: "display" | "inline" = "display"): string {
+export function mathCopyText(
+	tex: string,
+	kind: "display" | "inline" = "display"
+): string {
 	return kind === "inline" ? `$${tex}$` : `$$${tex}$$`;
 }
 
 /** Outer `$$…$$` delimiters off a fenced-latex body, when present. */
 export function stripOuterDisplayDelimiters(text: string): string {
 	const t = text.trim();
-	if (t.startsWith("$$") && t.endsWith("$$") && t.length >= 4) return t.slice(2, -2).trim();
+	if (t.startsWith("$$") && t.endsWith("$$") && t.length >= 4)
+		return t.slice(2, -2).trim();
 	return text;
 }
 
@@ -338,9 +358,14 @@ export function stripLatexFenceDupes(source: string): string {
 		/(\$\$[\s\S]*?\$\$)(?:\n[ \t]*)*\n```latex[^\S\n]*\n([\s\S]*?)\n```/gm;
 	const dropFence = (_match: string, fence: string, display: string): string =>
 		normMathSrc(fence) === normMathSrc(display) ? display : _match;
-	const dropFenceAfter = (_match: string, display: string, fence: string): string =>
-		normMathSrc(fence) === normMathSrc(display) ? display : _match;
-	return source.replace(fenceThenDisplay, dropFence).replace(displayThenFence, dropFenceAfter);
+	const dropFenceAfter = (
+		_match: string,
+		display: string,
+		fence: string
+	): string => (normMathSrc(fence) === normMathSrc(display) ? display : _match);
+	return source
+		.replace(fenceThenDisplay, dropFence)
+		.replace(displayThenFence, dropFenceAfter);
 }
 
 /** KaTeX HTML for one math entry, or its escaped plain source on failure. */

@@ -82,12 +82,20 @@ describe("attachment markers", () => {
 		expect(stripAttachmentMarkers("no markers")).toBe("no markers");
 		// Tags typed beside prose strip; the user's words and blank
 		// lines survive.
-		expect(stripAttachmentMarkers(`${IMAGE_MARKER} describe this`)).toBe("describe this");
-		expect(stripAttachmentMarkers(`look ${IMAGE_MARKER} here`)).toBe("look here");
-		expect(stripAttachmentMarkers(`hello\n\n${IMAGE_MARKER} \nworld`)).toBe("hello\n\nworld");
+		expect(stripAttachmentMarkers(`${IMAGE_MARKER} describe this`)).toBe(
+			"describe this"
+		);
+		expect(stripAttachmentMarkers(`look ${IMAGE_MARKER} here`)).toBe(
+			"look here"
+		);
+		expect(stripAttachmentMarkers(`hello\n\n${IMAGE_MARKER} \nworld`)).toBe(
+			"hello\n\nworld"
+		);
 		// Stacked tags on one line all go, mixed kinds alike.
 		expect(stripAttachmentMarkers(`${IMAGE_MARKER} ${IMAGE_MARKER} `)).toBe("");
-		expect(stripAttachmentMarkers(`${FILE_MARKER} read this`)).toBe("read this");
+		expect(stripAttachmentMarkers(`${FILE_MARKER} read this`)).toBe(
+			"read this"
+		);
 		expect(stripAttachmentMarkers(`see ${FILE_MARKER} now`)).toBe("see now");
 		expect(stripAttachmentMarkers(`${IMAGE_MARKER} ${FILE_MARKER} `)).toBe("");
 	});
@@ -122,7 +130,9 @@ describe("attachment markers", () => {
 		expect(appendImageMarkers("", 0)).toBe("");
 		expect(appendImageMarkers("", 1)).toBe(`${IMAGE_MARKER}`);
 		expect(appendImageMarkers("look", 1)).toBe(`look ${IMAGE_MARKER}`);
-		expect(appendImageMarkers("look", 2)).toBe(`look ${IMAGE_MARKER} ${IMAGE_MARKER}`);
+		expect(appendImageMarkers("look", 2)).toBe(
+			`look ${IMAGE_MARKER} ${IMAGE_MARKER}`
+		);
 	});
 
 	it("rides the paste's line one space apart right after a collapsed paste", () => {
@@ -158,9 +168,15 @@ describe("attachment markers", () => {
 		expect(removeMarker(`look ${IMAGE_MARKER} here`)).toBe("look here");
 		expect(removeMarker(`${IMAGE_MARKER} `)).toBe("");
 		// File tags remove by kind, never touching image tags.
-		expect(removeMarker(`${FILE_MARKER} read this`, FILE_MARKER)).toBe("read this");
-		expect(removeMarker(`${IMAGE_MARKER} ${FILE_MARKER}`, FILE_MARKER)).toBe(`${IMAGE_MARKER}`);
-		expect(removeMarker(`${IMAGE_MARKER} x`, FILE_MARKER)).toBe(`${IMAGE_MARKER} x`);
+		expect(removeMarker(`${FILE_MARKER} read this`, FILE_MARKER)).toBe(
+			"read this"
+		);
+		expect(removeMarker(`${IMAGE_MARKER} ${FILE_MARKER}`, FILE_MARKER)).toBe(
+			`${IMAGE_MARKER}`
+		);
+		expect(removeMarker(`${IMAGE_MARKER} x`, FILE_MARKER)).toBe(
+			`${IMAGE_MARKER} x`
+		);
 	});
 
 	it("removes the index-th tag, so a pill drops its own", () => {
@@ -169,14 +185,22 @@ describe("attachment markers", () => {
 		expect(removeMarkerAt(two, IMAGE_MARKER, 0)).toBe(removeMarker(two));
 		// Deleting one tag keeps the other's line (beside-prose
 		// survives on the edited line, as in the legacy path).
-		expect(removeMarkerAt(two, IMAGE_MARKER, 0)).toBe(`one\n${IMAGE_MARKER} two`);
-		expect(removeMarkerAt(two, IMAGE_MARKER, 1)).toBe(`${IMAGE_MARKER} one\ntwo`);
+		expect(removeMarkerAt(two, IMAGE_MARKER, 0)).toBe(
+			`one\n${IMAGE_MARKER} two`
+		);
+		expect(removeMarkerAt(two, IMAGE_MARKER, 1)).toBe(
+			`${IMAGE_MARKER} one\ntwo`
+		);
 		// Stacked on one line index by occurrence, not by line.
 		const stacked = `${IMAGE_MARKER} ${IMAGE_MARKER} end`;
-		expect(removeMarkerAt(stacked, IMAGE_MARKER, 1)).toBe(`${IMAGE_MARKER} end`);
+		expect(removeMarkerAt(stacked, IMAGE_MARKER, 1)).toBe(
+			`${IMAGE_MARKER} end`
+		);
 		// Kinds index separately; out-of-range leaves text untouched.
 		const mixed = `${IMAGE_MARKER} ${FILE_MARKER} ${IMAGE_MARKER}`;
-		expect(removeMarkerAt(mixed, FILE_MARKER, 0)).toBe(`${IMAGE_MARKER} ${IMAGE_MARKER}`);
+		expect(removeMarkerAt(mixed, FILE_MARKER, 0)).toBe(
+			`${IMAGE_MARKER} ${IMAGE_MARKER}`
+		);
 		expect(removeMarkerAt(two, IMAGE_MARKER, 2)).toBe(two);
 		expect(removeMarkerAt(two, IMAGE_MARKER, -1)).toBe(two);
 		expect(removeMarkerAt("no markers", IMAGE_MARKER, 0)).toBe("no markers");
@@ -187,14 +211,19 @@ describe("attachment markers", () => {
 		expect(countMarkers(`${IMAGE_MARKER} ${IMAGE_MARKER} `)).toBe(2);
 		expect(countMarkers(`look ${IMAGE_MARKER} here`)).toBe(1);
 		expect(countMarkers("plain")).toBe(0);
-		expect(countMarkers(`${FILE_MARKER} a ${FILE_MARKER}`, FILE_MARKER)).toBe(2);
+		expect(countMarkers(`${FILE_MARKER} a ${FILE_MARKER}`, FILE_MARKER)).toBe(
+			2
+		);
 		expect(countMarkers(`${IMAGE_MARKER} ${FILE_MARKER}`)).toBe(1);
 		expect(countMarkers(`${IMAGE_MARKER} ${FILE_MARKER}`, FILE_MARKER)).toBe(1);
 	});
 
 	it("cuts tag ranges with offsets for fold mapping", () => {
 		expect(removeTags("no markers")).toEqual({ text: "no markers", cuts: [] });
-		expect(removeTags(`${IMAGE_MARKER} hi`)).toEqual({ text: "hi", cuts: [{ start: 0, end: 15 }] });
+		expect(removeTags(`${IMAGE_MARKER} hi`)).toEqual({
+			text: "hi",
+			cuts: [{ start: 0, end: 15 }]
+		});
 		expect(removeTags(`see ${FILE_MARKER} now`).text).toBe("see now");
 	});
 
@@ -212,7 +241,9 @@ describe("attachment budgets", () => {
 		expect(estimateTextTokens("a".repeat(400))).toBe(100);
 	});
 });
-function testAttachment(partial: Partial<Attachment> & { kind: Attachment["kind"] }): Attachment {
+function testAttachment(
+	partial: Partial<Attachment> & { kind: Attachment["kind"] }
+): Attachment {
 	return {
 		id: partial.id ?? Math.random().toString(36),
 		name: "file",
@@ -276,25 +307,27 @@ describe("leftoverAttachments", () => {
 
 	it("consumes the first attachments of each kind per literal", () => {
 		const atts = [img("a"), img("b"), file("c")];
-		expect(leftoverAttachments(atts, `${IMAGE_MARKER} hi`).map((a) => a.id)).toEqual([
-			"b",
-			"c"
-		]);
+		expect(
+			leftoverAttachments(atts, `${IMAGE_MARKER} hi`).map((a) => a.id)
+		).toEqual(["b", "c"]);
 		expect(leftoverAttachments(atts, "plain text").map((a) => a.id)).toEqual([
 			"a",
 			"b",
 			"c"
 		]);
 		expect(
-			leftoverAttachments(atts, `${IMAGE_MARKER} ${IMAGE_MARKER} ${FILE_MARKER}`).map(
-				(a) => a.id
-			)
+			leftoverAttachments(
+				atts,
+				`${IMAGE_MARKER} ${IMAGE_MARKER} ${FILE_MARKER}`
+			).map((a) => a.id)
 		).toEqual([]);
 	});
 
 	it("ignores literals inside code", () => {
 		const atts = [img("a")];
-		expect(leftoverAttachments(atts, `\`${IMAGE_MARKER}\``).map((a) => a.id)).toEqual(["a"]);
+		expect(
+			leftoverAttachments(atts, `\`${IMAGE_MARKER}\``).map((a) => a.id)
+		).toEqual(["a"]);
 	});
 });
 
@@ -320,14 +353,21 @@ describe("attachmentImageBlobs", () => {
 	});
 
 	it("skips text attachments, dataless images, and dead counts", async () => {
-		const atts = [testAttachment({ id: "t", kind: "text", text: "hi" }), png("nodata", null), png("a")];
+		const atts = [
+			testAttachment({ id: "t", kind: "text", text: "hi" }),
+			png("nodata", null),
+			png("a")
+		];
 		expect(await attachmentImageBlobs(atts, 5)).toHaveLength(1);
 		expect(await attachmentImageBlobs(atts, 0)).toEqual([]);
 		expect(await attachmentImageBlobs([], 2)).toEqual([]);
 	});
 
 	it("skips unreadable entries instead of failing", async () => {
-		const atts = [png("bad", "http://127.0.0.1:1/unreachable.png"), png("good")];
+		const atts = [
+			png("bad", "http://127.0.0.1:1/unreachable.png"),
+			png("good")
+		];
 		expect(await attachmentImageBlobs(atts, 2)).toHaveLength(1);
 	});
 });
@@ -337,18 +377,31 @@ describe("indexed attachment access", () => {
 		"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 	const png = (id: string, dataUrl: string | null = PNG) =>
 		testAttachment({ id, kind: "image", mime: "image/png", dataUrl });
-	const pngSize = async (): Promise<number> => (await (await fetch(PNG)).blob()).size;
+	const pngSize = async (): Promise<number> =>
+		(await (await fetch(PNG)).blob()).size;
 
 	it("reads blobs for the indexed attachments, skipping dataless ones in place", async () => {
-		const atts = [png("a"), testAttachment({ id: "t", kind: "text", text: "hi" }), png("nodata", null), png("c")];
+		const atts = [
+			png("a"),
+			testAttachment({ id: "t", kind: "text", text: "hi" }),
+			png("nodata", null),
+			png("c")
+		];
 		// Indexes ride image order (text attachments don't shift them).
 		const blobs = await attachmentImageBlobsAt(atts, [0, 1, 2]);
-		expect(blobs.map((b) => b.size)).toEqual([await pngSize(), await pngSize()]);
+		expect(blobs.map((b) => b.size)).toEqual([
+			await pngSize(),
+			await pngSize()
+		]);
 		expect(await attachmentImageBlobsAt(atts, [5, -1])).toEqual([]);
 	});
 
 	it("reads data URLs synchronously for same-event clipboard writes", () => {
-		const atts = [png("a"), testAttachment({ id: "t", kind: "text", text: "hi" }), png("nodata", null)];
+		const atts = [
+			png("a"),
+			testAttachment({ id: "t", kind: "text", text: "hi" }),
+			png("nodata", null)
+		];
 		expect(attachmentDataUrlsAt(atts, [0])).toEqual([PNG]);
 		expect(attachmentDataUrlsAt(atts, [1])).toEqual([null]);
 		expect(attachmentDataUrlsAt(atts, [9])).toEqual([null]);
@@ -359,9 +412,15 @@ describe("indexed attachment access", () => {
 		const file = (id: string) => testAttachment({ id, kind: "text" });
 		const atts = [img("a"), file("f"), img("b"), img("c")];
 		// Deleting the first tag drops the first image, files untouched.
-		expect(dropAttachmentsAtIndexes(atts, "image", [0]).map((a) => a.id)).toEqual(["f", "b", "c"]);
-		expect(dropAttachmentsAtIndexes(atts, "image", [1]).map((a) => a.id)).toEqual(["a", "f", "c"]);
-		expect(dropAttachmentsAtIndexes(atts, "text", [0]).map((a) => a.id)).toEqual(["a", "b", "c"]);
+		expect(
+			dropAttachmentsAtIndexes(atts, "image", [0]).map((a) => a.id)
+		).toEqual(["f", "b", "c"]);
+		expect(
+			dropAttachmentsAtIndexes(atts, "image", [1]).map((a) => a.id)
+		).toEqual(["a", "f", "c"]);
+		expect(
+			dropAttachmentsAtIndexes(atts, "text", [0]).map((a) => a.id)
+		).toEqual(["a", "b", "c"]);
 		// Out-of-range and negative indexes drop nothing.
 		expect(dropAttachmentsAtIndexes(atts, "image", [9, -1])).toHaveLength(4);
 		expect(dropAttachmentsAtIndexes([], "image", [0])).toEqual([]);
@@ -401,7 +460,9 @@ describe("pasted-text tags", () => {
 	it("labels the stored char count and counts tags", () => {
 		expect(pastedTextMarker(512)).toBe("[Pasted 512 chars]");
 		expect(countPastedTags("plain text")).toBe(0);
-		expect(countPastedTags(`a ${pastedTextMarker(10)} b ${pastedTextMarker(20)}`)).toBe(2);
+		expect(
+			countPastedTags(`a ${pastedTextMarker(10)} b ${pastedTextMarker(20)}`)
+		).toBe(2);
 		// Fixed markers never read as pasted tags.
 		expect(countPastedTags(`${IMAGE_MARKER} ${FILE_MARKER}`)).toBe(0);
 		expect(countMarkers(pastedTextMarker(10))).toBe(0);
@@ -412,7 +473,9 @@ describe("pasted-text tags", () => {
 		expect(pastedMarkerInsert("", 10)).toBe("[Pasted 10 chars] ");
 		expect(pastedMarkerInsert("notes\n", 10)).toBe("[Pasted 10 chars] ");
 		// Chained after another tag's trailing space: same line.
-		expect(pastedMarkerInsert(`${IMAGE_MARKER} `, 10)).toBe("[Pasted 10 chars] ");
+		expect(pastedMarkerInsert(`${IMAGE_MARKER} `, 10)).toBe(
+			"[Pasted 10 chars] "
+		);
 		// Spaceless mid-prose takes the tag on its line, one space
 		// apart — never glues, never a line of its own.
 		expect(pastedMarkerInsert("hello", 10)).toBe(" [Pasted 10 chars] ");
@@ -435,9 +498,15 @@ describe("makePastedTextAttachment", () => {
 	it("caps like file drops and leaves files unflagged", () => {
 		const att = makePastedTextAttachment("a".repeat(MAX_FILE_CHARS + 10));
 		expect(att.text?.length).toBe(MAX_FILE_CHARS);
-		expect(pastedTextMarker(att.text?.length ?? 0)).toBe(`[Pasted ${MAX_FILE_CHARS} chars]`);
-		expect(isPastedTextAttachment(testAttachment({ kind: "text" }))).toBe(false);
-		expect(isPastedTextAttachment(testAttachment({ kind: "image" }))).toBe(false);
+		expect(pastedTextMarker(att.text?.length ?? 0)).toBe(
+			`[Pasted ${MAX_FILE_CHARS} chars]`
+		);
+		expect(isPastedTextAttachment(testAttachment({ kind: "text" }))).toBe(
+			false
+		);
+		expect(isPastedTextAttachment(testAttachment({ kind: "image" }))).toBe(
+			false
+		);
 	});
 });
 
@@ -449,8 +518,12 @@ describe("removePastedAt", () => {
 	});
 
 	it("keeps prose typed beside the tag and drops bare host lines", () => {
-		expect(removePastedAt(`look ${pastedTextMarker(5)} here`, 0)).toBe("look here");
-		expect(removePastedAt(`before\n${pastedTextMarker(5)} \nafter`, 0)).toBe("before\nafter");
+		expect(removePastedAt(`look ${pastedTextMarker(5)} here`, 0)).toBe(
+			"look here"
+		);
+		expect(removePastedAt(`before\n${pastedTextMarker(5)} \nafter`, 0)).toBe(
+			"before\nafter"
+		);
 	});
 
 	it("leaves text untouched out of range", () => {
@@ -463,7 +536,9 @@ describe("removePastedAt", () => {
 describe("stripPastedMarkers", () => {
 	it("drops every pasted tag without touching prose spacing", () => {
 		expect(stripPastedMarkers(`a  b ${pastedTextMarker(3)} c`)).toBe("a  b c");
-		expect(stripPastedMarkers(`keep\n${pastedTextMarker(3)}\nkeep`)).toBe("keep\nkeep");
+		expect(stripPastedMarkers(`keep\n${pastedTextMarker(3)}\nkeep`)).toBe(
+			"keep\nkeep"
+		);
 		expect(stripPastedMarkers("plain")).toBe("plain");
 		// Fixed markers stay for their own strip.
 		expect(stripPastedMarkers(`${IMAGE_MARKER} hi`)).toBe(`${IMAGE_MARKER} hi`);
@@ -473,13 +548,17 @@ describe("stripPastedMarkers", () => {
 describe("splicePastedText", () => {
 	it("splices stored text at tag positions index-matched", () => {
 		const doc = `intro ${pastedTextMarker(3)} middle ${pastedTextMarker(3)} end`;
-		expect(splicePastedText(doc, ["AAA", "BBB"])).toBe("intro AAA middle BBB end");
+		expect(splicePastedText(doc, ["AAA", "BBB"])).toBe(
+			"intro AAA middle BBB end"
+		);
 	});
 
 	it("leaves tags without text literal and end-appends texts without tags", () => {
 		// Fewer texts than tags: the orphan tag stays (hand-typed or
 		// resurrected by undo), exactly like an unmatched literal.
-		expect(splicePastedText(`a ${pastedTextMarker(3)}`, [])).toBe(`a ${pastedTextMarker(3)}`);
+		expect(splicePastedText(`a ${pastedTextMarker(3)}`, [])).toBe(
+			`a ${pastedTextMarker(3)}`
+		);
 		// More texts than tags: leftovers end-append like files.
 		expect(splicePastedText("hi", ["AAA", "BBB"])).toBe("hi\n\nAAA\n\nBBB");
 		expect(splicePastedText("", ["AAA"])).toBe("AAA");
@@ -507,29 +586,50 @@ describe("splicePastedFolds", () => {
 			text: `a ${pastedTextMarker(3)}`,
 			folds: []
 		});
-		expect(splicePastedFolds("plain", [])).toEqual({ text: "plain", folds: [] });
+		expect(splicePastedFolds("plain", [])).toEqual({
+			text: "plain",
+			folds: []
+		});
 	});
 
 	it("clamps folds into the trimmed send text", () => {
 		// Trailing-space prose (the usual paste tail): the stored
 		// text trims it, so the fold must end where storage ends or
 		// the renderer drops it and the tag is lost.
-		const { text, folds } = splicePastedFolds(`${pastedTextMarker(3)} `, ["AAA "]);
+		const { text, folds } = splicePastedFolds(`${pastedTextMarker(3)} `, [
+			"AAA "
+		]);
 		expect(text).toBe("AAA");
 		expect(folds).toEqual([{ start: 0, end: 3, chars: 3 }]);
 	});
 });
 
 describe("pasted-aware index drops", () => {
-	const pasted = (id: string) => ({ ...testAttachment({ id, kind: "text" }), pastedText: true });
+	const pasted = (id: string) => ({
+		...testAttachment({ id, kind: "text" }),
+		pastedText: true
+	});
 	const file = (id: string) => testAttachment({ id, kind: "text" });
 
 	it("pairs file tags with file drops and pasted tags with pasted drops", () => {
 		const list = [file("f"), pasted("p"), file("g")];
-		expect(dropFileAttachmentsAtIndexes(list, [0]).map((a) => a.id)).toEqual(["p", "g"]);
-		expect(dropFileAttachmentsAtIndexes(list, [1]).map((a) => a.id)).toEqual(["f", "p"]);
-		expect(dropPastedAttachmentsAtIndexes(list, [0]).map((a) => a.id)).toEqual(["f", "g"]);
-		expect(dropPastedAttachmentsAtIndexes(list, [4]).map((a) => a.id)).toEqual(["f", "p", "g"]);
+		expect(dropFileAttachmentsAtIndexes(list, [0]).map((a) => a.id)).toEqual([
+			"p",
+			"g"
+		]);
+		expect(dropFileAttachmentsAtIndexes(list, [1]).map((a) => a.id)).toEqual([
+			"f",
+			"p"
+		]);
+		expect(dropPastedAttachmentsAtIndexes(list, [0]).map((a) => a.id)).toEqual([
+			"f",
+			"g"
+		]);
+		expect(dropPastedAttachmentsAtIndexes(list, [4]).map((a) => a.id)).toEqual([
+			"f",
+			"p",
+			"g"
+		]);
 	});
 
 	it("never mistakes fixed markers for pasted tags", () => {
@@ -539,9 +639,9 @@ describe("pasted-aware index drops", () => {
 
 describe("blobToDataUrl", () => {
 	it("encodes typed blobs without FileReader", async () => {
-		await expect(blobToDataUrl(new Blob(["hi"], { type: "image/png" }))).resolves.toBe(
-			"data:image/png;base64,aGk="
-		);
+		await expect(
+			blobToDataUrl(new Blob(["hi"], { type: "image/png" }))
+		).resolves.toBe("data:image/png;base64,aGk=");
 	});
 
 	it("falls back to octet-stream for typeless blobs, like FileReader", async () => {

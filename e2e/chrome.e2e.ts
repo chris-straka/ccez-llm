@@ -12,7 +12,9 @@ async function openWithMessages(
 ) {
 	await seedChat(page, messages);
 	await page.goto("/");
-	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
 }
 
 async function openSettings(page: import("@playwright/test").Page) {
@@ -26,7 +28,9 @@ async function openSettings(page: import("@playwright/test").Page) {
 test("prompt slides away when idle and returns on keys", async ({ page }) => {
 	// Long thread: idle-hide skips content shorter than the viewport,
 	// so the timeout path needs an overflowing chat.
-	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(40);
+	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(
+		40
+	);
 	const turns = [0, 1, 2, 3, 4, 5].flatMap((n) => [
 		{ role: "user" as const, content: `question ${n} ${long}` },
 		{ role: "assistant" as const, content: `answer ${n} ${long}` }
@@ -39,7 +43,9 @@ test("prompt slides away when idle and returns on keys", async ({ page }) => {
 		);
 	});
 	await page.goto("/");
-	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const prompt = page.locator(".prompt");
 	// No input for 2s (+ticker): the idle class lands and the
 	// composer fades out of hit-testing.
@@ -56,7 +62,9 @@ test("prompt slides away when idle and returns on keys", async ({ page }) => {
 /** Summoning fades the composer back: opacity ramps instead of
 snapping to 1 on the restoring keystroke. */
 test("summoned prompt fades in instead of popping", async ({ page }) => {
-	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(40);
+	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(
+		40
+	);
 	const turns = [0, 1, 2, 3, 4, 5].flatMap((n) => [
 		{ role: "user" as const, content: `question ${n} ${long}` },
 		{ role: "assistant" as const, content: `answer ${n} ${long}` }
@@ -69,7 +77,9 @@ test("summoned prompt fades in instead of popping", async ({ page }) => {
 		);
 	});
 	await page.goto("/");
-	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const prompt = page.locator(".prompt");
 	await expect(prompt).toHaveClass(/prompt-idle/, { timeout: 15_000 });
 	const opacity = (): Promise<number> =>
@@ -85,7 +95,9 @@ test("summoned prompt fades in instead of popping", async ({ page }) => {
 /** Button clicks never summon the hidden prompt (copy, run, fold). */
 test("button clicks leave the hidden prompt alone", async ({ page }) => {
 	await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
-	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(40);
+	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(
+		40
+	);
 	const turns = [0, 1, 2, 3, 4, 5].flatMap((n) => [
 		{ role: "user" as const, content: `question ${n} ${long}` },
 		{ role: "assistant" as const, content: `answer ${n} ${long}` }
@@ -102,7 +114,9 @@ test("button clicks leave the hidden prompt alone", async ({ page }) => {
 		);
 	});
 	await page.goto("/");
-	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const prompt = page.locator(".prompt");
 	await expect(prompt).toHaveClass(/prompt-idle/, { timeout: 15_000 });
 	const block = page.locator(".ccez-code").first();
@@ -113,7 +127,9 @@ test("button clicks leave the hidden prompt alone", async ({ page }) => {
 	await page.waitForTimeout(600);
 	await expect(prompt).toHaveClass(/prompt-idle/);
 	await block.locator("button.ccez-code-run").click();
-	await expect(block.locator(".ccez-code-output")).toBeVisible({ timeout: 10_000 });
+	await expect(block.locator(".ccez-code-output")).toBeVisible({
+		timeout: 10_000
+	});
 	await page.waitForTimeout(600);
 	await expect(prompt).toHaveClass(/prompt-idle/);
 	// Plain message clicks leave it hidden too — summoning is keys-only.
@@ -132,7 +148,9 @@ test("double-click closes the settings panel", async ({ page }) => {
 	await expect(panel).not.toHaveClass(/closed/);
 	// Open space: dispatch on the panel box itself.
 	await panel.evaluate((el) => {
-		el.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, cancelable: true }));
+		el.dispatchEvent(
+			new MouseEvent("dblclick", { bubbles: true, cancelable: true })
+		);
 	});
 	await expect(panel).toHaveClass(/closed/);
 	// Text keeps its behavior: double-clicking a label reopens
@@ -145,7 +163,9 @@ test("double-click closes the settings panel", async ({ page }) => {
 
 /** Waypoint menu fades on a slow ramp, not a blink. */
 test("waypoint menu reveals on a 0.3s fade", async ({ page }) => {
-	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(20);
+	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(
+		20
+	);
 	await openWithMessages(
 		page,
 		[0, 1, 2, 3].flatMap((n) => [
@@ -164,7 +184,9 @@ test("waypoint menu reveals on a 0.3s fade", async ({ page }) => {
 
 /** Idle hide and restore never move the messages (reserved slot). */
 test("idle hide keeps every offset stable", async ({ page }) => {
-	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(40);
+	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(
+		40
+	);
 	const turns = [0, 1, 2, 3, 4, 5].flatMap((n) => [
 		{ role: "user" as const, content: `question ${n} ${long}` },
 		{ role: "assistant" as const, content: `answer ${n} ${long}` }
@@ -177,7 +199,9 @@ test("idle hide keeps every offset stable", async ({ page }) => {
 		);
 	});
 	await page.goto("/");
-	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const offsets = () =>
 		page.evaluate(() => ({
 			prompt: document.querySelector(".prompt")?.offsetTop ?? -1,
@@ -198,7 +222,9 @@ test("idle hide keeps every offset stable", async ({ page }) => {
 /** Always-hide mode: the prompt follows composer focus, not the clock. */
 test("always-hide hides on blur and returns on i", async ({ page }) => {
 	await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
-	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(40);
+	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(
+		40
+	);
 	const turns = [0, 1, 2, 3, 4, 5].flatMap((n) => [
 		{ role: "user" as const, content: `question ${n} ${long}` },
 		{ role: "assistant" as const, content: `answer ${n} ${long}` }
@@ -215,7 +241,9 @@ test("always-hide hides on blur and returns on i", async ({ page }) => {
 		);
 	});
 	await page.goto("/");
-	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article.assistant").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const prompt = page.locator(".prompt");
 	// Focus the composer via the i key, then pin focus natively
 	// (the restore focus lands on a tick — assert it before blurring).
@@ -223,21 +251,31 @@ test("always-hide hides on blur and returns on i", async ({ page }) => {
 	await expect(prompt).not.toHaveClass(/prompt-idle/, { timeout: 5_000 });
 	await page.locator(".ta-input").click();
 	await expect
-		.poll(() => page.evaluate(() => !!document.activeElement?.closest?.(".prompt")))
+		.poll(() =>
+			page.evaluate(() => !!document.activeElement?.closest?.(".prompt"))
+		)
 		.toBe(true);
 	// A control click blurs it: hidden at once, no timeout wait.
-	await page.locator(".ccez-code").first().locator("button.ccez-code-copy").click();
+	await page
+		.locator(".ccez-code")
+		.first()
+		.locator("button.ccez-code-copy")
+		.click();
 	await expect(prompt).toHaveClass(/prompt-idle/, { timeout: 5_000 });
 	// Focus rests on the clicked button (where i correctly stays
 	// silent): drop it to the page, then the i key summons back.
-	await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
+	await page.evaluate(() =>
+		(document.activeElement as HTMLElement | null)?.blur?.()
+	);
 	await page.keyboard.press("i");
 	await expect(prompt).not.toHaveClass(/prompt-idle/, { timeout: 5_000 });
 });
 
 /** Always-hide mode: boots hidden with no interaction (no mount steal). */
 test("always-hide boots hidden", async ({ page }) => {
-	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(40);
+	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(
+		40
+	);
 	const turns = [0, 1, 2, 3].flatMap((n) => [
 		{ role: "user" as const, content: `question ${n} ${long}` },
 		{ role: "assistant" as const, content: `answer ${n} ${long}` }
@@ -250,14 +288,22 @@ test("always-hide boots hidden", async ({ page }) => {
 		);
 	});
 	await page.goto("/");
-	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
-	await expect(page.locator(".prompt")).toHaveClass(/prompt-idle/, { timeout: 10_000 });
+	await expect(page.locator("article.assistant").first()).toBeVisible({
+		timeout: 60_000
+	});
+	await expect(page.locator(".prompt")).toHaveClass(/prompt-idle/, {
+		timeout: 10_000
+	});
 });
 
 /** Always-hide covers short threads too: no viewport exemption. */
 test("always-hide boots hidden on a short thread", async ({ page }) => {
 	await seedChat(page, [
-		{ role: "user", content: "Give me a Chinese paragraph and a Japanese paragraph, both long." },
+		{
+			role: "user",
+			content:
+				"Give me a Chinese paragraph and a Japanese paragraph, both long."
+		},
 		{ role: "assistant", content: "ready" }
 	]);
 	await page.addInitScript(() => {
@@ -267,15 +313,21 @@ test("always-hide boots hidden on a short thread", async ({ page }) => {
 		);
 	});
 	await page.goto("/");
-	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
-	await expect(page.locator(".prompt")).toHaveClass(/prompt-idle/, { timeout: 10_000 });
+	await expect(page.locator("article.assistant").first()).toBeVisible({
+		timeout: 60_000
+	});
+	await expect(page.locator(".prompt")).toHaveClass(/prompt-idle/, {
+		timeout: 10_000
+	});
 });
 
 /** Fresh installs boot hidden too: always-hide is the out-of-box
 default (seedChat presets never-idle for clickability, so this pins
 the default by writing it explicitly). */
 test("default boots hidden (always-hide out of the box)", async ({ page }) => {
-	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(40);
+	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(
+		40
+	);
 	const turns = [0, 1, 2, 3].flatMap((n) => [
 		{ role: "user" as const, content: `question ${n} ${long}` },
 		{ role: "assistant" as const, content: `answer ${n} ${long}` }
@@ -288,15 +340,21 @@ test("default boots hidden (always-hide out of the box)", async ({ page }) => {
 		);
 	});
 	await page.goto("/");
-	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
-	await expect(page.locator(".prompt")).toHaveClass(/prompt-idle/, { timeout: 10_000 });
+	await expect(page.locator("article.assistant").first()).toBeVisible({
+		timeout: 60_000
+	});
+	await expect(page.locator(".prompt")).toHaveClass(/prompt-idle/, {
+		timeout: 10_000
+	});
 });
 
 /** Space with a panel owning the stage is a no-op: settings open but
 focus outside it must not summon the prompt from behind. Closing the
 panel restores the normal Space summons. */
 test("space with settings open never summons the prompt", async ({ page }) => {
-	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(40);
+	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(
+		40
+	);
 	const turns = [0, 1, 2, 3].flatMap((n) => [
 		{ role: "user" as const, content: `question ${n} ${long}` },
 		{ role: "assistant" as const, content: `answer ${n} ${long}` }
@@ -310,15 +368,23 @@ test("space with settings open never summons the prompt", async ({ page }) => {
 	});
 	await page.goto("/");
 	const prompt = page.locator(".prompt");
-	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article.assistant").first()).toBeVisible({
+		timeout: 60_000
+	});
 	await expect(prompt).toHaveClass(/prompt-idle/, { timeout: 10_000 });
 	await page.keyboard.press("Meta+,");
 	await expect(page.locator(".settings-panel")).not.toHaveClass(/closed/);
 	// Focus sits outside the panel (the toggle moves no focus): Space
 	// out there summons nothing.
-	await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
+	await page.evaluate(() =>
+		(document.activeElement as HTMLElement | null)?.blur?.()
+	);
 	await expect
-		.poll(() => page.evaluate(() => (document.activeElement as HTMLElement | null)?.tagName ?? "NONE"))
+		.poll(() =>
+			page.evaluate(
+				() => (document.activeElement as HTMLElement | null)?.tagName ?? "NONE"
+			)
+		)
 		.not.toBe("INPUT");
 	await page.keyboard.press("Space");
 	await page.waitForTimeout(800);
@@ -333,7 +399,9 @@ test("space with settings open never summons the prompt", async ({ page }) => {
 /** Backslash is Space-equivalent: hidden it summons, on an empty
 composer it stows (blur, and always-hide hides on blur). */
 test("backslash summons and stows like Space", async ({ page }) => {
-	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(40);
+	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(
+		40
+	);
 	const turns = [0, 1, 2, 3].flatMap((n) => [
 		{ role: "user" as const, content: `question ${n} ${long}` },
 		{ role: "assistant" as const, content: `answer ${n} ${long}` }
@@ -347,15 +415,21 @@ test("backslash summons and stows like Space", async ({ page }) => {
 	});
 	await page.goto("/");
 	const prompt = page.locator(".prompt");
-	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article.assistant").first()).toBeVisible({
+		timeout: 60_000
+	});
 	await expect(prompt).toHaveClass(/prompt-idle/, { timeout: 10_000 });
-	await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
+	await page.evaluate(() =>
+		(document.activeElement as HTMLElement | null)?.blur?.()
+	);
 	await page.keyboard.press("\\");
 	await expect(prompt).not.toHaveClass(/prompt-idle/, { timeout: 5_000 });
 	// Restore lands focus in the composer on a tick — wait for it,
 	// then backslash stows instead of typing.
 	await expect
-		.poll(() => page.evaluate(() => !!document.activeElement?.closest?.(".prompt")))
+		.poll(() =>
+			page.evaluate(() => !!document.activeElement?.closest?.(".prompt"))
+		)
 		.toBe(true);
 	await page.keyboard.press("\\");
 	await expect(prompt).toHaveClass(/prompt-idle/, { timeout: 5_000 });
@@ -363,8 +437,12 @@ test("backslash summons and stows like Space", async ({ page }) => {
 
 /** Always-hide: the click that dismisses the prompt must not re-summon it.
 A click-off hides and stays hidden; the i key restores. */
-test("always-hide click-off stays hidden until the next press", async ({ page }) => {
-	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(40);
+test("always-hide click-off stays hidden until the next press", async ({
+	page
+}) => {
+	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(
+		40
+	);
 	const turns = [0, 1, 2, 3].flatMap((n) => [
 		{ role: "user" as const, content: `question ${n} ${long}` },
 		{ role: "assistant" as const, content: `answer ${n} ${long}` }
@@ -377,13 +455,17 @@ test("always-hide click-off stays hidden until the next press", async ({ page })
 		);
 	});
 	await page.goto("/");
-	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article.assistant").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const prompt = page.locator(".prompt");
 	await page.keyboard.press("i");
 	await expect(prompt).not.toHaveClass(/prompt-idle/, { timeout: 5_000 });
 	await page.locator(".ta-input").click();
 	await expect
-		.poll(() => page.evaluate(() => !!document.activeElement?.closest?.(".prompt")))
+		.poll(() =>
+			page.evaluate(() => !!document.activeElement?.closest?.(".prompt"))
+		)
 		.toBe(true);
 	// Click off the visible prompt: hides, and the same click must not
 	// bring it back (it starts to hide, then stays hidden).
@@ -400,17 +482,24 @@ test("always-hide click-off stays hidden until the next press", async ({ page })
 the prompt. The press begins on a live selection, so its click only
 dismisses — selecting and unselecting never touches the composer. */
 test("clearing a highlight never summons the prompt", async ({ page }) => {
-	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(40);
+	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(
+		40
+	);
 	const turns = [0, 1, 2, 3].flatMap((n) => [
 		{ role: "user" as const, content: `question ${n} ${long}` },
 		{ role: "assistant" as const, content: `answer ${n} ${long}` }
 	]);
 	await seedChat(page, turns);
 	await page.addInitScript(() => {
-		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({ promptIdleSec: -1 }));
+		window.localStorage.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify({ promptIdleSec: -1 })
+		);
 	});
 	await page.goto("/");
-	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article.assistant").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const prompt = page.locator(".prompt");
 	await expect(prompt).toHaveClass(/prompt-idle/, { timeout: 10_000 });
 	// Drag-select a word: the drag itself never summons (over 6px), the
@@ -429,7 +518,9 @@ test("clearing a highlight never summons the prompt", async ({ page }) => {
 	await expect(prompt).toHaveClass(/prompt-idle/, { timeout: 5_000 });
 	await page.waitForTimeout(800);
 	await expect(prompt).toHaveClass(/prompt-idle/);
-	const selected = await page.evaluate(() => window.getSelection()?.toString() ?? "");
+	const selected = await page.evaluate(
+		() => window.getSelection()?.toString() ?? ""
+	);
 	expect(selected).toBe("");
 });
 
@@ -437,17 +528,24 @@ test("clearing a highlight never summons the prompt", async ({ page }) => {
 prompt. The first click's press starts collapsed, which used to summon
 before the second click hid it again. */
 test("double-clicking text never flashes the prompt", async ({ page }) => {
-	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(40);
+	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(
+		40
+	);
 	const turns = [0, 1, 2, 3].flatMap((n) => [
 		{ role: "user" as const, content: `question ${n} ${long}` },
 		{ role: "assistant" as const, content: `answer ${n} ${long}` }
 	]);
 	await seedChat(page, turns);
 	await page.addInitScript(() => {
-		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({ promptIdleSec: -1 }));
+		window.localStorage.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify({ promptIdleSec: -1 })
+		);
 	});
 	await page.goto("/");
-	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article.assistant").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const prompt = page.locator(".prompt");
 	await expect(prompt).toHaveClass(/prompt-idle/, { timeout: 10_000 });
 	const body = page.locator("article.assistant .rendered").first();
@@ -455,7 +553,9 @@ test("double-clicking text never flashes the prompt", async ({ page }) => {
 	if (!box) throw new Error("message has no box");
 	await page.mouse.dblclick(box.x + 20, box.y + box.height / 2);
 	// A word is selected, and the prompt never left hidden — no flash.
-	const selected = await page.evaluate(() => window.getSelection()?.toString() ?? "");
+	const selected = await page.evaluate(
+		() => window.getSelection()?.toString() ?? ""
+	);
 	expect(selected).not.toBe("");
 	await expect(prompt).toHaveClass(/prompt-idle/);
 	await page.waitForTimeout(800);
@@ -464,19 +564,28 @@ test("double-clicking text never flashes the prompt", async ({ page }) => {
 
 /** Always-hide: bare Space on an empty composer dismisses (no message
 starts with a space), while Space after text types a space. */
-test("space dismisses an empty composer, types after text", async ({ page }) => {
+test("space dismisses an empty composer, types after text", async ({
+	page
+}) => {
 	await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
-	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(40);
+	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(
+		40
+	);
 	const turns = [0, 1, 2, 3].flatMap((n) => [
 		{ role: "user" as const, content: `question ${n} ${long}` },
 		{ role: "assistant" as const, content: `answer ${n} ${long}` }
 	]);
 	await seedChat(page, turns);
 	await page.addInitScript(() => {
-		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({ promptIdleSec: -1 }));
+		window.localStorage.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify({ promptIdleSec: -1 })
+		);
 	});
 	await page.goto("/");
-	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article.assistant").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const prompt = page.locator(".prompt");
 	await expect(prompt).toHaveClass(/prompt-idle/, { timeout: 10_000 });
 	const inPrompt = () =>
@@ -506,14 +615,18 @@ test("space dismisses an empty composer, types after text", async ({ page }) => 
 widths its center matches the articles' (scrollbar gutter included),
 so text never sticks out on one side only. */
 test("prompt centers on the message column", async ({ page }) => {
-	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(40);
+	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(
+		40
+	);
 	const turns = [0, 1].flatMap((n) => [
 		{ role: "user" as const, content: `question ${n} ${long}` },
 		{ role: "assistant" as const, content: `answer ${n} ${long}` }
 	]);
 	await seedChat(page, turns);
 	await page.goto("/");
-	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article.assistant").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const centers = await page.evaluate(() => {
 		const r = (el: Element | null): { cx: number } => {
 			const b = (el as HTMLElement).getBoundingClientRect();
@@ -530,42 +643,62 @@ test("prompt centers on the message column", async ({ page }) => {
 /** An empty focused composer still blinks: the native caret is the
 only focus signal, so the empty-box caret hiding applies unfocused only. */
 test("empty focused composer shows its cursor", async ({ page }) => {
-	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(40);
+	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(
+		40
+	);
 	await seedChat(page, [{ role: "assistant", content: `answer ${long}` }]);
 	await page.goto("/");
-	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article.assistant").first()).toBeVisible({
+		timeout: 60_000
+	});
 	await page.locator(".ta-input").click();
 	await expect
-		.poll(() => page.evaluate(() => !!document.activeElement?.closest?.(".prompt")))
+		.poll(() =>
+			page.evaluate(() => !!document.activeElement?.closest?.(".prompt"))
+		)
 		.toBe(true);
 	// Focused + empty: the native caret blinks (the cursor is the only
 	// focus signal), so pin the caret-color, not a cursor node.
 	const caretColor = (): Promise<string> =>
 		page.evaluate(
-			() => getComputedStyle(document.querySelector(".prompt .ta-input") as HTMLElement).caretColor
+			() =>
+				getComputedStyle(
+					document.querySelector(".prompt .ta-input") as HTMLElement
+				).caretColor
 		);
 	await expect.poll(caretColor).not.toBe("rgba(0, 0, 0, 0)");
 	// Blurred + empty: no stray caret (the data-empty rule parks it).
-	await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
+	await page.evaluate(() =>
+		(document.activeElement as HTMLElement | null)?.blur?.()
+	);
 	await expect.poll(caretColor).toBe("rgba(0, 0, 0, 0)");
 });
 
 /** The prompt parks while a sidebar owns the stage: settings open
 hides it, closing brings it back. */
 test("prompt hides while settings are open", async ({ page }) => {
-	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(40);
+	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(
+		40
+	);
 	await seedChat(page, [{ role: "assistant", content: `answer ${long}` }]);
 	// Timed idle: the always-hide default boots parked, which would
 	// fail the visible setup below (parking is what this tests).
 	await page.addInitScript(() => {
-		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({ promptIdleSec: 10 }));
+		window.localStorage.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify({ promptIdleSec: 10 })
+		);
 	});
 	await page.goto("/");
-	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article.assistant").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const prompt = page.locator(".prompt");
 	await expect(prompt).not.toHaveClass(/prompt-idle/, { timeout: 5_000 });
 	await page.keyboard.press("Meta+,");
-	await expect(page.locator(".settings-panel")).not.toHaveClass(/closed/, { timeout: 5_000 });
+	await expect(page.locator(".settings-panel")).not.toHaveClass(/closed/, {
+		timeout: 5_000
+	});
 	await expect(prompt).toHaveClass(/prompt-idle/, { timeout: 5_000 });
 	await page.keyboard.press("Meta+,");
 	await expect(prompt).not.toHaveClass(/prompt-idle/, { timeout: 5_000 });
@@ -573,15 +706,22 @@ test("prompt hides while settings are open", async ({ page }) => {
 
 /** Same park for the chats sidebar (Cmd/Ctrl+Shift+[ toggles it). */
 test("prompt hides while the chats sidebar is open", async ({ page }) => {
-	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(40);
+	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(
+		40
+	);
 	await seedChat(page, [{ role: "assistant", content: `answer ${long}` }]);
 	// Timed idle: the always-hide default boots parked, which would
 	// fail the visible setup below (parking is what this tests).
 	await page.addInitScript(() => {
-		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({ promptIdleSec: 10 }));
+		window.localStorage.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify({ promptIdleSec: 10 })
+		);
 	});
 	await page.goto("/");
-	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article.assistant").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const prompt = page.locator(".prompt");
 	const sidebar = page.locator("aside:not(.settings-panel)");
 	await expect(prompt).not.toHaveClass(/prompt-idle/, { timeout: 5_000 });
@@ -599,7 +739,9 @@ buttons themselves shifts no pixel. */
 test("sidebar export and delete never move on hover", async ({ page }) => {
 	await seedChat(page, [{ role: "assistant", content: "hello" }]);
 	await page.goto("/");
-	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article.assistant").first()).toBeVisible({
+		timeout: 60_000
+	});
 	await page.keyboard.press("Meta+Shift+[");
 	const sidebar = page.locator("aside:not(.settings-panel)");
 	await expect(sidebar).not.toHaveClass(/collapsed/, { timeout: 5_000 });
@@ -624,14 +766,18 @@ test("sidebar export and delete never move on hover", async ({ page }) => {
 /** The scrollbar shows mid-scroll and fades out promptly after the
 stop: the hold is short and the fade quick, never lingering. */
 test("scrollbar fades out promptly after scrolling stops", async ({ page }) => {
-	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(40);
+	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(
+		40
+	);
 	const turns = [0, 1, 2].flatMap((n) => [
 		{ role: "user" as const, content: `question ${n} ${long}` },
 		{ role: "assistant" as const, content: `answer ${n} ${long}` }
 	]);
 	await seedChat(page, turns);
 	await page.goto("/");
-	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article.assistant").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const box = page.locator(".messages");
 	const scrolling = (): Promise<boolean> =>
 		box.evaluate((el) => el.classList.contains("scrolling"));
@@ -639,7 +785,9 @@ test("scrollbar fades out promptly after scrolling stops", async ({ page }) => {
 	await expect.poll(scrolling).toBe(true);
 	await expect.poll(scrolling).toBe(false);
 	// The settled fade itself is quick (not the old lingering drift).
-	const fade = await box.evaluate((el) => parseFloat(getComputedStyle(el).transitionDuration));
+	const fade = await box.evaluate((el) =>
+		parseFloat(getComputedStyle(el).transitionDuration)
+	);
 	expect(fade).toBeLessThanOrEqual(0.35);
 });
 
@@ -649,10 +797,14 @@ the page background stays opaque. */
 test("page background stays opaque", async ({ page }) => {
 	await seedChat(page, [{ role: "assistant", content: "hello" }]);
 	await page.goto("/");
-	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article.assistant").first()).toBeVisible({
+		timeout: 60_000
+	});
 	// The background lives on .app (html itself stays unpainted).
 	const bg = await page.evaluate(
-		() => getComputedStyle(document.querySelector(".app") as Element).backgroundColor
+		() =>
+			getComputedStyle(document.querySelector(".app") as Element)
+				.backgroundColor
 	);
 	const nums = bg.match(/[\d.]+/g)?.map(Number) ?? [];
 	// rgb() carries no alpha (opaque); rgba()/color(srgb / a) do.
@@ -667,13 +819,21 @@ test("scale icons with text size applies immediately", async ({ page }) => {
 	await page.addInitScript(() => {
 		window.localStorage.setItem(
 			"ccez-llm-settings-v1",
-			JSON.stringify({ hoverAssistantActions: true, hoverUserActions: true, fontScale: 1.5 })
+			JSON.stringify({
+				hoverAssistantActions: true,
+				hoverUserActions: true,
+				fontScale: 1.5
+			})
 		);
 	});
 	await page.goto("/");
-	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article.assistant").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const button = page.locator("article.assistant .actions button").first();
-	const glyph = page.locator("article.assistant .actions .icon-btn .action-glyph").first();
+	const glyph = page
+		.locator("article.assistant .actions .icon-btn .action-glyph")
+		.first();
 	const px = (): Promise<number> =>
 		button.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
 	const glyphPx = (): Promise<number> =>
@@ -702,10 +862,16 @@ double-click zoom. */
 test("top bar is transparent", async ({ page }) => {
 	await seedChat(page, [{ role: "assistant", content: "hello" }]);
 	await page.goto("/");
-	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article.assistant").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const bar = await page.evaluate(() => {
 		const style = getComputedStyle(document.querySelector("header") as Element);
-		return { bg: style.backgroundColor, blur: style.backdropFilter, border: style.borderBottomWidth };
+		return {
+			bg: style.backgroundColor,
+			blur: style.backdropFilter,
+			border: style.borderBottomWidth
+		};
 	});
 	expect(bar.bg).toBe("rgba(0, 0, 0, 0)");
 	expect(bar.blur).toBe("none");
@@ -715,17 +881,25 @@ test("top bar is transparent", async ({ page }) => {
 /** Only the first message stands off the top: one strip-height of
 margin clears the invisible drag bar, while later messages bleed. */
 test("first message clears the top strip", async ({ page }) => {
-	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(20);
+	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(
+		20
+	);
 	await seedChat(page, [
 		{ role: "user", content: "first" },
 		{ role: "assistant", content: `answer ${long}` },
 		{ role: "user", content: "second" }
 	]);
 	await page.goto("/");
-	await expect(page.locator("article").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const gaps = await page.evaluate(() => {
-		const box = (document.querySelector(".messages") as HTMLElement).getBoundingClientRect();
-		const rects = [...document.querySelectorAll("article")].map((a) => a.getBoundingClientRect());
+		const box = (
+			document.querySelector(".messages") as HTMLElement
+		).getBoundingClientRect();
+		const rects = [...document.querySelectorAll("article")].map((a) =>
+			a.getBoundingClientRect()
+		);
 		const first = rects[0];
 		const second = rects[1];
 		if (!first || !second) throw new Error("missing articles");
@@ -746,17 +920,24 @@ summon (clicks never do on desktop), and an outside click from a
 visible prompt click-off hides (always-hide) without summoning
 back — the dismissing gesture leaves no summons behind. */
 test("sidebar outside-click never summons the prompt", async ({ page }) => {
-	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(40);
+	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(
+		40
+	);
 	const turns = [0, 1, 2, 3].flatMap((n) => [
 		{ role: "user" as const, content: `question ${n} ${long}` },
 		{ role: "assistant" as const, content: `answer ${n} ${long}` }
 	]);
 	await seedChat(page, turns);
 	await page.addInitScript(() => {
-		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({ promptIdleSec: -1 }));
+		window.localStorage.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify({ promptIdleSec: -1 })
+		);
 	});
 	await page.goto("/");
-	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article.assistant").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const prompt = page.locator(".prompt");
 	const sidebar = page.locator("aside:not(.settings-panel)");
 	// From already-hidden: stays hidden.
@@ -779,29 +960,12 @@ test("sidebar outside-click never summons the prompt", async ({ page }) => {
 
 /** Always-hide: stepping past the newest chat mints one with the
 prompt shown, never inheriting the hidden bar. */
-test("stepping past the end mints a chat with the prompt shown", async ({ page }) => {
-	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(40);
-	const turns = [0, 1, 2, 3].flatMap((n) => [
-		{ role: "user" as const, content: `question ${n} ${long}` },
-		{ role: "assistant" as const, content: `answer ${n} ${long}` }
-	]);
-	await seedChat(page, turns);
-	await page.addInitScript(() => {
-		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({ promptIdleSec: -1 }));
-	});
-	await page.goto("/");
-	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
-	await expect(page.locator(".prompt")).toHaveClass(/prompt-idle/, { timeout: 10_000 });
-	await page.keyboard.press("Meta+Shift+j");
-	await expect(page.locator(".prompt")).not.toHaveClass(/prompt-idle/, { timeout: 5_000 });
-	await expect
-		.poll(() => page.evaluate(() => !!document.activeElement?.closest?.(".prompt")))
-		.toBe(true);
-});
-
-/** Always-hide mode: sending from the keyboard hides the prompt. */
-test("always-hide hides after send", async ({ page }) => {
-	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(40);
+test("stepping past the end mints a chat with the prompt shown", async ({
+	page
+}) => {
+	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(
+		40
+	);
 	const turns = [0, 1, 2, 3].flatMap((n) => [
 		{ role: "user" as const, content: `question ${n} ${long}` },
 		{ role: "assistant" as const, content: `answer ${n} ${long}` }
@@ -814,13 +978,51 @@ test("always-hide hides after send", async ({ page }) => {
 		);
 	});
 	await page.goto("/");
-	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article.assistant").first()).toBeVisible({
+		timeout: 60_000
+	});
+	await expect(page.locator(".prompt")).toHaveClass(/prompt-idle/, {
+		timeout: 10_000
+	});
+	await page.keyboard.press("Meta+Shift+j");
+	await expect(page.locator(".prompt")).not.toHaveClass(/prompt-idle/, {
+		timeout: 5_000
+	});
+	await expect
+		.poll(() =>
+			page.evaluate(() => !!document.activeElement?.closest?.(".prompt"))
+		)
+		.toBe(true);
+});
+
+/** Always-hide mode: sending from the keyboard hides the prompt. */
+test("always-hide hides after send", async ({ page }) => {
+	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(
+		40
+	);
+	const turns = [0, 1, 2, 3].flatMap((n) => [
+		{ role: "user" as const, content: `question ${n} ${long}` },
+		{ role: "assistant" as const, content: `answer ${n} ${long}` }
+	]);
+	await seedChat(page, turns);
+	await page.addInitScript(() => {
+		window.localStorage.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify({ promptIdleSec: -1 })
+		);
+	});
+	await page.goto("/");
+	await expect(page.locator("article.assistant").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const prompt = page.locator(".prompt");
 	await page.keyboard.press("i");
 	await expect(prompt).not.toHaveClass(/prompt-idle/, { timeout: 5_000 });
 	await page.locator(".ta-input").click();
 	await expect
-		.poll(() => page.evaluate(() => !!document.activeElement?.closest?.(".prompt")))
+		.poll(() =>
+			page.evaluate(() => !!document.activeElement?.closest?.(".prompt"))
+		)
 		.toBe(true);
 	await page.keyboard.type("hello again");
 	await page.keyboard.press("Enter");
@@ -840,15 +1042,21 @@ test("idle timeout slider persists", async ({ page }) => {
 	await expect(slider).toHaveAttribute("max", "11");
 	await slider.fill("10");
 	await expect
-		.poll(() => page.evaluate(() => window.localStorage.getItem("ccez-llm-settings-v1")))
+		.poll(() =>
+			page.evaluate(() => window.localStorage.getItem("ccez-llm-settings-v1"))
+		)
 		.toContain('"promptIdleSec":10');
 	await slider.fill("11");
 	await expect
-		.poll(() => page.evaluate(() => window.localStorage.getItem("ccez-llm-settings-v1")))
+		.poll(() =>
+			page.evaluate(() => window.localStorage.getItem("ccez-llm-settings-v1"))
+		)
 		.toContain('"promptIdleSec":0');
 	await slider.fill("1");
 	await expect
-		.poll(() => page.evaluate(() => window.localStorage.getItem("ccez-llm-settings-v1")))
+		.poll(() =>
+			page.evaluate(() => window.localStorage.getItem("ccez-llm-settings-v1"))
+		)
 		.toContain('"promptIdleSec":-1');
 	await expect(
 		page.locator(".settings-panel output", { hasText: "always" })
@@ -863,21 +1071,31 @@ test("idle timeout slider persists", async ({ page }) => {
 test("chat width slider reaches past 80 rem", async ({ page }) => {
 	await openWithMessages(page, [{ role: "user", content: "hi" }]);
 	await openSettings(page);
-	const slider = page.locator('.settings-panel input[aria-label="Chat width in rem"]');
+	const slider = page.locator(
+		'.settings-panel input[aria-label="Chat width in rem"]'
+	);
 	await expect(slider).toHaveAttribute("max", "120");
 	await slider.fill("100");
 	await expect(slider).toHaveValue("100");
 	await expect
-		.poll(() => page.evaluate(() => window.localStorage.getItem("ccez-llm-settings-v1")))
+		.poll(() =>
+			page.evaluate(() => window.localStorage.getItem("ccez-llm-settings-v1"))
+		)
 		.toContain('"chatWidth":100');
 });
 
 /** Fresh installs: plain user messages, hover-only buttons both roles. */
-test("fresh installs default to plain messages and hover-only buttons", async ({ page }) => {
+test("fresh installs default to plain messages and hover-only buttons", async ({
+	page
+}) => {
 	await openWithMessages(page, [{ role: "user", content: "hi" }]);
-	await page.evaluate(() => window.localStorage.setItem("ccez-llm-settings-v1", "{}"));
+	await page.evaluate(() =>
+		window.localStorage.setItem("ccez-llm-settings-v1", "{}")
+	);
 	await page.reload();
-	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const main = page.locator("main");
 	await expect(main).toHaveClass(/plain-user/);
 	await expect(main).toHaveClass(/hover-user/);
@@ -891,10 +1109,17 @@ test("message buttons scale with text size when enabled", async ({ page }) => {
 		{ role: "assistant", content: "hello there" }
 	]);
 	await openSettings(page);
-	await page.locator('.settings-panel input[aria-label="Text size percent"]').fill("200");
-	const glyph = page.locator("article.assistant .actions .icon-btn .action-glyph").first();
+	await page
+		.locator('.settings-panel input[aria-label="Text size percent"]')
+		.fill("200");
+	const glyph = page
+		.locator("article.assistant .actions .icon-btn .action-glyph")
+		.first();
 	const fixed = await glyph.evaluate((el) => getComputedStyle(el).height);
-	await page.locator(".settings-panel").getByText("Scale message icons with text size").click();
+	await page
+		.locator(".settings-panel")
+		.getByText("Scale message icons with text size")
+		.click();
 	const scaled = await glyph.evaluate((el) => getComputedStyle(el).height);
 	expect(parseFloat(scaled)).toBeGreaterThan(parseFloat(fixed));
 });
@@ -927,14 +1152,18 @@ test("short thread hides past the timeout", async ({ page }) => {
 		);
 	});
 	await page.goto("/");
-	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
 	await expect(page.locator(".messages")).toBeVisible();
 	const fits = await page.evaluate(() => {
 		const box = document.querySelector(".messages") as HTMLElement | null;
 		return box ? box.scrollHeight <= box.clientHeight : null;
 	});
 	expect(fits).toBe(true);
-	await expect(page.locator(".prompt")).toHaveClass(/prompt-idle/, { timeout: 15_000 });
+	await expect(page.locator(".prompt")).toHaveClass(/prompt-idle/, {
+		timeout: 15_000
+	});
 });
 
 /** Think blocks never render: only the answer shows, at chat text size. */
@@ -961,7 +1190,9 @@ test("shift-meta-plus widens the chat column", async ({ page }) => {
 	// Default 36 + one 2rem step.
 	await expect(page.locator(".toast")).toContainText("Chat width 38 rem");
 	await expect
-		.poll(() => page.evaluate(() => window.localStorage.getItem("ccez-llm-settings-v1")))
+		.poll(() =>
+			page.evaluate(() => window.localStorage.getItem("ccez-llm-settings-v1"))
+		)
 		.toContain('"chatWidth":38');
 });
 
@@ -969,7 +1200,10 @@ test("shift-meta-plus widens the chat column", async ({ page }) => {
 test("viewport meta stays Chromium-key-free on desktop", async ({ page }) => {
 	await openWithMessages(page, [{ role: "user", content: "hi" }]);
 	const content = await page.evaluate(
-		() => document.querySelector('meta[name="viewport"]')?.getAttribute("content") ?? ""
+		() =>
+			document
+				.querySelector('meta[name="viewport"]')
+				?.getAttribute("content") ?? ""
 	);
 	expect(content).not.toContain("interactive-widget");
 });
@@ -985,28 +1219,42 @@ test("no traffic veil element remains", async ({ page }) => {
 /** Minting a chat from a shelved prompt shows the composer focused
 with a blinking cursor (sidebar button; Cmd+N shares doNewChat). */
 test("new chat button shows and focuses the prompt", async ({ page }) => {
-	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(40);
+	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(
+		40
+	);
 	const turns = [0, 1, 2, 3].flatMap((n) => [
 		{ role: "user" as const, content: `question ${n} ${long}` },
 		{ role: "assistant" as const, content: `answer ${n} ${long}` }
 	]);
 	await seedChat(page, turns);
 	await page.addInitScript(() => {
-		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({ promptIdleSec: -1 }));
+		window.localStorage.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify({ promptIdleSec: -1 })
+		);
 	});
 	await page.goto("/");
 	const prompt = page.locator(".prompt");
-	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article.assistant").first()).toBeVisible({
+		timeout: 60_000
+	});
 	await expect(prompt).toHaveClass(/prompt-idle/, { timeout: 10_000 });
 	await page.keyboard.press("Control+b");
-	await expect(page.locator("aside:not(.settings-panel)")).not.toHaveClass(/collapsed/);
-	await page.locator('aside:not(.settings-panel) button[aria-label="New chat"]').click();
+	await expect(page.locator("aside:not(.settings-panel)")).not.toHaveClass(
+		/collapsed/
+	);
+	await page
+		.locator('aside:not(.settings-panel) button[aria-label="New chat"]')
+		.click();
 	await expect(prompt).not.toHaveClass(/prompt-idle/, { timeout: 10_000 });
 	await expect
 		.poll(
 			() =>
 				page.evaluate(
-					() => !!(document.activeElement as HTMLElement | null)?.closest(".prompt .ta-input")
+					() =>
+						!!(document.activeElement as HTMLElement | null)?.closest(
+							".prompt .ta-input"
+						)
 				),
 			{ timeout: 10_000 }
 		)
@@ -1018,17 +1266,26 @@ signal, so the attach/voice pair can't wander on focus changes. */
 test("idle parking leaves the prompt tools in place", async ({ page }) => {
 	await seedChat(page, [{ role: "user", content: "hi" }]);
 	await page.addInitScript(() => {
-		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({ promptIdleSec: -1 }));
+		window.localStorage.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify({ promptIdleSec: -1 })
+		);
 	});
 	await page.goto("/");
 	const tools = page.locator(".prompt .prompt-tools");
-	await expect(page.locator("article.user").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article.user").first()).toBeVisible({
+		timeout: 60_000
+	});
 	// Bare i restores the always-hidden prompt into the composer.
 	await page.keyboard.press("i");
-	await expect(page.locator(".prompt")).not.toHaveClass(/prompt-idle/, { timeout: 10_000 });
+	await expect(page.locator(".prompt")).not.toHaveClass(/prompt-idle/, {
+		timeout: 10_000
+	});
 	// Blur into the thread: always-hide parks at once.
 	await page.locator("article.user").first().click();
-	await expect(page.locator(".prompt")).toHaveClass(/prompt-idle/, { timeout: 10_000 });
+	await expect(page.locator(".prompt")).toHaveClass(/prompt-idle/, {
+		timeout: 10_000
+	});
 	await expect(tools).toHaveCSS("transform", "none");
 });
 
@@ -1036,7 +1293,9 @@ test("idle parking leaves the prompt tools in place", async ({ page }) => {
 test("short thread boots with the prompt visible", async ({ page }) => {
 	await seedChat(page, [{ role: "user", content: "hi" }]);
 	await page.goto("/");
-	await expect(page.locator("article .rendered").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article .rendered").first()).toBeVisible({
+		timeout: 60_000
+	});
 	await page.waitForTimeout(1200);
 	await expect(page.locator(".prompt")).not.toHaveClass(/prompt-idle/);
 });
@@ -1044,7 +1303,9 @@ test("short thread boots with the prompt visible", async ({ page }) => {
 /** Picking a reply language updates the send button instantly — first
 pick and re-pick alike, with no prompt hover in between — and hands
 focus to the composer. */
-test("language re-pick updates send instantly and focuses prompt", async ({ page }) => {
+test("language re-pick updates send instantly and focuses prompt", async ({
+	page
+}) => {
 	// Tall viewport: the 20-option Europe list opens upward past the
 	// top edge on short windows (keyboard number keys still reach).
 	await page.setViewportSize({ width: 1280, height: 1000 });
@@ -1055,7 +1316,10 @@ test("language re-pick updates send instantly and focuses prompt", async ({ page
 	const pill = page.locator(".lang-menus .lang-menu button").first();
 	const focusedComposer = () =>
 		page.evaluate(
-			() => !!(document.activeElement as HTMLElement | null)?.closest(".prompt .ta-input")
+			() =>
+				!!(document.activeElement as HTMLElement | null)?.closest(
+					".prompt .ta-input"
+				)
 		);
 	await pill.click();
 	await page.locator('.lang-list button:has-text("Bulgarian")').click();

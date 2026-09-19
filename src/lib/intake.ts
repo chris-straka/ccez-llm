@@ -24,7 +24,8 @@ export function isPermissionDismissal(error: unknown): boolean {
  * handler.
  */
 export function dropFilesFromDataTransfer(
-	dataTransfer: { readonly files?: ArrayLike<File | null> | null } | null | undefined
+	dataTransfer:
+		{ readonly files?: ArrayLike<File | null> | null } | null | undefined
 ): File[] {
 	if (!dataTransfer?.files) return [];
 	const out: File[] = [];

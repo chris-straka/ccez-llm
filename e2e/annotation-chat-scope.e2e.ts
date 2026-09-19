@@ -5,7 +5,10 @@ import { seedChat } from "./helpers";
 restoring them on return, and the other chat's composer stays clean. */
 test("annotation drafts stay with their chat", async ({ page }) => {
 	await seedChat(page, [
-		{ role: "assistant", content: "Kyoto is an old capital with many temples and quiet gardens" }
+		{
+			role: "assistant",
+			content: "Kyoto is an old capital with many temples and quiet gardens"
+		}
 	]);
 	await page.goto("/");
 	const para = page.locator("article.assistant .rendered p").first();

@@ -110,5 +110,3 @@ describe("settlePin", () => {
 		expect(settled.fullHeight).toBe(500);
 	});
 });
-
-

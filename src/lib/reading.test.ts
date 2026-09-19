@@ -62,7 +62,10 @@ describe("script detection", () => {
 		expect(detectScripts("こんにちは！你好！")).toEqual(["ja"]);
 		expect(detectScripts("hello مرحبا\n你好")).toEqual(["ar", "zh"]);
 		// Mixed messages offer both local aids, furigana first.
-		expect(localAidsFor(detectScripts("こんにちは！\n你好！"))).toEqual(["furigana", "pinyin"]);
+		expect(localAidsFor(detectScripts("こんにちは！\n你好！"))).toEqual([
+			"furigana",
+			"pinyin"
+		]);
 		expect(localAidsFor(detectScripts("你好世界"))).toEqual(["pinyin"]);
 		expect(localAidsFor(detectScripts("漢字を読む"))).toEqual(["furigana"]);
 		expect(localAidsFor(detectScripts("hello world"))).toEqual([]);
@@ -82,8 +85,12 @@ describe("script detection", () => {
 	it("lets the chat language own kanji-only lines", () => {
 		// A kanji-only line is genuinely ambiguous — same script in
 		// both languages — so the reply-language pill breaks the tie.
-		expect(classifyAidLine("「警察官、交通規則違反者検挙中」", "furigana")).toBe("furigana");
-		expect(classifyAidLine("「警察官、交通規則違反者検挙中」", "pinyin")).toBe("pinyin");
+		expect(
+			classifyAidLine("「警察官、交通規則違反者検挙中」", "furigana")
+		).toBe("furigana");
+		expect(classifyAidLine("「警察官、交通規則違反者検挙中」", "pinyin")).toBe(
+			"pinyin"
+		);
 		expect(classifyAidLine("「警察官、交通規則違反者検挙中」")).toBe("pinyin");
 		expect(classifyAidLine("你好！测试。", "furigana")).toBe("furigana");
 		// Kana is unambiguous: the pill never overrides it.
@@ -151,24 +158,28 @@ describe("aid kind overrides", () => {
 	});
 
 	it("renders pinned kinds the message still offers", () => {
-		expect(resolveAidKinds(["pinyin", "furigana"], ["pinyin"], null)).toEqual(["pinyin"]);
-		expect(resolveAidKinds(["pinyin", "furigana"], ["pinyin", "furigana"], null)).toEqual([
-			"pinyin",
-			"furigana"
+		expect(resolveAidKinds(["pinyin", "furigana"], ["pinyin"], null)).toEqual([
+			"pinyin"
 		]);
+		expect(
+			resolveAidKinds(["pinyin", "furigana"], ["pinyin", "furigana"], null)
+		).toEqual(["pinyin", "furigana"]);
 	});
 
 	it("filters pinned kinds the edited text no longer offers", () => {
-		expect(resolveAidKinds(["pinyin"], ["pinyin", "furigana"], null)).toEqual(["pinyin"]);
+		expect(resolveAidKinds(["pinyin"], ["pinyin", "furigana"], null)).toEqual([
+			"pinyin"
+		]);
 	});
 
 	it("previews a hovered kind alongside pins, never twice", () => {
-		expect(resolveAidKinds(["pinyin", "furigana"], ["pinyin"], "furigana")).toEqual([
-			"pinyin",
-			"furigana"
-		]);
+		expect(
+			resolveAidKinds(["pinyin", "furigana"], ["pinyin"], "furigana")
+		).toEqual(["pinyin", "furigana"]);
 		expect(resolveAidKinds(["pinyin"], [], "pinyin")).toEqual(["pinyin"]);
-		expect(resolveAidKinds(["pinyin"], ["pinyin"], "pinyin")).toEqual(["pinyin"]);
+		expect(resolveAidKinds(["pinyin"], ["pinyin"], "pinyin")).toEqual([
+			"pinyin"
+		]);
 		expect(resolveAidKinds(["pinyin"], [], "furigana")).toEqual([]);
 		expect(resolveAidKinds(["pinyin"], ["pinyin"], null)).toEqual(["pinyin"]);
 	});
@@ -207,7 +218,10 @@ describe("speech locales", () => {
 
 	it("reports unavailable synthesis without throwing", () => {
 		expect(speakWord("hello")).toEqual({ spoken: false, lang: "en-US" });
-		expect(speakWord("bonjour", "fr-FR")).toEqual({ spoken: false, lang: "fr-FR" });
+		expect(speakWord("bonjour", "fr-FR")).toEqual({
+			spoken: false,
+			lang: "fr-FR"
+		});
 	});
 
 	it("spots pinyin tone marks and nothing else", () => {
@@ -282,11 +296,21 @@ describe("model-assisted reading aids", () => {
 
 	it("caches by aid + exact input", async () => {
 		const chat = vi.fn(async () => ({ content: "مَرْحَبًا", usage: null }));
-		const provider = { id: "scripted", chat, stream: chat } as unknown as ChatProvider;
-		await expect(runModelAid(provider, "tashkeel", "مرحبا")).resolves.toBe("مَرْحَبًا");
-		await expect(runModelAid(provider, "tashkeel", "مرحبا")).resolves.toBe("مَرْحَبًا");
+		const provider = {
+			id: "scripted",
+			chat,
+			stream: chat
+		} as unknown as ChatProvider;
+		await expect(runModelAid(provider, "tashkeel", "مرحبا")).resolves.toBe(
+			"مَرْحَبًا"
+		);
+		await expect(runModelAid(provider, "tashkeel", "مرحبا")).resolves.toBe(
+			"مَرْحَبًا"
+		);
 		expect(chat).toHaveBeenCalledTimes(1);
-		await expect(runModelAid(provider, "tashkeel", "  ")).rejects.toThrow("Nothing to vocalize");
+		await expect(runModelAid(provider, "tashkeel", "  ")).rejects.toThrow(
+			"Nothing to vocalize"
+		);
 		await expect(vocalizeArabic(provider, "مرحبا")).resolves.toBe("مَرْحَبًا");
 		expect(chat).toHaveBeenCalledTimes(1);
 	});
@@ -303,14 +327,18 @@ describe("pinyin readings", () => {
 		// Spacing is the engine's job (each base fits its own
 		// annotation): the markup carries no padding or hook classes.
 		const html = pinyinRuby("中文");
-		expect(html).toBe("<ruby>中<rt>zhōng</rt></ruby><ruby>文<rt>wén</rt></ruby>");
+		expect(html).toBe(
+			"<ruby>中<rt>zhōng</rt></ruby><ruby>文<rt>wén</rt></ruby>"
+		);
 	});
 
 	it("converts only Han-only lines, passing Japanese through", () => {
 		// Pinyin readings on Japanese kanji are wrong readings: kana
 		// lines survive escaped and unannotated, line count preserved.
 		const html = pinyinBlock("你好\n漢字を読む");
-		expect(html).toBe("<ruby>你<rt>nǐ</rt></ruby><ruby>好<rt>hǎo</rt></ruby>\n漢字を読む");
+		expect(html).toBe(
+			"<ruby>你<rt>nǐ</rt></ruby><ruby>好<rt>hǎo</rt></ruby>\n漢字を読む"
+		);
 		expect(html.split("\n")).toHaveLength(2);
 	});
 
@@ -341,9 +369,13 @@ describe("multilingual model aids", () => {
 	it("falls back to null when the model reshapes lines", () => {
 		const original = "日本語\nمرحبا\nبالعالم";
 		// Two lines back for two sent: fits.
-		expect(spliceAidResult(original, [1, 2], "مَرْحَبًا\nبِالْعَالَم")).toContain("日本語");
+		expect(
+			spliceAidResult(original, [1, 2], "مَرْحَبًا\nبِالْعَالَم")
+		).toContain("日本語");
 		// One line back for two sent: no safe splice.
-		expect(spliceAidResult(original, [1, 2], "مَرْحَبًا بِالْعَالَم")).toBeNull();
+		expect(
+			spliceAidResult(original, [1, 2], "مَرْحَبًا بِالْعَالَم")
+		).toBeNull();
 	});
 });
 
@@ -378,11 +410,17 @@ describe("code-aware aid lines", () => {
 	it("strips fenced blocks and inline spans for detection", () => {
 		expect(stripCodeForDetection("```py\nprint('日本語')\n```")).toBe("");
 		expect(stripCodeForDetection("見る `日本語` code")).toBe("見る  code");
-		expect(stripCodeForDetection("見る\n```\n日本語\n```\n読む")).toBe("見る\n読む");
+		expect(stripCodeForDetection("見る\n```\n日本語\n```\n読む")).toBe(
+			"見る\n読む"
+		);
 	});
 	it("code-only Japanese summons no aid script", () => {
-		expect(detectScripts(stripCodeForDetection("```py\nprint('日本語')\n```"))).toEqual([]);
-		expect(detectScripts(stripCodeForDetection("見る\n```\n日本語\n```"))).toEqual(["ja"]);
+		expect(
+			detectScripts(stripCodeForDetection("```py\nprint('日本語')\n```"))
+		).toEqual([]);
+		expect(
+			detectScripts(stripCodeForDetection("見る\n```\n日本語\n```"))
+		).toEqual(["ja"]);
 	});
 });
 

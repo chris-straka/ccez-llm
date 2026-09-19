@@ -13,7 +13,10 @@
  * just-opened keyboard, so subtracting it hides real opens and
  * strands the composer underneath.
  */
-export function keyboardOverlapPx(innerHeight: number, viewportHeight: number): number {
+export function keyboardOverlapPx(
+	innerHeight: number,
+	viewportHeight: number
+): number {
 	return Math.max(0, innerHeight - viewportHeight);
 }
 
@@ -64,7 +67,11 @@ export function pinNow(): PinArmState {
  * with coarser snapshots. The caller tracks the keyboard-closed
  * baseline and passes it as fullHeight.
  */
-export function nativeResizeActive(fullHeight: number, innerHeight: number, minShrink = 100): boolean {
+export function nativeResizeActive(
+	fullHeight: number,
+	innerHeight: number,
+	minShrink = 100
+): boolean {
 	return fullHeight - innerHeight >= minShrink;
 }
 
@@ -120,7 +127,9 @@ export function settlePin(
 	exactBaseline = true
 ): PinSettle {
 	if (!open) {
-		const baseline = exactBaseline ? innerHeight : Math.max(fullHeight, innerHeight);
+		const baseline = exactBaseline
+			? innerHeight
+			: Math.max(fullHeight, innerHeight);
 		return { pin: pinArmStart(), fullHeight: baseline };
 	}
 	if (nativeResizeActive(fullHeight, innerHeight, minShrink)) {
@@ -128,4 +137,3 @@ export function settlePin(
 	}
 	return { pin: pinNow(), fullHeight };
 }
-

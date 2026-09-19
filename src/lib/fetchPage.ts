@@ -1,6 +1,12 @@
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import { tauriBackendAvailable } from "./secrets";
-import { formatFeedItems, htmlToText, looksLikeFeed, parseFeedItems, validFetchUrl } from "./tools";
+import {
+	formatFeedItems,
+	htmlToText,
+	looksLikeFeed,
+	parseFeedItems,
+	validFetchUrl
+} from "./tools";
 
 /**
  * Page-fetch executor behind the model's `fetch_url` tool.
@@ -14,9 +20,15 @@ import { formatFeedItems, htmlToText, looksLikeFeed, parseFeedItems, validFetchU
 export class FetchPageError extends Error {}
 
 /** Fetch + clean one page (or feed). Pure validation, impure transport. */
-export async function fetchPageText(url: string, signal?: AbortSignal): Promise<string> {
-	if (!validFetchUrl(url)) throw new FetchPageError("That URL can't be fetched.");
-	const html = tauriBackendAvailable() ? await invokeHtml(url) : await browserHtml(url, signal);
+export async function fetchPageText(
+	url: string,
+	signal?: AbortSignal
+): Promise<string> {
+	if (!validFetchUrl(url))
+		throw new FetchPageError("That URL can't be fetched.");
+	const html = tauriBackendAvailable()
+		? await invokeHtml(url)
+		: await browserHtml(url, signal);
 	if (looksLikeFeed(html)) {
 		const text = formatFeedItems(parseFeedItems(html));
 		if (!text) throw new FetchPageError("That feed had no readable headlines.");
@@ -34,7 +46,8 @@ async function invokeHtml(url: string): Promise<string> {
 	} catch (error) {
 		throw new FetchPageError(fetchReason(error));
 	}
-	if (typeof out !== "string" || !out) throw new FetchPageError("That page came back empty.");
+	if (typeof out !== "string" || !out)
+		throw new FetchPageError("That page came back empty.");
 	return out;
 }
 
@@ -44,9 +57,12 @@ async function browserHtml(url: string, signal?: AbortSignal): Promise<string> {
 		res = await fetch(url, { signal: signal ?? null });
 	} catch (error) {
 		if (error instanceof Error && error.name === "AbortError") throw error;
-		throw new FetchPageError("That page can't be reached from browser preview (try the app).");
+		throw new FetchPageError(
+			"That page can't be reached from browser preview (try the app)."
+		);
 	}
-	if (!res.ok) throw new FetchPageError(`That page failed (HTTP ${res.status}).`);
+	if (!res.ok)
+		throw new FetchPageError(`That page failed (HTTP ${res.status}).`);
 	return res.text();
 }
 

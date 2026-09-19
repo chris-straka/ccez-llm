@@ -13,8 +13,8 @@ Workflow: the `release-windows-*` jobs in [.github/workflows/release.yml](../.gi
 They run in that file's strict `needs` chain (one writer at a time) and
 attach their artifacts to the same draft GitHub Release.
 
-| Arch  | Runner          | Rust target                |
-| ----- | --------------- | -------------------------- |
+| Arch  | Runner           | Rust target               |
+| ----- | ---------------- | ------------------------- |
 | x64   | `windows-latest` | `x86_64-pc-windows-msvc`  |
 | ARM64 | `windows-11-arm` | `aarch64-pc-windows-msvc` |
 
@@ -97,7 +97,7 @@ whether a `v*` CI runner is needed to prove it.
    `keyring = "3"` with no `features`, and keyring 3.6.3 documents
    "no default features … you must specify explicitly" with a
    mock-store fallback (`~/.cargo/…/keyring-3.6.3/src/lib.rs:60-77,
-   :293-299`). `src-tauri/Cargo.lock` lists keyring's deps as only
+:293-299`). `src-tauri/Cargo.lock` lists keyring's deps as only
    `log` + `zeroize` (the `security-framework` hits are via
    `rustls-native-certs`, unrelated), and
    `cargo tree -e features -i keyring` shows only feature `default`.
@@ -133,7 +133,7 @@ whether a `v*` CI runner is needed to prove it.
 6. **NSIS + WebView2 config is schema-valid (confirmed on macOS).**
    `bundle.windows` keys (`webviewInstallMode.downloadBootstrapper`
    silent, `nsis.installMode/compression/languages/
-   displayLanguageSelector/startMenuFolder/installerIcon`) all match
+displayLanguageSelector/startMenuFolder/installerIcon`) all match
    `definitions.WindowsConfig/NsisConfig/WebviewInstallMode`, and
    `src-tauri/icons/icon.ico` ships. Only a `v*` run can prove the
    installer builds, the bootstrapper downloads at install time, and

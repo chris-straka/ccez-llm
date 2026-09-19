@@ -23,7 +23,9 @@ export function focusDebugEnabled(): boolean {
 	}
 	if (cachedQueryFlag !== null) return cachedQueryFlag;
 	try {
-		cachedQueryFlag = new URLSearchParams(window.location.search).has("focusdebug");
+		cachedQueryFlag = new URLSearchParams(window.location.search).has(
+			"focusdebug"
+		);
 	} catch {
 		cachedQueryFlag = false;
 	}
@@ -35,7 +37,9 @@ export function focusDebugEnabled(): boolean {
  * [detached]` — enough to tell a node swap (detached, or two live
  * textareas) from a keystroke-eating fork (attached-and-1).
  */
-export function describeFocusTarget(target: EventTarget | null | undefined): string {
+export function describeFocusTarget(
+	target: EventTarget | null | undefined
+): string {
 	if (target === null || target === undefined) return String(target);
 	if (typeof Element !== "undefined" && target instanceof Element) {
 		const tag = target.tagName;

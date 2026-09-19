@@ -19,7 +19,9 @@ import { seedChat } from "./helpers";
  */
 test.setTimeout(90_000);
 
-const LONG = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(40);
+const LONG = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(
+	40
+);
 
 function turns(): Array<{ role: "user" | "assistant"; content: string }> {
 	return [0, 1, 2, 3, 4, 5].flatMap((n) => [
@@ -29,7 +31,11 @@ function turns(): Array<{ role: "user" | "assistant"; content: string }> {
 }
 
 async function scrollTop(page): Promise<number> {
-	return page.evaluate(() => (document.querySelector(".messages") as HTMLElement | null)?.scrollTop ?? -1);
+	return page.evaluate(
+		() =>
+			(document.querySelector(".messages") as HTMLElement | null)?.scrollTop ??
+			-1
+	);
 }
 
 async function deselectToBody(page): Promise<void> {
@@ -38,7 +44,9 @@ async function deselectToBody(page): Promise<void> {
 	// selectedIdx -1). Double-click would open sidebars; a single
 	// click only drops focus.
 	await page.mouse.click(1240, 400);
-	await page.waitForFunction(() => document.activeElement === document.body, { timeout: 10_000 });
+	await page.waitForFunction(() => document.activeElement === document.body, {
+		timeout: 10_000
+	});
 }
 
 test.beforeEach(async ({ page }) => {
@@ -56,24 +64,36 @@ test.beforeEach(async ({ page }) => {
 	await deselectToBody(page);
 });
 
-test("j/k smooth-scroll down and back up with nothing selected", async ({ page }) => {
+test("j/k smooth-scroll down and back up with nothing selected", async ({
+	page
+}) => {
 	const before = await scrollTop(page);
 	await page.keyboard.press("j");
-	await page.waitForFunction((prev) => {
-		const box = document.querySelector(".messages") as HTMLElement | null;
-		return box !== null && box.scrollTop > prev;
-	}, before, { timeout: 10_000 });
+	await page.waitForFunction(
+		(prev) => {
+			const box = document.querySelector(".messages") as HTMLElement | null;
+			return box !== null && box.scrollTop > prev;
+		},
+		before,
+		{ timeout: 10_000 }
+	);
 	const down = await scrollTop(page);
 	expect(down).toBeGreaterThan(before);
 	await page.keyboard.press("k");
-	await page.waitForFunction((prev) => {
-		const box = document.querySelector(".messages") as HTMLElement | null;
-		return box !== null && box.scrollTop < prev;
-	}, down, { timeout: 10_000 });
+	await page.waitForFunction(
+		(prev) => {
+			const box = document.querySelector(".messages") as HTMLElement | null;
+			return box !== null && box.scrollTop < prev;
+		},
+		down,
+		{ timeout: 10_000 }
+	);
 	expect(await scrollTop(page)).toBeLessThan(down);
 });
 
-test("bare d/u skip one smooth step; ctrl+d jumps and ctrl+u climbs back", async ({ page }) => {
+test("bare d/u skip one smooth step; ctrl+d jumps and ctrl+u climbs back", async ({
+	page
+}) => {
 	const before = await scrollTop(page);
 	const half = await page.evaluate(() => {
 		const box = document.querySelector(".messages") as HTMLElement | null;
@@ -99,7 +119,9 @@ test("bare d/u skip one smooth step; ctrl+d jumps and ctrl+u climbs back", async
 			const t = box.scrollTop;
 			return new Promise<boolean>((resolve) => {
 				setTimeout(() => {
-					const again = (document.querySelector(".messages") as HTMLElement | null)?.scrollTop;
+					const again = (
+						document.querySelector(".messages") as HTMLElement | null
+					)?.scrollTop;
 					resolve(again === t);
 				}, 350);
 			});
@@ -131,13 +153,19 @@ test("bare d/u skip one smooth step; ctrl+d jumps and ctrl+u climbs back", async
 	);
 	const jumped = await scrollTop(page);
 	await page.keyboard.press("Control+u");
-	await page.waitForFunction((prev) => {
-		const box = document.querySelector(".messages") as HTMLElement | null;
-		return box !== null && box.scrollTop < prev - 50;
-	}, jumped, { timeout: 10_000 });
+	await page.waitForFunction(
+		(prev) => {
+			const box = document.querySelector(".messages") as HTMLElement | null;
+			return box !== null && box.scrollTop < prev - 50;
+		},
+		jumped,
+		{ timeout: 10_000 }
+	);
 });
 
-test("j hold glides near SCROLLKEY_JK_VELOCITY_PX_S with no discrete jump", async ({ page }) => {
+test("j hold glides near SCROLLKEY_JK_VELOCITY_PX_S with no discrete jump", async ({
+	page
+}) => {
 	const HOLD_MS = 500;
 	const before = await scrollTop(page);
 	expect(before).toBeLessThanOrEqual(8);
@@ -154,11 +182,17 @@ test("j hold glides near SCROLLKEY_JK_VELOCITY_PX_S with no discrete jump", asyn
 	expect(dist).toBeLessThan(720);
 });
 
-test("d hold ramps: second window outruns the first, then cruises fast", async ({ page }) => {
+test("d hold ramps: second window outruns the first, then cruises fast", async ({
+	page
+}) => {
 	// Park mid-chat first so both windows have room below.
 	await page.evaluate(() => {
 		const box = document.querySelector(".messages") as HTMLElement | null;
-		if (box) box.scrollTo({ top: Math.max(0, box.scrollHeight - box.clientHeight * 2), behavior: "instant" });
+		if (box)
+			box.scrollTo({
+				top: Math.max(0, box.scrollHeight - box.clientHeight * 2),
+				behavior: "instant"
+			});
 	});
 	const start = await scrollTop(page);
 	await page.keyboard.down("d");
@@ -179,16 +213,26 @@ test("d hold ramps: second window outruns the first, then cruises fast", async (
 
 test("gg goes to top, G to the bottom", async ({ page }) => {
 	await page.keyboard.press("G");
-	await page.waitForFunction(() => {
-		const box = document.querySelector(".messages") as HTMLElement | null;
-		return box !== null && box.scrollHeight - box.scrollTop - box.clientHeight <= 8;
-	}, undefined, { timeout: 10_000 });
+	await page.waitForFunction(
+		() => {
+			const box = document.querySelector(".messages") as HTMLElement | null;
+			return (
+				box !== null && box.scrollHeight - box.scrollTop - box.clientHeight <= 8
+			);
+		},
+		undefined,
+		{ timeout: 10_000 }
+	);
 	await page.keyboard.press("g");
 	await page.keyboard.press("g");
-	await page.waitForFunction(() => {
-		const box = document.querySelector(".messages") as HTMLElement | null;
-		return box !== null && box.scrollTop <= 8;
-	}, undefined, { timeout: 10_000 });
+	await page.waitForFunction(
+		() => {
+			const box = document.querySelector(".messages") as HTMLElement | null;
+			return box !== null && box.scrollTop <= 8;
+		},
+		undefined,
+		{ timeout: 10_000 }
+	);
 	expect(await scrollTop(page)).toBeLessThanOrEqual(8);
 });
 
@@ -202,20 +246,31 @@ test("ctrl+g lands the cursor on the message in view", async ({ page }) => {
 		const box = document.querySelector(".messages") as HTMLElement | null;
 		const el = document.getElementById("msg-6");
 		if (box && el)
-			box.scrollTop = el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
+			box.scrollTop =
+				el.getBoundingClientRect().top -
+				box.getBoundingClientRect().top +
+				box.scrollTop;
 	});
 	await page.waitForFunction(() => {
 		const box = document.querySelector(".messages") as HTMLElement | null;
 		const el = document.getElementById("msg-6");
 		if (!box || !el) return false;
-		return Math.abs(el.getBoundingClientRect().top - box.getBoundingClientRect().top) < 4;
+		return (
+			Math.abs(
+				el.getBoundingClientRect().top - box.getBoundingClientRect().top
+			) < 4
+		);
 	});
 	// Body-focused (edit mode, prompt unfocused): the composer owns no keys.
 	await expect
-		.poll(() => page.evaluate(() => !!document.activeElement?.closest?.(".prompt")))
+		.poll(() =>
+			page.evaluate(() => !!document.activeElement?.closest?.(".prompt"))
+		)
 		.toBe(false);
 	await page.keyboard.press("Control+g");
-	await expect(page.locator(".app[data-focus-mode='scroll']")).toHaveCount(1, { timeout: 5_000 });
+	await expect(page.locator(".app[data-focus-mode='scroll']")).toHaveCount(1, {
+		timeout: 5_000
+	});
 	await expect(page.locator("#msg-6.selected")).toBeVisible({ timeout: 5_000 });
 	await page.keyboard.press("j");
 	await expect(page.locator("#msg-7.selected")).toBeVisible({ timeout: 5_000 });
@@ -230,7 +285,9 @@ test("z/Z land the hovered message top/bottom", async ({ page }) => {
 	await page.locator("article#msg-3").hover();
 	const box = await page.evaluate(() => {
 		const el = document.querySelector(".messages") as HTMLElement | null;
-		return el ? { top: el.getBoundingClientRect().top, viewH: el.clientHeight } : null;
+		return el
+			? { top: el.getBoundingClientRect().top, viewH: el.clientHeight }
+			: null;
 	});
 	expect(box).not.toBeNull();
 	await page.keyboard.press("z");
@@ -264,23 +321,33 @@ test("z/Z land the hovered message top/bottom", async ({ page }) => {
 
 test("tap Escape still dismisses the shortcuts overlay", async ({ page }) => {
 	await page.keyboard.press("Control+Shift+Slash");
-	await expect(page.locator(".modal", { hasText: "Keyboard shortcuts" })).toBeVisible({ timeout: 10_000 });
+	await expect(
+		page.locator(".modal", { hasText: "Keyboard shortcuts" })
+	).toBeVisible({ timeout: 10_000 });
 	// A quick tap (well under the fullscreen-hold threshold) keeps
 	// today's dismiss path and exits no fullscreen.
 	await page.keyboard.press("Escape");
-	await expect(page.locator(".modal", { hasText: "Keyboard shortcuts" })).toBeHidden({ timeout: 10_000 });
+	await expect(
+		page.locator(".modal", { hasText: "Keyboard shortcuts" })
+	).toBeHidden({ timeout: 10_000 });
 });
 
-test("held Escape past ESCAPE_HOLD_MS still dismisses overlays", async ({ page }) => {
+test("held Escape past ESCAPE_HOLD_MS still dismisses overlays", async ({
+	page
+}) => {
 	await page.keyboard.press("Control+Shift+Slash");
-	await expect(page.locator(".modal", { hasText: "Keyboard shortcuts" })).toBeVisible({ timeout: 10_000 });
+	await expect(
+		page.locator(".modal", { hasText: "Keyboard shortcuts" })
+	).toBeVisible({ timeout: 10_000 });
 	// A hold (past the 500ms fullscreen threshold) must not break
 	// the dismiss path: keyup still dismisses exactly like a tap.
 	// Fullscreen exit itself needs real window chrome (device-only).
 	await page.keyboard.down("Escape");
 	await page.waitForTimeout(700);
 	await page.keyboard.up("Escape");
-	await expect(page.locator(".modal", { hasText: "Keyboard shortcuts" })).toBeHidden({ timeout: 10_000 });
+	await expect(
+		page.locator(".modal", { hasText: "Keyboard shortcuts" })
+	).toBeHidden({ timeout: 10_000 });
 });
 
 /** j on the last message drops back into the prompt (scroll mode is
@@ -288,31 +355,55 @@ for visiting history, not parking past the newest) — decided in
 scrollModeAction's atNewest rule, pinned here. */
 test("j on the last message lands in the composer", async ({ page }) => {
 	await page.keyboard.press("Control+g");
-	await expect(page.locator(".app[data-focus-mode='scroll']")).toHaveCount(1, { timeout: 5_000 });
+	await expect(page.locator(".app[data-focus-mode='scroll']")).toHaveCount(1, {
+		timeout: 5_000
+	});
 	await page.keyboard.press("G");
-	await expect(page.locator("#msg-11.selected")).toBeVisible({ timeout: 5_000 });
+	await expect(page.locator("#msg-11.selected")).toBeVisible({
+		timeout: 5_000
+	});
 	await page.keyboard.press("j");
-	await expect(page.locator(".app[data-focus-mode='scroll']")).toHaveCount(0, { timeout: 10_000 });
-	await page.waitForFunction(() => {
-		const box = document.querySelector(".messages") as HTMLElement | null;
-		const editor = document.querySelector(".prompt .ta-input");
-		return box !== null && editor !== null && editor.contains(document.activeElement);
-	}, undefined, { timeout: 10_000 });
+	await expect(page.locator(".app[data-focus-mode='scroll']")).toHaveCount(0, {
+		timeout: 10_000
+	});
+	await page.waitForFunction(
+		() => {
+			const box = document.querySelector(".messages") as HTMLElement | null;
+			const editor = document.querySelector(".prompt .ta-input");
+			return (
+				box !== null &&
+				editor !== null &&
+				editor.contains(document.activeElement)
+			);
+		},
+		undefined,
+		{ timeout: 10_000 }
+	);
 });
 
 /** Bare u/d in scroll mode skip one smooth step and never move the
 message cursor; Ctrl+U / Ctrl+D jump an instant half-page each. */
-test("bare u/d skip in scroll mode; ctrl jumps, cursor stays", async ({ page }) => {
+test("bare u/d skip in scroll mode; ctrl jumps, cursor stays", async ({
+	page
+}) => {
 	// Park mid-chat first so both directions have room (instant: the
 	// column eases programmatic jumps, and a smooth park would still
 	// be animating under the assertions below).
 	await page.evaluate(() => {
 		const box = document.querySelector(".messages") as HTMLElement | null;
-		if (box) box.scrollTo({ top: Math.max(0, box.scrollHeight - box.clientHeight * 2), behavior: "instant" });
+		if (box)
+			box.scrollTo({
+				top: Math.max(0, box.scrollHeight - box.clientHeight * 2),
+				behavior: "instant"
+			});
 	});
 	await page.keyboard.press("Control+g");
-	await expect(page.locator(".app[data-focus-mode='scroll']")).toHaveCount(1, { timeout: 5_000 });
-	const sel = await page.evaluate(() => document.querySelector("article.selected")?.id ?? null);
+	await expect(page.locator(".app[data-focus-mode='scroll']")).toHaveCount(1, {
+		timeout: 5_000
+	});
+	const sel = await page.evaluate(
+		() => document.querySelector("article.selected")?.id ?? null
+	);
 	expect(sel).not.toBeNull();
 	const half = await page.evaluate(() => {
 		const box = document.querySelector(".messages") as HTMLElement | null;
@@ -336,7 +427,9 @@ test("bare u/d skip in scroll mode; ctrl jumps, cursor stays", async ({ page }) 
 			const t = box.scrollTop;
 			return new Promise<boolean>((resolve) => {
 				setTimeout(() => {
-					const again = (document.querySelector(".messages") as HTMLElement | null)?.scrollTop;
+					const again = (
+						document.querySelector(".messages") as HTMLElement | null
+					)?.scrollTop;
 					resolve(again === t);
 				}, 350);
 			});
@@ -356,7 +449,11 @@ test("bare u/d skip in scroll mode; ctrl jumps, cursor stays", async ({ page }) 
 		{ prev: skipped, min: 50 },
 		{ timeout: 10_000 }
 	);
-	expect(await page.evaluate(() => document.querySelector("article.selected")?.id ?? null)).toBe(sel);
+	expect(
+		await page.evaluate(
+			() => document.querySelector("article.selected")?.id ?? null
+		)
+	).toBe(sel);
 	const parked = await scrollTop(page);
 	await page.keyboard.press("Control+d");
 	await page.waitForFunction(
@@ -367,7 +464,11 @@ test("bare u/d skip in scroll mode; ctrl jumps, cursor stays", async ({ page }) 
 		{ prev: parked, min: half * 0.8 },
 		{ timeout: 10_000 }
 	);
-	expect(await page.evaluate(() => document.querySelector("article.selected")?.id ?? null)).toBe(sel);
+	expect(
+		await page.evaluate(
+			() => document.querySelector("article.selected")?.id ?? null
+		)
+	).toBe(sel);
 	const down = await scrollTop(page);
 	await page.keyboard.press("Control+u");
 	await page.waitForFunction(
@@ -378,7 +479,11 @@ test("bare u/d skip in scroll mode; ctrl jumps, cursor stays", async ({ page }) 
 		down,
 		{ timeout: 10_000 }
 	);
-	expect(await page.evaluate(() => document.querySelector("article.selected")?.id ?? null)).toBe(sel);
+	expect(
+		await page.evaluate(
+			() => document.querySelector("article.selected")?.id ?? null
+		)
+	).toBe(sel);
 });
 
 /** A held d in scroll mode glides with the same ramp as
@@ -390,11 +495,19 @@ test("d hold glides in scroll mode, cursor stays put", async ({ page }) => {
 	// be animating under the assertions below).
 	await page.evaluate(() => {
 		const box = document.querySelector(".messages") as HTMLElement | null;
-		if (box) box.scrollTo({ top: Math.max(0, box.scrollHeight - box.clientHeight * 2), behavior: "instant" });
+		if (box)
+			box.scrollTo({
+				top: Math.max(0, box.scrollHeight - box.clientHeight * 2),
+				behavior: "instant"
+			});
 	});
 	await page.keyboard.press("Control+g");
-	await expect(page.locator(".app[data-focus-mode='scroll']")).toHaveCount(1, { timeout: 5_000 });
-	const sel = await page.evaluate(() => document.querySelector("article.selected")?.id ?? null);
+	await expect(page.locator(".app[data-focus-mode='scroll']")).toHaveCount(1, {
+		timeout: 5_000
+	});
+	const sel = await page.evaluate(
+		() => document.querySelector("article.selected")?.id ?? null
+	);
 	expect(sel).not.toBeNull();
 	const before = await scrollTop(page);
 	await page.keyboard.down("d");
@@ -406,7 +519,11 @@ test("d hold glides in scroll mode, cursor stays put", async ({ page }) => {
 	const dist = (await scrollTop(page)) - before;
 	expect(dist).toBeGreaterThanOrEqual(300);
 	expect(dist).toBeLessThan(1000);
-	expect(await page.evaluate(() => document.querySelector("article.selected")?.id ?? null)).toBe(sel);
+	expect(
+		await page.evaluate(
+			() => document.querySelector("article.selected")?.id ?? null
+		)
+	).toBe(sel);
 });
 
 /** A quick d tap in scroll mode still lands exactly one skip step —
@@ -414,11 +531,19 @@ the hold loop owns repeats, taps stay discrete. */
 test("d tap lands one skip in scroll mode", async ({ page }) => {
 	await page.evaluate(() => {
 		const box = document.querySelector(".messages") as HTMLElement | null;
-		if (box) box.scrollTo({ top: Math.max(0, box.scrollHeight - box.clientHeight * 2), behavior: "instant" });
+		if (box)
+			box.scrollTo({
+				top: Math.max(0, box.scrollHeight - box.clientHeight * 2),
+				behavior: "instant"
+			});
 	});
 	await page.keyboard.press("Control+g");
-	await expect(page.locator(".app[data-focus-mode='scroll']")).toHaveCount(1, { timeout: 5_000 });
-	const sel = await page.evaluate(() => document.querySelector("article.selected")?.id ?? null);
+	await expect(page.locator(".app[data-focus-mode='scroll']")).toHaveCount(1, {
+		timeout: 5_000
+	});
+	const sel = await page.evaluate(
+		() => document.querySelector("article.selected")?.id ?? null
+	);
 	expect(sel).not.toBeNull();
 	const before = await scrollTop(page);
 	await page.keyboard.press("d");
@@ -434,5 +559,9 @@ test("d tap lands one skip in scroll mode", async ({ page }) => {
 	const dist = (await scrollTop(page)) - before;
 	expect(dist).toBeGreaterThanOrEqual(150);
 	expect(dist).toBeLessThan(300);
-	expect(await page.evaluate(() => document.querySelector("article.selected")?.id ?? null)).toBe(sel);
+	expect(
+		await page.evaluate(
+			() => document.querySelector("article.selected")?.id ?? null
+		)
+	).toBe(sel);
 });

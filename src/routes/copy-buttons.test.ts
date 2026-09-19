@@ -30,5 +30,4 @@ describe("icon-only copy buttons", () => {
 		);
 		expect(offenders).toEqual([]);
 	});
-
 });

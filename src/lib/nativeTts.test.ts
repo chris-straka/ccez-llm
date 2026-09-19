@@ -55,7 +55,9 @@ describe("sentenceAtOffset", () => {
 
 describe("friendlyNativeError", () => {
 	it("maps capability denials to a rebuild hint", () => {
-		expect(friendlyNativeError("tts_speak not allowed.")).toContain("permissions");
+		expect(friendlyNativeError("tts_speak not allowed.")).toContain(
+			"permissions"
+		);
 		expect(friendlyNativeError("permission denied")).toContain("permissions");
 	});
 
@@ -64,7 +66,9 @@ describe("friendlyNativeError", () => {
 	});
 
 	it("maps non-macOS builds to the browser-preview note", () => {
-		expect(friendlyNativeError("native TTS requires macOS")).toContain("Mac app");
+		expect(friendlyNativeError("native TTS requires macOS")).toContain(
+			"Mac app"
+		);
 	});
 
 	it("passes unknown errors through untouched", () => {
@@ -74,25 +78,30 @@ describe("friendlyNativeError", () => {
 
 describe("quoteLangFor", () => {
 	it("uses script detection without touching the bridge", async () => {
-		await expect(quoteLangFor("你好，这是一个中文测试句子", "en-US")).resolves.toBe("zh-CN");
-		await expect(quoteLangFor("مرحبا بك في هذا الاختبار الطويل", "en-US")).resolves.toBe(
-			"ar-SA"
-		);
+		await expect(
+			quoteLangFor("你好，这是一个中文测试句子", "en-US")
+		).resolves.toBe("zh-CN");
+		await expect(
+			quoteLangFor("مرحبا بك في هذا الاختبار الطويل", "en-US")
+		).resolves.toBe("ar-SA");
 	});
 
 	it("routes toned pinyin to Chinese before the recognizer can say Vietnamese", async () => {
 		// Apple's recognizer reads toned pinyin as vi (~0.98); the guard
 		// must win even when the bridge would answer otherwise.
 		mockInvoke.mockResolvedValue("vi");
-		await expect(quoteLangFor("nǐ hǎo, wǒ shì xuéshēng, wǒ xuéxí zhōngwén", "en-US")).resolves.toBe(
-			"zh-CN"
-		);
+		await expect(
+			quoteLangFor("nǐ hǎo, wǒ shì xuéshēng, wǒ xuéxí zhōngwén", "en-US")
+		).resolves.toBe("zh-CN");
 		expect(mockInvoke).not.toHaveBeenCalled();
 	});
 
 	it("falls back without a bridge for Latin text", async () => {
 		await expect(
-			quoteLangFor("this is a fairly long english sentence for testing", "en-US")
+			quoteLangFor(
+				"this is a fairly long english sentence for testing",
+				"en-US"
+			)
 		).resolves.toBe("en-US");
 	});
 
@@ -118,30 +127,37 @@ describe("quoteLangFor", () => {
 });
 
 describe("quoteLangForContext", () => {
-	const JA = "昨夜は星空がとても綺麗で、つい時間を忘れて眺めてしまいました。熊猫慢悠悠地吃着竹子。";
+	const JA =
+		"昨夜は星空がとても綺麗で、つい時間を忘れて眺めてしまいました。熊猫慢悠悠地吃着竹子。";
 	const ZH = "熊猫慢悠悠地吃着竹子，看起来很幸福。昨夜は星空がとても綺麗です。";
 
 	it("reads kanji with the sentence's voice when kana is near", async () => {
-		await expect(quoteLangForContext("眺め", JA, "en-US")).resolves.toBe("ja-JP");
+		await expect(quoteLangForContext("眺め", JA, "en-US")).resolves.toBe(
+			"ja-JP"
+		);
 		expect(mockInvoke).not.toHaveBeenCalled();
 	});
 
 	it("keeps the Chinese default without a bridge", async () => {
-		await expect(quoteLangForContext("竹子", ZH, "en-US")).resolves.toBe("zh-CN");
+		await expect(quoteLangForContext("竹子", ZH, "en-US")).resolves.toBe(
+			"zh-CN"
+		);
 	});
 
 	it("asks the bridge for Han-only sentences", async () => {
 		mockInvoke.mockResolvedValueOnce("ja");
-		await expect(quoteLangForContext("竹子", "熊猫慢悠悠地吃着竹子。", "en-US")).resolves.toBe(
-			"ja"
-		);
+		await expect(
+			quoteLangForContext("竹子", "熊猫慢悠悠地吃着竹子。", "en-US")
+		).resolves.toBe("ja");
 		expect(mockInvoke).toHaveBeenCalledWith("tts_identify_lang", {
 			text: "熊猫慢悠悠地吃着竹子。"
 		});
 	});
 
 	it("leaves unambiguous quotes on today's path", async () => {
-		await expect(quoteLangForContext("読む", JA, "en-US")).resolves.toBe("ja-JP");
+		await expect(quoteLangForContext("読む", JA, "en-US")).resolves.toBe(
+			"ja-JP"
+		);
 		await expect(
 			quoteLangForContext("this is a fairly long english sentence", JA, "en-US")
 		).resolves.toBe("en-US");
@@ -161,21 +177,27 @@ describe("latinSentencesLang", () => {
 		// English must not inherit the Japanese voice (the read-aloud
 		// bug), and the recognizer must never see the kana.
 		mockInvoke.mockImplementation(async (cmd: string, args?: unknown) => {
-			if (cmd !== "tts_identify_lang") throw new Error(`unmocked command: ${cmd}`);
+			if (cmd !== "tts_identify_lang")
+				throw new Error(`unmocked command: ${cmd}`);
 			return identifyText(args).includes("Bonjour") ? "fr-FR" : "en-US";
 		});
 		await expect(
-			latinSentencesLang("今日はいい天気ですね。Hello world, how are you today.", "ja-JP")
+			latinSentencesLang(
+				"今日はいい天気ですね。Hello world, how are you today.",
+				"ja-JP"
+			)
 		).resolves.toBe("en-US");
 		for (const [, args] of mockInvoke.mock.calls) {
-			expect(String((args as Record<string, string>)?.["text"] ?? "")).not.toMatch(
-				/[\u3040-\u30FF]/
-			);
+			expect(
+				String((args as Record<string, string>)?.["text"] ?? "")
+			).not.toMatch(/[\u3040-\u30FF]/);
 		}
 	});
 
 	it("returns the fallback without a bridge when nothing is Latin", async () => {
-		await expect(latinSentencesLang("今日はいい天気ですね。", "ja-JP")).resolves.toBe("ja-JP");
+		await expect(
+			latinSentencesLang("今日はいい天気ですね。", "ja-JP")
+		).resolves.toBe("ja-JP");
 		expect(mockInvoke).not.toHaveBeenCalled();
 	});
 });
@@ -188,9 +210,11 @@ describe("sentenceLangsFor", () => {
 		"今日はいい天気ですね。Hello world, how are you doing today. " +
 		"Bonjour le monde, comment allez-vous aujourd'hui. مرحبا بك في هذا الاختبار الطويل.";
 	const route = async (cmd: string, args?: unknown): Promise<string> => {
-		if (cmd !== "tts_identify_lang") throw new Error(`unmocked command: ${cmd}`);
+		if (cmd !== "tts_identify_lang")
+			throw new Error(`unmocked command: ${cmd}`);
 		const text = identifyText(args);
-		if (/[\u3040-\u30FF\u0600-\u06FF]/.test(text)) throw new Error("script text hit the bridge");
+		if (/[\u3040-\u30FF\u0600-\u06FF]/.test(text))
+			throw new Error("script text hit the bridge");
 		return text.includes("Bonjour") ? "fr-FR" : "en-US";
 	};
 
@@ -199,7 +223,9 @@ describe("sentenceLangsFor", () => {
 		const langFor = await sentenceLangsFor(MIXED, "en-US", []);
 		expect(langFor("今日はいい天気ですね。")).toBe("ja-JP");
 		expect(langFor("Hello world, how are you doing today.")).toBe("en-US");
-		expect(langFor("Bonjour le monde, comment allez-vous aujourd'hui.")).toBe("fr-FR");
+		expect(langFor("Bonjour le monde, comment allez-vous aujourd'hui.")).toBe(
+			"fr-FR"
+		);
 		expect(langFor("مرحبا بك في هذا الاختبار الطويل.")).toBe("ar-SA");
 	});
 
@@ -214,7 +240,11 @@ describe("sentenceLangsFor", () => {
 	});
 
 	it("returns the fallback without a bridge when nothing is Latin", async () => {
-		const langFor = await sentenceLangsFor("今日はいい天気ですね。", "ja-JP", []);
+		const langFor = await sentenceLangsFor(
+			"今日はいい天気ですね。",
+			"ja-JP",
+			[]
+		);
 		expect(langFor("今日はいい天気ですね。")).toBe("ja-JP");
 		expect(mockInvoke).not.toHaveBeenCalled();
 	});
@@ -222,7 +252,9 @@ describe("sentenceLangsFor", () => {
 
 describe("sentenceForQuote", () => {
 	it("finds the holding sentence and misses cleanly", () => {
-		expect(sentenceForQuote("First. 眺めて here. Last.", "眺めて")).toBe("眺めて here.");
+		expect(sentenceForQuote("First. 眺めて here. Last.", "眺めて")).toBe(
+			"眺めて here."
+		);
 		expect(sentenceForQuote("First. Second.", "missing")).toBeNull();
 		expect(sentenceForQuote("First. Second.", "  ")).toBeNull();
 	});
@@ -301,18 +333,24 @@ describe("speakNativeMulti", () => {
 		await new Promise((resolve) => setTimeout(resolve, 20));
 		expect(mockInvoke).toHaveBeenCalledTimes(1);
 		// First segment ends naturally: the second goes out in Chinese.
-		const doneCalls = mockListen.mock.calls.filter((call) => call[0] === "tts-done");
+		const doneCalls = mockListen.mock.calls.filter(
+			(call) => call[0] === "tts-done"
+		);
 		expect(doneCalls.length).toBe(1);
-		const done = doneCalls[0]?.[1] as (event: { payload: { id: number; finished: boolean } }) => void;
+		const done = doneCalls[0]?.[1] as (event: {
+			payload: { id: number; finished: boolean };
+		}) => void;
 		done({ payload: { id: 7, finished: true } });
 		await new Promise((resolve) => setTimeout(resolve, 20));
 		expect(mockInvoke).toHaveBeenCalledTimes(2);
 		expect(mockInvoke.mock.calls[1]?.[1]).toMatchObject({ lang: "zh-CN" });
 		// Second segment ends: the chain settles exactly once.
-		const doneCalls2 = mockListen.mock.calls.filter((call) => call[0] === "tts-done");
-		const done2 = doneCalls2[doneCalls2.length - 1]?.[1] as (
-			event: { payload: { id: number; finished: boolean } }
-		) => void;
+		const doneCalls2 = mockListen.mock.calls.filter(
+			(call) => call[0] === "tts-done"
+		);
+		const done2 = doneCalls2[doneCalls2.length - 1]?.[1] as (event: {
+			payload: { id: number; finished: boolean };
+		}) => void;
 		done2({ payload: { id: 7, finished: true } });
 		await new Promise((resolve) => setTimeout(resolve, 20));
 		expect(mockInvoke).toHaveBeenCalledTimes(2);
@@ -371,6 +409,8 @@ describe("saveNativeSpeech", () => {
 	});
 
 	it("rejects when the bridge is unavailable", async () => {
-		await expect(saveNativeSpeech("hello", "en-US")).rejects.toThrow("no bridge");
+		await expect(saveNativeSpeech("hello", "en-US")).rejects.toThrow(
+			"no bridge"
+		);
 	});
 });

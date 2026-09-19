@@ -19,7 +19,9 @@ declare global {
 		/** File Handling API: launches that arrive while running. */
 		launchQueue?: LaunchQueueLike;
 		/** File System Access save picker (Chromium only). */
-		showSaveFilePicker?: (options: SavePickerOptions) => Promise<SaveHandleLike>;
+		showSaveFilePicker?: (
+			options: SavePickerOptions
+		) => Promise<SaveHandleLike>;
 		/** Tauri v2 internals marker (__TAURI__ was v1). */
 		__TAURI_INTERNALS__?: unknown;
 		__TAURI__?: unknown;

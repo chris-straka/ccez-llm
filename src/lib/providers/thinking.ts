@@ -72,7 +72,8 @@ function metaSpark(): ThinkingSupport {
 		options,
 		defaultId: "medium",
 		native: true,
-		wireFields: (optionId) => (ids.has(optionId) ? { reasoning_effort: optionId } : {}),
+		wireFields: (optionId) =>
+			ids.has(optionId) ? { reasoning_effort: optionId } : {},
 		promptHint: () => ""
 	};
 }
@@ -108,15 +109,22 @@ function deepseekV4(): ThinkingSupport {
  * models fall back to generic prompt hints, so custom endpoints keep
  * working with no wire changes.
  */
-export function thinkingFor(providerId: string, model: string): ThinkingSupport {
+export function thinkingFor(
+	providerId: string,
+	model: string
+): ThinkingSupport {
 	if (providerId === "muse") return metaSpark();
 	if (providerId === "deepseek" && /v4|flash/i.test(model)) return deepseekV4();
 	return generic();
 }
 
 /** Clamp a saved id to what the model offers. */
-export function resolveThinkingId(support: ThinkingSupport, saved: string | undefined): string {
-	if (saved !== undefined && support.options.some((o) => o.id === saved)) return saved;
+export function resolveThinkingId(
+	support: ThinkingSupport,
+	saved: string | undefined
+): string {
+	if (saved !== undefined && support.options.some((o) => o.id === saved))
+		return saved;
 	return support.defaultId;
 }
 

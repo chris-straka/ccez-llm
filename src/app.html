@@ -1,19 +1,22 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="description" content="CCEZ Studio — BYOK chat with language-learner aids." />
-    <link rel="icon" href="%sveltekit.assets%/favicon.png" />
-    <link rel="apple-touch-icon" href="%sveltekit.assets%/favicon.png" />
-    <link rel="manifest" href="%sveltekit.assets%/manifest.webmanifest" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="CCEZ" />
-    <!-- viewport-fit=cover lets the app paint under the status bar and
+	<head>
+		<meta charset="utf-8" />
+		<meta
+			name="description"
+			content="CCEZ Studio — BYOK chat with language-learner aids."
+		/>
+		<link rel="icon" href="%sveltekit.assets%/favicon.png" />
+		<link rel="apple-touch-icon" href="%sveltekit.assets%/favicon.png" />
+		<link rel="manifest" href="%sveltekit.assets%/manifest.webmanifest" />
+		<meta name="mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+		<meta name="apple-mobile-web-app-title" content="CCEZ" />
+		<!-- viewport-fit=cover lets the app paint under the status bar and
     home indicator (no letterbox black bars); safe-area insets in the
     stylesheet keep content clear of them. Ignored off iOS. -->
-    <!-- interactive-widget=resizes-content makes the keyboard resize the
+		<!-- interactive-widget=resizes-content makes the keyboard resize the
     layout viewport instead of panning the visual one: .app (100dvh
     flex) glides with the keyboard instead of snapping 250ms late,
     and the caret reveal no longer pans by tap position (top taps
@@ -23,43 +26,55 @@
     stays OUT of this static tag (WebKit logs "not recognized" noise
     on every load) and +page.svelte appends it at runtime on Android,
     the only runtime that reads it. -->
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <!-- Status-bar / task-switcher tint, matched to the app's light/dark --bg. -->
-    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#17171a" media="(prefers-color-scheme: dark)" />
-    <title>Tauri + SvelteKit + Typescript App</title>
-    <style>
-      /* Bundled coding font (OFL): identical rendering on desktop and
+		<meta
+			name="viewport"
+			content="width=device-width, initial-scale=1, viewport-fit=cover"
+		/>
+		<!-- Status-bar / task-switcher tint, matched to the app's light/dark --bg. -->
+		<meta
+			name="theme-color"
+			content="#ffffff"
+			media="(prefers-color-scheme: light)"
+		/>
+		<meta
+			name="theme-color"
+			content="#17171a"
+			media="(prefers-color-scheme: dark)"
+		/>
+		<title>Tauri + SvelteKit + Typescript App</title>
+		<style>
+			/* Bundled coding font (OFL): identical rendering on desktop and
       phones, offline-first. Falls back to the system mono stack. */
-      @font-face {
-        font-family: "Fira Code";
-        src: url("%sveltekit.assets%/fonts/FiraCode-Regular.woff2") format("woff2");
-        font-weight: 400;
-        font-style: normal;
-        font-display: swap;
-      }
-      @font-face {
-        font-family: "Fira Code";
-        src: url("%sveltekit.assets%/fonts/FiraCode-Bold.woff2") format("woff2");
-        font-weight: 700;
-        font-style: normal;
-        font-display: swap;
-      }
-      /* First-paint background before SvelteKit CSS loads: mirrors the
+			@font-face {
+				font-family: "Fira Code";
+				src: url("%sveltekit.assets%/fonts/FiraCode-Regular.woff2")
+					format("woff2");
+				font-weight: 400;
+				font-style: normal;
+				font-display: swap;
+			}
+			@font-face {
+				font-family: "Fira Code";
+				src: url("%sveltekit.assets%/fonts/FiraCode-Bold.woff2") format("woff2");
+				font-weight: 700;
+				font-style: normal;
+				font-display: swap;
+			}
+			/* First-paint background before SvelteKit CSS loads: mirrors the
       app's light/dark --bg so Android cold start doesn't flash white.
       The app stylesheet takes over from here. */
-      html {
-        background: #fff;
-      }
-      @media (prefers-color-scheme: dark) {
-        html {
-          background: #17171a;
-        }
-      }
-    </style>
-    %sveltekit.head%
-  </head>
-  <body data-sveltekit-preload-data="hover">
-    <div style="display: contents">%sveltekit.body%</div>
-  </body>
+			html {
+				background: #fff;
+			}
+			@media (prefers-color-scheme: dark) {
+				html {
+					background: #17171a;
+				}
+			}
+		</style>
+		%sveltekit.head%
+	</head>
+	<body data-sveltekit-preload-data="hover">
+		<div style="display: contents">%sveltekit.body%</div>
+	</body>
 </html>

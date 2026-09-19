@@ -17,7 +17,9 @@ async function seedKeyedProvider(page: Page): Promise<void> {
 	await page.addInitScript((key: string) => {
 		window.localStorage.removeItem("ccez-mock-provider");
 		const stored = window.localStorage.getItem("ccez-llm-settings-v1");
-		const parsed = stored ? (JSON.parse(stored) as Record<string, unknown>) : {};
+		const parsed = stored
+			? (JSON.parse(stored) as Record<string, unknown>)
+			: {};
 		parsed["activeProviderId"] = "deepseek";
 		parsed["providers"] = {
 			...((parsed["providers"] as Record<string, unknown> | undefined) ?? {}),
@@ -48,7 +50,9 @@ test("401 surfaces the provider error with a retry", async ({ page }) => {
 	);
 	await seedKeyedProvider(page);
 	await page.goto("/");
-	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
 	await send(page, "hello provider");
 	const err = page.locator("article.assistant .error").first();
 	await expect(err).toContainText("HTTP 401", { timeout: 30_000 });
@@ -58,23 +62,32 @@ test("401 surfaces the provider error with a retry", async ({ page }) => {
 	).toBeVisible();
 });
 
-test("429 rate-limit retries without duplicating the reply", async ({ page }) => {
+test("429 rate-limit retries without duplicating the reply", async ({
+	page
+}) => {
 	await page.route("**/chat/completions", (route) =>
 		route.fulfill({
 			status: 429,
 			contentType: "application/json",
-			body: JSON.stringify({ error: { message: "rate limit exceeded", code: 429 } })
+			body: JSON.stringify({
+				error: { message: "rate limit exceeded", code: 429 }
+			})
 		})
 	);
 	await seedKeyedProvider(page);
 	await page.goto("/");
-	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
 	await send(page, "hello rate limit");
 	const err = page.locator("article.assistant .error").first();
 	await expect(err).toContainText("HTTP 429", { timeout: 30_000 });
 	// Retry re-attempts the same reply slot: still one assistant article,
 	// still failing with the same status, never a stacked duplicate.
-	await page.locator("article.assistant button", { hasText: "Retry" }).first().click();
+	await page
+		.locator("article.assistant button", { hasText: "Retry" })
+		.first()
+		.click();
 	await expect(err).toContainText("HTTP 429", { timeout: 30_000 });
 	await expect(page.locator("article.assistant")).toHaveCount(1);
 	await expect(page.locator("article.user")).toHaveCount(1);
@@ -101,9 +114,12 @@ test("deleting the streaming chat aborts its reply, composer keeps working", asy
 	await expect(page.locator(".sending")).toHaveCount(0);
 	await expect(page.locator("article")).toHaveCount(0);
 	await send(page, "second attempt after abort");
-	await expect(page.locator("article.assistant .rendered")).toContainText("Mock reply to:", {
-		timeout: 20_000
-	});
+	await expect(page.locator("article.assistant .rendered")).toContainText(
+		"Mock reply to:",
+		{
+			timeout: 20_000
+		}
+	);
 	await expect(page.locator("article")).toHaveCount(2);
 });
 
@@ -115,7 +131,11 @@ test("row error text scales only with the button opt-in", async ({ page }) => {
 	await page.addInitScript(() => {
 		window.localStorage.setItem(
 			"ccez-llm-settings-v1",
-			JSON.stringify({ hoverAssistantActions: true, hoverUserActions: true, fontScale: 1.5 })
+			JSON.stringify({
+				hoverAssistantActions: true,
+				hoverUserActions: true,
+				fontScale: 1.5
+			})
 		);
 		window.localStorage.setItem(
 			"ccez-llm-chats-v1",
@@ -124,7 +144,15 @@ test("row error text scales only with the button opt-in", async ({ page }) => {
 					id: "e2e-err",
 					createdAt: 1,
 					replyLang: null,
-					messages: [{ id: "e2e-m0", role: "assistant", content: "stalled", usage: null, error: "Load failed" }]
+					messages: [
+						{
+							id: "e2e-m0",
+							role: "assistant",
+							content: "stalled",
+							usage: null,
+							error: "Load failed"
+						}
+					]
 				}
 			])
 		);

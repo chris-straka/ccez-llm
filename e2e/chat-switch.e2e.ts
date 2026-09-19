@@ -38,12 +38,18 @@ test("thinking stays in its own chat across a switch", async ({ page }) => {
 	const rows = page.locator("aside ul li button.side-chat");
 	await rows.first().click();
 
-	await expect(page.locator("article.user .rendered")).toContainText("please write", {
-		timeout: 10_000
-	});
-	await expect(page.locator("article.assistant .rendered")).toContainText("Mock reply to:", {
-		timeout: 15_000
-	});
+	await expect(page.locator("article.user .rendered")).toContainText(
+		"please write",
+		{
+			timeout: 10_000
+		}
+	);
+	await expect(page.locator("article.assistant .rendered")).toContainText(
+		"Mock reply to:",
+		{
+			timeout: 15_000
+		}
+	);
 	// Count matches visible: one user message, one assistant reply, and
 	// the list holds both chats with the origin back on top and active.
 	// (Desktop rows carry no per-chat count — the span is phone-only —
@@ -61,7 +67,11 @@ test("entering another chat never summons the prompt", async ({ page }) => {
 		window.localStorage.setItem("ccez-mock-provider", "1");
 		window.localStorage.setItem(
 			"ccez-llm-settings-v1",
-			JSON.stringify({ hoverAssistantActions: true, hoverUserActions: true, promptIdleSec: -1 })
+			JSON.stringify({
+				hoverAssistantActions: true,
+				hoverUserActions: true,
+				promptIdleSec: -1
+			})
 		);
 		window.localStorage.setItem(
 			"ccez-llm-chats-v1",
@@ -70,13 +80,29 @@ test("entering another chat never summons the prompt", async ({ page }) => {
 					id: "e2e-first",
 					createdAt: 1,
 					replyLang: null,
-					messages: [{ id: "e2e-m0", role: "user", content: "first chat", usage: null, error: null }]
+					messages: [
+						{
+							id: "e2e-m0",
+							role: "user",
+							content: "first chat",
+							usage: null,
+							error: null
+						}
+					]
 				},
 				{
 					id: "e2e-second",
 					createdAt: 2,
 					replyLang: null,
-					messages: [{ id: "e2e-m1", role: "user", content: "second chat", usage: null, error: null }]
+					messages: [
+						{
+							id: "e2e-m1",
+							role: "user",
+							content: "second chat",
+							usage: null,
+							error: null
+						}
+					]
 				}
 			])
 		);
@@ -89,7 +115,9 @@ test("entering another chat never summons the prompt", async ({ page }) => {
 		const seen: string[] = [];
 		(window as unknown as Record<string, unknown>).__vtNames = seen;
 		const proto = Document.prototype as unknown as {
-			startViewTransition?: (opts: { update: () => void }) => { finished: Promise<unknown> };
+			startViewTransition?: (opts: { update: () => void }) => {
+				finished: Promise<unknown>;
+			};
 		};
 		const real = proto.startViewTransition;
 		if (typeof real === "function") {
@@ -98,15 +126,20 @@ test("entering another chat never summons the prompt", async ({ page }) => {
 				opts: { update: () => void }
 			): { finished: Promise<unknown> } {
 				seen.push(
-					getComputedStyle(document.querySelector(".messages")!).viewTransitionName
+					getComputedStyle(document.querySelector(".messages")!)
+						.viewTransitionName
 				);
 				return real.call(this, opts);
 			};
 		}
 	});
 	await page.goto("/");
-	await expect(page.locator("article .rendered")).toBeVisible({ timeout: 60_000 });
-	await expect(page.locator(".prompt")).toHaveClass(/prompt-idle/, { timeout: 10_000 });
+	await expect(page.locator("article .rendered")).toBeVisible({
+		timeout: 60_000
+	});
+	await expect(page.locator(".prompt")).toHaveClass(/prompt-idle/, {
+		timeout: 10_000
+	});
 	await page.keyboard.press("Meta+Shift+[");
 	const sidebar = page.locator("aside:not(.settings-panel)");
 	await expect(sidebar).not.toHaveClass(/collapsed/, { timeout: 5_000 });
@@ -117,7 +150,9 @@ test("entering another chat never summons the prompt", async ({ page }) => {
 		timeout: 10_000
 	});
 	await expect(page.locator(".prompt")).toHaveClass(/prompt-idle/);
-	const focused = await page.evaluate(() => !!document.activeElement?.closest?.(".prompt"));
+	const focused = await page.evaluate(
+		() => !!document.activeElement?.closest?.(".prompt")
+	);
 	expect(focused).toBe(false);
 	// The crossfade was scoped to the messages (every snapshot saw
 	// the name), and the scope is off again at rest.
@@ -127,7 +162,9 @@ test("entering another chat never summons the prompt", async ({ page }) => {
 	expect(vtNames.length).toBeGreaterThan(0);
 	for (const name of vtNames) expect(name).toBe("messages");
 	const vtRest = await page.evaluate(
-		() => getComputedStyle(document.querySelector(".messages") as Element).viewTransitionName
+		() =>
+			getComputedStyle(document.querySelector(".messages") as Element)
+				.viewTransitionName
 	);
 	expect(vtRest).toBe("none");
 });
@@ -149,7 +186,10 @@ test("thinking row keeps breathing room", async ({ page }) => {
 	// Explicit margins, not UA happenstance.
 	const margins = await sending.evaluate((el) => {
 		const style = getComputedStyle(el);
-		return { top: parseFloat(style.marginTop), bottom: parseFloat(style.marginBottom) };
+		return {
+			top: parseFloat(style.marginTop),
+			bottom: parseFloat(style.marginBottom)
+		};
 	});
 	expect(margins.top).toBeGreaterThan(12);
 	expect(margins.bottom).toBeGreaterThan(12);

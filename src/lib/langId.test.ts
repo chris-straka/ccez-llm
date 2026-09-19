@@ -26,6 +26,8 @@ describe("identifyLangOffline", () => {
 	it("returns null for short or scoreless samples", () => {
 		expect(identifyLangOffline("")).toBe(null);
 		expect(identifyLangOffline("hi there")).toBe(null);
-		expect(identifyLangOffline("lorem ipsum dolor sit amet consectetur adipiscing")).toBe(null);
+		expect(
+			identifyLangOffline("lorem ipsum dolor sit amet consectetur adipiscing")
+		).toBe(null);
 	});
 });

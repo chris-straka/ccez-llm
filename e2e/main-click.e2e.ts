@@ -10,7 +10,9 @@ import { seedChat } from "./helpers";
 test.beforeEach(async ({ page }) => {
 	await seedChat(page, []);
 	await page.goto("/");
-	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
 });
 
 test("clicking the main chat collapses the chats sidebar", async ({ page }) => {
@@ -35,7 +37,9 @@ test("clicking the main chat closes the settings panel", async ({ page }) => {
  * A click into the chat closes settings even while the reply streams:
  * tokens must never swallow the click-off-to-close.
  */
-test("clicking the main chat closes the settings panel mid-stream", async ({ page }) => {
+test("clicking the main chat closes the settings panel mid-stream", async ({
+	page
+}) => {
 	const filler = Array.from({ length: 30 }, (_, i) => ({
 		role: i % 2 === 0 ? "user" : "assistant",
 		content: `filler message number ${i} with enough words to take vertical space in the thread`
@@ -50,7 +54,13 @@ test("clicking the main chat closes the settings panel mid-stream", async ({ pag
 						id: "e2e-chat",
 						createdAt: 1,
 						replyLang: null,
-						messages: msgs.map((m, i) => ({ id: `e2e-m${i}`, role: m.role, content: m.content, usage: null, error: null }))
+						messages: msgs.map((m, i) => ({
+							id: `e2e-m${i}`,
+							role: m.role,
+							content: m.content,
+							usage: null,
+							error: null
+						}))
 					}
 				])
 			);
@@ -58,7 +68,9 @@ test("clicking the main chat closes the settings panel mid-stream", async ({ pag
 		{ msgs: filler }
 	);
 	await page.reload();
-	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const panel = page.locator(".settings-panel");
 	await page.locator(".ta-input").first().click();
 	await page.keyboard.type("mid-stream close probe");
@@ -82,11 +94,15 @@ test("clicking the main chat closes the settings panel mid-stream", async ({ pag
 	await expect(panel).toHaveClass(/closed/);
 	// And it stays closed when the stream lands: completion handlers
 	// must not resurrect the panel.
-	await expect(body).toHaveText("Mock reply to: mid-stream close probe", { timeout: 30_000 });
+	await expect(body).toHaveText("Mock reply to: mid-stream close probe", {
+		timeout: 30_000
+	});
 	await expect(panel).toHaveClass(/closed/);
 });
 
-test("shift-cmd-comma mirrors cmd-comma on the settings panel", async ({ page }) => {
+test("shift-cmd-comma mirrors cmd-comma on the settings panel", async ({
+	page
+}) => {
 	const panel = page.locator(".settings-panel");
 	await page.keyboard.press("Meta+,");
 	await expect(panel).not.toHaveClass(/closed/);

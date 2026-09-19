@@ -27,36 +27,36 @@ export const VOICE_TIMEOUT_MS = 8000;
 export const MODEL_TIMEOUT_MS = 5000;
 
 export interface NoticeSlot {
-  /** Generation: bumped on every show, captured by the clear timer. */
-  seq: number;
-  message: string | null;
+	/** Generation: bumped on every show, captured by the clear timer. */
+	seq: number;
+	message: string | null;
 }
 
 export interface NoticeState {
-  /** Sticky composer error (`attachError`). */
-  inline: NoticeSlot;
-  /** Sticky bottom banner (`vocalizeError`, settings `modelError`). */
-  banner: NoticeSlot;
-  /** Self-clearing top voice notice (`voiceError`). */
-  voice: NoticeSlot;
-  /** Self-clearing top toast (`toast`). */
-  toast: NoticeSlot;
-  /** Self-clearing top error toast (red pairing, both themes). */
-  errorToast: NoticeSlot;
+	/** Sticky composer error (`attachError`). */
+	inline: NoticeSlot;
+	/** Sticky bottom banner (`vocalizeError`, settings `modelError`). */
+	banner: NoticeSlot;
+	/** Self-clearing top voice notice (`voiceError`). */
+	voice: NoticeSlot;
+	/** Self-clearing top toast (`toast`). */
+	toast: NoticeSlot;
+	/** Self-clearing top error toast (red pairing, both themes). */
+	errorToast: NoticeSlot;
 }
 
 function emptySlot(): NoticeSlot {
-  return { seq: 0, message: null };
+	return { seq: 0, message: null };
 }
 
 export function emptyNotices(): NoticeState {
-  return {
-    inline: emptySlot(),
-    banner: emptySlot(),
-    voice: emptySlot(),
-    toast: emptySlot(),
-    errorToast: emptySlot()
-  };
+	return {
+		inline: emptySlot(),
+		banner: emptySlot(),
+		voice: emptySlot(),
+		toast: emptySlot(),
+		errorToast: emptySlot()
+	};
 }
 
 /**
@@ -64,11 +64,15 @@ export function emptyNotices(): NoticeState {
  * generation: a clear timer must pass it back to `expireNotice`, so
  * only the notice that armed the timer can be cleared by it.
  */
-export function showNotice(state: NoticeState, kind: NoticeKind, message: string): number {
-  const slot = state[kind];
-  slot.seq += 1;
-  slot.message = message;
-  return slot.seq;
+export function showNotice(
+	state: NoticeState,
+	kind: NoticeKind,
+	message: string
+): number {
+	const slot = state[kind];
+	slot.seq += 1;
+	slot.message = message;
+	return slot.seq;
 }
 
 /**
@@ -76,14 +80,18 @@ export function showNotice(state: NoticeState, kind: NoticeKind, message: string
  * timer (an older show's) is a no-op. This is the whole timer race:
  * callers never store or clear timer handles.
  */
-export function expireNotice(state: NoticeState, kind: NoticeKind, seq: number): void {
-  const slot = state[kind];
-  if (slot.seq === seq) slot.message = null;
+export function expireNotice(
+	state: NoticeState,
+	kind: NoticeKind,
+	seq: number
+): void {
+	const slot = state[kind];
+	if (slot.seq === seq) slot.message = null;
 }
 
 /** Immediate clear: tap-to-dismiss, next-attempt reset. */
 export function clearNotice(state: NoticeState, kind: NoticeKind): void {
-  state[kind].message = null;
+	state[kind].message = null;
 }
 
 /**
@@ -92,11 +100,11 @@ export function clearNotice(state: NoticeState, kind: NoticeKind): void {
  * disarms the older timer without any `clearTimeout`.
  */
 export function flashNotice(
-  state: NoticeState,
-  kind: NoticeKind,
-  message: string,
-  timeoutMs: number
+	state: NoticeState,
+	kind: NoticeKind,
+	message: string,
+	timeoutMs: number
 ): void {
-  const seq = showNotice(state, kind, message);
-  setTimeout(() => expireNotice(state, kind, seq), timeoutMs);
+	const seq = showNotice(state, kind, message);
+	setTimeout(() => expireNotice(state, kind, seq), timeoutMs);
 }

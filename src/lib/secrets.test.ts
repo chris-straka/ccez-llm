@@ -72,12 +72,17 @@ describe("secrets fallback (no Tauri shell)", () => {
 		await setSecret(secretAccount("legacy"), "sk-plain");
 		expect(await getSecret(secretAccount("legacy"))).toBe("sk-plain");
 		if (globalThis.crypto?.subtle) {
-			expect(localStorage.getItem("ccez-keychain:provider:legacy")).toContain("gcm1:");
+			expect(localStorage.getItem("ccez-keychain:provider:legacy")).toContain(
+				"gcm1:"
+			);
 		}
 	});
 
 	it("hydrates blank settings keys from the bundle only", async () => {
-		await setSecret(SECRET_BUNDLE_ACCOUNT, encodeSecretBundle({ muse: "muse-test" }));
+		await setSecret(
+			SECRET_BUNDLE_ACCOUNT,
+			encodeSecretBundle({ muse: "muse-test" })
+		);
 		const settings = defaultSettings();
 		settings.providers["deepseek"]!.apiKey = "";
 		settings.providers["muse"]!.apiKey = "";
@@ -114,7 +119,8 @@ describe("secrets fallback (no Tauri shell)", () => {
 			readFile("src-tauri/tauri.conf.json", "utf8"),
 			readFile("src-tauri/src/lib.rs", "utf8")
 		]);
-		const identifier = (JSON.parse(confRaw) as { identifier?: unknown }).identifier;
+		const identifier = (JSON.parse(confRaw) as { identifier?: unknown })
+			.identifier;
 		expect(identifier).toBe(KEYCHAIN_SERVICE);
 		const service = /const KEYCHAIN_SERVICE: &str = "([^"]+)"/.exec(libRs)?.[1];
 		expect(service).toBe(KEYCHAIN_SERVICE);
@@ -187,7 +193,10 @@ describe("secrets fallback (no Tauri shell)", () => {
 	});
 
 	it("never clobbers a stored bundle with emptiness before first hydrate", async () => {
-		await setSecret(SECRET_BUNDLE_ACCOUNT, encodeSecretBundle({ muse: "muse-test" }));
+		await setSecret(
+			SECRET_BUNDLE_ACCOUNT,
+			encodeSecretBundle({ muse: "muse-test" })
+		);
 		const settings = defaultSettings();
 		settings.providers["deepseek"]!.apiKey = "";
 		settings.providers["muse"]!.apiKey = "";

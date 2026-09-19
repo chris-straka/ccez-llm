@@ -16,7 +16,10 @@ function pageSource(): string {
 }
 
 function bodySource(): string {
-	return readFileSync(new URL("../lib/components/MessageBody.svelte", import.meta.url), "utf8");
+	return readFileSync(
+		new URL("../lib/components/MessageBody.svelte", import.meta.url),
+		"utf8"
+	);
 }
 
 function appHtml(): string {
@@ -24,14 +27,17 @@ function appHtml(): string {
 }
 
 function annotationsSource(): string {
-	return readFileSync(new URL("../lib/annotations.ts", import.meta.url), "utf8");
+	return readFileSync(
+		new URL("../lib/annotations.ts", import.meta.url),
+		"utf8"
+	);
 }
 
 describe("platform seal", () => {
 	it("defines androidUI as any phone, so data-android means phone", () => {
 		const source = pageSource();
 		expect(source).toContain(
-			"androidUI = isAndroidUserAgent(navigator.userAgent) || isIOSUserAgent(navigator.userAgent)"
+			"androidUI =\n\t\t\t\tisAndroidUserAgent(navigator.userAgent) ||\n\t\t\t\tisIOSUserAgent(navigator.userAgent)"
 		);
 		expect(source).toContain("data-android={androidUI || null}");
 	});
@@ -60,7 +66,9 @@ describe("platform seal", () => {
 
 	it("holds the phone dock past its timer while a highlight is live", () => {
 		const source = pageSource();
-		expect(source).toContain('if (androidUI && (window.getSelection()?.toString() ?? "") !== "") {');
+		expect(source).toContain(
+			'if (androidUI && (window.getSelection()?.toString() ?? "") !== "") {'
+		);
 	});
 
 	it("keeps the iOS furigana nudge on its own override", () => {
@@ -81,25 +89,32 @@ describe("android seal", () => {
 
 	it("keeps the Android furigana nudge off the iOS gate", () => {
 		const css = bodySource();
-		expect(css).toContain(":global(.app[data-android]:not([data-ios])) .rendered :global(.frt)");
+		expect(css).toContain(
+			":global(.app[data-android]:not([data-ios])) .rendered :global(.frt)"
+		);
 	});
 
 	it("yields the waypoint slot to the selection dock on phones", () => {
 		const source = pageSource();
-		expect(source).toContain("{#if androidUI && points.length > 3 && !selMenu}");
+		expect(source).toContain(
+			"{#if androidUI && points.length > 3 && !selMenu}"
+		);
 	});
 });
 
 describe("desktop seal", () => {
 	it("keeps the textarea composer for every UA (no CodeMirror branch)", () => {
 		const source = pageSource();
-		expect(source).toContain("editor = createTextareaEditor(promptEl, promptOptions());");
+		expect(source).toContain(
+			"editor = createTextareaEditor(promptEl, promptOptions());"
+		);
 		expect(source).not.toContain("createPromptEditor(");
 		expect(source).not.toContain("cm-content");
 	});
 	it("routes provider cycling through the gating contract", () => {
 		const source = pageSource();
-		const body = source.match(/function cycleProvider[\s\S]*?\n\t\}/)?.[0] ?? "";
+		const body =
+			source.match(/function cycleProvider[\s\S]*?\n\t\}/)?.[0] ?? "";
 		expect(body).toContain("visibleProviderIds(");
 	});
 
@@ -107,14 +122,20 @@ describe("desktop seal", () => {
 		const source = pageSource();
 		// Always-hide mode also skips the mount steal: the prompt is
 		// visible exactly while the composer holds focus.
-		expect(source).toContain("if (!androidUI && settings.promptIdleSec !== PROMPT_IDLE_ALWAYS) {");
+		expect(source).toContain(
+			"if (!androidUI && settings.promptIdleSec !== PROMPT_IDLE_ALWAYS) {"
+		);
 		expect(source).toContain("editor?.focus();");
 	});
 
 	it("keeps the keyboard-shortcuts heading for desktop", () => {
 		const source = pageSource();
-		expect(source).toContain('{#if !androidUI}<h2 id="shortcuts-heading">Keyboard shortcuts</h2>{/if}');
-		expect(source).toContain('aria-label={androidUI ? "Touch gestures" : undefined}');
+		expect(source).toContain(
+			'{#if !androidUI}<h2 id="shortcuts-heading">\n\t\t\t\t\t\t\tKeyboard shortcuts\n\t\t\t\t\t\t</h2>{/if}'
+		);
+		expect(source).toContain(
+			'aria-label={androidUI ? "Touch gestures" : undefined}'
+		);
 	});
 
 	it("keeps selection auto-speak desktop-only (phones need the tap)", () => {

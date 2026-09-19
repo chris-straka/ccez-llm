@@ -20,31 +20,108 @@ import { ttsLangFor } from "./reading";
 const STOP_WORDS: Array<{ lang: string; words: string[] }> = [
 	{
 		lang: "en-US",
-		words: ["the", "and", "that", "have", "with", "this", "from", "they", "would", "there"]
+		words: [
+			"the",
+			"and",
+			"that",
+			"have",
+			"with",
+			"this",
+			"from",
+			"they",
+			"would",
+			"there"
+		]
 	},
 	{
 		lang: "fr-FR",
-		words: ["les", "des", "une", "que", "est", "dans", "pour", "vous", "avec", "pas"]
+		words: [
+			"les",
+			"des",
+			"une",
+			"que",
+			"est",
+			"dans",
+			"pour",
+			"vous",
+			"avec",
+			"pas"
+		]
 	},
 	{
 		lang: "de-DE",
-		words: ["der", "die", "und", "den", "von", "mit", "ist", "das", "sich", "nicht"]
+		words: [
+			"der",
+			"die",
+			"und",
+			"den",
+			"von",
+			"mit",
+			"ist",
+			"das",
+			"sich",
+			"nicht"
+		]
 	},
 	{
 		lang: "es-ES",
-		words: ["los", "las", "una", "que", "está", "para", "con", "por", "como", "pero"]
+		words: [
+			"los",
+			"las",
+			"una",
+			"que",
+			"está",
+			"para",
+			"con",
+			"por",
+			"como",
+			"pero"
+		]
 	},
 	{
 		lang: "it-IT",
-		words: ["che", "una", "della", "sono", "come", "più", "anche", "nostra", "questo", "molto"]
+		words: [
+			"che",
+			"una",
+			"della",
+			"sono",
+			"come",
+			"più",
+			"anche",
+			"nostra",
+			"questo",
+			"molto"
+		]
 	},
 	{
 		lang: "pt-PT",
-		words: ["que", "uma", "para", "com", "não", "como", "mais", "seus", "entre", "muito"]
+		words: [
+			"que",
+			"uma",
+			"para",
+			"com",
+			"não",
+			"como",
+			"mais",
+			"seus",
+			"entre",
+			"muito"
+		]
 	},
 	{
 		lang: "nl-NL",
-		words: ["van", "het", "een", "dat", "die", "voor", "met", "zijn", "niet", "ook"]
+		words: [
+			"van",
+			"het",
+			"een",
+			"dat",
+			"die",
+			"voor",
+			"met",
+			"zijn",
+			"niet",
+			"ook"
+		]
 	}
 ];
 

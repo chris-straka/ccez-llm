@@ -63,7 +63,7 @@ web API already covers all three, the web API wins.
   Dynamic imports keep node/jsdom clean; unit-tested with injected
   handles, browser e2e pins the download fall-through.
 - `global-shortcut` — summon chord only (`CommandOrControl+Shift+
-  Space` in `desktop.rs install_summon_hotkey`, `on_shortcut` as a
+Space` in `desktop.rs install_summon_hotkey`, `on_shortcut` as a
   toggle (unfocused shows + focuses, focused hides back). Carbon hotkeys
   need no Accessibility grant; failed registration logs and the
   in-app chord still works. Extends summon to Windows/Linux (was

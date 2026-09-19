@@ -68,11 +68,16 @@ export function coverageFor(
  * Live probe in the current webview. Outside a browser (SSR, tests)
  * every script reports "unknown" — never a throw, never a pass claim.
  */
-export function probeFontCoverage(scripts: CjkScript[]): Record<CjkScript, FontStatus> {
+export function probeFontCoverage(
+	scripts: CjkScript[]
+): Record<CjkScript, FontStatus> {
 	const fonts =
 		typeof document !== "undefined"
-			? (document as Document & { fonts?: { check: (font: string, text: string) => boolean } })
-					.fonts
+			? (
+					document as Document & {
+						fonts?: { check: (font: string, text: string) => boolean };
+					}
+				).fonts
 			: undefined;
 	if (!fonts || typeof fonts.check !== "function") {
 		return { zh: "unknown", ja: "unknown", ko: "unknown" };
@@ -86,8 +91,12 @@ export function probeFontCoverage(scripts: CjkScript[]): Record<CjkScript, FontS
  * the voice-tier nudge (name the pane, not just "install fonts").
  * Null when nothing is known-missing. Pure and unit-tested.
  */
-export function fontNudgeFor(status: Record<CjkScript, FontStatus>): string | null {
-	const missing = (Object.keys(status) as CjkScript[]).filter((s) => status[s] === "missing");
+export function fontNudgeFor(
+	status: Record<CjkScript, FontStatus>
+): string | null {
+	const missing = (Object.keys(status) as CjkScript[]).filter(
+		(s) => status[s] === "missing"
+	);
 	if (missing.length === 0) return null;
 	const names = missing.map((s) => CJK_LABEL[s]).join(", ");
 	return (

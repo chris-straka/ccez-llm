@@ -20,11 +20,15 @@ test.beforeEach(async ({ page }) => {
 		{ role: "assistant", content: ASSISTANT }
 	]);
 	await page.goto("/");
-	await expect(page.locator(".ccez-math").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ccez-math").first()).toBeVisible({
+		timeout: 60_000
+	});
 });
 
 /** Display math renders KaTeX with copy + `$` chrome and a hidden folded label. */
-test("display block carries copy, $ toggle, and folded label", async ({ page }) => {
+test("display block carries copy, $ toggle, and folded label", async ({
+	page
+}) => {
 	const block = page.locator(".ccez-math").first();
 	await expect(block.locator(".ccez-math-body")).toBeVisible();
 	expect(await block.locator(".katex").count()).toBeGreaterThan(0);
@@ -40,21 +44,29 @@ test("body click selects without copying", async ({ page }) => {
 	const block = page.locator(".ccez-math").first();
 	await block.locator(".ccez-math-body").click();
 	await page.waitForTimeout(500);
-	expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("SENTINEL");
+	expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+		"SENTINEL"
+	);
 	await expect(page.locator(".toast")).toHaveCount(0);
 	// The body is an I-beam surface: a drag selects equation text.
 	// Same shiki-settle wait as the snap test below: the fixture's
 	// code fence swaps the HTML once after mount (attached, not
 	// visible — the block renders empty).
-	await expect(page.locator(".ccez-code code.shiki").first()).toBeAttached({ timeout: 20_000 });
+	await expect(page.locator(".ccez-code code.shiki").first()).toBeAttached({
+		timeout: 20_000
+	});
 	const body = block.locator(".ccez-math-body");
 	const box = await body.boundingBox();
 	if (!box) throw new Error("math body has no box");
 	await page.mouse.move(box.x + 8, box.y + box.height / 2);
 	await page.mouse.down();
-	await page.mouse.move(box.x + box.width - 8, box.y + box.height / 2, { steps: 5 });
+	await page.mouse.move(box.x + box.width - 8, box.y + box.height / 2, {
+		steps: 5
+	});
 	await page.mouse.up();
-	const selected = await page.evaluate(() => window.getSelection()?.toString() ?? "");
+	const selected = await page.evaluate(
+		() => window.getSelection()?.toString() ?? ""
+	);
 	expect(selected).not.toBe("");
 });
 
@@ -80,15 +92,23 @@ test("inline math carries $ toggle and copy", async ({ page }) => {
 	await page.evaluate(() => navigator.clipboard.writeText("SENTINEL"));
 	await copy.click();
 	await expect
-		.poll(() => page.evaluate(() => navigator.clipboard.readText()), { timeout: 10_000 })
+		.poll(() => page.evaluate(() => navigator.clipboard.readText()), {
+			timeout: 10_000
+		})
 		.toContain("$n = 1");
 });
 
 /** Single-dollar inline math renders with KaTeX; prices stay plain text. */
-test("single-dollar inline math renders, prices stay plain", async ({ page }) => {
+test("single-dollar inline math renders, prices stay plain", async ({
+	page
+}) => {
 	await seedChat(page, [
 		{ role: "user", content: "quadratic?" },
-		{ role: "assistant", content: "Roots are $x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$ but it costs $5 and $10." }
+		{
+			role: "assistant",
+			content:
+				"Roots are $x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$ but it costs $5 and $10."
+		}
 	]);
 	await page.goto("/");
 	const inline = page.locator(".ccez-math-inline").first();
@@ -136,10 +156,16 @@ test("right-click toggles the math fold, left-click unfolds, and both stay silen
 	await expect(block).toHaveAttribute("data-folded", "1");
 	await expect(body).toBeHidden();
 	await expect(block.locator(".ccez-math-foldedlabel")).toBeVisible();
-	await expect(block.locator(".ccez-math-foldedlabel")).toHaveText("latex · 1 LOC");
+	await expect(block.locator(".ccez-math-foldedlabel")).toHaveText(
+		"latex · 1 LOC"
+	);
 	await page.waitForTimeout(500);
-	await expect(page.locator("article.speaking, article.speaking-sel")).toHaveCount(0);
-	const selected = await page.evaluate(() => window.getSelection()?.toString() ?? "");
+	await expect(
+		page.locator("article.speaking, article.speaking-sel")
+	).toHaveCount(0);
+	const selected = await page.evaluate(
+		() => window.getSelection()?.toString() ?? ""
+	);
 	expect(selected).not.toBe("");
 	// A second right-click toggles back open (shortcuts modal: "Right-click toggles").
 	await block.click({ button: "right" });
@@ -158,7 +184,10 @@ test("right-click toggles the math fold, left-click unfolds, and both stay silen
 test("fence-plus-display pair shows once", async ({ page }) => {
 	await seedChat(page, [
 		{ role: "user", content: "quad" },
-		{ role: "assistant", content: "Quad:\n\n```latex\n$$x = 1$$\n```\n\n$$x = 1$$" }
+		{
+			role: "assistant",
+			content: "Quad:\n\n```latex\n$$x = 1$$\n```\n\n$$x = 1$$"
+		}
 	]);
 	await page.goto("/");
 	const blocks = page.locator("article.assistant .ccez-math");
@@ -198,7 +227,9 @@ test("$ toggle shows raw source and back", async ({ page }) => {
 test("math copy button copies tex", async ({ page }) => {
 	const block = page.locator(".ccez-math").first();
 	await block.locator(".ccez-math-copy").click();
-	await expect(page.locator(".toast")).toHaveText("Copied", { timeout: 10_000 });
+	await expect(page.locator(".toast")).toHaveText("Copied", {
+		timeout: 10_000
+	});
 	const clip = await page.evaluate(() => navigator.clipboard.readText());
 	expect(clip).toContain("E_n");
 	expect(clip.trim().startsWith("$$")).toBe(true);
@@ -212,7 +243,10 @@ test("folded math hugs its label", async ({ page }) => {
 	await expect(block).toHaveAttribute("data-folded", "1");
 	const widths = await block.evaluate((el) => {
 		const label = el.querySelector(".ccez-math-foldedlabel") as HTMLElement;
-		return { block: el.getBoundingClientRect().width, label: label.getBoundingClientRect().width };
+		return {
+			block: el.getBoundingClientRect().width,
+			label: label.getBoundingClientRect().width
+		};
 	});
 	expect(widths.block).toBeLessThan(widths.label + 8);
 });
@@ -235,7 +269,10 @@ text size" opt-in: at 2x text the chrome doubles instead of reading
 tiny next to scaled message buttons. A fresh context carries the
 scaled seed (init scripts re-run on reload, so a reload would wipe
 a mid-test settings write back to the seed). */
-test("math chrome follows the message-button scale opt-in", async ({ page, browser }) => {
+test("math chrome follows the message-button scale opt-in", async ({
+	page,
+	browser
+}) => {
 	const before = await page.locator(".ccez-math-copy").first().boundingBox();
 	if (!before) throw new Error("copy button has no box");
 	const scaled = await browser.newContext();
@@ -248,11 +285,17 @@ test("math chrome follows the message-button scale opt-in", async ({ page, brows
 		const raw = window.localStorage.getItem("ccez-llm-settings-v1") ?? "{}";
 		window.localStorage.setItem(
 			"ccez-llm-settings-v1",
-			JSON.stringify({ ...JSON.parse(raw), scaleActionsWithFont: true, fontScale: 2 })
+			JSON.stringify({
+				...JSON.parse(raw),
+				scaleActionsWithFont: true,
+				fontScale: 2
+			})
 		);
 	});
 	await second.goto("/");
-	await expect(second.locator(".ccez-math").first()).toBeVisible({ timeout: 60_000 });
+	await expect(second.locator(".ccez-math").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const after = await second.locator(".ccez-math-copy").first().boundingBox();
 	await scaled.close();
 	if (!after) throw new Error("scaled copy button has no box");
@@ -268,7 +311,9 @@ test("partial equation pick snaps to the whole equation", async ({ page }) => {
 	// once after mount — a drag drawn before that swap loses its live
 	// selection when the nodes detach. Settle it first (attached, not
 	// visible: this fence's block renders empty, so it has no box).
-	await expect(page.locator(".ccez-code code.shiki").first()).toBeAttached({ timeout: 20_000 });
+	await expect(page.locator(".ccez-code code.shiki").first()).toBeAttached({
+		timeout: 20_000
+	});
 	const body = page.locator(".ccez-math-body").first();
 	const box = await body.boundingBox();
 	if (!box) throw new Error("math body has no box");
@@ -290,7 +335,10 @@ test("partial equation pick snaps to the whole equation", async ({ page }) => {
 	const flat = (s: string) => s.replace(/\s+/g, "");
 	await expect
 		.poll(
-			() => page.evaluate(() => window.getSelection()?.toString() ?? "").then((s) => flat(s)),
+			() =>
+				page
+					.evaluate(() => window.getSelection()?.toString() ?? "")
+					.then((s) => flat(s)),
 			{ timeout: 8000 }
 		)
 		.toBe(flat(full));
@@ -305,7 +353,9 @@ test("triple-click raw tex stops at the equation", async ({ page }) => {
 	await expect(raw).toBeVisible();
 	const box = await raw.boundingBox();
 	if (!box) throw new Error("raw tex has no box");
-	await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2, { clickCount: 3 });
+	await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2, {
+		clickCount: 3
+	});
 	// Range (not Selection) text: Selection.toString synthesizes block
 	// breaks, so it always trails one here — the range itself must stop
 	// at the equation, which is what paints the highlight.
@@ -328,7 +378,9 @@ test("double-click raw tex stops at the equation", async ({ page }) => {
 	await expect(raw).toBeVisible();
 	const box = await raw.boundingBox();
 	if (!box) throw new Error("raw tex has no box");
-	await page.mouse.click(box.x + box.width - 4, box.y + box.height / 2, { clickCount: 2 });
+	await page.mouse.click(box.x + box.width - 4, box.y + box.height / 2, {
+		clickCount: 2
+	});
 	// Range (not Selection) text: Selection.toString synthesizes block
 	// breaks, so it always trails one here — the range itself must stop
 	// at the equation, which is what paints the highlight.
@@ -352,10 +404,14 @@ test("folded label text never quotes", async ({ page }) => {
 	if (!box) throw new Error("folded label has no box");
 	await page.mouse.move(box.x + 4, box.y + box.height / 2);
 	await page.mouse.down();
-	await page.mouse.move(box.x + box.width - 4, box.y + box.height / 2, { steps: 5 });
+	await page.mouse.move(box.x + box.width - 4, box.y + box.height / 2, {
+		steps: 5
+	});
 	await page.mouse.up();
 	await page.waitForTimeout(500);
-	expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).not.toContain("latex");
+	expect(
+		await page.evaluate(() => window.getSelection()?.toString() ?? "")
+	).not.toContain("latex");
 	await expect(block).toHaveAttribute("data-folded", "1");
 });
 
@@ -365,18 +421,36 @@ and its box never moves. Both chats carry the same equation, so any
 delta across the hover is pure chrome motion, never content. */
 test("preview settles latex chrome", async ({ page }) => {
 	await page.addInitScript(() => {
-		const msg = (id: string, content: string) => ({ id, role: "assistant", content, usage: null, error: null });
+		const msg = (id: string, content: string) => ({
+			id,
+			role: "assistant",
+			content,
+			usage: null,
+			error: null
+		});
 		const eq = "$$\\sum_{i=0}^{n} \\frac{x_i^2}{\\sqrt{1 + x_i^2}}$$";
 		window.localStorage.setItem(
 			"ccez-llm-chats-v1",
 			JSON.stringify([
-				{ id: "chat-a", createdAt: 1, replyLang: null, messages: [msg("a-m", `Alpha.\n\n${eq}\n\ntail.`)] },
-				{ id: "chat-b", createdAt: 2, replyLang: null, messages: [msg("b-m", `Beta.\n\n${eq}\n\ntail.`)] }
+				{
+					id: "chat-a",
+					createdAt: 1,
+					replyLang: null,
+					messages: [msg("a-m", `Alpha.\n\n${eq}\n\ntail.`)]
+				},
+				{
+					id: "chat-b",
+					createdAt: 2,
+					replyLang: null,
+					messages: [msg("b-m", `Beta.\n\n${eq}\n\ntail.`)]
+				}
 			])
 		);
 	});
 	await page.goto("/");
-	await expect(page.locator(".ccez-math-copy").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ccez-math-copy").first()).toBeVisible({
+		timeout: 60_000
+	});
 	// KaTeX webfonts shift equation widths (and the centered chrome
 	// with them) while loading: settle first so any delta across the
 	// hover is chrome motion, never a font swap.
@@ -386,29 +460,37 @@ test("preview settles latex chrome", async ({ page }) => {
 	// Trace the chrome box at 60fps across the hover instant.
 	const tracePromise = page.evaluate(
 		() =>
-			new Promise((resolve: (samples: { x: number; y: number; chain: string[] }[]) => void) => {
-				const out: { x: number; y: number; chain: string[] }[] = [];
-				let n = 0;
-				const tick = (): void => {
-					const target = document.querySelector("main .ccez-math-copy");
-					if (target) {
-						const rect = target.getBoundingClientRect();
-						const chain: string[] = [];
-						let el: Element | null = target;
-						while (el && el !== document.body) {
-							for (const anim of document.getAnimations({ subtree: true })) {
-								const effectTarget = (anim.effect as KeyframeEffect | null)?.target ?? null;
-								if (effectTarget === el && anim instanceof CSSAnimation) chain.push(anim.animationName);
+			new Promise(
+				(
+					resolve: (
+						samples: { x: number; y: number; chain: string[] }[]
+					) => void
+				) => {
+					const out: { x: number; y: number; chain: string[] }[] = [];
+					let n = 0;
+					const tick = (): void => {
+						const target = document.querySelector("main .ccez-math-copy");
+						if (target) {
+							const rect = target.getBoundingClientRect();
+							const chain: string[] = [];
+							let el: Element | null = target;
+							while (el && el !== document.body) {
+								for (const anim of document.getAnimations({ subtree: true })) {
+									const effectTarget =
+										(anim.effect as KeyframeEffect | null)?.target ?? null;
+									if (effectTarget === el && anim instanceof CSSAnimation)
+										chain.push(anim.animationName);
+								}
+								el = el.parentElement;
 							}
-							el = el.parentElement;
+							out.push({ x: rect.x, y: rect.y, chain });
 						}
-						out.push({ x: rect.x, y: rect.y, chain });
-					}
-					if (++n < 40) requestAnimationFrame(tick);
-					else resolve(out);
-				};
-				requestAnimationFrame(tick);
-			})
+						if (++n < 40) requestAnimationFrame(tick);
+						else resolve(out);
+					};
+					requestAnimationFrame(tick);
+				}
+			)
 	);
 	await page.waitForTimeout(100);
 	await page.locator("aside ul li button.side-chat").nth(1).hover();
@@ -429,10 +511,15 @@ test("preview settles latex chrome", async ({ page }) => {
 glyph — it now reads at the same weight). */
 test("math chrome matches the code chrome", async ({ page }) => {
 	await seedChat(page, [
-		{ role: "assistant", content: "$$E = mc^2$$\n\n```python\nprint('hi')\n```" }
+		{
+			role: "assistant",
+			content: "$$E = mc^2$$\n\n```python\nprint('hi')\n```"
+		}
 	]);
 	await page.goto("/");
-	await expect(page.locator(".ccez-math-tex").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ccez-math-tex").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const chrome = await page.evaluate(() => {
 		const pick = (sel: string): { color: string; weight: string } => {
 			const el = document.querySelector(sel);
@@ -468,6 +555,8 @@ test("raw latex survives annotating", async ({ page }) => {
 	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(0);
 	// Submitting stamps a badge without re-rendering the block either.
 	await page.keyboard.press("Enter");
-	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1, { timeout: 10_000 });
+	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1, {
+		timeout: 10_000
+	});
 	await expect(raw).toBeVisible();
 });

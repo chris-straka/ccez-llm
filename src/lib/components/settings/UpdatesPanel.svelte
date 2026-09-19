@@ -1,5 +1,10 @@
 <script lang="ts">
-	import { DEV_UPDATE_MESSAGE, runUpdateFlow, updateButtonLabel, updateRouteFor } from "$lib/updates";
+	import {
+		DEV_UPDATE_MESSAGE,
+		runUpdateFlow,
+		updateButtonLabel,
+		updateRouteFor
+	} from "$lib/updates";
 	import type { UpdatePhase } from "$lib/updates";
 	import { tauriBackendAvailable } from "$lib/secrets";
 	import { check } from "@tauri-apps/plugin-updater";
@@ -19,7 +24,9 @@
 	let updatePhase = $state<UpdatePhase>({ stage: "idle" });
 	let checkingUpdate = $derived(updatePhase.stage !== "idle");
 	/** Where "check for updates" goes: releases page, Tauri updater, or nowhere (web). */
-	const updateRoute = $derived(updateRouteFor(androidUI === true, inShell, import.meta.env.DEV));
+	const updateRoute = $derived(
+		updateRouteFor(androidUI === true, inShell, import.meta.env.DEV)
+	);
 
 	/**
 	 * Update result readout: the page toast when one is wired (it
@@ -39,13 +46,20 @@
 			try {
 				if (tauriBackendAvailable()) {
 					const { invoke } = await import("@tauri-apps/api/core");
-					await invoke("plugin:opener|open_url", { url: route.url, with: null });
+					await invoke("plugin:opener|open_url", {
+						url: route.url,
+						with: null
+					});
 				} else {
 					window.open(route.url, "_blank", "noopener");
 				}
-				sayUpdate("Grab the newest APK from the latest release page to update.");
+				sayUpdate(
+					"Grab the newest APK from the latest release page to update."
+				);
 			} catch {
-				sayUpdate(`Couldn't open it automatically — get the newest APK at ${route.url}`);
+				sayUpdate(
+					`Couldn't open it automatically — get the newest APK at ${route.url}`
+				);
 			} finally {
 				updatePhase = { stage: "idle" };
 			}
@@ -59,7 +73,8 @@
 		try {
 			await runUpdateFlow({
 				checkForUpdate: () => check(),
-				downloadAndInstall: (update, onEvent) => update.downloadAndInstall(onEvent),
+				downloadAndInstall: (update, onEvent) =>
+					update.downloadAndInstall(onEvent),
 				relaunchApp: async () => {
 					const { relaunch } = await import("@tauri-apps/plugin-process");
 					await relaunch();
@@ -75,13 +90,19 @@
 	}
 </script>
 
-	<!-- Web builds have no updater shell: the whole section stays out. -->
-	{#if updateRoute.kind !== "none"}
-		<section aria-labelledby="updates-heading">
-			<h2 id="updates-heading">Updates</h2>
-			<button type="button" onclick={() => void checkUpdates()} disabled={checkingUpdate}>
-				{updateButtonLabel(updatePhase)}
-			</button>
-			{#if updateStatus && !onToast}<p class="note" role="status">{updateStatus}</p>{/if}
-		</section>
-	{/if}
+<!-- Web builds have no updater shell: the whole section stays out. -->
+{#if updateRoute.kind !== "none"}
+	<section aria-labelledby="updates-heading">
+		<h2 id="updates-heading">Updates</h2>
+		<button
+			type="button"
+			onclick={() => void checkUpdates()}
+			disabled={checkingUpdate}
+		>
+			{updateButtonLabel(updatePhase)}
+		</button>
+		{#if updateStatus && !onToast}<p class="note" role="status">
+				{updateStatus}
+			</p>{/if}
+	</section>
+{/if}

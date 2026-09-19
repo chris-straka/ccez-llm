@@ -81,7 +81,8 @@ export function onDeviceUnsupported(status: OnDeviceStatus): boolean {
  * the count is missing or nonsense. Pure.
  */
 export function downloadedMB(bytes: unknown): string | null {
-	if (typeof bytes !== "number" || !Number.isFinite(bytes) || bytes < 0) return null;
+	if (typeof bytes !== "number" || !Number.isFinite(bytes) || bytes < 0)
+		return null;
 	return `${Math.floor(bytes / 1048576)} MB`;
 }
 
@@ -103,7 +104,8 @@ const MAX_MAX_TOKENS = 4096;
 
 /** Clamp a requested completion cap into the bridge range. Pure. */
 export function clampMaxTokens(value: number | undefined): number {
-	if (typeof value !== "number" || Number.isNaN(value)) return DEFAULT_MAX_TOKENS;
+	if (typeof value !== "number" || Number.isNaN(value))
+		return DEFAULT_MAX_TOKENS;
 	if (value < MIN_MAX_TOKENS) return MIN_MAX_TOKENS;
 	if (value > MAX_MAX_TOKENS) return MAX_MAX_TOKENS;
 	return Math.floor(value);
@@ -116,7 +118,10 @@ function clampProgress(value: unknown): number | undefined {
 	return value;
 }
 
-function liveInvoke(cmd: string, args?: Record<string, unknown>): Promise<unknown> {
+function liveInvoke(
+	cmd: string,
+	args?: Record<string, unknown>
+): Promise<unknown> {
 	return tauriInvoke<unknown>(cmd, args);
 }
 
@@ -126,9 +131,16 @@ function liveInvoke(cmd: string, args?: Record<string, unknown>): Promise<unknow
  * else is an error (bridge bug, never a crash). Pure.
  */
 export function parseOnDeviceStatus(payload: unknown): OnDeviceStatus {
-	const states: OnDeviceState[] = ["unavailable", "downloading", "ready", "error"];
+	const states: OnDeviceState[] = [
+		"unavailable",
+		"downloading",
+		"ready",
+		"error"
+	];
 	if (typeof payload === "string") {
-		const state = (states as string[]).includes(payload) ? (payload as OnDeviceState) : "error";
+		const state = (states as string[]).includes(payload)
+			? (payload as OnDeviceState)
+			: "error";
 		return state === "error" && payload !== "error"
 			? { state, reason: "bad-status" }
 			: { state };
@@ -136,12 +148,14 @@ export function parseOnDeviceStatus(payload: unknown): OnDeviceStatus {
 	if (typeof payload === "object" && payload !== null) {
 		const raw = payload as Record<string, unknown>;
 		const state =
-			typeof raw["state"] === "string" && (states as string[]).includes(raw["state"])
+			typeof raw["state"] === "string" &&
+			(states as string[]).includes(raw["state"])
 				? (raw["state"] as OnDeviceState)
 				: "error";
 		const out: OnDeviceStatus = { state };
 		const progress = clampProgress(raw["progress"]);
-		if (state === "downloading" && progress !== undefined) out.progress = progress;
+		if (state === "downloading" && progress !== undefined)
+			out.progress = progress;
 		const downloaded = raw["downloadedBytes"];
 		if (
 			state === "downloading" &&
@@ -151,8 +165,10 @@ export function parseOnDeviceStatus(payload: unknown): OnDeviceStatus {
 		) {
 			out.downloadedBytes = Math.floor(downloaded);
 		}
-		if (typeof raw["reason"] === "string" && raw["reason"]) out.reason = raw["reason"];
-		if (state === "error" && out.reason === undefined) out.reason = "bad-status";
+		if (typeof raw["reason"] === "string" && raw["reason"])
+			out.reason = raw["reason"];
+		if (state === "error" && out.reason === undefined)
+			out.reason = "bad-status";
 		return out;
 	}
 	return { state: "error", reason: "bad-status" };
@@ -198,7 +214,9 @@ function reasonFrom(error: unknown): string {
  * (the bridge isn't there), never throw. Success caches nothing —
  * download progress must keep flowing.
  */
-export async function onDeviceStatus(deps?: OnDeviceDeps): Promise<OnDeviceStatus> {
+export async function onDeviceStatus(
+	deps?: OnDeviceDeps
+): Promise<OnDeviceStatus> {
 	const shell = deps?.shell ?? tauriBackendAvailable();
 	if (!shell) return { state: "unavailable", reason: "no-bridge" };
 	const run = deps?.invoke ?? liveInvoke;
@@ -231,7 +249,8 @@ export async function generateOnDevice(
 		if (typeof out === "string" && out) return out;
 		throw new Error(onDeviceErrorCopy("failed"));
 	} catch (error) {
-		if (error instanceof Error && error.message.startsWith("On-device")) throw error;
+		if (error instanceof Error && error.message.startsWith("On-device"))
+			throw error;
 		throw new Error(onDeviceErrorCopy(reasonFrom(error)), { cause: error });
 	}
 }

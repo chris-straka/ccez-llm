@@ -25,10 +25,12 @@ export const STICK_PX = 64;
  * from stale state.
  */
 export function nearBottom(
-  metrics: { scrollHeight: number; scrollTop: number; clientHeight: number },
-  slopPx = STICK_PX,
+	metrics: { scrollHeight: number; scrollTop: number; clientHeight: number },
+	slopPx = STICK_PX
 ): boolean {
-  return metrics.scrollHeight - metrics.scrollTop - metrics.clientHeight <= slopPx;
+	return (
+		metrics.scrollHeight - metrics.scrollTop - metrics.clientHeight <= slopPx
+	);
 }
 
 /** How long Escape must be held to exit fullscreen: two full seconds,
@@ -59,7 +61,10 @@ export type UnselectedScrollIntent =
  * while a lone g is still inside its beat (see `ggArmed`); shifted
  * keys arrive as their uppercase spelling ("G", "Z").
  */
-export function unselectedScrollIntent(key: string, gArmed: boolean): UnselectedScrollIntent | null {
+export function unselectedScrollIntent(
+	key: string,
+	gArmed: boolean
+): UnselectedScrollIntent | null {
 	switch (key) {
 		case "j":
 			return { kind: "line", dy: SCROLLKEY_LINE_PX };
@@ -86,20 +91,31 @@ export function unselectedScrollIntent(key: string, gArmed: boolean): Unselected
 }
 
 /** True while a lone g is still inside its gg beat. */
-export function ggArmed(lastGAt: number, now: number, windowMs = GG_WINDOW_MS): boolean {
+export function ggArmed(
+	lastGAt: number,
+	now: number,
+	windowMs = GG_WINDOW_MS
+): boolean {
 	return now - lastGAt < windowMs;
 }
 
-export type SidebarSpaceEnter = { kind: "stay" } | { kind: "enter"; index: number };
+export type SidebarSpaceEnter =
+	{ kind: "stay" } | { kind: "enter"; index: number };
 
 /**
  * Space in the open chat list: with no row selected (sideIdx < 0) the
  * user stays on the current chat and lands in its prompt — never the
  * top chat. Otherwise the clamped row is entered.
  */
-export function resolveSidebarSpaceEnter(sideIdx: number, chatCount: number): SidebarSpaceEnter {
+export function resolveSidebarSpaceEnter(
+	sideIdx: number,
+	chatCount: number
+): SidebarSpaceEnter {
 	if (sideIdx < 0 || chatCount <= 0) return { kind: "stay" };
-	return { kind: "enter", index: Math.min(Math.max(sideIdx, 0), chatCount - 1) };
+	return {
+		kind: "enter",
+		index: Math.min(Math.max(sideIdx, 0), chatCount - 1)
+	};
 }
 
 /**
@@ -169,7 +185,11 @@ export function messageEdgeScrollTop(args: {
  * keydown timestamp (0 when no press is tracked); `now` the keyup
  * timestamp, both from the same clock.
  */
-export function isEscapeHold(downAt: number, now: number, thresholdMs = ESCAPE_HOLD_MS): boolean {
+export function isEscapeHold(
+	downAt: number,
+	now: number,
+	thresholdMs = ESCAPE_HOLD_MS
+): boolean {
 	return downAt > 0 && now - downAt >= thresholdMs;
 }
 
@@ -204,7 +224,10 @@ export interface MessageRect {
  * between messages), the nearest message center wins; -1 when empty.
  * Pure over measured viewport-space rects so Vitest can pin it.
  */
-export function indexAtViewportLine(rects: MessageRect[], line: number): number {
+export function indexAtViewportLine(
+	rects: MessageRect[],
+	line: number
+): number {
 	for (let i = 0; i < rects.length; i++) {
 		const r = rects[i];
 		if (r && r.top <= line && r.bottom > line) return i;
@@ -245,7 +268,11 @@ export function scrollHoldVelocity(key: string): number | null {
 }
 
 /** Advance a glide by one frame: pure so tests can pin the pacing. */
-export function stepScrollTop(current: number, velocityPxS: number, dtMs: number): number {
+export function stepScrollTop(
+	current: number,
+	velocityPxS: number,
+	dtMs: number
+): number {
 	return current + (velocityPxS * Math.max(0, dtMs)) / 1000;
 }
 
@@ -262,11 +289,16 @@ export function holdGlideVelocity(key: string, holdMs: number): number {
 	if (peak === null) return 0;
 	const base = Math.sign(peak) * SCROLLKEY_JK_VELOCITY_PX_S;
 	if (Math.abs(peak) <= SCROLLKEY_JK_VELOCITY_PX_S) return peak;
-	const t = Math.min(Math.max(holdMs, 0), SCROLL_HOLD_RAMP_MS) / SCROLL_HOLD_RAMP_MS;
+	const t =
+		Math.min(Math.max(holdMs, 0), SCROLL_HOLD_RAMP_MS) / SCROLL_HOLD_RAMP_MS;
 	return base + (peak - base) * t;
 }
 
 /** True when a key hold was really a tap (lands one discrete step). */
-export function holdIsTap(downAt: number, upAt: number, tapMs = SCROLL_HOLD_TAP_MS): boolean {
+export function holdIsTap(
+	downAt: number,
+	upAt: number,
+	tapMs = SCROLL_HOLD_TAP_MS
+): boolean {
 	return downAt > 0 && upAt - downAt < tapMs;
 }

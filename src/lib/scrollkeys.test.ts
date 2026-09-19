@@ -26,8 +26,14 @@ import {
 
 describe("unselectedScrollIntent", () => {
 	it("steps a few lines on j/k", () => {
-		expect(unselectedScrollIntent("j", false)).toEqual({ kind: "line", dy: SCROLLKEY_LINE_PX });
-		expect(unselectedScrollIntent("k", false)).toEqual({ kind: "line", dy: -SCROLLKEY_LINE_PX });
+		expect(unselectedScrollIntent("j", false)).toEqual({
+			kind: "line",
+			dy: SCROLLKEY_LINE_PX
+		});
+		expect(unselectedScrollIntent("k", false)).toEqual({
+			kind: "line",
+			dy: -SCROLLKEY_LINE_PX
+		});
 		expect(SCROLLKEY_LINE_PX).toBeGreaterThan(0);
 	});
 
@@ -36,8 +42,14 @@ describe("unselectedScrollIntent", () => {
 		// there); the intent itself is desktop-bound. The skip is
 		// three line steps: quick, but a little.
 		expect(SCROLLKEY_SKIP_PX).toBe(SCROLLKEY_LINE_PX * 3);
-		expect(unselectedScrollIntent("d", false)).toEqual({ kind: "skip", dir: 1 });
-		expect(unselectedScrollIntent("u", false)).toEqual({ kind: "skip", dir: -1 });
+		expect(unselectedScrollIntent("d", false)).toEqual({
+			kind: "skip",
+			dir: 1
+		});
+		expect(unselectedScrollIntent("u", false)).toEqual({
+			kind: "skip",
+			dir: -1
+		});
 	});
 
 	it("arms gg on the first g, tops on the second", () => {
@@ -47,12 +59,30 @@ describe("unselectedScrollIntent", () => {
 
 	it("bottoms on G, lands the hovered message on z/Z", () => {
 		expect(unselectedScrollIntent("G", false)).toEqual({ kind: "bottom" });
-		expect(unselectedScrollIntent("z", false)).toEqual({ kind: "hovered-edge", edge: "start" });
-		expect(unselectedScrollIntent("Z", false)).toEqual({ kind: "hovered-edge", edge: "end" });
+		expect(unselectedScrollIntent("z", false)).toEqual({
+			kind: "hovered-edge",
+			edge: "start"
+		});
+		expect(unselectedScrollIntent("Z", false)).toEqual({
+			kind: "hovered-edge",
+			edge: "end"
+		});
 	});
 
 	it("leaves every other key (and shifted fast-scroll spellings) alone", () => {
-		for (const key of ["J", "K", "D", "U", "f", "e", "x", " ", "Enter", "Escape", "ArrowDown"]) {
+		for (const key of [
+			"J",
+			"K",
+			"D",
+			"U",
+			"f",
+			"e",
+			"x",
+			" ",
+			"Enter",
+			"Escape",
+			"ArrowDown"
+		]) {
 			expect(unselectedScrollIntent(key, false), key).toBeNull();
 		}
 		// Existing bindings keep their keys: bare f/e/x stay unclaimed.
@@ -79,13 +109,27 @@ describe("halfPageDy", () => {
 describe("messageEdgeScrollTop", () => {
 	it("parks the hovered top a margin under the chat top", () => {
 		expect(
-			messageEdgeScrollTop({ scrollTop: 200, boxTop: 100, elTop: 300, elHeight: 60, viewH: 600, edge: "start" })
+			messageEdgeScrollTop({
+				scrollTop: 200,
+				boxTop: 100,
+				elTop: 300,
+				elHeight: 60,
+				viewH: 600,
+				edge: "start"
+			})
 		).toBe(200 + 200 - HOVER_EDGE_MARGIN_PX);
 	});
 
 	it("parks the hovered bottom a margin above the chat bottom", () => {
 		expect(
-			messageEdgeScrollTop({ scrollTop: 200, boxTop: 100, elTop: 300, elHeight: 60, viewH: 600, edge: "end" })
+			messageEdgeScrollTop({
+				scrollTop: 200,
+				boxTop: 100,
+				elTop: 300,
+				elHeight: 60,
+				viewH: 600,
+				edge: "end"
+			})
 		).toBe(200 + 200 + 60 - 600 + HOVER_EDGE_MARGIN_PX);
 	});
 
@@ -149,13 +193,21 @@ describe("keyFocusesEmptyPrompt", () => {
 
 	it("stays native with history, modifiers, an interactive target, or other keys", () => {
 		expect(keyFocusesEmptyPrompt({ ...bare, messageCount: 1 })).toBe(false);
-		expect(keyFocusesEmptyPrompt({ ...bare, key: "Enter", messageCount: 1 })).toBe(false);
-		expect(keyFocusesEmptyPrompt({ ...bare, key: "i", messageCount: 2 })).toBe(false);
+		expect(
+			keyFocusesEmptyPrompt({ ...bare, key: "Enter", messageCount: 1 })
+		).toBe(false);
+		expect(keyFocusesEmptyPrompt({ ...bare, key: "i", messageCount: 2 })).toBe(
+			false
+		);
 		expect(keyFocusesEmptyPrompt({ ...bare, shiftKey: true })).toBe(false);
-		expect(keyFocusesEmptyPrompt({ ...bare, key: "Enter", shiftKey: true })).toBe(false);
+		expect(
+			keyFocusesEmptyPrompt({ ...bare, key: "Enter", shiftKey: true })
+		).toBe(false);
 		expect(keyFocusesEmptyPrompt({ ...bare, ctrlKey: true })).toBe(false);
 		expect(keyFocusesEmptyPrompt({ ...bare, inInteractive: true })).toBe(false);
-		expect(keyFocusesEmptyPrompt({ ...bare, key: "Enter", inInteractive: true })).toBe(false);
+		expect(
+			keyFocusesEmptyPrompt({ ...bare, key: "Enter", inInteractive: true })
+		).toBe(false);
 		expect(keyFocusesEmptyPrompt({ ...bare, key: "j" })).toBe(false);
 		expect(keyFocusesEmptyPrompt({ ...bare, key: "I" })).toBe(false);
 	});
@@ -226,10 +278,14 @@ describe("holdGlideVelocity", () => {
 		expect(holdGlideVelocity("d", SCROLL_HOLD_RAMP_MS / 2)).toBe(
 			(SCROLLKEY_JK_VELOCITY_PX_S + SCROLLKEY_DU_VELOCITY_PX_S) / 2
 		);
-		expect(holdGlideVelocity("d", SCROLL_HOLD_RAMP_MS)).toBe(SCROLLKEY_DU_VELOCITY_PX_S);
+		expect(holdGlideVelocity("d", SCROLL_HOLD_RAMP_MS)).toBe(
+			SCROLLKEY_DU_VELOCITY_PX_S
+		);
 		expect(holdGlideVelocity("d", 10_000)).toBe(SCROLLKEY_DU_VELOCITY_PX_S);
 		expect(holdGlideVelocity("u", 0)).toBe(-SCROLLKEY_JK_VELOCITY_PX_S);
-		expect(holdGlideVelocity("u", SCROLL_HOLD_RAMP_MS)).toBe(-SCROLLKEY_DU_VELOCITY_PX_S);
+		expect(holdGlideVelocity("u", SCROLL_HOLD_RAMP_MS)).toBe(
+			-SCROLLKEY_DU_VELOCITY_PX_S
+		);
 	});
 	it("clamps negative ages and returns zero for non-gliding keys", () => {
 		expect(holdGlideVelocity("d", -50)).toBe(SCROLLKEY_JK_VELOCITY_PX_S);
@@ -239,10 +295,18 @@ describe("holdGlideVelocity", () => {
 
 describe("nearBottom", () => {
 	it("pins within the slop and releases past it", () => {
-		expect(nearBottom({ scrollHeight: 1000, scrollTop: 900, clientHeight: 100 })).toBe(true);
-		expect(nearBottom({ scrollHeight: 1000, scrollTop: 836, clientHeight: 100 })).toBe(true);
-		expect(nearBottom({ scrollHeight: 1000, scrollTop: 835, clientHeight: 100 })).toBe(false);
-		expect(nearBottom({ scrollHeight: 1000, scrollTop: 0, clientHeight: 100 }, 1000)).toBe(true);
+		expect(
+			nearBottom({ scrollHeight: 1000, scrollTop: 900, clientHeight: 100 })
+		).toBe(true);
+		expect(
+			nearBottom({ scrollHeight: 1000, scrollTop: 836, clientHeight: 100 })
+		).toBe(true);
+		expect(
+			nearBottom({ scrollHeight: 1000, scrollTop: 835, clientHeight: 100 })
+		).toBe(false);
+		expect(
+			nearBottom({ scrollHeight: 1000, scrollTop: 0, clientHeight: 100 }, 1000)
+		).toBe(true);
 	});
 });
 

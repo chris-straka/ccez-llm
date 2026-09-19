@@ -17,15 +17,21 @@ const PINYIN_ORIGINAL = "显示原件";
  * dictionary wait.
  */
 test.beforeEach(async ({ page }) => {
-	await seedChat(page, [{ role: "assistant", content: "你好世界\n漢字を読む" }]);
+	await seedChat(page, [
+		{ role: "assistant", content: "你好世界\n漢字を読む" }
+	]);
 	await page.goto("/");
-	await expect(page.locator(`${ARTICLE} .actions`)).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(`${ARTICLE} .actions`)).toBeVisible({
+		timeout: 60_000
+	});
 });
 
 test("hovering pinyin before any click previews nothing", async ({ page }) => {
 	const body = page.locator(BODY);
 	const before = await body.innerHTML();
-	const pinyinBtn = page.locator(`${ARTICLE} .actions button[data-tip="${PINYIN_TIP}"]`);
+	const pinyinBtn = page.locator(
+		`${ARTICLE} .actions button[data-tip="${PINYIN_TIP}"]`
+	);
 	await expect(pinyinBtn).toBeVisible();
 
 	await pinyinBtn.hover();
@@ -34,16 +40,24 @@ test("hovering pinyin before any click previews nothing", async ({ page }) => {
 	expect(await body.innerHTML()).toBe(before);
 });
 
-test("furigana hover never previews, even after its click", async ({ page }) => {
+test("furigana hover never previews, even after its click", async ({
+	page
+}) => {
 	const body = page.locator(BODY);
 	const before = await body.innerHTML();
-	const furiganaBtn = page.locator(`${ARTICLE} .actions button[data-tip="${FURIGANA_TIP}"]`);
+	const furiganaBtn = page.locator(
+		`${ARTICLE} .actions button[data-tip="${FURIGANA_TIP}"]`
+	);
 
 	// Click furigana (pins; the dictionary conversion is async), then
 	// unpin so the button is back to hover-only.
 	await furiganaBtn.click();
-	await expect(body.locator("ruby, rt, .frb, .frt").first()).toBeVisible({ timeout: 30_000 });
-	const showOriginal = page.locator(`${ARTICLE} .actions button:has-text("オリジナルを表示")`);
+	await expect(body.locator("ruby, rt, .frb, .frt").first()).toBeVisible({
+		timeout: 30_000
+	});
+	const showOriginal = page.locator(
+		`${ARTICLE} .actions button:has-text("オリジナルを表示")`
+	);
 	await expect(showOriginal).toBeVisible();
 	await showOriginal.click();
 	await expect(furiganaBtn).toBeVisible();
@@ -65,13 +79,19 @@ test("furigana hover never previews, even after its click", async ({ page }) => 
 test("pinyin hover never previews, even after its click", async ({ page }) => {
 	const body = page.locator(BODY);
 	const before = await body.innerHTML();
-	const pinyinBtn = page.locator(`${ARTICLE} .actions button[data-tip="${PINYIN_TIP}"]`);
-	const furiganaBtn = page.locator(`${ARTICLE} .actions button[data-tip="${FURIGANA_TIP}"]`);
+	const pinyinBtn = page.locator(
+		`${ARTICLE} .actions button[data-tip="${PINYIN_TIP}"]`
+	);
+	const furiganaBtn = page.locator(
+		`${ARTICLE} .actions button[data-tip="${FURIGANA_TIP}"]`
+	);
 
 	// Click pinyin (pins, renders synchronously), then unpin so both
 	// buttons are back to hover-only.
 	await pinyinBtn.click();
-	const showOriginal = page.locator(`${ARTICLE} .actions button[data-tip="${PINYIN_ORIGINAL}"]`);
+	const showOriginal = page.locator(
+		`${ARTICLE} .actions button[data-tip="${PINYIN_ORIGINAL}"]`
+	);
 	await expect(showOriginal).toBeVisible();
 	expect(await body.locator(".frb, .frt, ruby, rt").count()).toBeGreaterThan(0);
 	await showOriginal.click();

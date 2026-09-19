@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
-import { editContextSupported, shouldDeferForComposition, attachEditContext } from "./editContext";
+import {
+	editContextSupported,
+	shouldDeferForComposition,
+	attachEditContext
+} from "./editContext";
 
 describe("shouldDeferForComposition", () => {
 	it("defers on textarea isComposing", () => {
@@ -11,7 +15,9 @@ describe("shouldDeferForComposition", () => {
 	});
 	it("submits when neither signal is set", () => {
 		expect(shouldDeferForComposition({})).toBe(false);
-		expect(shouldDeferForComposition({ isComposing: false, viewComposing: false })).toBe(false);
+		expect(
+			shouldDeferForComposition({ isComposing: false, viewComposing: false })
+		).toBe(false);
 	});
 });
 

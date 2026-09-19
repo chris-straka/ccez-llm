@@ -222,7 +222,9 @@ export function createTextareaEditor(
 		const ranges: { from: number; to: number }[] = [];
 		try {
 			const targets =
-				typeof event.getTargetRanges === "function" ? event.getTargetRanges() : [];
+				typeof event.getTargetRanges === "function"
+					? event.getTargetRanges()
+					: [];
 			for (const range of targets) {
 				const from = range.startOffset;
 				const to = range.endOffset;
@@ -250,7 +252,8 @@ export function createTextareaEditor(
 		const grown =
 			expanded.length !== ranges.length ||
 			expanded.some(
-				(range, i) => range.from !== ranges[i]?.from || range.to !== ranges[i]?.to
+				(range, i) =>
+					range.from !== ranges[i]?.from || range.to !== ranges[i]?.to
 			);
 		if (grown) {
 			event.preventDefault();
@@ -352,7 +355,10 @@ export function createTextareaEditor(
 			options.onSubmit("stage");
 			return;
 		}
-		if ((event.ctrlKey || event.metaKey) && (event.key === "g" || event.key === "G")) {
+		if (
+			(event.ctrlKey || event.metaKey) &&
+			(event.key === "g" || event.key === "G")
+		) {
 			event.preventDefault();
 			ta.blur();
 			options.onHopOut();
@@ -428,7 +434,9 @@ export function createTextareaEditor(
 				try {
 					const blobs = await pending;
 					if (blobs.length === 0) throw new Error("no image data");
-					const urls = await Promise.all(blobs.map((blob) => blobToDataUrl(blob)));
+					const urls = await Promise.all(
+						blobs.map((blob) => blobToDataUrl(blob))
+					);
 					const imgs = urls.map((url) => `<img src="${url}">`).join("");
 					const html = new Blob(
 						[`${IMAGE_SET_MARKER}<p>${escapeHtml(plan.text)}</p>${imgs}`],
@@ -446,7 +454,9 @@ export function createTextareaEditor(
 				try {
 					const blobs = await pending;
 					if (blobs.length === 0) throw new Error("no image data");
-					const pngs = await Promise.all(blobs.map((blob) => clipboardPngBlob(blob)));
+					const pngs = await Promise.all(
+						blobs.map((blob) => clipboardPngBlob(blob))
+					);
 					await navigator.clipboard.write(
 						pngs.map(
 							(png) =>
@@ -522,7 +532,9 @@ export function createTextareaEditor(
 		}
 		// Every image file, not just the first: pastes from
 		// outside the app carry no set, but still land whole.
-		const images = [...clipboard.files].filter((f) => f.type.startsWith("image/"));
+		const images = [...clipboard.files].filter((f) =>
+			f.type.startsWith("image/")
+		);
 		if (images.length > 0 && options.onImagesPasted) {
 			event.preventDefault();
 			options.onImagesPasted(images);

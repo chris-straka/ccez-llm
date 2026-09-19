@@ -22,12 +22,11 @@ describe("view transitions for chat switching", () => {
 	});
 	it("routes the mutation through startViewTransition where supported", async () => {
 		const mutate = vi.fn();
-		(document as unknown as Record<string, unknown>).startViewTransition = vi.fn(
-			(opts: { update: () => void }) => {
+		(document as unknown as Record<string, unknown>).startViewTransition =
+			vi.fn((opts: { update: () => void }) => {
 				opts.update();
 				return { finished: Promise.resolve() };
-			}
-		);
+			});
 		expect(viewTransitionsSupported()).toBe(true);
 		await switchChatWithTransition(mutate);
 		expect(mutate).toHaveBeenCalledTimes(1);
@@ -49,9 +48,10 @@ describe("view transitions for chat switching", () => {
 	});
 	it("falls back to a direct run when the transition throws", async () => {
 		const mutate = vi.fn();
-		(document as unknown as Record<string, unknown>).startViewTransition = vi.fn(() => {
-			throw new Error("nope");
-		});
+		(document as unknown as Record<string, unknown>).startViewTransition =
+			vi.fn(() => {
+				throw new Error("nope");
+			});
 		await switchChatWithTransition(mutate);
 		expect(mutate).toHaveBeenCalledTimes(1);
 	});
@@ -60,8 +60,8 @@ describe("view transitions for chat switching", () => {
 		const onSnapshot = vi.fn();
 		let releaseReady!: () => void;
 		let releaseFinished!: () => void;
-		(document as unknown as Record<string, unknown>).startViewTransition = vi.fn(
-			(opts: { update: () => void }) => {
+		(document as unknown as Record<string, unknown>).startViewTransition =
+			vi.fn((opts: { update: () => void }) => {
 				opts.update();
 				return {
 					ready: new Promise<void>((resolve) => {
@@ -71,8 +71,7 @@ describe("view transitions for chat switching", () => {
 						releaseFinished = resolve;
 					})
 				};
-			}
-		);
+			});
 		const done = switchChatWithTransition(mutate, onSnapshot);
 		expect(mutate).toHaveBeenCalledTimes(1);
 		// The animation phase hasn't run, but ready releases the scope.
@@ -86,12 +85,11 @@ describe("view transitions for chat switching", () => {
 	});
 	it("releases snapshot state without a ready promise", async () => {
 		const onSnapshot = vi.fn();
-		(document as unknown as Record<string, unknown>).startViewTransition = vi.fn(
-			(opts: { update: () => void }) => {
+		(document as unknown as Record<string, unknown>).startViewTransition =
+			vi.fn((opts: { update: () => void }) => {
 				opts.update();
 				return { finished: Promise.resolve() };
-			}
-		);
+			});
 		await switchChatWithTransition(vi.fn(), onSnapshot);
 		expect(onSnapshot).toHaveBeenCalledTimes(1);
 	});

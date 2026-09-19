@@ -12,7 +12,12 @@ import {
 	shouldShowInspect
 } from "./inspect";
 import { extractStrokePaths, kanjiSvgUrl } from "./kanjivg";
-import { defaultSettings, loadSettings, saveSettings, memoryStore } from "./settings";
+import {
+	defaultSettings,
+	loadSettings,
+	saveSettings,
+	memoryStore
+} from "./settings";
 
 describe("isSingleHanChar", () => {
 	it("accepts exactly one Han character", () => {
@@ -127,7 +132,9 @@ describe("getInspectData", () => {
 	});
 
 	it("uses Unihan definitions with no curated override", () => {
-		expect(getInspectData("語").definition).toBe("language, words; saying, expression");
+		expect(getInspectData("語").definition).toBe(
+			"language, words; saying, expression"
+		);
 	});
 
 	it("reports null readings for characters outside Unihan coverage", () => {
@@ -190,11 +197,20 @@ describe("isHanChar", () => {
 
 describe("decomposeChar", () => {
 	it("splits common characters into components", () => {
-		expect(decomposeChar("好")).toEqual({ char: "好", components: ["女", "子"] });
-		expect(decomposeChar("語")).toEqual({ char: "語", components: ["言", "吾"] });
+		expect(decomposeChar("好")).toEqual({
+			char: "好",
+			components: ["女", "子"]
+		});
+		expect(decomposeChar("語")).toEqual({
+			char: "語",
+			components: ["言", "吾"]
+		});
 		// No hand table anymore: 漢 comes from the vendored subset
 		// (finer grain than the old hand split 氵+堇).
-		expect(decomposeChar("漢")).toEqual({ char: "漢", components: ["氵", "廿", "中", "夫"] });
+		expect(decomposeChar("漢")).toEqual({
+			char: "漢",
+			components: ["氵", "廿", "中", "夫"]
+		});
 	});
 
 	it("returns null for unknown or non-Han input", () => {
@@ -225,7 +241,10 @@ describe("vendored subset splits", () => {
 	it("covers common characters from data", () => {
 		// 館 resolves from the subset (variants normalized at
 		// build time: 飠→食).
-		expect(decomposeChar("館")).toEqual({ char: "館", components: ["食", "官"] });
+		expect(decomposeChar("館")).toEqual({
+			char: "館",
+			components: ["食", "官"]
+		});
 		// 鬱 used to be the honest-null example; the subset covers it now.
 		expect(decomposeChar("鬱")).toEqual({
 			char: "鬱",
@@ -236,8 +255,14 @@ describe("vendored subset splits", () => {
 	it("uses the vendored data everywhere, Mainland forms included", () => {
 		// No hand overrides left: 電 resolves to the subset's Mainland
 		// form (雨+电, not the old hand split 日乚土).
-		expect(decomposeChar("電")).toEqual({ char: "電", components: ["雨", "电"] });
-		expect(decomposeChar("好")).toEqual({ char: "好", components: ["女", "子"] });
+		expect(decomposeChar("電")).toEqual({
+			char: "電",
+			components: ["雨", "电"]
+		});
+		expect(decomposeChar("好")).toEqual({
+			char: "好",
+			components: ["女", "子"]
+		});
 	});
 });
 
@@ -283,12 +308,14 @@ describe("decomposeTree", () => {
 
 describe("onKunLine", () => {
 	it("lowercases and comma-joins both sides on one line", () => {
-		expect(onKunLine({ japaneseOn: "ICHI ITSU", japaneseKun: "HITOTSU HAJIME" })).toBe(
-			"On/Kun: ichi,itsu | hitotsu,hajime"
-		);
+		expect(
+			onKunLine({ japaneseOn: "ICHI ITSU", japaneseKun: "HITOTSU HAJIME" })
+		).toBe("On/Kun: ichi,itsu | hitotsu,hajime");
 	});
 	it("omits a missing side without a dangling separator", () => {
-		expect(onKunLine({ japaneseOn: "ICHI", japaneseKun: null })).toBe("On/Kun: ichi");
+		expect(onKunLine({ japaneseOn: "ICHI", japaneseKun: null })).toBe(
+			"On/Kun: ichi"
+		);
 		expect(onKunLine({ japaneseOn: null, japaneseKun: null })).toBeNull();
 	});
 });
@@ -304,7 +331,10 @@ describe("kanjivg", () => {
 		const svg =
 			`<svg><g id="kvg:123"><path id="kvg:123-s2" d="M20 0C30 0 40 0"/><path id="kvg:123-s1" d="M10 0C10 10 10 20"/>` +
 			`<path id="kvg:123-g1" d="M0 0h5"/></g></svg>`;
-		expect(extractStrokePaths(svg)).toEqual(["M10 0C10 10 10 20", "M20 0C30 0 40 0"]);
+		expect(extractStrokePaths(svg)).toEqual([
+			"M10 0C10 10 10 20",
+			"M20 0C30 0 40 0"
+		]);
 	});
 	it("returns null when no stroke paths exist", () => {
 		expect(extractStrokePaths("<svg><g></g></svg>")).toBeNull();

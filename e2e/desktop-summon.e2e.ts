@@ -20,7 +20,9 @@ test.beforeEach(async ({ page }) => {
 		{ role: "assistant", content: "Être means to be." }
 	]);
 	await page.goto("/");
-	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
 });
 
 test("study sheet section stays out of layout on screen", async ({ page }) => {
@@ -28,7 +30,9 @@ test("study sheet section stays out of layout on screen", async ({ page }) => {
 	await expect(sheet).toBeHidden();
 });
 
-test("print media shows only the study sheet with the chat text", async ({ page }) => {
+test("print media shows only the study sheet with the chat text", async ({
+	page
+}) => {
 	await page.emulateMedia({ media: "print" });
 	const sheet = page.locator("#study-sheet-print");
 	await expect(sheet).toBeVisible();
@@ -41,7 +45,9 @@ test("print media shows only the study sheet with the chat text", async ({ page 
 	await expect(sheet).toBeHidden();
 });
 
-test("empty chats still render a titled sheet under print media", async ({ page }) => {
+test("empty chats still render a titled sheet under print media", async ({
+	page
+}) => {
 	await page.emulateMedia({ media: "print" });
 	await expect(page.locator("#study-sheet-print h1")).toBeVisible();
 	await page.emulateMedia({ media: "screen" });

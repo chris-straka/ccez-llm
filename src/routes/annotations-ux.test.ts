@@ -17,7 +17,10 @@ function pageStyle(): string {
 }
 
 function messageBodyStyle(): string {
-	const source = readFileSync(new URL("../lib/components/MessageBody.svelte", import.meta.url), "utf8");
+	const source = readFileSync(
+		new URL("../lib/components/MessageBody.svelte", import.meta.url),
+		"utf8"
+	);
 	const match = source.match(/<style>([\s\S]*)<\/style>/);
 	if (!match) throw new Error("MessageBody.svelte has no <style> block");
 	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
@@ -60,7 +63,9 @@ describe("annotation edit Save animation", () => {
 		const css = pageSource();
 		// The field surface is near-black; the edit box must override it.
 		expect(css).toContain('html[data-theme="dark"]');
-		expect(css).toMatch(/\[data-theme="dark"\][\s\S]*?\.review textarea\s*\{[^}]*background:\s*#3a3a3c/);
+		expect(css).toMatch(
+			/\[data-theme="dark"\][\s\S]*?\.review textarea\s*\{[^}]*background:\s*#3a3a3c/
+		);
 	});
 });
 
@@ -99,12 +104,15 @@ describe("review pencil hover", () => {
 	it("signals with color only — no background, glow, or underline", () => {
 		const css = pageStyle();
 		expect(css).toMatch(/button\.review-pencil\s*\{[^}]*transition:/);
-		const hover = css.match(/button\.review-pencil:hover\s*\{[^}]*\}/)?.[0] ?? "";
+		const hover =
+			css.match(/button\.review-pencil:hover\s*\{[^}]*\}/)?.[0] ?? "";
 		expect(hover).toContain("color:");
 		expect(hover).not.toContain("background");
 		expect(hover).not.toContain("drop-shadow");
 		expect(hover).not.toContain("filter");
-		expect(css).toMatch(/button\.review-copy:hover\s*\{[^}]*text-decoration:\s*none/);
+		expect(css).toMatch(
+			/button\.review-copy:hover\s*\{[^}]*text-decoration:\s*none/
+		);
 	});
 });
 
@@ -127,8 +135,12 @@ describe("review quote clipping and link contract", () => {
 		// flex-shrink re-opts out of the generic head-button pin —
 		// without it the quote stretched the card instead of clipping.
 		expect(css).toMatch(/button\.review-quote\s*\{[^}]*flex-shrink:\s*1/);
-		expect(css).toMatch(/button\.review-quote:hover\s*\{[^}]*text-decoration:\s*underline/);
-		expect(css).toMatch(/\.ann-refs-quote:hover\s*\{[^}]*text-decoration:\s*underline/);
+		expect(css).toMatch(
+			/button\.review-quote:hover\s*\{[^}]*text-decoration:\s*underline/
+		);
+		expect(css).toMatch(
+			/\.ann-refs-quote:hover\s*\{[^}]*text-decoration:\s*underline/
+		);
 	});
 
 	it("fades quote underlines instead of snapping them", () => {
@@ -140,14 +152,20 @@ describe("review quote clipping and link contract", () => {
 				new RegExp(`${sel}\\s*\\{[^}]*text-decoration-color:\\s*transparent`)
 			);
 			expect(css).toMatch(
-				new RegExp(`${sel}:hover\\s*\\{[^}]*text-decoration-color:\\s*currentcolor`)
+				new RegExp(
+					`${sel}:hover\\s*\\{[^}]*text-decoration-color:\\s*currentcolor`
+				)
 			);
 		}
 	});
 
 	it("lights all three icons on the same color beat", () => {
 		const css = pageStyle();
-		for (const sel of ["button\\.review-copy", "button\\.review-del", "button\\.review-pencil"]) {
+		for (const sel of [
+			"button\\.review-copy",
+			"button\\.review-del",
+			"button\\.review-pencil"
+		]) {
 			expect(css).toMatch(new RegExp(`${sel}\\s*\\{[^}]*transition:\\s*color`));
 		}
 	});

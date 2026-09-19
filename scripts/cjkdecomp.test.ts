@@ -7,7 +7,7 @@ import {
 	parseRecord,
 	repeatCount,
 	resolveLevel,
-	type DecompTable,
+	type DecompTable
 } from "./cjkdecomp";
 
 const SAMPLE = [
@@ -21,7 +21,7 @@ const SAMPLE = [
 	"漢:a(氵,37060)",
 	"37060:d(廿,99970)",
 	"99970:d/m(中,夫)",
-	"木:wb(十,八)",
+	"木:wb(十,八)"
 ];
 
 function sampleTable(): DecompTable {
@@ -35,7 +35,11 @@ function sampleTable(): DecompTable {
 
 describe("parseRecord", () => {
 	it("parses char:type(part,part) lines", () => {
-		expect(parseRecord("好:a(女,子)")).toEqual({ char: "好", type: "a", parts: ["女", "子"] });
+		expect(parseRecord("好:a(女,子)")).toEqual({
+			char: "好",
+			type: "a",
+			parts: ["女", "子"]
+		});
 	});
 
 	it("keeps type-code suffixes like d/o", () => {
@@ -108,7 +112,9 @@ describe("checkAgreement", () => {
 
 	it("marks repeat-encoded matches resolved-agree", () => {
 		const t = sampleTable();
-		expect(checkAgreement(t, "林", ["木", "木"]).verdict).toBe("resolved-agree");
+		expect(checkAgreement(t, "林", ["木", "木"]).verdict).toBe(
+			"resolved-agree"
+		);
 	});
 
 	it("marks deeper splits mismatch", () => {

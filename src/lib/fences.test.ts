@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { parseFences, fenceBody, fenceAtOffset, shiftEnterAction } from "./fences";
+import {
+	parseFences,
+	fenceBody,
+	fenceAtOffset,
+	shiftEnterAction
+} from "./fences";
 
 describe("parseFences", () => {
 	it("returns no fences for plain text", () => {
@@ -71,7 +76,9 @@ describe("shiftEnterAction", () => {
 	});
 
 	it("keeps newlines inside non-empty bodies and outside fences", () => {
-		expect(shiftEnterAction("```js\ncode\n```", 8)).toEqual({ kind: "newline" });
+		expect(shiftEnterAction("```js\ncode\n```", 8)).toEqual({
+			kind: "newline"
+		});
 		expect(shiftEnterAction("plain text", 5)).toEqual({ kind: "newline" });
 	});
 });

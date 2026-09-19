@@ -28,7 +28,8 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 
-export const UNIHAN_SOURCE_URL = "https://www.unicode.org/Public/UCD/latest/ucd/Unihan.zip";
+export const UNIHAN_SOURCE_URL =
+	"https://www.unicode.org/Public/UCD/latest/ucd/Unihan.zip";
 export const UNIHAN_UNICODE_VERSION = "17.0.0";
 
 /** CJK Unified Ideographs block, always bundled. */
@@ -69,17 +70,31 @@ export interface ExtractedEntry {
 }
 
 const FIELD_BY_NAME = new Map<string, keyof ExtractedEntry>(
-	Object.entries(UNIHAN_FIELD_MAP).map(([field, short]) => [field, short as keyof ExtractedEntry])
+	Object.entries(UNIHAN_FIELD_MAP).map(([field, short]) => [
+		field,
+		short as keyof ExtractedEntry
+	])
 );
 
 /** True when the code point belongs to a bundled range under these options. */
-export function inBundledRange(codePoint: number, options: ExtractOptions = {}): boolean {
+export function inBundledRange(
+	codePoint: number,
+	options: ExtractOptions = {}
+): boolean {
 	if (codePoint >= UNIFIED_START && codePoint <= UNIFIED_END) return true;
-	if (options.includeExtA === true && codePoint >= EXT_A_START && codePoint <= EXT_A_END) return true;
+	if (
+		options.includeExtA === true &&
+		codePoint >= EXT_A_START &&
+		codePoint <= EXT_A_END
+	)
+		return true;
 	return false;
 }
 
-function entryFor(entries: Map<string, ExtractedEntry>, codePoint: number): ExtractedEntry {
+function entryFor(
+	entries: Map<string, ExtractedEntry>,
+	codePoint: number
+): ExtractedEntry {
 	const char = String.fromCodePoint(codePoint);
 	let entry = entries.get(char);
 	if (!entry) {
@@ -95,7 +110,10 @@ function entryFor(entries: Map<string, ExtractedEntry>, codePoint: number): Extr
  * entries. Unknown fields, out-of-range code points, and malformed
  * lines are skipped. A repeated field keeps the last value.
  */
-export function parseUnihanReadings(text: string, options: ExtractOptions = {}): Map<string, ExtractedEntry> {
+export function parseUnihanReadings(
+	text: string,
+	options: ExtractOptions = {}
+): Map<string, ExtractedEntry> {
 	const entries = new Map<string, ExtractedEntry>();
 	for (const line of text.split("\n")) {
 		if (line === "" || line.startsWith("#")) continue;
@@ -132,7 +150,10 @@ export interface GeneratedMeta {
  * object literal keyed by character. Entries sort by code point so
  * regeneration diffs stay stable.
  */
-export function formatGeneratedModule(entries: Map<string, ExtractedEntry>, meta: GeneratedMeta): string {
+export function formatGeneratedModule(
+	entries: Map<string, ExtractedEntry>,
+	meta: GeneratedMeta
+): string {
 	const sorted = [...entries.values()].sort(
 		(a, b) => (a.char.codePointAt(0) ?? 0) - (b.char.codePointAt(0) ?? 0)
 	);
@@ -150,7 +171,7 @@ export function formatGeneratedModule(entries: Map<string, ExtractedEntry>, meta
  * GENERATED — do not edit by hand. Regenerate with:
  *   bun scripts/unihan-extract.ts --src <Unihan_Readings.txt|Unihan.zip> --out src/lib/unihan.generated.ts${
 		meta.includeExtA ? " --include-ext-a" : ""
-	}
+ }
  *
  * Source: ${meta.sourceUrl} (Unicode ${meta.unicodeVersion},
  * Unihan_Readings.txt: kDefinition + kMandarin + kJapaneseOn +
@@ -158,7 +179,7 @@ export function formatGeneratedModule(entries: Map<string, ExtractedEntry>, meta
 		meta.includeExtA
 			? "CJK Unified Ideographs (U+4E00-U+9FFF) + Extension A (U+3400-U+4DBF)"
 			: "CJK Unified Ideographs (U+4E00-U+9FFF)"
-	}, ${entries.size} entries).
+ }, ${entries.size} entries).
  *
  * Unicode data © 1991-2026 Unicode, Inc. Distributed under the
  * Unicode License V3 (https://www.unicode.org/license.txt):
@@ -189,7 +210,9 @@ function readMember(src: string, member: string): string {
 			maxBuffer: 256 * 1024 * 1024
 		});
 		if (out.status !== 0 || out.stdout === "") {
-			throw new Error(`could not read ${member} from ${src}: ${out.stderr.trim()}`);
+			throw new Error(
+				`could not read ${member} from ${src}: ${out.stderr.trim()}`
+			);
 		}
 		return out.stdout as string;
 	}
@@ -202,7 +225,8 @@ function argValue(args: string[], name: string): string | undefined {
 	const idx = args.indexOf(flag);
 	if (idx < 0) return undefined;
 	const value = args[idx + 1];
-	if (value === undefined || value.startsWith("--")) throw new Error(`missing value for ${flag}`);
+	if (value === undefined || value.startsWith("--"))
+		throw new Error(`missing value for ${flag}`);
 	return value;
 }
 
@@ -212,10 +236,16 @@ if (import.meta.main) {
 		const src = argValue(args, "src") ?? "Unihan_Readings.txt";
 		const out = argValue(args, "out") ?? "src/lib/unihan.generated.ts";
 		const includeExtA = args.includes("--include-ext-a");
-		const entries = parseUnihanReadings(readMember(src, "Unihan_Readings.txt"), { includeExtA });
-		for (const [char, extra] of parseUnihanReadings(readMember(src, "Unihan_IRGSources.txt"), {
-			includeExtA
-		})) {
+		const entries = parseUnihanReadings(
+			readMember(src, "Unihan_Readings.txt"),
+			{ includeExtA }
+		);
+		for (const [char, extra] of parseUnihanReadings(
+			readMember(src, "Unihan_IRGSources.txt"),
+			{
+				includeExtA
+			}
+		)) {
 			const base = entryFor(entries, char.codePointAt(0) ?? 0);
 			if (extra.t !== undefined) base.t = extra.t;
 			if (extra.rs !== undefined) base.rs = extra.rs;
@@ -226,9 +256,13 @@ if (import.meta.main) {
 			includeExtA
 		});
 		writeFileSync(out, module);
-		console.log(`unihan-extract: ${entries.size} entries -> ${out} (${Buffer.byteLength(module, "utf-8")} bytes)`);
+		console.log(
+			`unihan-extract: ${entries.size} entries -> ${out} (${Buffer.byteLength(module, "utf-8")} bytes)`
+		);
 	} catch (error) {
-		console.error(`unihan-extract: ${error instanceof Error ? error.message : error}`);
+		console.error(
+			`unihan-extract: ${error instanceof Error ? error.message : error}`
+		);
 		process.exit(1);
 	}
 }

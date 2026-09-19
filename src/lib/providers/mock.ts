@@ -36,7 +36,10 @@ export class MockProvider implements ChatProvider {
 		// unset or invalid keeps the 15ms default.
 		let wordMs = 15;
 		try {
-			const raw = typeof localStorage === "undefined" ? null : localStorage.getItem("ccez-mock-word-ms");
+			const raw =
+				typeof localStorage === "undefined"
+					? null
+					: localStorage.getItem("ccez-mock-word-ms");
 			const n = raw === null ? NaN : Number(raw);
 			if (Number.isFinite(n) && n >= 0) wordMs = n;
 		} catch {
@@ -67,7 +70,8 @@ export function mockProviderEnabled(): boolean {
 		// preview and specs keep working.
 		if (
 			typeof window !== "undefined" &&
-			(window.__TAURI_INTERNALS__ !== undefined || window.__TAURI__ !== undefined)
+			(window.__TAURI_INTERNALS__ !== undefined ||
+				window.__TAURI__ !== undefined)
 		) {
 			return false;
 		}

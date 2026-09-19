@@ -35,7 +35,10 @@ export function judgeSanitizerShape(shape: {
 			reason: "No global Sanitizer constructor; DOMPurify stays."
 		};
 	}
-	if (!shape.supportsBaselineConfig || !shape.supportsCustomElementsAndDataAttrs) {
+	if (
+		!shape.supportsBaselineConfig ||
+		!shape.supportsCustomElementsAndDataAttrs
+	) {
 		return {
 			available: true,
 			equivalent: false,
@@ -56,7 +59,11 @@ export function nativeSanitizerStatus(): NativeSanitizerStatus {
 	try {
 		const ctor = (globalThis as Record<string, unknown>).Sanitizer;
 		if (typeof ctor !== "function") {
-			return judgeSanitizerShape({ hasConstructor: false, supportsBaselineConfig: false, supportsCustomElementsAndDataAttrs: false });
+			return judgeSanitizerShape({
+				hasConstructor: false,
+				supportsBaselineConfig: false,
+				supportsCustomElementsAndDataAttrs: false
+			});
 		}
 		// Even where the constructor exists, the baseline sanitizer
 		// config drops our custom allow-list (no data-* / ruby / button
@@ -68,7 +75,11 @@ export function nativeSanitizerStatus(): NativeSanitizerStatus {
 			supportsCustomElementsAndDataAttrs: false
 		});
 	} catch {
-		return judgeSanitizerShape({ hasConstructor: false, supportsBaselineConfig: false, supportsCustomElementsAndDataAttrs: false });
+		return judgeSanitizerShape({
+			hasConstructor: false,
+			supportsBaselineConfig: false,
+			supportsCustomElementsAndDataAttrs: false
+		});
 	}
 }
 

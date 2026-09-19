@@ -1,8 +1,15 @@
 import { describe, it, expect, vi } from "vitest";
-import { firstUrl, formatOnDevicePrompt, OnDeviceChatProvider } from "./provider";
+import {
+	firstUrl,
+	formatOnDevicePrompt,
+	OnDeviceChatProvider
+} from "./provider";
 import type { OnDeviceDeps } from "./bridge";
 
-function depsWith(result: unknown): { deps: OnDeviceDeps; invoke: ReturnType<typeof vi.fn> } {
+function depsWith(result: unknown): {
+	deps: OnDeviceDeps;
+	invoke: ReturnType<typeof vi.fn>;
+} {
 	const invoke = vi.fn(async () => result);
 	return { deps: { shell: true, invoke }, invoke };
 }
@@ -68,8 +75,11 @@ describe("OnDeviceChatProvider", () => {
 		const provider = new OnDeviceChatProvider(deps);
 		const controller = new AbortController();
 		controller.abort();
-		await expect(provider.chat([{ role: "user", content: "hi" }], { signal: controller.signal }))
-			.rejects.toThrow("On-device reply stopped.");
+		await expect(
+			provider.chat([{ role: "user", content: "hi" }], {
+				signal: controller.signal
+			})
+		).rejects.toThrow("On-device reply stopped.");
 		expect(invoke).not.toHaveBeenCalled();
 	});
 
@@ -78,7 +88,9 @@ describe("OnDeviceChatProvider", () => {
 			throw new Error("downloading");
 		});
 		const provider = new OnDeviceChatProvider({ shell: true, invoke });
-		await expect(provider.chat([{ role: "user", content: "hi" }])).rejects.toThrow(
+		await expect(
+			provider.chat([{ role: "user", content: "hi" }])
+		).rejects.toThrow(
 			"On-device model is still downloading. Try again in a bit."
 		);
 	});
@@ -86,9 +98,9 @@ describe("OnDeviceChatProvider", () => {
 
 describe("firstUrl", () => {
 	it("finds the first link and nothing else", () => {
-		expect(firstUrl("read https://example.com/a and https://example.com/b")).toBe(
-			"https://example.com/a"
-		);
+		expect(
+			firstUrl("read https://example.com/a and https://example.com/b")
+		).toBe("https://example.com/a");
 		expect(firstUrl("no links here")).toBe(null);
 		expect(firstUrl("")).toBe(null);
 	});
@@ -99,7 +111,9 @@ describe("OnDeviceChatProvider URL fallback", () => {
 		const { deps, invoke } = depsWith("done");
 		const fetchPage = vi.fn(async (url: string) => `text of ${url}`);
 		const provider = new OnDeviceChatProvider({ ...deps, fetchPage });
-		const result = await provider.chat([{ role: "user", content: "read https://example.com/x" }]);
+		const result = await provider.chat([
+			{ role: "user", content: "read https://example.com/x" }
+		]);
 		expect(result.content).toBe("done");
 		expect(fetchPage).toHaveBeenCalledOnce();
 		expect(invoke).toHaveBeenCalledWith("ondevice_generate", {
@@ -115,7 +129,9 @@ describe("OnDeviceChatProvider URL fallback", () => {
 			throw new Error("offline");
 		});
 		const provider = new OnDeviceChatProvider({ ...deps, fetchPage });
-		const result = await provider.chat([{ role: "user", content: "read https://example.com/x" }]);
+		const result = await provider.chat([
+			{ role: "user", content: "read https://example.com/x" }
+		]);
 		expect(result.content).toBe("done");
 		expect(invoke).toHaveBeenCalledWith("ondevice_generate", {
 			prompt: "user: read https://example.com/x",

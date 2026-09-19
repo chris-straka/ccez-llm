@@ -17,8 +17,20 @@ test("retry keeps previous articles mounted", async ({ page }) => {
 					createdAt: 1,
 					replyLang: null,
 					messages: [
-						{ id: "m1", role: "user", content: "hello", usage: null, error: null },
-						{ id: "m2", role: "assistant", content: "", usage: null, error: "boom" }
+						{
+							id: "m1",
+							role: "user",
+							content: "hello",
+							usage: null,
+							error: null
+						},
+						{
+							id: "m2",
+							role: "assistant",
+							content: "",
+							usage: null,
+							error: "boom"
+						}
 					]
 				}
 			])
@@ -28,9 +40,7 @@ test("retry keeps previous articles mounted", async ({ page }) => {
 	const retry = page.locator('button:has-text("Retry")');
 	await expect(retry).toBeVisible();
 	await page.evaluate(() => {
-		document
-			.querySelectorAll("article")
-			.forEach((a, i) => (a.__mark = i));
+		document.querySelectorAll("article").forEach((a, i) => (a.__mark = i));
 	});
 	await retry.click();
 	await expect(page.locator("article .rendered").first()).toBeVisible();

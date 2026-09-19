@@ -15,8 +15,12 @@ async function clickText(page: Page, count: 1 | 2 | 3 | 4): Promise<void> {
 	const box = await body.boundingBox();
 	if (!box) throw new Error("message has no box");
 	if (count === 1) await page.mouse.click(box.x + 20, box.y + box.height / 2);
-	else if (count === 2) await page.mouse.dblclick(box.x + 20, box.y + box.height / 2);
-	else await page.mouse.click(box.x + 20, box.y + box.height / 2, { clickCount: count });
+	else if (count === 2)
+		await page.mouse.dblclick(box.x + 20, box.y + box.height / 2);
+	else
+		await page.mouse.click(box.x + 20, box.y + box.height / 2, {
+			clickCount: count
+		});
 }
 
 /** Spaceless scripts have no words to pick: double-click keeps the
@@ -24,7 +28,9 @@ native fragment (and still summons the menu). */
 test("double-click in Japanese keeps the word pick", async ({ page }) => {
 	await clickText(page, 2);
 	await expect(page.locator(".sel-menu")).toBeVisible();
-	const selected = await page.evaluate(() => window.getSelection()?.toString() ?? "");
+	const selected = await page.evaluate(
+		() => window.getSelection()?.toString() ?? ""
+	);
 	expect(selected).toBe("テスト");
 });
 
@@ -32,19 +38,31 @@ test("double-click in Japanese keeps the word pick", async ({ page }) => {
 test("triple-click in Japanese selects the paragraph", async ({ page }) => {
 	await clickText(page, 3);
 	await expect(page.locator(".sel-menu")).toBeVisible();
-	const selected = await page.evaluate(() => window.getSelection()?.toString() ?? "");
-	expect(selected).toBe("テストを確認しました。何かお手伝いできることはありますか？");
+	const selected = await page.evaluate(
+		() => window.getSelection()?.toString() ?? ""
+	);
+	expect(selected).toBe(
+		"テストを確認しました。何かお手伝いできることはありますか？"
+	);
 });
 
 /** The paragraph pick holds wherever in it the triple-click lands. */
-test("triple-click on the second sentence selects the paragraph", async ({ page }) => {
+test("triple-click on the second sentence selects the paragraph", async ({
+	page
+}) => {
 	const body = page.locator("article .rendered").first();
 	const box = await body.boundingBox();
 	if (!box) throw new Error("message has no box");
-	await page.mouse.click(box.x + box.width * 0.7, box.y + box.height / 2, { clickCount: 3 });
+	await page.mouse.click(box.x + box.width * 0.7, box.y + box.height / 2, {
+		clickCount: 3
+	});
 	await expect(page.locator(".sel-menu")).toBeVisible();
-	const selected = await page.evaluate(() => window.getSelection()?.toString() ?? "");
-	expect(selected).toBe("テストを確認しました。何かお手伝いできることはありますか？");
+	const selected = await page.evaluate(
+		() => window.getSelection()?.toString() ?? ""
+	);
+	expect(selected).toBe(
+		"テストを確認しました。何かお手伝いできることはありますか？"
+	);
 });
 
 /** The basic flow: drag-select, slide to the menu, click Annotate,
@@ -60,12 +78,18 @@ test("drag, slide to Annotate, and file the pill", async ({ page }) => {
 	await page.mouse.up();
 	const menu = page.locator(".sel-menu");
 	await expect(menu).toBeVisible({ timeout: 5_000 });
-	const selected = await page.evaluate(() => window.getSelection()?.toString() ?? "");
+	const selected = await page.evaluate(
+		() => window.getSelection()?.toString() ?? ""
+	);
 	expect(selected).not.toBe("");
 	const btn = menu.locator('button:has-text("Annotate")');
 	const btnBox = await btn.boundingBox();
 	if (!btnBox) throw new Error("annotate button has no box");
-	await page.mouse.move(btnBox.x + btnBox.width / 2, btnBox.y + btnBox.height / 2, { steps: 6 });
+	await page.mouse.move(
+		btnBox.x + btnBox.width / 2,
+		btnBox.y + btnBox.height / 2,
+		{ steps: 6 }
+	);
 	const mid = await page.evaluate(() => ({
 		menu: !!document.querySelector(".sel-menu"),
 		sel: window.getSelection()?.toString() ?? ""
@@ -77,14 +101,18 @@ test("drag, slide to Annotate, and file the pill", async ({ page }) => {
 });
 
 /** Plain clicks on blank space drop a stale highlight, never re-summon. */
-test("clicking blank space deselects instead of reopening the menu", async ({ page }) => {
+test("clicking blank space deselects instead of reopening the menu", async ({
+	page
+}) => {
 	await clickText(page, 2);
 	await expect(page.locator(".sel-menu")).toBeVisible();
 	// Past the 6s idle window with no pointer activity: expired.
 	await page.waitForTimeout(7000);
 	await expect(page.locator(".sel-menu")).toHaveCount(0);
 	await page.mouse.click(10, 300);
-	const selected = await page.evaluate(() => window.getSelection()?.toString() ?? "");
+	const selected = await page.evaluate(
+		() => window.getSelection()?.toString() ?? ""
+	);
 	expect(selected).toBe("");
 	await expect(page.locator(".sel-menu")).toHaveCount(0);
 });
@@ -103,13 +131,17 @@ test("right-click keeps the highlighted text", async ({ page }) => {
 	await expect(page.locator(".sel-menu")).toBeVisible();
 	await page.mouse.click(box.x + 60, y, { button: "right" });
 	await page.waitForTimeout(400);
-	const selected = await page.evaluate(() => window.getSelection()?.toString() ?? "");
+	const selected = await page.evaluate(
+		() => window.getSelection()?.toString() ?? ""
+	);
 	expect(selected).not.toBe("");
 });
 
 /** Clicking inside a live highlight clears the highlight AND the menu —
 neither strands the other. */
-test("clicking inside the highlight clears it with the menu", async ({ page }) => {
+test("clicking inside the highlight clears it with the menu", async ({
+	page
+}) => {
 	const body = page.locator("article .rendered").first();
 	const box = await body.boundingBox();
 	if (!box) throw new Error("message has no box");
@@ -120,14 +152,18 @@ test("clicking inside the highlight clears it with the menu", async ({ page }) =
 	await page.mouse.up();
 	await expect(page.locator(".sel-menu")).toBeVisible();
 	await page.mouse.click(box.x + 60, y);
-	const selected = await page.evaluate(() => window.getSelection()?.toString() ?? "");
+	const selected = await page.evaluate(
+		() => window.getSelection()?.toString() ?? ""
+	);
 	expect(selected).toBe("");
 	await expect(page.locator(".sel-menu")).toHaveCount(0);
 });
 
 /** Clicking a stale highlight (menu already faded) clears it without
 re-summoning the menu. */
-test("clicking a stale highlight never brings the menu back", async ({ page }) => {
+test("clicking a stale highlight never brings the menu back", async ({
+	page
+}) => {
 	const body = page.locator("article .rendered").first();
 	const box = await body.boundingBox();
 	if (!box) throw new Error("message has no box");
@@ -140,16 +176,22 @@ test("clicking a stale highlight never brings the menu back", async ({ page }) =
 	await page.waitForTimeout(2700);
 	await expect(page.locator(".sel-menu")).toHaveCount(0);
 	await page.mouse.click(box.x + 200, y);
-	const selected = await page.evaluate(() => window.getSelection()?.toString() ?? "");
+	const selected = await page.evaluate(
+		() => window.getSelection()?.toString() ?? ""
+	);
 	expect(selected).toBe("");
 	await expect(page.locator(".sel-menu")).toHaveCount(0);
 });
 
 /** Four clicks: the paragraph pick comes off again and the menu goes
 with it instead of stranding. */
-test("fourth click clears the paragraph pick and the menu", async ({ page }) => {
+test("fourth click clears the paragraph pick and the menu", async ({
+	page
+}) => {
 	await clickText(page, 4);
-	const selected = await page.evaluate(() => window.getSelection()?.toString() ?? "");
+	const selected = await page.evaluate(
+		() => window.getSelection()?.toString() ?? ""
+	);
 	expect(selected).toBe("");
 	await expect(page.locator(".sel-menu")).toHaveCount(0);
 });
@@ -160,7 +202,9 @@ single-character word keeps the range on word edges, so the
 create marker's word-snap (which intentionally expands mid-word
 cuts like the last "c" of "ccc" to the whole word) leaves it
 alone and the repeat disambiguation is what gets exercised. */
-test("annotating a repeated character anchors the selected repeat", async ({ page }) => {
+test("annotating a repeated character anchors the selected repeat", async ({
+	page
+}) => {
 	await seedChat(page, [{ role: "assistant", content: "a a" }]);
 	await page.goto("/");
 	const body = page.locator("article .rendered").first();
@@ -213,7 +257,8 @@ test("prompt review card opens up and to the left", async ({ page }) => {
 	const card = page.locator(".ann-wrap .review");
 	await expect(card).toBeVisible();
 	const boxes = await page.evaluate(() => {
-		const rect = (sel: string) => document.querySelector(sel)?.getBoundingClientRect();
+		const rect = (sel: string) =>
+			document.querySelector(sel)?.getBoundingClientRect();
 		const r = rect(".ann-wrap .review");
 		const w = rect(".ann-wrap");
 		const p = rect(".prompt-tools .ann-pill");
@@ -258,13 +303,16 @@ test("message refs card opens over its number", async ({ page }) => {
 	const card = page.locator("article.user .ann-refs-pop");
 	await expect(card).toHaveCSS("opacity", "1");
 	const inside = await page.evaluate(() => {
-		const rect = (sel: string) => document.querySelector(sel)?.getBoundingClientRect();
+		const rect = (sel: string) =>
+			document.querySelector(sel)?.getBoundingClientRect();
 		const c = rect("article.user .ann-refs-pop");
 		const p = rect("article.user .ann-refs-pill");
 		if (!c || !p) return null;
 		const cx = p.x + p.width / 2;
 		const cy = p.y + p.height / 2;
-		return cx >= c.x && cx <= c.x + c.width && cy >= c.y && cy <= c.y + c.height;
+		return (
+			cx >= c.x && cx <= c.x + c.width && cy >= c.y && cy <= c.y + c.height
+		);
 	});
 	expect(inside).toBe(true);
 });
@@ -280,7 +328,10 @@ async function openPromptReview(page: Page): Promise<void> {
 
 /** Select a quote and open its comment box through the real UI. */
 async function openAnnotate(page: Page, quote: string): Promise<void> {
-	await page.locator(`article .rendered:has-text("${quote}")`).first().selectText();
+	await page
+		.locator(`article .rendered:has-text("${quote}")`)
+		.first()
+		.selectText();
 	await page.mouse.up();
 	await expect(page.locator(".sel-menu")).toBeVisible();
 	await page.locator('.sel-menu button:has-text("Annotate")').click();
@@ -373,7 +424,10 @@ test("flooding the comment box stays inside it", async ({ page }) => {
 	await openAnnotate(page, "確認しました");
 	const box = page.locator(".ann-pop textarea");
 	await box.fill("a".repeat(500));
-	const sizes = await box.evaluate((el) => ({ scroll: el.scrollWidth, client: el.clientWidth }));
+	const sizes = await box.evaluate((el) => ({
+		scroll: el.scrollWidth,
+		client: el.clientWidth
+	}));
 	expect(sizes.scroll).toBeLessThanOrEqual(sizes.client + 1);
 });
 
@@ -396,7 +450,9 @@ test("draft annotations survive a reload", async ({ page }) => {
 	await page.keyboard.press("Enter");
 	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1);
 	await page.reload();
-	await expect(page.locator("article .rendered").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article .rendered").first()).toBeVisible({
+		timeout: 60_000
+	});
 	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1);
 	await expect(page.locator(".prompt-tools .ann-pill")).toHaveText("1");
 });
@@ -467,7 +523,10 @@ test("badge cancel drops the edit", async ({ page }) => {
 	await expect(page.locator(".ann-pop")).toHaveCount(0);
 	const reopened = await badge.boundingBox();
 	if (!reopened) throw new Error("badge has no box");
-	await page.mouse.click(reopened.x + reopened.width / 2, reopened.y + reopened.height / 2);
+	await page.mouse.click(
+		reopened.x + reopened.width / 2,
+		reopened.y + reopened.height / 2
+	);
 	await expect(page.locator(".ann-pop textarea")).toHaveValue("kept");
 });
 
@@ -498,7 +557,8 @@ test("annotations-only message renders folded", async ({ page }) => {
 	await seedChat(page, [
 		{
 			role: "user",
-			content: 'Annotated selections:\n1. "風に舞う" — What does this mean?\n2. "夕暮れの公園で" — What does this mean?'
+			content:
+				'Annotated selections:\n1. "風に舞う" — What does this mean?\n2. "夕暮れの公園で" — What does this mean?'
 		}
 	]);
 	await page.reload();
@@ -508,12 +568,18 @@ test("annotations-only message renders folded", async ({ page }) => {
 	await expect(article.locator(".ann-refs-pill")).toBeVisible();
 	// Folding previews the quotes; unfolding restores the em-dash body
 	// with the pill above — the baked block never shows.
-	await article.locator('.actions button[aria-label="Fold this message"]').click();
+	await article
+		.locator('.actions button[aria-label="Fold this message"]')
+		.click();
 	const preview = article.locator(".folded-preview");
 	await expect(preview).toContainText("風に舞う");
-	await article.locator('.actions button[aria-label="Unfold this message"]').click();
+	await article
+		.locator('.actions button[aria-label="Unfold this message"]')
+		.click();
 	await expect(article.locator(".rendered")).toContainText("—");
-	await expect(article.locator(".rendered")).not.toContainText("Annotated selections:");
+	await expect(article.locator(".rendered")).not.toContainText(
+		"Annotated selections:"
+	);
 	await expect(article.locator(".ann-refs-pill")).toBeVisible();
 });
 
@@ -527,7 +593,9 @@ test("message rows have no download button", async ({ page }) => {
 	for (const role of ["user", "assistant"] as const) {
 		await page.locator(`article.${role} .rendered`).first().hover();
 		await expect(
-			page.locator(`article.${role} .actions [aria-label="Download audio for this message"]`)
+			page.locator(
+				`article.${role} .actions [aria-label="Download audio for this message"]`
+			)
 		).toHaveCount(0);
 	}
 });
@@ -547,7 +615,9 @@ test("sending clears pending annotations immediately", async ({ page }) => {
 	// The pill leaves with the send, not with the reply.
 	await expect(page.locator("article.user .rendered")).toContainText("go");
 	await expect(page.locator(".prompt-tools .ann-pill")).toHaveCount(0);
-	await expect(page.locator("article.assistant .rendered").last()).toContainText("Mock reply");
+	await expect(
+		page.locator("article.assistant .rendered").last()
+	).toContainText("Mock reply");
 	// The sent message carries the block (folded with its count).
 	await expect(page.locator("article.user .ann-refs-pill")).toHaveText("1");
 });
@@ -563,7 +633,9 @@ test("pencil edit saves without resending", async ({ page }) => {
 	const article = page.locator("article.user");
 	await expect(article).toBeVisible();
 	await article.hover();
-	await article.locator('.actions button[aria-label="Edit this message"]').click();
+	await article
+		.locator('.actions button[aria-label="Edit this message"]')
+		.click();
 	// Nothing is deleted; the text opens in an in-place editor where the
 	// message sat (the composer keeps its own empty draft).
 	const inline = page.locator(".msg-edit .ta-input");
@@ -577,7 +649,9 @@ test("pencil edit saves without resending", async ({ page }) => {
 	await page.keyboard.press("Control+a");
 	await page.keyboard.type("hello world");
 	await page.keyboard.press("Enter");
-	await expect(page.locator("article.user .rendered")).toContainText("hello world");
+	await expect(page.locator("article.user .rendered")).toContainText(
+		"hello world"
+	);
 	await expect(page.locator("article.user")).toHaveCount(1);
 	await expect(page.locator("article.assistant")).toHaveCount(1);
 	await expect(page.locator("article.assistant .rendered")).toContainText("hi");
@@ -587,12 +661,16 @@ test("pencil edit saves without resending", async ({ page }) => {
 /** The in-place edit keeps the raw text: fenced code edits plain (the
 composer is a textarea now — highlighting lives in history only). */
 test("in-place edit keeps the raw fence text", async ({ page }) => {
-	await seedChat(page, [{ role: "user", content: "```python\nprint('hi')\n```" }]);
+	await seedChat(page, [
+		{ role: "user", content: "```python\nprint('hi')\n```" }
+	]);
 	await page.reload();
 	const article = page.locator("article.user");
 	await expect(article).toBeVisible();
 	await article.hover();
-	await article.locator('.actions button[aria-label="Edit this message"]').click();
+	await article
+		.locator('.actions button[aria-label="Edit this message"]')
+		.click();
 	const inline = page.locator(".msg-edit .ta-input");
 	await expect(inline).toHaveValue("```python\nprint('hi')\n```");
 	// Cancel keeps history untouched.
@@ -617,7 +695,9 @@ test("E key edits the hovered own message", async ({ page }) => {
 	await page.keyboard.press("Escape");
 	await expect(page.locator(".msg-edit")).toHaveCount(0);
 	await expect(page.locator(".prompt .ta-input")).not.toHaveValue(/helo world/);
-	await expect(page.locator("article.user .rendered")).toContainText("helo world");
+	await expect(page.locator("article.user .rendered")).toContainText(
+		"helo world"
+	);
 });
 
 /** Clear-all sits at the bottom-right of the review overlay. */
@@ -634,7 +714,9 @@ test("clear-all lives at the top right of the review", async ({ page }) => {
 	// Top edge: the tools row starts where the overlay starts.
 	expect(toolsBox.y - reviewBox.y).toBeLessThan(32);
 	// Right edge: the tools row ends where the overlay ends.
-	expect(reviewBox.x + reviewBox.width - (toolsBox.x + toolsBox.width)).toBeLessThan(40);
+	expect(
+		reviewBox.x + reviewBox.width - (toolsBox.x + toolsBox.width)
+	).toBeLessThan(40);
 	await tools.locator("button").click();
 	await expect(page.locator(".prompt-tools .ann-pill")).toHaveCount(0);
 });
@@ -642,9 +724,15 @@ test("clear-all lives at the top right of the review", async ({ page }) => {
 /** Multi-paragraph quotes wash without painting the paragraph gaps: no
 whitespace-only marks, no layout growth while the wash is on, and a
 live highlight survives hovering the badge on and off. */
-test("multi-paragraph wash paints no gaps and keeps the highlight", async ({ page }) => {
+test("multi-paragraph wash paints no gaps and keeps the highlight", async ({
+	page
+}) => {
 	await seedChat(page, [
-		{ role: "assistant", content: "First paragraph here.\n\nSecond paragraph here.\n\nThird paragraph here." }
+		{
+			role: "assistant",
+			content:
+				"First paragraph here.\n\nSecond paragraph here.\n\nThird paragraph here."
+		}
 	]);
 	await page.goto("/");
 	const body = page.locator("article .rendered").first();
@@ -661,18 +749,23 @@ test("multi-paragraph wash paints no gaps and keeps the highlight", async ({ pag
 				while (walker.nextNode()) {
 					const node = walker.currentNode;
 					const parent = node.parentNode;
-					if (parent instanceof Element && parent.closest("[data-ann-badge]")) continue;
-					if (node instanceof Text && /\S/.test(node.textContent ?? "")) texts.push(node);
+					if (parent instanceof Element && parent.closest("[data-ann-badge]"))
+						continue;
+					if (node instanceof Text && /\S/.test(node.textContent ?? ""))
+						texts.push(node);
 				}
 				const first = texts[0];
 				const last = texts[texts.length - 1];
-				if (!first || !last || a === undefined || b === undefined) throw new Error("no text");
+				if (!first || !last || a === undefined || b === undefined)
+					throw new Error("no text");
 				window.getSelection()?.setBaseAndExtent(first, a, last, b);
 				return window.getSelection()?.toString() ?? "";
 			},
 			[from, to] as [number, number]
 		);
-	expect(await selectAcross(6, 5)).toBe("paragraph here.\n\nSecond paragraph here.\n\nThird");
+	expect(await selectAcross(6, 5)).toBe(
+		"paragraph here.\n\nSecond paragraph here.\n\nThird"
+	);
 	await page.mouse.up();
 	await expect(page.locator(".sel-menu")).toBeVisible();
 	await page.locator('.sel-menu button:has-text("Annotate")').click();
@@ -684,15 +777,19 @@ test("multi-paragraph wash paints no gaps and keeps the highlight", async ({ pag
 		page.evaluate(() => {
 			const root = document.querySelector("article .rendered");
 			// The preview wash paints Highlight ranges (no DOM marks) —
-		// under any graded ramp name mid-fade, so union all three.
+			// under any graded ramp name mid-fade, so union all three.
 			const reg = (
 				window as unknown as {
 					CSS?: { highlights?: { get(name: string): Set<Range> | undefined } };
 				}
 			).CSS?.highlights;
 			const names = ["ccez-ann", "ccez-ann-d1", "ccez-ann-d2", "ccez-ann-d3"];
-		const ranges = names.flatMap((n) => [...(reg?.get(n) ?? [])]).map((r) => r.toString());
-			const box = root?.querySelector("button.ccez-ann-badge")?.getBoundingClientRect();
+			const ranges = names
+				.flatMap((n) => [...(reg?.get(n) ?? [])])
+				.map((r) => r.toString());
+			const box = root
+				?.querySelector("button.ccez-ann-badge")
+				?.getBoundingClientRect();
 			return {
 				rangeCount: ranges.length,
 				blankRanges: ranges.filter((text) => !/\S/.test(text ?? "")).length,
@@ -732,18 +829,24 @@ test("multi-paragraph wash paints no gaps and keeps the highlight", async ({ pag
 	expect(hovered.blankRanges).toBe(0);
 	expect(hovered.height).toBe(washed.height);
 	expect(hovered.badgeY).toBe(washed.badgeY);
-	expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).toBe("paragraph");
+	expect(
+		await page.evaluate(() => window.getSelection()?.toString() ?? "")
+	).toBe("paragraph");
 	await page.mouse.move(4, 4);
 	await page.waitForTimeout(400);
 	const left = await snapshot();
 	expect(left.height).toBe(washed.height);
 	expect(left.badgeY).toBe(washed.badgeY);
-	expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).toBe("paragraph");
+	expect(
+		await page.evaluate(() => window.getSelection()?.toString() ?? "")
+	).toBe("paragraph");
 });
 
 /** RTL paragraphs lay out right-to-left (dir=auto), so a top-right to
 bottom drag starts at the text's start instead of mid-text. */
-test("rtl drag from the top-right selects the whole paragraph", async ({ page }) => {
+test("rtl drag from the top-right selects the whole paragraph", async ({
+	page
+}) => {
 	const para =
 		"القط السمين يجلس على السجادة القديمة في غرفة المعيشة المشمسة. الكلب الصغير يركض بسرعة في الحديقة الخضراء الواسعة. الطائر الأزرق يغرد بصوت عال فوق الأشجار العالية.";
 	await seedChat(page, [{ role: "assistant", content: para }]);
@@ -757,7 +860,9 @@ test("rtl drag from the top-right selects the whole paragraph", async ({ page })
 	await page.mouse.down();
 	await page.mouse.move(box.x + 4, box.y + box.height - 4, { steps: 15 });
 	await page.mouse.up();
-	const sel = await page.evaluate(() => window.getSelection()?.toString() ?? "");
+	const sel = await page.evaluate(
+		() => window.getSelection()?.toString() ?? ""
+	);
 	// Was 47 of 162 before per-block direction: the first sentence dropped.
 	expect(sel.length).toBeGreaterThan(150);
 	await expect(page.locator(".sel-menu")).toBeVisible();
@@ -766,9 +871,15 @@ test("rtl drag from the top-right selects the whole paragraph", async ({ page })
 /** Saving a bullet-spanning annotation with Enter leaves no native
 highlight behind: the quote keeps its badge and wash, but the
 selection itself is gone. */
-test("annotating bullets and saving with Enter clears the highlight", async ({ page }) => {
+test("annotating bullets and saving with Enter clears the highlight", async ({
+	page
+}) => {
 	await seedChat(page, [
-		{ role: "assistant", content: "Points:\n\n- 越えた (koeta) = crossed\n- 友情 (yujo) = friendship" }
+		{
+			role: "assistant",
+			content:
+				"Points:\n\n- 越えた (koeta) = crossed\n- 友情 (yujo) = friendship"
+		}
 	]);
 	await page.goto("/");
 	const body = page.locator("article .rendered").first();
@@ -799,10 +910,14 @@ test("annotating bullets and saving with Enter clears the highlight", async ({ p
 	await expect(page.locator(".ann-pop")).toBeVisible();
 	await page.keyboard.press("Enter");
 	await expect(page.locator(".ann-pop")).toHaveCount(0);
-	expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).toBe("");
+	expect(
+		await page.evaluate(() => window.getSelection()?.toString() ?? "")
+	).toBe("");
 	// The save itself worked: one badge stamped on the quote, and the
 	// steady state carries no wash — badges alone mark saved quotes.
-	expect(await page.locator("article .rendered [data-ann-badge]").count()).toBe(1);
+	expect(await page.locator("article .rendered [data-ann-badge]").count()).toBe(
+		1
+	);
 	// Past the pill fade (160ms): steady state carries no wash —
 	// badges alone mark saved quotes (the Highlight wash clears
 	// instantly, no fade-out).
@@ -821,7 +936,9 @@ test("annotating bullets and saving with Enter clears the highlight", async ({ p
 
 /** A press outside message text that drags into the chat keeps the
 live highlight: only a plain (unmoved) click clears it. */
-test("dragging from the gutter into the chat keeps the highlight", async ({ page }) => {
+test("dragging from the gutter into the chat keeps the highlight", async ({
+	page
+}) => {
 	const body = page.locator("article .rendered").first();
 	await expect(body).toBeVisible();
 	const box = await body.boundingBox();
@@ -832,7 +949,9 @@ test("dragging from the gutter into the chat keeps the highlight", async ({ page
 	await page.mouse.move(box.x + 120, y, { steps: 5 });
 	await page.mouse.up();
 	await expect(page.locator(".sel-menu")).toBeVisible();
-	const before = await page.evaluate(() => window.getSelection()?.toString() ?? "");
+	const before = await page.evaluate(
+		() => window.getSelection()?.toString() ?? ""
+	);
 	expect(before.length).toBeGreaterThan(0);
 	// Press in the gutter (past the 24px edge-gesture zone, so no
 	// sidebar claims the stroke), drag into the chat, release over text.
@@ -840,22 +959,30 @@ test("dragging from the gutter into the chat keeps the highlight", async ({ page
 	await page.mouse.down();
 	await page.mouse.move(box.x + 60, y, { steps: 8 });
 	await page.mouse.up();
-	expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).toBe(before);
+	expect(
+		await page.evaluate(() => window.getSelection()?.toString() ?? "")
+	).toBe(before);
 	await expect(page.locator(".sel-menu")).toBeVisible();
 });
 
 /** Annotations-only messages render an em-dash at text size with the
 count above, unfolded — never the baked block. */
-test("annotations-only message renders em-dash with count", async ({ page }) => {
+test("annotations-only message renders em-dash with count", async ({
+	page
+}) => {
 	await seedChat(page, [
 		{ role: "user", content: 'Annotated selections:\n1. "bonjour" — ?' },
 		{ role: "assistant", content: "ok" }
 	]);
 	await page.goto("/");
 	const article = page.locator("article.user");
-	await expect(article.locator(".ann-refs-pill")).toHaveText("1", { timeout: 60_000 });
+	await expect(article.locator(".ann-refs-pill")).toHaveText("1", {
+		timeout: 60_000
+	});
 	await expect(article.locator(".rendered")).toContainText("—");
-	await expect(article.locator(".rendered")).not.toContainText("Annotated selections");
+	await expect(article.locator(".rendered")).not.toContainText(
+		"Annotated selections"
+	);
 	await expect(article.locator(".folded-preview")).toHaveCount(0);
 	const dash = await article
 		.locator(".rendered")
@@ -870,14 +997,23 @@ test("annotations-only message renders em-dash with count", async ({ page }) => 
 test("message copy excludes baked annotations", async ({ page }) => {
 	await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
 	await seedChat(page, [
-		{ role: "user", content: 'explain this\n\nAnnotated selections:\n1. "bonjour" — ?' }
+		{
+			role: "user",
+			content: 'explain this\n\nAnnotated selections:\n1. "bonjour" — ?'
+		}
 	]);
 	await page.goto("/");
 	const row = page.locator("article.user .actions");
 	await row.hover();
-	await page.locator('article.user .actions button[data-tip="Copy as plain text"]').click();
-	await expect(page.locator(".toast")).toHaveText("Copied", { timeout: 10_000 });
-	expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("explain this");
+	await page
+		.locator('article.user .actions button[data-tip="Copy as plain text"]')
+		.click();
+	await expect(page.locator(".toast")).toHaveText("Copied", {
+		timeout: 10_000
+	});
+	expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+		"explain this"
+	);
 });
 
 /** Each baked annotation copies from the sent-refs card's icon button. */
@@ -888,22 +1024,34 @@ test("sent-refs card copies one annotation", async ({ page }) => {
 	// viewport's top edge.
 	await seedChat(page, [
 		{ role: "assistant", content: "noted" },
-		{ role: "user", content: 'explain this\n\nAnnotated selections:\n1. "bonjour" — greeting?' }
+		{
+			role: "user",
+			content: 'explain this\n\nAnnotated selections:\n1. "bonjour" — greeting?'
+		}
 	]);
 	await page.goto("/");
 	// Click-toggled (hover never opens it).
 	await page.locator(".ann-refs-pill").first().click();
 	await page.locator(".ann-refs-copy").first().click();
-	await expect(page.locator(".toast")).toHaveText("Copied", { timeout: 10_000 });
-	expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('"bonjour" — greeting?');
+	await expect(page.locator(".toast")).toHaveText("Copied", {
+		timeout: 10_000
+	});
+	expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+		'"bonjour" — greeting?'
+	);
 });
 
 /** Sent-refs rows read like the draft card: quote + copy up top,
 note + pencil below, Clear-all top-right of the card. */
-test("sent-refs card lays out quote, copy, note, pencil in order", async ({ page }) => {
+test("sent-refs card lays out quote, copy, note, pencil in order", async ({
+	page
+}) => {
 	await seedChat(page, [
 		{ role: "assistant", content: "noted" },
-		{ role: "user", content: 'explain this\n\nAnnotated selections:\n1. "bonjour" — greeting?' }
+		{
+			role: "user",
+			content: 'explain this\n\nAnnotated selections:\n1. "bonjour" — greeting?'
+		}
 	]);
 	await page.goto("/");
 	await page.locator(".ann-refs-pill").first().click();
@@ -930,19 +1078,26 @@ test("sent-refs card lays out quote, copy, note, pencil in order", async ({ page
 	const popBox = await pop.boundingBox();
 	if (!popBox) throw new Error("no pop box");
 	expect(clear.y + clear.height).toBeLessThanOrEqual(quote.y + 4);
-	expect(clear.x + clear.width).toBeGreaterThanOrEqual(popBox.x + popBox.width - 16);
+	expect(clear.x + clear.width).toBeGreaterThanOrEqual(
+		popBox.x + popBox.width - 16
+	);
 });
 
 /** Sent-refs Clear-all strips the baked block, keeping the prompt. */
 test("sent-refs Clear-all strips the baked block", async ({ page }) => {
 	await seedChat(page, [
 		{ role: "assistant", content: "noted" },
-		{ role: "user", content: 'explain this\n\nAnnotated selections:\n1. "bonjour" — greeting?' }
+		{
+			role: "user",
+			content: 'explain this\n\nAnnotated selections:\n1. "bonjour" — greeting?'
+		}
 	]);
 	await page.goto("/");
 	await page.locator(".ann-refs-pill").first().click();
 	await page.locator(".ann-refs-clear").first().click();
-	await expect(page.locator(".toast")).toHaveText("Sent annotations cleared", { timeout: 10_000 });
+	await expect(page.locator(".toast")).toHaveText("Sent annotations cleared", {
+		timeout: 10_000
+	});
 	await expect(page.locator(".ann-refs-pill")).toHaveCount(0);
 	const body = await page.locator("article.user .rendered").first().innerText();
 	expect(body).toContain("explain this");
@@ -959,7 +1114,9 @@ test("sent-refs Clear-all deletes a refs-only message", async ({ page }) => {
 	await expect(page.locator("article.user")).toHaveCount(1);
 	await page.locator(".ann-refs-pill").first().click();
 	await page.locator(".ann-refs-clear").first().click();
-	await expect(page.locator(".toast")).toHaveText("Sent annotations cleared", { timeout: 10_000 });
+	await expect(page.locator(".toast")).toHaveText("Sent annotations cleared", {
+		timeout: 10_000
+	});
 	await expect(page.locator("article.user")).toHaveCount(0);
 });
 
@@ -967,12 +1124,24 @@ test("sent-refs Clear-all deletes a refs-only message", async ({ page }) => {
 flashes the quote through the Highlight registry (zero DOM churn, so
 the badge anchor never moves; the jump clears the hover wash first,
 so no twin layers under the flash). */
-test("sent-refs quote jumps to the quoted text with a flash", async ({ page }) => {
-	const sentence = "The quick brown fox jumps over the lazy dog near the riverbank.";
-	const filler = Array.from({ length: 10 }, (_, i) => `Filler ${i}. ${sentence} ${sentence}`).join("\n\n");
+test("sent-refs quote jumps to the quoted text with a flash", async ({
+	page
+}) => {
+	const sentence =
+		"The quick brown fox jumps over the lazy dog near the riverbank.";
+	const filler = Array.from(
+		{ length: 10 },
+		(_, i) => `Filler ${i}. ${sentence} ${sentence}`
+	).join("\n\n");
 	await seedChat(page, [
-		{ role: "assistant", content: `Kyoto in spring is lovely and bright\n\n${filler}` },
-		{ role: "user", content: 'explain this\n\nAnnotated selections:\n1. "spring" — ?' }
+		{
+			role: "assistant",
+			content: `Kyoto in spring is lovely and bright\n\n${filler}`
+		},
+		{
+			role: "user",
+			content: 'explain this\n\nAnnotated selections:\n1. "spring" — ?'
+		}
 	]);
 	await page.goto("/");
 	await expect(page.locator("article .rendered").first()).toBeVisible();
@@ -982,7 +1151,9 @@ test("sent-refs quote jumps to the quoted text with a flash", async ({ page }) =
 		box.style.scrollBehavior = "auto";
 		box.scrollTo({ top: 999999 });
 	});
-	const top = await page.evaluate(() => document.querySelector(".messages")?.scrollTop ?? 0);
+	const top = await page.evaluate(
+		() => document.querySelector(".messages")?.scrollTop ?? 0
+	);
 	expect(top).toBeGreaterThan(100);
 	await page.locator(".ann-refs-pill").first().click();
 	await page.locator(".ann-refs-quote").first().click();
@@ -1013,13 +1184,17 @@ test("sent-refs quote jumps to the quoted text with a flash", async ({ page }) =
 	});
 	expect(washed).toBe(false);
 	await page.waitForTimeout(800);
-	const after = await page.evaluate(() => document.querySelector(".messages")?.scrollTop ?? 0);
+	const after = await page.evaluate(
+		() => document.querySelector(".messages")?.scrollTop ?? 0
+	);
 	expect(after).toBeLessThan(top - 50);
 	// The flash releases itself: no highlight lingers in the registry
 	// and no mark lingers in the message, and a failed re-locate
 	// clears rather than stranding yellow.
 	await expect.poll(flashSize, { timeout: 5_000 }).toBe(0);
-	await expect(page.locator("mark.ccez-ann-flash")).toHaveCount(0, { timeout: 5_000 });
+	await expect(page.locator("mark.ccez-ann-flash")).toHaveCount(0, {
+		timeout: 5_000
+	});
 });
 
 /** The pressed sent row blinks like a draft row (same phases), so the
@@ -1027,7 +1202,10 @@ jump reads even where the highlight wash can't paint. */
 test("sent-refs quote blinks its row", async ({ page }) => {
 	await seedChat(page, [
 		{ role: "assistant", content: "Kyoto in spring is lovely and bright" },
-		{ role: "user", content: 'explain this\n\nAnnotated selections:\n1. "spring" — ?' }
+		{
+			role: "user",
+			content: 'explain this\n\nAnnotated selections:\n1. "spring" — ?'
+		}
 	]);
 	await page.goto("/");
 	await expect(page.locator("article .rendered").first()).toBeVisible();
@@ -1043,7 +1221,10 @@ like the draft card. */
 test("sent-refs rows point only on the quote", async ({ page }) => {
 	await seedChat(page, [
 		{ role: "assistant", content: "Kyoto in spring is lovely and bright" },
-		{ role: "user", content: 'explain this\n\nAnnotated selections:\n1. "spring" — ?' }
+		{
+			role: "user",
+			content: 'explain this\n\nAnnotated selections:\n1. "spring" — ?'
+		}
 	]);
 	await page.goto("/");
 	await expect(page.locator("article .rendered").first()).toBeVisible();
@@ -1058,7 +1239,12 @@ test("sent-refs rows point only on the quote", async ({ page }) => {
 			note: style(".ann-refs-comment")
 		};
 	});
-	expect(cursors).toEqual({ item: "default", quote: "pointer", num: "default", note: "default" });
+	expect(cursors).toEqual({
+		item: "default",
+		quote: "pointer",
+		num: "default",
+		note: "default"
+	});
 });
 
 /** The sent card follows the theme: panel surface and quiet note on
@@ -1067,18 +1253,18 @@ for (const theme of ["light", "dark"] as const) {
 	test(`sent-refs card themes on ${theme}`, async ({ page }) => {
 		await seedChat(page, [
 			{ role: "assistant", content: "Kyoto in spring is lovely and bright" },
-			{ role: "user", content: 'explain this\n\nAnnotated selections:\n1. "spring" — ?' }
+			{
+				role: "user",
+				content: 'explain this\n\nAnnotated selections:\n1. "spring" — ?'
+			}
 		]);
-		await page.addInitScript(
-			(name: string) => {
-				const raw = window.localStorage.getItem("ccez-llm-settings-v1") ?? "{}";
-				window.localStorage.setItem(
-					"ccez-llm-settings-v1",
-					JSON.stringify({ ...JSON.parse(raw), theme: name })
-				);
-			},
-			theme
-		);
+		await page.addInitScript((name: string) => {
+			const raw = window.localStorage.getItem("ccez-llm-settings-v1") ?? "{}";
+			window.localStorage.setItem(
+				"ccez-llm-settings-v1",
+				JSON.stringify({ ...JSON.parse(raw), theme: name })
+			);
+		}, theme);
 		await page.goto("/");
 		await expect(page.locator("article .rendered").first()).toBeVisible();
 		await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
@@ -1112,7 +1298,10 @@ test("sent-refs missing quote falls back to the sender", async ({ page }) => {
 	});
 	await seedChat(page, [
 		{ role: "assistant", content: "noted" },
-		{ role: "user", content: 'explain this\n\nAnnotated selections:\n1. "bonjour" — greeting?' }
+		{
+			role: "user",
+			content: 'explain this\n\nAnnotated selections:\n1. "bonjour" — greeting?'
+		}
 	]);
 	await page.goto("/");
 	await page.locator(".ann-refs-pill").first().click();
@@ -1129,21 +1318,32 @@ test("sent-refs missing quote falls back to the sender", async ({ page }) => {
 test("sent-refs note click does not jump", async ({ page }) => {
 	await seedChat(page, [
 		{ role: "assistant", content: "Kyoto in spring is lovely and bright" },
-		{ role: "user", content: 'explain this\n\nAnnotated selections:\n1. "spring" — ?' }
+		{
+			role: "user",
+			content: 'explain this\n\nAnnotated selections:\n1. "spring" — ?'
+		}
 	]);
 	await page.goto("/");
 	await expect(page.locator("article .rendered").first()).toBeVisible();
 	await page.locator(".ann-refs-pill").first().click();
-	const top = await page.evaluate(() => document.querySelector(".messages")?.scrollTop ?? 0);
+	const top = await page.evaluate(
+		() => document.querySelector(".messages")?.scrollTop ?? 0
+	);
 	await page.locator(".ann-refs-comment").first().click();
 	await page.locator(".ann-refs-num").first().click();
 	await page.waitForTimeout(500);
-	expect(await page.evaluate(() => document.querySelector(".messages")?.scrollTop ?? 0)).toBe(top);
+	expect(
+		await page.evaluate(
+			() => document.querySelector(".messages")?.scrollTop ?? 0
+		)
+	).toBe(top);
 	const flashed = await page.evaluate(
 		() =>
-			(window as unknown as { CSS?: { highlights?: { has(name: string): boolean } } }).CSS?.highlights?.has(
-				"ccez-ann-jump"
-			) ?? false
+			(
+				window as unknown as {
+					CSS?: { highlights?: { has(name: string): boolean } };
+				}
+			).CSS?.highlights?.has("ccez-ann-jump") ?? false
 	);
 	expect(flashed).toBe(false);
 	await expect(page.locator(".ann-refs-pop").first()).toHaveCSS("opacity", "1");
@@ -1154,7 +1354,10 @@ selecting saved text summons no menu and keeps the pick. */
 test("selecting sent-refs text summons no menu", async ({ page }) => {
 	await seedChat(page, [
 		{ role: "assistant", content: "noted" },
-		{ role: "user", content: 'explain this\n\nAnnotated selections:\n1. "bonjour" — greeting?' }
+		{
+			role: "user",
+			content: 'explain this\n\nAnnotated selections:\n1. "bonjour" — greeting?'
+		}
 	]);
 	await page.goto("/");
 	await page.locator(".ann-refs-pill").first().click();
@@ -1163,10 +1366,14 @@ test("selecting sent-refs text summons no menu", async ({ page }) => {
 	if (!cbox) throw new Error("comment has no box");
 	await page.mouse.move(cbox.x + 2, cbox.y + cbox.height / 2);
 	await page.mouse.down();
-	await page.mouse.move(cbox.x + cbox.width - 2, cbox.y + cbox.height / 2, { steps: 6 });
+	await page.mouse.move(cbox.x + cbox.width - 2, cbox.y + cbox.height / 2, {
+		steps: 6
+	});
 	await page.mouse.up();
 	await expect(page.locator(".sel-menu")).toHaveCount(0);
-	expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).not.toBe("");
+	expect(
+		await page.evaluate(() => window.getSelection()?.toString() ?? "")
+	).not.toBe("");
 });
 
 /** Sent-refs rows stay one line like the composer card: quote cuts
@@ -1174,7 +1381,10 @@ with an ellipsis, note scrolls sideways, copy rides the row's end. */
 test("sent-refs rows are one line with copy at the end", async ({ page }) => {
 	await seedChat(page, [
 		{ role: "assistant", content: "noted" },
-		{ role: "user", content: 'explain this\n\nAnnotated selections:\n1. "bonjour" — greeting?' }
+		{
+			role: "user",
+			content: 'explain this\n\nAnnotated selections:\n1. "bonjour" — greeting?'
+		}
 	]);
 	await page.goto("/");
 	await page.locator(".ann-refs-pill").first().click();
@@ -1198,7 +1408,9 @@ test("sent-refs rows are one line with copy at the end", async ({ page }) => {
 	const order = await page.evaluate(() => {
 		const item = document.querySelector(".ann-refs-item");
 		const copy = item?.querySelector(".ann-refs-copy")?.getBoundingClientRect();
-		const quote = item?.querySelector(".ann-refs-quote")?.getBoundingClientRect();
+		const quote = item
+			?.querySelector(".ann-refs-quote")
+			?.getBoundingClientRect();
 		return copy && quote ? copy.x > quote.x : false;
 	});
 	expect(order).toBe(true);
@@ -1210,7 +1422,10 @@ focus parks back on the pencil. */
 test("sent-refs pencil edits the note in the row", async ({ page }) => {
 	await seedChat(page, [
 		{ role: "assistant", content: "noted" },
-		{ role: "user", content: 'explain this\n\nAnnotated selections:\n1. "bonjour" — greeting?' }
+		{
+			role: "user",
+			content: 'explain this\n\nAnnotated selections:\n1. "bonjour" — greeting?'
+		}
 	]);
 	await page.goto("/");
 	await page.locator(".ann-refs-pill").first().click();
@@ -1221,7 +1436,9 @@ test("sent-refs pencil edits the note in the row", async ({ page }) => {
 	await page.keyboard.press("End");
 	await page.keyboard.type("!!");
 	await page.keyboard.press("Enter");
-	await expect(page.locator(".ann-refs-comment").first()).toHaveText("greeting?!!");
+	await expect(page.locator(".ann-refs-comment").first()).toHaveText(
+		"greeting?!!"
+	);
 	// The pill count stands, focus is back on the pencil, nothing resent.
 	await expect(page.locator(".ann-refs-pencil").first()).toBeFocused();
 	await expect(page.locator(".ann-refs-pill").first()).toHaveText("1");
@@ -1233,7 +1450,10 @@ the card stays open for a second Esc. */
 test("sent-refs row edit cancels on Escape", async ({ page }) => {
 	await seedChat(page, [
 		{ role: "assistant", content: "noted" },
-		{ role: "user", content: 'explain this\n\nAnnotated selections:\n1. "bonjour" — greeting?' }
+		{
+			role: "user",
+			content: 'explain this\n\nAnnotated selections:\n1. "bonjour" — greeting?'
+		}
 	]);
 	await page.goto("/");
 	await page.locator(".ann-refs-pill").first().click();
@@ -1244,7 +1464,9 @@ test("sent-refs row edit cancels on Escape", async ({ page }) => {
 	await page.keyboard.type("!!");
 	await page.keyboard.press("Escape");
 	await expect(field).toHaveCount(0);
-	await expect(page.locator(".ann-refs-comment").first()).toHaveText("greeting?");
+	await expect(page.locator(".ann-refs-comment").first()).toHaveText(
+		"greeting?"
+	);
 	await expect(page.locator(".ann-refs-pop").first()).toHaveCSS("opacity", "1");
 });
 
@@ -1255,7 +1477,9 @@ test("review panel copies one annotation", async ({ page }) => {
 	await page.keyboard.press("Enter");
 	await openPromptReview(page);
 	await page.locator(".prompt-tools .review-copy").first().click();
-	await expect(page.locator(".toast")).toHaveText("Copied", { timeout: 10_000 });
+	await expect(page.locator(".toast")).toHaveText("Copied", {
+		timeout: 10_000
+	});
 	const pasted = await page.evaluate(() => navigator.clipboard.readText());
 	expect(pasted).toContain("テストを確認しました");
 });
@@ -1277,7 +1501,9 @@ test("review panel copies one annotation", async ({ page }) => {
  */
 
 test("mid-word drags snap out to whole words", async ({ page }) => {
-	await seedChat(page, [{ role: "assistant", content: "hello world from Kyoto" }]);
+	await seedChat(page, [
+		{ role: "assistant", content: "hello world from Kyoto" }
+	]);
 	await page.goto("/");
 	const body = page.locator("article.assistant .rendered").first();
 	await expect(body).toBeVisible({ timeout: 60_000 });
@@ -1290,7 +1516,9 @@ test("mid-word drags snap out to whole words", async ({ page }) => {
 	await page.mouse.move(box.x + box.width - 2, y);
 	await page.mouse.down();
 	await page.evaluate(() => {
-		const text = document.querySelector("article.assistant .rendered p")?.firstChild;
+		const text = document.querySelector(
+			"article.assistant .rendered p"
+		)?.firstChild;
 		if (!(text instanceof Text)) throw new Error("no message text");
 		window.getSelection()?.setBaseAndExtent(text, 1, text, 10);
 	});
@@ -1301,12 +1529,19 @@ test("mid-word drags snap out to whole words", async ({ page }) => {
 	await page.keyboard.press("Enter");
 	// The filed quote is the whole words, never the cut fragment.
 	await page.locator(".prompt-tools .ann-wrap").hover();
-	await expect(page.locator(".prompt-tools .review-quote").first()).toHaveText(/hello world/);
+	await expect(page.locator(".prompt-tools .review-quote").first()).toHaveText(
+		/hello world/
+	);
 });
 
-test("create box centers over narrow highlights, wide ones open at the cursor", async ({ page }) => {
+test("create box centers over narrow highlights, wide ones open at the cursor", async ({
+	page
+}) => {
 	await seedChat(page, [
-		{ role: "assistant", content: "Kyoto is an old capital with many temples and quiet gardens" }
+		{
+			role: "assistant",
+			content: "Kyoto is an old capital with many temples and quiet gardens"
+		}
 	]);
 	await page.goto("/");
 	const para = page.locator("article.assistant .rendered p").first();
@@ -1373,7 +1608,9 @@ test("create box centers over narrow highlights, wide ones open at the cursor", 
 });
 
 test("numbered badges grow with the message font size", async ({ page }) => {
-	await seedChat(page, [{ role: "assistant", content: "alpha beta gamma delta" }]);
+	await seedChat(page, [
+		{ role: "assistant", content: "alpha beta gamma delta" }
+	]);
 	await page.goto("/");
 	const para = page.locator("article.assistant .rendered p").first();
 	await expect(para).toBeVisible({ timeout: 60_000 });
@@ -1392,8 +1629,12 @@ test("numbered badges grow with the message font size", async ({ page }) => {
 	expect(parseFloat(big)).toBeGreaterThan(parseFloat(small));
 });
 
-test("empty annotations bake a question mark for the model", async ({ page }) => {
-	await seedChat(page, [{ role: "assistant", content: "alpha beta gamma delta" }]);
+test("empty annotations bake a question mark for the model", async ({
+	page
+}) => {
+	await seedChat(page, [
+		{ role: "assistant", content: "alpha beta gamma delta" }
+	]);
 	await page.goto("/");
 	const para = page.locator("article.assistant .rendered p").first();
 	await expect(para).toBeVisible({ timeout: 60_000 });
@@ -1415,7 +1656,9 @@ test("empty annotations bake a question mark for the model", async ({ page }) =>
 	await expect(user.locator(".ann-refs-comment").first()).toHaveText("?");
 });
 
-test("annotations-only messages render as an em-dash with the count pill above", async ({ page }) => {
+test("annotations-only messages render as an em-dash with the count pill above", async ({
+	page
+}) => {
 	await seedChat(page, [
 		{ role: "user", content: 'Annotated selections:\n1. "Kyoto" — ?' }
 	]);
@@ -1426,11 +1669,21 @@ test("annotations-only messages render as an em-dash with the count pill above",
 	const bodyText = await user.locator(".rendered").innerText();
 	expect(bodyText.trim()).toBe("—");
 	const sizes = await page.evaluate(() => {
-		const em = document.querySelector("article.user .rendered")?.getBoundingClientRect();
-		const pill = document.querySelector("article.user .ann-refs-pill")?.getBoundingClientRect();
-		const base = getComputedStyle(document.querySelector("article.user .rendered")!);
+		const em = document
+			.querySelector("article.user .rendered")
+			?.getBoundingClientRect();
+		const pill = document
+			.querySelector("article.user .ann-refs-pill")
+			?.getBoundingClientRect();
+		const base = getComputedStyle(
+			document.querySelector("article.user .rendered")!
+		);
 		if (!em || !pill) return null;
-		return { emTop: em.y, pillBottom: pill.y + pill.height, fontSize: base.fontSize };
+		return {
+			emTop: em.y,
+			pillBottom: pill.y + pill.height,
+			fontSize: base.fontSize
+		};
 	});
 	if (!sizes) throw new Error("missing refs-only boxes");
 	// The count UI rides above the dash, never inline with it.
@@ -1439,8 +1692,12 @@ test("annotations-only messages render as an em-dash with the count pill above",
 	expect(parseFloat(sizes.fontSize)).toBeGreaterThanOrEqual(13);
 });
 
-test("review pencil edits at the mark in the floating card", async ({ page }) => {
-	await seedChat(page, [{ role: "assistant", content: "alpha beta gamma delta" }]);
+test("review pencil edits at the mark in the floating card", async ({
+	page
+}) => {
+	await seedChat(page, [
+		{ role: "assistant", content: "alpha beta gamma delta" }
+	]);
 	await page.goto("/");
 	const para = page.locator("article.assistant .rendered p").first();
 	await expect(para).toBeVisible({ timeout: 60_000 });
@@ -1470,7 +1727,11 @@ test("review pencil edits at the mark in the floating card", async ({ page }) =>
 	// The composer draft survived untouched.
 	const draft = await page.evaluate(
 		() =>
-			(document.querySelector(".prompt .ta-input") as HTMLTextAreaElement | null)?.value ?? ""
+			(
+				document.querySelector(
+					".prompt .ta-input"
+				) as HTMLTextAreaElement | null
+			)?.value ?? ""
 	);
 	expect(draft).toBe("chat draft");
 });
@@ -1479,7 +1740,9 @@ test("review pencil edits at the mark in the floating card", async ({ page }) =>
 their boxes (a hover style that grows the box jitters the whole
 card under the cursor). */
 test("review pencil hover moves no icons", async ({ page }) => {
-	await seedChat(page, [{ role: "assistant", content: "alpha beta gamma delta" }]);
+	await seedChat(page, [
+		{ role: "assistant", content: "alpha beta gamma delta" }
+	]);
 	await page.goto("/");
 	const para = page.locator("article.assistant .rendered p").first();
 	await expect(para).toBeVisible({ timeout: 60_000 });
@@ -1496,7 +1759,12 @@ test("review pencil hover moves no icons", async ({ page }) => {
 				const el = document.querySelector(sel);
 				if (!(el instanceof HTMLElement)) throw new Error(`missing ${sel}`);
 				const b = el.getBoundingClientRect();
-				return { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height) };
+				return {
+					x: Math.round(b.x),
+					y: Math.round(b.y),
+					w: Math.round(b.width),
+					h: Math.round(b.height)
+				};
 			};
 			return {
 				copy: box(".review-copy"),
@@ -1509,9 +1777,11 @@ test("review pencil hover moves no icons", async ({ page }) => {
 	const before = await boxes();
 	// Copy and delete share one vertical middle at rest (the old text
 	// × sat low on its font bearings).
-	expect(Math.abs(before.copy.y + before.copy.h / 2 - (before.del.y + before.del.h / 2))).toBeLessThanOrEqual(
-		1
-	);
+	expect(
+		Math.abs(
+			before.copy.y + before.copy.h / 2 - (before.del.y + before.del.h / 2)
+		)
+	).toBeLessThanOrEqual(1);
 	await page.locator(".review-pencil").first().hover();
 	// Hover transitions run 0.15s; measure past them.
 	await page.waitForTimeout(400);
@@ -1520,7 +1790,8 @@ test("review pencil hover moves no icons", async ({ page }) => {
 	// never underline, the pencil signals with color alone (no
 	// background, no glow).
 	const paint = await page.evaluate(() => {
-		const style = (sel: string) => getComputedStyle(document.querySelector(sel) as HTMLElement);
+		const style = (sel: string) =>
+			getComputedStyle(document.querySelector(sel) as HTMLElement);
 		return {
 			copyDeco: style(".review-copy").textDecorationLine,
 			pencilDeco: style(".review-pencil").textDecorationLine,
@@ -1548,7 +1819,9 @@ test("review pencil hover moves no icons", async ({ page }) => {
 	await page.waitForTimeout(400);
 	expect(await boxes()).toEqual(before);
 	const delPaint = await page.evaluate(() => {
-		const style = getComputedStyle(document.querySelector(".review-del") as HTMLElement);
+		const style = getComputedStyle(
+			document.querySelector(".review-del") as HTMLElement
+		);
 		return { color: style.color, deco: style.textDecorationLine };
 	});
 	expect(delPaint).toEqual({ color: "rgb(148, 37, 10)", deco: "none" });
@@ -1556,8 +1829,10 @@ test("review pencil hover moves no icons", async ({ page }) => {
 	await page.locator(".review-quote").first().hover();
 	await page.waitForTimeout(400);
 	expect(await boxes()).toEqual(before);
-	const quoteDeco = await page.evaluate(() =>
-		getComputedStyle(document.querySelector(".review-quote") as HTMLElement).textDecorationLine
+	const quoteDeco = await page.evaluate(
+		() =>
+			getComputedStyle(document.querySelector(".review-quote") as HTMLElement)
+				.textDecorationLine
 	);
 	expect(quoteDeco).toBe("underline");
 });
@@ -1566,7 +1841,9 @@ test("review pencil hover moves no icons", async ({ page }) => {
 never scrolls sideways (a flex-shrink regression once stretched the
 whole overlay instead). */
 test("long review quote truncates with an ellipsis", async ({ page }) => {
-	await seedChat(page, [{ role: "assistant", content: "alpha beta gamma delta" }]);
+	await seedChat(page, [
+		{ role: "assistant", content: "alpha beta gamma delta" }
+	]);
 	await page.addInitScript(() => {
 		window.localStorage.setItem(
 			"ccez-llm-annotations-v1",
@@ -1598,7 +1875,11 @@ test("long review quote truncates with an ellipsis", async ({ page }) => {
 			cardScrolls: card.scrollWidth > card.clientWidth + 1
 		};
 	});
-	expect(sizes).toEqual({ quoteClipped: true, quoteFits: true, cardScrolls: false });
+	expect(sizes).toEqual({
+		quoteClipped: true,
+		quoteFits: true,
+		cardScrolls: false
+	});
 });
 
 test("gutter drags never highlight above the cursor line", async ({ page }) => {
@@ -1616,11 +1897,17 @@ test("gutter drags never highlight above the cursor line", async ({ page }) => {
 	// shares the same selectionchange trim).
 	await page.mouse.move(6, tbox.y + tbox.height / 2);
 	await page.mouse.down();
-	await page.mouse.move(tbox.x + tbox.width / 2, tbox.y + tbox.height / 2, { steps: 8 });
+	await page.mouse.move(tbox.x + tbox.width / 2, tbox.y + tbox.height / 2, {
+		steps: 8
+	});
 	await page.mouse.move(tbox.x + tbox.width / 2, 4, { steps: 4 });
-	await page.mouse.move(tbox.x + tbox.width / 2, tbox.y + tbox.height / 2, { steps: 4 });
+	await page.mouse.move(tbox.x + tbox.width / 2, tbox.y + tbox.height / 2, {
+		steps: 4
+	});
 	await page.mouse.up();
-	const selected = await page.evaluate(() => window.getSelection()?.toString() ?? "");
+	const selected = await page.evaluate(
+		() => window.getSelection()?.toString() ?? ""
+	);
 	// Nothing above the cursor's line ("aaa", "bbb") may highlight.
 	expect(selected).not.toContain("aaa");
 	expect(selected).not.toContain("bbb");
@@ -1629,8 +1916,12 @@ test("gutter drags never highlight above the cursor line", async ({ page }) => {
 /** Filed-annotations card dismisses: Escape closes it, and so does a
 press anywhere outside the card (the pill alone toggles). The pill
 also shows the pointer hand. */
-test("sent refs card dismisses on Escape and outside press", async ({ page }) => {
-	await seedChat(page, [{ role: "assistant", content: "alpha beta gamma delta" }]);
+test("sent refs card dismisses on Escape and outside press", async ({
+	page
+}) => {
+	await seedChat(page, [
+		{ role: "assistant", content: "alpha beta gamma delta" }
+	]);
 	await page.goto("/");
 	const para = page.locator("article.assistant .rendered p").first();
 	await expect(para).toBeVisible({ timeout: 60_000 });
@@ -1674,7 +1965,9 @@ test("tab through the badge edit keeps the card open", async ({ page }) => {
 	await expect(pop.locator("textarea")).toBeFocused();
 	await page.keyboard.press("Tab");
 	await expect(pop).toBeVisible();
-	await expect(pop.locator('button[aria-label="Delete annotation"]')).toBeFocused();
+	await expect(
+		pop.locator('button[aria-label="Delete annotation"]')
+	).toBeFocused();
 	// Every further Tab walks the card's own row (dictation joins it
 	// when the mic is available) until Save; the card must never
 	// close under keyboard traversal.
@@ -1682,7 +1975,11 @@ test("tab through the badge edit keeps the card open", async ({ page }) => {
 		page.evaluate(() => {
 			const active = document.activeElement;
 			if (!(active instanceof HTMLElement)) return "none";
-			return (active.getAttribute("aria-label") ?? active.textContent ?? "").trim();
+			return (
+				active.getAttribute("aria-label") ??
+				active.textContent ??
+				""
+			).trim();
 		});
 	for (let n = 0; n < 6; n++) {
 		if ((await focusedName()) === "Save") break;
@@ -1721,10 +2018,20 @@ no ranges for the hovered id must never clear a wash another body
 painted (assistant-to-user slides left the user quote dark), and
 hovering must never re-stamp badges (rebuilt nodes read as marker
 flicker). */
-test("badge hover washes every quote across both messages", async ({ page }) => {
+test("badge hover washes every quote across both messages", async ({
+	page
+}) => {
 	await seedChat(page, [
-		{ role: "user", content: "The quick brown fox jumps over the lazy dog near the river bank." },
-		{ role: "assistant", content: "Pack my box with five dozen liquor jugs before the long winter voyage ends." }
+		{
+			role: "user",
+			content:
+				"The quick brown fox jumps over the lazy dog near the river bank."
+		},
+		{
+			role: "assistant",
+			content:
+				"Pack my box with five dozen liquor jugs before the long winter voyage ends."
+		}
 	]);
 	await page.goto("/");
 	await expect(page.locator("article .rendered").first()).toBeVisible();
@@ -1735,7 +2042,8 @@ test("badge hover washes every quote across both messages", async ({ page }) => 
 		await expect(page.locator(".ann-pop")).toBeVisible();
 		await page.keyboard.press("Enter");
 	};
-	const badges = (role: "user" | "assistant") => page.locator(`article.${role} button.ccez-ann-badge`);
+	const badges = (role: "user" | "assistant") =>
+		page.locator(`article.${role} button.ccez-ann-badge`);
 	await annotate(0, "quick brown fox");
 	await annotate(0, "lazy dog");
 	await annotate(1, "five dozen liquor");
@@ -1763,7 +2071,7 @@ test("badge hover washes every quote across both messages", async ({ page }) => 
 				.map((r) => r.toString().replace(/\d/g, ""))
 				.join(" ");
 		});
-const hoverBadge = async (
+	const hoverBadge = async (
 		role: "user" | "assistant",
 		nth: number,
 		word: string,
@@ -1798,8 +2106,14 @@ const hoverBadge = async (
 	// User to assistant, then back: every slide must wash its quote.
 	// The first slide on each side also proves visible paint, not
 	// just registry ranges.
-	await hoverBadge("user", 0, "quick brown fox", { article: 0, quote: "quick brown fox" });
-	await hoverBadge("assistant", 0, "five dozen", { article: 1, quote: "five dozen liquor" });
+	await hoverBadge("user", 0, "quick brown fox", {
+		article: 0,
+		quote: "quick brown fox"
+	});
+	await hoverBadge("assistant", 0, "five dozen", {
+		article: 1,
+		quote: "five dozen liquor"
+	});
 	await hoverBadge("assistant", 1, "winter voyage");
 	await hoverBadge("user", 1, "lazy dog");
 	// Gapped slide across plain text: the stepped cursor crosses
@@ -1809,8 +2123,15 @@ const hoverBadge = async (
 	const slideFrom = await badges("user").nth(1).boundingBox();
 	const slideTo = await badges("assistant").nth(1).boundingBox();
 	if (!slideFrom || !slideTo) throw new Error("slide badges have no box");
-	await page.mouse.move(slideFrom.x + slideFrom.width / 2, slideFrom.y + slideFrom.height / 2);
-	await page.mouse.move(slideTo.x + slideTo.width / 2, slideTo.y + slideTo.height / 2, { steps: 12 });
+	await page.mouse.move(
+		slideFrom.x + slideFrom.width / 2,
+		slideFrom.y + slideFrom.height / 2
+	);
+	await page.mouse.move(
+		slideTo.x + slideTo.width / 2,
+		slideTo.y + slideTo.height / 2,
+		{ steps: 12 }
+	);
 	await page.waitForTimeout(400);
 	expect(await washedText()).toContain("winter voyage");
 	// No badge node churned under the hovers.
@@ -1830,9 +2151,17 @@ const hoverBadge = async (
 /** RTL quotes wash through DOM marks, Latin through the registry: the
 shell overlay paints a tight RTL registry range past its end, so the
 wash must never reach the registry for those quotes. */
-test("rtl quotes wash through dom marks, latin through the registry", async ({ page }) => {
+test("rtl quotes wash through dom marks, latin through the registry", async ({
+	page
+}) => {
 	await seedChat(page, [
-		{ role: "assistant", content: "Tall filler so badges can scroll clear of the sticky header. ".repeat(60) },
+		{
+			role: "assistant",
+			content:
+				"Tall filler so badges can scroll clear of the sticky header. ".repeat(
+					60
+				)
+		},
 		{ role: "assistant", content: "اللغة العربية من أجمل لغات العالم" },
 		{ role: "assistant", content: "the quick brown fox jumps" }
 	]);
@@ -1841,8 +2170,18 @@ test("rtl quotes wash through dom marks, latin through the registry", async ({ p
 			"ccez-llm-annotations-v1",
 			JSON.stringify({
 				"e2e-chat": [
-					{ id: "ann-ar", messageId: "e2e-m1", quote: "اللغة العربية", comment: "" },
-					{ id: "ann-en", messageId: "e2e-m2", quote: "quick brown", comment: "" }
+					{
+						id: "ann-ar",
+						messageId: "e2e-m1",
+						quote: "اللغة العربية",
+						comment: ""
+					},
+					{
+						id: "ann-en",
+						messageId: "e2e-m2",
+						quote: "quick brown",
+						comment: ""
+					}
 				]
 			})
 		);
@@ -1871,7 +2210,9 @@ test("rtl quotes wash through dom marks, latin through the registry", async ({ p
 		// header, and the pointer would land on chrome instead. The
 		// scroll glides (smooth behavior), so read the box only after
 		// it settles or the pointer chases a stale position.
-		await badges.nth(nth).evaluate((b) => b.scrollIntoView({ block: "center" }));
+		await badges
+			.nth(nth)
+			.evaluate((b) => b.scrollIntoView({ block: "center" }));
 		await page.waitForTimeout(600);
 		await badges.nth(nth).hover({ timeout: 8_000 });
 		await page.waitForTimeout(400);

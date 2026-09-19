@@ -21,7 +21,9 @@ test.beforeEach(async ({ page }) => {
 
 async function openShortcuts(page): Promise<void> {
 	await page.keyboard.press("Control+Shift+Slash");
-	await expect(page.locator(".modal", { hasText: "Keyboard shortcuts" })).toBeVisible({
+	await expect(
+		page.locator(".modal", { hasText: "Keyboard shortcuts" })
+	).toBeVisible({
 		timeout: 10_000
 	});
 }
@@ -32,19 +34,32 @@ test("list runs A-Z; modal toggle sits in place", async ({ page }) => {
 	// A-Z: "Branch from here" leads; the names read sorted.
 	const names = await keys.locator("div > dt").allInnerTexts();
 	const sorted = [...names].sort((a, b) =>
-		a.toLowerCase() < b.toLowerCase() ? -1 : a.toLowerCase() > b.toLowerCase() ? 1 : 0
+		a.toLowerCase() < b.toLowerCase()
+			? -1
+			: a.toLowerCase() > b.toLowerCase()
+				? 1
+				: 0
 	);
 	expect(names).toEqual(sorted);
 	// The modal toggle still lists middle-click, in place.
 	const toggle = keys.locator("div", { hasText: "Shortcuts show/hide" });
 	await expect(toggle).toContainText("middle-click");
 	// Newer global keys are folded in.
-	for (const name of ["Scroll", "New chat", "Edit own message", "Summon / hide window", "Fold message by drag", "Switch chat by drag"]) {
+	for (const name of [
+		"Scroll",
+		"New chat",
+		"Edit own message",
+		"Summon / hide window",
+		"Fold message by drag",
+		"Switch chat by drag"
+	]) {
 		await expect(keys.locator("div > dt", { hasText: name })).toBeVisible();
 	}
 	await expect(keys.locator("div", { hasText: "ctrl+u/ctrl+d" })).toBeVisible();
 	// Right-click speak is listed (a second right-click restarts, never stops).
-	await expect(keys.locator("div > dt", { hasText: "Speak text aloud" })).toBeVisible();
+	await expect(
+		keys.locator("div > dt", { hasText: "Speak text aloud" })
+	).toBeVisible();
 	// No paren spam in the entry copy (each dd reads flat).
 	const details = await keys.locator("dd").allInnerTexts();
 	expect(details.join("\n")).not.toContain("(");
@@ -53,11 +68,15 @@ test("list runs A-Z; modal toggle sits in place", async ({ page }) => {
 test("middle-click opens the shortcuts modal", async ({ page }) => {
 	await openShortcuts(page);
 	await page.keyboard.press("Escape");
-	await expect(page.locator(".modal", { hasText: "Keyboard shortcuts" })).toBeHidden({
+	await expect(
+		page.locator(".modal", { hasText: "Keyboard shortcuts" })
+	).toBeHidden({
 		timeout: 10_000
 	});
 	await page.mouse.click(640, 300, { button: "middle" });
-	await expect(page.locator(".modal", { hasText: "Keyboard shortcuts" })).toBeVisible({
+	await expect(
+		page.locator(".modal", { hasText: "Keyboard shortcuts" })
+	).toBeVisible({
 		timeout: 10_000
 	});
 });
@@ -85,7 +104,9 @@ test("Cmd+F focuses the modal filter, never chat find", async ({ page }) => {
 	await filter.pressSequentially("edit");
 	await expect(page.locator(".msg-edit")).toHaveCount(0);
 	await expect(page.locator(".find-bar")).toHaveCount(0);
-	await expect(page.locator(".modal", { hasText: "Keyboard shortcuts" })).toBeVisible();
+	await expect(
+		page.locator(".modal", { hasText: "Keyboard shortcuts" })
+	).toBeVisible();
 });
 
 /** j/k/u/d scroll the open modal like the main chat, contained: the
@@ -93,28 +114,50 @@ messages column never moves. */
 test("modal j/k scroll contained; d/u stay put", async ({ page }) => {
 	// Long thread behind a short viewport: the main column scrolls,
 	// so containment (it never moves) actually proves something.
-	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(30);
+	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(
+		30
+	);
 	await page.addInitScript((text: string) => {
 		window.localStorage.setItem("ccez-mock-provider", "1");
 		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
 		const turns = [0, 1, 2, 3, 4, 5].flatMap((n) => [
-			{ id: `e2e-m${n}a`, role: "user", content: `question ${n} ${text}`, usage: null, error: null },
-			{ id: `e2e-m${n}b`, role: "assistant", content: `answer ${n} ${text}`, usage: null, error: null }
+			{
+				id: `e2e-m${n}a`,
+				role: "user",
+				content: `question ${n} ${text}`,
+				usage: null,
+				error: null
+			},
+			{
+				id: `e2e-m${n}b`,
+				role: "assistant",
+				content: `answer ${n} ${text}`,
+				usage: null,
+				error: null
+			}
 		]);
 		window.localStorage.setItem(
 			"ccez-llm-chats-v1",
-			JSON.stringify([{ id: "e2e-chat", createdAt: 1, replyLang: null, messages: turns }])
+			JSON.stringify([
+				{ id: "e2e-chat", createdAt: 1, replyLang: null, messages: turns }
+			])
 		);
 	}, long);
 	await page.setViewportSize({ width: 1280, height: 400 });
 	await page.goto("/");
-	await expect(page.locator("article .rendered").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article .rendered").first()).toBeVisible({
+		timeout: 60_000
+	});
 	await openShortcuts(page);
 	const modal = page.locator(".modal-veil .modal");
 	await expect(modal).toBeVisible();
 	// Body focus (not the filter field): keys scroll, never type.
-	await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
-	const boxTop = await page.evaluate(() => document.querySelector(".messages")?.scrollTop ?? -1);
+	await page.evaluate(() =>
+		(document.activeElement as HTMLElement | null)?.blur?.()
+	);
+	const boxTop = await page.evaluate(
+		() => document.querySelector(".messages")?.scrollTop ?? -1
+	);
 	const half = await modal.evaluate((el) => Math.floor(el.clientHeight / 2));
 	expect(half).toBeGreaterThan(0);
 	// Bare d/u scroll nothing anywhere (only Ctrl+U / Ctrl+D jump,
@@ -122,11 +165,21 @@ test("modal j/k scroll contained; d/u stay put", async ({ page }) => {
 	await page.keyboard.press("d");
 	await page.waitForTimeout(500);
 	expect(await modal.evaluate((el) => el.scrollTop)).toBe(0);
-	expect(await page.evaluate(() => document.querySelector(".messages")?.scrollTop ?? -2)).toBe(boxTop);
+	expect(
+		await page.evaluate(
+			() => document.querySelector(".messages")?.scrollTop ?? -2
+		)
+	).toBe(boxTop);
 	await page.keyboard.press("u");
 	await page.waitForTimeout(500);
 	expect(await modal.evaluate((el) => el.scrollTop)).toBe(0);
 	await page.keyboard.press("j");
-	await expect.poll(() => modal.evaluate((el) => el.scrollTop), { timeout: 10_000 }).toBeGreaterThan(0);
-	expect(await page.evaluate(() => document.querySelector(".messages")?.scrollTop ?? -2)).toBe(boxTop);
+	await expect
+		.poll(() => modal.evaluate((el) => el.scrollTop), { timeout: 10_000 })
+		.toBeGreaterThan(0);
+	expect(
+		await page.evaluate(
+			() => document.querySelector(".messages")?.scrollTop ?? -2
+		)
+	).toBe(boxTop);
 });

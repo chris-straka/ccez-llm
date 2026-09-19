@@ -34,6 +34,7 @@ export function bumpVersion(current: string, bump: Bump): string {
 export function parseBump(args: string[]): Bump {
 	const wantMajor = args.includes("--major");
 	const wantMinor = args.includes("--minor");
-	if (wantMajor && wantMinor) throw new Error("Pick one of --major or --minor.");
+	if (wantMajor && wantMinor)
+		throw new Error("Pick one of --major or --minor.");
 	return wantMajor ? "major" : wantMinor ? "minor" : "patch";
 }

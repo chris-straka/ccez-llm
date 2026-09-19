@@ -8,7 +8,9 @@
 import { expect, test } from "@playwright/test";
 import { seedChat } from "./helpers";
 
-test("CJK composition Enter does not half-send the composer", async ({ page }) => {
+test("CJK composition Enter does not half-send the composer", async ({
+	page
+}) => {
 	await seedChat(page, []);
 	await page.goto("/");
 	await expect(page.locator(".hero")).toBeVisible({ timeout: 60_000 });
@@ -19,8 +21,12 @@ test("CJK composition Enter does not half-send the composer", async ({ page }) =
 	await expect(page.locator("article.user")).toHaveCount(0);
 });
 
-test("annotation quote text stays contiguous after render", async ({ page }) => {
-	await seedChat(page, [{ role: "user", content: "hello world annotation check" }]);
+test("annotation quote text stays contiguous after render", async ({
+	page
+}) => {
+	await seedChat(page, [
+		{ role: "user", content: "hello world annotation check" }
+	]);
 	await page.goto("/");
 	await expect(page.locator(".hero")).toBeHidden({ timeout: 60_000 });
 	const body = page.locator("article.user .rendered").first();
@@ -38,10 +44,14 @@ test("chat switching lands on the target chat", async ({ page }) => {
 	await expect(page.locator(".hero")).toBeVisible();
 	const rows = page.locator("aside ul li button.side-chat");
 	await rows.first().click();
-	await expect(page.locator("article.user .rendered")).toContainText("first chat marker");
+	await expect(page.locator("article.user .rendered")).toContainText(
+		"first chat marker"
+	);
 });
 
-test("sanitized render keeps code chrome and data attributes", async ({ page }) => {
+test("sanitized render keeps code chrome and data attributes", async ({
+	page
+}) => {
 	await seedChat(page, [
 		{ role: "user", content: "show me code" },
 		{ role: "assistant", content: "```python\nprint(1)\n```" }

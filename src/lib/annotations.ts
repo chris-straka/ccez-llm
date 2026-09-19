@@ -57,7 +57,10 @@ export function addAnnotation(
 ): Annotation[] {
 	const trimmed = quote.trim();
 	if (!trimmed) return list;
-	return [...list, { id: newAnnotationId(), messageId, quote: trimmed, comment }];
+	return [
+		...list,
+		{ id: newAnnotationId(), messageId, quote: trimmed, comment }
+	];
 }
 
 /**
@@ -67,7 +70,10 @@ export function addAnnotation(
  * Unscoped quotes always show. Pure so the message-badge filter
  * unit-tests without the component.
  */
-export function aidMarkVisible(aidScope: Annotation["aidScope"], tashkeelOn: boolean): boolean {
+export function aidMarkVisible(
+	aidScope: Annotation["aidScope"],
+	tashkeelOn: boolean
+): boolean {
 	return aidScope !== "tashkeel" || tashkeelOn;
 }
 
@@ -203,7 +209,10 @@ const HIGH_SURROGATE_RE = /[\uD800-\uDBFF]/;
  * Arabic joining/shaping, and the split survives the rebuild as shifted
  * words across lines.
  */
-function clusterBounds(text: string, offset: number): { start: number; end: number } {
+function clusterBounds(
+	text: string,
+	offset: number
+): { start: number; end: number } {
 	const at = Math.max(0, Math.min(offset, text.length));
 	if (graphemeSegmenter) {
 		let prev = { start: 0, end: 0 };
@@ -223,7 +232,10 @@ function clusterBounds(text: string, offset: number): { start: number; end: numb
 			start -= 1;
 			continue;
 		}
-		if (LOW_SURROGATE_RE.test(ch) && HIGH_SURROGATE_RE.test(text[start - 2] ?? "")) {
+		if (
+			LOW_SURROGATE_RE.test(ch) &&
+			HIGH_SURROGATE_RE.test(text[start - 2] ?? "")
+		) {
 			start -= 2;
 			continue;
 		}
@@ -271,7 +283,11 @@ export interface QuoteLocation {
  * selection was instead of always the first "c". Missing occurrences
  * fall back to the first match — same as before.
  */
-export function locateQuote(nodeTexts: string[], quote: string, occurrence = 0): QuoteLocation | null {
+export function locateQuote(
+	nodeTexts: string[],
+	quote: string,
+	occurrence = 0
+): QuoteLocation | null {
 	const q = stripForMatch(quote);
 	if (!q.stripped) return null;
 	let hay = "";
@@ -316,7 +332,11 @@ export function locateQuote(nodeTexts: string[], quote: string, occurrence = 0):
  * caller scrolls to the rect and flashes it via the Highlight API.
  * Null when the quote isn't in this root (folded, edited away).
  */
-export function quoteRange(root: HTMLElement, quote: string, occurrence = 0): Range | null {
+export function quoteRange(
+	root: HTMLElement,
+	quote: string,
+	occurrence = 0
+): Range | null {
 	try {
 		const nodes = quoteTextNodes(root);
 		const loc = locateQuote(
@@ -380,7 +400,10 @@ export function wrapRangeInMark(range: Range, cls: string): HTMLElement | null {
  * subtree is never touched. Returns the painted marks (empty when
  * nothing painted). Never throws.
  */
-export function wrapRangeExcludingBadges(range: Range, cls: string): HTMLElement[] {
+export function wrapRangeExcludingBadges(
+	range: Range,
+	cls: string
+): HTMLElement[] {
 	const painted: HTMLElement[] = [];
 	try {
 		if (range.collapsed) return painted;
@@ -431,8 +454,14 @@ export function wrapRangeExcludingBadges(range: Range, cls: string): HTMLElement
 			const first = run[0]!;
 			const last = run[run.length - 1]!;
 			const sub = doc.createRange();
-			sub.setStart(first, first === startNode ? Math.min(startOff, textLen(first)) : 0);
-			sub.setEnd(last, last === endNode ? Math.min(endOff, textLen(last)) : textLen(last));
+			sub.setStart(
+				first,
+				first === startNode ? Math.min(startOff, textLen(first)) : 0
+			);
+			sub.setEnd(
+				last,
+				last === endNode ? Math.min(endOff, textLen(last)) : textLen(last)
+			);
 			if (sub.collapsed) continue;
 			const mark = wrapRangeInMark(sub, cls);
 			if (mark) painted.push(mark);
@@ -465,7 +494,9 @@ export function findQuotedMessage(
 	senderId: ChatMsgId,
 	quote: string
 ): ChatMsgId | null {
-	const hit = messages.find((m) => m.id !== senderId && locateQuote([m.content], quote) !== null);
+	const hit = messages.find(
+		(m) => m.id !== senderId && locateQuote([m.content], quote) !== null
+	);
 	return hit?.id ?? null;
 }
 
@@ -676,10 +707,14 @@ export function equationBodyRange(body: Element): Range | null {
 		const range = document.createRange();
 		range.selectNodeContents(body);
 		const kids = [...body.childNodes];
-		const first = kids.find((kid) => !(kid instanceof Text && /^\s*$/.test(kid.textContent ?? "")));
+		const first = kids.find(
+			(kid) => !(kid instanceof Text && /^\s*$/.test(kid.textContent ?? ""))
+		);
 		const last = [...kids]
 			.reverse()
-			.find((kid) => !(kid instanceof Text && /^\s*$/.test(kid.textContent ?? "")));
+			.find(
+				(kid) => !(kid instanceof Text && /^\s*$/.test(kid.textContent ?? ""))
+			);
 		if (first) range.setStartBefore(first);
 		if (last) range.setEndAfter(last);
 		return range;
@@ -702,7 +737,9 @@ export function quoteTextNodes(root: Node): Text[] {
 		// same kind of chrome (their `$` text is never quotable).
 		if (
 			parent instanceof Element &&
-			parent.closest("[data-ann-badge], rt, rp, .frt, .ccez-math-tex, .ccez-math-copy")
+			parent.closest(
+				"[data-ann-badge], rt, rp, .frt, .ccez-math-tex, .ccez-math-copy"
+			)
 		)
 			continue;
 		nodes.push(node);
@@ -753,7 +790,12 @@ export function saveSelection(root: Node): SavedSelection | null {
 		if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return null;
 		const anchorNode = sel.anchorNode;
 		const focusNode = sel.focusNode;
-		if (!anchorNode || !focusNode || !root.contains(anchorNode) || !root.contains(focusNode)) {
+		if (
+			!anchorNode ||
+			!focusNode ||
+			!root.contains(anchorNode) ||
+			!root.contains(focusNode)
+		) {
 			return null;
 		}
 		const toOffset = (node: Node, offset: number): number => {
@@ -770,7 +812,10 @@ export function saveSelection(root: Node): SavedSelection | null {
 	}
 }
 
-function nodeAtOffset(root: Node, target: number): { node: Text; offset: number } | null {
+function nodeAtOffset(
+	root: Node,
+	target: number
+): { node: Text; offset: number } | null {
 	const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
 	let chars = 0;
 	let last: Text | null = null;
@@ -779,7 +824,8 @@ function nodeAtOffset(root: Node, target: number): { node: Text; offset: number 
 		if (!(text instanceof Text)) continue;
 		last = text;
 		const length = text.textContent?.length ?? 0;
-		if (chars + length >= target) return { node: text, offset: Math.max(0, target - chars) };
+		if (chars + length >= target)
+			return { node: text, offset: Math.max(0, target - chars) };
 		chars += length;
 	}
 	if (!last) return null;
@@ -833,7 +879,8 @@ export function applyMarks(
 function stampSignature(items: AnnotationMark[], skip: boolean): string {
 	return `${skip ? 1 : 0}|${items
 		.map(
-			(i) => `${i.id}:${i.number}:${i.quote}:${i.at ?? 0}:${i.preview === true ? 1 : 0}:${i.aidScope ?? ""}`
+			(i) =>
+				`${i.id}:${i.number}:${i.quote}:${i.at ?? 0}:${i.preview === true ? 1 : 0}:${i.aidScope ?? ""}`
 		)
 		.join(",")}`;
 }
@@ -845,7 +892,11 @@ function stampSignature(items: AnnotationMark[], skip: boolean): string {
  * early and the sweep no-ops (replaceWith on a detached node does
  * nothing).
  */
-function wrapLeaving(root: HTMLElement, items: AnnotationMark[], fading: string): void {
+function wrapLeaving(
+	root: HTMLElement,
+	items: AnnotationMark[],
+	fading: string
+): void {
 	const gone = items.find((item) => item.id === fading);
 	if (!gone) return;
 	const fnodes = quoteTextNodes(root);
@@ -966,7 +1017,11 @@ export function rangesExcludingReadings(range: Range): Range[] {
 	}
 }
 
-function washRanges(root: HTMLElement, items: AnnotationMark[], wash: string): Range[] {
+function washRanges(
+	root: HTMLElement,
+	items: AnnotationMark[],
+	wash: string
+): Range[] {
 	const item = items.find((i) => i.id === wash);
 	if (!item) return [];
 	const nodes = quoteTextNodes(root);
@@ -983,8 +1038,14 @@ function washRanges(root: HTMLElement, items: AnnotationMark[], wash: string): R
 		const startText = startNode.textContent ?? "";
 		const endText = endNode.textContent ?? "";
 		const range = root.ownerDocument.createRange();
-		range.setStart(startNode, expandWrapStart(startText, Math.min(loc.startOffset, startText.length)));
-		range.setEnd(endNode, expandWrapEnd(endText, Math.min(loc.endOffset, endText.length)));
+		range.setStart(
+			startNode,
+			expandWrapStart(startText, Math.min(loc.startOffset, startText.length))
+		);
+		range.setEnd(
+			endNode,
+			expandWrapEnd(endText, Math.min(loc.endOffset, endText.length))
+		);
 		if (range.collapsed) return [];
 		// One range spans every reading physically between the base
 		// runs — split them out so the registry never paints overlay
@@ -1029,7 +1090,8 @@ let washRamp: {
 function cancelWashRamp(root?: HTMLElement): void {
 	if (washRamp !== null) {
 		clearTimeout(washRamp.timer);
-		if (root !== undefined && washRamp.root !== root) invalidateWashPaint(washRamp.root);
+		if (root !== undefined && washRamp.root !== root)
+			invalidateWashPaint(washRamp.root);
 		washRamp = null;
 	}
 }
@@ -1067,7 +1129,8 @@ export function invalidateWashPaint(root: HTMLElement): void {
 				// Cosmetic: the 0.999 frame is invisible either way.
 			}
 		};
-		if (typeof requestAnimationFrame === "function") requestAnimationFrame(restore);
+		if (typeof requestAnimationFrame === "function")
+			requestAnimationFrame(restore);
 		else setTimeout(restore, 16);
 	} catch {
 		// Clearing is cosmetic: never break the stamp.
@@ -1154,35 +1217,35 @@ function paintWashHighlight(
 							washRamp = null;
 							// Re-hovered or cleared mid-step: the fresh paint owns it now.
 							if (liveWashId !== wash) return;
-						const fresh = washRanges(root, items, wash);
-						if (fresh.length === 0) {
-							liveWashId = null;
-							clearAnnotationWashes();
+							const fresh = washRanges(root, items, wash);
+							if (fresh.length === 0) {
+								liveWashId = null;
+								clearAnnotationWashes();
+								invalidateWashPaint(root);
+								return;
+							}
+							const name = schedule[step++]!;
+							paintAnnotationWash(fresh, name);
+							if (prev !== name) clearAnnotationWash(prev);
+							// Force every step to display: the shell
+							// overlay repaints only on forced frames, so
+							// un-nudged steps surface late and partial —
+							// bottom-up bands, never a fade.
 							invalidateWashPaint(root);
-							return;
-						}
-						const name = schedule[step++]!;
-						paintAnnotationWash(fresh, name);
-						if (prev !== name) clearAnnotationWash(prev);
-						// Force every step to display: the shell
-						// overlay repaints only on forced frames, so
-						// un-nudged steps surface late and partial —
-						// bottom-up bands, never a fade.
-						invalidateWashPaint(root);
-						prev = name;
-						if (step < schedule.length) tick();
-						else {
-							// Settled on live: drop the twins so only the live
-							// name holds ranges (a leftover twin reads as a
-							// stuck wash and blinks on the next paint), then
-							// force the repaint: registry deletes alone don't
-							// invalidate the shell overlay, so a stale twin
-							// sliver would stick above the wash until the next
-							// incidental repaint (scroll, hover, selection).
-							clearAnnotationWash(ANN_HIGHLIGHT_D3);
-							clearAnnotationWash(ANN_HIGHLIGHT_D1);
-							invalidateWashPaint(root);
-						}
+							prev = name;
+							if (step < schedule.length) tick();
+							else {
+								// Settled on live: drop the twins so only the live
+								// name holds ranges (a leftover twin reads as a
+								// stuck wash and blinks on the next paint), then
+								// force the repaint: registry deletes alone don't
+								// invalidate the shell overlay, so a stale twin
+								// sliver would stick above the wash until the next
+								// incidental repaint (scroll, hover, selection).
+								clearAnnotationWash(ANN_HIGHLIGHT_D3);
+								clearAnnotationWash(ANN_HIGHLIGHT_D1);
+								invalidateWashPaint(root);
+							}
 						}, WASH_FADE_STEP_MS),
 						root,
 						wash
@@ -1231,27 +1294,27 @@ function paintWashHighlight(
 							// A superseding paint already replaced it — stopping
 							// now never wipes the live wash.
 							if (liveWashId !== painted) return;
-						const name = schedule[step++]!;
-						if (name === null) {
-							liveWashId = null;
-							clearAnnotationWashes();
-							invalidateWashPaint(root);
-						} else {
-							const fresh = washRanges(root, items, painted);
-							if (fresh.length === 0) {
+							const name = schedule[step++]!;
+							if (name === null) {
 								liveWashId = null;
 								clearAnnotationWashes();
 								invalidateWashPaint(root);
 							} else {
-								paintAnnotationWash(fresh, name);
-								if (prev !== null) clearAnnotationWash(prev);
-								// Same forced display as the fade-in
-								// walker above: un-nudged steps band.
-								invalidateWashPaint(root);
-								prev = name;
-								tick();
+								const fresh = washRanges(root, items, painted);
+								if (fresh.length === 0) {
+									liveWashId = null;
+									clearAnnotationWashes();
+									invalidateWashPaint(root);
+								} else {
+									paintAnnotationWash(fresh, name);
+									if (prev !== null) clearAnnotationWash(prev);
+									// Same forced display as the fade-in
+									// walker above: un-nudged steps band.
+									invalidateWashPaint(root);
+									prev = name;
+									tick();
+								}
 							}
-						}
 						}, WASH_FADE_STEP_MS),
 						root,
 						wash: painted
@@ -1278,19 +1341,27 @@ function paintWashHighlight(
  * direction (dir=auto paragraphs resolve per content). Toggle, never
  * add-only, so reused buttons unmirror. Never throws.
  */
-function mirrorBadgeForDirection(badge: HTMLButtonElement, anchor: HTMLElement): void {
+function mirrorBadgeForDirection(
+	badge: HTMLButtonElement,
+	anchor: HTMLElement
+): void {
 	let rtl = false;
 	try {
 		const explicit = anchor.closest("[dir]")?.getAttribute("dir");
 		if (explicit === "rtl") rtl = true;
-		else if (explicit !== "ltr") rtl = getComputedStyle(anchor).direction === "rtl";
+		else if (explicit !== "ltr")
+			rtl = getComputedStyle(anchor).direction === "rtl";
 	} catch {
 		rtl = false;
 	}
 	badge.classList.toggle("rtl", rtl);
 }
 
-function stampBadges(root: HTMLElement, items: AnnotationMark[], skip: boolean): void {
+function stampBadges(
+	root: HTMLElement,
+	items: AnnotationMark[],
+	skip: boolean
+): void {
 	// Ids already on screen: re-stamping them (every render unwraps and
 	// re-locates) must not replay the mount fade — only new badges are fresh.
 	const settled = new Set(
@@ -1304,7 +1375,8 @@ function stampBadges(root: HTMLElement, items: AnnotationMark[], skip: boolean):
 	// the same anchor changes nothing hit-testable.
 	const live = new Map<string, HTMLButtonElement>();
 	for (const badge of root.querySelectorAll("[data-ann-badge]")) {
-		if (badge instanceof HTMLButtonElement) live.set(badge.dataset.annBadge ?? "", badge);
+		if (badge instanceof HTMLButtonElement)
+			live.set(badge.dataset.annBadge ?? "", badge);
 		badge.remove();
 	}
 	// Wash marks unwrap first (badges are already out, so textContent
@@ -1361,7 +1433,12 @@ function stampBadges(root: HTMLElement, items: AnnotationMark[], skip: boolean):
  * DOM. Frozen semantics — jsdom pins this path, so it never changes
  * out from under the unit suite.
  */
-function stampLegacy(root: HTMLElement, items: AnnotationMark[], skip: boolean, wash: string | null): void {
+function stampLegacy(
+	root: HTMLElement,
+	items: AnnotationMark[],
+	skip: boolean,
+	wash: string | null
+): void {
 	const settled = new Set(
 		[...root.querySelectorAll("[data-ann-badge]")].map((el) =>
 			el instanceof HTMLElement ? (el.dataset.annBadge ?? "") : ""
@@ -1369,7 +1446,8 @@ function stampLegacy(root: HTMLElement, items: AnnotationMark[], skip: boolean, 
 	);
 	const live = new Map<string, HTMLButtonElement>();
 	for (const badge of root.querySelectorAll("[data-ann-badge]")) {
-		if (badge instanceof HTMLButtonElement) live.set(badge.dataset.annBadge ?? "", badge);
+		if (badge instanceof HTMLButtonElement)
+			live.set(badge.dataset.annBadge ?? "", badge);
 		badge.remove();
 	}
 	// The wash whose marks are currently mounted ("" when none): a steady
@@ -1457,13 +1535,23 @@ function hasReadingMarkup(root: HTMLElement): boolean {
  * located span itself (cluster-snapped, never through tashkeel), like
  * the reading-markup routing above. Pure (takes the quote, no DOM).
  */
-const RTL_QUOTE_RE = /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/u;
+const RTL_QUOTE_RE =
+	/[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/u;
 export function hasRtlQuote(quote: string): boolean {
 	return RTL_QUOTE_RE.test(quote);
 }
 
-function stampMarks(root: HTMLElement, items: AnnotationMark[], skip: boolean, wash: string | null): void {
-	if (!highlightsSupported() || hasReadingMarkup(root) || items.some((i) => hasRtlQuote(i.quote))) {
+function stampMarks(
+	root: HTMLElement,
+	items: AnnotationMark[],
+	skip: boolean,
+	wash: string | null
+): void {
+	if (
+		!highlightsSupported() ||
+		hasReadingMarkup(root) ||
+		items.some((i) => hasRtlQuote(i.quote))
+	) {
 		// Leaving the registry path: drop a wash this body painted, or
 		// its pixels ghost under the marks (same stuck overlay behind
 		// every terminal clear). Another body's live wash is untouched.
@@ -1523,7 +1611,10 @@ export function lockSelectionToMessage(
 		const prose = (
 			anchorNode instanceof Element ? anchorNode : anchorNode.parentElement
 		)?.closest(".rendered");
-		const walker = document.createTreeWalker(prose ?? anchorEl, NodeFilter.SHOW_TEXT);
+		const walker = document.createTreeWalker(
+			prose ?? anchorEl,
+			NodeFilter.SHOW_TEXT
+		);
 		const texts: Text[] = [];
 		while (walker.nextNode()) {
 			const node = walker.currentNode;
@@ -1571,8 +1662,10 @@ function anchorSpan(nodes: Text[], loc: QuoteLocation): HTMLElement | null {
 		if (!node) continue;
 		const text = node.textContent ?? "";
 		const from = i === loc.startNode ? loc.startOffset : 0;
-		const to = i === loc.endNode ? Math.min(loc.endOffset, text.length) : text.length;
-		for (let at = from; at < to; at++) chars.push({ node, at, ch: text[at] ?? "" });
+		const to =
+			i === loc.endNode ? Math.min(loc.endOffset, text.length) : text.length;
+		for (let at = from; at < to; at++)
+			chars.push({ node, at, ch: text[at] ?? "" });
 	}
 	if (chars.length === 0) return null;
 	// Gap parking: the anchor is an empty span at the word gap nearest
@@ -1630,7 +1723,10 @@ function anchorSpan(nodes: Text[], loc: QuoteLocation): HTMLElement | null {
 	}
 	if (!pick) return null;
 	const parent = pick.node.parentElement;
-	if (parent instanceof Element && parent.classList.contains("ccez-ann-anchor")) {
+	if (
+		parent instanceof Element &&
+		parent.classList.contains("ccez-ann-anchor")
+	) {
 		return parent;
 	}
 	try {
@@ -1639,7 +1735,10 @@ function anchorSpan(nodes: Text[], loc: QuoteLocation): HTMLElement | null {
 		// breaks joining/shaping while mounted, and the split survives
 		// the rebuild as words shifted across lines.
 		const nodeText = pick.node.textContent ?? "";
-		const bounds = clusterBounds(nodeText, Math.min(pick.at, Math.max(0, nodeText.length - 1)));
+		const bounds = clusterBounds(
+			nodeText,
+			Math.min(pick.at, Math.max(0, nodeText.length - 1))
+		);
 		const from = Math.min(bounds.start, pick.at);
 		const to = Math.max(bounds.end, pick.at + 1);
 		if (to <= from) return null;
@@ -1665,7 +1764,11 @@ function anchorSpan(nodes: Text[], loc: QuoteLocation): HTMLElement | null {
  * mark paints the paragraph break (and grows the message while the
  * wash is on, flying the badge to a new line).
  */
-function wrapRange(nodes: Text[], loc: QuoteLocation, extraClass?: string): HTMLElement | null {
+function wrapRange(
+	nodes: Text[],
+	loc: QuoteLocation,
+	extraClass?: string
+): HTMLElement | null {
 	let last: HTMLElement | null = null;
 	for (let i = loc.startNode; i <= loc.endNode; i++) {
 		const node = nodes[i];
@@ -1677,7 +1780,8 @@ function wrapRange(nodes: Text[], loc: QuoteLocation, extraClass?: string): HTML
 		// Cluster edges, never through a cluster: a quote ending on a
 		// bare base letter must still wrap its tashkeel, or the wash
 		// cuts the cluster and shaping breaks until the rebuild.
-		const from = i === loc.startNode ? expandWrapStart(text, loc.startOffset) : 0;
+		const from =
+			i === loc.startNode ? expandWrapStart(text, loc.startOffset) : 0;
 		const to = i === loc.endNode ? expandWrapEnd(text, loc.endOffset) : length;
 		if (from >= to) continue;
 		if (!/\S/.test(text.slice(from, to))) continue;
@@ -1700,7 +1804,9 @@ function wrapRange(nodes: Text[], loc: QuoteLocation, extraClass?: string): HTML
  * Render annotations for the prompt tail, matching the review-panel shape:
  * numbered quote plus comment.
  */
-export function formatAnnotations(list: { quote: string; comment: string }[]): string {
+export function formatAnnotations(
+	list: { quote: string; comment: string }[]
+): string {
 	return list
 		.map((a, i) => {
 			const head = `${i + 1}. "${a.quote}"`;
@@ -1712,7 +1818,10 @@ export function formatAnnotations(list: { quote: string; comment: string }[]): s
 }
 
 /** Append the annotation block to outgoing prompt text. */
-export function withAnnotations(prompt: string, list: { quote: string; comment: string }[]): string {
+export function withAnnotations(
+	prompt: string,
+	list: { quote: string; comment: string }[]
+): string {
 	if (list.length === 0) return prompt;
 	const block = `Annotated selections:\n${formatAnnotations(list)}`;
 	return prompt ? `${prompt}\n\n${block}` : block;
@@ -1725,7 +1834,11 @@ export function withAnnotations(prompt: string, list: { quote: string; comment: 
  * treats that as gone. Numbering re-sequences from the kept order,
  * so an unchanged comment rebakes byte-for-byte.
  */
-export function rewriteAnnotationComment(content: string, n: number, comment: string): string | null {
+export function rewriteAnnotationComment(
+	content: string,
+	n: number,
+	comment: string
+): string | null {
 	const split = splitAnnotationBlock(content);
 	if (!split) return null;
 	if (!split.refs.some((ref) => ref.n === n)) return null;
@@ -1767,7 +1880,8 @@ function cleanDraftList(raw: unknown): Annotation[] {
 export function loadDraftAnnotations(chatId: string): Annotation[] {
 	try {
 		if (typeof localStorage === "undefined") return [];
-		const raw = localStorage.getItem(DRAFT_KEY) ?? localStorage.getItem(LEGACY_DRAFT_KEY);
+		const raw =
+			localStorage.getItem(DRAFT_KEY) ?? localStorage.getItem(LEGACY_DRAFT_KEY);
 		if (!raw) return [];
 		const record = JSON.parse(raw) as Record<string, unknown>;
 		return cleanDraftList(record?.[chatId]);
@@ -1776,18 +1890,28 @@ export function loadDraftAnnotations(chatId: string): Annotation[] {
 	}
 }
 
-export function saveDraftAnnotations(chatId: string, list: Annotation[], knownIds: string[]): void {
+export function saveDraftAnnotations(
+	chatId: string,
+	list: Annotation[],
+	knownIds: string[]
+): void {
 	try {
 		if (typeof localStorage === "undefined") return;
 		let record: Record<string, unknown> = {};
 		try {
-			record = (JSON.parse(localStorage.getItem(DRAFT_KEY) ?? localStorage.getItem(LEGACY_DRAFT_KEY) ?? "{}") as Record<string, unknown>) ?? {};
+			record =
+				(JSON.parse(
+					localStorage.getItem(DRAFT_KEY) ??
+						localStorage.getItem(LEGACY_DRAFT_KEY) ??
+						"{}"
+				) as Record<string, unknown>) ?? {};
 		} catch {
 			record = {};
 		}
 		if (list.length === 0) delete record[chatId];
 		else record[chatId] = list;
-		for (const key of Object.keys(record)) if (!knownIds.includes(key)) delete record[key];
+		for (const key of Object.keys(record))
+			if (!knownIds.includes(key)) delete record[key];
 		localStorage.setItem(DRAFT_KEY, JSON.stringify(record));
 	} catch {
 		// Storage full or blocked: drafts stay memory-only.
@@ -1861,8 +1985,13 @@ export function clearBakedAnnotations(content: string): string | null {
  * this runs per render and must never re-parse. Display-only — results
  * are never fed back into reactive effects.
  */
-const refsCache = new Map<string, { text: string; refs: AnnotationRef[] } | null>();
-export function annRefsFor(content: string): { text: string; refs: AnnotationRef[] } | null {
+const refsCache = new Map<
+	string,
+	{ text: string; refs: AnnotationRef[] } | null
+>();
+export function annRefsFor(
+	content: string
+): { text: string; refs: AnnotationRef[] } | null {
 	if (!content.includes("Annotated selections:")) return null;
 	const hit = refsCache.get(content);
 	if (hit !== undefined) return hit;
@@ -1952,8 +2081,10 @@ export function gapOffsetForAnchor(text: string): number | null {
 	for (let k = 0; k <= len; k++) {
 		const left = k > 0 ? (text[k - 1] ?? "") : "";
 		const right = k < len ? (text[k] ?? "") : "";
-		const touchesWord = (k > 0 && isWordChar(left)) || (k < len && isWordChar(right));
-		const splitsWords = k === 0 || k === len || !isWordChar(left) || !isWordChar(right);
+		const touchesWord =
+			(k > 0 && isWordChar(left)) || (k < len && isWordChar(right));
+		const splitsWords =
+			k === 0 || k === len || !isWordChar(left) || !isWordChar(right);
 		if (!touchesWord || !splitsWords) continue;
 		if (COMBINING_RE.test(left) || COMBINING_RE.test(right)) continue;
 		if (SURROGATE_RE.test(left) || SURROGATE_RE.test(right)) continue;
@@ -2018,8 +2149,14 @@ export function snapOffsetsToWordEdges(
 	let e = Math.max(0, Math.min(end, len));
 	if (s > e) [s, e] = [e, s];
 	if (s < e) {
-		while (s > 0 && isWordChar(text[s - 1] ?? "") && isWordChar(text[s] ?? "")) s -= 1;
-		while (e < len && isWordChar(text[e - 1] ?? "") && isWordChar(text[e] ?? "")) e += 1;
+		while (s > 0 && isWordChar(text[s - 1] ?? "") && isWordChar(text[s] ?? ""))
+			s -= 1;
+		while (
+			e < len &&
+			isWordChar(text[e - 1] ?? "") &&
+			isWordChar(text[e] ?? "")
+		)
+			e += 1;
 	}
 	return { start: s, end: e };
 }
@@ -2039,7 +2176,8 @@ export function snapOffsetsToWordEdges(
  */
 function anchorNeighborText(node: Text, dir: 1 | -1): Text | null {
 	try {
-		if (node.parentElement?.closest("button[data-ann-badge], rt, rp, .frt")) return null;
+		if (node.parentElement?.closest("button[data-ann-badge], rt, rp, .frt"))
+			return null;
 		// Badge buttons are UI chrome, never quotable text: step past them.
 		const pastButtons = (n: Node | null): Node | null => {
 			while (n instanceof Element && n.hasAttribute("data-ann-badge")) {
@@ -2056,7 +2194,8 @@ function anchorNeighborText(node: Text, dir: 1 | -1): Text | null {
 			const kids = dir === 1 ? [...n.childNodes] : [...n.childNodes].reverse();
 			for (const kid of kids) {
 				if (kid instanceof Text) return kid;
-				if (!(kid instanceof Element) || !kid.hasAttribute("data-ann-badge")) return null;
+				if (!(kid instanceof Element) || !kid.hasAttribute("data-ann-badge"))
+					return null;
 			}
 			return null;
 		};
@@ -2104,7 +2243,8 @@ function anchorNeighborText(node: Text, dir: 1 | -1): Text | null {
  */
 export function snapSelectionToWordEdges(selection: Selection): boolean {
 	try {
-		if (!selection || selection.isCollapsed || selection.rangeCount === 0) return false;
+		if (!selection || selection.isCollapsed || selection.rangeCount === 0)
+			return false;
 		const range = selection.getRangeAt(0);
 		const sc = range.startContainer;
 		const ec = range.endContainer;
@@ -2117,13 +2257,23 @@ export function snapSelectionToWordEdges(selection: Selection): boolean {
 		if (scN instanceof Text) {
 			const text = scN.textContent ?? "";
 			let s = Math.max(0, Math.min(so, text.length));
-			while (s > 0 && isWordChar(text[s - 1] ?? "") && isWordChar(text[s] ?? "")) s -= 1;
+			while (
+				s > 0 &&
+				isWordChar(text[s - 1] ?? "") &&
+				isWordChar(text[s] ?? "")
+			)
+				s -= 1;
 			so = s;
 		}
 		if (ecN instanceof Text) {
 			const text = ecN.textContent ?? "";
 			let e = Math.max(0, Math.min(eo, text.length));
-			while (e < text.length && isWordChar(text[e - 1] ?? "") && isWordChar(text[e] ?? "")) e += 1;
+			while (
+				e < text.length &&
+				isWordChar(text[e - 1] ?? "") &&
+				isWordChar(text[e] ?? "")
+			)
+				e += 1;
 			eo = e;
 		}
 		let guard = 0;
@@ -2138,7 +2288,11 @@ export function snapSelectionToWordEdges(selection: Selection): boolean {
 			if (!prev) break;
 			const left = prev.textContent ?? "";
 			const right = scN.textContent ?? "";
-			if (!isWordChar(left[left.length - 1] ?? "") || !isWordChar(right[0] ?? "")) break;
+			if (
+				!isWordChar(left[left.length - 1] ?? "") ||
+				!isWordChar(right[0] ?? "")
+			)
+				break;
 			scN = prev;
 			let s = left.length;
 			while (
@@ -2160,19 +2314,26 @@ export function snapSelectionToWordEdges(selection: Selection): boolean {
 			if (!next) break;
 			const left = ecN.textContent ?? "";
 			const right = next.textContent ?? "";
-			if (!isWordChar(left[left.length - 1] ?? "") || !isWordChar(right[0] ?? "")) break;
+			if (
+				!isWordChar(left[left.length - 1] ?? "") ||
+				!isWordChar(right[0] ?? "")
+			)
+				break;
 			ecN = next;
 			let e = 0;
 			while (
 				e < right.length &&
-				isWordChar(e === 0 ? (left[left.length - 1] ?? "") : (right[e - 1] ?? "")) &&
+				isWordChar(
+					e === 0 ? (left[left.length - 1] ?? "") : (right[e - 1] ?? "")
+				) &&
 				isWordChar(right[e] ?? "")
 			)
 				e += 1;
 			eo = e;
 		}
 		if (scN === sc && ecN === ec && so === so0 && eo === eo0) return false;
-		const anchorFirst = selection.anchorNode === sc && selection.anchorOffset === so0;
+		const anchorFirst =
+			selection.anchorNode === sc && selection.anchorOffset === so0;
 		if (anchorFirst) selection.setBaseAndExtent(scN, so, ecN, eo);
 		else selection.setBaseAndExtent(ecN, eo, scN, so);
 		return true;
@@ -2195,11 +2356,15 @@ export function placeAnnPopX(opts: {
 	popWidth: number;
 	viewportWidth: number;
 }): number {
-	const { cursorX, highlightLeft, highlightWidth, popWidth, viewportWidth } = opts;
+	const { cursorX, highlightLeft, highlightWidth, popWidth, viewportWidth } =
+		opts;
 	const lo = 8;
 	const hi = Math.max(lo, viewportWidth - popWidth - 8);
 	if (highlightWidth < popWidth) {
-		return Math.min(Math.max(lo, highlightLeft + (highlightWidth - popWidth) / 2), hi);
+		return Math.min(
+			Math.max(lo, highlightLeft + (highlightWidth - popWidth) / 2),
+			hi
+		);
 	}
 	return Math.min(Math.max(lo, cursorX), hi);
 }
@@ -2244,7 +2409,10 @@ export function selMenuPlacement(opts: {
 	const at = cursorX ?? rectLeft;
 	// The popup sits just below the cursor (never under it), still
 	// clamped to the viewport.
-	const x = Math.min(Math.max(8, at - 16), Math.max(8, viewportWidth - menuWidth - 8));
+	const x = Math.min(
+		Math.max(8, at - 16),
+		Math.max(8, viewportWidth - menuWidth - 8)
+	);
 	// Android: the OS text toolbar is suppressed (the app menu
 	// replaces it), but ours still goes below the selection — clear
 	// of the highlight and its handles — except near the screen
@@ -2304,7 +2472,10 @@ export function clampDragAnchorToFocusLine(
  * (Shift+Enter still newlines), Escape cancels. Anything else is
  * the textarea's own business.
  */
-export function reviewEditKey(key: string, shiftKey: boolean): "save" | "cancel" | null {
+export function reviewEditKey(
+	key: string,
+	shiftKey: boolean
+): "save" | "cancel" | null {
 	if (key === "Enter" && !shiftKey) return "save";
 	if (key === "Escape") return "cancel";
 	return null;

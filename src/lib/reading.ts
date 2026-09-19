@@ -45,7 +45,9 @@ const KANA_RE = /[\u3040-\u309F\u30A0-\u30FF]/;
  * fenced runs (plus their fences) never convert. Fences own the whole
  * rest on unclosed input, exactly like the markdown renderer.
  */
-export function codeAwareLines(text: string): Array<{ line: string; code: boolean }> {
+export function codeAwareLines(
+	text: string
+): Array<{ line: string; code: boolean }> {
 	const out: Array<{ line: string; code: boolean }> = [];
 	let fenced = false;
 	for (const line of text.split("\n")) {
@@ -75,7 +77,11 @@ export function detectScripts(text: string): AidScript[] {
 	const scripts: AidScript[] = [];
 	if (/[\u0600-\u06FF\u0750-\u077F]/.test(text)) scripts.push("ar");
 	if (KANA_RE.test(text)) scripts.push("ja");
-	if (text.split("\n").some((line) => /\p{Script=Han}/u.test(line) && !KANA_RE.test(line))) {
+	if (
+		text
+			.split("\n")
+			.some((line) => /\p{Script=Han}/u.test(line) && !KANA_RE.test(line))
+	) {
 		scripts.push("zh");
 	}
 	return scripts;
@@ -90,7 +96,10 @@ export function detectScripts(text: string): AidScript[] {
  * ever overrides it. Dual-aid rendering applies each aid only to its
  * own lines, so pinning both reads a mixed message end to end.
  */
-export function classifyAidLine(line: string, preferred: LocalAid | null = null): LocalAid | null {
+export function classifyAidLine(
+	line: string,
+	preferred: LocalAid | null = null
+): LocalAid | null {
 	if (KANA_RE.test(line)) return "furigana";
 	if (/\p{Script=Han}/u.test(line)) return preferred ?? "pinyin";
 	return null;
@@ -133,7 +142,10 @@ export function hanOverlayLangFor(text: string): HanOverlayLang {
  * small JP/中文 toggle to flip a wrong prediction.
  */
 export function isHanOverlayLangUncertain(text: string): boolean {
-	return /[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/.test(text) && !KANA_RE.test(text);
+	return (
+		/[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/.test(text) &&
+		!KANA_RE.test(text)
+	);
 }
 
 /**
@@ -173,7 +185,8 @@ export function isWordChar(char: string | undefined): boolean {
 
 /** Expand `offset` to the full word (maximal run of word chars). */
 export function extractWordAt(text: string, offset: number): string {
-	if (offset < 0 || offset >= text.length || !isWordChar(text[offset])) return "";
+	if (offset < 0 || offset >= text.length || !isWordChar(text[offset]))
+		return "";
 	let start = offset;
 	while (start > 0 && isWordChar(text[start - 1])) start--;
 	let end = offset;
@@ -214,19 +227,23 @@ export function sentenceBounds(text: string, offset: number): [number, number] {
 // --- Speech locale: Unicode script → BCP-47, Latin falls back ---
 
 /** Non-Latin scripts map to a voice locale; order matters (check callers). */
-const SCRIPT_LOCALE: Array<{ test: (word: string) => boolean; lang: string }> = [
-	{ test: (w) => /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(w), lang: "ar-SA" },
-	{ test: (w) => /[\u3040-\u309F\u30A0-\u30FF]/.test(w), lang: "ja-JP" },
-	{ test: (w) => /\p{Script=Hangul}/u.test(w), lang: "ko-KR" },
-	{ test: (w) => /\p{Script=Han}/u.test(w), lang: "zh-CN" },
-	{ test: (w) => /\p{Script=Cyrillic}/u.test(w), lang: "ru-RU" },
-	{ test: (w) => /\p{Script=Greek}/u.test(w), lang: "el-GR" },
-	{ test: (w) => /\p{Script=Hebrew}/u.test(w), lang: "he-IL" },
-	{ test: (w) => /\p{Script=Thai}/u.test(w), lang: "th-TH" },
-	{ test: (w) => /\p{Script=Devanagari}/u.test(w), lang: "hi-IN" },
-	{ test: (w) => /\p{Script=Armenian}/u.test(w), lang: "hy-AM" },
-	{ test: (w) => /\p{Script=Georgian}/u.test(w), lang: "ka-GE" }
-];
+const SCRIPT_LOCALE: Array<{ test: (word: string) => boolean; lang: string }> =
+	[
+		{
+			test: (w) => /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(w),
+			lang: "ar-SA"
+		},
+		{ test: (w) => /[\u3040-\u309F\u30A0-\u30FF]/.test(w), lang: "ja-JP" },
+		{ test: (w) => /\p{Script=Hangul}/u.test(w), lang: "ko-KR" },
+		{ test: (w) => /\p{Script=Han}/u.test(w), lang: "zh-CN" },
+		{ test: (w) => /\p{Script=Cyrillic}/u.test(w), lang: "ru-RU" },
+		{ test: (w) => /\p{Script=Greek}/u.test(w), lang: "el-GR" },
+		{ test: (w) => /\p{Script=Hebrew}/u.test(w), lang: "he-IL" },
+		{ test: (w) => /\p{Script=Thai}/u.test(w), lang: "th-TH" },
+		{ test: (w) => /\p{Script=Devanagari}/u.test(w), lang: "hi-IN" },
+		{ test: (w) => /\p{Script=Armenian}/u.test(w), lang: "hy-AM" },
+		{ test: (w) => /\p{Script=Georgian}/u.test(w), lang: "ka-GE" }
+	];
 
 /**
  * BCP-47 voice locale for a word. Non-Latin scripts resolve by Unicode
@@ -285,7 +302,9 @@ export function speakWord(word: string, fallback = "en-US"): SpeakResult {
 		utterance.lang = lang;
 		const voice = speechSynthesis
 			.getVoices()
-			.find((v) => v.lang.toLowerCase().startsWith(lang.slice(0, 2).toLowerCase()));
+			.find((v) =>
+				v.lang.toLowerCase().startsWith(lang.slice(0, 2).toLowerCase())
+			);
 		if (voice) utterance.voice = voice;
 		speechSynthesis.speak(utterance);
 		return { spoken: true, lang };
@@ -341,13 +360,18 @@ export function aidTargetLines(text: string): number[] {
  * the shape doesn't fit (one result line per sent line), so callers
  * fall back to the whole-text replace rather than scrambling.
  */
-export function spliceAidResult(original: string, indexes: number[], result: string): string | null {
+export function spliceAidResult(
+	original: string,
+	indexes: number[],
+	result: string
+): string | null {
 	const out = result.split("\n");
 	if (out.length !== indexes.length) return null;
 	const lines = original.split("\n");
 	indexes.forEach((lineIdx, k) => {
 		const replacement = out[k];
-		if (lineIdx < lines.length && replacement !== undefined) lines[lineIdx] = replacement;
+		if (lineIdx < lines.length && replacement !== undefined)
+			lines[lineIdx] = replacement;
 	});
 	return lines.join("\n");
 }
@@ -435,13 +459,17 @@ export function aidDisplayText(content: string): string {
  * pill, or without ambiguous lines, this is exactly the script-only
  * list as before.
  */
-export function offeredLocalAids(text: string, replyCode: string | null): LocalAid[] {
+export function offeredLocalAids(
+	text: string,
+	replyCode: string | null
+): LocalAid[] {
 	// Code never summons reading aids: detection reads the prose
 	// with fenced blocks and inline spans stripped out.
 	const prose = stripCodeForDetection(text);
 	const kinds = localAidsFor(detectScripts(prose));
 	const preferred = preferredLocalAid(replyCode);
-	if (preferred && hasAmbiguousAidLine(prose) && !kinds.includes(preferred)) kinds.unshift(preferred);
+	if (preferred && hasAmbiguousAidLine(prose) && !kinds.includes(preferred))
+		kinds.unshift(preferred);
 	return kinds;
 }
 
@@ -485,7 +513,9 @@ export async function runModelAid(
 }
 
 /** Back-compat wrapper: tashkeel is `MODEL_AIDS.tashkeel`. */
-export function buildVocalizeMessages(text: string): Array<{ role: string; content: string }> {
+export function buildVocalizeMessages(
+	text: string
+): Array<{ role: string; content: string }> {
 	return buildAidMessages("tashkeel", text);
 }
 
@@ -506,7 +536,11 @@ export function vocalizeArabic(
  * `escapeHtml` over textContent, or null when nothing matches — so
  * overlay `{@html}` sinks stay XSS-clean by construction.
  */
-export function readingsOnly(html: string, joiner: string, selector: string): string | null {
+export function readingsOnly(
+	html: string,
+	joiner: string,
+	selector: string
+): string | null {
 	let doc: Document;
 	try {
 		doc = new DOMParser().parseFromString(html, "text/html");

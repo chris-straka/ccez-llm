@@ -5,6 +5,7 @@ History is preserved, newest last within each section. The full verbatim
 requests behind old items live in git history (`PROMPT.md`, `PLAN.md`, …).
 
 ## Snapshot from the TODO header at archive time
+
 # Ccez Studio — TODO (single source of truth)
 
 Merged 2026-09-12 from `PROMPT.md` + `PROMPT2.md` (raw request logs) +
@@ -20,6 +21,7 @@ item lives in the deleted logs — recover with:
 `git show HEAD~1:PLAN2.md`, or the pre-merge `TODO.md` at the same ref.
 Composer/message items pair with screenshots under `imgs/`. When picking up
 an item, expand it with acceptance criteria first; don't guess.
+
 ## Shipped (condensed — detail in git log)
 
 S0 scaffold -> S1 providers/keys -> S2 core chat/prompt/vim -> S3 messages/code/
@@ -160,8 +162,7 @@ cut; release chain outcome still unconfirmed (see Now).
       `message-code.e2e.ts`, `textai.e2e.ts` assertion updated.)
 - [x] Right-click on latex/code folds must never start TTS.
       (Fold heads are buttons, so the restored desktop `contextmenu` speak
-      path skips them by its button guard — silence specs in `latex.e2e.ts`
-      + `message-code.e2e.ts` still green after the Sep 2026 restore.)
+      path skips them by its button guard — silence specs in `latex.e2e.ts` + `message-code.e2e.ts` still green after the Sep 2026 restore.)
 - [x] Right-click (even empty space) must never start audio.
       (Empty space has no `.rendered` ancestor and blank clicks resolve to
       no word, so both stay silent — `sel-menu.e2e.ts` still green after
@@ -192,7 +193,7 @@ cut; release chain outcome still unconfirmed (see Now).
       `calc(0.92rem * var(--font-scale, 1))`, the same size as chat text;
       pinned by the `thoughts scale with font size` spec in
       `message-code.e2e.ts`. No code change needed.)
- - [x] Code Run button + model-version bump + Cloudflare-domain hosting (later).
+- [x] Code Run button + model-version bump + Cloudflare-domain hosting (later).
       (Code Run DONE Sep 2026 on work/h2-coderun: local Run button on assistant
       code blocks Code-Runner-style — `run_code` Tauri command (PATH-resolved
       python3/node/bun/bash/ruby/deno, per-run temp cwd, 10s kill, 64 KiB cap,
@@ -226,8 +227,7 @@ cut; release chain outcome still unconfirmed (see Now).
       TABLE stays authoritative on conflict, e.g. 電 keeps 日乚土 not
       雨电). cjkvi-ids rejected (GPLv2 via CHISE); cjk-decomp evaluated in
       `docs/cjkdecomp-eval.md` (36/57 agree; mismatches are Mainland-typeface
-      finer-grain modeling — documented caveat on fallback chars). `radicals`
-      + `inspect` suites pin hand-wins + fallback + honest-null. The open
+      finer-grain modeling — documented caveat on fallback chars). `radicals` + `inspect` suites pin hand-wins + fallback + honest-null. The open
       question above is answered: Unihan for readings/meanings, cjk-decomp
       subset for splits. REVISED again Sep 2026 per user call — the 57 hand
       entries are deleted as arbitrary (they were common characters, never
@@ -564,9 +564,11 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
       listed, nothing deleted — removals are the user's call.)
 
 ## Pile: s1-suites (work/s1-suites)
+
 - Merged e2e suites (sel-menu+ios, android+touch+share, voice+error+native+ios, furigana+hover+ruby, annotations+ux, chrome-misc one-liners); 9 specs removed, merged files green on E2E_PORT=5231 except 3 failures also failing on HEAD (chrome idle-hide, annotation badge re-press + review note-labels).
 
 ## Refactors (Sep 2026, main)
+
 - [x] Platform-cast cleanup: `src/lib/web-apis.d.ts` declares the DOM-lib-missing
       APIs (launchQueue, save picker, Tauri internals, speech recognition,
       CSS.highlights/Highlight, build stamps); ~20 `as unknown as` repeats
@@ -584,6 +586,7 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
       next slice when wanted.
 
 ## Cast-cleanup tail (Sep 15, main)
+
 - [x] Finished the unfinished tail of the types refactor (0b28f3d):
       `onContextMenu` still asserted `event.target as HTMLElement`
       (predates the convention), the fade-scroll listener asserted
@@ -598,6 +601,7 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
       check 0/0, eslint clean.
 
 ## Failure triage + gates (Sep 14, main)
+
 - [x] Stale specs retargeted, real regressions fixed: latex/message-code
       fold tests now pin right-click toggle (ae72137's contract);
       keybindings j/Down at newest returns enter-edit (Sep-8 j-exits
@@ -615,6 +619,7 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
       on hardware/ears).
 
 ## Composer frosted + annotation dismiss (Sep 15, main)
+
 - [x] Badge edit lost focus on Tab: the comment box blur-saved on any
       blur, so Tab onto Delete closed the card. Departure blurs still
       save/cancel; in-card moves are ignored (relatedTarget). Tab-order
@@ -675,6 +680,7 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
       owner eyes on next launch.
 
 ## Android message chrome + reply signals (Sep 15, main)
+
 - [x] `bun run tauri:dev` package script for the sign wrapper (was
       shell-file-only).
 - [x] Button-scaling toggle owns the gaps: the list gap, pair margin,
@@ -723,6 +729,7 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
       slice is left to take.
 
 ## Dev Keychain silence (Sep 15, main)
+
 - [x] Mass password prompts in dev: every unsigned `tauri dev` rebuild
       ships a fresh code identity, so macOS re-prompted once per
       Keychain item (bundle + legacy migration touches ≈ the reported
@@ -742,6 +749,7 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
       verification is the live sign/verify smoke, re-runnable).
 
 ## Cross-platform OCR fallback (Sep 16, main)
+
 - [x] Runtimes with no native bridge (browser preview, Android WebView,
       Linux without system Tesseract) no longer toast "needs the Mac
       app": `recognizeAttachment` runs the in-client Tesseract WASM
@@ -751,12 +759,12 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
       fallback clicks load the engine), one warm worker per language
       set, reply-language traineddata (`jpn`/`chi_sim`/`kor` + `eng`),
       IndexedDB-cached engine+data after one download, CJK accuracy on
-      real hardware unverified by design. Unit (langs, error mapping)
-      + live e2e (canvas text inserts; textless image reports the miss)
+      real hardware unverified by design. Unit (langs, error mapping) + live e2e (canvas text inserts; textless image reports the miss)
       green. No bundled `tesseract` package needed on this path — the
       npm WASM build is the engine (on-device, no server, no fees).
 
 ## Post-v0.4.4 batch (Sep 17, main)
+
 - [x] Same-sentence mixed-language speech: `splitScriptRuns` groups
       maximal script runs (Latin breaks, kana+Han share, scriptless
       glues on), `splitSpeechSegments` splits sentences whose runs

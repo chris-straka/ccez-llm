@@ -56,7 +56,10 @@ function stateWith(store: Store): { state: ChatState; store: Store } {
 	return { state: createChatState(store), store };
 }
 
-function scriptedProvider(script: string[], usage = { prompt: 1, completion: 1, total: 2 }): ChatProvider {
+function scriptedProvider(
+	script: string[],
+	usage = { prompt: 1, completion: 1, total: 2 }
+): ChatProvider {
 	return {
 		id: "scripted",
 		async chat(): Promise<ChatResult> {
@@ -72,7 +75,14 @@ function scriptedProvider(script: string[], usage = { prompt: 1, completion: 1, 
 describe("chat", () => {
 	it("streams a reply, records usage, and totals tokens", async () => {
 		const { state, store } = stateWith(freshStore());
-		await sendMessage(state, scriptedProvider(["hel", "lo"]), "sys", "hi", {}, store);
+		await sendMessage(
+			state,
+			scriptedProvider(["hel", "lo"]),
+			"sys",
+			"hi",
+			{},
+			store
+		);
 		const chat = activeChat(state);
 		expect(chat.messages.map((m) => m.role)).toEqual(["user", "assistant"]);
 		expect(chat.messages[1]?.content).toBe("hello");
@@ -84,11 +94,18 @@ describe("chat", () => {
 	it("fires onFirstToken once on the first visible token", async () => {
 		const { state, store } = stateWith(freshStore());
 		let firsts = 0;
-		await sendMessage(state, scriptedProvider(["", "hel", "lo"]), "sys", "hi", {
-			onFirstToken: () => {
-				firsts += 1;
-			}
-		}, store);
+		await sendMessage(
+			state,
+			scriptedProvider(["", "hel", "lo"]),
+			"sys",
+			"hi",
+			{
+				onFirstToken: () => {
+					firsts += 1;
+				}
+			},
+			store
+		);
 		expect(firsts).toBe(1);
 		expect(activeChat(state).messages[1]?.content).toBe("hello");
 	});
@@ -98,11 +115,21 @@ describe("chat", () => {
 		// running) without reply-started (nothing printed yet).
 		const { state, store } = stateWith(freshStore());
 		let during: boolean[] = [];
-		await sendMessage(state, scriptedProvider(["", "hel", "lo"]), "sys", "hi", {
-			onFirstToken: () => {
-				during = [isSending(state, state.activeChatId), hasReplyStarted(state, state.activeChatId)];
-			}
-		}, store);
+		await sendMessage(
+			state,
+			scriptedProvider(["", "hel", "lo"]),
+			"sys",
+			"hi",
+			{
+				onFirstToken: () => {
+					during = [
+						isSending(state, state.activeChatId),
+						hasReplyStarted(state, state.activeChatId)
+					];
+				}
+			},
+			store
+		);
 		expect(during).toEqual([true, true]);
 		expect(isSending(state, state.activeChatId)).toBe(false);
 		expect(hasReplyStarted(state, state.activeChatId)).toBe(false);
@@ -110,8 +137,22 @@ describe("chat", () => {
 
 	it("splits tokens into input and output", async () => {
 		const { state, store } = stateWith(freshStore());
-		await sendMessage(state, scriptedProvider(["hi"], { prompt: 5, completion: 3, total: 8 }), "sys", "hello", {}, store);
-		await sendMessage(state, scriptedProvider(["yo"], { prompt: 7, completion: 2, total: 9 }), "sys", "again", {}, store);
+		await sendMessage(
+			state,
+			scriptedProvider(["hi"], { prompt: 5, completion: 3, total: 8 }),
+			"sys",
+			"hello",
+			{},
+			store
+		);
+		await sendMessage(
+			state,
+			scriptedProvider(["yo"], { prompt: 7, completion: 2, total: 9 }),
+			"sys",
+			"again",
+			{},
+			store
+		);
 		expect(tokenSplit(state)).toEqual({ prompt: 12, completion: 5 });
 		expect(tokenTotal(state)).toBe(17);
 	});
@@ -155,7 +196,14 @@ describe("chat", () => {
 
 		dismissFailedAssistant(state, store);
 		expect(activeChat(state).messages.map((m) => m.role)).toEqual(["user"]);
-		await sendMessage(state, scriptedProvider(["ok"]), "sys", "again", {}, store);
+		await sendMessage(
+			state,
+			scriptedProvider(["ok"]),
+			"sys",
+			"again",
+			{},
+			store
+		);
 		expect(activeChat(state).messages).toHaveLength(3);
 	});
 
@@ -178,7 +226,10 @@ describe("chat", () => {
 		expect(activeChat(state).messages).toHaveLength(2);
 		dismissFailedAssistant(state, store);
 		await resendLast(state, flaky, "sys", { store });
-		expect(activeChat(state).messages.map((m) => m.role)).toEqual(["user", "assistant"]);
+		expect(activeChat(state).messages.map((m) => m.role)).toEqual([
+			"user",
+			"assistant"
+		]);
 		expect(activeChat(state).messages[1]?.content).toBe("recovered");
 
 		takeBackLastReply(state, store);
@@ -242,19 +293,20 @@ describe("chat", () => {
 		onToken("hel");
 		await new Promise((r) => setTimeout(r, 20));
 		expect(state.chats.find((c) => c.id === awayId)?.messages).toHaveLength(0);
-		expect(state.chats.find((c) => c.id === originId)?.messages.map((m) => m.content)).toEqual([
-			"hi",
-			"hel"
-		]);
+		expect(
+			state.chats.find((c) => c.id === originId)?.messages.map((m) => m.content)
+		).toEqual(["hi", "hel"]);
 		expect(state.sendingChatId).toBe(originId);
-		resolveStream({ content: "hello", usage: { prompt: 1, completion: 1, total: 2 } });
+		resolveStream({
+			content: "hello",
+			usage: { prompt: 1, completion: 1, total: 2 }
+		});
 		await sending;
 		expect(state.sending).toBe(false);
 		expect(state.sendingChatId).toBeNull();
-		expect(state.chats.find((c) => c.id === originId)?.messages.map((m) => m.content)).toEqual([
-			"hi",
-			"hello"
-		]);
+		expect(
+			state.chats.find((c) => c.id === originId)?.messages.map((m) => m.content)
+		).toEqual(["hi", "hello"]);
 		expect(state.chats.find((c) => c.id === awayId)?.messages).toHaveLength(0);
 	});
 
@@ -285,7 +337,10 @@ describe("chat", () => {
 		onToken("hel");
 		await new Promise((r) => setTimeout(r, 20));
 		expect(visibleMessageCount(state, origin!)).toBe(2);
-		resolveStream({ content: "hello", usage: { prompt: 1, completion: 1, total: 2 } });
+		resolveStream({
+			content: "hello",
+			usage: { prompt: 1, completion: 1, total: 2 }
+		});
 		await sending;
 		expect(visibleMessageCount(state, origin!)).toBe(2);
 		// A chat that owns no stream always counts straight.
@@ -314,12 +369,22 @@ describe("chat", () => {
 		// A second send and a stage both wait for quiet: neither lands.
 		await sendMessage(state, gated, "sys", "second", {}, store);
 		stageMessage(state, "staged", [], store);
-		expect(activeChat(state).messages.map((m) => m.content)).toEqual(["first", ""]);
-		resolveStream({ content: "reply", usage: { prompt: 1, completion: 1, total: 2 } });
+		expect(activeChat(state).messages.map((m) => m.content)).toEqual([
+			"first",
+			""
+		]);
+		resolveStream({
+			content: "reply",
+			usage: { prompt: 1, completion: 1, total: 2 }
+		});
 		await sending;
 		// Quiet again: staging works, and the queued text was never lost.
 		stageMessage(state, "staged", [], store);
-		expect(activeChat(state).messages.map((m) => m.content)).toEqual(["first", "reply", "staged"]);
+		expect(activeChat(state).messages.map((m) => m.content)).toEqual([
+			"first",
+			"reply",
+			"staged"
+		]);
 	});
 
 	it("sends in a fresh chat while another still streams", async () => {
@@ -343,7 +408,10 @@ describe("chat", () => {
 		expect(isSending(state, originId)).toBe(true);
 		// A second send in the same chat still waits for quiet.
 		await sendMessage(state, gated, "sys", "blocked", {}, store);
-		expect(activeChat(state).messages.map((m) => m.content)).toEqual(["one", ""]);
+		expect(activeChat(state).messages.map((m) => m.content)).toEqual([
+			"one",
+			""
+		]);
 		// But a fresh chat sends concurrently: both stream at once.
 		newChat(state, store);
 		const awayId = state.activeChatId;
@@ -356,10 +424,9 @@ describe("chat", () => {
 		resolvers[0]?.({ content: "r1", usage });
 		await first;
 		// Origin lands with its own reply; the away stream carries on.
-		expect(state.chats.find((c) => c.id === originId)?.messages.map((m) => m.content)).toEqual([
-			"one",
-			"r1"
-		]);
+		expect(
+			state.chats.find((c) => c.id === originId)?.messages.map((m) => m.content)
+		).toEqual(["one", "r1"]);
 		expect(isSending(state, originId)).toBe(false);
 		expect(state.sending).toBe(true);
 		expect(state.sendingChatId).toBe(awayId);
@@ -367,10 +434,9 @@ describe("chat", () => {
 		await second;
 		expect(state.sending).toBe(false);
 		expect(state.sendingChatId).toBeNull();
-		expect(state.chats.find((c) => c.id === awayId)?.messages.map((m) => m.content)).toEqual([
-			"two",
-			"r2"
-		]);
+		expect(
+			state.chats.find((c) => c.id === awayId)?.messages.map((m) => m.content)
+		).toEqual(["two", "r2"]);
 	});
 
 	it("dropping one chat aborts only its own stream", async () => {
@@ -417,7 +483,10 @@ describe("chat", () => {
 		truncateToMessage(state, 0, store);
 		expect(activeChat(state).messages.map((m) => m.content)).toEqual(["one"]);
 		await resendLast(state, provider, "sys", { store });
-		expect(activeChat(state).messages.map((m) => m.role)).toEqual(["user", "assistant"]);
+		expect(activeChat(state).messages.map((m) => m.role)).toEqual([
+			"user",
+			"assistant"
+		]);
 
 		// Non-user targets and out-of-range indices are no-ops.
 		truncateToMessage(state, 1, store);
@@ -435,14 +504,26 @@ describe("chat", () => {
 		if (!target) throw new Error("seed message missing");
 
 		expect(editMessageContent(state, target.id, "TWO!", {}, store)).toBe(true);
-		expect(activeChat(state).messages.map((m) => m.content)).toEqual(["one", "r", "TWO!", "r"]);
+		expect(activeChat(state).messages.map((m) => m.content)).toEqual([
+			"one",
+			"r",
+			"TWO!",
+			"r"
+		]);
 
 		// Unknown ids and non-user targets are no-ops.
-		expect(editMessageContent(state, "nope" as never, "x", {}, store)).toBe(false);
+		expect(editMessageContent(state, "nope" as never, "x", {}, store)).toBe(
+			false
+		);
 		const reply = activeChat(state).messages[3];
 		if (!reply) throw new Error("seed reply missing");
 		expect(editMessageContent(state, reply.id, "x", {}, store)).toBe(false);
-		expect(activeChat(state).messages.map((m) => m.content)).toEqual(["one", "r", "TWO!", "r"]);
+		expect(activeChat(state).messages.map((m) => m.content)).toEqual([
+			"one",
+			"r",
+			"TWO!",
+			"r"
+		]);
 	});
 
 	it("reruns by dropping the last reply, branches fork history", async () => {
@@ -464,14 +545,15 @@ describe("chat", () => {
 		const { state, store } = stateWith(freshStore());
 		await sendMessage(state, scriptedProvider(["r"]), "sys", "q", {}, store);
 		stageMessage(state, "foo", [], store);
-		expect(activeChat(state).messages.map((m) => m.content)).toEqual(["q", "r", "foo"]);
-		// foo rides unseen until the next submit carries it in order.
-		expect(buildApiMessages(activeChat(state), "sys").map((m) => m.content)).toEqual([
-			"sys",
+		expect(activeChat(state).messages.map((m) => m.content)).toEqual([
 			"q",
 			"r",
 			"foo"
 		]);
+		// foo rides unseen until the next submit carries it in order.
+		expect(
+			buildApiMessages(activeChat(state), "sys").map((m) => m.content)
+		).toEqual(["sys", "q", "r", "foo"]);
 		await sendMessage(state, scriptedProvider(["ok"]), "sys", "bar", {}, store);
 		expect(activeChat(state).messages.map((m) => m.content)).toEqual([
 			"q",
@@ -509,7 +591,11 @@ describe("chat", () => {
 		expect(activeChat(state).messages).toEqual([]);
 		selectChat(state, first);
 		branchFrom(state, 0, store);
-		expect(state.chats.map((c) => c.id)).toEqual([first, second, state.activeChatId]);
+		expect(state.chats.map((c) => c.id)).toEqual([
+			first,
+			second,
+			state.activeChatId
+		]);
 		expect(activeChat(state).messages[0]?.content).toBe("one");
 	});
 
@@ -546,10 +632,16 @@ describe("chat", () => {
 		setPasteFold(state, msg.id, 0, true, store);
 		const updated = activeChat(state).messages[0]!;
 		expect(updated).not.toBe(msg);
-		expect(updated.pasteFolds).toEqual([{ start: 0, end: 5, chars: 5, open: true }]);
+		expect(updated.pasteFolds).toEqual([
+			{ start: 0, end: 5, chars: 5, open: true }
+		]);
 		const again = createChatState(store);
-		const reloaded = again.chats.flatMap((c) => c.messages).find((m) => m.id === msg.id);
-		expect(reloaded?.pasteFolds).toEqual([{ start: 0, end: 5, chars: 5, open: true }]);
+		const reloaded = again.chats
+			.flatMap((c) => c.messages)
+			.find((m) => m.id === msg.id);
+		expect(reloaded?.pasteFolds).toEqual([
+			{ start: 0, end: 5, chars: 5, open: true }
+		]);
 		setPasteFold(state, msg.id, 7, true, store);
 		setPasteFold(state, "missing" as typeof msg.id, 0, true, store);
 		expect(activeChat(state).messages[0]?.pasteFolds).toEqual([
@@ -561,7 +653,9 @@ describe("chat", () => {
 		const { state, store } = stateWith(freshStore());
 		await sendMessage(state, scriptedProvider(["r"]), "sys", "one", {}, store);
 		deleteMessage(state, 0, store);
-		expect(activeChat(state).messages.map((m) => m.role)).toEqual(["assistant"]);
+		expect(activeChat(state).messages.map((m) => m.role)).toEqual([
+			"assistant"
+		]);
 	});
 
 	it("exposes user-turn waypoints", async () => {
@@ -584,7 +678,9 @@ describe("chat", () => {
 		const store = freshStore();
 		store.setItem(
 			"ccez-studio-chats-v1",
-			JSON.stringify([{ id: "c1", createdAt: 1, replyLang: null, messages: [] }])
+			JSON.stringify([
+				{ id: "c1", createdAt: 1, replyLang: null, messages: [] }
+			])
 		);
 		const state = createChatState(store);
 		expect(state.chats.map((c) => c.id)).toEqual(["c1"]);
@@ -604,7 +700,9 @@ describe("chat", () => {
 		expect(again.chats[0]?.replyLang).toBeNull();
 		expect(again.chats[1]?.replyLang).toBe("ar");
 		// Unknown codes from retired languages fall back to no pill.
-		const raw = JSON.parse(store.getItem("ccez-llm-chats-v1") as string) as Array<{
+		const raw = JSON.parse(
+			store.getItem("ccez-llm-chats-v1") as string
+		) as Array<{
 			replyLang: unknown;
 		}>;
 		raw[1]!.replyLang = "xx";
@@ -637,7 +735,9 @@ describe("chat", () => {
 		setChatVoice(again, again.chats[0]!.id, null, store);
 		expect(chatVoiceReadback(again.chats[0]!, true)).toBe(true);
 		// Pre-override stores carry no flag: they follow the default.
-		const raw = JSON.parse(store.getItem("ccez-llm-chats-v1") as string) as Array<{
+		const raw = JSON.parse(
+			store.getItem("ccez-llm-chats-v1") as string
+		) as Array<{
 			voice: unknown;
 		}>;
 		for (const c of raw) delete c.voice;
@@ -652,7 +752,9 @@ describe("chat", () => {
 		const before = Date.now();
 		store.setItem(
 			"ccez-llm-chats-v1",
-			JSON.stringify([{ id: "old", messages: [], replyLang: null, voice: null }])
+			JSON.stringify([
+				{ id: "old", messages: [], replyLang: null, voice: null }
+			])
 		);
 		const healed = createChatState(store);
 		const stamped = healed.chats[0]?.createdAt ?? 0;
@@ -663,7 +765,14 @@ describe("chat", () => {
 	it("persists across instances and tolerates corruption", async () => {
 		const store = freshStore();
 		const first = createChatState(store);
-		await sendMessage(first, scriptedProvider(["hi"]), "sys", "hello", {}, store);
+		await sendMessage(
+			first,
+			scriptedProvider(["hi"]),
+			"sys",
+			"hello",
+			{},
+			store
+		);
 		const again = createChatState(store);
 		expect(activeChat(again).messages).toHaveLength(2);
 
@@ -704,9 +813,16 @@ describe("chat", () => {
 				tokens: 4
 			}
 		] as const;
-		await sendMessage(state, scriptedProvider(["ok"]), "sys", "look", {
-			attachments: [...attachments]
-		}, store);
+		await sendMessage(
+			state,
+			scriptedProvider(["ok"]),
+			"sys",
+			"look",
+			{
+				attachments: [...attachments]
+			},
+			store
+		);
 		const sent = activeChat(state).messages[0];
 		expect(sent?.attachments).toHaveLength(2);
 
@@ -726,7 +842,14 @@ describe("chat", () => {
 
 	it("sends attachment-free messages as plain strings", async () => {
 		const { state, store } = stateWith(freshStore());
-		await sendMessage(state, scriptedProvider(["ok"]), "sys", "plain", {}, store);
+		await sendMessage(
+			state,
+			scriptedProvider(["ok"]),
+			"sys",
+			"plain",
+			{},
+			store
+		);
 		const api = buildApiMessages(activeChat(state), "sys");
 		expect(api.find((m) => m.role === "user")?.content).toBe("plain");
 	});
@@ -746,9 +869,16 @@ describe("chat", () => {
 				tokens: 1
 			}
 		] as const;
-		await sendMessage(state, scriptedProvider(["one"]), "sys", "first", {
-			attachments: [...attachments]
-		}, store);
+		await sendMessage(
+			state,
+			scriptedProvider(["one"]),
+			"sys",
+			"first",
+			{
+				attachments: [...attachments]
+			},
+			store
+		);
 		await resendLast(state, scriptedProvider(["two"]), "sys", { store });
 		expect(activeChat(state).messages[0]?.attachments).toHaveLength(1);
 
@@ -810,13 +940,31 @@ describe("resolveSendCompletion", () => {
 		newChat(state);
 		const first = activeChat(state);
 		first.messages = [
-			{ id: newChatMsgId(), role: "user", content: "q", usage: null, error: null },
-			{ id: newChatMsgId(), role: "assistant", content: "old reply", usage: null, error: null }
+			{
+				id: newChatMsgId(),
+				role: "user",
+				content: "q",
+				usage: null,
+				error: null
+			},
+			{
+				id: newChatMsgId(),
+				role: "assistant",
+				content: "old reply",
+				usage: null,
+				error: null
+			}
 		];
 		newChat(state);
 		const second = activeChat(state);
 		second.messages = [
-			{ id: newChatMsgId(), role: "user", content: "new question", usage: null, error: null }
+			{
+				id: newChatMsgId(),
+				role: "user",
+				content: "new question",
+				usage: null,
+				error: null
+			}
 		];
 		const open = resolveSendCompletion(state, first.id, first.id);
 		expect(open.sent?.content).toBe("old reply");

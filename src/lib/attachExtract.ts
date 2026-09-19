@@ -13,12 +13,16 @@ import { inflateSync, unzipSync } from "fflate";
 /** Route a filename/mime to an extractor, or null for plain-text files. */
 export type ExtractableFormat = "pdf" | "docx";
 
-export function extractableFormat(fileName: string, mime: string): ExtractableFormat | null {
+export function extractableFormat(
+	fileName: string,
+	mime: string
+): ExtractableFormat | null {
 	const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
 	if (ext === "pdf" || mime === "application/pdf") return "pdf";
 	if (
 		ext === "docx" ||
-		mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+		mime ===
+			"application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 	) {
 		return "docx";
 	}
@@ -162,36 +166,41 @@ function scanLiterals(chunk: string): string[] {
 }
 
 function decodeLiteral(body: string): string {
-	return body.replace(/\\([nrtbf()\\]|[\r\n]+|[0-7]{1,3})/g, (match, code: string) => {
-		switch (code) {
-			case "n":
-				return "\n";
-			case "r":
-				return "\r";
-			case "t":
-				return "\t";
-			case "b":
-				return "\b";
-			case "f":
-				return "\f";
-			case "(":
-				return "(";
-			case ")":
-				return ")";
-			case "\\":
-				return "\\";
-			default:
-				// Octal byte (covers \r\n line continuations via the [\r\n]+ arm).
-				if (/^[0-7]/.test(code)) return String.fromCharCode(parseInt(code, 8) & 0xff);
-				return match;
+	return body.replace(
+		/\\([nrtbf()\\]|[\r\n]+|[0-7]{1,3})/g,
+		(match, code: string) => {
+			switch (code) {
+				case "n":
+					return "\n";
+				case "r":
+					return "\r";
+				case "t":
+					return "\t";
+				case "b":
+					return "\b";
+				case "f":
+					return "\f";
+				case "(":
+					return "(";
+				case ")":
+					return ")";
+				case "\\":
+					return "\\";
+				default:
+					// Octal byte (covers \r\n line continuations via the [\r\n]+ arm).
+					if (/^[0-7]/.test(code))
+						return String.fromCharCode(parseInt(code, 8) & 0xff);
+					return match;
+			}
 		}
-	});
+	);
 }
 
 function decodeHex(hex: string): string {
 	if (hex.length === 0 || hex.length % 2 !== 0) return "";
 	const bytes = new Uint8Array(hex.length / 2);
-	for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+	for (let i = 0; i < bytes.length; i++)
+		bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
 	// UTF-16BE with BOM (what writers emit for non-Latin text).
 	if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
 		let out = "";

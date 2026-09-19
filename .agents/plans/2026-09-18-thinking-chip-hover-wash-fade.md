@@ -19,7 +19,7 @@ Restyle the thinking indicator (no pill, more than blue) and give the badge hove
 
 - No DOM-mark hover revival (churn/flicker), no new color system or framework, no gradient/glow styling.
 - Rounded wash ends are a non-goal: square matches selection aesthetics, and rounding requires marks or overlays.
-- The existing streaming e2e asserting a tinted chip *will* redden and must be updated in the same unit.
+- The existing streaming e2e asserting a tinted chip _will_ redden and must be updated in the same unit.
 
 ## Key Decisions
 

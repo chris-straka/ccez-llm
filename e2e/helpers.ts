@@ -28,38 +28,51 @@ export async function seedChat(
 	messages: SeedMessage[],
 	replyLang: string | null = null
 ): Promise<void> {
-	await page.addInitScript((seed: { messages: SeedMessage[]; replyLang: string | null }) => {
-		window.localStorage.setItem("ccez-mock-provider", "1");
-		window.localStorage.setItem(
-			"ccez-llm-settings-v1",
-			JSON.stringify({ hoverAssistantActions: true, hoverUserActions: true, promptIdleSec: 0 })
-		);
-		window.localStorage.setItem(
-			"ccez-llm-chats-v1",
-			JSON.stringify([
-				{
-					id: "e2e-chat",
-					createdAt: 1,
-					replyLang: seed.replyLang,
-					messages: seed.messages.map((m, i) => ({
-						id: `e2e-m${i}`,
-						role: m.role,
-						content: m.content,
-						usage: null,
-						error: null
-					}))
-				}
-			])
-		);
-	}, { messages, replyLang });
+	await page.addInitScript(
+		(seed: { messages: SeedMessage[]; replyLang: string | null }) => {
+			window.localStorage.setItem("ccez-mock-provider", "1");
+			window.localStorage.setItem(
+				"ccez-llm-settings-v1",
+				JSON.stringify({
+					hoverAssistantActions: true,
+					hoverUserActions: true,
+					promptIdleSec: 0
+				})
+			);
+			window.localStorage.setItem(
+				"ccez-llm-chats-v1",
+				JSON.stringify([
+					{
+						id: "e2e-chat",
+						createdAt: 1,
+						replyLang: seed.replyLang,
+						messages: seed.messages.map((m, i) => ({
+							id: `e2e-m${i}`,
+							role: m.role,
+							content: m.content,
+							usage: null,
+							error: null
+						}))
+					}
+				])
+			);
+		},
+		{ messages, replyLang }
+	);
 }
 
 /** Bounding boxes for every button in an assistant message's action row. */
-export async function rowBoxes(page: Page, article: string): Promise<Array<{ x: number; y: number; width: number; height: number } | null>> {
+export async function rowBoxes(
+	page: Page,
+	article: string
+): Promise<
+	Array<{ x: number; y: number; width: number; height: number } | null>
+> {
 	const buttons = page.locator(`${article} .actions button`);
 	const count = await buttons.count();
 	const boxes = [];
-	for (let i = 0; i < count; i++) boxes.push(await buttons.nth(i).boundingBox());
+	for (let i = 0; i < count; i++)
+		boxes.push(await buttons.nth(i).boundingBox());
 	return boxes;
 }
 
@@ -79,7 +92,8 @@ export async function quoteRect(
 			while (walker.nextNode()) {
 				const node = walker.currentNode;
 				const parent = node.parentNode;
-				if (parent instanceof Element && parent.closest("[data-ann-badge]")) continue;
+				if (parent instanceof Element && parent.closest("[data-ann-badge]"))
+					continue;
 				if (node instanceof Text) texts.push(node);
 			}
 			const hay = texts.map((t) => t.textContent ?? "").join("");
@@ -114,11 +128,17 @@ export async function quoteRect(
 
 /** True drag-select of a quote inside one article: the release point
 stays inside the message, never on a control that would clear it. */
-export async function dragQuote(page: Page, article: number, quote: string): Promise<void> {
+export async function dragQuote(
+	page: Page,
+	article: number,
+	quote: string
+): Promise<void> {
 	const rect = await quoteRect(page, article, quote);
 	await page.mouse.move(rect.x + 1, rect.y + rect.height / 2);
 	await page.mouse.down();
-	await page.mouse.move(rect.x + rect.width - 1, rect.y + rect.height / 2, { steps: 8 });
+	await page.mouse.move(rect.x + rect.width - 1, rect.y + rect.height / 2, {
+		steps: 8
+	});
 	await page.mouse.up();
 }
 
@@ -128,7 +148,9 @@ export function expectBoxesStable(
 	after: Array<{ x: number; y: number; width: number; height: number } | null>
 ): void {
 	if (before.length !== after.length) {
-		throw new Error(`button count changed: ${before.length} -> ${after.length}`);
+		throw new Error(
+			`button count changed: ${before.length} -> ${after.length}`
+		);
 	}
 	for (let i = 0; i < before.length; i++) {
 		const a = before[i];

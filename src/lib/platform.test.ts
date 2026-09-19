@@ -33,7 +33,9 @@ describe("isAndroidUserAgent", () => {
 	it("matches Android phones and tablets", () => {
 		expect(isAndroidUserAgent(ANDROID_UA)).toBe(true);
 		expect(
-			isAndroidUserAgent("Mozilla/5.0 (Linux; Android 13; Pixel Tablet) AppleWebKit/537.36 Chrome/126.0 Mobile Safari/537.36")
+			isAndroidUserAgent(
+				"Mozilla/5.0 (Linux; Android 13; Pixel Tablet) AppleWebKit/537.36 Chrome/126.0 Mobile Safari/537.36"
+			)
 		).toBe(true);
 	});
 	it("rejects iOS and desktop agents", () => {
@@ -47,7 +49,9 @@ describe("isIOSUserAgent", () => {
 	it("matches iPhone and iPad agents", () => {
 		expect(isIOSUserAgent(IPHONE_UA)).toBe(true);
 		expect(
-			isIOSUserAgent("Mozilla/5.0 (iPad; CPU OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1")
+			isIOSUserAgent(
+				"Mozilla/5.0 (iPad; CPU OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1"
+			)
 		).toBe(true);
 	});
 	it("rejects Android and desktop agents", () => {
@@ -107,7 +111,12 @@ describe("isTouchTablet", () => {
 		"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15";
 	it("sends desktop-mode iPads to the touch UI", () => {
 		expect(
-			isTouchTablet({ ua: IPAD_DESKTOP_UA, coarse: true, maxTouchPoints: 5, smallestScreenDim: 820 })
+			isTouchTablet({
+				ua: IPAD_DESKTOP_UA,
+				coarse: true,
+				maxTouchPoints: 5,
+				smallestScreenDim: 820
+			})
 		).toBe(true);
 	});
 	it("sends other coarse touch tablets to the touch UI", () => {
@@ -123,7 +132,12 @@ describe("isTouchTablet", () => {
 	it("keeps real Macs, touchscreen laptops, and phones out", () => {
 		// Real Mac: Macintosh UA, no touch points.
 		expect(
-			isTouchTablet({ ua: MAC_UA, coarse: false, maxTouchPoints: 0, smallestScreenDim: 900 })
+			isTouchTablet({
+				ua: MAC_UA,
+				coarse: false,
+				maxTouchPoints: 0,
+				smallestScreenDim: 900
+			})
 		).toBe(false);
 		// Touchscreen laptop: fine primary pointer.
 		expect(
@@ -136,15 +150,30 @@ describe("isTouchTablet", () => {
 		).toBe(false);
 		// Phone-size touch device: below the tablet cutoff.
 		expect(
-			isTouchTablet({ ua: ANDROID_UA, coarse: true, maxTouchPoints: 5, smallestScreenDim: 412 })
+			isTouchTablet({
+				ua: ANDROID_UA,
+				coarse: true,
+				maxTouchPoints: 5,
+				smallestScreenDim: 412
+			})
 		).toBe(false);
 		// No touch hardware at all.
 		expect(
-			isTouchTablet({ ua: MAC_UA, coarse: false, maxTouchPoints: 0, smallestScreenDim: 412 })
+			isTouchTablet({
+				ua: MAC_UA,
+				coarse: false,
+				maxTouchPoints: 0,
+				smallestScreenDim: 412
+			})
 		).toBe(false);
 	});
 	it("honors a custom size cutoff", () => {
-		const probe = { ua: ANDROID_UA, coarse: true, maxTouchPoints: 5, smallestScreenDim: 500 };
+		const probe = {
+			ua: ANDROID_UA,
+			coarse: true,
+			maxTouchPoints: 5,
+			smallestScreenDim: 500
+		};
 		expect(isTouchTablet(probe, 600)).toBe(false);
 		expect(isTouchTablet(probe, 480)).toBe(true);
 	});
@@ -188,7 +217,9 @@ describe("isWindowsPlatform", () => {
 			["", "Windows"],
 			["", ""]
 		] as const) {
-			expect(isMacPlatform(platform, hint) && isWindowsPlatform(platform, hint)).toBe(false);
+			expect(
+				isMacPlatform(platform, hint) && isWindowsPlatform(platform, hint)
+			).toBe(false);
 		}
 	});
 });
@@ -239,22 +270,36 @@ describe("contentSwipeTarget", () => {
 describe("visibleProviderIds", () => {
 	const CLOUD = ["muse", "deepseek"];
 	it("lists everything on desktop, online or not", () => {
-		expect(visibleProviderIds(CLOUD, { android: false, online: true, local: false })).toEqual(CLOUD);
-		expect(visibleProviderIds(CLOUD, { android: false, online: false, local: false })).toEqual(CLOUD);
+		expect(
+			visibleProviderIds(CLOUD, { android: false, online: true, local: false })
+		).toEqual(CLOUD);
+		expect(
+			visibleProviderIds(CLOUD, { android: false, online: false, local: false })
+		).toEqual(CLOUD);
 	});
 	it("hides the local entry where its bridge can't exist", () => {
 		const all = [...CLOUD, "local-gemma"];
-		expect(visibleProviderIds(all, { android: false, online: true, local: true })).toEqual(CLOUD);
+		expect(
+			visibleProviderIds(all, { android: false, online: true, local: true })
+		).toEqual(CLOUD);
 	});
 	it("shows local alongside cloud on online Android once bridged", () => {
 		const all = [...CLOUD, "local-gemma"];
-		expect(visibleProviderIds(all, { android: true, online: true, local: true })).toEqual(all);
-		expect(visibleProviderIds(all, { android: true, online: true, local: false })).toEqual(CLOUD);
+		expect(
+			visibleProviderIds(all, { android: true, online: true, local: true })
+		).toEqual(all);
+		expect(
+			visibleProviderIds(all, { android: true, online: true, local: false })
+		).toEqual(CLOUD);
 	});
 	it("keeps only local on offline Android", () => {
 		const all = [...CLOUD, "local-gemma"];
-		expect(visibleProviderIds(all, { android: true, online: false, local: true })).toEqual(["local-gemma"]);
-		expect(visibleProviderIds(all, { android: true, online: false, local: false })).toEqual([]);
+		expect(
+			visibleProviderIds(all, { android: true, online: false, local: true })
+		).toEqual(["local-gemma"]);
+		expect(
+			visibleProviderIds(all, { android: true, online: false, local: false })
+		).toEqual([]);
 	});
 });
 
@@ -273,10 +318,13 @@ describe("pinchZoomStep", () => {
 
 describe("twoFingerSwipeDir", () => {
 	const grip = (x: number, y: number) =>
-		([
+		[
 			{ id: 0, x, y },
 			{ id: 1, x: x + 40, y }
-		] as [{ id: number; x: number; y: number }, { id: number; x: number; y: number }]);
+		] as [
+			{ id: number; x: number; y: number },
+			{ id: number; x: number; y: number }
+		];
 	it("steps newer on swipe right, older on swipe left", () => {
 		expect(twoFingerSwipeDir(grip(100, 600), grip(300, 600))).toBe(1);
 		expect(twoFingerSwipeDir(grip(300, 600), grip(100, 600))).toBe(-1);
@@ -289,10 +337,11 @@ describe("twoFingerSwipeDir", () => {
 		expect(twoFingerSwipeDir(split, splitEnd)).toBeNull(); // fingers split
 		expect(twoFingerSwipeDir(grip(100, 600), grip(300, 400))).toBeNull(); // diagonal
 		const pinch = grip(100, 500);
-		const pinched = grip(100, 300).map((f, i) => ({ ...f, x: i === 0 ? 40 : 200 }));
-		expect(
-			twoFingerSwipeDir(pinch, pinched as typeof pinch)
-		).toBeNull(); // opposite directions = pinch
+		const pinched = grip(100, 300).map((f, i) => ({
+			...f,
+			x: i === 0 ? 40 : 200
+		}));
+		expect(twoFingerSwipeDir(pinch, pinched as typeof pinch)).toBeNull(); // opposite directions = pinch
 		const spread = grip(100, 500);
 		const spreadEnd: typeof spread = [
 			{ id: 0, x: 220, y: 500 },
@@ -316,10 +365,13 @@ describe("threeFingerSwipeDir", () => {
 
 describe("twoFingerSlideDir", () => {
 	const grip = (x: number, y: number) =>
-		([
+		[
 			{ id: 0, x, y },
 			{ id: 1, x: x + 40, y }
-		] as [{ id: number; x: number; y: number }, { id: number; x: number; y: number }]);
+		] as [
+			{ id: number; x: number; y: number },
+			{ id: number; x: number; y: number }
+		];
 	it("slides up to the top, down to the bottom", () => {
 		expect(twoFingerSlideDir(grip(200, 600), grip(200, 400))).toBe("top");
 		expect(twoFingerSlideDir(grip(200, 400), grip(200, 600))).toBe("bottom");
@@ -350,12 +402,14 @@ describe("isThreeFingerTap", () => {
 	});
 });
 
-
-
-
 describe("nextTapCount", () => {
 	it("starts a fresh run at one", () => {
-		expect(nextTapCount(null, 1000, 50, 50)).toEqual({ count: 1, at: 1000, x: 50, y: 50 });
+		expect(nextTapCount(null, 1000, 50, 50)).toEqual({
+			count: 1,
+			at: 1000,
+			x: 50,
+			y: 50
+		});
 	});
 	it("pairs nearby taps into double, triple, quadruple", () => {
 		const one = nextTapCount(null, 1000, 50, 50);

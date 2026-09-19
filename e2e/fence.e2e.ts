@@ -4,12 +4,16 @@ import { seedChat } from "./helpers";
 test.beforeEach(async ({ page }) => {
 	await seedChat(page, []);
 	await page.goto("/");
-	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
 	await page.locator(".ta-input").first().click();
 });
 
 /** ```lang + Shift+Enter closes the fence with the caret on the body line. */
-test("fence opener plus shift-enter builds a python block", async ({ page }) => {
+test("fence opener plus shift-enter builds a python block", async ({
+	page
+}) => {
 	const box = page.locator(".ta-input").first();
 	await page.keyboard.type("```python");
 	await page.keyboard.press("Shift+Enter");

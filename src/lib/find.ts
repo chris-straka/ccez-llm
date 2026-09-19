@@ -20,6 +20,10 @@ export function emptyFind(): FindState {
  * Cycle the hit cursor past either end. The total stays positive — the
  * body only steps with hits, so zero is not a case here.
  */
-export function stepFindCursor(total: number, cursor: number, delta: 1 | -1): number {
-	return ((cursor + delta) % total + total) % total;
+export function stepFindCursor(
+	total: number,
+	cursor: number,
+	delta: 1 | -1
+): number {
+	return (((cursor + delta) % total) + total) % total;
 }

@@ -39,9 +39,9 @@ describe("recognizeImageText", () => {
 			confidence: 0.9
 		};
 		mockInvoke.mockResolvedValueOnce(result);
-		await expect(recognizeImageText("data:image/jpeg;base64,aGk=", "zh-CN")).resolves.toEqual(
-			result
-		);
+		await expect(
+			recognizeImageText("data:image/jpeg;base64,aGk=", "zh-CN")
+		).resolves.toEqual(result);
 		expect(mockInvoke).toHaveBeenCalledWith("ocr_recognize", {
 			image: "data:image/jpeg;base64,aGk=",
 			lang: "zh-CN"
@@ -64,10 +64,14 @@ describe("recognizeImageText", () => {
 
 describe("isOcrUnsupported", () => {
 	it("matches the platform stubs", () => {
-		expect(isOcrUnsupported("on-device OCR requires macOS (Windows WinRT OCR is a planned follow-up)")).toBe(
-			true
-		);
-		expect(isOcrUnsupported("native OCR is not supported on this platform")).toBe(true);
+		expect(
+			isOcrUnsupported(
+				"on-device OCR requires macOS (Windows WinRT OCR is a planned follow-up)"
+			)
+		).toBe(true);
+		expect(
+			isOcrUnsupported("native OCR is not supported on this platform")
+		).toBe(true);
 	});
 
 	it("leaves real failures alone", () => {
@@ -78,11 +82,15 @@ describe("isOcrUnsupported", () => {
 
 describe("friendlyOcrError", () => {
 	it("maps non-macOS builds to the browser-preview note", () => {
-		expect(friendlyOcrError("on-device OCR requires macOS")).toContain("Mac app");
+		expect(friendlyOcrError("on-device OCR requires macOS")).toContain(
+			"Mac app"
+		);
 	});
 
 	it("maps capability denials to a rebuild hint", () => {
-		expect(friendlyOcrError("ocr_recognize not allowed.")).toContain("permissions");
+		expect(friendlyOcrError("ocr_recognize not allowed.")).toContain(
+			"permissions"
+		);
 	});
 
 	it("keeps the no-text message user-facing", () => {
@@ -139,7 +147,24 @@ describe("visionSupports", () => {
 	it("covers the learner default and every modeled script", () => {
 		expect(visionSupports(null)).toBe(true);
 		expect(visionSupports("")).toBe(true);
-		for (const code of ["en", "zh", "ja", "ko", "yue", "uk", "ru", "ar", "th", "vi", "tr", "pl", "id", "ms", "no", "pt"]) {
+		for (const code of [
+			"en",
+			"zh",
+			"ja",
+			"ko",
+			"yue",
+			"uk",
+			"ru",
+			"ar",
+			"th",
+			"vi",
+			"tr",
+			"pl",
+			"id",
+			"ms",
+			"no",
+			"pt"
+		]) {
 			expect(visionSupports(code)).toBe(true);
 		}
 		// Latin without its own model reads through English …
@@ -154,7 +179,19 @@ describe("visionSupports", () => {
 	it("rejects scripts Vision has no model for", () => {
 		// Probe-verified absent (supportedRecognitionLanguages,
 		// macOS 26): these route to the WASM fallback instead.
-		for (const code of ["hi", "sa", "he", "el", "grc", "fa", "ur", "bn", "ta", "hy", "am"]) {
+		for (const code of [
+			"hi",
+			"sa",
+			"he",
+			"el",
+			"grc",
+			"fa",
+			"ur",
+			"bn",
+			"ta",
+			"hy",
+			"am"
+		]) {
 			expect(visionSupports(code)).toBe(false);
 		}
 	});
@@ -204,10 +241,12 @@ describe("keepBestRecognition", () => {
 
 describe("friendlyFallbackError", () => {
 	it("reads engine-download failures as offline", () => {
-		expect(friendlyFallbackError("Failed to fetch dynamically imported module")).toContain(
+		expect(
+			friendlyFallbackError("Failed to fetch dynamically imported module")
+		).toContain("check the network");
+		expect(friendlyFallbackError("Network request failed")).toContain(
 			"check the network"
 		);
-		expect(friendlyFallbackError("Network request failed")).toContain("check the network");
 	});
 
 	it("keeps the no-text message user-facing", () => {

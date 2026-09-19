@@ -13,7 +13,10 @@ import { describe, it, expect } from "vitest";
  * actions-reveal.test.ts does.
  */
 function pageStyle(): string {
-	const source = readFileSync(new URL("./+page.svelte", import.meta.url), "utf8");
+	const source = readFileSync(
+		new URL("./+page.svelte", import.meta.url),
+		"utf8"
+	);
 	const match = source.match(/<style>([\s\S]*)<\/style>/);
 	if (!match) throw new Error("+page.svelte has no <style> block");
 	// Strip CSS comments so prose can't trip the assertions below.
@@ -23,8 +26,13 @@ function pageStyle(): string {
 describe("mid-drag containment", () => {
 	it("covers descendants that declare their own selectability", () => {
 		const css = pageStyle();
-		const rule = css.match(/:global\(\.rendered\[data-drag-none\]\)[^{]*\{([^}]*)\}/);
-		expect(rule, "drag-none containment rule is gone — off-window drags paint other messages' math").toBeTruthy();
+		const rule = css.match(
+			/:global\(\.rendered\[data-drag-none\]\)[^{]*\{([^}]*)\}/
+		);
+		expect(
+			rule,
+			"drag-none containment rule is gone — off-window drags paint other messages' math"
+		).toBeTruthy();
 		expect(rule![1]).toMatch(/user-select\s*:\s*none\s*!important\s*;/);
 		expect(rule![1]).toMatch(/-webkit-user-select\s*:\s*none\s*!important\s*;/);
 	});

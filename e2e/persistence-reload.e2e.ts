@@ -53,9 +53,9 @@ test("history survives a reload", async ({ page }) => {
 		"persisted question alpha",
 		{ timeout: 60_000 }
 	);
-	await expect(page.locator("article.assistant .rendered").first()).toContainText(
-		"persisted answer beta"
-	);
+	await expect(
+		page.locator("article.assistant .rendered").first()
+	).toContainText("persisted answer beta");
 	await expect(page.locator("article")).toHaveCount(2);
 });
 
@@ -83,15 +83,17 @@ test("sent messages persist across a reload", async ({ page }) => {
 		"a message that must survive reload",
 		{ timeout: 60_000 }
 	);
-	await expect(page.locator("article.assistant .rendered").first()).toContainText(
-		"Mock reply to: a message that must survive reload"
-	);
+	await expect(
+		page.locator("article.assistant .rendered").first()
+	).toContainText("Mock reply to: a message that must survive reload");
 	await expect(page.locator("article")).toHaveCount(2);
 });
 
 test("theme choice survives a reload", async ({ page }) => {
 	await page.goto("/");
-	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
 	// NOTE: sidebar collapse is NOT covered here on purpose — the app
 	// forces `sidebarCollapsed = true` at boot by design ("always starts
 	// closed"), so it can never survive a reload. Theme is a genuinely
@@ -114,6 +116,8 @@ test("theme choice survives a reload", async ({ page }) => {
 		.toBe("dark");
 	await page.keyboard.press("Escape");
 	await page.reload();
-	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
 	await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 });

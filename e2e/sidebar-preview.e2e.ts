@@ -12,7 +12,15 @@ async function seedTwoChats(page: Page): Promise<void> {
 				id,
 				createdAt: 1,
 				replyLang: null,
-				messages: [{ id: `${id}-m`, role: "assistant", content, usage: null, error: null }]
+				messages: [
+					{
+						id: `${id}-m`,
+						role: "assistant",
+						content,
+						usage: null,
+						error: null
+					}
+				]
 			});
 			window.localStorage.setItem(
 				"ccez-llm-chats-v1",
@@ -35,7 +43,9 @@ test.beforeEach(async ({ page }) => {
 });
 
 /** Hovering a sidebar row previews that chat; leaving restores the active one. */
-test("sidebar hover previews the chat and restores on leave", async ({ page }) => {
+test("sidebar hover previews the chat and restores on leave", async ({
+	page
+}) => {
 	await openSidebar(page);
 	const main = page.locator("main .messages");
 	await expect(main).toContainText(ALPHA);
@@ -75,7 +85,9 @@ test("sidebar hover shows the chat counts tip", async ({ page }) => {
 (the peek reserves the row's space so opening the chat moves
 nothing), and no selection menu summons while hovering. Fails on
 pristine HEAD as count-0; the inert contract is the design. */
-test("preview holds the action row inert until the hover leaves", async ({ page }) => {
+test("preview holds the action row inert until the hover leaves", async ({
+	page
+}) => {
 	await openSidebar(page);
 	const actions = page.locator("article.assistant .actions");
 	await expect(actions).toHaveCount(1);

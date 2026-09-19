@@ -11,7 +11,10 @@ import {
 
 describe("updateRouteFor", () => {
 	it("routes Android to the releases page", () => {
-		expect(updateRouteFor(true)).toEqual({ kind: "releases", url: RELEASES_URL });
+		expect(updateRouteFor(true)).toEqual({
+			kind: "releases",
+			url: RELEASES_URL
+		});
 	});
 
 	it("routes desktop to the Tauri updater", () => {
@@ -22,7 +25,10 @@ describe("updateRouteFor", () => {
 	it("disables the updater on the web build (no Tauri shell)", () => {
 		expect(updateRouteFor(false, false)).toEqual({ kind: "none" });
 		// Android keeps its releases route even without a shell (browser preview).
-		expect(updateRouteFor(true, false)).toEqual({ kind: "releases", url: RELEASES_URL });
+		expect(updateRouteFor(true, false)).toEqual({
+			kind: "releases",
+			url: RELEASES_URL
+		});
 	});
 
 	it("points at the newest tagged release, not the list", () => {
@@ -34,7 +40,10 @@ describe("updateRouteFor", () => {
 	it("routes dev shells to the dev message instead of the updater", () => {
 		expect(updateRouteFor(false, true, true)).toEqual({ kind: "dev" });
 		// Android keeps its releases route in dev (APK flow still applies).
-		expect(updateRouteFor(true, true, true)).toEqual({ kind: "releases", url: RELEASES_URL });
+		expect(updateRouteFor(true, true, true)).toEqual({
+			kind: "releases",
+			url: RELEASES_URL
+		});
 		// Web builds stay disabled regardless of dev.
 		expect(updateRouteFor(false, false, true)).toEqual({ kind: "none" });
 		// Release desktop shells still use the Tauri updater.
@@ -50,12 +59,12 @@ describe("updateButtonLabel", () => {
 		expect(updateButtonLabel({ stage: "restarting" })).toBe("Restarting…");
 	});
 	it("shows download percent when the total is known", () => {
-		expect(updateButtonLabel({ stage: "downloading", received: 50, total: 100 })).toBe(
-			"Downloading… 50%"
-		);
-		expect(updateButtonLabel({ stage: "downloading", received: 0, total: null })).toBe(
-			"Downloading…"
-		);
+		expect(
+			updateButtonLabel({ stage: "downloading", received: 50, total: 100 })
+		).toBe("Downloading… 50%");
+		expect(
+			updateButtonLabel({ stage: "downloading", received: 0, total: null })
+		).toBe("Downloading…");
 	});
 });
 
@@ -91,7 +100,10 @@ describe("runUpdateFlow", () => {
 	it("reports up to date without downloading when no update is found", async () => {
 		const downloadAndInstall = vi.fn();
 		const relaunchApp = vi.fn();
-		const { deps, phases, reports } = flowHarness({ downloadAndInstall, relaunchApp });
+		const { deps, phases, reports } = flowHarness({
+			downloadAndInstall,
+			relaunchApp
+		});
 		await runUpdateFlow(deps);
 		expect(reports).toEqual(["You're on the latest version."]);
 		expect(downloadAndInstall).not.toHaveBeenCalled();

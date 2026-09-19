@@ -22,7 +22,11 @@ async function dropImage(page: Page, name = "blue.png"): Promise<void> {
 					const target = document.querySelector(".prompt");
 					if (!target) throw new Error("missing composer");
 					target.dispatchEvent(
-						new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: transfer })
+						new DragEvent("drop", {
+							bubbles: true,
+							cancelable: true,
+							dataTransfer: transfer
+						})
 					);
 					resolve();
 				} catch (error) {
@@ -34,7 +38,9 @@ async function dropImage(page: Page, name = "blue.png"): Promise<void> {
 }
 
 test.beforeEach(async ({ page }) => {
-	await seedChat(page, [{ role: "assistant", content: "alpha beta gamma delta" }]);
+	await seedChat(page, [
+		{ role: "assistant", content: "alpha beta gamma delta" }
+	]);
 	// Force the download-blob export path: a native save picker cannot
 	// be driven headless, so the picker must read as unavailable here.
 	await page.addInitScript(() => {
@@ -49,17 +55,25 @@ test.beforeEach(async ({ page }) => {
 	});
 });
 
-test("composer accepts dropped files into the attachments path", async ({ page }) => {
+test("composer accepts dropped files into the attachments path", async ({
+	page
+}) => {
 	// A .md drop lands as a text attachment pill under the composer.
 	// The event is dispatched in-page: DataTransfer is not serializable
 	// across the protocol, so dispatchEvent cannot carry it.
 	await page.evaluate(() => {
 		const transfer = new DataTransfer();
-		transfer.items.add(new File(["# hello"], "notes.md", { type: "text/markdown" }));
+		transfer.items.add(
+			new File(["# hello"], "notes.md", { type: "text/markdown" })
+		);
 		const target = document.querySelector(".prompt");
 		if (!target) throw new Error("missing composer");
 		target.dispatchEvent(
-			new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: transfer })
+			new DragEvent("drop", {
+				bubbles: true,
+				cancelable: true,
+				dataTransfer: transfer
+			})
 		);
 	});
 	await expect(page.locator(".attachments .name")).toHaveText("notes.md", {
@@ -67,10 +81,14 @@ test("composer accepts dropped files into the attachments path", async ({ page }
 	});
 });
 
-test("sidebar row export button downloads the chat as markdown", async ({ page }) => {
+test("sidebar row export button downloads the chat as markdown", async ({
+	page
+}) => {
 	// Export lives per sidebar row now (icon-only, left of delete);
 	// the header button is gone.
-	await expect(page.locator('header button[aria-label="Export chat as Markdown"]')).toHaveCount(0);
+	await expect(
+		page.locator('header button[aria-label="Export chat as Markdown"]')
+	).toHaveCount(0);
 	await page.keyboard.press("Meta+b");
 	const row = page.locator("aside li").first();
 	await expect(row).toBeVisible();
@@ -83,13 +101,17 @@ test("sidebar row export button downloads the chat as markdown", async ({ page }
 	expect(path).toBeTruthy();
 });
 
-test("dropped images land as cards with a [Pasted image] tag", async ({ page }) => {
+test("dropped images land as cards with a [Pasted image] tag", async ({
+	page
+}) => {
 	await dropImage(page);
 	const card = page.locator(".attachments li.card");
 	await expect(card).toBeVisible({ timeout: 15_000 });
 	await expect(card.locator(".thumb img")).toBeVisible();
 	await expect(card.locator(".tok")).toBeVisible();
-	await expect(card.locator('button[aria-label="Copy attachment"] svg')).toHaveCount(1);
+	await expect(
+		card.locator('button[aria-label="Copy attachment"] svg')
+	).toHaveCount(1);
 	await expect(
 		card.locator('button[aria-label="Remove attachment"] svg')
 	).toHaveCount(1);
@@ -97,7 +119,9 @@ test("dropped images land as cards with a [Pasted image] tag", async ({ page }) 
 	await expect(page.locator(".ta-input")).toHaveValue(/\[Pasted image\]/);
 });
 
-test("pasted tag leaves the caret after its space, same line", async ({ page }) => {
+test("pasted tag leaves the caret after its space, same line", async ({
+	page
+}) => {
 	await dropImage(page);
 	const content = page.locator(".ta-input");
 	await expect(content).toHaveValue(/\[Pasted image\]/, { timeout: 15_000 });
@@ -120,7 +144,9 @@ test("a second pasted image chains onto the same line", async ({ page }) => {
 	await expect(content).toHaveValue("[Pasted image] [Pasted image] ");
 });
 
-test("an image pasted after typed text stays on the same line", async ({ page }) => {
+test("an image pasted after typed text stays on the same line", async ({
+	page
+}) => {
 	const content = page.locator(".ta-input").first();
 	await content.click();
 	await page.keyboard.type("jj");
@@ -137,7 +163,9 @@ test("removing the pill collapses the strip", async ({ page }) => {
 	// No bridge in the preview: the fallback runs on the solid square
 	// and reports the miss, never the red inline slot.
 	await card.locator('button[aria-label="Recognize text in image"]').click();
-	await expect(page.locator(".toast")).toContainText("No text found", { timeout: 120_000 });
+	await expect(page.locator(".toast")).toContainText("No text found", {
+		timeout: 120_000
+	});
 	await expect(page.locator(".attach-error")).toHaveCount(0);
 	// The X takes the pill, its tag, and the strip — nothing lingers
 	// over the next draft.
@@ -146,14 +174,18 @@ test("removing the pill collapses the strip", async ({ page }) => {
 });
 
 test("attachment strip never covers message text", async ({ page }) => {
-	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(40);
+	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(
+		40
+	);
 	const turns = [0, 1, 2].flatMap((n) => [
 		{ role: "user" as const, content: `question ${n} ${long}` },
 		{ role: "assistant" as const, content: `answer ${n} ${long}` }
 	]);
 	await seedChat(page, turns);
 	await page.goto("/");
-	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article.assistant").first()).toBeVisible({
+		timeout: 60_000
+	});
 	await dropImage(page);
 	const strip = page.locator(".attachments");
 	await expect(strip).toBeVisible({ timeout: 15_000 });
@@ -166,7 +198,9 @@ test("attachment strip never covers message text", async ({ page }) => {
 	// Instant (not the eased smooth scroll): measure only once the
 	// scroller has settled at the bottom.
 	await page.evaluate(() => {
-		document.querySelector(".messages")?.scrollTo({ top: 1e9, behavior: "instant" });
+		document
+			.querySelector(".messages")
+			?.scrollTo({ top: 1e9, behavior: "instant" });
 	});
 	await expect
 		.poll(() =>
@@ -187,7 +221,9 @@ test("image pill and tag remove each other", async ({ page }) => {
 	const card = page.locator(".attachments li.card");
 	await expect(card).toBeVisible({ timeout: 15_000 });
 	// Pill → tag: the pill's X takes the marker line with it.
-	await page.locator('.attachments button[aria-label="Remove attachment"]').click();
+	await page
+		.locator('.attachments button[aria-label="Remove attachment"]')
+		.click();
 	await expect(card).toHaveCount(0);
 	await expect(page.locator(".ta-input")).not.toHaveValue(/\[Pasted image\]/);
 });
@@ -217,7 +253,10 @@ test("long paste becomes a pill with a positional tag", async ({ page }) => {
 		if (!target) throw new Error("missing editor");
 		const transfer = new DataTransfer();
 		transfer.setData("text/plain", text);
-		const event = new ClipboardEvent("paste", { bubbles: true, cancelable: true });
+		const event = new ClipboardEvent("paste", {
+			bubbles: true,
+			cancelable: true
+		});
 		Object.defineProperty(event, "clipboardData", { value: transfer });
 		target.dispatchEvent(event);
 	}, pasted);
@@ -252,7 +291,10 @@ test("pasted text renders as an image-sized card", async ({ page }) => {
 		if (!target) throw new Error("missing editor");
 		const transfer = new DataTransfer();
 		transfer.setData("text/plain", text);
-		const event = new ClipboardEvent("paste", { bubbles: true, cancelable: true });
+		const event = new ClipboardEvent("paste", {
+			bubbles: true,
+			cancelable: true
+		});
 		Object.defineProperty(event, "clipboardData", { value: transfer });
 		target.dispatchEvent(event);
 	}, pasted);
@@ -280,7 +322,9 @@ test("pasted text renders as an image-sized card", async ({ page }) => {
 	expect(Math.abs(openBox.height - previewBox.height)).toBeLessThanOrEqual(2);
 });
 
-test("thoughts never render and Ctrl+O stays quiet without paste tags", async ({ page }) => {
+test("thoughts never render and Ctrl+O stays quiet without paste tags", async ({
+	page
+}) => {
 	await page.addInitScript(() => {
 		window.localStorage.setItem(
 			"ccez-llm-chats-v1",
@@ -290,7 +334,13 @@ test("thoughts never render and Ctrl+O stays quiet without paste tags", async ({
 					createdAt: 1,
 					replyLang: null,
 					messages: [
-						{ id: "e2e-m0", role: "user", content: "hi", usage: null, error: null },
+						{
+							id: "e2e-m0",
+							role: "user",
+							content: "hi",
+							usage: null,
+							error: null
+						},
 						{
 							id: "e2e-m1",
 							role: "assistant",
@@ -315,18 +365,26 @@ test("thoughts never render and Ctrl+O stays quiet without paste tags", async ({
 	await expect(body).toContainText("Final answer");
 });
 
-test("screenshot-to-chat is gone, paste still takes images", async ({ page }) => {
+test("screenshot-to-chat is gone, paste still takes images", async ({
+	page
+}) => {
 	// Shot was removed (paste + OCR remain the image paths): no Shot
 	// control even where screen capture is supported.
 	await expect(
-		page.locator('.prompt-tools button[aria-label="Capture a screenshot into the chat"]')
+		page.locator(
+			'.prompt-tools button[aria-label="Capture a screenshot into the chat"]'
+		)
 	).toHaveCount(0);
 	await expect(
-		page.locator('.prompt-tools button[aria-label="Attach images or text files"]')
+		page.locator(
+			'.prompt-tools button[aria-label="Attach images or text files"]'
+		)
 	).toBeVisible();
 });
 
-test("expanded pasted content contracts from either blue bracket", async ({ page }) => {
+test("expanded pasted content contracts from either blue bracket", async ({
+	page
+}) => {
 	// A stored closed fold expands in place framed by blue collapse
 	// brackets; clicking either bracket contracts back to the tag.
 	await page.addInitScript(() => {
@@ -346,7 +404,13 @@ test("expanded pasted content contracts from either blue bracket", async ({ page
 							usage: null,
 							error: null
 						},
-						{ id: "e2e-m1", role: "assistant", content: "got it", usage: null, error: null }
+						{
+							id: "e2e-m1",
+							role: "assistant",
+							content: "got it",
+							usage: null,
+							error: null
+						}
 					]
 				}
 			])
@@ -355,7 +419,9 @@ test("expanded pasted content contracts from either blue bracket", async ({ page
 	await page.reload();
 	const body = page.locator("article.user .rendered").first();
 	await expect(body).toBeVisible({ timeout: 60_000 });
-	const marker = body.locator("button.paste-fold", { hasText: "[Pasted 4 chars]" });
+	const marker = body.locator("button.paste-fold", {
+		hasText: "[Pasted 4 chars]"
+	});
 	await expect(marker).toBeVisible();
 	// Composer-tag voice (ink bold), not link blue: the tag reads as
 	// message text that happens to click. Collapse brackets keep blue.
@@ -367,7 +433,9 @@ test("expanded pasted content contracts from either blue bracket", async ({ page
 	await expect(open).toBeVisible();
 	await open.click();
 	await expect(body).not.toContainText("BBBB");
-	await expect(body.locator("button.paste-fold", { hasText: "[Pasted 4 chars]" })).toBeVisible();
+	await expect(
+		body.locator("button.paste-fold", { hasText: "[Pasted 4 chars]" })
+	).toBeVisible();
 });
 
 test("tray stays background-free under a solid prompt", async ({ page }) => {
@@ -376,7 +444,9 @@ test("tray stays background-free under a solid prompt", async ({ page }) => {
 	// pills float with the thread visible between them, and draft
 	// image cards wear the blue wash again as basic pill-cards.
 	await page.reload();
-	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
 	await dropImage(page);
 	const tray = page.locator("ul.attachments").first();
 	await expect(tray).toBeVisible({ timeout: 15_000 });
@@ -404,69 +474,82 @@ attachments, which are the strip's only residents. */
 const PIXEL =
 	"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
-async function seedStripTurn(page: Page, imageCount: number, textBodies: string[] = []): Promise<void> {
-	await page.addInitScript((args: { url: string; imageCount: number; textBodies: string[] }) => {
-		window.localStorage.setItem("ccez-mock-provider", "1");
-		window.localStorage.setItem(
-			"ccez-llm-settings-v1",
-			JSON.stringify({ hoverAssistantActions: true, hoverUserActions: true, promptIdleSec: 0 })
-		);
-		const attachments = [
-			...Array.from({ length: args.imageCount }, (_, i) => ({
-				id: `e2e-img-${i}`,
-				name: `shot-${i}.png`,
-				mime: "image/png",
-				kind: "image",
-				dataUrl: args.url,
-				text: null,
-				width: 1,
-				height: 1,
-				tokens: 85
-			})),
-			...args.textBodies.map((text, i) => ({
-				id: `e2e-txt-${i}`,
-				name: `notes-${i}.md`,
-				mime: "text/markdown",
-				kind: "text",
-				dataUrl: null,
-				text,
-				width: null,
-				height: null,
-				tokens: 85
-			}))
-		];
-		window.localStorage.setItem(
-			"ccez-llm-chats-v1",
-			JSON.stringify([
-				{
-					id: "e2e-chat",
-					createdAt: 1,
-					replyLang: null,
-					messages: [
-						{
-							id: "e2e-m0",
-							role: "assistant",
-							content: "Welcome.",
-							usage: null,
-							error: null
-						},
-						{
-							id: "e2e-m1",
-							role: "user",
-							content: "What do you see here?",
-							usage: null,
-							error: null,
-							attachments
-						}
-					]
-				}
-			])
-		);
-	}, { url: PIXEL, imageCount, textBodies });
+async function seedStripTurn(
+	page: Page,
+	imageCount: number,
+	textBodies: string[] = []
+): Promise<void> {
+	await page.addInitScript(
+		(args: { url: string; imageCount: number; textBodies: string[] }) => {
+			window.localStorage.setItem("ccez-mock-provider", "1");
+			window.localStorage.setItem(
+				"ccez-llm-settings-v1",
+				JSON.stringify({
+					hoverAssistantActions: true,
+					hoverUserActions: true,
+					promptIdleSec: 0
+				})
+			);
+			const attachments = [
+				...Array.from({ length: args.imageCount }, (_, i) => ({
+					id: `e2e-img-${i}`,
+					name: `shot-${i}.png`,
+					mime: "image/png",
+					kind: "image",
+					dataUrl: args.url,
+					text: null,
+					width: 1,
+					height: 1,
+					tokens: 85
+				})),
+				...args.textBodies.map((text, i) => ({
+					id: `e2e-txt-${i}`,
+					name: `notes-${i}.md`,
+					mime: "text/markdown",
+					kind: "text",
+					dataUrl: null,
+					text,
+					width: null,
+					height: null,
+					tokens: 85
+				}))
+			];
+			window.localStorage.setItem(
+				"ccez-llm-chats-v1",
+				JSON.stringify([
+					{
+						id: "e2e-chat",
+						createdAt: 1,
+						replyLang: null,
+						messages: [
+							{
+								id: "e2e-m0",
+								role: "assistant",
+								content: "Welcome.",
+								usage: null,
+								error: null
+							},
+							{
+								id: "e2e-m1",
+								role: "user",
+								content: "What do you see here?",
+								usage: null,
+								error: null,
+								attachments
+							}
+						]
+					}
+				])
+			);
+		},
+		{ url: PIXEL, imageCount, textBodies }
+	);
 	await page.reload();
 }
 
-test("leftover strip tag matches body size and hugs the own-message edge", async ({ page }) => {
+test("leftover strip tag matches body size and hugs the own-message edge", async ({
+	page
+}) => {
 	// The strip sits outside .rendered, whose 0.92rem the fold buttons
 	// otherwise miss (they rendered at the 16px root size beside
 	// 14.72px body text); own-message strips pack right like the text.
@@ -504,7 +587,9 @@ test("strip popup opens above the tag, centered on it", async ({ page }) => {
 	const card = article.locator(".sent-open").first();
 	await expect(card).toBeVisible();
 	const geometry = await article.evaluate((root) => {
-		const t = root.querySelector(".sent-tags .paste-fold") as HTMLElement | null;
+		const t = root.querySelector(
+			".sent-tags .paste-fold"
+		) as HTMLElement | null;
 		const c = root.querySelector(".sent-open") as HTMLElement | null;
 		if (!t || !c) throw new Error("missing tag or card");
 		const tb = t.getBoundingClientRect();
@@ -518,7 +603,9 @@ test("strip popup opens above the tag, centered on it", async ({ page }) => {
 	});
 	expect(geometry.cardBottom).toBeLessThanOrEqual(geometry.tagTop + 1);
 	// Straddles its anchor instead of spilling right.
-	expect(Math.abs(geometry.cardCenterX - geometry.tagCenterX)).toBeLessThanOrEqual(6);
+	expect(
+		Math.abs(geometry.cardCenterX - geometry.tagCenterX)
+	).toBeLessThanOrEqual(6);
 });
 
 test("preview cards hug their content", async ({ page }) => {
@@ -526,7 +613,9 @@ test("preview cards hug their content", async ({ page }) => {
 	// rides narrow while a long excerpt fills the cap.
 	await seedStripTurn(page, 0, [
 		"Tiny note.",
-		"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor. ".repeat(6)
+		"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor. ".repeat(
+			6
+		)
 	]);
 	const article = page.locator("article.user").last();
 	const tags = article.locator(".sent-tags .paste-fold");
@@ -557,7 +646,10 @@ test("tray card thumbnail never covers its footer", async ({ page }) => {
 		if (!img || !name) throw new Error("missing thumb or name");
 		const ir = img.getBoundingClientRect();
 		const nr = name.getBoundingClientRect();
-		const hit = document.elementFromPoint(nr.left + nr.width / 2, nr.top + nr.height / 2);
+		const hit = document.elementFromPoint(
+			nr.left + nr.width / 2,
+			nr.top + nr.height / 2
+		);
 		return {
 			imgBottom: ir.bottom,
 			nameTop: nr.top,
@@ -581,13 +673,16 @@ test("one preview per message, contents centered", async ({ page }) => {
 	await tags.nth(1).click();
 	const cards = article.locator(".sent-open");
 	await expect(cards).toHaveCount(1);
-	const centered = await article.locator(".sent-card").first().evaluate((el) => {
-		const foot = el.querySelector(".sent-foot") as HTMLElement | null;
-		return {
-			card: window.getComputedStyle(el).textAlign,
-			foot: foot ? window.getComputedStyle(foot).justifyContent : "missing"
-		};
-	});
+	const centered = await article
+		.locator(".sent-card")
+		.first()
+		.evaluate((el) => {
+			const foot = el.querySelector(".sent-foot") as HTMLElement | null;
+			return {
+				card: window.getComputedStyle(el).textAlign,
+				foot: foot ? window.getComputedStyle(foot).justifyContent : "missing"
+			};
+		});
 	expect(centered.card).toBe("center");
 	expect(centered.foot).toBe("center");
 	// Toggling the open tag still closes it.
@@ -604,7 +699,10 @@ test("removing the image pill keeps the pasted-text pill", async ({ page }) => {
 		if (!target) throw new Error("missing editor");
 		const transfer = new DataTransfer();
 		transfer.setData("text/plain", text);
-		const event = new ClipboardEvent("paste", { bubbles: true, cancelable: true });
+		const event = new ClipboardEvent("paste", {
+			bubbles: true,
+			cancelable: true
+		});
 		Object.defineProperty(event, "clipboardData", { value: transfer });
 		target.dispatchEvent(event);
 	}, pasted);
@@ -615,7 +713,9 @@ test("removing the image pill keeps the pasted-text pill", async ({ page }) => {
 	// …then an image: its own card joins the strip (the text pill
 	// is a card too now, so scope to the thumbnail card)…
 	await dropImage(page);
-	const card = page.locator(".attachments li.card", { has: page.locator(".thumb") });
+	const card = page.locator(".attachments li.card", {
+		has: page.locator(".thumb")
+	});
 	await expect(card).toBeVisible({ timeout: 15_000 });
 	// …and removing the image pill keeps the pasted-text pill and tag.
 	await card.locator('button[aria-label="Remove attachment"]').click();
@@ -634,7 +734,10 @@ test("pasted-text pill expands to the full text and back", async ({ page }) => {
 		if (!target) throw new Error("missing editor");
 		const transfer = new DataTransfer();
 		transfer.setData("text/plain", text);
-		const event = new ClipboardEvent("paste", { bubbles: true, cancelable: true });
+		const event = new ClipboardEvent("paste", {
+			bubbles: true,
+			cancelable: true
+		});
 		Object.defineProperty(event, "clipboardData", { value: transfer });
 		target.dispatchEvent(event);
 	}, pasted);
@@ -672,7 +775,10 @@ test("tray docks a fixed margin above the prompt", async ({ page }) => {
 			const strip = document.querySelector("ul.attachments");
 			const prompt = document.querySelector("main .prompt");
 			if (!strip || !prompt) throw new Error("missing tray or prompt");
-			return prompt.getBoundingClientRect().top - strip.getBoundingClientRect().bottom;
+			return (
+				prompt.getBoundingClientRect().top -
+				strip.getBoundingClientRect().bottom
+			);
 		});
 	// The dock lands a frame after the attach: poll past the transient
 	// (a stuck negative would park the tray under the card).
@@ -694,7 +800,10 @@ test("tray re-docks above the prompt after cut and paste", async ({ page }) => {
 			const strip = document.querySelector("ul.attachments");
 			const prompt = document.querySelector("main .prompt");
 			if (!strip || !prompt) throw new Error("missing tray or prompt");
-			return prompt.getBoundingClientRect().top - strip.getBoundingClientRect().bottom;
+			return (
+				prompt.getBoundingClientRect().top -
+				strip.getBoundingClientRect().bottom
+			);
 		});
 	await expect.poll(gap, { timeout: 5_000 }).toBeGreaterThan(0);
 	await page.locator(".prompt .ta-input").click();
@@ -710,7 +819,9 @@ test("tray re-docks above the prompt after cut and paste", async ({ page }) => {
 					navigator.clipboard
 						.read()
 						.then(async (items) => {
-							const html = items.find((item) => item.types.includes("text/html"));
+							const html = items.find((item) =>
+								item.types.includes("text/html")
+							);
 							if (!html) return -1;
 							const text = await (await html.getType("text/html")).text();
 							return text.split("<img").length - 1;
@@ -734,7 +845,11 @@ test("thread text flows beside the floating tray", async ({ page }) => {
 		window.localStorage.setItem("ccez-mock-provider", "1");
 		window.localStorage.setItem(
 			"ccez-llm-settings-v1",
-			JSON.stringify({ hoverAssistantActions: true, hoverUserActions: true, promptIdleSec: 0 })
+			JSON.stringify({
+				hoverAssistantActions: true,
+				hoverUserActions: true,
+				promptIdleSec: 0
+			})
 		);
 		const msgs = [];
 		for (let i = 0; i < 20; i++) {
@@ -748,18 +863,26 @@ test("thread text flows beside the floating tray", async ({ page }) => {
 		}
 		window.localStorage.setItem(
 			"ccez-llm-chats-v1",
-			JSON.stringify([{ id: "e2e-chat", createdAt: 1, replyLang: null, messages: msgs }])
+			JSON.stringify([
+				{ id: "e2e-chat", createdAt: 1, replyLang: null, messages: msgs }
+			])
 		);
 	});
 	await page.reload();
-	await expect(page.locator("article.assistant").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article.assistant").first()).toBeVisible({
+		timeout: 60_000
+	});
 	await dropImage(page);
-	await expect(page.locator(".attachments li.card")).toBeVisible({ timeout: 15_000 });
+	await expect(page.locator(".attachments li.card")).toBeVisible({
+		timeout: 15_000
+	});
 	const hits = await page.evaluate(() => {
 		const box = document.querySelector(".messages") as HTMLElement | null;
 		if (!box) throw new Error("missing scroller");
 		box.scrollTo({ top: box.scrollHeight / 2, behavior: "instant" });
-		const rect = (el: Element | null): { top: number; bottom: number; left: number; right: number } | null => {
+		const rect = (
+			el: Element | null
+		): { top: number; bottom: number; left: number; right: number } | null => {
 			if (!el) return null;
 			const r = el.getBoundingClientRect();
 			return { top: r.top, bottom: r.bottom, left: r.left, right: r.right };
@@ -791,7 +914,9 @@ test("overflowing strip drag-pans under a grab cursor", async ({ page }) => {
 	const strip = page.locator("ul.attachments").first();
 	await expect(strip).toBeVisible({ timeout: 15_000 });
 	// The row really overflows: without that the pan has nothing to do.
-	await expect.poll(() => strip.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeGreaterThan(50);
+	await expect
+		.poll(() => strip.evaluate((el) => el.scrollWidth - el.clientWidth))
+		.toBeGreaterThan(50);
 	// Cards show the hand, never the bar: scrollbars stay hidden.
 	const cursor = await page
 		.locator("ul.attachments li.card")
@@ -808,15 +933,22 @@ test("overflowing strip drag-pans under a grab cursor", async ({ page }) => {
 	await page.mouse.down();
 	await page.mouse.move(startX - 160, startY, { steps: 8 });
 	await page.mouse.up();
-	await expect.poll(() => strip.evaluate((el) => el.scrollLeft)).not.toBe(before);
+	await expect
+		.poll(() => strip.evaluate((el) => el.scrollLeft))
+		.not.toBe(before);
 });
 
-test("cutting three tags pastes back three images, not one", async ({ page }) => {
+test("cutting three tags pastes back three images, not one", async ({
+	page
+}) => {
 	// Multi-tag cuts carry every picture (clipboard order); the paste
 	// hook used to take only the first file and strand the rest.
 	await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
-	for (const name of ["shot-0.png", "shot-1.png", "shot-2.png"]) await dropImage(page, name);
-	await expect(page.locator(".attachments li.card")).toHaveCount(3, { timeout: 15_000 });
+	for (const name of ["shot-0.png", "shot-1.png", "shot-2.png"])
+		await dropImage(page, name);
+	await expect(page.locator(".attachments li.card")).toHaveCount(3, {
+		timeout: 15_000
+	});
 	await page.locator(".prompt .ta-input").click();
 	await page.keyboard.press("Meta+a");
 	await page.keyboard.press("Meta+x");
@@ -830,7 +962,9 @@ test("cutting three tags pastes back three images, not one", async ({ page }) =>
 					navigator.clipboard
 						.read()
 						.then(async (items) => {
-							const html = items.find((item) => item.types.includes("text/html"));
+							const html = items.find((item) =>
+								item.types.includes("text/html")
+							);
 							if (!html) return -1;
 							const text = await (await html.getType("text/html")).text();
 							return text.split("<img").length - 1;
@@ -841,13 +975,17 @@ test("cutting three tags pastes back three images, not one", async ({ page }) =>
 		)
 		.toBe(3);
 	await page.keyboard.press("Meta+v");
-	await expect(page.locator(".attachments li.card")).toHaveCount(3, { timeout: 15_000 });
+	await expect(page.locator(".attachments li.card")).toHaveCount(3, {
+		timeout: 15_000
+	});
 	const tags = await page.evaluate(
 		() =>
 			(
-				(document.querySelector(".prompt .ta-input") as HTMLTextAreaElement | null)?.value.match(
-					/\[Pasted image\]/g
-				) ?? []
+				(
+					document.querySelector(
+						".prompt .ta-input"
+					) as HTMLTextAreaElement | null
+				)?.value.match(/\[Pasted image\]/g) ?? []
 			).length
 	);
 	expect(tags).toBe(3);
@@ -857,7 +995,9 @@ test("breaking an image tag drops its pill", async ({ page }) => {
 	// Tags are plain text now (no atomic unit): damaging the tag text
 	// still drops the attachment, never a half-tag reading as prose.
 	await dropImage(page);
-	await expect(page.locator(".attachments li.card")).toBeVisible({ timeout: 15_000 });
+	await expect(page.locator(".attachments li.card")).toBeVisible({
+		timeout: 15_000
+	});
 	await page.locator(".prompt .ta-input").click();
 	await page.keyboard.press("End");
 	await page.keyboard.press("ArrowLeft");
@@ -865,18 +1005,24 @@ test("breaking an image tag drops its pill", async ({ page }) => {
 	await page.keyboard.press("ArrowLeft");
 	await page.keyboard.press("Backspace");
 	await expect(page.locator(".attachments li.card")).toHaveCount(0);
-	await expect(page.locator(".prompt .ta-input").first()).not.toHaveValue(/\[Pasted image\]/);
+	await expect(page.locator(".prompt .ta-input").first()).not.toHaveValue(
+		/\[Pasted image\]/
+	);
 });
 
 test("backspacing a pasted-text tag drops its pill", async ({ page }) => {
 	// Over-threshold paste: pill plus positional tag, not a fold.
-	const pasted = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(4);
+	const pasted =
+		"lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(4);
 	await page.evaluate((text) => {
 		const target = document.querySelector(".ta-input");
 		if (!target) throw new Error("missing editor");
 		const transfer = new DataTransfer();
 		transfer.setData("text/plain", text);
-		const event = new ClipboardEvent("paste", { bubbles: true, cancelable: true });
+		const event = new ClipboardEvent("paste", {
+			bubbles: true,
+			cancelable: true
+		});
 		Object.defineProperty(event, "clipboardData", { value: transfer });
 		target.dispatchEvent(event);
 	}, pasted);
@@ -897,7 +1043,9 @@ test("backspacing a pasted-text tag drops its pill", async ({ page }) => {
 	await expect(box).not.toHaveValue(/\[Pasted 220 chars\]/);
 });
 
-test("cutting an image tag keeps its bytes for another chat", async ({ page }) => {
+test("cutting an image tag keeps its bytes for another chat", async ({
+	page
+}) => {
 	await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
 	await dropImage(page);
 	const card = page.locator(".attachments li.card");
@@ -910,17 +1058,23 @@ test("cutting an image tag keeps its bytes for another chat", async ({ page }) =
 	// ...but the clipboard kept the picture: a new chat pastes it back
 	// as a live image, not a dead tag.
 	await page.keyboard.press("Meta+b");
-	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/, { timeout: 10_000 });
+	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/, {
+		timeout: 10_000
+	});
 	await page.locator('button[aria-label="New chat"]').click();
 	await page.locator(".prompt .ta-input").click();
 	await page.keyboard.press("Meta+v");
 	const fresh = page.locator(".attachments li.card");
 	await expect(fresh).toBeVisible({ timeout: 15_000 });
 	await expect(fresh.locator(".thumb img")).toBeVisible();
-	await expect(page.locator(".prompt .ta-input").first()).toHaveValue(/\[Pasted image\]/);
+	await expect(page.locator(".prompt .ta-input").first()).toHaveValue(
+		/\[Pasted image\]/
+	);
 });
 
-test("deleting the first of two tags drops its own preview", async ({ page }) => {
+test("deleting the first of two tags drops its own preview", async ({
+	page
+}) => {
 	// Indexed pairing (Nth tag owns the Nth attachment): removing the
 	// first tag used to drop the second image's preview instead.
 	await dropImage(page, "first.png");
@@ -956,10 +1110,14 @@ test("removing the first pill keeps the second preview", async ({ page }) => {
 	await expect(cards).toHaveCount(1);
 	await expect(cards.first().locator(".name")).toContainText("second.png");
 	await expect(cards.first().locator(".thumb img")).toBeVisible();
-	await expect(page.locator(".prompt .ta-input").first()).toHaveValue(/\[Pasted image\]/);
+	await expect(page.locator(".prompt .ta-input").first()).toHaveValue(
+		/\[Pasted image\]/
+	);
 });
 
-test("cut pastes back previews when rich clipboard writes fail", async ({ page }) => {
+test("cut pastes back previews when rich clipboard writes fail", async ({
+	page
+}) => {
 	// Shell behavior: the enriched clipboard write rejects, so the
 	// paste lands as plain text — the in-app stash still rehydrates
 	// the pictures with their preview cards, never dead tags.
@@ -975,13 +1133,19 @@ test("cut pastes back previews when rich clipboard writes fail", async ({ page }
 	await page.keyboard.press("Meta+a");
 	await page.keyboard.press("Meta+c");
 	await expect
-		.poll(() => page.evaluate(() => navigator.clipboard.readText()), { timeout: 10_000 })
+		.poll(() => page.evaluate(() => navigator.clipboard.readText()), {
+			timeout: 10_000
+		})
 		.toContain("[Pasted image]");
 	const cutText = await page.evaluate(() => navigator.clipboard.readText());
 	// Now every clipboard write rejects (the shell's rich-write wall).
 	await page.evaluate(() => {
-		const denied = () => Promise.reject(new DOMException("denied", "NotAllowedError"));
-		Object.defineProperty(navigator.clipboard, "write", { value: denied, configurable: true });
+		const denied = () =>
+			Promise.reject(new DOMException("denied", "NotAllowedError"));
+		Object.defineProperty(navigator.clipboard, "write", {
+			value: denied,
+			configurable: true
+		});
 		Object.defineProperty(navigator.clipboard, "writeText", {
 			value: denied,
 			configurable: true
@@ -994,7 +1158,9 @@ test("cut pastes back previews when rich clipboard writes fail", async ({ page }
 	await page.evaluate((text) => {
 		const clipboard = navigator.clipboard as unknown as Record<string, unknown>;
 		delete clipboard["writeText"];
-		return (navigator.clipboard.writeText as (s: string) => Promise<void>)(text);
+		return (navigator.clipboard.writeText as (s: string) => Promise<void>)(
+			text
+		);
 	}, cutText);
 	await page.keyboard.press("Meta+v");
 	await expect(cards).toHaveCount(2, { timeout: 15_000 });
@@ -1017,23 +1183,32 @@ test("enter after a paste tag sends the message", async ({ page }) => {
 		if (!target) throw new Error("missing editor");
 		const transfer = new DataTransfer();
 		transfer.setData("text/plain", text);
-		const event = new ClipboardEvent("paste", { bubbles: true, cancelable: true });
+		const event = new ClipboardEvent("paste", {
+			bubbles: true,
+			cancelable: true
+		});
 		Object.defineProperty(event, "clipboardData", { value: transfer });
 		target.dispatchEvent(event);
 	}, pasted);
 	await expect(page.locator(".attachments .paste-body")).toBeVisible();
 	await dropImage(page, "after-paste.png");
 	const box = page.locator(".prompt .ta-input");
-	await expect(box).toHaveValue(/\[Pasted 540 chars\] \[Pasted image\] /, { timeout: 15_000 });
+	await expect(box).toHaveValue(/\[Pasted 540 chars\] \[Pasted image\] /, {
+		timeout: 15_000
+	});
 	await page.keyboard.press("Enter");
 	// First, not last: the mock assistant echo streams in after and
 	// would swallow the locator. The sent tag reads 539: the stored
 	// text trims the paste tail the composer pill still counts.
 	const user = page.locator("article.user").first();
-	const tag = user.locator("button.paste-fold", { hasText: "[Pasted 539 chars]" });
+	const tag = user.locator("button.paste-fold", {
+		hasText: "[Pasted 539 chars]"
+	});
 	await expect(tag).toBeVisible({ timeout: 15_000 });
 	await tag.click();
-	await expect(user.locator(".rendered")).toContainText("lorem ipsum", { timeout: 15_000 });
+	await expect(user.locator(".rendered")).toContainText("lorem ipsum", {
+		timeout: 15_000
+	});
 });
 
 /** Sent pastes keep the tag: a pill-backed long paste sends as
@@ -1047,15 +1222,22 @@ test("sent pasted text keeps its collapsed tag", async ({ page }) => {
 		if (!target) throw new Error("missing editor");
 		const transfer = new DataTransfer();
 		transfer.setData("text/plain", text);
-		const event = new ClipboardEvent("paste", { bubbles: true, cancelable: true });
+		const event = new ClipboardEvent("paste", {
+			bubbles: true,
+			cancelable: true
+		});
 		Object.defineProperty(event, "clipboardData", { value: transfer });
 		target.dispatchEvent(event);
 	}, pasted);
 	await expect(page.locator(".attachments .paste-body")).toBeVisible();
-	await expect(page.locator(".ta-input").first()).toHaveValue("[Pasted 540 chars] ");
+	await expect(page.locator(".ta-input").first()).toHaveValue(
+		"[Pasted 540 chars] "
+	);
 	await page.keyboard.press("Enter");
 	const user = page.locator("article.user").first();
-	const tag = user.locator("button.paste-fold", { hasText: "[Pasted 539 chars]" });
+	const tag = user.locator("button.paste-fold", {
+		hasText: "[Pasted 539 chars]"
+	});
 	await expect(tag).toBeVisible({ timeout: 15_000 });
 	await expect(user.locator(".rendered")).not.toContainText("lorem ipsum");
 	await tag.click();
@@ -1074,7 +1256,10 @@ test("pasted-text tag leaves one space after it", async ({ page }) => {
 		if (!target) throw new Error("missing editor");
 		const transfer = new DataTransfer();
 		transfer.setData("text/plain", text);
-		const event = new ClipboardEvent("paste", { bubbles: true, cancelable: true });
+		const event = new ClipboardEvent("paste", {
+			bubbles: true,
+			cancelable: true
+		});
 		Object.defineProperty(event, "clipboardData", { value: transfer });
 		target.dispatchEvent(event);
 	}, pasted);
@@ -1103,12 +1288,16 @@ test("sent images ride inline with the text", async ({ page }) => {
 	await page.keyboard.type("look at this");
 	await page.keyboard.press("Enter");
 	const user = page.locator("article.user");
-	await expect(user.locator(".rendered")).toContainText("look at this", { timeout: 15_000 });
+	await expect(user.locator(".rendered")).toContainText("look at this", {
+		timeout: 15_000
+	});
 	const tag = user.locator(".rendered .sent-fold");
 	await expect(tag).toContainText("[Pasted image]", { timeout: 15_000 });
 	await expect(user.locator(".rendered img.sent-img")).toHaveCount(0);
 	await tag.click();
-	await expect(user.locator(".rendered img.sent-img")).toBeVisible({ timeout: 15_000 });
+	await expect(user.locator(".rendered img.sent-img")).toBeVisible({
+		timeout: 15_000
+	});
 	await expect(user.locator(".rendered .sent-name")).toContainText("first.png");
 	// No strip for images: the above-message tags are files only.
 	await expect(user.locator(".sent-tags")).toHaveCount(0);
@@ -1122,5 +1311,7 @@ test("composer attachment tags are plain text", async ({ page }) => {
 	await expect(box).toHaveValue(/\[Pasted image\]/, { timeout: 15_000 });
 	// No inner spans anywhere inside the composer input: the tag is
 	// characters in the textarea value, not styled nodes.
-	expect(await box.evaluate((el) => el.querySelectorAll("span").length)).toBe(0);
+	expect(await box.evaluate((el) => el.querySelectorAll("span").length)).toBe(
+		0
+	);
 });

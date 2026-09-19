@@ -13,7 +13,9 @@ async function openWithMessages(
 ) {
 	await seedChat(page, messages);
 	await page.goto("/");
-	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
 }
 
 async function openSettings(page: import("@playwright/test").Page) {
@@ -26,7 +28,9 @@ async function seedEmpty(page: import("@playwright/test").Page): Promise<void> {
 		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
 		window.localStorage.setItem(
 			"ccez-llm-chats-v1",
-			JSON.stringify([{ id: "e2e-chat", createdAt: 1, replyLang: null, messages: [] }])
+			JSON.stringify([
+				{ id: "e2e-chat", createdAt: 1, replyLang: null, messages: [] }
+			])
 		);
 	});
 	await page.goto("/");
@@ -34,13 +38,27 @@ async function seedEmpty(page: import("@playwright/test").Page): Promise<void> {
 }
 
 /** Synthetic horizontal swipe (untrusted TouchEvents hit window listeners). */
-async function swipeX(page: import("@playwright/test").Page, x0: number, x1: number): Promise<void> {
+async function swipeX(
+	page: import("@playwright/test").Page,
+	x0: number,
+	x1: number
+): Promise<void> {
 	await page.evaluate(
 		({ x0, x1 }: { x0: number; x1: number }) => {
 			const touch = (x: number, y: number) =>
-				new Touch({ identifier: 9, target: document.body, clientX: x, clientY: y });
+				new Touch({
+					identifier: 9,
+					target: document.body,
+					clientX: x,
+					clientY: y
+				});
 			window.dispatchEvent(
-				new TouchEvent("touchstart", { bubbles: true, cancelable: true, composed: true, touches: [touch(x0, 600)] })
+				new TouchEvent("touchstart", {
+					bubbles: true,
+					cancelable: true,
+					composed: true,
+					touches: [touch(x0, 600)]
+				})
 			);
 			window.dispatchEvent(
 				new TouchEvent("touchend", {
@@ -67,51 +85,78 @@ test.describe("phone", () => {
 		viewport: { width: 412, height: 915 }
 	});
 
-		test("rerun tooltip is just Rerun", async ({ page }) => {
+	test("rerun tooltip is just Rerun", async ({ page }) => {
 		await page.addInitScript(() => {
 			window.localStorage.setItem("ccez-mock-provider", "1");
 			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
-			const msg = (id: string, role: string, content: string) => ({ id, role, content, usage: null, error: null });
+			const msg = (id: string, role: string, content: string) => ({
+				id,
+				role,
+				content,
+				usage: null,
+				error: null
+			});
 			window.localStorage.setItem(
 				"ccez-llm-chats-v1",
 				JSON.stringify([
-					{ id: "chat-a", createdAt: 1, replyLang: null, messages: [msg("m1", "user", "do it")] }
+					{
+						id: "chat-a",
+						createdAt: 1,
+						replyLang: null,
+						messages: [msg("m1", "user", "do it")]
+					}
 				])
 			);
 		});
 		await page.goto("/");
 		await page.locator("article").first().waitFor();
-		const rerun = page.locator('article .actions button[data-tip="Rerun"]').first();
+		const rerun = page
+			.locator('article .actions button[data-tip="Rerun"]')
+			.first();
 		await expect(rerun).toBeVisible();
 		expect(await rerun.getAttribute("aria-label")).toBe("Rerun");
 	});
 	test("drawers slide on transform, never pop", async ({ page }) => {
 		await seedEmpty(page);
-		const sheet = await page.locator("aside:has(button.new)").evaluate((el) => getComputedStyle(el).transition);
+		const sheet = await page
+			.locator("aside:has(button.new)")
+			.evaluate((el) => getComputedStyle(el).transition);
 		expect(sheet).toContain("transform");
 		await swipeX(page, 408, 268);
 		const panel = page.locator(".settings-panel");
 		await expect(panel).not.toHaveClass(/closed/);
-		const transition = await panel.evaluate((el) => getComputedStyle(el).transition);
+		const transition = await panel.evaluate(
+			(el) => getComputedStyle(el).transition
+		);
 		expect(transition).toContain("transform");
 	});
 });
-test("dragging the text slider upward resets to 100 percent", async ({ page }) => {
+test("dragging the text slider upward resets to 100 percent", async ({
+	page
+}) => {
 	await openWithMessages(page, [{ role: "user", content: "hi" }]);
 	await openSettings(page);
-	const slider = page.locator('.settings-panel input[aria-label="Text size percent"]');
+	const slider = page.locator(
+		'.settings-panel input[aria-label="Text size percent"]'
+	);
 	await slider.fill("250");
 	await expect(slider).toHaveValue("250");
 	const box = await slider.boundingBox();
 	expect(box).toBeTruthy();
-	await slider.dispatchEvent("pointerdown", { clientY: box!.y + box!.height / 2 });
-	await slider.dispatchEvent("pointerup", { clientY: box!.y + box!.height / 2 - 120 });
+	await slider.dispatchEvent("pointerdown", {
+		clientY: box!.y + box!.height / 2
+	});
+	await slider.dispatchEvent("pointerup", {
+		clientY: box!.y + box!.height / 2 - 120
+	});
 	await expect(slider).toHaveValue("100");
 });
 test("clicking the chat-width label text keeps the value", async ({ page }) => {
 	await openWithMessages(page, [{ role: "user", content: "hi" }]);
 	await openSettings(page);
-	const slider = page.locator('.settings-panel input[aria-label="Chat width in rem"]');
+	const slider = page.locator(
+		'.settings-panel input[aria-label="Chat width in rem"]'
+	);
 	await slider.fill("60");
 	await expect(slider).toHaveValue("60");
 	// NOTE: the inner `has` selector must be relative — an absolute
@@ -150,18 +195,26 @@ test("Meta+E toggles fullscreen", async ({ page }) => {
 	await openWithMessages(page, [{ role: "assistant", content: "hi" }]);
 	await page.keyboard.press("Meta+e");
 	await expect
-		.poll(() => page.evaluate(() => !!document.fullscreenElement), { timeout: 5_000 })
+		.poll(() => page.evaluate(() => !!document.fullscreenElement), {
+			timeout: 5_000
+		})
 		.toBe(true);
 	await page.keyboard.press("Meta+e");
 	await expect
-		.poll(() => page.evaluate(() => !!document.fullscreenElement), { timeout: 5_000 })
+		.poll(() => page.evaluate(() => !!document.fullscreenElement), {
+			timeout: 5_000
+		})
 		.toBe(false);
 	await page.keyboard.press("Meta+Control+f");
 	await expect
-		.poll(() => page.evaluate(() => !!document.fullscreenElement), { timeout: 5_000 })
+		.poll(() => page.evaluate(() => !!document.fullscreenElement), {
+			timeout: 5_000
+		})
 		.toBe(true);
 	await page.keyboard.press("Meta+Control+f");
 	await expect
-		.poll(() => page.evaluate(() => !!document.fullscreenElement), { timeout: 5_000 })
+		.poll(() => page.evaluate(() => !!document.fullscreenElement), {
+			timeout: 5_000
+		})
 		.toBe(false);
 });

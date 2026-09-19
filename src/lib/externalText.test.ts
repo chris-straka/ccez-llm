@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { cleanExternalAction, joinExternalDraft, routeExternalText } from "./externalText";
+import {
+	cleanExternalAction,
+	joinExternalDraft,
+	routeExternalText
+} from "./externalText";
 
 describe("joinExternalDraft", () => {
 	it("fills an empty draft", () => {
@@ -8,19 +12,26 @@ describe("joinExternalDraft", () => {
 	});
 
 	it("blank-line separates from existing text", () => {
-		expect(joinExternalDraft("question?", "今日は")).toBe("question?\n\n今日は");
+		expect(joinExternalDraft("question?", "今日は")).toBe(
+			"question?\n\n今日は"
+		);
 	});
 
 	it("trims trailing whitespace before joining", () => {
-		expect(joinExternalDraft("question?  \n", "今日は")).toBe("question?\n\n今日は");
+		expect(joinExternalDraft("question?  \n", "今日は")).toBe(
+			"question?\n\n今日は"
+		);
 	});
 
 	it("appends a multi-line share after an existing draft", () => {
 		// ACTION_SEND shape (excerpt + URL) joins the draft the same
 		// way a PROCESS_TEXT share does: one blank line, no gluing.
-		expect(joinExternalDraft("what is this?", "Look at this\nhttps://example.com/menu")).toBe(
-			"what is this?\n\nLook at this\nhttps://example.com/menu"
-		);
+		expect(
+			joinExternalDraft(
+				"what is this?",
+				"Look at this\nhttps://example.com/menu"
+			)
+		).toBe("what is this?\n\nLook at this\nhttps://example.com/menu");
 	});
 });
 
@@ -41,8 +52,12 @@ describe("cleanExternalAction", () => {
 
 describe("routeExternalText", () => {
 	it("prefills foreign shares", () => {
-		expect(routeExternalText("annotate", "from another app", "")).toBe("prefill");
-		expect(routeExternalText("speak", "from another app", "other")).toBe("prefill");
+		expect(routeExternalText("annotate", "from another app", "")).toBe(
+			"prefill"
+		);
+		expect(routeExternalText("speak", "from another app", "other")).toBe(
+			"prefill"
+		);
 	});
 
 	it("runs the tapped action on matching text", () => {

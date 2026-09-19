@@ -30,11 +30,17 @@ async function dropTextImage(page: Page, text: string): Promise<void> {
 				try {
 					if (!blob) throw new Error("canvas produced no blob");
 					const transfer = new DataTransfer();
-					transfer.items.add(new File([blob], "words.png", { type: "image/png" }));
+					transfer.items.add(
+						new File([blob], "words.png", { type: "image/png" })
+					);
 					const target = document.querySelector(".prompt");
 					if (!target) throw new Error("missing composer");
 					target.dispatchEvent(
-						new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: transfer })
+						new DragEvent("drop", {
+							bubbles: true,
+							cancelable: true,
+							dataTransfer: transfer
+						})
 					);
 					resolve();
 				} catch (error) {
@@ -46,19 +52,29 @@ async function dropTextImage(page: Page, text: string): Promise<void> {
 }
 
 test.beforeEach(async ({ page }) => {
-	await seedChat(page, [{ role: "assistant", content: "alpha beta gamma delta" }]);
+	await seedChat(page, [
+		{ role: "assistant", content: "alpha beta gamma delta" }
+	]);
 	await page.goto("/");
-	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
 });
 
 test("image attachments offer text recognition", async ({ page }) => {
-	await page.locator('input[type="file"]').setInputFiles("e2e/fixtures/attach.bmp");
+	await page
+		.locator('input[type="file"]')
+		.setInputFiles("e2e/fixtures/attach.bmp");
 	const item = page.locator(".attachments li").first();
 	await expect(item).toBeVisible({ timeout: 10_000 });
-	await expect(item.locator('button[aria-label="Recognize text in image"]')).toBeVisible();
+	await expect(
+		item.locator('button[aria-label="Recognize text in image"]')
+	).toBeVisible();
 });
 
-test("history card OCR reports a textless image without the Mac shell", async ({ page }) => {
+test("history card OCR reports a textless image without the Mac shell", async ({
+	page
+}) => {
 	// A sent message's expanded card carries a working OCR button:
 	// the pixel carries no text, so the fallback reports the miss
 	// (this also pins the delegated click reaching the stored
@@ -102,7 +118,13 @@ test("history card OCR reports a textless image without the Mac shell", async ({
 								}
 							]
 						},
-						{ id: "e2e-m2", role: "assistant", content: "a picture", usage: null, error: null }
+						{
+							id: "e2e-m2",
+							role: "assistant",
+							content: "a picture",
+							usage: null,
+							error: null
+						}
 					]
 				}
 			])
@@ -115,7 +137,9 @@ test("history card OCR reports a textless image without the Mac shell", async ({
 	const card = page.locator("article.user .sent-open").first();
 	await expect(card).toBeVisible();
 	await card.locator("button", { hasText: "OCR" }).click();
-	await expect(page.locator(".toast")).toContainText("No text found", { timeout: 120_000 });
+	await expect(page.locator(".toast")).toContainText("No text found", {
+		timeout: 120_000
+	});
 });
 
 test("recognition falls back live without the Mac shell", async ({ page }) => {

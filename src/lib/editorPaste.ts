@@ -41,7 +41,10 @@ export interface SendFold {
  * collapsed expand first; with none left, expanded tags collapse back;
  * with no tags at all the keystroke belongs to someone else.
  */
-export function pasteToggleAction(collapsed: number, open: number): "expand" | "collapse" | "none" {
+export function pasteToggleAction(
+	collapsed: number,
+	open: number
+): "expand" | "collapse" | "none" {
 	if (collapsed > 0) return "expand";
 	if (open > 0) return "collapse";
 	return "none";
@@ -61,7 +64,10 @@ export function pasteToggleAction(collapsed: number, open: number): "expand" | "
  * transform is dropped — sent unfolded — rather than misplaced. Pure and
  * unit-tested.
  */
-export function sendPasteFolds(doc: string, spans: PasteSpan[]): { text: string; folds: SendFold[] } {
+export function sendPasteFolds(
+	doc: string,
+	spans: PasteSpan[]
+): { text: string; folds: SendFold[] } {
 	// Drop marker tags, tracking dropped document ranges. Excisions come
 	// from the shared removeTags primitive, so this mirrors
 	// stripAttachmentMarkers by construction (a parity test still pins
@@ -105,7 +111,8 @@ export function sendPasteFolds(doc: string, spans: PasteSpan[]): { text: string;
 	const folds: SendFold[] = [];
 	for (const span of spans) {
 		if (span.from < 0 || span.to > doc.length || span.from >= span.to) continue;
-		if (dropped.some((range) => span.from < range.end && range.start < span.to)) continue;
+		if (dropped.some((range) => span.from < range.end && range.start < span.to))
+			continue;
 		const start = shift(span.from);
 		const end = shift(span.to);
 		if (start < 0 || end > text.length || start >= end) continue;
@@ -141,7 +148,10 @@ export function expandDeletionUnits(
 	deletions: DeletionRange[]
 ): DeletionRange[] {
 	const units: DeletionRange[] = [];
-	const tagRe = new RegExp(`${escapeRegExp(IMAGE_MARKER)}|${escapeRegExp(FILE_MARKER)}`, "g");
+	const tagRe = new RegExp(
+		`${escapeRegExp(IMAGE_MARKER)}|${escapeRegExp(FILE_MARKER)}`,
+		"g"
+	);
 	for (const match of docText.matchAll(tagRe)) {
 		const from = match.index ?? 0;
 		units.push({ from, to: from + match[0].length });
@@ -153,7 +163,8 @@ export function expandDeletionUnits(
 		units.push({ from, to: from + match[0].length });
 	}
 	for (const span of spans) {
-		if (span.from < 0 || span.to > docText.length || span.from >= span.to) continue;
+		if (span.from < 0 || span.to > docText.length || span.from >= span.to)
+			continue;
 		units.push({ from: span.from, to: span.to });
 	}
 	units.sort((a, b) => a.from - b.from);
@@ -205,7 +216,11 @@ export function markerCut(doc: string, marker: string): MarkerCut | null {
  * when the occurrence is absent. Index 0 behaves exactly like
  * `markerCut` (the parity battery pins it).
  */
-export function markerCutAt(doc: string, marker: string, index: number): MarkerCut | null {
+export function markerCutAt(
+	doc: string,
+	marker: string,
+	index: number
+): MarkerCut | null {
 	if (index < 0) return null;
 	const lines = doc.split("\n");
 	let seen = -1;
@@ -254,7 +269,8 @@ function markerCutSpan(
 	const keepAfter = raw.slice(tagAt + cutLen, rawTrimmedEnd);
 	if ((raw.slice(0, tagAt) + keepAfter).trim() === "") {
 		const isLast = at === lineCount - 1;
-		if (!isLast) return { from: lineStart, to: lineStart + raw.length + 1, insert: "" };
+		if (!isLast)
+			return { from: lineStart, to: lineStart + raw.length + 1, insert: "" };
 		if (at === 0) return { from: 0, to: raw.length, insert: "" };
 		return { from: lineStart - 1, to: lineStart + raw.length, insert: "" };
 	}
@@ -264,9 +280,17 @@ function markerCutSpan(
 	// With nothing after the tag, trimEnd eats into the pre-tag run too.
 	const before = raw.slice(0, tagAt);
 	if (keepAfter === "") {
-		return { from: lineStart + before.trimEnd().length, to: lineStart + raw.length, insert: "" };
+		return {
+			from: lineStart + before.trimEnd().length,
+			to: lineStart + raw.length,
+			insert: ""
+		};
 	}
-	return { from: lineStart + tagAt, to: lineStart + raw.length, insert: keepAfter };
+	return {
+		from: lineStart + tagAt,
+		to: lineStart + raw.length,
+		insert: keepAfter
+	};
 }
 
 /**
@@ -288,7 +312,8 @@ export function pastedCutAt(doc: string, index: number): MarkerCut | null {
 	const lineEnd = doc.indexOf("\n", absStart);
 	const raw = doc.slice(lineStart, lineEnd === -1 ? doc.length : lineEnd);
 	const tagAt = absStart - lineStart;
-	const cutLen = marker.length + (raw.slice(tagAt + marker.length).startsWith(" ") ? 1 : 0);
+	const cutLen =
+		marker.length + (raw.slice(tagAt + marker.length).startsWith(" ") ? 1 : 0);
 	return markerCutSpan(raw, tagAt, cutLen, lineStart, at, lineCount);
 }
 
@@ -358,7 +383,10 @@ export interface CollapsedPaste {
 	anchor: number;
 }
 
-export function collapsedPasteInsert(from: number, text: string): CollapsedPaste {
+export function collapsedPasteInsert(
+	from: number,
+	text: string
+): CollapsedPaste {
 	return {
 		insert: `${text} `,
 		pasteFrom: from,
@@ -381,7 +409,10 @@ export interface AttachTagRange {
 
 export function attachTagRanges(text: string): AttachTagRange[] {
 	const ranges: AttachTagRange[] = [];
-	const tagRe = new RegExp(`${escapeRegExp(IMAGE_MARKER)}|${escapeRegExp(FILE_MARKER)}`, "g");
+	const tagRe = new RegExp(
+		`${escapeRegExp(IMAGE_MARKER)}|${escapeRegExp(FILE_MARKER)}`,
+		"g"
+	);
 	for (const m of text.matchAll(tagRe)) {
 		const from = m.index ?? 0;
 		ranges.push({ from, to: from + m[0].length });
@@ -409,7 +440,10 @@ export interface TagCopyPlan {
  * `tagCopyIndexes`) onto its attachments — Nth tag pairs with the Nth
  * attachment, so a middle cut carries its own pictures.
  */
-export function tagCopyPlan(selectedText: string, clipboardWrite: boolean): TagCopyPlan | null {
+export function tagCopyPlan(
+	selectedText: string,
+	clipboardWrite: boolean
+): TagCopyPlan | null {
 	if (selectedText === "" || !clipboardWrite) return null;
 	const imageTags = countMarkers(selectedText);
 	if (imageTags === 0) return null;
@@ -422,7 +456,11 @@ export function tagCopyPlan(selectedText: string, clipboardWrite: boolean): TagC
  * selection's tags address the host's attachments directly. Empty
  * when the range holds no image tags.
  */
-export function tagCopyIndexes(doc: string, from: number, to: number): number[] {
+export function tagCopyIndexes(
+	doc: string,
+	from: number,
+	to: number
+): number[] {
 	if (from >= to) return [];
 	const base = countMarkers(doc.slice(0, Math.max(0, from)));
 	const count = countMarkers(doc.slice(from, to));
@@ -439,7 +477,11 @@ export async function dataUrlsToImageFiles(urls: string[]): Promise<File[]> {
 		if (!url.startsWith("data:")) continue;
 		try {
 			const blob = await (await fetch(url)).blob();
-			files.push(new File([blob], `pasted-image-${i}.png`, { type: blob.type || "image/png" }));
+			files.push(
+				new File([blob], `pasted-image-${i}.png`, {
+					type: blob.type || "image/png"
+				})
+			);
 		} catch {
 			// Unreadable entry skipped; the rest land.
 		}

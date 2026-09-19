@@ -10,7 +10,9 @@ describe("fetchPageText", () => {
 	it("rejects unfetchable URLs without touching the network", async () => {
 		const fetchMock = vi.fn(async () => new Response("x"));
 		vi.stubGlobal("fetch", fetchMock);
-		await expect(fetchPageText("file:///etc/passwd")).rejects.toThrow(FetchPageError);
+		await expect(fetchPageText("file:///etc/passwd")).rejects.toThrow(
+			FetchPageError
+		);
 		expect(fetchMock).not.toHaveBeenCalled();
 	});
 
@@ -19,9 +21,12 @@ describe("fetchPageText", () => {
 			"fetch",
 			vi.fn(
 				async () =>
-					new Response("<html><body><nav>n</nav><article><p>Words.</p></article></body></html>", {
-						status: 200
-					})
+					new Response(
+						"<html><body><nav>n</nav><article><p>Words.</p></article></body></html>",
+						{
+							status: 200
+						}
+					)
 			)
 		);
 		await expect(fetchPageText("https://example.com/")).resolves.toBe("Words.");
@@ -41,7 +46,12 @@ describe("fetchPageText", () => {
 		const text = await fetchPageText("https://example.com/feed.xml");
 		expect(text).toContain("H");
 		expect(text).toContain("https://example.com/h");
-		vi.stubGlobal("fetch", vi.fn(async () => new Response("x", { status: 404 })));
-		await expect(fetchPageText("https://example.com/")).rejects.toThrow("HTTP 404");
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => new Response("x", { status: 404 }))
+		);
+		await expect(fetchPageText("https://example.com/")).rejects.toThrow(
+			"HTTP 404"
+		);
 	});
 });

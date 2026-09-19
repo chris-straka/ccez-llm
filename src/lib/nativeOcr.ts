@@ -231,7 +231,10 @@ export function ocrRetryHint(code: string | null): string {
  * the first observation — observed text is never discarded. Pure
  * and unit-tested.
  */
-export function keepBestRecognition(first: OcrResult, second: OcrResult): OcrResult {
+export function keepBestRecognition(
+	first: OcrResult,
+	second: OcrResult
+): OcrResult {
 	if (first.confidence >= OCR_RETRY_BELOW) return first;
 	if (second.confidence > first.confidence) return second;
 	return first;
@@ -298,7 +301,10 @@ export async function recognizeFallbackText(
 		await worker.recognize(image, {}, { blocks: true })
 	).data;
 	const kept = (lines ?? [])
-		.map((line) => ({ text: line.text.trim(), confidence: line.confidence / 100 }))
+		.map((line) => ({
+			text: line.text.trim(),
+			confidence: line.confidence / 100
+		}))
 		.filter((line) => line.text !== "");
 	return {
 		text: text.trim(),
@@ -314,7 +320,11 @@ export async function recognizeFallbackText(
  * unit-tested.
  */
 export function friendlyFallbackError(message: string): string {
-	if (/failed to fetch|networkerror|network request failed|load failed|offline/i.test(message)) {
+	if (
+		/failed to fetch|networkerror|network request failed|load failed|offline/i.test(
+			message
+		)
+	) {
 		return "Couldn't fetch the text engine (one connection, then it works offline) — check the network and retry.";
 	}
 	if (/no text found/i.test(message)) {

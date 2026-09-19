@@ -93,10 +93,20 @@ export interface LanguageMenu {
 }
 
 export const LANGUAGE_MENUS: LanguageMenu[] = [
-	{ id: "europe", marker: "🌍", label: "Europe", languages: EUROPEAN_LANGUAGES },
+	{
+		id: "europe",
+		marker: "🌍",
+		label: "Europe",
+		languages: EUROPEAN_LANGUAGES
+	},
 	{ id: "asia", marker: "🌏", label: "Asia", languages: ASIAN_LANGUAGES },
 	{ id: "africa", marker: "🐘", label: "Africa", languages: AFRICAN_LANGUAGES },
-	{ id: "classics", marker: "🏛", label: "Classics", languages: CLASSICAL_LANGUAGES }
+	{
+		id: "classics",
+		marker: "🏛",
+		label: "Classics",
+		languages: CLASSICAL_LANGUAGES
+	}
 ];
 
 const BY_CODE: Record<string, ReplyLanguage> = {};

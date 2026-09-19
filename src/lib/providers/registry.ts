@@ -9,7 +9,11 @@ import { OpenAICompatProvider } from "./openai-compat";
  */
 export type ProviderId = string & { readonly kind: "provider" };
 
-export const BUILTIN_PROVIDER_IDS = ["muse", "deepseek", "local-gemma"] as const;
+export const BUILTIN_PROVIDER_IDS = [
+	"muse",
+	"deepseek",
+	"local-gemma"
+] as const;
 
 export type BuiltinProviderId = (typeof BUILTIN_PROVIDER_IDS)[number];
 
@@ -79,7 +83,10 @@ export function listProviders(custom: ProviderDef[] = []): ProviderDef[] {
  * this is the runtime validator for untrusted input (typo'd ids throw
  * instead of compiling — customs keep the set open).
  */
-export function getProviderDef(id: string, custom: ProviderDef[] = []): ProviderDef {
+export function getProviderDef(
+	id: string,
+	custom: ProviderDef[] = []
+): ProviderDef {
 	const def = listProviders(custom).find((p) => p.id === id);
 	if (!def) throw new Error(`Unknown provider: ${id}`);
 	return def;

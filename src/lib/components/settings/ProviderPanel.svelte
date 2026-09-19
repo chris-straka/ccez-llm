@@ -16,7 +16,11 @@
 		createProvider,
 		type ProviderId
 	} from "$lib/providers/registry";
-	import { maskKey, activeProviderSettings, type AppSettings } from "$lib/settings";
+	import {
+		maskKey,
+		activeProviderSettings,
+		type AppSettings
+	} from "$lib/settings";
 	import { tauriBackendAvailable } from "$lib/secrets";
 	import {
 		downloadedMB,
@@ -27,7 +31,12 @@
 		type OnDeviceStatus
 	} from "$lib/ondevice/bridge";
 	import { isAndroidUserAgent, visibleProviderIds } from "$lib/platform";
-	import { clearNotice, emptyNotices, flashNotice, MODEL_TIMEOUT_MS } from "$lib/notices";
+	import {
+		clearNotice,
+		emptyNotices,
+		flashNotice,
+		MODEL_TIMEOUT_MS
+	} from "$lib/notices";
 	import { onMount } from "svelte";
 	import "./panels.css";
 
@@ -41,16 +50,21 @@
 	async function refreshModels() {
 		clearNotice(modelNotice, "banner");
 		if (!active.baseUrl.trim() || !active.apiKey.trim()) {
-			flashNotice(modelNotice, "banner", "Enter a base URL and API key first.", MODEL_TIMEOUT_MS);
+			flashNotice(
+				modelNotice,
+				"banner",
+				"Enter a base URL and API key first.",
+				MODEL_TIMEOUT_MS
+			);
 			return;
 		}
 		modelLoading = true;
 		try {
 			active.models = await createProvider(
-			settings.activeProviderId,
-			active,
-			settings.customProviders
-		).listModels();
+				settings.activeProviderId,
+				active,
+				settings.customProviders
+			).listModels();
 		} catch (error) {
 			flashNotice(
 				modelNotice,
@@ -63,7 +77,8 @@
 		}
 	}
 	function maybeFetchModels() {
-		if (active.apiKey.trim() && active.models.length === 0) void refreshModels();
+		if (active.apiKey.trim() && active.models.length === 0)
+			void refreshModels();
 	}
 	let editingKey: Record<string, boolean> = $state({});
 	const inShell = tauriBackendAvailable();
@@ -93,15 +108,21 @@
 			)
 		);
 		return allProviders.filter(
-			(p) => visible.has(p.id) && (gemmaSupported !== false || !isOnDeviceProvider(p.id))
+			(p) =>
+				visible.has(p.id) &&
+				(gemmaSupported !== false || !isOnDeviceProvider(p.id))
 		);
 	});
-	const activeDef = $derived(getProviderDef(settings.activeProviderId, settings.customProviders));
+	const activeDef = $derived(
+		getProviderDef(settings.activeProviderId, settings.customProviders)
+	);
 	const activeCustom = $derived(
 		settings.customProviders.some((p) => p.id === settings.activeProviderId)
 	);
 	const active = $derived(activeProviderSettings(settings));
-	const showKeyField = $derived(!active.apiKey.trim() || editingKey[settings.activeProviderId]);
+	const showKeyField = $derived(
+		!active.apiKey.trim() || editingKey[settings.activeProviderId]
+	);
 	function switchProvider(id: ProviderId) {
 		settings.activeProviderId = id;
 		maybeFetchModels();
@@ -197,7 +218,13 @@
 		while (taken.has(id)) id = `custom-${slug}-${n++}`;
 		settings.customProviders = [
 			...settings.customProviders,
-			{ id: asProviderId(id), label, defaultBaseUrl: baseUrl, defaultModel: model, keyHint: "API key" }
+			{
+				id: asProviderId(id),
+				label,
+				defaultBaseUrl: baseUrl,
+				defaultModel: model,
+				keyHint: "API key"
+			}
 		];
 		settings.providers[id] = { baseUrl, apiKey: "", model, models: [] };
 		customName = "";
@@ -209,7 +236,9 @@
 	function removeCustomProvider(): void {
 		const id = settings.activeProviderId;
 		if (!settings.customProviders.some((p) => p.id === id)) return;
-		settings.customProviders = settings.customProviders.filter((p) => p.id !== id);
+		settings.customProviders = settings.customProviders.filter(
+			(p) => p.id !== id
+		);
 		delete settings.providers[id];
 		switchProvider(builtin("muse"));
 	}
@@ -247,7 +276,9 @@
 	{#if activeCustom}
 		<p class="note">
 			Custom provider.
-			<button type="button" onclick={removeCustomProvider}>Remove {activeDef.label}</button>
+			<button type="button" onclick={removeCustomProvider}
+				>Remove {activeDef.label}</button
+			>
 		</p>
 	{/if}
 	<details class="note provider-add">
@@ -301,7 +332,12 @@
 
 	<label>
 		Base URL
-		<input type="url" bind:value={active.baseUrl} autocomplete="off" spellcheck="false" />
+		<input
+			type="url"
+			bind:value={active.baseUrl}
+			autocomplete="off"
+			spellcheck="false"
+		/>
 	</label>
 	<label>
 		Model
@@ -325,7 +361,9 @@
 		<datalist id="model-list">
 			{#each active.models as id (id)}<option value={id}></option>{/each}
 		</datalist>
-		{#if modelNotice.banner.message}<span class="hint" role="alert">{modelNotice.banner.message}</span>{/if}
+		{#if modelNotice.banner.message}<span class="hint" role="alert"
+				>{modelNotice.banner.message}</span
+			>{/if}
 	</label>
 	{#if activeDef.keyless}
 		<p class="key-state" role="status">No key needed — {activeDef.keyHint}.</p>

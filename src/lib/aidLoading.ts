@@ -27,7 +27,10 @@ export function createAidLoadingReporter(
  * paste-fold layout. Re-runs with the same key (new marks array, new
  * callback identity from the parent) must re-stamp, never reconvert.
  */
-export function furiganaRequestKey(content: string, pasteFolds: unknown): string {
+export function furiganaRequestKey(
+	content: string,
+	pasteFolds: unknown
+): string {
 	return `${content}\n${JSON.stringify(pasteFolds ?? null)}`;
 }
 
@@ -38,7 +41,9 @@ export function furiganaRequestKey(content: string, pasteFolds: unknown): string
  * Same content returns the same reference; the cache is bounded and
  * content-keyed, so eviction only costs a rebuild, never correctness.
  */
-export function createRefMemo<T>(keyOf: (item: T) => string): (id: string, next: T[]) => T[] {
+export function createRefMemo<T>(
+	keyOf: (item: T) => string
+): (id: string, next: T[]) => T[] {
 	const cache = new Map<string, { key: string; items: T[] }>();
 	return (id: string, next: T[]) => {
 		const key = next.map(keyOf).join("\n");

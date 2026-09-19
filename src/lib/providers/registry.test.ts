@@ -33,7 +33,11 @@ describe("registry", () => {
 		expect(getProviderDef("muse", custom).label).toBe("Muse");
 		expect(() => getProviderDef("nope", custom)).toThrow("Unknown provider");
 		expect(
-			createProvider("custom-kimi", { baseUrl: "https://x", apiKey: "k", model: "m" }, custom)
+			createProvider(
+				"custom-kimi",
+				{ baseUrl: "https://x", apiKey: "k", model: "m" },
+				custom
+			)
 		).toBeTruthy();
 	});
 

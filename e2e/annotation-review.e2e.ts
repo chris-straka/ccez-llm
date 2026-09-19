@@ -1,7 +1,8 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { seedChat } from "./helpers";
 
-const SENTENCE = "The quick brown fox jumps over the lazy dog near the riverbank.";
+const SENTENCE =
+	"The quick brown fox jumps over the lazy dog near the riverbank.";
 
 /** Viewport center of the first real word inside a rendered message.
 Callers scroll first; measuring never moves anything. */
@@ -103,7 +104,8 @@ test("annotation markers show a pointer cursor", async ({ page }) => {
 no hits — elementFromPoint finds the composer, and clicking there
 opens no edit card. */
 test("badges slide beneath the composer", async ({ page }) => {
-	const para = "The quick brown fox jumps over the lazy dog near the riverbank. ";
+	const para =
+		"The quick brown fox jumps over the lazy dog near the riverbank. ";
 	await seedChat(
 		page,
 		Array.from({ length: 8 }, (_, i) => ({
@@ -151,7 +153,9 @@ test("badges slide beneath the composer", async ({ page }) => {
 	await filePickedAnnotation(page);
 	const probe = await page.evaluate(() => {
 		const msgs = document.querySelector(".messages") as HTMLElement | null;
-		const badge = document.querySelector("button.ccez-ann-badge") as HTMLElement | null;
+		const badge = document.querySelector(
+			"button.ccez-ann-badge"
+		) as HTMLElement | null;
 		const prompt = document.querySelector(".prompt") as HTMLElement | null;
 		if (!msgs || !badge || !prompt) throw new Error("missing layer");
 		msgs.scrollTop = msgs.scrollHeight;
@@ -217,9 +221,14 @@ test("review card closes on click-off and Escape", async ({ page }) => {
 
 /** A review quote click scrolls to the message and blinks the yellow
 wash on the annotated text. */
-test("review quote jumps to the message with a wash flash", async ({ page }) => {
+test("review quote jumps to the message with a wash flash", async ({
+	page
+}) => {
 	const para = `${SENTENCE} `.repeat(6);
-	const content = Array.from({ length: 12 }, (_, i) => `Paragraph ${i}. ${para}`).join("\n\n");
+	const content = Array.from(
+		{ length: 12 },
+		(_, i) => `Paragraph ${i}. ${para}`
+	).join("\n\n");
 	await seedChat(page, [{ role: "assistant", content }]);
 	await page.goto("/");
 	await expect(page.locator("article .rendered").first()).toBeVisible();
@@ -230,7 +239,9 @@ test("review quote jumps to the message with a wash flash", async ({ page }) => 
 		box.style.scrollBehavior = "auto";
 		box.scrollTo({ top: 999999 });
 	});
-	const top = await page.evaluate(() => document.querySelector(".messages")?.scrollTop ?? 0);
+	const top = await page.evaluate(
+		() => document.querySelector(".messages")?.scrollTop ?? 0
+	);
 	expect(top).toBeGreaterThan(200);
 	await page.locator(".prompt-tools .ann-pill").click();
 	await expect(page.locator(".ann-wrap.pinned .review")).toBeVisible();
@@ -254,7 +265,9 @@ test("review quote jumps to the message with a wash flash", async ({ page }) => 
 		)
 		.toBeGreaterThan(0);
 	await page.waitForTimeout(800);
-	const after = await page.evaluate(() => document.querySelector(".messages")?.scrollTop ?? 0);
+	const after = await page.evaluate(
+		() => document.querySelector(".messages")?.scrollTop ?? 0
+	);
 	expect(after).toBeLessThan(top - 50);
 });
 
@@ -264,7 +277,10 @@ behind the dock) — then a second jump restarts the flash for the
 wash read, since the landing outlasts one fade cycle. */
 test("down jump lands the quote clear of the dock", async ({ page }) => {
 	const para = `${SENTENCE} `.repeat(6);
-	const content = Array.from({ length: 12 }, (_, i) => `Paragraph ${i}. ${para}`).join("\n\n");
+	const content = Array.from(
+		{ length: 12 },
+		(_, i) => `Paragraph ${i}. ${para}`
+	).join("\n\n");
 	await seedChat(page, [{ role: "assistant", content }]);
 	// A live draft on the last paragraph (seeded in storage — the UI
 	// filing path is covered elsewhere, this test owns the jump).
@@ -272,7 +288,14 @@ test("down jump lands the quote clear of the dock", async ({ page }) => {
 		window.localStorage.setItem(
 			"ccez-llm-annotations-v1",
 			JSON.stringify({
-				"e2e-chat": [{ id: "ann-late", messageId: "e2e-m0", quote: "Paragraph 11", comment: "" }]
+				"e2e-chat": [
+					{
+						id: "ann-late",
+						messageId: "e2e-m0",
+						quote: "Paragraph 11",
+						comment: ""
+					}
+				]
 			})
 		);
 	});
@@ -286,7 +309,9 @@ test("down jump lands the quote clear of the dock", async ({ page }) => {
 	});
 	const start = await page.evaluate(() => {
 		const badge = document.querySelector("button.ccez-ann-badge");
-		return badge instanceof HTMLElement ? badge.getBoundingClientRect().top : -1;
+		return badge instanceof HTMLElement
+			? badge.getBoundingClientRect().top
+			: -1;
 	});
 	expect(start).toBeGreaterThan(600);
 	await page.locator(".prompt-tools .ann-pill").click();
@@ -300,8 +325,15 @@ test("down jump lands the quote clear of the dock", async ({ page }) => {
 				page.evaluate(() => {
 					const badge = document.querySelector("button.ccez-ann-badge");
 					const prompt = document.querySelector(".prompt");
-					if (!(badge instanceof HTMLElement) || !(prompt instanceof HTMLElement)) return 999999;
-					return badge.getBoundingClientRect().bottom - prompt.getBoundingClientRect().top;
+					if (
+						!(badge instanceof HTMLElement) ||
+						!(prompt instanceof HTMLElement)
+					)
+						return 999999;
+					return (
+						badge.getBoundingClientRect().bottom -
+						prompt.getBoundingClientRect().top
+					);
 				}),
 			{ timeout: 10_000 }
 		)
@@ -332,11 +364,17 @@ test("review note click does not jump", async ({ page }) => {
 	await annotateWord(page);
 	await page.locator(".prompt-tools .ann-pill").click();
 	await expect(page.locator(".ann-wrap.pinned .review")).toBeVisible();
-	const top = await page.evaluate(() => document.querySelector(".messages")?.scrollTop ?? 0);
+	const top = await page.evaluate(
+		() => document.querySelector(".messages")?.scrollTop ?? 0
+	);
 	await page.locator(".review-comment").first().click();
 	await page.locator(".review-num").first().click();
 	await page.waitForTimeout(500);
-	expect(await page.evaluate(() => document.querySelector(".messages")?.scrollTop ?? 0)).toBe(top);
+	expect(
+		await page.evaluate(
+			() => document.querySelector(".messages")?.scrollTop ?? 0
+		)
+	).toBe(top);
 	await expect(page.locator("mark.ccez-ann")).toHaveCount(0);
 	// No Highlight wash either (the wash paints through the registry).
 	expect(
@@ -357,7 +395,9 @@ test("review note click does not jump", async ({ page }) => {
 note text summons no menu, leaves the native pick exactly as drawn
 (stays copyable), and the trailing click does not jump (a live
 selection is a pick, not a press). */
-test("selecting review text summons no menu and stays put", async ({ page }) => {
+test("selecting review text summons no menu and stays put", async ({
+	page
+}) => {
 	const body = page.locator("article .rendered").first();
 	const box = await body.boundingBox();
 	if (!box) throw new Error("message has no box");
@@ -379,10 +419,14 @@ test("selecting review text summons no menu and stays put", async ({ page }) => 
 	if (!cbox) throw new Error("comment has no box");
 	await page.mouse.move(cbox.x + 2, cbox.y + cbox.height / 2);
 	await page.mouse.down();
-	await page.mouse.move(cbox.x + cbox.width - 2, cbox.y + cbox.height / 2, { steps: 6 });
+	await page.mouse.move(cbox.x + cbox.width - 2, cbox.y + cbox.height / 2, {
+		steps: 6
+	});
 	await page.mouse.up();
 	await expect(page.locator(".sel-menu")).toHaveCount(0);
-	expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).not.toBe("");
+	expect(
+		await page.evaluate(() => window.getSelection()?.toString() ?? "")
+	).not.toBe("");
 	await expect(page.locator(".review-item.highlight")).toHaveCount(0);
 });
 
@@ -421,16 +465,13 @@ test("review rows are one line with copy at the end", async ({ page }) => {
 of the pale dark-card grey, which washes out on white. */
 for (const theme of ["light", "dark"] as const) {
 	test(`review note reads on ${theme}`, async ({ page }) => {
-		await page.addInitScript(
-			(name: string) => {
-				const raw = window.localStorage.getItem("ccez-llm-settings-v1") ?? "{}";
-				window.localStorage.setItem(
-					"ccez-llm-settings-v1",
-					JSON.stringify({ ...JSON.parse(raw), theme: name })
-				);
-			},
-			theme
-		);
+		await page.addInitScript((name: string) => {
+			const raw = window.localStorage.getItem("ccez-llm-settings-v1") ?? "{}";
+			window.localStorage.setItem(
+				"ccez-llm-settings-v1",
+				JSON.stringify({ ...JSON.parse(raw), theme: name })
+			);
+		}, theme);
 		await page.goto("/");
 		await expect(page.locator("article .rendered").first()).toBeVisible();
 		await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
@@ -458,8 +499,12 @@ test("jump leaves a clear mark exactly where it is", async ({ page }) => {
 	// Drop the filing word-pick: a live selection would (correctly)
 	// make the quote press read as a pick instead of a jump.
 	await page.evaluate(() => window.getSelection()?.removeAllRanges());
-	const top = await page.evaluate(() => document.querySelector(".messages")?.scrollTop ?? 0);
-	await page.evaluate(() => (document.querySelector(".review-quote") as HTMLElement | null)?.click());
+	const top = await page.evaluate(
+		() => document.querySelector(".messages")?.scrollTop ?? 0
+	);
+	await page.evaluate(() =>
+		(document.querySelector(".review-quote") as HTMLElement | null)?.click()
+	);
 	// The flash still blinks: the jump happened, it just had nowhere to go.
 	await expect
 		.poll(
@@ -475,17 +520,28 @@ test("jump leaves a clear mark exactly where it is", async ({ page }) => {
 			{ timeout: 4_000 }
 		)
 		.toBeGreaterThan(0);
-	expect(await page.evaluate(() => document.querySelector(".messages")?.scrollTop ?? 0)).toBe(top);
+	expect(
+		await page.evaluate(
+			() => document.querySelector(".messages")?.scrollTop ?? 0
+		)
+	).toBe(top);
 });
 
 /** A quote whose message is gone toasts instead of jumping nowhere. */
-test("orphaned review quote toasts that the annotation is gone", async ({ page }) => {
+test("orphaned review quote toasts that the annotation is gone", async ({
+	page
+}) => {
 	await page.addInitScript(() => {
 		window.localStorage.setItem(
 			"ccez-llm-annotations-v1",
 			JSON.stringify({
 				"e2e-chat": [
-					{ id: "ann-ghost", messageId: "e2e-missing", quote: "gone", comment: "stale note" }
+					{
+						id: "ann-ghost",
+						messageId: "e2e-missing",
+						quote: "gone",
+						comment: "stale note"
+					}
 				]
 			})
 		);
@@ -495,7 +551,10 @@ test("orphaned review quote toasts that the annotation is gone", async ({ page }
 	await page.locator(".prompt-tools .ann-pill").click();
 	await expect(page.locator(".ann-wrap.pinned .review")).toBeVisible();
 	await page.locator(".review-quote").first().click();
-	await expect(page.locator(".toast")).toContainText("Annotation no longer exists", {
-		timeout: 5_000
-	});
+	await expect(page.locator(".toast")).toContainText(
+		"Annotation no longer exists",
+		{
+			timeout: 5_000
+		}
+	);
 });

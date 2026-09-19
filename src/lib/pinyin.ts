@@ -1,6 +1,11 @@
 import { pinyin } from "pinyin-pro";
 import { escapeHtml } from "./render";
-import { classifyAidLine, codeAwareLines, RUBY_SCRIPT_RE, type LocalAid } from "./reading";
+import {
+	classifyAidLine,
+	codeAwareLines,
+	RUBY_SCRIPT_RE,
+	type LocalAid
+} from "./reading";
 
 /**
  * Pinyin readings for Chinese text: per-character readings (pinyin-pro
@@ -51,12 +56,17 @@ export function pinyinRuby(text: string): string {
  * is preserved 1:1, so `plainParagraphs` source-text alignment is
  * unaffected.
  */
-export function pinyinBlock(text: string, preferred: LocalAid | null = null): string {
+export function pinyinBlock(
+	text: string,
+	preferred: LocalAid | null = null
+): string {
 	// Fenced code never converts: readings inside code are noise, and
 	// the buttons already ignore those lines at detection time.
 	return codeAwareLines(text)
 		.map(({ line, code }) =>
-			!code && classifyAidLine(line, preferred) === "pinyin" ? pinyinRuby(line) : escapeHtml(line)
+			!code && classifyAidLine(line, preferred) === "pinyin"
+				? pinyinRuby(line)
+				: escapeHtml(line)
 		)
 		.join("\n");
 }
@@ -95,15 +105,27 @@ function inlineEmphasis(html: string): string {
 		.replace(/\*(\S[^*]*?\S|\S)\*/g, "<em>$1</em>");
 }
 
-export function plainParagraphs(htmlInner: string, sourceText?: string): string {
+export function plainParagraphs(
+	htmlInner: string,
+	sourceText?: string
+): string {
 	const converted = htmlInner.split("\n").map(inlineEmphasis);
 	const sources = sourceText?.split("\n");
 	const lines: { html: string; kind: "para" | "ol" | "ul"; start: number }[] =
 		converted.map((html, i) => {
-			const src = sources && sources.length === converted.length ? (sources[i] ?? "") : html;
+			const src =
+				sources && sources.length === converted.length
+					? (sources[i] ?? "")
+					: html;
 			const ordered = src.match(/^\s*(\d+)[.)]\s+\S/);
-			if (ordered) return { html: html.replace(/^\s*\d+[.)]\s*/, ""), kind: "ol", start: Number(ordered[1]) };
-			if (/^\s*[-*+]\s+\S/.test(src)) return { html: html.replace(/^\s*[-*+]\s*/, ""), kind: "ul", start: 1 };
+			if (ordered)
+				return {
+					html: html.replace(/^\s*\d+[.)]\s*/, ""),
+					kind: "ol",
+					start: Number(ordered[1])
+				};
+			if (/^\s*[-*+]\s+\S/.test(src))
+				return { html: html.replace(/^\s*[-*+]\s*/, ""), kind: "ul", start: 1 };
 			return { html, kind: "para", start: 1 };
 		});
 	// Same ruby-room mark as the markdown renderer: blocks that can
@@ -126,10 +148,13 @@ export function plainParagraphs(htmlInner: string, sourceText?: string): string 
 	const flushList = (): void => {
 		if (list) {
 			const { kind, items, start } = list;
-			const open = kind === "ol" && start !== 1 ? `<ol start="${start}">` : `<${kind}>`;
+			const open =
+				kind === "ol" && start !== 1 ? `<ol start="${start}">` : `<${kind}>`;
 			blocks.push(
 				open +
-					items.map((item) => `<li${cjk(item)} dir="auto">${item}</li>`).join("") +
+					items
+						.map((item) => `<li${cjk(item)} dir="auto">${item}</li>`)
+						.join("") +
 					`</${kind}>`
 			);
 			list = null;

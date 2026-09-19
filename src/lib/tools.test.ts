@@ -24,7 +24,9 @@ describe("fetchToolDef", () => {
 		// A bare "test" once came back as a narrated fetch: the tool
 		// is plumbing the user doesn't know about, firing only for
 		// asked external information, never itself.
-		expect(fetchToolDef().function.description).toContain("The user doesn't know it exists.");
+		expect(fetchToolDef().function.description).toContain(
+			"The user doesn't know it exists."
+		);
 	});
 });
 
@@ -43,7 +45,9 @@ describe("validFetchUrl", () => {
 		expect(validFetchUrl("")).toBe(false);
 		expect(validFetchUrl(null)).toBe(false);
 		expect(validFetchUrl(42)).toBe(false);
-		expect(validFetchUrl(`https://example.com/${"a".repeat(2048)}`)).toBe(false);
+		expect(validFetchUrl(`https://example.com/${"a".repeat(2048)}`)).toBe(
+			false
+		);
 	});
 });
 
@@ -115,7 +119,9 @@ describe("parseFeedItems", () => {
 		const many = `<rss><channel>${"<item><title>t</title></item>".repeat(50)}</channel></rss>`;
 		expect(parseFeedItems(many).length).toBe(MAX_FEED_ITEMS);
 		expect(parseFeedItems("not xml at all <")).toEqual([]);
-		expect(formatFeedItems(parseFeedItems(RSS))).toContain("https://example.com/1");
+		expect(formatFeedItems(parseFeedItems(RSS))).toContain(
+			"https://example.com/1"
+		);
 	});
 });
 
@@ -124,17 +130,25 @@ describe("parseFetchCall", () => {
 		expect(
 			parseFetchCall({
 				id: "call_1",
-				function: { name: "fetch_url", arguments: '{"url":"https://example.com/"}' }
+				function: {
+					name: "fetch_url",
+					arguments: '{"url":"https://example.com/"}'
+				}
 			})
 		).toEqual({ id: "call_1", url: "https://example.com/" });
 	});
 
 	it("rejects wrong names, bad ids, and bad urls", () => {
-		expect(parseFetchCall({ id: "c", function: { name: "other", arguments: "{}" } })).toBe(null);
+		expect(
+			parseFetchCall({ id: "c", function: { name: "other", arguments: "{}" } })
+		).toBe(null);
 		expect(
 			parseFetchCall({
 				id: "",
-				function: { name: "fetch_url", arguments: '{"url":"https://example.com/"}' }
+				function: {
+					name: "fetch_url",
+					arguments: '{"url":"https://example.com/"}'
+				}
 			})
 		).toBe(null);
 		expect(
@@ -144,7 +158,10 @@ describe("parseFetchCall", () => {
 			})
 		).toBe(null);
 		expect(
-			parseFetchCall({ id: "c", function: { name: "fetch_url", arguments: "nope{" } })
+			parseFetchCall({
+				id: "c",
+				function: { name: "fetch_url", arguments: "nope{" }
+			})
 		).toBe(null);
 	});
 });

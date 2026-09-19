@@ -12,14 +12,21 @@ import { seedChat } from "./helpers";
  */
 
 /** Seed a chat, then merge the Inspect toggle into stored settings. */
-async function seedWithInspect(page: Page, enabled: boolean, content: string): Promise<void> {
+async function seedWithInspect(
+	page: Page,
+	enabled: boolean,
+	content: string
+): Promise<void> {
 	await seedChat(page, [{ role: "assistant", content }]);
 	await page.addInitScript((on: boolean) => {
 		try {
 			const raw = window.localStorage.getItem("ccez-llm-settings-v1");
 			const parsed = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
 			parsed["inspectEnabled"] = on;
-			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify(parsed));
+			window.localStorage.setItem(
+				"ccez-llm-settings-v1",
+				JSON.stringify(parsed)
+			);
 		} catch {
 			// Seed-order failure surfaces as a missing toggle below.
 		}

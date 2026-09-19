@@ -5,10 +5,14 @@ import { seedChat } from "./helpers";
 native field have to land as text (the focus-drop report typed over
 scroll mode entered via find-cycling/Ctrl+G and lost d/i/j/k/u/g). */
 test.beforeEach(async ({ page }) => {
-	await seedChat(page, [{ role: "assistant", content: "alpha beta gamma delta" }]);
+	await seedChat(page, [
+		{ role: "assistant", content: "alpha beta gamma delta" }
+	]);
 	await page.goto("/");
 	await expect(page.locator("article .rendered").first()).toBeVisible();
-	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
 });
 
 /** Enter scroll mode from the composer (mount focuses it: seeds run idle-hide off). */
@@ -47,7 +51,9 @@ test("open list keeps field keys in settings", async ({ page }) => {
 	await expect(target).toBeFocused();
 });
 
-test("scroll mode keeps field keys in the badge edit card", async ({ page }) => {
+test("scroll mode keeps field keys in the badge edit card", async ({
+	page
+}) => {
 	// File one annotation first (edit mode throughout).
 	await page.locator("article .rendered").first().selectText();
 	await page.mouse.up();

@@ -74,6 +74,9 @@ describe("markdown filename split", () => {
 		const md = textFile("notes.md");
 		const upper = textFile("UPPER.MARKDOWN");
 		const png = new File(["x"], "shot.png", { type: "image/png" });
-		expect(splitLaunchFiles([md, png, upper])).toEqual({ markdown: [md, upper], rest: [png] });
+		expect(splitLaunchFiles([md, png, upper])).toEqual({
+			markdown: [md, upper],
+			rest: [png]
+		});
 	});
 });

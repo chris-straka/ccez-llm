@@ -18,7 +18,9 @@ test("staging pins the scroller to the true bottom", async ({ page }) => {
 	await page.locator(".ta-input").click();
 	await page.keyboard.type("staged hello");
 	await page.keyboard.press("Alt+Enter");
-	await expect(page.locator("article.user").last()).toContainText("staged hello");
+	await expect(page.locator("article.user").last()).toContainText(
+		"staged hello"
+	);
 	// The smooth scroll lands after the render: poll past the motion.
 	await expect
 		.poll(async () =>
@@ -35,41 +37,41 @@ thread: the tail reserve never collapses while parked, so the last
 line already clears the opaque card and the scroll position survives
 the summon untouched (the floating-card regression covered the tail,
 and re-sticking yanked it upward — both read as hiding text). */
-test("summoning the parked composer keeps the tail visible", async ({ page }) => {
+test("summoning the parked composer keeps the tail visible", async ({
+	page
+}) => {
 	// Thirty one-line messages (not one tall paragraph): the last line
 	// is fully viewable, so the parking click below never triggers the
 	// driver's scroll-into-view and the test reads the app, not the rig.
 	const bodies = Array.from(
 		{ length: 30 },
-		(_, i) => `tail line ${i} with enough words to wrap and overflow the viewport`
+		(_, i) =>
+			`tail line ${i} with enough words to wrap and overflow the viewport`
 	);
-	await page.addInitScript(
-		(contents: string[]) => {
-			window.localStorage.setItem("ccez-mock-provider", "1");
-			window.localStorage.setItem(
-				"ccez-llm-settings-v1",
-				JSON.stringify({ promptIdleSec: -1 })
-			);
-			window.localStorage.setItem(
-				"ccez-llm-chats-v1",
-				JSON.stringify([
-					{
-						id: "e2e-chat",
-						createdAt: 1,
-						replyLang: null,
-						messages: contents.map((content, n) => ({
-							id: `m${n}`,
-							role: "assistant",
-							content,
-							usage: null,
-							error: null
-						}))
-					}
-				])
-			);
-		},
-		bodies
-	);
+	await page.addInitScript((contents: string[]) => {
+		window.localStorage.setItem("ccez-mock-provider", "1");
+		window.localStorage.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify({ promptIdleSec: -1 })
+		);
+		window.localStorage.setItem(
+			"ccez-llm-chats-v1",
+			JSON.stringify([
+				{
+					id: "e2e-chat",
+					createdAt: 1,
+					replyLang: null,
+					messages: contents.map((content, n) => ({
+						id: `m${n}`,
+						role: "assistant",
+						content,
+						usage: null,
+						error: null
+					}))
+				}
+			])
+		);
+	}, bodies);
 	await page.goto("/");
 	const last = page.locator("article .rendered").last();
 	await expect(last).toBeVisible({ timeout: 60_000 });
@@ -113,14 +115,19 @@ test("summoning the parked composer keeps the tail visible", async ({ page }) =>
 			page.evaluate(() => {
 				const paras = [...document.querySelectorAll("article .rendered p")];
 				const tail = paras[paras.length - 1]?.getBoundingClientRect();
-				const card = document.querySelector("main .prompt")?.getBoundingClientRect();
+				const card = document
+					.querySelector("main .prompt")
+					?.getBoundingClientRect();
 				if (!tail || !card) return 9999;
 				return tail.bottom - card.top;
 			})
 		)
 		.toBeLessThanOrEqual(0);
 	expect(
-		await page.evaluate((sel: string) => document.querySelector(sel)?.scrollTop ?? -1, scroller)
+		await page.evaluate(
+			(sel: string) => document.querySelector(sel)?.scrollTop ?? -1,
+			scroller
+		)
 	).toBe(parkedTop);
 });
 
@@ -131,29 +138,29 @@ tail reserve keeps it clear — but nothing ghosts through. */
 test("composer card is solid with no backdrop blur", async ({ page }) => {
 	const lines = Array.from(
 		{ length: 30 },
-		(_, i) => `tail line ${i} with enough words to wrap and overflow the viewport`
+		(_, i) =>
+			`tail line ${i} with enough words to wrap and overflow the viewport`
 	).join("\n");
-	await page.addInitScript(
-		(content: string) => {
-			window.localStorage.setItem("ccez-mock-provider", "1");
-			window.localStorage.setItem(
-				"ccez-llm-settings-v1",
-				JSON.stringify({ promptIdleSec: 0, composerOpacity: 0.5, bgOpacity: 0.5 })
-			);
-			window.localStorage.setItem(
-				"ccez-llm-chats-v1",
-				JSON.stringify([
-					{
-						id: "e2e-chat",
-						createdAt: 1,
-						replyLang: null,
-						messages: [{ id: "m", role: "assistant", content, usage: null, error: null }]
-					}
-				])
-			);
-		},
-		lines
-	);
+	await page.addInitScript((content: string) => {
+		window.localStorage.setItem("ccez-mock-provider", "1");
+		window.localStorage.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify({ promptIdleSec: 0, composerOpacity: 0.5, bgOpacity: 0.5 })
+		);
+		window.localStorage.setItem(
+			"ccez-llm-chats-v1",
+			JSON.stringify([
+				{
+					id: "e2e-chat",
+					createdAt: 1,
+					replyLang: null,
+					messages: [
+						{ id: "m", role: "assistant", content, usage: null, error: null }
+					]
+				}
+			])
+		);
+	}, lines);
 	await page.goto("/");
 	const composer = page.locator("main .prompt");
 	await expect(composer).toBeVisible({ timeout: 60_000 });
@@ -202,7 +209,15 @@ test("composer card is solid by default", async ({ page }) => {
 					id: "e2e-chat",
 					createdAt: 1,
 					replyLang: null,
-					messages: [{ id: "m", role: "assistant", content: "hi", usage: null, error: null }]
+					messages: [
+						{
+							id: "m",
+							role: "assistant",
+							content: "hi",
+							usage: null,
+							error: null
+						}
+					]
 				}
 			])
 		);
@@ -245,42 +260,50 @@ scroll and the read. */
 test("thread paints behind the floating composer", async ({ page }) => {
 	const lines = Array.from(
 		{ length: 30 },
-		(_, i) => `tail line ${i} with enough words to wrap and overflow the viewport`
+		(_, i) =>
+			`tail line ${i} with enough words to wrap and overflow the viewport`
 	).join("\n");
-	await page.addInitScript(
-		(content: string) => {
-			window.localStorage.setItem("ccez-mock-provider", "1");
-			window.localStorage.setItem(
-				"ccez-llm-settings-v1",
-				JSON.stringify({ promptIdleSec: 0 })
-			);
-			window.localStorage.setItem(
-				"ccez-llm-chats-v1",
-				JSON.stringify([
-					{
-						id: "e2e-chat",
-						createdAt: 1,
-						replyLang: null,
-						messages: [{ id: "m", role: "assistant", content, usage: null, error: null }]
-					}
-				])
-			);
-		},
-		lines
-	);
+	await page.addInitScript((content: string) => {
+		window.localStorage.setItem("ccez-mock-provider", "1");
+		window.localStorage.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify({ promptIdleSec: 0 })
+		);
+		window.localStorage.setItem(
+			"ccez-llm-chats-v1",
+			JSON.stringify([
+				{
+					id: "e2e-chat",
+					createdAt: 1,
+					replyLang: null,
+					messages: [
+						{ id: "m", role: "assistant", content, usage: null, error: null }
+					]
+				}
+			])
+		);
+	}, lines);
 	await page.goto("/");
-	await expect(page.locator("article .rendered").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article .rendered").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const overlap = await page.evaluate(() => {
 		const box = document.querySelector("main .messages") as HTMLElement | null;
 		const card = document.querySelector("main .prompt") as HTMLElement | null;
 		if (!box || !card) throw new Error("missing scroller or composer");
-		box.scrollTo({ top: box.scrollHeight - box.clientHeight - 600, behavior: "instant" });
+		box.scrollTo({
+			top: box.scrollHeight - box.clientHeight - 600,
+			behavior: "instant"
+		});
 		const cardRect = card.getBoundingClientRect();
 		const paras = [...document.querySelectorAll("article .rendered")];
 		return Math.max(
 			...paras.map((p) => {
 				const rect = p.getBoundingClientRect();
-				return Math.min(rect.bottom, cardRect.bottom) - Math.max(rect.top, cardRect.top);
+				return (
+					Math.min(rect.bottom, cardRect.bottom) -
+					Math.max(rect.top, cardRect.top)
+				);
 			})
 		);
 	});
@@ -303,7 +326,15 @@ test("reduced motion settles the composer instantly", async ({ page }) => {
 					id: "e2e-chat",
 					createdAt: 1,
 					replyLang: null,
-					messages: [{ id: "m", role: "assistant", content: "hi", usage: null, error: null }]
+					messages: [
+						{
+							id: "m",
+							role: "assistant",
+							content: "hi",
+							usage: null,
+							error: null
+						}
+					]
 				}
 			])
 		);
@@ -344,29 +375,30 @@ click behind pointer-events:none — tools buttons and the pill review
 toggle silently die. The idle ticker still re-parks a genuinely
 unfocused composer, so the guard only bridges the press in flight. */
 test("in-prompt press outlives a focusout to nowhere", async ({ page }) => {
-	await page.addInitScript(
-		(content: string) => {
-			window.localStorage.setItem("ccez-mock-provider", "1");
-			window.localStorage.setItem(
-				"ccez-llm-settings-v1",
-				JSON.stringify({ promptIdleSec: -1 })
-			);
-			window.localStorage.setItem(
-				"ccez-llm-chats-v1",
-				JSON.stringify([
-					{
-						id: "e2e-chat",
-						createdAt: 1,
-						replyLang: null,
-						messages: [{ id: "m", role: "assistant", content, usage: null, error: null }]
-					}
-				])
-			);
-		},
-		"stuck composer probe with enough words to render"
-	);
+	await page.addInitScript((content: string) => {
+		window.localStorage.setItem("ccez-mock-provider", "1");
+		window.localStorage.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify({ promptIdleSec: -1 })
+		);
+		window.localStorage.setItem(
+			"ccez-llm-chats-v1",
+			JSON.stringify([
+				{
+					id: "e2e-chat",
+					createdAt: 1,
+					replyLang: null,
+					messages: [
+						{ id: "m", role: "assistant", content, usage: null, error: null }
+					]
+				}
+			])
+		);
+	}, "stuck composer probe with enough words to render");
 	await page.goto("/");
-	await expect(page.locator("article .rendered").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article .rendered").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const composer = page.locator("main .prompt");
 	await page.keyboard.press("i");
 	await expect(composer).not.toHaveClass(/prompt-idle/, { timeout: 10_000 });
@@ -376,15 +408,22 @@ test("in-prompt press outlives a focusout to nowhere", async ({ page }) => {
 	// the press), then the editor blurs to nowhere (relatedTarget null)
 	// because WebKit never focuses the button. Release off-button so no
 	// file picker opens.
-	const attachBox = await page.locator(".prompt-tools .attach-btn").boundingBox();
+	const attachBox = await page
+		.locator(".prompt-tools .attach-btn")
+		.boundingBox();
 	if (!attachBox) throw new Error("attach button has no box");
-	await page.mouse.move(attachBox.x + attachBox.width / 2, attachBox.y + attachBox.height / 2);
+	await page.mouse.move(
+		attachBox.x + attachBox.width / 2,
+		attachBox.y + attachBox.height / 2
+	);
 	await page.mouse.down();
 	// A real FocusEvent (Playwright's dispatchEvent builds a generic
 	// Event for focusout, whose relatedTarget reads undefined): WebKit
 	// delivers null when the press focuses no button.
 	await editor.evaluate((el) => {
-		el.dispatchEvent(new FocusEvent("focusout", { bubbles: true, relatedTarget: null }));
+		el.dispatchEvent(
+			new FocusEvent("focusout", { bubbles: true, relatedTarget: null })
+		);
 	});
 	await page.mouse.move(8, 8);
 	await page.mouse.up();
@@ -431,11 +470,16 @@ test("prompt types and sends without vim", async ({ page }) => {
 	await page.keyboard.type("hello world");
 	await expect(page.locator(".ta-input")).toHaveValue("hello world");
 	await page.keyboard.press("Enter");
-	await expect(page.locator("article.user .rendered")).toContainText("hello world");
+	await expect(page.locator("article.user .rendered")).toContainText(
+		"hello world"
+	);
 	// Ctrl+G still hops out to scroll mode.
 	await page.locator(".ta-input").click();
 	await page.keyboard.press("Control+g");
-	await expect(page.locator(".ta-input")).toHaveAttribute("placeholder", " Ctrl+G to hop back in");
+	await expect(page.locator(".ta-input")).toHaveAttribute(
+		"placeholder",
+		" Ctrl+G to hop back in"
+	);
 });
 
 /** j past the newest message drops back into the prompt. */
@@ -486,7 +530,10 @@ opens it, and mouse travel never closes it. */
 test("prompt review card toggles on pill click", async ({ page }) => {
 	await seedChat(page, [{ role: "assistant", content: "fading review card" }]);
 	await page.goto("/");
-	await page.locator('article .rendered:has-text("fading review card")').first().selectText();
+	await page
+		.locator('article .rendered:has-text("fading review card")')
+		.first()
+		.selectText();
 	await page.mouse.up();
 	await expect(page.locator(".sel-menu")).toBeVisible();
 	await page.locator('.sel-menu button:has-text("Annotate")').click();
@@ -526,10 +573,11 @@ test("prompt typeface matches the chat typeface", async ({ page }) => {
 	const fonts = await page.evaluate(() => {
 		const cm = document.querySelector(".prompt .ta-input");
 		const msg = document.querySelector('article[id^="msg-"] .rendered');
-		if (!(cm instanceof HTMLElement) || !(msg instanceof HTMLElement)) return null;
+		if (!(cm instanceof HTMLElement) || !(msg instanceof HTMLElement))
+			return null;
 		return {
 			prompt: getComputedStyle(cm).fontFamily,
-			message: getComputedStyle(msg).fontFamily,
+			message: getComputedStyle(msg).fontFamily
 		};
 	});
 	if (!fonts) throw new Error("prompt or message node missing");
@@ -560,7 +608,10 @@ hover-clear shape, which the menu survives — see sel-menu.) */
 test("a cleared highlight drops the menu at once", async ({ page }) => {
 	await seedChat(page, [{ role: "assistant", content: "prompt halo" }]);
 	await page.goto("/");
-	await page.locator('article .rendered:has-text("prompt halo")').first().selectText();
+	await page
+		.locator('article .rendered:has-text("prompt halo")')
+		.first()
+		.selectText();
 	await page.mouse.up();
 	const menu = page.locator(".sel-menu");
 	await expect(menu).toBeVisible();
@@ -579,16 +630,24 @@ test("scrolling keeps a live selection menu", async ({ page }) => {
 		role: i % 2 === 0 ? "user" : "assistant",
 		content: `history filler paragraph ${i} with enough words to wrap several lines on any phone or desktop column`
 	}));
-	await seedChat(page, [...history, { role: "assistant", content: "halo keeper" }]);
+	await seedChat(page, [
+		...history,
+		{ role: "assistant", content: "halo keeper" }
+	]);
 	await page.goto("/");
-	await page.locator('article .rendered:has-text("halo keeper")').first().selectText();
+	await page
+		.locator('article .rendered:has-text("halo keeper")')
+		.first()
+		.selectText();
 	await page.mouse.up();
 	const menu = page.locator(".sel-menu");
 	await expect(menu).toBeVisible();
 	await page.mouse.wheel(0, -400);
 	await page.waitForTimeout(600);
 	await expect(menu).toBeVisible();
-	expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).toContain("halo");
+	expect(
+		await page.evaluate(() => window.getSelection()?.toString() ?? "")
+	).toContain("halo");
 });
 
 /** Sidebar hover preview yields to a live highlight: glancing at
@@ -600,16 +659,24 @@ test("sidebar hover keeps a live highlight and its menu", async ({ page }) => {
 			id,
 			createdAt: 1,
 			replyLang: null,
-			messages: [{ id: `${id}-m0`, role: "assistant", content, usage: null, error: null }]
+			messages: [
+				{ id: `${id}-m0`, role: "assistant", content, usage: null, error: null }
+			]
 		});
 		// The first chat is active on load.
 		window.localStorage.setItem(
 			"ccez-llm-chats-v1",
-			JSON.stringify([chat("e2e-active", "halo keeper"), chat("e2e-other", "other chat body")])
+			JSON.stringify([
+				chat("e2e-active", "halo keeper"),
+				chat("e2e-other", "other chat body")
+			])
 		);
 	});
 	await page.goto("/");
-	await page.locator('article .rendered:has-text("halo keeper")').first().selectText();
+	await page
+		.locator('article .rendered:has-text("halo keeper")')
+		.first()
+		.selectText();
 	await page.mouse.up();
 	const menu = page.locator(".sel-menu");
 	await expect(menu).toBeVisible();
@@ -621,8 +688,12 @@ test("sidebar hover keeps a live highlight and its menu", async ({ page }) => {
 	await page.waitForTimeout(400);
 	await expect(menu).toBeVisible();
 	await expect(page.locator("main .messages")).toContainText("halo keeper");
-	await expect(page.locator("main .messages")).not.toContainText("other chat body");
-	expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).toContain("halo");
+	await expect(page.locator("main .messages")).not.toContainText(
+		"other chat body"
+	);
+	expect(
+		await page.evaluate(() => window.getSelection()?.toString() ?? "")
+	).toContain("halo");
 });
 
 /** A sidebar preview reserves the same action rows as the open chat
@@ -630,7 +701,9 @@ without showing them: under hover-only rhythm the peek takes up the
 row's space (opening the chat moves nothing) while the buttons —
 and any error text riding with them — stay hidden until hovered in
 the open chat. */
-test("sidebar preview reserves action space without showing the row", async ({ page }) => {
+test("sidebar preview reserves action space without showing the row", async ({
+	page
+}) => {
 	await page.addInitScript(() => {
 		window.localStorage.setItem("ccez-mock-provider", "1");
 		const msg = (id: string, content: string, error: string | null) => ({
@@ -643,13 +716,25 @@ test("sidebar preview reserves action space without showing the row", async ({ p
 		window.localStorage.setItem(
 			"ccez-llm-chats-v1",
 			JSON.stringify([
-				{ id: "e2e-plain", createdAt: 1, replyLang: null, messages: [msg("e2e-plain-m", "plain thread", null)] },
-				{ id: "e2e-err", createdAt: 2, replyLang: null, messages: [msg("e2e-err-m", "failed thread", "Something broke")] }
+				{
+					id: "e2e-plain",
+					createdAt: 1,
+					replyLang: null,
+					messages: [msg("e2e-plain-m", "plain thread", null)]
+				},
+				{
+					id: "e2e-err",
+					createdAt: 2,
+					replyLang: null,
+					messages: [msg("e2e-err-m", "failed thread", "Something broke")]
+				}
 			])
 		);
 	});
 	await page.goto("/");
-	await expect(page.locator("article .rendered").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article .rendered").first()).toBeVisible({
+		timeout: 60_000
+	});
 	await page.keyboard.press("Meta+b");
 	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
 	const rows = page.locator("aside ul li button.side-chat");
@@ -671,18 +756,37 @@ chats with nothing filed still start at the top. */
 test("returning to a chat restores its scroll position", async ({ page }) => {
 	await page.addInitScript(() => {
 		window.localStorage.setItem("ccez-mock-provider", "1");
-		const lines = (tag: string) => Array.from({ length: 120 }, (_, i) => `${tag} line ${i}`).join("\n");
-		const msg = (id: string, content: string) => ({ id, role: "assistant", content, usage: null, error: null });
+		const lines = (tag: string) =>
+			Array.from({ length: 120 }, (_, i) => `${tag} line ${i}`).join("\n");
+		const msg = (id: string, content: string) => ({
+			id,
+			role: "assistant",
+			content,
+			usage: null,
+			error: null
+		});
 		window.localStorage.setItem(
 			"ccez-llm-chats-v1",
 			JSON.stringify([
-				{ id: "e2e-a", createdAt: 1, replyLang: null, messages: [msg("e2e-a-m", lines("Alpha"))] },
-				{ id: "e2e-b", createdAt: 2, replyLang: null, messages: [msg("e2e-b-m", lines("Beta"))] }
+				{
+					id: "e2e-a",
+					createdAt: 1,
+					replyLang: null,
+					messages: [msg("e2e-a-m", lines("Alpha"))]
+				},
+				{
+					id: "e2e-b",
+					createdAt: 2,
+					replyLang: null,
+					messages: [msg("e2e-b-m", lines("Beta"))]
+				}
 			])
 		);
 	});
 	await page.goto("/");
-	await expect(page.locator("article .rendered").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article .rendered").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const box = page.locator("main .messages");
 	await box.evaluate((el) => el.scrollTo({ top: 300 }));
 	await page.waitForTimeout(300);
@@ -691,7 +795,9 @@ test("returning to a chat restores its scroll position", async ({ page }) => {
 	const rows = page.locator("aside ul li button.side-chat");
 	// The unvisited chat starts at the top like today.
 	await rows.nth(1).click();
-	await expect.poll(() => box.evaluate((el) => el.scrollTop), { timeout: 8000 }).toBe(0);
+	await expect
+		.poll(() => box.evaluate((el) => el.scrollTop), { timeout: 8000 })
+		.toBe(0);
 	// Back on the first chat: where it was left, not the top.
 	await page.keyboard.press("Meta+b");
 	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
@@ -707,16 +813,35 @@ place that must compose stays stranded hidden. */
 test("empty chat restores an idle-hidden composer", async ({ page }) => {
 	await page.addInitScript(() => {
 		window.localStorage.setItem("ccez-mock-provider", "1");
-		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({ promptIdleSec: -1 }));
-		const chat = (id: string, messages: unknown[]) => ({ id, createdAt: 1, replyLang: null, messages });
-		const msg = (id: string, content: string) => ({ id, role: "assistant", content, usage: null, error: null });
+		window.localStorage.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify({ promptIdleSec: -1 })
+		);
+		const chat = (id: string, messages: unknown[]) => ({
+			id,
+			createdAt: 1,
+			replyLang: null,
+			messages
+		});
+		const msg = (id: string, content: string) => ({
+			id,
+			role: "assistant",
+			content,
+			usage: null,
+			error: null
+		});
 		window.localStorage.setItem(
 			"ccez-llm-chats-v1",
-			JSON.stringify([chat("chat-a", [msg("chat-a-m", "Alpha thread with a message.")]), chat("chat-b", [])])
+			JSON.stringify([
+				chat("chat-a", [msg("chat-a-m", "Alpha thread with a message.")]),
+				chat("chat-b", [])
+			])
 		);
 	});
 	await page.goto("/");
-	await expect(page.locator("article .rendered").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article .rendered").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const composer = page.locator("main .prompt");
 	await page.keyboard.press("Meta+b");
 	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
@@ -740,7 +865,8 @@ test("empty chat Space Enter i focus the composer", async ({ page }) => {
 	await seedChat(page, []);
 	await page.goto("/");
 	await expect(page.locator(".hero")).toBeVisible({ timeout: 60_000 });
-	const inPrompt = () => page.evaluate(() => !!document.activeElement?.closest?.(".prompt"));
+	const inPrompt = () =>
+		page.evaluate(() => !!document.activeElement?.closest?.(".prompt"));
 	for (const key of ["Space", "Enter", "i"]) {
 		// The hero takes focus back to the body without summoning.
 		await page.locator(".hero").click();
@@ -755,15 +881,31 @@ pills, and composer — inert, so every tap still belongs to the active chat. */
 test("empty preview shows inert pills and composer", async ({ page }) => {
 	await page.addInitScript(() => {
 		window.localStorage.setItem("ccez-mock-provider", "1");
-		const chat = (id: string, messages: unknown[]) => ({ id, createdAt: 1, replyLang: null, messages });
-		const msg = (id: string, content: string) => ({ id, role: "assistant", content, usage: null, error: null });
+		const chat = (id: string, messages: unknown[]) => ({
+			id,
+			createdAt: 1,
+			replyLang: null,
+			messages
+		});
+		const msg = (id: string, content: string) => ({
+			id,
+			role: "assistant",
+			content,
+			usage: null,
+			error: null
+		});
 		window.localStorage.setItem(
 			"ccez-llm-chats-v1",
-			JSON.stringify([chat("chat-a", [msg("chat-a-m", "Alpha thread with a message.")]), chat("chat-b", [])])
+			JSON.stringify([
+				chat("chat-a", [msg("chat-a-m", "Alpha thread with a message.")]),
+				chat("chat-b", [])
+			])
 		);
 	});
 	await page.goto("/");
-	await expect(page.locator("article .rendered").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article .rendered").first()).toBeVisible({
+		timeout: 60_000
+	});
 	await page.keyboard.press("Meta+b");
 	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
 	// The open sidebar parks the live composer...
@@ -776,12 +918,16 @@ test("empty preview shows inert pills and composer", async ({ page }) => {
 	await expect(previewPrompt).toBeVisible();
 	await expect(previewPrompt).toHaveAttribute("inert", "");
 	await expect(page.locator("main .lang-menus")).toHaveAttribute("inert", "");
-	await expect(page.locator("main .messages")).not.toContainText("Alpha thread");
+	await expect(page.locator("main .messages")).not.toContainText(
+		"Alpha thread"
+	);
 	// Clicking the previewed row lands directly: the preview clears
 	// inside the switch, so the column never flashes back to Alpha.
 	await page.locator("aside ul li button.side-chat").nth(1).click();
 	await expect(page.locator("aside").first()).toHaveClass(/collapsed/);
 	await expect(page.locator("main .hero")).toBeVisible();
-	await expect(page.locator("main .messages")).not.toContainText("Alpha thread");
+	await expect(page.locator("main .messages")).not.toContainText(
+		"Alpha thread"
+	);
 	await expect(page.locator("main .prompt")).toBeVisible();
 });

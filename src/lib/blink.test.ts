@@ -109,7 +109,7 @@ describe("startHighlightFade", () => {
 		return {
 			calls,
 			fade: {
-				locate: () => ({} as Range),
+				locate: () => ({}) as Range,
 				paint: (_range: Range, name: string) => calls.push(`paint:${name}`),
 				clear: (name: string) => calls.push(`clear:${name}`),
 				full: "flash",
@@ -156,7 +156,14 @@ describe("startHighlightFade", () => {
 		expect(calls).toEqual(["paint:d1", "clear:flash"]);
 		alive = false;
 		advance(50);
-		expect(calls).toEqual(["paint:d1", "clear:flash", "clear:flash", "clear:d1", "clear:d2", "done"]);
+		expect(calls).toEqual([
+			"paint:d1",
+			"clear:flash",
+			"clear:flash",
+			"clear:d1",
+			"clear:d2",
+			"done"
+		]);
 		advance(10_000);
 		expect(calls).toHaveLength(6);
 	});
@@ -202,7 +209,12 @@ describe("startMarkFade", () => {
 		vi.useFakeTimers();
 		const calls: string[] = [];
 		const m = mark();
-		startMarkFade({ marks: [m], holdMs: 700, fadeMs: 250, onDone: () => calls.push("done") });
+		startMarkFade({
+			marks: [m],
+			holdMs: 700,
+			fadeMs: 250,
+			onDone: () => calls.push("done")
+		});
 		expect(calls).toEqual([]);
 		advance(700);
 		expect((m as unknown as { classes: string[] }).classes).toEqual(["fading"]);
@@ -217,7 +229,12 @@ describe("startMarkFade", () => {
 		vi.useFakeTimers();
 		const calls: string[] = [];
 		const m = mark();
-		startMarkFade({ marks: [m], holdMs: 700, fadeMs: 0, onDone: () => calls.push("done") });
+		startMarkFade({
+			marks: [m],
+			holdMs: 700,
+			fadeMs: 0,
+			onDone: () => calls.push("done")
+		});
 		advance(700);
 		expect((m as unknown as { classes: string[] }).classes).toEqual([]);
 		expect(calls).toEqual(["done"]);

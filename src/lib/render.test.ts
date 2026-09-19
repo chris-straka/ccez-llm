@@ -13,25 +13,32 @@ import {
 	foldSegments,
 	pasteFoldButton,
 	htmlToText,
-	highlightRendered,
+	highlightRendered
 } from "./render";
 import type { AttachTagModel } from "./attachments";
 
 describe("thoughts", () => {
 	it("extracts closed think blocks, joining multiples", () => {
-		const { thoughts, body } = extractThoughts("<think>hmm</think>Answer<think>more</think>");
+		const { thoughts, body } = extractThoughts(
+			"<think>hmm</think>Answer<think>more</think>"
+		);
 		expect(thoughts).toBe("hmm\n\nmore");
 		expect(body).toBe("Answer");
 	});
 
 	it("treats an unclosed tag as streaming thoughts", () => {
-		const { thoughts, body } = extractThoughts("Answer so far<think>still thinking…");
+		const { thoughts, body } = extractThoughts(
+			"Answer so far<think>still thinking…"
+		);
 		expect(thoughts).toBe("still thinking…");
 		expect(body).toBe("Answer so far");
 	});
 
 	it("returns null thoughts for plain text", () => {
-		expect(extractThoughts("just text")).toEqual({ thoughts: null, body: "just text" });
+		expect(extractThoughts("just text")).toEqual({
+			thoughts: null,
+			body: "just text"
+		});
 	});
 });
 
@@ -109,7 +116,10 @@ describe("markdown rendering", () => {
 	});
 
 	it("strips thoughts: body only, never displayed", () => {
-		const { html, codes } = renderMessage("<think>hmm</think>```js\nx()\n```", false);
+		const { html, codes } = renderMessage(
+			"<think>hmm</think>```js\nx()\n```",
+			false
+		);
 		expect(html).not.toContain("ccez-thoughts");
 		expect(html).not.toContain("hmm");
 		expect(html).toContain("ccez-code");
@@ -117,7 +127,10 @@ describe("markdown rendering", () => {
 	});
 
 	it("keeps code indices unique across the body", () => {
-		const { html, codes } = renderMessage("```py\na\n```\n\n```js\nb\n```", false);
+		const { html, codes } = renderMessage(
+			"```py\na\n```\n\n```js\nb\n```",
+			false
+		);
 		expect(codes.map((c) => c.lang)).toEqual(["py", "js"]);
 		expect(html).toContain('data-code-index="0"');
 		expect(html).toContain('data-code-index="1"');
@@ -130,7 +143,9 @@ describe("markdown rendering", () => {
 	});
 
 	it("keeps blank-line breaks between CJK paragraphs", () => {
-		const { html } = renderMarkdown("秋が近づく。\n\n空が高くなる。\n\n紅葉が色づく。");
+		const { html } = renderMarkdown(
+			"秋が近づく。\n\n空が高くなる。\n\n紅葉が色づく。"
+		);
 		expect(html.match(/<p dir="auto" class="cjk">/g)).toHaveLength(3);
 	});
 
@@ -188,7 +203,9 @@ describe("sent-message tags", () => {
 	};
 
 	it("rebuilds literals as fold buttons paired by kind order", () => {
-		const { html } = renderMarkdown("[Pasted image] what do you see here?", [img]);
+		const { html } = renderMarkdown("[Pasted image] what do you see here?", [
+			img
+		]);
 		expect(html).toContain('class="paste-fold sent-fold"');
 		expect(html).toContain('data-sent-toggle="img-1"');
 		expect(html).toContain("[Pasted image]");
@@ -197,7 +214,9 @@ describe("sent-message tags", () => {
 	});
 
 	it("floats open tags as pill popups with icon buttons", () => {
-		const { html } = renderMarkdown("[Pasted image] what do you see here?", [{ ...img, open: true }]);
+		const { html } = renderMarkdown("[Pasted image] what do you see here?", [
+			{ ...img, open: true }
+		]);
 		expect(html).toContain('class="sent-open"');
 		// The tag stays mounted below its popup.
 		expect(html).toContain('class="paste-fold sent-fold"');
@@ -213,7 +232,9 @@ describe("sent-message tags", () => {
 	});
 
 	it("floats file excerpts with copy but no OCR", () => {
-		const { html } = renderMarkdown("[Pasted Attachment] notes", [{ ...file, open: true }]);
+		const { html } = renderMarkdown("[Pasted Attachment] notes", [
+			{ ...file, open: true }
+		]);
 		expect(html).toContain('class="sent-excerpt"');
 		expect(html).toContain("# hello");
 		expect(html).toContain("notes.md");
@@ -222,7 +243,9 @@ describe("sent-message tags", () => {
 	});
 
 	it("falls back to plain text past the end of the models", () => {
-		const { html } = renderMarkdown("[Pasted image] one [Pasted image] two", [img]);
+		const { html } = renderMarkdown("[Pasted image] one [Pasted image] two", [
+			img
+		]);
 		expect(html).toContain('data-sent-toggle="img-1"');
 		expect(html).toContain("[Pasted image] two");
 	});
@@ -236,13 +259,17 @@ describe("sent-message tags", () => {
 		expect(attachTagHtml(null, "i")).toBe("[Pasted image]");
 		expect(attachTagHtml(null, "f")).toBe("[Pasted Attachment]");
 		expect(attachTagHtml(img, "i")).toContain('data-sent-toggle="img-1"');
-		expect(attachTagHtml({ ...img, open: true }, "i")).toContain('class="sent-img"');
+		expect(attachTagHtml({ ...img, open: true }, "i")).toContain(
+			'class="sent-img"'
+		);
 	});
 });
 
 describe("highlighting", () => {
 	it("highlights known languages, leaves unknown ones plain", async () => {
-		const rendered = renderMarkdown("```js\nconst x = 1;\n```\n\n```zzz\n???\n```");
+		const rendered = renderMarkdown(
+			"```js\nconst x = 1;\n```\n\n```zzz\n???\n```"
+		);
 		const html = await highlightRendered(rendered);
 		// Shiki v4 emits light colors inline plus dark-mode CSS variables.
 		expect(html).toContain("--shiki-dark");
@@ -256,7 +283,6 @@ describe("highlighting", () => {
 	});
 });
 
-
 describe("token estimates", () => {
 	it("estimates ~4 chars per token", () => {
 		expect(estimateTextTokens("")).toBe(1);
@@ -264,8 +290,6 @@ describe("token estimates", () => {
 		expect(estimateTextTokens("abcde")).toBe(2);
 	});
 });
-
-
 
 describe("applyPasteFolds", () => {
 	it("passes content through with no folds", () => {
@@ -303,7 +327,9 @@ describe("applyPasteFolds", () => {
 
 describe("foldSegments", () => {
 	it("splits visible runs from closed-fold markers, opening folds apart", () => {
-		expect(foldSegments("hello", undefined)).toEqual([{ kind: "text", text: "hello" }]);
+		expect(foldSegments("hello", undefined)).toEqual([
+			{ kind: "text", text: "hello" }
+		]);
 		expect(
 			foldSegments("aa BBBB cc DDDD ee", [
 				{ start: 3, end: 7, chars: 4 },

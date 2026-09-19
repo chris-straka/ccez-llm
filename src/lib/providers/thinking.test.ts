@@ -27,7 +27,9 @@ describe("thinking", () => {
 			thinking: { type: "enabled" },
 			reasoning_effort: "max"
 		});
-		expect(support.wireFields("off")).toEqual({ thinking: { type: "disabled" } });
+		expect(support.wireFields("off")).toEqual({
+			thinking: { type: "disabled" }
+		});
 		expect(support.wireFields("bogus")).toEqual({});
 	});
 
@@ -35,9 +37,13 @@ describe("thinking", () => {
 		const support = thinkingFor("whatever", "whatever-1");
 		expect(support.native).toBe(false);
 		expect(support.options.map((o) => o.id)).toEqual(["low", "medium", "high"]);
-		expect(support.promptHint("low")).toBe("Answer directly with minimal deliberation.");
+		expect(support.promptHint("low")).toBe(
+			"Answer directly with minimal deliberation."
+		);
 		expect(support.promptHint("medium")).toBe("");
-		expect(support.promptHint("high")).toBe("Think carefully before answering.");
+		expect(support.promptHint("high")).toBe(
+			"Think carefully before answering."
+		);
 		expect(support.wireFields("high")).toEqual({});
 		// A non-v4 DeepSeek model has no known knob either.
 		expect(thinkingFor("deepseek", "deepseek-chat").native).toBe(false);

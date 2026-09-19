@@ -18,13 +18,23 @@ async function seedUserTest(page: Page): Promise<void> {
 					id: "e2e-chat",
 					createdAt: 1,
 					replyLang: null,
-					messages: [{ id: "m1", role: "user", content: "Test", usage: null, error: null }]
+					messages: [
+						{
+							id: "m1",
+							role: "user",
+							content: "Test",
+							usage: null,
+							error: null
+						}
+					]
 				}
 			])
 		);
 	});
 	await page.goto("/");
-	await expect(page.locator("article.user .bubble").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article.user .bubble").first()).toBeVisible({
+		timeout: 60_000
+	});
 }
 
 test.describe("ios parity", () => {
@@ -45,11 +55,15 @@ test.describe("ios parity", () => {
 
 	/** Same right-edge dock as Android: the last row button (Rerun)
 	shares the text's right edge instead of hanging past it. */
-	test("short own message shares its right edge with the row", async ({ page }) => {
+	test("short own message shares its right edge with the row", async ({
+		page
+	}) => {
 		await seedUserTest(page);
 		const edges = await page.evaluate(() => {
 			const text = document.querySelector("article.user .bubble .rendered");
-			const rerun = document.querySelector('article.user .actions button[data-tip="Rerun"]');
+			const rerun = document.querySelector(
+				'article.user .actions button[data-tip="Rerun"]'
+			);
 			if (!text || !rerun) throw new Error("missing text or rerun");
 			return {
 				textRight: text.getBoundingClientRect().right,

@@ -110,22 +110,32 @@
 		stepScrollTop,
 		unselectedScrollIntent
 	} from "$lib/scrollkeys";
-	import { hydrateSecrets, migrateLegacySecret, persistSecrets, tauriBackendAvailable, withBlankedKeys } from "$lib/secrets";
-	import { canEditMessage, toggleAidKinds, toggleSingleAid } from "$lib/message-actions";
+	import {
+		hydrateSecrets,
+		migrateLegacySecret,
+		persistSecrets,
+		tauriBackendAvailable,
+		withBlankedKeys
+	} from "$lib/secrets";
+	import {
+		canEditMessage,
+		toggleAidKinds,
+		toggleSingleAid
+	} from "$lib/message-actions";
 	import type { ChatProvider } from "$lib/providers/types";
 	import MessageBody from "$lib/components/MessageBody.svelte";
 	import ActionIcon from "$lib/components/ActionIcon.svelte";
 	import SettingsPanel from "$lib/components/SettingsPanel.svelte";
 	import { plainBody, sourcesAsked } from "$lib/render";
-import {
-	clearNotice,
-	emptyNotices,
-	flashNotice,
-	showNotice,
-	TOAST_TIMEOUT_MS,
-	ERROR_TOAST_TIMEOUT_MS,
-	VOICE_TIMEOUT_MS
-} from "$lib/notices";
+	import {
+		clearNotice,
+		emptyNotices,
+		flashNotice,
+		showNotice,
+		TOAST_TIMEOUT_MS,
+		ERROR_TOAST_TIMEOUT_MS,
+		VOICE_TIMEOUT_MS
+	} from "$lib/notices";
 	import {
 		appendImageMarkers,
 		FILE_MARKER,
@@ -155,7 +165,7 @@ import {
 		type AttachTagModel,
 		type SentTagAction
 	} from "$lib/attachments";
-		import {
+	import {
 		duplicateAnnotationId,
 		aidMarkVisible,
 		clearBakedAnnotations,
@@ -206,7 +216,10 @@ import {
 	import { badgeHover } from "$lib/hoverWash";
 	import { startBlink, startHighlightFade, startMarkFade } from "$lib/blink";
 	import { createRefMemo } from "$lib/aidLoading";
-	import { scopeMessagesTransition, switchChatWithTransition } from "$lib/viewTransitions";
+	import {
+		scopeMessagesTransition,
+		switchChatWithTransition
+	} from "$lib/viewTransitions";
 	import {
 		decomposeTree,
 		getInspectData,
@@ -219,28 +232,32 @@ import {
 	import { furiganaHtml } from "$lib/furigana";
 	import { fetchStrokePaths } from "$lib/kanjivg";
 	import {
-	isAndroidUserAgent,
-	isIOSUserAgent,
-	canWindowDrag,
-	isCoarsePointer,
-	isTouchTablet,
-	currentPlatform,
-	altKeyLabel,
-	edgeSwipeTarget,
-	contentSwipeTarget,
-	pinchZoomStep,
-	twoFingerSwipeDir,
-	twoFingerSlideDir,
-	threeFingerSwipeDir,
-	isThreeFingerTap,
-	nextTapCount,
-	visibleProviderIds,
-	type TapSequence,
-	type FlickZone,
-	type EdgePanel,
-	type FingerTrack
-} from "$lib/platform";
-import { desktopShortcuts, filteredShortcuts, touchShortcuts } from "$lib/shortcuts";
+		isAndroidUserAgent,
+		isIOSUserAgent,
+		canWindowDrag,
+		isCoarsePointer,
+		isTouchTablet,
+		currentPlatform,
+		altKeyLabel,
+		edgeSwipeTarget,
+		contentSwipeTarget,
+		pinchZoomStep,
+		twoFingerSwipeDir,
+		twoFingerSlideDir,
+		threeFingerSwipeDir,
+		isThreeFingerTap,
+		nextTapCount,
+		visibleProviderIds,
+		type TapSequence,
+		type FlickZone,
+		type EdgePanel,
+		type FingerTrack
+	} from "$lib/platform";
+	import {
+		desktopShortcuts,
+		filteredShortcuts,
+		touchShortcuts
+	} from "$lib/shortcuts";
 	import {
 		chromeChord,
 		commandChord,
@@ -259,8 +276,12 @@ import { desktopShortcuts, filteredShortcuts, touchShortcuts } from "$lib/shortc
 		spaceKeyAction,
 		enterKeyAction
 	} from "$lib/keybindings";
-import { describeActiveElement, describeFocusTarget, focusLog } from "$lib/focusDebug";
-import {
+	import {
+		describeActiveElement,
+		describeFocusTarget,
+		focusLog
+	} from "$lib/focusDebug";
+	import {
 		closestFromTarget,
 		consumeEvent,
 		isClickControlTarget,
@@ -306,11 +327,25 @@ import {
 		type HanOverlayLang
 	} from "$lib/reading";
 	import { isFuriganaCached } from "$lib/furigana";
-	import { buildSearchDocs, chatMatchesQuery, findMessageIndices, type SearchHit } from "$lib/chatSearch";
+	import {
+		buildSearchDocs,
+		chatMatchesQuery,
+		findMessageIndices,
+		type SearchHit
+	} from "$lib/chatSearch";
 	import { emptyFind, stepFindCursor, type FindState } from "$lib/find";
 	import { emptyPalette, type PaletteState } from "$lib/palette";
-	import { annPopBlurAction, annPopCancelKind, annPopSaveKind, pillWashId } from "$lib/annPop";
-	import { idleTapAction, shouldHideForAlways, shouldIdleHide } from "$lib/idle";
+	import {
+		annPopBlurAction,
+		annPopCancelKind,
+		annPopSaveKind,
+		pillWashId
+	} from "$lib/annPop";
+	import {
+		idleTapAction,
+		shouldHideForAlways,
+		shouldIdleHide
+	} from "$lib/idle";
 	import {
 		submitAction,
 		sendAction,
@@ -320,12 +355,26 @@ import {
 	import { emptyViewport, type ViewportState } from "$lib/viewport";
 	import { ChatSearchStore, createSearchWorker } from "$lib/chatSearchStore";
 
-	import { dropFilesFromDataTransfer, isPermissionDismissal } from "$lib/intake";
+	import {
+		dropFilesFromDataTransfer,
+		isPermissionDismissal
+	} from "$lib/intake";
 	import { consumeLaunchFiles, splitLaunchFiles } from "$lib/launchFiles";
-	import { copyExportText, downloadMarkdownFile, exportChatMarkdown, fileSaveAccessAvailable } from "$lib/chatExport";
+	import {
+		copyExportText,
+		downloadMarkdownFile,
+		exportChatMarkdown,
+		fileSaveAccessAvailable
+	} from "$lib/chatExport";
 	import { nativeSaveMarkdown } from "$lib/nativeExport";
-	import { isKeyboardOpen, kbFreshOpen, keyboardOverlapPx, pinArmStart, settlePin } from "$lib/viewportReflow";
-import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
+	import {
+		isKeyboardOpen,
+		kbFreshOpen,
+		keyboardOverlapPx,
+		pinArmStart,
+		settlePin
+	} from "$lib/viewportReflow";
+	import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	import {
 		speakText,
 		speakMultilingual,
@@ -455,7 +504,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// repositions it) instead of dismissing: on phones the native
 		// selection and its OS menu stay up across scrolls, so ours
 		// must too. Only a collapsed selection dismisses the menu.
-		if (!androidUI || (window.getSelection()?.toString() ?? "") === "") selMenu = null;
+		if (!androidUI || (window.getSelection()?.toString() ?? "") === "")
+			selMenu = null;
 		/* The phone language sheet is fitted to its open-frame geometry:
 		a thread scroll invalidates the fit, so it closes instead of
 		floating mis-anchored. Desktop keeps its in-flow list. */
@@ -532,7 +582,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * clears, switching chats still starts clean — the save below
 	 * records the empty list either way).
 	 */
-	let annotations = $state<Annotation[]>(loadDraftAnnotations(chatState.activeChatId));
+	let annotations = $state<Annotation[]>(
+		loadDraftAnnotations(chatState.activeChatId)
+	);
 	$effect(() => {
 		saveDraftAnnotations(
 			chatState.activeChatId,
@@ -548,7 +600,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 */
 	$effect(() => {
 		const fingerprint = chatState.chats
-			.map((c) => `${c.id}:${c.messages.length}:${c.messages.map((m) => m.content.length).join(",")}`)
+			.map(
+				(c) =>
+					`${c.id}:${c.messages.length}:${c.messages.map((m) => m.content.length).join(",")}`
+			)
 			.join("|");
 		const draftCount = annotations.length;
 		void fingerprint;
@@ -619,7 +674,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		if (!wpOpen) return;
 		void tick().then(() => {
 			if (!wpOpen) return;
-			const items = wpWrap?.querySelectorAll('.wp-menu button[role="menuitem"]');
+			const items = wpWrap?.querySelectorAll(
+				'.wp-menu button[role="menuitem"]'
+			);
 			const mid = items?.item(Math.floor(((items.length ?? 1) - 1) / 2));
 			if (!(mid instanceof HTMLElement)) return;
 			mid.scrollIntoView({ block: "nearest" });
@@ -660,7 +717,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			raf = window.requestAnimationFrame(() => {
 				raf = 0;
 				const r = el.getBoundingClientRect();
-				set(x >= r.left - R && x <= r.right + R && y >= r.top - R && y <= r.bottom + R);
+				set(
+					x >= r.left - R &&
+						x <= r.right + R &&
+						y >= r.top - R &&
+						y <= r.bottom + R
+				);
 			});
 		};
 		const onLeave = () => {
@@ -771,7 +833,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	/** Badge currently hovered (paints its quote wash as a preview). */
 	let hoverBadgeId: string | null = $state(null);
 	/** Cursor-anchored annotation pill (ChatGPT-style). Null when closed. */
-	let annPop = $state<{ id: string; x: number; y: number; fresh: boolean } | null>(null);
+	let annPop = $state<{
+		id: string;
+		x: number;
+		y: number;
+		fresh: boolean;
+	} | null>(null);
 	/** Last badge a mousedown press opened (or toggled): its trailing
 	click re-fire is the same gesture, never a new one. Plain field —
 	only the handlers below touch it, never the template. */
@@ -866,7 +933,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					// Engaged hands hold the menu: pointer activity (stamped
 					// by the shared activity listener) inside the window
 					// re-arms instead of dismissing.
-					if (!androidUI && !selMenuHover && Date.now() - lastInputAt < SEL_MENU_IDLE_MS) {
+					if (
+						!androidUI &&
+						!selMenuHover &&
+						Date.now() - lastInputAt < SEL_MENU_IDLE_MS
+					) {
 						arm();
 						return;
 					}
@@ -959,7 +1030,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		const observer = new MutationObserver(() => {
 			lastBodySwapAt = Date.now();
 		});
-		observer.observe(root, { childList: true, subtree: true, characterData: true });
+		observer.observe(root, {
+			childList: true,
+			subtree: true,
+			characterData: true
+		});
 	}
 	$effect(() => {
 		ensureSwapObserver();
@@ -1011,7 +1086,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	extra. The menu stays put so Annotate stays one tap away. */
 	function speakSelection(): void {
 		if (!selMenu) return;
-		void popupSelectionReadings(selMenu.quote, selMenu.messageId, selMenu.context);
+		void popupSelectionReadings(
+			selMenu.quote,
+			selMenu.messageId,
+			selMenu.context
+		);
 		void speakQuote(selMenu.quote, selMenu.messageId, true, selMenu.context);
 	}
 	/** Dock the readings overlay centered on the highlight, above
@@ -1020,9 +1099,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	matters; a frame later the true width clamps it exactly into
 	the viewport. The above branch anchors on the highlight's top
 	edge the same way, so tall readings never need measuring. */
-	function placeSelPinyin(quoted: { quote: string; messageId: ChatMsgId }, html: string): void {
+	function placeSelPinyin(
+		quoted: { quote: string; messageId: ChatMsgId },
+		html: string
+	): void {
 		const live = window.getSelection();
-		const rect = live?.rangeCount ? live.getRangeAt(0).getBoundingClientRect() : null;
+		const rect = live?.rangeCount
+			? live.getRangeAt(0).getBoundingClientRect()
+			: null;
 		if (!rect) return;
 		const above = rect.top >= 128;
 		const y = above ? rect.top : Math.min(rect.bottom, window.innerHeight - 40);
@@ -1037,12 +1121,21 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		requestAnimationFrame(() => {
 			const node = document.querySelector(".sel-pinyin");
 			const current = window.getSelection();
-			const now = current?.rangeCount ? current.getRangeAt(0).getBoundingClientRect() : null;
+			const now = current?.rangeCount
+				? current.getRangeAt(0).getBoundingClientRect()
+				: null;
 			if (!node || !now || !selPinyin) return;
 			// Same highlight still live (not scrolled or changed)?
-			if (Math.abs(now.left - rect.left) > 2 || Math.abs(now.top - rect.top) > 2) return;
+			if (
+				Math.abs(now.left - rect.left) > 2 ||
+				Math.abs(now.top - rect.top) > 2
+			)
+				return;
 			const w = node.getBoundingClientRect().width;
-			const x = Math.min(Math.max(w / 2 + 8, now.left + now.width / 2), window.innerWidth - w - 8);
+			const x = Math.min(
+				Math.max(w / 2 + 8, now.left + now.width / 2),
+				window.innerWidth - w - 8
+			);
 			if (Math.abs(x - selPinyin.x) > 1) selPinyin = { ...selPinyin, x };
 		});
 	}
@@ -1067,7 +1160,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			html = "";
 		}
 		const now = currentQuote();
-		if (!now || now.messageId !== quoted.messageId || now.quote !== quoted.quote) return;
+		if (
+			!now ||
+			now.messageId !== quoted.messageId ||
+			now.quote !== quoted.quote
+		)
+			return;
 		const readings = readingsOnly(html, "", ".frt");
 		if (!readings) {
 			if (selPinyin?.quote === quoted.quote) selPinyin = null;
@@ -1090,7 +1188,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		if (hanOverlayLangFor(probe) !== "ja") {
 			if (!offeredLocalAids(quote, activeReplyCode).includes("pinyin")) return;
 			const readings = readingsOnly(pinyinRuby(quote), " ", "rt");
-			if (readings && readings.length <= 140) placeSelPinyin({ quote, messageId }, readings);
+			if (readings && readings.length <= 140)
+				placeSelPinyin({ quote, messageId }, readings);
 			return;
 		}
 		await showSelectionFurigana({ quote, messageId });
@@ -1212,7 +1311,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.messages anything past its box clips — Europe's 20-item list
 	read as five languages cut by a rectangle. Null on desktop,
 	which keeps the in-flow upward list. */
-	let langMenuAnchor: { top: number; left: number; maxH: number } | null = $state(null);
+	let langMenuAnchor: { top: number; left: number; maxH: number } | null =
+		$state(null);
 	function toggleLangMenu(id: LanguageMenu["id"], btn: HTMLElement): void {
 		if (openLangMenu === id) {
 			openLangMenu = null;
@@ -1224,12 +1324,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			return;
 		}
 		const r = btn.getBoundingClientRect();
-		const composerTop = promptEl?.getBoundingClientRect().top ?? window.innerHeight;
+		const composerTop =
+			promptEl?.getBoundingClientRect().top ?? window.innerHeight;
 		langMenuAnchor = {
 			top: Math.round(r.bottom + 6),
 			// Pill-anchored when it fits, shifted left to stay on-screen
 			// otherwise (right-edge menus).
-			left: Math.round(Math.max(8, Math.min(r.left, window.innerWidth - 8 - 180))),
+			left: Math.round(
+				Math.max(8, Math.min(r.left, window.innerWidth - 8 - 180))
+			),
 			maxH: Math.max(140, Math.round(composerTop - r.bottom - 14))
 		};
 	}
@@ -1248,7 +1351,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		return () => window.removeEventListener("resize", close);
 	});
 	const activeReplyCode = $derived(
-		chatState.chats.find((c) => c.id === chatState.activeChatId)?.replyLang ?? null
+		chatState.chats.find((c) => c.id === chatState.activeChatId)?.replyLang ??
+			null
 	);
 	const activeReplyLang = $derived(
 		activeReplyCode ? replyLanguageFor(activeReplyCode) : null
@@ -1302,7 +1406,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	let inspectLang = $state<HanOverlayLang>("zh");
 	/** Current stroke step (1-based, manual only — never autoplay). */
 	let inspectStroke = $state(1);
-	const inspectData = $derived(inspectChar ? getInspectData(inspectChar) : null);
+	const inspectData = $derived(
+		inspectChar ? getInspectData(inspectChar) : null
+	);
 	/** KanjiVG stroke paths for the open character (null until loaded). */
 	let inspectStrokes = $state<string[] | null>(null);
 	$effect(() => {
@@ -1424,7 +1530,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	// Per-chat lock: a reply streaming in another chat never deadens
 	// this composer's send — only this chat's own stream gates it.
 	const canSubmit = $derived(
-		!isSending(chatState) && (hasText || attachments.length > 0 || annotations.length > 0)
+		!isSending(chatState) &&
+			(hasText || attachments.length > 0 || annotations.length > 0)
 	);
 
 	function toggleSidebar(): void {
@@ -1434,7 +1541,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		persistSettings();
 		// Touch draws one sidebar at a time: an opening chats list
 		// dismisses the settings panel (and vice versa below).
-		if (!settings.sidebarCollapsed && androidUI && settingsOpen) settingsOpen = false;
+		if (!settings.sidebarCollapsed && androidUI && settingsOpen)
+			settingsOpen = false;
 	}
 
 	/**
@@ -1446,7 +1554,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		const query = sideSearch.trim();
 		if (!query) return chatState.chats;
 		return chatState.chats.filter((item) =>
-			chatMatchesQuery(chatLabel(item.createdAt), item.messages.map((m) => m.content), query)
+			chatMatchesQuery(
+				chatLabel(item.createdAt),
+				item.messages.map((m) => m.content),
+				query
+			)
 		);
 	}
 
@@ -1516,13 +1628,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					}
 				}
 				void ensureSearchStore()
-				.index(buildSearchDocs(currentSearchDocs(), anns))
-				.then(() => {
-					// The palette may have queried before this snapshot
-					// landed (fast typists beat the 500ms debounce): an
-					// open query re-runs against the fresh snapshot.
-					if (palette.open && palette.query.trim()) runSearchQuery();
-				});
+					.index(buildSearchDocs(currentSearchDocs(), anns))
+					.then(() => {
+						// The palette may have queried before this snapshot
+						// landed (fast typists beat the 500ms debounce): an
+						// open query re-runs against the fresh snapshot.
+						if (palette.open && palette.query.trim()) runSearchQuery();
+					});
 			} catch {
 				// Search never breaks the chat: stale snapshot stays live.
 			}
@@ -1614,7 +1726,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// inside the transition keeps the autosave effect (which
 			// also keys on activeChatId) from ever filing one chat's
 			// drafts under another's id.
-			saveDraftAnnotations(from, annotations, chatState.chats.map((c) => c.id));
+			saveDraftAnnotations(
+				from,
+				annotations,
+				chatState.chats.map((c) => c.id)
+			);
 			selectChat(chatState, id);
 			annotations = loadDraftAnnotations(id);
 			restoreChatScroll(id);
@@ -1691,7 +1807,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	function moveSearchCursor(delta: 1 | -1): void {
 		if (palette.hits.length === 0) return;
 		palette.cursor =
-			((palette.cursor + delta) % palette.hits.length + palette.hits.length) %
+			(((palette.cursor + delta) % palette.hits.length) + palette.hits.length) %
 			palette.hits.length;
 	}
 
@@ -1716,7 +1832,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	let find = $state<FindState>(emptyFind());
 	let findInputEl: HTMLInputElement | undefined = $state();
 	function currentFindHits(): number[] {
-		return find.open ? findMessageIndices(viewChat.messages.map((m) => m.content), find.query) : [];
+		return find.open
+			? findMessageIndices(
+					viewChat.messages.map((m) => m.content),
+					find.query
+				)
+			: [];
 	}
 	function landFindHit(): void {
 		const index = currentFindHits()[find.cursor];
@@ -1755,8 +1876,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		editor?.focus();
 	}
 
-
-
 	/**
 	 * Export one sidebar chat as Markdown: File System Access picker
 	 * where available, native save dialog in the shell, download blob
@@ -1775,10 +1894,16 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			const how = await exportChatMarkdown(target, {
 				picker,
 				native: (filename, text) => nativeSaveMarkdown(filename, text),
-				download: shellPhone ? (text) => copyExportText(text) : downloadMarkdownFile
+				download: shellPhone
+					? (text) => copyExportText(text)
+					: downloadMarkdownFile
 			});
 			flashToast(
-				how === "download" ? (shellPhone ? "Chat copied to clipboard" : "Chat downloaded") : "Chat saved"
+				how === "download"
+					? shellPhone
+						? "Chat copied to clipboard"
+						: "Chat downloaded"
+					: "Chat saved"
 			);
 		} catch (error) {
 			// A clipboard denial on the shell phone arrives as
@@ -1786,14 +1911,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// copy button must say so instead of staying silent.
 			if (isPermissionDismissal(error)) {
 				if (shellPhone)
-					flashErrorToast("Couldn't copy this chat: clipboard unavailable on this device.");
+					flashErrorToast(
+						"Couldn't copy this chat: clipboard unavailable on this device."
+					);
 				return;
 			}
 			flashErrorToast("Couldn't export this chat.");
 		}
 	}
-
-
 
 	/**
 	 * Open the settings panel, dismissing the chats list on touch.
@@ -1838,7 +1963,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				window.localStorage.getItem("ccez-llm-settings-v1") ??
 				window.localStorage.getItem("ccez-studio-settings-v1");
 			if (!raw) return false;
-			return typeof (JSON.parse(raw) as { promptIdleSec?: unknown }).promptIdleSec === "number";
+			return (
+				typeof (JSON.parse(raw) as { promptIdleSec?: unknown })
+					.promptIdleSec === "number"
+			);
 		} catch {
 			return false;
 		}
@@ -1878,7 +2006,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 	/** Allowlisted restore: show the hidden prompt again. */
 	function restorePrompt(): void {
-		focusLog("restore-prompt", { active: describeActiveElement(), wasIdle: promptIdle });
+		focusLog("restore-prompt", {
+			active: describeActiveElement(),
+			wasIdle: promptIdle
+		});
 		stampInput();
 		promptIdle = false;
 	}
@@ -1961,14 +2092,16 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				// whose focusout lands nowhere is still in flight.
 				if (downTarget?.closest(".prompt")) promptPressAt = Date.now();
 			}
-			idleDown = event.button === 0 ? { x: event.clientX, y: event.clientY } : null;
+			idleDown =
+				event.button === 0 ? { x: event.clientX, y: event.clientY } : null;
 			// Summonable only from a fully shown prompt: a press that
 			// starts idle-hidden OR sidebar-parked (e.g. the click that
 			// dismisses a sidebar) never restores on its click.
 			idleDownVisible = event.button === 0 && !promptParked();
 			// A press that starts on a live highlight is its dismissal —
 			// the click that clears it must not summon the prompt.
-			idleDownHadSel = event.button === 0 && (window.getSelection()?.toString() ?? "") !== "";
+			idleDownHadSel =
+				event.button === 0 && (window.getSelection()?.toString() ?? "") !== "";
 			idleDownControl = event.button === 0 && isClickControlTarget(downTarget);
 		};
 		/**
@@ -2012,7 +2145,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				downVisible,
 				downHadSel,
 				traveled:
-					down !== null && Math.hypot(event.clientX - down.x, event.clientY - down.y) > 6,
+					down !== null &&
+					Math.hypot(event.clientX - down.x, event.clientY - down.y) > 6,
 				inMath: isMathTarget(target),
 				inClickControl: isClickControlTarget(target),
 				inOverlay: isTapOverlayTarget(target)
@@ -2135,8 +2269,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			window.removeEventListener("pointerdown", onIdleDown);
 			window.removeEventListener("pointerdown", onDown);
 			window.removeEventListener("pointerdown", onFindOutside);
-			window.removeEventListener("pointerdown", onRefsOutside, { capture: true });
-			window.removeEventListener("pointerdown", onSentTagOutside, { capture: true });
+			window.removeEventListener("pointerdown", onRefsOutside, {
+				capture: true
+			});
+			window.removeEventListener("pointerdown", onSentTagOutside, {
+				capture: true
+			});
 			window.removeEventListener("keydown", on);
 			window.removeEventListener("wheel", on);
 			window.removeEventListener("touchstart", on);
@@ -2203,7 +2341,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		if (!card || !box || !mainEl) return;
 		const sync = (): void => {
 			const cardH = Math.ceil(card.getBoundingClientRect().height);
-			const cardBottom = Number.parseFloat(window.getComputedStyle(card).bottom) || 0;
+			const cardBottom =
+				Number.parseFloat(window.getComputedStyle(card).bottom) || 0;
 			const clearPx = cardH + 54;
 			// The tray floats over the thread (absolute, transparent),
 			// so the thread runs full-height behind and beside it: the
@@ -2242,7 +2381,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// rendered (the absolute tray needs no lift).
 			// Binary, so park/summon (transform-only, layout kept)
 			// never move anything. Empty chats keep today's floor.
-			const chromeOpen = mainEl.querySelector(":scope > .attach-error") !== null;
+			const chromeOpen =
+				mainEl.querySelector(":scope > .attach-error") !== null;
 			const mainPad =
 				emptyChat || chromeOpen
 					? `calc(${clearPx}px + env(safe-area-inset-bottom, 0px))`
@@ -2293,10 +2433,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// Phones keep the composer mounted under open drawers, but an
 		// open drawer still drops the caret (typing behind the panel,
 		// keyboard over the drawer). Desktop blurs via promptParked.
-		const drawerOpen = androidUI && (settingsOpen || !settings.sidebarCollapsed);
+		const drawerOpen =
+			androidUI && (settingsOpen || !settings.sidebarCollapsed);
 		if (!promptParked() && !drawerOpen) return;
 		const active = document.activeElement;
-		if (active instanceof HTMLElement && active.closest(".prompt")) editor?.blur();
+		if (active instanceof HTMLElement && active.closest(".prompt"))
+			editor?.blur();
 	});
 	/**
 	 * Sleep prevention during speech/streaming (desktop shell only):
@@ -2312,11 +2454,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		const active = speakingId !== null || chatState.sending;
 		if (active) {
 			sleepWanted = true;
-			void desktopSleepBlock("Ccez Studio speech or reply streaming").then((id) => {
-				if (id === null) return;
-				if (sleepWanted) sleepClaim = id;
-				else void desktopSleepUnblock(id);
-			});
+			void desktopSleepBlock("Ccez Studio speech or reply streaming").then(
+				(id) => {
+					if (id === null) return;
+					if (sleepWanted) sleepClaim = id;
+					else void desktopSleepUnblock(id);
+				}
+			);
 		} else {
 			sleepWanted = false;
 			if (sleepClaim !== null) {
@@ -2329,7 +2473,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	/** UI text scale in 10% steps (50–600% desktop, 50–800% phones). */
 	function adjustFontScale(delta: number, quiet = false): void {
 		const cap = androidUI ? 8 : 6;
-		const next = Math.min(cap, Math.max(0.5, Math.round((settings.fontScale + delta) * 10) / 10));
+		const next = Math.min(
+			cap,
+			Math.max(0.5, Math.round((settings.fontScale + delta) * 10) / 10)
+		);
 		if (next === settings.fontScale) return;
 		settings.fontScale = next;
 		persistSettings();
@@ -2342,7 +2489,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	function adjustChatWidth(delta: number): void {
 		if (androidUI) return;
 		const current = settings.chatWidth ?? CHAT_WIDTH_DEFAULT;
-		const next = Math.min(CHAT_WIDTH_MAX, Math.max(CHAT_WIDTH_MIN, current + delta));
+		const next = Math.min(
+			CHAT_WIDTH_MAX,
+			Math.max(CHAT_WIDTH_MIN, current + delta)
+		);
 		if (next === current) {
 			flashToast(`Chat width ${current} rem (limit)`);
 			return;
@@ -2368,9 +2518,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		if (!settingsOpen && settings.sidebarCollapsed) return;
 		const down = mainDown;
 		mainDown = null;
-		if (down && Math.hypot(event.screenX - down.x, event.screenY - down.y) > 5) return;
+		if (down && Math.hypot(event.screenX - down.x, event.screenY - down.y) > 5)
+			return;
 		if (settingsOpen) {
-			if (event.target instanceof Element && event.target.closest("[data-settings-toggle]")) {
+			if (
+				event.target instanceof Element &&
+				event.target.closest("[data-settings-toggle]")
+			) {
 				return;
 			}
 			settingsOpen = false;
@@ -2389,7 +2543,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// unpark flushes async, so land after the tick — a sync focus
 		// would hit the still-parked composer and no-op.
 		const target = event.target instanceof Element ? event.target : null;
-		if (target?.closest("button, a, input, textarea, select, summary, [contenteditable], .ccez-code"))
+		if (
+			target?.closest(
+				"button, a, input, textarea, select, summary, [contenteditable], .ccez-code"
+			)
+		)
 			return;
 		if (promptIdle) return;
 		// Phones never land the caret on dismiss: the tap means "back
@@ -2409,7 +2567,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		const mode = settings.theme;
 		const query = window.matchMedia("(prefers-color-scheme: dark)");
 		const apply = (): void => {
-			document.documentElement.dataset.theme = resolveTheme(mode, query.matches);
+			document.documentElement.dataset.theme = resolveTheme(
+				mode,
+				query.matches
+			);
 		};
 		apply();
 		if (mode === "system") query.addEventListener("change", apply);
@@ -2460,8 +2621,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	function stepSwitcher(direction: 1 | -1): void {
 		const ids = chatState.chats.map((c) => c.id);
 		const at = ids.indexOf(chatState.activeChatId);
-		const wrapped = at >= 0 && ids.length > 0 ? (ids[(at + direction + ids.length) % ids.length] ?? null) : null;
-		if (wrapped !== null && wrapped !== chatState.activeChatId) transitionToChat(wrapped);
+		const wrapped =
+			at >= 0 && ids.length > 0
+				? (ids[(at + direction + ids.length) % ids.length] ?? null)
+				: null;
+		if (wrapped !== null && wrapped !== chatState.activeChatId)
+			transitionToChat(wrapped);
 		else stepChat(direction, false);
 		void hapticBeatAsync("send", {
 			enabled: !settings.hapticsDisabled,
@@ -2482,7 +2647,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// now would strand the spinner with no buttons, or the
 			// stop button out of reach mid-utterance. Re-arm and let
 			// a later tick close it after the work lands.
-			if (aidBusy.has(id) || vocalizing.has(id) || speakingId === id || speakingSelection === id) {
+			if (
+				aidBusy.has(id) ||
+				vocalizing.has(id) ||
+				speakingId === id ||
+				speakingSelection === id
+			) {
 				armActionsTimer(id);
 				return;
 			}
@@ -2503,7 +2673,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	function toggleMessageActions(id: ChatMsgId, event: MouseEvent): void {
 		if (!settings.showMessageButtons) return;
 		if (!settings.hideMessages && !(androidUI && settings.hideButtons)) return;
-		if (closestFromTarget(event.target, "button, a, input, textarea, select, summary")) return;
+		if (
+			closestFromTarget(
+				event.target,
+				"button, a, input, textarea, select, summary"
+			)
+		)
+			return;
 		// Tapping a folded message unfolds it: its row is hidden, so no
 		// fold button exists to press. Android only — desktop hovers the
 		// row back into view.
@@ -2535,12 +2711,16 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// use) so the composer can't strand at zero height, and the
 		// extra paint invalidates a stale tile the fade left behind
 		// on phone GPUs.
-		requestAnimationFrame(() => requestAnimationFrame(() => editor?.remeasure()));
+		requestAnimationFrame(() =>
+			requestAnimationFrame(() => editor?.remeasure())
+		);
 		armActionsTimer(id);
 	}
 	/** Focus a sidebar chat button by list position (clamped). */
 	function focusSideChat(index: number): void {
-		const items = [...document.querySelectorAll<HTMLElement>("aside ul li button.side-chat")];
+		const items = [
+			...document.querySelectorAll<HTMLElement>("aside ul li button.side-chat")
+		];
 		if (items.length === 0) return;
 		sideIdx = Math.min(Math.max(index, 0), items.length - 1);
 		const el = items[sideIdx];
@@ -2555,7 +2735,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * row when a search filter hides the active chat.
 	 */
 	function focusActiveSideChat(): void {
-		const at = sideVisibleChats().findIndex((c) => c.id === chatState.activeChatId);
+		const at = sideVisibleChats().findIndex(
+			(c) => c.id === chatState.activeChatId
+		);
 		requestAnimationFrame(() => focusSideChat(at < 0 ? 0 : at));
 	}
 
@@ -2586,7 +2768,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// empties `annotations`, and the autosave effect would then
 			// persist the empty list under the old id (draft restore
 			// on return would come back blank).
-			saveDraftAnnotations(chatState.activeChatId, annotations, chats.map((c) => c.id));
+			saveDraftAnnotations(
+				chatState.activeChatId,
+				annotations,
+				chats.map((c) => c.id)
+			);
 			resetDraftExtras();
 			// Minting switches without a transition, so the preview
 			// clears here (transitionToChat covers its own path).
@@ -2601,14 +2787,20 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			settings.sidebarCollapsed = true;
 			persistSettings();
 			if (focus) enterEditMode();
-			void hapticBeatAsync("send", { enabled: !settings.hapticsDisabled, shell: tauriBackendAvailable() });
+			void hapticBeatAsync("send", {
+				enabled: !settings.hapticsDisabled,
+				shell: tauriBackendAvailable()
+			});
 			restartStepSlide(direction);
 			return;
 		}
 		const target = chats[next];
 		if (!target) return;
 		sideIdx = next;
-		void hapticBeatAsync("send", { enabled: !settings.hapticsDisabled, shell: tauriBackendAvailable() });
+		void hapticBeatAsync("send", {
+			enabled: !settings.hapticsDisabled,
+			shell: tauriBackendAvailable()
+		});
 		transitionToChat(target.id);
 		// Landing is the switch effect's job (filed position, else
 		// top): a smooth top-scroll here would fight the restore.
@@ -2794,9 +2986,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	const split = $derived(tokenSplit(chatState));
 	const points = $derived(waypoints(chatState));
 	const sourcesWanted = $derived(
-		sourcesAsked(chat.messages.filter((m) => m.role === "user").map((m) => m.content))
+		sourcesAsked(
+			chat.messages.filter((m) => m.role === "user").map((m) => m.content)
+		)
 	);
-
 
 	/** Prompt text minus pasted-image marker lines (images travel as attachments). */
 	function composerText(): string {
@@ -2819,8 +3012,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		foldText: string,
 		outgoing: Attachment[]
 	): { stored: string; kept: Attachment[]; pastedFolds: SendFold[] } {
-		const pastedTexts = outgoing.filter(isPastedTextAttachment).map((a) => a.text ?? "");
-		const { text: spliced, folds: pastedFolds } = splicePastedFolds(foldText, pastedTexts);
+		const pastedTexts = outgoing
+			.filter(isPastedTextAttachment)
+			.map((a) => a.text ?? "");
+		const { text: spliced, folds: pastedFolds } = splicePastedFolds(
+			foldText,
+			pastedTexts
+		);
 		const kept = outgoing.filter((a) => !isPastedTextAttachment(a));
 		const stored = appendImageMarkers(
 			spliced,
@@ -2879,7 +3077,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		attachments = [...attachments, att];
 		markerSyncMuted = true;
 		try {
-			editor.insertText(pastedMarkerFor(editor, att.text?.length ?? text.length));
+			editor.insertText(
+				pastedMarkerFor(editor, att.text?.length ?? text.length)
+			);
 			syncMarkerCounts();
 		} finally {
 			markerSyncMuted = false;
@@ -2939,11 +3139,25 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		kept = dropFileAttachmentsAtIndexes(kept, rFile);
 		kept = dropPastedAttachmentsAtIndexes(kept, rPasted);
 		const imageAtts = kept.filter((a) => a.kind === "image").length;
-		const fileAtts = kept.filter((a) => a.kind === "text" && !isPastedTextAttachment(a)).length;
+		const fileAtts = kept.filter(
+			(a) => a.kind === "text" && !isPastedTextAttachment(a)
+		).length;
 		const pastedAtts = kept.length - imageAtts - fileAtts;
-		const dropImages = reconcileDropCount(imageAtts, imagesNow, prevImages - rImg.length);
-		const dropFiles = reconcileDropCount(fileAtts, filesNow, prevFiles - rFile.length);
-		const dropPasted = reconcileDropCount(pastedAtts, pastedNow, prevPasted - rPasted.length);
+		const dropImages = reconcileDropCount(
+			imageAtts,
+			imagesNow,
+			prevImages - rImg.length
+		);
+		const dropFiles = reconcileDropCount(
+			fileAtts,
+			filesNow,
+			prevFiles - rFile.length
+		);
+		const dropPasted = reconcileDropCount(
+			pastedAtts,
+			pastedNow,
+			prevPasted - rPasted.length
+		);
 		if (dropImages > 0 || dropFiles > 0 || dropPasted > 0) {
 			kept = dropNewestWhere(kept, (a) => a.kind === "image", dropImages);
 			kept = dropNewestWhere(
@@ -2965,7 +3179,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		const doc = ed.getText();
 		const caret = ed.selectionHead();
 		const afterPaste = ed.getPastes().some((s) => caret === s.to);
-		return kind === "image" ? imageMarkerInsert(doc, afterPaste) : fileMarkerInsert(doc, afterPaste);
+		return kind === "image"
+			? imageMarkerInsert(doc, afterPaste)
+			: fileMarkerInsert(doc, afterPaste);
 	}
 
 	/** One tag per fresh attachment, caret after each tag's space. */
@@ -3018,7 +3234,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * own pictures. The list read runs synchronously at call time so
 	 * a cut's own deletion can't race it.
 	 */
-	function copyImageTagBlobs(list: Attachment[], indexes: number[]): Promise<Blob[]> {
+	function copyImageTagBlobs(
+		list: Attachment[],
+		indexes: number[]
+	): Promise<Blob[]> {
 		return attachmentImageBlobsAt(list, indexes).then((blobs) =>
 			Promise.all(blobs.map((blob) => clipboardPngBlob(blob)))
 		);
@@ -3084,7 +3303,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	let stripDragMoved = false;
 	let stripDragging = $state(false);
 	function stripDragStart(event: PointerEvent): void {
-		if (!event.isPrimary || event.pointerType === "touch" || event.button !== 0) return;
+		if (!event.isPrimary || event.pointerType === "touch" || event.button !== 0)
+			return;
 		const ul = event.currentTarget;
 		if (!(ul instanceof HTMLElement)) return;
 		stripDragX = event.clientX;
@@ -3119,7 +3339,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// A cancel fires no click, so only it resets here: pointerup
 		// leaves the flag for the gate below (keyboard clicks need no
 		// pointerdown, so a stale flag must never survive one).
-		if (event.type === "pointercancel" || event.type === "cancel") stripDragMoved = false;
+		if (event.type === "pointercancel" || event.type === "cancel")
+			stripDragMoved = false;
 	}
 	function stripClickGate(event: MouseEvent): void {
 		if (!stripDragMoved) return;
@@ -3158,10 +3379,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					// share kind "text" but own no FILE_MARKER tag).
 					const kindIndex =
 						removed.kind === "image"
-							? attachments.slice(0, at).filter((a) => a.kind === "image").length
+							? attachments.slice(0, at).filter((a) => a.kind === "image")
+									.length
 							: attachments
 									.slice(0, at)
-									.filter((a) => a.kind === "text" && !isPastedTextAttachment(a)).length;
+									.filter(
+										(a) => a.kind === "text" && !isPastedTextAttachment(a)
+									).length;
 					editor.exciseMarkerAt(
 						removed.kind === "image" ? IMAGE_MARKER : FILE_MARKER,
 						kindIndex
@@ -3204,7 +3428,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// native pass and read through the WASM fallback's matching
 		// traineddata instead of English-shaped fragments.
 		const fallbackLangs =
-			!native || !visionSupports(activeReplyCode) ? ocrFallbackLangs(activeReplyCode) : null;
+			!native || !visionSupports(activeReplyCode)
+				? ocrFallbackLangs(activeReplyCode)
+				: null;
 		ocrBusyId = att.id;
 		clearNotice(notices, "inline");
 		try {
@@ -3222,7 +3448,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// never sink the first observation.
 			if (!fallbackLangs && result.confidence < OCR_RETRY_BELOW) {
 				try {
-					const retry = await recognizeImageText(att.dataUrl, ocrRetryHint(activeReplyCode));
+					const retry = await recognizeImageText(
+						att.dataUrl,
+						ocrRetryHint(activeReplyCode)
+					);
 					result = keepBestRecognition(result, retry);
 				} catch {
 					// First pass stands.
@@ -3244,7 +3473,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			}
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error);
-			failAttach(fallbackLangs ? friendlyFallbackError(message) : friendlyOcrError(message));
+			failAttach(
+				fallbackLangs
+					? friendlyFallbackError(message)
+					: friendlyOcrError(message)
+			);
 		} finally {
 			ocrBusyId = null;
 		}
@@ -3299,7 +3532,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// scroll offset across the render instead of scrolling anywhere.
 		const index = viewChat.messages.findIndex((m) => m.id === id);
 		const article = index >= 0 ? document.querySelector(`#msg-${index}`) : null;
-		const top = article instanceof HTMLElement ? article.getBoundingClientRect().top : null;
+		const top =
+			article instanceof HTMLElement
+				? article.getBoundingClientRect().top
+				: null;
 		if (foldedIds.has(id)) foldedIds.delete(id);
 		else foldedIds.add(id);
 		if (top !== null && scrollBox instanceof HTMLElement) {
@@ -3346,12 +3582,17 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	function copyText(content: string, role: string): void {
 		// Message copy excludes baked annotations (metadata, not prose);
 		// refs-only messages fall back to their quotes, never "".
-		copyPlain(redactedCopyText(plainBody(content, role, sourcesWanted)), "Copied");
+		copyPlain(
+			redactedCopyText(plainBody(content, role, sourcesWanted)),
+			"Copied"
+		);
 	}
 
 	/** Copy one annotation (either overlay): quote plus comment, no numbers. */
 	function copyAnnotation(quote: string, comment: string): void {
-		const text = comment.trim() ? `"${quote}" — ${comment.trim()}` : `"${quote}"`;
+		const text = comment.trim()
+			? `"${quote}" — ${comment.trim()}`
+			: `"${quote}"`;
 		copyPlain(text, "Copied");
 	}
 
@@ -3389,11 +3630,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			return;
 		}
 		void navigator.clipboard.writeText(text).catch(() => {
-			if (notices.toast.message === text) flashToast("Couldn't copy to the clipboard.");
+			if (notices.toast.message === text)
+				flashToast("Couldn't copy to the clipboard.");
 		});
 	}
-
-
 
 	/** Article element owning a DOM node, or null outside messages. */
 	function articleOf(node: Node | null): Element | null {
@@ -3411,12 +3651,20 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 
 	/** Viewed-message index under a tap point (multi-finger deletes):
 	articles carry msg-{index} ids; anything else is not a message. */
-	function messageIndexAtPoint(clientX: number, clientY: number): number | null {
+	function messageIndexAtPoint(
+		clientX: number,
+		clientY: number
+	): number | null {
 		const target = document.elementFromPoint(clientX, clientY);
 		const article = target ? articleOf(target) : null;
 		if (!(article instanceof HTMLElement)) return null;
 		const index = Number(article.id.slice(4));
-		if (!Number.isInteger(index) || index < 0 || index >= viewChat.messages.length) return null;
+		if (
+			!Number.isInteger(index) ||
+			index < 0 ||
+			index >= viewChat.messages.length
+		)
+			return null;
 		return index;
 	}
 
@@ -3428,10 +3676,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	function scrollMessageEndIntoView(clientX: number, clientY: number): void {
 		const tapEl = document.elementFromPoint(clientX, clientY);
 		const art = tapEl ? articleOf(tapEl) : null;
-		const dockReserve = (document.querySelector(".prompt")?.getBoundingClientRect().height ?? 0) + 48;
+		const dockReserve =
+			(document.querySelector(".prompt")?.getBoundingClientRect().height ?? 0) +
+			48;
 		if (art instanceof HTMLElement && scrollBox) {
 			const area = scrollBox.getBoundingClientRect();
-			const dy = art.getBoundingClientRect().bottom - (area.bottom - dockReserve);
+			const dy =
+				art.getBoundingClientRect().bottom - (area.bottom - dockReserve);
 			if (dy > 0) scrollBox.scrollBy({ top: dy, behavior: "smooth" });
 		} else if (scrollBox) {
 			scrollBox.scrollTo({ top: scrollBox.scrollHeight, behavior: "smooth" });
@@ -3460,18 +3711,25 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		const rendered = element?.closest(".messages .rendered") ?? null;
 		if (!(rendered instanceof Element)) return null;
 		const block =
-			element?.closest("p, li, pre, td, blockquote, h1, h2, h3, h4, div") ?? null;
-		if (!(block instanceof Element) || !rendered.contains(block)) return rendered ? { block: rendered, range } : null;
+			element?.closest("p, li, pre, td, blockquote, h1, h2, h3, h4, div") ??
+			null;
+		if (!(block instanceof Element) || !rendered.contains(block))
+			return rendered ? { block: rendered, range } : null;
 		return { block, range };
 	}
 
 	/** Caret offset of (node, offset) within the block's text. */
-	function caretOffsetInBlock(block: Element, node: Node, offset: number): number {
+	function caretOffsetInBlock(
+		block: Element,
+		node: Node,
+		offset: number
+	): number {
 		let at = 0;
 		const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
 		let current = walker.nextNode();
 		while (current) {
-			if (current === node) return at + Math.min(offset, current.textContent?.length ?? 0);
+			if (current === node)
+				return at + Math.min(offset, current.textContent?.length ?? 0);
 			at += current.textContent?.length ?? 0;
 			current = walker.nextNode();
 		}
@@ -3479,7 +3737,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 
 	/** (node, sub-offset) owning a block-text offset. */
-	function nodeAtBlockOffset(block: Element, offset: number): { node: Node; offset: number } | null {
+	function nodeAtBlockOffset(
+		block: Element,
+		offset: number
+	): { node: Node; offset: number } | null {
 		const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
 		let at = 0;
 		let current = walker.nextNode();
@@ -3503,14 +3764,23 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		const selection = window.getSelection();
 		if (!found || !selection) return false;
 		const text = found.block.textContent ?? "";
-		const caret = caretOffsetInBlock(found.block, found.range.startContainer, found.range.startOffset);
+		const caret = caretOffsetInBlock(
+			found.block,
+			found.range.startContainer,
+			found.range.startOffset
+		);
 		const [start, end] = sentenceBounds(text, caret);
 		if (end <= start) return false;
 		const anchor = nodeAtBlockOffset(found.block, start);
 		const focus = nodeAtBlockOffset(found.block, end);
 		if (!anchor || !focus) return false;
 		try {
-			selection.setBaseAndExtent(anchor.node, anchor.offset, focus.node, focus.offset);
+			selection.setBaseAndExtent(
+				anchor.node,
+				anchor.offset,
+				focus.node,
+				focus.offset
+			);
 		} catch {
 			return false;
 		}
@@ -3533,12 +3803,17 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		return !selection.isCollapsed;
 	}
 
-	function currentQuote(): { quote: string; context: string; messageId: ChatMsgId } | null {
+	function currentQuote(): {
+		quote: string;
+		context: string;
+		messageId: ChatMsgId;
+	} | null {
 		const selection = window.getSelection();
 		if (!selection || selection.isCollapsed) return null;
-		const inRendered = selection.anchorNode instanceof Element
-			? selection.anchorNode
-			: selection.anchorNode?.parentElement;
+		const inRendered =
+			selection.anchorNode instanceof Element
+				? selection.anchorNode
+				: selection.anchorNode?.parentElement;
 		if (!inRendered?.closest(".rendered")) return null;
 		// Math picks normalize to the whole equation: a partial glyph
 		// pick quotes a shard that never re-matches, so when both ends
@@ -3572,7 +3847,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			selection.anchorNode instanceof Element
 				? selection.anchorNode
 				: selection.anchorNode?.parentElement;
-		const context = (anchorEl?.closest("p, li")?.textContent ?? "").slice(0, 2000);
+		const context = (anchorEl?.closest("p, li")?.textContent ?? "").slice(
+			0,
+			2000
+		);
 		return { quote, context, messageId };
 	}
 
@@ -3584,7 +3862,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// native pick stays exactly as drawn (stays copyable), and
 		// summon nothing.
 		const anchorEl =
-			live?.anchorNode instanceof Element ? live.anchorNode : live?.anchorNode?.parentElement;
+			live?.anchorNode instanceof Element
+				? live.anchorNode
+				: live?.anchorNode?.parentElement;
 		if (anchorEl && isAnnotationUiTarget(anchorEl)) return;
 		// Selections never span messages: a drag crossing into another
 		// article trims back to the anchor message's edge first.
@@ -3625,7 +3905,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			return;
 		}
 		const live = window.getSelection();
-		const rect = live?.rangeCount ? live.getRangeAt(0).getBoundingClientRect() : null;
+		const rect = live?.rangeCount
+			? live.getRangeAt(0).getBoundingClientRect()
+			: null;
 		if (!rect) {
 			selMenu = null;
 			return;
@@ -3641,7 +3923,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		if (atX !== undefined && atY !== undefined && live && live.rangeCount > 0) {
 			const at = document.elementFromPoint(atX, atY);
 			const quoteArticle = articleOf(live.anchorNode);
-			if (quoteArticle && at && articleOf(at) && articleOf(at) !== quoteArticle) {
+			if (
+				quoteArticle &&
+				at &&
+				articleOf(at) &&
+				articleOf(at) !== quoteArticle
+			) {
 				atX = undefined;
 				atY = undefined;
 			}
@@ -3650,7 +3937,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// WebKit empties the document selection when the pointer moves
 		// onto the floating menu (no DOM change, no press). Nothing
 		// mutates in that path, so these nodes stay valid.
-		const stored = live && live.rangeCount > 0 ? live.getRangeAt(0).cloneRange() : null;
+		const stored =
+			live && live.rangeCount > 0 ? live.getRangeAt(0).cloneRange() : null;
 		const { x, y } = selMenuPlacement({
 			cursorX: atX,
 			cursorY: atY,
@@ -3695,7 +3983,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		const live = window.getSelection();
 		if (!live || live.toString() !== "") return;
 		try {
-			if (!document.contains(range.startContainer) || !document.contains(range.endContainer))
+			if (
+				!document.contains(range.startContainer) ||
+				!document.contains(range.endContainer)
+			)
 				return;
 			live.removeAllRanges();
 			live.addRange(range);
@@ -3715,7 +4006,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * the stripped occurrence holding it. Never throws — selection APIs
 	 * disagree across engines, and anything odd keeps 0 (first match).
 	 */
-	function occurrenceFromSelection(messageId: ChatMsgId, quote: string): number {
+	function occurrenceFromSelection(
+		messageId: ChatMsgId,
+		quote: string
+	): number {
 		try {
 			const selection = window.getSelection();
 			if (!selection || selection.rangeCount === 0) return 0;
@@ -3774,11 +4068,19 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// A quote picked from vocalized (tashkeel) text locates against
 		// that text only: its badge shows while the aid is on, never on
 		// the bare form.
-		const aidScope = aidModelPin.has(selMenu.messageId) ? ("tashkeel" as const) : undefined;
+		const aidScope = aidModelPin.has(selMenu.messageId)
+			? ("tashkeel" as const)
+			: undefined;
 		// Same span twice would stack two badges on one anchor (and
 		// hovering them oscillates): open the review on the existing
 		// one instead of filing a twin.
-		const dupe = duplicateAnnotationId(annotations, selMenu.messageId, quote, at, aidScope);
+		const dupe = duplicateAnnotationId(
+			annotations,
+			selMenu.messageId,
+			quote,
+			at,
+			aidScope
+		);
 		if (dupe) {
 			clearSelection();
 			selMenu = null;
@@ -3893,7 +4195,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// The pop id decides (see annPopSaveKind): a pop still
 		// addressing its pending annotation commits it, otherwise the
 		// saved comment of the existing one is edited.
-		if (annPopSaveKind(annPop.id, pendingAnn?.id ?? null) === "commit-pending") commitPending();
+		if (annPopSaveKind(annPop.id, pendingAnn?.id ?? null) === "commit-pending")
+			commitPending();
 		else annotations = editAnnotationComment(annotations, annPop.id, annDraft);
 		hideAnnPop();
 		// Only the Enter key needs the anti-double-send guard: a click-away
@@ -3922,7 +4225,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// saved comment (nothing is written until Save).
 		const cancelKind = annPopCancelKind(id, fresh, pendingAnn?.id ?? null);
 		if (cancelKind === "drop-pending") pendingAnn = null;
-		else if (cancelKind === "delete-fresh") annotations = deleteAnnotation(annotations, id);
+		else if (cancelKind === "delete-fresh")
+			annotations = deleteAnnotation(annotations, id);
 		editor?.focus();
 	}
 
@@ -3978,7 +4282,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			card?.classList.toggle("tall", h > TALL_PX);
 		};
 		mark();
-		const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(mark);
+		const ro =
+			typeof ResizeObserver === "undefined" ? null : new ResizeObserver(mark);
 		if (card && ro) ro.observe(node);
 		return {
 			destroy: () => {
@@ -3996,7 +4301,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	centering spec). */
 	function popWidth(fresh: boolean): number {
 		if (fresh) return Math.min(19 * 16, window.innerWidth - 16);
-		const scale = androidUI ? Math.min(8, settings.fontScale) : settings.fontScale;
+		const scale = androidUI
+			? Math.min(8, settings.fontScale)
+			: settings.fontScale;
 		return Math.min(Math.min(24 * scale, 32) * 16, window.innerWidth - 16);
 	}
 
@@ -4006,7 +4313,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * comment loads as the draft, Enter or the arrow files it back,
 	 * tapping out cancels. Re-pressing the editing badge cancels too.
 	 */
-	function openBadge(id: AnnotationId, anchor?: { x: number; y: number }): void {
+	function openBadge(
+		id: AnnotationId,
+		anchor?: { x: number; y: number }
+	): void {
 		// Re-pressing the open badge closes it, like cancel: the edit
 		// menu toggles instead of reopening under the cursor.
 		if (annPop && !annPopClosing && annPop.id === id) {
@@ -4019,7 +4329,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// textbox can't reliably summon the phone keyboard — see
 		// editAnnotationInPrompt. Re-pressing the editing badge cancels
 		// back out (toggle). Desktop keeps the floating edit menu.
-		if (promptAnnEdit && !("pending" in promptAnnEdit) && promptAnnEdit.id === id) {
+		if (
+			promptAnnEdit &&
+			!("pending" in promptAnnEdit) &&
+			promptAnnEdit.id === id
+		) {
 			cancelPromptAnnEdit();
 			return;
 		}
@@ -4038,12 +4352,19 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		settleAnnPop();
 		// Narrow viewports are narrower than the desktop card: clamp
 		// first or x goes negative and the popover runs off-screen.
-		const anchorAt = anchor ?? { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+		const anchorAt = anchor ?? {
+			x: window.innerWidth / 2,
+			y: window.innerHeight / 2
+		};
 		const width = popWidth(false);
-		const x = Math.min(Math.max(8, anchorAt.x - width / 2), window.innerWidth - width - 8);
+		const x = Math.min(
+			Math.max(8, anchorAt.x - width / 2),
+			window.innerWidth - width - 8
+		);
 		const height = 240;
 		let y = anchorAt.y + 8;
-		if (y + height > window.innerHeight - 8) y = Math.max(8, anchorAt.y - height - 8);
+		if (y + height > window.innerHeight - 8)
+			y = Math.max(8, anchorAt.y - height - 8);
 		annPop = { id, x, y, fresh: false };
 		// The box can morph from a still-fading fresh pill (same
 		// element, no remount, so growPill's mount focus never fires):
@@ -4058,8 +4379,16 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * not a re-press: running the toggle would shut the menu the press
 	 * opened (the iOS tap bug). Anything else toggles as before.
 	 */
-	function openBadgeClick(id: AnnotationId, anchor: { x: number; y: number }): void {
-		if (lastBadgePress && lastBadgePress.id === id && Date.now() - lastBadgePress.at < 800) return;
+	function openBadgeClick(
+		id: AnnotationId,
+		anchor: { x: number; y: number }
+	): void {
+		if (
+			lastBadgePress &&
+			lastBadgePress.id === id &&
+			Date.now() - lastBadgePress.at < 800
+		)
+			return;
 		openBadge(id, anchor);
 	}
 
@@ -4088,7 +4417,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			settleAnnPop();
 			annPop = null;
 		}
-		if (promptAnnEdit && !("pending" in promptAnnEdit) && promptAnnEdit.id === id) {
+		if (
+			promptAnnEdit &&
+			!("pending" in promptAnnEdit) &&
+			promptAnnEdit.id === id
+		) {
 			exitPromptAnnEdit();
 		}
 	}
@@ -4113,7 +4446,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		if ("pending" in promptAnnEdit) return pendingAnn?.id ?? null;
 		return promptAnnEdit.id;
 	}
-	function editAnnotationInPrompt(target: { id: string } | { pending: true }, comment: string): void {
+	function editAnnotationInPrompt(
+		target: { id: string } | { pending: true },
+		comment: string
+	): void {
 		// A fresh popover open underneath files first: typed comments
 		// are never silently dropped (same rule as annotate()).
 		if (pendingAnn && !("pending" in target)) commitPending();
@@ -4124,7 +4460,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		reviewOpen = false;
 		editor?.setText(comment);
 		// A saved note being revised says so; a fresh filing asks.
-		editor?.setPlaceholder("pending" in target ? "Add an annotation" : "Edit annotation");
+		editor?.setPlaceholder(
+			"pending" in target ? "Add an annotation" : "Edit annotation"
+		);
 		editor?.caretToEnd();
 		// Phones scroll the quote into the upper clear area first (the
 		// keyboard plus composer own the bottom): no manual scroll is
@@ -4143,7 +4481,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					: (() => {
 							const current = annotations.find((a) => a.id === target.id);
 							return current
-								? { messageId: current.messageId, quote: current.quote, at: current.at ?? 0 }
+								? {
+										messageId: current.messageId,
+										quote: current.quote,
+										at: current.at ?? 0
+									}
 								: null;
 						})();
 			if (lookup) {
@@ -4172,7 +4514,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * quote a fifth down the visible chat; already-visible quotes
 	 * never move.
 	 */
-	function scrollQuoteIntoEditView(messageId: ChatMsgId, quote: string, at: number): void {
+	function scrollQuoteIntoEditView(
+		messageId: ChatMsgId,
+		quote: string,
+		at: number
+	): void {
 		if (!scrollBox) return;
 		const index = viewChat.messages.findIndex((m) => m.id === messageId);
 		if (index < 0) return;
@@ -4189,9 +4535,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		const area = scrollBox.getBoundingClientRect();
 		const appEl = document.querySelector(".app");
 		const kb = appEl
-			? Number.parseFloat(getComputedStyle(appEl).getPropertyValue("--kb-height")) || 0
+			? Number.parseFloat(
+					getComputedStyle(appEl).getPropertyValue("--kb-height")
+				) || 0
 			: 0;
-		const promptH = document.querySelector(".prompt")?.getBoundingClientRect().height ?? 0;
+		const promptH =
+			document.querySelector(".prompt")?.getBoundingClientRect().height ?? 0;
 		const visibleBottom = area.bottom - promptH - kb;
 		if (visibleBottom <= area.top) return;
 		const landing = area.top + (visibleBottom - area.top) * 0.2;
@@ -4203,10 +4552,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	function commitPromptAnnEdit(): void {
 		const target = promptAnnEdit;
 		if (!target) return;
-		void hapticBeatAsync("send", { enabled: !settings.hapticsDisabled, shell: tauriBackendAvailable() });
+		void hapticBeatAsync("send", {
+			enabled: !settings.hapticsDisabled,
+			shell: tauriBackendAvailable()
+		});
 		const comment = editor?.getText() ?? "";
 		if ("pending" in target) {
-			if (pendingAnn) annotations = [...annotations, { ...pendingAnn, comment }];
+			if (pendingAnn)
+				annotations = [...annotations, { ...pendingAnn, comment }];
 			pendingAnn = null;
 		} else {
 			annotations = editAnnotationComment(annotations, target.id, comment);
@@ -4216,7 +4569,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// comment rewrites — the toast names which happened (a bare
 		// "Note saved" never said). Plain on every platform: no draft
 		// vocabulary, the note files straight from the composer.
-		const savedToast = "pending" in target ? "Annotation saved" : "Annotation edited";
+		const savedToast =
+			"pending" in target ? "Annotation saved" : "Annotation edited";
 		exitPromptAnnEdit();
 		flashToast(savedToast);
 		void tick().then(() => editor?.focus());
@@ -4256,13 +4610,19 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * (the click still fires), so only collapsed selections navigate.
 	 * The review closes so the landing clears the composer dock.
 	 */
-	function reviewQuoteClick(ann: { id: AnnotationId; messageId: ChatMsgId }): void {
+	function reviewQuoteClick(ann: {
+		id: AnnotationId;
+		messageId: ChatMsgId;
+	}): void {
 		if (!window.getSelection()?.isCollapsed) return;
 		reviewOpen = false;
 		gotoAnnotation(ann);
 	}
 
-	function gotoAnnotation(ann: { id: AnnotationId; messageId: ChatMsgId }): void {
+	function gotoAnnotation(ann: {
+		id: AnnotationId;
+		messageId: ChatMsgId;
+	}): void {
 		const index = viewChat.messages.findIndex((m) => m.id === ann.messageId);
 		if (index < 0) {
 			flashErrorToast("Annotation no longer exists");
@@ -4275,9 +4635,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// (nearest's down-landing trap). Fall back to the message when
 		// the badge is somehow missing.
 		const badge = document.querySelector(`[data-ann-badge="${ann.id}"]`);
-		if (badge instanceof HTMLElement) scrollRectIntoClear(badge.getBoundingClientRect());
+		if (badge instanceof HTMLElement)
+			scrollRectIntoClear(badge.getBoundingClientRect());
 		else {
-			document.querySelector(`#msg-${index}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+			document
+				.querySelector(`#msg-${index}`)
+				?.scrollIntoView({ block: "center", behavior: "smooth" });
 		}
 		// The quote flashes once like a sent jump (one registry
 		// flash; the jump clears the hover wash first, so no twin
@@ -4308,9 +4671,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		const scroller = document.querySelector(".messages");
 		if (!(scroller instanceof HTMLElement)) return;
 		const area = scroller.getBoundingClientRect();
-		const prompt = document.querySelector(".prompt")?.getBoundingClientRect().height ?? 0;
+		const prompt =
+			document.querySelector(".prompt")?.getBoundingClientRect().height ?? 0;
 		const review = reviewOpen
-			? (document.querySelector(".ann-wrap .review")?.getBoundingClientRect().height ?? 0)
+			? (document.querySelector(".ann-wrap .review")?.getBoundingClientRect()
+					.height ?? 0)
 			: 0;
 		const dock = prompt + review + 16;
 		if (rectInClearView(rect, area, dock)) return;
@@ -4321,13 +4686,19 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	/** True when a rect already reads in the clear viewport (same geometry
 	as the scroll landing above): the jump flash gates on this, so its
 	hold only burns once the eye can land on it. */
-	function rectInClearView(rect: DOMRect, area?: DOMRect, dock?: number): boolean {
+	function rectInClearView(
+		rect: DOMRect,
+		area?: DOMRect,
+		dock?: number
+	): boolean {
 		const scroller = document.querySelector(".messages");
 		if (!(scroller instanceof HTMLElement)) return true;
 		const box = area ?? scroller.getBoundingClientRect();
-		const prompt = document.querySelector(".prompt")?.getBoundingClientRect().height ?? 0;
+		const prompt =
+			document.querySelector(".prompt")?.getBoundingClientRect().height ?? 0;
 		const review = reviewOpen
-			? (document.querySelector(".ann-wrap .review")?.getBoundingClientRect().height ?? 0)
+			? (document.querySelector(".ann-wrap .review")?.getBoundingClientRect()
+					.height ?? 0)
 			: 0;
 		const clear = dock ?? prompt + review + 16;
 		return rect.top >= box.top && rect.bottom <= box.bottom - clear;
@@ -4341,7 +4712,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * lands on the quoted message with a flash when it still holds the
 	 * quote, or on the sending message when the quote is gone.
 	 */
-	function refsQuoteClick(messageId: ChatMsgId, quote: string, n: number): void {
+	function refsQuoteClick(
+		messageId: ChatMsgId,
+		quote: string,
+		n: number
+	): void {
 		// A row edit owns its row: quote taps must not yank the chat
 		// out from under the caret.
 		if (refsEditing) return;
@@ -4370,7 +4745,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 
 	function gotoSentRef(messageId: ChatMsgId, quote: string): void {
-		const live = annotations.find((a) => a.messageId === messageId && a.quote === quote);
+		const live = annotations.find(
+			(a) => a.messageId === messageId && a.quote === quote
+		);
 		if (live) {
 			gotoAnnotation({ id: live.id, messageId });
 			return;
@@ -4404,7 +4781,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	function jumpToQuotedText(messageId: ChatMsgId, quote: string): void {
 		const index = viewChat.messages.findIndex((m) => m.id === messageId);
 		const locate = (): Range | null => {
-			const article = index >= 0 ? document.querySelector(`#msg-${index}`) : null;
+			const article =
+				index >= 0 ? document.querySelector(`#msg-${index}`) : null;
 			const root = article?.querySelector(".rendered") ?? article;
 			return root instanceof HTMLElement ? quoteRange(root, quote) : null;
 		};
@@ -4509,7 +4887,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				const range = locate();
 				if (!range) return false;
 				root = rootOf(range);
-				return paintAnnotationWash(rangesExcludingReadings(range), ANN_FLASH_NAME);
+				return paintAnnotationWash(
+					rangesExcludingReadings(range),
+					ANN_FLASH_NAME
+				);
 			};
 			const nudgeLiveRoot = (): void => {
 				// Resolve the root fresh: a re-render mid-scroll
@@ -4611,8 +4992,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			if (timer !== null) clearTimeout(timer);
 			window.removeEventListener("scroll", onScroll, true);
 			const badge = document.querySelector(`[data-ann-badge="${id}"]`);
-			const rect = badge instanceof HTMLElement ? badge.getBoundingClientRect() : null;
-			openBadge(id, rect ? { x: rect.left + rect.width / 2, y: rect.bottom } : undefined);
+			const rect =
+				badge instanceof HTMLElement ? badge.getBoundingClientRect() : null;
+			openBadge(
+				id,
+				rect ? { x: rect.left + rect.width / 2, y: rect.bottom } : undefined
+			);
 		};
 		window.addEventListener("scroll", onScroll, true);
 		timer = setTimeout(finish, 80);
@@ -4625,7 +5010,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * the global dismiss below; newlines would break the baked block
 	 * shape the render parses back).
 	 */
-	function startRefsEdit(messageId: ChatMsgId, ref: { n: number; comment: string }): void {
+	function startRefsEdit(
+		messageId: ChatMsgId,
+		ref: { n: number; comment: string }
+	): void {
 		refsEditing = { messageId, n: ref.n };
 		refsEditDraft = ref.comment;
 		void tick().then(() => {
@@ -4642,7 +5030,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 */
 	function parkRefsEditFocus(n: number): void {
 		void tick().then(() => {
-			const pencil = document.querySelector(`.ann-refs-pop [data-refs-pencil="${n}"]`);
+			const pencil = document.querySelector(
+				`.ann-refs-pop [data-refs-pencil="${n}"]`
+			);
 			if (pencil instanceof HTMLElement) pencil.focus();
 		});
 	}
@@ -4658,9 +5048,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		refsEditing = null;
 		if (!editing) return;
 		const msg = viewChat.messages.find((m) => m.id === editing.messageId);
-		const next = msg ? rewriteAnnotationComment(msg.content, editing.n, refsEditDraft) : null;
+		const next = msg
+			? rewriteAnnotationComment(msg.content, editing.n, refsEditDraft)
+			: null;
 		if (next === null) flashErrorToast("Annotation no longer exists");
-		else if (msg && next !== msg.content) editMessageContent(chatState, editing.messageId, next);
+		else if (msg && next !== msg.content)
+			editMessageContent(chatState, editing.messageId, next);
 		refsEditDraft = "";
 		parkRefsEditFocus(editing.n);
 	}
@@ -4708,7 +5101,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		if (promptAnnEdit) exitPromptAnnEdit();
 		// Clearing everything thumps like a delete (done): the same
 		// unmistakable triple against single-tap ticks.
-		void hapticBeatAsync("done", { enabled: !settings.hapticsDisabled, shell: tauriBackendAvailable() });
+		void hapticBeatAsync("done", {
+			enabled: !settings.hapticsDisabled,
+			shell: tauriBackendAvailable()
+		});
 	}
 
 	/**
@@ -4726,7 +5122,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// form they'd badge the wrong words.
 		const tashkeelOn = aidModelPin.has(messageId);
 		const saved: AnnotationMark[] = annotations
-			.filter((a) => a.messageId === messageId && aidMarkVisible(a.aidScope, tashkeelOn))
+			.filter(
+				(a) =>
+					a.messageId === messageId && aidMarkVisible(a.aidScope, tashkeelOn)
+			)
 			.map((a) => ({
 				id: a.id,
 				number: annotationNumber(annotations, a.id),
@@ -4780,7 +5179,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 */
 	const memoAids = createRefMemo<LocalAid>((kind) => kind);
 	function localAidsOverrideFor(msg: ChatMsg): LocalAid[] {
-		const kinds = offeredLocalAids(aidDisplayText(msg.content), activeReplyCode);
+		const kinds = offeredLocalAids(
+			aidDisplayText(msg.content),
+			activeReplyCode
+		);
 		const peek = aidPeek?.id === msg.id ? (aidPeek.kind ?? null) : null;
 		return memoAids(msg.id, resolveAidKinds(kinds, pinnedKinds(msg.id), peek));
 	}
@@ -4940,7 +5342,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			);
 	}
 
-	async function runModelAidFor(msg: ChatMsg, aidId: string, pin: boolean): Promise<void> {
+	async function runModelAidFor(
+		msg: ChatMsg,
+		aidId: string,
+		pin: boolean
+	): Promise<void> {
 		if (vocalized[msg.id] !== undefined) {
 			if (pin) {
 				aidPin.add(msg.id);
@@ -4974,7 +5380,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			const targets = aidTargetLines(full);
 			const lines = full.split("\n");
 			const partial = targets.length > 0 && targets.length < lines.length;
-			const input = partial ? targets.map((i) => lines[i] ?? "").join("\n") : full;
+			const input = partial
+				? targets.map((i) => lines[i] ?? "").join("\n")
+				: full;
 			const text = await runModelAid(provider, aidId, input);
 			const spliced = partial ? spliceAidResult(full, targets, text) : null;
 			vocalized = { ...vocalized, [msg.id]: spliced ?? text };
@@ -5011,7 +5419,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 
 	/** Paste-fold toggle: replace the message (never mutate in place). */
 	function togglePasteFold(msg: ChatMsg, index: number): void {
-		setPasteFold(chatState, msg.id, index, !(msg.pasteFolds?.[index]?.open ?? false));
+		setPasteFold(
+			chatState,
+			msg.id,
+			index,
+			!(msg.pasteFolds?.[index]?.open ?? false)
+		);
 	}
 
 	/** The error banner clears itself like the toast: a failed read
@@ -5048,12 +5461,21 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	function messageSpeakable(msg: ChatMsg): boolean {
 		return speechAttemptable(
 			settings.voiceEngine,
-			messageSpeechLang(msg.content, latinFallback(settings.voiceLang), webVoices()),
+			messageSpeechLang(
+				msg.content,
+				latinFallback(settings.voiceLang),
+				webVoices()
+			),
 			webVoices()
 		);
 	}
 
-	function startSpeech(id: string, text: string, lang: string | ((sentence: string) => string), quiet = false): void {
+	function startSpeech(
+		id: string,
+		text: string,
+		lang: string | ((sentence: string) => string),
+		quiet = false
+	): void {
 		stopSpeaking();
 		stopNative();
 		setVoiceError(null);
@@ -5072,7 +5494,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		});
 		const useNative = settings.voiceEngine === "native";
 		const speakWeb = (cb: SpeakCallbacks): boolean =>
-			typeof lang === "function" ? speakMultilingual(text, lang, cb) : speakText(text, lang, cb);
+			typeof lang === "function"
+				? speakMultilingual(text, lang, cb)
+				: speakText(text, lang, cb);
 		const speakNat = (cb: SpeakCallbacks): boolean =>
 			typeof lang === "function"
 				? speakNativeMulti(text, lang, cb, settings.nativeVoiceId)
@@ -5086,7 +5510,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					// with web voices rather than leaving silence (quiet
 					// background readbacks skip the notice, not the retry).
 					fellBack = true;
-					if (!quiet) setVoiceError(`${friendlyNativeError(message)} Falling back to web voices.`);
+					if (!quiet)
+						setVoiceError(
+							`${friendlyNativeError(message)} Falling back to web voices.`
+						);
 					const ok = speakWeb({
 						onEnd: resetVoice,
 						onError: (webMessage) => {
@@ -5097,7 +5524,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					if (!ok) resetVoice();
 					return;
 				}
-				if (!quiet) setVoiceError(useNative ? friendlyNativeError(message) : message);
+				if (!quiet)
+					setVoiceError(useNative ? friendlyNativeError(message) : message);
 				resetVoice();
 			}
 		};
@@ -5122,7 +5550,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		if (!text) return;
 		const fallback = latinFallback(settings.voiceLang);
 		const voices = webVoices();
-		if (!speechAttemptable(settings.voiceEngine, messageSpeechLang(msg.content, fallback, voices), voices)) {
+		if (
+			!speechAttemptable(
+				settings.voiceEngine,
+				messageSpeechLang(msg.content, fallback, voices),
+				voices
+			)
+		) {
 			if (!quiet) setVoiceError("No voice for this language.");
 			return;
 		}
@@ -5131,7 +5565,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// resolves its own language, so four languages read in four
 		// voices (see sentenceLangsFor).
 		const seed = await quoteLangFor(stripped, fallback);
-		startSpeech(msg.id, text, await sentenceLangsFor(stripped, seed, voices), quiet);
+		startSpeech(
+			msg.id,
+			text,
+			await sentenceLangsFor(stripped, seed, voices),
+			quiet
+		);
 	}
 
 	/** Speak-button label. */
@@ -5154,7 +5593,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			if (
 				!speechAttemptable(
 					settings.voiceEngine,
-					messageSpeechLang(last.content, latinFallback(settings.voiceLang), voices),
+					messageSpeechLang(
+						last.content,
+						latinFallback(settings.voiceLang),
+						voices
+					),
 					voices
 				)
 			)
@@ -5241,7 +5684,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		const probe = sentence ?? context;
 		const voices = webVoices();
 		const lang = effectiveSpeechLang(
-			await quoteLangForContext(probe, context, latinFallback(settings.voiceLang)),
+			await quoteLangForContext(
+				probe,
+				context,
+				latinFallback(settings.voiceLang)
+			),
 			voices
 		);
 		if (!speechAttemptable(settings.voiceEngine, lang, voices)) {
@@ -5255,7 +5702,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// highlight still resolves its own language (see
 		// sentenceLangsFor), so a mixed highlight reads each part
 		// correctly and a kanji-only one keeps its context voice.
-		startSpeech("selection", quote, await sentenceLangsFor(quote, lang, voices));
+		startSpeech(
+			"selection",
+			quote,
+			await sentenceLangsFor(quote, lang, voices)
+		);
 	}
 
 	/** Pill-mic dictation into the annotation comment box. */
@@ -5280,10 +5731,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	): Promise<(() => void) | null> {
 		micStarting = true;
 		try {
-			const outcome = await startNativeDictation(latinFallback(settings.voiceLang), {
-				onFinal: onResult,
-				onError
-			});
+			const outcome = await startNativeDictation(
+				latinFallback(settings.voiceLang),
+				{
+					onFinal: onResult,
+					onError
+				}
+			);
 			if (outcome.kind === "started") return outcome.stop;
 			if (outcome.kind === "error") {
 				onError(outcome.message);
@@ -5306,7 +5760,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		const stop = await dictateNativeFirst(
 			(transcript) => {
 				annDraft =
-					annDraft === "" || annDraft.endsWith(" ") ? annDraft + transcript : `${annDraft} ${transcript}`;
+					annDraft === "" || annDraft.endsWith(" ")
+						? annDraft + transcript
+						: `${annDraft} ${transcript}`;
 				stopPillMic();
 			},
 			(message) => {
@@ -5333,7 +5789,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		dismissToast();
 		const stop = await dictateNativeFirst(
 			(transcript) => {
-				editor?.insertText(transcript.endsWith(" ") ? transcript : `${transcript} `);
+				editor?.insertText(
+					transcript.endsWith(" ") ? transcript : `${transcript} `
+				);
 				dictating = false;
 				stopDictation = null;
 			},
@@ -5361,7 +5819,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		const snapshot = source ?? $state.snapshot(settings);
 		void (async () => {
 			await persistSecrets(snapshot);
-			saveSettings(tauriBackendAvailable() ? withBlankedKeys(snapshot) : snapshot);
+			saveSettings(
+				tauriBackendAvailable() ? withBlankedKeys(snapshot) : snapshot
+			);
 		})();
 	}
 
@@ -5396,11 +5856,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		if (useMock) return new MockProvider();
 		// On-device Gemini Nano: keyless, conf-free, Gemma pill only —
 		// failures throw the seam's short copy, never a reroute.
-		if (isOnDeviceProvider(settings.activeProviderId)) return new OnDeviceChatProvider();
+		if (isOnDeviceProvider(settings.activeProviderId))
+			return new OnDeviceChatProvider();
 		const conf = settings.providers[settings.activeProviderId];
 		// Keyless on-device endpoints carry no key by design.
 		const keyless =
-			getProviderDef(settings.activeProviderId, settings.customProviders).keyless === true;
+			getProviderDef(settings.activeProviderId, settings.customProviders)
+				.keyless === true;
 		if (!keyless && !conf?.apiKey.trim()) return null;
 		if (!conf) return null;
 		return createProvider(
@@ -5468,7 +5930,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		if (action === "ignore") return;
 		// Haptic tap on send (silenced by the haptics toggle; native
 		// haptics in the shell, Web vibrator in the preview).
-		void hapticBeatAsync("send", { enabled: !settings.hapticsDisabled, shell: tauriBackendAvailable() });
+		void hapticBeatAsync("send", {
+			enabled: !settings.hapticsDisabled,
+			shell: tauriBackendAvailable()
+		});
 		clearStudyBadge();
 		// Permission-gated background ping: ask from the send gesture
 		// while the window is focused, so a later backgrounded long
@@ -5477,7 +5942,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// Notification ctor. No-op unless undecided — and never asked
 		// when the ping itself is off.
 		if (settings.replyNotifications) {
-			void ensureReplyNotificationPermissionAsync({ shell: tauriBackendAvailable() });
+			void ensureReplyNotificationPermissionAsync({
+				shell: tauriBackendAvailable()
+			});
 		}
 		if (action === "commit-edit") {
 			// Saving an edit rewrites the message in place, never
@@ -5497,7 +5964,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// Paste folds ride the send: same text composerText would give,
 		// plus collapsed-paste spans mapped into it (covers image-marker
 		// stripping and trim exactly — see sendPasteFolds).
-		const { text, folds } = sendPasteFolds(editor?.getText() ?? "", editor?.getPastes() ?? []);
+		const { text, folds } = sendPasteFolds(
+			editor?.getText() ?? "",
+			editor?.getPastes() ?? []
+		);
 		const outgoing = attachments;
 		const outgoingAnnotations = annotations;
 		// The prompt empties the moment the message goes out — not when the
@@ -5539,20 +6009,29 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			{
 				attachments: kept,
 				thinking: activeThinkingId(settings),
-				pasteFolds: [...folds, ...pastedFolds].sort((a, b) => a.start - b.start),
+				pasteFolds: [...folds, ...pastedFolds].sort(
+					(a, b) => a.start - b.start
+				),
 				// Haptic rumble as the reply starts arriving — only while
 				// its chat is still open. A mid-stream switch must not
 				// rumble the new chat for the old one's reply.
 				onFirstToken: () => {
 					if (chat.id !== sentFrom.id) return;
-					void hapticBeatAsync("first", { enabled: !settings.hapticsDisabled, shell: tauriBackendAvailable() });
+					void hapticBeatAsync("first", {
+						enabled: !settings.hapticsDisabled,
+						shell: tauriBackendAvailable()
+					});
 				}
 			}
 		);
 		scrollAfterRender();
 		await sending;
 		// Keep drafts when the reply failed so nothing silently drops.
-		const { sent, stillHere } = resolveSendCompletion(chatState, sentFrom.id, chat.id);
+		const { sent, stillHere } = resolveSendCompletion(
+			chatState,
+			sentFrom.id,
+			chat.id
+		);
 		if (sent?.role === "assistant" && !sent.error) {
 			// Same-chat only: the new chat must not thump for the old
 			// one's reply (a genuinely missed finish is the background
@@ -5561,14 +6040,19 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// filed (or pills staged, reviews opened) while the reply
 			// streamed in are post-send work and survive its landing.
 			if (stillHere) {
-				void hapticBeatAsync("done", { enabled: !settings.hapticsDisabled, shell: tauriBackendAvailable() });
+				void hapticBeatAsync("done", {
+					enabled: !settings.hapticsDisabled,
+					shell: tauriBackendAvailable()
+				});
 			} else if (androidUI) {
 				// Other-chat landing on phones: tick plus a tappable
 				// toast — a reply must not finish silently in a thread
 				// the user left. Tapping opens the origin chat.
 				buzzTap();
 				const originId = sentFrom.id;
-				flashToast("Reply ready — tap to open", () => transitionToChat(originId));
+				flashToast("Reply ready — tap to open", () =>
+					transitionToChat(originId)
+				);
 			}
 		}
 		// Follow the stream only while its chat is open: after a switch
@@ -5580,7 +6064,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// transitions on phones) can strand the emptied composer's cached
 		// line boxes at zero height: settle a re-measure after paint, like
 		// the mount path does, so it holds one line without a keystroke.
-		requestAnimationFrame(() => requestAnimationFrame(() => editor?.remeasure()));
+		requestAnimationFrame(() =>
+			requestAnimationFrame(() => editor?.remeasure())
+		);
 	}
 
 	async function resend() {
@@ -5592,28 +6078,48 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		missingKey = false;
 		stopVoice();
 		// A resend is a send too: same tap, rumble, and thump as doSend.
-		void hapticBeatAsync("send", { enabled: !settings.hapticsDisabled, shell: tauriBackendAvailable() });
-		const resentFrom = chat;
-		await resendLast(chatState, provider, effectiveSystemPrompt(settings, activeReplyCode), {
-			thinking: activeThinkingId(settings),
-			onFirstToken: () => {
-				if (chat.id !== resentFrom.id) return;
-				void hapticBeatAsync("first", { enabled: !settings.hapticsDisabled, shell: tauriBackendAvailable() });
-			}
+		void hapticBeatAsync("send", {
+			enabled: !settings.hapticsDisabled,
+			shell: tauriBackendAvailable()
 		});
+		const resentFrom = chat;
+		await resendLast(
+			chatState,
+			provider,
+			effectiveSystemPrompt(settings, activeReplyCode),
+			{
+				thinking: activeThinkingId(settings),
+				onFirstToken: () => {
+					if (chat.id !== resentFrom.id) return;
+					void hapticBeatAsync("first", {
+						enabled: !settings.hapticsDisabled,
+						shell: tauriBackendAvailable()
+					});
+				}
+			}
+		);
 		// Same origin-chat discipline as a fresh send (see
 		// resolveSendCompletion): the live `chat` may point at a new
 		// thread by now.
-		const { sent: resent, stillHere: resentHere } = resolveSendCompletion(chatState, resentFrom.id, chat.id);
+		const { sent: resent, stillHere: resentHere } = resolveSendCompletion(
+			chatState,
+			resentFrom.id,
+			chat.id
+		);
 		if (resent?.role === "assistant" && !resent.error) {
 			// Same-chat only: a new thread never thumps for the old
 			// one's reply (see the fresh-send twin above).
 			if (resentHere) {
-				void hapticBeatAsync("done", { enabled: !settings.hapticsDisabled, shell: tauriBackendAvailable() });
+				void hapticBeatAsync("done", {
+					enabled: !settings.hapticsDisabled,
+					shell: tauriBackendAvailable()
+				});
 			} else if (androidUI) {
 				buzzTap();
 				const originId = resentFrom.id;
-				flashToast("Reply ready — tap to open", () => transitionToChat(originId));
+				flashToast("Reply ready — tap to open", () =>
+					transitionToChat(originId)
+				);
 			}
 		}
 		// Same stillHere discipline as a fresh send: the scroller
@@ -5623,7 +6129,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		maybeNotifyReplyDone(resent);
 		// Same settle as a fresh send: the reply's layout churn can
 		// strand the composer's cached line boxes at zero height.
-		requestAnimationFrame(() => requestAnimationFrame(() => editor?.remeasure()));
+		requestAnimationFrame(() =>
+			requestAnimationFrame(() => editor?.remeasure())
+		);
 	}
 
 	/** The tall composer dwarfs a one-line draft: taps on its empty
@@ -5631,7 +6139,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	fields, and the annotation review keep their own clicks. */
 	function focusPromptFloor(event: MouseEvent): void {
 		const target = event.target instanceof Element ? event.target : null;
-		if (target?.closest("button, input, textarea, select, a, .ann-wrap")) return;
+		if (target?.closest("button, input, textarea, select, a, .ann-wrap"))
+			return;
 		editor?.focus();
 	}
 
@@ -5664,7 +6173,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		if (action === "stage") {
 			// ⌥+Enter: most recent message, no reply; the next submit
 			// carries the full history in order.
-			const { stored: staged, kept: stagedKept } = splicedSendText(composerText(), attachments);
+			const { stored: staged, kept: stagedKept } = splicedSendText(
+				composerText(),
+				attachments
+			);
 			stageMessage(chatState, staged, stagedKept);
 			attachments = [];
 			expandedPastes = [];
@@ -5705,7 +6217,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	/** Inspect card (touch): every button ticks through one delegated
 	gate instead of a tick per button. */
 	function buzzInspectTap(event: TouchEvent): void {
-		if (event.target instanceof Element && event.target.closest("button")) buzzTap();
+		if (event.target instanceof Element && event.target.closest("button"))
+			buzzTap();
 	}
 
 	/**
@@ -5724,7 +6237,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			sending: chatState.sending,
 			editingId: editingMsgId
 		});
-		if (editAction === "ignore-sending" || editAction === "ignore-not-user") return;
+		if (editAction === "ignore-sending" || editAction === "ignore-not-user")
+			return;
 		if (editAction === "toggle-off") {
 			cancelMessageEdit();
 			return;
@@ -5758,7 +6272,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// The edit action focuses on mount; keep the message on screen
 		// without yanking it (the composer-at-bottom jump is gone).
 		requestAnimationFrame(() =>
-			document.getElementById(`msg-${index}`)?.scrollIntoView({ block: "nearest" })
+			document
+				.getElementById(`msg-${index}`)
+				?.scrollIntoView({ block: "nearest" })
 		);
 	}
 
@@ -5801,7 +6317,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			if (box instanceof HTMLElement) {
 				if (box.contains(next)) return;
 				const boxArticle = box.closest("article");
-				if (boxArticle !== null && boxArticle === next.closest("article")) return;
+				if (boxArticle !== null && boxArticle === next.closest("article"))
+					return;
 			}
 			if (next.closest("[data-commit-edit]") !== null) return;
 		}
@@ -5818,7 +6335,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		const id = editingMsgId;
 		if (id) {
 			const src = msgEditor ?? editor;
-			const { text, folds } = sendPasteFolds(src?.getText() ?? "", src?.getPastes() ?? []);
+			const { text, folds } = sendPasteFolds(
+				src?.getText() ?? "",
+				src?.getPastes() ?? []
+			);
 			const stored = appendImageMarkers(
 				text,
 				editingAttachments.filter((a) => a.kind === "image").length
@@ -5827,7 +6347,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// empty span set would silently unfold the message's
 			// pasted tags on a no-op save.
 			const prev = activeChat(chatState).messages.find((m) => m.id === id);
-			const keepFolds = text === editingSeed ? (prev?.pasteFolds ?? folds) : folds;
+			const keepFolds =
+				text === editingSeed ? (prev?.pasteFolds ?? folds) : folds;
 			editMessageContent(chatState, id, withAnnotations(stored, annotations), {
 				attachments: editingAttachments,
 				pasteFolds: keepFolds
@@ -5909,7 +6430,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				enterScrollMode();
 			},
 			onImagesPasted: onInlineImagesPasted,
-			onCopyImageTags: (indexes) => copyImageTagBlobs(editingAttachments, indexes),
+			onCopyImageTags: (indexes) =>
+				copyImageTagBlobs(editingAttachments, indexes),
 			onDocChange: (text, removed) => {
 				// Tag → attachment half of two-way removal, mirrored
 				// from the composer: deleted occurrences drop the
@@ -6005,7 +6527,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 
 	function jumpTo(index: number) {
 		selectedIdx = index;
-		document.getElementById(`msg-${index}`)?.scrollIntoView({ block: "start", behavior: "smooth" });
+		document
+			.getElementById(`msg-${index}`)
+			?.scrollIntoView({ block: "start", behavior: "smooth" });
 	}
 
 	/**
@@ -6078,7 +6602,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 
 	function enterEditMode() {
-		focusLog("enter-edit-mode", { from: focusMode, active: describeActiveElement() });
+		focusLog("enter-edit-mode", {
+			from: focusMode,
+			active: describeActiveElement()
+		});
 		focusMode = "edit";
 		editor?.setPlaceholder(promptPlaceholder());
 		// A fresh editing context always shows the prompt: a minted
@@ -6098,14 +6625,19 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				// from the list focuses the composer only after the
 				// collapse drops that row, so keep retrying through it.
 				const settled =
-					active && active !== document.body && !(settings.sidebarCollapsed && active.closest("aside"));
+					active &&
+					active !== document.body &&
+					!(settings.sidebarCollapsed && active.closest("aside"));
 				if (settled) return;
 				const node = document.querySelector<HTMLElement>(".prompt .ta-input");
 				if (node && getComputedStyle(node).visibility !== "hidden") {
 					editor?.focus();
 					// A parked-composer focus no-ops silently: only stop
 					// when the caret actually landed.
-					const landed = closestFromTarget(document.activeElement, ".prompt .ta-input");
+					const landed = closestFromTarget(
+						document.activeElement,
+						".prompt .ta-input"
+					);
 					if (landed) return;
 				}
 				if (++frames < 60) requestAnimationFrame(land);
@@ -6120,10 +6652,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * deactivated state (nothing selected, no focus stolen).
 	 */
 	function exitScrollMode(): void {
-		focusLog("exit-scroll-mode", { from: focusMode, active: describeActiveElement() });
+		focusLog("exit-scroll-mode", {
+			from: focusMode,
+			active: describeActiveElement()
+		});
 		focusMode = "edit";
 		selectedIdx = -1;
-		if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+		if (document.activeElement instanceof HTMLElement)
+			document.activeElement.blur();
 	}
 
 	/**
@@ -6142,7 +6678,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * ramps from j/k speed to peak over SCROLL_HOLD_RAMP_MS (see
 	 * holdGlideVelocity) instead of kicking at full speed; j/k cruise.
 	 */
-	function startScrollHold(key: string, velocity: number, tapDy?: number): void {
+	function startScrollHold(
+		key: string,
+		velocity: number,
+		tapDy?: number
+	): void {
 		stopScrollHold();
 		if (!scrollBox) return;
 		// The .messages column eases programmatic jumps (scroll-behavior:
@@ -6207,7 +6747,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		scrollBox?.scrollTo({ top: 0, behavior: "smooth" });
 	}
 	function scrollChatBottom(): void {
-		if (scrollBox) scrollBox.scrollTo({ top: scrollBox.scrollHeight, behavior: "smooth" });
+		if (scrollBox)
+			scrollBox.scrollTo({ top: scrollBox.scrollHeight, behavior: "smooth" });
 	}
 	function scrollHoveredEdge(edge: "start" | "end"): void {
 		const el = document.getElementById(`msg-${hoveredIdx}`);
@@ -6220,7 +6761,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// article) underneath. Reserve the card plus a gap instead.
 		const card = document.querySelector<HTMLElement>("main .prompt");
 		const bottomReserve =
-			edge === "end" && card ? Math.ceil(card.getBoundingClientRect().height) + 8 : 0;
+			edge === "end" && card
+				? Math.ceil(card.getBoundingClientRect().height) + 8
+				: 0;
 		box.scrollTo({
 			top: messageEdgeScrollTop({
 				scrollTop: box.scrollTop,
@@ -6313,7 +6856,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			listProviders(settings.customProviders).map((p) => p.id),
 			{ android: androidBridge, online: navigator.onLine, local: androidBridge }
 		);
-		const next = (ids.indexOf(settings.activeProviderId) + direction + ids.length) % ids.length;
+		const next =
+			(ids.indexOf(settings.activeProviderId) + direction + ids.length) %
+			ids.length;
 		const id = ids[next];
 		if (id === undefined) return;
 		settings.activeProviderId = id;
@@ -6324,7 +6869,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		const support = activeThinkingSupport(settings);
 		settings.thinking = {
 			...settings.thinking,
-			[settings.activeProviderId]: cycleThinkingId(support, activeThinkingId(settings), direction)
+			[settings.activeProviderId]: cycleThinkingId(
+				support,
+				activeThinkingId(settings),
+				direction
+			)
 		};
 		persistSettings();
 	}
@@ -6385,7 +6934,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 
 	function sendHoldStart(): void {
 		if (!androidUI || sendHoldTimer !== null) return;
-		if (composerText() !== "" || attachments.length > 0 || annotations.length > 0) return;
+		if (
+			composerText() !== "" ||
+			attachments.length > 0 ||
+			annotations.length > 0
+		)
+			return;
 		sendHoldTimer = setTimeout(() => {
 			sendHoldTimer = null;
 			swapReplyLangHold();
@@ -6407,7 +6961,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		setChatReplyLang(chatState, id, next.current);
 		buzzTap();
 		const lang = next.current ? replyLanguageFor(next.current) : null;
-		flashToast(lang ? `Reply language: ${lang.name}` : "Reply language cleared");
+		flashToast(
+			lang ? `Reply language: ${lang.name}` : "Reply language cleared"
+		);
 	}
 
 	/**
@@ -6469,7 +7025,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				chatState.chats.map((c) => c.id)
 			);
 		}
-		if (chatState.chats.length === 1 && chatState.chats[0]?.messages.length === 0) {
+		if (
+			chatState.chats.length === 1 &&
+			chatState.chats[0]?.messages.length === 0
+		) {
 			void resetVoiceLangFromKeyboard();
 		}
 	}
@@ -6512,8 +7071,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		const today = new Date();
 		const sameDay = date.toDateString() === today.toDateString();
 		// 2-digit hour keeps the list column aligned (01:30, never 1:30).
-		const time = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-		const day = sameDay ? "Today" : date.toLocaleDateString([], { month: "short", day: "numeric" });
+		const time = date.toLocaleTimeString([], {
+			hour: "2-digit",
+			minute: "2-digit"
+		});
+		const day = sameDay
+			? "Today"
+			: date.toLocaleDateString([], { month: "short", day: "numeric" });
 		return `${day} ${time}`;
 	}
 
@@ -6597,7 +7161,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		try {
 			drag = getCurrentWindow().startDragging();
 		} catch (error) {
-			drag = Promise.reject(error instanceof Error ? error : new Error(errorMessage(error)));
+			drag = Promise.reject(
+				error instanceof Error ? error : new Error(errorMessage(error))
+			);
 		}
 		drag.catch((error: unknown) => {
 			// A denial here once meant a silently immovable window (the
@@ -6678,7 +7244,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				}
 				const exists = chatState.chats.some((c) => c.id === link.chatId);
 				if (!exists) return;
-				saveDraftAnnotations(chatState.activeChatId, annotations, chatState.chats.map((c) => c.id));
+				saveDraftAnnotations(
+					chatState.activeChatId,
+					annotations,
+					chatState.chats.map((c) => c.id)
+				);
 				selectChat(chatState, link.chatId as ChatId);
 				annotations = loadDraftAnnotations(link.chatId);
 				enterEditMode();
@@ -6697,13 +7267,18 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	 * download fallback presents it. One toast names the outcome.
 	 */
 	async function shareCurrentChat(): Promise<void> {
-		const lines = chat.messages.map((m) => ({ role: m.role, content: m.content }));
+		const lines = chat.messages.map((m) => ({
+			role: m.role,
+			content: m.content
+		}));
 		const title = sheetTitle(lines);
 		const markdown = studySheetMarkdown(title, lines);
 		const saved = await exportStudySheet(title, lines);
 		const outcome = await shareStudySheet(title, markdown);
 		if (outcome === "shared") {
-			flashToast(saved ? `Study sheet shared (${saved})` : "Study sheet shared");
+			flashToast(
+				saved ? `Study sheet shared (${saved})` : "Study sheet shared"
+			);
 		} else if (outcome === "copied") {
 			flashToast("Study sheet copied — paste it anywhere");
 		} else if (outcome === "downloaded") {
@@ -6761,7 +7336,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			}
 		} else if (event.clientX > right) {
 			if (!settingsOpen) openSettingsPanel();
-		} else if (target === scrollBox || target.closest(".empty-state") === target) {
+		} else if (
+			target === scrollBox ||
+			target.closest(".empty-state") === target
+		) {
 			// Open space in the column (the scroller's own padding past
 			// the last message, or the empty-state box itself):
 			// double-clicking summons the composer. Between-message gaps
@@ -6774,14 +7352,18 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	function zoomWindow(event: MouseEvent): void {
 		if (!tauriBackendAvailable()) return;
 		const target = event.target;
-		if (target instanceof HTMLElement && target.closest("button, input, select, textarea, a")) {
+		if (
+			target instanceof HTMLElement &&
+			target.closest("button, input, select, textarea, a")
+		) {
 			return;
 		}
 		try {
 			getCurrentWindow()
 				.toggleMaximize()
 				.catch((error: unknown) => {
-					const message = error instanceof Error ? error.message : String(error);
+					const message =
+						error instanceof Error ? error.message : String(error);
 					console.warn("Window zoom failed:", message);
 				});
 		} catch (error) {
@@ -6799,12 +7381,17 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// tablets join it too: iPads in desktop-mode Safari report
 			// a Macintosh UA, so touch points plus the coarse pointer
 			// and screen size pick them up (see isTouchTablet).
-			androidUI = isAndroidUserAgent(navigator.userAgent) || isIOSUserAgent(navigator.userAgent)
-				|| isTouchTablet({
+			androidUI =
+				isAndroidUserAgent(navigator.userAgent) ||
+				isIOSUserAgent(navigator.userAgent) ||
+				isTouchTablet({
 					ua: navigator.userAgent,
 					coarse: isCoarsePointer((q) => window.matchMedia(q)),
 					maxTouchPoints: navigator.maxTouchPoints ?? 0,
-					smallestScreenDim: Math.min(window.screen?.width ?? 0, window.screen?.height ?? 0)
+					smallestScreenDim: Math.min(
+						window.screen?.width ?? 0,
+						window.screen?.height ?? 0
+					)
 				});
 			iosUI = isIOSUserAgent(navigator.userAgent);
 		} catch {
@@ -6841,7 +7428,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				const meta = document.querySelector('meta[name="viewport"]');
 				const content = meta?.getAttribute("content") ?? "";
 				if (meta && !content.includes("interactive-widget")) {
-					meta.setAttribute("content", `${content}, interactive-widget=resizes-content`);
+					meta.setAttribute(
+						"content",
+						`${content}, interactive-widget=resizes-content`
+					);
 				}
 			}
 		} catch {
@@ -6966,14 +7556,20 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			start: { x: number; y: number; clean: boolean },
 			ended: { clientX: number; clientY: number }
 		): EdgePanel | null {
-			if (!androidUI || !start.clean || shortcutsOpen || inspectChar) return null;
+			if (!androidUI || !start.clean || shortcutsOpen || inspectChar)
+				return null;
 			if (window.getSelection()?.isCollapsed === false) return null;
 			// Chats summons from the left edge only (edge rule): a
 			// mid-screen rightward stroke never opens it — those
 			// collide with message gestures. Dismissing an open
 			// settings panel still works, and leftward settings
 			// strokes are untouched.
-			const target = contentSwipeTarget(start.x, start.y, ended.clientX, ended.clientY);
+			const target = contentSwipeTarget(
+				start.x,
+				start.y,
+				ended.clientX,
+				ended.clientY
+			);
 			if (target === "chats" && !settingsOpen) return null;
 			return target;
 		}
@@ -7018,9 +7614,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		 * selection, or started in an editable or on a control, is
 		 * ignored. Passive: the app never blocks the drag.
 		 */
-		let edgeMouse: { x: number; y: number; clean: boolean; sel: string } | null = null;
+		let edgeMouse: {
+			x: number;
+			y: number;
+			clean: boolean;
+			sel: string;
+		} | null = null;
 		window.addEventListener("pointerdown", (event) => {
-			if (androidUI || event.pointerType !== "mouse" || event.button !== 0) return;
+			if (androidUI || event.pointerType !== "mouse" || event.button !== 0)
+				return;
 			const target = event.target;
 			const clean =
 				!(target instanceof Element) ||
@@ -7041,7 +7643,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			if (event.pointerType !== "mouse" || event.button !== 0) return;
 			if ((window.getSelection()?.toString() ?? "") !== start.sel) return;
 			applyEdgeTarget(
-				edgeSwipeTarget(start.x, start.y, event.clientX, event.clientY, window.innerWidth)
+				edgeSwipeTarget(
+					start.x,
+					start.y,
+					event.clientX,
+					event.clientY,
+					window.innerWidth
+				)
 			);
 		});
 		let edgeTouch: {
@@ -7088,7 +7696,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		function flickZoneOf(target: EventTarget | null): FlickZone {
 			const el = target instanceof Element ? target : null;
 			if (!el) return "other";
-			if (el.closest("button, a, input, textarea, select, summary, [contenteditable], .actions"))
+			if (
+				el.closest(
+					"button, a, input, textarea, select, summary, [contenteditable], .actions"
+				)
+			)
 				return "other";
 			if (el.closest(".prompt")) return "prompt";
 			if (articleOf(el)) return "message";
@@ -7111,7 +7723,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// runs, so without the carve-out every marker tap would
 			// open its edit and cancel it in the same gesture.
 			const target = event.target instanceof Element ? event.target : null;
-			if (promptAnnEdit && !target?.closest(".prompt") && !target?.closest("[data-ann-badge]")) {
+			if (
+				promptAnnEdit &&
+				!target?.closest(".prompt") &&
+				!target?.closest("[data-ann-badge]")
+			) {
 				cancelPromptAnnEdit();
 			}
 		});
@@ -7145,25 +7761,32 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				const target = event.target;
 				const clean =
 					!(target instanceof Element) ||
-					target.closest("input, textarea, select, [contenteditable='true']") === null;
+					target.closest(
+						"input, textarea, select, [contenteditable='true']"
+					) === null;
 				// Message the stroke starts on (for swipe-to-fold). The
 				// article id carries the viewChat index (see msg-{i}).
 				const art = target instanceof Element ? articleOf(target) : null;
 				const msgIndex = art ? Number(art.id.slice(4)) : NaN;
-				const msgId =
-					Number.isInteger(msgIndex) ? (viewChat.messages[msgIndex]?.id ?? null) : null;
+				const msgId = Number.isInteger(msgIndex)
+					? (viewChat.messages[msgIndex]?.id ?? null)
+					: null;
 				// A stroke starting on the action row is the row's own
 				// scroll: scrolling an overflowing row must never fold
 				// the message or summon a sidebar.
-				const rowSwipe = target instanceof Element && target.closest(".actions") !== null;
+				const rowSwipe =
+					target instanceof Element && target.closest(".actions") !== null;
 				// Same for sideways pans inside code and latex blocks: the
 				// inner scroller owns the stroke, so it folds neither the
 				// block nor the message around it.
 				const codeSwipe =
-					target instanceof Element && target.closest(".ccez-code, .ccez-math") !== null;
+					target instanceof Element &&
+					target.closest(".ccez-code, .ccez-math") !== null;
 				// Strokes inside the chat switcher belong to the switcher
 				// card (cycle on swipe): the window paths below stay out.
-				const inSwitcher = target instanceof Element && target.closest(".chat-switcher") !== null;
+				const inSwitcher =
+					target instanceof Element &&
+					target.closest(".chat-switcher") !== null;
 				// Snapshot before the tap blurs anything: a tap-away that
 				// dismisses the keyboard must not re-arm focus below.
 				const promptHadFocus =
@@ -7215,7 +7838,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				const touch = event.touches[0];
 				if (
 					touch &&
-					Math.hypot(touch.clientX - edgeTouch.x, touch.clientY - edgeTouch.y) > 12
+					Math.hypot(touch.clientX - edgeTouch.x, touch.clientY - edgeTouch.y) >
+						12
 				) {
 					clearEmptyHoldTimer();
 				}
@@ -7229,7 +7853,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				edgeTouch = null;
 				clearEmptyHoldTimer();
 				if (!start) return;
-				let ended: { identifier: number; clientX: number; clientY: number } | null = null;
+				let ended: {
+					identifier: number;
+					clientX: number;
+					clientY: number;
+				} | null = null;
 				for (let i = 0; i < event.changedTouches.length; i++) {
 					const candidate = event.changedTouches[i];
 					if (candidate && candidate.identifier === start.id) ended = candidate;
@@ -7276,7 +7904,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					const now = Date.now();
 					const tapped =
 						now - start.at <= 300 &&
-						Math.hypot(ended.clientX - start.x, ended.clientY - start.y) <= 12 &&
+						Math.hypot(ended.clientX - start.x, ended.clientY - start.y) <=
+							12 &&
 						Math.abs((scrollBox?.scrollTop ?? 0) - start.scrollTop) <= 10 &&
 						start.zone === "empty" &&
 						window.getSelection()?.isCollapsed !== false;
@@ -7310,7 +7939,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					// tap that dismisses the keyboard never re-arms: the
 					// prompt had focus when the stroke began, so this tap
 					// is the way out, not the way in.
-					if (tapped && !paired && viewChat.messages.length === 0 && !start.promptHadFocus) {
+					if (
+						tapped &&
+						!paired &&
+						viewChat.messages.length === 0 &&
+						!start.promptHadFocus
+					) {
 						if (emptyTapTimer) clearTimeout(emptyTapTimer);
 						emptyTapTimer = setTimeout(() => {
 							emptyTapTimer = null;
@@ -7330,12 +7964,19 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					const now = Date.now();
 					const msgTapped =
 						now - start.at <= 300 &&
-						Math.hypot(ended.clientX - start.x, ended.clientY - start.y) <= 12 &&
+						Math.hypot(ended.clientX - start.x, ended.clientY - start.y) <=
+							12 &&
 						Math.abs((scrollBox?.scrollTop ?? 0) - start.scrollTop) <= 10 &&
 						start.zone === "message";
 					if (msgTapped) {
-						msgTapSeq = nextTapCount(msgTapSeq, now, ended.clientX, ended.clientY);
-						if (msgTapSeq.count === 2) msgDoubleTapPin = { id: start.msgId, at: now };
+						msgTapSeq = nextTapCount(
+							msgTapSeq,
+							now,
+							ended.clientX,
+							ended.clientY
+						);
+						if (msgTapSeq.count === 2)
+							msgDoubleTapPin = { id: start.msgId, at: now };
 						// Triple-tap takes the sentence, quadruple-tap the
 						// paragraph (this counter only ever sees
 						// single-finger taps). A false return keeps the
@@ -7348,12 +7989,18 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				}
 				const target = start.rowSwipe
 					? null
-					: (edgeSwipeTarget(start.x, start.y, ended.clientX, ended.clientY, window.innerWidth) ??
-						middleSwipeTarget(start, ended));
+					: (edgeSwipeTarget(
+							start.x,
+							start.y,
+							ended.clientX,
+							ended.clientY,
+							window.innerWidth
+						) ?? middleSwipeTarget(start, ended));
 				// The quick switcher owns every swipe while up: strokes
 				// on its veil cycle chats, and nothing may summon a
 				// sidebar behind it.
-				if (chatSwitcherOpen && (target === "chats" || target === "settings")) return;
+				if (chatSwitcherOpen && (target === "chats" || target === "settings"))
+					return;
 				if (target === "chats" && androidUI && !iosUI) {
 					// A rightward stroke summons the chats list (double-tap
 					// stays as the other opener) and never dismisses it —
@@ -7415,7 +8062,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				}
 				const first = event.touches[0];
 				selTouchStart = first
-					? { x: first.clientX, y: first.clientY, sel: window.getSelection()?.toString() ?? "" }
+					? {
+							x: first.clientX,
+							y: first.clientY,
+							sel: window.getSelection()?.toString() ?? ""
+						}
 					: null;
 			},
 			{ passive: true }
@@ -7453,7 +8104,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				// Phones never do this: every selection would talk.
 				if (!androidUI && settings.autoSpeakSelection) {
 					const fresh = currentQuote();
-					if (fresh) void speakQuote(fresh.quote, fresh.messageId, true, fresh.context);
+					if (fresh)
+						void speakQuote(fresh.quote, fresh.messageId, true, fresh.context);
 				}
 			},
 			{ passive: true }
@@ -7574,7 +8226,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						quote: refreshed.quote,
 						context: refreshed.context,
 						messageId: refreshed.messageId,
-						range: live.rangeCount > 0 ? live.getRangeAt(0).cloneRange() : selMenu.range
+						range:
+							live.rangeCount > 0
+								? live.getRangeAt(0).cloneRange()
+								: selMenu.range
 					};
 				}
 			}
@@ -7670,7 +8325,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				) === null
 			);
 		};
-		const trackOf = (t: Touch): FingerTrack => ({ id: t.identifier, x: t.clientX, y: t.clientY });
+		const trackOf = (t: Touch): FingerTrack => ({
+			id: t.identifier,
+			x: t.clientX,
+			y: t.clientY
+		});
 		window.addEventListener(
 			"touchstart",
 			(event) => {
@@ -7686,11 +8345,16 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					// almost every time. Loose tracks still swipe and
 					// slide; only clean ones pair taps, and taps never
 					// pair mid-select (see the guards below).
-					const modalBusy = shortcutsOpen || palette.open || inspectChar !== null;
+					const modalBusy =
+						shortcutsOpen || palette.open || inspectChar !== null;
 					const clean = !modalBusy && gestureClean(event);
 					twoTrack =
 						a && b && androidUI && !modalBusy
-							? { start: [trackOf(a), trackOf(b)], end: [trackOf(a), trackOf(b)], clean }
+							? {
+									start: [trackOf(a), trackOf(b)],
+									end: [trackOf(a), trackOf(b)],
+									clean
+								}
 							: null;
 					// A clean two-finger press starts the double-tap clock.
 					twoTapAt = twoTrack !== null && twoTrack.clean ? Date.now() : 0;
@@ -7705,7 +8369,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						target instanceof Element &&
 						target.closest("main .messages") !== null;
 					pinchBaseline = pinchStartSpread =
-						a && b ? Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) : 0;
+						a && b
+							? Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY)
+							: 0;
 					pinchMoved = false;
 					pinchStepped = false;
 					// Two-finger hold opens the chat switcher: both fingers
@@ -7778,11 +8444,16 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			"touchmove",
 			(event) => {
 				if (threeTrack) {
-					const lead = Array.from(event.touches).find((t) => t.identifier === threeTrack?.id);
+					const lead = Array.from(event.touches).find(
+						(t) => t.identifier === threeTrack?.id
+					);
 					if (lead) {
 						threeTrack.moved = Math.max(
 							threeTrack.moved,
-							Math.hypot(lead.clientX - threeTrack.x, lead.clientY - threeTrack.y)
+							Math.hypot(
+								lead.clientX - threeTrack.x,
+								lead.clientY - threeTrack.y
+							)
 						);
 						threeTrack.cx = lead.clientX;
 						threeTrack.cy = lead.clientY;
@@ -7809,7 +8480,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					const a = event.touches[0];
 					const b = event.touches[1];
 					if (a && b) {
-						const spread = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+						const spread = Math.hypot(
+							a.clientX - b.clientX,
+							a.clientY - b.clientY
+						);
 						if (Math.abs(spread - pinchStartSpread) > 12) pinchMoved = true;
 						const step = pinchZoomStep(pinchBaseline, spread);
 						if (step !== 0) {
@@ -7877,11 +8551,19 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						// while the tracks are alive; horizontal strokes read
 						// null here so the swipe step above keeps them.
 						const slide =
-							androidUI && dir === null ? twoFingerSlideDir(twoStart, twoEnd) : null;
+							androidUI && dir === null
+								? twoFingerSlideDir(twoStart, twoEnd)
+								: null;
 						const now = Date.now();
 						const moved = Math.max(
-							Math.hypot(twoEnd[0].x - twoStart[0].x, twoEnd[0].y - twoStart[0].y),
-							Math.hypot(twoEnd[1].x - twoStart[1].x, twoEnd[1].y - twoStart[1].y)
+							Math.hypot(
+								twoEnd[0].x - twoStart[0].x,
+								twoEnd[0].y - twoStart[0].y
+							),
+							Math.hypot(
+								twoEnd[1].x - twoStart[1].x,
+								twoEnd[1].y - twoStart[1].y
+							)
 						);
 						twoTrack = null;
 						// A pinch owns the gesture: spread motion vetoes
@@ -7902,7 +8584,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							// chats list. Chat steps moved to three
 							// fingers; desktop keeps stepping both
 							// directions.
-							if (dir === -1 && androidUI && !settingsOpen) openSettingsPanel(true);
+							if (dir === -1 && androidUI && !settingsOpen)
+								openSettingsPanel(true);
 							else if (dir === 1 && androidUI) {
 								if (settingsOpen) settingsOpen = false;
 								else if (settings.sidebarCollapsed) {
@@ -7933,7 +8616,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 								lastTwoTapAt = 0;
 								if (iosUI) {
 									// The open keyboard would cover the sidebar.
-									if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+									if (document.activeElement instanceof HTMLElement)
+										document.activeElement.blur();
 									toggleSidebar();
 								} else {
 									// On a message: its end lands above the
@@ -7949,8 +8633,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						// Home/End keys). Same pinch veto as the swipe step;
 						// desktop keeps swipes only.
 						if (slide !== null && !pinchMoved && scrollBox) {
-							if (slide === "top") scrollBox.scrollTo({ top: 0, behavior: "smooth" });
-							else scrollBox.scrollTo({ top: scrollBox.scrollHeight, behavior: "smooth" });
+							if (slide === "top")
+								scrollBox.scrollTo({ top: 0, behavior: "smooth" });
+							else
+								scrollBox.scrollTo({
+									top: scrollBox.scrollHeight,
+									behavior: "smooth"
+								});
 							void hapticBeatAsync("send", {
 								enabled: !settings.hapticsDisabled,
 								shell: tauriBackendAvailable()
@@ -7958,7 +8647,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						}
 						// Pinch zoom toasts once on release with the
 						// landed size (steps stay quiet mid-gesture).
-						if (pinchStepped) flashToast(`Text size ${Math.round(settings.fontScale * 100)}%`);
+						if (pinchStepped)
+							flashToast(`Text size ${Math.round(settings.fontScale * 100)}%`);
 						pinchFont = false;
 						pinchMoved = false;
 						pinchStepped = false;
@@ -7980,16 +8670,18 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					// Phones step chats on a three-finger horizontal swipe
 					// (right = newer, left = older, keyboard stays down);
 					// a near-stationary trio still pairs into the tap below.
-					const swipe = androidUI ? threeFingerSwipeDir(track.x, track.y, track.cx, track.cy) : null;
+					const swipe = androidUI
+						? threeFingerSwipeDir(track.x, track.y, track.cx, track.cy)
+						: null;
 					if (swipe !== null) {
 						stepChat(swipe, false);
 						void hapticBeatAsync("send", {
 							enabled: !settings.hapticsDisabled,
 							shell: tauriBackendAvailable()
 						});
-					// Never mid-select, like the two-finger jump above.
-					// A fired hold owns the release: the wipe already
-					// landed, so the tap below must not run after it.
+						// Never mid-select, like the two-finger jump above.
+						// A fired hold owns the release: the wipe already
+						// landed, so the tap below must not run after it.
 					} else if (
 						isThreeFingerTap(3, track.moved, now - track.at) &&
 						window.getSelection()?.isCollapsed !== false
@@ -8003,7 +8695,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							// maps back to the thread). Off-message
 							// taps do nothing.
 							const target = messageIndexAtPoint(track.cx, track.cy);
-							const id = target === null ? undefined : viewChat.messages[target]?.id;
+							const id =
+								target === null ? undefined : viewChat.messages[target]?.id;
 							const at = id ? chat.messages.findIndex((m) => m.id === id) : -1;
 							if (at >= 0) {
 								dropMessage(at);
@@ -8048,7 +8741,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// (window restore, DPR): cached line boxes go stale and the prompt
 		// snaps to a new height on the next measure. Settle it up front,
 		// after paint, like the window-focus path does.
-		requestAnimationFrame(() => requestAnimationFrame(() => editor?.remeasure()));
+		requestAnimationFrame(() =>
+			requestAnimationFrame(() => editor?.remeasure())
+		);
 
 		/**
 		 * One Escape ladder for the whole app (capture phase, so it
@@ -8069,7 +8764,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				// A first ESC moves DOM focus input -> list (the query
 				// stays, the highlight is already tracked); a second
 				// ESC — or one with no results — closes.
-				if (document.activeElement === searchInputEl && palette.hits.length > 0) {
+				if (
+					document.activeElement === searchInputEl &&
+					palette.hits.length > 0
+				) {
 					focusSearchHit(palette.cursor);
 				} else closeSearch();
 			} else if (find.open) {
@@ -8129,7 +8827,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					liveEsc?.anchorNode instanceof Element
 						? liveEsc.anchorNode
 						: liveEsc?.anchorNode?.parentElement;
-				if (liveEsc && !liveEsc.isCollapsed && escAnchor?.closest(".messages .rendered")) {
+				if (
+					liveEsc &&
+					!liveEsc.isCollapsed &&
+					escAnchor?.closest(".messages .rendered")
+				) {
 					clearSelection();
 				}
 				// Scroll mode entered from a deactivated prompt steps
@@ -8195,7 +8897,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				inField: isInspectFieldTarget(event.target)
 			});
 			if (inspectStep !== null) {
-								consumeEvent(event);
+				consumeEvent(event);
 				stepInspect(inspectStep);
 				return;
 			}
@@ -8267,7 +8969,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			if (event.key === "Escape") {
 				// One ladder for every layer (see dismissEscape):
 				// topmost first, exactly one per press.
-								consumeEvent(event);
+				consumeEvent(event);
 				dismissEscape(inEditor);
 				return;
 			}
@@ -8275,65 +8977,65 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				// Full-text search palette across chats/annotations.
 				// Browsers reserve Ctrl+P for print and may keep it; the
 				// shell owns the combo and always delivers it.
-								consumeEvent(event);
+				consumeEvent(event);
 				if (palette.open) closeSearch();
 				else openSearch();
 				return;
 			}
-				if (chord === "toggle-fullscreen") {
-					// Fullscreen toggle: Cmd+E and Ctrl+Cmd+F. Claimed
-					// before find below, so the dual-modifier chord never
-					// reads as Cmd/Ctrl+F.
-										consumeEvent(event);
-					void toggleFullscreen();
-					return;
-				}
-				if (chord === "find-toggle") {
-					// In-chat find across the visible messages, cycling hits.
-					// The fullscreen chords are claimed above, so
-					// Ctrl+Cmd+F never lands here.
-										consumeEvent(event);
-					if (shortcutsOpen) {
-						// The modal owns ⌘F while open: it filters this
-						// list only, never the chat.
-						const shortcutInput: HTMLInputElement | null = shortcutInputEl;
-						if (shortcutInput) {
-							/* eslint-disable @typescript-eslint/no-unsafe-call -- lint-program-only: the $state rune type
+			if (chord === "toggle-fullscreen") {
+				// Fullscreen toggle: Cmd+E and Ctrl+Cmd+F. Claimed
+				// before find below, so the dual-modifier chord never
+				// reads as Cmd/Ctrl+F.
+				consumeEvent(event);
+				void toggleFullscreen();
+				return;
+			}
+			if (chord === "find-toggle") {
+				// In-chat find across the visible messages, cycling hits.
+				// The fullscreen chords are claimed above, so
+				// Ctrl+Cmd+F never lands here.
+				consumeEvent(event);
+				if (shortcutsOpen) {
+					// The modal owns ⌘F while open: it filters this
+					// list only, never the chat.
+					const shortcutInput: HTMLInputElement | null = shortcutInputEl;
+					if (shortcutInput) {
+						/* eslint-disable @typescript-eslint/no-unsafe-call -- lint-program-only: the $state rune type
 							does not resolve under eslint's program here, but svelte-check (real tsc) types both calls. */
-							shortcutInput.focus();
-							shortcutInput.select();
-							/* eslint-enable @typescript-eslint/no-unsafe-call */
-						}
-						return;
+						shortcutInput.focus();
+						shortcutInput.select();
+						/* eslint-enable @typescript-eslint/no-unsafe-call */
 					}
-					// Repeat ⌘F closes the bar it opened.
-					if (find.open) closeFind();
-					else openFind();
 					return;
 				}
+				// Repeat ⌘F closes the bar it opened.
+				if (find.open) closeFind();
+				else openFind();
+				return;
+			}
 			if (isSummonHotkey(event) && !inEditor) {
-			// Summon chord (Cmd/Ctrl+Shift+Space) outside the editor:
-			// the toggle's hide half — back to the previous app (the
-			// OS-global half in desktop.rs fires too; hide is
-			// idempotent). Inside the editor the chord stays unbound
-			// so Ctrl+Shift+Space still types a non-breaking space.
-						consumeEvent(event);
-			void hideSummonWindow();
-			return;
-		}
+				// Summon chord (Cmd/Ctrl+Shift+Space) outside the editor:
+				// the toggle's hide half — back to the previous app (the
+				// OS-global half in desktop.rs fires too; hide is
+				// idempotent). Inside the editor the chord stays unbound
+				// so Ctrl+Shift+Space still types a non-breaking space.
+				consumeEvent(event);
+				void hideSummonWindow();
+				return;
+			}
 			if (chord === "toggle-pastes") {
 				// The textarea composer never folds (long pastes become
 				// pills), so Ctrl+O does nothing — still swallowed so
 				// the browser won't open a file.
 				if (inEditor) editor?.togglePastes();
-								consumeEvent(event);
+				consumeEvent(event);
 				return;
 			}
 			if (chord === "send") {
 				// ⌘Enter sends from anywhere — not just with the prompt
 				// focused. Settings fields keep ⌘Enter for themselves.
 				if (isFieldTarget(event.target)) return;
-								consumeEvent(event);
+				consumeEvent(event);
 				onSubmit("send");
 				return;
 			}
@@ -8345,7 +9047,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			) {
 				// Capture phase (see listener below): fires before the editor can
 				// swallow the combo, so the shortcuts work from anywhere.
-								consumeEvent(event);
+				consumeEvent(event);
 				if (chord === "provider-next") cycleProvider(1);
 				else if (chord === "provider-prev") cycleProvider(-1);
 				else if (chord === "thinking-next") cycleThinking(1);
@@ -8359,12 +9061,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				// single-window app, so there is no new window to open.
 				// Note: browsers reserve ⌘N for a new window, so in a
 				// plain browser tab this never arrives — the shell owns it.
-								consumeEvent(event);
+				consumeEvent(event);
 				doNewChat();
 				return;
 			}
 			if (chord === "toggle-voice") {
-								consumeEvent(event);
+				consumeEvent(event);
 				setVoiceEnabled(!voiceOn());
 				return;
 			}
@@ -8380,7 +9082,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				// reports Backspace; forward-delete reports Delete. Typing
 				// targets keep the plain chord for line-kill habits; the
 				// Shift variant below works everywhere.
-								consumeEvent(event);
+				consumeEvent(event);
 				dropChat(chat.id);
 				editor?.focus();
 				return;
@@ -8389,7 +9091,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				// ⌘⇧Delete drops EVERY chat (a blank one takes their
 				// place, so the composer never strands) and resets the
 				// voice language to the checked keyboard.
-								consumeEvent(event);
+				consumeEvent(event);
 				dropAllChats();
 				editor?.focus();
 				return;
@@ -8407,7 +9109,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				// ⇧⌘[ and ⌘B: physical key codes for the shifted
 				// brackets (layout-dependent `key` values), plain key
 				// for ⌘B. Opening the list lands on the active chat.
-								consumeEvent(event);
+				consumeEvent(event);
 				toggleSidebar();
 				if (!settings.sidebarCollapsed) focusActiveSideChat();
 				return;
@@ -8416,14 +9118,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				// ⇧⌘], ⌘., ⌘, (the macOS Settings shortcut), and ⇧⌘,
 				// (Shift turns the comma key into "<" on US layouts, so
 				// both spellings count).
-								consumeEvent(event);
+				consumeEvent(event);
 				toggleSettingsPanel();
 				return;
 			}
 			if (chrome === "dismiss-or-sidebar") {
 				// ⇧⌘H with settings open closes them and lands in the
 				// prompt; otherwise it mirrors ⌘B for the chat list.
-								consumeEvent(event);
+				consumeEvent(event);
 				if (settingsOpen) {
 					settingsOpen = false;
 					enterEditMode();
@@ -8436,7 +9138,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			if (chrome === "dismiss-or-settings") {
 				// ⇧⌘L with the chat list open closes it and lands in
 				// the prompt; otherwise it mirrors ⌘, for settings.
-								consumeEvent(event);
+				consumeEvent(event);
 				if (!settings.sidebarCollapsed) {
 					settings.sidebarCollapsed = true;
 					persistSettings();
@@ -8448,7 +9150,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			}
 			if (chrome === "shortcuts-toggle") {
 				// ⇧⌘/ (the "?" chord) toggles the shortcuts modal.
-								consumeEvent(event);
+				consumeEvent(event);
 				if (shortcutsOpen) shortcutsOpen = false;
 				else openShortcuts();
 				return;
@@ -8456,7 +9158,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			if (chrome === "step-chat-newer" || chrome === "step-chat-older") {
 				// ⇧⌘J steps down (newer chat, minting one past the
 				// newest end); ⇧⌘K steps up (older). Works sidebar-closed.
-								consumeEvent(event);
+				consumeEvent(event);
 				stepChat(chrome === "step-chat-newer" ? 1 : -1);
 				return;
 			}
@@ -8464,7 +9166,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				// ⌘+ / ⌘- scales the whole UI (the app's own zoom — the
 				// shell has no browser-chrome zoom to fall back on). With Shift
 				// held the same chords widen/narrow the chat column instead.
-								consumeEvent(event);
+				consumeEvent(event);
 				const narrow = event.key === "-" || event.key === "_";
 				if (event.shiftKey) adjustChatWidth(narrow ? -2 : 2);
 				else adjustFontScale(narrow ? -0.1 : 0.1);
@@ -8476,7 +9178,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				// body checks the code exists first.
 				const code = QUICK_LANG_CODES[quickLangIndexForKey(event.key)];
 				if (code) {
-										consumeEvent(event);
+					consumeEvent(event);
 					if (activeReplyCode === code) clearReplyLang();
 					else setReplyLang(code);
 					return;
@@ -8485,7 +9187,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			if (chrome === "delete-message") {
 				const target = chat.messages[hoveredIdx];
 				if (target) {
-										consumeEvent(event);
+					consumeEvent(event);
 					deleteMessage(chatState, hoveredIdx);
 					return;
 				}
@@ -8513,9 +9215,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				// Same offers the buttons show: refs-stripped display
 				// text over the rendered list, never raw stored content.
 				const target = viewChat.messages[hoveredIdx];
-				const kinds = target ? offeredLocalAids(aidDisplayText(target.content), activeReplyCode) : [];
+				const kinds = target
+					? offeredLocalAids(aidDisplayText(target.content), activeReplyCode)
+					: [];
 				if (target && kinds.length > 0) {
-										consumeEvent(event);
+					consumeEvent(event);
 					const { pin, unpin } = toggleAidKinds(kinds, pinnedKinds(target.id));
 					for (const kind of unpin) unpinLocalAid(target, kind);
 					for (const kind of pin) pinLocalAid(target, kind);
@@ -8530,17 +9234,17 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				// so the body never re-reads the key.
 				const idx = centerMessageIndex();
 				const target = idx >= 0 ? viewChat.messages[idx] : undefined;
-				const want: LocalAid = msgAction === "pin-pinyin" ? "pinyin" : "furigana";
-				const toggle =
-					target ?
-						toggleSingleAid(
+				const want: LocalAid =
+					msgAction === "pin-pinyin" ? "pinyin" : "furigana";
+				const toggle = target
+					? toggleSingleAid(
 							offeredLocalAids(aidDisplayText(target.content), activeReplyCode),
 							pinnedKinds(target.id),
 							want
 						)
-					:	null;
+					: null;
 				if (target && toggle !== null) {
-										consumeEvent(event);
+					consumeEvent(event);
 					if (toggle === "unpin") unpinLocalAid(target, want);
 					else pinLocalAid(target, want);
 					return;
@@ -8549,7 +9253,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			if (msgAction === "exit-fullscreen") {
 				// Esc+f exits fullscreen — the only way out. Escape
 				// alone never exits (it keeps its dismiss job).
-								consumeEvent(event);
+				consumeEvent(event);
 				escDownAt = 0;
 				void exitFullscreen();
 				return;
@@ -8573,75 +9277,75 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					return;
 				}
 			}
-		if (msgAction === "cut-hovered") {
+			if (msgAction === "cut-hovered") {
 				// X cuts the hovered message (copies, then deletes): Shift+D
 				// below deletes without touching the clipboard.
 				// An in-place code edit owns its keystrokes — X types x.
 				event.preventDefault();
 				cutHoverMessage(hoveredIdx);
 				return;
-		}
-		if (msgAction === "delete-hovered") {
-			// Shift+D drops the hovered message and copies nothing
-			// (X is the cut key). Bare Delete never deletes — too easy
-			// to hit while reading. Physical code, so any layout's D
-			// works. Buttons and links keep their own keys.
-			event.preventDefault();
-			deleteMessage(chatState, hoveredIdx);
-			return;
-		}
-		if (msgAction === "copy-hovered") {
-			// C copies the hovered message as plain text (the row
-			// button's own path, toast included) — only with nothing
-			// selected, so a live selection keeps its keys.
-			const target = viewChat.messages[hoveredIdx];
-			if (target) {
-				consumeEvent(event);
-				copyText(target.content, target.role);
+			}
+			if (msgAction === "delete-hovered") {
+				// Shift+D drops the hovered message and copies nothing
+				// (X is the cut key). Bare Delete never deletes — too easy
+				// to hit while reading. Physical code, so any layout's D
+				// works. Buttons and links keep their own keys.
+				event.preventDefault();
+				deleteMessage(chatState, hoveredIdx);
 				return;
 			}
-		}
-		if (msgAction === "branch-hovered") {
-			// Shift+C branches from the hovered message, same as its
-			// row button.
-			const target = viewChat.messages[hoveredIdx];
-			if (target) {
-				consumeEvent(event);
-				branchFrom(chatState, hoveredIdx);
-				return;
+			if (msgAction === "copy-hovered") {
+				// C copies the hovered message as plain text (the row
+				// button's own path, toast included) — only with nothing
+				// selected, so a live selection keeps its keys.
+				const target = viewChat.messages[hoveredIdx];
+				if (target) {
+					consumeEvent(event);
+					copyText(target.content, target.role);
+					return;
+				}
 			}
-		}
-		if (msgAction === "speak-hovered") {
-			// Shift+R reads the hovered message aloud (Stop when it is
-			// the one playing) — the row button's toggle, gated the
-			// same way, so languageless text stays silent.
-			const target = viewChat.messages[hoveredIdx];
-			if (target && messageSpeakable(target)) {
-				consumeEvent(event);
-				if (speakingId === target.id) stopVoice();
-				else void speakReply(target);
-				return;
+			if (msgAction === "branch-hovered") {
+				// Shift+C branches from the hovered message, same as its
+				// row button.
+				const target = viewChat.messages[hoveredIdx];
+				if (target) {
+					consumeEvent(event);
+					branchFrom(chatState, hoveredIdx);
+					return;
+				}
 			}
-		}
-		// One snapshot for the open chat list (see sidebarListAction):
-		// it owns j/k/space/l/Delete with preview-as-you-go. Bodies
-		// stay here as `if (sideAction === ...)` chains, never a switch.
-		const inSidebar = isSidebarTarget(event.target);
-		if (isFieldTarget(event.target)) {
-			focusLog("key-in-field", {
-				key: event.key,
-				target: describeFocusTarget(event.target),
-				active: describeActiveElement(),
-				focusMode,
-				promptIdle
+			if (msgAction === "speak-hovered") {
+				// Shift+R reads the hovered message aloud (Stop when it is
+				// the one playing) — the row button's toggle, gated the
+				// same way, so languageless text stays silent.
+				const target = viewChat.messages[hoveredIdx];
+				if (target && messageSpeakable(target)) {
+					consumeEvent(event);
+					if (speakingId === target.id) stopVoice();
+					else void speakReply(target);
+					return;
+				}
+			}
+			// One snapshot for the open chat list (see sidebarListAction):
+			// it owns j/k/space/l/Delete with preview-as-you-go. Bodies
+			// stay here as `if (sideAction === ...)` chains, never a switch.
+			const inSidebar = isSidebarTarget(event.target);
+			if (isFieldTarget(event.target)) {
+				focusLog("key-in-field", {
+					key: event.key,
+					target: describeFocusTarget(event.target),
+					active: describeActiveElement(),
+					focusMode,
+					promptIdle
+				});
+			}
+			const sideAction = sidebarListAction({
+				...keyFacts(event),
+				listOpen: !settings.sidebarCollapsed,
+				inSidebar,
+				inField: isFieldTarget(event.target)
 			});
-		}
-		const sideAction = sidebarListAction({
-			...keyFacts(event),
-			listOpen: !settings.sidebarCollapsed,
-			inSidebar,
-			inField: isFieldTarget(event.target)
-		});
 			if (sideAction !== null) {
 				focusLog("key-sidebar-consume", {
 					key: event.key,
@@ -8656,7 +9360,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				const delta = sideAction === "walk-down" ? 1 : -1;
 				const chats = chatState.chats;
 				const from =
-					sideIdx >= 0 ? sideIdx : chats.findIndex((c) => c.id === chatState.activeChatId);
+					sideIdx >= 0
+						? sideIdx
+						: chats.findIndex((c) => c.id === chatState.activeChatId);
 				focusSideChat(from + delta);
 				const landed = chats[Math.min(Math.max(sideIdx, 0), chats.length - 1)];
 				if (landed) transitionToChat(landed.id);
@@ -8670,7 +9376,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				event.preventDefault();
 				settings.sidebarCollapsed = true;
 				persistSettings();
-				if (resolveSidebarSpaceEnter(sideIdx, chatState.chats.length).kind === "stay") {
+				if (
+					resolveSidebarSpaceEnter(sideIdx, chatState.chats.length).kind ===
+					"stay"
+				) {
 					enterEditMode();
 				} else enterSideChat();
 				return;
@@ -8718,10 +9427,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				// The shortcuts modal scrolls under j/k like the main
 				// chat, contained: the palette and Inspect keep their own
 				// keys, fields keep typing, and the main column never moves.
-				const modalBox = document.querySelector<HTMLElement>(".modal-veil .modal");
+				const modalBox =
+					document.querySelector<HTMLElement>(".modal-veil .modal");
 				if (modalBox) {
-					const dy = modalScroll === "line-down" ? SCROLLKEY_LINE_PX : -SCROLLKEY_LINE_PX;
-										consumeEvent(event);
+					const dy =
+						modalScroll === "line-down"
+							? SCROLLKEY_LINE_PX
+							: -SCROLLKEY_LINE_PX;
+					consumeEvent(event);
 					modalBox.scrollBy({ top: dy, behavior: "smooth" });
 					return;
 				}
@@ -8733,7 +9446,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				// key. Every existing binding above keeps its keys —
 				// this branch only claims otherwise-unbound bare keys.
 				const modalOpen = Boolean(shortcutsOpen || palette.open || inspectChar);
-				const typing = Boolean(inEditor || isEditableTarget(event.target) || inSidebar);
+				const typing = Boolean(
+					inEditor || isEditableTarget(event.target) || inSidebar
+				);
 				// Ctrl+U/D jumps and empty-chat Space/Enter/i (see
 				// unselectedScrollAction); the intent glide below keeps
 				// its own guard and extracted call.
@@ -8759,7 +9474,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					lastGAt = 0;
 					if (scrollBox) {
 						scrollChatBy(
-							halfPageDy(scrollBox.clientHeight, unselected === "half-jump-up" ? -1 : 1)
+							halfPageDy(
+								scrollBox.clientHeight,
+								unselected === "half-jump-up" ? -1 : 1
+							)
 						);
 					}
 					return;
@@ -8770,8 +9488,17 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					enterEditMode();
 					return;
 				}
-				if (!modalOpen && !typing && !event.metaKey && !event.ctrlKey && !event.altKey) {
-					const intent = unselectedScrollIntent(event.key, ggArmed(lastGAt, Date.now()));
+				if (
+					!modalOpen &&
+					!typing &&
+					!event.metaKey &&
+					!event.ctrlKey &&
+					!event.altKey
+				) {
+					const intent = unselectedScrollIntent(
+						event.key,
+						ggArmed(lastGAt, Date.now())
+					);
 					if (intent) {
 						if (intent.kind === "gg-prefix") {
 							lastGAt = Date.now();
@@ -8795,7 +9522,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 								// Other line sources (arrows) keep stepping.
 								// Taps land the hold's own step (line for
 								// j/k, skip step for d/u).
-								const velocity = scrollBox ? scrollHoldVelocity(event.key) : null;
+								const velocity = scrollBox
+									? scrollHoldVelocity(event.key)
+									: null;
 								if (velocity !== null) {
 									if (!event.repeat && scrollBox) {
 										const tapDy =
@@ -8807,7 +9536,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 										startScrollHold(event.key, velocity, tapDy);
 									}
 								} else if (intent.kind === "line") scrollChatBy(intent.dy);
-								else if (scrollBox) scrollChatBy(halfPageDy(scrollBox.clientHeight, intent.dir));
+								else if (scrollBox)
+									scrollChatBy(halfPageDy(scrollBox.clientHeight, intent.dir));
 							} else if (intent.kind === "top") scrollChatTop();
 							else if (intent.kind === "bottom") scrollChatBottom();
 							else if (intent.kind === "hovered-edge" && hoveredIdx >= 0) {
@@ -8875,7 +9605,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				jumpTo(chat.messages.length - 1);
 				return;
 			}
-			if (scrollAction === "half-jump-up" || scrollAction === "half-jump-down") {
+			if (
+				scrollAction === "half-jump-up" ||
+				scrollAction === "half-jump-down"
+			) {
 				// Ctrl+U / Ctrl+D jump one instant half-page per press,
 				// vim-style (repeats jump again). Shift+D keeps its
 				// delete job above.
@@ -8895,7 +9628,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				const dir: 1 | -1 = scrollAction === "skip-up" ? -1 : 1;
 				if (scrollBox && !event.repeat) {
 					const velocity = scrollHoldVelocity(event.key);
-					if (velocity !== null) startScrollHold(event.key, velocity, dir * SCROLLKEY_SKIP_PX);
+					if (velocity !== null)
+						startScrollHold(event.key, velocity, dir * SCROLLKEY_SKIP_PX);
 					else scrollChatBy(dir * SCROLLKEY_SKIP_PX);
 				}
 				return;
@@ -8951,11 +9685,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			promptPressSt = null;
 			const field = document.querySelector(".prompt .ta-input");
 			const box = scrollBox;
-			if (!(field instanceof HTMLElement) || !box || !window.visualViewport) return;
+			if (!(field instanceof HTMLElement) || !box || !window.visualViewport)
+				return;
 			const r = field.getBoundingClientRect();
 			const vv = window.visualViewport;
-			if (r.top < 0 || r.left < 0 || r.bottom > vv.height || r.right > vv.width) return;
-			if (window.scrollX !== sx || window.scrollY !== sy) window.scrollTo(sx, sy);
+			if (r.top < 0 || r.left < 0 || r.bottom > vv.height || r.right > vv.width)
+				return;
+			if (window.scrollX !== sx || window.scrollY !== sy)
+				window.scrollTo(sx, sy);
 			if (box.scrollTop !== st) box.scrollTop = st;
 		}
 		// Badge press switches the edit box directly (A → B in one
@@ -9005,9 +9742,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		const clickGuardsPass = (event: MouseEvent): boolean => {
 			if (event.altKey) return false;
 			const target = event.target instanceof Element ? event.target : null;
-			if (
-				target?.closest(".sel-menu, .review, button, input, textarea")
-			) {
+			if (target?.closest(".sel-menu, .review, button, input, textarea")) {
 				return false;
 			}
 			return true;
@@ -9061,7 +9796,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			const target = event.target instanceof Element ? event.target : null;
 			const actions = target?.closest("article")?.querySelector(".actions");
 			const box = scrollBox;
-			if (!(actions instanceof HTMLElement) || !(box instanceof HTMLElement)) return;
+			if (!(actions instanceof HTMLElement) || !(box instanceof HTMLElement))
+				return;
 			const row = actions.getBoundingClientRect();
 			const view = box.getBoundingClientRect();
 			if (row.bottom > view.bottom || row.top < view.top) {
@@ -9089,7 +9825,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		const preserveMessageHighlight = (event: MouseEvent): void => {
 			if (event.button !== 0) return;
 			const target = event.target instanceof Element ? event.target : null;
-			if (!target?.closest("main") || target.closest(".rendered, .prompt")) return;
+			if (!target?.closest("main") || target.closest(".rendered, .prompt"))
+				return;
 			const live = window.getSelection();
 			const anchor =
 				live && !live.isCollapsed
@@ -9103,7 +9840,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		/** Press point for the drag-vs-click read in onMouseUp below. */
 		let downClient: { x: number; y: number } | null = null;
 		const noteDownPoint = (event: MouseEvent): void => {
-			downClient = event.button === 0 ? { x: event.clientX, y: event.clientY } : null;
+			downClient =
+				event.button === 0 ? { x: event.clientX, y: event.clientY } : null;
 		};
 		/**
 		 * Middle-drag on a message: press (button 1) records the point
@@ -9123,7 +9861,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			midActed = false;
 			if (event.button !== 1) return;
 			const target = event.target instanceof Element ? event.target : null;
-			if (!target || target.closest("button, a, input, textarea, select, summary, [contenteditable], .prompt, aside, .modal")) return;
+			if (
+				!target ||
+				target.closest(
+					"button, a, input, textarea, select, summary, [contenteditable], .prompt, aside, .modal"
+				)
+			)
+				return;
 			const article = target.closest('article[id^="msg-"]');
 			if (!article) return;
 			const index = Number(article.id.slice(4));
@@ -9136,7 +9880,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// Middle button held (buttons bitmask 4): a move without it
 			// is a stray, never a gesture.
 			if ((event.buttons & 4) === 0) return;
-			const gesture = middleDragGesture(event.clientX - midDown.x, event.clientY - midDown.y);
+			const gesture = middleDragGesture(
+				event.clientX - midDown.x,
+				event.clientY - midDown.y
+			);
 			if (!gesture) return;
 			midDragged = true;
 			midActed = true;
@@ -9221,10 +9968,20 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// of vanishing. Clicks never move (>4px, the onMouseUp line),
 		// so click-deselect still clears. Nodes are re-checked on every
 		// restore (stream swaps detach them).
-		let lastGoodDragRange: { an: Node; ao: number; fn: Node; fo: number } | null = null;
+		let lastGoodDragRange: {
+			an: Node;
+			ao: number;
+			fn: Node;
+			fo: number;
+		} | null = null;
 		const movedSinceDown = (): boolean => {
 			if (!downClient || !lastMoveClient) return false;
-			return Math.hypot(lastMoveClient.x - downClient.x, lastMoveClient.y - downClient.y) > 4;
+			return (
+				Math.hypot(
+					lastMoveClient.x - downClient.x,
+					lastMoveClient.y - downClient.y
+				) > 4
+			);
 		};
 		const trackDragSelection = (live: Selection): void => {
 			if (live.isCollapsed || live.rangeCount === 0) return;
@@ -9233,7 +9990,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			if (!anchorNode || !focusNode) return;
 			const anchorArticle = articleOf(anchorNode);
 			if (anchorArticle && anchorArticle === dragAnchorArticle) {
-				lastGoodDragRange = { an: anchorNode, ao: live.anchorOffset, fn: focusNode, fo: live.focusOffset };
+				lastGoodDragRange = {
+					an: anchorNode,
+					ao: live.anchorOffset,
+					fn: focusNode,
+					fo: live.focusOffset
+				};
 			}
 		};
 		const restoreDragSelection = (live: Selection): boolean => {
@@ -9246,7 +10008,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// gesture's business (editor selections), never the
 			// message drag's.
 			const collapsedEl =
-				live.anchorNode instanceof Element ? live.anchorNode : live.anchorNode?.parentElement;
+				live.anchorNode instanceof Element
+					? live.anchorNode
+					: live.anchorNode?.parentElement;
 			if (collapsedEl?.closest("input, textarea")) return false;
 			const { an, ao, fn, fo } = lastGoodDragRange;
 			if (!document.contains(an) || !document.contains(fn)) {
@@ -9267,8 +10031,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// so every press lands outside it). A right-click re-summons
 			// through contextmenu right after when it still applies.
 			selPinyin = null;
-			selectingInMessage = event.button === 0 && !!target?.closest(".messages .rendered");
-			offChatDragArmed = event.button === 0 && !target?.closest(".messages .rendered");
+			selectingInMessage =
+				event.button === 0 && !!target?.closest(".messages .rendered");
+			offChatDragArmed =
+				event.button === 0 && !target?.closest(".messages .rendered");
 			lastGoodDragRange = null;
 			containDragTo(selectingInMessage ? articleOf(target) : null);
 		};
@@ -9288,7 +10054,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// release, like the menu's own paths).
 			if (selPinyin) {
 				const now = currentQuote();
-				if (!now || now.messageId !== selPinyin.messageId || now.quote !== selPinyin.quote)
+				if (
+					!now ||
+					now.messageId !== selPinyin.messageId ||
+					now.quote !== selPinyin.quote
+				)
 					selPinyin = null;
 			}
 		};
@@ -9305,8 +10075,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				const anchorNode = live.anchorNode;
 				const focusNode = live.focusNode;
 				if (!anchorNode || !focusNode) return;
-				const anchorEl = anchorNode instanceof Element ? anchorNode : anchorNode.parentElement;
-				const focusEl = focusNode instanceof Element ? focusNode : focusNode.parentElement;
+				const anchorEl =
+					anchorNode instanceof Element ? anchorNode : anchorNode.parentElement;
+				const focusEl =
+					focusNode instanceof Element ? focusNode : focusNode.parentElement;
 				if (!focusEl?.closest(".messages .rendered")) return;
 				// Anchors in the prompt or a control are their own
 				// gesture (editor selections, button presses) — never
@@ -9324,9 +10096,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				// Only the upward side clamps: an anchor below the
 				// cursor highlights below it, which is allowed.
 				let anchorAbove: boolean;
-				if (anchorNode === focusNode) anchorAbove = live.anchorOffset < live.focusOffset;
+				if (anchorNode === focusNode)
+					anchorAbove = live.anchorOffset < live.focusOffset;
 				else {
-					anchorAbove = !!(anchorNode.compareDocumentPosition(focusNode) & Node.DOCUMENT_POSITION_FOLLOWING);
+					anchorAbove = !!(
+						anchorNode.compareDocumentPosition(focusNode) &
+						Node.DOCUMENT_POSITION_FOLLOWING
+					);
 				}
 				if (!anchorAbove) {
 					// An anchor below the cursor is allowed — unless it
@@ -9343,7 +10119,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						containDragTo(articleOf(focusNode));
 						const text = focusNode.textContent ?? "";
 						const start = lineStartOffset(text, live.focusOffset);
-						live.setBaseAndExtent(focusNode, start, focusNode, live.focusOffset);
+						live.setBaseAndExtent(
+							focusNode,
+							start,
+							focusNode,
+							live.focusOffset
+						);
 						trackDragSelection(live);
 					}
 					return;
@@ -9354,9 +10135,18 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				containDragTo(articleOf(focusNode));
 				if (anchorNode instanceof Text && anchorNode === focusNode) {
 					const text = anchorNode.textContent ?? "";
-					const fixed = clampDragAnchorToFocusLine(text, live.anchorOffset, live.focusOffset);
+					const fixed = clampDragAnchorToFocusLine(
+						text,
+						live.anchorOffset,
+						live.focusOffset
+					);
 					if (fixed !== live.anchorOffset) {
-						live.setBaseAndExtent(anchorNode, fixed, focusNode, live.focusOffset);
+						live.setBaseAndExtent(
+							anchorNode,
+							fixed,
+							focusNode,
+							live.focusOffset
+						);
 					}
 					trackDragSelection(live);
 					return;
@@ -9407,7 +10197,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			if (openLangMenu) {
 				if (!target?.closest(".lang-menu")) openLangMenu = null;
 			}
-			if (target?.closest(".sel-menu, .ann-dock, .review, button, input, textarea")) {
+			if (
+				target?.closest(
+					".sel-menu, .ann-dock, .review, button, input, textarea"
+				)
+			) {
 				// Clicking away into the prompt or a control clears the
 				// highlight and drops the menu with it — but never the
 				// menu's own clicks: the Annotate button's click fires
@@ -9416,7 +10210,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				// (a selection drawn across into a button still summons).
 				if (!target?.closest(".sel-menu, .ann-dock")) {
 					const endedDrag = downClient
-						? Math.hypot(event.clientX - downClient.x, event.clientY - downClient.y) > 4
+						? Math.hypot(
+								event.clientX - downClient.x,
+								event.clientY - downClient.y
+							) > 4
 						: false;
 					if (!endedDrag) {
 						focusLog("mouseup-clear-on-control", {
@@ -9445,13 +10242,20 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// the gutter that travels into the chat keeps the highlight
 			// it started with (the press itself is preserved above).
 			const dragged = downClient
-				? Math.hypot(event.clientX - downClient.x, event.clientY - downClient.y) > 4
+				? Math.hypot(
+						event.clientX - downClient.x,
+						event.clientY - downClient.y
+					) > 4
 				: false;
 			// A plain click anywhere dismisses: the stale-highlight path
 			// below clears it (a changed selection from a multi-click
 			// reselect is new work, not a collapse — it falls through to
 			// the normal summon path). Escape / the timer still dismiss.
-			if (!dragged && liveText === downSel && (event.detail <= 1 || event.detail >= 4)) {
+			if (
+				!dragged &&
+				liveText === downSel &&
+				(event.detail <= 1 || event.detail >= 4)
+			) {
 				// A plain click changed nothing: blank space, a collapsed
 				// caret, or inside the old highlight (the engine collapses
 				// that only after mouseup dispatches, so the stale text
@@ -9464,7 +10268,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				selMenu = null;
 				return;
 			}
-			if (!dragged && !target?.closest(".rendered") && liveText !== "" && liveText === downSel) {
+			if (
+				!dragged &&
+				!target?.closest(".rendered") &&
+				liveText !== "" &&
+				liveText === downSel
+			) {
 				live?.removeAllRanges();
 				selMenu = null;
 				return;
@@ -9482,7 +10291,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				range = null;
 			}
 			const node = range?.startContainer;
-			if (!node || node.nodeType !== Node.TEXT_NODE || !body.contains(node)) return "";
+			if (!node || node.nodeType !== Node.TEXT_NODE || !body.contains(node))
+				return "";
 			return extractWordAt(node.textContent ?? "", range?.startOffset ?? 0);
 		}
 		/** True when the right-click point lands on a Han character
@@ -9542,10 +10352,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// chrome has no fold bar, so the wrapper toggles directly;
 			// the copy and Run icons stay silent via the control check.
 			const codeBlock = closestFromTarget(event.target, ".ccez-code");
-			if (codeBlock && body.contains(codeBlock) && !target?.closest("[data-code-copy], [data-code-run]")) {
+			if (
+				codeBlock &&
+				body.contains(codeBlock) &&
+				!target?.closest("[data-code-copy], [data-code-run]")
+			) {
 				// Right-click toggles the fold (a left click on the
 				// folded label opens it back up).
-				if (codeBlock.dataset.folded === "1") codeBlock.removeAttribute("data-folded");
+				if (codeBlock.dataset.folded === "1")
+					codeBlock.removeAttribute("data-folded");
 				else codeBlock.dataset.folded = "1";
 				return;
 			}
@@ -9558,7 +10373,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				mathWrap.classList.contains("ccez-math") &&
 				!target?.closest(".ccez-math-copy, .ccez-math-tex")
 			) {
-				if (mathWrap.dataset.folded === "1") mathWrap.removeAttribute("data-folded");
+				if (mathWrap.dataset.folded === "1")
+					mathWrap.removeAttribute("data-folded");
 				else mathWrap.dataset.folded = "1";
 				return;
 			}
@@ -9573,7 +10389,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// char reads its locale from the surrounding sentence.
 			const quoted = currentQuote();
 			if (quoted) {
-				const probe = sentenceForQuote(quoted.context, quoted.quote) ?? quoted.context;
+				const probe =
+					sentenceForQuote(quoted.context, quoted.quote) ?? quoted.context;
 				if (hanCharUnderCursor(event, body)) {
 					if (
 						hanOverlayLangFor(probe) !== "ja" &&
@@ -9592,7 +10409,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// (same per-quote path as a selection); open message space
 			// reads the whole message. speakReply gates the voice.
 			const article = body.closest('article[id^="msg-"]');
-			const msg = article ? chat.messages[Number(article.id.slice(4))] : undefined;
+			const msg = article
+				? chat.messages[Number(article.id.slice(4))]
+				: undefined;
 			if (!msg) return;
 			const word = wordUnderCursor(event, body);
 			if (word) {
@@ -9865,7 +10684,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				}
 				const rect = range.getBoundingClientRect();
 				const above = rect.top >= 128;
-				const y = above ? rect.top : Math.min(rect.bottom + 8, window.innerHeight - 40);
+				const y = above
+					? rect.top
+					: Math.min(rect.bottom + 8, window.innerHeight - 40);
 				if (selPinyin.y !== y || selPinyin.above !== above)
 					selPinyin = { ...selPinyin, y, above };
 			} catch {
@@ -9885,7 +10706,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			if (!selMenu?.range) return;
 			try {
 				const { range } = selMenu;
-				if (!document.contains(range.startContainer) || !document.contains(range.endContainer)) {
+				if (
+					!document.contains(range.startContainer) ||
+					!document.contains(range.endContainer)
+				) {
 					selMenu = null;
 					return;
 				}
@@ -9902,7 +10726,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					iosUI,
 					menuWidth: selMenuWidthEstimate(selMenu.quote)
 				});
-				if (selMenu.x !== x || selMenu.y !== y || selMenu.left !== rect.left || selMenu.w !== rect.width)
+				if (
+					selMenu.x !== x ||
+					selMenu.y !== y ||
+					selMenu.left !== rect.left ||
+					selMenu.w !== rect.width
+				)
 					selMenu = { ...selMenu, x, y, left: rect.left, w: rect.width };
 			} catch {
 				selMenu = null;
@@ -9924,7 +10753,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			window.removeEventListener("keydown", onAlt);
 			window.removeEventListener("keyup", onAlt);
 			window.removeEventListener("keyup", onEscapeUp);
-		window.removeEventListener("keyup", releaseScrollHold);
+			window.removeEventListener("keyup", releaseScrollHold);
 			window.removeEventListener("blur", onBlur);
 			window.removeEventListener("focusin", onFocusIn);
 			window.removeEventListener("pointerdown", onPromptPress, true);
@@ -9970,19 +10799,39 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	data-shell={tauriBackendAvailable() ? "tauri" : "browser"}
 	data-android={androidUI || null}
 	data-ios={iosUI || null}
-	data-fullbleed={androidUI && settings.fontScale >= FULLBLEED_FONT_SCALE || null}
-	style="--font-scale: {androidUI ? Math.min(8, settings.fontScale) : settings.fontScale}; --chat-width: {effectiveChatWidth(androidUI, settings.fontScale, settings.chatWidth ?? 36)}; --msg-gap: {settings.messageGap ?? MESSAGE_GAP_DEFAULT}rem"
-	data-mac={isMac && !androidUI || null}
+	data-fullbleed={(androidUI && settings.fontScale >= FULLBLEED_FONT_SCALE) ||
+		null}
+	style="--font-scale: {androidUI
+		? Math.min(8, settings.fontScale)
+		: settings.fontScale}; --chat-width: {effectiveChatWidth(
+		androidUI,
+		settings.fontScale,
+		settings.chatWidth ?? 36
+	)}; --msg-gap: {settings.messageGap ?? MESSAGE_GAP_DEFAULT}rem"
+	data-mac={(isMac && !androidUI) || null}
 >
-	<aside class:collapsed={settings.sidebarCollapsed} inert={settings.sidebarCollapsed} data-fade-scroll
+	<aside
+		class:collapsed={settings.sidebarCollapsed}
+		inert={settings.sidebarCollapsed}
+		data-fade-scroll
 		ondblclick={(event) => {
 			const target = event.target;
-			if (target instanceof HTMLElement && target.closest("button, input, select, textarea, a")) return;
+			if (
+				target instanceof HTMLElement &&
+				target.closest("button, input, select, textarea, a")
+			)
+				return;
 			settings.sidebarCollapsed = true;
 			persistSettings();
-		}}>
-		<div class="side-head" data-tauri-drag-region aria-hidden="true" onmousedown={dragWindow} ondblclick={zoomWindow}>
-		</div>
+		}}
+	>
+		<div
+			class="side-head"
+			data-tauri-drag-region
+			aria-hidden="true"
+			onmousedown={dragWindow}
+			ondblclick={zoomWindow}
+		></div>
 		<!-- Sidebar search: a swipe left-to-right opens the list on this
 		box; tapping it focuses with the keyboard up (a real input, never
 		auto-focused on open, so the keyboard only comes on tap). -->
@@ -10039,9 +10888,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							persistSettings();
 						}}
 					>
-						{chatLabel(item.createdAt)}{#if androidUI}{@const n = visibleMessageCount(chatState, item)}{#if n > 0} <span
-								class="side-count">· {n} {n === 1 ? "msg" : "msgs"}</span
-							>{/if}{/if}
+						{chatLabel(item.createdAt)}{#if androidUI}{@const n =
+								visibleMessageCount(chatState, item)}{#if n > 0}
+								<span class="side-count">· {n} {n === 1 ? "msg" : "msgs"}</span
+								>{/if}{/if}
 					</button>
 					<!-- No export path works in the shell phone (no picker,
 					no native dialog bridge, clipboard denied): the button
@@ -10076,7 +10926,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		<button
 			type="button"
 			class="new"
-			title={tip(isMac ? "New chat (⌘N or ⇧⌘N)" : "New chat (Ctrl+N or Ctrl+Shift+N)", "New chat")}
+			title={tip(
+				isMac ? "New chat (⌘N or ⇧⌘N)" : "New chat (Ctrl+N or Ctrl+Shift+N)",
+				"New chat"
+			)}
 			aria-label="New chat"
 			onclick={() => doNewChat()}
 		>
@@ -10137,15 +10990,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 								class="lang-list"
 								class:lang-list-fixed={androidUI && langMenuAnchor !== null}
 								role="menu"
-								style={
-									androidUI && langMenuAnchor
-										? `top: ${langMenuAnchor.top}px; left: ${langMenuAnchor.left}px; max-height: ${langMenuAnchor.maxH}px;`
-										: undefined
-								}
+								style={androidUI && langMenuAnchor
+									? `top: ${langMenuAnchor.top}px; left: ${langMenuAnchor.left}px; max-height: ${langMenuAnchor.maxH}px;`
+									: undefined}
 							>
 								<!-- Menu-click clears only languages without a number key
 								(keyed ones clear by repeating the key). -->
-								{#each [...menu.languages].sort((a, b) => a.name.localeCompare(b.name, "en")) as lang (lang.code)}
+								{#each [...menu.languages].sort( (a, b) => a.name.localeCompare(b.name, "en") ) as lang (lang.code)}
 									{@const quickKey = quickKeyFor(lang.code)}
 									<button
 										type="button"
@@ -10153,18 +11004,19 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 										class:selected={activeReplyCode === lang.code}
 										title={quickKey ? `${lang.name} (${quickKey})` : lang.name}
 										onclick={() => {
-										if (activeReplyCode === lang.code && !quickKey) clearReplyLang();
-										else setReplyLang(lang.code);
-										// Picking a language hands focus to the
-										// composer on desktop: typing starts there
-										// next, and focus never lingers on the
-										// unmounted option (which left a stuck
-										// pointer behind). Phones stay unfocused:
-										// auto-focus pops the keyboard over the
-										// composer instead of pushing it up. Tap
-										// in when ready.
-										if (!androidUI) editor?.focus();
-									}}
+											if (activeReplyCode === lang.code && !quickKey)
+												clearReplyLang();
+											else setReplyLang(lang.code);
+											// Picking a language hands focus to the
+											// composer on desktop: typing starts there
+											// next, and focus never lingers on the
+											// unmounted option (which left a stuck
+											// pointer behind). Phones stay unfocused:
+											// auto-focus pops the keyboard over the
+											// composer instead of pushing it up. Tap
+											// in when ready.
+											if (!androidUI) editor?.focus();
+										}}
 									>
 										<span class="badge" aria-hidden="true">{lang.badge}</span>
 										{lang.name}
@@ -10177,15 +11029,36 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			</div>
 		{/snippet}
 		{#if notices.errorToast.message}
-			<button type="button" class="toast error" title="Dismiss" aria-live="polite" transition:fade={{ duration: 160 }} onclick={dismissErrorToast}>{notices.errorToast.message}</button>
+			<button
+				type="button"
+				class="toast error"
+				title="Dismiss"
+				aria-live="polite"
+				transition:fade={{ duration: 160 }}
+				onclick={dismissErrorToast}>{notices.errorToast.message}</button
+			>
 		{:else if notices.toast.message}
-			<button type="button" class="toast" title={toastAction && toastAction.seq === notices.toast.seq ? "Open" : "Click to copy"} aria-live="polite" transition:fade={{ duration: 160 }} onclick={toastTap}>{notices.toast.message}</button>
+			<button
+				type="button"
+				class="toast"
+				title={toastAction && toastAction.seq === notices.toast.seq
+					? "Open"
+					: "Click to copy"}
+				aria-live="polite"
+				transition:fade={{ duration: 160 }}
+				onclick={toastTap}>{notices.toast.message}</button
+			>
 		{/if}
 		<!-- Empty drag strip: nothing but the traffic-light clearance
 		(the active reply language shows on the send button instead).
 		Double-click zooms. -->
-		<header role="toolbar" aria-label="App" tabindex="-1" onmousedown={dragWindow} ondblclick={zoomWindow}>
-		</header>
+		<header
+			role="toolbar"
+			aria-label="App"
+			tabindex="-1"
+			onmousedown={dragWindow}
+			ondblclick={zoomWindow}
+		></header>
 
 		<!-- In-chat find (Cmd/Ctrl+F): message-level cycling browser-style. -->
 		{#if find.open && !androidUI}
@@ -10220,9 +11093,24 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							: ""
 						: `${Math.min(find.cursor + 1, currentFindHits().length)}/${currentFindHits().length}`}
 				</span>
-				<button type="button" aria-label="Previous match" title="Previous (Shift+Enter)" onclick={() => stepFind(-1)}>↑</button>
-				<button type="button" aria-label="Next match" title="Next (Enter)" onclick={() => stepFind(1)}>↓</button>
-				<button type="button" aria-label="Close find" title="Close (Esc)" onclick={closeFind}>×</button>
+				<button
+					type="button"
+					aria-label="Previous match"
+					title="Previous (Shift+Enter)"
+					onclick={() => stepFind(-1)}>↑</button
+				>
+				<button
+					type="button"
+					aria-label="Next match"
+					title="Next (Enter)"
+					onclick={() => stepFind(1)}>↓</button
+				>
+				<button
+					type="button"
+					aria-label="Close find"
+					title="Close (Esc)"
+					onclick={closeFind}>×</button
+				>
 			</div>
 		{/if}
 
@@ -10231,7 +11119,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				{#if wpOpen}
 					<!-- Sheet backdrop: a press outside the sheet (which is
 					outside .wp-wrap) also trips the pinned-menu closer. -->
-					<button type="button" class="wp-veil" tabindex={-1} aria-label="Close message list" transition:fade={{ duration: 150 }} onclick={() => (wpOpen = false)}></button>
+					<button
+						type="button"
+						class="wp-veil"
+						tabindex={-1}
+						aria-label="Close message list"
+						transition:fade={{ duration: 150 }}
+						onclick={() => (wpOpen = false)}
+					></button>
 				{/if}
 				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<div
@@ -10282,13 +11177,21 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							const end = e.changedTouches[0]?.clientY;
 							if (start == null || end == null) return;
 							const menu = e.currentTarget;
-							if (menu instanceof HTMLElement && menu.scrollTop <= 0 && end - start > 56)
+							if (
+								menu instanceof HTMLElement &&
+								menu.scrollTop <= 0 &&
+								end - start > 56
+							)
 								wpOpen = false;
 						}}
 					>
 						<div class="wp-sheet-head">
 							<span>Jump to a message</span>
-							<button type="button" aria-label="Close message list" onclick={() => (wpOpen = false)}>×</button>
+							<button
+								type="button"
+								aria-label="Close message list"
+								onclick={() => (wpOpen = false)}>×</button
+							>
 						</div>
 						{#each points as index, n (index)}
 							{@const target = chat.messages[index]}
@@ -10308,7 +11211,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 									if (e.detail > 0) e.currentTarget.blur();
 								}}
 							>
-								<span class="wp-dot" data-role={target?.role ?? "user"} aria-hidden="true"></span>
+								<span
+									class="wp-dot"
+									data-role={target?.role ?? "user"}
+									aria-hidden="true"
+								></span>
 								{waypointLabel(target?.content ?? "") || `Message ${index + 1}`}
 							</button>
 						{/each}
@@ -10347,7 +11254,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				{@const isFolded = foldedIds.has(msg.id)}
 				{@const script = detectScript(sentRefs ? sentRefs.text : msg.content)}
 				{@const aidId = script ? MODEL_AID_FOR_SCRIPT[script] : null}
-				{@const localKinds = offeredLocalAids(sentRefs ? sentRefs.text : msg.content, activeReplyCode)}
+				{@const localKinds = offeredLocalAids(
+					sentRefs ? sentRefs.text : msg.content,
+					activeReplyCode
+				)}
 				{@const streamingThis =
 					chatState.sending &&
 					viewChat.id === chatState.sendingChatId &&
@@ -10367,7 +11277,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					class:aid-loading={aidBusy.has(msg.id) || vocalizing.has(msg.id)}
 					data-actions-open={shownActionsId === msg.id}
 					onclick={(e) => {
-						if (e.target instanceof Element && e.target.closest(".sent-fold,.sent-open")) return;
+						if (
+							e.target instanceof Element &&
+							e.target.closest(".sent-fold,.sent-open")
+						)
+							return;
 						if (e.altKey) toggleFold(msg.id);
 						toggleMessageActions(msg.id, e);
 					}}
@@ -10380,10 +11294,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					{#if msg.attachments && msg.attachments.length > 0}
 						{@const leftoverModels = sentTagModels(
 							msg,
-							(sentRefs ? (refsOnly && !isFolded ? REFS_ONLY_BODY : sentRefs.text) : null) ??
-								msg.content
+							(sentRefs
+								? refsOnly && !isFolded
+									? REFS_ONLY_BODY
+									: sentRefs.text
+								: null) ?? msg.content
 						)}
-						{@const leftoverFiles = leftoverModels.filter((m) => m.kind === "text")}
+						{@const leftoverFiles = leftoverModels.filter(
+							(m) => m.kind === "text"
+						)}
 						{#if leftoverFiles.length > 0}
 							<!-- Sent-message file tags: one per text attachment
 							with no literal left in the text (literals rebuild
@@ -10412,11 +11331,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 											<span class="sent-open">
 												<span class="sent-card">
 													{#if m.text !== null}
-														<span class="sent-excerpt">{fileExcerpt(m.text)}</span>
+														<span class="sent-excerpt"
+															>{fileExcerpt(m.text)}</span
+														>
 													{/if}
 													<span class="sent-foot">
 														<span class="sent-name">{m.name}</span>
-														<span class="sent-tok" title="{m.tokens} tokens">{formatTokenCount(m.tokens)}</span>
+														<span class="sent-tok" title="{m.tokens} tokens"
+															>{formatTokenCount(m.tokens)}</span
+														>
 														{#if att}
 															<button
 																type="button"
@@ -10446,7 +11369,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							</div>
 						{/if}
 					{/if}
-				{#if sentRefs}
+					{#if sentRefs}
 						<!-- Previous-annotations card: filed annotations
 						baked onto a sent message, collapsed above it.
 						The count stays visible like the composer
@@ -10459,9 +11382,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							<button
 								type="button"
 								class="ann-refs-pill"
-								aria-label={sentRefs.refs.length === 1 ? "1 annotation" : `${sentRefs.refs.length} annotations`}
+								aria-label={sentRefs.refs.length === 1
+									? "1 annotation"
+									: `${sentRefs.refs.length} annotations`}
 								aria-expanded={refsPopOpen === msg.id}
-								onclick={() => (refsPopOpen = refsPopOpen === msg.id ? null : msg.id)}
+								onclick={() =>
+									(refsPopOpen = refsPopOpen === msg.id ? null : msg.id)}
 							>
 								{annotationCountLabel(sentRefs.refs.length)}
 							</button>
@@ -10489,9 +11415,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 									buttons keep their clicks (see
 									refsQuoteClick), drag-selects stay picks. -->
 									<div
-									class="ann-refs-item"
-									class:blink={refsBlink?.messageId === msg.id && refsBlink?.n === ref.n}
-								>
+										class="ann-refs-item"
+										class:blink={refsBlink?.messageId === msg.id &&
+											refsBlink?.n === ref.n}
+									>
 										<span class="ann-refs-num">{ref.n}.</span>
 										<span class="ann-refs-body">
 											<button
@@ -10525,10 +11452,18 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 											{/if}
 										</span>
 										{#if refsEditing?.messageId === msg.id && refsEditing.n === ref.n}
-											<button type="button" class="ann-refs-edit-btn" onclick={saveRefsEdit}>
+											<button
+												type="button"
+												class="ann-refs-edit-btn"
+												onclick={saveRefsEdit}
+											>
 												Save
 											</button>
-											<button type="button" class="ann-refs-edit-btn" onclick={cancelRefsEdit}>
+											<button
+												type="button"
+												class="ann-refs-edit-btn"
+												onclick={cancelRefsEdit}
+											>
 												Cancel
 											</button>
 										{:else}
@@ -10572,39 +11507,53 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							<div class="msg-edit-box" use:msgEditAction></div>
 						</div>
 					{:else}
-					<div class:bubble={msg.role === "user"}>
-						<MessageBody
-							message={msg}
-							streaming={streamingThis}
-							sourcesWanted={sourcesWanted}
-							folded={isFolded}
-							foldPreview={refsOnly && sentRefs ? sentRefs.refs.map((r) => `"${r.quote}"`).join(" ") : null}
-							marks={marksFor(msg.id)}
-							washId={pillWashId(annPop, annPopClosing) ?? promptAnnWashId() ?? editingId ?? hoverBadgeId}
-						onBadgeHover={(id: string | null) => (hoverBadgeId = id)}
-							onBadgeClick={openBadgeClick}
-							onAttachAction={sentTagAction}
-							expandedTags={expandedTags}
-							onTagToggle={(id: string) => toggleSentTag(msg, id)}
-							onToast={flashToast}
-							onFoldToggle={(index: number) => togglePasteFold(msg, index)}
-						onUnfold={() => toggleFold(msg.id)}
-							textOverride={aidedTextFor(msg)}
-							contentOverride={sentRefs ? (refsOnly && !isFolded ? REFS_ONLY_BODY : sentRefs.text) : null}
-							aidPreview={aidPeek?.id === msg.id && !aidPin.has(msg.id)}
-							preview={previewing}
-							aidKinds={localAidsOverrideFor(msg)}
-							aidPreferred={preferredLocalAid(activeReplyCode)}
-							onAidLoadingChange={(loading: boolean) => setAidBusy(msg.id, loading)}
-							onAidError={(_id: ChatMsgId, reason?: string) => aidFailed(msg.id, reason)}
-						/>
-					</div>
+						<div class:bubble={msg.role === "user"}>
+							<MessageBody
+								message={msg}
+								streaming={streamingThis}
+								{sourcesWanted}
+								folded={isFolded}
+								foldPreview={refsOnly && sentRefs
+									? sentRefs.refs.map((r) => `"${r.quote}"`).join(" ")
+									: null}
+								marks={marksFor(msg.id)}
+								washId={pillWashId(annPop, annPopClosing) ??
+									promptAnnWashId() ??
+									editingId ??
+									hoverBadgeId}
+								onBadgeHover={(id: string | null) => (hoverBadgeId = id)}
+								onBadgeClick={openBadgeClick}
+								onAttachAction={sentTagAction}
+								{expandedTags}
+								onTagToggle={(id: string) => toggleSentTag(msg, id)}
+								onToast={flashToast}
+								onFoldToggle={(index: number) => togglePasteFold(msg, index)}
+								onUnfold={() => toggleFold(msg.id)}
+								textOverride={aidedTextFor(msg)}
+								contentOverride={sentRefs
+									? refsOnly && !isFolded
+										? REFS_ONLY_BODY
+										: sentRefs.text
+									: null}
+								aidPreview={aidPeek?.id === msg.id && !aidPin.has(msg.id)}
+								preview={previewing}
+								aidKinds={localAidsOverrideFor(msg)}
+								aidPreferred={preferredLocalAid(activeReplyCode)}
+								onAidLoadingChange={(loading: boolean) =>
+									setAidBusy(msg.id, loading)}
+								onAidError={(_id: ChatMsgId, reason?: string) =>
+									aidFailed(msg.id, reason)}
+							/>
+						</div>
 					{/if}
 					{#if msg.attachments && msg.attachments.length > 0}
 						{@const inlineImages = sentTagModels(
 							msg,
-							(sentRefs ? (refsOnly && !isFolded ? REFS_ONLY_BODY : sentRefs.text) : null) ??
-								msg.content
+							(sentRefs
+								? refsOnly && !isFolded
+									? REFS_ONLY_BODY
+									: sentRefs.text
+								: null) ?? msg.content
 						).filter((m) => m.kind === "image")}
 						{#if inlineImages.length > 0}
 							<!-- Sent images ride in the text with the prose (below
@@ -10616,304 +11565,349 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							click-away / ESC closes, history stays read-only. -->
 							<div class="sent-inline">
 								{#each inlineImages as m (m.id)}
-								{@const att = msg.attachments?.find((a) => a.id === m.id)}
-								<span class="sent-wrap">
-									<button
-										type="button"
-										class="paste-fold sent-fold"
-										aria-expanded={m.open}
-										onclick={() => toggleSentTag(msg, m.id)}
-										>{IMAGE_MARKER}</button
-									>
-									{#if m.open}
-										<span class="sent-open">
-											<span class="sent-card">
-												{#if m.dataUrl?.startsWith("data:image/")}
-													<img class="sent-img" src={m.dataUrl} alt="" />
-												{/if}
-												<span class="sent-foot">
-													<span class="sent-name">{m.name}</span>
-													<span class="sent-tok" title="{m.tokens} tokens">{formatTokenCount(m.tokens)}</span>
-													{#if att}
-														<button
-															type="button"
-															class="sent-icobtn"
-															aria-label="Copy attachment"
-															title="Copy attachment"
-															onclick={(e) => {
-																e.stopPropagation();
-																copyAttachment(att);
-															}}><ActionIcon kind="copy" /></button
+									{@const att = msg.attachments?.find((a) => a.id === m.id)}
+									<span class="sent-wrap">
+										<button
+											type="button"
+											class="paste-fold sent-fold"
+											aria-expanded={m.open}
+											onclick={() => toggleSentTag(msg, m.id)}
+											>{IMAGE_MARKER}</button
+										>
+										{#if m.open}
+											<span class="sent-open">
+												<span class="sent-card">
+													{#if m.dataUrl?.startsWith("data:image/")}
+														<img class="sent-img" src={m.dataUrl} alt="" />
+													{/if}
+													<span class="sent-foot">
+														<span class="sent-name">{m.name}</span>
+														<span class="sent-tok" title="{m.tokens} tokens"
+															>{formatTokenCount(m.tokens)}</span
 														>
-														{#if att.kind === "image" && att.dataUrl}
+														{#if att}
 															<button
 																type="button"
-																class="sent-btn"
-																disabled={ocrBusyId === att.id}
+																class="sent-icobtn"
+																aria-label="Copy attachment"
+																title="Copy attachment"
 																onclick={(e) => {
 																	e.stopPropagation();
-																	void recognizeAttachment(att);
-																}}>{ocrBusyId === att.id ? "…" : "OCR"}</button
+																	copyAttachment(att);
+																}}><ActionIcon kind="copy" /></button
+															>
+															{#if att.kind === "image" && att.dataUrl}
+																<button
+																	type="button"
+																	class="sent-btn"
+																	disabled={ocrBusyId === att.id}
+																	onclick={(e) => {
+																		e.stopPropagation();
+																		void recognizeAttachment(att);
+																	}}
+																	>{ocrBusyId === att.id ? "…" : "OCR"}</button
+																>
+															{/if}
+															<button
+																type="button"
+																class="sent-icobtn"
+																aria-label="Close preview"
+																title="Close preview"
+																onclick={() => toggleSentTag(msg, m.id)}
+																><ActionIcon kind="close" /></button
 															>
 														{/if}
-														<button
-															type="button"
-															class="sent-icobtn"
-															aria-label="Close preview"
-															title="Close preview"
-															onclick={() => toggleSentTag(msg, m.id)}
-															><ActionIcon kind="close" /></button
-														>
-													{/if}
+													</span>
 												</span>
 											</span>
-										</span>
-									{/if}
-								</span>
-							{/each}
+										{/if}
+									</span>
+								{/each}
 							</div>
 						{/if}
 					{/if}
 					{#if settings.showMessageButtons && !(streamingThis && msg.content.trim() === "")}
-					<!-- Preview renders the same row inert: the peek
+						<!-- Preview renders the same row inert: the peek
 					reserves the row's space (opening the chat moves
 					nothing) while honoring the hover-only rhythm, so
 					no peek button is ever visible or firing. The
 					Messages toggle removes the row outright (its
 					shortcuts keep working on hover). -->
-					<div
-						class="actions"
-						role="group"
-						aria-label="Message actions"
-						inert={previewing}
-						onmouseleave={releaseRowFocus}
-						onpointerdown={holdActionsOpen}
-						onpointerup={releaseActionsHold}
-						onpointercancel={releaseActionsHold}
-					>
-						{#if !androidUI}
-							<!-- Desktop only: phones fold by swipe and unfold
+						<div
+							class="actions"
+							role="group"
+							aria-label="Message actions"
+							inert={previewing}
+							onmouseleave={releaseRowFocus}
+							onpointerdown={holdActionsOpen}
+							onpointerup={releaseActionsHold}
+							onpointercancel={releaseActionsHold}
+						>
+							{#if !androidUI}
+								<!-- Desktop only: phones fold by swipe and unfold
 							by tapping the folded body (its row stays hidden),
 							so the chevron would be dead chrome in the row. -->
+								<button
+									type="button"
+									class="icon-btn"
+									class:folded={isFolded}
+									data-tip={tip(
+										isMac
+											? "Fold this message (F or Option-click)"
+											: "Fold this message (F or Alt-click)",
+										"Fold this message"
+									)}
+									aria-label={isFolded
+										? "Unfold this message"
+										: "Fold this message"}
+									onclick={() => toggleFold(msg.id)}
+								>
+									<ActionIcon kind="fold" />
+								</button>
+							{/if}
 							<button
 								type="button"
 								class="icon-btn"
-								class:folded={isFolded}
-								data-tip={tip(isMac ? "Fold this message (F or Option-click)" : "Fold this message (F or Alt-click)", "Fold this message")}
-								aria-label={isFolded ? "Unfold this message" : "Fold this message"}
-								onclick={() => toggleFold(msg.id)}
+								data-tip="Copy as plain text"
+								aria-label="Copy as plain text"
+								onclick={() => copyText(msg.content, msg.role)}
 							>
-								<ActionIcon kind="fold" />
+								<ActionIcon kind="copy" />
 							</button>
-						{/if}
-						<button
-							type="button"
-							class="icon-btn"
-							data-tip="Copy as plain text"
-							aria-label="Copy as plain text"
-							onclick={() => copyText(msg.content, msg.role)}
-						>
-							<ActionIcon kind="copy" />
-						</button>
-						{#if msg.role !== "user"}
-							<!-- Assistant rows keep branch before audio. -->
+							{#if msg.role !== "user"}
+								<!-- Assistant rows keep branch before audio. -->
+								<button
+									type="button"
+									class="icon-btn"
+									data-tip="Branch from here"
+									aria-label="Branch from here"
+									onclick={() => branchHere(i)}
+								>
+									<ActionIcon kind="branch" />
+								</button>
+							{/if}
+							{#if msg.role !== "user"}
+								<button
+									type="button"
+									class="icon-btn"
+									data-tip={tip(
+										isMac ? "Delete this message (⌘D)" : "Delete this message",
+										"Delete this message"
+									)}
+									aria-label={tip(
+										isMac ? "Delete this message (⌘D)" : "Delete this message",
+										"Delete this message"
+									)}
+									onclick={() => dropMessage(i)}
+								>
+									<ActionIcon kind="delete" />
+								</button>
+							{/if}
 							<button
 								type="button"
 								class="icon-btn"
-								data-tip="Branch from here"
-								aria-label="Branch from here"
-								onclick={() => branchHere(i)}
+								class:active={speakingId === msg.id}
+								data-tip={messageSpeakable(msg)
+									? speakTitle(msg)
+									: "No voice for this language"}
+								aria-label={messageSpeakable(msg)
+									? speakTitle(msg)
+									: "No voice for this language"}
+								aria-pressed={speakingId === msg.id}
+								disabled={speakingId !== msg.id && !messageSpeakable(msg)}
+								onclick={() => {
+									if (speakingId === msg.id) stopVoice();
+									else void speakReply(msg);
+								}}
 							>
-								<ActionIcon kind="branch" />
+								<ActionIcon kind="speak" />
 							</button>
-						{/if}
-						{#if msg.role !== "user"}
-							<button
-								type="button"
-								class="icon-btn"
-								data-tip={tip(isMac ? "Delete this message (⌘D)" : "Delete this message", "Delete this message")}
-								aria-label={tip(isMac ? "Delete this message (⌘D)" : "Delete this message", "Delete this message")}
-								onclick={() => dropMessage(i)}
-							>
-								<ActionIcon kind="delete" />
-							</button>
-						{/if}
-						<button
-							type="button"
-							class="icon-btn"
-							class:active={speakingId === msg.id}
-							data-tip={messageSpeakable(msg) ? speakTitle(msg) : "No voice for this language"}
-							aria-label={messageSpeakable(msg) ? speakTitle(msg) : "No voice for this language"}
-							aria-pressed={speakingId === msg.id}
-							disabled={speakingId !== msg.id && !messageSpeakable(msg)}
-							onclick={() => {
-								if (speakingId === msg.id) stopVoice();
-								else void speakReply(msg);
-							}}
-						>
-							<ActionIcon kind="speak" />
-						</button>
-						{#if msg.role === "user"}
-							<!-- Own messages: audio before branch before
+							{#if msg.role === "user"}
+								<!-- Own messages: audio before branch before
 							delete (assistant rows keep branch, delete,
 							then audio). -->
-							<button
-								type="button"
-								class="icon-btn"
-								data-tip="Branch from here"
-								aria-label="Branch from here"
-								onclick={() => branchHere(i)}
-							>
-								<ActionIcon kind="branch" />
-							</button>
-							<button
-								type="button"
-								class="icon-btn"
-								data-tip={tip(isMac ? "Delete this message (⌘D)" : "Delete this message", "Delete this message")}
-								aria-label={tip(isMac ? "Delete this message (⌘D)" : "Delete this message", "Delete this message")}
-								onclick={() => dropMessage(i)}
-							>
-								<ActionIcon kind="delete" />
-							</button>
-						{/if}
-						{#if msg.role === "assistant" && !streamingThis}
-							<!-- Reading aids live here, right of speak: hover
+								<button
+									type="button"
+									class="icon-btn"
+									data-tip="Branch from here"
+									aria-label="Branch from here"
+									onclick={() => branchHere(i)}
+								>
+									<ActionIcon kind="branch" />
+								</button>
+								<button
+									type="button"
+									class="icon-btn"
+									data-tip={tip(
+										isMac ? "Delete this message (⌘D)" : "Delete this message",
+										"Delete this message"
+									)}
+									aria-label={tip(
+										isMac ? "Delete this message (⌘D)" : "Delete this message",
+										"Delete this message"
+									)}
+									onclick={() => dropMessage(i)}
+								>
+									<ActionIcon kind="delete" />
+								</button>
+							{/if}
+							{#if msg.role === "assistant" && !streamingThis}
+								<!-- Reading aids live here, right of speak: hover
 							previews, click pins (show original unpins). Model
 							and local aids sit side by side on mixed messages;
 							a model pin composes with local pins (the model revert drops
 						only the vocalized text), while furigana and pinyin pin
 						independently. -->
-							{#if aidId || localKinds.length > 0}
-								{#if aidId}
-									{#if aidModelPin.has(msg.id)}
-										<button
-											type="button"
-											class="aid-btn"
-											data-tip={MODEL_AIDS[aidId]?.revertTip ?? "Show original"}
-											onclick={() => unpinModelAid(msg)}
-										>
-											{MODEL_AIDS[aidId]?.revert ?? "show original"}
-										</button>
-									{:else}
-										{@const aid = MODEL_AIDS[aidId]}
-										{#if aid}
+								{#if aidId || localKinds.length > 0}
+									{#if aidId}
+										{#if aidModelPin.has(msg.id)}
 											<button
 												type="button"
 												class="aid-btn"
-												data-tip={aid.title}
-												disabled={vocalizing.has(msg.id)}
-												aria-busy={vocalizing.has(msg.id)}
-												onclick={() => void runModelAidFor(msg, aidId, true)}
+												data-tip={MODEL_AIDS[aidId]?.revertTip ??
+													"Show original"}
+												onclick={() => unpinModelAid(msg)}
 											>
-													{#if vocalizing.has(msg.id)}
-												{aid.button}<span class="tdots" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>
-											{:else}
-												{aid.button}
-											{/if}
+												{MODEL_AIDS[aidId]?.revert ?? "show original"}
 											</button>
+										{:else}
+											{@const aid = MODEL_AIDS[aidId]}
+											{#if aid}
+												<button
+													type="button"
+													class="aid-btn"
+													data-tip={aid.title}
+													disabled={vocalizing.has(msg.id)}
+													aria-busy={vocalizing.has(msg.id)}
+													onclick={() => void runModelAidFor(msg, aidId, true)}
+												>
+													{#if vocalizing.has(msg.id)}
+														{aid.button}<span class="tdots" aria-hidden="true"
+															><span>.</span><span>.</span><span>.</span></span
+														>
+													{:else}
+														{aid.button}
+													{/if}
+												</button>
+											{/if}
+										{/if}
 									{/if}
-									{/if}
-								{/if}
-								{#if localKinds.length > 0}
-								<!-- One button per aid, pinned independently: each
+									{#if localKinds.length > 0}
+										<!-- One button per aid, pinned independently: each
 								swaps in place to its own show-original, so the
 								row never shuffles when the other pins. -->
-								{#each localKinds as localKind (localKind)}
-									{@const showOriginal = LOCAL_AID_SHOW_ORIGINAL[localKind]}
-									{#if pinnedKinds(msg.id).includes(localKind)}
-											{@const furiganaBusy = localKind === "furigana" && aidBusy.has(msg.id)}
-											<button
-												type="button"
-												class="aid-btn"
-												data-tip={furiganaBusy ? `${LOCAL_AID_BUTTON[localKind]}...` : showOriginal}
-												onclick={() => unpinLocalAid(msg, localKind)}
-											>
-												{showOriginal}{#if furiganaBusy}<span class="tdots" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>{/if}
-											</button>
-									{:else}
-										<button
-											type="button"
-											class="aid-btn"
-											data-tip={LOCAL_AID_ADD_TITLE[localKind]}
-											onmouseenter={() => peekAid(msg, localKind)}
-											onmouseleave={() => unpeekAid(msg)}
-											onclick={() => pinLocalAid(msg, localKind)}
-										>
-											{LOCAL_AID_BUTTON[localKind]}{#if localKind === "furigana" && aidBusy.has(msg.id)}<span class="tdots" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>{/if}
-										</button>
+										{#each localKinds as localKind (localKind)}
+											{@const showOriginal = LOCAL_AID_SHOW_ORIGINAL[localKind]}
+											{#if pinnedKinds(msg.id).includes(localKind)}
+												{@const furiganaBusy =
+													localKind === "furigana" && aidBusy.has(msg.id)}
+												<button
+													type="button"
+													class="aid-btn"
+													data-tip={furiganaBusy
+														? `${LOCAL_AID_BUTTON[localKind]}...`
+														: showOriginal}
+													onclick={() => unpinLocalAid(msg, localKind)}
+												>
+													{showOriginal}{#if furiganaBusy}<span
+															class="tdots"
+															aria-hidden="true"
+															><span>.</span><span>.</span><span>.</span></span
+														>{/if}
+												</button>
+											{:else}
+												<button
+													type="button"
+													class="aid-btn"
+													data-tip={LOCAL_AID_ADD_TITLE[localKind]}
+													onmouseenter={() => peekAid(msg, localKind)}
+													onmouseleave={() => unpeekAid(msg)}
+													onclick={() => pinLocalAid(msg, localKind)}
+												>
+													{LOCAL_AID_BUTTON[
+														localKind
+													]}{#if localKind === "furigana" && aidBusy.has(msg.id)}<span
+															class="tdots"
+															aria-hidden="true"
+															><span>.</span><span>.</span><span>.</span></span
+														>{/if}
+												</button>
+											{/if}
+										{/each}
 									{/if}
-								{/each}
 								{/if}
 							{/if}
-						{/if}
-						{#if msg.role === "user"}
-							{#if editingMsgId === msg.id}
-								<!-- While editing, the pencil seat commits:
+							{#if msg.role === "user"}
+								{#if editingMsgId === msg.id}
+									<!-- While editing, the pencil seat commits:
 								checkmark in the same style, Enter works too. -->
+									<button
+										type="button"
+										class="icon-btn"
+										data-tip="Save edit"
+										aria-label="Save edit"
+										data-commit-edit
+										onclick={() => commitMessageEdit()}
+									>
+										<ActionIcon kind="check" />
+									</button>
+								{:else}
+									<button
+										type="button"
+										class="icon-btn"
+										data-tip="Edit"
+										aria-label="Edit this message"
+										onclick={() => editMessage(i)}
+									>
+										<ActionIcon kind="pencil" />
+									</button>
+								{/if}
 								<button
 									type="button"
 									class="icon-btn"
-									data-tip="Save edit"
-									aria-label="Save edit"
-									data-commit-edit
-									onclick={() => commitMessageEdit()}
+									data-tip="Rerun"
+									aria-label="Rerun"
+									onclick={() => rerunFrom(i)}
 								>
-									<ActionIcon kind="check" />
-								</button>
-							{:else}
-								<button
-									type="button"
-									class="icon-btn"
-									data-tip="Edit"
-									aria-label="Edit this message"
-									onclick={() => editMessage(i)}
-								>
-									<ActionIcon kind="pencil" />
+									<ActionIcon kind="rerun" />
 								</button>
 							{/if}
-							<button
-								type="button"
-								class="icon-btn"
-								data-tip="Rerun"
-								aria-label="Rerun"
-								onclick={() => rerunFrom(i)}
-							>
-								<ActionIcon kind="rerun" />
-							</button>
-						{/if}
-						{#if msg.error}
-							<button
-								type="button"
-								class="icon-btn"
-								data-tip="Retry"
-								aria-label="Retry"
-								onclick={retryFailed}
-							>
-								<ActionIcon kind="rerun" />
-							</button>
-						{/if}
-						{#if msg.error && !androidUI}
-							<span class="error">{msg.error}</span>
-						{/if}
-						<!-- Last in the row, always mounted (hidden when idle)
+							{#if msg.error}
+								<button
+									type="button"
+									class="icon-btn"
+									data-tip="Retry"
+									aria-label="Retry"
+									onclick={retryFailed}
+								>
+									<ActionIcon kind="rerun" />
+								</button>
+							{/if}
+							{#if msg.error && !androidUI}
+								<span class="error">{msg.error}</span>
+							{/if}
+							<!-- Last in the row, always mounted (hidden when idle)
 						so it never shoves the buttons around. -->
-						<span
-							class="speaking-dot"
-							class:on={speakingId === msg.id}
-							role="status"
-							aria-label="Speaking this message"
-						></span>
-					</div>
+							<span
+								class="speaking-dot"
+								class:on={speakingId === msg.id}
+								role="status"
+								aria-label="Speaking this message"
+							></span>
+						</div>
 					{/if}
 				</article>
 			{/each}
 			{#if isSending(chatState, viewChat.id) && !hasReplyStarted(chatState, viewChat.id)}
 				<p class="sending" role="status" aria-label="Waiting for a reply">
 					<span class="sending-chip"
-						>{thinkingLabelFor(activeReplyCode ?? settings.replyLang)}<span class="tdots" aria-hidden="true"
+						>{thinkingLabelFor(activeReplyCode ?? settings.replyLang)}<span
+							class="tdots"
+							aria-hidden="true"
 							><span>.</span><span>.</span><span>.</span></span
-						>{#if sendElapsed > 0}<span class="sending-elapsed" aria-hidden="true"
-								>· {sendElapsed}s</span
+						>{#if sendElapsed > 0}<span
+								class="sending-elapsed"
+								aria-hidden="true">· {sendElapsed}s</span
 							>{/if}</span
 					>
 				</p>
@@ -10928,9 +11922,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					class="link"
 					data-settings-toggle
 					onclick={() => {
-					openSettingsPanel();
-					pulseCursor();
-				}}
+						openSettingsPanel();
+						pulseCursor();
+					}}
 				>
 					open Settings</button
 				>.
@@ -10975,17 +11969,25 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 								class="paste-body"
 								class:open={pastedOpen}
 								aria-expanded={pastedOpen}
-								aria-label={pastedOpen ? "Collapse pasted text" : "Expand pasted text"}
+								aria-label={pastedOpen
+									? "Collapse pasted text"
+									: "Expand pasted text"}
 								onmousedown={(e) => e.preventDefault()}
 								onclick={() => togglePastedExpand(att.id)}
 							>
 								{pastedOpen ? pastedBody : fileExcerpt(pastedBody)}
 							</button>
 							<span class="file-kind" aria-hidden="true">PASTE</span>
-							<span class="tok" title="{att.tokens} tokens">{pastedBody.length} chars</span>
+							<span class="tok" title="{att.tokens} tokens"
+								>{pastedBody.length} chars</span
+							>
 						{:else}
-							<span class="name" title="{att.name} · ~{att.tokens} tokens">{att.name}</span>
-							<span class="tok" title="{att.tokens} tokens">{formatTokenCount(att.tokens)}</span>
+							<span class="name" title="{att.name} · ~{att.tokens} tokens"
+								>{att.name}</span
+							>
+							<span class="tok" title="{att.tokens} tokens"
+								>{formatTokenCount(att.tokens)}</span
+							>
 						{/if}
 						<button
 							type="button"
@@ -11024,7 +12026,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				{/each}
 			</ul>
 			{#if notices.inline.message && !androidUI}
-				<p class="error attach-error" class:composer-idle={promptIdle} role="alert">{notices.inline.message}</p>
+				<p
+					class="error attach-error"
+					class:composer-idle={promptIdle}
+					role="alert"
+				>
+					{notices.inline.message}
+				</p>
 			{/if}
 		{/if}
 
@@ -11037,7 +12045,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			onchange={(e) => {
 				const files = [...(e.currentTarget.files ?? [])];
 				e.currentTarget.value = "";
-				if (files.length > 0) void addFiles(files).then((kinds) => insertAttachmentMarkers(kinds));
+				if (files.length > 0)
+					void addFiles(files).then((kinds) => insertAttachmentMarkers(kinds));
 			}}
 		/>
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -11081,8 +12090,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 								onmousedown={noteMenuPress}
 								ontouchstart={noteMenuBtnTouch}
 								ontouchend={annotateTouch}
-								onclick={annotate}
-							>Annotate</button>
+								onclick={annotate}>Annotate</button
+							>
 						</div>
 					{:else if shouldShowInspect(selMenu.quote, settings.inspectEnabled)}
 						<div class="ann-dock-wrap">
@@ -11094,11 +12103,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 								onmousedown={noteMenuPress}
 								ontouchstart={noteMenuBtnTouch}
 								ontouchend={inspectTouch}
-								onclick={openInspect}
-							>Inspect</button>
+								onclick={openInspect}>Inspect</button
+							>
 						</div>
 					{/if}
-
 				{/if}
 				{#if annotations.length > 0}
 					<!-- New-annotations dock: unsent drafts filed from
@@ -11111,13 +12119,20 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							class="ann-pill"
 							bind:this={annPill}
 							title="Review annotations"
-							aria-label={annotations.length === 1 ? "1 unsent annotation" : `${annotations.length} unsent annotations`}
+							aria-label={annotations.length === 1
+								? "1 unsent annotation"
+								: `${annotations.length} unsent annotations`}
 							aria-expanded={reviewOpen}
 							onclick={() => (reviewOpen = !reviewOpen)}
 						>
 							{annotationCountLabel(annotations.length)}
 						</button>
-						<div class="review" role="dialog" aria-label="Annotations" data-fade-scroll>
+						<div
+							class="review"
+							role="dialog"
+							aria-label="Annotations"
+							data-fade-scroll
+						>
 							<div class="review-tools">
 								<button
 									type="button"
@@ -11169,7 +12184,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 									{#if editingId === ann.id}
 										<label>
 											<span class="review-label">-</span>
-											<textarea rows="2" bind:this={editBox} bind:value={editDraft} placeholder="Add an optional annotation…"
+											<textarea
+												rows="2"
+												bind:this={editBox}
+												bind:value={editDraft}
+												placeholder="Add an optional annotation…"
 												aria-label="Edit annotation. Enter saves, Shift+Enter adds a line, Escape cancels."
 												onkeydown={(e) => {
 													const action = reviewEditKey(e.key, e.shiftKey);
@@ -11182,11 +12201,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 														highlightAnnId = null;
 														focusPill();
 													}
-												}}
-											></textarea>
+												}}></textarea>
 										</label>
 										<div class="review-edit-actions">
-											<button type="button" onclick={() => saveEdit(ann.id)}>Save</button>
+											<button type="button" onclick={() => saveEdit(ann.id)}
+												>Save</button
+											>
 											<button
 												type="button"
 												onclick={() => {
@@ -11209,15 +12229,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 												title="Edit annotation"
 												aria-label="Edit annotation {n + 1}"
 												onclick={() => {
-												// Desktop edits at the mark in the
-												// floating card, phones in the
-												// composer (see
-												// editAnnotationAtMark) — the
-												// inline textarea below stays
-												// retired.
-												highlightAnnId = ann.id;
-												editAnnotationAtMark(ann.id);
-											}}
+													// Desktop edits at the mark in the
+													// floating card, phones in the
+													// composer (see
+													// editAnnotationAtMark) — the
+													// inline textarea below stays
+													// retired.
+													highlightAnnId = ann.id;
+													editAnnotationAtMark(ann.id);
+												}}
 											>
 												<ActionIcon kind="pencil" />
 											</button>
@@ -11246,7 +12266,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						class="mic-btn"
 						class:recording={dictating}
 						title={dictating ? "Stop dictation" : "Dictate into the prompt"}
-						aria-label={dictating ? "Stop dictation" : "Dictate into the prompt"}
+						aria-label={dictating
+							? "Stop dictation"
+							: "Dictate into the prompt"}
 						aria-pressed={dictating}
 						onclick={toggleMic}
 					>
@@ -11257,8 +12279,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					type="button"
 					class="voice-float"
 					class:on={voiceOn()}
-					title={speakingId !== null ? "Stop reading aloud" : tip(`Toggle voice readback (Ctrl+${altm}+S)`, "Toggle voice readback")}
-					aria-label={speakingId !== null ? "Stop reading aloud" : "Toggle voice readback"}
+					title={speakingId !== null
+						? "Stop reading aloud"
+						: tip(
+								`Toggle voice readback (Ctrl+${altm}+S)`,
+								"Toggle voice readback"
+							)}
+					aria-label={speakingId !== null
+						? "Stop reading aloud"
+						: "Toggle voice readback"}
 					aria-pressed={voiceOn()}
 					onclick={toggleVoice}
 				>
@@ -11290,27 +12319,33 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				ontouchend={sendHoldEnd}
 				ontouchmove={sendHoldEnd}
 				ontouchcancel={sendHoldEnd}
-			><button
-				type="button"
-				class="send-btn"
-				class:wide={altHeld}
-				disabled={!canSubmit}
-				title={altHeld
-					? androidUI
-						? "Stage"
-						: `Stage (${altm}+Enter)`
-					: activeReplyLang
+				><button
+					type="button"
+					class="send-btn"
+					class:wide={altHeld}
+					disabled={!canSubmit}
+					title={altHeld
 						? androidUI
-							? `Send in ${activeReplyLang.name} — repeat its number key to clear`
-							: `Send in ${activeReplyLang.name} (Enter) — repeat its number key to clear`
-						: androidUI
-							? "Send"
-							: "Send (Enter)"}
-				aria-label={altHeld ? "Stage" : activeReplyLang ? `Send in ${activeReplyLang.name}` : "Send"}
-				onclick={(event) => onSubmit(altHeld || event.altKey ? "stage" : "send")}
+							? "Stage"
+							: `Stage (${altm}+Enter)`
+						: activeReplyLang
+							? androidUI
+								? `Send in ${activeReplyLang.name} — repeat its number key to clear`
+								: `Send in ${activeReplyLang.name} (Enter) — repeat its number key to clear`
+							: androidUI
+								? "Send"
+								: "Send (Enter)"}
+					aria-label={altHeld
+						? "Stage"
+						: activeReplyLang
+							? `Send in ${activeReplyLang.name}`
+							: "Send"}
+					onclick={(event) =>
+						onSubmit(altHeld || event.altKey ? "stage" : "send")}
+				>
+					{altHeld ? "Add +" : activeReplyLang ? activeReplyLang.badge : "↑"}
+				</button></span
 			>
-				{altHeld ? "Add +" : activeReplyLang ? activeReplyLang.badge : "↑"}
-			</button></span>
 		</div>
 		{#if notices.banner.message && !androidUI}
 			<p class="error-banner" role="alert">{notices.banner.message}</p>
@@ -11319,7 +12354,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		{#if notices.voice.message && !androidUI}
 			<!-- Top notice, not the bottom banner: speech errors arrive
 			while the eyes are on the message, and a tap dismisses. -->
-			<button type="button" class="voice-error" title="Dismiss" transition:fade={{ duration: 160 }} onclick={() => setVoiceError(null)}>
+			<button
+				type="button"
+				class="voice-error"
+				title="Dismiss"
+				transition:fade={{ duration: 160 }}
+				onclick={() => setVoiceError(null)}
+			>
 				<span role="alert">{notices.voice.message}</span>
 			</button>
 		{/if}
@@ -11353,23 +12394,23 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					onmousedown={noteMenuPress}
 					onclick={() => void copySelection()}
 					ontouchstart={noteMenuBtnTouch}
-					ontouchend={copyTouch}
-				>Copy</button>
+					ontouchend={copyTouch}>Copy</button
+				>
 				<button
 					type="button"
 					onmousedown={noteMenuPress}
 					onclick={annotate}
 					ontouchstart={noteMenuBtnTouch}
-					ontouchend={annotateTouch}
-				>Annotate</button>
+					ontouchend={annotateTouch}>Annotate</button
+				>
 				<button
 					type="button"
 					aria-label="Speak selection"
 					onmousedown={noteMenuPress}
 					onclick={speakSelection}
 					ontouchstart={noteMenuBtnTouch}
-					ontouchend={speakTouch}
-				>Speak</button>
+					ontouchend={speakTouch}>Speak</button
+				>
 			{:else}
 				<!-- Desktop: Annotate floats above the highlight while
 				the OS bubble keeps its own slot. Copy and Read Aloud
@@ -11382,8 +12423,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					onmousedown={noteMenuPress}
 					onclick={annotate}
 					ontouchstart={noteMenuBtnTouch}
-					ontouchend={annotateTouch}
-				>Annotate</button>
+					ontouchend={annotateTouch}>Annotate</button
+				>
 				{#if shouldShowInspect(selMenu.quote, settings.inspectEnabled)}
 					<button
 						type="button"
@@ -11391,11 +12432,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						onmousedown={noteMenuPress}
 						ontouchstart={noteMenuBtnTouch}
 						ontouchend={inspectTouch}
-						onclick={openInspect}
-					>Inspect</button>
+						onclick={openInspect}>Inspect</button
+					>
 				{/if}
 			{/if}
-
 		</div>
 	{/if}
 
@@ -11410,7 +12450,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			class:above={selPinyin.above}
 			style="left: {selPinyin.x}px; top: {selPinyin.y}px"
 			aria-live="polite"
-		><!-- eslint-disable-line svelte/no-at-html-tags -- html is "…" or readingsOnly output (inert by unit test, see reading.ts) -->{@html selPinyin.html}</div>
+		>
+			<!-- eslint-disable-line svelte/no-at-html-tags -- html is "…" or readingsOnly output (inert by unit test, see reading.ts) -->{@html selPinyin.html}
+		</div>
 	{/if}
 
 	{#if annPop}
@@ -11441,8 +12483,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					const next = event.relatedTarget;
 					if (next instanceof Element && next.closest(".ann-pop")) return;
 					blurAnnPop();
-				}}
-			></textarea>
+				}}></textarea>
 			{#if annPop.fresh}
 				{#if canMic && settings.micEnabled}
 					<button
@@ -11471,54 +12512,56 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						class="ann-save ann-pill-save"
 						aria-label="Save annotation"
 						onmousedown={(e) => e.preventDefault()}
-						onclick={() => saveAnnPop()}
-					>↑</button>
+						onclick={() => saveAnnPop()}>↑</button
+					>
 				{/if}
 			{:else}
-			<div class="ann-pop-row">
-				<button
-					type="button"
-					class="ann-tool"
-					aria-label="Delete annotation"
-					title="Delete annotation"
-					onmousedown={(e) => e.preventDefault()}
-					onclick={() => {
-						if (annPop) {
-							removeAnnotation(annPop.id);
-							editor?.focus();
-						}
-					}}
-				>
-					<ActionIcon kind="delete" />
-				</button>
-				<span class="ann-pop-spacer"></span>
-				{#if canMic && settings.micEnabled}
-				<button
-					type="button"
-					class="ann-tool"
-					class:recording={pillDictating}
-					aria-label={pillDictating ? "Stop dictation" : "Dictate annotation"}
-					aria-pressed={pillDictating}
-					title="Dictate annotation"
-					onmousedown={(e) => e.preventDefault()}
-					onclick={togglePillMic}
-				>
-					<ActionIcon kind="mic" />
-				</button>
-				{/if}
-				<button
-					type="button"
-					class="ann-cancel"
-					onmousedown={(e) => e.preventDefault()}
-					onclick={cancelAnnPop}>Cancel</button
-				>
-				<button
-					type="button"
-					class="ann-save"
-					onmousedown={(e) => e.preventDefault()}
-					onclick={() => saveAnnPop()}>Save</button
-				>
-			</div>
+				<div class="ann-pop-row">
+					<button
+						type="button"
+						class="ann-tool"
+						aria-label="Delete annotation"
+						title="Delete annotation"
+						onmousedown={(e) => e.preventDefault()}
+						onclick={() => {
+							if (annPop) {
+								removeAnnotation(annPop.id);
+								editor?.focus();
+							}
+						}}
+					>
+						<ActionIcon kind="delete" />
+					</button>
+					<span class="ann-pop-spacer"></span>
+					{#if canMic && settings.micEnabled}
+						<button
+							type="button"
+							class="ann-tool"
+							class:recording={pillDictating}
+							aria-label={pillDictating
+								? "Stop dictation"
+								: "Dictate annotation"}
+							aria-pressed={pillDictating}
+							title="Dictate annotation"
+							onmousedown={(e) => e.preventDefault()}
+							onclick={togglePillMic}
+						>
+							<ActionIcon kind="mic" />
+						</button>
+					{/if}
+					<button
+						type="button"
+						class="ann-cancel"
+						onmousedown={(e) => e.preventDefault()}
+						onclick={cancelAnnPop}>Cancel</button
+					>
+					<button
+						type="button"
+						class="ann-save"
+						onmousedown={(e) => e.preventDefault()}
+						onclick={() => saveAnnPop()}>Save</button
+					>
+				</div>
 			{/if}
 		</div>
 	{/if}
@@ -11537,24 +12580,27 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// box itself). Text, controls, and anything inside them
 			// keep their behavior — including double-click text picks.
 			const t = e.target instanceof Element ? e.target : null;
-			if (t?.closest("aside, .settings-inner, section, fieldset") === t) settingsOpen = false;
+			if (t?.closest("aside, .settings-inner, section, fieldset") === t)
+				settingsOpen = false;
 		}}
 	>
 		<!-- Fixed-width inner: the panel clips instead of reflowing text mid-collapse. -->
 		<div class="settings-inner">
 			<SettingsPanel
-			settings={settings}
-			onToast={flashToast}
-			onClose={() => {
-			settingsOpen = false;
-			pulseCursor();
-		}}
-			onShortcuts={openShortcuts}
-			onExpand={zoomWindow}
-			tokensLabel="{formatTokens(split.prompt)} in / {formatTokens(split.completion)} out"
-			tokensTitle="{total} tokens total this chat"
-			androidUI={androidUI}
-		/>
+				{settings}
+				onToast={flashToast}
+				onClose={() => {
+					settingsOpen = false;
+					pulseCursor();
+				}}
+				onShortcuts={openShortcuts}
+				onExpand={zoomWindow}
+				tokensLabel="{formatTokens(split.prompt)} in / {formatTokens(
+					split.completion
+				)} out"
+				tokensTitle="{total} tokens total this chat"
+				{androidUI}
+			/>
 		</div>
 	</aside>
 
@@ -11588,9 +12634,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					onclick={() => stepSwitcher(-1)}>‹</button
 				>
 				<div class="switcher-mid">
-					<div class="switcher-title">{chatLabel(activeChat(chatState)?.createdAt ?? Date.now())}</div>
+					<div class="switcher-title">
+						{chatLabel(activeChat(chatState)?.createdAt ?? Date.now())}
+					</div>
 					<div class="switcher-pos">
-						{chatState.chats.findIndex((c) => c.id === chatState.activeChatId) + 1} / {chatState.chats.length}
+						{chatState.chats.findIndex((c) => c.id === chatState.activeChatId) +
+							1} / {chatState.chats.length}
 					</div>
 				</div>
 				<button
@@ -11617,7 +12666,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					title="Delete chat"
 					aria-label="Delete chat"
 					onclick={() => dropChat(chatState.activeChatId)}
-				><ActionIcon kind="delete" /></button
+					><ActionIcon kind="delete" /></button
 				>
 			</div>
 		</div>
@@ -11632,9 +12681,18 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				if (e.target === e.currentTarget) shortcutsOpen = false;
 			}}
 		>
-			<div class="modal" role="dialog" aria-modal="true" aria-labelledby={androidUI ? undefined : "shortcuts-heading"} aria-label={androidUI ? "Touch gestures" : undefined} data-fade-scroll>
+			<div
+				class="modal"
+				role="dialog"
+				aria-modal="true"
+				aria-labelledby={androidUI ? undefined : "shortcuts-heading"}
+				aria-label={androidUI ? "Touch gestures" : undefined}
+				data-fade-scroll
+			>
 				<div class="modal-head">
-					{#if !androidUI}<h2 id="shortcuts-heading">Keyboard shortcuts</h2>{/if}
+					{#if !androidUI}<h2 id="shortcuts-heading">
+							Keyboard shortcuts
+						</h2>{/if}
 					<input
 						type="search"
 						class="shortcuts-filter"
@@ -11659,19 +12717,25 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					so the same modal teaches the touch equivalents. -->
 					<dl class="keys">
 						{#each filteredShortcuts(touchShortcuts(), shortcutQuery) as row (row.name)}
-							<div><dt>{row.name}</dt><dd>{row.keys}</dd></div>
+							<div>
+								<dt>{row.name}</dt>
+								<dd>{row.keys}</dd>
+							</div>
 						{:else}
 							<div class="keys-empty">No matches</div>
 						{/each}
 					</dl>
 				{:else}
-				<dl class="keys">
-					{#each filteredShortcuts(desktopShortcuts(isMac), shortcutQuery) as row (row.name)}
-						<div><dt>{row.name}</dt><dd>{row.keys}</dd></div>
-					{:else}
-						<div class="keys-empty">No matches</div>
-					{/each}
-				</dl>
+					<dl class="keys">
+						{#each filteredShortcuts(desktopShortcuts(isMac), shortcutQuery) as row (row.name)}
+							<div>
+								<dt>{row.name}</dt>
+								<dd>{row.keys}</dd>
+							</div>
+						{:else}
+							<div class="keys-empty">No matches</div>
+						{/each}
+					</dl>
 				{/if}
 			</div>
 		</div>
@@ -11686,7 +12750,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				if (e.target === e.currentTarget) closeSearch();
 			}}
 		>
-			<div class="modal search-palette" role="dialog" aria-modal="true" aria-label="Search chats">
+			<div
+				class="modal search-palette"
+				role="dialog"
+				aria-modal="true"
+				aria-label="Search chats"
+			>
 				<div class="modal-head">
 					<input
 						type="search"
@@ -11713,7 +12782,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							}
 						}}
 					/>
-					<button type="button" aria-label="Close search" title="Close (Esc)" onclick={closeSearch}>
+					<button
+						type="button"
+						aria-label="Close search"
+						title="Close (Esc)"
+						onclick={closeSearch}
+					>
 						×
 					</button>
 				</div>
@@ -11760,7 +12834,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		</div>
 	{/if}
 	{#if inspectChar && inspectData}
-		{@const strokeTotal = inspectStrokes?.length ?? inspectData.strokeCount ?? 0}
+		{@const strokeTotal =
+			inspectStrokes?.length ?? inspectData.strokeCount ?? 0}
 		{@const strokeShown = Math.min(inspectStroke, Math.max(strokeTotal, 1))}
 		{@const onKunInspect = onKunLine(inspectData)}
 		{@const decompInspect = inspectChar ? decomposeTree(inspectChar) : null}
@@ -11782,9 +12857,20 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				if (e.target === e.currentTarget) inspectChar = null;
 			}}
 		>
-			<div class="modal inspect-modal" role="dialog" aria-modal="true" aria-labelledby="inspect-heading" data-fade-scroll ontouchend={buzzInspectTap}>
+			<div
+				class="modal inspect-modal"
+				role="dialog"
+				aria-modal="true"
+				aria-labelledby="inspect-heading"
+				data-fade-scroll
+				ontouchend={buzzInspectTap}
+			>
 				<div class="modal-head">
-					<h2 id="inspect-heading">Inspect <span lang={HAN_OVERLAY_LANG_TAG[inspectLang]}>{inspectData.char}</span></h2>
+					<h2 id="inspect-heading">
+						Inspect <span lang={HAN_OVERLAY_LANG_TAG[inspectLang]}
+							>{inspectData.char}</span
+						>
+					</h2>
 					<button
 						type="button"
 						aria-label="Close character inspect"
@@ -11801,15 +12887,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							aria-pressed={inspectLang === "ja"}
 							aria-label="Show Japanese reading"
 							title="Show Japanese reading"
-							onclick={() => (inspectLang = "ja")}
-						>日本語</button>
+							onclick={() => (inspectLang = "ja")}>日本語</button
+						>
 						<button
 							type="button"
 							aria-pressed={inspectLang === "zh"}
 							aria-label="Show Chinese reading"
 							title="Show Chinese reading"
-							onclick={() => (inspectLang = "zh")}
-						>中文</button>
+							onclick={() => (inspectLang = "zh")}>中文</button
+						>
 					</div>
 				{/if}
 				<div class="inspect-body">
@@ -11824,11 +12910,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 								aria-label={`Stroke order for ${inspectChar}`}
 							>
 								{#each inspectStrokes as d, i (i)}
-									<path d={d} class:painted={i < strokeShown} />
+									<path {d} class:painted={i < strokeShown} />
 								{/each}
 							</svg>
 						{:else}
-							<div class="inspect-char" lang={HAN_OVERLAY_LANG_TAG[inspectLang]} aria-hidden="true">
+							<div
+								class="inspect-char"
+								lang={HAN_OVERLAY_LANG_TAG[inspectLang]}
+								aria-hidden="true"
+							>
 								{inspectData.char}
 							</div>
 						{/if}
@@ -11848,7 +12938,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 									onpointercancel={stopStrokeHold}
 									onclick={() => strokeStep(-1)}>‹</button
 								>
-								<span class="inspect-count" aria-live="polite">{strokeShown} / {strokeTotal}</span>
+								<span class="inspect-count" aria-live="polite"
+									>{strokeShown} / {strokeTotal}</span
+								>
 								<button
 									type="button"
 									aria-label="Next stroke (l)"
@@ -11865,34 +12957,53 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					</div>
 					<div class="inspect-facts">
 						{#if inspectData.components.length > 0}
-							<p><strong>Components:</strong> {inspectData.components.join(" + ")}</p>
+							<p>
+								<strong>Components:</strong>
+								{inspectData.components.join(" + ")}
+							</p>
 						{:else}
-							<p class="note">Component breakdown unavailable offline for this character.</p>
+							<p class="note">
+								Component breakdown unavailable offline for this character.
+							</p>
 						{/if}
 						{#if inspectData.strokeCount !== null}
 							<p><strong>Strokes:</strong> {inspectData.strokeCount}</p>
 						{:else}
-							<p class="note">Stroke count unavailable offline for this character.</p>
+							<p class="note">
+								Stroke count unavailable offline for this character.
+							</p>
 						{/if}
 						{#if inspectData.radical !== null && inspectData.radicalRest !== null}
-							<p><strong>Radical:</strong> {inspectData.radical} + {inspectData.radicalRest}</p>
+							<p>
+								<strong>Radical:</strong>
+								{inspectData.radical} + {inspectData.radicalRest}
+							</p>
 						{/if}
 						{#if inspectData.definition !== null}
 							<p><strong>Definition:</strong> {inspectData.definition}</p>
 						{:else}
-							<p class="note">Unihan definition unavailable offline for this character.</p>
+							<p class="note">
+								Unihan definition unavailable offline for this character.
+							</p>
 						{/if}
 						{#if inspectLang === "zh"}
 							{#if inspectData.mandarin !== null}
-								<p><strong>Mandarin:</strong> <span lang="zh-Latn-pinyin">{inspectData.mandarin}</span></p>
+								<p>
+									<strong>Mandarin:</strong>
+									<span lang="zh-Latn-pinyin">{inspectData.mandarin}</span>
+								</p>
 							{:else}
-								<p class="note">Mandarin reading unavailable offline for this character.</p>
+								<p class="note">
+									Mandarin reading unavailable offline for this character.
+								</p>
 							{/if}
 						{:else}
 							{#if onKunInspect !== null}
 								<p class="inspect-onkun">{onKunInspect}</p>
 							{:else}
-								<p class="note">Japanese readings unavailable offline for this character.</p>
+								<p class="note">
+									Japanese readings unavailable offline for this character.
+								</p>
 							{/if}
 						{/if}
 					</div>
@@ -11906,25 +13017,32 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 								<span class="inspect-decomp-char">{child.char}</span>
 								{#if child.children.length > 0}
 									<span class="inspect-decomp-sub">
-										<span class="inspect-decomp-arrow" aria-hidden="true">→</span>
+										<span class="inspect-decomp-arrow" aria-hidden="true"
+											>→</span
+										>
 										{#each child.children as grand, gi (gi)}
-											<span class="inspect-decomp-char sub">{grand.char}</span>{#if gi < child.children.length - 1}<span
+											<span class="inspect-decomp-char sub">{grand.char}</span
+											>{#if gi < child.children.length - 1}<span
 													class="inspect-decomp-plus"
 													aria-hidden="true"
-													> + </span
-												>{/if}
+												>
+													+
+												</span>{/if}
 										{/each}
 									</span>
 								{/if}
 							</span>{#if ci < decompInspect.children.length - 1}<span
 									class="inspect-decomp-plus"
 									aria-hidden="true"
-									> + </span
-								>{/if}
+								>
+									+
+								</span>{/if}
 						{/each}
 					</div>
 				{:else}
-					<p class="note">No decomposition in the vendored subset for this character.</p>
+					<p class="note">
+						No decomposition in the vendored subset for this character.
+					</p>
 				{/if}
 			</div>
 		</div>
@@ -11935,7 +13053,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	artifact, not a theme snapshot. -->
 	<section id="study-sheet-print" aria-hidden="true">
 		<h1>{sheetTitle(chat.messages)}</h1>
-		<p class="sheet-sub">Ccez LLM study sheet — {chat.messages.length} message{chat.messages.length === 1 ? "" : "s"}.</p>
+		<p class="sheet-sub">
+			Ccez LLM study sheet — {chat.messages.length} message{chat.messages
+				.length === 1
+				? ""
+				: "s"}.
+		</p>
 		{#each chat.messages as msg (msg.id)}
 			<h2>{msg.role === "user" ? "You" : "Ccez"}</h2>
 			<p>{msg.content}</p>
@@ -14025,7 +15148,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		right past AI width on narrow windows. */
 		width: fit-content;
 		max-width: min(100%, calc(var(--chat-width, 36) * 1rem));
-		margin-right: max(0rem, calc((100% - min(100%, var(--chat-width, 36) * 1rem)) / 2));
+		margin-right: max(
+			0rem,
+			calc((100% - min(100%, var(--chat-width, 36) * 1rem)) / 2)
+		);
 		/* No background or padding here: the bubble wraps the text only,
 		so the action row below sits outside it. */
 		padding: 0;
@@ -14044,8 +15170,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		unbounded scale domes the top corners and squeezes the text into
 		a tall tower with dead gray shoulders. */
 		border-radius: calc(1.75rem * min(var(--font-scale, 1), 2));
-		padding:
-			calc(0.45rem * min(var(--font-scale, 1), 2))
+		padding: calc(0.45rem * min(var(--font-scale, 1), 2))
 			calc(1rem * min(var(--font-scale, 1), 2))
 			calc(0.55rem * min(var(--font-scale, 1), 2));
 		text-align: left;
@@ -14099,8 +15224,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		background: var(--bg-wash);
 		border: 0;
 		border-radius: calc(1.75rem * min(var(--font-scale, 1), 2));
-		padding:
-			calc(0.45rem * min(var(--font-scale, 1), 2))
+		padding: calc(0.45rem * min(var(--font-scale, 1), 2))
 			calc(1rem * min(var(--font-scale, 1), 2))
 			calc(0.55rem * min(var(--font-scale, 1), 2));
 		width: 100%;
@@ -15490,7 +16614,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	}
 	/* Light theme Save: the accent fill like the send button (dark keeps
 	the inverted fill). Cancel rides the quiet rule below, untouched. */
-	:global(html[data-theme="light"]) .review-edit-actions button:not(:last-child) {
+	:global(html[data-theme="light"])
+		.review-edit-actions
+		button:not(:last-child) {
 		border-color: #007aff;
 		border-color: var(--accent);
 		background: #007aff;
@@ -15871,7 +16997,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		pointer-events: none;
 		will-change: opacity;
 	}
-	.app[data-android] main.hide-buttons article[data-actions-open="true"] .actions {
+	.app[data-android]
+		main.hide-buttons
+		article[data-actions-open="true"]
+		.actions {
 		opacity: 1;
 		pointer-events: auto;
 	}
@@ -15885,10 +17014,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	/* The row scales with the text-size opt-in like the
 	desktop rows (same cap), so huge type never strands tiny
 	buttons — and never domes them past 200%. */
-	.app[data-android]
-		main.hide-buttons.scale-actions
-		.actions
-		button {
+	.app[data-android] main.hide-buttons.scale-actions .actions button {
 		font-size: calc(0.75rem * min(var(--font-scale, 1), 2));
 	}
 	.app[data-android]
@@ -15997,13 +17123,19 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	play first. DOM order stays copy-first for keyboard and readers;
 	the audio button keeps the default seat (right after the speaking
 	slot) while everything else files behind it by hook. */
-	.app[data-android] article.user .actions button[data-tip="Copy as plain text"] {
+	.app[data-android]
+		article.user
+		.actions
+		button[data-tip="Copy as plain text"] {
 		order: 2;
 	}
 	.app[data-android] article.user .actions button[data-tip="Branch from here"] {
 		order: 3;
 	}
-	.app[data-android] article.user .actions button[data-tip^="Delete this message"] {
+	.app[data-android]
+		article.user
+		.actions
+		button[data-tip^="Delete this message"] {
 		order: 4;
 	}
 	.app[data-android] article.user .actions button[data-tip="Edit"] {

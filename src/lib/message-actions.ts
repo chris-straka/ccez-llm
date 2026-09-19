@@ -44,6 +44,9 @@ export function toggleSingleAid(
  * rule as F fold, own messages only. Structural rows (only `role`
  * matters), so tests never build full messages.
  */
-export function canEditMessage(messages: { role: string }[], hoveredIdx: number): boolean {
+export function canEditMessage(
+	messages: { role: string }[],
+	hoveredIdx: number
+): boolean {
 	return messages[hoveredIdx]?.role === "user";
 }

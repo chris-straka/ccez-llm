@@ -51,7 +51,10 @@ export function imageTokens(width: number, height: number): number {
 }
 
 /** Target dimensions fitting inside IMAGE_MAX_DIM, preserving aspect ratio. */
-export function fitDimensions(width: number, height: number): { width: number; height: number } {
+export function fitDimensions(
+	width: number,
+	height: number
+): { width: number; height: number } {
 	const scale = Math.min(1, IMAGE_MAX_DIM / Math.max(width, height));
 	return {
 		width: Math.max(1, Math.round(width * scale)),
@@ -111,11 +114,52 @@ const TEXT_MIMES = [
 ];
 
 const TEXT_EXTENSIONS = [
-	"txt", "md", "markdown", "json", "js", "ts", "tsx", "jsx", "mjs", "cjs",
-	"py", "rb", "go", "rs", "java", "c", "h", "cpp", "hpp", "cs", "swift",
-	"kt", "php", "sh", "bash", "zsh", "yaml", "yml", "toml", "xml", "html",
-	"css", "scss", "sql", "csv", "tsv", "log", "ini", "cfg", "conf", "env",
-	"dockerfile", "gitignore", "svelte", "vue", "rs"
+	"txt",
+	"md",
+	"markdown",
+	"json",
+	"js",
+	"ts",
+	"tsx",
+	"jsx",
+	"mjs",
+	"cjs",
+	"py",
+	"rb",
+	"go",
+	"rs",
+	"java",
+	"c",
+	"h",
+	"cpp",
+	"hpp",
+	"cs",
+	"swift",
+	"kt",
+	"php",
+	"sh",
+	"bash",
+	"zsh",
+	"yaml",
+	"yml",
+	"toml",
+	"xml",
+	"html",
+	"css",
+	"scss",
+	"sql",
+	"csv",
+	"tsv",
+	"log",
+	"ini",
+	"cfg",
+	"conf",
+	"env",
+	"dockerfile",
+	"gitignore",
+	"svelte",
+	"vue",
+	"rs"
 ];
 
 /** Cap inlined file text so one attachment can't blow the context window. */
@@ -156,8 +200,13 @@ export async function fileToAttachment(file: File): Promise<Attachment> {
 	}
 	if (isTextFile(file)) {
 		const raw = await file.text();
-		const text = raw.length > MAX_FILE_CHARS ? raw.slice(0, MAX_FILE_CHARS) : raw;
-		return textAttachment(file.name || "pasted-text", file.type || "text/plain", text);
+		const text =
+			raw.length > MAX_FILE_CHARS ? raw.slice(0, MAX_FILE_CHARS) : raw;
+		return textAttachment(
+			file.name || "pasted-text",
+			file.type || "text/plain",
+			text
+		);
 	}
 	// PDF/docx carry no usable `File.text()`: pull the text out of the
 	// raw bytes offline (no downloads, no server) and inline it like
@@ -167,18 +216,28 @@ export async function fileToAttachment(file: File): Promise<Attachment> {
 		const bytes = new Uint8Array(await file.arrayBuffer());
 		const raw = extractAttachmentBytes(format, bytes)?.trim() ?? "";
 		if (raw) {
-			const text = raw.length > MAX_FILE_CHARS ? raw.slice(0, MAX_FILE_CHARS) : raw;
-			return textAttachment(file.name || `pasted-${format}`, file.type || format, text);
+			const text =
+				raw.length > MAX_FILE_CHARS ? raw.slice(0, MAX_FILE_CHARS) : raw;
+			return textAttachment(
+				file.name || `pasted-${format}`,
+				file.type || format,
+				text
+			);
 		}
 	}
-	throw new Error(`Unsupported attachment: ${file.name || file.type || "unknown file"}`);
+	throw new Error(
+		`Unsupported attachment: ${file.name || file.type || "unknown file"}`
+	);
 }
 
 /** Every attachment tag (they never overlap, so scan order only reads). */
 const ATTACHMENT_TAGS = [IMAGE_MARKER, FILE_MARKER];
 
 /** Earliest tag occurrence at or after `from`, or null. Pure. */
-function nextTag(line: string, from: number): { at: number; tag: string } | null {
+function nextTag(
+	line: string,
+	from: number
+): { at: number; tag: string } | null {
 	let found: { at: number; tag: string } | null = null;
 	for (const tag of ATTACHMENT_TAGS) {
 		const at = line.indexOf(tag, from);
@@ -203,7 +262,8 @@ export function removeTags(line: string): {
 	let hit = nextTag(line, cursor);
 	while (hit !== null) {
 		out += line.slice(cursor, hit.at);
-		const end = hit.at + hit.tag.length + (line[hit.at + hit.tag.length] === " " ? 1 : 0);
+		const end =
+			hit.at + hit.tag.length + (line[hit.at + hit.tag.length] === " " ? 1 : 0);
 		cuts.push({ start: hit.at, end });
 		cursor = end;
 		hit = nextTag(line, cursor);
@@ -234,7 +294,8 @@ export function stripAttachmentMarkers(text: string): string {
 	return text
 		.split("\n")
 		.flatMap((line) => {
-			if (!line.includes(IMAGE_MARKER) && !line.includes(FILE_MARKER)) return [line];
+			if (!line.includes(IMAGE_MARKER) && !line.includes(FILE_MARKER))
+				return [line];
 			const { text: out } = removeTags(line);
 			return out.trim() === "" ? [] : [out];
 		})
@@ -251,7 +312,8 @@ export function stripAttachmentMarkers(text: string): string {
  */
 function markerPrefix(doc: string, afterPaste = false): string {
 	if (doc === "" || doc.endsWith("\n")) return "";
-	if (doc.endsWith(`${IMAGE_MARKER} `) || doc.endsWith(`${FILE_MARKER} `)) return "";
+	if (doc.endsWith(`${IMAGE_MARKER} `) || doc.endsWith(`${FILE_MARKER} `))
+		return "";
 	// Right after a collapsed paste: the tag rides the same line, one
 	// space apart (never a newline of its own).
 	if (afterPaste) return doc.endsWith(" ") ? "" : " ";
@@ -306,7 +368,11 @@ export function countPastedTags(text: string): number {
  * the image/file tags (same line, one trailing space, caret after
  * it). Pure and unit-tested.
  */
-export function pastedMarkerInsert(doc: string, chars: number, afterPaste = false): string {
+export function pastedMarkerInsert(
+	doc: string,
+	chars: number,
+	afterPaste = false
+): string {
 	return `${markerPrefix(doc, afterPaste)}${pastedTextMarker(chars)} `;
 }
 
@@ -314,7 +380,8 @@ export function pastedMarkerInsert(doc: string, chars: number, afterPaste = fals
  * caller already holds the string, so this stays synchronous). Text
  * caps like file drops so one paste can't blow the context window. */
 export function makePastedTextAttachment(text: string): Attachment {
-	const capped = text.length > MAX_FILE_CHARS ? text.slice(0, MAX_FILE_CHARS) : text;
+	const capped =
+		text.length > MAX_FILE_CHARS ? text.slice(0, MAX_FILE_CHARS) : text;
 	return {
 		id: newId(),
 		name: "Pasted text",
@@ -347,7 +414,10 @@ export function isPastedTextAttachment(att: Attachment): boolean {
 export function splicePastedFolds(
 	doc: string,
 	texts: string[]
-): { text: string; folds: Array<{ start: number; end: number; chars: number }> } {
+): {
+	text: string;
+	folds: Array<{ start: number; end: number; chars: number }>;
+} {
 	const folds: Array<{ start: number; end: number; chars: number }> = [];
 	let out = "";
 	let last = 0;
@@ -424,7 +494,10 @@ export function splicePastedText(doc: string, texts: string[]): string {
  * indexes (tag deletions carry their positions now, not just counts).
  * Out-of-range and negative indexes drop nothing. Pure.
  */
-export function dropPastedAttachmentsAtIndexes(list: Attachment[], indexes: number[]): Attachment[] {
+export function dropPastedAttachmentsAtIndexes(
+	list: Attachment[],
+	indexes: number[]
+): Attachment[] {
 	const drop = new Set(indexes.filter((i) => i >= 0));
 	let seen = -1;
 	return list.filter((att) => {
@@ -439,7 +512,10 @@ export function dropPastedAttachmentsAtIndexes(list: Attachment[], indexes: numb
  * document-order indexes. Pasted-text attachments share kind "text"
  * but pair with `[Pasted N chars]` tags, never file tags. Pure.
  */
-export function dropFileAttachmentsAtIndexes(list: Attachment[], indexes: number[]): Attachment[] {
+export function dropFileAttachmentsAtIndexes(
+	list: Attachment[],
+	indexes: number[]
+): Attachment[] {
 	const drop = new Set(indexes.filter((i) => i >= 0));
 	let seen = -1;
 	return list.filter((att) => {
@@ -482,7 +558,9 @@ export async function attachmentImageBlobs(
 	count: number
 ): Promise<Blob[]> {
 	if (count <= 0) return [];
-	const imgs = list.filter((att) => att.kind === "image" && att.dataUrl).slice(-count);
+	const imgs = list
+		.filter((att) => att.kind === "image" && att.dataUrl)
+		.slice(-count);
 	return fetchAttachmentBlobs(imgs);
 }
 
@@ -519,7 +597,10 @@ export async function attachmentImageBlobsAt(
  * indexes, read synchronously for same-event clipboard setData.
  * Null entries (no bytes) are skipped downstream. Pure.
  */
-export function attachmentDataUrlsAt(list: Attachment[], indexes: number[]): (string | null)[] {
+export function attachmentDataUrlsAt(
+	list: Attachment[],
+	indexes: number[]
+): (string | null)[] {
 	const imgs = list.filter((att) => att.kind === "image");
 	return indexes.map((i) => imgs[i]?.dataUrl ?? null);
 }
@@ -579,7 +660,9 @@ export async function clipboardPngBlob(blob: Blob): Promise<Blob> {
 		const ctx = canvas.getContext("2d");
 		if (!ctx) return blob;
 		ctx.drawImage(bitmap, 0, 0);
-		const png = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+		const png = await new Promise<Blob | null>((resolve) =>
+			canvas.toBlob(resolve, "image/png")
+		);
 		return png ?? blob;
 	} catch {
 		return blob;
@@ -596,11 +679,18 @@ export async function clipboardPngBlob(blob: Blob): Promise<Blob> {
  * undo and cross-editor flows) drop the excess. Tags are the expressed
  * intent: never deleted silently here, never resurrected.
  */
-export function reconcileDropCount(atts: number, tags: number, prev: number): number {
+export function reconcileDropCount(
+	atts: number,
+	tags: number,
+	prev: number
+): number {
 	return Math.max(0, prev - tags, atts - tags);
 }
 
-export function countMarkers(text: string, marker: string = IMAGE_MARKER): number {
+export function countMarkers(
+	text: string,
+	marker: string = IMAGE_MARKER
+): number {
 	return text.split(marker).length - 1;
 }
 
@@ -611,7 +701,10 @@ export function countMarkers(text: string, marker: string = IMAGE_MARKER): numbe
  * tags vanish — while prose typed beside the tag survives. Pure and
  * unit-tested.
  */
-export function removeMarker(text: string, marker: string = IMAGE_MARKER): string {
+export function removeMarker(
+	text: string,
+	marker: string = IMAGE_MARKER
+): string {
 	return removeMarkerAt(text, marker, 0);
 }
 
@@ -737,7 +830,8 @@ export function extractAttachmentTags(markdownText: string): {
 	let out = "";
 	let i = 0;
 	const len = markdownText.length;
-	const lineStart = (pos: number): boolean => pos === 0 || markdownText[pos - 1] === "\n";
+	const lineStart = (pos: number): boolean =>
+		pos === 0 || markdownText[pos - 1] === "\n";
 	while (i < len) {
 		// Fenced code block: skip whole lines from opener to closer (or EOF).
 		if (lineStart(i) && markdownText.startsWith("```", i)) {
@@ -801,7 +895,10 @@ export function extractAttachmentTags(markdownText: string): {
  * kind are consumed by the N literals of that kind, the rest render
  * in the tag strip above the message. Pure and unit-tested.
  */
-export function leftoverAttachments(attachments: Attachment[], text: string): Attachment[] {
+export function leftoverAttachments(
+	attachments: Attachment[],
+	text: string
+): Attachment[] {
 	const { tags } = extractAttachmentTags(text);
 	const literals = { image: 0, text: 0 };
 	for (const tag of tags) literals[tag.kind]++;

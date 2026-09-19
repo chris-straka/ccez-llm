@@ -13,7 +13,9 @@ test.beforeEach(async ({ page }) => {
 	});
 	await seedChat(page, [{ role: "user", content: "hi" }]);
 	await page.goto("/");
-	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
 	await page.keyboard.press("Meta+,");
 	await expect(page.locator(".settings-panel")).not.toHaveClass(/closed/);
 });
@@ -29,7 +31,9 @@ test("update check toasts instead of popping the layout", async ({ page }) => {
 		});
 	const before = await height();
 	await panel.locator('button:has-text("Check for updates")').click();
-	await expect(page.locator(".toast")).toContainText("Dev builds don't check for updates");
+	await expect(page.locator(".toast")).toContainText(
+		"Dev builds don't check for updates"
+	);
 	await expect(panel.locator("p.result")).toHaveCount(0);
 	// No inline status block grew the panel content.
 	await expect.poll(height).toBe(before);

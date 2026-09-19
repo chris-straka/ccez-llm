@@ -1,5 +1,19 @@
 import { describe, it, expect } from "vitest";
-import { trimPasteTail, sendPasteFolds, pasteToggleAction, markerCut, markerCutAt, pastedCutAt, attachTagRanges, tagCopyPlan, tagCopyIndexes, removedMarkerIndexes, dataUrlsToImageFiles, expandDeletionUnits, collapsedPasteInsert } from "./editor";
+import {
+	trimPasteTail,
+	sendPasteFolds,
+	pasteToggleAction,
+	markerCut,
+	markerCutAt,
+	pastedCutAt,
+	attachTagRanges,
+	tagCopyPlan,
+	tagCopyIndexes,
+	removedMarkerIndexes,
+	dataUrlsToImageFiles,
+	expandDeletionUnits,
+	collapsedPasteInsert
+} from "./editor";
 import {
 	stripAttachmentMarkers,
 	removeMarker,
@@ -15,7 +29,10 @@ describe("collapsedPasteInsert", () => {
 		const text = "lorem ipsum dolor sit amet";
 		const collapsed = collapsedPasteInsert(7, text);
 		expect(collapsed.insert).toBe(`${text} `);
-		expect([collapsed.pasteFrom, collapsed.pasteTo]).toEqual([7, 7 + text.length]);
+		expect([collapsed.pasteFrom, collapsed.pasteTo]).toEqual([
+			7,
+			7 + text.length
+		]);
 		expect(collapsed.chars).toBe(text.length);
 		expect(collapsed.anchor).toBe(7 + text.length + 1);
 	});
@@ -73,21 +90,27 @@ describe("sendPasteFolds", () => {
 
 	it("maps a basic span into send coordinates", () => {
 		const doc = "hello PASTED world";
-		const { text, folds } = sendPasteFolds(doc, [{ from: 6, to: 12, chars: 6 }]);
+		const { text, folds } = sendPasteFolds(doc, [
+			{ from: 6, to: 12, chars: 6 }
+		]);
 		expect(text).toBe(doc);
 		expect(folds).toEqual([{ start: 6, end: 12, chars: 6 }]);
 	});
 
 	it("shifts spans past marker lines and trim", () => {
 		const doc = `\n\n${IMAGE_MARKER}\nhello PASTED`;
-		const { text, folds } = sendPasteFolds(doc, [{ from: 23, to: 29, chars: 6 }]);
+		const { text, folds } = sendPasteFolds(doc, [
+			{ from: 23, to: 29, chars: 6 }
+		]);
 		expect(text).toBe("hello PASTED");
 		expect(folds).toEqual([{ start: 6, end: 12, chars: 6 }]);
 	});
 
 	it("drops spans touched by stripping instead of misplacing them", () => {
 		const doc = `aaa\n${IMAGE_MARKER}\nbbb`;
-		expect(sendPasteFolds(doc, [{ from: 2, to: 24, chars: 22 }]).folds).toEqual([]);
+		expect(sendPasteFolds(doc, [{ from: 2, to: 24, chars: 22 }]).folds).toEqual(
+			[]
+		);
 	});
 
 	it("drops invalid spans and sorts the rest", () => {
@@ -151,7 +174,8 @@ describe("markerCut", () => {
 					expect(cut).toBeNull();
 				} else {
 					expect(cut).not.toBeNull();
-					const applied = doc.slice(0, cut!.from) + cut!.insert + doc.slice(cut!.to);
+					const applied =
+						doc.slice(0, cut!.from) + cut!.insert + doc.slice(cut!.to);
 					expect(applied).toBe(expected);
 				}
 			}
@@ -159,7 +183,11 @@ describe("markerCut", () => {
 	});
 	it("drops a blank host line with its newline, keeps beside-prose", () => {
 		const cut = markerCut(`a\n${IMAGE_MARKER}\nb`, IMAGE_MARKER);
-		expect(cut).toEqual({ from: 2, to: 2 + IMAGE_MARKER.length + 1, insert: "" });
+		expect(cut).toEqual({
+			from: 2,
+			to: 2 + IMAGE_MARKER.length + 1,
+			insert: ""
+		});
 		const kept = markerCut(`${IMAGE_MARKER} describe`, IMAGE_MARKER);
 		expect(kept).toEqual({
 			from: 0,
@@ -171,10 +199,13 @@ describe("markerCut", () => {
 	it("anchors the cut at the index-th occurrence", () => {
 		const two = `${IMAGE_MARKER} one\n${IMAGE_MARKER} two`;
 		// Index 0 is the legacy cut exactly.
-		expect(markerCutAt(two, IMAGE_MARKER, 0)).toEqual(markerCut(two, IMAGE_MARKER));
+		expect(markerCutAt(two, IMAGE_MARKER, 0)).toEqual(
+			markerCut(two, IMAGE_MARKER)
+		);
 		const second = markerCutAt(two, IMAGE_MARKER, 1);
 		expect(second).not.toBeNull();
-		const applied = two.slice(0, second!.from) + second!.insert + two.slice(second!.to);
+		const applied =
+			two.slice(0, second!.from) + second!.insert + two.slice(second!.to);
 		expect(applied).toBe(`${IMAGE_MARKER} one\ntwo`);
 		// Out-of-range indexes cut nothing.
 		expect(markerCutAt(two, IMAGE_MARKER, 2)).toBeNull();
@@ -199,7 +230,10 @@ describe("tagCopyPlan", () => {
 			text: `${IMAGE_MARKER} `,
 			imageTags: 1
 		});
-		expect(tagCopyPlan(`see ${IMAGE_MARKER} and ${IMAGE_MARKER} end`, true)?.imageTags).toBe(2);
+		expect(
+			tagCopyPlan(`see ${IMAGE_MARKER} and ${IMAGE_MARKER} end`, true)
+				?.imageTags
+		).toBe(2);
 	});
 });
 
@@ -251,7 +285,9 @@ describe("removedMarkerIndexes", () => {
 		// … and the second reports index 1 (the desync fix: the host
 		// drops the matching attachment, not the newest).
 		const secondStart = firstEnd + 1;
-		expect(removedMarkerIndexes(two, [{ from: secondStart, to: two.length }])).toEqual({
+		expect(
+			removedMarkerIndexes(two, [{ from: secondStart, to: two.length }])
+		).toEqual({
 			image: [1],
 			file: []
 		});
@@ -259,13 +295,18 @@ describe("removedMarkerIndexes", () => {
 
 	it("separates kinds and spans whole-document wipes", () => {
 		const mixed = `${IMAGE_MARKER} ${FILE_MARKER} ${IMAGE_MARKER}`;
-		expect(removedMarkerIndexes(mixed, [{ from: 0, to: mixed.length }])).toEqual({
+		expect(
+			removedMarkerIndexes(mixed, [{ from: 0, to: mixed.length }])
+		).toEqual({
 			image: [0, 1],
 			file: [0]
 		});
 		// Empty and inverted ranges remove nothing.
 		expect(removedMarkerIndexes(two, [])).toEqual({ image: [], file: [] });
-		expect(removedMarkerIndexes(two, [{ from: 4, to: 4 }])).toEqual({ image: [], file: [] });
+		expect(removedMarkerIndexes(two, [{ from: 4, to: 4 }])).toEqual({
+			image: [],
+			file: []
+		});
 	});
 });
 
@@ -275,14 +316,21 @@ describe("dataUrlsToImageFiles", () => {
 
 	it("rehydrates data URLs into paste-ready files in order", async () => {
 		const files = await dataUrlsToImageFiles([PNG, PNG]);
-		expect(files.map((f) => f.name)).toEqual(["pasted-image-0.png", "pasted-image-1.png"]);
+		expect(files.map((f) => f.name)).toEqual([
+			"pasted-image-0.png",
+			"pasted-image-1.png"
+		]);
 		expect(files[0]?.type).toBe("image/png");
 		expect(files[0]?.size).toBeGreaterThan(0);
 	});
 
 	it("skips non-data and unreadable entries", async () => {
-		await expect(dataUrlsToImageFiles(["https://example.com/a.png"])).resolves.toEqual([]);
-		await expect(dataUrlsToImageFiles(["data:image/png;base64,!!!"])).resolves.toEqual([]);
+		await expect(
+			dataUrlsToImageFiles(["https://example.com/a.png"])
+		).resolves.toEqual([]);
+		await expect(
+			dataUrlsToImageFiles(["data:image/png;base64,!!!"])
+		).resolves.toEqual([]);
 		await expect(dataUrlsToImageFiles([])).resolves.toEqual([]);
 	});
 });
@@ -290,24 +338,34 @@ describe("dataUrlsToImageFiles", () => {
 describe("expandDeletionUnits", () => {
 	const tag = IMAGE_MARKER; // "[Pasted image]", 14 chars
 	it("leaves prose deletions alone", () => {
-		expect(expandDeletionUnits("hello world", [], [{ from: 5, to: 6 }])).toEqual([
-			{ from: 5, to: 6 }
-		]);
+		expect(
+			expandDeletionUnits("hello world", [], [{ from: 5, to: 6 }])
+		).toEqual([{ from: 5, to: 6 }]);
 		expect(expandDeletionUnits("", [], [])).toEqual([]);
 	});
 
 	it("takes the whole tag from any touch", () => {
 		const doc = `${tag} `;
 		// Backspace inside, Delete at the start, Backspace at the end.
-		expect(expandDeletionUnits(doc, [], [{ from: 5, to: 6 }])).toEqual([{ from: 0, to: 14 }]);
-		expect(expandDeletionUnits(doc, [], [{ from: 0, to: 1 }])).toEqual([{ from: 0, to: 14 }]);
-		expect(expandDeletionUnits(doc, [], [{ from: 13, to: 14 }])).toEqual([{ from: 0, to: 14 }]);
+		expect(expandDeletionUnits(doc, [], [{ from: 5, to: 6 }])).toEqual([
+			{ from: 0, to: 14 }
+		]);
+		expect(expandDeletionUnits(doc, [], [{ from: 0, to: 1 }])).toEqual([
+			{ from: 0, to: 14 }
+		]);
+		expect(expandDeletionUnits(doc, [], [{ from: 13, to: 14 }])).toEqual([
+			{ from: 0, to: 14 }
+		]);
 	});
 
 	it("spares neighbors the tag merely borders", () => {
 		const doc = `${tag} x`;
-		expect(expandDeletionUnits(doc, [], [{ from: 14, to: 15 }])).toEqual([{ from: 14, to: 15 }]);
-		expect(expandDeletionUnits(doc, [], [{ from: 15, to: 16 }])).toEqual([{ from: 15, to: 16 }]);
+		expect(expandDeletionUnits(doc, [], [{ from: 14, to: 15 }])).toEqual([
+			{ from: 14, to: 15 }
+		]);
+		expect(expandDeletionUnits(doc, [], [{ from: 15, to: 16 }])).toEqual([
+			{ from: 15, to: 16 }
+		]);
 	});
 
 	it("covers file tags and tag-plus-prose selections", () => {
@@ -316,13 +374,19 @@ describe("expandDeletionUnits", () => {
 			{ from: 1, to: 20 }
 		]);
 		const mixed = `ab${tag}cd`;
-		expect(expandDeletionUnits(mixed, [], [{ from: 1, to: 19 }])).toEqual([{ from: 1, to: 19 }]);
+		expect(expandDeletionUnits(mixed, [], [{ from: 1, to: 19 }])).toEqual([
+			{ from: 1, to: 19 }
+		]);
 	});
 
 	it("takes a whole collapsed span, ignoring bad ones", () => {
 		const doc = "x".repeat(120);
 		expect(
-			expandDeletionUnits(doc, [{ from: 0, to: 100, chars: 100 }], [{ from: 50, to: 51 }])
+			expandDeletionUnits(
+				doc,
+				[{ from: 0, to: 100, chars: 100 }],
+				[{ from: 50, to: 51 }]
+			)
 		).toEqual([{ from: 0, to: 100 }]);
 		expect(
 			expandDeletionUnits(
@@ -339,10 +403,14 @@ describe("expandDeletionUnits", () => {
 	it("merges expansions that meet", () => {
 		const doc = `${tag}${tag}`;
 		expect(
-			expandDeletionUnits(doc, [], [
-				{ from: 5, to: 6 },
-				{ from: 19, to: 20 }
-			])
+			expandDeletionUnits(
+				doc,
+				[],
+				[
+					{ from: 5, to: 6 },
+					{ from: 19, to: 20 }
+				]
+			)
 		).toEqual([{ from: 0, to: 28 }]);
 	});
 
@@ -356,9 +424,9 @@ describe("expandDeletionUnits", () => {
 			{ from: 0, to: paste.length }
 		]);
 		// Fixed-marker lookalikes still match only themselves.
-		expect(expandDeletionUnits(`${tag} x`, [], [{ from: 15, to: 16 }])).toEqual([
-			{ from: 15, to: 16 }
-		]);
+		expect(expandDeletionUnits(`${tag} x`, [], [{ from: 15, to: 16 }])).toEqual(
+			[{ from: 15, to: 16 }]
+		);
 	});
 });
 
@@ -382,7 +450,8 @@ describe("pastedCutAt", () => {
 					continue;
 				}
 				expect(cut).not.toBeNull();
-				const applied = doc.slice(0, cut?.from) + (cut?.insert ?? "") + doc.slice(cut?.to);
+				const applied =
+					doc.slice(0, cut?.from) + (cut?.insert ?? "") + doc.slice(cut?.to);
 				expect(applied).toBe(removePastedAt(doc, index));
 			}
 		}
@@ -394,13 +463,18 @@ describe("pasted tags in shared tag flows", () => {
 	it("removedMarkerIndexes reports pasted occurrences per order", () => {
 		const doc = `${IMAGE_MARKER} ${pastedTextMarker(10)} ${pastedTextMarker(20)}`;
 		const secondStart = doc.indexOf(pastedTextMarker(20));
-		expect(removedMarkerIndexes(doc, [{ from: secondStart, to: doc.length }])).toEqual({
+		expect(
+			removedMarkerIndexes(doc, [{ from: secondStart, to: doc.length }])
+		).toEqual({
 			image: [],
 			file: [],
 			pasted: [1]
 		});
 		// Docs without pastes keep the exact old shape.
-		expect(removedMarkerIndexes(`${IMAGE_MARKER} x`, [])).toEqual({ image: [], file: [] });
+		expect(removedMarkerIndexes(`${IMAGE_MARKER} x`, [])).toEqual({
+			image: [],
+			file: []
+		});
 	});
 
 	it("attachTagRanges spans pasted tags in document order", () => {
@@ -408,6 +482,8 @@ describe("pasted tags in shared tag flows", () => {
 		const ranges = attachTagRanges(doc);
 		expect(ranges).toHaveLength(2);
 		expect(doc.slice(ranges[0]?.from, ranges[0]?.to)).toBe(IMAGE_MARKER);
-		expect(doc.slice(ranges[1]?.from, ranges[1]?.to)).toBe(pastedTextMarker(33));
+		expect(doc.slice(ranges[1]?.from, ranges[1]?.to)).toBe(
+			pastedTextMarker(33)
+		);
 	});
 });

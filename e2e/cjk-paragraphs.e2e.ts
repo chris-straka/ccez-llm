@@ -8,7 +8,9 @@ const PARA =
 line-height must not swallow the breaks, so CJK paragraphs carry a
 fuller margin plus the standard 1em first-line indent. */
 test("cjk paragraphs break visibly", async ({ page }) => {
-	await seedChat(page, [{ role: "assistant", content: `${PARA}\n\n${PARA}\n\n${PARA}` }]);
+	await seedChat(page, [
+		{ role: "assistant", content: `${PARA}\n\n${PARA}\n\n${PARA}` }
+	]);
 	await page.goto("/");
 	const body = page.locator("article .rendered").first();
 	await expect(body).toBeVisible({ timeout: 60_000 });
@@ -18,7 +20,12 @@ test("cjk paragraphs break visibly", async ({ page }) => {
 			const el = p as HTMLElement;
 			const cs = getComputedStyle(el);
 			const r = el.getBoundingClientRect();
-			return { indent: cs.textIndent, marginTop: cs.marginTop, top: r.top, bottom: r.bottom };
+			return {
+				indent: cs.textIndent,
+				marginTop: cs.marginTop,
+				top: r.top,
+				bottom: r.bottom
+			};
 		});
 	});
 	expect(info).toHaveLength(3);
@@ -55,13 +62,17 @@ test("cjk paragraphs break visibly", async ({ page }) => {
 land (masked by the ruby appearing), then stays tall when the toggle
 goes back off — no oscillation. Needs the real worker, so it lives
 with the e2e (90s budget for first-run dictionary build). */
-test("numbered-list items latch tall across the furigana toggle", async ({ page }) => {
+test("numbered-list items latch tall across the furigana toggle", async ({
+	page
+}) => {
 	test.setTimeout(90_000);
 	await seedChat(page, [
 		{ role: "assistant", content: "3. 漢字を読むテスト\n4. 空が高くなる" }
 	]);
 	await page.goto("/");
-	await expect(page.locator("article.assistant li").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article.assistant li").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const geom = () =>
 		page.evaluate(() => {
 			const lis = [...document.querySelectorAll("article.assistant li")];
@@ -71,7 +82,9 @@ test("numbered-list items latch tall across the furigana toggle", async ({ page 
 				return { top: r.top, lh: getComputedStyle(el).lineHeight };
 			});
 		});
-	const toggle = page.locator('article.assistant .actions button:has-text("読み仮名")');
+	const toggle = page.locator(
+		'article.assistant .actions button:has-text("読み仮名")'
+	);
 	const ruby = page.locator("article.assistant .rendered .frb");
 	// Tight before anything renders: the tall reservation is latched,
 	// not reserved up front.
@@ -85,7 +98,9 @@ test("numbered-list items latch tall across the furigana toggle", async ({ page 
 	// Toggling back off removes the ruby but keeps the tall leading —
 	// tops match the ON geometry, not the before one. (Once pinned,
 	// the row button becomes the show-original toggle.)
-	await page.locator('article.assistant .actions button:has-text("オリジナル")').click();
+	await page
+		.locator('article.assistant .actions button:has-text("オリジナル")')
+		.click();
 	await expect(ruby).toHaveCount(0, { timeout: 60_000 });
 	const off = await geom();
 	expect(off).toHaveLength(on.length);

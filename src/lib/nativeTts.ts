@@ -74,7 +74,8 @@ export async function nativeTtsSupported(): Promise<boolean> {
 		recordError(error);
 		return false;
 	}
-	if (!supportedCache) lastNativeError = "Native speech is not available in this build.";
+	if (!supportedCache)
+		lastNativeError = "Native speech is not available in this build.";
 	return supportedCache;
 }
 
@@ -132,7 +133,10 @@ export function friendlyNativeError(message: string): string {
  * in the shell, the offline stop-word scorer elsewhere — else the
  * fallback. Never throws.
  */
-export async function quoteLangFor(quote: string, fallback: string): Promise<string> {
+export async function quoteLangFor(
+	quote: string,
+	fallback: string
+): Promise<string> {
 	const scriptLang = ttsLangFor(quote, "");
 	if (scriptLang) return scriptLang;
 	// Toned pinyin is Latin-script, so script detection stays silent —
@@ -141,7 +145,9 @@ export async function quoteLangFor(quote: string, fallback: string): Promise<str
 	// marks are pinyin-exclusive, so they route to Chinese first.
 	if (hasPinyinTones(quote)) return "zh-CN";
 	try {
-		const tag = await invoke<string | null>("tts_identify_lang", { text: quote });
+		const tag = await invoke<string | null>("tts_identify_lang", {
+			text: quote
+		});
 		if (tag?.trim()) return tag.trim();
 	} catch {
 		// Bridge unavailable (browser preview, tests): offline scorer below.
@@ -160,7 +166,10 @@ export async function quoteLangFor(quote: string, fallback: string): Promise<str
  * Latin content the fallback (the whole-text voice) rides through for
  * Han-fragment inheritance. Never throws.
  */
-export async function latinSentencesLang(text: string, fallback: string): Promise<string> {
+export async function latinSentencesLang(
+	text: string,
+	fallback: string
+): Promise<string> {
 	const latin = splitSentences(text)
 		.filter((sentence) => ttsLangFor(sentence, "") === "")
 		.join(" ")
@@ -188,8 +197,11 @@ export async function sentenceLangsFor(
 	fallback: string,
 	voices: ReadonlyArray<{ lang: string }>
 ): Promise<(sentence: string) => string> {
-	const latin = splitSentences(text).filter((sentence) => ttsLangFor(sentence, "") === "");
-	const seed = latin.length > 0 ? await latinSentencesLang(text, fallback) : fallback;
+	const latin = splitSentences(text).filter(
+		(sentence) => ttsLangFor(sentence, "") === ""
+	);
+	const seed =
+		latin.length > 0 ? await latinSentencesLang(text, fallback) : fallback;
 	const perSentence = new Map<string, string>();
 	await Promise.all(
 		latin.map(async (sentence) => {
@@ -202,7 +214,8 @@ export async function sentenceLangsFor(
 		const hit = cache.get(sentence);
 		if (hit !== undefined) return hit;
 		const tag = perSentence.get(sentence);
-		const lang = tag === undefined ? base(sentence) : effectiveSpeechLang(tag, voices);
+		const lang =
+			tag === undefined ? base(sentence) : effectiveSpeechLang(tag, voices);
 		cache.set(sentence, lang);
 		return lang;
 	};
@@ -214,7 +227,10 @@ export async function sentenceLangsFor(
  * highlight speaks with its sentence's voice. Null when the quote
  * isn't found (rendered text and markdown differ).
  */
-export function sentenceForQuote(context: string, quote: string): string | null {
+export function sentenceForQuote(
+	context: string,
+	quote: string
+): string | null {
 	const needle = contextQuoteKey(quote);
 	if (!needle) return null;
 	for (const sentence of splitSentences(context)) {
@@ -246,7 +262,9 @@ export async function quoteLangForContext(
 	const sentenceLang = ttsLangFor(probe, "");
 	if (sentenceLang && sentenceLang !== "zh-CN") return sentenceLang;
 	try {
-		const tag = await invoke<string | null>("tts_identify_lang", { text: probe });
+		const tag = await invoke<string | null>("tts_identify_lang", {
+			text: probe
+		});
 		if (tag?.trim()) return tag.trim();
 	} catch {
 		// Bridge unavailable (browser preview, tests): offline scorer below.
@@ -282,7 +300,11 @@ export async function openVoiceSettings(): Promise<void> {
  * unit-tested; offsets come from native word-boundary events, which use the
  * same units as the string we send.
  */
-export function sentenceAtOffset(sentences: string[], utterance: string, offset: number): number {
+export function sentenceAtOffset(
+	sentences: string[],
+	utterance: string,
+	offset: number
+): number {
 	let cursor = 0;
 	for (let i = 0; i < sentences.length; i++) {
 		const sentence = sentences[i];
@@ -375,7 +397,11 @@ export function speakNative(
 	Promise.all([
 		listen<WordPayload>("tts-word", (event) => {
 			if (event.payload.id !== expectedId) return;
-			const index = sentenceAtOffset(sentences, utterance, event.payload.location);
+			const index = sentenceAtOffset(
+				sentences,
+				utterance,
+				event.payload.location
+			);
 			callbacks.onProgress?.({
 				sentence: index + 1,
 				sentences: sentences.length,
@@ -392,7 +418,11 @@ export function speakNative(
 	])
 		.then(([unword, undone]) => {
 			unlisteners.push(unword, undone);
-			return invoke<number>("tts_speak", { text: utterance, lang, voice: voiceId });
+			return invoke<number>("tts_speak", {
+				text: utterance,
+				lang,
+				voice: voiceId
+			});
 		})
 		.then((rustId) => {
 			if (gen === generation) expectedId = rustId;
@@ -472,9 +502,11 @@ export function speakNativeWord(
 	onError?: (message: string) => void,
 	voiceId: string | null = null
 ): void {
-	invoke<number>("tts_speak", { text: word, lang, voice: voiceId }).catch((error: unknown) => {
-		onError?.(error instanceof Error ? error.message : String(error));
-	});
+	invoke<number>("tts_speak", { text: word, lang, voice: voiceId }).catch(
+		(error: unknown) => {
+			onError?.(error instanceof Error ? error.message : String(error));
+		}
+	);
 }
 
 /** Stop native speech and invalidate in-flight event listeners. Never throws. */

@@ -7,11 +7,15 @@ test.beforeEach(async ({ page }) => {
 		{ role: "assistant", content: "hi back at you" }
 	]);
 	await page.goto("/");
-	await expect(page.locator("article.user .actions")).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article.user .actions")).toBeVisible({
+		timeout: 60_000
+	});
 });
 
 for (const role of ["user", "assistant"] as const) {
-	test(`${role} row reveals on message hover, hides on leave`, async ({ page }) => {
+	test(`${role} row reveals on message hover, hides on leave`, async ({
+		page
+	}) => {
 		const row = page.locator(`article.${role} .actions`);
 		const body = page.locator(`article.${role} .rendered`);
 		// Hover-reveal is on: the row starts hidden.
@@ -40,7 +44,8 @@ for (const role of ["user", "assistant"] as const) {
 		await expect(row).toHaveCSS("opacity", "1");
 		// ...releasing focus hides it again.
 		await page.evaluate(() => {
-			if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+			if (document.activeElement instanceof HTMLElement)
+				document.activeElement.blur();
 		});
 		await expect(row).toHaveCSS("opacity", "0");
 	});
@@ -51,7 +56,9 @@ test("assistant row hides after fold jumps the layout", async ({ page }) => {
 	await row.hover();
 	await expect(row).toHaveCSS("opacity", "1");
 	await page
-		.locator('article.assistant .actions button[data-tip="Fold this message (F or Option-click)"]')
+		.locator(
+			'article.assistant .actions button[data-tip="Fold this message (F or Option-click)"]'
+		)
 		.click();
 	// The collapse moves the row: leaving it must not trap it visible.
 	await page.mouse.move(2, 2);
@@ -65,13 +72,17 @@ test("assistant row stays up after speak click", async ({ page }) => {
 	// Engaging playback (or focusing its button) keeps the row up: the
 	// stop button must stay clickable after the pointer leaves.
 	await page
-		.locator('article.assistant .actions button[data-tip="Read this message aloud"]')
+		.locator(
+			'article.assistant .actions button[data-tip="Read this message aloud"]'
+		)
 		.click();
 	await page.mouse.move(2, 2);
 	await expect(row).toHaveCSS("opacity", "1");
 });
 
-test("row stays visible while its button holds keyboard focus", async ({ page }) => {
+test("row stays visible while its button holds keyboard focus", async ({
+	page
+}) => {
 	// No mouse involved: tab-focus must keep its row readable, and
 	// releasing focus hides it again. This is the one state where
 	// buttons legitimately outlast hovering.
@@ -83,14 +94,18 @@ test("row stays visible while its button holds keyboard focus", async ({ page })
 	await btn.focus();
 	await expect(row).toHaveCSS("opacity", "1");
 	await page.evaluate(() => {
-		if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+		if (document.activeElement instanceof HTMLElement)
+			document.activeElement.blur();
 	});
 	await expect(row).toHaveCSS("opacity", "0");
 });
 
 /** X cuts the hovered message (clipboard first, then delete);
 Shift+D drops it and copies nothing; bare Delete never deletes. */
-test("x cuts, shift+D drops, bare Delete spares the hovered message", async ({ page, context }) => {
+test("x cuts, shift+D drops, bare Delete spares the hovered message", async ({
+	page,
+	context
+}) => {
 	await context.grantPermissions(["clipboard-read", "clipboard-write"]);
 	await seedChat(page, [
 		{ role: "assistant", content: "cut me" },
@@ -105,7 +120,9 @@ test("x cuts, shift+D drops, bare Delete spares the hovered message", async ({ p
 	await first.hover();
 	await page.keyboard.press("x");
 	await expect(page.locator(".toast")).toContainText("Cut to clipboard");
-	await expect(page.evaluate(() => navigator.clipboard.readText())).resolves.toBe("cut me");
+	await expect(
+		page.evaluate(() => navigator.clipboard.readText())
+	).resolves.toBe("cut me");
 	await expect(page.locator("article .rendered")).toHaveCount(1);
 	const remaining = page.locator("article .rendered").first();
 	await expect(remaining).toContainText("drop me");
@@ -116,7 +133,9 @@ test("x cuts, shift+D drops, bare Delete spares the hovered message", async ({ p
 	// Shift+D drops it and copies nothing.
 	await page.keyboard.press("Shift+d");
 	await expect(page.locator("article .rendered")).toHaveCount(0);
-	await expect(page.evaluate(() => navigator.clipboard.readText())).resolves.toBe("cut me");
+	await expect(
+		page.evaluate(() => navigator.clipboard.readText())
+	).resolves.toBe("cut me");
 });
 
 /** Toasts clear the camera hole: parked below the island even with no

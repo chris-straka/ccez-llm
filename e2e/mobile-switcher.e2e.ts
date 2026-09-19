@@ -18,31 +18,53 @@ async function seedTwo(page: Page): Promise<void> {
 	await page.addInitScript(() => {
 		window.localStorage.setItem("ccez-mock-provider", "1");
 		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
-		const msg = (id: string, role: string, content: string) => ({ id, role, content, usage: null, error: null });
+		const msg = (id: string, role: string, content: string) => ({
+			id,
+			role,
+			content,
+			usage: null,
+			error: null
+		});
 		window.localStorage.setItem(
 			"ccez-llm-chats-v1",
 			JSON.stringify([
-				{ id: "e2e-first", createdAt: 1, replyLang: null, messages: [msg("m1", "assistant", "first chat")] },
-				{ id: "e2e-second", createdAt: 2, replyLang: null, messages: [msg("m2", "assistant", "second chat")] }
+				{
+					id: "e2e-first",
+					createdAt: 1,
+					replyLang: null,
+					messages: [msg("m1", "assistant", "first chat")]
+				},
+				{
+					id: "e2e-second",
+					createdAt: 2,
+					replyLang: null,
+					messages: [msg("m2", "assistant", "second chat")]
+				}
 			])
 		);
 	});
 	await page.goto("/");
-	await expect(page.locator("article .rendered").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article .rendered").first()).toBeVisible({
+		timeout: 60_000
+	});
 }
 
 /** Dead-space point below the short thread (not on text or chrome). */
 async function deadSpace(page: Page): Promise<{ x: number; y: number }> {
 	const y = await page.evaluate(() => {
 		const arts = [...document.querySelectorAll("article")];
-		const bottom = Math.max(...arts.map((a) => a.getBoundingClientRect().bottom));
+		const bottom = Math.max(
+			...arts.map((a) => a.getBoundingClientRect().bottom)
+		);
 		const prompt = document.querySelector(".prompt")?.getBoundingClientRect();
 		return Math.min(bottom + 120, (prompt?.top ?? 915) - 120);
 	});
 	return { x: 206, y: Math.max(200, y) };
 }
 
-test("double-tap on dead space opens the switcher and it stays open", async ({ page }) => {
+test("double-tap on dead space opens the switcher and it stays open", async ({
+	page
+}) => {
 	await seedTwo(page);
 	const at = await deadSpace(page);
 	await page.touchscreen.tap(at.x, at.y);
@@ -106,14 +128,18 @@ test("hold on dead space summons the switcher", async ({ page }) => {
 	await expect(veil).toBeVisible();
 });
 
-test("cycling inside the switcher cuts without a transition", async ({ page }) => {
+test("cycling inside the switcher cuts without a transition", async ({
+	page
+}) => {
 	await seedTwo(page);
 	// Record snapshot scopes: cycling under the open switcher must
 	// never snapshot (the crossfade paints above the dimming veil).
 	await page.evaluate(() => {
 		(window as unknown as { __vt: string[] }).__vt = [];
 		const proto = Document.prototype as unknown as {
-			startViewTransition?: (opts: { update: () => void }) => { finished: Promise<unknown> };
+			startViewTransition?: (opts: { update: () => void }) => {
+				finished: Promise<unknown>;
+			};
 		};
 		const real = proto.startViewTransition;
 		if (typeof real === "function") {
@@ -130,7 +156,9 @@ test("cycling inside the switcher cuts without a transition", async ({ page }) =
 	await page.touchscreen.tap(at.x, at.y);
 	await page.waitForTimeout(120);
 	await page.touchscreen.tap(at.x, at.y);
-	await expect(page.locator(".modal-veil.chat-switcher")).toBeVisible({ timeout: 5_000 });
+	await expect(page.locator(".modal-veil.chat-switcher")).toBeVisible({
+		timeout: 5_000
+	});
 	const pos = page.locator(".switcher-pos");
 	await expect(pos).toContainText("1 / 2");
 	// Swipe left across the veil cycles to the next chat.
@@ -159,7 +187,9 @@ test("cycling inside the switcher cuts without a transition", async ({ page }) =
 		);
 	});
 	await expect(pos).toContainText("2 / 2", { timeout: 5_000 });
-	const calls = await page.evaluate(() => (window as unknown as { __vt: string[] }).__vt);
+	const calls = await page.evaluate(
+		() => (window as unknown as { __vt: string[] }).__vt
+	);
 	expect(calls).toEqual([]);
 });
 
@@ -168,7 +198,9 @@ async function openSwitcher(page: Page): Promise<void> {
 	await page.touchscreen.tap(at.x, at.y);
 	await page.waitForTimeout(120);
 	await page.touchscreen.tap(at.x, at.y);
-	await expect(page.locator(".modal-veil.chat-switcher")).toBeVisible({ timeout: 5_000 });
+	await expect(page.locator(".modal-veil.chat-switcher")).toBeVisible({
+		timeout: 5_000
+	});
 	await page.waitForTimeout(900);
 }
 
@@ -177,10 +209,15 @@ test("switcher + mints a chat and dismisses", async ({ page }) => {
 	await openSwitcher(page);
 	const card = page.locator(".switcher-card");
 	await expect(card.locator(".switcher-pos")).toContainText("1 / 2");
-	await page.locator(".switcher-actions").getByRole("button", { name: "New chat" }).click();
+	await page
+		.locator(".switcher-actions")
+		.getByRole("button", { name: "New chat" })
+		.click();
 	await expect(page.locator(".modal-veil.chat-switcher")).toHaveCount(0);
 	const total = await page.evaluate(
-		() => JSON.parse(window.localStorage.getItem("ccez-llm-chats-v1") ?? "[]").length
+		() =>
+			JSON.parse(window.localStorage.getItem("ccez-llm-chats-v1") ?? "[]")
+				.length
 	);
 	expect(total).toBe(3);
 });
@@ -190,11 +227,16 @@ test("switcher trash drops the shown chat and stays open", async ({ page }) => {
 	await openSwitcher(page);
 	const card = page.locator(".switcher-card");
 	await expect(card.locator(".switcher-pos")).toContainText("1 / 2");
-	await page.locator(".switcher-actions").getByRole("button", { name: "Delete chat" }).click();
+	await page
+		.locator(".switcher-actions")
+		.getByRole("button", { name: "Delete chat" })
+		.click();
 	await expect(card.locator(".switcher-pos")).toContainText("1 / 1");
 	await expect(page.locator(".modal-veil.chat-switcher")).toBeVisible();
 	const total = await page.evaluate(
-		() => JSON.parse(window.localStorage.getItem("ccez-llm-chats-v1") ?? "[]").length
+		() =>
+			JSON.parse(window.localStorage.getItem("ccez-llm-chats-v1") ?? "[]")
+				.length
 	);
 	expect(total).toBe(1);
 });
@@ -203,15 +245,22 @@ test("switcher actions float centered below the card", async ({ page }) => {
 	await seedTwo(page);
 	await openSwitcher(page);
 	const layout = await page.evaluate(() => {
-		const card = document.querySelector(".switcher-card")!.getBoundingClientRect();
-		const acts = document.querySelector(".switcher-actions")!.getBoundingClientRect();
-		const btn = document.querySelector(".switcher-act")!.getBoundingClientRect();
+		const card = document
+			.querySelector(".switcher-card")!
+			.getBoundingClientRect();
+		const acts = document
+			.querySelector(".switcher-actions")!
+			.getBoundingClientRect();
+		const btn = document
+			.querySelector(".switcher-act")!
+			.getBoundingClientRect();
 		return {
 			cardBottom: card.bottom,
 			cardCx: card.left + card.width / 2,
 			actsTop: acts.top,
 			actsCx: acts.left + acts.width / 2,
-			insideCard: document.querySelector(".switcher-card .switcher-actions") !== null,
+			insideCard:
+				document.querySelector(".switcher-card .switcher-actions") !== null,
 			btnWidth: btn.width
 		};
 	});
@@ -243,7 +292,9 @@ test("composer refocuses and types after the first reply", async ({ page }) => {
 	await page.keyboard.type("hello android");
 	// Phones never send from the keyboard: the send button submits.
 	await page.locator(".send-btn").click();
-	await expect(page.locator("article.assistant .rendered").first()).toBeVisible({ timeout: 30_000 });
+	await expect(page.locator("article.assistant .rendered").first()).toBeVisible(
+		{ timeout: 30_000 }
+	);
 	await expect(page.locator(".sending")).toHaveCount(0, { timeout: 30_000 });
 	await box.click();
 	await expect(box).toBeFocused({ timeout: 5_000 });

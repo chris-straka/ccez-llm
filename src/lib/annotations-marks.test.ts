@@ -33,7 +33,10 @@ function baseText(root: Element): string {
 	while (walker.nextNode()) {
 		const node = walker.currentNode;
 		const parent = node.parentNode;
-		if (parent instanceof Element && parent.closest("[data-ann-badge], rt, rp, .frt")) {
+		if (
+			parent instanceof Element &&
+			parent.closest("[data-ann-badge], rt, rp, .frt")
+		) {
 			continue;
 		}
 		parts.push(node.textContent ?? "");
@@ -43,7 +46,9 @@ function baseText(root: Element): string {
 
 describe("applyMarks badges", () => {
 	it("fades only newly stamped badges", () => {
-		const marks: AnnotationMark[] = [{ id: "a1" as AnnotationId, number: 1, quote: "hello world" }];
+		const marks: AnnotationMark[] = [
+			{ id: "a1" as AnnotationId, number: 1, quote: "hello world" }
+		];
 		const root = rootWith("say hello world today");
 		applyMarks(root, marks, false, null);
 		const first = root.querySelector("[data-ann-badge]");
@@ -59,7 +64,12 @@ describe("applyMarks badges", () => {
 
 	it("marks a second quote fresh while the first stays settled", () => {
 		const root = rootWith("alpha and beta");
-		applyMarks(root, [{ id: "a1" as AnnotationId, number: 1, quote: "alpha" }], false, null);
+		applyMarks(
+			root,
+			[{ id: "a1" as AnnotationId, number: 1, quote: "alpha" }],
+			false,
+			null
+		);
 		applyMarks(
 			root,
 			[
@@ -76,12 +86,16 @@ describe("applyMarks badges", () => {
 });
 
 describe("applyMarks wash fade", () => {
-	const one: AnnotationMark[] = [{ id: "a1" as AnnotationId, number: 1, quote: "hello world" }];
+	const one: AnnotationMark[] = [
+		{ id: "a1" as AnnotationId, number: 1, quote: "hello world" }
+	];
 
 	it("fades a newly arrived wash in once, not on re-stamp", () => {
 		const root = rootWith("say hello world today");
 		applyMarks(root, one, false, "a1");
-		expect(root.querySelector("mark.ccez-ann")?.classList.contains("fresh")).toBe(true);
+		expect(
+			root.querySelector("mark.ccez-ann")?.classList.contains("fresh")
+		).toBe(true);
 
 		// Re-stamping a steady wash (every render does this) keeps the
 		// marks but must not replay the mount fade.
@@ -123,7 +137,9 @@ describe("applyMarks wash fade", () => {
 			];
 			applyMarks(root, two, false, "a1");
 			applyMarks(root, two, false, null);
-			expect(root.querySelector("mark.ccez-ann")?.classList.contains("leaving")).toBe(true);
+			expect(
+				root.querySelector("mark.ccez-ann")?.classList.contains("leaving")
+			).toBe(true);
 
 			applyMarks(root, two, false, "a2");
 			const marks = root.querySelectorAll("mark.ccez-ann");
@@ -142,11 +158,14 @@ describe("applyMarks wash fade", () => {
 describe("applyMarks badges over reading overlays", () => {
 	function readingBody(): HTMLDivElement {
 		const root = document.createElement("div");
-		root.innerHTML = '<p><span class="frb">漢字<span class="frt">かんじ</span></span>を読む</p>';
+		root.innerHTML =
+			'<p><span class="frb">漢字<span class="frt">かんじ</span></span>を読む</p>';
 		return root;
 	}
 
-	const one: AnnotationMark[] = [{ id: "a1" as AnnotationId, number: 1, quote: "漢字を読む" }];
+	const one: AnnotationMark[] = [
+		{ id: "a1" as AnnotationId, number: 1, quote: "漢字を読む" }
+	];
 
 	it("floats the badge on an anchor instead of inline text", () => {
 		const root = readingBody();
@@ -160,7 +179,9 @@ describe("applyMarks badges over reading overlays", () => {
 		expect(anchor?.classList.contains("ccez-ann-anchor")).toBe(true);
 		// Spaceless quote: the anchor parks after the quote holding
 		// no letters (the badge's own label is UI, never wash text).
-		const letterKids = [...(anchor?.childNodes ?? [])].filter((n) => n instanceof Text);
+		const letterKids = [...(anchor?.childNodes ?? [])].filter(
+			(n) => n instanceof Text
+		);
 		expect(letterKids).toEqual([]);
 		// Stamping moved nothing: base text and readings intact.
 		expect(baseText(root)).toBe("漢字を読む");
@@ -170,7 +191,12 @@ describe("applyMarks badges over reading overlays", () => {
 	it("washes a preview without stamping its badge", () => {
 		const root = rootWith("say hello world today");
 		const preview: AnnotationMark[] = [
-			{ id: "a1" as AnnotationId, number: 1, quote: "hello world", preview: true }
+			{
+				id: "a1" as AnnotationId,
+				number: 1,
+				quote: "hello world",
+				preview: true
+			}
 		];
 		// Open (wash id matches): the quote highlights, no badge yet.
 		applyMarks(root, preview, false, "a1");
@@ -185,7 +211,12 @@ describe("applyMarks badges over reading overlays", () => {
 
 	it("never matches a reading as message text", () => {
 		const root = readingBody();
-		applyMarks(root, [{ id: "a1" as AnnotationId, number: 1, quote: "かんじ" }], false, null);
+		applyMarks(
+			root,
+			[{ id: "a1" as AnnotationId, number: 1, quote: "かんじ" }],
+			false,
+			null
+		);
 		expect(root.querySelector("[data-ann-badge]")).toBeNull();
 		expect(root.querySelector(".frt")?.textContent).toBe("かんじ");
 	});
@@ -216,13 +247,20 @@ describe("applyMarks badges over reading overlays", () => {
 
 	it("parks a spaced quote in a word gap, wrapping no letters", () => {
 		const root = rootWith("say hello world today");
-		applyMarks(root, [{ id: "a1" as AnnotationId, number: 1, quote: "hello world" }], false, null);
+		applyMarks(
+			root,
+			[{ id: "a1" as AnnotationId, number: 1, quote: "hello world" }],
+			false,
+			null
+		);
 		const badge = root.querySelector("[data-ann-badge]");
 		const anchor = root.querySelector(".ccez-ann-anchor");
 		expect(badge?.parentElement).toBe(anchor);
 		// No letters live in the box (the badge's own label is UI,
 		// never wash text): nothing to paint short.
-		const letterKids = [...(anchor?.childNodes ?? [])].filter((n) => n instanceof Text);
+		const letterKids = [...(anchor?.childNodes ?? [])].filter(
+			(n) => n instanceof Text
+		);
 		expect(letterKids).toEqual([]);
 		expect(baseText(root)).toBe("say hello world today");
 	});
@@ -230,18 +268,39 @@ describe("applyMarks badges over reading overlays", () => {
 	it("mirrors the badge for RTL quotes, nowhere else", () => {
 		const rtl = document.createElement("div");
 		rtl.innerHTML = '<p dir="rtl">قال اليوم مودعا</p>';
-		applyMarks(rtl, [{ id: "a1" as AnnotationId, number: 1, quote: "اليوم" }], false, null);
-		expect(rtl.querySelector("[data-ann-badge]")?.classList.contains("rtl")).toBe(true);
+		applyMarks(
+			rtl,
+			[{ id: "a1" as AnnotationId, number: 1, quote: "اليوم" }],
+			false,
+			null
+		);
+		expect(
+			rtl.querySelector("[data-ann-badge]")?.classList.contains("rtl")
+		).toBe(true);
 		const ltr = rootWith("say hello world today");
-		applyMarks(ltr, [{ id: "a1" as AnnotationId, number: 1, quote: "world" }], false, null);
-		expect(ltr.querySelector("[data-ann-badge]")?.classList.contains("rtl")).toBe(false);
+		applyMarks(
+			ltr,
+			[{ id: "a1" as AnnotationId, number: 1, quote: "world" }],
+			false,
+			null
+		);
+		expect(
+			ltr.querySelector("[data-ann-badge]")?.classList.contains("rtl")
+		).toBe(false);
 	});
 
 	it("parks a lone word in its neighboring gap", () => {
 		const root = rootWith("say hello world today");
-		applyMarks(root, [{ id: "a1" as AnnotationId, number: 1, quote: "world" }], false, null);
+		applyMarks(
+			root,
+			[{ id: "a1" as AnnotationId, number: 1, quote: "world" }],
+			false,
+			null
+		);
 		const anchor = root.querySelector(".ccez-ann-anchor");
-		const letterKids = [...(anchor?.childNodes ?? [])].filter((n) => n instanceof Text);
+		const letterKids = [...(anchor?.childNodes ?? [])].filter(
+			(n) => n instanceof Text
+		);
 		expect(letterKids).toEqual([]);
 		// After the word (ties prefer later): the fence edges sit on
 		// the word's own boundaries.
@@ -293,9 +352,16 @@ describe("edgeOffsetForAnchor", () => {
 
 	it("wraps no letters on a spaceless stamp", () => {
 		const root = rootWith("に本を読む午後の時間は");
-		applyMarks(root, [{ id: "a1" as AnnotationId, number: 1, quote: "読む午" }], false, null);
+		applyMarks(
+			root,
+			[{ id: "a1" as AnnotationId, number: 1, quote: "読む午" }],
+			false,
+			null
+		);
 		const anchor = root.querySelector(".ccez-ann-anchor");
-		const letterKids = [...(anchor?.childNodes ?? [])].filter((n) => n instanceof Text);
+		const letterKids = [...(anchor?.childNodes ?? [])].filter(
+			(n) => n instanceof Text
+		);
 		expect(letterKids).toEqual([]);
 		expect(baseText(root)).toBe("に本を読む午後の時間は");
 	});
@@ -326,7 +392,9 @@ describe("lockSelectionToMessage", () => {
 			if (!first || !second) throw new Error("no text nodes");
 			sel.setBaseAndExtent(first, 0, second, 6);
 			expect(lockSelectionToMessage(sel, articleOf)).toBe(true);
-			expect(sel.focusNode === first || first.contains(sel.focusNode)).toBe(true);
+			expect(sel.focusNode === first || first.contains(sel.focusNode)).toBe(
+				true
+			);
 			expect(sel.toString()).toBe("first message here");
 		} finally {
 			root.remove();
@@ -369,7 +437,9 @@ describe("lockSelectionToMessage", () => {
 			// button's label into the selection.
 			sel.setBaseAndExtent(first, 18, outside, 0);
 			expect(lockSelectionToMessage(sel, articleOf)).toBe(true);
-			expect(sel.focusNode === first || first.contains(sel.focusNode)).toBe(true);
+			expect(sel.focusNode === first || first.contains(sel.focusNode)).toBe(
+				true
+			);
 			expect(sel.toString()).toBe("");
 		} finally {
 			root.remove();
@@ -427,7 +497,13 @@ describe("applyMarks wash over paragraphs", () => {
 	it("never wraps the whitespace between block elements", () => {
 		const root = twoParagraphs();
 		try {
-			const marks: AnnotationMark[] = [{ id: "a1" as AnnotationId, number: 1, quote: "alpha here\n\nbeta here" }];
+			const marks: AnnotationMark[] = [
+				{
+					id: "a1" as AnnotationId,
+					number: 1,
+					quote: "alpha here\n\nbeta here"
+				}
+			];
 			applyMarks(root, marks, false, "a1");
 			const wrapped = [...root.querySelectorAll("mark.ccez-ann")];
 			// One wash per paragraph: the "\n" gap stays unwrapped so no
@@ -448,7 +524,8 @@ describe("applyMarks wash over paragraphs", () => {
 			if (!sel) throw new Error("no selection");
 			const first = root.querySelector("p")?.firstChild;
 			const last = root.querySelectorAll("p")[1]?.firstChild;
-			if (!(first instanceof Text) || !(last instanceof Text)) throw new Error("no text nodes");
+			if (!(first instanceof Text) || !(last instanceof Text))
+				throw new Error("no text nodes");
 			// Right-to-left drag: direction must survive the round trip.
 			sel.setBaseAndExtent(last, 4, first, 6);
 			expect(sel.toString()).toBe("here\nbeta");
@@ -473,7 +550,9 @@ describe("applyMarks wash over paragraphs", () => {
 	});
 
 	it("reuses badge buttons across re-stamps", () => {
-		const marks: AnnotationMark[] = [{ id: "a1" as AnnotationId, number: 1, quote: "alpha" }];
+		const marks: AnnotationMark[] = [
+			{ id: "a1" as AnnotationId, number: 1, quote: "alpha" }
+		];
 		const root = rootWith("alpha and beta");
 		applyMarks(root, marks, false, null);
 		const first = root.querySelector("[data-ann-badge]");
@@ -514,7 +593,9 @@ describe("applyMarks wash over paragraphs", () => {
 		vi.useFakeTimers();
 		const root = twoParagraphs();
 		try {
-			const marks: AnnotationMark[] = [{ id: "a1" as AnnotationId, number: 1, quote: "alpha here" }];
+			const marks: AnnotationMark[] = [
+				{ id: "a1" as AnnotationId, number: 1, quote: "alpha here" }
+			];
 			applyMarks(root, marks, false, "a1");
 			const sel = document.getSelection();
 			if (!sel) throw new Error("no selection");
@@ -565,7 +646,9 @@ describe("tashkeel-anchored marks", () => {
 	});
 
 	it("keeps the badge when tashkeel is removed (aid unpinned)", () => {
-		const marks: AnnotationMark[] = [{ id: "a1" as AnnotationId, number: 1, quote: VOCALIZED }];
+		const marks: AnnotationMark[] = [
+			{ id: "a1" as AnnotationId, number: 1, quote: VOCALIZED }
+		];
 		const root = rootWith(VOCALIZED);
 		applyMarks(root, marks, false, null);
 		expect(root.querySelector("[data-ann-badge]")).not.toBeNull();
@@ -578,7 +661,9 @@ describe("tashkeel-anchored marks", () => {
 	});
 
 	it("keeps the badge when tashkeel is applied (aid pinned)", () => {
-		const marks: AnnotationMark[] = [{ id: "a1" as AnnotationId, number: 1, quote: BASE }];
+		const marks: AnnotationMark[] = [
+			{ id: "a1" as AnnotationId, number: 1, quote: BASE }
+		];
 		const root = rootWith(BASE);
 		applyMarks(root, marks, false, null);
 		expect(root.querySelector("[data-ann-badge]")).not.toBeNull();
@@ -592,8 +677,13 @@ describe("tashkeel-anchored marks", () => {
 		// The pinyin path renders plain paragraphs (markdown set aside);
 		// an Arabic annotation must persist across that toggle too.
 		const root = document.createElement("div");
-		root.innerHTML = "<p dir=\"auto\">مرحبا بك</p>";
-		applyMarks(root, [{ id: "a1" as AnnotationId, number: 1, quote: VOCALIZED }], false, null);
+		root.innerHTML = '<p dir="auto">مرحبا بك</p>';
+		applyMarks(
+			root,
+			[{ id: "a1" as AnnotationId, number: 1, quote: VOCALIZED }],
+			false,
+			null
+		);
 		expect(root.querySelector("[data-ann-badge]")).not.toBeNull();
 		expect(baseText(root)).toBe(BASE);
 	});
@@ -609,7 +699,11 @@ describe("grapheme-cluster-safe stamping", () => {
 		while (walker.nextNode()) {
 			const node = walker.currentNode;
 			const parent = node.parentNode;
-			if (parent instanceof Element && parent.closest("[data-ann-badge], rt, rp, .frt")) continue;
+			if (
+				parent instanceof Element &&
+				parent.closest("[data-ann-badge], rt, rp, .frt")
+			)
+				continue;
 			const text = node.textContent ?? "";
 			if (/^[\p{Mn}\p{Me}]/u.test(text)) bad.push(text);
 		}
@@ -618,7 +712,12 @@ describe("grapheme-cluster-safe stamping", () => {
 
 	it("never splits a base letter from its tashkeel (wash on)", () => {
 		const root = rootWith(`قال ${VOCALIZED} اليوم`);
-		applyMarks(root, [{ id: "a1" as AnnotationId, number: 1, quote: VOCALIZED }], false, "a1");
+		applyMarks(
+			root,
+			[{ id: "a1" as AnnotationId, number: 1, quote: VOCALIZED }],
+			false,
+			"a1"
+		);
 		expect(strandedMarks(root)).toEqual([]);
 	});
 
@@ -626,7 +725,12 @@ describe("grapheme-cluster-safe stamping", () => {
 		const root = rootWith(VOCALIZED);
 		// Bare "مرحب" ends on a base letter carrying a mark in the
 		// node: the wash must expand to the cluster end, not cut it.
-		applyMarks(root, [{ id: "a1" as AnnotationId, number: 1, quote: "مرحب" }], false, "a1");
+		applyMarks(
+			root,
+			[{ id: "a1" as AnnotationId, number: 1, quote: "مرحب" }],
+			false,
+			"a1"
+		);
 		expect(root.querySelector("mark.ccez-ann")).not.toBeNull();
 		expect(strandedMarks(root)).toEqual([]);
 	});
@@ -634,7 +738,9 @@ describe("grapheme-cluster-safe stamping", () => {
 	it("rebuild preserves shaping: wash off restores the exact base text", () => {
 		const original = `قال ${VOCALIZED} اليوم`;
 		const root = rootWith(original);
-		const marks: AnnotationMark[] = [{ id: "a1" as AnnotationId, number: 1, quote: VOCALIZED }];
+		const marks: AnnotationMark[] = [
+			{ id: "a1" as AnnotationId, number: 1, quote: VOCALIZED }
+		];
 		applyMarks(root, marks, false, "a1");
 		applyMarks(root, marks, false, null);
 		expect(baseText(root)).toBe(original);
@@ -676,7 +782,9 @@ describe("refresh sweep of orphaned fade grades (Highlight path)", () => {
 
 	it("a re-stamp clears a stranded dim grade beside the live wash", () => {
 		const root = rootWith("say hello world today");
-		const marks: AnnotationMark[] = [{ id: "w1" as AnnotationId, number: 1, quote: "hello world" }];
+		const marks: AnnotationMark[] = [
+			{ id: "w1" as AnnotationId, number: 1, quote: "hello world" }
+		];
 		applyMarks(root, marks, false, "w1");
 		expect(store.get(ANN_HIGHLIGHT_NAME)).toBeDefined();
 		// A preempted ramp's dim grade, stranded in the registry.
@@ -698,7 +806,9 @@ describe("refresh sweep of orphaned fade grades (Highlight path)", () => {
 		const root = document.createElement("div");
 		root.innerHTML =
 			"<p><ruby>静<rt>jìng</rt></ruby><ruby>读<rt>dú</rt></ruby></p>";
-		const marks: AnnotationMark[] = [{ id: "w1" as AnnotationId, number: 1, quote: "静读" }];
+		const marks: AnnotationMark[] = [
+			{ id: "w1" as AnnotationId, number: 1, quote: "静读" }
+		];
 		applyMarks(root, marks, false, "w1");
 		expect(store.get(ANN_HIGHLIGHT_NAME)).toBeUndefined();
 		const washed = [...root.querySelectorAll("mark.ccez-ann")]
@@ -720,7 +830,9 @@ describe("refresh sweep of orphaned fade grades (Highlight path)", () => {
 		const root = rootWith("اللغة العربية من أجمل لغات العالم");
 		document.body.appendChild(root);
 		try {
-			const marks: AnnotationMark[] = [{ id: "w1" as AnnotationId, number: 1, quote: "اللغة العربية" }];
+			const marks: AnnotationMark[] = [
+				{ id: "w1" as AnnotationId, number: 1, quote: "اللغة العربية" }
+			];
 			applyMarks(root, marks, false, "w1");
 			applyMarks(root, marks, false, "w1");
 			expect(store.get(ANN_HIGHLIGHT_NAME)).toBeUndefined();
@@ -757,7 +869,9 @@ describe("refresh sweep of orphaned fade grades (Highlight path)", () => {
 				if (prop === "opacity") nudges += 1;
 				return orig(prop, value, priority);
 			};
-			const marks: AnnotationMark[] = [{ id: "s9" as AnnotationId, number: 1, quote: "hello world" }];
+			const marks: AnnotationMark[] = [
+				{ id: "s9" as AnnotationId, number: 1, quote: "hello world" }
+			];
 			applyMarks(root, marks, false, "s9");
 			// First grade plus one nudge per walked step: un-nudged
 			// steps surface late and partial in the shell (bands).

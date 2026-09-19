@@ -7,7 +7,9 @@ import { dragQuote, seedChat } from "./helpers";
  * truncation flicker, no duplicated chunks).
  */
 
-test("stream renders exactly one reply with the full text", async ({ page }) => {
+test("stream renders exactly one reply with the full text", async ({
+	page
+}) => {
 	await seedChat(page, []);
 	await page.goto("/");
 	await expect(page.locator(".hero")).toBeVisible({ timeout: 60_000 });
@@ -15,12 +17,16 @@ test("stream renders exactly one reply with the full text", async ({ page }) => 
 	await page.keyboard.type("integrity check");
 	await page.keyboard.press("Enter");
 	const body = page.locator("article.assistant .rendered");
-	await expect(body).toContainText("Mock reply to: integrity check", { timeout: 15_000 });
+	await expect(body).toContainText("Mock reply to: integrity check", {
+		timeout: 15_000
+	});
 	await expect(page.locator("article.assistant")).toHaveCount(1);
 	await expect(body).toHaveText("Mock reply to: integrity check");
 });
 
-test("visible stream text grows monotonically, never flickers", async ({ page }) => {
+test("visible stream text grows monotonically, never flickers", async ({
+	page
+}) => {
 	await seedChat(page, []);
 	await page.addInitScript(() => {
 		window.localStorage.setItem("ccez-mock-word-ms", "60");
@@ -37,10 +43,13 @@ test("visible stream text grows monotonically, never flickers", async ({ page })
 		samples.push(((await body.textContent()) ?? "").trim());
 		await page.waitForTimeout(150);
 	}
-	await expect(body).toContainText("Mock reply to: monotonic stream sampling probe", {
-		timeout: 15_000
-	});
-	const final = (((await body.textContent()) ?? "").trim());
+	await expect(body).toContainText(
+		"Mock reply to: monotonic stream sampling probe",
+		{
+			timeout: 15_000
+		}
+	);
+	const final = ((await body.textContent()) ?? "").trim();
 	// Every mid-stream sample is a prefix of the final text: tokens only
 	// append (map + accumulator), the DOM never rewinds or restates.
 	for (const sample of samples) {
@@ -54,27 +63,55 @@ test("visible stream text grows monotonically, never flickers", async ({ page })
 alone: its draft annotations survive (the origin's resets must not
 run there) and its scroll never yanks to the bottom. The slow mock
 cadence makes the mid-stream switch deterministic. */
-test("mid-stream switch keeps the new chat's drafts and scroll", async ({ page }) => {
-	const long = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. ".repeat(6);
-	const bodies = Array.from({ length: 30 }, (_, i) => `filler message number ${i}: ${long}`);
+test("mid-stream switch keeps the new chat's drafts and scroll", async ({
+	page
+}) => {
+	const long =
+		"Lorem ipsum dolor sit amet, consectetur adipiscing elit. ".repeat(6);
+	const bodies = Array.from(
+		{ length: 30 },
+		(_, i) => `filler message number ${i}: ${long}`
+	);
 	await page.addInitScript(
 		({ filler }: { filler: string[] }) => {
 			window.localStorage.setItem("ccez-mock-provider", "1");
 			window.localStorage.setItem("ccez-mock-word-ms", "1000");
-			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({ promptIdleSec: 0 }));
-			const msg = (id: string, content: string) => ({ id, role: "assistant", content, usage: null, error: null });
+			window.localStorage.setItem(
+				"ccez-llm-settings-v1",
+				JSON.stringify({ promptIdleSec: 0 })
+			);
+			const msg = (id: string, content: string) => ({
+				id,
+				role: "assistant",
+				content,
+				usage: null,
+				error: null
+			});
 			window.localStorage.setItem(
 				"ccez-llm-chats-v1",
 				JSON.stringify([
-					{ id: "chat-1", createdAt: 1, replyLang: null, messages: [msg("m1", "origin chat opener")] },
-					{ id: "chat-2", createdAt: 2, replyLang: null, messages: filler.map((content, n) => msg(`f${n}`, content)) }
+					{
+						id: "chat-1",
+						createdAt: 1,
+						replyLang: null,
+						messages: [msg("m1", "origin chat opener")]
+					},
+					{
+						id: "chat-2",
+						createdAt: 2,
+						replyLang: null,
+						messages: filler.map((content, n) => msg(`f${n}`, content))
+					}
 				])
 			);
 		},
 		{ filler: bodies }
 	);
 	await page.goto("/");
-	await expect(page.locator("article .rendered").first()).toContainText("origin chat opener", { timeout: 60_000 });
+	await expect(page.locator("article .rendered").first()).toContainText(
+		"origin chat opener",
+		{ timeout: 60_000 }
+	);
 
 	// Draft (filed, unsent) annotation in chat 1, then send slow.
 	await annotateDraft(page, "origin chat opener", "origin note");
@@ -87,7 +124,9 @@ test("mid-stream switch keeps the new chat's drafts and scroll", async ({ page }
 	// message 5 into view, so the pin must come after it — anything
 	// that moves scroll past this point is the completion under test.
 	await switchChat(page, 1);
-	await expect(page.locator("article .rendered").first()).toContainText("filler message number 0");
+	await expect(page.locator("article .rendered").first()).toContainText(
+		"filler message number 0"
+	);
 	await annotateDraft(page, "filler message number 5", "keep me");
 	await page.evaluate(() => {
 		document.querySelector("main .messages")?.scrollTo({ top: 0 });
@@ -99,7 +138,9 @@ test("mid-stream switch keeps the new chat's drafts and scroll", async ({ page }
 		.poll(
 			() =>
 				page.evaluate(() => {
-					const chats = JSON.parse(window.localStorage.getItem("ccez-llm-chats-v1") ?? "[]") as {
+					const chats = JSON.parse(
+						window.localStorage.getItem("ccez-llm-chats-v1") ?? "[]"
+					) as {
 						id: string;
 						messages: unknown[];
 					}[];
@@ -122,7 +163,9 @@ test("mid-stream switch keeps the new chat's drafts and scroll", async ({ page }
 	expect(top).toBeLessThan(100);
 	// And the reply really did land back home.
 	await switchChat(page, 0);
-	await expect(page.locator("article.assistant .rendered").nth(1)).toContainText("Mock reply to: go slow");
+	await expect(
+		page.locator("article.assistant .rendered").nth(1)
+	).toContainText("Mock reply to: go slow");
 });
 
 /** Open the chat list if it closed itself, then pick a row. */
@@ -138,8 +181,15 @@ async function switchChat(page: Page, nth: number): Promise<void> {
 }
 
 /** File one draft annotation (unsent) on the first quote match. */
-async function annotateDraft(page: Page, quote: string, note: string): Promise<void> {
-	await page.locator(`article .rendered:has-text("${quote}")`).first().dblclick({ position: { x: 10, y: 10 } });
+async function annotateDraft(
+	page: Page,
+	quote: string,
+	note: string
+): Promise<void> {
+	await page
+		.locator(`article .rendered:has-text("${quote}")`)
+		.first()
+		.dblclick({ position: { x: 10, y: 10 } });
 	await expect(page.locator(".sel-menu")).toBeVisible();
 	await page.locator('.sel-menu button:has-text("Annotate")').click();
 	await expect(page.locator(".ann-pop")).toBeVisible();
@@ -152,12 +202,16 @@ async function annotateDraft(page: Page, quote: string, note: string): Promise<v
 post-send reset drops the baked pills only, never notes filed while
 the reply was still arriving. The slow mock cadence makes the
 mid-stream annotate deterministic. */
-test("mid-stream annotation on the sent message survives the reply", async ({ page }) => {
+test("mid-stream annotation on the sent message survives the reply", async ({
+	page
+}) => {
 	await page.addInitScript(() => {
 		window.localStorage.setItem("ccez-mock-provider", "1");
 		window.localStorage.setItem("ccez-mock-word-ms", "800");
 	});
-	await seedChat(page, [{ role: "user", content: "The quick brown fox jumps over the lazy dog." }]);
+	await seedChat(page, [
+		{ role: "user", content: "The quick brown fox jumps over the lazy dog." }
+	]);
 	await page.goto("/");
 	await expect(page.locator("article .rendered").first()).toBeVisible();
 	await page.locator(".ta-input").click();
@@ -165,7 +219,9 @@ test("mid-stream annotation on the sent message survives the reply", async ({ pa
 	await page.keyboard.press("Enter");
 	// The stream crawls (800ms a word): drag-select the just-sent
 	// message and file an annotation before the reply lands.
-	await expect(page.locator("article.assistant .rendered")).toBeVisible({ timeout: 15_000 });
+	await expect(page.locator("article.assistant .rendered")).toBeVisible({
+		timeout: 15_000
+	});
 	await dragQuote(page, 0, "quick brown fox");
 	await expect(page.locator(".sel-menu")).toBeVisible();
 	await page.locator('.sel-menu button:has-text("Annotate")').click();
@@ -177,9 +233,15 @@ test("mid-stream annotation on the sent message survives the reply", async ({ pa
 	// reply crawls, but a settled wash must not re-ramp — the live
 	// name stays populated on every sample (a restart would empty it
 	// for the ramp window each token: the streaming flicker).
-	const badgeBox = await page.locator("button.ccez-ann-badge").first().boundingBox();
+	const badgeBox = await page
+		.locator("button.ccez-ann-badge")
+		.first()
+		.boundingBox();
 	if (!badgeBox) throw new Error("badge has no box");
-	await page.mouse.move(badgeBox.x + badgeBox.width / 2, badgeBox.y + badgeBox.height / 2);
+	await page.mouse.move(
+		badgeBox.x + badgeBox.width / 2,
+		badgeBox.y + badgeBox.height / 2
+	);
 	await page.waitForTimeout(300);
 	const emptySamples = await page.evaluate(async () => {
 		const reg = (
@@ -196,9 +258,12 @@ test("mid-stream annotation on the sent message survives the reply", async ({ pa
 	});
 	expect(emptySamples).toBe(0);
 	// The reply lands after the note was filed: the note survives it.
-	await expect(page.locator("article.assistant .rendered")).toContainText("Mock reply to: tell me about foxes", {
-		timeout: 30_000
-	});
+	await expect(page.locator("article.assistant .rendered")).toContainText(
+		"Mock reply to: tell me about foxes",
+		{
+			timeout: 30_000
+		}
+	);
 	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1);
 	await expect(page.locator(".prompt-tools .ann-wrap")).toHaveCount(1);
 });
@@ -207,12 +272,18 @@ test("mid-stream annotation on the sent message survives the reply", async ({ pa
 reply is still on its way — then retires the moment tokens print
 (thinking is over when printing starts, even though the send runs
 on). Slow mock cadence makes both sides deterministic. */
-test("thinking chip shows while waiting, hides on first token", async ({ page }) => {
+test("thinking chip shows while waiting, hides on first token", async ({
+	page
+}) => {
 	await page.addInitScript(() => {
 		window.localStorage.setItem("ccez-mock-provider", "1");
 		window.localStorage.setItem("ccez-mock-word-ms", "800");
 	});
-	await seedChat(page, [{ role: "user", content: "The quick brown fox jumps over the lazy dog." }], "ja");
+	await seedChat(
+		page,
+		[{ role: "user", content: "The quick brown fox jumps over the lazy dog." }],
+		"ja"
+	);
 	await page.goto("/");
 	await expect(page.locator("article .rendered").first()).toBeVisible();
 	await page.locator(".ta-input").click();
@@ -222,9 +293,12 @@ test("thinking chip shows while waiting, hides on first token", async ({ page })
 	await expect(sending).toContainText("考え中", { timeout: 15_000 });
 	// First tokens print while the reply still streams: the chip is
 	// gone even though the send has not settled.
-	await expect(page.locator("article.assistant .rendered")).toContainText("Mock reply to:", {
-		timeout: 30_000
-	});
+	await expect(page.locator("article.assistant .rendered")).toContainText(
+		"Mock reply to:",
+		{
+			timeout: 30_000
+		}
+	);
 	await expect(sending).toHaveCount(0);
 	// The stream itself runs on to the full reply.
 	await expect(page.locator("article.assistant .rendered")).toContainText(
@@ -241,7 +315,11 @@ test("thinking chip counts up and tints", async ({ page }) => {
 		window.localStorage.setItem("ccez-mock-provider", "1");
 		window.localStorage.setItem("ccez-mock-word-ms", "60000");
 	});
-	await seedChat(page, [{ role: "user", content: "The quick brown fox jumps over the lazy dog." }], "ja");
+	await seedChat(
+		page,
+		[{ role: "user", content: "The quick brown fox jumps over the lazy dog." }],
+		"ja"
+	);
 	await page.goto("/");
 	await expect(page.locator("article .rendered").first()).toBeVisible();
 	await page.locator(".ta-input").click();
@@ -249,7 +327,9 @@ test("thinking chip counts up and tints", async ({ page }) => {
 	await page.keyboard.press("Enter");
 	const sending = page.locator(".sending");
 	await expect(sending).toContainText("考え中", { timeout: 15_000 });
-	await expect(sending.locator(".sending-elapsed")).toContainText(/· \d+s/, { timeout: 12_000 });
+	await expect(sending.locator(".sending-elapsed")).toContainText(/· \d+s/, {
+		timeout: 12_000
+	});
 	const elapsed = sending.locator(".sending-elapsed");
 	await expect(elapsed).toBeHidden();
 	await sending.locator(".sending-chip").hover();
@@ -258,7 +338,9 @@ test("thinking chip counts up and tints", async ({ page }) => {
 	// on the dots — three distinct hues in a blue-teal-green run.
 	const dotColors = await page.evaluate(() => {
 		const dots = [...document.querySelectorAll(".sending .tdots span")];
-		return dots.map((d) => (d instanceof HTMLElement ? getComputedStyle(d).color : ""));
+		return dots.map((d) =>
+			d instanceof HTMLElement ? getComputedStyle(d).color : ""
+		);
 	});
 	expect(dotColors).toHaveLength(3);
 	expect(new Set(dotColors).size).toBe(3);

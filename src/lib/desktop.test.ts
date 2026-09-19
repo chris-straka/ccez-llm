@@ -29,7 +29,10 @@ beforeEach(() => {
 
 describe("parseCcezDeepLink", () => {
 	it("reads the path form", () => {
-		expect(parseCcezDeepLink("ccez://chat/abc123")).toEqual({ kind: "open-chat", chatId: "abc123" });
+		expect(parseCcezDeepLink("ccez://chat/abc123")).toEqual({
+			kind: "open-chat",
+			chatId: "abc123"
+		});
 	});
 
 	it("reads the query form with decoding", () => {
@@ -61,17 +64,37 @@ describe("parseCcezDeepLink", () => {
 });
 
 describe("isSummonHotkey", () => {
-	const base = { metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, code: "" };
+	const base = {
+		metaKey: false,
+		ctrlKey: false,
+		shiftKey: false,
+		altKey: false,
+		code: ""
+	};
 	it("matches Cmd/Ctrl+Shift+Space", () => {
-		expect(isSummonHotkey({ ...base, metaKey: true, shiftKey: true, code: "Space" })).toBe(true);
-		expect(isSummonHotkey({ ...base, ctrlKey: true, shiftKey: true, code: "Space" })).toBe(true);
+		expect(
+			isSummonHotkey({ ...base, metaKey: true, shiftKey: true, code: "Space" })
+		).toBe(true);
+		expect(
+			isSummonHotkey({ ...base, ctrlKey: true, shiftKey: true, code: "Space" })
+		).toBe(true);
 	});
 	it("rejects missing modifiers and other keys", () => {
-		expect(isSummonHotkey({ ...base, metaKey: true, code: "Space" })).toBe(false);
-		expect(isSummonHotkey({ ...base, metaKey: true, shiftKey: true, code: "KeyS" })).toBe(false);
-		expect(isSummonHotkey({ ...base, metaKey: true, shiftKey: true, altKey: true, code: "Space" })).toBe(
+		expect(isSummonHotkey({ ...base, metaKey: true, code: "Space" })).toBe(
 			false
 		);
+		expect(
+			isSummonHotkey({ ...base, metaKey: true, shiftKey: true, code: "KeyS" })
+		).toBe(false);
+		expect(
+			isSummonHotkey({
+				...base,
+				metaKey: true,
+				shiftKey: true,
+				altKey: true,
+				code: "Space"
+			})
+		).toBe(false);
 	});
 });
 
@@ -91,10 +114,12 @@ describe("studySheetMarkdown", () => {
 	});
 
 	it("falls back to Untitled chat and truncates giant histories", () => {
-		expect(studySheetMarkdown("   ", [{ role: "user", content: "hi" }])).toContain(
-			"# Untitled chat"
-		);
-		const big = studySheetMarkdown("t", [{ role: "user", content: "x".repeat(200_010) }]);
+		expect(
+			studySheetMarkdown("   ", [{ role: "user", content: "hi" }])
+		).toContain("# Untitled chat");
+		const big = studySheetMarkdown("t", [
+			{ role: "user", content: "x".repeat(200_010) }
+		]);
 		expect(big.length).toBeLessThanOrEqual(200_100);
 		expect(big).toContain("truncated");
 	});
@@ -102,9 +127,15 @@ describe("studySheetMarkdown", () => {
 
 describe("sheetTitle", () => {
 	it("uses the first non-empty line, capped at 60 chars", () => {
-		expect(sheetTitle([{ role: "user", content: "  \nExplain être\nmore" }])).toBe("Explain être");
-		expect(sheetTitle([{ role: "user", content: "x".repeat(70) }])).toBe(`${"x".repeat(60)}…`);
-		expect(sheetTitle([{ role: "user", content: "   " }])).toBe("Untitled chat");
+		expect(
+			sheetTitle([{ role: "user", content: "  \nExplain être\nmore" }])
+		).toBe("Explain être");
+		expect(sheetTitle([{ role: "user", content: "x".repeat(70) }])).toBe(
+			`${"x".repeat(60)}…`
+		);
+		expect(sheetTitle([{ role: "user", content: "   " }])).toBe(
+			"Untitled chat"
+		);
 		expect(sheetTitle([])).toBe("Untitled chat");
 	});
 });
@@ -113,7 +144,9 @@ describe("sanitizeFileStem / studySheetFilename", () => {
 	it("collapses runs, lowercases, falls back", () => {
 		expect(sanitizeFileStem("French verbs: être!")).toBe("french-verbs-tre");
 		expect(sanitizeFileStem("???")).toBe("chat");
-		expect(studySheetFilename("French verbs")).toBe("french-verbs-study-sheet.md");
+		expect(studySheetFilename("French verbs")).toBe(
+			"french-verbs-study-sheet.md"
+		);
 	});
 });
 

@@ -15,7 +15,9 @@ const MIRROR_KEY = "ccez-keychain:provider:muse";
 test.beforeEach(async ({ page }) => {
 	await seedChat(page, []);
 	await page.goto("/");
-	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
 });
 
 async function typeKey(page: import("@playwright/test").Page): Promise<void> {
@@ -30,9 +32,13 @@ async function typeKey(page: import("@playwright/test").Page): Promise<void> {
 	// persistSecrets + saveSettings run async after the edit: the
 	// Keychain-fallback mirror landing proves the save completed.
 	await expect
-		.poll(async () => page.evaluate((k) => window.localStorage.getItem(k), MIRROR_KEY), {
-			timeout: 15_000
-		})
+		.poll(
+			async () =>
+				page.evaluate((k) => window.localStorage.getItem(k), MIRROR_KEY),
+			{
+				timeout: 15_000
+			}
+		)
 		.not.toBeNull();
 	await page.keyboard.press("Escape");
 }
@@ -54,9 +60,14 @@ test("typed key never appears outside settings storage", async ({ page }) => {
 	expect(leaks).toEqual([]);
 });
 
-test("keychain-fallback mirror holds ciphertext, not the raw key", async ({ page }) => {
+test("keychain-fallback mirror holds ciphertext, not the raw key", async ({
+	page
+}) => {
 	await typeKey(page);
-	const mirror = await page.evaluate((k) => window.localStorage.getItem(k), MIRROR_KEY);
+	const mirror = await page.evaluate(
+		(k) => window.localStorage.getItem(k),
+		MIRROR_KEY
+	);
 	expect(mirror).not.toBeNull();
 	expect(mirror).not.toContain(RAW);
 	expect(mirror!.startsWith("gcm1:")).toBe(true);
@@ -68,7 +79,9 @@ test("provider key never lands in persisted chat history", async ({ page }) => {
 	await page.evaluate(
 		({ raw }: { raw: string }) => {
 			const stored = window.localStorage.getItem("ccez-llm-settings-v1");
-			const parsed = stored ? (JSON.parse(stored) as Record<string, unknown>) : {};
+			const parsed = stored
+				? (JSON.parse(stored) as Record<string, unknown>)
+				: {};
 			parsed["activeProviderId"] = "muse";
 			parsed["providers"] = {
 				...((parsed["providers"] as Record<string, unknown> | undefined) ?? {}),
@@ -79,7 +92,10 @@ test("provider key never lands in persisted chat history", async ({ page }) => {
 					models: []
 				}
 			};
-			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify(parsed));
+			window.localStorage.setItem(
+				"ccez-llm-settings-v1",
+				JSON.stringify(parsed)
+			);
 		},
 		{ raw: RAW }
 	);
@@ -90,9 +106,12 @@ test("provider key never lands in persisted chat history", async ({ page }) => {
 	await page.locator(".ta-input").click();
 	await page.keyboard.type("history hygiene check");
 	await page.keyboard.press("Enter");
-	await expect(page.locator("article.assistant .rendered")).toContainText("Mock reply to:", {
-		timeout: 15_000
-	});
+	await expect(page.locator("article.assistant .rendered")).toContainText(
+		"Mock reply to:",
+		{
+			timeout: 15_000
+		}
+	);
 	const history = await page.evaluate(
 		(k) => window.localStorage.getItem(k) ?? "",
 		"ccez-llm-chats-v1"

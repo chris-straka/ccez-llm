@@ -14,52 +14,52 @@
 
 /** One frame-paced scroll-hold glide (started by a held key). */
 export interface ScrollHold {
-  key: string;
-  velocity: number;
-  /** Discrete step a sub-150ms tap lands (line for j/k, skip step for d/u). */
-  tapDy: number;
-  downAt: number;
-  /** rAF-clock start: the velocity ramp reads age off this, never the wall clock. */
-  startT: number;
-  lastT: number;
-  raf: number;
+	key: string;
+	velocity: number;
+	/** Discrete step a sub-150ms tap lands (line for j/k, skip step for d/u). */
+	tapDy: number;
+	downAt: number;
+	/** rAF-clock start: the velocity ramp reads age off this, never the wall clock. */
+	startT: number;
+	lastT: number;
+	raf: number;
 }
 
 export interface ViewportState {
-  /**
-   * Stick-to-bottom: submit/resend/stage pins the view to the newest
-   * content; scrolling up unpins (history never yanks), coming back
-   * to the bottom re-pins.
-   */
-  stick: boolean;
-  /**
-   * A finger held on the messages freezes all auto-scroll: the
-   * in-flight smooth scroll cancels in place and stream growth never
-   * yanks mid-hold.
-   */
-  holding: boolean;
-  /** Active key-hold glide, if any. */
-  hold: ScrollHold | null;
-  /**
-   * Glide generation: the rAF tick captures the count at start and
-   * exits when it changes. Identity comparison cannot work here —
-   * `$state` proxies never equal the raw object the tick closed
-   * over — so a primitive generation does the supersede check.
-   */
-  holdSeq: number;
-  /** Scrollbar fade timer handle (thumb shows while scrolling). */
-  idleTimer: number | undefined;
-  /** Stream-follow cache: last streamed length already pinned. */
-  lastStreamLen: number;
+	/**
+	 * Stick-to-bottom: submit/resend/stage pins the view to the newest
+	 * content; scrolling up unpins (history never yanks), coming back
+	 * to the bottom re-pins.
+	 */
+	stick: boolean;
+	/**
+	 * A finger held on the messages freezes all auto-scroll: the
+	 * in-flight smooth scroll cancels in place and stream growth never
+	 * yanks mid-hold.
+	 */
+	holding: boolean;
+	/** Active key-hold glide, if any. */
+	hold: ScrollHold | null;
+	/**
+	 * Glide generation: the rAF tick captures the count at start and
+	 * exits when it changes. Identity comparison cannot work here —
+	 * `$state` proxies never equal the raw object the tick closed
+	 * over — so a primitive generation does the supersede check.
+	 */
+	holdSeq: number;
+	/** Scrollbar fade timer handle (thumb shows while scrolling). */
+	idleTimer: number | undefined;
+	/** Stream-follow cache: last streamed length already pinned. */
+	lastStreamLen: number;
 }
 
 export function emptyViewport(): ViewportState {
-  return {
-    stick: true,
-    holding: false,
-    hold: null,
-    holdSeq: 0,
-    idleTimer: undefined,
-    lastStreamLen: 0,
-  };
+	return {
+		stick: true,
+		holding: false,
+		hold: null,
+		holdSeq: 0,
+		idleTimer: undefined,
+		lastStreamLen: 0
+	};
 }

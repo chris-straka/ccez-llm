@@ -37,7 +37,10 @@ const THINK_FULL = /<think>([\s\S]*?)<\/think>/gi;
 
 /** Split `<think>…</think>` reasoning out of model output. Unclosed tags
  * (mid-stream) treat the rest of the message as thoughts. */
-export function extractThoughts(markdown: string): { thoughts: string | null; body: string } {
+export function extractThoughts(markdown: string): {
+	thoughts: string | null;
+	body: string;
+} {
 	const full = [...markdown.matchAll(THINK_FULL)];
 	if (full.length > 0) {
 		const thoughts = full
@@ -59,7 +62,10 @@ export function extractThoughts(markdown: string): { thoughts: string | null; bo
 const SOURCES_HEADING = /^#{1,4}\s+sources(\s+(and|&)\s+citations)?\s*$/im;
 
 /** Drop a trailing "Sources" section unless the user asked for sources. */
-export function stripSourcesIfUnasked(body: string, sourcesAsked: boolean): string {
+export function stripSourcesIfUnasked(
+	body: string,
+	sourcesAsked: boolean
+): string {
 	if (sourcesAsked) return body;
 	const match = body.search(SOURCES_HEADING);
 	if (match < 0) return body;
@@ -77,13 +83,15 @@ export { estimateTextTokens } from "./attachments";
 
 /** Copy body for a message: thoughts and unasked sources stripped for
  * assistants, raw content otherwise. */
-export function plainBody(content: string, role: string, sourcesWanted: boolean): string {
+export function plainBody(
+	content: string,
+	role: string,
+	sourcesWanted: boolean
+): string {
 	if (role !== "assistant") return content;
 	const { body } = extractThoughts(content);
 	return stripSourcesIfUnasked(body, sourcesWanted);
 }
-
-
 
 export interface RenderedMessage {
 	html: string;
@@ -107,7 +115,7 @@ const SENT_COPY_GLYPH =
 const SENT_CLOSE_GLYPH =
 	'<svg class="sent-glyph" viewBox="0 0 16 16" fill="none" stroke="currentColor" ' +
 	'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-	"<path d=\"M4 4l8 8M12 4l-8 8\" />" +
+	'<path d="M4 4l8 8M12 4l-8 8" />' +
 	"</svg>";
 
 /**
@@ -121,7 +129,10 @@ const SENT_CLOSE_GLYPH =
  * literals than attachments, e.g. hand-typed): the plain marker text.
  * Pure and unit-tested.
  */
-export function attachTagHtml(model: AttachTagModel | null, kindLetter: string): string {
+export function attachTagHtml(
+	model: AttachTagModel | null,
+	kindLetter: string
+): string {
 	const label = kindLetter === "f" ? FILE_MARKER : IMAGE_MARKER;
 	if (!model) return escapeHtml(label);
 	if (!model.open) {
@@ -182,7 +193,9 @@ export function renderMessage(
 	const { body } = extractThoughts(markdownText);
 	const clean = stripSourcesIfUnasked(body, sourcesWanted);
 	const rendered: RenderedMessage = { html: "", codes: [], maths: [] };
-	rendered.html = sanitize(renderInto(clean, rendered.codes, rendered.maths, attachModels));
+	rendered.html = sanitize(
+		renderInto(clean, rendered.codes, rendered.maths, attachModels)
+	);
 	return rendered;
 }
 
@@ -193,7 +206,6 @@ export function renderMessage(
  * source rendering, never fatal. Unclosed delimiters (mid-stream) stay
  * literal. Fenced code blocks and inline code spans never become math.
  */
-
 
 /**
  * Shared-code-array render so `data-code-index` attributes stay unique even
@@ -232,7 +244,9 @@ function renderInto(
 	// Math leaves the source next (code fences/spans excluded there), so
 	// marked never sees the delimiters and KaTeX tags never pass through it.
 	const base = maths.length;
-	const { stripped, maths: found } = extractMath(stripLatexFenceDupes(extracted.stripped));
+	const { stripped, maths: found } = extractMath(
+		stripLatexFenceDupes(extracted.stripped)
+	);
 	for (const entry of found) maths.push(entry);
 	const instance = new Marked({ breaks: true });
 	instance.use({
@@ -266,7 +280,11 @@ function renderInto(
 				// to an identical `$$` block was already dropped by
 				// stripLatexFenceDupes, so each equation shows once).
 				if (language === "latex") {
-					maths.push({ kind: "display", tex: stripOuterDisplayDelimiters(text), raw: text });
+					maths.push({
+						kind: "display",
+						tex: stripOuterDisplayDelimiters(text),
+						raw: text
+					});
 					return mathPlaceholder(maths.length - 1 - base);
 				}
 				const index = codes.length;
@@ -316,11 +334,12 @@ function renderInto(
 		const isFile = kind === "f";
 		const index = isFile ? seen.text++ : seen.image++;
 		const model =
-			models.filter((m) => (isFile ? m.kind === "text" : m.kind === "image"))[index] ??
-			null;
+			models.filter((m) => (isFile ? m.kind === "text" : m.kind === "image"))[
+				index
+			] ?? null;
 		return attachTagHtml(model, kind);
 	});
-	return withTags.replace(DIR_AUTO_BLOCKS, "<$1 dir=\"auto\"");
+	return withTags.replace(DIR_AUTO_BLOCKS, '<$1 dir="auto"');
 }
 
 let purifier: ReturnType<typeof DOMPurify> | null = null;
@@ -372,12 +391,17 @@ export function pasteFoldButton(index: number, chars: number): string {
  */
 export function foldSegments(
 	content: string,
-	folds: Array<{ start: number; end: number; chars: number; open?: boolean }> | undefined
+	folds:
+		| Array<{ start: number; end: number; chars: number; open?: boolean }>
+		| undefined
 ): FoldSegment[] {
 	if (!folds || folds.length === 0) return [{ kind: "text", text: content }];
 	const ordered = folds
 		.map((fold, index) => ({ ...fold, index }))
-		.filter((fold) => fold.start >= 0 && fold.end <= content.length && fold.start < fold.end)
+		.filter(
+			(fold) =>
+				fold.start >= 0 && fold.end <= content.length && fold.start < fold.end
+		)
 		.sort((a, b) => a.start - b.start || a.end - b.end);
 	const segments: FoldSegment[] = [];
 	let run = "";
@@ -415,7 +439,11 @@ export function foldSegments(
  * blue like the marker, clicking contracts back to the tag. Pure and
  * unit-tested.
  */
-export function foldBracket(index: number, toggleAttr: string, bracket: "[" | "]"): string {
+export function foldBracket(
+	index: number,
+	toggleAttr: string,
+	bracket: "[" | "]"
+): string {
 	return (
 		`<button type="button" class="paste-fold paste-fold-bracket" ${toggleAttr}="${index}" ` +
 		`title="Collapse pasted content">${bracket}</button>`
@@ -431,12 +459,15 @@ export function foldBracket(index: number, toggleAttr: string, bracket: "[" | "]
  */
 export function applyPasteFolds(
 	content: string,
-	folds: Array<{ start: number; end: number; chars: number; open?: boolean }> | undefined
+	folds:
+		| Array<{ start: number; end: number; chars: number; open?: boolean }>
+		| undefined
 ): string {
 	return foldSegments(content, folds)
 		.map((segment) => {
 			if (segment.kind === "text") return segment.text;
-			if (segment.kind === "marker") return pasteFoldButton(segment.index, segment.chars);
+			if (segment.kind === "marker")
+				return pasteFoldButton(segment.index, segment.chars);
 			return (
 				foldBracket(segment.index, "data-paste-fold", "[") +
 				segment.text +
@@ -499,7 +530,9 @@ export function getHighlighter(): Promise<Highlighter> {
  * (dual light/dark CSS variables; the stylesheet picks by media query).
  * Unknown languages keep their plain rendering.
  */
-export async function highlightRendered(rendered: RenderedMessage): Promise<string> {
+export async function highlightRendered(
+	rendered: RenderedMessage
+): Promise<string> {
 	if (rendered.codes.length === 0) return rendered.html;
 	let highlighter: Highlighter;
 	try {
@@ -517,7 +550,9 @@ export async function highlightRendered(rendered: RenderedMessage): Promise<stri
 				themes: { light: "github-light", dark: "github-dark" }
 			});
 			const match = full.match(/<pre[^>]*>([\s\S]*)<\/pre>/);
-			return match ? (match[1] ?? "").replace(/^<code[^>]*>|<\/code>$/g, "") : null;
+			return match
+				? (match[1] ?? "").replace(/^<code[^>]*>|<\/code>$/g, "")
+				: null;
 		} catch {
 			return null;
 		}

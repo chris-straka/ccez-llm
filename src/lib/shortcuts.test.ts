@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { desktopShortcuts, filteredShortcuts, touchShortcuts } from "./shortcuts";
+import {
+	desktopShortcuts,
+	filteredShortcuts,
+	touchShortcuts
+} from "./shortcuts";
 
 /**
  * Shortcuts-menu copy guard: removed rows kept finding their way back
@@ -59,25 +63,37 @@ describe("shortcuts menu copy", () => {
 	it("pins the exact mac list in order", () => {
 		const rows = desktopShortcuts(true);
 		expect(rows.map((r) => r.name)).toEqual(MAC_NAMES);
-		expect(rows.find((r) => r.name === "Shortcuts show/hide")?.keys).toContain("middle-click");
+		expect(rows.find((r) => r.name === "Shortcuts show/hide")?.keys).toContain(
+			"middle-click"
+		);
 		expect(rows.find((r) => r.name === "Scroll")?.keys).toContain("h/l");
-		expect(rows.find((r) => r.name === "Reply language")?.keys).toContain("⌘1, ⌘0");
-		expect(rows.find((r) => r.name === "Speak text aloud")?.keys).toBe("Right-click");
+		expect(rows.find((r) => r.name === "Reply language")?.keys).toContain(
+			"⌘1, ⌘0"
+		);
+		expect(rows.find((r) => r.name === "Speak text aloud")?.keys).toBe(
+			"Right-click"
+		);
 	});
 
 	it("uses Ctrl labels off-mac with the same row names", () => {
 		const rows = desktopShortcuts(false);
 		expect(rows.map((r) => r.name)).toEqual(MAC_NAMES);
-		expect(rows.find((r) => r.name === "Shortcuts show/hide")?.keys).toContain("Ctrl+Shift+/");
+		expect(rows.find((r) => r.name === "Shortcuts show/hide")?.keys).toContain(
+			"Ctrl+Shift+/"
+		);
 		expect(rows.find((r) => r.name === "Search chats")?.keys).toBe("Ctrl+P");
-		expect(rows.find((r) => r.name === "Delete a message")?.keys).toBe("Hover + Shift+D");
+		expect(rows.find((r) => r.name === "Delete a message")?.keys).toBe(
+			"Hover + Shift+D"
+		);
 	});
 
 	it("never re-adds removed rows on either platform", () => {
 		for (const isMac of [true, false]) {
 			const names = desktopShortcuts(isMac).map((r) => r.name);
 			for (const gone of REMOVED) expect(names).not.toContain(gone);
-			const keys = desktopShortcuts(isMac).map((r) => r.keys).join("\n");
+			const keys = desktopShortcuts(isMac)
+				.map((r) => r.keys)
+				.join("\n");
 			expect(keys).not.toContain("again stops");
 			expect(keys).not.toContain("past newest");
 			expect(keys).not.toContain("Enter cycles");
@@ -85,7 +101,11 @@ describe("shortcuts menu copy", () => {
 	});
 
 	it("keeps entry copy paren-free (the e2e pithiness contract)", () => {
-		for (const row of [...desktopShortcuts(true), ...desktopShortcuts(false), ...touchShortcuts()]) {
+		for (const row of [
+			...desktopShortcuts(true),
+			...desktopShortcuts(false),
+			...touchShortcuts()
+		]) {
 			expect(`${row.name}: ${row.keys}`).not.toContain("(");
 		}
 	});
@@ -111,14 +131,18 @@ describe("shortcuts menu copy", () => {
 		// fingers so two-finger right can summon the list, and the
 		// vertical slides read as gg / G.
 		const byName = new Map(touchShortcuts().map((r) => [r.name, r.keys]));
-		expect(byName.get("Chats list")).toBe("Swipe right · two-finger swipe right");
+		expect(byName.get("Chats list")).toBe(
+			"Swipe right · two-finger swipe right"
+		);
 		expect(byName.get("Chat switcher")).toBe(
 			"Two-finger hold · double-tap empty space · swipe cycles · loops"
 		);
 		expect(byName.get("Settings")).toBe(
 			"Swipe left off messages · chats list button · two-finger swipe left"
 		);
-		expect(byName.get("Newer / older chat")).toBe("Three-finger swipe right / left");
+		expect(byName.get("Newer / older chat")).toBe(
+			"Three-finger swipe right / left"
+		);
 		expect(byName.get("Top of chat")).toBe("Two-finger swipe up · gg");
 		expect(byName.get("Bottom of chat")).toBe("Two-finger swipe down · G");
 		expect(byName.get("Message end")).toBe("Double two-finger tap");

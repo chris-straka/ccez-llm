@@ -19,13 +19,17 @@ test.beforeEach(async ({ page }) => {
 		const synth = window.speechSynthesis;
 		if (synth) {
 			synth.speak = ((utterance: SpeechSynthesisUtterance) => {
-				(window as unknown as { __spoken: string[] }).__spoken.push(utterance.text);
+				(window as unknown as { __spoken: string[] }).__spoken.push(
+					utterance.text
+				);
 			}) as typeof synth.speak;
 		}
 	});
 	await seedChat(page, [{ role: "assistant", content: "你好世界" }]);
 	await page.goto("/");
-	await expect(page.locator("article.assistant .rendered p").first()).toBeVisible({
+	await expect(
+		page.locator("article.assistant .rendered p").first()
+	).toBeVisible({
 		timeout: 60_000
 	});
 });
@@ -69,7 +73,9 @@ async function summonDock(page: Page): Promise<void> {
 	await expect(page.locator(".ann-dock-wrap")).toBeVisible({ timeout: 10_000 });
 }
 
-test("dock Speak toasts pinyin at the top and still speaks", async ({ page }) => {
+test("dock Speak toasts pinyin at the top and still speaks", async ({
+	page
+}) => {
 	await summonDock(page);
 	await page.locator('button[aria-label="Speak selection"]').click();
 	const toast = page.locator(".toast");

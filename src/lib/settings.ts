@@ -19,7 +19,10 @@ export type VoiceEngine = "web" | "native";
 export type ThemeMode = "system" | "light" | "dark";
 
 /** Resolved scheme for a mode: pins hold, system mirrors the OS. */
-export function resolveTheme(mode: ThemeMode, systemDark: boolean): "light" | "dark" {
+export function resolveTheme(
+	mode: ThemeMode,
+	systemDark: boolean
+): "light" | "dark" {
 	if (mode === "light") return "light";
 	if (mode === "dark") return "dark";
 	return systemDark ? "dark" : "light";
@@ -48,7 +51,10 @@ export function activeThinkingSupport(settings: AppSettings): ThinkingSupport {
 /** Saved thinking option for the active provider, clamped to its dial. */
 export function activeThinkingId(settings: AppSettings): string {
 	const support = activeThinkingSupport(settings);
-	return resolveThinkingId(support, settings.thinking[settings.activeProviderId]);
+	return resolveThinkingId(
+		support,
+		settings.thinking[settings.activeProviderId]
+	);
 }
 
 export interface ProviderSettings {
@@ -203,7 +209,11 @@ export const CHAT_WIDTH_PHONE_MIN_REM = 46;
  * go full-bleed once huge type needs the room, and never narrower
  * than the touch floor; desktop rides the slider raw. Pure.
  */
-export function effectiveChatWidth(androidUI: boolean, fontScale: number, chatWidth: number): number {
+export function effectiveChatWidth(
+	androidUI: boolean,
+	fontScale: number,
+	chatWidth: number
+): number {
 	if (!androidUI) return chatWidth;
 	if (fontScale >= FULLBLEED_FONT_SCALE) return CHAT_WIDTH_FULLBLEED_REM;
 	return Math.max(CHAT_WIDTH_PHONE_MIN_REM, chatWidth);
@@ -228,7 +238,9 @@ export const PROMPT_IDLE_MAX = 10;
  */
 function devEnv(): Record<string, string | undefined> {
 	const fromProcess = (
-		globalThis as unknown as { process?: { env?: Record<string, string | undefined> } }
+		globalThis as unknown as {
+			process?: { env?: Record<string, string | undefined> };
+		}
 	).process?.env;
 	try {
 		const viteEnv = import.meta.env;
@@ -248,7 +260,10 @@ const BASE_URL_ALIASES: Record<string, string[]> = {
 	muse: ["VITE_MUSE_BASE_URL", "META_BASE_URL"]
 };
 
-function firstSet(env: Record<string, string | undefined>, names: string[]): string {
+function firstSet(
+	env: Record<string, string | undefined>,
+	names: string[]
+): string {
 	for (const name of names) {
 		if (env[name]) return env[name];
 	}
@@ -281,7 +296,8 @@ export function envProviderDefaults(
 export function systemLocale(): string {
 	try {
 		const tag = typeof navigator !== "undefined" ? navigator.language : "";
-		if (/^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})?$/.test(tag.trim())) return tag.trim();
+		if (/^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})?$/.test(tag.trim()))
+			return tag.trim();
 	} catch {
 		// No DOM (SSR/tests without jsdom): fall through to en-US.
 	}
@@ -344,7 +360,9 @@ export function effectiveSystemPrompt(
 	lookupTools = false
 ): string {
 	const parts = [settings.systemPrompt.trim()];
-	const hint = activeThinkingSupport(settings).promptHint(activeThinkingId(settings));
+	const hint = activeThinkingSupport(settings).promptHint(
+		activeThinkingId(settings)
+	);
 	if (hint) parts.push(hint);
 	const lang = replyLanguageFor(replyCode ?? settings.replyLang);
 	if (lang) parts.push(lang.prompt);
@@ -385,7 +403,8 @@ function dropRetiredKeys(merged: AppSettings, keys: string[]): void {
 
 export function loadSettings(store?: KeyValueStore): AppSettings {
 	const backend = store ?? browserStore() ?? memoryStore;
-	const raw = backend.getItem(STORAGE_KEY) ?? backend.getItem(LEGACY_STORAGE_KEY);
+	const raw =
+		backend.getItem(STORAGE_KEY) ?? backend.getItem(LEGACY_STORAGE_KEY);
 	if (!raw) return defaultSettings();
 	try {
 		const parsed = JSON.parse(raw) as Partial<AppSettings>;
@@ -412,7 +431,11 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 		if (!Array.isArray(merged.customProviders)) merged.customProviders = [];
 		// An active provider that no longer exists (deleted custom) falls
 		// back to Muse rather than throwing in getProviderDef.
-		if (!listProviders(merged.customProviders).some((p) => p.id === merged.activeProviderId)) {
+		if (
+			!listProviders(merged.customProviders).some(
+				(p) => p.id === merged.activeProviderId
+			)
+		) {
 			merged.activeProviderId = builtin("muse");
 		}
 		// Backfill the model cache (provider entries from older saves
@@ -428,13 +451,18 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 		// working).
 		if (
 			typeof merged.fontScale !== "number" ||
-			!(merged.fontScale >= FONT_SCALE_MIN && merged.fontScale <= FONT_SCALE_MAX)
+			!(
+				merged.fontScale >= FONT_SCALE_MIN && merged.fontScale <= FONT_SCALE_MAX
+			)
 		) {
 			merged.fontScale = 1;
 		}
 		// Backfill the desktop chat width on older saves; clamp strays
 		// into range (rounded to whole rem, the slider's step).
-		if (typeof merged.chatWidth !== "number" || Number.isNaN(merged.chatWidth)) {
+		if (
+			typeof merged.chatWidth !== "number" ||
+			Number.isNaN(merged.chatWidth)
+		) {
 			merged.chatWidth = CHAT_WIDTH_DEFAULT;
 		} else {
 			merged.chatWidth = Math.min(
@@ -444,7 +472,11 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 		}
 		// Theme pins from older saves predate the switch: anything that
 		// isn't a known mode follows the OS.
-		if (merged.theme !== "light" && merged.theme !== "dark" && merged.theme !== "system") {
+		if (
+			merged.theme !== "light" &&
+			merged.theme !== "dark" &&
+			merged.theme !== "system"
+		) {
 			merged.theme = "system";
 		}
 		// Clamp the prompt idle-hide timeout (older saves predate it;
@@ -455,17 +487,21 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 			Number.isNaN(merged.promptIdleSec) ||
 			(merged.promptIdleSec !== PROMPT_IDLE_NEVER &&
 				merged.promptIdleSec !== PROMPT_IDLE_ALWAYS &&
-				(merged.promptIdleSec < PROMPT_IDLE_MIN || merged.promptIdleSec > PROMPT_IDLE_MAX))
+				(merged.promptIdleSec < PROMPT_IDLE_MIN ||
+					merged.promptIdleSec > PROMPT_IDLE_MAX))
 		) {
 			merged.promptIdleSec = PROMPT_IDLE_DEFAULT;
 		}
-		if (typeof merged.scaleActionsWithFont !== "boolean") merged.scaleActionsWithFont = false;
+		if (typeof merged.scaleActionsWithFont !== "boolean")
+			merged.scaleActionsWithFont = false;
 		// Touch-only toggles postdate older saves the same way.
-		if (typeof merged.inspectEnabled !== "boolean") merged.inspectEnabled = true;
+		if (typeof merged.inspectEnabled !== "boolean")
+			merged.inspectEnabled = true;
 		if (typeof merged.hideMessages !== "boolean") merged.hideMessages = false;
 		if (typeof merged.micEnabled !== "boolean") merged.micEnabled = true;
 		if (typeof merged.hideButtons !== "boolean") merged.hideButtons = true;
-		if (typeof merged.autoSpeakSelection !== "boolean") merged.autoSpeakSelection = true;
+		if (typeof merged.autoSpeakSelection !== "boolean")
+			merged.autoSpeakSelection = true;
 		// Legacy `vibration` (inverted wording): an explicit off
 		// becomes disabled; anything else stays enabled. Fresh
 		// defaults fill hapticsDisabled before healing, so the
@@ -475,11 +511,16 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 			merged.hapticsDisabled = parsedRecord["vibration"] === false;
 		}
 		delete (merged as unknown as Record<string, unknown>)["vibration"];
-		if (typeof merged.replyNotifications !== "boolean") merged.replyNotifications = true;
-		if (typeof merged.showMessageButtons !== "boolean") merged.showMessageButtons = true;
+		if (typeof merged.replyNotifications !== "boolean")
+			merged.replyNotifications = true;
+		if (typeof merged.showMessageButtons !== "boolean")
+			merged.showMessageButtons = true;
 		// Backfill the message gap on older saves; clamp strays into
 		// range (the slider persists exact decimals, so no rounding).
-		if (typeof merged.messageGap !== "number" || Number.isNaN(merged.messageGap)) {
+		if (
+			typeof merged.messageGap !== "number" ||
+			Number.isNaN(merged.messageGap)
+		) {
 			merged.messageGap = MESSAGE_GAP_DEFAULT;
 		} else {
 			merged.messageGap = Math.min(
@@ -508,7 +549,9 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 		// matching the dropped pill's voice is the override's
 		// fingerprint. A deliberate pick (pinned, or a non-default voice
 		// no pill explains) survives.
-		const dropped = merged.replyLang ? replyLanguageFor(merged.replyLang) : null;
+		const dropped = merged.replyLang
+			? replyLanguageFor(merged.replyLang)
+			: null;
 		merged.replyLang = null;
 		if (dropped && merged.voiceLang === dropped.voice) {
 			merged.voiceLang = fresh.voiceLang;
@@ -555,7 +598,10 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 	}
 }
 
-export function saveSettings(settings: AppSettings, store?: KeyValueStore): void {
+export function saveSettings(
+	settings: AppSettings,
+	store?: KeyValueStore
+): void {
 	const backend = store ?? browserStore() ?? memoryStore;
 	backend.setItem(STORAGE_KEY, JSON.stringify(settings));
 }

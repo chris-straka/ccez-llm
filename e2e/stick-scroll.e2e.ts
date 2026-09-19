@@ -19,9 +19,12 @@ async function sendLong(page) {
 }
 
 async function streamDone(page) {
-	await expect(page.locator("article.assistant .rendered")).toContainText("Mock reply to:", {
-		timeout: 60_000
-	});
+	await expect(page.locator("article.assistant .rendered")).toContainText(
+		"Mock reply to:",
+		{
+			timeout: 60_000
+		}
+	);
 	await page.waitForFunction(
 		() => {
 			const box = document.querySelector(".messages") as HTMLElement | null;
@@ -46,7 +49,9 @@ test("submit follows the stream to the bottom", async ({ browser }) => {
 	}
 });
 
-test("a held finger freezes submit scroll and stream follow", async ({ browser }) => {
+test("a held finger freezes submit scroll and stream follow", async ({
+	browser
+}) => {
 	const ctx = await browser.newContext({ ...devices["iPhone 15"] });
 	const page = await ctx.newPage();
 	try {
@@ -60,25 +65,36 @@ test("a held finger freezes submit scroll and stream follow", async ({ browser }
 		await page.locator(".ta-input").waitFor({ timeout: 60_000 });
 		// Park at the top, then hold a finger down for the whole send.
 		await page.evaluate(() => {
-			document.querySelector(".messages")?.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+			document
+				.querySelector(".messages")
+				?.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
 		});
 		await page.waitForFunction(() => {
-			return (document.querySelector(".messages") as HTMLElement)?.scrollTop === 0;
+			return (
+				(document.querySelector(".messages") as HTMLElement)?.scrollTop === 0
+			);
 		});
 		await page.evaluate(() => {
 			document
 				.querySelector(".messages")
-				?.dispatchEvent(new TouchEvent("touchstart", { bubbles: true, cancelable: true }));
+				?.dispatchEvent(
+					new TouchEvent("touchstart", { bubbles: true, cancelable: true })
+				);
 		});
 		await sendLong(page);
-		await expect(page.locator("article.assistant .rendered").last()).toContainText("Mock reply to:", {
+		await expect(
+			page.locator("article.assistant .rendered").last()
+		).toContainText("Mock reply to:", {
 			timeout: 60_000
 		});
 		await page.waitForTimeout(1000);
 		const held = await page.evaluate(() => {
 			const box = (document.querySelector(".messages") as HTMLElement) ?? null;
 			if (!box) throw new Error("no scroll box");
-			return { top: box.scrollTop, gap: box.scrollHeight - box.scrollTop - box.clientHeight };
+			return {
+				top: box.scrollTop,
+				gap: box.scrollHeight - box.scrollTop - box.clientHeight
+			};
 		});
 		// Never left the top, far from the new bottom.
 		expect(held.top).toBeLessThanOrEqual(4);
@@ -87,11 +103,14 @@ test("a held finger freezes submit scroll and stream follow", async ({ browser }
 		await page.evaluate(() => {
 			document
 				.querySelector(".messages")
-				?.dispatchEvent(new TouchEvent("touchend", { bubbles: true, cancelable: true }));
+				?.dispatchEvent(
+					new TouchEvent("touchend", { bubbles: true, cancelable: true })
+				);
 		});
 		await page.waitForTimeout(1000);
 		const after = await page.evaluate(
-			() => (document.querySelector(".messages") as HTMLElement)?.scrollTop ?? -1
+			() =>
+				(document.querySelector(".messages") as HTMLElement)?.scrollTop ?? -1
 		);
 		expect(after).toBeLessThanOrEqual(4);
 	} finally {

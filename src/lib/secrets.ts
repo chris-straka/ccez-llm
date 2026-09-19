@@ -71,9 +71,12 @@ export function decodeSecretBundle(raw: string | null): SecretBundle {
 	if (!raw) return {};
 	try {
 		const parsed: unknown = JSON.parse(raw);
-		if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return {};
+		if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed))
+			return {};
 		const out: SecretBundle = {};
-		for (const [id, value] of Object.entries(parsed as Record<string, unknown>)) {
+		for (const [id, value] of Object.entries(
+			parsed as Record<string, unknown>
+		)) {
 			if (typeof value === "string" && value) out[id] = value;
 		}
 		return out;
@@ -104,7 +107,9 @@ export function tauriBackendAvailable(): boolean {
 		// Tauri v2 exposes __TAURI_INTERNALS__ (__TAURI__ was v1). Checking
 		// only the v1 name silently disabled every tauri-gated branch in the
 		// real app (traffic clearance, Keychain, shell UI).
-		return window.__TAURI_INTERNALS__ !== undefined || window.__TAURI__ !== undefined;
+		return (
+			window.__TAURI_INTERNALS__ !== undefined || window.__TAURI__ !== undefined
+		);
 	} catch {
 		return false;
 	}
@@ -152,7 +157,8 @@ function idbDatabase(): Promise<IDBDatabase> {
 				}
 			};
 			request.onsuccess = () => resolve(request.result);
-			request.onerror = () => reject(request.error ?? new Error("IndexedDB open failed"));
+			request.onerror = () =>
+				reject(request.error ?? new Error("IndexedDB open failed"));
 		} catch (error) {
 			reject(error instanceof Error ? error : new Error(String(error)));
 		}
@@ -232,10 +238,11 @@ function webDataKey(): Promise<CryptoKey | null> {
 				// No IndexedDB (private mode, tests): ephemeral below.
 			}
 			try {
-				const fresh = await subtle.generateKey({ name: "AES-GCM", length: 256 }, false, [
-					"encrypt",
-					"decrypt"
-				]);
+				const fresh = await subtle.generateKey(
+					{ name: "AES-GCM", length: 256 },
+					false,
+					["encrypt", "decrypt"]
+				);
 				try {
 					await idbPutKey(fresh);
 				} catch {
@@ -294,7 +301,10 @@ async function fallbackSet(account: string, secret: string): Promise<void> {
 			);
 			value =
 				ENVELOPE_V1 +
-				JSON.stringify({ iv: bytesToB64(iv), data: bytesToB64(new Uint8Array(cipher)) });
+				JSON.stringify({
+					iv: bytesToB64(iv),
+					data: bytesToB64(new Uint8Array(cipher))
+				});
 		} catch {
 			value = secret;
 		}
@@ -317,7 +327,10 @@ export async function getSecret(account: string): Promise<string | null> {
 	return fallbackGet(account);
 }
 
-export async function setSecret(account: string, secret: string): Promise<void> {
+export async function setSecret(
+	account: string,
+	secret: string
+): Promise<void> {
 	if (tauriBackendAvailable()) {
 		try {
 			await invoke("keychain_set", { account, secret });
@@ -388,7 +401,10 @@ export async function hydrateSecrets(settings: AppSettings): Promise<string[]> {
  * meet at most one prompt per legacy key, in context — never a
  * launch-time fan-out across providers they may never use.
  */
-export async function migrateLegacySecret(settings: AppSettings, id: string): Promise<boolean> {
+export async function migrateLegacySecret(
+	settings: AppSettings,
+	id: string
+): Promise<boolean> {
 	const entry = settings.providers[id];
 	if (!entry || entry.apiKey.trim()) return false;
 	let secret: string | null;
@@ -437,7 +453,10 @@ export async function persistSecrets(settings: AppSettings): Promise<void> {
 	} else {
 		try {
 			const stored = await getSecret(SECRET_BUNDLE_ACCOUNT);
-			if (stored !== null && encodeSecretBundle(decodeSecretBundle(stored)) === encoded) {
+			if (
+				stored !== null &&
+				encodeSecretBundle(decodeSecretBundle(stored)) === encoded
+			) {
 				lastKnownBundle = encoded;
 				return;
 			}

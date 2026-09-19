@@ -7,14 +7,18 @@ const AID_TITLE = "Add tashkeel";
 test.beforeEach(async ({ page }) => {
 	await seedChat(page, [{ role: "assistant", content: "مرحبا بالعالم" }]);
 	await page.goto("/");
-	await expect(page.locator(`${ARTICLE} .actions`)).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(`${ARTICLE} .actions`)).toBeVisible({
+		timeout: 60_000
+	});
 });
 
 test("hovering the action row moves no button and leaves no stuck hover", async ({
 	page
 }) => {
 	const row = page.locator(`${ARTICLE} .actions`);
-	const aidBtn = page.locator(`${ARTICLE} .actions button[data-tip="${AID_TITLE}"]`);
+	const aidBtn = page.locator(
+		`${ARTICLE} .actions button[data-tip="${AID_TITLE}"]`
+	);
 
 	// Hover-reveal is on: the row starts hidden.
 	await expect(row).toHaveCSS("opacity", "0");
@@ -39,7 +43,9 @@ test("clicking tashkeel pins it, and show-original restores the text", async ({
 	page
 }) => {
 	const body = page.locator(`${ARTICLE} .rendered`);
-	const aidBtn = page.locator(`${ARTICLE} .actions button[data-tip="${AID_TITLE}"]`);
+	const aidBtn = page.locator(
+		`${ARTICLE} .actions button[data-tip="${AID_TITLE}"]`
+	);
 
 	await aidBtn.hover();
 	await aidBtn.click();
@@ -59,14 +65,18 @@ test("clicking tashkeel pins it, and show-original restores the text", async ({
 /** Tashkeel composes with pinyin: pinning the model aid keeps the
 ruby on the Chinese lines instead of replacing it. */
 test("tashkeel keeps pinned pinyin up", async ({ page }) => {
-	await seedChat(page, [{ role: "assistant", content: "你好世界\nمرحبا بالعالم" }]);
+	await seedChat(page, [
+		{ role: "assistant", content: "你好世界\nمرحبا بالعالم" }
+	]);
 	await page.goto("/");
 	const actions = page.locator(`${ARTICLE} .actions`);
 	const body = page.locator(`${ARTICLE} .rendered`);
 	await expect(actions).toBeVisible({ timeout: 60_000 });
 	await actions.locator('button:has-text("拼音")').click();
 	await expect(body.locator("ruby").first()).toBeVisible({ timeout: 60_000 });
-	const aidBtn = page.locator(`${ARTICLE} .actions button[data-tip="${AID_TITLE}"]`);
+	const aidBtn = page.locator(
+		`${ARTICLE} .actions button[data-tip="${AID_TITLE}"]`
+	);
 	await aidBtn.hover();
 	await aidBtn.click();
 	await expect(body).toContainText("Mock reply to:", { timeout: 60_000 });
@@ -78,11 +88,20 @@ test("tashkeel keeps pinned pinyin up", async ({ page }) => {
 other scripts stay byte-identical instead of vanishing with the
 whole-text replace. */
 test("tashkeel keeps non-Arabic paragraphs", async ({ page }) => {
-	await seedChat(page, [{ role: "assistant", content: "日本語の文です\nمرحبا بالعالم\nEnglish text" }]);
+	await seedChat(page, [
+		{
+			role: "assistant",
+			content: "日本語の文です\nمرحبا بالعالم\nEnglish text"
+		}
+	]);
 	await page.goto("/");
 	const body = page.locator(`${ARTICLE} .rendered`);
-	await expect(page.locator(`${ARTICLE} .actions`)).toBeVisible({ timeout: 60_000 });
-	const aidBtn = page.locator(`${ARTICLE} .actions button[data-tip="${AID_TITLE}"]`);
+	await expect(page.locator(`${ARTICLE} .actions`)).toBeVisible({
+		timeout: 60_000
+	});
+	const aidBtn = page.locator(
+		`${ARTICLE} .actions button[data-tip="${AID_TITLE}"]`
+	);
 	await aidBtn.hover();
 	await aidBtn.click();
 	await expect(body).toContainText("Mock reply to:", { timeout: 60_000 });
@@ -101,7 +120,9 @@ test("a trilingual message offers tashkeel, furigana, and pinyin", async ({
 	await page.goto("/");
 	const actions = page.locator(`${ARTICLE} .actions`);
 	await expect(actions).toBeVisible({ timeout: 60_000 });
-	await expect(actions.locator(`button[data-tip="${AID_TITLE}"]`)).toBeVisible();
+	await expect(
+		actions.locator(`button[data-tip="${AID_TITLE}"]`)
+	).toBeVisible();
 	await expect(actions.locator('button:has-text("読み仮名")')).toBeVisible();
 	await expect(actions.locator('button:has-text("拼音")')).toBeVisible();
 });
@@ -110,7 +131,11 @@ test("a trilingual message offers tashkeel, furigana, and pinyin", async ({
 rendered HTML, so equations stay rendered and fences stay fenced. */
 test("pinyin keeps code and math blocks", async ({ page }) => {
 	await seedChat(page, [
-		{ role: "assistant", content: "中文段落在这里。\n\n```python\nprint('你好')\n```\n\n$$E = mc^2$$" }
+		{
+			role: "assistant",
+			content:
+				"中文段落在这里。\n\n```python\nprint('你好')\n```\n\n$$E = mc^2$$"
+		}
 	]);
 	await page.goto("/");
 	const actions = page.locator(`${ARTICLE} .actions`);

@@ -97,7 +97,8 @@ export function looksLikeFeed(text: string): boolean {
 	return (
 		head.includes("<rss") ||
 		head.includes("<feed") ||
-		(head.includes("<?xml") && (head.includes("<item") || head.includes("<entry")))
+		(head.includes("<?xml") &&
+			(head.includes("<item") || head.includes("<entry")))
 	);
 }
 
@@ -153,7 +154,9 @@ export function parseFeedItems(markup: string): FeedItem[] {
 export function formatFeedItems(items: FeedItem[]): string {
 	return items
 		.map((item) => {
-			const head = item.description ? `${item.title} — ${item.description}` : item.title;
+			const head = item.description
+				? `${item.title} — ${item.description}`
+				: item.title;
 			return item.link ? `- ${head} (${item.link})` : `- ${head}`;
 		})
 		.join("\n")
@@ -168,11 +171,16 @@ export function formatFeedItems(items: FeedItem[]): string {
  */
 export function htmlToText(html: string): string {
 	const doc = new DOMParser().parseFromString(html, "text/html");
-	doc.querySelectorAll(
-		"script, style, noscript, nav, header, footer, form, template, svg, canvas, iframe"
-	).forEach((el) => el.remove());
+	doc
+		.querySelectorAll(
+			"script, style, noscript, nav, header, footer, form, template, svg, canvas, iframe"
+		)
+		.forEach((el) => el.remove());
 	const root =
-		doc.querySelector("article") ?? doc.querySelector("main") ?? doc.body ?? doc.documentElement;
+		doc.querySelector("article") ??
+		doc.querySelector("main") ??
+		doc.body ??
+		doc.documentElement;
 	const text = (root?.textContent ?? "")
 		.split("\n")
 		.map((line) => line.replace(/[ \t\u00a0]+/g, " ").trim())
@@ -190,7 +198,9 @@ export function parseFetchCall(call: {
 	if (call.function?.name !== FETCH_TOOL_NAME) return null;
 	let args: unknown;
 	try {
-		args = JSON.parse(typeof call.function.arguments === "string" ? call.function.arguments : "");
+		args = JSON.parse(
+			typeof call.function.arguments === "string" ? call.function.arguments : ""
+		);
 	} catch {
 		return null;
 	}

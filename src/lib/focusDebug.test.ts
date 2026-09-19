@@ -8,7 +8,9 @@ describe("describeFocusTarget", () => {
 			'<input id="base-url" class="settings-field mono extra fourth" />';
 		const el = document.getElementById("base-url");
 		// First three classes only; the fourth is noise.
-		expect(describeFocusTarget(el)).toBe("INPUT#base-url.settings-field.mono.extra");
+		expect(describeFocusTarget(el)).toBe(
+			"INPUT#base-url.settings-field.mono.extra"
+		);
 	});
 
 	it("marks a detached node so swaps are visible", () => {

@@ -115,7 +115,13 @@ export function newChatMsgId(): ChatMsgId {
 }
 
 function blankChat(): Chat {
-	return { id: newChatId(), createdAt: Date.now(), messages: [], replyLang: null, voice: null };
+	return {
+		id: newChatId(),
+		createdAt: Date.now(),
+		messages: [],
+		replyLang: null,
+		voice: null
+	};
 }
 
 function browserStore(): KeyValueStore | null {
@@ -199,7 +205,11 @@ export function setPasteFold(
 			...chat.messages.slice(0, at),
 			{
 				...msg,
-				pasteFolds: [...folds.slice(0, index), { ...fold, open }, ...folds.slice(index + 1)]
+				pasteFolds: [
+					...folds.slice(0, index),
+					{ ...fold, open },
+					...folds.slice(index + 1)
+				]
 			},
 			...chat.messages.slice(at + 1)
 		];
@@ -277,7 +287,11 @@ export function abortSend(chatId?: ChatId): void {
 	inflightByChat.delete(chatId);
 }
 
-export function deleteChat(state: ChatState, id: ChatId, store?: KeyValueStore): void {
+export function deleteChat(
+	state: ChatState,
+	id: ChatId,
+	store?: KeyValueStore
+): void {
 	abortSend(id);
 	const at = state.chats.findIndex((c) => c.id === id);
 	state.chats = state.chats.filter((c) => c.id !== id);
@@ -285,7 +299,8 @@ export function deleteChat(state: ChatState, id: ChatId, store?: KeyValueStore):
 	if (!state.chats.some((c) => c.id === state.activeChatId)) {
 		// Land on the chat that slid into the deleted one's place (the
 		// one right below it), or the new bottom one if it was last.
-		const target = state.chats[Math.min(Math.max(at, 0), state.chats.length - 1)];
+		const target =
+			state.chats[Math.min(Math.max(at, 0), state.chats.length - 1)];
 		if (target) state.activeChatId = target.id;
 	}
 	persistChats(state, store);
@@ -299,12 +314,20 @@ export function deleteAllChats(state: ChatState, store?: KeyValueStore): void {
 	persistChats(state, store);
 }
 
-export function deleteMessage(state: ChatState, index: number, store?: KeyValueStore): void {
+export function deleteMessage(
+	state: ChatState,
+	index: number,
+	store?: KeyValueStore
+): void {
 	const chat = activeChat(state);
 	// Removing the streaming placeholder mid-flight strands it the same
 	// way dropping the chat does — kill the send with it.
 	const target = chat.messages[index];
-	if (isSending(state) && target?.role === "assistant" && index === chat.messages.length - 1) {
+	if (
+		isSending(state) &&
+		target?.role === "assistant" &&
+		index === chat.messages.length - 1
+	) {
 		abortSend(chat.id);
 	}
 	chat.messages = chat.messages.filter((_, i) => i !== index);
@@ -340,7 +363,11 @@ export function stageMessage(
 }
 
 /** Copy messages up to `index` (inclusive) into a new chat. */
-export function branchFrom(state: ChatState, index: number, store?: KeyValueStore): void {
+export function branchFrom(
+	state: ChatState,
+	index: number,
+	store?: KeyValueStore
+): void {
 	const source = activeChat(state);
 	const fork: Chat = {
 		...blankChat(),
@@ -354,7 +381,10 @@ export function branchFrom(state: ChatState, index: number, store?: KeyValueStor
 }
 
 /** Drop a failed assistant reply so the same prompt can go again. */
-export function dismissFailedAssistant(state: ChatState, store?: KeyValueStore): void {
+export function dismissFailedAssistant(
+	state: ChatState,
+	store?: KeyValueStore
+): void {
 	const chat = activeChat(state);
 	const last = chat.messages[chat.messages.length - 1];
 	if (last?.role === "assistant" && last.error) {
@@ -364,7 +394,10 @@ export function dismissFailedAssistant(state: ChatState, store?: KeyValueStore):
 }
 
 /** Drop the last assistant reply (failed or not) to regenerate it. */
-export function takeBackLastReply(state: ChatState, store?: KeyValueStore): void {
+export function takeBackLastReply(
+	state: ChatState,
+	store?: KeyValueStore
+): void {
 	const chat = activeChat(state);
 	const last = chat.messages[chat.messages.length - 1];
 	if (last?.role === "assistant") {
@@ -377,7 +410,11 @@ export function takeBackLastReply(state: ChatState, store?: KeyValueStore): void
  * Rerun from any user message: delete everything after it (unlike branch,
  * which keeps the original), so the prompt can go again cleanly.
  */
-export function truncateToMessage(state: ChatState, index: number, store?: KeyValueStore): void {
+export function truncateToMessage(
+	state: ChatState,
+	index: number,
+	store?: KeyValueStore
+): void {
 	const chat = activeChat(state);
 	if (index < 0 || index >= chat.messages.length) return;
 	if (chat.messages[index]?.role !== "user") return;
@@ -396,7 +433,10 @@ export function editMessageContent(
 	state: ChatState,
 	id: ChatMsgId,
 	content: string,
-	opts: { attachments?: Attachment[] | undefined; pasteFolds?: PasteFold[] | undefined } = {},
+	opts: {
+		attachments?: Attachment[] | undefined;
+		pasteFolds?: PasteFold[] | undefined;
+	} = {},
 	store?: KeyValueStore
 ): boolean {
 	const chat = activeChat(state);
@@ -427,7 +467,8 @@ export async function resendLast(
 ): Promise<void> {
 	const chat = activeChat(state);
 	const last = chat.messages[chat.messages.length - 1];
-	if (!last || last.role !== "user" || state.sendingChatIds.includes(chat.id)) return;
+	if (!last || last.role !== "user" || state.sendingChatIds.includes(chat.id))
+		return;
 	await streamAssistantReply(
 		state,
 		provider,
@@ -443,7 +484,10 @@ export function tokenTotal(state: ChatState, chat?: Chat): number {
 }
 
 /** Per-chat input/output split, summed from each message's reported usage. */
-export function tokenSplit(state: ChatState, chat?: Chat): { prompt: number; completion: number } {
+export function tokenSplit(
+	state: ChatState,
+	chat?: Chat
+): { prompt: number; completion: number } {
 	const target = chat ?? activeChat(state);
 	let prompt = 0;
 	let completion = 0;
@@ -462,7 +506,12 @@ export function tokenSplit(state: ChatState, chat?: Chat): { prompt: number; com
 export function formatTokens(n: number): string {
 	const count = Math.max(0, Math.floor(n));
 	if (count < 1000) return String(count);
-	let divisor = count < 1_000_000 ? 1_000 : count < 1_000_000_000 ? 1_000_000 : 1_000_000_000;
+	let divisor =
+		count < 1_000_000
+			? 1_000
+			: count < 1_000_000_000
+				? 1_000_000
+				: 1_000_000_000;
 	const suffix = (): string =>
 		divisor === 1_000 ? "K" : divisor === 1_000_000 ? "M" : "B";
 	const text = (): string => {
@@ -498,7 +547,10 @@ export function waypointLabel(content: string, max = 60): string {
 	return Array.from(content.replace(/\s+/g, " ").trim()).slice(0, max).join("");
 }
 
-export function buildApiMessages(chat: Chat, systemPrompt: string): ChatMessage[] {
+export function buildApiMessages(
+	chat: Chat,
+	systemPrompt: string
+): ChatMessage[] {
 	const api: ChatMessage[] = [{ role: "system", content: systemPrompt }];
 	for (const m of chat.messages) {
 		if (m.role === "assistant" && m.error) continue;
@@ -512,7 +564,9 @@ export function buildApiMessages(chat: Chat, systemPrompt: string): ChatMessage[
  * text attachments are appended as fenced blocks so every provider sees them.
  */
 export function apiContent(message: ChatMsg): string | ContentPart[] {
-	const images = (message.attachments ?? []).filter((a) => a.kind === "image" && a.dataUrl);
+	const images = (message.attachments ?? []).filter(
+		(a) => a.kind === "image" && a.dataUrl
+	);
 	// Stored image literals are display tags (paired back to the parts
 	// below by kind order) — the provider sees clean prose plus parts.
 	let text = stripAttachmentMarkers(message.content);
@@ -552,7 +606,11 @@ export async function sendMessage(
 	const chat = activeChat(state);
 	// Per-chat lock: this chat streaming blocks only itself — a reply
 	// in flight elsewhere never gates a fresh send here.
-	if ((!trimmed && attachments.length === 0) || state.sendingChatIds.includes(chat.id)) return;
+	if (
+		(!trimmed && attachments.length === 0) ||
+		state.sendingChatIds.includes(chat.id)
+	)
+		return;
 	chat.messages = [
 		...chat.messages,
 		{
@@ -570,7 +628,11 @@ export async function sendMessage(
 		state,
 		provider,
 		systemPrompt,
-		{ signal: opts.signal, thinking: opts.thinking, onFirstToken: opts.onFirstToken },
+		{
+			signal: opts.signal,
+			thinking: opts.thinking,
+			onFirstToken: opts.onFirstToken
+		},
 		store
 	);
 }
@@ -611,7 +673,10 @@ export async function streamAssistantReply(
 	const controller = new AbortController();
 	inflightByChat.set(chatId, controller);
 	if (opts.signal?.aborted) controller.abort();
-	else opts.signal?.addEventListener("abort", () => controller.abort(), { once: true });
+	else
+		opts.signal?.addEventListener("abort", () => controller.abort(), {
+			once: true
+		});
 	// NOTE: never mutate a message object in place here. Svelte's proxy
 	// signals capture values on first read, so only wholesale replacement
 	// notifies reliably. The running text lives in this local accumulator.
@@ -627,21 +692,28 @@ export async function streamAssistantReply(
 		);
 	};
 	try {
-		const result = await provider.stream(apiMessages, {
-			onToken: (token) => {
-				// First visible token: the reply has started arriving
-				// (thinking chip retires, haptic rumble, readback
-				// warm-up). Fires once — later tokens just extend the
-				// accumulator.
-				if (streamed === "" && token !== "") {
-					if (!state.replyStartedChatIds.includes(chatId))
-						state.replyStartedChatIds = [...state.replyStartedChatIds, chatId];
-					opts.onFirstToken?.();
+		const result = await provider.stream(
+			apiMessages,
+			{
+				onToken: (token) => {
+					// First visible token: the reply has started arriving
+					// (thinking chip retires, haptic rumble, readback
+					// warm-up). Fires once — later tokens just extend the
+					// accumulator.
+					if (streamed === "" && token !== "") {
+						if (!state.replyStartedChatIds.includes(chatId))
+							state.replyStartedChatIds = [
+								...state.replyStartedChatIds,
+								chatId
+							];
+						opts.onFirstToken?.();
+					}
+					streamed += token;
+					replaceReply({ content: streamed });
 				}
-				streamed += token;
-				replaceReply({ content: streamed });
-			}
-		}, { signal: controller.signal, thinking: opts.thinking });
+			},
+			{ signal: controller.signal, thinking: opts.thinking }
+		);
 		replaceReply({ content: result.content, usage: result.usage });
 	} catch (error) {
 		replaceReply({
@@ -649,14 +721,18 @@ export async function streamAssistantReply(
 			error: error instanceof Error ? error.message : String(error)
 		});
 	} finally {
-		if (inflightByChat.get(chatId) === controller) inflightByChat.delete(chatId);
+		if (inflightByChat.get(chatId) === controller)
+			inflightByChat.delete(chatId);
 		state.sendingChatIds = state.sendingChatIds.filter((id) => id !== chatId);
-		state.replyStartedChatIds = state.replyStartedChatIds.filter((id) => id !== chatId);
+		state.replyStartedChatIds = state.replyStartedChatIds.filter(
+			(id) => id !== chatId
+		);
 		state.sending = state.sendingChatIds.length > 0;
 		// sendingChatId tracks the most recent in-flight chat for the
 		// legacy global readers: fall back to a still-streaming one.
 		if (state.sendingChatId === chatId) {
-			state.sendingChatId = state.sendingChatIds[state.sendingChatIds.length - 1] ?? null;
+			state.sendingChatId =
+				state.sendingChatIds[state.sendingChatIds.length - 1] ?? null;
 		}
 		persistChats(state, store);
 	}
@@ -677,7 +753,10 @@ export function resolveSendCompletion(
 ): { sent: ChatMsg | undefined; stillHere: boolean } {
 	const origin = state.chats.find((c) => c.id === originId);
 	const messages = origin ? origin.messages : [];
-	return { sent: messages[messages.length - 1], stillHere: originId === activeId };
+	return {
+		sent: messages[messages.length - 1],
+		stillHere: originId === activeId
+	};
 }
 
 /**
@@ -729,7 +808,10 @@ function loadChats(state: ChatState, store: KeyValueStore): void {
 					// Each chat keeps its reply pill across restarts (the
 					// launch effect reinstalls its voice); unknown codes
 					// from retired languages fall back to no pill.
-					if (typeof c.replyLang !== "string" || !replyLanguageFor(c.replyLang)) {
+					if (
+						typeof c.replyLang !== "string" ||
+						!replyLanguageFor(c.replyLang)
+					) {
 						c.replyLang = null;
 					}
 					// Pre-override chats (and hand-edited stores) carry no

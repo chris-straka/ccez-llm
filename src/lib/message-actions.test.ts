@@ -1,9 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { canEditMessage, toggleAidKinds, toggleSingleAid } from "./message-actions";
+import {
+	canEditMessage,
+	toggleAidKinds,
+	toggleSingleAid
+} from "./message-actions";
 
 describe("toggleAidKinds", () => {
 	it("lifts every kind when all are pinned, else pins the missing ones", () => {
-		expect(toggleAidKinds(["pinyin", "furigana"], ["pinyin", "furigana"])).toEqual({
+		expect(
+			toggleAidKinds(["pinyin", "furigana"], ["pinyin", "furigana"])
+		).toEqual({
 			pin: [],
 			unpin: ["pinyin", "furigana"]
 		});

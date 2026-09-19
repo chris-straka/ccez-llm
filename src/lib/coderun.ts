@@ -13,7 +13,9 @@ import { tauriBackendAvailable } from "./secrets";
 export const CODE_RUN_TIMEOUT_SECS = 10;
 
 /** PATH-resolved runner for a fence label. Null = honest "no runner" note. */
-export function runnerFor(language: string): { program: string; suffix: string } | null {
+export function runnerFor(
+	language: string
+): { program: string; suffix: string } | null {
 	const lang = language.trim().toLowerCase();
 	switch (lang) {
 		case "python":
@@ -81,13 +83,21 @@ export function noRunnerReason(language: string): string {
  * Resolves `unavailable` outside the shell or for unknown
  * languages — never rejects into UI teardown.
  */
-export async function runCodeBlock(language: string, code: string): Promise<CodeRunOutcome> {
+export async function runCodeBlock(
+	language: string,
+	code: string
+): Promise<CodeRunOutcome> {
 	// Pure mapping first: unknown labels report no-runner in every
 	// runtime (including the backend-less preview), never a guess.
 	const runner = runnerFor(language);
 	if (!runner) return { kind: "unavailable", reason: noRunnerReason(language) };
-	if (!tauriBackendAvailable()) return { kind: "unavailable", reason: codeRunDisabledReason() };
-	if (!code.trim()) return { kind: "unavailable", reason: "Nothing to run — the block is empty." };
+	if (!tauriBackendAvailable())
+		return { kind: "unavailable", reason: codeRunDisabledReason() };
+	if (!code.trim())
+		return {
+			kind: "unavailable",
+			reason: "Nothing to run — the block is empty."
+		};
 	try {
 		const result = await invoke<CodeRunResult>("run_code", { language, code });
 		return { kind: "ok", result };
@@ -114,7 +124,10 @@ export function codeRunBody(outcome: CodeRunOutcome): string {
 }
 
 /** One-line summary stamped above captured output (`ran with …`). */
-export function codeRunSummary(language: string, outcome: CodeRunOutcome): string {
+export function codeRunSummary(
+	language: string,
+	outcome: CodeRunOutcome
+): string {
 	if (outcome.kind === "unavailable") return outcome.reason;
 	const { result } = outcome;
 	if (result.timed_out)

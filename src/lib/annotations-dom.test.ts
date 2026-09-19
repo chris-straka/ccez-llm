@@ -38,7 +38,9 @@ describe("quoteFragmentText", () => {
 
 	it("drops annotation badge numbers", () => {
 		const text = quoteFragmentText(
-			fragment('<p>Kyoto<button data-ann-badge="a1">1</button> in two sentences</p>')
+			fragment(
+				'<p>Kyoto<button data-ann-badge="a1">1</button> in two sentences</p>'
+			)
 		);
 		expect(text).toBe("Kyoto in two sentences");
 	});
@@ -58,7 +60,9 @@ describe("quoteFragmentText", () => {
 	});
 
 	it("trims plain selections untouched", () => {
-		expect(quoteFragmentText(fragment("<p>  hello world  </p>"))).toBe("hello world");
+		expect(quoteFragmentText(fragment("<p>  hello world  </p>"))).toBe(
+			"hello world"
+		);
 	});
 
 	it("drops math chrome heads, keeping the equation body", () => {
@@ -101,7 +105,7 @@ describe("quoteFragmentText", () => {
 				'<div class="ccez-math" data-math-index="0" data-folded="1">' +
 					'<span class="ccez-math-foldedlabel">latex · 1 LOC</span>' +
 					'<div class="ccez-math-body"><span class="katex">E</span></div>' +
-					"<pre class=\"ccez-math-raw\">E_n</pre></div>"
+					'<pre class="ccez-math-raw">E_n</pre></div>'
 			)
 		);
 		expect(math).toBe("");
@@ -136,7 +140,9 @@ describe("equationBodyOf", () => {
 	it("returns the inline body for nodes inside inline math", () => {
 		const root = mathDoc();
 		const glyph = root.querySelector(".ccez-math-inline .ccez-math-body")!;
-		expect(equationBodyOf(glyph)?.classList.contains("ccez-math-body")).toBe(true);
+		expect(equationBodyOf(glyph)?.classList.contains("ccez-math-body")).toBe(
+			true
+		);
 		root.remove();
 	});
 
@@ -182,7 +188,9 @@ describe("equationBodyOf", () => {
 		const label = root.querySelector(".ccez-math-foldedlabel")!;
 		expect(equationBodyOf(label.firstChild)).toBeNull();
 		root.firstElementChild?.removeAttribute("data-folded");
-		expect(equationBodyOf(label.firstChild)?.classList.contains("ccez-math-body")).toBe(true);
+		expect(
+			equationBodyOf(label.firstChild)?.classList.contains("ccez-math-body")
+		).toBe(true);
 		root.remove();
 	});
 });
@@ -201,7 +209,8 @@ describe("equationBodyRange", () => {
 
 	it("keeps the whole body when nothing is blank", () => {
 		const root = document.createElement("div");
-		root.innerHTML = '<div class="ccez-math-body"><span class="katex">E_n</span></div>';
+		root.innerHTML =
+			'<div class="ccez-math-body"><span class="katex">E_n</span></div>';
 		document.body.append(root);
 		const body = root.querySelector(".ccez-math-body")!;
 		expect(equationBodyRange(body)?.toString()).toBe("E_n");
@@ -335,7 +344,8 @@ describe("snapSelectionToWordEdges", () => {
 		document.body.innerHTML = "<p>alpha <b>beta gamma</b></p>";
 		const first = document.querySelector("p")?.firstChild;
 		const bold = document.querySelector("b")?.firstChild;
-		if (!(first instanceof Text) || !(bold instanceof Text)) throw new Error("no text");
+		if (!(first instanceof Text) || !(bold instanceof Text))
+			throw new Error("no text");
 		const sel = window.getSelection();
 		if (!sel) throw new Error("no selection");
 		// "pha beta gam": start cut inside "alpha", end cut inside "gamma".
@@ -417,7 +427,11 @@ describe("draft annotation persistence", () => {
 
 	it("clearing a chat drops its entry, orphans prune on save", () => {
 		saveDraftAnnotations("c1", [ann()], ["c1", "c2"]);
-		saveDraftAnnotations("c2", [ann({ id: "a2" as Annotation["id"] })], ["c1", "c2"]);
+		saveDraftAnnotations(
+			"c2",
+			[ann({ id: "a2" as Annotation["id"] })],
+			["c1", "c2"]
+		);
 		saveDraftAnnotations("c1", [], ["c1", "c2"]);
 		expect(loadDraftAnnotations("c1")).toEqual([]);
 		expect(loadDraftAnnotations("c2")).toHaveLength(1);
@@ -428,7 +442,11 @@ describe("draft annotation persistence", () => {
 
 	it("deleting a background chat keeps the active chat's drafts", () => {
 		saveDraftAnnotations("c1", [ann()], ["c1", "c2"]);
-		saveDraftAnnotations("c2", [ann({ id: "a2" as Annotation["id"] })], ["c1", "c2"]);
+		saveDraftAnnotations(
+			"c2",
+			[ann({ id: "a2" as Annotation["id"] })],
+			["c1", "c2"]
+		);
 		// Drop c2 in the background: re-file c1's in-memory drafts with
 		// c2 excluded from known ids (the dropChat background branch).
 		saveDraftAnnotations("c1", [ann()], ["c1"]);
@@ -439,7 +457,9 @@ describe("draft annotation persistence", () => {
 	it("drops corrupt entries and survives corrupt storage", () => {
 		window.localStorage.setItem(
 			"ccez-llm-annotations-v1",
-			JSON.stringify({ c1: [ann(), null, "x", { id: 5 }, { ...ann(), at: "0" }] })
+			JSON.stringify({
+				c1: [ann(), null, "x", { id: 5 }, { ...ann(), at: "0" }]
+			})
 		);
 		const loaded = loadDraftAnnotations("c1");
 		expect(loaded).toHaveLength(2);
@@ -449,7 +469,10 @@ describe("draft annotation persistence", () => {
 	});
 
 	it("reads drafts saved under the pre-rename key", () => {
-		window.localStorage.setItem("ccez-studio-annotations-v1", JSON.stringify({ c1: [ann()] }));
+		window.localStorage.setItem(
+			"ccez-studio-annotations-v1",
+			JSON.stringify({ c1: [ann()] })
+		);
 		expect(loadDraftAnnotations("c1")).toEqual([ann()]);
 	});
 });
@@ -474,7 +497,8 @@ describe("quoteRange", () => {
 
 	it("skips badge numbers like badge stamping does", () => {
 		const root = document.createElement("div");
-		root.innerHTML = '<p>Kyoto<button data-ann-badge="a1">1</button> in spring</p>';
+		root.innerHTML =
+			'<p>Kyoto<button data-ann-badge="a1">1</button> in spring</p>';
 		document.body.appendChild(root);
 		// Without the skip the "1" fuses the haystack ("Kyoto1 in…")
 		// and nothing matches: endpoints on either side prove it.
@@ -503,7 +527,8 @@ describe("quoteRange", () => {
 describe("rangesExcludingReadings", () => {
 	/** Wash-style range: text-node endpoints, like every wash path builds. */
 	function textRange(first: Node, last: Node): Range {
-		if (!(first instanceof Text) || !(last instanceof Text)) throw new Error("fixture shape");
+		if (!(first instanceof Text) || !(last instanceof Text))
+			throw new Error("fixture shape");
 		const range = document.createRange();
 		range.setStart(first, 0);
 		range.setEnd(last, last.textContent?.length ?? 0);
@@ -542,7 +567,9 @@ describe("rangesExcludingReadings", () => {
 		root.innerHTML = "<p>say hello world today</p>";
 		document.body.appendChild(root);
 		const p = root.querySelector("p")!;
-		const parts = rangesExcludingReadings(textRange(p.firstChild!, p.lastChild!));
+		const parts = rangesExcludingReadings(
+			textRange(p.firstChild!, p.lastChild!)
+		);
 		expect(parts).toHaveLength(1);
 		expect(parts[0]?.toString()).toBe("say hello world today");
 		root.remove();
@@ -571,7 +598,9 @@ describe("rangesExcludingReadings", () => {
 	it("keeps the wash across a pinyin aid swap", () => {
 		const root = document.createElement("div");
 		root.textContent = "静静读书";
-		const marks: AnnotationMark[] = [{ id: "a1" as AnnotationId, number: 1, quote: "静静读书" }];
+		const marks: AnnotationMark[] = [
+			{ id: "a1" as AnnotationId, number: 1, quote: "静静读书" }
+		];
 		applyMarks(root, marks, false, "a1");
 		expect(root.querySelector("mark.ccez-ann")).not.toBeNull();
 		// Pinning pinyin swaps the whole HTML for native ruby on the
@@ -679,7 +708,9 @@ describe("wrapRangeExcludingBadges", () => {
 		// (marks paint back-to-front, so order is positional, not
 		// document).
 		expect(marks).toHaveLength(2);
-		expect(new Set(marks.map((m) => m.textContent))).toEqual(new Set(["wor", "d"]));
+		expect(new Set(marks.map((m) => m.textContent))).toEqual(
+			new Set(["wor", "d"])
+		);
 		for (const mark of marks) {
 			expect(mark.querySelector("[data-ann-badge]")).toBeNull();
 		}

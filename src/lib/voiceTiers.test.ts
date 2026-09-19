@@ -8,7 +8,12 @@ import {
 } from "./voiceTiers";
 import type { NativeVoice } from "./nativeTts";
 
-const voice = (id: string, lang: string, quality: number, name?: string): NativeVoice => ({
+const voice = (
+	id: string,
+	lang: string,
+	quality: number,
+	name?: string
+): NativeVoice => ({
 	id,
 	name: name ?? id.split(".").pop() ?? id,
 	lang,
@@ -23,7 +28,9 @@ describe("hasQualityVoices", () => {
 		];
 		expect(hasQualityVoices(voices)).toBe(true);
 		expect(
-			hasQualityVoices([voice("com.apple.voice.premium.de-DE.Petra", "de-DE", 3)])
+			hasQualityVoices([
+				voice("com.apple.voice.premium.de-DE.Petra", "de-DE", 3)
+			])
 		).toBe(true);
 	});
 
@@ -41,14 +48,18 @@ describe("hasQualityVoices", () => {
 
 describe("tierLabel", () => {
 	it("labels premium, enhanced, Siri, and default voices", () => {
-		expect(tierLabel(voice("com.apple.voice.premium.de-DE.Petra", "de-DE", 3))).toBe("premium");
-		expect(tierLabel(voice("com.apple.voice.enhanced.bg-BG.Daria", "bg-BG", 2))).toBe(
-			"enhanced"
+		expect(
+			tierLabel(voice("com.apple.voice.premium.de-DE.Petra", "de-DE", 3))
+		).toBe("premium");
+		expect(
+			tierLabel(voice("com.apple.voice.enhanced.bg-BG.Daria", "bg-BG", 2))
+		).toBe("enhanced");
+		expect(tierLabel(voice("com.apple.eloquence.en-US.Eddy", "en-US", 1))).toBe(
+			"Siri"
 		);
-		expect(tierLabel(voice("com.apple.eloquence.en-US.Eddy", "en-US", 1))).toBe("Siri");
-		expect(tierLabel(voice("com.apple.voice.compact.en-US.Samantha", "en-US", 1))).toBe(
-			"default"
-		);
+		expect(
+			tierLabel(voice("com.apple.voice.compact.en-US.Samantha", "en-US", 1))
+		).toBe("default");
 	});
 });
 
@@ -63,8 +74,13 @@ describe("voicesForLang", () => {
 	];
 
 	it("lists the exact locale first, then the same language", () => {
-		expect(voicesForLang(voices, "en-US").map((v) => v.name)).toEqual(["Zoe", "Jamie"]);
-		expect(voicesForLang(voices, "de-DE").map((v) => v.name)).toEqual(["Petra"]);
+		expect(voicesForLang(voices, "en-US").map((v) => v.name)).toEqual([
+			"Zoe",
+			"Jamie"
+		]);
+		expect(voicesForLang(voices, "de-DE").map((v) => v.name)).toEqual([
+			"Petra"
+		]);
 	});
 
 	it("leaves out default-tier voices, including Siri personas", () => {
@@ -116,13 +132,25 @@ describe("allVoicesForLang", () => {
 });
 
 describe("autoVoiceForLang", () => {
-	const jamie = voice("com.apple.voice.premium.en-GB.Malcolm", "en-GB", 3, "Jamie");
+	const jamie = voice(
+		"com.apple.voice.premium.en-GB.Malcolm",
+		"en-GB",
+		3,
+		"Jamie"
+	);
 	const zoe = voice("com.apple.voice.enhanced.en-US.Zoe", "en-US", 2, "Zoe");
-	const sam = voice("com.apple.voice.compact.en-US.Samantha", "en-US", 1, "Samantha");
+	const sam = voice(
+		"com.apple.voice.compact.en-US.Samantha",
+		"en-US",
+		1,
+		"Samantha"
+	);
 	const voices = [sam, zoe, jamie];
 
 	it("prefers the saved pick when it matches the language", () => {
-		expect(autoVoiceForLang(voices, "en-US", zoe.id)).toMatchObject({ name: "Zoe" });
+		expect(autoVoiceForLang(voices, "en-US", zoe.id)).toMatchObject({
+			name: "Zoe"
+		});
 	});
 
 	it("picks best installed otherwise: exact locale, then quality", () => {

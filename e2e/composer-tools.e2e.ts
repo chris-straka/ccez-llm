@@ -2,7 +2,9 @@ import { test, expect, type Page } from "@playwright/test";
 import { seedChat } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
-	await seedChat(page, [{ role: "assistant", content: "alpha beta gamma delta" }]);
+	await seedChat(page, [
+		{ role: "assistant", content: "alpha beta gamma delta" }
+	]);
 	await page.goto("/");
 	await expect(page.locator("article.assistant .rendered")).toBeVisible({
 		timeout: 60_000
@@ -13,7 +15,9 @@ test.beforeEach(async ({ page }) => {
 async function addAnnotation(page: Page) {
 	// Click on the text itself: the container's center is empty space
 	// for short left-aligned messages and selects nothing.
-	await page.locator("article.assistant .rendered p").dblclick({ position: { x: 10, y: 10 } });
+	await page
+		.locator("article.assistant .rendered p")
+		.dblclick({ position: { x: 10, y: 10 } });
 	await expect(page.locator(".sel-menu")).toBeVisible();
 	await page.locator('.sel-menu button:has-text("Annotate")').click();
 	await page.keyboard.press("Enter");
@@ -50,11 +54,15 @@ test("annotation tracker is a count badge left of the paperclip", async ({
 }) => {
 	const badge = await addAnnotation(page);
 	const badgeBox = await badge.boundingBox();
-	const attachBox = await page.locator(".prompt-tools .attach-btn").boundingBox();
+	const attachBox = await page
+		.locator(".prompt-tools .attach-btn")
+		.boundingBox();
 	if (!badgeBox || !attachBox) throw new Error("missing tool boxes");
 	expect(badgeBox.x + badgeBox.width).toBeLessThanOrEqual(attachBox.x);
 	// The word "annotations" appears nowhere visible in the tools.
-	expect(await page.locator(".prompt-tools").innerText()).not.toContain("nnotation");
+	expect(await page.locator(".prompt-tools").innerText()).not.toContain(
+		"nnotation"
+	);
 });
 
 /** Long chat payload so the thread overflows the viewport (idle-hide pays at any length now; overflow keeps it unambiguous). */
@@ -68,30 +76,46 @@ function longThread() {
 	}));
 }
 
-test("idle-hide takes the attachment strip with the prompt", async ({ page }) => {
+test("idle-hide takes the attachment strip with the prompt", async ({
+	page
+}) => {
 	// Reseed: a long thread (overflow) plus a 2s idle timeout, then reload.
 	await page.addInitScript((msgs) => {
 		window.localStorage.setItem(
 			"ccez-llm-settings-v1",
-			JSON.stringify({ hoverAssistantActions: true, hoverUserActions: true, promptIdleSec: 2 })
+			JSON.stringify({
+				hoverAssistantActions: true,
+				hoverUserActions: true,
+				promptIdleSec: 2
+			})
 		);
 		window.localStorage.setItem(
 			"ccez-llm-chats-v1",
-			JSON.stringify([{ id: "e2e-chat", createdAt: 1, replyLang: null, messages: msgs }])
+			JSON.stringify([
+				{ id: "e2e-chat", createdAt: 1, replyLang: null, messages: msgs }
+			])
 		);
 	}, longThread());
 	await page.reload();
-	await expect(page.locator("article.assistant .rendered").first()).toBeVisible({
-		timeout: 60_000
-	});
+	await expect(page.locator("article.assistant .rendered").first()).toBeVisible(
+		{
+			timeout: 60_000
+		}
+	);
 	// A dropped file lands as an attachment pill above the composer.
 	await page.evaluate(() => {
 		const transfer = new DataTransfer();
-		transfer.items.add(new File(["# hello"], "notes.md", { type: "text/markdown" }));
+		transfer.items.add(
+			new File(["# hello"], "notes.md", { type: "text/markdown" })
+		);
 		const target = document.querySelector(".prompt");
 		if (!target) throw new Error("missing composer");
 		target.dispatchEvent(
-			new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: transfer })
+			new DragEvent("drop", {
+				bubbles: true,
+				cancelable: true,
+				dataTransfer: transfer
+			})
 		);
 	});
 	await expect(page.locator(".attachments .name")).toHaveText("notes.md", {
@@ -120,7 +144,9 @@ test("idle-hide takes the attachment strip with the prompt", async ({ page }) =>
 				}),
 			{ timeout: 5_000 }
 		)
-		.toMatch(/^matrix\(1, 0, 0, 1, 0, 12\) ## 0\.25s, 0\.25s, 0s @@ matrix\(1, 0, 0, 1, 0, 12\)/);
+		.toMatch(
+			/^matrix\(1, 0, 0, 1, 0, 12\) ## 0\.25s, 0\.25s, 0s @@ matrix\(1, 0, 0, 1, 0, 12\)/
+		);
 	// A summon key restores both together (pointer travel alone only
 	// re-arms the timer, never restores).
 	await page.mouse.move(400, 200);
@@ -136,11 +162,17 @@ test("empty chat never idle-hides the composer", async ({ page }) => {
 	await page.addInitScript(() => {
 		window.localStorage.setItem(
 			"ccez-llm-settings-v1",
-			JSON.stringify({ hoverAssistantActions: true, hoverUserActions: true, promptIdleSec: 2 })
+			JSON.stringify({
+				hoverAssistantActions: true,
+				hoverUserActions: true,
+				promptIdleSec: 2
+			})
 		);
 		window.localStorage.setItem(
 			"ccez-llm-chats-v1",
-			JSON.stringify([{ id: "e2e-chat", createdAt: 1, replyLang: null, messages: [] }])
+			JSON.stringify([
+				{ id: "e2e-chat", createdAt: 1, replyLang: null, messages: [] }
+			])
 		);
 	});
 	await page.reload();
@@ -158,7 +190,9 @@ test.describe("phone idle default", () => {
 		isMobile: true
 	});
 
-	test("prompt stays visible on phones unless a timeout was chosen", async ({ page }) => {
+	test("prompt stays visible on phones unless a timeout was chosen", async ({
+		page
+	}) => {
 		// Long thread (would hide on desktop) but NO stored timeout.
 		await page.addInitScript((msgs) => {
 			window.localStorage.setItem(
@@ -167,11 +201,15 @@ test.describe("phone idle default", () => {
 			);
 			window.localStorage.setItem(
 				"ccez-llm-chats-v1",
-				JSON.stringify([{ id: "e2e-chat", createdAt: 1, replyLang: null, messages: msgs }])
+				JSON.stringify([
+					{ id: "e2e-chat", createdAt: 1, replyLang: null, messages: msgs }
+				])
 			);
 		}, longThread());
 		await page.reload();
-		await expect(page.locator("article.assistant .rendered").first()).toBeVisible({
+		await expect(
+			page.locator("article.assistant .rendered").first()
+		).toBeVisible({
 			timeout: 60_000
 		});
 		// Past the 6s desktop default: the phone composer stays put.
@@ -217,11 +255,17 @@ async function dropImage(page: Page): Promise<void> {
 				try {
 					if (!blob) throw new Error("canvas produced no blob");
 					const transfer = new DataTransfer();
-					transfer.items.add(new File([blob], "blue.png", { type: "image/png" }));
+					transfer.items.add(
+						new File([blob], "blue.png", { type: "image/png" })
+					);
 					const target = document.querySelector(".prompt");
 					if (!target) throw new Error("missing composer");
 					target.dispatchEvent(
-						new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: transfer })
+						new DragEvent("drop", {
+							bubbles: true,
+							cancelable: true,
+							dataTransfer: transfer
+						})
 					);
 					resolve();
 				} catch (error) {
@@ -232,7 +276,9 @@ async function dropImage(page: Page): Promise<void> {
 	});
 }
 
-test("send clears pills and files an inline tag in the message", async ({ page }) => {
+test("send clears pills and files an inline tag in the message", async ({
+	page
+}) => {
 	await dropImage(page);
 	const card = page.locator(".attachments li.card");
 	await expect(card).toBeVisible({ timeout: 15_000 });
@@ -263,13 +309,19 @@ test("send clears pills and files an inline tag in the message", async ({ page }
 	await expect(popup.locator(".sent-img")).toBeVisible();
 	await expect(popup).toContainText("blue.png");
 	await expect(popup.locator(".sent-tok")).toHaveAttribute("title", /tokens/);
-	await expect(popup.locator('button[aria-label="Copy attachment"] svg')).toBeVisible();
+	await expect(
+		popup.locator('button[aria-label="Copy attachment"] svg')
+	).toBeVisible();
 	await expect(popup.locator("button", { hasText: "OCR" })).toBeVisible();
-	await expect(popup.locator('button[aria-label="Close preview"] svg')).toBeVisible();
+	await expect(
+		popup.locator('button[aria-label="Close preview"] svg')
+	).toBeVisible();
 	// Overlay by construction: opening moves nothing visible (1px
 	// covers sub-pixel line-box noise, not content reflow).
 	const after = await article.boundingBox();
-	expect(Math.abs((after?.height ?? 0) - (before?.height ?? 0))).toBeLessThanOrEqual(1);
+	expect(
+		Math.abs((after?.height ?? 0) - (before?.height ?? 0))
+	).toBeLessThanOrEqual(1);
 	// Above the tag (inline tags carry text above them), above the
 	// messages but under the floating composer in z.
 	const boxes = await popup.evaluate((el) => {
@@ -294,10 +346,14 @@ test("send clears pills and files an inline tag in the message", async ({ page }
 	await expect(popup).toBeVisible();
 	await page.locator(".ta-input").first().click();
 	await expect(popup).toBeHidden();
-	await expect(page.locator('article.user [data-actions-open="true"]')).toHaveCount(0);
+	await expect(
+		page.locator('article.user [data-actions-open="true"]')
+	).toHaveCount(0);
 });
 
-test("a stored literal renders inline at body size with no duplicate", async ({ page }) => {
+test("a stored literal renders inline at body size with no duplicate", async ({
+	page
+}) => {
 	// Turns stored before send-time stripping keep the literal: it
 	// rebuilds in place, paired against the attachment, and the strip
 	// above stays empty — each file shows exactly once, at the same
@@ -333,7 +389,13 @@ test("a stored literal renders inline at body size with no duplicate", async ({ 
 								}
 							]
 						},
-						{ id: "e2e-m1", role: "assistant", content: "a picture", usage: null, error: null }
+						{
+							id: "e2e-m1",
+							role: "assistant",
+							content: "a picture",
+							usage: null,
+							error: null
+						}
 					]
 				}
 			])
@@ -366,7 +428,9 @@ test("a stored literal renders inline at body size with no duplicate", async ({ 
 	await expect(popup.locator(".sent-img")).toBeVisible();
 	await expect(popup).toContainText("shot.png");
 	const after = await article.boundingBox();
-	expect(Math.abs((after?.height ?? 0) - (before?.height ?? 0))).toBeLessThanOrEqual(1);
+	expect(
+		Math.abs((after?.height ?? 0) - (before?.height ?? 0))
+	).toBeLessThanOrEqual(1);
 	const boxes = await popup.evaluate((el) => {
 		const tagEl = el.closest(".sent-wrap")?.querySelector(".sent-fold");
 		const r = el.getBoundingClientRect();
@@ -427,7 +491,13 @@ test("sent turns with many attachments scroll their tags", async ({ page }) => {
 							error: null,
 							attachments: atts
 						},
-						{ id: "e2e-m1", role: "assistant", content: "got them", usage: null, error: null }
+						{
+							id: "e2e-m1",
+							role: "assistant",
+							content: "got them",
+							usage: null,
+							error: null
+						}
 					]
 				}
 			])
@@ -440,7 +510,9 @@ test("sent turns with many attachments scroll their tags", async ({ page }) => {
 	// stay mounted beside their popups, so indices hold while open).
 	await expect(page.locator("article.user .sent-fold")).toHaveCount(15);
 	await page.locator("article.user .sent-inline .sent-fold").first().click();
-	await expect(page.locator("article.user .sent-open .sent-img").first()).toBeVisible();
+	await expect(
+		page.locator("article.user .sent-open .sent-img").first()
+	).toBeVisible();
 	// Close the image popup before reaching into the scrolled strip:
 	// the overlay floats over the message and can cover the scrolled
 	// row's folds.
@@ -457,11 +529,15 @@ test("sent turns with many attachments scroll their tags", async ({ page }) => {
 	// popups closed (an open popup flips the strip to visible
 	// overflow, which reads zero by construction).
 	await page.keyboard.press("Escape");
-	const overflow = await strip.evaluate((el) => el.scrollWidth - el.clientWidth);
+	const overflow = await strip.evaluate(
+		(el) => el.scrollWidth - el.clientWidth
+	);
 	expect(overflow).toBeGreaterThan(0);
 });
 
-test("popup touches the badge and clear-all lives inside it", async ({ page }) => {
+test("popup touches the badge and clear-all lives inside it", async ({
+	page
+}) => {
 	const badge = await addAnnotation(page);
 
 	// The pill toggles the popup (hover never opens it): it floats

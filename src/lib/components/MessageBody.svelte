@@ -3,7 +3,10 @@
 	import { SvelteSet } from "svelte/reactivity";
 	// KaTeX stylesheet (fonts bundle relative to it, so math renders offline).
 	import "katex/dist/katex.min.css";
-	import { createAidLoadingReporter, furiganaRequestKey } from "$lib/aidLoading";
+	import {
+		createAidLoadingReporter,
+		furiganaRequestKey
+	} from "$lib/aidLoading";
 	import { detectScripts, localAidsFor, type LocalAid } from "$lib/reading";
 	import { aidHtml, aidPinyinHtml, type AidHtmlMode } from "$lib/aidHtml";
 	import {
@@ -19,7 +22,12 @@
 	import { badgeHover } from "$lib/hoverWash";
 	import type { AttachTagModel, SentTagAction } from "$lib/attachments";
 	import type { ChatMsg, ChatMsgId } from "$lib/chat";
-	import { applyMarks, annRefsFor, type AnnotationMark, type AnnotationId } from "$lib/annotations";
+	import {
+		applyMarks,
+		annRefsFor,
+		type AnnotationMark,
+		type AnnotationId
+	} from "$lib/annotations";
 
 	interface Props {
 		message: ChatMsg;
@@ -77,8 +85,8 @@
 		 * the preview inert.
 		 */
 		onUnfold?: () => void;
-	/** Badge hover (paints the quote wash while pointed at). Null on leave. */
-	onBadgeHover?: (id: string | null) => void;
+		/** Badge hover (paints the quote wash while pointed at). Null on leave. */
+		onBadgeHover?: (id: string | null) => void;
 		/**
 		 * Per-message aid overrides: pinned or hover-peeked local aids
 		 * render them (both at once on mixed messages, each on its own
@@ -200,7 +208,7 @@
 	with local kinds: ruby lands on the shown text, so the base follows
 	the override when one is pinned. */
 	const aidBase = $derived(
-		annRefsFor(textOverride ?? displayBase)?.text ?? (textOverride ?? displayBase)
+		annRefsFor(textOverride ?? displayBase)?.text ?? textOverride ?? displayBase
 	);
 	/** Scripts with a local aid always reserve ruby's vertical room, so
 	hovering or pinning one never shoves the message down — any script
@@ -220,7 +228,8 @@
 		// A redacted body renders with folds like the stored one: fold
 		// ranges only ever shrink, and out-of-range folds are ignored.
 		const plainBase = displayBase;
-		const content = textOverride ?? applyPasteFolds(plainBase, message.pasteFolds);
+		const content =
+			textOverride ?? applyPasteFolds(plainBase, message.pasteFolds);
 		// Read synchronously so the effect re-runs when badges change.
 		const items = marks;
 		const wash = washId;
@@ -228,7 +237,8 @@
 		// Aid-visible source: the refs block stays redacted (a pinned
 		// aid can't resurrect metadata); folds stay aligned — redaction
 		// only ever trims the trailing block, so prefix offsets hold.
-		const aidContent = textOverride ?? applyPasteFolds(aidBase, message.pasteFolds);
+		const aidContent =
+			textOverride ?? applyPasteFolds(aidBase, message.pasteFolds);
 		// Aids render onto the real markdown HTML (code and math blocks
 		// survive pinning); model-aid text (e.g. tashkeel) arrives via
 		// textOverride and composes with pinned local kinds, each
@@ -242,7 +252,8 @@
 		// kind to Nth of a kind); assistant output carries none, so an
 		// echoed literal there stays plain text.
 		const tagModels = (): AttachTagModel[] | undefined => {
-			if (message.role !== "user" || !message.attachments?.length) return undefined;
+			if (message.role !== "user" || !message.attachments?.length)
+				return undefined;
 			return message.attachments.map((att) => ({
 				id: att.id,
 				kind: att.kind,
@@ -260,8 +271,12 @@
 		// Shiki enhance sharing the caller's aid run: null when a newer
 		// render superseded it (or the enhance itself failed, falling
 		// back to the unenhanced HTML instead of hanging on loading).
-		const enhanceBase = (snapshot: RenderedMessage, run: number): Promise<string | null> => {
-			if (streaming || snapshot.codes.length === 0) return Promise.resolve(snapshot.html);
+		const enhanceBase = (
+			snapshot: RenderedMessage,
+			run: number
+		): Promise<string | null> => {
+			if (streaming || snapshot.codes.length === 0)
+				return Promise.resolve(snapshot.html);
 			const highlight = ++highlightRun;
 			const fresh = (): boolean => run === aidRun && highlight === highlightRun;
 			return highlightRendered(snapshot).then(
@@ -273,19 +288,19 @@
 		const pinyin = localAids.includes("pinyin");
 		// Marks apply after Svelte flushes the new HTML (see applyMarks).
 		const stamp = () =>
-		void tick().then(() => {
-			if (!bodyEl) return;
-			applyMarks(bodyEl, items, skipMarks, wash);
-			stampRunOutputs();
-			for (const wrap of bodyEl.querySelectorAll("[data-math-index]")) {
-				if (!(wrap instanceof HTMLElement)) continue;
-				const index = Number(wrap.dataset.mathIndex ?? "-1");
-				// "1", matching the toggle below (presence alone would
-				// desync its value check).
-				if (rawMaths.has(index)) wrap.setAttribute("data-math-raw", "1");
-				else wrap.removeAttribute("data-math-raw");
-			}
-		});
+			void tick().then(() => {
+				if (!bodyEl) return;
+				applyMarks(bodyEl, items, skipMarks, wash);
+				stampRunOutputs();
+				for (const wrap of bodyEl.querySelectorAll("[data-math-index]")) {
+					if (!(wrap instanceof HTMLElement)) continue;
+					const index = Number(wrap.dataset.mathIndex ?? "-1");
+					// "1", matching the toggle below (presence alone would
+					// desync its value check).
+					if (rawMaths.has(index)) wrap.setAttribute("data-math-raw", "1");
+					else wrap.removeAttribute("data-math-raw");
+				}
+			});
 		if (pinyin && !furigana) {
 			const snapshot = renderBaseSnapshot(aidContent);
 			rendered = snapshot;
@@ -311,7 +326,10 @@
 			// The kinds join the key: furigana-only and dual share text
 			// and folds but render differently, so switching between them
 			// must reconvert, never replay the other's HTML.
-			const key = furiganaRequestKey(`${[...localAids].sort().join("+")}\n${aidBase}`, message.pasteFolds);
+			const key = furiganaRequestKey(
+				`${[...localAids].sort().join("+")}\n${aidBase}`,
+				message.pasteFolds
+			);
 			if (key === furiganaKey) {
 				// Same conversion already shown or loading: badges may
 				// have changed, so re-stamp, but never reconvert and
@@ -341,8 +359,13 @@
 							if (run !== aidRun) return;
 							console.warn("[furigana] conversion failed:", error);
 							const first =
-								error instanceof Error ? error.message.split("\n")[0] : String(error);
-							onAidError?.(message.id, (first ?? "").slice(0, 140) || undefined);
+								error instanceof Error
+									? error.message.split("\n")[0]
+									: String(error);
+							onAidError?.(
+								message.id,
+								(first ?? "").slice(0, 140) || undefined
+							);
 						}
 					);
 				})
@@ -370,7 +393,9 @@
 	});
 
 	function badgeIdOf(target: EventTarget | null): string | null {
-		return closestFromTarget(target, "[data-ann-badge]")?.dataset.annBadge ?? null;
+		return (
+			closestFromTarget(target, "[data-ann-badge]")?.dataset.annBadge ?? null
+		);
 	}
 
 	/**
@@ -413,7 +438,10 @@
 			if (!live || live.isCollapsed || live.toString() === "") return false;
 			const anchor = live.anchorNode;
 			const focus = live.focusNode;
-			return (!!anchor && block.contains(anchor)) || (!!focus && block.contains(focus));
+			return (
+				(!!anchor && block.contains(anchor)) ||
+				(!!focus && block.contains(focus))
+			);
 		} catch {
 			return false;
 		}
@@ -422,7 +450,8 @@
 		const unfoldedDrag =
 			event.detail > 0 &&
 			chromeDown !== null &&
-			Math.hypot(event.clientX - chromeDown.x, event.clientY - chromeDown.y) > 4;
+			Math.hypot(event.clientX - chromeDown.x, event.clientY - chromeDown.y) >
+				4;
 		// History tag popup: buttons act (delegated Copy/OCR — raw
 		// {@html} carries no Svelte handlers), the collapsed tag and
 		// the X toggle the popup. Buttons win over the toggle; both
@@ -481,13 +510,18 @@
 			if (closestFromTarget(event.target, ".ccez-math-copy")) {
 				if (!navigator.clipboard) onToast?.("Couldn't copy to the clipboard.");
 				else
-					void navigator.clipboard.writeText(mathCopyText(entry.tex, entry.kind)).then(
-						() => onToast?.("Copied"),
-						() => onToast?.("Couldn't copy to the clipboard.")
-					);
+					void navigator.clipboard
+						.writeText(mathCopyText(entry.tex, entry.kind))
+						.then(
+							() => onToast?.("Copied"),
+							() => onToast?.("Couldn't copy to the clipboard.")
+						);
 				return;
 			}
-			if (mathWrap.classList.contains("ccez-math") && mathWrap.dataset.folded === "1") {
+			if (
+				mathWrap.classList.contains("ccez-math") &&
+				mathWrap.dataset.folded === "1"
+			) {
 				// A drag ending here selected the folded label: unfolding
 				// would detach that highlight (see chromeDown above).
 				if (unfoldedDrag || blockHoldsHighlight(mathWrap)) return;
@@ -589,7 +623,8 @@
 		aria-label="Unfold this message"
 		title="Unfold this message"
 		onclick={() => onUnfold?.()}
-	>{foldPreviewText(message.content, foldPreview)}</button>
+		>{foldPreviewText(message.content, foldPreview)}</button
+	>
 {:else}
 	<!-- Delegated in-block code copy buttons live inside the sanitized HTML. -->
 	<!-- The key swaps only for pinned model-aid text: previews and local
@@ -598,8 +633,20 @@
 	{#key textOverride && !aidPreview ? "model" : "plain"}
 		<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions, a11y_mouse_events_have_key_events -->
 		<!-- Badge wash is hover-only by decision (see onBadgeOver): Tab reaches markers, never highlights. -->
-		<!-- eslint-disable-next-line svelte/no-at-html-tags -- html is DOMPurify-sanitized in render.ts -->
-		<div class="rendered" class:aid-swap={!preview} class:aid-space={aidSpace} class:aid-tall={aidSpace && aidTall} bind:this={bodyEl} onmousedown={(e) => (chromeDown = { x: e.clientX, y: e.clientY })} onclick={onBodyClick} onmouseover={onBadgeOver} onmouseout={onBadgeOut}>{@html html}</div>
+		<div
+			class="rendered"
+			class:aid-swap={!preview}
+			class:aid-space={aidSpace}
+			class:aid-tall={aidSpace && aidTall}
+			bind:this={bodyEl}
+			onmousedown={(e) => (chromeDown = { x: e.clientX, y: e.clientY })}
+			onclick={onBodyClick}
+			onmouseover={onBadgeOver}
+			onmouseout={onBadgeOut}
+		>
+			<!-- eslint-disable-next-line svelte/no-at-html-tags -- html is DOMPurify-sanitized in render.ts -->
+			{@html html}
+		</div>
 	{/key}
 {/if}
 
@@ -653,7 +700,9 @@
 		padding: 0;
 		cursor: pointer;
 	}
-	:global(html[data-theme="dark"]) .rendered :global(button.paste-fold:not(.paste-fold-bracket)) {
+	:global(html[data-theme="dark"])
+		.rendered
+		:global(button.paste-fold:not(.paste-fold-bracket)) {
 		color: #98989f;
 		color: var(--muted);
 	}
@@ -911,8 +960,7 @@
 		border-top: 1px solid #e5e5ea;
 		background: #f7f7f8;
 		padding: 0.4rem 0.6rem;
-		font-family:
-			ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+		font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 		font-size: 0.75rem;
 		line-height: 1.45;
 		white-space: pre-wrap;
@@ -937,8 +985,7 @@
 		display: none;
 		padding: 0.4rem 0.6rem;
 		background: #fff;
-		font-family:
-			ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+		font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 		font-size: 0.75rem;
 		color: #6e6e73;
 		white-space: nowrap;
@@ -974,7 +1021,9 @@
 	copy alone there: display:none drops the button from taps, tabs,
 	and the accessibility tree alike. iOS keeps it (browser fallback
 	stamps the no-runner reason instead of breaking). */
-	:global(.app[data-android]:not([data-ios])) .rendered :global(.ccez-code-run) {
+	:global(.app[data-android]:not([data-ios]))
+		.rendered
+		:global(.ccez-code-run) {
 		display: none;
 	}
 	/* LaTeX math (main chat only): display blocks carry copy + `$`
@@ -1032,8 +1081,7 @@
 	instead of washing out beside it. */
 	.rendered :global(.ccez-math-tex) {
 		right: calc(50% + 0.2rem);
-		font-family:
-			ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+		font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 		font-size: 0.85rem;
 		font-style: normal;
 		font-weight: 700;
@@ -1072,8 +1120,7 @@
 		display: none;
 		padding: 0.4rem 0.6rem;
 		background: #fff;
-		font-family:
-			ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+		font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 		font-size: 0.75rem;
 		color: #6e6e73;
 		white-space: nowrap;
@@ -1111,8 +1158,7 @@
 		`$` flips rendered to source. */
 		padding: 2.2rem 0.8rem 0.6rem;
 		background: #fff;
-		font-family:
-			ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+		font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 		font-size: 0.8rem;
 		white-space: pre-wrap;
 		word-break: break-word;
@@ -1129,7 +1175,8 @@
 	/* Folded wins over the raw-source view: folding a `$`-toggled
 	block leaves the label only, like any other fold (the raw-view
 	rule above would otherwise out-order the fold). */
-	.rendered :global(.ccez-math[data-folded="1"][data-math-raw="1"] .ccez-math-raw) {
+	.rendered
+		:global(.ccez-math[data-folded="1"][data-math-raw="1"] .ccez-math-raw) {
 		display: none;
 	}
 	/* Inline math renders bare — no bar mid-sentence — so the line
@@ -1245,7 +1292,9 @@
 			background-color: transparent;
 		}
 	}
-	:global(html[data-theme="dark"]) .rendered :global(mark.ccez-ann-flash.fading) {
+	:global(html[data-theme="dark"])
+		.rendered
+		:global(mark.ccez-ann-flash.fading) {
 		animation-name: ann-flash-out-dark;
 	}
 	/* The wash mounts/unmounts imperatively (applyMarks), so a plain

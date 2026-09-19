@@ -17,7 +17,9 @@ test("folded equation previews parenthesized latex and clicks to unfold", async 
 	await page.goto("/");
 	const article = page.locator("article.assistant").first();
 	await expect(article.locator(".rendered")).toBeVisible();
-	await article.locator('.actions button[aria-label="Fold this message"]').click();
+	await article
+		.locator('.actions button[aria-label="Fold this message"]')
+		.click();
 	const preview = article.locator(".folded-preview");
 	await expect(preview).toBeVisible();
 	await expect(preview).toContainText("\\(E = mc^2\\)");
@@ -31,7 +33,9 @@ test("plain folded preview clicks to unfold", async ({ page }) => {
 	await page.goto("/");
 	const article = page.locator("article.assistant").first();
 	await expect(article.locator(".rendered")).toBeVisible();
-	await article.locator('.actions button[aria-label="Fold this message"]').click();
+	await article
+		.locator('.actions button[aria-label="Fold this message"]')
+		.click();
 	const preview = article.locator(".folded-preview");
 	await expect(preview).toContainText("hello world");
 	await preview.click();
@@ -44,29 +48,42 @@ test("long folded preview cuts with an ellipsis", async ({ page }) => {
 	await page.goto("/");
 	const article = page.locator("article.assistant").first();
 	await expect(article.locator(".rendered")).toBeVisible();
-	await article.locator('.actions button[aria-label="Fold this message"]').click();
+	await article
+		.locator('.actions button[aria-label="Fold this message"]')
+		.click();
 	const preview = article.locator(".folded-preview");
 	await expect(preview).toContainText(`${"あ".repeat(140)}…`);
 });
 
-test("folded preview lands on the first sentence, not the whole line", async ({ page }) => {
+test("folded preview lands on the first sentence, not the whole line", async ({
+	page
+}) => {
 	await seedChat(page, [
-		{ role: "assistant", content: "春は日本で最も美しい季節の一つです。桜が咲き誇ります。" }
+		{
+			role: "assistant",
+			content: "春は日本で最も美しい季節の一つです。桜が咲き誇ります。"
+		}
 	]);
 	await page.goto("/");
 	const article = page.locator("article.assistant").first();
 	await expect(article.locator(".rendered")).toBeVisible();
-	await article.locator('.actions button[aria-label="Fold this message"]').click();
+	await article
+		.locator('.actions button[aria-label="Fold this message"]')
+		.click();
 	const preview = article.locator(".folded-preview");
 	await expect(preview).toHaveText("春は日本で最も美しい季節の一つです。…");
 });
 
-test("long folded preview stays inside the message column", async ({ page }) => {
+test("long folded preview stays inside the message column", async ({
+	page
+}) => {
 	await seedChat(page, [{ role: "assistant", content: `${"あ".repeat(200)}` }]);
 	await page.goto("/");
 	const article = page.locator("article.assistant").first();
 	await expect(article.locator(".rendered")).toBeVisible();
-	await article.locator('.actions button[aria-label="Fold this message"]').click();
+	await article
+		.locator('.actions button[aria-label="Fold this message"]')
+		.click();
 	const preview = article.locator(".folded-preview");
 	await expect(preview).toBeVisible();
 	// The 140-char preview must clip with an ellipsis, never stretch
@@ -79,7 +96,8 @@ test("long folded preview stays inside the message column", async ({ page }) => 
 			right: rect.right,
 			articleRight: articleRect?.right ?? Number.POSITIVE_INFINITY,
 			pageOverflow:
-				document.documentElement.scrollWidth - document.documentElement.clientWidth
+				document.documentElement.scrollWidth -
+				document.documentElement.clientWidth
 		};
 	});
 	expect(layout.pageOverflow).toBeLessThanOrEqual(1);
@@ -87,7 +105,9 @@ test("long folded preview stays inside the message column", async ({ page }) => 
 });
 
 test("middle-drag left on a message folds it", async ({ page }) => {
-	await seedChat(page, [{ role: "assistant", content: "hello world, drag me" }]);
+	await seedChat(page, [
+		{ role: "assistant", content: "hello world, drag me" }
+	]);
 	await page.goto("/");
 	const article = page.locator("article.assistant").first();
 	const rendered = article.locator(".rendered");
@@ -99,7 +119,11 @@ test("middle-drag left on a message folds it", async ({ page }) => {
 	await page.mouse.down({ button: "middle" });
 	await page.mouse.move(box.x + box.width / 2 - 80, y, { steps: 5 });
 	await page.mouse.up({ button: "middle" });
-	await expect(article.locator(".folded-preview")).toBeVisible({ timeout: 10_000 });
+	await expect(article.locator(".folded-preview")).toBeVisible({
+		timeout: 10_000
+	});
 	// The drag acted, so no shortcuts modal toggled on release.
-	await expect(page.locator(".modal", { hasText: "Keyboard shortcuts" })).toHaveCount(0);
+	await expect(
+		page.locator(".modal", { hasText: "Keyboard shortcuts" })
+	).toHaveCount(0);
 });

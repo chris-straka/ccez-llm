@@ -12,8 +12,8 @@ export function viewTransitionsSupported(): boolean {
 	try {
 		return (
 			typeof document !== "undefined" &&
-			typeof (document as Document & { startViewTransition?: unknown }).startViewTransition ===
-				"function"
+			typeof (document as Document & { startViewTransition?: unknown })
+				.startViewTransition === "function"
 		);
 	} catch {
 		return false;
@@ -59,10 +59,17 @@ interface SwitchTransition {
  * fires again after `finished` as a guarantee (idempotent callbacks
  * only), and immediately on the sync/fallback paths.
  */
-export async function switchChatWithTransition(mutate: () => void, onSnapshot?: () => void): Promise<void> {
-	const doc = (
-		typeof document !== "undefined" ? document : undefined
-	) as (Document & { startViewTransition?: (opts: { update: () => void }) => SwitchTransition }) | undefined;
+export async function switchChatWithTransition(
+	mutate: () => void,
+	onSnapshot?: () => void
+): Promise<void> {
+	const doc = (typeof document !== "undefined" ? document : undefined) as
+		| (Document & {
+				startViewTransition?: (opts: {
+					update: () => void;
+				}) => SwitchTransition;
+		  })
+		| undefined;
 	if (doc && typeof doc.startViewTransition === "function") {
 		try {
 			const transition = doc.startViewTransition({ update: mutate });

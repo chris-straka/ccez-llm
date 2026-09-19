@@ -17,7 +17,9 @@ test.use({
 test.beforeEach(async ({ page }) => {
 	await seedChat(page, []);
 	await page.goto("/");
-	await expect(page.locator(".empty-state h1")).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".empty-state h1")).toBeVisible({
+		timeout: 60_000
+	});
 });
 
 test("europe list stays inside a phone viewport", async ({ page }) => {

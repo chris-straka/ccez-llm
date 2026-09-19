@@ -1,7 +1,15 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { applyMarks, type AnnotationMark, type AnnotationId } from "./annotations";
-import { ANN_HIGHLIGHT_D1, ANN_HIGHLIGHT_D3, ANN_HIGHLIGHT_NAME } from "./annHighlights";
+import {
+	applyMarks,
+	type AnnotationMark,
+	type AnnotationId
+} from "./annotations";
+import {
+	ANN_HIGHLIGHT_D1,
+	ANN_HIGHLIGHT_D3,
+	ANN_HIGHLIGHT_NAME
+} from "./annHighlights";
 
 /** Minimal CSS.highlights stand-in: name -> Highlight holding ranges. */
 class FakeHighlight {
@@ -52,7 +60,9 @@ describe("wash fade-in settle", () => {
 		const root = document.createElement("div");
 		root.textContent = "say hello world today";
 		const nudges = countNudges(root);
-		const marks: AnnotationMark[] = [{ id: "a9" as AnnotationId, number: 1, quote: "hello world" }];
+		const marks: AnnotationMark[] = [
+			{ id: "a9" as AnnotationId, number: 1, quote: "hello world" }
+		];
 
 		applyMarks(root, marks, false, "a9");
 		expect(nudges.count()).toBeGreaterThanOrEqual(1);

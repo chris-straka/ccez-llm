@@ -6,7 +6,12 @@
 //   bun scripts/cjkdecomp-subset.ts --data /path/to/cjk-decomp.txt \
 //     --out src/lib/cjkdecomp-subset.generated.ts
 import { readFileSync, writeFileSync } from "node:fs";
-import { normalizeVariant, parseRecord, resolveLevel, type DecompTable } from "./cjkdecomp";
+import {
+	normalizeVariant,
+	parseRecord,
+	resolveLevel,
+	type DecompTable
+} from "./cjkdecomp";
 
 const DATA_REPO = "https://github.com/amake/cjk-decomp";
 const DATA_COMMIT = "c29b391";
@@ -30,9 +35,11 @@ function loadChars(path: string): string[] {
 }
 
 function main(): void {
-	const candidates = [arg("data", ""), "./vendor/cjk-decomp.txt", "/tmp/cjk-decomp/cjk-decomp.txt"].filter(
-		(p) => p !== ""
-	);
+	const candidates = [
+		arg("data", ""),
+		"./vendor/cjk-decomp.txt",
+		"/tmp/cjk-decomp/cjk-decomp.txt"
+	].filter((p) => p !== "");
 	const dataPath = candidates.find((p) => {
 		try {
 			readFileSync(p);
@@ -52,7 +59,10 @@ function main(): void {
 		if (rec !== null) table.set(rec.char, rec);
 	}
 	const subset = [
-		...new Set([...loadChars("scripts/fixtures/joyo.txt"), ...loadChars("scripts/fixtures/hanzi-common.txt")])
+		...new Set([
+			...loadChars("scripts/fixtures/joyo.txt"),
+			...loadChars("scripts/fixtures/hanzi-common.txt")
+		])
 	];
 	const rows: Array<[string, string[]]> = [];
 	for (const ch of subset) {
@@ -70,7 +80,12 @@ function main(): void {
 		rows.push([ch, resolved]);
 	}
 	rows.sort((a, b) => (a[0] < b[0] ? -1 : 1));
-	const body = rows.map(([ch, comps]) => `\t${JSON.stringify(ch)}:[${comps.map((c) => JSON.stringify(c)).join(",")}],`).join("\n");
+	const body = rows
+		.map(
+			([ch, comps]) =>
+				`\t${JSON.stringify(ch)}:[${comps.map((c) => JSON.stringify(c)).join(",")}],`
+		)
+		.join("\n");
 	const out = `/**
  * GENERATED — do not edit by hand. Regenerate with:
  *   bun scripts/cjkdecomp-subset.ts --data /path/to/cjk-decomp.txt --out src/lib/cjkdecomp-subset.generated.ts
@@ -92,7 +107,9 @@ ${body}
 };
 `;
 	writeFileSync(arg("out", "src/lib/cjkdecomp-subset.generated.ts"), out);
-	console.log(`wrote ${rows.length} entries, ${Buffer.byteLength(out, "utf8")} B`);
+	console.log(
+		`wrote ${rows.length} entries, ${Buffer.byteLength(out, "utf8")} B`
+	);
 }
 
 main();

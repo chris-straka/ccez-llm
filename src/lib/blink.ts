@@ -118,21 +118,18 @@ export function startMarkFade(fade: MarkFade): () => void {
 		fade.onDone?.();
 	};
 	const fadeMs = fade.fadeMs ?? 250;
-	hold = setTimeout(
-		() => {
-			hold = null;
-			if (stopped) return;
-			if (fadeMs <= 0) {
-				finish();
-				return;
-			}
-			for (const mark of fade.marks) {
-				if (mark.isConnected) mark.classList.add(fade.fadeClass ?? "fading");
-			}
-			tail = setTimeout(finish, fadeMs);
-		},
-		fade.holdMs ?? 700
-	);
+	hold = setTimeout(() => {
+		hold = null;
+		if (stopped) return;
+		if (fadeMs <= 0) {
+			finish();
+			return;
+		}
+		for (const mark of fade.marks) {
+			if (mark.isConnected) mark.classList.add(fade.fadeClass ?? "fading");
+		}
+		tail = setTimeout(finish, fadeMs);
+	}, fade.holdMs ?? 700);
 	return stop;
 }
 

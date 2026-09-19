@@ -44,7 +44,11 @@ export function tokenizeText(text: string): string[] {
 }
 
 /** One-line context around the first query-token occurrence. */
-export function snippetFor(text: string, queryTokens: string[], radius = 40): string {
+export function snippetFor(
+	text: string,
+	queryTokens: string[],
+	radius = 40
+): string {
 	const flat = text.replace(/\s+/g, " ").trim();
 	if (!flat) return "";
 	const lower = flat.toLowerCase();
@@ -56,7 +60,11 @@ export function snippetFor(text: string, queryTokens: string[], radius = 40): st
 	if (at < 0) return flat.slice(0, radius * 2);
 	const start = Math.max(0, at - radius);
 	const end = Math.min(flat.length, at + radius);
-	return (start > 0 ? "…" : "") + flat.slice(start, end) + (end < flat.length ? "…" : "");
+	return (
+		(start > 0 ? "…" : "") +
+		flat.slice(start, end) +
+		(end < flat.length ? "…" : "")
+	);
 }
 
 function scoreDoc(tokens: string[], queryTokens: string[]): number {
@@ -86,7 +94,10 @@ function scoreDoc(tokens: string[], queryTokens: string[]): number {
  * the in-chat find bar cycles these browser-style. Pure over plain
  * message text (not rendered HTML) so Vitest runs it in node.
  */
-export function findMessageIndices(contents: string[], query: string): number[] {
+export function findMessageIndices(
+	contents: string[],
+	query: string
+): number[] {
 	const q = query.trim().toLowerCase();
 	if (!q) return [];
 	const out: number[] = [];
@@ -97,13 +108,18 @@ export function findMessageIndices(contents: string[], query: string): number[] 
 }
 
 /** Rank documents against a raw query string (AND semantics). */
-export function querySearch(docs: SearchDoc[], query: string, limit = 30): SearchHit[] {
+export function querySearch(
+	docs: SearchDoc[],
+	query: string,
+	limit = 30
+): SearchHit[] {
 	const queryTokens = tokenizeText(query);
 	if (queryTokens.length === 0) return [];
 	const hits: SearchHit[] = [];
 	for (const doc of docs) {
 		const score = scoreDoc(tokenizeText(doc.text), queryTokens);
-		if (score > 0) hits.push({ doc, score, snippet: snippetFor(doc.text, queryTokens) });
+		if (score > 0)
+			hits.push({ doc, score, snippet: snippetFor(doc.text, queryTokens) });
 	}
 	hits.sort((a, b) => b.score - a.score);
 	return hits.slice(0, Math.max(0, limit));
@@ -131,13 +147,23 @@ export function buildSearchDocs(
 	for (const chat of chats) {
 		for (const msg of chat.messages) {
 			if (!msg.content.trim()) continue;
-			docs.push({ chatId: chat.id, msgId: msg.id, kind: "message", text: msg.content });
+			docs.push({
+				chatId: chat.id,
+				msgId: msg.id,
+				kind: "message",
+				text: msg.content
+			});
 		}
 	}
 	for (const ann of annotations) {
 		const text = [ann.quote, ann.comment].filter((t) => t.trim()).join("\n");
 		if (!text) continue;
-		docs.push({ chatId: ann.chatId, msgId: ann.messageId, kind: "annotation", text });
+		docs.push({
+			chatId: ann.chatId,
+			msgId: ann.messageId,
+			kind: "annotation",
+			text
+		});
 	}
 	return docs;
 }
@@ -147,7 +173,11 @@ export function buildSearchDocs(
  * every query token (substring, case-insensitive — cheaper than the
  * ranked index and enough for a short visible list).
  */
-export function chatMatchesQuery(label: string, messageTexts: string[], query: string): boolean {
+export function chatMatchesQuery(
+	label: string,
+	messageTexts: string[],
+	query: string
+): boolean {
 	const tokens = tokenizeText(query);
 	if (tokens.length === 0) return true;
 	const haystack = [label, ...messageTexts].join("\n").toLowerCase();

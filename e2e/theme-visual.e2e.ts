@@ -23,9 +23,14 @@ test("light theme paints light surfaces", async ({ page }) => {
 	await seedChat(page, [{ role: "user", content: "hi" }]);
 	await seedTheme(page, "light");
 	await page.goto("/");
-	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
 	await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
-	await expect(page.locator(".app")).toHaveCSS("background-color", "rgb(255, 255, 255)");
+	await expect(page.locator(".app")).toHaveCSS(
+		"background-color",
+		"rgb(255, 255, 255)"
+	);
 	await expect(page.locator(".app")).toHaveCSS("color", "rgb(28, 28, 30)");
 });
 
@@ -33,17 +38,27 @@ test("dark theme paints dark surfaces", async ({ page }) => {
 	await seedChat(page, [{ role: "user", content: "hi" }]);
 	await seedTheme(page, "dark");
 	await page.goto("/");
-	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
 	await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-	await expect(page.locator(".app")).toHaveCSS("background-color", "rgb(23, 23, 26)");
+	await expect(page.locator(".app")).toHaveCSS(
+		"background-color",
+		"rgb(23, 23, 26)"
+	);
 	await expect(page.locator(".app")).toHaveCSS("color", "rgb(242, 242, 247)");
-	await expect(page.locator(".prompt")).toHaveCSS("background-color", "rgb(28, 28, 30)");
+	await expect(page.locator(".prompt")).toHaveCSS(
+		"background-color",
+		"rgb(28, 28, 30)"
+	);
 });
 
 test("app fills the viewport height", async ({ page }) => {
 	await seedChat(page, [{ role: "user", content: "hi" }]);
 	await page.goto("/");
-	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const { app, viewport } = await page.evaluate(() => ({
 		app: document.querySelector(".app")?.getBoundingClientRect().height ?? 0,
 		viewport: window.innerHeight
@@ -53,13 +68,23 @@ test("app fills the viewport height", async ({ page }) => {
 
 test("page never scrolls sideways", async ({ page }) => {
 	await seedChat(page, [
-		{ role: "user", content: "a much longer message to stretch the column width a bit" },
-		{ role: "assistant", content: "reply with enough text to wrap a few lines in the pane" }
+		{
+			role: "user",
+			content: "a much longer message to stretch the column width a bit"
+		},
+		{
+			role: "assistant",
+			content: "reply with enough text to wrap a few lines in the pane"
+		}
 	]);
 	await page.goto("/");
-	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const overflow = await page.evaluate(
-		() => document.documentElement.scrollWidth - document.documentElement.clientWidth
+		() =>
+			document.documentElement.scrollWidth -
+			document.documentElement.clientWidth
 	);
 	expect(overflow).toBeLessThanOrEqual(1);
 });
@@ -71,7 +96,9 @@ test("message list scrolls inside its pane", async ({ page }) => {
 	}));
 	await seedChat(page, msgs);
 	await page.goto("/");
-	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const sizes = await page.evaluate(() => {
 		const list = document.querySelector(".messages");
 		const root = document.scrollingElement;
@@ -115,7 +142,9 @@ for (const t of THEMES) {
 		await seedChat(page, [{ role: "user", content: "hi" }]);
 		await seedTheme(page, t.name);
 		await page.goto("/");
-		await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator(".ta-input").first()).toBeVisible({
+			timeout: 60_000
+		});
 		const L = t.name === "light";
 		// The list always boots closed; ⌘B opens it for real.
 		await page.keyboard.press("Meta+b");
@@ -123,7 +152,10 @@ for (const t of THEMES) {
 		await expect(sidebar).toBeVisible();
 		const row = sidebar.locator("li").first();
 		const chat = row.locator("button.side-chat");
-		await expect(chat).toHaveCSS("color", L ? "rgb(28, 28, 30)" : "rgb(242, 242, 247)");
+		await expect(chat).toHaveCSS(
+			"color",
+			L ? "rgb(28, 28, 30)" : "rgb(242, 242, 247)"
+		);
 		await chat.hover();
 		await expect(chat).toHaveCSS(
 			"background-color",
@@ -141,16 +173,24 @@ for (const t of THEMES) {
 		);
 		await row.hover();
 		const del = row.locator(".del");
-		await expect(del).toHaveCSS("color", L ? "rgb(110, 110, 115)" : "rgb(174, 174, 178)");
+		await expect(del).toHaveCSS(
+			"color",
+			L ? "rgb(110, 110, 115)" : "rgb(174, 174, 178)"
+		);
 		await del.hover();
-		await expect(del).toHaveCSS("color", L ? "rgb(148, 37, 10)" : "rgb(232, 154, 144)");
+		await expect(del).toHaveCSS(
+			"color",
+			L ? "rgb(148, 37, 10)" : "rgb(232, 154, 144)"
+		);
 	});
 
 	test(`sidebar paints ${t.name}`, async ({ page }) => {
 		await seedChat(page, [{ role: "user", content: "hi" }]);
 		await seedTheme(page, t.name);
 		await page.goto("/");
-		await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator(".ta-input").first()).toBeVisible({
+			timeout: 60_000
+		});
 		const sidebar = page.locator("aside:has(button.side-chat)");
 		await expect(sidebar).toHaveCSS("background-color", t.bg);
 		await expect(sidebar).toHaveCSS("border-right-color", t.softLine);
@@ -170,9 +210,14 @@ for (const t of THEMES) {
 		await seedChat(page, [{ role: "user", content: "bubble me" }]);
 		await seedTheme(page, t.name);
 		await page.goto("/");
-		await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator(".ta-input").first()).toBeVisible({
+			timeout: 60_000
+		});
 		await page.keyboard.press("Meta+,");
-		await page.locator(".settings-panel").getByText("Enable background on my messages").click();
+		await page
+			.locator(".settings-panel")
+			.getByText("Enable background on my messages")
+			.click();
 		await expect(page.locator("article.user .bubble").first()).toHaveCSS(
 			"background-color",
 			t.wash
@@ -183,13 +228,23 @@ for (const t of THEMES) {
 		await seedChat(page, [{ role: "user", content: "hi" }]);
 		await seedTheme(page, t.name);
 		await page.goto("/");
-		await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator(".ta-input").first()).toBeVisible({
+			timeout: 60_000
+		});
 		await page.keyboard.press("Meta+,");
 		await expect(page.locator(".settings-panel")).not.toHaveClass(/closed/);
-		await expect(page.locator(".settings-panel")).toHaveCSS("background-color", t.bg);
-		await expect(page.locator(".settings-panel")).toHaveCSS("border-left-color", t.softLine);
+		await expect(page.locator(".settings-panel")).toHaveCSS(
+			"background-color",
+			t.bg
+		);
+		await expect(page.locator(".settings-panel")).toHaveCSS(
+			"border-left-color",
+			t.softLine
+		);
 		// Provider selected pill: light blue on light, inverted on dark.
-		const selected = page.locator(".settings-inner .provider-row button.selected");
+		const selected = page.locator(
+			".settings-inner .provider-row button.selected"
+		);
 		await expect(selected).toHaveCSS(
 			"background-color",
 			t.name === "light" ? "rgb(229, 240, 255)" : "rgb(242, 242, 247)"
@@ -204,7 +259,9 @@ for (const t of THEMES) {
 		await seedChat(page, [{ role: "user", content: "hi" }]);
 		await seedTheme(page, t.name);
 		await page.goto("/");
-		await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator(".ta-input").first()).toBeVisible({
+			timeout: 60_000
+		});
 		const prompt = page.locator(".prompt");
 		await expect(prompt).toHaveCSS(
 			"background-color",
@@ -225,7 +282,10 @@ for (const t of THEMES) {
 		);
 		const hint = await page.evaluate(
 			() =>
-				getComputedStyle(document.querySelector(".prompt .ta-input")!, "::placeholder").color
+				getComputedStyle(
+					document.querySelector(".prompt .ta-input")!,
+					"::placeholder"
+				).color
 		);
 		expect(hint).toBe(
 			t.name === "light" ? "rgb(142, 142, 147)" : "rgb(99, 99, 102)"
@@ -265,14 +325,21 @@ for (const t of THEMES) {
 		await nearest.click();
 		await expect(page.locator(".send-btn")).toContainText(badge);
 		await menu.click();
-		await expect(list.locator("button.selected")).toHaveCSS("background-color", t.wash);
+		await expect(list.locator("button.selected")).toHaveCSS(
+			"background-color",
+			t.wash
+		);
 	});
 
 	test(`annotation surfaces paint ${t.name}`, async ({ page }) => {
-		await seedChat(page, [{ role: "assistant", content: "paintable annotation target" }]);
+		await seedChat(page, [
+			{ role: "assistant", content: "paintable annotation target" }
+		]);
 		await seedTheme(page, t.name);
 		await page.goto("/");
-		await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator(".ta-input").first()).toBeVisible({
+			timeout: 60_000
+		});
 		const L = t.name === "light";
 		const v = {
 			ink: L ? "rgb(28, 28, 30)" : "rgb(242, 242, 247)",
@@ -288,7 +355,10 @@ for (const t of THEMES) {
 			strong: L ? "rgb(28, 28, 30)" : "rgb(174, 174, 178)"
 		};
 		// Selection menu.
-		await page.locator('article .rendered:has-text("paintable annotation target")').first().selectText();
+		await page
+			.locator('article .rendered:has-text("paintable annotation target")')
+			.first()
+			.selectText();
 		await page.mouse.up();
 		const menu = page.locator(".sel-menu");
 		await expect(menu).toBeVisible();
@@ -308,8 +378,14 @@ for (const t of THEMES) {
 		await annBtn.click();
 		const pop = page.locator(".ann-pop");
 		await expect(pop).toBeVisible();
-		await expect(pop).toHaveCSS("background-color", L ? "rgb(255, 255, 255)" : "rgb(28, 28, 30)");
-		await expect(pop).toHaveCSS("border-color", L ? "rgb(229, 229, 234)" : "rgb(56, 56, 58)");
+		await expect(pop).toHaveCSS(
+			"background-color",
+			L ? "rgb(255, 255, 255)" : "rgb(28, 28, 30)"
+		);
+		await expect(pop).toHaveCSS(
+			"border-color",
+			L ? "rgb(229, 229, 234)" : "rgb(56, 56, 58)"
+		);
 		await page.keyboard.type("note");
 		await page.keyboard.press("Enter");
 		const pill = page.locator(".prompt-tools .ann-pill");
@@ -323,7 +399,9 @@ for (const t of THEMES) {
 		const card = page.locator(".ann-wrap .review");
 		await pill.click();
 		await expect
-			.poll(() => card.evaluate((el) => getComputedStyle(el).opacity), { timeout: 2000 })
+			.poll(() => card.evaluate((el) => getComputedStyle(el).opacity), {
+				timeout: 2000
+			})
 			.toBe("1");
 		await expect(card).toHaveCSS("background-color", v.panel);
 		await expect(card).toHaveCSS("border-color", v.softLine);
@@ -331,7 +409,10 @@ for (const t of THEMES) {
 		// it can leave it hovering the delete button, which then reads
 		// ink instead of rest.
 		await page.mouse.move(8, 8);
-		await expect(page.locator(".review-label").first()).toHaveCSS("color", v.muted);
+		await expect(page.locator(".review-label").first()).toHaveCSS(
+			"color",
+			v.muted
+		);
 		const del = page.locator(".review-head button.review-del").first();
 		await expect(del).toHaveCSS("color", v.muted);
 		await del.hover();
@@ -357,15 +438,25 @@ for (const t of THEMES) {
 		await expect(page.locator(".prompt .ta-input")).toHaveValue("");
 		// Send button: system blue on light, the inversion on dark.
 		const send = page.locator(".send-btn");
-		await expect(send).toHaveCSS("background-color", L ? "rgb(0, 122, 255)" : v.invert);
-		await expect(send).toHaveCSS("color", L ? "rgb(255, 255, 255)" : v.invertInk);
+		await expect(send).toHaveCSS(
+			"background-color",
+			L ? "rgb(0, 122, 255)" : v.invert
+		);
+		await expect(send).toHaveCSS(
+			"color",
+			L ? "rgb(255, 255, 255)" : v.invertInk
+		);
 	});
 
 	test(`action buttons paint ${t.name}`, async ({ page }) => {
-		await seedChat(page, [{ role: "assistant", content: "button paint check" }]);
+		await seedChat(page, [
+			{ role: "assistant", content: "button paint check" }
+		]);
 		await seedTheme(page, t.name);
 		await page.goto("/");
-		await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator(".ta-input").first()).toBeVisible({
+			timeout: 60_000
+		});
 		const L = t.name === "light";
 		const muted = L ? "rgb(110, 110, 115)" : "rgb(152, 152, 159)";
 		const ink = L ? "rgb(28, 28, 30)" : "rgb(242, 242, 247)";
@@ -384,11 +475,15 @@ for (const t of THEMES) {
 		await seedChat(page, []);
 		await seedTheme(page, t.name);
 		await page.goto("/");
-		await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator(".ta-input").first()).toBeVisible({
+			timeout: 60_000
+		});
 		const L = t.name === "light";
 		const muted = L ? "rgb(110, 110, 115)" : "rgb(152, 152, 159)";
 		const hl = L ? "rgb(238, 244, 255)" : "rgb(18, 35, 61)";
-		await page.locator('input[type="file"]').setInputFiles("e2e/fixtures/attach.bmp");
+		await page
+			.locator('input[type="file"]')
+			.setInputFiles("e2e/fixtures/attach.bmp");
 		const item = page.locator(".attachments li").first();
 		await expect(item).toBeVisible({ timeout: 10_000 });
 		await expect(item).toHaveCSS("background-color", hl);
@@ -405,10 +500,9 @@ for (const t of THEMES) {
 		const tag = page.locator("article.user .rendered .sent-fold").first();
 		await expect(tag).toContainText("[Pasted image]", { timeout: 30_000 });
 		await tag.click();
-		await expect(page.locator("article.user .rendered .sent-card").first()).toHaveCSS(
-			"border-color",
-			L ? "rgb(199, 199, 204)" : "rgb(72, 72, 74)"
-		);
+		await expect(
+			page.locator("article.user .rendered .sent-card").first()
+		).toHaveCSS("border-color", L ? "rgb(199, 199, 204)" : "rgb(72, 72, 74)");
 	});
 
 	// No failed-send test: without the mock the dev backend still
@@ -421,7 +515,9 @@ for (const t of THEMES) {
 		]);
 		await seedTheme(page, t.name);
 		await page.goto("/");
-		await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator(".ta-input").first()).toBeVisible({
+			timeout: 60_000
+		});
 		await page.locator(".ta-input").click();
 		await page.keyboard.press("Control+g");
 		const current = page.locator("article.selected");
@@ -441,11 +537,16 @@ for (const t of THEMES) {
 		await seedChat(page, [{ role: "user", content: "hi" }]);
 		await seedTheme(page, t.name);
 		await page.goto("/");
-		await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator(".ta-input").first()).toBeVisible({
+			timeout: 60_000
+		});
 		await page.keyboard.press("Shift+Meta+/");
 		await expect(page.locator(".modal")).toBeVisible();
 		await expect(page.locator(".modal")).toHaveCSS("background-color", t.bg);
-		await expect(page.locator(".modal")).toHaveCSS("border-top-color", t.softLine);
+		await expect(page.locator(".modal")).toHaveCSS(
+			"border-top-color",
+			t.softLine
+		);
 		const L = t.name === "light";
 		const line = L ? "rgb(199, 199, 204)" : "rgb(72, 72, 74)";
 		const focus = L ? "rgb(58, 58, 60)" : "rgb(174, 174, 178)";
@@ -475,7 +576,9 @@ for (const t of THEMES) {
 		await seedChat(page, msgs);
 		await seedTheme(page, t.name);
 		await page.goto("/");
-		await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator(".ta-input").first()).toBeVisible({
+			timeout: 60_000
+		});
 		const L = t.name === "light";
 		const muted = L ? "rgb(110, 110, 115)" : "rgb(152, 152, 159)";
 		const ink = L ? "rgb(28, 28, 30)" : "rgb(242, 242, 247)";
@@ -491,9 +594,15 @@ for (const t of THEMES) {
 		await voice.click();
 		await page.locator("article .rendered").first().selectText();
 		const tint = await page.evaluate(
-			() => getComputedStyle(document.querySelector("article .rendered")!, "::selection").backgroundColor
+			() =>
+				getComputedStyle(
+					document.querySelector("article .rendered")!,
+					"::selection"
+				).backgroundColor
 		);
-		expect(tint).toBe(L ? "rgba(0, 122, 255, 0.28)" : "rgba(10, 132, 255, 0.4)");
+		expect(tint).toBe(
+			L ? "rgba(0, 122, 255, 0.28)" : "rgba(10, 132, 255, 0.4)"
+		);
 		// The floating nav carries border: 0, so neither the old dark
 		// border rule nor its token line ever paints — nothing to pin.
 		await expect(page.locator('nav[aria-label="Waypoints"]')).toHaveCount(1);
@@ -528,7 +637,10 @@ signal): muting them washed out long passages on light theme. */
 for (const t of THEMES) {
 	test(`blockquote reads as body text on ${t.name}`, async ({ page }) => {
 		await seedChat(page, [
-			{ role: "assistant", content: "As the saying goes:\n\n> The quick brown fox jumps." }
+			{
+				role: "assistant",
+				content: "As the saying goes:\n\n> The quick brown fox jumps."
+			}
 		]);
 		await seedTheme(page, t.name);
 		await page.goto("/");
@@ -574,7 +686,9 @@ test("action buttons read 85 percent of message size", async ({ page }) => {
 test("composer holds its first line clear of the tools", async ({ page }) => {
 	await seedChat(page, []);
 	await page.goto("/");
-	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const pad = await page.evaluate(() => {
 		const el = document.querySelector(".prompt .ta-input");
 		return el ? parseFloat(getComputedStyle(el).paddingRight) : 0;
@@ -595,7 +709,10 @@ async function pasteCard(page: Page): Promise<void> {
 		if (!target) throw new Error("missing editor");
 		const transfer = new DataTransfer();
 		transfer.setData("text/plain", text);
-		const event = new ClipboardEvent("paste", { bubbles: true, cancelable: true });
+		const event = new ClipboardEvent("paste", {
+			bubbles: true,
+			cancelable: true
+		});
 		Object.defineProperty(event, "clipboardData", { value: transfer });
 		target.dispatchEvent(event);
 	}, pasted);
@@ -615,18 +732,28 @@ test.describe("mobile attachment pills", () => {
 		await seedChat(page, []);
 		await seedTheme(page, "light");
 		await page.goto("/");
-		await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator(".ta-input").first()).toBeVisible({
+			timeout: 60_000
+		});
 		await expect(page.locator(".app")).toHaveAttribute("data-android", "true");
 		await pasteCard(page);
-		await expect(page.locator(".attachments .file-kind")).toHaveCSS("font-weight", "600");
+		await expect(page.locator(".attachments .file-kind")).toHaveCSS(
+			"font-weight",
+			"600"
+		);
 	});
 
 	test("dark theme keeps kind pills bold", async ({ page }) => {
 		await seedChat(page, []);
 		await seedTheme(page, "dark");
 		await page.goto("/");
-		await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator(".ta-input").first()).toBeVisible({
+			timeout: 60_000
+		});
 		await pasteCard(page);
-		await expect(page.locator(".attachments .file-kind")).toHaveCSS("font-weight", "700");
+		await expect(page.locator(".attachments .file-kind")).toHaveCSS(
+			"font-weight",
+			"700"
+		);
 	});
 });

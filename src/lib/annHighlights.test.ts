@@ -56,7 +56,12 @@ describe("CSS.highlights annotation wash", () => {
 	});
 	it("graded names stay distinct from the live name", () => {
 		expect(
-			new Set([ANN_HIGHLIGHT_NAME, ANN_HIGHLIGHT_D1, ANN_HIGHLIGHT_D2, ANN_HIGHLIGHT_D3]).size
+			new Set([
+				ANN_HIGHLIGHT_NAME,
+				ANN_HIGHLIGHT_D1,
+				ANN_HIGHLIGHT_D2,
+				ANN_HIGHLIGHT_D3
+			]).size
 		).toBe(4);
 	});
 	it("flash name stays distinct from every wash name", () => {
@@ -97,18 +102,12 @@ describe("CSS.highlights annotation wash", () => {
 		expect(sameWashRanges([at(0, 5)], [])).toBe(false);
 		// Multi-range washes (readings split one quote): pairwise,
 		// so a relocated streaming re-stamp never reads as same.
-		expect(
-			sameWashRanges(
-				[at(0, 2), at(3, 5)],
-				[at(0, 2), at(3, 5)]
-			)
-		).toBe(true);
-		expect(
-			sameWashRanges(
-				[at(0, 2), at(3, 5)],
-				[at(0, 2), at(3, 6)]
-			)
-		).toBe(false);
+		expect(sameWashRanges([at(0, 2), at(3, 5)], [at(0, 2), at(3, 5)])).toBe(
+			true
+		);
+		expect(sameWashRanges([at(0, 2), at(3, 5)], [at(0, 2), at(3, 6)])).toBe(
+			false
+		);
 		expect(sameWashRanges([at(0, 2)], [at(0, 2), at(3, 5)])).toBe(false);
 		root.remove();
 	});
@@ -123,7 +122,11 @@ describe("CSS.highlights annotation wash", () => {
 		root.remove();
 	});
 	it("jump fade steps down dedicated flash grades, never wash grades", () => {
-		expect(flashFadeSchedule()).toEqual([ANN_FLASH_D1, ANN_FLASH_D2, ANN_FLASH_D3]);
+		expect(flashFadeSchedule()).toEqual([
+			ANN_FLASH_D1,
+			ANN_FLASH_D2,
+			ANN_FLASH_D3
+		]);
 		for (const grade of flashFadeSchedule()) {
 			expect(grade).not.toBe(ANN_HIGHLIGHT_NAME);
 			expect(grade.startsWith(`${ANN_FLASH_NAME}-`)).toBe(true);

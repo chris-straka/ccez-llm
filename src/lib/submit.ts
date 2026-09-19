@@ -13,13 +13,13 @@ import type { SubmitKind } from "./editor";
 
 /** Facts for `onSubmit`: verbatim mirrors of the handler's guards. */
 export interface SubmitFacts {
-  /** Annotation pill open and not fading: it owns Enter. */
-  annPopOpen: boolean;
-  /** Composer send gate (the same boolean the send button uses). */
-  canSubmit: boolean;
-  /** Now is inside the double-Enter window (time half of the guard). */
-  sendGuardTripped: boolean;
-  kind: SubmitKind;
+	/** Annotation pill open and not fading: it owns Enter. */
+	annPopOpen: boolean;
+	/** Composer send gate (the same boolean the send button uses). */
+	canSubmit: boolean;
+	/** Now is inside the double-Enter window (time half of the guard). */
+	sendGuardTripped: boolean;
+	kind: SubmitKind;
 }
 
 /** `onSubmit` outcome: drop it, stage a message, or send a reply. */
@@ -34,19 +34,19 @@ export type SubmitAction = "ignore" | "stage" | "send";
  * ever blocks a bare send, never a stage.
  */
 export function submitAction(facts: SubmitFacts): SubmitAction {
-  if (facts.annPopOpen) return "ignore";
-  if (!facts.canSubmit) return "ignore";
-  if (facts.kind === "send" && facts.sendGuardTripped) return "ignore";
-  if (facts.kind === "stage") return "stage";
-  return "send";
+	if (facts.annPopOpen) return "ignore";
+	if (!facts.canSubmit) return "ignore";
+	if (facts.kind === "send" && facts.sendGuardTripped) return "ignore";
+	if (facts.kind === "stage") return "stage";
+	return "send";
 }
 
 /** Facts for `doSend`: the two gates before the preamble. */
 export interface SendFacts {
-  /** Composer send gate (same boolean the send button uses). */
-  canSubmit: boolean;
-  /** An in-place message edit is open. */
-  editing: boolean;
+	/** Composer send gate (same boolean the send button uses). */
+	canSubmit: boolean;
+	/** An in-place message edit is open. */
+	editing: boolean;
 }
 
 /** `doSend` outcome: drop it, save-and-resend the edit, or send fresh. */
@@ -59,23 +59,20 @@ export type SendAction = "ignore" | "commit-edit" | "resolve-provider";
  * resolution stays inline (one null check, no logic to pin).
  */
 export function sendAction(facts: SendFacts): SendAction {
-  if (!facts.canSubmit) return "ignore";
-  if (facts.editing) return "commit-edit";
-  return "resolve-provider";
+	if (!facts.canSubmit) return "ignore";
+	if (facts.editing) return "commit-edit";
+	return "resolve-provider";
 }
 
 /** Minimal message shape for the edit-target decisions. */
 export interface EditTargetMessage {
-  role: string;
-  id: unknown;
+	role: string;
+	id: unknown;
 }
 
 /** `editMessage` outcome for one pencil press. */
 export type EditMessageAction =
-  | "ignore-sending"
-  | "ignore-not-user"
-  | "toggle-off"
-  | "open";
+	"ignore-sending" | "ignore-not-user" | "toggle-off" | "open";
 
 /**
  * What opening an in-place edit does. Guard order is the contract: a
@@ -84,16 +81,20 @@ export type EditMessageAction =
  * message toggles it shut instead of reopening.
  */
 export function editMessageAction(
-  messages: ReadonlyArray<EditTargetMessage>,
-  index: number,
-  facts: { sending: boolean; editingId: unknown },
+	messages: ReadonlyArray<EditTargetMessage>,
+	index: number,
+	facts: { sending: boolean; editingId: unknown }
 ): EditMessageAction {
-  if (facts.sending) return "ignore-sending";
-  const msg = messages[index];
-  if (!msg || msg.role !== "user") return "ignore-not-user";
-  if (facts.editingId !== null && facts.editingId !== undefined && msg.id === facts.editingId)
-    return "toggle-off";
-  return "open";
+	if (facts.sending) return "ignore-sending";
+	const msg = messages[index];
+	if (!msg || msg.role !== "user") return "ignore-not-user";
+	if (
+		facts.editingId !== null &&
+		facts.editingId !== undefined &&
+		msg.id === facts.editingId
+	)
+		return "toggle-off";
+	return "open";
 }
 
 /**
@@ -104,13 +105,13 @@ export function editMessageAction(
  * always present on the true path.
  */
 export function commitEditTarget(
-  messages: ReadonlyArray<EditTargetMessage>,
-  editingId: unknown,
+	messages: ReadonlyArray<EditTargetMessage>,
+	editingId: unknown
 ): number | null {
-  if (editingId === null || editingId === undefined) return null;
-  const index = messages.findIndex((m) => m.id === editingId);
-  if (index === -1) return null;
-  const target = messages[index];
-  if (!target || target.role !== "user") return null;
-  return index;
+	if (editingId === null || editingId === undefined) return null;
+	const index = messages.findIndex((m) => m.id === editingId);
+	if (index === -1) return null;
+	const target = messages[index];
+	if (!target || target.role !== "user") return null;
+	return index;
 }

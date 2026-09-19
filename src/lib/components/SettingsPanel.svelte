@@ -86,12 +86,14 @@
 		headDown = { x: event.screenX, y: event.screenY };
 		if (!tauriBackendAvailable()) return;
 		try {
-			getCurrentWindow().startDragging().catch((error: unknown) => {
-				console.warn(
-					"Window drag failed:",
-					error instanceof Error ? error.message : String(error)
-				);
-			});
+			getCurrentWindow()
+				.startDragging()
+				.catch((error: unknown) => {
+					console.warn(
+						"Window drag failed:",
+						error instanceof Error ? error.message : String(error)
+					);
+				});
 		} catch (error) {
 			console.warn(
 				"Window drag failed:",
@@ -103,7 +105,8 @@
 	function closeFromHead(event: MouseEvent): void {
 		const down = headDown;
 		headDown = null;
-		if (down && Math.hypot(event.screenX - down.x, event.screenY - down.y) > 5) return;
+		if (down && Math.hypot(event.screenX - down.x, event.screenY - down.y) > 5)
+			return;
 		// Single click closes on a short fuse: a double-tap cancels the
 		// close and expands instead (same gesture split the main top bar
 		// uses between click-drag and double-click zoom).
@@ -151,18 +154,24 @@
 		</span>
 	{/if}
 </div>
-	<ProviderPanel settings={settings} />
-	<DefaultsPanel settings={settings} androidUI={androidUI} />
-	<AppearancePanel settings={settings} />
+<ProviderPanel {settings} />
+<DefaultsPanel {settings} {androidUI} />
+<AppearancePanel {settings} />
 <div class="keys-updates">
 	<section aria-labelledby="keys-heading">
-		<h2 id="keys-heading">{androidUI ? "Touch gestures" : "Keyboard shortcuts"}</h2>
+		<h2 id="keys-heading">
+			{androidUI ? "Touch gestures" : "Keyboard shortcuts"}
+		</h2>
 		<button type="button" onclick={onShortcuts}>
 			{androidUI ? "Show all gestures" : "Shortcuts"}
 		</button>
 	</section>
-	<UpdatesPanel androidUI={androidUI} onToast={onToast} />
+	<UpdatesPanel {androidUI} {onToast} />
 </div>
 {#if showStamp}
-	<p class="build-stamp">{appVersion ? `v${appVersion} · build ${buildStamp}` : `build ${buildStamp}`}</p>
+	<p class="build-stamp">
+		{appVersion
+			? `v${appVersion} · build ${buildStamp}`
+			: `build ${buildStamp}`}
+	</p>
 {/if}

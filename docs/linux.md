@@ -53,7 +53,7 @@ Source: `packaging/aur/PKGBUILD`. Details:
   `v${pkgver}` plus the `LICENSE` file; replace both `SKIP` checksums with
   `updpkgsums` output before submitting to the AUR.
 - `depends=('webkit2gtk-4.1' 'gtk3' 'libappindicator-gtk3' 'librsvg'
-  'openssl')` — pacman cannot see .deb metadata, so the WebKitGTK runtime
+'openssl')` — pacman cannot see .deb metadata, so the WebKitGTK runtime
   (mandatory for every Tauri v2 app) is declared explicitly.
 - Adds a `ccez-studio` → `ccez-llm` back-compat symlink in `/usr/bin` and installs the
   license under `/usr/share/licenses/ccez-llm-bin/`.

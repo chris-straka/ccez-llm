@@ -66,7 +66,10 @@ export function isMarkdownFilename(name: string): boolean {
 }
 
 /** Split launched files: markdown opens into the composer, the rest attach. */
-export function splitLaunchFiles(files: File[]): { markdown: File[]; rest: File[] } {
+export function splitLaunchFiles(files: File[]): {
+	markdown: File[];
+	rest: File[];
+} {
 	const markdown: File[] = [];
 	const rest: File[] = [];
 	for (const file of files) {

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { formatGeneratedModule, inBundledRange, parseUnihanReadings } from "./unihan-extract";
+import {
+	formatGeneratedModule,
+	inBundledRange,
+	parseUnihanReadings
+} from "./unihan-extract";
 
 const FIXTURE = [
 	"# Unihan_Readings.txt",
@@ -49,7 +53,10 @@ describe("parseUnihanReadings", () => {
 			t: "14",
 			rs: "149.7"
 		});
-		expect(entries.get("好")).toMatchObject({ d: "good, excellent, fine; well", m: "hǎo" });
+		expect(entries.get("好")).toMatchObject({
+			d: "good, excellent, fine; well",
+			m: "hǎo"
+		});
 	});
 
 	it("ignores comments, unknown fields, and malformed lines", () => {
@@ -61,13 +68,20 @@ describe("parseUnihanReadings", () => {
 
 	it("drops empty values and keeps the boundary code point", () => {
 		const entries = parseUnihanReadings(FIXTURE);
-		expect(entries.get("\u9fff")).toEqual({ char: "\u9fff", m: "boundary-inclusive" });
+		expect(entries.get("\u9fff")).toEqual({
+			char: "\u9fff",
+			m: "boundary-inclusive"
+		});
 	});
 
 	it("excludes Extension A by default and includes it with the flag", () => {
 		expect(parseUnihanReadings(FIXTURE).has("㐀")).toBe(false);
 		const withExtA = parseUnihanReadings(FIXTURE, { includeExtA: true });
-		expect(withExtA.get("㐀")).toEqual({ char: "㐀", d: "(same as 丘) hillock or mound", m: "qiū" });
+		expect(withExtA.get("㐀")).toEqual({
+			char: "㐀",
+			d: "(same as 丘) hillock or mound",
+			m: "qiū"
+		});
 	});
 
 	it("never bundles Extension B", () => {
@@ -78,7 +92,9 @@ describe("parseUnihanReadings", () => {
 
 describe("formatGeneratedModule", () => {
 	it("emits the license notice, provenance, and escaped entries", () => {
-		const entries = parseUnihanReadings('U+8A9E\tkDefinition\ta "quoted" \\ gloss\nU+8A9E\tkMandarin\tyǔ\n');
+		const entries = parseUnihanReadings(
+			'U+8A9E\tkDefinition\ta "quoted" \\ gloss\nU+8A9E\tkMandarin\tyǔ\n'
+		);
 		const module = formatGeneratedModule(entries, {
 			unicodeVersion: "17.0.0",
 			sourceUrl: "https://example.invalid/Unihan.zip",
@@ -92,7 +108,9 @@ describe("formatGeneratedModule", () => {
 	});
 
 	it("sorts entries by code point for stable regeneration diffs", () => {
-		const entries = parseUnihanReadings("U+8A9E\tkMandarin\tyǔ\nU+597D\tkMandarin\thǎo\n");
+		const entries = parseUnihanReadings(
+			"U+8A9E\tkMandarin\tyǔ\nU+597D\tkMandarin\thǎo\n"
+		);
 		const module = formatGeneratedModule(entries, {
 			unicodeVersion: "17.0.0",
 			sourceUrl: "https://example.invalid/Unihan.zip",

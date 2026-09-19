@@ -41,7 +41,10 @@ export class OnDeviceChatProvider implements ChatProvider {
 
 	constructor(private readonly deps?: OnDeviceDeps & OnDeviceFetchDeps) {}
 
-	async chat(messages: ChatMessage[], opts: ChatOptions = {}): Promise<ChatResult> {
+	async chat(
+		messages: ChatMessage[],
+		opts: ChatOptions = {}
+	): Promise<ChatResult> {
 		throwIfAborted(opts.signal);
 		const content = await generateOnDevice(
 			formatOnDevicePrompt(await this.maybeEnrich(messages, opts.signal)),
@@ -69,7 +72,10 @@ export class OnDeviceChatProvider implements ChatProvider {
 		try {
 			const run = this.deps?.fetchPage ?? fetchPageText;
 			const text = await run(url, signal);
-			return [...messages, { role: "user", content: `Fetched page text for ${url}:\n${text}` }];
+			return [
+				...messages,
+				{ role: "user", content: `Fetched page text for ${url}:\n${text}` }
+			];
 		} catch {
 			return messages;
 		}

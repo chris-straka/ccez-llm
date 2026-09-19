@@ -34,7 +34,10 @@ export interface KeyEventFacts extends KeyModifiers {
  * real event.
  */
 export function keyFacts(
-	event: Pick<KeyboardEvent, "key" | "code" | "metaKey" | "ctrlKey" | "altKey" | "shiftKey">
+	event: Pick<
+		KeyboardEvent,
+		"key" | "code" | "metaKey" | "ctrlKey" | "altKey" | "shiftKey"
+	>
 ): KeyEventFacts {
 	return {
 		key: event.key,
@@ -84,9 +87,12 @@ export type MessageKeyAction =
 
 /** Hovered-message hotkey for this keypress, in handler priority
  * order (Esc+f before F fold, single-key before shifted). */
-export function messageKeyAction(facts: MessageKeyFacts): MessageKeyAction | null {
+export function messageKeyAction(
+	facts: MessageKeyFacts
+): MessageKeyAction | null {
 	const hovered = !facts.inEditor && facts.hoveredIdx >= 0;
-	if (facts.key === "a" && hovered && bare(facts) && !facts.inField) return "toggle-aids";
+	if (facts.key === "a" && hovered && bare(facts) && !facts.inField)
+		return "toggle-aids";
 	// M/N pin on the center message, not the hovered one, so they
 	// need no hover — only hands off the editor and fields.
 	if (
@@ -271,7 +277,9 @@ export type PromptIdleAction = "restore" | "swallow";
  * always-hide blurred it on send must not summon the prompt straight
  * back.
  */
-export function promptIdleKeyAction(facts: PromptIdleFacts): PromptIdleAction | null {
+export function promptIdleKeyAction(
+	facts: PromptIdleFacts
+): PromptIdleAction | null {
 	const unmodified = !facts.metaKey && !facts.ctrlKey && !facts.altKey;
 	if (
 		!facts.isComposing &&
@@ -293,7 +301,9 @@ export function promptIdleKeyAction(facts: PromptIdleFacts): PromptIdleAction | 
 		facts.inPromptEditor &&
 		unmodified &&
 		!facts.isComposing &&
-		(facts.key === "Backspace" || facts.key === "Delete" || facts.key.length === 1)
+		(facts.key === "Backspace" ||
+			facts.key === "Delete" ||
+			facts.key.length === 1)
 	) {
 		return "swallow";
 	}
@@ -369,7 +379,8 @@ export type CommandChord =
  */
 export function commandChord(facts: CommandChordFacts): CommandChord | null {
 	const cmd = facts.metaKey || facts.ctrlKey;
-	if (cmd && !facts.altKey && !facts.shiftKey && facts.code === "KeyP") return "toggle-palette";
+	if (cmd && !facts.altKey && !facts.shiftKey && facts.code === "KeyP")
+		return "toggle-palette";
 	if (
 		!facts.altKey &&
 		!facts.shiftKey &&
@@ -377,9 +388,12 @@ export function commandChord(facts: CommandChordFacts): CommandChord | null {
 			(facts.metaKey && facts.ctrlKey && facts.code === "KeyF"))
 	)
 		return "toggle-fullscreen";
-	if (cmd && !facts.altKey && !facts.shiftKey && facts.code === "KeyF") return "find-toggle";
-	if (facts.ctrlKey && (facts.key === "o" || facts.key === "O")) return "toggle-pastes";
-	if (cmd && !facts.altKey && !facts.shiftKey && facts.key === "Enter") return "send";
+	if (cmd && !facts.altKey && !facts.shiftKey && facts.code === "KeyF")
+		return "find-toggle";
+	if (facts.ctrlKey && (facts.key === "o" || facts.key === "O"))
+		return "toggle-pastes";
+	if (cmd && !facts.altKey && !facts.shiftKey && facts.key === "Enter")
+		return "send";
 	if (facts.ctrlKey && facts.altKey && facts.key.startsWith("Arrow")) {
 		// Only these four exist (UI Events spec); anything else claiming
 		// the prefix falls through instead of cycling.
@@ -391,7 +405,8 @@ export function commandChord(facts: CommandChordFacts): CommandChord | null {
 	}
 	if (facts.ctrlKey && facts.altKey && facts.code === "KeyN") return "new-chat";
 	if (cmd && !facts.altKey && facts.code === "KeyN") return "new-chat";
-	if (facts.ctrlKey && facts.altKey && facts.code === "KeyS") return "toggle-voice";
+	if (facts.ctrlKey && facts.altKey && facts.code === "KeyS")
+		return "toggle-voice";
 	return null;
 }
 
@@ -448,10 +463,18 @@ export function chromeChord(facts: ChromeChordFacts): ChromeChord | null {
 	if (
 		cmd &&
 		!facts.altKey &&
-		(facts.key === "=" || facts.key === "+" || facts.key === "-" || facts.key === "_")
+		(facts.key === "=" ||
+			facts.key === "+" ||
+			facts.key === "-" ||
+			facts.key === "_")
 	)
 		return "zoom";
-	if (cmd && !facts.altKey && facts.shiftKey && (facts.key === "<" || facts.key === ",")) {
+	if (
+		cmd &&
+		!facts.altKey &&
+		facts.shiftKey &&
+		(facts.key === "<" || facts.key === ",")
+	) {
 		return "toggle-settings";
 	}
 	if (cmd && !facts.altKey && !facts.shiftKey) {
@@ -488,7 +511,8 @@ export interface SidebarListFacts extends KeyModifiers {
 	inField: boolean;
 }
 
-export type SidebarListAction = "walk-up" | "walk-down" | "enter" | "delete-chat";
+export type SidebarListAction =
+	"walk-up" | "walk-down" | "enter" | "delete-chat";
 
 /**
  * The open chat list owns its keys: j/k walks chats (preview-as-you-go),
@@ -497,12 +521,15 @@ export type SidebarListAction = "walk-up" | "walk-down" | "enter" | "delete-chat
  * deliberately carry no shift condition (shift rides the key value for
  * letters, and shifted arrows still walk), while Delete keeps its own.
  */
-export function sidebarListAction(facts: SidebarListFacts): SidebarListAction | null {
+export function sidebarListAction(
+	facts: SidebarListFacts
+): SidebarListAction | null {
 	if (!facts.listOpen || !facts.inSidebar || facts.inField) return null;
 	if (facts.metaKey || facts.ctrlKey || facts.altKey) return null;
 	if (facts.key === "j" || facts.key === "ArrowDown") return "walk-down";
 	if (facts.key === "k" || facts.key === "ArrowUp") return "walk-up";
-	if (facts.key === " " || facts.key === "l" || facts.key === "L") return "enter";
+	if (facts.key === " " || facts.key === "l" || facts.key === "L")
+		return "enter";
 	if (!facts.shiftKey && (facts.key === "Delete" || facts.key === "Backspace"))
 		return "delete-chat";
 	return null;
@@ -531,7 +558,8 @@ export function scrollEnterAction(facts: ScrollEnterFacts): boolean {
 	if (!facts.ctrlKey || facts.metaKey || facts.altKey) return false;
 	if (facts.key !== "g" && facts.key !== "G") return false;
 	if (facts.inScrollMode || facts.inEditor || facts.androidUI) return false;
-	if (facts.shortcutsOpen || facts.searchOpen || facts.inspectOpen) return false;
+	if (facts.shortcutsOpen || facts.searchOpen || facts.inspectOpen)
+		return false;
 	return !facts.inOwnedTarget;
 }
 
@@ -555,10 +583,14 @@ export type ModalScrollAction = "line-up" | "line-down";
  * lookup (a missing box falls through). Bare d/u scroll nothing
  * anywhere — only Ctrl+U / Ctrl+D jump, in scroll mode.
  */
-export function modalScrollAction(facts: ModalScrollFacts): ModalScrollAction | null {
-	if (!facts.shortcutsOpen || facts.searchOpen || facts.inspectOpen) return null;
+export function modalScrollAction(
+	facts: ModalScrollFacts
+): ModalScrollAction | null {
+	if (!facts.shortcutsOpen || facts.searchOpen || facts.inspectOpen)
+		return null;
 	if (facts.inEditor || facts.androidUI) return null;
-	if (facts.metaKey || facts.ctrlKey || facts.altKey || facts.shiftKey) return null;
+	if (facts.metaKey || facts.ctrlKey || facts.altKey || facts.shiftKey)
+		return null;
 	if (facts.inEditable) return null;
 	if (facts.key === "j") return "line-down";
 	if (facts.key === "k") return "line-up";
@@ -609,8 +641,11 @@ export type ScrollModeAction =
  * effect stay in the body — including the lone-g arm, which sets the
  * beat without consuming the key. Callers chain `if` — never a switch.
  */
-export function scrollModeAction(facts: ScrollModeFacts): ScrollModeAction | null {
-	if (!facts.inScrollMode || facts.inEditor || facts.inFind || facts.inField) return null;
+export function scrollModeAction(
+	facts: ScrollModeFacts
+): ScrollModeAction | null {
+	if (!facts.inScrollMode || facts.inEditor || facts.inFind || facts.inField)
+		return null;
 	if (facts.key === "j" || facts.key === "ArrowDown") {
 		// Past the newest message drops back into the prompt.
 		return facts.atNewest ? "enter-edit" : "step-down";
@@ -620,7 +655,8 @@ export function scrollModeAction(facts: ScrollModeFacts): ScrollModeAction | nul
 		// gg hops to the top of history (a lone g starts the beat).
 		return facts.gArmed ? "go-top" : "arm-g";
 	}
-	if (facts.key === "G" && !facts.metaKey && !facts.ctrlKey && !facts.altKey) return "go-bottom";
+	if (facts.key === "G" && !facts.metaKey && !facts.ctrlKey && !facts.altKey)
+		return "go-bottom";
 	if (!facts.metaKey && !facts.altKey) {
 		const lower = facts.key.toLowerCase();
 		if (lower === "u" || lower === "d") {
@@ -637,7 +673,8 @@ export function scrollModeAction(facts: ScrollModeFacts): ScrollModeAction | nul
 		}
 	}
 	if (facts.key === "i" || facts.key === "Enter") return "enter-edit";
-	if (facts.ctrlKey && (facts.key === "g" || facts.key === "G")) return "scroll-toggle";
+	if (facts.ctrlKey && (facts.key === "g" || facts.key === "G"))
+		return "scroll-toggle";
 	return null;
 }
 
@@ -659,7 +696,8 @@ export interface UnselectedScrollFacts extends KeyModifiers {
 	hasScrollBox: boolean;
 }
 
-export type UnselectedScrollAction = "half-jump-up" | "half-jump-down" | "empty-enter";
+export type UnselectedScrollAction =
+	"half-jump-up" | "half-jump-down" | "empty-enter";
 
 /**
  * Ctrl+U / Ctrl+D jump an instant half-page, vim-style (repeats jump
@@ -668,7 +706,9 @@ export type UnselectedScrollAction = "half-jump-up" | "half-jump-down" | "empty-
  * with no scroll box, matches nothing — the bare branch below still
  * requires no ctrl, so those keys fall through exactly like before.
  */
-export function unselectedScrollAction(facts: UnselectedScrollFacts): UnselectedScrollAction | null {
+export function unselectedScrollAction(
+	facts: UnselectedScrollFacts
+): UnselectedScrollAction | null {
 	if (!facts.scrollable || facts.modalOpen || facts.typing) return null;
 	if (!facts.metaKey && facts.ctrlKey && !facts.altKey && !facts.shiftKey) {
 		const lower = facts.key.toLowerCase();

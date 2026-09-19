@@ -75,7 +75,7 @@ privileged (Keychain, updater, native TTS).
   Objective-C (`.m`), no Swift sidecar: both were evaluated and rejected (same
   engine underneath, worse bundling/signing story). See `src-tauri/src/tts.rs`.
 - There is no API that downloads Apple voices. The app picks the best
-  *installed* voice per locale and deep-links System Settings to the
+  _installed_ voice per locale and deep-links System Settings to the
   Accessibility pane
   (`x-apple.systempreferences:com.apple.preference.universalaccess`)
   for the rest — sub-anchors are swallowed by System Settings, so UI copy
@@ -141,7 +141,7 @@ or every fresh profile pops a password prompt per launch.
   `e2e/shortcuts-modal.e2e.ts`). These rows were deliberately removed —
   do not re-add them: New line, Stage message, Scroll messages, Export
   chat, Translate selection, and the `· Enter cycles · repeat closes ·
-  1 hit closes bare`, `· past newest mints one`, `· again stops`
+1 hit closes bare`, `· past newest mints one`, `· again stops`
   trailers. Phones show no `h2` (the filter owns the head row).
 - Spec history: `README.md` (what), `PLAN.md` (full plan), `TODO.md` (open
   work only — finished stages move to `DONE.md`, never deleted).

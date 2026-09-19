@@ -6,7 +6,9 @@ import { seedChat, type SeedMessage } from "./helpers";
  * middle-click toggle, emptied-composer caret (work/batch-chrome).
  */
 
-const LONG = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(40);
+const LONG = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(
+	40
+);
 
 async function openSettings(page: Page) {
 	await page.keyboard.press("Meta+,");
@@ -15,36 +17,41 @@ async function openSettings(page: Page) {
 
 /** Seed a long thread with a 2s idle timeout (overflows the viewport). */
 async function seedIdleChat(page: Page, messages: SeedMessage[]) {
-	await page.addInitScript((seed: { messages: SeedMessage[] }) => {
-		window.localStorage.setItem("ccez-mock-provider", "1");
-		window.localStorage.setItem(
-			"ccez-llm-settings-v1",
-			JSON.stringify({
-				hoverAssistantActions: true,
-				hoverUserActions: true,
-				promptIdleSec: 2
-			})
-		);
-		window.localStorage.setItem(
-			"ccez-llm-chats-v1",
-			JSON.stringify([
-				{
-					id: "e2e-chat",
-					createdAt: 1,
-					replyLang: null,
-					messages: seed.messages.map((m, i) => ({
-						id: `e2e-m${i}`,
-						role: m.role,
-						content: m.content,
-						usage: null,
-						error: null
-					}))
-				}
-			])
-		);
-	}, { messages });
+	await page.addInitScript(
+		(seed: { messages: SeedMessage[] }) => {
+			window.localStorage.setItem("ccez-mock-provider", "1");
+			window.localStorage.setItem(
+				"ccez-llm-settings-v1",
+				JSON.stringify({
+					hoverAssistantActions: true,
+					hoverUserActions: true,
+					promptIdleSec: 2
+				})
+			);
+			window.localStorage.setItem(
+				"ccez-llm-chats-v1",
+				JSON.stringify([
+					{
+						id: "e2e-chat",
+						createdAt: 1,
+						replyLang: null,
+						messages: seed.messages.map((m, i) => ({
+							id: `e2e-m${i}`,
+							role: m.role,
+							content: m.content,
+							usage: null,
+							error: null
+						}))
+					}
+				])
+			);
+		},
+		{ messages }
+	);
 	await page.goto("/");
-	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
 }
 
 function idleTurns(): SeedMessage[] {
@@ -70,10 +77,14 @@ async function clickLabelText(page: Page, sliderLabel: string) {
 test("slider label text never resets any row", async ({ page }) => {
 	await seedChat(page, [{ role: "user", content: "hi" }]);
 	await page.goto("/");
-	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
 	await openSettings(page);
 
-	const text = page.locator('.settings-panel input[aria-label="Text size percent"]');
+	const text = page.locator(
+		'.settings-panel input[aria-label="Text size percent"]'
+	);
 	await text.fill("250");
 	await expect(text).toHaveValue("250");
 	await clickLabelText(page, "Text size percent");
@@ -81,7 +92,9 @@ test("slider label text never resets any row", async ({ page }) => {
 	await page.locator(".settings-panel button", { hasText: "(100%)" }).click();
 	await expect(text).toHaveValue("100");
 
-	const width = page.locator('.settings-panel input[aria-label="Chat width in rem"]');
+	const width = page.locator(
+		'.settings-panel input[aria-label="Chat width in rem"]'
+	);
 	await width.fill("60");
 	await expect(width).toHaveValue("60");
 	await clickLabelText(page, "Chat width in rem");
@@ -94,7 +107,10 @@ test("slider label text never resets any row", async ({ page }) => {
 	);
 	await idle.fill("10");
 	await expect(idle).toHaveValue("10");
-	await clickLabelText(page, "Idle seconds before the prompt hides (bottom is always, top is never)");
+	await clickLabelText(
+		page,
+		"Idle seconds before the prompt hides (bottom is always, top is never)"
+	);
 	await expect(idle).toHaveValue("10");
 	// The idle default is always-on (bottom of the slider), not 6s.
 	await page.locator(".settings-panel button", { hasText: "(always)" }).click();
@@ -102,7 +118,9 @@ test("slider label text never resets any row", async ({ page }) => {
 });
 
 /** Idle prompt restores on i, Enter, and Space — and on nothing else key- or pointer-wise. */
-test("idle prompt restores only on i, Enter, Space, or real click", async ({ page }) => {
+test("idle prompt restores only on i, Enter, Space, or real click", async ({
+	page
+}) => {
 	await seedIdleChat(page, idleTurns());
 	const prompt = page.locator(".prompt");
 	await expect(prompt).toHaveClass(/prompt-idle/, { timeout: 15_000 });
@@ -123,7 +141,9 @@ test("idle prompt restores only on i, Enter, Space, or real click", async ({ pag
 	await page.keyboard.press("i");
 	await expect(prompt).not.toHaveClass(/prompt-idle/, { timeout: 5_000 });
 	await expect
-		.poll(() => page.evaluate(() => !!document.activeElement?.closest?.(".prompt")))
+		.poll(() =>
+			page.evaluate(() => !!document.activeElement?.closest?.(".prompt"))
+		)
 		.toBe(true);
 	await expect(prompt).toHaveAttribute("data-empty", "true");
 
@@ -139,15 +159,22 @@ test("idle prompt restores only on i, Enter, Space, or real click", async ({ pag
 });
 
 /** Selection drags keep the prompt hidden; plain clicks never summon; keys do; math never summons keys. */
-test("idle prompt ignores drags, clicks, and math, answers keys", async ({ page }) => {
+test("idle prompt ignores drags, clicks, and math, answers keys", async ({
+	page
+}) => {
 	await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
 	await seedIdleChat(page, [
 		{ role: "user", content: "show me the levels" },
-		{ role: "assistant", content: `First point:\n\n$$E_n = -\\frac{13.6}{n^2}$$\n\nSecond point ${LONG}` },
+		{
+			role: "assistant",
+			content: `First point:\n\n$$E_n = -\\frac{13.6}{n^2}$$\n\nSecond point ${LONG}`
+		},
 		...idleTurns()
 	]);
 	const prompt = page.locator(".prompt");
-	await expect(page.locator(".ccez-math").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ccez-math").first()).toBeVisible({
+		timeout: 60_000
+	});
 	await expect(prompt).toHaveClass(/prompt-idle/, { timeout: 15_000 });
 
 	// A highlight drag across message text: still hidden afterwards.
@@ -169,7 +196,9 @@ test("idle prompt ignores drags, clicks, and math, answers keys", async ({ page 
 	await page.keyboard.press("i");
 	await expect(prompt).not.toHaveClass(/prompt-idle/, { timeout: 5_000 });
 	await expect
-		.poll(() => page.evaluate(() => !!document.activeElement?.closest?.(".prompt")))
+		.poll(() =>
+			page.evaluate(() => !!document.activeElement?.closest?.(".prompt"))
+		)
 		.toBe(true);
 
 	// Math taps copy but never summon the keyboard back.
@@ -178,14 +207,18 @@ test("idle prompt ignores drags, clicks, and math, answers keys", async ({ page 
 	await page.waitForTimeout(800);
 	await expect(prompt).toHaveClass(/prompt-idle/);
 	await expect
-		.poll(() => page.evaluate(() => !!document.activeElement?.closest?.(".prompt")))
+		.poll(() =>
+			page.evaluate(() => !!document.activeElement?.closest?.(".prompt"))
+		)
 		.toBe(false);
 });
 
 /** Idle hide uncovers the tail: the prompt leaves the flow and stuck readers pin to the bottom. */
 test("idle hide floats and moves nothing", async ({ page }) => {
 	await seedIdleChat(page, idleTurns());
-	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const geometry = () =>
 		page.evaluate(() => {
 			const box = document.querySelector(".messages") as HTMLElement | null;
@@ -202,7 +235,9 @@ test("idle hide floats and moves nothing", async ({ page }) => {
 		if (box) box.scrollTop = box.scrollHeight;
 	});
 	const before = await geometry();
-	await expect(page.locator(".prompt")).toHaveClass(/prompt-idle/, { timeout: 15_000 });
+	await expect(page.locator(".prompt")).toHaveClass(/prompt-idle/, {
+		timeout: 15_000
+	});
 	await page.waitForTimeout(700);
 	const after = await geometry();
 	// Floating card in both states: hiding changes no geometry.
@@ -214,7 +249,9 @@ test("idle hide floats and moves nothing", async ({ page }) => {
 test("middle-click toggles the shortcuts modal", async ({ page }) => {
 	await seedChat(page, [{ role: "user", content: "hi" }]);
 	await page.goto("/");
-	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const box = await page.locator(".messages").boundingBox();
 	expect(box).toBeTruthy();
 	const x = box!.x + box!.width / 2;
@@ -229,10 +266,14 @@ test("middle-click toggles the shortcuts modal", async ({ page }) => {
 
 /** Paste-then-delete-all flags the composer empty and keeps focus
 with a live caret (the native blink is the only focus signal). */
-test("clearing the composer keeps focus with a live caret", async ({ page }) => {
+test("clearing the composer keeps focus with a live caret", async ({
+	page
+}) => {
 	await seedChat(page, [{ role: "user", content: "hi" }]);
 	await page.goto("/");
-	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
 	await page.locator(".ta-input").first().click();
 
 	// A long paste becomes a pill plus a positional tag (same dispatch
@@ -243,17 +284,25 @@ test("clearing the composer keeps focus with a live caret", async ({ page }) => 
 		if (!target) throw new Error("missing editor");
 		const transfer = new DataTransfer();
 		transfer.setData("text/plain", text);
-		const event = new ClipboardEvent("paste", { bubbles: true, cancelable: true });
+		const event = new ClipboardEvent("paste", {
+			bubbles: true,
+			cancelable: true
+		});
 		Object.defineProperty(event, "clipboardData", { value: transfer });
 		target.dispatchEvent(event);
 	}, pasted);
 	await expect(page.locator(".attachments .paste-body")).toBeVisible();
-	await expect(page.locator(".prompt .ta-input")).toHaveValue(/\[Pasted 540 chars\]/);
+	await expect(page.locator(".prompt .ta-input")).toHaveValue(
+		/\[Pasted 540 chars\]/
+	);
 
 	// Caret shows while the draft has content.
 	const caretColor = (): Promise<string> =>
 		page.evaluate(
-			() => getComputedStyle(document.querySelector(".prompt .ta-input") as HTMLElement).caretColor
+			() =>
+				getComputedStyle(
+					document.querySelector(".prompt .ta-input") as HTMLElement
+				).caretColor
 		);
 	await expect.poll(caretColor).not.toBe("rgba(0, 0, 0, 0)");
 

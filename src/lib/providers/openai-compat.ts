@@ -89,7 +89,9 @@ export class OpenAICompatProvider implements ChatProvider {
 				`${this.id} needs Ollama running on this device (start it with 'ollama serve'): ${messageOf(error)}`
 			);
 		}
-		return new ProviderError(`Network error talking to ${this.id}: ${messageOf(error)}`);
+		return new ProviderError(
+			`Network error talking to ${this.id}: ${messageOf(error)}`
+		);
 	}
 
 	private headers(): Record<string, string> {
@@ -123,7 +125,10 @@ export class OpenAICompatProvider implements ChatProvider {
 		});
 	}
 
-	async chat(messages: ChatMessage[], opts: ChatOptions = {}): Promise<ChatResult> {
+	async chat(
+		messages: ChatMessage[],
+		opts: ChatOptions = {}
+	): Promise<ChatResult> {
 		let res: Response;
 		try {
 			res = await fetch(this.url("/chat/completions"), {
@@ -165,7 +170,11 @@ export class OpenAICompatProvider implements ChatProvider {
 		history: WireMessage[],
 		opts: ChatOptions,
 		tools: boolean
-	): Promise<{ content: string; calls: WireToolCall[]; usage: TokenUsage | null }> {
+	): Promise<{
+		content: string;
+		calls: WireToolCall[];
+		usage: TokenUsage | null;
+	}> {
 		let res: Response;
 		try {
 			res = await fetch(this.url("/chat/completions"), {
@@ -193,7 +202,9 @@ export class OpenAICompatProvider implements ChatProvider {
 		const message = json.choices?.[0]?.message;
 		return {
 			content: message?.content ?? "",
-			calls: Array.isArray(message?.tool_calls) ? (message.tool_calls ?? []) : [],
+			calls: Array.isArray(message?.tool_calls)
+				? (message.tool_calls ?? [])
+				: [],
 			usage: toUsage(json.usage)
 		};
 	}
@@ -227,7 +238,11 @@ export class OpenAICompatProvider implements ChatProvider {
 		callbacks: StreamCallbacks,
 		opts: ChatOptions,
 		tools: boolean
-	): Promise<{ content: string; calls: WireToolCall[]; usage: TokenUsage | null }> {
+	): Promise<{
+		content: string;
+		calls: WireToolCall[];
+		usage: TokenUsage | null;
+	}> {
 		let res: Response;
 		try {
 			res = await fetch(this.url("/chat/completions"), {
@@ -313,8 +328,12 @@ export class OpenAICompatProvider implements ChatProvider {
 		return calls
 			.map((raw) => ({ raw, parsed: parseFetchCall(raw) }))
 			.filter(
-				(entry): entry is { raw: WireToolCall; parsed: { id: string; url: string } } =>
-					entry.parsed !== null
+				(
+					entry
+				): entry is {
+					raw: WireToolCall;
+					parsed: { id: string; url: string };
+				} => entry.parsed !== null
 			)
 			.slice(0, MAX_CALLS_PER_ROUND);
 	}
@@ -336,14 +355,20 @@ export class OpenAICompatProvider implements ChatProvider {
 		try {
 			first = await this.streamOnce(history, callbacks, opts, true);
 		} catch (error) {
-			if (!(error instanceof ProviderError) || error.status !== 400) throw error;
+			if (!(error instanceof ProviderError) || error.status !== 400)
+				throw error;
 			return this.streamOnce(history, callbacks, opts, false);
 		}
 		let pending = this.executableCalls(first.calls);
-		if (pending.length === 0) return { content: first.content, usage: first.usage };
+		if (pending.length === 0)
+			return { content: first.content, usage: first.usage };
 		let usage: TokenUsage | null = first.usage;
 		let assistantText = first.content;
-		for (let round = 0; round < MAX_TOOL_ROUNDS && pending.length > 0; round++) {
+		for (
+			let round = 0;
+			round < MAX_TOOL_ROUNDS && pending.length > 0;
+			round++
+		) {
 			history.push({
 				role: "assistant",
 				content: assistantText,
@@ -379,7 +404,9 @@ export class OpenAICompatProvider implements ChatProvider {
 		try {
 			res = await fetch(this.url("/models"), { headers: this.headers() });
 		} catch (error) {
-			throw new ProviderError(`Network error listing ${this.id} models: ${messageOf(error)}`);
+			throw new ProviderError(
+				`Network error listing ${this.id} models: ${messageOf(error)}`
+			);
 		}
 		if (!res.ok) {
 			throw new ProviderError(
@@ -406,18 +433,23 @@ export function parseModelIds(payload: unknown): string[] {
 	const ids = new Set<string>();
 	const candidates: unknown[] = Array.isArray(payload)
 		? payload
-		: payload && typeof payload === "object" && Array.isArray((payload as { data?: unknown }).data)
+		: payload &&
+			  typeof payload === "object" &&
+			  Array.isArray((payload as { data?: unknown }).data)
 			? ((payload as { data?: unknown }).data as unknown[])
 			: [];
 	for (const item of candidates) {
-		const id = typeof item === "string" ? item : (item as { id?: unknown } | null)?.id;
+		const id =
+			typeof item === "string" ? item : (item as { id?: unknown } | null)?.id;
 		if (typeof id === "string" && id.trim()) ids.add(id.trim());
 	}
 	return [...ids].sort();
 }
 
 /** Split an SSE byte stream into `data:` payloads. Exported for tests. */
-export async function* readSse(body: ReadableStream<Uint8Array>): AsyncGenerator<string> {
+export async function* readSse(
+	body: ReadableStream<Uint8Array>
+): AsyncGenerator<string> {
 	const reader = body.getReader();
 	const decoder = new TextDecoder();
 	let buffer = "";
@@ -452,7 +484,9 @@ function toUsage(
 	return {
 		prompt: raw.prompt_tokens ?? 0,
 		completion: raw.completion_tokens ?? 0,
-		total: raw.total_tokens ?? (raw.prompt_tokens ?? 0) + (raw.completion_tokens ?? 0),
+		total:
+			raw.total_tokens ??
+			(raw.prompt_tokens ?? 0) + (raw.completion_tokens ?? 0),
 		reasoning: raw.completion_tokens_details?.reasoning_tokens
 	};
 }

@@ -3,7 +3,9 @@ import { pinyinBlock, pinyinRuby, plainParagraphs } from "./pinyin";
 
 describe("pinyinRuby", () => {
 	it("annotates Han characters with tone-marked readings", () => {
-		expect(pinyinRuby("你好")).toBe("<ruby>你<rt>nǐ</rt></ruby><ruby>好<rt>hǎo</rt></ruby>");
+		expect(pinyinRuby("你好")).toBe(
+			"<ruby>你<rt>nǐ</rt></ruby><ruby>好<rt>hǎo</rt></ruby>"
+		);
 	});
 
 	it("never annotates Japanese segments: any kana run passes through bare", () => {
@@ -12,7 +14,9 @@ describe("pinyinRuby", () => {
 		// on kana-bearing input no matter who calls it.
 		expect(pinyinRuby("漢字を読む")).toBe("漢字を読む");
 		expect(pinyinRuby("テストtest测试")).toBe("テストtest测试");
-		expect(pinyinRuby("今日はとてもいい天気です")).toBe("今日はとてもいい天気です");
+		expect(pinyinRuby("今日はとてもいい天気です")).toBe(
+			"今日はとてもいい天気です"
+		);
 	});
 
 	it("passes non-Han text through escaped", () => {
@@ -46,8 +50,12 @@ describe("pinyinBlock", () => {
 	});
 
 	it("never converts fenced code, even with CJK inside", () => {
-		expect(pinyinBlock("```py\nprint('你好')\n```")).toBe("```py\nprint('你好')\n```");
-		expect(pinyinBlock("你好\n```\n世界\n```")).toContain("<ruby>你<rt>nǐ</rt></ruby>");
+		expect(pinyinBlock("```py\nprint('你好')\n```")).toBe(
+			"```py\nprint('你好')\n```"
+		);
+		expect(pinyinBlock("你好\n```\n世界\n```")).toContain(
+			"<ruby>你<rt>nǐ</rt></ruby>"
+		);
 		expect(pinyinBlock("你好\n```\n世界\n```")).toContain("世界");
 		expect(pinyinBlock("你好\n```\n世界\n```")).not.toContain("<ruby>世");
 	});
@@ -59,11 +67,15 @@ describe("plainParagraphs", () => {
 		// Soft break: one paragraph, not two.
 		expect(plainParagraphs("a\nb")).toBe('<p dir="auto">a<br>b</p>');
 		// Blank line: two paragraphs.
-		expect(plainParagraphs("a\n\nb")).toBe('<p dir="auto">a</p><p dir="auto">b</p>');
+		expect(plainParagraphs("a\n\nb")).toBe(
+			'<p dir="auto">a</p><p dir="auto">b</p>'
+		);
 	});
 
 	it("marks only paragraphs that can carry ruby", () => {
-		expect(plainParagraphs("hello\n\n漢字")).toBe('<p dir="auto">hello</p><p class="cjk" dir="auto">漢字</p>');
+		expect(plainParagraphs("hello\n\n漢字")).toBe(
+			'<p dir="auto">hello</p><p class="cjk" dir="auto">漢字</p>'
+		);
 		expect(plainParagraphs("hello")).toBe('<p dir="auto">hello</p>');
 	});
 
@@ -71,7 +83,9 @@ describe("plainParagraphs", () => {
 		expect(plainParagraphs("")).toBe("");
 		expect(plainParagraphs("a\n\n")).toBe('<p dir="auto">a</p>');
 		expect(plainParagraphs("\na")).toBe('<p dir="auto">a</p>');
-		expect(plainParagraphs("a\n   \nb")).toBe('<p dir="auto">a</p><p dir="auto">b</p>');
+		expect(plainParagraphs("a\n   \nb")).toBe(
+			'<p dir="auto">a</p><p dir="auto">b</p>'
+		);
 	});
 
 	it("keeps markdown lists as lists when given the source text", () => {
@@ -80,21 +94,31 @@ describe("plainParagraphs", () => {
 		expect(plainParagraphs("1. 漢字\n2. 仮名", "1. 漢字\n2. 仮名")).toBe(
 			'<ol><li class="cjk" dir="auto">漢字</li><li class="cjk" dir="auto">仮名</li></ol>'
 		);
-		expect(plainParagraphs("- a\n- b", "- a\n- b")).toBe('<ul><li dir="auto">a</li><li dir="auto">b</li></ul>');
+		expect(plainParagraphs("- a\n- b", "- a\n- b")).toBe(
+			'<ul><li dir="auto">a</li><li dir="auto">b</li></ul>'
+		);
 		// Start numbers survive, like markdown's <ol start>.
-		expect(plainParagraphs("3. a", "3. a")).toBe('<ol start="3"><li dir="auto">a</li></ol>');
+		expect(plainParagraphs("3. a", "3. a")).toBe(
+			'<ol start="3"><li dir="auto">a</li></ol>'
+		);
 		// A paragraph between items breaks the list, like markdown.
 		expect(plainParagraphs("1. a\nx\n2. b", "1. a\nx\n2. b")).toBe(
 			'<ol><li dir="auto">a</li></ol><p dir="auto">x</p><ol start="2"><li dir="auto">b</li></ol>'
 		);
 		// Decimals and lone markers are not lists.
-		expect(plainParagraphs("3.14 の話", "3.14 の話")).toBe('<p class="cjk" dir="auto">3.14 の話</p>');
+		expect(plainParagraphs("3.14 の話", "3.14 の話")).toBe(
+			'<p class="cjk" dir="auto">3.14 の話</p>'
+		);
 		expect(plainParagraphs("1.", "1.")).toBe('<p dir="auto">1.</p>');
 	});
 
 	it("keeps inline bold/italic like markdown, so aids never pin literal asterisks", () => {
-		expect(plainParagraphs("**今日は**")).toBe('<p class="cjk" dir="auto"><strong>今日は</strong></p>');
-		expect(plainParagraphs("*Kyou wa totemo*")).toBe('<p dir="auto"><em>Kyou wa totemo</em></p>');
+		expect(plainParagraphs("**今日は**")).toBe(
+			'<p class="cjk" dir="auto"><strong>今日は</strong></p>'
+		);
+		expect(plainParagraphs("*Kyou wa totemo*")).toBe(
+			'<p dir="auto"><em>Kyou wa totemo</em></p>'
+		);
 		// Emphasis never reaches inside converter tags.
 		expect(plainParagraphs("<ruby>漢<rt>かん</rt></ruby>**の**")).toBe(
 			'<p class="cjk" dir="auto"><ruby>漢<rt>かん</rt></ruby><strong>の</strong></p>'
@@ -108,7 +132,9 @@ describe("plainParagraphs", () => {
 		expect(plainParagraphs("2 * 3 * 4")).toBe('<p dir="auto">2 * 3 * 4</p>');
 		expect(plainParagraphs("*lone")).toBe('<p dir="auto">*lone</p>');
 		// Star list markers still strip instead of emphasizing.
-		expect(plainParagraphs("* a\n* b", "* a\n* b")).toBe('<ul><li dir="auto">a</li><li dir="auto">b</li></ul>');
+		expect(plainParagraphs("* a\n* b", "* a\n* b")).toBe(
+			'<ul><li dir="auto">a</li><li dir="auto">b</li></ul>'
+		);
 	});
 
 	it("never treats converted output as lists without source text", () => {

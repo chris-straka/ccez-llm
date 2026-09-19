@@ -13,13 +13,19 @@ test.describe("pinning", () => {
 	test.beforeEach(async ({ page }) => {
 		// Two soft-break lines, one paragraph: aid HTML must keep that
 		// structure (one <p> with a <br>), or the message grows on pin.
-		await seedChat(page, [{ role: "assistant", content: "漢字を読む\nテストです" }]);
+		await seedChat(page, [
+			{ role: "assistant", content: "漢字を読む\nテストです" }
+		]);
 		await page.goto("/");
-		await expect(page.locator("article.assistant .actions")).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator("article.assistant .actions")).toBeVisible({
+			timeout: 60_000
+		});
 	});
 
 	test("clicking the furigana aid pins kanji readings", async ({ page }) => {
-		const aidBtn = page.locator('article.assistant .actions button:has-text("読み仮名")');
+		const aidBtn = page.locator(
+			'article.assistant .actions button:has-text("読み仮名")'
+		);
 		const body = page.locator("article.assistant .rendered");
 		const before = await body.boundingBox();
 		if (!before) throw new Error("message body lost its box");
@@ -45,10 +51,14 @@ test.describe("pinning", () => {
 		await seedChat(page, [{ role: "assistant", content: "**漢字を読む**" }]);
 		await page.goto("/");
 		const body = page.locator("article.assistant .rendered");
-		await expect(page.locator("article.assistant .actions")).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator("article.assistant .actions")).toBeVisible({
+			timeout: 60_000
+		});
 		// Unpinned (markdown path) renders bold, as the baseline.
 		await expect(body.locator("strong")).toHaveCount(1);
-		const aidBtn = page.locator('article.assistant .actions button:has-text("読み仮名")');
+		const aidBtn = page.locator(
+			'article.assistant .actions button:has-text("読み仮名")'
+		);
 		await aidBtn.hover();
 		await aidBtn.click();
 		await expect(body.locator(".frb").first()).toBeVisible({ timeout: 60_000 });
@@ -59,7 +69,9 @@ test.describe("pinning", () => {
 	/** A message with its own Japanese and Chinese sections offers both
 	local aids, furigana first. Kanji alone must not summon pinyin: only a
 	Han-only line counts as Chinese. */
-	test("a Japanese+Chinese message offers furigana and pinyin", async ({ page }) => {
+	test("a Japanese+Chinese message offers furigana and pinyin", async ({
+		page
+	}) => {
 		await seedChat(page, [
 			{ role: "assistant", content: "こんにちは！テストです。\n你好！测试。" }
 		]);
@@ -91,7 +103,9 @@ test.describe("pinning", () => {
 	});
 
 	/** Prose Japanese still offers furigana when code holds Japanese too. */
-	test("prose Japanese offers furigana despite Japanese in code", async ({ page }) => {
+	test("prose Japanese offers furigana despite Japanese in code", async ({
+		page
+	}) => {
 		await seedChat(page, [
 			{ role: "assistant", content: "見る\n\n```py\nprint('日本語')\n```" }
 		]);
@@ -104,8 +118,12 @@ test.describe("pinning", () => {
 	/** Both aids pin at once on a mixed message: each renders only its own
 	lines, and each button swaps in place to its own show-original — the
 	row never shuffles, and unpinning one keeps the other up. */
-	test("pinning furigana and pinyin together renders each on its own lines", async ({ page }) => {
-		await seedChat(page, [{ role: "assistant", content: "漢字を読む\n你好世界" }]);
+	test("pinning furigana and pinyin together renders each on its own lines", async ({
+		page
+	}) => {
+		await seedChat(page, [
+			{ role: "assistant", content: "漢字を読む\n你好世界" }
+		]);
 		await page.goto("/");
 		const actions = page.locator("article.assistant .actions");
 		const body = page.locator("article.assistant .rendered");
@@ -119,7 +137,9 @@ test.describe("pinning", () => {
 		await expect(body.locator(".frb")).not.toHaveCount(0);
 		await expect(body).toContainText("かんじ");
 		// Both buttons swapped in place to their own show-originals.
-		await expect(actions.locator('button:has-text("オリジナルを表示")')).toBeVisible();
+		await expect(
+			actions.locator('button:has-text("オリジナルを表示")')
+		).toBeVisible();
 		await expect(actions.locator('button:has-text("显示原件")')).toBeVisible();
 		// Unpinning furigana keeps pinyin up.
 		await actions.locator('button:has-text("オリジナルを表示")').click();
@@ -130,7 +150,9 @@ test.describe("pinning", () => {
 
 	/** Clicking the pinyin aid pins Chinese readings (kana passes through). */
 	test("clicking the pinyin aid pins Chinese readings", async ({ page }) => {
-		await seedChat(page, [{ role: "assistant", content: "こんにちは！\n你好！" }]);
+		await seedChat(page, [
+			{ role: "assistant", content: "こんにちは！\n你好！" }
+		]);
 		await page.goto("/");
 		const actions = page.locator("article.assistant .actions");
 		const body = page.locator("article.assistant .rendered");
@@ -144,7 +166,11 @@ test.describe("pinning", () => {
 	/** A Japanese pill owns kanji-only lines: furigana is offered on a
 	kana-less sentence, and pinning it reads Japanese (not pinyin). */
 	test("a Japanese pill gives kanji-only lines furigana", async ({ page }) => {
-		await seedChat(page, [{ role: "assistant", content: "「警察官、交通規則違反者検挙中」" }], "ja");
+		await seedChat(
+			page,
+			[{ role: "assistant", content: "「警察官、交通規則違反者検挙中」" }],
+			"ja"
+		);
 		await page.goto("/");
 		const actions = page.locator("article.assistant .actions");
 		const body = page.locator("article.assistant .rendered");
@@ -162,7 +188,10 @@ test.describe("pinning", () => {
 	(never raw source text). */
 	test("pinning furigana keeps code and math blocks", async ({ page }) => {
 		await seedChat(page, [
-			{ role: "assistant", content: "漢字を読む\n\n```python\nprint('hi')\n```\n\n$$E = mc^2$$" }
+			{
+				role: "assistant",
+				content: "漢字を読む\n\n```python\nprint('hi')\n```\n\n$$E = mc^2$$"
+			}
 		]);
 		await page.goto("/");
 		const actions = page.locator("article.assistant .actions");
@@ -184,7 +213,9 @@ test.describe("hover", () => {
 	test.beforeEach(async ({ page }) => {
 		await seedChat(page, [{ role: "assistant", content: "漢字を読むテスト" }]);
 		await page.goto("/");
-		await expect(page.locator(`${ARTICLE} .actions`)).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator(`${ARTICLE} .actions`)).toBeVisible({
+			timeout: 60_000
+		});
 	});
 
 	test("hovering furigana fetches nothing; clicking fetches with dots", async ({
@@ -228,10 +259,14 @@ test.describe("ruby-geometry", () => {
 	 * and drifted right of the kanji), and per-character pinyin
 	 * syllables longer than one Hanzi colliding into an unreadable row.
 	 */
-	test("a wrapped multi-kanji base keeps its reading centered", async ({ page }) => {
+	test("a wrapped multi-kanji base keeps its reading centered", async ({
+		page
+	}) => {
 		await page.setViewportSize({ width: 480, height: 800 });
 		// One 12-kanji run: at this width it must wrap mid-run.
-		await seedChat(page, [{ role: "assistant", content: "国際連合教育科学文化機関の活動について" }]);
+		await seedChat(page, [
+			{ role: "assistant", content: "国際連合教育科学文化機関の活動について" }
+		]);
 		await page.goto("/");
 		const actions = page.locator("article.assistant .actions");
 		const body = page.locator("article.assistant .rendered");
@@ -243,34 +278,33 @@ test.describe("ruby-geometry", () => {
 		// no longer coincide there — ink does. Measure paint truth via
 		// Range rects on mac, boxes elsewhere.
 		const dataMac = await page.locator(".app").getAttribute("data-mac");
-		const drift = await body.evaluate(
-			(el, mac) => {
-				const rect = (node: Node): { l: number; w: number } => {
-					if (!mac) {
-						const r = (node as Element).getBoundingClientRect();
-						return { l: r.left, w: r.width };
-					}
-					const rg = document.createRange();
-					rg.selectNodeContents(node);
-					const r = rg.getBoundingClientRect();
+		const drift = await body.evaluate((el, mac) => {
+			const rect = (node: Node): { l: number; w: number } => {
+				if (!mac) {
+					const r = (node as Element).getBoundingClientRect();
 					return { l: r.left, w: r.width };
-				};
-				let worst = 0;
-				for (const base of el.querySelectorAll(".frb")) {
-					const reading = base.querySelector(".frt");
-					if (!reading?.firstChild || !base.firstChild) continue;
-					const b = rect(mac ? base.firstChild : base);
-					const r = rect(mac ? reading.firstChild : reading);
-					worst = Math.max(worst, Math.abs(b.l + b.w / 2 - (r.l + r.w / 2)));
 				}
-				return worst;
-			},
-			dataMac !== null
-		);
+				const rg = document.createRange();
+				rg.selectNodeContents(node);
+				const r = rg.getBoundingClientRect();
+				return { l: r.left, w: r.width };
+			};
+			let worst = 0;
+			for (const base of el.querySelectorAll(".frb")) {
+				const reading = base.querySelector(".frt");
+				if (!reading?.firstChild || !base.firstChild) continue;
+				const b = rect(mac ? base.firstChild : base);
+				const r = rect(mac ? reading.firstChild : reading);
+				worst = Math.max(worst, Math.abs(b.l + b.w / 2 - (r.l + r.w / 2)));
+			}
+			return worst;
+		}, dataMac !== null);
 		expect(drift).toBeLessThan(dataMac !== null ? 2 : 4);
 	});
 
-	test("long pinyin syllables never collide with their neighbors", async ({ page }) => {
+	test("long pinyin syllables never collide with their neighbors", async ({
+		page
+	}) => {
 		await seedChat(page, [{ role: "assistant", content: "双方创造价值" }]);
 		await page.goto("/");
 		const actions = page.locator("article.assistant .actions");
@@ -332,7 +366,9 @@ test.describe("ruby-geometry", () => {
 	});
 
 	test("pinning an aid keeps Arabic direction", async ({ page }) => {
-		await seedChat(page, [{ role: "assistant", content: "مرحبا بالعالم\n你好世界" }]);
+		await seedChat(page, [
+			{ role: "assistant", content: "مرحبا بالعالم\n你好世界" }
+		]);
 		await page.goto("/");
 		const actions = page.locator("article.assistant .actions");
 		const body = page.locator("article.assistant .rendered");
@@ -343,13 +379,18 @@ test.describe("ruby-geometry", () => {
 			const ps = [...el.querySelectorAll("p")];
 			const arabic = ps.find((p) => p.textContent?.includes("مرحبا"));
 			if (!arabic) throw new Error("no Arabic paragraph");
-			return { attr: arabic.getAttribute("dir"), css: getComputedStyle(arabic).direction };
+			return {
+				attr: arabic.getAttribute("dir"),
+				css: getComputedStyle(arabic).direction
+			};
 		});
 		expect(dir.attr).toBe("auto");
 		expect(dir.css).toBe("rtl");
 	});
 
-	test("pinyin spreads only readings that overflow their Hanzi", async ({ page }) => {
+	test("pinyin spreads only readings that overflow their Hanzi", async ({
+		page
+	}) => {
 		await seedChat(page, [{ role: "assistant", content: "双方创造价值" }]);
 		await page.goto("/");
 		const actions = page.locator("article.assistant .actions");
@@ -367,7 +408,9 @@ test.describe("ruby-geometry", () => {
 		await actions.locator('button:has-text("拼音")').click();
 		await expect(body.locator("ruby").first()).toBeVisible({ timeout: 60_000 });
 		const widths = await body.evaluate((el) =>
-			[...el.querySelectorAll("ruby")].map((b) => b.getBoundingClientRect().width),
+			[...el.querySelectorAll("ruby")].map(
+				(b) => b.getBoundingClientRect().width
+			)
 		);
 		expect(widths.length).toBe(6);
 		const min = Math.min(...widths);
@@ -389,7 +432,9 @@ test.describe("keyboard", () => {
 		const actions = article.locator(".actions");
 		await expect(actions).toBeVisible({ timeout: 60_000 });
 		await article.hover();
-		await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
+		await page.evaluate(() =>
+			(document.activeElement as HTMLElement | null)?.blur?.()
+		);
 		await page.keyboard.press("a");
 		await expect(body.locator("ruby")).not.toHaveCount(0, { timeout: 10_000 });
 		await expect(body).toContainText("nǐ");
@@ -407,7 +452,9 @@ test.describe("keyboard", () => {
 		const body = article.locator(".rendered");
 		await expect(article.locator(".actions")).toBeVisible({ timeout: 60_000 });
 		await article.hover();
-		await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
+		await page.evaluate(() =>
+			(document.activeElement as HTMLElement | null)?.blur?.()
+		);
 		await page.keyboard.press("a");
 		await expect(body.locator(".frb")).toHaveCount(2, { timeout: 60_000 });
 		await expect(body).toContainText("かんじ");
@@ -415,7 +462,8 @@ test.describe("keyboard", () => {
 
 	/** M pins pinyin on the message in the middle of the screen. */
 	test("m pins pinyin on the screen-center message", async ({ page }) => {
-		const filler = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(20);
+		const filler =
+			"lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(20);
 		await seedChat(page, [
 			{ role: "user", content: `hi ${filler}` },
 			{ role: "assistant", content: `Hello there ${filler}` },
@@ -425,7 +473,9 @@ test.describe("keyboard", () => {
 			{ role: "assistant", content: `bye ${filler}` }
 		]);
 		await page.goto("/");
-		await expect(page.locator("article.assistant .actions").first()).toBeVisible({ timeout: 60_000 });
+		await expect(
+			page.locator("article.assistant .actions").first()
+		).toBeVisible({ timeout: 60_000 });
 		await page.waitForFunction(
 			() => {
 				const box = document.querySelector(".messages") as HTMLElement | null;
@@ -434,10 +484,14 @@ test.describe("keyboard", () => {
 			undefined,
 			{ timeout: 15_000 }
 		);
-		await page.evaluate(() => document.getElementById("msg-3")?.scrollIntoView({ block: "center" }));
+		await page.evaluate(() =>
+			document.getElementById("msg-3")?.scrollIntoView({ block: "center" })
+		);
 		await page.waitForFunction(
 			() => {
-				const box = document.querySelector(".messages")?.getBoundingClientRect();
+				const box = document
+					.querySelector(".messages")
+					?.getBoundingClientRect();
 				const el = document.getElementById("msg-3")?.getBoundingClientRect();
 				if (!box || !el) return false;
 				const mid = box.top + box.height / 2;
@@ -446,10 +500,15 @@ test.describe("keyboard", () => {
 			undefined,
 			{ timeout: 10_000 }
 		);
-		await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
+		await page.evaluate(() =>
+			(document.activeElement as HTMLElement | null)?.blur?.()
+		);
 		await page.keyboard.press("m");
 		const center = page.locator("#msg-3");
-		await expect(center.locator(".rendered").locator("ruby")).not.toHaveCount(0, { timeout: 10_000 });
+		await expect(center.locator(".rendered").locator("ruby")).not.toHaveCount(
+			0,
+			{ timeout: 10_000 }
+		);
 		await expect(center.locator(".rendered")).toContainText("nǐ");
 		// Nobody else gained readings.
 		await expect(page.locator("#msg-1 .rendered ruby")).toHaveCount(0);
@@ -458,7 +517,8 @@ test.describe("keyboard", () => {
 
 	/** N pins furigana on the message in the middle of the screen. */
 	test("n pins furigana on the screen-center message", async ({ page }) => {
-		const filler = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(20);
+		const filler =
+			"lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(20);
 		await seedChat(page, [
 			{ role: "user", content: `hi ${filler}` },
 			{ role: "assistant", content: `Hello there ${filler}` },
@@ -468,7 +528,9 @@ test.describe("keyboard", () => {
 			{ role: "assistant", content: `bye ${filler}` }
 		]);
 		await page.goto("/");
-		await expect(page.locator("article.assistant .actions").first()).toBeVisible({ timeout: 60_000 });
+		await expect(
+			page.locator("article.assistant .actions").first()
+		).toBeVisible({ timeout: 60_000 });
 		await page.waitForFunction(
 			() => {
 				const box = document.querySelector(".messages") as HTMLElement | null;
@@ -477,10 +539,14 @@ test.describe("keyboard", () => {
 			undefined,
 			{ timeout: 15_000 }
 		);
-		await page.evaluate(() => document.getElementById("msg-3")?.scrollIntoView({ block: "center" }));
+		await page.evaluate(() =>
+			document.getElementById("msg-3")?.scrollIntoView({ block: "center" })
+		);
 		await page.waitForFunction(
 			() => {
-				const box = document.querySelector(".messages")?.getBoundingClientRect();
+				const box = document
+					.querySelector(".messages")
+					?.getBoundingClientRect();
 				const el = document.getElementById("msg-3")?.getBoundingClientRect();
 				if (!box || !el) return false;
 				const mid = box.top + box.height / 2;
@@ -489,9 +555,13 @@ test.describe("keyboard", () => {
 			undefined,
 			{ timeout: 10_000 }
 		);
-		await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
+		await page.evaluate(() =>
+			(document.activeElement as HTMLElement | null)?.blur?.()
+		);
 		await page.keyboard.press("n");
-		await expect(page.locator("#msg-3 .rendered .frb")).toHaveCount(2, { timeout: 60_000 });
+		await expect(page.locator("#msg-3 .rendered .frb")).toHaveCount(2, {
+			timeout: 60_000
+		});
 		await expect(page.locator("#msg-1 .rendered .frb")).toHaveCount(0);
 	});
 });
@@ -499,14 +569,20 @@ test.describe("keyboard", () => {
 test.describe("keyboard mixed", () => {
 	/** Hovering a mixed message and pressing a pins every offered aid:
 	pinyin over the Chinese lines, furigana over the Japanese ones. */
-	test("hovering mixed text and pressing a pins both aids", async ({ page }) => {
-		await seedChat(page, [{ role: "assistant", content: "漢字を読む\n你好世界" }]);
+	test("hovering mixed text and pressing a pins both aids", async ({
+		page
+	}) => {
+		await seedChat(page, [
+			{ role: "assistant", content: "漢字を読む\n你好世界" }
+		]);
 		await page.goto("/");
 		const article = page.locator("article.assistant");
 		const body = article.locator(".rendered");
 		await expect(article.locator(".actions")).toBeVisible({ timeout: 60_000 });
 		await article.hover();
-		await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
+		await page.evaluate(() =>
+			(document.activeElement as HTMLElement | null)?.blur?.()
+		);
 		await page.keyboard.press("a");
 		await expect(body.locator("ruby")).not.toHaveCount(0, { timeout: 10_000 });
 		await expect(body.locator(".frb").first()).toBeVisible({ timeout: 60_000 });

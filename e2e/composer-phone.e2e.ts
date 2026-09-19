@@ -26,7 +26,9 @@ test("emptied composer matches its fresh height", async ({ page }) => {
 	await page.keyboard.type("hello android");
 	// Phones never send from the keyboard: the send button submits.
 	await page.locator(".send-btn").click();
-	await expect(page.locator("article.assistant .rendered").first()).toBeVisible({ timeout: 30_000 });
+	await expect(page.locator("article.assistant .rendered").first()).toBeVisible(
+		{ timeout: 30_000 }
+	);
 	await expect(page.locator(".sending")).toHaveCount(0, { timeout: 30_000 });
 	const after = await page.evaluate(() => {
 		const el = document.querySelector(".prompt");

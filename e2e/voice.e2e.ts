@@ -10,19 +10,33 @@ test.describe("voice-data", () => {
 	 *   via the offline extractors; covered at unit level).
 	 */
 	test.beforeEach(async ({ page }) => {
-		await seedChat(page, [{ role: "assistant", content: "你好，let us study" }]);
+		await seedChat(page, [
+			{ role: "assistant", content: "你好，let us study" }
+		]);
 		await page.goto("/");
-		await expect(page.locator("article.assistant")).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator("article.assistant")).toBeVisible({
+			timeout: 60_000
+		});
 	});
 
-	test("settings show no study-fonts or lesson-audio sections", async ({ page }) => {
+	test("settings show no study-fonts or lesson-audio sections", async ({
+		page
+	}) => {
 		await page.keyboard.press("Meta+,");
 		const panel = page.locator(".settings-panel");
 		await expect(panel).not.toHaveClass(/closed/);
-		await expect(panel.getByText("Study fonts", { exact: true })).toHaveCount(0);
-		await expect(panel.getByRole("button", { name: "Check fonts again" })).toHaveCount(0);
-		await expect(panel.getByText("Lesson audio", { exact: true })).toHaveCount(0);
-		await expect(panel.getByRole("button", { name: "Save sample audio" })).toHaveCount(0);
+		await expect(panel.getByText("Study fonts", { exact: true })).toHaveCount(
+			0
+		);
+		await expect(
+			panel.getByRole("button", { name: "Check fonts again" })
+		).toHaveCount(0);
+		await expect(panel.getByText("Lesson audio", { exact: true })).toHaveCount(
+			0
+		);
+		await expect(
+			panel.getByRole("button", { name: "Save sample audio" })
+		).toHaveCount(0);
 	});
 });
 
@@ -30,7 +44,9 @@ test.describe("voice-error", () => {
 	/** Lab speech never fails at runtime (utterances queue silently), so these
 	specs stub `speak` to throw: `speakMultilingual` catches it and reports
 	false, which deterministically drives the unavailable-voice paths. */
-	async function throwingSpeak(page: Parameters<typeof seedChat>[0]): Promise<void> {
+	async function throwingSpeak(
+		page: Parameters<typeof seedChat>[0]
+	): Promise<void> {
 		await page.addInitScript(() => {
 			const synth = window.speechSynthesis;
 			if (!synth) return;
@@ -43,10 +59,15 @@ test.describe("voice-error", () => {
 		});
 	}
 
-	async function webEngine(page: Parameters<typeof seedChat>[0]): Promise<void> {
+	async function webEngine(
+		page: Parameters<typeof seedChat>[0]
+	): Promise<void> {
 		await page.addInitScript(() => {
 			window.localStorage.setItem("ccez-mock-provider", "1");
-			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({ voiceEngine: "web" }));
+			window.localStorage.setItem(
+				"ccez-llm-settings-v1",
+				JSON.stringify({ voiceEngine: "web" })
+			);
 		});
 	}
 
@@ -56,13 +77,19 @@ test.describe("voice-error", () => {
 		// Tall enough that the article's hover center clears the
 		// invisible top drag strip (a one-liner would sit under it).
 		await seedChat(page, [
-			{ role: "assistant", content: "hello there\n\nlorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor" }
+			{
+				role: "assistant",
+				content:
+					"hello there\n\nlorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor"
+			}
 		]);
 		await page.goto("/");
 		const article = page.locator("article.assistant");
 		await expect(article).toBeVisible({ timeout: 60_000 });
 		await article.hover();
-		await article.locator('button[aria-label="Read this message aloud"]').click();
+		await article
+			.locator('button[aria-label="Read this message aloud"]')
+			.click();
 		const toast = page.locator(".voice-error");
 		await expect(toast).toBeVisible();
 		await expect(toast).toBeHidden({ timeout: 20_000 });
@@ -75,7 +102,10 @@ test.describe("voice-error", () => {
 			// NOTE: voice itself can't be seeded — every boot resets it to
 			// false by design, so the test enables it post-boot below. Only
 			// the engine survives seeding.
-			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({ voiceEngine: "web" }));
+			window.localStorage.setItem(
+				"ccez-llm-settings-v1",
+				JSON.stringify({ voiceEngine: "web" })
+			);
 			// Count every banner appearance: the failure banner auto-expires,
 			// so a final absence proves nothing — only "never shown" does.
 			// Deferred past document readiness (init scripts can run before
@@ -95,7 +125,10 @@ test.describe("voice-error", () => {
 							}
 						}
 					}
-				}).observe(document.documentElement, { childList: true, subtree: true });
+				}).observe(document.documentElement, {
+					childList: true,
+					subtree: true
+				});
 				window.voiceToastWatching = true;
 			};
 			watch();
@@ -104,25 +137,25 @@ test.describe("voice-error", () => {
 		// Readback on, through the same toggle a user would press.
 		await expect
 			.poll(
-				async () =>
-					page.evaluate(
-						() => window.voiceToastWatching === true
-					),
+				async () => page.evaluate(() => window.voiceToastWatching === true),
 				{ timeout: 10_000 }
 			)
 			.toBe(true);
 		// Readback on, through the same toggle a user would press.
 		await page.locator(".prompt-tools .voice-float").click();
-		await expect(page.locator(".prompt-tools .voice-float")).toHaveAttribute("aria-pressed", "true");
+		await expect(page.locator(".prompt-tools .voice-float")).toHaveAttribute(
+			"aria-pressed",
+			"true"
+		);
 		await page.locator(".prompt .ta-input").click();
 		await page.keyboard.type("say hi");
 		await page.keyboard.press("Enter");
-		await expect(page.locator("article.assistant .rendered")).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator("article.assistant .rendered")).toBeVisible({
+			timeout: 60_000
+		});
 		// Past the reply and any failure banner's full auto-expiry.
 		await page.waitForTimeout(12_000);
-		const seen = await page.evaluate(
-			() => window.voiceToastSeen ?? -1
-		);
+		const seen = await page.evaluate(() => window.voiceToastSeen ?? -1);
 		expect(seen).toBe(0);
 	});
 });
@@ -139,10 +172,16 @@ test.describe("native-fallback", () => {
 		// Tall enough that the article's hover center clears the
 		// invisible top drag strip (a one-liner would sit under it).
 		await seedChat(page, [
-			{ role: "assistant", content: "hello there\n\nlorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor" }
+			{
+				role: "assistant",
+				content:
+					"hello there\n\nlorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor"
+			}
 		]);
 		await page.goto("/");
-		await expect(page.locator("article.assistant")).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator("article.assistant")).toBeVisible({
+			timeout: 60_000
+		});
 	});
 
 	test("browser settings show the web-voices engine note, not the system picker", async ({
@@ -151,14 +190,22 @@ test.describe("native-fallback", () => {
 		await page.keyboard.press("Meta+,");
 		const panel = page.locator(".settings-panel");
 		await expect(panel).not.toHaveClass(/closed/);
-		await expect(panel.getByText("browser preview can only use web voices")).toBeVisible();
-		await expect(panel.locator('select[aria-labelledby="system-voice-label"]')).toHaveCount(0);
+		await expect(
+			panel.getByText("browser preview can only use web voices")
+		).toBeVisible();
+		await expect(
+			panel.locator('select[aria-labelledby="system-voice-label"]')
+		).toHaveCount(0);
 	});
 
-	test("assistant messages still offer read-aloud without a native bridge", async ({ page }) => {
+	test("assistant messages still offer read-aloud without a native bridge", async ({
+		page
+	}) => {
 		const article = page.locator("article.assistant");
 		await article.hover();
-		await expect(article.locator('button[aria-label="Read this message aloud"]')).toBeVisible();
+		await expect(
+			article.locator('button[aria-label="Read this message aloud"]')
+		).toBeVisible();
 	});
 });
 
@@ -169,9 +216,24 @@ test.describe("ios-voice", () => {
 
 	/** iOS-side inventory has no premium/enhanced tiers (all quality ≤ 1). */
 	const IOS_VOICES = [
-		{ id: "com.apple.ttsbundle.Samantha-compact", name: "Samantha", lang: "en-US", quality: 1 },
-		{ id: "com.apple.ttsbundle.Daniel-compact", name: "Daniel", lang: "en-GB", quality: 1 },
-		{ id: "com.apple.ttsbundle.Marie-compact", name: "Marie", lang: "fr-FR", quality: 1 }
+		{
+			id: "com.apple.ttsbundle.Samantha-compact",
+			name: "Samantha",
+			lang: "en-US",
+			quality: 1
+		},
+		{
+			id: "com.apple.ttsbundle.Daniel-compact",
+			name: "Daniel",
+			lang: "en-GB",
+			quality: 1
+		},
+		{
+			id: "com.apple.ttsbundle.Marie-compact",
+			name: "Marie",
+			lang: "fr-FR",
+			quality: 1
+		}
 	];
 
 	test.use({
@@ -182,7 +244,9 @@ test.describe("ios-voice", () => {
 	});
 
 	/** Stub the Tauri bridge: native engine present, everything else absent. */
-	async function iosBridge(page: Parameters<typeof seedChat>[0]): Promise<void> {
+	async function iosBridge(
+		page: Parameters<typeof seedChat>[0]
+	): Promise<void> {
 		await page.addInitScript((voices: typeof IOS_VOICES) => {
 			(window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {
 				invoke: async (cmd: string) => {
@@ -207,16 +271,24 @@ test.describe("ios-voice", () => {
 	test("iphone rides the phone ui", async ({ page }) => {
 		await expect(page.locator("[data-android]")).toHaveCount(1);
 		await expect(
-			page.locator(".settings-panel").getByText("Hide message buttons until tapped")
+			page
+				.locator(".settings-panel")
+				.getByText("Hide message buttons until tapped")
 		).toBeVisible();
 	});
 
 	/** Both message checkboxes share one Messages box (no awkward gap). */
 	test("message toggles grouped in one fieldset", async ({ page }) => {
-		const box = page.locator(".settings-panel fieldset", { hasText: "Hide message buttons" });
+		const box = page.locator(".settings-panel fieldset", {
+			hasText: "Hide message buttons"
+		});
 		await expect(box.locator("legend")).toHaveText("Messages");
-		await expect(box.getByText("Hide message buttons until tapped")).toBeVisible();
-		await expect(box.getByText("Enable background on my messages")).toBeVisible();
+		await expect(
+			box.getByText("Hide message buttons until tapped")
+		).toBeVisible();
+		await expect(
+			box.getByText("Enable background on my messages")
+		).toBeVisible();
 	});
 
 	/** The voice picker lists every installed voice (no quality gate on iOS). */
@@ -240,7 +312,9 @@ test.describe("ios-voice", () => {
 		expect(box).toBeTruthy();
 		expect(Math.abs(box!.width - box!.height)).toBeLessThan(1);
 		await expect
-			.poll(() => refresh.evaluate((el) => getComputedStyle(el).backgroundColor))
+			.poll(() =>
+				refresh.evaluate((el) => getComputedStyle(el).backgroundColor)
+			)
 			.toBe("rgba(0, 0, 0, 0)");
 		await refresh.click();
 		await expect(panel.getByText("Voice list is up to date.")).toBeVisible();
@@ -263,14 +337,17 @@ test.describe("ios-voice", () => {
 			const raw = window.localStorage.getItem("ccez-llm-settings-v1") ?? "{}";
 			const settings = JSON.parse(raw) as Record<string, unknown>;
 			settings.nativeVoiceId = "com.apple.ttsbundle.Daniel-compact";
-			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify(settings));
+			window.localStorage.setItem(
+				"ccez-llm-settings-v1",
+				JSON.stringify(settings)
+			);
 		});
 		await page.reload();
 		await expect(page.locator("article.user")).toBeVisible({ timeout: 60_000 });
 		await page.keyboard.press("Meta+,");
 		await expect(page.locator(".settings-panel")).not.toHaveClass(/closed/);
-		await expect(page.locator(".settings-panel .voice-pick select")).toHaveValue(
-			"com.apple.ttsbundle.Daniel-compact"
-		);
+		await expect(
+			page.locator(".settings-panel .voice-pick select")
+		).toHaveValue("com.apple.ttsbundle.Daniel-compact");
 	});
 });

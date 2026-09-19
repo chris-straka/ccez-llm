@@ -21,7 +21,7 @@ describe("phone sidebar rows", () => {
 		// in-flight empty placeholder never counts.
 		const source = pageSource();
 		expect(source).toContain("visibleMessageCount(chatState, item)");
-		expect(source).toContain("{n === 1 ? \"msg\" : \"msgs\"}");
+		expect(source).toContain('{n === 1 ? "msg" : "msgs"}');
 		expect(source).not.toContain("sideTip(item) ||");
 	});
 

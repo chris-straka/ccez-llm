@@ -10,20 +10,22 @@ for (const theme of ["light", "dark"] as const) {
 	test(`failed copy toasts red on ${theme}`, async ({ page }) => {
 		await seedChat(page, [{ role: "assistant", content: "copy me" }]);
 		await page.addInitScript(() => {
-			Object.defineProperty(window.navigator, "clipboard", { value: null, configurable: true });
+			Object.defineProperty(window.navigator, "clipboard", {
+				value: null,
+				configurable: true
+			});
 		});
-		await page.addInitScript(
-			(name: string) => {
-				const raw = window.localStorage.getItem("ccez-llm-settings-v1") ?? "{}";
-				window.localStorage.setItem(
-					"ccez-llm-settings-v1",
-					JSON.stringify({ ...JSON.parse(raw), theme: name })
-				);
-			},
-			theme
-		);
+		await page.addInitScript((name: string) => {
+			const raw = window.localStorage.getItem("ccez-llm-settings-v1") ?? "{}";
+			window.localStorage.setItem(
+				"ccez-llm-settings-v1",
+				JSON.stringify({ ...JSON.parse(raw), theme: name })
+			);
+		}, theme);
 		await page.goto("/");
-		await expect(page.locator("article .rendered").first()).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator("article .rendered").first()).toBeVisible({
+			timeout: 60_000
+		});
 		const row = page.locator("article.assistant").first();
 		await row.hover();
 		await row.locator('button[aria-label="Copy as plain text"]').click();
@@ -47,7 +49,9 @@ test("plain toast clears fast", async ({ page }) => {
 	await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
 	await seedChat(page, [{ role: "assistant", content: "copy me" }]);
 	await page.goto("/");
-	await expect(page.locator("article .rendered").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article .rendered").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const row = page.locator("article.assistant").first();
 	await row.hover();
 	await row.locator('button[aria-label="Copy as plain text"]').click();
@@ -61,10 +65,15 @@ expiry, gone on their own later. */
 test("error toast outlives the plain delay", async ({ page }) => {
 	await seedChat(page, [{ role: "assistant", content: "copy me" }]);
 	await page.addInitScript(() => {
-		Object.defineProperty(window.navigator, "clipboard", { value: null, configurable: true });
+		Object.defineProperty(window.navigator, "clipboard", {
+			value: null,
+			configurable: true
+		});
 	});
 	await page.goto("/");
-	await expect(page.locator("article .rendered").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article .rendered").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const row = page.locator("article.assistant").first();
 	await row.hover();
 	await row.locator('button[aria-label="Copy as plain text"]').click();

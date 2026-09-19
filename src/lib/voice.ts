@@ -22,7 +22,9 @@ export function splitSentences(text: string): string[] {
 	for (const line of text.split("\n")) {
 		const cleaned = line.replace(/\s+/g, " ").trim();
 		if (!cleaned) continue;
-		const matches = cleaned.match(/[^.!?…。！？؛\n]+[.!?…。！？؛]+["»”’)]?|\S[^.!?…。！？；]*$/g);
+		const matches = cleaned.match(
+			/[^.!?…。！？؛\n]+[.!?…。！？؛]+["»”’)]?|\S[^.!?…。！？；]*$/g
+		);
 		for (const match of matches ?? [cleaned]) {
 			const trimmed = match.trim();
 			if (trimmed) out.push(trimmed);
@@ -36,21 +38,24 @@ export function splitSentences(text: string): string[] {
  * image/paste markers, and lightweight markdown formatting.
  */
 export function speechText(markdown: string): string {
-	return (
-		markdown
-			.replace(/```[\s\S]*?```/g, " ")
-			.replace(/!?\[[^\]]*\]\([^)]*\)/g, " ")
-			.replace(/\[Pasted an image\]/g, " ")
-			.replace(/\[Pasted \d+ chars\]/g, "pasted content")
-			.replace(/\[Pasted image\]/g, "pasted image")
-			.split("\n")
-			.map((line) => line.replace(/^#{1,6}\s+/, "").replace(/^>\s?/, "").replace(/^[-*]\s+/, ""))
-			.join("\n")
-			.replace(/[*_`~|]/g, "")
-			.replace(/[ \t]+/g, " ")
-			.replace(/\n{2,}/g, "\n")
-			.trim()
-	);
+	return markdown
+		.replace(/```[\s\S]*?```/g, " ")
+		.replace(/!?\[[^\]]*\]\([^)]*\)/g, " ")
+		.replace(/\[Pasted an image\]/g, " ")
+		.replace(/\[Pasted \d+ chars\]/g, "pasted content")
+		.replace(/\[Pasted image\]/g, "pasted image")
+		.split("\n")
+		.map((line) =>
+			line
+				.replace(/^#{1,6}\s+/, "")
+				.replace(/^>\s?/, "")
+				.replace(/^[-*]\s+/, "")
+		)
+		.join("\n")
+		.replace(/[*_`~|]/g, "")
+		.replace(/[ \t]+/g, " ")
+		.replace(/\n{2,}/g, "\n")
+		.trim();
 }
 
 /** Locale for a whole reply: first non-Latin script wins, else the fallback. */
@@ -66,7 +71,10 @@ export function replyLangFor(text: string, fallback: string): string {
  * pure: call sites pass `speechSynthesis.getVoices()`, tests pass
  * literals.
  */
-export function webVoiceAvailable(lang: string, voices: ReadonlyArray<{ lang: string }>): boolean {
+export function webVoiceAvailable(
+	lang: string,
+	voices: ReadonlyArray<{ lang: string }>
+): boolean {
 	if (voices.length === 0) return true;
 	const prefix = lang.slice(0, 2).toLowerCase();
 	if (!prefix) return false;
@@ -89,7 +97,10 @@ export function spokenFallbackFor(lang: string): string | null {
  * explains. An unloaded inventory passes everything through (see
  * webVoiceAvailable) — never route on a guess.
  */
-export function effectiveSpeechLang(lang: string, voices: ReadonlyArray<{ lang: string }>): string {
+export function effectiveSpeechLang(
+	lang: string,
+	voices: ReadonlyArray<{ lang: string }>
+): string {
 	if (webVoiceAvailable(lang, voices)) return lang;
 	const fallback = spokenFallbackFor(lang);
 	if (fallback && webVoiceAvailable(fallback, voices)) return fallback;
@@ -111,11 +122,16 @@ export interface SpeechSegment {
  * punctuation) inherit the surrounding voice instead of flipping to
  * Chinese at the boundary.
  */
-export function sentenceSpeechLang(sentence: string, fallbackLang: string): string {
+export function sentenceSpeechLang(
+	sentence: string,
+	fallbackLang: string
+): string {
 	const direct = ttsLangFor(sentence, "");
 	if (direct !== "" && direct !== "zh-CN") return direct;
 	if (direct === "") return fallbackLang;
-	return /[.!?…。！？；"»”’」』）)\]]$/.test(sentence.trim()) ? direct : fallbackLang;
+	return /[.!?…。！？；"»”’」』）)\]]$/.test(sentence.trim())
+		? direct
+		: fallbackLang;
 }
 
 /**
@@ -182,7 +198,10 @@ export function splitSpeechSegments(
 			continue;
 		}
 		for (let i = 0; i < runs.length; i++) {
-			out.push({ text: runs[i] ?? "", lang: langs[i] ?? langForSentence(sentence) });
+			out.push({
+				text: runs[i] ?? "",
+				lang: langs[i] ?? langForSentence(sentence)
+			});
 		}
 	}
 	return out;
@@ -205,7 +224,10 @@ export function messageSpeechLang(
 	fallback: string,
 	voices: ReadonlyArray<{ lang: string }>
 ): string {
-	return effectiveSpeechLang(replyLangFor(speechText(content), fallback), voices);
+	return effectiveSpeechLang(
+		replyLangFor(speechText(content), fallback),
+		voices
+	);
 }
 
 /**
@@ -262,7 +284,10 @@ export function speechLangsFor(
 		// no Latin voice reads Italian rather than failing.
 		// Han-only fragments inherit the surrounding voice (see
 		// sentenceSpeechLang) instead of flipping to Chinese.
-		const lang = effectiveSpeechLang(sentenceSpeechLang(sentence, latinLang), voices);
+		const lang = effectiveSpeechLang(
+			sentenceSpeechLang(sentence, latinLang),
+			voices
+		);
 		cache.set(sentence, lang);
 		return lang;
 	};
@@ -311,7 +336,11 @@ function queueUtterances(
 		try {
 			const voice = synth
 				.getVoices()
-				.find((v) => v.lang.toLowerCase().startsWith(segment.lang.slice(0, 2).toLowerCase()));
+				.find((v) =>
+					v.lang
+						.toLowerCase()
+						.startsWith(segment.lang.slice(0, 2).toLowerCase())
+				);
 			if (voice) utterance.voice = voice;
 		} catch {
 			// Voice matching is best-effort; lang still routes correctly.
@@ -347,7 +376,11 @@ function queueUtterances(
  * Speak `text` sentence by sentence so skip lands between sentences and
  * progress stays live. Returns false when speech is unavailable.
  */
-export function speakText(text: string, lang: string, callbacks: SpeakCallbacks = {}): boolean {
+export function speakText(
+	text: string,
+	lang: string,
+	callbacks: SpeakCallbacks = {}
+): boolean {
 	return speakMultilingual(text, () => lang, callbacks);
 }
 
@@ -438,7 +471,8 @@ export function dictateOnce(
 			const transcript = event.results?.[0]?.[0]?.transcript ?? "";
 			if (transcript.trim()) onResult(transcript);
 		};
-		recognition.onerror = (event) => onError(friendlyMicError(String(event.error || "mic error")));
+		recognition.onerror = (event) =>
+			onError(friendlyMicError(String(event.error || "mic error")));
 		recognition.onend = null;
 		recognition.start();
 		return () => {
@@ -465,7 +499,8 @@ export function friendlyMicError(message: string): string {
 		return "Mic permission denied — allow the microphone and try again.";
 	}
 	if (/no-speech/i.test(message)) return "Didn't catch anything — try again.";
-	if (/audio-capture|not-found|no-microphone/i.test(message)) return "No microphone found.";
+	if (/audio-capture|not-found|no-microphone/i.test(message))
+		return "No microphone found.";
 	if (/network/i.test(message)) {
 		try {
 			if (typeof navigator !== "undefined" && navigator.onLine === false) {

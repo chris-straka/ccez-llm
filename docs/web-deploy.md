@@ -17,12 +17,12 @@ bun run build:web   # == vite build; adapter-static writes ./build
 
 ## Web equivalents (no Tauri bridge)
 
-| Desktop (Tauri) | Web |
-| --- | --- |
-| macOS Keychain via `keychain_*` invokes | AES-GCM-256 encrypted localStorage (`src/lib/secrets.ts`); non-extractable key in IndexedDB, ephemeral in-memory key where IndexedDB is missing, legacy plaintext entries still read and re-encrypt on write |
-| Native `AVSpeechSynthesizer` bridge (`src/lib/nativeTts.ts`) | Web Speech `speechSynthesis` (`src/lib/voice.ts`); the native probe fails cleanly off-shell and settings fall back to `web` |
-| Tauri auto-updater (`@tauri-apps/plugin-updater`) | Disabled: `updateRouteFor()` returns `{ kind: "none" }` off-shell and the settings panel shows "updates with the site" instead of a check button |
-| `getCurrentWindow()` drag/zoom, menu-action events | Guarded no-ops off-shell (`src/routes/+page.svelte`) |
+| Desktop (Tauri)                                              | Web                                                                                                                                                                                                          |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| macOS Keychain via `keychain_*` invokes                      | AES-GCM-256 encrypted localStorage (`src/lib/secrets.ts`); non-extractable key in IndexedDB, ephemeral in-memory key where IndexedDB is missing, legacy plaintext entries still read and re-encrypt on write |
+| Native `AVSpeechSynthesizer` bridge (`src/lib/nativeTts.ts`) | Web Speech `speechSynthesis` (`src/lib/voice.ts`); the native probe fails cleanly off-shell and settings fall back to `web`                                                                                  |
+| Tauri auto-updater (`@tauri-apps/plugin-updater`)            | Disabled: `updateRouteFor()` returns `{ kind: "none" }` off-shell and the settings panel shows "updates with the site" instead of a check button                                                             |
+| `getCurrentWindow()` drag/zoom, menu-action events           | Guarded no-ops off-shell (`src/routes/+page.svelte`)                                                                                                                                                         |
 
 ## Cloudflare Pages setup
 

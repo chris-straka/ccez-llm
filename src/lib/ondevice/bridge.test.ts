@@ -12,7 +12,10 @@ import {
 	type OnDeviceDeps
 } from "./bridge";
 
-function depsWith(result: unknown): { deps: OnDeviceDeps; invoke: ReturnType<typeof vi.fn> } {
+function depsWith(result: unknown): {
+	deps: OnDeviceDeps;
+	invoke: ReturnType<typeof vi.fn>;
+} {
 	const invoke = vi.fn(async () => result);
 	return { deps: { shell: true, invoke }, invoke };
 }
@@ -34,11 +37,17 @@ describe("onDeviceErrorCopy", () => {
 			"no-model",
 			"On-device model isn't downloaded yet. Reconnect to download it once, then it works offline."
 		],
-		["downloading", "On-device model is still downloading. Try again in a bit."],
+		[
+			"downloading",
+			"On-device model is still downloading. Try again in a bit."
+		],
 		["no-bridge", "On-device chat isn't available on this device."],
 		["unsupported", "On-device chat isn't available on this device."],
 		["busy", "On-device chat is busy. Try again in a moment."],
-		["too-long", "That message is too long for on-device chat. Shorten it and try again."],
+		[
+			"too-long",
+			"That message is too long for on-device chat. Shorten it and try again."
+		],
 		["cancelled", "On-device reply stopped."],
 		["failed", "On-device chat failed. Try again."],
 		["anything-else", "On-device chat failed. Try again."],
@@ -71,7 +80,9 @@ describe("clampMaxTokens", () => {
 describe("parseOnDeviceStatus", () => {
 	it("passes states through and clamps progress", () => {
 		expect(parseOnDeviceStatus("ready")).toEqual({ state: "ready" });
-		expect(parseOnDeviceStatus({ state: "downloading", progress: 0.5 })).toEqual({
+		expect(
+			parseOnDeviceStatus({ state: "downloading", progress: 0.5 })
+		).toEqual({
 			state: "downloading",
 			progress: 0.5
 		});
@@ -86,10 +97,22 @@ describe("parseOnDeviceStatus", () => {
 	});
 
 	it("reads garbage as an error, never throws", () => {
-		expect(parseOnDeviceStatus("bogus")).toEqual({ state: "error", reason: "bad-status" });
-		expect(parseOnDeviceStatus({})).toEqual({ state: "error", reason: "bad-status" });
-		expect(parseOnDeviceStatus(null)).toEqual({ state: "error", reason: "bad-status" });
-		expect(parseOnDeviceStatus(42)).toEqual({ state: "error", reason: "bad-status" });
+		expect(parseOnDeviceStatus("bogus")).toEqual({
+			state: "error",
+			reason: "bad-status"
+		});
+		expect(parseOnDeviceStatus({})).toEqual({
+			state: "error",
+			reason: "bad-status"
+		});
+		expect(parseOnDeviceStatus(null)).toEqual({
+			state: "error",
+			reason: "bad-status"
+		});
+		expect(parseOnDeviceStatus(42)).toEqual({
+			state: "error",
+			reason: "bad-status"
+		});
 	});
 });
 
@@ -107,7 +130,10 @@ describe("onDeviceStatus", () => {
 
 	it("passes native payloads through the parser", async () => {
 		const { deps } = depsWith({ state: "downloading", progress: 0.25 });
-		expect(await onDeviceStatus(deps)).toEqual({ state: "downloading", progress: 0.25 });
+		expect(await onDeviceStatus(deps)).toEqual({
+			state: "downloading",
+			progress: 0.25
+		});
 	});
 
 	it("reads a rejected bridge as unavailable", async () => {
@@ -124,15 +150,20 @@ describe("onDeviceStatus", () => {
 describe("generateOnDevice", () => {
 	it("resolves native text and forwards prompt + clamped cap", async () => {
 		const { deps, invoke } = depsWith("hello back");
-		await expect(generateOnDevice("hello", { maxTokens: 64 }, deps)).resolves.toBe("hello back");
-		expect(invoke).toHaveBeenCalledWith("ondevice_generate", { prompt: "hello", maxTokens: 64 });
+		await expect(
+			generateOnDevice("hello", { maxTokens: 64 }, deps)
+		).resolves.toBe("hello back");
+		expect(invoke).toHaveBeenCalledWith("ondevice_generate", {
+			prompt: "hello",
+			maxTokens: 64
+		});
 	});
 
 	it("throws the short copy outside the shell without invoking", async () => {
 		const invoke = vi.fn(async () => "must not be called");
-		await expect(generateOnDevice("hi", undefined, { shell: false, invoke })).rejects.toThrow(
-			"On-device chat isn't available on this device."
-		);
+		await expect(
+			generateOnDevice("hi", undefined, { shell: false, invoke })
+		).rejects.toThrow("On-device chat isn't available on this device.");
 		expect(invoke).not.toHaveBeenCalled();
 	});
 
@@ -140,9 +171,9 @@ describe("generateOnDevice", () => {
 		const invoke = vi.fn(async () => {
 			throw new Error("busy");
 		});
-		await expect(generateOnDevice("hi", undefined, { shell: true, invoke })).rejects.toThrow(
-			"On-device chat is busy. Try again in a moment."
-		);
+		await expect(
+			generateOnDevice("hi", undefined, { shell: true, invoke })
+		).rejects.toThrow("On-device chat is busy. Try again in a moment.");
 	});
 
 	it("rejects empty or non-text completions with the default copy", async () => {
@@ -159,27 +190,39 @@ describe("generateOnDevice", () => {
 
 describe("parseOnDeviceStatus downloadedBytes", () => {
 	it("keeps whole bytes while downloading, floors fractions", () => {
-		expect(parseOnDeviceStatus({ state: "downloading", downloadedBytes: 50331648 })).toEqual({
+		expect(
+			parseOnDeviceStatus({ state: "downloading", downloadedBytes: 50331648 })
+		).toEqual({
 			state: "downloading",
 			downloadedBytes: 50331648
 		});
-		expect(parseOnDeviceStatus({ state: "downloading", downloadedBytes: 10.9 })).toEqual({
+		expect(
+			parseOnDeviceStatus({ state: "downloading", downloadedBytes: 10.9 })
+		).toEqual({
 			state: "downloading",
 			downloadedBytes: 10
 		});
 	});
 
 	it("drops the count outside downloading and drops nonsense", () => {
-		expect(parseOnDeviceStatus({ state: "ready", downloadedBytes: 7 })).toEqual({
-			state: "ready"
-		});
-		expect(parseOnDeviceStatus({ state: "downloading", downloadedBytes: -1 })).toEqual({
+		expect(parseOnDeviceStatus({ state: "ready", downloadedBytes: 7 })).toEqual(
+			{
+				state: "ready"
+			}
+		);
+		expect(
+			parseOnDeviceStatus({ state: "downloading", downloadedBytes: -1 })
+		).toEqual({
 			state: "downloading"
 		});
-		expect(parseOnDeviceStatus({ state: "downloading", downloadedBytes: Number.NaN })).toEqual({
+		expect(
+			parseOnDeviceStatus({ state: "downloading", downloadedBytes: Number.NaN })
+		).toEqual({
 			state: "downloading"
 		});
-		expect(parseOnDeviceStatus({ state: "downloading", downloadedBytes: "48 MB" })).toEqual({
+		expect(
+			parseOnDeviceStatus({ state: "downloading", downloadedBytes: "48 MB" })
+		).toEqual({
 			state: "downloading"
 		});
 	});
@@ -187,12 +230,20 @@ describe("parseOnDeviceStatus downloadedBytes", () => {
 
 describe("onDeviceUnsupported", () => {
 	it("hides the entry only on a positive unsupported verdict", () => {
-		expect(onDeviceUnsupported({ state: "unavailable", reason: "unsupported" })).toBe(true);
-		expect(onDeviceUnsupported({ state: "unavailable", reason: "no-model" })).toBe(false);
-		expect(onDeviceUnsupported({ state: "unavailable", reason: "no-bridge" })).toBe(false);
+		expect(
+			onDeviceUnsupported({ state: "unavailable", reason: "unsupported" })
+		).toBe(true);
+		expect(
+			onDeviceUnsupported({ state: "unavailable", reason: "no-model" })
+		).toBe(false);
+		expect(
+			onDeviceUnsupported({ state: "unavailable", reason: "no-bridge" })
+		).toBe(false);
 		expect(onDeviceUnsupported({ state: "downloading" })).toBe(false);
 		expect(onDeviceUnsupported({ state: "ready" })).toBe(false);
-		expect(onDeviceUnsupported({ state: "error", reason: "unsupported" })).toBe(false);
+		expect(onDeviceUnsupported({ state: "error", reason: "unsupported" })).toBe(
+			false
+		);
 	});
 });
 

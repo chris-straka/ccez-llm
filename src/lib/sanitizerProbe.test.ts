@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { judgeSanitizerShape, nativeSanitizerStatus, shouldUseNativeSanitizer } from "./sanitizerProbe";
+import {
+	judgeSanitizerShape,
+	nativeSanitizerStatus,
+	shouldUseNativeSanitizer
+} from "./sanitizerProbe";
 
 describe("native Sanitizer investigation", () => {
 	it("keeps DOMPurify where no constructor exists", () => {

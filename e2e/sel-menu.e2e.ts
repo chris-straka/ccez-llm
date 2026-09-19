@@ -21,7 +21,10 @@ test.describe("desktop", () => {
 	/** The dev shell flashes a bridge-error toast on load that overlaps
 	the menu: real users wait it out (8s), so the clicking tests do too. */
 	async function waitForToastToFade(page: Page): Promise<void> {
-		await page.locator(".toast").waitFor({ state: "hidden", timeout: 15000 }).catch(() => {});
+		await page
+			.locator(".toast")
+			.waitFor({ state: "hidden", timeout: 15000 })
+			.catch(() => {});
 	}
 
 	/** The menu is Annotate alone here (the Han aids stay off by
@@ -48,7 +51,9 @@ test.describe("desktop", () => {
 	and drops the menu: click-away always dismisses (controls,
 	composer, and message text alike — only menu presses, drags, and
 	multi-click reselections keep their paths). */
-	test("clicking another message clears the highlight and menu", async ({ page }) => {
+	test("clicking another message clears the highlight and menu", async ({
+		page
+	}) => {
 		await waitForToastToFade(page);
 		await page.addInitScript(() => {
 			window.localStorage.setItem(
@@ -59,8 +64,20 @@ test.describe("desktop", () => {
 						createdAt: 1,
 						replyLang: null,
 						messages: [
-							{ id: "e2e-m0", role: "user", content: "alpha beta gamma delta", usage: null, error: null },
-							{ id: "e2e-m1", role: "assistant", content: "zeta eta theta iota", usage: null, error: null }
+							{
+								id: "e2e-m0",
+								role: "user",
+								content: "alpha beta gamma delta",
+								usage: null,
+								error: null
+							},
+							{
+								id: "e2e-m1",
+								role: "assistant",
+								content: "zeta eta theta iota",
+								usage: null,
+								error: null
+							}
 						]
 					}
 				])
@@ -73,7 +90,9 @@ test.describe("desktop", () => {
 		await page.mouse.dblclick(box.x + 20, box.y + box.height / 2);
 		const menu = page.locator(".sel-menu");
 		await expect(menu).toBeVisible();
-		const quote = await page.evaluate(() => window.getSelection()?.toString() ?? "");
+		const quote = await page.evaluate(
+			() => window.getSelection()?.toString() ?? ""
+		);
 		expect(quote).not.toBe("");
 		const second = page.locator("article .rendered p").nth(1);
 		const box2 = await second.boundingBox();
@@ -85,7 +104,9 @@ test.describe("desktop", () => {
 		await expect(menu).toBeHidden();
 	});
 
-	test("pressing Annotate stands the menu through mousedown", async ({ page }) => {
+	test("pressing Annotate stands the menu through mousedown", async ({
+		page
+	}) => {
 		await waitForToastToFade(page);
 		await selectWord(page);
 		const button = page.locator('.sel-menu button:has-text("Annotate")');
@@ -112,11 +133,15 @@ test.describe("desktop", () => {
 		await waitForToastToFade(page);
 		await page.mouse.move(box.x + 40, box.y + 20);
 		await page.mouse.down();
-		await page.mouse.move(box.x + box.width - 40, box.y + box.height - 20, { steps: 12 });
+		await page.mouse.move(box.x + box.width - 40, box.y + box.height - 20, {
+			steps: 12
+		});
 		await page.mouse.up();
 		const menu = page.locator(".sel-menu");
 		await expect(menu).toBeVisible({ timeout: 5_000 });
-		const quote = await page.evaluate(() => window.getSelection()?.toString() ?? "");
+		const quote = await page.evaluate(
+			() => window.getSelection()?.toString() ?? ""
+		);
 		expect(quote.trim().length).toBeGreaterThan(20);
 		const button = page.locator('.sel-menu button:has-text("Annotate")');
 		await button.hover();
@@ -171,7 +196,9 @@ test.describe("desktop", () => {
 			await page.waitForTimeout(1000);
 		}
 		await expect(menu).toBeVisible();
-		const selected = await page.evaluate(() => window.getSelection()?.toString() ?? "");
+		const selected = await page.evaluate(
+			() => window.getSelection()?.toString() ?? ""
+		);
 		expect(selected).not.toBe("");
 		// Hands off: the idle window expires and the menu stands down.
 		await page.waitForTimeout(7000);
@@ -196,7 +223,9 @@ test.describe("desktop", () => {
 				sel.setBaseAndExtent(oldFirst, 0, oldFirst, 0);
 			}
 		});
-		expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).toBe("");
+		expect(
+			await page.evaluate(() => window.getSelection()?.toString() ?? "")
+		).toBe("");
 		await expect(menu).toBeVisible({ timeout: 5_000 });
 		await page.locator('.sel-menu button:has-text("Annotate")').click();
 		await expect(page.locator(".ann-pop")).toBeVisible({ timeout: 5_000 });
@@ -207,7 +236,9 @@ test.describe("desktop", () => {
 	reaches the floating menu (engine behavior — no DOM change, no
 	press; Chromium keeps it), so menu hover puts the stored live
 	range back, and Annotate files the pill off the live selection. */
-	test("sliding to Annotate keeps the highlight, menu, and pill", async ({ page }) => {
+	test("sliding to Annotate keeps the highlight, menu, and pill", async ({
+		page
+	}) => {
 		await selectWord(page);
 		const menu = page.locator(".sel-menu");
 		await expect(menu).toBeVisible();
@@ -216,10 +247,16 @@ test.describe("desktop", () => {
 		if (!btnBox) throw new Error("annotate button has no box");
 		// Stepped slide from the word to the button center, the way a
 		// real aimer travels (fires every over/out/leave on the path).
-		await page.mouse.move(btnBox.x + btnBox.width / 2, btnBox.y + btnBox.height / 2, {
-			steps: 15
-		});
-		const selected = await page.evaluate(() => window.getSelection()?.toString() ?? "");
+		await page.mouse.move(
+			btnBox.x + btnBox.width / 2,
+			btnBox.y + btnBox.height / 2,
+			{
+				steps: 15
+			}
+		);
+		const selected = await page.evaluate(
+			() => window.getSelection()?.toString() ?? ""
+		);
 		expect(selected).not.toBe("");
 		await expect(menu).toBeVisible({ timeout: 5_000 });
 		await waitForToastToFade(page);
@@ -232,7 +269,9 @@ test.describe("desktop", () => {
 	rebuild, stream chunk) collapses the selection onto the ATTACHED
 	container — empty, collapsed, contained. The menu must stand on
 	its stored quote anyway, and Annotate still files the pill. */
-	test("menu survives a real body swap under the highlight", async ({ page }) => {
+	test("menu survives a real body swap under the highlight", async ({
+		page
+	}) => {
 		await selectWord(page);
 		const menu = page.locator(".sel-menu");
 		await expect(menu).toBeVisible();
@@ -349,8 +388,12 @@ programmatic clears still dismiss (pinned by the tests around). */
 	test("right-click on empty space stays silent", async ({ page }) => {
 		await page.mouse.click(10, 300, { button: "right" });
 		await page.waitForTimeout(500);
-		await expect(page.locator("article.speaking, article.speaking-sel")).toHaveCount(0);
-		const selected = await page.evaluate(() => window.getSelection()?.toString() ?? "");
+		await expect(
+			page.locator("article.speaking, article.speaking-sel")
+		).toHaveCount(0);
+		const selected = await page.evaluate(
+			() => window.getSelection()?.toString() ?? ""
+		);
 		expect(selected).toBe("");
 	});
 
@@ -358,7 +401,9 @@ programmatic clears still dismiss (pinned by the tests around). */
 	pseudo-element outside the DOM, so native selection (which the
 	annotation quote reads) skips it — no annotation-side carve-out. */
 	test("list-item selection excludes the bullet marker", async ({ page }) => {
-		await seedChat(page, [{ role: "assistant", content: "- alpha item\n- beta item" }]);
+		await seedChat(page, [
+			{ role: "assistant", content: "- alpha item\n- beta item" }
+		]);
 		await page.goto("/");
 		const item = page.locator("article .rendered li").first();
 		await expect(item).toBeVisible({ timeout: 60_000 });
@@ -367,9 +412,13 @@ programmatic clears still dismiss (pinned by the tests around). */
 		// Start left of the text, over the marker gutter, drag mid-item.
 		await page.mouse.move(box.x - 12, box.y + box.height / 2);
 		await page.mouse.down();
-		await page.mouse.move(box.x + box.width * 0.5, box.y + box.height / 2, { steps: 5 });
+		await page.mouse.move(box.x + box.width * 0.5, box.y + box.height / 2, {
+			steps: 5
+		});
 		await page.mouse.up();
-		const selected = await page.evaluate(() => window.getSelection()?.toString() ?? "");
+		const selected = await page.evaluate(
+			() => window.getSelection()?.toString() ?? ""
+		);
 		expect(selected).toContain("alpha");
 		expect(selected).not.toContain("•");
 	});
@@ -381,8 +430,11 @@ programmatic clears still dismiss (pinned by the tests around). */
 	never the message dragged into. Integer coords throughout
 	(fractional ones birth dead drags in the harness); the start row
 	retries past line boundaries, which also birth dead drags. */
-	test("cross-message drag keeps the anchor message's quote", async ({ page }) => {
-		const M1 = "The quick brown fox jumps over the lazy dog near the riverbank.";
+	test("cross-message drag keeps the anchor message's quote", async ({
+		page
+	}) => {
+		const M1 =
+			"The quick brown fox jumps over the lazy dog near the riverbank.";
 		const M2 = "The five boxing wizards jump quickly past the quiet village.";
 		await seedChat(page, [
 			{ role: "assistant", content: M1 },
@@ -401,7 +453,9 @@ programmatic clears still dismiss (pinned by the tests around). */
 			await page.mouse.move(x, y);
 			await page.mouse.down();
 			await page.mouse.move(x, y + 14, { steps: 3 });
-			const len = await page.evaluate(() => window.getSelection()?.toString().length ?? 0);
+			const len = await page.evaluate(
+				() => window.getSelection()?.toString().length ?? 0
+			);
 			if (len > 0) {
 				start = { x, y };
 				break;
@@ -417,7 +471,9 @@ programmatic clears still dismiss (pinned by the tests around). */
 		const releaseY = Math.round(box2.y + box2.height / 2);
 		await page.mouse.move(start.x, releaseY, { steps: 12 });
 		await page.mouse.up();
-		const quote = await page.evaluate(() => window.getSelection()?.toString() ?? "");
+		const quote = await page.evaluate(
+			() => window.getSelection()?.toString() ?? ""
+		);
 		expect(quote).not.toBe("");
 		expect(quote).not.toContain("wizards");
 		const flat = (s: string): string => s.replace(/\s+/g, " ").trim();
@@ -435,23 +491,25 @@ programmatic clears still dismiss (pinned by the tests around). */
 });
 
 test.describe("ios", () => {
-		// iPhone 15 shape without defaultBrowserType (describe-level
-		// test.use cannot switch engines): Chromium with the iPhone UA,
-		// viewport, and touch. The dock/tap assertions are UA- and
-		// touch-driven, not engine-driven.
-		test.use({
-			userAgent:
-				"Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.6 Mobile/15E148 Safari/604.1",
-			viewport: { width: 393, height: 659 },
-			deviceScaleFactor: 3,
-			isMobile: true,
-			hasTouch: true
-		});
+	// iPhone 15 shape without defaultBrowserType (describe-level
+	// test.use cannot switch engines): Chromium with the iPhone UA,
+	// viewport, and touch. The dock/tap assertions are UA- and
+	// touch-driven, not engine-driven.
+	test.use({
+		userAgent:
+			"Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.6 Mobile/15E148 Safari/604.1",
+		viewport: { width: 393, height: 659 },
+		deviceScaleFactor: 3,
+		isMobile: true,
+		hasTouch: true
+	});
 
 	/** iOS selection dock: the Annotate control lives in the composer
 	tools while a highlight is up — no floating menu over the text (the
 	native callout owns that space), so nothing fights it or the thumb. */
-	test("ios docks Annotate in the composer, nothing floating", async ({ page }) => {
+	test("ios docks Annotate in the composer, nothing floating", async ({
+		page
+	}) => {
 		const filler =
 			"秋が近づくと空が高くなり紅葉が美しく色づきます温かいお茶を飲みながらゆっくりと読書をしたり散歩を楽しんだりするのにぴったりの季節です";
 		await seedChat(page, [
@@ -462,7 +520,9 @@ test.describe("ios", () => {
 			{ role: "assistant", content: filler }
 		]);
 		await page.goto("/");
-		await expect(page.locator("article .rendered").nth(2)).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator("article .rendered").nth(2)).toBeVisible({
+			timeout: 60_000
+		});
 		await expect
 			.poll(
 				async () =>
@@ -497,7 +557,10 @@ test.describe("ios", () => {
 			const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
 			let target: Text | null = null;
 			for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-				if (node instanceof Text && (node.textContent ?? "").trim().length >= 4) {
+				if (
+					node instanceof Text &&
+					(node.textContent ?? "").trim().length >= 4
+				) {
 					target = node;
 					break;
 				}
@@ -520,7 +583,9 @@ test.describe("ios", () => {
 		// reject. Coordinates still ride along for menu docking.
 		await page.evaluate(({ x, y }) => {
 			const el = document.querySelectorAll("article .rendered")[2];
-			el?.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: x, clientY: y }));
+			el?.dispatchEvent(
+				new MouseEvent("dblclick", { bubbles: true, clientX: x, clientY: y })
+			);
 		}, picked);
 		// No floating menu on iOS: the docked composer button stands in.
 		await expect(page.locator(".sel-menu")).toHaveCount(0);
@@ -544,9 +609,13 @@ test.describe("ios", () => {
 	tracks the native bubble, not the clock (collapsing the selection
 	still clears it at once). */
 	test("ios dock holds while the highlight lives", async ({ page }) => {
-		await seedChat(page, [{ role: "assistant", content: "漢字を読むテストです" }]);
+		await seedChat(page, [
+			{ role: "assistant", content: "漢字を読むテストです" }
+		]);
 		await page.goto("/");
-		await expect(page.locator("article .rendered").first()).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator("article .rendered").first()).toBeVisible({
+			timeout: 60_000
+		});
 		await page.locator("article .rendered").first().selectText();
 		await page.mouse.up();
 		const dock = page.locator(".prompt-tools .ann-dock");
@@ -562,9 +631,13 @@ test.describe("ios", () => {
 	that click via mousedown's preventDefault; iOS Safari fires it).
 	Phones edit through the composer, never a floating card. */
 	test("tapping a badge opens its note edit", async ({ page }) => {
-		await seedChat(page, [{ role: "assistant", content: "漢字を読むテストです" }]);
+		await seedChat(page, [
+			{ role: "assistant", content: "漢字を読むテストです" }
+		]);
 		await page.goto("/");
-		await expect(page.locator("article .rendered").first()).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator("article .rendered").first()).toBeVisible({
+			timeout: 60_000
+		});
 		// File an annotation through the composer's docked button.
 		await page.locator("article .rendered").first().selectText();
 		await page.mouse.up();
@@ -587,7 +660,13 @@ test.describe("ios", () => {
 			const r = el.getBoundingClientRect();
 			const x = r.x + r.width / 2;
 			const y = r.y + r.height / 2;
-			const at = { bubbles: true, cancelable: true, composed: true, clientX: x, clientY: y };
+			const at = {
+				bubbles: true,
+				cancelable: true,
+				composed: true,
+				clientX: x,
+				clientY: y
+			};
 			// No Touch objects: the Touch constructor is unavailable under
 			// iPhone emulation, and explicit empty touch lists throw there
 			// too — so the lists are omitted (defaulting empty). That

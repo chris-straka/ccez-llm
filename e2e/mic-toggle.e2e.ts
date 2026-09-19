@@ -6,7 +6,9 @@ test("mic toggle hides prompt mic button", async ({ page }) => {
 		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
 		window.localStorage.setItem(
 			"ccez-llm-chats-v1",
-			JSON.stringify([{ id: "e2e-chat", createdAt: 1, replyLang: null, messages: [] }])
+			JSON.stringify([
+				{ id: "e2e-chat", createdAt: 1, replyLang: null, messages: [] }
+			])
 		);
 	});
 	await page.goto("/");
@@ -17,7 +19,9 @@ test("mic toggle hides prompt mic button", async ({ page }) => {
 	test.skip(!hasRecognition, "no speech recognition in this browser");
 	await expect(page.locator(".prompt .mic-btn")).toBeVisible();
 	await page.evaluate(() => {
-		const raw = JSON.parse(window.localStorage.getItem("ccez-llm-settings-v1") || "{}");
+		const raw = JSON.parse(
+			window.localStorage.getItem("ccez-llm-settings-v1") || "{}"
+		);
 		window.localStorage.setItem(
 			"ccez-llm-settings-v1",
 			JSON.stringify({ ...raw, micEnabled: false })

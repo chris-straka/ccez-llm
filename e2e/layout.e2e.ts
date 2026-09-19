@@ -3,7 +3,9 @@ import { seedChat } from "./helpers";
 
 /** The chat pill spans the full row width flush with the + button
 (the row × overlays instead of reserving its slot). */
-test("active chat pill sits flush with the new-chat button", async ({ page }) => {
+test("active chat pill sits flush with the new-chat button", async ({
+	page
+}) => {
 	await seedChat(page, [{ role: "assistant", content: "hello" }]);
 	await page.goto("/");
 	await expect(page.locator("article .rendered").first()).toBeVisible();
@@ -11,7 +13,8 @@ test("active chat pill sits flush with the new-chat button", async ({ page }) =>
 	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
 	await page.waitForTimeout(600);
 	const edges = await page.evaluate(() => {
-		const rect = (s: string) => document.querySelector(s)?.getBoundingClientRect();
+		const rect = (s: string) =>
+			document.querySelector(s)?.getBoundingClientRect();
 		const pill = rect("aside ul button.side-chat");
 		const plus = rect("aside button.new");
 		if (!pill || !plus) throw new Error("no sidebar rows");
@@ -58,7 +61,9 @@ test("shift command plus and minus scale chat width", async ({ page }) => {
 
 /** Text size scales messages, never the composer input; annotation
 badges track it at a dampened rate (30%: 600% reads ≈2.5× badges). */
-test("text size scales messages and badges, not the composer", async ({ page }) => {
+test("text size scales messages and badges, not the composer", async ({
+	page
+}) => {
 	await seedChat(page, [{ role: "assistant", content: "hello" }]);
 	await page.goto("/");
 	await expect(page.locator("article .rendered").first()).toBeVisible();

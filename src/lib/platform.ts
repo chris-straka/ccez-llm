@@ -33,7 +33,9 @@ export function canWindowDrag(ua: string): boolean {
  * Primary input is touch (no hover to wait for). The query runner is
  * injected so tests can stub it: pass `(q) => window.matchMedia(q)`.
  */
-export function isCoarsePointer(query: (media: string) => { matches: boolean }): boolean {
+export function isCoarsePointer(
+	query: (media: string) => { matches: boolean }
+): boolean {
 	try {
 		return query("(pointer: coarse)").matches;
 	} catch {
@@ -78,7 +80,10 @@ export function isMacPlatform(platform: string, uaDataPlatform = ""): boolean {
  * `isMacPlatform`: Client Hints ("Windows") win, else `navigator.platform`
  * ("Win32"). Feeds the browser voice-install guidance in settings.
  */
-export function isWindowsPlatform(platform: string, uaDataPlatform = ""): boolean {
+export function isWindowsPlatform(
+	platform: string,
+	uaDataPlatform = ""
+): boolean {
 	const hint = uaDataPlatform.trim();
 	if (hint) return /win/i.test(hint);
 	return /win/i.test(platform);
@@ -141,9 +146,16 @@ export interface TouchTabletProbe {
  * report a fine primary pointer, so neither is pulled in. Pure so the
  * contract unit-tests without the hardware.
  */
-export function isTouchTablet(probe: TouchTabletProbe, minTabletDim = 600): boolean {
+export function isTouchTablet(
+	probe: TouchTabletProbe,
+	minTabletDim = 600
+): boolean {
 	if (isIPadDesktopMode(probe.ua, probe.maxTouchPoints)) return true;
-	return probe.coarse && probe.maxTouchPoints > 1 && probe.smallestScreenDim >= minTabletDim;
+	return (
+		probe.coarse &&
+		probe.maxTouchPoints > 1 &&
+		probe.smallestScreenDim >= minTabletDim
+	);
 }
 
 export type EdgePanel = "chats" | "settings";
@@ -168,7 +180,11 @@ export interface FingerTrack {
  * The caller re-baselines on nonzero so a held pinch keeps stepping.
  * Pure so the step unit-tests without touch hardware.
  */
-export function pinchZoomStep(baseline: number, current: number, stepPx = 48): 1 | -1 | 0 {
+export function pinchZoomStep(
+	baseline: number,
+	current: number,
+	stepPx = 48
+): 1 | -1 | 0 {
 	if (current - baseline >= stepPx) return 1;
 	if (baseline - current >= stepPx) return -1;
 	return 0;
@@ -274,8 +290,11 @@ export function visibleProviderIds<T extends string>(
 	all: T[],
 	caps: { android: boolean; online: boolean; local: boolean }
 ): T[] {
-	const listed = all.filter((id) => id !== "local-gemma" || (caps.android && caps.local));
-	if (caps.android && !caps.online) return listed.filter((id) => id === "local-gemma");
+	const listed = all.filter(
+		(id) => id !== "local-gemma" || (caps.android && caps.local)
+	);
+	if (caps.android && !caps.online)
+		return listed.filter((id) => id === "local-gemma");
 	return listed;
 }
 

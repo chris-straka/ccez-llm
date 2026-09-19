@@ -26,7 +26,9 @@ const KEYLAYOUT_LOCALES: Record<string, string> = {
 	korean: "ko-KR"
 };
 
-export function voiceLocaleForInputSource(inputSourceId: string): string | null {
+export function voiceLocaleForInputSource(
+	inputSourceId: string
+): string | null {
 	const id = inputSourceId.toLowerCase();
 	if (id.includes("scim")) return "zh-CN";
 	if (id.includes("tcim")) return "zh-TW";

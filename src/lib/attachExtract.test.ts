@@ -74,8 +74,7 @@ function docxWith(paragraphs: string): Uint8Array {
 	return zipSync({ "word/document.xml": enc.encode(xml) });
 }
 
-const para = (text: string) =>
-	`<w:p><w:r><w:t>${text}</w:t></w:r></w:p>`;
+const para = (text: string) => `<w:p><w:r><w:t>${text}</w:t></w:r></w:p>`;
 
 describe("extractDocxText", () => {
 	it("joins paragraphs with newlines and decodes entities", () => {
@@ -85,9 +84,9 @@ describe("extractDocxText", () => {
 
 	it("returns null for non-zip bytes", () => {
 		expect(extractDocxText(enc.encode("hello"))).toBe(null);
-		expect(
-			extractDocxText(zipSync({ "other.txt": enc.encode("hi") }))
-		).toBe(null);
+		expect(extractDocxText(zipSync({ "other.txt": enc.encode("hi") }))).toBe(
+			null
+		);
 	});
 });
 
@@ -95,7 +94,9 @@ describe("fileToAttachment with extracted formats", () => {
 	it("inlines PDF text as a text attachment", async () => {
 		const { fileToAttachment } = await import("./attachments");
 		const pdf = pdfWithStream("BT (Lesson vocabulary) Tj ET");
-		const file = new File([enc.encode(pdf)], "lesson.pdf", { type: "application/pdf" });
+		const file = new File([enc.encode(pdf)], "lesson.pdf", {
+			type: "application/pdf"
+		});
 		const attachment = await fileToAttachment(file);
 		expect(attachment.kind).toBe("text");
 		expect(attachment.text).toBe("Lesson vocabulary");
@@ -104,8 +105,12 @@ describe("fileToAttachment with extracted formats", () => {
 
 	it("rejects empty PDFs like any other unsupported file", async () => {
 		const { fileToAttachment } = await import("./attachments");
-		const file = new File([enc.encode("not a pdf")], "empty.pdf", { type: "application/pdf" });
-		await expect(fileToAttachment(file)).rejects.toThrow("Unsupported attachment");
+		const file = new File([enc.encode("not a pdf")], "empty.pdf", {
+			type: "application/pdf"
+		});
+		await expect(fileToAttachment(file)).rejects.toThrow(
+			"Unsupported attachment"
+		);
 	});
 });
 

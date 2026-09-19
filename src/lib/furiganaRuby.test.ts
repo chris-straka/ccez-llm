@@ -1,8 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { toHiragana } from "wanakana";
-import { rubyHtmlForTokens, rubyHtmlForText, type RubyToken } from "./furiganaRuby";
+import {
+	rubyHtmlForTokens,
+	rubyHtmlForText,
+	type RubyToken
+} from "./furiganaRuby";
 
-const ruby = (tokens: RubyToken[]): string => rubyHtmlForTokens(tokens, toHiragana);
+const ruby = (tokens: RubyToken[]): string =>
+	rubyHtmlForTokens(tokens, toHiragana);
 const aligned = (text: string, tokens: RubyToken[]): string =>
 	rubyHtmlForText(text, tokens, toHiragana);
 
@@ -23,7 +28,7 @@ describe("rubyHtmlForTokens", () => {
 				{ surface: "む", reading: "ム" }
 			])
 		).toBe(
-			'<span class="frb">漢字<span class="frt">かんじ</span></span>を<span class="frb">読<span class="frt">よ</span></span>む',
+			'<span class="frb">漢字<span class="frt">かんじ</span></span>を<span class="frb">読<span class="frt">よ</span></span>む'
 		);
 	});
 
@@ -39,7 +44,7 @@ describe("rubyHtmlForTokens", () => {
 				{ surface: "う", reading: "ウ" }
 			])
 		).toBe(
-			'<span class="frb">感<span class="frt">かん</span></span>じ<span class="frb">取<span class="frt">と</span></span>れたら<span class="frb">手<span class="frt">て</span></span>を<span class="frb">繋<span class="frt">つな</span></span>ごう',
+			'<span class="frb">感<span class="frt">かん</span></span>じ<span class="frb">取<span class="frt">と</span></span>れたら<span class="frb">手<span class="frt">て</span></span>を<span class="frb">繋<span class="frt">つな</span></span>ごう'
 		);
 	});
 
@@ -54,7 +59,7 @@ describe("rubyHtmlForTokens", () => {
 				{ surface: "ている", reading: "テイル" }
 			])
 		).toBe(
-			'<span class="frb">美<span class="frt">うつく</span></span>しい<span class="frb">花<span class="frt">はな</span></span>が<span class="frb">咲<span class="frt">さ</span></span>いている',
+			'<span class="frb">美<span class="frt">うつく</span></span>しい<span class="frb">花<span class="frt">はな</span></span>が<span class="frb">咲<span class="frt">さ</span></span>いている'
 		);
 	});
 
@@ -70,7 +75,7 @@ describe("rubyHtmlForTokens", () => {
 				{ surface: "いしました", reading: "イシマシタ" }
 			])
 		).toBe(
-			'<span class="frb">株式会社<span class="frt">かぶしきがいしゃ</span></span>の<span class="frb">田中<span class="frt">たなか</span></span>さんにお<span class="frb">会<span class="frt">あ</span></span>いしました',
+			'<span class="frb">株式会社<span class="frt">かぶしきがいしゃ</span></span>の<span class="frb">田中<span class="frt">たなか</span></span>さんにお<span class="frb">会<span class="frt">あ</span></span>いしました'
 		);
 	});
 
@@ -78,7 +83,7 @@ describe("rubyHtmlForTokens", () => {
 		// Lindera segments 感じ取れ as one token where kuromoji gave
 		// 感じ|取れ: the interior じ must still pin the split.
 		expect(ruby([{ surface: "感じ取れ", reading: "カンジトレ" }])).toBe(
-			'<span class="frb">感<span class="frt">かん</span></span>じ<span class="frb">取<span class="frt">と</span></span>れ',
+			'<span class="frb">感<span class="frt">かん</span></span>じ<span class="frb">取<span class="frt">と</span></span>れ'
 		);
 	});
 
@@ -88,7 +93,7 @@ describe("rubyHtmlForTokens", () => {
 
 	it("keeps 々 inside the kanji run", () => {
 		expect(ruby([{ surface: "様々", reading: "サマザマ" }])).toBe(
-			'<span class="frb">様々<span class="frt">さまざま</span></span>',
+			'<span class="frb">様々<span class="frt">さまざま</span></span>'
 		);
 	});
 
@@ -130,7 +135,9 @@ describe("rubyHtmlForText", () => {
 				{ surface: "漢字", reading: "カンジ" },
 				{ surface: "today", reading: "*" }
 			])
-		).toBe("Hello <span class=\"frb\">漢字<span class=\"frt\">かんじ</span></span> today");
+		).toBe(
+			'Hello <span class="frb">漢字<span class="frt">かんじ</span></span> today'
+		);
 	});
 
 	it("passes through gaps the tokenizer skipped", () => {
@@ -140,7 +147,9 @@ describe("rubyHtmlForText", () => {
 	});
 
 	it("renders tokens that match nowhere instead of dropping them", () => {
-		expect(aligned("漢字", [{ surface: "漢字", reading: "カンジ" }])).toContain("かんじ");
+		expect(aligned("漢字", [{ surface: "漢字", reading: "カンジ" }])).toContain(
+			"かんじ"
+		);
 		expect(
 			aligned("abc", [
 				{ surface: "abc", reading: "*" },
@@ -149,4 +158,3 @@ describe("rubyHtmlForText", () => {
 		).toBe("abczzz-normalized-away");
 	});
 });
-

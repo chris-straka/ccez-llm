@@ -19,7 +19,9 @@ function setup(overrides: Partial<PromptEditorOptions> = {}) {
 }
 
 function key(target: HTMLElement, init: KeyboardEventInit): void {
-	target.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, ...init }));
+	target.dispatchEvent(
+		new KeyboardEvent("keydown", { bubbles: true, ...init })
+	);
 }
 
 describe("createTextareaEditor", () => {
@@ -36,8 +38,7 @@ describe("createTextareaEditor", () => {
 		// no layout, so the write itself — not its value — is the
 		// assertion: on a real engine it sizes to content.
 		const css = (globalThis as Record<string, unknown>).CSS as
-			| { supports: (...args: string[]) => boolean }
-			| undefined;
+			{ supports: (...args: string[]) => boolean } | undefined;
 		const original = css?.supports;
 		try {
 			if (css) css.supports = () => false;
@@ -105,7 +106,11 @@ describe("createTextareaEditor", () => {
 		const { ta, options } = setup();
 		// jsdom KeyboardEvent supports isComposing via the init dict.
 		ta.dispatchEvent(
-			new KeyboardEvent("keydown", { bubbles: true, key: "Enter", isComposing: true })
+			new KeyboardEvent("keydown", {
+				bubbles: true,
+				key: "Enter",
+				isComposing: true
+			})
 		);
 		expect(options.onSubmit).not.toHaveBeenCalled();
 	});
@@ -156,7 +161,9 @@ describe("createTextareaEditor", () => {
 			value: { files: [], getData: () => long }
 		});
 		ta.dispatchEvent(event);
-		expect(options.onLongTextPasted).toHaveBeenCalledWith(long.replace(/\n+$/, ""));
+		expect(options.onLongTextPasted).toHaveBeenCalledWith(
+			long.replace(/\n+$/, "")
+		);
 		expect(ta.value).toBe("");
 	});
 
@@ -253,7 +260,10 @@ describe("atomic marker deletion", () => {
 	it("an editing engine takes the delete without the fallback", () => {
 		const { editor, ta } = setup();
 		const exec = vi.fn(() => true);
-		Object.defineProperty(document, "execCommand", { value: exec, configurable: true });
+		Object.defineProperty(document, "execCommand", {
+			value: exec,
+			configurable: true
+		});
 		try {
 			const spy = vi.spyOn(ta, "setRangeText");
 			editor.setText("see [Pasted image] now");
@@ -262,7 +272,10 @@ describe("atomic marker deletion", () => {
 			expect(spy).not.toHaveBeenCalled();
 			spy.mockRestore();
 		} finally {
-			Object.defineProperty(document, "execCommand", { value: undefined, configurable: true });
+			Object.defineProperty(document, "execCommand", {
+				value: undefined,
+				configurable: true
+			});
 		}
 	});
 
@@ -325,7 +338,10 @@ describe("image-tag copy/cut roundtrip", () => {
 		// New chat, plain-text clipboard (rich item lost): the stash
 		// rehydrates the picture instead of landing a dead tag.
 		ta.value = "";
-		const paste = new Event("paste", { bubbles: true, cancelable: true }) as ClipboardEvent & {
+		const paste = new Event("paste", {
+			bubbles: true,
+			cancelable: true
+		}) as ClipboardEvent & {
 			clipboardData: DataTransfer;
 		};
 		Object.defineProperty(paste, "clipboardData", {
@@ -334,7 +350,8 @@ describe("image-tag copy/cut roundtrip", () => {
 		ta.dispatchEvent(paste);
 		expect(paste.defaultPrevented).toBe(true);
 		await vi.waitFor(() => expect(options.onImagesPasted).toHaveBeenCalled());
-		const files = (options.onImagesPasted as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as File[];
+		const files = (options.onImagesPasted as ReturnType<typeof vi.fn>).mock
+			.calls[0]?.[0] as File[];
 		expect(files.length).toBe(1);
 		expect(ta.value).toBe("");
 	});
@@ -375,7 +392,10 @@ describe("image-tag copy/cut roundtrip", () => {
 		// Middle-cut precision survives the textarea (the input event
 		// carries no change ranges): the host drops index 0, not newest.
 		await vi.waitFor(() =>
-			expect(options.onDocChange).toHaveBeenCalledWith("", { image: [0], file: [] })
+			expect(options.onDocChange).toHaveBeenCalledWith("", {
+				image: [0],
+				file: []
+			})
 		);
 	});
 });

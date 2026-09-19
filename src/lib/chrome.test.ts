@@ -85,7 +85,9 @@ describe("idle slider mapping", () => {
 describe("draggedSliderPastTop", () => {
 	it("needs a full upward travel past the threshold", () => {
 		expect(draggedSliderPastTop(200, 200 - SLIDER_DRAG_RESET_PX)).toBe(true);
-		expect(draggedSliderPastTop(200, 200 - SLIDER_DRAG_RESET_PX + 1)).toBe(false);
+		expect(draggedSliderPastTop(200, 200 - SLIDER_DRAG_RESET_PX + 1)).toBe(
+			false
+		);
 	});
 
 	it("ignores downward and sideways travel", () => {

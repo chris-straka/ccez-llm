@@ -13,13 +13,17 @@ test.beforeEach(async ({ page }) => {
 		const synth = window.speechSynthesis;
 		if (synth) {
 			synth.speak = ((utterance: SpeechSynthesisUtterance) => {
-				(window as unknown as { __spoken: string[] }).__spoken.push(utterance.text);
+				(window as unknown as { __spoken: string[] }).__spoken.push(
+					utterance.text
+				);
 			}) as typeof synth.speak;
 		}
 	});
 	await seedChat(page, [{ role: "assistant", content: "你好世界" }]);
 	await page.goto("/");
-	await expect(page.locator("article.assistant .rendered p").first()).toBeVisible({
+	await expect(
+		page.locator("article.assistant .rendered p").first()
+	).toBeVisible({
 		timeout: 60_000
 	});
 });
@@ -43,12 +47,19 @@ async function selectFirstTwo(page: Page): Promise<string> {
 }
 
 async function clickOnText(page: Page): Promise<void> {
-	const box = await page.locator("article.assistant .rendered p").first().boundingBox();
+	const box = await page
+		.locator("article.assistant .rendered p")
+		.first()
+		.boundingBox();
 	if (!box) throw new Error("missing para box");
-	await page.mouse.click(box.x + 8, box.y + box.height / 2, { button: "right" });
+	await page.mouse.click(box.x + 8, box.y + box.height / 2, {
+		button: "right"
+	});
 }
 
-test("right-clicking a hanzi highlight shows its pinyin only", async ({ page }) => {
+test("right-clicking a hanzi highlight shows its pinyin only", async ({
+	page
+}) => {
 	const selected = await selectFirstTwo(page);
 	expect(selected).toBe("你好");
 	await clickOnText(page);
@@ -58,13 +69,17 @@ test("right-clicking a hanzi highlight shows its pinyin only", async ({ page }) 
 	await expect(panel).toContainText("nǐ");
 	await expect(panel).not.toContainText("你好");
 	// Speech always runs too: the panel is a silent extra.
-	await expect.poll(() => spoken(page), { timeout: 10_000 }).toContain(selected);
+	await expect
+		.poll(() => spoken(page), { timeout: 10_000 })
+		.toContain(selected);
 	// Escape dismisses the panel.
 	await page.keyboard.press("Escape");
 	await expect(panel).toHaveCount(0);
 });
 
-test("clicking off dismisses the panel with the highlight live", async ({ page }) => {
+test("clicking off dismisses the panel with the highlight live", async ({
+	page
+}) => {
 	await selectFirstTwo(page);
 	await clickOnText(page);
 	const panel = page.locator(".sel-pinyin");
@@ -76,11 +91,17 @@ test("clicking off dismisses the panel with the highlight live", async ({ page }
 		const selection = window.getSelection();
 		if (!selection || selection.rangeCount === 0) return null;
 		const rect = selection.getRangeAt(0).getBoundingClientRect();
-		return { cx: rect.left + rect.width / 2, top: rect.top, bottom: rect.bottom };
+		return {
+			cx: rect.left + rect.width / 2,
+			top: rect.top,
+			bottom: rect.bottom
+		};
 	});
 	expect(box).not.toBeNull();
 	expect(sel).not.toBeNull();
-	expect(Math.abs((box?.x ?? -999) + (box?.width ?? 0) / 2 - (sel?.cx ?? -999))).toBeLessThan(10);
+	expect(
+		Math.abs((box?.x ?? -999) + (box?.width ?? 0) / 2 - (sel?.cx ?? -999))
+	).toBeLessThan(10);
 	const above = await panel.evaluate((el) => el.classList.contains("above"));
 	const gap = above
 		? (sel?.top ?? -999) - ((box?.y ?? -999) + (box?.height ?? 0))
@@ -92,10 +113,14 @@ test("clicking off dismisses the panel with the highlight live", async ({ page }
 });
 
 test("scrolling carries the panel with the highlight", async ({ page }) => {
-	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(60);
+	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(
+		60
+	);
 	await seedChat(page, [{ role: "assistant", content: `你好世界\n\n${long}` }]);
 	await page.goto("/");
-	await expect(page.locator("article.assistant .rendered p").first()).toBeVisible({
+	await expect(
+		page.locator("article.assistant .rendered p").first()
+	).toBeVisible({
 		timeout: 60_000
 	});
 	await selectFirstTwo(page);
@@ -131,14 +156,19 @@ test("a highlight ending mid-sentence keeps one voice", async ({ page }) => {
 		const synth = window.speechSynthesis;
 		if (synth) {
 			synth.speak = ((utterance: SpeechSynthesisUtterance) => {
-				const langs = ((window as unknown as { __langs?: string[] }).__langs ??= []);
+				const langs = ((window as unknown as { __langs?: string[] }).__langs ??=
+					[]);
 				langs.push(`${utterance.lang}::${utterance.text}`);
 			}) as typeof synth.speak;
 		}
 	});
-	await seedChat(page, [{ role: "assistant", content: "昨日は雨が降ります。自然が多かったです。" }]);
+	await seedChat(page, [
+		{ role: "assistant", content: "昨日は雨が降ります。自然が多かったです。" }
+	]);
 	await page.goto("/");
-	await expect(page.locator("article.assistant .rendered p").first()).toBeVisible({
+	await expect(
+		page.locator("article.assistant .rendered p").first()
+	).toBeVisible({
 		timeout: 60_000
 	});
 	const selected = await page.evaluate(() => {
@@ -173,20 +203,24 @@ test("a highlight ending mid-sentence keeps one voice", async ({ page }) => {
 		.toEqual(["ja-JP::ます。", "ja-JP::自然"]);
 });
 
-test("right-clicking hanzi with no highlight still speaks", async ({ page }) => {
+test("right-clicking hanzi with no highlight still speaks", async ({
+	page
+}) => {
 	await clickOnText(page);
-	await expect
-		.poll(() => spoken(page), { timeout: 10_000 })
-		.not.toEqual([]);
+	await expect.poll(() => spoken(page), { timeout: 10_000 }).not.toEqual([]);
 	await expect(page.locator(".sel-pinyin")).toHaveCount(0);
 });
 
-test("right-clicking kanji in japanese shows furigana and speaks", async ({ page }) => {
+test("right-clicking kanji in japanese shows furigana and speaks", async ({
+	page
+}) => {
 	// Like Inspect, a lone Han char reads its locale from the
 	// surrounding sentence: kana nearby means Japanese.
 	await seedChat(page, [{ role: "assistant", content: "漢字を読む" }]);
 	await page.goto("/");
-	await expect(page.locator("article.assistant .rendered p").first()).toBeVisible({
+	await expect(
+		page.locator("article.assistant .rendered p").first()
+	).toBeVisible({
 		timeout: 60_000
 	});
 	const selected = await page.evaluate(() => {

@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { OFFLINE_FALLBACK_ID, needsNetwork, offlineTarget, onlineRestore } from "./offline";
+import {
+	OFFLINE_FALLBACK_ID,
+	needsNetwork,
+	offlineTarget,
+	onlineRestore
+} from "./offline";
 
 describe("offline fallback", () => {
 	it("parks cloud providers on Gemma, leaves local and mock alone", () => {

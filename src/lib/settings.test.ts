@@ -81,7 +81,10 @@ describe("settings", () => {
 			getItem: (k: string) => data.get(k) ?? null,
 			setItem: (k: string, v: string) => void data.set(k, v)
 		};
-		store.setItem("ccez-studio-settings-v1", JSON.stringify({ ...blankSettings(), fontScale: 1.5 }));
+		store.setItem(
+			"ccez-studio-settings-v1",
+			JSON.stringify({ ...blankSettings(), fontScale: 1.5 })
+		);
 		expect(loadSettings(store).fontScale).toBe(1.5);
 	});
 
@@ -103,7 +106,10 @@ describe("settings", () => {
 		s.bgOpacity = 0.5;
 		s.composerOpacity = 0.5;
 		saveSettings(s as never, memoryStore);
-		const loaded = loadSettings(memoryStore) as unknown as Record<string, unknown>;
+		const loaded = loadSettings(memoryStore) as unknown as Record<
+			string,
+			unknown
+		>;
 		expect("bgOpacity" in loaded).toBe(false);
 		expect("composerOpacity" in loaded).toBe(false);
 		expect("bgOpacity" in defaultSettings()).toBe(false);
@@ -264,7 +270,10 @@ describe("settings", () => {
 		(low as unknown as Record<string, unknown>)["thinkingLevel"] = "low";
 		delete (low as unknown as Record<string, unknown>)["thinking"];
 		saveSettings(low, memoryStore);
-		expect(loadSettings(memoryStore).thinking).toEqual({ muse: "low", deepseek: "high" });
+		expect(loadSettings(memoryStore).thinking).toEqual({
+			muse: "low",
+			deepseek: "high"
+		});
 	});
 
 	it("composes thinking hint and reply language into the prompt", () => {
@@ -282,10 +291,17 @@ describe("settings", () => {
 				keyHint: ""
 			}
 		];
-		s.providers["x"] = { baseUrl: "https://x.test", apiKey: "", model: "xm", models: [] };
+		s.providers["x"] = {
+			baseUrl: "https://x.test",
+			apiKey: "",
+			model: "xm",
+			models: []
+		};
 		s.activeProviderId = asProviderId("x");
 		s.thinking = { x: "high" };
-		expect(effectiveSystemPrompt(s)).toBe("Be brief. Think carefully before answering.");
+		expect(effectiveSystemPrompt(s)).toBe(
+			"Be brief. Think carefully before answering."
+		);
 		s.thinking = { x: "medium" };
 		expect(effectiveSystemPrompt(s)).toBe("Be brief.");
 		s.thinking = { x: "low" };
@@ -294,7 +310,9 @@ describe("settings", () => {
 			"Be brief. Answer directly with minimal deliberation. Reply in French."
 		);
 		s.replyLang = "nope";
-		expect(effectiveSystemPrompt(s)).toBe("Be brief. Answer directly with minimal deliberation.");
+		expect(effectiveSystemPrompt(s)).toBe(
+			"Be brief. Answer directly with minimal deliberation."
+		);
 	});
 
 	it("defaults to Muse with an empty system prompt", () => {
@@ -308,7 +326,9 @@ describe("settings", () => {
 		s.systemPrompt = "Be brief.";
 		expect(effectiveSystemPrompt(s)).toBe("Be brief.");
 		expect(effectiveSystemPrompt(s, null, false)).toBe("Be brief.");
-		expect(effectiveSystemPrompt(s, null, true)).toBe(`Be brief. ${LOOKUP_CAPABILITY_HINT}`);
+		expect(effectiveSystemPrompt(s, null, true)).toBe(
+			`Be brief. ${LOOKUP_CAPABILITY_HINT}`
+		);
 	});
 
 	it("drops the retired global reading-aids key", () => {

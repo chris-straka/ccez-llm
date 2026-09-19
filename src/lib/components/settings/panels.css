@@ -7,7 +7,7 @@
  * specificity; the cascade order is unchanged. Imported by each
  * sub-panel (Vite dedupes the shared file).
  */
-	/* The header is the close target and the window drag strip:
+/* The header is the close target and the window drag strip:
 	chrome, not content — no text selection for the native drag
 	region to fight over. Negative margins stretch it over the
 	aside's own padding so the strip reaches the panel's top edge,
@@ -15,504 +15,510 @@
 	the header) rather than margin (clicks would fall through to
 	the aside and drag nothing). Values mirror .settings-panel
 	padding in +page.svelte. */
-	.settings-inner .panel-head {
-		display: flex;
-		align-items: center;
-		gap: 1rem;
-		margin: -1.2rem -0.7rem 0;
-		padding: 1.2rem 0.7rem 0.5rem;
-		/* Default arrow like the main chat top bar: the whole strip
+.settings-inner .panel-head {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+	margin: -1.2rem -0.7rem 0;
+	padding: 1.2rem 0.7rem 0.5rem;
+	/* Default arrow like the main chat top bar: the whole strip
 		closes on click, so no pointer finger. Buttons keep their own. */
-		cursor: default;
-		user-select: none;
-		-webkit-user-select: none;
-	}
-	.settings-inner .panel-head h1 {
-		font-size: 1.15rem;
-		font-weight: 700;
-		margin: 0;
-	}
-	/* Active-chat tally right of the heading: quiet and copyable, and
+	cursor: default;
+	user-select: none;
+	-webkit-user-select: none;
+}
+.settings-inner .panel-head h1 {
+	font-size: 1.15rem;
+	font-weight: 700;
+	margin: 0;
+}
+/* Active-chat tally right of the heading: quiet and copyable, and
 	clicking it must not close the panel like the rest of the strip. */
-	.settings-inner .head-tokens {
-		margin-left: auto;
-		font-size: 0.75rem;
-		color: #6e6e73;
-		white-space: nowrap;
-		user-select: text;
-		-webkit-user-select: text;
-		cursor: text;
-	}
-	/* Dark theme, gated on the resolved scheme (<html data-theme>)
+.settings-inner .head-tokens {
+	margin-left: auto;
+	font-size: 0.75rem;
+	color: #6e6e73;
+	white-space: nowrap;
+	user-select: text;
+	-webkit-user-select: text;
+	cursor: text;
+}
+/* Dark theme, gated on the resolved scheme (<html data-theme>)
 	instead of the OS query, so the settings switch can pin it. */
-	html[data-theme="dark"] .settings-inner .head-tokens {
-		color: #98989f;
-	}
-	.settings-inner .panel-head:focus-visible {
-		outline: 2px solid #1c1c1e;
-		outline-offset: 2px;
-		border-radius: 4px;
-	}
-	/* Owner-drawn box: native unchecked boxes render a muddy grey
+html[data-theme="dark"] .settings-inner .head-tokens {
+	color: #98989f;
+}
+.settings-inner .panel-head:focus-visible {
+	outline: 2px solid #1c1c1e;
+	outline-offset: 2px;
+	border-radius: 4px;
+}
+/* Owner-drawn box: native unchecked boxes render a muddy grey
 	fill in some phone WebViews (and follow the OS scheme instead of
 	the app theme), so the box is transparent with a token border in
 	both themes and fills with the focus token when checked. */
+.settings-inner input[type="checkbox"] {
+	appearance: none;
+	-webkit-appearance: none;
+	width: 1.2rem;
+	height: 1.2rem;
+	flex: none;
+	margin: 0;
+	cursor: pointer;
+	background: transparent;
+	border: 1.5px solid var(--line-hover);
+	border-radius: 5px;
+	display: inline-grid;
+	place-content: center;
+	transition: box-shadow 0.15s ease;
+}
+.settings-inner input[type="checkbox"]::before {
+	content: "";
+	width: 0.65rem;
+	height: 0.65rem;
+	transform: scale(0);
+	clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+	background: var(--invert-ink);
+}
+.settings-inner input[type="checkbox"]:checked {
+	background: var(--focus);
+	border-color: var(--focus);
+}
+.settings-inner input[type="checkbox"]:checked::before {
+	transform: scale(1);
+}
+@media (prefers-contrast: more) {
 	.settings-inner input[type="checkbox"] {
-		appearance: none;
-		-webkit-appearance: none;
-		width: 1.2rem;
-		height: 1.2rem;
-		flex: none;
-		margin: 0;
-		cursor: pointer;
-		background: transparent;
-		border: 1.5px solid var(--line-hover);
-		border-radius: 5px;
-		display: inline-grid;
-		place-content: center;
-		transition: box-shadow 0.15s ease;
+		border-width: 2.5px;
 	}
-	.settings-inner input[type="checkbox"]::before {
-		content: "";
-		width: 0.65rem;
-		height: 0.65rem;
-		transform: scale(0);
-		clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
-		background: var(--invert-ink);
-	}
-	.settings-inner input[type="checkbox"]:checked {
-		background: var(--focus);
-		border-color: var(--focus);
-	}
-	.settings-inner input[type="checkbox"]:checked::before {
-		transform: scale(1);
-	}
-	@media (prefers-contrast: more) {
-		.settings-inner input[type="checkbox"] {
-			border-width: 2.5px;
-		}
-	}
-	.settings-inner input[type="checkbox"]:hover {
-		box-shadow: 0 0 0 3px rgba(142, 142, 147, 0.45);
-	}
-	.settings-inner .font-row {
-		display: flex;
-		align-items: center;
-		gap: 0.7rem;
-		margin-top: 0.55rem;
-	}
-	.settings-inner .font-row input[type="range"] {
-		flex: 1;
-		min-width: 0;
-		margin-top: 0;
-		padding: 0;
-		accent-color: #007aff;
-		accent-color: var(--accent);
-		cursor: pointer;
-	}
-	/* One track color, not two: the native fill (accent left, gray
+}
+.settings-inner input[type="checkbox"]:hover {
+	box-shadow: 0 0 0 3px rgba(142, 142, 147, 0.45);
+}
+.settings-inner .font-row {
+	display: flex;
+	align-items: center;
+	gap: 0.7rem;
+	margin-top: 0.55rem;
+}
+.settings-inner .font-row input[type="range"] {
+	flex: 1;
+	min-width: 0;
+	margin-top: 0;
+	padding: 0;
+	accent-color: #007aff;
+	accent-color: var(--accent);
+	cursor: pointer;
+}
+/* One track color, not two: the native fill (accent left, gray
 	right) reads as a broken half-toggle in light theme, so the
 	track renders uniform and the thumb keeps the accent. */
-	.settings-inner .font-row input[type="range"]::-webkit-slider-runnable-track {
-		background: #c7c7cc;
-		border-radius: 999px;
-	}
-	.settings-inner .font-row input[type="range"]::-moz-range-track {
-		background: #c7c7cc;
-		border-radius: 999px;
-	}
-	.settings-inner .font-row input[type="range"]::-moz-range-progress {
-		background: #c7c7cc;
-		border-radius: 999px;
-	}
-	.settings-inner .font-row output {
-		font-size: 0.83rem;
-		min-width: 3rem;
-		text-align: right;
-		font-variant-numeric: tabular-nums;
-	}
-	.settings-inner section {
-		border-top: 1px solid #e5e5ea;
-		padding: 1.1rem 0;
-	}
-	/* Touch gestures and Updates form a 2x2 grid: headings share the
+.settings-inner .font-row input[type="range"]::-webkit-slider-runnable-track {
+	background: #c7c7cc;
+	border-radius: 999px;
+}
+.settings-inner .font-row input[type="range"]::-moz-range-track {
+	background: #c7c7cc;
+	border-radius: 999px;
+}
+.settings-inner .font-row input[type="range"]::-moz-range-progress {
+	background: #c7c7cc;
+	border-radius: 999px;
+}
+.settings-inner .font-row output {
+	font-size: 0.83rem;
+	min-width: 3rem;
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+.settings-inner section {
+	border-top: 1px solid #e5e5ea;
+	padding: 1.1rem 0;
+}
+/* Touch gestures and Updates form a 2x2 grid: headings share the
 	top row, buttons share the row beneath. Sections go display:contents
 	so their children place directly on the grid. */
-	.settings-inner .keys-updates {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 0.6rem 1.5rem;
-		align-items: center;
-		border-top: 1px solid #e5e5ea;
-		padding: 1.1rem 0;
-	}
-	.settings-inner .keys-updates > section {
-		display: contents;
-	}
-	.settings-inner .keys-updates > section:first-of-type > h2 {
-		grid-area: 1 / 1;
-		justify-self: center;
-	}
-	.settings-inner .keys-updates > section:first-of-type > button {
-		grid-area: 2 / 1;
-		justify-self: center;
-		/* Short label now: never wrap onto a second line. */
-		white-space: nowrap;
-	}
-	/* Scoped to the updates section (not :last-of-type): on web
+.settings-inner .keys-updates {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 0.6rem 1.5rem;
+	align-items: center;
+	border-top: 1px solid #e5e5ea;
+	padding: 1.1rem 0;
+}
+.settings-inner .keys-updates > section {
+	display: contents;
+}
+.settings-inner .keys-updates > section:first-of-type > h2 {
+	grid-area: 1 / 1;
+	justify-self: center;
+}
+.settings-inner .keys-updates > section:first-of-type > button {
+	grid-area: 2 / 1;
+	justify-self: center;
+	/* Short label now: never wrap onto a second line. */
+	white-space: nowrap;
+}
+/* Scoped to the updates section (not :last-of-type): on web
 	builds the section stays out and the keys block must not slide
 	into column 2 by matching :last-of-type itself. */
-	.settings-inner .keys-updates > section[aria-labelledby="updates-heading"] > h2 {
-		grid-area: 1 / 2;
-		justify-self: center;
-	}
-	.settings-inner .keys-updates > section[aria-labelledby="updates-heading"] > button {
-		grid-area: 2 / 2;
-		justify-self: center;
-	}
-	.settings-inner .keys-updates h2 {
-		margin: 0;
-	}
-	.settings-inner h2 {
-		font-size: 1rem;
-		font-weight: 650;
-		margin: 0 0 0.9rem;
-	}
-	.settings-inner label,
-	.settings-inner .field,
-	.settings-inner .voice-pick {
-		display: block;
-		font-size: 0.87rem;
-		font-weight: 550;
-		margin-bottom: 0.9rem;
-	}
-	/* The picker hangs below the install note with room to breathe, then
+.settings-inner
+	.keys-updates
+	> section[aria-labelledby="updates-heading"]
+	> h2 {
+	grid-area: 1 / 2;
+	justify-self: center;
+}
+.settings-inner
+	.keys-updates
+	> section[aria-labelledby="updates-heading"]
+	> button {
+	grid-area: 2 / 2;
+	justify-self: center;
+}
+.settings-inner .keys-updates h2 {
+	margin: 0;
+}
+.settings-inner h2 {
+	font-size: 1rem;
+	font-weight: 650;
+	margin: 0 0 0.9rem;
+}
+.settings-inner label,
+.settings-inner .field,
+.settings-inner .voice-pick {
+	display: block;
+	font-size: 0.87rem;
+	font-weight: 550;
+	margin-bottom: 0.9rem;
+}
+/* The picker hangs below the install note with room to breathe, then
 	hands off tightly to Voice language (the fieldset adds its own 0.9rem). */
-	.settings-inner .voice-pick {
-		margin-top: 0.9rem;
-		margin-bottom: 0.4rem;
-	}
-	.settings-inner .voice-pick-label {
-		display: block;
-		margin-bottom: 0.35rem;
-	}
-	/* Refresh rides on the picker row (beside the select, never a
+.settings-inner .voice-pick {
+	margin-top: 0.9rem;
+	margin-bottom: 0.4rem;
+}
+.settings-inner .voice-pick-label {
+	display: block;
+	margin-bottom: 0.35rem;
+}
+/* Refresh rides on the picker row (beside the select, never a
 	paragraph of its own): a borderless ghost icon, so neither theme
 	can clash with it. Fixed square, never stretched. */
-	.settings-inner .voice-pick-row {
-		display: flex;
-		gap: 0.2rem;
-		align-items: center;
-	}
-	.settings-inner .voice-pick-row select {
-		flex: 1 1 auto;
-		min-width: 0;
-		width: auto;
-		margin-top: 0;
-	}
-	.settings-inner .voice-refresh {
-		flex: none;
-		align-self: center;
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		width: 1.9rem;
-		height: 1.9rem;
-		padding: 0;
-		border: 0;
-		border-radius: 8px;
-		background: none;
-		color: #6e6e73;
-		cursor: pointer;
-		transition: color 0.15s ease;
-	}
-	.settings-inner .voice-refresh:hover:not(:disabled) {
-		color: #1c1c1e;
-	}
-	.settings-inner .voice-refresh:disabled {
-		cursor: default;
-		opacity: 0.55;
-	}
-	.voice-refresh > svg {
-		height: 1rem;
-		width: 1rem;
-	}
-	html[data-theme="dark"] .settings-inner .voice-refresh {
-		color: #98989f;
-	}
-	html[data-theme="dark"] .settings-inner .voice-refresh:hover:not(:disabled) {
-		color: #f2f2f7;
-	}
-	/* Native select chrome (Aqua in the shell) sizes itself, so the
+.settings-inner .voice-pick-row {
+	display: flex;
+	gap: 0.2rem;
+	align-items: center;
+}
+.settings-inner .voice-pick-row select {
+	flex: 1 1 auto;
+	min-width: 0;
+	width: auto;
+	margin-top: 0;
+}
+.settings-inner .voice-refresh {
+	flex: none;
+	align-self: center;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.9rem;
+	height: 1.9rem;
+	padding: 0;
+	border: 0;
+	border-radius: 8px;
+	background: none;
+	color: #6e6e73;
+	cursor: pointer;
+	transition: color 0.15s ease;
+}
+.settings-inner .voice-refresh:hover:not(:disabled) {
+	color: #1c1c1e;
+}
+.settings-inner .voice-refresh:disabled {
+	cursor: default;
+	opacity: 0.55;
+}
+.voice-refresh > svg {
+	height: 1rem;
+	width: 1rem;
+}
+html[data-theme="dark"] .settings-inner .voice-refresh {
+	color: #98989f;
+}
+html[data-theme="dark"] .settings-inner .voice-refresh:hover:not(:disabled) {
+	color: #f2f2f7;
+}
+/* Native select chrome (Aqua in the shell) sizes itself, so the
 	picker would never match the text field: draw it as a twin with a
 	chevron in the project's line-icon style instead. */
-	.settings-inner .voice-pick select {
-		appearance: none;
-		-webkit-appearance: none;
-		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236e6e73' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-		background-repeat: no-repeat;
-		background-position: right 0.7rem center;
-		padding-right: 2rem;
-		cursor: pointer;
-	}
-	.settings-inner details.note summary {
-		cursor: pointer;
-	}
-	.settings-inner details.note {
-		margin-top: 0.55rem;
-	}
-	/* Element-qualified: the `.note` margin shorthand below ties at
+.settings-inner .voice-pick select {
+	appearance: none;
+	-webkit-appearance: none;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236e6e73' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+	background-repeat: no-repeat;
+	background-position: right 0.7rem center;
+	padding-right: 2rem;
+	cursor: pointer;
+}
+.settings-inner details.note summary {
+	cursor: pointer;
+}
+.settings-inner details.note {
+	margin-top: 0.55rem;
+}
+/* Element-qualified: the `.note` margin shorthand below ties at
 	   class specificity but comes later, so a bare class loses and the
 	   gap collapses to zero. */
-	.settings-inner details.note.provider-add {
-		margin-bottom: 1rem;
-	}
-	.settings-inner .provider-add form {
-		margin-top: 0.75rem;
-	}
-	.settings-inner .provider-add form button {
-		margin-top: 0.5rem;
-	}
-	.settings-inner input[type="url"],
-	.settings-inner input[type="text"],
-	.settings-inner input[type="password"],
-	.settings-inner select,
-	.settings-inner textarea {
-		display: block;
-		width: 100%;
-		box-sizing: border-box;
-		margin-top: 0.3rem;
-		padding: 0.5rem 0.6rem;
-		font: inherit;
-		font-weight: 400;
-		border: 1px solid #c7c7cc;
-		border-radius: 8px;
-		background: #fff;
-		color: inherit;
-		transition:
-			border-color 0.15s ease,
-			background-color 0.15s ease;
-	}
-	.settings-inner input[type="url"]:hover,
-	.settings-inner input[type="text"]:hover,
-	.settings-inner input[type="password"]:hover,
-	.settings-inner select:hover,
-	.settings-inner textarea:hover {
-		border-color: #8e8e93;
-	}
-	/* iOS zooms into text fields under 16px on focus: floor phone
+.settings-inner details.note.provider-add {
+	margin-bottom: 1rem;
+}
+.settings-inner .provider-add form {
+	margin-top: 0.75rem;
+}
+.settings-inner .provider-add form button {
+	margin-top: 0.5rem;
+}
+.settings-inner input[type="url"],
+.settings-inner input[type="text"],
+.settings-inner input[type="password"],
+.settings-inner select,
+.settings-inner textarea {
+	display: block;
+	width: 100%;
+	box-sizing: border-box;
+	margin-top: 0.3rem;
+	padding: 0.5rem 0.6rem;
+	font: inherit;
+	font-weight: 400;
+	border: 1px solid #c7c7cc;
+	border-radius: 8px;
+	background: #fff;
+	color: inherit;
+	transition:
+		border-color 0.15s ease,
+		background-color 0.15s ease;
+}
+.settings-inner input[type="url"]:hover,
+.settings-inner input[type="text"]:hover,
+.settings-inner input[type="password"]:hover,
+.settings-inner select:hover,
+.settings-inner textarea:hover {
+	border-color: #8e8e93;
+}
+/* iOS zooms into text fields under 16px on focus: floor phone
 	fields at 16px so tapping one never re-scales the sheet. The
 	ancestor gate keeps every desktop size exactly as-is. */
-	.app[data-android] .settings-inner input[type="url"],
-	.app[data-android] .settings-inner input[type="text"],
-	.app[data-android] .settings-inner input[type="password"],
-	.app[data-android] .settings-inner textarea {
-		font-size: max(16px, 1em);
-	}
-	.settings-inner input[type="url"]:focus,
-	.settings-inner input[type="text"]:focus,
-	.settings-inner input[type="password"]:focus,
-	.settings-inner select:focus,
-	.settings-inner textarea:focus {
-		border-color: #1c1c1e;
-		outline: none;
-	}
-	.settings-inner .hint {
-		font-weight: 400;
-		color: #6e6e73;
-		overflow-wrap: anywhere;
-	}
-	.settings-inner .build-stamp {
-		margin: 1rem 0 0;
-		font-size: 0.75rem;
-		color: #6e6e73;
-		text-align: center;
-	}
-	.settings-inner .model-row {
-		display: flex;
-		gap: 0.5rem;
-		margin-top: 0.3rem;
-	}
-	.settings-inner .model-row input {
-		margin-top: 0;
-		flex: 1;
-		min-width: 0;
-	}
-	.settings-inner .model-row button {
-		flex-shrink: 0;
-		/* Fixed floor: "…" must not reflow the row while refreshing. */
-		min-width: 4.6rem;
-		text-align: center;
-		font-size: 0.81rem;
-		border: 1px solid #c7c7cc;
-		border-radius: 8px;
-		background: #fff;
-		cursor: pointer;
-		padding: 0.2rem 0.7rem;
-		color: inherit;
-		transition:
-			border-color 0.15s ease,
-			background-color 0.15s ease,
-			color 0.15s ease,
-			opacity 0.15s ease;
-	}
-	.settings-inner .model-row button:not(:disabled):hover {
-		border-color: #1c1c1e;
-	}
-	.settings-inner .model-row button:disabled {
-		opacity: 0.5;
-		cursor: default;
-	}
-	.settings-inner .note {
-		font-size: 0.84rem;
-		color: #6e6e73;
-		margin: 0.2rem 0 0;
-		/* Long error strings must wrap, never shove the panel sideways. */
-		overflow-wrap: anywhere;
-	}
-	.settings-inner .provider-add label,
-	.settings-inner .provider-add input {
-		color: #1c1c1e;
-		color: var(--ink);
-	}
-	.settings-inner .note button {
-		font: inherit;
-		color: inherit;
-		text-decoration: underline;
-		text-underline-offset: 2px;
-		background: none;
-		border: 0;
-		cursor: pointer;
-		padding: 0;
-		transition: color 0.15s ease;
-	}
-	.settings-inner .note button:hover {
-		color: #1c1c1e;
-	}
-	/* Empty-inventory note: breathing room below before the next
+.app[data-android] .settings-inner input[type="url"],
+.app[data-android] .settings-inner input[type="text"],
+.app[data-android] .settings-inner input[type="password"],
+.app[data-android] .settings-inner textarea {
+	font-size: max(16px, 1em);
+}
+.settings-inner input[type="url"]:focus,
+.settings-inner input[type="text"]:focus,
+.settings-inner input[type="password"]:focus,
+.settings-inner select:focus,
+.settings-inner textarea:focus {
+	border-color: #1c1c1e;
+	outline: none;
+}
+.settings-inner .hint {
+	font-weight: 400;
+	color: #6e6e73;
+	overflow-wrap: anywhere;
+}
+.settings-inner .build-stamp {
+	margin: 1rem 0 0;
+	font-size: 0.75rem;
+	color: #6e6e73;
+	text-align: center;
+}
+.settings-inner .model-row {
+	display: flex;
+	gap: 0.5rem;
+	margin-top: 0.3rem;
+}
+.settings-inner .model-row input {
+	margin-top: 0;
+	flex: 1;
+	min-width: 0;
+}
+.settings-inner .model-row button {
+	flex-shrink: 0;
+	/* Fixed floor: "…" must not reflow the row while refreshing. */
+	min-width: 4.6rem;
+	text-align: center;
+	font-size: 0.81rem;
+	border: 1px solid #c7c7cc;
+	border-radius: 8px;
+	background: #fff;
+	cursor: pointer;
+	padding: 0.2rem 0.7rem;
+	color: inherit;
+	transition:
+		border-color 0.15s ease,
+		background-color 0.15s ease,
+		color 0.15s ease,
+		opacity 0.15s ease;
+}
+.settings-inner .model-row button:not(:disabled):hover {
+	border-color: #1c1c1e;
+}
+.settings-inner .model-row button:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+.settings-inner .note {
+	font-size: 0.84rem;
+	color: #6e6e73;
+	margin: 0.2rem 0 0;
+	/* Long error strings must wrap, never shove the panel sideways. */
+	overflow-wrap: anywhere;
+}
+.settings-inner .provider-add label,
+.settings-inner .provider-add input {
+	color: #1c1c1e;
+	color: var(--ink);
+}
+.settings-inner .note button {
+	font: inherit;
+	color: inherit;
+	text-decoration: underline;
+	text-underline-offset: 2px;
+	background: none;
+	border: 0;
+	cursor: pointer;
+	padding: 0;
+	transition: color 0.15s ease;
+}
+.settings-inner .note button:hover {
+	color: #1c1c1e;
+}
+/* Empty-inventory note: breathing room below before the next
 	control, and a quiet inline re-check action in the same voice. */
-	.settings-inner .voice-note {
-		margin-bottom: 0.9rem;
-	}
-	.settings-inner .key-state {
-		font-size: 0.87rem;
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		flex-wrap: wrap;
-	}
-	.settings-inner .key-state code {
-		font-family: ui-monospace, monospace;
-	}
-	.settings-inner .key-state button {
-		font-size: 0.81rem;
-		border: 1px solid #c7c7cc;
-		border-radius: 6px;
-		background: #fff;
-		cursor: pointer;
-		padding: 0.2rem 0.6rem;
-		color: inherit;
-		transition:
-			border-color 0.15s ease,
-			background-color 0.15s ease,
-			color 0.15s ease;
-	}
-	.settings-inner .key-state button:hover {
-		border-color: #1c1c1e;
-	}
-	.settings-inner .provider-row,
-	.settings-inner .segmented {
-		display: flex;
-		gap: 0.5rem;
-		flex-wrap: wrap;
-		margin-bottom: 1rem;
-	}
-	/* Thinking pills sit centered; the theme row keeps a tighter
+.settings-inner .voice-note {
+	margin-bottom: 0.9rem;
+}
+.settings-inner .key-state {
+	font-size: 0.87rem;
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+}
+.settings-inner .key-state code {
+	font-family: ui-monospace, monospace;
+}
+.settings-inner .key-state button {
+	font-size: 0.81rem;
+	border: 1px solid #c7c7cc;
+	border-radius: 6px;
+	background: #fff;
+	cursor: pointer;
+	padding: 0.2rem 0.6rem;
+	color: inherit;
+	transition:
+		border-color 0.15s ease,
+		background-color 0.15s ease,
+		color 0.15s ease;
+}
+.settings-inner .key-state button:hover {
+	border-color: #1c1c1e;
+}
+.settings-inner .provider-row,
+.settings-inner .segmented {
+	display: flex;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+	margin-bottom: 1rem;
+}
+/* Thinking pills sit centered; the theme row keeps a tighter
 	footprint now that its heading carries the label. */
-	.settings-inner .segmented.thinking {
-		justify-content: center;
-	}
-	.settings-inner .theme {
-		margin-bottom: 0.3rem;
-	}
-	.settings-inner .theme .segmented {
-		margin-bottom: 0.5rem;
-	}
-	.settings-inner .provider-row button,
-	.settings-inner .segmented button {
-		padding: 0.3rem 0.65rem;
-		font: inherit;
-		font-size: 0.81rem;
-		white-space: nowrap;
-		border: 1px solid #c7c7cc;
-		border-radius: 999px;
-		background: #fff;
-		cursor: pointer;
-		color: inherit;
-		transition:
-			border-color 0.15s ease,
-			background-color 0.15s ease,
-			color 0.15s ease,
-			opacity 0.15s ease;
-	}
-	.settings-inner .provider-row button.selected,
-	.settings-inner .segmented button.selected {
-		border-color: #007aff;
-		border-color: var(--accent);
-		background: #e5f0ff;
-		color: #1c1c1e;
-		font-weight: 600;
-	}
-	.settings-inner .provider-row button:not(.selected):not(:disabled):hover,
-	.settings-inner .segmented button:not(.selected):not(:disabled):hover {
-		border-color: #1c1c1e;
-	}
-	.settings-inner .segmented button:disabled {
-		background: #f3f3f4;
-		border-color: #e5e5ea;
-		color: #aeaeb2;
-		cursor: not-allowed;
-		opacity: 1;
-	}
-	.settings-inner fieldset {
-		border: 0;
-		padding: 0;
-		margin: 0 0 0.9rem;
-	}
-	/* The voice engine block carries the tallest stack (segmented + note
+.settings-inner .segmented.thinking {
+	justify-content: center;
+}
+.settings-inner .theme {
+	margin-bottom: 0.3rem;
+}
+.settings-inner .theme .segmented {
+	margin-bottom: 0.5rem;
+}
+.settings-inner .provider-row button,
+.settings-inner .segmented button {
+	padding: 0.3rem 0.65rem;
+	font: inherit;
+	font-size: 0.81rem;
+	white-space: nowrap;
+	border: 1px solid #c7c7cc;
+	border-radius: 999px;
+	background: #fff;
+	cursor: pointer;
+	color: inherit;
+	transition:
+		border-color 0.15s ease,
+		background-color 0.15s ease,
+		color 0.15s ease,
+		opacity 0.15s ease;
+}
+.settings-inner .provider-row button.selected,
+.settings-inner .segmented button.selected {
+	border-color: #007aff;
+	border-color: var(--accent);
+	background: #e5f0ff;
+	color: #1c1c1e;
+	font-weight: 600;
+}
+.settings-inner .provider-row button:not(.selected):not(:disabled):hover,
+.settings-inner .segmented button:not(.selected):not(:disabled):hover {
+	border-color: #1c1c1e;
+}
+.settings-inner .segmented button:disabled {
+	background: #f3f3f4;
+	border-color: #e5e5ea;
+	color: #aeaeb2;
+	cursor: not-allowed;
+	opacity: 1;
+}
+.settings-inner fieldset {
+	border: 0;
+	padding: 0;
+	margin: 0 0 0.9rem;
+}
+/* The voice engine block carries the tallest stack (segmented + note
 	+ picker): a breath more room before Voice language. */
-	.settings-inner .voice-engine {
-		margin-bottom: 1.2rem;
-	}
-	/* Hover toggles share one legend row instead of repeating the label. */
-	.settings-inner .hover-row {
-		display: flex;
-		gap: 1.2rem;
-		margin-bottom: 0.55rem;
-	}
-	.settings-inner .hover-row legend {
-		margin-bottom: 0.6rem;
-	}
-	.settings-inner legend {
-		font-size: 0.87rem;
-		font-weight: 550;
-		padding: 0;
-		margin-bottom: 0.4rem;
-	}
-	.settings-inner .check {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		font-weight: 400;
-		cursor: pointer;
-	}
-	/* Stacked checkboxes share one vertical rhythm whether they sit
+.settings-inner .voice-engine {
+	margin-bottom: 1.2rem;
+}
+/* Hover toggles share one legend row instead of repeating the label. */
+.settings-inner .hover-row {
+	display: flex;
+	gap: 1.2rem;
+	margin-bottom: 0.55rem;
+}
+.settings-inner .hover-row legend {
+	margin-bottom: 0.6rem;
+}
+.settings-inner legend {
+	font-size: 0.87rem;
+	font-weight: 550;
+	padding: 0;
+	margin-bottom: 0.4rem;
+}
+.settings-inner .check {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	font-weight: 400;
+	cursor: pointer;
+}
+/* Stacked checkboxes share one vertical rhythm whether they sit
 	in a fieldset or straight in the section: the box-to-text gap
 	above stays 0.5rem everywhere. */
-	.settings-inner .check + .check {
-		margin-top: 0.55rem;
-	}
-	/* The hover toggles share one row (the legend names the behavior
+.settings-inner .check + .check {
+	margin-top: 0.55rem;
+}
+/* The hover toggles share one row (the legend names the behavior
 	once); the stacked rhythm above stays out of the row. The
 	fieldset carries no bottom margin itself, and neither do the
 	row's labels (the generic label margin would stretch the row,
@@ -523,147 +529,162 @@
 	rendered rhythm: stacked checks collapse the generic 0.9rem
 	label margin with their 0.55rem top margin to 0.9rem, so the
 	row hands off the same. */
-	.settings-inner fieldset.hover-row {
-		display: flex;
-		gap: 1.25rem;
-		align-items: center;
-		margin-bottom: 0;
-	}
-	.settings-inner fieldset.hover-row .check {
-		margin-bottom: 0;
-	}
-	.settings-inner fieldset.hover-row + .check {
-		margin-top: 0.9rem;
-	}
-	.settings-inner fieldset.hover-row .check + .check {
-		margin-top: 0;
-	}
-	.settings-inner .reset-width {
-		background: none;
-		border: none;
-		padding: 0;
-		font: inherit;
-		cursor: pointer;
-		color: inherit;
-	}
+.settings-inner fieldset.hover-row {
+	display: flex;
+	gap: 1.25rem;
+	align-items: center;
+	margin-bottom: 0;
+}
+.settings-inner fieldset.hover-row .check {
+	margin-bottom: 0;
+}
+.settings-inner fieldset.hover-row + .check {
+	margin-top: 0.9rem;
+}
+.settings-inner fieldset.hover-row .check + .check {
+	margin-top: 0;
+}
+.settings-inner .reset-width {
+	background: none;
+	border: none;
+	padding: 0;
+	font: inherit;
+	cursor: pointer;
+	color: inherit;
+}
 
-	.settings-inner section > button {
-		padding: 0.45rem 1rem;
-		font: inherit;
-		font-size: 0.87rem;
-		border: 1px solid #c7c7cc;
-		border-radius: 8px;
-		background: #fff;
-		cursor: pointer;
-		color: inherit;
-		transition:
-			border-color 0.15s ease,
-			background-color 0.15s ease,
-			color 0.15s ease,
-			opacity 0.15s ease;
-	}
-	.settings-inner section > button:not(:disabled):hover {
-		border-color: #1c1c1e;
-	}
-	.settings-inner section > button:disabled {
-		opacity: 0.5;
-		cursor: default;
-	}
-	.settings-inner .result {
-		font-size: 0.87rem;
-		padding: 0.6rem 0.8rem;
-		border-radius: 8px;
-		background: #e6f4ea;
-		background: var(--ok-wash);
-		overflow-wrap: anywhere;
-	}
-	/* Dark theme, gated on the resolved scheme (<html data-theme>)
+.settings-inner section > button {
+	padding: 0.45rem 1rem;
+	font: inherit;
+	font-size: 0.87rem;
+	border: 1px solid #c7c7cc;
+	border-radius: 8px;
+	background: #fff;
+	cursor: pointer;
+	color: inherit;
+	transition:
+		border-color 0.15s ease,
+		background-color 0.15s ease,
+		color 0.15s ease,
+		opacity 0.15s ease;
+}
+.settings-inner section > button:not(:disabled):hover {
+	border-color: #1c1c1e;
+}
+.settings-inner section > button:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+.settings-inner .result {
+	font-size: 0.87rem;
+	padding: 0.6rem 0.8rem;
+	border-radius: 8px;
+	background: #e6f4ea;
+	background: var(--ok-wash);
+	overflow-wrap: anywhere;
+}
+/* Dark theme, gated on the resolved scheme (<html data-theme>)
 	instead of the OS query, so the settings switch can pin it. */
-	html[data-theme="dark"] .settings-inner .panel-head:focus-visible {
-		outline-color: #aeaeb2;
-	}
-	html[data-theme="dark"] .settings-inner section {
-		border-color: #38383a;
-	}
-	html[data-theme="dark"] .settings-inner input[type="url"],
-	html[data-theme="dark"] .settings-inner input[type="text"],
-	html[data-theme="dark"] .settings-inner input[type="password"],
-	html[data-theme="dark"] .settings-inner select,
-	html[data-theme="dark"] .settings-inner textarea,
-	html[data-theme="dark"] .settings-inner .provider-row button,
-	html[data-theme="dark"] .settings-inner .segmented button,
-	html[data-theme="dark"] .settings-inner .key-state button,
-	html[data-theme="dark"] .settings-inner section > button {
-		background: #1c1c1e;
-		border-color: #48484a;
-		color: #f2f2f7;
-	}
-	html[data-theme="dark"] .settings-inner .provider-row button:not(.selected):not(:disabled):hover,
-	html[data-theme="dark"] .settings-inner .segmented button:not(.selected):not(:disabled):hover,
-	html[data-theme="dark"] .settings-inner .key-state button:hover,
-	html[data-theme="dark"] .settings-inner section > button:not(:disabled):hover,
-	html[data-theme="dark"] .settings-inner .note button:hover {
-		border-color: #aeaeb2;
-		color: #f2f2f7;
-	}
-	html[data-theme="dark"] .settings-inner input[type="url"]:hover,
-	html[data-theme="dark"] .settings-inner input[type="text"]:hover,
-	html[data-theme="dark"] .settings-inner input[type="password"]:hover,
-	html[data-theme="dark"] .settings-inner select:hover,
-	html[data-theme="dark"] .settings-inner textarea:hover {
-		border-color: #636366;
-	}
-	html[data-theme="dark"] .settings-inner .voice-pick select {
-		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23aeaeb2' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-		/* The dark field `background` shorthand above resets repeat and
+html[data-theme="dark"] .settings-inner .panel-head:focus-visible {
+	outline-color: #aeaeb2;
+}
+html[data-theme="dark"] .settings-inner section {
+	border-color: #38383a;
+}
+html[data-theme="dark"] .settings-inner input[type="url"],
+html[data-theme="dark"] .settings-inner input[type="text"],
+html[data-theme="dark"] .settings-inner input[type="password"],
+html[data-theme="dark"] .settings-inner select,
+html[data-theme="dark"] .settings-inner textarea,
+html[data-theme="dark"] .settings-inner .provider-row button,
+html[data-theme="dark"] .settings-inner .segmented button,
+html[data-theme="dark"] .settings-inner .key-state button,
+html[data-theme="dark"] .settings-inner section > button {
+	background: #1c1c1e;
+	border-color: #48484a;
+	color: #f2f2f7;
+}
+html[data-theme="dark"]
+	.settings-inner
+	.provider-row
+	button:not(.selected):not(:disabled):hover,
+html[data-theme="dark"]
+	.settings-inner
+	.segmented
+	button:not(.selected):not(:disabled):hover,
+html[data-theme="dark"] .settings-inner .key-state button:hover,
+html[data-theme="dark"] .settings-inner section > button:not(:disabled):hover,
+html[data-theme="dark"] .settings-inner .note button:hover {
+	border-color: #aeaeb2;
+	color: #f2f2f7;
+}
+html[data-theme="dark"] .settings-inner input[type="url"]:hover,
+html[data-theme="dark"] .settings-inner input[type="text"]:hover,
+html[data-theme="dark"] .settings-inner input[type="password"]:hover,
+html[data-theme="dark"] .settings-inner select:hover,
+html[data-theme="dark"] .settings-inner textarea:hover {
+	border-color: #636366;
+}
+html[data-theme="dark"] .settings-inner .voice-pick select {
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23aeaeb2' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+	/* The dark field `background` shorthand above resets repeat and
 		position: re-assert or the 10px chevron tiles into zigzag. */
-		background-repeat: no-repeat;
-		background-position: right 0.7rem center;
-	}
-	html[data-theme="dark"] .settings-inner input[type="url"]:focus,
-	html[data-theme="dark"] .settings-inner input[type="text"]:focus,
-	html[data-theme="dark"] .settings-inner input[type="password"]:focus,
-	html[data-theme="dark"] .settings-inner select:focus,
-	html[data-theme="dark"] .settings-inner textarea:focus {
-		border-color: #aeaeb2;
-	}
-	html[data-theme="dark"] .settings-inner .font-row input[type="range"] {
-		accent-color: #f2f2f7;
-	}
-	html[data-theme="dark"] .settings-inner .font-row input[type="range"]::-webkit-slider-runnable-track {
-		background: #48484a;
-		border-radius: 999px;
-	}
-	html[data-theme="dark"] .settings-inner .font-row input[type="range"]::-moz-range-track {
-		background: #48484a;
-		border-radius: 999px;
-	}
-	html[data-theme="dark"] .settings-inner .font-row input[type="range"]::-moz-range-progress {
-		background: #48484a;
-		border-radius: 999px;
-	}
-	html[data-theme="dark"] .settings-inner .model-row button {
-		background: #1c1c1e;
-		border-color: #48484a;
-		color: #f2f2f7;
-	}
-	html[data-theme="dark"] .settings-inner .model-row button:not(:disabled):hover {
-		border-color: #aeaeb2;
-	}
-	html[data-theme="dark"] .settings-inner .provider-row button.selected,
-	html[data-theme="dark"] .settings-inner .segmented button.selected {
-		background: #f2f2f7;
-		border-color: #f2f2f7;
-		color: #1c1c1e;
-	}
-	html[data-theme="dark"] .settings-inner .segmented button:disabled {
-		background: #2c2c2e;
-		border-color: #38383a;
-		color: #636366;
-	}
-	html[data-theme="dark"] .settings-inner .hint,
-	html[data-theme="dark"] .settings-inner .note,
-	html[data-theme="dark"] .settings-inner .build-stamp {
-		color: #98989f;
-	}
-	/* .result rides --ok-wash now: no dark override needed. */
+	background-repeat: no-repeat;
+	background-position: right 0.7rem center;
+}
+html[data-theme="dark"] .settings-inner input[type="url"]:focus,
+html[data-theme="dark"] .settings-inner input[type="text"]:focus,
+html[data-theme="dark"] .settings-inner input[type="password"]:focus,
+html[data-theme="dark"] .settings-inner select:focus,
+html[data-theme="dark"] .settings-inner textarea:focus {
+	border-color: #aeaeb2;
+}
+html[data-theme="dark"] .settings-inner .font-row input[type="range"] {
+	accent-color: #f2f2f7;
+}
+html[data-theme="dark"]
+	.settings-inner
+	.font-row
+	input[type="range"]::-webkit-slider-runnable-track {
+	background: #48484a;
+	border-radius: 999px;
+}
+html[data-theme="dark"]
+	.settings-inner
+	.font-row
+	input[type="range"]::-moz-range-track {
+	background: #48484a;
+	border-radius: 999px;
+}
+html[data-theme="dark"]
+	.settings-inner
+	.font-row
+	input[type="range"]::-moz-range-progress {
+	background: #48484a;
+	border-radius: 999px;
+}
+html[data-theme="dark"] .settings-inner .model-row button {
+	background: #1c1c1e;
+	border-color: #48484a;
+	color: #f2f2f7;
+}
+html[data-theme="dark"] .settings-inner .model-row button:not(:disabled):hover {
+	border-color: #aeaeb2;
+}
+html[data-theme="dark"] .settings-inner .provider-row button.selected,
+html[data-theme="dark"] .settings-inner .segmented button.selected {
+	background: #f2f2f7;
+	border-color: #f2f2f7;
+	color: #1c1c1e;
+}
+html[data-theme="dark"] .settings-inner .segmented button:disabled {
+	background: #2c2c2e;
+	border-color: #38383a;
+	color: #636366;
+}
+html[data-theme="dark"] .settings-inner .hint,
+html[data-theme="dark"] .settings-inner .note,
+html[data-theme="dark"] .settings-inner .build-stamp {
+	color: #98989f;
+}
+/* .result rides --ok-wash now: no dark override needed. */

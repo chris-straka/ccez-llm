@@ -43,11 +43,21 @@ describe("hover-only message actions", () => {
 
 	it("holds the touch row while aids load or audio runs", () => {
 		const source = pageSource();
-		const timer = source.match(/function armActionsTimer\(id: ChatMsgId\): void \{([\s\S]*?)\n\t\}/);
-		expect(timer, "armActionsTimer is gone or reshaped — move the busy hold with it").toBeTruthy();
+		const timer = source.match(
+			/function armActionsTimer\(id: ChatMsgId\): void \{([\s\S]*?)\n\t\}/
+		);
+		expect(
+			timer,
+			"armActionsTimer is gone or reshaped — move the busy hold with it"
+		).toBeTruthy();
 		const body = timer![1]!;
 		// Every in-flight state that owns the row must re-arm, never close.
-		for (const state of ["aidBusy.has(id)", "vocalizing.has(id)", "speakingId === id", "speakingSelection === id"]) {
+		for (const state of [
+			"aidBusy.has(id)",
+			"vocalizing.has(id)",
+			"speakingId === id",
+			"speakingSelection === id"
+		]) {
 			expect(body).toContain(state);
 		}
 		expect(body).toContain("armActionsTimer(id)");
@@ -55,13 +65,20 @@ describe("hover-only message actions", () => {
 
 	it("stops speech from the composer button without flipping the setting", () => {
 		const source = pageSource();
-		const toggle = source.match(/function toggleVoice\(\): void \{([\s\S]*?)\n\t\}/);
-		expect(toggle, "toggleVoice is gone or reshaped — keep the global stop in it").toBeTruthy();
+		const toggle = source.match(
+			/function toggleVoice\(\): void \{([\s\S]*?)\n\t\}/
+		);
+		expect(
+			toggle,
+			"toggleVoice is gone or reshaped — keep the global stop in it"
+		).toBeTruthy();
 		const body = toggle![1]!;
 		expect(body).toContain("speakingId !== null");
 		expect(body).toContain("stopVoice()");
 		// The stop path returns before the setting toggle.
-		expect(body.indexOf("stopVoice()")).toBeLessThan(body.indexOf("setVoiceEnabled"));
+		expect(body.indexOf("stopVoice()")).toBeLessThan(
+			body.indexOf("setVoiceEnabled")
+		);
 	});
 
 	it("keeps will-change on the hover-hidden rows", () => {
@@ -79,7 +96,9 @@ describe("hover-only message actions", () => {
 
 	it("confirms message copy with a bare Copied toast", () => {
 		const source = pageSource();
-		expect(source).toContain('redactedCopyText(plainBody(content, role, sourcesWanted)), "Copied"');
+		expect(source).toContain(
+			'redactedCopyText(plainBody(content, role, sourcesWanted)),\n\t\t\t"Copied"'
+		);
 		expect(source).not.toContain("Copied as plain text");
 	});
 
@@ -94,7 +113,10 @@ describe("hover-only message actions", () => {
 		const glyph = css.match(
 			/main\.scale-actions \.actions \.icon-btn[^{]*\{([^}]*)\}/
 		);
-		expect(glyph, "scale-actions glyph rule is gone — move it with the text rule").toBeTruthy();
+		expect(
+			glyph,
+			"scale-actions glyph rule is gone — move it with the text rule"
+		).toBeTruthy();
 		expect(glyph![1]).toMatch(
 			/height\s*:\s*calc\(1\.05rem \* \(1 \+ \(min\(var\(--font-scale/
 		);
@@ -106,7 +128,9 @@ describe("hover-only message actions", () => {
 		// cap: at 85% of the message size they scale WITH the text,
 		// never past it.
 		const css = pageStyle();
-		const glyph = css.match(/main\.scale-actions \.actions \.icon-btn[^{]*\{([^}]*)\}/);
+		const glyph = css.match(
+			/main\.scale-actions \.actions \.icon-btn[^{]*\{([^}]*)\}/
+		);
 		expect(glyph, "scale-actions glyph rule is gone").toBeTruthy();
 		expect(glyph![1]).toMatch(/min\(var\(--font-scale/);
 	});
@@ -132,7 +156,10 @@ function transitionBody(): string {
 	const fn = pageSource().match(
 		/function transitionToChat\(id: Parameters<typeof selectChat>\[1\]\): void \{([\s\S]*?)switchChatWithTransition\(mutate/
 	);
-	expect(fn, "transitionToChat is gone or reshaped — keep the preview clear and voice stop in it").toBeTruthy();
+	expect(
+		fn,
+		"transitionToChat is gone or reshaped — keep the preview clear and voice stop in it"
+	).toBeTruthy();
 	return fn![1]!;
 }
 
@@ -159,22 +186,34 @@ describe("message spacing and overscroll", () => {
 		// Non-opt-in rules only: the scale-actions twin matches the
 		// same tail selector and must not trip the fixed assertion.
 		const gaps = [...css.matchAll(/([^{}]*)\.messages\s*\{([^}]*)\}/g)]
-			.filter((rule) => /gap\s*:/.test(rule[2] ?? "") && !(rule[1] ?? "").includes("scale-actions"))
+			.filter(
+				(rule) =>
+					/gap\s*:/.test(rule[2] ?? "") &&
+					!(rule[1] ?? "").includes("scale-actions")
+			)
 			.map((rule) => rule[2]);
 		expect(gaps, "no .messages gap rule").not.toHaveLength(0);
 		for (const gap of gaps) expect(gap).not.toMatch(/var\(--font-scale/);
 		const scaled = css.match(/main\.scale-actions \.messages\s*\{([^}]*)\}/);
-		expect(scaled, "opt-in scaled gap is gone — huge type domes the air").toBeTruthy();
+		expect(
+			scaled,
+			"opt-in scaled gap is gone — huge type domes the air"
+		).toBeTruthy();
 		expect(scaled![1]).toMatch(/gap\s*:\s*calc\([^;]*var\(--font-scale/);
 	});
 
 	it("fixes the between-pair separation unless button scaling opts in", () => {
 		const css = pageStyle();
 		const margins = [...css.matchAll(/([^{}]*?)article\.user\s*\{([^}]*)\}/g)]
-			.filter((rule) => /margin-top\s*:/.test(rule[2] ?? "") && !(rule[1] ?? "").includes("scale-actions"))
+			.filter(
+				(rule) =>
+					/margin-top\s*:/.test(rule[2] ?? "") &&
+					!(rule[1] ?? "").includes("scale-actions")
+			)
 			.map((rule) => rule[2]);
 		expect(margins, "no article.user margin-top rule").not.toHaveLength(0);
-		for (const margin of margins) expect(margin).not.toMatch(/var\(--font-scale/);
+		for (const margin of margins)
+			expect(margin).not.toMatch(/var\(--font-scale/);
 		const scaled = css.match(/main\.scale-actions article\.user\s*\{([^}]*)\}/);
 		expect(scaled, "opt-in scaled separation is gone").toBeTruthy();
 		expect(scaled![1]).toMatch(/margin-top\s*:\s*calc\([^;]*var\(--font-scale/);
@@ -182,10 +221,17 @@ describe("message spacing and overscroll", () => {
 
 	it("reserves tail overscroll outside the empty hero's zone", () => {
 		const css = pageStyle();
-		const spacer = css.match(/main:not\(\.empty\) \.messages::after\s*\{([^}]*)\}/);
-		expect(spacer, "overscroll spacer is gone — the tail docks hard again").toBeTruthy();
+		const spacer = css.match(
+			/main:not\(\.empty\) \.messages::after\s*\{([^}]*)\}/
+		);
+		expect(
+			spacer,
+			"overscroll spacer is gone — the tail docks hard again"
+		).toBeTruthy();
 		expect(spacer![1]).not.toMatch(/var\(--font-scale/);
-		const scaled = css.match(/main\.scale-actions:not\(\.empty\) \.messages::after\s*\{([^}]*)\}/);
+		const scaled = css.match(
+			/main\.scale-actions:not\(\.empty\) \.messages::after\s*\{([^}]*)\}/
+		);
 		expect(scaled, "opt-in scaled spacer is gone").toBeTruthy();
 		expect(scaled![1]).toMatch(/height\s*:\s*calc\([^;]*var\(--font-scale/);
 	});
@@ -195,11 +241,15 @@ describe("message spacing and overscroll", () => {
 		// Both row rules (desktop nowrap + touch): tooltips below the
 		// row must not make it scrollable up and down — clip the axis
 		// (never scrolls) while the paint margin lets them show.
-		const desktop = css.match(/\.app:not\(\[data-android\]\) \.actions\s*\{([^}]*)\}/);
+		const desktop = css.match(
+			/\.app:not\(\[data-android\]\) \.actions\s*\{([^}]*)\}/
+		);
 		expect(desktop, "desktop actions rule is gone").toBeTruthy();
 		expect(desktop![1]).toMatch(/overflow-y\s*:\s*clip/);
 		expect(desktop![1]).toMatch(/overflow-clip-margin/);
-		expect(css).toMatch(/@media \(hover: none\)\s*\{[^}]*\.actions\s*\{[^}]*overflow-y\s*:\s*clip/);
+		expect(css).toMatch(
+			/@media \(hover: none\)\s*\{[^}]*\.actions\s*\{[^}]*overflow-y\s*:\s*clip/
+		);
 	});
 });
 
@@ -235,7 +285,10 @@ describe("aid-button text size", () => {
 			if (at === -1) throw new Error(`aid handler gone: ${handler}`);
 			const open = source.lastIndexOf("<button", at);
 			if (open === -1) throw new Error(`no button tag for ${handler}`);
-			expect(source.slice(open, at), `${handler} button lost aid-btn`).toContain("aid-btn");
+			expect(
+				source.slice(open, at),
+				`${handler} button lost aid-btn`
+			).toContain("aid-btn");
 		}
 	});
 });

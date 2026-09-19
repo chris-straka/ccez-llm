@@ -11,14 +11,21 @@ import { seedChat } from "./helpers";
  */
 
 /** Seed a chat, then merge the Inspect toggle into stored settings. */
-async function seedWithInspect(page: Page, enabled: boolean, content: string): Promise<void> {
+async function seedWithInspect(
+	page: Page,
+	enabled: boolean,
+	content: string
+): Promise<void> {
 	await seedChat(page, [{ role: "assistant", content }]);
 	await page.addInitScript((on: boolean) => {
 		try {
 			const raw = window.localStorage.getItem("ccez-llm-settings-v1");
 			const parsed = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
 			parsed["inspectEnabled"] = on;
-			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify(parsed));
+			window.localStorage.setItem(
+				"ccez-llm-settings-v1",
+				JSON.stringify(parsed)
+			);
 		} catch {
 			// Seed-order failure surfaces as a missing toggle below.
 		}
@@ -66,7 +73,12 @@ async function selectChar(page: Page, ch: string): Promise<void> {
 		sel?.addRange(range);
 		const rect = range.getBoundingClientRect();
 		el.dispatchEvent(
-			new MouseEvent("mouseup", { bubbles: true, button: 0, clientX: rect.left, clientY: rect.top })
+			new MouseEvent("mouseup", {
+				bubbles: true,
+				button: 0,
+				clientX: rect.left,
+				clientY: rect.top
+			})
 		);
 	}, ch);
 	await expect(page.locator(".sel-menu")).toBeVisible();
@@ -81,7 +93,9 @@ test("no Inspect button anywhere when the setting is off", async ({ page }) => {
 	await expect(menu.locator('button:has-text("Inspect")')).toHaveCount(0);
 });
 
-test("single Han character gains an Inspect button next to Annotate", async ({ page }) => {
+test("single Han character gains an Inspect button next to Annotate", async ({
+	page
+}) => {
 	await seedWithInspect(page, true, "語");
 	await selectWord(page);
 	const menu = page.locator(".sel-menu");
@@ -148,16 +162,17 @@ test("Inspect resolves splits beyond the hand table via the data fallback", asyn
 	await expect(modal).toContainText("食");
 });
 
-test("single-char Inspect guesses Japanese from surrounding kana", async ({ page }) => {
+test("single-char Inspect guesses Japanese from surrounding kana", async ({
+	page
+}) => {
 	await seedWithInspect(page, true, "漢字のテスト");
 	await selectChar(page, "字");
 	await page.locator('.sel-menu button:has-text("Inspect")').click();
 	const modal = page.locator(".inspect-modal");
 	await expect(modal).toBeVisible();
-	await expect(modal.getByRole("button", { name: "Show Japanese reading" })).toHaveAttribute(
-		"aria-pressed",
-		"true"
-	);
+	await expect(
+		modal.getByRole("button", { name: "Show Japanese reading" })
+	).toHaveAttribute("aria-pressed", "true");
 	// JP face: Japanese readings only, no Mandarin row.
 	await expect(modal).toContainText("On/Kun:");
 	await expect(modal).not.toContainText("Mandarin:");
@@ -167,16 +182,17 @@ test("single-char Inspect guesses Japanese from surrounding kana", async ({ page
 	await expect(modal).not.toContainText("On/Kun:");
 });
 
-test("single-char Inspect defaults to Chinese without kana", async ({ page }) => {
+test("single-char Inspect defaults to Chinese without kana", async ({
+	page
+}) => {
 	await seedWithInspect(page, true, "汉字测试");
 	await selectChar(page, "字");
 	await page.locator('.sel-menu button:has-text("Inspect")').click();
 	const modal = page.locator(".inspect-modal");
 	await expect(modal).toBeVisible();
-	await expect(modal.getByRole("button", { name: "Show Chinese reading" })).toHaveAttribute(
-		"aria-pressed",
-		"true"
-	);
+	await expect(
+		modal.getByRole("button", { name: "Show Chinese reading" })
+	).toHaveAttribute("aria-pressed", "true");
 	// CN face: Mandarin only, no Japanese rows.
 	await expect(modal).toContainText("Mandarin:");
 	await expect(modal).not.toContainText("On/Kun:");
@@ -186,7 +202,9 @@ test("settings panel gates the feature behind a checkbox", async ({ page }) => {
 	await seedWithInspect(page, false, "語");
 	await page.keyboard.press("Meta+,");
 	await expect(page.locator(".settings-panel")).not.toHaveClass(/closed/);
-	const box = page.locator(".settings-panel").getByText("Show Inspect for single kanji/hanzi highlights");
+	const box = page
+		.locator(".settings-panel")
+		.getByText("Show Inspect for single kanji/hanzi highlights");
 	await expect(box).toBeVisible();
 });
 
@@ -203,7 +221,9 @@ test("decomposition replaces the stroke bar", async ({ page }) => {
 	await expect(page.locator(".inspect-bar")).toHaveCount(0);
 });
 
-test("stepper arrows and h/l step manually, never autoplay", async ({ page }) => {
+test("stepper arrows and h/l step manually, never autoplay", async ({
+	page
+}) => {
 	await seedWithInspect(page, true, "語");
 	await selectWord(page);
 	await page.locator('.sel-menu button:has-text("Inspect")').click();
@@ -226,7 +246,9 @@ test("stepper arrows and h/l step manually, never autoplay", async ({ page }) =>
 	await expect(count).toHaveText("1 / 14");
 });
 
-test("holding an arrow repeats strokes, taps still single-step", async ({ page }) => {
+test("holding an arrow repeats strokes, taps still single-step", async ({
+	page
+}) => {
 	await seedWithInspect(page, true, "語");
 	await selectWord(page);
 	await page.locator('.sel-menu button:has-text("Inspect")').click();

@@ -61,8 +61,7 @@ describe("page event idioms", () => {
 	});
 
 	it("finds the closest ancestor without a cast at each call", () => {
-		document.body.innerHTML =
-			'<div class="outer"><p id="p">y</p></div>';
+		document.body.innerHTML = '<div class="outer"><p id="p">y</p></div>';
 		const byId = (id: string): Element | null => document.getElementById(id);
 		expect(closestFromTarget(byId("p"), ".outer")?.className).toBe("outer");
 		expect(closestFromTarget(byId("p"), ".missing")).toBe(null);

@@ -25,15 +25,23 @@ beforeEach(() => {
 
 describe("nativeDictateFallback", () => {
 	it("falls back on unsupported platforms and missing bridges", () => {
-		expect(nativeDictateFallback("native dictation is not supported on this platform")).toBe(true);
-		expect(nativeDictateFallback("native dictation requires Android")).toBe(true);
+		expect(
+			nativeDictateFallback(
+				"native dictation is not supported on this platform"
+			)
+		).toBe(true);
+		expect(nativeDictateFallback("native dictation requires Android")).toBe(
+			true
+		);
 		expect(nativeDictateFallback("dictation requires Linux")).toBe(true);
 		expect(
 			nativeDictateFallback(
 				"native dictation is not supported on this platform: Linux has no OS speech-recognition API (install `nerd-dictation` for offline dictation, or use browser dictation)"
 			)
 		).toBe(true);
-		expect(nativeDictateFallback("dictation bridge not initialized")).toBe(true);
+		expect(nativeDictateFallback("dictation bridge not initialized")).toBe(
+			true
+		);
 		expect(nativeDictateFallback("no recognizer available")).toBe(true);
 	});
 
@@ -46,36 +54,48 @@ describe("nativeDictateFallback", () => {
 
 describe("friendlyNativeDictateError", () => {
 	it("maps capability denials to a rebuild hint", () => {
-		expect(friendlyNativeDictateError("dictate_start not allowed.")).toContain("rebuild");
+		expect(friendlyNativeDictateError("dictate_start not allowed.")).toContain(
+			"rebuild"
+		);
 	});
 
 	it("maps busy and permission failures to retry hints", () => {
 		expect(friendlyNativeDictateError("recognizer busy")).toContain("busy");
-		expect(friendlyNativeDictateError("Mic permission denied")).toContain("Mic permission");
+		expect(friendlyNativeDictateError("Mic permission denied")).toContain(
+			"Mic permission"
+		);
 	});
 
 	it("maps empty results to the no-speech hint", () => {
-		expect(friendlyNativeDictateError("no-speech")).toContain("Didn't catch anything");
+		expect(friendlyNativeDictateError("no-speech")).toContain(
+			"Didn't catch anything"
+		);
 	});
 });
 
 describe("startNativeDictation", () => {
 	it("falls back when there is no event bridge", async () => {
 		mockListen.mockRejectedValue(new Error("no bridge"));
-		await expect(startNativeDictation("en-US")).resolves.toEqual({ kind: "fallback" });
+		await expect(startNativeDictation("en-US")).resolves.toEqual({
+			kind: "fallback"
+		});
 	});
 
 	it("falls back when the platform has no recognizer", async () => {
 		mockInvoke.mockImplementation((cmd) => {
-			if (cmd === "dictate_start") return Promise.reject(new Error("not supported on this platform"));
+			if (cmd === "dictate_start")
+				return Promise.reject(new Error("not supported on this platform"));
 			return Promise.resolve();
 		});
-		await expect(startNativeDictation("en-US")).resolves.toEqual({ kind: "fallback" });
+		await expect(startNativeDictation("en-US")).resolves.toEqual({
+			kind: "fallback"
+		});
 	});
 
 	it("surfaces denials as display-ready errors", async () => {
 		mockInvoke.mockImplementation((cmd) => {
-			if (cmd === "dictate_start") return Promise.reject(new Error("dictate_start not allowed"));
+			if (cmd === "dictate_start")
+				return Promise.reject(new Error("dictate_start not allowed"));
 			return Promise.resolve();
 		});
 		const outcome = await startNativeDictation("en-US");
@@ -84,8 +104,10 @@ describe("startNativeDictation", () => {
 	});
 
 	it("starts listening and routes final transcripts", async () => {
-		type ResultHandler = (event: { payload: { transcript: string; final: boolean } }) => void;
-	let handler: ResultHandler = () => {};
+		type ResultHandler = (event: {
+			payload: { transcript: string; final: boolean };
+		}) => void;
+		let handler: ResultHandler = () => {};
 		mockListen.mockImplementation((_event, cb) => {
 			handler = cb as unknown as ResultHandler;
 			return Promise.resolve(() => {});
@@ -107,8 +129,10 @@ describe("startNativeDictation", () => {
 	});
 
 	it("reports empty finals as no-speech errors", async () => {
-		type ResultHandler = (event: { payload: { transcript: string; final: boolean } }) => void;
-	let handler: ResultHandler = () => {};
+		type ResultHandler = (event: {
+			payload: { transcript: string; final: boolean };
+		}) => void;
+		let handler: ResultHandler = () => {};
 		mockListen.mockImplementation((_event, cb) => {
 			handler = cb as unknown as ResultHandler;
 			return Promise.resolve(() => {});

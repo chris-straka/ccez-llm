@@ -39,18 +39,26 @@ describe("phone composer two bars", () => {
 			/\.app\[data-android\] \.prompt :global\(\.ta-input\)\s*\{[^}]*min-height:\s*1\.5rem[^}]*max-height:\s*7\.5rem/
 		);
 		// No focus-scoped field rule may exist: focus must never resize.
-		expect(css).not.toMatch(/\.app\[data-android\] \.prompt:focus-within :global\(\.ta-input\)/);
-		expect(css).not.toMatch(/\.app\[data-android\] \.prompt:not\(:focus-within\) :global\(\.ta-input\)/);
+		expect(css).not.toMatch(
+			/\.app\[data-android\] \.prompt:focus-within :global\(\.ta-input\)/
+		);
+		expect(css).not.toMatch(
+			/\.app\[data-android\] \.prompt:not\(:focus-within\) :global\(\.ta-input\)/
+		);
 	});
 
 	it("keeps the tools row static below the text as its own bar", () => {
 		const css = pageStyle();
-		expect(css).toMatch(/\.app\[data-android\] \.prompt-tools\s*\{[^}]*position:\s*static/);
+		expect(css).toMatch(
+			/\.app\[data-android\] \.prompt-tools\s*\{[^}]*position:\s*static/
+		);
 	});
 
 	it("draws no divider between the bars", () => {
 		const css = pageStyle();
-		const toolsRule = css.match(/\.app\[data-android\] \.prompt-tools\s*\{[^}]*\}/);
+		const toolsRule = css.match(
+			/\.app\[data-android\] \.prompt-tools\s*\{[^}]*\}/
+		);
 		expect(toolsRule?.[0]).toBeDefined();
 		expect(toolsRule?.[0]).not.toContain("border-top:");
 	});
@@ -60,7 +68,9 @@ describe("phone composer two bars", () => {
 		// The chats list and settings are overlays above the card, so
 		// hiding it under them only slid the thread: phones park for a
 		// real idle timeout alone, desktop keeps drawer parking.
-		expect(source).toMatch(/function promptParked\(\): boolean \{[\s\S]*?if \(androidUI\) return promptIdle;/);
+		expect(source).toMatch(
+			/function promptParked\(\): boolean \{[\s\S]*?if \(androidUI\) return promptIdle;/
+		);
 	});
 
 	it("grows the reading column with the chat-width setting", () => {
@@ -68,7 +78,9 @@ describe("phone composer two bars", () => {
 		// The old pin ignored the slider; the width expression now runs
 		// through the helper (phone floor, full-bleed at huge type —
 		// pinned unit-side in settings.test.ts).
-		expect(source).toContain("effectiveChatWidth(androidUI, settings.fontScale, settings.chatWidth ?? 36)");
+		expect(source).toContain(
+			"effectiveChatWidth(\n\t\tandroidUI,\n\t\tsettings.fontScale,\n\t\tsettings.chatWidth ?? 36\n\t)}"
+		);
 	});
 
 	it("keeps AI text off the screen edge with a rem-floor thread gutter", () => {
@@ -77,16 +89,22 @@ describe("phone composer two bars", () => {
 		// gutter alone separates AI text from the edge: a bare 0.5%
 		// hairline (~2px) reads as edge-to-edge on phones. Full-bleed
 		// huge type is the one exception (reading room beats gutter).
-		const rules = [...css.matchAll(/\.app\[data-android\][^{]*\.messages\s*\{[^}]*\}/g)];
+		const rules = [
+			...css.matchAll(/\.app\[data-android\][^{]*\.messages\s*\{[^}]*\}/g)
+		];
 		const plain = rules.filter(
-			(rule) => !rule[0].includes("[data-fullbleed]") && rule[0].includes("padding-left:")
+			(rule) =>
+				!rule[0].includes("[data-fullbleed]") &&
+				rule[0].includes("padding-left:")
 		);
 		expect(plain, "no plain android thread rule").not.toHaveLength(0);
 		for (const rule of plain) {
 			expect(rule[0]).toContain("padding-left: max(0.5%, 1rem)");
 			expect(rule[0]).toContain("padding-right: max(0.5%, 1rem)");
 		}
-		const fullbleed = rules.filter((rule) => rule[0].includes("[data-fullbleed]"));
+		const fullbleed = rules.filter((rule) =>
+			rule[0].includes("[data-fullbleed]")
+		);
 		expect(fullbleed, "no full-bleed thread rule").not.toHaveLength(0);
 		for (const rule of fullbleed) {
 			expect(rule[0]).toMatch(/padding-left:\s*0\.5%/);
@@ -141,12 +159,20 @@ describe("phone highlight dock", () => {
 
 	it("hides every other tool while the dock owns the row", () => {
 		const css = pageStyle();
-		expect(css).toContain(".app[data-android] .prompt:has(.ann-dock) .attach-btn");
+		expect(css).toContain(
+			".app[data-android] .prompt:has(.ann-dock) .attach-btn"
+		);
 		expect(css).toContain(".app[data-android] .prompt:has(.ann-dock) .mic-btn");
-		expect(css).toContain(".app[data-android] .prompt:has(.ann-dock) .voice-float");
+		expect(css).toContain(
+			".app[data-android] .prompt:has(.ann-dock) .voice-float"
+		);
 		expect(css).toContain(".app[data-android] .prompt:has(.ann-dock) .wp-jump");
-		expect(css).toContain(".app[data-android] .prompt:has(.ann-dock) .send-btn");
-		expect(css).toContain(".app[data-android] .prompt:has(.ann-dock) .ann-wrap");
+		expect(css).toContain(
+			".app[data-android] .prompt:has(.ann-dock) .send-btn"
+		);
+		expect(css).toContain(
+			".app[data-android] .prompt:has(.ann-dock) .ann-wrap"
+		);
 	});
 
 	it("stands the hint down while the dock owns the row", () => {

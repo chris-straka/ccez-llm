@@ -24,7 +24,9 @@ function pageStyle(): string {
 
 function cardPreviewRule(): string {
 	const css = pageStyle();
-	const rules = [...css.matchAll(/([^{}]*li\.card \.paste-body[^{}]*)\{([^}]*)\}/g)];
+	const rules = [
+		...css.matchAll(/([^{}]*li\.card \.paste-body[^{}]*)\{([^}]*)\}/g)
+	];
 	const base = rules.find((rule) => !rule[1]!.includes(".open"));
 	if (!base) throw new Error("no li.card .paste-body rule");
 	return base[2]!;
@@ -32,7 +34,9 @@ function cardPreviewRule(): string {
 
 describe("pasted-text cards", () => {
 	it("renders pasted text as a card, like images", () => {
-		expect(pageSource()).toContain('class:card={(att.kind === "image" && !!att.dataUrl) || pasted}');
+		expect(pageSource()).toContain(
+			'class:card={(att.kind === "image" && !!att.dataUrl) || pasted}'
+		);
 	});
 	it("fills the thumbnail seat with clamped text, never a tall pill", () => {
 		const rule = cardPreviewRule();
@@ -43,7 +47,9 @@ describe("pasted-text cards", () => {
 	});
 	it("scrolls the expanded preview in place instead of growing", () => {
 		const css = pageStyle();
-		const rules = [...css.matchAll(/([^{}]*li\.card \.paste-body\.open[^{}]*)\{([^}]*)\}/g)];
+		const rules = [
+			...css.matchAll(/([^{}]*li\.card \.paste-body\.open[^{}]*)\{([^}]*)\}/g)
+		];
 		expect(rules).not.toHaveLength(0);
 		const body = rules.map((rule) => rule[2]).join(";");
 		expect(body).toMatch(/display\s*:\s*block/);

@@ -9,7 +9,9 @@ import {
 
 describe("chatToMarkdown", () => {
 	it("renders an empty chat as header plus placeholder", () => {
-		expect(chatToMarkdown({ messages: [] })).toBe("# Chat export\n\n(empty chat)\n");
+		expect(chatToMarkdown({ messages: [] })).toBe(
+			"# Chat export\n\n(empty chat)\n"
+		);
 	});
 
 	it("strips stored image literals, leaving the attachment list", () => {
@@ -30,7 +32,11 @@ describe("chatToMarkdown", () => {
 	it("sections roles, trims trailing space, and lists attachments", () => {
 		const md = chatToMarkdown({
 			messages: [
-				{ role: "user", content: "hello   \n", attachments: [{ name: "notes.md" }] },
+				{
+					role: "user",
+					content: "hello   \n",
+					attachments: [{ name: "notes.md" }]
+				},
 				{ role: "assistant", content: "hi there" },
 				{ role: "user", content: "   " }
 			]
@@ -63,7 +69,9 @@ describe("chatToMarkdown", () => {
 });
 describe("exportFilename", () => {
 	it("names chat-YYYY-MM-DD.md in UTC", () => {
-		expect(exportFilename(Date.parse("2026-03-04T05:06:07Z"))).toBe("chat-2026-03-04.md");
+		expect(exportFilename(Date.parse("2026-03-04T05:06:07Z"))).toBe(
+			"chat-2026-03-04.md"
+		);
 	});
 });
 describe("exportChatMarkdown", () => {
@@ -128,7 +136,10 @@ describe("exportChatMarkdown", () => {
 		const native = async () => "saved" as const;
 		const how = await exportChatMarkdown(chat, {
 			picker: async () => ({
-				createWritable: async () => ({ write: async () => {}, close: async () => {} })
+				createWritable: async () => ({
+					write: async () => {},
+					close: async () => {}
+				})
 			}),
 			native
 		});
@@ -174,12 +185,16 @@ describe("exportChatMarkdown", () => {
 describe("copyExportText", () => {
 	it("writes through an injected clipboard", async () => {
 		const seen: string[] = [];
-		await copyExportText("# Chat export", { writeText: async (text) => void seen.push(text) });
+		await copyExportText("# Chat export", {
+			writeText: async (text) => void seen.push(text)
+		});
 		expect(seen).toEqual(["# Chat export"]);
 	});
 
 	it("throws when no clipboard is available", async () => {
-		await expect(copyExportText("x", null)).rejects.toThrowError("No export path available.");
+		await expect(copyExportText("x", null)).rejects.toThrowError(
+			"No export path available."
+		);
 	});
 
 	it("serves as the awaited download fallback", async () => {
@@ -188,7 +203,8 @@ describe("copyExportText", () => {
 		const how = await exportChatMarkdown(chat, {
 			picker: null,
 			native: async () => null,
-			download: (text) => copyExportText(text, { writeText: async (t) => void seen.push(t) })
+			download: (text) =>
+				copyExportText(text, { writeText: async (t) => void seen.push(t) })
 		});
 		expect(how).toBe("download");
 		expect(seen).toEqual([chatToMarkdown(chat)]);

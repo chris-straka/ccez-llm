@@ -30,7 +30,8 @@ function openDb(): Promise<IDBDatabase> {
 				request.result.createObjectStore(STORE_NAME);
 			};
 			request.onsuccess = () => resolve(request.result);
-			request.onerror = () => reject(request.error ?? new Error("IndexedDB open failed"));
+			request.onerror = () =>
+				reject(request.error ?? new Error("IndexedDB open failed"));
 		} catch (error) {
 			reject(error instanceof Error ? error : new Error(String(error)));
 		}
@@ -46,8 +47,10 @@ async function loadPersistedDocs(): Promise<SearchDoc[] | null> {
 				try {
 					const tx = db.transaction(STORE_NAME, "readonly");
 					const get = tx.objectStore(STORE_NAME).get(DOCS_KEY);
-					get.onsuccess = () => resolve((get.result as SearchDoc[] | undefined) ?? null);
-					get.onerror = () => reject(get.error ?? new Error("IndexedDB read failed"));
+					get.onsuccess = () =>
+						resolve((get.result as SearchDoc[] | undefined) ?? null);
+					get.onerror = () =>
+						reject(get.error ?? new Error("IndexedDB read failed"));
 				} catch (error) {
 					reject(error instanceof Error ? error : new Error(String(error)));
 				}
@@ -71,7 +74,8 @@ async function persistDocs(docs: SearchDoc[]): Promise<void> {
 					const tx = db.transaction(STORE_NAME, "readwrite");
 					tx.objectStore(STORE_NAME).put(docs, DOCS_KEY);
 					tx.oncomplete = () => resolve();
-					tx.onerror = () => reject(tx.error ?? new Error("IndexedDB write failed"));
+					tx.onerror = () =>
+						reject(tx.error ?? new Error("IndexedDB write failed"));
 				} catch (error) {
 					reject(error instanceof Error ? error : new Error(String(error)));
 				}
@@ -110,8 +114,13 @@ export class ChatSearchStore {
 	private attachWorker(worker: Worker): void {
 		this.worker = worker;
 		worker.onmessage = (event: MessageEvent) => {
-			const data = event.data as { type?: string; id?: number; hits?: SearchHit[] };
-			if (!data || data.type !== "results" || typeof data.id !== "number") return;
+			const data = event.data as {
+				type?: string;
+				id?: number;
+				hits?: SearchHit[];
+			};
+			if (!data || data.type !== "results" || typeof data.id !== "number")
+				return;
 			const entry = this.pending.get(data.id);
 			if (!entry) return;
 			this.pending.delete(data.id);
@@ -171,7 +180,8 @@ export class ChatSearchStore {
 
 	/** Ranked hits; falls back to main-thread search without a worker. */
 	async query(query: string, limit = 30): Promise<SearchHit[]> {
-		if (!this.worker || this.workerFailed) return querySearch(this.docs, query, limit);
+		if (!this.worker || this.workerFailed)
+			return querySearch(this.docs, query, limit);
 		const id = this.nextId++;
 		return new Promise((resolve) => {
 			const timer = setTimeout(() => {
@@ -208,5 +218,7 @@ export class ChatSearchStore {
 
 /** Default worker factory (Vite `?worker` URL, app-rooted like furigana's). */
 export function createSearchWorker(): Worker {
-	return new Worker(new URL("./chatSearch.worker.ts", import.meta.url), { type: "module" });
+	return new Worker(new URL("./chatSearch.worker.ts", import.meta.url), {
+		type: "module"
+	});
 }

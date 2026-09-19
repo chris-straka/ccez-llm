@@ -101,7 +101,10 @@ function registry(): HighlightRegistry | null {
  * (default live). No-op (returns false) where unsupported — the
  * caller keeps the mark-DOM path. Never throws.
  */
-export function paintAnnotationWash(ranges: Range[], name: string = ANN_HIGHLIGHT_NAME): boolean {
+export function paintAnnotationWash(
+	ranges: Range[],
+	name: string = ANN_HIGHLIGHT_NAME
+): boolean {
 	try {
 		const reg = registry();
 		if (!reg || ranges.length === 0) return false;
@@ -147,7 +150,10 @@ export function liveWashRanges(): AbstractRange[] {
  * re-stamp over replaced DOM (streaming tokens) relocates the quote,
  * while a same-content re-stamp does not. Pure — unit-tested.
  */
-export function sameWashRanges(a: AbstractRange[], b: AbstractRange[]): boolean {
+export function sameWashRanges(
+	a: AbstractRange[],
+	b: AbstractRange[]
+): boolean {
 	// Multi-range washes (readings split one quote into several):
 	// equal counts alone must not read as same — a streaming
 	// re-stamp relocates every endpoint, and skipping that repaint
@@ -176,7 +182,8 @@ export function selectionRanges(root: Node): Range[] {
 		if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return [];
 		const anchor = sel.anchorNode;
 		const focus = sel.focusNode;
-		if (!anchor || !focus || !root.contains(anchor) || !root.contains(focus)) return [];
+		if (!anchor || !focus || !root.contains(anchor) || !root.contains(focus))
+			return [];
 		const out: Range[] = [];
 		for (let i = 0; i < sel.rangeCount; i++) {
 			const range = sel.getRangeAt(i);

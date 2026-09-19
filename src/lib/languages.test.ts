@@ -13,7 +13,12 @@ import {
 
 describe("reply languages", () => {
 	it("has four menus in order", () => {
-		expect(LANGUAGE_MENUS.map((m) => m.id)).toEqual(["europe", "asia", "africa", "classics"]);
+		expect(LANGUAGE_MENUS.map((m) => m.id)).toEqual([
+			"europe",
+			"asia",
+			"africa",
+			"classics"
+		]);
 	});
 
 	it("keeps the requested European order", () => {
@@ -70,9 +75,13 @@ describe("reply languages", () => {
 
 	it("labels Arabic short and resolves the new languages", () => {
 		expect(replyLanguageFor("ar")?.name).toBe("Arabic (MSA)");
-		expect(replyLanguageFor("ar")?.prompt).toBe("Reply in Modern Standard Arabic.");
+		expect(replyLanguageFor("ar")?.prompt).toBe(
+			"Reply in Modern Standard Arabic."
+		);
 		for (const code of ["uk", "nl", "ur", "he"]) {
-			expect(replyLanguageFor(code)?.prompt).toBe(`Reply in ${replyLanguageFor(code)?.name}.`);
+			expect(replyLanguageFor(code)?.prompt).toBe(
+				`Reply in ${replyLanguageFor(code)?.name}.`
+			);
 		}
 		expect(quickKeyFor("ar")).toBe("⌘8");
 	});

@@ -18,16 +18,25 @@ export function touchShortcuts(): ShortcutRow[] {
 	return [
 		{ name: "Chats list", keys: "Swipe right · two-finger swipe right" },
 		{ name: "fold chat msg", keys: "Swipe left" },
-		{ name: "Settings", keys: "Swipe left off messages · chats list button · two-finger swipe left" },
+		{
+			name: "Settings",
+			keys: "Swipe left off messages · chats list button · two-finger swipe left"
+		},
 		{ name: "Newer / older chat", keys: "Three-finger swipe right / left" },
 		{ name: "Top of chat", keys: "Two-finger swipe up · gg" },
 		{ name: "Bottom of chat", keys: "Two-finger swipe down · G" },
-		{ name: "Chat switcher", keys: "Two-finger hold · double-tap empty space · swipe cycles · loops" },
+		{
+			name: "Chat switcher",
+			keys: "Two-finger hold · double-tap empty space · swipe cycles · loops"
+		},
 		{ name: "Delete a message", keys: "Three-finger tap" },
 		{ name: "Delete every chat", keys: "Three-finger hold" },
 		{ name: "Message end", keys: "Double two-finger tap" },
 		{ name: "Annotate", keys: "Select text · Annotate" },
-		{ name: "Message buttons", keys: "Tap a message · double-tap jumps to its end" },
+		{
+			name: "Message buttons",
+			keys: "Tap a message · double-tap jumps to its end"
+		},
 		{ name: "Fold a message", keys: "Swipe left on it" }
 	].sort(byName);
 }
@@ -45,8 +54,14 @@ export function desktopShortcuts(isMac: boolean): ShortcutRow[] {
 	const mod = modKeyLabel(isMac);
 	const meta = isMac ? "⌘" : "Ctrl+";
 	return [
-		{ name: "Shortcuts show/hide", keys: `${isMac ? "⇧⌘/" : "Ctrl+Shift+/"} · middle-click` },
-		{ name: "Summon / hide window", keys: `${isMac ? "⇧⌘Space" : "Ctrl+Shift+Space"}` },
+		{
+			name: "Shortcuts show/hide",
+			keys: `${isMac ? "⇧⌘/" : "Ctrl+Shift+/"} · middle-click`
+		},
+		{
+			name: "Summon / hide window",
+			keys: `${isMac ? "⇧⌘Space" : "Ctrl+Shift+Space"}`
+		},
 		{ name: "Switch model / key", keys: `Ctrl+${altm}+← / →` },
 		{ name: "Thinking level", keys: `Ctrl+${altm}+↓ / ↑` },
 		{
@@ -71,7 +86,10 @@ export function desktopShortcuts(isMac: boolean): ShortcutRow[] {
 			name: "Newer / older chat",
 			keys: `${isMac ? "⇧⌘J / ⇧⌘K" : "Ctrl+Shift+J / Ctrl+Shift+K"}`
 		},
-		{ name: "New chat", keys: `${isMac ? "⌘N or ⇧⌘N" : "Ctrl+N or Ctrl+Shift+N"}` },
+		{
+			name: "New chat",
+			keys: `${isMac ? "⌘N or ⇧⌘N" : "Ctrl+N or Ctrl+Shift+N"}`
+		},
 		{ name: "Voice readback on/off", keys: `Ctrl+${altm}+S` },
 		{ name: "Pasted text expand/collapse", keys: "Ctrl+O" },
 		{ name: "Stop voice / close", keys: "Esc" },
@@ -97,7 +115,10 @@ export function desktopShortcuts(isMac: boolean): ShortcutRow[] {
 			keys: `${isMac ? "⌘1, ⌘0" : "Ctrl+1, Ctrl+0"} · repeat to clear`
 		},
 		{ name: "Delete this chat", keys: `${meta}Delete` },
-		{ name: "Delete every chat", keys: `${isMac ? "⇧⌘Delete" : "Ctrl+Shift+Delete"}` },
+		{
+			name: "Delete every chat",
+			keys: `${isMac ? "⇧⌘Delete" : "Ctrl+Shift+Delete"}`
+		},
 		{ name: "Cut message", keys: "x" },
 		{ name: "Edit own message", keys: "hover + e" },
 		{ name: "Copy message", keys: "Hover + C" },
@@ -111,8 +132,13 @@ export function desktopShortcuts(isMac: boolean): ShortcutRow[] {
 }
 
 /** Modal filter: matches action or keys, case-insensitive. */
-export function filteredShortcuts(rows: ShortcutRow[], query: string): ShortcutRow[] {
+export function filteredShortcuts(
+	rows: ShortcutRow[],
+	query: string
+): ShortcutRow[] {
 	const q = query.trim().toLowerCase();
 	if (!q) return rows;
-	return rows.filter((row) => `${row.name} ${row.keys}`.toLowerCase().includes(q));
+	return rows.filter((row) =>
+		`${row.name} ${row.keys}`.toLowerCase().includes(q)
+	);
 }

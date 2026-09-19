@@ -30,7 +30,12 @@ import type { Annotation, AnnotationId } from "./annotations";
 
 describe("annotations", () => {
 	it("adds, edits, deletes, and clears", () => {
-		let list = addAnnotation([], "m1" as ChatMsgId, "  langue  ", "What does this mean?");
+		let list = addAnnotation(
+			[],
+			"m1" as ChatMsgId,
+			"  langue  ",
+			"What does this mean?"
+		);
 		expect(list).toHaveLength(1);
 		expect(list[0]?.quote).toBe("langue");
 		expect(list[0]?.messageId).toBe("m1");
@@ -45,7 +50,11 @@ describe("annotations", () => {
 		list = deleteAnnotation(list, list[0]!.id);
 		expect(list).toEqual([]);
 
-		list = addAnnotation(addAnnotation([], "m1" as ChatMsgId, "a"), "m2" as ChatMsgId, "b");
+		list = addAnnotation(
+			addAnnotation([], "m1" as ChatMsgId, "a"),
+			"m2" as ChatMsgId,
+			"b"
+		);
 		expect(clearAnnotations()).toEqual([]);
 		expect(annotationNumber(list, list[1]!.id)).toBe(2);
 		expect(annotationNumber(list, "missing" as AnnotationId)).toBe(0);
@@ -67,7 +76,9 @@ describe("annotations", () => {
 		expect(withAnnotations("explain", list)).toBe(
 			'explain\n\nAnnotated selections:\n1. "langue" — meaning?'
 		);
-		expect(withAnnotations("", list)).toBe('Annotated selections:\n1. "langue" — meaning?');
+		expect(withAnnotations("", list)).toBe(
+			'Annotated selections:\n1. "langue" — meaning?'
+		);
 		expect(withAnnotations("explain", [])).toBe("explain");
 	});
 
@@ -92,28 +103,44 @@ describe("annotations", () => {
 
 	it("leaves normal messages and lookalikes untouched", () => {
 		expect(splitAnnotationBlock("just a prompt")).toBeNull();
-		expect(splitAnnotationBlock("explain\n\nAnnotated selections:\n")).toBeNull();
-		expect(splitAnnotationBlock("I typed\n\nAnnotated selections:\nnot a list")).toBeNull();
+		expect(
+			splitAnnotationBlock("explain\n\nAnnotated selections:\n")
+		).toBeNull();
+		expect(
+			splitAnnotationBlock("I typed\n\nAnnotated selections:\nnot a list")
+		).toBeNull();
 	});
 
 	it("clears baked blocks back to the bare prompt", () => {
 		const list = addAnnotation([], "m1" as ChatMsgId, "langue", "meaning?");
-		expect(clearBakedAnnotations(withAnnotations("explain", list))).toBe("explain");
+		expect(clearBakedAnnotations(withAnnotations("explain", list))).toBe(
+			"explain"
+		);
 		expect(clearBakedAnnotations(withAnnotations("", list))).toBe("");
 		expect(clearBakedAnnotations("just a prompt")).toBeNull();
-		expect(clearBakedAnnotations("I typed\n\nAnnotated selections:\nnot a list")).toBeNull();
+		expect(
+			clearBakedAnnotations("I typed\n\nAnnotated selections:\nnot a list")
+		).toBeNull();
 	});
 
 	it("parses an annotations-only message to empty text plus refs", () => {
-		const list = addAnnotation([], "m1" as ChatMsgId, "風に舞う", "What does this mean?");
+		const list = addAnnotation(
+			[],
+			"m1" as ChatMsgId,
+			"風に舞う",
+			"What does this mean?"
+		);
 		const split = splitAnnotationBlock(withAnnotations("", list));
 		expect(split?.text).toBe("");
-		expect(split?.refs).toEqual([{ n: 1, quote: "風に舞う", comment: "What does this mean?" }]);
+		expect(split?.refs).toEqual([
+			{ n: 1, quote: "風に舞う", comment: "What does this mean?" }
+		]);
 	});
 });
 
 describe("rewriteAnnotationComment", () => {
-	const baked = 'explain this\n\nAnnotated selections:\n1. "bonjour" — greeting?\n2. "merci" — ?';
+	const baked =
+		'explain this\n\nAnnotated selections:\n1. "bonjour" — greeting?\n2. "merci" — ?';
 
 	it("swaps one ref's comment and keeps the rest", () => {
 		expect(rewriteAnnotationComment(baked, 2, "thanks")).toBe(
@@ -133,7 +160,9 @@ describe("rewriteAnnotationComment", () => {
 
 	it("keeps the refs-only shape (no prompt text, no leading blank)", () => {
 		const only = 'Annotated selections:\n1. "bonjour" — greeting?';
-		expect(rewriteAnnotationComment(only, 1, "hi")).toBe('Annotated selections:\n1. "bonjour" — hi');
+		expect(rewriteAnnotationComment(only, 1, "hi")).toBe(
+			'Annotated selections:\n1. "bonjour" — hi'
+		);
 	});
 
 	it("returns null for a missing number or no clean block", () => {
@@ -145,7 +174,11 @@ describe("rewriteAnnotationComment", () => {
 describe("duplicateAnnotationId", () => {
 	it("finds the same span and ignores neighbors", () => {
 		const msg = "m1" as ChatMsgId;
-		const list = addAnnotation(addAnnotation([], msg, "Kyoto", "old capital"), msg, "Osaka");
+		const list = addAnnotation(
+			addAnnotation([], msg, "Kyoto", "old capital"),
+			msg,
+			"Osaka"
+		);
 		const kyoto = list[0];
 		if (!kyoto) throw new Error("no annotation");
 		// Same message, quote, and repeat: a twin.
@@ -153,7 +186,9 @@ describe("duplicateAnnotationId", () => {
 		// A different repeat of the same text is its own span.
 		expect(duplicateAnnotationId(list, msg, "Kyoto", 2)).toBeNull();
 		// Same quote in another message is unrelated.
-		expect(duplicateAnnotationId(list, "m2" as ChatMsgId, "Kyoto", 0)).toBeNull();
+		expect(
+			duplicateAnnotationId(list, "m2" as ChatMsgId, "Kyoto", 0)
+		).toBeNull();
 		// Blank quotes never match.
 		expect(duplicateAnnotationId(list, msg, "   ", 0)).toBeNull();
 	});
@@ -161,15 +196,27 @@ describe("duplicateAnnotationId", () => {
 	it("treats aid scope as part of span identity", () => {
 		const msg = "m1" as ChatMsgId;
 		const scoped: Annotation[] = [
-			{ id: "a1" as AnnotationId, messageId: msg, quote: "Kyoto", comment: "", aidScope: "tashkeel" }
+			{
+				id: "a1" as AnnotationId,
+				messageId: msg,
+				quote: "Kyoto",
+				comment: "",
+				aidScope: "tashkeel"
+			}
 		];
 		// Same span in the bare text is not a twin of the vocalized one.
 		expect(duplicateAnnotationId(scoped, msg, "Kyoto", 0)).toBeNull();
-		expect(duplicateAnnotationId(scoped, msg, "Kyoto", 0, "tashkeel")).toBe("a1");
+		expect(duplicateAnnotationId(scoped, msg, "Kyoto", 0, "tashkeel")).toBe(
+			"a1"
+		);
 		// Unscoped lists match unscoped lookups, as before.
 		const plain = addAnnotation([], msg, "Kyoto");
-		expect(duplicateAnnotationId(plain, msg, "Kyoto", 0)).toBe(plain[0]?.id ?? null);
-		expect(duplicateAnnotationId(plain, msg, "Kyoto", 0, "tashkeel")).toBeNull();
+		expect(duplicateAnnotationId(plain, msg, "Kyoto", 0)).toBe(
+			plain[0]?.id ?? null
+		);
+		expect(
+			duplicateAnnotationId(plain, msg, "Kyoto", 0, "tashkeel")
+		).toBeNull();
 	});
 });
 
@@ -204,7 +251,9 @@ describe("locateQuote", () => {
 	});
 
 	it("ignores whitespace differences (multi-line selections)", () => {
-		expect(locateQuote(["first half", "second half"], "first half\n\nsecond half")).toEqual({
+		expect(
+			locateQuote(["first half", "second half"], "first half\n\nsecond half")
+		).toEqual({
 			startNode: 0,
 			startOffset: 0,
 			endNode: 1,
@@ -224,7 +273,9 @@ describe("locateQuote", () => {
 	it("returns null for empty quotes and cross-message text", () => {
 		expect(locateQuote(["hello"], "")).toBeNull();
 		expect(locateQuote(["hello"], "bye")).toBeNull();
-		expect(locateQuote(["first message"], "first message second message")).toBeNull();
+		expect(
+			locateQuote(["first message"], "first message second message")
+		).toBeNull();
 	});
 
 	it("picks the requested repeat of a repeated quote", () => {
@@ -284,31 +335,58 @@ describe("occurrenceAtPosition", () => {
 describe("snapOffsetsToWordEdges", () => {
 	it("expands mid-word cuts out to the word's edges", () => {
 		// "hell|o wo|rld": start cut inside "hello", end cut inside "world".
-		expect(snapOffsetsToWordEdges("hello world", 2, 9)).toEqual({ start: 0, end: 11 });
+		expect(snapOffsetsToWordEdges("hello world", 2, 9)).toEqual({
+			start: 0,
+			end: 11
+		});
 	});
 
 	it("leaves boundaries already on word edges alone", () => {
-		expect(snapOffsetsToWordEdges("hello world", 0, 5)).toEqual({ start: 0, end: 5 });
-		expect(snapOffsetsToWordEdges("hello world", 6, 11)).toEqual({ start: 6, end: 11 });
+		expect(snapOffsetsToWordEdges("hello world", 0, 5)).toEqual({
+			start: 0,
+			end: 5
+		});
+		expect(snapOffsetsToWordEdges("hello world", 6, 11)).toEqual({
+			start: 6,
+			end: 11
+		});
 		// Leading space is not a word char: no snap into the neighbor.
-		expect(snapOffsetsToWordEdges("hello world", 5, 6)).toEqual({ start: 5, end: 6 });
+		expect(snapOffsetsToWordEdges("hello world", 5, 6)).toEqual({
+			start: 5,
+			end: 6
+		});
 	});
 
 	it("leaves spaceless scripts untouched", () => {
-		expect(snapOffsetsToWordEdges("テストを確認", 2, 4)).toEqual({ start: 2, end: 4 });
+		expect(snapOffsetsToWordEdges("テストを確認", 2, 4)).toEqual({
+			start: 2,
+			end: 4
+		});
 	});
 
 	it("snaps spaced non-Latin words too", () => {
-		expect(snapOffsetsToWordEdges("مرحبا بالعالم", 2, 8)).toEqual({ start: 0, end: 13 });
+		expect(snapOffsetsToWordEdges("مرحبا بالعالم", 2, 8)).toEqual({
+			start: 0,
+			end: 13
+		});
 	});
 
 	it("clamps out-of-range input and normalizes reversed ranges", () => {
-		expect(snapOffsetsToWordEdges("hello", -4, 99)).toEqual({ start: 0, end: 5 });
-		expect(snapOffsetsToWordEdges("hello world", 8, 2)).toEqual({ start: 0, end: 11 });
+		expect(snapOffsetsToWordEdges("hello", -4, 99)).toEqual({
+			start: 0,
+			end: 5
+		});
+		expect(snapOffsetsToWordEdges("hello world", 8, 2)).toEqual({
+			start: 0,
+			end: 11
+		});
 	});
 
 	it("treats digits and underscores as word characters", () => {
-		expect(snapOffsetsToWordEdges("foo_bar2 baz", 2, 10)).toEqual({ start: 0, end: 12 });
+		expect(snapOffsetsToWordEdges("foo_bar2 baz", 2, 10)).toEqual({
+			start: 0,
+			end: 12
+		});
 	});
 });
 
@@ -319,22 +397,46 @@ describe("placeAnnPopX", () => {
 	it("centers the box over a highlight narrower than the box", () => {
 		// Highlight [500, 600): center 550, box 384 wide -> x = 358.
 		expect(
-			placeAnnPopX({ cursorX: 600, highlightLeft: 500, highlightWidth: 100, popWidth, viewportWidth })
+			placeAnnPopX({
+				cursorX: 600,
+				highlightLeft: 500,
+				highlightWidth: 100,
+				popWidth,
+				viewportWidth
+			})
 		).toBe(358);
 	});
 
 	it("keeps the cursor placement for wide highlights", () => {
 		expect(
-			placeAnnPopX({ cursorX: 600, highlightLeft: 100, highlightWidth: 900, popWidth, viewportWidth })
+			placeAnnPopX({
+				cursorX: 600,
+				highlightLeft: 100,
+				highlightWidth: 900,
+				popWidth,
+				viewportWidth
+			})
 		).toBe(600);
 	});
 
 	it("clamps centered and cursor placements on screen", () => {
 		expect(
-			placeAnnPopX({ cursorX: 10, highlightLeft: 0, highlightWidth: 40, popWidth, viewportWidth })
+			placeAnnPopX({
+				cursorX: 10,
+				highlightLeft: 0,
+				highlightWidth: 40,
+				popWidth,
+				viewportWidth
+			})
 		).toBe(8);
 		expect(
-			placeAnnPopX({ cursorX: 2000, highlightLeft: 100, highlightWidth: 900, popWidth, viewportWidth })
+			placeAnnPopX({
+				cursorX: 2000,
+				highlightLeft: 100,
+				highlightWidth: 900,
+				popWidth,
+				viewportWidth
+			})
 		).toBe(viewportWidth - popWidth - 8);
 	});
 });
@@ -488,7 +590,10 @@ describe("findQuotedMessage", () => {
 	const m2 = "m2" as ChatMsgId;
 	const messages = [
 		{ id: m1, content: "Kyoto in spring is lovely" },
-		{ id: m2, content: 'explain this\n\nAnnotated selections:\n1. "spring" — ?' }
+		{
+			id: m2,
+			content: 'explain this\n\nAnnotated selections:\n1. "spring" — ?'
+		}
 	];
 
 	it("finds the quoted message, never the sender", () => {

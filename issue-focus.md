@@ -124,12 +124,12 @@ Seeded harness (`bunx playwright test`, own E2E_PORT each):
   scrollModeAction only consumes j/k/g/G/i/Enter/u/d/Ctrl+G and
   exempts composer + find — plain letters should type even with
   Always on.
-- Open: focus timeline in Base URL *with typing* (drop on click or
+- Open: focus timeline in Base URL _with typing_ (drop on click or
   on first keystroke?); node-identity check for input remount;
   focusout destination if it fires.
 - Screenshot session (owner Brave @ :1420, edit card open): badge
   mousedown `prev=true`, one `focusin TEXTAREA`, `POLL BODY ->
-  TEXTAREA`, then seven textarea mousedowns `prev=false` with NO
+TEXTAREA`, then seven textarea mousedowns `prev=false` with NO
   `focusout` and NO further POLL change. Focus holds through
   repeated clicks — no steal visible. Combined with "typing does
   nothing", the fork is now: node swap (focused node detached,
@@ -219,18 +219,22 @@ races mouseup → one char sneaks in.
 
 Proposed edit (in the `if (!endedDrag)` branch — skip the wipe
 where the browser already moved the selection, i.e. the new caret):
+
 ```ts
 if (!endedDrag) {
-    // WebKit: clearing the selection after focusing a field kills
-    // the just-placed caret — later keystrokes never become text.
-    // Clicks into editables already moved the selection, so wipe
-    // only for non-editable targets (buttons, review chrome).
-    if (!target?.closest(".cm-content, input, textarea, select, [contenteditable]")) {
-        window.getSelection()?.removeAllRanges();
-    }
-    selMenu = null;
+	// WebKit: clearing the selection after focusing a field kills
+	// the just-placed caret — later keystrokes never become text.
+	// Clicks into editables already moved the selection, so wipe
+	// only for non-editable targets (buttons, review chrome).
+	if (
+		!target?.closest(".cm-content, input, textarea, select, [contenteditable]")
+	) {
+		window.getSelection()?.removeAllRanges();
+	}
+	selMenu = null;
 }
 ```
+
 Follow-up applied 2026-09-16 (same session): the `activeElement`
 gate is in, as `mouseupKeepsSelection(target, active)` in
 `src/lib/events.ts` (pure, unit-pinned in `events.test.ts`) wired
@@ -266,6 +270,7 @@ drops after this fix, that is a third wrinkle, not this one.
 
 Harness verification (Always `promptIdleSec: -1` + non-empty chat,
 harness Chromium, scratch configs under /tmp — repo untouched):
+
 - Settings Base URL (panel opened via Meta+,): single `in:INPUT`,
   no focusout, `QZX` lands in value. HOLDS.
 - Composer placeholder (summoned via `i`, clicked): single
@@ -284,6 +289,7 @@ ran with idle-hide OFF — never covered the owner's Always setup.
 
 Guard gaps flagged → implemented by fix slot as 65a8af8
 (`inField` into `scrollModeAction` + `sidebarListAction` tails):
+
 - `scrollModeAction` had no field guard (stuck `focusMode` ate
   j/k/d/u/g/G/Ctrl+G in fields; i/Enter yanked to composer).
 - `sidebarListAction` matched ANY `<aside>`: settings-panel fields
@@ -304,6 +310,7 @@ click-triggered focus path (global shortcut needs
 CommandOrControl+Shift+Space; `focus_main` on explicit gestures only).
 
 Residuals (real, neither explains repeated Base URL drops):
+
 - save/cancel/remove focuses the composer after unmounting the
   card; composer parked-hidden → `focus()` no-ops → focus to BODY
   (transient, post-close papercut; needs visibility guard/fallback).
@@ -325,6 +332,7 @@ fix not live; all letters + caret held = sub-app key eating);
 re-open) — next dig, never probed (audit cleared it by reasoning).
 
 ## Third-agent findings: save-fade click race (2026-09-16,
+
 reproduced in-harness, fix NOT applied)
 
 Method: read-only source audit plus `/tmp/focus-probe2/` scratch
@@ -359,7 +367,7 @@ the Enter-to-click gap versus the 160ms window.
 Fits every card symptom: the blink is `growPill`'s mount focus;
 fast typing sneaks a char in inside the window; selecting text
 first outlasts the fade; "drops again" on re-press is partly the
-*intended* badge toggle (`cancelAnnPop` on re-press of the open
+_intended_ badge toggle (`cancelAnnPop` on re-press of the open
 badge) plus the invisible focus cue (`textarea:focus` is
 `outline: none` over `border: 0`) — do not "fix" the toggle.
 
@@ -373,8 +381,8 @@ Relation to the other sections: distinct mechanism from 65a8af8
 (that fix is keystroke-eating with focus held; this is focus lost
 to `<body>` via unmount — both can be real at once). Adjacent to
 the second agent's residual (c) but different: theirs is
-`bind:this` staleness when re-open *hits* mid-fade; this is the
-click *missing* the badge because of the fade. Same family as
+`bind:this` staleness when re-open _hits_ mid-fade; this is the
+click _missing_ the badge because of the fade. Same family as
 their save/cancel-focuses-parked-composer residual (focus to BODY
 after unmount), different trigger.
 

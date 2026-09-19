@@ -15,11 +15,17 @@ export type AnnPopSaveKind = "commit-pending" | "save-edit";
  * existing one. The pop id decides: a pop still addressing its pending
  * annotation commits it.
  */
-export function annPopSaveKind(popId: string, pendingId: string | null): AnnPopSaveKind {
-	return pendingId !== null && popId === pendingId ? "commit-pending" : "save-edit";
+export function annPopSaveKind(
+	popId: string,
+	pendingId: string | null
+): AnnPopSaveKind {
+	return pendingId !== null && popId === pendingId
+		? "commit-pending"
+		: "save-edit";
 }
 
-export type AnnPopCancelKind = "drop-pending" | "delete-fresh" | "keep-existing";
+export type AnnPopCancelKind =
+	"drop-pending" | "delete-fresh" | "keep-existing";
 
 /**
  * Cancel means "as it was", checked in handler order: a never-submitted
@@ -52,6 +58,9 @@ export function annPopBlurAction(draft: string): "cancel" | "save" {
  * unmounts — the fade then starts at the click, so filing never holds
  * a full-bright wash through the pill fade before clearing it.
  */
-export function pillWashId(pop: { id: string } | null, closing: boolean): string | null {
+export function pillWashId(
+	pop: { id: string } | null,
+	closing: boolean
+): string | null {
 	return pop && !closing ? pop.id : null;
 }

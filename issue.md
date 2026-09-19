@@ -1,6 +1,7 @@
 # Tap-to-reveal on mobile duplicates message tail + collapses composer
 
 ## Symptoms (Samsung S24, Android app WebView, dark theme, `hideButtons` ON)
+
 1. Tap a message (user's own AND assistant's) to reveal its action buttons.
 2. The tapped message's row opens correctly, BUT a second fragment appears
    pinned above the composer showing **only the message's last line(s)**
@@ -12,6 +13,7 @@
    twice") but current screenshots show the tail-only variant.
 
 ## Decisive observations from screenshots
+
 - Shot A (09:25): user msg `test` shows user action row (copy/check/pencil/
   trash). Below the assistant reply sits the tail fragment: last line
   `What would you like to do?` + assistant action row
@@ -28,7 +30,7 @@
   not. This implicates scroll-dependent paths (`scrollIntoView`,
   scroll-anchoring, sticky) over message-count/state paths.
 - UPDATE: the ghost text is TRUNCATED mid-word (`Give me one sentence
-  abou`) and rendered UNDERNEATH the composer's own toolbar icons
+abou`) and rendered UNDERNEATH the composer's own toolbar icons
   (paperclip/speaker/keyboard overlap it). So the ghost lives IN THE
   COMPOSER REGION, clipped by the composer's collapsed input box.
 - UPDATE (decisive): NONE of the ghost fragment's buttons work. The ghost
@@ -101,6 +103,7 @@
   noise — meaningless for this bug, ignore.
 
 ## Ruled out (with proof)
+
 - **Second `<article>` / re-sent message**: trusted `touchscreen.tap` on
   WebView-UA Chromium (412/360/320px wide) keeps `article` count at 2 and
   the reply text occurs exactly once in `document.body.innerText`. No
@@ -132,6 +135,7 @@
 - **Vite/HMR, Tailwind**: build-time only; nothing at runtime that rasterizes.
 
 ## Prime suspects (unchecked on device — artifact-first ordering)
+
 1. **Stale compositor tile after tap-triggered smooth-scroll**: tap opens
    the row; `scrollIntoView`/`scrollToBottom` (`block:start`, smooth) runs
    while the row's layout shift is still settling. Short chats (no scroll
@@ -155,15 +159,18 @@
    `dragstart`/`selectstart` listeners.
 
 ## Repro in this repo (all clean on desktop Chromium — the bug is device-only)
+
 ```bash
 # trusted tap, mobile UA, narrow widths; prints article count/geometry/dupes
 bunx playwright test e2e/android-touch.e2e.ts
 ```
+
 Probes used `page.touchscreen.tap()` on `article .rendered` with seeded
 history. Synthetic `TouchEvent`s do NOT reach the Svelte handlers — only
 trusted taps count.
 
 ## What is needed to close this
+
 1. **Repro length rule**: seed ONE short user+assistant exchange (fits the
    viewport, no scroll), trusted-tap the message body. Long/multi-screen
    chats do not reproduce — do not test with those.
@@ -172,7 +179,7 @@ trusted taps count.
    stuck layer in the scroll container (suspect 1). Ghost stays FIXED or
    vanishes = overlay/compositor tile or cancelled drag-image (suspects
    2–3). Optional confirm via `chrome://inspect`: `querySelectorAll(
-   'article').length` should equal the real message count.
+'article').length` should equal the real message count.
 3. If state bug: add `page.touchscreen.tap` Playwright test asserting
    `article` count and tail-string occurrences stay at seed values after tap.
 
@@ -181,12 +188,14 @@ trusted taps count.
 # Annotation hover wash sticks / flashes (Mac app shell, both themes)
 
 ## Plain terms used below
+
 - **Badge / marker**: the numbered blue button stamped on an annotated quote.
 - **Draft card**: the editor popup for writing/saving a note.
 - **Filed pill**: after filing, the note waits as a chip in the composer
   (prompt-tools area) until its message sends.
 
 ## Symptoms (owner-observed, Mac Tauri shell)
+
 1. Dark theme: hovering a badge paints a DARK yellow wash; moving off
    paints a BRIGHT yellow wash that STAYS.
 2. Light theme: click/hover wash stays after hover-off AND after ESC.
@@ -201,6 +210,7 @@ trusted taps count.
    printed — now retires on first token, commit `2b62e87`.)
 
 ## Timing architecture (current)
+
 - 120ms hover-clear hysteresis, one shared machine (`src/lib/hoverWash.ts`).
 - Fade ramp through graded registry names: in D3→D1→live (~100ms), out
   D1→D2→D3→clear (~140ms), 35ms steps, timers in `paintWashHighlight`
@@ -214,6 +224,7 @@ trusted taps count.
   AND WebKit — the ramp exists because the pseudo cannot fade.
 
 ## Ruled out (with proof)
+
 - **Registry state**: live-shell bridge dumps show the correct timeline
   (graded in, settled live, stepped out, all empty ≤800ms after leave).
   Lab Chromium and Playwright WebKit behave identically.
@@ -229,6 +240,7 @@ trusted taps count.
   unrelated.
 
 ## Prime suspects (unchecked)
+
 1. **Stale highlight paint**: registry empties on schedule but the
    shell's WKWebView does not repaint the overlay until forced
    (blur/select/tab-switch ALL force repaints — matches symptom 5
@@ -250,14 +262,17 @@ trusted taps count.
    dark-theme only so far.
 
 ## Repro in this repo (all clean — bug is shell-only so far)
+
 ```bash
 E2E_PORT=5299 bunx playwright test e2e/annotations.e2e.ts
 ```
+
 Pins: multi-paragraph wash, cross-message badge hover, escape-cancel
 registry-empty, badge-edit ESC + click-away registry-empty, plus
 `annHighlights.test.ts` (schedules, `sameWashRanges`, clear-all).
 
 ## Live inspection (debug bridge, for other bots)
+
 - App opens a JSON-over-WebSocket bridge on `ws://127.0.0.1:9223`
   (debug builds only, `tauri-plugin-mcp-bridge`, see
   `src-tauri/src/lib.rs`). Envelope `{id, command, args}` →
@@ -274,6 +289,7 @@ registry-empty, badge-edit ESC + click-away registry-empty, plus
   `relatedTarget: document.body`).
 
 ## What is needed to close this
+
 1. Hard reload the shell, then reproduce on demand (exact clicks/keys).
 2. At the stuck moment: registry dump + native screenshot TOGETHER.
    Yellow pixels + empty registry = suspect 1 proven (stale paint);

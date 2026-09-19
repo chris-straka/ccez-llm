@@ -25,7 +25,8 @@ export function kanjiSvgUrl(ch: string): string {
  */
 export function extractStrokePaths(svg: string): string[] | null {
 	const paths: Array<{ n: number; d: string }> = [];
-	const re = /<path[^>]*\bid="[^"]*-s(\d+)"[^>]*\bd="([^"]+)"|<path[^>]*\bd="([^"]+)"[^>]*\bid="[^"]*-s(\d+)"/g;
+	const re =
+		/<path[^>]*\bid="[^"]*-s(\d+)"[^>]*\bd="([^"]+)"|<path[^>]*\bd="([^"]+)"[^>]*\bid="[^"]*-s(\d+)"/g;
 	let match: RegExpExecArray | null;
 	while ((match = re.exec(svg)) !== null) {
 		const n = Number(match[1] ?? match[4]);

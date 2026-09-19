@@ -1,35 +1,32 @@
 {
-  "name": "CCEZ Studio",
-  "short_name": "CCEZ",
-  "description": "BYOK chat with language-learner aids",
-  "start_url": ".",
-  "scope": ".",
-  "display": "standalone",
-  "orientation": "any",
-  "background_color": "#17171a",
-  "theme_color": "#17171a",
-  "icons": [
-    {
-      "src": "favicon.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "favicon.ico",
-      "sizes": "48x48",
-      "type": "image/x-icon"
-    }
-  ],
-  "file_handlers": [
-    {
-      "action": ".",
-      "accept": {
-        "text/markdown": [
-          ".md",
-          ".markdown"
-        ]
-      }
-    }
-  ]
+	"name": "CCEZ Studio",
+	"short_name": "CCEZ",
+	"description": "BYOK chat with language-learner aids",
+	"start_url": ".",
+	"scope": ".",
+	"display": "standalone",
+	"orientation": "any",
+	"background_color": "#17171a",
+	"theme_color": "#17171a",
+	"icons": [
+		{
+			"src": "favicon.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "favicon.ico",
+			"sizes": "48x48",
+			"type": "image/x-icon"
+		}
+	],
+	"file_handlers": [
+		{
+			"action": ".",
+			"accept": {
+				"text/markdown": [".md", ".markdown"]
+			}
+		}
+	]
 }

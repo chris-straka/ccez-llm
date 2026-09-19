@@ -106,7 +106,10 @@ interface SurfaceRun {
  * Anything the alignment cannot explain passes through untouched — a
  * missing ruby beats a wrong one.
  */
-function rubyToken(token: RubyToken, toHiragana: (katakana: string) => string): string {
+function rubyToken(
+	token: RubyToken,
+	toHiragana: (katakana: string) => string
+): string {
 	const surface = token.surface;
 	if (!surface || !hasKanji(surface)) return surface;
 	const reading = token.reading;
@@ -132,7 +135,8 @@ function rubyToken(token: RubyToken, toHiragana: (katakana: string) => string): 
 		if (!run) return surface;
 		if (!run.kanji) {
 			const want = [...run.text];
-			if (hira.slice(pos, pos + want.length).join("") !== run.text) return surface;
+			if (hira.slice(pos, pos + want.length).join("") !== run.text)
+				return surface;
 			pos += want.length;
 			out += run.text;
 			continue;

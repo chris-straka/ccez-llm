@@ -16,14 +16,17 @@ const PROMPT_SELECTOR = ".prompt";
  * Shift+D's wider selector: buttons and links keep their own keys too,
  * on top of every field and rich editor.
  */
-const INTERACTIVE_SELECTOR = "input, textarea, select, button, a, [contenteditable]";
+const INTERACTIVE_SELECTOR =
+	"input, textarea, select, button, a, [contenteditable]";
 /**
  * The Inspect field guard (also the Esc+f filter carve-out): typing in
  * the shortcuts filter must not step the preview or exit fullscreen.
  */
-const INSPECT_FIELD_SELECTOR = "input, textarea, select, [contenteditable], .shortcuts-filter";
+const INSPECT_FIELD_SELECTOR =
+	"input, textarea, select, [contenteditable], .shortcuts-filter";
 /** Fields and buttons keep their native Space (empty-chat summon check). */
-const SPACE_INTERACTIVE_SELECTOR = "input, textarea, select, [contenteditable], button, a";
+const SPACE_INTERACTIVE_SELECTOR =
+	"input, textarea, select, [contenteditable], button, a";
 /**
  * Idle-restore owned stage: an open overlay, sidebar, or panel owns bare
  * keys, so Space out there never summons the prompt from behind it.
@@ -174,7 +177,12 @@ export function isMathTarget(target: EventTarget | null): boolean {
 
 /** True where a summon restores without landing focus (overlay owns it). */
 export function isTapOverlayTarget(target: EventTarget | null): boolean {
-	return closestFromTarget(target, "aside, .modal, .modal-veil, .find-bar, .search-palette") !== null;
+	return (
+		closestFromTarget(
+			target,
+			"aside, .modal, .modal-veil, .find-bar, .search-palette"
+		) !== null
+	);
 }
 
 /**
@@ -209,13 +217,17 @@ export const MIDDLE_CHAT_PX = 36;
 press. Pure over dx/dy so the gesture unit-tests without a mouse. */
 export type MiddleDragGesture = "fold-message" | "older-chat" | "newer-chat";
 
-export function middleDragGesture(dx: number, dy: number): MiddleDragGesture | null {
+export function middleDragGesture(
+	dx: number,
+	dy: number
+): MiddleDragGesture | null {
 	const ax = Math.abs(dx);
 	const ay = Math.abs(dy);
 	if (ax < MIDDLE_DRAG_PX && ay < MIDDLE_DRAG_PX) return null;
 	// Dominant axis wins with margin: diagonals near 45° stay a
 	// press, so a shaky hand never folds and switches at once.
 	if (ax > MIDDLE_FOLD_PX && ax > ay * 1.2) return "fold-message";
-	if (ay > MIDDLE_CHAT_PX && ay > ax * 1.2) return dy < 0 ? "older-chat" : "newer-chat";
+	if (ay > MIDDLE_CHAT_PX && ay > ax * 1.2)
+		return dy < 0 ? "older-chat" : "newer-chat";
 	return null;
 }

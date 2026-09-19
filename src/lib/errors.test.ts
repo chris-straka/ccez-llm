@@ -10,7 +10,9 @@ describe("errorMessage", () => {
 	});
 	it("reads message off plain rejection objects", () => {
 		// Tauri IPC denials arrive shaped like this, never as Errors.
-		expect(errorMessage({ message: "capability denied" })).toBe("capability denied");
+		expect(errorMessage({ message: "capability denied" })).toBe(
+			"capability denied"
+		);
 	});
 	it("serializes message-less objects instead of [object Object]", () => {
 		const text = errorMessage({ code: 403, kind: "denied" });

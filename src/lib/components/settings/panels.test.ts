@@ -40,9 +40,15 @@ describe("shared settings ownership", () => {
 	// design, not an accident). Declaring the prop $bindable names
 	// that contract so Svelte stops warning ownership_invalid_mutation
 	// on every slider/checkbox write.
-	for (const name of ["DefaultsPanel.svelte", "ProviderPanel.svelte", "AppearancePanel.svelte"]) {
+	for (const name of [
+		"DefaultsPanel.svelte",
+		"ProviderPanel.svelte",
+		"AppearancePanel.svelte"
+	]) {
 		it(`${name} declares its settings prop bindable`, () => {
-			expect(panelSource(name)).toMatch(/let\s*\{\s*settings\s*=\s*\$bindable\(\)/);
+			expect(panelSource(name)).toMatch(
+				/let\s*\{\s*settings\s*=\s*\$bindable\(\)/
+			);
 		});
 	}
 });
@@ -73,27 +79,37 @@ describe("updates section", () => {
 		// match :last-of-type itself and slide into column 2.
 		const css = panelsCss();
 		expect(css).not.toMatch(/section:last-of-type/);
-		expect(css).toMatch(/section\[aria-labelledby="updates-heading"\] > h2/);
-		expect(css).toMatch(/section\[aria-labelledby="updates-heading"\] > button/);
+		expect(css).toMatch(/section\[aria-labelledby="updates-heading"\]\s*> h2/);
+		expect(css).toMatch(
+			/section\[aria-labelledby="updates-heading"\]\s*> button/
+		);
 	});
 });
 
 describe("hover-row rhythm", () => {
 	it("keeps the fieldset bottom margin at zero", () => {
-		expect(ruleBody(panelsCss(), "fieldset.hover-row")).toMatch(/margin-bottom\s*:\s*0/);
+		expect(ruleBody(panelsCss(), "fieldset.hover-row")).toMatch(
+			/margin-bottom\s*:\s*0/
+		);
 	});
 	it("keeps the row labels margin-free (generic label margin stretches the row)", () => {
 		const css = panelsCss();
 		const rules = [
 			...css.matchAll(/([^{}]*fieldset\.hover-row\s+\.check[^{}]*)\{([^}]*)\}/g)
 		].filter((rule) => !rule[1]!.includes("+"));
-		if (rules.length === 0) throw new Error("no fieldset.hover-row .check rule");
+		if (rules.length === 0)
+			throw new Error("no fieldset.hover-row .check rule");
 		expect(rules[0]![2]).toMatch(/margin-bottom\s*:\s*0/);
 	});
 	it("hands the stacked 0.9rem rhythm to the check after the row", () => {
 		const css = panelsCss();
-		const sibling = [...css.matchAll(/([^{}]*fieldset\.hover-row\s*\+\s*\.check[^{}]*)\{([^}]*)\}/g)];
-		if (sibling.length === 0) throw new Error("no fieldset.hover-row + .check rule");
+		const sibling = [
+			...css.matchAll(
+				/([^{}]*fieldset\.hover-row\s*\+\s*\.check[^{}]*)\{([^}]*)\}/g
+			)
+		];
+		if (sibling.length === 0)
+			throw new Error("no fieldset.hover-row + .check rule");
 		expect(sibling[0]![2]).toMatch(/margin-top\s*:\s*0\.9rem/);
 	});
 });

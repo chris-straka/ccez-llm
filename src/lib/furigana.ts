@@ -27,23 +27,31 @@ const inflight = new Map<
 >();
 
 function getWorker(): Worker {
-	if (typeof Worker === "undefined") throw new Error("Web workers are unavailable.");
+	if (typeof Worker === "undefined")
+		throw new Error("Web workers are unavailable.");
 	if (!worker) {
-		const created = new Worker(new URL("./furigana.worker.ts", import.meta.url), {
-			type: "module"
-		});
+		const created = new Worker(
+			new URL("./furigana.worker.ts", import.meta.url),
+			{
+				type: "module"
+			}
+		);
 		created.onmessage = (event: MessageEvent) => {
 			const response = event.data as ConvertResponse;
 			const pending = inflight.get(response.id);
 			if (!pending) return;
 			inflight.delete(response.id);
-			if (response.error !== undefined) pending.reject(new Error(response.error));
+			if (response.error !== undefined)
+				pending.reject(new Error(response.error));
 			else pending.resolve(response.html ?? "");
 		};
 		created.onerror = (event: Event) => {
 			// Drop the worker so the next request starts fresh instead of
 			// talking to a dead one; in-flight callers fail loudly.
-			const detail = event instanceof ErrorEvent && event.message ? `: ${event.message}` : "";
+			const detail =
+				event instanceof ErrorEvent && event.message
+					? `: ${event.message}`
+					: "";
 			const error = new Error(`Furigana worker failed${detail}.`);
 			inflight.forEach((pending) => pending.reject(error));
 			inflight.clear();
@@ -102,9 +110,7 @@ function convertInWorker(text: string): Promise<string> {
  * dictionary fetch — fetching happens on click alone.
  */
 export function isFuriganaCached(text: string): boolean {
-	return text
-		.split("\n")
-		.every((line) => !line.trim() || cache.has(line));
+	return text.split("\n").every((line) => !line.trim() || cache.has(line));
 }
 
 /**
@@ -127,13 +133,19 @@ async function fragment(line: string): Promise<string> {
  * math blocks survive pinning) — this is the per-node unit the DOM
  * walk calls. Blank lines convert to nothing.
  */
-export async function furiganaLine(line: string, preferred: LocalAid | null = null): Promise<string> {
+export async function furiganaLine(
+	line: string,
+	preferred: LocalAid | null = null
+): Promise<string> {
 	if (!line.trim()) return "";
 	if (classifyAidLine(line, preferred) !== "furigana") return escapeHtml(line);
 	return fragment(line);
 }
 
-export async function furiganaHtml(text: string, preferred: LocalAid | null = null): Promise<string> {
+export async function furiganaHtml(
+	text: string,
+	preferred: LocalAid | null = null
+): Promise<string> {
 	// Line by line: tokenization must never see (or eat) a newline, so
 	// multi-line messages keep their line structure no matter what the
 	// tokenizer does with whitespace. Blank lines convert to nothing;
@@ -160,7 +172,10 @@ export async function furiganaHtml(text: string, preferred: LocalAid | null = nu
  * rest plain), so both aids pin at once and neither touches the other's
  * parts. Same paragraph shape as the single-aid paths.
  */
-export async function dualAidHtml(text: string, preferred: LocalAid | null = null): Promise<string> {
+export async function dualAidHtml(
+	text: string,
+	preferred: LocalAid | null = null
+): Promise<string> {
 	const lines = codeAwareLines(text);
 	const converted = await Promise.all(
 		lines.map(({ line, code }) => {

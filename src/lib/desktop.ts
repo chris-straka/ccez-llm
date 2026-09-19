@@ -27,8 +27,7 @@ export interface StudyLine {
 }
 
 export type DeepLink =
-	| { kind: "open-chat"; chatId: string }
-	| { kind: "new-chat" };
+	{ kind: "open-chat"; chatId: string } | { kind: "new-chat" };
 
 export type ShareOutcome = "shared" | "copied" | "downloaded" | "unavailable";
 
@@ -62,7 +61,8 @@ function queryValue(query: string, key: string): string | null {
 	for (const pair of query.split("&")) {
 		const equals = pair.indexOf("=");
 		if (equals < 0) continue;
-		if (pair.slice(0, equals) === key) return safeDecode(pair.slice(equals + 1));
+		if (pair.slice(0, equals) === key)
+			return safeDecode(pair.slice(equals + 1));
 	}
 	return null;
 }
@@ -94,7 +94,10 @@ export function isSummonHotkey(event: {
 	code: string;
 }): boolean {
 	return (
-		(event.metaKey || event.ctrlKey) && event.shiftKey && !event.altKey && event.code === "Space"
+		(event.metaKey || event.ctrlKey) &&
+		event.shiftKey &&
+		!event.altKey &&
+		event.code === "Space"
 	);
 }
 
@@ -104,14 +107,22 @@ export function isSummonHotkey(event: {
  * suites). The shell build delegates to the backend; the browser
  * preview and tests use this copy.
  */
-export function studySheetMarkdown(title: string, messages: StudyLine[]): string {
+export function studySheetMarkdown(
+	title: string,
+	messages: StudyLine[]
+): string {
 	const MAX_CHARS = 200_000;
 	const cleanTitle = title.trim() || "Untitled chat";
 	const kept: Array<{ heading: string; text: string }> = [];
 	for (const message of messages) {
 		const text = message.content.trim();
 		if (!text) continue;
-		const heading = message.role === "user" ? "You" : message.role === "assistant" ? "Ccez" : message.role;
+		const heading =
+			message.role === "user"
+				? "You"
+				: message.role === "assistant"
+					? "Ccez"
+					: message.role;
 		kept.push({ heading, text });
 	}
 	let out = `# ${cleanTitle}\n\n*Ccez LLM study sheet — ${kept.length} message${kept.length === 1 ? "" : "s"}.*\n`;
@@ -177,9 +188,10 @@ export async function listenDeepLinks(
 			}
 		);
 		try {
-			const pending = await invoke<{ action: string; chat_id?: string | null } | null>(
-				"desktop_drain_pending_link"
-			);
+			const pending = await invoke<{
+				action: string;
+				chat_id?: string | null;
+			} | null>("desktop_drain_pending_link");
 			const link = pending ? payloadToLink(pending) : null;
 			if (link) callback(link);
 		} catch {
@@ -191,7 +203,10 @@ export async function listenDeepLinks(
 	}
 }
 
-function payloadToLink(payload: { action: string; chat_id?: string | null }): DeepLink | null {
+function payloadToLink(payload: {
+	action: string;
+	chat_id?: string | null;
+}): DeepLink | null {
 	if (payload.action === "new-chat") return { kind: "new-chat" };
 	if (payload.action === "open-chat" && payload.chat_id) {
 		const clean = cleanLinkId(payload.chat_id);
@@ -205,18 +220,25 @@ function payloadToLink(payload: { action: string; chat_id?: string | null }): De
  * available (`navigator.share`), else the clipboard, else a `.md`
  * download. Never throws; the outcome tells the caller what to toast.
  */
-export async function shareStudySheet(title: string, markdown: string): Promise<ShareOutcome> {
+export async function shareStudySheet(
+	title: string,
+	markdown: string
+): Promise<ShareOutcome> {
 	// `navigator.share` is typed on the DOM lib but only exists in
 	// runtimes with an OS sheet (mobile browsers, some desktops) —
 	// the `typeof` guard keeps node/jsdom on the fallbacks below.
-	if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+	if (
+		typeof navigator !== "undefined" &&
+		typeof navigator.share === "function"
+	) {
 		try {
 			await navigator.share({ title, text: markdown });
 			return "shared";
 		} catch (error) {
 			// User-cancelled shares reject (AbortError): not a failure,
 			// and not a fallback trigger — the user already decided.
-			if (error instanceof Error && error.name === "AbortError") return "shared";
+			if (error instanceof Error && error.name === "AbortError")
+				return "shared";
 		}
 	}
 	try {
@@ -251,7 +273,8 @@ export async function shareStudySheet(title: string, markdown: string): Promise<
  */
 export function printStudySheet(): boolean {
 	try {
-		if (typeof window === "undefined" || typeof window.print !== "function") return false;
+		if (typeof window === "undefined" || typeof window.print !== "function")
+			return false;
 		window.print();
 		return true;
 	} catch {
@@ -265,7 +288,9 @@ export function printStudySheet(): boolean {
  * Resolves null outside the shell or where unsupported, so the caller
  * can ride the Screen Wake Lock fallback instead. Never throws.
  */
-export async function desktopSleepBlock(reason: string): Promise<number | null> {
+export async function desktopSleepBlock(
+	reason: string
+): Promise<number | null> {
 	if (!tauriBackendAvailable()) return null;
 	try {
 		return await invoke<number>("desktop_sleep_block", { reason });
@@ -296,7 +321,10 @@ export async function exportStudySheet(
 ): Promise<string | null> {
 	if (!tauriBackendAvailable()) return null;
 	try {
-		return await invoke<string>("desktop_export_study_sheet", { title, messages });
+		return await invoke<string>("desktop_export_study_sheet", {
+			title,
+			messages
+		});
 	} catch {
 		return null;
 	}

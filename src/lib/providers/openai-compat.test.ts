@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { OpenAICompatProvider, isLoopbackBaseUrl, parseModelIds, readSse } from "./openai-compat";
+import {
+	OpenAICompatProvider,
+	isLoopbackBaseUrl,
+	parseModelIds,
+	readSse
+} from "./openai-compat";
 import { ProviderError } from "./types";
 
 const CONFIG = { baseUrl: "https://example.test/v1/", apiKey: "k", model: "m" };
@@ -18,7 +23,9 @@ function sseResponse(chunks: string[]): Response {
 			controller.close();
 		}
 	});
-	return new Response(stream, { headers: { "Content-Type": "text/event-stream" } });
+	return new Response(stream, {
+		headers: { "Content-Type": "text/event-stream" }
+	});
 }
 
 afterEach(() => {
@@ -36,9 +43,14 @@ describe("chat", () => {
 		const result = await provider.chat([{ role: "user", content: "hey" }]);
 
 		expect(fetchMock).toHaveBeenCalledOnce();
-		const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+		const [url, init] = fetchMock.mock.calls[0] as unknown as [
+			string,
+			RequestInit
+		];
 		expect(url).toBe("https://example.test/v1/chat/completions");
-		expect((init.headers as Record<string, string>)["Authorization"]).toBe("Bearer k");
+		expect((init.headers as Record<string, string>)["Authorization"]).toBe(
+			"Bearer k"
+		);
 		expect(JSON.parse(init.body as string)).toMatchObject({
 			model: "m",
 			messages: [{ role: "user", content: "hey" }],
@@ -73,16 +85,23 @@ describe("chat", () => {
 
 		vi.stubGlobal(
 			"fetch",
-			vi.fn(async () => jsonResponse({ choices: [{ message: { content: "x" } }] }))
+			vi.fn(async () =>
+				jsonResponse({ choices: [{ message: { content: "x" } }] })
+			)
 		);
 		const withoutUsage = await provider.chat([{ role: "user", content: "x" }]);
 		expect(withoutUsage.usage).toBeNull();
 	});
 
 	it("wraps HTTP failures and network errors in ProviderError", async () => {
-		vi.stubGlobal("fetch", vi.fn(async () => new Response("nope", { status: 401 })));
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => new Response("nope", { status: 401 }))
+		);
 		const provider = new OpenAICompatProvider("probe", CONFIG);
-		const err = await provider.chat([{ role: "user", content: "x" }]).catch((e: unknown) => e);
+		const err = await provider
+			.chat([{ role: "user", content: "x" }])
+			.catch((e: unknown) => e);
 		expect(err).toBeInstanceOf(ProviderError);
 		expect((err as ProviderError).status).toBe(401);
 
@@ -92,7 +111,9 @@ describe("chat", () => {
 				throw new Error("down");
 			})
 		);
-		const net = await provider.chat([{ role: "user", content: "x" }]).catch((e: unknown) => e);
+		const net = await provider
+			.chat([{ role: "user", content: "x" }])
+			.catch((e: unknown) => e);
 		expect(net).toBeInstanceOf(ProviderError);
 	});
 });
@@ -110,7 +131,9 @@ describe("user stops are never network errors", () => {
 	it("reports a stopped chat() as stopped", async () => {
 		abortFetch();
 		const provider = new OpenAICompatProvider("probe", CONFIG);
-		const err = await provider.chat([{ role: "user", content: "x" }]).catch((e: unknown) => e);
+		const err = await provider
+			.chat([{ role: "user", content: "x" }])
+			.catch((e: unknown) => e);
 		expect(err).toBeInstanceOf(ProviderError);
 		expect(String((err as ProviderError).message)).toBe("Reply stopped.");
 	});
@@ -128,13 +151,24 @@ describe("user stops are never network errors", () => {
 	it("reports a mid-stream abort as stopped", async () => {
 		const stream = new ReadableStream<Uint8Array>({
 			start(controller) {
-				controller.enqueue(new TextEncoder().encode(`data: {"choices":[{"delta":{"content":"hi"}}]}\n\n`));
-				controller.error(new DOMException("This operation was aborted", "AbortError"));
+				controller.enqueue(
+					new TextEncoder().encode(
+						`data: {"choices":[{"delta":{"content":"hi"}}]}\n\n`
+					)
+				);
+				controller.error(
+					new DOMException("This operation was aborted", "AbortError")
+				);
 			}
 		});
 		vi.stubGlobal(
 			"fetch",
-			vi.fn(async () => new Response(stream, { headers: { "Content-Type": "text/event-stream" } }))
+			vi.fn(
+				async () =>
+					new Response(stream, {
+						headers: { "Content-Type": "text/event-stream" }
+					})
+			)
 		);
 		const provider = new OpenAICompatProvider("probe", CONFIG);
 		const err = await provider
@@ -152,14 +186,21 @@ describe("user stops are never network errors", () => {
 		});
 		vi.stubGlobal(
 			"fetch",
-			vi.fn(async () => new Response(stream, { headers: { "Content-Type": "text/event-stream" } }))
+			vi.fn(
+				async () =>
+					new Response(stream, {
+						headers: { "Content-Type": "text/event-stream" }
+					})
+			)
 		);
 		const provider = new OpenAICompatProvider("probe", CONFIG);
 		const err = await provider
 			.stream([{ role: "user", content: "x" }], { onToken: () => {} })
 			.catch((e: unknown) => e);
 		expect(err).toBeInstanceOf(ProviderError);
-		expect(String((err as ProviderError).message)).toMatch(/Network error talking to probe/);
+		expect(String((err as ProviderError).message)).toMatch(
+			/Network error talking to probe/
+		);
 	});
 });
 
@@ -185,7 +226,9 @@ describe("stream", () => {
 
 	it("offers fetch_url on the first request, one round trip when unused", async () => {
 		const fetchMock = vi.fn(async () =>
-			sseResponse([`data: {"choices":[{"delta":{"content":"plain"}}]}\n\ndata: [DONE]\n\n`])
+			sseResponse([
+				`data: {"choices":[{"delta":{"content":"plain"}}]}\n\ndata: [DONE]\n\n`
+			])
 		);
 		vi.stubGlobal("fetch", fetchMock);
 		const provider = new OpenAICompatProvider("probe", CONFIG, {
@@ -198,7 +241,10 @@ describe("stream", () => {
 		});
 		expect(result.content).toBe("plain");
 		expect(fetchMock).toHaveBeenCalledOnce();
-		const [, firstInit] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+		const [, firstInit] = fetchMock.mock.calls[0] as unknown as [
+			string,
+			RequestInit
+		];
 		const body = JSON.parse(firstInit.body as string) as {
 			tools?: Array<{ function?: { name?: string } }>;
 		};
@@ -213,25 +259,24 @@ describe("stream", () => {
 			if (fetchMock.mock.calls.length === 1) {
 				// Built, not hand-spliced, so the JSON is valid; split
 				// mid-arguments to prove fragmented deltas join.
-				const wire =
-					`data: ${JSON.stringify({
-						choices: [
-							{
-								delta: {
-									tool_calls: [
-										{
-											index: 0,
-											id: "call_1",
-											function: {
-												name: "fetch_url",
-												arguments: JSON.stringify({ url: "https://example.com/" })
-											}
+				const wire = `data: ${JSON.stringify({
+					choices: [
+						{
+							delta: {
+								tool_calls: [
+									{
+										index: 0,
+										id: "call_1",
+										function: {
+											name: "fetch_url",
+											arguments: JSON.stringify({ url: "https://example.com/" })
 										}
-									]
-								}
+									}
+								]
 							}
-						]
-					})}`;
+						}
+					]
+				})}`;
 				const cutAt = wire.indexOf("example") - 2;
 				return sseResponse([
 					wire.slice(0, cutAt),
@@ -258,9 +303,16 @@ describe("stream", () => {
 		expect(seen.join("")).toBe("fetched!");
 		expect(fetchMock.mock.calls.length).toBe(3);
 		// The follow-up carries the assistant call plus the tool result.
-		const [, followInit] = fetchMock.mock.calls[1] as unknown as [string, RequestInit];
+		const [, followInit] = fetchMock.mock.calls[1] as unknown as [
+			string,
+			RequestInit
+		];
 		const followBody = JSON.parse(followInit.body as string) as {
-			messages: Array<{ role?: string; tool_calls?: unknown[]; tool_call_id?: string }>;
+			messages: Array<{
+				role?: string;
+				tool_calls?: unknown[];
+				tool_call_id?: string;
+			}>;
 		};
 		const roles = followBody.messages.map((m) => m.role);
 		expect(roles).toEqual(["user", "assistant", "tool"]);
@@ -273,7 +325,8 @@ describe("stream", () => {
 	it("falls back to a plain stream when the provider rejects tools", async () => {
 		const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
 			const body = JSON.parse(init.body as string) as { tools?: unknown };
-			if (body.tools !== undefined) return jsonResponse({ error: "no tools" }, 400);
+			if (body.tools !== undefined)
+				return jsonResponse({ error: "no tools" }, 400);
 			return sseResponse([
 				`data: {"choices":[{"delta":{"content":"plain"}}]}\n\ndata: [DONE]\n\n`
 			]);
@@ -285,8 +338,14 @@ describe("stream", () => {
 		});
 		expect(result.content).toBe("plain");
 		expect(fetchMock.mock.calls.length).toBe(2);
-		const [, retryInit] = fetchMock.mock.calls[1] as unknown as [string, RequestInit];
-		const retry = JSON.parse(retryInit.body as string) as Record<string, unknown>;
+		const [, retryInit] = fetchMock.mock.calls[1] as unknown as [
+			string,
+			RequestInit
+		];
+		const retry = JSON.parse(retryInit.body as string) as Record<
+			string,
+			unknown
+		>;
 		expect("tools" in retry).toBe(false);
 	});
 
@@ -336,7 +395,7 @@ describe("readSse", () => {
 		const stream = new ReadableStream<Uint8Array>({
 			start(controller) {
 				controller.enqueue(new TextEncoder().encode('data: {"a":'));
-				controller.enqueue(new TextEncoder().encode('1}\n\ndata: [DONE]\n\n'));
+				controller.enqueue(new TextEncoder().encode("1}\n\ndata: [DONE]\n\n"));
 				controller.close();
 			}
 		});
@@ -352,12 +411,21 @@ describe("listModels", () => {
 			"fetch",
 			vi.fn(async () =>
 				jsonResponse({
-					data: [{ id: "b-model" }, { id: "a-model" }, { id: "b-model" }, { id: "  " }, { id: 42 }]
+					data: [
+						{ id: "b-model" },
+						{ id: "a-model" },
+						{ id: "b-model" },
+						{ id: "  " },
+						{ id: 42 }
+					]
 				})
 			)
 		);
 		const provider = new OpenAICompatProvider("probe", CONFIG);
-		await expect(provider.listModels()).resolves.toEqual(["a-model", "b-model"]);
+		await expect(provider.listModels()).resolves.toEqual([
+			"a-model",
+			"b-model"
+		]);
 	});
 
 	it("sends the Bearer [REDACTED] to a trimmed /models URL", async () => {
@@ -366,13 +434,21 @@ describe("listModels", () => {
 		const provider = new OpenAICompatProvider("probe", CONFIG);
 		await provider.listModels();
 		expect(fetchMock).toHaveBeenCalledOnce();
-		const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+		const [url, init] = fetchMock.mock.calls[0] as unknown as [
+			string,
+			RequestInit
+		];
 		expect(url).toBe("https://example.test/v1/models");
-		expect((init.headers as Record<string, string>)["Authorization"]).toBe("Bearer k");
+		expect((init.headers as Record<string, string>)["Authorization"]).toBe(
+			"Bearer k"
+		);
 	});
 
 	it("throws ProviderError on HTTP and network failures", async () => {
-		vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ error: "nope" }, 401)));
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => jsonResponse({ error: "nope" }, 401))
+		);
 		const provider = new OpenAICompatProvider("probe", CONFIG);
 		await expect(provider.listModels()).rejects.toBeInstanceOf(ProviderError);
 		vi.stubGlobal(
@@ -406,7 +482,10 @@ describe("thinking", () => {
 		vi.stubGlobal("fetch", fetchMock);
 		const provider = new OpenAICompatProvider(id, { ...CONFIG, model });
 		await provider.chat([{ role: "user", content: "x" }], { thinking });
-		const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+		const [, init] = fetchMock.mock.calls[0] as unknown as [
+			string,
+			RequestInit
+		];
 		return JSON.parse(init.body as string) as Record<string, unknown>;
 	}
 
@@ -453,7 +532,11 @@ describe("thinking", () => {
 		expect(body).not.toHaveProperty("reasoning_effort");
 		expect(body).not.toHaveProperty("thinking");
 		// Unknown ids resolve to the model's default before sending.
-		const museBogus = await postedBody("muse", "muse-spark-1.3-contributor", "bogus");
+		const museBogus = await postedBody(
+			"muse",
+			"muse-spark-1.3-contributor",
+			"bogus"
+		);
 		expect(museBogus).toMatchObject({ reasoning_effort: "medium" });
 	});
 });
@@ -479,9 +562,9 @@ describe("loopback failures", () => {
 			/local-gemma needs Ollama running/
 		);
 		const remote = new OpenAICompatProvider("probe", CONFIG);
-		await expect(remote.chat([{ role: "user", content: "hi" }])).rejects.toThrow(
-			/Network error talking to probe/
-		);
+		await expect(
+			remote.chat([{ role: "user", content: "hi" }])
+		).rejects.toThrow(/Network error talking to probe/);
 	});
 
 	it("serves a mobile message on phones, never Ollama", async () => {
@@ -492,12 +575,11 @@ describe("loopback failures", () => {
 			model: "gemma4:latest",
 			mobile: true
 		});
-		const message = await local
-			.chat([{ role: "user", content: "hi" }])
-			.then(
-				() => "",
-				(error: unknown) => (error instanceof Error ? error.message : String(error))
-			);
+		const message = await local.chat([{ role: "user", content: "hi" }]).then(
+			() => "",
+			(error: unknown) =>
+				error instanceof Error ? error.message : String(error)
+		);
 		expect(message).toContain("on this phone");
 		expect(message).not.toMatch(/ollama/i);
 	});

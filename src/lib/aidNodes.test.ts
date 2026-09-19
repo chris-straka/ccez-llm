@@ -10,7 +10,9 @@ function rootOf(html: string): Element {
 
 describe("aidTextNodes", () => {
 	it("collects prose text, skipping blanks", () => {
-		const nodes = aidTextNodes(rootOf("<p>Hello <strong>世界</strong></p><p>  </p>"));
+		const nodes = aidTextNodes(
+			rootOf("<p>Hello <strong>世界</strong></p><p>  </p>")
+		);
 		expect(nodes.map((n) => n.textContent)).toEqual(["Hello ", "世界"]);
 	});
 
@@ -21,12 +23,16 @@ describe("aidTextNodes", () => {
 					"<pre><code>code 读取</code></pre>" +
 					'<div class="ccez-math" data-math-index="0"><div class="ccez-math-body">E 读取</div>' +
 					'<pre class="ccez-math-raw">raw 读取</pre></div>' +
-					'<p>ruby <ruby>読<rt>よみ</rt></ruby> tail</p>' +
+					"<p>ruby <ruby>読<rt>よみ</rt></ruby> tail</p>" +
 					'<p><button>btn 读取</button> <a href="#">link 读取</a></p>' +
 					'<div class="ccez-code-output">out 读取</div>'
 			)
 		);
-		expect(nodes.map((n) => n.textContent)).toEqual(["keep 读取", "ruby ", " tail"]);
+		expect(nodes.map((n) => n.textContent)).toEqual([
+			"keep 读取",
+			"ruby ",
+			" tail"
+		]);
 	});
 
 	it("stays empty with no prose", () => {
@@ -35,7 +41,17 @@ describe("aidTextNodes", () => {
 	});
 
 	it("documents the skip contract", () => {
-		for (const sel of ["pre", "code", "[data-math-index]", ".katex", "ruby", "rt", "rp", "button", "a"]) {
+		for (const sel of [
+			"pre",
+			"code",
+			"[data-math-index]",
+			".katex",
+			"ruby",
+			"rt",
+			"rp",
+			"button",
+			"a"
+		]) {
 			expect(AID_SKIP_SELECTOR).toContain(sel);
 		}
 	});

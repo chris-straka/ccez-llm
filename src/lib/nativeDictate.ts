@@ -100,7 +100,8 @@ export async function startNativeDictation(
 	try {
 		unlisten = await listen<{ transcript: string; final: boolean }>(
 			"dictate-result",
-			(event) => route(event.payload.transcript ?? "", event.payload.final === true)
+			(event) =>
+				route(event.payload.transcript ?? "", event.payload.final === true)
 		);
 	} catch {
 		// No event bridge (plain browser): fall back to web dictation.

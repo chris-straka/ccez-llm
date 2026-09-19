@@ -26,7 +26,12 @@ export interface VoiceOption {
 }
 
 function toOption(voice: NativeVoice): VoiceOption {
-	return { id: voice.id, name: voice.name, lang: voice.lang, tier: tierLabel(voice) };
+	return {
+		id: voice.id,
+		name: voice.name,
+		lang: voice.lang,
+		tier: tierLabel(voice)
+	};
 }
 
 /**
@@ -44,8 +49,11 @@ export function autoVoiceForLang(
 ): VoiceOption | null {
 	const exactTag = lang.trim().toLowerCase();
 	const primary = exactTag.split(/[-_]/)[0] ?? "";
-	const family = (tag: string): boolean => tag.toLowerCase().split(/[-_]/)[0] === primary;
-	const saved = savedId ? voices.find((voice) => voice.id === savedId) : undefined;
+	const family = (tag: string): boolean =>
+		tag.toLowerCase().split(/[-_]/)[0] === primary;
+	const saved = savedId
+		? voices.find((voice) => voice.id === savedId)
+		: undefined;
 	if (saved && family(saved.lang)) return toOption(saved);
 	let best: NativeVoice | null = null;
 	let bestScore = Number.MIN_SAFE_INTEGER;
@@ -53,7 +61,11 @@ export function autoVoiceForLang(
 		const exact = voice.lang.toLowerCase() === exactTag;
 		if (!exact && !family(voice.lang)) continue;
 		const score = voice.quality + (exact ? 10 : 0);
-		if (best === null || score > bestScore || (score === bestScore && voice.name < best.name)) {
+		if (
+			best === null ||
+			score > bestScore ||
+			(score === bestScore && voice.name < best.name)
+		) {
 			best = voice;
 			bestScore = score;
 		}
@@ -74,7 +86,10 @@ function byName(a: VoiceOption, b: VoiceOption): number {
  * them only adds noise — and unrelated languages resolve through
  * auto-pick at speak time. Pure and unit-tested.
  */
-export function voicesForLang(voices: NativeVoice[], lang: string): VoiceOption[] {
+export function voicesForLang(
+	voices: NativeVoice[],
+	lang: string
+): VoiceOption[] {
 	return groupByLang(voices, lang, 2);
 }
 
@@ -83,11 +98,18 @@ export function voicesForLang(voices: NativeVoice[], lang: string): VoiceOption[
  * then-language grouping, but no quality gate — Android has no
  * premium/enhanced tiers, so the gate would hide every voice.
  */
-export function allVoicesForLang(voices: NativeVoice[], lang: string): VoiceOption[] {
+export function allVoicesForLang(
+	voices: NativeVoice[],
+	lang: string
+): VoiceOption[] {
 	return groupByLang(voices, lang, 0);
 }
 
-function groupByLang(voices: NativeVoice[], lang: string, minQuality: number): VoiceOption[] {
+function groupByLang(
+	voices: NativeVoice[],
+	lang: string,
+	minQuality: number
+): VoiceOption[] {
 	const exactTag = lang.trim().toLowerCase();
 	const primary = exactTag.split(/[-_]/)[0] ?? "";
 	const exact: VoiceOption[] = [];

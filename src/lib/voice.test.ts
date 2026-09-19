@@ -31,7 +31,11 @@ describe("splitSentences", () => {
 			"How are you?",
 			"Fine!"
 		]);
-		expect(splitSentences("你好世界。今天好吗？很好！")).toEqual(["你好世界。", "今天好吗？", "很好！"]);
+		expect(splitSentences("你好世界。今天好吗？很好！")).toEqual([
+			"你好世界。",
+			"今天好吗？",
+			"很好！"
+		]);
 	});
 
 	it("handles single sentences and empties", () => {
@@ -41,14 +45,22 @@ describe("splitSentences", () => {
 	});
 
 	it("keeps halves on separate lines in their own voices", () => {
-		expect(splitSentences("Hello world\nこんにちは世界")).toEqual(["Hello world", "こんにちは世界"]);
-		expect(splitSentences("First.\n\nSecond line")).toEqual(["First.", "Second line"]);
+		expect(splitSentences("Hello world\nこんにちは世界")).toEqual([
+			"Hello world",
+			"こんにちは世界"
+		]);
+		expect(splitSentences("First.\n\nSecond line")).toEqual([
+			"First.",
+			"Second line"
+		]);
 	});
 });
 
 describe("speechText", () => {
 	it("drops code fences and markdown noise", () => {
-		const text = speechText('# Title\n\nHello **world**.\n\n```ts\nconst x = 1;\n```\n\n[Pasted an image]');
+		const text = speechText(
+			"# Title\n\nHello **world**.\n\n```ts\nconst x = 1;\n```\n\n[Pasted an image]"
+		);
 		expect(text).toContain("Title");
 		expect(text).toContain("Hello world.");
 		expect(text).not.toContain("const x");
@@ -97,7 +109,13 @@ describe("speech unavailability", () => {
 		expect(isSpeaking()).toBe(false);
 		expect(() => stopSpeaking()).not.toThrow();
 		expect(micAvailable()).toBe(false);
-		expect(dictateOnce("en-US", () => {}, () => {})).toBeNull();
+		expect(
+			dictateOnce(
+				"en-US",
+				() => {},
+				() => {}
+			)
+		).toBeNull();
 	});
 });
 
@@ -120,7 +138,9 @@ describe("splitScriptRuns", () => {
 describe("splitSpeechSegments", () => {
 	const langFor = (sentence: string): string => ttsLangFor(sentence, "en-US");
 	it("resolves a voice locale per sentence", () => {
-		expect(splitSpeechSegments("Hello world. 你好！こんにちは！", langFor)).toEqual([
+		expect(
+			splitSpeechSegments("Hello world. 你好！こんにちは！", langFor)
+		).toEqual([
 			{ text: "Hello world.", lang: "en-US" },
 			{ text: "你好！", lang: "zh-CN" },
 			{ text: "こんにちは！", lang: "ja-JP" }
@@ -147,7 +167,9 @@ describe("splitSpeechSegments", () => {
 			splitSpeechSegments("Hello世界", (s) => sentenceSpeechLang(s, "en-US"))
 		).toEqual([{ text: "Hello世界", lang: "en-US" }]);
 		expect(
-			splitSpeechSegments("Hello世界。Goodbye宇宙。", (s) => sentenceSpeechLang(s, "en-US"))
+			splitSpeechSegments("Hello世界。Goodbye宇宙。", (s) =>
+				sentenceSpeechLang(s, "en-US")
+			)
 		).toEqual([
 			{ text: "Hello", lang: "en-US" },
 			{ text: "世界。", lang: "zh-CN" },
@@ -173,7 +195,12 @@ describe("webVoiceAvailable", () => {
 });
 
 describe("effectiveSpeechLang", () => {
-	const VOICES = [{ lang: "en-US" }, { lang: "it-IT" }, { lang: "hi-IN" }, { lang: "ja-JP" }];
+	const VOICES = [
+		{ lang: "en-US" },
+		{ lang: "it-IT" },
+		{ lang: "hi-IN" },
+		{ lang: "ja-JP" }
+	];
 	it("keeps the request when a voice exists", () => {
 		expect(effectiveSpeechLang("en-US", VOICES)).toBe("en-US");
 		expect(effectiveSpeechLang("ja-JP", VOICES)).toBe("ja-JP");
@@ -204,7 +231,10 @@ describe("friendlyMicError", () => {
 		expect(friendlyMicError("weird-code")).toBe("weird-code");
 	});
 	it("names offline distinctly from unreachable", () => {
-		Object.defineProperty(window.navigator, "onLine", { value: false, configurable: true });
+		Object.defineProperty(window.navigator, "onLine", {
+			value: false,
+			configurable: true
+		});
 		try {
 			expect(friendlyMicError("network")).toMatch(/offline/i);
 		} finally {
@@ -262,19 +292,27 @@ describe("speechLangsFor", () => {
 
 describe("startSpeechError", () => {
 	it("banners start failures, naming the fault", () => {
-		expect(startSpeechError({ quiet: false, useNative: false, inventoryEmpty: true })).toBe(
-			"No voices on this device — check its text-to-speech settings."
-		);
-		expect(startSpeechError({ quiet: false, useNative: false, inventoryEmpty: false })).toBe(
-			"Voice not available."
-		);
-		expect(startSpeechError({ quiet: false, useNative: true, inventoryEmpty: true })).toBe(
-			"Voice not available."
-		);
+		expect(
+			startSpeechError({ quiet: false, useNative: false, inventoryEmpty: true })
+		).toBe("No voices on this device — check its text-to-speech settings.");
+		expect(
+			startSpeechError({
+				quiet: false,
+				useNative: false,
+				inventoryEmpty: false
+			})
+		).toBe("Voice not available.");
+		expect(
+			startSpeechError({ quiet: false, useNative: true, inventoryEmpty: true })
+		).toBe("Voice not available.");
 	});
 
 	it("keeps quiet background readbacks silent", () => {
-		expect(startSpeechError({ quiet: true, useNative: false, inventoryEmpty: true })).toBe(null);
-		expect(startSpeechError({ quiet: true, useNative: true, inventoryEmpty: false })).toBe(null);
+		expect(
+			startSpeechError({ quiet: true, useNative: false, inventoryEmpty: true })
+		).toBe(null);
+		expect(
+			startSpeechError({ quiet: true, useNative: true, inventoryEmpty: false })
+		).toBe(null);
 	});
 });

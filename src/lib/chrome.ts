@@ -1,4 +1,9 @@
-import { PROMPT_IDLE_ALWAYS, PROMPT_IDLE_MAX, PROMPT_IDLE_MIN, PROMPT_IDLE_NEVER } from "./settings";
+import {
+	PROMPT_IDLE_ALWAYS,
+	PROMPT_IDLE_MAX,
+	PROMPT_IDLE_MIN,
+	PROMPT_IDLE_NEVER
+} from "./settings";
 
 /**
  * App-chrome helpers (pure, DOM-free): prompt idle-hide and slider
@@ -14,7 +19,11 @@ export const SLIDER_DRAG_RESET_PX = 48;
  * `idleSec` seconds before `now` (epoch millis both). A non-positive
  * timeout disables hiding entirely.
  */
-export function isPromptIdle(lastInputAt: number, now: number, idleSec: number): boolean {
+export function isPromptIdle(
+	lastInputAt: number,
+	now: number,
+	idleSec: number
+): boolean {
 	if (!(idleSec > 0)) return false;
 	return now - lastInputAt >= idleSec * 1000;
 }

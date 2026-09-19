@@ -14,7 +14,9 @@ async function seedEmpty(page: Page): Promise<void> {
 		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
 		window.localStorage.setItem(
 			"ccez-llm-chats-v1",
-			JSON.stringify([{ id: "e2e-chat", createdAt: 1, replyLang: null, messages: [] }])
+			JSON.stringify([
+				{ id: "e2e-chat", createdAt: 1, replyLang: null, messages: [] }
+			])
 		);
 	});
 	await page.goto("/");
@@ -43,9 +45,19 @@ test.describe("gestures", () => {
 		const width = await page.evaluate(() => window.innerWidth);
 		await page.evaluate((w: number) => {
 			const touch = (x: number, y: number) =>
-				new Touch({ identifier: 9, target: document.body, clientX: x, clientY: y });
+				new Touch({
+					identifier: 9,
+					target: document.body,
+					clientX: x,
+					clientY: y
+				});
 			window.dispatchEvent(
-				new TouchEvent("touchstart", { bubbles: true, cancelable: true, composed: true, touches: [touch(w - 4, 600)] })
+				new TouchEvent("touchstart", {
+					bubbles: true,
+					cancelable: true,
+					composed: true,
+					touches: [touch(w - 4, 600)]
+				})
 			);
 			window.dispatchEvent(
 				new TouchEvent("touchend", {
@@ -59,7 +71,9 @@ test.describe("gestures", () => {
 		}, width);
 	}
 
-	test("shortcuts modal teaches touch gestures on Android", async ({ page }) => {
+	test("shortcuts modal teaches touch gestures on Android", async ({
+		page
+	}) => {
 		// Settings opens from the chats-list button (one-finger swipes
 		// never open it): summon the list, then walk the button path.
 		await swipeFromLeftEdge(page);
@@ -70,7 +84,9 @@ test.describe("gestures", () => {
 		const modal = page.locator(".modal-veil");
 		// Exact-match the row (a substring match would also hit siblings).
 		await expect(modal.locator('dt:text-is("Chats list")')).toBeVisible();
-		await expect(modal.locator('dd:has-text("Double-tap empty space")')).toBeVisible();
+		await expect(
+			modal.locator('dd:has-text("Double-tap empty space")')
+		).toBeVisible();
 		// The list row teaches its two openers; the switcher owns the
 		// double-tap now, and fold and settings rows exist.
 		await expect(modal.locator('dt:text-is("Chats list") + dd')).toHaveText(
@@ -82,37 +98,57 @@ test.describe("gestures", () => {
 		await expect(modal.locator('dd:has-text("Chats list button")')).toHaveText(
 			"Swipe left off messages · chats list button · two-finger swipe left"
 		);
-		await expect(modal.locator('dt:text-is("Newer / older chat")')).toBeVisible();
-		await expect(modal.locator('dd:has-text("Three-finger swipe right")')).toHaveText(
-			"Three-finger swipe right / left"
-		);
+		await expect(
+			modal.locator('dt:text-is("Newer / older chat")')
+		).toBeVisible();
+		await expect(
+			modal.locator('dd:has-text("Three-finger swipe right")')
+		).toHaveText("Three-finger swipe right / left");
 		await expect(modal.locator('dt:text-is("Top of chat")')).toBeVisible();
-		await expect(modal.locator('dd:has-text("Two-finger swipe up")')).toHaveText(
-			"Two-finger swipe up · gg"
-		);
+		await expect(
+			modal.locator('dd:has-text("Two-finger swipe up")')
+		).toHaveText("Two-finger swipe up · gg");
 		await expect(modal.locator('dt:text-is("Bottom of chat")')).toBeVisible();
-		await expect(modal.locator('dd:has-text("Two-finger swipe down")')).toHaveText(
-			"Two-finger swipe down · G"
-		);
+		await expect(
+			modal.locator('dd:has-text("Two-finger swipe down")')
+		).toHaveText("Two-finger swipe down · G");
 		await expect(modal.locator('dt:text-is("Chat switcher")')).toBeVisible();
 		await expect(modal.locator('dt:text-is("Chat switcher") + dd')).toHaveText(
 			"Two-finger hold · double-tap empty space · swipe cycles · loops"
 		);
 		await expect(modal.locator('dt:text-is("Message end")')).toBeVisible();
-		await expect(modal.locator('dt:text-is("Message end") + dd')).toHaveText("Double two-finger tap");
+		await expect(modal.locator('dt:text-is("Message end") + dd')).toHaveText(
+			"Double two-finger tap"
+		);
 		await expect(modal.locator('dt:text-is("Delete a message")')).toBeVisible();
-		await expect(modal.locator('dt:text-is("Delete a message") + dd')).toHaveText("Three-finger tap");
-		await expect(modal.locator('dt:text-is("Delete every chat")')).toBeVisible();
-		await expect(modal.locator('dt:text-is("Delete every chat") + dd')).toHaveText("Three-finger hold");
+		await expect(
+			modal.locator('dt:text-is("Delete a message") + dd')
+		).toHaveText("Three-finger tap");
+		await expect(
+			modal.locator('dt:text-is("Delete every chat")')
+		).toBeVisible();
+		await expect(
+			modal.locator('dt:text-is("Delete every chat") + dd')
+		).toHaveText("Three-finger hold");
 	});
 
 	/** Synthetic edge swipe (untrusted TouchEvents still hit window listeners). */
 	async function swipeFromLeftEdge(page: Page): Promise<void> {
 		await page.evaluate(() => {
 			const touch = (x: number, y: number) =>
-				new Touch({ identifier: 7, target: document.body, clientX: x, clientY: y });
+				new Touch({
+					identifier: 7,
+					target: document.body,
+					clientX: x,
+					clientY: y
+				});
 			window.dispatchEvent(
-				new TouchEvent("touchstart", { bubbles: true, cancelable: true, composed: true, touches: [touch(4, 600)] })
+				new TouchEvent("touchstart", {
+					bubbles: true,
+					cancelable: true,
+					composed: true,
+					touches: [touch(4, 600)]
+				})
 			);
 			window.dispatchEvent(
 				new TouchEvent("touchend", {
@@ -128,16 +164,35 @@ test.describe("gestures", () => {
 
 	/** Synthetic two-finger swipe (left opens settings, right steps
 	newer — same untrusted-event path as the one-finger strokes). */
-	async function swipeTwoFinger(page: Page, x0: number, x1: number): Promise<void> {
+	async function swipeTwoFinger(
+		page: Page,
+		x0: number,
+		x1: number
+	): Promise<void> {
 		await page.evaluate(
 			({ x0, x1 }: { x0: number; x1: number }) => {
 				const touch = (id: number, x: number, y: number) =>
-					new Touch({ identifier: id, target: document.body, clientX: x, clientY: y });
+					new Touch({
+						identifier: id,
+						target: document.body,
+						clientX: x,
+						clientY: y
+					});
 				window.dispatchEvent(
-					new TouchEvent("touchstart", { bubbles: true, cancelable: true, composed: true, touches: [touch(1, x0, 500), touch(2, x0 + 40, 500)] })
+					new TouchEvent("touchstart", {
+						bubbles: true,
+						cancelable: true,
+						composed: true,
+						touches: [touch(1, x0, 500), touch(2, x0 + 40, 500)]
+					})
 				);
 				window.dispatchEvent(
-					new TouchEvent("touchmove", { bubbles: true, cancelable: true, composed: true, touches: [touch(1, x1, 500), touch(2, x1 + 40, 500)] })
+					new TouchEvent("touchmove", {
+						bubbles: true,
+						cancelable: true,
+						composed: true,
+						touches: [touch(1, x1, 500), touch(2, x1 + 40, 500)]
+					})
 				);
 				window.dispatchEvent(
 					new TouchEvent("touchend", {
@@ -180,13 +235,27 @@ test.describe("gestures", () => {
 	});
 
 	/** Synthetic mid-screen swipe (same untrusted-event path as edges). */
-	async function swipeMidScreen(page: Page, x0: number, x1: number): Promise<void> {
+	async function swipeMidScreen(
+		page: Page,
+		x0: number,
+		x1: number
+	): Promise<void> {
 		await page.evaluate(
 			({ x0, x1 }: { x0: number; x1: number }) => {
 				const touch = (x: number, y: number) =>
-					new Touch({ identifier: 9, target: document.body, clientX: x, clientY: y });
+					new Touch({
+						identifier: 9,
+						target: document.body,
+						clientX: x,
+						clientY: y
+					});
 				window.dispatchEvent(
-					new TouchEvent("touchstart", { bubbles: true, cancelable: true, composed: true, touches: [touch(x0, 600)] })
+					new TouchEvent("touchstart", {
+						bubbles: true,
+						cancelable: true,
+						composed: true,
+						touches: [touch(x0, 600)]
+					})
 				);
 				window.dispatchEvent(
 					new TouchEvent("touchend", {
@@ -202,7 +271,9 @@ test.describe("gestures", () => {
 		);
 	}
 
-	test("mid-screen swipe right never opens the chat sidebar", async ({ page }) => {
+	test("mid-screen swipe right never opens the chat sidebar", async ({
+		page
+	}) => {
 		const aside = page.locator("aside:has(button.side-chat)");
 		const panel = page.locator(".settings-panel");
 		// Mid-screen rightward summons nothing (the list opens from
@@ -228,7 +299,9 @@ test.describe("gestures", () => {
 		await expect(aside).toHaveClass(/collapsed/);
 	});
 
-	test("mid-screen swipe left opens settings, folds the list", async ({ page }) => {
+	test("mid-screen swipe left opens settings, folds the list", async ({
+		page
+	}) => {
 		const panel = page.locator(".settings-panel");
 		const aside = page.locator("aside:has(button.side-chat)");
 		// Fresh load starts shut: a leftward stroke opens settings...
@@ -273,7 +346,9 @@ test.describe("share", () => {
 	 */
 	const SHARE = "Look at this\nhttps://example.com/menu";
 
-	test("shared text lands verbatim in an empty phone composer", async ({ page }) => {
+	test("shared text lands verbatim in an empty phone composer", async ({
+		page
+	}) => {
 		await seedEmpty(page);
 		// The bridge prefills an empty draft with the share as-is.
 		const box = page.locator(".prompt .ta-input");
@@ -288,7 +363,9 @@ test.describe("share", () => {
 		await expect(box).toHaveValue(`what is this? ${SHARE}`);
 	});
 
-	test("a share into an empty app sends as the first message", async ({ page }) => {
+	test("a share into an empty app sends as the first message", async ({
+		page
+	}) => {
 		await seedEmpty(page);
 		// Cold-start share outcome: the app opens on a chat whose first
 		// user message carries the shared text.
@@ -296,7 +373,9 @@ test.describe("share", () => {
 		await box.click();
 		await box.fill(SHARE);
 		await page.locator(".send-btn").click();
-		const sent = page.locator("article.user").filter({ hasText: "example.com/menu" });
+		const sent = page
+			.locator("article.user")
+			.filter({ hasText: "example.com/menu" });
 		await expect(sent).toBeVisible({ timeout: 15000 });
 	});
 });
@@ -317,9 +396,20 @@ test.describe("touch", () => {
 		if (!box) throw new Error("no message box");
 		await page.evaluate(
 			({ x, y }: { x: number; y: number }) => {
-				const touch = (id: number) => new Touch({ identifier: id, target: document.body, clientX: x, clientY: y });
+				const touch = (id: number) =>
+					new Touch({
+						identifier: id,
+						target: document.body,
+						clientX: x,
+						clientY: y
+					});
 				window.dispatchEvent(
-					new TouchEvent("touchstart", { bubbles: true, cancelable: true, composed: true, touches: [touch(1)] })
+					new TouchEvent("touchstart", {
+						bubbles: true,
+						cancelable: true,
+						composed: true,
+						touches: [touch(1)]
+					})
 				);
 				const rendered = document.querySelector("article .rendered");
 				const sel = window.getSelection();
@@ -345,12 +435,28 @@ test.describe("touch", () => {
 		await page.addInitScript(() => {
 			window.localStorage.setItem("ccez-mock-provider", "1");
 			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
-			const msg = (id: string, content: string) => ({ id, role: "assistant", content, usage: null, error: null });
+			const msg = (id: string, content: string) => ({
+				id,
+				role: "assistant",
+				content,
+				usage: null,
+				error: null
+			});
 			window.localStorage.setItem(
 				"ccez-llm-chats-v1",
 				JSON.stringify([
-					{ id: "chat-a", createdAt: 1, replyLang: null, messages: [msg("m1", "alpha-aaa")] },
-					{ id: "chat-b", createdAt: 2, replyLang: null, messages: [msg("m2", "beta-bbb")] }
+					{
+						id: "chat-a",
+						createdAt: 1,
+						replyLang: null,
+						messages: [msg("m1", "alpha-aaa")]
+					},
+					{
+						id: "chat-b",
+						createdAt: 2,
+						replyLang: null,
+						messages: [msg("m2", "beta-bbb")]
+					}
 				])
 			);
 		});
@@ -363,9 +469,19 @@ test.describe("touch", () => {
 		await page.evaluate(
 			({ x0, x1 }: { x0: number; x1: number }) => {
 				const touch = (x: number, y: number) =>
-					new Touch({ identifier: 9, target: document.body, clientX: x, clientY: y });
+					new Touch({
+						identifier: 9,
+						target: document.body,
+						clientX: x,
+						clientY: y
+					});
 				window.dispatchEvent(
-					new TouchEvent("touchstart", { bubbles: true, cancelable: true, composed: true, touches: [touch(x0, 600)] })
+					new TouchEvent("touchstart", {
+						bubbles: true,
+						cancelable: true,
+						composed: true,
+						touches: [touch(x0, 600)]
+					})
 				);
 				window.dispatchEvent(
 					new TouchEvent("touchend", {
@@ -397,7 +513,9 @@ test.describe("touch", () => {
 
 	test("region menus share one row on a phone", async ({ page }) => {
 		await seedEmpty(page);
-		const wrap = await page.locator(".lang-menus").evaluate((el) => getComputedStyle(el).flexWrap);
+		const wrap = await page
+			.locator(".lang-menus")
+			.evaluate((el) => getComputedStyle(el).flexWrap);
 		expect(wrap).toBe("nowrap");
 		const buttons = page.locator(".lang-menus .lang-menu > button");
 		expect(await buttons.count()).toBe(4);
@@ -409,13 +527,21 @@ test.describe("touch", () => {
 		expect(right).toBeLessThanOrEqual(412);
 	});
 
-	test("chats list is a left drawer covering ~3/4 width on a phone", async ({ page }) => {
+	test("chats list is a left drawer covering ~3/4 width on a phone", async ({
+		page
+	}) => {
 		await seedEmpty(page);
 		const aside = page.locator("aside:has(button.new)");
 		// Docked left, full height, square corners — not a bottom sheet.
 		const pos = await aside.evaluate((el) => {
 			const s = getComputedStyle(el);
-			return { left: s.left, top: s.top, bottom: s.bottom, radius: s.borderTopLeftRadius, width: parseFloat(s.width) };
+			return {
+				left: s.left,
+				top: s.top,
+				bottom: s.bottom,
+				radius: s.borderTopLeftRadius,
+				width: parseFloat(s.width)
+			};
 		});
 		expect(pos.left).toBe("0px");
 		expect(pos.top).toBe("0px");
@@ -431,7 +557,12 @@ test.describe("touch", () => {
 		for (let tap = 0; tap < 2; tap++) {
 			await page.evaluate(() => {
 				const touch = (id: number, x: number, y: number) =>
-					new Touch({ identifier: id, target: document.body, clientX: x, clientY: y });
+					new Touch({
+						identifier: id,
+						target: document.body,
+						clientX: x,
+						clientY: y
+					});
 				window.dispatchEvent(
 					new TouchEvent("touchstart", {
 						bubbles: true,
@@ -455,16 +586,35 @@ test.describe("touch", () => {
 	}
 
 	/** Synthetic two-finger swipe: left opens settings, right summons the list. */
-	async function swipeTwoFinger(page: Page, x0: number, x1: number): Promise<void> {
+	async function swipeTwoFinger(
+		page: Page,
+		x0: number,
+		x1: number
+	): Promise<void> {
 		await page.evaluate(
 			({ x0, x1 }: { x0: number; x1: number }) => {
 				const touch = (id: number, x: number, y: number) =>
-					new Touch({ identifier: id, target: document.body, clientX: x, clientY: y });
+					new Touch({
+						identifier: id,
+						target: document.body,
+						clientX: x,
+						clientY: y
+					});
 				window.dispatchEvent(
-					new TouchEvent("touchstart", { bubbles: true, cancelable: true, composed: true, touches: [touch(1, x0, 500), touch(2, x0 + 40, 500)] })
+					new TouchEvent("touchstart", {
+						bubbles: true,
+						cancelable: true,
+						composed: true,
+						touches: [touch(1, x0, 500), touch(2, x0 + 40, 500)]
+					})
 				);
 				window.dispatchEvent(
-					new TouchEvent("touchmove", { bubbles: true, cancelable: true, composed: true, touches: [touch(1, x1, 500), touch(2, x1 + 40, 500)] })
+					new TouchEvent("touchmove", {
+						bubbles: true,
+						cancelable: true,
+						composed: true,
+						touches: [touch(1, x1, 500), touch(2, x1 + 40, 500)]
+					})
 				);
 				window.dispatchEvent(
 					new TouchEvent("touchend", {
@@ -554,7 +704,12 @@ test.describe("touch", () => {
 		// lead finger's lift carries the travel, so no move event needed.
 		await page.evaluate(() => {
 			const touch = (id: number, x: number, y: number) =>
-				new Touch({ identifier: id, target: document.body, clientX: x, clientY: y });
+				new Touch({
+					identifier: id,
+					target: document.body,
+					clientX: x,
+					clientY: y
+				});
 			window.dispatchEvent(
 				new TouchEvent("touchstart", {
 					bubbles: true,
@@ -569,7 +724,11 @@ test.describe("touch", () => {
 					cancelable: true,
 					composed: true,
 					touches: [],
-					changedTouches: [touch(1, 310, 500), touch(2, 350, 500), touch(3, 390, 500)]
+					changedTouches: [
+						touch(1, 310, 500),
+						touch(2, 350, 500),
+						touch(3, 390, 500)
+					]
 				})
 			);
 		});
@@ -577,7 +736,9 @@ test.describe("touch", () => {
 		// one-shot read, or the assertion races the re-render and sees
 		// the old chat. A broken step still fails the poll honestly.
 		await expect
-			.poll(async () => page.locator("article .rendered").first().innerText(), { timeout: 10_000 })
+			.poll(async () => page.locator("article .rendered").first().innerText(), {
+				timeout: 10_000
+			})
 			.not.toBe(before);
 	});
 
@@ -590,7 +751,12 @@ test.describe("touch", () => {
 		// down, and the release after it must not swipe or delete.
 		await page.evaluate(() => {
 			const touch = (id: number, x: number, y: number) =>
-				new Touch({ identifier: id, target: document.body, clientX: x, clientY: y });
+				new Touch({
+					identifier: id,
+					target: document.body,
+					clientX: x,
+					clientY: y
+				});
 			window.dispatchEvent(
 				new TouchEvent("touchstart", {
 					bubbles: true,
@@ -603,7 +769,12 @@ test.describe("touch", () => {
 		await page.waitForTimeout(700);
 		await page.evaluate(() => {
 			const touch = (id: number, x: number, y: number) =>
-				new Touch({ identifier: id, target: document.body, clientX: x, clientY: y });
+				new Touch({
+					identifier: id,
+					target: document.body,
+					clientX: x,
+					clientY: y
+				});
 			window.dispatchEvent(
 				new TouchEvent("touchend", {
 					bubbles: true,
@@ -616,11 +787,15 @@ test.describe("touch", () => {
 		});
 		await expect(veil).toBeVisible();
 		// The release paired nothing: same chat still showing.
-		expect(await page.locator("article .rendered").first().innerText()).toBe(before);
+		expect(await page.locator("article .rendered").first().innerText()).toBe(
+			before
+		);
 		// Newer arrow cycles without closing; Escape closes.
 		await veil.locator('button[aria-label="Newer chat"]').click();
 		await expect
-			.poll(async () => page.locator("article .rendered").first().innerText(), { timeout: 10_000 })
+			.poll(async () => page.locator("article .rendered").first().innerText(), {
+				timeout: 10_000
+			})
 			.not.toBe(before);
 		await expect(veil).toBeVisible();
 		// Swipes anywhere on the veil cycle too, looping past either
@@ -662,40 +837,45 @@ test.describe("touch", () => {
 		await expect(veil).toHaveCount(0);
 	});
 
-	test("two-finger swipe left opens settings from a highlight", async ({ page }) => {
+	test("two-finger swipe left opens settings from a highlight", async ({
+		page
+	}) => {
 		await seedTwoChats(page);
 		const panel = page.locator(".settings-panel");
 		await expect(panel).toHaveClass(/closed/);
 		// A live highlight used to self-veto message-start swipes (the
 		// swipe picks text on the way down): settings still opens.
-		await page.locator("article.assistant .rendered").first().evaluate((el) => {
-			const selection = window.getSelection();
-			if (selection) {
-				const range = document.createRange();
-				range.selectNodeContents(el);
-				selection.removeAllRanges();
-				selection.addRange(range);
-			}
-			const touch = (id: number, x: number, y: number) =>
-				new Touch({ identifier: id, target: el, clientX: x, clientY: y });
-			el.dispatchEvent(
-				new TouchEvent("touchstart", {
-					bubbles: true,
-					cancelable: true,
-					composed: true,
-					touches: [touch(1, 300, 500), touch(2, 340, 500)]
-				})
-			);
-			el.dispatchEvent(
-				new TouchEvent("touchend", {
-					bubbles: true,
-					cancelable: true,
-					composed: true,
-					touches: [],
-					changedTouches: [touch(1, 150, 500), touch(2, 190, 500)]
-				})
-			);
-		});
+		await page
+			.locator("article.assistant .rendered")
+			.first()
+			.evaluate((el) => {
+				const selection = window.getSelection();
+				if (selection) {
+					const range = document.createRange();
+					range.selectNodeContents(el);
+					selection.removeAllRanges();
+					selection.addRange(range);
+				}
+				const touch = (id: number, x: number, y: number) =>
+					new Touch({ identifier: id, target: el, clientX: x, clientY: y });
+				el.dispatchEvent(
+					new TouchEvent("touchstart", {
+						bubbles: true,
+						cancelable: true,
+						composed: true,
+						touches: [touch(1, 300, 500), touch(2, 340, 500)]
+					})
+				);
+				el.dispatchEvent(
+					new TouchEvent("touchend", {
+						bubbles: true,
+						cancelable: true,
+						composed: true,
+						touches: [],
+						changedTouches: [touch(1, 150, 500), touch(2, 190, 500)]
+					})
+				);
+			});
 		await expect(panel).not.toHaveClass(/closed/);
 	});
 
@@ -709,28 +889,36 @@ test.describe("touch", () => {
 		await page.evaluate(() => {
 			const w = window as unknown as { __vib: unknown[] };
 			w.__vib = [];
-			const nav = navigator as unknown as { vibrate: (pattern: unknown) => boolean };
+			const nav = navigator as unknown as {
+				vibrate: (pattern: unknown) => boolean;
+			};
 			nav.vibrate = (pattern: unknown) => {
 				w.__vib.push(pattern);
 				return true;
 			};
 		});
-		await aside.locator("li .del").first().evaluate((el) => {
-			// Wiring test, not a pointer test: the row × sits under the
-			// pill in headless hover (real thumbs tap it in flow).
-			(el as HTMLElement).click();
-		});
+		await aside
+			.locator("li .del")
+			.first()
+			.evaluate((el) => {
+				// Wiring test, not a pointer test: the row × sits under the
+				// pill in headless hover (real thumbs tap it in flow).
+				(el as HTMLElement).click();
+			});
 		await expect
 			.poll(
 				async () =>
-					page.evaluate(
-						() => JSON.stringify((window as unknown as { __vib: unknown[] }).__vib)
+					page.evaluate(() =>
+						JSON.stringify((window as unknown as { __vib: unknown[] }).__vib)
 					),
 				{ timeout: 5000 }
-			).toBe(JSON.stringify([[35, 60, 110]]));
+			)
+			.toBe(JSON.stringify([[35, 60, 110]]));
 	});
 
-	test("two-finger swipe left opens settings from the composer", async ({ page }) => {
+	test("two-finger swipe left opens settings from the composer", async ({
+		page
+	}) => {
 		await seedEmpty(page);
 		const panel = page.locator(".settings-panel");
 		await expect(panel).toHaveClass(/closed/);
@@ -760,13 +948,18 @@ test.describe("touch", () => {
 		await expect(panel).not.toHaveClass(/closed/);
 	});
 
-	test("double two-finger tap jumps to the thread bottom, never deletes", async ({ page }) => {
+	test("double two-finger tap jumps to the thread bottom, never deletes", async ({
+		page
+	}) => {
 		// Long thread so the jump has somewhere to go; the pair lands
 		// on the last message, whose end sits below the fold.
 		await page.addInitScript(() => {
 			window.localStorage.setItem("ccez-mock-provider", "1");
 			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
-			const lines = Array.from({ length: 80 }, (_, n) => `line ${n} of a long assistant reply`).join("\n");
+			const lines = Array.from(
+				{ length: 80 },
+				(_, n) => `line ${n} of a long assistant reply`
+			).join("\n");
 			window.localStorage.setItem(
 				"ccez-llm-chats-v1",
 				JSON.stringify([
@@ -774,14 +967,24 @@ test.describe("touch", () => {
 						id: "e2e-chat",
 						createdAt: 1,
 						replyLang: null,
-						messages: [{ id: "m1", role: "assistant", content: lines, usage: null, error: null }]
+						messages: [
+							{
+								id: "m1",
+								role: "assistant",
+								content: lines,
+								usage: null,
+								error: null
+							}
+						]
 					}
 				])
 			);
 		});
 		await page.goto("/");
 		await expect(page.locator("article .rendered").first()).toBeVisible();
-		await page.evaluate(() => document.querySelector(".messages")?.scrollTo({ top: 0 }));
+		await page.evaluate(() =>
+			document.querySelector(".messages")?.scrollTo({ top: 0 })
+		);
 		const box = await page.locator("article .rendered").last().boundingBox();
 		if (!box) throw new Error("no message box");
 		const x = box.x + box.width / 2;
@@ -790,7 +993,12 @@ test.describe("touch", () => {
 			await page.evaluate(
 				({ x, y }: { x: number; y: number }) => {
 					const touch = (id: number) =>
-						new Touch({ identifier: id, target: document.body, clientX: x, clientY: y });
+						new Touch({
+							identifier: id,
+							target: document.body,
+							clientX: x,
+							clientY: y
+						});
 					window.dispatchEvent(
 						new TouchEvent("touchstart", {
 							bubbles: true,
@@ -815,7 +1023,13 @@ test.describe("touch", () => {
 		}
 		// Smooth scroll lands the thread bottom; nothing deleted.
 		await expect
-			.poll(async () => page.evaluate(() => document.querySelector(".messages")?.scrollTop ?? 0), { timeout: 5000 })
+			.poll(
+				async () =>
+					page.evaluate(
+						() => document.querySelector(".messages")?.scrollTop ?? 0
+					),
+				{ timeout: 5000 }
+			)
 			.toBeGreaterThan(100);
 		expect(await page.locator("aside button.side-chat").count()).toBe(1);
 	});
@@ -824,11 +1038,25 @@ test.describe("touch", () => {
 		await page.addInitScript(() => {
 			window.localStorage.setItem("ccez-mock-provider", "1");
 			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
-			const msg = (id: string, role: string, content: string) => ({ id, role, content, usage: null, error: null });
+			const msg = (id: string, role: string, content: string) => ({
+				id,
+				role,
+				content,
+				usage: null,
+				error: null
+			});
 			window.localStorage.setItem(
 				"ccez-llm-chats-v1",
 				JSON.stringify([
-					{ id: "e2e-chat", createdAt: 1, replyLang: null, messages: [msg("m1", "user", "first"), msg("m2", "assistant", "second")] }
+					{
+						id: "e2e-chat",
+						createdAt: 1,
+						replyLang: null,
+						messages: [
+							msg("m1", "user", "first"),
+							msg("m2", "assistant", "second")
+						]
+					}
 				])
 			);
 		});
@@ -838,10 +1066,21 @@ test.describe("touch", () => {
 		if (!box) throw new Error("no message box");
 		await page.evaluate(
 			({ x, y }: { x: number; y: number }) => {
-				const touch = (id: number) => new Touch({ identifier: id, target: document.body, clientX: x, clientY: y });
+				const touch = (id: number) =>
+					new Touch({
+						identifier: id,
+						target: document.body,
+						clientX: x,
+						clientY: y
+					});
 				const fingers = [touch(1), touch(2), touch(3)];
 				window.dispatchEvent(
-					new TouchEvent("touchstart", { bubbles: true, cancelable: true, composed: true, touches: fingers })
+					new TouchEvent("touchstart", {
+						bubbles: true,
+						cancelable: true,
+						composed: true,
+						touches: fingers
+					})
 				);
 				window.dispatchEvent(
 					new TouchEvent("touchend", {
@@ -863,7 +1102,13 @@ test.describe("touch", () => {
 		await seedTwoChats(page);
 		expect(await page.locator("aside button.side-chat").count()).toBe(2);
 		await page.evaluate(() => {
-			const touch = (id: number) => new Touch({ identifier: id, target: document.body, clientX: 200, clientY: 500 });
+			const touch = (id: number) =>
+				new Touch({
+					identifier: id,
+					target: document.body,
+					clientX: 200,
+					clientY: 500
+				});
 			window.dispatchEvent(
 				new TouchEvent("touchstart", {
 					bubbles: true,
@@ -876,7 +1121,13 @@ test.describe("touch", () => {
 		// The hold fires past tap range (600ms) while fingers rest.
 		await page.waitForTimeout(750);
 		await page.evaluate(() => {
-			const touch = (id: number) => new Touch({ identifier: id, target: document.body, clientX: 200, clientY: 500 });
+			const touch = (id: number) =>
+				new Touch({
+					identifier: id,
+					target: document.body,
+					clientX: 200,
+					clientY: 500
+				});
 			window.dispatchEvent(
 				new TouchEvent("touchend", {
 					bubbles: true,
@@ -892,15 +1143,28 @@ test.describe("touch", () => {
 		await expect(page.locator(".toast")).toHaveText("All chats deleted");
 	});
 
-	test("touch selection floats Copy/Annotate/Speak, Inspect stays docked", async ({ page }) => {
+	test("touch selection floats Copy/Annotate/Speak, Inspect stays docked", async ({
+		page
+	}) => {
 		await seedTwoChats(page);
 		const box = await page.locator("article .rendered").first().boundingBox();
 		if (!box) throw new Error("no message box");
 		await page.evaluate(
 			({ x, y }: { x: number; y: number }) => {
-				const touch = (id: number) => new Touch({ identifier: id, target: document.body, clientX: x, clientY: y });
+				const touch = (id: number) =>
+					new Touch({
+						identifier: id,
+						target: document.body,
+						clientX: x,
+						clientY: y
+					});
 				window.dispatchEvent(
-					new TouchEvent("touchstart", { bubbles: true, cancelable: true, composed: true, touches: [touch(1)] })
+					new TouchEvent("touchstart", {
+						bubbles: true,
+						cancelable: true,
+						composed: true,
+						touches: [touch(1)]
+					})
 				);
 				const rendered = document.querySelector("article .rendered");
 				const sel = window.getSelection();
@@ -924,33 +1188,54 @@ test.describe("touch", () => {
 		// text with Copy, Annotate, and Speak in the desktop style.
 		const menu = page.locator(".sel-menu");
 		await expect(menu).toBeVisible();
-		await expect(menu.locator("button")).toHaveText(["Copy", "Annotate", "Speak"]);
+		await expect(menu.locator("button")).toHaveText([
+			"Copy",
+			"Annotate",
+			"Speak"
+		]);
 		// Non-Han text docks nothing: Inspect is Han-only.
 		await expect(page.locator(".ann-dock")).toHaveCount(0);
 	});
 
-	test("a tap on Speak reads the highlight and keeps the menu", async ({ page }) => {
+	test("a tap on Speak reads the highlight and keeps the menu", async ({
+		page
+	}) => {
 		await page.addInitScript(() => {
 			(window as unknown as { __spoken: string[] }).__spoken = [];
 			const synth = window.speechSynthesis;
 			if (synth) {
 				synth.speak = ((utterance: SpeechSynthesisUtterance) => {
-					(window as unknown as { __spoken: string[] }).__spoken.push(utterance.text);
+					(window as unknown as { __spoken: string[] }).__spoken.push(
+						utterance.text
+					);
 				}) as typeof synth.speak;
 			}
 		});
 		await seedTwoChats(page);
 		await summonTouchSelection(page);
 		const menu = page.locator(".sel-menu");
-		await expect(menu.locator("button")).toHaveText(["Copy", "Annotate", "Speak"]);
+		await expect(menu.locator("button")).toHaveText([
+			"Copy",
+			"Annotate",
+			"Speak"
+		]);
 		const btn = menu.locator('button:has-text("Speak")');
 		const btnBox = await btn.boundingBox();
 		if (!btnBox) throw new Error("no speak box");
-		await page.touchscreen.tap(btnBox.x + btnBox.width / 2, btnBox.y + btnBox.height / 2);
+		await page.touchscreen.tap(
+			btnBox.x + btnBox.width / 2,
+			btnBox.y + btnBox.height / 2
+		);
 		await expect
-			.poll(() => page.evaluate(() => (window as unknown as { __spoken: string[] }).__spoken ?? []), {
-				timeout: 10_000
-			})
+			.poll(
+				() =>
+					page.evaluate(
+						() => (window as unknown as { __spoken: string[] }).__spoken ?? []
+					),
+				{
+					timeout: 10_000
+				}
+			)
 			.toContain("alpha-aaa");
 		// The menu stays put: Annotate is one tap away after listening.
 		await expect(menu.locator('button:has-text("Annotate")')).toBeVisible();
@@ -967,7 +1252,15 @@ test.describe("touch", () => {
 						id: "chat-han",
 						createdAt: 1,
 						replyLang: null,
-						messages: [{ id: "m1", role: "assistant", content: "語", usage: null, error: null }]
+						messages: [
+							{
+								id: "m1",
+								role: "assistant",
+								content: "語",
+								usage: null,
+								error: null
+							}
+						]
 					}
 				])
 			);
@@ -978,22 +1271,42 @@ test.describe("touch", () => {
 		// Copy/Annotate/Speak float in the menu; the single Han
 		// character docks Inspect alone in the composer.
 		const menu = page.locator(".sel-menu");
-		await expect(menu.locator("button")).toHaveText(["Copy", "Annotate", "Speak"]);
+		await expect(menu.locator("button")).toHaveText([
+			"Copy",
+			"Annotate",
+			"Speak"
+		]);
 		await expect(page.locator(".ann-dock")).toHaveText(["Inspect"]);
 	});
 
-	test("a long chat scrolls inside the list, never squeezing the prompt", async ({ page }) => {
+	test("a long chat scrolls inside the list, never squeezing the prompt", async ({
+		page
+	}) => {
 		await page.addInitScript(() => {
 			window.localStorage.setItem("ccez-mock-provider", "1");
 			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
 			const messages = [];
 			for (let i = 0; i < 20; i++) {
-				messages.push({ id: `u${i}`, role: "user", content: `question ${i}`, usage: null, error: null });
-				messages.push({ id: `a${i}`, role: "assistant", content: `answer ${i}`, usage: null, error: null });
+				messages.push({
+					id: `u${i}`,
+					role: "user",
+					content: `question ${i}`,
+					usage: null,
+					error: null
+				});
+				messages.push({
+					id: `a${i}`,
+					role: "assistant",
+					content: `answer ${i}`,
+					usage: null,
+					error: null
+				});
 			}
 			window.localStorage.setItem(
 				"ccez-llm-chats-v1",
-				JSON.stringify([{ id: "chat-a", createdAt: 1, replyLang: null, messages }])
+				JSON.stringify([
+					{ id: "chat-a", createdAt: 1, replyLang: null, messages }
+				])
 			);
 		});
 		await page.goto("/");
@@ -1003,7 +1316,11 @@ test.describe("touch", () => {
 			const prompt = document.querySelector(".prompt") as HTMLElement;
 			list.scrollTop = list.scrollHeight;
 			const promptBox = prompt.getBoundingClientRect();
-			return { scrollHeight: list.scrollHeight, clientHeight: list.clientHeight, promptHeight: promptBox.height };
+			return {
+				scrollHeight: list.scrollHeight,
+				clientHeight: list.clientHeight,
+				promptHeight: promptBox.height
+			};
 		});
 		expect(metrics.scrollHeight).toBeGreaterThan(metrics.clientHeight);
 		// Healthy multi-row composer, never squeezed flat: the floor
@@ -1013,19 +1330,35 @@ test.describe("touch", () => {
 
 	test("page never scrolls sideways on a phone", async ({ page }) => {
 		await seedTwoChats(page);
-		const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+		const overflow = await page.evaluate(
+			() => document.documentElement.scrollWidth - window.innerWidth
+		);
 		expect(overflow).toBeLessThanOrEqual(0);
 	});
 
 	test("hide-messages mode reveals one message per tap", async ({ page }) => {
 		await page.addInitScript(() => {
 			window.localStorage.setItem("ccez-mock-provider", "1");
-			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({ hideMessages: true }));
-			const msg = (id: string, role: string, content: string) => ({ id, role, content, usage: null, error: null });
+			window.localStorage.setItem(
+				"ccez-llm-settings-v1",
+				JSON.stringify({ hideMessages: true })
+			);
+			const msg = (id: string, role: string, content: string) => ({
+				id,
+				role,
+				content,
+				usage: null,
+				error: null
+			});
 			window.localStorage.setItem(
 				"ccez-llm-chats-v1",
 				JSON.stringify([
-					{ id: "chat-a", createdAt: 1, replyLang: null, messages: [msg("m1", "assistant", "hello-hidden")] }
+					{
+						id: "chat-a",
+						createdAt: 1,
+						replyLang: null,
+						messages: [msg("m1", "assistant", "hello-hidden")]
+					}
 				])
 			);
 		});
@@ -1036,13 +1369,17 @@ test.describe("touch", () => {
 		const body = page.locator("article .rendered").first();
 		await expect(body).toBeHidden();
 		await page.evaluate(() => {
-			document.querySelector("article")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+			document
+				.querySelector("article")
+				?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 		});
 		await expect(body).toBeVisible();
 		await expect(body).toBeHidden({ timeout: 5000 });
 	});
 
-	test("settings sheet matches the chats drawer and offers touch toggles", async ({ page }) => {
+	test("settings sheet matches the chats drawer and offers touch toggles", async ({
+		page
+	}) => {
 		await seedEmpty(page);
 		await swipeTwoFinger(page, 300, 150);
 		const panel = page.locator(".settings-panel");
@@ -1057,25 +1394,38 @@ test.describe("touch", () => {
 		await expect(aside).not.toHaveClass(/collapsed/);
 		const listWidth = (await aside.boundingBox())?.width ?? 0;
 		expect(Math.abs(panelWidth - listWidth)).toBeLessThanOrEqual(1);
-		await expect(panel.locator('legend:has-text("Voice engine")')).toHaveCount(0);
+		await expect(panel.locator('legend:has-text("Voice engine")')).toHaveCount(
+			0
+		);
 		// Phones never auto-read selections: no toggle, no behavior.
-		await expect(panel.locator('label:has-text("Read selections aloud on release")')).toHaveCount(0);
+		await expect(
+			panel.locator('label:has-text("Read selections aloud on release")')
+		).toHaveCount(0);
 		await expect(panel.locator('h2:has-text("Touch gestures")')).toBeVisible();
 	});
 
 	test("theme pin holds dark under a light OS", async ({ page }) => {
 		await page.addInitScript(() => {
 			window.localStorage.setItem("ccez-mock-provider", "1");
-			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({ theme: "dark" }));
+			window.localStorage.setItem(
+				"ccez-llm-settings-v1",
+				JSON.stringify({ theme: "dark" })
+			);
 			window.localStorage.setItem(
 				"ccez-llm-chats-v1",
-				JSON.stringify([{ id: "e2e-chat", createdAt: 1, replyLang: null, messages: [] }])
+				JSON.stringify([
+					{ id: "e2e-chat", createdAt: 1, replyLang: null, messages: [] }
+				])
 			);
 		});
 		await page.goto("/");
 		await expect(page.locator(".lang-menus")).toBeVisible();
-		expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe("dark");
-		const bg = await page.locator(".app").evaluate((el) => getComputedStyle(el).backgroundColor);
+		expect(
+			await page.evaluate(() => document.documentElement.dataset.theme)
+		).toBe("dark");
+		const bg = await page
+			.locator(".app")
+			.evaluate((el) => getComputedStyle(el).backgroundColor);
 		// Newer Chromium reports color(srgb …) floats instead of rgb()
 		// ints for the same paint: compare channels, not the string.
 		const channels = bg
@@ -1087,7 +1437,11 @@ test.describe("touch", () => {
 	});
 
 	test.describe("dark phone", () => {
-		test.use({ viewport: { width: 360, height: 740 }, colorScheme: "dark", hasTouch: true });
+		test.use({
+			viewport: { width: 360, height: 740 },
+			colorScheme: "dark",
+			hasTouch: true
+		});
 
 		/** The chat list keeps readable contrast in dark: phone WebViews
 		that "help" by darkening light text blank the sheet otherwise. */
@@ -1100,7 +1454,11 @@ test.describe("touch", () => {
 						const s = v / 255;
 						return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
 					};
-					return 0.2126 * f(m[0] ?? 0) + 0.7152 * f(m[1] ?? 0) + 0.0722 * f(m[2] ?? 0);
+					return (
+						0.2126 * f(m[0] ?? 0) +
+						0.7152 * f(m[1] ?? 0) +
+						0.0722 * f(m[2] ?? 0)
+					);
 				};
 				const ratio = (fg: string, bg: string): number => {
 					const [a, b] = [lum(fg), lum(bg)].sort((x, y) => y - x);
@@ -1143,7 +1501,8 @@ test.describe("touch", () => {
 			const fit = await page.evaluate(() => {
 				const keys = document.querySelector(".keys");
 				const dd = document.querySelector(".keys dd");
-				if (!(keys instanceof HTMLElement) || !(dd instanceof HTMLElement)) throw new Error("keys missing");
+				if (!(keys instanceof HTMLElement) || !(dd instanceof HTMLElement))
+					throw new Error("keys missing");
 				return {
 					overflow: keys.scrollWidth - keys.clientWidth,
 					columns: getComputedStyle(keys).gridTemplateColumns.split(" ").length,
@@ -1159,15 +1518,28 @@ test.describe("touch", () => {
 		selection handle are swallowed as handle nudges (no click ever
 		arrives), so the button runs off touchend instead of waiting for
 		onclick. */
-		test("a tap on Annotate files the note through the composer", async ({ page }) => {
+		test("a tap on Annotate files the note through the composer", async ({
+			page
+		}) => {
 			await seedTwoChats(page);
 			const box = await page.locator("article .rendered").first().boundingBox();
 			if (!box) throw new Error("no message box");
 			await page.evaluate(
 				({ x, y }: { x: number; y: number }) => {
-					const touch = (id: number) => new Touch({ identifier: id, target: document.body, clientX: x, clientY: y });
+					const touch = (id: number) =>
+						new Touch({
+							identifier: id,
+							target: document.body,
+							clientX: x,
+							clientY: y
+						});
 					window.dispatchEvent(
-						new TouchEvent("touchstart", { bubbles: true, cancelable: true, composed: true, touches: [touch(1)] })
+						new TouchEvent("touchstart", {
+							bubbles: true,
+							cancelable: true,
+							composed: true,
+							touches: [touch(1)]
+						})
 					);
 					const rendered = document.querySelector("article .rendered");
 					const sel = window.getSelection();
@@ -1195,12 +1567,18 @@ test.describe("touch", () => {
 			// only trusted taps exercise this path.)
 			const btnBox = await btn.boundingBox();
 			if (!btnBox) throw new Error("no annotate box");
-			await page.touchscreen.tap(btnBox.x + btnBox.width / 2, btnBox.y + btnBox.height / 2);
+			await page.touchscreen.tap(
+				btnBox.x + btnBox.width / 2,
+				btnBox.y + btnBox.height / 2
+			);
 			// Phones file the annotation in the composer, never a floating
 			// box: the tap consumes the menu and the composer asks for
 			// the note instead.
 			await expect(page.locator(".sel-menu")).toHaveCount(0);
-			await expect(page.locator(".prompt textarea")).toHaveAttribute("placeholder", "Add an annotation");
+			await expect(page.locator(".prompt textarea")).toHaveAttribute(
+				"placeholder",
+				"Add an annotation"
+			);
 			// Typing files through the send arrow: the pill counts it.
 			await page.locator(".prompt textarea").click();
 			await page.keyboard.type("nice point", { delay: 10 });
@@ -1214,13 +1592,24 @@ test.describe("touch", () => {
 		card (the transplanted textbox can't summon the keyboard). The
 		draft is seeded in storage — filing it by touch is covered by
 		the Annotate test above. */
-		test("review pencil loads the comment into the composer", async ({ page }) => {
-			await seedChat(page, [{ role: "assistant", content: "alpha beta gamma delta" }]);
+		test("review pencil loads the comment into the composer", async ({
+			page
+		}) => {
+			await seedChat(page, [
+				{ role: "assistant", content: "alpha beta gamma delta" }
+			]);
 			await page.addInitScript(() => {
 				window.localStorage.setItem(
 					"ccez-llm-annotations-v1",
 					JSON.stringify({
-						"e2e-chat": [{ id: "ann-1", messageId: "e2e-m0", quote: "beta", comment: "first" }]
+						"e2e-chat": [
+							{
+								id: "ann-1",
+								messageId: "e2e-m0",
+								quote: "beta",
+								comment: "first"
+							}
+						]
 					})
 				);
 			});
@@ -1242,13 +1631,24 @@ test.describe("touch", () => {
 		must survive the tap-out rule (capture press opens before the
 		bubble tap-out check), the composer starts empty, and the send
 		arrow files the note instead of sending a chat. */
-		test("tapping a badge rewrites its note through the composer", async ({ page }) => {
-			await seedChat(page, [{ role: "assistant", content: "alpha beta gamma delta" }]);
+		test("tapping a badge rewrites its note through the composer", async ({
+			page
+		}) => {
+			await seedChat(page, [
+				{ role: "assistant", content: "alpha beta gamma delta" }
+			]);
 			await page.addInitScript(() => {
 				window.localStorage.setItem(
 					"ccez-llm-annotations-v1",
 					JSON.stringify({
-						"e2e-chat": [{ id: "ann-1", messageId: "e2e-m0", quote: "beta", comment: "first" }]
+						"e2e-chat": [
+							{
+								id: "ann-1",
+								messageId: "e2e-m0",
+								quote: "beta",
+								comment: "first"
+							}
+						]
 					})
 				);
 			});
@@ -1257,7 +1657,10 @@ test.describe("touch", () => {
 			await expect(badge).toBeVisible({ timeout: 15_000 });
 			const bbox = await badge.boundingBox();
 			if (!bbox) throw new Error("badge has no box");
-			await page.touchscreen.tap(bbox.x + bbox.width / 2, bbox.y + bbox.height / 2);
+			await page.touchscreen.tap(
+				bbox.x + bbox.width / 2,
+				bbox.y + bbox.height / 2
+			);
 			const composer = page.locator(".prompt textarea");
 			await expect(composer).toHaveAttribute("placeholder", "Edit annotation");
 			await expect(composer).toHaveValue("");
@@ -1265,16 +1668,22 @@ test.describe("touch", () => {
 			await page.keyboard.type("revised", { delay: 10 });
 			const before = await page.evaluate(
 				() =>
-					(JSON.parse(window.localStorage.getItem("ccez-llm-chats-v1") ?? "[]") as Array<{ messages: unknown[] }>)[0]
-						?.messages.length ?? -1
+					(
+						JSON.parse(
+							window.localStorage.getItem("ccez-llm-chats-v1") ?? "[]"
+						) as Array<{ messages: unknown[] }>
+					)[0]?.messages.length ?? -1
 			);
 			await page.locator(".send-btn").click();
 			await expect(page.locator(".toast")).toHaveText("Annotation edited");
 			const after = await page.evaluate(() => ({
 				annotations: window.localStorage.getItem("ccez-llm-annotations-v1"),
 				messages:
-					(JSON.parse(window.localStorage.getItem("ccez-llm-chats-v1") ?? "[]") as Array<{ messages: unknown[] }>)[0]
-						?.messages.length ?? -1
+					(
+						JSON.parse(
+							window.localStorage.getItem("ccez-llm-chats-v1") ?? "[]"
+						) as Array<{ messages: unknown[] }>
+					)[0]?.messages.length ?? -1
 			}));
 			expect(after.annotations).toContain('"comment":"revised"');
 			expect(after.messages).toBe(before);
@@ -1284,12 +1693,21 @@ test.describe("touch", () => {
 		pending preview, review-pencil washes the saved quote — the
 		comment box otherwise floats over an unmarked thread. */
 		test("note edits wash their quote in the thread", async ({ page }) => {
-			await seedChat(page, [{ role: "assistant", content: "alpha beta gamma delta" }]);
+			await seedChat(page, [
+				{ role: "assistant", content: "alpha beta gamma delta" }
+			]);
 			await page.addInitScript(() => {
 				window.localStorage.setItem(
 					"ccez-llm-annotations-v1",
 					JSON.stringify({
-						"e2e-chat": [{ id: "ann-1", messageId: "e2e-m0", quote: "beta", comment: "first" }]
+						"e2e-chat": [
+							{
+								id: "ann-1",
+								messageId: "e2e-m0",
+								quote: "beta",
+								comment: "first"
+							}
+						]
 					})
 				);
 			});
@@ -1297,24 +1715,40 @@ test.describe("touch", () => {
 			const badge = page.locator("[data-ann-badge]").first();
 			await expect(badge).toBeVisible({ timeout: 15_000 });
 			const hasWash = () =>
-				page.evaluate(
-					() =>
-						(CSS as unknown as { highlights: { has(x: string): boolean } }).highlights.has("ccez-ann")
+				page.evaluate(() =>
+					(
+						CSS as unknown as { highlights: { has(x: string): boolean } }
+					).highlights.has("ccez-ann")
 				);
 			const bbox = await badge.boundingBox();
 			if (!bbox) throw new Error("badge has no box");
-			await page.touchscreen.tap(bbox.x + bbox.width / 2, bbox.y + bbox.height / 2);
+			await page.touchscreen.tap(
+				bbox.x + bbox.width / 2,
+				bbox.y + bbox.height / 2
+			);
 			await expect.poll(hasWash, { timeout: 10_000 }).toBe(true);
 		});
 
 		/** The selection menu survives scrolling a live highlight: the
 		native callout is suppressed, so our menu must stay up across
 		scrolls — only a collapsed selection dismisses it. */
-		test("the selection menu survives scrolling a live highlight", async ({ page }) => {
-			const filler = Array.from({ length: 30 }, (_, i) => `filler paragraph ${i} pads the thread.`).join("\n\n");
-			await seedChat(page, [{ role: "assistant", content: `${filler}\n\nhello world from Kyoto harbor\n\n${filler}` }]);
+		test("the selection menu survives scrolling a live highlight", async ({
+			page
+		}) => {
+			const filler = Array.from(
+				{ length: 30 },
+				(_, i) => `filler paragraph ${i} pads the thread.`
+			).join("\n\n");
+			await seedChat(page, [
+				{
+					role: "assistant",
+					content: `${filler}\n\nhello world from Kyoto harbor\n\n${filler}`
+				}
+			]);
 			await page.goto("/");
-			const quote = page.locator("article.assistant .rendered p", { hasText: "Kyoto harbor" }).first();
+			const quote = page
+				.locator("article.assistant .rendered p", { hasText: "Kyoto harbor" })
+				.first();
 			await expect(quote).toBeVisible({ timeout: 15_000 });
 			await quote.evaluate((el) => el.scrollIntoView({ block: "center" }));
 			await page.waitForTimeout(600);
@@ -1331,13 +1765,17 @@ test.describe("touch", () => {
 				document.querySelector(".messages")?.scrollBy({ top: 400 });
 			});
 			await page.waitForTimeout(400);
-			expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).not.toBe("");
+			expect(
+				await page.evaluate(() => window.getSelection()?.toString() ?? "")
+			).not.toBe("");
 			await expect(item).toBeVisible();
 		});
 
 		/** Below the full-bleed text size, short assistant messages
 		shrink-wrap like own bubbles instead of running the column. */
-		test("assistant messages shrink-wrap below full-bleed", async ({ page }) => {
+		test("assistant messages shrink-wrap below full-bleed", async ({
+			page
+		}) => {
 			await seedChat(page, [
 				{ role: "user", content: "hi" },
 				{ role: "assistant", content: "hello back" }
@@ -1356,7 +1794,9 @@ test.describe("touch", () => {
 		/** At the full-bleed text size the thread drops its rem gutter
 		and short assistant messages run ~99% wide, so huge type keeps
 		context instead of squeezing into the phone column. */
-		test("assistant messages go full-bleed at the full-bleed size", async ({ page }) => {
+		test("assistant messages go full-bleed at the full-bleed size", async ({
+			page
+		}) => {
 			await seedChat(page, [
 				{ role: "user", content: "hi" },
 				{ role: "assistant", content: "hello back" }
@@ -1364,11 +1804,19 @@ test.describe("touch", () => {
 			await page.addInitScript(() => {
 				window.localStorage.setItem(
 					"ccez-llm-settings-v1",
-					JSON.stringify({ hoverAssistantActions: true, hoverUserActions: true, promptIdleSec: 0, fontScale: 3.3 })
+					JSON.stringify({
+						hoverAssistantActions: true,
+						hoverUserActions: true,
+						promptIdleSec: 0,
+						fontScale: 3.3
+					})
 				);
 			});
 			await page.goto("/");
-			await expect(page.locator(".app")).toHaveAttribute("data-fullbleed", "true");
+			await expect(page.locator(".app")).toHaveAttribute(
+				"data-fullbleed",
+				"true"
+			);
 			const article = page.locator("article.assistant").first();
 			await expect(article).toBeVisible({ timeout: 15_000 });
 			const [col, box] = await Promise.all([
@@ -1382,18 +1830,28 @@ test.describe("touch", () => {
 			// hard right — no left-anchored full-width own column, and
 			// the hairline gutter leaves no room on its right.
 			const userBox = await page.locator("article.user").first().boundingBox();
-			const userBubble = await page.locator("article.user .bubble").first().boundingBox();
+			const userBubble = await page
+				.locator("article.user .bubble")
+				.first()
+				.boundingBox();
 			if (!userBox || !userBubble) throw new Error("own message has no box");
 			expect(userBox.width).toBeGreaterThan(col.width - 8);
 			expect(userBubble.width).toBeLessThan(userBox.width - 10);
-			expect(userBox.x + userBox.width - (userBubble.x + userBubble.width)).toBeLessThan(3);
+			expect(
+				userBox.x + userBox.width - (userBubble.x + userBubble.width)
+			).toBeLessThan(3);
 		});
 
 		/** Double-tapping a message taller than the screen scrolls its
 		action row into view: phones have no hover to reveal it. Rows
 		already visible never move. */
-		test("double-tapping a tall message reveals its action row", async ({ page }) => {
-			const long = Array.from({ length: 60 }, (_, i) => `line ${i} of a very tall message`).join("\n");
+		test("double-tapping a tall message reveals its action row", async ({
+			page
+		}) => {
+			const long = Array.from(
+				{ length: 60 },
+				(_, i) => `line ${i} of a very tall message`
+			).join("\n");
 			await page.addInitScript((content: string) => {
 				window.localStorage.setItem("ccez-mock-provider", "1");
 				window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
@@ -1404,7 +1862,15 @@ test.describe("touch", () => {
 							id: "e2e-chat",
 							createdAt: 1,
 							replyLang: null,
-							messages: [{ id: "e2e-m0", role: "assistant", content, usage: null, error: null }]
+							messages: [
+								{
+									id: "e2e-m0",
+									role: "assistant",
+									content,
+									usage: null,
+									error: null
+								}
+							]
 						}
 					])
 				);
@@ -1420,7 +1886,9 @@ test.describe("touch", () => {
 			expect(below?.y ?? 0).toBeGreaterThan(915);
 			await article.locator(".rendered").first().dblclick();
 			await expect
-				.poll(async () => (await actions.boundingBox())?.y ?? 9999, { timeout: 10_000 })
+				.poll(async () => (await actions.boundingBox())?.y ?? 9999, {
+					timeout: 10_000
+				})
 				.toBeLessThan(915);
 		});
 	});
@@ -1435,7 +1903,9 @@ test.describe("touch", () => {
 		await page.keyboard.type("hello world");
 		// Phones never send from the keyboard: the send button submits.
 		await page.locator(".send-btn").click();
-		await expect(page.locator('article .rendered:has-text("Mock reply to:")')).toBeVisible({ timeout: 15000 });
+		await expect(
+			page.locator('article .rendered:has-text("Mock reply to:")')
+		).toBeVisible({ timeout: 15000 });
 		const heights = await page.evaluate(() => {
 			const el = document.querySelector(".prompt .ta-input");
 			return el instanceof HTMLElement ? el.getBoundingClientRect().height : -1;
@@ -1446,7 +1916,9 @@ test.describe("touch", () => {
 		expect(await box.getAttribute("placeholder")).toBeTruthy();
 		// A keyboard transition settles through the same re-measure path
 		// without disturbing the healthy composer.
-		await page.evaluate(() => window.visualViewport?.dispatchEvent(new Event("resize")));
+		await page.evaluate(() =>
+			window.visualViewport?.dispatchEvent(new Event("resize"))
+		);
 		await page.waitForTimeout(500);
 		const after = await page.evaluate(() => {
 			const el = document.querySelector(".prompt .ta-input");
@@ -1499,15 +1971,21 @@ test.describe("touch", () => {
 		await seedEmpty(page);
 		await swipeTwoFinger(page, 300, 150);
 		await page.locator(".settings-panel").waitFor();
-		const box = page.locator('label.check:has-text("Hide message buttons until tapped") input');
+		const box = page.locator(
+			'label.check:has-text("Hide message buttons until tapped") input'
+		);
 		await expect(box).toBeChecked();
 	});
 
-	test("haptics toggle is off (enabled) by default and persists", async ({ page }) => {
+	test("haptics toggle is off (enabled) by default and persists", async ({
+		page
+	}) => {
 		await seedEmpty(page);
 		await swipeTwoFinger(page, 300, 150);
 		await page.locator(".settings-panel").waitFor();
-		const box = page.locator('label.check:has-text("Disable haptic feedback") input');
+		const box = page.locator(
+			'label.check:has-text("Disable haptic feedback") input'
+		);
 		await expect(box).not.toBeChecked();
 		// Disabled persists through the next settings flush: dismiss
 		// settings, then summon the list (its toggle persists the whole
@@ -1516,13 +1994,17 @@ test.describe("touch", () => {
 		await expect(box).toBeChecked();
 		await swipeX(page, 4, 144);
 		await swipeX(page, 4, 144);
-		await expect(page.locator("aside:has(button.new)")).not.toHaveClass(/collapsed/);
+		await expect(page.locator("aside:has(button.new)")).not.toHaveClass(
+			/collapsed/
+		);
 		// The flush is async: the stored flag (not a reload — the seed
 		// script resets settings on load) proves the disabled state sticks.
 		await expect
 			.poll(
 				async () =>
-					page.evaluate(() => window.localStorage.getItem("ccez-llm-settings-v1") ?? ""),
+					page.evaluate(
+						() => window.localStorage.getItem("ccez-llm-settings-v1") ?? ""
+					),
 				{ timeout: 5000 }
 			)
 			.toContain('"hapticsDisabled":true');
@@ -1565,7 +2047,15 @@ test.describe("always-visible prompt", () => {
 							messages:
 								content === ""
 									? []
-									: [{ id: `m${n}`, role: "assistant", content, usage: null, error: null }]
+									: [
+											{
+												id: `m${n}`,
+												role: "assistant",
+												content,
+												usage: null,
+												error: null
+											}
+										]
 						}))
 					)
 				);
@@ -1589,13 +2079,32 @@ test.describe("always-visible prompt", () => {
 			({ targetSel, x0, y0, x1, y1 }) => {
 				const target = document.querySelector(targetSel);
 				if (!target) throw new Error(`no flick target: ${targetSel}`);
-				const start = new Touch({ identifier: 7, target, clientX: x0, clientY: y0 });
+				const start = new Touch({
+					identifier: 7,
+					target,
+					clientX: x0,
+					clientY: y0
+				});
 				target.dispatchEvent(
-					new TouchEvent("touchstart", { touches: [start], bubbles: true, cancelable: true })
+					new TouchEvent("touchstart", {
+						touches: [start],
+						bubbles: true,
+						cancelable: true
+					})
 				);
-				const end = new Touch({ identifier: 7, target, clientX: x1, clientY: y1 });
+				const end = new Touch({
+					identifier: 7,
+					target,
+					clientX: x1,
+					clientY: y1
+				});
 				target.dispatchEvent(
-					new TouchEvent("touchend", { touches: [], changedTouches: [end], bubbles: true, cancelable: true })
+					new TouchEvent("touchend", {
+						touches: [],
+						changedTouches: [end],
+						bubbles: true,
+						cancelable: true
+					})
 				);
 			},
 			{ targetSel, x0, y0, x1, y1 }
@@ -1620,15 +2129,28 @@ test.describe("always-visible prompt", () => {
 				const a0 = finger(1, -spread0 / 2);
 				const b0 = finger(2, spread0 / 2);
 				target.dispatchEvent(
-					new TouchEvent("touchstart", { touches: [a0, b0], bubbles: true, cancelable: true })
+					new TouchEvent("touchstart", {
+						touches: [a0, b0],
+						bubbles: true,
+						cancelable: true
+					})
 				);
 				const a1 = finger(1, -spread1 / 2);
 				const b1 = finger(2, spread1 / 2);
 				target.dispatchEvent(
-					new TouchEvent("touchmove", { touches: [a1, b1], bubbles: true, cancelable: true })
+					new TouchEvent("touchmove", {
+						touches: [a1, b1],
+						bubbles: true,
+						cancelable: true
+					})
 				);
 				target.dispatchEvent(
-					new TouchEvent("touchend", { touches: [], changedTouches: [a1, b1], bubbles: true, cancelable: true })
+					new TouchEvent("touchend", {
+						touches: [],
+						changedTouches: [a1, b1],
+						bubbles: true,
+						cancelable: true
+					})
 				);
 			},
 			{ targetSel, spread0, spread1 }
@@ -1641,7 +2163,12 @@ test.describe("always-visible prompt", () => {
 		await page.goto("/");
 		await expect(page.locator("article .rendered").first()).toBeVisible();
 		const px = () =>
-			page.evaluate(() => parseFloat(getComputedStyle(document.querySelector("article .rendered")!).fontSize));
+			page.evaluate(() =>
+				parseFloat(
+					getComputedStyle(document.querySelector("article .rendered")!)
+						.fontSize
+				)
+			);
 		const before = await px();
 		await pinch(page, "article.assistant .rendered", 200, 320);
 		// Two 48px spread steps: 100% -> 120%, live per step.
@@ -1713,11 +2240,15 @@ test.describe("always-visible prompt", () => {
 		expect(boxes.ed && boxes.tools && boxes.send).toBeTruthy();
 		if (!boxes.ed || !boxes.tools || !boxes.send) return;
 		expect(boxes.tools.y).toBeGreaterThan(boxes.ed.y + boxes.ed.h - 2);
-		expect(Math.abs(boxes.send.y + boxes.send.h - (boxes.tools.y + boxes.tools.h))).toBeLessThanOrEqual(4);
+		expect(
+			Math.abs(boxes.send.y + boxes.send.h - (boxes.tools.y + boxes.tools.h))
+		).toBeLessThanOrEqual(4);
 	});
 
 	/** Two bars at rest and on focus: only typed text grows the field. */
-	test("composer rests at one line and stays short on focus", async ({ page }) => {
+	test("composer rests at one line and stays short on focus", async ({
+		page
+	}) => {
 		await seed(page, {}, [LONG]);
 		await page.goto("/");
 		await expect(page.locator("article .rendered").first()).toBeVisible();
@@ -1725,7 +2256,9 @@ test.describe("always-visible prompt", () => {
 		const tools = page.locator(".prompt .prompt-tools");
 		const send = page.locator(".prompt .send-btn");
 		const height = () =>
-			box.evaluate((el) => (el instanceof HTMLElement ? el.getBoundingClientRect().height : -1));
+			box.evaluate((el) =>
+				el instanceof HTMLElement ? el.getBoundingClientRect().height : -1
+			);
 		// At rest: one small line with the button bar already up.
 		const rest = await height();
 		expect(rest).toBeGreaterThan(16);
@@ -1747,12 +2280,26 @@ test.describe("always-visible prompt", () => {
 			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
 			const messages = [];
 			for (let i = 0; i < 20; i++) {
-				messages.push({ id: `u${i}`, role: "user", content: `question ${i}`, usage: null, error: null });
-				messages.push({ id: `a${i}`, role: "assistant", content: `answer ${i}`, usage: null, error: null });
+				messages.push({
+					id: `u${i}`,
+					role: "user",
+					content: `question ${i}`,
+					usage: null,
+					error: null
+				});
+				messages.push({
+					id: `a${i}`,
+					role: "assistant",
+					content: `answer ${i}`,
+					usage: null,
+					error: null
+				});
 			}
 			window.localStorage.setItem(
 				"ccez-llm-chats-v1",
-				JSON.stringify([{ id: "chat-a", createdAt: 1, replyLang: null, messages }])
+				JSON.stringify([
+					{ id: "chat-a", createdAt: 1, replyLang: null, messages }
+				])
 			);
 		});
 		await page.goto("/");
@@ -1797,7 +2344,9 @@ test.describe("always-visible prompt", () => {
 		await expect(aside).toHaveClass(/collapsed/);
 	});
 
-	test("tapping empty space focuses the composer in a new chat", async ({ page }) => {
+	test("tapping empty space focuses the composer in a new chat", async ({
+		page
+	}) => {
 		await seedEmpty(page);
 		await page.goto("/");
 		await expect(page.locator(".prompt")).toBeVisible();
@@ -1826,7 +2375,8 @@ test.describe("always-visible prompt", () => {
 	scroller: they fold neither the block nor the message around it. */
 	test("code and latex pans never fold the message", async ({ page }) => {
 		const code = "```python\nx = '" + "y".repeat(220) + "'\n```";
-		const math = "$$\nE_{n} = " + "a".repeat(60) + " + " + "b".repeat(60) + "\n$$";
+		const math =
+			"$$\nE_{n} = " + "a".repeat(60) + " + " + "b".repeat(60) + "\n$$";
 		await seed(page, {}, [`${code}\n\n${math}`]);
 		await page.goto("/");
 		const article = page.locator("article.assistant").first();
@@ -1836,11 +2386,21 @@ test.describe("always-visible prompt", () => {
 		const pan = async (sel: string): Promise<void> => {
 			const box = await page.locator(sel).first().boundingBox();
 			if (!box) throw new Error(`no pan target: ${sel}`);
-			await flick(page, sel, box.x + box.width - 30, box.y + box.height / 2, box.x + 30, box.y + box.height / 2);
+			await flick(
+				page,
+				sel,
+				box.x + box.width - 30,
+				box.y + box.height / 2,
+				box.x + 30,
+				box.y + box.height / 2
+			);
 		};
 		await pan("article.assistant .rendered .ccez-code pre");
 		await expect(article).not.toHaveClass(/folded-msg/);
-		await expect(article.locator(".ccez-code")).not.toHaveAttribute("data-folded", "1");
+		await expect(article.locator(".ccez-code")).not.toHaveAttribute(
+			"data-folded",
+			"1"
+		);
 		const block = article.locator(".ccez-math");
 		await expect(block).toBeVisible({ timeout: 60_000 });
 		await pan("article.assistant .rendered .ccez-math");
@@ -1850,7 +2410,9 @@ test.describe("always-visible prompt", () => {
 
 	/** Own rows read audio before copy on phones (DOM stays copy-first
 	for keyboard and readers): assert the visual left-to-right order. */
-	test("own message buttons order audio before copy on a phone", async ({ page }) => {
+	test("own message buttons order audio before copy on a phone", async ({
+		page
+	}) => {
 		await seedChat(page, [{ role: "user", content: "hi" }]);
 		await page.goto("/");
 		const row = page.locator("article.user .actions").first();
@@ -1876,7 +2438,14 @@ test.describe("always-visible prompt", () => {
 										: "audio"
 				)
 		);
-		expect(order).toEqual(["audio", "copy", "branch", "delete", "edit", "rerun"]);
+		expect(order).toEqual([
+			"audio",
+			"copy",
+			"branch",
+			"delete",
+			"edit",
+			"rerun"
+		]);
 	});
 
 	/** Composer tools share one even rhythm on phones: attach, audio,
@@ -1896,7 +2465,11 @@ test.describe("always-visible prompt", () => {
 		await page.addInitScript(() => {
 			window.localStorage.setItem(
 				"ccez-llm-annotations-v1",
-				JSON.stringify({ "e2e-chat": [{ id: "ann-1", messageId: "e2e-m0", quote: "two", comment: "" }] })
+				JSON.stringify({
+					"e2e-chat": [
+						{ id: "ann-1", messageId: "e2e-m0", quote: "two", comment: "" }
+					]
+				})
 			);
 		});
 		await page.goto("/");
@@ -1918,7 +2491,9 @@ test.describe("always-visible prompt", () => {
 				.filter((el) => (el as HTMLElement).offsetParent !== null)
 				.map((el) => el.getBoundingClientRect())
 				.sort((a, b) => a.x - b.x);
-			return boxes.slice(1).map((b, i) => b.x - (boxes[i]!.x + boxes[i]!.width));
+			return boxes
+				.slice(1)
+				.map((b, i) => b.x - (boxes[i]!.x + boxes[i]!.width));
 		});
 		expect(Math.max(...gaps) - Math.min(...gaps)).toBeLessThan(1.5);
 	});
@@ -1928,28 +2503,52 @@ test.describe("message chrome", () => {
 	function seedScript(s: Record<string, unknown>): void {
 		window.localStorage.setItem("ccez-mock-provider", "1");
 		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify(s));
-		const msg = (id: string, content: string) => ({ id, role: "assistant", content, usage: null, error: null });
+		const msg = (id: string, content: string) => ({
+			id,
+			role: "assistant",
+			content,
+			usage: null,
+			error: null
+		});
 		window.localStorage.setItem(
 			"ccez-llm-chats-v1",
 			JSON.stringify([
-				{ id: "e2e-chat", createdAt: 1, replyLang: null, messages: [msg("m1", "first message here"), msg("m2", "second message here")] }
+				{
+					id: "e2e-chat",
+					createdAt: 1,
+					replyLang: null,
+					messages: [
+						msg("m1", "first message here"),
+						msg("m2", "second message here")
+					]
+				}
 			])
 		);
 	}
 
-	async function seedChrome(page: Page, settings: Record<string, unknown>): Promise<void> {
+	async function seedChrome(
+		page: Page,
+		settings: Record<string, unknown>
+	): Promise<void> {
 		await page.addInitScript(seedScript, settings);
 		await page.goto("/");
-		await expect(page.locator("article .rendered").first()).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator("article .rendered").first()).toBeVisible({
+			timeout: 60_000
+		});
 	}
 
 	// Init scripts re-run on every navigation (reload included), so a
 	// later leg must re-register the full settings — patching storage
 	// alone gets overwritten by the original seed.
-	async function reseed(page: Page, settings: Record<string, unknown>): Promise<void> {
+	async function reseed(
+		page: Page,
+		settings: Record<string, unknown>
+	): Promise<void> {
 		await page.addInitScript(seedScript, settings);
 		await page.reload();
-		await expect(page.locator("article .rendered").first()).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator("article .rendered").first()).toBeVisible({
+			timeout: 60_000
+		});
 	}
 
 	/** Huge type with button scaling off keeps tight gaps; the opt-in
@@ -1958,7 +2557,9 @@ test.describe("message chrome", () => {
 		await seedChrome(page, { fontScale: 4 });
 		const listGap = (): Promise<number> =>
 			page.evaluate(() => {
-				const articles = [...document.querySelectorAll("main .messages article")];
+				const articles = [
+					...document.querySelectorAll("main .messages article")
+				];
 				if (articles.length < 2) throw new Error("need two articles");
 				const first = articles[0]!.getBoundingClientRect();
 				const second = articles[1]!.getBoundingClientRect();
@@ -1973,15 +2574,23 @@ test.describe("message chrome", () => {
 
 	/** No fold chevron on phones: swipe folds, body tap unfolds. */
 	test("fold button stays off the mobile row", async ({ page }) => {
-		await seedChrome(page, { hideButtons: false, hoverAssistantActions: false, hoverUserActions: false });
+		await seedChrome(page, {
+			hideButtons: false,
+			hoverAssistantActions: false,
+			hoverUserActions: false
+		});
 		const row = page.locator("article.assistant .actions").first();
 		await expect(row.locator("button").first()).toBeVisible();
-		await expect(row.locator('button[aria-label="Fold this message"]')).toHaveCount(0);
+		await expect(
+			row.locator('button[aria-label="Fold this message"]')
+		).toHaveCount(0);
 	});
 
 	/** Short own messages dock hard right: the last row button (Rerun)
 	shares the text's right edge instead of hanging past it. */
-	test("short own message shares its right edge with the row", async ({ page }) => {
+	test("short own message shares its right edge with the row", async ({
+		page
+	}) => {
 		await page.addInitScript(() => {
 			window.localStorage.setItem("ccez-mock-provider", "1");
 			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
@@ -1992,16 +2601,28 @@ test.describe("message chrome", () => {
 						id: "e2e-chat",
 						createdAt: 1,
 						replyLang: null,
-						messages: [{ id: "m1", role: "user", content: "Test", usage: null, error: null }]
+						messages: [
+							{
+								id: "m1",
+								role: "user",
+								content: "Test",
+								usage: null,
+								error: null
+							}
+						]
 					}
 				])
 			);
 		});
 		await page.goto("/");
-		await expect(page.locator("article.user .bubble").first()).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator("article.user .bubble").first()).toBeVisible({
+			timeout: 60_000
+		});
 		const edges = await page.evaluate(() => {
 			const text = document.querySelector("article.user .bubble .rendered");
-			const rerun = document.querySelector('article.user .actions button[data-tip="Rerun"]');
+			const rerun = document.querySelector(
+				'article.user .actions button[data-tip="Rerun"]'
+			);
 			if (!text || !rerun) throw new Error("missing text or rerun");
 			return {
 				textRight: text.getBoundingClientRect().right,
@@ -2030,7 +2651,9 @@ test.describe("message chrome", () => {
 	/** The open phone sheet escapes the thread scroller: every option
 	fits on screen and stays reachable (the scroller used to clip
 	Europe's list to five languages, cut by a rectangle). */
-	test("open language sheet shows every option above the composer", async ({ page }) => {
+	test("open language sheet shows every option above the composer", async ({
+		page
+	}) => {
 		await seedEmpty(page);
 		await page.goto("/");
 		await page.locator(".lang-menu > button").first().tap();
@@ -2056,20 +2679,32 @@ test.describe("message chrome", () => {
 	height growth raced the keyboard glide and moved the thread
 	twice): full width and the same small height at rest, focused,
 	and with text. */
-	test("empty phone composer stays full-width, never grows", async ({ page }) => {
+	test("empty phone composer stays full-width, never grows", async ({
+		page
+	}) => {
 		await seedEmpty(page);
 		await page.goto("/");
 		await expect(page.locator(".prompt")).toBeVisible();
 		// Let the editor mount settle before measuring.
 		await page.waitForTimeout(500);
-		const geom = (): Promise<{ mainW: number; rem: number; w: number; h: number }> =>
+		const geom = (): Promise<{
+			mainW: number;
+			rem: number;
+			w: number;
+			h: number;
+		}> =>
 			page.evaluate(() => {
-				const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
-				const mainW = document.querySelector("main")!.getBoundingClientRect().width;
+				const rem = parseFloat(
+					getComputedStyle(document.documentElement).fontSize
+				);
+				const mainW = document
+					.querySelector("main")!
+					.getBoundingClientRect().width;
 				const r = document.querySelector(".prompt")!.getBoundingClientRect();
 				return { mainW, rem, w: r.width, h: r.height };
 			});
-		const full = (g: { mainW: number; rem: number }): number => g.mainW - 2 * 1.2 * g.rem;
+		const full = (g: { mainW: number; rem: number }): number =>
+			g.mainW - 2 * 1.2 * g.rem;
 		// At rest while textless the card already fills the column.
 		const rest = await geom();
 		expect(Math.abs(rest.w - full(rest))).toBeLessThanOrEqual(4);
@@ -2079,7 +2714,9 @@ test.describe("message chrome", () => {
 		const fieldMax = (): Promise<string> =>
 			page.evaluate(() => {
 				const el = document.querySelector(".prompt .ta-input");
-				return el instanceof HTMLElement ? getComputedStyle(el).maxHeight : "missing";
+				return el instanceof HTMLElement
+					? getComputedStyle(el).maxHeight
+					: "missing";
 			});
 		const restClamp = await fieldMax();
 		await page.locator(".prompt .ta-input").click();
@@ -2134,7 +2771,9 @@ test.describe("message chrome", () => {
 		await expect(page.locator(".prompt .ta-input")).toBeFocused();
 		await page.waitForTimeout(400);
 		const after = await page.evaluate(
-			() => (document.querySelector(".messages") as HTMLElement | null)?.scrollTop ?? -1
+			() =>
+				(document.querySelector(".messages") as HTMLElement | null)
+					?.scrollTop ?? -1
 		);
 		expect(after).toBe(top);
 	});
@@ -2159,19 +2798,28 @@ test.describe("toasts", () => {
 	desktop pill stretched full-width on Android. Forced through the
 	message copy path with no clipboard (same trigger as
 	error-toast.e2e.ts, under the Android UA). */
-	test("error toast fits the phone column and reads at text size", async ({ page }) => {
+	test("error toast fits the phone column and reads at text size", async ({
+		page
+	}) => {
 		await seedChat(page, [{ role: "assistant", content: "copy me" }]);
 		await page.addInitScript(() => {
-			Object.defineProperty(window.navigator, "clipboard", { value: null, configurable: true });
+			Object.defineProperty(window.navigator, "clipboard", {
+				value: null,
+				configurable: true
+			});
 		});
 		await page.goto("/");
-		await expect(page.locator("article .rendered").first()).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator("article .rendered").first()).toBeVisible({
+			timeout: 60_000
+		});
 		const row = page.locator("article.assistant").first();
 		await row.click();
 		await expect(row).toHaveAttribute("data-actions-open", "true");
 		await row.locator('button[aria-label="Copy as plain text"]').click();
 		const toast = page.locator(".toast.error");
-		await expect(toast).toContainText("Couldn't copy to the clipboard.", { timeout: 10_000 });
+		await expect(toast).toContainText("Couldn't copy to the clipboard.", {
+			timeout: 10_000
+		});
 		const style = await toast.evaluate((el) => {
 			const s = getComputedStyle(el);
 			return {

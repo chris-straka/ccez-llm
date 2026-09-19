@@ -58,7 +58,11 @@ export async function aidHtml(
 	const nodes = aidTextNodes(host);
 	await Promise.all(
 		nodes.map(async (node) => {
-			const converted = await convertAidNode(node.textContent ?? "", mode, preferred);
+			const converted = await convertAidNode(
+				node.textContent ?? "",
+				mode,
+				preferred
+			);
 			if (converted === null) return;
 			const span = host.ownerDocument.createElement("span");
 			span.innerHTML = converted;
@@ -73,7 +77,10 @@ export async function aidHtml(
  * replacement, no promise. The component uses this on its hot path
  * so pinning pinyin never suspends on a microtask.
  */
-export function aidPinyinHtml(dirtyHtml: string, preferred: LocalAid | null): string {
+export function aidPinyinHtml(
+	dirtyHtml: string,
+	preferred: LocalAid | null
+): string {
 	const host = document.createElement("div");
 	host.innerHTML = dirtyHtml;
 	for (const node of aidTextNodes(host)) {

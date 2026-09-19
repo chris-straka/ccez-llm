@@ -12,7 +12,15 @@ async function seedTwoChats(page: Page): Promise<void> {
 				id,
 				createdAt: 1,
 				replyLang: null,
-				messages: [{ id: `${id}-m`, role: "assistant", content, usage: null, error: null }]
+				messages: [
+					{
+						id: `${id}-m`,
+						role: "assistant",
+						content,
+						usage: null,
+						error: null
+					}
+				]
 			});
 			window.localStorage.setItem(
 				"ccez-llm-chats-v1",
@@ -100,11 +108,10 @@ test("Ctrl+Shift+H opens on the current chat for j/k", async ({ page }) => {
 	// Focus lands on the current chat's row (index 1), not the top.
 	await expect
 		.poll(() =>
-			page.evaluate(
-				() =>
-					[...document.querySelectorAll("aside ul li button.side-chat")].indexOf(
-						document.activeElement
-					)
+			page.evaluate(() =>
+				[...document.querySelectorAll("aside ul li button.side-chat")].indexOf(
+					document.activeElement
+				)
 			)
 		)
 		.toBe(1);
@@ -114,7 +121,9 @@ test("Ctrl+Shift+H opens on the current chat for j/k", async ({ page }) => {
 });
 
 /** Double-tap on non-button sidebar areas closes it; buttons keep working. */
-test("double-tap on sidebar chrome closes it, on buttons does not", async ({ page }) => {
+test("double-tap on sidebar chrome closes it, on buttons does not", async ({
+	page
+}) => {
 	await openSidebar(page);
 	// A row button double-tap is a button action: the list stays open.
 	await chatRows(page).nth(0).dispatchEvent("dblclick");
@@ -134,7 +143,9 @@ test("open find floats centered, outside press dismisses", async ({ page }) => {
 	await expect(bar).toBeVisible();
 	const geom = await page.evaluate(() => {
 		const barEl = document.querySelector(".find-bar") as HTMLElement | null;
-		const art = document.querySelector(".messages article") as HTMLElement | null;
+		const art = document.querySelector(
+			".messages article"
+		) as HTMLElement | null;
 		if (!barEl || !art) return null;
 		const barBox = barEl.getBoundingClientRect();
 		const artBox = art.getBoundingClientRect();
@@ -187,13 +198,20 @@ test("space on an empty chat focuses the prompt", async ({ page }) => {
 		window.localStorage.setItem(
 			"ccez-llm-chats-v1",
 			JSON.stringify([
-				{ id: "chat-full", createdAt: 2, replyLang: null, messages: [msg("f1", "hello there")] },
+				{
+					id: "chat-full",
+					createdAt: 2,
+					replyLang: null,
+					messages: [msg("f1", "hello there")]
+				},
 				{ id: "chat-empty", createdAt: 1, replyLang: null, messages: [] }
 			])
 		);
 	});
 	await page.goto("/");
-	await expect(page.locator("article .rendered").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article .rendered").first()).toBeVisible({
+		timeout: 60_000
+	});
 	await openSidebar(page);
 	// Opening lands keyboard focus on the current row (Ctrl+Shift+H
 	// would just toggle the list shut again). Step down to the empty
@@ -202,7 +220,10 @@ test("space on an empty chat focuses the prompt", async ({ page }) => {
 		.poll(
 			() =>
 				page.evaluate(
-					() => !!(document.activeElement as HTMLElement | null)?.closest("aside ul li button.side-chat")
+					() =>
+						!!(document.activeElement as HTMLElement | null)?.closest(
+							"aside ul li button.side-chat"
+						)
 				),
 			{ timeout: 10_000 }
 		)
@@ -214,7 +235,10 @@ test("space on an empty chat focuses the prompt", async ({ page }) => {
 		.poll(
 			() =>
 				page.evaluate(
-					() => !!(document.activeElement as HTMLElement | null)?.closest(".prompt .ta-input")
+					() =>
+						!!(document.activeElement as HTMLElement | null)?.closest(
+							".prompt .ta-input"
+						)
 				),
 			{ timeout: 10_000 }
 		)
@@ -223,22 +247,34 @@ test("space on an empty chat focuses the prompt", async ({ page }) => {
 
 /** Bare Space on an empty chat lands in the composer: with no messages
 there is nothing to scroll, so the key focuses the prompt instead. */
-test("space on an empty chat with focus outside focuses the prompt", async ({ page }) => {
+test("space on an empty chat with focus outside focuses the prompt", async ({
+	page
+}) => {
 	await page.addInitScript(() => {
 		window.localStorage.setItem("ccez-mock-provider", "1");
 		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
 		window.localStorage.setItem(
 			"ccez-llm-chats-v1",
-			JSON.stringify([{ id: "chat-empty", createdAt: 1, replyLang: null, messages: [] }])
+			JSON.stringify([
+				{ id: "chat-empty", createdAt: 1, replyLang: null, messages: [] }
+			])
 		);
 	});
 	await page.goto("/");
-	await expect(page.locator(".prompt .ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".prompt .ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
 	// Leave the composer: the empty chat has nowhere to scroll.
-	await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
+	await page.evaluate(() =>
+		(document.activeElement as HTMLElement | null)?.blur?.()
+	);
 	await expect
 		.poll(
-			() => page.evaluate(() => (document.activeElement as HTMLElement | null)?.tagName ?? "NONE"),
+			() =>
+				page.evaluate(
+					() =>
+						(document.activeElement as HTMLElement | null)?.tagName ?? "NONE"
+				),
 			{ timeout: 10_000 }
 		)
 		.toBe("BODY");
@@ -247,7 +283,10 @@ test("space on an empty chat with focus outside focuses the prompt", async ({ pa
 		.poll(
 			() =>
 				page.evaluate(
-					() => !!(document.activeElement as HTMLElement | null)?.closest(".prompt .ta-input")
+					() =>
+						!!(document.activeElement as HTMLElement | null)?.closest(
+							".prompt .ta-input"
+						)
 				),
 			{ timeout: 10_000 }
 		)

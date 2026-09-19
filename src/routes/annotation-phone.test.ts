@@ -30,12 +30,17 @@ describe("phone marker taps survive tap-out", () => {
 		const rule = source.match(
 			/window\.addEventListener\("mousedown", \(event\) => \{\s*\/\/ Badge presses never tap out[\s\S]*?\n\t\t\}\);/
 		);
-		expect(rule, "mousedown tap-out rule is gone or reshaped — keep the badge carve-out with it").toBeTruthy();
-		expect(rule![0]).toContain('[data-ann-badge]');
+		expect(
+			rule,
+			"mousedown tap-out rule is gone or reshaped — keep the badge carve-out with it"
+		).toBeTruthy();
+		expect(rule![0]).toContain("[data-ann-badge]");
 	});
 	it("exempts badges in the touchstart tap-out rule", () => {
 		const source = pageSource();
-		expect(source).toContain("Badges never tap out either (see the mousedown twin)");
+		expect(source).toContain(
+			"Badges never tap out either (see the mousedown twin)"
+		);
 	});
 	it("starts marker-tap edits with an empty composer", () => {
 		// Review-pencil edits keep loading the saved comment; marker
@@ -47,12 +52,19 @@ describe("phone marker taps survive tap-out", () => {
 
 describe("phone edits wash their quote", () => {
 	it("feeds the in-prompt edit into the wash id", () => {
-		expect(pageSource()).toContain("promptAnnWashId() ?? editingId");
+		expect(pageSource()).toContain(
+			"promptAnnWashId() ??\n\t\t\t\t\t\t\t\t\teditingId ??"
+		);
 	});
 	it("washes pending filings and saved notes alike", () => {
 		const source = pageSource();
-		const fn = source.match(/function promptAnnWashId\(\): string \| null \{([\s\S]*?)\n\t\}/);
-		expect(fn, "promptAnnWashId is gone or reshaped — keep both branches with it").toBeTruthy();
+		const fn = source.match(
+			/function promptAnnWashId\(\): string \| null \{([\s\S]*?)\n\t\}/
+		);
+		expect(
+			fn,
+			"promptAnnWashId is gone or reshaped — keep both branches with it"
+		).toBeTruthy();
 		expect(fn![1]).toContain("pendingAnn");
 		expect(fn![1]).toContain("promptAnnEdit.id");
 	});
@@ -60,7 +72,9 @@ describe("phone edits wash their quote", () => {
 
 describe("phone assistant width", () => {
 	it("marks the full-bleed text size on the app root", () => {
-		expect(pageSource()).toContain("data-fullbleed={androidUI && settings.fontScale >= FULLBLEED_FONT_SCALE");
+		expect(pageSource()).toContain(
+			"data-fullbleed={(androidUI && settings.fontScale >= FULLBLEED_FONT_SCALE) ||\n\t\tnull}"
+		);
 	});
 	it("shrink-wraps assistant messages below full-bleed", () => {
 		const css = pageStyle();

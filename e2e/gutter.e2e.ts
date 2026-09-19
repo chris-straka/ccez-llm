@@ -10,7 +10,9 @@ test("gutter double-click opens the chat list anywhere left of the column", asyn
 }) => {
 	await seedChat(page, []);
 	await page.goto("/");
-	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const aside = page.locator("aside:not(.settings-panel)");
 	await expect(aside).toHaveClass(/collapsed/);
 	// Below the hero zone: bare <main>, past the messages pane's cap.
@@ -30,7 +32,9 @@ test("gutter double-click opens the chat list anywhere left of the column", asyn
 /** Double-clicking open space below the thread focuses the composer:
 margins hit-test to the scroller, so the gap past the last message
 summons the prompt (a real text pick lands on text instead). */
-test("double-clicking below the thread focuses the composer", async ({ page }) => {
+test("double-clicking below the thread focuses the composer", async ({
+	page
+}) => {
 	await seedChat(page, [
 		{ role: "user", content: "one" },
 		{ role: "assistant", content: "two" }
@@ -42,8 +46,11 @@ test("double-clicking below the thread focuses the composer", async ({ page }) =
 	if (!box) throw new Error("no article box");
 	await page.mouse.dblclick(box.x + box.width / 2, box.y + box.height + 6);
 	await expect
-		.poll(() => page.evaluate(() => !!document.activeElement?.closest?.(".prompt")), {
-			timeout: 10_000
-		})
+		.poll(
+			() => page.evaluate(() => !!document.activeElement?.closest?.(".prompt")),
+			{
+				timeout: 10_000
+			}
+		)
 		.toBe(true);
 });

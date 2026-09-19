@@ -24,7 +24,9 @@ describe("shouldHideForAlways", () => {
 	// the explicit setting). Only an empty chat keeps the composer —
 	// with nothing to read, hiding strands it for good.
 	it("keeps the prompt for mode, focus, and empty chats", () => {
-		expect(shouldHideForAlways({ ...alwaysBase, alwaysMode: false })).toBe(false);
+		expect(shouldHideForAlways({ ...alwaysBase, alwaysMode: false })).toBe(
+			false
+		);
 		expect(shouldHideForAlways({ ...alwaysBase, inPrompt: true })).toBe(false);
 		expect(shouldHideForAlways({ ...alwaysBase, emptyChat: true })).toBe(false);
 	});

@@ -11,7 +11,10 @@ async function seedPlain(page) {
 	// After seedChat: its init script overwrites this key, so ours
 	// must register later to win.
 	await page.addInitScript(() => {
-		localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({ ownBubble: false }));
+		localStorage.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify({ ownBubble: false })
+		);
 	});
 }
 
@@ -26,7 +29,9 @@ test("own two-line message aligns right", async ({ page }) => {
 		}
 	]);
 	await page.goto("/");
-	await expect(page.locator("article.user .rendered").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article.user .rendered").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const info = await page.evaluate(() => {
 		const article = document.querySelector("article.user") as HTMLElement;
 		const bubble = article.querySelector(".bubble") as HTMLElement;
@@ -53,7 +58,9 @@ test("own two-line message aligns right", async ({ page }) => {
 
 /** Narrow phone: the own message docks hard right with the same inset
 as the assistant's left edge — no dead space stranded on the right. */
-test("own message docks right with symmetric insets on a phone", async ({ browser }) => {
+test("own message docks right with symmetric insets on a phone", async ({
+	browser
+}) => {
 	const ctx = await browser.newContext({ ...devices["iPhone 15"] });
 	const page = await ctx.newPage();
 	try {
@@ -62,9 +69,12 @@ test("own message docks right with symmetric insets on a phone", async ({ browse
 			{ role: "assistant", content: "OK." }
 		]);
 		await page.goto("/");
-		await expect(page.locator("article.user .rendered").first()).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator("article.user .rendered").first()).toBeVisible({
+			timeout: 60_000
+		});
 		const info = await page.evaluate(() => {
-			const r = (sel: string) => document.querySelector(sel)?.getBoundingClientRect();
+			const r = (sel: string) =>
+				document.querySelector(sel)?.getBoundingClientRect();
 			const msgs = r(".messages");
 			const user = r("article.user");
 			const bubble = r("article.user .bubble");
@@ -86,7 +96,9 @@ test("own message docks right with symmetric insets on a phone", async ({ browse
 /** A wrapped own message keeps a left gutter on a phone: long text
 wraps at 90% instead of going full-bleed, so the message still reads
 as right-docked rather than a centered block. */
-test("wrapped own message keeps its right dock on a phone", async ({ browser }) => {
+test("wrapped own message keeps its right dock on a phone", async ({
+	browser
+}) => {
 	const ctx = await browser.newContext({ ...devices["iPhone 15"] });
 	const page = await ctx.newPage();
 	try {
@@ -98,9 +110,12 @@ test("wrapped own message keeps its right dock on a phone", async ({ browser }) 
 			}
 		]);
 		await page.goto("/");
-		await expect(page.locator("article.user .rendered").first()).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator("article.user .rendered").first()).toBeVisible({
+			timeout: 60_000
+		});
 		const info = await page.evaluate(() => {
-			const r = (sel: string) => document.querySelector(sel)?.getBoundingClientRect();
+			const r = (sel: string) =>
+				document.querySelector(sel)?.getBoundingClientRect();
 			const user = r("article.user");
 			const bubble = r("article.user .bubble");
 			const msgs = r(".messages");
@@ -128,7 +143,9 @@ async function textGap(page, articleSel: string): Promise<number | null> {
 		const text = article?.querySelector(".rendered") as HTMLElement | null;
 		const actions = article?.querySelector(".actions") as HTMLElement | null;
 		if (!text || !actions) return null;
-		return Math.round(actions.getBoundingClientRect().top - text.getBoundingClientRect().bottom);
+		return Math.round(
+			actions.getBoundingClientRect().top - text.getBoundingClientRect().bottom
+		);
 	}, articleSel);
 }
 
@@ -137,7 +154,9 @@ assistant's — no leftover bubble padding in between. */
 test("plain own messages match the assistant button gap", async ({ page }) => {
 	await seedPlain(page);
 	await page.goto("/");
-	await expect(page.locator("article.user .rendered").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article.user .rendered").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const user = await textGap(page, "article.user");
 	const assistant = await textGap(page, "article.assistant");
 	expect(user, "user gap measured").not.toBeNull();
@@ -151,10 +170,14 @@ test("revealed phone pill hugs own text like replies", async ({ browser }) => {
 	try {
 		await seedPlain(page);
 		await page.goto("/");
-		await expect(page.locator("article.user .rendered").first()).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator("article.user .rendered").first()).toBeVisible({
+			timeout: 60_000
+		});
 		for (const sel of ["article.user", "article.assistant"]) {
 			await page.locator(sel).click();
-			await expect(page.locator(`${sel}[data-actions-open="true"] .actions`)).toBeVisible();
+			await expect(
+				page.locator(`${sel}[data-actions-open="true"] .actions`)
+			).toBeVisible();
 		}
 		const user = await textGap(page, "article.user");
 		const assistant = await textGap(page, "article.assistant");

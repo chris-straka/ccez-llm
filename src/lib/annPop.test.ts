@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { annPopBlurAction, annPopCancelKind, annPopSaveKind, pillWashId } from "./annPop";
+import {
+	annPopBlurAction,
+	annPopCancelKind,
+	annPopSaveKind,
+	pillWashId
+} from "./annPop";
 
 describe("annPopSaveKind", () => {
 	it("commits the pending annotation, else edits the saved comment", () => {

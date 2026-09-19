@@ -121,7 +121,11 @@ export interface DecompNode {
  * splits stop as leaves so the tree always terminates. Pure and
  * unit-tested.
  */
-export function decomposeTree(ch: string, depth = 2, seen: string[] = []): DecompNode {
+export function decomposeTree(
+	ch: string,
+	depth = 2,
+	seen: string[] = []
+): DecompNode {
 	if (depth <= 0 || seen.includes(ch)) return { char: ch, children: [] };
 	const entry = decomposeChar(ch);
 	if (!entry || entry.components.length < 2) return { char: ch, children: [] };
@@ -146,10 +150,13 @@ function joinReadings(raw: string | null): string {
  * One-line on/kun row ("On/Kun: ichi,itsu | hitor..."), or null when the
  * subset holds neither. Pure and unit-tested.
  */
-export function onKunLine(data: Pick<InspectData, "japaneseOn" | "japaneseKun">): string | null {
-	const parts = [joinReadings(data.japaneseOn), joinReadings(data.japaneseKun)].filter(
-		(part) => part.length > 0
-	);
+export function onKunLine(
+	data: Pick<InspectData, "japaneseOn" | "japaneseKun">
+): string | null {
+	const parts = [
+		joinReadings(data.japaneseOn),
+		joinReadings(data.japaneseKun)
+	].filter((part) => part.length > 0);
 	if (parts.length === 0) return null;
 	return `On/Kun: ${parts.join(" | ")}`;
 }
@@ -183,7 +190,9 @@ const RADICAL_DISPLAY: Record<string, string> = { 辵: "辶" };
  * Parse a Unihan kRSUnicode value ("149.7") into its radical number
  * and residual stroke count. Anything else yields nulls.
  */
-export function parseKangxi(rs: string | undefined): { radical: string; rest: number } | null {
+export function parseKangxi(
+	rs: string | undefined
+): { radical: string; rest: number } | null {
 	if (rs === undefined) return null;
 	const dot = rs.indexOf(".");
 	if (dot < 0) return null;
@@ -200,7 +209,8 @@ export function getInspectData(char: string): InspectData {
 	const trimmed = char.trim();
 	const unihan = UNIHAN[trimmed];
 	const entry = decomposeChar(trimmed);
-	const strokes = unihan?.t === undefined ? null : Number.parseInt(unihan.t, 10);
+	const strokes =
+		unihan?.t === undefined ? null : Number.parseInt(unihan.t, 10);
 	const kangxi = parseKangxi(unihan?.rs);
 	return {
 		char: trimmed,

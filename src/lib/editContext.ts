@@ -22,7 +22,9 @@ export interface EditContextLike {
 /** True when the EditContext constructor exists in this runtime. */
 export function editContextSupported(): boolean {
 	try {
-		return typeof (globalThis as Record<string, unknown>).EditContext === "function";
+		return (
+			typeof (globalThis as Record<string, unknown>).EditContext === "function"
+		);
 	} catch {
 		return false;
 	}
@@ -45,15 +47,20 @@ export function shouldDeferForComposition(input: {
  * unsupported — the caller keeps the current `isComposing` path.
  * Never throws (WebView API shapes disagree; composition must survive).
  */
-export function attachEditContext(target: HTMLTextAreaElement): EditContextLike | null {
+export function attachEditContext(
+	target: HTMLTextAreaElement
+): EditContextLike | null {
 	try {
 		if (!editContextSupported()) return null;
-		const Ctor = (globalThis as Record<string, unknown>).EditContext as new () => EditContextLike;
+		const Ctor = (globalThis as Record<string, unknown>)
+			.EditContext as new () => EditContextLike;
 		const ctx = new Ctor();
 		// EditContext couples to the element via the `editContext` IDL
 		// attribute where the browser implements it; where the setter is
 		// absent the context is still returned for range reads.
-		const el = target as HTMLTextAreaElement & { editContext?: EditContextLike | null };
+		const el = target as HTMLTextAreaElement & {
+			editContext?: EditContextLike | null;
+		};
 		if ("editContext" in el) el.editContext = ctx;
 		return ctx;
 	} catch {

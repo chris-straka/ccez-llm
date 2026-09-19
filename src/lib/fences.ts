@@ -29,7 +29,8 @@ const OPEN_RE = /^```([A-Za-z0-9_+-]*)\s*$/;
 const CLOSE_RE = /^\s*```\s*$/;
 
 /** Shift+Enter outcomes on the cursor line (decided pure, executed in `editor.ts`). */
-export type ShiftEnterAction = { kind: "newline" } | { kind: "close" } | { kind: "exit" };
+export type ShiftEnterAction =
+	{ kind: "newline" } | { kind: "close" } | { kind: "exit" };
 
 /**
  * What Shift+Enter does at `cursor`: on an unclosed opener it closes
@@ -38,7 +39,10 @@ export type ShiftEnterAction = { kind: "newline" } | { kind: "close" } | { kind:
  * collapsed to two, since an empty body holds nothing to keep); anywhere
  * else it stays a plain newline.
  */
-export function shiftEnterAction(doc: string, cursor: number): ShiftEnterAction {
+export function shiftEnterAction(
+	doc: string,
+	cursor: number
+): ShiftEnterAction {
 	const lines = doc.split("\n");
 	let offset = 0;
 	let lineNo = 0;
@@ -93,10 +97,19 @@ export function parseFences(doc: string): FenceBlock[] {
 			}
 			j++;
 		}
-		const bodyTo = closeLine === -1 ? doc.length : (starts[closeLine] ?? doc.length);
+		const bodyTo =
+			closeLine === -1 ? doc.length : (starts[closeLine] ?? doc.length);
 		const closeTo =
 			closeLine === -1 ? doc.length : bodyTo + (lines[closeLine] ?? "").length;
-		out.push({ openLine, closeLine, lang, openFrom, bodyFrom, bodyTo, closeTo });
+		out.push({
+			openLine,
+			closeLine,
+			lang,
+			openFrom,
+			bodyFrom,
+			bodyTo,
+			closeTo
+		});
 		i = closeLine === -1 ? lines.length : closeLine + 1;
 	}
 	return out;
@@ -108,7 +121,10 @@ export function fenceBody(doc: string, fence: FenceBlock): string {
 }
 
 /** Fence holding a doc offset (bars included), or null outside fences. */
-export function fenceAtOffset(fences: FenceBlock[], offset: number): FenceBlock | null {
+export function fenceAtOffset(
+	fences: FenceBlock[],
+	offset: number
+): FenceBlock | null {
 	for (const fence of fences) {
 		if (offset >= fence.openFrom && offset <= fence.closeTo) return fence;
 	}

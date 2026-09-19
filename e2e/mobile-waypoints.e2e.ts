@@ -11,7 +11,10 @@ test.use({
 	viewport: { width: 412, height: 915 }
 });
 
-function fifteenTurns(): Array<{ role: "user" | "assistant"; content: string }> {
+function fifteenTurns(): Array<{
+	role: "user" | "assistant";
+	content: string;
+}> {
 	// Fifteen user turns: the sheet caps at 55vh, so the list must
 	// overflow and scroll inside it on a 915px phone viewport.
 	return [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].flatMap((n) => [

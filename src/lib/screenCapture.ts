@@ -15,9 +15,11 @@ export interface ScreenStreamLike {
 /** True when screen capture can work in this runtime. */
 export function screenshotCaptureAvailable(): boolean {
 	try {
-		const media = (navigator as Navigator & {
-			mediaDevices?: { getDisplayMedia?: unknown };
-		}).mediaDevices;
+		const media = (
+			navigator as Navigator & {
+				mediaDevices?: { getDisplayMedia?: unknown };
+			}
+		).mediaDevices;
 		return typeof media?.getDisplayMedia === "function";
 	} catch {
 		return false;
@@ -31,13 +33,18 @@ export function screenshotCaptureAvailable(): boolean {
  * propagate — callers stay silent via `isPermissionDismissal`.
  */
 export async function captureScreenToFile<S extends ScreenStreamLike>(
-	getDisplayMedia: (constraints: { video: boolean; audio: boolean }) => Promise<S>,
+	getDisplayMedia: (constraints: {
+		video: boolean;
+		audio: boolean;
+	}) => Promise<S>,
 	grabFrame: (stream: S) => Promise<Blob>
 ): Promise<File> {
 	const stream = await getDisplayMedia({ video: true, audio: false });
 	try {
 		const blob = await grabFrame(stream);
-		return new File([blob], "screenshot.png", { type: blob.type || "image/png" });
+		return new File([blob], "screenshot.png", {
+			type: blob.type || "image/png"
+		});
 	} finally {
 		for (const track of stream.getVideoTracks()) {
 			try {
@@ -63,7 +70,9 @@ export function grabVideoFrame(stream: MediaStream): Promise<Blob> {
 			video.remove();
 			if (error !== undefined) {
 				reject(
-					error instanceof Error ? error : new Error("Couldn't capture that frame.")
+					error instanceof Error
+						? error
+						: new Error("Couldn't capture that frame.")
 				);
 			}
 		};

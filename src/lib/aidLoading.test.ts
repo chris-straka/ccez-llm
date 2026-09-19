@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { createAidLoadingReporter, createRefMemo, furiganaRequestKey } from "./aidLoading";
+import {
+	createAidLoadingReporter,
+	createRefMemo,
+	furiganaRequestKey
+} from "./aidLoading";
 
 describe("createAidLoadingReporter", () => {
 	it("notifies on change, never twice in a row", () => {

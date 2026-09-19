@@ -42,7 +42,8 @@ export interface NativeSaveDeps {
  */
 async function nativeDialog(): Promise<NativeSaveDialog | null> {
 	try {
-		const mod = (await import("@tauri-apps/plugin-dialog")) as unknown as Partial<NativeSaveDialog>;
+		const mod =
+			(await import("@tauri-apps/plugin-dialog")) as unknown as Partial<NativeSaveDialog>;
 		return typeof mod.save === "function" ? (mod as NativeSaveDialog) : null;
 	} catch {
 		return null;
@@ -56,8 +57,11 @@ async function nativeDialog(): Promise<NativeSaveDialog | null> {
  */
 async function nativeFs(): Promise<NativeSaveFs | null> {
 	try {
-		const mod = (await import("@tauri-apps/plugin-fs")) as unknown as Partial<NativeSaveFs>;
-		return typeof mod.writeTextFile === "function" ? (mod as NativeSaveFs) : null;
+		const mod =
+			(await import("@tauri-apps/plugin-fs")) as unknown as Partial<NativeSaveFs>;
+		return typeof mod.writeTextFile === "function"
+			? (mod as NativeSaveFs)
+			: null;
 	} catch {
 		return null;
 	}

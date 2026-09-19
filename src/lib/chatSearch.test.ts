@@ -81,7 +81,16 @@ describe("snippetFor", () => {
 describe("buildSearchDocs", () => {
 	it("flattens messages and annotations, skipping blanks", () => {
 		const docs = buildSearchDocs(
-			[{ id: "a", createdAt: 1, messages: [{ id: "m1", content: "hi" }, { id: "m2", content: "  " }] }],
+			[
+				{
+					id: "a",
+					createdAt: 1,
+					messages: [
+						{ id: "m1", content: "hi" },
+						{ id: "m2", content: "  " }
+					]
+				}
+			],
 			[{ chatId: "a", messageId: "m1", quote: "hi", comment: "" }]
 		);
 		expect(docs).toHaveLength(2);
@@ -91,7 +100,9 @@ describe("buildSearchDocs", () => {
 
 describe("findMessageIndices", () => {
 	it("lists message indices containing the query, case-insensitive", () => {
-		expect(findMessageIndices(["miso ramen", "sushi rice", "MISO soup"], "miso")).toEqual([0, 2]);
+		expect(
+			findMessageIndices(["miso ramen", "sushi rice", "MISO soup"], "miso")
+		).toEqual([0, 2]);
 		expect(findMessageIndices(["aaa", "bbb"], "z")).toEqual([]);
 		expect(findMessageIndices(["aaa"], "  ")).toEqual([]);
 	});
@@ -103,6 +114,8 @@ describe("chatMatchesQuery", () => {
 		expect(chatMatchesQuery("Morning notes", [], "morning")).toBe(true);
 		expect(chatMatchesQuery("label", ["sushi recipe"], "sushi")).toBe(true);
 		expect(chatMatchesQuery("label", ["sushi recipe"], "ramen")).toBe(false);
-		expect(chatMatchesQuery("label", ["sushi recipe"], "sushi ramen")).toBe(false);
+		expect(chatMatchesQuery("label", ["sushi recipe"], "sushi ramen")).toBe(
+			false
+		);
 	});
 });

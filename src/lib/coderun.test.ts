@@ -34,7 +34,9 @@ describe("runnerFor", () => {
 		expect(runnerFor("haskell")).toBeNull();
 		expect(runnerFor("")).toBeNull();
 		expect(runnerFor("text")).toBeNull();
-		expect(noRunnerReason("haskell")).toContain('No local runner for "haskell"');
+		expect(noRunnerReason("haskell")).toContain(
+			'No local runner for "haskell"'
+		);
 	});
 });
 
@@ -49,7 +51,8 @@ describe("runCodeBlock outside the shell", () => {
 		// jsdom/node has no Tauri internals, so this rides the fallback.
 		const outcome = await runCodeBlock("python", "print('hi')");
 		expect(outcome.kind).toBe("unavailable");
-		if (outcome.kind === "unavailable") expect(outcome.reason).toContain("desktop app");
+		if (outcome.kind === "unavailable")
+			expect(outcome.reason).toContain("desktop app");
 	});
 
 	it("reports unknown languages without touching the backend", async () => {
@@ -57,7 +60,8 @@ describe("runCodeBlock outside the shell", () => {
 		// in every runtime, including this backend-less one.
 		const outcome = await runCodeBlock("haskell", "main = return ()");
 		expect(outcome.kind).toBe("unavailable");
-		if (outcome.kind === "unavailable") expect(outcome.reason).toContain("No local runner");
+		if (outcome.kind === "unavailable")
+			expect(outcome.reason).toContain("No local runner");
 		expect(runnerFor("haskell")).toBeNull();
 		expect(noRunnerReason("haskell")).toContain("No local runner");
 	});
@@ -98,7 +102,9 @@ describe("codeRunSummary", () => {
 				}
 			})
 		).toContain("Timed out after 10s");
-		expect(codeRunSummary("python", { kind: "unavailable", reason: "nope" })).toBe("nope");
+		expect(
+			codeRunSummary("python", { kind: "unavailable", reason: "nope" })
+		).toBe("nope");
 		expect(codeRunDisabledReason()).toContain("desktop app");
 	});
 });
@@ -113,17 +119,26 @@ describe("codeRunBody", () => {
 	};
 	it("stamps output with no header line", () => {
 		expect(
-			codeRunBody({ kind: "ok", result: { ...result, stdout: "Hello, world!\n", stderr: "" } })
+			codeRunBody({
+				kind: "ok",
+				result: { ...result, stdout: "Hello, world!\n", stderr: "" }
+			})
 		).toBe("Hello, world!\n");
 		expect(
-			codeRunBody({ kind: "ok", result: { ...result, stdout: "out\n", stderr: "warn\n" } })
+			codeRunBody({
+				kind: "ok",
+				result: { ...result, stdout: "out\n", stderr: "warn\n" }
+			})
 		).toBe("out\n\nwarn\n");
 	});
 
 	it("is empty for silent runs so no tray renders", () => {
-		expect(codeRunBody({ kind: "ok", result: { ...result, stdout: "", stderr: "  \n" } })).toBe(
-			""
-		);
+		expect(
+			codeRunBody({
+				kind: "ok",
+				result: { ...result, stdout: "", stderr: "  \n" }
+			})
+		).toBe("");
 	});
 
 	it("keeps the reason for never-ran outcomes", () => {

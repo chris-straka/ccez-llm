@@ -1,0 +1,9 @@
+# Generated data files: source of truth is the generator script
+# (see each file header). Regen output is dense, so formatting
+# them would flip-flop on every regen.
+*.generated.ts
+# Build outputs and local artifacts: never formatted.
+target/
+dist/
+build/
+coverage/

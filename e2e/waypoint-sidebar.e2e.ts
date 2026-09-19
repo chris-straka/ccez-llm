@@ -21,7 +21,9 @@ test("no prompt jump icon on desktop", async ({ page }) => {
 		}))
 	);
 	await page.goto("/");
-	await expect(page.locator("article .rendered").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article .rendered").first()).toBeVisible({
+		timeout: 60_000
+	});
 	await expect(page.locator(".wp-jump")).toHaveCount(0);
 	await expect(page.locator('nav[aria-label="Waypoints"]')).toBeVisible();
 });
@@ -31,7 +33,9 @@ an option jumps the history there. Hovering the tick stack reveals the
 menu (the reveal covers its own trigger, so the mouse path is
 hover-open — the button toggle is the keyboard path, pinned in
 waypoints.e2e.ts). */
-test("waypoint menu opens mid-list and dismisses on leave", async ({ page }) => {
+test("waypoint menu opens mid-list and dismisses on leave", async ({
+	page
+}) => {
 	await seedChat(
 		page,
 		Array.from({ length: 15 }, (_, i) => ({
@@ -40,13 +44,18 @@ test("waypoint menu opens mid-list and dismisses on leave", async ({ page }) => 
 		}))
 	);
 	await page.goto("/");
-	await expect(page.locator("article .rendered").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article .rendered").first()).toBeVisible({
+		timeout: 60_000
+	});
 	const menu = page.locator(".wp-menu");
 	const items = menu.locator('button[role="menuitem"]');
 	const hoverTrigger = async (): Promise<void> => {
 		const trigger = await page.locator(".wp-btn").boundingBox();
 		if (!trigger) throw new Error("missing wp trigger");
-		await page.mouse.move(trigger.x + trigger.width / 2, trigger.y + trigger.height / 2);
+		await page.mouse.move(
+			trigger.x + trigger.width / 2,
+			trigger.y + trigger.height / 2
+		);
 		await expect(menu).toBeVisible({ timeout: 15_000 });
 	};
 	// Opens at the middle option, not the top.
@@ -92,16 +101,16 @@ test("space with no selection focuses the prompt", async ({ page }) => {
 	await expect(page.locator("main .messages")).toContainText(ALPHA);
 	await openSidebar(page);
 	// Focus a row without selecting it (sideIdx stays -1).
-	await chatRows(page).nth(0).evaluate((el) => (el as HTMLElement).focus());
+	await chatRows(page)
+		.nth(0)
+		.evaluate((el) => (el as HTMLElement).focus());
 	await page.keyboard.press("Space");
 	// List closed, prompt focused, same chat on screen.
 	await expect(chatsAside(page)).toHaveClass(/collapsed/);
 	await expect(page.locator("main .messages")).toContainText(ALPHA);
 	await expect
 		.poll(() =>
-			page.evaluate(
-				() => document.activeElement?.closest(".ta-input") !== null
-			)
+			page.evaluate(() => document.activeElement?.closest(".ta-input") !== null)
 		)
 		.toBe(true);
 });
@@ -118,7 +127,9 @@ test("message counter caps at 99+", async ({ page }) => {
 		}))
 	);
 	await page.goto("/");
-	await expect(page.locator("article .rendered").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator("article .rendered").first()).toBeVisible({
+		timeout: 60_000
+	});
 	await openSidebar(page);
 	await expect(chatRows(page).first()).toContainText("99+");
 });
@@ -127,7 +138,9 @@ test("message counter caps at 99+", async ({ page }) => {
 test("row buttons share a fixed box", async ({ page }) => {
 	await seedChat(page, [{ role: "user", content: "hi" }]);
 	await page.goto("/");
-	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
 	await openSidebar(page);
 	const row = page.locator("aside ul li").first();
 	await row.hover();

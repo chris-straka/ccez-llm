@@ -47,24 +47,38 @@
 	/** This model's thinking dial (native knob or prompt hints); hidden
 	 * when a single level exists. Recomputes from the model field, so a
 	 * newer/cheaper model id picks up its own dial as soon as it is typed. */
-	const thinkingSupport = $derived(thinkingFor(settings.activeProviderId, active.model));
+	const thinkingSupport = $derived(
+		thinkingFor(settings.activeProviderId, active.model)
+	);
 	const thinkingId = $derived(
-		resolveThinkingId(thinkingSupport, settings.thinking[settings.activeProviderId])
+		resolveThinkingId(
+			thinkingSupport,
+			settings.thinking[settings.activeProviderId]
+		)
 	);
 	function setThinking(id: string) {
-		settings.thinking = { ...settings.thinking, [settings.activeProviderId]: id };
-	}</script>
+		settings.thinking = {
+			...settings.thinking,
+			[settings.activeProviderId]: id
+		};
+	}
+</script>
 
 <section aria-labelledby="defaults-heading">
 	<h2 id="defaults-heading">Defaults</h2>
 	<label>
 		System prompt
-		<textarea rows="2" bind:value={settings.systemPrompt} spellcheck="false"></textarea>
+		<textarea rows="2" bind:value={settings.systemPrompt} spellcheck="false"
+		></textarea>
 	</label>
 	{#if thinkingSupport.options.length > 1}
 		<fieldset>
 			<legend>Thinking level</legend>
-			<div class="segmented thinking" role="radiogroup" aria-label="Thinking level">
+			<div
+				class="segmented thinking"
+				role="radiogroup"
+				aria-label="Thinking level"
+			>
 				{#each thinkingSupport.options as option (option.id)}
 					<button
 						type="button"
@@ -144,7 +158,8 @@
 			<input type="checkbox" bind:checked={settings.replyNotifications} />
 			Notify when replies finish in the background
 		</label>
-	{/if}	<VoicePanel settings={settings} androidUI={androidUI} />
+	{/if}
+	<VoicePanel {settings} {androidUI} />
 	<!-- Study-fonts and lesson-audio sections removed (lesson-audio
 	froze the app): the inventory helpers stay in
 	fontCoverage.ts and nativeTts.ts for their remaining callers. -->
@@ -170,8 +185,8 @@
 			type="button"
 			class="reset-width"
 			title="Reset to the default size"
-			onclick={() => (settings.fontScale = 1)}
-		>(100%)</button>
+			onclick={() => (settings.fontScale = 1)}>(100%)</button
+		>
 		<span class="font-row">
 			<input
 				type="range"
@@ -207,12 +222,15 @@
 				value={settings.messageGap ?? MESSAGE_GAP_DEFAULT}
 				aria-label="Gap size in rem"
 				onpointerdown={noteSliderPress}
-				onpointerup={(e) => sliderRelease(e, () => (settings.messageGap = MESSAGE_GAP_DEFAULT))}
+				onpointerup={(e) =>
+					sliderRelease(e, () => (settings.messageGap = MESSAGE_GAP_DEFAULT))}
 				oninput={(e) => {
 					settings.messageGap = Number(e.currentTarget.value);
 				}}
 			/>
-			<output style="min-width: 3.6rem;">{settings.messageGap ?? MESSAGE_GAP_DEFAULT} rem</output>
+			<output style="min-width: 3.6rem;"
+				>{settings.messageGap ?? MESSAGE_GAP_DEFAULT} rem</output
+			>
 		</span>
 	</label>
 	{#if !androidUI}
@@ -234,41 +252,56 @@
 					value={settings.chatWidth ?? CHAT_WIDTH_DEFAULT}
 					aria-label="Chat width in rem"
 					onpointerdown={noteSliderPress}
-					onpointerup={(e) => sliderRelease(e, () => (settings.chatWidth = CHAT_WIDTH_DEFAULT))}
+					onpointerup={(e) =>
+						sliderRelease(e, () => (settings.chatWidth = CHAT_WIDTH_DEFAULT))}
 					oninput={(e) => {
 						settings.chatWidth = Number(e.currentTarget.value);
 					}}
 				/>
-				<output style="min-width: 3.6rem;">{settings.chatWidth ?? CHAT_WIDTH_DEFAULT} rem</output>
+				<output style="min-width: 3.6rem;"
+					>{settings.chatWidth ?? CHAT_WIDTH_DEFAULT} rem</output
+				>
 			</span>
 		</label>
 	{/if}
 	{#if !androidUI}
-	<label class="slider-row">
-		Hide prompt after idle
-		<button
-			type="button"
-			class="reset-width"
-			title="Reset to the default idle time"
-			onclick={() => (settings.promptIdleSec = PROMPT_IDLE_DEFAULT)}
-			>({formatIdleTimeout(PROMPT_IDLE_DEFAULT)})</button
-		>
-		<span class="font-row">
-			<input
-				type="range"
-				min={IDLE_SLIDER_BOTTOM}
-				max={IDLE_SLIDER_TOP}
-				step="1"
-				value={idleSettingToSlider(settings.promptIdleSec ?? PROMPT_IDLE_DEFAULT)}
-				aria-label="Idle seconds before the prompt hides (bottom is always, top is never)"
-				onpointerdown={noteSliderPress}
-				onpointerup={(e) => sliderRelease(e, () => (settings.promptIdleSec = PROMPT_IDLE_DEFAULT))}
-				oninput={(e) => {
-					settings.promptIdleSec = idleSliderToSetting(Number(e.currentTarget.value));
-				}}
-			/>
-			<output style="min-width: 3.6rem;">{formatIdleTimeout(settings.promptIdleSec ?? PROMPT_IDLE_DEFAULT)}</output>
-		</span>
-	</label>
+		<label class="slider-row">
+			Hide prompt after idle
+			<button
+				type="button"
+				class="reset-width"
+				title="Reset to the default idle time"
+				onclick={() => (settings.promptIdleSec = PROMPT_IDLE_DEFAULT)}
+				>({formatIdleTimeout(PROMPT_IDLE_DEFAULT)})</button
+			>
+			<span class="font-row">
+				<input
+					type="range"
+					min={IDLE_SLIDER_BOTTOM}
+					max={IDLE_SLIDER_TOP}
+					step="1"
+					value={idleSettingToSlider(
+						settings.promptIdleSec ?? PROMPT_IDLE_DEFAULT
+					)}
+					aria-label="Idle seconds before the prompt hides (bottom is always, top is never)"
+					onpointerdown={noteSliderPress}
+					onpointerup={(e) =>
+						sliderRelease(
+							e,
+							() => (settings.promptIdleSec = PROMPT_IDLE_DEFAULT)
+						)}
+					oninput={(e) => {
+						settings.promptIdleSec = idleSliderToSetting(
+							Number(e.currentTarget.value)
+						);
+					}}
+				/>
+				<output style="min-width: 3.6rem;"
+					>{formatIdleTimeout(
+						settings.promptIdleSec ?? PROMPT_IDLE_DEFAULT
+					)}</output
+				>
+			</span>
+		</label>
 	{/if}
 </section>

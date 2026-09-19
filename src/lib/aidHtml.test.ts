@@ -10,9 +10,13 @@ describe("convertAidNode", () => {
 	});
 
 	it("leaves non-pinyin nodes bare", async () => {
-		await expect(convertAidNode("hello world", "pinyin", null)).resolves.toBeNull();
+		await expect(
+			convertAidNode("hello world", "pinyin", null)
+		).resolves.toBeNull();
 		// Kana is Japanese: pinyin never annotates it.
-		await expect(convertAidNode("ひらがな", "pinyin", null)).resolves.toBeNull();
+		await expect(
+			convertAidNode("ひらがな", "pinyin", null)
+		).resolves.toBeNull();
 		await expect(convertAidNode("hello", "dual", null)).resolves.toBeNull();
 	});
 });
@@ -49,7 +53,11 @@ describe("aidPinyinHtml", () => {
 
 describe("aidHtml", () => {
 	it("dual mode rubies Han prose and skips the rest", async () => {
-		const html = await aidHtml("<p>中文 and English</p><pre><code>x = 1</code></pre>", "dual", null);
+		const html = await aidHtml(
+			"<p>中文 and English</p><pre><code>x = 1</code></pre>",
+			"dual",
+			null
+		);
 		expect(html).toContain("<ruby>");
 		expect(html).toContain("<pre><code>x = 1</code></pre>");
 	});

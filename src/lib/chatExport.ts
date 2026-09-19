@@ -73,7 +73,10 @@ export interface SavePickerOptions {
 
 /** FileSystemFileHandle narrowed to what we call. */
 export interface SaveHandleLike {
-	createWritable(): Promise<{ write(data: string): Promise<void>; close(): Promise<void> }>;
+	createWritable(): Promise<{
+		write(data: string): Promise<void>;
+		close(): Promise<void>;
+	}>;
 }
 
 /**
@@ -87,9 +90,19 @@ export interface SaveHandleLike {
 export async function exportChatMarkdown(
 	chat: ExportableChat,
 	deps: {
-		picker?: ((options: SavePickerOptions) => Promise<SaveHandleLike>) | null | undefined;
-		native?: ((filename: string, text: string) => Promise<"saved" | "dismissed" | null>) | null | undefined;
-		download?: ((text: string, filename: string) => void | Promise<void>) | undefined;
+		picker?:
+			| ((options: SavePickerOptions) => Promise<SaveHandleLike>)
+			| null
+			| undefined;
+		native?:
+			| ((
+					filename: string,
+					text: string
+			  ) => Promise<"saved" | "dismissed" | null>)
+			| null
+			| undefined;
+		download?:
+			((text: string, filename: string) => void | Promise<void>) | undefined;
 	} = {}
 ): Promise<"picker" | "native" | "download"> {
 	const text = chatToMarkdown(chat);
@@ -111,7 +124,8 @@ export async function exportChatMarkdown(
 		// A dismissal stays silent like a picker abort: the AbortError
 		// below rides the caller's `isPermissionDismissal` path, and a
 		// missing native bridge falls through to the download.
-		if (outcome === "dismissed") throw new DOMException("Export dismissed.", "AbortError");
+		if (outcome === "dismissed")
+			throw new DOMException("Export dismissed.", "AbortError");
 	}
 	const download = deps.download;
 	if (!download) throw new Error("No export path available.");
@@ -133,9 +147,13 @@ export interface ClipboardLike {
 	writeText(text: string): Promise<void>;
 }
 
-export async function copyExportText(text: string, clipboard?: ClipboardLike | null): Promise<void> {
+export async function copyExportText(
+	text: string,
+	clipboard?: ClipboardLike | null
+): Promise<void> {
 	const target =
-		clipboard ?? (typeof navigator !== "undefined" ? (navigator.clipboard ?? null) : null);
+		clipboard ??
+		(typeof navigator !== "undefined" ? (navigator.clipboard ?? null) : null);
 	if (!target) throw new Error("No export path available.");
 	await target.writeText(text);
 }

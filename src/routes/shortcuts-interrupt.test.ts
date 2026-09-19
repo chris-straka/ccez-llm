@@ -15,8 +15,13 @@ function pageSource(): string {
 describe("middle-click shortcuts toggle", () => {
 	it("interrupts speech when toggling the modal", () => {
 		const source = pageSource();
-		const toggle = source.match(/const onMiddleClick = \(event: MouseEvent\) => \{([\s\S]*?)\n\t\t\};/);
-		expect(toggle, "onMiddleClick is gone or reshaped — keep the speech interrupt with it").toBeTruthy();
+		const toggle = source.match(
+			/const onMiddleClick = \(event: MouseEvent\) => \{([\s\S]*?)\n\t\t\};/
+		);
+		expect(
+			toggle,
+			"onMiddleClick is gone or reshaped — keep the speech interrupt with it"
+		).toBeTruthy();
 		expect(toggle![1]).toContain("stopVoice()");
 	});
 });

@@ -17,8 +17,11 @@ import { seedChat } from "./helpers";
  * 7. off-chat drags never highlight above the cursor's current line.
  */
 
-test("annotation card widens with font size up to its cap", async ({ page }) => {
-	const sentence = "Kyoto is an old capital with many temples near the riverbank.";
+test("annotation card widens with font size up to its cap", async ({
+	page
+}) => {
+	const sentence =
+		"Kyoto is an old capital with many temples near the riverbank.";
 	await seedChat(page, [
 		{ role: "assistant", content: sentence },
 		{ role: "assistant", content: sentence },
@@ -43,7 +46,8 @@ test("annotation card widens with font size up to its cap", async ({ page }) => 
 	await page.mouse.move(box.x + box.width - 2, y);
 	await page.mouse.down();
 	await page.evaluate(() => {
-		const text = document.querySelectorAll("article.assistant .rendered p")[1]?.firstChild;
+		const text = document.querySelectorAll("article.assistant .rendered p")[1]
+			?.firstChild;
 		if (!(text instanceof Text)) throw new Error("no message text");
 		window.getSelection()?.setBaseAndExtent(text, 0, text, 5);
 	});
@@ -68,19 +72,27 @@ test("annotation card widens with font size up to its cap", async ({ page }) => 
 });
 
 test("desktop right-click never opens the native menu", async ({ page }) => {
-	await seedChat(page, [{ role: "assistant", content: "hello world from Kyoto" }]);
+	await seedChat(page, [
+		{ role: "assistant", content: "hello world from Kyoto" }
+	]);
 	await page.goto("/");
 	const body = page.locator("article.assistant .rendered").first();
 	await expect(body).toBeVisible({ timeout: 60_000 });
 	const suppressed = await body.evaluate((el) => {
-		const event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+		const event = new MouseEvent("contextmenu", {
+			bubbles: true,
+			cancelable: true
+		});
 		el.dispatchEvent(event);
 		return event.defaultPrevented;
 	});
 	expect(suppressed).toBe(true);
 	// Editable fields keep theirs (spellcheck, copy/paste).
 	const kept = await page.locator(".prompt .ta-input").evaluate((el) => {
-		const event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+		const event = new MouseEvent("contextmenu", {
+			bubbles: true,
+			cancelable: true
+		});
 		el.dispatchEvent(event);
 		return event.defaultPrevented;
 	});
@@ -88,7 +100,9 @@ test("desktop right-click never opens the native menu", async ({ page }) => {
 });
 
 test("mid-word drags snap out to whole words", async ({ page }) => {
-	await seedChat(page, [{ role: "assistant", content: "hello world from Kyoto" }]);
+	await seedChat(page, [
+		{ role: "assistant", content: "hello world from Kyoto" }
+	]);
 	await page.goto("/");
 	const body = page.locator("article.assistant .rendered").first();
 	await expect(body).toBeVisible({ timeout: 60_000 });
@@ -101,7 +115,9 @@ test("mid-word drags snap out to whole words", async ({ page }) => {
 	await page.mouse.move(box.x + box.width - 2, y);
 	await page.mouse.down();
 	await page.evaluate(() => {
-		const text = document.querySelector("article.assistant .rendered p")?.firstChild;
+		const text = document.querySelector(
+			"article.assistant .rendered p"
+		)?.firstChild;
 		if (!(text instanceof Text)) throw new Error("no message text");
 		window.getSelection()?.setBaseAndExtent(text, 1, text, 10);
 	});
@@ -112,12 +128,19 @@ test("mid-word drags snap out to whole words", async ({ page }) => {
 	await page.keyboard.press("Enter");
 	// The filed quote is the whole words, never the cut fragment.
 	await page.locator(".prompt-tools .ann-wrap").hover();
-	await expect(page.locator(".prompt-tools .review-quote").first()).toHaveText(/hello world/);
+	await expect(page.locator(".prompt-tools .review-quote").first()).toHaveText(
+		/hello world/
+	);
 });
 
-test("create box centers over narrow highlights, wide ones open at the cursor", async ({ page }) => {
+test("create box centers over narrow highlights, wide ones open at the cursor", async ({
+	page
+}) => {
 	await seedChat(page, [
-		{ role: "assistant", content: "Kyoto is an old capital with many temples and quiet gardens" }
+		{
+			role: "assistant",
+			content: "Kyoto is an old capital with many temples and quiet gardens"
+		}
 	]);
 	await page.goto("/");
 	const para = page.locator("article.assistant .rendered p").first();
@@ -184,7 +207,9 @@ test("create box centers over narrow highlights, wide ones open at the cursor", 
 });
 
 test("numbered badges grow with the message font size", async ({ page }) => {
-	await seedChat(page, [{ role: "assistant", content: "alpha beta gamma delta" }]);
+	await seedChat(page, [
+		{ role: "assistant", content: "alpha beta gamma delta" }
+	]);
 	await page.goto("/");
 	const para = page.locator("article.assistant .rendered p").first();
 	await expect(para).toBeVisible({ timeout: 60_000 });
@@ -203,8 +228,12 @@ test("numbered badges grow with the message font size", async ({ page }) => {
 	expect(parseFloat(big)).toBeGreaterThan(parseFloat(small));
 });
 
-test("empty annotations bake a question mark for the model", async ({ page }) => {
-	await seedChat(page, [{ role: "assistant", content: "alpha beta gamma delta" }]);
+test("empty annotations bake a question mark for the model", async ({
+	page
+}) => {
+	await seedChat(page, [
+		{ role: "assistant", content: "alpha beta gamma delta" }
+	]);
 	await page.goto("/");
 	const para = page.locator("article.assistant .rendered p").first();
 	await expect(para).toBeVisible({ timeout: 60_000 });
@@ -226,7 +255,9 @@ test("empty annotations bake a question mark for the model", async ({ page }) =>
 	await expect(user.locator(".ann-refs-comment").first()).toHaveText("?");
 });
 
-test("annotations-only messages render as an em-dash with the count pill above", async ({ page }) => {
+test("annotations-only messages render as an em-dash with the count pill above", async ({
+	page
+}) => {
 	await seedChat(page, [
 		{ role: "user", content: 'Annotated selections:\n1. "Kyoto" — ?' }
 	]);
@@ -237,11 +268,21 @@ test("annotations-only messages render as an em-dash with the count pill above",
 	const bodyText = await user.locator(".rendered").innerText();
 	expect(bodyText.trim()).toBe("—");
 	const sizes = await page.evaluate(() => {
-		const em = document.querySelector("article.user .rendered")?.getBoundingClientRect();
-		const pill = document.querySelector("article.user .ann-refs-pill")?.getBoundingClientRect();
-		const base = getComputedStyle(document.querySelector("article.user .rendered")!);
+		const em = document
+			.querySelector("article.user .rendered")
+			?.getBoundingClientRect();
+		const pill = document
+			.querySelector("article.user .ann-refs-pill")
+			?.getBoundingClientRect();
+		const base = getComputedStyle(
+			document.querySelector("article.user .rendered")!
+		);
 		if (!em || !pill) return null;
-		return { emTop: em.y, pillBottom: pill.y + pill.height, fontSize: base.fontSize };
+		return {
+			emTop: em.y,
+			pillBottom: pill.y + pill.height,
+			fontSize: base.fontSize
+		};
 	});
 	if (!sizes) throw new Error("missing refs-only boxes");
 	// The count UI rides above the dash, never inline with it.
@@ -251,7 +292,9 @@ test("annotations-only messages render as an em-dash with the count pill above",
 });
 
 test("review pencil card cancels on Escape", async ({ page }) => {
-	await seedChat(page, [{ role: "assistant", content: "alpha beta gamma delta" }]);
+	await seedChat(page, [
+		{ role: "assistant", content: "alpha beta gamma delta" }
+	]);
 	await page.goto("/");
 	const para = page.locator("article.assistant .rendered p").first();
 	await expect(para).toBeVisible({ timeout: 60_000 });
@@ -293,11 +336,17 @@ test("gutter drags never highlight above the cursor line", async ({ page }) => {
 	// shares the same selectionchange trim).
 	await page.mouse.move(6, tbox.y + tbox.height / 2);
 	await page.mouse.down();
-	await page.mouse.move(tbox.x + tbox.width / 2, tbox.y + tbox.height / 2, { steps: 8 });
+	await page.mouse.move(tbox.x + tbox.width / 2, tbox.y + tbox.height / 2, {
+		steps: 8
+	});
 	await page.mouse.move(tbox.x + tbox.width / 2, 4, { steps: 4 });
-	await page.mouse.move(tbox.x + tbox.width / 2, tbox.y + tbox.height / 2, { steps: 4 });
+	await page.mouse.move(tbox.x + tbox.width / 2, tbox.y + tbox.height / 2, {
+		steps: 4
+	});
 	await page.mouse.up();
-	const selected = await page.evaluate(() => window.getSelection()?.toString() ?? "");
+	const selected = await page.evaluate(
+		() => window.getSelection()?.toString() ?? ""
+	);
 	// Nothing above the cursor's line ("aaa", "bbb") may highlight.
 	expect(selected).not.toContain("aaa");
 	expect(selected).not.toContain("bbb");
@@ -307,7 +356,9 @@ test("gutter drags never highlight above the cursor line", async ({ page }) => {
 Highlight registry, so the hovered marker keeps its node (and its
 :hover) while every other marker sits still. */
 test("badge hover moves no DOM nodes", async ({ page }) => {
-	await seedChat(page, [{ role: "assistant", content: "hello world from Kyoto" }]);
+	await seedChat(page, [
+		{ role: "assistant", content: "hello world from Kyoto" }
+	]);
 	await page.goto("/");
 	const body = page.locator("article.assistant .rendered").first();
 	await expect(body).toBeVisible({ timeout: 60_000 });
@@ -315,7 +366,9 @@ test("badge hover moves no DOM nodes", async ({ page }) => {
 	if (!box) throw new Error("message has no box");
 	// Word-pick "world", file it, submit.
 	await page.evaluate(() => {
-		const text = document.querySelector("article.assistant .rendered p")?.firstChild;
+		const text = document.querySelector(
+			"article.assistant .rendered p"
+		)?.firstChild;
 		if (!(text instanceof Text)) throw new Error("no message text");
 		window.getSelection()?.setBaseAndExtent(text, 6, text, 11);
 	});
@@ -339,12 +392,16 @@ test("badge hover moves no DOM nodes", async ({ page }) => {
 	);
 	await page.waitForTimeout(300);
 	const state = await page.evaluate(() => ({
-		same: document.querySelector("button.ccez-ann-badge") ===
+		same:
+			document.querySelector("button.ccez-ann-badge") ===
 			(window as unknown as { __badge?: Element | null }).__badge,
 		marks: document.querySelectorAll("mark.ccez-ann").length,
 		washed:
-			(window as unknown as { CSS?: { highlights?: { has(n: string): boolean } } }).CSS
-				?.highlights?.has("ccez-ann") ?? false
+			(
+				window as unknown as {
+					CSS?: { highlights?: { has(n: string): boolean } };
+				}
+			).CSS?.highlights?.has("ccez-ann") ?? false
 	}));
 	// Same button node (no remove + re-append), no DOM wash marks, and
 	// the registry wash actually painted.

@@ -9,7 +9,9 @@ import { seedChat } from "./helpers";
 test.beforeEach(async ({ page }) => {
 	await seedChat(page, []);
 	await page.goto("/");
-	await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
 });
 
 test("arrow by default, flag while a language is set", async ({ page }) => {

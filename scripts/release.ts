@@ -20,7 +20,9 @@ const run = (cmd: string): void => {
 	if (!DRY) execSync(cmd, { stdio: "inherit" });
 };
 
-const pkg = JSON.parse(readFileSync("package.json", "utf8")) as { version: string };
+const pkg = JSON.parse(readFileSync("package.json", "utf8")) as {
+	version: string;
+};
 const next = bumpVersion(pkg.version, bump);
 const tag = `v${next}`;
 
@@ -54,7 +56,11 @@ if (clashes.length > 0) {
 
 console.log(`${pkg.version} -> ${next} (${bump})`);
 
-const bumpTomlVersion = (path: string, version: string, anchor: string): string => {
+const bumpTomlVersion = (
+	path: string,
+	version: string,
+	anchor: string
+): string => {
 	const lines = readFileSync(path, "utf8").split("\n");
 	const at = lines.findIndex((l) => l.trim() === anchor);
 	if (at < 0) throw new Error(`${path}: anchor ${anchor} not found`);
@@ -75,7 +81,10 @@ if (!DRY) {
 	}
 	writeFileSync(
 		confPath,
-		confText.replace(/^(\s*)"version": "[^"]*"(,?)$/m, `$1"version": "${next}"$2`)
+		confText.replace(
+			/^(\s*)"version": "[^"]*"(,?)$/m,
+			`$1"version": "${next}"$2`
+		)
 	);
 
 	writeFileSync(
@@ -86,6 +95,11 @@ if (!DRY) {
 		"src-tauri/Cargo.lock",
 		bumpTomlVersion("src-tauri/Cargo.lock", next, 'name = "ccez-llm"')
 	);
+	// The bump above writes 2-space JSON; re-format so releases stay
+	// prettier-clean under the repo .prettierrc (tabs).
+	execSync("bunx prettier --write package.json src-tauri/tauri.conf.json", {
+		stdio: "inherit"
+	});
 }
 
 run(`git add ${versionFiles.join(" ")}`);
@@ -94,5 +108,7 @@ run(`git tag -a ${tag} -m "Ccez LLM ${tag}"`);
 run(`git push origin HEAD`);
 run(`git push origin ${tag}`);
 console.log(
-	DRY ? "(dry run — nothing changed)" : `Released ${tag}. CI is building all targets; publish the draft when green.`
+	DRY
+		? "(dry run — nothing changed)"
+		: `Released ${tag}. CI is building all targets; publish the draft when green.`
 );

@@ -14,13 +14,18 @@ test.beforeEach(async ({ page }) => {
 		const synth = window.speechSynthesis;
 		if (synth) {
 			synth.speak = ((utterance: SpeechSynthesisUtterance) => {
-				(window as unknown as { __spoken: string[] }).__spoken.push(utterance.text);
+				(window as unknown as { __spoken: string[] }).__spoken.push(
+					utterance.text
+				);
 			}) as typeof synth.speak;
 		}
 	});
 });
 
-async function openThread(page: Page, settings?: Record<string, unknown>): Promise<void> {
+async function openThread(
+	page: Page,
+	settings?: Record<string, unknown>
+): Promise<void> {
 	await seedChat(page, [
 		{ role: "user", content: "what is up" },
 		{ role: "assistant", content: "alpha beta gamma delta" },
@@ -29,13 +34,18 @@ async function openThread(page: Page, settings?: Record<string, unknown>): Promi
 	]);
 	if (settings) {
 		await page.addInitScript((extra: Record<string, unknown>) => {
-			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify(extra));
+			window.localStorage.setItem(
+				"ccez-llm-settings-v1",
+				JSON.stringify(extra)
+			);
 		}, settings);
 	}
 	await page.goto("/");
-	await expect(page.locator("article.assistant .rendered").first()).toBeVisible({
-		timeout: 60_000
-	});
+	await expect(page.locator("article.assistant .rendered").first()).toBeVisible(
+		{
+			timeout: 60_000
+		}
+	);
 }
 
 /** Hover a message as keyboard-shortcut hands do (the composer owns
@@ -43,7 +53,9 @@ autofocus, so blur it: the keypress must read as body keys). */
 async function hoverArticle(page: Page, role: string, nth = 0) {
 	const article = page.locator(`article.${role}`).nth(nth);
 	await article.hover();
-	await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
+	await page.evaluate(() =>
+		(document.activeElement as HTMLElement | null)?.blur?.()
+	);
 	return article;
 }
 
@@ -58,9 +70,9 @@ test("hovering with nothing selected and pressing c copies the message", async (
 	await hoverArticle(page, "assistant");
 	await page.keyboard.press("c");
 	// The write rides a promise: poll for it instead of racing it.
-	await expect.poll(() => clipboardText(page), { timeout: 10_000 }).toContain(
-		"alpha beta gamma delta"
-	);
+	await expect
+		.poll(() => clipboardText(page), { timeout: 10_000 })
+		.toContain("alpha beta gamma delta");
 });
 
 test("a live selection keeps its keys: c copies nothing", async ({ page }) => {
@@ -68,7 +80,9 @@ test("a live selection keeps its keys: c copies nothing", async ({ page }) => {
 	await page.evaluate(() => navigator.clipboard.writeText("sentinel"));
 	const article = await hoverArticle(page, "assistant");
 	await article.locator(".rendered").first().selectText();
-	const selected = await page.evaluate(() => window.getSelection()?.toString() ?? "");
+	const selected = await page.evaluate(
+		() => window.getSelection()?.toString() ?? ""
+	);
 	expect(selected.length).toBeGreaterThan(0);
 	await page.keyboard.press("c");
 	// A regressed copy lands fast: wait it out, then prove nothing moved.
@@ -86,7 +100,9 @@ test("Shift+C branches from the hovered message", async ({ page }) => {
 		.poll(
 			() =>
 				page.evaluate(
-					() => JSON.parse(window.localStorage.getItem("ccez-llm-chats-v1") ?? "[]").length
+					() =>
+						JSON.parse(window.localStorage.getItem("ccez-llm-chats-v1") ?? "[]")
+							.length
 				),
 			{ timeout: 10_000 }
 		)
@@ -112,15 +128,21 @@ test("Shift+R reads the hovered message aloud", async ({ page }) => {
 		.toContain("alpha beta gamma delta");
 });
 
-test("hiding message buttons removes every row; c still copies", async ({ page }) => {
+test("hiding message buttons removes every row; c still copies", async ({
+	page
+}) => {
 	await openThread(page, { showMessageButtons: false });
 	await expect(page.locator("article .actions")).toHaveCount(0);
 	await hoverArticle(page, "assistant", 1);
 	await page.keyboard.press("c");
-	await expect.poll(() => clipboardText(page), { timeout: 10_000 }).toContain("omega psi chi");
+	await expect
+		.poll(() => clipboardText(page), { timeout: 10_000 })
+		.toContain("omega psi chi");
 });
 
-async function threadGaps(page: Page): Promise<{ root: number; gap: number; pair: number }> {
+async function threadGaps(
+	page: Page
+): Promise<{ root: number; gap: number; pair: number }> {
 	return page.evaluate(() => {
 		const list = document.querySelector(".messages");
 		const secondOwn = document.querySelectorAll("article.user")[1];
@@ -152,12 +174,16 @@ test("gap size rides the row gap; pair separation stays a hair above", async ({
 	expect(wide.pair).toBeCloseTo(wide.root * 1.1, 1);
 });
 
-test("settings offers the buttons checkbox and the gap slider", async ({ page }) => {
+test("settings offers the buttons checkbox and the gap slider", async ({
+	page
+}) => {
 	await openThread(page);
 	await page.keyboard.press("Meta+,");
 	const panel = page.locator(".settings-panel");
 	await expect(panel).not.toHaveClass(/closed/, { timeout: 10_000 });
-	await expect(panel.getByRole("checkbox", { name: "Show message buttons" })).toBeChecked();
+	await expect(
+		panel.getByRole("checkbox", { name: "Show message buttons" })
+	).toBeChecked();
 	const slider = panel.getByRole("slider", { name: "Gap size in rem" });
 	await expect(slider).toBeVisible();
 	expect(await slider.inputValue()).toBe("0.35");
@@ -166,10 +192,14 @@ test("settings offers the buttons checkbox and the gap slider", async ({ page })
 test("shortcuts modal lists the message keys", async ({ page }) => {
 	await openThread(page);
 	await page.keyboard.press("Control+Shift+Slash");
-	await expect(page.locator(".modal", { hasText: "Keyboard shortcuts" })).toBeVisible({
+	await expect(
+		page.locator(".modal", { hasText: "Keyboard shortcuts" })
+	).toBeVisible({
 		timeout: 10_000
 	});
 	for (const name of ["Copy message", "Branch from here", "Speak message"]) {
-		await expect(page.locator(".modal .keys div > dt", { hasText: name })).toBeVisible();
+		await expect(
+			page.locator(".modal .keys div > dt", { hasText: name })
+		).toBeVisible();
 	}
 });
