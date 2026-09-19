@@ -12601,7 +12601,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		existing paddings, not the gap. */
 		gap: 0;
 		min-height: 0;
-		padding: 0.7rem 0.8rem 0.6rem;
+		padding: 0.85rem 0.8rem 0.75rem;
 	}
 	.app[data-android] .prompt :global(.ta-input) {
 		/* Top bar is text-only: the tools live in the row below, so no
