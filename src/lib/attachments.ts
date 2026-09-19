@@ -550,16 +550,22 @@ export function dropAttachmentsAtIndexes(
  * original blob when conversion is unavailable (Safari writes JPEG).
  */
 /**
- * Data URL for a blob (clipboard image-set JSON). FileReader needs a
- * browser; unit tests never call this (e2e covers the round trip).
+ * Data URL for a blob (clipboard image-set JSON). Built on
+ * `arrayBuffer` + `btoa` instead of FileReader: FileReader throws
+ * outside the promise in some jsdom versions (uncaught, red CI),
+ * while the buffer path runs identically in browsers, node, and
+ * jsdom — same `data:<type>;base64,…` output either way.
  */
-export function blobToDataUrl(blob: Blob): Promise<string> {
-	return new Promise((resolve, reject) => {
-		const reader = new FileReader();
-		reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
-		reader.onerror = () => reject(reader.error ?? new Error("blob read failed"));
-		reader.readAsDataURL(blob);
-	});
+export async function blobToDataUrl(blob: Blob): Promise<string> {
+	const bytes = new Uint8Array(await blob.arrayBuffer());
+	let binary = "";
+	const CHUNK = 0x8000;
+	for (let i = 0; i < bytes.length; i += CHUNK) {
+		binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+	}
+	// Empty-type fallback mirrors FileReader.readAsDataURL exactly.
+	const mime = blob.type === "" ? "application/octet-stream" : blob.type;
+	return `data:${mime};base64,${btoa(binary)}`;
 }
 
 export async function clipboardPngBlob(blob: Blob): Promise<Blob> {

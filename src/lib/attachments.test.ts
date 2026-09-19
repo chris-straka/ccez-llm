@@ -37,6 +37,7 @@ import {
 	stripPastedMarkers,
 	tagPlaceholder,
 	attachmentImageBlobs,
+	blobToDataUrl,
 	clipboardPngBlob,
 	reconcileDropCount,
 	type Attachment
@@ -533,5 +534,19 @@ describe("pasted-aware index drops", () => {
 
 	it("never mistakes fixed markers for pasted tags", () => {
 		expect(`${IMAGE_MARKER} ${FILE_MARKER}`.match(PASTED_TAG_RE)).toBeNull();
+	});
+});
+
+describe("blobToDataUrl", () => {
+	it("encodes typed blobs without FileReader", async () => {
+		await expect(blobToDataUrl(new Blob(["hi"], { type: "image/png" }))).resolves.toBe(
+			"data:image/png;base64,aGk="
+		);
+	});
+
+	it("falls back to octet-stream for typeless blobs, like FileReader", async () => {
+		await expect(blobToDataUrl(new Blob(["hi"]))).resolves.toBe(
+			"data:application/octet-stream;base64,aGk="
+		);
 	});
 });
