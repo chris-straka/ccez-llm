@@ -582,3 +582,51 @@ test("composer holds its first line clear of the tools", async ({ page }) => {
 	// 4.6rem ≈ 74px at the default root size; tools must never overlap text.
 	expect(pad).toBeGreaterThan(60);
 });
+
+const ANDROID_UA =
+	"Mozilla/5.0 (Linux; Android 14; SM-S921W) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36";
+
+/** Paste >100 chars so the draft grows a PASTE-kind attachment card. */
+async function pasteCard(page: Page): Promise<void> {
+	const pasted = "lorem ipsum dolor sit amet ".repeat(20);
+	await page.locator(".ta-input").first().click();
+	await page.evaluate((text) => {
+		const target = document.querySelector(".ta-input");
+		if (!target) throw new Error("missing editor");
+		const transfer = new DataTransfer();
+		transfer.setData("text/plain", text);
+		const event = new ClipboardEvent("paste", { bubbles: true, cancelable: true });
+		Object.defineProperty(event, "clipboardData", { value: transfer });
+		target.dispatchEvent(event);
+	}, pasted);
+	const kind = page.locator(".attachments .file-kind");
+	await expect(kind).toHaveText("PASTE");
+}
+
+test.describe("mobile attachment pills", () => {
+	test.use({
+		userAgent: ANDROID_UA,
+		viewport: { width: 390, height: 844 },
+		hasTouch: true,
+		isMobile: true
+	});
+
+	test("light theme reads kind pills semibold", async ({ page }) => {
+		await seedChat(page, []);
+		await seedTheme(page, "light");
+		await page.goto("/");
+		await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+		await expect(page.locator(".app")).toHaveAttribute("data-android", "true");
+		await pasteCard(page);
+		await expect(page.locator(".attachments .file-kind")).toHaveCSS("font-weight", "600");
+	});
+
+	test("dark theme keeps kind pills bold", async ({ page }) => {
+		await seedChat(page, []);
+		await seedTheme(page, "dark");
+		await page.goto("/");
+		await expect(page.locator(".ta-input").first()).toBeVisible({ timeout: 60_000 });
+		await pasteCard(page);
+		await expect(page.locator(".attachments .file-kind")).toHaveCSS("font-weight", "700");
+	});
+});
