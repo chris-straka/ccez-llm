@@ -30,6 +30,10 @@ test("annotation drafts stay with their chat", async ({ page }) => {
 
 	// Back to chat A: the draft is restored, not duplicated. New chats
 	// append at the bottom (see newChat), so A is still the first row.
+	// Minting brings you home (the list closes like a row-pick), so
+	// reopen it before picking A back.
+	await page.keyboard.press("Meta+b");
+	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
 	const rows = page.locator("aside ul li button.side-chat");
 	await rows.nth(0).click();
 	await expect(page.locator(".prompt-tools .ann-wrap")).toHaveCount(1);

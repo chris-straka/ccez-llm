@@ -548,6 +548,26 @@ describe("rangesExcludingReadings", () => {
 		root.remove();
 	});
 
+	it("bridges badge digits and skips whitespace-only gaps", () => {
+		const root = document.createElement("div");
+		root.innerHTML =
+			'<p>The quick <span><button data-ann-badge="a1">1</button></span>brown fox</p>\n<p>tail here</p>';
+		document.body.appendChild(root);
+		const first = root.querySelector("p")!.firstChild!;
+		const last = root.querySelectorAll("p")[1]!.firstChild!;
+		const parts = rangesExcludingReadings(textRange(first, last));
+		// One merged run per paragraph: the badge digit rides inside
+		// the first (readers strip digits), while the inter-block
+		// newline paints nothing and breaks the run instead of
+		// stranding a blank range.
+		expect(parts).toHaveLength(2);
+		expect(parts.map((r) => r.toString().replace(/\d/g, "")).join("")).toBe(
+			"The quick brown foxtail here"
+		);
+		expect(parts.every((r) => /\S/.test(r.toString()))).toBe(true);
+		root.remove();
+	});
+
 	it("keeps the wash across a pinyin aid swap", () => {
 		const root = document.createElement("div");
 		root.textContent = "静静读书";

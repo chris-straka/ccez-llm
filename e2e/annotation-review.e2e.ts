@@ -115,9 +115,36 @@ test("badges slide beneath the composer", async ({ page }) => {
 	const body = page.locator("article .rendered").last();
 	await body.scrollIntoViewIfNeeded();
 	// The scrolled-to message can rest under the floating composer:
-	// lift it clear, then measure and click with no scroll between.
+	// lift the first word clear of it, then measure and click with no
+	// scroll between. The lift is computed, not fixed: a constant
+	// drifts with fonts while the composer edge is the real hazard.
+	// Instant: the column eases programmatic jumps (smooth), so an
+	// animated lift would still be flying at the measure below.
 	await page.evaluate(() => {
-		document.querySelector(".messages")!.scrollTop -= 250;
+		const box = document.querySelector(".messages") as HTMLElement;
+		box.style.scrollBehavior = "auto";
+		const prompt = document.querySelector(".prompt");
+		const pTop = prompt?.getBoundingClientRect().top ?? 0;
+		const rendered = document.querySelectorAll("article .rendered");
+		const el = rendered[rendered.length - 1];
+		if (!el) return;
+		const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+		let node = walker.nextNode();
+		while (node) {
+			const text = node as Text;
+			const m = /[A-Za-z]{4,}/.exec(text.data);
+			if (m) {
+				const range = document.createRange();
+				range.setStart(text, m.index);
+				range.setEnd(text, m.index + m[0].length);
+				const r = range.getBoundingClientRect();
+				if (r.width > 0 && r.height > 0 && r.top + r.height / 2 >= pTop - 20) {
+					box.scrollTop -= r.top + r.height / 2 - (pTop - 60);
+				}
+				break;
+			}
+			node = walker.nextNode();
+		}
 	});
 	const word = await wordCenter(body);
 	await page.mouse.dblclick(word.x, word.y);

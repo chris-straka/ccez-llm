@@ -197,7 +197,10 @@ test("annotating a repeated character anchors the selected repeat", async ({ pag
 		}
 		return -1;
 	});
-	expect(offset).toBe(2);
+	// Gap parking (unit-pinned): a lone word parks AFTER itself, so the
+	// second "a" anchors at 3 — still the selected repeat (the first
+	// would anchor at 1), never on the letter.
+	expect(offset).toBe(3);
 });
 
 /** The prompt's review card grows up and to the left of its pill —

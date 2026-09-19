@@ -902,7 +902,27 @@ export function rangesExcludingReadings(range: Range): Range[] {
 				? range.commonAncestorContainer
 				: range.commonAncestorContainer.parentElement;
 		if (!scope) return [range];
+		// Contiguous kept segments merge back into one range: splitting
+		// at every node boundary strands badge digits as their own
+		// ranges and fabricates spaces when readers join them. Only a
+		// genuinely skipped node (a reading, or a whitespace-only gap)
+		// breaks the run.
 		const out: Range[] = [];
+		let pending: Array<{ node: Text; from: number; to: number }> = [];
+		const flush = (): void => {
+			if (pending.length === 0) return;
+			const first = pending[0]!;
+			const last = pending[pending.length - 1]!;
+			try {
+				const merged = doc.createRange();
+				merged.setStart(first.node, first.from);
+				merged.setEnd(last.node, last.to);
+				if (!merged.collapsed) out.push(merged);
+			} catch {
+				// Detached mid-walk: drop the run, keep the rest.
+			}
+			pending = [];
+		};
 		const walker = doc.createTreeWalker(scope, NodeFilter.SHOW_TEXT);
 		while (walker.nextNode()) {
 			const node = walker.currentNode;
@@ -914,7 +934,15 @@ export function rangesExcludingReadings(range: Range): Range[] {
 				inside = false;
 			}
 			if (!inside) continue;
-			if (node.parentElement?.closest(WASH_READING_SELECTOR) !== null) continue;
+			if (node.parentElement?.closest(WASH_READING_SELECTOR) !== null) {
+				flush();
+				continue;
+			}
+			// Badge chrome (the digit inside an anchor) is not quote
+			// text, but cutting around it strands the digit as its own
+			// range: bridge it instead — the merged range spans the
+			// button like readers already expect (digits strip out).
+			if (node.parentElement?.closest("[data-ann-badge]") !== null) continue;
 			const len = node.textContent?.length ?? 0;
 			let from = 0;
 			let to = len;
@@ -923,11 +951,15 @@ export function rangesExcludingReadings(range: Range): Range[] {
 			from = Math.max(0, Math.min(from, len));
 			to = Math.max(0, Math.min(to, len));
 			if (to <= from) continue;
-			const sub = doc.createRange();
-			sub.setStart(node, from);
-			sub.setEnd(node, to);
-			if (!sub.collapsed) out.push(sub);
+			// Whitespace-only runs (inter-block newlines) never paint:
+			// the wash covers quotes, not paragraph gaps.
+			if (!/\S/.test((node.textContent ?? "").slice(from, to))) {
+				flush();
+				continue;
+			}
+			pending.push({ node, from, to });
 		}
+		flush();
 		return out;
 	} catch {
 		return [range];
