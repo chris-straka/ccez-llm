@@ -475,7 +475,7 @@ dependencies = [
 
 [[package]]
 name = "ccez-llm"
-version = "0.4.13"
+version = "0.4.14"
 dependencies = [
  "base64 0.22.1",
  "block2 0.6.2",
@@ -500,6 +500,7 @@ dependencies = [
  "tauri-plugin-mcp-bridge",
  "tauri-plugin-notification",
  "tauri-plugin-opener",
+ "tauri-plugin-process",
  "tauri-plugin-updater",
  "windows",
 ]
@@ -4942,6 +4943,16 @@ dependencies = [
  "url",
  "windows",
  "zbus 5.19.0",
+]
+
+[[package]]
+name = "tauri-plugin-process"
+version = "2.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d55511a7bf6cd70c8767b02c97bf8134fa434daf3926cfc1be0a0f94132d165a"
+dependencies = [
+ "tauri",
+ "tauri-plugin",
 ]
 
 [[package]]
