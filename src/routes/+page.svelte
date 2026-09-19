@@ -219,6 +219,7 @@ import {
 	import {
 	isAndroidUserAgent,
 	isIOSUserAgent,
+	canWindowDrag,
 	isCoarsePointer,
 	isTouchTablet,
 	currentPlatform,
@@ -6187,6 +6188,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	/** A drag denial already explained itself; don't toast on every grab. */
 	let dragWarned = false;
 	function dragWindow(event: MouseEvent): void {
+		// Mobile shells have no draggable window: tapping empty header
+		// space there only rejects startDragging into an error toast.
+		if (!canWindowDrag(navigator.userAgent)) return;
 		if (event.button !== 0 || !tauriBackendAvailable()) return;
 		// The second press of a double-click zooms instead of dragging.
 		if (event.detail > 1) return;
@@ -11156,24 +11160,46 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				aria-label="Switch chat"
 				tabindex="-1"
 			>
-				<button
-					type="button"
-					class="switcher-arrow"
-					aria-label="Older chat"
-					onclick={() => stepSwitcher(-1)}>‹</button
-				>
-				<div class="switcher-mid">
-					<div class="switcher-title">{chatLabel(activeChat(chatState)?.createdAt ?? Date.now())}</div>
-					<div class="switcher-pos">
-						{chatState.chats.findIndex((c) => c.id === chatState.activeChatId) + 1} / {chatState.chats.length}
+				<div class="switcher-row">
+					<button
+						type="button"
+						class="switcher-arrow"
+						aria-label="Older chat"
+						onclick={() => stepSwitcher(-1)}>‹</button
+					>
+					<div class="switcher-mid">
+						<div class="switcher-title">{chatLabel(activeChat(chatState)?.createdAt ?? Date.now())}</div>
+						<div class="switcher-pos">
+							{chatState.chats.findIndex((c) => c.id === chatState.activeChatId) + 1} / {chatState.chats.length}
+						</div>
 					</div>
+					<button
+						type="button"
+						class="switcher-arrow"
+						aria-label="Newer chat"
+						onclick={() => stepSwitcher(1)}>›</button
+					>
 				</div>
-				<button
-					type="button"
-					class="switcher-arrow"
-					aria-label="Newer chat"
-					onclick={() => stepSwitcher(1)}>›</button
-				>
+				<div class="switcher-actions">
+					<button
+						type="button"
+						class="switcher-act"
+						title="New chat"
+						aria-label="New chat"
+						onclick={() => {
+							doNewChat();
+							closeChatSwitcher();
+						}}>+</button
+					>
+					<button
+						type="button"
+						class="switcher-act"
+						title="Delete chat"
+						aria-label="Delete chat"
+						onclick={() => dropChat(chatState.activeChatId)}
+					><ActionIcon kind="delete" /></button
+					>
+				</div>
 			</div>
 		</div>
 	{/if}
@@ -12016,14 +12042,48 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	platform prefix is needed; desktop never sees it. */
 	.switcher-card {
 		display: flex;
-		align-items: center;
-		gap: 1rem;
+		flex-direction: column;
+		gap: 0.75rem;
 		width: min(22rem, calc(100vw - 3rem));
 		padding: 1rem 1.2rem;
 		/* A menu, not a document: its title and position never
 		select (long-presses there summon handles otherwise). */
 		user-select: none;
 		-webkit-user-select: none;
+	}
+	/* Swipe row keeps the old strip layout: arrows around the
+	title, full card width. */
+	.switcher-row {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+		width: 100%;
+	}
+	/* Mint/delete row: + opens a fresh chat and dismisses, the
+	trash drops the shown chat and stays put so a purge streak
+	never leaves the menu. Ghost buttons like the arrows. */
+	.switcher-actions {
+		display: flex;
+		justify-content: space-between;
+		width: 100%;
+	}
+	.switcher-act {
+		flex: none;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		min-width: 2.75rem;
+		min-height: 2.75rem;
+		padding: 0 0.5rem;
+		font-size: 1.5rem;
+		line-height: 1;
+		background: none;
+		border: 1px solid #c7c7cc;
+		border: 1px solid var(--line);
+		border-radius: 12px;
+		color: #1c1c1e;
+		color: var(--ink);
+		cursor: pointer;
 	}
 	.switcher-mid {
 		flex: 1;
@@ -16057,6 +16117,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		font-weight: 700;
 		letter-spacing: 0.05em;
 		color: #6e6e73;
+	}
+	/* Mobile light theme: the blue wash already shouts — the kind
+	pills and OCR read quieter at semibold instead of bold. */
+	:global(html[data-theme="light"]) .app[data-android] .file-kind,
+	:global(html[data-theme="light"]) .app[data-android] .attachments .ocr-btn {
+		font-weight: 600;
 	}
 	/* Emptied composer: no stray caret while UNFOCUSED. Clearing the
 	draft (paste then delete-all, or a send) leaves focus in place —

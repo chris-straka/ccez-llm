@@ -163,6 +163,42 @@ test("cycling inside the switcher cuts without a transition", async ({ page }) =
 	expect(calls).toEqual([]);
 });
 
+async function openSwitcher(page: Page): Promise<void> {
+	const at = await deadSpace(page);
+	await page.touchscreen.tap(at.x, at.y);
+	await page.waitForTimeout(120);
+	await page.touchscreen.tap(at.x, at.y);
+	await expect(page.locator(".modal-veil.chat-switcher")).toBeVisible({ timeout: 5_000 });
+	await page.waitForTimeout(900);
+}
+
+test("switcher + mints a chat and dismisses", async ({ page }) => {
+	await seedTwo(page);
+	await openSwitcher(page);
+	const card = page.locator(".switcher-card");
+	await expect(card.locator(".switcher-pos")).toContainText("1 / 2");
+	await card.getByRole("button", { name: "New chat" }).click();
+	await expect(page.locator(".modal-veil.chat-switcher")).toHaveCount(0);
+	const total = await page.evaluate(
+		() => JSON.parse(window.localStorage.getItem("ccez-llm-chats-v1") ?? "[]").length
+	);
+	expect(total).toBe(3);
+});
+
+test("switcher trash drops the shown chat and stays open", async ({ page }) => {
+	await seedTwo(page);
+	await openSwitcher(page);
+	const card = page.locator(".switcher-card");
+	await expect(card.locator(".switcher-pos")).toContainText("1 / 2");
+	await card.getByRole("button", { name: "Delete chat" }).click();
+	await expect(card.locator(".switcher-pos")).toContainText("1 / 1");
+	await expect(page.locator(".modal-veil.chat-switcher")).toBeVisible();
+	const total = await page.evaluate(
+		() => JSON.parse(window.localStorage.getItem("ccez-llm-chats-v1") ?? "[]").length
+	);
+	expect(total).toBe(1);
+});
+
 test("composer refocuses and types after the first reply", async ({ page }) => {
 	await seedChat(page, []);
 	await page.goto("/");
