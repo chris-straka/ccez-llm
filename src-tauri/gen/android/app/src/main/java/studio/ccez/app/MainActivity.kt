@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.enableEdgeToEdge
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsAnimationCompat
 import androidx.core.view.WindowInsetsCompat
 
 class MainActivity : TauriActivity() {
@@ -63,6 +64,9 @@ class MainActivity : TauriActivity() {
    * failure logs — a silent catch here once shipped a dead bridge
    * with an "unfixable" overlap.
    */
+  /** Last dispatched IME height; -1 until the first dispatch lands. */
+  private var lastImeBottom = -1
+
   private fun attachImeInsetBridge(retry: Int = 0): Unit {
     val content = findViewById<android.view.View>(android.R.id.content)
     if (content == null) {
@@ -74,11 +78,47 @@ class MainActivity : TauriActivity() {
       }
       return
     }
+    // Re-query handle: rapid hide/show can deliver a stale zero
+    // after the re-show started — both compensators then read
+    // "closed" while the keyboard covers the composer. Debounced:
+    // a no-op when truly closed, a heal when racing.
+    val resync = Runnable { ViewCompat.requestApplyInsets(content) }
     ViewCompat.setOnApplyWindowInsetsListener(content) { v, insets ->
-      val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
-      v.setPadding(v.paddingLeft, v.paddingTop, v.paddingRight, ime.bottom)
+      val imeBottom = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+      if (imeBottom != lastImeBottom) {
+        android.util.Log.i("CcezMain", "IME inset $lastImeBottom -> $imeBottom")
+        lastImeBottom = imeBottom
+      }
+      v.setPadding(v.paddingLeft, v.paddingTop, v.paddingRight, imeBottom)
+      v.removeCallbacks(resync)
+      if (imeBottom == 0) v.postDelayed(resync, 120)
       insets
     }
+    // Glide, don't jump: the dispatch above lands the FINAL height
+    // instantly (black window flash, then the keyboard slides over
+    // it). Track the IME animation per frame instead, so the padding
+    // rides the keyboard's own top edge. CONTINUE mode: the WebView
+    // still needs the inset for its own resizes-content handling.
+    ViewCompat.setWindowInsetsAnimationCallback(
+      content,
+      object : WindowInsetsAnimationCompat.Callback(
+        WindowInsetsAnimationCompat.Callback.DISPATCH_MODE_CONTINUE_ON_SUBTREE
+      ) {
+        override fun onProgress(
+          insets: WindowInsetsCompat,
+          runningAnimations: List<WindowInsetsAnimationCompat>
+        ): WindowInsetsCompat {
+          val imeRunning = runningAnimations.any { anim ->
+            anim.typeMask and WindowInsetsCompat.Type.ime() != 0
+          }
+          if (imeRunning) {
+            val b = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+            content.setPadding(content.paddingLeft, content.paddingTop, content.paddingRight, b)
+          }
+          return insets
+        }
+      }
+    )
     ViewCompat.requestApplyInsets(content)
     android.util.Log.i("CcezMain", "IME inset bridge attached")
   }
