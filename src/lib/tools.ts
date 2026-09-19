@@ -35,8 +35,7 @@ export function fetchToolDef(): FetchToolDef {
 			description:
 				"Fetch a web page and return its readable text. Use this when the user asks about a URL or " +
 				"when current/external facts would answer better than training data. Never call it to test " +
-				"itself — a bare probe like 'test', 'hi', or 'hello' needs no fetch, answer those directly — " +
-				"or when the message needs no external information. Returns the page text " +
+				"itself or when the message needs no external information. Returns the page text " +
 				"(truncated when long) or a one-line error — never raw HTML. " +
 				"RSS/Atom feeds work too and are the best route to recent news: a feed returns its latest " +
 				"headlines as one line each. Known-good feeds: BBC UK news " +
