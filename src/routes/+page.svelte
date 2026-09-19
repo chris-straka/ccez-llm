@@ -11160,46 +11160,44 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				aria-label="Switch chat"
 				tabindex="-1"
 			>
-				<div class="switcher-row">
-					<button
-						type="button"
-						class="switcher-arrow"
-						aria-label="Older chat"
-						onclick={() => stepSwitcher(-1)}>‹</button
-					>
-					<div class="switcher-mid">
-						<div class="switcher-title">{chatLabel(activeChat(chatState)?.createdAt ?? Date.now())}</div>
-						<div class="switcher-pos">
-							{chatState.chats.findIndex((c) => c.id === chatState.activeChatId) + 1} / {chatState.chats.length}
-						</div>
+				<button
+					type="button"
+					class="switcher-arrow"
+					aria-label="Older chat"
+					onclick={() => stepSwitcher(-1)}>‹</button
+				>
+				<div class="switcher-mid">
+					<div class="switcher-title">{chatLabel(activeChat(chatState)?.createdAt ?? Date.now())}</div>
+					<div class="switcher-pos">
+						{chatState.chats.findIndex((c) => c.id === chatState.activeChatId) + 1} / {chatState.chats.length}
 					</div>
-					<button
-						type="button"
-						class="switcher-arrow"
-						aria-label="Newer chat"
-						onclick={() => stepSwitcher(1)}>›</button
-					>
 				</div>
-				<div class="switcher-actions">
-					<button
-						type="button"
-						class="switcher-act"
-						title="New chat"
-						aria-label="New chat"
-						onclick={() => {
-							doNewChat();
-							closeChatSwitcher();
-						}}>+</button
-					>
-					<button
-						type="button"
-						class="switcher-act"
-						title="Delete chat"
-						aria-label="Delete chat"
-						onclick={() => dropChat(chatState.activeChatId)}
-					><ActionIcon kind="delete" /></button
-					>
-				</div>
+				<button
+					type="button"
+					class="switcher-arrow"
+					aria-label="Newer chat"
+					onclick={() => stepSwitcher(1)}>›</button
+				>
+			</div>
+			<div class="switcher-actions">
+				<button
+					type="button"
+					class="switcher-act"
+					title="New chat"
+					aria-label="New chat"
+					onclick={() => {
+						doNewChat();
+						closeChatSwitcher();
+					}}>+</button
+				>
+				<button
+					type="button"
+					class="switcher-act"
+					title="Delete chat"
+					aria-label="Delete chat"
+					onclick={() => dropChat(chatState.activeChatId)}
+				><ActionIcon kind="delete" /></button
+				>
 			</div>
 		</div>
 	{/if}
@@ -12034,7 +12032,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	screen (not centered) — a thumb stays near the arrows while the
 	thread below stays readable. */
 	.modal-veil.chat-switcher {
-		align-items: flex-start;
+		flex-direction: column;
+		justify-content: flex-start;
+		align-items: center;
+		gap: 0.75rem;
 		padding-top: 18dvh;
 	}
 	/* Phone chat switcher card: title plus position between two thumb
@@ -12042,8 +12043,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	platform prefix is needed; desktop never sees it. */
 	.switcher-card {
 		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
+		align-items: center;
+		gap: 1rem;
 		width: min(22rem, calc(100vw - 3rem));
 		padding: 1rem 1.2rem;
 		/* A menu, not a document: its title and position never
@@ -12051,36 +12052,35 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		user-select: none;
 		-webkit-user-select: none;
 	}
-	/* Swipe row keeps the old strip layout: arrows around the
-	title, full card width. */
-	.switcher-row {
-		display: flex;
-		align-items: center;
-		gap: 1rem;
-		width: 100%;
-	}
-	/* Mint/delete row: + opens a fresh chat and dismisses, the
-	trash drops the shown chat and stays put so a purge streak
-	never leaves the menu. Ghost buttons like the arrows. */
+	/* Mint/delete pair: floats centered under the card, outside
+	its panel — + opens a fresh chat and dismisses, the trash
+	drops the shown chat and stays put so a purge streak never
+	leaves the menu. Small round buttons, same panel fill as the
+	card so they read over the dimmed thread. */
 	.switcher-actions {
 		display: flex;
-		justify-content: space-between;
-		width: 100%;
+		justify-content: center;
+		gap: 0.75rem;
+		user-select: none;
+		-webkit-user-select: none;
 	}
 	.switcher-act {
 		flex: none;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		min-width: 2.75rem;
-		min-height: 2.75rem;
-		padding: 0 0.5rem;
-		font-size: 1.5rem;
+		min-width: 2.25rem;
+		width: 2.25rem;
+		height: 2.25rem;
+		padding: 0;
+		font-size: 1.2rem;
 		line-height: 1;
-		background: none;
-		border: 1px solid #c7c7cc;
-		border: 1px solid var(--line);
-		border-radius: 12px;
+		background: #fff;
+		background: var(--bg);
+		border: 1px solid #e5e5ea;
+		border-color: var(--line-soft);
+		border-radius: 999px;
+		box-shadow: 0 12px 48px rgba(0, 0, 0, 0.25);
 		color: #1c1c1e;
 		color: var(--ink);
 		cursor: pointer;

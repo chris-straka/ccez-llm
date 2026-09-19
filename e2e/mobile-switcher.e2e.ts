@@ -177,7 +177,7 @@ test("switcher + mints a chat and dismisses", async ({ page }) => {
 	await openSwitcher(page);
 	const card = page.locator(".switcher-card");
 	await expect(card.locator(".switcher-pos")).toContainText("1 / 2");
-	await card.getByRole("button", { name: "New chat" }).click();
+	await page.locator(".switcher-actions").getByRole("button", { name: "New chat" }).click();
 	await expect(page.locator(".modal-veil.chat-switcher")).toHaveCount(0);
 	const total = await page.evaluate(
 		() => JSON.parse(window.localStorage.getItem("ccez-llm-chats-v1") ?? "[]").length
@@ -190,13 +190,37 @@ test("switcher trash drops the shown chat and stays open", async ({ page }) => {
 	await openSwitcher(page);
 	const card = page.locator(".switcher-card");
 	await expect(card.locator(".switcher-pos")).toContainText("1 / 2");
-	await card.getByRole("button", { name: "Delete chat" }).click();
+	await page.locator(".switcher-actions").getByRole("button", { name: "Delete chat" }).click();
 	await expect(card.locator(".switcher-pos")).toContainText("1 / 1");
 	await expect(page.locator(".modal-veil.chat-switcher")).toBeVisible();
 	const total = await page.evaluate(
 		() => JSON.parse(window.localStorage.getItem("ccez-llm-chats-v1") ?? "[]").length
 	);
 	expect(total).toBe(1);
+});
+
+test("switcher actions float centered below the card", async ({ page }) => {
+	await seedTwo(page);
+	await openSwitcher(page);
+	const layout = await page.evaluate(() => {
+		const card = document.querySelector(".switcher-card")!.getBoundingClientRect();
+		const acts = document.querySelector(".switcher-actions")!.getBoundingClientRect();
+		const btn = document.querySelector(".switcher-act")!.getBoundingClientRect();
+		return {
+			cardBottom: card.bottom,
+			cardCx: card.left + card.width / 2,
+			actsTop: acts.top,
+			actsCx: acts.left + acts.width / 2,
+			insideCard: document.querySelector(".switcher-card .switcher-actions") !== null,
+			btnWidth: btn.width
+		};
+	});
+	// Outside the card panel, below it, centered on it.
+	expect(layout.insideCard).toBe(false);
+	expect(layout.actsTop).toBeGreaterThanOrEqual(layout.cardBottom);
+	expect(Math.abs(layout.actsCx - layout.cardCx)).toBeLessThan(4);
+	// Small round buttons, not full-size bar buttons.
+	expect(layout.btnWidth).toBeLessThanOrEqual(40);
 });
 
 test("composer refocuses and types after the first reply", async ({ page }) => {
