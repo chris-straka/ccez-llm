@@ -49,6 +49,18 @@ test("long folded preview cuts with an ellipsis", async ({ page }) => {
 	await expect(preview).toContainText(`${"あ".repeat(140)}…`);
 });
 
+test("folded preview lands on the first sentence, not the whole line", async ({ page }) => {
+	await seedChat(page, [
+		{ role: "assistant", content: "春は日本で最も美しい季節の一つです。桜が咲き誇ります。" }
+	]);
+	await page.goto("/");
+	const article = page.locator("article.assistant").first();
+	await expect(article.locator(".rendered")).toBeVisible();
+	await article.locator('.actions button[aria-label="Fold this message"]').click();
+	const preview = article.locator(".folded-preview");
+	await expect(preview).toHaveText("春は日本で最も美しい季節の一つです。…");
+});
+
 test("long folded preview stays inside the message column", async ({ page }) => {
 	await seedChat(page, [{ role: "assistant", content: `${"あ".repeat(200)}` }]);
 	await page.goto("/");

@@ -157,6 +157,10 @@ export function createTextareaEditor(
 		autogrow();
 		options.onDocChange?.(ta.value);
 	};
+	// Size to a seeded document on mount: input-driven growth never
+	// fires for hosts that open with content (the in-place message
+	// editor), which otherwise render one row tall until typed in.
+	autogrow();
 
 	const onInput = (): void => {
 		// Keyboard/native deletion snapshot (see onBeforeInput):

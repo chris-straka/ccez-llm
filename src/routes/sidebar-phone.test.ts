@@ -15,10 +15,14 @@ function pageSource(): string {
 }
 
 describe("phone sidebar rows", () => {
-	it("prints the tooltip breakdown after the timestamp on phones", () => {
+	it("prints a short visible-message count after the timestamp on phones", () => {
+		// The row shows "· N msgs" (never the tooltip's full split,
+		// which truncated into "..."), skipping empty chats, and the
+		// in-flight empty placeholder never counts.
 		const source = pageSource();
-		expect(source).toContain("{#if androidUI} <span class=\"side-count\"");
-		expect(source).toContain("sideTip(item) ||");
+		expect(source).toContain("visibleMessageCount(chatState, item)");
+		expect(source).toContain("{n === 1 ? \"msg\" : \"msgs\"}");
+		expect(source).not.toContain("sideTip(item) ||");
 	});
 
 	it("hides export where the shell phone has no export path", () => {

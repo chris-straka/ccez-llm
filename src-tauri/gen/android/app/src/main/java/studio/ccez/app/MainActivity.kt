@@ -193,6 +193,45 @@ class MainActivity : TauriActivity() {
     }
   }
 
+  // In-app text selection: the OS floating toolbar (Copy /
+  // Translate / Read Aloud / Maps) is suppressed — the WebView shows
+  // its own Copy / Annotate / Speak menu instead. Suppression clears
+  // the mode's menu rather than finishing the mode, so the selection
+  // and its handles survive; both creation and prepare are cleared
+  // because the system rebuilds the menu on every invalidate.
+  // (Code-ADDED items cannot survive here — AppCompat never consults
+  // the activity for floating toolbars — but clearing does: nothing
+  // re-adds what the wrapper strips.)
+  override fun onWindowStartingActionMode(
+    callback: android.view.ActionMode.Callback,
+    type: Int
+  ): android.view.ActionMode? {
+    if (type == android.view.ActionMode.TYPE_FLOATING) {
+      android.util.Log.i("CcezMain", "suppressing floating selection toolbar")
+      val clearing = object : android.view.ActionMode.Callback by callback {
+        override fun onCreateActionMode(
+          mode: android.view.ActionMode?,
+          menu: android.view.Menu?
+        ): Boolean {
+          val created = callback.onCreateActionMode(mode, menu)
+          menu?.clear()
+          return created
+        }
+
+        override fun onPrepareActionMode(
+          mode: android.view.ActionMode?,
+          menu: android.view.Menu?
+        ): Boolean {
+          val prepared = callback.onPrepareActionMode(mode, menu)
+          menu?.clear()
+          return prepared
+        }
+      }
+      return super.onWindowStartingActionMode(clearing, type)
+    }
+    return super.onWindowStartingActionMode(callback, type)
+  }
+
   // OS selection toolbar: the Annotate/Speak/Inspect entries come
   // from the activity-aliases in the manifest, not from code.
   // Code-added items cannot survive here — AppCompat never consults

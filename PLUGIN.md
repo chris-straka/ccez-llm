@@ -18,7 +18,7 @@ teardown. This rule decides most entries below: any plugin that only
 works in the shell must degrade cleanly in the other two, and where a
 web API already covers all three, the web API wins.
 
-## In use (7)
+## In use (8)
 
 - `opener` — full for our needs. One `open_url` invoke (update-route
   links in `SettingsPanel.svelte`); the JS `openUrl` API is
@@ -37,13 +37,22 @@ web API already covers all three, the web API wins.
   UNVERIFIED ON DEVICE — unit-tested only; feel the
   send/first-token/done beats on iPhone + Android, plus the
   vibrate fallback in the browser preview.
-- `updater` — deliberately partial: `check()` only, then "download
-  from the release page to install" (`SettingsPanel.svelte`
-  `checkUpdates`). The plugin supports silent download+install+
-  relaunch; manual install matches the serialized single-writer
-  release chain (verify → publish → prune → rename, per-arch DMGs),
-  so this is a decision, not a half-finished wiring. Revisit only if
-  the release process changes.
+- `updater` — full: `check()` then `downloadAndInstall()` plus
+  `relaunch()` from `plugin-process` (`UpdatesPanel.svelte`
+  `checkUpdates` driving the `runUpdateFlow` core in
+  `src/lib/updates.ts`). Manual install was the earlier decision
+  (matching the serialized single-writer release chain); reversed
+  Sep 2026 at the owner's request — the tail job synthesizes
+  `latest.json` from the renamed bundles before publishing, so the
+  manifest the updater reads already points at the final assets,
+  and the plugin verifies minisign signatures client-side. A
+  failed download/install still falls back to the releases page.
+  Single-shot guard plus per-stage button labels
+  (`updateButtonLabel`): concurrent checks flickered the label.
+- `process` — `relaunch()` only, for the updater flow above
+  (the updater replaces the bundle; macOS/Linux need the restart).
+  Granular capability (`process:allow-restart`); dynamic-imported so
+  node/jsdom never touch it.
 - `dialog` + `fs` — chat export only (`save()` + `writeTextFile`
   in `src/lib/nativeExport.ts`, wired as the middle path in
   `exportChatMarkdown`). Granular capabilities (`dialog:allow-save`,

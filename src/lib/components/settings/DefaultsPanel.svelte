@@ -101,8 +101,8 @@
 				Show Inspect for single kanji/hanzi highlights
 			</label>
 			<label class="check">
-				<input type="checkbox" bind:checked={settings.vibration} />
-				Vibrate when messages send and arrive
+				<input type="checkbox" bind:checked={settings.hapticsDisabled} />
+				Disable haptic feedback
 			</label>
 			<label class="check">
 				<input type="checkbox" bind:checked={settings.replyNotifications} />

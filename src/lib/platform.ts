@@ -333,3 +333,34 @@ export function contentSwipeTarget(
  * natively.
  */
 export type FlickZone = "message" | "prompt" | "empty" | "other";
+
+/** One tap in a consecutive-tap run (double/triple/quadruple). */
+export interface TapSequence {
+	count: number;
+	at: number;
+	x: number;
+	y: number;
+}
+
+/**
+ * Fold a tap into its sequence: taps within `windowMs` and `maxDist`
+ * of the last increment the count (cycling back to one after four);
+ * anything else restarts at one. Pure — handlers own the clock.
+ */
+export function nextTapCount(
+	prev: TapSequence | null,
+	at: number,
+	x: number,
+	y: number,
+	windowMs = 400,
+	maxDist = 32
+): TapSequence {
+	if (
+		prev &&
+		at - prev.at < windowMs &&
+		Math.hypot(x - prev.x, y - prev.y) < maxDist
+	) {
+		return { count: prev.count >= 4 ? 1 : prev.count + 1, at, x, y };
+	}
+	return { count: 1, at, x, y };
+}

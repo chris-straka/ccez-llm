@@ -222,6 +222,21 @@ export function setChatReplyLang(
 }
 
 /**
+ * Send-button hold swap (touch): holding with a reply language set
+ * stashes it and drops back to default; holding with none restores
+ * the stash. Pure toggle core — the component keeps the stash per
+ * chat and calls setChatReplyLang with the outcome.
+ */
+export function swapReplyLang(
+	current: string | null,
+	stash: string | null
+): { current: string | null; stash: string | null } {
+	if (current !== null) return { current: null, stash: current };
+	if (stash !== null) return { current: stash, stash };
+	return { current, stash };
+}
+
+/**
  * Effective voice readback for one chat: its own override when set,
  * else the global default. Pure so the page and tests share it.
  */

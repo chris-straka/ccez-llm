@@ -202,3 +202,40 @@ describe("message spacing and overscroll", () => {
 		expect(css).toMatch(/@media \(hover: none\)\s*\{[^}]*\.actions\s*\{[^}]*overflow-y\s*:\s*clip/);
 	});
 });
+
+describe("aid-button text size", () => {
+	it("holds aid labels at the resting size unless the opt-in is on", () => {
+		// Furigana/pinyin/tashkeel labels mirror the fixed icon glyphs:
+		// with the toggle off, message-text growth must never dome them.
+		const css = pageStyle();
+		const fixed = css.match(/\.actions button\.aid-btn\s*\{([^}]*)\}/);
+		expect(fixed, "fixed aid-btn rule is gone").toBeTruthy();
+		expect(fixed![1]).toMatch(/font-size\s*:\s*calc\(0\.92rem \* 0\.85\)/);
+		expect(fixed![1]).not.toMatch(/--font-scale/);
+		const scaled = css.match(
+			/main\.scale-actions \.actions button\.aid-btn\s*\{([^}]*)\}/
+		);
+		expect(scaled, "opt-in scaled aid-btn rule is gone").toBeTruthy();
+		expect(scaled![1]).toMatch(/font-size\s*:\s*calc\([^;]*var\(--font-scale/);
+	});
+
+	it("marks every aid label button, run and revert alike", () => {
+		// Each aid onclick (model run/revert, local pin/unpin) lives on
+		// a button tag carrying aid-btn: the fixed-size rule above keys
+		// off the class, so an unmarked aid button would track text.
+		const source = pageSource();
+		const handlers = [
+			"() => unpinModelAid(msg)",
+			"() => void runModelAidFor(msg, aidId, true)",
+			"() => unpinLocalAid(msg, localKind)",
+			"() => pinLocalAid(msg, localKind)"
+		];
+		for (const handler of handlers) {
+			const at = source.indexOf(handler);
+			if (at === -1) throw new Error(`aid handler gone: ${handler}`);
+			const open = source.lastIndexOf("<button", at);
+			if (open === -1) throw new Error(`no button tag for ${handler}`);
+			expect(source.slice(open, at), `${handler} button lost aid-btn`).toContain("aid-btn");
+		}
+	});
+});

@@ -7,6 +7,7 @@ import {
 	newChatMsgId,
 	selectChat,
 	setChatReplyLang,
+	swapReplyLang,
 	chatVoiceReadback,
 	setChatVoice,
 	deleteChat,
@@ -827,5 +828,17 @@ describe("resolveSendCompletion", () => {
 		const gone = resolveSendCompletion(state, first.id, second.id);
 		expect(gone.sent).toBeUndefined();
 		expect(gone.stillHere).toBe(false);
+	});
+});
+
+describe("swapReplyLang", () => {
+	it("stashes the language and drops to default", () => {
+		expect(swapReplyLang("fr", null)).toEqual({ current: null, stash: "fr" });
+	});
+	it("restores the stash and keeps it for the next hold", () => {
+		expect(swapReplyLang(null, "fr")).toEqual({ current: "fr", stash: "fr" });
+	});
+	it("does nothing with neither language nor stash", () => {
+		expect(swapReplyLang(null, null)).toEqual({ current: null, stash: null });
 	});
 });

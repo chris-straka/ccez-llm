@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { DEV_UPDATE_MESSAGE, updateRouteFor } from "$lib/updates";
+	import { DEV_UPDATE_MESSAGE, runUpdateFlow, updateButtonLabel, updateRouteFor } from "$lib/updates";
+	import type { UpdatePhase } from "$lib/updates";
 	import { tauriBackendAvailable } from "$lib/secrets";
 	import { check } from "@tauri-apps/plugin-updater";
 	import "./panels.css";
@@ -12,7 +13,11 @@
 	let { androidUI, onToast }: Props = $props();
 	const inShell = tauriBackendAvailable();
 	let updateStatus = $state("");
-	let checkingUpdate = $state(false);
+	/** Single-shot flow state: the button narrates each stage, and a
+	re-click (or double-click racing the disabled flip) while busy is
+	a no-op instead of a second concurrent check. */
+	let updatePhase = $state<UpdatePhase>({ stage: "idle" });
+	let checkingUpdate = $derived(updatePhase.stage !== "idle");
 	/** Where "check for updates" goes: releases page, Tauri updater, or nowhere (web). */
 	const updateRoute = $derived(updateRouteFor(androidUI === true, inShell, import.meta.env.DEV));
 
@@ -26,10 +31,11 @@
 		else updateStatus = message;
 	}
 	async function checkUpdates() {
-		checkingUpdate = true;
+		if (updatePhase.stage !== "idle") return;
 		const route = updateRoute;
 		if (route.kind === "releases") {
 			// No Tauri auto-updater on Android: open the Releases page instead.
+			updatePhase = { stage: "checking" };
 			try {
 				if (tauriBackendAvailable()) {
 					const { invoke } = await import("@tauri-apps/api/core");
@@ -41,29 +47,30 @@
 			} catch {
 				sayUpdate(`Couldn't open it automatically — get the newest APK at ${route.url}`);
 			} finally {
-				checkingUpdate = false;
+				updatePhase = { stage: "idle" };
 			}
 			return;
 		}
 		if (route.kind === "dev") {
 			// Dev shells have no updater artifacts: explain instead of a fetch error.
 			sayUpdate(DEV_UPDATE_MESSAGE);
-			checkingUpdate = false;
 			return;
 		}
 		try {
-			const update = await check();
-			sayUpdate(
-				update
-					? `Version ${update.version} is available — download it from the release page to install.`
-					: "You're on the latest version."
-			);
-		} catch (error) {
-			sayUpdate(
-				`Updater unavailable: ${error instanceof Error ? error.message : String(error)}`
-			);
+			await runUpdateFlow({
+				checkForUpdate: () => check(),
+				downloadAndInstall: (update, onEvent) => update.downloadAndInstall(onEvent),
+				relaunchApp: async () => {
+					const { relaunch } = await import("@tauri-apps/plugin-process");
+					await relaunch();
+				},
+				report: sayUpdate,
+				onPhase: (phase) => {
+					updatePhase = phase;
+				}
+			});
 		} finally {
-			checkingUpdate = false;
+			updatePhase = { stage: "idle" };
 		}
 	}
 </script>
@@ -73,7 +80,7 @@
 		<section aria-labelledby="updates-heading">
 			<h2 id="updates-heading">Updates</h2>
 			<button type="button" onclick={() => void checkUpdates()} disabled={checkingUpdate}>
-				{checkingUpdate ? "Checking…" : "Check for updates"}
+				{updateButtonLabel(updatePhase)}
 			</button>
 			{#if updateStatus && !onToast}<p class="note" role="status">{updateStatus}</p>{/if}
 		</section>

@@ -32,7 +32,7 @@
 		/**
 		 * Folded-preview text override: refs-only messages preview their
 		 * quotes (the stored content is just the baked block). Null keeps
-		 * the content's first line.
+		 * the content's first sentence.
 		 */
 		foldPreview?: string | null;
 		/** Annotation badges to stamp onto this message's quoted spans. */

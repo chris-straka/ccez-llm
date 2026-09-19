@@ -59,6 +59,15 @@ describe("updates section", () => {
 		expect(section).toBeGreaterThan(gate);
 		expect(source).not.toMatch(/nothing to check/);
 	});
+	it("runs one check at a time and narrates it on the button", () => {
+		// A re-click (or double-click racing the disabled flip) while
+		// busy returns before touching the updater: concurrent checks
+		// flickered the label between Checking and idle.
+		const source = panelSource("UpdatesPanel.svelte");
+		expect(source).toMatch(/if \(updatePhase\.stage !== "idle"\) return/);
+		expect(source).toMatch(/\{updateButtonLabel\(updatePhase\)\}/);
+		expect(source).toMatch(/disabled=\{checkingUpdate\}/);
+	});
 	it("places the updates column by section identity, not :last-of-type", () => {
 		// On web the updates section is gone, so the keys block would
 		// match :last-of-type itself and slide into column 2.

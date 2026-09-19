@@ -16,7 +16,7 @@ class FakeHighlight {
 
 function installHighlightStubs(): Map<string, FakeHighlight> {
 	const store = new Map<string, FakeHighlight>();
-	vi.stubGlobal("Highlight", FakeHighlight as unknown as typeof Highlight);
+	vi.stubGlobal("Highlight", FakeHighlight);
 	vi.stubGlobal("CSS", {
 		highlights: {
 			set: (name: string, hl: FakeHighlight) => store.set(name, hl),
@@ -33,10 +33,10 @@ function installHighlightStubs(): Map<string, FakeHighlight> {
 function countNudges(root: HTMLElement): { count: () => number } {
 	let nudges = 0;
 	const orig = root.style.setProperty.bind(root.style);
-	root.style.setProperty = ((prop: string, value: string, priority?: string) => {
+	root.style.setProperty = (prop: string, value: string, priority?: string) => {
 		if (prop === "opacity") nudges += 1;
 		return orig(prop, value, priority);
-	}) as typeof root.style.setProperty;
+	};
 	return { count: () => nudges };
 }
 

@@ -391,7 +391,7 @@ export async function hydrateSecrets(settings: AppSettings): Promise<string[]> {
 export async function migrateLegacySecret(settings: AppSettings, id: string): Promise<boolean> {
 	const entry = settings.providers[id];
 	if (!entry || entry.apiKey.trim()) return false;
-	let secret: string | null = null;
+	let secret: string | null;
 	try {
 		secret = await getSecret(secretAccount(id));
 	} catch {

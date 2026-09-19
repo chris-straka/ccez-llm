@@ -469,11 +469,16 @@ test.describe("ios", () => {
 					page.evaluate(() => {
 						const app = document.querySelector(".app");
 						if (!app?.hasAttribute("data-ios")) return "no-flag";
-						if (app.hasAttribute("data-native-callout")) return "stale-flag";
-						const css = Array.from(document.querySelectorAll("style"))
-							.map((t) => t.textContent ?? "")
-							.join("\n");
-						return /-webkit-touch-callout\s*:\s*none/.test(css) ? "suppressed" : "ok";
+						// Message text itself must keep the callout (Apple's
+						// bubble owns the slot): read the computed value
+						// off a rendered message, so the pinyin ruby rule
+						// (annotations only) can't trip the check.
+						const rendered = document.querySelector("article .rendered");
+						if (!rendered) return "no-render";
+						const value = getComputedStyle(rendered)
+							.getPropertyValue("-webkit-touch-callout")
+							.trim();
+						return value === "none" ? "suppressed" : "ok";
 					}),
 				{ timeout: 30_000 }
 			)
@@ -522,17 +527,17 @@ test.describe("ios", () => {
 		const dock = page.locator(".prompt-tools .ann-dock");
 		await expect(dock).toBeVisible();
 		await expect(dock).toHaveText("Annotate");
-		// The dock files the annotation: the comment box opens off it.
+		// The dock files the annotation through the composer, never a
+		// floating box (its textbox can't summon the phone keyboard):
+		// the composer asks for the note instead.
 		await dock.click();
-		const pop = page.locator(".ann-pop");
-		await expect(pop).toBeVisible();
-		// The composer fits the viewport: border-box keeps its padding
-		// inside the rem/vw bounds (it spilled past the right edge).
-		const popBox = await pop.boundingBox();
-		const vw = await page.evaluate(() => window.innerWidth);
-		expect(popBox, "pop has a box").not.toBeNull();
-		expect(popBox!.x).toBeGreaterThanOrEqual(0);
-		expect(popBox!.x + popBox!.width).toBeLessThanOrEqual(vw);
+		const composer = page.locator(".prompt textarea");
+		await expect(composer).toHaveAttribute("placeholder", "Add an annotation");
+		await composer.click();
+		await page.keyboard.type("nice point", { delay: 10 });
+		await page.locator(".send-btn").click();
+		await expect(page.locator(".toast")).toHaveText("Annotation saved");
+		await expect(page.locator("button.ccez-ann-badge").first()).toBeVisible();
 	});
 
 	/** The dock holds past its timer while the highlight lives: on iOS it
@@ -551,11 +556,12 @@ test.describe("ios", () => {
 		await expect(dock).toBeVisible();
 	});
 
-	/** Tapping an annotation's marker opens its edit menu: the tap's
+	/** Tapping an annotation's marker opens its note edit: the tap's
 	compatibility mousedown opens it, and the trailing compatibility
 	click must not toggle it straight back shut (desktop Chrome eats
-	that click via mousedown's preventDefault; iOS Safari fires it). */
-	test("tapping a badge opens its edit menu", async ({ page }) => {
+	that click via mousedown's preventDefault; iOS Safari fires it).
+	Phones edit through the composer, never a floating card. */
+	test("tapping a badge opens its note edit", async ({ page }) => {
 		await seedChat(page, [{ role: "assistant", content: "漢字を読むテストです" }]);
 		await page.goto("/");
 		await expect(page.locator("article .rendered").first()).toBeVisible({ timeout: 60_000 });
@@ -563,9 +569,12 @@ test.describe("ios", () => {
 		await page.locator("article .rendered").first().selectText();
 		await page.mouse.up();
 		await page.locator(".prompt-tools .ann-dock").click();
-		await expect(page.locator(".ann-pop")).toBeVisible();
-		await page.locator(".ann-pop textarea").fill("go");
-		await page.keyboard.press("Enter");
+		const composer = page.locator(".prompt textarea");
+		await expect(composer).toHaveAttribute("placeholder", "Add an annotation");
+		await composer.click();
+		await page.keyboard.type("go", { delay: 10 });
+		await page.locator(".send-btn").click();
+		await expect(page.locator(".toast")).toHaveText("Annotation saved");
 		const badge = page.locator("button.ccez-ann-badge").first();
 		await expect(badge).toHaveCount(1);
 		// The iOS Safari tap sequence, dispatched verbatim: touch events
@@ -591,18 +600,10 @@ test.describe("ios", () => {
 			el.dispatchEvent(new MouseEvent("mouseup", { ...at, button: 0 }));
 			el.dispatchEvent(new MouseEvent("click", { ...at, button: 0 }));
 		});
-		await expect(page.locator(".ann-pop")).toBeVisible();
-		// Closing is a 160ms fade-out (still "visible" mid-fade), so a
-		// toggle-shut pop only fails the assertion after it unmounts.
+		// The trailing click must not toggle the edit straight back
+		// shut: the composer keeps asking for the note afterwards.
+		await expect(composer).toHaveAttribute("placeholder", "Edit annotation");
 		await page.waitForTimeout(400);
-		const open = page.locator(".ann-pop");
-		await expect(open).toBeVisible();
-		// The edit card (24rem) fits the viewport too: with content-box
-		// its padding stacked outside the vw clamp and it spilled right.
-		const openBox = await open.boundingBox();
-		const openVw = await page.evaluate(() => window.innerWidth);
-		expect(openBox, "edit pop has a box").not.toBeNull();
-		expect(openBox!.x).toBeGreaterThanOrEqual(0);
-		expect(openBox!.x + openBox!.width).toBeLessThanOrEqual(openVw);
+		await expect(composer).toHaveAttribute("placeholder", "Edit annotation");
 	});
 });

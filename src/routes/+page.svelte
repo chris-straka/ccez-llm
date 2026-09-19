@@ -12,6 +12,8 @@
 		newChat,
 		selectChat,
 		setChatReplyLang,
+		swapReplyLang,
+		visibleMessageCount,
 		chatVoiceReadback,
 		setChatVoice,
 		deleteChat,
@@ -231,7 +233,9 @@ import {
 	twoFingerSlideDir,
 	threeFingerSwipeDir,
 	isThreeFingerTap,
+	nextTapCount,
 	visibleProviderIds,
+	type TapSequence,
 	type FlickZone,
 	type EdgePanel,
 	type FingerTrack
@@ -289,6 +293,7 @@ import {
 		MODEL_AIDS,
 		MODEL_AID_FOR_SCRIPT,
 		extractWordAt,
+		sentenceBounds,
 		hanOverlayLangFor,
 		isHanOverlayLangUncertain,
 		HAN_OVERLAY_LANG_TAG,
@@ -920,10 +925,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	let lastProgrammaticClearAt = 0;
 	/**
 	 * Width estimate (px) for the selection menu's right-edge clamp:
-	 * one padded button, two when Inspect joins Annotate. The
-	 * measured effect on the menu div corrects font/zoom variance.
+	 * one padded button, two when Inspect joins Annotate, three for
+	 * the phone menu (Copy, Annotate, Speak). The measured effect on
+	 * the menu div corrects font/zoom variance.
 	 */
 	function selMenuWidthEstimate(quote: string): number {
+		if (androidUI) return 300;
 		return shouldShowInspect(quote, settings.inspectEnabled) ? 220 : 120;
 	}
 	/** The floating menu element: its measured width pulls the
@@ -993,44 +1000,118 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		menuBtnTouch(event, annotate);
 	}
 	function speakTouch(event: TouchEvent): void {
-		menuBtnTouch(event, speakDockSelection);
+		menuBtnTouch(event, speakSelection);
 	}
-	/** Mobile dock Speak: read the highlight aloud, dock stays put
-	so Annotate (and Inspect) stay one tap away after listening. */
-	function speakDockSelection(): void {
+	function copyTouch(event: TouchEvent): void {
+		menuBtnTouch(event, () => void copySelection());
+	}
+	/** Selection Speak: read the highlight aloud, showing CJK readings
+	in the popup above it (desktop parity) — pinyin in Chinese text,
+	furigana in Japanese. Speech always runs; the popup is a silent
+	extra. The menu stays put so Annotate stays one tap away. */
+	function speakSelection(): void {
 		if (!selMenu) return;
-		// Phones get no readings popup (the native callout owns the
-		// text space): a CJK highlight toasts its readings at the top
-		// instead — pinyin in Chinese text, furigana in Japanese —
-		// mirroring the desktop right-click panel. Speech always runs;
-		// the toast is a silent extra.
-		if (androidUI) void toastSelectionReadings(selMenu.quote, selMenu.context);
+		void popupSelectionReadings(selMenu.quote, selMenu.messageId, selMenu.context);
 		void speakQuote(selMenu.quote, selMenu.messageId, true, selMenu.context);
 	}
+	/** Dock the readings overlay centered on the highlight, above
+	it (below only when the top edge leaves no room). Centering
+	rides CSS translateX so panel width — and font size — never
+	matters; a frame later the true width clamps it exactly into
+	the viewport. The above branch anchors on the highlight's top
+	edge the same way, so tall readings never need measuring. */
+	function placeSelPinyin(quoted: { quote: string; messageId: ChatMsgId }, html: string): void {
+		const live = window.getSelection();
+		const rect = live?.rangeCount ? live.getRangeAt(0).getBoundingClientRect() : null;
+		if (!rect) return;
+		const above = rect.top >= 128;
+		const y = above ? rect.top : Math.min(rect.bottom, window.innerHeight - 40);
+		selPinyin = {
+			x: Math.min(Math.max(8, rect.left), window.innerWidth - 208),
+			y,
+			above,
+			quote: quoted.quote,
+			messageId: quoted.messageId,
+			html
+		};
+		requestAnimationFrame(() => {
+			const node = document.querySelector(".sel-pinyin");
+			const current = window.getSelection();
+			const now = current?.rangeCount ? current.getRangeAt(0).getBoundingClientRect() : null;
+			if (!node || !now || !selPinyin) return;
+			// Same highlight still live (not scrolled or changed)?
+			if (Math.abs(now.left - rect.left) > 2 || Math.abs(now.top - rect.top) > 2) return;
+			const w = node.getBoundingClientRect().width;
+			const x = Math.min(Math.max(w / 2 + 8, now.left + now.width / 2), window.innerWidth - w - 8);
+			if (Math.abs(x - selPinyin.x) > 1) selPinyin = { ...selPinyin, x };
+		});
+	}
 	/**
-	 * Readings for a highlight as top-toast text (see
-	 * speakDockSelection): sync pinyin, worker furigana. Long
-	 * readings stay off the toast (the pill is single-line); a
-	 * moved-on highlight drops the async result instead of showing it.
+	 * Japanese side of the overlay: furigana for just the highlight,
+	 * converted on demand (worker). The panel lands at once with a
+	 * pending mark — the dictionary load behind a cold worker takes
+	 * seconds, and a silent wait reads as a dead click (the second
+	 * right-click only "worked" because the first fetch had landed
+	 * by then). Stale right-clicks never fill it: a moved-on
+	 * highlight drops the result instead of showing it.
 	 */
-	async function toastSelectionReadings(quote: string, context: string): Promise<void> {
+	async function showSelectionFurigana(quoted: {
+		quote: string;
+		messageId: ChatMsgId;
+	}): Promise<void> {
+		placeSelPinyin(quoted, "…");
+		let html: string;
+		try {
+			html = await furiganaHtml(quoted.quote, "furigana");
+		} catch {
+			html = "";
+		}
+		const now = currentQuote();
+		if (!now || now.messageId !== quoted.messageId || now.quote !== quoted.quote) return;
+		const readings = readingsOnly(html, "", ".frt");
+		if (!readings) {
+			if (selPinyin?.quote === quoted.quote) selPinyin = null;
+			return;
+		}
+		placeSelPinyin(quoted, readings);
+	}
+	/**
+	 * Readings for a highlight in the popup above the selection (see
+	 * speakSelection): sync pinyin, worker furigana. Long readings
+	 * stay off the popup; a moved-on highlight drops the async
+	 * result instead of showing it.
+	 */
+	async function popupSelectionReadings(
+		quote: string,
+		messageId: ChatMsgId,
+		context: string
+	): Promise<void> {
 		const probe = sentenceForQuote(context, quote) ?? context;
 		if (hanOverlayLangFor(probe) !== "ja") {
 			if (!offeredLocalAids(quote, activeReplyCode).includes("pinyin")) return;
 			const readings = readingsOnly(pinyinRuby(quote), " ", "rt");
-			if (readings && readings.length <= 140) flashToast(readings);
+			if (readings && readings.length <= 140) placeSelPinyin({ quote, messageId }, readings);
 			return;
 		}
-		let html: string;
+		await showSelectionFurigana({ quote, messageId });
+	}
+	/** Selection Copy: the quote to the clipboard with a light tick.
+	The native menu is suppressed on Android, so this replaces its
+	Copy entry. */
+	async function copySelection(): Promise<void> {
+		const quote = selMenu?.quote ?? "";
+		if (quote === "") return;
+		buzzTap();
+		if (!navigator.clipboard) {
+			flashToast("Couldn't copy to the clipboard.");
+			return;
+		}
 		try {
-			html = await furiganaHtml(quote, "furigana");
+			await navigator.clipboard.writeText(quote);
+			flashToast("Copied");
 		} catch {
-			return;
+			flashToast("Couldn't copy to the clipboard.");
 		}
-		const now = currentQuote();
-		if (!now || now.quote !== quote) return;
-		const readings = readingsOnly(html, "", ".frt");
-		if (readings && readings.length <= 140) flashToast(readings);
 	}
 	function inspectTouch(event: TouchEvent): void {
 		menuBtnTouch(event, openInspect);
@@ -1092,11 +1173,29 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	let canMic = $state(false);
 	let dictating = $state(false);
 	/** Transient top toast (copy confirmations, readings, saved notes). */
-	function flashToast(message: string): void {
+	/** Tap action armed on the current toast generation (reply-ready
+	navigation): tapping the toast runs it instead of copying. The
+	generation pins the lifetime — an expired toast never fires a
+	stale action. */
+	let toastAction: { seq: number; run: () => void } | null = null;
+	function flashToast(message: string, action?: () => void): void {
 		flashNotice(notices, "toast", message, TOAST_TIMEOUT_MS);
+		toastAction = action ? { seq: notices.toast.seq, run: action } : null;
 	}
 	function dismissToast(): void {
 		clearNotice(notices, "toast");
+	}
+	/** Toast tap: an armed action (same generation) navigates;
+	otherwise the tap copies the toast text, as before. */
+	function toastTap(): void {
+		if (toastAction && toastAction.seq === notices.toast.seq) {
+			const run = toastAction.run;
+			toastAction = null;
+			dismissToast();
+			run();
+			return;
+		}
+		copyToast();
 	}
 	/** Transient top error toast: action failures (send errors, export,
 	attach, mic) render in the red pairing, themed both ways. */
@@ -1269,6 +1368,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		if (!selMenu) return;
 		const quote = selMenu.quote.trim();
 		if (!shouldShowInspect(quote, settings.inspectEnabled)) return;
+		// One delegated tick for every open path (dock, menu, key):
+		// Android-only and toggle-gated inside, so desktop stays silent.
+		buzzTap();
 		inspectChar = quote;
 		inspectLang = inspectLangFor(quote, selMenu.context);
 		clearSelection();
@@ -1703,7 +1805,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// of folds and steps and the triple thump of deletes.
 		if (androidUI && !silent) {
 			void hapticBeatAsync("first", {
-				enabled: settings.vibration,
+				enabled: !settings.hapticsDisabled,
 				shell: tauriBackendAvailable()
 			});
 		}
@@ -2322,7 +2424,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	let shownActionsId: ChatMsgId | null = $state(null);
 	/** Phone only: the second tap of a message double-tap pins the just
 	revealed row open — without this its click would toggle it shut
-	while scrolling to the message end. Stamped in the touchend below,
+	(the tap word-selects natively). Stamped in the touchend below,
 	consumed by the click's toggle path. */
 	let msgDoubleTapPin: { id: ChatMsgId; at: number } | null = null;
 	/**
@@ -2337,7 +2439,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		chatSwitcherOpen = true;
 		switcherOpenedAt = Date.now();
 		void hapticBeatAsync("first", {
-			enabled: settings.vibration,
+			enabled: !settings.hapticsDisabled,
 			shell: tauriBackendAvailable()
 		});
 	}
@@ -2345,7 +2447,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		if (!chatSwitcherOpen) return;
 		chatSwitcherOpen = false;
 		void hapticBeatAsync("send", {
-			enabled: settings.vibration,
+			enabled: !settings.hapticsDisabled,
 			shell: tauriBackendAvailable()
 		});
 	}
@@ -2362,7 +2464,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		if (wrapped !== null && wrapped !== chatState.activeChatId) transitionToChat(wrapped);
 		else stepChat(direction, false);
 		void hapticBeatAsync("send", {
-			enabled: settings.vibration,
+			enabled: !settings.hapticsDisabled,
 			shell: tauriBackendAvailable()
 		});
 	}
@@ -2413,10 +2515,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		if (shownActionsTimer) clearTimeout(shownActionsTimer);
 		shownActionsTimer = null;
 		if (shownActionsId === id) {
-			// The second tap of a message double-tap scrolls to the
-			// message end instead of toggling shut (see the touchend
-			// below): re-arm, never close. Desktop has no pin, so
-			// its toggle rhythm is untouched.
+			// The second tap of a message double-tap word-selects
+			// instead of toggling shut (see the touchend below):
+			// re-arm, never close. Desktop has no pin, so its toggle
+			// rhythm is untouched.
 			if (msgDoubleTapPin?.id === id && Date.now() - msgDoubleTapPin.at < 500) {
 				armActionsTimer(id);
 				return;
@@ -2499,14 +2601,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			settings.sidebarCollapsed = true;
 			persistSettings();
 			if (focus) enterEditMode();
-			void hapticBeatAsync("send", { enabled: settings.vibration, shell: tauriBackendAvailable() });
+			void hapticBeatAsync("send", { enabled: !settings.hapticsDisabled, shell: tauriBackendAvailable() });
 			restartStepSlide(direction);
 			return;
 		}
 		const target = chats[next];
 		if (!target) return;
 		sideIdx = next;
-		void hapticBeatAsync("send", { enabled: settings.vibration, shell: tauriBackendAvailable() });
+		void hapticBeatAsync("send", { enabled: !settings.hapticsDisabled, shell: tauriBackendAvailable() });
 		transitionToChat(target.id);
 		// Landing is the switch effect's job (filed position, else
 		// top): a smooth top-scroll here would fight the restore.
@@ -2601,7 +2703,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// A fresh chat opens medium (first), like settings.
 		if (androidUI) {
 			void hapticBeatAsync("first", {
-				enabled: settings.vibration,
+				enabled: !settings.hapticsDisabled,
 				shell: tauriBackendAvailable()
 			});
 		}
@@ -3187,16 +3289,49 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// the draft (keyboard, alt-click, and button share this gate).
 		if (editingMsgId === id) return;
 		if (androidUI) {
-			void hapticBeatAsync("send", {
-				enabled: settings.vibration,
+			void hapticBeatAsync("tap", {
+				enabled: !settings.hapticsDisabled,
 				shell: tauriBackendAvailable()
 			});
 		}
+		// Anchor the message in place: collapsing its height reflows
+		// the thread and the browser lands it mid-screen, so pin the
+		// scroll offset across the render instead of scrolling anywhere.
+		const index = viewChat.messages.findIndex((m) => m.id === id);
+		const article = index >= 0 ? document.querySelector(`#msg-${index}`) : null;
+		const top = article instanceof HTMLElement ? article.getBoundingClientRect().top : null;
 		if (foldedIds.has(id)) foldedIds.delete(id);
 		else foldedIds.add(id);
+		if (top !== null && scrollBox instanceof HTMLElement) {
+			flushSync();
+			const now = index >= 0 ? document.querySelector(`#msg-${index}`) : null;
+			if (now instanceof HTMLElement) {
+				scrollBox.scrollTop += now.getBoundingClientRect().top - top;
+			}
+		}
 	}
 
+	/** Light UI tick (phones): button taps with no visible
+	confirmation of their own. Gated by the haptics toggle. */
+	function buzzTap(): void {
+		if (!androidUI) return;
+		void hapticBeatAsync("tap", {
+			enabled: !settings.hapticsDisabled,
+			shell: tauriBackendAvailable()
+		});
+	}
+	/** Stern denial buzz (phones): refused actions. */
+	function buzzNo(): void {
+		if (!androidUI) return;
+		void hapticBeatAsync("no", {
+			enabled: !settings.hapticsDisabled,
+			shell: tauriBackendAvailable()
+		});
+	}
 	function copyPlain(text: string, note: string): void {
+		// Every copy button ticks: the clipboard gives no visible
+		// confirmation of its own.
+		buzzTap();
 		const failed = "Couldn't copy to the clipboard.";
 		if (!navigator.clipboard) {
 			flashErrorToast(failed);
@@ -3272,6 +3407,130 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		if (!article) return null;
 		const index = Number(article.id.slice(4));
 		return chat.messages[index]?.id ?? null;
+	}
+
+	/** Viewed-message index under a tap point (multi-finger deletes):
+	articles carry msg-{index} ids; anything else is not a message. */
+	function messageIndexAtPoint(clientX: number, clientY: number): number | null {
+		const target = document.elementFromPoint(clientX, clientY);
+		const article = target ? articleOf(target) : null;
+		if (!(article instanceof HTMLElement)) return null;
+		const index = Number(article.id.slice(4));
+		if (!Number.isInteger(index) || index < 0 || index >= viewChat.messages.length) return null;
+		return index;
+	}
+
+	/** Two-finger double-tap: land the tapped message's end above the
+	composer dock (prompt plus the message's own buttons row, which
+	sits below its text) — the old single-finger pair's math, moved
+	here so single taps keep native word select. Empty space jumps
+	the thread bottom instead. */
+	function scrollMessageEndIntoView(clientX: number, clientY: number): void {
+		const tapEl = document.elementFromPoint(clientX, clientY);
+		const art = tapEl ? articleOf(tapEl) : null;
+		const dockReserve = (document.querySelector(".prompt")?.getBoundingClientRect().height ?? 0) + 48;
+		if (art instanceof HTMLElement && scrollBox) {
+			const area = scrollBox.getBoundingClientRect();
+			const dy = art.getBoundingClientRect().bottom - (area.bottom - dockReserve);
+			if (dy > 0) scrollBox.scrollBy({ top: dy, behavior: "smooth" });
+		} else if (scrollBox) {
+			scrollBox.scrollTo({ top: scrollBox.scrollHeight, behavior: "smooth" });
+		}
+		// Quiet-tick gate (Android-only, honors the haptic toggle):
+		// a jump is a UI affordance, not a sent action.
+		buzzTap();
+	}
+
+	/** Prose block owning a tap point's text (rendered message only),
+	with the caret range at the point. Null outside message text. */
+	function textBlockAtPoint(
+		clientX: number,
+		clientY: number
+	): { block: Element; range: Range } | null {
+		if (typeof document.caretRangeFromPoint !== "function") return null;
+		let range: Range | null;
+		try {
+			range = document.caretRangeFromPoint(clientX, clientY);
+		} catch {
+			return null;
+		}
+		const node = range?.startContainer;
+		if (!range || !node) return null;
+		const element = node instanceof Element ? node : node.parentElement;
+		const rendered = element?.closest(".messages .rendered") ?? null;
+		if (!(rendered instanceof Element)) return null;
+		const block =
+			element?.closest("p, li, pre, td, blockquote, h1, h2, h3, h4, div") ?? null;
+		if (!(block instanceof Element) || !rendered.contains(block)) return rendered ? { block: rendered, range } : null;
+		return { block, range };
+	}
+
+	/** Caret offset of (node, offset) within the block's text. */
+	function caretOffsetInBlock(block: Element, node: Node, offset: number): number {
+		let at = 0;
+		const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
+		let current = walker.nextNode();
+		while (current) {
+			if (current === node) return at + Math.min(offset, current.textContent?.length ?? 0);
+			at += current.textContent?.length ?? 0;
+			current = walker.nextNode();
+		}
+		return at;
+	}
+
+	/** (node, sub-offset) owning a block-text offset. */
+	function nodeAtBlockOffset(block: Element, offset: number): { node: Node; offset: number } | null {
+		const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
+		let at = 0;
+		let current = walker.nextNode();
+		let last: Node | null = null;
+		let lastLength = 0;
+		while (current) {
+			const length = current.textContent?.length ?? 0;
+			if (offset <= at + length) return { node: current, offset: offset - at };
+			at += length;
+			last = current;
+			lastLength = length;
+			current = walker.nextNode();
+		}
+		return last ? { node: last, offset: lastLength } : null;
+	}
+
+	/** Triple-tap: select the sentence around the tap point. False
+	keeps native behavior (the override never fires blind). */
+	function selectSentenceAtPoint(clientX: number, clientY: number): boolean {
+		const found = textBlockAtPoint(clientX, clientY);
+		const selection = window.getSelection();
+		if (!found || !selection) return false;
+		const text = found.block.textContent ?? "";
+		const caret = caretOffsetInBlock(found.block, found.range.startContainer, found.range.startOffset);
+		const [start, end] = sentenceBounds(text, caret);
+		if (end <= start) return false;
+		const anchor = nodeAtBlockOffset(found.block, start);
+		const focus = nodeAtBlockOffset(found.block, end);
+		if (!anchor || !focus) return false;
+		try {
+			selection.setBaseAndExtent(anchor.node, anchor.offset, focus.node, focus.offset);
+		} catch {
+			return false;
+		}
+		return !selection.isCollapsed;
+	}
+
+	/** Quadruple-tap: select the whole paragraph block. */
+	function selectParagraphAtPoint(clientX: number, clientY: number): boolean {
+		const found = textBlockAtPoint(clientX, clientY);
+		const selection = window.getSelection();
+		if (!found || !selection) return false;
+		try {
+			const range = document.createRange();
+			range.selectNodeContents(found.block);
+			selection.removeAllRanges();
+			selection.addRange(range);
+		} catch {
+			return false;
+		}
+		return !selection.isCollapsed;
 	}
 
 	function currentQuote(): { quote: string; context: string; messageId: ChatMsgId } | null {
@@ -3417,11 +3676,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			messageId: found.messageId,
 			range: stored
 		};
-		// Phones dock Annotate in the composer tools: a highlight with a
-		// parked prompt would strand the menu off-screen, so summon the
-		// prompt (shown, unfocused — the keyboard waits for the pill).
-		// Desktop keeps keys-only restore; its menu floats already.
-		if (androidUI) restorePrompt();
+		// No prompt summon: the menu floats viewport-fixed on every
+		// platform now (the old phone dock needed the composer shown).
 	}
 
 	/**
@@ -3549,7 +3805,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			selMenu = null;
 			highlightAnnId = pending.id;
 			editAnnotationInPrompt({ pending: true }, "");
-			if (settings.vibration) vibrateTick(6);
+			if (!settings.hapticsDisabled) vibrateTick(6);
 			return;
 		}
 		const width = popWidth(true);
@@ -3597,7 +3853,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		} else {
 			void tick().then(() => annPopBox?.focus({ preventScroll: true }));
 		}
-		if (settings.vibration) vibrateTick(6);
+		if (!settings.hapticsDisabled) vibrateTick(6);
 	}
 
 	/** Submit the annotation being composed (Enter or Save). The id is
@@ -3821,7 +4077,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// triple-beat contract: call sites carry no haptic of their own).
 		if (androidUI) {
 			void hapticBeatAsync("done", {
-				enabled: settings.vibration,
+				enabled: !settings.hapticsDisabled,
 				shell: tauriBackendAvailable()
 			});
 		}
@@ -3868,7 +4124,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		reviewOpen = false;
 		editor?.setText(comment);
 		// A saved note being revised says so; a fresh filing asks.
-		editor?.setPlaceholder("pending" in target ? "Add a comment" : "Edit annotation");
+		editor?.setPlaceholder("pending" in target ? "Add an annotation" : "Edit annotation");
 		editor?.caretToEnd();
 		// Phones scroll the quote into the upper clear area first (the
 		// keyboard plus composer own the bottom): no manual scroll is
@@ -3947,7 +4203,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	function commitPromptAnnEdit(): void {
 		const target = promptAnnEdit;
 		if (!target) return;
-		void hapticBeatAsync("send", { enabled: settings.vibration, shell: tauriBackendAvailable() });
+		void hapticBeatAsync("send", { enabled: !settings.hapticsDisabled, shell: tauriBackendAvailable() });
 		const comment = editor?.getText() ?? "";
 		if ("pending" in target) {
 			if (pendingAnn) annotations = [...annotations, { ...pendingAnn, comment }];
@@ -4452,7 +4708,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		if (promptAnnEdit) exitPromptAnnEdit();
 		// Clearing everything thumps like a delete (done): the same
 		// unmistakable triple against single-tap ticks.
-		void hapticBeatAsync("done", { enabled: settings.vibration, shell: tauriBackendAvailable() });
+		void hapticBeatAsync("done", { enabled: !settings.hapticsDisabled, shell: tauriBackendAvailable() });
 	}
 
 	/**
@@ -4947,10 +5203,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	function toggleVoice(): void {
 		// Global stop, always in reach: message audio keeps playing
 		// after its row fades (or the user scrolls away from it), and
-		// on phones there is no other stop in view. This never flips
-		// the readback setting — it only stills the current utterance.
+		// on phones there is no other stop in view. Tapping mid-speech
+		// stills the utterance AND switches readback off: a green
+		// toggle that just stopped talking would lie about the state.
 		if (speakingId !== null) {
 			stopVoice();
+			setVoiceEnabled(false);
 			return;
 		}
 		setVoiceEnabled(!voiceOn());
@@ -5208,9 +5466,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// the preamble and both continuations stay here as effects.
 		const action = sendAction({ canSubmit, editing: editingMsgId !== null });
 		if (action === "ignore") return;
-		// Haptic tap on send (silenced by the vibration setting; native
+		// Haptic tap on send (silenced by the haptics toggle; native
 		// haptics in the shell, Web vibrator in the preview).
-		void hapticBeatAsync("send", { enabled: settings.vibration, shell: tauriBackendAvailable() });
+		void hapticBeatAsync("send", { enabled: !settings.hapticsDisabled, shell: tauriBackendAvailable() });
 		clearStudyBadge();
 		// Permission-gated background ping: ask from the send gesture
 		// while the window is focused, so a later backgrounded long
@@ -5287,7 +5545,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				// rumble the new chat for the old one's reply.
 				onFirstToken: () => {
 					if (chat.id !== sentFrom.id) return;
-					void hapticBeatAsync("first", { enabled: settings.vibration, shell: tauriBackendAvailable() });
+					void hapticBeatAsync("first", { enabled: !settings.hapticsDisabled, shell: tauriBackendAvailable() });
 				}
 			}
 		);
@@ -5303,7 +5561,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// filed (or pills staged, reviews opened) while the reply
 			// streamed in are post-send work and survive its landing.
 			if (stillHere) {
-				void hapticBeatAsync("done", { enabled: settings.vibration, shell: tauriBackendAvailable() });
+				void hapticBeatAsync("done", { enabled: !settings.hapticsDisabled, shell: tauriBackendAvailable() });
+			} else if (androidUI) {
+				// Other-chat landing on phones: tick plus a tappable
+				// toast — a reply must not finish silently in a thread
+				// the user left. Tapping opens the origin chat.
+				buzzTap();
+				const originId = sentFrom.id;
+				flashToast("Reply ready — tap to open", () => transitionToChat(originId));
 			}
 		}
 		// Follow the stream only while its chat is open: after a switch
@@ -5327,13 +5592,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		missingKey = false;
 		stopVoice();
 		// A resend is a send too: same tap, rumble, and thump as doSend.
-		void hapticBeatAsync("send", { enabled: settings.vibration, shell: tauriBackendAvailable() });
+		void hapticBeatAsync("send", { enabled: !settings.hapticsDisabled, shell: tauriBackendAvailable() });
 		const resentFrom = chat;
 		await resendLast(chatState, provider, effectiveSystemPrompt(settings, activeReplyCode), {
 			thinking: activeThinkingId(settings),
 			onFirstToken: () => {
 				if (chat.id !== resentFrom.id) return;
-				void hapticBeatAsync("first", { enabled: settings.vibration, shell: tauriBackendAvailable() });
+				void hapticBeatAsync("first", { enabled: !settings.hapticsDisabled, shell: tauriBackendAvailable() });
 			}
 		});
 		// Same origin-chat discipline as a fresh send (see
@@ -5344,7 +5609,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			// Same-chat only: a new thread never thumps for the old
 			// one's reply (see the fresh-send twin above).
 			if (resentHere) {
-				void hapticBeatAsync("done", { enabled: settings.vibration, shell: tauriBackendAvailable() });
+				void hapticBeatAsync("done", { enabled: !settings.hapticsDisabled, shell: tauriBackendAvailable() });
+			} else if (androidUI) {
+				buzzTap();
+				const originId = resentFrom.id;
+				flashToast("Reply ready — tap to open", () => transitionToChat(originId));
 			}
 		}
 		// Same stillHere discipline as a fresh send: the scroller
@@ -5376,7 +5645,18 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			sendGuardTripped: Date.now() < sendGuardUntil,
 			kind
 		});
-		if (action === "ignore") return;
+		if (action === "ignore") {
+			// A send attempted while this chat's reply streams buzzes
+			// denial (annotations or not — nothing goes out mid-thought).
+			// Empty Enter stays silent, like before.
+			if (
+				isSending(chatState) &&
+				(hasText || attachments.length > 0 || annotations.length > 0)
+			) {
+				buzzNo();
+			}
+			return;
+		}
 		// Always-hide mode: sending yields focus, so the prompt hides
 		// behind the reply (the focusout below does the hiding; this
 		// just drops the caret).
@@ -5403,6 +5683,29 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	function rerunFrom(index: number) {
 		truncateToMessage(chatState, index);
 		void resend();
+	}
+
+	/** Row branch (touch): chat.ts forks, the tick plus toast live
+	here — call sites carry no haptic of their own (see dropChat). */
+	function branchHere(index: number): void {
+		branchFrom(chatState, index);
+		if (!androidUI) return;
+		buzzTap();
+		flashToast("Branched");
+	}
+
+	/** Row message delete (touch): chat.ts deletes, the tick lives
+	here. Keyboard and cut paths keep their own silence. */
+	function dropMessage(index: number): void {
+		deleteMessage(chatState, index);
+		if (!androidUI) return;
+		buzzTap();
+	}
+
+	/** Inspect card (touch): every button ticks through one delegated
+	gate instead of a tick per button. */
+	function buzzInspectTap(event: TouchEvent): void {
+		if (event.target instanceof Element && event.target.closest("button")) buzzTap();
 	}
 
 	/**
@@ -5479,6 +5782,30 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	/** Esc during an edit: drop the draft, keep history untouched. */
 	function cancelMessageEdit(): void {
 		resetInlineEdit();
+	}
+
+	/** Ctrl+G hop-out blurs without canceling: the draft stays mounted
+	for a click back in (only true focus-away reverts). */
+	let blurCancelMuted = false;
+
+	/** Focus leaving the in-place editor reverts to the untouched
+	message (the draft dies with the editor, so history is safe):
+	focus landing outside the edited message cancels — but the
+	message's own action row stays live (fold stays gated, the
+	commit checkmark must reach commitMessageEdit first). */
+	function blurInlineEdit(event: FocusEvent): void {
+		if (!editingMsgId || blurCancelMuted) return;
+		const next = event.relatedTarget;
+		if (next instanceof Element) {
+			const box = event.currentTarget;
+			if (box instanceof HTMLElement) {
+				if (box.contains(next)) return;
+				const boxArticle = box.closest("article");
+				if (boxArticle !== null && boxArticle === next.closest("article")) return;
+			}
+			if (next.closest("[data-commit-edit]") !== null) return;
+		}
+		cancelMessageEdit();
 	}
 
 	/**
@@ -5574,7 +5901,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				commitMessageEdit();
 			},
 			onHopOut: () => {
+				// Hop out blurs past the cancel gate: the draft stays
+				// mounted for a click back in (see blurCancelMuted).
+				blurCancelMuted = true;
 				msgEditor?.blur();
+				blurCancelMuted = false;
 				enterScrollMode();
 			},
 			onImagesPasted: onInlineImagesPasted,
@@ -6045,6 +6376,40 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		openLangMenu = null;
 	}
 
+	/** Send-button hold (touch, empty composer): stash the reply
+	language and drop to default, or restore the stash — the emoji
+	vanishes and returns. Haptic ticks on every switch. */
+	const SEND_HOLD_MS = 500;
+	const replyLangStash = new SvelteMap<ChatId, string>();
+	let sendHoldTimer: ReturnType<typeof setTimeout> | null = null;
+
+	function sendHoldStart(): void {
+		if (!androidUI || sendHoldTimer !== null) return;
+		if (composerText() !== "" || attachments.length > 0 || annotations.length > 0) return;
+		sendHoldTimer = setTimeout(() => {
+			sendHoldTimer = null;
+			swapReplyLangHold();
+		}, SEND_HOLD_MS);
+	}
+
+	function sendHoldEnd(): void {
+		if (sendHoldTimer !== null) {
+			clearTimeout(sendHoldTimer);
+			sendHoldTimer = null;
+		}
+	}
+
+	function swapReplyLangHold(): void {
+		const id = chatState.activeChatId;
+		const next = swapReplyLang(activeReplyCode, replyLangStash.get(id) ?? null);
+		if (next.current === activeReplyCode) return;
+		if (next.stash !== null) replyLangStash.set(id, next.stash);
+		setChatReplyLang(chatState, id, next.current);
+		buzzTap();
+		const lang = next.current ? replyLanguageFor(next.current) : null;
+		flashToast(lang ? `Reply language: ${lang.name}` : "Reply language cleared");
+	}
+
 	/**
 	 * Reset the voice language to the checked keyboard input source
 	 * (⇧⌘Delete's second half). Anything unknown — no source id (the
@@ -6071,7 +6436,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// gestures, keyboard — so call sites carry no haptic of their own.
 		if (androidUI) {
 			void hapticBeatAsync("done", {
-				enabled: settings.vibration,
+				enabled: !settings.hapticsDisabled,
 				shell: tauriBackendAvailable()
 			});
 		}
@@ -6115,7 +6480,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// haptic of their own.
 		if (androidUI) {
 			void hapticBeatAsync("done", {
-				enabled: settings.vibration,
+				enabled: !settings.hapticsDisabled,
 				shell: tauriBackendAvailable()
 			});
 		}
@@ -6524,7 +6889,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							);
 							return;
 						}
-						if (route === "speak") speakDockSelection();
+						if (route === "speak") speakSelection();
 						else if (route === "inspect") openInspect();
 						else annotate();
 					}
@@ -6603,7 +6968,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		): EdgePanel | null {
 			if (!androidUI || !start.clean || shortcutsOpen || inspectChar) return null;
 			if (window.getSelection()?.isCollapsed === false) return null;
-			return contentSwipeTarget(start.x, start.y, ended.clientX, ended.clientY);
+			// Chats summons from the left edge only (edge rule): a
+			// mid-screen rightward stroke never opens it — those
+			// collide with message gestures. Dismissing an open
+			// settings panel still works, and leftward settings
+			// strokes are untouched.
+			const target = contentSwipeTarget(start.x, start.y, ended.clientX, ended.clientY);
+			if (target === "chats" && !settingsOpen) return null;
+			return target;
 		}
 		/**
 		 * Shared edge-stroke outcome (touch swipes and desktop mouse
@@ -6708,13 +7080,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		/** Pending empty-tap focus (new chat): fired unless the second
 		tap pairs into the sidebar open instead. */
 		let emptyTapTimer: ReturnType<typeof setTimeout> | null = null;
-		/** Last single-tap point on a message: pairs into the double-tap
-		jump to that message's end (phones). Own pairing — empty-space
-		taps keep theirs above. */
-		let lastMsgTapAt = 0;
-		let lastMsgTapX = 0;
-		let lastMsgTapY = 0;
-		let lastMsgTapId: ChatMsgId | null = null;
+		/** Consecutive-tap run on message text (phones): double-tap
+		stays native (word), triple-tap selects the sentence and
+		quadruple-tap the paragraph (see the touchend override
+		below). Own pairing — empty-space taps keep theirs above. */
+		let msgTapSeq: TapSequence | null = null;
 		function flickZoneOf(target: EventTarget | null): FlickZone {
 			const el = target instanceof Element ? target : null;
 			if (!el) return "other";
@@ -6948,56 +7318,32 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						}, 380);
 					}
 				}
-				// Double-tap on a message jumps to its end (phones):
-				// huge replies strand their buttons below the fold
-				// and phones have no End key. Text keeps native
-				// double-tap word select (a pick leaves a selection,
-				// failing the collapsed check); controls keep taps.
+				// Message taps pair into runs (phones): double-tap stays
+				// native (word select), triple-tap takes the sentence and
+				// quadruple-tap the paragraph (selectSentenceAtPoint /
+				// selectParagraphAtPoint do the selecting just below).
+				// The pair pins the revealed row
+				// open: the second tap's click would otherwise toggle it
+				// shut (see toggleMessageActions). No collapsed gate: the
+				// third tap lands on the second's word pick by design.
 				if (androidUI && start.msgId && !start.rowSwipe) {
 					const now = Date.now();
 					const msgTapped =
 						now - start.at <= 300 &&
 						Math.hypot(ended.clientX - start.x, ended.clientY - start.y) <= 12 &&
 						Math.abs((scrollBox?.scrollTop ?? 0) - start.scrollTop) <= 10 &&
-						start.zone === "message" &&
-						window.getSelection()?.isCollapsed !== false;
-					const msgPaired =
-						msgTapped &&
-						start.msgId === lastMsgTapId &&
-						now - lastMsgTapAt < 400 &&
-						Math.hypot(ended.clientX - lastMsgTapX, ended.clientY - lastMsgTapY) < 32;
+						start.zone === "message";
 					if (msgTapped) {
-						lastMsgTapAt = now;
-						lastMsgTapX = ended.clientX;
-						lastMsgTapY = ended.clientY;
-						lastMsgTapId = start.msgId;
-					}
-					if (msgPaired) {
-						lastMsgTapAt = 0;
-						lastMsgTapId = null;
-						// Pin the revealed row open: the second tap's
-						// click would otherwise toggle it shut (see
-						// toggleMessageActions).
-						msgDoubleTapPin = { id: start.msgId, at: now };
-						const tapEl = document.elementFromPoint(ended.clientX, ended.clientY);
-						const art = tapEl ? articleOf(tapEl) : null;
-						// Message end lands above the composer dock (prompt
-						// plus the message's own buttons row, which sits
-						// below its text): a bare scrollIntoView strands
-						// both behind the dock.
-						const dockReserve = (document.querySelector(".prompt")?.getBoundingClientRect().height ?? 0) + 48;
-						if (art instanceof HTMLElement && scrollBox) {
-							const area = scrollBox.getBoundingClientRect();
-							const dy = art.getBoundingClientRect().bottom - (area.bottom - dockReserve);
-							if (dy > 0) scrollBox.scrollBy({ top: dy, behavior: "smooth" });
-						} else if (scrollBox) {
-							scrollBox.scrollTo({ top: scrollBox.scrollHeight, behavior: "smooth" });
-						}
-						void hapticBeatAsync("send", {
-							enabled: settings.vibration,
-							shell: tauriBackendAvailable()
-						});
-						return;
+						msgTapSeq = nextTapCount(msgTapSeq, now, ended.clientX, ended.clientY);
+						if (msgTapSeq.count === 2) msgDoubleTapPin = { id: start.msgId, at: now };
+						// Triple-tap takes the sentence, quadruple-tap the
+						// paragraph (this counter only ever sees
+						// single-finger taps). A false return keeps the
+						// native pick: the override never fires blind.
+						else if (msgTapSeq.count === 3)
+							selectSentenceAtPoint(ended.clientX, ended.clientY);
+						else if (msgTapSeq.count === 4)
+							selectParagraphAtPoint(ended.clientX, ended.clientY);
 					}
 				}
 				const target = start.rowSwipe
@@ -7237,10 +7583,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		// right = chats list); a vertical two-finger slide jumps the chat
 		// (up to the top, down to the bottom — gg and G); a three-finger
 		// horizontal swipe steps chats (right = newer, left = older, no
-		// focus: the keyboard stays down); a two-finger double tap deletes
-		// the current chat on Android (sidebar toggle on iOS); a double
-		// three-finger tap deletes every chat on Android (current chat on
-		// iOS). Taps start away from controls, drawers, and the modal;
+		// focus: the keyboard stays down); a two-finger double tap
+		// jumps to the bottom on Android (sidebar toggle on iOS); a
+		// three-finger tap deletes the tapped message; a three-finger
+		// hold wipes every chat on Android (current chat on iOS).
+		// Taps start away from controls, drawers, and the modal;
 		// swipes and slides track from anywhere a modal isn't open, and
 		// the swipe's pinch veto (see twoFingerSwipeDir) keeps page zoom.
 		let twoTrack: {
@@ -7269,7 +7616,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			moved: number;
 			at: number;
 		} | null = null;
-		let lastThreeTapAt = 0;
 		let twoTapAt = 0;
 		let lastTwoTapAt = 0;
 		/**
@@ -7281,6 +7627,19 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		/** Two-finger hold: armed while both fingers rest, fired once. */
 		let holdTimer: ReturnType<typeof setTimeout> | null = null;
 		let holdFired = false;
+		/**
+		 * Three-finger hold: armed while the trio rests, fired once (a
+		 * wipe). The release consumes the flag so it never falls
+		 * through to the message-delete tap.
+		 */
+		let threeHoldTimer: ReturnType<typeof setTimeout> | null = null;
+		let threeHoldFired = false;
+		function clearThreeHoldTimer(): void {
+			if (threeHoldTimer) {
+				clearTimeout(threeHoldTimer);
+				threeHoldTimer = null;
+			}
+		}
 		function clearHoldTimer(): void {
 			if (holdTimer) {
 				clearTimeout(holdTimer);
@@ -7336,6 +7695,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					// A clean two-finger press starts the double-tap clock.
 					twoTapAt = twoTrack !== null && twoTrack.clean ? Date.now() : 0;
 					threeTrack = null;
+					clearThreeHoldTimer();
+					threeHoldFired = false;
 					// Pinch-to-font arms only in the messages column: the
 					// sidebar and sheets keep the default page zoom.
 					const target = event.target;
@@ -7380,9 +7741,33 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					clearHoldTimer();
 					pinchFont = false;
 					pinchMoved = false;
+					// Three-finger hold wipes the thread: the trio
+					// resting still for 600ms (past tap range) fires
+					// once; travel or lift cancels before it fires.
+					clearThreeHoldTimer();
+					threeHoldFired = false;
+					if (threeTrack !== null) {
+						threeHoldTimer = setTimeout(() => {
+							threeHoldTimer = null;
+							if (threeTrack !== null && threeTrack.moved <= 12) {
+								threeHoldFired = true;
+								if (iosUI) {
+									// Haptic lives inside dropChat (triple thump).
+									dropChat(chatState.activeChatId);
+									flashToast("Chat deleted");
+								} else {
+									// Haptic lives inside dropAllChats (triple thump).
+									dropAllChats();
+									flashToast("All chats deleted");
+								}
+							}
+						}, 600);
+					}
 				} else {
 					twoTrack = null;
 					clearHoldTimer();
+					clearThreeHoldTimer();
+					threeHoldFired = false;
 					pinchFont = false;
 					pinchMoved = false;
 				}
@@ -7402,6 +7787,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						threeTrack.cx = lead.clientX;
 						threeTrack.cy = lead.clientY;
 					}
+					// A wandering trio is a swipe-in-progress, not a hold.
+					if (threeHoldTimer && threeTrack.moved > 12) clearThreeHoldTimer();
 				}
 				if (twoTrack) {
 					for (const t of Array.from(event.touches)) {
@@ -7430,7 +7817,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							pinchStepped = true;
 							adjustFontScale(step * 0.1, true);
 							void hapticBeatAsync("send", {
-								enabled: settings.vibration,
+								enabled: !settings.hapticsDisabled,
 								shell: tauriBackendAvailable()
 							});
 						}
@@ -7458,6 +7845,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			"touchend",
 			(event) => {
 				clearHoldTimer();
+				// A partial lift breaks the trio: no hold, no tap.
+				if (threeTrack && event.touches.length > 0) {
+					threeTrack = null;
+					clearThreeHoldTimer();
+					threeHoldFired = false;
+				}
 				if (twoTrack) {
 					// A fired hold owns the release: no swipe, slide, or
 					// tap pairing after the switcher opens.
@@ -7519,13 +7912,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 								chatSwitcherOpen = false;
 							} else stepChat(dir, false);
 						}
-						// Still two-finger taps pair into a delete (Android:
-						// no keyboard for the Delete key, and the sidebar
-						// moved to swipe-up-from-prompt); swipes take the
-						// step path instead. iOS keeps the sidebar toggle.
-						// Never mid-select: opening settings stopped
-						// vetoing on a highlight, but a delete must not
-						// fire under one.
+						// Still two-finger taps pair into a bottom jump
+						// (Android: no Home/End keys, and a tap lands
+						// where a slide stroke can't start); swipes take
+						// the step path instead. Message delete moved
+						// to the three-finger tap, the chat wipe to the
+						// three-finger hold. iOS keeps the sidebar
+						// toggle. Never mid-select: opening settings
+						// stopped vetoing on a highlight, but a jump
+						// must not fire under one.
 						else if (
 							!pinchMoved &&
 							androidUI &&
@@ -7541,9 +7936,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 									if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
 									toggleSidebar();
 								} else {
-									// Haptic lives inside dropChat (triple thump).
-									dropChat(chatState.activeChatId);
-									flashToast("Chat deleted");
+									// On a message: its end lands above the
+									// dock. On empty space: the thread
+									// bottom. The quiet tick lives inside
+									// the jump.
+									scrollMessageEndIntoView(twoEnd[0].x, twoEnd[0].y);
 								}
 							} else lastTwoTapAt = now;
 						}
@@ -7555,7 +7952,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							if (slide === "top") scrollBox.scrollTo({ top: 0, behavior: "smooth" });
 							else scrollBox.scrollTo({ top: scrollBox.scrollHeight, behavior: "smooth" });
 							void hapticBeatAsync("send", {
-								enabled: settings.vibration,
+								enabled: !settings.hapticsDisabled,
 								shell: tauriBackendAvailable()
 							});
 						}
@@ -7587,30 +7984,31 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					if (swipe !== null) {
 						stepChat(swipe, false);
 						void hapticBeatAsync("send", {
-							enabled: settings.vibration,
+							enabled: !settings.hapticsDisabled,
 							shell: tauriBackendAvailable()
 						});
-					// Never mid-select, like the two-finger delete above.
+					// Never mid-select, like the two-finger jump above.
+					// A fired hold owns the release: the wipe already
+					// landed, so the tap below must not run after it.
 					} else if (
 						isThreeFingerTap(3, track.moved, now - track.at) &&
 						window.getSelection()?.isCollapsed !== false
 					) {
-						if (now - lastThreeTapAt < 600) {
-							lastThreeTapAt = 0;
-							// Android: three fingers clear everything (two
-							// already take the current chat). iOS keeps the
-							// single-chat delete.
-							if (iosUI) {
-								// Haptic lives inside dropChat (triple thump).
-								dropChat(chatState.activeChatId);
-								flashToast("Chat deleted");
-							} else {
-								// Haptic lives inside dropAllChats (triple thump).
-								dropAllChats();
-								flashToast("All chats deleted");
+						const wiped = threeHoldFired;
+						threeHoldFired = false;
+						clearThreeHoldTimer();
+						if (!wiped) {
+							// A three-finger tap deletes the tapped
+							// message (the lead finger's lift point
+							// maps back to the thread). Off-message
+							// taps do nothing.
+							const target = messageIndexAtPoint(track.cx, track.cy);
+							const id = target === null ? undefined : viewChat.messages[target]?.id;
+							const at = id ? chat.messages.findIndex((m) => m.id === id) : -1;
+							if (at >= 0) {
+								dropMessage(at);
+								flashToast("Message deleted");
 							}
-						} else {
-							lastThreeTapAt = now;
 						}
 					}
 				}
@@ -7624,6 +8022,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				threeTrack = null;
 				clearHoldTimer();
 				holdFired = false;
+				clearThreeHoldTimer();
+				threeHoldFired = false;
 			},
 			{ passive: true }
 		);
@@ -9107,67 +9507,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			}
 			return ch !== "" && isHanChar(ch);
 		}
-		/** Dock the readings overlay centered on the highlight, above
-		it (below only when the top edge leaves no room). Centering
-		rides CSS translateX so panel width — and font size — never
-		matters; a frame later the true width clamps it exactly into
-		the viewport. The above branch anchors on the highlight's top
-		edge the same way, so tall readings never need measuring. */
-		function placeSelPinyin(quoted: { quote: string; messageId: ChatMsgId }, html: string): void {
-			const live = window.getSelection();
-			const rect = live?.rangeCount ? live.getRangeAt(0).getBoundingClientRect() : null;
-			if (!rect) return;
-			const above = rect.top >= 128;
-			const y = above ? rect.top : Math.min(rect.bottom, window.innerHeight - 40);
-			selPinyin = {
-				x: Math.min(Math.max(8, rect.left), window.innerWidth - 208),
-				y,
-				above,
-				quote: quoted.quote,
-				messageId: quoted.messageId,
-				html
-			};
-			requestAnimationFrame(() => {
-				const node = document.querySelector(".sel-pinyin");
-				const current = window.getSelection();
-				const now = current?.rangeCount ? current.getRangeAt(0).getBoundingClientRect() : null;
-				if (!node || !now || !selPinyin) return;
-				// Same highlight still live (not scrolled or changed)?
-				if (Math.abs(now.left - rect.left) > 2 || Math.abs(now.top - rect.top) > 2) return;
-				const w = node.getBoundingClientRect().width;
-				const x = Math.min(Math.max(w / 2 + 8, now.left + now.width / 2), window.innerWidth - w - 8);
-				if (Math.abs(x - selPinyin.x) > 1) selPinyin = { ...selPinyin, x };
-			});
-		}
-		/**
-		 * Japanese side of the overlay: furigana for just the highlight,
-		 * converted on demand (worker). The panel lands at once with a
-		 * pending mark — the dictionary load behind a cold worker takes
-		 * seconds, and a silent wait reads as a dead click (the second
-		 * right-click only "worked" because the first fetch had landed
-		 * by then). Stale right-clicks never fill it: a moved-on
-		 * highlight drops the result instead of showing it.
-		 */
-		async function showSelectionFurigana(quoted: {
-			quote: string;
-			messageId: ChatMsgId;
-		}): Promise<void> {
-			placeSelPinyin(quoted, "…");
-			let html: string;
-			try {
-				html = await furiganaHtml(quoted.quote, "furigana");
-			} catch {
-				html = "";
-			}
-			const now = currentQuote();
-			if (!now || now.messageId !== quoted.messageId || now.quote !== quoted.quote) return;
-			const readings = readingsOnly(html, "", ".frt");
-			if (!readings) {
-				if (selPinyin?.quote === quoted.quote) selPinyin = null;
-				return;
-			}
-			placeSelPinyin(quoted, readings);
-		}
 		// Desktop right-click reads aloud (the selection, else the word
 		// under the cursor, else the whole message; a second
 		// right-click restarts it, never stops it) AND opens the
@@ -9700,9 +10039,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							persistSettings();
 						}}
 					>
-						{chatLabel(item.createdAt)}{#if androidUI} <span class="side-count"
-							>· {sideTip(item) || `${item.messages.length}`}</span
-						>{/if}
+						{chatLabel(item.createdAt)}{#if androidUI}{@const n = visibleMessageCount(chatState, item)}{#if n > 0} <span
+								class="side-count">· {n} {n === 1 ? "msg" : "msgs"}</span
+							>{/if}{/if}
 					</button>
 					<!-- No export path works in the shell phone (no picker,
 					no native dialog bridge, clipboard denied): the button
@@ -9840,7 +10179,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		{#if notices.errorToast.message}
 			<button type="button" class="toast error" title="Dismiss" aria-live="polite" transition:fade={{ duration: 160 }} onclick={dismissErrorToast}>{notices.errorToast.message}</button>
 		{:else if notices.toast.message}
-			<button type="button" class="toast" title="Click to copy" aria-live="polite" transition:fade={{ duration: 160 }} onclick={copyToast}>{notices.toast.message}</button>
+			<button type="button" class="toast" title={toastAction && toastAction.seq === notices.toast.seq ? "Open" : "Click to copy"} aria-live="polite" transition:fade={{ duration: 160 }} onclick={toastTap}>{notices.toast.message}</button>
 		{/if}
 		<!-- Empty drag strip: nothing but the traffic-light clearance
 		(the active reply language shows on the send button instead).
@@ -10226,18 +10565,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					{/if}
 					{#if editingMsgId === msg.id && msg.role === "user"}
 						<!-- In-place own-message edit: the editor mounts
-						where the text sat, colors intact; the actions row
-						below stays live (pencil toggles back off). -->
-						<div class="msg-edit">
+						where the text sat and sizes to it. Commit lives on
+						the row's checkmark (or Enter); focus leaving the
+						box cancels back to the untouched message. -->
+						<div class="msg-edit" onfocusout={blurInlineEdit}>
 							<div class="msg-edit-box" use:msgEditAction></div>
-							<div class="msg-edit-bar">
-								<button type="button" class="msg-edit-btn" onclick={() => commitMessageEdit()}>
-									Save
-								</button>
-								<button type="button" class="msg-edit-btn" onclick={() => cancelMessageEdit()}>
-									Cancel
-								</button>
-							</div>
 						</div>
 					{:else}
 					<div class:bubble={msg.role === "user"}>
@@ -10390,7 +10722,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 								class="icon-btn"
 								data-tip="Branch from here"
 								aria-label="Branch from here"
-								onclick={() => branchFrom(chatState, i)}
+								onclick={() => branchHere(i)}
 							>
 								<ActionIcon kind="branch" />
 							</button>
@@ -10401,7 +10733,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 								class="icon-btn"
 								data-tip={tip(isMac ? "Delete this message (⌘D)" : "Delete this message", "Delete this message")}
 								aria-label={tip(isMac ? "Delete this message (⌘D)" : "Delete this message", "Delete this message")}
-								onclick={() => deleteMessage(chatState, i)}
+								onclick={() => dropMessage(i)}
 							>
 								<ActionIcon kind="delete" />
 							</button>
@@ -10430,7 +10762,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 								class="icon-btn"
 								data-tip="Branch from here"
 								aria-label="Branch from here"
-								onclick={() => branchFrom(chatState, i)}
+								onclick={() => branchHere(i)}
 							>
 								<ActionIcon kind="branch" />
 							</button>
@@ -10439,7 +10771,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 								class="icon-btn"
 								data-tip={tip(isMac ? "Delete this message (⌘D)" : "Delete this message", "Delete this message")}
 								aria-label={tip(isMac ? "Delete this message (⌘D)" : "Delete this message", "Delete this message")}
-								onclick={() => deleteMessage(chatState, i)}
+								onclick={() => dropMessage(i)}
 							>
 								<ActionIcon kind="delete" />
 							</button>
@@ -10456,6 +10788,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 									{#if aidModelPin.has(msg.id)}
 										<button
 											type="button"
+											class="aid-btn"
 											data-tip={MODEL_AIDS[aidId]?.revertTip ?? "Show original"}
 											onclick={() => unpinModelAid(msg)}
 										>
@@ -10466,6 +10799,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 										{#if aid}
 											<button
 												type="button"
+												class="aid-btn"
 												data-tip={aid.title}
 												disabled={vocalizing.has(msg.id)}
 												aria-busy={vocalizing.has(msg.id)}
@@ -10490,6 +10824,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 											{@const furiganaBusy = localKind === "furigana" && aidBusy.has(msg.id)}
 											<button
 												type="button"
+												class="aid-btn"
 												data-tip={furiganaBusy ? `${LOCAL_AID_BUTTON[localKind]}...` : showOriginal}
 												onclick={() => unpinLocalAid(msg, localKind)}
 											>
@@ -10498,6 +10833,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 									{:else}
 										<button
 											type="button"
+											class="aid-btn"
 											data-tip={LOCAL_AID_ADD_TITLE[localKind]}
 											onmouseenter={() => peekAid(msg, localKind)}
 											onmouseleave={() => unpeekAid(msg)}
@@ -10511,15 +10847,30 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 							{/if}
 						{/if}
 						{#if msg.role === "user"}
-							<button
-								type="button"
-								class="icon-btn"
-								data-tip="Edit"
-								aria-label="Edit this message"
-								onclick={() => editMessage(i)}
-							>
-								<ActionIcon kind="pencil" />
-							</button>
+							{#if editingMsgId === msg.id}
+								<!-- While editing, the pencil seat commits:
+								checkmark in the same style, Enter works too. -->
+								<button
+									type="button"
+									class="icon-btn"
+									data-tip="Save edit"
+									aria-label="Save edit"
+									data-commit-edit
+									onclick={() => commitMessageEdit()}
+								>
+									<ActionIcon kind="check" />
+								</button>
+							{:else}
+								<button
+									type="button"
+									class="icon-btn"
+									data-tip="Edit"
+									aria-label="Edit this message"
+									onclick={() => editMessage(i)}
+								>
+									<ActionIcon kind="pencil" />
+								</button>
+							{/if}
 							<button
 								type="button"
 								class="icon-btn"
@@ -10710,38 +11061,31 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		>
 			<div class="prompt-tools">
 				{#if androidUI && selMenu && !previewing}
-					<!-- Phone selection dock: the highlight menu lives in the
-					composer tools, not floating over the text (the native
-					callout owns that space on both phones). Same handlers
-					as the desktop floating menu it replaces — and the same
-					click-away exemption in onMouseUp, or the tap collapses
-					the highlight and clears the menu before onclick fires.
-					Speak always docks between them; Inspect joins for
-					single Han characters with the setting on. The wrapper
-					overlays the whole card (see CSS): the buttons split it
-					evenly without resizing anything. -->
-					<div class="ann-dock-wrap">
-						<button
-							type="button"
-							class="ann-dock"
-							aria-label="Annotate selection"
-							transition:fade={{ duration: 150 }}
-							onmousedown={noteMenuPress}
-							ontouchstart={noteMenuBtnTouch}
-							ontouchend={annotateTouch}
-							onclick={annotate}
-						>Annotate</button>
-						<button
-							type="button"
-							class="ann-dock"
-							aria-label="Speak selection"
-							transition:fade={{ duration: 150 }}
-							onmousedown={noteMenuPress}
-							ontouchstart={noteMenuBtnTouch}
-							ontouchend={speakTouch}
-							onclick={speakDockSelection}
-						>Speak</button>
-						{#if shouldShowInspect(selMenu.quote, settings.inspectEnabled)}
+					<!-- Phone Inspect dock: single Han characters keep
+					Inspect in the composer (Copy, Annotate, and Speak
+					float in the selection menu). iOS keeps Annotate
+					docked instead of floating: Apple's callout can't be
+					suppressed, so a floating menu would double it. Same
+					handlers and the same click-away exemption in
+					onMouseUp, or the tap collapses the highlight and
+					clears the menu before onclick fires. The wrapper
+					overlays the whole card (see CSS) without resizing
+					anything. -->
+					{#if iosUI}
+						<div class="ann-dock-wrap">
+							<button
+								type="button"
+								class="ann-dock"
+								aria-label="Annotate selection"
+								transition:fade={{ duration: 150 }}
+								onmousedown={noteMenuPress}
+								ontouchstart={noteMenuBtnTouch}
+								ontouchend={annotateTouch}
+								onclick={annotate}
+							>Annotate</button>
+						</div>
+					{:else if shouldShowInspect(selMenu.quote, settings.inspectEnabled)}
+						<div class="ann-dock-wrap">
 							<button
 								type="button"
 								class="ann-dock"
@@ -10752,8 +11096,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 								ontouchend={inspectTouch}
 								onclick={openInspect}
 							>Inspect</button>
-						{/if}
-					</div>
+						</div>
+					{/if}
 
 				{/if}
 				{#if annotations.length > 0}
@@ -10825,8 +11169,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 									{#if editingId === ann.id}
 										<label>
 											<span class="review-label">-</span>
-											<textarea rows="2" bind:this={editBox} bind:value={editDraft} placeholder="Add an optional comment…"
-												aria-label="Edit annotation note. Enter saves, Shift+Enter adds a line, Escape cancels."
+											<textarea rows="2" bind:this={editBox} bind:value={editDraft} placeholder="Add an optional annotation…"
+												aria-label="Edit annotation. Enter saves, Shift+Enter adds a line, Escape cancels."
 												onkeydown={(e) => {
 													const action = reviewEditKey(e.key, e.shiftKey);
 													if (action === "save") {
@@ -10862,8 +11206,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 											<button
 												type="button"
 												class="review-pencil"
-												title="Edit comment"
-												aria-label="Edit comment for annotation {n + 1}"
+												title="Edit annotation"
+												aria-label="Edit annotation {n + 1}"
 												onclick={() => {
 												// Desktop edits at the mark in the
 												// floating card, phones in the
@@ -10940,7 +11284,13 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					</button>
 				{/if}
 			</div>
-			<button
+			<span
+				class="send-hold"
+				ontouchstart={sendHoldStart}
+				ontouchend={sendHoldEnd}
+				ontouchmove={sendHoldEnd}
+				ontouchcancel={sendHoldEnd}
+			><button
 				type="button"
 				class="send-btn"
 				class:wide={altHeld}
@@ -10960,7 +11310,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				onclick={(event) => onSubmit(altHeld || event.altKey ? "stage" : "send")}
 			>
 				{altHeld ? "Add +" : activeReplyLang ? activeReplyLang.badge : "↑"}
-			</button>
+			</button></span>
 		</div>
 		{#if notices.banner.message && !androidUI}
 			<p class="error-banner" role="alert">{notices.banner.message}</p>
@@ -10979,7 +11329,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		{/if}
 	</main>
 
-	{#if selMenu && !previewing && !androidUI}
+	{#if selMenu && !previewing && !iosUI}
 		<div
 			class="sel-menu"
 			bind:this={selMenuEl}
@@ -10992,29 +11342,58 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 			onmouseenter={enterSelMenu}
 			onmouseleave={() => (selMenuHover = false)}
 		>
-			<!-- Desktop only: Annotate floats above the highlight while
-			the OS bubble keeps its own slot. Phones dock it in the
-			composer instead (the native callout owns the text space).
-			Copy and Read Aloud live on the message action rows
-			instead of doubling here. Inspect joins Annotate only for
-			a single kanji/hanzi highlight with the setting on;
-			everything else gets Annotate alone. -->
-			<button
-				type="button"
-				onmousedown={noteMenuPress}
-				onclick={annotate}
-				ontouchstart={noteMenuBtnTouch}
-				ontouchend={annotateTouch}
-			>Annotate</button>
-			{#if shouldShowInspect(selMenu.quote, settings.inspectEnabled)}
+			{#if androidUI}
+				<!-- Phone selection menu: the native callout is
+				suppressed, so Copy, Annotate, and Speak live here in
+				the desktop popup's style. Inspect stays docked in the
+				composer. -->
 				<button
 					type="button"
-					aria-label="Inspect character"
+					aria-label="Copy selection"
 					onmousedown={noteMenuPress}
+					onclick={() => void copySelection()}
 					ontouchstart={noteMenuBtnTouch}
-					ontouchend={inspectTouch}
-					onclick={openInspect}
-				>Inspect</button>
+					ontouchend={copyTouch}
+				>Copy</button>
+				<button
+					type="button"
+					onmousedown={noteMenuPress}
+					onclick={annotate}
+					ontouchstart={noteMenuBtnTouch}
+					ontouchend={annotateTouch}
+				>Annotate</button>
+				<button
+					type="button"
+					aria-label="Speak selection"
+					onmousedown={noteMenuPress}
+					onclick={speakSelection}
+					ontouchstart={noteMenuBtnTouch}
+					ontouchend={speakTouch}
+				>Speak</button>
+			{:else}
+				<!-- Desktop: Annotate floats above the highlight while
+				the OS bubble keeps its own slot. Copy and Read Aloud
+				live on the message action rows instead of doubling
+				here. Inspect joins Annotate only for a single
+				kanji/hanzi highlight with the setting on; everything
+				else gets Annotate alone. -->
+				<button
+					type="button"
+					onmousedown={noteMenuPress}
+					onclick={annotate}
+					ontouchstart={noteMenuBtnTouch}
+					ontouchend={annotateTouch}
+				>Annotate</button>
+				{#if shouldShowInspect(selMenu.quote, settings.inspectEnabled)}
+					<button
+						type="button"
+						aria-label="Inspect character"
+						onmousedown={noteMenuPress}
+						ontouchstart={noteMenuBtnTouch}
+						ontouchend={inspectTouch}
+						onclick={openInspect}
+					>Inspect</button>
+				{/if}
 			{/if}
 
 		</div>
@@ -11049,8 +11428,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				rows={1}
 				bind:this={annPopBox}
 				bind:value={annDraft}
-				placeholder="Add a comment"
-				aria-label="Annotation comment. Enter or clicking away saves, Escape cancels."
+				placeholder="Add an annotation"
+				aria-label="Annotation text. Enter or clicking away saves, Escape cancels."
 				use:growPill
 				onkeydown={annPopKey}
 				onblur={(event) => {
@@ -11071,11 +11450,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 						class="ann-tool"
 						class:recording={pillDictating}
 						class:gone={!(pillDictating || annDraft.trim().length === 0)}
-						aria-label={pillDictating ? "Stop dictation" : "Dictate comment"}
+						aria-label={pillDictating ? "Stop dictation" : "Dictate annotation"}
 						aria-pressed={pillDictating}
 						aria-hidden={!(pillDictating || annDraft.trim().length === 0)}
 						tabindex={pillDictating || annDraft.trim().length === 0 ? 0 : -1}
-						title="Dictate comment"
+						title="Dictate annotation"
 						onmousedown={(e) => e.preventDefault()}
 						onclick={togglePillMic}
 					>
@@ -11118,9 +11497,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 					type="button"
 					class="ann-tool"
 					class:recording={pillDictating}
-					aria-label={pillDictating ? "Stop dictation" : "Dictate comment"}
+					aria-label={pillDictating ? "Stop dictation" : "Dictate annotation"}
 					aria-pressed={pillDictating}
-					title="Dictate comment"
+					title="Dictate annotation"
 					onmousedown={(e) => e.preventDefault()}
 					onclick={togglePillMic}
 				>
@@ -11403,7 +11782,7 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 				if (e.target === e.currentTarget) inspectChar = null;
 			}}
 		>
-			<div class="modal inspect-modal" role="dialog" aria-modal="true" aria-labelledby="inspect-heading" data-fade-scroll>
+			<div class="modal inspect-modal" role="dialog" aria-modal="true" aria-labelledby="inspect-heading" data-fade-scroll ontouchend={buzzInspectTap}>
 				<div class="modal-head">
 					<h2 id="inspect-heading">Inspect <span lang={HAN_OVERLAY_LANG_TAG[inspectLang]}>{inspectData.char}</span></h2>
 					<button
@@ -12584,8 +12963,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	exactly (a 100% width would add the padding on top and overflow).
 	The inner column centers itself. */
 	.app[data-android] .settings-panel {
+		/* Same sheet as the chats list (never full-width): the two
+		drawers match instead of one spanning the screen. Border-box
+		so padding can't part the boxes (content-box left a ~2px
+		gap between them). */
+		box-sizing: border-box;
 		left: 0;
-		width: auto;
+		right: auto;
+		width: min(78vw, 20rem);
 		padding-top: calc(1.2rem + env(safe-area-inset-top, 0px));
 	}
 	.app[data-android] .settings-inner {
@@ -12849,6 +13234,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	Desktop keeps its left drawer; the settings panel keeps its
 	right drawer (one sidebar at a time). */
 	.app[data-android] aside:not(.settings-panel) {
+		/* Border-box like the settings sheet: equal width properties
+		must paint equal boxes. */
+		box-sizing: border-box;
 		left: 0;
 		right: auto;
 		top: 0;
@@ -13576,6 +13964,14 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		position: relative;
 		border-radius: 10px;
 		padding: 0.6rem 0.8rem;
+	}
+	/* Two folded previews back to back (the user turn between them
+	deleted) read as one folded block under the row gap alone: a
+	full extra gap separates the folds. */
+	article.folded-msg + article.folded-msg {
+		margin-top: var(--msg-gap, 0.35rem);
+	}
+	article {
 		/* Flex items default to min-width:auto: a nowrap folded preview
 		refuses to shrink and shoves the whole chat sideways (stray
 		scrollbars). Zero lets the ellipsis bite instead. */
@@ -13727,25 +14123,6 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		outline: none;
 		field-sizing: content;
 		padding: 0;
-	}
-	.msg-edit-bar {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding-top: 0.35rem;
-	}
-	.msg-edit-btn {
-		font: inherit;
-		font-size: 0.8rem;
-		padding: 0.25rem 0.7rem;
-		border-radius: 999px;
-		border: 1px solid var(--line);
-		background: none;
-		color: var(--ink);
-		cursor: pointer;
-	}
-	.msg-edit-btn:hover {
-		border-color: var(--line-hover);
 	}
 	article.assistant {
 		align-self: center;
@@ -14046,6 +14423,11 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		/* Never wider than the viewport: huge annotations on narrow
 		phones spilled past the screen's left edge. */
 		max-width: min(24rem, calc(100vw - 2rem));
+		/* Never taller than the viewport either: a long list on the
+		first message shot past the top of the screen instead of
+		scrolling in place. */
+		max-height: min(60vh, 24rem);
+		overflow-y: auto;
 		background: #1c1c1e;
 		color: #f2f2f7;
 		/* Transparent by default so the light theme can paint just
@@ -15627,6 +16009,9 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.app[data-android] article.user .actions button[data-tip="Edit"] {
 		order: 5;
 	}
+	.app[data-android] article.user .actions button[data-tip="Save edit"] {
+		order: 5;
+	}
 	.app[data-android] article.user .actions button[data-tip="Rerun"] {
 		order: 6;
 	}
@@ -15692,7 +16077,10 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.actions button {
 		/* 85% of the message size (see .rendered's 0.92rem): the row
 		reads quieter than the text it acts on, tracking text-size
-		growth instead of holding a fixed size. */
+		growth instead of holding a fixed size. Button labels never
+		join a text pick (and long-pressing one never starts one). */
+		user-select: none;
+		-webkit-user-select: none;
 		font-size: calc(0.92rem * var(--font-scale, 1) * 0.85);
 		line-height: 1.5;
 		color: #6e6e73;
@@ -15708,6 +16096,15 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 		color: #1c1c1e;
 		color: var(--ink);
 		text-decoration: none;
+	}
+	/* Reading-aid labels hold the row's resting size unless the
+	text-size opt-in is on: like the fixed icon glyphs they must not
+	track message growth, so large type never domes them. */
+	.actions button.aid-btn {
+		font-size: calc(0.92rem * 0.85);
+	}
+	main.scale-actions .actions button.aid-btn {
+		font-size: calc(0.92rem * var(--font-scale, 1) * 0.85);
 	}
 	/* Opt-in (Settings): the logo icons grow with the text-size
 	setting (text buttons track at 85% by default now, so only the
@@ -16005,6 +16402,12 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	/* No entrance animation on the composer: it used to glide down on the
 	first message, exactly while the first tokens streamed in — on a slow
 	phone GPU the overlap reads as flicker. The composer just stays put. */
+	/* Hold wrapper: layout-transparent so the button keeps its
+	seat; touch press/release still bubble through it (a disabled
+	button swallows its own taps). */
+	.send-hold {
+		display: contents;
+	}
 	.send-btn {
 		position: absolute;
 		right: 0.6rem;
@@ -16113,6 +16516,8 @@ import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
 	.ann-dock {
 		border: 0;
 		background: none;
+		user-select: none;
+		-webkit-user-select: none;
 		cursor: pointer;
 		font-size: 0.85rem;
 		font-weight: 600;

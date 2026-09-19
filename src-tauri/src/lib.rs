@@ -185,7 +185,8 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_haptics::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_fs::init());
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_process::init());
     // Global summon chord (desktop only — the plugin crate does not
     // compile for mobile; same shape as the on_menu_event link below).
     #[cfg(desktop)]

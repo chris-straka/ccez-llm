@@ -244,8 +244,32 @@ function mathPreviewInner(lines: string[]): string | null {
 }
 
 /**
+ * Boundaries before this many characters never end a folded preview:
+ * a leading "Mr." or "はい。" is an abbreviation or a stub, not a
+ * sentence — scanning continues to the next terminator instead.
+ */
+const MIN_SENTENCE_CHARS = 8;
+
+/**
+ * First-sentence head of a line (through its terminator), or null
+ * when the line holds no boundary. CJK marks (。！？．) always
+ * terminate; western . ! ? terminate only before whitespace or end
+ * of line, so decimals never cut. Boundary characters are BMP, so
+ * slicing at a match can never split a surrogate pair.
+ */
+function firstSentence(line: string): string | null {
+	const pattern = /[。！？．]|[.!?](?=\s|$)/g;
+	for (let match = pattern.exec(line); match !== null; match = pattern.exec(line)) {
+		const end = match.index + match[0].length;
+		if (Array.from(line.slice(0, end)).length < MIN_SENTENCE_CHARS) continue;
+		return line.slice(0, end);
+	}
+	return null;
+}
+
+/**
  * Folded-message preview text: the override wins (refs-only quotes),
- * else the first line (unchanged plain-text behavior). Math folds
+ * else the first sentence (not the whole first line). Math folds
  * into its TeX wrapped in `\\(…\\)` so a folded equation still reads
  * as latex — and the preview button keeps it clickable. Pure and
  * unit-tested.
@@ -255,11 +279,17 @@ export function foldPreviewText(content: string, override: string | null): strin
 	const lines = content.split("\n");
 	const tex = mathPreviewInner(lines);
 	if (tex !== null) return `\\(${mathTexPreview(tex, 120)}\\)`;
+	// Folds land on the first sentence: a long opener previews to its
+	// first 。/．/. and earns the marker, instead of spanning the
+	// whole first line. A one-sentence first line falls through to the
+	// length rules below (short line + more below still reads cut).
+	const first = lines[0] ?? "";
+	const sentence = firstSentence(first);
+	if (sentence !== null && sentence !== first) return `${sentence}…`;
 	// Long first lines cut with the ellipsis marker (never a silent
 	// crop): length reads bounded in every script. A short first line
 	// with more below still earns the marker — otherwise a folded
 	// multi-line message reads complete when it is not.
-	const first = lines[0] ?? "";
 	const cut = cutPreview(first, 140);
 	if (cut === first && lines.slice(1).join("\n").trim() !== "") return `${first}…`;
 	return cut;

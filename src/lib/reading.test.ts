@@ -10,6 +10,7 @@ import {
 	HAN_OVERLAY_LANG_TAG,
 	preferredLocalAid,
 	extractWordAt,
+	sentenceBounds,
 	aidDisplayText,
 	offeredLocalAids,
 	hasPinyinTones,
@@ -443,5 +444,28 @@ describe("readingsOnly", () => {
 	it("trims each reading before joining", () => {
 		const html = "<p><rt>  a  </rt><rt>b</rt></p>";
 		expect(readingsOnly(html, "|", "rt")).toBe("a|b");
+	});
+});
+
+describe("sentenceBounds", () => {
+	it("spans the sentence around the offset", () => {
+		const text = "First sentence. Second here. Third.";
+		const [s, e] = sentenceBounds(text, 20);
+		expect(text.slice(s, e)).toBe("Second here.");
+	});
+	it("skips leading space after the previous mark", () => {
+		expect(sentenceBounds("Hi. Bye.", 5)).toEqual([4, 8]);
+	});
+	it("ends CJK sentences at 。！？", () => {
+		const text = "春は美しい。桜が咲く。";
+		const [s, e] = sentenceBounds(text, 8);
+		expect(text.slice(s, e)).toBe("桜が咲く。");
+	});
+	it("selects the last sentence at the very end, never empty", () => {
+		expect(sentenceBounds("Hi.", 3)).toEqual([0, 3]);
+		expect(sentenceBounds("One. Two.", 9)).toEqual([5, 9]);
+	});
+	it("returns the whole text with no marks", () => {
+		expect(sentenceBounds("no marks here", 5)).toEqual([0, 13]);
 	});
 });

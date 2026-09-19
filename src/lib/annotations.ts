@@ -2213,12 +2213,12 @@ export function selMenuPlacement(opts: {
 	// The popup sits just below the cursor (never under it), still
 	// clamped to the viewport.
 	const x = Math.min(Math.max(8, at - 16), Math.max(8, viewportWidth - menuWidth - 8));
-	// Android: the OS text toolbar (Copy / Translate / Read Aloud)
-	// docks above the selection, so ours goes below it instead of
-	// underneath it — except near the screen bottom, where above
-	// wins and may share space with the OS bar. iOS docks its
-	// bubble below the selection, so ours takes the above slot
-	// like desktop — one popup on each side, never stacked.
+	// Android: the OS text toolbar is suppressed (the app menu
+	// replaces it), but ours still goes below the selection — clear
+	// of the highlight and its handles — except near the screen
+	// bottom, where above wins. iOS docks its bubble below the
+	// selection, so ours takes the above slot like desktop — one
+	// popup on each side, never stacked.
 	let y: number;
 	if (androidUI && !iosUI) {
 		// Well clear of the selection handles (~24px below text).

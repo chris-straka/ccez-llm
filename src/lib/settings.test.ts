@@ -488,7 +488,25 @@ describe("touch toggles", () => {
 		expect(s.hideMessages).toBe(false);
 		expect(s.hideButtons).toBe(true);
 		expect(s.autoSpeakSelection).toBe(true);
-		expect(s.vibration).toBe(true);
+		expect(s.hapticsDisabled).toBe(false);
+	});
+	it("migrates the legacy vibration toggle (explicit off stays off)", () => {
+		// Legacy saves predate hapticsDisabled: only an explicit
+		// vibration:false becomes disabled (blankSettings carries the
+		// new default, so strip it to simulate the old shape).
+		const legacy = (vibration: boolean): Record<string, unknown> => {
+			const rest: Record<string, unknown> = { ...blankSettings() };
+			delete rest.hapticsDisabled;
+			return { ...rest, vibration };
+		};
+		const store = memoryStore;
+		saveSettings(legacy(false) as unknown as AppSettings, store);
+		const healed = loadSettings(store);
+		expect(healed.hapticsDisabled).toBe(true);
+		expect("vibration" in healed).toBe(false);
+		const store2 = memoryStore;
+		saveSettings(legacy(true) as unknown as AppSettings, store2);
+		expect(loadSettings(store2).hapticsDisabled).toBe(false);
 	});
 	it("drops the retired overlay pill from older saves", () => {
 		const store = memoryStore;
@@ -508,7 +526,7 @@ describe("touch toggles", () => {
 			hideMessages: "yes",
 			hideButtons: 0,
 			autoSpeakSelection: 0,
-			vibration: "yes"
+			hapticsDisabled: "yes"
 		} as unknown as Record<string, unknown>;
 		stale.iosNativeCallout = true;
 		stale.overlayActions = 0;
@@ -517,7 +535,7 @@ describe("touch toggles", () => {
 		expect(healed.hideMessages).toBe(false);
 		expect(healed.hideButtons).toBe(true);
 		expect(healed.autoSpeakSelection).toBe(true);
-		expect(healed.vibration).toBe(true);
+		expect(healed.hapticsDisabled).toBe(false);
 		expect("iosNativeCallout" in healed).toBe(false);
 		expect("overlayActions" in healed).toBe(false);
 	});

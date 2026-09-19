@@ -29,6 +29,25 @@ describe("createTextareaEditor", () => {
 		expect(parent.firstElementChild).toBe(ta);
 	});
 
+	it("sizes to a seeded document on mount (no input needed)", () => {
+		// Force the manual path: this jsdom claims field-sizing
+		// support (which would let the absent stylesheet own the
+		// height and skip the mount pass). scrollHeight reads 0 with
+		// no layout, so the write itself — not its value — is the
+		// assertion: on a real engine it sizes to content.
+		const css = (globalThis as Record<string, unknown>).CSS as
+			| { supports: (...args: string[]) => boolean }
+			| undefined;
+		const original = css?.supports;
+		try {
+			if (css) css.supports = () => false;
+			const { ta } = setup({ initialDoc: "one\ntwo\nthree" });
+			expect(ta.style.height).not.toBe("");
+		} finally {
+			if (css && original) css.supports = original;
+		}
+	});
+
 	it("Enter sends, Shift-Enter does not", () => {
 		const { ta, options } = setup();
 		key(ta, { key: "Enter" });

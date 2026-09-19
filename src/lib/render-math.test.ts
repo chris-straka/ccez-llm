@@ -111,6 +111,24 @@ describe("latex math", () => {
 		expect(foldPreviewText("Done.\n\n", null)).toBe("Done.");
 	});
 
+	it("folds long openers at the first sentence, not the whole line", () => {
+		expect(foldPreviewText("春は日本で最も美しい季節の一つです。桜が咲き誇ります。", null)).toBe(
+			"春は日本で最も美しい季節の一つです。…"
+		);
+		expect(foldPreviewText("This is sentence one. Sentence two follows.", null)).toBe(
+			"This is sentence one.…"
+		);
+	});
+
+	it("skips stubs and non-terminators when finding the sentence", () => {
+		// A leading abbreviation never folds to a stub.
+		expect(foldPreviewText("Mr. Smith went home. He slept.", null)).toBe("Mr. Smith went home.…");
+		// Decimals never cut.
+		expect(foldPreviewText("Pi is 3.14 and more", null)).toBe("Pi is 3.14 and more");
+		// One short sentence alone reads complete, marker-free.
+		expect(foldPreviewText("Hi there.", null)).toBe("Hi there.");
+	});
+
 	it("cuts long folded previews with an ellipsis in every script", () => {
 		// Japanese (BMP): 140 chars plus the marker, never a silent crop.
 		const ja = foldPreviewText(`${"あ".repeat(200)}\nsecond`, null);

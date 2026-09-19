@@ -343,6 +343,24 @@ describe("hapticBeat", () => {
     expect(vibrate).toHaveBeenCalledWith(110);
   });
 
+  it("ticks UI taps light and buzzes denials stern", async () => {
+    const selectionFeedback = vi.fn(async () => null);
+    const notificationFeedback = vi.fn(async () => null);
+    const plugin = { selectionFeedback, notificationFeedback };
+    expect(await hapticBeatAsync("tap", { shell: true, plugin })).toBe(true);
+    expect(selectionFeedback).toHaveBeenCalledTimes(1);
+    expect(await hapticBeatAsync("no", { shell: true, plugin })).toBe(true);
+    expect(notificationFeedback).toHaveBeenCalledWith("error");
+  });
+
+  it("buzzes denial patterns on the web vibrator", async () => {
+    const vibrate = vi.fn();
+    expect(await hapticBeatAsync("tap", { nav: { vibrate } })).toBe(true);
+    expect(JSON.stringify(vibrate.mock.calls[0] ?? [])).toContain("15");
+    expect(await hapticBeatAsync("no", { nav: { vibrate } })).toBe(true);
+    expect(JSON.stringify(vibrate.mock.calls[1] ?? [])).toContain("50");
+  });
+
   it("stays silent when the shell plugin throws or is missing", async () => {
     const throwing = {
       selectionFeedback: async () => Promise.reject(new Error("denied"))

@@ -96,11 +96,12 @@ describe("shortcuts menu copy", () => {
 			"Bottom of chat",
 			"Chat switcher",
 			"Chats list",
-			"Delete current chat",
+			"Delete a message",
 			"Delete every chat",
 			"Fold a message",
 			"fold chat msg",
 			"Message buttons",
+			"Message end",
 			"Newer / older chat",
 			"Settings",
 			"Top of chat"
@@ -120,6 +121,9 @@ describe("shortcuts menu copy", () => {
 		expect(byName.get("Newer / older chat")).toBe("Three-finger swipe right / left");
 		expect(byName.get("Top of chat")).toBe("Two-finger swipe up · gg");
 		expect(byName.get("Bottom of chat")).toBe("Two-finger swipe down · G");
+		expect(byName.get("Message end")).toBe("Double two-finger tap");
+		expect(byName.get("Delete a message")).toBe("Three-finger tap");
+		expect(byName.get("Delete every chat")).toBe("Three-finger hold");
 	});
 
 	it("filters case-insensitively on name or keys", () => {

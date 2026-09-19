@@ -3,8 +3,9 @@ import { test, expect, type Page } from "@playwright/test";
 /**
  * Touch action rows: every row sits in flow under its message and
  * fades like the desktop rows. Tapping a message reveals its row
- * for 3s; double-tapping jumps to the message end where the row
- * sits. There is no overlay pill and no overlay checkbox.
+ * for 3s; double-tapping pins it open while word-selecting natively
+ * (the message-end jump moved to the two-finger double-tap). There
+ * is no overlay pill and no overlay checkbox.
  */
 test.use({
 	userAgent:
@@ -51,6 +52,28 @@ async function swipeX(page: Page, x0: number, x1: number): Promise<void> {
 	);
 }
 
+/** Synthetic left-edge swipe: the only stroke that summons the chats
+list (mid-screen rightward never opens it — those collide with
+message gestures). */
+async function swipeFromLeftEdge(page: Page): Promise<void> {
+	await page.evaluate(() => {
+		const touch = (x: number, y: number) =>
+			new Touch({ identifier: 7, target: document.body, clientX: x, clientY: y });
+		window.dispatchEvent(
+			new TouchEvent("touchstart", { bubbles: true, cancelable: true, composed: true, touches: [touch(4, 600)] })
+		);
+		window.dispatchEvent(
+			new TouchEvent("touchend", {
+				bubbles: true,
+				cancelable: true,
+				composed: true,
+				touches: [],
+				changedTouches: [touch(144, 604)]
+			})
+		);
+	});
+}
+
 /** Synthetic swipe starting on one element (the app decides fold vs
 sidebar from where the stroke begins — window dispatch can't test that). */
 async function swipeFrom(page: Page, selector: string, dx: number): Promise<void> {
@@ -93,15 +116,16 @@ test("scrolling the action row folds nothing and summons no sidebar", async ({ p
 	await expect(page.locator("article.assistant .actions .icon-btn").first()).not.toHaveClass(/folded/);
 	// Control: a leftward stroke off the row DOES open settings (the
 	// remap kept mid-screen one-finger left as the settings stroke —
-	// see the edge-swipes spec and the shortcuts menu), while a
-	// rightward stroke summons the chats list — proving the harness
-	// gesture reaches the app.
+	// see the edge-swipes spec and the shortcuts menu), proving the
+	// harness gesture reaches the app.
 	await swipeX(page, 300, 150);
 	await expect(page.locator(".settings-panel")).not.toHaveClass(/closed/);
-	// The first rightward stroke dismisses settings; the second
-	// summons the list (the chats stroke yields to an open panel).
+	// A rightward stroke dismisses the open settings; the list itself
+	// summons from the left edge only (mid-screen rightward never
+	// opens it — those strokes collide with message gestures).
 	await swipeX(page, 100, 250);
-	await swipeX(page, 100, 250);
+	await expect(page.locator(".settings-panel")).toHaveClass(/closed/);
+	await swipeFromLeftEdge(page);
 	await expect(page.locator("aside:has(button.side-chat)").first()).not.toHaveClass(/collapsed/);
 });
 

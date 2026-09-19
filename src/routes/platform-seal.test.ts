@@ -37,9 +37,16 @@ describe("platform seal", () => {
 	});
 
 	it("keeps the Annotate dock on phones (floating menu desktop-only)", () => {
+		// The composer dock stays phone-gated (Annotate on iOS, Inspect
+		// on Android); the floating menu is one shell with the platform
+		// split inside but never on iOS, where Apple's callout owns the
+		// text slot: the Android branch carries Copy/Annotate/Speak in
+		// the desktop popup's style, desktop keeps Annotate alone.
 		const source = pageSource();
 		expect(source).toContain("{#if androidUI && selMenu && !previewing}");
-		expect(source).toContain("{#if selMenu && !previewing && !androidUI}");
+		expect(source).toContain("{#if selMenu && !previewing && !iosUI}");
+		expect(source).toContain("Phone selection menu: the native callout is");
+		expect(source).toContain("Desktop: Annotate floats above the highlight");
 	});
 
 	it("keeps the iOS selection-menu slot split from Android's", () => {

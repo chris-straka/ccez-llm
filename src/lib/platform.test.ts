@@ -18,6 +18,7 @@ import {
 	twoFingerSwipeDir,
 	twoFingerSlideDir,
 	isThreeFingerTap,
+	nextTapCount,
 	threeFingerSwipeDir
 } from "./platform";
 
@@ -351,3 +352,25 @@ describe("isThreeFingerTap", () => {
 
 
 
+
+describe("nextTapCount", () => {
+	it("starts a fresh run at one", () => {
+		expect(nextTapCount(null, 1000, 50, 50)).toEqual({ count: 1, at: 1000, x: 50, y: 50 });
+	});
+	it("pairs nearby taps into double, triple, quadruple", () => {
+		const one = nextTapCount(null, 1000, 50, 50);
+		const two = nextTapCount(one, 1200, 52, 51);
+		const three = nextTapCount(two, 1400, 51, 52);
+		const four = nextTapCount(three, 1600, 50, 50);
+		expect([two.count, three.count, four.count]).toEqual([2, 3, 4]);
+	});
+	it("cycles back to one after four", () => {
+		const four = { count: 4, at: 1600, x: 50, y: 50 };
+		expect(nextTapCount(four, 1800, 50, 50).count).toBe(1);
+	});
+	it("restarts on slow or distant taps", () => {
+		const one = nextTapCount(null, 1000, 50, 50);
+		expect(nextTapCount(one, 1500, 50, 50).count).toBe(1);
+		expect(nextTapCount(one, 1200, 200, 200).count).toBe(1);
+	});
+});

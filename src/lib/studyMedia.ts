@@ -429,18 +429,22 @@ export function vibrateTick(
   }
 }
 
-/** Haptic beats: send taps, the first reply token rumbles, stream end thumps. */
-export type HapticBeat = "send" | "first" | "done";
+/** Haptic beats: send taps, the first reply token rumbles, stream
+end thumps, UI taps tick, denial buzzes. */
+export type HapticBeat = "send" | "first" | "done" | "tap" | "no";
 
 /**
  * Vibration pattern per beat: a short single tap on send, a longer
  * rumble as the reply starts arriving, a double thump when it is
- * fully in. Kept small — these fire on every message.
+ * fully in, a light tick for button taps, a stern double-buzz for
+ * refused actions. Kept small — most fire on every message.
  */
 const HAPTIC_PATTERNS: Record<HapticBeat, number[]> = {
   send: [20],
   first: [70],
   done: [35, 60, 110],
+  tap: [15],
+  no: [50, 70, 50],
 };
 
 /**
@@ -509,8 +513,9 @@ export async function hapticBeatAsync(
       const haptics = opts.plugin ?? (await nativeHaptics(true));
       if (!haptics) return false;
       // Send taps light, the first token rumbles medium, arrival
-      // thumps a success — the same three beats as the web patterns.
-      if (kind === "send" && haptics.selectionFeedback) {
+      // thumps a success, UI taps tick, denials buzz an error — the
+      // same five beats as the web patterns.
+      if ((kind === "send" || kind === "tap") && haptics.selectionFeedback) {
         await haptics.selectionFeedback();
         return true;
       }
@@ -522,8 +527,14 @@ export async function hapticBeatAsync(
         await haptics.notificationFeedback("success");
         return true;
       }
+      if (kind === "no" && haptics.notificationFeedback) {
+        await haptics.notificationFeedback("error");
+        return true;
+      }
       if (haptics.vibrate) {
-        await haptics.vibrate(kind === "send" ? 20 : kind === "first" ? 70 : 110);
+        await haptics.vibrate(
+          kind === "send" ? 20 : kind === "first" ? 70 : kind === "tap" ? 15 : kind === "no" ? 80 : 110
+        );
         return true;
       }
       return false;

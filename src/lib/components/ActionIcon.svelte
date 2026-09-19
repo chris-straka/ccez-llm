@@ -5,7 +5,7 @@
 	 * the button color for free).
 	 */
 
-	export type ActionKind = "fold" | "copy" | "branch" | "speak" | "delete" | "rerun" | "close" | "mic" | "attach" | "paste" | "pencil" | "jump" | "mark" | "export";
+	export type ActionKind = "fold" | "copy" | "branch" | "speak" | "delete" | "rerun" | "close" | "mic" | "attach" | "paste" | "pencil" | "jump" | "mark" | "export" | "check";
 
 	interface Props {
 		kind: ActionKind;
@@ -70,6 +70,8 @@
 		<path d="M8 2v8.5" />
 		<path d="M5 7.2L8 10.2l3-3" />
 		<path d="M2.5 11.5v1.3a1.2 1.2 0 0 0 1.2 1.2h8.6a1.2 1.2 0 0 0 1.2-1.2v-1.3" />
+	{:else if kind === "check"}
+		<path d="M3 8.5l3.5 3.5L13 4.5" />
 	{/if}
 </svg>
 

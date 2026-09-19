@@ -181,6 +181,36 @@ export function extractWordAt(text: string, offset: number): string {
 	return text.slice(start, end);
 }
 
+const SENTENCE_END = /[.!?。！？．]/;
+
+/**
+ * Sentence span containing `offset`: from after the previous
+ * sentence-ending mark (plus its trailing spaces) through the next
+ * one. Western and CJK terminators both end a sentence; a caret
+ * parked past the final mark selects the last sentence, never an
+ * empty span. Pure — backs triple-tap sentence select.
+ */
+export function sentenceBounds(text: string, offset: number): [number, number] {
+	const at = Math.min(Math.max(offset, 0), text.length);
+	let end = text.length;
+	for (let i = at; i < text.length; i++) {
+		if (SENTENCE_END.test(text[i] ?? "")) {
+			end = i + 1;
+			break;
+		}
+	}
+	let start = 0;
+	for (let i = at - 1; i >= 0; i--) {
+		if (SENTENCE_END.test(text[i] ?? "")) {
+			start = i + 1;
+			break;
+		}
+	}
+	while (start < end && /\s/.test(text[start] ?? "")) start++;
+	if (start >= end) return sentenceBounds(text, at - 1);
+	return [start, end];
+}
+
 // --- Speech locale: Unicode script → BCP-47, Latin falls back ---
 
 /** Non-Latin scripts map to a voice locale; order matters (check callers). */

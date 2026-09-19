@@ -144,11 +144,11 @@ export interface AppSettings {
 	/** Touch only: read a fresh text selection aloud on release. */
 	autoSpeakSelection: boolean;
 	/**
-	 * Touch only: haptic beats on send, first reply token, and stream
-	 * end. Off silences every vibration. The checkbox lives in Messages
-	 * on phones.
+	 * Touch only: disable every haptic beat (send, first reply token,
+	 * stream end, button taps). Unchecked by default — haptics are on.
+	 * The checkbox lives in Messages on phones.
 	 */
-	vibration: boolean;
+	hapticsDisabled: boolean;
 	/**
 	 * Ping when a finished reply lands while the window is backgrounded
 	 * (hidden or unfocused). Off silences the finished-reply ping
@@ -321,7 +321,7 @@ export function defaultSettings(): AppSettings {
 		hideMessages: false,
 		hideButtons: true,
 		autoSpeakSelection: true,
-		vibration: true,
+		hapticsDisabled: false,
 		replyNotifications: true,
 		inspectEnabled: true
 	};
@@ -466,7 +466,15 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 		if (typeof merged.micEnabled !== "boolean") merged.micEnabled = true;
 		if (typeof merged.hideButtons !== "boolean") merged.hideButtons = true;
 		if (typeof merged.autoSpeakSelection !== "boolean") merged.autoSpeakSelection = true;
-		if (typeof merged.vibration !== "boolean") merged.vibration = true;
+		// Legacy `vibration` (inverted wording): an explicit off
+		// becomes disabled; anything else stays enabled. Fresh
+		// defaults fill hapticsDisabled before healing, so the
+		// parsed save (not the merged one) decides the migration.
+		const parsedRecord = parsed as unknown as Record<string, unknown>;
+		if (typeof parsedRecord["hapticsDisabled"] !== "boolean") {
+			merged.hapticsDisabled = parsedRecord["vibration"] === false;
+		}
+		delete (merged as unknown as Record<string, unknown>)["vibration"];
 		if (typeof merged.replyNotifications !== "boolean") merged.replyNotifications = true;
 		if (typeof merged.showMessageButtons !== "boolean") merged.showMessageButtons = true;
 		// Backfill the message gap on older saves; clamp strays into

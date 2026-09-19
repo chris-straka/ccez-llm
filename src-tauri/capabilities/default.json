@@ -23,6 +23,7 @@
     "haptics:allow-notification-feedback",
     "haptics:allow-selection-feedback",
     "dialog:allow-save",
+    "process:allow-restart",
     "fs:allow-write-text-file"
   ]
 }

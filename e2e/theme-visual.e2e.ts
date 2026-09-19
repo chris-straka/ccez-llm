@@ -347,7 +347,7 @@ for (const t of THEMES) {
 		// Edit mode via the pencil: desktop edits at the mark in the
 		// floating card (phones use the composer) — the card opens
 		// carrying the comment, and the composer stays empty.
-		await page.locator('button[aria-label="Edit comment for annotation 1"]').click();
+		await page.locator('button[aria-label="Edit annotation 1"]').click();
 		const editPop = page.locator(".ann-pop");
 		await expect(editPop).toBeVisible({ timeout: 10_000 });
 		await expect(editPop.locator("textarea")).toHaveValue("note");

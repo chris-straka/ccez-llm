@@ -28,7 +28,7 @@ test("saving an edit rewrites in place without resending", async ({ page }) => {
 	await page.locator(".msg-edit .ta-input").first().click();
 	await page.keyboard.press("ControlOrMeta+a");
 	await page.keyboard.type("edited question");
-	await page.locator('.msg-edit-bar button:has-text("Save")').click();
+	await page.locator('article.user button[aria-label="Save edit"]').click();
 	// The edit box closes and the message shows the new text...
 	await expect(page.locator(".msg-edit")).toHaveCount(0);
 	await expect(page.locator("article.user .rendered").first()).toContainText("edited question");
@@ -36,6 +36,28 @@ test("saving an edit rewrites in place without resending", async ({ page }) => {
 	await expect(page.locator("article")).toHaveCount(3);
 	await expect(page.locator("article.assistant .rendered").nth(0)).toContainText("first answer");
 	await expect(page.locator("article.assistant .rendered").nth(1)).toContainText("second answer");
+	await expect(page.locator(".sending")).toHaveCount(0);
+});
+
+test("the pencil becomes a checkmark while editing", async ({ page }) => {
+	await openUserEdit(page);
+	const article = page.locator("article.user").first();
+	// No Save/Cancel bar: the pencil seat commits.
+	await expect(page.locator(".msg-edit-bar")).toHaveCount(0);
+	await expect(article.locator('button[aria-label="Save edit"]')).toBeVisible();
+	await expect(article.locator('button[aria-label="Edit this message"]')).toHaveCount(0);
+});
+
+test("clicking away cancels the edit and keeps history", async ({ page }) => {
+	await openUserEdit(page);
+	await page.locator(".msg-edit .ta-input").first().click();
+	await page.keyboard.press("ControlOrMeta+a");
+	await page.keyboard.type("abandoned question");
+	// Click into another message: the draft dies with the editor.
+	await page.locator("article.assistant .rendered").first().click();
+	await expect(page.locator(".msg-edit")).toHaveCount(0);
+	await expect(page.locator("article.user .rendered").first()).toContainText("original question");
+	await expect(page.locator("article")).toHaveCount(3);
 	await expect(page.locator(".sending")).toHaveCount(0);
 });
 
@@ -52,6 +74,6 @@ test("a message under edit never folds", async ({ page }) => {
 	await expect(page.locator(".msg-edit")).toHaveCount(1);
 	await expect(article).not.toHaveClass(/folded-msg/);
 	// Saving still works afterwards.
-	await page.locator('.msg-edit-bar button:has-text("Save")').click();
+	await article.locator('button[aria-label="Save edit"]').click();
 	await expect(page.locator(".msg-edit")).toHaveCount(0);
 });

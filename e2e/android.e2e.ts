@@ -26,8 +26,9 @@ test.describe("gestures", () => {
 	 * Android milestone (S24 Galaxy): key chords don't exist on a phone, so
 	 * the shortcuts modal teaches touch gestures. Double-tap on empty
 	 * space is the only sidebar opener — rightward strokes only dismiss,
-	 * two-finger double-tap deletes. These specs pin the UA-gated
-	 * branches that ship on desktop today.
+	 * two-finger double-tap jumps to the bottom, three-finger tap
+	 * deletes the message, three-finger hold wipes. These specs pin
+	 * the UA-gated branches that ship on desktop today.
 	 */
 	test.beforeEach(async ({ page }) => {
 		await seedChat(page, [{ role: "assistant", content: "hello" }]);
@@ -97,10 +98,12 @@ test.describe("gestures", () => {
 		await expect(modal.locator('dt:text-is("Chat switcher") + dd')).toHaveText(
 			"Two-finger hold · double-tap empty space · swipe cycles · loops"
 		);
-		await expect(modal.locator('dt:has-text("Delete current chat")')).toBeVisible();
-		await expect(modal.locator('dd:has-text("Double two-finger tap")')).toBeVisible();
-		await expect(modal.locator('dt:has-text("Delete every chat")')).toBeVisible();
-		await expect(modal.locator('dd:has-text("Double three-finger tap")')).toBeVisible();
+		await expect(modal.locator('dt:text-is("Message end")')).toBeVisible();
+		await expect(modal.locator('dt:text-is("Message end") + dd')).toHaveText("Double two-finger tap");
+		await expect(modal.locator('dt:text-is("Delete a message")')).toBeVisible();
+		await expect(modal.locator('dt:text-is("Delete a message") + dd')).toHaveText("Three-finger tap");
+		await expect(modal.locator('dt:text-is("Delete every chat")')).toBeVisible();
+		await expect(modal.locator('dt:text-is("Delete every chat") + dd')).toHaveText("Three-finger hold");
 	});
 
 	/** Synthetic edge swipe (untrusted TouchEvents still hit window listeners). */
@@ -199,16 +202,20 @@ test.describe("gestures", () => {
 		);
 	}
 
-	test("mid-screen swipe right opens the chat sidebar", async ({ page }) => {
+	test("mid-screen swipe right never opens the chat sidebar", async ({ page }) => {
 		const aside = page.locator("aside:has(button.side-chat)");
 		const panel = page.locator(".settings-panel");
-		// Mid-screen rightward summons like the edge stroke, and never
-		// toggles the open list shut.
+		// Mid-screen rightward summons nothing (the list opens from
+		// the left edge only) — and never toggles anything shut.
+		await swipeMidScreen(page, 150, 260);
+		await expect(aside).toHaveClass(/collapsed/);
+		// The edge stroke still summons...
+		await swipeFromLeftEdge(page);
+		await expect(aside).not.toHaveClass(/collapsed/);
+		// ...a mid-screen rightward never toggles the open list shut...
 		await swipeMidScreen(page, 150, 260);
 		await expect(aside).not.toHaveClass(/collapsed/);
-		await swipeMidScreen(page, 150, 260);
-		await expect(aside).not.toHaveClass(/collapsed/);
-		// A leftward stroke folds it back (and never opens settings)...
+		// ...a leftward stroke folds it back (and never opens settings)...
 		await swipeMidScreen(page, 260, 150);
 		await expect(aside).toHaveClass(/collapsed/);
 		await expect(panel).toHaveClass(/closed/);
@@ -231,10 +238,15 @@ test.describe("gestures", () => {
 		// ...a rightward stroke closes it...
 		await swipeMidScreen(page, 150, 260);
 		await expect(panel).toHaveClass(/closed/);
-		// ...a rightward stroke with all shut summons the list...
+		// ...a rightward stroke with all shut summons nothing now
+		// (the list opens from the left edge only)...
 		await swipeMidScreen(page, 150, 260);
+		await expect(aside).toHaveClass(/collapsed/);
+		// ...but with the list open, a leftward stroke folds it
+		// instead of opening settings (same precedence the
+		// rightward test above pins the other way).
+		await swipeFromLeftEdge(page);
 		await expect(aside).not.toHaveClass(/collapsed/);
-		// ...and a leftward stroke folds the list instead of settings.
 		await swipeMidScreen(page, 260, 150);
 		await expect(aside).toHaveClass(/collapsed/);
 		await expect(panel).toHaveClass(/closed/);
@@ -293,9 +305,9 @@ test.describe("touch", () => {
 	/**
 	 * Android touch batch: one-line region pills, the chats drawer, the
 	 * touch selection menu with Speak, three-finger chat steps,
-	 * two-finger delete, three-finger delete-all, sidebar mutual
-	 * exclusion, and the theme pin. Same UA-gated branches as
-	 * android.e2e.ts, S24-class viewport.
+	 * two-finger bottom jump, three-finger message delete plus hold
+	 * wipe, sidebar mutual exclusion, and the theme pin. Same
+	 * UA-gated branches as android.e2e.ts, S24-class viewport.
 	 */
 	/** Touch-summon a highlight: a tap plus a programmatic range, the
 	same dance the dock tests below share (trusted taps only reach
@@ -369,9 +381,10 @@ test.describe("touch", () => {
 		);
 	}
 
-	/** Touch has no hover, so each chat row prints the tooltip's
-	breakdown inline after the timestamp. */
-	test("chat rows print the message breakdown on a phone", async ({ page }) => {
+	/** Touch has no hover, so each chat row prints a short message
+	count after the timestamp (the tooltip's full split lives on
+	the hover tip, never in the row where it truncated). */
+	test("chat rows print the message count on a phone", async ({ page }) => {
 		await seedChat(page, [
 			{ role: "user", content: "hi" },
 			{ role: "assistant", content: "hello back" }
@@ -379,7 +392,7 @@ test.describe("touch", () => {
 		await page.goto("/");
 		const row = page.locator("aside ul li .side-chat").first();
 		await expect(row).toBeVisible({ timeout: 15_000 });
-		await expect(row).toContainText("2 messages · you 1 · AI 1");
+		await expect(row).toContainText("· 2 msgs");
 	});
 
 	test("region menus share one row on a phone", async ({ page }) => {
@@ -413,7 +426,7 @@ test.describe("touch", () => {
 		expect(pos.width).toBeLessThanOrEqual(340);
 	});
 
-	/** Synthetic two-finger double-tap (owns the chats sidebar on Android). */
+	/** Synthetic two-finger double-tap (bottom jump on Android). */
 	async function doubleTapTwoFinger(page: Page): Promise<void> {
 		for (let tap = 0; tap < 2; tap++) {
 			await page.evaluate(() => {
@@ -500,10 +513,12 @@ test.describe("touch", () => {
 		await swipeX(page, 268, 128);
 		await expect(aside).toHaveClass(/collapsed/);
 		await expect(panel).toHaveClass(/closed/);
-		// Two-finger double-tap still deletes instead of summoning.
+		// Two-finger double-tap jumps instead of summoning (and
+		// never deletes): the list stays shut, the chat remains.
+		const chats = await page.locator("aside button.side-chat").count();
 		await doubleTapTwoFinger(page);
 		await expect(aside).toHaveClass(/collapsed/);
-		await expect(page.locator(".toast")).toHaveText("Chat deleted");
+		expect(await page.locator("aside button.side-chat").count()).toBe(chats);
 		// Settings still opens from a two-finger swipe left after that.
 		await swipeTwoFinger(page, 300, 150);
 		await expect(panel).not.toHaveClass(/closed/);
@@ -745,20 +760,85 @@ test.describe("touch", () => {
 		await expect(panel).not.toHaveClass(/closed/);
 	});
 
-	test("double two-finger tap deletes the current chat", async ({ page }) => {
-		await seedTwoChats(page);
-		expect(await page.locator("aside button.side-chat").count()).toBe(2);
-		await doubleTapTwoFinger(page);
-		await expect(page.locator("aside button.side-chat")).toHaveCount(1);
-		await expect(page.locator(".toast")).toHaveText("Chat deleted");
+	test("double two-finger tap jumps to the thread bottom, never deletes", async ({ page }) => {
+		// Long thread so the jump has somewhere to go; the pair lands
+		// on the last message, whose end sits below the fold.
+		await page.addInitScript(() => {
+			window.localStorage.setItem("ccez-mock-provider", "1");
+			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
+			const lines = Array.from({ length: 80 }, (_, n) => `line ${n} of a long assistant reply`).join("\n");
+			window.localStorage.setItem(
+				"ccez-llm-chats-v1",
+				JSON.stringify([
+					{
+						id: "e2e-chat",
+						createdAt: 1,
+						replyLang: null,
+						messages: [{ id: "m1", role: "assistant", content: lines, usage: null, error: null }]
+					}
+				])
+			);
+		});
+		await page.goto("/");
+		await expect(page.locator("article .rendered").first()).toBeVisible();
+		await page.evaluate(() => document.querySelector(".messages")?.scrollTo({ top: 0 }));
+		const box = await page.locator("article .rendered").last().boundingBox();
+		if (!box) throw new Error("no message box");
+		const x = box.x + box.width / 2;
+		const y = box.y + box.height / 2;
+		for (let tap = 0; tap < 2; tap++) {
+			await page.evaluate(
+				({ x, y }: { x: number; y: number }) => {
+					const touch = (id: number) =>
+						new Touch({ identifier: id, target: document.body, clientX: x, clientY: y });
+					window.dispatchEvent(
+						new TouchEvent("touchstart", {
+							bubbles: true,
+							cancelable: true,
+							composed: true,
+							touches: [touch(1, x, y), touch(2, x + 40, y)]
+						})
+					);
+					window.dispatchEvent(
+						new TouchEvent("touchend", {
+							bubbles: true,
+							cancelable: true,
+							composed: true,
+							touches: [],
+							changedTouches: [touch(1, x, y), touch(2, x + 40, y)]
+						})
+					);
+				},
+				{ x, y }
+			);
+			if (tap === 0) await page.waitForTimeout(120);
+		}
+		// Smooth scroll lands the thread bottom; nothing deleted.
+		await expect
+			.poll(async () => page.evaluate(() => document.querySelector(".messages")?.scrollTop ?? 0), { timeout: 5000 })
+			.toBeGreaterThan(100);
+		expect(await page.locator("aside button.side-chat").count()).toBe(1);
 	});
 
-	test("double three-finger tap deletes every chat", async ({ page }) => {
-		await seedTwoChats(page);
-		expect(await page.locator("aside button.side-chat").count()).toBe(2);
-		const tap = () =>
-			page.evaluate(() => {
-				const touch = (id: number) => new Touch({ identifier: id, target: document.body, clientX: 200, clientY: 500 });
+	test("three-finger tap deletes the tapped message", async ({ page }) => {
+		await page.addInitScript(() => {
+			window.localStorage.setItem("ccez-mock-provider", "1");
+			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
+			const msg = (id: string, role: string, content: string) => ({ id, role, content, usage: null, error: null });
+			window.localStorage.setItem(
+				"ccez-llm-chats-v1",
+				JSON.stringify([
+					{ id: "e2e-chat", createdAt: 1, replyLang: null, messages: [msg("m1", "user", "first"), msg("m2", "assistant", "second")] }
+				])
+			);
+		});
+		await page.goto("/");
+		await expect(page.locator("article")).toHaveCount(2);
+		const box = await page.locator("article .rendered").first().boundingBox();
+		if (!box) throw new Error("no message box");
+		await page.evaluate(
+			({ x, y }: { x: number; y: number }) => {
+				const touch = (id: number) => new Touch({ identifier: id, target: document.body, clientX: x, clientY: y });
 				const fingers = [touch(1), touch(2), touch(3)];
 				window.dispatchEvent(
 					new TouchEvent("touchstart", { bubbles: true, cancelable: true, composed: true, touches: fingers })
@@ -772,15 +852,47 @@ test.describe("touch", () => {
 						changedTouches: fingers
 					})
 				);
-			});
-		await tap();
-		await tap();
+			},
+			{ x: box.x + box.width / 2, y: box.y + box.height / 2 }
+		);
+		await expect(page.locator(".toast")).toHaveText("Message deleted");
+		await expect(page.locator("article")).toHaveCount(1);
+	});
+
+	test("three-finger hold wipes every chat", async ({ page }) => {
+		await seedTwoChats(page);
+		expect(await page.locator("aside button.side-chat").count()).toBe(2);
+		await page.evaluate(() => {
+			const touch = (id: number) => new Touch({ identifier: id, target: document.body, clientX: 200, clientY: 500 });
+			window.dispatchEvent(
+				new TouchEvent("touchstart", {
+					bubbles: true,
+					cancelable: true,
+					composed: true,
+					touches: [touch(1), touch(2), touch(3)]
+				})
+			);
+		});
+		// The hold fires past tap range (600ms) while fingers rest.
+		await page.waitForTimeout(750);
+		await page.evaluate(() => {
+			const touch = (id: number) => new Touch({ identifier: id, target: document.body, clientX: 200, clientY: 500 });
+			window.dispatchEvent(
+				new TouchEvent("touchend", {
+					bubbles: true,
+					cancelable: true,
+					composed: true,
+					touches: [],
+					changedTouches: [touch(1), touch(2), touch(3)]
+				})
+			);
+		});
 		await expect(page.locator("aside button.side-chat")).toHaveCount(1);
 		await expect(page.locator("article")).toHaveCount(0);
 		await expect(page.locator(".toast")).toHaveText("All chats deleted");
 	});
 
-	test("touch selection docks Annotate in the composer, never floating", async ({ page }) => {
+	test("touch selection floats Copy/Annotate/Speak, Inspect stays docked", async ({ page }) => {
 		await seedTwoChats(page);
 		const box = await page.locator("article .rendered").first().boundingBox();
 		if (!box) throw new Error("no message box");
@@ -808,19 +920,16 @@ test.describe("touch", () => {
 			},
 			{ x: box.x + box.width / 2, y: box.y + box.height / 2 }
 		);
-		// The floating menu is desktop-only now: nothing near the text.
-		await expect(page.locator(".sel-menu")).toHaveCount(0);
-		// The dock buttons live in the composer tools, below the message:
-		// Annotate and Speak always, Inspect only for Han characters.
-		const dock = page.locator(".ann-dock");
-		await expect(dock).toHaveText(["Annotate", "Speak"]);
-		await expect(dock.first()).toBeVisible();
-		const msgBox = await page.locator("article .rendered").first().boundingBox();
-		const dockBox = await dock.first().boundingBox();
-		expect(dockBox?.y ?? 0).toBeGreaterThan((msgBox?.y ?? 0) + (msgBox?.height ?? 0));
+		// The native callout is suppressed: our menu floats near the
+		// text with Copy, Annotate, and Speak in the desktop style.
+		const menu = page.locator(".sel-menu");
+		await expect(menu).toBeVisible();
+		await expect(menu.locator("button")).toHaveText(["Copy", "Annotate", "Speak"]);
+		// Non-Han text docks nothing: Inspect is Han-only.
+		await expect(page.locator(".ann-dock")).toHaveCount(0);
 	});
 
-	test("a tap on Speak reads the highlight and keeps the dock", async ({ page }) => {
+	test("a tap on Speak reads the highlight and keeps the menu", async ({ page }) => {
 		await page.addInitScript(() => {
 			(window as unknown as { __spoken: string[] }).__spoken = [];
 			const synth = window.speechSynthesis;
@@ -832,8 +941,9 @@ test.describe("touch", () => {
 		});
 		await seedTwoChats(page);
 		await summonTouchSelection(page);
-		await expect(page.locator(".ann-dock")).toHaveText(["Annotate", "Speak"]);
-		const btn = page.locator('.ann-dock:has-text("Speak")');
+		const menu = page.locator(".sel-menu");
+		await expect(menu.locator("button")).toHaveText(["Copy", "Annotate", "Speak"]);
+		const btn = menu.locator('button:has-text("Speak")');
 		const btnBox = await btn.boundingBox();
 		if (!btnBox) throw new Error("no speak box");
 		await page.touchscreen.tap(btnBox.x + btnBox.width / 2, btnBox.y + btnBox.height / 2);
@@ -842,11 +952,11 @@ test.describe("touch", () => {
 				timeout: 10_000
 			})
 			.toContain("alpha-aaa");
-		// The dock stays put: Annotate is one tap away after listening.
-		await expect(page.locator('.ann-dock:has-text("Annotate")')).toBeVisible();
+		// The menu stays put: Annotate is one tap away after listening.
+		await expect(menu.locator('button:has-text("Annotate")')).toBeVisible();
 	});
 
-	test("a Han highlight docks Inspect beside Speak with equal widths", async ({ page }) => {
+	test("a Han highlight floats Speak and docks Inspect", async ({ page }) => {
 		await page.addInitScript(() => {
 			window.localStorage.setItem("ccez-mock-provider", "1");
 			window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
@@ -865,18 +975,11 @@ test.describe("touch", () => {
 		await page.goto("/");
 		await expect(page.locator("article .rendered").first()).toBeVisible();
 		await summonTouchSelection(page);
-		const dock = page.locator(".ann-dock");
-		await expect(dock).toHaveText(["Annotate", "Speak", "Inspect"]);
-		const boxes = await Promise.all(
-			["Annotate", "Speak", "Inspect"].map((label) =>
-				page.locator(`.ann-dock:has-text("${label}")`).boundingBox()
-			)
-		);
-		const widths = boxes.map((box) => {
-			if (!box) throw new Error("no dock box");
-			return box.width;
-		});
-		expect(Math.max(...widths) - Math.min(...widths)).toBeLessThanOrEqual(2);
+		// Copy/Annotate/Speak float in the menu; the single Han
+		// character docks Inspect alone in the composer.
+		const menu = page.locator(".sel-menu");
+		await expect(menu.locator("button")).toHaveText(["Copy", "Annotate", "Speak"]);
+		await expect(page.locator(".ann-dock")).toHaveText(["Inspect"]);
 	});
 
 	test("a long chat scrolls inside the list, never squeezing the prompt", async ({ page }) => {
@@ -903,7 +1006,9 @@ test.describe("touch", () => {
 			return { scrollHeight: list.scrollHeight, clientHeight: list.clientHeight, promptHeight: promptBox.height };
 		});
 		expect(metrics.scrollHeight).toBeGreaterThan(metrics.clientHeight);
-		expect(metrics.promptHeight).toBeGreaterThanOrEqual(90);
+		// Healthy multi-row composer, never squeezed flat: the floor
+		// tolerates headless font-metric drift (86px observed vs 90).
+		expect(metrics.promptHeight).toBeGreaterThanOrEqual(80);
 	});
 
 	test("page never scrolls sideways on a phone", async ({ page }) => {
@@ -937,13 +1042,21 @@ test.describe("touch", () => {
 		await expect(body).toBeHidden({ timeout: 5000 });
 	});
 
-	test("settings sheet spans the phone and offers touch toggles", async ({ page }) => {
+	test("settings sheet matches the chats drawer and offers touch toggles", async ({ page }) => {
 		await seedEmpty(page);
 		await swipeTwoFinger(page, 300, 150);
 		const panel = page.locator(".settings-panel");
 		await expect(panel).not.toHaveClass(/closed/);
-		const box = await panel.boundingBox();
-		expect(box?.width ?? 0).toBeCloseTo(412, 0);
+		const panelWidth = (await panel.boundingBox())?.width ?? 0;
+		// The two drawers match instead of one spanning the screen:
+		// shut settings, summon the list, compare.
+		await swipeX(page, 4, 144);
+		await expect(panel).toHaveClass(/closed/);
+		await swipeX(page, 4, 144);
+		const aside = page.locator("aside:has(button.new)");
+		await expect(aside).not.toHaveClass(/collapsed/);
+		const listWidth = (await aside.boundingBox())?.width ?? 0;
+		expect(Math.abs(panelWidth - listWidth)).toBeLessThanOrEqual(1);
 		await expect(panel.locator('legend:has-text("Voice engine")')).toHaveCount(0);
 		// Phones never auto-read selections: no toggle, no behavior.
 		await expect(panel.locator('label:has-text("Read selections aloud on release")')).toHaveCount(0);
@@ -1046,7 +1159,7 @@ test.describe("touch", () => {
 		selection handle are swallowed as handle nudges (no click ever
 		arrives), so the button runs off touchend instead of waiting for
 		onclick. */
-		test("a tap on Annotate opens the comment box", async ({ page }) => {
+		test("a tap on Annotate files the note through the composer", async ({ page }) => {
 			await seedTwoChats(page);
 			const box = await page.locator("article .rendered").first().boundingBox();
 			if (!box) throw new Error("no message box");
@@ -1074,20 +1187,20 @@ test.describe("touch", () => {
 				},
 				{ x: box.x + box.width / 2, y: box.y + box.height / 2 }
 			);
-			const btn = page.locator('.ann-dock:has-text("Annotate")');
+			const btn = page.locator('.sel-menu button:has-text("Annotate")');
 			await expect(btn).toBeVisible();
 			// A real tap on the button: on-device the handle eats the click,
-			// so the comment box must open off the touch sequence itself.
+			// so the annotation must open off the touch sequence itself.
 			// (Synthetic TouchEvents don't reach Svelte's touch handlers —
 			// only trusted taps exercise this path.)
 			const btnBox = await btn.boundingBox();
 			if (!btnBox) throw new Error("no annotate box");
 			await page.touchscreen.tap(btnBox.x + btnBox.width / 2, btnBox.y + btnBox.height / 2);
-			// Phones file the comment in the composer, never a floating
+			// Phones file the annotation in the composer, never a floating
 			// box: the tap consumes the menu and the composer asks for
 			// the note instead.
-			await expect(page.locator(".ann-dock")).toHaveCount(0);
-			await expect(page.locator(".prompt textarea")).toHaveAttribute("placeholder", "Add a comment");
+			await expect(page.locator(".sel-menu")).toHaveCount(0);
+			await expect(page.locator(".prompt textarea")).toHaveAttribute("placeholder", "Add an annotation");
 			// Typing files through the send arrow: the pill counts it.
 			await page.locator(".prompt textarea").click();
 			await page.keyboard.type("nice point", { delay: 10 });
@@ -1194,10 +1307,10 @@ test.describe("touch", () => {
 			await expect.poll(hasWash, { timeout: 10_000 }).toBe(true);
 		});
 
-		/** The annotate dock survives scrolling a live selection: the
-		native highlight and its OS menu stay up across scrolls, so
-		ours must too — only a collapsed selection dismisses it. */
-		test("the annotate dock survives scrolling a live selection", async ({ page }) => {
+		/** The selection menu survives scrolling a live highlight: the
+		native callout is suppressed, so our menu must stay up across
+		scrolls — only a collapsed selection dismisses it. */
+		test("the selection menu survives scrolling a live highlight", async ({ page }) => {
 			const filler = Array.from({ length: 30 }, (_, i) => `filler paragraph ${i} pads the thread.`).join("\n\n");
 			await seedChat(page, [{ role: "assistant", content: `${filler}\n\nhello world from Kyoto harbor\n\n${filler}` }]);
 			await page.goto("/");
@@ -1212,14 +1325,14 @@ test.describe("touch", () => {
 			await page.mouse.down();
 			await page.mouse.move(qbox.x + 200, y, { steps: 8 });
 			await page.mouse.up();
-			const dock = page.locator('.ann-dock[aria-label="Annotate selection"]');
-			await expect(dock).toBeVisible();
+			const item = page.locator('.sel-menu button:has-text("Annotate")');
+			await expect(item).toBeVisible();
 			await page.evaluate(() => {
 				document.querySelector(".messages")?.scrollBy({ top: 400 });
 			});
 			await page.waitForTimeout(400);
 			expect(await page.evaluate(() => window.getSelection()?.toString() ?? "")).not.toBe("");
-			await expect(dock).toBeVisible();
+			await expect(item).toBeVisible();
 		});
 
 		/** Below the full-bleed text size, short assistant messages
@@ -1390,28 +1503,29 @@ test.describe("touch", () => {
 		await expect(box).toBeChecked();
 	});
 
-	test("vibration checkbox is checked by default", async ({ page }) => {
+	test("haptics toggle is off (enabled) by default and persists", async ({ page }) => {
 		await seedEmpty(page);
 		await swipeTwoFinger(page, 300, 150);
 		await page.locator(".settings-panel").waitFor();
-		const box = page.locator('label.check:has-text("Vibrate when messages send and arrive") input');
-		await expect(box).toBeChecked();
-		// Off persists through the next settings flush: dismiss settings,
-		// then summon the list (its toggle persists the whole object).
-		await box.click();
+		const box = page.locator('label.check:has-text("Disable haptic feedback") input');
 		await expect(box).not.toBeChecked();
+		// Disabled persists through the next settings flush: dismiss
+		// settings, then summon the list (its toggle persists the whole
+		// object).
+		await box.click();
+		await expect(box).toBeChecked();
 		await swipeX(page, 4, 144);
 		await swipeX(page, 4, 144);
 		await expect(page.locator("aside:has(button.new)")).not.toHaveClass(/collapsed/);
 		// The flush is async: the stored flag (not a reload — the seed
-		// script resets settings on load) proves the off state sticks.
+		// script resets settings on load) proves the disabled state sticks.
 		await expect
 			.poll(
 				async () =>
 					page.evaluate(() => window.localStorage.getItem("ccez-llm-settings-v1") ?? ""),
 				{ timeout: 5000 }
 			)
-			.toContain('"vibration":false');
+			.toContain('"hapticsDisabled":true');
 	});
 
 	test("settings button in the chats list opens settings", async ({ page }) => {
@@ -2008,6 +2122,10 @@ test.describe("message chrome", () => {
 		const top = await page.evaluate(() => {
 			const box = document.querySelector(".messages") as HTMLElement | null;
 			if (!box) return -1;
+			// Instant: the column eases programmatic jumps (smooth), so a
+			// bare assignment would still be animating at the read below
+			// (same guard the key-glide path uses).
+			box.style.scrollBehavior = "auto";
 			box.scrollTop = Math.max(0, box.scrollHeight - box.clientHeight - 600);
 			return box.scrollTop;
 		});
