@@ -176,5 +176,7 @@ describe("reply pill data", () => {
 		expect(switchToastFor(replyLanguageFor("cs")!)).toBe("Čeština 🇨🇿");
 		expect(switchToastFor(replyLanguageFor("ja")!)).toBe("日本語 🇯🇵");
 		expect(switchToastFor(replyLanguageFor("la")!)).toBe("Latina 🏛");
+		// Language names stay lowercase where the language does so.
+		expect(switchToastFor(replyLanguageFor("fr")!)).toBe("français 🇫🇷");
 	});
 });

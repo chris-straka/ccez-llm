@@ -2388,11 +2388,13 @@ export function selMenuPlacement(opts: {
 	rectLeft: number;
 	rectTop: number;
 	rectBottom: number;
+	/** Selection width (px): phones center the menu over the text. */
+	rectWidth: number;
 	viewportWidth: number;
 	viewportHeight: number;
 	androidUI: boolean;
 	iosUI: boolean;
-	/** Estimated menu width (px) for the right-edge clamp. */
+	/** Estimated menu width (px) for the centering/clamp. */
 	menuWidth: number;
 }): { x: number; y: number } {
 	const {
@@ -2401,17 +2403,20 @@ export function selMenuPlacement(opts: {
 		rectLeft,
 		rectTop,
 		rectBottom,
+		rectWidth,
 		viewportWidth,
 		viewportHeight,
 		androidUI,
 		iosUI,
 		menuWidth
 	} = opts;
+	// Phones center the menu over the selected text (a 2-button row
+	// left-anchored like desktop reads off-center); desktop keeps the
+	// cursor-anchored left edge. Either way clamped to the viewport.
 	const at = cursorX ?? rectLeft;
-	// The popup sits just below the cursor (never under it), still
-	// clamped to the viewport.
+	const phoneX = rectLeft + rectWidth / 2 - menuWidth / 2;
 	const x = Math.min(
-		Math.max(8, at - 16),
+		Math.max(8, androidUI && !iosUI ? phoneX : at - 16),
 		Math.max(8, viewportWidth - menuWidth - 8)
 	);
 	// Android: the OS text toolbar is suppressed (the app menu

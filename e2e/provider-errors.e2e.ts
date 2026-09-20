@@ -116,6 +116,58 @@ async function seedBlankKeyProvider(page: Page): Promise<void> {
 	});
 }
 
+test("switching to a keyless-less provider wipes the stranded draft", async ({
+	page
+}) => {
+	// Keyed Muse: type a draft, then switch to keyless-less DeepSeek in
+	// Settings — the lock wipes the dead text so the locked hint shows.
+	await seedChat(page, []);
+	await page.addInitScript(() => {
+		window.localStorage.removeItem("ccez-mock-provider");
+		const stored = window.localStorage.getItem("ccez-llm-settings-v1");
+		const parsed = stored
+			? (JSON.parse(stored) as Record<string, unknown>)
+			: {};
+		parsed["activeProviderId"] = "muse";
+		parsed["providers"] = {
+			...((parsed["providers"] as Record<string, unknown> | undefined) ?? {}),
+			muse: {
+				baseUrl: "https://api.example.com",
+				apiKey: "fake",
+				model: "m",
+				models: []
+			},
+			deepseek: {
+				baseUrl: "https://api.deepseek.com",
+				apiKey: "",
+				model: "deepseek-chat",
+				models: []
+			}
+		};
+		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify(parsed));
+	});
+	await page.goto("/");
+	const composer = page.locator(".ta-input").first();
+	await expect(composer).toBeVisible({ timeout: 60_000 });
+	await expect(composer).toBeEditable({ timeout: 10_000 });
+	await composer.click();
+	await page.keyboard.type("stranded draft");
+	await expect(composer).toHaveValue("stranded draft");
+	await page.keyboard.press("Meta+,");
+	await expect(page.locator(".settings-panel")).not.toHaveClass(/closed/);
+	await page
+		.locator('.settings-panel [role="radiogroup"][aria-label="Active provider"]')
+		.getByRole("radio", { name: "DeepSeek" })
+		.click();
+	// The pill switch locks and wipes: locked hint, empty field.
+	await expect(composer).toBeDisabled({ timeout: 10_000 });
+	await expect(composer).toHaveValue("");
+	await expect(composer).toHaveAttribute(
+		"placeholder",
+		"Set an API key in Settings to chat"
+	);
+});
+
 test("blank key locks the composer and explains on tap", async ({ page }) => {
 	await seedBlankKeyProvider(page);
 	await page.goto("/");

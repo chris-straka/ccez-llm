@@ -601,8 +601,11 @@
 	 */
 	$effect(() => {
 		if (!androidUI) return;
-		if (!missingKey && !noKeyLock) {
-			keyToastFor = null;
+		// Never from inside Settings: switching to a keyless-less
+		// provider mid-panel must not toast before the key can be
+		// entered — closing the panel still keyless reminds once.
+		if ((!missingKey && !noKeyLock) || settingsOpen) {
+			if (!missingKey && !noKeyLock) keyToastFor = null;
 			return;
 		}
 		const id = settings.activeProviderId;
@@ -1048,6 +1051,18 @@
 		const menu = selMenu;
 		const el = selMenuEl;
 		if (!menu || !el) return;
+		if (androidUI && !iosUI) {
+			// Phones ride the selection's middle by measured width (the
+			// placement estimate is deliberately wide), clamped on
+			// screen. Settled centers never re-trigger this.
+			const center = menu.left + menu.w / 2;
+			const x = Math.min(
+				Math.max(8, center - el.offsetWidth / 2),
+				Math.max(8, window.innerWidth - el.offsetWidth - 8)
+			);
+			if (x !== menu.x) selMenu = { ...menu, x };
+			return;
+		}
 		const over = menu.x + el.offsetWidth + 8 - window.innerWidth;
 		if (over > 0) selMenu = { ...menu, x: Math.max(8, menu.x - over) };
 	});
@@ -1848,7 +1863,7 @@
 	let stopDictation: (() => void) | null = null;
 	let openLangMenu: LanguageMenu["id"] | null = $state(null);
 	/* Phone sheet anchor: the open list escapes the thread scroller
-	(fixed, fitted to the space above the composer) because inside
+	(fixed, full column from screen top to composer) because inside
 	.messages anything past its box clips — Europe's 20-item list
 	read as five languages cut by a rectangle. Null on desktop,
 	which keeps the in-flow upward list. */
@@ -1870,14 +1885,16 @@
 		const r = btn.getBoundingClientRect();
 		const composerTop =
 			promptEl?.getBoundingClientRect().top ?? window.innerHeight;
+		// Full-column sheet: Europe/Asia never fit between their pill
+		// and the composer, so the panel spans screen top to composer
+		// instead — overlapping its own pills (tap-away still closes).
+		// Left edge stays pill-anchored, shifted to stay on-screen.
 		langMenuAnchor = {
-			top: Math.round(r.bottom + 6),
-			// Pill-anchored when it fits, shifted left to stay on-screen
-			// otherwise (right-edge menus).
+			top: 8,
 			left: Math.round(
 				Math.max(8, Math.min(r.left, window.innerWidth - 8 - 180))
 			),
-			maxH: Math.max(140, Math.round(composerTop - r.bottom - 14))
+			maxH: Math.max(140, Math.round(composerTop - 8 - 8))
 		};
 	}
 	$effect(() => {
@@ -3479,6 +3496,8 @@
 	}
 
 	const useMock = mockProviderEnabled();
+	/** Dev servers (and `tauri dev`) wear the red-dot tab logo. */
+	const devBuild = import.meta.env.DEV === true;
 	/**
 	 * No-key lock: a keyed provider with a blank stored key locks the
 	 * composer (no typing, locked hint) instead of accepting a draft
@@ -3494,11 +3513,18 @@
 			apiKey: settings.providers[settings.activeProviderId]?.apiKey ?? ""
 		})
 	);
+	let wasLocked = false;
 	$effect(() => {
 		editor?.setDisabled(noKeyLock);
+		// Locking wipes the live composer text (a provider switch must
+		// not strand a dead draft over the locked hint); unlocking
+		// restores the default hint. Nothing persists text drafts, so
+		// nothing needs saving here.
+		if (noKeyLock && !wasLocked) editor?.clear();
 		if (noKeyLock)
 			editor?.setPlaceholder("Set an API key in Settings to chat");
 		else editor?.setPlaceholder(promptPlaceholder());
+		wasLocked = noKeyLock;
 	});
 	const chat = $derived(activeChat(chatState));
 	/**
@@ -4511,6 +4537,7 @@
 			rectLeft: rect.left,
 			rectTop: rect.top,
 			rectBottom: rect.bottom,
+			rectWidth: rect.width,
 			viewportWidth: window.innerWidth,
 			viewportHeight: window.innerHeight,
 			androidUI,
@@ -7830,17 +7857,32 @@
 		openLangMenu = null;
 	}
 
-	/** Send-button hold (touch, empty composer): stash the reply
-	language and drop to default, or restore the stash — the emoji
-	vanishes and returns. Haptic ticks on every switch. */
+	/** Send-button hold (touch or desktop mouse, empty composer):
+	stash the reply language and drop to default, or restore the
+	stash — the emoji vanishes and returns. Haptic ticks on every
+	switch (phones); desktop toasts the swap like the menus do. */
 	const SEND_HOLD_MS = 500;
 	const replyLangStash = new SvelteMap<ChatId, string>();
+	/** Send-button box for the prompt-level hold zone below. */
+	let sendBtnEl: HTMLElement | null = $state(null);
+	/**
+	 * True when a point sits over the send button. The button is
+	 * absolutely positioned inside a display:contents span (no box of
+	 * its own) and disabled buttons eat their events — so holds arm
+	 * from the prompt's own handlers by geometry, never by bubbling.
+	 */
+	function overSendButton(x: number, y: number): boolean {
+		const r = sendBtnEl?.getBoundingClientRect();
+		return (
+			!!r && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom
+		);
+	}
 	let sendHoldTimer: ReturnType<typeof setTimeout> | null = null;
 
 	function sendHoldStart(): void {
 		// In-prompt note edits own the arrow (tap files, even empty):
 		// never arm a language swap underneath them.
-		if (!androidUI || sendHoldTimer !== null || promptAnnEdit) return;
+		if (sendHoldTimer !== null || promptAnnEdit) return;
 		if (
 			composerText() !== "" ||
 			attachments.length > 0 ||
@@ -8452,6 +8494,14 @@
 				settings.voiceLang = fallback;
 				persistSettings();
 			}
+		}
+		// Startup notification ask (the send gesture keeps its own):
+		// with the background ping on, ask on launch so a later
+		// backgrounded long reply may notify. No-op unless undecided.
+		if (settings.replyNotifications) {
+			void ensureReplyNotificationPermissionAsync({
+				shell: tauriBackendAvailable()
+			});
 		}
 		// Edge swipes toggle the sidebars on touch screens (Android
 		// milestone): rightward from the left edge for chats, leftward
@@ -11685,6 +11735,7 @@
 					rectLeft: rect.left,
 					rectTop: rect.top,
 					rectBottom: rect.bottom,
+					rectWidth: rect.width,
 					viewportWidth: window.innerWidth,
 					viewportHeight: window.innerHeight,
 					androidUI,
@@ -11755,6 +11806,12 @@
 
 <svelte:head>
 	<title>Ccez LLM</title>
+	{#if devBuild}
+		<!-- Dev builds wear the red-dot logo in the tab so they never
+			read as the release build (release keeps the yellow-dot
+			favicon.png from app.html). -->
+		<link rel="icon" type="image/svg+xml" href="/logo-dev.svg" />
+	{/if}
 </svelte:head>
 
 <div
@@ -12909,7 +12966,7 @@
 			{/if}
 		</div>
 
-		{#if (missingKey || noKeyLock) && !androidUI}
+		{#if (missingKey || (noKeyLock && !settingsOpen)) && !androidUI}
 			<p class="error-banner" role="alert">
 				Set an API key first —
 				<button
@@ -13054,6 +13111,28 @@
 			inert={previewing && viewChat.messages.length === 0}
 			bind:this={promptEl}
 			onclick={focusPromptFloor}
+			ontouchstart={(e) => {
+				// Hold zone for the send swap (see overSendButton):
+				// arms on press, cancels on lift or slide-away.
+				const t = e.changedTouches[0];
+				if (t && overSendButton(t.clientX, t.clientY)) sendHoldStart();
+			}}
+			ontouchend={sendHoldEnd}
+			ontouchmove={sendHoldEnd}
+			ontouchcancel={sendHoldEnd}
+			onmousedown={(e) => {
+				// Desktop mirrors the touch swap (primary button over
+				// send only); the post-swap click lands on an empty
+				// composer, so it stays silent like touch.
+				if (
+					!androidUI &&
+					e.button === 0 &&
+					overSendButton(e.clientX, e.clientY)
+				)
+					sendHoldStart();
+			}}
+			onmouseup={sendHoldEnd}
+			onmouseleave={sendHoldEnd}
 			ondragover={(e) => e.preventDefault()}
 			ondrop={(e) => {
 				e.preventDefault();
@@ -13337,14 +13416,9 @@
 					</button>
 				{/if}
 			</div>
-			<span
-				class="send-hold"
-				ontouchstart={sendHoldStart}
-				ontouchend={sendHoldEnd}
-				ontouchmove={sendHoldEnd}
-				ontouchcancel={sendHoldEnd}
-				><button
+			<span class="send-hold"><button
 					type="button"
+					bind:this={sendBtnEl}
 					class="send-btn"
 					class:wide={altHeld}
 					disabled={!canSubmit && !promptAnnEdit}
@@ -14339,6 +14413,15 @@
 	}
 	/* The current chat wears a marker bar, never a background — so the
 	hover wash reads on every row including the current one. */
+	/* Sidebar chrome is tappable, never selectable: long-presses on
+	chat titles, the + button, and the Settings button must never
+	raise a text selection (message text keeps its own). */
+	aside ul,
+	aside button.new,
+	aside button.side-settings {
+		user-select: none;
+		-webkit-user-select: none;
+	}
 	aside ul button.side-chat {
 		position: relative;
 		/* Same ButtonText trap as .sel-menu: pin the color explicitly. */
@@ -18710,6 +18793,10 @@
 	.send-btn:disabled {
 		opacity: 0.35;
 		cursor: not-allowed;
+		/* Hits fall through to the .send-hold span: disabled buttons
+		eat mouse/touch events, which would disarm the empty-composer
+		language hold (touch and desktop alike). */
+		pointer-events: none;
 	}
 	.send-btn.wide {
 		width: auto;

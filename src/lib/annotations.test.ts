@@ -446,7 +446,7 @@ describe("placeAnnPopX", () => {
 describe("selMenuPlacement", () => {
 	const viewportWidth = 1280;
 	const viewportHeight = 800;
-	const rect = { rectLeft: 500, rectTop: 300, rectBottom: 322 };
+	const rect = { rectLeft: 500, rectTop: 300, rectBottom: 322, rectWidth: 200 };
 
 	it("docks desktop above the finishing cursor", () => {
 		expect(
@@ -511,7 +511,9 @@ describe("selMenuPlacement", () => {
 		).toEqual({ x: 1152, y: 262 });
 	});
 
-	it("docks Android and iOS above the highlight, like desktop", () => {
+	it("centers the Android menu over the highlight, like desktop height", () => {
+		// Selection middle is 600; a 120-wide menu centers at 540 —
+		// never at the cursor-anchored 584, whatever the button count.
 		expect(
 			selMenuPlacement({
 				cursorX: 600,
@@ -523,7 +525,7 @@ describe("selMenuPlacement", () => {
 				iosUI: false,
 				menuWidth: 120
 			})
-		).toEqual({ x: 584, y: 253 });
+		).toEqual({ x: 540, y: 253 });
 		expect(
 			selMenuPlacement({
 				cursorX: 600,
@@ -546,13 +548,38 @@ describe("selMenuPlacement", () => {
 				rectLeft: 180,
 				rectTop: 20,
 				rectBottom: 42,
+				rectWidth: 120,
 				viewportWidth: 360,
 				viewportHeight: 740,
 				androidUI: true,
 				iosUI: false,
 				menuWidth: 220
 			})
-		).toEqual({ x: 132, y: 72 });
+		).toEqual({ x: 130, y: 72 });
+	});
+
+	it("keeps the phone menu centered for 2- and 3-button widths", () => {
+		// Same selection (middle 700): narrow and wide rows both ride
+		// its middle, so Annotate+Speak centers exactly like the
+		// Copy-armed row does.
+		const at = {
+			cursorX: undefined,
+			cursorY: undefined,
+			rectLeft: 500,
+			rectTop: 300,
+			rectBottom: 322,
+			rectWidth: 400,
+			viewportWidth,
+			viewportHeight,
+			androidUI: true,
+			iosUI: false
+		};
+		const narrow = selMenuPlacement({ ...at, menuWidth: 200 });
+		const wide = selMenuPlacement({ ...at, menuWidth: 320 });
+		expect(narrow).toEqual({ x: 600, y: 253 });
+		expect(wide).toEqual({ x: 540, y: 253 });
+		expect(narrow.x + 200 / 2).toBe(700);
+		expect(wide.x + 320 / 2).toBe(700);
 	});
 });
 

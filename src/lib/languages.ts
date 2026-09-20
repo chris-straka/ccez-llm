@@ -39,7 +39,7 @@ const LANG = (
 });
 
 export const EUROPEAN_LANGUAGES: ReplyLanguage[] = [
-	LANG("fr", "French", "fr-FR", "🇫🇷", "Français", "Effacé"),
+	LANG("fr", "French", "fr-FR", "🇫🇷", "français", "Effacé"),
 	LANG("de", "German", "de-DE", "🇩🇪", "Deutsch", "Gelöscht"),
 	LANG("es", "Spanish", "es-ES", "🇪🇸", "Español", "Borrado"),
 	LANG("pt", "Portuguese", "pt-PT", "🇵🇹", "Português", "Apagado"),

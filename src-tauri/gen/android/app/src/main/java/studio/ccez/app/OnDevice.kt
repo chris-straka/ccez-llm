@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import com.google.mlkit.genai.common.DownloadStatus
 import com.google.mlkit.genai.common.FeatureStatus
+import com.google.mlkit.genai.common.GenAiException
 import com.google.mlkit.genai.prompt.Generation
 import com.google.mlkit.genai.prompt.TextPart
 import com.google.mlkit.genai.prompt.generateContentRequest
@@ -31,13 +32,13 @@ import org.json.JSONObject
  * Both entries block the caller and return JSON strings (same trick as
  * `Tts.voices`, dodging JNI exception plumbing):
  * - [status] -> `{"state": <ready|downloading|unavailable|error>,
- *   "reason"?: <no-model|unsupported|failed>,
+ *   "reason"?: <no-model|unsupported|stale-aicore|failed>,
  *   "downloadedBytes"?: <bytes so far, downloading only>}`. DOWNLOADABLE reports
  *   unavailable/no-model AND starts the download in the background, so
  *   the next polls read downloading, then ready — "reconnect once,
  *   then it works offline".
  * - [generate] -> `{"text": ...}` or `{"reason": <no-model|
- *   downloading|unsupported|too-long|failed>}`. Reason codes stay
+ *   downloading|unsupported|stale-aicore|too-long|failed>}`. Reason codes stay
  *   inside the set the TS seam already maps to toast copy; a missing
  *   model errors, never reroutes to a cloud provider.
  *
@@ -151,6 +152,17 @@ object OnDevice {
         }
     }
 
+    /**
+     * 606 FEATURE_NOT_FOUND reads as `stale-aicore`: the installed
+     * AICore doesn't serve the requested feature (outdated configs or
+     * a lib/AICore mismatch) — a Play Store AI Core update or a
+     * restart resolves it, never a retry of the same call.
+     */
+    private fun failureReason(e: Exception): String {
+        return if (e is GenAiException && e.errorCode == 606) "stale-aicore"
+        else "failed"
+    }
+
     /** Readiness as JSON (blocks the caller briefly; never throws). */
     @JvmStatic
     fun status(): String {
@@ -170,7 +182,7 @@ object OnDevice {
                 }
             }
         } catch (e: Exception) {
-            json("error", "failed", detail = detailOf(e))
+            json("error", failureReason(e), detail = detailOf(e))
         }
     }
 
@@ -206,7 +218,7 @@ object OnDevice {
                 }
             }
         } catch (e: Exception) {
-            json("error", "failed", detail = detailOf(e))
+            json("error", failureReason(e), detail = detailOf(e))
         }
     }
 }

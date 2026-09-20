@@ -35,6 +35,10 @@ describe("on-device provider gate", () => {
 describe("onDeviceErrorCopy", () => {
 	const cases: Array<[unknown, string]> = [
 		[
+			"stale-aicore",
+			"On-device chat isn't ready. Update AI Core in the Play Store or restart this phone, then try again."
+		],
+		[
 			"no-model",
 			"On-device model isn't downloaded yet. Reconnect to download it once, then it works offline."
 		],

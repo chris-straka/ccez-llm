@@ -558,3 +558,38 @@ test("popup touches the badge and clear-all lives inside it", async ({
 	await page.locator(".review-tools button").click();
 	await expect(badge).toHaveCount(0);
 });
+
+/** Desktop send-hold mirrors the touch language swap: hold an empty
+composer's send to stash the pill, hold again to restore — each step
+toasts like the menus do. */
+test("desktop send-hold stashes and restores the reply language", async ({
+	page
+}) => {
+	await seedChat(page, []);
+	await page.goto("/");
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
+	// Pick French from the Europe menu (desktop list, in-flow).
+	await page.locator('.lang-menu button:has-text("Europe")').click();
+	await page.locator('.lang-list [role="menuitem"]', { hasText: "French" }).click();
+	await expect(page.locator(".toast").first()).toContainText("français 🇫🇷");
+	// Hold the empty send: pill stashes, toast names the cleared word.
+	const send = page.locator(".send-btn");
+	const box = await send.boundingBox();
+	if (!box) throw new Error("no send button box");
+	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+	await page.mouse.down();
+	await page.waitForTimeout(700);
+	await page.mouse.up();
+	await expect(page.locator(".toast").first()).toContainText("Effacé", {
+		timeout: 10_000
+	});
+	// Hold again: the stash restores with the switch toast.
+	await page.mouse.down();
+	await page.waitForTimeout(700);
+	await page.mouse.up();
+	await expect(page.locator(".toast").first()).toContainText("français 🇫🇷", {
+		timeout: 10_000
+	});
+});

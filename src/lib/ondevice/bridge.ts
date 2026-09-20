@@ -190,6 +190,8 @@ export function parseOnDeviceStatus(payload: unknown): OnDeviceStatus {
 export function onDeviceErrorCopy(reason: unknown): string {
 	const code = typeof reason === "string" ? reason : "";
 	switch (code) {
+		case "stale-aicore":
+			return "On-device chat isn't ready. Update AI Core in the Play Store or restart this phone, then try again.";
 		case "no-model":
 			return "On-device model isn't downloaded yet. Reconnect to download it once, then it works offline.";
 		case "downloading":
