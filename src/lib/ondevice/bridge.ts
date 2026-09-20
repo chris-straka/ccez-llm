@@ -73,6 +73,13 @@ export interface OnDeviceStatus {
 	 * note only, never a toast): "failed" alone says nothing.
 	 */
 	detail?: string;
+	/**
+	 * Winning config of the native probe walk (ready only):
+	 * "default" or a FULL/FAST x STABLE/PREVIEW fallback. The
+	 * settings note names non-default winners so a fallback config
+	 * never passes silently.
+	 */
+	variant?: string;
 }
 
 /**
@@ -178,6 +185,8 @@ export function parseOnDeviceStatus(payload: unknown): OnDeviceStatus {
 			out.reason = raw["reason"];
 		if (typeof raw["detail"] === "string" && raw["detail"].trim())
 			out.detail = raw["detail"].trim().slice(0, 200);
+		if (typeof raw["variant"] === "string" && raw["variant"])
+			out.variant = raw["variant"];
 		if (state === "error" && out.reason === undefined)
 			out.reason = "bad-status";
 		return out;

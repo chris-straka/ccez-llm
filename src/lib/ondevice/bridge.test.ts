@@ -137,6 +137,15 @@ describe("parseOnDeviceStatus", () => {
 		});
 	});
 
+	it("carries the probe walk's winning variant", () => {
+		expect(
+			parseOnDeviceStatus({ state: "ready", variant: "full-stable" })
+		).toEqual({ state: "ready", variant: "full-stable" });
+		expect(parseOnDeviceStatus({ state: "ready", variant: 7 })).toEqual({
+			state: "ready"
+		});
+	});
+
 	it("carries the native detail one-liner, capped", () => {
 		expect(
 			parseOnDeviceStatus({

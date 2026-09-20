@@ -214,9 +214,16 @@
 				return;
 			}
 			onDeviceReason = status.reason ?? null;
+			// A fallback config names itself so it never passes
+			// silently; the default needs no annotation.
+			const readyNote =
+				"On-device model ready — replies never leave this phone." +
+				(status.variant && status.variant !== "default"
+					? ` (${status.variant})`
+					: "");
 			onDeviceNote =
 				status.state === "ready"
-					? "On-device model ready — replies never leave this phone."
+					? readyNote
 					: status.state === "downloading"
 						? downloadNote(status)
 						: onDeviceErrorCopy(status.reason ?? "unsupported") +

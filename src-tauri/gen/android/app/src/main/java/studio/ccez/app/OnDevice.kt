@@ -8,6 +8,12 @@ import android.net.Uri
 import com.google.mlkit.genai.common.DownloadStatus
 import com.google.mlkit.genai.common.FeatureStatus
 import com.google.mlkit.genai.common.GenAiException
+import com.google.mlkit.genai.prompt.GenerationConfig
+import com.google.mlkit.genai.prompt.GenerativeModel
+import com.google.mlkit.genai.prompt.ModelConfig
+import com.google.mlkit.genai.prompt.ModelPreference
+import com.google.mlkit.genai.prompt.ModelReleaseStage
+import java.util.concurrent.Executors
 import com.google.mlkit.genai.prompt.Generation
 import com.google.mlkit.genai.prompt.TextPart
 import com.google.mlkit.genai.prompt.generateContentRequest
@@ -36,6 +42,7 @@ import org.json.JSONObject
  * `Tts.voices`, dodging JNI exception plumbing):
  * - [status] -> `{"state": <ready|downloading|unavailable|error>,
  *   "reason"?: <no-model|unsupported|stale-aicore|failed>,
+ *   "variant"?: <winning config name, ready only>,
  *   "downloadedBytes"?: <bytes so far, downloading only>}`. DOWNLOADABLE reports
  *   unavailable/no-model AND starts the download in the background, so
  *   the next polls read downloading, then ready — "reconnect once,
@@ -88,8 +95,65 @@ object OnDevice {
     /** Bytes downloaded so far (no API total exists); read by [status]. */
     private val downloadedBytes = AtomicLong(0)
 
-    /** AICore Prompt client; first use binds it (may throw: no AICore). */
-    private val client by lazy { Generation.getClient() }
+    /**
+     * Config variants, probed in order: null is the library default
+     * (requests AICore feature 636); the explicit ModelConfigs request
+     * sibling features for the same Nano model (FULL/FAST x
+     * STABLE/PREVIEW). AICore names features per config, and ships
+     * different subsets per device — so the probe walks the list and
+     * pins the first config AICore answers for. [status] owns
+     * discovery; [generate] reuses the winner.
+     */
+    private data class ConfigVariant(val name: String, val config: ModelConfig?)
+
+    private fun modelConfig(preference: Int, stage: Int): ModelConfig {
+        return ModelConfig.builder().apply {
+            setPreference(preference)
+            setReleaseStage(stage)
+        }.build()
+    }
+
+    private val configVariants = listOf(
+        ConfigVariant("default", null),
+        ConfigVariant(
+            "full-stable",
+            modelConfig(ModelPreference.FULL, ModelReleaseStage.STABLE),
+        ),
+        ConfigVariant(
+            "full-preview",
+            modelConfig(ModelPreference.FULL, ModelReleaseStage.PREVIEW),
+        ),
+        ConfigVariant(
+            "fast-stable",
+            modelConfig(ModelPreference.FAST, ModelReleaseStage.STABLE),
+        ),
+        ConfigVariant(
+            "fast-preview",
+            modelConfig(ModelPreference.FAST, ModelReleaseStage.PREVIEW),
+        ),
+    )
+
+    private val variantExecutor = Executors.newSingleThreadExecutor()
+
+    /** Winner of the last probe walk (default until one answers). */
+    @Volatile
+    private var activeVariant: ConfigVariant = configVariants[0]
+
+    private val clients = mutableMapOf<String, GenerativeModel>()
+
+    /** AICore Prompt client for a variant; first use binds it. */
+    @Synchronized
+    private fun clientFor(variant: ConfigVariant): GenerativeModel {
+        return clients.getOrPut(variant.name) {
+            if (variant.config == null) Generation.getClient()
+            else Generation.getClient(
+                GenerationConfig.Builder().apply {
+                    setModelConfig(variant.config)
+                    setWorkerExecutor(variantExecutor)
+                }.build(),
+            )
+        }
+    }
 
     /** Prompt input cap: the API takes 4000 tokens (~3000 English
      * words); 12000 chars is the conservative truncation guard. */
@@ -124,11 +188,13 @@ object OnDevice {
         reason: String?,
         downloaded: Long? = null,
         detail: String? = null,
+        variant: String? = null,
     ): String {
         val o = JSONObject().put("state", state)
         if (reason != null) o.put("reason", reason)
         if (detail != null) o.put("detail", detail)
         if (downloaded != null) o.put("downloadedBytes", downloaded)
+        if (variant != null) o.put("variant", variant)
         return o.toString()
     }
 
@@ -141,6 +207,7 @@ object OnDevice {
      */
     private fun kickDownloadOnce() {
         if (!downloadWatch.compareAndSet(false, true)) return
+        val client = clientFor(activeVariant)
         scope.launch {
             try {
                 client.download().collect { status ->
@@ -169,22 +236,60 @@ object OnDevice {
         else "failed"
     }
 
-    /** Readiness as JSON (blocks the caller briefly; never throws). */
+    /**
+     * Readiness as JSON (blocks the caller briefly; never throws).
+     * Walks the config variants in order and pins the first one
+     * AICore answers for: a 606 (feature unknown to this AICore)
+     * moves to the next config, as does a known-but-unsupported
+     * verdict. Anything else aborts with the real error. All-606
+     * reads stale-aicore; any known unsupported reads unsupported.
+     * The winning variant name rides the ready payload so the
+     * settings note can say which config answered.
+     */
     @JvmStatic
     fun status(): String {
         return try {
             runBlocking {
                 withTimeout(STATUS_TIMEOUT_MS) {
-                    when (client.checkStatus()) {
-                        FeatureStatus.AVAILABLE -> json("ready", null)
-                        FeatureStatus.DOWNLOADING ->
-                            json("downloading", null, downloadedBytes.get())
-                        FeatureStatus.DOWNLOADABLE -> {
-                            kickDownloadOnce()
-                            json("unavailable", "no-model")
+                    var sawUnsupported = false
+                    walk@ for (variant in configVariants) {
+                        val code = try {
+                            clientFor(variant).checkStatus()
+                        } catch (e: Exception) {
+                            if (e is GenAiException && e.errorCode == 606) continue@walk
+                            return@withTimeout json(
+                                "error",
+                                failureReason(e),
+                                detail = detailOf(e),
+                            )
                         }
-                        else -> json("unavailable", "unsupported")
+                        when (code) {
+                            FeatureStatus.AVAILABLE -> {
+                                activeVariant = variant
+                                return@withTimeout json(
+                                    "ready",
+                                    null,
+                                    variant = variant.name,
+                                )
+                            }
+                            FeatureStatus.DOWNLOADING -> {
+                                activeVariant = variant
+                                return@withTimeout json(
+                                    "downloading",
+                                    null,
+                                    downloadedBytes.get(),
+                                )
+                            }
+                            FeatureStatus.DOWNLOADABLE -> {
+                                activeVariant = variant
+                                kickDownloadOnce()
+                                return@withTimeout json("unavailable", "no-model")
+                            }
+                            else -> sawUnsupported = true
+                        }
                     }
+                    if (sawUnsupported) json("unavailable", "unsupported")
+                    else json("error", "stale-aicore")
                 }
             }
         } catch (e: Exception) {
@@ -192,12 +297,17 @@ object OnDevice {
         }
     }
 
-    /** One completion as JSON (blocks the caller; never throws). */
+    /**
+     * One completion as JSON (blocks the caller; never throws).
+     * Runs on the probe walk's winner — [status] owns discovery, so a
+     * send never re-walks.
+     */
     @JvmStatic
     fun generate(prompt: String, maxTokens: Int): String {
         if (prompt.isBlank()) return json("error", "failed")
         if (prompt.length > MAX_PROMPT_CHARS) return json("error", "too-long")
         val cap = maxTokens.coerceIn(1, 4096)
+        val client = clientFor(activeVariant)
         return try {
             runBlocking {
                 withTimeout(GENERATE_TIMEOUT_MS) {
