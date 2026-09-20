@@ -248,8 +248,12 @@ export function waveformBars(level: number, bars: number): number[] {
  * Must fit int32 for the native side.
  */
 export const REPLY_NOTIFICATION_ID = 4201;
-/** Stale pings clear themselves after ten minutes. */
-export const REPLY_NOTIFICATION_TIMEOUT_MS = 10 * 60_000;
+/**
+ * Pings clear themselves after five seconds (out of the shade, not
+ * just silent). Best-effort while backgrounded: a suspended WebView
+ * runs the timer late, never early.
+ */
+export const REPLY_NOTIFICATION_TIMEOUT_MS = 5_000;
 
 export interface ReplyDoneGate {
 	hidden: boolean;
@@ -363,7 +367,13 @@ export function notifyReplyDone(
 		return false;
 	}
 	try {
-		new ctor(title, { body: body.slice(0, 160) });
+		const note = new ctor(title, { body: body.slice(0, 160) }) as {
+			close?: unknown;
+		};
+		if (note && typeof note.close === "function") {
+			const dismiss = (note.close as () => void).bind(note);
+			setTimeout(dismiss, REPLY_NOTIFICATION_TIMEOUT_MS);
+		}
 		return true;
 	} catch {
 		return false;

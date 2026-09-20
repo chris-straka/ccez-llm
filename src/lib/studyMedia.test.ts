@@ -24,7 +24,8 @@ import {
 	vibrateTick,
 	wakeLockSupported,
 	waveformBars,
-	REPLY_NOTIFICATION_ID
+	REPLY_NOTIFICATION_ID,
+	REPLY_NOTIFICATION_TIMEOUT_MS
 } from "./studyMedia";
 
 describe("wake lock", () => {
@@ -252,6 +253,38 @@ describe("notification wrappers", () => {
 				hidden: true
 			})
 		).toBe(false);
+	});
+
+	it("closes the web ping after five seconds", () => {
+		expect(REPLY_NOTIFICATION_TIMEOUT_MS).toBe(5_000);
+		vi.useFakeTimers();
+		try {
+			const close = vi.fn();
+			class StubNotif {
+				static permission = "granted";
+				title: string;
+				options?: { body?: string };
+				constructor(title: string, options?: { body?: string }) {
+					this.title = title;
+					this.options = options;
+				}
+				close(): void {
+					close();
+				}
+			}
+			const ctor = StubNotif;
+			expect(
+				notifyReplyDone("Reply finished", "hello", {
+					notif: ctor,
+					hidden: true
+				})
+			).toBe(true);
+			expect(close).not.toHaveBeenCalled();
+			vi.advanceTimersByTime(REPLY_NOTIFICATION_TIMEOUT_MS);
+			expect(close).toHaveBeenCalledTimes(1);
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 });
 
