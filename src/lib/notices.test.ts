@@ -6,7 +6,9 @@ import {
 	clearNotice,
 	flashNotice,
 	TOAST_TIMEOUT_MS,
-	ERROR_TOAST_TIMEOUT_MS
+	ERROR_TOAST_TIMEOUT_MS,
+	toastTimeoutFor,
+	errorToastTimeoutFor
 } from "./notices";
 
 describe("notice queue", () => {
@@ -65,6 +67,19 @@ describe("notice queue", () => {
 	it("plain toasts clear fast while error toasts hold the long delay", () => {
 		expect(TOAST_TIMEOUT_MS).toBe(2500);
 		expect(ERROR_TOAST_TIMEOUT_MS).toBe(8000);
+	});
+
+	it("toast delays scale with message length (reading time), capped", () => {
+		// Empty messages sit at the base delay; short ticks barely above.
+		expect(toastTimeoutFor("")).toBe(2500);
+		expect(errorToastTimeoutFor("")).toBe(8000);
+		expect(toastTimeoutFor("Copied")).toBe(2500 + 6 * 40);
+		// Long failure notices hold: ~40ms/char over base.
+		expect(toastTimeoutFor("x".repeat(100))).toBe(2500 + 4000);
+		expect(errorToastTimeoutFor("x".repeat(100))).toBe(8000 + 4000);
+		// Paragraphs never linger past the cap.
+		expect(toastTimeoutFor("x".repeat(1000))).toBe(9000);
+		expect(errorToastTimeoutFor("x".repeat(1000))).toBe(15000);
 	});
 
 	it("re-flashing disarms the older timer without clearTimeout", () => {

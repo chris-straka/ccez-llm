@@ -132,8 +132,8 @@
 		emptyNotices,
 		flashNotice,
 		showNotice,
-		TOAST_TIMEOUT_MS,
-		ERROR_TOAST_TIMEOUT_MS,
+		toastTimeoutFor,
+		errorToastTimeoutFor,
 		VOICE_TIMEOUT_MS
 	} from "$lib/notices";
 	import {
@@ -1289,7 +1289,7 @@
 	stale action. */
 	let toastAction: { seq: number; run: () => void } | null = null;
 	function flashToast(message: string, action?: () => void): void {
-		flashNotice(notices, "toast", message, TOAST_TIMEOUT_MS);
+		flashNotice(notices, "toast", message, toastTimeoutFor(message));
 		toastAction = action ? { seq: notices.toast.seq, run: action } : null;
 	}
 	function dismissToast(): void {
@@ -1310,7 +1310,12 @@
 	/** Transient top error toast: action failures (send errors, export,
 	attach, mic) render in the red pairing, themed both ways. */
 	function flashErrorToast(message: string): void {
-		flashNotice(notices, "errorToast", message, ERROR_TOAST_TIMEOUT_MS);
+		flashNotice(
+			notices,
+			"errorToast",
+			message,
+			errorToastTimeoutFor(message)
+		);
 	}
 	function dismissErrorToast(): void {
 		clearNotice(notices, "errorToast");

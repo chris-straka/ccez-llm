@@ -310,11 +310,15 @@ jobs:
           files: release-assets/*
       # Updater manifest: `tauri build` writes no latest.json of its own
       # (the old tauri-action generated it), so the tail synthesizes one
-      # here from the renamed bundles plus the draft's asset IDs — the same
-      # shape tauri-action produced (base keys plus -app/-nsis/-appimage/
-      # -deb variants, api.github.com asset URLs, the .sig file contents
-      # as signatures). Runs after the single upload above, so every asset
-      # ID exists; fails loud on any missing bundle, signature, or asset.
+      # here from the renamed bundles — the same shape tauri-action
+      # produced (base keys plus -app/-nsis/-appimage/-deb variants, the
+      # .sig file contents as signatures), except URLs are public
+      # releases/download links, not api.github.com asset URLs: current
+      # `gh` reports GraphQL node IDs (RA_...) as asset `id`, and the
+      # REST asset endpoint 404s on those (every v0.4.16 auto-update
+      # failed downloading). Runs after the single upload above, so
+      # every bundle exists; fails loud on any missing bundle or
+      # signature.
       - name: Build and attach updater manifest (manifest)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -333,7 +337,7 @@ jobs:
               capture_output=True, text=True, check=True,
           )
           by_name = {a["name"]: a["id"] for a in json.loads(out.stdout)}
-          base = f"https://api.github.com/repos/{repo}/releases/assets"
+          dl = f"https://github.com/{repo}/releases/download/{ref}"
 
           def sig_text(clean):
               with open(os.path.join(dest_dir, clean + ".sig")) as f:
@@ -359,7 +363,7 @@ jobs:
               except FileNotFoundError:
                   print(f"ERROR: {bundle}.sig missing from {dest_dir}", flush=True)
                   sys.exit(1)
-              entry = {"signature": signature, "url": f"{base}/{by_name[bundle]}"}
+              entry = {"signature": signature, "url": f"{dl}/{bundle}"}
               for key in keys:
                   platforms[key] = entry
           manifest = {
