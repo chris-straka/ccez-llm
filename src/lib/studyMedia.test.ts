@@ -5,6 +5,7 @@ import {
 	createVadState,
 	DEFAULT_VAD_OPTIONS,
 	dictationCaptureMode,
+	dismissReplyNotificationAsync,
 	ensureReplyNotificationPermission,
 	ensureReplyNotificationPermissionAsync,
 	hapticBeat,
@@ -23,7 +24,7 @@ import {
 	vibrateTick,
 	wakeLockSupported,
 	waveformBars,
-	LONG_REPLY_MIN_CHARS
+	REPLY_NOTIFICATION_ID
 } from "./studyMedia";
 
 describe("wake lock", () => {
@@ -148,57 +149,46 @@ describe("waveformBars", () => {
 });
 
 describe("shouldNotifyReplyDone", () => {
-	const long = "x".repeat(LONG_REPLY_MIN_CHARS);
-	it("fires for long backgrounded granted replies", () => {
+	it("fires for backgrounded granted replies of any length", () => {
+		// A backgrounded user is waiting on the reply, short or long:
+		// the old 240-char floor swallowed exactly the pings people
+		// switch apps to wait for.
 		expect(
 			shouldNotifyReplyDone({
 				hidden: true,
 				focused: false,
-				permission: "granted",
-				replyChars: long.length
+				permission: "granted"
 			})
 		).toBe(true);
 		expect(
 			shouldNotifyReplyDone({
 				hidden: false,
 				focused: false,
-				permission: "granted",
-				replyChars: long.length
+				permission: "granted"
 			})
 		).toBe(true);
 	});
 
-	it("stays silent when focused, short, or unpermitted", () => {
+	it("stays silent when focused or unpermitted", () => {
 		expect(
 			shouldNotifyReplyDone({
 				hidden: false,
 				focused: true,
-				permission: "granted",
-				replyChars: long.length
+				permission: "granted"
 			})
 		).toBe(false);
 		expect(
 			shouldNotifyReplyDone({
 				hidden: true,
 				focused: false,
-				permission: "granted",
-				replyChars: 10
+				permission: "default"
 			})
 		).toBe(false);
 		expect(
 			shouldNotifyReplyDone({
 				hidden: true,
 				focused: false,
-				permission: "default",
-				replyChars: long.length
-			})
-		).toBe(false);
-		expect(
-			shouldNotifyReplyDone({
-				hidden: true,
-				focused: false,
-				permission: "denied",
-				replyChars: long.length
+				permission: "denied"
 			})
 		).toBe(false);
 	});
@@ -231,7 +221,7 @@ describe("notification wrappers", () => {
 
 	it("notifies only through the gate, never throws", () => {
 		const ctor = notifCtor("granted");
-		const body = "y".repeat(LONG_REPLY_MIN_CHARS);
+		const body = "a backgrounded reply of any length";
 		expect(
 			notifyReplyDone("Reply finished", body, { notif: ctor, hidden: true })
 		).toBe(true);
@@ -244,9 +234,9 @@ describe("notification wrappers", () => {
 				focused: true
 			})
 		).toBe(false);
-		// Short: silent.
+		// Empty: silent.
 		expect(
-			notifyReplyDone("Reply finished", "short", { notif: ctor, hidden: true })
+			notifyReplyDone("Reply finished", "   ", { notif: ctor, hidden: true })
 		).toBe(false);
 		// Unpermitted: silent.
 		expect(
@@ -392,13 +382,14 @@ describe("hapticBeat", () => {
 });
 
 describe("shell-aware notifications", () => {
-	const long = "z".repeat(LONG_REPLY_MIN_CHARS);
+	const long = "a backgrounded reply";
 
 	function plugin(granted: boolean) {
 		return {
 			isPermissionGranted: vi.fn(async () => granted),
 			requestPermission: vi.fn(async () => "granted"),
-			sendNotification: vi.fn()
+			sendNotification: vi.fn(),
+			cancel: vi.fn(async () => {})
 		};
 	}
 
@@ -442,14 +433,19 @@ describe("shell-aware notifications", () => {
 			})
 		).toBe(false);
 		expect(p.sendNotification).not.toHaveBeenCalled();
-		// Short: silent.
+		// Short backgrounded replies ping too (no length floor).
 		expect(
 			await notifyReplyDoneAsync("Reply finished", "short", {
 				shell: true,
 				plugin: p,
 				hidden: true
 			})
-		).toBe(false);
+		).toBe(true);
+		// The ping carries the fixed id with autoCancel, so finishes
+		// replace each other instead of stacking in the shade.
+		expect(p.sendNotification).toHaveBeenCalledWith(
+			expect.objectContaining({ id: REPLY_NOTIFICATION_ID, autoCancel: true })
+		);
 		// Ungranted shell without a web ctor: silent.
 		const denied = plugin(false);
 		denied.requestPermission = vi.fn(async () => "denied");
@@ -461,5 +457,24 @@ describe("shell-aware notifications", () => {
 				hidden: true
 			})
 		).toBe(false);
+	});
+
+	it("dismisses the ping by id, never throws", async () => {
+		const p = plugin(true);
+		await dismissReplyNotificationAsync({ plugin: p });
+		expect(p.cancel).toHaveBeenCalledWith([REPLY_NOTIFICATION_ID]);
+		// No plugin, no cancel fn, throwing cancel: all silent.
+		await dismissReplyNotificationAsync({ plugin: null });
+		await dismissReplyNotificationAsync({});
+		await dismissReplyNotificationAsync({
+			plugin: {
+				isPermissionGranted: async () => true,
+				requestPermission: async () => "pending",
+				sendNotification: () => {},
+				cancel: async () => {
+					throw new Error("gone");
+				}
+			}
+		});
 	});
 });

@@ -410,6 +410,7 @@
 	import {
 		acquireStudyWakeLock,
 		clearStudyBadge,
+		dismissReplyNotificationAsync,
 		ensureReplyNotificationPermissionAsync,
 		hapticBeatAsync,
 		notifyReplyDoneAsync,
@@ -1077,14 +1078,53 @@
 		const stampPress = (): void => {
 			lastPressAt = Date.now();
 		};
+		// Foreground return: the user sees the finished reply, so its
+		// ping and badge stand down instead of lingering in the shade.
+		const onVisible = (): void => {
+			if (document.visibilityState !== "visible") return;
+			clearStudyBadge();
+			void dismissReplyNotificationAsync({
+				shell: tauriBackendAvailable()
+			});
+		};
 		window.addEventListener("pointerdown", stampPress, { passive: true });
 		window.addEventListener("keydown", stampPress);
+		document.addEventListener("visibilitychange", onVisible);
 		return () => {
 			window.removeEventListener("pointerdown", stampPress);
 			window.removeEventListener("keydown", stampPress);
+			document.removeEventListener("visibilitychange", onVisible);
 		};
 	});
 	let menuBtnTouchStart: { x: number; y: number } | null = null;
+	/** Selection-menu drag: touch anchor plus the menu spot it
+	started from; a drag past the tap slop moves the menu instead of
+	tapping (the button drift guard below eats the post-drag tap). */
+	let selMenuDrag: { mx: number; my: number; x0: number; y0: number } | null =
+		null;
+	let menuDragSuppressAt = 0;
+	function menuDragStart(event: TouchEvent): void {
+		const t = event.changedTouches[0];
+		if (!t || !selMenu) return;
+		selMenuDrag = { mx: t.clientX, my: t.clientY, x0: selMenu.x, y0: selMenu.y };
+	}
+	function menuDragMove(event: TouchEvent): void {
+		const drag = selMenuDrag;
+		const t = event.changedTouches[0];
+		if (!drag || !t || !selMenu) return;
+		const dx = t.clientX - drag.mx;
+		const dy = t.clientY - drag.my;
+		if (Math.hypot(dx, dy) <= 12) return;
+		menuDragSuppressAt = Date.now();
+		selMenu = {
+			...selMenu,
+			x: Math.min(Math.max(8, drag.x0 + dx), window.innerWidth - 8),
+			y: Math.min(Math.max(8, drag.y0 + dy), window.innerHeight - 8)
+		};
+	}
+	function menuDragEnd(): void {
+		selMenuDrag = null;
+	}
 	function noteMenuBtnTouch(event: TouchEvent): void {
 		const t = event.changedTouches[0];
 		menuBtnTouchStart = t ? { x: t.clientX, y: t.clientY } : null;
@@ -1098,6 +1138,9 @@
 	 * compat mouse sequence. Mouse and keyboard keep onclick.
 	 */
 	function menuBtnTouch(event: TouchEvent, run: () => void): void {
+		// A menu drag just ended here: the button's own drift guard
+		// already ate the tap, and this eats any synthesized sequel.
+		if (Date.now() - menuDragSuppressAt < 750) return;
 		const t = event.changedTouches[0];
 		const start = menuBtnTouchStart;
 		menuBtnTouchStart = null;
@@ -5946,10 +5989,10 @@
 	}
 
 	/**
-	 * Backgrounded long-reply ping (study sessions): when a reply
+	 * Backgrounded reply ping (study sessions): when a reply
 	 * finishes while the window is hidden/backgrounded, a
 	 * permission-gated notification + badge carries its head. Silent
-	 * when focused, silent for short replies and failures.
+	 * when focused, silent for failures.
 	 */
 	function maybeNotifyReplyDone(msg: ChatMsg | undefined): void {
 		if (!settings.replyNotifications) return;
@@ -7280,7 +7323,9 @@
 	let sendHoldTimer: ReturnType<typeof setTimeout> | null = null;
 
 	function sendHoldStart(): void {
-		if (!androidUI || sendHoldTimer !== null) return;
+		// In-prompt note edits own the arrow (tap files, even empty):
+		// never arm a language swap underneath them.
+		if (!androidUI || sendHoldTimer !== null || promptAnnEdit) return;
 		if (
 			composerText() !== "" ||
 			attachments.length > 0 ||
@@ -11560,7 +11605,10 @@
 						aria-label="Jump to a message"
 						aria-haspopup="true"
 						aria-expanded={wpOpen}
-						onclick={() => (wpOpen = !wpOpen)}
+						onclick={() => {
+							wpOpen = !wpOpen;
+							buzzTap();
+						}}
 					>
 						{#each points as index (index)}
 							<span class="wp-tick" aria-hidden="true"></span>
@@ -11605,6 +11653,7 @@
 								onclick={(e) => {
 									jumpTo(index);
 									wpOpen = false;
+									buzzTap();
 									// Mouse jumps release focus so hover-outside can
 									// close: focus pinned on the item would hold the
 									// menu open under a stationary pointer. Keyboard
@@ -12472,16 +12521,15 @@
 		>
 			<div class="prompt-tools">
 				{#if androidUI && selMenu && !previewing}
-					<!-- Phone Inspect dock: single Han characters keep
-					Inspect in the composer (Copy, Annotate, and Speak
-					float in the selection menu). iOS keeps Annotate
-					docked instead of floating: Apple's callout can't be
-					suppressed, so a floating menu would double it. Same
-					handlers and the same click-away exemption in
-					onMouseUp, or the tap collapses the highlight and
-					clears the menu before onclick fires. The wrapper
-					overlays the whole card (see CSS) without resizing
-					anything. -->
+					<!-- Phone action dock: Annotate, Speak, and Inspect
+					redundant with the floating selection menu (Copy stays
+					menu-only). iOS keeps Annotate docked instead of
+					floating: Apple's callout can't be suppressed, so a
+					floating menu would double it. Same handlers and the
+					same click-away exemption in onMouseUp, or the tap
+					collapses the highlight and clears the menu before
+					onclick fires. The wrapper overlays the whole card
+					(see CSS) without resizing anything. -->
 					{#if iosUI}
 						<div class="ann-dock-wrap">
 							<button
@@ -12495,18 +12543,45 @@
 								onclick={annotate}>Annotate</button
 							>
 						</div>
-					{:else if shouldShowInspect(selMenu.quote, settings.inspectEnabled)}
+					{:else}
+						<!-- Phone action dock: Annotate, Speak, and (for a
+						single Han character with the setting on) Inspect —
+						redundant with the floating selection menu, which a
+						thumb can drag out of reach. Same handlers and the
+						same click-away exemption; Copy stays menu-only. -->
 						<div class="ann-dock-wrap">
 							<button
 								type="button"
 								class="ann-dock"
-								aria-label="Inspect character"
+								aria-label="Annotate selection"
 								transition:fade={{ duration: 150 }}
 								onmousedown={noteMenuPress}
 								ontouchstart={noteMenuBtnTouch}
-								ontouchend={inspectTouch}
-								onclick={openInspect}>Inspect</button
+								ontouchend={annotateTouch}
+								onclick={annotate}>Annotate</button
 							>
+							<button
+								type="button"
+								class="ann-dock"
+								aria-label="Speak selection"
+								transition:fade={{ duration: 150 }}
+								onmousedown={noteMenuPress}
+								ontouchstart={noteMenuBtnTouch}
+								ontouchend={speakTouch}
+								onclick={speakSelection}>Speak</button
+							>
+							{#if shouldShowInspect(selMenu.quote, settings.inspectEnabled)}
+								<button
+									type="button"
+									class="ann-dock"
+									aria-label="Inspect character"
+									transition:fade={{ duration: 150 }}
+									onmousedown={noteMenuPress}
+									ontouchstart={noteMenuBtnTouch}
+									ontouchend={inspectTouch}
+									onclick={openInspect}>Inspect</button
+								>
+							{/if}
 						</div>
 					{/if}
 				{/if}
@@ -12709,7 +12784,10 @@
 						aria-label="Jump to a message"
 						aria-haspopup="true"
 						aria-expanded={wpOpen}
-						onclick={() => (wpOpen = !wpOpen)}
+						onclick={() => {
+							wpOpen = !wpOpen;
+							buzzTap();
+						}}
 					>
 						<ActionIcon kind="jump" />
 					</button>
@@ -12725,7 +12803,7 @@
 					type="button"
 					class="send-btn"
 					class:wide={altHeld}
-					disabled={!canSubmit}
+					disabled={!canSubmit && !promptAnnEdit}
 					title={altHeld
 						? androidUI
 							? "Stage"
@@ -12781,7 +12859,13 @@
 			tabindex="-1"
 			transition:fade={{ duration: 150 }}
 			onmousedown={noteMenuPress}
-			ontouchstart={noteMenuPress}
+			ontouchstart={(e) => {
+				noteMenuPress();
+				menuDragStart(e);
+			}}
+			ontouchmove={menuDragMove}
+			ontouchend={menuDragEnd}
+			ontouchcancel={menuDragEnd}
 			onmouseenter={enterSelMenu}
 			onmouseleave={() => (selMenuHover = false)}
 		>
@@ -12813,6 +12897,16 @@
 					ontouchstart={noteMenuBtnTouch}
 					ontouchend={speakTouch}>Speak</button
 				>
+				{#if shouldShowInspect(selMenu.quote, settings.inspectEnabled)}
+					<button
+						type="button"
+						aria-label="Inspect character"
+						onmousedown={noteMenuPress}
+						onclick={openInspect}
+						ontouchstart={noteMenuBtnTouch}
+						ontouchend={inspectTouch}>Inspect</button
+					>
+				{/if}
 			{:else}
 				<!-- Desktop: Annotate floats above the highlight while
 				the OS bubble keeps its own slot. Copy and Read Aloud
@@ -15675,11 +15769,14 @@
 		padding: 0;
 	}
 	article.assistant {
-		align-self: center;
+		/* Left-docked, never centered: shrink-wrapped short replies
+		start at the left edge like full paragraphs do (a centered
+		stub reads as a status line, not a message). Assistant text
+		packs tight: the list gap already separates messages, so no
+		vertical padding here (desktop and touch). */
+		align-self: flex-start;
 		padding-left: 0;
 		padding-right: 0;
-		/* Assistant text packs tight: the list gap already separates
-		messages, so no vertical padding here (desktop and touch). */
 		padding-top: 0;
 		padding-bottom: 0;
 	}
@@ -16570,6 +16667,10 @@
 	on white: blur + shadow alone read as a smudge over text. */
 	.sel-menu {
 		position: fixed;
+		/* Tap-and-drag moves the menu: no browser gesture may own
+		the stroke (taps still fire; the drift guard eats post-drag
+		button taps). */
+		touch-action: none;
 		z-index: 50;
 		display: flex;
 		align-items: stretch;

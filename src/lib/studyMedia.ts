@@ -241,26 +241,31 @@ export function waveformBars(level: number, bars: number): number[] {
 	return out;
 }
 
-/** Replies at/above this length ping when they finish backgrounded. */
-export const LONG_REPLY_MIN_CHARS = 240;
+/**
+ * Fixed notification id for the reply ping: every finished reply
+ * replaces the previous one instead of stacking in the shade, and
+ * the same id lets a timer (or a foreground return) dismiss it.
+ * Must fit int32 for the native side.
+ */
+export const REPLY_NOTIFICATION_ID = 4201;
+/** Stale pings clear themselves after ten minutes. */
+export const REPLY_NOTIFICATION_TIMEOUT_MS = 10 * 60_000;
 
 export interface ReplyDoneGate {
 	hidden: boolean;
 	focused: boolean;
 	permission: string;
-	replyChars: number;
-	minChars?: number;
 }
 
 /**
- * Whether a finished reply earns a notification: permission granted,
- * window backgrounded (hidden or unfocused), and the reply long
- * enough to have kept the user waiting. Pure and unit-tested.
+ * Whether a finished reply earns a notification: permission granted
+ * and the window backgrounded (hidden or unfocused). Any non-empty
+ * reply pings — a backgrounded user is waiting on it, short or long.
+ * Pure and unit-tested.
  */
 export function shouldNotifyReplyDone(gate: ReplyDoneGate): boolean {
 	if (gate.permission !== "granted") return false;
-	if (!(gate.hidden || !gate.focused)) return false;
-	return gate.replyChars >= (gate.minChars ?? LONG_REPLY_MIN_CHARS);
+	return gate.hidden || !gate.focused;
 }
 
 function documentHiddenNow(): boolean {
@@ -339,8 +344,8 @@ export async function ensureReplyNotificationPermission(
 }
 
 /**
- * Ping for a finished long reply while backgrounded. Silent (false)
- * when focused, short, unpermitted, or unsupported. Never throws.
+ * Ping for a finished reply while backgrounded. Silent (false) when
+ * focused, empty, unpermitted, or unsupported. Never throws.
  */
 export function notifyReplyDone(
 	title: string,
@@ -350,17 +355,11 @@ export function notifyReplyDone(
 	const source = input?.notif ?? globalOf("Notification");
 	const ctor = notificationCtor(source);
 	if (!ctor) return false;
+	if (!body.trim()) return false;
 	const permission = replyNotificationPermission(source);
 	const hidden = input?.hidden ?? documentHiddenNow();
 	const focused = input?.focused ?? windowFocusedNow();
-	if (
-		!shouldNotifyReplyDone({
-			hidden,
-			focused,
-			permission,
-			replyChars: body.length
-		})
-	) {
+	if (!shouldNotifyReplyDone({ hidden, focused, permission })) {
 		return false;
 	}
 	try {
@@ -559,7 +558,14 @@ export async function hapticBeatAsync(
 export interface NativeNotifier {
 	isPermissionGranted(): Promise<boolean>;
 	requestPermission(): Promise<string>;
-	sendNotification(opts: { title: string; body?: string }): unknown;
+	sendNotification(opts: {
+		id?: number;
+		title: string;
+		body?: string;
+		autoCancel?: boolean;
+	}): unknown;
+	cancel?(notifications: number[]): Promise<void>;
+	cancelAll?(): Promise<void>;
 }
 
 /**
@@ -631,15 +637,24 @@ export async function notifyReplyDoneAsync(
 	}
 ): Promise<boolean> {
 	const text = body.trim();
+	if (!text) return false;
 	const hidden = input?.hidden ?? documentHiddenNow();
 	const focused = input?.focused ?? windowFocusedNow();
 	if (!(hidden || !focused)) return false;
-	if (text.length < LONG_REPLY_MIN_CHARS) return false;
 	if (input?.shell) {
 		try {
 			const plugin = input?.plugin ?? (await nativeNotifier(true));
 			if (plugin && (await plugin.isPermissionGranted())) {
-				await plugin.sendNotification({ title, body: text.slice(0, 160) });
+				// Fixed id: each finished reply replaces the last
+				// instead of stacking; autoCancel clears the tap, and
+				// a timer clears the stale (the shade is not storage).
+				await plugin.sendNotification({
+					id: REPLY_NOTIFICATION_ID,
+					title,
+					body: text.slice(0, 160),
+					autoCancel: true
+				});
+				scheduleReplyNotificationClear(plugin);
 				return true;
 			}
 		} catch {
@@ -648,4 +663,36 @@ export async function notifyReplyDoneAsync(
 		return notifyReplyDone(title, body, input);
 	}
 	return notifyReplyDone(title, body, input);
+}
+
+/** Best-effort stale-ping clear (a backgrounded timer may run late). */
+function scheduleReplyNotificationClear(plugin: NativeNotifier): void {
+	try {
+		setTimeout(() => {
+			void dismissReplyNotificationAsync({ plugin });
+		}, REPLY_NOTIFICATION_TIMEOUT_MS);
+	} catch {
+		// No timer: the foreground return still clears it below.
+	}
+}
+
+/**
+ * Dismiss the reply ping (foreground return, or the stale timer).
+ * Never throws — callers never await it.
+ */
+export async function dismissReplyNotificationAsync(input?: {
+	plugin?: NativeNotifier | null;
+	shell?: boolean;
+}): Promise<void> {
+	try {
+		const plugin = input?.plugin ?? (await nativeNotifier(input?.shell ?? true));
+		if (!plugin) return;
+		if (typeof plugin.cancel === "function") {
+			await plugin.cancel([REPLY_NOTIFICATION_ID]);
+		} else if (typeof plugin.cancelAll === "function") {
+			await plugin.cancelAll();
+		}
+	} catch {
+		// Already gone (or never sent): nothing to dismiss.
+	}
 }
