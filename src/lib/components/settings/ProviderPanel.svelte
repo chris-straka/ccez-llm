@@ -22,12 +22,13 @@
 		type AppSettings
 	} from "$lib/settings";
 	import { tauriBackendAvailable } from "$lib/secrets";
-	import {
+		import {
 		downloadedMB,
 		isOnDeviceProvider,
 		onDeviceErrorCopy,
 		onDeviceStatus,
 		onDeviceUnsupported,
+		openAICorePage,
 		type OnDeviceStatus
 	} from "$lib/ondevice/bridge";
 	import { isAndroidUserAgent, visibleProviderIds } from "$lib/platform";
@@ -157,6 +158,23 @@
 	 * count moves, and terminal states stop it.
 	 */
 	let onDeviceNote = $state("");
+	/** Machine reason behind the note (drives the AI Core button). */
+	let onDeviceReason: string | null = $state(null);
+	/** Store-open failure for the AI Core button; cleared on edit. */
+	let aicoreOpenError = $state("");
+	/**
+	 * AI Core's store page (hidden system component — the button is
+	 * the only way to reach it). Failures name the fallback instead
+	 * of going silent.
+	 */
+	async function openAICoreOnce(): Promise<void> {
+		aicoreOpenError = "";
+		try {
+			await openAICorePage();
+		} catch {
+			aicoreOpenError = "Couldn't open the store app.";
+		}
+	}
 	let onDeviceProbing = $state(false);
 	let downloadTimer: number | undefined;
 	function clearDownloadTimer(): void {
@@ -192,8 +210,10 @@
 			}
 			if (!wantNote) {
 				onDeviceNote = "";
+				onDeviceReason = null;
 				return;
 			}
+			onDeviceReason = status.reason ?? null;
 			onDeviceNote =
 				status.state === "ready"
 					? "On-device model ready — replies never leave this phone."
@@ -207,7 +227,10 @@
 				downloadTimer = window.setTimeout(() => void probeOnDevice(), 3000);
 			}
 		} catch {
-			if (wantNote) onDeviceNote = onDeviceErrorCopy("unsupported");
+			if (wantNote) {
+				onDeviceNote = onDeviceErrorCopy("unsupported");
+				onDeviceReason = null;
+			}
 		} finally {
 			onDeviceProbing = false;
 		}
@@ -403,6 +426,19 @@
 			<p class="note" role="status">
 				{onDeviceProbing ? "Checking on-device model…" : onDeviceNote}
 			</p>
+			{#if onDeviceReason === "stale-aicore" && !onDeviceProbing}
+				<!-- AI Core is a hidden system component (unsearchable
+					in the store): the button deep-links its page by
+					package id. -->
+				<p class="note">
+					<button type="button" onclick={() => void openAICoreOnce()}
+						>Update AI Core</button
+					>
+					{#if aicoreOpenError}<span class="hint" role="alert"
+							>{aicoreOpenError}</span
+						>{/if}
+				</p>
+			{/if}
 		{/if}
 	{:else if showKeyField}
 		<label>

@@ -16,24 +16,28 @@ import { tauriBackendAvailable } from "../secrets";
  * `no-model` copy — never a silent reroute to another provider.
  *
  * Native contract (`src-tauri/src/ondevice.rs`, Android leg in
- * `OnDevice.kt`): two Tauri commands, `ondevice_status` -> status
- * payload and `ondevice_generate` {prompt, maxTokens} -> completion
- * text, backed on Android by `com.google.mlkit:genai-prompt`
- * (1.0.0-beta4, `Generation.getClient()` over the AICore system app —
- * no bundled weights, no API key). Native availability maps onto the
- * existing states: AICore AVAILABLE -> ready, DOWNLOADING ->
- * downloading, DOWNLOADABLE -> unavailable/no-model (status kicks off
- * the download, so reconnecting once then works offline),
- * UNAVAILABLE -> unavailable/unsupported. No manifest change (INTERNET
+ * `OnDevice.kt`): three Tauri commands, `ondevice_status` -> status
+ * payload, `ondevice_generate` {prompt, maxTokens} -> completion text,
+ * and `ondevice_open_aicore_page` -> the hidden AI Core store page,
+ * backed on Android by `com.google.mlkit:genai-prompt`
+ * (`Generation.getClient()` over the AICore system app — no bundled
+ * weights, no API key). Native availability maps onto the existing
+ * states: AICore AVAILABLE -> ready, DOWNLOADING -> downloading,
+ * DOWNLOADABLE -> unavailable/no-model (status kicks off the
+ * download, so reconnecting once then works offline), UNAVAILABLE ->
+ * unavailable/unsupported, and a 606 FEATURE_NOT_FOUND from
+ * `checkStatus()` reads `stale-aicore`. No manifest change (INTERNET
  * is already granted; AICore downloads through Play) and no settings
  * change (keyless — Gemini Nano needs no API key).
  *
- * Field note: the dep is pinned to genai-prompt beta3, not beta4 —
- * beta4's Kotlin 2.3 metadata needs kotlin-gradle-plugin 2.3, which
- * rejects Tauri's own bundled script (upstream tauri#15694,
- * unreleased). beta3 reads cleanly under KGP 2.2.21. Native leg
- * compiles locally but is still unverified on device (see
- * `OnDevice.kt`).
+ * Field note: the dep is pinned to genai-prompt beta2 — beta3's
+ * default ModelConfig requests AICore feature 648, which no shipping
+ * AICore provides (606 on-device; upstream googlesamples/mlkit issue
+ * 1061), and beta4's Kotlin 2.3 metadata needs kotlin-gradle-plugin
+ * 2.3, which rejects Tauri's own bundled script (upstream
+ * tauri#15694, unreleased). beta2 reads cleanly under the KGP 2.2.21
+ * pinned in ../build.gradle.kts. Native leg compiles locally but is
+ * still unverified on device (see `OnDevice.kt`).
  *
  * Every function degrades cleanly across the three runtimes: outside
  * the Tauri shell (browser preview, jsdom/node tests) status reads
@@ -221,6 +225,19 @@ export function onDeviceNotReadyCopy(status: OnDeviceStatus): string {
 	if (status.state === "downloading")
 		return onDeviceErrorCopy("downloading");
 	return onDeviceErrorCopy("unsupported");
+}
+
+/**
+ * Open AI Core's Play Store page (hidden system component, reached by
+ * package id — store search won't find it). Rejects when the store
+ * app can't open, so the settings entry can say so instead of going
+ * silent. Outside the shell this rejects as unsupported.
+ */
+export async function openAICorePage(deps?: OnDeviceDeps): Promise<void> {
+	const shell = deps?.shell ?? tauriBackendAvailable();
+	if (!shell) throw new Error(onDeviceErrorCopy("unsupported"));
+	const run = deps?.invoke ?? liveInvoke;
+	await run("ondevice_open_aicore_page");
 }
 
 /** Failure reason out of an invoke rejection (native code or message). */

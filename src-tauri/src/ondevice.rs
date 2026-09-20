@@ -53,6 +53,20 @@ fn reason_of(payload: &str) -> String {
         .unwrap_or_else(|| "failed".into())
 }
 
+/// Open AI Core's Play Store page (hidden system component, reached
+/// by package id since store search won't find it). Android-only;
+/// elsewhere this rejects as unsupported and the UI hides the entry.
+#[tauri::command]
+pub fn ondevice_open_aicore_page(app: tauri::AppHandle) -> Result<(), String> {
+    #[cfg(target_os = "android")]
+    return ondevice_android::open_aicore_page(&app);
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = app;
+        Err("unsupported".into())
+    }
+}
+
 /// Bridge + model readiness. Off Android this is `unavailable`
 /// without touching JNI; native rejections also read `unavailable`
 /// (the bridge isn't there), never throw.
@@ -258,6 +272,26 @@ mod ondevice_android {
                 .l()
                 .map_err(|e| format!("bad generate() return: {e:?}"))?;
             jstring_result(env, obj, "generate")
+        })
+    }
+
+    /// Open AI Core's Play Store page. Kotlin returns "" on success or
+    /// a short message; a non-empty message rejects so the UI can say
+    /// the store didn't open.
+    pub fn open_aicore_page(_app: &tauri::AppHandle) -> Result<(), String> {
+        with_env("open_aicore_page", |env, cls| {
+            let out = env
+                .call_static_method(cls, "openAicorePage", "()Ljava/lang/String;", &[])
+                .map_err(|e| format!("openAicorePage() failed: {e:?}"))?;
+            let obj: JObject = out
+                .l()
+                .map_err(|e| format!("bad openAicorePage() return: {e:?}"))?;
+            let message = jstring_result(env, obj, "openAicorePage")?;
+            if message.is_empty() {
+                Ok(())
+            } else {
+                Err(message)
+            }
         })
     }
 }

@@ -2,6 +2,9 @@ package studio.ccez.app
 
 import android.app.Activity
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
 import com.google.mlkit.genai.common.DownloadStatus
 import com.google.mlkit.genai.common.FeatureStatus
 import com.google.mlkit.genai.common.GenAiException
@@ -219,6 +222,42 @@ object OnDevice {
             }
         } catch (e: Exception) {
             json("error", failureReason(e), detail = detailOf(e))
+        }
+    }
+
+    /**
+     * Open AI Core's Play Store page (the `market:` scheme first, the
+     * https page as fallback) for the Rust bridge
+     * (`ondevice_open_aicore_page`). AI Core is a hidden system
+     * component — unsearchable in the store — so the error copy points
+     * here instead of naming a search. Returns "" on success or an
+     * error message, never null. Started from the application context,
+     * so it needs NEW_TASK.
+     */
+    @JvmStatic
+    fun openAicorePage(): String {
+        if (!::appContext.isInitialized) return "bridge not initialized"
+        val targets = listOf(
+            "market://details?id=com.google.android.aicore",
+            "https://play.google.com/store/apps/details?id=com.google.android.aicore",
+        )
+        return try {
+            val pm = appContext.packageManager
+            for (target in targets) {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(target)).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                if (
+                    pm.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
+                        .isNotEmpty()
+                ) {
+                    appContext.startActivity(intent)
+                    return ""
+                }
+            }
+            "no store app found"
+        } catch (_: Exception) {
+            "could not open the store app"
         }
     }
 }

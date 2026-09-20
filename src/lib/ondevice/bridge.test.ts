@@ -9,6 +9,7 @@ import {
 	onDeviceNotReadyCopy,
 	onDeviceStatus,
 	onDeviceUnsupported,
+	openAICorePage,
 	parseOnDeviceStatus,
 	type OnDeviceDeps
 } from "./bridge";
@@ -85,6 +86,23 @@ describe("onDeviceNotReadyCopy", () => {
 		const copy = onDeviceNotReadyCopy({ state: "unavailable" });
 		expect(copy).toBe(onDeviceErrorCopy("unsupported"));
 		expect(copy).not.toContain("Try again");
+	});
+});
+
+describe("openAICorePage", () => {
+	it("rejects outside the shell without invoking", async () => {
+		const invoke = vi.fn(async () => {
+			throw new Error("must not be called");
+		});
+		await expect(openAICorePage({ shell: false, invoke })).rejects.toThrow(
+			"isn't available on this device"
+		);
+		expect(invoke).not.toHaveBeenCalled();
+	});
+	it("invokes the store command in the shell", async () => {
+		const { deps, invoke } = depsWith(undefined);
+		await openAICorePage(deps);
+		expect(invoke).toHaveBeenCalledWith("ondevice_open_aicore_page");
 	});
 });
 

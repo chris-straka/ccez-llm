@@ -268,6 +268,7 @@ pub fn run() {
             turn::turn_dismiss,
             ondevice::ondevice_status,
             ondevice::ondevice_generate,
+            ondevice::ondevice_open_aicore_page,
             update_android::update_download_apk,
             update_android::update_install_apk
         ])
