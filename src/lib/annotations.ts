@@ -2376,10 +2376,11 @@ export function placeAnnPopX(opts: {
  * clamped to the viewport. The right clamp uses the caller's menu
  * width estimate (one button vs Annotate+Inspect), never a
  * one-size box: a wide phantom shoves the menu far left of picks
- * near the right edge. Phones dock around the native selection
- * bubble instead (above on Android, below on iOS). placeSelMenu uses
- * it at summon time; the scroll tracker re-runs it cursorless so the
- * menu follows its highlight instead of dying on scroll.
+ * near the right edge. Phones take the above slot too (the native
+ * callout is suppressed; readings dock below instead) — iOS keeps
+ * it because its bubble owns below. placeSelMenu uses it at summon
+ * time; the scroll tracker re-runs it cursorless so the menu
+ * follows its highlight instead of dying on scroll.
  */
 export function selMenuPlacement(opts: {
 	cursorX: number | undefined;
@@ -2414,16 +2415,18 @@ export function selMenuPlacement(opts: {
 		Math.max(8, viewportWidth - menuWidth - 8)
 	);
 	// Android: the OS text toolbar is suppressed (the app menu
-	// replaces it), but ours still goes below the selection — clear
-	// of the highlight and its handles — except near the screen
-	// bottom, where above wins. iOS docks its bubble below the
-	// selection, so ours takes the above slot like desktop — one
-	// popup on each side, never stacked.
+	// replaces it), so ours takes the above slot like desktop —
+	// clear of the highlight — except near the screen top, where
+	// below wins. iOS docks its bubble below the selection, so
+	// ours takes the above slot like desktop — one popup on each
+	// side, never stacked.
 	let y: number;
 	if (androidUI && !iosUI) {
-		// Well clear of the selection handles (~24px below text).
-		y = rectBottom + 30;
-		if (y + 44 > viewportHeight) y = Math.max(8, rectTop - 47);
+		// Above the highlight; only a cramped top edge drops it
+		// below, still clear of the handles, and clamped on screen.
+		y = rectTop - 47;
+		if (y < 8) y = rectBottom + 30;
+		if (y + 44 > viewportHeight) y = Math.max(8, viewportHeight - 52);
 	} else if (iosUI) {
 		// Above slot (Apple's bubble owns below); only a cramped
 		// top edge drops it below, still clear of the handles and
@@ -2439,6 +2442,68 @@ export function selMenuPlacement(opts: {
 		y = Math.max(8, cy - 48);
 	}
 	return { x, y };
+}
+
+/** Minimal rect shape for reading-panel anchoring (DOMRect compatible). */
+export interface AnchorRect {
+	left: number;
+	top: number;
+	bottom: number;
+	width: number;
+	height: number;
+}
+
+/**
+ * Anchor for one highlight span's readings panel: the span's first
+ * line fragment, never the whole union box. A group wrapping across
+ * lines reports a union rect whose center sits mid-column — every
+ * wrapped group would anchor the same middle and stack. The first
+ * fragment starts at the group's own kanji on every layout.
+ */
+export function firstContentRect<T extends AnchorRect>(rects: readonly T[]): T | null {
+	for (const rect of rects) {
+		if (rect.width > 0 && rect.height > 0) return rect;
+	}
+	return null;
+}
+
+/**
+ * Readings-panel placement (pure): the panel centers on its
+ * highlight span via CSS translateX, so the style left IS the
+ * span's center — never the span's left edge, which would park
+ * the panel half its width too far left. The center clamps only
+ * to the viewport edges (never a fixed-pixel reserve): on a
+ * narrow phone a wide reserve collapses every group's center to
+ * one x and the panels stack exactly. A later width pass nudges
+ * wide panels back inside; placement keeps them spread on their
+ * own groups first.
+ *
+ * Above by default (the menu owns the above slot on desktop, the
+ * readings hang over the highlight's top edge); `preferBelow`
+ * docks below instead — phones put the menu above, so readings
+ * below never overlap it — except near the screen bottom, where
+ * above wins.
+ */
+export function readingPanelPlacement(opts: {
+	rect: AnchorRect;
+	viewportWidth: number;
+	viewportHeight: number;
+	preferBelow: boolean;
+}): { x: number; y: number; above: boolean } {
+	const { rect, viewportWidth, viewportHeight, preferBelow } = opts;
+	const cx = rect.left + rect.width / 2;
+	const x = Math.min(
+		Math.max(8, cx),
+		Math.max(8, viewportWidth - 8)
+	);
+	const headroom = rect.top >= 128;
+	const footroom = rect.bottom + 44 <= viewportHeight;
+	// Desktop: above with headroom, else below. Phone menu above:
+	// below with footroom, else above (a tall highlight under the
+	// keyboard can leave no room under it).
+	const above = preferBelow ? !footroom : headroom;
+	if (above) return { x, y: Math.max(8, rect.top), above: true };
+	return { x, y: Math.min(rect.bottom, viewportHeight - 40), above: false };
 }
 
 /**

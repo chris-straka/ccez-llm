@@ -1201,8 +1201,82 @@ test.describe("touch", () => {
 			"Annotate",
 			"Speak"
 		]);
-		// Non-Han text docks nothing: Inspect is Han-only.
-		await expect(page.locator(".ann-dock")).toHaveCount(0);
+		// The composer dock mirrors Annotate/Speak; Inspect is Han-only.
+		await expect(page.locator(".ann-dock")).toHaveText(["Annotate", "Speak"]);
+	});
+
+	test("touch selection menu docks above the highlight", async ({ page }) => {
+		const paras = Array.from(
+			{ length: 10 },
+			(_, i) => `para-${i} alpha beta gamma delta epsilon`
+		).join("\n\n");
+		await seedChat(page, [
+			{ role: "assistant", content: paras },
+			{ role: "assistant", content: paras }
+		]);
+		await page.goto("/");
+		await expect(page.locator("article .rendered").first()).toBeVisible();
+		// Park a middle paragraph mid-screen (plenty of headroom, so the
+		// above slot wins deterministically), then run the same
+		// touchstart → highlight → touchend dance the shared summon
+		// helper uses.
+		const center = await page.evaluate(() => {
+			const p = document.querySelectorAll("article .rendered p")[4];
+			if (!(p instanceof HTMLElement)) return null;
+			p.scrollIntoView({ block: "center", behavior: "instant" });
+			const box = p.getBoundingClientRect();
+			return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+		});
+		if (!center) throw new Error("no paragraph box");
+		await page.waitForTimeout(300);
+		await page.evaluate(
+			({ x, y }: { x: number; y: number }) => {
+				const touch = (id: number) =>
+					new Touch({
+						identifier: id,
+						target: document.body,
+						clientX: x,
+						clientY: y
+					});
+				window.dispatchEvent(
+					new TouchEvent("touchstart", {
+						bubbles: true,
+						cancelable: true,
+						composed: true,
+						touches: [touch(1)]
+					})
+				);
+				const p = document.querySelectorAll("article .rendered p")[4];
+				const sel = window.getSelection();
+				sel?.removeAllRanges();
+				if (p) sel?.selectAllChildren(p);
+				window.dispatchEvent(
+					new TouchEvent("touchend", {
+						bubbles: true,
+						cancelable: true,
+						composed: true,
+						touches: [],
+						changedTouches: [touch(1)]
+					})
+				);
+			},
+			{ x: center.x, y: center.y }
+		);
+		const menu = page.locator(".sel-menu");
+		await expect(menu).toBeVisible();
+		// Above, never overlapping: the menu's bottom edge sits clear
+		// of the highlight's top (readings dock below instead).
+		const geometry = await page.evaluate(() => {
+			const sel = window.getSelection();
+			const menuEl = document.querySelector(".sel-menu");
+			if (!sel || sel.rangeCount === 0 || !(menuEl instanceof HTMLElement))
+				return null;
+			const highlight = sel.getRangeAt(0).getBoundingClientRect();
+			const box = menuEl.getBoundingClientRect();
+			return { highlightTop: highlight.top, menuBottom: box.bottom };
+		});
+		expect(geometry).not.toBeNull();
+		expect(geometry!.menuBottom).toBeLessThanOrEqual(geometry!.highlightTop + 4);
 	});
 
 	test("a tap on Speak reads the highlight and keeps the menu", async ({
@@ -1276,15 +1350,21 @@ test.describe("touch", () => {
 		await page.goto("/");
 		await expect(page.locator("article .rendered").first()).toBeVisible();
 		await summonTouchSelection(page);
-		// Copy/Annotate/Speak float in the menu; the single Han
-		// character docks Inspect alone in the composer.
+		// Copy/Annotate/Speak float in the menu, joined by Inspect for
+		// the single Han character; the composer dock mirrors all four
+		// (redundant on purpose — a thumb can drag the menu out of reach).
 		const menu = page.locator(".sel-menu");
 		await expect(menu.locator("button")).toHaveText([
 			"Copy",
 			"Annotate",
-			"Speak"
+			"Speak",
+			"Inspect"
 		]);
-		await expect(page.locator(".ann-dock")).toHaveText(["Inspect"]);
+		await expect(page.locator(".ann-dock")).toHaveText([
+			"Annotate",
+			"Speak",
+			"Inspect"
+		]);
 	});
 
 	test("a long chat scrolls inside the list, never squeezing the prompt", async ({

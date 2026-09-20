@@ -194,6 +194,8 @@
 		occurrenceAtPosition,
 		snapSelectionToWordEdges,
 		selMenuPlacement,
+		firstContentRect,
+		readingPanelPlacement,
 		placeAnnPopX,
 		REFS_ONLY_BODY,
 		lineStartOffset,
@@ -1206,9 +1208,10 @@
 		menuBtnTouch(event, () => void copySelection());
 	}
 	/** Selection Speak: read the highlight aloud, showing CJK readings
-	in the popup above it (desktop parity) — pinyin in Chinese text,
-	furigana in Japanese. Speech always runs; the popup is a silent
-	extra. The menu stays put so Annotate stays one tap away. */
+	in the popup by it (above on desktop, below on phones where the
+	menu owns above) — pinyin in Chinese text, furigana in Japanese.
+	Speech always runs; the popup is a silent extra. The menu stays
+	put so Annotate stays one tap away. */
 	function speakSelection(): void {
 		if (!selMenu) return;
 		void popupSelectionReadings(
@@ -1218,31 +1221,62 @@
 		);
 		void speakQuote(selMenu.quote, selMenu.messageId, true, selMenu.context);
 	}
-	/** Dock the readings overlay centered on the highlight, above
-	it (below only when the top edge leaves no room). Centering
-	rides CSS translateX so panel width — and font size — never
-	matters: the style left IS the highlight's center (rect.left
-	would park the panel half its width too far left). A frame
-	later the true width clamps it exactly into the viewport. The
-	above branch anchors on the highlight's top edge the same way,
-	so tall readings never need measuring. */
+	/** Dock the readings overlay centered on the highlight span
+	(pure math in readingPanelPlacement): above on desktop, below
+	on phones — the phone menu takes the above slot, so readings
+	below never overlap it. Centering rides CSS translateX so
+	panel width — and font size — never matters: the style left
+	IS the highlight's center (rect.left would park the panel
+	half its width too far left). A frame later the true width
+	clamps it exactly into the viewport. The above branch anchors
+	on the highlight's top edge the same way, so tall readings
+	never need measuring. */
 	function panelXY(rect: {
 		left: number;
 		top: number;
 		bottom: number;
 		width: number;
+		height: number;
 	}): {
 		x: number;
 		y: number;
 		above: boolean;
 	} {
-		const above = rect.top >= 128;
-		const cx = rect.left + rect.width / 2;
-		return {
-			x: Math.min(Math.max(8, cx), window.innerWidth - 208),
-			y: above ? rect.top : Math.min(rect.bottom, window.innerHeight - 40),
-			above
-		};
+		return readingPanelPlacement({
+			rect,
+			viewportWidth: window.innerWidth,
+			viewportHeight: window.innerHeight,
+			preferBelow: androidUI
+		});
+	}
+	/** Nudge every readings panel back inside by its true width
+	(the placement pass only knows the highlight center): same
+	correction placeSelPinyin runs for the flat panel, mapped by
+	order — at settle the nodes ARE the panels in order (the flat
+	panel is null while groups are up, and vice versa). A
+	mismatch skips instead of shuffling panels. */
+	function correctPanelWidths(
+		current: { x: number; y: number }[],
+		apply: (xs: number[]) => void
+	): void {
+		requestAnimationFrame(() => {
+			const nodes = [...document.querySelectorAll(".sel-pinyin")];
+			if (nodes.length !== current.length) return;
+			let moved = false;
+			const xs = current.map((panel, i) => {
+				const node = nodes[i];
+				if (!(node instanceof HTMLElement)) return panel.x;
+				const w = node.getBoundingClientRect().width;
+				if (w === 0) return panel.x;
+				const x = Math.min(
+					Math.max(w / 2 + 8, panel.x),
+					Math.max(w / 2 + 8, window.innerWidth - w - 8)
+				);
+				if (Math.abs(x - panel.x) > 1) moved = true;
+				return x;
+			});
+			if (moved) apply(xs);
+		});
 	}
 	function placeSelPinyin(
 		quoted: { quote: string; messageId: ChatMsgId },
@@ -1344,7 +1378,11 @@
 		}
 		return null;
 	}
-	/** Screen rect of a highlight span, or null. */
+	/** Screen rect of a highlight span, or null: the span's first
+	line fragment, never the union box — a group wrapping across
+	lines centers mid-column and stacks onto its siblings (see
+	firstContentRect). Each furigana group anchors on its own
+	kanji this way. */
 	function spanRect(
 		slices: SelSlice[],
 		start: number,
@@ -1357,7 +1395,8 @@
 			const range = document.createRange();
 			range.setStart(a.node, Math.min(a.offset, a.node.length));
 			range.setEnd(b.node, Math.min(b.offset, b.node.length));
-			const rect = range.getBoundingClientRect();
+			const first = firstContentRect([...range.getClientRects()]);
+			const rect = first ?? range.getBoundingClientRect();
 			range.detach();
 			if (rect.width === 0 && rect.height === 0) return null;
 			return rect;
@@ -1587,10 +1626,20 @@
 		if (exact && slices && !solo) tintSelectionSpans(slices, tintSpans);
 		selPinyin = null;
 		selFurigana = panels;
+		// True-width pass: placement only knows highlight centers,
+		// so a wide panel near the right edge hangs off-screen —
+		// nudge each back inside without collapsing them onto one x.
+		correctPanelWidths(panels, (xs) => {
+			if (selFurigana !== panels) return;
+			selFurigana = panels.map((panel, i) => ({
+				...panel,
+				x: xs[i] ?? panel.x
+			}));
+		});
 		return sliced.map((run) => run.reading ?? run.text).join("");
 	}
 	/**
-	 * Readings for a highlight in the popup above the selection (see
+	 * Readings for a highlight in the popup by the selection (see
 	 * speakSelection): sync pinyin, worker furigana. Long readings
 	 * stay off the popup; a moved-on highlight drops the async
 	 * result instead of showing it.
@@ -11192,12 +11241,9 @@
 				}
 				if (!selPinyin) return;
 				const rect = range.getBoundingClientRect();
-				const above = rect.top >= 128;
-				const y = above
-					? rect.top
-					: Math.min(rect.bottom + 8, window.innerHeight - 40);
-				if (selPinyin.y !== y || selPinyin.above !== above)
-					selPinyin = { ...selPinyin, y, above };
+				const placed = panelXY(rect);
+				if (selPinyin.y !== placed.y || selPinyin.above !== placed.above)
+					selPinyin = { ...selPinyin, ...placed };
 			} catch {
 				dismissSelPanels();
 			}
@@ -13003,7 +13049,8 @@
 
 	{#if selPinyin && !previewing}
 		<!-- Selection readings: pronunciations for just the highlight,
-		docked above it (below only without headroom). Pointer-transparent
+		docked above it on desktop (below only without headroom) and
+		below it on phones (the menu owns above). Pointer-transparent
 		so it never disturbs the selection or blocks the native menu;
 		the highlight clearing dismisses it (see trimMessageDrag), and
 		scrolling tracks it (see trackSelPinyin). -->
@@ -15835,12 +15882,13 @@
 		padding: 0;
 	}
 	article.assistant {
-		/* Left-docked, never centered: shrink-wrapped short replies
-		start at the left edge like full paragraphs do (a centered
-		stub reads as a status line, not a message). Assistant text
-		packs tight: the list gap already separates messages, so no
+		/* Centered column like every message (see the column rule);
+		the text itself stays left-aligned — only the alignment was
+		meant to change, never the column. Assistant text packs
+		tight: the list gap already separates messages, so no
 		vertical padding here (desktop and touch). */
-		align-self: flex-start;
+		align-self: center;
+		text-align: left;
 		padding-left: 0;
 		padding-right: 0;
 		padding-top: 0;
@@ -16785,8 +16833,9 @@
 	}
 	/* Selection pinyin: readings for just the highlight. Same glass
 	as the selection menu, but pointer-transparent (read-only — it
-	must never disturb the highlight or block the native menu) and
-	docked below the highlight while the menu takes above. */
+	must never disturb the highlight or block the native menu).
+	Desktop docks it above the highlight while the menu rides the
+	cursor; phones dock it below, since the menu owns above. */
 	.sel-pinyin {
 		position: fixed;
 		z-index: 50;
@@ -17691,6 +17740,10 @@
 	and past it the column goes wide so huge text stays readable. */
 	.app[data-android]:not([data-fullbleed]) article.assistant {
 		width: fit-content;
+		/* Shrink-wrapped phone replies left-dock: a centered stub
+		reads as a status line, not a message. Desktop keeps the
+		centered column (see article.assistant). */
+		align-self: flex-start;
 	}
 	/* A folded assistant message spans the column instead of
 	shrink-wrapping: the capped preview floated mid-screen rather

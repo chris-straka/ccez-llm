@@ -18,6 +18,8 @@ import {
 	snapOffsetsToWordEdges,
 	placeAnnPopX,
 	selMenuPlacement,
+	firstContentRect,
+	readingPanelPlacement,
 	lineStartOffset,
 	clampDragAnchorToFocusLine,
 	reviewEditKey,
@@ -509,7 +511,7 @@ describe("selMenuPlacement", () => {
 		).toEqual({ x: 1152, y: 262 });
 	});
 
-	it("docks Android below the handles, iOS above the bubble", () => {
+	it("docks Android and iOS above the highlight, like desktop", () => {
 		expect(
 			selMenuPlacement({
 				cursorX: 600,
@@ -521,7 +523,7 @@ describe("selMenuPlacement", () => {
 				iosUI: false,
 				menuWidth: 120
 			})
-		).toEqual({ x: 584, y: 352 });
+		).toEqual({ x: 584, y: 253 });
 		expect(
 			selMenuPlacement({
 				cursorX: 600,
@@ -534,6 +536,101 @@ describe("selMenuPlacement", () => {
 				menuWidth: 220
 			})
 		).toEqual({ x: 584, y: 253 });
+	});
+
+	it("drops the Android menu below only at the cramped top edge", () => {
+		expect(
+			selMenuPlacement({
+				cursorX: 200,
+				cursorY: 30,
+				rectLeft: 180,
+				rectTop: 20,
+				rectBottom: 42,
+				viewportWidth: 360,
+				viewportHeight: 740,
+				androidUI: true,
+				iosUI: false,
+				menuWidth: 220
+			})
+		).toEqual({ x: 132, y: 72 });
+	});
+});
+
+describe("firstContentRect", () => {
+	it("anchors on the first line fragment, not the union box", () => {
+		const first = { left: 40, top: 300, bottom: 322, width: 120, height: 22 };
+		const second = { left: 16, top: 322, bottom: 344, width: 200, height: 22 };
+		expect(firstContentRect([first, second])).toBe(first);
+	});
+
+	it("skips empty fragments and gives up on none", () => {
+		const empty = { left: 0, top: 0, bottom: 0, width: 0, height: 0 };
+		const live = { left: 40, top: 300, bottom: 322, width: 60, height: 22 };
+		expect(firstContentRect([empty, live])).toBe(live);
+		expect(firstContentRect([empty])).toBeNull();
+		expect(firstContentRect([])).toBeNull();
+	});
+});
+
+describe("readingPanelPlacement", () => {
+	const rect = { left: 40, top: 300, bottom: 322, width: 120, height: 22 };
+
+	it("centers on the span, never its left edge", () => {
+		expect(
+			readingPanelPlacement({
+				rect,
+				viewportWidth: 1280,
+				viewportHeight: 800,
+				preferBelow: false
+			})
+		).toEqual({ x: 100, y: 300, above: true });
+	});
+
+	it("goes below without headroom on desktop", () => {
+		expect(
+			readingPanelPlacement({
+				rect: { ...rect, top: 40, bottom: 62 },
+				viewportWidth: 1280,
+				viewportHeight: 800,
+				preferBelow: false
+			})
+		).toEqual({ x: 100, y: 62, above: false });
+	});
+
+	it("prefers below (phone menu owns above), above without footroom", () => {
+		expect(
+			readingPanelPlacement({
+				rect,
+				viewportWidth: 360,
+				viewportHeight: 740,
+				preferBelow: true
+			})
+		).toEqual({ x: 100, y: 322, above: false });
+		expect(
+			readingPanelPlacement({
+				rect: { ...rect, top: 660, bottom: 700 },
+				viewportWidth: 360,
+				viewportHeight: 740,
+				preferBelow: true
+			})
+		).toEqual({ x: 100, y: 660, above: true });
+	});
+
+	it("keeps narrow-phone group centers spread, never stacked", () => {
+		// Four kanji groups across a 360px phone: the old fixed-pixel
+		// reserve collapsed every center past ~150px to one x.
+		const xs = [60, 140, 220, 300].map(
+			(left) =>
+				readingPanelPlacement({
+					rect: { left, top: 300, bottom: 322, width: 40, height: 22 },
+					viewportWidth: 360,
+					viewportHeight: 740,
+					preferBelow: true
+				}).x
+		);
+		expect(new Set(xs).size).toBe(4);
+		expect(Math.min(...xs)).toBeGreaterThanOrEqual(8);
+		expect(Math.max(...xs)).toBeLessThanOrEqual(352);
 	});
 });
 
