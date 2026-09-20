@@ -376,11 +376,16 @@ export class OpenAICompatProvider implements ChatProvider {
 			});
 			for (const entry of pending) {
 				if (opts.signal?.aborted) throw new ProviderError("Reply stopped.");
-				history.push({
-					role: "tool",
-					content: await this.runFetch(entry.parsed, opts.signal),
-					tool_call_id: entry.parsed.id
-				});
+				callbacks.onFetchStart?.(entry.parsed.url);
+				try {
+					history.push({
+						role: "tool",
+						content: await this.runFetch(entry.parsed, opts.signal),
+						tool_call_id: entry.parsed.id
+					});
+				} finally {
+					callbacks.onFetchEnd?.();
+				}
 			}
 			// Follow-up fetches ride capped non-streaming rounds; the
 			// answer itself always streams last.

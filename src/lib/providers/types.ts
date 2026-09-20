@@ -39,6 +39,11 @@ export interface ChatResult {
 
 export interface StreamCallbacks {
 	onToken: (text: string) => void;
+	/** Tool-fetch phase: fired around each page fetch so the UI can
+	 * show Fetching instead of going silent mid-turn. Optional —
+	 * providers without tools never fire them. */
+	onFetchStart?: ((url: string) => void) | undefined;
+	onFetchEnd?: (() => void) | undefined;
 }
 
 export interface ChatOptions {

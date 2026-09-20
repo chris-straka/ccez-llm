@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { seedChat } from "./helpers";
+import { dragQuote, seedChat } from "./helpers";
 
 /**
  * Provider failure paths against a keyed (non-mock) provider: HTTP 401
@@ -170,4 +170,29 @@ test("row error text scales only with the button opt-in", async ({ page }) => {
 	await expect(check).toBeVisible({ timeout: 5_000 });
 	await check.check();
 	expect(await px()).toBeGreaterThan(18);
+});
+
+/** A failed turn never locks annotations out: the error lands on the
+reply, and filing a note on settled text keeps working after it. */
+test("annotating still works after a failed turn", async ({ page }) => {
+	await page.route("**/chat/completions", (route) =>
+		route.fulfill({
+			status: 401,
+			contentType: "application/json",
+			body: JSON.stringify({ error: { message: "invalid api key", code: 401 } })
+		})
+	);
+	await seedKeyedProvider(page);
+	await page.goto("/");
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
+	await send(page, "hello provider");
+	const err = page.locator("article.assistant .error").first();
+	await expect(err).toContainText("HTTP 401", { timeout: 30_000 });
+	await dragQuote(page, 0, "hello provider");
+	const menu = page.locator(".sel-menu");
+	await expect(menu).toBeVisible({ timeout: 5_000 });
+	await menu.locator('button:has-text("Annotate")').click();
+	await expect(page.locator(".ann-pop")).toBeVisible({ timeout: 5_000 });
 });

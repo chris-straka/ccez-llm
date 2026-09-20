@@ -33,6 +33,10 @@ import {
 	visibleMessageCount,
 	isSending,
 	hasReplyStarted,
+	hasFetchActive,
+	beginNativeSend,
+	beginNativeResend,
+	settleNativeSend,
 	type ChatState
 } from "./chat";
 import type { ChatProvider, ChatResult } from "./providers/types";
@@ -133,6 +137,101 @@ describe("chat", () => {
 		expect(during).toEqual([true, true]);
 		expect(isSending(state, state.activeChatId)).toBe(false);
 		expect(hasReplyStarted(state, state.activeChatId)).toBe(false);
+	});
+
+	it("opens, refuses, and settles native sends", () => {
+		// The page passes these ids to turn_start; the runner fills the
+		// placeholder and the done/scan paths settle the flags.
+		const { state, store } = stateWith(freshStore());
+		const opened = beginNativeSend(state, "hi", {}, store);
+		expect(opened).not.toBeNull();
+		expect(activeChat(state).messages).toHaveLength(2);
+		expect(activeChat(state).messages[1]).toMatchObject({
+			role: "assistant",
+			content: ""
+		});
+		expect(isSending(state, state.activeChatId)).toBe(true);
+		// A second send into the same chat races out.
+		expect(beginNativeSend(state, "again", {}, store)).toBeNull();
+		settleNativeSend(state, opened!.chatId, store);
+		expect(isSending(state, state.activeChatId)).toBe(false);
+		expect(hasFetchActive(state, state.activeChatId)).toBe(false);
+		// Nothing to send: empty text, no attachments.
+		expect(beginNativeSend(state, "  ", {}, store)).toBeNull();
+	});
+
+	it("opens native resends only on user-last", () => {
+		const { state, store } = stateWith(freshStore());
+		// Fresh chat ends on the blank assistant stub, not a user message.
+		expect(beginNativeResend(state, store)).toBeNull();
+		const opened = beginNativeSend(state, "hi", {}, store);
+		expect(opened).not.toBeNull();
+		settleNativeSend(state, opened!.chatId, store);
+		// The send's own placeholder is assistant-last: no resend.
+		expect(beginNativeResend(state, store)).toBeNull();
+		// A failed turn fills the placeholder's error; dismissing it
+		// (the Retry path) leaves user-last.
+		const failed = activeChat(state).messages[1];
+		activeChat(state).messages[1] = { ...failed!, error: "boom" };
+		dismissFailedAssistant(state, store);
+		const userOnly = activeChat(state).messages;
+		expect(userOnly).toHaveLength(1);
+		expect(userOnly[0]?.role).toBe("user");
+		const resent = beginNativeResend(state, store);
+		expect(resent).not.toBeNull();
+		expect(activeChat(state).messages).toHaveLength(2);
+		expect(activeChat(state).messages[1]).toMatchObject({
+			role: "assistant",
+			content: ""
+		});
+		expect(isSending(state, state.activeChatId)).toBe(true);
+	});
+
+	it("tracks the fetch phase, clearing it on settle", async () => {
+		// The Fetching chip reads this flag: active during the tool
+		// fetch (even with tokens already printed), never stranded after.
+		const { state, store } = stateWith(freshStore());
+		let during: boolean[] = [];
+		const fetching: ChatProvider = {
+			id: "fetching",
+			async chat(): Promise<ChatResult> {
+				return { content: "done", usage: null };
+			},
+			async stream(_messages, callbacks): Promise<ChatResult> {
+				callbacks.onToken("chatter ");
+				callbacks.onFetchStart?.("https://example.com/");
+				during = [
+					isSending(state, state.activeChatId),
+					hasFetchActive(state, state.activeChatId)
+				];
+				callbacks.onFetchEnd?.();
+				callbacks.onToken("done");
+				return { content: "chatter done", usage: null };
+			}
+		};
+		await sendMessage(state, fetching, "sys", "hi", {}, store);
+		expect(during).toEqual([true, true]);
+		expect(hasFetchActive(state, state.activeChatId)).toBe(false);
+		expect(isSending(state, state.activeChatId)).toBe(false);
+	});
+
+	it("clears a stranded fetch phase when the turn throws", async () => {
+		// A fetch cut short by an abort must not strand the chip: the
+		// send's finally owns the flag, not the fetch end callback.
+		const { state, store } = stateWith(freshStore());
+		const bomb: ChatProvider = {
+			id: "bomb",
+			async chat(): Promise<ChatResult> {
+				throw new Error("x");
+			},
+			async stream(_messages, callbacks): Promise<ChatResult> {
+				callbacks.onFetchStart?.("https://example.com/");
+				throw new Error("boom");
+			}
+		};
+		await sendMessage(state, bomb, "sys", "hi", {}, store);
+		expect(hasFetchActive(state, state.activeChatId)).toBe(false);
+		expect(isSending(state, state.activeChatId)).toBe(false);
 	});
 
 	it("splits tokens into input and output", async () => {

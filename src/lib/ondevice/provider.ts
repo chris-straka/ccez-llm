@@ -43,11 +43,14 @@ export class OnDeviceChatProvider implements ChatProvider {
 
 	async chat(
 		messages: ChatMessage[],
-		opts: ChatOptions = {}
+		opts: ChatOptions = {},
+		callbacks?: StreamCallbacks
 	): Promise<ChatResult> {
 		throwIfAborted(opts.signal);
 		const content = await generateOnDevice(
-			formatOnDevicePrompt(await this.maybeEnrich(messages, opts.signal)),
+			formatOnDevicePrompt(
+				await this.maybeEnrich(messages, opts.signal, callbacks)
+			),
 			undefined,
 			this.deps
 		);
@@ -63,7 +66,8 @@ export class OnDeviceChatProvider implements ChatProvider {
 	 */
 	private async maybeEnrich(
 		messages: ChatMessage[],
-		signal: AbortSignal | undefined
+		signal: AbortSignal | undefined,
+		callbacks?: StreamCallbacks
 	): Promise<ChatMessage[]> {
 		const last = messages[messages.length - 1];
 		if (!last || last.role !== "user") return messages;
@@ -71,11 +75,16 @@ export class OnDeviceChatProvider implements ChatProvider {
 		if (!url) return messages;
 		try {
 			const run = this.deps?.fetchPage ?? fetchPageText;
-			const text = await run(url, signal);
-			return [
-				...messages,
-				{ role: "user", content: `Fetched page text for ${url}:\n${text}` }
-			];
+			callbacks?.onFetchStart?.(url);
+			try {
+				const text = await run(url, signal);
+				return [
+					...messages,
+					{ role: "user", content: `Fetched page text for ${url}:\n${text}` }
+				];
+			} finally {
+				callbacks?.onFetchEnd?.();
+			}
 		} catch {
 			return messages;
 		}
@@ -86,7 +95,7 @@ export class OnDeviceChatProvider implements ChatProvider {
 		callbacks: StreamCallbacks,
 		opts: ChatOptions = {}
 	): Promise<ChatResult> {
-		const result = await this.chat(messages, opts);
+		const result = await this.chat(messages, opts, callbacks);
 		if (result.content) callbacks.onToken(result.content);
 		return result;
 	}

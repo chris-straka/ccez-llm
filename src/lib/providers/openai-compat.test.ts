@@ -322,6 +322,99 @@ describe("stream", () => {
 		});
 	});
 
+	it("reports the fetch phase around each page fetch", async () => {
+		const wire = `data: ${JSON.stringify({
+			choices: [
+				{
+					delta: {
+						tool_calls: [
+							{
+								index: 0,
+								id: "call_1",
+								function: {
+									name: "fetch_url",
+									arguments: JSON.stringify({ url: "https://example.com/" })
+								}
+							}
+						]
+					}
+				}
+			]
+		})}\n\ndata: [DONE]\n\n`;
+		const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+			const body = JSON.parse(init.body as string) as { stream?: boolean };
+			if (fetchMock.mock.calls.length === 1) return sseResponse([wire]);
+			if (body.stream === false) {
+				return jsonResponse({ choices: [{ message: { content: "" } }] });
+			}
+			return sseResponse([
+				`data: {"choices":[{"delta":{"content":"fetched!"}}]}\n\ndata: [DONE]\n\n`
+			]);
+		});
+		vi.stubGlobal("fetch", fetchMock);
+		const provider = new OpenAICompatProvider("probe", CONFIG, {
+			fetchPage: vi.fn(async () => "page text")
+		});
+		const events: string[] = [];
+		const result = await provider.stream([{ role: "user", content: "x" }], {
+			onToken: () => {},
+			onFetchStart: (url) => void events.push(`start ${url}`),
+			onFetchEnd: () => void events.push("end")
+		});
+		expect(result.content).toBe("fetched!");
+		// The Fetching chip reads exactly this bracket: start with the
+		// URL, end when the page lands — even around chatter.
+		expect(events).toEqual(["start https://example.com/", "end"]);
+	});
+
+	it("still ends the fetch phase when the page fetch fails", async () => {
+		// A dead page must not strand the Fetching chip: the failure
+		// reads as a tool result (the model reports it) and the phase
+		// bracket closes around it like a success.
+		const wire = `data: ${JSON.stringify({
+			choices: [
+				{
+					delta: {
+						tool_calls: [
+							{
+								index: 0,
+								id: "call_1",
+								function: {
+									name: "fetch_url",
+									arguments: JSON.stringify({ url: "https://example.com/" })
+								}
+							}
+						]
+					}
+				}
+			]
+		})}\n\ndata: [DONE]\n\n`;
+		const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+			const body = JSON.parse(init.body as string) as { stream?: boolean };
+			if (fetchMock.mock.calls.length === 1) return sseResponse([wire]);
+			if (body.stream === false) {
+				return jsonResponse({ choices: [{ message: { content: "" } }] });
+			}
+			return sseResponse([
+				`data: {"choices":[{"delta":{"content":"it failed"}}]}\n\ndata: [DONE]\n\n`
+			]);
+		});
+		vi.stubGlobal("fetch", fetchMock);
+		const provider = new OpenAICompatProvider("probe", CONFIG, {
+			fetchPage: vi.fn(async () => {
+				throw new Error("That page couldn't be fetched.");
+			})
+		});
+		const events: string[] = [];
+		const result = await provider.stream([{ role: "user", content: "x" }], {
+			onToken: () => {},
+			onFetchStart: (url) => void events.push(`start ${url}`),
+			onFetchEnd: () => void events.push("end")
+		});
+		expect(result.content).toBe("it failed");
+		expect(events).toEqual(["start https://example.com/", "end"]);
+	});
+
 	it("falls back to a plain stream when the provider rejects tools", async () => {
 		const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
 			const body = JSON.parse(init.body as string) as { tools?: unknown };

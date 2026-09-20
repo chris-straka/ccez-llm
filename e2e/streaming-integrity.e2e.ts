@@ -347,3 +347,31 @@ test("thinking chip counts up and tints", async ({ page }) => {
 	// The mock still has not answered: the chip waits on.
 	await expect(sending).toContainText("考え中");
 });
+
+/** Annotating stays available mid-stream: the send gates, never the
+selection menu — filing a note on settled text works while the new
+reply (or a page fetch) is still in flight. */
+test("mid-stream annotate files the pill on settled text", async ({
+	page
+}) => {
+	await seedChat(page, [
+		{ role: "assistant", content: "Settled earlier text for notes." }
+	]);
+	await page.addInitScript(() => {
+		window.localStorage.setItem("ccez-mock-word-ms", "400");
+	});
+	await page.goto("/");
+	await expect(page.locator("article .rendered").first()).toBeVisible({
+		timeout: 60_000
+	});
+	await page.locator(".ta-input").click();
+	await page.keyboard.type("keep talking slowly");
+	await page.keyboard.press("Enter");
+	// The reply is still streaming (slow mock cadence).
+	await expect(page.locator(".sending")).toBeVisible({ timeout: 15_000 });
+	await dragQuote(page, 0, "earlier text");
+	const menu = page.locator(".sel-menu");
+	await expect(menu).toBeVisible({ timeout: 5_000 });
+	await menu.locator('button:has-text("Annotate")').click();
+	await expect(page.locator(".ann-pop")).toBeVisible({ timeout: 5_000 });
+});

@@ -26,6 +26,9 @@ mod trafficlights;
 mod tts;
 #[cfg(target_os = "android")]
 mod tts_android;
+mod turn;
+#[cfg(target_os = "android")]
+mod turn_service;
 mod update_android;
 mod tts_linux;
 mod tts_windows;
@@ -257,6 +260,12 @@ pub fn run() {
             dictate_stop,
             coderun::run_code,
             fetch::fetch_page,
+            turn::turn_start,
+            turn::turn_poll,
+            turn::turn_scan,
+            turn::turn_stop,
+            turn::turn_seen,
+            turn::turn_dismiss,
             ondevice::ondevice_status,
             ondevice::ondevice_generate,
             update_android::update_download_apk,

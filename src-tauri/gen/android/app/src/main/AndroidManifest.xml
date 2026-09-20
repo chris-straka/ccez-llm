@@ -6,6 +6,14 @@
     APK. The OS still confirms every install; first use opens the
     unknown-sources page for a one-time allow. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Native turns: a dataSync foreground service holds the process
+    while a reply finishes in the background (persistent "working"
+    notification, as Android requires). POST_NOTIFICATIONS gates the
+    separate "reply ready" ping, which the notification plugin
+    requests from the send gesture. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- AndroidTV support -->
     <uses-feature android:name="android.software.leanback" android:required="false" />
@@ -83,6 +91,15 @@
             </intent-filter>
         </activity-alias>
 
+        <!-- Native turns (see TurnSvc): stateless holder for the
+        foreground claim while a reply finishes. Not sticky — if the
+        system does kill us, the turn files already say interrupted and
+        there is nothing to resume. Not exported: only our own Rust
+        bridge starts and stops it. -->
+        <service
+            android:name=".TurnService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
         <provider
           android:name="androidx.core.content.FileProvider"
           android:authorities="${applicationId}.fileprovider"

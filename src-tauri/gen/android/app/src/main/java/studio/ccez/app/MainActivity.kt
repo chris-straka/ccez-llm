@@ -33,6 +33,9 @@ class MainActivity : TauriActivity() {
     OnDevice.init(this)
     // In-app update bridge: system installer for downloaded APKs (see Update).
     Update.init(this)
+    // Native turns bridge: foreground-service claim while a reply
+    // finishes in the background (see TurnSvc).
+    TurnSvc.init(this)
     if (isAliasLaunch(intent)) {
       // An alias launch always starts a NEW activity record
       // (launchMode lives on the activity element and never applies to

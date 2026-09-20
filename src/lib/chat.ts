@@ -90,6 +90,14 @@ export interface ChatState {
 	 * persisted, cleared with the send.
 	 */
 	replyStartedChatIds: ChatId[];
+	/**
+	 * Every sending chat with a page fetch in flight right now (the
+	 * model's fetch_url tool). The Fetching chip shows while listed,
+	 * even after tokens printed — a fetch gap after chatter would
+	 * otherwise read as a stall. Never persisted, cleared with the
+	 * send (and on every fetch end, so a failed fetch can't strand it).
+	 */
+	fetchActiveChatIds: ChatId[];
 }
 
 /** True when the given chat (default: active) has a reply streaming. */
@@ -100,6 +108,20 @@ export function isSending(state: ChatState, id?: ChatId): boolean {
 /** True when the given chat's reply visibly started (first token landed). */
 export function hasReplyStarted(state: ChatState, id?: ChatId): boolean {
 	return state.replyStartedChatIds.includes(id ?? state.activeChatId);
+}
+
+/** Flag a chat's reply started (first token landed) — the thinking
+chip reads this. Both engines (TypeScript stream, native turn events)
+raise it the same way. */
+export function markReplyStarted(state: ChatState, id?: ChatId): void {
+	const chatId = id ?? state.activeChatId;
+	if (!state.replyStartedChatIds.includes(chatId))
+		state.replyStartedChatIds = [...state.replyStartedChatIds, chatId];
+}
+
+/** True when the given chat has a page fetch in flight right now. */
+export function hasFetchActive(state: ChatState, id?: ChatId): boolean {
+	return state.fetchActiveChatIds.includes(id ?? state.activeChatId);
 }
 
 const STORAGE_KEY = "ccez-llm-chats-v1";
@@ -140,7 +162,8 @@ export function createChatState(store?: KeyValueStore): ChatState {
 		sending: false,
 		sendingChatId: null,
 		sendingChatIds: [],
-		replyStartedChatIds: []
+		replyStartedChatIds: [],
+		fetchActiveChatIds: []
 	};
 	loadChats(state, store ?? browserStore() ?? memoryStore);
 	if (state.chats.length === 0) {
@@ -695,17 +718,22 @@ export async function streamAssistantReply(
 		const result = await provider.stream(
 			apiMessages,
 			{
+				onFetchStart: () => {
+					if (!state.fetchActiveChatIds.includes(chatId))
+						state.fetchActiveChatIds = [...state.fetchActiveChatIds, chatId];
+				},
+				onFetchEnd: () => {
+					state.fetchActiveChatIds = state.fetchActiveChatIds.filter(
+						(id) => id !== chatId
+					);
+				},
 				onToken: (token) => {
 					// First visible token: the reply has started arriving
 					// (thinking chip retires, haptic rumble, readback
 					// warm-up). Fires once — later tokens just extend the
 					// accumulator.
 					if (streamed === "" && token !== "") {
-						if (!state.replyStartedChatIds.includes(chatId))
-							state.replyStartedChatIds = [
-								...state.replyStartedChatIds,
-								chatId
-							];
+						markReplyStarted(state, chatId);
 						opts.onFirstToken?.();
 					}
 					streamed += token;
@@ -727,6 +755,9 @@ export async function streamAssistantReply(
 		state.replyStartedChatIds = state.replyStartedChatIds.filter(
 			(id) => id !== chatId
 		);
+		state.fetchActiveChatIds = state.fetchActiveChatIds.filter(
+			(id) => id !== chatId
+		);
 		state.sending = state.sendingChatIds.length > 0;
 		// sendingChatId tracks the most recent in-flight chat for the
 		// legacy global readers: fall back to a still-streaming one.
@@ -736,6 +767,105 @@ export async function streamAssistantReply(
 		}
 		persistChats(state, store);
 	}
+}
+
+/**
+ * Open a native (Rust-run) send: append the user message plus the empty
+ * assistant placeholder the turn fills, raise the sending flags, and
+ * persist — so a killed process still leaves the placeholder and the
+ * turn file behind for the boot scan to reconcile. Returns the ids the
+ * page passes to `turn_start`, or null when there is nothing to send
+ * (same guards as `sendMessage`: empty, or this chat already sending).
+ */
+export function beginNativeSend(
+	state: ChatState,
+	text: string,
+	opts: {
+		attachments?: Attachment[] | undefined;
+		pasteFolds?: PasteFold[] | undefined;
+	} = {},
+	store?: KeyValueStore
+): { chatId: ChatId; userId: ChatMsgId; replyId: ChatMsgId } | null {
+	const trimmed = text.trim();
+	const attachments = opts.attachments ?? [];
+	const pasteFolds = opts.pasteFolds ?? [];
+	const chat = activeChat(state);
+	if (
+		(!trimmed && attachments.length === 0) ||
+		state.sendingChatIds.includes(chat.id)
+	)
+		return null;
+	const userId = newChatMsgId();
+	const replyId = newChatMsgId();
+	chat.messages = [
+		...chat.messages,
+		{
+			id: userId,
+			role: "user",
+			content: trimmed,
+			usage: null,
+			error: null,
+			...(attachments.length > 0 ? { attachments } : {}),
+			...(pasteFolds.length > 0 ? { pasteFolds } : {})
+		},
+		{ id: replyId, role: "assistant", content: "", usage: null, error: null }
+	];
+	state.sendingChatIds = [...state.sendingChatIds, chat.id];
+	state.sending = true;
+	state.sendingChatId = chat.id;
+	persistChats(state, store);
+	return { chatId: chat.id, userId, replyId };
+}
+
+/**
+ * Open a native resend: the placeholder goes under the last user
+ * message (same guards as `resendLast`: user-last, nobody sending).
+ * Retry buttons route here on Android, so a retried turn survives the
+ * background exactly like a fresh one.
+ */
+export function beginNativeResend(
+	state: ChatState,
+	store?: KeyValueStore
+): { chatId: ChatId; replyId: ChatMsgId } | null {
+	const chat = activeChat(state);
+	const last = chat.messages[chat.messages.length - 1];
+	if (!last || last.role !== "user") return null;
+	if (state.sendingChatIds.includes(chat.id)) return null;
+	const replyId = newChatMsgId();
+	chat.messages = [
+		...chat.messages,
+		{ id: replyId, role: "assistant", content: "", usage: null, error: null }
+	];
+	state.sendingChatIds = [...state.sendingChatIds, chat.id];
+	state.sending = true;
+	state.sendingChatId = chat.id;
+	persistChats(state, store);
+	return { chatId: chat.id, replyId };
+}
+
+/**
+ * Settle a native send: drop every per-chat flag the turn raised and
+ * persist — the same tail `streamAssistantReply` runs, factored so the
+ * page, the done-event path, and the boot scan all settle identically.
+ */
+export function settleNativeSend(
+	state: ChatState,
+	chatId: ChatId,
+	store?: KeyValueStore
+): void {
+	state.sendingChatIds = state.sendingChatIds.filter((id) => id !== chatId);
+	state.replyStartedChatIds = state.replyStartedChatIds.filter(
+		(id) => id !== chatId
+	);
+	state.fetchActiveChatIds = state.fetchActiveChatIds.filter(
+		(id) => id !== chatId
+	);
+	state.sending = state.sendingChatIds.length > 0;
+	if (state.sendingChatId === chatId) {
+		state.sendingChatId =
+			state.sendingChatIds[state.sendingChatIds.length - 1] ?? null;
+	}
+	persistChats(state, store);
 }
 
 /**
@@ -778,7 +908,8 @@ export function visibleMessageCount(state: ChatState, chat: Chat): number {
 	return msgs.length;
 }
 
-function persistChats(state: ChatState, store?: KeyValueStore): void {
+/** Persisted shape owner (chats array only — runtime flags never touch disk). */
+export function persistChats(state: ChatState, store?: KeyValueStore): void {
 	try {
 		(store ?? browserStore() ?? memoryStore).setItem(
 			STORAGE_KEY,
