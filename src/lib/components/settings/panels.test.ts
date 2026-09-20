@@ -167,4 +167,12 @@ describe("provider gating wiring", () => {
 		expect(source).toMatch(/Check again/);
 		expect(source).toContain("probeOnDevice()");
 	});
+	it("renders the probe facts behind the verdict", () => {
+		// A flat stale-aicore can't tell an old AICore from a
+		// library mismatch: the version plus per-variant receipts
+		// ride a second note line.
+		const source = panelSource("ProviderPanel.svelte");
+		expect(source).toContain("onDeviceFacts");
+		expect(source).toContain("probeFacts(");
+	});
 });

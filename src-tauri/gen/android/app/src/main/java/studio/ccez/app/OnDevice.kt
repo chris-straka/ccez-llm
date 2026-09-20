@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.util.Log
 import com.google.mlkit.genai.common.DownloadStatus
 import com.google.mlkit.genai.common.FeatureStatus
 import com.google.mlkit.genai.common.GenAiException
@@ -25,6 +26,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import org.json.JSONArray
 import org.json.JSONObject
 
 /**
@@ -43,7 +45,9 @@ import org.json.JSONObject
  * - [status] -> `{"state": <ready|downloading|unavailable|error>,
  *   "reason"?: <no-model|unsupported|stale-aicore|failed>,
  *   "variant"?: <winning config name, ready only>,
- *   "downloadedBytes"?: <bytes so far, downloading only>}`. DOWNLOADABLE reports
+ *   "downloadedBytes"?: <bytes so far, downloading only>,
+ *   "aicore"?: <installed AICore version>,
+ *   "log"?: <per-variant receipts, oldest first>}`. DOWNLOADABLE reports
  *   unavailable/no-model AND starts the download in the background, so
  *   the next polls read downloading, then ready — "reconnect once,
  *   then it works offline".
@@ -91,6 +95,57 @@ object OnDevice {
 
     /** Guard so repeated status polls start only one download watcher. */
     private val downloadWatch = AtomicBoolean(false)
+
+    /**
+     * Per-variant receipts of the last probe walk, oldest first
+     * ("default: 606 feature 636 not found in 412ms"). Cleared at
+     * each walk start; rides every status JSON so Settings shows
+     * what AICore answered per config instead of one flat verdict.
+     */
+    private val probeLog = mutableListOf<String>()
+
+    @Synchronized
+    private fun addProbe(entry: String) {
+        probeLog.add(entry)
+        Log.d("OnDevice", entry)
+    }
+
+    @Synchronized
+    private fun clearProbe() {
+        probeLog.clear()
+    }
+
+    @Synchronized
+    private fun snapshotProbe(): List<String> = probeLog.toList()
+
+    /**
+     * Installed AICore version (a hidden system component — the user
+     * can't see it in the store, so the probe reports it). "not
+     * installed" when absent, "unknown" when the lookup fails.
+     */
+    private fun aicoreVersion(): String {
+        if (!::appContext.isInitialized) return "unknown"
+        return try {
+            val info = appContext.packageManager.getPackageInfo(
+                "com.google.android.aicore", 0,
+            )
+            info.versionName ?: "unknown"
+        } catch (_: PackageManager.NameNotFoundException) {
+            "not installed"
+        } catch (_: Exception) {
+            "unknown"
+        }
+    }
+
+    /**
+     * AICore names the missing feature in the 606 message ("Feature
+     * 636 is not available") — pull the number so the log says
+     * WHICH feature each config asked for.
+     */
+    private fun featureOf(e: Exception): String {
+        val hit = Regex("Feature (\\d+)").find(e.message ?: "")
+        return if (hit != null) "feature ${hit.groupValues[1]}" else "feature unknown"
+    }
 
     /** Bytes downloaded so far (no API total exists); read by [status]. */
     private val downloadedBytes = AtomicLong(0)
@@ -195,6 +250,14 @@ object OnDevice {
         if (detail != null) o.put("detail", detail)
         if (downloaded != null) o.put("downloadedBytes", downloaded)
         if (variant != null) o.put("variant", variant)
+        // Diagnostics ride every payload: the walk receipts plus the
+        // installed AICore version (a bare stale-aicore can't tell an
+        // old AICore from a library mismatch). The TS bridge ignores
+        // unknown keys; the Rust side reads only known ones.
+        o.put("aicore", aicoreVersion())
+        val log = JSONArray()
+        for (entry in snapshotProbe()) log.put(entry)
+        o.put("log", log)
         return o.toString()
     }
 
@@ -248,15 +311,24 @@ object OnDevice {
      */
     @JvmStatic
     fun status(): String {
+        clearProbe()
         return try {
             runBlocking {
                 withTimeout(STATUS_TIMEOUT_MS) {
                     var sawUnsupported = false
                     walk@ for (variant in configVariants) {
+                        val started = System.currentTimeMillis()
+                        val ms = { System.currentTimeMillis() - started }
                         val code = try {
                             clientFor(variant).checkStatus()
                         } catch (e: Exception) {
-                            if (e is GenAiException && e.errorCode == 606) continue@walk
+                            if (e is GenAiException && e.errorCode == 606) {
+                                addProbe(
+                                    "${variant.name}: 606 ${featureOf(e)} not found in ${ms()}ms",
+                                )
+                                continue@walk
+                            }
+                            addProbe("${variant.name}: error in ${ms()}ms")
                             return@withTimeout json(
                                 "error",
                                 failureReason(e),
@@ -266,6 +338,7 @@ object OnDevice {
                         when (code) {
                             FeatureStatus.AVAILABLE -> {
                                 activeVariant = variant
+                                addProbe("${variant.name}: AVAILABLE in ${ms()}ms")
                                 return@withTimeout json(
                                     "ready",
                                     null,
@@ -274,6 +347,7 @@ object OnDevice {
                             }
                             FeatureStatus.DOWNLOADING -> {
                                 activeVariant = variant
+                                addProbe("${variant.name}: DOWNLOADING in ${ms()}ms")
                                 return@withTimeout json(
                                     "downloading",
                                     null,
@@ -282,10 +356,14 @@ object OnDevice {
                             }
                             FeatureStatus.DOWNLOADABLE -> {
                                 activeVariant = variant
+                                addProbe("${variant.name}: DOWNLOADABLE in ${ms()}ms")
                                 kickDownloadOnce()
                                 return@withTimeout json("unavailable", "no-model")
                             }
-                            else -> sawUnsupported = true
+                            else -> {
+                                sawUnsupported = true
+                                addProbe("${variant.name}: $code in ${ms()}ms")
+                            }
                         }
                     }
                     if (sawUnsupported) json("unavailable", "unsupported")

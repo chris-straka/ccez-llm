@@ -275,3 +275,48 @@ test("reply notification toggle persists", async ({ page }) => {
 		)
 		.toContain('"replyNotifications":true');
 });
+
+/** The on-device note carries the probe facts: AICore version plus
+per-variant receipts, so a flat verdict never hides what AICore
+answered per config. */
+test("on-device note renders probe facts", async ({ page }) => {
+	await page.addInitScript(() => {
+		const stored = window.localStorage.getItem("ccez-llm-settings-v1");
+		const parsed = stored
+			? (JSON.parse(stored) as Record<string, unknown>)
+			: {};
+		parsed["activeProviderId"] = "local-mlkit";
+		window.localStorage.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify(parsed)
+		);
+		(window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {
+			invoke: async (cmd: string) => {
+				if (cmd === "ondevice_status")
+					return {
+						state: "error",
+						reason: "stale-aicore",
+						log: [
+							"default: 606 feature 636 not found",
+							"full-stable: UNAVAILABLE"
+						],
+						aicore: "241912009"
+					};
+				throw new Error(`unmocked command: ${cmd}`);
+			}
+		};
+	});
+	await page.goto("/");
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
+	await page.keyboard.press("Meta+,");
+	const panel = page.locator(".settings-panel");
+	await expect(panel).not.toHaveClass(/closed/);
+	await expect(panel.getByText("On-device chat isn't ready.")).toBeVisible();
+	await expect(
+		panel.getByText("AI Core 241912009 · default: 606 feature 636 not found", {
+			exact: false
+		})
+	).toBeVisible();
+});

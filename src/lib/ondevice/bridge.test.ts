@@ -11,6 +11,7 @@ import {
 	onDeviceUnsupported,
 	openAICorePage,
 	parseOnDeviceStatus,
+	probeFacts,
 	type OnDeviceDeps
 } from "./bridge";
 
@@ -173,6 +174,36 @@ describe("parseOnDeviceStatus", () => {
 		expect(long.detail).toHaveLength(200);
 	});
 
+	it("carries the probe log and AICore version, capped", () => {
+		expect(
+			parseOnDeviceStatus({
+				state: "error",
+				reason: "stale-aicore",
+				log: ["default: 606 feature 636 not found in 412ms"],
+				aicore: "241912009"
+			})
+		).toEqual({
+			state: "error",
+			reason: "stale-aicore",
+			log: ["default: 606 feature 636 not found in 412ms"],
+			aicore: "241912009"
+		});
+		// Non-strings drop out, blanks drop out, caps hold.
+		const capped = parseOnDeviceStatus({
+			state: "error",
+			reason: "failed",
+			log: [7, "  ", "x".repeat(500), "ok"],
+			aicore: "  "
+		});
+		expect(capped.log).toEqual(["x".repeat(120), "ok"]);
+		expect(capped.aicore).toBeUndefined();
+		const many = parseOnDeviceStatus({
+			state: "ready",
+			log: ["a", "b", "c", "d", "e", "f", "g", "h", "i"]
+		});
+		expect(many.log).toHaveLength(8);
+	});
+
 	it("reads garbage as an error, never throws", () => {
 		expect(parseOnDeviceStatus("bogus")).toEqual({
 			state: "error",
@@ -190,6 +221,26 @@ describe("parseOnDeviceStatus", () => {
 			state: "error",
 			reason: "bad-status"
 		});
+	});
+});
+
+describe("probeFacts", () => {
+	it("joins the AICore version and per-variant receipts", () => {
+		expect(
+			probeFacts({
+				state: "error",
+				reason: "stale-aicore",
+				log: ["default: 606 feature 636 not found", "full-stable: UNAVAILABLE"],
+				aicore: "241912009"
+			})
+		).toBe(
+			"AI Core 241912009 · default: 606 feature 636 not found; full-stable: UNAVAILABLE"
+		);
+		expect(probeFacts({ state: "ready", aicore: "1" })).toBe("AI Core 1");
+		expect(probeFacts({ state: "ready", log: ["default: AVAILABLE"] })).toBe(
+			"default: AVAILABLE"
+		);
+		expect(probeFacts({ state: "ready" })).toBeNull();
 	});
 });
 

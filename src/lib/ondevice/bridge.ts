@@ -80,6 +80,15 @@ export interface OnDeviceStatus {
 	 * never passes silently.
 	 */
 	variant?: string;
+	/**
+	 * Per-variant receipts of the native probe walk, oldest first
+	 * ("default: 606 feature 636 not found in 412ms"). Settings
+	 * renders them behind a probe result so a flat verdict never
+	 * hides what AICore answered per config.
+	 */
+	log?: string[];
+	/** Installed AICore version behind the probe ("not installed" when absent). */
+	aicore?: string;
 }
 
 /**
@@ -187,6 +196,18 @@ export function parseOnDeviceStatus(payload: unknown): OnDeviceStatus {
 			out.detail = raw["detail"].trim().slice(0, 200);
 		if (typeof raw["variant"] === "string" && raw["variant"])
 			out.variant = raw["variant"];
+		if (Array.isArray(raw["log"])) {
+			const entries = raw["log"]
+				.filter(
+					(entry): entry is string =>
+						typeof entry === "string" && entry.trim() !== ""
+				)
+				.slice(0, 8)
+				.map((entry) => entry.trim().slice(0, 120));
+			if (entries.length > 0) out.log = entries;
+		}
+		if (typeof raw["aicore"] === "string" && raw["aicore"].trim())
+			out.aicore = raw["aicore"].trim().slice(0, 64);
 		if (state === "error" && out.reason === undefined)
 			out.reason = "bad-status";
 		return out;
@@ -221,6 +242,20 @@ export function onDeviceErrorCopy(reason: unknown): string {
 		default:
 			return "On-device chat failed. Try again.";
 	}
+}
+
+/**
+ * Settings-only facts line behind a probe result: installed AICore
+ * plus per-variant receipts ("AI Core 241912009 · default: 606
+ * feature 636 not found in 412ms; full-stable: DOWNLOADABLE").
+ * Null when there is nothing to show. Pure.
+ */
+export function probeFacts(status: OnDeviceStatus): string | null {
+	const parts: string[] = [];
+	if (status.aicore) parts.push(`AI Core ${status.aicore}`);
+	if (status.log?.length) parts.push(status.log.join("; "));
+	if (parts.length === 0) return null;
+	return parts.join(" · ");
 }
 
 /**

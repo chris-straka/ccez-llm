@@ -29,6 +29,7 @@
 		onDeviceStatus,
 		onDeviceUnsupported,
 		openAICorePage,
+		probeFacts,
 		type OnDeviceStatus
 	} from "$lib/ondevice/bridge";
 	import { isAndroidUserAgent, visibleProviderIds } from "$lib/platform";
@@ -160,6 +161,12 @@
 	let onDeviceNote = $state("");
 	/** Machine reason behind the note (drives the AI Core button). */
 	let onDeviceReason: string | null = $state(null);
+	/**
+	 * Facts behind the note (AICore version + per-variant probe
+	 * receipts). Rendered once the probe lands so a flat verdict
+	 * never hides what AICore answered per config.
+	 */
+	let onDeviceFacts: string | null = $state(null);
 	/** Store-open failure for the AI Core button; cleared on edit. */
 	let aicoreOpenError = $state("");
 	/**
@@ -211,9 +218,11 @@
 			if (!wantNote) {
 				onDeviceNote = "";
 				onDeviceReason = null;
+				onDeviceFacts = null;
 				return;
 			}
 			onDeviceReason = status.reason ?? null;
+			onDeviceFacts = probeFacts(status);
 			// A fallback config names itself so it never passes
 			// silently; the default needs no annotation.
 			const readyNote =
@@ -237,6 +246,7 @@
 			if (wantNote) {
 				onDeviceNote = onDeviceErrorCopy("unsupported");
 				onDeviceReason = null;
+				onDeviceFacts = null;
 			}
 		} finally {
 			onDeviceProbing = false;
@@ -433,6 +443,9 @@
 			<p class="note" role="status">
 				{onDeviceProbing ? "Checking on-device model…" : onDeviceNote}
 			</p>
+			{#if onDeviceFacts && !onDeviceProbing}
+				<p class="note">{onDeviceFacts}</p>
+			{/if}
 			<p class="note">
 				<!-- Manual re-probe: terminal states (error, no model
 					yet) never re-poll on their own, so after an AI Core
