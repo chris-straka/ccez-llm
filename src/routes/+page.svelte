@@ -145,6 +145,7 @@
 		showNotice,
 		toastTimeoutFor,
 		errorToastTimeoutFor,
+		toastLong,
 		VOICE_TIMEOUT_MS
 	} from "$lib/notices";
 	import {
@@ -6859,17 +6860,10 @@
 			shell: tauriBackendAvailable()
 		});
 		clearStudyBadge();
-		// Permission-gated background ping: ask from the send gesture
-		// while the window is focused, so a later backgrounded long
-		// reply may notify. Shell goes through the notification plugin
-		// (the only channel in the Android WebView); web asks the
-		// Notification ctor. No-op unless undecided — and never asked
-		// when the ping itself is off.
-		if (settings.replyNotifications) {
-			void ensureReplyNotificationPermissionAsync({
-				shell: tauriBackendAvailable()
-			});
-		}
+		// No permission ask from the send gesture: tapping send must
+		// never raise anything notification-shaped. The startup ask
+		// (same gating) is the only prompt, so a later backgrounded
+		// long reply may still notify once granted there.
 		if (action === "commit-edit") {
 			// Saving an edit rewrites the message in place, never
 			// resends — and the composer text below still sends as a
@@ -12064,7 +12058,9 @@
 		{#if notices.errorToast.message}
 			<button
 				type="button"
-				class="toast error"
+				class={toastLong(notices.errorToast.message)
+					? "toast error long"
+					: "toast error"}
 				title="Dismiss"
 				aria-live="polite"
 				transition:fade={{ duration: 160 }}
@@ -12073,7 +12069,7 @@
 		{:else if notices.toast.message}
 			<button
 				type="button"
-				class="toast"
+				class={toastLong(notices.toast.message) ? "toast long" : "toast"}
 				title={toastAction && toastAction.seq === notices.toast.seq
 					? "Open"
 					: "Click to copy"}
@@ -17237,6 +17233,12 @@
 		max-width: calc(100vw - 2rem);
 		max-height: 30vh;
 		overflow-y: auto;
+	}
+	/* Long copy wraps into a card: the 999px stadium radius reads
+	broken past ~two lines, so toasts over TOAST_LONG_CHARS ride
+	the same 12px card radius as the app's other surfaces. */
+	.toast.long {
+		border-radius: 12px;
 	}
 	/* Speech errors ride under the toast: top of the screen, big
 	enough to notice, same dark-red pairing as the old banner so it

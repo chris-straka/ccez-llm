@@ -8,7 +8,9 @@ import {
 	TOAST_TIMEOUT_MS,
 	ERROR_TOAST_TIMEOUT_MS,
 	toastTimeoutFor,
-	errorToastTimeoutFor
+	errorToastTimeoutFor,
+	toastLong,
+	TOAST_LONG_CHARS
 } from "./notices";
 
 describe("notice queue", () => {
@@ -80,6 +82,14 @@ describe("notice queue", () => {
 		// Paragraphs never linger past the cap.
 		expect(toastTimeoutFor("x".repeat(1000))).toBe(9000);
 		expect(errorToastTimeoutFor("x".repeat(1000))).toBe(15000);
+	});
+
+	it("long copy rides the card radius, short copy stays a pill", () => {
+		expect(TOAST_LONG_CHARS).toBe(90);
+		expect(toastLong(null)).toBe(false);
+		expect(toastLong("Copied")).toBe(false);
+		expect(toastLong("x".repeat(90))).toBe(false);
+		expect(toastLong("x".repeat(91))).toBe(true);
 	});
 
 	it("re-flashing disarms the older timer without clearTimeout", () => {

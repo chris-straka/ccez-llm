@@ -32,6 +32,15 @@ export function toastTimeoutFor(message: string): number {
 export function errorToastTimeoutFor(message: string): number {
 	return Math.min(15000, ERROR_TOAST_TIMEOUT_MS + message.length * 40);
 }
+/**
+ * Above this length a toast wraps into a card instead of a pill: the
+ * stadium shape reads broken past ~two phone lines. Pure.
+ */
+export const TOAST_LONG_CHARS = 90;
+/** True when the copy needs the long (card-radius) toast. Pure. */
+export function toastLong(message: string | null): boolean {
+	return typeof message === "string" && message.length > TOAST_LONG_CHARS;
+}
 export const VOICE_TIMEOUT_MS = 8000;
 export const MODEL_TIMEOUT_MS = 5000;
 

@@ -114,9 +114,13 @@ test("short backgrounded reply stays silent (no notification, no badge)", async 
 	await page.addInitScript(() => {
 		const notes: unknown[] = [];
 		(window as unknown as Record<string, unknown>).__notes = notes;
+		const permRequests: unknown[] = [];
+		(window as unknown as Record<string, unknown>).__permRequests =
+			permRequests;
 		class StubNotification {
-			static permission = "granted";
+			static permission = "default";
 			static requestPermission(): Promise<string> {
+				permRequests.push(1);
 				return Promise.resolve("granted");
 			}
 			constructor(
@@ -166,4 +170,13 @@ test("short backgrounded reply stays silent (no notification, no badge)", async 
 		() => (window as unknown as { __notes?: unknown[] }).__notes ?? []
 	);
 	expect(notes).toEqual([]);
+	// Exactly one permission prompt, from the startup ask: the send
+	// gesture never raises anything notification-shaped (with the old
+	// send-time ask this would be two).
+	const permRequests = await page.evaluate(
+		() =>
+			(window as unknown as { __permRequests?: unknown[] }).__permRequests ??
+			[]
+	);
+	expect(permRequests).toEqual([1]);
 });
