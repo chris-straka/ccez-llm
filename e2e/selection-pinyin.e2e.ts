@@ -237,6 +237,12 @@ test("right-clicking kanji in japanese shows furigana and speaks", async ({
 	// lands at once, readings follow when the load finishes.
 	await expect(panel).toBeVisible({ timeout: 10_000 });
 	await expect(panel).toContainText("かんじ", { timeout: 60_000 });
-	await expect(panel).not.toContainText("漢字");
+	// Annotated popup: the kanji repeat beside their own readings
+	// (both accent) so each pair maps back; kana would repeat plain.
+	await expect(panel).toContainText("漢字");
+	expect(await panel.locator(".spr").count()).toBeGreaterThanOrEqual(1);
+	expect(await panel.locator(".srt").count()).toBe(
+		await panel.locator(".spr").count()
+	);
 	await expect.poll(() => spoken(page), { timeout: 10_000 }).toContain("漢字");
 });

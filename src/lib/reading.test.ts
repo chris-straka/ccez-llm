@@ -33,7 +33,8 @@ import {
 	resolveAidKinds,
 	codeAwareLines,
 	stripCodeForDetection,
-	readingsOnly
+	readingsOnly,
+	annotatedRuns
 } from "./reading";
 import { pinyinBlock, pinyinRuby } from "./pinyin";
 import { isFuriganaCached } from "./furigana";
@@ -482,6 +483,53 @@ describe("readingsOnly", () => {
 	it("trims each reading before joining", () => {
 		const html = "<p><rt>  a  </rt><rt>b</rt></p>";
 		expect(readingsOnly(html, "|", "rt")).toBe("a|b");
+	});
+});
+
+describe("annotatedRuns", () => {
+	it("splits kanji runs with readings, kana plain", () => {
+		expect(
+			annotatedRuns(
+				'<span class="frb">咲<span class="frt">さ</span></span>き<span class="frb">誇<span class="frt">ほこ</span></span>り'
+			)
+		).toEqual([
+			{ text: "咲", reading: "さ" },
+			{ text: "き", reading: null },
+			{ text: "誇", reading: "ほこ" },
+			{ text: "り", reading: null }
+		]);
+	});
+
+	it("descends into wrappers: the real converter wraps runs in <p>", () => {
+		expect(
+			annotatedRuns(
+				'<p><span class="frb">咲<span class="frt">さ</span></span>き<span class="frb">誇<span class="frt">ほこ</span></span>り</p>'
+			)
+		).toEqual([
+			{ text: "咲", reading: "さ" },
+			{ text: "き", reading: null },
+			{ text: "誇", reading: "ほこ" },
+			{ text: "り", reading: null }
+		]);
+	});
+
+	it("returns null when no kanji run carries a reading", () => {
+		expect(annotatedRuns("<p>plain</p>")).toBe(null);
+		expect(annotatedRuns("")).toBe(null);
+		expect(
+			annotatedRuns('<span class="frb">咲<span class="frt">  </span></span>')
+		).toBe(null);
+	});
+
+	it("keeps hostile markup inert: only span text is read out", () => {
+		// The parse yields strings, never elements: the Svelte
+		// renderer escapes them again, so no tag survives as markup.
+		const runs = annotatedRuns(
+			'<span class="frb">&lt;img src=x onerror=alert(1)&gt;<span class="frt">さ</span></span>'
+		);
+		expect(runs).toEqual([
+			{ text: "<img src=x onerror=alert(1)>", reading: "さ" }
+		]);
 	});
 });
 

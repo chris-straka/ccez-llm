@@ -299,6 +299,14 @@ test.describe("gestures", () => {
 		await expect(aside).toHaveClass(/collapsed/);
 	});
 
+	test("near-left-edge swipe summons the chat sidebar", async ({ page }) => {
+		const aside = page.locator("aside:has(button.side-chat)");
+		// A thumb landing 60px in (no case can hit the old 24px strip)
+		// still summons — the zone is thumb-wide, not pixel-tight.
+		await swipeMidScreen(page, 60, 220);
+		await expect(aside).not.toHaveClass(/collapsed/);
+	});
+
 	test("mid-screen swipe left opens settings, folds the list", async ({
 		page
 	}) => {
@@ -2356,7 +2364,7 @@ test.describe("always-visible prompt", () => {
 		await expect(composer(page)).toBeFocused({ timeout: 5000 });
 	});
 
-	/** A leftward stroke starting on a message folds it, never summons. */
+	/** A stroke starting on a message folds it either way, never summons. */
 	test("message swipe folds, never summons the sidebar", async ({ page }) => {
 		await seed(page, {}, [LONG]);
 		await page.goto("/");
@@ -2367,6 +2375,15 @@ test.describe("always-visible prompt", () => {
 		await expect(article).not.toHaveClass(/folded-msg/);
 		// Leftward: folds the message, sidebar stays shut.
 		await flick(page, "article.assistant .rendered", 220, 500, 30, 505);
+		await expect(article).toHaveClass(/folded-msg/);
+		await expect(aside).toHaveClass(/collapsed/);
+		// Rightward on the folded message unfolds it (swipe toggles),
+		// still never summoning.
+		await flick(page, "article.assistant", 30, 500, 220, 505);
+		await expect(article).not.toHaveClass(/folded-msg/);
+		await expect(aside).toHaveClass(/collapsed/);
+		// Rightward on the open message folds it again.
+		await flick(page, "article.assistant", 30, 500, 220, 505);
 		await expect(article).toHaveClass(/folded-msg/);
 		await expect(aside).toHaveClass(/collapsed/);
 	});

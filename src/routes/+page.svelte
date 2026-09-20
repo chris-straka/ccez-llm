@@ -323,6 +323,8 @@
 		spliceAidResult,
 		resolveAidKinds,
 		readingsOnly,
+		annotatedRuns,
+		type AnnotatedRun,
 		type LocalAid,
 		type HanOverlayLang
 	} from "$lib/reading";
@@ -880,9 +882,12 @@
 		range: Range | null;
 	} | null>(null);
 	/**
-	 * Selection readings overlay: right-clicking a Han character with
-	 * a live highlight shows just the readings (pinyin/furigana, never
-	 * the characters again — they're right there). Read-only and
+	 * Selection readings overlay: right-clicking a highlight that
+	 * contains Han shows just the readings (pinyin/furigana, never
+	 * the characters again — they're right there). The furigana side
+	 * keeps per-kanji runs (kanji + its word-context reading in
+	 * accent, okurigana repeated plain) so mixed selections like
+	 * 咲き誇り map back; pinyin stays a flat string. Read-only and
 	 * pointer-transparent, so it can't disturb the highlight — and
 	 * the highlight clearing dismisses it at once via
 	 * selectionchange below.
@@ -894,6 +899,7 @@
 		quote: string;
 		messageId: ChatMsgId;
 		html: string;
+		runs: AnnotatedRun[] | null;
 	} | null>(null);
 	/**
 	 * An unanswered selection menu never lingers (clicking away still
@@ -1101,7 +1107,8 @@
 	edge the same way, so tall readings never need measuring. */
 	function placeSelPinyin(
 		quoted: { quote: string; messageId: ChatMsgId },
-		html: string
+		html: string,
+		runs: AnnotatedRun[] | null = null
 	): void {
 		const live = window.getSelection();
 		const rect = live?.rangeCount
@@ -1116,7 +1123,8 @@
 			above,
 			quote: quoted.quote,
 			messageId: quoted.messageId,
-			html
+			html,
+			runs
 		};
 		requestAnimationFrame(() => {
 			const node = document.querySelector(".sel-pinyin");
@@ -1166,12 +1174,15 @@
 			now.quote !== quoted.quote
 		)
 			return;
-		const readings = readingsOnly(html, "", ".frt");
-		if (!readings) {
+		// Annotated runs keep each kanji beside its own word-context
+		// reading (mixed selections included); null means no kanji
+		// carried a reading, so the popup stays shut like before.
+		const runs = annotatedRuns(html);
+		if (!runs) {
 			if (selPinyin?.quote === quoted.quote) selPinyin = null;
 			return;
 		}
-		placeSelPinyin(quoted, readings);
+		placeSelPinyin(quoted, "", runs);
 	}
 	/**
 	 * Readings for a highlight in the popup above the selection (see
@@ -7874,11 +7885,11 @@
 					}
 					return;
 				}
-				// Phone: a leftward stroke starting on a message folds it
-				// (a rightward stroke instead summons the chats list via
-				// the stroke below — the fold only wins on a leftward
-				// message stroke). An active text selection wins —
-				// folding mid-select would eat the highlight.
+				// Phone: a horizontal stroke starting on a message folds
+				// it either way (a rightward stroke off messages summons
+				// the chats list via the stroke below instead). An active
+				// text selection wins — folding mid-select would eat the
+				// highlight.
 				const foldDx = ended.clientX - start.x;
 				const foldDy = ended.clientY - start.y;
 				if (
@@ -7886,7 +7897,7 @@
 					start.msgId &&
 					!start.rowSwipe &&
 					!start.codeSwipe &&
-					foldDx <= -64 &&
+					Math.abs(foldDx) >= 64 &&
 					Math.abs(foldDy) < Math.abs(foldDx) &&
 					window.getSelection()?.isCollapsed !== false
 				) {
@@ -7987,6 +7998,10 @@
 							selectParagraphAtPoint(ended.clientX, ended.clientY);
 					}
 				}
+				// Thumb-wide edge zone (not the 24px helper default a
+				// thumb in a case can't land): rightward strokes still only
+				// summon from the left side, mid-screen drift still never
+				// opens the list (see middleSwipeTarget).
 				const target = start.rowSwipe
 					? null
 					: (edgeSwipeTarget(
@@ -7994,7 +8009,9 @@
 							start.y,
 							ended.clientX,
 							ended.clientY,
-							window.innerWidth
+							window.innerWidth,
+							48,
+							64
 						) ?? middleSwipeTarget(start, ended));
 				// The quick switcher owns every swipe while up: strokes
 				// on its veil cycle chats, and nothing may summon a
@@ -10295,28 +10312,6 @@
 				return "";
 			return extractWordAt(node.textContent ?? "", range?.startOffset ?? 0);
 		}
-		/** True when the right-click point lands on a Han character
-		inside the message body (same hit test as the word reader). */
-		function hanCharUnderCursor(event: MouseEvent, body: Element): boolean {
-			let range: Range | null = null;
-			try {
-				if (typeof document.caretRangeFromPoint === "function") {
-					range = document.caretRangeFromPoint(event.clientX, event.clientY);
-				}
-			} catch {
-				range = null;
-			}
-			const node = range?.startContainer;
-			if (!node || !body.contains(node)) return false;
-			let ch: string;
-			if (node.nodeType === Node.TEXT_NODE) {
-				ch = (node.textContent ?? "")[range?.startOffset ?? 0] ?? "";
-			} else {
-				const kid = node.childNodes[range?.startOffset ?? 0];
-				ch = kid?.textContent?.[0] ?? "";
-			}
-			return ch !== "" && isHanChar(ch);
-		}
 		// Desktop right-click reads aloud (the selection, else the word
 		// under the cursor, else the whole message; a second
 		// right-click restarts it, never stops it) AND opens the
@@ -10382,16 +10377,18 @@
 			if (target?.closest("button, input, textarea, a, summary")) return;
 			// Highlighted text wins: a right-click with a live message
 			// selection reads the whole selection (same per-quote
-			// language as the sel-menu button). On a Han character it
-			// also shows readings for just the highlight — pinyin in
-			// Chinese text, furigana in Japanese — speech always runs;
-			// the panel is a silent extra. Like Inspect, a lone Han
-			// char reads its locale from the surrounding sentence.
+			// language as the sel-menu button). When the highlight
+			// contains Han it also shows readings for just the
+			// highlight — pinyin in Chinese text, furigana in
+			// Japanese (per-kanji runs, so mixed selections like
+			// 咲き誇り map back) — speech always runs; the panel is
+			// a silent extra. Like Inspect, a lone Han char reads
+			// its locale from the surrounding sentence.
 			const quoted = currentQuote();
 			if (quoted) {
 				const probe =
 					sentenceForQuote(quoted.context, quoted.quote) ?? quoted.context;
-				if (hanCharUnderCursor(event, body)) {
+				if ([...quoted.quote].some((ch) => isHanChar(ch))) {
 					if (
 						hanOverlayLangFor(probe) !== "ja" &&
 						offeredLocalAids(quoted.quote, activeReplyCode).includes("pinyin")
@@ -12451,7 +12448,23 @@
 			style="left: {selPinyin.x}px; top: {selPinyin.y}px"
 			aria-live="polite"
 		>
-			<!-- eslint-disable-line svelte/no-at-html-tags -- html is "…" or readingsOnly output (inert by unit test, see reading.ts) -->{@html selPinyin.html}
+			{#if selPinyin.runs}
+				<!-- Annotated furigana: each kanji keeps its own
+				word-context reading above it (both accent); kana
+				repeats plain. Runs are parser output rendered as
+				text, so hostile markup stays inert. -->
+				{#each selPinyin.runs as run, i (i)}
+					{#if run.reading}
+						<span class="spr"
+							><span class="srt">{run.reading}</span><span class="spb"
+								>{run.text}</span
+							></span
+						>
+					{:else}{run.text}{/if}
+				{/each}
+			{:else}
+				<!-- eslint-disable-line svelte/no-at-html-tags -- html is "…" or readingsOnly output (inert by unit test, see reading.ts) -->{@html selPinyin.html}
+			{/if}
 		</div>
 	{/if}
 
@@ -14082,18 +14095,15 @@
 		padding-right: 0.5%;
 	}
 	/* Full-width settings sheet on phones: no sliver to tap, no
-	weird one-tap-close strip. left+right with auto width fills
-	exactly (a 100% width would add the padding on top and overflow).
-	The inner column centers itself. */
+	weird one-tap-close strip, no gap down the right side. left+right
+	with auto width fills exactly (a 100% width would add the padding
+	on top and overflow); border-box keeps that promise. The inner
+	column centers itself. */
 	.app[data-android] .settings-panel {
-		/* Same sheet as the chats list (never full-width): the two
-		drawers match instead of one spanning the screen. Border-box
-		so padding can't part the boxes (content-box left a ~2px
-		gap between them). */
 		box-sizing: border-box;
 		left: 0;
-		right: auto;
-		width: min(78vw, 20rem);
+		right: 0;
+		width: auto;
 		padding-top: calc(1.2rem + env(safe-area-inset-top, 0px));
 	}
 	.app[data-android] .settings-inner {
@@ -16225,6 +16235,27 @@
 	.sel-pinyin:not(.above) {
 		margin-top: 4px;
 	}
+	/* Annotated furigana runs: reading stacked above its kanji
+	(ruby order), the pair kept atomic across line breaks. Kanji
+	and reading share the accent so each pair reads as one unit;
+	kana repeats in the popup ink, uncolored. */
+	.sel-pinyin .spr {
+		display: inline-block;
+		text-align: center;
+		white-space: nowrap;
+		line-height: 1.3;
+	}
+	.sel-pinyin .srt {
+		display: block;
+		font-size: 0.72em;
+		color: #007aff;
+		color: var(--accent);
+	}
+	.sel-pinyin .spb {
+		display: block;
+		color: #007aff;
+		color: var(--accent);
+	}
 	/* Cursor-anchored annotation pill (ChatGPT-style): a rounded bar that
 	starts as a single-line prompt and grows as you type. Enter saves,
 	Shift+Enter adds a line, Escape cancels. Beats the centered-column
@@ -17061,6 +17092,13 @@
 	and past it the column goes wide so huge text stays readable. */
 	.app[data-android]:not([data-fullbleed]) article.assistant {
 		width: fit-content;
+	}
+	/* A folded assistant message spans the column instead of
+	shrink-wrapping: the capped preview floated mid-screen rather
+	than starting where the message text starts. */
+	.app[data-android]:not([data-fullbleed]) article.assistant.folded-msg {
+		width: auto;
+		align-self: stretch;
 	}
 	/* Full-bleed keeps the article full width while the bubble stays
 	shrink-wrapped: short notes dock hard right (a full-width own

@@ -253,6 +253,17 @@ describe("edgeSwipeTarget", () => {
 		expect(edgeSwipeTarget(30, 0, 100, 0, W, 48, 24)).toBeNull(); // outside zone
 		expect(edgeSwipeTarget(30, 0, 100, 0, W, 48, 32)).toBe("chats");
 	});
+	it("summons chats from the wider thumb zone, never mid-screen", () => {
+		// The one-finger touch path passes 48/64: a thumb landing 60px
+		// in still summons...
+		expect(edgeSwipeTarget(60, 600, 200, 604, W, 48, 64)).toBe("chats");
+		// ...while a mid-screen stroke stays shut.
+		expect(edgeSwipeTarget(100, 600, 240, 604, W, 48, 64)).toBeNull();
+		// The right edge mirrors for settings.
+		expect(edgeSwipeTarget(W - 60, 600, W - 200, 596, W, 48, 64)).toBe(
+			"settings"
+		);
+	});
 });
 
 describe("contentSwipeTarget", () => {

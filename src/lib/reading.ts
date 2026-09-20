@@ -552,3 +552,59 @@ export function readingsOnly(
 		.filter((part) => part !== "");
 	return parts.length > 0 ? escapeHtml(parts.join(joiner)) : null;
 }
+
+/** One annotated run for the selection popup: a kanji slice with its
+contextual reading, or plain text (okurigana repeats uncolored). */
+export interface AnnotatedRun {
+	text: string;
+	reading: string | null;
+}
+
+/**
+ * Split ruby HTML into annotated runs for the selection popup: each
+ * `.frb` span becomes a kanji run with its `.frt` reading, every
+ * other element is transparent (real converter output wraps runs in
+ * paragraphs), and text passes through as plain runs. Returns null
+ * when no kanji run carries a reading — the popup stays shut, same
+ * as the flat path. Parsing (not string-splitting) keeps hostile
+ * markup inert: only span text is ever read out, and the Svelte
+ * renderer escapes it again on the way in.
+ */
+export function annotatedRuns(html: string): AnnotatedRun[] | null {
+	let doc: Document;
+	try {
+		doc = new DOMParser().parseFromString(html, "text/html");
+	} catch {
+		return null;
+	}
+	const out: AnnotatedRun[] = [];
+	let found = false;
+	const plain = (text: string): void => {
+		if (text !== "") out.push({ text, reading: null });
+	};
+	// Recursive: real converter output wraps runs in paragraphs, so
+	// plain elements are transparent — only .frb is special.
+	const walk = (node: Node): void => {
+		if (node.nodeType === Node.TEXT_NODE) {
+			plain(node.textContent ?? "");
+			return;
+		}
+		if (node instanceof Element && node.classList.contains("frb")) {
+			const reading = node.querySelector(".frt")?.textContent?.trim() ?? "";
+			const base = [...node.childNodes]
+				.filter((kid) => kid.nodeType === Node.TEXT_NODE)
+				.map((kid) => kid.textContent ?? "")
+				.join("");
+			if (base !== "" && reading !== "") {
+				out.push({ text: base, reading });
+				found = true;
+			} else {
+				plain(node.textContent ?? "");
+			}
+			return;
+		}
+		node.childNodes.forEach(walk);
+	};
+	doc.body.childNodes.forEach(walk);
+	return found ? out : null;
+}
