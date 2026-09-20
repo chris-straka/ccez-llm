@@ -129,6 +129,19 @@ async function spoken(page: Page): Promise<string[]> {
 	);
 }
 
+/** Click the middle of the live highlight: a right mousedown outside
+it moves the caret and collapses it (native). */
+async function clickInsideHighlight(page: Page) {
+	const at = await page.evaluate(() => {
+		const selection = window.getSelection();
+		if (!selection || selection.rangeCount === 0) return null;
+		const rect = selection.getRangeAt(0).getBoundingClientRect();
+		return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+	});
+	if (!at) throw new Error("no selection rect");
+	await page.mouse.click(at.x, at.y, { button: "right" });
+}
+
 test("right-clicking kanji shows its sentence reading and speaks kana", async ({
 	page
 }) => {
@@ -149,16 +162,7 @@ test("right-clicking kanji shows its sentence reading and speaks kana", async ({
 		return window.getSelection()?.toString() ?? "";
 	});
 	expect(selected).toBe("生");
-	// Click inside the highlight: a right mousedown outside it moves
-	// the caret and collapses it (native), landing on the word path.
-	const at = await page.evaluate(() => {
-		const selection = window.getSelection();
-		if (!selection || selection.rangeCount === 0) return null;
-		const rect = selection.getRangeAt(0).getBoundingClientRect();
-		return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-	});
-	if (!at) throw new Error("no selection rect");
-	await page.mouse.click(at.x, at.y, { button: "right" });
+	await clickInsideHighlight(page);
 	const panels = page.locator(".sel-pinyin");
 	await expect(panels.locator(".spr").first()).toBeVisible({
 		timeout: 120_000
@@ -170,4 +174,81 @@ test("right-clicking kanji shows its sentence reading and speaks kana", async ({
 	// the worker conversion, so this covers a cold dictionary build
 	// like the panel wait above.
 	await expect.poll(() => spoken(page), { timeout: 120_000 }).toContain("う");
+});
+
+test("back-to-back kanji share one panel with split colors", async ({
+	page
+}) => {
+	await seedChat(page, [{ role: "assistant", content: "一人で行く" }]);
+	await page.goto("/");
+	await expect(
+		page.locator("article.assistant .rendered p").first()
+	).toBeVisible({
+		timeout: 60_000
+	});
+	const selected = await page.evaluate(() => {
+		const p = document.querySelector("article.assistant .rendered p");
+		const text = p?.firstChild;
+		if (!text) return "";
+		window.getSelection()?.setBaseAndExtent(text, 0, text, 2);
+		return window.getSelection()?.toString() ?? "";
+	});
+	expect(selected).toBe("一人");
+	await clickInsideHighlight(page);
+	const panels = page.locator(".sel-pinyin");
+	await expect(panels.locator(".spr").first()).toBeVisible({
+		timeout: 120_000
+	});
+	// One panel, both furigana, zero kanji — and the boundary splits
+	// by color (いち one color, にん another).
+	await expect(panels).toHaveCount(1);
+	const readings = panels.locator(".srt");
+	expect(await readings.count()).toBe(2);
+	await expect(panels.filter({ hasText: "一" })).toHaveCount(0);
+	await expect(panels.filter({ hasText: "人" })).toHaveCount(0);
+	const colors = await readings.evaluateAll((els) =>
+		els.map((el) => getComputedStyle(el).color)
+	);
+	expect(new Set(colors).size).toBe(2);
+	// Both document kanji glow, each in its popup color.
+	const body = page.locator("article.assistant .rendered");
+	expect(await body.locator(".frbt0").count()).toBe(1);
+	expect(await body.locator(".frbt1").count()).toBe(1);
+	await page.keyboard.press("Escape");
+	await expect(panels).toHaveCount(0);
+	expect(await body.locator('[class*="frbt"]').count()).toBe(0);
+});
+
+test("scrolling carries every group panel with the highlight", async ({
+	page
+}) => {
+	const long = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(
+		60
+	);
+	await seedChat(page, [
+		{ role: "assistant", content: `花が咲き誇る春\n\n${long}` }
+	]);
+	await page.goto("/");
+	await expect(
+		page.locator("article.assistant .rendered p").first()
+	).toBeVisible({
+		timeout: 60_000
+	});
+	await selectAll(page);
+	await clickOnText(page);
+	const panels = page.locator(".sel-pinyin");
+	await expect(panels.locator(".spr").first()).toBeVisible({
+		timeout: 120_000
+	});
+	const before = await panels.first().boundingBox();
+	await page.evaluate(() => {
+		document.querySelector(".messages")?.scrollBy({ top: 300 });
+	});
+	await page.waitForTimeout(300);
+	const after = await panels.first().boundingBox();
+	expect(before).not.toBeNull();
+	expect(after).not.toBeNull();
+	// The highlight moved up 300px; its first panel rode with it.
+	expect((before?.y ?? 0) - (after?.y ?? 0)).toBeGreaterThan(200);
+	expect(await panels.count()).toBeGreaterThanOrEqual(2);
 });

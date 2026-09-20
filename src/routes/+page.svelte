@@ -1192,13 +1192,20 @@
 	slice texts equal the quote when the range is the highlight. */
 	function selectionSlices(range: Range): SelSlice[] | null {
 		try {
-			const walker = document.createTreeWalker(
-				range.commonAncestorContainer,
-				NodeFilter.SHOW_TEXT
-			);
+			const root = range.commonAncestorContainer;
+			const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
 			const out: SelSlice[] = [];
 			let base = 0;
+			// The walker descends from the container: when the range
+			// sits inside a single text node (short highlights), the
+			// container IS the node and descent finds nothing.
+			const first: Node[] =
+				root instanceof Text && range.intersectsNode(root) ? [root] : [];
+			const rest: Node[] = [];
 			for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+				rest.push(node);
+			}
+			for (const node of [...first, ...rest]) {
 				if (!(node instanceof Text)) continue;
 				if (!range.intersectsNode(node)) continue;
 				if (node.parentElement?.closest(SEL_TEXT_SKIP)) continue;
@@ -1253,10 +1260,33 @@
 			return null;
 		}
 	}
+	/** Whole-scope text slices (no range clamp): re-resolving offsets
+	after surgery, when the live range is gone. */
+	function scopeSlices(scope: ParentNode): SelSlice[] {
+		const out: SelSlice[] = [];
+		try {
+			const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT);
+			let base = 0;
+			for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+				if (!(node instanceof Text)) continue;
+				if (node.parentElement?.closest(SEL_TEXT_SKIP)) continue;
+				const len = (node.textContent ?? "").length;
+				if (len === 0) continue;
+				out.push({ node, start: 0, end: len, base });
+				base += len;
+			}
+		} catch {
+			// Partial walk still resolves.
+		}
+		return out;
+	}
 	/** Wrap the selected kanji spans in tint spans (backwards, so
 	offsets hold), then put the highlight back over the same
-	characters. Tint spans carry no text of their own, so quotes,
-	context, and copy all read through them. */
+	characters. The live range is detached first: removing a node
+	that holds range endpoints collapses the range, and restoring
+	from the wreckage selects the wrong text. Tint spans carry no
+	text of their own, so quotes, context, and copy all read
+	through them. */
 	function tintSelectionSpans(
 		slices: SelSlice[],
 		spans: { start: number; end: number; color: number }[]
@@ -1264,30 +1294,56 @@
 		try {
 			const live = window.getSelection();
 			if (!live || live.rangeCount === 0) return false;
-			for (let i = slices.length - 1; i >= 0; i--) {
-				const s = slices[i];
-				if (!s) continue;
-				for (const span of spans) {
-					const lo = Math.max(span.start, s.base);
-					const hi = Math.min(span.end, s.base + (s.end - s.start));
-					if (hi <= lo) continue;
-					const relLo = s.start + (lo - s.base);
-					const relHi = s.start + (hi - s.base);
-					let target: Text = s.node;
-					// Split back-to-front so earlier offsets survive.
-					if (relHi < target.length) target.splitText(relHi);
-					if (relLo > 0) target = target.splitText(relLo);
-					const wrap = document.createElement("span");
-					wrap.className = `frbt${span.color % 4}`;
-					target.parentNode?.replaceChild(wrap, target);
-					wrap.appendChild(target);
+			const total = slices.reduce((n, s) => n + (s.end - s.start), 0);
+			const anchor = slices[0]?.node.parentElement?.closest(".rendered");
+			const scope: ParentNode = anchor ?? document.body;
+			// Highlight start in scope offsets (pre-surgery: splits
+			// keep earlier text byte-identical, so it stays valid).
+			const first = slices[0];
+			let highlightBase = -1;
+			if (first) {
+				for (const s of scopeSlices(scope)) {
+					if (s.node === first.node) {
+						highlightBase = s.base + (first.start - s.start);
+						break;
+					}
 				}
 			}
-			// Re-resolve the same character span over the new nodes.
-			const fresh = selectionSlices(live.getRangeAt(0));
-			const total = fresh?.reduce((n, s) => n + (s.end - s.start), 0) ?? -1;
-			const a = fresh ? slicePoint(fresh, 0) : null;
-			const b = fresh && total >= 0 ? slicePoint(fresh, total) : null;
+			if (highlightBase < 0) return false;
+			live.removeAllRanges();
+			try {
+				// Latest spans first: each wrap shortens the working
+				// node from the right, so earlier offsets keep
+				// resolving (forward order walks off the shortened
+				// node and throws, stranding the selection).
+				const ordered = [...spans].sort((a, b) => b.start - a.start);
+				for (let i = slices.length - 1; i >= 0; i--) {
+					const s = slices[i];
+					if (!s) continue;
+					for (const span of ordered) {
+						const lo = Math.max(span.start, s.base);
+						const hi = Math.min(span.end, s.base + (s.end - s.start));
+						if (hi <= lo) continue;
+						const relLo = s.start + (lo - s.base);
+						const relHi = s.start + (hi - s.base);
+						let target: Text = s.node;
+						if (relHi < target.length) target.splitText(relHi);
+						if (relLo > 0) target = target.splitText(relLo);
+						const wrap = document.createElement("span");
+						wrap.className = `frbt${span.color % 4}`;
+						target.parentNode?.replaceChild(wrap, target);
+						wrap.appendChild(target);
+					}
+				}
+			} catch {
+				// Partial tint still preserves every character: fall
+				// through and restore the highlight regardless.
+			}
+			// Re-resolve the same character span over the new nodes,
+			// located from the scope root: the detached range is gone.
+			const fresh = scopeSlices(scope);
+			const a = slicePoint(fresh, highlightBase);
+			const b = slicePoint(fresh, highlightBase + total);
 			if (!a || !b) return false;
 			live.setBaseAndExtent(a.node, a.offset, b.node, b.offset);
 			return true;
