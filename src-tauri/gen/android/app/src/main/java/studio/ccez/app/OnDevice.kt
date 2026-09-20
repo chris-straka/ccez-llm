@@ -112,8 +112,11 @@ object OnDevice {
      * One-line exception summary for the settings note (never a toast):
      * "failed" alone says nothing, so the native message rides along.
      */
+    // 240 chars: the error class AND the full AICore feature number
+    // (606 names it — at 160 the id truncates to "Feature 63…", which
+    // cannot distinguish library versions).
     private fun detailOf(e: Exception): String {
-        return e.toString().replace(Regex("\\s+"), " ").take(160)
+        return e.toString().replace(Regex("\\s+"), " ").take(240)
     }
 
     private fun json(
