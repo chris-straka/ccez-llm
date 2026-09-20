@@ -299,6 +299,26 @@ export function visibleProviderIds<T extends string>(
 }
 
 /**
+ * Whether the mic buttons show. Web SpeechRecognition covers browsers;
+ * inside a shell they ride the native recognizer instead, which exists
+ * on macOS and Android. Windows needs package identity the installer
+ * lacks and Linux has no OS speech API, so shells there stay hidden
+ * rather than toasting on every tap. iOS is excluded even when it
+ * reports Macintosh (iPad desktop mode): it has no native recognizer.
+ * Pure so the gate unit-tests.
+ */
+export function micButtonsShown(
+	webMic: boolean,
+	inShell: boolean,
+	isMac: boolean,
+	isAndroid: boolean,
+	isIOS: boolean
+): boolean {
+	if (isIOS) return webMic;
+	return webMic || (inShell && (isMac || isAndroid));
+}
+
+/**
  * Edge-swipe target for touch sidebars: a mostly-horizontal swipe of at
  * least `minDistance` px starting inside the screen's edge zone. Left
  * edge swipes right to open chats; right edge swipes left for settings.

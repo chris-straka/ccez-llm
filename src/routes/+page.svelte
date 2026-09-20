@@ -238,6 +238,7 @@
 		isCoarsePointer,
 		isTouchTablet,
 		currentPlatform,
+		micButtonsShown,
 		altKeyLabel,
 		edgeSwipeTarget,
 		contentSwipeTarget,
@@ -323,9 +324,10 @@
 		spliceAidResult,
 		resolveAidKinds,
 		readingsOnly,
-		annotatedRuns,
-		pairRuns,
-		type PairedRun,
+		annotatedRunsWithOffsets,
+		sliceRunsForQuote,
+		groupRuns,
+		type GroupedRun,
 		type LocalAid,
 		type HanOverlayLang
 	} from "$lib/reading";
@@ -884,13 +886,15 @@
 	} | null>(null);
 	/**
 	 * Selection readings overlay: right-clicking a highlight that
-	 * contains Han shows readings for just the highlight (pinyin
-	 * flat, furigana per-kanji). Each furigana pair repeats its
-	 * kanji as the color anchor beside its word-context reading,
-	 * okurigana plain, so mixed selections like 咲き誇り map back.
-	 * Read-only and pointer-transparent, so it can't disturb the
-	 * highlight — and the highlight clearing dismisses it at once
-	 * via selectionchange below.
+	 * contains Han shows readings for just the highlight. The
+	 * Japanese side renders one panel per back-to-back kanji group:
+	 * furigana only, solo in the lead color, shared groups splitting
+	 * boundaries by palette cycle — never kanji, never kana. The
+	 * selected kanji glow in their popup color in the document
+	 * (unwrapped on dismiss). Pinyin stays one flat string. Read-only
+	 * and pointer-transparent, so nothing disturbs the highlight —
+	 * and the highlight clearing dismisses everything at once via
+	 * selectionchange below.
 	 */
 	let selPinyin = $state<{
 		x: number;
@@ -899,8 +903,26 @@
 		quote: string;
 		messageId: ChatMsgId;
 		html: string;
-		runs: PairedRun[] | null;
 	} | null>(null);
+	/** One furigana panel: a single back-to-back kanji group's
+	readings, anchored to that group's screen rect. */
+	interface FuriganaPanel {
+		x: number;
+		y: number;
+		above: boolean;
+		quote: string;
+		messageId: ChatMsgId;
+		runs: GroupedRun[];
+	}
+	let selFurigana = $state<FuriganaPanel[] | null>(null);
+	/** Drop every selection overlay at once: the flat panel, the
+	furigana panels, and the document tint. Every dismiss site below
+	uses this — a bare selPinyin clear would strand tinted kanji. */
+	function dismissSelPanels(): void {
+		selPinyin = null;
+		selFurigana = null;
+		unwrapFuriganaTint();
+	}
 	/**
 	 * An unanswered selection menu never lingers (clicking away still
 	 * dismisses instantly). Desktop gives a 6s idle window, and any
@@ -1105,26 +1127,32 @@
 	matters; a frame later the true width clamps it exactly into
 	the viewport. The above branch anchors on the highlight's top
 	edge the same way, so tall readings never need measuring. */
+	function panelXY(rect: { left: number; top: number; bottom: number }): {
+		x: number;
+		y: number;
+		above: boolean;
+	} {
+		const above = rect.top >= 128;
+		return {
+			x: Math.min(Math.max(8, rect.left), window.innerWidth - 208),
+			y: above ? rect.top : Math.min(rect.bottom, window.innerHeight - 40),
+			above
+		};
+	}
 	function placeSelPinyin(
 		quoted: { quote: string; messageId: ChatMsgId },
-		html: string,
-		runs: PairedRun[] | null = null
+		html: string
 	): void {
 		const live = window.getSelection();
 		const rect = live?.rangeCount
 			? live.getRangeAt(0).getBoundingClientRect()
 			: null;
 		if (!rect) return;
-		const above = rect.top >= 128;
-		const y = above ? rect.top : Math.min(rect.bottom, window.innerHeight - 40);
 		selPinyin = {
-			x: Math.min(Math.max(8, rect.left), window.innerWidth - 208),
-			y,
-			above,
+			...panelXY(rect),
 			quote: quoted.quote,
 			messageId: quoted.messageId,
-			html,
-			runs
+			html
 		};
 		requestAnimationFrame(() => {
 			const node = document.querySelector(".sel-pinyin");
@@ -1147,23 +1175,172 @@
 			if (Math.abs(x - selPinyin.x) > 1) selPinyin = { ...selPinyin, x };
 		});
 	}
+	/** Chrome elements whose text never counts toward highlight
+	offsets (element form of quoteFragmentText's skip set): ruby
+	readings, annotation badges, math/code UI. */
+	const SEL_TEXT_SKIP =
+		"rt, rp, .frt, [data-ann-badge], .ccez-math-head, .ccez-code-head," +
+		" .ccez-math-tex, .ccez-math-copy, .ccez-math-foldedlabel, .ccez-code-foldedlabel";
+	interface SelSlice {
+		node: Text;
+		start: number;
+		end: number;
+		base: number;
+	}
+	/** Text slices of a range with highlight offsets: one entry per
+	text node, clamped to the range, chrome skipped. The concatenated
+	slice texts equal the quote when the range is the highlight. */
+	function selectionSlices(range: Range): SelSlice[] | null {
+		try {
+			const walker = document.createTreeWalker(
+				range.commonAncestorContainer,
+				NodeFilter.SHOW_TEXT
+			);
+			const out: SelSlice[] = [];
+			let base = 0;
+			for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+				if (!(node instanceof Text)) continue;
+				if (!range.intersectsNode(node)) continue;
+				if (node.parentElement?.closest(SEL_TEXT_SKIP)) continue;
+				const text = node.textContent ?? "";
+				let start = 0;
+				let end = text.length;
+				if (node === range.startContainer) start = range.startOffset;
+				if (node === range.endContainer) end = range.endOffset;
+				if (end <= start) continue;
+				out.push({ node, start, end, base });
+				base += end - start;
+			}
+			return out;
+		} catch {
+			return null;
+		}
+	}
+	/** (node, offset) for an absolute highlight offset, or null. */
+	function slicePoint(
+		slices: SelSlice[],
+		at: number
+	): { node: Text; offset: number } | null {
+		for (const s of slices) {
+			if (at >= s.base && at <= s.base + (s.end - s.start)) {
+				return { node: s.node, offset: s.start + (at - s.base) };
+			}
+		}
+		const last = slices[slices.length - 1];
+		if (last && at === last.base + (last.end - last.start)) {
+			return { node: last.node, offset: last.end };
+		}
+		return null;
+	}
+	/** Screen rect of a highlight span, or null. */
+	function spanRect(
+		slices: SelSlice[],
+		start: number,
+		end: number
+	): DOMRect | null {
+		try {
+			const a = slicePoint(slices, start);
+			const b = slicePoint(slices, end);
+			if (!a || !b) return null;
+			const range = document.createRange();
+			range.setStart(a.node, Math.min(a.offset, a.node.length));
+			range.setEnd(b.node, Math.min(b.offset, b.node.length));
+			const rect = range.getBoundingClientRect();
+			range.detach();
+			if (rect.width === 0 && rect.height === 0) return null;
+			return rect;
+		} catch {
+			return null;
+		}
+	}
+	/** Wrap the selected kanji spans in tint spans (backwards, so
+	offsets hold), then put the highlight back over the same
+	characters. Tint spans carry no text of their own, so quotes,
+	context, and copy all read through them. */
+	function tintSelectionSpans(
+		slices: SelSlice[],
+		spans: { start: number; end: number; color: number }[]
+	): boolean {
+		try {
+			const live = window.getSelection();
+			if (!live || live.rangeCount === 0) return false;
+			for (let i = slices.length - 1; i >= 0; i--) {
+				const s = slices[i];
+				if (!s) continue;
+				for (const span of spans) {
+					const lo = Math.max(span.start, s.base);
+					const hi = Math.min(span.end, s.base + (s.end - s.start));
+					if (hi <= lo) continue;
+					const relLo = s.start + (lo - s.base);
+					const relHi = s.start + (hi - s.base);
+					let target: Text = s.node;
+					// Split back-to-front so earlier offsets survive.
+					if (relHi < target.length) target.splitText(relHi);
+					if (relLo > 0) target = target.splitText(relLo);
+					const wrap = document.createElement("span");
+					wrap.className = `frbt${span.color % 4}`;
+					target.parentNode?.replaceChild(wrap, target);
+					wrap.appendChild(target);
+				}
+			}
+			// Re-resolve the same character span over the new nodes.
+			const fresh = selectionSlices(live.getRangeAt(0));
+			const total = fresh?.reduce((n, s) => n + (s.end - s.start), 0) ?? -1;
+			const a = fresh ? slicePoint(fresh, 0) : null;
+			const b = fresh && total >= 0 ? slicePoint(fresh, total) : null;
+			if (!a || !b) return false;
+			live.setBaseAndExtent(a.node, a.offset, b.node, b.offset);
+			return true;
+		} catch {
+			return false;
+		}
+	}
+	/** Unwrap every tint span back to bare text (dismiss paths and
+	re-summons; a re-rendered message simply has none to find). */
+	function unwrapFuriganaTint(): void {
+		const spans = document.querySelectorAll(
+			".frbt0, .frbt1, .frbt2, .frbt3"
+		);
+		const parents: ParentNode[] = [];
+		spans.forEach((el) => {
+			const parent = el.parentNode;
+			if (!parent) return;
+			if (!parents.includes(parent)) parents.push(parent);
+			while (el.firstChild) parent.insertBefore(el.firstChild, el);
+			parent.removeChild(el);
+		});
+		parents.forEach((parent) => parent.normalize());
+	}
 	/**
 	 * Japanese side of the overlay: furigana for just the highlight,
-	 * converted on demand (worker). The panel lands at once with a
-	 * pending mark — the dictionary load behind a cold worker takes
-	 * seconds, and a silent wait reads as a dead click (the second
-	 * right-click only "worked" because the first fetch had landed
-	 * by then). Stale right-clicks never fill it: a moved-on
-	 * highlight drops the result instead of showing it.
+	 * converted from the whole sentence (worker) so readings match
+	 * the context — an isolated kanji converts to its default, not
+	 * its sentence reading. One panel per back-to-back kanji group,
+	 * furigana only, anchored to its group; the selected kanji glow
+	 * in their popup color. Returns the highlight's kana (readings +
+	 * kana in order) for speech, or null when nothing showed. The
+	 * pending mark lands at once — the dictionary load behind a cold
+	 * worker takes seconds, and a silent wait reads as a dead click.
+	 * Stale right-clicks never fill it: a moved-on highlight drops
+	 * the result instead of showing it.
 	 */
 	async function showSelectionFurigana(quoted: {
 		quote: string;
 		messageId: ChatMsgId;
-	}): Promise<void> {
+	}): Promise<string | null> {
+		dismissSelPanels();
 		placeSelPinyin(quoted, "…");
+		const live = currentQuote();
+		const context =
+			live && live.messageId === quoted.messageId && live.quote === quoted.quote
+				? live.context
+				: quoted.quote;
+		// Convert the sentence, slice the highlight: isolated text
+		// misreads (生 alone is せい, in 生まれる it is う).
+		const sentence = sentenceForQuote(context, quoted.quote) ?? quoted.quote;
 		let html: string;
 		try {
-			html = await furiganaHtml(quoted.quote, "furigana");
+			html = await furiganaHtml(sentence, "furigana");
 		} catch {
 			html = "";
 		}
@@ -1173,16 +1350,78 @@
 			now.messageId !== quoted.messageId ||
 			now.quote !== quoted.quote
 		)
-			return;
-		// Annotated runs keep each kanji beside its own word-context
-		// reading (mixed selections included); null means no kanji
-		// carried a reading, so the popup stays shut like before.
-		const runs = annotatedRuns(html);
-		if (!runs) {
+			return null;
+		const sentRuns = annotatedRunsWithOffsets(html);
+		if (!sentRuns) {
 			if (selPinyin?.quote === quoted.quote) selPinyin = null;
-			return;
+			return null;
 		}
-		placeSelPinyin(quoted, "", pairRuns(runs));
+		const plain = sentRuns.map((run) => run.text).join("");
+		const sliced = sliceRunsForQuote(sentRuns, plain, quoted.quote);
+		if (!sliced) {
+			if (selPinyin?.quote === quoted.quote) selPinyin = null;
+			return null;
+		}
+		const grouped = groupRuns(sliced);
+		if (grouped.length === 0) {
+			if (selPinyin?.quote === quoted.quote) selPinyin = null;
+			return null;
+		}
+		// Anchor each group to its own screen span and tint the
+		// document kanji; a failed walk keeps the single highlight
+		// rect for every panel rather than stranding the popup.
+		const selection = window.getSelection();
+		const range =
+			selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+		const highlightRect = range?.getBoundingClientRect() ?? null;
+		const slices = range ? selectionSlices(range) : null;
+		// The live range can carry whitespace the trimmed quote
+		// drops (drag handles): locate the quote inside the walked
+		// text and shift spans onto it, or fall back to the single
+		// highlight rect.
+		const walkText = slices
+			? slices
+					.map((s) => (s.node.textContent ?? "").slice(s.start, s.end))
+					.join("")
+			: "";
+		const qi = slices ? walkText.indexOf(quoted.quote) : -1;
+		const exact = slices !== null && qi >= 0;
+		const byGroup: GroupedRun[][] = [];
+		for (const run of grouped) {
+			const list = byGroup[run.group];
+			if (list) list.push(run);
+			else byGroup[run.group] = [run];
+		}
+		const panels: FuriganaPanel[] = [];
+		const tintSpans: { start: number; end: number; color: number }[] = [];
+		for (const runs of byGroup) {
+			if (!runs) continue;
+			const start = Math.min(...runs.map((run) => run.start)) + qi;
+			const end = Math.max(...runs.map((run) => run.end)) + qi;
+			const rect = exact ? spanRect(slices ?? [], start, end) : null;
+			const anchor = rect ?? highlightRect;
+			if (!anchor) {
+				dismissSelPanels();
+				return null;
+			}
+			panels.push({
+				...panelXY(anchor),
+				quote: quoted.quote,
+				messageId: quoted.messageId,
+				runs
+			});
+			for (const run of runs) {
+				tintSpans.push({
+					start: run.start + qi,
+					end: run.end + qi,
+					color: run.color
+				});
+			}
+		}
+		if (exact && slices) tintSelectionSpans(slices, tintSpans);
+		selPinyin = null;
+		selFurigana = panels;
+		return sliced.map((run) => run.reading ?? run.text).join("");
 	}
 	/**
 	 * Readings for a highlight in the popup above the selection (see
@@ -1727,7 +1966,7 @@
 	 * (instant cut elsewhere) — identical end state either way. */
 	function transitionToChat(id: Parameters<typeof selectChat>[1]): void {
 		const from = chatState.activeChatId;
-		selPinyin = null;
+		dismissSelPanels();
 		const mutate = (): void => {
 			// File the leaving chat's scroll first (a no-op mid-peek,
 			// where the box shows another chat), then clear the hover
@@ -2920,7 +3159,7 @@
 		saveChatScroll();
 		previewChatId = null;
 		stopVoice();
-		selPinyin = null;
+		dismissSelPanels();
 		// File the leaving chat's drafts away before resetDraftExtras
 		// empties them — otherwise the autosave effect files the empty
 		// list under the old chat's id and return-restore comes back
@@ -5787,7 +6026,11 @@
 			}
 		);
 		if (!stop) {
-			flashErrorToast("Mic input not available in this browser.");
+			flashErrorToast(
+				tauriBackendAvailable()
+					? "Mic input is not available."
+					: "Mic input not available in this browser."
+			);
 			return;
 		}
 		stopPillDictation = stop;
@@ -5818,7 +6061,11 @@
 			}
 		);
 		if (!stop) {
-			flashErrorToast("Mic input not available in this browser.");
+			flashErrorToast(
+				tauriBackendAvailable()
+					? "Mic input is not available."
+					: "Mic input not available in this browser."
+			);
 			return;
 		}
 		stopDictation = stop;
@@ -8824,7 +9071,7 @@
 				// message edits keep their earlier branches above.
 				editor?.blur();
 				selMenu = null;
-				selPinyin = null;
+				dismissSelPanels();
 				openLangMenu = null;
 			} else {
 				// A bare Esc must never reach the OS/browser default
@@ -8835,7 +9082,7 @@
 				// so close it here, or Esc strands an open box.
 				cancelAnnPop();
 				selMenu = null;
-				selPinyin = null;
+				dismissSelPanels();
 				inspectChar = null;
 				openLangMenu = null;
 				settingsOpen = false;
@@ -10052,7 +10299,7 @@
 			// highlight itself lingers (the panel is pointer-transparent,
 			// so every press lands outside it). A right-click re-summons
 			// through contextmenu right after when it still applies.
-			selPinyin = null;
+			dismissSelPanels();
 			selectingInMessage =
 				event.button === 0 && !!target?.closest(".messages .rendered");
 			offChatDragArmed =
@@ -10071,17 +10318,19 @@
 				return;
 			}
 			clampOffChatDrag();
-			// The pinyin overlay belongs to one highlight: a changed or
-			// cleared selection dismisses it (mid-drag leaves it until
-			// release, like the menu's own paths).
-			if (selPinyin) {
+			// The readings overlays belong to one highlight: a changed
+			// or cleared selection dismisses them (mid-drag leaves them
+			// until release, like the menu's own paths).
+			if (selPinyin || selFurigana) {
 				const now = currentQuote();
+				const anchor = selPinyin ?? selFurigana?.[0];
 				if (
 					!now ||
-					now.messageId !== selPinyin.messageId ||
-					now.quote !== selPinyin.quote
+					!anchor ||
+					now.messageId !== anchor.messageId ||
+					now.quote !== anchor.quote
 				)
-					selPinyin = null;
+					dismissSelPanels();
 			}
 		};
 		const clampOffChatDrag = (): void => {
@@ -10401,7 +10650,18 @@
 						const readings = readingsOnly(pinyinRuby(quoted.quote), " ", "rt");
 						if (readings) placeSelPinyin(quoted, readings);
 					} else if (hanOverlayLangFor(probe) === "ja") {
-						void showSelectionFurigana(quoted);
+						// Speech waits for the sentence-correct kana: the
+						// raw kanji would read with default guesses.
+						void (async () => {
+							const kana = await showSelectionFurigana(quoted);
+							void speakQuote(
+								kana ?? quoted.quote,
+								quoted.messageId,
+								false,
+								quoted.context
+							);
+						})();
+						return;
 					}
 				}
 				void speakQuote(quoted.quote, quoted.messageId, false, quoted.context);
@@ -10478,10 +10738,17 @@
 				editor?.focus();
 			}
 		};
-		// Web SpeechRecognition is service-blocked inside the Tauri
-		// WKWebView (and there is no native dictation path), so the
-		// Mic buttons hide there instead of toasting an error.
-		canMic = micAvailable() && !tauriBackendAvailable();
+		// Web SpeechRecognition is service-blocked inside Tauri
+		// shells, so the Mic buttons ride the native recognizer there
+		// (macOS and Android have one; Windows and Linux shells hide
+		// the buttons instead of toasting an error on every tap).
+		canMic = micButtonsShown(
+			micAvailable(),
+			tauriBackendAvailable(),
+			currentPlatform().isMac,
+			isAndroidUserAgent(navigator.userAgent),
+			isIOSUserAgent(navigator.userAgent)
+		);
 		// Voice inventory arrives async (slow on phones): the first
 		// getVoices() kicks the load, voiceschanged bumps the gates.
 		try {
@@ -10668,22 +10935,57 @@
 			);
 		};
 		window.addEventListener("scroll", onFadeScroll, true);
-		// The readings overlay tracks its highlight while it scrolls
+		// The readings overlays track their highlight while it scrolls
 		// (same anchor math as placement): a detached or collapsed
-		// range dismisses it instead of stranding it.
+		// range dismisses them instead of stranding them. Furigana
+		// groups re-resolve their own spans, so multi-line highlights
+		// keep each panel glued to its kanji.
 		const trackSelPinyin = (): void => {
-			if (!selPinyin) return;
+			if (!selPinyin && !selFurigana) return;
 			try {
 				const live = window.getSelection();
 				if (!live || live.rangeCount === 0 || live.isCollapsed) {
-					selPinyin = null;
+					dismissSelPanels();
 					return;
 				}
 				const range = live.getRangeAt(0);
 				if (!document.contains(range.startContainer)) {
-					selPinyin = null;
+					dismissSelPanels();
 					return;
 				}
+				if (selFurigana) {
+					const slices = selectionSlices(range);
+					const first = selFurigana[0];
+					if (!slices || !first) {
+						dismissSelPanels();
+						return;
+					}
+					const walkText = slices
+						.map((s) => (s.node.textContent ?? "").slice(s.start, s.end))
+						.join("");
+					const qi = walkText.indexOf(first.quote);
+					if (qi < 0) {
+						dismissSelPanels();
+						return;
+					}
+					let moved = false;
+					const next = selFurigana.map((panel) => {
+						const runs = panel.runs;
+						const start =
+							Math.min(...runs.map((run) => run.start)) + qi;
+						const end = Math.max(...runs.map((run) => run.end)) + qi;
+						const rect = spanRect(slices, start, end);
+						if (!rect) return panel;
+						const placed = panelXY(rect);
+						if (placed.y !== panel.y || placed.above !== panel.above) {
+							moved = true;
+							return { ...panel, ...placed };
+						}
+						return panel;
+					});
+					if (moved) selFurigana = next;
+				}
+				if (!selPinyin) return;
 				const rect = range.getBoundingClientRect();
 				const above = rect.top >= 128;
 				const y = above
@@ -10692,7 +10994,7 @@
 				if (selPinyin.y !== y || selPinyin.above !== above)
 					selPinyin = { ...selPinyin, y, above };
 			} catch {
-				selPinyin = null;
+				dismissSelPanels();
 			}
 		};
 		window.addEventListener("scroll", trackSelPinyin, true);
@@ -12453,25 +12755,28 @@
 			style="left: {selPinyin.x}px; top: {selPinyin.y}px"
 			aria-live="polite"
 		>
-			{#if selPinyin.runs}
-				<!-- Annotated furigana: each kanji keeps its own
-				word-context reading above it, the pair in its own
-				palette color (kana repeats plain). Runs are parser
-				output rendered as text, so hostile markup stays
-				inert. -->
-				{#each selPinyin.runs as run, i (i)}
-					{#if run.reading}
-						<span class="spr pk{run.pair}"
-							><span class="srt">{run.reading}</span><span class="spb"
-								>{run.text}</span
-							></span
-						>
-					{:else}{run.text}{/if}
-				{/each}
-			{:else}
-				<!-- eslint-disable-line svelte/no-at-html-tags -- html is "…" or readingsOnly output (inert by unit test, see reading.ts) -->{@html selPinyin.html}
-			{/if}
+			<!-- eslint-disable-line svelte/no-at-html-tags -- html is "…" or readingsOnly output (inert by unit test, see reading.ts) -->{@html selPinyin.html}
 		</div>
+	{/if}
+	{#if selFurigana && !previewing}
+		<!-- Furigana group panels: one per back-to-back kanji group,
+		furigana only, each anchored to its own group. Same glass as
+		the flat panel; the selected kanji glow in matching colors
+		in the document (see tintSelectionSpans). -->
+		{#each selFurigana as panel, pi (pi)}
+			<div
+				class="sel-pinyin"
+				class:above={panel.above}
+				style="left: {panel.x}px; top: {panel.y}px"
+				aria-live="polite"
+			>
+				{#each panel.runs as run (run.start)}
+					<span class="spr pk{run.color}"
+						><span class="srt">{run.reading}</span></span
+					>
+				{/each}
+			</div>
+		{/each}
 	{/if}
 
 	{#if annPop}
@@ -16241,38 +16546,40 @@
 	.sel-pinyin:not(.above) {
 		margin-top: 4px;
 	}
-	/* Annotated furigana runs: reading stacked above its kanji
-	(ruby order), the pair kept atomic across line breaks. Each
-	pair carries its own palette color on both halves so kanji and
-	reading read as one unit; kana repeats in the popup ink,
-	uncolored. Dark theme leads yellow, never blue. */
+	/* Annotated furigana runs: one reading per kanji, solo in the
+	lead color, shared popups splitting boundaries by palette
+	cycle. No repeated kanji or kana anywhere. */
 	.sel-pinyin .spr {
 		display: inline-block;
-		text-align: center;
 		white-space: nowrap;
-		line-height: 1.3;
 	}
 	.sel-pinyin .srt {
 		display: block;
-		font-size: 0.72em;
 	}
-	.sel-pinyin .spb {
-		display: block;
-	}
-	.sel-pinyin .pk0 .srt,
-	.sel-pinyin .pk0 .spb {
+	.sel-pinyin .pk0 .srt {
 		color: var(--pair0);
 	}
-	.sel-pinyin .pk1 .srt,
-	.sel-pinyin .pk1 .spb {
+	.sel-pinyin .pk1 .srt {
 		color: var(--pair1);
 	}
-	.sel-pinyin .pk2 .srt,
-	.sel-pinyin .pk2 .spb {
+	.sel-pinyin .pk2 .srt {
 		color: var(--pair2);
 	}
-	.sel-pinyin .pk3 .srt,
-	.sel-pinyin .pk3 .spb {
+	.sel-pinyin .pk3 .srt {
+		color: var(--pair3);
+	}
+	/* Document tint: selected kanji glow in their popup color
+	while the panels are up (unwrapped on dismiss). */
+	:global(.rendered .frbt0) {
+		color: var(--pair0);
+	}
+	:global(.rendered .frbt1) {
+		color: var(--pair1);
+	}
+	:global(.rendered .frbt2) {
+		color: var(--pair2);
+	}
+	:global(.rendered .frbt3) {
 		color: var(--pair3);
 	}
 	/* Cursor-anchored annotation pill (ChatGPT-style): a rounded bar that

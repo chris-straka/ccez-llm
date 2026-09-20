@@ -19,7 +19,8 @@ import {
 	twoFingerSlideDir,
 	isThreeFingerTap,
 	nextTapCount,
-	threeFingerSwipeDir
+	threeFingerSwipeDir,
+	micButtonsShown
 } from "./platform";
 
 const ANDROID_UA =
@@ -437,5 +438,23 @@ describe("nextTapCount", () => {
 		const one = nextTapCount(null, 1000, 50, 50);
 		expect(nextTapCount(one, 1500, 50, 50).count).toBe(1);
 		expect(nextTapCount(one, 1200, 200, 200).count).toBe(1);
+	});
+});
+
+describe("micButtonsShown", () => {
+	it("shows on web speech recognition, shell or not", () => {
+		expect(micButtonsShown(true, false, false, false, false)).toBe(true);
+		expect(micButtonsShown(true, true, false, false, false)).toBe(true);
+	});
+	it("shows in macOS and Android shells via the native recognizer", () => {
+		expect(micButtonsShown(false, true, true, false, false)).toBe(true);
+		expect(micButtonsShown(false, true, false, true, false)).toBe(true);
+	});
+	it("stays hidden in Windows and Linux shells with no usable recognizer", () => {
+		expect(micButtonsShown(false, true, false, false, false)).toBe(false);
+		expect(micButtonsShown(false, false, true, false, false)).toBe(false);
+	});
+	it("excludes iOS even when it reports Macintosh", () => {
+		expect(micButtonsShown(false, true, true, false, true)).toBe(false);
 	});
 });

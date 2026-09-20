@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+	Merged into the release bundle's Info.plist by Tauri (it looks for
+	this file next to tauri.conf.json). Both keys are required for
+	native dictation: requesting speech recognition or touching the mic
+	without them kills the process, so the backend refuses to start
+	instead. `tauri dev` runs unbundled and never sees these keys —
+	dictation stays unavailable there by design.
+-->
+<plist version="1.0">
+<dict>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Ccez LLM uses the microphone to dictate messages.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Ccez LLM transcribes your dictation into the prompt.</string>
+</dict>
+</plist>
