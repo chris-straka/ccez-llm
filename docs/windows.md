@@ -107,13 +107,12 @@ whether a `v*` CI runner is needed to prove it.
    `keyring = { version = "3", features = ["apple-native", "windows-native"] }`.
    Provable on macOS locally (restart loses the key); Windows
    Credential Manager persistence needs a `v*` runner.
-2. **`open_voice_settings` errors on Windows (cosmetic, confirmed).**
-   `src-tauri/src/lib.rs:71-74` returns
-   `"opening System Settings requires macOS"`. The frontend
-   (`SettingsPanel.svelte:230-241`) keeps the text readable, so this
-   is graceful. Optional patch: a `cfg(target_os = "windows")` arm
-   running `cmd /C start ms-settings:speech` — URI choice needs a
-   runner to confirm.
+2. **`open_voice_settings` opens Speech settings on Windows
+   (implemented, needs a `v*` runner to confirm).** The Windows arm
+   runs `cmd /C start ms-settings:speech` (Manage voices lives on
+   that page); Android opens the system text-to-speech settings the
+   same way. The frontend keeps the manual path printed alongside,
+   so a failed open stays graceful.
 3. **Windows TTS stubs fail over to web voices (cosmetic,
    confirmed).** `src-tauri/src/tts.rs:639-640,661-665,675-679,705-709`
    return `Err("native TTS requires macOS or iOS")`; the frontend

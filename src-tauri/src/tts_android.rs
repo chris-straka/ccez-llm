@@ -157,6 +157,29 @@ pub fn stop(app: &AppHandle) -> Result<(), String> {
     })
 }
 
+/// Open the system text-to-speech settings (engine + voice data) via
+/// `Tts.openTtsSettings`, which returns "" on success or an error
+/// message. Code-only: unverified on device.
+pub fn open_tts_settings() -> Result<(), String> {
+    with_env("open_tts_settings", |env, cls| {
+        let out = env
+            .call_static_method(cls, "openTtsSettings", "()Ljava/lang/String;", &[])
+            .map_err(|e| format!("openTtsSettings() failed: {e:?}"))?;
+        let err: String = env
+            .get_string(&JString::from(out.l().map_err(|e| {
+                format!("bad openTtsSettings() return: {e:?}")
+            })?))
+            .map_err(|e| format!("settings result failed: {e:?}"))?
+            .to_string_lossy()
+            .into_owned();
+        if err.is_empty() {
+            Ok(())
+        } else {
+            Err(err)
+        }
+    })
+}
+
 pub fn voices(app: &AppHandle) -> Result<Vec<NativeVoice>, String> {
     remember(app);
     with_env("voices", |env, cls| {

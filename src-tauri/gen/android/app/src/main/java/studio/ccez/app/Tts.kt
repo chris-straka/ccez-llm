@@ -108,6 +108,36 @@ object Tts {
     }
 
     /**
+     * Open the system text-to-speech settings (preferred engine, voice
+     * data) for the Rust bridge (`open_voice_settings`). Returns "" on
+     * success or an error message — never null (the bridge has no null
+     * path). Started from the application context, so it needs NEW_TASK;
+     * falls back to the top-level Settings page when the TTS page is
+     * missing on a vendor ROM.
+     */
+    @JvmStatic
+    fun openTtsSettings(): String {
+        return try {
+            val intent = Intent("com.android.settings.TTS_SETTINGS").apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            appContext.startActivity(intent)
+            ""
+        } catch (_: Exception) {
+            try {
+                val fallback =
+                    Intent(android.provider.Settings.ACTION_SETTINGS).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                appContext.startActivity(fallback)
+                ""
+            } catch (_: Exception) {
+                "could not open text-to-speech settings"
+            }
+        }
+    }
+
+    /**
      * Queue [text] for speech, flushing anything in flight (Skip semantics).
      * Never blocks the caller; completion arrives via [nativeOnTtsDone].
      */

@@ -114,6 +114,30 @@ describe("hover-row rhythm", () => {
 	});
 });
 
+describe("desktop voice copy and controls", () => {
+	// Windows and Linux shells report every voice at quality 1, so the
+	// macOS premium/enhanced gate would list nothing — those shells
+	// list every installed voice instead, and the note names no OS.
+	it("names no OS in the system-voice note and lists all voices off-macOS", () => {
+		const source = panelSource("VoicePanel.svelte");
+		expect(source).not.toMatch(/macOS system voices/);
+		expect(source).toMatch(/Messages always read with system voices/);
+		expect(source).toMatch(/isWindowsShell \|\| isLinuxShell/);
+		expect(source).toMatch(/allVoicesForLang\(installedVoices, voiceLangTag\)/);
+	});
+	it("links each platform to its own voice-download settings", () => {
+		const source = panelSource("VoicePanel.svelte");
+		expect(source).toMatch(/Open Speech settings/);
+		expect(source).toMatch(/Open text-to-speech settings/);
+	});
+	it("offers the mic toggle in the desktop shell, not just the browser", () => {
+		const source = panelSource("VoicePanel.svelte");
+		const desktop = source.indexOf("{#if nativeVoice && !androidUI}");
+		if (desktop === -1) throw new Error("no desktop native-voice branch");
+		expect(source.slice(desktop)).toMatch(/Enable microphone dictation/);
+	});
+});
+
 describe("provider gating wiring", () => {
 	// The platform.ts contract is unit-tested pure; these pin that both
 	// listing sites actually route through it — otherwise local-gemma

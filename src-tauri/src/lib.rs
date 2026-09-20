@@ -122,11 +122,14 @@ fn keychain_set(account: String, secret: String) -> Result<(), String> {
     }
 }
 
-/// Open System Settings at the Accessibility pane, where voice downloads
-/// live (Read & Speak → System Voice → Manage Voices). Uses the `open` CLI
-/// directly: no plugin scope to misconfigure, and opening Settings needs no
-/// user permission. No public API goes deeper (sub-anchors are swallowed),
-/// so the UI always prints the in-pane path alongside.
+/// Open the OS voice-download settings: macOS System Settings at the
+/// Accessibility pane, where voice downloads live (Read & Speak → System
+/// Voice → Manage Voices); Windows Speech settings (Time & language →
+/// Speech → Manage voices); Android text-to-speech settings. macOS uses
+/// the `open` CLI directly: no plugin scope to misconfigure, and opening
+/// Settings needs no user permission. No public Apple API goes deeper
+/// (sub-anchors are swallowed), so the UI always prints the in-pane path
+/// alongside.
 #[tauri::command]
 fn open_voice_settings() -> Result<(), String> {
     #[cfg(target_os = "macos")]
@@ -142,7 +145,30 @@ fn open_voice_settings() -> Result<(), String> {
             Err("System Settings did not open".into())
         };
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "windows")]
+    {
+        // Speech settings page (Manage voices lives there). `start`
+        // needs the empty title arg: the first quoted arg is a window
+        // title, not the target.
+        let status = std::process::Command::new("cmd")
+            .args(["/C", "start", "", "ms-settings:speech"])
+            .status()
+            .map_err(|e| e.to_string())?;
+        return if status.success() {
+            Ok(())
+        } else {
+            Err("Speech settings did not open".into())
+        };
+    }
+    #[cfg(target_os = "android")]
+    {
+        return tts_android::open_tts_settings();
+    }
+    #[cfg(not(any(
+        target_os = "macos",
+        target_os = "windows",
+        target_os = "android"
+    )))]
     {
         return Err("opening System Settings requires macOS".into());
     }

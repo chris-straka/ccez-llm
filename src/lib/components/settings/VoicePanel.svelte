@@ -32,8 +32,8 @@
 	let isMacBrowser = $state(false);
 	/** Plain browser on Windows: same, with the Windows install path. */
 	let isWindowsBrowser = $state(false);
-	/** Tauri shell on Windows: the Rust opener is macOS-only, so the
-	note carries the Windows path with no button. */
+	/** Tauri shell on Windows: the Rust opener lands on Speech
+	settings (Manage voices lives there). */
 	let isWindowsShell = $state(false);
 	/** Tauri shell on Linux: same, with the Linux note. */
 	let isLinuxShell = $state(false);
@@ -51,7 +51,16 @@
 			replyLanguageFor(voiceLangTag.split("-")[0] ?? "")?.name ??
 			voiceLangTag
 	);
-	const voiceOptions = $derived(voicesForLang(installedVoices, voiceLangTag));
+	/* Desktop picker source: macOS tiers premium/enhanced out of the
+	registry, but Windows (SAPI) and Linux (Speech Dispatcher/espeak)
+	report every voice at quality 1 — the premium/enhanced gate would
+	list nothing there, so those shells list every installed voice
+	(like Android, which has no tiers either). */
+	const voiceOptions = $derived(
+		isWindowsShell || isLinuxShell
+			? allVoicesForLang(installedVoices, voiceLangTag)
+			: voicesForLang(installedVoices, voiceLangTag)
+	);
 	/** Android picker: no quality gate — Android has no premium/enhanced tiers. */
 	const androidVoiceOptions = $derived(
 		allVoicesForLang(installedVoices, voiceLangTag)
@@ -226,6 +235,17 @@
 	{#if voiceRefreshNote !== ""}
 		<p class="note" role="status">{voiceRefreshNote}</p>
 	{/if}
+	<p class="note">
+		To add voices: open
+		<button
+			type="button"
+			title="Open text-to-speech settings"
+			onclick={openVoiceSetup}>Text-to-speech settings</button
+		>, then check again.
+		{#if voiceSetupError}<span role="alert">
+				(couldn't open it automatically)</span
+			>{/if}
+	</p>
 {/if}
 {#if androidUI && !inShell}
 	<label class="check">
@@ -237,12 +257,20 @@
 	<fieldset class="voice-engine">
 		<legend>System voice</legend>
 		<p class="note">
-			Replies always read with macOS system voices (web voices only ever step in
+			Messages always read with system voices (web voices only ever step in
 			when the native bridge is unavailable).
 			{#if isWindowsShell}
-				To add voices on Windows: Settings → Time &amp; language → Speech →
-				Manage voices → Add voices, then reload this page so the new voices
+				To add voices on Windows: open
+				<button
+					type="button"
+					title="Open Speech settings"
+					onclick={openVoiceSetup}>Speech settings</button
+				>
+				→ Manage voices → Add voices, then reload this page so the new voices
 				appear.
+				{#if voiceSetupError}<span role="alert">
+						(couldn't open it automatically)</span
+					>{/if}
 			{:else if isLinuxShell}
 				To add voices on Linux: install your desktop's speech engine (eSpeak via
 				your package manager on most distros), then reload this page so the new
@@ -310,15 +338,26 @@
 					</div>
 				</div>
 			{:else if voicesLoaded}
-				<p class="note voice-note">
-					No premium or enhanced voices installed for {voiceLangTag} — Auto uses your
-					System Voice.
-				</p>
+				{#if isWindowsShell || isLinuxShell}
+					<p class="note voice-note">
+						No {voiceLangName} voices installed — Auto uses the system default.
+						Install one following the steps above, then check again.
+					</p>
+				{:else}
+					<p class="note voice-note">
+						No premium or enhanced voices installed for {voiceLangTag} — Auto uses your
+						System Voice.
+					</p>
+				{/if}
 			{/if}
 		{/if}
 		{#if voiceRefreshNote !== ""}
 			<p class="note" role="status">{voiceRefreshNote}</p>
 		{/if}
+		<label class="check">
+			<input type="checkbox" bind:checked={settings.micEnabled} />
+			Enable microphone dictation
+		</label>
 	</fieldset>
 {:else if inShell && voiceLoadError && !androidUI}
 	<fieldset>
