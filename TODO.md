@@ -134,6 +134,20 @@ cannot (no Android hardware here).
       issues for spaced scripts; floating pins remain the full fix,
       needed only if gap parking stops being enough.)
 
+## Pile: +page.svelte component split (reopened Sep 2026)
+
+`src/routes/+page.svelte` is ~19k lines (script ~11.7k with ~300
+functions, markup ~2.4k, style ~4.9k). Sequence: land the in-flight
+turns work first (it touches the same file), then split outside-in —
+self-contained overlays first (shortcuts modal, search palette,
+settings panel), message/composer core last (shared `$state` must move
+behind a small store/props contract, not prop-drilling soup). Keep the
+`keybindings.ts` hollowing going in parallel.
+
+- [ ] Split `+page.svelte` outside-in per the sequence above, with the
+      repo gates green at each step (`bun run check` + `bun run test` +
+      focused e2e per extracted area).
+
 ## Non-goals
 
 - No app-build/agentic features. No cloud sync / sharing / plugins.

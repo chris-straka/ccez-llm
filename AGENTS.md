@@ -157,12 +157,10 @@ or every fresh profile pops a password prompt per launch.
 ## Known structural debt
 
 - `src/routes/+page.svelte` is sidebar, messages, composer, popovers in
-  one file and stays one file by explicit decision (Sep 2026):
-  nothing fixed so far was caused by its size, it is AI-navigable via search,
-  and a split buys no user-visible change for real regression risk. Instead
-  the `onKey` dispatcher is being hollowed out branch by branch into
+  one file (~19k lines; component split is an open task in `TODO.md`).
+  The `onKey` dispatcher is being hollowed out branch by branch into
   `src/lib/keybindings.ts`: decisions are pure functions over an explicit
   facts snapshot (unit-tested, priority encoded inside), effects stay in the
   component. New dispatcher branches follow that split — no new untested
-  guard soup in `onKey`. Testing Library is deferred for the same reason:
+  guard soup in `onKey`. Testing Library stays deferred:
   test pure logic and bridge contracts with colocated Vitest instead.
