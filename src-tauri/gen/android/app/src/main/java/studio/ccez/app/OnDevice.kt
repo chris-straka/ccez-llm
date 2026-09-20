@@ -54,7 +54,10 @@ import org.json.JSONObject
  *
  * CODE-ONLY, UNVERIFIED ON DEVICE (no device ran in this harness;
  * the Kotlin compiles locally — see the report). Pinned to
- * `com.google.mlkit:genai-prompt:1.0.0-beta3`, NOT beta4: beta4 ships
+ * `com.google.mlkit:genai-prompt:1.0.0-beta2`, NOT beta3/4: beta3's
+ * default ModelConfig requests AICore feature 648, which no shipping
+ * AICore provides (606 FEATURE_NOT_FOUND on-device; upstream
+ * googlesamples/mlkit issue 1061). beta4 ships
  * Kotlin 2.3 metadata, which needs kotlin-gradle-plugin 2.3 — and 2.3
  * turns Tauri's own bundled `kotlinOptions` script into a hard error
  * (fixed upstream in tauri#15694, unreleased). beta3 reads cleanly
@@ -194,9 +197,9 @@ object OnDevice {
                             maxOutputTokens = cap
                         }
                     )
-                    // beta3 has no response-level `.text` (that
-                    // convenience arrived in beta4): read the first
-                    // candidate's text instead.
+                    // beta2/3 have no response-level `.text`
+                    // (that convenience arrived in beta4): read the
+                    // first candidate's text instead.
                     val text = response.candidates.firstOrNull()?.text
                     if (text.isNullOrEmpty()) json("error", "failed")
                     else JSONObject().put("text", text).toString()

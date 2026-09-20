@@ -197,6 +197,15 @@ describe("createTextareaEditor", () => {
 		expect(ta.placeholder).toBe("Tap to write again");
 	});
 
+	it("setDisabled locks and unlocks the field", () => {
+		const { editor, ta } = setup();
+		expect(ta.disabled).toBe(false);
+		editor.setDisabled(true);
+		expect(ta.disabled).toBe(true);
+		editor.setDisabled(false);
+		expect(ta.disabled).toBe(false);
+	});
+
 	it("destroy removes the node", () => {
 		const { parent, editor } = setup();
 		editor.destroy();

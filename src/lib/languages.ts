@@ -208,3 +208,12 @@ export function thinkingLabelFor(code: string | null): string {
 	if (!code) return "Thinking";
 	return THINKING_LABEL[code] ?? "Thinking";
 }
+
+/**
+ * Language-switch toast: endonym plus marker ("Čeština 🇨🇿").
+ * Shared by the submenu picks and the send-button hold swap so the
+ * shape never drifts. Pure.
+ */
+export function switchToastFor(lang: ReplyLanguage): string {
+	return `${lang.native} ${lang.badge}`;
+}

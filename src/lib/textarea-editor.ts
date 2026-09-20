@@ -87,6 +87,9 @@ export interface PromptEditor {
 	blur(): void;
 	/** Swap the empty-prompt hint (edit vs scroll mode). */
 	setPlaceholder(text: string): void;
+	/** No-key lock: the field refuses typing and focus (send
+	 * explains through the existing notice path). */
+	setDisabled(disabled: boolean): void;
 	/** Re-run layout measurement (stale caches after occlusion/DPR change). */
 	remeasure(): void;
 	destroy(): void;
@@ -652,6 +655,9 @@ export function createTextareaEditor(
 		blur: () => ta.blur(),
 		setPlaceholder: (text: string) => {
 			ta.placeholder = text;
+		},
+		setDisabled: (disabled: boolean) => {
+			ta.disabled = disabled;
 		},
 		// Nothing cached: there is no stale measurement to settle.
 		remeasure: () => {},

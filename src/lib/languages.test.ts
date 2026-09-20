@@ -8,6 +8,7 @@ import {
 	QUICK_LANG_CODES,
 	quickKeyFor,
 	replyLanguageFor,
+	switchToastFor,
 	thinkingLabelFor
 } from "./languages";
 
@@ -170,5 +171,10 @@ describe("reply pill data", () => {
 		expect(replyLanguageFor("cs")?.native).toBe("Čeština");
 		expect(replyLanguageFor("cs")?.cleared).toBe("Vymazáno");
 		expect(replyLanguageFor("ja")?.native).toBe("日本語");
+	});
+	it("toasts the switch as endonym plus marker", () => {
+		expect(switchToastFor(replyLanguageFor("cs")!)).toBe("Čeština 🇨🇿");
+		expect(switchToastFor(replyLanguageFor("ja")!)).toBe("日本語 🇯🇵");
+		expect(switchToastFor(replyLanguageFor("la")!)).toBe("Latina 🏛");
 	});
 });

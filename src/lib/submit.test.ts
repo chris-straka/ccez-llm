@@ -2,9 +2,34 @@ import { describe, it, expect } from "vitest";
 import {
 	submitAction,
 	sendAction,
+	composerLocked,
 	editMessageAction,
 	commitEditTarget
 } from "./submit";
+
+describe("composerLocked", () => {
+	it("locks a keyed provider with a blank key", () => {
+		expect(
+			composerLocked({ mock: false, keyless: false, apiKey: "" })
+		).toBe(true);
+		expect(
+			composerLocked({ mock: false, keyless: false, apiKey: "   " })
+		).toBe(true);
+	});
+	it("leaves a stored key alone", () => {
+		expect(
+			composerLocked({ mock: false, keyless: false, apiKey: "sk-x" })
+		).toBe(false);
+	});
+	it("exempts the mock provider and keyless endpoints", () => {
+		expect(composerLocked({ mock: true, keyless: false, apiKey: "" })).toBe(
+			false
+		);
+		expect(composerLocked({ mock: false, keyless: true, apiKey: "" })).toBe(
+			false
+		);
+	});
+});
 
 describe("submitAction", () => {
 	it("lets the annotation pill own Enter over everything", () => {

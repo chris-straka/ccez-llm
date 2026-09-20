@@ -69,6 +69,7 @@
 		QUICK_LANG_CODES,
 		quickKeyFor,
 		replyLanguageFor,
+		switchToastFor,
 		thinkingLabelFor,
 		type LanguageMenu
 	} from "$lib/languages";
@@ -384,6 +385,7 @@
 	import {
 		submitAction,
 		sendAction,
+		composerLocked,
 		editMessageAction,
 		commitEditTarget
 	} from "$lib/submit";
@@ -599,7 +601,7 @@
 	 */
 	$effect(() => {
 		if (!androidUI) return;
-		if (!missingKey) {
+		if (!missingKey && !noKeyLock) {
 			keyToastFor = null;
 			return;
 		}
@@ -2075,6 +2077,7 @@
 		!isSending(chatState) &&
 			(hasText || attachments.length > 0 || annotations.length > 0)
 	);
+	/** No-key lock lives below, next to `useMock` (it reads it). */
 
 	function toggleSidebar(): void {
 		settings.sidebarCollapsed = !settings.sidebarCollapsed;
@@ -3476,6 +3479,27 @@
 	}
 
 	const useMock = mockProviderEnabled();
+	/**
+	 * No-key lock: a keyed provider with a blank stored key locks the
+	 * composer (no typing, locked hint) instead of accepting a draft
+	 * into a doomed turn. Mock and keyless (on-device) never lock.
+	 */
+	const noKeyLock = $derived(
+		composerLocked({
+			mock: useMock,
+			keyless:
+				getProviderDef(settings.activeProviderId, settings.customProviders)
+					.keyless === true ||
+				isOnDeviceProvider(settings.activeProviderId),
+			apiKey: settings.providers[settings.activeProviderId]?.apiKey ?? ""
+		})
+	);
+	$effect(() => {
+		editor?.setDisabled(noKeyLock);
+		if (noKeyLock)
+			editor?.setPlaceholder("Set an API key in Settings to chat");
+		else editor?.setPlaceholder(promptPlaceholder());
+	});
 	const chat = $derived(activeChat(chatState));
 	/**
 	 * Hover preview: the sidebar row under the cursor shows its chat in
@@ -7011,6 +7035,15 @@
 	fields, and the annotation review keep their own clicks. */
 	function focusPromptFloor(event: MouseEvent): void {
 		const target = event.target instanceof Element ? event.target : null;
+		// Locked taps explain instead of focusing (the disabled field
+		// takes no focus and pops no keyboard) — except on controls
+		// with their own behavior, which keep it.
+		if (noKeyLock && !target?.closest("button, input, select, a, .ann-wrap")) {
+			const message = "Set an API key first — open Settings.";
+			showNotice(notices, "banner", message);
+			if (androidUI) flashErrorToast(message);
+			return;
+		}
 		if (target?.closest("button, input, textarea, select, a, .ann-wrap"))
 			return;
 		editor?.focus();
@@ -7837,7 +7870,7 @@
 		const lang = next.current ? replyLanguageFor(next.current) : null;
 		flashToast(
 			lang
-				? `${lang.native} ${lang.badge}`
+				? switchToastFor(lang)
 				: (replyLanguageFor(next.stash)?.cleared ?? "Cleared")
 		);
 	}
@@ -11936,9 +11969,15 @@
 										class:selected={activeReplyCode === lang.code}
 										title={quickKey ? `${lang.name} (${quickKey})` : lang.name}
 										onclick={() => {
-											if (activeReplyCode === lang.code && !quickKey)
+											if (activeReplyCode === lang.code && !quickKey) {
 												clearReplyLang();
-											else setReplyLang(lang.code);
+												// Clearing names the released language
+												// in its own cleared word.
+												flashToast(lang.cleared);
+											} else {
+												setReplyLang(lang.code);
+												flashToast(switchToastFor(lang));
+											}
 											// Language picks tick on phones like the
 											// family buttons above do.
 											buzzTap();
@@ -12870,7 +12909,7 @@
 			{/if}
 		</div>
 
-		{#if missingKey && !androidUI}
+		{#if (missingKey || noKeyLock) && !androidUI}
 			<p class="error-banner" role="alert">
 				Set an API key first —
 				<button

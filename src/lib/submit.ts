@@ -64,6 +64,31 @@ export function sendAction(facts: SendFacts): SendAction {
 	return "resolve-provider";
 }
 
+/**
+ * Facts for the no-key composer lock: with no usable credential the
+ * composer locks (no typing, send explains) instead of accepting a
+ * draft into a doomed turn. Mock (tests/dev) and keyless providers
+ * (on-device Nano) never lock. Pure.
+ */
+export interface ComposerLockFacts {
+	/** Test/dev mock provider owns sends. */
+	mock: boolean;
+	/** Provider needs no credential by design. */
+	keyless: boolean;
+	/** Stored key for the active provider (blank when unset). */
+	apiKey: string;
+}
+
+/**
+ * True when the composer must refuse typing. Guard order is the
+ * contract: exemptions first, then the blank-key lock.
+ */
+export function composerLocked(facts: ComposerLockFacts): boolean {
+	if (facts.mock) return false;
+	if (facts.keyless) return false;
+	return facts.apiKey.trim() === "";
+}
+
 /** Minimal message shape for the edit-target decisions. */
 export interface EditTargetMessage {
 	role: string;

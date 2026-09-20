@@ -99,12 +99,15 @@ dependencies {
     implementation("com.google.android.material:material:1.12.0")
     implementation("androidx.lifecycle:lifecycle-process:2.10.0")
     // On-device chat: ML Kit GenAI Prompt API over the AICore system app
-    // (Gemini Nano — no bundled weights, no API key). Pinned to beta3,
-    // NOT beta4: beta4's Kotlin 2.3 metadata needs kotlin-gradle-plugin
-    // 2.3, which Tauri's own bundled script rejects (upstream
-    // tauri#15694, unreleased). beta3 reads under the KGP 2.2.21 pinned
-    // in ../build.gradle.kts.
-    implementation("com.google.mlkit:genai-prompt:1.0.0-beta3")
+    // (Gemini Nano — no bundled weights, no API key). Pinned to beta2,
+    // NOT beta3/4: beta3's default ModelConfig requests AICore feature
+    // 648, which no shipping AICore provides — checkStatus() throws 606
+    // FEATURE_NOT_FOUND on real hardware (upstream googlesamples/mlkit
+    // issue 1061; beta1/2 request 636, which ships). beta4 is out too: its
+    // Kotlin 2.3 metadata needs kotlin-gradle-plugin 2.3, which Tauri's
+    // own bundled script rejects (upstream tauri#15694, unreleased).
+    // beta2 reads under the KGP 2.2.21 pinned in ../build.gradle.kts.
+    implementation("com.google.mlkit:genai-prompt:1.0.0-beta2")
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.4")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.0")
