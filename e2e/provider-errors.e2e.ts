@@ -58,7 +58,7 @@ test("401 surfaces the provider error with a retry", async ({ page }) => {
 	await expect(err).toContainText("HTTP 401", { timeout: 30_000 });
 	await expect(err).toContainText("deepseek");
 	await expect(
-		page.locator("article.assistant button", { hasText: "Retry" }).first()
+		page.locator('article.assistant button[aria-label="Retry"]').first()
 	).toBeVisible();
 });
 
@@ -85,12 +85,63 @@ test("429 rate-limit retries without duplicating the reply", async ({
 	// Retry re-attempts the same reply slot: still one assistant article,
 	// still failing with the same status, never a stacked duplicate.
 	await page
-		.locator("article.assistant button", { hasText: "Retry" })
+		.locator('article.assistant button[aria-label="Retry"]')
 		.first()
 		.click();
 	await expect(err).toContainText("HTTP 429", { timeout: 30_000 });
 	await expect(page.locator("article.assistant")).toHaveCount(1);
 	await expect(page.locator("article.user")).toHaveCount(1);
+});
+
+/** Blank-key deepseek with the mock flag removed (real resolve path). */
+async function seedBlankKeyProvider(page: Page): Promise<void> {
+	await seedChat(page, []);
+	await page.addInitScript(() => {
+		window.localStorage.removeItem("ccez-mock-provider");
+		const stored = window.localStorage.getItem("ccez-llm-settings-v1");
+		const parsed = stored
+			? (JSON.parse(stored) as Record<string, unknown>)
+			: {};
+		parsed["activeProviderId"] = "deepseek";
+		parsed["providers"] = {
+			...((parsed["providers"] as Record<string, unknown> | undefined) ?? {}),
+			deepseek: {
+				baseUrl: "https://api.deepseek.com",
+				apiKey: "",
+				model: "deepseek-chat",
+				models: []
+			}
+		};
+		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify(parsed));
+	});
+}
+
+test("blank key keeps the composer editable and explains on send", async ({
+	page
+}) => {
+	await seedBlankKeyProvider(page);
+	await page.goto("/");
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
+	// Typing is never gated on the key: the draft lands in the composer.
+	// Click and type with no awaits between — anything in between
+	// risks losing the freshly planted focus.
+	const composer = page.locator(".ta-input").first();
+	await expect(composer).toBeEditable({ timeout: 10_000 });
+	await composer.click();
+	await page.keyboard.type("hello without a key");
+	// Textarea value is a property, not text content: toHaveValue.
+	await expect(composer).toHaveValue("hello without a key");
+	await page.keyboard.press("Enter");
+	// Send refuses with the key notice and keeps the draft — no user
+	// message is stored, so nothing is lost to a doomed turn.
+	await expect(page.locator(".error-banner").first()).toContainText(
+		"Set an API key first",
+		{ timeout: 10_000 }
+	);
+	await expect(composer).toHaveValue("hello without a key");
+	await expect(page.locator("article.user")).toHaveCount(0);
 });
 
 test("deleting the streaming chat aborts its reply, composer keeps working", async ({

@@ -208,6 +208,19 @@ export function onDeviceErrorCopy(reason: unknown): string {
 	}
 }
 
+/**
+ * Send-time refusal copy for a not-ready model. A bare state without a
+ * reason still names the situation (downloading vs unavailable) — the
+ * default "failed, try again" never explains, so it never ships here.
+ * Pure.
+ */
+export function onDeviceNotReadyCopy(status: OnDeviceStatus): string {
+	if (status.reason) return onDeviceErrorCopy(status.reason);
+	if (status.state === "downloading")
+		return onDeviceErrorCopy("downloading");
+	return onDeviceErrorCopy("unsupported");
+}
+
 /** Failure reason out of an invoke rejection (native code or message). */
 function reasonFrom(error: unknown): string {
 	if (typeof error === "string" && error) return error;

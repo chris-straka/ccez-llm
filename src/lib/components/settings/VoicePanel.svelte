@@ -280,16 +280,8 @@
 				(couldn't open it automatically)</span
 			>{/if}
 	</p>
-	<label class="check">
-		<input type="checkbox" bind:checked={settings.micEnabled} />
-		Enable microphone dictation
-	</label>
-{/if}
-{#if androidUI && !inShell}
-	<label class="check">
-		<input type="checkbox" bind:checked={settings.micEnabled} />
-		Enable microphone dictation
-	</label>
+	<!-- The mic toggle lives with the other checkboxes in DefaultsPanel's
+		Messages group now, not buried here under the voice pickers. -->
 {/if}
 {#if nativeVoice && !androidUI}
 	<fieldset class="voice-engine">
@@ -392,10 +384,6 @@
 		{#if voiceRefreshNote !== ""}
 			<p class="note" role="status">{voiceRefreshNote}</p>
 		{/if}
-		<label class="check">
-			<input type="checkbox" bind:checked={settings.micEnabled} />
-			Enable microphone dictation
-		</label>
 	</fieldset>
 {:else if inShell && voiceLoadError && !androidUI}
 	<fieldset>
@@ -423,9 +411,5 @@
 				allow them).
 			{/if}
 		</p>
-		<label class="check">
-			<input type="checkbox" bind:checked={settings.micEnabled} />
-			Enable microphone dictation
-		</label>
 	</fieldset>
 {/if}

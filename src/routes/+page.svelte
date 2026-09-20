@@ -80,7 +80,11 @@
 	} from "$lib/providers/registry";
 	import { offlineTarget, onlineRestore } from "$lib/offline";
 	import { MockProvider, mockProviderEnabled } from "$lib/providers/mock";
-	import { isOnDeviceProvider } from "$lib/ondevice/bridge";
+	import {
+		isOnDeviceProvider,
+		onDeviceNotReadyCopy,
+		onDeviceStatus
+	} from "$lib/ondevice/bridge";
 	import { OnDeviceChatProvider } from "$lib/ondevice/provider";
 	import { getCurrentWindow } from "@tauri-apps/api/window";
 	import { invoke } from "@tauri-apps/api/core";
@@ -1849,6 +1853,9 @@
 	let langMenuAnchor: { top: number; left: number; maxH: number } | null =
 		$state(null);
 	function toggleLangMenu(id: LanguageMenu["id"], btn: HTMLElement): void {
+		// Family open/close ticks on phones (buzzTap self-gates to
+		// Android and honors the haptics toggle).
+		buzzTap();
 		if (openLangMenu === id) {
 			openLangMenu = null;
 			return;
@@ -6455,6 +6462,24 @@
 		return null;
 	}
 
+	/**
+	 * On-device send gate: a not-ready local model refuses before the
+	 * composer clears, with the probe's own copy (downloading vs
+	 * missing vs unsupported) in the banner slot — never a sent turn
+	 * that fails without thinking. Cloud providers pass straight
+	 * through. True when the send is refused (caller returns, draft
+	 * intact).
+	 */
+	async function blockUnreadyOnDevice(): Promise<boolean> {
+		if (!isOnDeviceProvider(settings.activeProviderId)) return false;
+		const status = await onDeviceStatus();
+		if (status.state === "ready") return false;
+		const message = onDeviceNotReadyCopy(status);
+		showNotice(notices, "banner", message);
+		if (androidUI) flashErrorToast(message);
+		return true;
+	}
+
 	/** Seconds since the viewed chat started sending (the Thinking
 	chip counts the wait up). No cleanup return on purpose: token
 	updates may re-run this watcher mid-send, and tearing the
@@ -6811,6 +6836,9 @@
 					!isOnDeviceProvider(settings.activeProviderId)
 				)
 			: "";
+		// The local model either answers or refuses here: no send into
+		// a missing/downloading Nano, and the draft stays for a retry.
+		if (!nativeConfig && (await blockUnreadyOnDevice())) return;
 		const provider = nativeConfig ? null : await resolveProviderActive();
 		if (!provider && !nativeConfig) {
 			missingKey = true;
@@ -6950,6 +6978,7 @@
 		}
 		// TypeScript resends resolve the provider (Keychain on first
 		// use); the native branch above never gets here.
+		if (await blockUnreadyOnDevice()) return;
 		const provider = await resolveProviderActive();
 		if (!provider) {
 			missingKey = true;
@@ -11910,6 +11939,9 @@
 											if (activeReplyCode === lang.code && !quickKey)
 												clearReplyLang();
 											else setReplyLang(lang.code);
+											// Language picks tick on phones like the
+											// family buttons above do.
+											buzzTap();
 											// Picking a language hands focus to the
 											// composer on desktop: typing starts there
 											// next, and focus never lingers on the

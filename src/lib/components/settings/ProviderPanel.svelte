@@ -81,6 +81,27 @@
 			void refreshModels();
 	}
 	let editingKey: Record<string, boolean> = $state({});
+	/** Paste-button failure (clipboard denied, empty): cleared on edit. */
+	let keyPasteError = $state("");
+	/**
+	 * Phone keyboards hide paste on password fields, so the field gets
+	 * its own button. The tap is the clipboard-read user gesture; when
+	 * the WebView denies it, the hint names the long-press fallback.
+	 */
+	async function pasteKey(): Promise<void> {
+		keyPasteError = "";
+		try {
+			const text = await navigator.clipboard.readText();
+			if (!text.trim()) {
+				keyPasteError = "Clipboard is empty.";
+				return;
+			}
+			active.apiKey = text.trim();
+		} catch {
+			keyPasteError =
+				"Couldn't read the clipboard — long-press the field to paste.";
+		}
+	}
 	const inShell = tauriBackendAvailable();
 
 	const allProviders = $derived(listProviders(settings.customProviders));
@@ -386,13 +407,20 @@
 	{:else if showKeyField}
 		<label>
 			API key <span class="hint">{activeDef.keyHint}</span>
-			<input
-				type="password"
-				bind:value={active.apiKey}
-				autocomplete="off"
-				spellcheck="false"
-				onblur={() => (editingKey[settings.activeProviderId] = false)}
-			/>
+			<span class="model-row">
+				<input
+					type="password"
+					bind:value={active.apiKey}
+					autocomplete="off"
+					spellcheck="false"
+					oninput={() => (keyPasteError = "")}
+					onblur={() => (editingKey[settings.activeProviderId] = false)}
+				/>
+				<button type="button" onclick={() => void pasteKey()}>Paste</button>
+			</span>
+			{#if keyPasteError}<span class="hint" role="alert"
+					>{keyPasteError}</span
+				>{/if}
 		</label>
 	{:else}
 		<p class="key-state" role="status">

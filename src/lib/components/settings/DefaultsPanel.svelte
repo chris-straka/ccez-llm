@@ -122,6 +122,10 @@
 				<input type="checkbox" bind:checked={settings.replyNotifications} />
 				Notify when replies finish in the background
 			</label>
+			<label class="check">
+				<input type="checkbox" bind:checked={settings.micEnabled} />
+				Enable microphone dictation
+			</label>
 		</fieldset>
 	{:else}
 		<!-- One row for both hover toggles: the label names the behavior once,
@@ -157,6 +161,10 @@
 		<label class="check">
 			<input type="checkbox" bind:checked={settings.replyNotifications} />
 			Notify when replies finish in the background
+		</label>
+		<label class="check">
+			<input type="checkbox" bind:checked={settings.micEnabled} />
+			Enable microphone dictation
 		</label>
 	{/if}
 	<VoicePanel {settings} {androidUI} />

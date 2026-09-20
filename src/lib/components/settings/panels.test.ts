@@ -133,11 +133,20 @@ describe("desktop voice copy and controls", () => {
 		expect(source).toMatch(/Open Speech settings/);
 		expect(source).toMatch(/Open text-to-speech settings/);
 	});
-	it("offers the mic toggle in the desktop shell, not just the browser", () => {
-		const source = panelSource("VoicePanel.svelte");
-		const desktop = source.indexOf("{#if nativeVoice && !androidUI}");
-		if (desktop === -1) throw new Error("no desktop native-voice branch");
-		expect(source.slice(desktop)).toMatch(/Enable microphone dictation/);
+	it("seats the mic toggle with the other checkboxes, not in the voice panel", () => {
+		// The toggle moved out of VoicePanel (buried under the pickers)
+		// into DefaultsPanel's Messages group, both branches.
+		const voice = panelSource("VoicePanel.svelte");
+		expect(voice).not.toMatch(/Enable microphone dictation/);
+		const defaults = panelSource("DefaultsPanel.svelte");
+		const android = defaults.indexOf("{#if androidUI}");
+		if (android === -1) throw new Error("no android branch");
+		const desktop = defaults.indexOf("{:else}", android);
+		if (desktop === -1) throw new Error("no desktop branch");
+		expect(defaults.slice(android, desktop)).toMatch(
+			/Enable microphone dictation/
+		);
+		expect(defaults.slice(desktop)).toMatch(/Enable microphone dictation/);
 	});
 });
 

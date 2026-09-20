@@ -6,6 +6,7 @@ import {
 	isOnDeviceProvider,
 	ONDEVICE_PROVIDER_ID,
 	onDeviceErrorCopy,
+	onDeviceNotReadyCopy,
 	onDeviceStatus,
 	onDeviceUnsupported,
 	parseOnDeviceStatus,
@@ -63,6 +64,24 @@ describe("onDeviceErrorCopy", () => {
 			expect(text).not.toContain("\n");
 		});
 	}
+});
+
+describe("onDeviceNotReadyCopy", () => {
+	it("prefers the native reason when one is present", () => {
+		expect(
+			onDeviceNotReadyCopy({ state: "error", reason: "no-model" })
+		).toBe(onDeviceErrorCopy("no-model"));
+	});
+	it("names a downloading state with no reason instead of failing vaguely", () => {
+		expect(onDeviceNotReadyCopy({ state: "downloading" })).toBe(
+			onDeviceErrorCopy("downloading")
+		);
+	});
+	it("reads a bare unavailable state as unsupported, never failed", () => {
+		const copy = onDeviceNotReadyCopy({ state: "unavailable" });
+		expect(copy).toBe(onDeviceErrorCopy("unsupported"));
+		expect(copy).not.toContain("Try again");
+	});
 });
 
 describe("clampMaxTokens", () => {
