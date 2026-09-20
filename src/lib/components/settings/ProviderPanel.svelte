@@ -426,6 +426,20 @@
 			<p class="note" role="status">
 				{onDeviceProbing ? "Checking on-device model…" : onDeviceNote}
 			</p>
+			<p class="note">
+				<!-- Manual re-probe: terminal states (error, no model
+					yet) never re-poll on their own, so after an AI Core
+					update or a restart this is how the pill finds the
+					model without closing Settings. -->
+				<button
+					type="button"
+					title="Check the on-device model again"
+					disabled={onDeviceProbing}
+					onclick={() => void probeOnDevice()}
+				>
+					{onDeviceProbing ? "Checking…" : "Check again"}
+				</button>
+			</p>
 			{#if onDeviceReason === "stale-aicore" && !onDeviceProbing}
 				<!-- AI Core is a hidden system component (unsearchable
 					in the store): the button deep-links its page by

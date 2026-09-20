@@ -160,4 +160,11 @@ describe("provider gating wiring", () => {
 		expect(source).toMatch(/\{#each listedProviders as/);
 		expect(source).not.toMatch(/\{#each allProviders as/);
 	});
+	it("offers a manual re-probe under the on-device note", () => {
+		// Terminal states never re-poll alone: without this button the
+		// only retry after an AI Core update is closing Settings.
+		const source = panelSource("ProviderPanel.svelte");
+		expect(source).toMatch(/Check again/);
+		expect(source).toContain("probeOnDevice()");
+	});
 });
