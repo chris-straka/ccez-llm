@@ -570,6 +570,154 @@ export interface AnnotatedRun {
  * markup inert: only span text is ever read out, and the Svelte
  * renderer escapes it again on the way in.
  */
+/** One annotated run plus its plain-text span: `start`/`end` index
+into the concatenated run texts (reading/`rt` text excluded). */
+export interface AnnotatedRunWithOffsets extends AnnotatedRun {
+	start: number;
+	end: number;
+}
+
+/**
+ * Ruby HTML parsed into annotated runs with plain-text offsets: each
+ * run carries its `start`/`end` into the concatenated run texts, so a
+ * full-sentence conversion can be sliced down to a highlight. Reading
+ * (`rt`/`.frt`) text never advances the offsets — only base/plain
+ * text counts. Same parse and null contract as `annotatedRuns`
+ * (null when no kanji run carries a reading); strings only, so
+ * hostile markup stays inert.
+ */
+export function annotatedRunsWithOffsets(
+	html: string
+): AnnotatedRunWithOffsets[] | null {
+	let doc: Document;
+	try {
+		doc = new DOMParser().parseFromString(html, "text/html");
+	} catch {
+		return null;
+	}
+	const out: AnnotatedRunWithOffsets[] = [];
+	let found = false;
+	let cursor = 0;
+	const plain = (text: string): void => {
+		if (text !== "") {
+			out.push({ text, reading: null, start: cursor, end: cursor + text.length });
+			cursor += text.length;
+		}
+	};
+	// Same walk as `annotatedRuns`: plain elements are transparent,
+	// only .frb is special; offsets advance on emitted text alone.
+	const walk = (node: Node): void => {
+		if (node.nodeType === Node.TEXT_NODE) {
+			plain(node.textContent ?? "");
+			return;
+		}
+		if (node instanceof Element && node.classList.contains("frb")) {
+			const reading = node.querySelector(".frt")?.textContent?.trim() ?? "";
+			const base = [...node.childNodes]
+				.filter((kid) => kid.nodeType === Node.TEXT_NODE)
+				.map((kid) => kid.textContent ?? "")
+				.join("");
+			if (base !== "" && reading !== "") {
+				out.push({
+					text: base,
+					reading,
+					start: cursor,
+					end: cursor + base.length
+				});
+				cursor += base.length;
+				found = true;
+			} else {
+				plain(node.textContent ?? "");
+			}
+			return;
+		}
+		node.childNodes.forEach(walk);
+	};
+	doc.body.childNodes.forEach(walk);
+	return found ? out : null;
+}
+
+/** One popup's kanji: back-to-back reading runs share a panel, and
+colors restart at 0 per group — solo furigana always the lead color,
+shared popups split boundaries by color. Kana/plain runs split
+groups and never render. `start`/`end` index into the concatenated
+run texts (the highlight), so panels anchor and tint by span. Pure
+over runs. */
+export interface GroupedRun extends AnnotatedRun {
+	group: number;
+	color: number;
+	start: number;
+	end: number;
+}
+export function groupRuns(runs: AnnotatedRun[], size = 4): GroupedRun[] {
+	const out: GroupedRun[] = [];
+	let group = -1;
+	let color = 0;
+	let open = false;
+	let cursor = 0;
+	for (const run of runs) {
+		const len = run.text.length;
+		if (run.reading === null) {
+			open = false;
+		} else {
+			if (!open) {
+				group += 1;
+				color = 0;
+				open = true;
+			}
+			out.push({
+				text: run.text,
+				reading: run.reading,
+				group,
+				color,
+				start: cursor,
+				end: cursor + len
+			});
+			color = (color + 1) % size;
+		}
+		cursor += len;
+	}
+	return out;
+}
+
+/**
+ * Sub-runs covering a highlight's first occurrence in a converted
+ * sentence: locate `quote` in `sentencePlain` (the concatenated
+ * sentence run texts) and clip overlapping `sentenceRuns` to that
+ * span, preserving each run's reading on its clipped slice. Null
+ * when the quote is empty, unfound, or covers no runs.
+ *
+ * NOTE (first-occurrence limitation): `indexOf` finds the quote's
+ * FIRST occurrence, so a phrase repeated in the sentence always
+ * slices that first span — never a later selected instance. The
+ * +page wiring must pass the sentence containing the selection, and
+ * callers needing occurrence choice must resolve the offset first.
+ * Pure over strings; hostile markup stays inert (strings only, no
+ * elements).
+ */
+export function sliceRunsForQuote(
+	sentenceRuns: AnnotatedRunWithOffsets[] | null,
+	sentencePlain: string,
+	quote: string
+): AnnotatedRun[] | null {
+	if (!sentenceRuns || quote === "") return null;
+	const qStart = sentencePlain.indexOf(quote);
+	if (qStart < 0) return null;
+	const qEnd = qStart + quote.length;
+	const out: AnnotatedRun[] = [];
+	for (const run of sentenceRuns) {
+		const lo = Math.max(run.start, qStart);
+		const hi = Math.min(run.end, qEnd);
+		if (lo < hi) {
+			out.push({
+				text: run.text.slice(lo - run.start, hi - run.start),
+				reading: run.reading
+			});
+		}
+	}
+	return out.length > 0 ? out : null;
+}
+
 export function annotatedRuns(html: string): AnnotatedRun[] | null {
 	let doc: Document;
 	try {
@@ -609,18 +757,4 @@ export function annotatedRuns(html: string): AnnotatedRun[] | null {
 	return found ? out : null;
 }
 
-/** An annotated run with its popup pair color: kanji runs cycle
-0..size-1 in order, plain (kana) runs carry -1 and render uncolored.
-Pure pairing (no DOM), so the popup markup stays a straight map. */
-export interface PairedRun extends AnnotatedRun {
-	pair: number;
-}
-export function pairRuns(runs: AnnotatedRun[], size = 4): PairedRun[] {
-	let next = 0;
-	return runs.map((run) => {
-		if (run.reading === null) return { ...run, pair: -1 };
-		const pair = next % size;
-		next += 1;
-		return { ...run, pair };
-	});
-}
+

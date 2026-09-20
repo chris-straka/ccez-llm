@@ -21,13 +21,14 @@ html {
 	rgba everywhere — Chromium leaves color-mix() unresolved. */
 	--accent: #007aff;
 	--accent-ink: #fff;
-	/* Furigana pair palette (selection popup): each kanji+reading
-	pair carries one color so mixed selections map back. Dark theme
-	leads yellow, never blue. */
+	/* Furigana popup colors (selection readings): solo furigana
+	always pair0; shared popups split boundaries cycling the set.
+	No red/green pair (most common deficiency): orange/teal/plum
+	stay separable, dark leads yellow, never blue. */
 	--pair0: #007aff;
-	--pair1: #248a3d;
-	--pair2: #b25e09;
-	--pair3: #d70015;
+	--pair1: #b25e09;
+	--pair2: #00755a;
+	--pair3: #a85a8a;
 	--ok-wash: #e6f4ea;
 	--sel-tint: rgba(0, 122, 255, 0.28);
 	--ok: #1f7a4d;
@@ -62,9 +63,9 @@ html[data-theme="light"] {
 	--accent: #007aff;
 	--accent-ink: #fff;
 	--pair0: #007aff;
-	--pair1: #248a3d;
-	--pair2: #b25e09;
-	--pair3: #d70015;
+	--pair1: #b25e09;
+	--pair2: #00755a;
+	--pair3: #a85a8a;
 	--ok-wash: #e6f4ea;
 	--sel-tint: rgba(0, 122, 255, 0.28);
 	--ok: #1f7a4d;
@@ -99,9 +100,9 @@ html[data-theme="dark"] {
 	--accent: #0a84ff;
 	--accent-ink: #fff;
 	--pair0: #ffd60a;
-	--pair1: #30d158;
-	--pair2: #ff9f0a;
-	--pair3: #ff453a;
+	--pair1: #ff9f0a;
+	--pair2: #2dd4a7;
+	--pair3: #64d2ff;
 	--ok-wash: #12351f;
 	--sel-tint: rgba(10, 132, 255, 0.4);
 	--ok: #7cc3a3;

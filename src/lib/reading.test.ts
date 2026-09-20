@@ -35,7 +35,9 @@ import {
 	stripCodeForDetection,
 	readingsOnly,
 	annotatedRuns,
-	pairRuns
+	annotatedRunsWithOffsets,
+	sliceRunsForQuote,
+	groupRuns
 } from "./reading";
 import { pinyinBlock, pinyinRuby } from "./pinyin";
 import { isFuriganaCached } from "./furigana";
@@ -514,25 +516,21 @@ describe("annotatedRuns", () => {
 		]);
 	});
 
-	it("pairs kanji runs in order, kana plain, cycling the palette", () => {
+	it("groups back-to-back kanji, restarting colors per group", () => {
 		expect(
-			pairRuns([
+			groupRuns([
 				{ text: "咲", reading: "さ" },
 				{ text: "き", reading: null },
 				{ text: "誇", reading: "ほこ" },
-				{ text: "り", reading: null },
-				{ text: "春", reading: "はる" },
-				{ text: "夏", reading: "なつ" },
-				{ text: "秋", reading: "あき" }
+				{ text: "季", reading: "き" },
+				{ text: "節", reading: "せつ" },
+				{ text: "の", reading: null }
 			])
 		).toEqual([
-			{ text: "咲", reading: "さ", pair: 0 },
-			{ text: "き", reading: null, pair: -1 },
-			{ text: "誇", reading: "ほこ", pair: 1 },
-			{ text: "り", reading: null, pair: -1 },
-			{ text: "春", reading: "はる", pair: 2 },
-			{ text: "夏", reading: "なつ", pair: 3 },
-			{ text: "秋", reading: "あき", pair: 0 }
+			{ text: "咲", reading: "さ", group: 0, color: 0, start: 0, end: 1 },
+			{ text: "誇", reading: "ほこ", group: 1, color: 0, start: 2, end: 3 },
+			{ text: "季", reading: "き", group: 1, color: 1, start: 3, end: 4 },
+			{ text: "節", reading: "せつ", group: 1, color: 2, start: 4, end: 5 }
 		]);
 	});
 
@@ -553,6 +551,104 @@ describe("annotatedRuns", () => {
 		expect(runs).toEqual([
 			{ text: "<img src=x onerror=alert(1)>", reading: "さ" }
 		]);
+	});
+});
+
+describe("annotatedRunsWithOffsets", () => {
+	it("tracks plain-text offsets excluding reading text", () => {
+		const runs = annotatedRunsWithOffsets(
+			'<span class="frb">咲<span class="frt">さ</span></span>き<span class="frb">誇<span class="frt">ほこ</span></span>り'
+		);
+		expect(runs).toEqual([
+			{ text: "咲", reading: "さ", start: 0, end: 1 },
+			{ text: "き", reading: null, start: 1, end: 2 },
+			{ text: "誇", reading: "ほこ", start: 2, end: 3 },
+			{ text: "り", reading: null, start: 3, end: 4 }
+		]);
+		// Plain text is the run texts alone: readings (さほこ)
+		// never advance the offsets.
+		expect(runs!.map((r) => r.text).join("")).toBe("咲き誇り");
+		expect(runs!.at(-1)!.end).toBe(4);
+	});
+
+	it("returns null when no kanji run carries a reading", () => {
+		expect(annotatedRunsWithOffsets("<p>plain</p>")).toBe(null);
+		expect(annotatedRunsWithOffsets("")).toBe(null);
+	});
+
+	it("keeps hostile markup inert: strings only, no elements", () => {
+		const runs = annotatedRunsWithOffsets(
+			'<span class="frb">&lt;img src=x onerror=alert(1)&gt;<span class="frt">さ</span></span>き'
+		);
+		expect(runs).toEqual([
+			{ text: "<img src=x onerror=alert(1)>", reading: "さ", start: 0, end: 28 },
+			{ text: "き", reading: null, start: 28, end: 29 }
+		]);
+		for (const run of runs!) {
+			// Strings only: the hostile base survives as literal text
+			// (length 28 counts toward offsets), never as an element.
+			expect(typeof run.text).toBe("string");
+			expect(run instanceof Element).toBe(false);
+			expect(run.reading === null || typeof run.reading === "string").toBe(
+				true
+			);
+		}
+	});
+});
+
+describe("sliceRunsForQuote", () => {
+	it("slices a mid-sentence quote to exactly its runs", () => {
+		const sentenceRuns = annotatedRunsWithOffsets(
+			'<span class="frb">桜<span class="frt">さくら</span></span>が<span class="frb">咲<span class="frt">さ</span></span>く'
+		)!;
+		const sentencePlain = sentenceRuns.map((r) => r.text).join("");
+		expect(sentencePlain).toBe("桜が咲く");
+		// Mid-sentence highlight: kana + kanji + kana.
+		expect(sliceRunsForQuote(sentenceRuns, sentencePlain, "が咲く")).toEqual([
+			{ text: "が", reading: null },
+			{ text: "咲", reading: "さ" },
+			{ text: "く", reading: null }
+		]);
+		// Single kanji mid-sentence keeps its contextual reading.
+		expect(sliceRunsForQuote(sentenceRuns, sentencePlain, "咲")).toEqual([
+			{ text: "咲", reading: "さ" }
+		]);
+	});
+
+	it("clips partial runs at the quote edges", () => {
+		const sentenceRuns = annotatedRunsWithOffsets(
+			'<span class="frb">桜<span class="frt">さくら</span></span>が咲く'
+		)!;
+		const sentencePlain = sentenceRuns.map((r) => r.text).join("");
+		// Quote starting inside the multi-char plain run "が咲く".
+		const sliced = sliceRunsForQuote(sentenceRuns, sentencePlain, "咲く");
+		expect(sliced).toEqual([{ text: "咲く", reading: null }]);
+		expect(sliced!.map((r) => r.text).join("")).toBe("咲く");
+	});
+
+	it("returns null for empty or unfound quotes", () => {
+		const sentenceRuns = annotatedRunsWithOffsets(
+			'<span class="frb">桜<span class="frt">さくら</span></span>が咲く'
+		)!;
+		const sentencePlain = sentenceRuns.map((r) => r.text).join("");
+		expect(sliceRunsForQuote(sentenceRuns, sentencePlain, "")).toBe(null);
+		expect(sliceRunsForQuote(sentenceRuns, sentencePlain, "富士山")).toBe(
+			null
+		);
+		expect(sliceRunsForQuote(null, sentencePlain, "桜")).toBe(null);
+	});
+
+	it("keeps hostile markup inert: strings only, no elements", () => {
+		const sentenceRuns = annotatedRunsWithOffsets(
+			'<span class="frb">&lt;img src=x onerror=alert(1)&gt;<span class="frt">さ</span></span>き'
+		)!;
+		const sentencePlain = sentenceRuns.map((r) => r.text).join("");
+		const sliced = sliceRunsForQuote(sentenceRuns, sentencePlain, "き")!;
+		expect(sliced).toEqual([{ text: "き", reading: null }]);
+		for (const run of sliced) {
+			expect(typeof run.text).toBe("string");
+			expect(run instanceof Element).toBe(false);
+		}
 	});
 });
 

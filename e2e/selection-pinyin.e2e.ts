@@ -191,16 +191,19 @@ test("a highlight ending mid-sentence keeps one voice", async ({ page }) => {
 	if (!at) throw new Error("no selection rect");
 	await page.mouse.click(at.x, at.y, { button: "right" });
 	// Two segments ("ます。" + the kana-less fragment "自然"): both
-	// must read Japanese — no flip to Chinese at the boundary.
+	// must read Japanese — no flip to Chinese at the boundary. Speech
+	// waits for the worker conversion, so this covers a cold build.
 	await expect
 		.poll(
 			() =>
 				page.evaluate(
 					() => (window as unknown as { __langs?: string[] }).__langs ?? []
 				),
-			{ timeout: 10_000 }
+			{ timeout: 120_000 }
 		)
-		.toEqual(["ja-JP::ます。", "ja-JP::自然"]);
+		// Sentence-correct kana goes to speech (自然 reads しぜん):
+		// still one Japanese voice, never a flip to Chinese.
+		.toEqual(["ja-JP::ます。", "ja-JP::しぜん"]);
 });
 
 test("right-clicking hanzi with no highlight still speaks", async ({
@@ -237,12 +240,11 @@ test("right-clicking kanji in japanese shows furigana and speaks", async ({
 	// lands at once, readings follow when the load finishes.
 	await expect(panel).toBeVisible({ timeout: 10_000 });
 	await expect(panel).toContainText("かんじ", { timeout: 60_000 });
-	// Annotated popup: the kanji repeat beside their own readings,
-	// each pair in its own palette color; kana would repeat plain.
-	await expect(panel).toContainText("漢字");
-	expect(await panel.locator(".spr").count()).toBeGreaterThanOrEqual(1);
-	expect(await panel.locator(".srt").count()).toBe(
-		await panel.locator(".spr").count()
-	);
-	await expect.poll(() => spoken(page), { timeout: 10_000 }).toContain("漢字");
+	// Readings only: the kanji are right there in the highlight,
+	// so the popup never repeats them.
+	await expect(panel).not.toContainText("漢字");
+	expect(await panel.locator(".spb").count()).toBe(0);
+	// Speech reads the sentence-correct kana, never the raw kanji
+	// (and waits for the worker conversion behind it).
+	await expect.poll(() => spoken(page), { timeout: 120_000 }).toContain("かんじ");
 });
