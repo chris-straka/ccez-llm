@@ -22,7 +22,6 @@ same codebase via the Tauri mobile target.
 - rAF scroll glide; per-chat draft scoping.
 - FTS5 parked (IndexedDB not proven slow). Win/Linux/Android device proof
   needs real hardware — unit tests + honest unverified notes, never pass claims.
-- P23 (`+page.svelte` component split) stays its own future task.
 - Ghost features: user believes all fixed — verify, then drop this item.
 - Cmd+T browser removed (owner request, Sep 2026): the chord, sideview
   webview, fallback strip, width setting, and shortcut row are gone;
