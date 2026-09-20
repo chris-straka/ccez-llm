@@ -204,7 +204,7 @@ test("settings panel gates the feature behind a checkbox", async ({ page }) => {
 	await expect(page.locator(".settings-panel")).not.toHaveClass(/closed/);
 	const box = page
 		.locator(".settings-panel")
-		.getByText("Show Inspect for single kanji/hanzi highlights");
+		.getByText("Enable inspect for han characters");
 	await expect(box).toBeVisible();
 });
 

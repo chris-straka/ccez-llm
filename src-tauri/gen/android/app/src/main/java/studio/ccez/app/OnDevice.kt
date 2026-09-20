@@ -106,10 +106,10 @@ object OnDevice {
      */
     private data class ConfigVariant(val name: String, val config: ModelConfig?)
 
-    private fun modelConfig(preference: Int, stage: Int): ModelConfig {
+    private fun modelConfig(pref: Int, stage: Int): ModelConfig {
         return ModelConfig.builder().apply {
-            setPreference(preference)
-            setReleaseStage(stage)
+            preference = pref
+            releaseStage = stage
         }.build()
     }
 
@@ -148,8 +148,8 @@ object OnDevice {
             if (variant.config == null) Generation.getClient()
             else Generation.getClient(
                 GenerationConfig.Builder().apply {
-                    setModelConfig(variant.config)
-                    setWorkerExecutor(variantExecutor)
+                    modelConfig = variant.config
+                    workerExecutor = variantExecutor
                 }.build(),
             )
         }

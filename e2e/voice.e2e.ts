@@ -273,18 +273,18 @@ test.describe("ios-voice", () => {
 		await expect(
 			page
 				.locator(".settings-panel")
-				.getByText("Hide message buttons until tapped")
+				.getByText("Show message buttons only when tapped")
 		).toBeVisible();
 	});
 
 	/** Both message checkboxes share one Messages box (no awkward gap). */
 	test("message toggles grouped in one fieldset", async ({ page }) => {
 		const box = page.locator(".settings-panel fieldset", {
-			hasText: "Hide message buttons"
+			hasText: "only when tapped"
 		});
 		await expect(box.locator("legend")).toHaveText("Messages");
 		await expect(
-			box.getByText("Hide message buttons until tapped")
+			box.getByText("Show message buttons only when tapped")
 		).toBeVisible();
 		await expect(
 			box.getByText("Enable background on my messages")

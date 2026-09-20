@@ -182,7 +182,7 @@ test("settings offers the buttons checkbox and the gap slider", async ({
 	const panel = page.locator(".settings-panel");
 	await expect(panel).not.toHaveClass(/closed/, { timeout: 10_000 });
 	await expect(
-		panel.getByRole("checkbox", { name: "Show message buttons" })
+		panel.getByRole("checkbox", { name: "Always show message buttons" })
 	).toBeChecked();
 	const slider = panel.getByRole("slider", { name: "Gap size in rem" });
 	await expect(slider).toBeVisible();

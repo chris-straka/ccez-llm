@@ -2492,7 +2492,7 @@
 		// of folds and steps and the triple thump of deletes.
 		if (androidUI && !silent) {
 			void hapticBeatAsync("first", {
-				enabled: !settings.hapticsDisabled,
+				enabled: settings.hapticsEnabled,
 				shell: tauriBackendAvailable()
 			});
 		}
@@ -3162,7 +3162,7 @@
 		chatSwitcherOpen = true;
 		switcherOpenedAt = Date.now();
 		void hapticBeatAsync("first", {
-			enabled: !settings.hapticsDisabled,
+			enabled: settings.hapticsEnabled,
 			shell: tauriBackendAvailable()
 		});
 	}
@@ -3170,7 +3170,7 @@
 		if (!chatSwitcherOpen) return;
 		chatSwitcherOpen = false;
 		void hapticBeatAsync("send", {
-			enabled: !settings.hapticsDisabled,
+			enabled: settings.hapticsEnabled,
 			shell: tauriBackendAvailable()
 		});
 	}
@@ -3191,7 +3191,7 @@
 			transitionToChat(wrapped);
 		else stepChat(direction, false);
 		void hapticBeatAsync("send", {
-			enabled: !settings.hapticsDisabled,
+			enabled: settings.hapticsEnabled,
 			shell: tauriBackendAvailable()
 		});
 	}
@@ -3233,7 +3233,9 @@
 		armActionsTimer(shownActionsId);
 	}
 	function toggleMessageActions(id: ChatMsgId, event: MouseEvent): void {
-		if (!settings.showMessageButtons) return;
+		// Phones always render the row (no master off-switch), so taps
+		// always toggle there; desktop honors the Messages checkbox.
+		if (!androidUI && !settings.showMessageButtons) return;
 		if (!settings.hideMessages && !(androidUI && settings.hideButtons)) return;
 		if (
 			closestFromTarget(
@@ -3350,7 +3352,7 @@
 			persistSettings();
 			if (focus) enterEditMode();
 			void hapticBeatAsync("send", {
-				enabled: !settings.hapticsDisabled,
+				enabled: settings.hapticsEnabled,
 				shell: tauriBackendAvailable()
 			});
 			restartStepSlide(direction);
@@ -3360,7 +3362,7 @@
 		if (!target) return;
 		sideIdx = next;
 		void hapticBeatAsync("send", {
-			enabled: !settings.hapticsDisabled,
+			enabled: settings.hapticsEnabled,
 			shell: tauriBackendAvailable()
 		});
 		transitionToChat(target.id);
@@ -3457,7 +3459,7 @@
 		// A fresh chat opens medium (first), like settings.
 		if (androidUI) {
 			void hapticBeatAsync("first", {
-				enabled: !settings.hapticsDisabled,
+				enabled: settings.hapticsEnabled,
 				shell: tauriBackendAvailable()
 			});
 		}
@@ -4115,7 +4117,7 @@
 		if (editingMsgId === id) return;
 		if (androidUI) {
 			void hapticBeatAsync("tap", {
-				enabled: !settings.hapticsDisabled,
+				enabled: settings.hapticsEnabled,
 				shell: tauriBackendAvailable()
 			});
 		}
@@ -4144,7 +4146,7 @@
 	function buzzTap(): void {
 		if (!androidUI) return;
 		void hapticBeatAsync("tap", {
-			enabled: !settings.hapticsDisabled,
+			enabled: settings.hapticsEnabled,
 			shell: tauriBackendAvailable()
 		});
 	}
@@ -4152,7 +4154,7 @@
 	function buzzNo(): void {
 		if (!androidUI) return;
 		void hapticBeatAsync("no", {
-			enabled: !settings.hapticsDisabled,
+			enabled: settings.hapticsEnabled,
 			shell: tauriBackendAvailable()
 		});
 	}
@@ -4703,7 +4705,7 @@
 			selMenu = null;
 			highlightAnnId = pending.id;
 			editAnnotationInPrompt({ pending: true }, "");
-			if (!settings.hapticsDisabled) vibrateTick(6);
+			if (settings.hapticsEnabled) vibrateTick(6);
 			return;
 		}
 		const width = popWidth(true);
@@ -4751,7 +4753,7 @@
 		} else {
 			void tick().then(() => annPopBox?.focus({ preventScroll: true }));
 		}
-		if (!settings.hapticsDisabled) vibrateTick(6);
+		if (settings.hapticsEnabled) vibrateTick(6);
 	}
 
 	/** Submit the annotation being composed (Enter or Save). The id is
@@ -5005,7 +5007,7 @@
 		// triple-beat contract: call sites carry no haptic of their own).
 		if (androidUI) {
 			void hapticBeatAsync("done", {
-				enabled: !settings.hapticsDisabled,
+				enabled: settings.hapticsEnabled,
 				shell: tauriBackendAvailable()
 			});
 		}
@@ -5152,7 +5154,7 @@
 		const target = promptAnnEdit;
 		if (!target) return;
 		void hapticBeatAsync("send", {
-			enabled: !settings.hapticsDisabled,
+			enabled: settings.hapticsEnabled,
 			shell: tauriBackendAvailable()
 		});
 		const comment = editor?.getText() ?? "";
@@ -5701,7 +5703,7 @@
 		// Clearing everything thumps like a delete (done): the same
 		// unmistakable triple against single-tap ticks.
 		void hapticBeatAsync("done", {
-			enabled: !settings.hapticsDisabled,
+			enabled: settings.hapticsEnabled,
 			shell: tauriBackendAvailable()
 		});
 	}
@@ -6576,7 +6578,7 @@
 			// ping's job).
 			if (stillHere) {
 				void hapticBeatAsync("done", {
-					enabled: !settings.hapticsDisabled,
+					enabled: settings.hapticsEnabled,
 					shell: tauriBackendAvailable()
 				});
 			} else if (androidUI) {
@@ -6714,7 +6716,7 @@
 			markReplyStarted(chatState, owned.chatId);
 			if (chatState.activeChatId === owned.chatId) {
 				void hapticBeatAsync("first", {
-					enabled: !settings.hapticsDisabled,
+					enabled: settings.hapticsEnabled,
 					shell: tauriBackendAvailable()
 				});
 			}
@@ -6853,7 +6855,7 @@
 		// Haptic tap on send (silenced by the haptics toggle; native
 		// haptics in the shell, Web vibrator in the preview).
 		void hapticBeatAsync("send", {
-			enabled: !settings.hapticsDisabled,
+			enabled: settings.hapticsEnabled,
 			shell: tauriBackendAvailable()
 		});
 		clearStudyBadge();
@@ -6975,7 +6977,7 @@
 				onFirstToken: () => {
 					if (chat.id !== sentFrom.id) return;
 					void hapticBeatAsync("first", {
-						enabled: !settings.hapticsDisabled,
+						enabled: settings.hapticsEnabled,
 						shell: tauriBackendAvailable()
 					});
 				}
@@ -6994,7 +6996,7 @@
 		stopVoice();
 		// A resend is a send too: same tap, rumble, and thump as doSend.
 		void hapticBeatAsync("send", {
-			enabled: !settings.hapticsDisabled,
+			enabled: settings.hapticsEnabled,
 			shell: tauriBackendAvailable()
 		});
 		// Native resends (Android): Retry buttons land here after
@@ -7046,7 +7048,7 @@
 				onFirstToken: () => {
 					if (chat.id !== resentFrom.id) return;
 					void hapticBeatAsync("first", {
-						enabled: !settings.hapticsDisabled,
+						enabled: settings.hapticsEnabled,
 						shell: tauriBackendAvailable()
 					});
 				}
@@ -7943,7 +7945,7 @@
 		// gestures, keyboard — so call sites carry no haptic of their own.
 		if (androidUI) {
 			void hapticBeatAsync("done", {
-				enabled: !settings.hapticsDisabled,
+				enabled: settings.hapticsEnabled,
 				shell: tauriBackendAvailable()
 			});
 		}
@@ -7990,7 +7992,7 @@
 		// haptic of their own.
 		if (androidUI) {
 			void hapticBeatAsync("done", {
-				enabled: !settings.hapticsDisabled,
+				enabled: settings.hapticsEnabled,
 				shell: tauriBackendAvailable()
 			});
 		}
@@ -9469,7 +9471,7 @@
 							pinchStepped = true;
 							adjustFontScale(step * 0.1, true);
 							void hapticBeatAsync("send", {
-								enabled: !settings.hapticsDisabled,
+								enabled: settings.hapticsEnabled,
 								shell: tauriBackendAvailable()
 							});
 						}
@@ -9619,7 +9621,7 @@
 									behavior: "smooth"
 								});
 							void hapticBeatAsync("send", {
-								enabled: !settings.hapticsDisabled,
+								enabled: settings.hapticsEnabled,
 								shell: tauriBackendAvailable()
 							});
 						}
@@ -9654,7 +9656,7 @@
 					if (swipe !== null) {
 						stepChat(swipe, false);
 						void hapticBeatAsync("send", {
-							enabled: !settings.hapticsDisabled,
+							enabled: settings.hapticsEnabled,
 							shell: tauriBackendAvailable()
 						});
 						// Never mid-select, like the two-finger jump above.
@@ -12661,13 +12663,14 @@
 							</div>
 						{/if}
 					{/if}
-					{#if settings.showMessageButtons && !(streamingThis && msg.content.trim() === "")}
+					{#if (androidUI || settings.showMessageButtons) && !(streamingThis && msg.content.trim() === "")}
 						<!-- Preview renders the same row inert: the peek
 					reserves the row's space (opening the chat moves
 					nothing) while honoring the hover-only rhythm, so
 					no peek button is ever visible or firing. The
-					Messages toggle removes the row outright (its
-					shortcuts keep working on hover). -->
+					desktop Messages toggle removes the row outright
+					(its shortcuts keep working); phones always render
+					it — no shortcuts exist to cover an off state. -->
 						<div
 							class="actions"
 							role="group"

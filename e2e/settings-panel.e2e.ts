@@ -66,7 +66,7 @@ test("own-bubble checkbox follows the hover row", async ({ page }) => {
 			return null;
 		};
 		return {
-			hover: find("message buttons only on hover"),
+			hover: find("message buttons on hover"),
 			bubble: find("Enable background on my messages")
 		};
 	});
@@ -178,7 +178,7 @@ test("no hide-buttons checkbox on desktop", async ({ page }) => {
 	await expect(
 		page
 			.locator(".settings-panel")
-			.getByText("Hide message buttons until tapped")
+			.getByText("Show message buttons only when tapped")
 	).toHaveCount(0);
 });
 
@@ -258,7 +258,7 @@ test("transparency sliders are gone and surfaces stay solid", async ({
 test("reply notification toggle persists", async ({ page }) => {
 	const box = page
 		.locator(".settings-panel label", {
-			hasText: "Notify when replies finish in the background"
+			hasText: "Enable notifications"
 		})
 		.locator("input");
 	await expect(box).toBeChecked();

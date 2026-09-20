@@ -2060,33 +2060,50 @@ test.describe("touch", () => {
 		await swipeTwoFinger(page, 300, 150);
 		await page.locator(".settings-panel").waitFor();
 		const box = page.locator(
-			'label.check:has-text("Hide message buttons until tapped") input'
+			'label.check:has-text("Show message buttons only when tapped") input'
 		);
 		await expect(box).toBeChecked();
 	});
 
-	test("haptics toggle is off (enabled) by default and persists", async ({
+	/** A stale master-off save never hides rows on a phone: with no
+	shortcuts, redo/speak/copy would strand behind a setting. */
+	test("master-off save still renders rows on a phone", async ({ page }) => {
+		await seedChat(page, [{ role: "assistant", content: "hello" }]);
+		await page.addInitScript(() => {
+			window.localStorage.setItem(
+				"ccez-llm-settings-v1",
+				JSON.stringify({ showMessageButtons: false, hideButtons: false })
+			);
+		});
+		await page.goto("/");
+		await expect(page.locator("article .rendered").first()).toBeVisible({
+			timeout: 60_000
+		});
+		await expect(page.locator("article .actions")).toHaveCount(1);
+	});
+
+	test("haptics toggle is on (enabled) by default and persists", async ({
 		page
 	}) => {
 		await seedEmpty(page);
 		await swipeTwoFinger(page, 300, 150);
 		await page.locator(".settings-panel").waitFor();
 		const box = page.locator(
-			'label.check:has-text("Disable haptic feedback") input'
+			'label.check:has-text("Enable haptic feedback") input'
 		);
-		await expect(box).not.toBeChecked();
-		// Disabled persists through the next settings flush: dismiss
-		// settings, then summon the list (its toggle persists the whole
-		// object).
-		await box.click();
 		await expect(box).toBeChecked();
+		// The off state persists through the next settings flush:
+		// dismiss settings, then summon the list (its toggle persists
+		// the whole object).
+		await box.click();
+		await expect(box).not.toBeChecked();
 		await swipeX(page, 4, 144);
 		await swipeX(page, 4, 144);
 		await expect(page.locator("aside:has(button.new)")).not.toHaveClass(
 			/collapsed/
 		);
 		// The flush is async: the stored flag (not a reload — the seed
-		// script resets settings on load) proves the disabled state sticks.
+		// script resets settings on load) proves the off state sticks.
 		await expect
 			.poll(
 				async () =>
@@ -2095,7 +2112,7 @@ test.describe("touch", () => {
 					),
 				{ timeout: 5000 }
 			)
-			.toContain('"hapticsDisabled":true');
+			.toContain('"hapticsEnabled":false');
 	});
 
 	test("settings button in the chats list opens settings", async ({ page }) => {

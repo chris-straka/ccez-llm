@@ -150,11 +150,11 @@ export interface AppSettings {
 	/** Touch only: read a fresh text selection aloud on release. */
 	autoSpeakSelection: boolean;
 	/**
-	 * Touch only: disable every haptic beat (send, first reply token,
-	 * stream end, button taps). Unchecked by default — haptics are on.
+	 * Touch only: every haptic beat (send, first reply token,
+	 * stream end, button taps). Checked by default — haptics are on.
 	 * The checkbox lives in Messages on phones.
 	 */
-	hapticsDisabled: boolean;
+	hapticsEnabled: boolean;
 	/**
 	 * Ping when a finished reply lands while the window is backgrounded
 	 * (hidden or unfocused). Off silences the finished-reply ping
@@ -337,7 +337,7 @@ export function defaultSettings(): AppSettings {
 		hideMessages: false,
 		hideButtons: true,
 		autoSpeakSelection: true,
-		hapticsDisabled: false,
+		hapticsEnabled: true,
 		replyNotifications: true,
 		inspectEnabled: true
 	};
@@ -520,15 +520,18 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 		if (typeof merged.hideButtons !== "boolean") merged.hideButtons = true;
 		if (typeof merged.autoSpeakSelection !== "boolean")
 			merged.autoSpeakSelection = true;
-		// Legacy `vibration` (inverted wording): an explicit off
-		// becomes disabled; anything else stays enabled. Fresh
-		// defaults fill hapticsDisabled before healing, so the
+		// The disable-worded `hapticsDisabled` is renamed to the
+		// positive `hapticsEnabled`: an explicit old off stays off,
+		// and legacy `vibration: false` stays off too. Fresh
+		// defaults fill hapticsEnabled before healing, so the
 		// parsed save (not the merged one) decides the migration.
 		const parsedRecord = parsed as unknown as Record<string, unknown>;
-		if (typeof parsedRecord["hapticsDisabled"] !== "boolean") {
-			merged.hapticsDisabled = parsedRecord["vibration"] === false;
+		if (typeof parsedRecord["hapticsEnabled"] !== "boolean") {
+			merged.hapticsEnabled =
+				parsedRecord["hapticsDisabled"] !== true &&
+				parsedRecord["vibration"] !== false;
 		}
-		delete (merged as unknown as Record<string, unknown>)["vibration"];
+		dropRetiredKeys(merged, ["hapticsDisabled", "vibration"]);
 		if (typeof merged.replyNotifications !== "boolean")
 			merged.replyNotifications = true;
 		if (typeof merged.showMessageButtons !== "boolean")

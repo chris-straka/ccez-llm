@@ -100,27 +100,27 @@
 			</label>
 			<label class="check">
 				<input type="checkbox" bind:checked={settings.hideButtons} />
-				Hide message buttons until tapped
+				Show message buttons only when tapped
 			</label>
-			<label class="check">
-				<input type="checkbox" bind:checked={settings.showMessageButtons} />
-				Show message buttons
-			</label>
+			<!-- No master off-switch on phones: with no shortcuts,
+			hiding the row would strand redo/speak/copy behind a
+			setting. The row always renders; the toggle above
+			declutters it. -->
 			<label class="check">
 				<input type="checkbox" bind:checked={settings.ownBubble} />
 				Enable background on my messages
 			</label>
 			<label class="check">
 				<input type="checkbox" bind:checked={settings.inspectEnabled} />
-				Show Inspect for single kanji/hanzi highlights
+				Enable inspect for han characters
 			</label>
 			<label class="check">
-				<input type="checkbox" bind:checked={settings.hapticsDisabled} />
-				Disable haptic feedback
+				<input type="checkbox" bind:checked={settings.hapticsEnabled} />
+				Enable haptic feedback
 			</label>
 			<label class="check">
 				<input type="checkbox" bind:checked={settings.replyNotifications} />
-				Notify when replies finish in the background
+				Enable notifications
 			</label>
 			<label class="check">
 				<input type="checkbox" bind:checked={settings.micEnabled} />
@@ -132,7 +132,7 @@
 		each box names whose buttons it covers. Desktop-only (this branch),
 		with the bubble toggle below the row. -->
 		<fieldset class="hover-row">
-			<legend>Show message buttons only on hover for:</legend>
+			<legend>Show message buttons on hover for:</legend>
 			<label class="check">
 				<input type="checkbox" bind:checked={settings.hoverUserActions} />
 				My messages
@@ -152,15 +152,15 @@
 		</label>
 		<label class="check">
 			<input type="checkbox" bind:checked={settings.showMessageButtons} />
-			Show message buttons
+			Always show message buttons
 		</label>
 		<label class="check">
 			<input type="checkbox" bind:checked={settings.inspectEnabled} />
-			Show Inspect for single kanji/hanzi highlights
+			Enable inspect for han characters
 		</label>
 		<label class="check">
 			<input type="checkbox" bind:checked={settings.replyNotifications} />
-			Notify when replies finish in the background
+			Enable notifications
 		</label>
 		<label class="check">
 			<input type="checkbox" bind:checked={settings.micEnabled} />
