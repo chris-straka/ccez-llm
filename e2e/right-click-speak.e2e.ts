@@ -10,6 +10,7 @@ import { seedChat } from "./helpers";
 test.beforeEach(async ({ page }) => {
 	await page.addInitScript(() => {
 		(window as unknown as { __spoken: string[] }).__spoken = [];
+		(window as unknown as { __spokenLang: string[] }).__spokenLang = [];
 		(window as unknown as { __menuBlocked: boolean[] }).__menuBlocked = [];
 		const synth = window.speechSynthesis;
 		if (synth) {
@@ -18,6 +19,9 @@ test.beforeEach(async ({ page }) => {
 			synth.speak = ((utterance: SpeechSynthesisUtterance) => {
 				(window as unknown as { __spoken: string[] }).__spoken.push(
 					utterance.text
+				);
+				(window as unknown as { __spokenLang: string[] }).__spokenLang.push(
+					utterance.lang
 				);
 			}) as typeof synth.speak;
 		}
@@ -45,6 +49,14 @@ async function spoken(
 ): Promise<string[]> {
 	return page.evaluate(
 		() => (window as unknown as { __spoken: string[] }).__spoken ?? []
+	);
+}
+
+async function spokenLang(
+	page: import("@playwright/test").Page
+): Promise<string[]> {
+	return page.evaluate(
+		() => (window as unknown as { __spokenLang: string[] }).__spokenLang ?? []
 	);
 }
 
@@ -137,6 +149,34 @@ test("right-click on message open space reads the whole message", async ({
 	expect(texts.join(" ").replace(/\s+/g, " ")).toContain(
 		"alpha beta gamma delta"
 	);
+});
+
+test("right-click mixed message reads each line in its own voice", async ({
+	page
+}) => {
+	await seedChat(page, [
+		{ role: "assistant", content: "paragraph for you:\n汉语是" }
+	]);
+	await page.goto("/");
+	const para = page.locator("article.assistant .rendered p").first();
+	await expect(para).toBeVisible({ timeout: 60_000 });
+	// Far-right padding is message space with no word under the
+	// cursor: the whole-message path, not the per-quote one.
+	const box = await para.boundingBox();
+	if (!box) throw new Error("missing para box");
+	await page.mouse.click(box.x + box.width - 4, box.y + box.height / 2, {
+		button: "right"
+	});
+	await expect.poll(() => spoken(page), { timeout: 10_000 }).toEqual([
+		"paragraph for you:",
+		"汉语是"
+	]);
+	// The Han line keeps its Chinese voice under the English seed —
+	// never the message fallback.
+	const langs = await spokenLang(page);
+	expect(langs).toHaveLength(2);
+	expect(langs[0]?.startsWith("en")).toBe(true);
+	expect(langs[1]).toBe("zh-CN");
 });
 
 test("right-click a playing message stops it instead", async ({ page }) => {

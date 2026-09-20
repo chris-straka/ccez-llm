@@ -92,6 +92,15 @@ describe("sentenceSpeechLang", () => {
 		expect(sentenceSpeechLang("自然", "ja-JP")).toBe("ja-JP");
 		expect(sentenceSpeechLang("自", "zh-CN")).toBe("zh-CN");
 	});
+
+	it("keeps han-only fragments chinese under a latin surrounding voice", () => {
+		// A bare Han line in an English message reads Mandarin,
+		// never English — the fragment rule only inherits CJK voices.
+		expect(sentenceSpeechLang("汉语是", "en-US")).toBe("zh-CN");
+		expect(sentenceSpeechLang("自然", "en-US")).toBe("zh-CN");
+		expect(sentenceSpeechLang("汉语是", "fr-FR")).toBe("zh-CN");
+		expect(sentenceSpeechLang("汉语是", "ko-KR")).toBe("ko-KR");
+	});
 });
 
 describe("replyLangFor", () => {
@@ -157,16 +166,20 @@ describe("splitSpeechSegments", () => {
 		]);
 	});
 	it("keeps same-locale runs one utterance with exact text", () => {
-		// ttsLangFor reads the Han fragment as Chinese, but the real
-		// callback (sentenceSpeechLang) inherits the fallback for
-		// unterminated fragments — pin both contracts.
+		// ttsLangFor reads the Han fragment as Chinese; the real
+		// callback (sentenceSpeechLang) only inherits CJK surrounding
+		// voices, so a Han run under a Latin voice splits into its
+		// own utterance instead of collapsing into English.
 		expect(splitSpeechSegments("Hello世界", langFor)).toEqual([
 			{ text: "Hello", lang: "en-US" },
 			{ text: "世界", lang: "zh-CN" }
 		]);
 		expect(
 			splitSpeechSegments("Hello世界", (s) => sentenceSpeechLang(s, "en-US"))
-		).toEqual([{ text: "Hello世界", lang: "en-US" }]);
+		).toEqual([
+			{ text: "Hello", lang: "en-US" },
+			{ text: "世界", lang: "zh-CN" }
+		]);
 		expect(
 			splitSpeechSegments("Hello世界。Goodbye宇宙。", (s) =>
 				sentenceSpeechLang(s, "en-US")

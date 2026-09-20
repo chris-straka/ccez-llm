@@ -120,7 +120,10 @@ export interface SpeechSegment {
  * complete — but a highlight can end mid-sentence, and that trailing
  * fragment has no kana left to identify it. Fragments (no closing
  * punctuation) inherit the surrounding voice instead of flipping to
- * Chinese at the boundary.
+ * Chinese at the boundary — but only when that voice itself reads
+ * Han (ja/zh/ko): a Latin surrounding voice reading Han characters
+ * is never right, so the fragment keeps Chinese. A bare Han line in
+ * an English message ("汉语是") reads Mandarin instead of English.
  */
 export function sentenceSpeechLang(
 	sentence: string,
@@ -129,9 +132,13 @@ export function sentenceSpeechLang(
 	const direct = ttsLangFor(sentence, "");
 	if (direct !== "" && direct !== "zh-CN") return direct;
 	if (direct === "") return fallbackLang;
-	return /[.!?…。！？；"»”’」』）)\]]$/.test(sentence.trim())
-		? direct
-		: fallbackLang;
+	if (/[.!?…。！？；"»”’」』）)\]]$/.test(sentence.trim())) return direct;
+	const surrounding = fallbackLang.split(/[-_]/)[0]?.toLowerCase();
+	return surrounding === "ja" ||
+		surrounding === "zh" ||
+		surrounding === "ko"
+		? fallbackLang
+		: direct;
 }
 
 /**

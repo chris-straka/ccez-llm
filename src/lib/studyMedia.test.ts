@@ -263,7 +263,7 @@ describe("notification wrappers", () => {
 			class StubNotif {
 				static permission = "granted";
 				title: string;
-				options?: { body?: string };
+				options?: { body?: string } | undefined;
 				constructor(title: string, options?: { body?: string }) {
 					this.title = title;
 					this.options = options;
