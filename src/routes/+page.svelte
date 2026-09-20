@@ -324,7 +324,8 @@
 		resolveAidKinds,
 		readingsOnly,
 		annotatedRuns,
-		type AnnotatedRun,
+		pairRuns,
+		type PairedRun,
 		type LocalAid,
 		type HanOverlayLang
 	} from "$lib/reading";
@@ -883,14 +884,13 @@
 	} | null>(null);
 	/**
 	 * Selection readings overlay: right-clicking a highlight that
-	 * contains Han shows just the readings (pinyin/furigana, never
-	 * the characters again — they're right there). The furigana side
-	 * keeps per-kanji runs (kanji + its word-context reading in
-	 * accent, okurigana repeated plain) so mixed selections like
-	 * 咲き誇り map back; pinyin stays a flat string. Read-only and
-	 * pointer-transparent, so it can't disturb the highlight — and
-	 * the highlight clearing dismisses it at once via
-	 * selectionchange below.
+	 * contains Han shows readings for just the highlight (pinyin
+	 * flat, furigana per-kanji). Each furigana pair repeats its
+	 * kanji as the color anchor beside its word-context reading,
+	 * okurigana plain, so mixed selections like 咲き誇り map back.
+	 * Read-only and pointer-transparent, so it can't disturb the
+	 * highlight — and the highlight clearing dismisses it at once
+	 * via selectionchange below.
 	 */
 	let selPinyin = $state<{
 		x: number;
@@ -899,7 +899,7 @@
 		quote: string;
 		messageId: ChatMsgId;
 		html: string;
-		runs: AnnotatedRun[] | null;
+		runs: PairedRun[] | null;
 	} | null>(null);
 	/**
 	 * An unanswered selection menu never lingers (clicking away still
@@ -1108,7 +1108,7 @@
 	function placeSelPinyin(
 		quoted: { quote: string; messageId: ChatMsgId },
 		html: string,
-		runs: AnnotatedRun[] | null = null
+		runs: PairedRun[] | null = null
 	): void {
 		const live = window.getSelection();
 		const rect = live?.rangeCount
@@ -1182,7 +1182,7 @@
 			if (selPinyin?.quote === quoted.quote) selPinyin = null;
 			return;
 		}
-		placeSelPinyin(quoted, "", runs);
+		placeSelPinyin(quoted, "", pairRuns(runs));
 	}
 	/**
 	 * Readings for a highlight in the popup above the selection (see
@@ -12455,12 +12455,13 @@
 		>
 			{#if selPinyin.runs}
 				<!-- Annotated furigana: each kanji keeps its own
-				word-context reading above it (both accent); kana
-				repeats plain. Runs are parser output rendered as
-				text, so hostile markup stays inert. -->
+				word-context reading above it, the pair in its own
+				palette color (kana repeats plain). Runs are parser
+				output rendered as text, so hostile markup stays
+				inert. -->
 				{#each selPinyin.runs as run, i (i)}
 					{#if run.reading}
-						<span class="spr"
+						<span class="spr pk{run.pair}"
 							><span class="srt">{run.reading}</span><span class="spb"
 								>{run.text}</span
 							></span
@@ -16241,9 +16242,10 @@
 		margin-top: 4px;
 	}
 	/* Annotated furigana runs: reading stacked above its kanji
-	(ruby order), the pair kept atomic across line breaks. Kanji
-	and reading share the accent so each pair reads as one unit;
-	kana repeats in the popup ink, uncolored. */
+	(ruby order), the pair kept atomic across line breaks. Each
+	pair carries its own palette color on both halves so kanji and
+	reading read as one unit; kana repeats in the popup ink,
+	uncolored. Dark theme leads yellow, never blue. */
 	.sel-pinyin .spr {
 		display: inline-block;
 		text-align: center;
@@ -16253,13 +16255,25 @@
 	.sel-pinyin .srt {
 		display: block;
 		font-size: 0.72em;
-		color: #007aff;
-		color: var(--accent);
 	}
 	.sel-pinyin .spb {
 		display: block;
-		color: #007aff;
-		color: var(--accent);
+	}
+	.sel-pinyin .pk0 .srt,
+	.sel-pinyin .pk0 .spb {
+		color: var(--pair0);
+	}
+	.sel-pinyin .pk1 .srt,
+	.sel-pinyin .pk1 .spb {
+		color: var(--pair1);
+	}
+	.sel-pinyin .pk2 .srt,
+	.sel-pinyin .pk2 .spb {
+		color: var(--pair2);
+	}
+	.sel-pinyin .pk3 .srt,
+	.sel-pinyin .pk3 .spb {
+		color: var(--pair3);
 	}
 	/* Cursor-anchored annotation pill (ChatGPT-style): a rounded bar that
 	starts as a single-line prompt and grows as you type. Enter saves,

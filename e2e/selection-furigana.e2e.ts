@@ -87,6 +87,18 @@ test("right-clicking a mixed highlight shows per-kanji readings", async ({
 	expect(await pairs.count()).toBeGreaterThanOrEqual(1);
 	expect(await panel.locator(".srt").count()).toBe(await pairs.count());
 	expect(await panel.locator(".spb").count()).toBe(await pairs.count());
+	// Pair colors: the first kanji run leads the palette, and its
+	// reading shares its own kanji's color exactly.
+	const first = pairs.first();
+	await expect(first).toHaveClass(/pk0/);
+	const pairColor = await first.evaluate((el) => {
+		const reading = el.querySelector(".srt");
+		const base = el.querySelector(".spb");
+		if (!reading || !base) return null;
+		const color = getComputedStyle(reading).color;
+		return color === getComputedStyle(base).color ? color : null;
+	});
+	expect(pairColor).not.toBeNull();
 	// Okurigana repeats in the popup, plain (uncolored).
 	await expect(panel).toContainText("き");
 	// Escape dismisses the panel.

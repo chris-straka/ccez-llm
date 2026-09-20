@@ -34,7 +34,8 @@ import {
 	codeAwareLines,
 	stripCodeForDetection,
 	readingsOnly,
-	annotatedRuns
+	annotatedRuns,
+	pairRuns
 } from "./reading";
 import { pinyinBlock, pinyinRuby } from "./pinyin";
 import { isFuriganaCached } from "./furigana";
@@ -510,6 +511,28 @@ describe("annotatedRuns", () => {
 			{ text: "き", reading: null },
 			{ text: "誇", reading: "ほこ" },
 			{ text: "り", reading: null }
+		]);
+	});
+
+	it("pairs kanji runs in order, kana plain, cycling the palette", () => {
+		expect(
+			pairRuns([
+				{ text: "咲", reading: "さ" },
+				{ text: "き", reading: null },
+				{ text: "誇", reading: "ほこ" },
+				{ text: "り", reading: null },
+				{ text: "春", reading: "はる" },
+				{ text: "夏", reading: "なつ" },
+				{ text: "秋", reading: "あき" }
+			])
+		).toEqual([
+			{ text: "咲", reading: "さ", pair: 0 },
+			{ text: "き", reading: null, pair: -1 },
+			{ text: "誇", reading: "ほこ", pair: 1 },
+			{ text: "り", reading: null, pair: -1 },
+			{ text: "春", reading: "はる", pair: 2 },
+			{ text: "夏", reading: "なつ", pair: 3 },
+			{ text: "秋", reading: "あき", pair: 0 }
 		]);
 	});
 

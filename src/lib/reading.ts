@@ -608,3 +608,19 @@ export function annotatedRuns(html: string): AnnotatedRun[] | null {
 	doc.body.childNodes.forEach(walk);
 	return found ? out : null;
 }
+
+/** An annotated run with its popup pair color: kanji runs cycle
+0..size-1 in order, plain (kana) runs carry -1 and render uncolored.
+Pure pairing (no DOM), so the popup markup stays a straight map. */
+export interface PairedRun extends AnnotatedRun {
+	pair: number;
+}
+export function pairRuns(runs: AnnotatedRun[], size = 4): PairedRun[] {
+	let next = 0;
+	return runs.map((run) => {
+		if (run.reading === null) return { ...run, pair: -1 };
+		const pair = next % size;
+		next += 1;
+		return { ...run, pair };
+	});
+}

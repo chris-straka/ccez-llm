@@ -73,7 +73,11 @@ describe("color tokens", () => {
 			"--alarm:",
 			"--danger:",
 			"--sel-tint:",
-			"--ok-wash:"
+			"--ok-wash:",
+			"--pair0:",
+			"--pair1:",
+			"--pair2:",
+			"--pair3:"
 		]) {
 			expect(app).toContain(token);
 		}
@@ -98,7 +102,11 @@ describe("color tokens", () => {
 			"var(--error-line)",
 			"var(--alarm)",
 			"var(--sel-tint)",
-			"var(--ok-wash)"
+			"var(--ok-wash)",
+			"var(--pair0)",
+			"var(--pair1)",
+			"var(--pair2)",
+			"var(--pair3)"
 		]) {
 			expect(all).toContain(token);
 		}
