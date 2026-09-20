@@ -429,6 +429,24 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 		]);
 		// Backfill user-added providers on older saves.
 		if (!Array.isArray(merged.customProviders)) merged.customProviders = [];
+		// The on-device pill renamed local-gemma → local-mlkit (ML Kit,
+		// not Gemma): saves pointing at the old id follow it, including
+		// the per-provider settings and thinking keys.
+		if (merged.activeProviderId === "local-gemma") {
+			merged.activeProviderId = builtin("local-mlkit");
+		}
+		const legacyGemmaEntry = merged.providers["local-gemma"];
+		if (legacyGemmaEntry && !merged.providers["local-mlkit"]) {
+			merged.providers["local-mlkit"] = legacyGemmaEntry;
+		}
+		delete merged.providers["local-gemma"];
+		if (
+			typeof merged.thinking["local-gemma"] === "string" &&
+			typeof merged.thinking["local-mlkit"] !== "string"
+		) {
+			merged.thinking["local-mlkit"] = merged.thinking["local-gemma"];
+		}
+		delete merged.thinking["local-gemma"];
 		// An active provider that no longer exists (deleted custom) falls
 		// back to Muse rather than throwing in getProviderDef.
 		if (

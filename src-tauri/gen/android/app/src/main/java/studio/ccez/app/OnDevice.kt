@@ -101,9 +101,23 @@ object OnDevice {
         nativeInit(activity)
     }
 
-    private fun json(state: String, reason: String?, downloaded: Long? = null): String {
+    /**
+     * One-line exception summary for the settings note (never a toast):
+     * "failed" alone says nothing, so the native message rides along.
+     */
+    private fun detailOf(e: Exception): String {
+        return e.toString().replace(Regex("\\s+"), " ").take(160)
+    }
+
+    private fun json(
+        state: String,
+        reason: String?,
+        downloaded: Long? = null,
+        detail: String? = null,
+    ): String {
         val o = JSONObject().put("state", state)
         if (reason != null) o.put("reason", reason)
+        if (detail != null) o.put("detail", detail)
         if (downloaded != null) o.put("downloadedBytes", downloaded)
         return o.toString()
     }
@@ -152,8 +166,8 @@ object OnDevice {
                     }
                 }
             }
-        } catch (_: Exception) {
-            json("error", "failed")
+        } catch (e: Exception) {
+            json("error", "failed", detail = detailOf(e))
         }
     }
 
@@ -188,8 +202,8 @@ object OnDevice {
                     else JSONObject().put("text", text).toString()
                 }
             }
-        } catch (_: Exception) {
-            json("error", "failed")
+        } catch (e: Exception) {
+            json("error", "failed", detail = detailOf(e))
         }
     }
 }

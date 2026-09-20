@@ -11,7 +11,7 @@ import { tauriBackendAvailable } from "../secrets";
  * branch on this yet: the one-line hookup stays `if
  * (isOnDeviceProvider(id)) return generateOnDevice(prompt)` —
  * everything else (status, errors, download progress) already flows
- * through this module. Binding is local-gemma only: Muse/deepseek
+ * through this module. Binding is local-mlkit only: Muse/deepseek
  * paths are untouched, and a missing model throws the short
  * `no-model` copy — never a silent reroute to another provider.
  *
@@ -64,11 +64,16 @@ export interface OnDeviceStatus {
 	downloadedBytes?: number;
 	/** Machine-readable reason; UI shows `onDeviceErrorCopy` of it. */
 	reason?: string;
+	/**
+	 * Native exception one-liner behind a `failed` reason (settings
+	 * note only, never a toast): "failed" alone says nothing.
+	 */
+	detail?: string;
 }
 
 /**
  * True when the probe positively reports an unsupported device (no
- * AICore / no Gemini Nano): callers hide the Gemma entry instead of
+ * AICore / no Gemini Nano): callers hide the ML Kit entry instead of
  * letting it fail at send time. Anything else — no model yet,
  * mid-download, probe garbage — keeps the entry listed. Pure.
  */
@@ -167,6 +172,8 @@ export function parseOnDeviceStatus(payload: unknown): OnDeviceStatus {
 		}
 		if (typeof raw["reason"] === "string" && raw["reason"])
 			out.reason = raw["reason"];
+		if (typeof raw["detail"] === "string" && raw["detail"].trim())
+			out.detail = raw["detail"].trim().slice(0, 200);
 		if (state === "error" && out.reason === undefined)
 			out.reason = "bad-status";
 		return out;

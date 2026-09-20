@@ -1,10 +1,10 @@
 <script lang="ts" module>
 	/**
 	 * Last AICore support verdict, kept across panel opens so a
-	 * reopen doesn't re-flash the Gemma radio on unsupported
+	 * reopen doesn't re-flash the ML Kit radio on unsupported
 	 * hardware. Unknown until the first mount probe resolves.
 	 */
-	let lastGemmaSupport: boolean | null = null;
+	let lastMlkitSupport: boolean | null = null;
 </script>
 
 <script lang="ts">
@@ -86,20 +86,20 @@
 	const allProviders = $derived(listProviders(settings.customProviders));
 	/**
 	 * Radios follow the provider gating contract (platform.ts):
-	 * local-gemma lists only where its bridge ships (Android shell —
-	 * not iOS, not desktop), and offline Android narrows to Gemma
+	 * local-mlkit lists only where its bridge ships (Android shell —
+	 * not iOS, not desktop), and offline Android narrows to ML Kit
 	 * alone. Online state tracks the window events while the panel
 	 * is open, so an offline drop re-narrows without a reopen.
 	 */
 	const androidBridge = isAndroidUserAgent(navigator.userAgent);
 	let online = $state(navigator.onLine);
 	/**
-	 * Mount-probe verdict on AICore support (Android only): false
-	 * hides the Gemma radio on hardware that can never run it, so it
-	 * fails nowhere — not even at send time. Null (unknown) lists it,
-	 * the pre-probe behavior.
+	 * Mount-probe verdict on AICore support (Android shell only): the
+	 * ML Kit radio lists only on positively supported hardware, so it
+	 * fails nowhere — not even at send time. Unknown (pre-probe) and
+	 * failed probes hide it; reopening re-probes.
 	 */
-	let gemmaSupported = $state(lastGemmaSupport);
+	let mlkitSupported = $state(lastMlkitSupport);
 	const listedProviders = $derived.by(() => {
 		const visible = new Set(
 			visibleProviderIds(
@@ -110,7 +110,7 @@
 		return allProviders.filter(
 			(p) =>
 				visible.has(p.id) &&
-				(gemmaSupported !== false || !isOnDeviceProvider(p.id))
+				(!isOnDeviceProvider(p.id) || mlkitSupported === true)
 		);
 	});
 	const activeDef = $derived(
@@ -129,7 +129,7 @@
 		void probeOnDevice();
 	}
 	/**
-	 * On-device readiness under the Gemma pill: ready, downloading
+	 * On-device readiness under the ML Kit pill: ready, downloading
 	 * with the MB count, or the short reason copy (wrong device, no
 	 * model yet). Probed when the panel opens (every switch too); the
 	 * only poll in settings re-probes while a download runs so the
@@ -162,8 +162,12 @@
 		try {
 			const status = await onDeviceStatus();
 			if (androidBridge) {
-				gemmaSupported = !onDeviceUnsupported(status);
-				lastGemmaSupport = gemmaSupported;
+				// Shell only: a phone browser has the UA but no
+				// bridge, so it must not list the pill either. A
+				// failed probe stays unknown (hidden now, re-probed
+				// on the next open) rather than caching a false no.
+				mlkitSupported = inShell && !onDeviceUnsupported(status);
+				if (mlkitSupported) lastMlkitSupport = true;
 			}
 			if (!wantNote) {
 				onDeviceNote = "";
@@ -174,7 +178,10 @@
 					? "On-device model ready — replies never leave this phone."
 					: status.state === "downloading"
 						? downloadNote(status)
-						: onDeviceErrorCopy(status.reason ?? "unsupported");
+						: onDeviceErrorCopy(status.reason ?? "unsupported") +
+							// The native one-liner behind a bare "failed":
+							// settings-only detail, never toasted.
+							(status.detail ? ` (${status.detail})` : "");
 			if (status.state === "downloading") {
 				downloadTimer = window.setTimeout(() => void probeOnDevice(), 3000);
 			}
@@ -330,41 +337,45 @@
 		</form>
 	</details>
 
-	<label>
-		Base URL
-		<input
-			type="url"
-			bind:value={active.baseUrl}
-			autocomplete="off"
-			spellcheck="false"
-		/>
-	</label>
-	<label>
-		Model
-		<span class="model-row">
+	{#if !isOnDeviceProvider(settings.activeProviderId)}
+		<!-- On-device ML Kit has no URL to point and no model to pick:
+			showing them reads as user configuration that does nothing. -->
+		<label>
+			Base URL
 			<input
-				type="text"
-				list="model-list"
-				bind:value={active.model}
+				type="url"
+				bind:value={active.baseUrl}
 				autocomplete="off"
 				spellcheck="false"
 			/>
-			<button
-				type="button"
-				title="Fetch the model list from this base URL"
-				disabled={modelLoading}
-				onclick={() => void refreshModels()}
-			>
-				{modelLoading ? "…" : "Refresh"}
-			</button>
-		</span>
-		<datalist id="model-list">
-			{#each active.models as id (id)}<option value={id}></option>{/each}
-		</datalist>
-		{#if modelNotice.banner.message}<span class="hint" role="alert"
-				>{modelNotice.banner.message}</span
-			>{/if}
-	</label>
+		</label>
+		<label>
+			Model
+			<span class="model-row">
+				<input
+					type="text"
+					list="model-list"
+					bind:value={active.model}
+					autocomplete="off"
+					spellcheck="false"
+				/>
+				<button
+					type="button"
+					title="Fetch the model list from this base URL"
+					disabled={modelLoading}
+					onclick={() => void refreshModels()}
+				>
+					{modelLoading ? "…" : "Refresh"}
+				</button>
+			</span>
+			<datalist id="model-list">
+				{#each active.models as id (id)}<option value={id}></option>{/each}
+			</datalist>
+			{#if modelNotice.banner.message}<span class="hint" role="alert"
+					>{modelNotice.banner.message}</span
+				>{/if}
+		</label>
+	{/if}
 	{#if activeDef.keyless}
 		<p class="key-state" role="status">No key needed — {activeDef.keyHint}.</p>
 		{#if isOnDeviceProvider(settings.activeProviderId)}
@@ -395,7 +406,7 @@
 		</p>
 	{/if}
 	{#if !activeDef.keyless}
-		<!-- Keyless providers (on-device Gemma) have no key to reassure
+		<!-- Keyless providers (on-device ML Kit) have no key to reassure
 		about: the note would read as if one were stored. -->
 		<p class="note">
 			{#if inShell}

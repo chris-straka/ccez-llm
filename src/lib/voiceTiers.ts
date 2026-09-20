@@ -105,6 +105,20 @@ export function allVoicesForLang(
 	return groupByLang(voices, lang, 0);
 }
 
+/**
+ * Distinct installed language tags for the Android language picker
+ * (en-US, ja-JP, …): exact tags as the engine reports them, sorted,
+ * blanks dropped. Pure and unit-tested.
+ */
+export function installedLangs(voices: NativeVoice[]): string[] {
+	const seen = new Set<string>();
+	for (const voice of voices) {
+		const tag = voice.lang.trim();
+		if (tag) seen.add(tag);
+	}
+	return [...seen].sort((a, b) => a.localeCompare(b));
+}
+
 function groupByLang(
 	voices: NativeVoice[],
 	lang: string,

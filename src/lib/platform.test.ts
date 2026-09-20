@@ -290,13 +290,13 @@ describe("visibleProviderIds", () => {
 		).toEqual(CLOUD);
 	});
 	it("hides the local entry where its bridge can't exist", () => {
-		const all = [...CLOUD, "local-gemma"];
+		const all = [...CLOUD, "local-mlkit"];
 		expect(
 			visibleProviderIds(all, { android: false, online: true, local: true })
 		).toEqual(CLOUD);
 	});
 	it("shows local alongside cloud on online Android once bridged", () => {
-		const all = [...CLOUD, "local-gemma"];
+		const all = [...CLOUD, "local-mlkit"];
 		expect(
 			visibleProviderIds(all, { android: true, online: true, local: true })
 		).toEqual(all);
@@ -305,10 +305,10 @@ describe("visibleProviderIds", () => {
 		).toEqual(CLOUD);
 	});
 	it("keeps only local on offline Android", () => {
-		const all = [...CLOUD, "local-gemma"];
+		const all = [...CLOUD, "local-mlkit"];
 		expect(
 			visibleProviderIds(all, { android: true, online: false, local: true })
-		).toEqual(["local-gemma"]);
+		).toEqual(["local-mlkit"]);
 		expect(
 			visibleProviderIds(all, { android: true, online: false, local: false })
 		).toEqual([]);

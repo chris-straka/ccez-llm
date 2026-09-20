@@ -164,21 +164,25 @@
 	froze the app): the inventory helpers stay in
 	fontCoverage.ts and nativeTts.ts for their remaining callers. -->
 
-	<div class="field">
-		<span id="voice-lang-label">Voice language</span>
-		<input
-			type="text"
-			aria-labelledby="voice-lang-label"
-			bind:value={settings.voiceLang}
-			placeholder="en-US"
-			autocomplete="off"
-			spellcheck="false"
-			onchange={() => {
-				// A typed locale is deliberate: restarts keep it.
-				settings.voiceLangPinned = true;
-			}}
-		/>
-	</div>
+	{#if !androidUI}
+		<!-- Android picks the language from the installed inventory
+			inside VoicePanel above; desktop keeps the free-text tag. -->
+		<div class="field">
+			<span id="voice-lang-label">Voice language</span>
+			<input
+				type="text"
+				aria-labelledby="voice-lang-label"
+				bind:value={settings.voiceLang}
+				placeholder="en-US"
+				autocomplete="off"
+				spellcheck="false"
+				onchange={() => {
+					// A typed locale is deliberate: restarts keep it.
+					settings.voiceLangPinned = true;
+				}}
+			/>
+		</div>
+	{/if}
 	<label class="slider-row">
 		Text Size
 		<button

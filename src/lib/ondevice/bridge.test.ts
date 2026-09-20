@@ -22,8 +22,8 @@ function depsWith(result: unknown): {
 
 describe("on-device provider gate", () => {
 	it("matches only the parked local entry", () => {
-		expect(ONDEVICE_PROVIDER_ID).toBe("local-gemma");
-		expect(isOnDeviceProvider("local-gemma")).toBe(true);
+		expect(ONDEVICE_PROVIDER_ID).toBe("local-mlkit");
+		expect(isOnDeviceProvider("local-mlkit")).toBe(true);
 		expect(isOnDeviceProvider("muse")).toBe(false);
 		expect(isOnDeviceProvider("deepseek")).toBe(false);
 		expect(isOnDeviceProvider("mock")).toBe(false);
@@ -94,6 +94,33 @@ describe("parseOnDeviceStatus", () => {
 			state: "error",
 			reason: "busy"
 		});
+	});
+
+	it("carries the native detail one-liner, capped", () => {
+		expect(
+			parseOnDeviceStatus({
+				state: "error",
+				reason: "failed",
+				detail: "java.lang.Exception: timed out"
+			})
+		).toEqual({
+			state: "error",
+			reason: "failed",
+			detail: "java.lang.Exception: timed out"
+		});
+		expect(
+			parseOnDeviceStatus({
+				state: "error",
+				reason: "failed",
+				detail: "  "
+			})
+		).toEqual({ state: "error", reason: "failed" });
+		const long = parseOnDeviceStatus({
+			state: "error",
+			reason: "failed",
+			detail: "x".repeat(500)
+		});
+		expect(long.detail).toHaveLength(200);
 	});
 
 	it("reads garbage as an error, never throws", () => {

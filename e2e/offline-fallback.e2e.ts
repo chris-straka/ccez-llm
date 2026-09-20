@@ -30,7 +30,7 @@ test("desktop settings hide the Gemma pill", async ({ page }) => {
 		page.locator(
 			'.settings-panel [role="radiogroup"][aria-label="Active provider"] button',
 			{
-				hasText: "Gemma (on-device)"
+				hasText: "ML Kit (on-device)"
 			}
 		)
 	).toHaveCount(0);
@@ -53,7 +53,7 @@ test("android Gemma is keyless with a readiness note", async ({ browser }) => {
 		await openSettings(page);
 		const gemma = page.locator(
 			'.settings-panel [role="radiogroup"][aria-label="Active provider"] button',
-			{ hasText: "Gemma (on-device)" }
+			{ hasText: "ML Kit (on-device)" }
 		);
 		await expect(gemma).toBeVisible();
 		await gemma.click();
@@ -97,7 +97,7 @@ test("offline parks on Gemma and online restores", async ({
 	await context.setOffline(true);
 	await expect
 		.poll(() => activeProviderId(page), { timeout: 10_000 })
-		.toBe("local-gemma");
+		.toBe("local-mlkit");
 	await context.setOffline(false);
 	await expect
 		.poll(() => activeProviderId(page), { timeout: 10_000 })

@@ -88,6 +88,37 @@ describe("settings", () => {
 		expect(loadSettings(store).fontScale).toBe(1.5);
 	});
 
+	it("migrates the local-gemma provider id to local-mlkit", () => {
+		const data = new Map<string, string>();
+		const store = {
+			getItem: (k: string) => data.get(k) ?? null,
+			setItem: (k: string, v: string) => void data.set(k, v)
+		};
+		const saved = {
+			...blankSettings(),
+			activeProviderId: "local-gemma",
+			providers: {
+				...blankSettings().providers,
+				"local-gemma": {
+					baseUrl: "http://localhost:11434/v1",
+					apiKey: "",
+					model: "gemma4:latest",
+					models: []
+				}
+			},
+			thinking: { "local-gemma": "low" }
+		};
+		store.setItem("ccez-studio-settings-v1", JSON.stringify(saved));
+		const loaded = loadSettings(store);
+		expect(loaded.activeProviderId).toBe("local-mlkit");
+		expect(loaded.providers["local-mlkit"]).toMatchObject({
+			model: "gemma4:latest"
+		});
+		expect(loaded.providers["local-gemma"]).toBeUndefined();
+		expect(loaded.thinking["local-mlkit"]).toBe("low");
+		expect(loaded.thinking["local-gemma"]).toBeUndefined();
+	});
+
 	it("persists text size up to 800% and resets strays", () => {
 		const max = blankSettings();
 		max.fontScale = 8;

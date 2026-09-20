@@ -142,6 +142,11 @@ body {
 	header pill under the island until the keyboard closes. */
 	overflow: hidden;
 	height: 100%;
+	/* No double-tap zoom: on phones it zoom-jumps the thread (a
+	double-tap on the newest message reads as a jump to the
+	bottom) and eats the native double-tap word pick. Pan and
+	pinch zoom still work; taps keep their gestures. */
+	touch-action: manipulation;
 }
 
 @media print {

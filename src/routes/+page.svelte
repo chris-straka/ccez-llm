@@ -314,7 +314,7 @@
 		LOCAL_AID_ADD_TITLE,
 		MODEL_AIDS,
 		MODEL_AID_FOR_SCRIPT,
-		extractWordAt,
+		wordAtNodeOffset,
 		sentenceBounds,
 		hanOverlayLangFor,
 		isHanOverlayLangUncertain,
@@ -571,7 +571,11 @@
 		for (const m of viewChat.messages) {
 			if (m.error && !errorToasted.has(m.id)) {
 				errorToasted.add(m.id);
-				flashErrorToast(m.error);
+				// On-device failures explain themselves in Settings
+				// (status note under the pill, with native detail);
+				// the generic toast adds nothing.
+				if (!isOnDeviceProvider(settings.activeProviderId))
+					flashErrorToast(m.error);
 			}
 		}
 	});
@@ -888,10 +892,11 @@
 	 * Selection readings overlay: right-clicking a highlight that
 	 * contains Han shows readings for just the highlight. The
 	 * Japanese side renders one panel per back-to-back kanji group:
-	 * furigana only, solo in the lead color, shared groups splitting
-	 * boundaries by palette cycle — never kanji, never kana. The
-	 * selected kanji glow in their popup color in the document
-	 * (unwrapped on dismiss). Pinyin stays one flat string. Read-only
+	 * furigana only, colors cycling continuously across the
+	 * highlight — never kanji, never kana. A lone single-run popup
+	 * renders plain. The selected kanji glow in their popup color
+	 * in the document (unwrapped on dismiss). Pinyin stays one flat
+	 * string. Read-only
 	 * and pointer-transparent, so nothing disturbs the highlight —
 	 * and the highlight clearing dismisses everything at once via
 	 * selectionchange below.
@@ -905,7 +910,9 @@
 		html: string;
 	} | null>(null);
 	/** One furigana panel: a single back-to-back kanji group's
-	readings, anchored to that group's screen rect. */
+	readings, anchored to that group's screen rect. `plain` is the
+	lone single-run highlight: with nothing to disambiguate it
+	renders in ink with no document tint. */
 	interface FuriganaPanel {
 		x: number;
 		y: number;
@@ -913,6 +920,7 @@
 		quote: string;
 		messageId: ChatMsgId;
 		runs: GroupedRun[];
+		plain: boolean;
 	}
 	let selFurigana = $state<FuriganaPanel[] | null>(null);
 	/** Drop every selection overlay at once: the flat panel, the
@@ -1124,17 +1132,25 @@
 	/** Dock the readings overlay centered on the highlight, above
 	it (below only when the top edge leaves no room). Centering
 	rides CSS translateX so panel width — and font size — never
-	matters; a frame later the true width clamps it exactly into
-	the viewport. The above branch anchors on the highlight's top
-	edge the same way, so tall readings never need measuring. */
-	function panelXY(rect: { left: number; top: number; bottom: number }): {
+	matters: the style left IS the highlight's center (rect.left
+	would park the panel half its width too far left). A frame
+	later the true width clamps it exactly into the viewport. The
+	above branch anchors on the highlight's top edge the same way,
+	so tall readings never need measuring. */
+	function panelXY(rect: {
+		left: number;
+		top: number;
+		bottom: number;
+		width: number;
+	}): {
 		x: number;
 		y: number;
 		above: boolean;
 	} {
 		const above = rect.top >= 128;
+		const cx = rect.left + rect.width / 2;
 		return {
-			x: Math.min(Math.max(8, rect.left), window.innerWidth - 208),
+			x: Math.min(Math.max(8, cx), window.innerWidth - 208),
 			y: above ? rect.top : Math.min(rect.bottom, window.innerHeight - 40),
 			above
 		};
@@ -1450,6 +1466,9 @@
 		}
 		const panels: FuriganaPanel[] = [];
 		const tintSpans: { start: number; end: number; color: number }[] = [];
+		// Lone single-run highlight: one popup, one reading, nothing
+		// to disambiguate — it renders plain with no document tint.
+		const solo = grouped.length === 1;
 		for (const runs of byGroup) {
 			if (!runs) continue;
 			const start = Math.min(...runs.map((run) => run.start)) + qi;
@@ -1464,8 +1483,10 @@
 				...panelXY(anchor),
 				quote: quoted.quote,
 				messageId: quoted.messageId,
-				runs
+				runs,
+				plain: solo
 			});
+			if (solo) continue;
 			for (const run of runs) {
 				tintSpans.push({
 					start: run.start + qi,
@@ -1474,7 +1495,7 @@
 				});
 			}
 		}
-		if (exact && slices) tintSelectionSpans(slices, tintSpans);
+		if (exact && slices && !solo) tintSelectionSpans(slices, tintSpans);
 		selPinyin = null;
 		selFurigana = panels;
 		return sliced.map((run) => run.reading ?? run.text).join("");
@@ -5886,8 +5907,15 @@
 
 	/** Speak-button label. */
 	function speakTitle(msg: ChatMsg): string {
-		if (speakingId === msg.id) return "Stop reading aloud";
+		if (messageSpeaking(msg)) return "Stop reading aloud";
 		return "Read this message aloud";
+	}
+
+	/** This message owns the live utterance: a whole-reply readback
+	or a right-click quote pick from it. The speak button reads as
+	stop either way. */
+	function messageSpeaking(msg: ChatMsg): boolean {
+		return speakingId === msg.id || speakingSelection === msg.id;
 	}
 
 	function maybeSpeakReply(inChat = chat): void {
@@ -7281,7 +7309,9 @@
 		buzzTap();
 		const lang = next.current ? replyLanguageFor(next.current) : null;
 		flashToast(
-			lang ? `Reply language: ${lang.name}` : "Reply language cleared"
+			lang
+				? `${lang.native} ${lang.badge}`
+				: (replyLanguageFor(next.stash)?.cleared ?? "Cleared")
 		);
 	}
 
@@ -7869,7 +7899,11 @@
 		 * strokes starting in the middle of the conversation. Gated on the
 		 * Android UA so touchscreen laptops never see it, and suppressed
 		 * while text is selected (handle-dragging), while starting in an
-		 * editable, or while the shortcuts modal owns the screen.
+		 * editable, or while the shortcuts modal owns the screen. A
+		 * rightward stroke summons the chats list from anywhere on the
+		 * main chat — messages included (only a leftward stroke folds).
+		 * Dismissing an open settings panel still works, and leftward
+		 * settings strokes are untouched.
 		 */
 		function middleSwipeTarget(
 			start: { x: number; y: number; clean: boolean },
@@ -7878,19 +7912,12 @@
 			if (!androidUI || !start.clean || shortcutsOpen || inspectChar)
 				return null;
 			if (window.getSelection()?.isCollapsed === false) return null;
-			// Chats summons from the left edge only (edge rule): a
-			// mid-screen rightward stroke never opens it — those
-			// collide with message gestures. Dismissing an open
-			// settings panel still works, and leftward settings
-			// strokes are untouched.
-			const target = contentSwipeTarget(
+			return contentSwipeTarget(
 				start.x,
 				start.y,
 				ended.clientX,
 				ended.clientY
 			);
-			if (target === "chats" && !settingsOpen) return null;
-			return target;
 		}
 		/**
 		 * Shared edge-stroke outcome (touch swipes and desktop mouse
@@ -8193,9 +8220,9 @@
 					}
 					return;
 				}
-				// Phone: a horizontal stroke starting on a message folds
-				// it either way (a rightward stroke off messages summons
-				// the chats list via the stroke below instead). An active
+				// Phone: a leftward stroke starting on a message folds
+				// it (a rightward stroke summons the chats list via the
+				// stroke below instead, wherever it starts). An active
 				// text selection wins — folding mid-select would eat the
 				// highlight.
 				const foldDx = ended.clientX - start.x;
@@ -8205,6 +8232,7 @@
 					start.msgId &&
 					!start.rowSwipe &&
 					!start.codeSwipe &&
+					foldDx < 0 &&
 					Math.abs(foldDx) >= 64 &&
 					Math.abs(foldDy) < Math.abs(foldDx) &&
 					window.getSelection()?.isCollapsed !== false
@@ -8307,10 +8335,12 @@
 					}
 				}
 				// Thumb-wide edge zone (not the 24px helper default a
-				// thumb in a case can't land): rightward strokes still only
-				// summon from the left side, mid-screen drift still never
-				// opens the list (see middleSwipeTarget).
-				const target = start.rowSwipe
+				// thumb in a case can't land). Rightward strokes summon
+				// the chats list from anywhere on the main chat (see
+				// middleSwipeTarget) — except strokes starting on the
+				// action row or inside code/math blocks, where the inner
+				// scroller owns the stroke.
+				const target = start.rowSwipe || start.codeSwipe
 					? null
 					: (edgeSwipeTarget(
 							start.x,
@@ -8507,6 +8537,13 @@
 				// selection on menu hover, and the enter restore below
 				// puts it back.
 				if (!anchor) {
+					// A programmatic clear newer than the open (the
+					// capture collapse that drops the native toolbar)
+					// strands no range to restore, but the stored quote
+					// still stands: keep the menu. Every other
+					// clearSelection() caller nulls the menu in the same
+					// tick, so this only ever fires for the capture.
+					if (lastProgrammaticClearAt > selMenuOpenedAt) return;
 					if (!selMenuHover) selMenu = null;
 					return;
 				}
@@ -9647,7 +9684,7 @@
 				const target = viewChat.messages[hoveredIdx];
 				if (target && messageSpeakable(target)) {
 					consumeEvent(event);
-					if (speakingId === target.id) stopVoice();
+					if (messageSpeaking(target)) stopVoice();
 					else void speakReply(target);
 					return;
 				}
@@ -10620,7 +10657,9 @@
 			const node = range?.startContainer;
 			if (!node || node.nodeType !== Node.TEXT_NODE || !body.contains(node))
 				return "";
-			return extractWordAt(node.textContent ?? "", range?.startOffset ?? 0);
+			// Node-edge landings (a click on a glyph's far edge
+			// resolving past it) retry inside the char.
+			return wordAtNodeOffset(node.textContent ?? "", range?.startOffset ?? 0);
 		}
 		// Desktop right-click reads aloud (the selection, else the word
 		// under the cursor, else the whole message; a second
@@ -10638,10 +10677,13 @@
 			// native callout on purpose (see below).
 			if (!androidUI && !isFieldTarget(event.target)) event.preventDefault();
 			// Android long-press fires contextmenu mid-hold, before
-			// touchend: summon the menu off the live selection without
-			// consuming the event, so the native callout (Copy) still
-			// appears.
+			// touchend: summon the menu off the live selection and
+			// consume the event, so the native callout never appears
+			// beside ours. The selection (and its handles) stay live
+			// for handle-dragging; the lift below drops the highlight
+			// once the quote is stored.
 			if (androidUI && target?.closest(".messages .rendered")) {
+				event.preventDefault();
 				if (currentQuote()) {
 					placeSelMenu(event.clientX, event.clientY);
 					touchMenuAt = Date.now();
@@ -12066,17 +12108,17 @@
 							<button
 								type="button"
 								class="icon-btn"
-								class:active={speakingId === msg.id}
+								class:active={messageSpeaking(msg)}
 								data-tip={messageSpeakable(msg)
 									? speakTitle(msg)
 									: "No voice for this language"}
 								aria-label={messageSpeakable(msg)
 									? speakTitle(msg)
 									: "No voice for this language"}
-								aria-pressed={speakingId === msg.id}
-								disabled={speakingId !== msg.id && !messageSpeakable(msg)}
+								aria-pressed={messageSpeaking(msg)}
+								disabled={!messageSpeaking(msg) && !messageSpeakable(msg)}
 								onclick={() => {
-									if (speakingId === msg.id) stopVoice();
+									if (messageSpeaking(msg)) stopVoice();
 									else void speakReply(msg);
 								}}
 							>
@@ -12827,9 +12869,13 @@
 				aria-live="polite"
 			>
 				{#each panel.runs as run (run.start)}
-					<span class="spr pk{run.color}"
-						><span class="srt">{run.reading}</span></span
-					>
+					{#if panel.plain}
+						<span class="spr"><span class="srt">{run.reading}</span></span>
+					{:else}
+						<span class="spr pk{run.color}"
+							><span class="srt">{run.reading}</span></span
+						>
+					{/if}
 				{/each}
 			</div>
 		{/each}
@@ -15522,9 +15568,12 @@
 		Beats the centered-column rule's width:100% on specificity;
 		margin-right docks the right edge to the assistant column
 		(centered min(100%, chat-width)), so own messages never drift
-		right past AI width on narrow windows. */
+		right past AI width on narrow windows. Capped at 90% of the
+		column (never the full chat width): even long own messages
+		keep a left gutter, so they still read as mine next to
+		full-width replies. */
 		width: fit-content;
-		max-width: min(100%, calc(var(--chat-width, 36) * 1rem));
+		max-width: min(90%, calc(var(--chat-width, 36) * 1rem));
 		margin-right: max(
 			0rem,
 			calc((100% - min(100%, var(--chat-width, 36) * 1rem)) / 2)
@@ -16602,9 +16651,10 @@
 	.sel-pinyin:not(.above) {
 		margin-top: 4px;
 	}
-	/* Annotated furigana runs: one reading per kanji, solo in the
-	lead color, shared popups splitting boundaries by palette
-	cycle. No repeated kanji or kana anywhere. */
+	/* Annotated furigana runs: colors cycle continuously across the
+	highlight so every popup links its own document tint. A lone
+	single-run popup renders plain (no pk class, ink text). No
+	repeated kanji or kana anywhere. */
 	.sel-pinyin .spr {
 		display: inline-block;
 		white-space: nowrap;
@@ -17962,6 +18012,11 @@
 	}
 	.send-btn {
 		position: absolute;
+		/* The glyph (arrow, flag, "Add +") is chrome, never content:
+		long-pressing it must not start a text pick. */
+		user-select: none;
+		-webkit-user-select: none;
+		-webkit-touch-callout: none;
 		right: 0.6rem;
 		bottom: 0.65rem;
 		width: 1.7rem;
@@ -18173,6 +18228,14 @@
 		/* Same box as the text (see the textarea rule): never the
 		engine's own placeholder metrics. */
 		line-height: 1.5;
+	}
+	/* The placeholder hint is chrome, never content: while it shows
+	(the box is empty) the field takes no pick, so a long-press on
+	the empty composer selects nothing. Typing flips
+	:placeholder-shown off and selection works again. */
+	.prompt :global(.ta-input:placeholder-shown) {
+		user-select: none;
+		-webkit-user-select: none;
 	}
 	/* Tool seating rides the DOM, not JS classes: .mic-btn renders
 	exactly when dictation is available and .ann-wrap exactly when

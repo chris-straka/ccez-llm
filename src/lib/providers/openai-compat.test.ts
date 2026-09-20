@@ -553,13 +553,13 @@ describe("loopback failures", () => {
 
 	it("names Ollama for on-device servers, stays generic for remote ones", async () => {
 		deadFetch();
-		const local = new OpenAICompatProvider("local-gemma", {
+		const local = new OpenAICompatProvider("local-mlkit", {
 			baseUrl: "http://localhost:11434/v1",
 			apiKey: "",
 			model: "gemma4:latest"
 		});
 		await expect(local.chat([{ role: "user", content: "hi" }])).rejects.toThrow(
-			/local-gemma needs Ollama running/
+			/local-mlkit needs Ollama running/
 		);
 		const remote = new OpenAICompatProvider("probe", CONFIG);
 		await expect(
@@ -569,7 +569,7 @@ describe("loopback failures", () => {
 
 	it("serves a mobile message on phones, never Ollama", async () => {
 		deadFetch();
-		const local = new OpenAICompatProvider("local-gemma", {
+		const local = new OpenAICompatProvider("local-mlkit", {
 			baseUrl: "http://localhost:11434/v1",
 			apiKey: "",
 			model: "gemma4:latest",

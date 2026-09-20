@@ -400,6 +400,30 @@ html[data-theme="dark"] .settings-inner .voice-refresh:hover:not(:disabled) {
 .settings-inner .voice-note {
 	margin-bottom: 0.9rem;
 }
+/* Android empty-inventory note: one line, never wrapped. Slightly
+smaller so the full sentence fits a phone column; clips with an
+ellipsis on the narrowest screens instead of wrapping. */
+.settings-inner .voice-note-oneline {
+	white-space: nowrap;
+	font-size: 0.78rem;
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+/* Add-voices blurb: breathing room below so it never touches the
+next label. */
+.settings-inner .voice-add {
+	margin-bottom: 0.9rem;
+}
+/* Voice language label breathes above its control (block: inline
+margins would not take). */
+.settings-inner .field > span {
+	display: block;
+	margin-bottom: 0.5rem;
+}
+.settings-inner .voice-pick-label {
+	margin-bottom: 0.5rem;
+}
 .settings-inner .key-state {
 	font-size: 0.87rem;
 	display: flex;

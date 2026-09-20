@@ -15,7 +15,7 @@ import {
 } from "../providers/types";
 
 /**
- * On-device ChatProvider behind the `local-gemma` pill: Gemini Nano
+ * On-device ChatProvider behind the `local-mlkit` pill: Gemini Nano
  * takes one text prompt (no roles, no images, no token counts), so
  * the turn history flattens to labeled lines and streaming resolves
  * the whole completion through a single `onToken` call. Errors arrive

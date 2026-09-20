@@ -4,7 +4,8 @@ import {
 	tierLabel,
 	voicesForLang,
 	allVoicesForLang,
-	autoVoiceForLang
+	autoVoiceForLang,
+	installedLangs
 } from "./voiceTiers";
 import type { NativeVoice } from "./nativeTts";
 
@@ -169,5 +170,20 @@ describe("autoVoiceForLang", () => {
 			name: "Samantha",
 			tier: "default"
 		});
+	});
+});
+
+describe("installedLangs", () => {
+	it("lists distinct engine tags sorted, blanks dropped", () => {
+		expect(
+			installedLangs([
+				voice("a", "ja-JP", 0),
+				voice("b", "en-US", 1),
+				voice("c", "en-US", 0),
+				voice("d", "  ", 0),
+				voice("e", "en-GB", 0)
+			])
+		).toEqual(["en-GB", "en-US", "ja-JP"]);
+		expect(installedLangs([])).toEqual([]);
 	});
 });

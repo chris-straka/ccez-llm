@@ -194,6 +194,18 @@ export function extractWordAt(text: string, offset: number): string {
 	return text.slice(start, end);
 }
 
+/**
+ * Word at a caret offset, tolerating node-edge landings: a click on a
+ * glyph's far edge can resolve past the node (offset === length, an
+ * empty pick), so only that case retries inside the char. Mid-text
+ * whitespace stays empty. Pure.
+ */
+export function wordAtNodeOffset(text: string, offset: number): string {
+	const word = extractWordAt(text, offset);
+	if (word || offset < text.length) return word;
+	return offset > 0 ? extractWordAt(text, offset - 1) : "";
+}
+
 const SENTENCE_END = /[.!?。！？．]/;
 
 /**
@@ -638,11 +650,12 @@ export function annotatedRunsWithOffsets(
 }
 
 /** One popup's kanji: back-to-back reading runs share a panel, and
-colors restart at 0 per group — solo furigana always the lead color,
-shared popups split boundaries by color. Kana/plain runs split
-groups and never render. `start`/`end` index into the concatenated
-run texts (the highlight), so panels anchor and tint by span. Pure
-over runs. */
+colors run continuously across the highlight (no per-group restart),
+so every popup links its own color to its document tint. Kana/plain
+runs split groups and never render. `start`/`end` index into the
+concatenated run texts (the highlight), so panels anchor and tint by
+span. A lone single-run highlight renders plain (no color, no tint):
+with nothing to disambiguate, color is noise. Pure over runs. */
 export interface GroupedRun extends AnnotatedRun {
 	group: number;
 	color: number;
@@ -662,7 +675,6 @@ export function groupRuns(runs: AnnotatedRun[], size = 4): GroupedRun[] {
 		} else {
 			if (!open) {
 				group += 1;
-				color = 0;
 				open = true;
 			}
 			out.push({

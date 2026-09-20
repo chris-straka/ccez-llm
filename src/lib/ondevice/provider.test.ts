@@ -50,7 +50,7 @@ describe("OnDeviceChatProvider", () => {
 	it("sends the flattened prompt and reports no usage", async () => {
 		const { deps, invoke } = depsWith("done");
 		const provider = new OnDeviceChatProvider(deps);
-		expect(provider.id).toBe("local-gemma");
+		expect(provider.id).toBe("local-mlkit");
 		const result = await provider.chat([{ role: "user", content: "hi" }]);
 		expect(result).toEqual({ content: "done", usage: null });
 		expect(invoke).toHaveBeenCalledWith("ondevice_generate", {

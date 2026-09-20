@@ -158,3 +158,17 @@ describe("reply languages", () => {
 		expect(thinkingLabelFor("fr")).toBe("Réflexion");
 	});
 });
+
+describe("reply pill data", () => {
+	it("gives every language an endonym and a cleared word", () => {
+		for (const menu of LANGUAGE_MENUS) {
+			for (const lang of menu.languages) {
+				expect(lang.native.trim().length).toBeGreaterThan(0);
+				expect(lang.cleared.trim().length).toBeGreaterThan(0);
+			}
+		}
+		expect(replyLanguageFor("cs")?.native).toBe("Čeština");
+		expect(replyLanguageFor("cs")?.cleared).toBe("Vymazáno");
+		expect(replyLanguageFor("ja")?.native).toBe("日本語");
+	});
+});

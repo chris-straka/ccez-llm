@@ -14,7 +14,8 @@
 	import {
 		voicesForLang,
 		allVoicesForLang,
-		autoVoiceForLang
+		autoVoiceForLang,
+		installedLangs
 	} from "$lib/voiceTiers";
 	import ActionIcon from "../ActionIcon.svelte";
 	import { onMount } from "svelte";
@@ -65,6 +66,19 @@
 	const androidVoiceOptions = $derived(
 		allVoicesForLang(installedVoices, voiceLangTag)
 	);
+	/** Android language picker: installed engine tags first, the current
+	tag kept even when it matches nothing installed (a custom locale is
+	still selectable, never silently dropped). */
+	const androidLangOptions = $derived.by(() => {
+		const tags = installedLangs(installedVoices);
+		return tags.includes(voiceLangTag) ? tags : [voiceLangTag, ...tags];
+	});
+	/** Picker label for a language tag ("English · en-US", bare tag
+	when the name is unknown). */
+	function androidLangLabel(tag: string): string {
+		const name = replyLanguageFor(tag)?.name;
+		return name ? `${name} · ${tag}` : tag;
+	}
 	/** The voice Auto would use next for the tag above (label only —
 	the bridge stays authoritative at speak time). */
 	const autoVoice = $derived(
@@ -188,6 +202,28 @@
 		</p>
 	{/if}
 	{#if !voiceLoadError}
+		<!-- Language first: the picker below lists voices for this tag,
+			and the empty note sits directly under it. -->
+		<div class="voice-pick">
+			<span class="voice-pick-label" id="voice-lang-label-android"
+				>Voice language</span
+			>
+			<div class="voice-pick-row">
+				<select
+					value={voiceLangTag}
+					aria-labelledby="voice-lang-label-android"
+					onchange={(e) => {
+						settings.voiceLang = e.currentTarget.value;
+						// A picked locale is deliberate: restarts keep it.
+						settings.voiceLangPinned = true;
+					}}
+				>
+					{#each androidLangOptions as tag (tag)}
+						<option value={tag}>{androidLangLabel(tag)}</option>
+					{/each}
+				</select>
+			</div>
+		</div>
 		{#if androidVoiceOptions.length > 0}
 			<div class="voice-pick">
 				<span class="voice-pick-label" id="system-voice-label-android"
@@ -226,26 +262,28 @@
 				</div>
 			</div>
 		{:else if voicesLoaded}
-			<p class="note voice-note">
-				No {voiceLangName} voices installed — Auto uses the system default. Install
-				one in the system settings, then check again.
+			<p class="note voice-note voice-note-oneline">
+				No {voiceLangTag} voices installed. Uses system voice by default.
 			</p>
 		{/if}
 	{/if}
 	{#if voiceRefreshNote !== ""}
 		<p class="note" role="status">{voiceRefreshNote}</p>
 	{/if}
-	<p class="note">
-		To add voices: open
-		<button
-			type="button"
-			title="Open text-to-speech settings"
-			onclick={openVoiceSetup}>Text-to-speech settings</button
-		>, then check again.
+	<p class="note voice-add">
+		You can add voices in the
+		<button type="button" title="Open text-to-speech settings" onclick={openVoiceSetup}
+			>Text-to-speech</button
+		>
+		settings.
 		{#if voiceSetupError}<span role="alert">
 				(couldn't open it automatically)</span
 			>{/if}
 	</p>
+	<label class="check">
+		<input type="checkbox" bind:checked={settings.micEnabled} />
+		Enable microphone dictation
+	</label>
 {/if}
 {#if androidUI && !inShell}
 	<label class="check">

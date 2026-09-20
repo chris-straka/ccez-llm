@@ -1,13 +1,13 @@
 /**
  * Offline fallback: when the network drops, a cloud chat provider is
- * parked on the on-device Gemma option; reconnecting restores exactly
+ * parked on the on-device ML Kit option; reconnecting restores exactly
  * what the drop parked — never a provider the user picked meanwhile.
  * Pure helpers (tested); the event wiring lives in `+page.svelte`.
  */
 import { asProviderId, builtin, type ProviderId } from "./providers/registry";
 
 /** The on-device provider id (see `providers/registry.ts`). */
-export const OFFLINE_FALLBACK_ID: ProviderId = builtin("local-gemma");
+export const OFFLINE_FALLBACK_ID: ProviderId = builtin("local-mlkit");
 
 /** Test seam id: the mock provider never touches the network either. */
 const MOCK_ID = "mock";

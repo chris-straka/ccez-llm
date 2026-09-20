@@ -14,6 +14,10 @@ export interface ReplyLanguage {
 	voice: string;
 	/** Clean badge content (ISO code or classic marker). */
 	badge: string;
+	/** Endonym for the reply pill ("Čeština"). */
+	native: string;
+	/** "Cleared" in that language, for the clear toast. */
+	cleared: string;
 }
 
 const LANG = (
@@ -21,68 +25,72 @@ const LANG = (
 	name: string,
 	voice: string,
 	badge: string,
+	native: string,
+	cleared: string,
 	prompt?: string
 ): ReplyLanguage => ({
 	code,
 	name,
 	voice,
 	badge,
+	native,
+	cleared,
 	prompt: prompt ?? `Reply in ${name}.`
 });
 
 export const EUROPEAN_LANGUAGES: ReplyLanguage[] = [
-	LANG("fr", "French", "fr-FR", "🇫🇷"),
-	LANG("de", "German", "de-DE", "🇩🇪"),
-	LANG("es", "Spanish", "es-ES", "🇪🇸"),
-	LANG("pt", "Portuguese", "pt-PT", "🇵🇹"),
-	LANG("ru", "Russian", "ru-RU", "🇷🇺"),
-	LANG("pl", "Polish", "pl-PL", "🇵🇱"),
-	LANG("it", "Italian", "it-IT", "🇮🇹"),
-	LANG("no", "Norwegian", "nb-NO", "🇳🇴"),
-	LANG("cs", "Czech", "cs-CZ", "🇨🇿"),
-	LANG("el", "Greek", "el-GR", "🇬🇷"),
-	LANG("ro", "Romanian", "ro-RO", "🇷🇴"),
-	LANG("bg", "Bulgarian", "bg-BG", "🇧🇬"),
-	LANG("hu", "Hungarian", "hu-HU", "🇭🇺"),
-	LANG("uk", "Ukrainian", "uk-UA", "🇺🇦"),
-	LANG("nl", "Dutch", "nl-NL", "🇳🇱"),
-	LANG("sv", "Swedish", "sv-SE", "🇸🇪"),
-	LANG("da", "Danish", "da-DK", "🇩🇰"),
-	LANG("fi", "Finnish", "fi-FI", "🇫🇮"),
-	LANG("sr", "Serbian", "sr-RS", "🇷🇸"),
-	LANG("sk", "Slovak", "sk-SK", "🇸🇰")
+	LANG("fr", "French", "fr-FR", "🇫🇷", "Français", "Effacé"),
+	LANG("de", "German", "de-DE", "🇩🇪", "Deutsch", "Gelöscht"),
+	LANG("es", "Spanish", "es-ES", "🇪🇸", "Español", "Borrado"),
+	LANG("pt", "Portuguese", "pt-PT", "🇵🇹", "Português", "Apagado"),
+	LANG("ru", "Russian", "ru-RU", "🇷🇺", "Русский", "Сброшено"),
+	LANG("pl", "Polish", "pl-PL", "🇵🇱", "Polski", "Wyczyszczono"),
+	LANG("it", "Italian", "it-IT", "🇮🇹", "Italiano", "Cancellato"),
+	LANG("no", "Norwegian", "nb-NO", "🇳🇴", "Norsk", "Nullstilt"),
+	LANG("cs", "Czech", "cs-CZ", "🇨🇿", "Čeština", "Vymazáno"),
+	LANG("el", "Greek", "el-GR", "🇬🇷", "Ελληνικά", "Διαγράφηκε"),
+	LANG("ro", "Romanian", "ro-RO", "🇷🇴", "Română", "Șters"),
+	LANG("bg", "Bulgarian", "bg-BG", "🇧🇬", "Български", "Изчистено"),
+	LANG("hu", "Hungarian", "hu-HU", "🇭🇺", "Magyar", "Törölve"),
+	LANG("uk", "Ukrainian", "uk-UA", "🇺🇦", "Українська", "Скинуто"),
+	LANG("nl", "Dutch", "nl-NL", "🇳🇱", "Nederlands", "Gewist"),
+	LANG("sv", "Swedish", "sv-SE", "🇸🇪", "Svenska", "Rensat"),
+	LANG("da", "Danish", "da-DK", "🇩🇰", "Dansk", "Rydet"),
+	LANG("fi", "Finnish", "fi-FI", "🇫🇮", "Suomi", "Tyhjennetty"),
+	LANG("sr", "Serbian", "sr-RS", "🇷🇸", "Српски", "Obrisano"),
+	LANG("sk", "Slovak", "sk-SK", "🇸🇰", "Slovenčina", "Vymazané")
 ];
 
 export const ASIAN_LANGUAGES: ReplyLanguage[] = [
-	LANG("zh", "Chinese", "zh-CN", "🇹🇼"),
-	LANG("ja", "Japanese", "ja-JP", "🇯🇵"),
-	LANG("ko", "Korean", "ko-KR", "🇰🇷"),
-	LANG("ar", "Arabic (MSA)", "ar-SA", "🇸🇦", "Reply in Modern Standard Arabic."),
-	LANG("hi", "Hindi", "hi-IN", "🇮🇳"),
-	LANG("id", "Indonesian", "id-ID", "🇮🇩"),
-	LANG("tr", "Turkish", "tr-TR", "🇹🇷"),
-	LANG("fa", "Persian", "fa-IR", "🇮🇷"),
-	LANG("th", "Thai", "th-TH", "🇹🇭"),
-	LANG("vi", "Vietnamese", "vi-VN", "🇻🇳"),
-	LANG("hy", "Armenian", "hy-AM", "🇦🇲"),
-	LANG("ur", "Urdu", "ur-PK", "🇵🇰"),
-	LANG("he", "Hebrew", "he-IL", "🇮🇱"),
-	LANG("bn", "Bengali", "bn-BD", "🇧🇩"),
-	LANG("ta", "Tamil", "ta-IN", "🇱🇰"),
-	LANG("tl", "Tagalog", "fil-PH", "🇵🇭"),
-	LANG("ms", "Malay", "ms-MY", "🇲🇾"),
-	LANG("yue", "Cantonese", "zh-HK", "🇭🇰", "Reply in Cantonese.")
+	LANG("zh", "Chinese", "zh-CN", "🇹🇼", "中文", "已清除"),
+	LANG("ja", "Japanese", "ja-JP", "🇯🇵", "日本語", "クリア"),
+	LANG("ko", "Korean", "ko-KR", "🇰🇷", "한국어", "지워짐"),
+	LANG("ar", "Arabic (MSA)", "ar-SA", "🇸🇦", "العربية", "تم المسح", "Reply in Modern Standard Arabic."),
+	LANG("hi", "Hindi", "hi-IN", "🇮🇳", "हिन्दी", "साफ़ किया गया"),
+	LANG("id", "Indonesian", "id-ID", "🇮🇩", "Bahasa Indonesia", "Dihapus"),
+	LANG("tr", "Turkish", "tr-TR", "🇹🇷", "Türkçe", "Temizlendi"),
+	LANG("fa", "Persian", "fa-IR", "🇮🇷", "فارسی", "پاک شد"),
+	LANG("th", "Thai", "th-TH", "🇹🇭", "ไทย", "ล้างแล้ว"),
+	LANG("vi", "Vietnamese", "vi-VN", "🇻🇳", "Tiếng Việt", "Đã xóa"),
+	LANG("hy", "Armenian", "hy-AM", "🇦🇲", "Հայերեն", "Մաքրված է"),
+	LANG("ur", "Urdu", "ur-PK", "🇵🇰", "اردو", "صاف کر دیا گیا"),
+	LANG("he", "Hebrew", "he-IL", "🇮🇱", "עברית", "נוקה"),
+	LANG("bn", "Bengali", "bn-BD", "🇧🇩", "বাংলা", "মুছে ফেলা হয়েছে"),
+	LANG("ta", "Tamil", "ta-IN", "🇱🇰", "தமிழ்", "அழிக்கப்பட்டது"),
+	LANG("tl", "Tagalog", "fil-PH", "🇵🇭", "Tagalog", "Na-clear"),
+	LANG("ms", "Malay", "ms-MY", "🇲🇾", "Bahasa Melayu", "Dipadam"),
+	LANG("yue", "Cantonese", "zh-HK", "🇭🇰", "粵語", "已清除", "Reply in Cantonese.")
 ];
 
 export const CLASSICAL_LANGUAGES: ReplyLanguage[] = [
-	LANG("la", "Latin", "it-IT", "🏛", "Reply in Latin."),
-	LANG("grc", "Ancient Greek", "el-GR", "🏺", "Reply in Ancient Greek."),
-	LANG("sa", "Sanskrit", "hi-IN", "🪷", "Reply in Sanskrit.")
+	LANG("la", "Latin", "it-IT", "🏛", "Latina", "Deletum", "Reply in Latin."),
+	LANG("grc", "Ancient Greek", "el-GR", "🏺", "Ἀρχαία Ἑλληνικά", "Διαγέγραπται", "Reply in Ancient Greek."),
+	LANG("sa", "Sanskrit", "hi-IN", "🪷", "संस्कृतम्", "विलुप्तम्", "Reply in Sanskrit.")
 ];
 
 export const AFRICAN_LANGUAGES: ReplyLanguage[] = [
-	LANG("sw", "Swahili", "sw-KE", "🇰🇪"),
-	LANG("am", "Amharic", "am-ET", "🇪🇹")
+	LANG("sw", "Swahili", "sw-KE", "🇰🇪", "Kiswahili", "Imefutwa"),
+	LANG("am", "Amharic", "am-ET", "🇪🇹", "አማርኛ", "ተሰርዟል")
 ];
 
 export interface LanguageMenu {

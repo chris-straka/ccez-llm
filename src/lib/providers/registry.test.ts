@@ -26,7 +26,7 @@ describe("registry", () => {
 		expect(listProviders(custom).map((p) => p.id)).toEqual([
 			"muse",
 			"deepseek",
-			"local-gemma",
+			"local-mlkit",
 			"custom-kimi"
 		]);
 		expect(getProviderDef("custom-kimi", custom).label).toBe("Kimi");
@@ -42,12 +42,13 @@ describe("registry", () => {
 	});
 
 	it("flags the on-device fallback as keyless with Ollama defaults", () => {
-		const def = getProviderDef("local-gemma", custom);
+		const def = getProviderDef("local-mlkit", custom);
+		expect(def.label).toBe("ML Kit (on-device)");
 		expect(def.keyless).toBe(true);
 		expect(def.defaultBaseUrl).toBe("http://localhost:11434/v1");
 		expect(
 			createProvider(
-				"local-gemma",
+				"local-mlkit",
 				{ baseUrl: def.defaultBaseUrl, apiKey: "", model: def.defaultModel },
 				custom
 			)
@@ -57,7 +58,7 @@ describe("registry", () => {
 	it("pins the built-in set: registry ids match BUILTIN_PROVIDER_IDS", () => {
 		expect(listProviders().map((p) => p.id)).toEqual([...BUILTIN_PROVIDER_IDS]);
 		expect(isBuiltinProviderId("muse")).toBe(true);
-		expect(isBuiltinProviderId("local-gemma")).toBe(true);
+		expect(isBuiltinProviderId("local-mlkit")).toBe(true);
 		expect(isBuiltinProviderId("custom-kimi")).toBe(false);
 		expect(isBuiltinProviderId("musse")).toBe(false);
 	});

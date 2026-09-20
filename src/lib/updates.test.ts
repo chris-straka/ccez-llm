@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import {
 	RELEASES_URL,
+	compareVersions,
+	fetchLatestApk,
+	pickApkAsset,
 	runUpdateFlow,
 	updateButtonLabel,
 	updateRouteFor,
@@ -10,11 +13,9 @@ import {
 } from "./updates";
 
 describe("updateRouteFor", () => {
-	it("routes Android to the releases page", () => {
-		expect(updateRouteFor(true)).toEqual({
-			kind: "releases",
-			url: RELEASES_URL
-		});
+	it("routes release Android shells to the in-app updater", () => {
+		expect(updateRouteFor(true)).toEqual({ kind: "android" });
+		expect(updateRouteFor(true, true, false)).toEqual({ kind: "android" });
 	});
 
 	it("routes desktop to the Tauri updater", () => {
@@ -39,7 +40,7 @@ describe("updateRouteFor", () => {
 
 	it("routes dev shells to the dev message instead of the updater", () => {
 		expect(updateRouteFor(false, true, true)).toEqual({ kind: "dev" });
-		// Android keeps its releases route in dev (APK flow still applies).
+		// Dev Android keeps the releases link (no self-update from dev).
 		expect(updateRouteFor(true, true, true)).toEqual({
 			kind: "releases",
 			url: RELEASES_URL
@@ -169,5 +170,81 @@ describe("runUpdateFlow", () => {
 		expect(reports[1]).toContain("0.4.14");
 		expect(reports[1]).toContain(RELEASES_URL);
 		expect(relaunchApp).not.toHaveBeenCalled();
+	});
+});
+
+describe("pickApkAsset", () => {
+	const apk = (name: string) => ({
+		name,
+		browser_download_url: `https://example.com/${name}`
+	});
+	it("prefers the exact arm64 asset, else the first apk", () => {
+		expect(
+			pickApkAsset([apk("notes.txt"), apk("CcezLLM-android-arm64.apk")])
+		).toBe("https://example.com/CcezLLM-android-arm64.apk");
+		expect(pickApkAsset([apk("other.apk")])).toBe(
+			"https://example.com/other.apk"
+		);
+		expect(pickApkAsset([apk("notes.txt")])).toBeNull();
+		expect(pickApkAsset([])).toBeNull();
+	});
+});
+
+describe("compareVersions", () => {
+	it("compares dotted versions with or without a v", () => {
+		expect(compareVersions("v0.4.18", "0.4.18")).toBe(0);
+		expect(compareVersions("v0.4.19", "0.4.18")).toBe(1);
+		expect(compareVersions("0.4.18", "v0.5.0")).toBe(-1);
+		expect(compareVersions("0.4.9", "0.4.18")).toBe(-1);
+		expect(compareVersions("1.0", "0.9.9")).toBe(1);
+	});
+});
+
+describe("fetchLatestApk", () => {
+	const release = (tag: string, names: string[]) =>
+		({
+			ok: true,
+			status: 200,
+			json: async () => ({
+				tag_name: tag,
+				assets: names.map((name) => ({
+					name,
+					browser_download_url: `https://example.com/${name}`
+				}))
+			})
+		}) as unknown as Response;
+	const fetchOf = (response: Response) =>
+		(async () => response) as unknown as typeof fetch;
+	it("returns the apk when newer, null when current", async () => {
+		await expect(
+			fetchLatestApk(
+				fetchOf(release("v0.4.19", ["CcezLLM-android-arm64.apk"])),
+				"0.4.18"
+			)
+		).resolves.toEqual({
+			version: "v0.4.19",
+			url: "https://example.com/CcezLLM-android-arm64.apk"
+		});
+		await expect(
+			fetchLatestApk(
+				fetchOf(release("v0.4.18", ["CcezLLM-android-arm64.apk"])),
+				"0.4.18"
+			)
+		).resolves.toBeNull();
+	});
+	it("throws without a tag, an apk, or a response", async () => {
+		await expect(
+			fetchLatestApk(fetchOf(release("v0.4.19", ["notes.txt"])), "0.4.18")
+		).rejects.toThrow("no APK");
+		await expect(
+			fetchLatestApk(
+				fetchOf({
+					ok: false,
+					status: 404,
+					json: async () => ({})
+				} as unknown as Response),
+				"0.4.18"
+			)
+		).rejects.toThrow("404");
 	});
 });

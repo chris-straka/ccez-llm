@@ -26,6 +26,7 @@ mod trafficlights;
 mod tts;
 #[cfg(target_os = "android")]
 mod tts_android;
+mod update_android;
 mod tts_linux;
 mod tts_windows;
 #[cfg(target_os = "android")]
@@ -257,7 +258,9 @@ pub fn run() {
             coderun::run_code,
             fetch::fetch_page,
             ondevice::ondevice_status,
-            ondevice::ondevice_generate
+            ondevice::ondevice_generate,
+            update_android::update_download_apk,
+            update_android::update_install_apk
         ])
         .setup(|_app| {
             // External-text bridge (Android PROCESS_TEXT / action-mode):

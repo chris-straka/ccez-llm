@@ -37,7 +37,8 @@ import {
 	annotatedRuns,
 	annotatedRunsWithOffsets,
 	sliceRunsForQuote,
-	groupRuns
+	groupRuns,
+	wordAtNodeOffset
 } from "./reading";
 import { pinyinBlock, pinyinRuby } from "./pinyin";
 import { isFuriganaCached } from "./furigana";
@@ -516,7 +517,7 @@ describe("annotatedRuns", () => {
 		]);
 	});
 
-	it("groups back-to-back kanji, restarting colors per group", () => {
+	it("groups back-to-back kanji, cycling colors across the highlight", () => {
 		expect(
 			groupRuns([
 				{ text: "咲", reading: "さ" },
@@ -528,9 +529,9 @@ describe("annotatedRuns", () => {
 			])
 		).toEqual([
 			{ text: "咲", reading: "さ", group: 0, color: 0, start: 0, end: 1 },
-			{ text: "誇", reading: "ほこ", group: 1, color: 0, start: 2, end: 3 },
-			{ text: "季", reading: "き", group: 1, color: 1, start: 3, end: 4 },
-			{ text: "節", reading: "せつ", group: 1, color: 2, start: 4, end: 5 }
+			{ text: "誇", reading: "ほこ", group: 1, color: 1, start: 2, end: 3 },
+			{ text: "季", reading: "き", group: 1, color: 2, start: 3, end: 4 },
+			{ text: "節", reading: "せつ", group: 1, color: 3, start: 4, end: 5 }
 		]);
 	});
 
@@ -672,5 +673,20 @@ describe("sentenceBounds", () => {
 	});
 	it("returns the whole text with no marks", () => {
 		expect(sentenceBounds("no marks here", 5)).toEqual([0, 13]);
+	});
+});
+
+describe("wordAtNodeOffset", () => {
+	it("reads the word run at the offset", () => {
+		expect(wordAtNodeOffset("日本語を", 2)).toBe("日本語を");
+		expect(wordAtNodeOffset("日本語を", 0)).toBe("日本語を");
+	});
+	it("retries inside the char on a past-the-end landing", () => {
+		expect(wordAtNodeOffset("日本語を", 4)).toBe("日本語を");
+	});
+	it("stays empty on genuinely empty spots", () => {
+		expect(wordAtNodeOffset("", 0)).toBe("");
+		expect(wordAtNodeOffset("a b", 1)).toBe("");
+		expect(wordAtNodeOffset("hi", 0)).toBe("hi");
 	});
 });

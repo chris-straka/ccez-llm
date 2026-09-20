@@ -31,6 +31,8 @@ class MainActivity : TauriActivity() {
     Dictation.init(this)
     // On-device chat bridge: ML Kit Prompt API over AICore (see OnDevice).
     OnDevice.init(this)
+    // In-app update bridge: system installer for downloaded APKs (see Update).
+    Update.init(this)
     if (isAliasLaunch(intent)) {
       // An alias launch always starts a NEW activity record
       // (launchMode lives on the activity element and never applies to

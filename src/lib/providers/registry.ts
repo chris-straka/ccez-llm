@@ -12,7 +12,7 @@ export type ProviderId = string & { readonly kind: "provider" };
 export const BUILTIN_PROVIDER_IDS = [
 	"muse",
 	"deepseek",
-	"local-gemma"
+	"local-mlkit"
 ] as const;
 
 export type BuiltinProviderId = (typeof BUILTIN_PROVIDER_IDS)[number];
@@ -64,8 +64,8 @@ export const PROVIDERS: ProviderDef[] = [
 		keyHint: "Starts with sk-"
 	},
 	{
-		id: builtin("local-gemma"),
-		label: "Gemma (on-device)",
+		id: builtin("local-mlkit"),
+		label: "ML Kit (on-device)",
 		defaultBaseUrl: "http://localhost:11434/v1",
 		defaultModel: "gemma4:latest",
 		keyHint: "served on this device",

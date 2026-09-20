@@ -30,6 +30,17 @@ object Tts {
     /** Main thread only. Null until the first speak initializes it. */
     private var engine: TextToSpeech? = null
 
+    /**
+     * Engine init is async (binds to the system service): [voices]
+     * waits on this on its JNI thread before reading, otherwise the
+     * first inventory lands empty and settings claims no voices are
+     * installed. Never awaited on the main thread (the init callback
+     * itself runs there).
+     */
+    @Volatile
+    private var initOk = false
+    private val initLatch = CountDownLatch(1)
+
     private val listener = object : UtteranceProgressListener() {
         override fun onStart(id: String) {}
         override fun onDone(id: String) {
@@ -92,8 +103,11 @@ object Tts {
 
     private fun ensure() {
         if (engine != null) return
-        engine = TextToSpeech(appContext, { _ ->
+        initOk = false
+        engine = TextToSpeech(appContext, { status ->
+            initOk = status == TextToSpeech.SUCCESS
             engine?.setOnUtteranceProgressListener(listener)
+            initLatch.countDown()
         })
     }
 
@@ -255,11 +269,16 @@ object Tts {
      */
     @JvmStatic
     fun voices(): String {
+        main.post { ensure() }
+        // The engine binds async: read only after onInit lands, or
+        // the first call reports an empty inventory. This waits on
+        // the JNI thread, never main.
+        initLatch.await(4, TimeUnit.SECONDS)
+        if (!initOk) return ""
         var text = ""
         val latch = CountDownLatch(1)
         main.post {
             try {
-                ensure()
                 val tts = engine
                 val defaultName = try {
                     tts?.defaultVoice?.name

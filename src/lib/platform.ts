@@ -278,7 +278,7 @@ export function isThreeFingerTap(
 }
 
 /**
- * Provider ids visible under the platform caps. `local-gemma` is the
+ * Provider ids visible under the platform caps. `local-mlkit` is the
  * on-device entry: it lists only on Android (nowhere else has
  * its bridge), and it is the ONLY entry when Android is offline —
  * cloud models can't answer without a connection. Desktop and online
@@ -291,10 +291,10 @@ export function visibleProviderIds<T extends string>(
 	caps: { android: boolean; online: boolean; local: boolean }
 ): T[] {
 	const listed = all.filter(
-		(id) => id !== "local-gemma" || (caps.android && caps.local)
+		(id) => id !== "local-mlkit" || (caps.android && caps.local)
 	);
 	if (caps.android && !caps.online)
-		return listed.filter((id) => id === "local-gemma");
+		return listed.filter((id) => id === "local-mlkit");
 	return listed;
 }
 

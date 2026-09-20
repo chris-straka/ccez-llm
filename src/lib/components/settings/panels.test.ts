@@ -71,7 +71,10 @@ describe("updates section", () => {
 		// flickered the label between Checking and idle.
 		const source = panelSource("UpdatesPanel.svelte");
 		expect(source).toMatch(/if \(updatePhase\.stage !== "idle"\) return/);
-		expect(source).toMatch(/\{updateButtonLabel\(updatePhase\)\}/);
+		// Desktop narrates through updateButtonLabel; Android shells
+		// branch to the staged check/download/install label instead.
+		expect(source).toMatch(/updateButtonLabel\(updatePhase\)/);
+		expect(source).toMatch(/androidButtonLabel\(\)/);
 		expect(source).toMatch(/disabled=\{checkingUpdate\}/);
 	});
 	it("places the updates column by section identity, not :last-of-type", () => {
@@ -140,7 +143,7 @@ describe("desktop voice copy and controls", () => {
 
 describe("provider gating wiring", () => {
 	// The platform.ts contract is unit-tested pure; these pin that both
-	// listing sites actually route through it — otherwise local-gemma
+	// listing sites actually route through it — otherwise local-mlkit
 	// lists on desktops that can never run it.
 	it("settings radios iterate the gated list, not the raw registry", () => {
 		const source = panelSource("ProviderPanel.svelte");
