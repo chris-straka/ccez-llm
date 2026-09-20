@@ -33,6 +33,20 @@ export function touchShortcuts(): ShortcutRow[] {
 		{ name: "Delete every chat", keys: "Three-finger hold" },
 		{ name: "Message end", keys: "Double two-finger tap" },
 		{ name: "Annotate", keys: "Select text · Annotate" },
+		{ name: "Speak selection", keys: "Select text · Speak" },
+		{
+			name: "Inspect character",
+			keys: "Select one Han character · Inspect"
+		},
+		{
+			name: "Copy selection",
+			keys: "Hold the highlight 3.3s · Copy leads the menu"
+		},
+		{ name: "Move the selection menu", keys: "Drag it" },
+		{
+			name: "Keep an annotation while scrolling",
+			keys: "Scroll freely · only tap-away cancels"
+		},
 		{
 			name: "Message buttons",
 			keys: "Tap a message · double-tap jumps to its end"

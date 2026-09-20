@@ -248,6 +248,30 @@ describe("sentenceLangsFor", () => {
 		expect(langFor("今日はいい天気ですね。")).toBe("ja-JP");
 		expect(mockInvoke).not.toHaveBeenCalled();
 	});
+
+	it("reads gloss terms in the seed and translations in the gloss voice", async () => {
+		mockInvoke.mockResolvedValue(null);
+		const langFor = await sentenceLangsFor(
+			"Das Wetter ist heute sehr schön und warm. miteinander = with each other",
+			"de-DE",
+			[],
+			"en-US"
+		);
+		expect(langFor("miteinander")).toBe("de-DE");
+		expect(langFor("with each other")).toBe("en-US");
+	});
+
+	it("falls scoreless translation halves back to the gloss voice", async () => {
+		mockInvoke.mockResolvedValue(null);
+		const langFor = await sentenceLangsFor(
+			"verbindet = connects, joins, combines",
+			"de-DE",
+			[],
+			"en-US"
+		);
+		expect(langFor("verbindet")).toBe("de-DE");
+		expect(langFor("connects, joins, combines")).toBe("en-US");
+	});
 });
 
 describe("sentenceForQuote", () => {

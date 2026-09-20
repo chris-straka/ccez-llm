@@ -13,6 +13,7 @@ import {
 	sentenceSpeechLang,
 	webVoiceAvailable,
 	effectiveSpeechLang,
+	splitGlossHalves,
 	splitSpeechSegments,
 	speakText,
 	speakMultilingual,
@@ -176,6 +177,38 @@ describe("splitSpeechSegments", () => {
 			{ text: "Goodbye", lang: "en-US" },
 			{ text: "宇宙。", lang: "zh-CN" }
 		]);
+	});
+});
+
+describe("splitGlossHalves", () => {
+	it("splits translation glosses at the first top-level =", () => {
+		expect(splitGlossHalves("miteinander = with each other")).toEqual([
+			"miteinander",
+			"with each other"
+		]);
+		expect(splitGlossHalves("tief = deep / deeply")).toEqual([
+			"tief",
+			"deep / deeply"
+		]);
+	});
+	it("leaves code, math, and letterless halves whole", () => {
+		expect(splitGlossHalves("a == b")).toBe(null);
+		expect(splitGlossHalves("a => b")).toBe(null);
+		expect(splitGlossHalves("x = 2")).toBe(null);
+		expect(splitGlossHalves("no equals here")).toBe(null);
+	});
+	it("reads gloss halves in different voices, same-voice lines whole", () => {
+		const halves = (s: string): string =>
+			s === "miteinander" ? "de-DE" : "en-US";
+		expect(splitSpeechSegments("miteinander = with each other", halves)).toEqual(
+			[
+				{ text: "miteinander", lang: "de-DE" },
+				{ text: "with each other", lang: "en-US" }
+			]
+		);
+		expect(splitSpeechSegments("miteinander = with each other", () => "de-DE")).toEqual(
+			[{ text: "miteinander = with each other", lang: "de-DE" }]
+		);
 	});
 });
 

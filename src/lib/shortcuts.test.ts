@@ -116,14 +116,19 @@ describe("shortcuts menu copy", () => {
 			"Bottom of chat",
 			"Chat switcher",
 			"Chats list",
+			"Copy selection",
 			"Delete a message",
 			"Delete every chat",
 			"Fold a message",
 			"fold chat msg",
+			"Inspect character",
+			"Keep an annotation while scrolling",
 			"Message buttons",
 			"Message end",
+			"Move the selection menu",
 			"Newer / older chat",
 			"Settings",
+			"Speak selection",
 			"Top of chat"
 		]);
 		// Message-start left strokes fold (never settings); everywhere
@@ -148,6 +153,9 @@ describe("shortcuts menu copy", () => {
 		expect(byName.get("Message end")).toBe("Double two-finger tap");
 		expect(byName.get("Delete a message")).toBe("Three-finger tap");
 		expect(byName.get("Delete every chat")).toBe("Three-finger hold");
+		expect(byName.get("Copy selection")).toBe(
+			"Hold the highlight 3.3s · Copy leads the menu"
+		);
 	});
 
 	it("filters case-insensitively on name or keys", () => {

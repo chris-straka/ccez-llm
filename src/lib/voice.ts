@@ -181,12 +181,42 @@ export function splitScriptRuns(sentence: string): string[] {
  * further (no line break or punctuation needed between halves); runs
  * resolving alike stay one utterance with the sentence's exact text.
  */
+/**
+ * Translation-gloss halves ("miteinander = with each other"): the
+ * first top-level "=" whose sides both hold letters. "==", "=>",
+ * "!=", "<=", ">=" stay whole, so code and math never split.
+ */
+export function splitGlossHalves(sentence: string): [string, string] | null {
+	// The match starts on the character before the "=" itself.
+	const at = sentence.search(/[^=!<>]=(?!=|>)/);
+	if (at < 0) return null;
+	const eq = at + 1;
+	const left = sentence.slice(0, eq).trim();
+	const right = sentence.slice(eq + 1).trim();
+	if (!/[A-Za-zÀ-ÿ]/.test(left) || !/[A-Za-zÀ-ÿ]/.test(right)) return null;
+	return [left, right];
+}
+
 export function splitSpeechSegments(
 	text: string,
 	langForSentence: (sentence: string) => string
 ): SpeechSegment[] {
 	const out: SpeechSegment[] = [];
 	for (const sentence of splitSentences(text)) {
+		// Gloss lines read each side in its own voice; same-voice
+		// halves stay one utterance exactly as before.
+		const gloss = splitGlossHalves(sentence);
+		if (gloss) {
+			const leftLang = langForSentence(gloss[0]);
+			const rightLang = langForSentence(gloss[1]);
+			if (leftLang === rightLang) {
+				out.push({ text: sentence, lang: leftLang });
+			} else {
+				out.push({ text: gloss[0], lang: leftLang });
+				out.push({ text: gloss[1], lang: rightLang });
+			}
+			continue;
+		}
 		const runs = splitScriptRuns(sentence);
 		if (runs.length < 2) {
 			out.push({ text: sentence, lang: langForSentence(sentence) });

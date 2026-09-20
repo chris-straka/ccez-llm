@@ -941,6 +941,8 @@
 	 * longer to reach than a cursor.
 	 */
 	const SEL_MENU_IDLE_MS = 6000;
+	/** Held-selection hold before Copy joins the phone menu. */
+	const COPY_HOLD_MS = 3300;
 	let selMenuTimer: ReturnType<typeof setTimeout> | null = null;
 	/**
 	 * True while the pointer hovers the selection menu: the auto-dismiss
@@ -1090,12 +1092,40 @@
 		window.addEventListener("pointerdown", stampPress, { passive: true });
 		window.addEventListener("keydown", stampPress);
 		document.addEventListener("visibilitychange", onVisible);
+		window.addEventListener("touchstart", trackAnnTouchStart, {
+			passive: true
+		});
+		window.addEventListener("touchmove", trackAnnTouchMove, {
+			passive: true
+		});
 		return () => {
 			window.removeEventListener("pointerdown", stampPress);
 			window.removeEventListener("keydown", stampPress);
 			document.removeEventListener("visibilitychange", onVisible);
+			window.removeEventListener("touchstart", trackAnnTouchStart);
+			window.removeEventListener("touchmove", trackAnnTouchMove);
 		};
 	});
+	/**
+	 * Scroll-stroke tracking for the annotation pill: a scroll blurs
+	 * its textbox exactly like a tap-away does, but only a real
+	 * tap-away (which also dismisses the phone keyboard) may cancel
+	 * or save — scrolling around keeps the draft as left.
+	 */
+	let annTouchStart: { x: number; y: number } | null = null;
+	let lastAnnScrollAt = 0;
+	function trackAnnTouchStart(event: TouchEvent): void {
+		const t = event.changedTouches[0];
+		annTouchStart = t ? { x: t.clientX, y: t.clientY } : null;
+	}
+	function trackAnnTouchMove(event: TouchEvent): void {
+		const t = event.changedTouches[0];
+		const s = annTouchStart;
+		if (!t || !s) return;
+		if (Math.hypot(t.clientX - s.x, t.clientY - s.y) > 12) {
+			lastAnnScrollAt = Date.now();
+		}
+	}
 	let menuBtnTouchStart: { x: number; y: number } | null = null;
 	/** Selection-menu drag: touch anchor plus the menu spot it
 	started from; a drag past the tap slop moves the menu instead of
@@ -1124,6 +1154,22 @@
 	}
 	function menuDragEnd(): void {
 		selMenuDrag = null;
+	}
+	/**
+	 * Hold-gated Copy: quick highlights get Annotate/Speak/Inspect
+	 * only; a 3.3s held selection arms Copy at the far left of the
+	 * phone menu. The stamp binds the timer to this opening, so a
+	 * close-and-reselect restarts the hold instead of inheriting it.
+	 */
+	let copyArmed = $state(false);
+	let copyArmTimer: ReturnType<typeof setTimeout> | null = null;
+	function armCopyButton(stamp: number): void {
+		copyArmed = false;
+		if (copyArmTimer) clearTimeout(copyArmTimer);
+		copyArmTimer = setTimeout(() => {
+			copyArmTimer = null;
+			if (selMenu && selMenuOpenedAt === stamp) copyArmed = true;
+		}, COPY_HOLD_MS);
 	}
 	function noteMenuBtnTouch(event: TouchEvent): void {
 		const t = event.changedTouches[0];
@@ -4339,6 +4385,7 @@
 			messageId: found.messageId,
 			range: stored
 		};
+		armCopyButton(selMenuOpenedAt);
 		// No prompt summon: the menu floats viewport-fixed on every
 		// platform now (the old phone dock needed the composer shown).
 	}
@@ -4473,6 +4520,8 @@
 			...(aidScope ? { aidScope } : {})
 		};
 		pendingAnn = pending;
+		// Voice readback on: the filed quote reads itself back out.
+		if (voiceOn()) void speakQuote(quote, selMenu.messageId, true, selMenu.context);
 		clearSelection();
 		// Phones file the comment in the composer, never the
 		// transplanted pill (its textbox can't reliably summon the
@@ -4585,6 +4634,9 @@
 	silently dropped. Enter with no text is the way to file an empty one. */
 	function blurAnnPop(): void {
 		if (!annPop || annPopClosing) return;
+		// A scroll stroke just blurred the box: keep the draft open
+		// for the return tap instead of canceling or filing it.
+		if (Date.now() - lastAnnScrollAt < 800) return;
 		if (annPopBlurAction(annDraft) === "cancel") cancelAnnPop();
 		else saveAnnPop();
 	}
@@ -5943,7 +5995,12 @@
 		startSpeech(
 			msg.id,
 			text,
-			await sentenceLangsFor(stripped, seed, voices),
+			await sentenceLangsFor(
+				stripped,
+				seed,
+				voices,
+				latinFallback(settings.voiceLang)
+			),
 			quiet
 		);
 	}
@@ -6087,7 +6144,12 @@
 		startSpeech(
 			"selection",
 			quote,
-			await sentenceLangsFor(quote, lang, voices)
+			await sentenceLangsFor(
+				quote,
+				lang,
+				voices,
+				latinFallback(settings.voiceLang)
+			)
 		);
 	}
 
@@ -12871,17 +12933,21 @@
 		>
 			{#if androidUI}
 				<!-- Phone selection menu: the native callout is
-				suppressed, so Copy, Annotate, and Speak live here in
-				the desktop popup's style. Inspect stays docked in the
-				composer. -->
-				<button
-					type="button"
-					aria-label="Copy selection"
-					onmousedown={noteMenuPress}
-					onclick={() => void copySelection()}
-					ontouchstart={noteMenuBtnTouch}
-					ontouchend={copyTouch}>Copy</button
-				>
+				suppressed, so Annotate and Speak live here in the
+				desktop popup's style; Inspect joins for a single Han
+				character, and a 3.3s held selection arms Copy at the
+				far left (quick highlights skip it). The composer dock
+				mirrors Annotate/Speak/Inspect without Copy. -->
+				{#if copyArmed}
+					<button
+						type="button"
+						aria-label="Copy selection"
+						onmousedown={noteMenuPress}
+						onclick={() => void copySelection()}
+						ontouchstart={noteMenuBtnTouch}
+						ontouchend={copyTouch}>Copy</button
+					>
+				{/if}
 				<button
 					type="button"
 					onmousedown={noteMenuPress}

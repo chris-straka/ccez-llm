@@ -1,10 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { identifyLangOffline } from "./langId";
+import { identifyLangOffline, identifyLangShort } from "./langId";
 import { hasPinyinTones, ttsLangFor } from "./reading";
 import {
 	effectiveSpeechLang,
 	speechLangsFor,
+	splitGlossHalves,
 	splitSentences,
 	splitSpeechSegments,
 	type SpeakCallbacks
@@ -152,7 +153,12 @@ export async function quoteLangFor(
 	} catch {
 		// Bridge unavailable (browser preview, tests): offline scorer below.
 	}
-	return identifyLangOffline(quote) ?? fallback;
+	// Short highlights never reach the full scorer's word minimum —
+	// the orthographic pass reads them (umlauts, accents, ß) instead
+	// of stranding every one on the fallback voice.
+	return (
+		identifyLangOffline(quote) ?? identifyLangShort(quote) ?? fallback
+	);
 }
 
 /**
@@ -195,7 +201,13 @@ export async function latinSentencesLang(
 export async function sentenceLangsFor(
 	text: string,
 	fallback: string,
-	voices: ReadonlyArray<{ lang: string }>
+	voices: ReadonlyArray<{ lang: string }>,
+	/**
+	 * Voice for translation-gloss right halves ("X = translation"):
+	 * the translation speaks the user's own language, never the
+	 * message seed. Defaults to the seed (old behavior).
+	 */
+	glossFallback: string = fallback
 ): Promise<(sentence: string) => string> {
 	const latin = splitSentences(text).filter(
 		(sentence) => ttsLangFor(sentence, "") === ""
@@ -205,7 +217,18 @@ export async function sentenceLangsFor(
 	const perSentence = new Map<string, string>();
 	await Promise.all(
 		latin.map(async (sentence) => {
-			perSentence.set(sentence, await quoteLangFor(sentence, seed));
+			const gloss = splitGlossHalves(sentence);
+			if (gloss) {
+				// The term resolves normally (seed for misses); its
+				// translation reads in the gloss fallback.
+				perSentence.set(gloss[0], await quoteLangFor(gloss[0], seed));
+				perSentence.set(
+					gloss[1],
+					await quoteLangFor(gloss[1], glossFallback)
+				);
+			} else {
+				perSentence.set(sentence, await quoteLangFor(sentence, seed));
+			}
 		})
 	);
 	const base = speechLangsFor(seed, voices);
@@ -269,7 +292,9 @@ export async function quoteLangForContext(
 	} catch {
 		// Bridge unavailable (browser preview, tests): offline scorer below.
 	}
-	return identifyLangOffline(probe) ?? "zh-CN";
+	return (
+		identifyLangOffline(probe) ?? identifyLangShort(probe) ?? "zh-CN"
+	);
 }
 
 /**

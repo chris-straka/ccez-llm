@@ -179,7 +179,15 @@ object Tts {
             tuneFor(tts, locale)
             if (voiceName != null) {
                 try {
-                    tts.voices?.firstOrNull { it.name == voiceName }?.let { tts.voice = it }
+                    // The pinned voice only applies to its own language:
+                    // assigning it blindly would drag every segment into
+                    // one voice and kill multilingual switching. Other
+                    // languages keep the locale routing above.
+                    tts.voices
+                        ?.firstOrNull {
+                            it.name == voiceName && it.locale.language == locale.language
+                        }
+                        ?.let { tts.voice = it }
                 } catch (_: Exception) {
                     // Named voice gone; engine default stands in.
                 }
