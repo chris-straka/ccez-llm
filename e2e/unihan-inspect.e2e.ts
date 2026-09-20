@@ -6,9 +6,9 @@ import { seedChat } from "./helpers";
  *
  * The generated Unihan bundle (kDefinition + kMandarin + kJapaneseOn +
  * kJapaneseKun) wires through getInspectData, so the overlay shows the
- * curated gloss plus Mandarin pinyin and Japanese on/kun readings for
- * a table-covered character. Separate from inspect.e2e.ts (gating +
- * overlay contract): this spec pins the enrichment alone.
+ * curated gloss plus Mandarin pinyin, with Japanese on/kun one toggle
+ * tap away, for a table-covered character. Separate from inspect.e2e.ts
+ * (gating + overlay contract): this spec pins the enrichment alone.
  */
 
 /** Seed a chat, then merge the Inspect toggle into stored settings. */
@@ -53,13 +53,15 @@ test("Inspect overlay shows Unihan definition and readings for a covered char", 
 	await expect(modal).toBeVisible();
 	// Unihan definition (no curated overrides remain).
 	await expect(modal).toContainText("language, words; saying, expression");
-	// Unihan enrichment: Mandarin pinyin + Japanese on/kun readings.
+	// Unihan enrichment: Mandarin pinyin by default (a lone char with
+	// no kana context resolves zh) and Japanese on/kun behind the
+	// 日本語 toggle — one locale's reading at a time, by design.
 	await expect(modal).toContainText("Mandarin");
 	await expect(modal).toContainText("yǔ");
-	await expect(modal).toContainText("Japanese on");
-	await expect(modal).toContainText("GO GYO");
-	await expect(modal).toContainText("Japanese kun");
-	await expect(modal).toContainText("KATARU");
+	await modal.getByRole("button", { name: "Show Japanese reading" }).click();
+	await expect(modal).toContainText("On/Kun:");
+	await expect(modal).toContainText("go,gyo");
+	await expect(modal).toContainText("kataru");
 	// Unihan strokes + Kangxi radical (語: 14 strokes, 言 + 7).
 	await expect(modal).toContainText("Strokes:");
 	await expect(modal).toContainText("14");

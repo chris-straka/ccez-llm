@@ -35,11 +35,14 @@ test.describe("pinning", () => {
 		await expect(body.locator(".frb")).toHaveCount(2, { timeout: 60_000 });
 		await expect(body).toContainText("かんじ");
 		await expect(body).toContainText("よ");
-		// Readings are overlay, never layout: spawning them must not move
-		// the base text by even a pixel.
+		// Readings are overlay, never reflow: pinning must not shift
+		// the message origin or rewrap its width. Height is excluded
+		// on purpose — latched CJK leading (line-height 2.7 while ruby
+		// is rendered) grows the block by design so stacked readings
+		// never overlap adjacent lines.
 		const after = await body.boundingBox();
 		if (!after) throw new Error("message body lost its box");
-		for (const key of ["x", "y", "width", "height"] as const) {
+		for (const key of ["x", "y", "width"] as const) {
 			expect(Math.abs(after[key] - before[key])).toBeLessThanOrEqual(1);
 		}
 	});
