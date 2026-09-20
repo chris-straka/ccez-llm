@@ -212,6 +212,10 @@ test("deleting the streaming chat aborts its reply, composer keeps working", asy
 	await expect(page.locator(".hero")).toBeVisible({ timeout: 10_000 });
 	await expect(page.locator(".sending")).toHaveCount(0);
 	await expect(page.locator("article")).toHaveCount(0);
+	// Desktop parks the composer under open drawers: close the sidebar
+	// before re-sending, or the prompt stays idle-hidden.
+	await page.keyboard.press("Meta+b");
+	await expect(sidebar).toHaveClass(/collapsed/);
 	await send(page, "second attempt after abort");
 	await expect(page.locator("article.assistant .rendered")).toContainText(
 		"Mock reply to:",
@@ -223,7 +227,7 @@ test("deleting the streaming chat aborts its reply, composer keeps working", asy
 });
 
 /** Row error text follows text size only with the button opt-in: at
-enlarged text it stays fixed until "Scale message buttons with text
+enlarged text it stays fixed until "Scale message icons with text
 size" is checked. */
 test("row error text scales only with the button opt-in", async ({ page }) => {
 	await seedChat(page, []);
@@ -264,7 +268,7 @@ test("row error text scales only with the button opt-in", async ({ page }) => {
 	expect(await px()).toBeLessThan(14);
 	await page.keyboard.press("Meta+,");
 	const check = page.locator(
-		'.settings-panel label:has-text("Scale message buttons with text size") input'
+		'.settings-panel label:has-text("Scale message icons with text size") input'
 	);
 	await expect(check).toBeVisible({ timeout: 5_000 });
 	await check.check();

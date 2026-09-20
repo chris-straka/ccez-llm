@@ -36,9 +36,12 @@ test("desktop settings hide the Gemma pill", async ({ page }) => {
 	).toHaveCount(0);
 });
 
-/** Android lists Gemma beside the cloud options: keyless, with a
-readiness note (browser dev has no bridge, so the note names that). */
-test("android Gemma is keyless with a readiness note", async ({ browser }) => {
+/** A phone browser without the shell hides the Gemma pill (same
+mount-probe gating as the desktop test above: no bridge, no offer) —
+only the keyed cloud options list. */
+test("android browser without the shell hides the Gemma pill", async ({
+	browser
+}) => {
 	const ctx = await browser.newContext({
 		userAgent:
 			"Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36"
@@ -51,33 +54,18 @@ test("android Gemma is keyless with a readiness note", async ({ browser }) => {
 			timeout: 60_000
 		});
 		await openSettings(page);
-		const gemma = page.locator(
-			'.settings-panel [role="radiogroup"][aria-label="Active provider"] button',
-			{ hasText: "ML Kit (on-device)" }
+		const pills = page.locator(
+			'.settings-panel [role="radiogroup"][aria-label="Active provider"] button'
 		);
-		await expect(gemma).toBeVisible();
-		await gemma.click();
-		await expect(gemma).toHaveAttribute("aria-checked", "true");
-		// Keyless: the hint replaces the password field, not supplements it.
 		await expect(
-			page.locator(".settings-panel").getByText(/No key needed/)
-		).toBeVisible();
-		await expect(
-			page.locator('.settings-panel input[type="password"]')
+			pills.filter({ hasText: "ML Kit (on-device)" })
 		).toHaveCount(0);
-		// No shell here: the note says on-device chat is unavailable.
-		await expect(
-			page
-				.locator(".settings-panel")
-				.getByText(/isn't available on this device/)
-		).toBeVisible();
-		// Offline narrows the picker to Gemma alone.
+		// The keyed cloud options still list.
+		await expect(pills.first()).toBeVisible();
+		// Offline narrows to Gemma alone, which stays hidden without
+		// the shell: nothing lists, honestly — no provider can work.
 		await ctx.setOffline(true);
-		await expect(
-			page.locator(
-				'.settings-panel [role="radiogroup"][aria-label="Active provider"] button'
-			)
-		).toHaveCount(1);
+		await expect(pills).toHaveCount(0);
 	} finally {
 		await ctx.close();
 	}
