@@ -218,9 +218,8 @@ class MainActivity : TauriActivity() {
   // the WebView itself and survive an empty menu; external apps
   // keep resolving our aliases through the package manager, which
   // this hook never touches. Owner demand: no OS text menu anywhere
-  // in the app except the main prompt and the settings panel, which
-  // keep their real OS menu while a live selection sits in either
-  // (see nativePromptMenuAllowed).
+  // in the app except the main prompt, which keeps its real OS menu
+  // while a live selection sits in it (see nativePromptMenuAllowed).
   private var emptySelectionMenu: android.view.Menu? = null
 
   private fun emptyMenu(): android.view.Menu {
@@ -236,13 +235,12 @@ class MainActivity : TauriActivity() {
     type: Int
   ): android.view.ActionMode? {
     if (type == android.view.ActionMode.TYPE_FLOATING) {
-      // The main prompt and the settings panel keep their real OS
-      // menu (Copy / Cut / Paste / Select All): the frontend reports
-      // live selections inside either to Rust, and only those pass
-      // through to the framework menu. Every other selection keeps
-      // the empty dummy and the WebView menu.
+      // The main prompt keeps its real OS menu (Copy / Cut / Paste /
+      // Select All): the frontend reports live prompt selections to
+      // Rust, and only those pass through to the framework menu. Every
+      // other selection keeps the empty dummy and the WebView menu.
       if (nativePromptMenuAllowed()) {
-        android.util.Log.i("CcezMain", "prompt/settings selection: real OS menu")
+        android.util.Log.i("CcezMain", "prompt selection: real OS menu")
         return super.onWindowStartingActionMode(callback, type)
       }
       android.util.Log.i("CcezMain", "swapping in empty selection mode")

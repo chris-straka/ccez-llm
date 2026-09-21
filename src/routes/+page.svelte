@@ -527,7 +527,6 @@
 	}
 	let editor: PromptEditor | null = $state(null);
 	let promptEl: HTMLElement | undefined = $state();
-	let settingsEl: HTMLElement | undefined = $state();
 	let scrollBox: HTMLElement | undefined = $state();
 	/** App root (pinned to the visual height while the phone keyboard is up). */
 	let appEl: HTMLElement | undefined = $state();
@@ -11367,15 +11366,16 @@
 					dismissSelPanels();
 			}
 		};
-		// Native OS menu in the prompt and settings: while a live
-		// selection sits inside either, the Activity shows the real OS
-		// menu (Copy / Cut / Paste) instead of the empty dummy, so key
-		// fields and other settings inputs paste like anywhere else.
-		// Transitions only — handle drags stay silent on the bridge.
+		// Native OS menu in the prompt only: while a live selection
+		// sits inside it, the Activity shows the real OS menu (Copy /
+		// Cut / Paste) instead of the empty dummy. Settings stays on
+		// the dummy — its key field pastes through the Paste button's
+		// native read instead. Transitions only — handle drags stay
+		// silent on the bridge.
 		const notePromptSelection = (): void => {
 			const live = window.getSelection();
 			reportOsMenu(
-				[promptEl, settingsEl],
+				[promptEl],
 				live?.anchorNode ?? null,
 				live?.isCollapsed ?? true
 			);
@@ -14051,7 +14051,6 @@
 	<aside
 		class="settings-panel"
 		class:closed={!settingsOpen}
-		bind:this={settingsEl}
 		data-fade-scroll
 		aria-label="Settings"
 		inert={!settingsOpen}

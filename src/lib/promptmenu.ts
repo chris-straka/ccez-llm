@@ -3,16 +3,16 @@ import { invoke } from "@tauri-apps/api/core";
 import { tauriBackendAvailable } from "./secrets";
 
 /**
- * Settings/composer native OS text menu.
+ * Prompt-only native OS text menu.
  *
  * The Activity swaps every floating selection menu for an empty dummy
- * except while a live selection sits inside the main prompt or the
- * settings panel: then the real OS menu (Copy / Cut / Paste /
- * Select All) shows, so key fields and other settings inputs paste
- * like anywhere else on the device. The page owns the
- * "inside an allowed root" fact (CodeMirror renders the prompt, so
- * only the DOM can see the anchor) and reports transitions to Rust,
- * which the Activity reads synchronously at menu time.
+ * except while a live selection sits inside the main prompt: then the
+ * real OS menu (Copy / Cut / Paste / Select All) shows. The page owns
+ * the "inside an allowed root" fact (CodeMirror renders the prompt,
+ * so only the DOM can see the anchor) and reports transitions to
+ * Rust, which the Activity reads synchronously at menu time. The
+ * roots stay a list so the allowance can widen again without
+ * reshaping the bridge.
  */
 
 export type ContainsNode = Pick<Node, "contains">;

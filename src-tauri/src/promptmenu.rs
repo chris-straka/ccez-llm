@@ -1,11 +1,11 @@
-//! Prompt-and-settings native text menu flag.
+//! Prompt-only native text menu flag.
 //!
 //! The Activity swaps every floating text-selection menu for an empty
 //! dummy (see `MainActivity.kt`: no OS text menu anywhere in the app,
-//! the WebView owns Annotate / Copy / Speak). The exceptions are the
-//! main prompt and the settings panel: a live selection inside either
-//! gets the real OS menu (Copy / Cut / Paste / Select All) so key
-//! fields and other inputs paste like anywhere else on the device.
+//! the WebView owns Annotate / Copy / Speak). The one exception is the
+//! main prompt: a live selection inside it gets the real OS menu
+//! (Copy / Cut / Paste / Select All). Settings pastes through the key
+//! field's Paste button (native clipboard read) instead.
 //!
 //! Crossing the flag: the frontend reports selection transitions
 //! through the `set_prompt_menu_allowed` command (cheap, transitions
