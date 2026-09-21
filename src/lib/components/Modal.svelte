@@ -116,4 +116,12 @@ move here verbatim. -->
 		user-select: none;
 		-webkit-user-select: none;
 	}
+	/* Search palette box: pinned to the top so the phone keyboard
+	never covers the input; hits read as full-width rows. */
+	.search-palette {
+		align-self: flex-start;
+		margin-top: 8vh;
+		margin-top: 8dvh;
+		padding: 0.7rem 0.9rem 0.8rem;
+	}
 </style>

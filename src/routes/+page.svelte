@@ -142,6 +142,7 @@
 	import Readings from "$lib/components/Readings.svelte";
 	import ChatSwitcher from "$lib/components/ChatSwitcher.svelte";
 	import ShortcutsModal from "$lib/components/ShortcutsModal.svelte";
+	import SearchPalette from "$lib/components/SearchPalette.svelte";
 	import { plainBody, sourcesAsked } from "$lib/render";
 	import {
 		clearNotice,
@@ -13947,96 +13948,21 @@
 	{/if}
 
 	{#if palette.open}
-		<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-		<!-- Command palette: full-text search across chats/annotations. -->
-		<div
-			class="modal-veil"
-			onclick={(e) => {
-				if (e.target === e.currentTarget) closeSearch();
+		<!-- Command palette through the shared shell: the page keeps
+		the palette object, focus, and search behaviors; the component
+		owns the dialog markup, the hit list, and their surfaces. -->
+		<SearchPalette
+			{palette}
+			bind:inputEl={searchInputEl}
+			bind:resultsEl={searchResultsEl}
+			actions={{
+				query: runSearchQuery,
+				close: closeSearch,
+				move: moveSearchCursor,
+				enter: enterSearchHit,
+				focusHit: focusSearchHit
 			}}
-		>
-			<div
-				class="modal search-palette"
-				role="dialog"
-				aria-modal="true"
-				aria-label="Search chats"
-			>
-				<div class="modal-head">
-					<input
-						type="search"
-						class="search-input"
-						bind:this={searchInputEl}
-						bind:value={palette.query}
-						oninput={runSearchQuery}
-						placeholder="Search chats and annotations"
-						aria-label="Search chats and annotations"
-						inputmode="search"
-						enterkeyhint="search"
-						autocomplete="off"
-						onkeydown={(e) => {
-							if (e.key === "ArrowDown") {
-								e.preventDefault();
-								moveSearchCursor(1);
-							} else if (e.key === "ArrowUp") {
-								e.preventDefault();
-								moveSearchCursor(-1);
-							} else if (e.key === "Enter") {
-								e.preventDefault();
-								const hit = palette.hits[palette.cursor];
-								if (hit) enterSearchHit(hit);
-							}
-						}}
-					/>
-					<button
-						type="button"
-						aria-label="Close search"
-						title="Close (Esc)"
-						onclick={closeSearch}
-					>
-						×
-					</button>
-				</div>
-				<div
-					class="search-results"
-					bind:this={searchResultsEl}
-					data-fade-scroll
-					role="listbox"
-					aria-label="Search results"
-				>
-					{#if palette.busy}
-						<p class="search-status" role="status">Searching…</p>
-					{:else if palette.query.trim() && palette.hits.length === 0}
-						<p class="search-status">No matches.</p>
-					{:else}
-						{#each palette.hits as hit, n (hit.doc.chatId + (hit.doc.msgId ?? "") + hit.doc.kind)}
-							<button
-								type="button"
-								role="option"
-								aria-selected={n === palette.cursor}
-								class="search-hit"
-								class:cursor={n === palette.cursor}
-								onmouseenter={() => (palette.cursor = n)}
-								onclick={() => enterSearchHit(hit)}
-								onkeydown={(e) => {
-									if (e.key === "j" || e.key === "ArrowDown") {
-										e.preventDefault();
-										moveSearchCursor(1);
-										focusSearchHit(palette.cursor);
-									} else if (e.key === "k" || e.key === "ArrowUp") {
-										e.preventDefault();
-										moveSearchCursor(-1);
-										focusSearchHit(palette.cursor);
-									}
-								}}
-							>
-								<span class="search-kind">{hit.doc.kind}</span>
-								<span class="search-snippet">{hit.snippet}</span>
-							</button>
-						{/each}
-					{/if}
-				</div>
-			</div>
-		</div>
+		/>
 	{/if}
 	{#if inspectChar && inspectData}
 		{@const strokeTotal =
@@ -14680,81 +14606,9 @@
 	/* Shortcuts filter and key grid render in `ShortcutsModal.svelte`
 	now (field chrome, focus ring, and rows moved with the markup).
 	The palette input keeps its own focus ring below. */
-	.search-input:focus-visible {
-		outline: 2px solid #3a3a3c;
-		outline-color: var(--focus);
-		outline-offset: 1px;
-	}
-	/* Search palette (search-mobile): pinned to the top so the phone
-	keyboard never covers the input; hits read as full-width rows. */
-	.search-palette {
-		align-self: flex-start;
-		margin-top: 8vh;
-		margin-top: 8dvh;
-		padding: 0.7rem 0.9rem 0.8rem;
-	}
-	.search-input {
-		flex: 1;
-		min-width: 0;
-		font: inherit;
-		font-size: 0.95rem;
-		padding: 0.5rem 0.7rem;
-		border: 1px solid #c7c7cc;
-		border: 1px solid var(--line);
-		border-radius: 8px;
-		background: #fff;
-		background: var(--field);
-		color: inherit;
-	}
-	.search-results {
-		max-height: 50vh;
-		max-height: 50dvh;
-		overflow-y: auto;
-		display: flex;
-		flex-direction: column;
-		gap: 0.15rem;
-	}
-	.search-hit {
-		display: flex;
-		align-items: baseline;
-		gap: 0.6rem;
-		text-align: left;
-		font: inherit;
-		font-size: 0.85rem;
-		padding: 0.45rem 0.6rem;
-		border: 1px solid transparent;
-		border-radius: 8px;
-		background: transparent;
-		color: inherit;
-		cursor: pointer;
-	}
-	.search-hit.cursor {
-		background: #eef4ff;
-		background: var(--hl);
-		border-color: #e5e5ea;
-		border-color: var(--line-soft);
-	}
-	.search-kind {
-		flex: none;
-		font-size: 0.7rem;
-		text-transform: uppercase;
-		letter-spacing: 0.04em;
-		color: #6e6e73;
-		color: var(--dim);
-	}
-	.search-snippet {
-		min-width: 0;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-	.search-status {
-		font-size: 0.85rem;
-		color: #6e6e73;
-		color: var(--dim);
-		padding: 0.6rem;
-		margin: 0;
-	}
+	/* Search palette dialog renders in `SearchPalette.svelte` now
+	(markup, hits, and surfaces moved with it; the box seating lives
+	in `Modal.svelte`). */
 	.modal-head button:hover {
 		border-color: #1c1c1e;
 		border-color: var(--strong);
