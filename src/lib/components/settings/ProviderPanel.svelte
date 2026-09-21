@@ -486,7 +486,6 @@
 				/>
 				<button type="button" onclick={() => void pasteKey()}>Paste</button>
 			</span>
-			<span class="hint" role="alert">{keyPasteError}</span>
 		</label>
 	{:else}
 		<p class="key-state" role="status">
@@ -502,8 +501,12 @@
 	{#if !activeDef.keyless}
 		<!-- Keyless providers (on-device ML Kit) have no key to reassure
 		about: the note would read as if one were stored. -->
+		<!-- Paste errors borrow this line instead of stacking a new
+		one: same slot, no layout shove. -->
 		<p class="note">
-			{#if inShell}
+			{#if keyPasteError}
+				{keyPasteError}
+			{:else if inShell}
 				Keys stay in this app's secured storage, never in a file.
 			{:else}
 				Keys stay on this machine, in this app's local storage.
