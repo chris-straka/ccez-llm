@@ -158,9 +158,25 @@ class MainActivity : TauriActivity() {
 
   private external fun nativeOnExternalText(text: String?, action: String?)
 
-  // Composer-only native menu: synchronous Rust read of the
-  // frontend's composer-selection flag (see promptmenu.rs). True only
-  // while a live selection sits inside the main prompt.
+  // Foreground ground truth for the reply-ping veto (see turn.rs):
+  // true between onResume and onPause. The window-focus query alone
+  // misfires, so this is what keeps "Reply ready" from landing in
+  // front of the user.
+  private external fun nativeOnForeground(active: Boolean)
+
+  override fun onResume() {
+    super.onResume()
+    nativeOnForeground(true)
+  }
+
+  override fun onPause() {
+    nativeOnForeground(false)
+    super.onPause()
+  }
+
+  // Prompt-and-settings native menu: synchronous Rust read of the
+  // frontend's selection flag (see promptmenu.rs). True only while a
+  // live selection sits inside the main prompt or the settings panel.
   private external fun nativePromptMenuAllowed(): Boolean
 
   /**

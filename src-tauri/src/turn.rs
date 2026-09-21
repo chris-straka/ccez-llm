@@ -703,6 +703,41 @@ async fn sleep_secs(secs: u64) {
 /// dismiss) targets the same notice instead of stranding it.
 const REPLY_NOTIFICATION_ID: i32 = 4201;
 
+/// Activity foreground ground truth (Android): MainActivity reports
+/// onResume/onPause through `nativeOnForeground`. Defaults false so
+/// desktop — which has no reporter — keeps the window-focus query as
+/// its only veto input. Read after the seen-grace, so a return
+/// mid-grace still vetoes the ping.
+static FOREGROUND: AtomicBool = AtomicBool::new(false);
+
+fn set_foreground(active: bool) {
+    FOREGROUND.store(active, Ordering::SeqCst);
+}
+
+fn app_foreground() -> bool {
+    FOREGROUND.load(Ordering::SeqCst)
+}
+
+/// Pure ping verdict: an unseen done turn pings only when neither the
+/// lifecycle flag nor the window query places the user in the app.
+/// Either witness vetoes — a raced ping must never land in front of
+/// the user. Pure and unit-tested.
+fn should_ping(seen: bool, done: bool, foreground: bool, window_focused: bool) -> bool {
+    !seen && done && !(foreground || window_focused)
+}
+
+/// Lifecycle report from MainActivity (same convention as the
+/// `nativeOnExternalText` entry point).
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub unsafe extern "C" fn Java_studio_ccez_app_MainActivity_nativeOnForeground(
+    _env: jni::JNIEnv,
+    _this: jni::objects::JObject,
+    active: jni::sys::jboolean,
+) {
+    set_foreground(active != 0);
+}
+
 /// Notification plain text: strip the reply's markdown so the shade
 /// never shows `**bold**`, backticks, headings, quotes, or link
 /// targets. Display-only — the reply itself is untouched. Pure and
@@ -952,17 +987,19 @@ async fn finish_turn(
     // grace window; backgrounded ones never do, and only they ping.
     // A raced ping must still never land in front of the user (the
     // page renders the reply, then the grace expires onto nothing to
-    // dismiss), so a focused app window vetoes the ping outright.
-    // Unknown focus reads as background: the ping is the safe side.
+    // dismiss), so either witness of the user in the app — the
+    // Activity lifecycle flag or a focused window — vetoes outright.
+    // Both unknown reads as background: the ping is the safe side.
     sleep_secs(SEEN_GRACE_SECS).await;
-    if !live.seen.load(Ordering::Relaxed) && status == "done" {
-        let focused = app
-            .get_webview_window("main")
+    if should_ping(
+        live.seen.load(Ordering::Relaxed),
+        status == "done",
+        app_foreground(),
+        app.get_webview_window("main")
             .and_then(|window| window.is_focused().ok())
-            .unwrap_or(false);
-        if !focused {
-            notify_ready(app, &content);
-        }
+            .unwrap_or(false),
+    ) {
+        notify_ready(app, &content);
     }
     let _ = error;
 }
@@ -1104,6 +1141,30 @@ mod tests {
     use super::*;
     use std::io::{Read, Write};
     use std::net::TcpListener;
+
+    #[test]
+    fn ping_only_for_unseen_backgrounded_done_turns() {
+        // The user's case: in the app, unseen, done — no ping.
+        assert!(!should_ping(false, true, true, false));
+        assert!(!should_ping(false, true, false, true));
+        assert!(!should_ping(false, true, true, true));
+        // Backgrounded and unseen: ping.
+        assert!(should_ping(false, true, false, false));
+        // Seen, failed, or interrupted: never.
+        assert!(!should_ping(true, true, false, false));
+        assert!(!should_ping(false, false, false, false));
+    }
+
+    #[test]
+    fn foreground_flag_defaults_off() {
+        // Desktop has no lifecycle reporter: the window query stays
+        // the only veto input there.
+        set_foreground(false);
+        assert!(!app_foreground());
+        set_foreground(true);
+        assert!(app_foreground());
+        set_foreground(false);
+    }
 
     #[test]
     fn notification_plain_strips_markdown() {
