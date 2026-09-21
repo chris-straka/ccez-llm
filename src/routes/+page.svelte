@@ -1896,7 +1896,7 @@
 	navigation): tapping the toast runs it instead of copying. The
 	generation pins the lifetime — an expired toast never fires a
 	stale action. */
-	let toastAction: { seq: number; run: () => void } | null = null;
+	let toastAction = $state<{ seq: number; run: () => void } | null>(null);
 	function flashToast(message: string, action?: () => void): void {
 		flashNotice(notices, "toast", message, toastTimeoutFor(message));
 		toastAction = action ? { seq: notices.toast.seq, run: action } : null;
@@ -14078,6 +14078,7 @@
 			<div
 				class="modal inspect-modal"
 				role="dialog"
+				tabindex="-1"
 				aria-modal="true"
 				aria-labelledby="inspect-heading"
 				data-fade-scroll
