@@ -149,8 +149,9 @@ export interface AppSettings {
 	hideButtons: boolean;
 	/**
 	 * Touch only: a leftward stroke over a message folds it. On by
-	 * default; uncheck to make swipe inert (the row's fold button
-	 * still folds). The checkbox lives in Messages on phones.
+	 * default; uncheck and the stroke opens settings instead (the
+	 * row's fold button still folds). The checkbox lives in Messages
+	 * on phones.
 	 */
 	foldOnSwipe: boolean;
 	/** Touch only: read a fresh text selection aloud on release. */

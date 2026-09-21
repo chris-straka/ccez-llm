@@ -2473,16 +2473,21 @@ test.describe("always-visible prompt", () => {
 		await expect(aside).toHaveClass(/collapsed/);
 	});
 
-	/** Unchecked "Enable fold on swipe" makes the stroke inert. */
-	test("fold on swipe off leaves swiped messages open", async ({ page }) => {
+	/** Unchecked "Enable fold on swipe" sends the stroke to settings. */
+	test("fold on swipe off opens settings from a message stroke", async ({
+		page
+	}) => {
 		await seed(page, { foldOnSwipe: false }, [LONG]);
 		await page.goto("/");
 		await expect(page.locator("article .rendered").first()).toBeVisible();
 		const article = page.locator("article.assistant").first();
 		await expect(article).not.toHaveClass(/folded-msg/);
-		// Leftward: no fold with the toggle off.
+		const panel = page.locator(".settings-panel");
+		await expect(panel).toHaveClass(/closed/);
+		// Leftward: no fold with the toggle off — settings opens instead.
 		await flick(page, "article.assistant .rendered", 220, 500, 30, 505);
 		await expect(article).not.toHaveClass(/folded-msg/);
+		await expect(panel).not.toHaveClass(/closed/);
 	});
 
 	/** Sideways pans inside code and latex blocks belong to the inner

@@ -9007,13 +9007,16 @@
 				if (target === "settings" && androidUI) {
 					// Phones: a leftward stroke off messages and the
 					// prompt opens settings (message-start strokes fold
-					// via the branch above — or do nothing when short —
-					// and prompt-start strokes never reach here as
-					// unclean). An open chats list folds instead, and
-					// an open panel stays (rightward dismisses it).
+					// via the branch above when fold on swipe is on —
+					// or do nothing when short — and prompt-start
+					// strokes never reach here as unclean; with the
+					// toggle off the stroke falls through to settings
+					// like any other). An open chats list folds instead,
+					// and an open panel stays (rightward dismisses it).
 					// Desktop keeps the shared edge outcome below.
 					if (settingsOpen) return;
-					if (start.msgId || start.rowSwipe) return;
+					if (start.rowSwipe) return;
+					if (start.msgId && settings.foldOnSwipe) return;
 					if (!settings.sidebarCollapsed) {
 						settings.sidebarCollapsed = true;
 						persistSettings();
