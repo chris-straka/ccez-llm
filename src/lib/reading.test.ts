@@ -37,8 +37,9 @@ import {
 	annotatedRuns,
 	annotatedRunsWithOffsets,
 	sliceRunsForQuote,
-	quoteTailCompletion,
+	speechKanaForQuote,
 	quoteStartForContext,
+	wordBoundsAt,
 	groupRuns,
 	wordAtNodeOffset
 } from "./reading";
@@ -692,28 +693,92 @@ describe("quoteStartForContext", () => {
 	});
 });
 
-describe("quoteTailCompletion", () => {
-	// The repo's own 美しい fixture: a highlight cut at 美 must speak
-	// the full うつくしい, not the うつく stem (raw: ビ).
+describe("speechKanaForQuote", () => {
+	// Lindera splits stems and okurigana (美/うつく + しい + が),
+	// so speech assembles exactly the highlight: no completion
+	// crosses a run boundary, and a mid-run cut sheds only an
+	// all-kana remainder.
 	const runs = annotatedRunsWithOffsets(
 		'<span class="frb">美<span class="frt">うつく</span></span>しいが<span class="frb">花<span class="frt">はな</span></span>'
 	)!;
 	const plain = runs.map((r) => r.text).join("");
 
-	it("completes a mid-token tail through kana continuations", () => {
+	it("speaks a stem cut exactly, never the whole word", () => {
 		expect(plain).toBe("美しいが花");
-		expect(quoteTailCompletion(runs, plain, "美")).toBe("しいが");
+		expect(speechKanaForQuote(runs, plain, "美")).toBe("うつく");
 	});
 
-	it("stops at the next kanji token", () => {
-		expect(quoteTailCompletion(runs, plain, "美しいが")).toBe("");
+	it("speaks a full-token highlight whole", () => {
+		expect(speechKanaForQuote(runs, plain, "美しい")).toBe("うつくしい");
+		expect(speechKanaForQuote(runs, plain, "花")).toBe("はな");
 	});
 
-	it("returns empty at the sentence end or off the map", () => {
-		expect(quoteTailCompletion(runs, plain, "美しいが花")).toBe("");
-		expect(quoteTailCompletion(runs, plain, "富士山")).toBe("");
-		expect(quoteTailCompletion(runs, plain, "")).toBe("");
-		expect(quoteTailCompletion(null, plain, "美")).toBe("");
+	it("never lets a particle ride along", () => {
+		const mikakuRuns = annotatedRunsWithOffsets(
+			'<span class="frb">味覚<span class="frt">みかく</span></span>が並び'
+		)!;
+		const mikakuPlain = mikakuRuns.map((r) => r.text).join("");
+		expect(speechKanaForQuote(mikakuRuns, mikakuPlain, "味覚")).toBe("みかく");
+	});
+
+	it("sheds an all-kana remainder inside one run", () => {
+		const kokochiRuns = annotatedRunsWithOffsets(
+			'<span class="frb">心地よい<span class="frt">ここちよい</span></span>季節'
+		)!;
+		const kokochiPlain = kokochiRuns.map((r) => r.text).join("");
+		expect(speechKanaForQuote(kokochiRuns, kokochiPlain, "心地")).toBe(
+			"ここち"
+		);
+	});
+
+	it("keeps the full reading past a non-kana remainder", () => {
+		const kyouRuns = annotatedRunsWithOffsets(
+			'<span class="frb">今日<span class="frt">きょう</span></span>は'
+		)!;
+		const kyouPlain = kyouRuns.map((r) => r.text).join("");
+		expect(speechKanaForQuote(kyouRuns, kyouPlain, "今")).toBe("きょう");
+	});
+
+	it("returns null at the sentence end or off the map", () => {
+		expect(speechKanaForQuote(runs, plain, "富士山")).toBeNull();
+		expect(speechKanaForQuote(runs, plain, "")).toBeNull();
+		expect(speechKanaForQuote(null, plain, "美")).toBeNull();
+	});
+
+	it("keeps the sentence's reading for the selected kanji", () => {
+		// The context lock: 生 inside 生まれる speaks う (the
+		// sentence token's reading), never the せい/なま an
+		// isolated lookup would guess. Readings always flow from
+		// the sentence tokenization; only the tail is exact.
+		const umareru = annotatedRunsWithOffsets(
+			'<span class="frb">生まれる<span class="frt">うまれる</span></span>と'
+		)!;
+		const umareruPlain = umareru.map((r) => r.text).join("");
+		expect(speechKanaForQuote(umareru, umareruPlain, "生")).toBe("う");
+	});
+});
+
+describe("wordBoundsAt", () => {
+	it("spans the Latin word holding the offset", () => {
+		expect(wordBoundsAt("hello world", 1)).toEqual([0, 5]);
+		expect(wordBoundsAt("hello world", 8)).toEqual([6, 11]);
+		expect(wordBoundsAt("hello world", 11)).toEqual([6, 11]);
+	});
+
+	it("yields nothing on whitespace or punctuation", () => {
+		expect(wordBoundsAt("hello world", 5)).toBe(null);
+		expect(wordBoundsAt("hi, there", 2)).toBe(null);
+		expect(wordBoundsAt("", 0)).toBe(null);
+	});
+
+	it("takes a word-like CJK segment, never empty", () => {
+		const text = "日本語は繊細です";
+		const span = wordBoundsAt(text, 4);
+		expect(span).not.toBe(null);
+		const [start, end] = span!;
+		expect(start).toBeLessThanOrEqual(4);
+		expect(end).toBeGreaterThan(4);
+		expect(text.slice(start, end)).not.toMatch(/[\s。、]/);
 	});
 });
 

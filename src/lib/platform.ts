@@ -11,6 +11,28 @@ export function isAndroidUserAgent(ua: string): boolean {
 }
 
 /**
+ * Android major version from a legacy user-agent string ("Android
+ * 14; ..."). Null when absent or unparseable (iOS, desktop, reduced
+ * UA) — callers keep their old behavior then. Pure.
+ */
+export function androidMajorFromUA(ua: string): number | null {
+	const match = /android\s+(\d+)/i.exec(ua ?? "");
+	if (!match) return null;
+	const major = Number(match[1]);
+	return Number.isSafeInteger(major) ? major : null;
+}
+
+/**
+ * Whether the OS itself confirms a clipboard write, making an app
+ * toast a duplicate. Android 13+ shows a system "Copied" overlay on
+ * every copy; older Android and desktop stay silent, so the app's
+ * own toast still owns confirmation there. Pure.
+ */
+export function osConfirmsClipboard(androidMajor: number | null): boolean {
+	return androidMajor !== null && androidMajor >= 13;
+}
+
+/**
  * iPhone/iPad WebView or browser, by user agent string. (iPads in
  * desktop-mode Safari report "Macintosh" and stay on the desktop UI;
  * the Tauri shell reports a real iPhone/iPad token.)

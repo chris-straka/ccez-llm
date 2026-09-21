@@ -749,11 +749,30 @@ fn link_text(line: &str) -> String {
     out
 }
 
+/// Replies channel: the ping must buzz (the finished-while-away thump
+/// callers asked back), and on Android buzz means a channel with
+/// vibration — the default channel stays silent. Creating an existing
+/// channel keeps the user's own settings, so this only sets the
+/// first-run default. Android-only: channels don't exist on desktop.
+#[cfg(target_os = "android")]
+const REPLY_CHANNEL_ID: &str = "replies";
+
 fn notify_ready(app: &AppHandle, head: &str) {
     use tauri_plugin_notification::NotificationExt;
     let stripped = notification_plain(&head.chars().take(280).collect::<String>());
     let body: String = stripped.chars().take(140).collect();
-    let _ = app
+    #[cfg(target_os = "android")]
+    {
+        use tauri_plugin_notification::Channel;
+        let channel = Channel::builder(REPLY_CHANNEL_ID, "Replies ready")
+            .description("One buzzing ping when a reply finishes while away.")
+            .vibration(true)
+            .build();
+        // Best-effort: without the channel the ping below won't fire,
+        // but a channel failure must never fail the turn itself.
+        let _ = app.notification().create_channel(channel);
+    }
+    let mut ping = app
         .notification()
         .builder()
         .id(REPLY_NOTIFICATION_ID)
@@ -762,15 +781,19 @@ fn notify_ready(app: &AppHandle, head: &str) {
             "Your reply finished while you were away.".to_string()
         } else {
             body
-        })
-        .show();
+        });
+    #[cfg(target_os = "android")]
+    {
+        ping = ping.channel_id(REPLY_CHANNEL_ID);
+    }
+    let _ = ping.show();
     // The shade is not storage: a native timer clears the ping after
-    // 5s (the page's own timer freezes while backgrounded, which is
+    // 6s (the page's own timer freezes while backgrounded, which is
     // exactly when this ping exists). Same id the foreground return
     // dismisses, so a revisit clears it even sooner.
     let handle = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        std::thread::sleep(Duration::from_secs(5));
+        std::thread::sleep(Duration::from_secs(6));
         let _ = handle.notification().cancel(vec![REPLY_NOTIFICATION_ID]);
     });
 }
@@ -870,8 +893,10 @@ async fn drive_attempts(
             Err(AttemptEnd::Stopped) => return TurnOutcome::Stopped,
             Err(AttemptEnd::Fatal(error)) => return TurnOutcome::Failed(error),
             Err(AttemptEnd::Retryable) if attempt >= MAX_ATTEMPTS => {
+                // Transport gave up, usually a sleeping radio behind a
+                // backgrounded app — never blame the user's network.
                 return TurnOutcome::Failed(
-                    "The network kept dropping. Try again.".to_string(),
+                    "Couldn't finish the reply. Try again.".to_string(),
                 )
             }
             Err(AttemptEnd::Retryable) => {
@@ -920,9 +945,19 @@ async fn finish_turn(
     turn_service_settle();
     // Foreground pages mark the turn seen on the done event inside the
     // grace window; backgrounded ones never do, and only they ping.
+    // A raced ping must still never land in front of the user (the
+    // page renders the reply, then the grace expires onto nothing to
+    // dismiss), so a focused app window vetoes the ping outright.
+    // Unknown focus reads as background: the ping is the safe side.
     sleep_secs(SEEN_GRACE_SECS).await;
     if !live.seen.load(Ordering::Relaxed) && status == "done" {
-        notify_ready(app, &content);
+        let focused = app
+            .get_webview_window("main")
+            .and_then(|window| window.is_focused().ok())
+            .unwrap_or(false);
+        if !focused {
+            notify_ready(app, &content);
+        }
     }
     let _ = error;
 }
@@ -1037,13 +1072,14 @@ pub fn turn_dismiss(app: AppHandle, turn_id: String) -> Result<bool, String> {
 /// process life alone.
 /// Owner demand (Sep 2026): never show the "Working on your reply"
 /// notice. Android mandates a notification for every foreground
-/// service, so the claim itself goes — turns run on process life
-/// alone now. Consequence, stated plainly: a backgrounded app is
-/// more likely to be killed mid-turn on aggressive OEM skins; killed
-/// turns already reconcile as interrupted on return, and finished
-/// ones land through the result file plus the Reply-ready ping.
+/// Android claim: the first live turn starts the foreground service
+/// (quiet "Reply coming…" notice, the least Android allows), the
+/// last settle stops it. Without this a backgrounded app is killed
+/// mid-turn; killed turns auto-resume with dots on return instead.
 #[cfg(target_os = "android")]
-fn turn_service_claim() {}
+fn turn_service_claim() {
+    crate::turn_service::service_claim();
+}
 
 /// Non-Android builds keep no service: the turn still outlives page
 /// stalls wherever the process itself lives (desktop).

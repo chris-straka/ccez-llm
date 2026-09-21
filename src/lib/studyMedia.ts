@@ -249,11 +249,14 @@ export function waveformBars(level: number, bars: number): number[] {
  */
 export const REPLY_NOTIFICATION_ID = 4201;
 /**
- * Pings clear themselves after five seconds (out of the shade, not
+ * Pings clear themselves after six seconds (out of the shade, not
  * just silent). Best-effort while backgrounded: a suspended WebView
- * runs the timer late, never early.
+ * runs the timer late, never early. Replies channel (mirrors
+ * turn.rs): the ping buzzes like the old flow did — Android buzzes
+ * per channel, and the default stays silent.
  */
-export const REPLY_NOTIFICATION_TIMEOUT_MS = 5_000;
+export const REPLY_NOTIFICATION_CHANNEL_ID = "replies";
+export const REPLY_NOTIFICATION_TIMEOUT_MS = 6_000;
 
 export interface ReplyDoneGate {
 	hidden: boolean;
@@ -570,10 +573,18 @@ export interface NativeNotifier {
 	requestPermission(): Promise<string>;
 	sendNotification(opts: {
 		id?: number;
+		channelId?: string;
 		title: string;
 		body?: string;
 		autoCancel?: boolean;
 	}): unknown;
+	createChannel?(channel: {
+		id: string;
+		name: string;
+		description?: string;
+		vibration?: boolean;
+		importance?: number;
+	}): Promise<void>;
 	cancel?(notifications: number[]): Promise<void>;
 	cancelAll?(): Promise<void>;
 }
@@ -679,8 +690,26 @@ export async function notifyReplyDoneAsync(
 				// Fixed id: each finished reply replaces the last
 				// instead of stacking; autoCancel clears the tap, and
 				// a timer clears the stale (the shade is not storage).
+				// Buzzing replies channel (see turn.rs): creating an
+				// existing channel keeps user settings. A missing
+				// channel fires nowhere, so the id rides along only
+				// when creation lands — otherwise the default channel
+				// still delivers (silently).
+				let channelId: string | undefined;
+				try {
+					await plugin.createChannel?.({
+						id: REPLY_NOTIFICATION_CHANNEL_ID,
+						name: "Replies ready",
+						description: "One buzzing ping when a reply finishes while away.",
+						vibration: true
+					});
+					channelId = REPLY_NOTIFICATION_CHANNEL_ID;
+				} catch {
+					channelId = undefined;
+				}
 				await plugin.sendNotification({
 					id: REPLY_NOTIFICATION_ID,
+					...(channelId ? { channelId } : {}),
 					title,
 					body: text.slice(0, 160),
 					autoCancel: true

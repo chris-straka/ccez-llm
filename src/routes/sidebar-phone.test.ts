@@ -15,13 +15,14 @@ function pageSource(): string {
 }
 
 describe("phone sidebar rows", () => {
-	it("prints a short visible-message count after the timestamp on phones", () => {
-		// The row shows "· N msgs" (never the tooltip's full split,
-		// which truncated into "..."), skipping empty chats, and the
-		// in-flight empty placeholder never counts.
+	it("shows a bare timestamp on phones, never a count suffix", () => {
+		// The row used to print "· N msgs" after the timestamp, but
+		// the suffix truncated into "· ..." on narrow rows — pure
+		// noise beside the date. Rows render the timestamp alone.
 		const source = pageSource();
-		expect(source).toContain("visibleMessageCount(chatState, item)");
-		expect(source).toContain('{n === 1 ? "msg" : "msgs"}');
+		expect(source).not.toContain("visibleMessageCount");
+		expect(source).not.toContain("side-count");
+		expect(source).not.toContain('{n === 1 ? "msg" : "msgs"}');
 		expect(source).not.toContain("sideTip(item) ||");
 	});
 

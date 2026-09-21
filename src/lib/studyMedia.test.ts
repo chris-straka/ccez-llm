@@ -26,6 +26,7 @@ import {
 	wakeLockSupported,
 	waveformBars,
 	REPLY_NOTIFICATION_ID,
+	REPLY_NOTIFICATION_CHANNEL_ID,
 	REPLY_NOTIFICATION_TIMEOUT_MS
 } from "./studyMedia";
 
@@ -267,8 +268,8 @@ describe("notification wrappers", () => {
 		expect(notificationPlainText("")).toBe("");
 	});
 
-	it("closes the web ping after five seconds", () => {
-		expect(REPLY_NOTIFICATION_TIMEOUT_MS).toBe(5_000);
+	it("closes the web ping after six seconds", () => {
+		expect(REPLY_NOTIFICATION_TIMEOUT_MS).toBe(6_000);
 		vi.useFakeTimers();
 		try {
 			const close = vi.fn();
@@ -434,6 +435,7 @@ describe("shell-aware notifications", () => {
 			isPermissionGranted: vi.fn(async () => granted),
 			requestPermission: vi.fn(async () => "granted"),
 			sendNotification: vi.fn(),
+			createChannel: vi.fn(async () => {}),
 			cancel: vi.fn(async () => {})
 		};
 	}
@@ -502,6 +504,40 @@ describe("shell-aware notifications", () => {
 				hidden: true
 			})
 		).toBe(false);
+	});
+
+	it("buzzes through the replies channel, default when it fails", async () => {
+		const p = plugin(true);
+		await notifyReplyDoneAsync("Reply finished", long, {
+			shell: true,
+			plugin: p,
+			hidden: true
+		});
+		expect(p.createChannel).toHaveBeenCalledWith(
+			expect.objectContaining({
+				id: REPLY_NOTIFICATION_CHANNEL_ID,
+				vibration: true
+			})
+		);
+		expect(p.sendNotification).toHaveBeenCalledWith(
+			expect.objectContaining({ channelId: REPLY_NOTIFICATION_CHANNEL_ID })
+		);
+		// A missing channel fires nowhere, so a failed creation drops
+		// the id and the default channel still delivers (silently).
+		const failing = plugin(true);
+		failing.createChannel = vi.fn(async () => {
+			throw new Error("no channels");
+		});
+		await notifyReplyDoneAsync("Reply finished", long, {
+			shell: true,
+			plugin: failing,
+			hidden: true
+		});
+		const sent = failing.sendNotification.mock.calls[0]?.[0] as
+			| Record<string, unknown>
+			| undefined;
+		expect(sent).toMatchObject({ id: REPLY_NOTIFICATION_ID });
+		expect(sent).not.toHaveProperty("channelId");
 	});
 
 	it("dismisses the ping by id, never throws", async () => {

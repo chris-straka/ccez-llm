@@ -40,7 +40,6 @@ plus owner try-outs.
       dead through handle drags.
 - [ ] Double-tap word select (multi-tap wipe fix) + fold toggle off =
       inert strokes + mobile fold chevron on every row.
-- [ ] ML Kit pill stays hidden on all-606; provider list otherwise intact.
 - [ ] Share intent (ACTION_SEND -> draft) and API-key persistence across
       restarts (Keystore envelope; self-sign decision stands, no Play).
 - [ ] Tap-marker edit flash when the OS keyboard resizes (prompt focus

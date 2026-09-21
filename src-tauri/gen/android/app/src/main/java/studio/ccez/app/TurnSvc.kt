@@ -16,10 +16,11 @@ import androidx.core.app.NotificationCompat
  * Foreground-service claim for native turns (`turn_service.rs`).
  *
  * While at least one turn is live, the app runs a `dataSync`
- * foreground service — a persistent "working" notification, as
- * Android requires — so a backgrounded app is far less likely to be
- * killed before the reply lands. When the last turn settles, Rust
- * calls [keeperStop] and the service stops itself.
+ * foreground service — the quietest notice Android allows (MIN
+ * importance: no status-bar icon, no buzz, shade-only) — so a
+ * backgrounded app is far less likely to be killed before the reply
+ * lands. When the last turn settles, Rust calls [keeperStop] and
+ * the service stops itself.
  *
  * Everything service-side runs on the main thread and returns at
  * once; Rust never passes contexts through JNI ([init] runs from
@@ -32,9 +33,29 @@ object TurnSvc {
 
     private external fun nativeInit(activity: Activity)
 
+    private var retiredOldChannel = false
+
     fun init(activity: Activity) {
         appContext = activity.applicationContext
         nativeInit(activity)
+        // Retire the old loud channel: it is never referenced by a
+        // foreground service (the notice moved to QUIET_CHANNEL_ID),
+        // so deleting it here is allowed — and any refusal throws
+        // only inside this try, never into callers. Runs at every
+        // launch from MainActivity, long before any turn can claim
+        // the service.
+        if (!retiredOldChannel) {
+            retiredOldChannel = true
+            try {
+                val manager = appContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    // Literal, not the companion const: that id belongs
+                    // to TurnService's scope, not this object's.
+                    manager.deleteNotificationChannel("ccez-turns")
+                }
+            } catch (_: Exception) {
+            }
+        }
     }
 
     /** First live turn: start (or reaffirm) the foreground service. */
@@ -66,8 +87,8 @@ object TurnSvc {
 /**
  * The service itself: stateless, exists only to hold the foreground
  * claim while turns run. Not sticky — if the system does kill us, a
- * restart would serve nothing (the turn files already say
- * interrupted), so there is nothing to resume.
+ * restart would serve nothing: the turn files say streaming, and the
+ * page auto-resumes those with dots on return.
  */
 class TurnService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
@@ -87,18 +108,23 @@ class TurnService : Service() {
     private fun buildNotification(): Notification {
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // A fresh id: importance freezes at creation, so the old
+            // (louder) channel can never become quiet — it retires in
+            // TurnSvc.init instead. Deleting here would crash: this
+            // channel backs a live foreground service.
             val channel = NotificationChannel(
-                CHANNEL_ID,
+                QUIET_CHANNEL_ID,
                 "Replies",
-                NotificationManager.IMPORTANCE_LOW
+                NotificationManager.IMPORTANCE_MIN
             )
             manager.createNotificationChannel(channel)
         }
-        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Working on your reply")
-            .setContentText("It will be ready when you return.")
+        val builder = NotificationCompat.Builder(this, QUIET_CHANNEL_ID)
+            .setContentTitle("Reply coming…")
+            .setContentText("Your reply will be ready when you return.")
             .setSmallIcon(R.mipmap.ic_launcher)
             .setOngoing(true)
+            .setShowWhen(false)
         return builder.build()
     }
 
@@ -116,6 +142,7 @@ class TurnService : Service() {
 
     companion object {
         private const val CHANNEL_ID = "ccez-turns"
+        private const val QUIET_CHANNEL_ID = "ccez-turns-quiet"
         private const val NOTIFICATION_ID = 41
     }
 }

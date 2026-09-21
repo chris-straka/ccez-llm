@@ -175,10 +175,11 @@ test("right-clicking kanji shows its sentence reading and speaks kana", async ({
 	await expect(panels).toContainText("う");
 	await expect(panels).not.toContainText("せい");
 	await expect(panels).not.toContainText("生");
-	// Speech reads the kana, never the raw kanji. Speech waits for
+	// Speech reads the kana, never the raw kanji — the full うまれる,
+	// not the う stem (mid-token tail completion). Speech waits for
 	// the worker conversion, so this covers a cold dictionary build
 	// like the panel wait above.
-	await expect.poll(() => spoken(page), { timeout: 120_000 }).toContain("う");
+	await expect.poll(() => spoken(page), { timeout: 120_000 }).toContain("うまれる");
 });
 
 test("back-to-back kanji share one panel with split colors", async ({

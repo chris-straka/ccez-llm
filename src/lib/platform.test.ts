@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
 	isAndroidUserAgent,
+	androidMajorFromUA,
+	osConfirmsClipboard,
 	isIOSUserAgent,
 	canWindowDrag,
 	isCoarsePointer,
@@ -478,5 +480,32 @@ describe("micButtonsShown", () => {
 	});
 	it("excludes iOS even when it reports Macintosh", () => {
 		expect(micButtonsShown(false, true, true, false, true)).toBe(false);
+	});
+});
+
+describe("clipboard confirmation ownership", () => {
+	const S24 =
+		"Mozilla/5.0 (Linux; Android 14; SM-S921B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36";
+
+	it("reads the Android major from a full user agent", () => {
+		expect(androidMajorFromUA(S24)).toBe(14);
+		expect(androidMajorFromUA("Mozilla/5.0 (Linux; Android 10)")).toBe(10);
+	});
+
+	it("yields null off Android", () => {
+		expect(
+			androidMajorFromUA(
+				"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)"
+			)
+		).toBeNull();
+		expect(androidMajorFromUA("")).toBeNull();
+		expect(androidMajorFromUA("Android")).toBeNull();
+	});
+
+	it("lets Android 13+ own the confirmation", () => {
+		expect(osConfirmsClipboard(14)).toBe(true);
+		expect(osConfirmsClipboard(13)).toBe(true);
+		expect(osConfirmsClipboard(12)).toBe(false);
+		expect(osConfirmsClipboard(null)).toBe(false);
 	});
 });

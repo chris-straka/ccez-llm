@@ -889,25 +889,6 @@ export function resolveSendCompletion(
 	};
 }
 
-/**
- * Sidebar label count for one chat: the in-flight assistant placeholder
- * carries no text yet (nothing visible to count), so it joins the total
- * only once tokens — or an error — land. Keeps the "N msg" label equal
- * to the messages actually shown.
- */
-export function visibleMessageCount(state: ChatState, chat: Chat): number {
-	const msgs = chat.messages;
-	const last = msgs[msgs.length - 1];
-	if (
-		state.sendingChatIds.includes(chat.id) &&
-		last?.role === "assistant" &&
-		last.content === "" &&
-		!last.error
-	)
-		return msgs.length - 1;
-	return msgs.length;
-}
-
 /** Persisted shape owner (chats array only — runtime flags never touch disk). */
 export function persistChats(state: ChatState, store?: KeyValueStore): void {
 	try {

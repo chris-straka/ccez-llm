@@ -13,7 +13,6 @@
 		selectChat,
 		setChatReplyLang,
 		swapReplyLang,
-		visibleMessageCount,
 		chatVoiceReadback,
 		setChatVoice,
 		deleteChat,
@@ -250,6 +249,7 @@
 		nativeTurnAvailable,
 		nativeTurnConfig,
 		pollNativeTurn,
+		resumableKilledTurn,
 		scanNativeTurns,
 		seenNativeTurn,
 		startNativeTurn,
@@ -283,6 +283,8 @@
 		nextTapCount,
 		multiTapOwnsRelease,
 		visibleProviderIds,
+		androidMajorFromUA,
+		osConfirmsClipboard,
 		type TapSequence,
 		type FlickZone,
 		type EdgePanel,
@@ -360,8 +362,9 @@
 		readingsOnly,
 		annotatedRunsWithOffsets,
 		sliceRunsForQuote,
-		quoteTailCompletion,
+		speechKanaForQuote,
 		quoteStartForContext,
+		wordBoundsAt,
 		groupRuns,
 		type GroupedRun,
 		type LocalAid,
@@ -598,6 +601,11 @@
 	this alongside the TypeScript provider's flag, so both engines drive
 	one indicator. */
 	const nativeFetching = new SvelteSet<ChatId>();
+	/** Chats with a native turn in flight: the Thinking chip and the
+	submit gate read this — native turns never raise the TypeScript
+	sending flag, so without it a backgrounded-then-revisited reply
+	would show neither dots nor a dead send button. */
+	const liveNative = new SvelteSet<ChatId>();
 	/**
 	 * Android reports errors as toasts, never inline chrome: a phone
 	 * column has no room for a persistent banner, and a font-scaled
@@ -1139,6 +1147,10 @@
 		});
 	}
 	$effect(() => {
+		// Boot shell stand-down: the static loading token in app.html
+		// paints with the first frame on cold start; the live app
+		// replaces it now (long before, on warm starts).
+		document.getElementById("boot-shell")?.remove();
 		ensureSwapObserver();
 		const stampPress = (): void => {
 			lastPressAt = Date.now();
@@ -1148,7 +1160,18 @@
 		// Native turns reconcile here too — files finished while
 		// suspended render now, dead ones mark interrupted.
 		const onVisible = (): void => {
-			if (document.visibilityState !== "visible") return;
+			if (document.visibilityState !== "visible") {
+				// Leaving with a live native turn: one quiet tick that
+				// the reply keeps working — the shade notice itself is
+				// silent by design. Honors the haptics toggle.
+				if (nativeTurns.size > 0) {
+					void hapticBeatAsync("tap", {
+						enabled: settings.hapticsEnabled,
+						shell: tauriBackendAvailable()
+					});
+				}
+				return;
+			}
 			clearStudyBadge();
 			void dismissReplyNotificationAsync({
 				shell: tauriBackendAvailable()
@@ -1182,6 +1205,11 @@
 		window.addEventListener("touchmove", trackAnnTouchMove, {
 			passive: true
 		});
+		// Fresh boot after a kill never fires visibilitychange (it
+		// starts visible), so reconcile on mount too — a turn that
+		// died with the process restarts here (dots again, reply
+		// completes) instead of stranding its placeholder.
+		void reconcileNativeTurns();
 		return () => {
 			window.removeEventListener("pointerdown", stampPress);
 			window.removeEventListener("keydown", stampPress);
@@ -1275,7 +1303,7 @@
 		menuBtnTouch(event, annotate);
 	}
 	function speakTouch(event: TouchEvent): void {
-		menuBtnTouch(event, speakSelection);
+		menuBtnTouch(event, () => void speakSelection());
 	}
 	function copyTouch(event: TouchEvent): void {
 		menuBtnTouch(event, () => void copySelection());
@@ -1285,10 +1313,28 @@
 	Japanese. Speech always runs; the popup is a silent extra. On
 	phones the menu rises above the popup (see
 	liftSelMenuAbovePinyin) so Annotate stays one tap away. */
-	function speakSelection(): void {
+	async function speakSelection(): Promise<void> {
 		if (!selMenu) return;
 		const menu = selMenu;
 		buzzTap();
+		// Japanese kanji speak their sentence reading, never the raw
+		// fragment (right-click parity): になる美 alone converts to
+		// になるうつくしい — the bare quote would read 美 as ビ with
+		// no sentence to correct it. showSelectionFurigana also shows
+		// the popup, so this path skips popupSelectionReadings.
+		const probe = sentenceForQuote(menu.context, menu.quote) ?? menu.context;
+		if (
+			[...menu.quote].some((ch) => isHanChar(ch)) &&
+			hanOverlayLangFor(probe) === "ja"
+		) {
+			const kana = await showSelectionFurigana({
+				quote: menu.quote,
+				messageId: menu.messageId
+			});
+			void speakQuote(kana ?? menu.quote, menu.messageId, true, menu.context);
+			if (androidUI) liftSelMenuAbovePinyin();
+			return;
+		}
 		void popupSelectionReadings(
 			menu.quote,
 			menu.messageId,
@@ -1784,14 +1830,12 @@
 				x: xs[i] ?? panel.x
 			}));
 		});
-		// Speech completes a mid-token tail the slice keeps exact:
-		// 美しい cut at 美 would otherwise speak the うつく stem
-		// (raw, the ビ on-reading). Popup ruby and tints stay on the
-		// highlight itself.
-		return (
-			sliced.map((run) => run.reading ?? run.text).join("") +
-			quoteTailCompletion(sentRuns, plain, quoted.quote, qStart)
-		);
+		// Speech says exactly the highlight: slice readings joined,
+		// shedding an all-kana tail when the highlight ends inside a
+		// run (心地 from 心地よい speaks ここち), never crossing a
+		// run boundary (味覚が speaks みかく, no particle). Popup
+		// ruby and tints stay on the highlight itself.
+		return speechKanaForQuote(sentRuns, plain, quoted.quote, qStart);
 	}
 	/**
 	 * Readings for a highlight in the popup by the selection (see
@@ -1827,7 +1871,7 @@
 		}
 		try {
 			await navigator.clipboard.writeText(quote);
-			flashToast("Copied");
+			flashCopyToast("Copied");
 		} catch {
 			flashToast("Couldn't copy to the clipboard.");
 		}
@@ -1932,17 +1976,16 @@
 	let stopDictation: (() => void) | null = null;
 	let openLangMenu: LanguageMenu["id"] | null = $state(null);
 	/* Phone sheet anchor: the open list escapes the thread scroller
-	(fixed, vertically centered between screen top and composer)
-	because inside .messages anything past its box clips —
-	Europe's 20-item list read as five languages cut by a
-	rectangle. Null on desktop, which keeps the in-flow upward
-	list. Equal top/bottom margins center the shrink-wrapped sheet
-	(see .lang-list-fixed). */
+	(fixed, centered on the screen) because inside .messages
+	anything past its box clips — Europe's 20-item list read as
+	five languages cut by a rectangle. Null on desktop, which
+	keeps the in-flow upward list. top:50% plus translateY centers
+	the shrink-wrapped sheet (see .lang-list-fixed). */
 	let langMenuAnchor: {
-		top: number;
-		bottom: number;
 		left: number;
 		maxH: number;
+		mode: "drop" | "center";
+		top: number;
 	} | null = $state(null);
 	function toggleLangMenu(id: LanguageMenu["id"], btn: HTMLElement): void {
 		// Family open/close ticks on phones (buzzTap self-gates to
@@ -1960,20 +2003,30 @@
 		const r = btn.getBoundingClientRect();
 		const composerTop =
 			promptEl?.getBoundingClientRect().top ?? window.innerHeight;
-		// Centered sheet: Europe/Asia never fit between their pill
-		// and the composer, so the panel centers in the screen-top
-		// to composer band instead of starting at the top —
-		// overlapping its own pills (tap-away still closes). Equal
-		// top/bottom offsets plus auto vertical margins do the
-		// centering (see .lang-list-fixed). Left edge stays
-		// pill-anchored, shifted to stay on-screen.
+		// Smart anchor: a short list drops under its own pill like a
+		// plain menu (Africa/Classics hug their buttons); a long one
+		// centers on the screen instead (see .lang-list-fixed).
+		// Europe/Asia never fit between pill and composer, and a
+		// top/bottom pair is forbidden — an over-constrained fixed
+		// box stretches full-band (margins compute to zero), which
+		// read as a massive empty panel. Height is estimated from
+		// the item count (~35px a row, measured); the drop caps at
+		// the composer and the centered sheet scrolls past maxH.
+		// Left edge stays pill-anchored, shifted to stay on-screen.
+		const menu = LANGUAGE_MENUS.find((m) => m.id === id);
+		const estH = (menu?.languages.length ?? 8) * 35 + 12;
+		const dropTop = Math.round(r.bottom + 6);
+		const drop = dropTop + estH + 8 <= composerTop;
 		langMenuAnchor = {
-			top: 8,
-			bottom: Math.round(window.innerHeight - composerTop + 8),
 			left: Math.round(
 				Math.max(8, Math.min(r.left, window.innerWidth - 8 - 180))
 			),
-			maxH: Math.max(140, Math.round(composerTop - 8 - 8))
+			maxH: Math.max(
+				140,
+				Math.round((drop ? composerTop - dropTop : composerTop) - 8 - 8)
+			),
+			mode: drop ? "drop" : "center",
+			top: dropTop
 		};
 	}
 	$effect(() => {
@@ -2167,10 +2220,12 @@
 	// and stage — but only after doSend/stage already emptied the
 	// composer. Gating here keeps the button dead AND the draft intact,
 	// so Enter during Thinking is a no-op instead of a lost message.
+	// Native turns count too (liveNative — they never raise isSending).
 	// Per-chat lock: a reply streaming in another chat never deadens
 	// this composer's send — only this chat's own stream gates it.
 	const canSubmit = $derived(
 		!isSending(chatState) &&
+			!liveNative.has(chatState.activeChatId) &&
 			(hasText || attachments.length > 0 || annotations.length > 0)
 	);
 	/** No-key lock lives below, next to `useMock` (it reads it). */
@@ -2185,6 +2240,16 @@
 		if (!settings.sidebarCollapsed && androidUI && settingsOpen)
 			settingsOpen = false;
 	}
+	// Phones: an opening chats list dismisses the keyboard — peeking
+	// at threads must not keep composer focus, and closing the list
+	// must not hand it back (nothing refocuses on close, and picks
+	// deliberately stay unfocused too). Desktop keeps its keyed
+	// flows (Enter lands in the prompt; hands are on keys there).
+	$effect(() => {
+		if (!androidUI || settings.sidebarCollapsed) return;
+		if (document.activeElement instanceof HTMLElement)
+			document.activeElement.blur();
+	});
 
 	/**
 	 * Sidebar chat list filtered by the sidebar search box. Matches the
@@ -4237,6 +4302,16 @@
 			shell: tauriBackendAvailable()
 		});
 	}
+	/** Copy confirmation without doubling the OS: Android 13+ shows
+	its own system "Copied" overlay on every write, so our toast
+	stands down there; older Android, iOS, and desktop keep ours
+	(the clipboard gives no visible confirmation of its own). */
+	function flashCopyToast(note: string): void {
+		if (osConfirmsClipboard(androidMajorFromUA(navigator.userAgent)))
+			return;
+		flashToast(note);
+	}
+
 	function copyPlain(text: string, note: string): void {
 		// Every copy button ticks: the clipboard gives no visible
 		// confirmation of its own.
@@ -4247,7 +4322,7 @@
 			return;
 		}
 		void navigator.clipboard.writeText(text).then(
-			() => flashToast(note),
+			() => flashCopyToast(note),
 			() => flashErrorToast(failed)
 		);
 	}
@@ -4285,7 +4360,7 @@
 		void done.then(
 			() => {
 				deleteMessage(chatState, index);
-				flashToast("Cut to clipboard");
+				flashCopyToast("Cut to clipboard");
 			},
 			() => flashToast("Couldn't copy to the clipboard.")
 		);
@@ -4446,6 +4521,41 @@
 		if (end <= start) return false;
 		const anchor = nodeAtBlockOffset(found.block, start);
 		const focus = nodeAtBlockOffset(found.block, end);
+		if (!anchor || !focus) return false;
+		try {
+			selection.setBaseAndExtent(
+				anchor.node,
+				anchor.offset,
+				focus.node,
+				focus.offset
+			);
+		} catch {
+			return false;
+		}
+		return !selection.isCollapsed;
+	}
+
+	/** Double-tap: select the word around the tap point. The native
+	double-tap gesture never fires for touch here (`touch-action:
+	manipulation` on html/body eats it — verified on-device: the pair
+	produces one empty selectionchange), so the run takes the word
+	itself (Segmenter bounds, CJK-aware) instead of leaving the pair
+	to the OS. Mouse double-click is unaffected. False keeps native
+	behavior. */
+	function selectWordAtPoint(clientX: number, clientY: number): boolean {
+		const found = textBlockAtPoint(clientX, clientY);
+		const selection = window.getSelection();
+		if (!found || !selection) return false;
+		const text = found.block.textContent ?? "";
+		const caret = caretOffsetInBlock(
+			found.block,
+			found.range.startContainer,
+			found.range.startOffset
+		);
+		const span = wordBoundsAt(text, caret);
+		if (!span) return false;
+		const anchor = nodeAtBlockOffset(found.block, span[0]);
+		const focus = nodeAtBlockOffset(found.block, span[1]);
 		if (!anchor || !focus) return false;
 		try {
 			selection.setBaseAndExtent(
@@ -6626,9 +6736,11 @@
 	let wasSending = false;
 	$effect(() => {
 		// Native turns never raise the TS sending flag, so a detached
-		// fetch counts the wait up on its own event set instead.
+		// turn counts the wait up on its own liveness instead.
 		const sending =
-			isSending(chatState, viewChat.id) || nativeFetching.has(viewChat.id);
+			isSending(chatState, viewChat.id) ||
+			nativeFetching.has(viewChat.id) ||
+			liveNative.has(viewChat.id);
 		if (sending && !wasSending) {
 			wasSending = true;
 			sendElapsed = 0;
@@ -6719,6 +6831,7 @@
 		const turnId = crypto.randomUUID() as TurnId;
 		nativeTurns.set(turnId, { chatId, replyId });
 		nativeText.set(turnId, "");
+		liveNative.add(chatId);
 		try {
 			await startNativeTurn({
 				turn_id: turnId,
@@ -6738,6 +6851,8 @@
 			nativeTurns.delete(turnId);
 			nativeText.delete(turnId);
 			nativeFetching.delete(chatId);
+			if (![...nativeTurns.values()].some((t) => t.chatId === chatId))
+				liveNative.delete(chatId);
 			applyTurnFile(chatState, {
 				turn_id: turnId,
 				chat_id: chatId,
@@ -6851,6 +6966,8 @@
 		nativeTurns.delete(turn_id);
 		nativeText.delete(turn_id);
 		nativeFetching.delete(owned.chatId);
+		if (![...nativeTurns.values()].some((t) => t.chatId === owned.chatId))
+			liveNative.delete(owned.chatId);
 		let file: NativeTurnFile;
 		try {
 			file = await pollNativeTurn(turn_id);
@@ -6869,12 +6986,17 @@
 		settleNativeSend(chatState, owned.chatId);
 		// A visible page marks the turn seen, which stands down the
 		// runner's background ping; backgrounded pages never call it.
+		// Either way a ping for a reply rendering in front of the user
+		// is always wrong (grace-expiry races), so it dies here too.
 		if (document.visibilityState === "visible") {
 			try {
 				await seenNativeTurn(turn_id);
 			} catch {
 				// A stray ping beats a lost reply.
 			}
+			void dismissReplyNotificationAsync({
+				shell: tauriBackendAvailable()
+			});
 		}
 		try {
 			await dismissNativeTurn(turn_id);
@@ -6884,11 +7006,49 @@
 		if (outcome === "applied") afterSend(owned.chatId);
 	}
 
+	/** Restart a turn whose process died mid-flight: the request the
+	provider API never held gets re-sent onto its own placeholder, so
+	the user returns to thinking dots and a completed reply — never
+	Retry. Strict shape (clean assistant placeholder still last,
+	chat idle, key resolves), otherwise false and the caller falls
+	back to interrupted. A resumed-then-killed turn resumes again on
+	the next return; each restart owns a fresh turn id, so nothing
+	loops inside one session. */
+	async function resumeKilledTurn(file: NativeTurnFile): Promise<boolean> {
+		if (!resumableKilledTurn(chatState, file)) return false;
+		const target = chatState.chats.find((c) => c.id === file.chat_id);
+		const last = target?.messages[target.messages.length - 1];
+		const prev = target?.messages[(target?.messages.length ?? 0) - 2];
+		if (!target || !last || !prev || prev.role !== "user") return false;
+		// Same route as a manual Retry (last user message's own
+		// attachments decide images); a missing key keeps the draft
+		// instead of erroring.
+		const config = nativeRoute(prev.attachments ?? []);
+		if (!config) return false;
+		const history = turnHistory(
+			target.messages.filter((m) => m.id !== last.id)
+		);
+		chatState.sendingChatIds = [...chatState.sendingChatIds, target.id];
+		chatState.sending = true;
+		chatState.sendingChatId = target.id;
+		scrollAfterRender();
+		await startNativeTurnFor(
+			target.id,
+			last.id,
+			config,
+			effectiveSystemPrompt(settings, activeReplyCode),
+			history
+		);
+		return true;
+	}
+
 	/** Foreground-return and boot reconciliation: every turn file the
-	live listeners don't own gets rendered (finished), marked
-	interrupted (streaming with no live owner — a dead process), or
-	dismissed (placeholder gone). Tail effects run only for chats that
-	were actually waiting, so a boot scan never thumps for old news. */
+	live listeners don't own gets rendered (finished), resumed
+	(streaming with no live owner — a dead process — restarts, so the
+	user returns to dots, never Retry), or dismissed (placeholder
+	gone). Resume can fail (no key, chat busy): only then does the
+	interrupted copy apply. Tail effects run only for chats that were
+	actually waiting, so a boot scan never thumps for old news. */
 	async function reconcileNativeTurns(): Promise<void> {
 		if (!tauriBackendAvailable()) return;
 		let files: NativeTurnFile[];
@@ -6906,9 +7066,19 @@
 			nativeTurns.delete(file.turn_id);
 			nativeText.delete(file.turn_id);
 			nativeFetching.delete(file.chat_id);
+			if (![...nativeTurns.values()].some((t) => t.chatId === file.chat_id))
+				liveNative.delete(file.chat_id);
 			const wasLive = isSending(chatState, file.chat_id);
 			if (file.status === "streaming") {
-				if (markTurnInterrupted(chatState, file)) {
+				// A dead process never strands the user on Retry: the
+				// turn restarts onto its own placeholder (dots again),
+				// and a late completion heals everything. Only a
+				// resume the page cannot rebuild falls back to
+				// interrupted.
+				if (await resumeKilledTurn(file)) {
+					// Ownership moved to the new turn; the stale file
+					// still dismisses below.
+				} else if (markTurnInterrupted(chatState, file)) {
 					settleNativeSend(chatState, file.chat_id);
 					if (wasLive) afterSend(file.chat_id);
 				}
@@ -8510,7 +8680,7 @@
 							);
 							return;
 						}
-						if (route === "speak") speakSelection();
+						if (route === "speak") void speakSelection();
 						else if (route === "inspect") openInspect();
 						else annotate();
 					}
@@ -8731,9 +8901,10 @@
 		tap pairs into the sidebar open instead. */
 		let emptyTapTimer: ReturnType<typeof setTimeout> | null = null;
 		/** Consecutive-tap run on message text (phones): double-tap
-		stays native (word), triple-tap selects the sentence and
-		quadruple-tap the paragraph (see the touchend overrides
-		below). Own pairing — empty-space taps keep theirs above. */
+		selects the word, triple-tap the sentence and quadruple-tap
+		the paragraph (see the touchend overrides below — native
+		double-tap never fires under `touch-action: manipulation`).
+		Own pairing — empty-space taps keep theirs above. */
 		let msgTapSeq: TapSequence | null = null;
 		function flickZoneOf(target: EventTarget | null): FlickZone {
 			const el = target instanceof Element ? target : null;
@@ -8945,8 +9116,8 @@
 				// Double-tap on empty space opens the quick switcher
 				// (Android): the list keeps its swipe and button openers,
 				// and prompt flicks never count. Taps are short, still, unscrolled
-				// strokes over dead space: text keeps native double-tap
-				// word select, controls keep their taps.
+				// strokes over dead space: text takes its own double-tap
+				// word pick below, controls keep their taps.
 				if (androidUI && !iosUI) {
 					const now = Date.now();
 					const tapped =
@@ -8985,12 +9156,19 @@
 					// the pair; chats with messages keep tap-to-peace. A
 					// tap that dismisses the keyboard never re-arms: the
 					// prompt had focus when the stroke began, so this tap
-					// is the way out, not the way in.
+					// is the way out, not the way in. Dismissal taps
+					// never summon either: a tap that lands while a
+					// language sheet is open closes it (touchend runs
+					// before the mouseup closer), and a tap beside an
+					// open sidebar belongs to the drawer, not the
+					// composer — both stay keyboard-down.
 					if (
 						tapped &&
 						!paired &&
 						viewChat.messages.length === 0 &&
-						!start.promptHadFocus
+						!start.promptHadFocus &&
+						openLangMenu === null &&
+						settings.sidebarCollapsed
 					) {
 						if (emptyTapTimer) clearTimeout(emptyTapTimer);
 						emptyTapTimer = setTimeout(() => {
@@ -9022,11 +9200,14 @@
 							ended.clientX,
 							ended.clientY
 						);
-						// Native double-tap owns word select (the
-						// multi-tap guards below keep its pick): the
-						// pin only holds the revealed row open.
-						if (msgTapSeq.count === 2)
+						// Double-tap takes the word itself (native never
+						// fires under `touch-action: manipulation`): the
+						// pin holds the revealed row open while the pick
+						// lands.
+						if (msgTapSeq.count === 2) {
 							msgDoubleTapPin = { id: start.msgId, at: now };
+							selectWordAtPoint(ended.clientX, ended.clientY);
+						}
 						// Triple-tap takes the sentence, quadruple-tap the
 						// paragraph (this counter only ever sees
 						// single-finger taps). A false return keeps the
@@ -11267,7 +11448,18 @@
 			// selection UI — real mouse-ups always target an Element.
 			const target = event.target instanceof Element ? event.target : null;
 			if (openLangMenu) {
-				if (!target?.closest(".lang-menu")) openLangMenu = null;
+				if (!target?.closest(".lang-menu")) {
+					openLangMenu = null;
+					// A tap-away never summons: the touchend dead-space
+					// branch stands down while a sheet is open, but a
+					// timer armed just before the sheet opened (or any
+					// ordering edge) dies here instead of popping the
+					// keyboard behind the closing menu.
+					if (emptyTapTimer) {
+						clearTimeout(emptyTapTimer);
+						emptyTapTimer = null;
+					}
+				}
 			}
 			if (
 				target?.closest(
@@ -12011,10 +12203,7 @@
 							persistSettings();
 						}}
 					>
-						{chatLabel(item.createdAt)}{#if androidUI}{@const n =
-								visibleMessageCount(chatState, item)}{#if n > 0}
-								<span class="side-count">· {n} {n === 1 ? "msg" : "msgs"}</span
-								>{/if}{/if}
+						{chatLabel(item.createdAt)}
 					</button>
 					<!-- No export path works in the shell phone (no picker,
 					no native dialog bridge, clipboard denied): the button
@@ -12112,9 +12301,14 @@
 							<div
 								class="lang-list"
 								class:lang-list-fixed={androidUI && langMenuAnchor !== null}
+								class:lang-list-drop={
+									androidUI &&
+									langMenuAnchor !== null &&
+									langMenuAnchor.mode === "drop"
+								}
 								role="menu"
 								style={androidUI && langMenuAnchor
-									? `top: ${langMenuAnchor.top}px; bottom: ${langMenuAnchor.bottom}px; left: ${langMenuAnchor.left}px; max-height: ${langMenuAnchor.maxH}px;`
+									? `left: ${langMenuAnchor.left}px; max-height: ${langMenuAnchor.maxH}px;${langMenuAnchor.mode === "drop" ? ` top: ${langMenuAnchor.top}px;` : ""}`
 									: undefined}
 							>
 								<!-- Menu-click clears only languages without a number key
@@ -13054,7 +13248,7 @@
 							>{/if}</span
 					>
 				</p>
-			{:else if isSending(chatState, viewChat.id) && !hasReplyStarted(chatState, viewChat.id)}
+			{:else if (isSending(chatState, viewChat.id) || liveNative.has(viewChat.id)) && !hasReplyStarted(chatState, viewChat.id)}
 				<p class="sending" role="status" aria-label="Waiting for a reply">
 					<span class="sending-chip"
 						>{thinkingLabelFor(activeReplyCode ?? settings.replyLang)}<span
@@ -15654,14 +15848,6 @@
 		font-size: 1.15rem;
 		margin-top: 0.6rem;
 	}
-	/* The per-chat breakdown rides dim beside the label, so the
-	date column keeps its alignment (the hover tooltip's text, inline
-	where touch has no hover). Phone-only markup; desktop rows never
-	render it. */
-	.side-count {
-		color: #6e6e73;
-		color: var(--dim);
-	}
 	.app[data-android] aside:not(.settings-panel).collapsed {
 		transform: translateX(-105%);
 	}
@@ -15685,25 +15871,45 @@
 		bottom: auto;
 	}
 	/* The open sheet escapes the thread scroller as a fitted fixed
-	panel (top/bottom/left/max-height ride inline from the pill
-	rect): the scroller clips anything past its box, which read as
-	five languages cut by a rectangle. Equal inline top/bottom plus
-	auto vertical margins center the shrink-wrapped sheet between
-	screen top and composer instead of starting at the top; the
-	phone centering translate stands down. */
-	.app[data-android] .lang-list-fixed {
+	panel (left/max-height ride inline from the pill rect): the
+	scroller clips anything past its box, which read as five
+	languages cut by a rectangle. Short lists drop under their
+	pill (.lang-list-drop, top rides inline); long ones center on
+	the screen (top:50% plus translateY). The list never sets a
+	top/bottom pair (an over-constrained fixed box stretches
+	full-band and reads as a massive empty panel). Long lists cap
+	at max-height and scroll. */
+	.app[data-android] .lang-menu .lang-list-fixed {
 		position: fixed;
+		top: 50%;
+		bottom: auto;
+		left: auto;
 		right: auto;
-		margin-top: auto;
-		margin-bottom: auto;
-		transform: none;
+		transform: translateY(-50%);
 		z-index: 60;
 		overflow-y: auto;
+	}
+	.app[data-android] .lang-menu .lang-list-fixed.lang-list-drop {
+		top: auto;
+		transform: none;
 	}
 	.app[data-android] .lang-menu > button {
 		font-size: 0.75rem;
 		padding: 0.3rem 0.55rem;
 		white-space: nowrap;
+	}
+	/* Narrow phones (S24 is 360 CSS px): four pills plus gaps overrun
+	by ~16px, clipping Classics half off-screen — and a clipped pill
+	anchors its sheet from a rect the user can't see. Tighten gaps
+	and padding instead of scrolling or renaming; wider phones keep
+	the roomier row above. */
+	@media (max-width: 380px) {
+		.app[data-android] .lang-menus {
+			gap: 0.2rem;
+		}
+		.app[data-android] .lang-menu > button {
+			padding: 0.3rem 0.35rem;
+		}
 	}
 	/* The gestures list goes single-column on phones: two columns
 	overflow a 360px viewport by ~60px, clipping the very text that

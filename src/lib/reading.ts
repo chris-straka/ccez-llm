@@ -206,6 +206,73 @@ export function wordAtNodeOffset(text: string, offset: number): string {
 	return offset > 0 ? extractWordAt(text, offset - 1) : "";
 }
 
+/** Minimal word-segment view (Intl.Segmenter when present). */
+interface WordSegment {
+	index: number;
+	segment: string;
+	isWordLike: boolean;
+}
+interface WordSegmenter {
+	segment(text: string): Iterable<WordSegment>;
+}
+
+function loadWordSegmenter(): WordSegmenter | null {
+	try {
+		const Ctor = (
+			Intl as unknown as {
+				Segmenter?: new (
+					locales?: string | string[],
+					options?: { granularity?: string }
+				) => WordSegmenter;
+			}
+		).Segmenter;
+		if (!Ctor) return null;
+		return new Ctor(undefined, { granularity: "word" });
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Word span holding `offset` (a UTF-16 index into `text`) for
+ * double-tap select: Intl.Segmenter word bounds — the same ICU word
+ * segmentation browsers use, so CJK taps take a word-like segment
+ * instead of nothing. Needed because `touch-action: manipulation`
+ * (on html/body, against zoom jumps) eats the native double-tap
+ * gesture for touch; mouse double-click is unaffected. A caret on
+ * whitespace or punctuation yields null — nothing to select. Without
+ * a segmenter, the span expands over word chars instead. Pure.
+ */
+export function wordBoundsAt(
+	text: string,
+	offset: number
+): [number, number] | null {
+	const at = Math.max(0, Math.min(offset, text.length));
+	if (text.length === 0) return null;
+	try {
+		const segmenter = loadWordSegmenter();
+		if (segmenter) {
+			const idx = at >= text.length && at > 0 ? at - 1 : at;
+			for (const part of segmenter.segment(text)) {
+				const start = part.index;
+				const end = start + part.segment.length;
+				if (idx >= start && idx < end)
+					return part.isWordLike ? [start, end] : null;
+			}
+			return null;
+		}
+	} catch {
+		// Fall through to the word-char expansion below.
+	}
+	const idx = at >= text.length && at > 0 ? at - 1 : at;
+	if (!isWordChar(text[idx])) return null;
+	let start = idx;
+	while (start > 0 && isWordChar(text[start - 1])) start--;
+	let end = idx;
+	while (end < text.length && isWordChar(text[end])) end++;
+	return [start, end];
+}
+
 const SENTENCE_END = /[.!?。！？．]/;
 
 /**
@@ -815,42 +882,62 @@ export function sliceRunsForQuote(
 }
 
 /**
- * Kana continuation past a highlight's end, for speech assembly only.
- * The slice above keeps exactly the highlight (popup ruby + tints),
- * but a highlight ending mid-token would speak a stem: 美 sliced from
- * 美しい carries reading うつく, and the raw fallback reads ビ. Runs
- * after the quote with no reading are okurigana (or a particle riding
- * along), so their text completes the spoken tail (うつくしい). Stops
- * at the next reading-bearing run (a new kanji token), non-kana text,
- * the sentence end, or an unfound quote. Pure.
+ * Spoken kana for a highlight, for speech assembly only. Speaks
+ * exactly the selection: slice readings joined, with one trim — a
+ * highlight ending strictly inside a run whose remainder is all
+ * kana sheds that okurigana tail from the reading (心地 cut from
+ * 心地よい speaks ここち, not ここちよい). Nothing crosses a run
+ * boundary, so trailing particles never ride along (味覚が speaks
+ * みかく). A highlight ending mid-run on non-kana keeps the full
+ * token reading (best effort: mora alignment is unknowable). Popup
+ * ruby and tints keep the untrimmed slice. Pure.
  */
-export function quoteTailCompletion(
+export function speechKanaForQuote(
 	sentenceRuns: AnnotatedRunWithOffsets[] | null,
 	sentencePlain: string,
 	quote: string,
 	quoteStart: number | null = null
-): string {
-	if (!sentenceRuns || quote === "") return "";
+): string | null {
+	if (!sentenceRuns || quote === "") return null;
 	const qStart =
 		quoteStart !== null &&
 		quoteStart >= 0 &&
 		sentencePlain.startsWith(quote, quoteStart)
 			? quoteStart
 			: sentencePlain.indexOf(quote);
-	if (qStart < 0) return "";
+	if (qStart < 0) return null;
 	const qEnd = qStart + quote.length;
-	let tail = "";
+	let kana = "";
 	for (const run of sentenceRuns) {
-		if (run.end <= qEnd) continue;
-		// A reading-bearing run past the quote (or straddling its
-		// end) is a new kanji token — or a clipped one, whose full
-		// reading the slice already carries: stop either way.
-		if (run.reading !== null) break;
-		if (!/^[\p{Script=Hiragana}\p{Script=Katakana}]+$/u.test(run.text))
+		if (run.end <= qStart) continue;
+		if (run.start >= qEnd) break;
+		const reading = run.reading ?? run.text;
+		if (run.end <= qEnd) {
+			kana += reading;
+			continue;
+		}
+		// The quote ends strictly inside this run: a reading-less
+		// run contributes only its covered text; a reading-bearing
+		// one sheds an all-kana remainder (okurigana) from the
+		// reading.
+		const cut = qEnd - run.start;
+		if (run.reading === null) {
+			kana += run.text.slice(0, cut);
 			break;
-		tail += run.start < qEnd ? run.text.slice(qEnd - run.start) : run.text;
+		}
+		const rest = run.text.slice(cut);
+		if (
+			rest !== "" &&
+			/^[\p{Script=Hiragana}\p{Script=Katakana}]+$/u.test(rest) &&
+			reading.length >= rest.length
+		) {
+			kana += reading.slice(0, reading.length - rest.length);
+		} else {
+			kana += reading;
+		}
+		break;
 	}
-	return tail;
+	return kana === "" ? null : kana;
 }
 
 export function annotatedRuns(html: string): AnnotatedRun[] | null {

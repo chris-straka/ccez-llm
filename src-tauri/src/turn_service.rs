@@ -2,10 +2,11 @@
 //!
 //! The turn runner already survives WebView suspension on process life
 //! alone; the service extends that life. While at least one native turn
-//! is live, the app runs a `dataSync` foreground service (persistent
-//! "working" notification, as Android requires), so a backgrounded app
-//! is far less likely to be killed before the reply lands. When the
-//! last turn settles, the claim releases and the service stops.
+//! is live, the app runs a `dataSync` foreground service with the
+//! quietest notice Android allows (MIN importance: no icon, no buzz,
+//! shade-only), so a backgrounded app is far less likely to be killed
+//! before the reply lands. When the last turn settles, the claim
+//! releases and the service stops.
 //! Best-effort throughout: every failure logs through the returned
 //! error (which callers ignore) and never fails a turn.
 //!
@@ -87,9 +88,6 @@ pub unsafe extern "C" fn Java_studio_ccez_app_TurnSvc_nativeInit(
 }
 
 /// First live turn starts the service; later ones only bump the count.
-/// Currently unclaimed (owner removed the foreground notice; see
-/// turn_service_claim) but kept as the documented mechanism.
-#[allow(dead_code)]
 pub fn service_claim() {
     let start = match live_count().lock() {
         Ok(mut count) => {

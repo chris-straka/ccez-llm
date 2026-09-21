@@ -200,22 +200,55 @@ class MainActivity : TauriActivity() {
 
   // In-app text selection: the OS floating toolbar (Copy /
   // Translate / Read Aloud / Maps, plus our own manifest aliases)
-  // never starts — the WebView shows its own Annotate / Copy menu
-  // and Speak dock instead. Refusing the mode (null) rather than
-  // clearing its menu: clearing loses to items the system appends
-  // after prepare returns (aliases, handle-drag respawns), while no
-  // mode means no toolbar on any path. Selection and handles live in
-  // the WebView itself and survive without the mode; external apps
+  // never shows — the WebView shows its own Annotate / Copy menu
+  // and Speak dock instead. The hook hands the framework OUR OWN
+  // empty mode rather than clearing or refusing: returning null
+  // does NOT suppress (the framework creates the default mode
+  // anyway — verified on-device with the pill visible beside
+  // refusal logs), and clearing loses to items appended after
+  // prepare returns (aliases, handle-drag respawns through paths
+  // that never re-enter onWindowStarting). With our mode the
+  // WebView's own populate callback never runs, so no items — and
+  // no aliases — ever reach a menu. Selection and handles live in
+  // the WebView itself and survive an empty menu; external apps
   // keep resolving our aliases through the package manager, which
   // this hook never touches. Owner demand: no OS text menu anywhere
   // in the app, for any reason.
+  private var emptySelectionMenu: android.view.Menu? = null
+
+  private fun emptyMenu(): android.view.Menu {
+    val cached = emptySelectionMenu
+    if (cached != null) return cached
+    val created = android.widget.PopupMenu(this, null).menu
+    emptySelectionMenu = created
+    return created
+  }
+
   override fun onWindowStartingActionMode(
     callback: android.view.ActionMode.Callback,
     type: Int
   ): android.view.ActionMode? {
     if (type == android.view.ActionMode.TYPE_FLOATING) {
-      android.util.Log.i("CcezMain", "refusing floating selection toolbar")
-      return null
+      android.util.Log.i("CcezMain", "swapping in empty selection mode")
+      return object : android.view.ActionMode() {
+        override fun setTitle(title: CharSequence?) {}
+        override fun setTitle(resId: Int) {}
+        override fun setSubtitle(subtitle: CharSequence?) {}
+        override fun setSubtitle(resId: Int) {}
+        override fun setCustomView(view: android.view.View?) {}
+        override fun invalidate() {}
+        // Swallowed: finishing would tear down the WebView
+        // selection with it, and the handles must survive. The mode
+        // shows nothing, so there is nothing to dismiss; the next
+        // selection simply swaps in a fresh one.
+        override fun finish() {}
+        override fun getMenu(): android.view.Menu = emptyMenu()
+        override fun getTitle(): CharSequence? = null
+        override fun getSubtitle(): CharSequence? = null
+        override fun getCustomView(): android.view.View? = null
+        override fun getMenuInflater(): android.view.MenuInflater = menuInflater
+        override fun getType(): Int = android.view.ActionMode.TYPE_FLOATING
+      }
     }
     return super.onWindowStartingActionMode(callback, type)
   }

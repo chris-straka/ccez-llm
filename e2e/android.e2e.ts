@@ -234,6 +234,23 @@ test.describe("gestures", () => {
 		await expect(aside).toHaveClass(/collapsed/);
 	});
 
+	test("opening the chat sidebar drops composer focus and keeps it down", async ({
+		page
+	}) => {
+		const aside = page.locator("aside:has(button.side-chat)");
+		const composer = page.locator(".prompt .ta-input");
+		// Start typing, then peek at the list: the keyboard stands
+		// down with the drawer, and folding it volunteers nothing back.
+		await composer.click();
+		await expect(composer).toBeFocused();
+		await swipeFromLeftEdge(page);
+		await expect(aside).not.toHaveClass(/collapsed/);
+		await expect(composer).not.toBeFocused();
+		await swipeMidScreen(page, 260, 150);
+		await expect(aside).toHaveClass(/collapsed/);
+		await expect(composer).not.toBeFocused();
+	});
+
 	/** Synthetic mid-screen swipe (same untrusted-event path as edges). */
 	async function swipeMidScreen(
 		page: Page,
@@ -2489,6 +2506,43 @@ test.describe("always-visible prompt", () => {
 		await flick(page, "article.assistant .rendered", 220, 500, 30, 505);
 		await expect(article).not.toHaveClass(/folded-msg/);
 		await expect(panel).not.toHaveClass(/closed/);
+	});
+
+	/** Double-tap selects the tapped word: `touch-action: manipulation`
+	(on html/body, against zoom jumps) eats the native double-tap word
+	pick, so the run takes the word itself (Segmenter bounds,
+	CJK-aware). */
+	test("double-tap selects the tapped word", async ({ page }) => {
+		await seed(page, {}, ["Language is a bridge that connects people."]);
+		await page.goto("/");
+		const rendered = page.locator("article.assistant .rendered").first();
+		await expect(rendered).toBeVisible();
+		const word = await rendered.evaluate((el) => {
+			const r = el.getBoundingClientRect();
+			const x = r.x + 10;
+			const y = r.y + 10;
+			const touch = () =>
+				new Touch({ identifier: 7, target: el, clientX: x, clientY: y });
+			for (let i = 0; i < 2; i++) {
+				el.dispatchEvent(
+					new TouchEvent("touchstart", {
+						touches: [touch()],
+						bubbles: true,
+						cancelable: true
+					})
+				);
+				el.dispatchEvent(
+					new TouchEvent("touchend", {
+						touches: [],
+						changedTouches: [touch()],
+						bubbles: true,
+						cancelable: true
+					})
+				);
+			}
+			return window.getSelection()?.toString() ?? "";
+		});
+		expect(word).toBe("Language");
 	});
 
 	/** Sideways pans inside code and latex blocks belong to the inner

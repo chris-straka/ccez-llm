@@ -30,7 +30,6 @@ import {
 	resolveSendCompletion,
 	apiContent,
 	buildApiMessages,
-	visibleMessageCount,
 	isSending,
 	hasReplyStarted,
 	hasFetchActive,
@@ -407,45 +406,6 @@ describe("chat", () => {
 			state.chats.find((c) => c.id === originId)?.messages.map((m) => m.content)
 		).toEqual(["hi", "hello"]);
 		expect(state.chats.find((c) => c.id === awayId)?.messages).toHaveLength(0);
-	});
-
-	it("labels the empty in-flight placeholder as not yet a message", async () => {
-		const { state, store } = stateWith(freshStore());
-		let onToken!: (token: string) => void;
-		let resolveStream!: (result: ChatResult) => void;
-		const gated: ChatProvider = {
-			id: "gated",
-			async chat(): Promise<ChatResult> {
-				throw new Error("unused");
-			},
-			stream(_m, callbacks): Promise<ChatResult> {
-				onToken = callbacks.onToken;
-				return new Promise<ChatResult>((resolve) => {
-					resolveStream = resolve;
-				});
-			}
-		};
-		const originId = state.activeChatId;
-		const sending = sendMessage(state, gated, "sys", "hi", {}, store);
-		await new Promise((r) => setTimeout(r, 20));
-		const origin = state.chats.find((c) => c.id === originId);
-		expect(origin?.messages).toHaveLength(2);
-		// Placeholder is empty: the label matches the one visible message.
-		expect(visibleMessageCount(state, origin!)).toBe(1);
-		// First token lands: the reply is visible, the label follows.
-		onToken("hel");
-		await new Promise((r) => setTimeout(r, 20));
-		expect(visibleMessageCount(state, origin!)).toBe(2);
-		resolveStream({
-			content: "hello",
-			usage: { prompt: 1, completion: 1, total: 2 }
-		});
-		await sending;
-		expect(visibleMessageCount(state, origin!)).toBe(2);
-		// A chat that owns no stream always counts straight.
-		newChat(state, store);
-		const away = state.chats.find((c) => c.id === state.activeChatId);
-		expect(visibleMessageCount(state, away!)).toBe(0);
 	});
 
 	it("locks send and stage while a reply streams", async () => {

@@ -7,6 +7,7 @@ import {
 	markTurnInterrupted,
 	nativeTurnAvailable,
 	nativeTurnConfig,
+	resumableKilledTurn,
 	type TurnId,
 	pollNativeTurn,
 	scanNativeTurns,
@@ -233,6 +234,57 @@ describe("markTurnInterrupted", () => {
 			finished_at: 1
 		};
 		expect(markTurnInterrupted(seeded.state, file, seeded.store)).toBe(false);
+	});
+});
+
+describe("resumableKilledTurn", () => {
+	const file = (): NativeTurnFile => ({
+		turn_id: "t1" as TurnId,
+		chat_id: "c1" as ChatId,
+		message_id: "r1" as ChatMsgId,
+		status: "streaming",
+		content: "",
+		finished_at: 1
+	});
+
+	function idle(messages: ChatMsg[]): ChatState {
+		const seeded = stateWithMessages(messages);
+		seeded.state.chats[0]!.id = "c1" as ChatId;
+		return seeded.state;
+	}
+
+	it("resumes a clean placeholder still last after a user message", () => {
+		const state = idle([msg("u1", "user", "hi"), msg("r1", "assistant", "")]);
+		expect(resumableKilledTurn(state, file())).toBe(true);
+	});
+
+	it("refuses errored placeholders (explicit Retry owns those)", () => {
+		const state = idle([
+			msg("u1", "user", "hi"),
+			msg("r1", "assistant", "", "boom")
+		]);
+		expect(resumableKilledTurn(state, file())).toBe(false);
+	});
+
+	it("refuses busy chats, moved placeholders, and missing chats", () => {
+		const busy = idle([msg("u1", "user", "hi"), msg("r1", "assistant", "")]);
+		busy.sendingChatIds = ["c1" as ChatId];
+		expect(resumableKilledTurn(busy, file())).toBe(false);
+		// Placeholder no longer last: the thread moved on.
+		const moved = idle([
+			msg("u1", "user", "hi"),
+			msg("r1", "assistant", "old"),
+			msg("u2", "user", "new")
+		]);
+		expect(resumableKilledTurn(moved, file())).toBe(false);
+		// Placeholder deleted outright.
+		const deleted = idle([msg("u1", "user", "hi")]);
+		expect(resumableKilledTurn(deleted, file())).toBe(false);
+		// Chat itself gone.
+		const gone = idle([msg("u1", "user", "hi"), msg("r1", "assistant", "")]);
+		expect(
+			resumableKilledTurn(gone, { ...file(), chat_id: "gone" as ChatId })
+		).toBe(false);
 	});
 });
 

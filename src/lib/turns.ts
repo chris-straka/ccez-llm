@@ -217,6 +217,33 @@ export function markTurnInterrupted(
 	return true;
 }
 
+/**
+ * Resume shape for a turn whose process died mid-flight: the file's
+ * chat exists and is idle, and the placeholder is still the last
+ * message — a clean assistant message with no error (an errored one
+ * belongs to an explicit Retry the user already owns). True means
+ * the page may re-send onto that placeholder; anything else falls
+ * back to the interrupted copy. Pure.
+ */
+export function resumableKilledTurn(
+	state: ChatState,
+	file: NativeTurnFile
+): boolean {
+	const chat = state.chats.find((c) => c.id === file.chat_id);
+	if (!chat) return false;
+	if (state.sendingChatIds.includes(chat.id)) return false;
+	const last = chat.messages[chat.messages.length - 1];
+	if (
+		!last ||
+		last.id !== file.message_id ||
+		last.role !== "assistant" ||
+		last.error
+	)
+		return false;
+	const prev = chat.messages[chat.messages.length - 2];
+	return !!prev && prev.role === "user";
+}
+
 export async function startNativeTurn(req: {
 	turn_id: TurnId;
 	chat_id: ChatId;
