@@ -37,6 +37,33 @@ describe("osMenuSelectionActive", () => {
 		} as unknown as Node & { contains(n: Node | null): boolean };
 		expect(osMenuSelectionActive([flaky], anchor, false)).toBe(false);
 	});
+
+	it("allows editable fields without any root", () => {
+		// Text-node anchor (the selection case): climbs to the parent.
+		const inField = {
+			parentElement: { closest: () => ({}) }
+		} as unknown as Node;
+		expect(osMenuSelectionActive([outside], inField, false)).toBe(true);
+		// Element anchor answers directly.
+		const fieldEl = { closest: () => ({}) } as unknown as Node;
+		expect(osMenuSelectionActive([], fieldEl, false)).toBe(true);
+	});
+
+	it("denies static text and throwing closest", () => {
+		const staticText = {
+			parentElement: { closest: () => null }
+		} as unknown as Node;
+		expect(osMenuSelectionActive([outside], staticText, false)).toBe(false);
+		expect(osMenuSelectionActive([outside], staticText, true)).toBe(false);
+		const flakyField = {
+			parentElement: {
+				closest: () => {
+					throw new Error("detached");
+				}
+			}
+		} as unknown as Node;
+		expect(osMenuSelectionActive([outside], flakyField, false)).toBe(false);
+	});
 });
 
 describe("reportOsMenu", () => {

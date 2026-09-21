@@ -3,27 +3,61 @@ import { invoke } from "@tauri-apps/api/core";
 import { tauriBackendAvailable } from "./secrets";
 
 /**
- * Prompt-only native OS text menu.
+ * Prompt-and-fields native OS text menu.
  *
  * The Activity swaps every floating selection menu for an empty dummy
- * except while a live selection sits inside the main prompt: then the
- * real OS menu (Copy / Cut / Paste / Select All) shows. The page owns
- * the "inside an allowed root" fact (CodeMirror renders the prompt,
- * so only the DOM can see the anchor) and reports transitions to
- * Rust, which the Activity reads synchronously at menu time. The
- * roots stay a list so the allowance can widen again without
- * reshaping the bridge.
+ * except while a live selection sits inside the main prompt or an
+ * editable field (key inputs and friends): then the real OS menu
+ * (Copy / Cut / Paste / Select All) shows. Static panel copy matches
+ * neither and keeps the dummy. The page owns the anchor fact
+ * (CodeMirror renders the prompt, so only the DOM can see it) and
+ * reports transitions to Rust, which the Activity reads synchronously
+ * at menu time.
  */
 
 export type ContainsNode = Pick<Node, "contains">;
 
-/** Pure read: is there a live range anchored inside any allowed root? */
+const EDITABLE_SELECTOR = "input, textarea, [contenteditable='true']";
+
+type MaybeElement = {
+	closest?: (selector: string) => unknown;
+	parentElement?: MaybeElement | null;
+};
+
+/**
+ * True when the anchor sits inside an editable field (text selections
+ * anchor text nodes, so climb one level). Static panel copy never
+ * matches — only fields get the native menu.
+ */
+function inEditableField(node: Node): boolean {
+	const probe = node as unknown as MaybeElement;
+	try {
+		if (typeof probe.closest === "function") {
+			return probe.closest(EDITABLE_SELECTOR) !== null;
+		}
+		const parent = probe.parentElement;
+		if (parent && typeof parent.closest === "function") {
+			return parent.closest(EDITABLE_SELECTOR) !== null;
+		}
+	} catch {
+		return false;
+	}
+	return false;
+}
+
+/**
+ * Pure read: is there a live range anchored inside any allowed root
+ * or editable field? Roots cover rendered editors (the prompt's
+ * CodeMirror); the field check covers native inputs like the key
+ * field. Static text matches neither.
+ */
 export function osMenuSelectionActive(
 	roots: Array<ContainsNode | null | undefined>,
 	anchor: Node | null,
 	collapsed: boolean
 ): boolean {
 	if (anchor == null || collapsed) return false;
+	if (inEditableField(anchor)) return true;
 	return roots.some((root) => {
 		if (root == null) return false;
 		try {
