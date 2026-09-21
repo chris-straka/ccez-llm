@@ -4,11 +4,12 @@ import { describe, it, expect } from "vitest";
 /**
  * Stylesheet invariants for the hover-only message action rows.
  *
- * These assert on +page.svelte's <style> source because the behavior they
- * guard — compositor-layer promotion during the opacity fade — is invisible
- * to jsdom (no layout, no layers). The row must fade with opacity only
- * (never transform/translate/animation, or the buttons visibly shift
- * mid-fade) and must carry will-change so the layer exists before the fade
+ * These assert on MessageActions.svelte's <style> source (moved with the
+ * row) because the behavior they guard — compositor-layer promotion
+ * during the opacity fade — is invisible to jsdom (no layout, no
+ * layers). The row must fade with opacity only (never
+ * transform/translate/animation, or the buttons visibly shift mid-fade)
+ * and must carry will-change so the layer exists before the fade
  * starts. will-change looks like removable dead weight; it is not.
  */
 function pageStyle(): string {
@@ -18,27 +19,41 @@ function pageStyle(): string {
 	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
+/** Action-row chrome moved to MessageActions.svelte with its styles. */
+function rowSource(): string {
+	return readFileSync(
+		new URL("../lib/components/MessageActions.svelte", import.meta.url),
+		"utf8"
+	);
+}
+
+function rowStyle(): string {
+	const match = rowSource().match(/<style>([\s\S]*)<\/style>/);
+	if (!match) throw new Error("MessageActions.svelte has no <style> block");
+	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
+}
+
 function pageSource(): string {
 	return readFileSync(new URL("./+page.svelte", import.meta.url), "utf8");
 }
 
 describe("hover-only message actions", () => {
 	it("reveals when the message is hovered, not just the button row", () => {
-		const css = pageStyle();
-		expect(css).toContain("article.user:hover .actions");
-		expect(css).toContain("article.assistant:hover .actions");
+		const css = rowStyle();
+		expect(css).toContain(":global(article.user:hover) .actions");
+		expect(css).toContain(":global(article.assistant:hover) .actions");
 	});
 
 	it("keeps the row up while its message is speaking", () => {
-		const css = pageStyle();
-		expect(css).toContain("article.user.speaking .actions");
-		expect(css).toContain("article.assistant.speaking .actions");
+		const css = rowStyle();
+		expect(css).toContain(":global(article.user.speaking) .actions");
+		expect(css).toContain(":global(article.assistant.speaking) .actions");
 	});
 
 	it("keeps the row up while an aid loads", () => {
-		const css = pageStyle();
-		expect(css).toContain("article.user.aid-loading .actions");
-		expect(css).toContain("article.assistant.aid-loading .actions");
+		const css = rowStyle();
+		expect(css).toContain(":global(article.user.aid-loading) .actions");
+		expect(css).toContain(":global(article.assistant.aid-loading) .actions");
 	});
 
 	it("holds the touch row while aids load or audio runs", () => {
@@ -82,9 +97,9 @@ describe("hover-only message actions", () => {
 	});
 
 	it("keeps will-change on the hover-hidden rows", () => {
-		const css = pageStyle();
+		const css = rowStyle();
 		const block = css.match(
-			/main\.hover-user article\.user \.actions,\s*main\.hover-assistant article\.assistant \.actions\s*\{([^}]*)\}/
+			/:global\(main\.hover-user\) :global\(article\.user\) \.actions,\s*:global\(main\.hover-assistant\) :global\(article\.assistant\) \.actions\s*\{([^}]*)\}/
 		);
 		expect(
 			block,
@@ -103,7 +118,7 @@ describe("hover-only message actions", () => {
 	});
 
 	it("scales the icon glyphs with the text-size opt-in", () => {
-		const css = pageStyle();
+		const css = rowStyle();
 		// Text buttons track at 85% of the message size by default
 		// (user decision: the row reads quieter than its text), so
 		// only the fixed-size logo icons still need the opt-in — and
@@ -111,7 +126,7 @@ describe("hover-only message actions", () => {
 		// Growth damps a fifth — full tracking overshoots the text.
 		expect(css).toContain("calc(0.92rem * var(--font-scale, 1) * 0.85)");
 		const glyph = css.match(
-			/main\.scale-actions \.actions \.icon-btn[^{]*\{([^}]*)\}/
+			/:global\(main\.scale-actions\) \.actions \.icon-btn[^{]*\{([^}]*)\}/
 		);
 		expect(
 			glyph,
@@ -127,16 +142,16 @@ describe("hover-only message actions", () => {
 		// keeps them proportional past 200%. Text buttons need no
 		// cap: at 85% of the message size they scale WITH the text,
 		// never past it.
-		const css = pageStyle();
+		const css = rowStyle();
 		const glyph = css.match(
-			/main\.scale-actions \.actions \.icon-btn[^{]*\{([^}]*)\}/
+			/:global\(main\.scale-actions\) \.actions \.icon-btn[^{]*\{([^}]*)\}/
 		);
 		expect(glyph, "scale-actions glyph rule is gone").toBeTruthy();
 		expect(glyph![1]).toMatch(/min\(var\(--font-scale/);
 	});
 
 	it("never moves the buttons with transform, translate, or animation", () => {
-		const css = pageStyle();
+		const css = rowStyle();
 		// The tooltip bubble (::after) intentionally rises; everything else
 		// touching .actions must be motion-free so the fade can't shift.
 		const offenders = css
@@ -237,12 +252,12 @@ describe("message spacing and overscroll", () => {
 	});
 
 	it("never scrolls the row vertically, at any text size", () => {
-		const css = pageStyle();
+		const css = rowStyle();
 		// Both row rules (desktop nowrap + touch): tooltips below the
 		// row must not make it scrollable up and down — clip the axis
 		// (never scrolls) while the paint margin lets them show.
 		const desktop = css.match(
-			/\.app:not\(\[data-android\]\) \.actions\s*\{([^}]*)\}/
+			/:global\(\.app:not\(\[data-android\]\)\) \.actions\s*\{([^}]*)\}/
 		);
 		expect(desktop, "desktop actions rule is gone").toBeTruthy();
 		expect(desktop![1]).toMatch(/overflow-y\s*:\s*clip/);
@@ -257,13 +272,13 @@ describe("aid-button text size", () => {
 	it("holds aid labels at the resting size unless the opt-in is on", () => {
 		// Furigana/pinyin/tashkeel labels mirror the fixed icon glyphs:
 		// with the toggle off, message-text growth must never dome them.
-		const css = pageStyle();
+		const css = rowStyle();
 		const fixed = css.match(/\.actions button\.aid-btn\s*\{([^}]*)\}/);
 		expect(fixed, "fixed aid-btn rule is gone").toBeTruthy();
 		expect(fixed![1]).toMatch(/font-size\s*:\s*calc\(0\.92rem \* 0\.85\)/);
 		expect(fixed![1]).not.toMatch(/--font-scale/);
 		const scaled = css.match(
-			/main\.scale-actions \.actions button\.aid-btn\s*\{([^}]*)\}/
+			/:global\(main\.scale-actions\) \.actions button\.aid-btn\s*\{([^}]*)\}/
 		);
 		expect(scaled, "opt-in scaled aid-btn rule is gone").toBeTruthy();
 		expect(scaled![1]).toMatch(/font-size\s*:\s*calc\([^;]*var\(--font-scale/);
@@ -273,22 +288,24 @@ describe("aid-button text size", () => {
 		// Each aid onclick (model run/revert, local pin/unpin) lives on
 		// a button tag carrying aid-btn: the fixed-size rule above keys
 		// off the class, so an unmarked aid button would track text.
-		const source = pageSource();
-		const handlers = [
-			"() => unpinModelAid(msg)",
-			"() => void runModelAidFor(msg, aidId, true)",
-			"() => unpinLocalAid(msg, localKind)",
-			"() => pinLocalAid(msg, localKind)"
+		// Buttons render in the row component, handlers stay paged.
+		const row = rowSource();
+		const wired: Array<[string, string]> = [
+			["actions.unpinModelAid()", "unpinModelAid: () => unpinModelAid(msg)"],
+			["actions.runModelAid(aidId)", "runModelAidFor(msg, modelId, true)"],
+			["actions.unpinLocalAid(localKind)", "unpinLocalAid: (kind: LocalAid) => unpinLocalAid(msg, kind)"],
+			["actions.pinLocalAid(localKind)", "pinLocalAid: (kind: LocalAid) => pinLocalAid(msg, kind)"]
 		];
-		for (const handler of handlers) {
-			const at = source.indexOf(handler);
-			if (at === -1) throw new Error(`aid handler gone: ${handler}`);
-			const open = source.lastIndexOf("<button", at);
-			if (open === -1) throw new Error(`no button tag for ${handler}`);
-			expect(
-				source.slice(open, at),
-				`${handler} button lost aid-btn`
-			).toContain("aid-btn");
+		const page = pageSource();
+		for (const [call, wiring] of wired) {
+			const at = row.indexOf(call);
+			if (at === -1) throw new Error(`aid call gone: ${call}`);
+			const open = row.lastIndexOf("<button", at);
+			if (open === -1) throw new Error(`no button tag for ${call}`);
+			expect(row.slice(open, at), `${call} button lost aid-btn`).toContain(
+				"aid-btn"
+			);
+			expect(page, `${call} unwired`).toContain(wiring);
 		}
 	});
 });
