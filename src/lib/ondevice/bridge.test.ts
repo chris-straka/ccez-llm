@@ -361,6 +361,11 @@ describe("onDeviceUnsupported", () => {
 		expect(
 			onDeviceUnsupported({ state: "unavailable", reason: "unsupported" })
 		).toBe(true);
+		// All-606 against an installed AICore: the feature isn't
+		// provisioned for this device (S24), so the entry hides too.
+		expect(
+			onDeviceUnsupported({ state: "error", reason: "stale-aicore" })
+		).toBe(true);
 		expect(
 			onDeviceUnsupported({ state: "unavailable", reason: "no-model" })
 		).toBe(false);
@@ -370,6 +375,9 @@ describe("onDeviceUnsupported", () => {
 		expect(onDeviceUnsupported({ state: "downloading" })).toBe(false);
 		expect(onDeviceUnsupported({ state: "ready" })).toBe(false);
 		expect(onDeviceUnsupported({ state: "error", reason: "unsupported" })).toBe(
+			false
+		);
+		expect(onDeviceUnsupported({ state: "error", reason: "failed" })).toBe(
 			false
 		);
 	});

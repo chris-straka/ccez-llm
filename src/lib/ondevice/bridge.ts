@@ -92,13 +92,20 @@ export interface OnDeviceStatus {
 }
 
 /**
- * True when the probe positively reports an unsupported device (no
- * AICore / no Gemini Nano): callers hide the ML Kit entry instead of
- * letting it fail at send time. Anything else — no model yet,
- * mid-download, probe garbage — keeps the entry listed. Pure.
+ * True when the probe positively reports an unsupported device: no
+ * AICore / no Gemini Nano, or every config answering FEATURE_NOT_FOUND
+ * against an installed AICore (the Prompt feature isn't provisioned
+ * for this device — S24 answers all-606 on a current AICore, and no
+ * update within the user's control changes that). Callers hide the
+ * ML Kit entry instead of letting it fail at send time; reopening
+ * re-probes (606s land in milliseconds), so a future provisioning
+ * restores it. Anything else — no model yet, mid-download, transient
+ * failure, probe garbage — keeps the entry listed. Pure.
  */
 export function onDeviceUnsupported(status: OnDeviceStatus): boolean {
-	return status.state === "unavailable" && status.reason === "unsupported";
+	if (status.state === "unavailable" && status.reason === "unsupported")
+		return true;
+	return status.state === "error" && status.reason === "stale-aicore";
 }
 
 /**

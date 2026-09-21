@@ -320,3 +320,33 @@ test("on-device note renders probe facts", async ({ page }) => {
 		})
 	).toBeVisible();
 });
+
+/** All-606 hides the ML Kit pill: the feature isn't provisioned for
+the device, so the entry would only ever fail (reopening re-probes,
+so a future provisioning restores it). */
+test("ml kit pill hides on all-606 when inactive", async ({ page }) => {
+	await page.addInitScript(() => {
+		(window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {
+			invoke: async (cmd: string) => {
+				if (cmd === "ondevice_status")
+					return {
+						state: "error",
+						reason: "stale-aicore",
+						log: ["default: 606 feature 636 not found"],
+						aicore: "241912009"
+					};
+				throw new Error(`unmocked command: ${cmd}`);
+			}
+		};
+	});
+	await page.goto("/");
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
+	await page.keyboard.press("Meta+,");
+	const panel = page.locator(".settings-panel");
+	await expect(panel).not.toHaveClass(/closed/);
+	await expect(
+		panel.getByRole("radio", { name: "ML Kit (on-device)" })
+	).toHaveCount(0);
+});
