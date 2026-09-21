@@ -148,10 +148,10 @@ export interface AppSettings {
 	 */
 	hideButtons: boolean;
 	/**
-	 * Touch only: a leftward stroke over a message folds it. On by
-	 * default; uncheck and the stroke opens settings instead (the
-	 * row's fold button still folds). The checkbox lives in Messages
-	 * on phones.
+	 * Touch only: a leftward stroke over a message folds it. Off by
+	 * default; check to fold, uncheck and the stroke opens settings
+	 * instead (the row's fold button still folds). The checkbox
+	 * lives in Messages on phones.
 	 */
 	foldOnSwipe: boolean;
 	/** Touch only: read a fresh text selection aloud on release. */
@@ -335,7 +335,7 @@ export function defaultSettings(): AppSettings {
 		ownBubble: false,
 		hoverUserActions: true,
 		hoverAssistantActions: true,
-		scaleActionsWithFont: false,
+		scaleActionsWithFont: true,
 		showMessageButtons: true,
 		messageGap: MESSAGE_GAP_DEFAULT,
 		promptIdleSec: PROMPT_IDLE_DEFAULT,
@@ -343,7 +343,7 @@ export function defaultSettings(): AppSettings {
 		theme: "system",
 		hideMessages: false,
 		hideButtons: true,
-		foldOnSwipe: true,
+		foldOnSwipe: false,
 		autoSpeakSelection: true,
 		hapticsEnabled: true,
 		replyNotifications: true,
@@ -519,14 +519,14 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 			merged.promptIdleSec = PROMPT_IDLE_DEFAULT;
 		}
 		if (typeof merged.scaleActionsWithFont !== "boolean")
-			merged.scaleActionsWithFont = false;
+			merged.scaleActionsWithFont = true;
 		// Touch-only toggles postdate older saves the same way.
 		if (typeof merged.inspectEnabled !== "boolean")
 			merged.inspectEnabled = true;
 		if (typeof merged.hideMessages !== "boolean") merged.hideMessages = false;
 		if (typeof merged.micEnabled !== "boolean") merged.micEnabled = true;
 		if (typeof merged.hideButtons !== "boolean") merged.hideButtons = true;
-		if (typeof merged.foldOnSwipe !== "boolean") merged.foldOnSwipe = true;
+		if (typeof merged.foldOnSwipe !== "boolean") merged.foldOnSwipe = false;
 		if (typeof merged.autoSpeakSelection !== "boolean")
 			merged.autoSpeakSelection = true;
 		// The disable-worded `hapticsDisabled` is renamed to the

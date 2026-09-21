@@ -272,6 +272,27 @@ describe("sentenceLangsFor", () => {
 		expect(langFor("verbindet")).toBe("de-DE");
 		expect(langFor("connects, joins, combines")).toBe("en-US");
 	});
+
+	it("seeds short Latin from the message when the highlight starts mid-sentence", async () => {
+		// Five Latin words identify nothing alone; the message holds
+		// whole English sentences, so the fragment reads English while
+		// the Han fragment keeps Japanese.
+		mockInvoke.mockResolvedValue(null);
+		const quote = " in which two people died.\nモスクワ市長";
+		const context =
+			"Moscow's mayor says the drones were downed during the overnight " +
+			"barrage in the city center today. " +
+			quote;
+		const langFor = await sentenceLangsFor(
+			quote,
+			"ja-JP",
+			[],
+			"en-US",
+			context
+		);
+		expect(langFor("in which two people died.")).toBe("en-US");
+		expect(langFor("モスクワ市長")).toBe("ja-JP");
+	});
 });
 
 describe("sentenceForQuote", () => {

@@ -107,6 +107,11 @@ test("right-clicking a mixed highlight shows one panel per kanji group", async (
 		);
 	});
 	expect(match).toBe(true);
+	// The tint surgery keeps the live highlight: splits and wraps
+	// preserve the range (no removeAllRanges), so the selection — and
+	// on phones its handles — survives the popup.
+	const kept = await page.evaluate(() => window.getSelection()?.toString() ?? "");
+	expect(kept).toBe(selected);
 	// Escape dismisses the panels and unwraps the tint.
 	await page.keyboard.press("Escape");
 	await expect(panels).toHaveCount(0);

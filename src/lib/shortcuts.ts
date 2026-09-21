@@ -22,7 +22,7 @@ export function touchShortcuts(): ShortcutRow[] {
 			name: "Settings",
 			keys: "Swipe left off messages · chats list button · two-finger swipe left"
 		},
-		{ name: "Newer / older chat", keys: "Three-finger swipe right / left" },
+		{ name: "Newer / older chat", keys: "Three-finger swipe left / right" },
 		{ name: "Top of chat", keys: "Two-finger swipe up · gg" },
 		{ name: "Bottom of chat", keys: "Two-finger swipe down · G" },
 		{

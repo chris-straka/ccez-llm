@@ -11,6 +11,7 @@ import {
 	hapticBeat,
 	hapticBeatAsync,
 	mediaRecorderSupported,
+	notificationPlainText,
 	notifyReplyDone,
 	notifyReplyDoneAsync,
 	releaseStudyWakeLock,
@@ -253,6 +254,17 @@ describe("notification wrappers", () => {
 				hidden: true
 			})
 		).toBe(false);
+	});
+
+	it("strips markdown from the ping body", () => {
+		expect(notificationPlainText("**Bold** and `code` speak")).toBe(
+			"Bold and code speak"
+		);
+		expect(
+			notificationPlainText("# Head\n> quote [text](https://x.y/z) | cell")
+		).toBe("Head quote text cell");
+		expect(notificationPlainText(" plain words ")).toBe("plain words");
+		expect(notificationPlainText("")).toBe("");
 	});
 
 	it("closes the web ping after five seconds", () => {

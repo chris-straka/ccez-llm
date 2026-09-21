@@ -38,7 +38,7 @@ import {
 	annotatedRunsWithOffsets,
 	sliceRunsForQuote,
 	quoteTailCompletion,
-	wordBoundsAt,
+	quoteStartForContext,
 	groupRuns,
 	wordAtNodeOffset
 } from "./reading";
@@ -655,6 +655,43 @@ describe("sliceRunsForQuote", () => {
 	});
 });
 
+describe("quoteStartForContext", () => {
+	it("picks the instance its left context points at", () => {
+		const plain = "夜間に夜が来る";
+		// Standalone 夜 (index 3): context ends …夜間に.
+		expect(quoteStartForContext(plain, "夜", "昨夜間に")).toBe(3);
+		// The 夜間 compound (index 0): sentence-start context.
+		expect(quoteStartForContext(plain, "夜", "")).toBe(0);
+	});
+
+	it("keeps the first match on ties and misses", () => {
+		expect(quoteStartForContext("夜に夜", "夜", "")).toBe(0);
+		expect(quoteStartForContext("夜に夜", "月", "夜に")).toBe(-1);
+		expect(quoteStartForContext("", "夜", "")).toBe(-1);
+		expect(quoteStartForContext("夜", "", "")).toBe(-1);
+	});
+
+	it("slices the selected instance, not the first", () => {
+		const runs = annotatedRunsWithOffsets(
+			'<span class="frb">夜間<span class="frt">やかん</span></span>に<span class="frb">夜<span class="frt">よる</span></span>が来る'
+		)!;
+		const p = runs.map((r) => r.text).join("");
+		expect(p).toBe("夜間に夜が来る");
+		expect(sliceRunsForQuote(runs, p, "夜", 3)).toEqual([
+			{ text: "夜", reading: "よる" }
+		]);
+		// A genuinely partial pick clips to the quote (popup shows
+		// exactly the highlight); only the occurrence moves.
+		expect(sliceRunsForQuote(runs, p, "夜", 0)).toEqual([
+			{ text: "夜", reading: "やかん" }
+		]);
+		// Default stays first-match (quote-bounded like the rest).
+		expect(sliceRunsForQuote(runs, p, "夜")).toEqual([
+			{ text: "夜", reading: "やかん" }
+		]);
+	});
+});
+
 describe("quoteTailCompletion", () => {
 	// The repo's own 美しい fixture: a highlight cut at 美 must speak
 	// the full うつくしい, not the うつく stem (raw: ビ).
@@ -677,30 +714,6 @@ describe("quoteTailCompletion", () => {
 		expect(quoteTailCompletion(runs, plain, "富士山")).toBe("");
 		expect(quoteTailCompletion(runs, plain, "")).toBe("");
 		expect(quoteTailCompletion(null, plain, "美")).toBe("");
-	});
-});
-
-describe("wordBoundsAt", () => {
-	it("spans the Latin word holding the offset", () => {
-		expect(wordBoundsAt("hello world", 1)).toEqual([0, 5]);
-		expect(wordBoundsAt("hello world", 8)).toEqual([6, 11]);
-		expect(wordBoundsAt("hello world", 11)).toEqual([6, 11]);
-	});
-
-	it("yields nothing on whitespace or punctuation", () => {
-		expect(wordBoundsAt("hello world", 5)).toBe(null);
-		expect(wordBoundsAt("hi, there", 2)).toBe(null);
-		expect(wordBoundsAt("", 0)).toBe(null);
-	});
-
-	it("takes a word-like CJK segment, never empty", () => {
-		const text = "日本語は繊細です";
-		const span = wordBoundsAt(text, 4);
-		expect(span).not.toBe(null);
-		const [start, end] = span!;
-		expect(start).toBeLessThanOrEqual(4);
-		expect(end).toBeGreaterThan(4);
-		expect(text.slice(start, end)).not.toMatch(/[\s。、]/);
 	});
 });
 

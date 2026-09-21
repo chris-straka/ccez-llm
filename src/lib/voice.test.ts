@@ -101,6 +101,20 @@ describe("sentenceSpeechLang", () => {
 		expect(sentenceSpeechLang("汉语是", "fr-FR")).toBe("zh-CN");
 		expect(sentenceSpeechLang("汉语是", "ko-KR")).toBe("ko-KR");
 	});
+
+	it("reads a long distinctive Chinese tail in Mandarin under a CJK seed", () => {
+		// Simplified-only 适/节 identify the fragment; short shared
+		// fragments still inherit (two kanji identify nothing).
+		expect(sentenceSpeechLang("秋天是中国最舒适的季节之", "ja-JP")).toBe(
+			"zh-CN"
+		);
+		expect(sentenceSpeechLang("汉语是", "ja-JP")).toBe("ja-JP");
+		expect(sentenceSpeechLang("日本経済新聞社", "zh-CN")).toBe("zh-CN");
+		// Traditional-only 國/說 identify just as well.
+		expect(sentenceSpeechLang("我國小說是好看的故事書本", "ja-JP")).toBe(
+			"zh-CN"
+		);
+	});
 });
 
 describe("replyLangFor", () => {

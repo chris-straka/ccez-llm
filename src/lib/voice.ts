@@ -1,4 +1,4 @@
-import { ttsLangFor, scriptRunKey } from "./reading";
+import { ttsLangFor, scriptRunKey, hasDistinctiveChinese } from "./reading";
 import type { VoiceEngine } from "./settings";
 
 /**
@@ -133,6 +133,13 @@ export function sentenceSpeechLang(
 	if (direct !== "" && direct !== "zh-CN") return direct;
 	if (direct === "") return fallbackLang;
 	if (/[.!?…。！？；"»”’」』）)\]]$/.test(sentence.trim())) return direct;
+	// A long fragment can still identify itself: simplified-only and
+	// traditional-only characters occur in neither Japanese nor each
+	// other, so a Chinese tail cut mid-sentence reads Mandarin instead
+	// of inheriting the seed. Short shared-kanji fragments stay on the
+	// seed — two characters identify nothing (see hasDistinctiveChinese
+	// for the length gate the pinned fragment tests rest on).
+	if (hasDistinctiveChinese(sentence)) return direct;
 	const surrounding = fallbackLang.split(/[-_]/)[0]?.toLowerCase();
 	return surrounding === "ja" ||
 		surrounding === "zh" ||

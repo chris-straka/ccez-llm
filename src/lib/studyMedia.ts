@@ -635,6 +635,27 @@ export async function ensureReplyNotificationPermissionAsync(input?: {
  * Silent (false) when foregrounded, short, unpermitted, or
  * unsupported. Never throws.
  */
+/**
+ * Notification plain text (mirrors turn.rs `notification_plain`): strip
+ * the reply's markdown so the shade never shows `**bold**`, backticks,
+ * headings, quotes, or link targets. Display-only. Pure.
+ */
+export function notificationPlainText(head: string): string {
+	const inline = head.replace(/[*`~]/g, "");
+	const lines = inline.split("\n").map((line) => {
+		let t = line.trimStart();
+		if (t.startsWith("#")) t = t.slice(1).trimStart();
+		if (t.startsWith(">")) t = t.slice(1).trimStart();
+		return t.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1");
+	});
+	return lines
+		.join("\n")
+		.replace(/\|/g, " ")
+		.split(/\s+/)
+		.filter((w) => w.length > 0)
+		.join(" ");
+}
+
 export async function notifyReplyDoneAsync(
 	title: string,
 	body: string,
@@ -646,7 +667,7 @@ export async function notifyReplyDoneAsync(
 		plugin?: NativeNotifier | null;
 	}
 ): Promise<boolean> {
-	const text = body.trim();
+	const text = notificationPlainText(body);
 	if (!text) return false;
 	const hidden = input?.hidden ?? documentHiddenNow();
 	const focused = input?.focused ?? windowFocusedNow();

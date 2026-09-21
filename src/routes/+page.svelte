@@ -361,7 +361,7 @@
 		annotatedRunsWithOffsets,
 		sliceRunsForQuote,
 		quoteTailCompletion,
-		wordBoundsAt,
+		quoteStartForContext,
 		groupRuns,
 		type GroupedRun,
 		type LocalAid,
@@ -1557,7 +1557,14 @@
 				}
 			}
 			if (highlightBase < 0) return false;
-			live.removeAllRanges();
+			// The live range stays through the surgery below: splitText
+			// and the wrap move endpoints along (same text nodes, new
+			// parents), so the highlight — and on phones the native drag
+			// handles — survive. removeAllRanges would tear the handles
+			// down, and the programmatic restore never brings them back.
+			const expected = slices
+				.map((s) => (s.node.textContent ?? "").slice(s.start, s.end))
+				.join("");
 			try {
 				// Latest spans first: each wrap shortens the working
 				// node from the right, so earlier offsets keep
@@ -1586,8 +1593,18 @@
 				// Partial tint still preserves every character: fall
 				// through and restore the highlight regardless.
 			}
-			// Re-resolve the same character span over the new nodes,
-			// located from the scope root: the detached range is gone.
+			// Surgery keeps a live range tracking the same characters,
+			// so an intact highlight is already correct — leave it (and
+			// the native handles) alone. Only re-resolve when the engine
+			// lost it mid-surgery.
+			const kept = window.getSelection();
+			if (
+				kept &&
+				kept.rangeCount > 0 &&
+				!kept.isCollapsed &&
+				kept.toString() === expected
+			)
+				return true;
 			const fresh = scopeSlices(scope);
 			const a = slicePoint(fresh, highlightBase);
 			const b = slicePoint(fresh, highlightBase + total);
@@ -1660,7 +1677,35 @@
 			return null;
 		}
 		const plain = sentRuns.map((run) => run.text).join("");
-		const sliced = sliceRunsForQuote(sentRuns, plain, quoted.quote);
+		// Slice the selected instance, not the first: a repeated word
+		// (夜 picked from 夜間…夜) reads its own span's tokens, like
+		// speech does. Unresolvable keeps the historical first match.
+		let qStart: number | null = null;
+		try {
+			const liveSel = window.getSelection();
+			const anchor =
+				liveSel?.anchorNode instanceof Element
+					? liveSel.anchorNode
+					: liveSel?.anchorNode?.parentElement;
+			const block = anchor?.closest("p, li");
+			if (block && liveSel && liveSel.rangeCount > 0) {
+				const range = liveSel.getRangeAt(0);
+				const at = caretOffsetInBlock(
+					block,
+					range.startContainer,
+					range.startOffset
+				);
+				const blockText = block.textContent ?? "";
+				qStart = quoteStartForContext(
+					plain,
+					quoted.quote,
+					blockText.slice(Math.max(0, at - 24), at)
+				);
+			}
+		} catch {
+			// Document moved under the highlight: first match below.
+		}
+		const sliced = sliceRunsForQuote(sentRuns, plain, quoted.quote, qStart);
 		if (!sliced) {
 			if (selPinyin?.quote === quoted.quote) selPinyin = null;
 			return null;
@@ -1745,7 +1790,7 @@
 		// highlight itself.
 		return (
 			sliced.map((run) => run.reading ?? run.text).join("") +
-			quoteTailCompletion(sentRuns, plain, quoted.quote)
+			quoteTailCompletion(sentRuns, plain, quoted.quote, qStart)
 		);
 	}
 	/**
@@ -4415,38 +4460,6 @@
 		return !selection.isCollapsed;
 	}
 
-	/** Double-tap: select the word around the tap point. Native
-	double-tap word select never fires in the app's WebView, so the
-	run takes the word itself (Segmenter bounds, CJK-aware) instead
-	of leaving the pair to the OS. False keeps native behavior. */
-	function selectWordAtPoint(clientX: number, clientY: number): boolean {
-		const found = textBlockAtPoint(clientX, clientY);
-		const selection = window.getSelection();
-		if (!found || !selection) return false;
-		const text = found.block.textContent ?? "";
-		const caret = caretOffsetInBlock(
-			found.block,
-			found.range.startContainer,
-			found.range.startOffset
-		);
-		const span = wordBoundsAt(text, caret);
-		if (!span) return false;
-		const anchor = nodeAtBlockOffset(found.block, span[0]);
-		const focus = nodeAtBlockOffset(found.block, span[1]);
-		if (!anchor || !focus) return false;
-		try {
-			selection.setBaseAndExtent(
-				anchor.node,
-				anchor.offset,
-				focus.node,
-				focus.offset
-			);
-		} catch {
-			return false;
-		}
-		return !selection.isCollapsed;
-	}
-
 	/** Quadruple-tap: select the whole paragraph block. */
 	function selectParagraphAtPoint(clientX: number, clientY: number): boolean {
 		const found = textBlockAtPoint(clientX, clientY);
@@ -6387,7 +6400,11 @@
 				quote,
 				lang,
 				voices,
-				latinFallback(settings.voiceLang)
+				latinFallback(settings.voiceLang),
+				// Seed Latin identification from the whole message: the
+				// highlight alone can start mid-sentence, too short to
+				// identify, while its message holds whole sentences.
+				context
 			)
 		);
 	}
@@ -6608,7 +6625,10 @@
 	let sendTick: ReturnType<typeof setInterval> | null = null;
 	let wasSending = false;
 	$effect(() => {
-		const sending = isSending(chatState, viewChat.id);
+		// Native turns never raise the TS sending flag, so a detached
+		// fetch counts the wait up on its own event set instead.
+		const sending =
+			isSending(chatState, viewChat.id) || nativeFetching.has(viewChat.id);
 		if (sending && !wasSending) {
 			wasSending = true;
 			sendElapsed = 0;
@@ -8711,10 +8731,9 @@
 		tap pairs into the sidebar open instead. */
 		let emptyTapTimer: ReturnType<typeof setTimeout> | null = null;
 		/** Consecutive-tap run on message text (phones): double-tap
-		selects the word, triple-tap the sentence and quadruple-tap
-		the paragraph (see the touchend overrides below — native
-		double-tap never fires in the WebView). Own pairing —
-		empty-space taps keep theirs above. */
+		stays native (word), triple-tap selects the sentence and
+		quadruple-tap the paragraph (see the touchend overrides
+		below). Own pairing — empty-space taps keep theirs above. */
 		let msgTapSeq: TapSequence | null = null;
 		function flickZoneOf(target: EventTarget | null): FlickZone {
 			const el = target instanceof Element ? target : null;
@@ -8893,7 +8912,10 @@
 					const dx = ended.clientX - start.x;
 					const dy = ended.clientY - start.y;
 					if (Math.abs(dx) >= 64 && Math.abs(dy) < Math.abs(dx)) {
-						stepSwitcher(dx > 0 ? 1 : -1);
+						// Left steps newer (minting past the end), right
+						// steps older — the arrow buttons read the same
+						// way (‹ older, newer ›).
+						stepSwitcher(dx > 0 ? -1 : 1);
 					}
 					return;
 				}
@@ -9000,10 +9022,11 @@
 							ended.clientX,
 							ended.clientY
 						);
-						if (msgTapSeq.count === 2) {
+						// Native double-tap owns word select (the
+						// multi-tap guards below keep its pick): the
+						// pin only holds the revealed row open.
+						if (msgTapSeq.count === 2)
 							msgDoubleTapPin = { id: start.msgId, at: now };
-							selectWordAtPoint(ended.clientX, ended.clientY);
-						}
 						// Triple-tap takes the sentence, quadruple-tap the
 						// paragraph (this counter only ever sees
 						// single-finger taps). A false return keeps the
@@ -9282,7 +9305,7 @@
 		// Two-finger horizontal swipes open drawers (left = settings,
 		// right = chats list); a vertical two-finger slide jumps the chat
 		// (up to the top, down to the bottom — gg and G); a three-finger
-		// horizontal swipe steps chats (right = newer, left = older, no
+		// horizontal swipe steps chats (left = newer, right = older, no
 		// focus: the keyboard stays down); a two-finger double tap
 		// jumps to the bottom on Android (sidebar toggle on iOS); a
 		// three-finger tap deletes the tapped message; a three-finger
@@ -9713,13 +9736,15 @@
 						}
 					}
 					// Phones step chats on a three-finger horizontal swipe
-					// (right = newer, left = older, keyboard stays down);
+					// (left = newer, right = older, keyboard stays down);
 					// a near-stationary trio still pairs into the tap below.
 					const swipe = androidUI
 						? threeFingerSwipeDir(track.x, track.y, track.cx, track.cy)
 						: null;
 					if (swipe !== null) {
-						stepChat(swipe, false);
+						// Left steps newer (minting past the end), right
+						// older — matching the switcher veil above.
+						stepChat(swipe === 1 ? -1 : 1, false);
 						void hapticBeatAsync("send", {
 							enabled: settings.hapticsEnabled,
 							shell: tauriBackendAvailable()
@@ -13012,7 +13037,7 @@
 					{/if}
 				</article>
 			{/each}
-			{#if isSending(chatState, viewChat.id) && (hasFetchActive(chatState, viewChat.id) || nativeFetching.has(viewChat.id))}
+			{#if (isSending(chatState, viewChat.id) && hasFetchActive(chatState, viewChat.id)) || nativeFetching.has(viewChat.id)}
 				<!-- Tool-fetch phase: the turn went quiet pulling a page
 				(even after chatter printed, when Thinking already retired).
 				The elapsed count keeps running, so a long fetch reads as

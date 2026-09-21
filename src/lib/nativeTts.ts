@@ -207,13 +207,20 @@ export async function sentenceLangsFor(
 	 * the translation speaks the user's own language, never the
 	 * message seed. Defaults to the seed (old behavior).
 	 */
-	glossFallback: string = fallback
+	glossFallback: string = fallback,
+	/**
+	 * Wider text the Latin seed identifies from: a highlight can start
+	 * mid-sentence ("in which two people died."), too short to
+	 * identify alone, while its message holds whole English sentences.
+	 * Defaults to the utterance itself (old behavior).
+	 */
+	seedText: string = text
 ): Promise<(sentence: string) => string> {
 	const latin = splitSentences(text).filter(
 		(sentence) => ttsLangFor(sentence, "") === ""
 	);
 	const seed =
-		latin.length > 0 ? await latinSentencesLang(text, fallback) : fallback;
+		latin.length > 0 ? await latinSentencesLang(seedText, fallback) : fallback;
 	const perSentence = new Map<string, string>();
 	await Promise.all(
 		latin.map(async (sentence) => {

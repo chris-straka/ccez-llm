@@ -199,68 +199,31 @@ class MainActivity : TauriActivity() {
   }
 
   // In-app text selection: the OS floating toolbar (Copy /
-  // Translate / Read Aloud / Maps) is suppressed — the WebView shows
-  // its own Copy / Annotate / Speak menu instead. Suppression clears
-  // the mode's menu rather than finishing the mode, so the selection
-  // and its handles survive; both creation and prepare are cleared
-  // because the system rebuilds the menu on every invalidate.
-  // (Code-ADDED items cannot survive here — AppCompat never consults
-  // the activity for floating toolbars — but clearing does: nothing
-  // re-adds what the wrapper strips.)
+  // Translate / Read Aloud / Maps, plus our own manifest aliases)
+  // never starts — the WebView shows its own Annotate / Copy menu
+  // and Speak dock instead. Refusing the mode (null) rather than
+  // clearing its menu: clearing loses to items the system appends
+  // after prepare returns (aliases, handle-drag respawns), while no
+  // mode means no toolbar on any path. Selection and handles live in
+  // the WebView itself and survive without the mode; external apps
+  // keep resolving our aliases through the package manager, which
+  // this hook never touches. Owner demand: no OS text menu anywhere
+  // in the app, for any reason.
   override fun onWindowStartingActionMode(
     callback: android.view.ActionMode.Callback,
     type: Int
   ): android.view.ActionMode? {
     if (type == android.view.ActionMode.TYPE_FLOATING) {
-      android.util.Log.i("CcezMain", "suppressing floating selection toolbar")
-      val clearing = object : android.view.ActionMode.Callback by callback {
-        override fun onCreateActionMode(
-          mode: android.view.ActionMode?,
-          menu: android.view.Menu?
-        ): Boolean {
-          val created = callback.onCreateActionMode(mode, menu)
-          menu?.clear()
-          return created
-        }
-
-        override fun onPrepareActionMode(
-          mode: android.view.ActionMode?,
-          menu: android.view.Menu?
-        ): Boolean {
-          val prepared = callback.onPrepareActionMode(mode, menu)
-          menu?.clear()
-          return prepared
-        }
-      }
-      return super.onWindowStartingActionMode(clearing, type)
+      android.util.Log.i("CcezMain", "refusing floating selection toolbar")
+      return null
     }
     return super.onWindowStartingActionMode(callback, type)
   }
 
-  // Handle-drag respawn: moving the selection handles rebuilds the
-  // floating toolbar through paths that never re-enter
-  // onWindowStarting (same mode, fresh invalidate), so the OS menu
-  // pops back over the drag. Clearing + invalidating a started mode
-  // re-runs the prepare hook above (which strips it again) without
-  // finishing the mode — selection and handles survive.
-  override fun onActionModeStarted(mode: android.view.ActionMode?) {
-    super.onActionModeStarted(mode)
-    if (mode?.type == android.view.ActionMode.TYPE_FLOATING) {
-      android.util.Log.i("CcezMain", "clearing restarted selection toolbar")
-      mode.menu?.clear()
-      mode.invalidate()
-    }
-  }
-
-  // OS selection toolbar: the Annotate/Speak/Inspect entries come
-  // from the activity-aliases in the manifest, not from code.
-  // Code-added items cannot survive here — AppCompat never consults
-  // the activity for floating toolbars (no onActionModeStarted, no
-  // usable onWindowStarting* hook), and the menu is rebuilt on every
-  // invalidate. The system owns the alias entries (overflow menu —
-  // the main pill's buttons are system-fixed), so they are always
-  // present; taps forward above into the running singleTask
-  // instance when there is one (cold starts become the instance),
-  // and the frontend runs the tapped action on text picked in-app
-  // versus prefilling outside shares.
+  // Manifest aliases (Annotate/Speak/Inspect in OTHER apps'
+  // selection menus): resolved by the package manager outside this
+  // window, so the refusal above never touches them. Taps forward
+  // into the running singleTask instance when there is one (cold
+  // starts become the instance), and the frontend runs the tapped
+  // action on text picked in-app versus prefilling outside shares.
 }

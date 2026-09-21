@@ -47,7 +47,7 @@ describe("settings", () => {
 		expect(s.ownBubble).toBe(false);
 		expect(s.hoverUserActions).toBe(true);
 		expect(s.hoverAssistantActions).toBe(true);
-		expect(s.scaleActionsWithFont).toBe(false);
+		expect(s.scaleActionsWithFont).toBe(true);
 		expect(s.promptIdleSec).toBe(PROMPT_IDLE_DEFAULT);
 		expect(s.voiceEngine).toBe("native");
 		// Locale-aware: defaultSettings() follows systemLocale() (OS locale),
@@ -219,16 +219,16 @@ describe("settings", () => {
 		expect(loadSettings(memoryStore).chatWidth).toBe(100);
 	});
 
-	it("folds on swipe out of the box and keeps an explicit off", () => {
-		expect(defaultSettings().foldOnSwipe).toBe(true);
-		const off = blankSettings();
-		off.foldOnSwipe = false;
-		saveSettings(off, memoryStore);
-		expect(loadSettings(memoryStore).foldOnSwipe).toBe(false);
+	it("leaves fold on swipe off out of the box and keeps an explicit on", () => {
+		expect(defaultSettings().foldOnSwipe).toBe(false);
+		const on = blankSettings();
+		on.foldOnSwipe = true;
+		saveSettings(on, memoryStore);
+		expect(loadSettings(memoryStore).foldOnSwipe).toBe(true);
 		const junk = blankSettings();
 		(junk as unknown as Record<string, unknown>).foldOnSwipe = "no";
 		saveSettings(junk, memoryStore);
-		expect(loadSettings(memoryStore).foldOnSwipe).toBe(true);
+		expect(loadSettings(memoryStore).foldOnSwipe).toBe(false);
 	});
 
 	it("shows message buttons out of the box and keeps an explicit off", () => {

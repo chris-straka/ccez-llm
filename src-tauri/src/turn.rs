@@ -697,12 +697,66 @@ async fn sleep_secs(secs: u64) {
     .await;
 }
 
+/// Fixed reply-ping id, shared with the frontend's
+/// `REPLY_NOTIFICATION_ID` (studyMedia.ts): one ping replaces the
+/// last, and every clearer (the 5s timer below, the foreground-return
+/// dismiss) targets the same notice instead of stranding it.
+const REPLY_NOTIFICATION_ID: i32 = 4201;
+
+/// Notification plain text: strip the reply's markdown so the shade
+/// never shows `**bold**`, backticks, headings, quotes, or link
+/// targets. Display-only — the reply itself is untouched. Pure and
+/// unit-tested.
+fn notification_plain(head: &str) -> String {
+    let inline = head.replace(['*', '`', '~'], "");
+    let mut out = String::new();
+    for line in inline.lines() {
+        let t = line.trim_start();
+        let t = t.strip_prefix('#').map(str::trim_start).unwrap_or(t);
+        let t = t.strip_prefix('>').map(str::trim_start).unwrap_or(t);
+        out.push_str(&link_text(t));
+        out.push('\n');
+    }
+    out.replace('|', " ")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// `[text](url)` (and `![alt](url)`) renders as its text in a ping.
+fn link_text(line: &str) -> String {
+    let mut out = String::new();
+    let mut rest = line;
+    while let Some(open) = rest.find('[') {
+        out.push_str(&rest[..open]);
+        let after = &rest[open + 1..];
+        match after.find("](") {
+            Some(close) => {
+                out.push_str(&after[..close]);
+                let target = &after[close + 2..];
+                rest = match target.find(')') {
+                    Some(end) => &target[end + 1..],
+                    None => "",
+                };
+            }
+            None => {
+                out.push_str(after);
+                rest = "";
+            }
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
 fn notify_ready(app: &AppHandle, head: &str) {
     use tauri_plugin_notification::NotificationExt;
-    let body: String = head.chars().take(140).collect();
+    let stripped = notification_plain(&head.chars().take(280).collect::<String>());
+    let body: String = stripped.chars().take(140).collect();
     let _ = app
         .notification()
         .builder()
+        .id(REPLY_NOTIFICATION_ID)
         .title("Reply ready")
         .body(if body.is_empty() {
             "Your reply finished while you were away.".to_string()
@@ -710,6 +764,15 @@ fn notify_ready(app: &AppHandle, head: &str) {
             body
         })
         .show();
+    // The shade is not storage: a native timer clears the ping after
+    // 5s (the page's own timer freezes while backgrounded, which is
+    // exactly when this ping exists). Same id the foreground return
+    // dismisses, so a revisit clears it even sooner.
+    let handle = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        std::thread::sleep(Duration::from_secs(5));
+        let _ = handle.notification().cancel(vec![REPLY_NOTIFICATION_ID]);
+    });
 }
 
 /// The detached turn: attempts with backoff, result file, done event,
@@ -972,10 +1035,15 @@ pub fn turn_dismiss(app: AppHandle, turn_id: String) -> Result<bool, String> {
 /// last settles. Best-effort everywhere — a service failure must never
 /// fail the turn itself, which already survives WebView suspension on
 /// process life alone.
+/// Owner demand (Sep 2026): never show the "Working on your reply"
+/// notice. Android mandates a notification for every foreground
+/// service, so the claim itself goes — turns run on process life
+/// alone now. Consequence, stated plainly: a backgrounded app is
+/// more likely to be killed mid-turn on aggressive OEM skins; killed
+/// turns already reconcile as interrupted on return, and finished
+/// ones land through the result file plus the Reply-ready ping.
 #[cfg(target_os = "android")]
-fn turn_service_claim() {
-    crate::turn_service::service_claim();
-}
+fn turn_service_claim() {}
 
 /// Non-Android builds keep no service: the turn still outlives page
 /// stalls wherever the process itself lives (desktop).
@@ -995,6 +1063,20 @@ mod tests {
     use super::*;
     use std::io::{Read, Write};
     use std::net::TcpListener;
+
+    #[test]
+    fn notification_plain_strips_markdown() {
+        assert_eq!(
+            notification_plain("**Bold** and `code` speak"),
+            "Bold and code speak"
+        );
+        assert_eq!(
+            notification_plain("# Head\n> quote [text](https://x.y/z) | cell"),
+            "Head quote text cell"
+        );
+        assert_eq!(notification_plain(""), "");
+        assert_eq!(notification_plain(" plain words "), "plain words");
+    }
 
     #[test]
     fn sse_split_keeps_partial_events() {

@@ -206,71 +206,6 @@ export function wordAtNodeOffset(text: string, offset: number): string {
 	return offset > 0 ? extractWordAt(text, offset - 1) : "";
 }
 
-/** Minimal word-segment view (Intl.Segmenter when present). */
-interface WordSegment {
-	index: number;
-	segment: string;
-	isWordLike: boolean;
-}
-interface WordSegmenter {
-	segment(text: string): Iterable<WordSegment>;
-}
-
-function loadWordSegmenter(): WordSegmenter | null {
-	try {
-		const Ctor = (
-			Intl as unknown as {
-				Segmenter?: new (
-					locales?: string | string[],
-					options?: { granularity?: string }
-				) => WordSegmenter;
-			}
-		).Segmenter;
-		if (!Ctor) return null;
-		return new Ctor(undefined, { granularity: "word" });
-	} catch {
-		return null;
-	}
-}
-
-/**
- * Word span holding `offset` (a UTF-16 index into `text`) for
- * double-tap select: Intl.Segmenter word bounds, so CJK taps take a
- * word-like segment instead of nothing (native double-tap never fires
- * in the app's WebView). A caret on whitespace or punctuation yields
- * null — nothing to select. Without a segmenter, the span expands
- * over word chars instead. Pure.
- */
-export function wordBoundsAt(
-	text: string,
-	offset: number
-): [number, number] | null {
-	const at = Math.max(0, Math.min(offset, text.length));
-	if (text.length === 0) return null;
-	try {
-		const segmenter = loadWordSegmenter();
-		if (segmenter) {
-			const idx = at >= text.length && at > 0 ? at - 1 : at;
-			for (const part of segmenter.segment(text)) {
-				const start = part.index;
-				const end = start + part.segment.length;
-				if (idx >= start && idx < end)
-					return part.isWordLike ? [start, end] : null;
-			}
-			return null;
-		}
-	} catch {
-		// Fall through to the word-char expansion below.
-	}
-	const idx = at >= text.length && at > 0 ? at - 1 : at;
-	if (!isWordChar(text[idx])) return null;
-	let start = idx;
-	while (start > 0 && isWordChar(text[start - 1])) start--;
-	let end = idx;
-	while (end < text.length && isWordChar(text[end])) end++;
-	return [start, end];
-}
-
 const SENTENCE_END = /[.!?。！？．]/;
 
 /**
@@ -332,6 +267,45 @@ export function ttsLangFor(word: string, fallback = "en-US"): string {
 		if (test(word)) return lang;
 	}
 	return fallback;
+}
+
+/**
+ * Simplified-only characters: in neither Traditional nor Japanese
+ * (each differs from both, e.g. 说 vs 説/說, 读 vs 読/讀). Curated
+ * conservatively — kokuji and shared shinjitai (国, 会, 発, 学)
+ * stay out, so Japanese text never trips it.
+ */
+const SIMPLIFIED_ONLY =
+	"语说读听汉适节观现规设证识访译络绝统线练组织众优质际产严买" +
+	"车门问间长马鸟风飞饮饭馆头为务认让边达过进远运还这么对发" +
+	"华电脑视别圣云气";
+/**
+ * Traditional-only characters: in neither Simplified nor Japanese
+ * (e.g. 說 vs 说/説, 讀 vs 读/読). Same conservative curation —
+ * shared forms (車, 語, 門, 頭) stay out.
+ */
+const TRADITIONAL_ONLY = "國學們麼這廣說讀聽龜觀廠應舉關麥黃點臉兒邊來條帶";
+
+/** Han characters in `text` (UTF-16 length is irrelevant — code points). */
+function hanLength(text: string): number {
+	let n = 0;
+	for (const ch of text) if (/\p{Script=Han}/u.test(ch)) n++;
+	return n;
+}
+
+/**
+ * Whether a Han fragment identifies as Chinese on its own characters:
+ * at least six Han characters (two shared kanji identify nothing —
+ * short highlights keep their surrounding voice) with a
+ * simplified-only or traditional-only form among them. Pure.
+ */
+export function hasDistinctiveChinese(text: string): boolean {
+	if (hanLength(text) < 6) return false;
+	for (const ch of text) {
+		if (SIMPLIFIED_ONLY.includes(ch) || TRADITIONAL_ONLY.includes(ch))
+			return true;
+	}
+	return false;
 }
 
 /**
@@ -772,13 +746,58 @@ export function groupRuns(runs: AnnotatedRun[], size = 4): GroupedRun[] {
  * Pure over strings; hostile markup stays inert (strings only, no
  * elements).
  */
+/**
+ * Start of the selected instance of `quote` in `plain`: every
+ * occurrence scores by left-context overlap with the document text
+ * around the highlight, so a repeated word slices the selected
+ * instance (夜 picked from 夜間…夜 reads よる, not the first span's
+ * やかん) instead of always the first. Ties and misses return -1 —
+ * callers keep the historical first match. Pure.
+ */
+export function quoteStartForContext(
+	plain: string,
+	quote: string,
+	leftCtx: string
+): number {
+	if (!plain || !quote) return -1;
+	let best = -1;
+	let bestScore = -1;
+	let from = 0;
+	for (;;) {
+		const at = plain.indexOf(quote, from);
+		if (at < 0) break;
+		from = at + 1;
+		const back = plain.slice(Math.max(0, at - 24), at);
+		const ctx = leftCtx.slice(-24);
+		let score = 0;
+		while (
+			score < back.length &&
+			score < ctx.length &&
+			back[back.length - 1 - score] === ctx[ctx.length - 1 - score]
+		)
+			score++;
+		if (score > bestScore) {
+			bestScore = score;
+			best = at;
+		}
+		if (from >= plain.length) break;
+	}
+	return best;
+}
+
 export function sliceRunsForQuote(
 	sentenceRuns: AnnotatedRunWithOffsets[] | null,
 	sentencePlain: string,
-	quote: string
+	quote: string,
+	quoteStart: number | null = null
 ): AnnotatedRun[] | null {
 	if (!sentenceRuns || quote === "") return null;
-	const qStart = sentencePlain.indexOf(quote);
+	const qStart =
+		quoteStart !== null &&
+		quoteStart >= 0 &&
+		sentencePlain.startsWith(quote, quoteStart)
+			? quoteStart
+			: sentencePlain.indexOf(quote);
 	if (qStart < 0) return null;
 	const qEnd = qStart + quote.length;
 	const out: AnnotatedRun[] = [];
@@ -808,10 +827,16 @@ export function sliceRunsForQuote(
 export function quoteTailCompletion(
 	sentenceRuns: AnnotatedRunWithOffsets[] | null,
 	sentencePlain: string,
-	quote: string
+	quote: string,
+	quoteStart: number | null = null
 ): string {
 	if (!sentenceRuns || quote === "") return "";
-	const qStart = sentencePlain.indexOf(quote);
+	const qStart =
+		quoteStart !== null &&
+		quoteStart >= 0 &&
+		sentencePlain.startsWith(quote, quoteStart)
+			? quoteStart
+			: sentencePlain.indexOf(quote);
 	if (qStart < 0) return "";
 	const qEnd = qStart + quote.length;
 	let tail = "";

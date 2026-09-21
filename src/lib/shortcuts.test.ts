@@ -146,7 +146,7 @@ describe("shortcuts menu copy", () => {
 			"Swipe left off messages · chats list button · two-finger swipe left"
 		);
 		expect(byName.get("Newer / older chat")).toBe(
-			"Three-finger swipe right / left"
+			"Three-finger swipe left / right"
 		);
 		expect(byName.get("Top of chat")).toBe("Two-finger swipe up · gg");
 		expect(byName.get("Bottom of chat")).toBe("Two-finger swipe down · G");

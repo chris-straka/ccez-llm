@@ -87,6 +87,9 @@ pub unsafe extern "C" fn Java_studio_ccez_app_TurnSvc_nativeInit(
 }
 
 /// First live turn starts the service; later ones only bump the count.
+/// Currently unclaimed (owner removed the foreground notice; see
+/// turn_service_claim) but kept as the documented mechanism.
+#[allow(dead_code)]
 pub fn service_claim() {
     let start = match live_count().lock() {
         Ok(mut count) => {

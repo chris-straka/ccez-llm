@@ -102,8 +102,8 @@ test.describe("gestures", () => {
 			modal.locator('dt:text-is("Newer / older chat")')
 		).toBeVisible();
 		await expect(
-			modal.locator('dd:has-text("Three-finger swipe right")')
-		).toHaveText("Three-finger swipe right / left");
+			modal.locator('dd:has-text("Three-finger swipe left")')
+		).toHaveText("Three-finger swipe left / right");
 		await expect(modal.locator('dt:text-is("Top of chat")')).toBeVisible();
 		await expect(
 			modal.locator('dd:has-text("Two-finger swipe up")')
@@ -708,8 +708,9 @@ test.describe("touch", () => {
 	test("three-finger swipe steps to the newer chat", async ({ page }) => {
 		await seedTwoChats(page);
 		const before = await page.locator("article .rendered").first().innerText();
-		// Chat steps moved to three fingers (right steps newer); the
-		// lead finger's lift carries the travel, so no move event needed.
+		// Chat steps moved to three fingers (left steps newer, matching
+		// the switcher veil); the lead finger's lift carries the travel,
+		// so no move event needed.
 		await page.evaluate(() => {
 			const touch = (id: number, x: number, y: number) =>
 				new Touch({
@@ -723,7 +724,7 @@ test.describe("touch", () => {
 					bubbles: true,
 					cancelable: true,
 					composed: true,
-					touches: [touch(1, 150, 500), touch(2, 190, 500), touch(3, 230, 500)]
+					touches: [touch(1, 310, 500), touch(2, 350, 500), touch(3, 390, 500)]
 				})
 			);
 			window.dispatchEvent(
@@ -733,9 +734,9 @@ test.describe("touch", () => {
 					composed: true,
 					touches: [],
 					changedTouches: [
-						touch(1, 310, 500),
-						touch(2, 350, 500),
-						touch(3, 390, 500)
+						touch(1, 150, 500),
+						touch(2, 190, 500),
+						touch(3, 230, 500)
 					]
 				})
 			);
@@ -2488,41 +2489,6 @@ test.describe("always-visible prompt", () => {
 		await flick(page, "article.assistant .rendered", 220, 500, 30, 505);
 		await expect(article).not.toHaveClass(/folded-msg/);
 		await expect(panel).not.toHaveClass(/closed/);
-	});
-
-	/** Double-tap selects the tapped word (native double-tap never
-	fires in the WebView, so the run takes the word itself). */
-	test("double-tap selects the tapped word", async ({ page }) => {
-		await seed(page, {}, ["Language is a bridge that connects people."]);
-		await page.goto("/");
-		const rendered = page.locator("article.assistant .rendered").first();
-		await expect(rendered).toBeVisible();
-		const word = await rendered.evaluate((el) => {
-			const r = el.getBoundingClientRect();
-			const x = r.x + 10;
-			const y = r.y + 10;
-			const touch = () =>
-				new Touch({ identifier: 7, target: el, clientX: x, clientY: y });
-			for (let i = 0; i < 2; i++) {
-				el.dispatchEvent(
-					new TouchEvent("touchstart", {
-						touches: [touch()],
-						bubbles: true,
-						cancelable: true
-					})
-				);
-				el.dispatchEvent(
-					new TouchEvent("touchend", {
-						touches: [],
-						changedTouches: [touch()],
-						bubbles: true,
-						cancelable: true
-					})
-				);
-			}
-			return window.getSelection()?.toString() ?? "";
-		});
-		expect(word).toBe("Language");
 	});
 
 	/** Sideways pans inside code and latex blocks belong to the inner
