@@ -139,6 +139,7 @@
 	import Toasts from "$lib/components/Toasts.svelte";
 	import SelMenu from "$lib/components/SelMenu.svelte";
 	import Attachments from "$lib/components/Attachments.svelte";
+	import Readings from "$lib/components/Readings.svelte";
 	import { plainBody, sourcesAsked } from "$lib/render";
 	import {
 		clearNotice,
@@ -13764,47 +13765,10 @@
 		/>
 	{/if}
 
-	{#if selPinyin && !previewing}
-		<!-- Selection readings: pronunciations for just the highlight,
-		docked above it (below only without headroom) — on phones the
-		menu rises above the panels (see liftSelMenuAboveReadings) instead
-		of owning the above slot. Pointer-transparent so it never
-		disturbs the selection or blocks the native menu; the highlight
-		clearing dismisses it (see trimMessageDrag), and scrolling
-		tracks it (see trackSelPinyin). -->
-		<div
-			class="sel-pinyin"
-			class:above={selPinyin.above}
-			style="left: {selPinyin.x}px; top: {selPinyin.y}px"
-			aria-live="polite"
-		>
-			<!-- eslint-disable-line svelte/no-at-html-tags -- html is "…" or readingsOnly output (inert by unit test, see reading.ts) -->{@html selPinyin.html}
-		</div>
-	{/if}
-	{#if selFurigana && !previewing}
-		<!-- Furigana group panels: one per back-to-back kanji group,
-		furigana only, each anchored to its own group. Same glass as
-		the flat panel; the selected kanji glow in matching colors
-		in the document (see tintSelectionSpans). -->
-		{#each selFurigana as panel, pi (pi)}
-			<div
-				class="sel-pinyin"
-				class:above={panel.above}
-				style="left: {panel.x}px; top: {panel.y}px"
-				aria-live="polite"
-			>
-				{#each panel.runs as run (run.start)}
-					{#if panel.plain}
-						<span class="spr"><span class="srt">{run.reading}</span></span>
-					{:else}
-						<span class="spr pk{run.color}"
-							><span class="srt">{run.reading}</span></span
-						>
-					{/if}
-				{/each}
-			</div>
-		{/each}
-	{/if}
+	<!-- Selection readings panels: pronunciations for just the
+	highlight. Readings.svelte owns the panels and their surfaces;
+	the page keeps placement, tracking, and dismiss. -->
+	<Readings pinyin={selPinyin} furigana={selFurigana} previewing={previewing} />
 
 	{#if annPop}
 		<!-- Mousedown on the buttons keeps textarea focus: without it the
@@ -17313,62 +17277,8 @@
 	must never disturb the highlight or block the native menu).
 	Desktop docks it above the highlight while the menu rides the
 	cursor; phones dock it below, since the menu owns above. */
-	.sel-pinyin {
-		position: fixed;
-		z-index: 50;
-		pointer-events: none;
-		max-width: 20rem;
-		/* Tight sides: the popup hugs its readings (runs carry no
-		inner padding of their own). */
-		padding: 0.3rem 0.2rem;
-		border-radius: 8px;
-		font-size: 0.85rem;
-		background: rgba(255, 255, 255, 0.88);
-		-webkit-backdrop-filter: blur(18px) saturate(1.6);
-		backdrop-filter: blur(18px) saturate(1.6);
-		box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
-		color: #1c1c1e;
-		color: var(--ink);
-	}
-	:global(html[data-theme="dark"]) .sel-pinyin {
-		background: rgba(30, 30, 32, 0.88);
-	}
-	/* Centered on the highlight whatever the panel width (and so
-	whatever the font size): the style left is the highlight's
-	center. Above hangs 4px over its top edge; below clears 4px
-	under it. */
-	.sel-pinyin {
-		transform: translateX(-50%);
-	}
-	.sel-pinyin.above {
-		transform: translate(-50%, calc(-100% - 4px));
-	}
-	.sel-pinyin:not(.above) {
-		margin-top: 4px;
-	}
-	/* Annotated furigana runs: colors cycle continuously across the
-	highlight so every popup links its own document tint. A lone
-	single-run popup renders plain (no pk class, ink text). No
-	repeated kanji or kana anywhere. */
-	.sel-pinyin .spr {
-		display: inline-block;
-		white-space: nowrap;
-	}
-	.sel-pinyin .srt {
-		display: block;
-	}
-	.sel-pinyin .pk0 .srt {
-		color: var(--pair0);
-	}
-	.sel-pinyin .pk1 .srt {
-		color: var(--pair1);
-	}
-	.sel-pinyin .pk2 .srt {
-		color: var(--pair2);
-	}
-	.sel-pinyin .pk3 .srt {
-		color: var(--pair3);
-	}
+	/* Reading panels render in `Readings.svelte` now (panel glass,
+	anchoring, and run colors moved with the markup). */
 	/* Document tint: selected kanji glow in their popup color
 	while the panels are up (unwrapped on dismiss). */
 	:global(.rendered .frbt0) {
