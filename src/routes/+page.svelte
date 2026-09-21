@@ -1864,12 +1864,18 @@
 	let stopDictation: (() => void) | null = null;
 	let openLangMenu: LanguageMenu["id"] | null = $state(null);
 	/* Phone sheet anchor: the open list escapes the thread scroller
-	(fixed, full column from screen top to composer) because inside
-	.messages anything past its box clips — Europe's 20-item list
-	read as five languages cut by a rectangle. Null on desktop,
-	which keeps the in-flow upward list. */
-	let langMenuAnchor: { top: number; left: number; maxH: number } | null =
-		$state(null);
+	(fixed, vertically centered between screen top and composer)
+	because inside .messages anything past its box clips —
+	Europe's 20-item list read as five languages cut by a
+	rectangle. Null on desktop, which keeps the in-flow upward
+	list. Equal top/bottom margins center the shrink-wrapped sheet
+	(see .lang-list-fixed). */
+	let langMenuAnchor: {
+		top: number;
+		bottom: number;
+		left: number;
+		maxH: number;
+	} | null = $state(null);
 	function toggleLangMenu(id: LanguageMenu["id"], btn: HTMLElement): void {
 		// Family open/close ticks on phones (buzzTap self-gates to
 		// Android and honors the haptics toggle).
@@ -1886,12 +1892,16 @@
 		const r = btn.getBoundingClientRect();
 		const composerTop =
 			promptEl?.getBoundingClientRect().top ?? window.innerHeight;
-		// Full-column sheet: Europe/Asia never fit between their pill
-		// and the composer, so the panel spans screen top to composer
-		// instead — overlapping its own pills (tap-away still closes).
-		// Left edge stays pill-anchored, shifted to stay on-screen.
+		// Centered sheet: Europe/Asia never fit between their pill
+		// and the composer, so the panel centers in the screen-top
+		// to composer band instead of starting at the top —
+		// overlapping its own pills (tap-away still closes). Equal
+		// top/bottom offsets plus auto vertical margins do the
+		// centering (see .lang-list-fixed). Left edge stays
+		// pill-anchored, shifted to stay on-screen.
 		langMenuAnchor = {
 			top: 8,
+			bottom: Math.round(window.innerHeight - composerTop + 8),
 			left: Math.round(
 				Math.max(8, Math.min(r.left, window.innerWidth - 8 - 180))
 			),
@@ -12009,7 +12019,7 @@
 								class:lang-list-fixed={androidUI && langMenuAnchor !== null}
 								role="menu"
 								style={androidUI && langMenuAnchor
-									? `top: ${langMenuAnchor.top}px; left: ${langMenuAnchor.left}px; max-height: ${langMenuAnchor.maxH}px;`
+									? `top: ${langMenuAnchor.top}px; bottom: ${langMenuAnchor.bottom}px; left: ${langMenuAnchor.left}px; max-height: ${langMenuAnchor.maxH}px;`
 									: undefined}
 							>
 								<!-- Menu-click clears only languages without a number key
@@ -15608,14 +15618,17 @@
 		bottom: auto;
 	}
 	/* The open sheet escapes the thread scroller as a fitted fixed
-	panel (top/left/max-height ride inline from the pill rect): the
-	scroller clips anything past its box, which read as five
-	languages cut by a rectangle. Above the composer (z-30), below
-	nothing it needs; the phone centering translate stands down. */
+	panel (top/bottom/left/max-height ride inline from the pill
+	rect): the scroller clips anything past its box, which read as
+	five languages cut by a rectangle. Equal inline top/bottom plus
+	auto vertical margins center the shrink-wrapped sheet between
+	screen top and composer instead of starting at the top; the
+	phone centering translate stands down. */
 	.app[data-android] .lang-list-fixed {
 		position: fixed;
 		right: auto;
-		bottom: auto;
+		margin-top: auto;
+		margin-bottom: auto;
 		transform: none;
 		z-index: 60;
 		overflow-y: auto;
