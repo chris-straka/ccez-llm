@@ -280,6 +280,7 @@
 		threeFingerSwipeDir,
 		isThreeFingerTap,
 		nextTapCount,
+		multiTapOwnsRelease,
 		visibleProviderIds,
 		type TapSequence,
 		type FlickZone,
@@ -11237,10 +11238,19 @@
 			// below clears it (a changed selection from a multi-click
 			// reselect is new work, not a collapse — it falls through to
 			// the normal summon path). Escape / the timer still dismiss.
+			// Phones exempt a fresh multi-tap run: the double-tap word
+			// pick (and the triple/quad sentence/paragraph overrides)
+			// land between touchend and this compatibility mouseup, so
+			// downSel already includes the fresh pick and the equality
+			// below misreads it as "nothing changed" — clearing the
+			// word the tap just selected. msgTapSeq only ever counts
+			// past one on Android (see the touchend run tracker), so
+			// desktop multi-clicks keep the old path untouched.
 			if (
 				!dragged &&
 				liveText === downSel &&
-				(event.detail <= 1 || event.detail >= 4)
+				(event.detail <= 1 || event.detail >= 4) &&
+				!multiTapOwnsRelease(msgTapSeq, Date.now())
 			) {
 				// A plain click changed nothing: blank space, a collapsed
 				// caret, or inside the old highlight (the engine collapses

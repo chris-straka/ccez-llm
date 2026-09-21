@@ -403,3 +403,21 @@ export function nextTapCount(
 	}
 	return { count: 1, at, x, y };
 }
+
+/**
+ * Whether a release belongs to tap 2+ of a consecutive-tap run
+ * (double/triple/quadruple): the run's own selection (native word
+ * pick, sentence/paragraph override) lands between touchend and the
+ * compatibility mouseup, so a staleness check that compares against
+ * the press-time snapshot misreads the fresh pick as "nothing
+ * changed". Single taps and stale runs never qualify. Pure.
+ */
+export function multiTapOwnsRelease(
+	seq: TapSequence | null,
+	now: number,
+	windowMs = 800
+): boolean {
+	return (
+		seq !== null && seq.count >= 2 && now - seq.at >= 0 && now - seq.at < windowMs
+	);
+}

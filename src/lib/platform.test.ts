@@ -19,6 +19,7 @@ import {
 	twoFingerSlideDir,
 	isThreeFingerTap,
 	nextTapCount,
+	multiTapOwnsRelease,
 	threeFingerSwipeDir,
 	micButtonsShown
 } from "./platform";
@@ -438,6 +439,27 @@ describe("nextTapCount", () => {
 		const one = nextTapCount(null, 1000, 50, 50);
 		expect(nextTapCount(one, 1500, 50, 50).count).toBe(1);
 		expect(nextTapCount(one, 1200, 200, 200).count).toBe(1);
+	});
+});
+
+describe("multiTapOwnsRelease", () => {
+	it("claims taps two through four while the run is fresh", () => {
+		const two = { count: 2, at: 1000, x: 50, y: 50 };
+		expect(multiTapOwnsRelease(two, 1050)).toBe(true);
+		expect(multiTapOwnsRelease({ ...two, count: 3 }, 1100)).toBe(true);
+		expect(multiTapOwnsRelease({ ...two, count: 4 }, 1100)).toBe(true);
+	});
+	it("releases single taps, stale runs, and clock skew", () => {
+		expect(multiTapOwnsRelease(null, 1050)).toBe(false);
+		expect(
+			multiTapOwnsRelease({ count: 1, at: 1000, x: 50, y: 50 }, 1050)
+		).toBe(false);
+		expect(
+			multiTapOwnsRelease({ count: 2, at: 1000, x: 50, y: 50 }, 2000)
+		).toBe(false);
+		expect(
+			multiTapOwnsRelease({ count: 2, at: 1000, x: 50, y: 50 }, 900)
+		).toBe(false);
 	});
 });
 
