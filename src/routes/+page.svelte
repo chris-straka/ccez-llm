@@ -371,7 +371,7 @@
 		type HanOverlayLang
 	} from "$lib/reading";
 	import { isFuriganaCached } from "$lib/furigana";
-	import { reportPromptMenu } from "$lib/promptmenu";
+	import { reportOsMenu } from "$lib/promptmenu";
 	import {
 		buildSearchDocs,
 		chatMatchesQuery,
@@ -527,6 +527,7 @@
 	}
 	let editor: PromptEditor | null = $state(null);
 	let promptEl: HTMLElement | undefined = $state();
+	let settingsEl: HTMLElement | undefined = $state();
 	let scrollBox: HTMLElement | undefined = $state();
 	/** App root (pinned to the visual height while the phone keyboard is up). */
 	let appEl: HTMLElement | undefined = $state();
@@ -11366,13 +11367,18 @@
 					dismissSelPanels();
 			}
 		};
-		// Composer-only native OS menu: while a live selection sits
-		// inside the prompt, the Activity shows the real OS menu (Copy
-		// / Cut / Paste) instead of the empty dummy. Transitions only —
-		// handle drags stay silent on the bridge.
+		// Native OS menu in the prompt and settings: while a live
+		// selection sits inside either, the Activity shows the real OS
+		// menu (Copy / Cut / Paste) instead of the empty dummy, so key
+		// fields and other settings inputs paste like anywhere else.
+		// Transitions only — handle drags stay silent on the bridge.
 		const notePromptSelection = (): void => {
 			const live = window.getSelection();
-			reportPromptMenu(promptEl, live?.anchorNode ?? null, live?.isCollapsed ?? true);
+			reportOsMenu(
+				[promptEl, settingsEl],
+				live?.anchorNode ?? null,
+				live?.isCollapsed ?? true
+			);
 		};
 		const clampOffChatDrag = (): void => {
 			if (!offChatDragArmed) return;
@@ -14045,6 +14051,7 @@
 	<aside
 		class="settings-panel"
 		class:closed={!settingsOpen}
+		bind:this={settingsEl}
 		data-fade-scroll
 		aria-label="Settings"
 		inert={!settingsOpen}
