@@ -1286,6 +1286,7 @@
 	function speakSelection(): void {
 		if (!selMenu) return;
 		const menu = selMenu;
+		buzzTap();
 		void popupSelectionReadings(
 			menu.quote,
 			menu.messageId,
