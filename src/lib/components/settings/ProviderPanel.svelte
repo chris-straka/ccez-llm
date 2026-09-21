@@ -483,6 +483,10 @@
 					spellcheck="false"
 					oninput={() => (keyPasteError = "")}
 					onblur={() => (editingKey[settings.activeProviderId] = false)}
+					// Pasting replaces: with the old key selected, both
+					// the Paste button and a long-press paste overwrite
+					// instead of inserting at the cursor.
+					onfocus={(e) => e.currentTarget.select()}
 				/>
 				<button type="button" onclick={() => void pasteKey()}>Paste</button>
 			</span>
