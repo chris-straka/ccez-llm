@@ -206,6 +206,71 @@ export function wordAtNodeOffset(text: string, offset: number): string {
 	return offset > 0 ? extractWordAt(text, offset - 1) : "";
 }
 
+/** Minimal word-segment view (Intl.Segmenter when present). */
+interface WordSegment {
+	index: number;
+	segment: string;
+	isWordLike: boolean;
+}
+interface WordSegmenter {
+	segment(text: string): Iterable<WordSegment>;
+}
+
+function loadWordSegmenter(): WordSegmenter | null {
+	try {
+		const Ctor = (
+			Intl as unknown as {
+				Segmenter?: new (
+					locales?: string | string[],
+					options?: { granularity?: string }
+				) => WordSegmenter;
+			}
+		).Segmenter;
+		if (!Ctor) return null;
+		return new Ctor(undefined, { granularity: "word" });
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Word span holding `offset` (a UTF-16 index into `text`) for
+ * double-tap select: Intl.Segmenter word bounds, so CJK taps take a
+ * word-like segment instead of nothing (native double-tap never fires
+ * in the app's WebView). A caret on whitespace or punctuation yields
+ * null — nothing to select. Without a segmenter, the span expands
+ * over word chars instead. Pure.
+ */
+export function wordBoundsAt(
+	text: string,
+	offset: number
+): [number, number] | null {
+	const at = Math.max(0, Math.min(offset, text.length));
+	if (text.length === 0) return null;
+	try {
+		const segmenter = loadWordSegmenter();
+		if (segmenter) {
+			const idx = at >= text.length && at > 0 ? at - 1 : at;
+			for (const part of segmenter.segment(text)) {
+				const start = part.index;
+				const end = start + part.segment.length;
+				if (idx >= start && idx < end)
+					return part.isWordLike ? [start, end] : null;
+			}
+			return null;
+		}
+	} catch {
+		// Fall through to the word-char expansion below.
+	}
+	const idx = at >= text.length && at > 0 ? at - 1 : at;
+	if (!isWordChar(text[idx])) return null;
+	let start = idx;
+	while (start > 0 && isWordChar(text[start - 1])) start--;
+	let end = idx;
+	while (end < text.length && isWordChar(text[end])) end++;
+	return [start, end];
+}
+
 const SENTENCE_END = /[.!?。！？．]/;
 
 /**
@@ -728,6 +793,39 @@ export function sliceRunsForQuote(
 		}
 	}
 	return out.length > 0 ? out : null;
+}
+
+/**
+ * Kana continuation past a highlight's end, for speech assembly only.
+ * The slice above keeps exactly the highlight (popup ruby + tints),
+ * but a highlight ending mid-token would speak a stem: 美 sliced from
+ * 美しい carries reading うつく, and the raw fallback reads ビ. Runs
+ * after the quote with no reading are okurigana (or a particle riding
+ * along), so their text completes the spoken tail (うつくしい). Stops
+ * at the next reading-bearing run (a new kanji token), non-kana text,
+ * the sentence end, or an unfound quote. Pure.
+ */
+export function quoteTailCompletion(
+	sentenceRuns: AnnotatedRunWithOffsets[] | null,
+	sentencePlain: string,
+	quote: string
+): string {
+	if (!sentenceRuns || quote === "") return "";
+	const qStart = sentencePlain.indexOf(quote);
+	if (qStart < 0) return "";
+	const qEnd = qStart + quote.length;
+	let tail = "";
+	for (const run of sentenceRuns) {
+		if (run.end <= qEnd) continue;
+		// A reading-bearing run past the quote (or straddling its
+		// end) is a new kanji token — or a clipped one, whose full
+		// reading the slice already carries: stop either way.
+		if (run.reading !== null) break;
+		if (!/^[\p{Script=Hiragana}\p{Script=Katakana}]+$/u.test(run.text))
+			break;
+		tail += run.start < qEnd ? run.text.slice(qEnd - run.start) : run.text;
+	}
+	return tail;
 }
 
 export function annotatedRuns(html: string): AnnotatedRun[] | null {

@@ -360,6 +360,8 @@
 		readingsOnly,
 		annotatedRunsWithOffsets,
 		sliceRunsForQuote,
+		quoteTailCompletion,
+		wordBoundsAt,
 		groupRuns,
 		type GroupedRun,
 		type LocalAid,
@@ -1737,7 +1739,14 @@
 				x: xs[i] ?? panel.x
 			}));
 		});
-		return sliced.map((run) => run.reading ?? run.text).join("");
+		// Speech completes a mid-token tail the slice keeps exact:
+		// 美しい cut at 美 would otherwise speak the うつく stem
+		// (raw, the ビ on-reading). Popup ruby and tints stay on the
+		// highlight itself.
+		return (
+			sliced.map((run) => run.reading ?? run.text).join("") +
+			quoteTailCompletion(sentRuns, plain, quoted.quote)
+		);
 	}
 	/**
 	 * Readings for a highlight in the popup by the selection (see
@@ -4392,6 +4401,38 @@
 		if (end <= start) return false;
 		const anchor = nodeAtBlockOffset(found.block, start);
 		const focus = nodeAtBlockOffset(found.block, end);
+		if (!anchor || !focus) return false;
+		try {
+			selection.setBaseAndExtent(
+				anchor.node,
+				anchor.offset,
+				focus.node,
+				focus.offset
+			);
+		} catch {
+			return false;
+		}
+		return !selection.isCollapsed;
+	}
+
+	/** Double-tap: select the word around the tap point. Native
+	double-tap word select never fires in the app's WebView, so the
+	run takes the word itself (Segmenter bounds, CJK-aware) instead
+	of leaving the pair to the OS. False keeps native behavior. */
+	function selectWordAtPoint(clientX: number, clientY: number): boolean {
+		const found = textBlockAtPoint(clientX, clientY);
+		const selection = window.getSelection();
+		if (!found || !selection) return false;
+		const text = found.block.textContent ?? "";
+		const caret = caretOffsetInBlock(
+			found.block,
+			found.range.startContainer,
+			found.range.startOffset
+		);
+		const span = wordBoundsAt(text, caret);
+		if (!span) return false;
+		const anchor = nodeAtBlockOffset(found.block, span[0]);
+		const focus = nodeAtBlockOffset(found.block, span[1]);
 		if (!anchor || !focus) return false;
 		try {
 			selection.setBaseAndExtent(
@@ -8670,9 +8711,10 @@
 		tap pairs into the sidebar open instead. */
 		let emptyTapTimer: ReturnType<typeof setTimeout> | null = null;
 		/** Consecutive-tap run on message text (phones): double-tap
-		stays native (word), triple-tap selects the sentence and
-		quadruple-tap the paragraph (see the touchend override
-		below). Own pairing — empty-space taps keep theirs above. */
+		selects the word, triple-tap the sentence and quadruple-tap
+		the paragraph (see the touchend overrides below — native
+		double-tap never fires in the WebView). Own pairing —
+		empty-space taps keep theirs above. */
 		let msgTapSeq: TapSequence | null = null;
 		function flickZoneOf(target: EventTarget | null): FlickZone {
 			const el = target instanceof Element ? target : null;
@@ -8958,8 +9000,10 @@
 							ended.clientX,
 							ended.clientY
 						);
-						if (msgTapSeq.count === 2)
+						if (msgTapSeq.count === 2) {
 							msgDoubleTapPin = { id: start.msgId, at: now };
+							selectWordAtPoint(ended.clientX, ended.clientY);
+						}
 						// Triple-tap takes the sentence, quadruple-tap the
 						// paragraph (this counter only ever sees
 						// single-finger taps). A false return keeps the

@@ -37,6 +37,8 @@ import {
 	annotatedRuns,
 	annotatedRunsWithOffsets,
 	sliceRunsForQuote,
+	quoteTailCompletion,
+	wordBoundsAt,
 	groupRuns,
 	wordAtNodeOffset
 } from "./reading";
@@ -650,6 +652,55 @@ describe("sliceRunsForQuote", () => {
 			expect(typeof run.text).toBe("string");
 			expect(run instanceof Element).toBe(false);
 		}
+	});
+});
+
+describe("quoteTailCompletion", () => {
+	// The repo's own 美しい fixture: a highlight cut at 美 must speak
+	// the full うつくしい, not the うつく stem (raw: ビ).
+	const runs = annotatedRunsWithOffsets(
+		'<span class="frb">美<span class="frt">うつく</span></span>しいが<span class="frb">花<span class="frt">はな</span></span>'
+	)!;
+	const plain = runs.map((r) => r.text).join("");
+
+	it("completes a mid-token tail through kana continuations", () => {
+		expect(plain).toBe("美しいが花");
+		expect(quoteTailCompletion(runs, plain, "美")).toBe("しいが");
+	});
+
+	it("stops at the next kanji token", () => {
+		expect(quoteTailCompletion(runs, plain, "美しいが")).toBe("");
+	});
+
+	it("returns empty at the sentence end or off the map", () => {
+		expect(quoteTailCompletion(runs, plain, "美しいが花")).toBe("");
+		expect(quoteTailCompletion(runs, plain, "富士山")).toBe("");
+		expect(quoteTailCompletion(runs, plain, "")).toBe("");
+		expect(quoteTailCompletion(null, plain, "美")).toBe("");
+	});
+});
+
+describe("wordBoundsAt", () => {
+	it("spans the Latin word holding the offset", () => {
+		expect(wordBoundsAt("hello world", 1)).toEqual([0, 5]);
+		expect(wordBoundsAt("hello world", 8)).toEqual([6, 11]);
+		expect(wordBoundsAt("hello world", 11)).toEqual([6, 11]);
+	});
+
+	it("yields nothing on whitespace or punctuation", () => {
+		expect(wordBoundsAt("hello world", 5)).toBe(null);
+		expect(wordBoundsAt("hi, there", 2)).toBe(null);
+		expect(wordBoundsAt("", 0)).toBe(null);
+	});
+
+	it("takes a word-like CJK segment, never empty", () => {
+		const text = "日本語は繊細です";
+		const span = wordBoundsAt(text, 4);
+		expect(span).not.toBe(null);
+		const [start, end] = span!;
+		expect(start).toBeLessThanOrEqual(4);
+		expect(end).toBeGreaterThan(4);
+		expect(text.slice(start, end)).not.toMatch(/[\s。、]/);
 	});
 });
 

@@ -2490,6 +2490,41 @@ test.describe("always-visible prompt", () => {
 		await expect(panel).not.toHaveClass(/closed/);
 	});
 
+	/** Double-tap selects the tapped word (native double-tap never
+	fires in the WebView, so the run takes the word itself). */
+	test("double-tap selects the tapped word", async ({ page }) => {
+		await seed(page, {}, ["Language is a bridge that connects people."]);
+		await page.goto("/");
+		const rendered = page.locator("article.assistant .rendered").first();
+		await expect(rendered).toBeVisible();
+		const word = await rendered.evaluate((el) => {
+			const r = el.getBoundingClientRect();
+			const x = r.x + 10;
+			const y = r.y + 10;
+			const touch = () =>
+				new Touch({ identifier: 7, target: el, clientX: x, clientY: y });
+			for (let i = 0; i < 2; i++) {
+				el.dispatchEvent(
+					new TouchEvent("touchstart", {
+						touches: [touch()],
+						bubbles: true,
+						cancelable: true
+					})
+				);
+				el.dispatchEvent(
+					new TouchEvent("touchend", {
+						touches: [],
+						changedTouches: [touch()],
+						bubbles: true,
+						cancelable: true
+					})
+				);
+			}
+			return window.getSelection()?.toString() ?? "";
+		});
+		expect(word).toBe("Language");
+	});
+
 	/** Sideways pans inside code and latex blocks belong to the inner
 	scroller: they fold neither the block nor the message around it. */
 	test("code and latex pans never fold the message", async ({ page }) => {
