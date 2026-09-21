@@ -150,6 +150,8 @@
 	import SentAttachments from "$lib/components/SentAttachments.svelte";
 	import SentRefs from "$lib/components/SentRefs.svelte";
 	import MessageActions from "$lib/components/MessageActions.svelte";
+	import SendingIndicator from "$lib/components/SendingIndicator.svelte";
+	import FindBar from "$lib/components/FindBar.svelte";
 	import { plainBody, sourcesAsked } from "$lib/render";
 	import {
 		clearNotice,
@@ -12304,56 +12306,24 @@
 
 		<!-- In-chat find (Cmd/Ctrl+F): message-level cycling browser-style. -->
 		{#if find.open && !androidUI}
-			<div class="find-bar" role="search" aria-label="Find in chat">
-				<input
-					type="search"
-					bind:this={findInputEl}
-					bind:value={find.query}
-					oninput={() => {
+			<!-- In-chat find renders in `FindBar.svelte`; the page keeps
+			the query/cursor/hits, landing, and focus behind bindables
+			and actions. -->
+			<FindBar
+				bind:query={find.query}
+				bind:inputEl={findInputEl}
+				hitCount={currentFindHits().length}
+				cursor={find.cursor}
+				actions={{
+					input: () => {
 						find.cursor = 0;
 						landFindHit();
-					}}
-					onkeydown={(e) => {
-						if (e.key === "Enter") {
-							e.preventDefault();
-							// One hit is "done": close (the cursor dies
-							// with the bar). Several keep cycling; none
-							// keeps the bar.
-							if (currentFindHits().length === 1) closeFind();
-							else stepFind(e.shiftKey ? -1 : 1);
-						}
-					}}
-					placeholder="Find in chat"
-					aria-label="Find in chat"
-					autocomplete="off"
-					spellcheck={false}
-				/>
-				<span class="find-count" aria-live="polite">
-					{currentFindHits().length === 0
-						? find.query.trim()
-							? "No matches"
-							: ""
-						: `${Math.min(find.cursor + 1, currentFindHits().length)}/${currentFindHits().length}`}
-				</span>
-				<button
-					type="button"
-					aria-label="Previous match"
-					title="Previous (Shift+Enter)"
-					onclick={() => stepFind(-1)}>↑</button
-				>
-				<button
-					type="button"
-					aria-label="Next match"
-					title="Next (Enter)"
-					onclick={() => stepFind(1)}>↓</button
-				>
-				<button
-					type="button"
-					aria-label="Close find"
-					title="Close (Esc)"
-					onclick={closeFind}>×</button
-				>
-			</div>
+					},
+					enter: (shift: boolean) => stepFind(shift ? -1 : 1),
+					step: stepFind,
+					close: closeFind
+				}}
+			/>
 		{/if}
 
 		{#if points.length > 3 && !settingsOpen && !previewing}
@@ -12714,37 +12684,13 @@
 					{/if}
 				</article>
 			{/each}
-			{#if (isSending(chatState, viewChat.id) && hasFetchActive(chatState, viewChat.id)) || nativeFetching.has(viewChat.id)}
-				<!-- Tool-fetch phase: the turn went quiet pulling a page
-				(even after chatter printed, when Thinking already retired).
-				The elapsed count keeps running, so a long fetch reads as
-				working, never stalled. -->
-				<p class="sending" role="status" aria-label="Fetching a page">
-					<span class="sending-chip"
-						>Fetching<span
-							class="tdots"
-							aria-hidden="true"
-							><span>.</span><span>.</span><span>.</span></span
-						>{#if sendElapsed > 0}<span
-								class="sending-elapsed"
-								aria-hidden="true">· {sendElapsed}s</span
-							>{/if}</span
-					>
-				</p>
-			{:else if (isSending(chatState, viewChat.id) || liveNative.has(viewChat.id)) && !hasReplyStarted(chatState, viewChat.id)}
-				<p class="sending" role="status" aria-label="Waiting for a reply">
-					<span class="sending-chip"
-						>{thinkingLabelFor(activeReplyCode ?? settings.replyLang)}<span
-							class="tdots"
-							aria-hidden="true"
-							><span>.</span><span>.</span><span>.</span></span
-						>{#if sendElapsed > 0}<span
-								class="sending-elapsed"
-								aria-hidden="true">· {sendElapsed}s</span
-							>{/if}</span
-					>
-				</p>
-			{/if}
+			<!-- Sending status renders in `SendingIndicator.svelte`; the
+			page keeps send/fetch state and labels. -->
+			<SendingIndicator
+				phase={(isSending(chatState, viewChat.id) && hasFetchActive(chatState, viewChat.id)) || nativeFetching.has(viewChat.id) ? "fetch" : (isSending(chatState, viewChat.id) || liveNative.has(viewChat.id)) && !hasReplyStarted(chatState, viewChat.id) ? "waiting" : null}
+				elapsed={sendElapsed}
+				waitingLabel={thinkingLabelFor(activeReplyCode ?? settings.replyLang)}
+			/>
 		</div>
 
 		{#if (missingKey || (noKeyLock && !settingsOpen)) && !androidUI}
@@ -13424,59 +13370,8 @@
 			opacity: 1;
 		}
 	}
-	.find-bar {
-		/* Floating overlay, never in-flow: opening find must not push
-		the column down. Upper half of the viewport (never dead
-		center), over the messages. High z-index so hits reach it,
-		not the text underneath. */
-		position: fixed;
-		top: 25%;
-		left: 50%;
-		transform: translate(-50%, -50%);
-		z-index: 60;
-		margin: 0;
-		display: flex;
-		align-items: center;
-		gap: 0.4rem;
-		padding: 0.35rem 0.5rem;
-		border: 1px solid #c7c7cc;
-		border-color: var(--line);
-		border-radius: 10px;
-		background: #fff;
-		background: var(--bg-raised);
-		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-	}
-	.find-bar input[type="search"] {
-		font: inherit;
-		font-size: 0.85rem;
-		color: inherit;
-		background: none;
-		border: 0;
-		outline: none;
-		width: 12rem;
-	}
-	.find-count {
-		font-size: 0.75rem;
-		color: #6e6e73;
-		color: var(--muted);
-		min-width: 3.2rem;
-		text-align: right;
-		white-space: nowrap;
-	}
-	.find-bar button {
-		font: inherit;
-		font-size: 0.85rem;
-		border: 0;
-		border-radius: 6px;
-		background: none;
-		cursor: pointer;
-		color: inherit;
-		padding: 0.1rem 0.35rem;
-		line-height: 1.2;
-	}
-	.find-bar button:hover {
-		background: rgba(120, 120, 128, 0.18);
-	}
+	/* Find bar renders in `FindBar.svelte` now (bar, input, count,
+	step/close buttons). */
 	button.link {
 		font: inherit;
 		color: inherit;
@@ -14918,52 +14813,8 @@
 		height: calc(1rem * min(var(--font-scale, 1), 2));
 		width: calc(1rem * min(var(--font-scale, 1), 2));
 	}
-	.sending {
-		color: #6e6e73;
-		/* Status reading text: tracks the text-size setting like messages. */
-		font-size: calc(0.85rem * var(--font-scale, 1));
-		/* Breathing room, explicit (never UA margins): the status
-		stands off the last message above and the composer below. */
-		margin: 0.9rem 0 1.1rem;
-	}
-	/* The wait reads as plain status text — no backplate. The three
-	dots carry the color instead: accent blue, then the thinking
-	sky/green tokens (per-theme, so no dark override block). Scoped
-	here: bare .tdots stays ink-colored on aid buttons. */
-	.sending-chip {
-		display: inline-flex;
-		align-items: baseline;
-		gap: 0.35em;
-	}
-	.sending .tdots span:nth-child(1) {
-		color: var(--accent);
-	}
-	.sending .tdots span:nth-child(2) {
-		color: #5ac8fa;
-		color: var(--thinking-2);
-	}
-	.sending .tdots span:nth-child(3) {
-		color: #34c759;
-		color: var(--thinking-3);
-	}
-	.sending-elapsed {
-		font-variant-numeric: tabular-nums;
-		opacity: 0.8;
-	}
-	/* The count stays out of the way until asked: hover the chip to
-	reveal it. Touch clients have no hover, so it always shows
-	there. (Visibility only — the text still ticks for tests.) */
-	.sending-chip .sending-elapsed {
-		display: none;
-	}
-	.sending-chip:hover .sending-elapsed {
-		display: inline;
-	}
-	@media (hover: none) {
-		.sending-chip .sending-elapsed {
-			display: inline;
-		}
-	}
+	/* Sending status renders in `SendingIndicator.svelte` now
+	(line, colored dots, elapsed). */
 	/* Loading dots exist only while busy, so an idle aid button is
 	exactly its visible label — hover and spacing never cover text
 	that isn't there. Global: the dots render in `MessageActions.svelte`
@@ -15379,9 +15230,12 @@
 	/* Centered reading column on wide screens (DeepSeek-web rhythm).
 	The cap rides --chat-width off .app (desktop slider, 36 = the default
 	fixed width); the fallback keeps phones and older saves identical. */
-	article,
-	.empty-state,
-	.sending {
+	/* Shared column width (article, hero, sending status): global,
+	since the status renders in `SendingIndicator.svelte` (and the
+	article follows with the messages shell). */
+	:global(article),
+	:global(.empty-state),
+	:global(.sending) {
 		align-self: center;
 		width: 100%;
 		max-width: min(100%, calc(var(--chat-width, 36) * 1rem));

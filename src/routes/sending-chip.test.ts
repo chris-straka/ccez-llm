@@ -4,18 +4,19 @@ import { describe, it, expect } from "vitest";
 /**
  * Stylesheet invariants for the thinking/sending chip's elapsed count.
  *
- * These assert on +page.svelte's <style> source because the behavior they
- * guard — hidden until hover, revealed on hover — is invisible to jsdom
- * (no hover, no layout). The count must not tick away in the corner
- * unasked: it hides by default, reveals on chip hover, and stays visible
- * on touch clients that have no hover to ask with.
+ * These assert on SendingIndicator.svelte's <style> source (moved with
+ * the status line) because the behavior they guard — hidden until
+ * hover, revealed on hover — is invisible to jsdom (no hover, no
+ * layout). The count must not tick away in the corner unasked: it
+ * hides by default, reveals on chip hover, and stays visible on touch
+ * clients that have no hover to ask with.
  */
 function pageStyle(): string {
 	const match = readFileSync(
-		new URL("./+page.svelte", import.meta.url),
+		new URL("../lib/components/SendingIndicator.svelte", import.meta.url),
 		"utf8"
 	).match(/<style>([\s\S]*)<\/style>/);
-	if (!match) throw new Error("+page.svelte has no <style> block");
+	if (!match) throw new Error("SendingIndicator.svelte has no <style> block");
 	// Strip CSS comments so prose can't trip the assertions below.
 	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
 }
