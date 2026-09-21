@@ -60,6 +60,41 @@ test("plain toast clears fast", async ({ page }) => {
 	await expect(toast).toBeHidden({ timeout: 6_000 });
 });
 
+/** Tapping an error toast copies its text, then dismisses: failures
+stay readable and shareable (bug reports, 401s). */
+test("error toast tap copies its text and dismisses", async ({ page }) => {
+	await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+	await seedChat(page, [{ role: "assistant", content: "copy me" }]);
+	// First write fails (the failure under test), later writes pass.
+	await page.addInitScript(() => {
+		const target = window.navigator.clipboard;
+		if (!target) return;
+		const passthrough = target.writeText.bind(target);
+		let spent = false;
+		target.writeText = (text: string) => {
+			if (spent) return passthrough(text);
+			spent = true;
+			return Promise.reject(new DOMException("denied", "NotAllowedError"));
+		};
+	});
+	await page.goto("/");
+	await expect(page.locator("article .rendered").first()).toBeVisible({
+		timeout: 60_000
+	});
+	const row = page.locator("article.assistant").first();
+	await row.hover();
+	await row.locator('button[aria-label="Copy as plain text"]').click();
+	const toast = page.locator(".toast.error");
+	await expect(toast).toContainText("Couldn't copy to the clipboard.", {
+		timeout: 10_000
+	});
+	await toast.click();
+	await expect(toast).toBeHidden({ timeout: 10_000 });
+	expect(await page.evaluate(() => window.navigator.clipboard.readText())).toBe(
+		"Couldn't copy to the clipboard."
+	);
+});
+
 /** Failures hold the long delay (8s): still up past the plain toast's
 expiry, gone on their own later. */
 test("error toast outlives the plain delay", async ({ page }) => {

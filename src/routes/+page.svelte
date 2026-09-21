@@ -1878,14 +1878,14 @@
 		if (quote === "") return;
 		buzzTap();
 		if (!navigator.clipboard) {
-			flashToast("Couldn't copy to the clipboard.");
+			flashErrorToast("Couldn't copy to the clipboard.");
 			return;
 		}
 		try {
 			await navigator.clipboard.writeText(quote);
 			flashCopyToast("Copied");
 		} catch {
-			flashToast("Couldn't copy to the clipboard.");
+			flashErrorToast("Couldn't copy to the clipboard.");
 		}
 	}
 	function inspectTouch(event: TouchEvent): void {
@@ -1984,6 +1984,20 @@
 	}
 	function dismissErrorToast(): void {
 		clearNotice(notices, "errorToast");
+	}
+	/** Error toast tap: copies the failure text (bug reports, keys
+	from 401s), then dismisses. A failed copy re-flashes red. */
+	function errorToastTap(): void {
+		const text = notices.errorToast.message;
+		dismissErrorToast();
+		if (!text) return;
+		if (!navigator.clipboard) {
+			flashErrorToast("Couldn't copy to the clipboard.");
+			return;
+		}
+		void navigator.clipboard.writeText(text).catch(() => {
+			flashErrorToast("Couldn't copy to the clipboard.");
+		});
 	}
 	let stopDictation: (() => void) | null = null;
 	let openLangMenu: LanguageMenu["id"] | null = $state(null);
@@ -4387,7 +4401,7 @@
 		const text = plainBody(target.content, target.role, sourcesWanted);
 		const done = navigator.clipboard?.writeText(text);
 		if (done === undefined) {
-			flashToast("Couldn't copy to the clipboard.");
+			flashErrorToast("Couldn't copy to the clipboard.");
 			return;
 		}
 		void done.then(
@@ -4395,7 +4409,7 @@
 				deleteMessage(chatState, index);
 				flashCopyToast("Cut to clipboard");
 			},
-			() => flashToast("Couldn't copy to the clipboard.")
+			() => flashErrorToast("Couldn't copy to the clipboard.")
 		);
 	}
 
@@ -4412,7 +4426,7 @@
 		}
 		void navigator.clipboard.writeText(text).catch(() => {
 			if (notices.toast.message === text)
-				flashToast("Couldn't copy to the clipboard.");
+				flashErrorToast("Couldn't copy to the clipboard.");
 		});
 	}
 
@@ -6157,7 +6171,7 @@
 		// The reason ships in the toast: a bare failure gives nothing to
 		// report back when it only reproduces on a phone.
 		if (had)
-			flashToast(
+			flashErrorToast(
 				reason
 					? `Couldn't load the readings for this message (${reason}).`
 					: "Couldn't load the readings for this message."
@@ -8410,7 +8424,7 @@
 			console.warn("Window drag failed:", message);
 			if (!dragWarned) {
 				dragWarned = true;
-				flashToast(`Window drag failed: ${message}`);
+				flashErrorToast(`Window drag failed: ${message}`);
 			}
 		});
 	}
@@ -8518,7 +8532,7 @@
 		} else if (outcome === "downloaded") {
 			flashToast("Study sheet downloaded");
 		} else {
-			flashToast("Sharing is unavailable here");
+			flashErrorToast("Sharing is unavailable here");
 		}
 	}
 
@@ -8528,7 +8542,7 @@
 	 * that dialog writes the file).
 	 */
 	function printCurrentChat(): void {
-		if (!printStudySheet()) flashToast("Printing is unavailable here");
+		if (!printStudySheet()) flashErrorToast("Printing is unavailable here");
 	}
 
 	/**
@@ -12452,10 +12466,10 @@
 				class={toastLong(notices.errorToast.message)
 					? "toast error long"
 					: "toast error"}
-				title="Dismiss"
+				title="Click to copy"
 				aria-live="polite"
 				transition:fade={{ duration: 160 }}
-				onclick={dismissErrorToast}>{notices.errorToast.message}</button
+				onclick={errorToastTap}>{notices.errorToast.message}</button
 			>
 		{:else if notices.toast.message}
 			<button
