@@ -1338,6 +1338,138 @@ test.describe("touch", () => {
 		await expect(menu.locator('button:has-text("Annotate")')).toBeVisible();
 	});
 
+	/** Summon a touch selection over the nth rendered paragraph (the
+	same trusted-tap-plus-hand-range dance as summonTouchSelection,
+	which always takes the first). */
+	async function summonTouchParagraph(
+		page: Page,
+		index: number
+	): Promise<void> {
+		const box = await page
+			.locator("article .rendered")
+			.nth(index)
+			.boundingBox();
+		if (!box) throw new Error("no message box");
+		const center = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+		await page.evaluate(
+			({ x, y, index: pi }: { x: number; y: number; index: number }) => {
+				const touch = (id: number) =>
+					new Touch({
+						identifier: id,
+						target: document.body,
+						clientX: x,
+						clientY: y
+					});
+				window.dispatchEvent(
+					new TouchEvent("touchstart", {
+						bubbles: true,
+						cancelable: true,
+						composed: true,
+						touches: [touch(1)]
+					})
+				);
+				const p = document.querySelectorAll("article .rendered p")[pi];
+				const sel = window.getSelection();
+				sel?.removeAllRanges();
+				if (p) sel?.selectAllChildren(p);
+				window.dispatchEvent(
+					new TouchEvent("touchend", {
+						bubbles: true,
+						cancelable: true,
+						composed: true,
+						touches: [],
+						changedTouches: [touch(1)]
+					})
+				);
+			},
+			{ x: center.x, y: center.y, index }
+		);
+	}
+
+	/** Menu bottom edge must clear the topmost above-panel: readings
+	never sit under the Annotate/Copy/Speak row. */
+	async function expectMenuClearsPanels(page: Page): Promise<void> {
+		const panels = page.locator(".sel-pinyin.above");
+		await expect(panels.first()).toBeVisible({ timeout: 120_000 });
+		// Let the lift glide settle before measuring.
+		await page.waitForTimeout(500);
+		const geometry = await page.evaluate(() => {
+			const menuEl = document.querySelector(".sel-menu");
+			const above = [...document.querySelectorAll(".sel-pinyin.above")];
+			if (!(menuEl instanceof HTMLElement) || above.length === 0)
+				return null;
+			const box = menuEl.getBoundingClientRect();
+			const top = Math.min(
+				...above.map((el) =>
+					(el as HTMLElement).getBoundingClientRect().top
+				)
+			);
+			return { menuBottom: box.bottom, panelTop: top };
+		});
+		expect(geometry).not.toBeNull();
+		expect(geometry!.menuBottom).toBeLessThanOrEqual(geometry!.panelTop);
+	}
+
+	test("speaking a kanji highlight lifts the menu above every furigana panel", async ({
+		page
+	}) => {
+		await seedChat(page, [
+			{ role: "assistant", content: "Filler line one." },
+			{ role: "assistant", content: "Filler line two." },
+			{ role: "assistant", content: "花が咲き誇る春の丘で弁当を食べる" },
+			{ role: "assistant", content: "Filler line four." }
+		]);
+		await page.goto("/");
+		await expect(page.locator("article .rendered").first()).toBeVisible({
+			timeout: 60_000
+		});
+		await summonTouchParagraph(page, 2);
+		const menu = page.locator(".sel-menu");
+		await expect(menu).toBeVisible();
+		// Han highlights float Speak to the composer dock (the menu
+		// holds Annotate/Copy), so the lift runs off the dock tap.
+		const dockSpeak = page.locator('button.ann-dock:has-text("Speak")');
+		await expect(dockSpeak).toBeVisible();
+		const btnBox = await dockSpeak.boundingBox();
+		if (!btnBox) throw new Error("no speak box");
+		await page.touchscreen.tap(
+			btnBox.x + btnBox.width / 2,
+			btnBox.y + btnBox.height / 2
+		);
+		await expectMenuClearsPanels(page);
+		await expect(menu.locator('button:has-text("Annotate")')).toBeVisible();
+	});
+
+	test("speaking a Hanzi highlight lifts the menu above the pinyin panel", async ({
+		page
+	}) => {
+		await seedChat(page, [
+			{ role: "assistant", content: "Filler line one." },
+			{ role: "assistant", content: "Filler line two." },
+			{ role: "assistant", content: "秋天的夜晚很凉爽宜人" },
+			{ role: "assistant", content: "Filler line four." }
+		]);
+		await page.goto("/");
+		await expect(page.locator("article .rendered").first()).toBeVisible({
+			timeout: 60_000
+		});
+		await summonTouchParagraph(page, 2);
+		const menu = page.locator(".sel-menu");
+		await expect(menu).toBeVisible();
+		// Han highlights float Speak to the composer dock (the menu
+		// holds Annotate/Copy), so the lift runs off the dock tap.
+		const dockSpeak = page.locator('button.ann-dock:has-text("Speak")');
+		await expect(dockSpeak).toBeVisible();
+		const btnBox = await dockSpeak.boundingBox();
+		if (!btnBox) throw new Error("no speak box");
+		await page.touchscreen.tap(
+			btnBox.x + btnBox.width / 2,
+			btnBox.y + btnBox.height / 2
+		);
+		await expectMenuClearsPanels(page);
+		await expect(menu.locator('button:has-text("Annotate")')).toBeVisible();
+	});
+
 	test("a Han highlight floats Speak and docks Inspect", async ({ page }) => {
 		await page.addInitScript(() => {
 			window.localStorage.setItem("ccez-mock-provider", "1");

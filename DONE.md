@@ -821,3 +821,20 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
 - [x] +page.svelte split dropped — decided: stays one file
       (AGENTS.md standing decision, Sep 2026); hollowing into
       `keybindings.ts` continues instead.
+- [x] Floating badge full pins dropped — owner decision (Sep 2026):
+      gap parking (empty anchors on word boundaries, in
+      `annotations.ts`) is enough; revisit only if it stops being
+      enough.
+- [x] S24 device pass done (owner verdict, Sep 2026): Annotate+Copy
+      bar, Speak+Inspect dock, ruby above the Han with the lifted
+      menu, OS callout dead through handle drags (composer keeps its
+      native menu by later decision); double-tap word select with the
+      multi-tap wipe fix, fold-toggle-off inert strokes, mobile fold
+      chevron on every row; ACTION_SEND share into the draft plus
+      API-key persistence across restarts (Keystore envelope,
+      self-sign, no Play); tap-marker edit flash on OS keyboard
+      resize; voices button spacing, system-voices auto element at
+      startup, one-finger double-tap with an empty chat.
+- [x] TTS ear-check done (owner verified by ear, Sep 2026): Mac Han
+      voice switching on English/Chinese mixed readback and S24 TTS
+      voices; Eddy/Flo zh_CN/zh_TW/ja_JP/ko_KR ranking heard.

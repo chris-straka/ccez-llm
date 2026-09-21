@@ -659,7 +659,7 @@ describe("readingPanelPlacement", () => {
 
 describe("menuYAbovePanel", () => {
 	it("clears the panel with a hair, never past the edge", () => {
-		expect(menuYAbovePanel(300, 48)).toBe(244);
+		expect(menuYAbovePanel(300, 48)).toBe(248);
 		expect(menuYAbovePanel(40, 48)).toBe(8);
 		expect(menuYAbovePanel(300, 48, 12)).toBe(240);
 	});

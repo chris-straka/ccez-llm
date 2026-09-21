@@ -47,13 +47,23 @@ test("list runs A-Z; modal toggle sits in place", async ({ page }) => {
 	// Newer global keys are folded in.
 	for (const name of [
 		"Scroll",
-		"New chat",
 		"Edit own message",
 		"Summon / hide window",
 		"Fold message by drag",
 		"Switch chat by drag"
 	]) {
 		await expect(keys.locator("div > dt", { hasText: name })).toBeVisible();
+	}
+	// Browser-dead chords stay out of the web modal (shell keeps them).
+	for (const name of [
+		"Search chats",
+		"Find in chat",
+		"Reply language",
+		"Text size up / down",
+		"Chat width + / −",
+		"New chat"
+	]) {
+		await expect(keys.locator("div > dt", { hasText: name })).toHaveCount(0);
 	}
 	await expect(keys.locator("div", { hasText: "ctrl+u/ctrl+d" })).toBeVisible();
 	// Right-click speak is listed (a second right-click restarts, never stops).

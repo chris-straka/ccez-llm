@@ -62,12 +62,27 @@ export function touchShortcuts(): ShortcutRow[] {
  * Scroll messages, Export chat, Translate selection) must stay out —
  * shortcuts.test.ts pins the full list. Returned A-Z (byName), so new
  * rows land sorted without hand-placement.
+ *
+ * inShell is false in the browser preview, where browser-claimed
+ * chords (tab switching, find, print, bookmarks, page zoom) and
+ * browser-eaten ones (new window) never reach the page: advertising
+ * them would lie, so the modal drops those rows there. Every dropped
+ * feature keeps a click equivalent.
  */
-export function desktopShortcuts(isMac: boolean): ShortcutRow[] {
+const WEB_HIDDEN_ROWS = new Set([
+	"Search chats",
+	"Find in chat",
+	"Reply language",
+	"Text size up / down",
+	"Chat width + / −",
+	"New chat"
+]);
+
+export function desktopShortcuts(isMac: boolean, inShell = true): ShortcutRow[] {
 	const altm = altKeyLabel(isMac);
 	const mod = modKeyLabel(isMac);
 	const meta = isMac ? "⌘" : "Ctrl+";
-	return [
+	const rows: ShortcutRow[] = [
 		{
 			name: "Shortcuts show/hide",
 			keys: `${isMac ? "⇧⌘/" : "Ctrl+Shift+/"} · middle-click`
@@ -142,7 +157,10 @@ export function desktopShortcuts(isMac: boolean): ShortcutRow[] {
 		{ name: "prev/next stroke step", keys: "H / L with Inspect open" },
 		{ name: "Text size up / down", keys: `${mod}+ / ${mod}−` },
 		{ name: "Chat width + / −", keys: `⇧${mod}+ / ⇧${mod}−` }
-	].sort(byName);
+	];
+	return (inShell ? rows : rows.filter((row) => !WEB_HIDDEN_ROWS.has(row.name))).sort(
+		byName
+	);
 }
 
 /** Modal filter: matches action or keys, case-insensitive. */

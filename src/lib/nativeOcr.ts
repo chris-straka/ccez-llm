@@ -257,6 +257,12 @@ interface FallbackWorker {
 			lines?: Array<{ text: string; confidence: number }>;
 		};
 	}>;
+	detect(image: string): Promise<{
+		data: {
+			script: string | null;
+			script_confidence: number | null;
+		};
+	}>;
 	terminate(): Promise<unknown>;
 }
 
@@ -311,6 +317,86 @@ export async function recognizeFallbackText(
 		lines: kept,
 		confidence: kept.length > 0 ? (confidence ?? 0) / 100 : 0
 	};
+}
+
+/**
+ * Script-detection confidence floor: below it the OSD script guess is
+ * not worth a retry pass (short captions misdetect) — the first pass
+ * stands. Paragraphs, the OCR button's real input, score far above.
+ * Pure and unit-tested through `ocrScriptLangs`.
+ */
+export const OCR_SCRIPT_FLOOR = 50;
+
+/**
+ * Tesseract traineddata for an OSD script name (`worker.detect`
+ * reports "Japanese", "Cyrillic", "Arabic", …): the retry models for
+ * a weak reply-led pass, so the image's own script picks the engine
+ * instead of the chat's reply language. Substring matching survives
+ * engine naming drift ("Hangul" vs "Korean"); unknown or shaky
+ * scripts return null and the first pass stands. Scripts with no
+ * traineddata in the reply set (Georgian, Khmer, …) also return
+ * null — English fragments beat a doomed download. Pure and
+ * unit-tested.
+ */
+export function ocrScriptLangs(
+	script: string | null,
+	scriptConfidence: number | null
+): string[] | null {
+	if (script === null || (scriptConfidence ?? 0) < OCR_SCRIPT_FLOOR)
+		return null;
+	const name = script.toLowerCase();
+	if (name.includes("japan")) return ["jpn", "eng"];
+	// Korean before Chinese: "hangul" contains "han".
+	if (name.includes("korea") || name.includes("hangul")) return ["kor", "eng"];
+	if (name.includes("chin") || name.includes("han")) return ["chi_sim", "chi_tra", "eng"];
+	// Cyrillic without a country guess: the two big models share the
+	// read (mirrors the bg/sr shared-base convention), English rides
+	// along for mixed UI.
+	if (name.includes("cyril")) return ["rus", "ukr", "eng"];
+	if (name.includes("arab")) return ["ara", "eng"];
+	if (name.includes("devanag")) return ["hin", "eng"];
+	if (name.includes("greek")) return ["ell", "eng"];
+	if (name.includes("hebrew")) return ["heb", "eng"];
+	if (name.includes("thai")) return ["tha", "eng"];
+	if (name.includes("armen")) return ["hye", "eng"];
+	if (name.includes("ethiop")) return ["amh", "eng"];
+	if (name.includes("beng")) return ["ben", "eng"];
+	if (name.includes("tamil")) return ["tam", "eng"];
+	if (name.includes("latin")) return ["eng"];
+	return null;
+}
+
+/**
+ * OSD script guess for one attached image, through the shared worker
+ * cache (the `osd` model downloads once, then reads offline like the
+ * rest). Null on any failure or shaky guess: the caller keeps its
+ * first pass, so detection can never sink a recognition.
+ */
+export async function detectFallbackScript(
+	image: string
+): Promise<{ langs: string[]; script: string } | null> {
+	try {
+		const key = "osd";
+		let pending = fallbackWorkers.get(key);
+		if (!pending) {
+			pending = (async () => {
+				const { createWorker } = await import("tesseract.js");
+				const worker = (await createWorker(["osd"])) as unknown as FallbackWorker;
+				return worker;
+			})().catch((error: unknown) => {
+				fallbackWorkers.delete(key);
+				throw error;
+			});
+			fallbackWorkers.set(key, pending);
+		}
+		const worker = await pending;
+		const { script, script_confidence } = (await worker.detect(image)).data;
+		const langs = ocrScriptLangs(script, script_confidence);
+		if (langs === null || script === null) return null;
+		return { langs, script };
+	} catch {
+		return null;
+	}
 }
 
 /**

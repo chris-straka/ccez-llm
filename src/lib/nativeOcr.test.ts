@@ -6,6 +6,8 @@ import {
 	isOcrUnsupported,
 	keepBestRecognition,
 	ocrFallbackLangs,
+	ocrScriptLangs,
+	OCR_SCRIPT_FLOOR,
 	ocrRetryHint,
 	visionSupports,
 	OCR_RETRY_BELOW,
@@ -140,6 +142,41 @@ describe("ocrFallbackLangs", () => {
 		expect(ocrFallbackLangs("el")).toEqual(["ell", "eng"]);
 		expect(ocrFallbackLangs("grc")).toEqual(["grc", "eng"]);
 		expect(ocrFallbackLangs("yue")).toEqual(["chi_tra", "eng"]);
+	});
+});
+
+describe("ocrScriptLangs", () => {
+	it("maps the user's failing scripts to their traineddata", () => {
+		expect(ocrScriptLangs("Japanese", 90)).toEqual(["jpn", "eng"]);
+		expect(ocrScriptLangs("Chinese", 90)).toEqual(["chi_sim", "chi_tra", "eng"]);
+		expect(ocrScriptLangs("Cyrillic", 90)).toEqual(["rus", "ukr", "eng"]);
+		expect(ocrScriptLangs("Arabic", 90)).toEqual(["ara", "eng"]);
+		expect(ocrScriptLangs("Devanagari", 90)).toEqual(["hin", "eng"]);
+	});
+
+	it("covers the remaining reply-set scripts plus Latin", () => {
+		expect(ocrScriptLangs("Korean", 80)).toEqual(["kor", "eng"]);
+		expect(ocrScriptLangs("Greek", 80)).toEqual(["ell", "eng"]);
+		expect(ocrScriptLangs("Hebrew", 80)).toEqual(["heb", "eng"]);
+		expect(ocrScriptLangs("Thai", 80)).toEqual(["tha", "eng"]);
+		expect(ocrScriptLangs("Armenian", 80)).toEqual(["hye", "eng"]);
+		expect(ocrScriptLangs("Ethiopic", 80)).toEqual(["amh", "eng"]);
+		expect(ocrScriptLangs("Bengali", 80)).toEqual(["ben", "eng"]);
+		expect(ocrScriptLangs("Tamil", 80)).toEqual(["tam", "eng"]);
+		expect(ocrScriptLangs("Latin", 80)).toEqual(["eng"]);
+	});
+
+	it("rejects shaky, missing, and unmodeled scripts", () => {
+		expect(ocrScriptLangs("Japanese", OCR_SCRIPT_FLOOR - 1)).toBeNull();
+		expect(ocrScriptLangs("Japanese", null)).toBeNull();
+		expect(ocrScriptLangs(null, 90)).toBeNull();
+		expect(ocrScriptLangs("Georgian", 95)).toBeNull();
+		expect(ocrScriptLangs("", 95)).toBeNull();
+	});
+
+	it("tolerates engine naming drift", () => {
+		expect(ocrScriptLangs("hangul", 90)).toEqual(["kor", "eng"]);
+		expect(ocrScriptLangs("HAN", 90)).toEqual(["chi_sim", "chi_tra", "eng"]);
 	});
 });
 

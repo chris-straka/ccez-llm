@@ -353,6 +353,9 @@ export function shortcutsFilterBlocksKey(facts: ShortcutsFilterFacts): boolean {
 export interface CommandChordFacts extends KeyModifiers {
 	key: string;
 	code: string;
+	/** True in the Tauri shell; false in the browser preview, where
+	 * browser-chrome chords (find, print, tab switching) pass through. */
+	inShell: boolean;
 }
 
 export type CommandChord =
@@ -379,17 +382,27 @@ export type CommandChord =
  */
 export function commandChord(facts: CommandChordFacts): CommandChord | null {
 	const cmd = facts.metaKey || facts.ctrlKey;
-	if (cmd && !facts.altKey && !facts.shiftKey && facts.code === "KeyP")
-		return "toggle-palette";
+	// Shell only: a browser claims ⌘/Ctrl+P (print) and ⌘/Ctrl+F
+	// (find) and the page must not swallow them. The ⌘+Ctrl+F
+	// fullscreen arm stays everywhere — no browser binds it.
+	if (cmd && !facts.altKey && !facts.shiftKey && facts.code === "KeyP") {
+		if (facts.inShell) return "toggle-palette";
+		return null;
+	}
 	if (
 		!facts.altKey &&
 		!facts.shiftKey &&
-		((facts.metaKey && !facts.ctrlKey && facts.code === "KeyE") ||
+		((facts.metaKey &&
+			!facts.ctrlKey &&
+			facts.code === "KeyE" &&
+			facts.inShell) ||
 			(facts.metaKey && facts.ctrlKey && facts.code === "KeyF"))
 	)
 		return "toggle-fullscreen";
-	if (cmd && !facts.altKey && !facts.shiftKey && facts.code === "KeyF")
-		return "find-toggle";
+	if (cmd && !facts.altKey && !facts.shiftKey && facts.code === "KeyF") {
+		if (facts.inShell) return "find-toggle";
+		return null;
+	}
 	if (facts.ctrlKey && (facts.key === "o" || facts.key === "O"))
 		return "toggle-pastes";
 	if (cmd && !facts.altKey && !facts.shiftKey && facts.key === "Enter")
@@ -417,6 +430,9 @@ export interface ChromeChordFacts extends KeyModifiers {
 	inEditor: boolean;
 	hovered: boolean;
 	inField: boolean;
+	/** True in the Tauri shell; false in the browser preview, where
+	 * browser-chrome chords (tab switching) must pass through. */
+	inShell: boolean;
 }
 
 export type ChromeChord =
@@ -460,7 +476,10 @@ export function chromeChord(facts: ChromeChordFacts): ChromeChord | null {
 		if (facts.code === "KeyJ") return "step-chat-newer";
 		if (facts.code === "KeyK") return "step-chat-older";
 	}
+	// Shell only: a browser owns ⌘/Ctrl+plus/minus (page zoom — the
+	// shell has no browser-chrome zoom to fall back on, the web does).
 	if (
+		facts.inShell &&
 		cmd &&
 		!facts.altKey &&
 		(facts.key === "=" ||
@@ -481,11 +500,18 @@ export function chromeChord(facts: ChromeChordFacts): ChromeChord | null {
 		// Physical key codes: shifted brackets report layout-dependent
 		// `key` values ("{" / "}" on US), so the shift group above
 		// matches the code instead.
-		if (facts.key.toLowerCase() === "b") return "toggle-sidebar";
+		// Shell only: a browser claims ⌘/Ctrl+B (bookmarks bar).
+		if (facts.inShell && facts.key.toLowerCase() === "b")
+			return "toggle-sidebar";
 		if (facts.key === ".") return "toggle-settings";
 		if (facts.key === ",") return "toggle-settings";
-		if (quickLangIndexForKey(facts.key) !== -1) return "quick-lang";
+		// Shell only: in a browser ⌘1…⌘0 / Ctrl+1…0 switch tabs, and
+		// the page must not swallow them.
+		if (facts.inShell && quickLangIndexForKey(facts.key) !== -1)
+			return "quick-lang";
+		// Shell only: a browser claims ⌘/Ctrl+D (bookmark tab).
 		if (
+			facts.inShell &&
 			facts.metaKey &&
 			!facts.ctrlKey &&
 			(facts.key === "d" || facts.key === "D") &&

@@ -75,6 +75,29 @@ describe("shortcuts menu copy", () => {
 		);
 	});
 
+	it("drops browser-dead rows on the web, still A-Z", () => {
+		const gone = [
+			"Search chats",
+			"Find in chat",
+			"Reply language",
+			"Text size up / down",
+			"Chat width + / −",
+			"New chat"
+		];
+		for (const isMac of [true, false]) {
+			const names = desktopShortcuts(isMac, false).map((r) => r.name);
+			expect(names).toEqual(MAC_NAMES.filter((n) => !gone.includes(n)));
+			for (const row of desktopShortcuts(isMac, false)) {
+				expect(`${row.name}: ${row.keys}`).not.toContain("(");
+			}
+		}
+		// Shell keeps the full list either way (default included).
+		expect(desktopShortcuts(true).map((r) => r.name)).toEqual(MAC_NAMES);
+		expect(desktopShortcuts(true, true).map((r) => r.name)).toEqual(
+			MAC_NAMES
+		);
+	});
+
 	it("uses Ctrl labels off-mac with the same row names", () => {
 		const rows = desktopShortcuts(false);
 		expect(rows.map((r) => r.name)).toEqual(MAC_NAMES);

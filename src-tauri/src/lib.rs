@@ -26,6 +26,7 @@ mod trafficlights;
 mod tts;
 #[cfg(target_os = "android")]
 mod tts_android;
+mod promptmenu;
 mod turn;
 #[cfg(target_os = "android")]
 mod turn_service;
@@ -260,6 +261,7 @@ pub fn run() {
             dictate_stop,
             coderun::run_code,
             fetch::fetch_page,
+            promptmenu::set_prompt_menu_allowed,
             turn::turn_start,
             turn::turn_poll,
             turn::turn_scan,

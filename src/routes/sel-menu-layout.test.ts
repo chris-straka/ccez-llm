@@ -61,9 +61,13 @@ describe("phone selection layout", () => {
 		expect(source).not.toContain("armCopyButton");
 	});
 
-	it("lifts the menu above the readings panel on speak", () => {
+	it("lifts the menu above every readings panel on speak", () => {
 		const source = pageSource();
-		expect(source).toContain("liftSelMenuAbovePinyin");
-		expect(source).toContain("menuYAbovePanel(pr.top, mr.height)");
+		// Pinyin and furigana share .sel-pinyin; the lift clears the
+		// topmost above-panel of either, and glides (drag stays 1:1).
+		expect(source).toContain("liftSelMenuAboveReadings");
+		expect(source).toContain('document.querySelectorAll(".sel-pinyin.above")');
+		expect(source).toContain("menuYAbovePanel(Math.min(...tops), mr.height)");
+		expect(source).toContain("selMenuDragging");
 	});
 });

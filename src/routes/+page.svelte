@@ -371,6 +371,7 @@
 		type HanOverlayLang
 	} from "$lib/reading";
 	import { isFuriganaCached } from "$lib/furigana";
+	import { reportPromptMenu } from "$lib/promptmenu";
 	import {
 		buildSearchDocs,
 		chatMatchesQuery,
@@ -462,6 +463,7 @@
 	import {
 		recognizeImageText,
 		recognizeFallbackText,
+		detectFallbackScript,
 		ocrFallbackLangs,
 		keepBestRecognition,
 		ocrRetryHint,
@@ -1251,11 +1253,15 @@
 	tapping (the button drift guard below eats the post-drag tap). */
 	let selMenuDrag: { mx: number; my: number; x0: number; y0: number } | null =
 		null;
+	/** A menu drag is in flight: programmatic hops glide, but the
+	finger's own stroke must stay 1:1 (see .sel-menu transition). */
+	let selMenuDragging = $state(false);
 	let menuDragSuppressAt = 0;
 	function menuDragStart(event: TouchEvent): void {
 		const t = event.changedTouches[0];
 		if (!t || !selMenu) return;
 		selMenuDrag = { mx: t.clientX, my: t.clientY, x0: selMenu.x, y0: selMenu.y };
+		selMenuDragging = true;
 	}
 	function menuDragMove(event: TouchEvent): void {
 		const drag = selMenuDrag;
@@ -1273,6 +1279,7 @@
 	}
 	function menuDragEnd(): void {
 		selMenuDrag = null;
+		selMenuDragging = false;
 	}
 	function noteMenuBtnTouch(event: TouchEvent): void {
 		const t = event.changedTouches[0];
@@ -1312,7 +1319,7 @@
 	in the popup above it — pinyin in Chinese text, furigana in
 	Japanese. Speech always runs; the popup is a silent extra. On
 	phones the menu rises above the popup (see
-	liftSelMenuAbovePinyin) so Annotate stays one tap away. */
+	liftSelMenuAboveReadings) so Annotate stays one tap away. */
 	async function speakSelection(): Promise<void> {
 		if (!selMenu) return;
 		const menu = selMenu;
@@ -1332,7 +1339,7 @@
 				messageId: menu.messageId
 			});
 			void speakQuote(kana ?? menu.quote, menu.messageId, true, menu.context);
-			if (androidUI) liftSelMenuAbovePinyin();
+			if (androidUI) liftSelMenuAboveReadings();
 			return;
 		}
 		void popupSelectionReadings(
@@ -1340,41 +1347,45 @@
 			menu.messageId,
 			menu.context
 		).then(() => {
-			if (androidUI) liftSelMenuAbovePinyin();
+			if (androidUI) liftSelMenuAboveReadings();
 		});
 		void speakQuote(menu.quote, menu.messageId, true, menu.context);
 	}
 	/**
-	 * Rise the selection menu above a readings panel the speak tap
-	 * just opened: the panel hangs over the highlight's top edge,
-	 * so the menu's old spot would cover it. Measures both live
-	 * rects and only ever moves up (no headroom above the panel,
-	 * or the popup falling below for lack of it, keeps the menu
-	 * where placeSelMenu put it).
+	 * Rise the selection menu above the readings panels a speak tap
+	 * just opened — Chinese pinyin or Japanese furigana (every panel
+	 * shares .sel-pinyin; furigana renders one per kanji group). The
+	 * panels hang over the highlight's top edge, so the menu's old
+	 * spot would cover them. Measures every above-panel live and
+	 * clears the topmost; only ever moves up (no headroom above the
+	 * top panel, or every popup falling below for lack of it, keeps
+	 * the menu where placeSelMenu put it). The hop glides (see
+	 * .sel-menu transition); a drag in flight stays 1:1.
 	 */
-	function liftSelMenuAbovePinyin(): void {
-		if (!androidUI || !selMenu || !selPinyin?.above) return;
+	function liftSelMenuAboveReadings(): void {
+		if (!androidUI || !selMenu) return;
+		if (!selPinyin?.above && !selFurigana?.some((panel) => panel.above))
+			return;
 		requestAnimationFrame(() => {
-			const panel = document.querySelector(".sel-pinyin");
+			const tops: number[] = [];
+			document.querySelectorAll(".sel-pinyin.above").forEach((el) => {
+				if (el instanceof HTMLElement)
+					tops.push(el.getBoundingClientRect().top);
+			});
 			const menu = selMenuEl;
 			const current = selMenu;
-			if (
-				!(panel instanceof HTMLElement) ||
-				!(menu instanceof HTMLElement) ||
-				!current
-			)
+			if (!(menu instanceof HTMLElement) || !current || tops.length === 0)
 				return;
-			const pr = panel.getBoundingClientRect();
 			const mr = menu.getBoundingClientRect();
 			if (mr.width === 0 || mr.height === 0) return;
-			const y = menuYAbovePanel(pr.top, mr.height);
+			const y = menuYAbovePanel(Math.min(...tops), mr.height);
 			if (y < current.y) selMenu = { ...current, y };
 		});
 	}
 	/** Dock the readings overlay centered on the highlight span
 	(pure math in readingPanelPlacement): above with headroom, else
 	below — on phones the menu rises above an above-panel instead
-	of owning the above slot (see liftSelMenuAbovePinyin).
+	of owning the above slot (see liftSelMenuAboveReadings).
 	Centering rides CSS translateX so panel width — and font size —
 	never matters: the style left IS the highlight's center
 	(rect.left would park the panel half its width too far left).
@@ -4191,6 +4202,27 @@
 						ocrRetryHint(activeReplyCode)
 					);
 					result = keepBestRecognition(result, retry);
+				} catch {
+					// First pass stands.
+				}
+			}
+			// A weak fallback pass is usually the wrong script: the
+			// reply language picks the models, not the image, so an
+			// English-led pass on a Japanese paragraph scores low.
+			// Detect the image's own script and retry once with its
+			// traineddata; detection can never sink the first pass.
+			if (fallbackLangs && result.confidence < OCR_RETRY_BELOW) {
+				try {
+					const detected = await detectFallbackScript(att.dataUrl);
+					const retryLangs = detected?.langs;
+					if (
+						retryLangs &&
+						[...retryLangs].sort().join("+") !==
+							[...fallbackLangs].sort().join("+")
+					) {
+						const retry = await recognizeFallbackText(att.dataUrl, retryLangs);
+						result = keepBestRecognition(result, retry);
+					}
 				} catch {
 					// First pass stands.
 				}
@@ -10216,7 +10248,34 @@
 			// One snapshot for the whole modifier-chord table below (see
 			// commandChord): priority lives in the table, bodies stay here
 			// as `if (chord === ...)` chains, never a switch.
-			const chord = commandChord(keyFacts(event));
+			// The modal owns ⌘/Ctrl+F while open on every runtime (it
+			// filters this list only, never the chat): this intercept
+			// runs ahead of the shell-gated find chord so the browser
+			// preview keeps it too.
+			if (
+				shortcutsOpen &&
+				(event.metaKey || event.ctrlKey) &&
+				!event.altKey &&
+				!event.shiftKey &&
+				event.code === "KeyF"
+			) {
+				consumeEvent(event);
+				const shortcutInput: HTMLInputElement | null = shortcutInputEl;
+				if (shortcutInput) {
+					/* eslint-disable @typescript-eslint/no-unsafe-call -- lint-program-only: the $state rune type
+						does not resolve under eslint's program here, but svelte-check (real tsc) types both calls. */
+					shortcutInput.focus();
+					shortcutInput.select();
+					/* eslint-enable @typescript-eslint/no-unsafe-call */
+				}
+				return;
+			}
+			const chord = commandChord({
+				...keyFacts(event),
+				// Browser preview leaves print/find to the browser;
+				// only the shell owns those chords.
+				inShell: tauriBackendAvailable()
+			});
 			if (event.key === "Escape") {
 				// One ladder for every layer (see dismissEscape):
 				// topmost first, exactly one per press.
@@ -10244,21 +10303,10 @@
 			if (chord === "find-toggle") {
 				// In-chat find across the visible messages, cycling hits.
 				// The fullscreen chords are claimed above, so
-				// Ctrl+Cmd+F never lands here.
+				// Ctrl+Cmd+F never lands here. The modal-open ⌘F
+				// intercept runs ahead of chord dispatch (every
+				// runtime), so reaching here means the modal is shut.
 				consumeEvent(event);
-				if (shortcutsOpen) {
-					// The modal owns ⌘F while open: it filters this
-					// list only, never the chat.
-					const shortcutInput: HTMLInputElement | null = shortcutInputEl;
-					if (shortcutInput) {
-						/* eslint-disable @typescript-eslint/no-unsafe-call -- lint-program-only: the $state rune type
-							does not resolve under eslint's program here, but svelte-check (real tsc) types both calls. */
-						shortcutInput.focus();
-						shortcutInput.select();
-						/* eslint-enable @typescript-eslint/no-unsafe-call */
-					}
-					return;
-				}
 				// Repeat ⌘F closes the bar it opened.
 				if (find.open) closeFind();
 				else openFind();
@@ -10354,7 +10402,10 @@
 				...keyFacts(event),
 				inEditor: inEditor !== null,
 				hovered: hoveredIdx >= 0,
-				inField: isFieldTarget(event.target)
+				inField: isFieldTarget(event.target),
+				// Browser preview has tab switching on these chords;
+				// only the shell owns them.
+				inShell: tauriBackendAvailable()
 			});
 			if (chrome === "toggle-sidebar") {
 				// ⇧⌘[ and ⌘B: physical key codes for the shifted
@@ -11315,6 +11366,14 @@
 					dismissSelPanels();
 			}
 		};
+		// Composer-only native OS menu: while a live selection sits
+		// inside the prompt, the Activity shows the real OS menu (Copy
+		// / Cut / Paste) instead of the empty dummy. Transitions only —
+		// handle drags stay silent on the bridge.
+		const notePromptSelection = (): void => {
+			const live = window.getSelection();
+			reportPromptMenu(promptEl, live?.anchorNode ?? null, live?.isCollapsed ?? true);
+		};
 		const clampOffChatDrag = (): void => {
 			if (!offChatDragArmed) return;
 			try {
@@ -11923,6 +11982,7 @@
 		window.addEventListener("mousemove", noteMiddleMove, { passive: true });
 		window.addEventListener("mouseup", clearMiddleDown);
 		document.addEventListener("selectionchange", trimMessageDrag);
+		document.addEventListener("selectionchange", notePromptSelection);
 		// Secondary scrollers share the main chat's fade: scroll events
 		// don't bubble, so catch them on the way down and toggle the
 		// same .scrolling class with the same short hold.
@@ -12077,6 +12137,7 @@
 			window.removeEventListener("mousemove", noteMiddleMove);
 			window.removeEventListener("mouseup", clearMiddleDown);
 			document.removeEventListener("selectionchange", trimMessageDrag);
+			document.removeEventListener("selectionchange", notePromptSelection);
 			window.removeEventListener("scroll", onFadeScroll, true);
 			window.removeEventListener("scroll", trackSelPinyin, true);
 			window.removeEventListener("resize", trackSelPinyin);
@@ -12319,7 +12380,7 @@
 										type="button"
 										role="menuitem"
 										class:selected={activeReplyCode === lang.code}
-										title={quickKey ? `${lang.name} (${quickKey})` : lang.name}
+										title={quickKey && tauriBackendAvailable() ? `${lang.name} (${quickKey})` : lang.name}
 										onclick={() => {
 											if (activeReplyCode === lang.code && !quickKey) {
 												clearReplyLang();
@@ -13760,6 +13821,7 @@
 	{#if selMenu && !previewing && !iosUI}
 		<div
 			class="sel-menu"
+			class:sel-menu-drag={selMenuDragging}
 			bind:this={selMenuEl}
 			style="left: {selMenu.x}px; top: {selMenu.y}px"
 			role="menu"
@@ -13828,7 +13890,7 @@
 	{#if selPinyin && !previewing}
 		<!-- Selection readings: pronunciations for just the highlight,
 		docked above it (below only without headroom) — on phones the
-		menu rises above the panel (see liftSelMenuAbovePinyin) instead
+		menu rises above the panels (see liftSelMenuAboveReadings) instead
 		of owning the above slot. Pointer-transparent so it never
 		disturbs the selection or blocks the native menu; the highlight
 		clearing dismisses it (see trimMessageDrag), and scrolling
@@ -14139,7 +14201,7 @@
 					</dl>
 				{:else}
 					<dl class="keys">
-						{#each filteredShortcuts(desktopShortcuts(isMac), shortcutQuery) as row (row.name)}
+						{#each filteredShortcuts(desktopShortcuts(isMac, tauriBackendAvailable()), shortcutQuery) as row (row.name)}
 							<div>
 								<dt>{row.name}</dt>
 								<dd>{row.keys}</dd>
@@ -17594,6 +17656,12 @@
 		/* Tap-and-drag moves the menu: no browser gesture may own
 		the stroke (taps still fire; the drift guard eats post-drag
 		button taps). */
+		/* Programmatic hops (readings-panel lift, edge clamps) glide
+		up instead of jumping; the finger's own drag stays 1:1 via
+		.sel-menu-drag below. Mount never animates (no prior box). */
+		transition:
+			top 0.18s ease,
+			left 0.18s ease;
 		touch-action: none;
 		z-index: 50;
 		display: flex;
@@ -17614,6 +17682,9 @@
 	}
 	:global(html[data-theme="dark"]) .sel-menu {
 		background: rgba(30, 30, 32, 0.88);
+	}
+	.sel-menu.sel-menu-drag {
+		transition: none;
 	}
 	.sel-menu button {
 		font-size: 0.95rem;
@@ -17651,7 +17722,9 @@
 		z-index: 50;
 		pointer-events: none;
 		max-width: 20rem;
-		padding: 0.3rem 0.55rem;
+		/* Tight sides: the popup hugs its readings (runs carry no
+		inner padding of their own). */
+		padding: 0.3rem 0.2rem;
 		border-radius: 8px;
 		font-size: 0.85rem;
 		background: rgba(255, 255, 255, 0.88);

@@ -2514,9 +2514,12 @@ export function readingPanelPlacement(opts: {
 export function menuYAbovePanel(
 	panelTop: number,
 	menuHeight: number,
-	gap = 8,
+	gap = 4,
 	minY = 8
 ): number {
+	// A 4px hairline: the menu sits as close under the panel as it
+	// can without ever touching it (menu bottom lands exactly
+	// gap above the panel top).
 	return Math.max(minY, Math.round(panelTop - menuHeight - gap));
 }
 

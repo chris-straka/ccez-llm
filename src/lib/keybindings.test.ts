@@ -460,7 +460,8 @@ const chordBase: CommandChordFacts = {
 	metaKey: false,
 	ctrlKey: false,
 	altKey: false,
-	shiftKey: false
+	shiftKey: false,
+	inShell: true
 };
 
 describe("commandChord", () => {
@@ -528,6 +529,37 @@ describe("commandChord", () => {
 		// the shell keeps new-tab and the page never sees the combo.
 		expect(commandChord({ ...chordBase, metaKey: true, key: "t" })).toBe(null);
 		expect(commandChord({ ...chordBase, ctrlKey: true, key: "T" })).toBe(null);
+	});
+
+	it("passes browser-claimed chords through on the web only", () => {
+		// Print, find, and the ⌘E fullscreen arm belong to the
+		// browser outside the shell.
+		expect(
+			commandChord({ ...chordBase, inShell: false, metaKey: true, code: "KeyP" })
+		).toBe(null);
+		expect(
+			commandChord({ ...chordBase, inShell: false, metaKey: true, code: "KeyF" })
+		).toBe(null);
+		expect(
+			commandChord({ ...chordBase, inShell: false, metaKey: true, code: "KeyE" })
+		).toBe(null);
+		// The ⌘+Ctrl+F fullscreen arm has no browser claim: it works
+		// everywhere, as do send and the deliberate Ctrl+O swallow.
+		expect(
+			commandChord({
+				...chordBase,
+				inShell: false,
+				metaKey: true,
+				ctrlKey: true,
+				code: "KeyF"
+			})
+		).toBe("toggle-fullscreen");
+		expect(
+			commandChord({ ...chordBase, inShell: false, metaKey: true, key: "Enter" })
+		).toBe("send");
+		expect(
+			commandChord({ ...chordBase, inShell: false, ctrlKey: true, key: "o" })
+		).toBe("toggle-pastes");
 	});
 
 	it("keeps handler priority (dual-modifier chords win their race)", () => {
@@ -605,7 +637,8 @@ const chromeBase: ChromeChordFacts = {
 	shiftKey: false,
 	inEditor: false,
 	hovered: false,
-	inField: false
+	inField: false,
+	inShell: true
 };
 
 describe("chromeChord", () => {
@@ -654,6 +687,37 @@ describe("chromeChord", () => {
 		).toBe("zoom");
 		expect(chromeChord({ ...chromeBase, key: "1", code: "Digit1" })).toBe(
 			"quick-lang"
+		);
+		// Browser preview: digit chords pass through to tab switching.
+		expect(
+			chromeChord({ ...chromeBase, inShell: false, key: "1", code: "Digit1" })
+		).toBeNull();
+		expect(
+			chromeChord({ ...chromeBase, inShell: false, key: "0", code: "Digit0" })
+		).toBeNull();
+		// Same for the other browser-claimed chords: zoom (page
+		// zoom), ⌘B (bookmarks bar), hovered ⌘D (bookmark tab).
+		expect(
+			chromeChord({ ...chromeBase, inShell: false, key: "=", code: "Equal" })
+		).toBeNull();
+		expect(
+			chromeChord({ ...chromeBase, inShell: false, key: "b", code: "KeyB" })
+		).toBeNull();
+		expect(
+			chromeChord({
+				...chromeBase,
+				inShell: false,
+				key: "d",
+				code: "KeyD",
+				hovered: true
+			})
+		).toBeNull();
+		// Shell keeps them all.
+		expect(chromeChord({ ...chromeBase, key: "=", code: "Equal" })).toBe(
+			"zoom"
+		);
+		expect(chromeChord({ ...chromeBase, key: "b", code: "KeyB" })).toBe(
+			"toggle-sidebar"
 		);
 		expect(
 			chromeChord({ ...chromeBase, key: "d", code: "KeyD", hovered: true })
