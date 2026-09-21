@@ -395,7 +395,7 @@
 					spellcheck="false"
 				/>
 			</label>
-			<span class="hint" role="alert">{customError}</span>
+			{#if customError}<span class="hint" role="alert">{customError}</span>{/if}
 			<button type="submit">Add provider</button>
 		</form>
 	</details>
@@ -434,7 +434,9 @@
 			<datalist id="model-list">
 				{#each active.models as id (id)}<option value={id}></option>{/each}
 			</datalist>
-			<span class="hint" role="alert">{modelNotice.banner.message}</span>
+			{#if modelNotice.banner.message}<span class="hint" role="alert"
+					>{modelNotice.banner.message}</span
+				>{/if}
 		</label>
 	{/if}
 	{#if activeDef.keyless}
@@ -468,7 +470,9 @@
 					<button type="button" onclick={() => void openAICoreOnce()}
 						>Update AI Core</button
 					>
-					<span class="hint" role="alert">{aicoreOpenError}</span>
+					{#if aicoreOpenError}<span class="hint" role="alert"
+							>{aicoreOpenError}</span
+						>{/if}
 				</p>
 			{/if}
 		{/if}

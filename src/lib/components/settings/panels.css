@@ -328,13 +328,12 @@ html[data-theme="dark"] .settings-inner .voice-refresh:hover:not(:disabled) {
 	color: #6e6e73;
 	overflow-wrap: anywhere;
 }
-/* Error/note alerts under controls: always mounted with a one-line
-floor, so appearing never shoves the layout (the paste flicker), and
-a breathing top margin separates them from the row above. */
+/* Error/note alerts under controls: a breathing top margin
+separates shown text from the row above. Only mounted with content,
+so empty errors never hold a blank row. */
 .settings-inner .hint[role="alert"] {
 	display: block;
 	margin-top: 0.45rem;
-	min-height: 1.2em;
 }
 /* Button labels are actions, never content: long-presses must not
 select them. */
