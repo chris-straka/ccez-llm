@@ -59,7 +59,7 @@ const messageBodyStyle = styleOf("../lib/components/MessageBody.svelte");
 // with their markup — Svelte scoping binds page CSS to page markup,
 // so the scan follows the extractions (Toasts, SelMenu, Attachments,
 // Readings, ShortcutsModal, ChatSwitcher, Modal, SearchPalette,
-// InspectOverlay).
+// InspectOverlay, AnnPop).
 // Toasts also hosts the always-dark voice-error exception, stripped
 // like the page scan below.
 const extractedStyle = [
@@ -74,7 +74,8 @@ const extractedStyle = [
 	styleOf("../lib/components/ChatSwitcher.svelte"),
 	styleOf("../lib/components/Modal.svelte"),
 	styleOf("../lib/components/SearchPalette.svelte"),
-	styleOf("../lib/components/InspectOverlay.svelte")
+	styleOf("../lib/components/InspectOverlay.svelte"),
+	styleOf("../lib/components/AnnPop.svelte")
 ].join("\n");
 // panels.css is a raw stylesheet (no <style> wrapper): read it whole.
 const panelsStyle = readFileSync(
