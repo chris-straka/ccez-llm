@@ -69,7 +69,8 @@
 		replyLanguageFor,
 		switchToastFor,
 		thinkingLabelFor,
-		type LanguageMenu
+		type LanguageMenu,
+		type ReplyLanguage
 	} from "$lib/languages";
 	import {
 		listProviders,
@@ -144,6 +145,7 @@
 	import AnnPop from "$lib/components/AnnPop.svelte";
 	import Sidebar from "$lib/components/Sidebar.svelte";
 	import MessageArticle from "$lib/components/MessageArticle.svelte";
+	import LangMenus from "$lib/components/LangMenus.svelte";
 	import SendingIndicator from "$lib/components/SendingIndicator.svelte";
 	import FindBar from "$lib/components/FindBar.svelte";
 	import Composer from "$lib/components/Composer.svelte";
@@ -8058,6 +8060,36 @@
 		openLangMenu = null;
 	}
 
+	/** Shared by both `LangMenus` call sites (hero + composer dock). */
+	const langMenusActions = {
+		toggle: (id: LanguageMenu["id"], el: HTMLElement) =>
+			toggleLangMenu(id, el),
+		pick: (lang: ReplyLanguage) => {
+			const quickKey = quickKeyFor(lang.code);
+			if (activeReplyCode === lang.code && !quickKey) {
+				clearReplyLang();
+				// Clearing names the released language
+				// in its own cleared word.
+				flashToast(lang.cleared);
+			} else {
+				setReplyLang(lang.code);
+				flashToast(switchToastFor(lang));
+			}
+			// Language picks tick on phones like the
+			// family buttons above do.
+			buzzTap();
+			// Picking a language hands focus to the
+			// composer on desktop: typing starts there
+			// next, and focus never lingers on the
+			// unmounted option (which left a stuck
+			// pointer behind). Phones stay unfocused:
+			// auto-focus pops the keyboard over the
+			// composer instead of pushing it up. Tap
+			// in when ready.
+			if (!androidUI) editor?.focus();
+		}
+	};
+
 	/** Send-button hold (touch or desktop mouse, empty composer):
 	stash the reply language and drop to default, or restore the
 	stash — the emoji vanishes and returns. Haptic ticks on every
@@ -12206,82 +12238,9 @@
 		onclick={closeSettingsFromMain}
 		ondblclick={gutterDoubleClick}
 	>
-		{#snippet langMenus()}
-			<!-- A hover preview of an empty chat shows the same pills,
-			inert: they preview the empty state, but every tap belongs
-			to the active chat — hovering away restores it. Rendered
-			under the hero on phones, docked over the composer
-			elsewhere (see the two call sites). -->
-			<div class="lang-menus" aria-label="Reply language" inert={previewing}>
-				{#each LANGUAGE_MENUS as menu (menu.id)}
-					<div class="lang-menu">
-						<button
-							type="button"
-							aria-haspopup="true"
-							aria-expanded={openLangMenu === menu.id}
-							title="Reply in a {menu.label.toLowerCase()} language"
-							onclick={(e) => toggleLangMenu(menu.id, e.currentTarget)}
-						>
-							<span aria-hidden="true">{menu.marker}</span>
-							{menu.label}
-						</button>
-						{#if openLangMenu === menu.id}
-							<div
-								class="lang-list"
-								class:lang-list-fixed={androidUI && langMenuAnchor !== null}
-								class:lang-list-drop={
-									androidUI &&
-									langMenuAnchor !== null &&
-									langMenuAnchor.mode === "drop"
-								}
-								role="menu"
-								style={androidUI && langMenuAnchor
-									? `left: ${langMenuAnchor.left}px; max-height: ${langMenuAnchor.maxH}px;${langMenuAnchor.mode === "drop" ? ` top: ${langMenuAnchor.top}px;` : ""}`
-									: undefined}
-							>
-								<!-- Menu-click clears only languages without a number key
-								(keyed ones clear by repeating the key). -->
-								{#each [...menu.languages].sort( (a, b) => a.name.localeCompare(b.name, "en") ) as lang (lang.code)}
-									{@const quickKey = quickKeyFor(lang.code)}
-									<button
-										type="button"
-										role="menuitem"
-										class:selected={activeReplyCode === lang.code}
-										title={quickKey && tauriBackendAvailable() ? `${lang.name} (${quickKey})` : lang.name}
-										onclick={() => {
-											if (activeReplyCode === lang.code && !quickKey) {
-												clearReplyLang();
-												// Clearing names the released language
-												// in its own cleared word.
-												flashToast(lang.cleared);
-											} else {
-												setReplyLang(lang.code);
-												flashToast(switchToastFor(lang));
-											}
-											// Language picks tick on phones like the
-											// family buttons above do.
-											buzzTap();
-											// Picking a language hands focus to the
-											// composer on desktop: typing starts there
-											// next, and focus never lingers on the
-											// unmounted option (which left a stuck
-											// pointer behind). Phones stay unfocused:
-											// auto-focus pops the keyboard over the
-											// composer instead of pushing it up. Tap
-											// in when ready.
-											if (!androidUI) editor?.focus();
-										}}
-									>
-										<span class="badge" aria-hidden="true">{lang.badge}</span>
-										{lang.name}
-									</button>
-								{/each}
-							</div>
-						{/if}
-					</div>
-				{/each}
-			</div>
-		{/snippet}
+		<!-- Reply-language pills render in `LangMenus.svelte` (hero and
+		composer call sites below); the page keeps the open menu, the
+		phone sheet anchor, the active code, and the behaviors. -->
 		<Toasts {notices} bind:toastAction android={androidUI} />
 		<!-- Empty drag strip: nothing but the traffic-light clearance
 		(the active reply language shows on the send button instead).
@@ -12371,7 +12330,14 @@
 						<p class="mock-note"><strong>Mock provider active.</strong></p>
 					{/if}
 					{#if androidUI}
-						{@render langMenus()}
+						<LangMenus
+							openId={openLangMenu}
+							anchor={langMenuAnchor}
+							activeCode={activeReplyCode}
+							android={androidUI}
+							previewing={previewing}
+							actions={langMenusActions}
+						/>
 					{/if}
 				</div>
 			{/if}
@@ -12663,7 +12629,14 @@
 		<!-- Speech errors render from `Toasts.svelte` (top notice,
 		tap to dismiss); the banner below stays paged. -->
 		{#if !androidUI && viewChat.messages.length === 0}
-			{@render langMenus()}
+			<LangMenus
+				openId={openLangMenu}
+				anchor={langMenuAnchor}
+				activeCode={activeReplyCode}
+				android={androidUI}
+				previewing={previewing}
+				actions={langMenusActions}
+			/>
 		{/if}
 	</main>
 
@@ -13103,66 +13076,7 @@
 	with the dock). */
 	/* Phone pill type renders in `AnnPop.svelte` (moved with
 	the pill). */
-	/* Four region menus share one row on a phone: no wrap, tighter
-	chrome. Desktop keeps the wrapping rhythm. */
-	.app[data-android] .lang-menus {
-		flex-wrap: nowrap;
-		gap: 0.4rem;
-	}
-	/* Phones hang the row under the hero instead of docking it over
-	the composer: kill the bottom-dock margin and its padding (the
-	empty-state gap owns the rhythm now). Desktop keeps the dock. */
-	.app[data-android] main.empty .lang-menus {
-		margin-top: 0;
-		padding: 0;
-	}
-	/* Under-hero pills open downward; desktop keeps opening upward
-	over the messages. The phone sheet cap below still bounds it. */
-	.app[data-android] .lang-menu .lang-list {
-		top: calc(100% + 0.35rem);
-		bottom: auto;
-	}
-	/* The open sheet escapes the thread scroller as a fitted fixed
-	panel (left/max-height ride inline from the pill rect): the
-	scroller clips anything past its box, which read as five
-	languages cut by a rectangle. Short lists drop under their
-	pill (.lang-list-drop, top rides inline); long ones center on
-	the screen (top:50% plus translateY). The list never sets a
-	top/bottom pair (an over-constrained fixed box stretches
-	full-band and reads as a massive empty panel). Long lists cap
-	at max-height and scroll. */
-	.app[data-android] .lang-menu .lang-list-fixed {
-		position: fixed;
-		top: 50%;
-		bottom: auto;
-		left: auto;
-		right: auto;
-		transform: translateY(-50%);
-		z-index: 60;
-		overflow-y: auto;
-	}
-	.app[data-android] .lang-menu .lang-list-fixed.lang-list-drop {
-		top: auto;
-		transform: none;
-	}
-	.app[data-android] .lang-menu > button {
-		font-size: 0.75rem;
-		padding: 0.3rem 0.55rem;
-		white-space: nowrap;
-	}
-	/* Narrow phones (S24 is 360 CSS px): four pills plus gaps overrun
-	by ~16px, clipping Classics half off-screen — and a clipped pill
-	anchors its sheet from a rect the user can't see. Tighten gaps
-	and padding instead of scrolling or renaming; wider phones keep
-	the roomier row above. */
-	@media (max-width: 380px) {
-		.app[data-android] .lang-menus {
-			gap: 0.2rem;
-		}
-		.app[data-android] .lang-menu > button {
-			padding: 0.3rem 0.35rem;
-		}
-	}
+	/* (Language pills in `LangMenus.svelte`.) */
 	/* Phone gestures list renders in `ShortcutsModal.svelte`
 	(single-column override moved with the dialog). */
 	/* (Waypoint nav in `Waypoints.svelte`: the last paged nav moved
@@ -13336,12 +13250,7 @@
 		below the fold of the hero, neither middle nor bottom. */
 		max-height: 60%;
 	}
-	main.empty .lang-menus {
-		/* Docked above the prompt's reserved floor, never mid-page:
-		the auto margin eats the free space between the hero zone
-		and the pills, so the row sits just over the composer. */
-		margin-top: auto;
-	}
+	/* (Empty-state pills dock in `LangMenus.svelte`.) */
 	.empty-state {
 		display: flex;
 		flex-direction: column;
@@ -13366,139 +13275,7 @@
 		color: #6e6e73;
 		font-size: 0.85rem;
 	}
-	.lang-menus {
-		display: flex;
-		align-items: center;
-		gap: 0.6rem;
-		flex-wrap: wrap;
-	}
-	main.empty .lang-menus {
-		justify-content: center;
-		padding: 0.55rem 1.2rem 0.6rem;
-	}
-	/* No row-level fade here: hovering open space inside the row lit
-	every button at once and the opacity shimmer read as movement.
-	Each pill answers only for itself (border-color on
-	.lang-menu > button:hover below); the row stays put on all
-	platforms. Touch layouts untouched. */
-	.lang-menu {
-		position: relative;
-	}
-	.lang-menu > button {
-		font-size: 0.82rem;
-		border: 1px solid #c7c7cc;
-		border-color: var(--line);
-		border-radius: 10px;
-		background: none;
-		cursor: pointer;
-		padding: 0.4rem 0.8rem;
-		color: #1c1c1e;
-		color: var(--ink);
-		transition: border-color 0.15s ease;
-	}
-	.lang-menu > button:hover {
-		border-color: #1c1c1e;
-		border-color: var(--strong);
-	}
-	.lang-list {
-		position: absolute;
-		z-index: 40;
-		/* Desktop opens upward over the composer, never down past it
-		(phones override below: their pills hang under the hero). */
-		bottom: calc(100% + 0.35rem);
-		left: 0;
-		/* Shrink-wrap the longest name: a fixed min-width leaves dead
-		space right of every short option and pushes right-edge menus
-		(like African) off-screen. */
-		min-width: 0;
-		width: max-content;
-		max-width: calc(100vw - 1rem);
-		/* Full extent, never a scrollbar: the longest menu is 15 items
-		and the list opens upward over the messages. */
-		display: flex;
-		flex-direction: column;
-		padding: 0.3rem;
-		border: 1px solid #c7c7cc;
-		border-color: var(--line);
-		border-radius: 10px;
-		background: #fff;
-		background: var(--bg-raised);
-		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-	}
-	@media (hover: none) {
-		/* A phone can't fit the 15-item list above the pills, so it
-		gets a capped sheet with its own scroll instead of flying off
-		the top of the screen. Desktop keeps full extent, no scrollbar. */
-		.lang-list {
-			max-height: 52vh;
-			overflow-y: auto;
-		}
-		/* Phone menus must not trail off-screen: middle menus center
-		under their button, while the edge menus hug their own edge
-		(Europe's list spilled left, Classics' right). The capped
-		max-width still bounds every list to the viewport. */
-		.lang-menu .lang-list {
-			left: 50%;
-			right: auto;
-			transform: translateX(-50%);
-		}
-		.lang-menu:first-child .lang-list {
-			left: 0;
-			transform: none;
-		}
-		.lang-menu:last-child .lang-list {
-			left: auto;
-			right: 0;
-			transform: none;
-		}
-	}
-	/* The last menu (Classics) hugs the right edge: a left-anchored
-	list of long nowrap names trails off the page there. Right-anchor
-	it instead (all viewports — narrow desktop windows clip it too). */
-	.lang-menu:last-child .lang-list {
-		left: auto;
-		right: 0;
-	}
-	.lang-list button {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		font-size: 0.82rem;
-		border: 0;
-		border-radius: 7px;
-		background: none;
-		cursor: pointer;
-		padding: 0.35rem 0.45rem;
-		text-align: left;
-		color: #1c1c1e;
-		color: var(--ink);
-		white-space: nowrap;
-		transition: background-color 0.15s ease;
-	}
-	.lang-list button:hover,
-	.lang-list button:focus-visible {
-		background: #f1f1f4;
-		background: var(--bg-wash);
-	}
-	.lang-list button.selected {
-		font-weight: 650;
-		background: #f1f1f4;
-		background: var(--bg-wash);
-	}
-	.badge {
-		display: inline-block;
-		min-width: 2rem;
-		text-align: center;
-		font-size: 0.7rem;
-		font-weight: 700;
-		letter-spacing: 0.04em;
-		color: #3a3a3c;
-		color: var(--focus);
-		border: 1px solid #c7c7cc;
-		border-color: var(--line);
-		border-radius: 6px;
-		padding: 0.1rem 0.3rem;
-	}
+	/* (Pill row, lists, and badges in `LangMenus.svelte`.) */
 	/* Article shell surfaces render in `MessageArticle.svelte` now
 	(row, bubble, edit box, and states moved with the markup). */
 	/* (Own-message row in `MessageArticle.svelte`.) */
@@ -13712,16 +13489,17 @@
 	(line, colored dots, elapsed). */
 	/* Loading dots exist only while busy, so an idle aid button is
 	exactly its visible label — hover and spacing never cover text
-	that isn't there. Global: the dots render in `MessageActions.svelte`
-	(aid buttons) and in the paged sending indicator alike. */
-	:global(.tdots) span {
+	that isn't there. Fully global (both halves in :global): the dots
+	render in `MessageActions.svelte` (aid buttons) and
+	`SendingIndicator.svelte`, whose spans carry no page hash. */
+	:global(.tdots span) {
 		display: inline-block;
 		animation: tdot-pulse 1.2s ease-in-out infinite;
 	}
-	:global(.tdots) span:nth-child(2) {
+	:global(.tdots span:nth-child(2)) {
 		animation-delay: 0.2s;
 	}
-	:global(.tdots) span:nth-child(3) {
+	:global(.tdots span:nth-child(3)) {
 		animation-delay: 0.4s;
 	}
 	@keyframes tdot-pulse {
@@ -13808,13 +13586,7 @@
 	keeps its own width there too.) */
 	/* `.attachments` keeps its own tray width in `Attachments.svelte`. */
 	/* `.review` keeps its own tray width in `ReviewDock.svelte`. */
-	.lang-menus {
-		width: calc(100% - 2.4rem);
-		max-width: calc(var(--chat-width, 36) * 1rem);
-		margin-left: auto;
-		margin-right: auto;
-		box-sizing: border-box;
-	}
+	/* (Pill-row width in `LangMenus.svelte`.) */
 	/* Missing-key banner above the attachment strip: paged markup,
 	so it keeps its own error pairing here (same tokens as the
 	composer's banner in `Composer.svelte`; Svelte scoping binds
