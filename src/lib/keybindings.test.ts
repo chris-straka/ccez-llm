@@ -8,10 +8,13 @@ import {
 	keyFacts,
 	messageKeyAction,
 	modalScrollAction,
+	pastesKeyAction,
 	promptIdleKeyAction,
 	quickLangIndexForKey,
 	scrollEnterAction,
 	scrollModeAction,
+	sendKeyAction,
+	summonHideAction,
 	unselectedScrollAction,
 	shortcutsFilterBlocksKey,
 	sidebarListAction,
@@ -22,9 +25,12 @@ import {
 	type InspectStepFacts,
 	type MessageKeyFacts,
 	type ModalScrollFacts,
+	type PastesKeyFacts,
 	type PromptIdleFacts,
 	type ScrollEnterFacts,
 	type ScrollModeFacts,
+	type SendKeyFacts,
+	type SummonHideFacts,
 	type UnselectedScrollFacts,
 	type ShortcutsFilterFacts,
 	type SidebarListFacts,
@@ -307,6 +313,54 @@ describe("deleteChatScope", () => {
 		expect(
 			deleteChatScope({ ...delBase, shiftKey: true, inEditable: true })
 		).toBe("all");
+	});
+});
+
+describe("summonHideAction", () => {
+	const hideBase: SummonHideFacts = { summon: true, inEditor: false };
+
+	it("hides on the summon chord outside the editor", () => {
+		expect(summonHideAction(hideBase)).toBe("hide");
+	});
+
+	it("leaves the chord unbound inside the editor", () => {
+		expect(summonHideAction({ ...hideBase, inEditor: true })).toBe(null);
+	});
+
+	it("ignores other keys", () => {
+		expect(summonHideAction({ ...hideBase, summon: false })).toBe(null);
+	});
+});
+
+describe("pastesKeyAction", () => {
+	const pastesBase: PastesKeyFacts = { pastesChord: true, inEditor: true };
+
+	it("toggles folds in the editor, swallows elsewhere", () => {
+		expect(pastesKeyAction(pastesBase)).toBe("toggle");
+		expect(pastesKeyAction({ ...pastesBase, inEditor: false })).toBe(
+			"swallow"
+		);
+	});
+
+	it("ignores other chords", () => {
+		expect(pastesKeyAction({ ...pastesBase, pastesChord: false })).toBe(
+			null
+		);
+	});
+});
+
+describe("sendKeyAction", () => {
+	const sendBase: SendKeyFacts = { sendChord: true, inField: false };
+
+	it("sends from anywhere but settings fields", () => {
+		expect(sendKeyAction(sendBase)).toBe("send");
+		expect(sendKeyAction({ ...sendBase, inField: true })).toBe(
+			"field-keeps"
+		);
+	});
+
+	it("ignores other chords", () => {
+		expect(sendKeyAction({ ...sendBase, sendChord: false })).toBe(null);
 	});
 });
 

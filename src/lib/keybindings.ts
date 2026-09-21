@@ -423,6 +423,63 @@ export function commandChord(facts: CommandChordFacts): CommandChord | null {
 	return null;
 }
 
+/**
+ * Facts the summon-hide branch reads. The chord itself stays in
+ * desktop.ts (`isSummonHotkey`); only the editor exemption moves
+ * here, so the hide-outside-editor rule is unit-pinned.
+ */
+export interface SummonHideFacts {
+	summon: boolean;
+	inEditor: boolean;
+}
+
+/**
+ * Summon chord outside the editor: the toggle's hide half (back to
+ * the previous app; hide is idempotent). Inside the editor the chord
+ * stays unbound so Ctrl+Shift+Space still types a non-breaking space.
+ */
+export function summonHideAction(facts: SummonHideFacts): "hide" | null {
+	if (!facts.summon) return null;
+	return facts.inEditor ? null : "hide";
+}
+
+/**
+ * Facts the paste-fold chord branch reads. The textarea composer
+ * never folds (long pastes become pills), so the chord only toggles
+ * there — everywhere else it is still swallowed so the browser won't
+ * open a file.
+ */
+export interface PastesKeyFacts {
+	pastesChord: boolean;
+	inEditor: boolean;
+}
+
+export type PastesKeyAction = "toggle" | "swallow";
+
+/** Null when the chord isn't the paste-fold chord: keep dispatching. */
+export function pastesKeyAction(facts: PastesKeyFacts): PastesKeyAction | null {
+	if (!facts.pastesChord) return null;
+	return facts.inEditor ? "toggle" : "swallow";
+}
+
+/**
+ * Facts the send-chord branch reads. ⌘Enter sends from anywhere —
+ * not just with the prompt focused. Settings fields keep ⌘Enter for
+ * themselves (unconsumed, so the field still sees it).
+ */
+export interface SendKeyFacts {
+	sendChord: boolean;
+	inField: boolean;
+}
+
+export type SendKeyAction = "send" | "field-keeps";
+
+/** Null when the chord isn't send: keep dispatching. */
+export function sendKeyAction(facts: SendKeyFacts): SendKeyAction | null {
+	if (!facts.sendChord) return null;
+	return facts.inField ? "field-keeps" : "send";
+}
+
 /** Facts the sidebar/settings/zoom chord cluster reads. */
 export interface ChromeChordFacts extends KeyModifiers {
 	key: string;

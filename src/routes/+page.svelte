@@ -304,7 +304,10 @@
 		keyFacts,
 		messageKeyAction,
 		modalScrollAction,
+		pastesKeyAction,
 		promptIdleKeyAction,
+		sendKeyAction,
+		summonHideAction,
 		quickLangIndexForKey,
 		scrollEnterAction,
 		scrollModeAction,
@@ -10284,32 +10287,37 @@
 				else openFind();
 				return;
 			}
-			if (isSummonHotkey(event) && !inEditor) {
-				// Summon chord (Cmd/Ctrl+Shift+Space) outside the editor:
-				// the toggle's hide half — back to the previous app (the
-				// OS-global half in desktop.rs fires too; hide is
-				// idempotent). Inside the editor the chord stays unbound
-				// so Ctrl+Shift+Space still types a non-breaking space.
+			if (
+				summonHideAction({
+					summon: isSummonHotkey(event),
+					inEditor: inEditor !== null
+				}) === "hide"
+			) {
+				// The OS-global half in desktop.rs fires too; hide is
+				// idempotent.
 				consumeEvent(event);
 				void hideSummonWindow();
 				return;
 			}
-			if (chord === "toggle-pastes") {
-				// The textarea composer never folds (long pastes become
-				// pills), so Ctrl+O does nothing — still swallowed so
-				// the browser won't open a file.
-				if (inEditor) editor?.togglePastes();
+			const pastesAction = pastesKeyAction({
+				pastesChord: chord === "toggle-pastes",
+				inEditor: inEditor !== null
+			});
+			if (pastesAction !== null) {
+				if (pastesAction === "toggle") editor?.togglePastes();
 				consumeEvent(event);
 				return;
 			}
-			if (chord === "send") {
-				// ⌘Enter sends from anywhere — not just with the prompt
-				// focused. Settings fields keep ⌘Enter for themselves.
-				if (isFieldTarget(event.target)) return;
+			const sendAction = sendKeyAction({
+				sendChord: chord === "send",
+				inField: isFieldTarget(event.target)
+			});
+			if (sendAction === "send") {
 				consumeEvent(event);
 				onSubmit("send");
 				return;
 			}
+			if (sendAction === "field-keeps") return;
 			if (
 				chord === "provider-next" ||
 				chord === "provider-prev" ||
