@@ -9,13 +9,6 @@ function pageSource(): string {
 	return readFileSync(new URL("./+page.svelte", import.meta.url), "utf8");
 }
 
-function pageStyle(): string {
-	const match = pageSource().match(/<style>([\s\S]*)<\/style>/);
-	if (!match) throw new Error("+page.svelte has no <style> block");
-	// Strip CSS comments so prose can't trip the assertions below.
-	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
-}
-
 function messageBodyStyle(): string {
 	const source = readFileSync(
 		new URL("../lib/components/MessageBody.svelte", import.meta.url),
