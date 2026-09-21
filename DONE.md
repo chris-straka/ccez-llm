@@ -798,3 +798,26 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
       packing (first tags were unreachable + starved scrollWidth).
 - [x] Folded multi-line previews earn `…`; inline LaTeX gains line-sized
       `$` + copy (`$tex$` delimiters).
+
+## Retired from TODO (Sep 2026 — hardware arrived, S24 on USB + releases)
+
+- [x] On-device ML Kit verdict: S24 is NOT provisioned — every config
+      answers 606 FEATURE_NOT_FOUND against a current AICore
+      (0.release.qc.prod_aicore_20260723, read off the phone via adb;
+      Prompt API is a per-device allowlist: Pixel 9/10, S25 Fold
+      series). Not stale software, not an app bug. ML Kit pill hides
+      on all-606 (`onDeviceUnsupported` + stale-aicore), reopening
+      re-probes so a future provisioning restores it; per-variant
+      receipts + AICore version show under the verdict.
+- [x] Android native-menu entries item superseded: the Android
+      selection menu is Annotate+Copy, the composer dock is
+      Speak+Inspect, and the OS callout stays suppressed including
+      handle-drag rebuilds (`onActionModeStarted` clear+invalidate).
+- [x] Desktop j/k/u/d smoothness dropped — no repro (reporter
+      suspected their mouse); revisit only with one on known HW.
+- [x] Enter-at-tag newline + tag-only dash dropped — not
+      reproducible, no code path found; needs the reporter's exact
+      sequence/screenshot if either recurs.
+- [x] +page.svelte split dropped — decided: stays one file
+      (AGENTS.md standing decision, Sep 2026); hollowing into
+      `keybindings.ts` continues instead.
