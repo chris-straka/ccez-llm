@@ -40,7 +40,7 @@ export function touchShortcuts(): ShortcutRow[] {
 		},
 		{
 			name: "Copy selection",
-			keys: "Hold the highlight 3.3s · Copy leads the menu"
+			keys: "Select text · Copy"
 		},
 		{ name: "Move the selection menu", keys: "Drag it" },
 		{

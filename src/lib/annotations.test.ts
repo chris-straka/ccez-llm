@@ -20,6 +20,7 @@ import {
 	selMenuPlacement,
 	firstContentRect,
 	readingPanelPlacement,
+	menuYAbovePanel,
 	lineStartOffset,
 	clampDragAnchorToFocusLine,
 	reviewEditKey,
@@ -607,38 +608,34 @@ describe("readingPanelPlacement", () => {
 			readingPanelPlacement({
 				rect,
 				viewportWidth: 1280,
-				viewportHeight: 800,
-				preferBelow: false
+				viewportHeight: 800
 			})
 		).toEqual({ x: 100, y: 300, above: true });
 	});
 
-	it("goes below without headroom on desktop", () => {
+	it("goes below without headroom", () => {
 		expect(
 			readingPanelPlacement({
 				rect: { ...rect, top: 40, bottom: 62 },
 				viewportWidth: 1280,
-				viewportHeight: 800,
-				preferBelow: false
+				viewportHeight: 800
 			})
 		).toEqual({ x: 100, y: 62, above: false });
 	});
 
-	it("prefers below (phone menu owns above), above without footroom", () => {
+	it("hangs above on phones too — the menu rises above the panel", () => {
 		expect(
 			readingPanelPlacement({
 				rect,
 				viewportWidth: 360,
-				viewportHeight: 740,
-				preferBelow: true
+				viewportHeight: 740
 			})
-		).toEqual({ x: 100, y: 322, above: false });
+		).toEqual({ x: 100, y: 300, above: true });
 		expect(
 			readingPanelPlacement({
 				rect: { ...rect, top: 660, bottom: 700 },
 				viewportWidth: 360,
-				viewportHeight: 740,
-				preferBelow: true
+				viewportHeight: 740
 			})
 		).toEqual({ x: 100, y: 660, above: true });
 	});
@@ -651,13 +648,20 @@ describe("readingPanelPlacement", () => {
 				readingPanelPlacement({
 					rect: { left, top: 300, bottom: 322, width: 40, height: 22 },
 					viewportWidth: 360,
-					viewportHeight: 740,
-					preferBelow: true
+					viewportHeight: 740
 				}).x
 		);
 		expect(new Set(xs).size).toBe(4);
 		expect(Math.min(...xs)).toBeGreaterThanOrEqual(8);
 		expect(Math.max(...xs)).toBeLessThanOrEqual(352);
+	});
+});
+
+describe("menuYAbovePanel", () => {
+	it("clears the panel with a hair, never past the edge", () => {
+		expect(menuYAbovePanel(300, 48)).toBe(244);
+		expect(menuYAbovePanel(40, 48)).toBe(8);
+		expect(menuYAbovePanel(300, 48, 12)).toBe(240);
 	});
 });
 

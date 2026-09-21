@@ -208,6 +208,7 @@
 		selMenuPlacement,
 		firstContentRect,
 		readingPanelPlacement,
+		menuYAbovePanel,
 		placeAnnPopX,
 		REFS_ONLY_BODY,
 		lineStartOffset,
@@ -991,8 +992,6 @@
 	 * longer to reach than a cursor.
 	 */
 	const SEL_MENU_IDLE_MS = 6000;
-	/** Held-selection hold before Copy joins the phone menu. */
-	const COPY_HOLD_MS = 3300;
 	let selMenuTimer: ReturnType<typeof setTimeout> | null = null;
 	/**
 	 * True while the pointer hovers the selection menu: the auto-dismiss
@@ -1245,22 +1244,6 @@
 	function menuDragEnd(): void {
 		selMenuDrag = null;
 	}
-	/**
-	 * Hold-gated Copy: quick highlights get Annotate/Speak/Inspect
-	 * only; a 3.3s held selection arms Copy at the far left of the
-	 * phone menu. The stamp binds the timer to this opening, so a
-	 * close-and-reselect restarts the hold instead of inheriting it.
-	 */
-	let copyArmed = $state(false);
-	let copyArmTimer: ReturnType<typeof setTimeout> | null = null;
-	function armCopyButton(stamp: number): void {
-		copyArmed = false;
-		if (copyArmTimer) clearTimeout(copyArmTimer);
-		copyArmTimer = setTimeout(() => {
-			copyArmTimer = null;
-			if (selMenu && selMenuOpenedAt === stamp) copyArmed = true;
-		}, COPY_HOLD_MS);
-	}
 	function noteMenuBtnTouch(event: TouchEvent): void {
 		const t = event.changedTouches[0];
 		menuBtnTouchStart = t ? { x: t.clientX, y: t.clientY } : null;
@@ -1296,29 +1279,59 @@
 		menuBtnTouch(event, () => void copySelection());
 	}
 	/** Selection Speak: read the highlight aloud, showing CJK readings
-	in the popup by it (above on desktop, below on phones where the
-	menu owns above) — pinyin in Chinese text, furigana in Japanese.
-	Speech always runs; the popup is a silent extra. The menu stays
-	put so Annotate stays one tap away. */
+	in the popup above it — pinyin in Chinese text, furigana in
+	Japanese. Speech always runs; the popup is a silent extra. On
+	phones the menu rises above the popup (see
+	liftSelMenuAbovePinyin) so Annotate stays one tap away. */
 	function speakSelection(): void {
 		if (!selMenu) return;
+		const menu = selMenu;
 		void popupSelectionReadings(
-			selMenu.quote,
-			selMenu.messageId,
-			selMenu.context
-		);
-		void speakQuote(selMenu.quote, selMenu.messageId, true, selMenu.context);
+			menu.quote,
+			menu.messageId,
+			menu.context
+		).then(() => {
+			if (androidUI) liftSelMenuAbovePinyin();
+		});
+		void speakQuote(menu.quote, menu.messageId, true, menu.context);
+	}
+	/**
+	 * Rise the selection menu above a readings panel the speak tap
+	 * just opened: the panel hangs over the highlight's top edge,
+	 * so the menu's old spot would cover it. Measures both live
+	 * rects and only ever moves up (no headroom above the panel,
+	 * or the popup falling below for lack of it, keeps the menu
+	 * where placeSelMenu put it).
+	 */
+	function liftSelMenuAbovePinyin(): void {
+		if (!androidUI || !selMenu || !selPinyin?.above) return;
+		requestAnimationFrame(() => {
+			const panel = document.querySelector(".sel-pinyin");
+			const menu = selMenuEl;
+			const current = selMenu;
+			if (
+				!(panel instanceof HTMLElement) ||
+				!(menu instanceof HTMLElement) ||
+				!current
+			)
+				return;
+			const pr = panel.getBoundingClientRect();
+			const mr = menu.getBoundingClientRect();
+			if (mr.width === 0 || mr.height === 0) return;
+			const y = menuYAbovePanel(pr.top, mr.height);
+			if (y < current.y) selMenu = { ...current, y };
+		});
 	}
 	/** Dock the readings overlay centered on the highlight span
-	(pure math in readingPanelPlacement): above on desktop, below
-	on phones — the phone menu takes the above slot, so readings
-	below never overlap it. Centering rides CSS translateX so
-	panel width — and font size — never matters: the style left
-	IS the highlight's center (rect.left would park the panel
-	half its width too far left). A frame later the true width
-	clamps it exactly into the viewport. The above branch anchors
-	on the highlight's top edge the same way, so tall readings
-	never need measuring. */
+	(pure math in readingPanelPlacement): above with headroom, else
+	below — on phones the menu rises above an above-panel instead
+	of owning the above slot (see liftSelMenuAbovePinyin).
+	Centering rides CSS translateX so panel width — and font size —
+	never matters: the style left IS the highlight's center
+	(rect.left would park the panel half its width too far left).
+	A frame later the true width clamps it exactly into the
+	viewport. The above branch anchors on the highlight's top edge
+	the same way, so tall readings never need measuring. */
 	function panelXY(rect: {
 		left: number;
 		top: number;
@@ -1333,8 +1346,7 @@
 		return readingPanelPlacement({
 			rect,
 			viewportWidth: window.innerWidth,
-			viewportHeight: window.innerHeight,
-			preferBelow: androidUI
+			viewportHeight: window.innerHeight
 		});
 	}
 	/** Nudge every readings panel back inside by its true width
@@ -4571,7 +4583,6 @@
 			messageId: found.messageId,
 			range: stored
 		};
-		armCopyButton(selMenuOpenedAt);
 		// No prompt summon: the menu floats viewport-fixed on every
 		// platform now (the old phone dock needed the composer shown).
 	}
@@ -13163,12 +13174,12 @@
 		>
 			<div class="prompt-tools">
 				{#if androidUI && selMenu && !previewing}
-					<!-- Phone action dock: Annotate, Speak, and Inspect
-					redundant with the floating selection menu (Copy stays
-					menu-only). iOS keeps Annotate docked instead of
-					floating: Apple's callout can't be suppressed, so a
-					floating menu would double it. Same handlers and the
-					same click-away exemption in onMouseUp, or the tap
+					<!-- Phone action dock: Speak and Inspect (Annotate
+					and Copy live in the floating selection menu).
+					iOS keeps Annotate docked instead of floating:
+					Apple's callout can't be suppressed, so a floating
+					menu would double it. Same handlers and the same
+					click-away exemption in onMouseUp, or the tap
 					collapses the highlight and clears the menu before
 					onclick fires. The wrapper overlays the whole card
 					(see CSS) without resizing anything. -->
@@ -13186,22 +13197,13 @@
 							>
 						</div>
 					{:else}
-						<!-- Phone action dock: Annotate, Speak, and (for a
-						single Han character with the setting on) Inspect —
-						redundant with the floating selection menu, which a
-						thumb can drag out of reach. Same handlers and the
-						same click-away exemption; Copy stays menu-only. -->
+						<!-- Phone action dock: Speak, and (for a single
+						Han character with the setting on) Inspect, in
+						that order. Annotate and Copy live in the
+						floating selection menu instead — never here.
+						Same handlers and the same click-away
+						exemption. -->
 						<div class="ann-dock-wrap">
-							<button
-								type="button"
-								class="ann-dock"
-								aria-label="Annotate selection"
-								transition:fade={{ duration: 150 }}
-								onmousedown={noteMenuPress}
-								ontouchstart={noteMenuBtnTouch}
-								ontouchend={annotateTouch}
-								onclick={annotate}>Annotate</button
-							>
 							<button
 								type="button"
 								class="ann-dock"
@@ -13507,22 +13509,11 @@
 			onmouseleave={() => (selMenuHover = false)}
 		>
 			{#if androidUI}
-				<!-- Phone selection menu: the native callout is
-				suppressed, so Annotate and Speak live here in the
-				desktop popup's style; Inspect joins for a single Han
-				character, and a 3.3s held selection arms Copy at the
-				far left (quick highlights skip it). The composer dock
-				mirrors Annotate/Speak/Inspect without Copy. -->
-				{#if copyArmed}
-					<button
-						type="button"
-						aria-label="Copy selection"
-						onmousedown={noteMenuPress}
-						onclick={() => void copySelection()}
-						ontouchstart={noteMenuBtnTouch}
-						ontouchend={copyTouch}>Copy</button
-					>
-				{/if}
+				<!-- Phone selection menu: Annotate then Copy, always
+				(no hold-to-arm). The native callout is suppressed, so
+				this replaces it in the desktop popup's style. Speak
+				and Inspect live in the composer dock instead — never
+				here. -->
 				<button
 					type="button"
 					onmousedown={noteMenuPress}
@@ -13532,22 +13523,12 @@
 				>
 				<button
 					type="button"
-					aria-label="Speak selection"
+					aria-label="Copy selection"
 					onmousedown={noteMenuPress}
-					onclick={speakSelection}
+					onclick={() => void copySelection()}
 					ontouchstart={noteMenuBtnTouch}
-					ontouchend={speakTouch}>Speak</button
+					ontouchend={copyTouch}>Copy</button
 				>
-				{#if shouldShowInspect(selMenu.quote, settings.inspectEnabled)}
-					<button
-						type="button"
-						aria-label="Inspect character"
-						onmousedown={noteMenuPress}
-						onclick={openInspect}
-						ontouchstart={noteMenuBtnTouch}
-						ontouchend={inspectTouch}>Inspect</button
-					>
-				{/if}
 			{:else}
 				<!-- Desktop: Annotate floats above the highlight while
 				the OS bubble keeps its own slot. Copy and Read Aloud
@@ -13578,11 +13559,12 @@
 
 	{#if selPinyin && !previewing}
 		<!-- Selection readings: pronunciations for just the highlight,
-		docked above it on desktop (below only without headroom) and
-		below it on phones (the menu owns above). Pointer-transparent
-		so it never disturbs the selection or blocks the native menu;
-		the highlight clearing dismisses it (see trimMessageDrag), and
-		scrolling tracks it (see trackSelPinyin). -->
+		docked above it (below only without headroom) — on phones the
+		menu rises above the panel (see liftSelMenuAbovePinyin) instead
+		of owning the above slot. Pointer-transparent so it never
+		disturbs the selection or blocks the native menu; the highlight
+		clearing dismisses it (see trimMessageDrag), and scrolling
+		tracks it (see trackSelPinyin). -->
 		<div
 			class="sel-pinyin"
 			class:above={selPinyin.above}

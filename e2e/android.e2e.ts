@@ -1193,16 +1193,13 @@ test.describe("touch", () => {
 			{ x: box.x + box.width / 2, y: box.y + box.height / 2 }
 		);
 		// The native callout is suppressed: our menu floats near the
-		// text with Copy, Annotate, and Speak in the desktop style.
+		// text with Annotate then Copy (Speak/Inspect live in the
+		// composer dock instead).
 		const menu = page.locator(".sel-menu");
 		await expect(menu).toBeVisible();
-		await expect(menu.locator("button")).toHaveText([
-			"Copy",
-			"Annotate",
-			"Speak"
-		]);
-		// The composer dock mirrors Annotate/Speak; Inspect is Han-only.
-		await expect(page.locator(".ann-dock")).toHaveText(["Annotate", "Speak"]);
+		await expect(menu.locator("button")).toHaveText(["Annotate", "Copy"]);
+		// The composer dock holds Speak; Inspect is Han-only.
+		await expect(page.locator(".ann-dock")).toHaveText(["Speak"]);
 	});
 
 	test("touch selection menu docks above the highlight", async ({ page }) => {
@@ -1350,21 +1347,12 @@ test.describe("touch", () => {
 		await page.goto("/");
 		await expect(page.locator("article .rendered").first()).toBeVisible();
 		await summonTouchSelection(page);
-		// Copy/Annotate/Speak float in the menu, joined by Inspect for
-		// the single Han character; the composer dock mirrors all four
-		// (redundant on purpose — a thumb can drag the menu out of reach).
+		// Annotate/Copy float in the menu; the composer dock holds
+		// Speak/Inspect for the single Han character (redundant on
+		// purpose — a thumb can drag the menu out of reach).
 		const menu = page.locator(".sel-menu");
-		await expect(menu.locator("button")).toHaveText([
-			"Copy",
-			"Annotate",
-			"Speak",
-			"Inspect"
-		]);
-		await expect(page.locator(".ann-dock")).toHaveText([
-			"Annotate",
-			"Speak",
-			"Inspect"
-		]);
+		await expect(menu.locator("button")).toHaveText(["Annotate", "Copy"]);
+		await expect(page.locator(".ann-dock")).toHaveText(["Speak", "Inspect"]);
 	});
 
 	test("a long chat scrolls inside the list, never squeezing the prompt", async ({

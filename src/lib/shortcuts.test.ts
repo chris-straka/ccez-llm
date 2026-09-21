@@ -153,9 +153,7 @@ describe("shortcuts menu copy", () => {
 		expect(byName.get("Message end")).toBe("Double two-finger tap");
 		expect(byName.get("Delete a message")).toBe("Three-finger tap");
 		expect(byName.get("Delete every chat")).toBe("Three-finger hold");
-		expect(byName.get("Copy selection")).toBe(
-			"Hold the highlight 3.3s · Copy leads the menu"
-		);
+		expect(byName.get("Copy selection")).toBe("Select text · Copy");
 	});
 
 	it("filters case-insensitively on name or keys", () => {

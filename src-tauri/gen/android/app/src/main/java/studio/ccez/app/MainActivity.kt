@@ -237,6 +237,21 @@ class MainActivity : TauriActivity() {
     return super.onWindowStartingActionMode(callback, type)
   }
 
+  // Handle-drag respawn: moving the selection handles rebuilds the
+  // floating toolbar through paths that never re-enter
+  // onWindowStarting (same mode, fresh invalidate), so the OS menu
+  // pops back over the drag. Clearing + invalidating a started mode
+  // re-runs the prepare hook above (which strips it again) without
+  // finishing the mode — selection and handles survive.
+  override fun onActionModeStarted(mode: android.view.ActionMode?) {
+    super.onActionModeStarted(mode)
+    if (mode?.type == android.view.ActionMode.TYPE_FLOATING) {
+      android.util.Log.i("CcezMain", "clearing restarted selection toolbar")
+      mode.menu?.clear()
+      mode.invalidate()
+    }
+  }
+
   // OS selection toolbar: the Annotate/Speak/Inspect entries come
   // from the activity-aliases in the manifest, not from code.
   // Code-added items cannot survive here — AppCompat never consults

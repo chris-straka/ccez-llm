@@ -2483,19 +2483,17 @@ export function firstContentRect<T extends AnchorRect>(rects: readonly T[]): T |
  * wide panels back inside; placement keeps them spread on their
  * own groups first.
  *
- * Above by default (the menu owns the above slot on desktop, the
- * readings hang over the highlight's top edge); `preferBelow`
- * docks below instead — phones put the menu above, so readings
- * below never overlap it — except near the screen bottom, where
- * above wins.
+ * Above with headroom, else below (a tall highlight under the
+ * keyboard can leave no room under it): the readings hang over
+ * the highlight's top edge, and on phones the selection menu
+ * rises above them instead of owning the above slot.
  */
 export function readingPanelPlacement(opts: {
 	rect: AnchorRect;
 	viewportWidth: number;
 	viewportHeight: number;
-	preferBelow: boolean;
 }): { x: number; y: number; above: boolean } {
-	const { rect, viewportWidth, viewportHeight, preferBelow } = opts;
+	const { rect, viewportWidth, viewportHeight } = opts;
 	const cx = rect.left + rect.width / 2;
 	const x = Math.min(
 		Math.max(8, cx),
@@ -2503,12 +2501,23 @@ export function readingPanelPlacement(opts: {
 	);
 	const headroom = rect.top >= 128;
 	const footroom = rect.bottom + 44 <= viewportHeight;
-	// Desktop: above with headroom, else below. Phone menu above:
-	// below with footroom, else above (a tall highlight under the
-	// keyboard can leave no room under it).
-	const above = preferBelow ? !footroom : headroom;
+	const above = headroom || !footroom;
 	if (above) return { x, y: Math.max(8, rect.top), above: true };
 	return { x, y: Math.min(rect.bottom, viewportHeight - 40), above: false };
+}
+
+/**
+ * Menu top that clears a readings panel above the highlight: the
+ * panel's visual top minus the menu height and a hair, never past
+ * the screen edge. Pure — callers measure both rects.
+ */
+export function menuYAbovePanel(
+	panelTop: number,
+	menuHeight: number,
+	gap = 8,
+	minY = 8
+): number {
+	return Math.max(minY, Math.round(panelTop - menuHeight - gap));
 }
 
 /**
