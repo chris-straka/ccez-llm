@@ -110,5 +110,5 @@ run(`git push origin ${tag}`);
 console.log(
 	DRY
 		? "(dry run — nothing changed)"
-		: `Released ${tag}. CI is building all targets; publish the draft when green.`
+		: `Released ${tag}. CI is building all targets and publishes the draft itself.`
 );
