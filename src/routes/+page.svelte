@@ -136,6 +136,7 @@
 	import MessageBody from "$lib/components/MessageBody.svelte";
 	import ActionIcon from "$lib/components/ActionIcon.svelte";
 	import SettingsPanel from "$lib/components/SettingsPanel.svelte";
+	import Toasts from "$lib/components/Toasts.svelte";
 	import { plainBody, sourcesAsked } from "$lib/render";
 	import {
 		clearNotice,
@@ -144,7 +145,6 @@
 		showNotice,
 		toastTimeoutFor,
 		errorToastTimeoutFor,
-		toastLong,
 		VOICE_TIMEOUT_MS
 	} from "$lib/notices";
 	import {
@@ -1947,11 +1947,13 @@
 	}
 	let canMic = $state(false);
 	let dictating = $state(false);
-	/** Transient top toast (copy confirmations, readings, saved notes). */
+	/** Transient top toast (copy confirmations, readings, saved notes).
+	Rendering and tap/copy behavior live in `Toasts.svelte`; the page
+	keeps these flash wrappers for its call sites. */
 	/** Tap action armed on the current toast generation (reply-ready
-	navigation): tapping the toast runs it instead of copying. The
-	generation pins the lifetime — an expired toast never fires a
-	stale action. */
+	navigation): bound into `Toasts`, which runs it instead of
+	copying. The generation pins the lifetime — an expired toast
+	never fires a stale action. */
 	let toastAction = $state<{ seq: number; run: () => void } | null>(null);
 	function flashToast(message: string, action?: () => void): void {
 		flashNotice(notices, "toast", message, toastTimeoutFor(message));
@@ -1959,18 +1961,6 @@
 	}
 	function dismissToast(): void {
 		clearNotice(notices, "toast");
-	}
-	/** Toast tap: an armed action (same generation) navigates;
-	otherwise the tap copies the toast text, as before. */
-	function toastTap(): void {
-		if (toastAction && toastAction.seq === notices.toast.seq) {
-			const run = toastAction.run;
-			toastAction = null;
-			dismissToast();
-			run();
-			return;
-		}
-		copyToast();
 	}
 	/** Transient top error toast: action failures (send errors, export,
 	attach, mic) render in the red pairing, themed both ways. */
@@ -1981,23 +1971,6 @@
 			message,
 			errorToastTimeoutFor(message)
 		);
-	}
-	function dismissErrorToast(): void {
-		clearNotice(notices, "errorToast");
-	}
-	/** Error toast tap: copies the failure text (bug reports, keys
-	from 401s), then dismisses. A failed copy re-flashes red. */
-	function errorToastTap(): void {
-		const text = notices.errorToast.message;
-		dismissErrorToast();
-		if (!text) return;
-		if (!navigator.clipboard) {
-			flashErrorToast("Couldn't copy to the clipboard.");
-			return;
-		}
-		void navigator.clipboard.writeText(text).catch(() => {
-			flashErrorToast("Couldn't copy to the clipboard.");
-		});
 	}
 	let stopDictation: (() => void) | null = null;
 	let openLangMenu: LanguageMenu["id"] | null = $state(null);
@@ -4411,23 +4384,6 @@
 			},
 			() => flashErrorToast("Couldn't copy to the clipboard.")
 		);
-	}
-
-	/** Clicking the toast copies its text. Success stays silent by
-	design: flashing a confirmation would overwrite the very text being
-	copied. Failure still says so (guarded against clobbering a newer
-	toast that landed meanwhile). */
-	function copyToast(): void {
-		const text = notices.toast.message;
-		if (!text) return;
-		if (!navigator.clipboard) {
-			flashErrorToast("Couldn't copy to the clipboard.");
-			return;
-		}
-		void navigator.clipboard.writeText(text).catch(() => {
-			if (notices.toast.message === text)
-				flashErrorToast("Couldn't copy to the clipboard.");
-		});
 	}
 
 	/** Article element owning a DOM node, or null outside messages. */
@@ -12460,29 +12416,7 @@
 				{/each}
 			</div>
 		{/snippet}
-		{#if notices.errorToast.message}
-			<button
-				type="button"
-				class={toastLong(notices.errorToast.message)
-					? "toast error long"
-					: "toast error"}
-				title="Click to copy"
-				aria-live="polite"
-				transition:fade={{ duration: 160 }}
-				onclick={errorToastTap}>{notices.errorToast.message}</button
-			>
-		{:else if notices.toast.message}
-			<button
-				type="button"
-				class={toastLong(notices.toast.message) ? "toast long" : "toast"}
-				title={toastAction && toastAction.seq === notices.toast.seq
-					? "Open"
-					: "Click to copy"}
-				aria-live="polite"
-				transition:fade={{ duration: 160 }}
-				onclick={toastTap}>{notices.toast.message}</button
-			>
-		{/if}
+		<Toasts {notices} bind:toastAction />
 		<!-- Empty drag strip: nothing but the traffic-light clearance
 		(the active reply language shows on the send button instead).
 		Double-click zooms. -->
@@ -17579,62 +17513,9 @@
 	thread with the text visible between them (a veil here read as a
 	white block occluding the messages). Surfaces are solid now —
 	no frost anywhere — so the strip simply stays transparent. */
-	.toast {
-		position: fixed;
-		/* Clear of the camera hole even when the WebView reports no
-		safe-area (env() = 0): 3.5rem sits below the island either way. */
-		top: max(3.5rem, calc(0.5rem + env(safe-area-inset-top, 0px)));
-		left: 50%;
-		transform: translateX(-50%);
-		z-index: 100;
-		background: #1c1c1e;
-		color: #f2f2f7;
-		font: inherit;
-		font-size: 0.82rem;
-		padding: 0.55rem 1rem;
-		/* Outlined: on the dark theme the fill sits almost on top of
-		the app background, so the ring does the noticing. */
-		border: 1px solid #8e8e93;
-		border-color: var(--line-hover);
-		border-radius: 999px;
-		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-		cursor: pointer;
-		white-space: nowrap;
-	}
-	/* Light plain toast (dark-always above): white card, ink text,
-	quiet border — the same surface as the light edit card. Raw
-	values like that card, not tokens: there is no surface token. */
-	:global(html[data-theme="light"]) .toast:not(.error) {
-		background: #fff;
-		color: #1c1c1e;
-		border-color: #e5e5ea;
-	}
-	/* Error toasts pair red both ways (same pairings as the banner):
-	the tokens already resolve per theme, so no dark override block. */
-	.toast.error {
-		background: #fdecea;
-		background: var(--error-bg);
-		color: #94250a;
-		color: var(--error-ink);
-		border-color: #e0a392;
-		border-color: var(--error-line);
-	}
-	/* Android toasts read at default text size, wrap, and scroll: a
-	long error on a phone column blew the nowrap pill full-width.
-	Plain and error share the base size, matching the voice error. */
-	.app[data-android] .toast {
-		font-size: 0.95rem;
-		white-space: normal;
-		max-width: calc(100vw - 2rem);
-		max-height: 30vh;
-		overflow-y: auto;
-	}
-	/* Long copy wraps into a card: the 999px stadium radius reads
-	broken past ~two lines, so toasts over TOAST_LONG_CHARS ride
-	the same 12px card radius as the app's other surfaces. */
-	.toast.long {
-		border-radius: 12px;
-	}
+	/* Toast surfaces live with their markup in `Toasts.svelte`
+	(Svelte scoping binds them to the buttons); only the voice error
+	below stays paged. */
 	/* Speech errors ride under the toast: top of the screen, big
 	enough to notice, same dark-red pairing as the old banner so it
 	reads in both themes. A tap dismisses; silence still expires it. */
