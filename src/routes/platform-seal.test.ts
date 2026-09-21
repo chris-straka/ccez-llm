@@ -33,6 +33,13 @@ function annotationsSource(): string {
 	);
 }
 
+function selMenuSource(): string {
+	return readFileSync(
+		new URL("../lib/components/SelMenu.svelte", import.meta.url),
+		"utf8"
+	);
+}
+
 describe("platform seal", () => {
 	it("defines androidUI as any phone, so data-android means phone", () => {
 		const source = pageSource();
@@ -52,8 +59,11 @@ describe("platform seal", () => {
 		const source = pageSource();
 		expect(source).toContain("{#if androidUI && selMenu && !previewing}");
 		expect(source).toContain("{#if selMenu && !previewing && !iosUI}");
-		expect(source).toContain("Phone selection menu: Annotate then Copy");
-		expect(source).toContain("Desktop: Annotate floats above the highlight");
+		// The floating menu's platform branches render from
+		// `SelMenu.svelte` now; the seal follows the markers.
+		const menu = selMenuSource();
+		expect(menu).toContain("Phone selection menu: Annotate then Copy");
+		expect(menu).toContain("Desktop: Annotate floats above the highlight");
 	});
 
 	it("keeps the iOS selection-menu slot split from Android's", () => {

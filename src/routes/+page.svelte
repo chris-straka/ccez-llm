@@ -138,6 +138,7 @@
 	import SettingsPanel from "$lib/components/SettingsPanel.svelte";
 	import Toasts from "$lib/components/Toasts.svelte";
 	import SelMenu from "$lib/components/SelMenu.svelte";
+	import Attachments from "$lib/components/Attachments.svelte";
 	import { plainBody, sourcesAsked } from "$lib/render";
 	import {
 		clearNotice,
@@ -13330,109 +13331,38 @@
 			</p>
 		{/if}
 
-		{#if attachments.length > 0 || notices.inline.message}
-			<ul
-				class="attachments"
+		<!-- Attachment strip: pills and image/pasted-text cards over the
+		thread. Attachments.svelte owns the strip markup, card buttons,
+		and surfaces; the page keeps the array, drag/expand/busy flags,
+		and the editor/toast side effects. The inline error stays paged
+		in the shared `.error` look (Svelte scoping binds page CSS to
+		page markup, so moving it would drop the red pairing). -->
+		<Attachments
+			attachments={attachments}
+			expanded={expandedPastes}
+			dragging={stripDragging}
+			busyId={ocrBusyId}
+			idle={promptIdle}
+			inlineError={notices.inline.message}
+			actions={{
+				dragStart: stripDragStart,
+				dragMove: stripDragMove,
+				dragEnd: stripDragEnd,
+				clickGate: stripClickGate,
+				toggleExpand: togglePastedExpand,
+				copy: copyAttachment,
+				recognize: (att: Attachment) => void recognizeAttachment(att),
+				remove: removeAttachment
+			}}
+		/>
+		{#if notices.inline.message && !androidUI}
+			<p
+				class="error attach-error"
 				class:composer-idle={promptIdle}
-				class:dragging={stripDragging}
-				onpointerdown={stripDragStart}
-				onpointermove={stripDragMove}
-				onpointerup={stripDragEnd}
-				oncancel={stripDragEnd}
-				onpointercancel={stripDragEnd}
-				ondragstart={(event) => event.preventDefault()}
-				onclickcapture={stripClickGate}
+				role="alert"
 			>
-				{#each attachments as att (att.id)}
-					{@const pasted = isPastedTextAttachment(att) && att.text !== null}
-					{@const pastedBody = att.text ?? ""}
-					{@const pastedOpen = expandedPastes.includes(att.id)}
-					<li class:card={(att.kind === "image" && !!att.dataUrl) || pasted}>
-						{#if att.kind === "image" && att.dataUrl}
-							<!-- Inert thumbnail: clicking previews nothing
-							(the big peek is gone) — it only drags the row. -->
-							<span class="thumb" aria-hidden="true">
-								<img src={att.dataUrl} alt="" draggable="false" />
-							</span>
-						{:else if !pasted}
-							<span class="file-kind" aria-hidden="true">FILE</span>
-						{/if}
-						{#if pasted}
-							<!-- Pasted-text card: same card as images, with
-							the text filling the thumbnail's seat (clamped,
-							ellipsis) instead of a picture. The preview
-							toggles the full text; copy and remove below are
-							the shared card buttons. -->
-							<button
-								type="button"
-								class="paste-body"
-								class:open={pastedOpen}
-								aria-expanded={pastedOpen}
-								aria-label={pastedOpen
-									? "Collapse pasted text"
-									: "Expand pasted text"}
-								onmousedown={(e) => e.preventDefault()}
-								onclick={() => togglePastedExpand(att.id)}
-							>
-								{pastedOpen ? pastedBody : fileExcerpt(pastedBody)}
-							</button>
-							<span class="file-kind" aria-hidden="true">PASTE</span>
-							<span class="tok" title="{att.tokens} tokens"
-								>{pastedBody.length} chars</span
-							>
-						{:else}
-							<span class="name" title="{att.name} · ~{att.tokens} tokens"
-								>{att.name}</span
-							>
-							<span class="tok" title="{att.tokens} tokens"
-								>{formatTokenCount(att.tokens)}</span
-							>
-						{/if}
-						<button
-							type="button"
-							class="card-btn"
-							aria-label="Copy attachment"
-							title="Copy attachment"
-							onmousedown={(e) => e.preventDefault()}
-							onclick={() => copyAttachment(att)}
-						>
-							<ActionIcon kind="copy" />
-						</button>
-						{#if att.kind === "image" && att.dataUrl}
-							<button
-								type="button"
-								class="ocr-btn"
-								aria-label="Recognize text in image"
-								title="Recognize text in image"
-								disabled={ocrBusyId === att.id}
-								onmousedown={(e) => e.preventDefault()}
-								onclick={() => void recognizeAttachment(att)}
-							>
-								{ocrBusyId === att.id ? "…" : "OCR"}
-							</button>
-						{/if}
-						<button
-							type="button"
-							class="card-btn"
-							aria-label="Remove attachment"
-							title="Remove attachment"
-							onmousedown={(e) => e.preventDefault()}
-							onclick={() => removeAttachment(att.id)}
-						>
-							<ActionIcon kind="close" />
-						</button>
-					</li>
-				{/each}
-			</ul>
-			{#if notices.inline.message && !androidUI}
-				<p
-					class="error attach-error"
-					class:composer-idle={promptIdle}
-					role="alert"
-				>
-					{notices.inline.message}
-				</p>
-			{/if}
+				{notices.inline.message}
+			</p>
 		{/if}
 
 		<input
@@ -17304,179 +17234,8 @@
 	as its cards: it docks a fixed margin above the card while the
 	thread runs full-height behind and beside it, text visible around
 	the pills. */
-	.attachments {
-		position: absolute;
-		left: 1.2rem;
-		right: 1.2rem;
-		z-index: 25;
-		/* Gaps stay thread territory (selectable, scrollable): only
-		the pills and cards take pointer events. */
-		pointer-events: none;
-		list-style: none;
-		display: flex;
-		/* Cards set the row height; lesser pills center instead of
-		stretching into tall capsules beside them. */
-		align-items: center;
-		flex-wrap: nowrap;
-		gap: 0.4rem;
-		margin: 0 1.2rem;
-		padding: 0.3rem 0 0.15rem;
-		box-sizing: border-box;
-		max-width: calc(100% - 2.4rem);
-		overflow-x: auto;
-		/* Plain scrolling row, never a bar: revealing one on hover
-		reshapes the row on classic scrollbars, so every card jumps
-		a few pixels. Scroll still works (wheel, touch, drag, keys);
-		clipped cards are the affordance. */
-		scrollbar-width: none;
-	}
-	.attachments::-webkit-scrollbar {
-		width: 0;
-		height: 0;
-	}
-	.attachments li {
-		display: flex;
-		align-items: center;
-		pointer-events: auto;
-		gap: 0.25rem;
-		flex-shrink: 0;
-		font-size: 0.78rem;
-		background: #eef4ff;
-		background: var(--hl);
-		border-radius: 999px;
-		padding: 0.25rem 0.3rem 0.25rem 0.7rem;
-		max-width: 100%;
-		/* Overflowing rows pan by hand: the card is the grip. */
-		cursor: grab;
-	}
-	/* While the pan owns the gesture every card shows the fist. */
-	.attachments.dragging li,
-	.attachments.dragging li button {
-		cursor: grabbing;
-	}
-	.attachments .name {
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		max-width: 16rem;
-	}
-	.attachments .tok {
-		flex: none;
-		white-space: nowrap;
-		color: #6e6e73;
-		color: var(--muted);
-	}
-	/* Pasted-text pill body: excerpt preview, single-line like the
-	file name; expanded it scrolls in place instead of growing the
-	strip. */
-	.attachments .paste-body {
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		max-width: 16rem;
-		text-align: left;
-		border-radius: 0.5rem;
-		padding: 0.1rem 0.3rem;
-	}
-	.attachments .paste-body.open {
-		white-space: pre-wrap;
-		word-break: break-word;
-		max-height: 8rem;
-		max-width: 20rem;
-		overflow: auto;
-		text-overflow: clip;
-	}
-	.attachments button {
-		border: 0;
-		background: none;
-		cursor: pointer;
-		color: #3a3a3c;
-		color: var(--ink);
-	}
-	.attachments .thumb {
-		border: 0;
-		background: none;
-		line-height: 0;
-		padding: 0;
-	}
-	/* Image cards: thumbnail preview up top, token/copy/OCR/X footer
-	below (the strip itself stays one scrolling row — only the card
-	wraps internally). The blue wash is back on the card: it reads
-	as one basic pill-card over the thread, text visible between
-	the cards. */
-	.attachments li.card {
-		flex-wrap: wrap;
-		row-gap: 0.3rem;
-		border-radius: 12px;
-		padding: 0.4rem 0.5rem;
-		max-width: 12rem;
-		align-items: center;
-		background: #eef4ff;
-		background: var(--hl);
-	}
-	.attachments li.card .thumb {
-		flex: 1 1 100%;
-	}
-	.attachments .thumb img {
-		display: block;
-		width: 100%;
-		height: 4.5rem;
-		object-fit: cover;
-		border-radius: 8px;
-	}
-	/* Pasted-text cards: the same 12rem card as images, with the
-	pasted text filling the thumbnail's seat (same 4.5rem) instead
-	of a picture — four clamped lines with an ellipsis, never a
-	tall pill. The footer (PASTE, chars, copy, X) matches the image
-	card's row. */
-	.attachments li.card .paste-body {
-		flex: 1 1 100%;
-		max-width: none;
-		height: 4.5rem;
-		line-height: 1.4;
-		display: -webkit-box;
-		-webkit-line-clamp: 4;
-		line-clamp: 4;
-		-webkit-box-orient: vertical;
-		overflow: hidden;
-		white-space: normal;
-		text-align: left;
-		border-radius: 8px;
-		padding: 0.1rem 0.3rem;
-	}
-	/* Expanded preview scrolls in place like the old pill: same
-	card footprint, full text, no strip growth. */
-	.attachments li.card .paste-body.open {
-		display: block;
-		max-width: none;
-		max-height: none;
-		white-space: pre-wrap;
-		word-break: break-word;
-		overflow-y: auto;
-		text-overflow: clip;
-	}
-	/* Card buttons are icon-only (message-button copy glyph, close
-	glyph), sized to the card's font so they track it. */
-	.attachments .card-btn {
-		display: inline-flex;
-		align-items: center;
-		padding: 0.1rem;
-		font-size: 0.78rem;
-	}
-	.attachments .card-btn :global(.action-glyph) {
-		height: 1em;
-	}
-	.attachments .ocr-btn {
-		font-size: 0.72rem;
-		font-weight: 700;
-		letter-spacing: 0.04em;
-		padding: 0.1rem 0.25rem;
-		border-radius: 6px;
-	}
-	.attachments .ocr-btn:disabled {
-		opacity: 0.45;
-		cursor: default;
-	}
+	/* Attachment strip surfaces live with their markup in
+	`Attachments.svelte` (Svelte scoping binds them to the strip). */
 	/* The tray paints no background of its own: pills float over the
 	thread with the text visible between them (a veil here read as a
 	white block occluding the messages). Surfaces are solid now —
@@ -18903,18 +18662,16 @@
 			opacity 0.35s ease,
 			visibility 0s;
 	}
-	/* Idle-hide covers the attachment strip too (pills, preview
-	image, error): it rides the same slide/fade as the prompt so no
-	image bubble lingers over the chat, and restores with it on the
-	next input (the class drops together with prompt-idle). */
-	.attachments,
+	/* Idle-hide covers the inline attach error too (the strip rides
+	with the prompt from `Attachments.svelte`): same slide/fade so no
+	image bubble lingers over the chat, restored with the next input. */
 	.attach-error {
 		transition:
 			transform 0.25s ease,
 			opacity 0.25s ease,
 			visibility 0s;
 	}
-	:is(.attachments, .attach-error).composer-idle {
+	.attach-error.composer-idle {
 		/* Same 0.75rem settle and ramp as the card: the old
 		full-height slide outran the prompt — taller trays visibly
 		faster. The fade does the hiding; the slide just settles. */
@@ -18928,7 +18685,7 @@
 			visibility 0s linear 0.25s;
 	}
 	/* Reduced motion settles the summon instantly: no slide, no fade
-	ramp on the card or its strip — what lands is the final frame.
+	ramp on the card or its error — what lands is the final frame.
 	After every ramp above (equal specificity, later wins), so the
 	desktop rise honors the OS setting like the drawers already do. */
 	@media (prefers-reduced-motion: reduce) {
@@ -18936,7 +18693,6 @@
 		.prompt:not(.prompt-idle),
 		.prompt.prompt-idle.prompt-preview,
 		.app:not([data-android]) .prompt-tools,
-		.attachments,
 		.attach-error {
 			transition: none;
 		}
@@ -19114,18 +18870,7 @@
 		color: #ff3b30;
 		color: var(--alarm);
 	}
-	.file-kind {
-		font-size: 0.68rem;
-		font-weight: 700;
-		letter-spacing: 0.05em;
-		color: #6e6e73;
-	}
-	/* Mobile light theme: the blue wash already shouts — the kind
-	pills and OCR read quieter at semibold instead of bold. */
-	:global(html[data-theme="light"]) .app[data-android] .file-kind,
-	:global(html[data-theme="light"]) .app[data-android] .attachments .ocr-btn {
-		font-weight: 600;
-	}
+	/* `.file-kind` badges render in `Attachments.svelte` now. */
 	/* Emptied composer: no stray caret while UNFOCUSED. Clearing the
 	draft (paste then delete-all, or a send) leaves focus in place —
 	but a focused empty box keeps its blink: the cursor is the only
@@ -19227,8 +18972,8 @@
 		box-sizing: border-box;
 		right: calc(1.2rem + var(--sbw, 0px));
 	}
+	/* `.attachments` keeps its own tray width in `Attachments.svelte`. */
 	.lang-menus,
-	.attachments,
 	.review,
 	.error-banner {
 		width: calc(100% - 2.4rem);
@@ -19298,11 +19043,8 @@
 	}
 	/* tool-icon hovers ride --ink now. */
 	/* .error-banner rides --error-bg/--error-ink now: no dark override needed. */
-	/* sent tags inherit body type; attachment pills ride --hl now.
-	The pill × keeps its rule: light --focus against dark --ink. */
-	:global(html[data-theme="dark"]) .attachments button {
-		color: #f2f2f7;
-	}
+	/* sent tags inherit body type; attachment pills ride --hl now
+	(rules live in `Attachments.svelte`). */
 	/* ann-wrap rides --line/--muted/--ink; review-tools ride --muted/--danger now. */
 	/* sel-menu rides --bg-raised/--line/--bg-wash/--ink;
 	ann-pop is dark-always; review rides --panel/--line-soft. */

@@ -55,6 +55,16 @@ function pageStyle(): string {
 }
 
 const messageBodyStyle = styleOf("../lib/components/MessageBody.svelte");
+// Extracted page components keep their surfaces (and token references)
+// with their markup — Svelte scoping binds page CSS to page markup,
+// so the scan follows the extractions (Toasts, SelMenu, Attachments).
+const extractedStyle = [
+	"../lib/components/Toasts.svelte",
+	"../lib/components/SelMenu.svelte",
+	"../lib/components/Attachments.svelte"
+]
+	.map((path) => styleOf(path))
+	.join("\n");
 // panels.css is a raw stylesheet (no <style> wrapper): read it whole.
 const panelsStyle = readFileSync(
 	new URL("../lib/components/settings/panels.css", import.meta.url),
@@ -93,7 +103,7 @@ describe("color tokens", () => {
 	});
 
 	it("references every token somewhere", () => {
-		const all = pageStyle() + messageBodyStyle + panelsStyle;
+		const all = pageStyle() + messageBodyStyle + panelsStyle + extractedStyle;
 		for (const token of [
 			"var(--accent)",
 			"var(--accent-ink)",

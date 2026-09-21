@@ -13,6 +13,13 @@ function pageSource(): string {
 	return readFileSync(new URL("./+page.svelte", import.meta.url), "utf8");
 }
 
+function selMenuSource(): string {
+	return readFileSync(
+		new URL("../lib/components/SelMenu.svelte", import.meta.url),
+		"utf8"
+	);
+}
+
 function blockAfter(
 	source: string,
 	marker: string,
@@ -28,8 +35,11 @@ function blockAfter(
 
 describe("phone selection layout", () => {
 	it("floats Annotate then Copy, never Speak or Inspect", () => {
+		// The floating menu renders from `SelMenu.svelte` now (buttons,
+		// drag, and surfaces moved with the markup); the layout pin
+		// follows it.
 		const menu = blockAfter(
-			pageSource(),
+			selMenuSource(),
 			"Phone selection menu: Annotate then Copy"
 		);
 		expect(menu.indexOf(">Annotate</button")).toBeGreaterThan(-1);
