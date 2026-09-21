@@ -1,11 +1,12 @@
-//! Prompt-and-fields native text menu flag.
+//! Prompt-and-settings native text menu flag.
 //!
 //! The Activity swaps every floating text-selection menu for an empty
 //! dummy (see `MainActivity.kt`: no OS text menu anywhere in the app,
 //! the WebView owns Annotate / Copy / Speak). The exceptions are the
-//! main prompt and editable settings fields: a live selection inside
-//! either gets the real OS menu (Copy / Cut / Paste / Select All).
-//! Static panel copy matches neither.
+//! main prompt and the settings panel: a live selection inside either
+//! gets the real OS menu (Copy / Cut / Paste / Select All), since
+//! selectable labels are only honest with a menu behind them. Chat
+//! text matches neither.
 //!
 //! Crossing the flag: the frontend reports selection transitions
 //! through the `set_prompt_menu_allowed` command (cheap, transitions

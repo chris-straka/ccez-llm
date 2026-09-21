@@ -3,16 +3,15 @@ import { invoke } from "@tauri-apps/api/core";
 import { tauriBackendAvailable } from "./secrets";
 
 /**
- * Prompt-and-fields native OS text menu.
+ * Prompt-and-settings native OS text menu.
  *
  * The Activity swaps every floating selection menu for an empty dummy
- * except while a live selection sits inside the main prompt or an
- * editable field (key inputs and friends): then the real OS menu
- * (Copy / Cut / Paste / Select All) shows. Static panel copy matches
- * neither and keeps the dummy. The page owns the anchor fact
- * (CodeMirror renders the prompt, so only the DOM can see it) and
- * reports transitions to Rust, which the Activity reads synchronously
- * at menu time.
+ * except while a live selection sits inside the main prompt or the
+ * settings panel: then the real OS menu (Copy / Cut / Paste /
+ * Select All) shows, since selectable labels are only honest with a
+ * menu behind them. Chat text matches neither. The page owns the
+ * anchor fact and reports transitions to Rust, which the Activity
+ * reads synchronously at menu time.
  */
 
 export type ContainsNode = Pick<Node, "contains">;

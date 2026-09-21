@@ -527,6 +527,7 @@
 	}
 	let editor: PromptEditor | null = $state(null);
 	let promptEl: HTMLElement | undefined = $state();
+	let settingsEl: HTMLElement | undefined = $state();
 	let scrollBox: HTMLElement | undefined = $state();
 	/** App root (pinned to the visual height while the phone keyboard is up). */
 	let appEl: HTMLElement | undefined = $state();
@@ -11366,11 +11367,12 @@
 					dismissSelPanels();
 			}
 		};
-		// Native OS menu in the prompt and settings fields: while a
-		// live selection sits inside either, the Activity shows the
-		// real OS menu (Copy / Cut / Paste) instead of the empty
-		// dummy. Static settings text keeps the dummy. Native fields
-		// hide their range from window.getSelection(), so the focused
+		// Native OS menu in the prompt and across the settings
+		// panel: while a live selection sits inside either, the
+		// Activity shows the real OS menu (Copy / Cut / Paste)
+		// instead of the empty dummy — selectable labels are only
+		// honest with a menu behind them. Native fields hide their
+		// range from window.getSelection(), so the focused
 		// field's own start/end is read too. The select event covers
 		// field selections where selectionchange never fires.
 		// Transitions only — handle drags stay silent on the bridge.
@@ -11392,7 +11394,7 @@
 				}
 			}
 			reportOsMenu(
-				[promptEl],
+				[promptEl, settingsEl],
 				live?.anchorNode ?? null,
 				live?.isCollapsed ?? true,
 				undefined,
@@ -14074,6 +14076,7 @@
 	<aside
 		class="settings-panel"
 		class:closed={!settingsOpen}
+		bind:this={settingsEl}
 		data-fade-scroll
 		aria-label="Settings"
 		inert={!settingsOpen}
