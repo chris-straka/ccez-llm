@@ -93,9 +93,12 @@ privileged (Keychain, updater, native TTS).
 
 ## Source control
 
-Standing authorization: commit and push without waiting for review —
-the user has granted this once for all future turns, so finished work
-goes straight to a commit and `origin/main` when green. Scope is commit + push only:
+Standing authorization: commit and push as you go, without waiting
+for review — the user has granted this once for all future turns.
+Each finished unit of work gets its own commit the moment its gates
+are green, pushed straight to `origin/main` in the same motion; never
+batch unrelated work into one commit and never sit on green work.
+Scope is commit + push only:
 never amend, rebase, force-push, tag, or cut a release without an
 explicit ask in that turn. Name committed files explicitly, never
 `git add -A`. One shared local checkout: a commit is already on the

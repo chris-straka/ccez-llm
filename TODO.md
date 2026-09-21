@@ -35,6 +35,13 @@ same codebase via the Tauri mobile target.
       (`platform.ts`, `updates.ts`, `langId.ts` + `langid.rs`,
       `secrets_*` fail-closed). No pass claims without the hardware.
 
+## Pile: maybe later (only if troublesome)
+
+- [ ] Chats-sidebar swipe misfires on downward scrolls: directional
+      lock (predominantly-horizontal past a minimum distance) or
+      edge-started swipes. Owner call — implement only if it keeps
+      happening.
+
 ## Non-goals
 
 - No app-build/agentic features. No cloud sync / sharing / plugins.
