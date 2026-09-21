@@ -51,6 +51,13 @@ function reviewDockSource(): string {
 	);
 }
 
+function sentRefsSource(): string {
+	return readFileSync(
+		new URL("../lib/components/SentRefs.svelte", import.meta.url),
+		"utf8"
+	);
+}
+
 describe("annotation badge font-size tracking", () => {
 	it("scales numbered badges with the message font size", () => {
 		// Dampened tracking (never compounding rem): the badge rule must
@@ -158,10 +165,10 @@ describe("review delete button", () => {
 
 describe("review quote clipping and link contract", () => {
 	it("lets the quote button shrink so long quotes clip, and links it on hover", () => {
-		// The dock quote moved to ReviewDock; the refs quote still
-		// renders in the page (message-anchored popover).
+		// The dock quote moved to ReviewDock; the refs quote to
+		// SentRefs (message-anchored popover card).
 		const dockCss = componentStyle(reviewDockSource(), "ReviewDock.svelte");
-		const css = pageStyle();
+		const css = componentStyle(sentRefsSource(), "SentRefs.svelte");
 		// flex-shrink re-opts out of the generic head-button pin —
 		// without it the quote stretched the card instead of clipping.
 		expect(dockCss).toMatch(/button\.review-quote\s*\{[^}]*flex-shrink:\s*1/);
@@ -175,7 +182,7 @@ describe("review quote clipping and link contract", () => {
 
 	it("fades quote underlines instead of snapping them", () => {
 		const dockCss = componentStyle(reviewDockSource(), "ReviewDock.svelte");
-		const css = pageStyle();
+		const css = componentStyle(sentRefsSource(), "SentRefs.svelte");
 		// The line is always drawn but transparent at rest: color (not
 		// the line) ramps on hover, on both cards.
 		for (const [sel, src] of [
@@ -207,7 +214,7 @@ describe("review quote clipping and link contract", () => {
 
 describe("sent-message annotation count", () => {
 	it("scales the refs count with the message font size", () => {
-		const css = pageStyle();
+		const css = componentStyle(sentRefsSource(), "SentRefs.svelte");
 		expect(css).toMatch(/\.ann-refs-pill\s*\{[^}]*var\(--font-scale, 1\)/);
 	});
 });
