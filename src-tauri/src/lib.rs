@@ -211,6 +211,7 @@ fn install_tls_provider() {
 pub fn run() {
     install_tls_provider();
     let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_notification::init())

@@ -32,6 +32,7 @@ tauri = { version = "2", features = ["macos-private-api", "tray-icon", "image-pn
 # gtk 0.18. No app code touches glib directly, and `cargo tree` proves
 # the crate compiles on Linux only (absent from the macOS target tree;
 # reached via tray-icon -> libappindicator -> gtk).
+tauri-plugin-clipboard-manager = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-notification = "2"
