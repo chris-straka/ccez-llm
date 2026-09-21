@@ -19,6 +19,14 @@ function pageStyle(): string {
 	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
+/** Review-dock chrome moved to ReviewDock.svelte with its styles. */
+function reviewDockSource(): string {
+	return readFileSync(
+		new URL("../lib/components/ReviewDock.svelte", import.meta.url),
+		"utf8"
+	);
+}
+
 describe("phone composer two bars", () => {
 	it("makes the top bar text-only (no tools reservation on phones)", () => {
 		const css = pageStyle();
@@ -170,8 +178,12 @@ describe("phone highlight dock", () => {
 		expect(css).toContain(
 			".app[data-android] .prompt:has(.ann-dock) .send-btn"
 		);
-		expect(css).toContain(
-			".app[data-android] .prompt:has(.ann-dock) .ann-wrap"
+		// The wrap's own hide moved with the dock (same gate, global:
+		// the prompt renders paged, the dock doesn't).
+		const dock = reviewDockSource();
+		expect(dock).toContain(".prompt:has(.ann-dock)) .ann-wrap");
+		expect(dock).toMatch(
+			/\.ann-wrap\s*\{[^}]*visibility:\s*hidden[^}]*pointer-events:\s*none/
 		);
 	});
 

@@ -22,6 +22,14 @@ function bodySource(): string {
 	);
 }
 
+/** Shortcuts dialog moved to ShortcutsModal.svelte with its markup. */
+function shortcutsSource(): string {
+	return readFileSync(
+		new URL("../lib/components/ShortcutsModal.svelte", import.meta.url),
+		"utf8"
+	);
+}
+
 function appHtml(): string {
 	return readFileSync(new URL("../app.html", import.meta.url), "utf8");
 }
@@ -140,13 +148,17 @@ describe("desktop seal", () => {
 	});
 
 	it("keeps the keyboard-shortcuts heading for desktop", () => {
-		const source = pageSource();
+		// Phones get the gestures title; desktop keeps the h2 (which
+		// names the dialog for assistive tech via labelledby).
+		const source = shortcutsSource();
+		expect(source).toContain('{#if !android}<h2 id="shortcuts-heading">');
+		expect(source).toContain("Keyboard shortcuts");
 		expect(source).toContain(
-			'{#if !androidUI}<h2 id="shortcuts-heading">\n\t\t\t\t\t\t\tKeyboard shortcuts\n\t\t\t\t\t\t</h2>{/if}'
+			'label={android ? "Touch gestures" : "Keyboard shortcuts"}'
 		);
-		expect(source).toContain(
-			'aria-label={androidUI ? "Touch gestures" : undefined}'
-		);
+		// The page still feeds the dialog the live phone flag.
+		expect(pageSource()).toContain("<ShortcutsModal");
+		expect(pageSource()).toContain("android={androidUI}");
 	});
 
 	it("keeps selection auto-speak desktop-only (phones need the tap)", () => {

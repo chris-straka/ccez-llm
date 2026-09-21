@@ -26,6 +26,31 @@ function messageBodyStyle(): string {
 	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
+/**
+ * Popover (AnnPop) and review dock (ReviewDock) renders moved out of
+ * +page.svelte with their markup and styles; the assertions below
+ * follow them (same contracts, new homes).
+ */
+function annPopSource(): string {
+	return readFileSync(
+		new URL("../lib/components/AnnPop.svelte", import.meta.url),
+		"utf8"
+	);
+}
+
+function componentStyle(source: string, name: string): string {
+	const match = source.match(/<style>([\s\S]*)<\/style>/);
+	if (!match) throw new Error(`${name} has no <style> block`);
+	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
+}
+
+function reviewDockSource(): string {
+	return readFileSync(
+		new URL("../lib/components/ReviewDock.svelte", import.meta.url),
+		"utf8"
+	);
+}
+
 describe("annotation badge font-size tracking", () => {
 	it("scales numbered badges with the message font size", () => {
 		// Dampened tracking (never compounding rem): the badge rule must
@@ -47,7 +72,7 @@ describe("annotation badge RTL mirror", () => {
 
 describe("annotation edit Save animation", () => {
 	it("animates the popover Save symmetrically on hover in/out", () => {
-		const css = pageStyle();
+		const css = componentStyle(annPopSource(), "AnnPop.svelte");
 		// Symmetric means the transition lives on the base rule, not
 		// :hover (a hover-only transition snaps back on leave).
 		expect(css).toMatch(/\.ann-save\s*\{[^}]*transition:/);
@@ -55,16 +80,16 @@ describe("annotation edit Save animation", () => {
 	});
 
 	it("animates the review edit buttons symmetrically on hover in/out", () => {
-		const css = pageStyle();
+		const css = componentStyle(reviewDockSource(), "ReviewDock.svelte");
 		expect(css).toMatch(/\.review-edit-actions button\s*\{[^}]*transition:/);
 	});
 
 	it("keeps the review edit textarea readable in dark mode", () => {
-		const css = pageSource();
+		const source = reviewDockSource();
 		// The field surface is near-black; the edit box must override it.
-		expect(css).toContain('html[data-theme="dark"]');
-		expect(css).toMatch(
-			/\[data-theme="dark"\][\s\S]*?\.review textarea\s*\{[^}]*background:\s*#3a3a3c/
+		expect(source).toContain(':global(html[data-theme="dark"]) .review textarea');
+		expect(source).toMatch(
+			/\.review textarea\s*\{[^}]*background:\s*#3a3a3c/
 		);
 	});
 });
@@ -81,15 +106,17 @@ describe("annotation create wiring", () => {
 	});
 
 	it("ends the phone create pill with a Save button", () => {
-		const source = pageSource();
+		const source = annPopSource();
 		// The fresh pill is textarea + mic only on desktop (Enter
 		// files); phones get an explicit submit at the end because
 		// the software enter key is unreliable for filing.
-		const fresh = source.match(/#if annPop\.fresh\}[\s\S]*?\{:else\}/);
+		const fresh = source.match(/#if pop\.fresh\}[\s\S]*?\{:else\}/);
 		expect(fresh?.[0]).toBeDefined();
-		expect(fresh?.[0]).toContain("{#if androidUI}");
+		expect(fresh?.[0]).toContain("{#if android}");
 		expect(fresh?.[0]).toContain("ann-pill-save");
-		expect(fresh?.[0]).toContain("saveAnnPop()");
+		expect(fresh?.[0]).toContain("actions.save");
+		// The page still wires that action to the real save path.
+		expect(pageSource()).toContain("save: saveAnnPop");
 	});
 });
 
@@ -102,7 +129,7 @@ describe("annotations-only messages", () => {
 
 describe("review pencil hover", () => {
 	it("signals with color only — no background, glow, or underline", () => {
-		const css = pageStyle();
+		const css = componentStyle(reviewDockSource(), "ReviewDock.svelte");
 		expect(css).toMatch(/button\.review-pencil\s*\{[^}]*transition:/);
 		const hover =
 			css.match(/button\.review-pencil:hover\s*\{[^}]*\}/)?.[0] ?? "";
@@ -118,10 +145,10 @@ describe("review pencil hover", () => {
 
 describe("review delete button", () => {
 	it("is a centered close icon going Clear-all red, never underlined", () => {
-		const source = pageSource();
+		const source = reviewDockSource();
 		expect(source).toContain('class="review-del"');
 		expect(source).toContain('kind="close"');
-		const css = pageStyle();
+		const css = componentStyle(source, "ReviewDock.svelte");
 		expect(css).toMatch(/button\.review-del\s*\{[^}]*align-self:\s*center/);
 		const hover = css.match(/button\.review-del:hover\s*\{[^}]*\}/)?.[0] ?? "";
 		expect(hover).toContain("var(--danger)");
@@ -131,11 +158,14 @@ describe("review delete button", () => {
 
 describe("review quote clipping and link contract", () => {
 	it("lets the quote button shrink so long quotes clip, and links it on hover", () => {
+		// The dock quote moved to ReviewDock; the refs quote still
+		// renders in the page (message-anchored popover).
+		const dockCss = componentStyle(reviewDockSource(), "ReviewDock.svelte");
 		const css = pageStyle();
 		// flex-shrink re-opts out of the generic head-button pin —
 		// without it the quote stretched the card instead of clipping.
-		expect(css).toMatch(/button\.review-quote\s*\{[^}]*flex-shrink:\s*1/);
-		expect(css).toMatch(
+		expect(dockCss).toMatch(/button\.review-quote\s*\{[^}]*flex-shrink:\s*1/);
+		expect(dockCss).toMatch(
 			/button\.review-quote:hover\s*\{[^}]*text-decoration:\s*underline/
 		);
 		expect(css).toMatch(
@@ -144,14 +174,18 @@ describe("review quote clipping and link contract", () => {
 	});
 
 	it("fades quote underlines instead of snapping them", () => {
+		const dockCss = componentStyle(reviewDockSource(), "ReviewDock.svelte");
 		const css = pageStyle();
 		// The line is always drawn but transparent at rest: color (not
 		// the line) ramps on hover, on both cards.
-		for (const sel of ["button\\.review-quote", "\\.ann-refs-quote"]) {
-			expect(css).toMatch(
+		for (const [sel, src] of [
+			["button\\.review-quote", dockCss],
+			["\\.ann-refs-quote", css]
+		] as const) {
+			expect(src).toMatch(
 				new RegExp(`${sel}\\s*\\{[^}]*text-decoration-color:\\s*transparent`)
 			);
-			expect(css).toMatch(
+			expect(src).toMatch(
 				new RegExp(
 					`${sel}:hover\\s*\\{[^}]*text-decoration-color:\\s*currentcolor`
 				)
@@ -160,7 +194,7 @@ describe("review quote clipping and link contract", () => {
 	});
 
 	it("lights all three icons on the same color beat", () => {
-		const css = pageStyle();
+		const css = componentStyle(reviewDockSource(), "ReviewDock.svelte");
 		for (const sel of [
 			"button\\.review-copy",
 			"button\\.review-del",
