@@ -7,11 +7,16 @@ import { describe, it, expect } from "vitest";
  * button hides where no export path works (shell phone: no picker,
  * no native dialog bridge, clipboard denied).
  *
- * Asserts on +page.svelte source because the shell-phone branch
- * (Tauri backend present) never runs in jsdom or browser e2e.
+ * Asserts on source because the shell-phone branch (Tauri backend
+ * present) never runs in jsdom or browser e2e: row markup moved to
+ * Sidebar.svelte, while the page still wires the android/shell flags.
  */
 function pageSource(): string {
 	return readFileSync(new URL("./+page.svelte", import.meta.url), "utf8");
+}
+
+function sidebarSource(): string {
+	return readFileSync(new URL("../lib/components/Sidebar.svelte", import.meta.url), "utf8");
 }
 
 describe("phone sidebar rows", () => {
@@ -27,9 +32,12 @@ describe("phone sidebar rows", () => {
 	});
 
 	it("hides export where the shell phone has no export path", () => {
-		const source = pageSource();
-		expect(source).toMatch(
-			/\{#if !\(androidUI && tauriBackendAvailable\(\)\)\}[\s\S]*?class="exp"/
-		);
+		const source = sidebarSource();
+		expect(source).toMatch(/\{#if !\(android && shell\)\}[\s\S]*?class="exp"/);
+		// The page feeds the gate from the same live flags the old
+		// inline row read: no export path hides instead of failing.
+		const page = pageSource();
+		expect(page).toContain("android={androidUI}");
+		expect(page).toContain("shell={tauriBackendAvailable()}");
 	});
 });

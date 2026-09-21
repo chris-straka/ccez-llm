@@ -5,14 +5,17 @@ import { describe, it, expect } from "vitest";
  * Sidebar chrome must never select: long-presses on chat titles, the
  * + button, and the Settings button raise app text selection instead
  * of the row tap. jsdom has no selection UI, so like
- * actions-reveal.test.ts this asserts on +page.svelte's <style>
- * source: one rule covering all three, with the webkit prefix for
- * mobile Safari.
+ * actions-reveal.test.ts this asserts on Sidebar.svelte's <style>
+ * source (moved with the drawer): one rule covering all three, with
+ * the webkit prefix for mobile Safari.
  */
 function pageStyle(): string {
-	const source = readFileSync(new URL("./+page.svelte", import.meta.url), "utf8");
+	const source = readFileSync(
+		new URL("../lib/components/Sidebar.svelte", import.meta.url),
+		"utf8"
+	);
 	const match = source.match(/<style>([\s\S]*)<\/style>/);
-	if (!match) throw new Error("+page.svelte has no <style> block");
+	if (!match) throw new Error("Sidebar.svelte has no <style> block");
 	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
