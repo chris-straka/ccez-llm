@@ -22,6 +22,7 @@
 		type AppSettings
 	} from "$lib/settings";
 	import { tauriBackendAvailable } from "$lib/secrets";
+	import { readClipboardText } from "$lib/clipboard";
 		import {
 		downloadedMB,
 		isOnDeviceProvider,
@@ -87,22 +88,23 @@
 	let keyPasteError = $state("");
 	/**
 	 * Phone keyboards hide paste on password fields, so the field gets
-	 * its own button. The tap is the clipboard-read user gesture; when
-	 * the WebView denies it, the hint names the long-press fallback.
+	 * its own button. The tap is the clipboard-read user gesture; the
+	 * shell reads natively (the WebView denies the Web API), and when
+	 * that fails too the hint names the long-press fallback.
 	 */
 	async function pasteKey(): Promise<void> {
 		keyPasteError = "";
-		try {
-			const text = await navigator.clipboard.readText();
-			if (!text.trim()) {
-				keyPasteError = "Clipboard is empty.";
-				return;
-			}
-			active.apiKey = text.trim();
-		} catch {
+		const text = await readClipboardText();
+		if (text === null) {
 			keyPasteError =
 				"Couldn't read the clipboard — long-press the field to paste.";
+			return;
 		}
+		if (!text.trim()) {
+			keyPasteError = "Clipboard is empty.";
+			return;
+		}
+		active.apiKey = text.trim();
 	}
 	const inShell = tauriBackendAvailable();
 
@@ -393,7 +395,7 @@
 					spellcheck="false"
 				/>
 			</label>
-			{#if customError}<span class="hint" role="alert">{customError}</span>{/if}
+			<span class="hint" role="alert">{customError}</span>
 			<button type="submit">Add provider</button>
 		</form>
 	</details>
@@ -432,9 +434,7 @@
 			<datalist id="model-list">
 				{#each active.models as id (id)}<option value={id}></option>{/each}
 			</datalist>
-			{#if modelNotice.banner.message}<span class="hint" role="alert"
-					>{modelNotice.banner.message}</span
-				>{/if}
+			<span class="hint" role="alert">{modelNotice.banner.message}</span>
 		</label>
 	{/if}
 	{#if activeDef.keyless}
@@ -468,9 +468,7 @@
 					<button type="button" onclick={() => void openAICoreOnce()}
 						>Update AI Core</button
 					>
-					{#if aicoreOpenError}<span class="hint" role="alert"
-							>{aicoreOpenError}</span
-						>{/if}
+					<span class="hint" role="alert">{aicoreOpenError}</span>
 				</p>
 			{/if}
 		{/if}
@@ -488,9 +486,7 @@
 				/>
 				<button type="button" onclick={() => void pasteKey()}>Paste</button>
 			</span>
-			{#if keyPasteError}<span class="hint" role="alert"
-					>{keyPasteError}</span
-				>{/if}
+			<span class="hint" role="alert">{keyPasteError}</span>
 		</label>
 	{:else}
 		<p class="key-state" role="status">
