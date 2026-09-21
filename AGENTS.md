@@ -45,6 +45,11 @@ privileged (Keychain, updater, native TTS).
 - Playwright: one invocation per file with combined `-g` patterns for every
   new/affected test in it, then the full file once at the end. Never one
   single-test invocation after another — each pays the dev-server wait again.
+  Batch across files too (multiple files in one invocation, separate ports
+  only for parallel runs): every fresh browser launch risks a login-keychain
+  password prompt for the user, so launches are budgeted — no probe specs,
+  no re-runs to "just look", no parallel same-file runs. When prompts are
+  already firing, stop launching entirely and say so.
 - Read failure output from that same run (list reporter prints the error);
   don't re-run just to collect details.
 - Pristine-tree attribution (`git stash` + rerun) only when a failure
@@ -102,7 +107,13 @@ stop and report instead of asking for a password.
 Automation browsers must never touch the login keychain either:
 Playwright Chromium launches with `--use-mock-keychain` (see
 `playwright.config.ts`; same flag for any `/tmp` browser probe),
-or every fresh profile pops a password prompt per launch.
+or every fresh profile pops a password prompt per launch. The
+bundled Chromium builds are ad-hoc-signed, so Always Allow can
+never stick to them — spamming it does nothing; Deny re-prompts
+forever. Prompts from `playwright-mcp` servers mean those servers
+launched without the flag (stale ones get stopped, not clicked
+through). The only prompt-proof browser is a Google-signed one
+(system Chrome channel), which holds an Always Allow grant.
 
 ## Conventions
 
@@ -153,6 +164,10 @@ or every fresh profile pops a password prompt per launch.
   instead, and downloadable voices live under Read & Speak → System
   Voice → Manage Voices. Speech → Live Speech is type-to-speak, NOT
   where voices download. Never write "Spoken Content" in UI copy.
+- CJK TTS voices are installed on this machine (`say -v '?'` lists
+  Eddy/Flo for zh_CN, zh_TW, ja_JP, ko_KR): multilingual read-aloud
+  is verifiable locally, and missing-voice failures elsewhere are
+  the device's gap, not the app's.
 
 ## Known structural debt
 
