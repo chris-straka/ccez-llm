@@ -133,7 +133,6 @@
 		toggleSingleAid
 	} from "$lib/message-actions";
 	import type { ChatProvider } from "$lib/providers/types";
-	import SettingsPanel from "$lib/components/SettingsPanel.svelte";
 	import Toasts from "$lib/components/Toasts.svelte";
 	import SelMenu from "$lib/components/SelMenu.svelte";
 	import Attachments from "$lib/components/Attachments.svelte";
@@ -146,6 +145,7 @@
 	import Sidebar from "$lib/components/Sidebar.svelte";
 	import MessageArticle from "$lib/components/MessageArticle.svelte";
 	import LangMenus from "$lib/components/LangMenus.svelte";
+	import SettingsDrawer from "$lib/components/SettingsDrawer.svelte";
 	import SendingIndicator from "$lib/components/SendingIndicator.svelte";
 	import FindBar from "$lib/components/FindBar.svelte";
 	import Composer from "$lib/components/Composer.svelte";
@@ -12700,45 +12700,34 @@
 		/>
 	{/if}
 
-	<!-- Double-click on open space closes the panel; keyboard users
-	keep Meta+,. -->
-	<aside
-		class="settings-panel"
-		class:closed={!settingsOpen}
-		bind:this={settingsEl}
-		data-fade-scroll
-		aria-label="Settings"
-		inert={!settingsOpen}
-		ondblclick={(e) => {
-			// Open space only: the tap must land on the panel's own
-			// padding (the aside, inner wrapper, or a section/fieldset
-			// box itself). Text, controls, and anything inside them
-			// keep their behavior — including double-click text picks.
-			const t = e.target instanceof Element ? e.target : null;
-			if (t?.closest("aside, .settings-inner, section, fieldset") === t)
+	<!-- Settings drawer through `SettingsDrawer.svelte` (double-click
+	on open space closes the panel; keyboard users keep Meta+,): the
+	page keeps the open flag, the settings object, token labels, and
+	every behavior; the component owns the drawer shell, the inner,
+	and their surfaces. -->
+	<SettingsDrawer
+		open={settingsOpen}
+		{settings}
+		tokensLabel="{formatTokens(split.prompt)} in / {formatTokens(
+			split.completion
+		)} out"
+		tokensTitle="{total} tokens total this chat"
+		android={androidUI}
+		bind:panelEl={settingsEl}
+		actions={{
+			commit: () => persistSettings(),
+			toast: flashToast,
+			panelClose: () => {
 				settingsOpen = false;
+				pulseCursor();
+			},
+			shortcuts: openShortcuts,
+			expand: zoomWindow,
+			drawerClose: () => {
+				settingsOpen = false;
+			}
 		}}
-	>
-		<!-- Fixed-width inner: the panel clips instead of reflowing text mid-collapse. -->
-		<div class="settings-inner">
-			<SettingsPanel
-				{settings}
-				onCommit={() => persistSettings()}
-				onToast={flashToast}
-				onClose={() => {
-					settingsOpen = false;
-					pulseCursor();
-				}}
-				onShortcuts={openShortcuts}
-				onExpand={zoomWindow}
-				tokensLabel="{formatTokens(split.prompt)} in / {formatTokens(
-					split.completion
-				)} out"
-				tokensTitle="{total} tokens total this chat"
-				{androidUI}
-			/>
-		</div>
-	</aside>
+	/>
 
 	{#if androidUI && chatSwitcherOpen}
 		<!-- Phone chat switcher: card plus mint/delete actions through
@@ -12850,47 +12839,7 @@
 	}
 	/* Chat-list drawer renders in `Sidebar.svelte` now (drawer box,
 	rows, search, tips, and phone seating moved with the markup). */
-	/* Overlay drawer, right side: same contract as the chat list —
-	the main chat never squeezes. */
-	.settings-panel {
-		position: fixed;
-		/* Kept from the old shared `aside` drawer rule (now in
-		Sidebar.svelte): a single-child column, unchanged. */
-		display: flex;
-		flex-direction: column;
-		right: 0;
-		/* The chat-list drawer rule parks asides left: reset it here or
-		the right-docked panel over-constrains and left wins. */
-		left: auto;
-		top: 0;
-		bottom: 0;
-		width: 22rem;
-		z-index: 55;
-		box-shadow: -8px 0 24px rgba(0, 0, 0, 0.12);
-		border-left: 1px solid #e5e5ea;
-		border-left-color: var(--line-soft);
-		padding: 1.2rem 0.7rem 2rem;
-		overflow-y: auto;
-		overflow-x: hidden;
-		background: #fff;
-		background: var(--bg);
-		/* Same drawer contract as the chat list (see aside): the
-		fade used to finish first and swallow the closing slide. */
-		transition:
-			transform 0.22s ease,
-			opacity 0.22s ease;
-	}
-	.settings-panel.closed {
-		transform: translateX(105%);
-		opacity: 0;
-	}
-	.settings-inner {
-		width: 20.6rem;
-		flex-shrink: 0;
-		/* Right-docked panels clip from the left: the header (the close
-		target) stays put while collapsing, so it lands back under the cursor. */
-		margin-left: auto;
-	}
+	/* (Settings drawer shell in `SettingsDrawer.svelte`.) */
 	/* Dialog shells render in `Modal.svelte` now (veil, box, and
 	per-dialog chrome moved with each dialog through the shell);
 	content heads render in each dialog. No paged dialog markup
@@ -13022,24 +12971,7 @@
 		padding-left: 0.5%;
 		padding-right: 0.5%;
 	}
-	/* Full-width settings sheet on phones: no sliver to tap, no
-	weird one-tap-close strip, no gap down the right side. left+right
-	with auto width fills exactly (a 100% width would add the padding
-	on top and overflow); border-box keeps that promise. The inner
-	column centers itself. */
-	.app[data-android] .settings-panel {
-		box-sizing: border-box;
-		left: 0;
-		right: 0;
-		width: auto;
-		padding-top: calc(1.2rem + env(safe-area-inset-top, 0px));
-	}
-	.app[data-android] .settings-inner {
-		width: auto;
-		max-width: 26rem;
-		margin-left: auto;
-		margin-right: auto;
-	}
+	/* (Phone settings sheet in `SettingsDrawer.svelte`.) */
 	/* Composer surfaces render in `Composer.svelte` now (phone card,
 	tools bar, send seat, highlight dock, and field caps moved with
 	the markup). */
@@ -13219,29 +13151,8 @@
 		background: rgba(142, 142, 147, 0.55);
 		transition: background-color 0.12s ease;
 	}
-	/* The drawers slide on transform (plus their collapse widths),
-	which the shared fade shorthand above would replace: restate the
-	full lists here so the scrollbar fade joins instead of killing the
-	slide. Every list keeps transform, or closes read as a fade. (The
+	/* (Drawer fade-scroll restate in `SettingsDrawer.svelte`; the
 	chat-list drawer keeps its own copy in `Sidebar.svelte`.) */
-	.settings-panel[data-fade-scroll] {
-		transition:
-			transform 0.22s ease,
-			width 0.22s ease,
-			opacity 0.22s ease,
-			padding 0.22s ease,
-			border-color 0.22s ease,
-			scrollbar-color 0.3s ease;
-	}
-	.settings-panel[data-fade-scroll]:global(.scrolling) {
-		transition:
-			transform 0.22s ease,
-			width 0.22s ease,
-			opacity 0.22s ease,
-			padding 0.22s ease,
-			border-color 0.22s ease,
-			scrollbar-color 0.12s ease;
-	}
 	/* (Waypoint fade-scroll restate in `Waypoints.svelte`.) */
 	/* (Waypoint touch sheet in `Waypoints.svelte`.) */
 	main.empty .messages {
@@ -13450,12 +13361,7 @@
 			translate: -50% 0;
 		}
 	}
-	@media (prefers-reduced-motion: reduce) {
-		aside,
-		.settings-panel {
-			transition: none;
-		}
-	}
+	/* (Drawer reduced-motion settle in `SettingsDrawer.svelte`.) */
 	/* Shared error look (composer banner, attach error, message-row
 	error): global, since the row renders in `MessageActions.svelte`
 	outside this component's scope. */
