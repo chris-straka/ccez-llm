@@ -21,6 +21,10 @@ function pageSource(): string {
 	return readFileSync(new URL("../../routes/+page.svelte", import.meta.url), "utf8");
 }
 
+function articleSource(): string {
+	return readFileSync(new URL("./MessageArticle.svelte", import.meta.url), "utf8");
+}
+
 describe("sent attachment variants", () => {
 	it("renders file tags and inline image folds from pre-filtered models", () => {
 		const source = componentSource();
@@ -62,12 +66,18 @@ describe("sent attachment variants", () => {
 		}
 	});
 
-	it("feeds each variant its kind from the page", () => {
+	it("feeds each variant its kind from the page through the article", () => {
+		// Both usages moved into the row with the article; the page
+		// computes the pre-filtered models per message.
+		const row = articleSource();
+		expect(row).toContain('variant="tags"');
+		expect(row).toContain('variant="inline"');
+		expect(row).toContain("models={textModels}");
+		expect(row).toContain("models={imageModels}");
+		expect(row).toContain("attachments={msg.attachments ?? []}");
 		const page = pageSource();
-		expect(page).toContain('variant="tags"');
-		expect(page).toContain('variant="inline"');
-		expect(page).toMatch(/variant="tags"[\s\S]*?m\.kind === "text"/);
-		expect(page).toMatch(/variant="inline"[\s\S]*?m\.kind === "image"/);
-		expect(page).toContain("attachments={msg.attachments ?? []}");
+		expect(page).toContain('m.kind === "text"');
+		expect(page).toContain('m.kind === "image"');
+		expect(page).toContain("<MessageArticle");
 	});
 });

@@ -92,8 +92,9 @@ describe("composer contract", () => {
 		// keeps its own error pairing here (the composer's banner
 		// pairing lives with its markup).
 		expect(css).toMatch(/\.error-banner\s*\{[^}]*background:\s*var\(--error-bg\)/);
-		// The in-place message editor keeps its own field rules.
-		expect(css).toContain(".msg-edit-box :global(.ta-input)");
+		// The in-place message editor moved with the row: its field
+		// rules live in `MessageArticle.svelte` now.
+		expect(css).not.toContain(".msg-edit-box");
 	});
 
 	it("keeps the composer surfaces scoped to the card", () => {

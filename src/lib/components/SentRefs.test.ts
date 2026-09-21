@@ -16,6 +16,10 @@ function pageSource(): string {
 	return readFileSync(new URL("../../routes/+page.svelte", import.meta.url), "utf8");
 }
 
+function articleSource(): string {
+	return readFileSync(new URL("./MessageArticle.svelte", import.meta.url), "utf8");
+}
+
 describe("sent refs state contract", () => {
 	it("binds pop, draft, and box while reading edit and blink", () => {
 		const source = componentSource();
@@ -49,13 +53,21 @@ describe("sent refs state contract", () => {
 	});
 
 	it("feeds the card from the page with live message state", () => {
+		// The usage moved into the row with the article; the page
+		// owns the shared pop/edit state behind article bindables.
+		const row = articleSource();
+		expect(row).toContain("<SentRefs");
+		expect(row).toContain("bind:popOpen");
+		expect(row).toContain("bind:editDraft={refsDraft}");
+		expect(row).toContain("bind:editBox={refsBox}");
+		expect(row).toContain("editing={refsEditing}");
+		expect(row).toContain("blink={refsBlink}");
+		expect(row).toContain("actions={actions.refs}");
 		const page = pageSource();
-		expect(page).toContain("<SentRefs");
+		expect(page).toContain("<MessageArticle");
 		expect(page).toContain("bind:popOpen={refsPopOpen}");
-		expect(page).toContain("bind:editDraft={refsEditDraft}");
-		expect(page).toContain("bind:editBox={refsEditBox}");
-		expect(page).toContain("editing={refsEditing}");
-		expect(page).toContain("blink={refsBlink}");
+		expect(page).toContain("bind:refsDraft={refsEditDraft}");
+		expect(page).toContain("refsEditing={refsEditing}");
 		expect(page).toContain("quoteClick: (quote: string, n: number) =>");
 		expect(page).toContain("startEdit: (ref: { n: number; comment: string }) =>");
 	});

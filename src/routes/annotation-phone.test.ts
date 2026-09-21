@@ -17,10 +17,17 @@ function pageSource(): string {
 	return readFileSync(new URL("./+page.svelte", import.meta.url), "utf8");
 }
 
-function pageStyle(): string {
-	const match = pageSource().match(/<style>([\s\S]*)<\/style>/);
-	if (!match) throw new Error("+page.svelte has no <style> block");
-	// Strip CSS comments so prose can't trip the assertions below.
+/** Article row moved to MessageArticle.svelte with its styles. */
+function articleSource(): string {
+	return readFileSync(
+		new URL("../lib/components/MessageArticle.svelte", import.meta.url),
+		"utf8"
+	);
+}
+
+function articleStyle(): string {
+	const match = articleSource().match(/<style>([\s\S]*)<\/style>/);
+	if (!match) throw new Error("MessageArticle.svelte has no <style> block");
 	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
@@ -52,9 +59,10 @@ describe("phone marker taps survive tap-out", () => {
 
 describe("phone edits wash their quote", () => {
 	it("feeds the in-prompt edit into the wash id", () => {
-		expect(pageSource()).toContain(
-			"promptAnnWashId() ??\n\t\t\t\t\t\t\t\t\teditingId ??"
-		);
+		// The wash feeds the row through the article now: the page
+		// computes it per message, the article forwards it.
+		expect(pageSource()).toMatch(/promptAnnWashId\(\) \?\?\s+editingId \?\?/);
+		expect(articleSource()).toContain("washId={washId ?? null}");
 	});
 	it("washes pending filings and saved notes alike", () => {
 		const source = pageSource();
@@ -77,9 +85,11 @@ describe("phone assistant width", () => {
 		);
 	});
 	it("shrink-wraps assistant messages below full-bleed", () => {
-		const css = pageStyle();
+		// The row rules moved with the article (paged app ancestor
+		// renders global there).
+		const css = articleStyle();
 		const rule = css.match(
-			/\.app\[data-android\]:not\(\[data-fullbleed\]\) article\.assistant\s*\{([^}]*)\}/
+			/:global\(\.app\[data-android\]\):not\(\[data-fullbleed\]\) article\.assistant\s*\{([^}]*)\}/
 		);
 		expect(rule, "assistant shrink-wrap rule is gone or reshaped").toBeTruthy();
 		expect(rule![1]).toMatch(/width\s*:\s*fit-content/);

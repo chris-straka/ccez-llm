@@ -9,25 +9,26 @@ import { describe, it, expect } from "vitest";
  * selectionchange for the JS trim to see, so only engine-level CSS
  * stops the paint wandering into other messages' math. That behavior
  * is invisible to jsdom (no layout, no selection engine), so this
- * asserts on +page.svelte's <style> source the way
+ * asserts on MessageArticle.svelte's <style> source the way
  * actions-reveal.test.ts does.
  */
-function pageStyle(): string {
+function articleStyle(): string {
 	const source = readFileSync(
-		new URL("./+page.svelte", import.meta.url),
+		new URL("../lib/components/MessageArticle.svelte", import.meta.url),
 		"utf8"
 	);
 	const match = source.match(/<style>([\s\S]*)<\/style>/);
-	if (!match) throw new Error("+page.svelte has no <style> block");
+	if (!match) throw new Error("MessageArticle.svelte has no <style> block");
 	// Strip CSS comments so prose can't trip the assertions below.
 	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
 describe("mid-drag containment", () => {
 	it("covers descendants that declare their own selectability", () => {
-		const css = pageStyle();
+		// The containment moved with the article row.
+		const css = articleStyle();
 		const rule = css.match(
-			/:global\(\.rendered\[data-drag-none\]\)[^{]*\{([^}]*)\}/
+			/article :global\(\.rendered\[data-drag-none\]\)[^{]*\{([^}]*)\}/
 		);
 		expect(
 			rule,

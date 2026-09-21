@@ -37,6 +37,20 @@ function pageSource(): string {
 	return readFileSync(new URL("./+page.svelte", import.meta.url), "utf8");
 }
 
+/** Article row moved to MessageArticle.svelte with its styles. */
+function articleSource(): string {
+	return readFileSync(
+		new URL("../lib/components/MessageArticle.svelte", import.meta.url),
+		"utf8"
+	);
+}
+
+function articleStyle(): string {
+	const match = articleSource().match(/<style>([\s\S]*)<\/style>/);
+	if (!match) throw new Error("MessageArticle.svelte has no <style> block");
+	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
+}
+
 describe("hover-only message actions", () => {
 	it("reveals when the message is hovered, not just the button row", () => {
 		const css = rowStyle();
@@ -191,7 +205,11 @@ describe("chat-switch transition", () => {
 	});
 
 	it("passes previewing into message bodies", () => {
-		expect(pageSource()).toContain("preview={previewing}");
+		// The row renders from `MessageArticle.svelte` now: the page
+		// feeds the article, the article forwards into the body.
+		expect(pageSource()).toContain("<MessageArticle");
+		expect(pageSource()).toContain("previewing={previewing}");
+		expect(articleSource()).toContain("preview={previewing}");
 	});
 });
 
@@ -218,7 +236,9 @@ describe("message spacing and overscroll", () => {
 	});
 
 	it("fixes the between-pair separation unless button scaling opts in", () => {
-		const css = pageStyle();
+		// The row rules moved with the article (paged main ancestor
+		// renders global there).
+		const css = articleStyle();
 		const margins = [...css.matchAll(/([^{}]*?)article\.user\s*\{([^}]*)\}/g)]
 			.filter(
 				(rule) =>
@@ -229,7 +249,9 @@ describe("message spacing and overscroll", () => {
 		expect(margins, "no article.user margin-top rule").not.toHaveLength(0);
 		for (const margin of margins)
 			expect(margin).not.toMatch(/var\(--font-scale/);
-		const scaled = css.match(/main\.scale-actions article\.user\s*\{([^}]*)\}/);
+		const scaled = css.match(
+			/:global\(main\.scale-actions\) article\.user\s*\{([^}]*)\}/
+		);
 		expect(scaled, "opt-in scaled separation is gone").toBeTruthy();
 		expect(scaled![1]).toMatch(/margin-top\s*:\s*calc\([^;]*var\(--font-scale/);
 	});

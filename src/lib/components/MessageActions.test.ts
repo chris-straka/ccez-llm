@@ -17,6 +17,10 @@ function pageSource(): string {
 	return readFileSync(new URL("../../routes/+page.svelte", import.meta.url), "utf8");
 }
 
+function articleSource(): string {
+	return readFileSync(new URL("./MessageArticle.svelte", import.meta.url), "utf8");
+}
+
 describe("message actions contract", () => {
 	it("reads computed voice/aid state as plain props", () => {
 		const source = componentSource();
@@ -76,8 +80,16 @@ describe("message actions contract", () => {
 	});
 
 	it("feeds the row from the page behind its visibility gate", () => {
+		// The usage moved into the row with the article; the page
+		// feeds the article the computed props and the ma group.
+		const row = articleSource();
+		expect(row).toContain("<MessageActions");
+		expect(row).toContain("{speaking}");
+		expect(row).toContain("{aidModelPinned}");
+		expect(row).toContain("{pinnedKinds}");
+		expect(row).toContain("actions={actions.ma}");
 		const page = pageSource();
-		expect(page).toContain("<MessageActions");
+		expect(page).toContain("<MessageArticle");
 		expect(page).toContain("speaking={messageSpeaking(msg)}");
 		expect(page).toContain("aidModelPinned={aidModelPin.has(msg.id)}");
 		expect(page).toContain("pinnedKinds={pinnedKinds(msg.id)}");

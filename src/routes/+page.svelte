@@ -132,7 +132,6 @@
 		toggleSingleAid
 	} from "$lib/message-actions";
 	import type { ChatProvider } from "$lib/providers/types";
-	import MessageBody from "$lib/components/MessageBody.svelte";
 	import SettingsPanel from "$lib/components/SettingsPanel.svelte";
 	import Toasts from "$lib/components/Toasts.svelte";
 	import SelMenu from "$lib/components/SelMenu.svelte";
@@ -144,9 +143,7 @@
 	import InspectOverlay from "$lib/components/InspectOverlay.svelte";
 	import AnnPop from "$lib/components/AnnPop.svelte";
 	import Sidebar from "$lib/components/Sidebar.svelte";
-	import SentAttachments from "$lib/components/SentAttachments.svelte";
-	import SentRefs from "$lib/components/SentRefs.svelte";
-	import MessageActions from "$lib/components/MessageActions.svelte";
+	import MessageArticle from "$lib/components/MessageArticle.svelte";
 	import SendingIndicator from "$lib/components/SendingIndicator.svelte";
 	import FindBar from "$lib/components/FindBar.svelte";
 	import Composer from "$lib/components/Composer.svelte";
@@ -12393,210 +12390,143 @@
 					viewChat.id === chatState.sendingChatId &&
 					msg.role === "assistant" &&
 					i === viewChat.messages.length - 1}
-				<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
-				<!-- Option-click is mouse-only by design; keyboard users get the Fold button below. -->
-				<article
-					id="msg-{i}"
-					tabindex="-1"
-					class:user={msg.role === "user"}
-					class:assistant={msg.role === "assistant"}
-					class:selected={focusMode === "scroll" && selectedIdx === i}
-					class:folded-msg={isFolded}
-					class:speaking={speakingId === msg.id}
-					class:speaking-sel={speakingSelection === msg.id}
-					class:aid-loading={aidBusy.has(msg.id) || vocalizing.has(msg.id)}
-					data-actions-open={shownActionsId === msg.id}
-					onclick={(e) => {
-						if (
-							e.target instanceof Element &&
-							e.target.closest(".sent-fold,.sent-open")
-						)
-							return;
-						if (e.altKey) toggleFold(msg.id);
-						toggleMessageActions(msg.id, e);
-					}}
-					onmouseenter={() => {
-						hoveredIdx = i;
-						lastHoverChangeAt = Date.now();
-					}}
-					onmouseleave={(event) => onArticleLeave(event, msg, i)}
-				>
-					<!-- Sent file tags render in `SentAttachments.svelte`
-					(variant "tags"); the page keeps the models (expand
-					state) and the fold/copy behaviors. -->
-					<SentAttachments
-						variant="tags"
-						models={sentTagModels(
-							msg,
-							(sentRefs
-								? refsOnly && !isFolded
-									? REFS_ONLY_BODY
-									: sentRefs.text
-								: null) ?? msg.content
-						).filter((m) => m.kind === "text")}
-						attachments={msg.attachments ?? []}
-						ocrBusyId={ocrBusyId}
-						actions={{
+				{@const tagBase =
+					(sentRefs
+						? refsOnly && !isFolded
+							? REFS_ONLY_BODY
+							: sentRefs.text
+						: null) ?? msg.content}
+				<!-- Message row renders in `MessageArticle.svelte`; the page
+				keeps the lists, all row state, and every behavior behind
+				computed props and action groups. -->
+				<MessageArticle
+					msg={msg}
+					index={i}
+					selected={focusMode === "scroll" && selectedIdx === i}
+					folded={isFolded}
+					speakingNow={speakingId === msg.id}
+					speakingSel={speakingSelection === msg.id}
+					aidLoading={aidBusy.has(msg.id) || vocalizing.has(msg.id)}
+					actionsOpen={shownActionsId === msg.id}
+					editing={editingMsgId === msg.id}
+					{sentRefs}
+					textModels={sentTagModels(msg, tagBase).filter((m) => m.kind === "text")}
+					imageModels={sentTagModels(msg, tagBase).filter((m) => m.kind === "image")}
+					ocrBusyId={ocrBusyId}
+					android={androidUI}
+					showButtons={settings.showMessageButtons}
+					refsEditing={refsEditing}
+					refsBlink={refsBlink}
+					bind:popOpen={refsPopOpen}
+					bind:refsDraft={refsEditDraft}
+					bind:refsBox={refsEditBox}
+					streaming={streamingThis}
+					sourcesWanted={sourcesWanted}
+					foldPreview={refsOnly && sentRefs
+						? sentRefs.refs.map((r) => `"${r.quote}"`).join(" ")
+						: null}
+					marks={marksFor(msg.id)}
+					washId={pillWashId(annPop, annPopClosing) ??
+						promptAnnWashId() ??
+						editingId ??
+						hoverBadgeId}
+					expandedTags={expandedTags}
+					textOverride={aidedTextFor(msg)}
+					contentOverride={sentRefs
+						? refsOnly && !isFolded
+							? REFS_ONLY_BODY
+							: sentRefs.text
+						: null}
+					aidPreview={aidPeek?.id === msg.id && !aidPin.has(msg.id)}
+					previewing={previewing}
+					aidKinds={localAidsOverrideFor(msg)}
+					aidPreferred={preferredLocalAid(activeReplyCode)}
+					foldTitle={tip(
+						isMac ? "Fold this message (F or Option-click)" : "Fold this message (F or Alt-click)",
+						"Fold this message"
+					)}
+					deleteTitle={tip(
+						isMac ? "Delete this message (⌘D)" : "Delete this message",
+						"Delete this message"
+					)}
+					speaking={messageSpeaking(msg)}
+					speakable={messageSpeakable(msg)}
+					speakLabel={speakTitle(msg)}
+					aidId={aidId}
+					aidModelPinned={aidModelPin.has(msg.id)}
+					aidVocalizing={vocalizing.has(msg.id)}
+					localKinds={localKinds}
+					pinnedKinds={pinnedKinds(msg.id)}
+					aidBusy={aidBusy.has(msg.id)}
+					actions={{
+						articleClick: (event: MouseEvent) => {
+							if (
+								event.target instanceof Element &&
+								event.target.closest(".sent-fold,.sent-open")
+							)
+								return;
+							if (event.altKey) toggleFold(msg.id);
+							toggleMessageActions(msg.id, event);
+						},
+						articleEnter: () => {
+							hoveredIdx = i;
+							lastHoverChangeAt = Date.now();
+						},
+						articleLeave: (event: MouseEvent) => onArticleLeave(event, msg, i),
+						editFocusOut: blurInlineEdit,
+						editAction: msgEditAction,
+						tags: {
 							toggle: (id: string) => toggleSentTag(msg, id),
 							copy: copyAttachment,
 							recognize: (att: Attachment) => void recognizeAttachment(att)
-						}}
-					/>
-					{#if sentRefs}
-						<!-- Baked-annotation refs render in `SentRefs.svelte`;
-						the page keeps the pop flag, the row-edit state (it
-						focuses the box), the blink, and the behaviors. -->
-						<SentRefs
-							msgId={msg.id}
-							role={msg.role}
-							android={androidUI}
-							{sentRefs}
-							bind:popOpen={refsPopOpen}
-							editing={refsEditing}
-							bind:editDraft={refsEditDraft}
-							bind:editBox={refsEditBox}
-							blink={refsBlink}
-							actions={{
-								clearAll: () => clearSentRefs(msg.id),
-								quoteClick: (quote: string, n: number) =>
-									refsQuoteClick(msg.id, quote, n),
-								copy: copyAnnotation,
-								startEdit: (ref: { n: number; comment: string }) =>
-									startRefsEdit(msg.id, ref),
-								saveEdit: saveRefsEdit,
-								cancelEdit: cancelRefsEdit
-							}}
-						/>
-					{/if}
-					{#if editingMsgId === msg.id && msg.role === "user"}
-						<!-- In-place own-message edit: the editor mounts
-						where the text sat and sizes to it. Commit lives on
-						the row's checkmark (or Enter); focus leaving the
-						box cancels back to the untouched message. -->
-						<div class="msg-edit" onfocusout={blurInlineEdit}>
-							<div class="msg-edit-box" use:msgEditAction></div>
-						</div>
-					{:else}
-						<div class:bubble={msg.role === "user"}>
-							<MessageBody
-								message={msg}
-								streaming={streamingThis}
-								{sourcesWanted}
-								folded={isFolded}
-								foldPreview={refsOnly && sentRefs
-									? sentRefs.refs.map((r) => `"${r.quote}"`).join(" ")
-									: null}
-								marks={marksFor(msg.id)}
-								washId={pillWashId(annPop, annPopClosing) ??
-									promptAnnWashId() ??
-									editingId ??
-									hoverBadgeId}
-								onBadgeHover={(id: string | null) => (hoverBadgeId = id)}
-								onBadgeClick={openBadgeClick}
-								onAttachAction={sentTagAction}
-								{expandedTags}
-								onTagToggle={(id: string) => toggleSentTag(msg, id)}
-								onToast={flashToast}
-								onFoldToggle={(index: number) => togglePasteFold(msg, index)}
-								onUnfold={() => toggleFold(msg.id)}
-								textOverride={aidedTextFor(msg)}
-								contentOverride={sentRefs
-									? refsOnly && !isFolded
-										? REFS_ONLY_BODY
-										: sentRefs.text
-									: null}
-								aidPreview={aidPeek?.id === msg.id && !aidPin.has(msg.id)}
-								preview={previewing}
-								aidKinds={localAidsOverrideFor(msg)}
-								aidPreferred={preferredLocalAid(activeReplyCode)}
-								onAidLoadingChange={(loading: boolean) =>
-									setAidBusy(msg.id, loading)}
-								onAidError={(_id: ChatMsgId, reason?: string) =>
-									aidFailed(msg.id, reason)}
-							/>
-						</div>
-					{/if}
-					<!-- Sent image folds render in `SentAttachments.svelte`
-					(variant "inline"); the page keeps the models, the OCR
-					busy flag, and the fold/copy/OCR behaviors. -->
-					<SentAttachments
-						variant="inline"
-						models={sentTagModels(
-							msg,
-							(sentRefs
-								? refsOnly && !isFolded
-									? REFS_ONLY_BODY
-									: sentRefs.text
-								: null) ?? msg.content
-						).filter((m) => m.kind === "image")}
-						attachments={msg.attachments ?? []}
-						ocrBusyId={ocrBusyId}
-						actions={{
-							toggle: (id: string) => toggleSentTag(msg, id),
-							copy: copyAttachment,
-							recognize: (att: Attachment) => void recognizeAttachment(att)
-						}}
-					/>
-					{#if (androidUI || settings.showMessageButtons) && !(streamingThis && msg.content.trim() === "")}
-						<!-- Preview renders the same row inert: the peek
-					reserves the row's space (opening the chat moves
-					nothing) while honoring the hover-only rhythm, so
-					no peek button is ever visible or firing. The
-					desktop Messages toggle removes the row outright
-					(its shortcuts keep working); phones always render
-					it — no shortcuts exist to cover an off state. -->
-						<!-- Action row renders in `MessageActions.svelte`;
-						the page keeps voice/aid/selection state and every
-						behavior behind computed props and actions. -->
-						<MessageActions
-							msg={msg}
-							previewing={previewing}
-							folded={isFolded}
-							streamingThis={streamingThis}
-							editing={editingMsgId === msg.id}
-							android={androidUI}
-							foldTitle={tip(
-								isMac ? "Fold this message (F or Option-click)" : "Fold this message (F or Alt-click)",
-								"Fold this message"
-							)}
-							deleteTitle={tip(
-								isMac ? "Delete this message (⌘D)" : "Delete this message",
-								"Delete this message"
-							)}
-							speaking={messageSpeaking(msg)}
-							speakable={messageSpeakable(msg)}
-							speakLabel={speakTitle(msg)}
-							aidId={aidId}
-							aidModelPinned={aidModelPin.has(msg.id)}
-							aidVocalizing={vocalizing.has(msg.id)}
-							localKinds={localKinds}
-							pinnedKinds={pinnedKinds(msg.id)}
-							aidBusy={aidBusy.has(msg.id)}
-							actions={{
-								toggleFold: () => toggleFold(msg.id),
-								copy: () => copyText(msg.content, msg.role),
-								branch: () => branchHere(i),
-								drop: () => dropMessage(i),
-								stopVoice,
-								speak: () => void speakReply(msg),
-								unpinModelAid: () => unpinModelAid(msg),
-								runModelAid: (modelId: string) =>
-									void runModelAidFor(msg, modelId, true),
-								unpinLocalAid: (kind: LocalAid) => unpinLocalAid(msg, kind),
-								pinLocalAid: (kind: LocalAid) => pinLocalAid(msg, kind),
-								peekAid: (kind: LocalAid) => peekAid(msg, kind),
-								unpeekAid: () => unpeekAid(msg),
-								commitEdit: () => void commitMessageEdit(),
-								edit: () => void editMessage(i),
-								rerun: () => rerunFrom(i),
-								retry: () => void retryFailed(),
-								releaseRowFocus,
-								holdOpen: holdActionsOpen,
-								releaseHold: releaseActionsHold
-							}}
-						/>
-					{/if}
-				</article>
+						},
+						refs: {
+							clearAll: () => clearSentRefs(msg.id),
+							quoteClick: (quote: string, n: number) =>
+								refsQuoteClick(msg.id, quote, n),
+							copy: copyAnnotation,
+							startEdit: (ref: { n: number; comment: string }) =>
+								startRefsEdit(msg.id, ref),
+							saveEdit: saveRefsEdit,
+							cancelEdit: cancelRefsEdit
+						},
+						setHoverBadge: (id: string | null) => (hoverBadgeId = id),
+						badgeClick: openBadgeClick,
+						attachAction: sentTagAction,
+						tagToggle: (id: string) => toggleSentTag(msg, id),
+						toast: flashToast,
+						foldToggle: (index: number) => togglePasteFold(msg, index),
+						unfold: () => toggleFold(msg.id),
+						aidLoadingChange: (loading: boolean) => setAidBusy(msg.id, loading),
+						aidError: (_id: ChatMsgId, reason?: string) => aidFailed(msg.id, reason),
+						ma: {
+							toggleFold: () => toggleFold(msg.id),
+							copy: () => copyText(msg.content, msg.role),
+							branch: () => branchHere(i),
+							drop: () => dropMessage(i),
+							stopVoice,
+							speak: () => void speakReply(msg),
+							unpinModelAid: () => unpinModelAid(msg),
+							runModelAid: (modelId: string) =>
+								void runModelAidFor(msg, modelId, true),
+							unpinLocalAid: (kind: LocalAid) => unpinLocalAid(msg, kind),
+							pinLocalAid: (kind: LocalAid) => pinLocalAid(msg, kind),
+							peekAid: (kind: LocalAid) => peekAid(msg, kind),
+							unpeekAid: () => unpeekAid(msg),
+							commitEdit: () => void commitMessageEdit(),
+							edit: () => void editMessage(i),
+							rerun: () => rerunFrom(i),
+							retry: () => void retryFailed(),
+							releaseRowFocus,
+							holdOpen: holdActionsOpen,
+							releaseHold: releaseActionsHold
+						}
+					}}
+				/>
+
+
+
+
 			{/each}
 			<!-- Sending status renders in `SendingIndicator.svelte`; the
 			page keeps send/fetch state and labels. -->
@@ -13076,11 +13006,7 @@
 		native traffic lights instead of riding above them. */
 		padding-top: 1.15rem;
 	}
-	/* The shell's strip is taller by that same padding: the first
-	message stands off the full height there. */
-	.app[data-shell="tauri"] article:first-of-type {
-		margin-top: calc(1.75rem + 1.15rem);
-	}
+	/* (Tauri first-message offset in `MessageArticle.svelte`.) */
 	/* Shell/Android side-head seating rides in `Sidebar.svelte`
 	(moved with the drawer). */
 	/* Traffic-light hover fade lives in the shell (see
@@ -13573,243 +13499,14 @@
 		border-radius: 6px;
 		padding: 0.1rem 0.3rem;
 	}
-	article {
-		position: relative;
-		border-radius: 10px;
-		padding: 0.6rem 0.8rem;
-	}
-	/* Two folded previews back to back (the user turn between them
-	deleted) read as one folded block under the row gap alone: a
-	full extra gap separates the folds. */
-	article.folded-msg + article.folded-msg {
-		margin-top: var(--msg-gap, 0.35rem);
-	}
-	article {
-		/* Flex items default to min-width:auto: a nowrap folded preview
-		refuses to shrink and shoves the whole chat sideways (stray
-		scrollbars). Zero lets the ellipsis bite instead. */
-		min-width: 0;
-		/* Text starts only at the message body: dragging anywhere else
-		(empty space, action rows) is a plain pointer drag, never an
-		I-beam selection. .rendered re-enables both below. */
-		user-select: none;
-		-webkit-user-select: none;
-		cursor: default;
-	}
-	/* Mid-drag containment covers the whole contained article: KaTeX
-	bodies and folded labels declare their own user-select:text,
-	which overrules the inline none containDragTo sets on the
-	article's .rendered — without this, off-window drags wander
-	into other messages' math. !important: only inline styles lose
-	to it, and the attribute lives for the drag alone (mouseup
-	clears it, so this is never a resting state). */
-	article :global(.rendered[data-drag-none]),
-	article :global(.rendered[data-drag-none] *) {
-		user-select: none !important;
-		-webkit-user-select: none !important;
-	}
-	/* A user message opens a new pair, so it carries the
-	between-pair separation on top; replies hug underneath.
-	The Gap size slider plus a hair, unless the button-scaling
-	opt-in says otherwise (same contract as the list gap above). */
-	article.user {
-		margin-top: calc(var(--msg-gap, 0.35rem) + 0.1rem);
-	}
-	main.scale-actions article.user {
-		margin-top: calc((var(--msg-gap, 0.35rem) + 0.1rem) * var(--font-scale, 1));
-	}
-	article:first-of-type {
-		margin-top: 0;
-	}
-	/* Even wrapping reads better in a chat column; one line, and
-	engines without it just wrap normally. Assistant only: on short
-	own messages pretty balances the lines into even halves, reshaping
-	the bubble (a lone "paragraphs." gets "Japanese" pulled down to
-	join it) — own text keeps its natural ragged wrap. */
-	.messages article.assistant :global(.rendered) {
-		text-wrap: pretty;
-	}
-	article.user {
-		align-self: flex-end;
-		/* Shrink-wrap so short prompts don't stretch into empty space.
-		Beats the centered-column rule's width:100% on specificity;
-		margin-right docks the right edge to the assistant column
-		(centered min(100%, chat-width)), so own messages never drift
-		right past AI width on narrow windows. Capped at 90% of the
-		column (never the full chat width): even long own messages
-		keep a left gutter, so they still read as mine next to
-		full-width replies. */
-		width: fit-content;
-		max-width: min(90%, calc(var(--chat-width, 36) * 1rem));
-		margin-right: max(
-			0rem,
-			calc((100% - min(100%, var(--chat-width, 36) * 1rem)) / 2)
-		);
-		/* No background or padding here: the bubble wraps the text only,
-		so the action row below sits outside it. */
-		padding: 0;
-	}
-	/* Own-message bubble: shrink-wraps the text (never the wider action
-	row underneath) and docks hard right, so the side padding matches on
-	both sides. Text stays left-aligned inside the right-docked bubble;
-	long text wraps at 90% instead of going full-bleed, so a wrapped
-	message keeps a visible left gutter and still reads as right-docked.
-	Slightly tighter on top, where the text sat low. */
-	article.user .bubble {
-		background: #f1f1f4;
-		background: var(--bg-wash);
-		/* Radius and padding track the text size only up to 2x: past that
-		the article cap stays fixed while the font keeps growing, so an
-		unbounded scale domes the top corners and squeezes the text into
-		a tall tower with dead gray shoulders. */
-		border-radius: calc(1.75rem * min(var(--font-scale, 1), 2));
-		padding: calc(0.45rem * min(var(--font-scale, 1), 2))
-			calc(1rem * min(var(--font-scale, 1), 2))
-			calc(0.55rem * min(var(--font-scale, 1), 2));
-		text-align: left;
-		width: fit-content;
-		/* 100%, not 90%: the article already caps at min(100%, chat-width),
-		and 90% here resolves against the shrink-wrapped article itself —
-		squeezing short prompts into an early wrap with dead space left. */
-		max-width: 100%;
-		margin-left: auto;
-	}
-	/* Structured content stays left-aligned inside own messages: code
-	and tables read badly right-aligned. */
-	article.user :global(.rendered pre),
-	article.user :global(.rendered table),
-	article.user :global(.ccez-code) {
-		text-align: left;
-	}
-	/* In-place own-message edit: same right-docked footprint as the
-	bubble, with a visible editing frame (the bubble shade would fight
-	the code colors). The bar holds the touch path — phones have no
-	Esc and no Enter-to-save. */
-	article.user .msg-edit {
-		background: var(--bg-raised);
-		border: 1px solid var(--line);
-		border-radius: 12px;
-		padding: 0.5rem 0.75rem 0.4rem;
-		width: fit-content;
-		max-width: 100%;
-		margin-left: auto;
-		text-align: left;
-	}
-	.msg-edit-box :global(.ta-input) {
-		background: none;
-		line-height: 1.5;
-		max-height: 16rem;
-		width: 100%;
-		box-sizing: border-box;
-		border: 0;
-		color: inherit;
-		font: inherit;
-		resize: none;
-		outline: none;
-	}
-	/* In-place edit on phones: the textarea editor misses the
-	prompt-scoped textarea styles, so it falls back to native chrome;
-	and the desktop editing frame fights the bubble. Match the bubble
-	instead (same wash, radius, padding, right dock) with a bare
-	text field inside — the bar keeps the touch path (phones have no
-	Esc and no Enter-to-save). */
-	.app[data-android] article.user .msg-edit {
-		background: var(--bg-wash);
-		border: 0;
-		border-radius: calc(1.75rem * min(var(--font-scale, 1), 2));
-		padding: calc(0.45rem * min(var(--font-scale, 1), 2))
-			calc(1rem * min(var(--font-scale, 1), 2))
-			calc(0.55rem * min(var(--font-scale, 1), 2));
-		width: 100%;
-		box-sizing: border-box;
-		/* Same type as the message it replaces (see MessageBody's
-		.rendered): the bare textarea inherits this, so the draft
-		reads at exactly the message size. Desktop keeps its own
-		editing frame above. */
-		font-size: calc(0.92rem * var(--font-scale, 1));
-		line-height: 1.5;
-	}
-	.app[data-android] .msg-edit-box :global(.ta-input) {
-		width: 100%;
-		box-sizing: border-box;
-		border: 0;
-		background: transparent;
-		color: inherit;
-		font: inherit;
-		resize: none;
-		outline: none;
-		field-sizing: content;
-		padding: 0;
-	}
-	article.assistant {
-		/* Centered column like every message (see the column rule);
-		the text itself stays left-aligned — only the alignment was
-		meant to change, never the column. Assistant text packs
-		tight: the list gap already separates messages, so no
-		vertical padding here (desktop and touch). */
-		align-self: center;
-		text-align: left;
-		padding-left: 0;
-		padding-right: 0;
-		padding-top: 0;
-		padding-bottom: 0;
-	}
-	/* Unshaded own messages read like replies: no bubble, but the same
-	right-docked flow — alignment never changes with the background.
-	Shrink-wrap + auto margin docks short messages hard right (a full
-	width here would strand them left with dead space on the right). */
-	main.plain-user article.user .bubble {
-		background: none;
-		/* No bottom pad: the action row below sits as close as the
-		assistant's (its margin is the whole gap). 100%, not 90%: the
-		article already caps at min(100%, chat-width), and 90% here
-		resolves against the shrink-wrapped article itself — same early
-		wrap the shaded bubble's rule calls out. */
-		padding: 0.5rem 0 0;
-		text-align: left;
-		width: fit-content;
-		max-width: 100%;
-		margin-left: auto;
-	}
-	article.selected {
-		outline: 2px solid #3a3a3c;
-		outline-color: var(--focus);
-		outline-offset: 2px;
-	}
-	/* Palette jumps land DOM focus on the article itself (tabindex -1
-	for programmatic focus only, never in the Tab order): .selected
-	carries the keyboard indicator, so focus adds no second ring. */
-	article:focus {
-		outline: none;
-	}
-	article.selected:focus {
-		outline: 2px solid #3a3a3c;
-		outline-color: var(--focus);
-		outline-offset: 2px;
-	}
-	/* Hover-only button modes keep the actions row in the layout
-	(invisible via opacity), so the article ring would box the buttons'
-	empty floor too. The article ring goes quiet there and the text body
-	carries the selected indicator instead. */
-	main.hover-user article.user.selected,
-	main.hover-user article.user.selected:focus,
-	main.hover-assistant article.assistant.selected,
-	main.hover-assistant article.assistant.selected:focus {
-		outline-color: transparent;
-	}
-	main.hover-user article.user.selected .bubble,
-	main.hover-assistant article.assistant.selected :global(.rendered) {
-		outline: 2px solid #3a3a3c;
-		outline-color: var(--focus);
-		outline-offset: 6px;
-		border-radius: 8px;
-	}
-	/* Holding Option arms message click actions (fold/unfold): the
-	pointer says clickable where the I-beam says selectable. */
-	main.alt article,
-	main.alt article * {
-		cursor: pointer;
-	}
+	/* Article shell surfaces render in `MessageArticle.svelte` now
+	(row, bubble, edit box, and states moved with the markup). */
+	/* (Own-message row in `MessageArticle.svelte`.) */
+	/* (Phone in-place edit in `MessageArticle.svelte`.) */
+	/* (Assistant column and plain-user bubble in
+	`MessageArticle.svelte`.) */
+	/* (Selection ring and Option-arm cursor in
+	`MessageArticle.svelte`.) */
 	/* Sent file/image folds render in `SentAttachments.svelte` now
 	(tags row + inline folds, popup card, fold surfaces). */
 	/* Baked-refs card renders in `SentRefs.svelte` now (pill, pop,
@@ -13853,11 +13550,7 @@
 		background: rgba(0, 122, 255, 0.28);
 		background: var(--sel-tint);
 	}
-	/* …tinted amber on the message a speak-aloud selection came from,
-	restored automatically when speech ends. */
-	article.speaking-sel ::selection {
-		background: rgba(245, 158, 11, 0.45);
-	}
+	/* (Speak-aloud selection tint in `MessageArticle.svelte`.) */
 	/* (hidden-input in `Composer.svelte`.) */
 	/* System-callout look: one translucent pill, hairline dividers, no
 	gaps. On iOS this IS the selection menu (the native callout is
@@ -13903,32 +13596,8 @@
 	/* (pencil/copy/del icons in `ReviewDock.svelte`.) */
 	/* (quote/pencil link rules in `ReviewDock.svelte`.) */
 	/* (popover card in `ReviewDock.svelte`.) */
-	/* Hide-messages mode (touch option): bodies and baked quote blocks
-	stay hidden until their message is tapped open; the open row shows
-	text and buttons for 3s. Later than the hover rules so it wins ties;
-	the open-row attr outranks them outright. */
-	main.hide-messages article :global(.rendered),
-	main.hide-messages article :global(.ann-refs) {
-		display: none;
-	}
-	main.hide-messages article[data-actions-open="true"] :global(.rendered),
-	main.hide-messages article[data-actions-open="true"] :global(.ann-refs) {
-		display: block;
-	}
-	/* No bubble, no bubble padding: the text's right edge lands on the
-	row's right edge, so the last button never hangs past short text.
-	(The 1rem side pad only makes sense with a visible bubble behind
-	it; without one it strands the text a full pad left of its own
-	buttons.) */
-	.app[data-android] main.plain-user article.user .bubble {
-		padding: 0.25rem 0 0;
-	}
-	/* My-message background OFF on phones: the edit box carries no
-	background either (it mirrors the plain text, not the bubble).
-	Desktop keeps its editing frame above. */
-	.app[data-android] main.plain-user article.user .msg-edit {
-		background: none;
-	}
+	/* (Hide-messages mode in `MessageArticle.svelte`.) */
+	/* (Phone plain-user row in `MessageArticle.svelte`.) */
 	/* Message text never spills sideways off a phone: inner scrollers
 	(code blocks, aid-label rows) keep their own axes. */
 	.app[data-android] .messages {
@@ -13945,32 +13614,7 @@
 		word-break: normal;
 		overflow-wrap: break-word;
 	}
-	/* Below the full-bleed text size, assistant messages shrink-wrap
-	to their text like own bubbles instead of running the full
-	column — short replies read at the same width on both sides,
-	while long ones still fill to the cap. At the full-bleed size
-	and past it the column goes wide so huge text stays readable. */
-	.app[data-android]:not([data-fullbleed]) article.assistant {
-		width: fit-content;
-		/* Shrink-wrapped phone replies left-dock: a centered stub
-		reads as a status line, not a message. Desktop keeps the
-		centered column (see article.assistant). */
-		align-self: flex-start;
-	}
-	/* A folded assistant message spans the column instead of
-	shrink-wrapping: the capped preview floated mid-screen rather
-	than starting where the message text starts. */
-	.app[data-android]:not([data-fullbleed]) article.assistant.folded-msg {
-		width: auto;
-		align-self: stretch;
-	}
-	/* Full-bleed keeps the article full width while the bubble stays
-	shrink-wrapped: short notes dock hard right (a full-width own
-	column reads left-anchored like a reply) and long ones still
-	fill to the cap. */
-	.app[data-android][data-fullbleed] article.user {
-		width: 100%;
-	}
+	/* (Phone article widths in `MessageArticle.svelte`.) */
 	/* Chat-step slide: the incoming chat glides in from the swipe
 	side (newer from the right, older from the left). Phone-only;
 	reduced-motion keeps the instant switch. */
@@ -14149,10 +13793,9 @@
 	/* Centered reading column on wide screens (DeepSeek-web rhythm).
 	The cap rides --chat-width off .app (desktop slider, 36 = the default
 	fixed width); the fallback keeps phones and older saves identical. */
-	/* Shared column width (article, hero, sending status): global,
-	since the status renders in `SendingIndicator.svelte` (and the
-	article follows with the messages shell). */
-	:global(article),
+	/* Shared column width (hero, sending status): global, since the
+	status renders in `SendingIndicator.svelte`; the article keeps
+	its own pairing in `MessageArticle.svelte`. */
 	:global(.empty-state),
 	:global(.sending) {
 		align-self: center;
@@ -14160,13 +13803,7 @@
 		max-width: min(100%, calc(var(--chat-width, 36) * 1rem));
 		box-sizing: border-box;
 	}
-	/* Only the very first message stands off the top: one strip-height
-	of margin clears the invisible drag strip at scroll zero, so the
-	first line is clickable as well as visible. Everything after it
-	bleeds edge to edge (see .messages padding). */
-	article:first-of-type {
-		margin-top: 1.75rem;
-	}
+	/* (First-message offset in `MessageArticle.svelte`.) */
 	/* (Composer width and outline in `Composer.svelte`; the banner
 	keeps its own width there too.) */
 	/* `.attachments` keeps its own tray width in `Attachments.svelte`. */
