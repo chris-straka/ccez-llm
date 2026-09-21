@@ -141,6 +141,7 @@
 	import Attachments from "$lib/components/Attachments.svelte";
 	import Readings from "$lib/components/Readings.svelte";
 	import ChatSwitcher from "$lib/components/ChatSwitcher.svelte";
+	import ShortcutsModal from "$lib/components/ShortcutsModal.svelte";
 	import { plainBody, sourcesAsked } from "$lib/render";
 	import {
 		clearNotice,
@@ -294,11 +295,8 @@
 		type EdgePanel,
 		type FingerTrack
 	} from "$lib/platform";
-	import {
-		desktopShortcuts,
-		filteredShortcuts,
-		touchShortcuts
-	} from "$lib/shortcuts";
+	/* Shortcut row data renders in `ShortcutsModal.svelte`
+	(imports `$lib/shortcuts` there). */
 	import {
 		chromeChord,
 		commandChord,
@@ -13932,72 +13930,20 @@
 	{/if}
 
 	{#if shortcutsOpen}
-		<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-		<!-- Backdrop click only; keyboard users get Esc and the × button. -->
-		<div
-			class="modal-veil"
-			onclick={(e) => {
-				if (e.target === e.currentTarget) shortcutsOpen = false;
-			}}
-		>
-			<div
-				class="modal"
-				role="dialog"
-				aria-modal="true"
-				aria-labelledby={androidUI ? undefined : "shortcuts-heading"}
-				aria-label={androidUI ? "Touch gestures" : undefined}
-				data-fade-scroll
-			>
-				<div class="modal-head">
-					{#if !androidUI}<h2 id="shortcuts-heading">
-							Keyboard shortcuts
-						</h2>{/if}
-					<input
-						type="search"
-						class="shortcuts-filter"
-						bind:this={shortcutInputEl}
-						bind:value={shortcutQuery}
-						placeholder={isMac ? "Filter (⌘F)" : "Filter (Ctrl+F)"}
-						aria-label={androidUI ? "Filter gestures" : "Filter shortcuts"}
-						autocomplete="off"
-						spellcheck={false}
-					/>
-					<button
-						type="button"
-						aria-label="Close shortcuts"
-						title={tip(isMac ? "Close (⇧⌘/)" : "Close (Ctrl+Shift+/)", "Close")}
-						onclick={() => (shortcutsOpen = false)}
-					>
-						×
-					</button>
-				</div>
-				{#if androidUI}
-					<!-- Android milestone: key chords don't exist on a phone,
-					so the same modal teaches the touch equivalents. -->
-					<dl class="keys">
-						{#each filteredShortcuts(touchShortcuts(), shortcutQuery) as row (row.name)}
-							<div>
-								<dt>{row.name}</dt>
-								<dd>{row.keys}</dd>
-							</div>
-						{:else}
-							<div class="keys-empty">No matches</div>
-						{/each}
-					</dl>
-				{:else}
-					<dl class="keys">
-						{#each filteredShortcuts(desktopShortcuts(isMac, tauriBackendAvailable()), shortcutQuery) as row (row.name)}
-							<div>
-								<dt>{row.name}</dt>
-								<dd>{row.keys}</dd>
-							</div>
-						{:else}
-							<div class="keys-empty">No matches</div>
-						{/each}
-					</dl>
-				{/if}
-			</div>
-		</div>
+		<!-- Shortcuts modal through the shared shell: the page keeps
+		the open flag, the filter reset, and ⌘F focus; the component
+		owns the list, the field, and their surfaces. -->
+		<ShortcutsModal
+			android={androidUI}
+			mac={isMac}
+			bind:query={shortcutQuery}
+			bind:inputEl={shortcutInputEl}
+			closeTitle={tip(
+				isMac ? "Close (⇧⌘/)" : "Close (Ctrl+Shift/)",
+				"Close"
+			)}
+			onClose={() => (shortcutsOpen = false)}
+		/>
 	{/if}
 
 	{#if palette.open}
@@ -14731,36 +14677,13 @@
 			background-color 0.15s ease,
 			color 0.15s ease;
 	}
-	/* Shortcuts filter: sits between the heading and ×, same field
-	chrome as the search palette input. */
-	.shortcuts-filter {
-		flex: 1;
-		min-width: 0;
-		font: inherit;
-		font-size: 0.85rem;
-		padding: 0.3rem 0.6rem;
-		border: 1px solid #c7c7cc;
-		border: 1px solid var(--line);
-		border-radius: 8px;
-		background: #fff;
-		background: var(--field);
-		color: inherit;
-	}
-	.modal-head .shortcuts-filter + button {
-		margin-left: 0;
-	}
-	/* The filter reads dead on focus without this: same ring as the
-	selected article, so keyboard users see where they are. */
-	.shortcuts-filter:focus-visible,
+	/* Shortcuts filter and key grid render in `ShortcutsModal.svelte`
+	now (field chrome, focus ring, and rows moved with the markup).
+	The palette input keeps its own focus ring below. */
 	.search-input:focus-visible {
 		outline: 2px solid #3a3a3c;
 		outline-color: var(--focus);
 		outline-offset: 1px;
-	}
-	.keys-empty {
-		padding: 0.6rem 0;
-		color: var(--muted);
-		font-size: 0.8rem;
 	}
 	/* Search palette (search-mobile): pinned to the top so the phone
 	keyboard never covers the input; hits read as full-width rows. */
@@ -14990,37 +14913,8 @@
 		color: var(--muted);
 		font-size: 0.85rem;
 	}
-	.keys {
-		margin: 0;
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		column-gap: 2rem;
-	}
-	.keys div {
-		display: flex;
-		gap: 0.7rem;
-		padding: 0.26rem 0;
-		border-top: 1px solid #e5e5ea;
-		border-top-color: var(--line-soft);
-		font-size: 0.8rem;
-	}
-	/* Two-column grid: the whole first row skips the divisor. */
-	.keys div:nth-child(-n + 2) {
-		border-top: 0;
-	}
-	.keys dt {
-		flex: 0 0 8rem;
-		color: #3a3a3c;
-		color: var(--focus);
-	}
-	.keys dd {
-		margin: 0;
-		font-family: ui-monospace, monospace;
-		font-size: 0.75rem;
-		color: #1c1c1e;
-		color: var(--ink);
-		overflow-wrap: anywhere;
-	}
+	/* Key grid rows render in `ShortcutsModal.svelte` (moved with
+	the dialog). */
 	aside .del {
 		color: #6e6e73;
 		color: var(--dim);
@@ -15669,20 +15563,8 @@
 			padding: 0.3rem 0.35rem;
 		}
 	}
-	/* The gestures list goes single-column on phones: two columns
-	overflow a 360px viewport by ~60px, clipping the very text that
-	teaches the gestures. Touch descriptions are prose, not key
-	chords, so they drop the monospace too. */
-	.app[data-android] .keys {
-		grid-template-columns: 1fr;
-	}
-	.app[data-android] .keys div:nth-child(2) {
-		border-top: 1px solid #e5e5ea;
-	}
-	.app[data-android] .keys dd {
-		font-family: inherit;
-		font-size: 0.8rem;
-	}
+	/* Phone gestures list renders in `ShortcutsModal.svelte`
+	(single-column override moved with the dialog). */
 	nav {
 		display: flex;
 		gap: 0.3rem;
@@ -18769,10 +18651,8 @@
 	:global(html[data-theme="dark"]) .modal-head button:hover {
 		color: #f2f2f7;
 	}
-	/* .keys ride --line-soft/--focus/--ink now. */
-	:global(html[data-theme="dark"]) .app[data-android] .keys div:nth-child(2) {
-		border-top-color: #38383a;
-	}
+	/* Phone gestures-list dark divisor moved with the dialog
+	(`ShortcutsModal.svelte`). */
 	/* nav rides --line-soft; its buttons ride --bg-raised/--line/--ink now. */
 	/* wp-menu rides --bg-raised/--line/--ink/--bg-wash now (sheet-head stays: touch-only). */
 	:global(html[data-theme="dark"]) .wp-sheet-head {

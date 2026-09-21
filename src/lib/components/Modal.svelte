@@ -10,8 +10,16 @@ move here verbatim. -->
 	import type { Snippet } from "svelte";
 
 	interface Props {
-		/** Dialog name for assistive tech. */
+		/** Dialog name for assistive tech (skipped when labelledby
+		names a visible heading instead). */
 		label: string;
+		/** Visible heading id labelling the dialog (desktop
+		shortcuts modal); omit for aria-label. Explicit undefined
+		passes (exactOptionalPropertyTypes). */
+		labelledby?: string | undefined;
+		/** Edge-fade scroll hook on the box (see the page's
+		fade-scroll tracker). */
+		fadeScroll?: boolean;
 		/** Extra veil class (e.g. "chat-switcher" for top seating). */
 		veilClass?: string;
 		/** Extra box class (e.g. "switcher-card"). */
@@ -28,6 +36,8 @@ move here verbatim. -->
 
 	let {
 		label,
+		labelledby,
+		fadeScroll = false,
 		veilClass = "",
 		cardClass = "",
 		onVeilClick,
@@ -42,7 +52,9 @@ move here verbatim. -->
 		class="modal {cardClass}"
 		role="dialog"
 		aria-modal="true"
-		aria-label={label}
+		aria-label={labelledby ? undefined : label}
+		aria-labelledby={labelledby}
+		data-fade-scroll={fadeScroll || undefined}
 		tabindex="-1"
 	>
 		{@render children()}
