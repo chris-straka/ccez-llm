@@ -18,6 +18,7 @@
 	} from "$lib/providers/registry";
 	import {
 		maskKey,
+		keyNeedsEditing,
 		activeProviderSettings,
 		type AppSettings
 	} from "$lib/settings";
@@ -486,7 +487,16 @@
 					autocomplete="off"
 					spellcheck="false"
 					oninput={() => (keyPasteError = "")}
-					onblur={() => (editingKey[settings.activeProviderId] = false)}
+					onblur={() => {
+						// Fragments never load: a 1-char blur used to
+						// close into "Key loaded" and 401 at send time.
+						if (!keyNeedsEditing(active.apiKey)) {
+							editingKey[settings.activeProviderId] = false;
+						} else if (active.apiKey.trim()) {
+							keyPasteError =
+								"That key looks too short — paste the whole key.";
+						}
+					}}
 					// Pasting replaces: with the old key selected, both
 					// the Paste button and a long-press paste overwrite
 					// instead of inserting at the cursor.

@@ -640,5 +640,21 @@ export function saveSettings(
 export function maskKey(key: string): string {
 	const trimmed = key.trim();
 	if (!trimmed) return "";
-	return trimmed.length <= 8 ? "••••" : `••••${trimmed.slice(-4)}`;
+	return trimmed.length <= MIN_KEY_CHARS ? "••••" : `••••${trimmed.slice(-4)}`;
+}
+
+/**
+ * Minimum stored-key length: below it a blur keeps the field open
+ * instead of loading a fragment (single fat-fingered chars 401 at
+ * send time). Same floor maskKey displays under. Pure.
+ */
+export const MIN_KEY_CHARS = 8;
+
+/**
+ * True while the key field must stay open: empty, or a fragment too
+ * short to be a real key. Pure.
+ */
+export function keyNeedsEditing(value: string): boolean {
+	const trimmed = value.trim();
+	return trimmed.length === 0 || trimmed.length < MIN_KEY_CHARS;
 }

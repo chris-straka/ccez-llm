@@ -20,6 +20,9 @@ import {
 	PROMPT_IDLE_MAX,
 	PROMPT_IDLE_MIN,
 	activeThinkingId,
+	keyNeedsEditing,
+	MIN_KEY_CHARS,
+	maskKey,
 	effectiveSystemPrompt,
 	LOOKUP_CAPABILITY_HINT,
 	systemLocale,
@@ -612,5 +615,26 @@ describe("touch toggles", () => {
 		expect(healed.hapticsEnabled).toBe(true);
 		expect("iosNativeCallout" in healed).toBe(false);
 		expect("overlayActions" in healed).toBe(false);
+	});
+});
+
+describe("keyNeedsEditing", () => {
+	it("keeps fragments and empties in the field", () => {
+		expect(keyNeedsEditing("")).toBe(true);
+		expect(keyNeedsEditing("   ")).toBe(true);
+		expect(keyNeedsEditing("t")).toBe(true);
+		expect(keyNeedsEditing("x".repeat(MIN_KEY_CHARS - 1))).toBe(true);
+	});
+
+	it("loads full-length keys", () => {
+		expect(keyNeedsEditing("x".repeat(MIN_KEY_CHARS))).toBe(false);
+		expect(keyNeedsEditing("sk-ant-abcdefghijklmnopqrstuvwxyz0123456789")).toBe(
+			false
+		);
+	});
+
+	it("shares its floor with the mask display", () => {
+		expect(maskKey("x".repeat(MIN_KEY_CHARS))).toBe("••••");
+		expect(maskKey("x".repeat(MIN_KEY_CHARS + 1))).toBe("••••xxxx");
 	});
 });
