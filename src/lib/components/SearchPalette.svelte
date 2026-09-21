@@ -163,6 +163,13 @@ markup). Field writes ride the shared object like the notices proxy
 		border-color: #1c1c1e;
 		border-color: var(--strong);
 	}
+	:global(html[data-theme="dark"]) .modal-head button:hover {
+		color: #f2f2f7;
+	}
+	.modal-head button:hover {
+		border-color: #1c1c1e;
+		border-color: var(--strong);
+	}
 	.search-input:focus-visible {
 		outline: 2px solid #3a3a3c;
 		outline-color: var(--focus);

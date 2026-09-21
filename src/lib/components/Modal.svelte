@@ -27,6 +27,9 @@ move here verbatim. -->
 		/** Veil tap: dialogs close on taps that land on the veil
 		itself, never on content. */
 		onVeilClick: (event: MouseEvent) => void;
+		/** Box touch-end passthrough (e.g. the inspect overlay's
+		tap haptic). Omit when the dialog needs none. */
+		onBoxTouchEnd?: (event: TouchEvent) => void;
 		/** Box content. */
 		children: Snippet;
 		/** Optional veil content outside the box (e.g. the
@@ -41,6 +44,7 @@ move here verbatim. -->
 		veilClass = "",
 		cardClass = "",
 		onVeilClick,
+		onBoxTouchEnd,
 		children,
 		below
 	}: Props = $props();
@@ -55,6 +59,7 @@ move here verbatim. -->
 		aria-label={labelledby ? undefined : label}
 		aria-labelledby={labelledby}
 		data-fade-scroll={fadeScroll || undefined}
+		ontouchend={onBoxTouchEnd}
 		tabindex="-1"
 	>
 		{@render children()}
@@ -123,5 +128,10 @@ move here verbatim. -->
 		margin-top: 8vh;
 		margin-top: 8dvh;
 		padding: 0.7rem 0.9rem 0.8rem;
+	}
+	/* Character Inspect box: narrow modal, big glyph beside the
+	facts, schematic stroke progress below. */
+	.inspect-modal {
+		width: min(28rem, calc(100vw - 3rem));
 	}
 </style>

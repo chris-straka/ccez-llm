@@ -131,6 +131,9 @@ CSS to this markup). Row data already lives in `$lib/shortcuts`
 	.modal-head .shortcuts-filter + button {
 		margin-left: 0;
 	}
+	:global(html[data-theme="dark"]) .modal-head button:hover {
+		color: #f2f2f7;
+	}
 	/* Shortcuts filter: sits between the heading and ×, same field
 	chrome as the search palette input. */
 	.shortcuts-filter {

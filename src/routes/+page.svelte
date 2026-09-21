@@ -143,6 +143,7 @@
 	import ChatSwitcher from "$lib/components/ChatSwitcher.svelte";
 	import ShortcutsModal from "$lib/components/ShortcutsModal.svelte";
 	import SearchPalette from "$lib/components/SearchPalette.svelte";
+	import InspectOverlay from "$lib/components/InspectOverlay.svelte";
 	import { plainBody, sourcesAsked } from "$lib/render";
 	import {
 		clearNotice,
@@ -240,12 +241,11 @@
 		scopeMessagesTransition,
 		switchChatWithTransition
 	} from "$lib/viewTransitions";
+	/* decomposeTree + onKunLine render in `InspectOverlay.svelte`. */
 	import {
-		decomposeTree,
 		getInspectData,
 		inspectLangFor,
 		isHanChar,
-		onKunLine,
 		shouldShowInspect
 	} from "$lib/inspect";
 	import {
@@ -359,8 +359,6 @@
 		wordAtNodeOffset,
 		sentenceBounds,
 		hanOverlayLangFor,
-		isHanOverlayLangUncertain,
-		HAN_OVERLAY_LANG_TAG,
 		runModelAid,
 		aidTargetLines,
 		spliceAidResult,
@@ -13965,219 +13963,23 @@
 		/>
 	{/if}
 	{#if inspectChar && inspectData}
-		{@const strokeTotal =
-			inspectStrokes?.length ?? inspectData.strokeCount ?? 0}
-		{@const strokeShown = Math.min(inspectStroke, Math.max(strokeTotal, 1))}
-		{@const onKunInspect = onKunLine(inspectData)}
-		{@const decompInspect = inspectChar ? decomposeTree(inspectChar) : null}
-		<!-- Character Inspect overlay: same modal-veil/modal pattern as
-		the shortcuts overlay. Component splits come from the vendored
-		cjk-decomp subset; count, radical, definition, and readings
-		(Mandarin, Japanese on/kun) from the generated Unihan bundle —
-		all offline, no hand-curated entries. Stroke vectors load on
-		demand from KanjiVG (CC BY-SA 3.0) and step manually — never
-		autoplay; the font glyph stands in while they load. The
-		JP/中文 toggle flips the predicted reading
-		locale (kana = Japanese, else Chinese) for genuinely ambiguous
-		Han text. -->
-		<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-		<!-- Backdrop click only; keyboard users get Esc and the × button. -->
-		<div
-			class="modal-veil"
-			onclick={(e) => {
-				if (e.target === e.currentTarget) inspectChar = null;
+		<!-- Character Inspect overlay through the shared shell: the page
+		keeps the open character, vectors, step, and locale default;
+		InspectOverlay owns the overlay, stepper, toggle, and surfaces. -->
+		<InspectOverlay
+			char={inspectChar}
+			data={inspectData}
+			strokes={inspectStrokes}
+			stroke={inspectStroke}
+			bind:lang={inspectLang}
+			actions={{
+				close: () => (inspectChar = null),
+				step: strokeStep,
+				holdStart: startStrokeHold,
+				holdStop: stopStrokeHold,
+				buzz: buzzInspectTap
 			}}
-		>
-			<div
-				class="modal inspect-modal"
-				role="dialog"
-				tabindex="-1"
-				aria-modal="true"
-				aria-labelledby="inspect-heading"
-				data-fade-scroll
-				ontouchend={buzzInspectTap}
-			>
-				<div class="modal-head">
-					<h2 id="inspect-heading">
-						Inspect <span lang={HAN_OVERLAY_LANG_TAG[inspectLang]}
-							>{inspectData.char}</span
-						>
-					</h2>
-					<button
-						type="button"
-						aria-label="Close character inspect"
-						title="Close (Esc)"
-						onclick={() => (inspectChar = null)}
-					>
-						×
-					</button>
-				</div>
-				{#if inspectChar && isHanOverlayLangUncertain(inspectChar)}
-					<div class="inspect-lang" role="group" aria-label="Reading language">
-						<button
-							type="button"
-							aria-pressed={inspectLang === "ja"}
-							aria-label="Show Japanese reading"
-							title="Show Japanese reading"
-							onclick={() => (inspectLang = "ja")}>日本語</button
-						>
-						<button
-							type="button"
-							aria-pressed={inspectLang === "zh"}
-							aria-label="Show Chinese reading"
-							title="Show Chinese reading"
-							onclick={() => (inspectLang = "zh")}>中文</button
-						>
-					</div>
-				{/if}
-				<div class="inspect-body">
-					<div class="inspect-glyph">
-						{#if inspectStrokes && inspectStrokes.length > 0}
-							<!-- KanjiVG vectors (CC BY-SA 3.0): unstepped
-							strokes stay grey, stepped ones paint light. -->
-							<svg
-								viewBox="0 0 109 109"
-								class="inspect-svg"
-								role="img"
-								aria-label={`Stroke order for ${inspectChar}`}
-							>
-								{#each inspectStrokes as d, i (i)}
-									<path {d} class:painted={i < strokeShown} />
-								{/each}
-							</svg>
-						{:else}
-							<div
-								class="inspect-char"
-								lang={HAN_OVERLAY_LANG_TAG[inspectLang]}
-								aria-hidden="true"
-							>
-								{inspectData.char}
-							</div>
-						{/if}
-						{#if inspectStrokes && inspectStrokes.length > 0}
-							<!-- Stepper waits for the vectors: the static
-							char shows first, and the arrows must not offer
-							steps through a drawing that isn't here yet. -->
-							<div class="inspect-stepper">
-								<button
-									type="button"
-									aria-label="Previous stroke (h)"
-									title="Previous stroke (h)"
-									disabled={inspectStroke <= 1}
-									onpointerdown={() => startStrokeHold(-1)}
-									onpointerup={stopStrokeHold}
-									onpointerleave={stopStrokeHold}
-									onpointercancel={stopStrokeHold}
-									onclick={() => strokeStep(-1)}>‹</button
-								>
-								<span class="inspect-count" aria-live="polite"
-									>{strokeShown} / {strokeTotal}</span
-								>
-								<button
-									type="button"
-									aria-label="Next stroke (l)"
-									title="Next stroke (l)"
-									disabled={inspectStroke >= strokeTotal}
-									onpointerdown={() => startStrokeHold(1)}
-									onpointerup={stopStrokeHold}
-									onpointerleave={stopStrokeHold}
-									onpointercancel={stopStrokeHold}
-									onclick={() => strokeStep(1)}>›</button
-								>
-							</div>
-						{/if}
-					</div>
-					<div class="inspect-facts">
-						{#if inspectData.components.length > 0}
-							<p>
-								<strong>Components:</strong>
-								{inspectData.components.join(" + ")}
-							</p>
-						{:else}
-							<p class="note">
-								Component breakdown unavailable offline for this character.
-							</p>
-						{/if}
-						{#if inspectData.strokeCount !== null}
-							<p><strong>Strokes:</strong> {inspectData.strokeCount}</p>
-						{:else}
-							<p class="note">
-								Stroke count unavailable offline for this character.
-							</p>
-						{/if}
-						{#if inspectData.radical !== null && inspectData.radicalRest !== null}
-							<p>
-								<strong>Radical:</strong>
-								{inspectData.radical} + {inspectData.radicalRest}
-							</p>
-						{/if}
-						{#if inspectData.definition !== null}
-							<p><strong>Definition:</strong> {inspectData.definition}</p>
-						{:else}
-							<p class="note">
-								Unihan definition unavailable offline for this character.
-							</p>
-						{/if}
-						{#if inspectLang === "zh"}
-							{#if inspectData.mandarin !== null}
-								<p>
-									<strong>Mandarin:</strong>
-									<span lang="zh-Latn-pinyin">{inspectData.mandarin}</span>
-								</p>
-							{:else}
-								<p class="note">
-									Mandarin reading unavailable offline for this character.
-								</p>
-							{/if}
-						{:else}
-							{#if onKunInspect !== null}
-								<p class="inspect-onkun">{onKunInspect}</p>
-							{:else}
-								<p class="note">
-									Japanese readings unavailable offline for this character.
-								</p>
-							{/if}
-						{/if}
-					</div>
-				</div>
-				{#if decompInspect && decompInspect.children.length > 0}
-					<div class="inspect-decomp" aria-label="Character decomposition">
-						<span class="inspect-decomp-char root">{decompInspect.char}</span>
-						<span class="inspect-decomp-arrow" aria-hidden="true">→</span>
-						{#each decompInspect.children as child, ci (ci)}
-							<span class="inspect-decomp-group">
-								<span class="inspect-decomp-char">{child.char}</span>
-								{#if child.children.length > 0}
-									<span class="inspect-decomp-sub">
-										<span class="inspect-decomp-arrow" aria-hidden="true"
-											>→</span
-										>
-										{#each child.children as grand, gi (gi)}
-											<span class="inspect-decomp-char sub">{grand.char}</span
-											>{#if gi < child.children.length - 1}<span
-													class="inspect-decomp-plus"
-													aria-hidden="true"
-												>
-													+
-												</span>{/if}
-										{/each}
-									</span>
-								{/if}
-							</span>{#if ci < decompInspect.children.length - 1}<span
-									class="inspect-decomp-plus"
-									aria-hidden="true"
-								>
-									+
-								</span>{/if}
-						{/each}
-					</div>
-				{:else}
-					<p class="note">
-						No decomposition in the vendored subset for this character.
-					</p>
-				{/if}
-			</div>
-		</div>
+		/>
 	{/if}
 	<!-- Print-only study sheet: hidden on screen, the sole visible
 	node under `@media print` (File → Print Study Sheet…, or Save as
@@ -14546,227 +14348,26 @@
 		target) stays put while collapsing, so it lands back under the cursor. */
 		margin-left: auto;
 	}
-	.modal-veil {
-		position: fixed;
-		inset: 0;
-		z-index: 60;
-		background: rgba(0, 0, 0, 0.35);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		padding: 1.5rem;
-	}
-	.modal {
-		width: min(52rem, calc(100vw - 3rem));
-		max-height: min(38rem, calc(100vh - 3rem));
-		max-height: min(38rem, calc(100dvh - 3rem));
-		overflow-y: auto;
-		background: #fff;
-		background: var(--bg);
-		color: #1c1c1e;
-		color: var(--ink);
-		border: 1px solid #e5e5ea;
-		border-color: var(--line-soft);
-		border-radius: 14px;
-		box-shadow: 0 12px 48px rgba(0, 0, 0, 0.25);
-		padding: 0.9rem 1.4rem 1rem;
-		box-sizing: border-box;
-	}
-	.modal-head {
-		display: flex;
-		align-items: center;
-		gap: 1rem;
-		margin-bottom: 0.35rem;
-	}
-	.modal-head h2 {
-		font-size: 1.05rem;
-		font-weight: 700;
-		margin: 0;
-	}
-	.modal-head button {
-		margin-left: auto;
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 1.1rem;
-		line-height: 1;
-		border: 1px solid #c7c7cc;
-		border-color: var(--line);
-		border-radius: 8px;
-		background: none;
-		cursor: pointer;
-		padding: 0.15rem 0.55rem;
-		color: #3a3a3c;
-		color: var(--focus);
-		transition:
-			border-color 0.15s ease,
-			background-color 0.15s ease,
-			color 0.15s ease;
-	}
+	/* Dialog shells render in `Modal.svelte` now (veil, box, and
+	per-dialog chrome moved with each dialog through the shell);
+	content heads render in each dialog. No paged dialog markup
+	remains. */
 	/* Shortcuts filter and key grid render in `ShortcutsModal.svelte`
 	now (field chrome, focus ring, and rows moved with the markup).
 	The palette input keeps its own focus ring below. */
 	/* Search palette dialog renders in `SearchPalette.svelte` now
 	(markup, hits, and surfaces moved with it; the box seating lives
 	in `Modal.svelte`). */
-	.modal-head button:hover {
-		border-color: #1c1c1e;
-		border-color: var(--strong);
-	}
-	/* Character Inspect overlay: narrow modal, big glyph beside the
-	facts, schematic stroke progress below. */
-	.inspect-modal {
-		width: min(28rem, calc(100vw - 3rem));
-	}
-	/* Phone chat switcher chrome (veil seating, card) renders in
-	`Modal.svelte`; its content surfaces in `ChatSwitcher.svelte`.
-	The shared veil/box base below stays paged until the last
-	dialog (Shortcuts, Palette, Inspect) moves through the shell. */
-	/* Reading-locale toggle: small JP/中文 pair for ambiguous Han text. */
-	.inspect-lang {
-		display: flex;
-		gap: 0.35rem;
-		margin: 0.2rem 0 0.1rem;
-	}
-	/* Every inspect button is a control: pointer on hover. */
-	.inspect-modal button {
-		cursor: pointer;
-	}
-	.inspect-lang button {
-		font-size: 0.8rem;
-		padding: 0.15rem 0.5rem;
-		border: 1px solid #c7c7cc;
-		border-color: var(--line);
-		border-radius: 8px;
-		background: none;
-		color: inherit;
-	}
-	.inspect-lang button:hover {
-		border-color: #1c1c1e;
-		border-color: var(--strong);
-	}
-	/* Active locale reads as filled, not just bold: bold alone never
-	scanned as selected. */
-	.inspect-lang button[aria-pressed="true"] {
-		font-weight: 700;
-		background: #1c1c1e;
-		background: var(--invert);
-		color: #fff;
-		color: var(--invert-ink);
-		border-color: transparent;
-	}
-	.inspect-body {
-		display: flex;
-		gap: 1.1rem;
-		align-items: flex-start;
-		margin: 0.4rem 0 0.6rem;
-	}
-	.inspect-char {
-		font-size: 3.4rem;
-		line-height: 1.1;
-	}
-	.inspect-facts {
-		flex: 1;
-		min-width: 0;
-	}
-	.inspect-facts p {
-		margin: 0.3rem 0;
-	}
-	.inspect-modal .note {
-		color: #6e6e73;
-		color: var(--muted);
-		font-size: 0.85rem;
-	}
-	/* Glyph column: vector (or font) glyph up top, stepper beneath. */
-	.inspect-glyph {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 0.4rem;
-		min-width: 5.5rem;
-	}
-	.inspect-svg {
-		width: 5.5rem;
-		height: 5.5rem;
-	}
-	.inspect-svg path {
-		fill: none;
-		stroke: #8e8e93;
-		stroke-width: 3;
-		stroke-linecap: round;
-		stroke-linejoin: round;
-	}
-	.inspect-svg path.painted {
-		stroke: #1c1c1e;
-	}
-	:global(html[data-theme="dark"]) .inspect-svg path {
-		stroke: #48484a;
-	}
-	:global(html[data-theme="dark"]) .inspect-svg path.painted {
-		stroke: #f2f2f7;
-	}
-	.inspect-stepper {
-		display: flex;
-		align-items: center;
-		gap: 0.45rem;
-	}
-	.inspect-stepper button {
-		font-size: 1.1rem;
-		line-height: 1;
-		padding: 0.1rem 0.5rem;
-		border: 1px solid #c7c7cc;
-		border-color: var(--line);
-		border-radius: 8px;
-		background: none;
-		color: inherit;
-	}
-	.inspect-stepper button:not(:disabled):hover {
-		border-color: #1c1c1e;
-		border-color: var(--strong);
-	}
-	.inspect-stepper button:disabled {
-		opacity: 0.35;
-		cursor: default;
-	}
-	.inspect-count {
-		font-variant-numeric: tabular-nums;
-		font-size: 0.85rem;
-	}
-	.inspect-onkun {
-		overflow-wrap: anywhere;
-	}
-	/* Decomposition tree (mdbg-style, two levels): root → parts,
-	nested splits inline. */
-	.inspect-decomp {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: baseline;
-		gap: 0.3rem;
-		margin-top: 0.5rem;
-		padding: 0.5rem 0.65rem;
-		border: 1px solid #e5e5ea;
-		border-color: var(--line-soft);
-		border-radius: 8px;
-		font-size: 1.15rem;
-	}
-	.inspect-decomp-group {
-		display: inline-flex;
-		align-items: baseline;
-		gap: 0.3rem;
-		padding: 0.15rem 0.4rem;
-		border: 1px solid #e5e5ea;
-		border-color: var(--line-soft);
-		border-radius: 6px;
-	}
-	.inspect-decomp-char.sub {
-		font-size: 0.95rem;
-	}
-	.inspect-decomp-arrow,
-	.inspect-decomp-plus {
-		color: #6e6e73;
-		color: var(--muted);
-		font-size: 0.85rem;
-	}
+	/* Dialog head hover, inspect overlay, and switcher chrome all
+	render in their dialog components now; no paged dialog rules
+	remain. */
+	/* (Inspect locale toggle, body, and facts render in
+	`InspectOverlay.svelte`.) */
+	/* (Inspect glyph column renders in `InspectOverlay.svelte`.) */
+	/* (Inspect stepper/decomp render in `InspectOverlay.svelte`.) */
+	/* (Inspect stepper states render in `InspectOverlay.svelte`.) */
+	/* (count/onkun in `InspectOverlay.svelte`.) */
+	/* (Decomposition tree renders in `InspectOverlay.svelte`.) */
 	/* Key grid rows render in `ShortcutsModal.svelte` (moved with
 	the dialog). */
 	aside .del {
@@ -18499,12 +18100,7 @@
 	/* .settings-panel rides the --bg/--line-soft tokens now; no dark override needed. */
 	/* The overlay pill rides --bg-raised/--line-soft now; no dark override needed. */
 	/* .modal rides the --bg/--ink/--line-soft tokens now; no dark override needed. */
-	/* .modal-head button rides --line/--focus/--strong now. */
-	/* The dark × hover lifts past every token to near-white: a lone
-	declaration is cheaper than a single-use variable. */
-	:global(html[data-theme="dark"]) .modal-head button:hover {
-		color: #f2f2f7;
-	}
+	/* Dialog × hovers render in each dialog component now. */
 	/* Phone gestures-list dark divisor moved with the dialog
 	(`ShortcutsModal.svelte`). */
 	/* nav rides --line-soft; its buttons ride --bg-raised/--line/--ink now. */
