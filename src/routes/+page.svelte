@@ -14554,6 +14554,25 @@
 		margin-right: auto;
 		box-sizing: border-box;
 	}
+	/* Missing-key banner above the attachment strip: paged markup,
+	so it keeps its own error pairing here (same tokens as the
+	composer's banner in `Composer.svelte`; Svelte scoping binds
+	each pairing to the markup that renders it). */
+	.error-banner {
+		margin: 0 1.2rem;
+		font-size: 0.85rem;
+		padding: 0.6rem 0.8rem;
+		border-radius: 8px;
+		background: #fdecea;
+		background: var(--error-bg);
+		color: #94250a;
+		color: var(--error-ink);
+		width: calc(100% - 2.4rem);
+		max-width: calc(var(--chat-width, 36) * 1rem);
+		margin-left: auto;
+		margin-right: auto;
+		box-sizing: border-box;
+	}
 
 	/* Dark theme, gated on the resolved scheme (<html data-theme>)
 	instead of the OS query, so the settings switch can pin it. */

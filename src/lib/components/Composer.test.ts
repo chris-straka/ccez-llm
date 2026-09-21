@@ -78,7 +78,6 @@ describe("composer contract", () => {
 			".prompt",
 			".send-btn",
 			".prompt-tools",
-			".error-banner",
 			".ann-dock",
 			"hidden-input",
 			"wp-jump",
@@ -89,6 +88,10 @@ describe("composer contract", () => {
 		]) {
 			expect(css, selector).not.toContain(selector);
 		}
+		// The missing-key banner stays paged above the strip, so it
+		// keeps its own error pairing here (the composer's banner
+		// pairing lives with its markup).
+		expect(css).toMatch(/\.error-banner\s*\{[^}]*background:\s*var\(--error-bg\)/);
 		// The in-place message editor keeps its own field rules.
 		expect(css).toContain(".msg-edit-box :global(.ta-input)");
 	});
