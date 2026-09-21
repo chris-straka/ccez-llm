@@ -15,6 +15,10 @@ function dockSource(): string {
 	return readFileSync(new URL("./ReviewDock.svelte", import.meta.url), "utf8");
 }
 
+function composerSource(): string {
+	return readFileSync(new URL("./Composer.svelte", import.meta.url), "utf8");
+}
+
 function pageSource(): string {
 	return readFileSync(
 		new URL("../../routes/+page.svelte", import.meta.url),
@@ -40,7 +44,10 @@ describe("review dock extraction", () => {
 		expect(dockSource()).toContain('class="review"');
 		expect(dockSource()).toContain("Clear all");
 		expect(dockSource()).toContain('aria-label="Edit annotation {n + 1}"');
-		expect(pageSource()).toContain("<ReviewDock");
+		// The dock usage moved into the composer with the tools row;
+		// the page renders the composer instead.
+		expect(composerSource()).toContain("<ReviewDock");
+		expect(pageSource()).toContain("<Composer");
 		expect(pageSource()).not.toContain('class="ann-wrap"');
 		expect(pageSource()).not.toContain('class="review-item"');
 		// The page keeps the array, ids, draft, and behaviors.

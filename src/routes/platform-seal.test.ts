@@ -48,6 +48,14 @@ function selMenuSource(): string {
 	);
 }
 
+/** Composer card moved to Composer.svelte with its markup. */
+function composerSource(): string {
+	return readFileSync(
+		new URL("../lib/components/Composer.svelte", import.meta.url),
+		"utf8"
+	);
+}
+
 describe("platform seal", () => {
 	it("defines androidUI as any phone, so data-android means phone", () => {
 		const source = pageSource();
@@ -64,9 +72,10 @@ describe("platform seal", () => {
 		// callout owns the text slot: the Android branch carries
 		// Annotate/Copy in the desktop popup's style, desktop keeps
 		// Annotate alone.
-		const source = pageSource();
-		expect(source).toContain("{#if androidUI && selMenu && !previewing}");
-		expect(source).toContain("{#if selMenu && !previewing && !iosUI}");
+		// The phone dock gates moved with the composer (prop form);
+		// the floating menu gate stays paged.
+		expect(composerSource()).toContain("{#if android && hasSelMenu && !preview}");
+		expect(pageSource()).toContain("{#if selMenu && !previewing && !iosUI}");
 		// The floating menu's platform branches render from
 		// `SelMenu.svelte` now; the seal follows the markers.
 		const menu = selMenuSource();
@@ -114,9 +123,9 @@ describe("android seal", () => {
 	});
 
 	it("yields the waypoint slot to the selection dock on phones", () => {
-		const source = pageSource();
-		expect(source).toContain(
-			"{#if androidUI && points.length > 3 && !selMenu}"
+		// The jump trigger moved with the composer (prop form).
+		expect(composerSource()).toContain(
+			"{#if android && waypointCount > 3 && !hasSelMenu}"
 		);
 	});
 });

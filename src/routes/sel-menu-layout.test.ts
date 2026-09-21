@@ -20,6 +20,14 @@ function selMenuSource(): string {
 	);
 }
 
+/** Composer dock moved to Composer.svelte with its markup. */
+function composerSource(): string {
+	return readFileSync(
+		new URL("../lib/components/Composer.svelte", import.meta.url),
+		"utf8"
+	);
+}
+
 function blockAfter(
 	source: string,
 	marker: string,
@@ -52,8 +60,10 @@ describe("phone selection layout", () => {
 	});
 
 	it("docks Speak then Inspect, never Annotate", () => {
+		// The dock renders from `Composer.svelte` now; the layout
+		// pin follows it.
 		const dock = blockAfter(
-			pageSource(),
+			composerSource(),
 			"Phone action dock: Speak, and (for a single",
 			"{/if}"
 		);

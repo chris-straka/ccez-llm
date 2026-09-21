@@ -27,45 +27,63 @@ function reviewDockSource(): string {
 	);
 }
 
+/** Composer chrome moved to Composer.svelte with its styles. Paged
+ancestors render global there (`:global(.app[data-android])`), so
+phone-gate expectations carry the wrapper. */
+function composerSource(): string {
+	return readFileSync(
+		new URL("../lib/components/Composer.svelte", import.meta.url),
+		"utf8"
+	);
+}
+
+function composerStyle(): string {
+	const match = composerSource().match(/<style>([\s\S]*)<\/style>/);
+	if (!match) throw new Error("Composer.svelte has no <style> block");
+	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
+}
+
 describe("phone composer two bars", () => {
 	it("makes the top bar text-only (no tools reservation on phones)", () => {
-		const css = pageStyle();
-		expect(css).toContain(".app[data-android] .prompt :global(.ta-input)");
+		const css = composerStyle();
+		expect(css).toContain(
+			":global(.app[data-android]) .prompt :global(.ta-input)"
+		);
 		// The tools live in the row below, so the field drops the
 		// desktop right-side reservation instead of squeezing text.
 		expect(css).toMatch(
-			/\.app\[data-android\] \.prompt :global\(\.ta-input\)\s*\{[^}]*--tools-pad:\s*0rem/
+			/:global\(\.app\[data-android\]\) \.prompt :global\(\.ta-input\)\s*\{[^}]*--tools-pad:\s*0rem/
 		);
 	});
 
 	it("caps the field and never inflates it on focus", () => {
-		const css = pageStyle();
+		const css = composerStyle();
 		// One floor, one cap, focused or not: the old rest-only clamp
 		// clipped scaled text and released it on focus, growing the
 		// card under the placeholder on every tap.
 		expect(css).toMatch(
-			/\.app\[data-android\] \.prompt :global\(\.ta-input\)\s*\{[^}]*min-height:\s*1\.5rem[^}]*max-height:\s*7\.5rem/
+			/:global\(\.app\[data-android\]\) \.prompt :global\(\.ta-input\)\s*\{[^}]*min-height:\s*1\.5rem[^}]*max-height:\s*7\.5rem/
 		);
 		// No focus-scoped field rule may exist: focus must never resize.
 		expect(css).not.toMatch(
-			/\.app\[data-android\] \.prompt:focus-within :global\(\.ta-input\)/
+			/:global\(\.app\[data-android\]\) \.prompt:focus-within :global\(\.ta-input\)/
 		);
 		expect(css).not.toMatch(
-			/\.app\[data-android\] \.prompt:not\(:focus-within\) :global\(\.ta-input\)/
+			/:global\(\.app\[data-android\]\) \.prompt:not\(:focus-within\) :global\(\.ta-input\)/
 		);
 	});
 
 	it("keeps the tools row static below the text as its own bar", () => {
-		const css = pageStyle();
+		const css = composerStyle();
 		expect(css).toMatch(
-			/\.app\[data-android\] \.prompt-tools\s*\{[^}]*position:\s*static/
+			/:global\(\.app\[data-android\]\) \.prompt-tools\s*\{[^}]*position:\s*static/
 		);
 	});
 
 	it("draws no divider between the bars", () => {
-		const css = pageStyle();
+		const css = composerStyle();
 		const toolsRule = css.match(
-			/\.app\[data-android\] \.prompt-tools\s*\{[^}]*\}/
+			/:global\(\.app\[data-android\]\) \.prompt-tools\s*\{[^}]*\}/
 		);
 		expect(toolsRule?.[0]).toBeDefined();
 		expect(toolsRule?.[0]).not.toContain("border-top:");
@@ -121,11 +139,12 @@ describe("phone composer two bars", () => {
 	});
 
 	it("never collapses the tools bar or its buttons while idle", () => {
-		const css = pageStyle();
+		// The composer rules moved with the markup: guard both styles.
+		const css = pageStyle() + "\n" + composerStyle();
 		// Idle single-bar mode is gone: no rule may hide the row or
 		// the send button on :not(:focus-within) outside highlight mode.
 		for (const match of css.matchAll(
-			/\.app\[data-android\][^{]*:not\(:focus-within\)[^{]*\{[^}]*\}/g
+			/(?::global\()?\.app\[data-android\]\)?[^{]*:not\(:focus-within\)[^{]*\{[^}]*\}/g
 		)) {
 			expect(match[0]).not.toContain("max-height: 0");
 			expect(match[0]).not.toContain("visibility: hidden");
@@ -135,48 +154,54 @@ describe("phone composer two bars", () => {
 
 describe("phone button parity", () => {
 	it("sizes attach, dictation, voice, and the jump trigger to the send seat on phones", () => {
-		const css = pageStyle();
-		expect(css).toContain(".app[data-android] .attach-btn");
-		expect(css).toContain(".app[data-android] .mic-btn");
-		expect(css).toContain(".app[data-android] .voice-float");
-		expect(css).toContain(".app[data-android] .wp-jump");
+		const css = composerStyle();
+		expect(css).toContain(":global(.app[data-android]) .attach-btn");
+		expect(css).toContain(":global(.app[data-android]) .mic-btn");
+		expect(css).toContain(":global(.app[data-android]) .voice-float");
+		expect(css).toContain(":global(.app[data-android]) .wp-jump");
 		expect(css).toMatch(
-			/\.app\[data-android\] \.wp-jump\s*\{[^}]*width:\s*1\.7rem[^}]*height:\s*1\.7rem/
+			/:global\(\.app\[data-android\]\) \.wp-jump\s*\{[^}]*width:\s*1\.7rem[^}]*height:\s*1\.7rem/
 		);
-		expect(css).toContain(".app[data-android] .wp-jump :global(.action-glyph)");
+		expect(css).toContain(
+			":global(.app[data-android]) .wp-jump :global(.action-glyph)"
+		);
 	});
 });
 
 describe("phone highlight dock", () => {
 	it("overlays both bars at 50/50 without resizing the card", () => {
-		const css = pageStyle();
+		const css = composerStyle();
 		// Card-sized overlay: the buttons split it evenly, so the
 		// card keeps its idle geometry to the pixel.
 		expect(css).toMatch(
-			/\.app\[data-android\] \.prompt:has\(\.ann-dock\) \.ann-dock-wrap\s*\{[^}]*position:\s*absolute[^}]*inset:\s*0[^}]*display:\s*flex/
+			/:global\(\.app\[data-android\]\) \.prompt:has\(\.ann-dock\) \.ann-dock-wrap\s*\{[^}]*position:\s*absolute[^}]*inset:\s*0[^}]*display:\s*flex/
 		);
 		expect(css).toMatch(
-			/\.app\[data-android\] \.prompt:has\(\.ann-dock\) \.ann-dock\s*\{[^}]*flex:\s*1 1 0[^}]*height:\s*100%/
+			/:global\(\.app\[data-android\]\) \.prompt:has\(\.ann-dock\) \.ann-dock\s*\{[^}]*flex:\s*1 1 0[^}]*height:\s*100%/
 		);
 		// The row's overflow cap lifts while docked, or it clips the
 		// overlay to a strip.
 		expect(css).toMatch(
-			/\.app\[data-android\] \.prompt:has\(\.ann-dock\) \.prompt-tools\s*\{[^}]*overflow:\s*visible/
+			/:global\(\.app\[data-android\]\) \.prompt:has\(\.ann-dock\) \.prompt-tools\s*\{[^}]*overflow:\s*visible/
 		);
 	});
 
 	it("hides every other tool while the dock owns the row", () => {
-		const css = pageStyle();
+		const css = composerStyle();
 		expect(css).toContain(
-			".app[data-android] .prompt:has(.ann-dock) .attach-btn"
+			":global(.app[data-android]) .prompt:has(.ann-dock) .attach-btn"
 		);
-		expect(css).toContain(".app[data-android] .prompt:has(.ann-dock) .mic-btn");
 		expect(css).toContain(
-			".app[data-android] .prompt:has(.ann-dock) .voice-float"
+			":global(.app[data-android]) .prompt:has(.ann-dock) .mic-btn"
 		);
-		expect(css).toContain(".app[data-android] .prompt:has(.ann-dock) .wp-jump");
 		expect(css).toContain(
-			".app[data-android] .prompt:has(.ann-dock) .send-btn"
+			":global(.app[data-android]) .prompt:has(.ann-dock) .voice-float"
+		);
+		expect(css).toContain(
+			":global(.app[data-android]) .prompt:has(.ann-dock) .wp-jump"
+		);
+		expect(css).toContain(
+			":global(.app[data-android]) .prompt:has(.ann-dock) .send-btn"
 		);
 		// The wrap's own hide moved with the dock (same gate, global:
 		// the prompt renders paged, the dock doesn't).
@@ -188,9 +213,9 @@ describe("phone highlight dock", () => {
 	});
 
 	it("stands the hint down while the dock owns the row", () => {
-		const css = pageStyle();
+		const css = composerStyle();
 		expect(css).toContain(
-			".app[data-android] .prompt:has(.ann-dock) :global(.ta-input::placeholder)"
+			":global(.app[data-android]) .prompt:has(.ann-dock) :global(.ta-input::placeholder)"
 		);
 		expect(css).toMatch(
 			/ta-input::placeholder\)[\s\S]*?\{[^}]*color:\s*transparent/
@@ -200,14 +225,14 @@ describe("phone highlight dock", () => {
 
 describe("phone annotation focus stability", () => {
 	it("holds the composer's space while the comment box owns the keyboard", () => {
-		const css = pageStyle();
+		const css = composerStyle();
 		// Unmounting the card collapses the tail clearance and snaps
 		// the thread; visibility keeps the footprint with no taps.
 		expect(css).toMatch(
-			/\.app\[data-android\] \.prompt\.prompt-hidden\s*\{[^}]*visibility:\s*hidden[^}]*pointer-events:\s*none/
+			/:global\(\.app\[data-android\]\) \.prompt\.prompt-hidden\s*\{[^}]*visibility:\s*hidden[^}]*pointer-events:\s*none/
 		);
 		expect(css).not.toMatch(
-			/\.app\[data-android\] \.prompt\.prompt-hidden\s*\{[^}]*display:\s*none/
+			/:global\(\.app\[data-android\]\) \.prompt\.prompt-hidden\s*\{[^}]*display:\s*none/
 		);
 	});
 
@@ -232,13 +257,13 @@ describe("phone annotation focus stability", () => {
 
 describe("phone composer desktop seal", () => {
 	it("keeps the desktop send button overlaid and the dock text-sized", () => {
-		const css = pageStyle();
+		const css = composerStyle();
 		expect(css).toMatch(/\.send-btn\s*\{[^}]*position:\s*absolute/);
 		expect(css).toMatch(/\.ann-dock\s*\{[^}]*font-size:\s*0\.85rem/);
 	});
 
 	it("keeps the base prompt-hidden rule for the non-phone path", () => {
-		const css = pageStyle();
+		const css = composerStyle();
 		expect(css).toMatch(/\.prompt\.prompt-hidden\s*\{[^}]*display:\s*none/);
 	});
 });
