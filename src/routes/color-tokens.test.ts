@@ -57,14 +57,19 @@ function pageStyle(): string {
 const messageBodyStyle = styleOf("../lib/components/MessageBody.svelte");
 // Extracted page components keep their surfaces (and token references)
 // with their markup — Svelte scoping binds page CSS to page markup,
-// so the scan follows the extractions (Toasts, SelMenu, Attachments).
+// so the scan follows the extractions (Toasts, SelMenu, Attachments,
+// Readings).
+// Toasts also hosts the always-dark voice-error exception, stripped
+// like the page scan below.
 const extractedStyle = [
-	"../lib/components/Toasts.svelte",
-	"../lib/components/SelMenu.svelte",
-	"../lib/components/Attachments.svelte"
-]
-	.map((path) => styleOf(path))
-	.join("\n");
+	styleOf("../lib/components/Toasts.svelte").replace(
+		/\.voice-error\s*\{[^}]*\}/g,
+		""
+	),
+	styleOf("../lib/components/SelMenu.svelte"),
+	styleOf("../lib/components/Attachments.svelte"),
+	styleOf("../lib/components/Readings.svelte")
+].join("\n");
 // panels.css is a raw stylesheet (no <style> wrapper): read it whole.
 const panelsStyle = readFileSync(
 	new URL("../lib/components/settings/panels.css", import.meta.url),
@@ -100,6 +105,7 @@ describe("color tokens", () => {
 		expect(unpairedHexLines(pageStyle())).toEqual([]);
 		expect(unpairedHexLines(messageBodyStyle)).toEqual([]);
 		expect(unpairedHexLines(panelsStyle)).toEqual([]);
+		expect(unpairedHexLines(extractedStyle)).toEqual([]);
 	});
 
 	it("references every token somewhere", () => {

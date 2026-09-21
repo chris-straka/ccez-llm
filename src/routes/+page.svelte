@@ -12427,7 +12427,7 @@
 				{/each}
 			</div>
 		{/snippet}
-		<Toasts {notices} bind:toastAction />
+		<Toasts {notices} bind:toastAction android={androidUI} />
 		<!-- Empty drag strip: nothing but the traffic-light clearance
 		(the active reply language shows on the send button instead).
 		Double-click zooms. -->
@@ -13718,20 +13718,8 @@
 			<p class="error-banner" role="alert">{notices.banner.message}</p>
 		{/if}
 
-		{#if notices.voice.message && !androidUI}
-			<!-- Top notice, not the bottom banner: speech errors arrive
-			while the eyes are on the message, and a tap dismisses. -->
-			<button
-				type="button"
-				class="voice-error"
-				title="Dismiss"
-				transition:fade={{ duration: 160 }}
-				onclick={() => setVoiceError(null)}
-			>
-				<span role="alert">{notices.voice.message}</span>
-			</button>
-		{/if}
-
+		<!-- Speech errors render from `Toasts.svelte` (top notice,
+		tap to dismiss); the banner below stays paged. -->
 		{#if !androidUI && viewChat.messages.length === 0}
 			{@render langMenus()}
 		{/if}
@@ -17210,24 +17198,8 @@
 	/* Speech errors ride under the toast: top of the screen, big
 	enough to notice, same dark-red pairing as the old banner so it
 	reads in both themes. A tap dismisses; silence still expires it. */
-	.voice-error {
-		position: fixed;
-		top: max(6.75rem, calc(3rem + env(safe-area-inset-top, 0px)));
-		left: 50%;
-		transform: translateX(-50%);
-		z-index: 100;
-		max-width: min(30rem, calc(100vw - 2rem));
-		background: #3d1008;
-		color: #ffb4a2;
-		font: inherit;
-		font-size: 0.95rem;
-		line-height: 1.4;
-		padding: 0.7rem 1.1rem;
-		border: 0;
-		border-radius: 12px;
-		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-		cursor: pointer;
-	}
+	/* The speech-error notice renders in `Toasts.svelte` now (same
+	always-dark surface, moved with the markup). */
 	@keyframes voice-pulse {
 		0%,
 		100% {

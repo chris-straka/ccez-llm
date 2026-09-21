@@ -17,9 +17,12 @@
 		of copying. The generation pins the lifetime — an expired
 		toast never fires a stale action. */
 		toastAction: { seq: number; run: () => void } | null;
+		/** Phone gate: speech errors ride the error toast on phones
+		(see setVoiceError), so the top notice is desktop-only. */
+		android: boolean;
 	}
 
-	let { notices, toastAction = $bindable() }: Props = $props();
+	let { notices, toastAction = $bindable(), android }: Props = $props();
 
 	/** Plain-toast copy: silent on success (the toast is the
 	confirmation); a failed write says so, guarded against clobbering
@@ -76,6 +79,12 @@
 	function dismissErrorToast(): void {
 		clearNotice(notices, "errorToast");
 	}
+
+	/** Speech-error dismiss: clearing is the whole action (the page's
+	setVoiceError(null) path) — silence still expires it. */
+	function dismissVoiceError(): void {
+		clearNotice(notices, "voice");
+	}
 </script>
 
 {#if notices.errorToast.message}
@@ -100,6 +109,20 @@
 		transition:fade={{ duration: 160 }}
 		onclick={toastTap}>{notices.toast.message}</button
 	>
+{/if}
+
+{#if notices.voice.message && !android}
+	<!-- Top notice, not the bottom banner: speech errors arrive
+	while the eyes are on the message, and a tap dismisses. -->
+	<button
+		type="button"
+		class="voice-error"
+		title="Dismiss"
+		transition:fade={{ duration: 160 }}
+		onclick={dismissVoiceError}
+	>
+		<span role="alert">{notices.voice.message}</span>
+	</button>
 {/if}
 
 <style>
@@ -159,5 +182,28 @@
 	the same 12px card radius as the app's other surfaces. */
 	.toast.long {
 		border-radius: 12px;
+	}
+	/* Speech errors ride under the toast: top of the screen, big
+	enough to notice, same dark-red pairing as the old banner so it
+	reads in both themes. A tap dismisses; silence still expires it.
+	Raw dark hexes both ways (documented always-dark exception, see
+	docs/colors.md) — never tokens. */
+	.voice-error {
+		position: fixed;
+		top: max(6.75rem, calc(3rem + env(safe-area-inset-top, 0px)));
+		left: 50%;
+		transform: translateX(-50%);
+		z-index: 100;
+		max-width: min(30rem, calc(100vw - 2rem));
+		background: #3d1008;
+		color: #ffb4a2;
+		font: inherit;
+		font-size: 0.95rem;
+		line-height: 1.4;
+		padding: 0.7rem 1.1rem;
+		border: 0;
+		border-radius: 12px;
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+		cursor: pointer;
 	}
 </style>
