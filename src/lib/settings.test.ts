@@ -219,6 +219,18 @@ describe("settings", () => {
 		expect(loadSettings(memoryStore).chatWidth).toBe(100);
 	});
 
+	it("folds on swipe out of the box and keeps an explicit off", () => {
+		expect(defaultSettings().foldOnSwipe).toBe(true);
+		const off = blankSettings();
+		off.foldOnSwipe = false;
+		saveSettings(off, memoryStore);
+		expect(loadSettings(memoryStore).foldOnSwipe).toBe(false);
+		const junk = blankSettings();
+		(junk as unknown as Record<string, unknown>).foldOnSwipe = "no";
+		saveSettings(junk, memoryStore);
+		expect(loadSettings(memoryStore).foldOnSwipe).toBe(true);
+	});
+
 	it("shows message buttons out of the box and keeps an explicit off", () => {
 		expect(defaultSettings().showMessageButtons).toBe(true);
 		const off = blankSettings();

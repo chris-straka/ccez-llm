@@ -147,6 +147,12 @@ export interface AppSettings {
 	 * chrome on a phone. The checkbox lives in Messages on phones.
 	 */
 	hideButtons: boolean;
+	/**
+	 * Touch only: a leftward stroke over a message folds it. On by
+	 * default; uncheck to make swipe inert (the row's fold button
+	 * still folds). The checkbox lives in Messages on phones.
+	 */
+	foldOnSwipe: boolean;
 	/** Touch only: read a fresh text selection aloud on release. */
 	autoSpeakSelection: boolean;
 	/**
@@ -336,6 +342,7 @@ export function defaultSettings(): AppSettings {
 		theme: "system",
 		hideMessages: false,
 		hideButtons: true,
+		foldOnSwipe: true,
 		autoSpeakSelection: true,
 		hapticsEnabled: true,
 		replyNotifications: true,
@@ -518,6 +525,7 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 		if (typeof merged.hideMessages !== "boolean") merged.hideMessages = false;
 		if (typeof merged.micEnabled !== "boolean") merged.micEnabled = true;
 		if (typeof merged.hideButtons !== "boolean") merged.hideButtons = true;
+		if (typeof merged.foldOnSwipe !== "boolean") merged.foldOnSwipe = true;
 		if (typeof merged.autoSpeakSelection !== "boolean")
 			merged.autoSpeakSelection = true;
 		// The disable-worded `hapticsDisabled` is renamed to the

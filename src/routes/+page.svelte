@@ -8863,6 +8863,7 @@
 				const foldDy = ended.clientY - start.y;
 				if (
 					androidUI &&
+					settings.foldOnSwipe &&
 					start.msgId &&
 					!start.rowSwipe &&
 					!start.codeSwipe &&
@@ -12708,28 +12709,28 @@
 							onpointerup={releaseActionsHold}
 							onpointercancel={releaseActionsHold}
 						>
-							{#if !androidUI}
-								<!-- Desktop only: phones fold by swipe and unfold
-							by tapping the folded body (its row stays hidden),
-							so the chevron would be dead chrome in the row. -->
-								<button
-									type="button"
-									class="icon-btn"
-									class:folded={isFolded}
-									data-tip={tip(
-										isMac
-											? "Fold this message (F or Option-click)"
-											: "Fold this message (F or Alt-click)",
-										"Fold this message"
-									)}
-									aria-label={isFolded
-										? "Unfold this message"
-										: "Fold this message"}
-									onclick={() => toggleFold(msg.id)}
-								>
-									<ActionIcon kind="fold" />
-								</button>
-							{/if}
+							<!-- Fold chevron on every message, phones included:
+							phones fold by swipe too, but the button is the
+							discoverable path (and the only one when fold
+							on swipe is off); folded rows unfold by tapping
+							the folded body. -->
+							<button
+								type="button"
+								class="icon-btn"
+								class:folded={isFolded}
+								data-tip={tip(
+									isMac
+										? "Fold this message (F or Option-click)"
+										: "Fold this message (F or Alt-click)",
+									"Fold this message"
+								)}
+								aria-label={isFolded
+									? "Unfold this message"
+									: "Fold this message"}
+								onclick={() => toggleFold(msg.id)}
+							>
+								<ActionIcon kind="fold" />
+							</button>
 							<button
 								type="button"
 								class="icon-btn"

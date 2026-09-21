@@ -2473,6 +2473,18 @@ test.describe("always-visible prompt", () => {
 		await expect(aside).toHaveClass(/collapsed/);
 	});
 
+	/** Unchecked "Enable fold on swipe" makes the stroke inert. */
+	test("fold on swipe off leaves swiped messages open", async ({ page }) => {
+		await seed(page, { foldOnSwipe: false }, [LONG]);
+		await page.goto("/");
+		await expect(page.locator("article .rendered").first()).toBeVisible();
+		const article = page.locator("article.assistant").first();
+		await expect(article).not.toHaveClass(/folded-msg/);
+		// Leftward: no fold with the toggle off.
+		await flick(page, "article.assistant .rendered", 220, 500, 30, 505);
+		await expect(article).not.toHaveClass(/folded-msg/);
+	});
+
 	/** Sideways pans inside code and latex blocks belong to the inner
 	scroller: they fold neither the block nor the message around it. */
 	test("code and latex pans never fold the message", async ({ page }) => {
@@ -2674,8 +2686,9 @@ test.describe("message chrome", () => {
 		expect(on).toBeGreaterThan(off * 2);
 	});
 
-	/** No fold chevron on phones: swipe folds, body tap unfolds. */
-	test("fold button stays off the mobile row", async ({ page }) => {
+	/** Fold chevron on every row, phones included: the button is the
+	discoverable path (and the only one when fold on swipe is off). */
+	test("fold button rides the mobile row", async ({ page }) => {
 		await seedChrome(page, {
 			hideButtons: false,
 			hoverAssistantActions: false,
@@ -2685,7 +2698,7 @@ test.describe("message chrome", () => {
 		await expect(row.locator("button").first()).toBeVisible();
 		await expect(
 			row.locator('button[aria-label="Fold this message"]')
-		).toHaveCount(0);
+		).toHaveCount(1);
 	});
 
 	/** Short own messages dock hard right: the last row button (Rerun)
