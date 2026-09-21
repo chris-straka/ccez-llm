@@ -12,6 +12,8 @@
 	interface Props {
 		settings: AppSettings;
 		onClose: () => void;
+		/** Field commits (key paste/blur) persist through the page. */
+		onCommit: () => void;
 		/** Opens the shortcuts modal (owned by the page). */
 		onShortcuts: () => void;
 		/** Active-chat token tally shown right of the heading. */
@@ -32,6 +34,7 @@
 	let {
 		settings,
 		onClose,
+		onCommit,
 		onShortcuts,
 		tokensLabel = null,
 		tokensTitle = null,
@@ -154,7 +157,7 @@
 		</span>
 	{/if}
 </div>
-<ProviderPanel {settings} />
+<ProviderPanel {settings} {onCommit} />
 <DefaultsPanel {settings} {androidUI} />
 <AppearancePanel {settings} />
 <div class="keys-updates">

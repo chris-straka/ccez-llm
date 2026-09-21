@@ -14094,6 +14094,7 @@
 		<div class="settings-inner">
 			<SettingsPanel
 				{settings}
+				onCommit={() => persistSettings()}
 				onToast={flashToast}
 				onClose={() => {
 					settingsOpen = false;

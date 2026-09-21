@@ -46,9 +46,11 @@
 
 	interface Props {
 		settings: AppSettings;
+		/** Key field commits persist through the page (wipe sticks). */
+		onCommit: () => void;
 	}
 
-	let { settings = $bindable() }: Props = $props();
+	let { settings = $bindable(), onCommit }: Props = $props();
 	let modelLoading = $state(false);
 	let modelNotice = $state(emptyNotices());
 	async function refreshModels() {
@@ -106,6 +108,9 @@
 			return;
 		}
 		active.apiKey = text.trim();
+		// Persist the commit: without this a restart resurrects the
+		// stored key over the wiped field (hydrate refills empties).
+		onCommit();
 	}
 	const inShell = tauriBackendAvailable();
 
@@ -496,6 +501,9 @@
 							keyPasteError =
 								"That key looks too short — paste the whole key.";
 						}
+						// Persist the commit (including wipes) so a
+						// restart can't resurrect the stored key.
+						onCommit();
 					}}
 					// Pasting replaces: with the old key selected, both
 					// the Paste button and a long-press paste overwrite
