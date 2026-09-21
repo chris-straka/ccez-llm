@@ -137,6 +137,7 @@
 	import ActionIcon from "$lib/components/ActionIcon.svelte";
 	import SettingsPanel from "$lib/components/SettingsPanel.svelte";
 	import Toasts from "$lib/components/Toasts.svelte";
+	import SelMenu from "$lib/components/SelMenu.svelte";
 	import { plainBody, sourcesAsked } from "$lib/render";
 	import {
 		clearNotice,
@@ -13798,72 +13799,31 @@
 	</main>
 
 	{#if selMenu && !previewing && !iosUI}
-		<div
-			class="sel-menu"
-			class:sel-menu-drag={selMenuDragging}
-			bind:this={selMenuEl}
-			style="left: {selMenu.x}px; top: {selMenu.y}px"
-			role="menu"
-			tabindex="-1"
-			transition:fade={{ duration: 150 }}
-			onmousedown={noteMenuPress}
-			ontouchstart={(e) => {
-				noteMenuPress();
-				menuDragStart(e);
+		<!-- Floating Annotate/Copy/Inspect menu: the page owns the
+		state, placement, drag, and idle-dismiss; SelMenu owns the
+		buttons and surfaces. -->
+		<SelMenu
+			menu={selMenu}
+			dragging={selMenuDragging}
+			android={androidUI}
+			inspectEnabled={settings.inspectEnabled}
+			bind:menuEl={selMenuEl}
+			actions={{
+				press: noteMenuPress,
+				dragStart: menuDragStart,
+				dragMove: menuDragMove,
+				dragEnd: menuDragEnd,
+				enter: enterSelMenu,
+				leave: () => (selMenuHover = false),
+				annotate,
+				annotateTouch,
+				copy: () => void copySelection(),
+				copyTouch,
+				inspect: openInspect,
+				inspectTouch,
+				btnTouch: noteMenuBtnTouch
 			}}
-			ontouchmove={menuDragMove}
-			ontouchend={menuDragEnd}
-			ontouchcancel={menuDragEnd}
-			onmouseenter={enterSelMenu}
-			onmouseleave={() => (selMenuHover = false)}
-		>
-			{#if androidUI}
-				<!-- Phone selection menu: Annotate then Copy, always
-				(no hold-to-arm). The native callout is suppressed, so
-				this replaces it in the desktop popup's style. Speak
-				and Inspect live in the composer dock instead — never
-				here. -->
-				<button
-					type="button"
-					onmousedown={noteMenuPress}
-					onclick={annotate}
-					ontouchstart={noteMenuBtnTouch}
-					ontouchend={annotateTouch}>Annotate</button
-				>
-				<button
-					type="button"
-					aria-label="Copy selection"
-					onmousedown={noteMenuPress}
-					onclick={() => void copySelection()}
-					ontouchstart={noteMenuBtnTouch}
-					ontouchend={copyTouch}>Copy</button
-				>
-			{:else}
-				<!-- Desktop: Annotate floats above the highlight while
-				the OS bubble keeps its own slot. Copy and Read Aloud
-				live on the message action rows instead of doubling
-				here. Inspect joins Annotate only for a single
-				kanji/hanzi highlight with the setting on; everything
-				else gets Annotate alone. -->
-				<button
-					type="button"
-					onmousedown={noteMenuPress}
-					onclick={annotate}
-					ontouchstart={noteMenuBtnTouch}
-					ontouchend={annotateTouch}>Annotate</button
-				>
-				{#if shouldShowInspect(selMenu.quote, settings.inspectEnabled)}
-					<button
-						type="button"
-						aria-label="Inspect character"
-						onmousedown={noteMenuPress}
-						ontouchstart={noteMenuBtnTouch}
-						ontouchend={inspectTouch}
-						onclick={openInspect}>Inspect</button
-					>
-				{/if}
-			{/if}
-		</div>
+		/>
 	{/if}
 
 	{#if selPinyin && !previewing}
@@ -17579,67 +17539,8 @@
 	suppressed over messages), so it should feel at home there — a
 	generic pill with text buttons, no Apple marks. The ring seats it
 	on white: blur + shadow alone read as a smudge over text. */
-	.sel-menu {
-		position: fixed;
-		/* Tap-and-drag moves the menu: no browser gesture may own
-		the stroke (taps still fire; the drift guard eats post-drag
-		button taps). */
-		/* Programmatic hops (readings-panel lift, edge clamps) glide
-		up instead of jumping; the finger's own drag stays 1:1 via
-		.sel-menu-drag below. Mount never animates (no prior box). */
-		transition:
-			top 0.18s ease,
-			left 0.18s ease;
-		touch-action: none;
-		z-index: 50;
-		display: flex;
-		align-items: stretch;
-		padding: 0;
-		border: 1px solid #e5e5ea;
-		border-color: var(--line-soft);
-		border-radius: 12px;
-		background: rgba(255, 255, 255, 0.88);
-		-webkit-backdrop-filter: blur(18px) saturate(1.6);
-		backdrop-filter: blur(18px) saturate(1.6);
-		box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
-		overflow: hidden;
-		/* The menu is chrome, not text: dragging across it must not
-		start a selection of its own label. */
-		user-select: none;
-		-webkit-user-select: none;
-	}
-	:global(html[data-theme="dark"]) .sel-menu {
-		background: rgba(30, 30, 32, 0.88);
-	}
-	.sel-menu.sel-menu-drag {
-		transition: none;
-	}
-	.sel-menu button {
-		font-size: 0.95rem;
-		border: 0;
-		border-radius: 0;
-		background: none;
-		/* Buttons resolve color to system ButtonText, never inheritance:
-		pin it or dark mode reads phone-default black. */
-		color: #1c1c1e;
-		color: var(--ink);
-		cursor: pointer;
-		padding: 0.55rem 0.95rem;
-		white-space: nowrap;
-	}
-	/* Single-button menu (Annotate alone): no dividers; Inspect adds
-	a hairline between the two when a single Han character qualifies. */
-	.sel-menu button + button {
-		border-left: 1px solid #e5e5ea;
-		border-left-color: var(--line-soft);
-	}
-	.sel-menu button:hover {
-		background: #f1f1f4;
-		background: var(--bg-wash);
-	}
-	.sel-menu button:active {
-		opacity: 0.55;
-	}
+	/* The selection menu's surfaces live with its markup in
+	`SelMenu.svelte` (Svelte scoping binds them to the buttons). */
 	/* Selection pinyin: readings for just the highlight. Same glass
 	as the selection menu, but pointer-transparent (read-only — it
 	must never disturb the highlight or block the native menu).
