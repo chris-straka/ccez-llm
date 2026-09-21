@@ -371,7 +371,7 @@
 		type HanOverlayLang
 	} from "$lib/reading";
 	import { isFuriganaCached } from "$lib/furigana";
-	import { reportOsMenu } from "$lib/promptmenu";
+	import { fieldSelectionLive, reportOsMenu } from "$lib/promptmenu";
 	import {
 		buildSearchDocs,
 		chatMatchesQuery,
@@ -11369,14 +11369,34 @@
 		// Native OS menu in the prompt and settings fields: while a
 		// live selection sits inside either, the Activity shows the
 		// real OS menu (Copy / Cut / Paste) instead of the empty
-		// dummy. Static settings text keeps the dummy. Transitions
-		// only — handle drags stay silent on the bridge.
+		// dummy. Static settings text keeps the dummy. Native fields
+		// hide their range from window.getSelection(), so the focused
+		// field's own start/end is read too. The select event covers
+		// field selections where selectionchange never fires.
+		// Transitions only — handle drags stay silent on the bridge.
 		const notePromptSelection = (): void => {
 			const live = window.getSelection();
+			const focused = document.activeElement;
+			let fieldLive = false;
+			if (
+				focused instanceof HTMLInputElement ||
+				focused instanceof HTMLTextAreaElement
+			) {
+				try {
+					fieldLive = fieldSelectionLive(
+						focused.selectionStart,
+						focused.selectionEnd
+					);
+				} catch {
+					fieldLive = false;
+				}
+			}
 			reportOsMenu(
 				[promptEl],
 				live?.anchorNode ?? null,
-				live?.isCollapsed ?? true
+				live?.isCollapsed ?? true,
+				undefined,
+				fieldLive
 			);
 		};
 		const clampOffChatDrag = (): void => {
@@ -11988,6 +12008,9 @@
 		window.addEventListener("mouseup", clearMiddleDown);
 		document.addEventListener("selectionchange", trimMessageDrag);
 		document.addEventListener("selectionchange", notePromptSelection);
+		// Native fields fire select on their own range (capture: the
+		// event never bubbles).
+		document.addEventListener("select", notePromptSelection, true);
 		// Secondary scrollers share the main chat's fade: scroll events
 		// don't bubble, so catch them on the way down and toggle the
 		// same .scrolling class with the same short hold.
@@ -12143,6 +12166,7 @@
 			window.removeEventListener("mouseup", clearMiddleDown);
 			document.removeEventListener("selectionchange", trimMessageDrag);
 			document.removeEventListener("selectionchange", notePromptSelection);
+			document.removeEventListener("select", notePromptSelection, true);
 			window.removeEventListener("scroll", onFadeScroll, true);
 			window.removeEventListener("scroll", trackSelPinyin, true);
 			window.removeEventListener("resize", trackSelPinyin);

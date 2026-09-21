@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+	fieldSelectionLive,
 	osMenuSelectionActive,
 	reportOsMenu,
 	resetOsMenuLatch
@@ -14,7 +15,22 @@ const outside = { contains: () => false } as unknown as Node & {
 };
 const anchor = {} as Node;
 
+describe("fieldSelectionLive", () => {
+	it("reads the field's own range (anchors stay null there)", () => {
+		expect(fieldSelectionLive(0, 5)).toBe(true);
+		expect(fieldSelectionLive(3, 3)).toBe(false);
+		expect(fieldSelectionLive(null, 5)).toBe(false);
+		expect(fieldSelectionLive(0, null)).toBe(false);
+		expect(fieldSelectionLive(null, null)).toBe(false);
+	});
+});
+
 describe("osMenuSelectionActive", () => {
+	it("trusts a live field range with no anchor at all", () => {
+		expect(osMenuSelectionActive([], null, true, true)).toBe(true);
+		expect(osMenuSelectionActive([outside], null, true, true)).toBe(true);
+		expect(osMenuSelectionActive([], null, true, false)).toBe(false);
+	});
 	it("is active for a live range anchored in any allowed root", () => {
 		expect(osMenuSelectionActive([inside], anchor, false)).toBe(true);
 		expect(osMenuSelectionActive([outside, inside], anchor, false)).toBe(true);

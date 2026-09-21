@@ -17,6 +17,20 @@ import { tauriBackendAvailable } from "./secrets";
 
 export type ContainsNode = Pick<Node, "contains">;
 
+/**
+ * True when a focused field holds a live (non-collapsed) range.
+ * Native fields keep their selection off `window.getSelection()`
+ * (the anchor stays null), so the field's own start/end is the only
+ * signal — this is the whole ballgame for the prompt textarea and
+ * settings inputs. Pure and unit-tested.
+ */
+export function fieldSelectionLive(
+	start: number | null,
+	end: number | null
+): boolean {
+	return start !== null && end !== null && start !== end;
+}
+
 const EDITABLE_SELECTOR = "input, textarea, [contenteditable='true']";
 
 type MaybeElement = {
@@ -46,16 +60,18 @@ function inEditableField(node: Node): boolean {
 }
 
 /**
- * Pure read: is there a live range anchored inside any allowed root
- * or editable field? Roots cover rendered editors (the prompt's
- * CodeMirror); the field check covers native inputs like the key
- * field. Static text matches neither.
+ * Pure read: is there a live range for the native menu? `fieldLive`
+ * carries the focused field's own range (native fields hide theirs
+ * from `window.getSelection()`); roots and the anchor cover rendered
+ * editors and contenteditable. Static text matches nothing.
  */
 export function osMenuSelectionActive(
 	roots: Array<ContainsNode | null | undefined>,
 	anchor: Node | null,
-	collapsed: boolean
+	collapsed: boolean,
+	fieldLive = false
 ): boolean {
+	if (fieldLive) return true;
 	if (anchor == null || collapsed) return false;
 	if (inEditableField(anchor)) return true;
 	return roots.some((root) => {
@@ -89,9 +105,10 @@ export function reportOsMenu(
 	roots: Array<ContainsNode | null | undefined>,
 	anchor: Node | null,
 	collapsed: boolean,
-	sink: (allowed: boolean) => unknown = defaultSink
+	sink: (allowed: boolean) => unknown = defaultSink,
+	fieldLive = false
 ): void {
-	const active = osMenuSelectionActive(roots, anchor, collapsed);
+	const active = osMenuSelectionActive(roots, anchor, collapsed, fieldLive);
 	if (active === lastReported) return;
 	lastReported = active;
 	void sink(active);
