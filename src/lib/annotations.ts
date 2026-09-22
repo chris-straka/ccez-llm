@@ -365,6 +365,21 @@ export function quoteRange(
 }
 
 /**
+ * Paragraph holding a quote: the annotation answer's original
+ * context. Blank-line paragraphs split prose; a quote spanning the
+ * split (or missing) falls back to the quote itself, never the whole
+ * message — the request stays small either way.
+ */
+export function paragraphForQuote(text: string, quote: string): string {
+	const clean = quote.trim();
+	if (!clean) return "";
+	for (const para of text.split(/\n\s*\n/)) {
+		if (para.includes(clean)) return para.trim();
+	}
+	return clean;
+}
+
+/**
  * Wrap a range in a highlight mark (sent-jump destination flash):
  * extract handles every boundary shape (mid-node, cross-element),
  * so callers never juggle split points. Returns the mark, or null

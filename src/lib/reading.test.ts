@@ -21,6 +21,9 @@ import {
 	buildVocalizeMessages,
 	buildAidMessages,
 	runModelAid,
+	annotationAnswer,
+	buildAnnotationAnswerMessages,
+	ANNOTATION_ANSWER_WORDS,
 	MODEL_AIDS,
 	MODEL_AID_FOR_SCRIPT,
 	localAidFor,
@@ -836,5 +839,48 @@ describe("messageAidKinds", () => {
 			"pinyin"
 		]);
 		expect(messageAidKinds("hello", null, null, [])).toEqual([]);
+	});
+});
+
+describe("annotationAnswer", () => {
+	const q = {
+		quote: "la neige",
+		question: "why feminine?",
+		context: "Regarde la neige. Elle tombe."
+	};
+
+	it("caps the answer length in the system prompt", () => {
+		const [system, user] = buildAnnotationAnswerMessages(q);
+		expect(system!.content).toContain(`${ANNOTATION_ANSWER_WORDS} words`);
+		expect(user!.content).toContain('Quoted: "la neige"');
+		expect(user!.content).toContain("Question: why feminine?");
+		expect(user!.content).toContain("Regarde la neige");
+	});
+
+	it("asks what the quote means for an empty comment", () => {
+		const [, user] = buildAnnotationAnswerMessages({ ...q, question: "  " });
+		expect(user!.content).toContain("What does this mean?");
+	});
+
+	it("asks once per filing, rejecting blanks and empties", async () => {
+		const chat = vi.fn(async () => ({ content: "  short answer  ", usage: null }));
+		const provider = {
+			id: "scripted",
+			chat,
+			stream: chat
+		} as unknown as ChatProvider;
+		await expect(annotationAnswer(provider, q)).resolves.toBe("short answer");
+		await expect(annotationAnswer(provider, { ...q, quote: "  " })).rejects.toThrow(
+			"Nothing to answer about"
+		);
+		const empty = vi.fn(async () => ({ content: "  ", usage: null }));
+		const emptyProvider = {
+			id: "empty",
+			chat: empty,
+			stream: empty
+		} as unknown as ChatProvider;
+		await expect(annotationAnswer(emptyProvider, q)).rejects.toThrow(
+			"Empty annotation answer"
+		);
 	});
 });

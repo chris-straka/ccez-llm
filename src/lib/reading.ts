@@ -646,6 +646,67 @@ export function vocalizeArabic(
 	return runModelAid(provider, "tashkeel", text, signal);
 }
 
+/** Cap for annotation answers: short enough to fit the in-context popup. */
+export const ANNOTATION_ANSWER_WORDS = 60;
+
+/** One annotation question: the quote, the comment, and its paragraph. */
+export interface AnnotationQuestion {
+	quote: string;
+	question: string;
+	context: string;
+}
+
+/**
+ * One-shot messages answering an annotation in its original context:
+ * the system caps the length so the answer fits its popup, the user
+ * carries the paragraph, the quote, and the question (an empty
+ * comment asks what the quote means).
+ */
+export function buildAnnotationAnswerMessages(
+	q: AnnotationQuestion
+): Array<{ role: string; content: string }> {
+	const quote = q.quote.trim();
+	const asked = q.question.trim();
+	return [
+		{
+			role: "system",
+			content:
+				`Answer the question about the quoted text below, in its paragraph ` +
+				`context. Reply in at most ${ANNOTATION_ANSWER_WORDS} words, plain ` +
+				`text with no markdown headings, so the answer fits on screen.`
+		},
+		{
+			role: "user",
+			content:
+				`Paragraph:\n${q.context}\n\nQuoted: "${quote}"\n\n` +
+				(asked ? `Question: ${asked}` : `Question: What does this mean?`)
+		}
+	];
+}
+
+/**
+ * Ask the model one annotation question: a separate request, never
+ * linked to the main prompt or chat history. No cache — every filing
+ * asks fresh (14 small questions stay current).
+ */
+export async function annotationAnswer(
+	provider: ChatProvider,
+	q: AnnotationQuestion,
+	signal?: AbortSignal
+): Promise<string> {
+	if (!q.quote.trim()) throw new Error("Nothing to answer about.");
+	const result = await provider.chat(
+		buildAnnotationAnswerMessages(q) as Array<{
+			role: "system" | "user" | "assistant";
+			content: string;
+		}>,
+		{ signal }
+	);
+	const answer = result.content.trim();
+	if (!answer) throw new Error("Empty annotation answer.");
+	return answer;
+}
+
 /**
  * Readings alone from ruby markup: the characters are right there in
  * the highlight, so the overlay carries only their pronunciations

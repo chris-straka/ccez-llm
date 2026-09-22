@@ -32,6 +32,7 @@ import {
 	annotationCopyText,
 	filePendingAnnotation,
 	promptAnnWashIdFor,
+	paragraphForQuote,
 	clampMenuDrag,
 	annEditCommitToast,
 	REFS_ONLY_BODY,
@@ -915,5 +916,20 @@ describe("annEditCommitToast", () => {
 	it("names filings vs rewrites", () => {
 		expect(annEditCommitToast(true)).toBe("Annotation saved");
 		expect(annEditCommitToast(false)).toBe("Annotation edited");
+	});
+});
+
+describe("paragraphForQuote", () => {
+	const text = "First para here.\n\nSecond holds the quote word.\n\nThird.";
+
+	it("returns the paragraph holding the quote", () => {
+		expect(paragraphForQuote(text, "quote word")).toBe(
+			"Second holds the quote word."
+		);
+	});
+
+	it("falls back to the quote when missing or blank", () => {
+		expect(paragraphForQuote(text, "absent")).toBe("absent");
+		expect(paragraphForQuote(text, "  ")).toBe("");
 	});
 });
