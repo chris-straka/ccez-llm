@@ -24,6 +24,7 @@ import {
 	nextTapCount,
 	multiTapOwnsRelease,
 	threeFingerSwipeDir,
+	switcherVeilStep,
 	micButtonsShown
 } from "./platform";
 
@@ -388,6 +389,18 @@ describe("threeFingerSwipeDir", () => {
 		expect(threeFingerSwipeDir(100, 600, 140, 600)).toBeNull(); // too short
 		expect(threeFingerSwipeDir(200, 500, 205, 502)).toBeNull(); // tap jitter
 		expect(threeFingerSwipeDir(100, 600, 300, 400)).toBeNull(); // diagonal
+	});
+});
+
+describe("switcherVeilStep", () => {
+	it("steps older on swipe right, newer on swipe left", () => {
+		expect(switcherVeilStep(100, 600, 300, 600)).toBe(-1);
+		expect(switcherVeilStep(300, 600, 100, 600)).toBe(1);
+	});
+	it("rejects short glides, still taps, and steep diagonals", () => {
+		expect(switcherVeilStep(100, 600, 140, 600)).toBeNull(); // too short
+		expect(switcherVeilStep(200, 500, 205, 502)).toBeNull(); // tap jitter
+		expect(switcherVeilStep(100, 600, 300, 300)).toBeNull(); // diagonal
 	});
 });
 

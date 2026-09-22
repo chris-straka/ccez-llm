@@ -289,6 +289,7 @@
 		twoFingerSwipeDir,
 		twoFingerSlideDir,
 		threeFingerSwipeDir,
+		switcherVeilStep,
 		isThreeFingerTap,
 		nextTapCount,
 		multiTapOwnsRelease,
@@ -9037,14 +9038,13 @@
 				// screen (taps still close via click): every other
 				// window gesture stays out.
 				if (start.inSwitcher) {
-					const dx = ended.clientX - start.x;
-					const dy = ended.clientY - start.y;
-					if (Math.abs(dx) >= 64 && Math.abs(dy) < Math.abs(dx)) {
-						// Left steps newer (minting past the end), right
-						// steps older — the arrow buttons read the same
-						// way (‹ older, newer ›).
-						stepSwitcher(dx > 0 ? -1 : 1);
-					}
+					const step = switcherVeilStep(
+						start.x,
+						start.y,
+						ended.clientX,
+						ended.clientY
+					);
+					if (step !== null) stepSwitcher(step);
 					return;
 				}
 				// Phone: a stroke starting on a message folds it either

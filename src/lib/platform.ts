@@ -284,6 +284,27 @@ export function threeFingerSwipeDir(
 }
 
 /**
+ * Quick-switcher veil swipe (phone only): a mostly-horizontal stroke
+ * anywhere on the veil cycles chats. Left steps newer (minting past
+ * the end), right steps older — the arrow buttons read the same way
+ * (‹ older, newer ›). Taps still close via click; anything short or
+ * diagonal stays out.
+ */
+export function switcherVeilStep(
+	startX: number,
+	startY: number,
+	endX: number,
+	endY: number,
+	minDistance = 64
+): 1 | -1 | null {
+	const dx = endX - startX;
+	const dy = endY - startY;
+	if (Math.abs(dx) < minDistance || Math.abs(dy) > Math.abs(dx))
+		return null;
+	return dx > 0 ? -1 : 1;
+}
+
+/**
  * Three-finger double-tap delete: each tap is short, near-stationary, and
  * exactly three fingers. The pairing window lives at the call site (it
  * needs a clock); this judges one tap. Pure so the shape unit-tests
