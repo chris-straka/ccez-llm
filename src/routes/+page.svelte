@@ -145,6 +145,7 @@
 	import MessageArticle from "$lib/components/MessageArticle.svelte";
 	import LangMenus from "$lib/components/LangMenus.svelte";
 	import EmptyHero from "$lib/components/EmptyHero.svelte";
+	import StudySheet from "$lib/components/StudySheet.svelte";
 	import SettingsDrawer from "$lib/components/SettingsDrawer.svelte";
 	import SendingIndicator from "$lib/components/SendingIndicator.svelte";
 	import FindBar from "$lib/components/FindBar.svelte";
@@ -12719,23 +12720,9 @@
 			}}
 		/>
 	{/if}
-	<!-- Print-only study sheet: hidden on screen, the sole visible
-	node under `@media print` (File → Print Study Sheet…, or Save as
-	PDF from that dialog). Plain text on purpose — the PDF is a study
-	artifact, not a theme snapshot. -->
-	<section id="study-sheet-print" aria-hidden="true">
-		<h1>{sheetTitle(chat.messages)}</h1>
-		<p class="sheet-sub">
-			Ccez LLM study sheet — {chat.messages.length} message{chat.messages
-				.length === 1
-				? ""
-				: "s"}.
-		</p>
-		{#each chat.messages as msg (msg.id)}
-			<h2>{msg.role === "user" ? "You" : "Ccez"}</h2>
-			<p>{msg.content}</p>
-		{/each}
-	</section>
+	<!-- Print-only study sheet renders in `StudySheet.svelte`; the page
+	keeps the title call. -->
+	<StudySheet title={sheetTitle(chat.messages)} messages={chat.messages} />
 </div>
 
 <style>
@@ -13453,10 +13440,6 @@
 	/* .prompt rides --bg/--line/--line-hover/--focus now; no dark overrides needed. */
 	/* Lang menus ride --ink/--strong/--line/--bg-raised/--bg-wash/--focus now. */
 	/* .send-btn rides --invert/--invert-ink now. */
-	/* Study-sheet print: the section stays out of layout on screen;
-	the print dialog (File → Print Study Sheet…, Save as PDF there)
-	shows only it — every other .app child hides. */
-	#study-sheet-print {
-		display: none;
-	}
+	/* Study-sheet screen hide moved with the markup to
+	`StudySheet.svelte`; the print rules stay global in app.css. */
 </style>
