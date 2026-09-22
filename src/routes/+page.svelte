@@ -6304,58 +6304,77 @@
 		}
 		return dictateOnce(latinFallback(settings.voiceLang), onResult, onError);
 	}
-	async function togglePillMic(): Promise<void> {
-		if (micStarting) return;
-		if (stopPillDictation) {
-			stopPillMic();
+	/**
+	 * Shared mic-tap engine: start guard, stop-active, native-first
+	 * start, unavailable toast. The composer and the annotation pill
+	 * differ only in where the transcript lands and which cells track
+	 * the run, so both ride this with their own tails in the
+	 * callbacks (a stale stop is always null on entry — every exit
+	 * path clears it — so the optional halt calls stay exact).
+	 */
+	async function runDictationFlow(opts: {
+		startArmed: boolean;
+		stopActive: boolean;
+		haltActive: () => void;
+		beginActive: (stop: () => void) => void;
+		onTranscript: (transcript: string) => void;
+	}): Promise<void> {
+		if (!opts.startArmed) return;
+		if (opts.stopActive) {
+			opts.haltActive();
 			return;
 		}
 		dismissToast();
 		const stop = await dictateNativeFirst(
 			(transcript) => {
-				annDraft = appendDictation(annDraft, transcript);
-				stopPillMic();
+				opts.onTranscript(transcript);
 			},
 			(message) => {
 				flashErrorToast(message);
-				stopPillMic();
+				opts.haltActive();
 			}
 		);
 		if (!stop) {
 			flashErrorToast(micUnavailableMessage(tauriBackendAvailable()));
 			return;
 		}
-		stopPillDictation = stop;
-		pillDictating = true;
+		opts.beginActive(stop);
+	}
+	async function togglePillMic(): Promise<void> {
+		await runDictationFlow({
+			startArmed: !micStarting,
+			stopActive: stopPillDictation !== null,
+			haltActive: stopPillMic,
+			beginActive: (stop) => {
+				stopPillDictation = stop;
+				pillDictating = true;
+			},
+			onTranscript: (transcript) => {
+				annDraft = appendDictation(annDraft, transcript);
+				stopPillMic();
+			}
+		});
 	}
 
 	async function toggleMic(): Promise<void> {
-		if (micStarting) return;
-		if (dictating) {
-			stopDictation?.();
-			stopDictation = null;
-			dictating = false;
-			return;
-		}
-		dismissToast();
-		const stop = await dictateNativeFirst(
-			(transcript) => {
+		await runDictationFlow({
+			startArmed: !micStarting,
+			stopActive: dictating,
+			haltActive: () => {
+				stopDictation?.();
+				stopDictation = null;
+				dictating = false;
+			},
+			beginActive: (stop) => {
+				stopDictation = stop;
+				dictating = true;
+			},
+			onTranscript: (transcript) => {
 				editor?.insertText(dictationInsert(transcript));
 				dictating = false;
 				stopDictation = null;
-			},
-			(message) => {
-				flashErrorToast(message);
-				dictating = false;
-				stopDictation = null;
 			}
-		);
-		if (!stop) {
-			flashErrorToast(micUnavailableMessage(tauriBackendAvailable()));
-			return;
-		}
-		stopDictation = stop;
-		dictating = true;
+		});
 	}
 
 	/**
