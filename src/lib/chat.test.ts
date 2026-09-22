@@ -20,6 +20,8 @@ import {
 	dismissFailedAssistant,
 	takeBackLastReply,
 	resendLast,
+	planChatStep,
+	clampChatIndex,
 	tokenTotal,
 	tokenSplit,
 	formatTokens,
@@ -36,7 +38,8 @@ import {
 	beginNativeSend,
 	beginNativeResend,
 	settleNativeSend,
-	type ChatState
+	type ChatState,
+	type ChatId
 } from "./chat";
 import type { ChatProvider, ChatResult } from "./providers/types";
 import { MockProvider } from "./providers/mock";
@@ -1047,5 +1050,43 @@ describe("swapReplyLang", () => {
 	});
 	it("does nothing with neither language nor stash", () => {
 		expect(swapReplyLang(null, null)).toEqual({ current: null, stash: null });
+	});
+});
+
+describe("planChatStep", () => {
+	it("walks to neighbors and stops at the oldest end", () => {
+		const { state } = stateWith(freshStore());
+		expect(planChatStep([], "x" as ChatId, 1)).toEqual({ kind: "none" });
+		newChat(state);
+		newChat(state);
+		const [older, newer] = state.chats;
+		expect(planChatStep(state.chats, newer!.id, -1)).toEqual({
+			kind: "goto",
+			id: older!.id,
+			index: 0
+		});
+		expect(planChatStep(state.chats, older!.id, -1)).toEqual({ kind: "none" });
+	});
+
+	it("mints past a full newest chat, stays on an empty one", () => {
+		const { state } = stateWith(freshStore());
+		newChat(state);
+		// Single empty chat: stepping down stays (never piles blanks).
+		expect(planChatStep(state.chats, state.activeChatId, 1)).toEqual({
+			kind: "stay"
+		});
+		stageMessage(state, "hi");
+		expect(planChatStep(state.chats, state.activeChatId, 1)).toEqual({
+			kind: "mint"
+		});
+	});
+});
+
+describe("clampChatIndex", () => {
+	it("clamps into range, null when empty", () => {
+		expect(clampChatIndex(5, 3)).toBe(2);
+		expect(clampChatIndex(-2, 3)).toBe(0);
+		expect(clampChatIndex(1, 3)).toBe(1);
+		expect(clampChatIndex(0, 0)).toBeNull();
 	});
 });

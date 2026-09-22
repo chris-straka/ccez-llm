@@ -17,6 +17,8 @@
 		setChatVoice,
 		deleteChat,
 		deleteAllChats,
+		planChatStep,
+		clampChatIndex,
 		deleteMessage,
 		stageMessage,
 		branchFrom,
@@ -3396,8 +3398,9 @@
 		const items = [
 			...document.querySelectorAll<HTMLElement>("aside ul li button.side-chat")
 		];
-		if (items.length === 0) return;
-		sideIdx = Math.min(Math.max(index, 0), items.length - 1);
+		const clamped = clampChatIndex(index, items.length);
+		if (clamped === null) return;
+		sideIdx = clamped;
 		const el = items[sideIdx];
 		if (!el) return;
 		el.focus();
@@ -3425,20 +3428,16 @@
 	 */
 	function stepChat(direction: 1 | -1, focus = true): void {
 		const chats = chatState.chats;
-		if (chats.length === 0) return;
-		const at = Math.max(
-			chats.findIndex((c) => c.id === chatState.activeChatId),
-			0
-		);
-		const next = at + direction;
-		if (next < 0) return;
-		// Touch steps never take focus: landing in the prompt would pop
-		// the keyboard on every swipe. Keyboard steps keep the old path.
-		if (next >= chats.length) {
-			if (chats[at]?.messages.length === 0) {
-				if (focus) enterEditMode();
-				return;
-			}
+		const step = planChatStep(chats, chatState.activeChatId, direction);
+		if (step.kind === "none") return;
+		if (step.kind === "stay") {
+			// Touch steps never take focus: landing in the prompt
+			// would pop the keyboard on every swipe. Keyboard steps
+			// keep the old path.
+			if (focus) enterEditMode();
+			return;
+		}
+		if (step.kind === "mint") {
 			// File the leaving chat's drafts away first: resetDraftExtras
 			// empties `annotations`, and the autosave effect would then
 			// persist the empty list under the old id (draft restore
@@ -3469,14 +3468,13 @@
 			restartStepSlide(direction);
 			return;
 		}
-		const target = chats[next];
-		if (!target) return;
-		sideIdx = next;
+		if (step.kind !== "goto") return;
+		sideIdx = step.index;
 		void hapticBeatAsync("send", {
 			enabled: settings.hapticsEnabled,
 			shell: tauriBackendAvailable()
 		});
-		transitionToChat(target.id);
+		transitionToChat(step.id);
 		// Landing is the switch effect's job (filed position, else
 		// top): a smooth top-scroll here would fight the restore.
 		if (focus) enterEditMode();
@@ -3501,8 +3499,9 @@
 	/** Enter the cursor chat from the keyboard, close the list, and land in its prompt. */
 	function enterSideChat(): void {
 		const chats = chatState.chats;
-		if (chats.length === 0) return;
-		const item = chats[Math.min(Math.max(sideIdx, 0), chats.length - 1)];
+		const at = clampChatIndex(sideIdx, chats.length);
+		if (at === null) return;
+		const item = chats[at];
 		if (!item) return;
 		sideIdx = chats.indexOf(item);
 		transitionToChat(item.id);
@@ -3519,12 +3518,12 @@
 	 */
 	function deleteSideChat(): void {
 		const chats = chatState.chats;
-		if (chats.length === 0) return;
-		const at = Math.min(Math.max(sideIdx, 0), chats.length - 1);
+		const at = clampChatIndex(sideIdx, chats.length);
+		if (at === null) return;
 		const item = chats[at];
 		if (!item) return;
 		dropChat(item.id);
-		sideIdx = Math.min(Math.max(at, 0), chatState.chats.length - 1);
+		sideIdx = clampChatIndex(at, chatState.chats.length) ?? -1;
 		requestAnimationFrame(() => focusSideChat(sideIdx));
 	}
 

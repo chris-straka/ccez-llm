@@ -946,3 +946,48 @@ function loadChats(state: ChatState, store: KeyValueStore): void {
 		// Corrupt storage starts fresh.
 	}
 }
+
+/** Chat-step decision (REFACTOR §6): where a sidebar-closed step lands. */
+export type ChatStep =
+	| { kind: "none" }
+	| { kind: "stay" }
+	| { kind: "mint" }
+	| { kind: "goto"; id: ChatId; index: number };
+
+/**
+ * Step through chats: +1 goes down (newer), -1 goes up (older).
+ * Past the newest end, a chat with messages mints one fresh chat
+ * below it — never a second while it is still empty, so repeats
+ * can't pile up blanks. Transition, haptics, and focus stay paged.
+ */
+export function planChatStep(
+	chats: Chat[],
+	activeId: ChatId,
+	direction: 1 | -1
+): ChatStep {
+	if (chats.length === 0) return { kind: "none" };
+	const at = Math.max(
+		chats.findIndex((c) => c.id === activeId),
+		0
+	);
+	const next = at + direction;
+	if (next < 0) return { kind: "none" };
+	if (next >= chats.length) {
+		return chats[at]?.messages.length === 0
+			? { kind: "stay" }
+			: { kind: "mint" };
+	}
+	const target = chats[next];
+	if (!target) return { kind: "none" };
+	return { kind: "goto", id: target.id, index: next };
+}
+
+/**
+ * Clamp a chat-list cursor into range (REFACTOR §6): sidebar focus,
+ * keyboard enter, and post-delete landing share the one clamp. Null
+ * on an empty list.
+ */
+export function clampChatIndex(index: number, length: number): number | null {
+	if (length === 0) return null;
+	return Math.min(Math.max(index, 0), length - 1);
+}
