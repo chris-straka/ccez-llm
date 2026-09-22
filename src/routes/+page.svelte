@@ -280,6 +280,7 @@
 		tintSelectionSpans,
 		unwrapFuriganaTint
 	} from "$lib/selTint";
+	import { caretOffsetInBlock, nodeAtBlockOffset } from "$lib/caret";
 	import {
 		applyTurnFile,
 		dismissNativeTurn,
@@ -1617,11 +1618,12 @@
 			const block = anchor?.closest("p, li");
 			if (block && liveSel && liveSel.rangeCount > 0) {
 				const range = liveSel.getRangeAt(0);
-				const at = caretOffsetInBlock(
-					block,
-					range.startContainer,
-					range.startOffset
-				);
+			const at = caretOffsetInBlock(
+				document,
+				block,
+				range.startContainer,
+				range.startOffset
+			);
 				const blockText = block.textContent ?? "";
 				qStart = quoteStartForContext(
 					plain,
@@ -4132,45 +4134,7 @@
 
 	/** Prose block owning a tap point's text (rendered message only),
 	with the caret range at the point. Null outside message text. */
-	/** Caret offset of (node, offset) within the block's text. */
-	function caretOffsetInBlock(
-		block: Element,
-		node: Node,
-		offset: number
-	): number {
-		let at = 0;
-		const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
-		let current = walker.nextNode();
-		while (current) {
-			if (current === node)
-				return at + Math.min(offset, current.textContent?.length ?? 0);
-			at += current.textContent?.length ?? 0;
-			current = walker.nextNode();
-		}
-		return at;
-	}
-
-	/** (node, sub-offset) owning a block-text offset. */
-	function nodeAtBlockOffset(
-		block: Element,
-		offset: number
-	): { node: Node; offset: number } | null {
-		const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT);
-		let at = 0;
-		let current = walker.nextNode();
-		let last: Node | null = null;
-		let lastLength = 0;
-		while (current) {
-			const length = current.textContent?.length ?? 0;
-			if (offset <= at + length) return { node: current, offset: offset - at };
-			at += length;
-			last = current;
-			lastLength = length;
-			current = walker.nextNode();
-		}
-		return last ? { node: last, offset: lastLength } : null;
-	}
-
+	/** Caret offset ↔ node math lives in $lib/caret (jsdom-tested). */
 	/** Triple-tap: select the sentence around the tap point. False
 	keeps native behavior (the override never fires blind). */
 	/** Shared tap-to-select engine: resolve the span with a bounds
@@ -4187,6 +4151,7 @@
 		if (!found || !selection) return false;
 		const text = found.block.textContent ?? "";
 		const caret = caretOffsetInBlock(
+			document,
 			found.block,
 			found.range.startContainer,
 			found.range.startOffset
@@ -4195,8 +4160,8 @@
 		if (!span) return false;
 		const [start, end] = span;
 		if (end <= start) return false;
-		const anchor = nodeAtBlockOffset(found.block, start);
-		const focus = nodeAtBlockOffset(found.block, end);
+		const anchor = nodeAtBlockOffset(document, found.block, start);
+		const focus = nodeAtBlockOffset(document, found.block, end);
 		if (!anchor || !focus) return false;
 		try {
 			selection.setBaseAndExtent(
