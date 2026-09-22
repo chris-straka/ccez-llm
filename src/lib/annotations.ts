@@ -522,6 +522,35 @@ export function findQuotedMessage(
 }
 
 /**
+ * Sent-annotation landing target: a still-live annotation jumps to
+ * the badge, a quote surviving in its owner's text jumps there, an
+ * everywhere-edited quote falls back to the sending message, and a
+ * sender edited away too reports gone. Pure (lists in, target out)
+ * so the component shell only performs the landing.
+ */
+export type SentRefTarget =
+	| { kind: "live"; id: AnnotationId; messageId: ChatMsgId }
+	| { kind: "quoted"; messageId: ChatMsgId }
+	| { kind: "sender"; index: number }
+	| { kind: "gone" };
+
+export function resolveSentRefTarget(
+	live: { id: AnnotationId; messageId: ChatMsgId; quote: string }[],
+	messages: { id: ChatMsgId; content: string }[],
+	messageId: ChatMsgId,
+	quote: string
+): SentRefTarget {
+	const hit = live.find(
+		(a) => a.messageId === messageId && a.quote === quote
+	);
+	if (hit) return { kind: "live", id: hit.id, messageId };
+	const quotedId = findQuotedMessage(messages, messageId, quote);
+	if (quotedId) return { kind: "quoted", messageId: quotedId };
+	const index = messages.findIndex((m) => m.id === messageId);
+	return index < 0 ? { kind: "gone" } : { kind: "sender", index };
+}
+
+/**
  * Which occurrence of a quote holds a node position: counts full,
  * non-overlapping occurrences of the stripped quote in the stripped
  * haystack and returns the index of the one containing the stripped

@@ -12,6 +12,7 @@ import {
 	withAnnotations,
 	rewriteAnnotationComment,
 	findQuotedMessage,
+	resolveSentRefTarget,
 	splitAnnotationBlock,
 	locateQuote,
 	occurrenceAtPosition,
@@ -805,6 +806,50 @@ describe("findQuotedMessage", () => {
 
 	it("matches badge-insensitively across whitespace", () => {
 		expect(findQuotedMessage(messages, m2, "  Kyoto   in  spring ")).toBe(m1);
+	});
+});
+
+describe("resolveSentRefTarget", () => {
+	const m1 = "m1" as ChatMsgId;
+	const m2 = "m2" as ChatMsgId;
+	const messages = [
+		{ id: m1, content: "Kyoto in spring is lovely" },
+		{
+			id: m2,
+			content: 'explain this\n\nAnnotated selections:\n1. "spring" — ?'
+		}
+	];
+	const ann = "a1" as AnnotationId;
+
+	it("prefers the still-live annotation", () => {
+		expect(
+			resolveSentRefTarget(
+				[{ id: ann, messageId: m2, quote: "spring" }],
+				messages,
+				m2,
+				"spring"
+			)
+		).toEqual({ kind: "live", id: ann, messageId: m2 });
+	});
+
+	it("jumps to the quote owner when the badge is gone", () => {
+		expect(resolveSentRefTarget([], messages, m2, "spring")).toEqual({
+			kind: "quoted",
+			messageId: m1
+		});
+	});
+
+	it("falls back to the sender when edited away everywhere", () => {
+		expect(resolveSentRefTarget([], messages, m2, "osaka")).toEqual({
+			kind: "sender",
+			index: 1
+		});
+	});
+
+	it("reports gone when the sender is edited away too", () => {
+		expect(
+			resolveSentRefTarget([], messages, "m9" as ChatMsgId, "osaka")
+		).toEqual({ kind: "gone" });
 	});
 });
 

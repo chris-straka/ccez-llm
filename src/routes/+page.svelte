@@ -210,7 +210,7 @@
 		wrapRangeExcludingBadges,
 		unwrapMark,
 		invalidateWashPaint,
-		findQuotedMessage,
+		resolveSentRefTarget,
 		annRefsFor,
 		lockSelectionToMessage,
 		quoteTextNodes,
@@ -5185,28 +5185,26 @@
 	}
 
 	function gotoSentRef(messageId: ChatMsgId, quote: string): void {
-		const live = annotations.find(
-			(a) => a.messageId === messageId && a.quote === quote
+		const target = resolveSentRefTarget(
+			annotations,
+			viewChat.messages,
+			messageId,
+			quote
 		);
-		if (live) {
-			gotoAnnotation({ id: live.id, messageId });
+		if (target.kind === "live") {
+			gotoAnnotation({ id: target.id, messageId: target.messageId });
 			return;
 		}
-		// The quote lives in the message it was taken from: jump there
-		// with a flash, not to the message that sent it.
-		const quotedId = findQuotedMessage(viewChat.messages, messageId, quote);
-		if (quotedId) {
-			jumpToQuotedText(quotedId, quote);
+		if (target.kind === "quoted") {
+			jumpToQuotedText(target.messageId, quote);
 			return;
 		}
-		// Edited away everywhere: fall back to the sender, as before.
-		const index = viewChat.messages.findIndex((m) => m.id === messageId);
-		if (index < 0) {
+		if (target.kind === "gone") {
 			flashErrorToast("Annotation no longer exists");
 			return;
 		}
 		document
-			.querySelector(`#msg-${index}`)
+			.querySelector(`#msg-${target.index}`)
 			?.scrollIntoView({ block: "center", behavior: "smooth" });
 	}
 
