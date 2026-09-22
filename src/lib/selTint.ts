@@ -125,6 +125,35 @@ export function speechBlockOf(
 	}
 }
 
+/**
+ * Rendered text block under a window point: the caret range's block
+ * (paragraph, item, cell…), contained in a message body. Null off
+ * text, without the API, or outside the thread. DOM-bound; the tap
+ * selectors share it.
+ */
+export function textBlockAtPoint(
+	clientX: number,
+	clientY: number
+): { block: Element; range: Range } | null {
+	try {
+		if (typeof document.caretRangeFromPoint !== "function") return null;
+		const range = document.caretRangeFromPoint(clientX, clientY);
+		const node = range?.startContainer;
+		if (!range || !node) return null;
+		const element = node instanceof Element ? node : node.parentElement;
+		const rendered = element?.closest(".messages .rendered") ?? null;
+		if (!(rendered instanceof Element)) return null;
+		const block =
+			element?.closest("p, li, pre, td, blockquote, h1, h2, h3, h4, div") ??
+			null;
+		if (!(block instanceof Element) || !rendered.contains(block))
+			return rendered ? { block: rendered, range } : null;
+		return { block, range };
+	} catch {
+		return null;
+	}
+}
+
 /** One laid-out text fragment for the panel-narrowing pass. */
 export interface LineFrag {
 	top: number;

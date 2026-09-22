@@ -8,6 +8,7 @@ import {
 	shrinkPanelToContent,
 	spanRect,
 	speechBlockOf,
+	textBlockAtPoint,
 	tintSelectionSpans,
 	unwrapFuriganaTint
 } from "./selTint";
@@ -154,6 +155,12 @@ describe("shrinkPanelToContent", () => {
 		const div = rendered("");
 		div.innerHTML = "<p>alpha beta gamma</p>";
 		expect(shrinkPanelToContent(div)).toBe(0);
+	});
+});
+
+describe("textBlockAtPoint", () => {
+	it("is null where the caret API is missing", () => {
+		expect(textBlockAtPoint(10, 10)).toBeNull();
 	});
 });
 

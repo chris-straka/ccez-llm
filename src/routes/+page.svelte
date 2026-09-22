@@ -275,6 +275,7 @@
 		selectionSlices,
 		shrinkPanelToContent,
 		spanRect,
+		textBlockAtPoint,
 		tintSelectionSpans,
 		unwrapFuriganaTint
 	} from "$lib/selTint";
@@ -4129,30 +4130,6 @@
 
 	/** Prose block owning a tap point's text (rendered message only),
 	with the caret range at the point. Null outside message text. */
-	function textBlockAtPoint(
-		clientX: number,
-		clientY: number
-	): { block: Element; range: Range } | null {
-		if (typeof document.caretRangeFromPoint !== "function") return null;
-		let range: Range | null;
-		try {
-			range = document.caretRangeFromPoint(clientX, clientY);
-		} catch {
-			return null;
-		}
-		const node = range?.startContainer;
-		if (!range || !node) return null;
-		const element = node instanceof Element ? node : node.parentElement;
-		const rendered = element?.closest(".messages .rendered") ?? null;
-		if (!(rendered instanceof Element)) return null;
-		const block =
-			element?.closest("p, li, pre, td, blockquote, h1, h2, h3, h4, div") ??
-			null;
-		if (!(block instanceof Element) || !rendered.contains(block))
-			return rendered ? { block: rendered, range } : null;
-		return { block, range };
-	}
-
 	/** Caret offset of (node, offset) within the block's text. */
 	function caretOffsetInBlock(
 		block: Element,
