@@ -376,6 +376,11 @@ test("escape cancels the fresh annotation pill", async ({ page }) => {
 /** Escape closes the badge edit box without writing. */
 test("escape closes the badge edit without saving", async ({ page }) => {
 	await openAnnotate(page, "確認しました");
+	// Slow the mock answer: the badge clicks below must open the edit
+	// card, not the ready-answer card.
+	await page.evaluate(() =>
+		localStorage.setItem("ccez-mock-chat-ms", "15000")
+	);
 	await page.locator(".ann-pop textarea").fill("go");
 	// File without sending: a send bakes annotations into the outgoing
 	// message and clears the live list (withAnnotations), so no badge
@@ -463,6 +468,11 @@ test("badge re-press closes the edit menu", async ({ page }) => {
 	// File without sending: a send bakes annotations into the outgoing
 	// message and clears the live list (withAnnotations), so no badge
 	// survives it.
+	// Slow the mock answer: the badge clicks below must open the edit
+	// card, not the ready-answer card.
+	await page.evaluate(() =>
+		localStorage.setItem("ccez-mock-chat-ms", "15000")
+	);
 	await page.keyboard.press("Enter");
 	const badge = page.locator("button.ccez-ann-badge").first();
 	await expect(badge).toHaveCount(1);
@@ -477,6 +487,11 @@ test("badge re-press closes the edit menu", async ({ page }) => {
 /** Saving the badge edit writes the new comment back to the annotation. */
 test("badge save files the edited comment", async ({ page }) => {
 	await openAnnotate(page, "確認しました");
+	// Slow the mock answer: the badge clicks below must open the edit
+	// card, not the ready-answer card.
+	await page.evaluate(() =>
+		localStorage.setItem("ccez-mock-chat-ms", "15000")
+	);
 	await page.keyboard.press("Enter");
 	const badge = page.locator("button.ccez-ann-badge").first();
 	await expect(badge).toHaveCount(1);
@@ -498,6 +513,11 @@ test("badge save files the edited comment", async ({ page }) => {
 test("keyboard enter opens the badge edit", async ({ page }) => {
 	await openAnnotate(page, "確認しました");
 	await page.locator(".ann-pop textarea").fill("typed");
+	// Slow the mock answer: the badge Enter below must open the edit
+	// card, not the ready-answer card.
+	await page.evaluate(() =>
+		localStorage.setItem("ccez-mock-chat-ms", "15000")
+	);
 	await page.keyboard.press("Enter");
 	const badge = page.locator("button.ccez-ann-badge").first();
 	await expect(badge).toHaveCount(1);
@@ -511,6 +531,11 @@ test("keyboard enter opens the badge edit", async ({ page }) => {
 test("badge cancel drops the edit", async ({ page }) => {
 	await openAnnotate(page, "確認しました");
 	await page.locator(".ann-pop textarea").fill("kept");
+	// Slow the mock answer: the badge clicks below must open the edit
+	// card, not the ready-answer card.
+	await page.evaluate(() =>
+		localStorage.setItem("ccez-mock-chat-ms", "15000")
+	);
 	await page.keyboard.press("Enter");
 	const badge = page.locator("button.ccez-ann-badge").first();
 	await expect(badge).toHaveCount(1);
@@ -1954,6 +1979,11 @@ test("sent refs card dismisses on Escape and outside press", async ({
 fires when focus leaves the card, not between its own buttons. */
 test("tab through the badge edit keeps the card open", async ({ page }) => {
 	await openAnnotate(page, "確認しました");
+	// Slow the mock answer: the badge click below must open the edit
+	// card, not the ready-answer card.
+	await page.evaluate(() =>
+		localStorage.setItem("ccez-mock-chat-ms", "15000")
+	);
 	await page.keyboard.press("Enter");
 	const badge = page.locator("button.ccez-ann-badge").first();
 	await expect(badge).toHaveCount(1);
@@ -1995,6 +2025,11 @@ and after clicking back in (a delayed steal must fail this, not the
 instant assertion above). */
 test("badge edit keeps focus after open and re-click", async ({ page }) => {
 	await openAnnotate(page, "確認しました");
+	// Slow the mock answer: the badge clicks below must open the edit
+	// card, not the ready-answer card.
+	await page.evaluate(() =>
+		localStorage.setItem("ccez-mock-chat-ms", "15000")
+	);
 	await page.keyboard.press("Enter");
 	const badge = page.locator("button.ccez-ann-badge").first();
 	await expect(badge).toHaveCount(1);

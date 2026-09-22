@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { seedChat } from "./helpers";
+import { dragQuote, seedChat } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
 	await seedChat(page, [
@@ -20,6 +20,9 @@ async function addAnnotation(page: Page) {
 		.dblclick({ position: { x: 10, y: 10 } });
 	await expect(page.locator(".sel-menu")).toBeVisible();
 	await page.locator('.sel-menu button:has-text("Annotate")').click();
+	// The pill mounts async: Enter before it lands hits the body and
+	// files nothing.
+	await expect(page.locator(".ann-pop")).toBeVisible({ timeout: 10_000 });
 	await page.keyboard.press("Enter");
 	const badge = page.locator(".prompt-tools .ann-pill");
 	await expect(badge).toHaveText("1");
@@ -590,6 +593,45 @@ test("desktop send-hold stashes and restores the reply language", async ({
 	await page.waitForTimeout(700);
 	await page.mouse.up();
 	await expect(page.locator(".toast").first()).toContainText("français 🇫🇷", {
+		timeout: 10_000
+	});
+});
+
+/** Send-hold still swaps the reply language with a staged
+annotation: the annotation rides the send either way, so it must
+not disarm the hold. (The hero language menu only renders on empty
+chats, so the reply language arrives via the seed instead.) */
+test("send-hold clears the reply language past a staged annotation", async ({
+	page
+}) => {
+	await seedChat(
+		page,
+		[{ role: "assistant", content: "alpha beta gamma delta" }],
+		"fr"
+	);
+	await page.goto("/");
+	await expect(page.locator("article.assistant .rendered")).toBeVisible({
+		timeout: 60_000
+	});
+	// Stage an annotation (the "?" note files on Enter); the composer
+	// text stays empty.
+	await dragQuote(page, 0, "beta");
+	await page.keyboard.press("a");
+	const pop = page.locator(".ann-pop.fresh");
+	await expect(pop).toBeVisible({ timeout: 10_000 });
+	await page.keyboard.press("Enter");
+	await expect(page.locator(".prompt-tools .ann-pill")).toBeVisible({
+		timeout: 10_000
+	});
+	// Hold the send: the stash clears despite the staged annotation.
+	const send = page.locator(".send-btn");
+	const box = await send.boundingBox();
+	if (!box) throw new Error("no send button box");
+	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+	await page.mouse.down();
+	await page.waitForTimeout(700);
+	await page.mouse.up();
+	await expect(page.locator(".toast").first()).toContainText("Effacé", {
 		timeout: 10_000
 	});
 });

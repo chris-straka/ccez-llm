@@ -4543,7 +4543,7 @@
 	/** Annotate at the cursor: the comment pill opens where the selection
 	was — never down in the composer. Enter saves, Escape cancels. The
 	annotation stays pending (no badge, no count) until submit. */
-	function annotate(initialComment = ""): void {
+	function annotate(initialComment: string = ""): void {
 		if (!selMenu) return;
 		if (!selMenu.quote.trim()) {
 			clearSelection();
@@ -4810,7 +4810,8 @@
 	 */
 	function openBadge(
 		id: AnnotationId,
-		anchor?: { x: number; y: number }
+		anchor?: { x: number; y: number },
+		forEdit = false
 	): void {
 		// Re-pressing the open badge closes it, like cancel: the edit
 		// menu toggles instead of reopening under the cursor.
@@ -4823,8 +4824,10 @@
 		// A ready answer opens in its own popup (the remodel): the note
 		// still edits from the review dock. Re-press toggles it shut;
 		// an open pill for the same note settles first through the
-		// proper cancel path so typed text is never dropped.
-		if (current.answer) {
+		// proper cancel path so typed text is never dropped. The
+		// review pencil passes forEdit: it is the edit path, so a
+		// ready answer must not hijack it.
+		if (current.answer && !forEdit) {
 			if (answerPop?.id === id) {
 				answerPop = null;
 				return;
@@ -5510,7 +5513,7 @@
 			return;
 		}
 		gotoAnnotation({ id, messageId: current.messageId });
-		openEditCardAtSettledBadge(id);
+		openEditCardAtSettledBadge(id, true);
 	}
 
 	/**
@@ -5519,7 +5522,7 @@
 	 * from the quote: scroll events re-arm a short settle timer, and
 	 * an already-visible mark (no scroll at all) opens on a near tick.
 	 */
-	function openEditCardAtSettledBadge(id: AnnotationId): void {
+	function openEditCardAtSettledBadge(id: AnnotationId, forEdit = false): void {
 		let done = false;
 		let timer: ReturnType<typeof setTimeout> | null = null;
 		const onScroll = (): void => {
@@ -5536,7 +5539,8 @@
 				badge instanceof HTMLElement ? badge.getBoundingClientRect() : null;
 			openBadge(
 				id,
-				rect ? { x: rect.left + rect.width / 2, y: rect.bottom } : undefined
+				rect ? { x: rect.left + rect.width / 2, y: rect.bottom } : undefined,
+				forEdit
 			);
 		};
 		window.addEventListener("scroll", onScroll, true);
@@ -7826,11 +7830,10 @@
 
 	function sendHoldStart(): void {
 		// In-prompt note edits own the arrow (tap files, even empty):
-		// never arm a language swap underneath them.
-		const empty =
-			composerText() === "" &&
-			attachments.length === 0 &&
-			annotations.length === 0;
+		// never arm a language swap underneath them. Staged
+		// annotations ride the send either way, so they never block
+		// the hold — only text and attachments disarm it.
+		const empty = composerText() === "" && attachments.length === 0;
 		if (!sendHoldArmed(sendHoldTimer !== null, !!promptAnnEdit, empty))
 			return;
 		sendHoldTimer = setTimeout(() => {
@@ -12264,7 +12267,10 @@
 				dragEnd: menuDragEnd,
 				enter: enterSelMenu,
 				leave: () => (selMenuHover = false),
-				annotate,
+				// Wrapped: Svelte hands the click event to a bare
+				// reference, and the event would become the draft and
+				// crash the pill's trim on render.
+				annotate: () => annotate(),
 				annotateTouch,
 				copy: () => void copySelection(),
 				copyTouch,

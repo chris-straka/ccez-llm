@@ -193,6 +193,12 @@ focus instead of dropping it. The badge sits mid-thread: edge badges
 park under the chrome and take no hits by design (see the composer
 test above). */
 test("badge click opens the edit card with stable focus", async ({ page }) => {
+	// Slow the mock answer: the badge is still unanswered at click
+	// time, so it opens the edit card — a ready answer opens the
+	// answer card instead (pinned in annotation-answer.e2e.ts).
+	await page.addInitScript(() => {
+		localStorage.setItem("ccez-mock-chat-ms", "10000");
+	});
 	await seedTriple(page);
 	await annotateMiddle(page);
 	const at = await badgeCenter(page);

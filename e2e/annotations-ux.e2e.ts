@@ -59,6 +59,11 @@ test("annotation card widens with font size up to its cap", async ({
 	// The create box is the fixed 19rem fresh pill; file a note and
 	// reopen the review card to measure the scaled menu.
 	await pop.locator("textarea").fill("riverbank note");
+	// Slow the mock answer: the badge click below must open the edit
+	// card for the width read, not the ready-answer card.
+	await page.evaluate(() =>
+		localStorage.setItem("ccez-mock-chat-ms", "15000")
+	);
 	await page.keyboard.press("Enter");
 	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1);
 	await expect(pop).toHaveCount(0, { timeout: 5_000 });
