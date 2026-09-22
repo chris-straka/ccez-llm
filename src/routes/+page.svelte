@@ -159,7 +159,13 @@
 	import FindBar from "$lib/components/FindBar.svelte";
 	import Composer from "$lib/components/Composer.svelte";
 	import Waypoints from "$lib/components/Waypoints.svelte";
-	import { plainBody, sourcesAsked, messageCopyText } from "$lib/render";
+	import {
+		plainBody,
+		sourcesAsked,
+		messageCopyText,
+		sanitize,
+		escapeHtml
+	} from "$lib/render";
 	import {
 		clearNotice,
 		emptyNotices,
@@ -397,6 +403,8 @@
 		hanOverlayLangFor,
 		runModelAid,
 		annotationAnswer,
+		detectScript,
+		answerReadingsKind,
 		aidTargetLines,
 		aidFailureToast,
 		selectAidInput,
@@ -413,7 +421,7 @@
 		type LocalAid,
 		type HanOverlayLang
 	} from "$lib/reading";
-	import { isFuriganaCached } from "$lib/furigana";
+	import { isFuriganaCached, furiganaLine } from "$lib/furigana";
 	import { fieldSelectionLive, reportOsMenu } from "$lib/promptmenu";
 	import {
 		buildSearchDocs,
@@ -1005,13 +1013,18 @@
 	} | null>(null);
 	/** Answer popup (the remodel): open answer read in context. Null
 	when closed; the card self-heals (renders nothing) if its
-	annotation is deleted or sent while open. */
+	annotation is deleted or sent while open. Readings ride along
+	(ruby/vowelled quote line, null until computed). */
 	let answerPop = $state<{
 		id: AnnotationId;
 		x: number;
 		y: number;
 		w: number;
+		readings: string | null;
 	} | null>(null);
+	/** Answer fade-out in flight (unmounts when the ramp ends). */
+	let answerClosing = $state(false);
+	let answerTimer: ReturnType<typeof setTimeout> | null = null;
 	/** Last badge a mousedown press opened (or toggled): its trailing
 	click re-fire is the same gesture, never a new one. Plain field —
 	only the handlers below touch it, never the template. */
@@ -1044,6 +1057,10 @@
 		/** Highlight rect (viewport px): centers the create box when narrow. */
 		left: number;
 		w: number;
+		/** Highlight vertical span: the create box hangs below it with
+		an em-scaled gap, never covering the word. */
+		hlTop: number;
+		hlBottom: number;
 		quote: string;
 		/** Containing paragraph text: the single-char guess reads it for kana. */
 		context: string;
@@ -3045,11 +3062,24 @@
 	 * selection) are not plain clicks.
 	 */
 	function closeSettingsFromMain(event: MouseEvent): void {
-		if (!settingsOpen && settings.sidebarCollapsed) return;
+		// An open answer card closes on a plain click anywhere off
+		// it (the badge toggles itself, so badge clicks stay out).
+		// Drags (text selection) are not plain clicks.
 		const down = mainDown;
 		mainDown = null;
-		if (down && Math.hypot(event.screenX - down.x, event.screenY - down.y) > 5)
-			return;
+		const dragged =
+			!!down && Math.hypot(event.screenX - down.x, event.screenY - down.y) > 5;
+		if (
+			answerPop &&
+			!dragged &&
+			event.target instanceof Element &&
+			!event.target.closest(".ann-answer") &&
+			!event.target.closest("[data-ann-badge]")
+		) {
+			closeAnswerPop();
+		}
+		if (!settingsOpen && settings.sidebarCollapsed) return;
+		if (dragged) return;
 		if (settingsOpen) {
 			if (
 				event.target instanceof Element &&
@@ -4358,6 +4388,8 @@
 			y,
 			left: rect.left,
 			w: rect.width,
+			hlTop: rect.top,
+			hlBottom: rect.bottom,
 			quote: found.quote,
 			context: found.context,
 			messageId: found.messageId,
@@ -4497,8 +4529,10 @@
 			...(aidScope ? { aidScope } : {})
 		};
 		pendingAnn = pending;
-		// Voice readback on: the filed quote reads itself back out.
-		if (voiceOn()) void speakQuote(quote, selMenu.messageId, true, selMenu.context);
+		// Creating an annotation always reads the quote back out
+		// (no readback gate): filing is an explicit listen moment,
+		// exactly like tapping Speak on the highlight.
+		void speakQuote(quote, selMenu.messageId, true, selMenu.context);
 		clearSelection();
 		// Phones file the comment in the composer, never the
 		// transplanted pill (its textbox can't reliably summon the
@@ -4512,23 +4546,25 @@
 			return;
 		}
 		const width = popWidth(true);
-		// The comment box sits a breath below the Annotate menu's
-		// anchor: sharing selMenu.y leaves it floating high above tall
-		// CJK lines. Narrow highlights center the box over themselves;
-		// wide ones keep the end-of-selection placement. The Annotate
-		// button itself never moves (stays at the cursor end).
-		// Phone: the keyboard eats the lower screen, so the composer
-		// pins high and centered instead of at the selection — it is
-		// never covered, wherever the quote sits.
+		// The comment box hangs below the highlight itself (never
+		// covering the word, at any font size): narrow highlights
+		// center the box over themselves; wide ones keep the
+		// end-of-selection placement. The Annotate button itself
+		// never moves (stays at the cursor end). Phone: the keyboard
+		// eats the lower screen, so the composer pins high and
+		// centered instead of at the selection — it is never
+		// covered, wherever the quote sits.
 		const { x, y } = placeAnnComposer({
 			android: androidUI,
 			viewportWidth: window.innerWidth,
 			viewportHeight: window.innerHeight,
 			width,
 			menuX: selMenu.x,
-			menuY: selMenu.y,
 			highlightLeft: selMenu.left,
-			highlightWidth: selMenu.w
+			highlightWidth: selMenu.w,
+			highlightTop: selMenu.hlTop,
+			highlightBottom: selMenu.hlBottom,
+			fontScale: settings.fontScale
 		});
 		selMenu = null;
 		highlightAnnId = pending.id;
@@ -4729,7 +4765,7 @@
 		// ready answer must not hijack it.
 		if (current.answer && !forEdit) {
 			if (answerPop?.id === id) {
-				answerPop = null;
+				closeAnswerPop();
 				return;
 			}
 			if (annPop && !annPopClosing && annPop.id === id) cancelAnnPop();
@@ -4751,7 +4787,23 @@
 				viewportWidth: window.innerWidth,
 				viewportHeight: window.innerHeight
 			});
-			answerPop = { id, x: placed.x, y: placed.y, w: width };
+			if (answerTimer) {
+				clearTimeout(answerTimer);
+				answerTimer = null;
+			}
+			answerClosing = false;
+			answerPop = { id, x: placed.x, y: placed.y, w: width, readings: null };
+			// The quote stays highlighted while its answer reads, and
+			// opening the reply always reads the annotated thing back
+			// out — same listen moment as creating the annotation.
+			highlightAnnId = id;
+			void speakQuote(
+				current.quote,
+				current.messageId,
+				false,
+				answerContextFor(current.messageId, current.quote)
+			);
+			void fillAnswerReadings(id, current.quote);
 			return;
 		}
 		// Phones edit in the composer, never the card: the transplanted
@@ -4825,7 +4877,57 @@
 		if (!current?.answer) return;
 		editor?.setText(joinExternalDraft(editor?.getText() ?? "", current.answer));
 		editor?.focus();
-		answerPop = null;
+		closeAnswerPop();
+	}
+
+	/** Fade the answer card out, then unmount it. The quote's wash
+	releases with the fade, not after it. */
+	function closeAnswerPop(): void {
+		if (!answerPop || answerClosing) return;
+		if (highlightAnnId === answerPop.id) highlightAnnId = null;
+		answerClosing = true;
+		if (answerTimer) clearTimeout(answerTimer);
+		answerTimer = setTimeout(() => {
+			answerTimer = null;
+			answerPop = null;
+			answerClosing = false;
+		}, 160);
+	}
+
+	/**
+	 * Readings line for an open answer: pinyin computes sync and
+	 * local; furigana converts async in the worker; tashkeel asks
+	 * the model once (the shared aid cache, so a vocalized quote
+	 * never pays twice). Failures leave the line off — the answer
+	 * still reads. Stale opens (another answer since) never write.
+	 */
+	async function fillAnswerReadings(
+		id: AnnotationId,
+		quote: string
+	): Promise<void> {
+		const kind = answerReadingsKind(detectScript(quote));
+		if (!kind) return;
+		if (kind === "pinyin") {
+			if (answerPop?.id === id)
+				answerPop = { ...answerPop, readings: pinyinRuby(quote) };
+			return;
+		}
+		try {
+			let line: string | null = null;
+			if (kind === "furigana") {
+				line = sanitize(
+					await furiganaLine(quote, preferredLocalAid(activeReplyCode))
+				);
+			} else {
+				const provider = await resolveProviderActive();
+				if (!provider) return;
+				line = escapeHtml(await runModelAid(provider, "tashkeel", quote));
+			}
+			if (line && answerPop?.id === id)
+				answerPop = { ...answerPop, readings: line };
+		} catch {
+			// Readings stay off; the answer still reads.
+		}
 	}
 
 	function saveEdit(id: string): void {
@@ -9586,6 +9688,9 @@
 				// so it sits in the ladder beside the filed-annotations
 				// card: Esc closes it.
 				expandedTags = [];
+			} else if (answerPop) {
+				// The answer card has no close button: Esc fades it.
+				closeAnswerPop();
 			} else if (editingMsgId) {
 				// An in-progress message edit cancels from anywhere,
 				// including inside the prompt (capture phase pre-empts
@@ -12302,22 +12407,23 @@
 
 	{#if answerPop}
 		<!-- Answer popup through AnnAnswer: the page keeps open state,
-		badge-anchor placement, and the add-to-prompt behavior; the
-		component owns the card and its surface. Self-heals when its
-		annotation is deleted or sent while open. -->
+		below-word badge-anchor placement, the readings line, fade-out,
+		and the add-to-prompt behavior; the component owns the card
+		and its surface. Self-heals when its annotation is deleted or
+		sent while open. No close button: click-off and Esc close it. -->
 		{@const pop = answerPop}
 		{@const answered = annotations.find((a) => a.id === pop.id)}
 		{#if answered?.answer}
 			<AnnAnswer
 				id={answered.id}
-				quote={answered.quote}
 				answer={answered.answer}
+				readingsHtml={pop.readings}
+				closing={answerClosing}
 				x={pop.x}
 				y={pop.y}
 				width={pop.w}
 				actions={{
-					addToPrompt: addAnswerToPrompt,
-					close: () => (answerPop = null)
+					addToPrompt: addAnswerToPrompt
 				}}
 			/>
 		{/if}

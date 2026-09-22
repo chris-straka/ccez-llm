@@ -116,9 +116,11 @@ describe("placeAnnComposer", () => {
 				viewportHeight: 800,
 				width: 300,
 				menuX: 50,
-				menuY: 600,
 				highlightLeft: 40,
-				highlightWidth: 60
+				highlightWidth: 60,
+				highlightTop: 580,
+				highlightBottom: 600,
+				fontScale: 1
 			})
 		).toEqual({ x: 50, y: 96 });
 	});
@@ -130,13 +132,38 @@ describe("placeAnnComposer", () => {
 			viewportHeight: 800,
 			width: 304,
 			menuX: 500,
-			menuY: 300,
 			highlightLeft: 100,
-			highlightWidth: 50
+			highlightWidth: 50,
+			highlightTop: 280,
+			highlightBottom: 300,
+			fontScale: 1
 		};
+		// Below the highlight with the 1x breath, never on the word.
 		expect(placeAnnComposer(narrow)).toEqual({ x: 8, y: 302 });
 		expect(
 			placeAnnComposer({ ...narrow, highlightWidth: 500 })
 		).toEqual({ x: 500, y: 302 });
+	});
+
+	it("scales the below-word gap with the font, flipping above at the edge", () => {
+		const base = {
+			android: false,
+			viewportWidth: 1000,
+			viewportHeight: 800,
+			width: 304,
+			menuX: 500,
+			highlightLeft: 100,
+			highlightWidth: 50,
+			highlightTop: 280,
+			highlightBottom: 300,
+			fontScale: 3.7
+		};
+		// 2 + 2.7 × 12 ≈ 34px below the highlight bottom.
+		expect(placeAnnComposer(base)).toEqual({ x: 8, y: 334 });
+		// No room below: the box goes above the highlight top.
+		const edge = { ...base, highlightTop: 700, highlightBottom: 720 };
+		const placed = placeAnnComposer(edge);
+		expect(placed.y + 99).toBeLessThanOrEqual(700);
+		expect(placed.y).toBeGreaterThanOrEqual(8);
 	});
 });

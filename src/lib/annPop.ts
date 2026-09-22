@@ -114,8 +114,10 @@ export function placeAnnCard(facts: {
  * high and centered (the keyboard eats the lower screen, so the box
  * is never covered wherever the quote sits); desktop centers narrow
  * highlights over themselves and keeps the end-of-selection
- * placement for wide ones, a breath below the menu anchor and
- * clamped inside the viewport.
+ * placement for wide ones, hanging below the highlight itself with
+ * an em-scaled gap — never covering the word, at any font size —
+ * and clamped inside the viewport (above fallback when the bottom
+ * edge would clip).
  */
 export function placeAnnComposer(facts: {
 	android: boolean;
@@ -123,9 +125,11 @@ export function placeAnnComposer(facts: {
 	viewportHeight: number;
 	width: number;
 	menuX: number;
-	menuY: number;
 	highlightLeft: number;
 	highlightWidth: number;
+	highlightTop: number;
+	highlightBottom: number;
+	fontScale: number;
 }): { x: number; y: number } {
 	if (facts.android) {
 		return {
@@ -133,6 +137,16 @@ export function placeAnnComposer(facts: {
 			y: Math.max(8, facts.viewportHeight * 0.12)
 		};
 	}
+	// A breath at 1x, half a line more per extra scale: the pill
+	// clears descenders at any size without drifting away at 1x.
+	const gap = Math.max(2, Math.round(2 + (facts.fontScale - 1) * 12));
+	// Fresh-pill first line plus chrome: ~22px per scale step.
+	const estH = Math.round(22 * Math.max(1, facts.fontScale) + 18);
+	const below = facts.highlightBottom + gap;
+	const y =
+		below + estH <= facts.viewportHeight - 8
+			? below
+			: Math.max(8, facts.highlightTop - gap - estH);
 	return {
 		x: placeAnnPopX({
 			cursorX: facts.menuX,
@@ -141,6 +155,6 @@ export function placeAnnComposer(facts: {
 			popWidth: facts.width,
 			viewportWidth: facts.viewportWidth
 		}),
-		y: Math.min(Math.max(8, facts.menuY + 2), facts.viewportHeight - 72)
+		y
 	};
 }
