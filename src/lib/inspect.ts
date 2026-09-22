@@ -239,3 +239,16 @@ export function clampStrokeStep(
 	const top = Math.max(total, 1);
 	return Math.min(Math.max(current + delta, 1), top);
 }
+
+/**
+ * Whether a selection speaks Japanese (REFACTOR §6): kanji present
+ * and the sentence probe reads Japanese. Such fragments speak
+ * their sentence reading, never the raw quote.
+ * Page call-site deferred while the selection-pinyin E2E flake is
+ * diagnosed (probe slice reverted to the original page wiring).
+ */
+export function speaksJapaneseSelection(quote: string, probe: string): boolean {
+	return (
+		[...quote].some((ch) => isHanChar(ch)) && hanOverlayLangFor(probe) === "ja"
+	);
+}

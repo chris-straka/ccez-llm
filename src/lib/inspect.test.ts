@@ -10,7 +10,8 @@ import {
 	onKunLine,
 	parseKangxi,
 	shouldShowInspect,
-	clampStrokeStep
+	clampStrokeStep,
+	speaksJapaneseSelection
 } from "./inspect";
 import { extractStrokePaths, kanjiSvgUrl } from "./kanjivg";
 import {
@@ -353,5 +354,13 @@ describe("clampStrokeStep", () => {
 	it("pins unknown totals at 1", () => {
 		expect(clampStrokeStep(1, 1, 0)).toBe(1);
 		expect(clampStrokeStep(9, -1, 0)).toBe(1);
+	});
+});
+
+describe("speaksJapaneseSelection", () => {
+	it("needs kanji plus a Japanese probe", () => {
+		expect(speaksJapaneseSelection("漢字を読む", "漢字を読む")).toBe(true);
+		expect(speaksJapaneseSelection("hello", "hello world")).toBe(false);
+		expect(speaksJapaneseSelection("漢字", "你好世界")).toBe(false);
 	});
 });

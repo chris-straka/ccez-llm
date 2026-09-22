@@ -9,6 +9,7 @@ import {
 	latinSentencesLang,
 	sentenceLangsFor,
 	sentenceForQuote,
+	quoteProbeFor,
 	speakNative,
 	speakNativeMulti,
 	stopNative,
@@ -457,5 +458,14 @@ describe("saveNativeSpeech", () => {
 		await expect(saveNativeSpeech("hello", "en-US")).rejects.toThrow(
 			"no bridge"
 		);
+	});
+});
+
+describe("quoteProbeFor", () => {
+	it("prefers the sentence, falls back to context", () => {
+		expect(quoteProbeFor("First. 眺めて here. Last.", "眺めて")).toBe(
+			"眺めて here."
+		);
+		expect(quoteProbeFor("ctx", "missing")).toBe("ctx");
 	});
 });

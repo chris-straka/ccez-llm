@@ -288,7 +288,7 @@ export async function quoteLangForContext(
 	const scriptLang = ttsLangFor(quote, "");
 	if (scriptLang && scriptLang !== "zh-CN") return scriptLang;
 	if (scriptLang !== "zh-CN") return quoteLangFor(quote, fallback);
-	const probe = sentenceForQuote(context, quote) ?? context;
+	const probe = quoteProbeFor(context, quote);
 	const sentenceLang = ttsLangFor(probe, "");
 	if (sentenceLang && sentenceLang !== "zh-CN") return sentenceLang;
 	try {
@@ -547,4 +547,13 @@ export function stopNative(): void {
 	invoke("tts_stop").catch(() => {
 		// Stopping must never throw from UI teardown paths.
 	});
+}
+
+/**
+ * Sentence probe for a quote (REFACTOR §6): the sentence holding
+ * the quote when found, else the context. Readings and language
+ * resolve against the probe, never the bare fragment.
+ */
+export function quoteProbeFor(context: string, quote: string): string {
+	return sentenceForQuote(context, quote) ?? context;
 }
