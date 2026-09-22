@@ -29,7 +29,9 @@ export interface ViewportState {
 	/**
 	 * Stick-to-bottom: submit/resend/stage pins the view to the newest
 	 * content; scrolling up unpins (history never yanks), coming back
-	 * to the bottom re-pins.
+	 * to the bottom re-pins. Starts false: stuckness is established
+	 * by geometry or scroll events, never assumed (an assumed-true
+	 * yanks readers parked at the top before any scroll yet fired).
 	 */
 	stick: boolean;
 	/**
@@ -55,7 +57,7 @@ export interface ViewportState {
 
 export function emptyViewport(): ViewportState {
 	return {
-		stick: true,
+		stick: false,
 		holding: false,
 		hold: null,
 		holdSeq: 0,

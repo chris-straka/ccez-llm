@@ -121,6 +121,7 @@
 		nearBottom,
 		resolveSidebarSpaceEnter,
 		scaleScrollPx,
+		STICK_PX,
 		scrollHoldVelocity,
 		stepScrollTop,
 		unselectedScrollIntent
@@ -2948,16 +2949,21 @@
 			}
 			// A lengthening draft grows the reserve under the card:
 			// when stuck to the bottom, re-stick past it or the tail
-			// slides under the solid card as you type. Park, summon,
-			// and restores never change the reserve, so they never
-			// move the thread; mid-thread readers and touch holds
-			// never move either; phones keep their bottom-anchored card.
+			// slides under the solid card as you type. Stuckness reads
+			// off the live gap, discounted by this growth: the stick
+			// flag goes stale when no scroll event ever fired (fresh
+			// load parked at the top), and trusting it yanks a
+			// mid-thread reader to the end on the first keystroke. Park,
+			// summon, and restores never change the reserve, so they
+			// never move the thread; touch holds never move either;
+			// phones keep their bottom-anchored card.
 			if (
 				!androidUI &&
 				lastClearPx >= 0 &&
 				clearPx > lastClearPx &&
-				viewport.stick &&
-				!viewport.holding
+				!viewport.holding &&
+				box.scrollHeight - box.scrollTop - box.clientHeight <=
+					STICK_PX + (clearPx - lastClearPx)
 			) {
 				box.scrollTo({ top: box.scrollHeight, behavior: "instant" });
 			}
@@ -6508,9 +6514,11 @@
 				);
 			}
 		}
-		// Follow the stream only while its chat is open: after a switch
-		// the new chat keeps its own scroll position.
-		if (stillHere) scrollToBottom();
+		// Follow the stream only while its chat is open — and only a
+		// stuck reader: a finished reply must not yank a mid-thread
+		// reader back to the end. After a switch the new chat keeps
+		// its own scroll position.
+		if (stillHere && stuckToBottom()) scrollToBottom();
 		const origin = chatState.chats.find((c) => c.id === originId);
 		if (origin) maybeSpeakReply(origin);
 		maybeNotifyReplyDone(sent);
@@ -6596,6 +6604,8 @@
 		config: NativeTurnConfig;
 		system: string;
 	}): Promise<void> {
+		// Before the append below (see stuckToBottom).
+		const stuck = stuckToBottom();
 		const opened = beginNativeSend(chatState, opts.baked, {
 			attachments: opts.kept,
 			pasteFolds: mergeFolds(opts.folds, opts.pastedFolds)
@@ -6606,7 +6616,7 @@
 		const history = turnHistory(
 			(target?.messages ?? []).filter((m) => m.id !== opened.replyId)
 		);
-		scrollAfterRender();
+		if (stuck) scrollAfterRender();
 		await startNativeTurnFor(
 			opened.chatId,
 			opened.replyId,
@@ -6734,7 +6744,7 @@
 		chatState.sendingChatIds = [...chatState.sendingChatIds, target.id];
 		chatState.sending = true;
 		chatState.sendingChatId = target.id;
-		scrollAfterRender();
+		if (stuckToBottom()) scrollAfterRender();
 		await startNativeTurnFor(
 			target.id,
 			last.id,
@@ -6903,6 +6913,9 @@
 			missingKey = true;
 			return;
 		}
+		// Before the append below (see stuckToBottom): the provider
+		// await above is real time, so snapshot here, not earlier.
+		const stuck = stuckToBottom();
 		const sending = sendMessage(
 			chatState,
 			provider,
@@ -6928,7 +6941,7 @@
 				}
 			}
 		);
-		scrollAfterRender();
+		if (stuck) scrollAfterRender();
 		await sending;
 		// Keep drafts when the reply failed so nothing silently drops.
 		// Filed (or staged) annotations survive the landing: the
@@ -6952,6 +6965,8 @@
 		const resendConfig = nativeRoute(lastResend?.attachments ?? []);
 		if (resendConfig) {
 			missingKey = false;
+			// Before the append below (see stuckToBottom).
+			const stuck = stuckToBottom();
 			const reopened = beginNativeResend(chatState);
 			// Non-user-last (or a racing send): resendLast no-ops the
 			// same way, so return silently here too.
@@ -6964,7 +6979,7 @@
 					(m) => m.id !== reopened.replyId
 				)
 			);
-			scrollAfterRender();
+			if (stuck) scrollAfterRender();
 			await startNativeTurnFor(
 				reopened.chatId,
 				reopened.replyId,
@@ -7051,7 +7066,9 @@
 		if (settings.promptIdleSec === PROMPT_IDLE_ALWAYS) editor?.blur();
 		if (action === "stage") {
 			// ⌥+Enter: most recent message, no reply; the next submit
-			// carries the full history in order.
+			// carries the full history in order. Before the append
+			// below (see stuckToBottom).
+			const stuck = stuckToBottom();
 			const { stored: staged, kept: stagedKept } = spliceSendText(
 				composerText(),
 				attachments
@@ -7060,7 +7077,7 @@
 			attachments = [];
 			expandedPastes = [];
 			editor?.clear();
-			scrollAfterRender();
+			if (stuck) scrollAfterRender();
 			return;
 		}
 		void doSend();
@@ -7366,6 +7383,17 @@
 	 */
 	function scrollAfterRender(): void {
 		void tick().then(() => scrollToBottom());
+	}
+	/**
+	 * Live stuck-to-bottom read (send paths): true only while the box
+	 * sits within stick slop of its own bottom. The stick flag can't
+	 * answer this — it goes stale across appends (and starts true, so
+	 * a reader parked at the top with no scroll event yet still reads
+	 * stuck). Call BEFORE appending: the append itself grows the
+	 * height, so a post-append read always says unstuck.
+	 */
+	function stuckToBottom(): boolean {
+		return scrollBox ? nearBottom(scrollBox) : false;
 	}
 	/** Stream-follow: while a reply streams into the visible chat, stay
 	pinned to the newest token — but only while stuck. Instant, never

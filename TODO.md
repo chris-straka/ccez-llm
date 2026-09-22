@@ -39,8 +39,6 @@ same codebase via the Tauri mobile target.
 
 THINGS I NOTICED ON 0.5.3 mac app with 370% font size
 
-When a message  is finished in mac, I think it scrolls me to the end but it should not do that. 
-
 composer should increase with font size.
 
 Hitting shift+command+j will open the main text prompt and shouldn't. Also, it's slower than I would have thought to switch chats, it's like 2s going down a chat and 1s going up. It's not going to storage on each chat is it? I'm in the Mac client. On a new chat, hitting shift+command+k  also focused the main text prompt and command+shift+j and command+shift+k should never open the main text prompt or focus it. Both on the window I am currently or on am heading to. 
@@ -56,8 +54,6 @@ The create annotation textbox should get more square like the more text that's i
 Used the English TTS for neigeait, dissous and dissoudre individually. Is my TTS detection for French that bad ? 
 
 PART 2 
-
-When I hit enter to submit a message, it scrolls me to the bottom when I don't want that.
 
 I think it does become boxy actually but it becomes boxy too late on large font sizes
 

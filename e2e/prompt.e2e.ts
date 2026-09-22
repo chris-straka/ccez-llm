@@ -17,6 +17,18 @@ test("staging pins the scroller to the true bottom", async ({ page }) => {
 	// with thirteen messages overflowing the viewport.
 	await page.locator(".ta-input").click();
 	await page.keyboard.type("staged hello");
+	// Start genuinely stuck (a real scroll, so the flag and geometry
+	// agree): the pin below asserts the landing, not the yank — a
+	// mid-thread stage stays put (pinned in stick-scroll.e2e.ts).
+	await page.evaluate(() => {
+		document
+			.querySelector("main .messages")
+			?.scrollTo({ top: 1e9, behavior: "instant" as ScrollBehavior });
+	});
+	await page.waitForFunction(() => {
+		const el = document.querySelector("main .messages");
+		return el ? el.scrollHeight - el.scrollTop - el.clientHeight < 64 : false;
+	});
 	await page.keyboard.press("Alt+Enter");
 	await expect(page.locator("article.user").last()).toContainText(
 		"staged hello"

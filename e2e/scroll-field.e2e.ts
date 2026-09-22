@@ -64,6 +64,11 @@ test("scroll mode keeps field keys in the badge edit card", async ({
 	await page.locator('.sel-menu button:has-text("Annotate")').click();
 	await expect(page.locator(".ann-pop")).toBeVisible();
 	await page.locator(".ann-pop textarea").fill("seed note");
+	// Slow the mock answer: the badge Enter below must open the edit
+	// card, not the ready-answer card.
+	await page.evaluate(() =>
+		localStorage.setItem("ccez-mock-chat-ms", "15000")
+	);
 	await page.keyboard.press("Enter");
 	const badge = page.locator("button.ccez-ann-badge").first();
 	await expect(badge).toHaveCount(1);

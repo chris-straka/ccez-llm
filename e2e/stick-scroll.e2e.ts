@@ -119,3 +119,53 @@ test("a held finger freezes submit scroll and stream follow", async ({
 		await ctx.close();
 	}
 });
+
+/** Neither the submit, the stream, nor the completion yanks a
+mid-thread reader: stuck-to-bottom follows, anything else stays. */
+test("send and completion never yank a mid-thread reader", async ({
+	page
+}) => {
+	await seedChat(page, [
+		{ role: "user", content: "first" },
+		{ role: "assistant", content: LONG },
+		{ role: "user", content: "second" },
+		{ role: "assistant", content: LONG }
+	]);
+	await page.goto("/");
+	await page.locator(".ta-input").waitFor({ timeout: 60_000 });
+	// Park at the top: stuck is false, so nothing below may scroll.
+	await page.evaluate(() => {
+		document
+			.querySelector(".messages")
+			?.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+	});
+	await page.waitForFunction(() => {
+		return (
+			(document.querySelector(".messages") as HTMLElement)?.scrollTop === 0
+		);
+	});
+	await sendLong(page);
+	// The submit itself must not move: read before the reply lands.
+	await page.waitForTimeout(400);
+	const atSend = await page.evaluate(
+		() => (document.querySelector(".messages") as HTMLElement)?.scrollTop ?? -1
+	);
+	expect(atSend).toBeLessThanOrEqual(100);
+	// The stream and its completion must not move either.
+	await expect(
+		page.locator("article.assistant .rendered").last()
+	).toContainText("Mock reply to:", {
+		timeout: 60_000
+	});
+	await page.waitForTimeout(1000);
+	const rest = await page.evaluate(() => {
+		const box = (document.querySelector(".messages") as HTMLElement) ?? null;
+		if (!box) throw new Error("no scroll box");
+		return {
+			top: box.scrollTop,
+			gap: box.scrollHeight - box.scrollTop - box.clientHeight
+		};
+	});
+	expect(rest.top).toBeLessThanOrEqual(100);
+	expect(rest.gap).toBeGreaterThan(500);
+});

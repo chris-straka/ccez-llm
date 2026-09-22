@@ -7,9 +7,9 @@ import {
 } from "./viewport";
 
 describe("emptyViewport", () => {
-	it("starts pinned, unheld, uncached", () => {
+	it("starts unpinned, unheld, uncached", () => {
 		expect(emptyViewport()).toEqual({
-			stick: true,
+			stick: false,
 			holding: false,
 			hold: null,
 			holdSeq: 0,
@@ -21,10 +21,10 @@ describe("emptyViewport", () => {
 	it("hands out independent states", () => {
 		const a = emptyViewport();
 		const b = emptyViewport();
-		a.stick = false;
+		a.stick = true;
 		a.lastStreamLen = 42;
 		a.holdSeq = 7;
-		expect(b.stick).toBe(true);
+		expect(b.stick).toBe(false);
 		expect(b.lastStreamLen).toBe(0);
 		expect(b.holdSeq).toBe(0);
 	});

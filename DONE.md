@@ -894,3 +894,12 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
       next to 370% text — latex chrome shares the cap (`chrome.e2e.ts`
       "message icon glyphs scale past double type" pins ~43.7px at
       300% vs the old ~30.2px ceiling; phones keep 2x).
+
+- [x] No yank-to-bottom on send or completion: submit, resend,
+      retry, stage, and reply-done scrolled unconditionally — now a
+      live geometric stuck check (`stuckToBottom`, pre-append) gates
+      each, and the composer-grow restick validates the gap against
+      its own growth instead of a stale flag (`emptyViewport` starts
+      unpinned). `stick-scroll.e2e.ts` "send and completion never
+      yank a mid-thread reader"; the staging pin spec now starts
+      genuinely stuck (it asserts the landing, not the yank).
