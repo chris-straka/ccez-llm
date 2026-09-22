@@ -1130,7 +1130,7 @@ test.describe("touch", () => {
 		await expect(page.locator("article")).toHaveCount(1);
 	});
 
-	test("three-finger hold wipes every chat", async ({ page }) => {
+	test("three-finger hold wipes the current chat", async ({ page }) => {
 		await seedTwoChats(page);
 		expect(await page.locator("aside button.side-chat").count()).toBe(2);
 		await page.evaluate(() => {
@@ -1171,8 +1171,8 @@ test.describe("touch", () => {
 			);
 		});
 		await expect(page.locator("aside button.side-chat")).toHaveCount(1);
-		await expect(page.locator("article")).toHaveCount(0);
-		await expect(page.locator(".toast")).toHaveText("All chats deleted");
+		await expect(page.locator("article")).toHaveCount(1);
+		await expect(page.locator(".toast")).toHaveText("Chat deleted");
 	});
 
 	test("touch selection floats Copy/Annotate/Speak, Inspect stays docked", async ({

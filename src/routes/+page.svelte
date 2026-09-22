@@ -16,7 +16,6 @@
 		chatVoiceReadback,
 		setChatVoice,
 		deleteChat,
-		deleteAllChats,
 		planChatStep,
 		clampChatIndex,
 		messageIndexFromId,
@@ -7942,10 +7941,10 @@
 
 	/**
 	 * Reset the voice language to the checked keyboard input source
-	 * (⇧⌘Delete's second half). Anything unknown — no source id (the
-	 * bridge is down in browser preview) or an unrecognized layout —
-	 * stays silent and leaves the language untouched: routine chat
-	 * deletions must never toast.
+	 * (a chat delete's second half). Anything unknown — no source id
+	 * (the bridge is down in browser preview) or an unrecognized
+	 * layout — stays silent and leaves the language untouched:
+	 * routine chat deletions must never toast.
 	 */
 	async function resetVoiceLangFromKeyboard(): Promise<void> {
 		const sourceId = await currentKeyboardInputSource();
@@ -8005,26 +8004,6 @@
 		) {
 			void resetVoiceLangFromKeyboard();
 		}
-	}
-
-	/** Drop every chat, then reset the voice language to the keyboard. */
-	function dropAllChats(): void {
-		// Same triple thump as a single delete. Call sites carry no
-		// haptic of their own.
-		if (androidUI) {
-			void hapticBeatAsync("done", {
-				enabled: settings.hapticsEnabled,
-				shell: tauriBackendAvailable()
-			});
-		}
-		stopVoice();
-		resetDraftExtras();
-		chatScrollTops.clear();
-		deleteAllChats(chatState);
-		// Every filed draft died with its chat: prune the whole record
-		// so the fresh blank starts clean even in storage.
-		saveDraftAnnotations(chatState.activeChatId, [], [chatState.activeChatId]);
-		void resetVoiceLangFromKeyboard();
 	}
 
 	function promptOptions(): PromptEditorOptions {
@@ -9396,15 +9375,9 @@
 							threeHoldTimer = null;
 							if (threeTrack !== null && threeTrack.moved <= 12) {
 								threeHoldFired = true;
-								if (iosUI) {
-									// Haptic lives inside dropChat (triple thump).
-									dropChat(chatState.activeChatId);
-									flashToast("Chat deleted");
-								} else {
-									// Haptic lives inside dropAllChats (triple thump).
-									dropAllChats();
-									flashToast("All chats deleted");
-								}
+								// Haptic lives inside dropChat (triple thump).
+								dropChat(chatState.activeChatId);
+								flashToast("Chat deleted");
 							}
 						}, 600);
 					}
@@ -10083,18 +10056,9 @@
 				// voice language to the checked keyboard. Mac Delete-key
 				// reports Backspace; forward-delete reports Delete. Typing
 				// targets keep the plain chord for line-kill habits; the
-				// Shift variant below works everywhere.
+				// ⇧⌘Delete variant works everywhere, same single chat.
 				consumeEvent(event);
 				dropChat(chat.id);
-				editor?.focus();
-				return;
-			}
-			if (delScope === "all") {
-				// ⌘⇧Delete drops EVERY chat (a blank one takes their
-				// place, so the composer never strands) and resets the
-				// voice language to the checked keyboard.
-				consumeEvent(event);
-				dropAllChats();
 				editor?.focus();
 				return;
 			}

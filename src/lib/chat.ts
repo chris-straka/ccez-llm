@@ -329,14 +329,6 @@ export function deleteChat(
 	persistChats(state, store);
 }
 
-export function deleteAllChats(state: ChatState, store?: KeyValueStore): void {
-	abortSend();
-	const chat = blankChat();
-	state.chats = [chat];
-	state.activeChatId = chat.id;
-	persistChats(state, store);
-}
-
 export function deleteMessage(
 	state: ChatState,
 	index: number,

@@ -11,7 +11,6 @@ import {
 	chatVoiceReadback,
 	setChatVoice,
 	deleteChat,
-	deleteAllChats,
 	deleteMessage,
 	stageMessage,
 	branchFrom,
@@ -639,9 +638,7 @@ describe("chat", () => {
 		expect(state.activeChatId).toBe(first);
 		deleteChat(state, first, store);
 		expect(state.activeChatId).not.toBe(first);
-		deleteAllChats(state, store);
 		expect(state.chats).toHaveLength(1);
-		expect(activeChat(state).messages).toEqual([]);
 	});
 
 	it("appends new and branched chats at the bottom, newest last", async () => {

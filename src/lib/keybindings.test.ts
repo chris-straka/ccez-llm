@@ -299,9 +299,9 @@ describe("enterKeyAction", () => {
 });
 
 describe("deleteChatScope", () => {
-	it("drops one chat, or all with Shift", () => {
+	it("drops one chat, Shift included", () => {
 		expect(deleteChatScope(delBase)).toBe("chat");
-		expect(deleteChatScope({ ...delBase, shiftKey: true })).toBe("all");
+		expect(deleteChatScope({ ...delBase, shiftKey: true })).toBe("chat");
 		expect(deleteChatScope({ ...delBase, key: "Delete" })).toBe("chat");
 	});
 
@@ -315,13 +315,13 @@ describe("deleteChatScope", () => {
 		expect(deleteChatScope({ ...delBase, key: "d" })).toBe(null);
 	});
 
-	it("Shift drops every chat even from typing targets", () => {
+	it("Shift drops the chat even from typing targets", () => {
 		expect(
 			deleteChatScope({ ...delBase, shiftKey: true, inEditor: true })
-		).toBe("all");
+		).toBe("chat");
 		expect(
 			deleteChatScope({ ...delBase, shiftKey: true, inEditable: true })
-		).toBe("all");
+		).toBe("chat");
 	});
 });
 

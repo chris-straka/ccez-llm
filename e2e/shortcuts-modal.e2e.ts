@@ -95,10 +95,10 @@ test("filter narrows the list and reports no matches", async ({ page }) => {
 	await openShortcuts(page);
 	const filter = page.locator(".shortcuts-filter");
 	await expect(filter).toBeVisible();
-	await filter.fill("delete every");
+	await filter.fill("delete this");
 	const rows = page.locator(".modal .keys div > dt");
 	await expect(rows).toHaveCount(1);
-	await expect(rows.first()).toHaveText("Delete every chat");
+	await expect(rows.first()).toHaveText("Delete this chat");
 	await filter.fill("zzz-no-such-row");
 	await expect(page.locator(".modal .keys-empty")).toBeVisible();
 	await expect(rows).toHaveCount(0);

@@ -20,7 +20,6 @@ const MAC_NAMES = [
 	"Copy message",
 	"Cut message",
 	"Delete a message",
-	"Delete every chat",
 	"Delete this chat",
 	"Edit own message",
 	"Exit fullscreen",
@@ -141,7 +140,7 @@ describe("shortcuts menu copy", () => {
 			"Chats list",
 			"Copy selection",
 			"Delete a message",
-			"Delete every chat",
+			"Delete this chat",
 			"Fold a message",
 			"fold chat msg",
 			"Inspect character",
@@ -175,15 +174,15 @@ describe("shortcuts menu copy", () => {
 		expect(byName.get("Bottom of chat")).toBe("Two-finger swipe down · G");
 		expect(byName.get("Message end")).toBe("Double two-finger tap");
 		expect(byName.get("Delete a message")).toBe("Three-finger tap");
-		expect(byName.get("Delete every chat")).toBe("Three-finger hold");
+		expect(byName.get("Delete this chat")).toBe("Three-finger hold");
 		expect(byName.get("Copy selection")).toBe("Select text · Copy");
 	});
 
 	it("filters case-insensitively on name or keys", () => {
 		const rows = desktopShortcuts(true);
 		expect(filteredShortcuts(rows, "")).toBe(rows);
-		expect(filteredShortcuts(rows, "delete every").map((r) => r.name)).toEqual([
-			"Delete every chat"
+		expect(filteredShortcuts(rows, "this chat").map((r) => r.name)).toEqual([
+			"Delete this chat"
 		]);
 		expect(
 			filteredShortcuts(desktopShortcuts(false), "CTRL+P").map((r) => r.name)

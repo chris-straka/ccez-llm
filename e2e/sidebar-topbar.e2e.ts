@@ -56,12 +56,13 @@ test("ctrl-delete drops the current chat", async ({ page }) => {
 	await expect(page.locator("article .rendered")).toHaveCount(1);
 });
 
-/** Ctrl+Shift+Delete drops every chat, minting a blank. */
-test("ctrl-shift-delete drops every chat", async ({ page }) => {
-	await expect(page.locator("article .rendered").first()).toBeVisible();
+/** Ctrl+Shift+Delete drops the current chat too (no drop-everything). */
+test("ctrl-shift-delete drops the current chat", async ({ page }) => {
+	await expect(page.locator("article .rendered").first()).toContainText(ALPHA);
 	await page.locator("article .rendered").first().click();
 	await page.keyboard.press("Control+Shift+Delete");
-	await expect(page.locator("article .rendered")).toHaveCount(0);
+	await expect(page.locator("article .rendered").first()).toContainText(BRAVO);
+	await expect(page.locator("article .rendered")).toHaveCount(1);
 });
 
 /** Row icons sit adjacent inside reserved title padding: export parks

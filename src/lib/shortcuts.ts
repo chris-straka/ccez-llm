@@ -30,7 +30,7 @@ export function touchShortcuts(): ShortcutRow[] {
 			keys: "Two-finger hold · double-tap empty space · swipe cycles · loops"
 		},
 		{ name: "Delete a message", keys: "Three-finger tap" },
-		{ name: "Delete every chat", keys: "Three-finger hold" },
+		{ name: "Delete this chat", keys: "Three-finger hold" },
 		{ name: "Message end", keys: "Double two-finger tap" },
 		{ name: "Annotate", keys: "Select text · Annotate" },
 		{ name: "Speak selection", keys: "Select text · Speak" },
@@ -143,10 +143,9 @@ export function desktopShortcuts(isMac: boolean, inShell = true): ShortcutRow[] 
 			name: "Reply language",
 			keys: `${isMac ? "⌘1, ⌘0" : "Ctrl+1, Ctrl+0"} · repeat to clear`
 		},
-		{ name: "Delete this chat", keys: `${meta}Delete` },
 		{
-			name: "Delete every chat",
-			keys: `${isMac ? "⇧⌘Delete" : "Ctrl+Shift+Delete"}`
+			name: "Delete this chat",
+			keys: isMac ? "⌘Delete · ⇧⌘Delete" : "Ctrl+Delete · Ctrl+Shift+Delete"
 		},
 		{ name: "Cut message", keys: "x" },
 		{ name: "Edit own message", keys: "hover + e" },
