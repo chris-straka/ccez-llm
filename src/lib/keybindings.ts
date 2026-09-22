@@ -447,6 +447,13 @@ export function commandChord(facts: CommandChordFacts): CommandChord | null {
 	}
 	if (facts.ctrlKey && facts.altKey && facts.code === "KeyN") return "new-chat";
 	if (cmd && !facts.altKey && facts.code === "KeyN") return "new-chat";
+	// Shell only: a browser claims ⌘/Ctrl+T (new tab) and the page
+	// must not swallow it. The app has no tabs, so the shell opens
+	// a chat instead (0.5.3 field notes).
+	if (cmd && !facts.altKey && facts.code === "KeyT") {
+		if (facts.inShell) return "new-chat";
+		return null;
+	}
 	if (facts.ctrlKey && facts.altKey && facts.code === "KeyS")
 		return "toggle-voice";
 	return null;

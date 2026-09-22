@@ -617,11 +617,21 @@ describe("commandChord", () => {
 		).toBe("toggle-voice");
 	});
 
-	it("releases Cmd/Ctrl+T to the OS (no in-app browser)", () => {
-		// The sideview browser is removed: T chords match nothing, so
-		// the shell keeps new-tab and the page never sees the combo.
-		expect(commandChord({ ...chordBase, metaKey: true, key: "t" })).toBe(null);
-		expect(commandChord({ ...chordBase, ctrlKey: true, key: "T" })).toBe(null);
+	it("opens a chat on ⌘/Ctrl+T in the shell, releases it on the web", () => {
+		// No in-app browser and no tabs: the shell mints a chat
+		// (0.5.3 field notes), the browser keeps new-tab.
+		expect(commandChord({ ...chordBase, metaKey: true, code: "KeyT" })).toBe(
+			"new-chat"
+		);
+		expect(commandChord({ ...chordBase, ctrlKey: true, code: "KeyT" })).toBe(
+			"new-chat"
+		);
+		expect(
+			commandChord({ ...chordBase, inShell: false, metaKey: true, code: "KeyT" })
+		).toBeNull();
+		expect(
+			commandChord({ ...chordBase, metaKey: true, altKey: true, code: "KeyT" })
+		).toBeNull();
 	});
 
 	it("passes browser-claimed chords through on the web only", () => {

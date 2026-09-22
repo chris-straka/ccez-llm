@@ -121,7 +121,7 @@ export function desktopShortcuts(isMac: boolean, inShell = true): ShortcutRow[] 
 		},
 		{
 			name: "New chat",
-			keys: `${isMac ? "⌘N or ⇧⌘N" : "Ctrl+N or Ctrl+Shift+N"}`
+			keys: `${isMac ? "⌘N, ⇧⌘N, ⌘T" : "Ctrl+N, Ctrl+Shift+N, Ctrl+T"}`
 		},
 		{ name: "Voice readback on/off", keys: `Ctrl+${altm}+S` },
 		{ name: "Pasted text expand/collapse", keys: "Ctrl+O" },

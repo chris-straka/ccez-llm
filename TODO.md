@@ -25,9 +25,6 @@ same codebase via the Tauri mobile target.
   APKs + adb) — unit tests + honest unverified notes elsewhere,
   never pass claims.
 - Ghost features: user believes all fixed — verify, then drop this item.
-- Cmd+T browser removed (owner request, Sep 2026): the chord, sideview
-  webview, fallback strip, width setting, and shortcut row are gone;
-  Cmd+T returns to the OS/browser.
 
 ## Pile: Win/Linux device proof (still no hardware)
 
