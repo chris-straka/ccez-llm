@@ -10089,8 +10089,11 @@
 			if (chrome === "step-chat-newer" || chrome === "step-chat-older") {
 				// ⇧⌘J steps down (newer chat, minting one past the
 				// newest end); ⇧⌘K steps up (older). Works sidebar-closed.
+				// Never takes focus: stepping is navigation, and landing
+				// in the prompt (opening it, popping the keyboard) is
+				// the switcher's job, not the step's.
 				consumeEvent(event);
-				stepChat(chrome === "step-chat-newer" ? 1 : -1);
+				stepChat(chrome === "step-chat-newer" ? 1 : -1, false);
 				return;
 			}
 			if (chrome === "zoom") {

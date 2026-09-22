@@ -908,3 +908,11 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
       0.95rem next to huge type — `.ta-input` rides `--font-scale`
       like message text (phones keep the 16px anti-zoom floor;
       `layout.e2e.ts` now pins the composer growing with messages).
+
+- [x] ⇧⌘J/K steps never focus the prompt: keyboard chat steps took
+      focus via `enterEditMode` — the chrome step path passes
+      `focus=false` now (`chat-switch.e2e.ts` "shift-cmd-j steps
+      chats without focusing the prompt"). The slow-switch half
+      stays open: per-switch storage is only draft/scroll filing
+      (localStorage, KBs) — render cost dominates and needs a
+      device profile.

@@ -169,6 +169,52 @@ test("entering another chat never summons the prompt", async ({ page }) => {
 	expect(vtRest).toBe("none");
 });
 
+/** ⇧⌘J steps to the newer chat without touching the prompt:
+stepping is navigation, never an invitation to type. */
+test("shift-cmd-j steps chats without focusing the prompt", async ({
+	page
+}) => {
+	await page.addInitScript(() => {
+		window.localStorage.setItem("ccez-mock-provider", "1");
+		const chat = (id: string, createdAt: number, content: string) => ({
+			id,
+			createdAt,
+			replyLang: null,
+			messages: [
+				{
+					id: `${id}-m0`,
+					role: "assistant",
+					content,
+					usage: null,
+					error: null
+				}
+			]
+		});
+		window.localStorage.setItem(
+			"ccez-llm-chats-v1",
+			JSON.stringify([
+				chat("e2e-old", 1, "older chat here"),
+				chat("e2e-new", 2, "newer chat here")
+			])
+		);
+	});
+	await page.goto("/");
+	// Lands on the first seed.
+	await expect(page.locator("article .rendered")).toContainText(
+		"older chat here",
+		{ timeout: 60_000 }
+	);
+	await page.keyboard.press("Meta+Shift+J");
+	await expect(page.locator("article .rendered")).toContainText(
+		"newer chat here",
+		{ timeout: 10_000 }
+	);
+	const focused = await page.evaluate(
+		() => !!document.activeElement?.closest?.(".prompt")
+	);
+	expect(focused).toBe(false);
+});
+
 /** The Thinking row keeps breathing room: explicit margins stand it
 off the last message above (never the pair-hug gap alone). */
 test("thinking row keeps breathing room", async ({ page }) => {
