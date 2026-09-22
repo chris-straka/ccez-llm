@@ -35,6 +35,15 @@ same codebase via the Tauri mobile target.
       (`platform.ts`, `updates.ts`, `langId.ts` + `langid.rs`,
       `secrets_*` fail-closed). No pass claims without the hardware.
 
+## Pile: Android in-app update install fails (reported on 0.5.2, Sep 2026)
+
+- [ ] 0.5.2 sees the new version and downloads it, but Install errors:
+      "installer did not start: Error invoking postMessage: Java
+      exception was raised during method invocation." Likely the
+      postMessage bridge call into the Activity (provider/FileUri or
+      install-intent args) throwing before the installer starts —
+      reproduce on the S24 with adb and read the full Java stack.
+
 ## Pile: maybe later (only if troublesome)
 
 - [ ] Chats-sidebar swipe misfires on downward scrolls: directional
