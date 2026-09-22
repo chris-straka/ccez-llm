@@ -443,6 +443,9 @@
 		messageSpeakableFor,
 		isMessageSpeaking,
 		speakTitleFor,
+		appendDictation,
+		dictationInsert,
+		micUnavailableMessage,
 		startSpeechError,
 		effectiveSpeechLang,
 		stopSpeaking,
@@ -6339,10 +6342,7 @@
 		dismissToast();
 		const stop = await dictateNativeFirst(
 			(transcript) => {
-				annDraft =
-					annDraft === "" || annDraft.endsWith(" ")
-						? annDraft + transcript
-						: `${annDraft} ${transcript}`;
+				annDraft = appendDictation(annDraft, transcript);
 				stopPillMic();
 			},
 			(message) => {
@@ -6351,11 +6351,7 @@
 			}
 		);
 		if (!stop) {
-			flashErrorToast(
-				tauriBackendAvailable()
-					? "Mic input is not available."
-					: "Mic input not available in this browser."
-			);
+			flashErrorToast(micUnavailableMessage(tauriBackendAvailable()));
 			return;
 		}
 		stopPillDictation = stop;
@@ -6373,9 +6369,7 @@
 		dismissToast();
 		const stop = await dictateNativeFirst(
 			(transcript) => {
-				editor?.insertText(
-					transcript.endsWith(" ") ? transcript : `${transcript} `
-				);
+				editor?.insertText(dictationInsert(transcript));
 				dictating = false;
 				stopDictation = null;
 			},
@@ -6386,11 +6380,7 @@
 			}
 		);
 		if (!stop) {
-			flashErrorToast(
-				tauriBackendAvailable()
-					? "Mic input is not available."
-					: "Mic input not available in this browser."
-			);
+			flashErrorToast(micUnavailableMessage(tauriBackendAvailable()));
 			return;
 		}
 		stopDictation = stop;

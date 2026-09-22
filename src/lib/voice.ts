@@ -595,3 +595,29 @@ export function speakTitleFor(speaking: boolean): string {
 	if (speaking) return "Stop reading aloud";
 	return "Read this message aloud";
 }
+
+/**
+ * Append a dictation transcript to a draft (REFACTOR §6): spacing
+ * rides the draft's tail, so words never glue or double-space.
+ */
+export function appendDictation(draft: string, transcript: string): string {
+	return draft === "" || draft.endsWith(" ") ? draft + transcript : `${draft} ${transcript}`;
+}
+
+/**
+ * Dictation text for editor insertion (REFACTOR §6): trailing space
+ * so the next typed word starts clean.
+ */
+export function dictationInsert(transcript: string): string {
+	return transcript.endsWith(" ") ? transcript : `${transcript} `;
+}
+
+/**
+ * Mic-unavailable message (REFACTOR §6): shells lack the function,
+ * browsers lack the support — say which.
+ */
+export function micUnavailableMessage(inShell: boolean): string {
+	return inShell
+		? "Mic input is not available."
+		: "Mic input not available in this browser.";
+}
