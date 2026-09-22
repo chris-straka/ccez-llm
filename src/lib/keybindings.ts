@@ -592,6 +592,9 @@ export interface SidebarListFacts extends KeyModifiers {
 	inSidebar: boolean;
 	/** Fields keep their keys (the list's own search box types, never walks). */
 	inField: boolean;
+	/** Enter only enters from a row button: every other sidebar
+	button (New chat, settings controls) keeps its native Enter. */
+	inChatRow: boolean;
 }
 
 export type SidebarListAction =
@@ -599,10 +602,14 @@ export type SidebarListAction =
 
 /**
  * The open chat list owns its keys: j/k walks chats (preview-as-you-go),
- * space/l enters the cursor chat, Delete drops the focused chat. Each
- * guard is the handler's verbatim spelling — the walk and enter blocks
- * deliberately carry no shift condition (shift rides the key value for
- * letters, and shifted arrows still walk), while Delete keeps its own.
+ * space/l/Enter enters the cursor chat, Delete drops the focused chat.
+ * Each guard is the handler's verbatim spelling — the walk and enter
+ * blocks deliberately carry no shift condition (shift rides the key
+ * value for letters, and shifted arrows still walk), while Delete
+ * keeps its own. Row Enter must map here too: without it the key
+ * falls through to a native row click, which closes the list but
+ * leaves the composer parked instead of landing in the prompt.
+ * Row-scoped so New-chat and settings buttons keep native Enter.
  */
 export function sidebarListAction(
 	facts: SidebarListFacts
@@ -611,7 +618,12 @@ export function sidebarListAction(
 	if (facts.metaKey || facts.ctrlKey || facts.altKey) return null;
 	if (facts.key === "j" || facts.key === "ArrowDown") return "walk-down";
 	if (facts.key === "k" || facts.key === "ArrowUp") return "walk-up";
-	if (facts.key === " " || facts.key === "l" || facts.key === "L")
+	if (
+		facts.key === " " ||
+		facts.key === "l" ||
+		facts.key === "L" ||
+		(facts.key === "Enter" && facts.inChatRow)
+	)
 		return "enter";
 	if (!facts.shiftKey && (facts.key === "Delete" || facts.key === "Backspace"))
 		return "delete-chat";
@@ -699,6 +711,8 @@ export interface ScrollModeFacts {
 	inFind: boolean;
 	/** Native fields keep their keys: scroll mode owns the stage, not typing. */
 	inField: boolean;
+	/** Buttons and links keep Enter: scroll mode owns the stage, not activation. */
+	inInteractive: boolean;
 	gArmed: boolean;
 	atNewest: boolean;
 	scrollFromPrompt: boolean;
@@ -755,7 +769,10 @@ export function scrollModeAction(
 			return lower === "u" ? "half-jump-up" : "half-jump-down";
 		}
 	}
-	if (facts.key === "i" || facts.key === "Enter") return "enter-edit";
+	if (facts.key === "i") return "enter-edit";
+	// Enter on a button or link clicks it natively (sidebar rows never
+	// reach here: the list branch above owns its own Enter).
+	if (facts.key === "Enter" && !facts.inInteractive) return "enter-edit";
 	if (facts.ctrlKey && (facts.key === "g" || facts.key === "G"))
 		return "scroll-toggle";
 	return null;

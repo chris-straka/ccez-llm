@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { seedChat } from "./helpers";
+import { seedChat, settleScroller } from "./helpers";
 
 const SENTENCE =
 	"The quick brown fox jumps over the lazy dog near the riverbank.";
@@ -116,6 +116,10 @@ test("badges slide beneath the composer", async ({ page }) => {
 	await page.goto("/");
 	const body = page.locator("article .rendered").last();
 	await body.scrollIntoViewIfNeeded();
+	// The glide to a far message overlaps the menu's lifetime: any
+	// scroll dismisses it on desktop, so the select below must run
+	// on a settled thread.
+	await settleScroller(page);
 	// The scrolled-to message can rest under the floating composer:
 	// lift the first word clear of it, then measure and click with no
 	// scroll between. The lift is computed, not fixed: a constant

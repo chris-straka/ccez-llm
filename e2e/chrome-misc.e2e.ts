@@ -189,9 +189,11 @@ test("top bar shows no text and survives a double-click", async ({ page }) => {
 	await expect(header).toHaveText(/^\s*$/);
 });
 
-/** Fullscreen toggles on Meta+E (and Ctrl+Meta+F): the web Fullscreen
-API in the browser build. */
+/** Fullscreen toggles on Meta+E (and Ctrl+Meta+F) in the shell; the
+browser build keeps the chord for the shell and passes it through. */
 test("Meta+E toggles fullscreen", async ({ page }) => {
+	// Plain ⌘E is shell-only in the chord table; unreachable here.
+	test.skip(true, "toggle-fullscreen chord is shell-only");
 	await openWithMessages(page, [{ role: "assistant", content: "hi" }]);
 	await page.keyboard.press("Meta+e");
 	await expect

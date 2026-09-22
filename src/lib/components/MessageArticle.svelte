@@ -10,10 +10,7 @@ where the text sat, like the composer's promptEl pattern). -->
 <script lang="ts">
 	import type { ChatMsg, ChatMsgId } from "$lib/chat";
 	import type { LocalAid } from "$lib/reading";
-	import type {
-		AttachTagModel,
-		SentTagAction
-	} from "$lib/attachments";
+	import type { AttachTagModel, SentTagAction } from "$lib/attachments";
 	import type {
 		AnnotationId,
 		AnnotationMark,
@@ -321,9 +318,7 @@ where the text sat, like the composer's promptEl pattern). -->
 	:global(main.scale-actions) article.user {
 		margin-top: calc((var(--msg-gap, 0.35rem) + 0.1rem) * var(--font-scale, 1));
 	}
-	article:first-of-type {
-		margin-top: 0;
-	}
+
 	/* Even wrapping reads better in a chat column; one line, and
 	engines without it just wrap normally. Assistant only: on short
 	own messages pretty balances the lines into even halves, reshaping
@@ -526,8 +521,12 @@ where the text sat, like the composer's promptEl pattern). -->
 	:global(main.hide-messages) article :global(.ann-refs) {
 		display: none;
 	}
-	:global(main.hide-messages) article[data-actions-open="true"] :global(.rendered),
-	:global(main.hide-messages) article[data-actions-open="true"] :global(.ann-refs) {
+	:global(main.hide-messages)
+		article[data-actions-open="true"]
+		:global(.rendered),
+	:global(main.hide-messages)
+		article[data-actions-open="true"]
+		:global(.ann-refs) {
 		display: block;
 	}
 	/* No bubble, no bubble padding: the text's right edge lands on the
@@ -559,7 +558,8 @@ where the text sat, like the composer's promptEl pattern). -->
 	/* A folded assistant message spans the column instead of
 	shrink-wrapping: the capped preview floated mid-screen rather
 	than starting where the message text starts. */
-	:global(.app[data-android]):not([data-fullbleed]) article.assistant.folded-msg {
+	:global(.app[data-android]):not([data-fullbleed])
+		article.assistant.folded-msg {
 		width: auto;
 		align-self: stretch;
 	}
@@ -584,6 +584,14 @@ where the text sat, like the composer's promptEl pattern). -->
 	first line is clickable as well as visible. Everything after it
 	bleeds edge to edge (see .messages padding). */
 	article:first-of-type {
+		margin-top: 1.75rem;
+	}
+	/* The button-scaling opt-in is on by default, and its user-margin
+	rule outranks the offset above (extra main class), parking the
+	first message back under the strip. This twin reasserts the
+	fixed-chrome clearance after it: same specificity, later wins.
+	The strip never scales, so the offset stays fixed too. */
+	:global(main.scale-actions) article:first-of-type {
 		margin-top: 1.75rem;
 	}
 	/* The shell's strip is taller by that same padding: the first

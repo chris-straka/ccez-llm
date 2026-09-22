@@ -820,7 +820,8 @@ const sideBase: SidebarListFacts = {
 	shiftKey: false,
 	listOpen: true,
 	inSidebar: true,
-	inField: false
+	inField: false,
+	inChatRow: true
 };
 
 describe("sidebarListAction", () => {
@@ -833,6 +834,11 @@ describe("sidebarListAction", () => {
 		expect(sidebarListAction({ ...sideBase, key: "ArrowUp" })).toBe("walk-up");
 		expect(sidebarListAction({ ...sideBase, key: " " })).toBe("enter");
 		expect(sidebarListAction({ ...sideBase, key: "l" })).toBe("enter");
+		expect(sidebarListAction({ ...sideBase, key: "Enter" })).toBe("enter");
+		// Off-row Enter keeps its native behavior (New chat, settings).
+		expect(
+			sidebarListAction({ ...sideBase, key: "Enter", inChatRow: false })
+		).toBe(null);
 		expect(sidebarListAction({ ...sideBase, key: "Delete" })).toBe(
 			"delete-chat"
 		);
@@ -957,6 +963,7 @@ const scrollBase: ScrollModeFacts = {
 	inEditor: false,
 	inFind: false,
 	inField: false,
+	inInteractive: false,
 	gArmed: false,
 	atNewest: false,
 	scrollFromPrompt: false,
@@ -987,6 +994,10 @@ describe("scrollModeAction", () => {
 		expect(scrollModeAction({ ...scrollBase, key: "Enter" })).toBe(
 			"enter-edit"
 		);
+		// Enter on a button or link clicks it natively instead.
+		expect(
+			scrollModeAction({ ...scrollBase, key: "Enter", inInteractive: true })
+		).toBe(null);
 	});
 
 	it("skips bare U/D on desktop, ignores them on phones, jumps Ctrl+U/D", () => {

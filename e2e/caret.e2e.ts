@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { seedChat } from "./helpers";
+import { seedChat, toggleSidebar } from "./helpers";
 
 /** Empty-composer caret: a plain textarea owns exactly one native caret,
 so no ghost-caret paint can strand a second one. The emptied box keeps
@@ -12,7 +12,7 @@ test.beforeEach(async ({ page }) => {
 	await expect(page.locator(".ta-input").first()).toBeVisible({
 		timeout: 60_000
 	});
-	await page.keyboard.press("Meta+b");
+	await toggleSidebar(page);
 	await expect(page.locator("aside:not(.settings-panel)")).not.toHaveClass(
 		/collapsed/
 	);

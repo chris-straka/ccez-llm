@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { seedChat } from "./helpers";
+import { seedChat, toggleSidebar } from "./helpers";
 
 /**
  * Visual baseline for the modern-CSS overhaul (tokens, dvh, field-sizing,
@@ -147,7 +147,7 @@ for (const t of THEMES) {
 		});
 		const L = t.name === "light";
 		// The list always boots closed; ⌘B opens it for real.
-		await page.keyboard.press("Meta+b");
+		await toggleSidebar(page);
 		const sidebar = page.locator("aside:has(button.side-chat)");
 		await expect(sidebar).toBeVisible();
 		const row = sidebar.locator("li").first();

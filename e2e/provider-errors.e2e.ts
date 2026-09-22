@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { dragQuote, seedChat } from "./helpers";
+import { dragQuote, seedChat, toggleSidebar } from "./helpers";
 
 /**
  * Provider failure paths against a keyed (non-mock) provider: HTTP 401
@@ -156,7 +156,9 @@ test("switching to a keyless-less provider wipes the stranded draft", async ({
 	await page.keyboard.press("Meta+,");
 	await expect(page.locator(".settings-panel")).not.toHaveClass(/closed/);
 	await page
-		.locator('.settings-panel [role="radiogroup"][aria-label="Active provider"]')
+		.locator(
+			'.settings-panel [role="radiogroup"][aria-label="Active provider"]'
+		)
 		.getByRole("radio", { name: "DeepSeek" })
 		.click();
 	// The pill switch locks and wipes: locked hint, empty field.
@@ -204,7 +206,7 @@ test("deleting the streaming chat aborts its reply, composer keeps working", asy
 	await send(page, "please write a long slow reply for this prompt");
 	await expect(page.locator(".sending")).toBeVisible({ timeout: 10_000 });
 	// Drop the chat mid-stream via its sidebar delete button.
-	await page.keyboard.press("Meta+b");
+	await toggleSidebar(page);
 	const sidebar = page.locator("aside").first();
 	await expect(sidebar).not.toHaveClass(/collapsed/);
 	await sidebar.locator('button[aria-label="Delete chat"]').first().click();
@@ -214,7 +216,7 @@ test("deleting the streaming chat aborts its reply, composer keeps working", asy
 	await expect(page.locator("article")).toHaveCount(0);
 	// Desktop parks the composer under open drawers: close the sidebar
 	// before re-sending, or the prompt stays idle-hidden.
-	await page.keyboard.press("Meta+b");
+	await toggleSidebar(page);
 	await expect(sidebar).toHaveClass(/collapsed/);
 	await send(page, "second attempt after abort");
 	await expect(page.locator("article.assistant .rendered")).toContainText(
@@ -237,7 +239,10 @@ test("row error text scales only with the button opt-in", async ({ page }) => {
 			JSON.stringify({
 				hoverAssistantActions: true,
 				hoverUserActions: true,
-				fontScale: 1.5
+				fontScale: 1.5,
+				// Explicit: the opt-in ships on by default, and this
+				// case pins the off state.
+				scaleActionsWithFont: false
 			})
 		);
 		window.localStorage.setItem(

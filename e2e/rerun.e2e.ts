@@ -37,7 +37,8 @@ test("retry keeps previous articles mounted", async ({ page }) => {
 		);
 	});
 	await page.goto("/");
-	const retry = page.locator('button:has-text("Retry")');
+	// Icon-only row button (glyph + tip, no text node).
+	const retry = page.locator('button[aria-label="Retry"]');
 	await expect(retry).toBeVisible();
 	await page.evaluate(() => {
 		document.querySelectorAll("article").forEach((a, i) => (a.__mark = i));

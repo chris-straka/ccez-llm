@@ -106,6 +106,17 @@ export function isSidebarTarget(target: EventTarget | null): boolean {
 	return closestFromTarget(target, SIDEBAR_SELECTOR) !== null;
 }
 
+/**
+ * True on a chat-list row button. Enter there enters the chat through
+ * the list handler (landing in the prompt); every other sidebar
+ * button keeps its native Enter.
+ */
+export function isChatRowTarget(target: EventTarget | null): boolean {
+	return (
+		closestFromTarget(target, "aside ul li button.side-chat") !== null
+	);
+}
+
 /** True anywhere inside the prompt subtree (editor or chrome). */
 export function isPromptTarget(target: EventTarget | null): boolean {
 	return closestFromTarget(target, PROMPT_SELECTOR) !== null;

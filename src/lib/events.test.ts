@@ -11,6 +11,7 @@ import {
 	isFindBarTarget,
 	isIdleOwnedTarget,
 	isInspectFieldTarget,
+	isChatRowTarget,
 	isInteractiveTarget,
 	isMathTarget,
 	isPromptEditorTarget,
@@ -95,6 +96,19 @@ describe("page event idioms", () => {
 		expect(isFindBarTarget(byId("f"))).toBe(false);
 		expect(isSidebarTarget(byId("fb"))).toBe(true);
 		expect(isSidebarTarget(byId("p"))).toBe(false);
+	});
+
+	it("spots chat-list row buttons only", () => {
+		document.body.innerHTML =
+			'<aside><ul><li><button class="side-chat" id="row">x</button></li></ul>' +
+			'<button class="new" id="new">+</button></aside>' +
+			'<aside class="settings-panel"><button id="set">y</button></aside><p id="p">z</p>';
+		const byId = (id: string): Element | null => document.getElementById(id);
+		expect(isChatRowTarget(byId("row"))).toBe(true);
+		expect(isChatRowTarget(byId("new"))).toBe(false);
+		expect(isChatRowTarget(byId("set"))).toBe(false);
+		expect(isChatRowTarget(byId("p"))).toBe(false);
+		expect(isChatRowTarget(null)).toBe(false);
 	});
 
 	it("keeps the wider interactive and field spellings apart", () => {

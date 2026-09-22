@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { dragQuote, seedChat } from "./helpers";
+import { dragQuote, seedChat, settleScroller, toggleSidebar } from "./helpers";
 
 /**
  * Streaming integrity on the mock provider: the reply lands exactly
@@ -173,7 +173,7 @@ async function switchChat(page: Page, nth: number): Promise<void> {
 	await page.locator(".ta-input").click();
 	const aside = page.locator("aside").first();
 	if (await aside.evaluate((el) => el.classList.contains("collapsed"))) {
-		await page.keyboard.press("Meta+b");
+		await toggleSidebar(page);
 	}
 	const row = page.locator("aside ul li button.side-chat").nth(nth);
 	await expect(row).toBeVisible();
@@ -186,10 +186,13 @@ async function annotateDraft(
 	quote: string,
 	note: string
 ): Promise<void> {
-	await page
-		.locator(`article .rendered:has-text("${quote}")`)
-		.first()
-		.dblclick({ position: { x: 10, y: 10 } });
+	const target = page.locator(`article .rendered:has-text("${quote}")`).first();
+	// Settle the thread before selecting: gliding to a far message
+	// overlaps the menu's lifetime otherwise, and the idle-dismiss
+	// reaps it mid-aim while the click waits for stability.
+	await target.scrollIntoViewIfNeeded();
+	await settleScroller(page);
+	await target.dblclick({ position: { x: 10, y: 10 } });
 	await expect(page.locator(".sel-menu")).toBeVisible();
 	await page.locator('.sel-menu button:has-text("Annotate")').click();
 	await expect(page.locator(".ann-pop")).toBeVisible();
@@ -351,9 +354,7 @@ test("thinking chip counts up and tints", async ({ page }) => {
 /** Annotating stays available mid-stream: the send gates, never the
 selection menu — filing a note on settled text works while the new
 reply (or a page fetch) is still in flight. */
-test("mid-stream annotate files the pill on settled text", async ({
-	page
-}) => {
+test("mid-stream annotate files the pill on settled text", async ({ page }) => {
 	await seedChat(page, [
 		{ role: "assistant", content: "Settled earlier text for notes." }
 	]);

@@ -2,9 +2,9 @@ import { expect, test } from "@playwright/test";
 import { seedChat } from "./helpers";
 
 /**
- * Mobile readings + welcome text: the dock Speak button toasts CJK
- * readings at the top (no popup space on phones), and the hero is
- * chrome — never selectable.
+ * Mobile readings + welcome text: the dock Speak button shows CJK
+ * readings in the panel at the top (no popup space on phones), and
+ * the hero is chrome — never selectable.
  */
 test.use({
 	hasTouch: true,
@@ -73,18 +73,20 @@ async function summonDock(page: Page): Promise<void> {
 	await expect(page.locator(".ann-dock-wrap")).toBeVisible({ timeout: 10_000 });
 }
 
-test("dock Speak toasts pinyin at the top and still speaks", async ({
+test("dock Speak shows pinyin at the top and still speaks", async ({
 	page
 }) => {
 	await summonDock(page);
 	await page.locator('button[aria-label="Speak selection"]').click();
-	const toast = page.locator(".toast");
-	await expect(toast).toBeVisible({ timeout: 10_000 });
+	// Readings ride the unified panel now (the phone top-toast is
+	// gone): readings only, near the highlight.
+	const panel = page.locator(".sel-pinyin");
+	await expect(panel).toBeVisible({ timeout: 10_000 });
 	// Readings only: the characters are right there in the highlight.
-	await expect(toast).toContainText("nǐ");
-	await expect(toast).not.toContainText("你好");
+	await expect(panel).toContainText("nǐ");
+	await expect(panel).not.toContainText("你好");
 	// Pinned under the camera hole, not down by the composer.
-	const top = (await toast.boundingBox())?.y ?? 9999;
+	const top = (await panel.boundingBox())?.y ?? 9999;
 	expect(top).toBeLessThan(200);
 	// Speech always runs too: the toast is a silent extra.
 	const spoken = await page.evaluate(

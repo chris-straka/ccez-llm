@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { seedChat } from "./helpers";
+import { seedChat, toggleSidebar } from "./helpers";
 
 /** Gutter double-click on a fresh (empty) chat: with no articles, the
 hero text anchors the column, and the bare main below the 60%-capped
@@ -21,7 +21,7 @@ test("gutter double-click opens the chat list anywhere left of the column", asyn
 	await page.mouse.dblclick(main.x + 10, main.y + main.height - 250);
 	await expect(aside).not.toHaveClass(/collapsed/, { timeout: 10_000 });
 	// Back to collapsed, then the classic strip beside the hero.
-	await page.keyboard.press("Meta+b");
+	await toggleSidebar(page);
 	await expect(aside).toHaveClass(/collapsed/);
 	const box = await page.locator(".messages").boundingBox();
 	if (!box) throw new Error("no messages box");

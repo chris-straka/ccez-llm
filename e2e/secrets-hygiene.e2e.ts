@@ -10,7 +10,9 @@ import { seedChat } from "./helpers";
 
 const RAW = "sk-e2e-hygiene-PROBE-9f8c";
 const SETTINGS_KEY = "ccez-llm-settings-v1";
-const MIRROR_KEY = "ccez-keychain:provider:muse";
+// One bundle item for every provider key (see SECRET_BUNDLE_ACCOUNT):
+// the per-provider mirror keys are legacy migration sources only.
+const MIRROR_KEY = "ccez-keychain:providers";
 
 test.beforeEach(async ({ page }) => {
 	await seedChat(page, []);

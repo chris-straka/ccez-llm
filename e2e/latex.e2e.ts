@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { seedChat } from "./helpers";
+import { seedChat, toggleSidebar } from "./helpers";
 
 const ASSISTANT = `The energy levels:
 
@@ -455,7 +455,7 @@ test("preview settles latex chrome", async ({ page }) => {
 	// with them) while loading: settle first so any delta across the
 	// hover is chrome motion, never a font swap.
 	await page.evaluate(() => document.fonts.ready);
-	await page.keyboard.press("Meta+b");
+	await toggleSidebar(page);
 	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
 	// Trace the chrome box at 60fps across the hover instant.
 	const tracePromise = page.evaluate(

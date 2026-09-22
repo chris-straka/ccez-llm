@@ -15,7 +15,9 @@ const LONG = "lorem ipsum dolor sit amet ".repeat(60);
 async function sendLong(page) {
 	await page.locator(".ta-input").click();
 	await page.keyboard.type(LONG.slice(0, 400), { delay: 0 });
-	await page.keyboard.press("Enter");
+	// Phone composer: Enter is a carriage return there (enterSubmits
+	// is false), so the send button alone sends.
+	await page.locator(".send-btn").click();
 }
 
 async function streamDone(page) {

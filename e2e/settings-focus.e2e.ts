@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { toggleSidebar } from "./helpers";
 
 const LONG = "Line of chat text for height. ".repeat(200);
 
@@ -103,7 +104,7 @@ test("enter on the active chat skips the crossfade", async ({ page }) => {
 		"Alpha"
 	);
 	// The list boots closed: opening lands focus on the current row.
-	await page.keyboard.press("Control+b");
+	await toggleSidebar(page);
 	await expect
 		.poll(
 			() =>

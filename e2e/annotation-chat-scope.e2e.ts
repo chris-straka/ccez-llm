@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { seedChat } from "./helpers";
+import { seedChat, toggleSidebar } from "./helpers";
 
 /** Draft annotations belong to one chat: leaving files them away,
 restoring them on return, and the other chat's composer stays clean. */
@@ -25,7 +25,7 @@ test("annotation drafts stay with their chat", async ({ page }) => {
 
 	// New chat B: composer starts clean.
 	await page.locator(".ta-input").click();
-	await page.keyboard.press("Meta+b");
+	await toggleSidebar(page);
 	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
 	await page.locator('button[aria-label="New chat"]').click();
 	await expect(page.locator(".hero")).toBeVisible();
@@ -35,7 +35,7 @@ test("annotation drafts stay with their chat", async ({ page }) => {
 	// append at the bottom (see newChat), so A is still the first row.
 	// Minting brings you home (the list closes like a row-pick), so
 	// reopen it before picking A back.
-	await page.keyboard.press("Meta+b");
+	await toggleSidebar(page);
 	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
 	const rows = page.locator("aside ul li button.side-chat");
 	await rows.nth(0).click();

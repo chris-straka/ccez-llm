@@ -194,8 +194,29 @@ test("d hold ramps: second window outruns the first, then cruises fast", async (
 				behavior: "instant"
 			});
 	});
-	const start = await scrollTop(page);
+	// Let the park land: a settling glide would inflate the first
+	// window with non-hold travel.
+	await page.waitForFunction(() => {
+		const box = document.querySelector(".messages") as HTMLElement | null;
+		if (!box) return false;
+		const rest = box.scrollTop;
+		return new Promise<boolean>((resolve) => {
+			setTimeout(() => resolve(box.scrollTop === rest), 200);
+		});
+	});
 	await page.keyboard.down("d");
+	// Wait for the hold to engage before opening window one: keydown
+	// latency otherwise shifts the ramp between runs.
+	const parked = await scrollTop(page);
+	await page.waitForFunction(
+		(prev: number) => {
+			const box = document.querySelector(".messages") as HTMLElement | null;
+			return box !== null && box.scrollTop > prev;
+		},
+		parked,
+		{ timeout: 10_000 }
+	);
+	const start = await scrollTop(page);
 	await page.waitForTimeout(250);
 	const m1 = await scrollTop(page);
 	await page.waitForTimeout(250);

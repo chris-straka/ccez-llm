@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { seedChat } from "./helpers";
+import { seedChat, toggleSidebar } from "./helpers";
 
 const ALPHA = "Alpha active-chat message";
 
@@ -7,7 +7,7 @@ const chatsAside = (page: Page) => page.locator("aside").first();
 const chatRows = (page: Page) => page.locator("aside ul li button.side-chat");
 
 async function openSidebar(page: Page): Promise<void> {
-	await page.keyboard.press("Control+b");
+	await toggleSidebar(page);
 	await expect(chatsAside(page)).not.toHaveClass(/collapsed/);
 }
 
@@ -115,8 +115,9 @@ test("space with no selection focuses the prompt", async ({ page }) => {
 		.toBe(true);
 });
 
-/** Sidebar counter caps at 99+. */
-test("message counter caps at 99+", async ({ page }) => {
+/** Sidebar hover tip reports the message count (rows stay date-only;
+the inline capped count is gone by design). */
+test("sidebar tip reports the message count", async ({ page }) => {
 	// Seed 105 directly: the seed init script re-runs on reload, so a
 	// mid-test storage write would be wiped by the reload meant to show it.
 	await seedChat(
@@ -131,7 +132,11 @@ test("message counter caps at 99+", async ({ page }) => {
 		timeout: 60_000
 	});
 	await openSidebar(page);
-	await expect(chatRows(page).first()).toContainText("99+");
+	// The tip waits out passing glances (3s hover delay), so poll past it.
+	await chatRows(page).first().hover();
+	const tip = page.locator("aside ul li .side-tip").first();
+	await expect(tip).toBeVisible({ timeout: 10_000 });
+	await expect(tip).toContainText("105 messages");
 });
 
 /** Export/del share one fixed box: no hover shift, bigger X. */

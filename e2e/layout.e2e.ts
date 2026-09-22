@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { seedChat } from "./helpers";
+import { seedChat, toggleSidebar } from "./helpers";
 
 /** The chat pill spans the full row width flush with the + button
 (the row × overlays instead of reserving its slot). */
@@ -9,7 +9,7 @@ test("active chat pill sits flush with the new-chat button", async ({
 	await seedChat(page, [{ role: "assistant", content: "hello" }]);
 	await page.goto("/");
 	await expect(page.locator("article .rendered").first()).toBeVisible();
-	await page.keyboard.press("Meta+b");
+	await toggleSidebar(page);
 	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
 	await page.waitForTimeout(600);
 	const edges = await page.evaluate(() => {
@@ -30,33 +30,52 @@ test("gutter double-click opens the nearby sidebar", async ({ page }) => {
 	await expect(page.locator("article .rendered").first()).toBeVisible();
 	await page.mouse.dblclick(8, 300);
 	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
-	await page.keyboard.press("Meta+b");
+	await toggleSidebar(page);
 	await expect(page.locator("aside").first()).toHaveClass(/collapsed/);
 	const width = await page.evaluate(() => window.innerWidth);
 	await page.mouse.dblclick(width - 8, 300);
 	await expect(page.locator(".settings-panel")).toBeVisible();
 });
 
-/** ⌘+ / ⌘− steps the UI text scale with a percent toast. */
-test("command plus and minus scale text", async ({ page }) => {
-	await seedChat(page, []);
+/** The text-size setting scales the UI text live (the ⌘+ / ⌘− chords
+are shell-only: the browser owns page zoom, so specs drive the setting
+the chords would have stepped). */
+test("text size setting scales text", async ({ page }) => {
+	await seedChat(page, [{ role: "assistant", content: "hello" }]);
 	await page.goto("/");
-	await expect(page.locator(".ta-input").first()).toBeVisible();
-	await page.keyboard.press("Meta+=");
-	await expect(page.locator(".toast")).toContainText("Text size 110%");
-	await page.keyboard.press("Meta+-");
-	await expect(page.locator(".toast")).toContainText("Text size 100%");
+	const rendered = page.locator("article .rendered").first();
+	await expect(rendered).toBeVisible();
+	const px = () =>
+		rendered.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+	const before = await px();
+	await page.keyboard.press("Meta+,");
+	const size = page.locator(
+		'.settings-panel input[aria-label="Text size percent"]'
+	);
+	await expect(size).toBeVisible({ timeout: 5_000 });
+	await size.fill("110");
+	await expect.poll(px).toBeGreaterThan(before);
+	await size.fill("100");
+	await expect.poll(px).toBeCloseTo(before, 1);
 });
 
-/** ⇧⌘+ / ⇧⌘− widens and narrows the chat column with a rem toast. */
-test("shift command plus and minus scale chat width", async ({ page }) => {
+/** The chat-width setting widens and narrows the column (the ⇧⌘+
+/ ⇧⌘− chords are shell-only, so specs drive the setting instead). */
+test("chat width setting scales the column", async ({ page }) => {
 	await seedChat(page, []);
 	await page.goto("/");
 	await expect(page.locator(".ta-input").first()).toBeVisible();
-	await page.keyboard.press("Meta+Shift+=");
-	await expect(page.locator(".toast")).toContainText("Chat width 38 rem");
-	await page.keyboard.press("Meta+Shift+-");
-	await expect(page.locator(".toast")).toContainText("Chat width 36 rem");
+	await page.keyboard.press("Meta+,");
+	const width = page.locator(
+		'.settings-panel input[aria-label="Chat width in rem"]'
+	);
+	await expect(width).toBeVisible({ timeout: 5_000 });
+	const stored = () =>
+		page.evaluate(() => window.localStorage.getItem("ccez-llm-settings-v1"));
+	await width.fill("38");
+	await expect.poll(stored).toContain('"chatWidth":38');
+	await width.fill("36");
+	await expect.poll(stored).toContain('"chatWidth":36');
 });
 
 /** Text size scales messages, never the composer input; annotation
@@ -84,9 +103,16 @@ test("text size scales messages and badges, not the composer", async ({
 	const msgBefore = await px("article .rendered");
 	const editorBefore = await px(".prompt .ta-input");
 	const badgeBefore = await px("button.ccez-ann-badge");
-	await page.keyboard.press("Meta+=");
-	await expect(page.locator(".toast")).toContainText("Text size 110%");
-	expect(await px("article .rendered")).toBeCloseTo(msgBefore * 1.1, 1);
+	// Shell-only chord (browser owns page zoom): drive the setting.
+	await page.keyboard.press("Meta+,");
+	const size = page.locator(
+		'.settings-panel input[aria-label="Text size percent"]'
+	);
+	await expect(size).toBeVisible({ timeout: 5_000 });
+	await size.fill("110");
+	await expect
+		.poll(() => px("article .rendered"), { timeout: 5_000 })
+		.toBeCloseTo(msgBefore * 1.1, 1);
 	expect(await px(".prompt .ta-input")).toBeCloseTo(editorBefore, 1);
 	expect(await px("button.ccez-ann-badge")).toBeCloseTo(badgeBefore * 1.03, 1);
 });

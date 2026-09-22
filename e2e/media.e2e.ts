@@ -53,7 +53,11 @@ test("sending ticks haptics", async ({ page }) => {
 	await page.goto("/");
 	await page.locator(".ta-input").first().waitFor({ timeout: 60_000 });
 	await sendHello(page);
-	await expect.poll(() => vibrateCalls(page)).toEqual([8]);
+	// Beat vocabulary (see HAPTIC_PATTERNS): send tap, first-token
+	// rumble, stream-done thump.
+	await expect
+		.poll(() => vibrateCalls(page), { timeout: 15_000 })
+		.toEqual([[20], [70], [35, 60, 110]]);
 });
 
 test("annotate ticks haptics and opens the pill", async ({ page }) => {

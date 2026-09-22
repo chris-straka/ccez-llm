@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import { test, type Page } from "@playwright/test";
 
 /** Test-only window/element fields (replaces `as unknown` casts). */
 declare global {
@@ -59,6 +59,45 @@ export async function seedChat(
 		},
 		{ messages, replyLang }
 	);
+}
+
+/**
+ * Toggle the chat-list sidebar the browser-safe way. Plain Cmd/Ctrl+B is
+ * shell-only (the browser runtime passes it through), so specs use
+ * Shift+Cmd+[ — the chord that toggles on every runtime.
+ */
+export async function toggleSidebar(page: Page): Promise<void> {
+	await page.keyboard.press("Meta+Shift+BracketLeft");
+}
+
+/**
+ * Skip the rest of the calling test unless it runs inside the Tauri
+ * shell. Shell-only chords (palette Ctrl+P, find Ctrl+F) pass through
+ * to browser chrome on web runtimes, so their specs can only open a
+ * dialog there — call after the seed/goto, before the chord press.
+ */
+export async function requireShell(page: Page): Promise<void> {
+	const inShell = await page.evaluate(
+		() => "__TAURI_INTERNALS__" in window
+	);
+	test.skip(!inShell, "shell-only chord passes through on web runtimes");
+}
+
+/**
+ * Wait for the message column to rest: smooth programmatic glides keep
+ * firing scroll events after they look done, and any scroll dismisses
+ * the selection menu on desktop — so selects that summon the menu must
+ * only run on a settled thread.
+ */
+export async function settleScroller(page: Page): Promise<void> {
+	await page.waitForFunction(() => {
+		const el = document.querySelector("main .messages") as HTMLElement | null;
+		if (!el) return false;
+		const rest = el.scrollTop;
+		return new Promise<boolean>((resolve) => {
+			setTimeout(() => resolve(el.scrollTop === rest), 350);
+		});
+	});
 }
 
 /** Bounding boxes for every button in an assistant message's action row. */

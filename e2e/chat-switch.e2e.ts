@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { seedChat } from "./helpers";
+import { seedChat, toggleSidebar } from "./helpers";
 
 /** New chat mid-stream: the fresh chat stays clean, the origin keeps
 its reply, and the sidebar count always matches visible messages. */
@@ -24,7 +24,7 @@ test("thinking stays in its own chat across a switch", async ({ page }) => {
 	await expect(page.locator(".ta-input")).toHaveValue("second draft");
 	await expect(page.locator("article")).toHaveCount(2);
 	// Away: the new chat is pristine — no borrowed Thinking.
-	await page.keyboard.press("Meta+b");
+	await toggleSidebar(page);
 	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
 	await page.locator('button[aria-label="New chat"]').click();
 	await expect(page.locator(".hero")).toBeVisible();
@@ -33,7 +33,7 @@ test("thinking stays in its own chat across a switch", async ({ page }) => {
 	// Back: the origin kept streaming (or finished) in place.
 	// (Minting brings you home, so the list closed like a row-pick:
 	// reopen it first — a lingering open list would park the prompt.)
-	await page.keyboard.press("Meta+b");
+	await toggleSidebar(page);
 	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
 	const rows = page.locator("aside ul li button.side-chat");
 	await rows.first().click();

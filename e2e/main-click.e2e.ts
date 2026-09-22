@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { seedChat } from "./helpers";
+import { seedChat, toggleSidebar } from "./helpers";
 
 /**
  * Clicking into the main chat collapses both sidebars (settings panel
@@ -17,7 +17,7 @@ test.beforeEach(async ({ page }) => {
 
 test("clicking the main chat collapses the chats sidebar", async ({ page }) => {
 	const aside = page.locator("aside").first();
-	await page.keyboard.press("Meta+b");
+	await toggleSidebar(page);
 	await expect(aside).not.toHaveClass(/collapsed/);
 
 	await page.locator(".empty-state h1").click();

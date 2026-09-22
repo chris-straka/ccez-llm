@@ -284,6 +284,7 @@
 		altKeyLabel,
 		edgeSwipeTarget,
 		contentSwipeTarget,
+		messageFoldSwipe,
 		pinchZoomStep,
 		twoFingerSwipeDir,
 		twoFingerSlideDir,
@@ -337,6 +338,7 @@
 		isFindBarTarget,
 		isIdleOwnedTarget,
 		isInspectFieldTarget,
+		isChatRowTarget,
 		isInteractiveTarget,
 		isMathTarget,
 		isPromptEditorTarget,
@@ -2889,6 +2891,16 @@
 			// (or pill review toggle) never runs. Skip the hide; the
 			// idle ticker re-parks a genuinely unfocused composer
 			// within half a second, so an over-skip self-heals.
+			// A focusout from a detaching or freshly inert node
+			// (sidebar collapse inerting its focused row, modal
+			// teardown) is removal, not intent to leave: hiding on it
+			// strands keyboard flows that already called enterEditMode.
+			// Click-away and tab-out targets stay attached and outside
+			// inert roots, so those hides are untouched.
+			if (event.target instanceof Element) {
+				if (!document.contains(event.target)) return;
+				if (event.target.closest("[inert]")) return;
+			}
 			const next: EventTarget | null = event.relatedTarget ?? null;
 			focusLog("focusout-idle", {
 				target: describeFocusTarget(event.target),
@@ -8751,9 +8763,10 @@
 		 * while text is selected (handle-dragging), while starting in an
 		 * editable, or while the shortcuts modal owns the screen. A
 		 * rightward stroke summons the chats list from anywhere on the
-		 * main chat — messages included (only a leftward stroke folds).
-		 * Dismissing an open settings panel still works, and leftward
-		 * settings strokes are untouched.
+		 * main chat except a message with fold on swipe on (message
+		 * strokes fold either way there — only a leftward stroke folds
+		 * otherwise). Dismissing an open settings panel still works,
+		 * and leftward settings strokes are untouched.
 		 */
 		function middleSwipeTarget(
 			start: { x: number; y: number; clean: boolean },
@@ -9074,22 +9087,20 @@
 					}
 					return;
 				}
-				// Phone: a leftward stroke starting on a message folds
-				// it (a rightward stroke summons the chats list via the
-				// stroke below instead, wherever it starts). An active
-				// text selection wins — folding mid-select would eat the
+				// Phone: a stroke starting on a message folds it either
+				// way while fold on swipe is on — a rightward message
+				// stroke folds instead of summoning the chats list (off
+				// messages and with the toggle off, rightward summons
+				// via the stroke below as before). An active text
+				// selection wins — folding mid-select would eat the
 				// highlight.
-				const foldDx = ended.clientX - start.x;
-				const foldDy = ended.clientY - start.y;
 				if (
 					androidUI &&
 					settings.foldOnSwipe &&
 					start.msgId &&
 					!start.rowSwipe &&
 					!start.codeSwipe &&
-					foldDx < 0 &&
-					Math.abs(foldDx) >= 64 &&
-					Math.abs(foldDy) < Math.abs(foldDx) &&
+					messageFoldSwipe(start.x, start.y, ended.clientX, ended.clientY) &&
 					window.getSelection()?.isCollapsed !== false
 				) {
 					// Haptic lives inside toggleFold (every fold path
@@ -10603,7 +10614,8 @@
 				...keyFacts(event),
 				listOpen: !settings.sidebarCollapsed,
 				inSidebar,
-				inField: isFieldTarget(event.target)
+				inField: isFieldTarget(event.target),
+				inChatRow: isChatRowTarget(event.target)
 			});
 			if (sideAction !== null) {
 				focusLog("key-sidebar-consume", {
@@ -10819,6 +10831,7 @@
 				inEditor: inEditor !== null,
 				inFind: isFindBarTarget(event.target),
 				inField: isFieldTarget(event.target),
+				inInteractive: isInteractiveTarget(event.target),
 				gArmed: ggArmed(lastGAt, Date.now()),
 				atNewest: selectedIdx >= chat.messages.length - 1,
 				scrollFromPrompt
@@ -11608,9 +11621,35 @@
 			const node = range?.startContainer;
 			if (!node || node.nodeType !== Node.TEXT_NODE || !body.contains(node))
 				return "";
+			const text = node.textContent ?? "";
+			const offset = range?.startOffset ?? 0;
+			// Caret snapped past the text (open-space click resolving
+			// to a node edge): only retry inside the char when the
+			// point is actually over the text — far padding is message
+			// space, not the edge word (the touch double-tap path
+			// keeps its own retry in wordAtNodeOffset, which has no
+			// point to check).
+			if ((offset >= text.length || offset <= 0) && text.length > 0) {
+				try {
+					const edge = document.createRange();
+					if (offset >= text.length) {
+						edge.setStart(node, text.length - 1);
+						edge.setEnd(node, text.length);
+						if (event.clientX > edge.getBoundingClientRect().right + 2)
+							return "";
+					} else {
+						edge.setStart(node, 0);
+						edge.setEnd(node, 1);
+						if (event.clientX < edge.getBoundingClientRect().left - 2)
+							return "";
+					}
+				} catch {
+					// Unmeasurable edge: fall through to the word retry.
+				}
+			}
 			// Node-edge landings (a click on a glyph's far edge
 			// resolving past it) retry inside the char.
-			return wordAtNodeOffset(node.textContent ?? "", range?.startOffset ?? 0);
+			return wordAtNodeOffset(text, offset);
 		}
 		// Desktop right-click reads aloud (the selection, else the word
 		// under the cursor, else the whole message; a second

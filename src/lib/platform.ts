@@ -386,6 +386,27 @@ export function contentSwipeTarget(
 }
 
 /**
+ * Message fold stroke (phone only): a mostly-horizontal stroke starting
+ * on a message folds it — either direction, so rightward message
+ * strokes never summon the chats list while fold on swipe is on.
+ * Same 64px floor as the mid-screen rule, so scroll drift never folds.
+ * Callers gate this on the Android UA, the fold toggle, a resolved
+ * message id, a clean start (never the action row or code/math), and
+ * no text selection — geometry alone never folds.
+ */
+export function messageFoldSwipe(
+	startX: number,
+	startY: number,
+	endX: number,
+	endY: number,
+	minDistance = 64
+): boolean {
+	const dx = endX - startX;
+	const dy = endY - startY;
+	return Math.abs(dx) >= minDistance && Math.abs(dy) < Math.abs(dx);
+}
+
+/**
  * Where a single-finger tap began: "message" (an article body, never
  * its action row or a control), "prompt" (the composer card outside any
  * field or button), "empty" (dead main-column space), or "other"

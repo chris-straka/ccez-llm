@@ -288,16 +288,17 @@ test.describe("gestures", () => {
 		);
 	}
 
-	test("mid-screen swipe right never opens the chat sidebar", async ({
+	test("mid-screen swipe right summons the chat sidebar", async ({
 		page
 	}) => {
 		const aside = page.locator("aside:has(button.side-chat)");
 		const panel = page.locator(".settings-panel");
-		// Mid-screen rightward summons nothing (the list opens from
-		// the left edge only) — and never toggles anything shut.
+		// Fresh load starts shut; a mid-screen rightward summons the
+		// list (the edge is not the only opener) — and never toggles
+		// anything shut.
 		await swipeMidScreen(page, 150, 260);
-		await expect(aside).toHaveClass(/collapsed/);
-		// The edge stroke still summons...
+		await expect(aside).not.toHaveClass(/collapsed/);
+		// The edge stroke keeps it open...
 		await swipeFromLeftEdge(page);
 		await expect(aside).not.toHaveClass(/collapsed/);
 		// ...a mid-screen rightward never toggles the open list shut...
@@ -336,10 +337,10 @@ test.describe("gestures", () => {
 		// ...a rightward stroke closes it...
 		await swipeMidScreen(page, 150, 260);
 		await expect(panel).toHaveClass(/closed/);
-		// ...a rightward stroke with all shut summons nothing now
-		// (the list opens from the left edge only)...
+		// ...a rightward stroke with all shut summons the list now
+		// (mid-screen strokes summon; edge-only was the old rule)...
 		await swipeMidScreen(page, 150, 260);
-		await expect(aside).toHaveClass(/collapsed/);
+		await expect(aside).not.toHaveClass(/collapsed/);
 		// ...but with the list open, a leftward stroke folds it
 		// instead of opening settings (same precedence the
 		// rightward test above pins the other way).
@@ -525,7 +526,9 @@ test.describe("touch", () => {
 	/** Touch has no hover, so each chat row prints a short message
 	count after the timestamp (the tooltip's full split lives on
 	the hover tip, never in the row where it truncated). */
-	test("chat rows print the message count on a phone", async ({ page }) => {
+	test("chat rows carry the message count in the hover tip", async ({
+		page
+	}) => {
 		await seedChat(page, [
 			{ role: "user", content: "hi" },
 			{ role: "assistant", content: "hello back" }
@@ -533,7 +536,10 @@ test.describe("touch", () => {
 		await page.goto("/");
 		const row = page.locator("aside ul li .side-chat").first();
 		await expect(row).toBeVisible({ timeout: 15_000 });
-		await expect(row).toContainText("· 2 msgs");
+		// Phone rows print the date; the count rides the hover tip.
+		await expect(page.locator("aside ul li .side-tip").first()).toContainText(
+			"2 messages"
+		);
 	});
 
 	test("region menus share one row on a phone", async ({ page }) => {
@@ -1311,12 +1317,11 @@ test.describe("touch", () => {
 		await seedTwoChats(page);
 		await summonTouchSelection(page);
 		const menu = page.locator(".sel-menu");
-		await expect(menu.locator("button")).toHaveText([
-			"Copy",
-			"Annotate",
-			"Speak"
-		]);
-		const btn = menu.locator('button:has-text("Speak")');
+		// The touch menu floats Annotate then Copy; Speak lives in
+		// the composer dock (see "touch selection floats
+		// Copy/Annotate/Speak, Inspect stays docked").
+		await expect(menu.locator("button")).toHaveText(["Annotate", "Copy"]);
+		const btn = page.locator('button.ann-dock:has-text("Speak")');
 		const btnBox = await btn.boundingBox();
 		if (!btnBox) throw new Error("no speak box");
 		await page.touchscreen.tap(
@@ -1391,23 +1396,34 @@ test.describe("touch", () => {
 	async function expectMenuClearsPanels(page: Page): Promise<void> {
 		const panels = page.locator(".sel-pinyin.above");
 		await expect(panels.first()).toBeVisible({ timeout: 120_000 });
-		// Let the lift glide settle before measuring.
-		await page.waitForTimeout(500);
-		const geometry = await page.evaluate(() => {
-			const menuEl = document.querySelector(".sel-menu");
-			const above = [...document.querySelectorAll(".sel-pinyin.above")];
-			if (!(menuEl instanceof HTMLElement) || above.length === 0)
-				return null;
-			const box = menuEl.getBoundingClientRect();
-			const top = Math.min(
-				...above.map((el) =>
-					(el as HTMLElement).getBoundingClientRect().top
-				)
-			);
-			return { menuBottom: box.bottom, panelTop: top };
-		});
-		expect(geometry).not.toBeNull();
-		expect(geometry!.menuBottom).toBeLessThanOrEqual(geometry!.panelTop);
+		// Poll for the settled lift: the menu glides above the panels,
+		// and a fixed sleep loses the race under parallel load.
+		await expect
+			.poll(
+				async () => {
+					const geometry = await page.evaluate(() => {
+						const menuEl = document.querySelector(".sel-menu");
+						const above = [
+							...document.querySelectorAll(".sel-pinyin.above")
+						];
+						if (!(menuEl instanceof HTMLElement) || above.length === 0)
+							return null;
+						const box = menuEl.getBoundingClientRect();
+						const top = Math.min(
+							...above.map((el) =>
+								(el as HTMLElement).getBoundingClientRect().top
+							)
+						);
+						return { menuBottom: box.bottom, panelTop: top };
+					});
+					if (!geometry) return "waiting";
+					return geometry.menuBottom <= geometry.panelTop
+						? "clear"
+						: "overlapping";
+				},
+				{ timeout: 10_000 }
+			)
+			.toBe("clear");
 	}
 
 	test("speaking a kanji highlight lifts the menu above every furigana panel", async ({
@@ -1603,7 +1619,7 @@ test.describe("touch", () => {
 		await expect(body).toBeHidden({ timeout: 5000 });
 	});
 
-	test("settings sheet matches the chats drawer and offers touch toggles", async ({
+	test("settings sheet spans the phone while the list keeps its sliver", async ({
 		page
 	}) => {
 		await seedEmpty(page);
@@ -1611,15 +1627,20 @@ test.describe("touch", () => {
 		const panel = page.locator(".settings-panel");
 		await expect(panel).not.toHaveClass(/closed/);
 		const panelWidth = (await panel.boundingBox())?.width ?? 0;
-		// The two drawers match instead of one spanning the screen:
-		// shut settings, summon the list, compare.
+		const viewport = await page.evaluate(() => window.innerWidth);
+		// Full-width settings sheet on phones by design (no sliver to
+		// tap, no one-tap-close strip): shut settings, summon the
+		// list, compare against its own contract.
+		expect(Math.abs(panelWidth - viewport)).toBeLessThanOrEqual(1);
 		await swipeX(page, 4, 144);
 		await expect(panel).toHaveClass(/closed/);
 		await swipeX(page, 4, 144);
 		const aside = page.locator("aside:has(button.new)");
 		await expect(aside).not.toHaveClass(/collapsed/);
 		const listWidth = (await aside.boundingBox())?.width ?? 0;
-		expect(Math.abs(panelWidth - listWidth)).toBeLessThanOrEqual(1);
+		expect(
+			Math.abs(listWidth - Math.min(viewport * 0.78, 320))
+		).toBeLessThanOrEqual(2);
 		await expect(panel.locator('legend:has-text("Voice engine")')).toHaveCount(
 			0
 		);
@@ -2051,17 +2072,18 @@ test.describe("touch", () => {
 			]);
 			if (!col || !box) throw new Error("thread has no boxes");
 			expect(box.width).toBeGreaterThan(col.width - 8);
-			// Own messages keep their alignment: the article spans the
-			// column while the bubble stays shrink-wrapped and docked
-			// hard right — no left-anchored full-width own column, and
-			// the hairline gutter leaves no room on its right.
+			// Own messages keep their alignment: the article caps at
+			// 90% of the column (never the full chat width) while the
+			// bubble stays shrink-wrapped and docked hard right — no
+			// left-anchored full-width own column, and the hairline
+			// gutter leaves no room on its right.
 			const userBox = await page.locator("article.user").first().boundingBox();
 			const userBubble = await page
 				.locator("article.user .bubble")
 				.first()
 				.boundingBox();
 			if (!userBox || !userBubble) throw new Error("own message has no box");
-			expect(userBox.width).toBeGreaterThan(col.width - 8);
+			expect(userBox.width).toBeLessThan(col.width - 8);
 			expect(userBubble.width).toBeLessThan(userBox.width - 10);
 			expect(
 				userBox.x + userBox.width - (userBubble.x + userBubble.width)
@@ -2600,8 +2622,11 @@ test.describe("always-visible prompt", () => {
 	});
 
 	/** A stroke starting on a message folds it either way, never summons. */
-	test("message swipe folds, never summons the sidebar", async ({ page }) => {
-		await seed(page, {}, [LONG]);
+	test("message swipes fold with the toggle on, never summon", async ({
+		page
+	}) => {
+		// Fold on swipe defaults off: the fold legs opt in explicitly.
+		await seed(page, { foldOnSwipe: true }, [LONG]);
 		await page.goto("/");
 		await expect(page.locator("article .rendered").first()).toBeVisible();
 		const aside = page.locator("aside").first();
@@ -2617,7 +2642,9 @@ test.describe("always-visible prompt", () => {
 		await flick(page, "article.assistant", 30, 500, 220, 505);
 		await expect(article).not.toHaveClass(/folded-msg/);
 		await expect(aside).toHaveClass(/collapsed/);
-		// Rightward on the open message folds it again.
+		// Rightward on the open message folds it again: message
+		// strokes fold either way while the toggle is on, so the
+		// list can only be summoned off-message.
 		await flick(page, "article.assistant", 30, 500, 220, 505);
 		await expect(article).toHaveClass(/folded-msg/);
 		await expect(aside).toHaveClass(/collapsed/);
@@ -2638,6 +2665,15 @@ test.describe("always-visible prompt", () => {
 		await flick(page, "article.assistant .rendered", 220, 500, 30, 505);
 		await expect(article).not.toHaveClass(/folded-msg/);
 		await expect(panel).not.toHaveClass(/closed/);
+		// Rightward first dismisses the open settings...
+		await flick(page, "article.assistant .rendered", 30, 500, 220, 505);
+		await expect(panel).toHaveClass(/closed/);
+		await expect(article).not.toHaveClass(/folded-msg/);
+		// ...then a second rightward summons the list: message
+		// strokes only fold with the toggle on.
+		await flick(page, "article.assistant .rendered", 30, 500, 220, 505);
+		const aside = page.locator("aside").first();
+		await expect(aside).not.toHaveClass(/collapsed/);
 	});
 
 	/** Double-tap selects the tapped word: `touch-action: manipulation`
@@ -2741,10 +2777,15 @@ test.describe("always-visible prompt", () => {
 									? "edit"
 									: b.label.includes("Rerun")
 										? "rerun"
-										: "audio"
+										: b.label.includes("Fold") || b.label.includes("Unfold")
+											? "fold"
+											: "audio"
 				)
 		);
+		// The fold chevron rides every row (phones included),
+		// leading the phone order.
 		expect(order).toEqual([
+			"fold",
 			"audio",
 			"copy",
 			"branch",
@@ -2860,7 +2901,8 @@ test.describe("message chrome", () => {
 	/** Huge type with button scaling off keeps tight gaps; the opt-in
 	restores airy ones. Same engine, same thread — only the toggle flips. */
 	test("button scaling toggle owns the message gaps", async ({ page }) => {
-		await seedChrome(page, { fontScale: 4 });
+		// The toggle defaults on: the tight leg opts out explicitly.
+		await seedChrome(page, { fontScale: 4, scaleActionsWithFont: false });
 		const listGap = (): Promise<number> =>
 			page.evaluate(() => {
 				const articles = [

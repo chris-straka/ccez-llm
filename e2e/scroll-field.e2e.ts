@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { seedChat } from "./helpers";
+import { seedChat, settleScroller, toggleSidebar } from "./helpers";
 
 /** Scroll mode must own the stage, not typing: command letters in a
 native field have to land as text (the focus-drop report typed over
@@ -20,6 +20,9 @@ async function enterScroll(page: Page): Promise<void> {
 	await page.locator(".ta-input").first().click();
 	await page.keyboard.press("Control+g");
 	await expect(page.locator("article.selected")).toHaveCount(1);
+	// The composer click can still be gliding: box reads below must
+	// not chase a moving thread.
+	await settleScroller(page);
 }
 
 test("scroll mode keeps field keys in settings", async ({ page }) => {
@@ -38,7 +41,7 @@ test("scroll mode keeps field keys in settings", async ({ page }) => {
 /** Open-list chat keys (j/k/l/Space/Delete) typed in a settings field
 must land as text — the list owns its keys, not typing. */
 test("open list keeps field keys in settings", async ({ page }) => {
-	await page.keyboard.press("Meta+b");
+	await toggleSidebar(page);
 	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
 	await page.keyboard.press("Meta+,");
 	await expect(page.locator(".settings-panel")).not.toHaveClass(/closed/);
@@ -65,10 +68,11 @@ test("scroll mode keeps field keys in the badge edit card", async ({
 	const badge = page.locator("button.ccez-ann-badge").first();
 	await expect(badge).toHaveCount(1);
 	// Now enter scroll mode, open the EDIT card, and type command letters.
+	// Keyboard-first (focus + Enter): scroll mode owns the pointer
+	// stage, so mouse-clicking the badge fights it.
 	await enterScroll(page);
-	const box = await badge.boundingBox();
-	if (!box) throw new Error("badge has no box");
-	await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+	await badge.focus();
+	await page.keyboard.press("Enter");
 	const area = page.locator(".ann-pop textarea");
 	await expect(area).toBeFocused();
 	await area.click();

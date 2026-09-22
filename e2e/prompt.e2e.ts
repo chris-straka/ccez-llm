@@ -1,5 +1,5 @@
 import { devices, expect, test } from "@playwright/test";
-import { seedChat } from "./helpers";
+import { seedChat, toggleSidebar } from "./helpers";
 
 /** Staging (Alt+Enter, no reply stream) pins the scroller to the true
 bottom: measuring in the send tick reads the pre-append height and the
@@ -680,7 +680,7 @@ test("sidebar hover keeps a live highlight and its menu", async ({ page }) => {
 	await page.mouse.up();
 	const menu = page.locator(".sel-menu");
 	await expect(menu).toBeVisible();
-	await page.keyboard.press("Meta+b");
+	await toggleSidebar(page);
 	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
 	// The other chat's row: without the yield this previews it (menu
 	// gone, column swapped); with it, nothing moves.
@@ -735,7 +735,7 @@ test("sidebar preview reserves action space without showing the row", async ({
 	await expect(page.locator("article .rendered").first()).toBeVisible({
 		timeout: 60_000
 	});
-	await page.keyboard.press("Meta+b");
+	await toggleSidebar(page);
 	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
 	const rows = page.locator("aside ul li button.side-chat");
 	await rows.nth(1).hover();
@@ -790,7 +790,7 @@ test("returning to a chat restores its scroll position", async ({ page }) => {
 	const box = page.locator("main .messages");
 	await box.evaluate((el) => el.scrollTo({ top: 300 }));
 	await page.waitForTimeout(300);
-	await page.keyboard.press("Meta+b");
+	await toggleSidebar(page);
 	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
 	const rows = page.locator("aside ul li button.side-chat");
 	// The unvisited chat starts at the top like today.
@@ -799,7 +799,7 @@ test("returning to a chat restores its scroll position", async ({ page }) => {
 		.poll(() => box.evaluate((el) => el.scrollTop), { timeout: 8000 })
 		.toBe(0);
 	// Back on the first chat: where it was left, not the top.
-	await page.keyboard.press("Meta+b");
+	await toggleSidebar(page);
 	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
 	await rows.nth(0).click();
 	await expect
@@ -843,7 +843,7 @@ test("empty chat restores an idle-hidden composer", async ({ page }) => {
 		timeout: 60_000
 	});
 	const composer = page.locator("main .prompt");
-	await page.keyboard.press("Meta+b");
+	await toggleSidebar(page);
 	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
 	const rows = page.locator("aside ul li button.side-chat");
 	// Park it on the full chat first (always-hide drops the composer
@@ -853,7 +853,7 @@ test("empty chat restores an idle-hidden composer", async ({ page }) => {
 	await expect(composer).toBeHidden();
 	// The empty chat's row restores the composer on switch (row
 	// picks collapse the sidebar, so reopen it first).
-	await page.keyboard.press("Meta+b");
+	await toggleSidebar(page);
 	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
 	await rows.nth(1).click();
 	await expect(composer).toBeVisible();
@@ -906,7 +906,7 @@ test("empty preview shows inert pills and composer", async ({ page }) => {
 	await expect(page.locator("article .rendered").first()).toBeVisible({
 		timeout: 60_000
 	});
-	await page.keyboard.press("Meta+b");
+	await toggleSidebar(page);
 	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
 	// The open sidebar parks the live composer...
 	await expect(page.locator("main .prompt")).toBeHidden();

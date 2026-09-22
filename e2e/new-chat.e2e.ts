@@ -1,11 +1,11 @@
 import { test, expect, type Page } from "@playwright/test";
-import { seedChat } from "./helpers";
+import { seedChat, toggleSidebar } from "./helpers";
 
 /** New-chat sidebar behavior: creation toasts, empty rows stay quiet,
 and the count tip answers the row button — never its action buttons. */
 
 async function openSidebar(page: Page): Promise<void> {
-	await page.keyboard.press("Meta+b");
+	await toggleSidebar(page);
 	await expect(page.locator("aside:not(.settings-panel)")).not.toHaveClass(
 		/collapsed/
 	);

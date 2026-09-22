@@ -3,9 +3,9 @@ import { seedChat } from "./helpers";
 
 /**
  * Right-click reads aloud on desktop: a live selection first, else the
- * whole message (a playing message stops instead) — and the native menu
- * is never blocked (no preventDefault), so Copy stays available beside
- * speech.
+ * word under the cursor, else the whole message (a playing message
+ * restarts instead of stopping) — and the app owns the gesture, so
+ * the native menu stays suppressed by design (fields keep theirs).
  */
 test.beforeEach(async ({ page }) => {
 	await page.addInitScript(() => {
@@ -14,8 +14,27 @@ test.beforeEach(async ({ page }) => {
 		(window as unknown as { __menuBlocked: boolean[] }).__menuBlocked = [];
 		const synth = window.speechSynthesis;
 		if (synth) {
-			const origSpeak = synth.speak.bind(synth);
-			void origSpeak;
+			// Faithful utterance lifecycle: the app drives its speaking
+			// marks off onstart/onend, so a record-only stub strands
+			// every speaking class. Cancel drops pending ends, like the
+			// queue-clear it shadows.
+			let pending: number[] = [];
+			const clearPending = () => {
+				for (const id of pending) window.clearTimeout(id);
+				pending = [];
+			};
+			const fire = (
+				utterance: SpeechSynthesisUtterance,
+				name: "start" | "end",
+				ms: number
+			) => {
+				pending.push(
+					window.setTimeout(() => {
+						if (name === "start") utterance.onstart?.(new Event("start") as SpeechSynthesisEvent);
+						else utterance.onend?.(new Event("end") as SpeechSynthesisEvent);
+					}, ms)
+				);
+			};
 			synth.speak = ((utterance: SpeechSynthesisUtterance) => {
 				(window as unknown as { __spoken: string[] }).__spoken.push(
 					utterance.text
@@ -23,7 +42,19 @@ test.beforeEach(async ({ page }) => {
 				(window as unknown as { __spokenLang: string[] }).__spokenLang.push(
 					utterance.lang
 				);
+				clearPending();
+				fire(utterance, "start", 0);
+				fire(utterance, "end", 100);
 			}) as typeof synth.speak;
+			const origCancel = synth.cancel.bind(synth);
+			synth.cancel = (() => {
+				clearPending();
+				try {
+					origCancel();
+				} catch {
+					// Headless cancel is best-effort; the flags above carry it.
+				}
+			}) as typeof synth.cancel;
 		}
 		window.addEventListener("contextmenu", (event) => {
 			setTimeout(() => {
@@ -60,7 +91,7 @@ async function spokenLang(
 	);
 }
 
-test("right-click with a selection reads the selection, menu unblocked", async ({
+test("right-click with a selection reads the selection, app menu owned", async ({
 	page
 }) => {
 	const para = page.locator("article.assistant .rendered p").first();
@@ -70,10 +101,26 @@ test("right-click with a selection reads the selection, menu unblocked", async (
 	);
 	expect(selected.length).toBeGreaterThan(0);
 	// The double-click summons the Annotate menu over the paragraph's
-	// top edge; dismiss it (Escape keeps the highlight) so the
-	// right-click lands on the selected text, not a menu button.
+	// top edge; Escape drops the menu and (by design, click-away
+	// parity) the highlight with it. Re-select programmatically so
+	// the right-click lands on selected text with no menu in the way
+	// (programmatic ranges summon nothing).
 	await page.keyboard.press("Escape");
 	await expect(page.locator(".sel-menu")).toHaveCount(0);
+	await page.evaluate((text) => {
+		const p = document.querySelector("article.assistant .rendered p");
+		const node = p?.firstChild;
+		if (!p || !node || node.nodeType !== Node.TEXT_NODE)
+			throw new Error("no text to reselect");
+		const idx = (node.textContent ?? "").indexOf(text);
+		if (idx < 0) throw new Error("selection text gone");
+		const range = document.createRange();
+		range.setStart(node, idx);
+		range.setEnd(node, idx + text.length);
+		const live = window.getSelection();
+		live?.removeAllRanges();
+		live?.addRange(range);
+	}, selected);
 	const reselected = await page.evaluate(
 		() => window.getSelection()?.toString() ?? ""
 	);
@@ -85,7 +132,9 @@ test("right-click with a selection reads the selection, menu unblocked", async (
 		.poll(() => spoken(page), { timeout: 10_000 })
 		.toContain(selected);
 	// The recorder pushes off a nested timeout, so poll for it instead
-	// of asserting immediately (cold-compile flakes otherwise).
+	// of asserting immediately (cold-compile flakes otherwise). Desktop
+	// right-click belongs to the app (speech, folds), so the native
+	// menu stays suppressed by design — fields and phones keep theirs.
 	await expect
 		.poll(
 			() =>
@@ -96,7 +145,7 @@ test("right-click with a selection reads the selection, menu unblocked", async (
 				),
 			{ timeout: 10_000 }
 		)
-		.toEqual([false]);
+		.toEqual([true]);
 });
 
 test("right-click on a word reads just that word", async ({ page }) => {
@@ -124,11 +173,14 @@ test("right-click on a word reads just that word", async ({ page }) => {
 		timeout: 10_000
 	});
 	const count = (await spoken(page)).length;
+	// Same word, still no selection: restarts instead of stopping.
 	await page.mouse.click(point.x, point.y, { button: "right" });
-	await expect(page.locator("article.assistant.speaking-sel")).toBeHidden({
+	await expect
+		.poll(() => spoken(page), { timeout: 10_000 })
+		.toHaveLength(count + 1);
+	await expect(page.locator("article.assistant.speaking-sel")).toBeVisible({
 		timeout: 10_000
 	});
-	expect(await spoken(page)).toHaveLength(count);
 });
 
 test("right-click on message open space reads the whole message", async ({
@@ -179,7 +231,7 @@ test("right-click mixed message reads each line in its own voice", async ({
 	expect(langs[1]).toBe("zh-CN");
 });
 
-test("right-click a playing message stops it instead", async ({ page }) => {
+test("right-click a playing message restarts it", async ({ page }) => {
 	const para = page.locator("article.assistant .rendered p").first();
 	// Open message space starts the whole-message read (word pixels
 	// would take the per-quote path instead).
@@ -191,10 +243,13 @@ test("right-click a playing message stops it instead", async ({ page }) => {
 		timeout: 10_000
 	});
 	const count = (await spoken(page)).length;
-	// Same message, still no selection: stops instead of restarting.
+	// Same message, still no selection: a second right-click restarts
+	// the read instead of stopping it.
 	await page.mouse.click(point.x, point.y, { button: "right" });
-	await expect(page.locator("article.assistant.speaking")).toBeHidden({
+	await expect
+		.poll(() => spoken(page), { timeout: 10_000 })
+		.toHaveLength(count + 1);
+	await expect(page.locator("article.assistant.speaking")).toBeVisible({
 		timeout: 10_000
 	});
-	expect(await spoken(page)).toHaveLength(count);
 });

@@ -68,9 +68,10 @@ async function clickLabelText(page: Page, sliderLabel: string) {
 	const label = page
 		.locator(".settings-panel label")
 		.filter({ has: page.locator(`input[aria-label="${sliderLabel}"]`) });
-	const box = await label.boundingBox();
-	expect(box).toBeTruthy();
-	await page.mouse.click(box!.x + 20, box!.y + 10);
+	// Click through the locator (never a cached box): the drawer is
+	// still settling when these rows run, and a stale point drifts
+	// onto the reset button under load.
+	await label.click({ position: { x: 5, y: 5 } });
 }
 
 /** Only the parens button resets: label/row clicks keep the value, on all three rows. */

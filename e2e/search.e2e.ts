@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { requireShell, toggleSidebar } from "./helpers";
 
 /**
  * Search-mobile bucket: the Ctrl+P / Cmd+P command palette (Worker
@@ -50,6 +51,7 @@ async function seedThreeChats(page: Page): Promise<void> {
 test.describe("search palette", () => {
 	test("Ctrl+P opens the palette and finds a message", async ({ page }) => {
 		await seedThreeChats(page);
+		await requireShell(page);
 		await page.keyboard.press("Control+p");
 		await expect(
 			page.getByRole("dialog", { name: "Search chats" })
@@ -62,6 +64,7 @@ test.describe("search palette", () => {
 
 	test("CJK query matches without whitespace boundaries", async ({ page }) => {
 		await seedThreeChats(page);
+		await requireShell(page);
 		await page.keyboard.press("Control+p");
 		await page.getByLabel("Search chats and annotations").fill("中文");
 		await expect(page.locator(".search-hit").first()).toContainText("中文", {
@@ -71,6 +74,7 @@ test.describe("search palette", () => {
 
 	test("Enter jumps to the hit chat and Esc closes", async ({ page }) => {
 		await seedThreeChats(page);
+		await requireShell(page);
 		await page.keyboard.press("Control+p");
 		const box = page.getByLabel("Search chats and annotations");
 		await box.fill("sushi");
@@ -133,6 +137,7 @@ test.describe("palette focus order", () => {
 		page
 	}) => {
 		await seedMiso(page);
+		await requireShell(page);
 		await page.keyboard.press("Control+p");
 		const box = page.getByLabel("Search chats and annotations");
 		await box.fill("miso");
@@ -159,6 +164,7 @@ test.describe("palette focus order", () => {
 		page
 	}) => {
 		await seedMiso(page);
+		await requireShell(page);
 		await page.keyboard.press("Control+p");
 		await page.getByLabel("Search chats and annotations").fill("miso");
 		await expect(page.locator(".search-hit")).toHaveCount(3, { timeout: 8000 });
@@ -182,6 +188,7 @@ test.describe("palette focus order", () => {
 
 	test("Enter jumps without selecting the message", async ({ page }) => {
 		await seedMiso(page);
+		await requireShell(page);
 		await page.keyboard.press("Control+p");
 		const box = page.getByLabel("Search chats and annotations");
 		await box.fill("ramen");
@@ -242,6 +249,7 @@ test.describe("find in chat", () => {
 		});
 		await page.goto("/");
 		await expect(page.locator("article .rendered").first()).toBeVisible();
+		await requireShell(page);
 		await page.keyboard.press("Control+f");
 		const bar = page.locator(".find-bar");
 		await expect(bar).toBeVisible();
@@ -265,6 +273,7 @@ test.describe("find in chat", () => {
 
 	test("repeat Ctrl+F closes the bar it opened", async ({ page }) => {
 		await seedThreeChats(page);
+		await requireShell(page);
 		await page.keyboard.press("Control+f");
 		const bar = page.locator(".find-bar");
 		await expect(bar).toBeVisible();
@@ -306,6 +315,7 @@ test.describe("find in chat", () => {
 		});
 		await page.goto("/");
 		await expect(page.locator("article .rendered").first()).toBeVisible();
+		await requireShell(page);
 		const bar = page.locator(".find-bar");
 		const box = bar.getByLabel("Find in chat");
 		const loneHit = async () => {
@@ -354,6 +364,7 @@ test.describe("find in chat", () => {
 		page
 	}) => {
 		await seedThreeChats(page);
+		await requireShell(page);
 		await page.keyboard.press("Control+f");
 		const bar = page.locator(".find-bar");
 		await expect(bar).toBeVisible();
@@ -412,10 +423,30 @@ test.describe("find in chat", () => {
 	});
 });
 
+test.describe("web pass-through", () => {
+	// Shell-only chords stay dead in the browser (e1026be): the page
+	// never swallows print or browser find.
+	test("Ctrl+P never opens the palette in the browser", async ({ page }) => {
+		await seedThreeChats(page);
+		await page.keyboard.press("Control+p");
+		await expect(
+			page.getByRole("dialog", { name: "Search chats" })
+		).toHaveCount(0);
+	});
+
+	test("Ctrl+F never opens the find bar in the browser", async ({
+		page
+	}) => {
+		await seedThreeChats(page);
+		await page.keyboard.press("Control+f");
+		await expect(page.locator(".find-bar")).toHaveCount(0);
+	});
+});
+
 test.describe("sidebar search", () => {
 	test("typing in the sidebar box filters the chat list", async ({ page }) => {
 		await seedThreeChats(page);
-		await page.keyboard.press("Control+b");
+		await toggleSidebar(page);
 		const box = page.getByLabel("Search chats");
 		await expect(box).toBeVisible();
 		await box.fill("sushi");
@@ -498,7 +529,7 @@ test.describe("touch paths", () => {
 test.describe("sidebar search focus", () => {
 	test("clicking the box keeps focus", async ({ page }) => {
 		await seedThreeChats(page);
-		await page.keyboard.press("Control+b");
+		await toggleSidebar(page);
 		const box = page.getByLabel("Search chats");
 		await expect(box).toBeVisible();
 		await page.evaluate(() => {

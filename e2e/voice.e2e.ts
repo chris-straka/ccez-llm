@@ -295,7 +295,11 @@ test.describe("ios-voice", () => {
 	test("ios voice picker lists installed voices", async ({ page }) => {
 		const pick = page.locator(".settings-panel .voice-pick");
 		await expect(pick.getByText("System voice (en-US)")).toBeVisible();
-		const select = pick.locator("select");
+		// Scope past the Voice-language picker: phones carry two
+		// .voice-pick blocks (language, then system voice).
+		const select = page.locator(
+			'.settings-panel .voice-pick select[aria-labelledby="system-voice-label-android"]'
+		);
 		await expect(select.locator("option").nth(1)).toHaveText("Samantha");
 		await expect(select.locator("option").nth(2)).toHaveText("Daniel · en-GB");
 	});
@@ -322,7 +326,9 @@ test.describe("ios-voice", () => {
 
 	/** A picked voice is saved (debounced) and restored on boot. */
 	test("ios voice pick persists", async ({ page }) => {
-		const select = page.locator(".settings-panel .voice-pick select");
+		const select = page.locator(
+			'.settings-panel .voice-pick select[aria-labelledby="system-voice-label-android"]'
+		);
 		await select.selectOption("com.apple.ttsbundle.Daniel-compact");
 		// Settings autosave debounces: let the pick land, then prove the save.
 		await page.waitForTimeout(700);
@@ -347,7 +353,9 @@ test.describe("ios-voice", () => {
 		await page.keyboard.press("Meta+,");
 		await expect(page.locator(".settings-panel")).not.toHaveClass(/closed/);
 		await expect(
-			page.locator(".settings-panel .voice-pick select")
+			page.locator(
+				'.settings-panel .voice-pick select[aria-labelledby="system-voice-label-android"]'
+			)
 		).toHaveValue("com.apple.ttsbundle.Daniel-compact");
 	});
 });

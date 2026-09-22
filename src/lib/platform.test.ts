@@ -15,6 +15,7 @@ import {
 	shiftKeyLabel,
 	edgeSwipeTarget,
 	contentSwipeTarget,
+	messageFoldSwipe,
 	visibleProviderIds,
 	pinchZoomStep,
 	twoFingerSwipeDir,
@@ -279,6 +280,18 @@ describe("contentSwipeTarget", () => {
 		expect(contentSwipeTarget(150, 600, 200, 600)).toBeNull(); // too short
 		expect(contentSwipeTarget(150, 600, 260, 760)).toBeNull(); // vertical
 		expect(contentSwipeTarget(150, 600, 151, 600)).toBeNull(); // tap
+	});
+});
+
+describe("messageFoldSwipe", () => {
+	it("folds on long mostly-horizontal strokes either way", () => {
+		expect(messageFoldSwipe(220, 500, 30, 505)).toBe(true); // left
+		expect(messageFoldSwipe(30, 500, 220, 505)).toBe(true); // right
+	});
+	it("rejects short drags, vertical scrolls, and taps", () => {
+		expect(messageFoldSwipe(220, 500, 180, 500)).toBe(false); // too short
+		expect(messageFoldSwipe(220, 500, 30, 700)).toBe(false); // vertical
+		expect(messageFoldSwipe(220, 500, 221, 500)).toBe(false); // tap
 	});
 });
 

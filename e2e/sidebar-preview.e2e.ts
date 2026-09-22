@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { toggleSidebar } from "./helpers";
 
 const ALPHA = "Alpha active-chat message";
 const BRAVO = "Bravo preview-chat message";
@@ -32,7 +33,7 @@ async function seedTwoChats(page: Page): Promise<void> {
 }
 
 async function openSidebar(page: Page): Promise<void> {
-	await page.keyboard.press("Meta+b");
+	await toggleSidebar(page);
 	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
 }
 

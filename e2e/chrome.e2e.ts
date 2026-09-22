@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { expectBoxesStable, seedChat } from "./helpers";
+import { expectBoxesStable, seedChat, toggleSidebar } from "./helpers";
 
 /**
  * App chrome + settings (bucket chromesettings). NOT RUN in this
@@ -840,13 +840,16 @@ test("scale icons with text size applies immediately", async ({ page }) => {
 		glyph.evaluate((el) => parseFloat(getComputedStyle(el).height));
 	// Buttons track the text (0.92rem × 1.5 × 0.85 ≈ 18.8px) with no opt-in.
 	expect(await px()).toBeGreaterThan(16);
-	// Icons hold their fixed height until the opt-in.
-	expect(await glyphPx()).toBeLessThan(18);
 	await page.keyboard.press("Meta+,");
 	const check = page.locator(
 		'.settings-panel label:has-text("Scale message icons with text size") input'
 	);
 	await expect(check).toBeVisible({ timeout: 5_000 });
+	// Deterministic baseline first: the opt-in ships on by default.
+	await check.uncheck();
+	await expect(page.locator("main")).not.toHaveClass(/scale-actions/);
+	// Icons hold their fixed height until the opt-in.
+	expect(await glyphPx()).toBeLessThan(18);
 	await check.check();
 	await expect(page.locator("main")).toHaveClass(/scale-actions/);
 	// 1.05rem × (1 + 0.5 × 0.8) ≈ 23.5px at 150%: visibly grown.
@@ -1115,11 +1118,13 @@ test("message buttons scale with text size when enabled", async ({ page }) => {
 	const glyph = page
 		.locator("article.assistant .actions .icon-btn .action-glyph")
 		.first();
+	const opt = page.locator(
+		'.settings-panel label:has-text("Scale message icons with text size") input'
+	);
+	// Deterministic states, not a toggle: the opt-in ships on by default.
+	await opt.uncheck();
 	const fixed = await glyph.evaluate((el) => getComputedStyle(el).height);
-	await page
-		.locator(".settings-panel")
-		.getByText("Scale message icons with text size")
-		.click();
+	await opt.check();
 	const scaled = await glyph.evaluate((el) => getComputedStyle(el).height);
 	expect(parseFloat(scaled)).toBeGreaterThan(parseFloat(fixed));
 });
@@ -1178,17 +1183,15 @@ test("think blocks stay hidden", async ({ page }) => {
 	await expect(page.locator("article.assistant .ccez-thoughts")).toHaveCount(0);
 });
 
-/** Shift+Meta+plus/minus widen/narrow the chat column. */
-test("shift-meta-plus widens the chat column", async ({ page }) => {
+/** The chat-width setting widens the column (the ⇧⌘+ chord is
+shell-only: the browser owns page zoom, so specs drive the setting). */
+test("chat width setting widens the chat column", async ({ page }) => {
 	await openWithMessages(page, [{ role: "user", content: "hi" }]);
-	await page.locator(".ta-input").first().click();
-	await page.keyboard.down("Shift");
-	await page.keyboard.down("Meta");
-	await page.keyboard.press("Equal");
-	await page.keyboard.up("Meta");
-	await page.keyboard.up("Shift");
+	await openSettings(page);
+	await page
+		.locator('.settings-panel input[aria-label="Chat width in rem"]')
+		.fill("38");
 	// Default 36 + one 2rem step.
-	await expect(page.locator(".toast")).toContainText("Chat width 38 rem");
 	await expect
 		.poll(() =>
 			page.evaluate(() => window.localStorage.getItem("ccez-llm-settings-v1"))
@@ -1239,7 +1242,7 @@ test("new chat button shows and focuses the prompt", async ({ page }) => {
 		timeout: 60_000
 	});
 	await expect(prompt).toHaveClass(/prompt-idle/, { timeout: 10_000 });
-	await page.keyboard.press("Control+b");
+	await toggleSidebar(page);
 	await expect(page.locator("aside:not(.settings-panel)")).not.toHaveClass(
 		/collapsed/
 	);

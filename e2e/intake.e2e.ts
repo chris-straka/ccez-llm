@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { seedChat } from "./helpers";
+import { seedChat, toggleSidebar } from "./helpers";
 
 /** Drop a canvas-painted PNG onto the composer (in-page: DataTransfer
 is not serializable across the protocol, so dispatchEvent can't carry
@@ -89,7 +89,7 @@ test("sidebar row export button downloads the chat as markdown", async ({
 	await expect(
 		page.locator('header button[aria-label="Export chat as Markdown"]')
 	).toHaveCount(0);
-	await page.keyboard.press("Meta+b");
+	await toggleSidebar(page);
 	const row = page.locator("aside li").first();
 	await expect(row).toBeVisible();
 	await row.hover();
@@ -1057,7 +1057,7 @@ test("cutting an image tag keeps its bytes for another chat", async ({
 	await expect(card).toHaveCount(0);
 	// ...but the clipboard kept the picture: a new chat pastes it back
 	// as a live image, not a dead tag.
-	await page.keyboard.press("Meta+b");
+	await toggleSidebar(page);
 	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/, {
 		timeout: 10_000
 	});
