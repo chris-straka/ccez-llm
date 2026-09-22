@@ -33,6 +33,7 @@ import {
 	filePendingAnnotation,
 	promptAnnWashIdFor,
 	paragraphForQuote,
+	badgeAnswerClass,
 	clampMenuDrag,
 	annEditCommitToast,
 	REFS_ONLY_BODY,
@@ -795,6 +796,28 @@ describe("buildMarksFor", () => {
 		});
 		// Another message's pill never leaks in.
 		expect(buildMarksFor(list, m2, false, pending)).toHaveLength(1);
+	});
+
+	it("marks waiting and ready answers, neutral otherwise", () => {
+		const answered: Annotation = { ...list[0]!, answer: "because" };
+		const ready = buildMarksFor([answered], m1, false, null);
+		expect(ready[0]).toMatchObject({ answer: "ready" });
+		const waiting = buildMarksFor(
+			list,
+			m1,
+			false,
+			null,
+			new Set([list[0]!.id])
+		);
+		expect(waiting[0]).toMatchObject({ answer: "waiting" });
+		const neutral = buildMarksFor(list, m1, false, null);
+		expect(neutral[0]!.answer).toBeUndefined();
+	});
+
+	it("paints waiting blue and ready orange, neutral unclassed", () => {
+		expect(badgeAnswerClass("waiting")).toBe(" ans-waiting");
+		expect(badgeAnswerClass("ready")).toBe(" ans-ready");
+		expect(badgeAnswerClass(undefined)).toBe("");
 	});
 });
 

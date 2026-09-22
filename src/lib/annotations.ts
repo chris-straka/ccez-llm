@@ -43,6 +43,12 @@ export interface Annotation {
 	 * annotations, cleared on send.
 	 */
 	at?: number;
+	/**
+	 * Model answer to the annotation's question (the remodel): set
+	 * when the separate request lands, persisted with drafts like the
+	 * comment. Absent means unanswered — badges stay neutral.
+	 */
+	answer?: string;
 }
 
 export function newAnnotationId(): AnnotationId {
@@ -574,6 +580,8 @@ export interface AnnotationMark {
 	at?: number;
 	/** Aid text the quote locates against (see Annotation.aidScope). */
 	aidScope?: "tashkeel";
+	/** Answer state for the badge (see Annotation.answer). */
+	answer?: "waiting" | "ready";
 	/**
 	 * Preview (unsaved) annotation: washes like a real mark when it is
 	 * the open one, but stamps no badge — badges appear on submit only.
@@ -1372,6 +1380,19 @@ function mirrorBadgeForDirection(
 	badge.classList.toggle("rtl", rtl);
 }
 
+/**
+ * Answer-state badge class: waiting reads blue, ready reads slick
+ * orange (both themes — see the MessageBody badge rules). Empty when
+ * unanswered so neutral badges keep the accent.
+ */
+export function badgeAnswerClass(
+	answer: "waiting" | "ready" | undefined
+): string {
+	if (answer === "waiting") return " ans-waiting";
+	if (answer === "ready") return " ans-ready";
+	return "";
+}
+
 function stampBadges(
 	root: HTMLElement,
 	items: AnnotationMark[],
@@ -1431,7 +1452,7 @@ function stampBadges(
 		// the swap mid-flight and oscillate.
 		const badge = live.get(item.id) ?? document.createElement("button");
 		badge.type = "button";
-		badge.className = "ccez-ann-badge";
+		badge.className = `ccez-ann-badge${badgeAnswerClass(item.answer)}`;
 		if (!settled.has(item.id)) badge.classList.add("fresh");
 		else badge.classList.remove("fresh");
 		badge.dataset.annBadge = item.id;
@@ -1510,7 +1531,7 @@ function stampLegacy(
 		if (!anchor) continue;
 		const badge = live.get(item.id) ?? document.createElement("button");
 		badge.type = "button";
-		badge.className = "ccez-ann-badge";
+		badge.className = `ccez-ann-badge${badgeAnswerClass(item.answer)}`;
 		if (!settled.has(item.id)) badge.classList.add("fresh");
 		else badge.classList.remove("fresh");
 		badge.dataset.annBadge = item.id;
@@ -2589,7 +2610,8 @@ export function buildMarksFor(
 	list: Annotation[],
 	messageId: ChatMsgId,
 	tashkeelOn: boolean,
-	pending: Annotation | null
+	pending: Annotation | null,
+	answering: Set<AnnotationId> = new Set()
 ): AnnotationMark[] {
 	const saved: AnnotationMark[] = list
 		.filter((a) => a.messageId === messageId && aidMarkVisible(a.aidScope, tashkeelOn))
@@ -2598,7 +2620,12 @@ export function buildMarksFor(
 			number: annotationNumber(list, a.id),
 			quote: a.quote,
 			at: a.at ?? 0,
-			...(a.aidScope ? { aidScope: a.aidScope } : {})
+			...(a.aidScope ? { aidScope: a.aidScope } : {}),
+			...(a.answer
+				? { answer: "ready" as const }
+				: answering.has(a.id)
+					? { answer: "waiting" as const }
+					: {})
 		}));
 	if (pending && pending.messageId === messageId) {
 		saved.push({

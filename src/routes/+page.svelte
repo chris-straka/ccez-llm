@@ -225,6 +225,7 @@
 		annotationCopyText,
 		filePendingAnnotation,
 		promptAnnWashIdFor,
+		paragraphForQuote,
 		clampMenuDrag,
 		annEditCommitToast,
 		type Annotation,
@@ -375,6 +376,7 @@
 		sentenceBounds,
 		hanOverlayLangFor,
 		runModelAid,
+		annotationAnswer,
 		aidTargetLines,
 		spliceAidResult,
 		messageAidKinds,
@@ -741,6 +743,11 @@
 	 * already address the annotation it will become.
 	 */
 	let pendingAnn = $state<Annotation | null>(null);
+	/** Annotations with a model answer in flight (the remodel):
+	badges read blue until the answer lands, orange after. Memory-only
+	like the request itself — answers persist on the annotation, the
+	waiting flag does not survive a reload. */
+	let annAnswering = new SvelteSet<AnnotationId>();
 	let reviewOpen = $state(false);
 	/** Focus refs: after a control unmounts mid-touch, focus must
 	land on a live node inside .ann-wrap — never on a dying button
@@ -4825,13 +4832,59 @@
 		if (settings.hapticsEnabled) vibrateTick(6);
 	}
 
+	/** Paragraph holding a quote, for the answer request's context. */
+	function answerContextFor(messageId: ChatMsgId, quote: string): string {
+		const msg = chatState.chats
+			.flatMap((c) => c.messages)
+			.find((m) => m.id === messageId);
+		return paragraphForQuote(msg ? aidDisplayText(msg.content) : "", quote);
+	}
+
+	/** Fire one annotation's separate model request (the remodel):
+	never linked to the main prompt or history — later questions file
+	while earlier ones are still waiting. Failures banner (toast on
+	phones) and leave the badge neutral; the question keeps its note. */
+	async function askAnnotation(ann: Annotation): Promise<void> {
+		annAnswering.add(ann.id);
+		try {
+			const provider = await resolveProviderActive();
+			if (!provider) {
+				const message = "Set an API key first — open Settings.";
+				showNotice(notices, "banner", message);
+				if (androidUI) flashErrorToast(message);
+				return;
+			}
+			clearNotice(notices, "banner");
+			const answer = await annotationAnswer(provider, {
+				quote: ann.quote,
+				question: ann.comment,
+				context: answerContextFor(ann.messageId, ann.quote)
+			});
+			annotations = annotations.map((a) =>
+				a.id === ann.id ? { ...a, answer } : a
+			);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			showNotice(notices, "banner", message);
+			if (androidUI) flashErrorToast(message);
+		} finally {
+			annAnswering.delete(ann.id);
+		}
+	}
+
 	/** Submit the annotation being composed (Enter or Save). The id is
-	kept from composition so wash, pill, and badge address one thing. */
+	kept from composition so wash, pill, and badge address one thing.
+	Filing also fires the answer request (the remodel). */
 	function commitPending(): void {
 		const filed = filePendingAnnotation(annotations, pendingAnn, annDraft);
 		if (!filed) return;
 		annotations = filed;
+		const id = pendingAnn?.id;
 		pendingAnn = null;
+		if (id) {
+			const ann = annotations.find((a) => a.id === id);
+			if (ann) void askAnnotation(ann);
+		}
 	}
 
 	/** Fade the pill out, then unmount it. Data writes stay synchronous
@@ -5179,7 +5232,12 @@
 		if (pending) {
 			const filed = filePendingAnnotation(annotations, pendingAnn, comment);
 			if (filed) annotations = filed;
+			const id = pendingAnn?.id;
 			pendingAnn = null;
+			if (id) {
+				const ann = annotations.find((a) => a.id === id);
+				if (ann) void askAnnotation(ann);
+			}
 		} else {
 			annotations = editAnnotationComment(annotations, target.id, comment);
 		}
@@ -5738,7 +5796,7 @@
 	 */
 	const memoMarks = createRefMemo<AnnotationMark>(
 		(m) =>
-			`${m.id}:${m.number}:${m.quote}:${m.at ?? 0}:${m.preview === true ? "preview" : "saved"}:${m.aidScope ?? ""}`
+			`${m.id}:${m.number}:${m.quote}:${m.at ?? 0}:${m.preview === true ? "preview" : "saved"}:${m.aidScope ?? ""}:${m.answer ?? ""}`
 	);
 	function marksFor(messageId: ChatMsgId): AnnotationMark[] {
 		return memoMarks(
@@ -5747,7 +5805,8 @@
 				annotations,
 				messageId,
 				aidModelPin.has(messageId),
-				pendingAnn
+				pendingAnn,
+				annAnswering
 			)
 		);
 	}

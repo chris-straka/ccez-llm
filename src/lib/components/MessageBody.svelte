@@ -1564,6 +1564,15 @@
 		white-space: nowrap;
 		cursor: pointer;
 	}
+	/* Answer states (the remodel): waiting reads blue, ready reads
+	slick orange — explicit in both themes so the accent never mutes
+	the signal. The tail inherits via `background: inherit`. */
+	.rendered :global(button.ccez-ann-badge.ans-waiting) {
+		background: #0a84ff;
+	}
+	.rendered :global(button.ccez-ann-badge.ans-ready) {
+		background: #ff9f0a;
+	}
 	/* Speech-bubble tail: a slash leaning down-left toward the quote
 	it annotates — tip at the bottom-left corner, wide top tucked 5px
 	under the badge (same color, so the join can never gap — the circle
