@@ -228,6 +228,7 @@
 		filePendingAnnotation,
 		promptAnnWashIdFor,
 		clampMenuDrag,
+		annEditCommitToast,
 		type Annotation,
 		type AnnotationId,
 		type AnnotationMark
@@ -419,6 +420,7 @@
 		emptyViewport,
 		rectInClear,
 		clearLandingDelta,
+		editViewDelta,
 		type ViewportState
 	} from "$lib/viewport";
 	import { ChatSearchStore, createSearchWorker } from "$lib/chatSearchStore";
@@ -5146,9 +5148,12 @@
 			document.querySelector(".prompt")?.getBoundingClientRect().height ?? 0;
 		const visibleBottom = area.bottom - promptH - kb;
 		if (visibleBottom <= area.top) return;
-		const landing = area.top + (visibleBottom - area.top) * 0.2;
-		const dy = range.getBoundingClientRect().top - landing;
-		if (Math.abs(dy) > 8) scrollBox.scrollBy({ top: dy, behavior: "smooth" });
+		const dy = editViewDelta(
+			range.getBoundingClientRect().top,
+			area.top,
+			visibleBottom
+		);
+		if (dy !== null) scrollBox.scrollBy({ top: dy, behavior: "smooth" });
 	}
 
 	/** Send-arrow commit for an in-prompt note edit (see doSend). */
@@ -5160,9 +5165,10 @@
 			shell: tauriBackendAvailable()
 		});
 		const comment = editor?.getText() ?? "";
-		if ("pending" in target) {
-			if (pendingAnn)
-				annotations = [...annotations, { ...pendingAnn, comment }];
+		const pending = "pending" in target;
+		if (pending) {
+			const filed = filePendingAnnotation(annotations, pendingAnn, comment);
+			if (filed) annotations = filed;
 			pendingAnn = null;
 		} else {
 			annotations = editAnnotationComment(annotations, target.id, comment);
@@ -5172,10 +5178,8 @@
 		// comment rewrites — the toast names which happened (a bare
 		// "Note saved" never said). Plain on every platform: no draft
 		// vocabulary, the note files straight from the composer.
-		const savedToast =
-			"pending" in target ? "Annotation saved" : "Annotation edited";
 		exitPromptAnnEdit();
-		flashToast(savedToast);
+		flashToast(annEditCommitToast(pending));
 		void tick().then(() => editor?.focus());
 	}
 

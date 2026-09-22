@@ -2733,3 +2733,11 @@ export function clampMenuDrag(
 		y: Math.min(Math.max(margin, y), viewportHeight - margin)
 	};
 }
+
+/**
+ * Toast for an in-prompt note commit (REFACTOR §6): pending filings
+ * save for the first time, a saved note's comment rewrites.
+ */
+export function annEditCommitToast(pending: boolean): string {
+	return pending ? "Annotation saved" : "Annotation edited";
+}

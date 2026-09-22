@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { emptyViewport, rectInClear, clearLandingDelta } from "./viewport";
+import {
+	emptyViewport,
+	rectInClear,
+	clearLandingDelta,
+	editViewDelta
+} from "./viewport";
 
 describe("emptyViewport", () => {
 	it("starts pinned, unheld, uncached", () => {
@@ -36,5 +41,14 @@ describe("clear-view geometry", () => {
 		expect(clearLandingDelta(400, 0, 500, 100)).toBe(400 - 120);
 		// A dock taller than the column clamps the landing at the top.
 		expect(clearLandingDelta(400, 0, 500, 900)).toBe(400);
+	});
+});
+
+describe("editViewDelta", () => {
+	it("lands quotes a fifth down the visible chat", () => {
+		expect(editViewDelta(500, 0, 1000)).toBe(300);
+		expect(editViewDelta(205, 0, 1000)).toBeNull();
+		expect(editViewDelta(195, 0, 1000)).toBeNull();
+		expect(editViewDelta(100, 0, 1000)).toBe(-100);
 	});
 });

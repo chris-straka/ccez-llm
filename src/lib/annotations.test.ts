@@ -33,6 +33,7 @@ import {
 	filePendingAnnotation,
 	promptAnnWashIdFor,
 	clampMenuDrag,
+	annEditCommitToast,
 	REFS_ONLY_BODY,
 	isRefsOnly,
 	redactedCopyText
@@ -907,5 +908,12 @@ describe("clampMenuDrag", () => {
 		expect(clampMenuDrag(100, 100, 400, 800)).toEqual({ x: 100, y: 100 });
 		expect(clampMenuDrag(-50, 900, 400, 800)).toEqual({ x: 8, y: 792 });
 		expect(clampMenuDrag(500, 100, 400, 800)).toEqual({ x: 392, y: 100 });
+	});
+});
+
+describe("annEditCommitToast", () => {
+	it("names filings vs rewrites", () => {
+		expect(annEditCommitToast(true)).toBe("Annotation saved");
+		expect(annEditCommitToast(false)).toBe("Annotation edited");
 	});
 });

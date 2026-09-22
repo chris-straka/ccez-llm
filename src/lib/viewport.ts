@@ -94,3 +94,19 @@ export function clearLandingDelta(
 	const landing = areaTop + Math.max(0, areaHeight - dock) * 0.3;
 	return rectTop - landing;
 }
+
+/**
+ * Scroll delta landing a quote in the edit view (REFACTOR §6):
+ * a fifth down the visible chat — the keyboard plus composer own
+ * the bottom on phones, so the only visible space while typing is
+ * at the top. Null when already there (8px dead zone).
+ */
+export function editViewDelta(
+	rectTop: number,
+	areaTop: number,
+	visibleBottom: number
+): number | null {
+	const landing = areaTop + (visibleBottom - areaTop) * 0.2;
+	const dy = rectTop - landing;
+	return Math.abs(dy) > 8 ? dy : null;
+}
