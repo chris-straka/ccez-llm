@@ -916,3 +916,14 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
       stays open: per-switch storage is only draft/scroll filing
       (localStorage, KBs) — render cost dominates and needs a
       device profile.
+
+- [x] Shift+W/S/P read the word/sentence/paragraph under the mouse:
+      keybindings dispatch (`speak-word/sentence/paragraph`, fields and
+      bare letters yield), block-aware flatten (`joinSlicesWithBlocks`
+      blank-lines rendered blocks apart so Shift+P stops at the visible
+      paragraph), shortcuts-menu rows included
+      (`e2e/speech-chords.e2e.ts` 5/5).
+
+- [x] Desktop text size uncapped to 800%: the 600% chord cap had no
+      layout reason (slider already maxes at 800, badges/glyphs scale
+      dampened) — `stepFontScale` takes one cap, desktop and phone alike.
