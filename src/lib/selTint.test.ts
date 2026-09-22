@@ -2,8 +2,10 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
 	joinSlicesWithBlocks,
+	longestLineWidth,
 	scopeSlices,
 	selectionSlices,
+	shrinkPanelToContent,
 	spanRect,
 	speechBlockOf,
 	tintSelectionSpans,
@@ -120,6 +122,38 @@ describe("joinSlicesWithBlocks", () => {
 		expect(speechBlockOf(inner, div)?.tagName).toBe("P");
 		const outer = document.createElement("div");
 		expect(speechBlockOf(inner, outer)).toBeNull();
+	});
+});
+
+describe("longestLineWidth", () => {
+	it("takes the widest top-sharing run span", () => {
+		expect(
+			longestLineWidth([
+				{ top: 10, left: 0, width: 100 },
+				{ top: 10, left: 100, width: 146 },
+				{ top: 30, left: 0, width: 300 }
+			])
+		).toBe(300);
+	});
+
+	it("unions fragments on a line, skips zero-width ones", () => {
+		expect(
+			longestLineWidth([
+				{ top: 10, left: 0, width: 100 },
+				{ top: 10, left: 90, width: 100 },
+				{ top: 10, left: 0, width: 0 },
+				{ top: 30, left: 0, width: 50 }
+			])
+		).toBe(190);
+		expect(longestLineWidth([])).toBe(0);
+	});
+});
+
+describe("shrinkPanelToContent", () => {
+	it("is zero where nothing lays out (jsdom paints no boxes)", () => {
+		const div = rendered("");
+		div.innerHTML = "<p>alpha beta gamma</p>";
+		expect(shrinkPanelToContent(div)).toBe(0);
 	});
 });
 

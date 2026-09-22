@@ -248,3 +248,82 @@ test("right-clicking kanji in japanese shows furigana and speaks", async ({
 	// (and waits for the worker conversion behind it).
 	await expect.poll(() => spoken(page), { timeout: 120_000 }).toContain("かんじ");
 });
+
+/** A long pinyin line's glass hugs its longest laid-out line, never
+the 20rem slab, so the backdrop fits where the characters do. */
+test("a scrunched reading's backdrop hugs its longest line", async ({
+	page
+}) => {
+	// Pinyin for ~30 hanzi overflows the cap and wraps onto
+	// several lines.
+	await seedChat(page, [
+		{
+			role: "assistant",
+			content: "我正在学习中文因为我觉得中文很有意思而且每天都练习说中文"
+		}
+	]);
+	await page.goto("/");
+	await expect(
+		page.locator("article.assistant .rendered p").first()
+	).toBeVisible({
+		timeout: 60_000
+	});
+	const selected = await page.evaluate(() => {
+		const p = document.querySelector("article.assistant .rendered p");
+		if (!p) return "";
+		const range = document.createRange();
+		range.selectNodeContents(p);
+		const sel = window.getSelection();
+		sel?.removeAllRanges();
+		sel?.addRange(range);
+		return sel?.toString() ?? "";
+	});
+	expect(selected.length).toBeGreaterThan(10);
+	// Click the highlight's own middle: a right mousedown outside it
+	// collapses the caret, and the width pass stands down on a moved
+	// highlight (see highlightSteady).
+	const at = await page.evaluate(() => {
+		const sel = window.getSelection();
+		if (!sel || sel.rangeCount === 0) return null;
+		const rect = sel.getRangeAt(0).getBoundingClientRect();
+		return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+	});
+	if (!at) throw new Error("no selection rect");
+	await page.mouse.click(at.x, at.y, { button: "right" });
+	const panels = page.locator(".sel-pinyin");
+	await expect(panels.first()).toBeVisible({ timeout: 10_000 });
+	const widths = await page.evaluate(() => {
+		const out: Array<{ panel: number; line: number; lines: number }> = [];
+		for (const el of document.querySelectorAll(".sel-pinyin")) {
+			if (!(el instanceof HTMLElement)) continue;
+			const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+			const grouped = new Map<number, { l: number; r: number }>();
+			for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+				if (!(n.textContent ?? "").trim()) continue;
+				const range = document.createRange();
+				range.selectNodeContents(n);
+				for (const rect of range.getClientRects()) {
+					if (rect.width === 0) continue;
+					const top = Math.round(rect.top);
+					const line = grouped.get(top) ?? { l: Infinity, r: -Infinity };
+					line.l = Math.min(line.l, rect.left);
+					line.r = Math.max(line.r, rect.right);
+					grouped.set(top, line);
+				}
+			}
+			let longest = 0;
+			for (const { l, r } of grouped.values())
+				longest = Math.max(longest, r - l);
+			out.push({ panel: el.clientWidth, line: longest, lines: grouped.size });
+		}
+		return out;
+	});
+	expect(widths.length).toBeGreaterThan(0);
+	// At least one panel genuinely wraps, or the seed never
+	// exercised the scrunch path.
+	const wrapped = widths.filter((w) => w.lines > 1 && w.panel > 200);
+	expect(wrapped.length).toBeGreaterThan(0);
+	for (const { panel, line } of wrapped) {
+		expect(panel).toBeLessThanOrEqual(line + 14);
+	}
+});

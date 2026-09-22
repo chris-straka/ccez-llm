@@ -269,6 +269,7 @@
 		joinSlicesWithBlocks,
 		scopeSlices,
 		selectionSlices,
+		shrinkPanelToContent,
 		spanRect,
 		tintSelectionSpans,
 		unwrapFuriganaTint
@@ -1501,7 +1502,9 @@
 			const xs = current.map((panel, i) => {
 				const node = nodes[i];
 				if (!(node instanceof HTMLElement)) return panel.x;
-				const w = node.getBoundingClientRect().width;
+				// Narrow scrunched glass to its longest line first:
+				// the clamp below then guards text, not empty slab.
+				const w = shrinkPanelToContent(node);
 				if (w === 0) return panel.x;
 				const x = clampPanelCenterX(panel.x, w, window.innerWidth);
 				if (panelCenterMoved(x, panel.x)) moved = true;
@@ -1534,7 +1537,7 @@
 			if (!node || !now || !selPinyin) return;
 			// Same highlight still live (not scrolled or changed)?
 			if (!highlightSteady(now, rect)) return;
-			const w = node.getBoundingClientRect().width;
+			const w = shrinkPanelToContent(node);
 			const x = clampPanelCenterX(
 				now.left + now.width / 2,
 				w,

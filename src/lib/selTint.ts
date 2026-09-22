@@ -125,6 +125,75 @@ export function speechBlockOf(
 	}
 }
 
+/** One laid-out text fragment for the panel-narrowing pass. */
+export interface LineFrag {
+	top: number;
+	left: number;
+	width: number;
+}
+
+/** Longest laid-out line across fragments sharing a rounded top:
+the width readings panels narrow to. Zero-width fragments never
+count (collapsed whitespace, empty runs). */
+export function longestLineWidth(frags: LineFrag[]): number {
+	const lines = new Map<number, { l: number; r: number }>();
+	for (const f of frags) {
+		if (f.width <= 0) continue;
+		const line = lines.get(f.top) ?? { l: Infinity, r: -Infinity };
+		line.l = Math.min(line.l, f.left);
+		line.r = Math.max(line.r, f.left + f.width);
+		lines.set(f.top, line);
+	}
+	let longest = 0;
+	for (const { l, r } of lines.values())
+		longest = Math.max(longest, r - l);
+	return longest;
+}
+
+/** Narrow a readings panel to its longest laid-out line plus side
+padding (DOM-bound; the pure grouping is longestLineWidth). Returns
+the effective width for the x-clamp: the narrowed width when the
+glass was a slab, else the measured one. Zero when unmeasurable
+(jsdom, display none) — callers keep their placed x. Explicit
+widths are safe: panels are transient per selection, and the
+translateX centering holds whatever the width. */
+export function shrinkPanelToContent(node: Element): number {
+	try {
+		const w = node.getBoundingClientRect().width;
+		if (w === 0) return 0;
+		const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+		const frags: LineFrag[] = [];
+		for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+			if (!(n.textContent ?? "").trim()) continue;
+			const range = document.createRange();
+			range.selectNodeContents(n);
+			for (const rect of range.getClientRects()) {
+				if (rect.width === 0) continue;
+				frags.push({
+					top: Math.round(rect.top),
+					left: rect.left,
+					width: rect.width
+				});
+			}
+			range.detach();
+		}
+		const longest = longestLineWidth(frags);
+		const cs = getComputedStyle(node);
+		const pad =
+			(parseFloat(cs.paddingLeft) || 0) +
+			(parseFloat(cs.paddingRight) || 0);
+		if (longest > 0 && w > longest + pad + 1) {
+			const narrowed = Math.ceil(longest + pad);
+			if (node instanceof HTMLElement)
+				node.style.width = `${narrowed}px`;
+			return narrowed;
+		}
+		return w;
+	} catch {
+		return 0;
+	}
+}
+
 /** Flatten scope slices to plain text with a blank line between
 slices from different blocks, so paragraph speech stops at the
 rendered paragraph (raw concatenation fuses "zeta." and "Second"

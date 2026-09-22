@@ -951,3 +951,10 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
       plus 100px gate kept it round too long); the sent card spans the
       message width (stretched container, right-anchored for user
       bubbles) at twice the height cap (48rem, viewport still bounds).
+
+- [x] Furigana/pinyin backdrop hugs scrunched readings: pure CSS cannot
+      do it (fit-content resolves long text to the cap, verified by
+      measurement: 326px glass over a 246px line). The width pass now
+      narrows panels to the longest laid-out line
+      (`shrinkPanelToContent` + `longestLineWidth`, wired into both
+      width passes; centering rides translateX so it holds).

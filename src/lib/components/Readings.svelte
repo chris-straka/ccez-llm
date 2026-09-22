@@ -85,6 +85,11 @@ panels. -->
 		position: fixed;
 		z-index: 50;
 		pointer-events: none;
+		/* Hug the characters: when long readings scrunch onto
+		several lines, the width pass (see shrinkPanelToContent)
+		narrows the glass to the longest laid-out line — never a
+		slab spanning the max-width. No pure-CSS shape does this:
+		shrink-to-fit resolves long text to the cap. */
 		max-width: 20rem;
 		/* Scrunched (wrapped) readings balance into even centered
 		lines, so the glass hugs the characters instead of spanning
