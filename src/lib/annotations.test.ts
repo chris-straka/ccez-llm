@@ -21,6 +21,9 @@ import {
 	firstContentRect,
 	readingPanelPlacement,
 	menuYAbovePanel,
+	clampPanelCenterX,
+	highlightSteady,
+	panelCenterMoved,
 	lineStartOffset,
 	clampDragAnchorToFocusLine,
 	reviewEditKey,
@@ -674,6 +677,33 @@ describe("menuYAbovePanel", () => {
 		expect(menuYAbovePanel(300, 48)).toBe(248);
 		expect(menuYAbovePanel(40, 48)).toBe(8);
 		expect(menuYAbovePanel(300, 48, 12)).toBe(240);
+	});
+});
+
+describe("readings width pass", () => {
+	it("clampPanelCenterX keeps the 8px margins on both sides", () => {
+		expect(clampPanelCenterX(600, 200, 1280)).toBe(600);
+		expect(clampPanelCenterX(10, 200, 1280)).toBe(108);
+		expect(clampPanelCenterX(1270, 200, 1280)).toBe(1072);
+	});
+
+	it("clampPanelCenterX never inverts on a narrow phone", () => {
+		// 300-wide panel on a 320 viewport: the upper bound
+		// (12) sits below the lower (158), so it parks at 158
+		// instead of sliding off the left edge.
+		expect(clampPanelCenterX(160, 300, 320)).toBe(158);
+	});
+
+	it("panelCenterMoved tolerates a pixel, flags the rest", () => {
+		expect(panelCenterMoved(100.5, 100)).toBe(false);
+		expect(panelCenterMoved(101.5, 100)).toBe(true);
+	});
+
+	it("highlightSteady tolerates 2px drift either way", () => {
+		const placed = { left: 100, top: 200 };
+		expect(highlightSteady({ left: 101, top: 202 }, placed)).toBe(true);
+		expect(highlightSteady({ left: 103, top: 200 }, placed)).toBe(false);
+		expect(highlightSteady({ left: 100, top: 204 }, placed)).toBe(false);
 	});
 });
 

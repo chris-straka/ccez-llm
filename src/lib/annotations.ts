@@ -2562,6 +2562,57 @@ export function menuYAbovePanel(
 }
 
 /**
+ * Width-pass center clamp for readings panels: the panel centers on
+ * its highlight (CSS translateX), so the center keeps an 8px margin
+ * on both sides. The upper bound never drops below the lower one —
+ * on a very narrow phone a wide panel parks at the lower bound
+ * instead of inverting to a negative x. Pure — callers measure the
+ * true width a frame after placement.
+ */
+export function clampPanelCenterX(
+	x: number,
+	panelWidth: number,
+	viewportWidth: number,
+	margin = 8
+): number {
+	const lo = panelWidth / 2 + margin;
+	return Math.min(
+		Math.max(lo, x),
+		Math.max(lo, viewportWidth - panelWidth - margin)
+	);
+}
+
+/**
+ * Settle check for the width pass: a sub-pixel-corrected center
+ * within a pixel of the placed one needs no state write (and no
+ * re-render). Pure.
+ */
+export function panelCenterMoved(
+	x: number,
+	placedX: number,
+	tolerance = 1
+): boolean {
+	return Math.abs(x - placedX) > tolerance;
+}
+
+/**
+ * Steadiness check before the width pass: the live highlight must
+ * still sit where placement measured it (scrolls and selection
+ * edits move it), else the corrected center belongs to a stale
+ * rect. Pure.
+ */
+export function highlightSteady(
+	now: { left: number; top: number },
+	placed: { left: number; top: number },
+	tolerance = 2
+): boolean {
+	return (
+		Math.abs(now.left - placed.left) <= tolerance &&
+		Math.abs(now.top - placed.top) <= tolerance
+	);
+}
+
+/**
  * Start offset of the visual line holding `offset`: the index just
  * past the nearest preceding newline (0 when none). Lines come from
  * text alone so the rule unit-tests without layout.

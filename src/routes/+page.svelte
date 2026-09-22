@@ -215,6 +215,9 @@
 		selMenuPlacement,
 		readingPanelPlacement,
 		menuYAbovePanel,
+		clampPanelCenterX,
+		highlightSteady,
+		panelCenterMoved,
 		lineStartOffset,
 		clampDragAnchorToFocusLine,
 		loadDraftAnnotations,
@@ -1499,11 +1502,8 @@
 				if (!(node instanceof HTMLElement)) return panel.x;
 				const w = node.getBoundingClientRect().width;
 				if (w === 0) return panel.x;
-				const x = Math.min(
-					Math.max(w / 2 + 8, panel.x),
-					Math.max(w / 2 + 8, window.innerWidth - w - 8)
-				);
-				if (Math.abs(x - panel.x) > 1) moved = true;
+				const x = clampPanelCenterX(panel.x, w, window.innerWidth);
+				if (panelCenterMoved(x, panel.x)) moved = true;
 				return x;
 			});
 			if (moved) apply(xs);
@@ -1532,17 +1532,14 @@
 				: null;
 			if (!node || !now || !selPinyin) return;
 			// Same highlight still live (not scrolled or changed)?
-			if (
-				Math.abs(now.left - rect.left) > 2 ||
-				Math.abs(now.top - rect.top) > 2
-			)
-				return;
+			if (!highlightSteady(now, rect)) return;
 			const w = node.getBoundingClientRect().width;
-			const x = Math.min(
-				Math.max(w / 2 + 8, now.left + now.width / 2),
-				window.innerWidth - w - 8
+			const x = clampPanelCenterX(
+				now.left + now.width / 2,
+				w,
+				window.innerWidth
 			);
-			if (Math.abs(x - selPinyin.x) > 1) selPinyin = { ...selPinyin, x };
+			if (panelCenterMoved(x, selPinyin.x)) selPinyin = { ...selPinyin, x };
 		});
 	}
 	/**
