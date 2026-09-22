@@ -1841,6 +1841,14 @@
 			errorToastTimeoutFor(message)
 		);
 	}
+	/** Missing-key notice, one source: banner everywhere, toast on
+	phones. Ask, aids, and locked taps share it so the copy and the
+	pairing never fork. */
+	function flashMissingKey(): void {
+		const message = "Set an API key first — open Settings.";
+		showNotice(notices, "banner", message);
+		if (androidUI) flashErrorToast(message);
+	}
 	let stopDictation: (() => void) | null = null;
 	let openLangMenu: LanguageMenu["id"] | null = $state(null);
 	/* Phone sheet anchor: the open list escapes the thread scroller
@@ -4625,9 +4633,7 @@
 		try {
 			const provider = await resolveProviderActive();
 			if (!provider) {
-				const message = "Set an API key first — open Settings.";
-				showNotice(notices, "banner", message);
-				if (androidUI) flashErrorToast(message);
+				flashMissingKey();
 				return;
 			}
 			clearNotice(notices, "banner");
@@ -5818,9 +5824,7 @@
 		}
 		const provider = await resolveProviderActive();
 		if (!provider) {
-			const message = "Set an API key first — open Settings.";
-			showNotice(notices, "banner", message);
-			if (androidUI) flashErrorToast(message);
+			flashMissingKey();
 			return;
 		}
 		clearNotice(notices, "banner");
@@ -7026,9 +7030,7 @@
 		// takes no focus and pops no keyboard) — except on controls
 		// with their own behavior, which keep it.
 		if (noKeyLock && !target?.closest("button, input, select, a, .ann-wrap")) {
-			const message = "Set an API key first — open Settings.";
-			showNotice(notices, "banner", message);
-			if (androidUI) flashErrorToast(message);
+			flashMissingKey();
 			return;
 		}
 		if (target?.closest("button, input, textarea, select, a, .ann-wrap"))
