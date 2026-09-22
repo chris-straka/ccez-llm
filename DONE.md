@@ -972,3 +972,13 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
       (returns null off-shell, ⌘⌥T untouched). Dispatch unit-pinned
       in `keybindings.test.ts`; effect rides the existing new-chat
       path; shortcuts menu lists ⌘T under New chat.
+
+## Dropped (Sep 2026, owner call — not bugs, removed from TODO)
+
+- [x] Win/Linux device-proof pile DROPPED: no hardware exists and none
+      is coming — the standing unit-tested-contracts rule already
+      covers what can be covered. Retired from TODO so the working
+      file holds actionable work only.
+- [x] Sidebar-swipe directional lock DROPPED: never misfired once and
+      the owner is tired of seeing it. If it ever fires, file it as a
+      new bug with a repro instead of resurrecting the tripwire.

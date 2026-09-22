@@ -26,12 +26,6 @@ same codebase via the Tauri mobile target.
   never pass claims.
 - Ghost features: user believes all fixed — verify, then drop this item.
 
-## Pile: Win/Linux device proof (still no hardware)
-
-- [ ] Every shipped feature on Win/Linux: unit-tested contracts only
-      (`platform.ts`, `updates.ts`, `langId.ts` + `langid.rs`,
-      `secrets_*` fail-closed). No pass claims without the hardware.
-
 ## Pile: 0.5.3 remainder (mac app, 370% font size)
 
 Every other 0.5.3 field note is closed in `DONE.md` (speech chords,
@@ -55,13 +49,6 @@ text-size uncap, furigana backdrop, shell Cmd+T). One stays open:
       postMessage bridge call into the Activity (provider/FileUri or
       install-intent args) throwing before the installer starts —
       reproduce on the S24 with adb and read the full Java stack.
-
-## Pile: maybe later (only if troublesome)
-
-- [ ] Chats-sidebar swipe misfires on downward scrolls: directional
-      lock (predominantly-horizontal past a minimum distance) or
-      edge-started swipes. Owner call — implement only if it keeps
-      happening.
 
 ## Non-goals
 
