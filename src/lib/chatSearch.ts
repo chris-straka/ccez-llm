@@ -138,6 +138,51 @@ export interface SearchableAnnotation {
 	comment: string;
 }
 
+/** Draft-annotation shape the index snapshot needs (structural so
+this module stays dependency-free). */
+export interface IndexableAnnotation {
+	id: string;
+	messageId: string;
+	quote: string;
+	comment: string;
+}
+
+/** Collect one index snapshot's annotations: the open chat's live
+drafts plus every other chat's stored ones, de-duplicated by
+chat+annotation so repeat entries collapse. A throwing draft loader
+yields nothing for that chat — search never breaks the chat, the
+stale snapshot stays live. */
+export function collectSearchAnnotations(
+	chats: Array<{ id: string }>,
+	activeChatId: string | null,
+	liveAnnotations: IndexableAnnotation[],
+	loadDraft: (chatId: string) => IndexableAnnotation[]
+): SearchableAnnotation[] {
+	const anns: SearchableAnnotation[] = [];
+	const seen = new Set<string>();
+	for (const chat of chats) {
+		let drafts: IndexableAnnotation[];
+		try {
+			drafts =
+				chat.id === activeChatId ? liveAnnotations : loadDraft(chat.id);
+		} catch {
+			drafts = [];
+		}
+		for (const ann of drafts) {
+			const key = `${chat.id}:${ann.id}`;
+			if (seen.has(key)) continue;
+			seen.add(key);
+			anns.push({
+				chatId: chat.id,
+				messageId: ann.messageId,
+				quote: ann.quote,
+				comment: ann.comment
+			});
+		}
+	}
+	return anns;
+}
+
 /** Flatten chats + annotations into indexable documents. */
 export function buildSearchDocs(
 	chats: SearchableChat[],

@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
 	buildSearchDocs,
 	chatMatchesQuery,
+	collectSearchAnnotations,
 	findMessageIndices,
 	querySearch,
 	snippetFor,
 	tokenizeText,
+	type IndexableAnnotation,
 	type SearchDoc
 } from "./chatSearch";
 
@@ -95,6 +97,51 @@ describe("buildSearchDocs", () => {
 		);
 		expect(docs).toHaveLength(2);
 		expect(docs[1]?.kind).toBe("annotation");
+	});
+});
+
+describe("collectSearchAnnotations", () => {
+	const live: IndexableAnnotation[] = [
+		{ id: "a1", messageId: "m1", quote: "q", comment: "c" }
+	];
+	const stored: IndexableAnnotation[] = [
+		{ id: "b1", messageId: "m2", quote: "qq", comment: "cc" }
+	];
+	const chats = [{ id: "open" }, { id: "other" }];
+
+	it("takes live drafts for the open chat, stored for the rest", () => {
+		const anns = collectSearchAnnotations(chats, "open", live, (id) =>
+			id === "other" ? stored : []
+		);
+		expect(anns).toEqual([
+			{ chatId: "open", messageId: "m1", quote: "q", comment: "c" },
+			{ chatId: "other", messageId: "m2", quote: "qq", comment: "cc" }
+		]);
+	});
+
+	it("scopes dedup keys by chat, collapses repeat chats", () => {
+		// Same annotation id in two chats: both kept (keys differ).
+		const sameId: IndexableAnnotation[] = [
+			{ id: "a1", messageId: "m9", quote: "q", comment: "c" }
+		];
+		const anns = collectSearchAnnotations(chats, "open", live, () => sameId);
+		expect(anns).toHaveLength(2);
+		// Same chat twice: second pass collapses.
+		const repeat = collectSearchAnnotations(
+			[{ id: "open" }, { id: "open" }],
+			"open",
+			live,
+			() => live
+		);
+		expect(repeat).toHaveLength(1);
+	});
+
+	it("a throwing loader yields nothing for that chat", () => {
+		const anns = collectSearchAnnotations(chats, "open", live, () => {
+			throw new Error("locked");
+		});
+		expect(anns).toHaveLength(1);
+		expect(anns[0]?.chatId).toBe("open");
 	});
 });
 

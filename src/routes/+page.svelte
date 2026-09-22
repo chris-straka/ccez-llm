@@ -407,6 +407,7 @@
 	import { fieldSelectionLive, reportOsMenu } from "$lib/promptmenu";
 	import {
 		buildSearchDocs,
+		collectSearchAnnotations,
 		findMessageIndices,
 		type SearchHit
 	} from "$lib/chatSearch";
@@ -2148,30 +2149,14 @@
 		searchIndexTimer = setTimeout(() => {
 			searchIndexTimer = null;
 			try {
-				const seen: string[] = [];
-				const anns: Parameters<typeof buildSearchDocs>[1] = [];
-				for (const chat of chatState.chats) {
-					let drafts: Annotation[] = [];
-					try {
-						drafts =
-							chat.id === chatState.activeChatId
-								? annotations
-								: loadDraftAnnotations(chat.id);
-					} catch {
-						drafts = [];
-					}
-					for (const ann of drafts) {
-						const key = `${chat.id}:${ann.id}`;
-						if (seen.includes(key)) continue;
-						seen.push(key);
-						anns.push({
-							chatId: chat.id,
-							messageId: ann.messageId,
-							quote: ann.quote,
-							comment: ann.comment
-						});
-					}
-				}
+				// Live drafts for the open chat, stored for the rest
+				// (pure collection in chatSearch).
+				const anns = collectSearchAnnotations(
+					chatState.chats,
+					chatState.activeChatId,
+					annotations,
+					loadDraftAnnotations
+				);
 				void ensureSearchStore()
 					.index(buildSearchDocs(currentSearchDocs(), anns))
 					.then(() => {
