@@ -17,6 +17,7 @@ export {
 	sendPasteFolds,
 	bakeEditedMessage,
 	caretAfterPaste,
+	mergeFolds,
 	trimPasteTail,
 	markerCut,
 	markerCutAt,

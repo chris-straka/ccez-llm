@@ -100,6 +100,7 @@
 		sendPasteFolds,
 		bakeEditedMessage,
 		caretAfterPaste,
+		mergeFolds,
 		type PromptEditor,
 		type PromptEditorOptions,
 		type SubmitKind
@@ -6636,9 +6637,7 @@
 	}): Promise<void> {
 		const opened = beginNativeSend(chatState, opts.baked, {
 			attachments: opts.kept,
-			pasteFolds: [...opts.folds, ...opts.pastedFolds].sort(
-				(a, b) => a.start - b.start
-			)
+			pasteFolds: mergeFolds(opts.folds, opts.pastedFolds)
 		});
 		// A duplicate send racing in: the first one owns the chat.
 		if (!opened) return;
@@ -6971,9 +6970,7 @@
 			{
 				attachments: kept,
 				thinking: activeThinkingId(settings),
-				pasteFolds: [...folds, ...pastedFolds].sort(
-					(a, b) => a.start - b.start
-				),
+				pasteFolds: mergeFolds(folds, pastedFolds),
 				// Haptic rumble as the reply starts arriving — only while
 				// its chat is still open. A mid-stream switch must not
 				// rumble the new chat for the old one's reply.

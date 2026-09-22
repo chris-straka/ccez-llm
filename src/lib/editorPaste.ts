@@ -520,3 +520,12 @@ export function caretAfterPaste(
 ): boolean {
 	return pastes.some((s) => caret === s.to);
 }
+
+/**
+ * Merge two fold lists into send order (REFACTOR §6): span folds
+ * plus spliced-paste folds, ascending by start. Both send paths
+ * (TypeScript and native) store the same order.
+ */
+export function mergeFolds<T extends { start: number }>(a: T[], b: T[]): T[] {
+	return [...a, ...b].sort((x, y) => x.start - y.start);
+}

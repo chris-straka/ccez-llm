@@ -4,6 +4,7 @@ import {
 	sendPasteFolds,
 	bakeEditedMessage,
 	caretAfterPaste,
+	mergeFolds,
 	pasteToggleAction,
 	markerCut,
 	markerCutAt,
@@ -511,5 +512,20 @@ describe("caretAfterPaste", () => {
 		expect(caretAfterPaste(spans, 5)).toBe(true);
 		expect(caretAfterPaste(spans, 4)).toBe(false);
 		expect(caretAfterPaste([], 0)).toBe(false);
+	});
+});
+
+describe("mergeFolds", () => {
+	it("merges span and paste folds ascending by start", () => {
+		expect(
+			mergeFolds(
+				[{ start: 10, end: 12, chars: 2 }],
+				[
+					{ start: 2, end: 5, chars: 3 },
+					{ start: 20, end: 22, chars: 2 }
+				]
+			).map((f) => f.start)
+		).toEqual([2, 10, 20]);
+		expect(mergeFolds([], [])).toEqual([]);
 	});
 });
