@@ -282,6 +282,33 @@ describe("highlighting", () => {
 		const rendered = renderMarkdown("plain text");
 		await expect(highlightRendered(rendered)).resolves.toBe(rendered.html);
 	});
+
+	it("replays cached fragments on repeat renders", async () => {
+		// Every chat switch re-renders the entering thread: identical
+		// blocks must replay byte-identical HTML instead of
+		// re-tokenizing (switch cost is profiled, not unit-timed).
+		const first = await highlightRendered(
+			renderMarkdown("```js\nconst x = 1;\n```")
+		);
+		expect(first).toContain("--shiki-dark");
+		const second = await highlightRendered(
+			renderMarkdown("```js\nconst x = 1;\n```")
+		);
+		expect(second).toBe(first);
+	}, 30000);
+
+	it("evicts oldest entries without changing output", async () => {
+		const block = "```js\nconst evictMe = 1;\n```";
+		const before = await highlightRendered(renderMarkdown(block));
+		for (let i = 0; i < 220; i++) {
+			await highlightRendered(
+				renderMarkdown(`\`\`\`js\nconst filler${i} = ${i};\n\`\`\``)
+			);
+		}
+		await expect(
+			highlightRendered(renderMarkdown(block))
+		).resolves.toBe(before);
+	}, 120000);
 });
 
 describe("token estimates", () => {

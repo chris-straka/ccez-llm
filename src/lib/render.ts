@@ -517,6 +517,18 @@ const PRELOAD_LANGS = [
 
 let highlighterPromise: Promise<Highlighter> | null = null;
 
+/**
+ * Shiki fragment cache: `codeToHtml` output depends only on
+ * (language, code) — the themes are fixed and the singleton never
+ * loads more languages after creation — so repeat mounts (every chat
+ * switch re-renders the entering thread) replay instead of
+ * re-tokenizing. Bounded and memory-only: reloads start cold, and
+ * oversized blocks skip the cache to bound retained bytes.
+ */
+const HIGHLIGHT_CACHE_MAX = 200;
+const HIGHLIGHT_CACHE_CODE_MAX = 65536;
+const highlightCache = new Map<string, string | null>();
+
 /** Lazily loaded singleton — Shiki's WASM/TextMate grammars are heavy. */
 export function getHighlighter(): Promise<Highlighter> {
 	highlighterPromise ??= createHighlighter({
@@ -545,18 +557,30 @@ export async function highlightRendered(
 	// Synchronous throughout (codeToHtml is not async): no Promise.all.
 	const highlighted = rendered.codes.map(({ lang, code }) => {
 		const language = loaded.has(lang) ? lang : "plaintext";
+		const key = `${language}\n${code}`;
+		const hit = highlightCache.get(key);
+		if (hit !== undefined) return hit;
+		let fragment: string | null;
 		try {
 			const full = highlighter.codeToHtml(code, {
 				lang: language,
 				themes: { light: "github-light", dark: "github-dark" }
 			});
 			const match = full.match(/<pre[^>]*>([\s\S]*)<\/pre>/);
-			return match
+			fragment = match
 				? (match[1] ?? "").replace(/^<code[^>]*>|<\/code>$/g, "")
 				: null;
 		} catch {
-			return null;
+			fragment = null;
 		}
+		if (code.length <= HIGHLIGHT_CACHE_CODE_MAX) {
+			if (highlightCache.size >= HIGHLIGHT_CACHE_MAX) {
+				const oldest = highlightCache.keys().next();
+				if (!oldest.done) highlightCache.delete(oldest.value);
+			}
+			highlightCache.set(key, fragment);
+		}
+		return fragment;
 	});
 	if (typeof document === "undefined") return rendered.html;
 	const template = document.createElement("template");

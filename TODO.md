@@ -39,12 +39,13 @@ chat-step aliases, digit dual-mode, annotation sizing, TTS floor,
 text-size uncap, furigana backdrop, shell Cmd+T). One stays open:
 
 - [ ] Chat switching feels slow (2s down a chat, 1s up at 370% font).
-      Storage ruled out: `selectChat` flips `activeChatId` only (no
-      `persistChats`); per-switch sync work is draft/scroll filing
-      (KBs of localStorage) plus a 500ms-debounced worker search
-      reindex off the critical path. Render cost of the entering
-      thread dominates — needs a device profile in the Mac client
-      before any fix.
+      Profiled Sep 2026 in Chromium (scratch server, seeded
+      30-message threads): Shiki re-highlighted every code block on
+      every mount (~0.4s JS on code-heavy threads) — now cached per
+      (lang, code) in `render.ts`, so repeat switches replay.
+      Residual: ~0.4s render/layout baseline per thread, plus
+      whatever the release WebKit client adds at 370% with real
+      data — still needs Mac-client confirmation before more fixes.
 
 ## Pile: Android in-app update install fails (reported on 0.5.2, Sep 2026)
 
