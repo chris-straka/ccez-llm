@@ -1742,20 +1742,10 @@
 	/** Selection Copy: the quote to the clipboard with a light tick.
 	The native menu is suppressed on Android, so this replaces its
 	Copy entry. */
-	async function copySelection(): Promise<void> {
+	function copySelection(): void {
 		const quote = selMenu?.quote ?? "";
 		if (quote === "") return;
-		buzzTap();
-		if (!navigator.clipboard) {
-			flashErrorToast("Couldn't copy to the clipboard.");
-			return;
-		}
-		try {
-			await navigator.clipboard.writeText(quote);
-			flashCopyToast("Copied");
-		} catch {
-			flashErrorToast("Couldn't copy to the clipboard.");
-		}
+		copyPlain(quote, "Copied");
 	}
 	function inspectTouch(event: TouchEvent): void {
 		menuBtnTouch(event, openInspect);
