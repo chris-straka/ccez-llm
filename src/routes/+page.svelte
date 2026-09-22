@@ -434,7 +434,8 @@
 		isPromptIdle,
 		stageOwnedByOverlay,
 		pointInRect,
-		sendHoldArmed
+		sendHoldArmed,
+		gutterSide
 	} from "$lib/chrome";
 	import {
 		speakText,
@@ -501,6 +502,7 @@
 		studySheetMarkdown,
 		sheetTitle,
 		shareStudySheet,
+		shareOutcomeToast,
 		printStudySheet,
 		desktopSleepBlock,
 		desktopSleepUnblock,
@@ -8211,17 +8213,9 @@
 		const markdown = studySheetMarkdown(title, lines);
 		const saved = await exportStudySheet(title, lines);
 		const outcome = await shareStudySheet(title, markdown);
-		if (outcome === "shared") {
-			flashToast(
-				saved ? `Study sheet shared (${saved})` : "Study sheet shared"
-			);
-		} else if (outcome === "copied") {
-			flashToast("Study sheet copied — paste it anywhere");
-		} else if (outcome === "downloaded") {
-			flashToast("Study sheet downloaded");
-		} else {
-			flashErrorToast("Sharing is unavailable here");
-		}
+		const toast = shareOutcomeToast(outcome, saved);
+		if (toast.error) flashErrorToast(toast.text);
+		else flashToast(toast.text);
 	}
 
 	/**
@@ -8265,12 +8259,13 @@
 			right = Math.max(right, box.x + box.width);
 		});
 		if (left === Infinity) return;
-		if (event.clientX < left) {
+		const side = gutterSide(event.clientX, left, right);
+		if (side === "left") {
 			if (settings.sidebarCollapsed) {
 				settings.sidebarCollapsed = false;
 				persistSettings();
 			}
-		} else if (event.clientX > right) {
+		} else if (side === "right") {
 			if (!settingsOpen) openSettingsPanel();
 		} else if (
 			target === scrollBox ||

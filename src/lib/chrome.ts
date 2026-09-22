@@ -133,3 +133,18 @@ export function sendHoldArmed(
 ): boolean {
 	return !timerRunning && !promptNoteEditing && composerEmpty;
 }
+
+/**
+ * Gutter side for a double-click (REFACTOR §6): left of the column
+ * opens the chat list, right of it opens settings, inside the
+ * column summons the composer. Edges belong to the column.
+ */
+export function gutterSide(
+	clientX: number,
+	left: number,
+	right: number
+): "left" | "right" | "column" {
+	if (clientX < left) return "left";
+	if (clientX > right) return "right";
+	return "column";
+}

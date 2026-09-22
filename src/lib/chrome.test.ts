@@ -10,6 +10,7 @@ import {
 	isPromptIdle,
 	pointInRect,
 	sendHoldArmed,
+	gutterSide,
 	SLIDER_DRAG_RESET_PX,
 	stageOwnedByOverlay,
 	type StageOwnerFlags
@@ -134,5 +135,15 @@ describe("send-button hold geometry", () => {
 		expect(sendHoldArmed(true, false, true)).toBe(false);
 		expect(sendHoldArmed(false, true, true)).toBe(false);
 		expect(sendHoldArmed(false, false, false)).toBe(false);
+	});
+});
+
+describe("gutterSide", () => {
+	it("picks the gutter outside the column, column on edges", () => {
+		expect(gutterSide(5, 10, 100)).toBe("left");
+		expect(gutterSide(150, 10, 100)).toBe("right");
+		expect(gutterSide(50, 10, 100)).toBe("column");
+		expect(gutterSide(10, 10, 100)).toBe("column");
+		expect(gutterSide(100, 10, 100)).toBe("column");
 	});
 });

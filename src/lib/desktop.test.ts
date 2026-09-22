@@ -12,6 +12,7 @@ import {
 	desktopSleepBlock,
 	desktopSleepUnblock,
 	exportStudySheet,
+	shareOutcomeToast,
 	type StudyLine
 } from "./desktop";
 
@@ -185,5 +186,24 @@ describe("shareStudySheet", () => {
 		vi.stubGlobal("navigator", {});
 		await expect(shareStudySheet("t", "body")).resolves.toBe("unavailable");
 		vi.unstubAllGlobals();
+	});
+});
+
+describe("shareOutcomeToast", () => {
+	it("names where the sheet landed", () => {
+		expect(shareOutcomeToast("shared", "/tmp/a.md")).toEqual({
+			error: false,
+			text: "Study sheet shared (/tmp/a.md)"
+		});
+		expect(shareOutcomeToast("shared", null)).toEqual({
+			error: false,
+			text: "Study sheet shared"
+		});
+		expect(shareOutcomeToast("copied", null).error).toBe(false);
+		expect(shareOutcomeToast("downloaded", null).error).toBe(false);
+		expect(shareOutcomeToast("unavailable", null)).toEqual({
+			error: true,
+			text: "Sharing is unavailable here"
+		});
 	});
 });

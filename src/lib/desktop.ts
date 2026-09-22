@@ -329,3 +329,24 @@ export async function exportStudySheet(
 		return null;
 	}
 }
+
+/**
+ * Toast for a study-sheet share outcome (REFACTOR §6): one toast
+ * names where the sheet landed; unavailable is the error path.
+ */
+export function shareOutcomeToast(
+	outcome: ShareOutcome,
+	saved: string | null
+): { error: boolean; text: string } {
+	if (outcome === "shared") {
+		return {
+			error: false,
+			text: saved ? `Study sheet shared (${saved})` : "Study sheet shared"
+		};
+	}
+	if (outcome === "copied")
+		return { error: false, text: "Study sheet copied — paste it anywhere" };
+	if (outcome === "downloaded")
+		return { error: false, text: "Study sheet downloaded" };
+	return { error: true, text: "Sharing is unavailable here" };
+}
