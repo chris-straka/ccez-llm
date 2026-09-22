@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.util.Log
 import androidx.core.content.FileProvider
 import java.io.File
 
@@ -18,6 +19,7 @@ import java.io.File
  * so Rust never passes contexts through JNI.
  */
 object Update {
+    private const val TAG = "Update"
     private lateinit var appContext: Context
 
     private external fun nativeInit(activity: Activity)
@@ -59,7 +61,8 @@ object Update {
                     }
                     appContext.startActivity(settings)
                     "needs-approval"
-                } catch (e: Exception) {
+                } catch (e: Throwable) {
+                    Log.e(TAG, "install-permission settings did not open", e)
                     "could not open install-permission settings: ${e.message}"
                 }
             }
@@ -79,7 +82,13 @@ object Update {
             }
             appContext.startActivity(install)
             "installing"
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            // Throwable, not Exception: an uncaught Error (linkage,
+            // missing class) would otherwise stay pending across JNI
+            // and surface only as a bridge "Java exception" with the
+            // real cause swallowed (seen on 0.5.2). Log the full
+            // stack so adb logcat carries it next time.
+            Log.e(TAG, "installApk failed for $path", e)
             "installer did not start: ${e.message}"
         }
     }

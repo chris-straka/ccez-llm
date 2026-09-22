@@ -45,10 +45,17 @@ text-size uncap, furigana backdrop, shell Cmd+T). One stays open:
 
 - [ ] 0.5.2 sees the new version and downloads it, but Install errors:
       "installer did not start: Error invoking postMessage: Java
-      exception was raised during method invocation." Likely the
-      postMessage bridge call into the Activity (provider/FileUri or
-      install-intent args) throwing before the installer starts —
-      reproduce on the S24 with adb and read the full Java stack.
+      exception was raised during method invocation." Diagnosed Sep
+      2026 on the S24 (0.5.3 installed, same code): the string
+      assembles as Kotlin catch → Rust passthrough → frontend
+      prefix, so the invoke itself failed at the bridge with a Java
+      exception pending — an uncaught `Error` (Kotlin caught only
+      `Exception`) stayed pending across JNI and masked the real
+      cause. `Update.init` wiring, manifest FileProvider, and dex
+      contents all verified present on-device. Fix in `Update.kt`:
+      catch `Throwable` + `Log.e` the stack, so any recurrence
+      reports its real cause and logcat carries it. Still needs:
+      release APK on the S24, retry Install, read logcat.
 
 ## Non-goals
 
