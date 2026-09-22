@@ -24,6 +24,8 @@ import {
 	lineStartOffset,
 	clampDragAnchorToFocusLine,
 	reviewEditKey,
+	buildMarksFor,
+	aidedTextForMsg,
 	REFS_ONLY_BODY,
 	isRefsOnly,
 	redactedCopyText
@@ -740,5 +742,68 @@ describe("findQuotedMessage", () => {
 
 	it("matches badge-insensitively across whitespace", () => {
 		expect(findQuotedMessage(messages, m2, "  Kyoto   in  spring ")).toBe(m1);
+	});
+});
+
+describe("buildMarksFor", () => {
+	const m1 = "m1" as ChatMsgId;
+	const m2 = "m2" as ChatMsgId;
+	const list = addAnnotation(
+		addAnnotation([], m1, "first"),
+		m2,
+		"second"
+	);
+
+	it("builds numbered badges for one message only", () => {
+		const marks = buildMarksFor(list, m1, false, null);
+		expect(marks).toHaveLength(1);
+		expect(marks[0]).toMatchObject({ number: 1, quote: "first", at: 0 });
+		expect(marks[0]!.preview).toBeUndefined();
+	});
+
+	it("hides aid-scoped quotes while the aid is off", () => {
+		const scoped: Annotation = {
+			...list[0]!,
+			aidScope: "tashkeel"
+		};
+		expect(buildMarksFor([scoped], m1, false, null)).toHaveLength(0);
+		expect(buildMarksFor([scoped], m1, true, null)).toHaveLength(1);
+	});
+
+	it("appends a pending preview with the next number, no badge", () => {
+		const pending: Annotation = {
+			id: "pending" as AnnotationId,
+			messageId: m1,
+			quote: "draft",
+			comment: ""
+		};
+		const marks = buildMarksFor(list, m1, false, pending);
+		expect(marks).toHaveLength(2);
+		expect(marks[1]).toMatchObject({
+			number: 3,
+			quote: "draft",
+			preview: true
+		});
+		// Another message's pill never leaks in.
+		expect(buildMarksFor(list, m2, false, pending)).toHaveLength(1);
+	});
+});
+
+describe("aidedTextForMsg", () => {
+	const m1 = "m1" as ChatMsgId;
+
+	it("reads the peeked message cache first", () => {
+		expect(aidedTextForMsg(m1, m1, { m1: "vocal" }, new Set())).toBe(
+			"vocal"
+		);
+		expect(aidedTextForMsg(m1, m1, {}, new Set([m1]))).toBeNull();
+	});
+
+	it("shows the model pin cache, surviving one unpin click", () => {
+		expect(aidedTextForMsg(m1, null, { m1: "vocal" }, new Set([m1]))).toBe(
+			"vocal"
+		);
+		expect(aidedTextForMsg(m1, null, {}, new Set([m1]))).toBeNull();
+		expect(aidedTextForMsg(m1, null, { m1: "vocal" }, new Set())).toBeNull();
 	});
 });

@@ -31,6 +31,7 @@ import {
 	aidTargetLines,
 	spliceAidResult,
 	resolveAidKinds,
+	messageAidKinds,
 	codeAwareLines,
 	stripCodeForDetection,
 	readingsOnly,
@@ -817,5 +818,23 @@ describe("wordAtNodeOffset", () => {
 		expect(wordAtNodeOffset("", 0)).toBe("");
 		expect(wordAtNodeOffset("a b", 1)).toBe("");
 		expect(wordAtNodeOffset("hi", 0)).toBe("hi");
+	});
+});
+
+describe("messageAidKinds", () => {
+	it("keeps pinned kinds the message still offers, drops the rest", () => {
+		expect(messageAidKinds("漢字を読む", null, null, ["furigana"])).toEqual([
+			"furigana"
+		]);
+		// Edited text no longer offers pinyin: the pin filters out.
+		expect(messageAidKinds("hello", null, null, ["pinyin"])).toEqual([]);
+	});
+
+	it("previews a peeked kind alongside pins, empty renders original", () => {
+		expect(messageAidKinds("漢字", "ja", "pinyin", ["furigana"])).toEqual([
+			"furigana",
+			"pinyin"
+		]);
+		expect(messageAidKinds("hello", null, null, [])).toEqual([]);
 	});
 });

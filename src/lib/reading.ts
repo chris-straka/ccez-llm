@@ -980,3 +980,20 @@ export function annotatedRuns(html: string): AnnotatedRun[] | null {
 }
 
 
+
+/**
+ * Local-aid kinds a message renders (REFACTOR §6): pinned kinds that
+ * the message still offers (edited text filters the rest out), plus
+ * a hover-peeked kind alongside them; empty renders the original.
+ * Offer computation is shared with hotkeys and vocalize; the page
+ * memos the array by message so bodies keep identity.
+ */
+export function messageAidKinds(
+	text: string,
+	replyCode: string | null,
+	peek: LocalAid | null,
+	pinned: LocalAid[]
+): LocalAid[] {
+	const kinds = offeredLocalAids(aidDisplayText(text), replyCode);
+	return resolveAidKinds(kinds, pinned, peek);
+}

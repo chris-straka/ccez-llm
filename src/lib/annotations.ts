@@ -2562,3 +2562,57 @@ export function reviewEditKey(
 	if (key === "Escape") return "cancel";
 	return null;
 }
+
+/**
+ * Badge array for one message, unmemoized (REFACTOR §6): aid-scoped
+ * quotes only show while the aid is on (they locate against aided
+ * text), and a composed-but-unsubmitted annotation washes while its
+ * pill is open with no badge. The page memos the result by content
+ * (see marksFor) so renders keep array identity.
+ */
+export function buildMarksFor(
+	list: Annotation[],
+	messageId: ChatMsgId,
+	tashkeelOn: boolean,
+	pending: Annotation | null
+): AnnotationMark[] {
+	const saved: AnnotationMark[] = list
+		.filter((a) => a.messageId === messageId && aidMarkVisible(a.aidScope, tashkeelOn))
+		.map((a) => ({
+			id: a.id,
+			number: annotationNumber(list, a.id),
+			quote: a.quote,
+			at: a.at ?? 0,
+			...(a.aidScope ? { aidScope: a.aidScope } : {})
+		}));
+	if (pending && pending.messageId === messageId) {
+		saved.push({
+			id: pending.id,
+			number: list.length + 1,
+			quote: pending.quote,
+			at: pending.at ?? 0,
+			preview: true
+		});
+	}
+	return saved;
+}
+
+/**
+ * Pinned or hover-peeked model-aid text for a message (REFACTOR §6):
+ * the peeked message reads its cached vocalization, otherwise the
+ * model pin shows the cache when present. The cache survives unpin
+ * for one click back (the page keeps it, this only reads).
+ */
+export function aidedTextForMsg(
+	messageId: ChatMsgId,
+	peekId: string | null,
+	vocalized: Record<string, string>,
+	modelPinned: ReadonlySet<string>
+): string | null {
+	if (peekId === messageId) {
+		const cached = vocalized[messageId];
+		if (cached !== undefined) return cached;
+	}
+	if (modelPinned.has(messageId)) return vocalized[messageId] ?? null;
+	return null;
+}

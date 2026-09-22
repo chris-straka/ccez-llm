@@ -185,12 +185,10 @@
 	} from "$lib/attachments";
 	import {
 		duplicateAnnotationId,
-		aidMarkVisible,
 		clearBakedAnnotations,
 		editAnnotationComment,
 		deleteAnnotation,
 		clearAnnotations,
-		annotationNumber,
 		withAnnotations,
 		quoteFragmentText,
 		equationBodyOf,
@@ -219,6 +217,8 @@
 		clampDragAnchorToFocusLine,
 		loadDraftAnnotations,
 		saveDraftAnnotations,
+		buildMarksFor,
+		aidedTextForMsg,
 		type Annotation,
 		type AnnotationId,
 		type AnnotationMark
@@ -362,7 +362,7 @@
 		runModelAid,
 		aidTargetLines,
 		spliceAidResult,
-		resolveAidKinds,
+		messageAidKinds,
 		readingsOnly,
 		annotatedRunsWithOffsets,
 		sliceRunsForQuote,
@@ -5753,48 +5753,20 @@
 			`${m.id}:${m.number}:${m.quote}:${m.at ?? 0}:${m.preview === true ? "preview" : "saved"}:${m.aidScope ?? ""}`
 	);
 	function marksFor(messageId: ChatMsgId): AnnotationMark[] {
-		// Aid-scoped quotes (tashkeel vocalization) only show while the
-		// aid is on: they locate against vocalized text, so on the bare
-		// form they'd badge the wrong words.
-		const tashkeelOn = aidModelPin.has(messageId);
-		const saved: AnnotationMark[] = annotations
-			.filter(
-				(a) =>
-					a.messageId === messageId && aidMarkVisible(a.aidScope, tashkeelOn)
+		return memoMarks(
+			messageId,
+			buildMarksFor(
+				annotations,
+				messageId,
+				aidModelPin.has(messageId),
+				pendingAnn
 			)
-			.map((a) => ({
-				id: a.id,
-				number: annotationNumber(annotations, a.id),
-				quote: a.quote,
-				at: a.at ?? 0,
-				...(a.aidScope ? { aidScope: a.aidScope } : {})
-			}));
-		// A composed-but-unsubmitted annotation washes while its pill is
-		// open, but stamps no badge (badges appear on submit only).
-		if (pendingAnn && pendingAnn.messageId === messageId) {
-			saved.push({
-				id: pendingAnn.id,
-				number: annotations.length + 1,
-				quote: pendingAnn.quote,
-				at: pendingAnn.at ?? 0,
-				preview: true
-			});
-		}
-		return memoMarks(messageId, saved);
+		);
 	}
 
 	/** Pinned or hover-peeked model-aid text for a message (tashkeel). */
 	function aidedTextFor(msg: ChatMsg): string | null {
-		if (aidPeek?.id === msg.id) {
-			const cached = vocalized[msg.id];
-			if (cached !== undefined) return cached;
-		}
-		// Model and local aids compose: vocalized text shows whenever
-		// the model pin is on, with pinned local kinds rendered onto it
-		// (each on its own lines). The cache survives unpin for one
-		// click back.
-		if (aidModelPin.has(msg.id)) return vocalized[msg.id] ?? null;
-		return null;
+		return aidedTextForMsg(msg.id, aidPeek?.id ?? null, vocalized, aidModelPin);
 	}
 
 	/**
@@ -5815,12 +5787,15 @@
 	 */
 	const memoAids = createRefMemo<LocalAid>((kind) => kind);
 	function localAidsOverrideFor(msg: ChatMsg): LocalAid[] {
-		const kinds = offeredLocalAids(
-			aidDisplayText(msg.content),
-			activeReplyCode
+		return memoAids(
+			msg.id,
+			messageAidKinds(
+				msg.content,
+				activeReplyCode,
+				aidPeek?.id === msg.id ? (aidPeek.kind ?? null) : null,
+				pinnedKinds(msg.id)
+			)
 		);
-		const peek = aidPeek?.id === msg.id ? (aidPeek.kind ?? null) : null;
-		return memoAids(msg.id, resolveAidKinds(kinds, pinnedKinds(msg.id), peek));
 	}
 
 	/**
