@@ -533,6 +533,24 @@ export function aidTargetLines(text: string): number[] {
 }
 
 /**
+ * Model-aid input for a message: the targeted lines joined when they
+ * are a strict subset of the text (the rest never crosses to the
+ * model — faster, cheaper), else the full text. The caller splices
+ * partial results back with spliceAidResult. Pure and unit-tested.
+ */
+export function selectAidInput(
+	full: string,
+	targets: number[]
+): { input: string; partial: boolean } {
+	const lines = full.split("\n");
+	const partial = targets.length > 0 && targets.length < lines.length;
+	return {
+		input: partial ? targets.map((i) => lines[i] ?? "").join("\n") : full,
+		partial
+	};
+}
+
+/**
  * Splice vocalized lines back into the original line structure, so a
  * model aid on a multilingual message replaces only its own script —
  * Japanese/Chinese/English paragraphs stay byte-identical, and the

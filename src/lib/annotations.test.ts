@@ -31,6 +31,7 @@ import {
 	aidedTextForMsg,
 	commitRefsEdit,
 	planClearSentRefs,
+	promptAnnLookup,
 	seedAnnotationsFromRefs,
 	annotationCopyText,
 	filePendingAnnotation,
@@ -704,6 +705,28 @@ describe("readings width pass", () => {
 		expect(highlightSteady({ left: 101, top: 202 }, placed)).toBe(true);
 		expect(highlightSteady({ left: 103, top: 200 }, placed)).toBe(false);
 		expect(highlightSteady({ left: 100, top: 204 }, placed)).toBe(false);
+	});
+});
+
+describe("promptAnnLookup", () => {
+	const saved = addAnnotation([], "m1" as ChatMsgId, "quote one", "note");
+	const first = saved[0];
+	if (!first) throw new Error("no annotation");
+
+	it("resolves pending targets from the pending note", () => {
+		expect(
+			promptAnnLookup({ pending: true }, { ...first, at: 2 }, saved)
+		).toEqual({ messageId: "m1", quote: "quote one", at: 2 });
+		expect(promptAnnLookup({ pending: true }, null, saved)).toBeNull();
+	});
+
+	it("resolves id targets from saved notes, defaulting at", () => {
+		expect(promptAnnLookup({ id: first.id }, null, saved)).toEqual({
+			messageId: "m1",
+			quote: "quote one",
+			at: 0
+		});
+		expect(promptAnnLookup({ id: "nope" }, null, saved)).toBeNull();
 	});
 });
 

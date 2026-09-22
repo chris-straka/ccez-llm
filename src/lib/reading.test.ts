@@ -32,6 +32,7 @@ import {
 	LOCAL_AID_SHOW_ORIGINAL,
 	LOCAL_AID_ADD_TITLE,
 	aidTargetLines,
+	selectAidInput,
 	spliceAidResult,
 	resolveAidKinds,
 	messageAidKinds,
@@ -377,6 +378,24 @@ describe("multilingual model aids", () => {
 		expect(spliceAidResult(original, [1], "مَرْحَبًا بِالْعَالَم")).toBe(
 			"日本語の文です\nمَرْحَبًا بِالْعَالَم\nEnglish text"
 		);
+	});
+
+	it("selects targeted lines only for strict subsets", () => {
+		const full = "日本語の文です\nمرحبا بالعالم\nEnglish text";
+		expect(selectAidInput(full, [1])).toEqual({
+			input: "مرحبا بالعالم",
+			partial: true
+		});
+		// No targets, or every line targeted: the full text goes.
+		expect(selectAidInput(full, [])).toEqual({ input: full, partial: false });
+		expect(selectAidInput("مرحبا", [0])).toEqual({
+			input: "مرحبا",
+			partial: false
+		});
+		expect(selectAidInput(full, [0, 1, 2])).toEqual({
+			input: full,
+			partial: false
+		});
 	});
 
 	it("falls back to null when the model reshapes lines", () => {

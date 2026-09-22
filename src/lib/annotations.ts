@@ -2763,6 +2763,33 @@ export function planClearSentRefs(
 }
 
 /**
+ * Quote lookup for in-prompt note edits (phones): the pending
+ * annotation's own location, else the saved note's (`at` defaults
+ * to 0). Null when neither resolves. Pure and unit-tested.
+ */
+export function promptAnnLookup(
+	target: { id: string } | { pending: true },
+	pending: Annotation | null,
+	saved: Annotation[]
+): { messageId: ChatMsgId; quote: string; at: number } | null {
+	if ("pending" in target) {
+		if (!pending) return null;
+		return {
+			messageId: pending.messageId,
+			quote: pending.quote,
+			at: pending.at ?? 0
+		};
+	}
+	const current = saved.find((a) => a.id === target.id);
+	if (!current) return null;
+	return {
+		messageId: current.messageId,
+		quote: current.quote,
+		at: current.at ?? 0
+	};
+}
+
+/**
  * Seed pending annotations from a message's baked refs (REFACTOR §6):
  * the baked block is provider context, not edit text, so saving
  * re-bakes the same context from these seeds.

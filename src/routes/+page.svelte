@@ -226,6 +226,7 @@
 		aidedTextForMsg,
 		commitRefsEdit,
 		planClearSentRefs,
+		promptAnnLookup,
 		seedAnnotationsFromRefs,
 		annotationCopyText,
 		filePendingAnnotation,
@@ -391,6 +392,7 @@
 		runModelAid,
 		annotationAnswer,
 		aidTargetLines,
+		selectAidInput,
 		spliceAidResult,
 		messageAidKinds,
 		readingsOnly,
@@ -5007,25 +5009,7 @@
 		// needed to see the highlighted text, so the scroll gesture
 		// never cancels the edit out from under the typing.
 		if (androidUI) {
-			const lookup =
-				"pending" in target
-					? pendingAnn
-						? {
-								messageId: pendingAnn.messageId,
-								quote: pendingAnn.quote,
-								at: pendingAnn.at ?? 0
-							}
-						: null
-					: (() => {
-							const current = annotations.find((a) => a.id === target.id);
-							return current
-								? {
-										messageId: current.messageId,
-										quote: current.quote,
-										at: current.at ?? 0
-									}
-								: null;
-						})();
+			const lookup = promptAnnLookup(target, pendingAnn, annotations);
 			if (lookup) {
 				// Land the quote only after the focus growth settles:
 				// measuring against the small at-rest card strands the
@@ -5907,11 +5891,7 @@
 			// A shape mismatch falls back to the whole-text replace.
 			const full = aidDisplayText(msg.content);
 			const targets = aidTargetLines(full);
-			const lines = full.split("\n");
-			const partial = targets.length > 0 && targets.length < lines.length;
-			const input = partial
-				? targets.map((i) => lines[i] ?? "").join("\n")
-				: full;
+			const { input, partial } = selectAidInput(full, targets);
 			const text = await runModelAid(provider, aidId, input);
 			const spliced = partial ? spliceAidResult(full, targets, text) : null;
 			vocalized = { ...vocalized, [msg.id]: spliced ?? text };
