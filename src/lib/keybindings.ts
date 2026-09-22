@@ -526,6 +526,10 @@ export interface ChromeChordFacts extends KeyModifiers {
 	/** True in the Tauri shell; false in the browser preview, where
 	 * browser-chrome chords (tab switching) must pass through. */
 	inShell: boolean;
+	/** True once the active chat holds messages: digit chords jump
+	 * chats instead of picking the reply language (0.5.3 field
+	 * notes — the language locked in with the first send). */
+	chatLocked: boolean;
 }
 
 export type ChromeChord =
@@ -538,6 +542,7 @@ export type ChromeChord =
 	| "step-chat-older"
 	| "zoom"
 	| "quick-lang"
+	| "jump-chat"
 	| "delete-message";
 
 /** Digit order for the Cmd+1..0 quick-language chords (see `quickLangIndexForKey`). */
@@ -554,9 +559,9 @@ export function quickLangIndexForKey(key: string): number {
  * spellings: BracketLeft and Cmd+B both read "toggle-sidebar", all
  * three settings spellings read "toggle-settings". Bodies keep their
  * splits (the KeyH/KeyL close-and-land variants, the zoom
- * narrow/widen derivation, the quick-lang code lookup, the Cmd+D
- * target-exists check); only the chord match moves here. Callers
- * chain `if (chrome === ...)` — never a switch.
+ * narrow/widen derivation, the quick-lang/jump-chat code lookup, the
+ * Cmd+D target-exists check); only the chord match moves here.
+ * Callers chain `if (chrome === ...)` — never a switch.
  */
 export function chromeChord(facts: ChromeChordFacts): ChromeChord | null {
 	const cmd = facts.metaKey || facts.ctrlKey;
@@ -599,9 +604,13 @@ export function chromeChord(facts: ChromeChordFacts): ChromeChord | null {
 		if (facts.key === ".") return "toggle-settings";
 		if (facts.key === ",") return "toggle-settings";
 		// Shell only: in a browser ⌘1…⌘0 / Ctrl+1…0 switch tabs, and
-		// the page must not swallow them.
-		if (facts.inShell && quickLangIndexForKey(facts.key) !== -1)
+		// the page must not swallow them. Empty chats pick the reply
+		// language; chats with messages jump instead (the language
+		// locked in with the first send — 0.5.3 field notes).
+		if (facts.inShell && quickLangIndexForKey(facts.key) !== -1) {
+			if (facts.chatLocked) return "jump-chat";
 			return "quick-lang";
+		}
 		// Shell only: the browser claims ⌘[ / ⌘] (history) and
 		// ⌘↑ / ⌘↓ (scroll edges) — in the shell they step chats
 		// (0.5.3 field notes), same tokens as ⇧⌘J/K. Fields and the

@@ -738,6 +738,7 @@ const chromeBase: ChromeChordFacts = {
 	ctrlKey: false,
 	altKey: false,
 	shiftKey: false,
+	chatLocked: false,
 	inEditor: false,
 	hovered: false,
 	inField: false,
@@ -791,6 +792,23 @@ describe("chromeChord", () => {
 		expect(chromeChord({ ...chromeBase, key: "1", code: "Digit1" })).toBe(
 			"quick-lang"
 		);
+		// Locked chats (messages sent) jump instead of picking.
+		expect(
+			chromeChord({ ...chromeBase, chatLocked: true, key: "1", code: "Digit1" })
+		).toBe("jump-chat");
+		expect(
+			chromeChord({ ...chromeBase, chatLocked: true, key: "0", code: "Digit0" })
+		).toBe("jump-chat");
+		// Preview keeps tab switching either way.
+		expect(
+			chromeChord({
+				...chromeBase,
+				inShell: false,
+				chatLocked: true,
+				key: "1",
+				code: "Digit1"
+			})
+		).toBeNull();
 		// Browser preview: digit chords pass through to tab switching.
 		expect(
 			chromeChord({ ...chromeBase, inShell: false, key: "1", code: "Digit1" })

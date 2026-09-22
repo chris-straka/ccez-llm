@@ -145,7 +145,9 @@ export function desktopShortcuts(isMac: boolean, inShell = true): ShortcutRow[] 
 		{ name: "Rerun a prompt", keys: "Rerun button · deletes after" },
 		{
 			name: "Reply language",
-			keys: `${isMac ? "⌘1, ⌘0" : "Ctrl+1, Ctrl+0"} · repeat to clear`
+			keys: `${
+				isMac ? "⌘1, ⌘0" : "Ctrl+1, Ctrl+0"
+			} · repeat clears · empty picks · messaged jumps chat`
 		},
 		{
 			name: "Delete this chat",

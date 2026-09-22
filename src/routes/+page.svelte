@@ -10092,7 +10092,10 @@
 				inField: isFieldTarget(event.target),
 				// Browser preview has tab switching on these chords;
 				// only the shell owns them.
-				inShell: tauriBackendAvailable()
+				inShell: tauriBackendAvailable(),
+				// Digits pick the reply language only before the
+				// first send; after that they jump chats.
+				chatLocked: viewChat.messages.length > 0
 			});
 			if (chrome === "toggle-sidebar") {
 				// ⇧⌘[ and ⌘B: physical key codes for the shifted
@@ -10177,6 +10180,20 @@
 					else setReplyLang(code);
 					return;
 				}
+			}
+			if (chrome === "jump-chat") {
+				// Locked-chat digits jump to the nth visible chat (the
+				// chat keeps its own reply language — per-chat by
+				// design, so a French chat never turns German). Out of
+				// range buzzes instead of minting.
+				const target = sideVisibleChats()[quickLangIndexForKey(event.key)];
+				if (!target) {
+					buzzNo();
+					return;
+				}
+				consumeEvent(event);
+				transitionToChat(target.id);
+				return;
 			}
 			if (chrome === "delete-message") {
 				const target = chat.messages[hoveredIdx];

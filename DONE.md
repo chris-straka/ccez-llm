@@ -958,3 +958,10 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
       narrows panels to the longest laid-out line
       (`shrinkPanelToContent` + `longestLineWidth`, wired into both
       width passes; centering rides translateX so it holds).
+
+- [x] Digit dual-mode (0.5.3 field note, clarified by owner): empty
+      chats pick the reply language on ⌘1…⌘0 (as before); once a chat
+      holds messages the digits jump to the nth visible chat instead.
+      Reply language was already per-chat, so jumped chats keep their
+      own (French stays French). Shell-only like quick-lang; dispatch
+      unit-pinned, effect rides transitionToChat.
