@@ -927,3 +927,14 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
 - [x] Desktop text size uncapped to 800%: the 600% chord cap had no
       layout reason (slider already maxes at 800, badges/glyphs scale
       dampened) — `stepFontScale` takes one cap, desktop and phone alike.
+
+- [x] TTS language floor removed (0.5.3 French field note): the shell
+      recognizer refused every sample under 10 chars before Apple ever
+      saw it, so lone words (neigeait, dissous, dissoudre) always fell
+      to the seed voice. `identify_lang` now only gates empties —
+      device-verified on the Mac (`short_samples_reach_the_recognizer`;
+      `cargo test --lib` 89/89). Residual finding, not a bug: Apple
+      itself reads isolated "dissoudre" as English, so lone words with
+      no French context still seed English by design; French sentences
+      and paragraphs already route French via context seeding, and the
+      voice-language setting forces French for all Latin text.

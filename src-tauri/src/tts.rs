@@ -328,9 +328,14 @@ mod imp {
     /// call; runs on the invoke handler thread.
     pub fn identify_lang(text: &str) -> Option<String> {
         let trimmed = text.trim();
-        if trimmed.chars().count() < 10 {
+        if trimmed.is_empty() {
             return None;
         }
+        // No length floor: single words ("dissoudre", "neigeait") are
+        // exactly what the recognizer is for — it returns nil itself
+        // when the sample is too short to call, and callers fall back
+        // the same way. A floor here stranded every lone word on the
+        // seed voice.
         unsafe {
             let ns = NSString::from_str(trimmed);
             NLLanguageRecognizer::dominantLanguageForString(&ns).map(|id| id.to_string())
@@ -777,7 +782,23 @@ mod imp {
 
     #[cfg(test)]
     mod system_id_tests {
-        use super::{speech_rate_for, split_system_id};
+        use super::{identify_lang, speech_rate_for, split_system_id};
+
+        #[test]
+        fn short_samples_reach_the_recognizer() {
+            // No length floor (the 0.5.3 field notes: lone words like
+            // "dissoudre" never reached Apple at all): the
+            // recognizer's own verdict decides — nil when IT is
+            // uncertain — instead of a hardcoded None. This Mac reads
+            // "dissoudre" as English; that is Apple's call, surfaced
+            // instead of masked. Device-dependent by nature: a future
+            // OS verdict change fails loudly here for re-examination.
+            assert_eq!(identify_lang(""), None);
+            assert_eq!(identify_lang("   "), None);
+            for word in ["dissoudre", "neigeait", "dissous"] {
+                assert!(identify_lang(word).is_some(), "{word}");
+            }
+        }
 
         #[test]
         fn chinese_rate_slower_than_default() {
@@ -922,8 +943,8 @@ pub fn tts_save_speech(
 
 /// Identify the language of a text sample for highlight-to-speak in Latin
 /// scripts, where script detection cannot tell French from English.
-/// Returns a BCP-47-ish tag, or null when the sample is too short or the
-/// recognizer is uncertain (callers fall back to script detection).
+/// Returns a BCP-47-ish tag, or null when the recognizer is uncertain
+/// (callers fall back to script detection, then the offline scorer).
 #[tauri::command]
 pub fn tts_identify_lang(text: String) -> Option<String> {
     #[cfg(any(target_os = "macos", target_os = "ios"))]
