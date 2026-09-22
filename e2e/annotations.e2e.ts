@@ -373,6 +373,155 @@ test("escape cancels the fresh annotation pill", async ({ page }) => {
 	expect(leftover.marks).toBe(0);
 });
 
+/** Escape cancels an Arabic draft with no stranded highlight or wash:
+RTL washes stamp DOM marks (the registry overpaints Arabic), so an
+unwashed mark here reads as a highlight that never went away. */
+test("escape cancels an arabic draft cleanly", async ({ page }) => {
+	await seedChat(page, [
+		{ role: "assistant", content: "اللغة العربية جميلة والأفكار عميقة" }
+	]);
+	await page.goto("/");
+	await expect(
+		page.locator("article .rendered").first()
+	).toBeVisible({ timeout: 60_000 });
+	await openAnnotate(page, "والأفكار");
+	await expect(page.locator(".ann-pop")).toBeVisible();
+	await page.keyboard.press("Escape");
+	await expect(page.locator(".ann-pop")).toHaveCount(0);
+	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(0);
+	await page.waitForTimeout(600);
+	const leftover = await page.evaluate(() => {
+		const reg = (
+			window as unknown as {
+				CSS?: { highlights?: { get(name: string): Set<Range> | undefined } };
+			}
+		).CSS?.highlights;
+		const names = ["ccez-ann", "ccez-ann-d1", "ccez-ann-d2", "ccez-ann-d3"];
+		return {
+			ranges: names.flatMap((n) => [...(reg?.get(n) ?? [])]).length,
+			marks: document.querySelectorAll("mark.ccez-ann").length
+		};
+	});
+	expect(leftover.ranges).toBe(0);
+	expect(leftover.marks).toBe(0);
+});
+
+const AR_PARAGRAPH =
+	"Here is an arabic paragraph for you:\n\nاللغة العربية من أجمل لغات العالم وأغناها، فهي لغة القرآن الكريم ولغة الشعر والأدب والحكمة. تتميز بثراء مفرداتها وجمال أسلوبها وقدرتها على التعبير عن أدق المشاعر والأفكار. من تعلمها أدرك سحر بيانها، ومن قرأ أدبها اكتشف كنوزًا من المعرفة والثقافة تمتد عبر قرون طويلة.";
+
+/** Hovering an answered Arabic badge moves nothing: no duplicated
+words, no reflow — hovering والأفكار once pulled أدرك up a line
+and shoved the quote sideways. */
+test("hovering an answered arabic badge moves no text", async ({ page }) => {
+	test.setTimeout(120_000);
+	await seedChat(page, [{ role: "assistant", content: AR_PARAGRAPH }]);
+	await page.addInitScript(() => {
+		localStorage.setItem("ccez-mock-chat-ms", "2500");
+		const raw = window.localStorage.getItem("ccez-llm-settings-v1");
+		const prev = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+		window.localStorage.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify({ ...prev, fontScale: 3.7 })
+		);
+	});
+	await page.goto("/");
+	await expect(
+		page.locator("article .rendered").first()
+	).toBeVisible({ timeout: 60_000 });
+	// A second annotation on the message, left waiting (blue): the
+	// shift showed with two badges up, mid-restyle.
+	await dragQuote(page, 0, "العربية");
+	await page.locator('.sel-menu button:has-text("Annotate")').click();
+	await expect(page.locator(".ann-pop")).toBeVisible();
+	await page.keyboard.press("Enter");
+	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1);
+	await dragQuote(page, 0, "والأفكار");
+	await page.locator('.sel-menu button:has-text("Annotate")').click();
+	await expect(page.locator(".ann-pop")).toBeVisible();
+	await page.locator(".ann-pop textarea").fill("what does this mean?");
+	await page.keyboard.press("Enter");
+	const readies = page.locator("button.ccez-ann-badge.ans-ready");
+	await expect(readies).toHaveCount(2, { timeout: 20_000 });
+	const ready = readies.nth(1);
+	const snap = (): Promise<{
+		base: string;
+		adrak: number;
+		anchors: number;
+		marks: number;
+		lines: number;
+		anchorRect: { x: number; y: number; width: number; height: number } | null;
+		sameBadge: boolean;
+	}> =>
+		page.evaluate(() => {
+			const w = window as unknown as { __b?: Element | null };
+			const root = document.querySelector("article .rendered");
+			const walker = document.createTreeWalker(root ?? document.body, NodeFilter.SHOW_TEXT);
+			const parts: string[] = [];
+			let node: Node | null;
+			while ((node = walker.nextNode())) {
+				const parent = node.parentElement;
+				if (parent?.closest("[data-ann-badge], rt, rp, .frt, .frb, button"))
+					continue;
+				parts.push(node.textContent ?? "");
+			}
+			const base = parts.join("");
+			const anchor = document.querySelector("article .rendered span.ccez-ann-anchor");
+			const rect = anchor?.getBoundingClientRect();
+			const badge = document.querySelector("button.ccez-ann-badge");
+			const sameBadge = w.__b === undefined ? true : w.__b === badge;
+			w.__b = badge;
+			const para = [...(root?.querySelectorAll("p") ?? [])].find((p) =>
+				(p.textContent ?? "").includes("والأفكار")
+			);
+			return {
+				base,
+				adrak: base.split("أدرك").length - 1,
+				anchors: document.querySelectorAll("article .rendered span.ccez-ann-anchor").length,
+				marks: document.querySelectorAll("article .rendered mark.ccez-ann").length,
+				lines: para?.getClientRects().length ?? -1,
+				anchorRect: rect
+					? { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+					: null,
+				sameBadge
+			};
+		});
+	const hoverReady = async (): Promise<void> => {
+		const box = await ready.boundingBox();
+		if (!box) throw new Error("badge has no box");
+		await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+		await page.waitForTimeout(600);
+	};
+	// Park the pointer off-message so the before shot is wash-free.
+	await page.mouse.move(4, 4);
+	await page.waitForTimeout(600);
+	const before = await snap();
+	// Cycle the hover: off, on, off, on — a reflow that accumulates
+	// (or only shows after a leaving fade) must fail here, not just
+	// on the first paint.
+	await hoverReady();
+	const once = await snap();
+	await page.mouse.move(4, 4);
+	await page.waitForTimeout(600);
+	await hoverReady();
+	const after = await snap();
+	// The wash legitimately appears; the text must not change.
+	expect(after.marks).toBeGreaterThan(0);
+	expect(after.base).toBe(before.base);
+	expect(after.adrak).toBe(1);
+	expect(after.anchors).toBe(2);
+	expect(after.sameBadge).toBe(true);
+	expect(after.lines).toBe(before.lines);
+	expect(once.lines).toBe(before.lines);
+	if (!before.anchorRect || !after.anchorRect)
+		throw new Error("anchor lost its box on hover");
+	for (const key of ["x", "y", "width", "height"] as const) {
+		expect(
+			Math.abs(after.anchorRect[key] - before.anchorRect[key]),
+			`anchor ${key} moved on hover`
+		).toBeLessThanOrEqual(1);
+	}
+});
+
 /** Escape closes the badge edit box without writing. */
 test("escape closes the badge edit without saving", async ({ page }) => {
 	await openAnnotate(page, "確認しました");

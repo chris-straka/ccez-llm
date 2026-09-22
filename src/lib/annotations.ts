@@ -1680,10 +1680,21 @@ function stampMarks(
 	skip: boolean,
 	wash: string | null
 ): void {
+	// DOM marks still mounted (a legacy wash or its leaving fade)
+	// unwind through the legacy path even when the new items route
+	// to the registry: cancelling an Arabic draft with zero filed
+	// items would otherwise strand its fresh mark — the registry
+	// path skips stampBadges when badges are current, and the
+	// registry never touches DOM marks. The unwind removes them,
+	// so the next stamp routes normally. (A dataset flag can't say
+	// this: the registry path records its own wash id in
+	// washStamped too.)
+	const legacyMarksMounted = root.querySelector("mark.ccez-ann") !== null;
 	if (
 		!highlightsSupported() ||
 		hasReadingMarkup(root) ||
-		items.some((i) => hasRtlQuote(i.quote))
+		items.some((i) => hasRtlQuote(i.quote)) ||
+		legacyMarksMounted
 	) {
 		// Leaving the registry path: drop a wash this body painted, or
 		// its pixels ghost under the marks (same stuck overlay behind
