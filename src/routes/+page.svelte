@@ -250,7 +250,8 @@
 		getInspectData,
 		inspectLangFor,
 		isHanChar,
-		shouldShowInspect
+		shouldShowInspect,
+		clampStrokeStep
 	} from "$lib/inspect";
 	import {
 		selMenuWidthEstimate,
@@ -2113,8 +2114,7 @@
 	/** Step the stroke preview, clamped to 1..total (never wraps). */
 	function stepInspect(delta: number): void {
 		const total = inspectStrokes?.length ?? inspectData?.strokeCount ?? 1;
-		const top = Math.max(total, 1);
-		inspectStroke = Math.min(Math.max(inspectStroke + delta, 1), top);
+		inspectStroke = clampStrokeStep(inspectStroke, delta, total);
 	}
 	/**
 	 * Hold-to-repeat on the stepper arrows: a tap steps once via

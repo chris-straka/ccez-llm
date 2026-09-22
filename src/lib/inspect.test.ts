@@ -9,7 +9,8 @@ import {
 	isSingleHanChar,
 	onKunLine,
 	parseKangxi,
-	shouldShowInspect
+	shouldShowInspect,
+	clampStrokeStep
 } from "./inspect";
 import { extractStrokePaths, kanjiSvgUrl } from "./kanjivg";
 import {
@@ -338,5 +339,19 @@ describe("kanjivg", () => {
 	});
 	it("returns null when no stroke paths exist", () => {
 		expect(extractStrokePaths("<svg><g></g></svg>")).toBeNull();
+	});
+});
+
+describe("clampStrokeStep", () => {
+	it("steps within 1..total without wrapping", () => {
+		expect(clampStrokeStep(1, 1, 5)).toBe(2);
+		expect(clampStrokeStep(5, 1, 5)).toBe(5);
+		expect(clampStrokeStep(1, -1, 5)).toBe(1);
+		expect(clampStrokeStep(3, -2, 5)).toBe(1);
+	});
+
+	it("pins unknown totals at 1", () => {
+		expect(clampStrokeStep(1, 1, 0)).toBe(1);
+		expect(clampStrokeStep(9, -1, 0)).toBe(1);
 	});
 });

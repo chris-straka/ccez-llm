@@ -225,3 +225,17 @@ export function getInspectData(char: string): InspectData {
 		hasStrokePaths: false
 	};
 }
+
+/**
+ * Step the stroke preview (REFACTOR §6): clamped to 1..total,
+ * never wraps. The caller feeds the stroke count or the data
+ * fallback; unknown totals still pin at 1.
+ */
+export function clampStrokeStep(
+	current: number,
+	delta: number,
+	total: number
+): number {
+	const top = Math.max(total, 1);
+	return Math.min(Math.max(current + delta, 1), top);
+}
