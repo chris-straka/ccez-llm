@@ -5,7 +5,8 @@ import {
 	annPopSaveKind,
 	annPopWidth,
 	pillWashId,
-	placeAnnCard
+	placeAnnCard,
+	placeAnnComposer
 } from "./annPop";
 
 describe("annPopSaveKind", () => {
@@ -95,5 +96,39 @@ describe("placeAnnCard", () => {
 		expect(
 			placeAnnCard({ anchorX: 640, anchorY: 780, width: 384, viewportWidth: 1280, viewportHeight: 800 })
 		).toEqual({ x: 448, y: 532 });
+	});
+});
+
+describe("placeAnnComposer", () => {
+	it("pins phones high and centered", () => {
+		expect(
+			placeAnnComposer({
+				android: true,
+				viewportWidth: 400,
+				viewportHeight: 800,
+				width: 300,
+				menuX: 50,
+				menuY: 600,
+				highlightLeft: 40,
+				highlightWidth: 60
+			})
+		).toEqual({ x: 50, y: 96 });
+	});
+
+	it("centers narrow desktop highlights, keeps wide cursor ends", () => {
+		const narrow = {
+			android: false,
+			viewportWidth: 1000,
+			viewportHeight: 800,
+			width: 304,
+			menuX: 500,
+			menuY: 300,
+			highlightLeft: 100,
+			highlightWidth: 50
+		};
+		expect(placeAnnComposer(narrow)).toEqual({ x: 8, y: 302 });
+		expect(
+			placeAnnComposer({ ...narrow, highlightWidth: 500 })
+		).toEqual({ x: 500, y: 302 });
 	});
 });

@@ -7,6 +7,7 @@
  * re-verified by ear. Bodies keep their liveness guards
  * (`!annPop || annPopClosing`) and fall through unchanged.
  */
+import { placeAnnPopX } from "$lib/annotations";
 
 export type AnnPopSaveKind = "commit-pending" | "save-edit";
 
@@ -103,4 +104,40 @@ export function placeAnnCard(facts: {
 	if (y + height > facts.viewportHeight - 8)
 		y = Math.max(8, facts.anchorY - height - 8);
 	return { x, y };
+}
+
+/**
+ * Compose-box placement from the selection-menu anchor: phones pin
+ * high and centered (the keyboard eats the lower screen, so the box
+ * is never covered wherever the quote sits); desktop centers narrow
+ * highlights over themselves and keeps the end-of-selection
+ * placement for wide ones, a breath below the menu anchor and
+ * clamped inside the viewport.
+ */
+export function placeAnnComposer(facts: {
+	android: boolean;
+	viewportWidth: number;
+	viewportHeight: number;
+	width: number;
+	menuX: number;
+	menuY: number;
+	highlightLeft: number;
+	highlightWidth: number;
+}): { x: number; y: number } {
+	if (facts.android) {
+		return {
+			x: Math.max(8, (facts.viewportWidth - facts.width) / 2),
+			y: Math.max(8, facts.viewportHeight * 0.12)
+		};
+	}
+	return {
+		x: placeAnnPopX({
+			cursorX: facts.menuX,
+			highlightLeft: facts.highlightLeft,
+			highlightWidth: facts.highlightWidth,
+			popWidth: facts.width,
+			viewportWidth: facts.viewportWidth
+		}),
+		y: Math.min(Math.max(8, facts.menuY + 2), facts.viewportHeight - 72)
+	};
 }

@@ -215,7 +215,6 @@
 		firstContentRect,
 		readingPanelPlacement,
 		menuYAbovePanel,
-		placeAnnPopX,
 		lineStartOffset,
 		clampDragAnchorToFocusLine,
 		loadDraftAnnotations,
@@ -406,7 +405,8 @@
 		annPopSaveKind,
 		annPopWidth,
 		pillWashId,
-		placeAnnCard
+		placeAnnCard,
+		placeAnnComposer
 	} from "$lib/annPop";
 	import {
 		idleTapAction,
@@ -4779,19 +4779,16 @@
 		// Phone: the keyboard eats the lower screen, so the composer
 		// pins high and centered instead of at the selection — it is
 		// never covered, wherever the quote sits.
-		const x = androidUI
-			? Math.max(8, (window.innerWidth - width) / 2)
-			: placeAnnPopX({
-					cursorX: selMenu.x,
-					highlightLeft: selMenu.left,
-					highlightWidth: selMenu.w,
-					popWidth: width,
-					viewportWidth: window.innerWidth
-				});
-		let y = Math.min(Math.max(8, selMenu.y + 2), window.innerHeight - 72);
-		if (androidUI) {
-			y = Math.max(8, window.innerHeight * 0.12);
-		}
+		const { x, y } = placeAnnComposer({
+			android: androidUI,
+			viewportWidth: window.innerWidth,
+			viewportHeight: window.innerHeight,
+			width,
+			menuX: selMenu.x,
+			menuY: selMenu.y,
+			highlightLeft: selMenu.left,
+			highlightWidth: selMenu.w
+		});
 		selMenu = null;
 		highlightAnnId = pending.id;
 		annDraft = "";
