@@ -4262,6 +4262,7 @@
 		}
 		void done.then(
 			() => {
+				stopAudioForMessage(target.id);
 				deleteMessage(chatState, index);
 				flashCopyToast("Cut to clipboard");
 			},
@@ -5707,8 +5708,10 @@
 			return;
 		}
 		refsPopOpen = null;
-		if (plan.kind === "delete") deleteMessage(chatState, index);
-		else editMessageContent(chatState, messageId, plan.bare);
+		if (plan.kind === "delete") {
+			stopAudioForMessage(msg.id);
+			deleteMessage(chatState, index);
+		} else editMessageContent(chatState, messageId, plan.bare);
 		flashToast("Sent annotations cleared");
 	}
 
@@ -6012,6 +6015,13 @@
 		stopSpeaking();
 		stopNative();
 		resetVoice();
+	}
+
+	/** Deleting the message that's playing stops its audio — a reply
+	must not keep talking over its own grave. Selection speech stops
+	with its source message too. */
+	function stopAudioForMessage(id: ChatMsgId): void {
+		if (isMessageSpeaking(id, speakingId, speakingSelection)) stopVoice();
 	}
 
 	/** Paste-fold toggle: replace the message (never mutate in place). */
@@ -7150,6 +7160,8 @@
 	/** Row message delete (touch): chat.ts deletes, the tick lives
 	here. Keyboard and cut paths keep their own silence. */
 	function dropMessage(index: number): void {
+		const doomed = chat.messages[index];
+		if (doomed) stopAudioForMessage(doomed.id);
 		deleteMessage(chatState, index);
 		if (!androidUI) return;
 		buzzTap();
@@ -10181,6 +10193,7 @@
 				const target = chat.messages[hoveredIdx];
 				if (target) {
 					consumeEvent(event);
+					stopAudioForMessage(target.id);
 					deleteMessage(chatState, hoveredIdx);
 					return;
 				}
@@ -10284,6 +10297,8 @@
 				// to hit while reading. Physical code, so any layout's D
 				// works. Buttons and links keep their own keys.
 				event.preventDefault();
+				const doomed = chat.messages[hoveredIdx];
+				if (doomed) stopAudioForMessage(doomed.id);
 				deleteMessage(chatState, hoveredIdx);
 				return;
 			}
