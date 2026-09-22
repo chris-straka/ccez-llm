@@ -148,3 +148,41 @@ export function gutterSide(
 	if (clientX > right) return "right";
 	return "column";
 }
+
+/**
+ * Whether live work owns a message's action row (REFACTOR §6): a
+ * loading aid or running audio holds the row like a held press —
+ * closing now would strand the spinner with no buttons, or the
+ * stop button out of reach mid-utterance. The timer re-arms and a
+ * later tick closes it after the work lands.
+ */
+export function rowWorkRunning(
+	id: string,
+	aidBusy: ReadonlySet<string>,
+	vocalizing: ReadonlySet<string>,
+	speakingId: string | null,
+	speakingSelection: string | null
+): boolean {
+	return (
+		aidBusy.has(id) ||
+		vocalizing.has(id) ||
+		speakingId === id ||
+		speakingSelection === id
+	);
+}
+
+/**
+ * Whether a tap may toggle a message's action row (REFACTOR §6):
+ * phones always render the row (no master off-switch), so taps
+ * always toggle there; desktop honors the Messages checkbox.
+ */
+export function messageActionsTapAllowed(
+	android: boolean,
+	showMessageButtons: boolean,
+	hideMessages: boolean,
+	hideButtons: boolean
+): boolean {
+	if (!android && !showMessageButtons) return false;
+	if (!hideMessages && !(android && hideButtons)) return false;
+	return true;
+}

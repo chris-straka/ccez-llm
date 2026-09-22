@@ -11,6 +11,8 @@ import {
 	pointInRect,
 	sendHoldArmed,
 	gutterSide,
+	rowWorkRunning,
+	messageActionsTapAllowed,
 	SLIDER_DRAG_RESET_PX,
 	stageOwnedByOverlay,
 	type StageOwnerFlags
@@ -145,5 +147,30 @@ describe("gutterSide", () => {
 		expect(gutterSide(50, 10, 100)).toBe("column");
 		expect(gutterSide(10, 10, 100)).toBe("column");
 		expect(gutterSide(100, 10, 100)).toBe("column");
+	});
+});
+
+describe("action-row ownership", () => {
+	it("holds the row while aids load or audio runs", () => {
+		expect(rowWorkRunning("m", new Set(["m"]), new Set(), null, null)).toBe(
+			true
+		);
+		expect(rowWorkRunning("m", new Set(), new Set(["m"]), null, null)).toBe(
+			true
+		);
+		expect(rowWorkRunning("m", new Set(), new Set(), "m", null)).toBe(true);
+		expect(rowWorkRunning("m", new Set(), new Set(), null, "m")).toBe(true);
+		expect(rowWorkRunning("m", new Set(), new Set(), null, null)).toBe(false);
+		expect(rowWorkRunning("m", new Set(["x"]), new Set(), "y", null)).toBe(
+			false
+		);
+	});
+
+	it("gates row toggles on platform and settings", () => {
+		expect(messageActionsTapAllowed(false, true, true, false)).toBe(true);
+		expect(messageActionsTapAllowed(true, false, false, true)).toBe(true);
+		expect(messageActionsTapAllowed(false, false, true, false)).toBe(false);
+		expect(messageActionsTapAllowed(false, true, false, false)).toBe(false);
+		expect(messageActionsTapAllowed(true, false, false, false)).toBe(false);
 	});
 });

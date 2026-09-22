@@ -444,7 +444,9 @@
 		stageOwnedByOverlay,
 		pointInRect,
 		sendHoldArmed,
-		gutterSide
+		gutterSide,
+		rowWorkRunning,
+		messageActionsTapAllowed
 	} from "$lib/chrome";
 	import {
 		speakText,
@@ -3331,12 +3333,7 @@
 			// now would strand the spinner with no buttons, or the
 			// stop button out of reach mid-utterance. Re-arm and let
 			// a later tick close it after the work lands.
-			if (
-				aidBusy.has(id) ||
-				vocalizing.has(id) ||
-				speakingId === id ||
-				speakingSelection === id
-			) {
+			if (rowWorkRunning(id, aidBusy, vocalizing, speakingId, speakingSelection)) {
 				armActionsTimer(id);
 				return;
 			}
@@ -3357,8 +3354,15 @@
 	function toggleMessageActions(id: ChatMsgId, event: MouseEvent): void {
 		// Phones always render the row (no master off-switch), so taps
 		// always toggle there; desktop honors the Messages checkbox.
-		if (!androidUI && !settings.showMessageButtons) return;
-		if (!settings.hideMessages && !(androidUI && settings.hideButtons)) return;
+		if (
+			!messageActionsTapAllowed(
+				androidUI,
+				settings.showMessageButtons,
+				settings.hideMessages,
+				settings.hideButtons
+			)
+		)
+			return;
 		if (
 			closestFromTarget(
 				event.target,
