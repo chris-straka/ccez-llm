@@ -2444,12 +2444,7 @@
 	function openSettingsPanel(silent = false): void {
 		// Openings tick medium (first): distinct from the light ticks
 		// of folds and steps and the triple thump of deletes.
-		if (androidUI && !silent) {
-			void hapticBeatAsync("first", {
-				enabled: settings.hapticsEnabled,
-				shell: tauriBackendAvailable()
-			});
-		}
+		buzzBeat("first", androidUI && !silent);
 		// One overlay at a time: the switcher yields to settings.
 		chatSwitcherOpen = false;
 		settingsOpen = true;
@@ -3126,18 +3121,12 @@
 	function openChatSwitcher(): void {
 		chatSwitcherOpen = true;
 		switcherOpenedAt = Date.now();
-		void hapticBeatAsync("first", {
-			enabled: settings.hapticsEnabled,
-			shell: tauriBackendAvailable()
-		});
+		buzzBeat("first");
 	}
 	function closeChatSwitcher(): void {
 		if (!chatSwitcherOpen) return;
 		chatSwitcherOpen = false;
-		void hapticBeatAsync("send", {
-			enabled: settings.hapticsEnabled,
-			shell: tauriBackendAvailable()
-		});
+		buzzBeat("send");
 	}
 	/**
 	 * Cycle from inside the switcher (stays open across steps) with
@@ -3155,10 +3144,7 @@
 		if (wrapped !== null && wrapped !== chatState.activeChatId)
 			transitionToChat(wrapped);
 		else stepChat(direction, false);
-		void hapticBeatAsync("send", {
-			enabled: settings.hapticsEnabled,
-			shell: tauriBackendAvailable()
-		});
+		buzzBeat("send");
 	}
 	let shownActionsTimer: ReturnType<typeof setTimeout> | null = null;
 	/** (Re)arm the 3s auto-dismiss for one reveal. */
@@ -3315,19 +3301,13 @@
 			settings.sidebarCollapsed = true;
 			persistSettings();
 			if (focus) enterEditMode();
-			void hapticBeatAsync("send", {
-				enabled: settings.hapticsEnabled,
-				shell: tauriBackendAvailable()
-			});
+			buzzBeat("send");
 			restartStepSlide(direction);
 			return;
 		}
 		if (step.kind !== "goto") return;
 		sideIdx = step.index;
-		void hapticBeatAsync("send", {
-			enabled: settings.hapticsEnabled,
-			shell: tauriBackendAvailable()
-		});
+		buzzBeat("send");
 		transitionToChat(step.id);
 		// Landing is the switch effect's job (filed position, else
 		// top): a smooth top-scroll here would fight the restore.
@@ -3421,12 +3401,7 @@
 
 	function doNewChat(): void {
 		// A fresh chat opens medium (first), like settings.
-		if (androidUI) {
-			void hapticBeatAsync("first", {
-				enabled: settings.hapticsEnabled,
-				shell: tauriBackendAvailable()
-			});
-		}
+		buzzBeat("first", androidUI);
 		// File the abandoned chat's scroll before the fresh chat
 		// resets the box: returning later lands where it was left.
 		saveChatScroll();
@@ -3979,12 +3954,7 @@
 		// lives where the text sat, and folding it away would strand
 		// the draft (keyboard, alt-click, and button share this gate).
 		if (editingMsgId === id) return;
-		if (androidUI) {
-			void hapticBeatAsync("tap", {
-				enabled: settings.hapticsEnabled,
-				shell: tauriBackendAvailable()
-			});
-		}
+		buzzTap();
 		// Anchor the message in place: collapsing its height reflows
 		// the thread and the browser lands it mid-screen, so pin the
 		// scroll offset across the render instead of scrolling anywhere.
@@ -4018,6 +3988,18 @@
 	function buzzNo(): void {
 		if (!androidUI) return;
 		void hapticBeatAsync("no", {
+			enabled: settings.hapticsEnabled,
+			shell: tauriBackendAvailable()
+		});
+	}
+	/**
+	 * Shared first/send/done beat: one shell+toggle wiring point.
+	 * The gate stays at the call site (phones-only vs always), so
+	 * each call reads as what-it-is plus when — never a bare kind.
+	 */
+	function buzzBeat(kind: "first" | "send" | "done", active = true): void {
+		if (!active) return;
+		void hapticBeatAsync(kind, {
 			enabled: settings.hapticsEnabled,
 			shell: tauriBackendAvailable()
 		});
@@ -4853,12 +4835,7 @@
 	function removeAnnotation(id: string): void {
 		// Annotation deletes thump like message deletes (the shared
 		// triple-beat contract: call sites carry no haptic of their own).
-		if (androidUI) {
-			void hapticBeatAsync("done", {
-				enabled: settings.hapticsEnabled,
-				shell: tauriBackendAvailable()
-			});
-		}
+		buzzBeat("done", androidUI);
 		annotations = deleteAnnotation(annotations, id);
 		if (editingId === id) editingId = null;
 		if (highlightAnnId === id) highlightAnnId = null;
@@ -4984,10 +4961,7 @@
 	function commitPromptAnnEdit(): void {
 		const target = promptAnnEdit;
 		if (!target) return;
-		void hapticBeatAsync("send", {
-			enabled: settings.hapticsEnabled,
-			shell: tauriBackendAvailable()
-		});
+		buzzBeat("send");
 		const comment = editor?.getText() ?? "";
 		const pending = "pending" in target;
 		if (pending) {
@@ -5543,10 +5517,7 @@
 		if (promptAnnEdit) exitPromptAnnEdit();
 		// Clearing everything thumps like a delete (done): the same
 		// unmistakable triple against single-tap ticks.
-		void hapticBeatAsync("done", {
-			enabled: settings.hapticsEnabled,
-			shell: tauriBackendAvailable()
-		});
+		buzzBeat("done");
 	}
 
 	/**
@@ -6442,12 +6413,8 @@
 			// Same-chat only: the new chat must not thump for the old
 			// one's reply (a genuinely missed finish is the background
 			// ping's job).
-			if (stillHere) {
-				void hapticBeatAsync("done", {
-					enabled: settings.hapticsEnabled,
-					shell: tauriBackendAvailable()
-				});
-			} else if (androidUI) {
+			if (stillHere) buzzBeat("done");
+			else if (androidUI) {
 				// Other-chat landing on phones: tick plus a tappable
 				// toast — a reply must not finish silently in a thread
 				// the user left. Tapping opens the origin chat.
@@ -6582,12 +6549,7 @@
 		nativeText.set(turn_id, full);
 		if (!hasReplyStarted(chatState, owned.chatId)) {
 			markReplyStarted(chatState, owned.chatId);
-			if (chatState.activeChatId === owned.chatId) {
-				void hapticBeatAsync("first", {
-					enabled: settings.hapticsEnabled,
-					shell: tauriBackendAvailable()
-				});
-			}
+			buzzBeat("first", chatState.activeChatId === owned.chatId);
 		}
 		target.messages = target.messages.map((m) =>
 			m.id === owned.replyId ? { ...m, content: full } : m
@@ -6761,10 +6723,7 @@
 		if (action === "ignore") return;
 		// Haptic tap on send (silenced by the haptics toggle; native
 		// haptics in the shell, Web vibrator in the preview).
-		void hapticBeatAsync("send", {
-			enabled: settings.hapticsEnabled,
-			shell: tauriBackendAvailable()
-		});
+		buzzBeat("send");
 		clearStudyBadge();
 		// No permission ask from the send gesture: tapping send must
 		// never raise anything notification-shaped. The startup ask
@@ -6877,10 +6836,7 @@
 				// rumble the new chat for the old one's reply.
 				onFirstToken: () => {
 					if (chat.id !== sentFrom.id) return;
-					void hapticBeatAsync("first", {
-						enabled: settings.hapticsEnabled,
-						shell: tauriBackendAvailable()
-					});
+					buzzBeat("first");
 				}
 			}
 		);
@@ -6896,10 +6852,7 @@
 	async function resend() {
 		stopVoice();
 		// A resend is a send too: same tap, rumble, and thump as doSend.
-		void hapticBeatAsync("send", {
-			enabled: settings.hapticsEnabled,
-			shell: tauriBackendAvailable()
-		});
+		buzzBeat("send");
 		// Native resends (Android): Retry buttons land here after
 		// dismissing the failed reply, so the retried turn survives the
 		// background exactly like a fresh one. Guards mirror the fresh
@@ -6950,10 +6903,7 @@
 				thinking: activeThinkingId(settings),
 				onFirstToken: () => {
 					if (chat.id !== resentFrom.id) return;
-					void hapticBeatAsync("first", {
-						enabled: settings.hapticsEnabled,
-						shell: tauriBackendAvailable()
-					});
+					buzzBeat("first");
 				}
 			}
 		);
@@ -7866,12 +7816,7 @@
 		// Deletes thump triple (done): unmistakable against the single
 		// ticks of opens and folds. Every delete path shares it — row ×,
 		// gestures, keyboard — so call sites carry no haptic of their own.
-		if (androidUI) {
-			void hapticBeatAsync("done", {
-				enabled: settings.hapticsEnabled,
-				shell: tauriBackendAvailable()
-			});
-		}
+		buzzBeat("done", androidUI);
 		stopVoice();
 		if (id === chatState.activeChatId) {
 			// Dropping the open chat discards its drafts (stored entry
@@ -9343,10 +9288,7 @@
 							pinchBaseline = spread;
 							pinchStepped = true;
 							adjustFontScale(step * 0.1, true);
-							void hapticBeatAsync("send", {
-								enabled: settings.hapticsEnabled,
-								shell: tauriBackendAvailable()
-							});
+							buzzBeat("send");
 						}
 					}
 				}
@@ -9493,10 +9435,7 @@
 									top: scrollBox.scrollHeight,
 									behavior: "smooth"
 								});
-							void hapticBeatAsync("send", {
-								enabled: settings.hapticsEnabled,
-								shell: tauriBackendAvailable()
-							});
+							buzzBeat("send");
 						}
 						// Pinch zoom toasts once on release with the
 						// landed size (steps stay quiet mid-gesture).
@@ -9530,10 +9469,7 @@
 						// Left steps newer (minting past the end), right
 						// older — matching the switcher veil above.
 						stepChat(swipe === 1 ? -1 : 1, false);
-						void hapticBeatAsync("send", {
-							enabled: settings.hapticsEnabled,
-							shell: tauriBackendAvailable()
-						});
+						buzzBeat("send");
 						// Never mid-select, like the two-finger jump above.
 						// A fired hold owns the release: the wipe already
 						// landed, so the tap below must not run after it.
