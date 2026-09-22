@@ -107,10 +107,11 @@ describe("phone composer two bars", () => {
 		const source = pageSource();
 		// The chats list and settings are overlays above the card, so
 		// hiding it under them only slid the thread: phones park for a
-		// real idle timeout alone, desktop keeps drawer parking.
-		expect(source).toMatch(
-			/function promptParked\(\): boolean \{[\s\S]*?if \(androidUI\) return promptIdle;/
-		);
+		// real idle timeout alone, desktop keeps drawer parking. The
+		// branch lives in chrome.promptParkedFor (unit-tested); the
+		// seal follows the wiring.
+		expect(source).toContain("promptParkedFor(");
+		expect(source).toContain("promptIdle,");
 	});
 
 	it("grows the reading column with the chat-width setting", () => {

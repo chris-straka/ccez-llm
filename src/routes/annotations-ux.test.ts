@@ -109,8 +109,10 @@ describe("annotation create wiring", () => {
 	});
 
 	it("centers narrow create boxes, keeps cursor placement for wide ones", () => {
+		// The geometry lives in annPop.placeAnnComposer (unit-tested);
+		// the seal follows the summon wiring.
 		const source = pageSource();
-		expect(source).toContain("placeAnnPopX({");
+		expect(source).toContain("placeAnnComposer({");
 	});
 
 	it("ends the phone create pill with a Save button", () => {

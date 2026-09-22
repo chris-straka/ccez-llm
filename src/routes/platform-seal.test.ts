@@ -93,10 +93,13 @@ describe("platform seal", () => {
 	});
 
 	it("holds the phone dock past its timer while a highlight is live", () => {
+		// The rearm decision lives in selSlices.selMenuIdleDecision
+		// (unit-tested); the seal follows the timer wiring so the
+		// live-highlight hold can't silently drop.
 		const source = pageSource();
-		expect(source).toContain(
-			'if (androidUI && (window.getSelection()?.toString() ?? "") !== "") {'
-		);
+		expect(source).toContain("selMenuIdleDecision({");
+		expect(source).toContain('android: androidUI,');
+		expect(source).toContain('(window.getSelection()?.toString() ?? "") !== ""');
 	});
 
 	it("keeps the iOS furigana nudge on its own override", () => {

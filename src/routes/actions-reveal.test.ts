@@ -87,15 +87,12 @@ describe("hover-only message actions", () => {
 			"armActionsTimer is gone or reshaped — move the busy hold with it"
 		).toBeTruthy();
 		const body = timer![1]!;
-		// Every in-flight state that owns the row must re-arm, never close.
-		for (const state of [
-			"aidBusy.has(id)",
-			"vocalizing.has(id)",
-			"speakingId === id",
-			"speakingSelection === id"
-		]) {
-			expect(body).toContain(state);
-		}
+		// Every in-flight state that owns the row must re-arm, never
+		// close: the hold lives in chrome.rowWorkRunning (unit-tested),
+		// fed all four states here.
+		expect(body).toContain(
+			"rowWorkRunning(id, aidBusy, vocalizing, speakingId, speakingSelection)"
+		);
 		expect(body).toContain("armActionsTimer(id)");
 	});
 

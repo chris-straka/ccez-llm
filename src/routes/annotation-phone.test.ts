@@ -65,16 +65,12 @@ describe("phone edits wash their quote", () => {
 		expect(articleSource()).toContain("washId={washId ?? null}");
 	});
 	it("washes pending filings and saved notes alike", () => {
-		const source = pageSource();
-		const fn = source.match(
-			/function promptAnnWashId\(\): string \| null \{([\s\S]*?)\n\t\}/
+		// The branches live in annotations.promptAnnWashIdFor
+		// (unit-tested); the seal follows the wiring so neither the
+		// pending filing nor the saved note can silently drop.
+		expect(pageSource()).toContain(
+			"promptAnnWashIdFor(promptAnnEdit, pendingAnn?.id ?? null)"
 		);
-		expect(
-			fn,
-			"promptAnnWashId is gone or reshaped — keep both branches with it"
-		).toBeTruthy();
-		expect(fn![1]).toContain("pendingAnn");
-		expect(fn![1]).toContain("promptAnnEdit.id");
 	});
 });
 
