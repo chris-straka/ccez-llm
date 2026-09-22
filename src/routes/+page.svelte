@@ -246,6 +246,12 @@
 		shouldShowInspect
 	} from "$lib/inspect";
 	import {
+		selMenuWidthEstimate,
+		slicePoint,
+		spanSliceOverlap,
+		type SelSlice
+	} from "$lib/selSlices";
+	import {
 		applyTurnFile,
 		dismissNativeTurn,
 		markTurnInterrupted,
@@ -1101,16 +1107,6 @@
 	hover-clears rescue (see above). Every caller also drops the menu,
 	so this is belt-and-braces for future paths. */
 	let lastProgrammaticClearAt = 0;
-	/**
-	 * Width estimate (px) for the selection menu's right-edge clamp:
-	 * one padded button, two when Inspect joins Annotate, three for
-	 * the phone menu (Copy, Annotate, Speak). The measured effect on
-	 * the menu div corrects font/zoom variance.
-	 */
-	function selMenuWidthEstimate(quote: string): number {
-		if (androidUI) return 300;
-		return shouldShowInspect(quote, settings.inspectEnabled) ? 220 : 120;
-	}
 	/** The floating menu element: its measured width pulls the
 	estimated x back on screen (see the effect below). */
 	let selMenuEl: HTMLElement | null = $state(null);
@@ -1475,12 +1471,6 @@
 	const SEL_TEXT_SKIP =
 		"rt, rp, .frt, [data-ann-badge], .ccez-math-head, .ccez-code-head," +
 		" .ccez-math-tex, .ccez-math-copy, .ccez-math-foldedlabel, .ccez-code-foldedlabel";
-	interface SelSlice {
-		node: Text;
-		start: number;
-		end: number;
-		base: number;
-	}
 	/** Text slices of a range with highlight offsets: one entry per
 	text node, clamped to the range, chrome skipped. The concatenated
 	slice texts equal the quote when the range is the highlight. */
@@ -1516,22 +1506,6 @@
 		} catch {
 			return null;
 		}
-	}
-	/** (node, offset) for an absolute highlight offset, or null. */
-	function slicePoint(
-		slices: SelSlice[],
-		at: number
-	): { node: Text; offset: number } | null {
-		for (const s of slices) {
-			if (at >= s.base && at <= s.base + (s.end - s.start)) {
-				return { node: s.node, offset: s.start + (at - s.base) };
-			}
-		}
-		const last = slices[slices.length - 1];
-		if (last && at === last.base + (last.end - last.start)) {
-			return { node: last.node, offset: last.end };
-		}
-		return null;
 	}
 	/** Screen rect of a highlight span, or null: the span's first
 	line fragment, never the union box — a group wrapping across
@@ -1627,11 +1601,9 @@
 					const s = slices[i];
 					if (!s) continue;
 					for (const span of ordered) {
-						const lo = Math.max(span.start, s.base);
-						const hi = Math.min(span.end, s.base + (s.end - s.start));
-						if (hi <= lo) continue;
-						const relLo = s.start + (lo - s.base);
-						const relHi = s.start + (hi - s.base);
+						const overlap = spanSliceOverlap(span, s);
+						if (!overlap) continue;
+						const { relLo, relHi } = overlap;
 						let target: Text = s.node;
 						if (relHi < target.length) target.splitText(relHi);
 						if (relLo > 0) target = target.splitText(relLo);
@@ -4657,7 +4629,11 @@
 			viewportHeight: window.innerHeight,
 			androidUI,
 			iosUI,
-			menuWidth: selMenuWidthEstimate(found.quote)
+			menuWidth: selMenuWidthEstimate(
+				found.quote,
+				androidUI,
+				settings.inspectEnabled
+			)
 		});
 		// The rescue in the selectionchange auto-dismiss restores the
 		// stored range while nothing newer landed (see selMenuOpenedAt).
@@ -11994,7 +11970,11 @@
 					viewportHeight: window.innerHeight,
 					androidUI,
 					iosUI,
-					menuWidth: selMenuWidthEstimate(selMenu.quote)
+					menuWidth: selMenuWidthEstimate(
+						selMenu.quote,
+						androidUI,
+						settings.inspectEnabled
+					)
 				});
 				if (
 					selMenu.x !== x ||
