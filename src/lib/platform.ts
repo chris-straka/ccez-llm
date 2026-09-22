@@ -485,3 +485,20 @@ export function multiTapOwnsRelease(
 		seq !== null && seq.count >= 2 && now - seq.at >= 0 && now - seq.at < windowMs
 	);
 }
+
+/**
+ * One step through a cyclic id list (REFACTOR §6): the provider
+ * cycle wraps through the visible ids. Unknown currents land on
+ * the neighbor past the insertion point (indexOf -1 + direction +
+ * length), never stuck; empty lists stay undefined.
+ */
+export function stepCyclicId<T>(
+	ids: T[],
+	current: T,
+	direction: 1 | -1
+): T | undefined {
+	if (ids.length === 0) return undefined;
+	const next =
+		(ids.indexOf(current) + direction + ids.length) % ids.length;
+	return ids[next];
+}

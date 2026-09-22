@@ -296,6 +296,7 @@
 		nextTapCount,
 		multiTapOwnsRelease,
 		visibleProviderIds,
+		stepCyclicId,
 		androidMajorFromUA,
 		osConfirmsClipboard,
 		type TapSequence,
@@ -7801,10 +7802,7 @@
 			listProviders(settings.customProviders).map((p) => p.id),
 			{ android: androidBridge, online: navigator.onLine, local: androidBridge }
 		);
-		const next =
-			(ids.indexOf(settings.activeProviderId) + direction + ids.length) %
-			ids.length;
-		const id = ids[next];
+		const id = stepCyclicId(ids, settings.activeProviderId, direction);
 		if (id === undefined) return;
 		settings.activeProviderId = id;
 		persistSettings();

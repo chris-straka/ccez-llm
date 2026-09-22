@@ -17,6 +17,7 @@ import {
 	contentSwipeTarget,
 	messageFoldSwipe,
 	visibleProviderIds,
+	stepCyclicId,
 	pinchZoomStep,
 	twoFingerSwipeDir,
 	twoFingerSlideDir,
@@ -533,5 +534,19 @@ describe("clipboard confirmation ownership", () => {
 		expect(osConfirmsClipboard(13)).toBe(true);
 		expect(osConfirmsClipboard(12)).toBe(false);
 		expect(osConfirmsClipboard(null)).toBe(false);
+	});
+});
+
+describe("stepCyclicId", () => {
+	it("walks and wraps both directions", () => {
+		expect(stepCyclicId(["a", "b", "c"], "b", 1)).toBe("c");
+		expect(stepCyclicId(["a", "b", "c"], "c", 1)).toBe("a");
+		expect(stepCyclicId(["a", "b", "c"], "a", -1)).toBe("c");
+		expect(stepCyclicId(["a"], "a", 1)).toBe("a");
+	});
+
+	it("recovers from unknown currents and empty lists", () => {
+		expect(stepCyclicId(["a", "b"], "zzz", 1)).toBe("a");
+		expect(stepCyclicId([], "a", 1)).toBeUndefined();
 	});
 });
