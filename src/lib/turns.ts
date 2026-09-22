@@ -335,3 +335,29 @@ export function errorTurnFile(
 		finished_at: Math.floor(Date.now() / 1000)
 	};
 }
+
+/** Live ownership one turn holds: its accumulator, fetch flag, and liveness. */
+export interface NativeTurnOwnership {
+	turns: Map<TurnId, { chatId: ChatId; replyId: ChatMsgId }>;
+	texts: Map<TurnId, string>;
+	fetching: Set<ChatId>;
+	live: Set<ChatId>;
+}
+
+/**
+ * Release one turn's live ownership: drop its accumulator and fetch
+ * flag, and stand down the chat's liveness once no turn owns it
+ * anymore. The page passes its SvelteMaps (same identity, so the
+ * deletes stay reactive); tests use plain Maps.
+ */
+export function releaseNativeTurn(
+	own: NativeTurnOwnership,
+	turnId: TurnId,
+	chatId: ChatId
+): void {
+	own.turns.delete(turnId);
+	own.texts.delete(turnId);
+	own.fetching.delete(chatId);
+	if (![...own.turns.values()].some((t) => t.chatId === chatId))
+		own.live.delete(chatId);
+}

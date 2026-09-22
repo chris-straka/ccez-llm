@@ -271,6 +271,7 @@
 		nativeRouteFor,
 		errorTurnFile,
 		pollNativeTurn,
+		releaseNativeTurn,
 		resumableKilledTurn,
 		scanNativeTurns,
 		seenNativeTurn,
@@ -278,6 +279,7 @@
 		turnHistory,
 		type NativeTurnConfig,
 		type NativeTurnFile,
+		type NativeTurnOwnership,
 		type TurnId,
 		type TurnDoneEvent,
 		type TurnFetchEvent,
@@ -651,6 +653,14 @@
 	sending flag, so without it a backgrounded-then-revisited reply
 	would show neither dots nor a dead send button. */
 	const liveNative = new SvelteSet<ChatId>();
+	/** Shared ownership bundle for releaseNativeTurn: same map
+	identity, so the deletes stay reactive. */
+	const nativeOwn: NativeTurnOwnership = {
+		turns: nativeTurns,
+		texts: nativeText,
+		fetching: nativeFetching,
+		live: liveNative
+	};
 	/**
 	 * Android reports errors as toasts, never inline chrome: a phone
 	 * column has no room for a persistent banner, and a font-scaled
@@ -6621,11 +6631,7 @@
 			// The spawn itself failed: settle locally as a failed turn
 			// so the existing Retry UI applies (same shape as any
 			// provider error, never a wedged send).
-			nativeTurns.delete(turnId);
-			nativeText.delete(turnId);
-			nativeFetching.delete(chatId);
-			if (![...nativeTurns.values()].some((t) => t.chatId === chatId))
-				liveNative.delete(chatId);
+			releaseNativeTurn(nativeOwn, turnId, chatId);
 			applyTurnFile(chatState, {
 				turn_id: turnId,
 				chat_id: chatId,
@@ -6734,11 +6740,7 @@
 			}
 			return;
 		}
-		nativeTurns.delete(turn_id);
-		nativeText.delete(turn_id);
-		nativeFetching.delete(owned.chatId);
-		if (![...nativeTurns.values()].some((t) => t.chatId === owned.chatId))
-			liveNative.delete(owned.chatId);
+		releaseNativeTurn(nativeOwn, turn_id, owned.chatId);
 		let file: NativeTurnFile;
 		try {
 			file = await pollNativeTurn(turn_id);
@@ -6826,11 +6828,7 @@
 			if (file.status === "streaming" && nativeTurns.has(file.turn_id)) {
 				continue;
 			}
-			nativeTurns.delete(file.turn_id);
-			nativeText.delete(file.turn_id);
-			nativeFetching.delete(file.chat_id);
-			if (![...nativeTurns.values()].some((t) => t.chatId === file.chat_id))
-				liveNative.delete(file.chat_id);
+			releaseNativeTurn(nativeOwn, file.turn_id, file.chat_id);
 			const wasLive = isSending(chatState, file.chat_id);
 			if (file.status === "streaming") {
 				// A dead process never strands the user on Retry: the

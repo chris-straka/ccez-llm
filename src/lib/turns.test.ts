@@ -9,7 +9,9 @@ import {
 	nativeTurnConfig,
 	nativeRouteFor,
 	errorTurnFile,
+	releaseNativeTurn,
 	resumableKilledTurn,
+	type NativeTurnOwnership,
 	type TurnId,
 	pollNativeTurn,
 	scanNativeTurns,
@@ -382,5 +384,36 @@ describe("errorTurnFile", () => {
 			error: "Reply failed."
 		});
 		expect(file.finished_at).toBeGreaterThan(0);
+	});
+});
+
+describe("releaseNativeTurn", () => {
+	function owned(): NativeTurnOwnership {
+		return {
+			turns: new Map([
+				["t1" as TurnId, { chatId: "c1" as ChatId, replyId: "r1" as ChatMsgId }],
+				["t2" as TurnId, { chatId: "c1" as ChatId, replyId: "r2" as ChatMsgId }]
+			]),
+			texts: new Map([["t1" as TurnId, "hi"]]),
+			fetching: new Set(["c1" as ChatId]),
+			live: new Set(["c1" as ChatId])
+		};
+	}
+
+	it("drops the turn but holds liveness while a sibling owns the chat", () => {
+		const own = owned();
+		releaseNativeTurn(own, "t1" as TurnId, "c1" as ChatId);
+		expect(own.turns.has("t1" as TurnId)).toBe(false);
+		expect(own.texts.has("t1" as TurnId)).toBe(false);
+		expect(own.fetching.has("c1" as ChatId)).toBe(false);
+		expect(own.live.has("c1" as ChatId)).toBe(true);
+	});
+
+	it("stands the chat down with its last turn", () => {
+		const own = owned();
+		releaseNativeTurn(own, "t1" as TurnId, "c1" as ChatId);
+		releaseNativeTurn(own, "t2" as TurnId, "c1" as ChatId);
+		expect(own.turns.size).toBe(0);
+		expect(own.live.has("c1" as ChatId)).toBe(false);
 	});
 });
