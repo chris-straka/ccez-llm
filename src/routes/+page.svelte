@@ -3081,17 +3081,12 @@
 		// composer strands keyboard users (Space/i/Enter restore a hidden
 		// one, but nothing re-focuses a shown one). Focus only, never a
 		// mode flip: scroll mode survives the round trip. Controls keep
-		// their own clicks (same guard as the idle press path), drags
-		// were filtered above, and a hidden prompt stays keys-only. The
-		// unpark flushes async, so land after the tick — a sync focus
-		// would hit the still-parked composer and no-op.
-		const target = event.target instanceof Element ? event.target : null;
-		if (
-			target?.closest(
-				"button, a, input, textarea, select, summary, [contenteditable], .ccez-code"
-			)
-		)
-			return;
+		// their own clicks via the shared idle-press guard below —
+		// never a forked copy of its selector. Drags were filtered
+		// above, and a hidden prompt stays keys-only. The unpark
+		// flushes async, so land after the tick — a sync focus would
+		// hit the still-parked composer and no-op.
+		if (isClickControlTarget(event.target)) return;
 		if (promptIdle) return;
 		// Phones never land the caret on dismiss: the tap means "back
 		// to the chat", and focusing pops the keyboard over it. Desktop
