@@ -100,3 +100,13 @@ export function createProvider(
 	getProviderDef(id, custom); // throws on unknown ids
 	return new OpenAICompatProvider(id, opts);
 }
+
+/**
+ * Whether a provider key is missing (REFACTOR §6): blank on a
+ * provider that needs one. Keyless on-device endpoints carry no
+ * key by design. The conf-presence check stays at the call site
+ * so narrowing keeps working.
+ */
+export function providerKeyMissing(apiKey: string, keyless: boolean): boolean {
+	return !keyless && !apiKey.trim();
+}

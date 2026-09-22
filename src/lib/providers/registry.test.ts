@@ -6,6 +6,7 @@ import {
 	getProviderDef,
 	isBuiltinProviderId,
 	listProviders,
+	providerKeyMissing,
 	createProvider,
 	BUILTIN_PROVIDER_IDS,
 	type ProviderId
@@ -70,5 +71,14 @@ describe("registry", () => {
 		expect(misassigned).toBe("x");
 		// @ts-expect-error a typo'd built-in never compiles via builtin()
 		builtin("musse");
+	});
+});
+
+describe("providerKeyMissing", () => {
+	it("refuses blank keys except on keyless endpoints", () => {
+		expect(providerKeyMissing("  ", false)).toBe(true);
+		expect(providerKeyMissing("", false)).toBe(true);
+		expect(providerKeyMissing("k", false)).toBe(false);
+		expect(providerKeyMissing("", true)).toBe(false);
 	});
 });

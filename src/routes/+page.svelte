@@ -79,6 +79,7 @@
 		listProviders,
 		createProvider,
 		getProviderDef,
+		providerKeyMissing,
 		type ProviderId
 	} from "$lib/providers/registry";
 	import { offlineTarget, onlineRestore } from "$lib/offline";
@@ -6454,8 +6455,8 @@
 		const keyless =
 			getProviderDef(settings.activeProviderId, settings.customProviders)
 				.keyless === true;
-		if (!keyless && !conf?.apiKey.trim()) return null;
 		if (!conf) return null;
+		if (providerKeyMissing(conf.apiKey, keyless)) return null;
 		return createProvider(
 			settings.activeProviderId,
 			{ ...conf, mobile: androidUI },
