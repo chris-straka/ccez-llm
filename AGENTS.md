@@ -174,8 +174,11 @@ through). The only prompt-proof browser is a Google-signed one
 
 ## Known structural debt
 
-- `src/routes/+page.svelte` is sidebar, messages, composer, popovers in
-  one file (~19k lines; component split is an open task in `TODO.md`).
+- `src/routes/+page.svelte` markup is decomposed (13 components own
+  their markup/CSS; page owns state/behavior/wiring, ~13.5k lines).
+  Script-level decomposition follows the `keybindings.ts` pattern:
+  pure decisions over explicit facts snapshots in lib (unit-tested),
+  state and effects stay in the component.
   The `onKey` dispatcher is being hollowed out branch by branch into
   `src/lib/keybindings.ts`: decisions are pure functions over an explicit
   facts snapshot (unit-tested, priority encoded inside), effects stay in the

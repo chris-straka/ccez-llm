@@ -818,9 +818,7 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
 - [x] Enter-at-tag newline + tag-only dash dropped — not
       reproducible, no code path found; needs the reporter's exact
       sequence/screenshot if either recurs.
-- [x] +page.svelte split dropped — decided: stays one file
-      (AGENTS.md standing decision, Sep 2026); hollowing into
-      `keybindings.ts` continues instead.
+
 - [x] Floating badge full pins dropped — owner decision (Sep 2026):
       gap parking (empty anchors on word boundaries, in
       `annotations.ts`) is enough; revisit only if it stops being
