@@ -524,6 +524,17 @@ export const MODEL_AIDS: Record<string, ModelAid> = {
 /** Lines carrying Arabic script: the only lines tashkeel may touch. */
 const ARABIC_LINE_RE = /[\u0600-\u06FF\u0750-\u077F]/;
 
+/**
+ * Readings-load failure toast: the reason ships in the copy — a bare
+ * failure gives nothing to report back when it only reproduces on a
+ * phone. Pure and unit-tested.
+ */
+export function aidFailureToast(reason?: string): string {
+	return reason
+		? `Couldn't load the readings for this message (${reason}).`
+		: "Couldn't load the readings for this message.";
+}
+
 export function aidTargetLines(text: string): number[] {
 	const indexes: number[] = [];
 	text.split("\n").forEach((line, i) => {

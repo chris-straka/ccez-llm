@@ -397,6 +397,7 @@
 		runModelAid,
 		annotationAnswer,
 		aidTargetLines,
+		aidFailureToast,
 		selectAidInput,
 		spliceAidResult,
 		messageAidKinds,
@@ -5792,14 +5793,7 @@
 			if (!aidModelPin.has(id)) aidPin.delete(id);
 		} else aidKindPin.set(id, kept);
 		if (aidPeek?.id === id) aidPeek = null;
-		// The reason ships in the toast: a bare failure gives nothing to
-		// report back when it only reproduces on a phone.
-		if (had)
-			flashErrorToast(
-				reason
-					? `Couldn't load the readings for this message (${reason}).`
-					: "Couldn't load the readings for this message."
-			);
+		if (had) flashErrorToast(aidFailureToast(reason));
 	}
 
 	async function runModelAidFor(

@@ -32,6 +32,7 @@ import {
 	LOCAL_AID_SHOW_ORIGINAL,
 	LOCAL_AID_ADD_TITLE,
 	aidTargetLines,
+	aidFailureToast,
 	selectAidInput,
 	spliceAidResult,
 	resolveAidKinds,
@@ -377,6 +378,15 @@ describe("multilingual model aids", () => {
 		const original = "日本語の文です\nمرحبا بالعالم\nEnglish text";
 		expect(spliceAidResult(original, [1], "مَرْحَبًا بِالْعَالَم")).toBe(
 			"日本語の文です\nمَرْحَبًا بِالْعَالَم\nEnglish text"
+		);
+	});
+
+	it("ships the failure reason in the toast", () => {
+		expect(aidFailureToast("timeout")).toBe(
+			"Couldn't load the readings for this message (timeout)."
+		);
+		expect(aidFailureToast()).toBe(
+			"Couldn't load the readings for this message."
 		);
 	});
 
