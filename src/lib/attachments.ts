@@ -1061,3 +1061,43 @@ export function sentTagModelsFor(
 		text: att.text
 	}));
 }
+
+/** Last reconciled marker counts (see syncTagRemovals). */
+export interface TagSyncCounts {
+	markers: number;
+	fileMarkers: number;
+	pasted: number;
+}
+
+/**
+ * One tag→attachment reconciliation step (REFACTOR §6): count the
+ * three marker kinds in the new text, drop matching attachments,
+ * and report the fresh counts. The composer and the in-place
+ * editor share the step; each keeps its own counts. `cleared`
+ * tells the caller an attachment died with its scoped error.
+ */
+export function syncTagRemovals(
+	list: Attachment[],
+	text: string,
+	removed: RemovedMarkerTags | undefined,
+	prev: TagSyncCounts
+): { kept: Attachment[]; counts: TagSyncCounts; cleared: boolean } {
+	const imagesNow = countMarkers(text);
+	const filesNow = countMarkers(text, FILE_MARKER);
+	const pastedNow = countPastedTags(text);
+	const kept = reconcileTagRemovals(
+		list,
+		imagesNow,
+		filesNow,
+		prev.markers,
+		prev.fileMarkers,
+		removed,
+		pastedNow,
+		prev.pasted
+	);
+	return {
+		kept,
+		counts: { markers: imagesNow, fileMarkers: filesNow, pasted: pastedNow },
+		cleared: kept.length !== list.length
+	};
+}

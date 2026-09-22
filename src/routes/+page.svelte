@@ -179,9 +179,9 @@
 		makePastedTextAttachment,
 		pastedMarkerInsert,
 		spliceSendText,
+		syncTagRemovals,
 		stripPastedMarkers,
 		sentTagModelsFor,
-		reconcileTagRemovals,
 		type Attachment,
 		type AttachmentKind,
 		type AttachTagModel,
@@ -7354,27 +7354,19 @@
 				// from the composer: deleted occurrences drop the
 				// matching attachments by index.
 				if (editingMarkerMuted) return;
-				const imagesNow = countMarkers(text);
-				const filesNow = countMarkers(text, FILE_MARKER);
-				const pastedNow = countPastedTags(text);
-				const kept = reconcileTagRemovals(
-					editingAttachments,
-					imagesNow,
-					filesNow,
-					editingPrevMarkers,
-					editingPrevFileMarkers,
-					removed,
-					pastedNow,
-					editingPrevPasted
-				);
-				if (kept.length !== editingAttachments.length) {
-					editingAttachments = kept;
+				const step = syncTagRemovals(editingAttachments, text, removed, {
+					markers: editingPrevMarkers,
+					fileMarkers: editingPrevFileMarkers,
+					pasted: editingPrevPasted
+				});
+				if (step.cleared) {
+					editingAttachments = step.kept;
 					// Attachment-scoped errors die with the attachment.
 					clearNotice(notices, "inline");
 				}
-				editingPrevMarkers = imagesNow;
-				editingPrevFileMarkers = filesNow;
-				editingPrevPasted = pastedNow;
+				editingPrevMarkers = step.counts.markers;
+				editingPrevFileMarkers = step.counts.fileMarkers;
+				editingPrevPasted = step.counts.pasted;
 			}
 		};
 	}
@@ -8035,29 +8027,21 @@
 				// (attachments with no tags, from undo and cross-editor
 				// flows) drop the excess newest-first.
 				if (markerSyncMuted) return;
-				const imagesNow = countMarkers(text);
-				const filesNow = countMarkers(text, FILE_MARKER);
-				const pastedNow = countPastedTags(text);
-				const kept = reconcileTagRemovals(
-					attachments,
-					imagesNow,
-					filesNow,
-					prevMarkerCount,
-					prevFileMarkerCount,
-					removed,
-					pastedNow,
-					prevPastedCount
-				);
-				if (kept.length !== attachments.length) {
-					attachments = kept;
+				const step = syncTagRemovals(attachments, text, removed, {
+					markers: prevMarkerCount,
+					fileMarkers: prevFileMarkerCount,
+					pasted: prevPastedCount
+				});
+				if (step.cleared) {
+					attachments = step.kept;
 					// Attachment-scoped errors die with the attachment —
 					// otherwise the red line dangles over the next draft
 					// with nothing left to explain.
 					clearNotice(notices, "inline");
 				}
-				prevMarkerCount = imagesNow;
-				prevFileMarkerCount = filesNow;
-				prevPastedCount = pastedNow;
+				prevMarkerCount = step.counts.markers;
+				prevFileMarkerCount = step.counts.fileMarkers;
+				prevPastedCount = step.counts.pasted;
 			}
 		};
 	}

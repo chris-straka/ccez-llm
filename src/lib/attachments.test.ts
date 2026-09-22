@@ -26,6 +26,7 @@ import {
 	pastedMarkerInsert,
 	pastedTextMarker,
 	reconcileTagRemovals,
+	syncTagRemovals,
 	removeMarker,
 	removeMarkerAt,
 	removePastedAt,
@@ -750,5 +751,31 @@ describe("sentTagModelsFor", () => {
 			["b", true]
 		]);
 		expect(models[1]).toMatchObject({ kind: "text", text: "hello" });
+	});
+});
+
+describe("syncTagRemovals", () => {
+	const img = (id: string) => testAttachment({ id, kind: "image" });
+	const zero = { markers: 0, fileMarkers: 0, pasted: 0 };
+
+	it("counts text and reports no change when tags match", () => {
+		const list = [img("a")];
+		const doc = `see ${IMAGE_MARKER}`;
+		const step = syncTagRemovals(list, doc, undefined, zero);
+		expect(step.kept.map((a) => a.id)).toEqual(["a"]);
+		expect(step.cleared).toBe(false);
+		expect(step.counts).toEqual({ markers: 1, fileMarkers: 0, pasted: 0 });
+	});
+
+	it("drops orphan attachments and flags the clear", () => {
+		const list = [img("a"), img("b")];
+		const step = syncTagRemovals(list, "no tags", undefined, {
+			markers: 2,
+			fileMarkers: 0,
+			pasted: 0
+		});
+		expect(step.kept).toEqual([]);
+		expect(step.cleared).toBe(true);
+		expect(step.counts.markers).toBe(0);
 	});
 });
