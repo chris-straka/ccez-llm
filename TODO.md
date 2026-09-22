@@ -32,39 +32,19 @@ same codebase via the Tauri mobile target.
       (`platform.ts`, `updates.ts`, `langId.ts` + `langid.rs`,
       `secrets_*` fail-closed). No pass claims without the hardware.
 
-## Pile: 0.5.3 field notes (mac app, 370% font size)
+## Pile: 0.5.3 remainder (mac app, 370% font size)
 
-THINGS I NOTICED ON 0.5.3 mac app with 370% font size
+Every other 0.5.3 field note is closed in `DONE.md` (speech chords,
+chat-step aliases, digit dual-mode, annotation sizing, TTS floor,
+text-size uncap, furigana backdrop, shell Cmd+T). One stays open:
 
-Switching chats feels slow (like 2s going down a chat and 1s going up). It's not going to storage on each chat is it? I'm in the Mac client.
-
-I need a keyboard shortcut that plays the audio for the word that I'm on, then another one for its sentence, then another one for its paragraph
-
-Command+[, command+down-arrow and command+up-arrow and command+] should switch chats.
-
-After I pick a language with the language menu buttons and pick a chat language, the command+1 through command+0 should take me to other chats (2nd chat, 3rd chat, etc). and hitting hitting command+1 should clear the language and put it back on again. Each chat therefore should not switch from a french chat to a german one for example. 
-
-The create annotation textbox should get more square like the more text that's inside it.
-
-Used the English TTS for neigeait, dissous and dissoudre individually. Is my TTS detection for French that bad ? 
-
-PART 2 
-
-I think it does become boxy actually but it becomes boxy too late on large font sizes
-
-On Mac, clicking on the annotations menu for a previously sent message is way too small in width and height. It should span the full chat width and it should go twice as high.
-
-PART 3
-
-command+t should open a chat
-
-text size stops at 600% on mac when hitting command + sign, should not be capped like that I don't think unless there's a good reason I'm forgetting.
-
-## Pile: furigana popup backdrop should fit scrunched characters (Sep 2026)
-
-- [ ] The furigana popup's backdrop width should shrink to only as wide
-      as its characters, so everything still fits when they scrunch
-      together — currently the backdrop can clip or overflow the text.
+- [ ] Chat switching feels slow (2s down a chat, 1s up at 370% font).
+      Storage ruled out: `selectChat` flips `activeChatId` only (no
+      `persistChats`); per-switch sync work is draft/scroll filing
+      (KBs of localStorage) plus a 500ms-debounced worker search
+      reindex off the critical path. Render cost of the entering
+      thread dominates — needs a device profile in the Mac client
+      before any fix.
 
 ## Pile: Android in-app update install fails (reported on 0.5.2, Sep 2026)
 

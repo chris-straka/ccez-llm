@@ -965,3 +965,10 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
       Reply language was already per-chat, so jumped chats keep their
       own (French stays French). Shell-only like quick-lang; dispatch
       unit-pinned, effect rides transitionToChat.
+
+- [x] Shell ⌘T opens a chat (0.5.3 field note, ac4b2fd): the app has
+      no tabs and the in-app browser is gone, so the shell mints a
+      chat instead of swallowing the chord; the browser keeps new-tab
+      (returns null off-shell, ⌘⌥T untouched). Dispatch unit-pinned
+      in `keybindings.test.ts`; effect rides the existing new-chat
+      path; shortcuts menu lists ⌘T under New chat.
