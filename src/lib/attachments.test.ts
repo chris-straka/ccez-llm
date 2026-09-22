@@ -41,6 +41,7 @@ import {
 	stripAttachmentMarkers,
 	stripPastedMarkers,
 	tagPlaceholder,
+	toggleTagKey,
 	attachmentImageBlobs,
 	blobToDataUrl,
 	clipboardPngBlob,
@@ -751,6 +752,18 @@ describe("sentTagModelsFor", () => {
 			["b", true]
 		]);
 		expect(models[1]).toMatchObject({ kind: "text", text: "hello" });
+	});
+});
+
+describe("toggleTagKey", () => {
+	it("toggles the tapped tag, closing same-message siblings", () => {
+		expect(toggleTagKey([], "m1", "a")).toEqual(["m1:a"]);
+		expect(toggleTagKey(["m1:a"], "m1", "a")).toEqual([]);
+		expect(toggleTagKey(["m1:a"], "m1", "b")).toEqual(["m1:b"]);
+		expect(toggleTagKey(["m1:a", "m2:x"], "m1", "b")).toEqual([
+			"m2:x",
+			"m1:b"
+		]);
 	});
 });
 

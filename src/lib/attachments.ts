@@ -1041,6 +1041,22 @@ export function spliceSendText(
 }
 
 /**
+ * History tag fold toggle: replace the key list (never mutate). One
+ * preview per message — opening a tag closes its siblings, so popups
+ * never stack over each other. Pure and unit-tested.
+ */
+export function toggleTagKey(
+	keys: string[],
+	msgId: string,
+	attId: string
+): string[] {
+	const key = `${msgId}:${attId}`;
+	if (keys.includes(key)) return keys.filter((k) => k !== key);
+	const prefix = `${msgId}:`;
+	return [...keys.filter((k) => !k.startsWith(prefix)), key];
+}
+
+/**
  * Preview models for the leftovers strip (REFACTOR §6): one per
  * attachment with no literal left in the message text (literals
  * rebuild inline instead, so each file shows exactly once).

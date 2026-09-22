@@ -100,6 +100,48 @@ export interface LanguageMenu {
 	languages: ReplyLanguage[];
 }
 
+/** Anchor box for a language menu (see .lang-list-fixed). */
+export interface LangMenuAnchor {
+	left: number;
+	maxH: number;
+	mode: "drop" | "center";
+	top: number;
+}
+
+/**
+ * Smart anchor for a language menu: a short list drops under its own
+ * pill like a plain menu (Africa/Classics hug their buttons); a long
+ * one centers on the screen instead. Europe/Asia never fit between
+ * pill and composer, and a top/bottom pair is forbidden — an
+ * over-constrained fixed box stretches full-band (margins compute to
+ * zero), which reads as a massive empty panel. Height is estimated
+ * from the item count (~35px a row, measured); the drop caps at the
+ * composer and the centered sheet scrolls past maxH. Left edge stays
+ * pill-anchored, shifted to stay on-screen. Pure and unit-tested.
+ */
+export function langMenuAnchorFor(opts: {
+	btnLeft: number;
+	btnBottom: number;
+	composerTop: number;
+	viewportWidth: number;
+	itemCount: number;
+}): LangMenuAnchor {
+	const estH = opts.itemCount * 35 + 12;
+	const dropTop = Math.round(opts.btnBottom + 6);
+	const drop = dropTop + estH + 8 <= opts.composerTop;
+	return {
+		left: Math.round(
+			Math.max(8, Math.min(opts.btnLeft, opts.viewportWidth - 8 - 180))
+		),
+		maxH: Math.max(
+			140,
+			Math.round((drop ? opts.composerTop - dropTop : opts.composerTop) - 8 - 8)
+		),
+		mode: drop ? "drop" : "center",
+		top: dropTop
+	};
+}
+
 export const LANGUAGE_MENUS: LanguageMenu[] = [
 	{
 		id: "europe",

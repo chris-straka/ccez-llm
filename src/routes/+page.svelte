@@ -67,10 +67,12 @@
 	import {
 		LANGUAGE_MENUS,
 		QUICK_LANG_CODES,
+		langMenuAnchorFor,
 		quickKeyFor,
 		replyLanguageFor,
 		switchToastFor,
 		thinkingLabelFor,
+		type LangMenuAnchor,
 		type LanguageMenu,
 		type ReplyLanguage
 	} from "$lib/languages";
@@ -185,6 +187,7 @@
 		syncTagRemovals,
 		stripPastedMarkers,
 		sentTagModelsFor,
+		toggleTagKey,
 		type Attachment,
 		type AttachmentKind,
 		type AttachTagModel,
@@ -1840,12 +1843,7 @@
 	five languages cut by a rectangle. Null on desktop, which
 	keeps the in-flow upward list. top:50% plus translateY centers
 	the shrink-wrapped sheet (see .lang-list-fixed). */
-	let langMenuAnchor: {
-		left: number;
-		maxH: number;
-		mode: "drop" | "center";
-		top: number;
-	} | null = $state(null);
+	let langMenuAnchor: LangMenuAnchor | null = $state(null);
 	function toggleLangMenu(id: LanguageMenu["id"], btn: HTMLElement): void {
 		// Family open/close ticks on phones (buzzTap self-gates to
 		// Android and honors the haptics toggle).
@@ -1862,31 +1860,16 @@
 		const r = btn.getBoundingClientRect();
 		const composerTop =
 			promptEl?.getBoundingClientRect().top ?? window.innerHeight;
-		// Smart anchor: a short list drops under its own pill like a
-		// plain menu (Africa/Classics hug their buttons); a long one
-		// centers on the screen instead (see .lang-list-fixed).
-		// Europe/Asia never fit between pill and composer, and a
-		// top/bottom pair is forbidden — an over-constrained fixed
-		// box stretches full-band (margins compute to zero), which
-		// read as a massive empty panel. Height is estimated from
-		// the item count (~35px a row, measured); the drop caps at
-		// the composer and the centered sheet scrolls past maxH.
-		// Left edge stays pill-anchored, shifted to stay on-screen.
+		// Smart anchor geometry lives in languages (pure, tested);
+		// only the DOM reads stay here.
 		const menu = LANGUAGE_MENUS.find((m) => m.id === id);
-		const estH = (menu?.languages.length ?? 8) * 35 + 12;
-		const dropTop = Math.round(r.bottom + 6);
-		const drop = dropTop + estH + 8 <= composerTop;
-		langMenuAnchor = {
-			left: Math.round(
-				Math.max(8, Math.min(r.left, window.innerWidth - 8 - 180))
-			),
-			maxH: Math.max(
-				140,
-				Math.round((drop ? composerTop - dropTop : composerTop) - 8 - 8)
-			),
-			mode: drop ? "drop" : "center",
-			top: dropTop
-		};
+		langMenuAnchor = langMenuAnchorFor({
+			btnLeft: r.left,
+			btnBottom: r.bottom,
+			composerTop,
+			viewportWidth: window.innerWidth,
+			itemCount: menu?.languages.length ?? 8
+		});
 	}
 	$effect(() => {
 		if (!openLangMenu) langMenuAnchor = null;
@@ -3981,17 +3964,10 @@
 	 */
 	let expandedTags = $state<string[]>([]);
 
-	/** History tag fold toggle: replace the key list (never mutate).
-	One preview per message — opening a tag closes its siblings, so
-	popups never stack over each other. */
+	/** History tag fold toggle (see toggleTagKey): replace the key
+	list, never mutate. */
 	function toggleSentTag(msg: ChatMsg, attId: string): void {
-		const key = `${msg.id}:${attId}`;
-		if (expandedTags.includes(key)) {
-			expandedTags = expandedTags.filter((k) => k !== key);
-			return;
-		}
-		const prefix = `${msg.id}:`;
-		expandedTags = [...expandedTags.filter((k) => !k.startsWith(prefix)), key];
+		expandedTags = toggleTagKey(expandedTags, msg.id, attId);
 	}
 
 	function toggleFold(id: ChatMsgId): void {

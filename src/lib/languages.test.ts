@@ -6,6 +6,7 @@ import {
 	AFRICAN_LANGUAGES,
 	CLASSICAL_LANGUAGES,
 	QUICK_LANG_CODES,
+	langMenuAnchorFor,
 	quickKeyFor,
 	replyLanguageFor,
 	switchToastFor,
@@ -178,5 +179,40 @@ describe("reply pill data", () => {
 		expect(switchToastFor(replyLanguageFor("la")!)).toBe("Latina 🏛");
 		// Language names stay lowercase where the language does so.
 		expect(switchToastFor(replyLanguageFor("fr")!)).toBe("français 🇫🇷");
+	});
+});
+
+describe("langMenuAnchorFor", () => {
+	const base = {
+		btnLeft: 100,
+		btnBottom: 200,
+		composerTop: 800,
+		viewportWidth: 1280,
+		itemCount: 4
+	};
+
+	it("drops short lists under the pill, capped at the composer", () => {
+		expect(langMenuAnchorFor(base)).toEqual({
+			left: 100,
+			maxH: 578,
+			mode: "drop",
+			top: 206
+		});
+	});
+
+	it("centers long lists that never fit the gap", () => {
+		expect(
+			langMenuAnchorFor({ ...base, itemCount: 30 }).mode
+		).toBe("center");
+		expect(
+			langMenuAnchorFor({ ...base, itemCount: 30 }).maxH
+		).toBe(784);
+	});
+
+	it("keeps the left edge on-screen", () => {
+		expect(
+			langMenuAnchorFor({ ...base, btnLeft: 1200 }).left
+		).toBe(1092);
+		expect(langMenuAnchorFor({ ...base, btnLeft: -50 }).left).toBe(8);
 	});
 });
