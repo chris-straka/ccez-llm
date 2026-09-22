@@ -69,3 +69,52 @@ export function selMenuWidthEstimate(
 	if (android) return 300;
 	return shouldShowInspect(quote, inspectEnabled) ? 220 : 120;
 }
+
+/**
+ * Post-paint x correction for the selection menu, or null when the
+ * estimate already holds. Phones ride the highlight's middle by
+ * measured width; desktop pulls the estimate back on screen. The
+ * one-shot page effect applies a non-null result once — a settled
+ * value never re-triggers it.
+ */
+export function correctSelMenuX(
+	menu: { x: number; left: number; w: number },
+	measuredW: number,
+	viewportW: number,
+	phone: boolean
+): number | null {
+	if (phone) {
+		const center = menu.left + menu.w / 2;
+		const x = Math.min(
+			Math.max(8, center - measuredW / 2),
+			Math.max(8, viewportW - measuredW - 8)
+		);
+		return x !== menu.x ? x : null;
+	}
+	const over = menu.x + measuredW + 8 - viewportW;
+	return over > 0 ? Math.max(8, menu.x - over) : null;
+}
+
+/**
+ * What the selection menu's idle timer does on fire: re-arm while
+ * engaged hands hold it (a live phone highlight, or recent desktop
+ * input outside a hover), else dismiss. Pure decision behind the
+ * page's arming effect.
+ */
+export function selMenuIdleDecision(facts: {
+	android: boolean;
+	selectionLive: boolean;
+	hover: boolean;
+	lastInputAt: number;
+	now: number;
+	idleMs: number;
+}): "rearm" | "dismiss" {
+	if (facts.android && facts.selectionLive) return "rearm";
+	if (
+		!facts.android &&
+		!facts.hover &&
+		facts.now - facts.lastInputAt < facts.idleMs
+	)
+		return "rearm";
+	return "dismiss";
+}

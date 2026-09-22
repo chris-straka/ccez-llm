@@ -258,6 +258,8 @@
 		clampStrokeStep
 	} from "$lib/inspect";
 	import {
+		correctSelMenuX,
+		selMenuIdleDecision,
 		selMenuWidthEstimate,
 		slicePoint,
 		spanSliceOverlap,
@@ -1064,17 +1066,19 @@
 			selMenuTimer = setTimeout(
 				() => {
 					selMenuTimer = null;
-					if (androidUI && (window.getSelection()?.toString() ?? "") !== "") {
-						arm();
-						return;
-					}
 					// Engaged hands hold the menu: pointer activity (stamped
 					// by the shared activity listener) inside the window
 					// re-arms instead of dismissing.
 					if (
-						!androidUI &&
-						!selMenuHover &&
-						Date.now() - lastInputAt < SEL_MENU_IDLE_MS
+						selMenuIdleDecision({
+							android: androidUI,
+							selectionLive:
+								(window.getSelection()?.toString() ?? "") !== "",
+							hover: selMenuHover,
+							lastInputAt,
+							now: Date.now(),
+							idleMs: SEL_MENU_IDLE_MS
+						}) === "rearm"
 					) {
 						arm();
 						return;
@@ -1102,20 +1106,17 @@
 		const menu = selMenu;
 		const el = selMenuEl;
 		if (!menu || !el) return;
-		if (androidUI && !iosUI) {
-			// Phones ride the selection's middle by measured width (the
-			// placement estimate is deliberately wide), clamped on
-			// screen. Settled centers never re-trigger this.
-			const center = menu.left + menu.w / 2;
-			const x = Math.min(
-				Math.max(8, center - el.offsetWidth / 2),
-				Math.max(8, window.innerWidth - el.offsetWidth - 8)
-			);
-			if (x !== menu.x) selMenu = { ...menu, x };
-			return;
-		}
-		const over = menu.x + el.offsetWidth + 8 - window.innerWidth;
-		if (over > 0) selMenu = { ...menu, x: Math.max(8, menu.x - over) };
+		// Phones ride the selection's middle by measured width (the
+		// placement estimate is deliberately wide), clamped on screen;
+		// desktop pulls the estimate back on screen. Settled values
+		// never re-trigger this.
+		const x = correctSelMenuX(
+			menu,
+			el.offsetWidth,
+			window.innerWidth,
+			androidUI && !iosUI
+		);
+		if (x !== null) selMenu = { ...menu, x };
 	});
 	/**
 	 * Last press that began inside the selection menu: whatever

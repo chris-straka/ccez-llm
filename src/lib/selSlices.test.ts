@@ -3,6 +3,8 @@ import {
 	slicePoint,
 	spanSliceOverlap,
 	selMenuWidthEstimate,
+	correctSelMenuX,
+	selMenuIdleDecision,
 	type SelSlice
 } from "./selSlices";
 
@@ -61,5 +63,50 @@ describe("selMenuWidthEstimate", () => {
 		expect(selMenuWidthEstimate("字", false, true)).toBe(220);
 		expect(selMenuWidthEstimate("plain words here", false, true)).toBe(120);
 		expect(selMenuWidthEstimate("字", false, false)).toBe(120);
+	});
+});
+
+describe("correctSelMenuX", () => {
+	it("pulls desktop overflow back on screen, null when settled", () => {
+		expect(
+			correctSelMenuX({ x: 900, left: 0, w: 10 }, 200, 1000, false)
+		).toBe(792);
+		expect(correctSelMenuX({ x: 100, left: 0, w: 10 }, 200, 1000, false)).toBe(
+			null
+		);
+	});
+
+	it("centers phones on the highlight middle, clamped on screen", () => {
+		expect(
+			correctSelMenuX({ x: 0, left: 400, w: 100 }, 200, 1000, true)
+		).toBe(350);
+		expect(
+			correctSelMenuX({ x: 350, left: 400, w: 100 }, 200, 1000, true)
+		).toBe(null);
+	});
+});
+
+describe("selMenuIdleDecision", () => {
+	const base = {
+		android: false,
+		selectionLive: false,
+		hover: false,
+		lastInputAt: 1000,
+		now: 2000,
+		idleMs: 6000
+	};
+	it("re-arms on live phone highlights and fresh desktop input", () => {
+		expect(
+			selMenuIdleDecision({ ...base, android: true, selectionLive: true })
+		).toBe("rearm");
+		expect(selMenuIdleDecision(base)).toBe("rearm");
+	});
+
+	it("dismisses dead phone highlights, hover holds, and stale input", () => {
+		expect(
+			selMenuIdleDecision({ ...base, android: true, selectionLive: false })
+		).toBe("dismiss");
+		expect(selMenuIdleDecision({ ...base, hover: true })).toBe("dismiss");
+		expect(selMenuIdleDecision({ ...base, now: 8000 })).toBe("dismiss");
 	});
 });
