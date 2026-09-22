@@ -566,6 +566,33 @@ describe("applyMarks wash over paragraphs", () => {
 		expect(root.querySelector("[data-ann-badge]")).toBe(first);
 	});
 
+	it("opens and cancels a preview without moving filed badges", () => {
+		const filed: AnnotationMark[] = [
+			{ id: "a1" as AnnotationId, number: 1, quote: "alpha" }
+		];
+		const root = rootWith("alpha and beta");
+		applyMarks(root, filed, false, null);
+		const badge = root.querySelector("[data-ann-badge]");
+		const anchor = root.querySelector("span.ccez-ann-anchor");
+		if (!(badge instanceof HTMLButtonElement) || !(anchor instanceof Element))
+			throw new Error("no badge");
+		const withDraft: AnnotationMark[] = [
+			...filed,
+			{ id: "draft" as AnnotationId, number: 2, quote: "beta", preview: true }
+		];
+		// Opening the draft washes only: the filed badge and its
+		// anchor stay mounted (re-inserting the anchor re-splits
+		// Arabic text nodes mid-word — reshape flicker).
+		applyMarks(root, withDraft, false, "draft");
+		expect(root.querySelector("[data-ann-badge]")).toBe(badge);
+		expect(root.querySelector("span.ccez-ann-anchor")).toBe(anchor);
+		expect(root.querySelectorAll("span.ccez-ann-anchor")).toHaveLength(1);
+		// Cancelling (ESC) unwashes the same way.
+		applyMarks(root, filed, false, null);
+		expect(root.querySelector("[data-ann-badge]")).toBe(badge);
+		expect(root.querySelector("span.ccez-ann-anchor")).toBe(anchor);
+	});
+
 	it("snapshots nothing for carets and outside selections", () => {
 		const root = twoParagraphs();
 		const outsider = document.createElement("div");

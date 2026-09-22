@@ -925,17 +925,20 @@ export function applyMarks(
 }
 
 /**
- * Stamp signature: badge placement AND answer paint depend on items
- * + skip. A wash-only change (badge hover, draft click) re-stamps
- * marks without touching badges or anchors — see stampWashOnly
- * below. The answer rides along or a landed answer never repaints
+ * Stamp signature: badge placement AND answer paint depend on filed
+ * items + skip — never the wash id, which flips below without moving
+ * a node, and never preview (unsaved) items, which stamp no badge:
+ * opening or cancelling a draft must ride the wash-only path or
+ * every open/ESC re-splits Arabic text nodes mid-word (reshape
+ * flicker). The answer rides along or a landed answer never repaints
  * its waiting badge.
  */
 function stampSignature(items: AnnotationMark[], skip: boolean): string {
 	return `${skip ? 1 : 0}|${items
+		.filter((i) => i.preview !== true)
 		.map(
 			(i) =>
-				`${i.id}:${i.number}:${i.quote}:${i.at ?? 0}:${i.preview === true ? 1 : 0}:${i.aidScope ?? ""}:${i.answer ?? ""}`
+				`${i.id}:${i.number}:${i.quote}:${i.at ?? 0}:${i.aidScope ?? ""}:${i.answer ?? ""}`
 		)
 		.join(",")}`;
 }
@@ -1507,6 +1510,70 @@ function stampLegacy(
 	skip: boolean,
 	wash: string | null
 ): void {
+	const sig = stampSignature(items, skip);
+	const prevWash = root.dataset.washStamped || null;
+	// Wash-only change (badge hover, draft click): the badge set is
+	// already current, so flip only the wash's own marks. Badges,
+	// anchors, and every other quote's nodes stay mounted: the full
+	// rebuild below re-inserts anchor spans (splitting text nodes
+	// mid-word), which reshapes Arabic on every hover crossing and
+	// reads as flicker. The badge count guards a DOM swap under the
+	// dataset flag (aid pin/unpin replaces the text): wiped badges
+	// need the full path to re-stamp them.
+	const wantBadges = skip ? 0 : items.filter((i) => !i.preview).length;
+	const haveBadges = root.querySelectorAll("[data-ann-badge]").length;
+	if (!skip && root.dataset.legacyStamped === sig && haveBadges === wantBadges) {
+		// A steady re-stamp drops the one-shot fades (marks and
+		// badges alike) and moves nothing at all.
+		if (prevWash === wash) {
+			for (const mark of root.querySelectorAll("mark.ccez-ann")) {
+				if (mark instanceof HTMLElement) mark.classList.remove("fresh");
+			}
+			for (const badge of root.querySelectorAll("[data-ann-badge]")) {
+				if (badge instanceof HTMLElement) badge.classList.remove("fresh");
+			}
+			return;
+		}
+		// Badges ride out and back in on their still-mounted anchors:
+		// unwrapping a mark over a live button would bake the
+		// button's digit into text and destroy it.
+		const riders = new Map<string, { badge: HTMLButtonElement; anchor: Element }>();
+		for (const badge of root.querySelectorAll("[data-ann-badge]")) {
+			if (!(badge instanceof HTMLButtonElement)) continue;
+			const anchor = badge.parentElement;
+			if (!anchor) continue;
+			riders.set(badge.dataset.annBadge ?? "", { badge, anchor });
+			badge.remove();
+		}
+		for (const mark of root.querySelectorAll("mark.ccez-ann")) {
+			mark.replaceWith(document.createTextNode(mark.textContent ?? ""));
+		}
+		root.normalize();
+		root.dataset.washStamped = wash ?? "";
+		if (wash) {
+			const nodes = quoteTextNodes(root);
+			const texts = nodes.map((n) => n.textContent ?? "");
+			for (const item of items) {
+				if (item.id !== wash) continue;
+				const loc = locateQuote(texts, item.quote, item.at ?? 0);
+				if (!loc) continue;
+				wrapRange(nodes, loc, "fresh");
+			}
+		} else if (prevWash) {
+			wrapLeaving(root, items, prevWash);
+		}
+		for (const { badge, anchor } of riders.values()) {
+			// Settled badges never replay the mount fade (the full
+			// path strips fresh the same way; there are no new
+			// badges on this path to fade in).
+			badge.classList.remove("fresh");
+			// Contained in this root, not connected to the document:
+			// unit roots are detached, and nothing on this path
+			// removes anchors anyway.
+			if (root.contains(anchor)) anchor.append(badge);
+		}
+		return;
+	}
 	const settled = new Set(
 		[...root.querySelectorAll("[data-ann-badge]")].map((el) =>
 			el instanceof HTMLElement ? (el.dataset.annBadge ?? "") : ""
@@ -1518,9 +1585,6 @@ function stampLegacy(
 			live.set(badge.dataset.annBadge ?? "", badge);
 		badge.remove();
 	}
-	// The wash whose marks are currently mounted ("" when none): a steady
-	// wash re-stamps without replaying its fade-in, like settled badges.
-	const prevWash = root.dataset.washStamped || null;
 	// A cleared wash fades out: unwrap now (badges need clean text to
 	// anchor beside, never inside, a mark), stamp badges normally, then
 	// re-wrap the old range as leaving marks below.
@@ -1533,6 +1597,7 @@ function stampLegacy(
 	}
 	root.normalize();
 	root.dataset.washStamped = wash ?? "";
+	root.dataset.legacyStamped = sig;
 	if (skip || items.length === 0) return;
 	// A newly arrived wash fades in; a steady one re-mounts silently.
 	const freshWash = !!wash && wash !== prevWash;
