@@ -5,6 +5,7 @@
  * restarts (see load/saveDraftAnnotations); the baked blocks never do.
  */
 import type { ChatMsgId } from "./chat";
+import { touchPastSlop } from "./platform";
 import {
 	ANN_HIGHLIGHT_D1,
 	ANN_HIGHLIGHT_D2,
@@ -2883,6 +2884,55 @@ export function clampMenuDrag(
 		x: Math.min(Math.max(margin, x), viewportWidth - margin),
 		y: Math.min(Math.max(margin, y), viewportHeight - margin)
 	};
+}
+
+/** A touch point in client pixels. */
+export interface MenuTouchPoint {
+	x: number;
+	y: number;
+}
+
+/** `menuBtnTouch` outcome: eat the tap, or run the button action. */
+export type MenuBtnTouchAction = "suppress-drag" | "ignore" | "run";
+
+/**
+ * What a selection-menu touchend does. Order is the contract: a drag
+ * that just ended eats the synthesized tap (750ms drift guard), then
+ * a missing endpoint or a finger that drifted past the 14px tap slop
+ * (handle nudge, not a tap) drops silently — only a settled tap runs.
+ */
+export function menuBtnTouchAction(facts: {
+	now: number;
+	suppressAt: number;
+	start: MenuTouchPoint | null;
+	end: MenuTouchPoint | null;
+}): MenuBtnTouchAction {
+	if (facts.now - facts.suppressAt < 750) return "suppress-drag";
+	if (!facts.start || !facts.end) return "ignore";
+	if (touchPastSlop(facts.start.x, facts.start.y, facts.end.x, facts.end.y, 14))
+		return "ignore";
+	return "run";
+}
+
+/**
+ * Where a selection-menu drag moves the menu, or null while the
+ * finger stays inside the 12px tap slop (no move yet). The caller
+ * owns the suppress stamp and the assignment; this only resolves
+ * the clamped target from the drag anchor plus the finger delta.
+ */
+export function selMenuDragTarget(
+	drag: { mx: number; my: number; x0: number; y0: number },
+	at: MenuTouchPoint,
+	viewportWidth: number,
+	viewportHeight: number
+): { x: number; y: number } | null {
+	if (!touchPastSlop(drag.mx, drag.my, at.x, at.y, 12)) return null;
+	return clampMenuDrag(
+		drag.x0 + (at.x - drag.mx),
+		drag.y0 + (at.y - drag.my),
+		viewportWidth,
+		viewportHeight
+	);
 }
 
 /**

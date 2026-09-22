@@ -123,6 +123,18 @@ export function editMessageAction(
 }
 
 /**
+ * True when the first-token rumble belongs to the visible chat. A
+ * mid-stream chat switch must not rumble the new chat for the old
+ * one's reply — both `doSend` and `resend` share this guard.
+ */
+export function shouldRumbleOnFirstToken(
+	currentChatId: unknown,
+	sentFromChatId: unknown
+): boolean {
+	return currentChatId === sentFromChatId;
+}
+
+/**
  * Index of the message an in-place edit commits to, or null when the
  * edited message vanished (or was never a user's message): the caller
  * resets and falls through to a fresh send. Null editing id counts as

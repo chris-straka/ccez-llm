@@ -9,6 +9,7 @@ import {
 	speechAttemptable,
 	speechLangsFor,
 	startSpeechError,
+	speechErrorStep,
 	replyLangFor,
 	sentenceSpeechLang,
 	webVoiceAvailable,
@@ -380,6 +381,26 @@ describe("startSpeechError", () => {
 		expect(
 			startSpeechError({ quiet: true, useNative: true, inventoryEmpty: false })
 		).toBe(null);
+	});
+});
+
+describe("speechErrorStep", () => {
+	it("falls back once on the first native failure", () => {
+		expect(speechErrorStep({ useNative: true, fellBack: false })).toBe(
+			"fallback"
+		);
+	});
+
+	it("reports web failures and repeat native failures", () => {
+		expect(speechErrorStep({ useNative: false, fellBack: false })).toBe(
+			"report"
+		);
+		expect(speechErrorStep({ useNative: true, fellBack: true })).toBe(
+			"report"
+		);
+		expect(speechErrorStep({ useNative: false, fellBack: true })).toBe(
+			"report"
+		);
 	});
 });
 

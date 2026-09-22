@@ -4,7 +4,8 @@ import {
 	sendAction,
 	composerLocked,
 	editMessageAction,
-	commitEditTarget
+	commitEditTarget,
+	shouldRumbleOnFirstToken
 } from "./submit";
 
 describe("composerLocked", () => {
@@ -168,5 +169,15 @@ describe("commitEditTarget", () => {
 		expect(commitEditTarget(messages, undefined)).toBeNull();
 		expect(commitEditTarget(messages, "gone")).toBeNull();
 		expect(commitEditTarget(messages, "a1")).toBeNull();
+	});
+});
+
+describe("shouldRumbleOnFirstToken", () => {
+	it("rumbles while the sent-from chat is still open", () => {
+		expect(shouldRumbleOnFirstToken("c1", "c1")).toBe(true);
+	});
+
+	it("stays silent after a mid-stream chat switch", () => {
+		expect(shouldRumbleOnFirstToken("c2", "c1")).toBe(false);
 	});
 });

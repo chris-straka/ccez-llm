@@ -309,6 +309,23 @@ export function startSpeechError(facts: {
 	return "Voice not available.";
 }
 
+/** `startSpeech` error outcome: retry once on web voices, or report. */
+export type SpeechErrorStep = "fallback" | "report";
+
+/**
+ * What a speech error does. The native bridge gets exactly one silent
+ * retry as web speech (the body owns the notice + retry); everything
+ * else reports through the banner path. Order is the contract: the
+ * first native failure falls back, a second one reports.
+ */
+export function speechErrorStep(facts: {
+	useNative: boolean;
+	fellBack: boolean;
+}): SpeechErrorStep {
+	if (facts.useNative && !facts.fellBack) return "fallback";
+	return "report";
+}
+
 /**
  * Voice locale per sentence: non-Latin scripts resolve sync from the
  * sentence itself (reliable, needs no bridge); Latin sentences share

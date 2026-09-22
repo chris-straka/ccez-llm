@@ -234,7 +234,8 @@
 		filePendingAnnotation,
 		promptAnnWashIdFor,
 		paragraphForQuote,
-		clampMenuDrag,
+		menuBtnTouchAction,
+		selMenuDragTarget,
 		annEditCommitToast,
 		type Annotation,
 		type AnnotationId,
@@ -441,7 +442,8 @@
 		sendAction,
 		composerLocked,
 		editMessageAction,
-		commitEditTarget
+		commitEditTarget,
+		shouldRumbleOnFirstToken
 	} from "$lib/submit";
 	import {
 		emptyViewport,
@@ -494,6 +496,7 @@
 		dictationInsert,
 		micUnavailableMessage,
 		startSpeechError,
+		speechErrorStep,
 		effectiveSpeechLang,
 		stopSpeaking,
 		micAvailable,
@@ -1352,16 +1355,17 @@
 		const drag = selMenuDrag;
 		const t = event.changedTouches[0];
 		if (!drag || !t || !selMenu) return;
-		const dx = t.clientX - drag.mx;
-		const dy = t.clientY - drag.my;
-		if (!touchPastSlop(drag.mx, drag.my, t.clientX, t.clientY, 12)) return;
-		menuDragSuppressAt = Date.now();
-		const at = clampMenuDrag(
-			drag.x0 + dx,
-			drag.y0 + dy,
+		// Target resolution lives in selMenuDragTarget (pinned in
+		// annotations.test.ts); the suppress stamp and assignment stay
+		// here as effects.
+		const at = selMenuDragTarget(
+			drag,
+			{ x: t.clientX, y: t.clientY },
 			window.innerWidth,
 			window.innerHeight
 		);
+		if (!at) return;
+		menuDragSuppressAt = Date.now();
 		selMenu = { ...selMenu, x: at.x, y: at.y };
 	}
 	function menuDragEnd(): void {
@@ -1381,15 +1385,20 @@
 	 * compat mouse sequence. Mouse and keyboard keep onclick.
 	 */
 	function menuBtnTouch(event: TouchEvent, run: () => void): void {
-		// A menu drag just ended here: the button's own drift guard
-		// already ate the tap, and this eats any synthesized sequel.
-		if (Date.now() - menuDragSuppressAt < 750) return;
+		// Decision lives in menuBtnTouchAction (pinned in
+		// annotations.test.ts: a menu drag just ended here eats the
+		// tap via the drift guard, plus the synthesized sequel); the
+		// touch reset, press stamp, and run stay here as effects.
 		const t = event.changedTouches[0];
-		const start = menuBtnTouchStart;
+		const action = menuBtnTouchAction({
+			now: Date.now(),
+			suppressAt: menuDragSuppressAt,
+			start: menuBtnTouchStart,
+			end: t ? { x: t.clientX, y: t.clientY } : null
+		});
 		menuBtnTouchStart = null;
 		menuPressAt = Date.now();
-		if (!t || !start) return;
-		if (touchPastSlop(start.x, start.y, t.clientX, t.clientY, 14)) return;
+		if (action !== "run") return;
 		event.preventDefault();
 		run();
 	}
@@ -5885,7 +5894,7 @@
 		const callbacks: SpeakCallbacks = {
 			onEnd: resetVoice,
 			onError: (message) => {
-				if (useNative && !fellBack) {
+				if (speechErrorStep({ useNative, fellBack }) === "fallback") {
 					// The bridge failed: say why, then read this utterance
 					// with web voices rather than leaving silence (quiet
 					// background readbacks skip the notice, not the retry).
@@ -6835,8 +6844,8 @@
 				// its chat is still open. A mid-stream switch must not
 				// rumble the new chat for the old one's reply.
 				onFirstToken: () => {
-					if (chat.id !== sentFrom.id) return;
-					buzzBeat("first");
+					if (shouldRumbleOnFirstToken(chat.id, sentFrom.id))
+						buzzBeat("first");
 				}
 			}
 		);
@@ -6902,8 +6911,8 @@
 			{
 				thinking: activeThinkingId(settings),
 				onFirstToken: () => {
-					if (chat.id !== resentFrom.id) return;
-					buzzBeat("first");
+					if (shouldRumbleOnFirstToken(chat.id, resentFrom.id))
+						buzzBeat("first");
 				}
 			}
 		);

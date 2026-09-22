@@ -40,6 +40,8 @@ import {
 	paragraphForQuote,
 	badgeAnswerClass,
 	clampMenuDrag,
+	menuBtnTouchAction,
+	selMenuDragTarget,
 	annEditCommitToast,
 	REFS_ONLY_BODY,
 	isRefsOnly,
@@ -1030,6 +1032,64 @@ describe("clampMenuDrag", () => {
 		expect(clampMenuDrag(100, 100, 400, 800)).toEqual({ x: 100, y: 100 });
 		expect(clampMenuDrag(-50, 900, 400, 800)).toEqual({ x: 8, y: 792 });
 		expect(clampMenuDrag(500, 100, 400, 800)).toEqual({ x: 392, y: 100 });
+	});
+});
+
+describe("menuBtnTouchAction", () => {
+	const tap = { x: 10, y: 10 };
+
+	it("runs a settled tap", () => {
+		expect(
+			menuBtnTouchAction({ now: 1000, suppressAt: 0, start: tap, end: tap })
+		).toBe("run");
+	});
+
+	it("eats the tap while the post-drag drift guard holds", () => {
+		expect(
+			menuBtnTouchAction({ now: 1000, suppressAt: 500, start: tap, end: tap })
+		).toBe("suppress-drag");
+		expect(
+			menuBtnTouchAction({ now: 1000, suppressAt: 251, start: tap, end: tap })
+		).toBe("suppress-drag");
+		expect(
+			menuBtnTouchAction({ now: 1000, suppressAt: 250, start: tap, end: tap })
+		).toBe("run");
+	});
+
+	it("drops missing endpoints and handle-nudge drift", () => {
+		expect(
+			menuBtnTouchAction({ now: 1000, suppressAt: 0, start: null, end: tap })
+		).toBe("ignore");
+		expect(
+			menuBtnTouchAction({ now: 1000, suppressAt: 0, start: tap, end: null })
+		).toBe("ignore");
+		expect(
+			menuBtnTouchAction({
+				now: 1000,
+				suppressAt: 0,
+				start: tap,
+				end: { x: 100, y: 100 }
+			})
+		).toBe("ignore");
+	});
+});
+
+describe("selMenuDragTarget", () => {
+	const drag = { mx: 10, my: 10, x0: 100, y0: 200 };
+
+	it("holds still inside the tap slop", () => {
+		expect(
+			selMenuDragTarget(drag, { x: 12, y: 12 }, 400, 800)
+		).toBeNull();
+	});
+
+	it("follows the finger past the slop, clamped to the viewport", () => {
+		expect(
+			selMenuDragTarget(drag, { x: 30, y: 40 }, 400, 800)
+		).toEqual({ x: 120, y: 230 });
+		expect(
+			selMenuDragTarget(drag, { x: -500, y: -500 }, 400, 800)
+		).toEqual({ x: 8, y: 8 });
 	});
 });
 
