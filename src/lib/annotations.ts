@@ -2690,3 +2690,29 @@ export function seedAnnotationsFromRefs(
 export function annotationCopyText(quote: string, comment: string): string {
 	return comment.trim() ? `"${quote}" — ${comment.trim()}` : `"${quote}"`;
 }
+
+/**
+ * File a pending annotation with its draft comment (REFACTOR §6):
+ * the pill commit path. Null when nothing is pending.
+ */
+export function filePendingAnnotation(
+	list: Annotation[],
+	pending: Annotation | null,
+	draft: string
+): Annotation[] | null {
+	if (!pending) return null;
+	return [...list, { ...pending, comment: draft }];
+}
+
+/**
+ * Wash id for an in-prompt note edit (REFACTOR §6): a pending
+ * filing washes its preview, a saved note its quote.
+ */
+export function promptAnnWashIdFor(
+	edit: { id: string } | { pending: true } | null,
+	pendingId: AnnotationId | null
+): string | null {
+	if (!edit) return null;
+	if ("pending" in edit) return pendingId;
+	return edit.id;
+}

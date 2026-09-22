@@ -30,6 +30,8 @@ import {
 	planClearSentRefs,
 	seedAnnotationsFromRefs,
 	annotationCopyText,
+	filePendingAnnotation,
+	promptAnnWashIdFor,
 	REFS_ONLY_BODY,
 	isRefsOnly,
 	redactedCopyText
@@ -870,5 +872,31 @@ describe("annotation copy text", () => {
 	it("formats one annotation without numbers", () => {
 		expect(annotationCopyText("Kyoto", "meaning?")).toBe('"Kyoto" — meaning?');
 		expect(annotationCopyText("Kyoto", "  ")).toBe('"Kyoto"');
+	});
+});
+
+describe("pending filing", () => {
+	const m1 = "m1" as ChatMsgId;
+
+	it("files the pending annotation with its draft", () => {
+		const pending: Annotation = {
+			id: "p" as AnnotationId,
+			messageId: m1,
+			quote: "q",
+			comment: ""
+		};
+		expect(filePendingAnnotation([], pending, "note")).toEqual([
+			{ ...pending, comment: "note" }
+		]);
+		expect(filePendingAnnotation([], null, "note")).toBeNull();
+	});
+
+	it("washes the pending preview or the saved quote", () => {
+		expect(promptAnnWashIdFor(null, "p" as AnnotationId)).toBeNull();
+		expect(promptAnnWashIdFor({ pending: true }, "p" as AnnotationId)).toBe(
+			"p"
+		);
+		expect(promptAnnWashIdFor({ pending: true }, null)).toBeNull();
+		expect(promptAnnWashIdFor({ id: "s" }, "p" as AnnotationId)).toBe("s");
 	});
 });

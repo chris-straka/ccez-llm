@@ -224,6 +224,8 @@
 		planClearSentRefs,
 		seedAnnotationsFromRefs,
 		annotationCopyText,
+		filePendingAnnotation,
+		promptAnnWashIdFor,
 		type Annotation,
 		type AnnotationId,
 		type AnnotationMark
@@ -4796,9 +4798,9 @@
 	/** Submit the annotation being composed (Enter or Save). The id is
 	kept from composition so wash, pill, and badge address one thing. */
 	function commitPending(): void {
-		const pending = pendingAnn;
-		if (!pending) return;
-		annotations = [...annotations, { ...pending, comment: annDraft }];
+		const filed = filePendingAnnotation(annotations, pendingAnn, annDraft);
+		if (!filed) return;
+		annotations = filed;
 		pendingAnn = null;
 	}
 
@@ -5027,9 +5029,7 @@
 	 * Without this the comment box floats over an unmarked thread.
 	 */
 	function promptAnnWashId(): string | null {
-		if (!promptAnnEdit) return null;
-		if ("pending" in promptAnnEdit) return pendingAnn?.id ?? null;
-		return promptAnnEdit.id;
+		return promptAnnWashIdFor(promptAnnEdit, pendingAnn?.id ?? null);
 	}
 	function editAnnotationInPrompt(
 		target: { id: string } | { pending: true },
