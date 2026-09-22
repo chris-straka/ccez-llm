@@ -418,6 +418,8 @@
 		copyExportText,
 		downloadMarkdownFile,
 		exportChatMarkdown,
+		exportSuccessToast,
+		exportFailureToast,
 		fileSaveAccessAvailable
 	} from "$lib/chatExport";
 	import { nativeSaveMarkdown } from "$lib/nativeExport";
@@ -2574,25 +2576,16 @@
 					? (text) => copyExportText(text)
 					: downloadMarkdownFile
 			});
-			flashToast(
-				how === "download"
-					? shellPhone
-						? "Chat copied to clipboard"
-						: "Chat downloaded"
-					: "Chat saved"
-			);
+			flashToast(exportSuccessToast(how, shellPhone));
 		} catch (error) {
 			// A clipboard denial on the shell phone arrives as
 			// NotAllowedError: unlike a dismissed save picker, a dead
 			// copy button must say so instead of staying silent.
-			if (isPermissionDismissal(error)) {
-				if (shellPhone)
-					flashErrorToast(
-						"Couldn't copy this chat: clipboard unavailable on this device."
-					);
-				return;
-			}
-			flashErrorToast("Couldn't export this chat.");
+			const message = exportFailureToast(
+				isPermissionDismissal(error),
+				shellPhone
+			);
+			if (message !== null) flashErrorToast(message);
 		}
 	}
 

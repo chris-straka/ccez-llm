@@ -4,6 +4,8 @@ import {
 	copyExportText,
 	exportChatMarkdown,
 	exportFilename,
+	exportSuccessToast,
+	exportFailureToast,
 	type SavePickerOptions
 } from "./chatExport";
 
@@ -208,5 +210,22 @@ describe("copyExportText", () => {
 		});
 		expect(how).toBe("download");
 		expect(seen).toEqual([chatToMarkdown(chat)]);
+	});
+});
+
+describe("export toasts", () => {
+	it("names the success path", () => {
+		expect(exportSuccessToast("picker", false)).toBe("Chat saved");
+		expect(exportSuccessToast("native", false)).toBe("Chat saved");
+		expect(exportSuccessToast("download", false)).toBe("Chat downloaded");
+		expect(exportSuccessToast("download", true)).toBe("Chat copied to clipboard");
+	});
+
+	it("stays silent on dismissal, honest on failure", () => {
+		expect(exportFailureToast(true, false)).toBeNull();
+		expect(exportFailureToast(true, true)).toBe(
+			"Couldn't copy this chat: clipboard unavailable on this device."
+		);
+		expect(exportFailureToast(false, false)).toBe("Couldn't export this chat.");
 	});
 });

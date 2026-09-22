@@ -173,3 +173,37 @@ export function downloadMarkdownFile(text: string, filename: string): void {
 	anchor.remove();
 	window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+/** Where an export landed (see exportChatMarkdown). */
+export type ExportOutcome = "picker" | "native" | "download";
+
+/**
+ * Success toast for an export (REFACTOR §6): the shell phone copies
+ * instead of downloading, so its tap lands somewhere visible.
+ */
+export function exportSuccessToast(
+	how: ExportOutcome,
+	shellPhone: boolean
+): string {
+	if (how === "download")
+		return shellPhone ? "Chat copied to clipboard" : "Chat downloaded";
+	return "Chat saved";
+}
+
+/**
+ * Failure toast for an export (REFACTOR §6): a dismissed picker
+ * stays silent, but a shell-phone clipboard denial must say so —
+ * unlike a dismissal, a dead copy button must not stay silent.
+ * Anything else is a plain export failure. Null stays silent.
+ */
+export function exportFailureToast(
+	dismissed: boolean,
+	shellPhone: boolean
+): string | null {
+	if (dismissed) {
+		return shellPhone
+			? "Couldn't copy this chat: clipboard unavailable on this device."
+			: null;
+	}
+	return "Couldn't export this chat.";
+}
