@@ -302,3 +302,12 @@ export function holdIsTap(
 ): boolean {
 	return downAt > 0 && upAt - downAt < tapMs;
 }
+
+/**
+ * Scroll-mode entry line (REFACTOR §6): a few lines below the
+ * viewport top — a bottom sliver of the message above never wins,
+ * and a taller-than-viewport message still matches by coverage.
+ */
+export function viewCursorLine(viewTop: number, viewBottom: number): number {
+	return viewTop + Math.min(160, (viewBottom - viewTop) * 0.25);
+}

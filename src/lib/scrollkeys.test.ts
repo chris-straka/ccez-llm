@@ -14,6 +14,7 @@ import {
 	holdGlideVelocity,
 	holdIsTap,
 	indexAtViewportLine,
+	viewCursorLine,
 	isEscapeHold,
 	keyFocusesEmptyPrompt,
 	messageEdgeScrollTop,
@@ -334,5 +335,14 @@ describe("indexAtViewportLine", () => {
 
 	it("returns -1 when empty", () => {
 		expect(indexAtViewportLine([], 150)).toBe(-1);
+	});
+});
+
+describe("viewCursorLine", () => {
+	it("sits a few lines below the viewport top", () => {
+		expect(viewCursorLine(0, 800)).toBe(160);
+		expect(viewCursorLine(100, 500)).toBe(200);
+		// Short viewports take the quarter line instead of 160.
+		expect(viewCursorLine(0, 400)).toBe(100);
 	});
 });

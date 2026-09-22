@@ -114,6 +114,7 @@
 		holdGlideVelocity,
 		holdIsTap,
 		indexAtViewportLine,
+		viewCursorLine,
 		isEscapeHold,
 		keyFocusesEmptyPrompt,
 		messageEdgeScrollTop,
@@ -7466,7 +7467,7 @@
 		// The message crossing a line a few lines below the viewport
 		// top — a bottom sliver of the message above never wins, and a
 		// taller-than-viewport message still matches by coverage.
-		const line = top + Math.min(160, (bottom - top) * 0.25);
+		const line = viewCursorLine(top, bottom);
 		for (let i = 0; i < messages.length; i++) {
 			const el = document.getElementById(`msg-${i}`);
 			if (!el) continue;
