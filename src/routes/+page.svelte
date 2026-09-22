@@ -2470,9 +2470,11 @@
 
 	function moveSearchCursor(delta: 1 | -1): void {
 		if (palette.hits.length === 0) return;
-		palette.cursor =
-			(((palette.cursor + delta) % palette.hits.length) + palette.hits.length) %
-			palette.hits.length;
+		palette.cursor = stepFindCursor(
+			palette.hits.length,
+			palette.cursor,
+			delta
+		);
 	}
 
 	/**
