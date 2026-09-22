@@ -39,8 +39,6 @@ same codebase via the Tauri mobile target.
 
 THINGS I NOTICED ON 0.5.3 mac app with 370% font size
 
-The annotation creation text box and the annotation button on mac should scale with the font size 
-
 Scroll speed should change with text size. 
 
 On Mac the msg buttons need to scale more

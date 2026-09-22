@@ -61,6 +61,14 @@ describe("annPopWidth", () => {
 			annPopWidth({ fresh: true, android: false, fontScale: 1, viewportWidth: 300 })
 		).toBe(284);
 	});
+	it("scales the fresh pill with font size up to 32rem", () => {
+		expect(
+			annPopWidth({ fresh: true, android: false, fontScale: 1.5, viewportWidth: 1280 })
+		).toBe(456);
+		expect(
+			annPopWidth({ fresh: true, android: false, fontScale: 4, viewportWidth: 1280 })
+		).toBe(512);
+	});
 	it("scales the card with font size up to 32rem", () => {
 		expect(
 			annPopWidth({ fresh: false, android: false, fontScale: 1, viewportWidth: 1280 })

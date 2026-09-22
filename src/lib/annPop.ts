@@ -77,8 +77,11 @@ export function annPopWidth(facts: {
 	fontScale: number;
 	viewportWidth: number;
 }): number {
-	if (facts.fresh) return Math.min(19 * 16, facts.viewportWidth - 16);
 	const scale = facts.android ? Math.min(8, facts.fontScale) : facts.fontScale;
+	// The creation pill scales with the text size like the card does
+	// (19rem base, same 32rem cap): mirrors the fresh width in CSS.
+	if (facts.fresh)
+		return Math.min(Math.min(19 * scale, 32) * 16, facts.viewportWidth - 16);
 	return Math.min(Math.min(24 * scale, 32) * 16, facts.viewportWidth - 16);
 }
 

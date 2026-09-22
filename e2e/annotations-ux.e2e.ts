@@ -233,6 +233,39 @@ test("numbered badges grow with the message font size", async ({ page }) => {
 	expect(parseFloat(big)).toBeGreaterThan(parseFloat(small));
 });
 
+/** The creation pill and its Annotate button track the text size: a
+fixed 19rem pill next to huge type is unreadable. */
+test("creation pill and Annotate button scale with font size", async ({
+	page
+}) => {
+	await seedChat(page, [
+		{ role: "assistant", content: "alpha beta gamma delta" }
+	]);
+	await page.goto("/");
+	const para = page.locator("article.assistant .rendered p").first();
+	await expect(para).toBeVisible({ timeout: 60_000 });
+	await para.dblclick({ position: { x: 10, y: 10 } });
+	const menuBtn = page.locator('.sel-menu button:has-text("Annotate")');
+	await expect(menuBtn).toBeVisible();
+	const btnSmall = await menuBtn.evaluate((el) => getComputedStyle(el).fontSize);
+	await page.evaluate(() => {
+		document.querySelector(".app")?.setAttribute("style", "--font-scale: 2");
+	});
+	const btnBig = await menuBtn.evaluate((el) => getComputedStyle(el).fontSize);
+	expect(parseFloat(btnBig)).toBeGreaterThan(parseFloat(btnSmall));
+	await menuBtn.click();
+	const pop = page.locator(".ann-pop.fresh");
+	await expect(pop).toBeVisible({ timeout: 10_000 });
+	const area = pop.locator("textarea");
+	const areaSize = await area.evaluate((el) => getComputedStyle(el).fontSize);
+	expect(parseFloat(areaSize)).toBeGreaterThan(parseFloat(btnSmall));
+	const pillBox = await pop.boundingBox();
+	if (!pillBox) throw new Error("fresh pill has no box");
+	// 19rem at 200% would be 608px: capped at 32rem (512px).
+	expect(pillBox.width).toBeGreaterThan(304);
+	expect(pillBox.width).toBeLessThanOrEqual(514);
+});
+
 test("empty annotations bake a question mark for the model", async ({
 	page
 }) => {

@@ -874,3 +874,10 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
       60rem) and its gutter math — capped like `.prompt`, and `--sbw`
       moved from the card to `main` so both see it (edges within 2px;
       `layout.e2e.ts` "attachment strip shares the prompt box").
+
+- [x] Creation pill and Annotate button scale with the text size: the
+      fresh pill was a fixed 19rem/1rem next to huge type — pill width
+      (19rem base, 32rem cap, mirrored in `annPopWidth`), pill text
+      (inheritance), and the menu button all track `--font-scale`
+      (`annotations-ux.e2e.ts` "creation pill and Annotate button
+      scale with font size"; the desktop edit card stays fixed type).

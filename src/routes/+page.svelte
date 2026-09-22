@@ -4792,9 +4792,9 @@
 	/* Pill grow/focus action renders in `AnnPop.svelte` (moved with
 	the field it sizes). */
 
-	/** Annotation popover width (see $lib/annPop): the desktop card,
-	clamped to fit narrow phones, scaling with font size up to 32rem
-	(the fresh pill stays 19rem). */
+	/** Annotation popover width (see $lib/annPop): card and creation
+	pill alike, clamped to fit narrow phones, scaling with font
+	size up to 32rem (19rem base for the fresh pill). */
 	function popWidth(fresh: boolean): number {
 		return annPopWidth({
 			fresh,

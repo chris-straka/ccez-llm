@@ -428,15 +428,20 @@ blur-save fires first and Cancel/Delete can never win the race. -->
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		width: 19rem;
+		/* The creation pill scales with the text size like the edit
+		card's width does (a fixed 19rem pill next to 370% type is a
+		toy): the save arrow rides along via font inheritance.
+		popWidth mirrors this math for centering. */
+		width: min(32rem, calc(19rem * var(--font-scale, 1)));
 		padding: 0.55rem 0.6rem 0.55rem 1rem;
 		border-radius: 999px;
+		font-size: calc(1rem * var(--font-scale, 1));
 	}
 	.ann-pop.fresh textarea {
 		flex: 1;
 		min-width: 0;
 		min-height: 0;
-		font-size: 1rem;
+		font-size: 1em;
 		padding: 0.15rem 0;
 	}
 	/* Thumb-sized Cancel targets on phones (the .app ancestor stays
@@ -447,7 +452,8 @@ blur-save fires first and Cancel/Delete can never win the race. -->
 	}
 	/* Annotation boxes read at the screen's message size on phones:
 	a fixed 1rem box next to 800% message type strands the eyes.
-	Desktop keeps its fixed overlay type. */
+	The desktop edit card keeps its fixed overlay type; only the
+	creation pill scales there (see .ann-pop.fresh above). */
 	:global(.app[data-android]) .ann-pop textarea {
 		font-size: calc(0.92rem * var(--font-scale, 1));
 	}

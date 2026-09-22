@@ -173,7 +173,10 @@ can't be suppressed, so a floating menu would double it. -->
 		transition: none;
 	}
 	.sel-menu button {
-		font-size: 0.95rem;
+		/* The menu reads next to message text, so it tracks the text
+		size like the annotation pill does — a fixed button next to
+		370% type is unreadable. */
+		font-size: calc(0.95rem * var(--font-scale, 1));
 		border: 0;
 		border-radius: 0;
 		background: none;
