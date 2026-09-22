@@ -103,3 +103,33 @@ export function stageOwnedByOverlay(flags: StageOwnerFlags): boolean {
 		flags.sidebarOpen
 	);
 }
+
+/**
+ * True when a point sits inside a rect (REFACTOR §6): the send
+ * button is absolutely positioned inside a display:contents span
+ * (no box of its own) and disabled buttons eat their events — so
+ * holds arm from the prompt's own handlers by geometry, never by
+ * bubbling.
+ */
+export function pointInRect(
+	x: number,
+	y: number,
+	rect: { left: number; right: number; top: number; bottom: number } | null | undefined
+): boolean {
+	return (
+		!!rect && x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom
+	);
+}
+
+/**
+ * Whether a send-button hold may arm (REFACTOR §6): the composer
+ * must read empty (no text, pills, or annotations) with no timer
+ * already running and no in-prompt note edit owning the gesture.
+ */
+export function sendHoldArmed(
+	timerRunning: boolean,
+	promptNoteEditing: boolean,
+	composerEmpty: boolean
+): boolean {
+	return !timerRunning && !promptNoteEditing && composerEmpty;
+}

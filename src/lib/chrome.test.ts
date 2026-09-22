@@ -8,6 +8,8 @@ import {
 	idleSettingToSlider,
 	idleSliderToSetting,
 	isPromptIdle,
+	pointInRect,
+	sendHoldArmed,
 	SLIDER_DRAG_RESET_PX,
 	stageOwnedByOverlay,
 	type StageOwnerFlags
@@ -114,5 +116,23 @@ describe("stageOwnedByOverlay", () => {
 		for (const key of Object.keys(STAGE_CLEAR) as (keyof StageOwnerFlags)[]) {
 			expect(stageOwnedByOverlay({ ...STAGE_CLEAR, [key]: true })).toBe(true);
 		}
+	});
+});
+
+describe("send-button hold geometry", () => {
+	it("hits inside the button rect, edges included", () => {
+		const rect = { left: 10, right: 20, top: 30, bottom: 40 };
+		expect(pointInRect(15, 35, rect)).toBe(true);
+		expect(pointInRect(10, 30, rect)).toBe(true);
+		expect(pointInRect(9, 35, rect)).toBe(false);
+		expect(pointInRect(15, 35, null)).toBe(false);
+		expect(pointInRect(15, 35, undefined)).toBe(false);
+	});
+
+	it("arms only on a truly empty composer with no owner", () => {
+		expect(sendHoldArmed(false, false, true)).toBe(true);
+		expect(sendHoldArmed(true, false, true)).toBe(false);
+		expect(sendHoldArmed(false, true, true)).toBe(false);
+		expect(sendHoldArmed(false, false, false)).toBe(false);
 	});
 });

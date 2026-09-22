@@ -426,7 +426,12 @@
 		pinArmStart,
 		settlePin
 	} from "$lib/viewportReflow";
-	import { isPromptIdle, stageOwnedByOverlay } from "$lib/chrome";
+	import {
+		isPromptIdle,
+		stageOwnedByOverlay,
+		pointInRect,
+		sendHoldArmed
+	} from "$lib/chrome";
 	import {
 		speakText,
 		speakMultilingual,
@@ -7915,22 +7920,18 @@
 	 * from the prompt's own handlers by geometry, never by bubbling.
 	 */
 	function overSendButton(x: number, y: number): boolean {
-		const r = sendBtnEl?.getBoundingClientRect();
-		return (
-			!!r && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom
-		);
+		return pointInRect(x, y, sendBtnEl?.getBoundingClientRect());
 	}
 	let sendHoldTimer: ReturnType<typeof setTimeout> | null = null;
 
 	function sendHoldStart(): void {
 		// In-prompt note edits own the arrow (tap files, even empty):
 		// never arm a language swap underneath them.
-		if (sendHoldTimer !== null || promptAnnEdit) return;
-		if (
-			composerText() !== "" ||
-			attachments.length > 0 ||
-			annotations.length > 0
-		)
+		const empty =
+			composerText() === "" &&
+			attachments.length === 0 &&
+			annotations.length === 0;
+		if (!sendHoldArmed(sendHoldTimer !== null, !!promptAnnEdit, empty))
 			return;
 		sendHoldTimer = setTimeout(() => {
 			sendHoldTimer = null;
