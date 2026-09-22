@@ -5,8 +5,9 @@ import { dragQuote, seedChat } from "./helpers";
  * Word selection plus A files an annotation with "?" staged as the
  * note — send to file the question, or type over it. (Phones
  * double-tap the word; desktop drags it: both leave a live
- * selection, which is what owns A.) Bare-message A still toggles
- * aids.
+ * selection, which is what owns A.) Hovering a word with no
+ * selection plus A files and sends at once, no pill; Shift+A opens
+ * the create box empty instead. Bare-message A still toggles aids.
  */
 test("selected word plus A stages a question note", async ({ page }) => {
 	await seedChat(page, [
@@ -26,10 +27,10 @@ test("selected word plus A stages a question note", async ({ page }) => {
 	await expect(pop.locator("textarea")).toHaveValue("?");
 });
 
-/** Hovering a word (no selection) plus A files the hovered word
-with "?" staged — the word selects itself first, then the same
-filing path runs. */
-test("hovered word plus A stages a question note", async ({ page }) => {
+/** Hovering a word (no selection) plus A files and sends the
+hovered word at once — the word selects itself first, then the
+request fires with no pill in between. */
+test("hovered word plus A sends at once", async ({ page }) => {
 	await seedChat(page, [
 		{ role: "assistant", content: "the riverbank at dawn holds the fog" }
 	]);
@@ -68,7 +69,28 @@ test("hovered word plus A stages a question note", async ({ page }) => {
 	await page.evaluate(() => window.getSelection()?.removeAllRanges());
 	await page.mouse.move(pt.x, pt.y);
 	await page.keyboard.press("a");
+	// No pill ever opens; the badge files (the answer request may
+	// banner without a dev key, but filing never depends on it).
+	await expect(page.locator(".ann-pop")).toHaveCount(0);
+	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1, {
+		timeout: 10_000
+	});
+});
+
+/** Shift+A opens the create box with nothing staged — over a live
+selection, or over a hovered word that selects itself first. */
+test("shift A opens an empty create box", async ({ page }) => {
+	await seedChat(page, [
+		{ role: "assistant", content: "the riverbank at dawn holds the fog" }
+	]);
+	await page.goto("/");
+	const article = page.locator("article.assistant");
+	await expect(article).toBeVisible({ timeout: 60_000 });
+	await dragQuote(page, 0, "riverbank");
+	await page.keyboard.press("A");
 	const pop = page.locator(".ann-pop.fresh");
 	await expect(pop).toBeVisible({ timeout: 10_000 });
-	await expect(pop.locator("textarea")).toHaveValue("?");
+	await expect(pop.locator("textarea")).toHaveValue("");
+	await page.keyboard.press("Escape");
+	await expect(page.locator(".ann-pop")).toHaveCount(0);
 });

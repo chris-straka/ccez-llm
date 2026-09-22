@@ -85,14 +85,14 @@ describe("messageKeyAction", () => {
 			"annotate-selection"
 		);
 		expect(
-			messageKeyAction({ ...msgBase, hasSelection: true, shiftKey: true })
-		).toBe(null);
+			messageKeyAction({ ...msgBase, hasSelection: true, shiftKey: true, key: "A" })
+		).toBe("annotate-empty");
 	});
 
-	it("files a hovered word on A with no selection", () => {
+	it("sends a hovered word on A with no selection (no pill)", () => {
 		expect(
 			messageKeyAction({ ...msgBase, hoverWord: "riverbank" })
-		).toBe("annotate-hovered-word");
+		).toBe("annotate-hovered-instant");
 		// A selection still wins over the hover word.
 		expect(
 			messageKeyAction({
@@ -105,6 +105,33 @@ describe("messageKeyAction", () => {
 		expect(messageKeyAction({ ...msgBase, hoverWord: null })).toBe(
 			"toggle-aids"
 		);
+	});
+	it("opens an empty create box on Shift+A (selection or hover)", () => {
+		const shiftA = {
+			...msgBase,
+			key: "A",
+			code: "KeyA",
+			shiftKey: true,
+			hasSelection: true
+		};
+		expect(messageKeyAction(shiftA)).toBe("annotate-empty");
+		expect(
+			messageKeyAction({ ...shiftA, hasSelection: false, hoverWord: "riverbank" })
+		).toBe("annotate-empty");
+		// Bare message Shift+A files nothing (no selection, no word).
+		expect(
+			messageKeyAction({
+				...shiftA,
+				hasSelection: false,
+				hoverWord: null
+			})
+		).toBe(null);
+		// CapsLock spelling (no shift flag) reads the same chord.
+		expect(
+			messageKeyAction({ ...shiftA, shiftKey: false })
+		).toBe("annotate-empty");
+		// Shift+A yields to fields like every other message hotkey.
+		expect(messageKeyAction({ ...shiftA, inField: true })).toBe(null);
 	});
 	it("fires the hovered-message hotkeys bare and hovered", () => {
 		expect(messageKeyAction(msgBase)).toBe("toggle-aids");

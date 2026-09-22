@@ -396,7 +396,6 @@
 		aidDisplayText,
 		offeredLocalAids,
 		preferredLocalAid,
-		wordAtNodeOffset,
 		sentenceBounds,
 		paragraphBounds,
 		extractWordAt,
@@ -4516,7 +4515,7 @@
 	/** Annotate at the cursor: the comment pill opens where the selection
 	was — never down in the composer. Enter saves, Escape cancels. The
 	annotation stays pending (no badge, no count) until submit. */
-	function annotate(initialComment: string = ""): void {
+	function annotate(initialComment: string = "", instant = false): void {
 		if (!selMenu) return;
 		if (!selMenu.quote.trim()) {
 			clearSelection();
@@ -4573,6 +4572,14 @@
 		// exactly like tapping Speak on the highlight.
 		void speakQuote(quote, selMenu.messageId, true, selMenu.context);
 		clearSelection();
+		// Instant file (hover A): the pill never opens — the empty
+		// note files at once and the request fires, on desktop and
+		// phones alike (no in-prompt edit either).
+		if (instant) {
+			annDraft = initialComment;
+			commitPending();
+			return;
+		}
 		// Phones file the comment in the composer, never the
 		// transplanted pill (its textbox can't reliably summon the
 		// phone keyboard — see editAnnotationInPrompt). Desktop
@@ -10173,15 +10180,22 @@
 			// One snapshot for every hovered-message hotkey below: the
 			// guards each walked the target themselves, so this is also
 			// fewer ancestor walks per keypress, not more. The hover
-			// word resolves only for bare A (the one chord that reads
-			// it): caretRangeFromPoint on every keypress would tax
-			// typing-adjacent keys for nothing.
-			const hoverHit =
+			// word resolves only for the A chords that read it (bare A
+			// and Shift+A): caretRangeFromPoint on every keypress would
+			// tax typing-adjacent keys for nothing.
+			const shiftAOnly =
+				event.key === "A" &&
+				!event.metaKey &&
+				!event.ctrlKey &&
+				!event.altKey;
+			const bareAOnly =
 				event.key === "a" &&
 				!event.metaKey &&
 				!event.ctrlKey &&
 				!event.altKey &&
-				!event.shiftKey &&
+				!event.shiftKey;
+			const hoverHit =
+				(bareAOnly || shiftAOnly) &&
 				hoveredIdx >= 0 &&
 				(window.getSelection()?.toString() ?? "") === ""
 					? hoverWordRange()
@@ -10208,12 +10222,12 @@
 				annotate("?");
 				return;
 			}
-			if (msgAction === "annotate-hovered-word") {
-				// Hover a word, hit A: select it first, then file
-				// exactly like a live selection ("?" staged). The
-				// decision already confirmed a word is under the
-				// pointer; a stale range selects nothing and files
-				// nothing (annotate guards the empty quote).
+			if (msgAction === "annotate-hovered-instant") {
+				// Hover a word, hit A: select it first, then file and
+				// send at once — the pill never opens. The decision
+				// already confirmed a word is under the pointer; a
+				// stale range selects nothing and files nothing
+				// (annotate guards the empty quote).
 				if (hoverHit) {
 					event.preventDefault();
 					window
@@ -10225,7 +10239,32 @@
 							hoverHit.end
 						);
 					placeSelMenu();
-					annotate("?");
+					annotate("", true);
+					return;
+				}
+			}
+			if (msgAction === "annotate-empty") {
+				// Shift+A opens the create box empty: a live selection
+				// files as-is, otherwise the hovered word selects
+				// itself first (same selection prelude, no "?" staged).
+				if (msgFacts.hasSelection) {
+					event.preventDefault();
+					placeSelMenu();
+					annotate("");
+					return;
+				}
+				if (hoverHit) {
+					event.preventDefault();
+					window
+						.getSelection()
+						?.setBaseAndExtent(
+							hoverHit.node,
+							hoverHit.start,
+							hoverHit.node,
+							hoverHit.end
+						);
+					placeSelMenu();
+					annotate("");
 					return;
 				}
 			}
@@ -11432,9 +11471,7 @@
 			// Caret snapped past the text (open-space click resolving
 			// to a node edge): only retry inside the char when the
 			// point is actually over the text — far padding is message
-			// space, not the edge word (the touch double-tap path
-			// keeps its own retry in wordAtNodeOffset, which has no
-			// point to check).
+			// space, not the edge word.
 			if ((offset >= text.length || offset <= 0) && text.length > 0) {
 				try {
 					const edge = document.createRange();
@@ -11454,11 +11491,17 @@
 				}
 			}
 			// Node-edge landings (a click on a glyph's far edge
-			// resolving past it) retry inside the char.
-			return wordAtNodeOffset(text, offset);
+			// resolving past it) retry inside the char. Segmented
+			// bounds, not maximal-run expansion: an isolated CJK word
+			// inside an unspaced run must resolve to itself (没有,
+			// not the whole clause) — same segmentation the hover
+			// path uses.
+			const bounds = wordBoundsAt(text, offset);
+			if (!bounds) return "";
+			return text.slice(bounds[0], bounds[1]);
 		}
 		// Desktop right-click reads aloud (the selection, else the word
-		// under the cursor, else the whole message; a second
+		// under the cursor; open space reads nothing. A second
 		// right-click restarts it, never stops it) AND opens the
 		// native menu: no preventDefault here, so Copy stays
 		// available beside speech.
@@ -11563,7 +11606,7 @@
 			}
 			// No selection: a word under the cursor reads just that word
 			// (same per-quote path as a selection); open message space
-			// reads the whole message. speakReply gates the voice.
+			// reads nothing — not a listen moment, so no read starts.
 			const article = body.closest('article[id^="msg-"]');
 			const msg = article
 				? chat.messages[Number(article.id.slice(4))]
@@ -11574,7 +11617,6 @@
 				void speakQuote(word, msg.id, false, speechText(msg.content));
 				return;
 			}
-			void speakReply(msg);
 		};
 		// Holding Option morphs the send button into "Add +" (stage).
 		const onAlt = (event: KeyboardEvent) => {

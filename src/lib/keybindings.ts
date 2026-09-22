@@ -68,7 +68,7 @@ export interface MessageKeyFacts extends KeyModifiers {
 	inFieldOrFilter: boolean;
 	/** A text selection is live: hovered copy yields to it. */
 	hasSelection: boolean;
-	/** Word under the pointer (no selection): A files it as `?`. */
+	/** Word under the pointer (no selection): A sends it at once. */
 	hoverWord?: string | null;
 	hoveredIdx: number;
 	escDownAt: number;
@@ -77,7 +77,8 @@ export interface MessageKeyFacts extends KeyModifiers {
 export type MessageKeyAction =
 	| "toggle-aids"
 	| "annotate-selection"
-	| "annotate-hovered-word"
+	| "annotate-hovered-instant"
+	| "annotate-empty"
 	| "pin-pinyin"
 	| "pin-furigana"
 	| "exit-fullscreen"
@@ -100,12 +101,28 @@ export function messageKeyAction(
 	const hovered = !facts.inEditor && facts.hoveredIdx >= 0;
 	// A live selection owns A: double-tap a word and hit A to file it
 	// as an annotation (the note stages "?"). Hovering a word with
-	// no selection files that word the same way; bare message A over
-	// anything else still toggles aids below.
+	// no selection files and sends that word at once, no pill;
+	// Shift+A opens the create box empty instead (selection or
+	// hover). Bare message A over anything else still toggles aids
+	// below.
 	if (facts.key === "a" && hovered && facts.hasSelection && bare(facts) && !facts.inField)
 		return "annotate-selection";
 	if (facts.key === "a" && hovered && !facts.hasSelection && facts.hoverWord && bare(facts) && !facts.inField)
-		return "annotate-hovered-word";
+		return "annotate-hovered-instant";
+	// Key spelling, not the shift flag: real Shift+A, CapsLock+A,
+	// and synthetic presses all read key "A" (same convention as
+	// the scroll-mode uppercase signals below).
+	if (
+		facts.key === "A" &&
+		!facts.metaKey &&
+		!facts.ctrlKey &&
+		!facts.altKey &&
+		hovered &&
+		!facts.inField &&
+		!facts.inEditable &&
+		(facts.hasSelection || facts.hoverWord)
+	)
+		return "annotate-empty";
 	if (facts.key === "a" && hovered && bare(facts) && !facts.inField)
 		return "toggle-aids";
 	// M/N pin on the center message, not the hovered one, so they
