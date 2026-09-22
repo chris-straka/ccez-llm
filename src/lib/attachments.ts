@@ -1,4 +1,5 @@
 import { extractAttachmentBytes, extractableFormat } from "./attachExtract";
+import type { RemovedMarkerTags } from "./editorPaste";
 
 /** Rough token estimate for plain text (~4 chars per token). */
 export function estimateTextTokens(text: string): number {
@@ -685,6 +686,78 @@ export function reconcileDropCount(
 	prev: number
 ): number {
 	return Math.max(0, prev - tags, atts - tags);
+}
+
+/** Drop the newest n attachments matching a predicate (tag reconciliation). */
+export function dropNewestWhere(
+	list: Attachment[],
+	match: (att: Attachment) => boolean,
+	n: number
+): Attachment[] {
+	const kept = [...list];
+	for (let i = kept.length - 1; i >= 0 && n > 0; i--) {
+		const att = kept[i];
+		if (att !== undefined && match(att)) {
+			kept.splice(i, 1);
+			n--;
+		}
+	}
+	return kept;
+}
+
+/**
+ * Reconcile an attachment list against the editor's marker tags:
+ * explicitly removed tags drop their attachments by index, and
+ * orphans (attachments with no tags, from undo and cross-editor
+ * flows) drop the excess newest-first. Pure: the caller assigns the
+ * returned list and re-syncs its marker counts.
+ */
+export function reconcileTagRemovals(
+	list: Attachment[],
+	imagesNow: number,
+	filesNow: number,
+	prevImages: number,
+	prevFiles: number,
+	removed: RemovedMarkerTags | undefined,
+	pastedNow: number,
+	prevPasted: number
+): Attachment[] {
+	const rImg = removed?.image ?? [];
+	const rFile = removed?.file ?? [];
+	const rPasted = removed?.pasted ?? [];
+	let kept = dropAttachmentsAtIndexes(list, "image", rImg);
+	kept = dropFileAttachmentsAtIndexes(kept, rFile);
+	kept = dropPastedAttachmentsAtIndexes(kept, rPasted);
+	const imageAtts = kept.filter((a) => a.kind === "image").length;
+	const fileAtts = kept.filter(
+		(a) => a.kind === "text" && !isPastedTextAttachment(a)
+	).length;
+	const pastedAtts = kept.length - imageAtts - fileAtts;
+	const dropImages = reconcileDropCount(
+		imageAtts,
+		imagesNow,
+		prevImages - rImg.length
+	);
+	const dropFiles = reconcileDropCount(
+		fileAtts,
+		filesNow,
+		prevFiles - rFile.length
+	);
+	const dropPasted = reconcileDropCount(
+		pastedAtts,
+		pastedNow,
+		prevPasted - rPasted.length
+	);
+	if (dropImages > 0 || dropFiles > 0 || dropPasted > 0) {
+		kept = dropNewestWhere(kept, (a) => a.kind === "image", dropImages);
+		kept = dropNewestWhere(
+			kept,
+			(a) => a.kind === "text" && !isPastedTextAttachment(a),
+			dropFiles
+		);
+		kept = dropNewestWhere(kept, isPastedTextAttachment, dropPasted);
+	}
+	return kept;
 }
 
 export function countMarkers(

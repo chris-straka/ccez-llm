@@ -10,6 +10,7 @@ import {
 	countMarkers,
 	countPastedTags,
 	dropFileAttachmentsAtIndexes,
+	dropNewestWhere,
 	dropPastedAttachmentsAtIndexes,
 	extractAttachmentTags,
 	fileExcerpt,
@@ -24,6 +25,7 @@ import {
 	makePastedTextAttachment,
 	pastedMarkerInsert,
 	pastedTextMarker,
+	reconcileTagRemovals,
 	removeMarker,
 	removeMarkerAt,
 	removePastedAt,
@@ -634,6 +636,61 @@ describe("pasted-aware index drops", () => {
 
 	it("never mistakes fixed markers for pasted tags", () => {
 		expect(`${IMAGE_MARKER} ${FILE_MARKER}`.match(PASTED_TAG_RE)).toBeNull();
+	});
+});
+
+describe("dropNewestWhere", () => {
+	const img = (id: string) => testAttachment({ id, kind: "image" });
+	it("drops the newest n matches and keeps order", () => {
+		const list = [img("a"), img("b"), img("c")];
+		expect(
+			dropNewestWhere(list, (a) => a.kind === "image", 2).map((a) => a.id)
+		).toEqual(["a"]);
+	});
+	it("keeps everything when nothing matches or n is zero", () => {
+		const list = [img("a")];
+		expect(
+			dropNewestWhere(list, (a) => a.kind === "text", 1).map((a) => a.id)
+		).toEqual(["a"]);
+		expect(
+			dropNewestWhere(list, (a) => a.kind === "image", 0).map((a) => a.id)
+		).toEqual(["a"]);
+	});
+});
+
+describe("reconcileTagRemovals", () => {
+	const img = (id: string) => testAttachment({ id, kind: "image" });
+	const file = (id: string) => testAttachment({ id, kind: "text" });
+	const pasted = (id: string) => ({
+		...testAttachment({ id, kind: "text" }),
+		pastedText: true
+	});
+	const ids = (list: Attachment[]) => list.map((a) => a.id);
+	it("keeps everything when tags match attachments", () => {
+		const list = [img("a"), file("b")];
+		expect(
+			ids(reconcileTagRemovals(list, 1, 1, 1, 1, undefined, 0, 0))
+		).toEqual(["a", "b"]);
+	});
+	it("drops explicitly removed tags by index", () => {
+		const list = [img("a"), img("b")];
+		expect(
+			ids(
+				reconcileTagRemovals(list, 1, 0, 2, 0, { image: [0], file: [] }, 0, 0)
+			)
+		).toEqual(["b"]);
+	});
+	it("drops orphan attachments newest-first", () => {
+		const list = [img("a"), img("b"), file("c")];
+		expect(ids(reconcileTagRemovals(list, 1, 1, 1, 1, undefined, 0, 0))).toEqual(
+			["a", "c"]
+		);
+	});
+	it("drops orphan pastes newest-first", () => {
+		const list = [pasted("a"), pasted("b")];
+		expect(ids(reconcileTagRemovals(list, 0, 0, 0, 0, undefined, 1, 1))).toEqual(
+			["a"]
+		);
 	});
 });
 

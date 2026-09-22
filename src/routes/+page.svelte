@@ -97,7 +97,6 @@
 		sendPasteFolds,
 		type PromptEditor,
 		type PromptEditorOptions,
-		type RemovedMarkerTags,
 		type SendFold,
 		type SubmitKind
 	} from "$lib/editor";
@@ -171,10 +170,6 @@
 		imageMarkerInsert,
 		attachmentImageBlobsAt,
 		clipboardPngBlob,
-		dropAttachmentsAtIndexes,
-		dropFileAttachmentsAtIndexes,
-		dropPastedAttachmentsAtIndexes,
-		reconcileDropCount,
 		countMarkers,
 		countPastedTags,
 		isPastedTextAttachment,
@@ -183,6 +178,7 @@
 		splicePastedFolds,
 		stripPastedMarkers,
 		leftoverAttachments,
+		reconcileTagRemovals,
 		type Attachment,
 		type AttachmentKind,
 		type AttachTagModel,
@@ -3832,80 +3828,7 @@
 		prevPastedCount = countPastedTags(doc);
 	}
 
-	/** Drop the `n` newest attachments matching `match` (tag → attachment reconciliation). */
-	function dropNewestWhere(
-		list: Attachment[],
-		match: (att: Attachment) => boolean,
-		n: number
-	): Attachment[] {
-		const kept = [...list];
-		for (let i = kept.length - 1; i >= 0 && n > 0; i--) {
-			const att = kept[i];
-			if (att !== undefined && match(att)) {
-				kept.splice(i, 1);
-				n--;
-			}
-		}
-		return kept;
-	}
-
-	/**
-	 * Tag → attachment reconciliation with positions: deleted tag
-	 * occurrences carry their document-order indexes, so the matching
-	 * attachments go with them (Nth tag pairs with the Nth
-	 * attachment). Indexed drops consume their tags, so the count path
-	 * anchors past them — position-less leftovers and pre-existing
-	 * orphans still reconcile newest-first without double-dropping.
-	 * File tags pair with file drops only: pasted-text attachments
-	 * share kind "text" but pair with `[Pasted N chars]` tags.
-	 */
-	function reconcileTagRemovals(
-		list: Attachment[],
-		imagesNow: number,
-		filesNow: number,
-		prevImages: number,
-		prevFiles: number,
-		removed: RemovedMarkerTags | undefined,
-		pastedNow: number,
-		prevPasted: number
-	): Attachment[] {
-		const rImg = removed?.image ?? [];
-		const rFile = removed?.file ?? [];
-		const rPasted = removed?.pasted ?? [];
-		let kept = dropAttachmentsAtIndexes(list, "image", rImg);
-		kept = dropFileAttachmentsAtIndexes(kept, rFile);
-		kept = dropPastedAttachmentsAtIndexes(kept, rPasted);
-		const imageAtts = kept.filter((a) => a.kind === "image").length;
-		const fileAtts = kept.filter(
-			(a) => a.kind === "text" && !isPastedTextAttachment(a)
-		).length;
-		const pastedAtts = kept.length - imageAtts - fileAtts;
-		const dropImages = reconcileDropCount(
-			imageAtts,
-			imagesNow,
-			prevImages - rImg.length
-		);
-		const dropFiles = reconcileDropCount(
-			fileAtts,
-			filesNow,
-			prevFiles - rFile.length
-		);
-		const dropPasted = reconcileDropCount(
-			pastedAtts,
-			pastedNow,
-			prevPasted - rPasted.length
-		);
-		if (dropImages > 0 || dropFiles > 0 || dropPasted > 0) {
-			kept = dropNewestWhere(kept, (a) => a.kind === "image", dropImages);
-			kept = dropNewestWhere(
-				kept,
-				(a) => a.kind === "text" && !isPastedTextAttachment(a),
-				dropFiles
-			);
-			kept = dropNewestWhere(kept, isPastedTextAttachment, dropPasted);
-		}
-		return kept;
-	}
+	/* Tag → attachment reconciliation lives in $lib/attachments. */
 
 	/**
 	 * Marker text for one fresh attachment: right after a collapsed
