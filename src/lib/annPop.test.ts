@@ -3,7 +3,9 @@ import {
 	annPopBlurAction,
 	annPopCancelKind,
 	annPopSaveKind,
-	pillWashId
+	annPopWidth,
+	pillWashId,
+	placeAnnCard
 } from "./annPop";
 
 describe("annPopSaveKind", () => {
@@ -46,5 +48,52 @@ describe("pillWashId", () => {
 		expect(pillWashId({ id: "a" }, true)).toBeNull();
 		expect(pillWashId(null, false)).toBeNull();
 		expect(pillWashId(null, true)).toBeNull();
+	});
+});
+
+describe("annPopWidth", () => {
+	it("keeps the fresh pill at 19rem inside the viewport", () => {
+		expect(
+			annPopWidth({ fresh: true, android: false, fontScale: 1, viewportWidth: 1280 })
+		).toBe(304);
+		expect(
+			annPopWidth({ fresh: true, android: false, fontScale: 1, viewportWidth: 300 })
+		).toBe(284);
+	});
+	it("scales the card with font size up to 32rem", () => {
+		expect(
+			annPopWidth({ fresh: false, android: false, fontScale: 1, viewportWidth: 1280 })
+		).toBe(384);
+		expect(
+			annPopWidth({ fresh: false, android: false, fontScale: 4, viewportWidth: 1280 })
+		).toBe(512);
+	});
+	it("caps phone cards at 8x scale", () => {
+		expect(
+			annPopWidth({ fresh: false, android: true, fontScale: 10, viewportWidth: 1280 })
+		).toBe(512);
+	});
+});
+
+describe("placeAnnCard", () => {
+	it("centers over the anchor inside the viewport", () => {
+		expect(
+			placeAnnCard({ anchorX: 640, anchorY: 400, width: 384, viewportWidth: 1280, viewportHeight: 800 })
+		).toEqual({ x: 448, y: 408 });
+	});
+	it("clamps narrow viewports instead of running off-screen", () => {
+		const { x } = placeAnnCard({
+			anchorX: 40,
+			anchorY: 400,
+			width: 384,
+			viewportWidth: 412,
+			viewportHeight: 915
+		});
+		expect(x).toBe(8);
+	});
+	it("drops above the anchor past the bottom edge", () => {
+		expect(
+			placeAnnCard({ anchorX: 640, anchorY: 780, width: 384, viewportWidth: 1280, viewportHeight: 800 })
+		).toEqual({ x: 448, y: 532 });
 	});
 });

@@ -386,7 +386,9 @@
 		annPopBlurAction,
 		annPopCancelKind,
 		annPopSaveKind,
-		pillWashId
+		annPopWidth,
+		pillWashId,
+		placeAnnCard
 	} from "$lib/annPop";
 	import {
 		idleTapAction,
@@ -4960,18 +4962,16 @@
 	/* Pill grow/focus action renders in `AnnPop.svelte` (moved with
 	the field it sizes). */
 
-	/** Annotation popover width: the desktop card, clamped to fit narrow
-	phones — without the clamp x goes negative and it runs off-screen.
-	The card scales with font size up to 32rem (see .ann-pop); the
-	fresh pill stays 19rem. Mirror that math here (16px root) or the
-	centering lands on the wrong middle (see annotations-ux
-	centering spec). */
+	/** Annotation popover width (see $lib/annPop): the desktop card,
+	clamped to fit narrow phones, scaling with font size up to 32rem
+	(the fresh pill stays 19rem). */
 	function popWidth(fresh: boolean): number {
-		if (fresh) return Math.min(19 * 16, window.innerWidth - 16);
-		const scale = androidUI
-			? Math.min(8, settings.fontScale)
-			: settings.fontScale;
-		return Math.min(Math.min(24 * scale, 32) * 16, window.innerWidth - 16);
+		return annPopWidth({
+			fresh,
+			android: androidUI,
+			fontScale: settings.fontScale,
+			viewportWidth: window.innerWidth
+		});
 	}
 
 	/**
@@ -5017,21 +5017,18 @@
 		}
 		annDraft = current.comment;
 		settleAnnPop();
-		// Narrow viewports are narrower than the desktop card: clamp
-		// first or x goes negative and the popover runs off-screen.
 		const anchorAt = anchor ?? {
 			x: window.innerWidth / 2,
 			y: window.innerHeight / 2
 		};
 		const width = popWidth(false);
-		const x = Math.min(
-			Math.max(8, anchorAt.x - width / 2),
-			window.innerWidth - width - 8
-		);
-		const height = 240;
-		let y = anchorAt.y + 8;
-		if (y + height > window.innerHeight - 8)
-			y = Math.max(8, anchorAt.y - height - 8);
+		const { x, y } = placeAnnCard({
+			anchorX: anchorAt.x,
+			anchorY: anchorAt.y,
+			width,
+			viewportWidth: window.innerWidth,
+			viewportHeight: window.innerHeight
+		});
 		annPop = { id, x, y, fresh: false };
 		// The box can morph from a still-fading fresh pill (same
 		// element, no remount, so growPill's mount focus never fires):

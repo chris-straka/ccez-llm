@@ -64,3 +64,43 @@ export function pillWashId(
 ): string | null {
 	return pop && !closing ? pop.id : null;
 }
+
+/**
+ * Popover width in px (16px root): the card scales with font size up
+ * to 32rem (see .ann-pop); the fresh pill stays 19rem. The viewport
+ * clamp keeps narrow phones inside the screen.
+ */
+export function annPopWidth(facts: {
+	fresh: boolean;
+	android: boolean;
+	fontScale: number;
+	viewportWidth: number;
+}): number {
+	if (facts.fresh) return Math.min(19 * 16, facts.viewportWidth - 16);
+	const scale = facts.android ? Math.min(8, facts.fontScale) : facts.fontScale;
+	return Math.min(Math.min(24 * scale, 32) * 16, facts.viewportWidth - 16);
+}
+
+/**
+ * Edit-card placement from a badge anchor: centered over the anchor,
+ * clamped inside the viewport; drops above the anchor when the 240px
+ * card would run past the bottom edge. Narrow viewports clamp first
+ * or x goes negative and the popover runs off-screen.
+ */
+export function placeAnnCard(facts: {
+	anchorX: number;
+	anchorY: number;
+	width: number;
+	viewportWidth: number;
+	viewportHeight: number;
+}): { x: number; y: number } {
+	const x = Math.min(
+		Math.max(8, facts.anchorX - facts.width / 2),
+		facts.viewportWidth - facts.width - 8
+	);
+	const height = 240;
+	let y = facts.anchorY + 8;
+	if (y + height > facts.viewportHeight - 8)
+		y = Math.max(8, facts.anchorY - height - 8);
+	return { x, y };
+}
