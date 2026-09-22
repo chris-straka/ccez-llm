@@ -79,6 +79,15 @@ const delBase: DeleteKeyFacts = {
 };
 
 describe("messageKeyAction", () => {
+	it("files a live selection on A, toggles aids on bare message A", () => {
+		expect(messageKeyAction(msgBase)).toBe("toggle-aids");
+		expect(messageKeyAction({ ...msgBase, hasSelection: true })).toBe(
+			"annotate-selection"
+		);
+		expect(
+			messageKeyAction({ ...msgBase, hasSelection: true, shiftKey: true })
+		).toBe(null);
+	});
 	it("fires the hovered-message hotkeys bare and hovered", () => {
 		expect(messageKeyAction(msgBase)).toBe("toggle-aids");
 		expect(messageKeyAction({ ...msgBase, key: "m", code: "KeyM" })).toBe(

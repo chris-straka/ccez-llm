@@ -4715,7 +4715,7 @@
 	/** Annotate at the cursor: the comment pill opens where the selection
 	was — never down in the composer. Enter saves, Escape cancels. The
 	annotation stays pending (no badge, no count) until submit. */
-	function annotate(): void {
+	function annotate(initialComment = ""): void {
 		if (!selMenu) return;
 		if (!selMenu.quote.trim()) {
 			clearSelection();
@@ -4777,7 +4777,7 @@
 		if (androidUI) {
 			selMenu = null;
 			highlightAnnId = pending.id;
-			editAnnotationInPrompt({ pending: true }, "");
+			editAnnotationInPrompt({ pending: true }, initialComment);
 			if (settings.hapticsEnabled) vibrateTick(6);
 			return;
 		}
@@ -4802,7 +4802,7 @@
 		});
 		selMenu = null;
 		highlightAnnId = pending.id;
-		annDraft = "";
+		annDraft = initialComment;
 		settleAnnPop();
 		annPop = { id: pending.id, x, y, fresh: true };
 		// The pill mounts async: land the caret once it flushes, or
@@ -10213,6 +10213,15 @@
 				escDownAt
 			};
 			const msgAction = messageKeyAction(msgFacts);
+			if (msgAction === "annotate-selection") {
+				// Double-tap a word, hit A: file the live selection as
+				// an annotation with "?" staged as the note — send to
+				// file the question, or type over it.
+				event.preventDefault();
+				placeSelMenu();
+				annotate("?");
+				return;
+			}
 			if (msgAction === "toggle-aids") {
 				// A toggles every aid the hovered message offers — pinyin
 				// over Chinese lines, furigana over Japanese ones (dual
