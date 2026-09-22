@@ -55,6 +55,16 @@ describe("mock fetch hook", () => {
 		expect(result.content).toContain("Mock reply to:");
 	});
 
+	test("chat delay hook slows the one-shot when flagged", async () => {
+		window.localStorage.setItem("ccez-mock-chat-ms", "120");
+		const t0 = Date.now();
+		const result = await new MockProvider().chat([
+			{ role: "user", content: "hi" }
+		]);
+		expect(Date.now() - t0).toBeGreaterThanOrEqual(100);
+		expect(result.content).toContain("Mock reply to:");
+	});
+
 	test("no flag means no fetch callbacks", async () => {
 		const events: string[] = [];
 		await new MockProvider().stream([{ role: "user", content: "hi" }], {

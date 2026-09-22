@@ -895,15 +895,17 @@ export function applyMarks(
 }
 
 /**
- * Stamp signature: badge placement depends on items + skip only. A
- * wash-only change (badge hover, draft click) re-stamps marks without
- * touching badges or anchors — see stampWashOnly below.
+ * Stamp signature: badge placement AND answer paint depend on items
+ * + skip. A wash-only change (badge hover, draft click) re-stamps
+ * marks without touching badges or anchors — see stampWashOnly
+ * below. The answer rides along or a landed answer never repaints
+ * its waiting badge.
  */
 function stampSignature(items: AnnotationMark[], skip: boolean): string {
 	return `${skip ? 1 : 0}|${items
 		.map(
 			(i) =>
-				`${i.id}:${i.number}:${i.quote}:${i.at ?? 0}:${i.preview === true ? 1 : 0}:${i.aidScope ?? ""}`
+				`${i.id}:${i.number}:${i.quote}:${i.at ?? 0}:${i.preview === true ? 1 : 0}:${i.aidScope ?? ""}:${i.answer ?? ""}`
 		)
 		.join(",")}`;
 }

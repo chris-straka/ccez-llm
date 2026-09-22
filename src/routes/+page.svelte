@@ -146,6 +146,7 @@
 	import SearchPalette from "$lib/components/SearchPalette.svelte";
 	import InspectOverlay from "$lib/components/InspectOverlay.svelte";
 	import AnnPop from "$lib/components/AnnPop.svelte";
+	import AnnAnswer from "$lib/components/AnnAnswer.svelte";
 	import Sidebar from "$lib/components/Sidebar.svelte";
 	import ThreadView from "$lib/components/ThreadView.svelte";
 	import LangMenus from "$lib/components/LangMenus.svelte";
@@ -967,6 +968,15 @@
 		x: number;
 		y: number;
 		fresh: boolean;
+	} | null>(null);
+	/** Answer popup (the remodel): open answer read in context. Null
+	when closed; the card self-heals (renders nothing) if its
+	annotation is deleted or sent while open. */
+	let answerPop = $state<{
+		id: AnnotationId;
+		x: number;
+		y: number;
+		w: number;
 	} | null>(null);
 	/** Last badge a mousedown press opened (or toggled): its trailing
 	click re-fire is the same gesture, never a new one. Plain field —
@@ -4998,6 +5008,37 @@
 		}
 		const current = annotations.find((a) => a.id === id);
 		if (!current) return;
+		// A ready answer opens in its own popup (the remodel): the note
+		// still edits from the review dock. Re-press toggles it shut;
+		// an open pill for the same note settles first through the
+		// proper cancel path so typed text is never dropped.
+		if (current.answer) {
+			if (answerPop?.id === id) {
+				answerPop = null;
+				return;
+			}
+			if (annPop && !annPopClosing && annPop.id === id) cancelAnnPop();
+			if (
+				promptAnnEdit &&
+				!("pending" in promptAnnEdit) &&
+				promptAnnEdit.id === id
+			)
+				cancelPromptAnnEdit();
+			const anchorAt = anchor ?? {
+				x: window.innerWidth / 2,
+				y: window.innerHeight / 2
+			};
+			const width = popWidth(false);
+			const placed = placeAnnCard({
+				anchorX: anchorAt.x,
+				anchorY: anchorAt.y,
+				width,
+				viewportWidth: window.innerWidth,
+				viewportHeight: window.innerHeight
+			});
+			answerPop = { id, x: placed.x, y: placed.y, w: width };
+			return;
+		}
 		// Phones edit in the composer, never the card: the transplanted
 		// textbox can't reliably summon the phone keyboard — see
 		// editAnnotationInPrompt. Re-pressing the editing badge cancels
@@ -5060,6 +5101,16 @@
 		)
 			return;
 		openBadge(id, anchor);
+	}
+
+	/** File the answer into the next prompt (the remodel): blank-line
+	joined onto the draft, then the composer takes focus. */
+	function addAnswerToPrompt(id: AnnotationId): void {
+		const current = annotations.find((a) => a.id === id);
+		if (!current?.answer) return;
+		editor?.setText(joinExternalDraft(editor?.getText() ?? "", current.answer));
+		editor?.focus();
+		answerPop = null;
 	}
 
 	function saveEdit(id: string): void {
@@ -12442,6 +12493,29 @@
 				mic: () => void togglePillMic()
 			}}
 		/>
+	{/if}
+
+	{#if answerPop}
+		<!-- Answer popup through AnnAnswer: the page keeps open state,
+		badge-anchor placement, and the add-to-prompt behavior; the
+		component owns the card and its surface. Self-heals when its
+		annotation is deleted or sent while open. -->
+		{@const pop = answerPop}
+		{@const answered = annotations.find((a) => a.id === pop.id)}
+		{#if answered?.answer}
+			<AnnAnswer
+				id={answered.id}
+				quote={answered.quote}
+				answer={answered.answer}
+				x={pop.x}
+				y={pop.y}
+				width={pop.w}
+				actions={{
+					addToPrompt: addAnswerToPrompt,
+					close: () => (answerPop = null)
+				}}
+			/>
+		{/if}
 	{/if}
 
 	<!-- Settings drawer through `SettingsDrawer.svelte` (double-click

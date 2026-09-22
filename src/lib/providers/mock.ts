@@ -16,13 +16,16 @@ import { messageText } from "./types";
 export class MockProvider implements ChatProvider {
 	readonly id = "mock";
 
-	chat(messages: ChatMessage[]): Promise<ChatResult> {
-		// Promise interface (not async): the reply is canned, but the
-		// provider contract is async so the signature stays put.
-		return Promise.resolve({
+	async chat(messages: ChatMessage[]): Promise<ChatResult> {
+		// Test hook: slow the one-shot reply (ms) so specs can catch
+		// mid-flight states (annotation answer badges). Unset keeps it
+		// instant.
+		const ms = mockFlagMs("ccez-mock-chat-ms");
+		if (ms !== null) await new Promise((r) => setTimeout(r, ms));
+		return {
 			content: canned(messages),
 			usage: { prompt: 10, completion: 12, total: 22 }
-		});
+		};
 	}
 
 	async stream(
@@ -70,6 +73,17 @@ export class MockProvider implements ChatProvider {
 			callbacks.onToken(word);
 		}
 		return { content: full, usage: { prompt: 10, completion: 12, total: 22 } };
+	}
+}
+
+/** Finite non-negative flag value (ms), or null when unset/invalid. */
+function mockFlagMs(key: string): number | null {
+	try {
+		const raw = typeof localStorage === "undefined" ? null : localStorage.getItem(key);
+		const n = raw === null ? NaN : Number(raw);
+		return Number.isFinite(n) && n >= 0 ? n : null;
+	} catch {
+		return null;
 	}
 }
 
