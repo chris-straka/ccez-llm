@@ -145,6 +145,7 @@
 	import Sidebar from "$lib/components/Sidebar.svelte";
 	import MessageArticle from "$lib/components/MessageArticle.svelte";
 	import LangMenus from "$lib/components/LangMenus.svelte";
+	import EmptyHero from "$lib/components/EmptyHero.svelte";
 	import SettingsDrawer from "$lib/components/SettingsDrawer.svelte";
 	import SendingIndicator from "$lib/components/SendingIndicator.svelte";
 	import FindBar from "$lib/components/FindBar.svelte";
@@ -12324,11 +12325,9 @@
 			}}
 		>
 			{#if viewChat.messages.length === 0}
-				<div class="empty-state">
-					<h1 class="hero">What can I do for you?</h1>
-					{#if useMock}
-						<p class="mock-note"><strong>Mock provider active.</strong></p>
-					{/if}
+				<!-- Empty hero through `EmptyHero.svelte` (phones slot
+				the pills here); the page keeps emptiness and the pills. -->
+				<EmptyHero mock={useMock}>
 					{#if androidUI}
 						<LangMenus
 							openId={openLangMenu}
@@ -12339,7 +12338,7 @@
 							actions={langMenusActions}
 						/>
 					{/if}
-				</div>
+				</EmptyHero>
 			{/if}
 			{#each viewChat.messages as msg, i (msg.id)}
 				{@const sentRefs = annRefsFor(msg.content)}
@@ -13162,30 +13161,7 @@
 		max-height: 60%;
 	}
 	/* (Empty-state pills dock in `LangMenus.svelte`.) */
-	.empty-state {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 0.6rem;
-		padding: 1rem 0.5rem;
-	}
-	.hero {
-		margin: 0;
-		text-align: center;
-		text-wrap: balance;
-		font-size: 1.65rem;
-		font-weight: 650;
-		letter-spacing: -0.01em;
-		/* Welcome text is chrome, not content: never selectable. */
-		user-select: none;
-		-webkit-user-select: none;
-		cursor: default;
-	}
-	.mock-note {
-		margin: 0;
-		color: #6e6e73;
-		font-size: 0.85rem;
-	}
+	/* (Empty hero in `EmptyHero.svelte`.) */
 	/* (Pill row, lists, and badges in `LangMenus.svelte`.) */
 	/* Article shell surfaces render in `MessageArticle.svelte` now
 	(row, bubble, edit box, and states moved with the markup). */
@@ -13477,10 +13453,9 @@
 	/* Centered reading column on wide screens (DeepSeek-web rhythm).
 	The cap rides --chat-width off .app (desktop slider, 36 = the default
 	fixed width); the fallback keeps phones and older saves identical. */
-	/* Shared column width (hero, sending status): global, since the
-	status renders in `SendingIndicator.svelte`; the article keeps
-	its own pairing in `MessageArticle.svelte`. */
-	:global(.empty-state),
+	/* Shared column width (sending status): global, since the status
+	renders in `SendingIndicator.svelte`; article and hero keep
+	their own pairings in their components. */
 	:global(.sending) {
 		align-self: center;
 		width: 100%;
