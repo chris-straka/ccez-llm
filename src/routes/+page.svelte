@@ -79,19 +79,17 @@
 	} from "$lib/languages";
 	import {
 		listProviders,
-		createProvider,
 		getProviderDef,
-		providerKeyMissing,
 		type ProviderId
 	} from "$lib/providers/registry";
 	import { offlineTarget, onlineRestore } from "$lib/offline";
-	import { MockProvider, mockProviderEnabled } from "$lib/providers/mock";
+	import { mockProviderEnabled } from "$lib/providers/mock";
+	import { resolveProviderFor } from "$lib/providers/resolve";
 	import {
 		isOnDeviceProvider,
 		onDeviceNotReadyCopy,
 		onDeviceStatus
 	} from "$lib/ondevice/bridge";
-	import { OnDeviceChatProvider } from "$lib/ondevice/provider";
 	import { getCurrentWindow } from "@tauri-apps/api/window";
 	import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 	import {
@@ -6352,23 +6350,13 @@
 	}
 
 	function resolveProvider(): ChatProvider | null {
-		if (useMock) return new MockProvider();
-		// On-device Gemini Nano: keyless, conf-free, Gemma pill only —
-		// failures throw the seam's short copy, never a reroute.
-		if (isOnDeviceProvider(settings.activeProviderId))
-			return new OnDeviceChatProvider();
-		const conf = settings.providers[settings.activeProviderId];
-		// Keyless on-device endpoints carry no key by design.
-		const keyless =
-			getProviderDef(settings.activeProviderId, settings.customProviders)
-				.keyless === true;
-		if (!conf) return null;
-		if (providerKeyMissing(conf.apiKey, keyless)) return null;
-		return createProvider(
-			settings.activeProviderId,
-			{ ...conf, mobile: androidUI },
-			settings.customProviders
-		);
+		return resolveProviderFor({
+			useMock,
+			activeProviderId: settings.activeProviderId,
+			providers: settings.providers,
+			customProviders: settings.customProviders,
+			mobile: androidUI
+		});
 	}
 
 	/**
