@@ -303,6 +303,68 @@ export function sentenceBounds(text: string, offset: number): [number, number] {
 	return [start, end];
 }
 
+/**
+ * Paragraph span containing `offset`: a maximal run of non-blank
+ * lines, edges trimmed. Single newlines never split (soft wraps
+ * carry no newline in rendered text); a caret inside a blank run
+ * reads the paragraph after it, trailing blanks never strand an
+ * empty span, and empty text reads [0, 0]. Pure — backs keyboard
+ * paragraph speech.
+ */
+export function paragraphBounds(text: string, offset: number): [number, number] {
+	const at = Math.min(Math.max(offset, 0), text.length);
+	const blocks: Array<[number, number]> = [];
+	let i = 0;
+	while (i < text.length) {
+		// Skip one blank run: newlines and whitespace-only lines.
+		while (i < text.length) {
+			if (text[i] === "\n") {
+				i++;
+				continue;
+			}
+			if (text[i] === " " || text[i] === "\t") {
+				let j = i;
+				while (j < text.length && (text[j] === " " || text[j] === "\t")) j++;
+				if (j >= text.length || text[j] === "\n") {
+					i = j;
+					continue;
+				}
+			}
+			break;
+		}
+		if (i >= text.length) break;
+		const start = i;
+		while (i < text.length) {
+			if (text[i] !== "\n") {
+				i++;
+				continue;
+			}
+			let j = i + 1;
+			while (j < text.length && (text[j] === " " || text[j] === "\t")) j++;
+			if (j >= text.length || text[j] === "\n") break;
+			i++;
+		}
+		blocks.push([start, i]);
+	}
+	const trim = (start: number, end: number): [number, number] => {
+		while (start < end && (text[start] === " " || text[start] === "\t"))
+			start++;
+		while (end > start && (text[end - 1] === " " || text[end - 1] === "\t"))
+			end--;
+		return [start, end];
+	};
+	if (blocks.length === 0) return [0, 0];
+	for (const [start, end] of blocks) {
+		if (at >= start && at <= end) return trim(start, end);
+	}
+	// Inside a blank run: the paragraph after it, else the last.
+	for (const [start, end] of blocks) {
+		if (start > at) return trim(start, end);
+	}
+	const last = blocks[blocks.length - 1] ?? [0, 0];
+	return trim(last[0] ?? 0, last[1] ?? 0);
+}
+
 // --- Speech locale: Unicode script → BCP-47, Latin falls back ---
 
 /** Non-Latin scripts map to a voice locale; order matters (check callers). */

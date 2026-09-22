@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from "vitest";
 import {
+	joinSlicesWithBlocks,
 	scopeSlices,
 	selectionSlices,
 	spanRect,
+	speechBlockOf,
 	tintSelectionSpans,
 	unwrapFuriganaTint
 } from "./selTint";
@@ -70,6 +72,54 @@ describe("scopeSlices", () => {
 		expect(
 			slices.map((s) => (s.node.textContent ?? "").slice(s.start, s.end)).join("")
 		).toBe("abcdef");
+	});
+});
+
+describe("joinSlicesWithBlocks", () => {
+	it("blank-lines rendered blocks apart", () => {
+		const div = rendered("");
+		div.innerHTML =
+			"<p>Alpha beta gamma. Delta epsilon zeta.</p><p>Second paragraph here.</p>";
+		const slices = scopeSlices(div);
+		const hit = slices[0];
+		if (!hit) throw new Error("no slices");
+		const { full, at } = joinSlicesWithBlocks(slices, div, hit, 7);
+		expect(full).toBe(
+			"Alpha beta gamma. Delta epsilon zeta.\n\nSecond paragraph here."
+		);
+		expect(at).toBe(7);
+	});
+
+	it("points the caret into the hit block past the separator", () => {
+		const div = rendered("");
+		div.innerHTML = "<p>First.</p><p>Second paragraph here.</p>";
+		const slices = scopeSlices(div);
+		const hit = slices[1];
+		if (!hit) throw new Error("no second slice");
+		const { full, at } = joinSlicesWithBlocks(slices, div, hit, 1);
+		expect(full).toBe("First.\n\nSecond paragraph here.");
+		expect(full.slice(at, at + 4)).toBe("econ");
+	});
+
+	it("keeps same-block spans fused and clamps the caret", () => {
+		const div = rendered("");
+		div.innerHTML = "<p>ab<b>cd</b>ef</p>";
+		const slices = scopeSlices(div);
+		const hit = slices[2];
+		if (!hit) throw new Error("no slices");
+		const { full, at } = joinSlicesWithBlocks(slices, div, hit, 99);
+		expect(full).toBe("abcdef");
+		expect(at).toBe(6);
+	});
+
+	it("speechBlockOf stays inside the scope", () => {
+		const div = rendered("");
+		div.innerHTML = "<p>inner</p>";
+		document.body.append(div);
+		const inner = div.querySelector("p")?.firstChild as Text;
+		expect(speechBlockOf(inner, div)?.tagName).toBe("P");
+		const outer = document.createElement("div");
+		expect(speechBlockOf(inner, outer)).toBeNull();
 	});
 });
 

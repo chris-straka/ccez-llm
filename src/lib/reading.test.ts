@@ -45,7 +45,8 @@ import {
 	quoteStartForContext,
 	wordBoundsAt,
 	groupRuns,
-	wordAtNodeOffset
+	wordAtNodeOffset,
+	paragraphBounds
 } from "./reading";
 import { pinyinBlock, pinyinRuby } from "./pinyin";
 import { isFuriganaCached } from "./furigana";
@@ -806,6 +807,32 @@ describe("sentenceBounds", () => {
 	});
 	it("returns the whole text with no marks", () => {
 		expect(sentenceBounds("no marks here", 5)).toEqual([0, 13]);
+	});
+});
+
+describe("paragraphBounds", () => {
+	it("spans the paragraph around the offset", () => {
+		const text = "First para.\n\nSecond para here.\n\nThird.";
+		const [s, e] = paragraphBounds(text, 20);
+		expect(text.slice(s, e)).toBe("Second para here.");
+	});
+	it("keeps single newlines inside one paragraph", () => {
+		const text = "soft\nwrapped lines";
+		expect(paragraphBounds(text, 6)).toEqual([0, 18]);
+	});
+	it("reads the next paragraph from inside a blank run", () => {
+		const text = "One.\n\n\nTwo.";
+		const [s, e] = paragraphBounds(text, 5);
+		expect(text.slice(s, e)).toBe("Two.");
+	});
+	it("reads the last paragraph from trailing blanks, never empty", () => {
+		const text = "One.\n\n";
+		const [s, e] = paragraphBounds(text, 6);
+		expect(text.slice(s, e)).toBe("One.");
+		expect(paragraphBounds("", 0)).toEqual([0, 0]);
+	});
+	it("trims space-padded edges", () => {
+		expect(paragraphBounds("  padded  \n\nnext", 3)).toEqual([2, 8]);
 	});
 });
 

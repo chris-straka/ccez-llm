@@ -84,7 +84,10 @@ export type MessageKeyAction =
 	| "cut-hovered"
 	| "delete-hovered"
 	| "branch-hovered"
-	| "speak-hovered";
+	| "speak-hovered"
+	| "speak-word"
+	| "speak-sentence"
+	| "speak-paragraph";
 
 /** Hovered-message hotkey for this keypress, in handler priority
  * order (Esc+f before F fold, single-key before shifted). */
@@ -191,6 +194,26 @@ export function messageKeyAction(
 		!facts.inEditable
 	)
 		return "speak-hovered";
+	// Shift+W/S/P read the word, sentence, paragraph under the mouse
+	// point (same hovered/field guards as Shift+R): the page resolves
+	// the point to a unit and speaks it, or buzzes off-text.
+	for (const [code, action] of [
+		["KeyW", "speak-word"],
+		["KeyS", "speak-sentence"],
+		["KeyP", "speak-paragraph"]
+	] as const) {
+		if (
+			facts.code === code &&
+			facts.shiftKey &&
+			!facts.metaKey &&
+			!facts.ctrlKey &&
+			!facts.altKey &&
+			hovered &&
+			!facts.inField &&
+			!facts.inEditable
+		)
+			return action;
+	}
 	return null;
 }
 

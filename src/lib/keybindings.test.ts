@@ -174,6 +174,36 @@ describe("messageKeyAction", () => {
 		).toBe(null);
 	});
 
+	it("reads word/sentence/paragraph on Shift+W/S/P over a message", () => {
+		const shifted = { ...msgBase, shiftKey: true };
+		expect(messageKeyAction({ ...shifted, key: "W", code: "KeyW" })).toBe(
+			"speak-word"
+		);
+		expect(messageKeyAction({ ...shifted, key: "S", code: "KeyS" })).toBe(
+			"speak-sentence"
+		);
+		expect(messageKeyAction({ ...shifted, key: "P", code: "KeyP" })).toBe(
+			"speak-paragraph"
+		);
+		// Bare letters never speak; fields, editors, chords, and no
+		// hover all yield like Shift+R.
+		expect(messageKeyAction({ ...msgBase, key: "w", code: "KeyW" })).toBe(null);
+		expect(
+			messageKeyAction({ ...shifted, key: "W", code: "KeyW", inField: true })
+		).toBe(null);
+		expect(
+			messageKeyAction({
+				...shifted,
+				key: "S",
+				code: "KeyS",
+				metaKey: true
+			})
+		).toBe(null);
+		expect(
+			messageKeyAction({ ...shifted, key: "P", code: "KeyP", hoveredIdx: -1 })
+		).toBe(null);
+	});
+
 	it("rejects modifiers, the editor, fields, and no hover", () => {
 		expect(messageKeyAction({ ...msgBase, metaKey: true })).toBe(null);
 		expect(messageKeyAction({ ...msgBase, ctrlKey: true })).toBe(null);

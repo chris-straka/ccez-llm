@@ -263,6 +263,8 @@
 		selMenuWidthEstimate
 	} from "$lib/selSlices";
 	import {
+		joinSlicesWithBlocks,
+		scopeSlices,
 		selectionSlices,
 		spanRect,
 		tintSelectionSpans,
@@ -379,6 +381,8 @@
 		preferredLocalAid,
 		wordAtNodeOffset,
 		sentenceBounds,
+		paragraphBounds,
+		extractWordAt,
 		hanOverlayLangFor,
 		runModelAid,
 		annotationAnswer,
@@ -628,6 +632,12 @@
 	let scrollFromPrompt = false;
 	let selectedIdx = $state(-1);
 	let hoveredIdx = $state(-1);
+	/**
+	 * Latest window pointer point (keyboard speech chords read the
+	 * word/sentence/paragraph under it): a plain cell the global
+	 * mousemove listener stores into, never reactive state.
+	 */
+	let lastHoverClient: { x: number; y: number } | null = null;
 	/**
 	 * Last hover-index change: hovering another message empties a live
 	 * selection on WebKit (engine, no press), so a selectionchange that
@@ -6202,6 +6212,69 @@
 	// mapped inside dictateOnce) — callers toast the message directly.
 
 	/**
+	 * Speak the word/sentence/paragraph under a window point (the
+	 * Shift+W/S/P chords): the point resolves to a text node, the
+	 * node's article to its message, and the slice walk to the offset
+	 * in the rendered text — bounds come from the visible words, so
+	 * washes and speech agree. The paragraph routes the voice (a
+	 * kanji word alone would read Chinese inside Japanese text).
+	 * Off-text points buzz denial; languageless messages stay silent
+	 * like the Shift+R path.
+	 */
+	function speakUnitAtPoint(
+		clientX: number,
+		clientY: number,
+		unit: "word" | "sentence" | "paragraph"
+	): void {
+		let range: Range | null = null;
+		try {
+			if (typeof document.caretRangeFromPoint === "function")
+				range = document.caretRangeFromPoint(clientX, clientY);
+		} catch {
+			range = null;
+		}
+		const node = range?.startContainer ?? null;
+		const holder =
+			node instanceof Text
+				? (node.parentElement?.closest(".rendered") ?? null)
+				: null;
+		const article = holder?.closest('article[id^="msg-"]') ?? null;
+		const msg =
+			article && holder
+				? viewChat.messages[Number(article.id.slice(4))]
+				: undefined;
+		if (!msg || !holder || !messageSpeakable(msg)) return;
+		const slices = scopeSlices(holder);
+		const hit = slices.find((s) => s.node === node);
+		if (!hit || !node) {
+			buzzNo();
+			return;
+		}
+		// Block-aware flatten: a blank line separates rendered
+		// blocks so paragraph/sentence speech stops at the visible
+		// paragraph instead of fusing adjacent blocks.
+		const { full, at } = joinSlicesWithBlocks(
+			slices,
+			holder,
+			hit,
+			range?.startOffset ?? 0
+		);
+		const [paraStart, paraEnd] = paragraphBounds(full, at);
+		const paragraph = full.slice(paraStart, paraEnd);
+		let quote: string;
+		if (unit === "word") quote = extractWordAt(full, at);
+		else if (unit === "sentence") {
+			const [s, e] = sentenceBounds(full, at);
+			quote = full.slice(s, e);
+		} else quote = paragraph;
+		if (!quote.trim()) {
+			buzzNo();
+			return;
+		}
+		void speakQuote(quote, msg.id, false, paragraph);
+	}
+
+	/**
 	 * Highlight-to-speak: only what was selected, only when asked. The quote
 	 * keeps its own language (script detection, then Apple's recognizer for
 	 * Latin scripts), so a French highlight gets a French voice even when
@@ -10273,6 +10346,31 @@
 					return;
 				}
 			}
+			if (
+				msgAction === "speak-word" ||
+				msgAction === "speak-sentence" ||
+				msgAction === "speak-paragraph"
+			) {
+				// Shift+W/S/P read the word, sentence, paragraph under
+				// the mouse point (off-text points buzz, like the menu's
+				// empty-tap path). No point yet (keyboard-only so far)
+				// buzzes too — there is nothing to resolve.
+				consumeEvent(event);
+				if (!lastHoverClient) {
+					buzzNo();
+					return;
+				}
+				speakUnitAtPoint(
+					lastHoverClient.x,
+					lastHoverClient.y,
+					msgAction === "speak-word"
+						? "word"
+						: msgAction === "speak-sentence"
+							? "sentence"
+							: "paragraph"
+				);
+				return;
+			}
 			// One snapshot for the open chat list (see sidebarListAction):
 			// it owns j/k/space/l/Delete with preview-as-you-go. Bodies
 			// stay here as `if (sideAction === ...)` chains, never a switch.
@@ -10870,6 +10968,12 @@
 		/** Latest pointer point (drag-vs-click for the mid-drag
 		collapse restore below). Passive, one store per move. */
 		let lastMoveClient: { x: number; y: number } | null = null;
+		/** Latest window pointer point (keyboard speech chords read
+		the word/sentence/paragraph under it): passive, one store per
+		move into the component-level cell below, never reactive. */
+		const noteHoverPoint = (event: MouseEvent): void => {
+			lastHoverClient = { x: event.clientX, y: event.clientY };
+		};
 		const noteMovePoint = (event: MouseEvent): void => {
 			if (!selectingInMessage && !offChatDragArmed) return;
 			lastMoveClient = { x: event.clientX, y: event.clientY };
@@ -11699,6 +11803,7 @@
 		window.addEventListener("mousedown", noteMiddleDown, true);
 		window.addEventListener("mousemove", noteMovePoint, { passive: true });
 		window.addEventListener("mousemove", noteMiddleMove, { passive: true });
+		window.addEventListener("mousemove", noteHoverPoint, { passive: true });
 		window.addEventListener("mouseup", clearMiddleDown);
 		document.addEventListener("selectionchange", trimMessageDrag);
 		document.addEventListener("selectionchange", notePromptSelection);
@@ -11861,6 +11966,7 @@
 			window.removeEventListener("mousedown", noteMiddleDown, true);
 			window.removeEventListener("mousemove", noteMovePoint);
 			window.removeEventListener("mousemove", noteMiddleMove);
+			window.removeEventListener("mousemove", noteHoverPoint);
 			window.removeEventListener("mouseup", clearMiddleDown);
 			document.removeEventListener("selectionchange", trimMessageDrag);
 			document.removeEventListener("selectionchange", notePromptSelection);

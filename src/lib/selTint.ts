@@ -106,6 +106,57 @@ export function scopeSlices(scope: ParentNode): SelSlice[] {
 	return out;
 }
 
+/** Block elements whose boundaries count as paragraph breaks when
+speech chords flatten scope slices to plain text. */
+const SPEECH_BLOCK_SEL =
+	"p,li,h1,h2,h3,h4,h5,h6,blockquote,pre,td,th,dt,dd";
+
+/** Nearest speech-block ancestor of a text node, confined to the
+scope (a match above the scope belongs to outer chrome). */
+export function speechBlockOf(
+	node: Text,
+	scope: ParentNode
+): Element | null {
+	try {
+		const block = node.parentElement?.closest(SPEECH_BLOCK_SEL) ?? null;
+		return block && scope.contains(block) ? block : null;
+	} catch {
+		return null;
+	}
+}
+
+/** Flatten scope slices to plain text with a blank line between
+slices from different blocks, so paragraph speech stops at the
+rendered paragraph (raw concatenation fuses "zeta." and "Second"
+into one run-on). `caretOffset` is range-relative to the hit node;
+the returned caret is clamped to the joined text. */
+export function joinSlicesWithBlocks(
+	slices: SelSlice[],
+	scope: ParentNode,
+	hit: SelSlice,
+	caretOffset: number
+): { full: string; at: number } {
+	let full = "";
+	let at = 0;
+	let prev: Element | null = null;
+	let started = false;
+	try {
+		for (const s of slices) {
+			const block =
+				s.node instanceof Text ? speechBlockOf(s.node, scope) : null;
+			if (started && block !== prev) full += "\n\n";
+			if (s === hit)
+				at = full.length + Math.max(caretOffset - s.start, 0);
+			full += (s.node.textContent ?? "").slice(s.start, s.end);
+			prev = block;
+			started = true;
+		}
+	} catch {
+		// Partial join still resolves.
+	}
+	return { full, at: Math.min(Math.max(at, 0), full.length) };
+}
+
 /** Wrap the selected kanji spans in tint spans (backwards, so offsets
 hold), then put the highlight back over the same characters. The live
 range is detached first: removing a node that holds range endpoints
