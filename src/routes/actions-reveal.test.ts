@@ -131,11 +131,20 @@ describe("hover-only message actions", () => {
 	});
 
 	it("confirms message copy with a bare Copied toast", () => {
+		// The composition moved to messageCopyText in render.ts; the
+		// page feeds it and toasts the bare word.
 		const source = pageSource();
 		expect(source).toContain(
-			'redactedCopyText(plainBody(content, role, sourcesWanted)),\n\t\t\t"Copied"'
+			'copyPlain(messageCopyText(content, role, sourcesWanted), "Copied")'
 		);
 		expect(source).not.toContain("Copied as plain text");
+		const render = readFileSync(
+			new URL("../lib/render.ts", import.meta.url),
+			"utf8"
+		);
+		expect(render).toContain(
+			"redactedCopyText(plainBody(content, role, sourcesWanted))"
+		);
 	});
 
 	it("scales the icon glyphs with the text-size opt-in", () => {

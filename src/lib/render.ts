@@ -3,6 +3,7 @@ import DOMPurify from "dompurify";
 import { createHighlighter, type Highlighter } from "shiki";
 import { RUBY_SCRIPT_RE } from "./reading";
 import { runnerFor } from "./coderun";
+import { redactedCopyText } from "./annotations";
 import {
 	ATTACH_TAG_RE,
 	FILE_MARKER,
@@ -572,4 +573,17 @@ export async function highlightRendered(
 	const wrapper = document.createElement("div");
 	wrapper.append(template.content.cloneNode(true));
 	return wrapper.innerHTML;
+}
+
+/**
+ * Copy body for a message (REFACTOR §6): baked annotations are
+ * metadata, not prose, so refs-only messages fall back to their
+ * quotes, never "".
+ */
+export function messageCopyText(
+	content: string,
+	role: string,
+	sourcesWanted: boolean
+): string {
+	return redactedCopyText(plainBody(content, role, sourcesWanted));
 }

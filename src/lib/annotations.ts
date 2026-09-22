@@ -2683,3 +2683,10 @@ export function seedAnnotationsFromRefs(
 		comment: r.comment
 	}));
 }
+
+/**
+ * Copy one annotation (REFACTOR §6): quote plus comment, no numbers.
+ */
+export function annotationCopyText(quote: string, comment: string): string {
+	return comment.trim() ? `"${quote}" — ${comment.trim()}` : `"${quote}"`;
+}

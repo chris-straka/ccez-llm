@@ -153,7 +153,7 @@
 	import FindBar from "$lib/components/FindBar.svelte";
 	import Composer from "$lib/components/Composer.svelte";
 	import Waypoints from "$lib/components/Waypoints.svelte";
-	import { plainBody, sourcesAsked } from "$lib/render";
+	import { plainBody, sourcesAsked, messageCopyText } from "$lib/render";
 	import {
 		clearNotice,
 		emptyNotices,
@@ -196,7 +196,6 @@
 		equationBodyOf,
 		equationBodyRange,
 		trimParagraphTerminator,
-		redactedCopyText,
 		newAnnotationId,
 		quoteRange,
 		rangesExcludingReadings,
@@ -223,6 +222,7 @@
 		commitRefsEdit,
 		planClearSentRefs,
 		seedAnnotationsFromRefs,
+		annotationCopyText,
 		type Annotation,
 		type AnnotationId,
 		type AnnotationMark
@@ -4203,20 +4203,12 @@
 	}
 
 	function copyText(content: string, role: string): void {
-		// Message copy excludes baked annotations (metadata, not prose);
-		// refs-only messages fall back to their quotes, never "".
-		copyPlain(
-			redactedCopyText(plainBody(content, role, sourcesWanted)),
-			"Copied"
-		);
+		copyPlain(messageCopyText(content, role, sourcesWanted), "Copied");
 	}
 
 	/** Copy one annotation (either overlay): quote plus comment, no numbers. */
 	function copyAnnotation(quote: string, comment: string): void {
-		const text = comment.trim()
-			? `"${quote}" — ${comment.trim()}`
-			: `"${quote}"`;
-		copyPlain(text, "Copied");
+		copyPlain(annotationCopyText(quote, comment), "Copied");
 	}
 
 	/**

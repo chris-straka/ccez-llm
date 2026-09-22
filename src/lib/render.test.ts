@@ -10,6 +10,7 @@ import {
 	renderMessage,
 	applyPasteFolds,
 	foldBracket,
+	messageCopyText,
 	foldSegments,
 	pasteFoldButton,
 	htmlToText,
@@ -354,5 +355,12 @@ describe("foldSegments", () => {
 		expect(pasteFoldButton(2, 128)).toBe(
 			'<button type="button" class="paste-fold" data-paste-fold="2">[Pasted 128 chars]</button>'
 		);
+	});
+});
+
+describe("messageCopyText", () => {
+	it("redacts message bodies for copy", () => {
+		expect(messageCopyText("hello", "user", false)).toBe("hello");
+		expect(messageCopyText("hello", "assistant", false)).toBe("hello");
 	});
 });

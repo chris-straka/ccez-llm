@@ -29,6 +29,7 @@ import {
 	commitRefsEdit,
 	planClearSentRefs,
 	seedAnnotationsFromRefs,
+	annotationCopyText,
 	REFS_ONLY_BODY,
 	isRefsOnly,
 	redactedCopyText
@@ -862,5 +863,12 @@ describe("seedAnnotationsFromRefs", () => {
 		expect(seeded[0]).toMatchObject({ messageId: m1, quote: "a", comment: "x" });
 		expect(seeded[0]!.id).not.toBe(seeded[1]!.id);
 		expect(seedAnnotationsFromRefs(m1, [])).toEqual([]);
+	});
+});
+
+describe("annotation copy text", () => {
+	it("formats one annotation without numbers", () => {
+		expect(annotationCopyText("Kyoto", "meaning?")).toBe('"Kyoto" — meaning?');
+		expect(annotationCopyText("Kyoto", "  ")).toBe('"Kyoto"');
 	});
 });
