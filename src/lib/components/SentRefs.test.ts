@@ -16,6 +16,11 @@ function pageSource(): string {
 	return readFileSync(new URL("../../routes/+page.svelte", import.meta.url), "utf8");
 }
 
+function threadSource(): string {
+	return readFileSync(new URL("./ThreadView.svelte", import.meta.url), "utf8");
+}
+
+
 function articleSource(): string {
 	return readFileSync(new URL("./MessageArticle.svelte", import.meta.url), "utf8");
 }
@@ -64,11 +69,15 @@ describe("sent refs state contract", () => {
 		expect(row).toContain("blink={refsBlink}");
 		expect(row).toContain("actions={actions.refs}");
 		const page = pageSource();
-		expect(page).toContain("<MessageArticle");
+		expect(page).toContain("<ThreadView");
 		expect(page).toContain("bind:popOpen={refsPopOpen}");
 		expect(page).toContain("bind:refsDraft={refsEditDraft}");
-		expect(page).toContain("refsEditing={refsEditing}");
-		expect(page).toContain("quoteClick: (quote: string, n: number) =>");
-		expect(page).toContain("startEdit: (ref: { n: number; comment: string }) =>");
+		const thread = threadSource();
+		expect(thread).toContain("<MessageArticle");
+		expect(thread).toContain("bind:popOpen");
+		expect(thread).toContain("bind:refsDraft");
+		expect(thread).toContain("{refsEditing}");
+		expect(thread).toContain("quoteClick: (quote: string, n: number) =>");
+		expect(thread).toContain("startEdit: (ref: { n: number; comment: string }) =>");
 	});
 });

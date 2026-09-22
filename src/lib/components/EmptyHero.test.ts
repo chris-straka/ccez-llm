@@ -22,6 +22,10 @@ function pageSource(): string {
 	return readFileSync(new URL("../../routes/+page.svelte", import.meta.url), "utf8");
 }
 
+function threadSource(): string {
+	return readFileSync(new URL("./ThreadView.svelte", import.meta.url), "utf8");
+}
+
 function pageStyle(): string {
 	const match = pageSource().match(/<style>([\s\S]*)<\/style>/);
 	if (!match) throw new Error("+page.svelte has no <style> block");
@@ -40,9 +44,9 @@ describe("empty hero contract", () => {
 	});
 
 	it("keeps emptiness and the pills paged", () => {
-		const page = pageSource();
-		expect(page).toContain("<EmptyHero mock={useMock}>");
-		expect(page).toContain("{#if viewChat.messages.length === 0}");
+		const thread = threadSource();
+		expect(thread).toContain("<EmptyHero mock={useMock}>");
+		expect(thread).toContain("{#if messages.length === 0}");
 	});
 
 	it("keeps no hero selector in page style", () => {

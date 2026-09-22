@@ -24,6 +24,11 @@ function pageSource(): string {
 	return readFileSync(new URL("../../routes/+page.svelte", import.meta.url), "utf8");
 }
 
+function threadSource(): string {
+	return readFileSync(new URL("./ThreadView.svelte", import.meta.url), "utf8");
+}
+
+
 function pageStyle(): string {
 	const match = pageSource().match(/<style>([\s\S]*)<\/style>/);
 	if (!match) throw new Error("+page.svelte has no <style> block");
@@ -57,14 +62,17 @@ describe("message article contract", () => {
 	});
 
 	it("keeps lists, derivations, and behaviors paged", () => {
-		const page = pageSource();
-		expect(page).toContain("<MessageArticle");
-		expect(page).toContain("{#each viewChat.messages as msg, i (msg.id)}");
-		expect(page).toContain("{@const sentRefs = annRefsFor(msg.content)}");
-		expect(page).toContain("actions={{");
-		expect(page).toContain("editAction: msgEditAction,");
-		expect(page).toContain("ma: {");
+		const thread = threadSource();
+		expect(thread).toContain("<MessageArticle");
+		expect(thread).toContain("{#each messages as msg, i (msg.id)}");
+		expect(thread).toContain("{@const sentRefs = annRefsFor(msg.content)}");
+		expect(thread).toContain("actions={{");
+		expect(thread).toContain(
+			"editAction: (node: HTMLElement) => actions.editAction(node),"
+		);
+		expect(thread).toContain("ma: {");
 		// The page keeps the in-place edit functions (cross as actions).
+		const page = pageSource();
 		expect(page).toContain("function blurInlineEdit");
 		expect(page).toContain("function msgEditAction");
 	});

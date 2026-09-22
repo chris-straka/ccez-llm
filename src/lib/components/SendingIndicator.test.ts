@@ -15,6 +15,10 @@ function pageSource(): string {
 	return readFileSync(new URL("../../routes/+page.svelte", import.meta.url), "utf8");
 }
 
+function threadSource(): string {
+	return readFileSync(new URL("./ThreadView.svelte", import.meta.url), "utf8");
+}
+
 describe("sending indicator contract", () => {
 	it("renders fetch, waiting, or nothing from one phase prop", () => {
 		const source = componentSource();
@@ -34,11 +38,14 @@ describe("sending indicator contract", () => {
 
 	it("computes the phase from live send/fetch state in the page", () => {
 		const page = pageSource();
-		expect(page).toContain("<SendingIndicator");
-		expect(page).toContain('? "fetch" :');
-		expect(page).toContain('? "waiting" : null');
+		expect(page).toContain("<ThreadView");
+		expect(page).toContain('? "fetch"');
+		expect(page).toContain('? "waiting"');
 		expect(page).toContain("hasFetchActive(chatState, viewChat.id)");
 		expect(page).toContain("hasReplyStarted(chatState, viewChat.id)");
 		expect(page).toContain("waitingLabel={thinkingLabelFor(");
+		const thread = threadSource();
+		expect(thread).toContain("<SendingIndicator");
+		expect(thread).toContain("phase={sendingPhase}");
 	});
 });

@@ -19,6 +19,20 @@ function pageStyle(): string {
 	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
+/** Thread column moved to ThreadView.svelte with its styles. */
+function threadSource(): string {
+	return readFileSync(
+		new URL("../lib/components/ThreadView.svelte", import.meta.url),
+		"utf8"
+	);
+}
+
+function threadStyle(): string {
+	const match = threadSource().match(/<style>([\s\S]*)<\/style>/);
+	if (!match) throw new Error("ThreadView.svelte has no <style> block");
+	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
+}
+
 /** Review-dock chrome moved to ReviewDock.svelte with its styles. */
 function reviewDockSource(): string {
 	return readFileSync(
@@ -110,7 +124,7 @@ describe("phone composer two bars", () => {
 	});
 
 	it("keeps AI text off the screen edge with a rem-floor thread gutter", () => {
-		const css = pageStyle();
+		const css = threadStyle();
 		// Assistant articles carry no side padding, so the thread
 		// gutter alone separates AI text from the edge: a bare 0.5%
 		// hairline (~2px) reads as edge-to-edge on phones. Full-bleed

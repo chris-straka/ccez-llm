@@ -142,12 +142,10 @@
 	import InspectOverlay from "$lib/components/InspectOverlay.svelte";
 	import AnnPop from "$lib/components/AnnPop.svelte";
 	import Sidebar from "$lib/components/Sidebar.svelte";
-	import MessageArticle from "$lib/components/MessageArticle.svelte";
+	import ThreadView from "$lib/components/ThreadView.svelte";
 	import LangMenus from "$lib/components/LangMenus.svelte";
-	import EmptyHero from "$lib/components/EmptyHero.svelte";
 	import StudySheet from "$lib/components/StudySheet.svelte";
 	import SettingsDrawer from "$lib/components/SettingsDrawer.svelte";
-	import SendingIndicator from "$lib/components/SendingIndicator.svelte";
 	import FindBar from "$lib/components/FindBar.svelte";
 	import Composer from "$lib/components/Composer.svelte";
 	import Waypoints from "$lib/components/Waypoints.svelte";
@@ -217,7 +215,6 @@
 		readingPanelPlacement,
 		menuYAbovePanel,
 		placeAnnPopX,
-		REFS_ONLY_BODY,
 		lineStartOffset,
 		clampDragAnchorToFocusLine,
 		loadDraftAnnotations,
@@ -351,10 +348,8 @@
 	} from "$lib/events";
 	import {
 		aidDisplayText,
-		detectScript,
 		offeredLocalAids,
 		preferredLocalAid,
-		MODEL_AID_FOR_SCRIPT,
 		wordAtNodeOffset,
 		sentenceBounds,
 		hanOverlayLangFor,
@@ -12144,7 +12139,7 @@
 		}}
 	/>
 
-	<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions, a11y_no_noninteractive_element_interactions -->
+	<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
 	<!-- Click-off closes the settings panel (keyboard users get Esc and ⌘,). -->
 	<main
 		class:empty={viewChat.messages.length === 0}
@@ -12231,196 +12226,128 @@
 			}}
 		/>
 
-		<div
-			class="messages"
-			class:step-newer={androidUI && chatStepDir === 1}
-			class:step-older={androidUI && chatStepDir === -1}
-			bind:this={scrollBox}
-			onscroll={noteScrolling}
-			ontouchstart={freezeScroll}
-			ontouchend={releaseScroll}
-			ontouchcancel={releaseScroll}
-			onanimationend={(e) => {
-				if (e.target === e.currentTarget) chatStepDir = null;
+		<!-- Thread column renders in `ThreadView.svelte`: the scrollable
+		message list, per-row derivations, the empty hero, and the
+		sending indicator. The page keeps chat state, focus, speech,
+		aids, refs, popovers, and every behavior behind computed props
+		and the actions object. -->
+		<ThreadView
+			messages={viewChat.messages}
+			chatId={viewChat.id}
+			{focusMode}
+			{selectedIdx}
+			{speakingId}
+			{speakingSelection}
+			{aidBusy}
+			{vocalizing}
+			{aidPin}
+			{aidModelPin}
+			{foldedIds}
+			{aidPeek}
+			{shownActionsId}
+			{editingMsgId}
+			{ocrBusyId}
+			android={androidUI}
+			showButtons={settings.showMessageButtons}
+			{refsEditing}
+			{refsBlink}
+			{sourcesWanted}
+			{expandedTags}
+			{previewing}
+			{activeReplyCode}
+			foldTitle={tip(
+				isMac ? "Fold this message (F or Option-click)" : "Fold this message (F or Alt-click)",
+				"Fold this message"
+			)}
+			deleteTitle={tip(
+				isMac ? "Delete this message (⌘D)" : "Delete this message",
+				"Delete this message"
+			)}
+			aidPreferred={preferredLocalAid(activeReplyCode)}
+			washId={pillWashId(annPop, annPopClosing) ??
+				promptAnnWashId() ??
+				editingId ??
+				hoverBadgeId}
+			sending={isSending(chatState, viewChat.id)}
+			sendingChatId={chatState.sendingChatId}
+			sendingPhase={(isSending(chatState, viewChat.id) &&
+				hasFetchActive(chatState, viewChat.id)) ||
+			nativeFetching.has(viewChat.id)
+				? "fetch"
+				: (isSending(chatState, viewChat.id) ||
+							liveNative.has(viewChat.id)) &&
+					  !hasReplyStarted(chatState, viewChat.id)
+					? "waiting"
+					: null}
+			{sendElapsed}
+			waitingLabel={thinkingLabelFor(activeReplyCode ?? settings.replyLang)}
+			{chatStepDir}
+			{useMock}
+			{openLangMenu}
+			{langMenuAnchor}
+			{langMenusActions}
+			bind:scrollBox
+			bind:popOpen={refsPopOpen}
+			bind:refsDraft={refsEditDraft}
+			bind:refsBox={refsEditBox}
+			actions={{
+				noteScrolling,
+				freezeScroll,
+				releaseScroll,
+				clearStepDir: () => (chatStepDir = null),
+				hoverRow: (i: number) => {
+					hoveredIdx = i;
+					lastHoverChangeAt = Date.now();
+				},
+				sentTagModels,
+				marksFor,
+				aidedTextFor,
+				localAidsOverrideFor,
+				pinnedKinds,
+				messageSpeaking,
+				messageSpeakable,
+				speakTitle,
+				toggleFold,
+				toggleMessageActions,
+				articleLeave: onArticleLeave,
+				editFocusOut: blurInlineEdit,
+				editAction: msgEditAction,
+				toggleSentTag,
+				copyAttachment,
+				recognizeAttachment,
+				clearSentRefs,
+				refsQuoteClick,
+				copyAnnotation,
+				startRefsEdit,
+				saveRefsEdit,
+				cancelRefsEdit,
+				setHoverBadge: (id: string | null) => (hoverBadgeId = id),
+				badgeClick: openBadgeClick,
+				attachAction: sentTagAction,
+				toast: flashToast,
+				togglePasteFold,
+				setAidBusy,
+				aidFailed,
+				copyText,
+				branchHere,
+				dropMessage,
+				stopVoice,
+				speakReply,
+				unpinModelAid,
+				runModelAidFor,
+				unpinLocalAid,
+				pinLocalAid,
+				peekAid,
+				unpeekAid,
+				commitMessageEdit,
+				editMessage,
+				rerunFrom,
+				retryFailed,
+				releaseRowFocus,
+				holdActionsOpen,
+				releaseActionsHold
 			}}
-		>
-			{#if viewChat.messages.length === 0}
-				<!-- Empty hero through `EmptyHero.svelte` (phones slot
-				the pills here); the page keeps emptiness and the pills. -->
-				<EmptyHero mock={useMock}>
-					{#if androidUI}
-						<LangMenus
-							openId={openLangMenu}
-							anchor={langMenuAnchor}
-							activeCode={activeReplyCode}
-							android={androidUI}
-							previewing={previewing}
-							actions={langMenusActions}
-						/>
-					{/if}
-				</EmptyHero>
-			{/if}
-			{#each viewChat.messages as msg, i (msg.id)}
-				{@const sentRefs = annRefsFor(msg.content)}
-				{@const refsOnly = sentRefs ? sentRefs.text.trim() === "" : false}
-				{@const isFolded = foldedIds.has(msg.id)}
-				{@const script = detectScript(sentRefs ? sentRefs.text : msg.content)}
-				{@const aidId = script ? MODEL_AID_FOR_SCRIPT[script] : null}
-				{@const localKinds = offeredLocalAids(
-					sentRefs ? sentRefs.text : msg.content,
-					activeReplyCode
-				)}
-				{@const streamingThis =
-					chatState.sending &&
-					viewChat.id === chatState.sendingChatId &&
-					msg.role === "assistant" &&
-					i === viewChat.messages.length - 1}
-				{@const tagBase =
-					(sentRefs
-						? refsOnly && !isFolded
-							? REFS_ONLY_BODY
-							: sentRefs.text
-						: null) ?? msg.content}
-				<!-- Message row renders in `MessageArticle.svelte`; the page
-				keeps the lists, all row state, and every behavior behind
-				computed props and action groups. -->
-				<MessageArticle
-					msg={msg}
-					index={i}
-					selected={focusMode === "scroll" && selectedIdx === i}
-					folded={isFolded}
-					speakingNow={speakingId === msg.id}
-					speakingSel={speakingSelection === msg.id}
-					aidLoading={aidBusy.has(msg.id) || vocalizing.has(msg.id)}
-					actionsOpen={shownActionsId === msg.id}
-					editing={editingMsgId === msg.id}
-					{sentRefs}
-					textModels={sentTagModels(msg, tagBase).filter((m) => m.kind === "text")}
-					imageModels={sentTagModels(msg, tagBase).filter((m) => m.kind === "image")}
-					ocrBusyId={ocrBusyId}
-					android={androidUI}
-					showButtons={settings.showMessageButtons}
-					refsEditing={refsEditing}
-					refsBlink={refsBlink}
-					bind:popOpen={refsPopOpen}
-					bind:refsDraft={refsEditDraft}
-					bind:refsBox={refsEditBox}
-					streaming={streamingThis}
-					sourcesWanted={sourcesWanted}
-					foldPreview={refsOnly && sentRefs
-						? sentRefs.refs.map((r) => `"${r.quote}"`).join(" ")
-						: null}
-					marks={marksFor(msg.id)}
-					washId={pillWashId(annPop, annPopClosing) ??
-						promptAnnWashId() ??
-						editingId ??
-						hoverBadgeId}
-					expandedTags={expandedTags}
-					textOverride={aidedTextFor(msg)}
-					contentOverride={sentRefs
-						? refsOnly && !isFolded
-							? REFS_ONLY_BODY
-							: sentRefs.text
-						: null}
-					aidPreview={aidPeek?.id === msg.id && !aidPin.has(msg.id)}
-					previewing={previewing}
-					aidKinds={localAidsOverrideFor(msg)}
-					aidPreferred={preferredLocalAid(activeReplyCode)}
-					foldTitle={tip(
-						isMac ? "Fold this message (F or Option-click)" : "Fold this message (F or Alt-click)",
-						"Fold this message"
-					)}
-					deleteTitle={tip(
-						isMac ? "Delete this message (⌘D)" : "Delete this message",
-						"Delete this message"
-					)}
-					speaking={messageSpeaking(msg)}
-					speakable={messageSpeakable(msg)}
-					speakLabel={speakTitle(msg)}
-					aidId={aidId}
-					aidModelPinned={aidModelPin.has(msg.id)}
-					aidVocalizing={vocalizing.has(msg.id)}
-					localKinds={localKinds}
-					pinnedKinds={pinnedKinds(msg.id)}
-					aidBusy={aidBusy.has(msg.id)}
-					actions={{
-						articleClick: (event: MouseEvent) => {
-							if (
-								event.target instanceof Element &&
-								event.target.closest(".sent-fold,.sent-open")
-							)
-								return;
-							if (event.altKey) toggleFold(msg.id);
-							toggleMessageActions(msg.id, event);
-						},
-						articleEnter: () => {
-							hoveredIdx = i;
-							lastHoverChangeAt = Date.now();
-						},
-						articleLeave: (event: MouseEvent) => onArticleLeave(event, msg, i),
-						editFocusOut: blurInlineEdit,
-						editAction: msgEditAction,
-						tags: {
-							toggle: (id: string) => toggleSentTag(msg, id),
-							copy: copyAttachment,
-							recognize: (att: Attachment) => void recognizeAttachment(att)
-						},
-						refs: {
-							clearAll: () => clearSentRefs(msg.id),
-							quoteClick: (quote: string, n: number) =>
-								refsQuoteClick(msg.id, quote, n),
-							copy: copyAnnotation,
-							startEdit: (ref: { n: number; comment: string }) =>
-								startRefsEdit(msg.id, ref),
-							saveEdit: saveRefsEdit,
-							cancelEdit: cancelRefsEdit
-						},
-						setHoverBadge: (id: string | null) => (hoverBadgeId = id),
-						badgeClick: openBadgeClick,
-						attachAction: sentTagAction,
-						tagToggle: (id: string) => toggleSentTag(msg, id),
-						toast: flashToast,
-						foldToggle: (index: number) => togglePasteFold(msg, index),
-						unfold: () => toggleFold(msg.id),
-						aidLoadingChange: (loading: boolean) => setAidBusy(msg.id, loading),
-						aidError: (_id: ChatMsgId, reason?: string) => aidFailed(msg.id, reason),
-						ma: {
-							toggleFold: () => toggleFold(msg.id),
-							copy: () => copyText(msg.content, msg.role),
-							branch: () => branchHere(i),
-							drop: () => dropMessage(i),
-							stopVoice,
-							speak: () => void speakReply(msg),
-							unpinModelAid: () => unpinModelAid(msg),
-							runModelAid: (modelId: string) =>
-								void runModelAidFor(msg, modelId, true),
-							unpinLocalAid: (kind: LocalAid) => unpinLocalAid(msg, kind),
-							pinLocalAid: (kind: LocalAid) => pinLocalAid(msg, kind),
-							peekAid: (kind: LocalAid) => peekAid(msg, kind),
-							unpeekAid: () => unpeekAid(msg),
-							commitEdit: () => void commitMessageEdit(),
-							edit: () => void editMessage(i),
-							rerun: () => rerunFrom(i),
-							retry: () => void retryFailed(),
-							releaseRowFocus,
-							holdOpen: holdActionsOpen,
-							releaseHold: releaseActionsHold
-						}
-					}}
-				/>
-
-
-
-
-			{/each}
-			<!-- Sending status renders in `SendingIndicator.svelte`; the
-			page keeps send/fetch state and labels. -->
-			<SendingIndicator
-				phase={(isSending(chatState, viewChat.id) && hasFetchActive(chatState, viewChat.id)) || nativeFetching.has(viewChat.id) ? "fetch" : (isSending(chatState, viewChat.id) || liveNative.has(viewChat.id)) && !hasReplyStarted(chatState, viewChat.id) ? "waiting" : null}
-				elapsed={sendElapsed}
-				waitingLabel={thinkingLabelFor(activeReplyCode ?? settings.replyLang)}
-			/>
-		</div>
+		/>
 
 		{#if (missingKey || (noKeyLock && !settingsOpen)) && !androidUI}
 			<p class="error-banner" role="alert">
@@ -12858,24 +12785,6 @@
 	.app[data-android] main {
 		padding-bottom: env(safe-area-inset-bottom, 0px);
 	}
-	/* Original spacing stands: the header strip plus the list's own
-	inset keep the first message clear of the island. Trimming it
-	(any of three tries) slid text under the clock — the first-message
-	gap was never worth chasing. */
-	.app[data-android] .messages {
-		padding-top: calc(1rem + env(safe-area-inset-top, 0px));
-		/* Assistant articles carry no side padding, so the thread
-		gutter is the only thing between AI text and the screen
-		edge: a rem floor keeps a real gutter on narrow phones. */
-		padding-left: max(0.5%, 1rem);
-		padding-right: max(0.5%, 1rem);
-	}
-	/* Full-bleed trades the gutter back for reading room: at huge
-	type the thread runs ~99% wide so giant glyphs keep context. */
-	.app[data-android][data-fullbleed] .messages {
-		padding-left: 0.5%;
-		padding-right: 0.5%;
-	}
 	/* (Phone settings sheet in `SettingsDrawer.svelte`.) */
 	/* Composer surfaces render in `Composer.svelte` now (phone card,
 	tools bar, send seat, highlight dock, and field caps moved with
@@ -12918,78 +12827,6 @@
 	(single-column override moved with the dialog). */
 	/* (Waypoint nav in `Waypoints.svelte`: the last paged nav moved
 	with its buttons.) */
-	.messages {
-		flex: 1;
-		/* Flex items default to min-height: auto, which lets growing
-		content stretch this pane and squeeze the composer instead of
-		scrolling inside it — the prompt shrank and juddered with
-		every streamed chunk. Zero lets it scroll like it should. */
-		min-height: 0;
-		overflow-y: auto;
-		/* Jumped-to rows never park under the invisible drag strip
-		(jumpTo, double-tap, scroll-into-view): its pixels show text
-		but don't take clicks, so programmatic scrolls clear the
-		strip's 1.75rem plus the old breathing room. */
-		scroll-padding-top: calc(1.75rem + 1rem);
-		/* Bottom clearance for the floating card is measured, not static
-		(see the ResizeObserver below): in-scroller padding physically
-		keeps the tail above the card while the thread runs full-height
-		behind it (bleed-through); the in-flow attachment strip keeps
-		its own main-level lift, since padding inside the scroller
-		would leave the strip parked under the card eating its taps. */
-	}
-	.messages {
-		/* Selection starts at message text only: dragging empty space
-		between messages is a plain pointer drag (arrow, no I-beam, no
-		stray selection). .rendered re-enables both; buttons keep
-		their own pointer cursor. */
-		user-select: none;
-		-webkit-user-select: none;
-		cursor: default;
-		/* Fast wheel, eased programmatic jumps. The scrollbar snaps in
-		(the .scrolling override below shortens the transition while
-		scroll events land) and drifts out quickly once they stop. */
-		scroll-behavior: smooth;
-		scrollbar-width: thin;
-		scrollbar-color: transparent transparent;
-		/* Classic scrollbars never shove the column when they appear. */
-		scrollbar-gutter: stable;
-		transition: scrollbar-color 0.3s ease;
-		/* Full bleed under the invisible drag strip: content starts at
-		the window's own top edge and stays visible behind the bar.
-		The strip's pixels don't take clicks, so scroll-padding-top
-		(not this padding) keeps jumped-to targets clickable. */
-		padding: 0 1.2rem 1rem;
-		display: flex;
-		flex-direction: column;
-		/* Pairs hug: a message sits close to its reply; the wider
-		separation lands between pairs (see article.user below). The
-		base gap rides the Gap size slider — the text-size growth
-		below belongs to the button-scaling opt-in, so huge type
-		with the opt-in off keeps tight gaps (the buttons stay
-		small too). */
-		gap: var(--msg-gap, 0.35rem);
-	}
-	/* Button-scaling opt-in: roomy type keeps airy gaps. */
-	main.scale-actions .messages {
-		gap: calc(var(--msg-gap, 0.35rem) * var(--font-scale, 1));
-	}
-	/* Overscroll past the tail: the last message lifts a touch above
-	the composer instead of docking hard at the column's end. Fixed
-	unless the opt-in below says otherwise (capped like the bubble,
-	so huge type doesn't drown in spacer). Non-empty only: the empty
-	hero centers in its zone and must not drift. */
-	main:not(.empty) .messages::after {
-		content: "";
-		display: block;
-		flex: none;
-		height: 2rem;
-	}
-	/* Same opt-in as the list gap: the tail spacer grows with the
-	text size only when message-button scaling is on. */
-	main.scale-actions:not(.empty) .messages::after {
-		height: calc(2rem * min(var(--font-scale, 1), 2));
-	}
 	/* Chat-switch crossfade covers the messages only: an unscoped
 	transition snapshots the whole page, so the closing sidebar and
 	the parking prompt ghost mid-switch — the prompt reads as
@@ -13003,27 +12840,6 @@
 	:global(::view-transition-old(root)),
 	:global(::view-transition-new(root)) {
 		animation: none;
-	}
-	/* The chat scrollbar stays out of the way: invisible until a scroll
-	is in flight (JS toggles .scrolling while scroll events land). */
-	.messages::-webkit-scrollbar {
-		width: 8px;
-	}
-	.messages::-webkit-scrollbar-track {
-		background: transparent;
-	}
-	.messages::-webkit-scrollbar-thumb {
-		background: transparent;
-		border-radius: 4px;
-		transition: background-color 0.3s ease;
-	}
-	.messages:global(.scrolling) {
-		scrollbar-color: rgba(142, 142, 147, 0.55) transparent;
-		transition: scrollbar-color 0.12s ease;
-	}
-	.messages:global(.scrolling)::-webkit-scrollbar-thumb {
-		background: rgba(142, 142, 147, 0.55);
-		transition: background-color 0.12s ease;
 	}
 	/* Every other scroller fades exactly like the main chat: invisible
 	until a scroll is in flight (one capture-phase listener below toggles
@@ -13060,12 +12876,6 @@
 	chat-list drawer keeps its own copy in `Sidebar.svelte`.) */
 	/* (Waypoint fade-scroll restate in `Waypoints.svelte`.) */
 	/* (Waypoint touch sheet in `Waypoints.svelte`.) */
-	main.empty .messages {
-		justify-content: center;
-		/* Roomy hero zone: on the empty screen the prompt and pills sit
-		below the fold of the hero, neither middle nor bottom. */
-		max-height: 60%;
-	}
 	/* (Empty-state pills dock in `LangMenus.svelte`.) */
 	/* (Empty hero in `EmptyHero.svelte`.) */
 	/* (Pill row, lists, and badges in `LangMenus.svelte`.) */
@@ -13168,58 +12978,7 @@
 	/* (popover card in `ReviewDock.svelte`.) */
 	/* (Hide-messages mode in `MessageArticle.svelte`.) */
 	/* (Phone plain-user row in `MessageArticle.svelte`.) */
-	/* Message text never spills sideways off a phone: inner scrollers
-	(code blocks, aid-label rows) keep their own axes. */
-	.app[data-android] .messages {
-		overflow-x: clip;
-	}
-	/* CJK wraps at the column edge on phones, like desktop: the shared
-	body rule uses word-break: break-word (legacy anywhere semantics),
-	which lets shrink-wrapped rows size to a narrow min-content and
-	wraps Chinese far too early at huge text sizes. Phones keep normal
-	character breaking with kinsoku (strict) while long Latin strings
-	still break via overflow-wrap — desktop keeps its own rule. */
-	.app[data-android] .messages :global(.rendered) {
-		line-break: strict;
-		word-break: normal;
-		overflow-wrap: break-word;
-	}
 	/* (Phone article widths in `MessageArticle.svelte`.) */
-	/* Chat-step slide: the incoming chat glides in from the swipe
-	side (newer from the right, older from the left). Phone-only;
-	reduced-motion keeps the instant switch. */
-	@keyframes step-in-right {
-		from {
-			transform: translateX(2.5rem);
-			opacity: 0;
-		}
-		to {
-			transform: none;
-			opacity: 1;
-		}
-	}
-	@keyframes step-in-left {
-		from {
-			transform: translateX(-2.5rem);
-			opacity: 0;
-		}
-		to {
-			transform: none;
-			opacity: 1;
-		}
-	}
-	.app[data-android] .messages.step-newer {
-		animation: step-in-right 0.18s ease-out;
-	}
-	.app[data-android] .messages.step-older {
-		animation: step-in-left 0.18s ease-out;
-	}
-	@media (prefers-reduced-motion: reduce) {
-		.app[data-android] .messages.step-newer,
-		.app[data-android] .messages.step-older {
-			animation: none;
-		}
-	}
 	/* dir=auto puts Arabic paragraphs at the right edge; the chat
 	reads left-aligned, so alignment follows the column while the
 	base direction (selection, drag) stays with the text. */

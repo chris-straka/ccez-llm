@@ -17,9 +17,11 @@ function componentSource(): string {
 	);
 }
 
-function pageSource(): string {
-	return readFileSync(new URL("../../routes/+page.svelte", import.meta.url), "utf8");
+
+function threadSource(): string {
+	return readFileSync(new URL("./ThreadView.svelte", import.meta.url), "utf8");
 }
+
 
 function articleSource(): string {
 	return readFileSync(new URL("./MessageArticle.svelte", import.meta.url), "utf8");
@@ -75,9 +77,9 @@ describe("sent attachment variants", () => {
 		expect(row).toContain("models={textModels}");
 		expect(row).toContain("models={imageModels}");
 		expect(row).toContain("attachments={msg.attachments ?? []}");
-		const page = pageSource();
-		expect(page).toContain('m.kind === "text"');
-		expect(page).toContain('m.kind === "image"');
-		expect(page).toContain("<MessageArticle");
+		const thread = threadSource();
+		expect(thread).toContain('m.kind === "text"');
+		expect(thread).toContain('m.kind === "image"');
+		expect(thread).toContain("<MessageArticle");
 	});
 });

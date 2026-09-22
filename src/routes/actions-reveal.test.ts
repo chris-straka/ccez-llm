@@ -12,13 +12,6 @@ import { describe, it, expect } from "vitest";
  * and must carry will-change so the layer exists before the fade
  * starts. will-change looks like removable dead weight; it is not.
  */
-function pageStyle(): string {
-	const match = pageSource().match(/<style>([\s\S]*)<\/style>/);
-	if (!match) throw new Error("+page.svelte has no <style> block");
-	// Strip CSS comments so prose can't trip the assertions below.
-	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
-}
-
 /** Action-row chrome moved to MessageActions.svelte with its styles. */
 function rowSource(): string {
 	return readFileSync(
@@ -35,6 +28,20 @@ function rowStyle(): string {
 
 function pageSource(): string {
 	return readFileSync(new URL("./+page.svelte", import.meta.url), "utf8");
+}
+
+/** Thread column moved to ThreadView.svelte with its styles. */
+function threadSource(): string {
+	return readFileSync(
+		new URL("../lib/components/ThreadView.svelte", import.meta.url),
+		"utf8"
+	);
+}
+
+function threadStyle(): string {
+	const match = threadSource().match(/<style>([\s\S]*)<\/style>/);
+	if (!match) throw new Error("ThreadView.svelte has no <style> block");
+	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
 /** Article row moved to MessageArticle.svelte with its styles. */
@@ -205,17 +212,19 @@ describe("chat-switch transition", () => {
 	});
 
 	it("passes previewing into message bodies", () => {
-		// The row renders from `MessageArticle.svelte` now: the page
-		// feeds the article, the article forwards into the body.
-		expect(pageSource()).toContain("<MessageArticle");
-		expect(pageSource()).toContain("previewing={previewing}");
+		// The thread renders from `ThreadView.svelte` now: the page
+		// feeds the thread, the thread feeds the article, the article
+		// forwards into the body.
+		expect(pageSource()).toContain("<ThreadView");
+		expect(threadSource()).toContain("<MessageArticle");
+		expect(threadSource()).toContain("{previewing}");
 		expect(articleSource()).toContain("preview={previewing}");
 	});
 });
 
 describe("message spacing and overscroll", () => {
 	it("fixes the list gap unless button scaling opts into growth", () => {
-		const css = pageStyle();
+		const css = threadStyle();
 		// Non-opt-in rules only: the scale-actions twin matches the
 		// same tail selector and must not trip the fixed assertion.
 		const gaps = [...css.matchAll(/([^{}]*)\.messages\s*\{([^}]*)\}/g)]
@@ -227,7 +236,9 @@ describe("message spacing and overscroll", () => {
 			.map((rule) => rule[2]);
 		expect(gaps, "no .messages gap rule").not.toHaveLength(0);
 		for (const gap of gaps) expect(gap).not.toMatch(/var\(--font-scale/);
-		const scaled = css.match(/main\.scale-actions \.messages\s*\{([^}]*)\}/);
+		const scaled = css.match(
+			/:global\(main\.scale-actions\) \.messages\s*\{([^}]*)\}/
+		);
 		expect(
 			scaled,
 			"opt-in scaled gap is gone — huge type domes the air"
@@ -257,9 +268,9 @@ describe("message spacing and overscroll", () => {
 	});
 
 	it("reserves tail overscroll outside the empty hero's zone", () => {
-		const css = pageStyle();
+		const css = threadStyle();
 		const spacer = css.match(
-			/main:not\(\.empty\) \.messages::after\s*\{([^}]*)\}/
+			/:global\(main:not\(\.empty\)\) \.messages::after\s*\{([^}]*)\}/
 		);
 		expect(
 			spacer,
@@ -267,7 +278,7 @@ describe("message spacing and overscroll", () => {
 		).toBeTruthy();
 		expect(spacer![1]).not.toMatch(/var\(--font-scale/);
 		const scaled = css.match(
-			/main\.scale-actions:not\(\.empty\) \.messages::after\s*\{([^}]*)\}/
+			/:global\(main\.scale-actions:not\(\.empty\)\) \.messages::after\s*\{([^}]*)\}/
 		);
 		expect(scaled, "opt-in scaled spacer is gone").toBeTruthy();
 		expect(scaled![1]).toMatch(/height\s*:\s*calc\([^;]*var\(--font-scale/);
@@ -312,14 +323,15 @@ describe("aid-button text size", () => {
 		// off the class, so an unmarked aid button would track text.
 		// Buttons render in the row component, handlers stay paged.
 		const row = rowSource();
-		const wired: Array<[string, string]> = [
-			["actions.unpinModelAid()", "unpinModelAid: () => unpinModelAid(msg)"],
-			["actions.runModelAid(aidId)", "runModelAidFor(msg, modelId, true)"],
-			["actions.unpinLocalAid(localKind)", "unpinLocalAid: (kind: LocalAid) => unpinLocalAid(msg, kind)"],
-			["actions.pinLocalAid(localKind)", "pinLocalAid: (kind: LocalAid) => pinLocalAid(msg, kind)"]
+		const wired: Array<[string, string, string]> = [
+			["actions.unpinModelAid()", "actions.unpinModelAid(msg)", "unpinModelAid,"],
+			["actions.runModelAid(aidId)", "actions.runModelAidFor(msg, modelId, true)", "runModelAidFor,"],
+			["actions.unpinLocalAid(localKind)", "actions.unpinLocalAid(msg, kind)", "unpinLocalAid,"],
+			["actions.pinLocalAid(localKind)", "actions.pinLocalAid(msg, kind)", "pinLocalAid,"]
 		];
+		const thread = threadSource();
 		const page = pageSource();
-		for (const [call, wiring] of wired) {
+		for (const [call, threadWiring, pageWiring] of wired) {
 			const at = row.indexOf(call);
 			if (at === -1) throw new Error(`aid call gone: ${call}`);
 			const open = row.lastIndexOf("<button", at);
@@ -327,7 +339,8 @@ describe("aid-button text size", () => {
 			expect(row.slice(open, at), `${call} button lost aid-btn`).toContain(
 				"aid-btn"
 			);
-			expect(page, `${call} unwired`).toContain(wiring);
+			expect(thread, `${call} unwired in thread`).toContain(threadWiring);
+			expect(page, `${call} unwired in page`).toContain(pageWiring);
 		}
 	});
 });

@@ -9,6 +9,14 @@ function pageSource(): string {
 	return readFileSync(new URL("./+page.svelte", import.meta.url), "utf8");
 }
 
+/** Thread column moved to ThreadView.svelte with its row derivations. */
+function threadSource(): string {
+	return readFileSync(
+		new URL("../lib/components/ThreadView.svelte", import.meta.url),
+		"utf8"
+	);
+}
+
 function messageBodyStyle(): string {
 	const source = readFileSync(
 		new URL("../lib/components/MessageBody.svelte", import.meta.url),
@@ -122,8 +130,8 @@ describe("annotation create wiring", () => {
 
 describe("annotations-only messages", () => {
 	it("renders an em-dash body with the annotation UI above it", () => {
-		const source = pageSource();
-		expect(source).toContain("REFS_ONLY_BODY");
+		expect(pageSource()).toContain("<ThreadView");
+		expect(threadSource()).toContain("REFS_ONLY_BODY");
 	});
 });
 

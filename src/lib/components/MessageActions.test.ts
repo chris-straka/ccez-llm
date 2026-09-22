@@ -13,9 +13,11 @@ function componentSource(): string {
 	return readFileSync(new URL("./MessageActions.svelte", import.meta.url), "utf8");
 }
 
-function pageSource(): string {
-	return readFileSync(new URL("../../routes/+page.svelte", import.meta.url), "utf8");
+
+function threadSource(): string {
+	return readFileSync(new URL("./ThreadView.svelte", import.meta.url), "utf8");
 }
+
 
 function articleSource(): string {
 	return readFileSync(new URL("./MessageArticle.svelte", import.meta.url), "utf8");
@@ -88,13 +90,13 @@ describe("message actions contract", () => {
 		expect(row).toContain("{aidModelPinned}");
 		expect(row).toContain("{pinnedKinds}");
 		expect(row).toContain("actions={actions.ma}");
-		const page = pageSource();
-		expect(page).toContain("<MessageArticle");
-		expect(page).toContain("speaking={messageSpeaking(msg)}");
-		expect(page).toContain("aidModelPinned={aidModelPin.has(msg.id)}");
-		expect(page).toContain("pinnedKinds={pinnedKinds(msg.id)}");
-		expect(page).toContain("copy: () => copyText(msg.content, msg.role)");
-		expect(page).toContain("stopVoice,");
-		expect(page).toContain("releaseRowFocus,");
+		const thread = threadSource();
+		expect(thread).toContain("<MessageArticle");
+		expect(thread).toContain("speaking={actions.messageSpeaking(msg)}");
+		expect(thread).toContain("aidModelPinned={aidModelPin.has(msg.id)}");
+		expect(thread).toContain("pinnedKinds={actions.pinnedKinds(msg.id)}");
+		expect(thread).toContain("copy: () => actions.copyText(msg.content, msg.role)");
+		expect(thread).toContain("stopVoice: () => actions.stopVoice(),");
+		expect(thread).toContain("releaseRowFocus: (event: MouseEvent) =>");
 	});
 });
