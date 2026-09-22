@@ -1,10 +1,10 @@
 <!-- Reply-language pills: a hover preview of an empty chat shows the
 same pills, inert: they preview the empty state, but every tap belongs
 to the active chat — hovering away restores it. Rendered under the
-hero on phones, docked over the composer elsewhere (see the two page
-call sites). The page owns the open menu, the phone sheet anchor, the
-active code, and every behavior; this component owns the row markup
-and its surfaces. -->
+hero on every platform; an open pill escapes as a fitted fixed
+sheet (drop under the pill, or centered for long lists). The page
+owns the open menu, the sheet anchor, the active code, and every
+behavior; this component owns the row markup and its surfaces. -->
 <script lang="ts">
 	import {
 		LANGUAGE_MENUS,
@@ -29,12 +29,11 @@ and its surfaces. -->
 			top: number;
 		} | null;
 		activeCode: string | null;
-		android: boolean;
 		previewing: boolean;
 		actions: LangMenusActions;
 	}
 
-	let { openId, anchor, activeCode, android, previewing, actions }: Props =
+	let { openId, anchor, activeCode, previewing, actions }: Props =
 		$props();
 </script>
 
@@ -52,14 +51,18 @@ and its surfaces. -->
 				{menu.label}
 			</button>
 			{#if openId === menu.id}
+				<!-- The open list escapes the thread scroller as a fitted
+				fixed sheet (left/max-height ride inline from the pill
+				rect): in-flow it would clip past the scroller box. Short
+				lists drop under their pill, long ones center. -->
 				<div
 					class="lang-list"
-					class:lang-list-fixed={android && anchor !== null}
+					class:lang-list-fixed={anchor !== null}
 					class:lang-list-drop={
-						android && anchor !== null && anchor.mode === "drop"
+						anchor !== null && anchor.mode === "drop"
 					}
 					role="menu"
-					style={android && anchor
+					style={anchor
 						? `left: ${anchor.left}px; max-height: ${anchor.maxH}px;${anchor.mode === "drop" ? ` top: ${anchor.top}px;` : ""}`
 						: undefined}
 				>
@@ -91,16 +94,16 @@ and its surfaces. -->
 		flex-wrap: nowrap;
 		gap: 0.4rem;
 	}
-	/* Phones hang the row under the hero instead of docking it over
-	the composer: kill the bottom-dock margin and its padding (the
-	empty-state gap owns the rhythm now). Desktop keeps the dock. */
-	:global(.app[data-android]) :global(main.empty) .lang-menus {
-		margin-top: 0;
+	/* The row slots under the hero on every platform (no dock
+	anymore): kill the empty-screen auto margin and its padding —
+	the empty-state gap owns the rhythm now. */
+	:global(.empty-state) .lang-menus {
+		margin-top: 0.25rem;
 		padding: 0;
 	}
-	/* Under-hero pills open downward; desktop keeps opening upward
-	over the messages. The phone sheet cap below still bounds it. */
-	:global(.app[data-android]) .lang-menu .lang-list {
+	/* Under-hero pills open downward. Fixed sheets (below) are
+	exempt: their top rides inline or centers. */
+	:global(.empty-state) .lang-menu .lang-list:not(.lang-list-fixed) {
 		top: calc(100% + 0.35rem);
 		bottom: auto;
 	}
@@ -113,7 +116,7 @@ and its surfaces. -->
 	top/bottom pair (an over-constrained fixed box stretches
 	full-band and reads as a massive empty panel). Long lists cap
 	at max-height and scroll. */
-	:global(.app[data-android]) .lang-menu .lang-list-fixed {
+	.lang-menu .lang-list-fixed {
 		position: fixed;
 		top: 50%;
 		bottom: auto;
@@ -123,7 +126,7 @@ and its surfaces. -->
 		z-index: 60;
 		overflow-y: auto;
 	}
-	:global(.app[data-android]) .lang-menu .lang-list-fixed.lang-list-drop {
+	.lang-menu .lang-list-fixed.lang-list-drop {
 		top: auto;
 		transform: none;
 	}
@@ -159,14 +162,7 @@ and its surfaces. -->
 		box-sizing: border-box;
 	}
 	:global(main.empty) .lang-menus {
-		/* Docked above the prompt's reserved floor, never mid-page:
-		the auto margin eats the free space between the hero zone
-		and the pills, so the row sits just over the composer. */
-		margin-top: auto;
-	}
-	:global(main.empty) .lang-menus {
 		justify-content: center;
-		padding: 0.55rem 1.2rem 0.6rem;
 	}
 	/* No row-level fade here: hovering open space inside the row lit
 	every button at once and the opacity shimmer read as movement.
@@ -228,17 +224,19 @@ and its surfaces. -->
 		/* Phone menus must not trail off-screen: middle menus center
 		under their button, while the edge menus hug their own edge
 		(Europe's list spilled left, Classics' right). The capped
-		max-width still bounds every list to the viewport. */
-		.lang-menu .lang-list {
+		max-width still bounds every list to the viewport. Fitted
+		sheets carry their own geometry, so these in-flow rules
+		exempt them. */
+		.lang-menu .lang-list:not(.lang-list-fixed) {
 			left: 50%;
 			right: auto;
 			transform: translateX(-50%);
 		}
-		.lang-menu:first-child .lang-list {
+		.lang-menu:first-child .lang-list:not(.lang-list-fixed) {
 			left: 0;
 			transform: none;
 		}
-		.lang-menu:last-child .lang-list {
+		.lang-menu:last-child .lang-list:not(.lang-list-fixed) {
 			left: auto;
 			right: 0;
 			transform: none;
@@ -246,8 +244,9 @@ and its surfaces. -->
 	}
 	/* The last menu (Classics) hugs the right edge: a left-anchored
 	list of long nowrap names trails off the page there. Right-anchor
-	it instead (all viewports — narrow desktop windows clip it too). */
-	.lang-menu:last-child .lang-list {
+	it instead (all viewports — narrow desktop windows clip it too).
+	Fitted sheets carry their own geometry, so they stay exempt. */
+	.lang-menu:last-child .lang-list:not(.lang-list-fixed) {
 		left: auto;
 		right: 0;
 	}

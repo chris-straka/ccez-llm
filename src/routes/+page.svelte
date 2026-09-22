@@ -59,6 +59,7 @@
 		stepChatWidth,
 		MESSAGE_GAP_DEFAULT,
 		effectiveChatWidth,
+		effectivePromptWidth,
 		FULLBLEED_FONT_SCALE,
 		PROMPT_IDLE_ALWAYS,
 		PROMPT_IDLE_NEVER,
@@ -152,7 +153,7 @@
 	import AnnAnswer from "$lib/components/AnnAnswer.svelte";
 	import Sidebar from "$lib/components/Sidebar.svelte";
 	import ThreadView from "$lib/components/ThreadView.svelte";
-	import LangMenus from "$lib/components/LangMenus.svelte";
+
 	import StudySheet from "$lib/components/StudySheet.svelte";
 	import SettingsDrawer from "$lib/components/SettingsDrawer.svelte";
 	import FindBar from "$lib/components/FindBar.svelte";
@@ -626,10 +627,10 @@
 		// must too. Only a collapsed selection dismisses the menu.
 		if (!androidUI || (window.getSelection()?.toString() ?? "") === "")
 			selMenu = null;
-		/* The phone language sheet is fitted to its open-frame geometry:
+		/* The language sheet is fitted to its open-frame geometry:
 		a thread scroll invalidates the fit, so it closes instead of
-		floating mis-anchored. Desktop keeps its in-flow list. */
-		if (androidUI && openLangMenu) openLangMenu = null;
+		floating mis-anchored. */
+		if (openLangMenu) openLangMenu = null;
 		saveChatScroll();
 		if (scrollBox) viewport.stick = nearBottom(scrollBox);
 		scrollBox?.classList.add("scrolling");
@@ -1850,12 +1851,11 @@
 	}
 	let stopDictation: (() => void) | null = null;
 	let openLangMenu: LanguageMenu["id"] | null = $state(null);
-	/* Phone sheet anchor: the open list escapes the thread scroller
+	/* Sheet anchor: the open list escapes the thread scroller
 	(fixed, centered on the screen) because inside .messages
 	anything past its box clips — Europe's 20-item list read as
-	five languages cut by a rectangle. Null on desktop, which
-	keeps the in-flow upward list. top:50% plus translateY centers
-	the shrink-wrapped sheet (see .lang-list-fixed). */
+	five languages cut by a rectangle. Short lists drop under
+	their pill, long ones center (see .lang-list-fixed). */
 	let langMenuAnchor: LangMenuAnchor | null = $state(null);
 	function toggleLangMenu(id: LanguageMenu["id"], btn: HTMLElement): void {
 		// Family open/close ticks on phones (buzzTap self-gates to
@@ -1866,10 +1866,6 @@
 			return;
 		}
 		openLangMenu = id;
-		if (!androidUI) {
-			langMenuAnchor = null;
-			return;
-		}
 		const r = btn.getBoundingClientRect();
 		const composerTop =
 			promptEl?.getBoundingClientRect().top ?? window.innerHeight;
@@ -1888,10 +1884,10 @@
 		if (!openLangMenu) langMenuAnchor = null;
 	});
 	/* A fitted box goes stale on any geometry change (rotation,
-	keyboard glide): phones close it instead of wearing a
-	mis-anchored sheet. Desktop keeps its in-flow list. */
+	keyboard glide, window resize): close it instead of wearing a
+	mis-anchored sheet. */
 	$effect(() => {
-		if (!androidUI || !openLangMenu) return;
+		if (!openLangMenu) return;
 		const close = (): void => {
 			openLangMenu = null;
 		};
@@ -7716,7 +7712,7 @@
 		openLangMenu = null;
 	}
 
-	/** Shared by both `LangMenus` call sites (hero + composer dock). */
+	/** Shared by the `LangMenus` hero call site (see `ThreadView`). */
 	const langMenusActions = {
 		toggle: (id: LanguageMenu["id"], el: HTMLElement) =>
 			toggleLangMenu(id, el),
@@ -11846,6 +11842,10 @@
 		androidUI,
 		settings.fontScale,
 		settings.chatWidth ?? 36
+	)}; --prompt-width: {effectivePromptWidth(
+		androidUI,
+		settings.fontScale,
+		settings.chatWidth ?? 36
 	)}; --msg-gap: {settings.messageGap ?? MESSAGE_GAP_DEFAULT}rem"
 	data-mac={(isMac && !androidUI) || null}
 >
@@ -11915,9 +11915,9 @@
 		onclick={closeSettingsFromMain}
 		ondblclick={gutterDoubleClick}
 	>
-		<!-- Reply-language pills render in `LangMenus.svelte` (hero and
-		composer call sites below); the page keeps the open menu, the
-		phone sheet anchor, the active code, and the behaviors. -->
+		<!-- Reply-language pills render in `LangMenus.svelte` (hero call
+		site in `ThreadView` below); the page keeps the open menu, the
+		sheet anchor, the active code, and the behaviors. -->
 		<Toasts {notices} bind:toastAction android={androidUI} />
 		<!-- Empty drag strip: nothing but the traffic-light clearance
 		(the active reply language shows on the send button instead).
@@ -12235,17 +12235,7 @@
 
 		<!-- Speech errors render from `Toasts.svelte` (top notice,
 		tap to dismiss); the banner below stays paged. -->
-		{#if !androidUI && viewChat.messages.length === 0}
-			<LangMenus
-				openId={openLangMenu}
-				anchor={langMenuAnchor}
-				activeCode={activeReplyCode}
-				android={androidUI}
-				previewing={previewing}
-				actions={langMenusActions}
-			/>
-		{/if}
-	</main>
+		</main>
 
 	{#if selMenu && !previewing && !iosUI}
 		<!-- Floating Annotate/Copy/Inspect menu: the page owns the

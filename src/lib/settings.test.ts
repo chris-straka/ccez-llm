@@ -15,6 +15,8 @@ import {
 	MESSAGE_GAP_MAX,
 	MESSAGE_GAP_MIN,
 	effectiveChatWidth,
+	effectivePromptWidth,
+	widenFactorForFont,
 	stepFontScale,
 	stepChatWidth,
 	PROMPT_IDLE_ALWAYS,
@@ -286,12 +288,36 @@ describe("settings", () => {
 	});
 
 	it("sizes the chat column full-bleed on huge phone type", () => {
-		expect(effectiveChatWidth(false, 4, 36)).toBe(36);
-		expect(effectiveChatWidth(false, 8, 120)).toBe(120);
+		expect(effectiveChatWidth(false, 1, 36)).toBe(36);
+		expect(effectiveChatWidth(false, 2, 36)).toBe(36);
+		expect(effectiveChatWidth(false, 4, 36)).toBe(72);
+		expect(effectiveChatWidth(false, 8, 120)).toBe(480);
 		expect(effectiveChatWidth(true, 1, 36)).toBe(46);
 		expect(effectiveChatWidth(true, 3.29, 36)).toBe(46);
 		expect(effectiveChatWidth(true, 3.3, 36)).toBe(CHAT_WIDTH_FULLBLEED_REM);
 		expect(effectiveChatWidth(true, 8, 120)).toBe(CHAT_WIDTH_FULLBLEED_REM);
+	});
+
+	it("widens desktop columns past 200% at half the font rate", () => {
+		expect(widenFactorForFont(1)).toBe(1);
+		expect(widenFactorForFont(1.99)).toBe(1);
+		expect(widenFactorForFont(2)).toBe(1);
+		expect(widenFactorForFont(3.7)).toBeCloseTo(1.85, 10);
+		expect(widenFactorForFont(8)).toBe(4);
+	});
+
+	it("sizes the composer off its own base, capped by the column", () => {
+		// Normal sizes: the historic 36rem pin, slider-independent.
+		expect(effectivePromptWidth(false, 1, 36)).toBe(36);
+		expect(effectivePromptWidth(false, 1, 60)).toBe(36);
+		expect(effectivePromptWidth(false, 1, 28)).toBe(28);
+		// Huge type: own base widens by the same factor…
+		expect(effectivePromptWidth(false, 4, 36)).toBe(72);
+		// …but never past the column.
+		expect(effectivePromptWidth(false, 4, 28)).toBe(56);
+		expect(effectivePromptWidth(false, 4, 60)).toBe(72);
+		// Phones: the touch floor still caps a narrow pin.
+		expect(effectivePromptWidth(true, 1, 36)).toBe(36);
 	});
 
 	it("defaults mic dictation on and keeps an explicit off", () => {

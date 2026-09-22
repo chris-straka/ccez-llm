@@ -210,20 +210,52 @@ export const FULLBLEED_FONT_SCALE = 3.3;
 export const CHAT_WIDTH_FULLBLEED_REM = 999;
 /** Phone floor: the column never narrows past this, however small. */
 export const CHAT_WIDTH_PHONE_MIN_REM = 46;
+/** Font scale at/above which desktop columns auto-widen (200%). */
+export const CHAT_WIDEN_FONT_SCALE = 2;
+/** Composer's own width base (rem): independent of the chat slider. */
+export const PROMPT_WIDTH_BASE_REM = 36;
+
+/**
+ * Auto-widen factor for huge type: past 200% the column grows with
+ * the font at half the font rate, so the slider stays meaningful
+ * (it sets the base) and mid sizes keep their measure. Continuous
+ * at the threshold (2x reads exactly 1). Pure.
+ */
+export function widenFactorForFont(fontScale: number): number {
+	return Math.max(1, fontScale / CHAT_WIDEN_FONT_SCALE);
+}
 
 /**
  * Effective chat column width (rem) for the --chat-width var. Phones
  * go full-bleed once huge type needs the room, and never narrower
- * than the touch floor; desktop rides the slider raw. Pure.
+ * than the touch floor; desktop rides the slider times the
+ * auto-widen factor. Pure.
  */
 export function effectiveChatWidth(
 	androidUI: boolean,
 	fontScale: number,
 	chatWidth: number
 ): number {
-	if (!androidUI) return chatWidth;
+	if (!androidUI) return chatWidth * widenFactorForFont(fontScale);
 	if (fontScale >= FULLBLEED_FONT_SCALE) return CHAT_WIDTH_FULLBLEED_REM;
 	return Math.max(CHAT_WIDTH_PHONE_MIN_REM, chatWidth);
+}
+
+/**
+ * Effective composer width (rem) for the --prompt-width var. The
+ * prompt keeps its own base (never the slider) widened by the same
+ * factor past 200%, capped by the column — so the composer grows
+ * with huge type but never sticks out past the messages. Pure.
+ */
+export function effectivePromptWidth(
+	androidUI: boolean,
+	fontScale: number,
+	chatWidth: number
+): number {
+	return Math.min(
+		effectiveChatWidth(androidUI, fontScale, chatWidth),
+		PROMPT_WIDTH_BASE_REM * widenFactorForFont(fontScale)
+	);
 }
 
 /** Stored idle-hide value meaning "never hide" (see `isPromptIdle`). */

@@ -1221,6 +1221,65 @@ test("chat width setting widens the chat column", async ({ page }) => {
 		.toContain('"chatWidth":38');
 });
 
+/** Past 200% type the column and the composer auto-widen off their
+own bases (36rem slider → 66.6rem at 370%: half the font rate, so the
+slider stays meaningful), and the composer never exceeds the column.
+The language pills slot under the hero on desktop too. */
+test("huge type auto-widens the column and the composer", async ({
+	page
+}) => {
+	await page.setViewportSize({ width: 1600, height: 900 });
+	await seedChat(page, []);
+	await page.addInitScript(() => {
+		window.localStorage.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify({ fontScale: 3.7 })
+		);
+	});
+	await page.goto("/");
+	await expect(page.locator(".empty-state h1")).toBeVisible({
+		timeout: 60_000
+	});
+	const vars = await page.evaluate(() => {
+		const app = document.querySelector(".app") as HTMLElement;
+		return {
+			chat: parseFloat(
+				getComputedStyle(app).getPropertyValue("--chat-width")
+			),
+			prompt: parseFloat(
+				getComputedStyle(app).getPropertyValue("--prompt-width")
+			)
+		};
+	});
+	// 36 × 3.7 / 2: the slider base times half the font rate.
+	expect(vars.chat).toBeCloseTo(66.6, 1);
+	expect(vars.prompt).toBeCloseTo(66.6, 1);
+	// Rendered boxes (not max-width: engines report min() and
+	// fit-content differently): the hero rides the column cap, the
+	// prompt its own — both well past the 36rem (576px) pin…
+	const heroBox = await page.locator(".empty-state").boundingBox();
+	const promptBox = await page.locator(".prompt").boundingBox();
+	expect(heroBox!.width).toBeGreaterThan(900);
+	expect(promptBox!.width).toBeGreaterThan(900);
+	// …and the composer never exceeds the column.
+	expect(promptBox!.width).toBeLessThanOrEqual(heroBox!.width + 1);
+});
+
+/** Desktop pills slot under the welcome text (hero), not over the
+composer: one row inside .empty-state, below the h1. */
+test("desktop language pills live under the hero", async ({ page }) => {
+	await openWithMessages(page, []);
+	const hero = page.locator(".hero");
+	const menus = page.locator(".empty-state .lang-menus");
+	await expect(hero).toBeVisible();
+	await expect(menus).toBeVisible();
+	const heroBox = await hero.boundingBox();
+	const menusBox = await menus.boundingBox();
+	expect(heroBox).toBeTruthy();
+	expect(menusBox).toBeTruthy();
+	expect(menusBox!.y).toBeGreaterThanOrEqual(heroBox!.y + heroBox!.height);
+});
+
 /** WebKit sees no interactive-widget key: it ships only to Android at runtime. */
 test("viewport meta stays Chromium-key-free on desktop", async ({ page }) => {
 	await openWithMessages(page, [{ role: "user", content: "hi" }]);
@@ -1331,8 +1390,8 @@ focus to the composer. */
 test("language re-pick updates send instantly and focuses prompt", async ({
 	page
 }) => {
-	// Tall viewport: the 20-option Europe list opens upward past the
-	// top edge on short windows (keyboard number keys still reach).
+	// Tall viewport: the 20-option Europe list escapes as a centered
+	// sheet (keyboard number keys still reach on short windows).
 	await page.setViewportSize({ width: 1280, height: 1000 });
 	await seedChat(page, []);
 	await page.goto("/");

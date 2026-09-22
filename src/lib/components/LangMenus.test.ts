@@ -2,13 +2,17 @@ import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
 
 /**
- * Reply-language pills render in LangMenus.svelte (hero and composer
- * call sites); the page keeps the open menu, the phone sheet anchor,
- * the active code, and every behavior. Both call sites share one
- * actions object (no call-site closures).
+ * Reply-language pills render in LangMenus.svelte (hero slot in
+ * ThreadView, every platform); the page keeps the open menu, the
+ * sheet anchor, the active code, and every behavior behind one
+ * shared actions object (no call-site closures).
  */
 function componentSource(): string {
 	return readFileSync(new URL("./LangMenus.svelte", import.meta.url), "utf8");
+}
+
+function threadSource(): string {
+	return readFileSync(new URL("./ThreadView.svelte", import.meta.url), "utf8");
 }
 
 function componentStyle(): string {
@@ -44,12 +48,22 @@ describe("language menus contract", () => {
 
 	it("keeps the open menu, anchor, code, and behaviors paged", () => {
 		const page = pageSource();
-		expect(page).toContain("<LangMenus");
-		expect(page).toContain("actions={langMenusActions}");
 		expect(page).toContain("function toggleLangMenu(");
 		expect(page).toContain("pick: (lang: ReplyLanguage) =>");
+		expect(page).toContain("{openLangMenu}");
+		expect(page).toContain("{langMenuAnchor}");
+		expect(page).toContain("{langMenusActions}");
+		expect(page).not.toContain("<LangMenus");
 		expect(page).not.toContain("{#snippet langMenus()}");
 		expect(page).not.toContain("{@render langMenus()}");
+	});
+
+	it("slots the pills under the hero on every platform", () => {
+		const thread = threadSource();
+		expect(thread).toContain("<LangMenus");
+		expect(thread).toContain("<EmptyHero");
+		// No platform gate around the hero pills.
+		expect(thread).not.toMatch(/\{#if android\}[\s\S]*?<LangMenus/);
 	});
 
 	it("keeps no pill selector in page style", () => {
@@ -70,7 +84,9 @@ describe("language menus contract", () => {
 		expect(css).toContain(".lang-menu > button:hover");
 		expect(css).toContain(".lang-list button.selected");
 		expect(css).toContain(".badge");
+		expect(css).toContain(".lang-list-fixed");
 		expect(css).toContain(":global(.app[data-android]) .lang-menus");
+		expect(css).toContain(":global(.empty-state) .lang-menus");
 		expect(css).toContain(":global(main.empty) .lang-menus");
 	});
 });

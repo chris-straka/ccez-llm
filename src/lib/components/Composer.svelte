@@ -904,13 +904,17 @@ shared `.error` look. -->
 	(`ReviewDock.svelte`): :has() matches the dock in the DOM at
 	runtime, whichever component renders it. */
 	.prompt {
-		/* Pinned to the default width: the composer never grows with the
-		chat slider, but still shrinks on narrow columns. --sbw (set from
-		JS: messages' scrollbar gutter, 0 with overlay bars) keeps the
-		card centered on the article column instead of the full width,
-		so text never sticks out on the right side only. */
+		/* Own width track (--prompt-width): the composer never grows
+		with the chat slider, but still shrinks on narrow columns and
+		widens with huge type past 200%. The column caps it, and --sbw
+		(set from JS: messages' scrollbar gutter, 0 with overlay bars)
+		keeps the card centered on the article column instead of the
+		full width, so text never sticks out on the right side only. */
 		width: calc(100% - 2.4rem - var(--sbw, 0px));
-		max-width: min(calc(var(--chat-width, 36) * 1rem), 36rem);
+		max-width: min(
+			calc(var(--chat-width, 36) * 1rem),
+			calc(var(--prompt-width, 36) * 1rem)
+		);
 		margin-left: auto;
 		margin-right: auto;
 		box-sizing: border-box;

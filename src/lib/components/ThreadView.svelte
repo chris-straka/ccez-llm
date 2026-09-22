@@ -203,19 +203,17 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 	}}
 >
 	{#if messages.length === 0}
-		<!-- Empty hero through `EmptyHero.svelte` (phones slot the pills
-		here); the page keeps emptiness and the pill state. -->
+		<!-- Empty hero through `EmptyHero.svelte` (the pills slot under
+		the welcome text on every platform); the page keeps emptiness
+		and the pill state. -->
 		<EmptyHero mock={useMock}>
-			{#if android}
-				<LangMenus
-					openId={openLangMenu}
-					anchor={langMenuAnchor}
-					activeCode={activeReplyCode}
-					{android}
-					{previewing}
-					actions={langMenusActions}
-				/>
-			{/if}
+			<LangMenus
+				openId={openLangMenu}
+				anchor={langMenuAnchor}
+				activeCode={activeReplyCode}
+				{previewing}
+				actions={langMenusActions}
+			/>
 		</EmptyHero>
 	{/if}
 	{#each messages as msg, i (msg.id)}
