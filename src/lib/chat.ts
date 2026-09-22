@@ -991,3 +991,18 @@ export function clampChatIndex(index: number, length: number): number | null {
 	if (length === 0) return null;
 	return Math.min(Math.max(index, 0), length - 1);
 }
+
+/**
+ * Viewed-message index from a `msg-{index}` article id (REFACTOR
+ * §6): tap points, selection anchors, and scroll targets share the
+ * one parse. Null outside messages or past the list end.
+ */
+export function messageIndexFromId(
+	articleId: string,
+	length: number
+): number | null {
+	const index = Number(articleId.slice(4));
+	if (!Number.isInteger(index) || index < 0 || index >= length)
+		return null;
+	return index;
+}

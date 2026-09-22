@@ -22,6 +22,7 @@ import {
 	resendLast,
 	planChatStep,
 	clampChatIndex,
+	messageIndexFromId,
 	tokenTotal,
 	tokenSplit,
 	formatTokens,
@@ -1088,5 +1089,15 @@ describe("clampChatIndex", () => {
 		expect(clampChatIndex(-2, 3)).toBe(0);
 		expect(clampChatIndex(1, 3)).toBe(1);
 		expect(clampChatIndex(0, 0)).toBeNull();
+	});
+});
+
+describe("messageIndexFromId", () => {
+	it("parses msg-{index} ids within the list", () => {
+		expect(messageIndexFromId("msg-0", 3)).toBe(0);
+		expect(messageIndexFromId("msg-2", 3)).toBe(2);
+		expect(messageIndexFromId("msg-3", 3)).toBeNull();
+		expect(messageIndexFromId("msg-x", 3)).toBeNull();
+		expect(messageIndexFromId("other-1", 3)).toBeNull();
 	});
 });

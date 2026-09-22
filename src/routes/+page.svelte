@@ -19,6 +19,7 @@
 		deleteAllChats,
 		planChatStep,
 		clampChatIndex,
+		messageIndexFromId,
 		deleteMessage,
 		stageMessage,
 		branchFrom,
@@ -4261,7 +4262,8 @@
 	function selectedMessageId(selection: Selection): ChatMsgId | null {
 		const article = articleOf(selection.anchorNode);
 		if (!article) return null;
-		const index = Number(article.id.slice(4));
+		const index = messageIndexFromId(article.id, chat.messages.length);
+		if (index === null) return null;
 		return chat.messages[index]?.id ?? null;
 	}
 
@@ -4274,14 +4276,7 @@
 		const target = document.elementFromPoint(clientX, clientY);
 		const article = target ? articleOf(target) : null;
 		if (!(article instanceof HTMLElement)) return null;
-		const index = Number(article.id.slice(4));
-		if (
-			!Number.isInteger(index) ||
-			index < 0 ||
-			index >= viewChat.messages.length
-		)
-			return null;
-		return index;
+		return messageIndexFromId(article.id, viewChat.messages.length);
 	}
 
 	/** Two-finger double-tap: land the tapped message's end above the
