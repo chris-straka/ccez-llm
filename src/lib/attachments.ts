@@ -1006,3 +1006,36 @@ export interface AttachTagModel {
 	/** Full file text (text kind only; the builder excerpts it). */
 	text: string | null;
 }
+
+/**
+ * Outgoing send payload from the composer draft (REFACTOR §6):
+ * pasted-text pills splice back inline at their tag positions (Nth
+ * tag pairs with the Nth pasted attachment — the send-time mirror of
+ * render.ts kind-order pairing) AND refold over the inserted prose,
+ * so the sent message keeps the collapsed `[Pasted N chars]` tag
+ * until opened; leftovers end-append like files. Pasted attachments
+ * are composer vehicles — the stored message keeps the spliced prose
+ * plus folds, not the pills.
+ */
+export function spliceSendText(
+	foldText: string,
+	outgoing: Attachment[]
+): {
+	stored: string;
+	kept: Attachment[];
+	pastedFolds: Array<{ start: number; end: number; chars: number }>;
+} {
+	const pastedTexts = outgoing
+		.filter(isPastedTextAttachment)
+		.map((a) => a.text ?? "");
+	const { text: spliced, folds: pastedFolds } = splicePastedFolds(
+		foldText,
+		pastedTexts
+	);
+	const kept = outgoing.filter((a) => !isPastedTextAttachment(a));
+	const stored = appendImageMarkers(
+		spliced,
+		kept.filter((a) => a.kind === "image").length
+	);
+	return { stored, kept, pastedFolds };
+}

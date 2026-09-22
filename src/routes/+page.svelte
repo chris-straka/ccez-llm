@@ -98,7 +98,6 @@
 		bakeEditedMessage,
 		type PromptEditor,
 		type PromptEditorOptions,
-		type SendFold,
 		type SubmitKind
 	} from "$lib/editor";
 	import { createTextareaEditor } from "$lib/textarea-editor";
@@ -161,7 +160,6 @@
 		VOICE_TIMEOUT_MS
 	} from "$lib/notices";
 	import {
-		appendImageMarkers,
 		FILE_MARKER,
 		IMAGE_MARKER,
 		fileMarkerInsert,
@@ -175,7 +173,7 @@
 		isPastedTextAttachment,
 		makePastedTextAttachment,
 		pastedMarkerInsert,
-		splicePastedFolds,
+		spliceSendText,
 		stripPastedMarkers,
 		leftoverAttachments,
 		reconcileTagRemovals,
@@ -3703,36 +3701,6 @@
 		return stripAttachmentMarkers(editor?.getText() ?? "").trim();
 	}
 
-	/**
-	 * Outgoing send payload from the composer draft: pasted-text pills
-	 * splice back inline at their tag positions (Nth tag pairs with
-	 * the Nth pasted attachment — the send-time mirror of render.ts
-	 * kind-order pairing) AND refold over the inserted prose, so the
-	 * sent message keeps the collapsed `[Pasted N chars]` tag until
-	 * opened; leftovers end-append like files. Pasted attachments are
-	 * composer vehicles — the stored message keeps the spliced prose
-	 * plus folds, not the pills. (The textarea composer tracks no
-	 * paste spans, so span-based folds alone would store unfolded
-	 * prose with no marker at all.)
-	 */
-	function splicedSendText(
-		foldText: string,
-		outgoing: Attachment[]
-	): { stored: string; kept: Attachment[]; pastedFolds: SendFold[] } {
-		const pastedTexts = outgoing
-			.filter(isPastedTextAttachment)
-			.map((a) => a.text ?? "");
-		const { text: spliced, folds: pastedFolds } = splicePastedFolds(
-			foldText,
-			pastedTexts
-		);
-		const kept = outgoing.filter((a) => !isPastedTextAttachment(a));
-		const stored = appendImageMarkers(
-			spliced,
-			kept.filter((a) => a.kind === "image").length
-		);
-		return { stored, kept, pastedFolds };
-	}
 
 	/**
 	 * Attachment/OCR failure: inline under the composer on desktop, a
@@ -6999,7 +6967,7 @@
 		// provider payload strips them again in apiContent. Pasted-text
 		// pills splice back inline at their tags (kept attachments ride
 		// along; pasted ones are already prose).
-		const { stored, kept, pastedFolds } = splicedSendText(text, outgoing);
+		const { stored, kept, pastedFolds } = spliceSendText(text, outgoing);
 		const baked = withAnnotations(stored, outgoingAnnotations);
 		// Native turns detach here and complete via turn-done (or the
 		// return/boot scan); the shared tail runs at completion, not here.
@@ -7171,7 +7139,7 @@
 		if (action === "stage") {
 			// ⌥+Enter: most recent message, no reply; the next submit
 			// carries the full history in order.
-			const { stored: staged, kept: stagedKept } = splicedSendText(
+			const { stored: staged, kept: stagedKept } = spliceSendText(
 				composerText(),
 				attachments
 			);

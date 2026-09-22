@@ -35,6 +35,7 @@ import {
 	removeTags,
 	splicePastedText,
 	splicePastedFolds,
+	spliceSendText,
 	stripAttachmentMarkers,
 	stripPastedMarkers,
 	tagPlaceholder,
@@ -705,5 +706,31 @@ describe("blobToDataUrl", () => {
 		await expect(blobToDataUrl(new Blob(["hi"]))).resolves.toBe(
 			"data:application/octet-stream;base64,aGk="
 		);
+	});
+});
+
+describe("spliceSendText", () => {
+	const pasted = (id: string, text: string) => ({
+		...testAttachment({ id, kind: "text" as const, text }),
+		pastedText: true as const
+	});
+
+	it("splices pasted pills inline and keeps the rest", () => {
+		const img = testAttachment({ id: "i", kind: "image" });
+		const { stored, kept, pastedFolds } = spliceSendText(
+			`hi ${pastedTextMarker(3)}`,
+			[pasted("p", "AAA "), img]
+		);
+		expect(stored).toBe(`hi AAA ${IMAGE_MARKER}`);
+		expect(kept.map((a) => a.id)).toEqual(["i"]);
+		expect(pastedFolds).toEqual([{ start: 3, end: 6, chars: 3 }]);
+	});
+
+	it("stores prose with no pills untouched", () => {
+		expect(spliceSendText("plain", [])).toEqual({
+			stored: "plain",
+			kept: [],
+			pastedFolds: []
+		});
 	});
 });
