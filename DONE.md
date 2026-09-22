@@ -903,3 +903,8 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
       unpinned). `stick-scroll.e2e.ts` "send and completion never
       yank a mid-thread reader"; the staging pin spec now starts
       genuinely stuck (it asserts the landing, not the yank).
+
+- [x] Composer input tracks the text size: the typed text was a fixed
+      0.95rem next to huge type — `.ta-input` rides `--font-scale`
+      like message text (phones keep the 16px anti-zoom floor;
+      `layout.e2e.ts` now pins the composer growing with messages).

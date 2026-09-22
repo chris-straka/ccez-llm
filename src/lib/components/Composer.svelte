@@ -850,12 +850,14 @@ shared `.error` look. -->
 	.prompt:has(.wp-jump) {
 		--tools-extra: 1.8rem;
 	}
-	/* Textarea composer: fixed size on purpose — the text-size setting
-	scales reading, never typing. */
+	/* Textarea composer: the typed text tracks the text-size setting
+	like message text (a fixed 0.95rem box next to huge type strands
+	the eyes). Phones keep the 16px floor below: iOS zooms smaller
+	fields on focus. */
 	.prompt :global(.ta-input) {
 		font-family:
 			-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
-		font-size: 0.95rem;
+		font-size: calc(0.95rem * var(--font-scale, 1));
 		/* Pinned (not normal): the placeholder resolves its own
 		metrics in some engines and rides above the caret otherwise —
 		both share this exact box. */

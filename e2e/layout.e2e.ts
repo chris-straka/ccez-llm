@@ -80,7 +80,7 @@ test("chat width setting scales the column", async ({ page }) => {
 
 /** Text size scales messages, never the composer input; annotation
 badges track it at a dampened rate (30%: 600% reads ≈2.5× badges). */
-test("text size scales messages and badges, not the composer", async ({
+test("text size scales messages, badges, and the composer", async ({
 	page
 }) => {
 	await seedChat(page, [{ role: "assistant", content: "hello" }]);
@@ -113,7 +113,7 @@ test("text size scales messages and badges, not the composer", async ({
 	await expect
 		.poll(() => px("article .rendered"), { timeout: 5_000 })
 		.toBeCloseTo(msgBefore * 1.1, 1);
-	expect(await px(".prompt .ta-input")).toBeCloseTo(editorBefore, 1);
+	expect(await px(".prompt .ta-input")).toBeCloseTo(editorBefore * 1.1, 1);
 	expect(await px("button.ccez-ann-badge")).toBeCloseTo(badgeBefore * 1.03, 1);
 });
 

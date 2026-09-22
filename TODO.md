@@ -39,8 +39,6 @@ same codebase via the Tauri mobile target.
 
 THINGS I NOTICED ON 0.5.3 mac app with 370% font size
 
-composer should increase with font size.
-
 Hitting shift+command+j will open the main text prompt and shouldn't. Also, it's slower than I would have thought to switch chats, it's like 2s going down a chat and 1s going up. It's not going to storage on each chat is it? I'm in the Mac client. On a new chat, hitting shift+command+k  also focused the main text prompt and command+shift+j and command+shift+k should never open the main text prompt or focus it. Both on the window I am currently or on am heading to. 
 
 I need a keyboard shortcut that plays the audio for the word that I'm on, then another one for its sentence, then another one for its paragraph
