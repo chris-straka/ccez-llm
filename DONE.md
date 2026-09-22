@@ -888,3 +888,9 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
       "j-step scales with the text size" pins the doubled landing.
       Note: the file's "d hold ramps" test flakes identically on the
       pristine tree (rAF pacing) — pre-existing, untouched.
+
+- [x] Message icon glyphs track to 4x (was 2x): the damped opt-in
+      scaling capped out just past double type, stranding small icons
+      next to 370% text — latex chrome shares the cap (`chrome.e2e.ts`
+      "message icon glyphs scale past double type" pins ~43.7px at
+      300% vs the old ~30.2px ceiling; phones keep 2x).

@@ -476,9 +476,9 @@ cover an off state. -->
 	:global(.app[data-android]) .actions {
 		margin-top: 0.2rem;
 	}
-	/* The row scales with the text-size opt-in like the desktop rows
-	(same cap), so huge type never strands tiny buttons — and never
-	domes them past 200%. */
+	/* The row scales with the text-size opt-in; phones keep the 2x
+	cap while desktop glyphs track to 4x — huge type never strands
+	tiny buttons on either. */
 	:global(.app[data-android]) :global(main.hide-buttons.scale-actions) .actions button {
 		font-size: calc(0.75rem * min(var(--font-scale, 1), 2));
 	}
@@ -560,13 +560,13 @@ cover an off state. -->
 	}
 	/* Opt-in (Settings): the logo icons grow with the text-size
 	setting (text buttons track at 85% by default now, so only the
-	fixed-size glyphs need the opt-in) — capped like the bubble, so
-	huge type doesn't dome them into towers. Growth is damped a
-	fifth: full tracking overshoots the text beside it. */
+	fixed-size glyphs need the opt-in) — capped at 4x, so huge type
+	doesn't dome them into towers. Growth is damped a fifth: full
+	tracking overshoots the text beside it. */
 	/* Same opt-in for the logo icons: the glyph holds its fixed
 	1.05rem height otherwise, so larger text leaves tiny icons. */
 	:global(main.scale-actions) .actions .icon-btn :global(.action-glyph) {
-		height: calc(1.05rem * (1 + (min(var(--font-scale, 1), 2) - 1) * 0.8));
+		height: calc(1.05rem * (1 + (min(var(--font-scale, 1), 4) - 1) * 0.8));
 	}
 	/* Loading buttons hold their look while the dots pulse. */
 	.actions button:disabled {

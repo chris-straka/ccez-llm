@@ -12839,18 +12839,18 @@
 		font-size: calc(0.85rem * min(var(--font-scale, 1), 2));
 	}
 	/* Same opt-in for the latex chrome: the `$` toggle and copy button
-	scale with the text size like the message buttons (same cap), so the
-	pair never reads tiny under huge type. Box, `$` type, and glyph
-	scale together, keeping the shared-box centering. */
+	scale with the text size like the message buttons (same 4x cap),
+	so the pair never reads tiny under huge type. Box, `$` type, and
+	glyph scale together, keeping the shared-box centering. */
 	main.scale-actions :global(.ccez-math-tex),
 	main.scale-actions :global(.ccez-math-copy) {
-		height: calc(1.3rem * min(var(--font-scale, 1), 2));
-		width: calc(1.3rem * min(var(--font-scale, 1), 2));
-		font-size: calc(0.85rem * min(var(--font-scale, 1), 2));
+		height: calc(1.3rem * min(var(--font-scale, 1), 4));
+		width: calc(1.3rem * min(var(--font-scale, 1), 4));
+		font-size: calc(0.85rem * min(var(--font-scale, 1), 4));
 	}
 	main.scale-actions :global(.ccez-math-copy .action-glyph) {
-		height: calc(1rem * min(var(--font-scale, 1), 2));
-		width: calc(1rem * min(var(--font-scale, 1), 2));
+		height: calc(1rem * min(var(--font-scale, 1), 4));
+		width: calc(1rem * min(var(--font-scale, 1), 4));
 	}
 	/* Sending status renders in `SendingIndicator.svelte` now
 	(line, colored dots, elapsed). */

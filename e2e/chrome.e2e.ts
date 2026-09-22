@@ -1129,6 +1129,28 @@ test("message buttons scale with text size when enabled", async ({ page }) => {
 	expect(parseFloat(scaled)).toBeGreaterThan(parseFloat(fixed));
 });
 
+/** Message icon glyphs keep tracking past double type (4x cap): at
+300% the glyph reads ~2.7x, past the old 1.8x ceiling. */
+test("message icon glyphs scale past double type", async ({ page }) => {
+	await openWithMessages(page, [
+		{ role: "user", content: "hi" },
+		{ role: "assistant", content: "hello there" }
+	]);
+	await openSettings(page);
+	await page
+		.locator('.settings-panel input[aria-label="Text size percent"]')
+		.fill("300");
+	const glyph = page
+		.locator("article.assistant .actions .icon-btn .action-glyph")
+		.first();
+	const h = await glyph.evaluate((el) =>
+		parseFloat(getComputedStyle(el).height)
+	);
+	// 1.05rem × (1 + 2 × 0.8) ≈ 43.7px; the old 2x cap read ≈ 30.2px.
+	expect(h).toBeGreaterThan(38);
+	expect(h).toBeLessThan(50);
+});
+
 /** Language buttons never overlap the hero on an empty chat. */
 test("empty-state language buttons sit clear of the hero", async ({ page }) => {
 	await openWithMessages(page, []);
