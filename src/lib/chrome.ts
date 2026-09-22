@@ -186,3 +186,22 @@ export function messageActionsTapAllowed(
 	if (!hideMessages && !(android && hideButtons)) return false;
 	return true;
 }
+
+/**
+ * Parked composer (REFACTOR §6): idle-hidden OR a sidebar owns the
+ * stage (chats list or settings). Parking is visual only — idle
+ * keeps its own state, so closing the sidebar returns exactly the
+ * prior idle state instead of summoning a hidden prompt. Phones
+ * never park for drawers: the chats list and settings are overlays
+ * above the composer, so hiding it under them only slid the thread
+ * and flickered the card — only a real idle timeout parks.
+ */
+export function promptParkedFor(
+	android: boolean,
+	idle: boolean,
+	settingsOpen: boolean,
+	sidebarCollapsed: boolean
+): boolean {
+	if (android) return idle;
+	return idle || settingsOpen || !sidebarCollapsed;
+}

@@ -13,6 +13,7 @@ import {
 	gutterSide,
 	rowWorkRunning,
 	messageActionsTapAllowed,
+	promptParkedFor,
 	SLIDER_DRAG_RESET_PX,
 	stageOwnedByOverlay,
 	type StageOwnerFlags
@@ -172,5 +173,15 @@ describe("action-row ownership", () => {
 		expect(messageActionsTapAllowed(false, false, true, false)).toBe(false);
 		expect(messageActionsTapAllowed(false, true, false, false)).toBe(false);
 		expect(messageActionsTapAllowed(true, false, false, false)).toBe(false);
+	});
+});
+
+describe("promptParkedFor", () => {
+	it("parks for drawers on desktop, idle only on phones", () => {
+		expect(promptParkedFor(false, false, true, true)).toBe(true);
+		expect(promptParkedFor(false, false, false, false)).toBe(true);
+		expect(promptParkedFor(false, false, false, true)).toBe(false);
+		expect(promptParkedFor(true, false, true, false)).toBe(false);
+		expect(promptParkedFor(true, true, false, true)).toBe(true);
 	});
 });

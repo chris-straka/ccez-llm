@@ -448,7 +448,8 @@
 		sendHoldArmed,
 		gutterSide,
 		rowWorkRunning,
-		messageActionsTapAllowed
+		messageActionsTapAllowed,
+		promptParkedFor
 	} from "$lib/chrome";
 	import {
 		speakText,
@@ -2709,8 +2710,12 @@
 		// are overlays above the composer (z 55+ over 30), so hiding
 		// it under them only slid the thread and flickered the card.
 		// Only a real idle timeout parks. Desktop keeps drawer parking.
-		if (androidUI) return promptIdle;
-		return promptIdle || settingsOpen || !settings.sidebarCollapsed;
+		return promptParkedFor(
+			androidUI,
+			promptIdle,
+			settingsOpen,
+			settings.sidebarCollapsed
+		);
 	}
 	/**
 	 * Always-hide park: hide unless focus is (or is heading) inside
