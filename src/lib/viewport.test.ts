@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { emptyViewport } from "./viewport";
+import { emptyViewport, rectInClear, clearLandingDelta } from "./viewport";
 
 describe("emptyViewport", () => {
 	it("starts pinned, unheld, uncached", () => {
@@ -22,5 +22,19 @@ describe("emptyViewport", () => {
 		expect(b.stick).toBe(true);
 		expect(b.lastStreamLen).toBe(0);
 		expect(b.holdSeq).toBe(0);
+	});
+});
+
+describe("clear-view geometry", () => {
+	it("reads clear inside the column above the dock", () => {
+		expect(rectInClear(100, 150, 0, 500, 100)).toBe(true);
+		expect(rectInClear(100, 450, 0, 500, 100)).toBe(false);
+		expect(rectInClear(-10, 50, 0, 500, 100)).toBe(false);
+	});
+
+	it("lands covered rects a third down the clear height", () => {
+		expect(clearLandingDelta(400, 0, 500, 100)).toBe(400 - 120);
+		// A dock taller than the column clamps the landing at the top.
+		expect(clearLandingDelta(400, 0, 500, 900)).toBe(400);
 	});
 });

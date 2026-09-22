@@ -63,3 +63,34 @@ export function emptyViewport(): ViewportState {
 		lastStreamLen: 0
 	};
 }
+
+/**
+ * True when a rect already reads in the clear viewport (REFACTOR
+ * §6): inside the column and above the composer dock. The jump
+ * flash gates on this, so its hold only burns once the eye can
+ * land on it.
+ */
+export function rectInClear(
+	rectTop: number,
+	rectBottom: number,
+	boxTop: number,
+	boxBottom: number,
+	clear: number
+): boolean {
+	return rectTop >= boxTop && rectBottom <= boxBottom - clear;
+}
+
+/**
+ * Scroll delta landing a rect in the clear (REFACTOR §6): covered
+ * rects settle at a third of the clear height so the quote reads
+ * with context around it.
+ */
+export function clearLandingDelta(
+	rectTop: number,
+	areaTop: number,
+	areaHeight: number,
+	dock: number
+): number {
+	const landing = areaTop + Math.max(0, areaHeight - dock) * 0.3;
+	return rectTop - landing;
+}

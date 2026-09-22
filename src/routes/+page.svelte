@@ -412,7 +412,12 @@
 		editMessageAction,
 		commitEditTarget
 	} from "$lib/submit";
-	import { emptyViewport, type ViewportState } from "$lib/viewport";
+	import {
+		emptyViewport,
+		rectInClear,
+		clearLandingDelta,
+		type ViewportState
+	} from "$lib/viewport";
 	import { ChatSearchStore, createSearchWorker } from "$lib/chatSearchStore";
 
 	import { isPermissionDismissal } from "$lib/intake";
@@ -5264,8 +5269,10 @@
 			: 0;
 		const dock = prompt + review + 16;
 		if (rectInClearView(rect, area, dock)) return;
-		const landing = area.top + Math.max(0, area.height - dock) * 0.3;
-		scroller.scrollBy({ top: rect.top - landing, behavior: "smooth" });
+		scroller.scrollBy({
+			top: clearLandingDelta(rect.top, area.top, area.height, dock),
+			behavior: "smooth"
+		});
 	}
 
 	/** True when a rect already reads in the clear viewport (same geometry
@@ -5286,7 +5293,7 @@
 					.height ?? 0)
 			: 0;
 		const clear = dock ?? prompt + review + 16;
-		return rect.top >= box.top && rect.bottom <= box.bottom - clear;
+		return rectInClear(rect.top, rect.bottom, box.top, box.bottom, clear);
 	}
 
 	/**
