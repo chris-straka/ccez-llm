@@ -2616,3 +2616,53 @@ export function aidedTextForMsg(
 	if (modelPinned.has(messageId)) return vocalized[messageId] ?? null;
 	return null;
 }
+
+/** Row-edit commit outcome (REFACTOR §6): rebake, no-op, or gone. */
+export type RefsEditCommit =
+	| { kind: "rewrote"; content: string }
+	| { kind: "untouched" }
+	| { kind: "gone" };
+
+/**
+ * Row-edit commit decision: rebake the message with the one comment
+ * swapped (see rewriteAnnotationComment) — history rewrites in place
+ * with no resend. An unparseable block (or a missing message) reads
+ * as gone; an untouched draft writes nothing. Toasts and the focus
+ * park stay paged.
+ */
+export function commitRefsEdit(
+	content: string | null,
+	n: number,
+	draft: string
+): RefsEditCommit {
+	if (content === null) return { kind: "gone" };
+	const next = rewriteAnnotationComment(content, n, draft);
+	if (next === null) return { kind: "gone" };
+	if (next === content) return { kind: "untouched" };
+	return { kind: "rewrote", content: next };
+}
+
+/** Sent-card Clear-all outcome (REFACTOR §6). */
+export type ClearSentRefsPlan =
+	| { kind: "skip" }
+	| { kind: "gone" }
+	| { kind: "delete" }
+	| { kind: "rewrote"; bare: string };
+
+/**
+ * Sent-card Clear-all decision: strip the baked block, keeping the
+ * bare prompt (see clearBakedAnnotations). A refs-only message
+ * clears to nothing — delete it instead of keeping an empty one.
+ * Own messages only (baked blocks ride the outgoing prompt), so
+ * anything else skips silently. Toasts and the pop close stay paged.
+ */
+export function planClearSentRefs(
+	role: string,
+	content: string
+): ClearSentRefsPlan {
+	if (role !== "user") return { kind: "skip" };
+	const bare = clearBakedAnnotations(content);
+	if (bare === null) return { kind: "gone" };
+	if (bare.trim() === "") return { kind: "delete" };
+	return { kind: "rewrote", bare };
+}

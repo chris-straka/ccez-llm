@@ -26,6 +26,8 @@ import {
 	reviewEditKey,
 	buildMarksFor,
 	aidedTextForMsg,
+	commitRefsEdit,
+	planClearSentRefs,
 	REFS_ONLY_BODY,
 	isRefsOnly,
 	redactedCopyText
@@ -805,5 +807,45 @@ describe("aidedTextForMsg", () => {
 		);
 		expect(aidedTextForMsg(m1, null, {}, new Set([m1]))).toBeNull();
 		expect(aidedTextForMsg(m1, null, { m1: "vocal" }, new Set())).toBeNull();
+	});
+});
+
+describe("commitRefsEdit", () => {
+	const baked =
+		'explain this\n\nAnnotated selections:\n1. "bonjour" — greeting?\n2. "merci" — ?';
+
+	it("rewrites with one comment swapped", () => {
+		expect(commitRefsEdit(baked, 2, "thanks")).toEqual({
+			kind: "rewrote",
+			content:
+				'explain this\n\nAnnotated selections:\n1. "bonjour" — greeting?\n2. "merci" — thanks'
+		});
+	});
+
+	it("reports untouched drafts and gone blocks", () => {
+		expect(commitRefsEdit(baked, 1, "greeting?")).toEqual({
+			kind: "untouched"
+		});
+		expect(commitRefsEdit("just a prompt", 1, "x")).toEqual({ kind: "gone" });
+		expect(commitRefsEdit(baked, 9, "x")).toEqual({ kind: "gone" });
+		expect(commitRefsEdit(null, 1, "x")).toEqual({ kind: "gone" });
+	});
+});
+
+describe("planClearSentRefs", () => {
+	it("skips non-user messages silently", () => {
+		expect(planClearSentRefs("assistant", "anything")).toEqual({ kind: "skip" });
+	});
+
+	it("reports gone blocks, deletes refs-only, rewrites the rest", () => {
+		const list = addAnnotation([], "m1" as ChatMsgId, "langue", "meaning?");
+		expect(planClearSentRefs("user", "just a prompt")).toEqual({ kind: "gone" });
+		expect(planClearSentRefs("user", withAnnotations("", list))).toEqual({
+			kind: "delete"
+		});
+		expect(planClearSentRefs("user", withAnnotations("explain", list))).toEqual({
+			kind: "rewrote",
+			bare: "explain"
+		});
 	});
 });

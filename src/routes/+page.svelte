@@ -185,7 +185,6 @@
 	} from "$lib/attachments";
 	import {
 		duplicateAnnotationId,
-		clearBakedAnnotations,
 		editAnnotationComment,
 		deleteAnnotation,
 		clearAnnotations,
@@ -196,7 +195,6 @@
 		trimParagraphTerminator,
 		redactedCopyText,
 		newAnnotationId,
-		rewriteAnnotationComment,
 		quoteRange,
 		rangesExcludingReadings,
 		wrapRangeExcludingBadges,
@@ -219,6 +217,8 @@
 		saveDraftAnnotations,
 		buildMarksFor,
 		aidedTextForMsg,
+		commitRefsEdit,
+		planClearSentRefs,
 		type Annotation,
 		type AnnotationId,
 		type AnnotationMark
@@ -5684,12 +5684,14 @@
 		refsEditing = null;
 		if (!editing) return;
 		const msg = viewChat.messages.find((m) => m.id === editing.messageId);
-		const next = msg
-			? rewriteAnnotationComment(msg.content, editing.n, refsEditDraft)
-			: null;
-		if (next === null) flashErrorToast("Annotation no longer exists");
-		else if (msg && next !== msg.content)
-			editMessageContent(chatState, editing.messageId, next);
+		const commit = commitRefsEdit(
+			msg?.content ?? null,
+			editing.n,
+			refsEditDraft
+		);
+		if (commit.kind === "gone") flashErrorToast("Annotation no longer exists");
+		else if (commit.kind === "rewrote")
+			editMessageContent(chatState, editing.messageId, commit.content);
 		refsEditDraft = "";
 		parkRefsEditFocus(editing.n);
 	}
@@ -5714,15 +5716,16 @@
 		const index = viewChat.messages.findIndex((m) => m.id === messageId);
 		if (index < 0) return;
 		const msg = viewChat.messages[index];
-		if (!msg || msg.role !== "user") return;
-		const bare = clearBakedAnnotations(msg.content);
-		if (bare === null) {
+		if (!msg) return;
+		const plan = planClearSentRefs(msg.role, msg.content);
+		if (plan.kind === "skip") return;
+		if (plan.kind === "gone") {
 			flashErrorToast("Annotation no longer exists");
 			return;
 		}
 		refsPopOpen = null;
-		if (bare.trim() === "") deleteMessage(chatState, index);
-		else editMessageContent(chatState, messageId, bare);
+		if (plan.kind === "delete") deleteMessage(chatState, index);
+		else editMessageContent(chatState, messageId, plan.bare);
 		flashToast("Sent annotations cleared");
 	}
 
