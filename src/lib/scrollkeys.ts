@@ -10,6 +10,18 @@
 export const SCROLLKEY_LINE_PX = 72;
 
 /**
+ * Scale a fixed scroll distance with the text size: a j-step moves
+ * lines, and lines grow with the font — unscaled steps crawl at
+ * 370%. Half-page jumps stay viewport-based (a page is a page).
+ * Non-finite or non-positive scales read as 1, never 0 or NaN.
+ */
+export function scaleScrollPx(px: number, fontScale: number): number {
+	const scale =
+		Number.isFinite(fontScale) && fontScale > 0 ? fontScale : 1;
+	return px * scale;
+}
+
+/**
  * One bare d/u tap: three j/k steps — quick without jumping a
  * half-page per tap. Fixed like the line step so tests can pin it;
  * held d/u still glide fast, Ctrl+U / Ctrl+D still jump half-pages.

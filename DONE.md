@@ -881,3 +881,10 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
       (inheritance), and the menu button all track `--font-scale`
       (`annotations-ux.e2e.ts` "creation pill and Annotate button
       scale with font size"; the desktop edit card stays fixed type).
+
+- [x] Keyboard scroll steps ride the text size: j/k line, d/u skip,
+      and hold-glide velocities scale linearly via `scaleScrollPx`
+      (half-page jumps stay viewport-based); `scrollkeys.e2e.ts`
+      "j-step scales with the text size" pins the doubled landing.
+      Note: the file's "d hold ramps" test flakes identically on the
+      pristine tree (rAF pacing) — pre-existing, untouched.

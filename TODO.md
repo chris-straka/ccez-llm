@@ -39,8 +39,6 @@ same codebase via the Tauri mobile target.
 
 THINGS I NOTICED ON 0.5.3 mac app with 370% font size
 
-Scroll speed should change with text size. 
-
 On Mac the msg buttons need to scale more
 
 When a message  is finished in mac, I think it scrolls me to the end but it should not do that. 

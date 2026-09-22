@@ -10,6 +10,7 @@ import {
 	SCROLL_HOLD_RAMP_MS,
 	SCROLL_HOLD_TAP_MS,
 	ggArmed,
+	scaleScrollPx,
 	halfPageDy,
 	holdGlideVelocity,
 	holdIsTap,
@@ -344,5 +345,19 @@ describe("viewCursorLine", () => {
 		expect(viewCursorLine(100, 500)).toBe(200);
 		// Short viewports take the quarter line instead of 160.
 		expect(viewCursorLine(0, 400)).toBe(100);
+	});
+});
+
+describe("scaleScrollPx", () => {
+	it("scales fixed steps linearly with the text size", () => {
+		expect(scaleScrollPx(72, 1)).toBe(72);
+		expect(scaleScrollPx(72, 2)).toBe(144);
+		expect(scaleScrollPx(216, 3.7)).toBeCloseTo(799.2, 6);
+	});
+	it("reads broken scales as 1, never 0 or NaN", () => {
+		expect(scaleScrollPx(72, 0)).toBe(72);
+		expect(scaleScrollPx(72, -2)).toBe(72);
+		expect(scaleScrollPx(72, NaN)).toBe(72);
+		expect(scaleScrollPx(72, Infinity)).toBe(72);
 	});
 });

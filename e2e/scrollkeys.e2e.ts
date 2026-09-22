@@ -586,3 +586,65 @@ test("d tap lands one skip in scroll mode", async ({ page }) => {
 		)
 	).toBe(sel);
 });
+
+/** The j-step rides the text size: at 200% type one step moves two
+steps' worth of pixels, so lines-per-press stays put. Drives the
+real setting (storage writes race the seed on reload). */
+test("j-step scales with the text size", async ({ page }) => {
+	await page.keyboard.press("Meta+,");
+	const size = page.locator(
+		'.settings-panel input[aria-label="Text size percent"]'
+	);
+	await expect(size).toBeVisible({ timeout: 5_000 });
+	await size.fill("200");
+	await expect
+		.poll(
+			() =>
+				page.evaluate(
+					() =>
+						parseFloat(
+							getComputedStyle(
+								document.querySelector(
+									"article .rendered"
+								) as HTMLElement
+							).fontSize
+						)
+				),
+			{ timeout: 5_000 }
+		)
+		.toBeGreaterThan(20);
+	await page.keyboard.press("Escape");
+	await deselectToBody(page);
+	const before = await scrollTop(page);
+	await page.keyboard.press("j");
+	await page.waitForFunction(
+		(prev) => {
+			const box = document.querySelector(".messages") as HTMLElement | null;
+			return box !== null && box.scrollTop > prev;
+		},
+		before,
+		{ timeout: 10_000 }
+	);
+	// Settle past the smooth ease, then pin the doubled landing.
+	await page.waitForFunction(
+		() => {
+			const box = document.querySelector(".messages") as HTMLElement | null;
+			if (!box) return false;
+			const t = box.scrollTop;
+			return new Promise<boolean>((resolve) => {
+				setTimeout(() => {
+					const again = (
+						document.querySelector(".messages") as HTMLElement | null
+					)?.scrollTop;
+					resolve(again === t);
+				}, 350);
+			});
+		},
+		undefined,
+		{ timeout: 10_000 }
+	);
+	const dist = (await scrollTop(page)) - before;
+	// 72px a step at 100%, doubled at 200% (ease slop either way).
+	expect(dist).toBeGreaterThanOrEqual(110);
+	expect(dist).toBeLessThan(200);
+});

@@ -120,6 +120,7 @@
 		messageEdgeScrollTop,
 		nearBottom,
 		resolveSidebarSpaceEnter,
+		scaleScrollPx,
 		scrollHoldVelocity,
 		stepScrollTop,
 		unselectedScrollIntent
@@ -7561,7 +7562,10 @@
 		viewport.hold = {
 			key,
 			velocity,
-			tapDy: tapDy ?? Math.sign(velocity) * SCROLLKEY_LINE_PX,
+			tapDy:
+				tapDy ??
+				Math.sign(velocity) *
+					scaleScrollPx(SCROLLKEY_LINE_PX, settings.fontScale),
 			downAt: Date.now(),
 			startT: performance.now(),
 			lastT: performance.now(),
@@ -7572,7 +7576,10 @@
 			if (!hold || viewport.holdSeq !== seq || !scrollBox) return;
 			scrollBox.scrollTop = stepScrollTop(
 				scrollBox.scrollTop,
-				holdGlideVelocity(hold.key, t - hold.startT),
+				scaleScrollPx(
+					holdGlideVelocity(hold.key, t - hold.startT),
+					settings.fontScale
+				),
 				t - hold.lastT
 			);
 			hold.lastT = t;
@@ -10436,15 +10443,28 @@
 									: null;
 								if (velocity !== null) {
 									if (!event.repeat && scrollBox) {
+										// Fixed steps ride the text size (see
+										// scaleScrollPx); half-pages stay
+										// viewport-based.
+										const step = settings.fontScale;
 										const tapDy =
 											intent.kind === "half-page"
 												? halfPageDy(scrollBox.clientHeight, intent.dir)
 												: intent.kind === "skip"
-													? intent.dir * SCROLLKEY_SKIP_PX
-													: Math.sign(velocity) * SCROLLKEY_LINE_PX;
-										startScrollHold(event.key, velocity, tapDy);
+													? scaleScrollPx(
+															intent.dir * SCROLLKEY_SKIP_PX,
+															step
+														)
+													: Math.sign(velocity) *
+														scaleScrollPx(SCROLLKEY_LINE_PX, step);
+										startScrollHold(
+											event.key,
+											scaleScrollPx(velocity, step),
+											tapDy
+										);
 									}
-								} else if (intent.kind === "line") scrollChatBy(intent.dy);
+								} else if (intent.kind === "line")
+									scrollChatBy(scaleScrollPx(intent.dy, settings.fontScale));
 								else if (scrollBox)
 									scrollChatBy(halfPageDy(scrollBox.clientHeight, intent.dir));
 							} else if (intent.kind === "top") scrollChatTop();
@@ -10538,9 +10558,17 @@
 				const dir: 1 | -1 = scrollAction === "skip-up" ? -1 : 1;
 				if (scrollBox && !event.repeat) {
 					const velocity = scrollHoldVelocity(event.key);
+					const skipDy = scaleScrollPx(
+						dir * SCROLLKEY_SKIP_PX,
+						settings.fontScale
+					);
 					if (velocity !== null)
-						startScrollHold(event.key, velocity, dir * SCROLLKEY_SKIP_PX);
-					else scrollChatBy(dir * SCROLLKEY_SKIP_PX);
+						startScrollHold(
+							event.key,
+							scaleScrollPx(velocity, settings.fontScale),
+							skipDy
+						);
+					else scrollChatBy(skipDy);
 				}
 				return;
 			}
