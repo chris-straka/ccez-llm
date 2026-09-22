@@ -836,3 +836,21 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
 - [x] TTS ear-check done (owner verified by ear, Sep 2026): Mac Han
       voice switching on English/Chinese mixed readback and S24 TTS
       voices; Eddy/Flo zh_CN/zh_TW/ja_JP/ko_KR ranking heard.
+
+## 0.5.3 field notes closed (Sep 2026 — verified in-repo)
+
+- [x] Fetching indicator shows mid tool-fetch (`fetching-chip.e2e.ts`).
+- [x] Shift+Delete drops the current chat; delete-everything removed
+      (2205ba8; `sidebar-topbar.e2e.ts` pins Ctrl+Delete and
+      Ctrl+Shift+Delete, no drop-everything).
+- [x] Deleting a message stops its audio
+      (`delete-stops-audio.e2e.ts`).
+- [x] Double-tap/selected word plus A stages a `?` question note
+      (`annotate-hotkey.e2e.ts`).
+- [x] Annotation remodel: filing fires a separate model request
+      (never linked to the prompt); the badge reads blue while
+      waiting, orange when the capped answer lands; the answer opens
+      in context above/below the quote with Add to prompt; later
+      questions file while earlier ones wait
+      (`annotation-answer.e2e.ts`, `AnnAnswer.svelte`,
+      `annotationAnswer` in `reading.ts`).

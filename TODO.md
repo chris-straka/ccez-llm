@@ -35,13 +35,9 @@ same codebase via the Tauri mobile target.
       (`platform.ts`, `updates.ts`, `langId.ts` + `langid.rs`,
       `secrets_*` fail-closed). No pass claims without the hardware.
 
-## Pile: furigana popup backdrop should fit scrunched characters (Sep 2026)
+## Pile: 0.5.3 field notes (mac app, 370% font size)
 
 THINGS I NOTICED ON 0.5.3 mac app with 370% font size
-
-When it's fetching, it doesn't show me the Fetching... indicator.
-
-shift+command+delete should be the "delete chat" button and delete all chats should be removed.
 
 Holding down the submit button when I have an annotation does not remove the language modifier.
 
@@ -73,11 +69,7 @@ PART 2
 
 When I hit enter to submit a message, it scrolls me to the bottom when I don't want that.
 
-When I play the audio for a message and then delete that message, it should stop the audio.
-
 I think it does become boxy actually but it becomes boxy too late on large font sizes
-
-Double tapping a word and hitting a on the keyboard should annotate it and leave ? as the note.
 
 On Mac, clicking on the annotations menu for a previously sent message is way too small in width and height. It should span the full chat width and it should go twice as high.
 
@@ -86,8 +78,6 @@ PART 3
 command+t should open a chat
 
 text size stops at 600% on mac when hitting command + sign, should not be capped like that I don't think unless there's a good reason I'm forgetting.
-
-I want to remodel the annotation feature. When I annotate something and hit enter, it should fire off a separate request to the model that is not linked to the main text prompt. For dark theme the annotation marker should be blue while I'm waiting for a request and then become a slick color like orange when a new response is back. We should tell the AI to limit the size of its response so that it can fit on screen. The AI's response should then go in a popup above or below the highlighted text. Then in that popup, I can click a button to add it to my next main prompt if I'm not satisfied with that answer. The point of this is I find that I have 14 small questions and I want to have them answered in their original context (i.e., in the original paragraph that I'm asking from). I also want to move on and ask more questions as I wait for stuff. So I like this idea.
 
 ## Pile: furigana popup backdrop should fit scrunched characters (Sep 2026)
 
