@@ -3014,9 +3014,9 @@
 			}
 		}
 	});
-	/** UI text scale in 10% steps (50–600% desktop, 50–800% phones). */
+	/** UI text scale in 10% steps (50–800% everywhere). */
 	function adjustFontScale(delta: number, quiet = false): void {
-		const next = stepFontScale(settings.fontScale, delta, androidUI);
+		const next = stepFontScale(settings.fontScale, delta);
 		if (next === settings.fontScale) return;
 		settings.fontScale = next;
 		persistSettings();

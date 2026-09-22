@@ -660,18 +660,15 @@ export function keyNeedsEditing(value: string): boolean {
 }
 
 /**
- * UI text-scale step in 10% increments (REFACTOR §6): 50–600%
- * desktop, 50–800% phones. The page no-ops (and skips the toast)
- * when the step lands back on the current value.
+ * UI text-scale step in 10% increments (REFACTOR §6): 50–800%
+ * everywhere (the old 600% desktop cap had no layout reason —
+ * badges and glyphs already scale at a dampened rate, see
+ * layout.e2e.ts). The page no-ops (and skips the toast) when the
+ * step lands back on the current value.
  */
-export function stepFontScale(
-	current: number,
-	delta: number,
-	android: boolean
-): number {
-	const cap = android ? FONT_SCALE_MAX : 6;
+export function stepFontScale(current: number, delta: number): number {
 	return Math.min(
-		cap,
+		FONT_SCALE_MAX,
 		Math.max(FONT_SCALE_MIN, Math.round((current + delta) * 10) / 10)
 	);
 }

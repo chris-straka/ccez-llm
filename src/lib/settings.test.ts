@@ -642,12 +642,11 @@ describe("keyNeedsEditing", () => {
 });
 
 describe("step helpers", () => {
-	it("steps text size in 10% increments within platform caps", () => {
-		expect(stepFontScale(1, 0.1, false)).toBe(1.1);
-		expect(stepFontScale(6, 0.1, false)).toBe(6);
-		expect(stepFontScale(6, 0.1, true)).toBe(6.1);
-		expect(stepFontScale(8, 1, true)).toBe(8);
-		expect(stepFontScale(0.5, -0.1, false)).toBe(0.5);
+	it("steps text size in 10% increments to one 800% cap", () => {
+		expect(stepFontScale(1, 0.1)).toBe(1.1);
+		expect(stepFontScale(6, 0.1)).toBe(6.1);
+		expect(stepFontScale(8, 1)).toBe(8);
+		expect(stepFontScale(0.5, -0.1)).toBe(0.5);
 	});
 
 	it("steps chat width in 2rem within min/max", () => {
