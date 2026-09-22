@@ -54,8 +54,8 @@
 		resolveTheme,
 		systemLocale,
 		CHAT_WIDTH_DEFAULT,
-		CHAT_WIDTH_MIN,
-		CHAT_WIDTH_MAX,
+		stepFontScale,
+		stepChatWidth,
 		MESSAGE_GAP_DEFAULT,
 		effectiveChatWidth,
 		FULLBLEED_FONT_SCALE,
@@ -3145,11 +3145,7 @@
 	});
 	/** UI text scale in 10% steps (50–600% desktop, 50–800% phones). */
 	function adjustFontScale(delta: number, quiet = false): void {
-		const cap = androidUI ? 8 : 6;
-		const next = Math.min(
-			cap,
-			Math.max(0.5, Math.round((settings.fontScale + delta) * 10) / 10)
-		);
+		const next = stepFontScale(settings.fontScale, delta, androidUI);
 		if (next === settings.fontScale) return;
 		settings.fontScale = next;
 		persistSettings();
@@ -3162,10 +3158,7 @@
 	function adjustChatWidth(delta: number): void {
 		if (androidUI) return;
 		const current = settings.chatWidth ?? CHAT_WIDTH_DEFAULT;
-		const next = Math.min(
-			CHAT_WIDTH_MAX,
-			Math.max(CHAT_WIDTH_MIN, current + delta)
-		);
+		const next = stepChatWidth(current, delta);
 		if (next === current) {
 			flashToast(`Chat width ${current} rem (limit)`);
 			return;

@@ -658,3 +658,32 @@ export function keyNeedsEditing(value: string): boolean {
 	const trimmed = value.trim();
 	return trimmed.length === 0 || trimmed.length < MIN_KEY_CHARS;
 }
+
+/**
+ * UI text-scale step in 10% increments (REFACTOR §6): 50–600%
+ * desktop, 50–800% phones. The page no-ops (and skips the toast)
+ * when the step lands back on the current value.
+ */
+export function stepFontScale(
+	current: number,
+	delta: number,
+	android: boolean
+): number {
+	const cap = android ? FONT_SCALE_MAX : 6;
+	return Math.min(
+		cap,
+		Math.max(FONT_SCALE_MIN, Math.round((current + delta) * 10) / 10)
+	);
+}
+
+/**
+ * Chat-column width step in 2rem (REFACTOR §6): desktop only —
+ * phones fix it at 46rem. The page toasts the limit when the step
+ * lands back on the current value.
+ */
+export function stepChatWidth(current: number, delta: number): number {
+	return Math.min(
+		CHAT_WIDTH_MAX,
+		Math.max(CHAT_WIDTH_MIN, current + delta)
+	);
+}

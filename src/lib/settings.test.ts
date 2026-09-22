@@ -15,6 +15,8 @@ import {
 	MESSAGE_GAP_MAX,
 	MESSAGE_GAP_MIN,
 	effectiveChatWidth,
+	stepFontScale,
+	stepChatWidth,
 	PROMPT_IDLE_ALWAYS,
 	PROMPT_IDLE_DEFAULT,
 	PROMPT_IDLE_MAX,
@@ -636,5 +638,21 @@ describe("keyNeedsEditing", () => {
 	it("shares its floor with the mask display", () => {
 		expect(maskKey("x".repeat(MIN_KEY_CHARS))).toBe("••••");
 		expect(maskKey("x".repeat(MIN_KEY_CHARS + 1))).toBe("••••xxxx");
+	});
+});
+
+describe("step helpers", () => {
+	it("steps text size in 10% increments within platform caps", () => {
+		expect(stepFontScale(1, 0.1, false)).toBe(1.1);
+		expect(stepFontScale(6, 0.1, false)).toBe(6);
+		expect(stepFontScale(6, 0.1, true)).toBe(6.1);
+		expect(stepFontScale(8, 1, true)).toBe(8);
+		expect(stepFontScale(0.5, -0.1, false)).toBe(0.5);
+	});
+
+	it("steps chat width in 2rem within min/max", () => {
+		expect(stepChatWidth(36, 2)).toBe(38);
+		expect(stepChatWidth(120, 2)).toBe(120);
+		expect(stepChatWidth(28, -2)).toBe(28);
 	});
 });
