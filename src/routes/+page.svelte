@@ -473,6 +473,7 @@
 		stageOwnedByOverlay,
 		pointInRect,
 		sendHoldArmed,
+		columnBounds,
 		gutterSide,
 		rowWorkRunning,
 		messageActionsTapAllowed,
@@ -8201,15 +8202,13 @@
 		) {
 			return;
 		}
-		let left = Infinity;
-		let right = -Infinity;
-		scrollBox.querySelectorAll("article, .empty-state").forEach((el) => {
-			const box = el.getBoundingClientRect();
-			left = Math.min(left, box.x);
-			right = Math.max(right, box.x + box.width);
-		});
-		if (left === Infinity) return;
-		const side = gutterSide(event.clientX, left, right);
+		const bounds = columnBounds(
+			[...scrollBox.querySelectorAll("article, .empty-state")].map((el) =>
+				el.getBoundingClientRect()
+			)
+		);
+		if (!bounds) return;
+		const side = gutterSide(event.clientX, bounds.left, bounds.right);
 		if (side === "left") {
 			if (settings.sidebarCollapsed) {
 				settings.sidebarCollapsed = false;

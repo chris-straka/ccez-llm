@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	clampPromptIdleSec,
+	columnBounds,
 	draggedSliderPastTop,
 	formatIdleTimeout,
 	IDLE_SLIDER_BOTTOM,
@@ -148,6 +149,16 @@ describe("gutterSide", () => {
 		expect(gutterSide(50, 10, 100)).toBe("column");
 		expect(gutterSide(10, 10, 100)).toBe("column");
 		expect(gutterSide(100, 10, 100)).toBe("column");
+	});
+
+	it("columnBounds spans the boxes, null when empty", () => {
+		expect(
+			columnBounds([
+				{ x: 10, width: 100 },
+				{ x: 20, width: 120 }
+			])
+		).toEqual({ left: 10, right: 140 });
+		expect(columnBounds([])).toBeNull();
 	});
 });
 

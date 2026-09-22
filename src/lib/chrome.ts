@@ -135,6 +135,24 @@ export function sendHoldArmed(
 }
 
 /**
+ * Chat-column bounds for gutter clicks (REFACTOR §6): min left and
+ * max right across the message boxes (plus the empty state, which
+ * holds the column alone). Null with nothing laid out. Pure and
+ * unit-tested.
+ */
+export function columnBounds(
+	boxes: Iterable<{ x: number; width: number }>
+): { left: number; right: number } | null {
+	let left = Infinity;
+	let right = -Infinity;
+	for (const box of boxes) {
+		left = Math.min(left, box.x);
+		right = Math.max(right, box.x + box.width);
+	}
+	return left === Infinity ? null : { left, right };
+}
+
+/**
  * Gutter side for a double-click (REFACTOR §6): left of the column
  * opens the chat list, right of it opens settings, inside the
  * column summons the composer. Edges belong to the column.
