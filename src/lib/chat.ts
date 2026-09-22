@@ -550,6 +550,22 @@ export function waypoints(state: ChatState, chat?: Chat): number[] {
 }
 
 /**
+ * Waypoint position from laid-out message tops: the count of
+ * targets at or above the scroll line (120px grace), minimum 1 —
+ * the menu highlights where the thread sits. Offsets arrive in
+ * message order (a missing node ends the run); empty stays 1.
+ * Pure and unit-tested.
+ */
+export function waypointIndexAt(offsets: number[], scrollTop: number): number {
+	let n = 0;
+	for (const offset of offsets) {
+		if (offset - scrollTop <= 120) n++;
+		else break;
+	}
+	return Math.max(1, n);
+}
+
+/**
  * Menu label for a waypoint jump target: the message's first line,
  * whitespace-collapsed and capped (may be empty for blank messages —
  * callers fall back).

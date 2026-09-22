@@ -26,6 +26,7 @@ import {
 	tokenSplit,
 	formatTokens,
 	waypoints,
+	waypointIndexAt,
 	waypointLabel,
 	sendMessage,
 	setPasteFold,
@@ -724,6 +725,14 @@ describe("chat", () => {
 		await sendMessage(state, provider, "sys", "one", {}, store);
 		await sendMessage(state, provider, "sys", "two", {}, store);
 		expect(waypoints(state)).toEqual([0, 2]);
+	});
+
+	it("positions the waypoint at the scroll line with grace", () => {
+		expect(waypointIndexAt([0, 500, 1000], 0)).toBe(1);
+		expect(waypointIndexAt([0, 500, 1000], 480)).toBe(2);
+		expect(waypointIndexAt([0, 500, 1000], 2000)).toBe(3);
+		expect(waypointIndexAt([], 0)).toBe(1);
+		expect(waypointIndexAt([5000], 0)).toBe(1);
 	});
 
 	it("labels waypoint targets with a collapsed excerpt", () => {
