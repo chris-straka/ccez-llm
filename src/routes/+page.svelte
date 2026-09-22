@@ -429,8 +429,10 @@
 		speakMultilingual,
 		speechText,
 		latinFallback,
-		messageSpeechLang,
 		speechAttemptable,
+		messageSpeakableFor,
+		isMessageSpeaking,
+		speakTitleFor,
 		startSpeechError,
 		effectiveSpeechLang,
 		stopSpeaking,
@@ -6073,13 +6075,10 @@
 
 	/** Speak-button state per message (a playing message always offers Stop). */
 	function messageSpeakable(msg: ChatMsg): boolean {
-		return speechAttemptable(
+		return messageSpeakableFor(
 			settings.voiceEngine,
-			messageSpeechLang(
-				msg.content,
-				latinFallback(settings.voiceLang),
-				webVoices()
-			),
+			msg.content,
+			settings.voiceLang,
 			webVoices()
 		);
 	}
@@ -6164,13 +6163,7 @@
 		if (!text) return;
 		const fallback = latinFallback(settings.voiceLang);
 		const voices = webVoices();
-		if (
-			!speechAttemptable(
-				settings.voiceEngine,
-				messageSpeechLang(msg.content, fallback, voices),
-				voices
-			)
-		) {
+		if (!messageSpeakableFor(settings.voiceEngine, msg.content, fallback, voices)) {
 			if (!quiet) setVoiceError("No voice for this language.");
 			return;
 		}
@@ -6194,15 +6187,14 @@
 
 	/** Speak-button label. */
 	function speakTitle(msg: ChatMsg): string {
-		if (messageSpeaking(msg)) return "Stop reading aloud";
-		return "Read this message aloud";
+		return speakTitleFor(messageSpeaking(msg));
 	}
 
 	/** This message owns the live utterance: a whole-reply readback
 	or a right-click quote pick from it. The speak button reads as
 	stop either way. */
 	function messageSpeaking(msg: ChatMsg): boolean {
-		return speakingId === msg.id || speakingSelection === msg.id;
+		return isMessageSpeaking(msg.id, speakingId, speakingSelection);
 	}
 
 	function maybeSpeakReply(inChat = chat): void {
@@ -6217,13 +6209,10 @@
 			// failure after an attemptable-looking voice.
 			const voices = webVoices();
 			if (
-				!speechAttemptable(
+				!messageSpeakableFor(
 					settings.voiceEngine,
-					messageSpeechLang(
-						last.content,
-						latinFallback(settings.voiceLang),
-						voices
-					),
+					last.content,
+					settings.voiceLang,
 					voices
 				)
 			)

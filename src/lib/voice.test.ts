@@ -21,7 +21,10 @@ import {
 	isSpeaking,
 	micAvailable,
 	dictateOnce,
-	friendlyMicError
+	friendlyMicError,
+	messageSpeakableFor,
+	isMessageSpeaking,
+	speakTitleFor
 } from "./voice";
 import { ttsLangFor } from "./reading";
 
@@ -374,5 +377,31 @@ describe("startSpeechError", () => {
 		expect(
 			startSpeechError({ quiet: true, useNative: true, inventoryEmpty: false })
 		).toBe(null);
+	});
+});
+
+describe("message row voice state", () => {
+	it("gates speak buttons on attemptability", () => {
+		const voices = [{ lang: "en-US" }, { lang: "fr-FR" }];
+		expect(messageSpeakableFor("web", "hello", "en-US", voices)).toBe(true);
+		// An unloaded inventory never disables; a loaded one without
+		// the locale does.
+		expect(messageSpeakableFor("web", "hello", "en-US", [])).toBe(true);
+		expect(messageSpeakableFor("web", "hello", "en-US", [{ lang: "ja-JP" }])).toBe(
+			false
+		);
+		expect(messageSpeakableFor("native", "hello", "en-US", [])).toBe(true);
+	});
+
+	it("attributes the live utterance to replies and quote picks", () => {
+		expect(isMessageSpeaking("m1", "m1", null)).toBe(true);
+		expect(isMessageSpeaking("m1", null, "m1")).toBe(true);
+		expect(isMessageSpeaking("m1", "m2", null)).toBe(false);
+		expect(isMessageSpeaking("m1", null, null)).toBe(false);
+	});
+
+	it("labels the speak button stop while speaking", () => {
+		expect(speakTitleFor(true)).toBe("Stop reading aloud");
+		expect(speakTitleFor(false)).toBe("Read this message aloud");
 	});
 });

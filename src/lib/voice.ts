@@ -557,3 +557,41 @@ export function friendlyMicError(message: string): string {
 	}
 	return message;
 }
+
+/**
+ * Speak-button state per message (REFACTOR §6): a playing message
+ * always offers Stop. One derivation feeds the row, the send gate,
+ * and the background readback so all three agree on attemptability.
+ */
+export function messageSpeakableFor(
+	engine: VoiceEngine,
+	content: string,
+	voiceLang: string | null | undefined,
+	voices: ReadonlyArray<{ lang: string }>
+): boolean {
+	const fallback = latinFallback(voiceLang);
+	return speechAttemptable(
+		engine,
+		messageSpeechLang(content, fallback, voices),
+		voices
+	);
+}
+
+/**
+ * Whether a message owns the live utterance (REFACTOR §6): a
+ * whole-reply readback or a right-click quote pick from it. The
+ * speak button reads as stop either way.
+ */
+export function isMessageSpeaking(
+	messageId: string,
+	speakingId: string | null,
+	speakingSelection: string | null
+): boolean {
+	return speakingId === messageId || speakingSelection === messageId;
+}
+
+/** Speak-button label (REFACTOR §6). */
+export function speakTitleFor(speaking: boolean): string {
+	if (speaking) return "Stop reading aloud";
+	return "Read this message aloud";
+}
