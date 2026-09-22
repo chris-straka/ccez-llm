@@ -4194,7 +4194,15 @@
 
 	/** Triple-tap: select the sentence around the tap point. False
 	keeps native behavior (the override never fires blind). */
-	function selectSentenceAtPoint(clientX: number, clientY: number): boolean {
+	/** Shared tap-to-select engine: resolve the span with a bounds
+	function, then set the live selection to it. Word and sentence
+	taps differ only in the span function, so they share this (the
+	paragraph tap selects the whole block instead). */
+	function selectSpanAtPoint(
+		clientX: number,
+		clientY: number,
+		spanFor: (text: string, caret: number) => [number, number] | null
+	): boolean {
 		const found = textBlockAtPoint(clientX, clientY);
 		const selection = window.getSelection();
 		if (!found || !selection) return false;
@@ -4204,7 +4212,9 @@
 			found.range.startContainer,
 			found.range.startOffset
 		);
-		const [start, end] = sentenceBounds(text, caret);
+		const span = spanFor(text, caret);
+		if (!span) return false;
+		const [start, end] = span;
 		if (end <= start) return false;
 		const anchor = nodeAtBlockOffset(found.block, start);
 		const focus = nodeAtBlockOffset(found.block, end);
@@ -4222,6 +4232,13 @@
 		return !selection.isCollapsed;
 	}
 
+	function selectSentenceAtPoint(clientX: number, clientY: number): boolean {
+		return selectSpanAtPoint(clientX, clientY, (text, caret) => {
+			const [start, end] = sentenceBounds(text, caret);
+			return end <= start ? null : [start, end];
+		});
+	}
+
 	/** Double-tap: select the word around the tap point. The native
 	double-tap gesture never fires for touch here (`touch-action:
 	manipulation` on html/body eats it — verified on-device: the pair
@@ -4230,31 +4247,9 @@
 	to the OS. Mouse double-click is unaffected. False keeps native
 	behavior. */
 	function selectWordAtPoint(clientX: number, clientY: number): boolean {
-		const found = textBlockAtPoint(clientX, clientY);
-		const selection = window.getSelection();
-		if (!found || !selection) return false;
-		const text = found.block.textContent ?? "";
-		const caret = caretOffsetInBlock(
-			found.block,
-			found.range.startContainer,
-			found.range.startOffset
+		return selectSpanAtPoint(clientX, clientY, (text, caret) =>
+			wordBoundsAt(text, caret)
 		);
-		const span = wordBoundsAt(text, caret);
-		if (!span) return false;
-		const anchor = nodeAtBlockOffset(found.block, span[0]);
-		const focus = nodeAtBlockOffset(found.block, span[1]);
-		if (!anchor || !focus) return false;
-		try {
-			selection.setBaseAndExtent(
-				anchor.node,
-				anchor.offset,
-				focus.node,
-				focus.offset
-			);
-		} catch {
-			return false;
-		}
-		return !selection.isCollapsed;
 	}
 
 	/** Quadruple-tap: select the whole paragraph block. */
