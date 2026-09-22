@@ -945,3 +945,9 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
       like quick-lang; fields and the prompt keep them for caret
       travel. Dispatch unit-pinned, shared effect covered by
       `chat-switch.e2e.ts`.
+
+- [x] Annotation sizing (0.5.3 field notes): the create box drops its
+      capsule at three lines (3rem floor, 64px gate — the 4.5rem floor
+      plus 100px gate kept it round too long); the sent card spans the
+      message width (stretched container, right-anchored for user
+      bubbles) at twice the height cap (48rem, viewport still bounds).

@@ -266,6 +266,45 @@ test("creation pill and Annotate button scale with font size", async ({
 	expect(pillBox.width).toBeLessThanOrEqual(514);
 });
 
+/** The sent card spans the message (not a 24rem strip) at twice
+the old height cap. */
+test("sent card spans the message at twice the height cap", async ({
+	page
+}) => {
+	await seedChat(page, [
+		{ role: "assistant", content: "First filler message." },
+		{ role: "assistant", content: "Second filler message." },
+		{
+			role: "assistant",
+			content:
+				'Alpha beta gamma delta.\n\nAnnotated selections:\n1. "beta" — note'
+		}
+	]);
+	await page.goto("/");
+	// The count floats above its message: take the last article so
+	// scrolling can clear it of the sticky app header (a lone first
+	// message sits under the header with nowhere to scroll).
+	const article = page.locator("article.assistant").last();
+	await expect(article).toBeVisible({ timeout: 60_000 });
+	await article.locator(".ann-refs-pill").click();
+	const pop = article.locator(".ann-refs-pop");
+	await expect(pop).toHaveCSS("opacity", "1");
+	const sizes = await page.evaluate(() => {
+		const articles = document.querySelectorAll("article.assistant");
+		const a = articles[articles.length - 1];
+		const p = a?.querySelector(".ann-refs-pop");
+		if (!a || !p) return null;
+		return {
+			article: a.getBoundingClientRect().width,
+			pop: p.getBoundingClientRect().width
+		};
+	});
+	if (!sizes) throw new Error("missing boxes");
+	expect(sizes.pop).toBeGreaterThan(sizes.article - 40);
+	const maxH = await pop.evaluate((el) => getComputedStyle(el).maxHeight);
+	expect(parseFloat(maxH)).toBeGreaterThan(384);
+});
+
 test("empty annotations bake a question mark for the model", async ({
 	page
 }) => {

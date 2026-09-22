@@ -83,11 +83,13 @@ the page's save/focus paths keep working. -->
 		// full pill radius reads over-rounded once the field is tall.
 		// Measured on the field itself: the card chrome differs
 		// between the fresh pill and the edit card, but both fields
-		// grow 1 line toward the same 168px cap, so one threshold
-		// splits short from tall for both. clientHeight counts
-		// CSS-owned growth too, not just the hand-measured fallback.
+		// start at the same 3rem floor, so one threshold splits short
+		// from tall for both — at three lines, not five (the old
+		// 4.5rem floor plus 100px gate kept the capsule too long).
+		// clientHeight counts CSS-owned growth too, not just the
+		// hand-measured fallback.
 		const card = node.closest(".ann-pop");
-		const TALL_PX = 100;
+		const TALL_PX = 64;
 		const mark = () => {
 			const h = node.clientHeight ?? 0;
 			card?.classList.toggle("tall", h > TALL_PX);
@@ -293,7 +295,9 @@ blur-save fires first and Cancel/Delete can never win the race. -->
 		line-height: 1.4;
 		color: #f2f2f7;
 		padding: 0.15rem 0;
-		min-height: 4.5rem;
+		/* Two-line floor: the pill reads as a prompt, and the tall
+		gate below trips at three lines instead of five. */
+		min-height: 3rem;
 		/* Cap mirrors growPill's 168px: with field-sizing the CSS owns
 		the height and the JS stands down (see guard there). */
 		max-height: 168px;

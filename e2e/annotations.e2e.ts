@@ -443,6 +443,10 @@ test("grown comment box rounds its corners less", async ({ page }) => {
 	const pop = page.locator(".ann-pop");
 	await expect(pop).not.toHaveClass(/tall/);
 	await expect(pop).toHaveCSS("border-radius", "999px");
+	// Three lines already drops the capsule (not five).
+	await page.locator(".ann-pop textarea").fill("one\ntwo\nthree");
+	await expect(pop).toHaveClass(/tall/);
+	await expect(pop).toHaveCSS("border-radius", "12px");
 	await page.locator(".ann-pop textarea").fill("a".repeat(500));
 	await expect(pop).toHaveClass(/tall/);
 	await expect(pop).toHaveCSS("border-radius", "12px");

@@ -187,7 +187,10 @@ its body is just an em-dash (see REFS_ONLY_BODY). -->
 	.ann-refs {
 		position: absolute;
 		top: -1.2rem;
+		/* Span the message: the card below fills this box, so the
+		sent menu is the full chat width, not a 24rem strip. */
 		left: 0.8rem;
+		right: 0.8rem;
 		display: flex;
 		margin: 0;
 	}
@@ -199,11 +202,11 @@ its body is just an em-dash (see REFS_ONLY_BODY). -->
 		margin-top: calc(var(--msg-gap, 0.35rem) + 1.1rem);
 	}
 	:global(article.user) .ann-refs {
-		left: auto;
-		right: 0.8rem;
+		/* The user bubble is narrow: span it like above, but keep
+		the count hugging its right edge. */
+		justify-content: flex-end;
 	}
 	.ann-refs-pill {
-		position: relative;
 		border: 0;
 		border-radius: 0;
 		background: transparent;
@@ -225,16 +228,20 @@ its body is just an em-dash (see REFS_ONLY_BODY). -->
 	.ann-refs-pop {
 		position: absolute;
 		bottom: 0;
+		/* Fill the stretched container (see .ann-refs): the menu is
+		as wide as the message, never the old 24rem strip. Narrow
+		user bubbles keep the 14rem floor, extending left. */
 		left: 0;
+		right: 0;
 		z-index: 40;
 		min-width: min(14rem, calc(100vw - 2rem));
-		/* Never wider than the viewport: huge annotations on narrow
-		phones spilled past the screen's left edge. */
-		max-width: min(24rem, calc(100vw - 2rem));
-		/* Never taller than the viewport either: a long list on the
-		first message shot past the top of the screen instead of
-		scrolling in place. */
-		max-height: min(60vh, 24rem);
+		/* Backstop only: the container already lives inside the
+		chat column, so this bites on nothing reachable. */
+		max-width: calc(100vw - 2rem);
+		/* Twice as tall as before (a long list on the first message
+		still scrolls in place instead of shooting past the top —
+		the viewport bound stays). */
+		max-height: min(60vh, 48rem);
 		overflow-y: auto;
 		background: #1c1c1e;
 		color: #f2f2f7;
@@ -258,8 +265,11 @@ its body is just an em-dash (see REFS_ONLY_BODY). -->
 		transition: opacity 0.15s ease;
 	}
 	:global(article.user) .ann-refs-pop {
+		/* Right-anchored: a narrow bubble's floor extends left,
+		like before, instead of spilling right past the screen. */
 		left: auto;
 		right: 0;
+		width: 100%;
 	}
 	/* The number itself summons the card — not the row around it. The
 	invisible bridge keeps it open while crossing into the card. */
