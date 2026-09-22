@@ -263,8 +263,7 @@
 		applyTurnFile,
 		dismissNativeTurn,
 		markTurnInterrupted,
-		nativeTurnAvailable,
-		nativeTurnConfig,
+		nativeRouteFor,
 		pollNativeTurn,
 		resumableKilledTurn,
 		scanNativeTurns,
@@ -6564,15 +6563,16 @@
 	resolution below raises missing-key with the draft intact, same
 	as any TypeScript send). */
 	function nativeRoute(outgoing: Attachment[]): NativeTurnConfig | null {
-		const available = nativeTurnAvailable({
-			androidUI,
-			shell: tauriBackendAvailable(),
-			mock: useMock,
-			onDevice: isOnDeviceProvider(settings.activeProviderId),
-			hasImages: outgoing.some((a) => a.kind === "image")
-		});
-		if (!available) return null;
-		return nativeTurnConfig(settings);
+		return nativeRouteFor(
+			{
+				androidUI,
+				shell: tauriBackendAvailable(),
+				mock: useMock,
+				onDevice: isOnDeviceProvider(settings.activeProviderId)
+			},
+			outgoing,
+			settings
+		);
 	}
 
 	/** Start one native turn for an already-opened placeholder. */

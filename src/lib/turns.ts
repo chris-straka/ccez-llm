@@ -8,6 +8,7 @@ import {
 	type ChatState
 } from "./chat";
 import { messageText } from "./providers/types";
+import type { Attachment } from "./attachments";
 import {
 	activeThinkingId,
 	type AppSettings,
@@ -288,4 +289,28 @@ export async function seenNativeTurn(turnId: TurnId): Promise<boolean> {
 
 export async function dismissNativeTurn(turnId: TurnId): Promise<boolean> {
 	return invoke<boolean>("turn_dismiss", { turnId });
+}
+
+/**
+ * Native route decision (REFACTOR §6): the provider config for the
+ * native runner, or null when the TypeScript engine stays on
+ * (including keyless: the provider resolution raises missing-key
+ * with the draft intact, same as any TypeScript send).
+ */
+export function nativeRouteFor(
+	facts: {
+		androidUI: boolean;
+		shell: boolean;
+		mock: boolean;
+		onDevice: boolean;
+	},
+	outgoing: Attachment[],
+	settings: AppSettings
+): NativeTurnConfig | null {
+	const available = nativeTurnAvailable({
+		...facts,
+		hasImages: outgoing.some((a) => a.kind === "image")
+	});
+	if (!available) return null;
+	return nativeTurnConfig(settings);
 }

@@ -7,6 +7,7 @@ import {
 	markTurnInterrupted,
 	nativeTurnAvailable,
 	nativeTurnConfig,
+	nativeRouteFor,
 	resumableKilledTurn,
 	type TurnId,
 	pollNativeTurn,
@@ -336,5 +337,30 @@ describe("invoke wrappers", () => {
 		mockInvoke.mockResolvedValueOnce(true);
 		await dismissNativeTurn(tid);
 		expect(mockInvoke).toHaveBeenCalledWith("turn_dismiss", { turnId: "t1" });
+	});
+});
+
+describe("nativeRouteFor", () => {
+	const facts = { androidUI: true, shell: true, mock: false, onDevice: false };
+	const settings = settingsWith("muse", {
+		baseUrl: "https://x.test/v1/",
+		apiKey: "k",
+		model: "m"
+	});
+
+	it("routes text turns with config, images stay TypeScript", () => {
+		expect(nativeRouteFor(facts, [], settings)?.model).toBe("m");
+		expect(
+			nativeRouteFor(facts, [{ kind: "image" } as never], settings)
+		).toBeNull();
+	});
+
+	it("stays TypeScript off the native path", () => {
+		expect(
+			nativeRouteFor({ ...facts, shell: false }, [], settings)
+		).toBeNull();
+		expect(
+			nativeRouteFor({ ...facts, mock: true }, [], settings)
+		).toBeNull();
 	});
 });
