@@ -6,6 +6,7 @@ import {
 	DEFAULT_VAD_OPTIONS,
 	dictationCaptureMode,
 	dismissReplyNotificationAsync,
+	drainPendingExternalAsync,
 	ensureReplyNotificationPermission,
 	ensureReplyNotificationPermissionAsync,
 	hapticBeat,
@@ -557,5 +558,13 @@ describe("shell-aware notifications", () => {
 				}
 			}
 		});
+	});
+});
+
+describe("drainPendingExternalAsync", () => {
+	it("stands down without a shell, never throws", async () => {
+		await drainPendingExternalAsync();
+		await drainPendingExternalAsync({});
+		await drainPendingExternalAsync({ shell: false });
 	});
 });

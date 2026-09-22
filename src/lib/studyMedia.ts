@@ -756,3 +756,21 @@ export async function dismissReplyNotificationAsync(input?: {
 		// Already gone (or never sent): nothing to dismiss.
 	}
 }
+
+/**
+ * Cold-start drain for parked shares: a share that arrived before the
+ * annotate-external listener registered waits in Rust — the listener
+ * calls this once registered. Never throws; without a backend there
+ * is nothing parked. Callers never await it.
+ */
+export async function drainPendingExternalAsync(input?: {
+	shell?: boolean;
+}): Promise<void> {
+	if (!input?.shell) return;
+	try {
+		const { invoke } = await import("@tauri-apps/api/core");
+		await invoke("drain_pending_external");
+	} catch {
+		// Browser preview or a shell hiccup: nothing parked to lose.
+	}
+}

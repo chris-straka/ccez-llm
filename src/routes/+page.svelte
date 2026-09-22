@@ -91,7 +91,6 @@
 	} from "$lib/ondevice/bridge";
 	import { OnDeviceChatProvider } from "$lib/ondevice/provider";
 	import { getCurrentWindow } from "@tauri-apps/api/window";
-	import { invoke } from "@tauri-apps/api/core";
 	import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 	import {
 		PROMPT_PLACEHOLDER,
@@ -495,6 +494,7 @@
 		acquireStudyWakeLock,
 		clearStudyBadge,
 		dismissReplyNotificationAsync,
+		drainPendingExternalAsync,
 		ensureReplyNotificationPermissionAsync,
 		hapticBeatAsync,
 		notifyReplyDoneAsync,
@@ -8405,7 +8405,9 @@
 				).then(() => {
 					// Cold start: a share that arrived before setup parked
 					// in Rust — the listener is registered now, so drain it.
-					void invoke("drain_pending_external").catch(() => {});
+					void drainPendingExternalAsync({
+						shell: tauriBackendAvailable()
+					});
 				});
 			} catch (error) {
 				console.warn(
