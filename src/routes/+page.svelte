@@ -95,6 +95,7 @@
 		ANDROID_PROMPT_PLACEHOLDER,
 		ANDROID_SCROLL_PLACEHOLDER,
 		sendPasteFolds,
+		bakeEditedMessage,
 		type PromptEditor,
 		type PromptEditorOptions,
 		type SendFold,
@@ -219,6 +220,7 @@
 		aidedTextForMsg,
 		commitRefsEdit,
 		planClearSentRefs,
+		seedAnnotationsFromRefs,
 		type Annotation,
 		type AnnotationId,
 		type AnnotationMark
@@ -7242,14 +7244,7 @@
 		const msg = chat.messages[index];
 		if (!msg) return;
 		const refs = annRefsFor(msg.content);
-		annotations = refs
-			? refs.refs.map((r) => ({
-					id: newAnnotationId(),
-					messageId: msg.id,
-					quote: r.quote,
-					comment: r.comment
-				}))
-			: [];
+		annotations = refs ? seedAnnotationsFromRefs(msg.id, refs.refs) : [];
 		editingAttachments = msg.attachments ? [...msg.attachments] : [];
 		// Message content carries no stripped markers on save, so the
 		// seed keeps its marker lines: recount instead of reconciling,
@@ -7331,20 +7326,14 @@
 		const id = editingMsgId;
 		if (id) {
 			const src = msgEditor ?? editor;
-			const { text, folds } = sendPasteFolds(
-				src?.getText() ?? "",
-				src?.getPastes() ?? []
-			);
-			const stored = appendImageMarkers(
-				text,
-				editingAttachments.filter((a) => a.kind === "image").length
-			);
-			// Untouched text keeps its folds: recomputing from an
-			// empty span set would silently unfold the message's
-			// pasted tags on a no-op save.
 			const prev = activeChat(chatState).messages.find((m) => m.id === id);
-			const keepFolds =
-				text === editingSeed ? (prev?.pasteFolds ?? folds) : folds;
+			const { stored, folds: keepFolds } = bakeEditedMessage(
+				src?.getText() ?? "",
+				src?.getPastes() ?? [],
+				editingAttachments.filter((a) => a.kind === "image").length,
+				editingSeed,
+				prev?.pasteFolds
+			);
 			editMessageContent(chatState, id, withAnnotations(stored, annotations), {
 				attachments: editingAttachments,
 				pasteFolds: keepFolds

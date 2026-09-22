@@ -15,6 +15,7 @@ export {
 	pastedLabel,
 	pasteToggleAction,
 	sendPasteFolds,
+	bakeEditedMessage,
 	trimPasteTail,
 	markerCut,
 	markerCutAt,

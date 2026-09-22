@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
 	trimPasteTail,
 	sendPasteFolds,
+	bakeEditedMessage,
 	pasteToggleAction,
 	markerCut,
 	markerCutAt,
@@ -485,5 +486,20 @@ describe("pasted tags in shared tag flows", () => {
 		expect(doc.slice(ranges[1]?.from, ranges[1]?.to)).toBe(
 			pastedTextMarker(33)
 		);
+	});
+});
+
+describe("bakeEditedMessage", () => {
+	it("bakes text with markers and fresh folds", () => {
+		const { stored, folds } = bakeEditedMessage("hello", [], 1, "other", undefined);
+		expect(stored).toBe(`hello ${IMAGE_MARKER}`);
+		expect(folds).toEqual([]);
+	});
+
+	it("keeps stored folds on an untouched save", () => {
+		const prev = [{ start: 0, end: 5, chars: 10 }];
+		const { stored, folds } = bakeEditedMessage("hello", [], 0, "hello", prev);
+		expect(stored).toBe("hello");
+		expect(folds).toBe(prev);
 	});
 });

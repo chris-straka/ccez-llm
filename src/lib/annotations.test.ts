@@ -28,6 +28,7 @@ import {
 	aidedTextForMsg,
 	commitRefsEdit,
 	planClearSentRefs,
+	seedAnnotationsFromRefs,
 	REFS_ONLY_BODY,
 	isRefsOnly,
 	redactedCopyText
@@ -847,5 +848,19 @@ describe("planClearSentRefs", () => {
 			kind: "rewrote",
 			bare: "explain"
 		});
+	});
+});
+
+describe("seedAnnotationsFromRefs", () => {
+	it("seeds one pending annotation per baked ref", () => {
+		const m1 = "m1" as ChatMsgId;
+		const seeded = seedAnnotationsFromRefs(m1, [
+			{ n: 1, quote: "a", comment: "x" },
+			{ n: 2, quote: "b", comment: "" }
+		]);
+		expect(seeded).toHaveLength(2);
+		expect(seeded[0]).toMatchObject({ messageId: m1, quote: "a", comment: "x" });
+		expect(seeded[0]!.id).not.toBe(seeded[1]!.id);
+		expect(seedAnnotationsFromRefs(m1, [])).toEqual([]);
 	});
 });

@@ -12,6 +12,7 @@ import {
 	FILE_MARKER,
 	IMAGE_MARKER,
 	PASTED_TAG_RE,
+	appendImageMarkers,
 	countMarkers,
 	countPastedTags,
 	removeTags
@@ -487,4 +488,23 @@ export async function dataUrlsToImageFiles(urls: string[]): Promise<File[]> {
 		}
 	}
 	return files;
+}
+
+/**
+ * Bake an in-place edit for storage (REFACTOR §6): paste folds from
+ * the send transforms, image markers appended, annotations baked by
+ * the caller. Untouched text keeps its stored folds — recomputing
+ * from an empty span set would silently unfold the message's pasted
+ * tags on a no-op save.
+ */
+export function bakeEditedMessage(
+	raw: string,
+	pastes: PasteSpan[],
+	imageCount: number,
+	seed: string,
+	prevFolds?: SendFold[]
+): { stored: string; folds: SendFold[] } {
+	const { text, folds } = sendPasteFolds(raw, pastes);
+	const stored = appendImageMarkers(text, imageCount);
+	return { stored, folds: text === seed ? (prevFolds ?? folds) : folds };
 }

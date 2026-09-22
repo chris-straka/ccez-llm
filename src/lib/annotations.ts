@@ -2666,3 +2666,20 @@ export function planClearSentRefs(
 	if (bare.trim() === "") return { kind: "delete" };
 	return { kind: "rewrote", bare };
 }
+
+/**
+ * Seed pending annotations from a message's baked refs (REFACTOR §6):
+ * the baked block is provider context, not edit text, so saving
+ * re-bakes the same context from these seeds.
+ */
+export function seedAnnotationsFromRefs(
+	messageId: ChatMsgId,
+	refs: AnnotationRef[]
+): Annotation[] {
+	return refs.map((r) => ({
+		id: newAnnotationId(),
+		messageId,
+		quote: r.quote,
+		comment: r.comment
+	}));
+}
