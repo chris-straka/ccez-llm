@@ -18,6 +18,7 @@ import {
 	messageFoldSwipe,
 	visibleProviderIds,
 	stepCyclicId,
+	touchPastSlop,
 	pinchZoomStep,
 	twoFingerSwipeDir,
 	twoFingerSlideDir,
@@ -548,5 +549,13 @@ describe("stepCyclicId", () => {
 	it("recovers from unknown currents and empty lists", () => {
 		expect(stepCyclicId(["a", "b"], "zzz", 1)).toBe("a");
 		expect(stepCyclicId([], "a", 1)).toBeUndefined();
+	});
+});
+
+describe("touchPastSlop", () => {
+	it("reads travel against the slop", () => {
+		expect(touchPastSlop(0, 0, 9, 9, 12)).toBe(true);
+		expect(touchPastSlop(0, 0, 5, 5, 12)).toBe(false);
+		expect(touchPastSlop(0, 0, 12, 0, 12)).toBe(false);
 	});
 });

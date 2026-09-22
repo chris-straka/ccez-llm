@@ -32,6 +32,7 @@ import {
 	annotationCopyText,
 	filePendingAnnotation,
 	promptAnnWashIdFor,
+	clampMenuDrag,
 	REFS_ONLY_BODY,
 	isRefsOnly,
 	redactedCopyText
@@ -898,5 +899,13 @@ describe("pending filing", () => {
 		);
 		expect(promptAnnWashIdFor({ pending: true }, null)).toBeNull();
 		expect(promptAnnWashIdFor({ id: "s" }, "p" as AnnotationId)).toBe("s");
+	});
+});
+
+describe("clampMenuDrag", () => {
+	it("pins the dragged spot inside the viewport", () => {
+		expect(clampMenuDrag(100, 100, 400, 800)).toEqual({ x: 100, y: 100 });
+		expect(clampMenuDrag(-50, 900, 400, 800)).toEqual({ x: 8, y: 792 });
+		expect(clampMenuDrag(500, 100, 400, 800)).toEqual({ x: 392, y: 100 });
 	});
 });

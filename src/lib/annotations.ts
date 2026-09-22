@@ -2716,3 +2716,20 @@ export function promptAnnWashIdFor(
 	if ("pending" in edit) return pendingId;
 	return edit.id;
 }
+
+/**
+ * Clamp a dragged menu spot on screen (REFACTOR §6): the finger's
+ * own stroke stays 1:1, pinned inside the viewport by a margin.
+ */
+export function clampMenuDrag(
+	x: number,
+	y: number,
+	viewportWidth: number,
+	viewportHeight: number,
+	margin = 8
+): { x: number; y: number } {
+	return {
+		x: Math.min(Math.max(margin, x), viewportWidth - margin),
+		y: Math.min(Math.max(margin, y), viewportHeight - margin)
+	};
+}

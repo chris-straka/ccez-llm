@@ -502,3 +502,18 @@ export function stepCyclicId<T>(
 		(ids.indexOf(current) + direction + ids.length) % ids.length;
 	return ids[next];
 }
+
+/**
+ * True when a touch traveled past the tap slop (REFACTOR §6): menu
+ * drags, button taps, and scroll-stroke tracking share the one
+ * distance check with their own slops.
+ */
+export function touchPastSlop(
+	x1: number,
+	y1: number,
+	x2: number,
+	y2: number,
+	slop: number
+): boolean {
+	return Math.hypot(x2 - x1, y2 - y1) > slop;
+}

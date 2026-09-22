@@ -227,6 +227,7 @@
 		annotationCopyText,
 		filePendingAnnotation,
 		promptAnnWashIdFor,
+		clampMenuDrag,
 		type Annotation,
 		type AnnotationId,
 		type AnnotationMark
@@ -303,6 +304,7 @@
 		multiTapOwnsRelease,
 		visibleProviderIds,
 		stepCyclicId,
+		touchPastSlop,
 		androidMajorFromUA,
 		osConfirmsClipboard,
 		type TapSequence,
@@ -1264,7 +1266,7 @@
 		const t = event.changedTouches[0];
 		const s = annTouchStart;
 		if (!t || !s) return;
-		if (Math.hypot(t.clientX - s.x, t.clientY - s.y) > 12) {
+		if (touchPastSlop(s.x, s.y, t.clientX, t.clientY, 12)) {
 			lastAnnScrollAt = Date.now();
 		}
 	}
@@ -1290,13 +1292,15 @@
 		if (!drag || !t || !selMenu) return;
 		const dx = t.clientX - drag.mx;
 		const dy = t.clientY - drag.my;
-		if (Math.hypot(dx, dy) <= 12) return;
+		if (!touchPastSlop(drag.mx, drag.my, t.clientX, t.clientY, 12)) return;
 		menuDragSuppressAt = Date.now();
-		selMenu = {
-			...selMenu,
-			x: Math.min(Math.max(8, drag.x0 + dx), window.innerWidth - 8),
-			y: Math.min(Math.max(8, drag.y0 + dy), window.innerHeight - 8)
-		};
+		const at = clampMenuDrag(
+			drag.x0 + dx,
+			drag.y0 + dy,
+			window.innerWidth,
+			window.innerHeight
+		);
+		selMenu = { ...selMenu, x: at.x, y: at.y };
 	}
 	function menuDragEnd(): void {
 		selMenuDrag = null;
@@ -1323,7 +1327,7 @@
 		menuBtnTouchStart = null;
 		menuPressAt = Date.now();
 		if (!t || !start) return;
-		if (Math.hypot(t.clientX - start.x, t.clientY - start.y) > 14) return;
+		if (touchPastSlop(start.x, start.y, t.clientX, t.clientY, 14)) return;
 		event.preventDefault();
 		run();
 	}
