@@ -1564,14 +1564,17 @@
 		white-space: nowrap;
 		cursor: pointer;
 	}
-	/* Answer states (the remodel): waiting reads blue, ready reads
-	slick orange — explicit in both themes so the accent never mutes
-	the signal. The tail inherits via `background: inherit`. */
+	/* Answer states (the remodel): waiting rides the accent blue,
+	ready the orange token — explicit in both themes so the accent
+	never mutes the signal. The tail inherits via
+	`background: inherit`. */
 	.rendered :global(button.ccez-ann-badge.ans-waiting) {
-		background: #0a84ff;
+		background: #007aff;
+		background: var(--accent);
 	}
 	.rendered :global(button.ccez-ann-badge.ans-ready) {
 		background: #ff9f0a;
+		background: var(--ans-ready);
 	}
 	/* Speech-bubble tail: a slash leaning down-left toward the quote
 	it annotates — tip at the bottom-left corner, wide top tucked 5px

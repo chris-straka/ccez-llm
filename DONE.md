@@ -854,3 +854,17 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
       questions file while earlier ones wait
       (`annotation-answer.e2e.ts`, `AnnAnswer.svelte`,
       `annotationAnswer` in `reading.ts`).
+
+- [x] Send-hold clears the reply language with a staged annotation:
+      staged annotations ride the send either way, so only composer
+      text and attachments disarm the hold (`composer-tools.e2e.ts`:
+      "send-hold clears the reply language past a staged annotation").
+- [x] Selection-menu Annotate button opens the pill again: the bare
+      handler reference passed the click event as the draft and the
+      extracted pill crashed on its trim — the menu action wraps
+      `annotate()` now, with the parameter typed so a reintroduction
+      fails check (healed `composer-tools`, `annotation-review`,
+      `annotations`, `annotations-ux` suites).
+- [x] Review pencil always opens the edit card: a ready answer no
+      longer hijacks the dock's edit path (`openBadge` `forEdit`;
+      badge clicks keep the answer card).

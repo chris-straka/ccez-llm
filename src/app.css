@@ -21,6 +21,7 @@ html {
 	rgba everywhere — Chromium leaves color-mix() unresolved. */
 	--accent: #007aff;
 	--accent-ink: #fff;
+	--ans-ready: #b25e09;
 	/* Furigana popup colors (selection readings): solo furigana
 	always pair0; shared popups split boundaries cycling the set.
 	No red/green pair (most common deficiency): orange/teal/plum
@@ -62,6 +63,7 @@ html[data-theme="light"] {
 	--strong: #1c1c1e;
 	--accent: #007aff;
 	--accent-ink: #fff;
+	--ans-ready: #b25e09;
 	--pair0: #007aff;
 	--pair1: #b25e09;
 	--pair2: #00755a;
@@ -99,6 +101,7 @@ html[data-theme="dark"] {
 	--strong: #aeaeb2;
 	--accent: #0a84ff;
 	--accent-ink: #fff;
+	--ans-ready: #ff9f0a;
 	--pair0: #ffd60a;
 	--pair1: #ff9f0a;
 	--pair2: #2dd4a7;
