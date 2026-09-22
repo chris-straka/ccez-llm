@@ -425,42 +425,89 @@ test.describe("ruby-geometry", () => {
 });
 
 test.describe("keyboard", () => {
-	/** The a key was once nested inside the modifier branch (dead —
-	 * bare a never fired). Hovering Chinese + a must pin pinyin. */
-	test("hovering Chinese and pressing a pins pinyin", async ({ page }) => {
+	/** Hovering a Chinese word + a files it as an annotation ("?"
+	 * staged): the hover word owns bare A now. Aids pinning moved to
+	 * M / N and the gap-hover fallback below. */
+	test("hovering Chinese and pressing a annotates the word", async ({
+		page
+	}) => {
 		await seedChat(page, [{ role: "assistant", content: "你好世界" }]);
 		await page.goto("/");
 		const article = page.locator("article.assistant");
-		const body = article.locator(".rendered");
-		const actions = article.locator(".actions");
-		await expect(actions).toBeVisible({ timeout: 60_000 });
-		await article.hover();
-		await page.evaluate(() =>
-			(document.activeElement as HTMLElement | null)?.blur?.()
-		);
-		await page.keyboard.press("a");
-		await expect(body.locator("ruby")).not.toHaveCount(0, { timeout: 10_000 });
-		await expect(body).toContainText("nǐ");
-		await expect(actions.locator('button:has-text("显示原件")')).toBeVisible();
-		// Second press lifts it again.
-		await page.keyboard.press("a");
-		await expect(body.locator("ruby")).toHaveCount(0, { timeout: 10_000 });
-	});
-
-	/** Hovering Japanese + a pins furigana (same dead-branch regression). */
-	test("hovering Japanese and pressing a pins furigana", async ({ page }) => {
-		await seedChat(page, [{ role: "assistant", content: "漢字を読む" }]);
-		await page.goto("/");
-		const article = page.locator("article.assistant");
-		const body = article.locator(".rendered");
 		await expect(article.locator(".actions")).toBeVisible({ timeout: 60_000 });
 		await article.hover();
 		await page.evaluate(() =>
 			(document.activeElement as HTMLElement | null)?.blur?.()
 		);
 		await page.keyboard.press("a");
-		await expect(body.locator(".frb")).toHaveCount(2, { timeout: 60_000 });
-		await expect(body).toContainText("かんじ");
+		const pop = page.locator(".ann-pop.fresh");
+		await expect(pop).toBeVisible({ timeout: 10_000 });
+		await expect(pop.locator("textarea")).toHaveValue("?");
+	});
+
+	/** Hovering a Japanese word + a files it the same way (the old
+	 * pins-furigana contract moved to N and the gap fallback). */
+	test("hovering Japanese and pressing a annotates the word", async ({
+		page
+	}) => {
+		await seedChat(page, [{ role: "assistant", content: "漢字を読む" }]);
+		await page.goto("/");
+		const article = page.locator("article.assistant");
+		await expect(article.locator(".actions")).toBeVisible({ timeout: 60_000 });
+		await article.hover();
+		await page.evaluate(() =>
+			(document.activeElement as HTMLElement | null)?.blur?.()
+		);
+		await page.keyboard.press("a");
+		const pop = page.locator(".ann-pop.fresh");
+		await expect(pop).toBeVisible({ timeout: 10_000 });
+		await expect(pop.locator("textarea")).toHaveValue("?");
+	});
+
+	/** Bare A over no word (below the text, above the actions)
+	still toggles aids: UI chrome never files. */
+	test("hovering message chrome and pressing a pins pinyin", async ({
+		page
+	}) => {
+		await seedChat(page, [{ role: "assistant", content: "你好世界" }]);
+		await page.goto("/");
+		const article = page.locator("article.assistant");
+		const body = article.locator(".rendered");
+		const actions = article.locator(".actions");
+		await expect(actions).toBeVisible({ timeout: 60_000 });
+		const gapPoint = () =>
+			page.evaluate(() => {
+				const text = document.querySelector(
+					"article.assistant .rendered"
+				)?.getBoundingClientRect();
+				const row = document.querySelector(
+					"article.assistant .actions"
+				)?.getBoundingClientRect();
+				if (!text || !row) return null;
+				// Between the last glyph and the action row: inside the
+				// article (hover index set), on no word at all.
+				return {
+					x: text.left + text.width / 2,
+					y: (text.bottom + row.top) / 2
+				};
+			});
+		const pt = await gapPoint();
+		if (!pt) throw new Error("message has no chrome gap");
+		await page.mouse.move(pt.x, pt.y);
+		await page.evaluate(() =>
+			(document.activeElement as HTMLElement | null)?.blur?.()
+		);
+		await page.keyboard.press("a");
+		await expect(body.locator("ruby")).not.toHaveCount(0, { timeout: 10_000 });
+		await expect(body).toContainText("nǐ");
+		// Second press lifts it again (re-aim first: pinned ruby
+		// reflows the line, so the old point may sit on a glyph now
+		// — and glyphs file annotations instead of toggling).
+		const pt2 = await gapPoint();
+		if (!pt2) throw new Error("message has no chrome gap");
+		await page.mouse.move(pt2.x, pt2.y);
+		await page.keyboard.press("a");
+		await expect(body.locator("ruby")).toHaveCount(0, { timeout: 10_000 });
 	});
 
 	/** M pins pinyin on the message in the middle of the screen. */
@@ -570,9 +617,9 @@ test.describe("keyboard", () => {
 });
 
 test.describe("keyboard mixed", () => {
-	/** Hovering a mixed message and pressing a pins every offered aid:
-	pinyin over the Chinese lines, furigana over the Japanese ones. */
-	test("hovering mixed text and pressing a pins both aids", async ({
+	/** Hovering mixed text + a files the hovered word ("?" staged):
+	the hover word owns bare A now (M / N still pin both aids). */
+	test("hovering mixed text and pressing a annotates the word", async ({
 		page
 	}) => {
 		await seedChat(page, [
@@ -580,19 +627,14 @@ test.describe("keyboard mixed", () => {
 		]);
 		await page.goto("/");
 		const article = page.locator("article.assistant");
-		const body = article.locator(".rendered");
 		await expect(article.locator(".actions")).toBeVisible({ timeout: 60_000 });
 		await article.hover();
 		await page.evaluate(() =>
 			(document.activeElement as HTMLElement | null)?.blur?.()
 		);
 		await page.keyboard.press("a");
-		await expect(body.locator("ruby")).not.toHaveCount(0, { timeout: 10_000 });
-		await expect(body.locator(".frb").first()).toBeVisible({ timeout: 60_000 });
-		await expect(body).toContainText("nǐ");
-		// Second press lifts both again.
-		await page.keyboard.press("a");
-		await expect(body.locator("ruby")).toHaveCount(0, { timeout: 10_000 });
-		await expect(body.locator(".frb")).toHaveCount(0, { timeout: 10_000 });
+		const pop = page.locator(".ann-pop.fresh");
+		await expect(pop).toBeVisible({ timeout: 10_000 });
+		await expect(pop.locator("textarea")).toHaveValue("?");
 	});
 });

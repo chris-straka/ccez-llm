@@ -478,7 +478,8 @@ describe("selMenuPlacement", () => {
 				viewportHeight,
 				androidUI: false,
 				iosUI: false,
-				menuWidth: 120
+				menuWidth: 120,
+				fontScale: 1
 			})
 		).toEqual({ x: 584, y: 262 });
 	});
@@ -493,7 +494,8 @@ describe("selMenuPlacement", () => {
 				viewportHeight,
 				androidUI: false,
 				iosUI: false,
-				menuWidth: 120
+				menuWidth: 120,
+				fontScale: 1
 			})
 		).toEqual({ x: 484, y: 252 });
 	});
@@ -508,7 +510,8 @@ describe("selMenuPlacement", () => {
 				viewportHeight,
 				androidUI: false,
 				iosUI: false,
-				menuWidth: 120
+				menuWidth: 120,
+				fontScale: 1
 			})
 		).toEqual({ x: 8, y: 8 });
 	});
@@ -526,7 +529,8 @@ describe("selMenuPlacement", () => {
 				viewportHeight,
 				androidUI: false,
 				iosUI: false,
-				menuWidth: 120
+				menuWidth: 120,
+				fontScale: 1
 			})
 		).toEqual({ x: 1152, y: 262 });
 	});
@@ -543,7 +547,8 @@ describe("selMenuPlacement", () => {
 				viewportHeight,
 				androidUI: true,
 				iosUI: false,
-				menuWidth: 120
+				menuWidth: 120,
+				fontScale: 1
 			})
 		).toEqual({ x: 540, y: 253 });
 		expect(
@@ -555,7 +560,8 @@ describe("selMenuPlacement", () => {
 				viewportHeight,
 				androidUI: false,
 				iosUI: true,
-				menuWidth: 220
+				menuWidth: 220,
+				fontScale: 1
 			})
 		).toEqual({ x: 584, y: 253 });
 	});
@@ -573,9 +579,29 @@ describe("selMenuPlacement", () => {
 				viewportHeight: 740,
 				androidUI: true,
 				iosUI: false,
-				menuWidth: 220
+				menuWidth: 220,
+				fontScale: 1
 			})
 		).toEqual({ x: 130, y: 72 });
+	});
+
+	it("lifts the desktop menu clear of huge type", () => {
+		// 370%: the button stands ~83px tall, so the menu rides
+		// ~91px above the cursor instead of the 1x 48px — the word
+		// stays clickable for double/triple clicks underneath.
+		expect(
+			selMenuPlacement({
+				cursorX: 600,
+				cursorY: 310,
+				...rect,
+				viewportWidth,
+				viewportHeight,
+				androidUI: false,
+				iosUI: false,
+				menuWidth: 120,
+				fontScale: 3.7
+			})
+		).toEqual({ x: 584, y: 219 });
 	});
 
 	it("keeps the phone menu centered for 2- and 3-button widths", () => {
@@ -592,7 +618,8 @@ describe("selMenuPlacement", () => {
 			viewportWidth,
 			viewportHeight,
 			androidUI: true,
-			iosUI: false
+			iosUI: false,
+			fontScale: 1
 		};
 		const narrow = selMenuPlacement({ ...at, menuWidth: 200 });
 		const wide = selMenuPlacement({ ...at, menuWidth: 320 });

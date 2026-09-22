@@ -196,12 +196,8 @@ blur-save fires first and Cancel/Delete can never win the race. -->
 					<ActionIcon kind="mic" />
 				</button>
 			{/if}
-			<button
-				type="button"
-				class="ann-cancel"
-				onmousedown={(e) => e.preventDefault()}
-				onclick={actions.cancel}>Cancel</button
-			>
+			<!-- No Cancel button: clicking off the card (or Escape)
+			closes it — an empty draft cancels, typed text saves. -->
 			<button
 				type="button"
 				class="ann-save"
@@ -341,19 +337,6 @@ blur-save fires first and Cancel/Delete can never win the race. -->
 	.ann-tool :global(.action-glyph) {
 		height: 1.25rem;
 	}
-	.ann-cancel {
-		flex: none;
-		border: 1px solid #6e6e73;
-		border-radius: 999px;
-		background: none;
-		color: #f2f2f7;
-		font: inherit;
-		padding: 0.5rem 1.25rem;
-		cursor: pointer;
-	}
-	.ann-cancel:hover {
-		border-color: #aeaeb2;
-	}
 	.ann-save {
 		flex: none;
 		border: 1px solid #f2f2f7;
@@ -402,13 +385,6 @@ blur-save fires first and Cancel/Delete can never win the race. -->
 		color: #ff3b30;
 		color: var(--alarm);
 	}
-	:global(html[data-theme="light"]) .ann-pop .ann-cancel {
-		border-color: #c7c7cc;
-		color: #1c1c1e;
-	}
-	:global(html[data-theme="light"]) .ann-pop .ann-cancel:hover {
-		border-color: #1c1c1e;
-	}
 	:global(html[data-theme="light"]) .ann-pop .ann-save {
 		border-color: #007aff;
 		border-color: var(--accent);
@@ -448,18 +424,25 @@ blur-save fires first and Cancel/Delete can never win the race. -->
 		font-size: 1em;
 		padding: 0.15rem 0;
 	}
-	/* Thumb-sized Cancel targets on phones (the .app ancestor stays
+	/* Thumb-sized Save target on phones (the .app ancestor stays
 	global — it renders paged, unscopable). */
-	:global(.app[data-android]) .ann-cancel,
 	:global(.app[data-android]) .ann-save {
 		min-height: 2.75rem;
 	}
 	/* Annotation boxes read at the screen's message size on phones:
-	a fixed 1rem box next to 800% message type strands the eyes.
-	The desktop edit card keeps its fixed overlay type; only the
-	creation pill scales there (see .ann-pop.fresh above). */
+	a fixed 1rem box next to 800% message type strands the eyes. */
 	:global(.app[data-android]) .ann-pop textarea {
 		font-size: calc(0.92rem * var(--font-scale, 1));
+	}
+	/* The desktop edit card scales with the text size like the
+	creation pill does: a fixed 1rem field next to 370% type is
+	unreadable. em units ride the card root, so Save and the tools
+	scale with the field. */
+	.ann-pop:not(.fresh) {
+		font-size: calc(1rem * var(--font-scale, 1));
+	}
+	.ann-pop:not(.fresh) textarea {
+		font-size: 1.05em;
 	}
 	/* The create pill's arrow rides round like the composer's send:
 	compact pill, compact button. */

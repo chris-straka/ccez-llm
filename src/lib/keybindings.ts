@@ -68,6 +68,8 @@ export interface MessageKeyFacts extends KeyModifiers {
 	inFieldOrFilter: boolean;
 	/** A text selection is live: hovered copy yields to it. */
 	hasSelection: boolean;
+	/** Word under the pointer (no selection): A files it as `?`. */
+	hoverWord?: string | null;
 	hoveredIdx: number;
 	escDownAt: number;
 }
@@ -75,6 +77,7 @@ export interface MessageKeyFacts extends KeyModifiers {
 export type MessageKeyAction =
 	| "toggle-aids"
 	| "annotate-selection"
+	| "annotate-hovered-word"
 	| "pin-pinyin"
 	| "pin-furigana"
 	| "exit-fullscreen"
@@ -96,10 +99,13 @@ export function messageKeyAction(
 ): MessageKeyAction | null {
 	const hovered = !facts.inEditor && facts.hoveredIdx >= 0;
 	// A live selection owns A: double-tap a word and hit A to file it
-	// as an annotation (the note stages "?"). Bare message A still
-	// toggles aids below.
+	// as an annotation (the note stages "?"). Hovering a word with
+	// no selection files that word the same way; bare message A over
+	// anything else still toggles aids below.
 	if (facts.key === "a" && hovered && facts.hasSelection && bare(facts) && !facts.inField)
 		return "annotate-selection";
+	if (facts.key === "a" && hovered && !facts.hasSelection && facts.hoverWord && bare(facts) && !facts.inField)
+		return "annotate-hovered-word";
 	if (facts.key === "a" && hovered && bare(facts) && !facts.inField)
 		return "toggle-aids";
 	// M/N pin on the center message, not the hovered one, so they

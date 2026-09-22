@@ -531,7 +531,8 @@ test("keyboard enter opens the badge edit", async ({ page }) => {
 	await expect(page.locator(".ann-pop textarea")).toHaveValue("typed");
 });
 
-/** Cancel drops the badge edit without touching the saved comment. */
+/** Escape drops the badge edit without touching the saved comment
+(no Cancel button: click-off and Esc close the card). */
 test("badge cancel drops the edit", async ({ page }) => {
 	await openAnnotate(page, "確認しました");
 	await page.locator(".ann-pop textarea").fill("kept");
@@ -548,7 +549,8 @@ test("badge cancel drops the edit", async ({ page }) => {
 	await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
 	await expect(page.locator(".ann-pop")).toBeVisible();
 	await page.locator(".ann-pop textarea").fill("scratch");
-	await page.locator(".ann-pop .ann-cancel").click();
+	await expect(page.locator(".ann-pop .ann-cancel")).toHaveCount(0);
+	await page.keyboard.press("Escape");
 	await expect(page.locator(".ann-pop")).toHaveCount(0);
 	const reopened = await badge.boundingBox();
 	if (!reopened) throw new Error("badge has no box");

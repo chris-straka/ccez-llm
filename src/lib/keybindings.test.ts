@@ -88,6 +88,24 @@ describe("messageKeyAction", () => {
 			messageKeyAction({ ...msgBase, hasSelection: true, shiftKey: true })
 		).toBe(null);
 	});
+
+	it("files a hovered word on A with no selection", () => {
+		expect(
+			messageKeyAction({ ...msgBase, hoverWord: "riverbank" })
+		).toBe("annotate-hovered-word");
+		// A selection still wins over the hover word.
+		expect(
+			messageKeyAction({
+				...msgBase,
+				hasSelection: true,
+				hoverWord: "riverbank"
+			})
+		).toBe("annotate-selection");
+		// No word under the pointer: aids toggle as before.
+		expect(messageKeyAction({ ...msgBase, hoverWord: null })).toBe(
+			"toggle-aids"
+		);
+	});
 	it("fires the hovered-message hotkeys bare and hovered", () => {
 		expect(messageKeyAction(msgBase)).toBe("toggle-aids");
 		expect(messageKeyAction({ ...msgBase, key: "m", code: "KeyM" })).toBe(

@@ -2464,6 +2464,8 @@ export function selMenuPlacement(opts: {
 	iosUI: boolean;
 	/** Estimated menu width (px) for the centering/clamp. */
 	menuWidth: number;
+	/** Message text scale: the menu tracks it, so clearance scales too. */
+	fontScale: number;
 }): { x: number; y: number } {
 	const {
 		cursorX,
@@ -2476,7 +2478,8 @@ export function selMenuPlacement(opts: {
 		viewportHeight,
 		androidUI,
 		iosUI,
-		menuWidth
+		menuWidth,
+		fontScale
 	} = opts;
 	// Phones center the menu over the selected text (a 2-button row
 	// left-anchored like desktop reads off-center); desktop keeps the
@@ -2509,10 +2512,13 @@ export function selMenuPlacement(opts: {
 		if (y + 44 > viewportHeight) y = Math.max(8, viewportHeight - 52);
 	} else {
 		// Desktop: always above the cursor that finished the
-		// gesture (never below it), the menu riding just clear of
-		// it (a breath of gap), clamped to the viewport top.
+		// gesture (never below it), riding clear of it by its own
+		// scaled height plus a breath — a fixed 48px strands the
+		// menu over the cursor once the button tracks huge type,
+		// eating double/triple clicks. Clamped to the viewport top.
+		const menuH = Math.round(24 + 16 * Math.max(1, fontScale));
 		const cy = cursorY ?? rectTop;
-		y = Math.max(8, cy - 48);
+		y = Math.max(8, cy - 8 - menuH);
 	}
 	return { x, y };
 }

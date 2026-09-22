@@ -3054,6 +3054,44 @@
 	function noteMainDown(event: PointerEvent): void {
 		mainDown = { x: event.screenX, y: event.screenY };
 	}
+	/** Last pointer position over the chat (plain field, never state):
+	hover hotkeys resolve the word under it without a selection. */
+	let lastPointer = { x: 0, y: 0 };
+	function noteMainMove(event: PointerEvent): void {
+		lastPointer = { x: event.clientX, y: event.clientY };
+	}
+	/**
+	 * Word under the pointer for hover hotkeys: caret-precise (not
+	 * element hover), bounded with the word segmenter, null on
+	 * whitespace or outside text. The caller selects the range, so
+	 * the quote files exactly like a live selection.
+	 */
+	function hoverWordRange(): {
+		word: string;
+		node: Text;
+		start: number;
+		end: number;
+	} | null {
+		let range: Range | null = null;
+		try {
+			range = document.caretRangeFromPoint(lastPointer.x, lastPointer.y);
+		} catch {
+			return null;
+		}
+		if (!range) return null;
+		const node = range.startContainer;
+		if (!(node instanceof Text)) return null;
+		// Message text only: action-row buttons, badges, and pills
+		// are words too, but filing UI chrome as an annotation is
+		// nonsense — those hovers keep the old aids behavior.
+		if (!node.parentElement?.closest(".rendered")) return null;
+		const text = node.textContent ?? "";
+		const bounds = wordBoundsAt(text, range.startOffset);
+		if (!bounds) return null;
+		const word = text.slice(bounds[0], bounds[1]);
+		if (!word.trim()) return null;
+		return { word, node, start: bounds[0], end: bounds[1] };
+	}
 	/**
 	 * Clicking into the main chat closes the sidebars: the settings
 	 * panel and the chats list both collapse, so the click lands on a
@@ -4378,7 +4416,8 @@
 				found.quote,
 				androidUI,
 				settings.inspectEnabled
-			)
+			),
+			fontScale: settings.fontScale
 		});
 		// The rescue in the selectionchange auto-dismiss restores the
 		// stored range while nothing newer landed (see selMenuOpenedAt).
@@ -10133,7 +10172,20 @@
 			}
 			// One snapshot for every hovered-message hotkey below: the
 			// guards each walked the target themselves, so this is also
-			// fewer ancestor walks per keypress, not more.
+			// fewer ancestor walks per keypress, not more. The hover
+			// word resolves only for bare A (the one chord that reads
+			// it): caretRangeFromPoint on every keypress would tax
+			// typing-adjacent keys for nothing.
+			const hoverHit =
+				event.key === "a" &&
+				!event.metaKey &&
+				!event.ctrlKey &&
+				!event.altKey &&
+				!event.shiftKey &&
+				hoveredIdx >= 0 &&
+				(window.getSelection()?.toString() ?? "") === ""
+					? hoverWordRange()
+					: null;
 			const msgFacts = {
 				...keyFacts(event),
 				inEditor: inEditor !== null,
@@ -10142,6 +10194,7 @@
 				inInteractive: isInteractiveTarget(event.target),
 				inFieldOrFilter: isInspectFieldTarget(event.target),
 				hasSelection: (window.getSelection()?.toString() ?? "") !== "",
+				hoverWord: hoverHit?.word ?? null,
 				hoveredIdx,
 				escDownAt
 			};
@@ -10154,6 +10207,27 @@
 				placeSelMenu();
 				annotate("?");
 				return;
+			}
+			if (msgAction === "annotate-hovered-word") {
+				// Hover a word, hit A: select it first, then file
+				// exactly like a live selection ("?" staged). The
+				// decision already confirmed a word is under the
+				// pointer; a stale range selects nothing and files
+				// nothing (annotate guards the empty quote).
+				if (hoverHit) {
+					event.preventDefault();
+					window
+						.getSelection()
+						?.setBaseAndExtent(
+							hoverHit.node,
+							hoverHit.start,
+							hoverHit.node,
+							hoverHit.end
+						);
+					placeSelMenu();
+					annotate("?");
+					return;
+				}
 			}
 			if (msgAction === "toggle-aids") {
 				// A toggles every aid the hovered message offers — pinyin
@@ -11855,7 +11929,8 @@
 						selMenu.quote,
 						androidUI,
 						settings.inspectEnabled
-					)
+					),
+					fontScale: settings.fontScale
 				});
 				if (
 					selMenu.x !== x ||
@@ -12017,6 +12092,7 @@
 		class:scale-actions={settings.scaleActionsWithFont}
 		class:alt={altHeld}
 		onpointerdown={noteMainDown}
+		onpointermove={noteMainMove}
 		onclick={closeSettingsFromMain}
 		ondblclick={gutterDoubleClick}
 	>

@@ -32,7 +32,7 @@ export function touchShortcuts(): ShortcutRow[] {
 		{ name: "Delete a message", keys: "Three-finger tap" },
 		{ name: "Delete this chat", keys: "Three-finger hold" },
 		{ name: "Message end", keys: "Double two-finger tap" },
-		{ name: "Annotate", keys: "Select text · Annotate" },
+		{ name: "Annotate", keys: "Hover + A · Select + Annotate" },
 		{ name: "Speak selection", keys: "Select text · Speak" },
 		{
 			name: "Inspect character",
@@ -161,7 +161,7 @@ export function desktopShortcuts(isMac: boolean, inShell = true): ShortcutRow[] 
 		{ name: "Speak word", keys: "Hover + Shift+W" },
 		{ name: "Speak sentence", keys: "Hover + Shift+S" },
 		{ name: "Speak paragraph", keys: "Hover + Shift+P" },
-		{ name: "Reading aid toggle", keys: "Hover + A · M pinyin · N furigana" },
+		{ name: "Reading aid toggle", keys: "M pinyin · N furigana" },
 		{ name: "prev/next stroke step", keys: "H / L with Inspect open" },
 		{ name: "Text size up / down", keys: `${mod}+ / ${mod}−` },
 		{ name: "Chat width + / −", keys: `⇧${mod}+ / ⇧${mod}−` }

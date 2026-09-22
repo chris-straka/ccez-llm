@@ -25,3 +25,50 @@ test("selected word plus A stages a question note", async ({ page }) => {
 	await expect(pop).toBeVisible({ timeout: 10_000 });
 	await expect(pop.locator("textarea")).toHaveValue("?");
 });
+
+/** Hovering a word (no selection) plus A files the hovered word
+with "?" staged — the word selects itself first, then the same
+filing path runs. */
+test("hovered word plus A stages a question note", async ({ page }) => {
+	await seedChat(page, [
+		{ role: "assistant", content: "the riverbank at dawn holds the fog" }
+	]);
+	await page.goto("/");
+	const article = page.locator("article.assistant");
+	await expect(article).toBeVisible({ timeout: 60_000 });
+	// Hands off the prompt first: a focused composer eats the A
+	// into typed text (correct product behavior — typing is
+	// typing). Escape drops its caret without hiding it.
+	await page.keyboard.press("Escape");
+	// Mid-word hover with no selection anywhere: resolve the
+	// word's own caret rect so the pointer lands on a glyph, not a
+	// gap (gaps keep the old aids behavior, which files nothing
+	// here).
+	const pt = await page.evaluate(() => {
+		const el = document.querySelector("article.assistant .rendered");
+		if (!el) return null;
+		const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+		let node: Node | null;
+		while ((node = walker.nextNode())) {
+			const i = (node.textContent ?? "").indexOf("riverbank");
+			if (i >= 0) {
+				const r = document.createRange();
+				r.setStart(node, i + 2);
+				r.setEnd(node, i + 3);
+				const rect = r.getBoundingClientRect();
+				return {
+					x: rect.left + rect.width / 2,
+					y: rect.top + rect.height / 2
+				};
+			}
+		}
+		return null;
+	});
+	if (!pt) throw new Error("word has no caret rect");
+	await page.evaluate(() => window.getSelection()?.removeAllRanges());
+	await page.mouse.move(pt.x, pt.y);
+	await page.keyboard.press("a");
+	const pop = page.locator(".ann-pop.fresh");
+	await expect(pop).toBeVisible({ timeout: 10_000 });
+	await expect(pop.locator("textarea")).toHaveValue("?");
+});
