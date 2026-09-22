@@ -595,6 +595,16 @@ export function chromeChord(facts: ChromeChordFacts): ChromeChord | null {
 		// the page must not swallow them.
 		if (facts.inShell && quickLangIndexForKey(facts.key) !== -1)
 			return "quick-lang";
+		// Shell only: the browser claims ⌘[ / ⌘] (history) and
+		// ⌘↑ / ⌘↓ (scroll edges) — in the shell they step chats
+		// (0.5.3 field notes), same tokens as ⇧⌘J/K. Fields and the
+		// prompt keep them for caret travel.
+		if (facts.inShell && !facts.inField && !facts.inEditor) {
+			if (facts.code === "BracketLeft") return "step-chat-older";
+			if (facts.code === "BracketRight") return "step-chat-newer";
+			if (facts.key === "ArrowDown") return "step-chat-newer";
+			if (facts.key === "ArrowUp") return "step-chat-older";
+		}
 		// Shell only: a browser claims ⌘/Ctrl+D (bookmark tab).
 		if (
 			facts.inShell &&

@@ -113,7 +113,11 @@ export function desktopShortcuts(isMac: boolean, inShell = true): ShortcutRow[] 
 		{ name: "Fullscreen", keys: `${isMac ? "⌘E, F" : "Ctrl+Meta+F"}` },
 		{
 			name: "Newer / older chat",
-			keys: `${isMac ? "⇧⌘J / ⇧⌘K" : "Ctrl+Shift+J / Ctrl+Shift+K"}`
+			keys: `${
+				isMac
+					? "⇧⌘J / ⇧⌘K / ⌘[ / ⌘] / ⌘↑ / ⌘↓"
+					: "Ctrl+Shift+J / Ctrl+Shift+K / Ctrl+[ / Ctrl+] / Ctrl+↑ / Ctrl+↓"
+			}`
 		},
 		{
 			name: "New chat",

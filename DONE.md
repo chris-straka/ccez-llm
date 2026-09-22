@@ -938,3 +938,10 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
       no French context still seed English by design; French sentences
       and paragraphs already route French via context seeding, and the
       voice-language setting forces French for all Latin text.
+
+- [x] Chat-step aliases (0.5.3 field note): plain ⌘[ / ⌘] and ⌘↑ / ⌘↓
+      step older/newer in the shell (same tokens as ⇧⌘J/K, no focus
+      taken). Browser-claimed (history, scroll edges) so shell-only
+      like quick-lang; fields and the prompt keep them for caret
+      travel. Dispatch unit-pinned, shared effect covered by
+      `chat-switch.e2e.ts`.

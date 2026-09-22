@@ -820,6 +820,42 @@ describe("chromeChord", () => {
 		expect(quickLangIndexForKey("x")).toBe(-1);
 	});
 
+	it("steps chats on plain ⌘[ / ⌘] / ⌘↑ / ⌘↓ (shell only, fields keep them)", () => {
+		expect(chromeChord({ ...chromeBase, key: "[", code: "BracketLeft" })).toBe(
+			"step-chat-older"
+		);
+		expect(chromeChord({ ...chromeBase, key: "]", code: "BracketRight" })).toBe(
+			"step-chat-newer"
+		);
+		expect(
+			chromeChord({ ...chromeBase, key: "ArrowDown", code: "ArrowDown" })
+		).toBe("step-chat-newer");
+		expect(chromeChord({ ...chromeBase, key: "ArrowUp", code: "ArrowUp" })).toBe(
+			"step-chat-older"
+		);
+		// Bare arrows never step; shift keeps the shift spelling.
+		expect(chromeChord({ ...chromeBase, metaKey: false, key: "ArrowDown" })).toBe(
+			null
+		);
+		expect(
+			chromeChord({ ...chromeBase, shiftKey: true, code: "BracketLeft" })
+		).toBe("toggle-sidebar");
+		// Browser preview: history and scroll edges stay native.
+		expect(
+			chromeChord({ ...chromeBase, inShell: false, key: "[", code: "BracketLeft" })
+		).toBeNull();
+		expect(
+			chromeChord({ ...chromeBase, inShell: false, key: "ArrowUp", code: "ArrowUp" })
+		).toBeNull();
+		// Fields and the prompt keep them for caret travel.
+		expect(
+			chromeChord({ ...chromeBase, key: "[", code: "BracketLeft", inField: true })
+		).toBeNull();
+		expect(
+			chromeChord({ ...chromeBase, key: "ArrowDown", code: "ArrowDown", inEditor: true })
+		).toBeNull();
+	});
+
 	it("keeps the guard spellings (Cmd+D stays meta-only and hover-gated)", () => {
 		// Ctrl+D belongs to the prompt and scroll-mode fast-scroll.
 		expect(
