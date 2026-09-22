@@ -86,6 +86,12 @@ panels. -->
 		z-index: 50;
 		pointer-events: none;
 		max-width: 20rem;
+		/* Scrunched (wrapped) readings balance into even centered
+		lines, so the glass hugs the characters instead of spanning
+		a longest-line slab. Single-line panels already shrink-wrap,
+		so this changes nothing there. */
+		text-align: center;
+		text-wrap: balance;
 		/* Tight sides: the popup hugs its readings (runs carry no
 		inner padding of their own). */
 		padding: 0.3rem 0.2rem;
