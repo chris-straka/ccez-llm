@@ -3,13 +3,12 @@ import { readFileSync } from "node:fs";
 
 /**
  * The annotation answer popup renders from `AnnAnswer.svelte`, not
- * the page. The page owns open state, badge-anchor placement below
- * the word, the readings line, and fade-out; the component owns the
- * card markup and its surface. The quote itself never renders here
- * (the highlighted word upstream is the title). Answer text renders
- * as text (never {@html}); the readings line is the only HTML, and
- * it is locally generated and sanitized upstream. No close button:
- * clicking off the card (or Esc) closes it.
+ * the page. The page owns open state, below-quote placement, and
+ * fade-out; the component owns the card markup and its surface.
+ * The quote itself never renders here (the highlighted word
+ * upstream is the title, with Han readings in the panels above
+ * it). Answer text renders as text (never {@html}). No close
+ * button: clicking off the card (or Esc) closes it.
  */
 function answerSource(): string {
 	return readFileSync(new URL("./AnnAnswer.svelte", import.meta.url), "utf8");
@@ -35,10 +34,12 @@ describe("annotation answer extraction", () => {
 		expect(answerSource()).not.toContain("{quote}");
 	});
 
-	it("renders answer text as text, readings as upstream HTML", () => {
+	it("renders answer text as text, never HTML", () => {
 		expect(answerSource()).toContain("{answer}");
 		expect(answerSource()).not.toContain("{@html answer}");
-		expect(answerSource()).toContain("{@html readingsHtml}");
+		expect(answerSource()).not.toContain("{@html");
+		expect(answerSource()).not.toContain("readingsHtml");
+		expect(answerSource()).not.toContain("ann-answer-readings");
 	});
 
 	it("fades in on mount and out while closing", () => {

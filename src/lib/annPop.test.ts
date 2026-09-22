@@ -5,6 +5,7 @@ import {
 	annPopSaveKind,
 	annPopWidth,
 	pillWashId,
+	placeAnnAnswer,
 	placeAnnCard,
 	placeAnnComposer
 } from "./annPop";
@@ -165,5 +166,28 @@ describe("placeAnnComposer", () => {
 		const placed = placeAnnComposer(edge);
 		expect(placed.y + 99).toBeLessThanOrEqual(700);
 		expect(placed.y).toBeGreaterThanOrEqual(8);
+	});
+});
+
+describe("placeAnnAnswer", () => {
+	const base = {
+		viewportWidth: 1000,
+		menuX: 500,
+		highlightLeft: 100,
+		highlightWidth: 50,
+		highlightBottom: 300,
+		width: 304,
+		fontScale: 1
+	};
+	it("hangs below the quote with the create pill's gap and x math", () => {
+		expect(placeAnnAnswer(base)).toEqual(placeAnnComposer({ ...base, android: false, viewportHeight: 800, highlightTop: 280 }));
+		expect(placeAnnAnswer(base)).toEqual({ x: 8, y: 302 });
+	});
+	it("never flips above at the edge: the page scrolls instead", () => {
+		const edge = { ...base, highlightBottom: 790 };
+		expect(placeAnnAnswer(edge)).toEqual({ x: 8, y: 792 });
+	});
+	it("scales the gap with the font", () => {
+		expect(placeAnnAnswer({ ...base, fontScale: 3.7 })).toEqual({ x: 8, y: 334 });
 	});
 });

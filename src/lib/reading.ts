@@ -176,23 +176,6 @@ export const AID_LABEL: Record<DetectedScript, string> = {
 	ar: "tashkeel"
 };
 
-/** Reading-aid kind for an answer popup's quote line, by script. */
-export type AnswerReadingsKind = "pinyin" | "furigana" | "tashkeel";
-
-/**
- * Which readings line an answered annotation earns: pinyin for
- * Chinese, furigana for Japanese, tashkeel for Arabic — nothing
- * otherwise. Pure policy; the page computes the line itself.
- */
-export function answerReadingsKind(
-	script: DetectedScript | null
-): AnswerReadingsKind | null {
-	if (script === "zh") return "pinyin";
-	if (script === "ja") return "furigana";
-	if (script === "ar") return "tashkeel";
-	return null;
-}
-
 const WORD_BREAK =
 	/[\s，。！？、；：「」『』（）［］【】《》〈〉…—–·,.!?;:"'()[\]{}<>・、。؟؛،«»‹›„“”‘’\n\r\t]/;
 

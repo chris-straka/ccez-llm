@@ -209,8 +209,21 @@ test("a highlight ending mid-sentence keeps one voice", async ({ page }) => {
 test("right-clicking hanzi with no highlight still speaks", async ({
 	page
 }) => {
-	await clickOnText(page);
-	await expect.poll(() => spoken(page), { timeout: 10_000 }).not.toEqual([]);
+	// On the glyph itself (not the padding): the word path reads
+	// the segmented word back, never a panel.
+	const point = await page.evaluate(() => {
+		const p = document.querySelector("article.assistant .rendered p");
+		const text = p?.firstChild;
+		if (!text || text.nodeType !== Node.TEXT_NODE)
+			throw new Error("no text node");
+		const range = document.createRange();
+		range.setStart(text, 0);
+		range.setEnd(text, 1);
+		const rect = range.getBoundingClientRect();
+		return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+	});
+	await page.mouse.click(point.x, point.y, { button: "right" });
+	await expect.poll(() => spoken(page), { timeout: 10_000 }).toEqual(["你好"]);
 	await expect(page.locator(".sel-pinyin")).toHaveCount(0);
 });
 

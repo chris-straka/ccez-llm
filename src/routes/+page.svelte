@@ -219,6 +219,7 @@
 		annRefsFor,
 		lockSelectionToMessage,
 		quoteTextNodes,
+		locateQuote,
 		occurrenceAtPosition,
 		snapSelectionToWordEdges,
 		selMenuPlacement,
@@ -402,8 +403,6 @@
 		hanOverlayLangFor,
 		runModelAid,
 		annotationAnswer,
-		detectScript,
-		answerReadingsKind,
 		aidTargetLines,
 		aidFailureToast,
 		selectAidInput,
@@ -420,7 +419,7 @@
 		type LocalAid,
 		type HanOverlayLang
 	} from "$lib/reading";
-	import { isFuriganaCached, furiganaLine } from "$lib/furigana";
+	import { isFuriganaCached } from "$lib/furigana";
 	import { fieldSelectionLive, reportOsMenu } from "$lib/promptmenu";
 	import {
 		buildSearchDocs,
@@ -437,6 +436,7 @@
 		annPopSaveKind,
 		annPopWidth,
 		pillWashId,
+		placeAnnAnswer,
 		placeAnnCard,
 		placeAnnComposer
 	} from "$lib/annPop";
@@ -1012,14 +1012,14 @@
 	} | null>(null);
 	/** Answer popup (the remodel): open answer read in context. Null
 	when closed; the card self-heals (renders nothing) if its
-	annotation is deleted or sent while open. Readings ride along
-	(ruby/vowelled quote line, null until computed). */
+	annotation is deleted or sent while open. The quote itself never
+	renders in the card — the highlighted word upstream is the
+	title, with Han readings in the panels above it. */
 	let answerPop = $state<{
 		id: AnnotationId;
 		x: number;
 		y: number;
 		w: number;
-		readings: string | null;
 	} | null>(null);
 	/** Answer fade-out in flight (unmounts when the ramp ends). */
 	let answerClosing = $state(false);
@@ -1103,10 +1103,17 @@
 		plain: boolean;
 	}
 	let selFurigana = $state<FuriganaPanel[] | null>(null);
+	/** Pinned panels belong to an open pill/answer, not the live
+	highlight: creating/answering steals focus (collapsing the
+	document selection), so the watcher must not dismiss them on
+	empty — only on a mismatched new highlight, or explicitly on
+	submit/cancel/close (dismissSelPanels resets this). */
+	let panelsPinned = $state(false);
 	/** Drop every selection overlay at once: the flat panel, the
 	furigana panels, and the document tint. Every dismiss site below
 	uses this — a bare selPinyin clear would strand tinted kanji. */
 	function dismissSelPanels(): void {
+		panelsPinned = false;
 		selPinyin = null;
 		selFurigana = null;
 		unwrapFuriganaTint();
@@ -1596,17 +1603,29 @@
 	 * Stale right-clicks never fill it: a moved-on highlight drops
 	 * the result instead of showing it.
 	 */
-	async function showSelectionFurigana(quoted: {
-		quote: string;
-		messageId: ChatMsgId;
-	}): Promise<string | null> {
+	async function showSelectionFurigana(
+		quoted: {
+			quote: string;
+			messageId: ChatMsgId;
+		},
+		// Pinned callers (create/answer) pass the context outright:
+		// their highlight is gone (focus collapse) by resolve time,
+		// so the pending panel's own anchor stands in for the live
+		// match below.
+		explicitContext?: string
+	): Promise<string | null> {
 		dismissSelPanels();
 		placeSelPinyin(quoted, "…");
 		const live = currentQuote();
 		const context =
 			live && live.messageId === quoted.messageId && live.quote === quoted.quote
 				? live.context
-				: quoted.quote;
+				: (explicitContext ??
+					(selPinyin?.quote === quoted.quote &&
+					selPinyin.messageId === quoted.messageId
+						? quoted.quote
+						: null));
+		if (!context) return null;
 		// Convert the sentence, slice the highlight: isolated text
 		// misreads (生 alone is せい, in 生まれる it is う).
 		const sentence = sentenceForQuote(context, quoted.quote) ?? quoted.quote;
@@ -1617,10 +1636,15 @@
 			html = "";
 		}
 		const now = currentQuote();
+		const anchored =
+			selPinyin?.quote === quoted.quote &&
+			selPinyin.messageId === quoted.messageId;
 		if (
-			!now ||
-			now.messageId !== quoted.messageId ||
-			now.quote !== quoted.quote
+			(!now || now.messageId !== quoted.messageId || now.quote !== quoted.quote) &&
+			// Pinned resolve (create/answer): the highlight collapsed
+			// under pill focus, but nobody moved on — the pending
+			// panel's anchor still addresses this quote.
+			!(explicitContext && anchored)
 		)
 			return null;
 		const sentRuns = annotatedRunsWithOffsets(html);
@@ -1743,6 +1767,67 @@
 		// run boundary (味覚が speaks みかく, no particle). Popup
 		// ruby and tints stay on the highlight itself.
 		return speechKanaForQuote(sentRuns, plain, quoted.quote, qStart);
+	}
+	// Readings panels for a Han quote (right-click, answer open,
+	// create): local pinyin places at once; Japanese resolves
+	// sentence-correct kana first (async). A silent extra — speech
+	// stays with the caller, which awaits the kana when the voice
+	// needs it. Placement reads the live rect, so the quote must be
+	// selected at call time; pinned callers (create/answer) keep
+	// their panels past the focus collapse that follows, with an
+	// explicit context for the async resolve. Never throws.
+	async function readingsForQuote(
+		quoted: {
+			quote: string;
+			messageId: ChatMsgId;
+			context: string;
+		},
+		pin = false
+	): Promise<string | null> {
+		if (!pin) panelsPinned = false;
+		else panelsPinned = true;
+		const probe =
+			sentenceForQuote(quoted.context, quoted.quote) ?? quoted.context;
+		if (![...quoted.quote].some((ch) => isHanChar(ch))) {
+			if (pin) panelsPinned = false;
+			return null;
+		}
+		if (
+			hanOverlayLangFor(probe) !== "ja" &&
+			offeredLocalAids(quoted.quote, activeReplyCode).includes("pinyin")
+		) {
+			const readings = readingsOnly(pinyinRuby(quoted.quote), " ", "rt");
+			if (readings) placeSelPinyin(quoted, readings);
+			if (pin && !selPinyin) panelsPinned = false;
+			return null;
+		}
+		if (hanOverlayLangFor(probe) === "ja") {
+			const kana = await showSelectionFurigana(
+				quoted,
+				pin ? quoted.context : undefined
+			);
+			if (pin && !selPinyin && !selFurigana) panelsPinned = false;
+			return kana;
+		}
+		if (pin) panelsPinned = false;
+		return null;
+	}
+	/** Sync offer check behind readingsForQuote: creation keeps
+	the highlight (instead of clearing it) exactly when panels
+	are coming, so they have a live rect to place against. */
+	function quoteOffersReadings(quoted: {
+		quote: string;
+		messageId: ChatMsgId;
+		context: string;
+	}): boolean {
+		const probe =
+			sentenceForQuote(quoted.context, quoted.quote) ?? quoted.context;
+		if (![...quoted.quote].some((ch) => isHanChar(ch))) return false;
+		return (
+			(hanOverlayLangFor(probe) !== "ja" &&
+				offeredLocalAids(quoted.quote, activeReplyCode).includes("pinyin")) ||
+			hanOverlayLangFor(probe) === "ja"
+		);
 	}
 	/**
 	 * Readings for a highlight in the popup by the selection (see
@@ -4571,7 +4656,14 @@
 		// (no readback gate): filing is an explicit listen moment,
 		// exactly like tapping Speak on the highlight.
 		void speakQuote(quote, selMenu.messageId, true, selMenu.context);
-		clearSelection();
+		// Han quotes earn their readings panel above the quote while
+		// creating too: the highlight stays (instead of clearing) so
+		// the panels have a live rect — the selectionchange watcher
+		// drops them with it on submit or cancel.
+		const quoted = { quote, messageId: selMenu.messageId, context: selMenu.context };
+		const keepHighlight = quoteOffersReadings(quoted);
+		if (keepHighlight) void readingsForQuote(quoted, true);
+		else clearSelection();
 		// Instant file (hover A): the pill never opens — the empty
 		// note files at once and the request fires, on desktop and
 		// phones alike (no in-prompt edit either).
@@ -4685,6 +4777,10 @@
 		annotations = filed;
 		const id = pendingAnn?.id;
 		pendingAnn = null;
+		// The filed draft owned the highlight (kept for readings
+		// panels while creating): both go with the submit.
+		clearSelection();
+		dismissSelPanels();
 		if (id) {
 			const ann = annotations.find((a) => a.id === id);
 			if (ann) void askAnnotation(ann);
@@ -4751,8 +4847,13 @@
 		// goes no matter what was typed; an existing one keeps its
 		// saved comment (nothing is written until Save).
 		const cancelKind = annPopCancelKind(id, fresh, pendingAnn?.id ?? null);
-		if (cancelKind === "drop-pending") pendingAnn = null;
-		else if (cancelKind === "delete-fresh")
+		if (cancelKind === "drop-pending") {
+			pendingAnn = null;
+			// The dropped draft owned the highlight (kept for
+			// readings panels while creating): both go with it.
+			clearSelection();
+			dismissSelPanels();
+		} else if (cancelKind === "delete-fresh")
 			annotations = deleteAnnotation(annotations, id);
 		editor?.focus();
 	}
@@ -4826,19 +4927,38 @@
 				y: window.innerHeight / 2
 			};
 			const width = popWidth(false);
-			const placed = placeAnnCard({
-				anchorX: anchorAt.x,
-				anchorY: anchorAt.y,
-				width,
-				viewportWidth: window.innerWidth,
-				viewportHeight: window.innerHeight
-			});
+			// The card hangs below the quote like the create pill
+			// (same gap and x math), never flipped above and never
+			// covering the word: when the bottom edge would clip, the
+			// thread scrolls to make room instead (below). Phones
+			// keep the centered card (keyboard geometry).
+			const quoteRect = document
+				.querySelector(`[data-ann-badge="${id}"]`)
+				?.parentElement?.getBoundingClientRect();
+			const placed =
+				!androidUI && quoteRect
+					? placeAnnAnswer({
+							viewportWidth: window.innerWidth,
+							menuX: anchorAt.x,
+							highlightLeft: quoteRect.left,
+							highlightWidth: quoteRect.width,
+							highlightBottom: quoteRect.bottom,
+							width,
+							fontScale: settings.fontScale
+						})
+					: placeAnnCard({
+							anchorX: anchorAt.x,
+							anchorY: anchorAt.y,
+							width,
+							viewportWidth: window.innerWidth,
+							viewportHeight: window.innerHeight
+						});
 			if (answerTimer) {
 				clearTimeout(answerTimer);
 				answerTimer = null;
 			}
 			answerClosing = false;
-			answerPop = { id, x: placed.x, y: placed.y, w: width, readings: null };
+			answerPop = { id, x: placed.x, y: placed.y, w: width };
 			// The quote stays highlighted while its answer reads, and
 			// opening the reply always reads the annotated thing back
 			// out — same listen moment as creating the annotation.
@@ -4849,7 +4969,37 @@
 				false,
 				answerContextFor(current.messageId, current.quote)
 			);
-			void fillAnswerReadings(id, current.quote);
+			// The quote highlights like a selection (its own text is
+			// the context) and Han quotes earn the right-click
+			// readings panel above it — nothing repeated in the card,
+			// no extra request.
+			const selected = selectAnswerQuote(id);
+			if (selected) void readingsForQuote(selected, true);
+			if (!androidUI && quoteRect) {
+				void (async () => {
+					await tick();
+					if (answerPop?.id !== id || answerClosing) return;
+					const card = document.querySelector(".ann-answer");
+					if (!(card instanceof HTMLElement)) return;
+					const overflow =
+						card.getBoundingClientRect().bottom - (window.innerHeight - 8);
+					if (overflow <= 0 || !scrollBox) return;
+					// Instant: a smooth scroll would still be animating
+					// when the re-place below measures the quote.
+					scrollBox.scrollTo({
+						top: scrollBox.scrollTop + overflow,
+						behavior: "instant"
+					});
+					await tick();
+					if (answerPop?.id !== id || answerClosing) return;
+					const fresh = document
+						.querySelector(`[data-ann-badge="${id}"]`)
+						?.parentElement?.getBoundingClientRect();
+					if (!fresh) return;
+					const gap = Math.max(2, Math.round(2 + (settings.fontScale - 1) * 12));
+					answerPop = { ...answerPop, y: Math.floor(fresh.bottom + gap) };
+				})();
+			}
 			return;
 		}
 		// Phones edit in the composer, never the card: the transplanted
@@ -4931,6 +5081,10 @@
 	function closeAnswerPop(): void {
 		if (!answerPop || answerClosing) return;
 		if (highlightAnnId === answerPop.id) highlightAnnId = null;
+		// The answer owned the quote highlight (and its readings
+		// panels): both go with the card.
+		clearSelection();
+		dismissSelPanels();
 		answerClosing = true;
 		if (answerTimer) clearTimeout(answerTimer);
 		answerTimer = setTimeout(() => {
@@ -4940,40 +5094,45 @@
 		}, 160);
 	}
 
-	/**
-	 * Readings line for an open answer: pinyin computes sync and
-	 * local; furigana converts async in the worker; tashkeel asks
-	 * the model once (the shared aid cache, so a vocalized quote
-	 * never pays twice). Failures leave the line off — the answer
-	 * still reads. Stale opens (another answer since) never write.
-	 */
-	async function fillAnswerReadings(
-		id: AnnotationId,
-		quote: string
-	): Promise<void> {
-		const kind = answerReadingsKind(detectScript(quote));
-		if (!kind) return;
-		if (kind === "pinyin") {
-			if (answerPop?.id === id)
-				answerPop = { ...answerPop, readings: pinyinRuby(quote) };
-			return;
-		}
+	/** Select an answered quote's text (anchors are empty gap
+	markers, never wraps): the answer highlights its quote like a
+	selection, so the existing text reads as context and the
+	readings panels place against it. Null when the quote is gone
+	(aid swap, edit). */
+	function selectAnswerQuote(
+		id: AnnotationId
+	): { quote: string; messageId: ChatMsgId; context: string } | null {
+		const ann = annotations.find((a) => a.id === id);
+		if (!ann) return null;
+		const index = chat.messages.findIndex((m) => m.id === ann.messageId);
+		if (index === -1) return null;
+		const root = document.querySelector(`article#msg-${index} .rendered`);
+		if (!(root instanceof HTMLElement)) return null;
+		const nodes = quoteTextNodes(root);
+		const loc = locateQuote(
+			nodes.map((n) => n.textContent ?? ""),
+			ann.quote,
+			ann.at ?? 0
+		);
+		if (!loc) return null;
+		const startNode = nodes[loc.startNode];
+		const endNode = nodes[loc.endNode];
+		if (!startNode || !endNode) return null;
 		try {
-			let line: string | null = null;
-			if (kind === "furigana") {
-				line = sanitize(
-					await furiganaLine(quote, preferredLocalAid(activeReplyCode))
-				);
-			} else {
-				const provider = await resolveProviderActive();
-				if (!provider) return;
-				line = escapeHtml(await runModelAid(provider, "tashkeel", quote));
-			}
-			if (line && answerPop?.id === id)
-				answerPop = { ...answerPop, readings: line };
+			window.getSelection()?.setBaseAndExtent(
+				startNode,
+				Math.min(loc.startOffset, startNode.length),
+				endNode,
+				Math.min(loc.endOffset, endNode.length)
+			);
 		} catch {
-			// Readings stay off; the answer still reads.
+			return null;
 		}
+		return {
+			quote: ann.quote,
+			messageId: ann.messageId,
+			context: answerContextFor(ann.messageId, ann.quote)
+		};
 	}
 
 	function saveEdit(id: string): void {
@@ -11172,9 +11331,13 @@
 			if (selPinyin || selFurigana) {
 				const now = currentQuote();
 				const anchor = selPinyin ?? selFurigana?.[0];
-				if (
-					!now ||
-					!anchor ||
+				if (!anchor) dismissSelPanels();
+				// A pinned highlight (create/answer) collapses under
+				// pill focus: emptiness alone never dismisses it, only
+				// a mismatched new highlight (or submit/cancel/close).
+				else if (!now) {
+					if (!panelsPinned) dismissSelPanels();
+				} else if (
 					now.messageId !== anchor.messageId ||
 					now.quote !== anchor.quote
 				)
@@ -11577,31 +11740,20 @@
 			// its locale from the surrounding sentence.
 			const quoted = currentQuote();
 			if (quoted) {
-				const probe =
-					sentenceForQuote(quoted.context, quoted.quote) ?? quoted.context;
-				if ([...quoted.quote].some((ch) => isHanChar(ch))) {
-					if (
-						hanOverlayLangFor(probe) !== "ja" &&
-						offeredLocalAids(quoted.quote, activeReplyCode).includes("pinyin")
-					) {
-						const readings = readingsOnly(pinyinRuby(quoted.quote), " ", "rt");
-						if (readings) placeSelPinyin(quoted, readings);
-					} else if (hanOverlayLangFor(probe) === "ja") {
-						// Speech waits for the sentence-correct kana: the
-						// raw kanji would read with default guesses.
-						void (async () => {
-							const kana = await showSelectionFurigana(quoted);
-							void speakQuote(
-								kana ?? quoted.quote,
-								quoted.messageId,
-								false,
-								quoted.context
-							);
-						})();
-						return;
-					}
-				}
-				void speakQuote(quoted.quote, quoted.messageId, false, quoted.context);
+				// 咲き誇り map back) — speech always runs; the panel is
+				// a silent extra. Like Inspect, a lone Han char reads
+				// its locale from the surrounding sentence. Speech
+				// waits for the sentence-correct kana: the raw kanji
+				// would read with default guesses.
+				void (async () => {
+					const kana = await readingsForQuote(quoted);
+					void speakQuote(
+						kana ?? quoted.quote,
+						quoted.messageId,
+						false,
+						quoted.context
+					);
+				})();
 				return;
 			}
 			// No selection: a word under the cursor reads just that word
@@ -12525,17 +12677,16 @@
 
 	{#if answerPop}
 		<!-- Answer popup through AnnAnswer: the page keeps open state,
-		below-word badge-anchor placement, the readings line, fade-out,
-		and the add-to-prompt behavior; the component owns the card
-		and its surface. Self-heals when its annotation is deleted or
-		sent while open. No close button: click-off and Esc close it. -->
+		below-word quote placement, fade-out, and the add-to-prompt
+		behavior; the component owns the card and its surface.
+		Self-heals when its annotation is deleted or sent while open.
+		No close button: click-off and Esc close it. -->
 		{@const pop = answerPop}
 		{@const answered = annotations.find((a) => a.id === pop.id)}
 		{#if answered?.answer}
 			<AnnAnswer
 				id={answered.id}
 				answer={answered.answer}
-				readingsHtml={pop.readings}
 				closing={answerClosing}
 				x={pop.x}
 				y={pop.y}

@@ -1344,7 +1344,7 @@
 		}
 	}
 	.rendered :global(mark.ccez-ann.fresh) {
-		animation: ann-wash-in 0.12s ease;
+		animation: ann-wash-in 0.3s ease;
 	}
 	@keyframes ann-wash-in-dark {
 		from {
@@ -1629,7 +1629,7 @@
 			opacity: 1;
 		}
 		50% {
-			opacity: 0.45;
+			opacity: 0.68;
 		}
 	}
 	.rendered :global(button.ccez-ann-badge.ans-waiting) {

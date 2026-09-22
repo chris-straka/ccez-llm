@@ -23,7 +23,6 @@ import {
 	runModelAid,
 	annotationAnswer,
 	buildAnnotationAnswerMessages,
-	answerReadingsKind,
 	ANNOTATION_ANSWER_WORDS,
 	MODEL_AIDS,
 	MODEL_AID_FOR_SCRIPT,
@@ -78,11 +77,6 @@ describe("script detection", () => {
 		expect(detectScripts("こんにちは！你好！")).toEqual(["ja"]);
 		expect(detectScripts("hello مرحبا\n你好")).toEqual(["ar", "zh"]);
 
-		expect(answerReadingsKind(detectScript("你好世界"))).toBe("pinyin");
-		expect(answerReadingsKind(detectScript("漢字を読む"))).toBe("furigana");
-		expect(answerReadingsKind(detectScript("والأفكار"))).toBe("tashkeel");
-		expect(answerReadingsKind(detectScript("hello world"))).toBeNull();
-		expect(answerReadingsKind(null)).toBeNull();
 		// Mixed messages offer both local aids, furigana first.
 		expect(localAidsFor(detectScripts("こんにちは！\n你好！"))).toEqual([
 			"furigana",

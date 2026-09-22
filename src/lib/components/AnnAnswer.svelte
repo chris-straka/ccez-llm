@@ -1,12 +1,10 @@
 <!-- Annotation answer popup (the remodel): the separate request's
 answer, read below its highlight with the quote's wash held. Pure
-presentational: the page owns open state, placement (below the
-badge anchor via placeAnnCard), the readings line, and fade-out;
-this component owns the card markup and its surface (Svelte scoping
-binds the CSS to this markup). The quote itself never renders here
-(the highlighted word upstream is the title); the readings line is
-locally generated, sanitized upstream (pinyin escapes, furigana is
-sanitized, tashkeel is escaped model text) — answer text renders
+presentational: the page owns open state, below-quote placement,
+and fade-out; this component owns the card markup and its surface
+(Svelte scoping binds the CSS to this markup). The quote itself
+never renders here (the highlighted word upstream is the title,
+with Han readings in the panels above it) — answer text renders
 as plain text, never HTML, so model output can't inject markup.
 No close button: clicking off the card closes it (Esc too). -->
 <script lang="ts">
@@ -20,8 +18,6 @@ No close button: clicking off the card closes it (Esc too). -->
 	interface Props {
 		id: AnnotationId;
 		answer: string;
-		/** Sanitized readings line (ruby/vowelled quote) or null. */
-		readingsHtml: string | null;
 		/** Fade-out in flight (unmounts when the ramp ends). */
 		closing: boolean;
 		x: number;
@@ -30,8 +26,7 @@ No close button: clicking off the card closes it (Esc too). -->
 		actions: AnnAnswerActions;
 	}
 
-	let { id, answer, readingsHtml, closing, x, y, width, actions }: Props =
-		$props();
+	let { id, answer, closing, x, y, width, actions }: Props = $props();
 </script>
 
 <div
@@ -41,9 +36,6 @@ No close button: clicking off the card closes it (Esc too). -->
 	role="dialog"
 	aria-label="Annotation answer"
 >
-	{#if readingsHtml}
-		<p class="ann-answer-readings">{@html readingsHtml}</p>
-	{/if}
 	<p class="ann-answer-text">{answer}</p>
 	<div class="ann-answer-row">
 		<button
@@ -70,7 +62,9 @@ No close button: clicking off the card closes it (Esc too). -->
 		z-index: 60;
 		padding: 0.6rem 0.7rem 0.5rem;
 		border-radius: 10px;
-		font-size: 0.85rem;
+		/* Same size as the create pill root: the card reads at
+		message size, never toy-fixed beside scaled type. */
+		font-size: calc(1rem * var(--font-scale, 1));
 		/* Opaque surface: translucent cards bleed message text
 		through behind the answer. */
 		background: #fff;
@@ -97,34 +91,6 @@ No close button: clicking off the card closes it (Esc too). -->
 		animation: none;
 		opacity: 0;
 		transition: opacity 0.16s ease;
-		pointer-events: none;
-	}
-	/* Readings context line (not a title): the quote with its
-	readings, smaller and dimmer than the answer. Furigana spans
-	ride the same overlay geometry as message text (scoped here —
-	the message rules live under .rendered, which never wraps
-	this card). */
-	.ann-answer-readings {
-		margin: 0 0 0.35rem;
-		font-size: 0.92em;
-		opacity: 0.85;
-		line-height: 1.6;
-	}
-	.ann-answer-readings :global(.frb) {
-		position: relative;
-		white-space: nowrap;
-	}
-	.ann-answer-readings :global(.frt) {
-		position: absolute;
-		bottom: 100%;
-		left: 50%;
-		transform: translateX(-50%);
-		margin-left: -0.3em;
-		white-space: nowrap;
-		font-size: 0.62em;
-		line-height: 1.2;
-		color: #6e6e73;
-		color: var(--muted);
 		pointer-events: none;
 	}
 	.ann-answer-text {

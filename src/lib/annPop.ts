@@ -119,6 +119,37 @@ export function placeAnnCard(facts: {
  * and clamped inside the viewport (above fallback when the bottom
  * edge would clip).
  */
+/**
+ * Answer-card placement from the quote rect: always below the
+ * highlight with the create pill's em-scaled gap and x math —
+ * never flipped above, never covering the word. When the bottom
+ * edge would clip, the page scrolls the thread to make room
+ * instead (the card stays glued to its quote). Pure.
+ */
+export function placeAnnAnswer(facts: {
+	viewportWidth: number;
+	menuX: number;
+	highlightLeft: number;
+	highlightWidth: number;
+	highlightBottom: number;
+	width: number;
+	fontScale: number;
+}): { x: number; y: number } {
+	const gap = Math.max(2, Math.round(2 + (facts.fontScale - 1) * 12));
+	return {
+		x: placeAnnPopX({
+			cursorX: facts.menuX,
+			highlightLeft: facts.highlightLeft,
+			highlightWidth: facts.highlightWidth,
+			popWidth: facts.width,
+			viewportWidth: facts.viewportWidth
+		}),
+		// Floored: a fractional highlight bottom would leave the
+		// card a subpixel past the viewport edge after scrolling.
+		y: Math.floor(facts.highlightBottom + gap)
+	};
+}
+
 export function placeAnnComposer(facts: {
 	android: boolean;
 	viewportWidth: number;
