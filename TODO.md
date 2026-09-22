@@ -39,8 +39,6 @@ same codebase via the Tauri mobile target.
 
 THINGS I NOTICED ON 0.5.3 mac app with 370% font size
 
-The char X paste tag was too far to the left when I increased the chat width, it needs to go on top of the main text prompt.
-
 The annotation creation text box and the annotation button on mac should scale with the font size 
 
 Scroll speed should change with text size. 

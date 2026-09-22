@@ -868,3 +868,9 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
 - [x] Review pencil always opens the edit card: a ready answer no
       longer hijacks the dock's edit path (`openBadge` `forEdit`;
       badge clicks keep the answer card).
+
+- [x] Paste-tag strip shares the prompt box at wide chat widths: the
+      tray missed the composer's 36rem cap (spilling ~186px left at
+      60rem) and its gutter math — capped like `.prompt`, and `--sbw`
+      moved from the card to `main` so both see it (edges within 2px;
+      `layout.e2e.ts` "attachment strip shares the prompt box").

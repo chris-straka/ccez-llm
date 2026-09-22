@@ -178,11 +178,15 @@ whenever the tray area is active. -->
 		clipped cards are the affordance. */
 		scrollbar-width: none;
 		/* Pinned tray width (was the shared width group in the page
-		stylesheet): the strip never grows with the chat slider. */
-		width: calc(100% - 2.4rem);
-		max-width: calc(var(--chat-width, 36) * 1rem);
+		stylesheet): the strip shares the prompt's box line for line —
+		same gutter math (--sbw rides main now, so both see it),
+		same 36rem cap — so paste tags and their × sit on top of the
+		prompt instead of spilling left at wide chat widths. */
+		width: calc(100% - 2.4rem - var(--sbw, 0px));
+		max-width: min(calc(var(--chat-width, 36) * 1rem), 36rem);
 		margin-left: auto;
 		margin-right: auto;
+		right: calc(1.2rem + var(--sbw, 0px));
 	}
 	.attachments::-webkit-scrollbar {
 		width: 0;

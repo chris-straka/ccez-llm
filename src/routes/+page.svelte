@@ -2937,10 +2937,12 @@
 			// Scrollbar gutter the messages reserve (classic thin bar,
 			// zero with overlay scrollbars): the floating card centers in
 			// the full column, so it rides this much right of the
-			// articles without compensation (see --sbw on .prompt).
+			// articles without compensation (see --sbw on .prompt). Set
+			// on main, not the card: the attachment tray is the card's
+			// sibling and shares the same centering math.
 			const sbw = `${Math.max(0, box.offsetWidth - box.clientWidth)}px`;
 			if (sbw !== lastSbw) {
-				card.style.setProperty("--sbw", sbw);
+				mainEl.style.setProperty("--sbw", sbw);
 				lastSbw = sbw;
 			}
 			// A lengthening draft grows the reserve under the card:

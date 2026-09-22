@@ -116,3 +116,51 @@ test("text size scales messages and badges, not the composer", async ({
 	expect(await px(".prompt .ta-input")).toBeCloseTo(editorBefore, 1);
 	expect(await px("button.ccez-ann-badge")).toBeCloseTo(badgeBefore * 1.03, 1);
 });
+
+/** The attachment strip sits on top of the prompt: past a 36rem chat
+width the composer stops growing, and the paste-tag row (with its
+remove ×) must stop with it instead of spilling left. */
+test("attachment strip shares the prompt box at wide chat widths", async ({
+	page
+}) => {
+	await seedChat(page, [{ role: "assistant", content: "hello" }]);
+	// Widen past the prompt's 36rem cap (seedChat's settings write
+	// runs first; this merges the width in before load).
+	await page.addInitScript(() => {
+		const raw = window.localStorage.getItem("ccez-llm-settings-v1");
+		const prev = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+		window.localStorage.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify({ ...prev, chatWidth: 60 })
+		);
+	});
+	await page.goto("/");
+	await expect(page.locator("article .rendered").first()).toBeVisible();
+	const btn = page.locator(".prompt-tools .attach-btn");
+	await expect(btn).toBeVisible();
+	const [chooser] = await Promise.all([
+		page.waitForEvent("filechooser", { timeout: 10_000 }),
+		btn.click()
+	]);
+	await chooser.setFiles("e2e/fixtures/attach.bmp");
+	await expect(page.locator(".attachments li")).toBeVisible({
+		timeout: 15_000
+	});
+	const edges = await page.evaluate(() => {
+		const rect = (s: string) => {
+			const el = document.querySelector(s);
+			if (!(el instanceof HTMLElement)) throw new Error(`missing ${s}`);
+			return el.getBoundingClientRect();
+		};
+		const strip = rect(".attachments");
+		const prompt = rect(".prompt");
+		return {
+			stripLeft: strip.left,
+			promptLeft: prompt.left,
+			stripRight: strip.right,
+			promptRight: prompt.right
+		};
+	});
+	expect(Math.abs(edges.stripLeft - edges.promptLeft)).toBeLessThanOrEqual(2);
+	expect(Math.abs(edges.stripRight - edges.promptRight)).toBeLessThanOrEqual(2);
+});
