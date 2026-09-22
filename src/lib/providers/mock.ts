@@ -45,6 +45,25 @@ export class MockProvider implements ChatProvider {
 		} catch {
 			/* storage unavailable: default cadence */
 		}
+		// Test hook: simulate a tool-fetch round (ms) so specs can
+		// assert the Fetching chip mid-fetch — fetch first like the
+		// tool loop, then the answer streams. Unset keeps plain chat.
+		let fetchMs = NaN;
+		try {
+			const raw =
+				typeof localStorage === "undefined"
+					? null
+					: localStorage.getItem("ccez-mock-fetch-ms");
+			fetchMs = raw === null ? NaN : Number(raw);
+		} catch {
+			/* storage unavailable: plain chat */
+		}
+		if (Number.isFinite(fetchMs) && fetchMs >= 0) {
+			callbacks.onFetchStart?.("https://example.com/");
+			await new Promise((r) => setTimeout(r, fetchMs));
+			opts?.signal?.throwIfAborted();
+			callbacks.onFetchEnd?.();
+		}
 		for (const word of full.split(/(?<=\s)/)) {
 			await new Promise((r) => setTimeout(r, wordMs));
 			opts?.signal?.throwIfAborted();
