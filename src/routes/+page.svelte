@@ -379,10 +379,10 @@
 	import { fieldSelectionLive, reportOsMenu } from "$lib/promptmenu";
 	import {
 		buildSearchDocs,
-		chatMatchesQuery,
 		findMessageIndices,
 		type SearchHit
 	} from "$lib/chatSearch";
+	import { chatLabel, filterSidebarChats, sideTip } from "$lib/sidebar";
 	import { emptyFind, stepFindCursor, type FindState } from "$lib/find";
 	import { emptyPalette, type PaletteState } from "$lib/palette";
 	import {
@@ -2249,21 +2249,9 @@
 			document.activeElement.blur();
 	});
 
-	/**
-	 * Sidebar chat list filtered by the sidebar search box. Matches the
-	 * chat label plus every message body (substring per token), so a
-	 * swipe-opened list narrows as you type.
-	 */
+	/** Sidebar chat list filtered by the sidebar search box (see $lib/sidebar). */
 	function sideVisibleChats(): (typeof chatState.chats)[number][] {
-		const query = sideSearch.trim();
-		if (!query) return chatState.chats;
-		return chatState.chats.filter((item) =>
-			chatMatchesQuery(
-				chatLabel(item.createdAt),
-				item.messages.map((m) => m.content),
-				query
-			)
-		);
+		return filterSidebarChats(chatState.chats, sideSearch);
 	}
 
 	/** Focus the sidebar search box (tap path: keyboard comes up). */
@@ -8248,34 +8236,6 @@
 		// so the fresh blank starts clean even in storage.
 		saveDraftAnnotations(chatState.activeChatId, [], [chatState.activeChatId]);
 		void resetVoiceLangFromKeyboard();
-	}
-
-	/** Sidebar hover tip: message count plus the you/AI split
-	(in-memory only — drafts live per-chat in storage, so counting
-	them here would read localStorage on every row render). */
-	function sideTip(item: (typeof chatState.chats)[number]): string {
-		// Empty chats report nothing: a "0 messages" tip is pure noise
-		// (and pops on every keyboard-opened sidebar via the focus tip).
-		const n = item.messages.length;
-		if (n === 0) return "";
-		const you = item.messages.filter((m) => m.role === "user").length;
-		const msgs = n === 1 ? "1 message" : `${n} messages`;
-		return `${msgs} · you ${you} · AI ${n - you}`;
-	}
-
-	function chatLabel(createdAt: number): string {
-		const date = new Date(createdAt);
-		const today = new Date();
-		const sameDay = date.toDateString() === today.toDateString();
-		// 2-digit hour keeps the list column aligned (01:30, never 1:30).
-		const time = date.toLocaleTimeString([], {
-			hour: "2-digit",
-			minute: "2-digit"
-		});
-		const day = sameDay
-			? "Today"
-			: date.toLocaleDateString([], { month: "short", day: "numeric" });
-		return `${day} ${time}`;
 	}
 
 	function promptOptions(): PromptEditorOptions {
