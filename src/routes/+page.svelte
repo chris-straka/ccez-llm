@@ -523,6 +523,7 @@
 		recognizeFallbackText,
 		detectFallbackScript,
 		ocrFallbackLangs,
+		ocrLangsKey,
 		keepBestRecognition,
 		ocrRetryHint,
 		visionSupports,
@@ -3928,8 +3929,7 @@
 					const retryLangs = detected?.langs;
 					if (
 						retryLangs &&
-						[...retryLangs].sort().join("+") !==
-							[...fallbackLangs].sort().join("+")
+						ocrLangsKey(retryLangs) !== ocrLangsKey(fallbackLangs)
 					) {
 						const retry = await recognizeFallbackText(att.dataUrl, retryLangs);
 						result = keepBestRecognition(result, retry);

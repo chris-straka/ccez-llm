@@ -6,6 +6,7 @@ import {
 	isOcrUnsupported,
 	keepBestRecognition,
 	ocrFallbackLangs,
+	ocrLangsKey,
 	ocrScriptLangs,
 	OCR_SCRIPT_FLOOR,
 	ocrRetryHint,
@@ -247,6 +248,15 @@ describe("ocrRetryHint", () => {
 		expect(ocrRetryHint("sr")).toBe("uk");
 		// No reply language: the legacy Ukrainian guess stands.
 		expect(ocrRetryHint(null)).toBe("uk");
+	});
+});
+
+describe("ocrLangsKey", () => {
+	it("keys traineddata sets order-insensitively", () => {
+		expect(ocrLangsKey(["jpn", "eng"])).toBe("eng+jpn");
+		expect(ocrLangsKey(["eng", "jpn"])).toBe("eng+jpn");
+		expect(ocrLangsKey(new Set(["jpn", "eng"]))).toBe("eng+jpn");
+		expect(ocrLangsKey([])).toBe("");
 	});
 });
 

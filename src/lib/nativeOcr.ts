@@ -225,6 +225,14 @@ export function ocrRetryHint(code: string | null): string {
 	return primary || "uk";
 }
 
+/** Canonical key for a traineddata set: order-insensitive, so the
+ * worker cache and the retry-dedup compare the same string (a
+ * redetected set equal to the first pass retries nothing). Pure
+ * and unit-tested. */
+export function ocrLangsKey(langs: Iterable<string>): string {
+	return [...langs].sort().join("+");
+}
+
 /**
  * Keep-best merge for the retry pass: a good first pass stands (no
  * contest), otherwise the higher mean confidence wins, ties keeping
@@ -282,7 +290,7 @@ export async function recognizeFallbackText(
 	image: string,
 	langs: string[] = ["eng"]
 ): Promise<OcrResult> {
-	const key = [...langs].sort().join("+");
+	const key = ocrLangsKey(langs);
 	let pending = fallbackWorkers.get(key);
 	if (!pending) {
 		pending = (async () => {
