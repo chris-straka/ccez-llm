@@ -8,6 +8,7 @@ import {
 	nativeTurnAvailable,
 	nativeTurnConfig,
 	nativeRouteFor,
+	errorTurnFile,
 	resumableKilledTurn,
 	type TurnId,
 	pollNativeTurn,
@@ -362,5 +363,24 @@ describe("nativeRouteFor", () => {
 		expect(
 			nativeRouteFor({ ...facts, mock: true }, [], settings)
 		).toBeNull();
+	});
+});
+
+describe("errorTurnFile", () => {
+	it("settles an unpollable turn as a failed reply", () => {
+		const file = errorTurnFile(
+			"t" as TurnId,
+			"c" as ChatId,
+			"m" as ChatMsgId
+		);
+		expect(file).toMatchObject({
+			turn_id: "t",
+			chat_id: "c",
+			message_id: "m",
+			status: "error",
+			content: "",
+			error: "Reply failed."
+		});
+		expect(file.finished_at).toBeGreaterThan(0);
 	});
 });

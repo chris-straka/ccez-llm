@@ -267,6 +267,7 @@
 		dismissNativeTurn,
 		markTurnInterrupted,
 		nativeRouteFor,
+		errorTurnFile,
 		pollNativeTurn,
 		resumableKilledTurn,
 		scanNativeTurns,
@@ -6743,15 +6744,7 @@
 		try {
 			file = await pollNativeTurn(turn_id);
 		} catch {
-			file = {
-				turn_id,
-				chat_id: owned.chatId,
-				message_id: owned.replyId,
-				status: "error",
-				content: "",
-				error: "Reply failed.",
-				finished_at: Math.floor(Date.now() / 1000)
-			};
+			file = errorTurnFile(turn_id, owned.chatId, owned.replyId);
 		}
 		const outcome = applyTurnFile(chatState, file);
 		settleNativeSend(chatState, owned.chatId);

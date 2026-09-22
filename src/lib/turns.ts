@@ -314,3 +314,24 @@ export function nativeRouteFor(
 	if (!available) return null;
 	return nativeTurnConfig(settings);
 }
+
+/**
+ * Error file for an unpollable turn (REFACTOR §6): a completion
+ * whose file never materialized still settles as a failed reply —
+ * the shared tail raises Retry on the chat instead of hanging.
+ */
+export function errorTurnFile(
+	turnId: TurnId,
+	chatId: ChatId,
+	replyId: ChatMsgId
+): NativeTurnFile {
+	return {
+		turn_id: turnId,
+		chat_id: chatId,
+		message_id: replyId,
+		status: "error",
+		content: "",
+		error: "Reply failed.",
+		finished_at: Math.floor(Date.now() / 1000)
+	};
+}
