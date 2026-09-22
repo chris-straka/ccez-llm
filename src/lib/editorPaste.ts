@@ -508,3 +508,15 @@ export function bakeEditedMessage(
 	const stored = appendImageMarkers(text, imageCount);
 	return { stored, folds: text === seed ? (prevFolds ?? folds) : folds };
 }
+
+/**
+ * True when the caret sits right after a collapsed paste
+ * (REFACTOR §6): fresh marker tags then ride the same line, one
+ * space apart, instead of taking the usual prefix.
+ */
+export function caretAfterPaste(
+	pastes: PasteSpan[],
+	caret: number
+): boolean {
+	return pastes.some((s) => caret === s.to);
+}

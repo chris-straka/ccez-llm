@@ -36,6 +36,7 @@ import {
 	splicePastedText,
 	splicePastedFolds,
 	spliceSendText,
+	sentTagModelsFor,
 	stripAttachmentMarkers,
 	stripPastedMarkers,
 	tagPlaceholder,
@@ -732,5 +733,22 @@ describe("spliceSendText", () => {
 			kept: [],
 			pastedFolds: []
 		});
+	});
+});
+
+describe("sentTagModelsFor", () => {
+	it("models leftovers with expanded flags", () => {
+		const atts = [
+			testAttachment({ id: "a", kind: "image" }),
+			testAttachment({ id: "b", kind: "text", text: "hello" })
+		];
+		const models = sentTagModelsFor(atts, "no literals here", "m1", [
+			"m1:b"
+		]);
+		expect(models.map((m) => [m.id, m.open])).toEqual([
+			["a", false],
+			["b", true]
+		]);
+		expect(models[1]).toMatchObject({ kind: "text", text: "hello" });
 	});
 });

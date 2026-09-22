@@ -1039,3 +1039,25 @@ export function spliceSendText(
 	);
 	return { stored, kept, pastedFolds };
 }
+
+/**
+ * Preview models for the leftovers strip (REFACTOR §6): one per
+ * attachment with no literal left in the message text (literals
+ * rebuild inline instead, so each file shows exactly once).
+ */
+export function sentTagModelsFor(
+	attachments: Attachment[],
+	base: string,
+	messageId: string,
+	expandedTags: string[]
+): AttachTagModel[] {
+	return leftoverAttachments(attachments, base).map((att) => ({
+		id: att.id,
+		kind: att.kind,
+		name: att.name,
+		tokens: att.tokens,
+		open: expandedTags.includes(`${messageId}:${att.id}`),
+		dataUrl: att.dataUrl,
+		text: att.text
+	}));
+}

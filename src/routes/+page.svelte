@@ -99,6 +99,7 @@
 		ANDROID_SCROLL_PLACEHOLDER,
 		sendPasteFolds,
 		bakeEditedMessage,
+		caretAfterPaste,
 		type PromptEditor,
 		type PromptEditorOptions,
 		type SubmitKind
@@ -178,7 +179,7 @@
 		pastedMarkerInsert,
 		spliceSendText,
 		stripPastedMarkers,
-		leftoverAttachments,
+		sentTagModelsFor,
 		reconcileTagRemovals,
 		type Attachment,
 		type AttachmentKind,
@@ -3780,8 +3781,7 @@
 	 */
 	function attachmentMarkerFor(ed: PromptEditor, kind: AttachmentKind): string {
 		const doc = ed.getText();
-		const caret = ed.selectionHead();
-		const afterPaste = ed.getPastes().some((s) => caret === s.to);
+		const afterPaste = caretAfterPaste(ed.getPastes(), ed.selectionHead());
 		return kind === "image"
 			? imageMarkerInsert(doc, afterPaste)
 			: fileMarkerInsert(doc, afterPaste);
@@ -3807,8 +3807,7 @@
 	 */
 	function pastedMarkerFor(ed: PromptEditor, chars: number): string {
 		const doc = ed.getText();
-		const caret = ed.selectionHead();
-		const afterPaste = ed.getPastes().some((s) => caret === s.to);
+		const afterPaste = caretAfterPaste(ed.getPastes(), ed.selectionHead());
 		return pastedMarkerInsert(doc, chars, afterPaste);
 	}
 
@@ -3885,15 +3884,7 @@
 	 * instead, so each file shows exactly once).
 	 */
 	function sentTagModels(msg: ChatMsg, base: string): AttachTagModel[] {
-		return leftoverAttachments(msg.attachments ?? [], base).map((att) => ({
-			id: att.id,
-			kind: att.kind,
-			name: att.name,
-			tokens: att.tokens,
-			open: expandedTags.includes(`${msg.id}:${att.id}`),
-			dataUrl: att.dataUrl,
-			text: att.text
-		}));
+		return sentTagModelsFor(msg.attachments ?? [], base, msg.id, expandedTags);
 	}
 
 	// Tray drag-to-scroll (mouse only; touch scrolls natively): with

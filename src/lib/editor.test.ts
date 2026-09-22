@@ -3,6 +3,7 @@ import {
 	trimPasteTail,
 	sendPasteFolds,
 	bakeEditedMessage,
+	caretAfterPaste,
 	pasteToggleAction,
 	markerCut,
 	markerCutAt,
@@ -501,5 +502,14 @@ describe("bakeEditedMessage", () => {
 		const { stored, folds } = bakeEditedMessage("hello", [], 0, "hello", prev);
 		expect(stored).toBe("hello");
 		expect(folds).toBe(prev);
+	});
+});
+
+describe("caretAfterPaste", () => {
+	it("matches caret to span ends only", () => {
+		const spans = [{ from: 0, to: 5, chars: 5 }];
+		expect(caretAfterPaste(spans, 5)).toBe(true);
+		expect(caretAfterPaste(spans, 4)).toBe(false);
+		expect(caretAfterPaste([], 0)).toBe(false);
 	});
 });

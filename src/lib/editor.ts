@@ -16,6 +16,7 @@ export {
 	pasteToggleAction,
 	sendPasteFolds,
 	bakeEditedMessage,
+	caretAfterPaste,
 	trimPasteTail,
 	markerCut,
 	markerCutAt,
