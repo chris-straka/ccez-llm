@@ -11621,21 +11621,91 @@
 			}
 			onSelectEnd(event, event.clientX);
 		};
-		// Word under the cursor, or "" on open space / non-text.
-		function wordUnderCursor(event: MouseEvent, body: Element): string {
-			let range: Range | null = null;
+		// Base-text char under a point: aid readings (pinyin ruby,
+		// furigana .frb/.frt spans) split prose into elements, so the
+		// caret can land on a wrapper or on the reading itself.
+		// Readings never speak — resolve to the base char under the
+		// point instead.
+		function baseCharAtPoint(
+			root: Element,
+			x: number,
+			y: number
+		): { node: Text; index: number } | null {
 			try {
-				if (typeof document.caretRangeFromPoint === "function") {
-					range = document.caretRangeFromPoint(event.clientX, event.clientY);
+				const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+				let n: Node | null = null;
+				while ((n = walker.nextNode())) {
+					const textNode = n as Text;
+					if (textNode.parentElement?.closest("rt, rp, .frt")) continue;
+					const text = textNode.textContent ?? "";
+					if (text.length === 0) continue;
+					const nodeRect = document.createRange();
+					nodeRect.selectNodeContents(textNode);
+					const bounds = nodeRect.getBoundingClientRect();
+					if (
+						x < bounds.left - 2 ||
+						x > bounds.right + 2 ||
+						y < bounds.top - 2 ||
+						y > bounds.bottom + 2
+					)
+						continue;
+					for (let i = 0; i < text.length; i++) {
+						try {
+							const char = document.createRange();
+							char.setStart(textNode, i);
+							char.setEnd(textNode, i + 1);
+							const rect = char.getBoundingClientRect();
+							if (rect.width === 0 && rect.height === 0) continue;
+							if (
+								x >= rect.left - 2 &&
+								x <= rect.right + 2 &&
+								y >= rect.top - 2 &&
+								y <= rect.bottom + 2
+							)
+								return { node: textNode, index: i };
+						} catch {
+							continue;
+						}
+					}
 				}
 			} catch {
-				range = null;
+				return null;
 			}
-			const node = range?.startContainer;
-			if (!node || node.nodeType !== Node.TEXT_NODE || !body.contains(node))
-				return "";
+			return null;
+		}
+		// Word under the cursor, or "" on open space / non-text.
+		function wordUnderCursor(event: MouseEvent, body: Element): string {
+			let node: Node | null = null;
+			let offset = 0;
+			try {
+				if (typeof document.caretRangeFromPoint === "function") {
+					const range = document.caretRangeFromPoint(
+						event.clientX,
+						event.clientY
+					);
+					node = range?.startContainer ?? null;
+					offset = range?.startOffset ?? 0;
+				}
+			} catch {
+				node = null;
+			}
+			// Element landing (ruby/span wrappers, split boundaries)
+			// or a reading hit: resolve the base-text char under the
+			// point. Readings (rt/rp/.frt) never count as text hits
+			// either — the caret path below would speak the kana
+			// instead of the kanji.
+			if (
+				!node ||
+				node.nodeType !== Node.TEXT_NODE ||
+				!body.contains(node) ||
+				(node as Text).parentElement?.closest("rt, rp, .frt") !== null
+			) {
+				const hit = baseCharAtPoint(body, event.clientX, event.clientY);
+				if (!hit) return "";
+				node = hit.node;
+				offset = hit.index;
+			}
 			const text = node.textContent ?? "";
-			const offset = range?.startOffset ?? 0;
 			// Caret snapped past the text (open-space click resolving
 			// to a node edge): only retry inside the char when the
 			// point is actually over the text — far padding is message

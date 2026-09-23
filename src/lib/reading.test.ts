@@ -815,6 +815,14 @@ describe("wordBoundsAt", () => {
 		expect(end).toBeGreaterThan(4);
 		expect(text.slice(start, end)).not.toMatch(/[\s。、]/);
 	});
+
+	it("falls back to the maximal run on non-word-like word chars", () => {
+		// ICU marks iteration marks like 々 non-word-like; the
+		// word-char set still claims them, so right-click TTS speaks
+		// the run instead of silence.
+		expect(wordBoundsAt("a々b", 1)).toEqual([0, 3]);
+		expect(wordBoundsAt("hi, there", 2)).toBe(null);
+	});
 });
 
 describe("sentenceBounds", () => {

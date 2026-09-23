@@ -256,10 +256,15 @@ export function wordBoundsAt(
 			for (const part of segmenter.segment(text)) {
 				const start = part.index;
 				const end = start + part.segment.length;
-				if (idx >= start && idx < end)
-					return part.isWordLike ? [start, end] : null;
+				if (idx >= start && idx < end) {
+					if (part.isWordLike) return [start, end];
+					// Claimed but not word-like (a locale's idea of a
+					// boundary): a real word char still falls through
+					// to the maximal run below instead of silence —
+					// whitespace and punctuation yield null there.
+					break;
+				}
 			}
-			return null;
 		}
 	} catch {
 		// Fall through to the word-char expansion below.
