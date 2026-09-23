@@ -1,12 +1,60 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { dragQuote, seedChat } from "./helpers";
 
 /**
- * Annotation remodel: filing a note fires a separate model request
- * (the mock answers), the badge reads ready, clicking it opens the
- * answer in context, and Add to prompt files it into the composer.
+ * Staged annotation questions: filing never sends anything (the
+ * badge holds steady blue, never blinking), the inclusion chip's
+ * pencil stages the wording, and the send bundles it into one
+ * request whose reply lands as the annotation's answer (orange).
  */
-test("filed question answers in context and joins the prompt", async ({
+async function askThroughSend(
+	page: Page,
+	question: string
+): Promise<void> {
+	const pop = page.locator(".ann-pop.fresh");
+	await expect(pop).toBeVisible({ timeout: 10_000 });
+	await pop.locator("textarea").fill(question);
+	await page.keyboard.press("Enter");
+	const badge = page.locator("button.ccez-ann-badge.ans-waiting");
+	await expect(badge).toBeVisible({ timeout: 15_000 });
+	// Steady blue: no request fires on file, nothing ever blinks.
+	const pulse = await badge.evaluate(
+		(el) => getComputedStyle(el).animationName
+	);
+	expect(pulse).not.toContain("ann-badge-wait");
+	// The question rides the send as an inclusion chip; its pencil
+	// stages the exact wording into the send-prompt pill.
+	const chip = page.locator(".inclusion-chip");
+	await expect(chip).toBeVisible({ timeout: 10_000 });
+	await chip.locator("button").click();
+	const pill = page.locator(".staged-pill");
+	await expect(pill).toBeVisible({ timeout: 10_000 });
+	await expect(pill.locator(".staged-quote")).not.toBeEmpty();
+	await expect(pill.locator("textarea")).toHaveValue(question);
+	await page.locator(".send-btn").click();
+	// The reply lands as the answer: blue turns orange. A failed
+	// send banners in the composer instead — surface its text, not
+	// a bare timeout.
+	await page.waitForFunction(
+		() =>
+			document.querySelector("button.ccez-ann-badge.ans-ready") ||
+			document.querySelector(".error-banner"),
+		{ timeout: 30_000 }
+	);
+	// Absent banners never resolve: bound the read, or its default
+	// auto-wait burns the test budget and the real assertion below
+	// evaluates during teardown.
+	const bannered = await page
+		.locator(".error-banner")
+		.textContent({ timeout: 1_000 })
+		.catch(() => null);
+	expect(bannered, "staged send failed").toBeNull();
+	await expect(
+		page.locator("button.ccez-ann-badge.ans-ready")
+	).toBeVisible({ timeout: 10_000 });
+}
+
+test("staged question asks on send and the reply lands as its answer", async ({
 	page
 }) => {
 	test.setTimeout(120_000);
@@ -26,39 +74,8 @@ test("filed question answers in context and joins the prompt", async ({
 	expect(selText.trim().length).toBeGreaterThan(0);
 	await expect(page.locator(".sel-menu")).toBeVisible({ timeout: 10_000 });
 	await page.keyboard.press("a");
-	const pop = page.locator(".ann-pop.fresh");
-	await expect(pop).toBeVisible({ timeout: 10_000 });
-	await pop.locator("textarea").fill("what lives here?");
-	await page.keyboard.press("Enter");
-	const badge = page.locator("button.ccez-ann-badge");
-	await expect(badge).toBeVisible({ timeout: 15_000 });
-	// Slow mock one-shot: blue while waiting, orange on arrival. A
-	// failed request banners in the composer instead — surface its
-	// text, not a bare timeout.
-	await expect(
-		page.locator("button.ccez-ann-badge.ans-waiting")
-	).toBeVisible({ timeout: 10_000 });
-	// The waiting badge pulses its request in flight.
-	const pulse = await page
-		.locator("button.ccez-ann-badge.ans-waiting")
-		.evaluate((el) => getComputedStyle(el).animationName);
-	expect(pulse).toContain("ann-badge-wait");
-	await page.waitForFunction(
-		() =>
-			document.querySelector("button.ccez-ann-badge.ans-ready") ||
-			document.querySelector(".error-banner"),
-		{ timeout: 15_000 }
-	);
-	// Absent banners never resolve: bound the read, or its default
-	// auto-wait burns the test budget and the real assertion below
-	// evaluates during teardown.
-	const bannered = await page
-		.locator(".error-banner")
-		.textContent({ timeout: 1_000 })
-		.catch(() => null);
-	expect(bannered, "answer request failed").toBeNull();
+	await askThroughSend(page, "what lives here?");
 	const ready = page.locator("button.ccez-ann-badge.ans-ready");
-	await expect(ready).toBeVisible({ timeout: 10_000 });
 	// The thread sits top-scrolled under the sticky header, which
 	// intercepts pointer events over the badge: keyboard-activate
 	// instead (buttons act on Enter without hit-testing).
@@ -83,12 +100,17 @@ test("filed question answers in context and joins the prompt", async ({
 	expect(badgeBox).toBeTruthy();
 	expect(cardBox).toBeTruthy();
 	expect(cardBox!.y).toBeGreaterThanOrEqual(badgeBox!.y + badgeBox!.height);
-	await card.getByRole("button", { name: "Add answer to prompt" }).click();
-	await expect(page.locator(".prompt .ta-input")).toHaveValue(
-		/Mock reply to:/,
-		{ timeout: 15_000 }
+	// The answer also displays always under its dock row (green
+	// annotated-text chip plus the reply text) — never popup-only.
+	await page.locator(".prompt-tools .ann-pill").click();
+	const dock = page.locator(".ann-wrap .review");
+	await expect(dock).toHaveCSS("opacity", "1");
+	await expect(
+		page.locator(".review-quote.annotated").first()
+	).toBeVisible();
+	await expect(page.locator(".review-answer").first()).toContainText(
+		"Mock reply to:"
 	);
-	await expect(card).toHaveCount(0);
 });
 
 /** Clicking off the answer card fades it out (no close button):
@@ -107,12 +129,8 @@ test("clicking off the answer closes it", async ({ page }) => {
 	await dragQuote(page, 0, "riverbank");
 	await expect(page.locator(".sel-menu")).toBeVisible({ timeout: 10_000 });
 	await page.keyboard.press("a");
-	const pop = page.locator(".ann-pop.fresh");
-	await expect(pop).toBeVisible({ timeout: 10_000 });
-	await pop.locator("textarea").fill("what lives here?");
-	await page.keyboard.press("Enter");
+	await askThroughSend(page, "what lives here?");
 	const ready = page.locator("button.ccez-ann-badge.ans-ready");
-	await expect(ready).toBeVisible({ timeout: 20_000 });
 	await ready.focus();
 	await page.keyboard.press("Enter");
 	const card = page.locator(".ann-answer");
@@ -146,12 +164,8 @@ test("chinese answer spawns the pinyin panel above the quote", async ({
 	await dragQuote(page, 0, "雨过");
 	await expect(page.locator(".sel-menu")).toBeVisible({ timeout: 10_000 });
 	await page.keyboard.press("a");
-	const pop = page.locator(".ann-pop.fresh");
-	await expect(pop).toBeVisible({ timeout: 10_000 });
-	await pop.locator("textarea").fill("what does this mean?");
-	await page.keyboard.press("Enter");
+	await askThroughSend(page, "what does this mean?");
 	const ready = page.locator("button.ccez-ann-badge.ans-ready");
-	await expect(ready).toBeVisible({ timeout: 20_000 });
 	await ready.focus();
 	await page.keyboard.press("Enter");
 	const card = page.locator(".ann-answer");
@@ -255,12 +269,8 @@ test("bottom answer scrolls the thread to make room", async ({ page }) => {
 	await dragQuote(page, 11, "paragraph number 11");
 	await expect(page.locator(".sel-menu")).toBeVisible({ timeout: 10_000 });
 	await page.keyboard.press("a");
-	const pop = page.locator(".ann-pop.fresh");
-	await expect(pop).toBeVisible({ timeout: 10_000 });
-	await pop.locator("textarea").fill("what lives here?");
-	await page.keyboard.press("Enter");
+	await askThroughSend(page, "what lives here?");
 	const ready = page.locator("button.ccez-ann-badge.ans-ready");
-	await expect(ready).toBeVisible({ timeout: 20_000 });
 	const scrolled = async (): Promise<number> =>
 		page.evaluate(() => {
 			let el: Element | null = document.querySelector(

@@ -1834,12 +1834,12 @@ test.describe("touch", () => {
 			await expect(page.locator(".ann-pill")).toBeVisible();
 		});
 
-		/** The review pencil keeps the composer path on phones: the
-		saved comment loads into the comment box instead of a floating
-		card (the transplanted textbox can't summon the keyboard). The
-		draft is seeded in storage — filing it by touch is covered by
-		the Annotate test above. */
-		test("review pencil loads the comment into the composer", async ({
+		/** Filed notes never transplant on phones: the dock row
+		carries no pencil and no inline editor — the saved comment
+		reads as text, and the question asks through the staged
+		pill. The draft is seeded in storage — filing it by touch
+		is covered by the Annotate test above. */
+		test("dock rows read filed notes without editing them", async ({
 			page
 		}) => {
 			await seedChat(page, [
@@ -1864,23 +1864,27 @@ test.describe("touch", () => {
 			await expect(page.locator(".ann-pill")).toBeVisible();
 			await page.locator(".prompt-tools .ann-pill").click();
 			await expect(page.locator(".ann-wrap .review")).toHaveCSS("opacity", "1");
-			await page.locator(".review-pencil").first().click();
-			// No floating card on phones — the composer asks for the note.
+			await expect(page.locator(".review-comment").first()).toHaveText(
+				"first"
+			);
+			// No pencil, no inline editor, no floating card on phones.
+			await expect(page.locator(".review-pencil")).toHaveCount(0);
+			await expect(page.locator(".review textarea")).toHaveCount(0);
 			await expect(page.locator(".ann-pop")).toHaveCount(0);
-			await expect(page.locator(".prompt textarea")).toHaveAttribute(
+			// The composer keeps its chat placeholder — nothing transplants.
+			await expect(page.locator(".prompt textarea")).not.toHaveAttribute(
 				"placeholder",
 				"Edit annotation"
 			);
-			await expect(page.locator(".prompt textarea")).toHaveValue("first");
+			// A questioned row rides the send as an inclusion chip.
+			await expect(page.locator(".inclusion-chip")).toBeVisible();
 		});
 
-		/** Tapping a badge edits its note through the composer: the tap
-		must survive the tap-out rule (capture press opens before the
-		bubble tap-out check), the composer starts empty, and the send
-		arrow files the note instead of sending a chat. */
-		test("tapping a badge rewrites its note through the composer", async ({
-			page
-		}) => {
+		/** Tapping a badge opens the dock on its row: the tap must
+		survive the tap-out rule (capture press opens before the
+		bubble tap-out check), nothing transplants into the composer,
+		and the send arrow sends a chat instead of filing a note. */
+		test("tapping a badge opens its dock row", async ({ page }) => {
 			await seedChat(page, [
 				{ role: "assistant", content: "alpha beta gamma delta" }
 			]);
@@ -1908,70 +1912,128 @@ test.describe("touch", () => {
 				bbox.x + bbox.width / 2,
 				bbox.y + bbox.height / 2
 			);
-			const composer = page.locator(".prompt textarea");
-			await expect(composer).toHaveAttribute("placeholder", "Edit annotation");
-			await expect(composer).toHaveValue("");
-			await composer.click();
-			await page.keyboard.type("revised", { delay: 10 });
-			const before = await page.evaluate(
-				() =>
-					(
-						JSON.parse(
-							window.localStorage.getItem("ccez-llm-chats-v1") ?? "[]"
-						) as Array<{ messages: unknown[] }>
-					)[0]?.messages.length ?? -1
+			// The dock opens on the tapped row — no floating card, no
+			// composer transplant, the saved comment stands.
+			await expect(page.locator(".ann-wrap .review")).toHaveCSS(
+				"opacity",
+				"1"
 			);
+			await expect(page.locator(".review-item.highlight")).toBeVisible();
+			await expect(page.locator(".review-comment").first()).toHaveText(
+				"first"
+			);
+			await expect(page.locator(".ann-pop")).toHaveCount(0);
+			const composer = page.locator(".prompt textarea");
+			await expect(composer).not.toHaveAttribute(
+				"placeholder",
+				"Edit annotation"
+			);
+			// The send arrow sends a chat: the filed note rides the
+			// message as baked context (unstaged riders clear).
+			await composer.click();
+			await page.keyboard.type("hello", { delay: 10 });
 			await page.locator(".send-btn").click();
-			await expect(page.locator(".toast")).toHaveText("Annotation edited");
-			const after = await page.evaluate(() => ({
-				annotations: window.localStorage.getItem("ccez-llm-annotations-v1"),
-				messages:
-					(
-						JSON.parse(
-							window.localStorage.getItem("ccez-llm-chats-v1") ?? "[]"
-						) as Array<{ messages: unknown[] }>
-					)[0]?.messages.length ?? -1
-			}));
-			expect(after.annotations).toContain('"comment":"revised"');
-			expect(after.messages).toBe(before);
+			await expect
+				.poll(
+					async () =>
+						page.evaluate(() => {
+							const content =
+								(
+									JSON.parse(
+										window.localStorage.getItem("ccez-llm-chats-v1") ??
+											"[]"
+									) as Array<{
+										messages: Array<{ role: string; content: string }>;
+									}>
+								)[0]?.messages
+									.filter((m) => m.role === "user")
+									.pop()?.content ?? "";
+							return (
+								content.includes("hello") &&
+								content.includes("Annotated selections:") &&
+								content.includes('"beta" — first')
+							);
+						}),
+					{ timeout: 60_000 }
+				)
+				.toBe(true);
 		});
 
-		/** Entering a note edit washes its quote: creating washes the
-		pending preview, review-pencil washes the saved quote — the
-		comment box otherwise floats over an unmarked thread. */
-		test("note edits wash their quote in the thread", async ({ page }) => {
+		/** Creating washes the pending preview: the comment box
+		otherwise floats over an unmarked thread. (Filed notes never
+		transplant, so only the create path washes now.) */
+		test("creating washes the pending quote in the thread", async ({ page }) => {
 			await seedChat(page, [
 				{ role: "assistant", content: "alpha beta gamma delta" }
 			]);
-			await page.addInitScript(() => {
-				window.localStorage.setItem(
-					"ccez-llm-annotations-v1",
-					JSON.stringify({
-						"e2e-chat": [
-							{
-								id: "ann-1",
-								messageId: "e2e-m0",
-								quote: "beta",
-								comment: "first"
-							}
-						]
-					})
-				);
-			});
 			await page.goto("/");
-			const badge = page.locator("[data-ann-badge]").first();
-			await expect(badge).toBeVisible({ timeout: 15_000 });
+			const quote = page
+				.locator("article.assistant .rendered p", { hasText: "alpha beta" })
+				.first();
+			await expect(quote).toBeVisible({ timeout: 15_000 });
+			await quote.evaluate((el) => el.scrollIntoView({ block: "center" }));
+			await page.waitForTimeout(600);
 			const hasWash = () =>
 				page.evaluate(() =>
 					(
 						CSS as unknown as { highlights: { has(x: string): boolean } }
 					).highlights.has("ccez-ann")
 				);
-			const bbox = await badge.boundingBox();
-			if (!bbox) throw new Error("badge has no box");
+			// Programmatic paragraph pick plus the touch sequence the
+			// menu listens for (same pattern as the Annotate test).
+			const qbox2 = await quote.boundingBox();
+			if (!qbox2) throw new Error("quote lost its box");
+			await page.evaluate(
+				({ x, y }: { x: number; y: number }) => {
+					const touch = (id: number) =>
+						new Touch({
+							identifier: id,
+							target: document.body,
+							clientX: x,
+							clientY: y
+						});
+					window.dispatchEvent(
+						new TouchEvent("touchstart", {
+							bubbles: true,
+							cancelable: true,
+							composed: true,
+							touches: [touch(1)]
+						})
+					);
+					const p = document.querySelector(
+						"article.assistant .rendered p"
+					);
+					const sel = window.getSelection();
+					sel?.removeAllRanges();
+					const range = document.createRange();
+					if (p) range.selectNodeContents(p);
+					sel?.addRange(range);
+					window.dispatchEvent(
+						new TouchEvent("touchend", {
+							bubbles: true,
+							cancelable: true,
+							composed: true,
+							touches: [],
+							changedTouches: [touch(1)]
+						})
+					);
+				},
+				{ x: qbox2.x + qbox2.width / 2, y: qbox2.y + qbox2.height / 2 }
+			);
+			const item = page.locator('.sel-menu button:has-text("Annotate")');
+			await expect(item).toBeVisible({ timeout: 10_000 });
+			const btnBox = await item.boundingBox();
+			if (!btnBox) throw new Error("no annotate box");
 			await page.touchscreen.tap(
-				bbox.x + bbox.width / 2,
-				bbox.y + bbox.height / 2
+				btnBox.x + btnBox.width / 2,
+				btnBox.y + btnBox.height / 2
+			);
+			// Phones file the annotation in the composer: the pending
+			// preview washes while the comment box owns the screen.
+			await expect(page.locator(".prompt textarea")).toHaveAttribute(
+				"placeholder",
+				"Add an annotation",
+				{ timeout: 10_000 }
 			);
 			await expect.poll(hasWash, { timeout: 10_000 }).toBe(true);
 		});

@@ -425,13 +425,22 @@ for (const t of THEMES) {
 		await expect(clear).toHaveCSS("color", v.muted);
 		await clear.hover();
 		await expect(clear).toHaveCSS("color", v.danger);
-		// Edit mode via the pencil: desktop edits at the mark in the
-		// floating card (phones use the composer) — the card opens
-		// carrying the comment, and the composer stays empty.
-		await page.locator('button[aria-label="Edit annotation 1"]').click();
-		const editPop = page.locator(".ann-pop");
-		await expect(editPop).toBeVisible({ timeout: 10_000 });
-		await expect(editPop.locator("textarea")).toHaveValue("note");
+		// The inclusion chip's pencil stages the wording in the
+		// send-prompt pill: panel surface, accent ring, field
+		// surface — and the composer stays empty.
+		await page.locator(".inclusion-chip button").click();
+		const staged = page.locator(".staged-pill");
+		await expect(staged).toBeVisible({ timeout: 10_000 });
+		await expect(staged).toHaveCSS("background-color", v.panel);
+		await expect(staged).toHaveCSS(
+			"border-color",
+			L ? "rgb(0, 122, 255)" : "rgb(10, 132, 255)"
+		);
+		await expect(staged.locator("textarea")).toHaveValue("note");
+		await expect(staged.locator("textarea")).toHaveCSS(
+			"background-color",
+			v.field
+		);
 		await page.mouse.click(4, 300);
 		// The hint is a placeholder attribute, never draft text:
 		// only a real value counts.

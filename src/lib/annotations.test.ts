@@ -37,6 +37,11 @@ import {
 	annotationCopyText,
 	filePendingAnnotation,
 	promptAnnWashIdFor,
+	promptInclusions,
+	canAddToPrompt,
+	setPromptExcluded,
+	fileStagedComment,
+	attachStagedAnswers,
 	paragraphForQuote,
 	badgeAnswerClass,
 	clampMenuDrag,
@@ -102,6 +107,72 @@ describe("annotations", () => {
 			'Annotated selections:\n1. "langue" — meaning?'
 		);
 		expect(withAnnotations("explain", [])).toBe("explain");
+	});
+
+	it("omits removed prompt inclusions with no footnote trace", () => {
+		const list = setPromptExcluded(
+			addAnnotation(
+				addAnnotation([], "m1" as ChatMsgId, "langue", "meaning?"),
+				"m1" as ChatMsgId,
+				"alphabet",
+				"letters?"
+			),
+			"missing" as AnnotationId,
+			true
+		);
+		// Unknown id: nothing changes.
+		expect(withAnnotations("explain", list)).toBe(
+			'explain\n\nAnnotated selections:\n1. "langue" — meaning?\n2. "alphabet" — letters?'
+		);
+		const excluded = setPromptExcluded(list, list[0]!.id, true);
+		expect(promptInclusions(excluded)).toHaveLength(1);
+		// Numbering resequences from the kept order: no gaps.
+		expect(withAnnotations("explain", excluded)).toBe(
+			'explain\n\nAnnotated selections:\n1. "alphabet" — letters?'
+		);
+		// All excluded: the prompt goes out bare.
+		const allOut = setPromptExcluded(excluded, excluded[1]!.id, true);
+		expect(withAnnotations("explain", allOut)).toBe("explain");
+		// Re-including restores the bake and drops the flag.
+		const back = setPromptExcluded(allOut, list[0]!.id, false);
+		expect(back[0]).not.toHaveProperty("excludedFromPrompt");
+		expect(withAnnotations("explain", back)).toBe(
+			'explain\n\nAnnotated selections:\n1. "langue" — meaning?'
+		);
+		const full = setPromptExcluded(back, list[1]!.id, false);
+		expect(withAnnotations("explain", full)).toBe(
+			'explain\n\nAnnotated selections:\n1. "langue" — meaning?\n2. "alphabet" — letters?'
+		);
+	});
+
+	it("offers Add to prompt only for empty questions, files staged wording", () => {
+		expect(canAddToPrompt({ comment: "" })).toBe(true);
+		expect(canAddToPrompt({ comment: "   " })).toBe(true);
+		expect(canAddToPrompt({ comment: "meaning?" })).toBe(false);
+		const list = addAnnotation([], "m1" as ChatMsgId, "langue", "");
+		const filed = fileStagedComment(list, list[0]!.id, "meaning?");
+		expect(filed[0]?.comment).toBe("meaning?");
+		expect(list[0]?.comment).toBe("");
+	});
+
+	it("lands staged replies only on asked ids, never on blank replies", () => {
+		const list = addAnnotation(
+			addAnnotation([], "m1" as ChatMsgId, "langue", "meaning?"),
+			"m1" as ChatMsgId,
+			"alphabet",
+			"letters?"
+		);
+		const asked = attachStagedAnswers(list, [list[0]!.id], "because reasons");
+		expect(asked[0]?.answer).toBe("because reasons");
+		// Bundled context riders stay blue.
+		expect(asked[1]?.answer).toBeUndefined();
+		expect(list[0]?.answer).toBeUndefined();
+		// Blank/blocked replies attach nothing (same ref back).
+		expect(attachStagedAnswers(list, [list[0]!.id], "   ")).toBe(list);
+		expect(attachStagedAnswers(list, [], "because")).toBe(list);
+		expect(
+			attachStagedAnswers(list, ["missing" as AnnotationId], "because")
+		).toBe(list);
 	});
 
 	it("round-trips baked blocks back into text plus refs", () => {
@@ -925,20 +996,14 @@ describe("buildMarksFor", () => {
 		expect(buildMarksFor(list, m2, false, pending)).toHaveLength(1);
 	});
 
-	it("marks waiting and ready answers, neutral otherwise", () => {
+	it("marks filed-but-unasked waiting (steady blue) and answered ready", () => {
 		const answered: Annotation = { ...list[0]!, answer: "because" };
 		const ready = buildMarksFor([answered], m1, false, null);
 		expect(ready[0]).toMatchObject({ answer: "ready" });
-		const waiting = buildMarksFor(
-			list,
-			m1,
-			false,
-			null,
-			new Set([list[0]!.id])
-		);
+		// No separate request exists: every filed annotation without
+		// an answer waits, never neutral.
+		const waiting = buildMarksFor(list, m1, false, null);
 		expect(waiting[0]).toMatchObject({ answer: "waiting" });
-		const neutral = buildMarksFor(list, m1, false, null);
-		expect(neutral[0]!.answer).toBeUndefined();
 	});
 
 	it("paints waiting blue and ready orange, neutral unclassed", () => {

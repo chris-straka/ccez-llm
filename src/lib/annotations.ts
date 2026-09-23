@@ -50,6 +50,12 @@ export interface Annotation {
 	 * comment. Absent means unanswered — badges stay neutral.
 	 */
 	answer?: string;
+	/**
+	 * Removed from prompt inclusions: the annotation stays listed
+	 * (badge, dock) but the send omits it — no bake, no number, no
+	 * footnote trace. Absent means included.
+	 */
+	excludedFromPrompt?: boolean;
 }
 
 export function newAnnotationId(): AnnotationId {
@@ -1961,14 +1967,84 @@ export function formatAnnotations(
 		.join("\n");
 }
 
-/** Append the annotation block to outgoing prompt text. */
+/**
+ * Append the annotation block to outgoing prompt text. Removed
+ * prompt inclusions never bake: they filter here, so numbering
+ * resequences from the kept order with no gaps and no footnote
+ * trace of the omitted ones.
+ */
 export function withAnnotations(
 	prompt: string,
-	list: { quote: string; comment: string }[]
+	list: { quote: string; comment: string; excludedFromPrompt?: boolean }[]
 ): string {
-	if (list.length === 0) return prompt;
-	const block = `Annotated selections:\n${formatAnnotations(list)}`;
+	const kept = list.filter((a) => a.excludedFromPrompt !== true);
+	if (kept.length === 0) return prompt;
+	const block = `Annotated selections:\n${formatAnnotations(kept)}`;
 	return prompt ? `${prompt}\n\n${block}` : block;
+}
+
+/**
+ * Prompt inclusions for a send: filed annotations not removed from
+ * the prompt. The dock lists everything; the message carries these.
+ */
+export function promptInclusions(list: Annotation[]): Annotation[] {
+	return list.filter((a) => a.excludedFromPrompt !== true);
+}
+
+/**
+ * Add-to-prompt eligibility: the affordance exists only for an empty
+ * question — a staged pill asks what the blank annotation means.
+ * Annotations already carrying a question ride the send as baked.
+ */
+export function canAddToPrompt(ann: { comment: string }): boolean {
+	return ann.comment.trim() === "";
+}
+
+/** Flip one annotation's prompt inclusion (never deletes it). */
+export function setPromptExcluded(
+	list: Annotation[],
+	id: AnnotationId,
+	excluded: boolean
+): Annotation[] {
+	return list.map((a) => {
+		if (a.id !== id) return a;
+		if (excluded) return { ...a, excludedFromPrompt: true };
+		const next = { ...a };
+		delete next.excludedFromPrompt;
+		return next;
+	});
+}
+
+/** File staged wording into an annotation (the staged pill's send). */
+export function fileStagedComment(
+	list: Annotation[],
+	id: AnnotationId,
+	comment: string
+): Annotation[] {
+	return list.map((a) => (a.id === id ? { ...a, comment } : a));
+}
+
+/**
+ * Land a staged send's reply as its annotations' answers (asked and
+ * answered): only the ids asked through the pill attach — bundled
+ * context riders stay blue. A blank/blocked reply attaches nothing
+ * (the annotations stay blue); the reply itself still renders as a
+ * plain message. Returns the list unchanged when nothing attaches.
+ */
+export function attachStagedAnswers(
+	list: Annotation[],
+	ids: readonly AnnotationId[],
+	reply: string
+): Annotation[] {
+	if (!reply.trim() || ids.length === 0) return list;
+	const wanted = new Set<AnnotationId>(ids);
+	let touched = false;
+	const next = list.map((a) => {
+		if (!wanted.has(a.id) || a.answer === reply) return a;
+		touched = true;
+		return { ...a, answer: reply };
+	});
+	return touched ? next : list;
 }
 
 /**
@@ -2015,7 +2091,13 @@ function cleanDraftList(raw: unknown): Annotation[] {
 			messageId: a.messageId,
 			quote: a.quote,
 			comment: a.comment,
-			at: typeof a.at === "number" ? a.at : 0
+			at: typeof a.at === "number" ? a.at : 0,
+			// Answers persist with drafts like the comment: a reload
+			// must not un-ask an answered annotation back to blue.
+			...(typeof a.answer === "string" && a.answer
+				? { answer: a.answer }
+				: {}),
+			...(a.excludedFromPrompt === true ? { excludedFromPrompt: true } : {})
 		});
 	}
 	return out;
@@ -2768,15 +2850,16 @@ export function reviewEditKey(
  * Badge array for one message, unmemoized (REFACTOR §6): aid-scoped
  * quotes only show while the aid is on (they locate against aided
  * text), and a composed-but-unsubmitted annotation washes while its
- * pill is open with no badge. The page memos the result by content
- * (see marksFor) so renders keep array identity.
+ * pill is open with no badge. Filed-but-unasked annotations paint
+ * steady blue (waiting), answered ones orange (ready) — there is no
+ * separate request anymore, so nothing ever blinks. The page memos
+ * the result by content (see marksFor) so renders keep array identity.
  */
 export function buildMarksFor(
 	list: Annotation[],
 	messageId: ChatMsgId,
 	tashkeelOn: boolean,
-	pending: Annotation | null,
-	answering: Set<AnnotationId> = new Set()
+	pending: Annotation | null
 ): AnnotationMark[] {
 	const saved: AnnotationMark[] = list
 		.filter((a) => a.messageId === messageId && aidMarkVisible(a.aidScope, tashkeelOn))
@@ -2786,11 +2869,7 @@ export function buildMarksFor(
 			quote: a.quote,
 			at: a.at ?? 0,
 			...(a.aidScope ? { aidScope: a.aidScope } : {}),
-			...(a.answer
-				? { answer: "ready" as const }
-				: answering.has(a.id)
-					? { answer: "waiting" as const }
-					: {})
+			answer: a.answer ? "ready" : "waiting"
 		}));
 	if (pending && pending.messageId === messageId) {
 		saved.push({

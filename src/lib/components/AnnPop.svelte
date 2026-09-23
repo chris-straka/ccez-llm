@@ -21,7 +21,6 @@ the page's save/focus paths keep working. -->
 		key: (event: KeyboardEvent) => void;
 		blur: () => void;
 		save: () => void;
-		cancel: () => void;
 		remove: (id: string) => void;
 		mic: () => void;
 	}

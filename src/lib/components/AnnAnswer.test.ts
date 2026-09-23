@@ -24,7 +24,10 @@ function pageSource(): string {
 describe("annotation answer extraction", () => {
 	it("renders the answer card from the component, not the page", () => {
 		expect(answerSource()).toContain('class="ann-answer"');
-		expect(answerSource()).toContain('aria-label="Add answer to prompt"');
+		// No Add-to-prompt anywhere in the answer overlay: empty
+		// questions stage from the dock, never from an answer.
+		expect(answerSource()).not.toContain("Add to prompt");
+		expect(answerSource()).not.toContain("addToPrompt");
 		expect(pageSource()).not.toContain('class="ann-answer"');
 	});
 

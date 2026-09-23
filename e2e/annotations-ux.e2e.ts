@@ -12,12 +12,12 @@ import { seedChat } from "./helpers";
  * 3. numbered badges scale with the message font size;
  * 4. empty annotations bake a "?" so the model sees the confusion;
  * 5. annotations-only messages render as an em-dash with the count UI above;
- * 6. review edit box: Enter saves, Save animates symmetrically, and the
- *    textarea stays readable in dark mode;
+ * 6. staged pill: Add to prompt animates symmetrically, and the pill
+ *    rides token surfaces (filed notes never edit in an overlay);
  * 7. off-chat drags never highlight above the cursor's current line.
  */
 
-test("annotation card widens with font size up to its cap", async ({
+test("review dock respects its width cap at 200% type", async ({
 	page
 }) => {
 	const sentence =
@@ -57,23 +57,19 @@ test("annotation card widens with font size up to its cap", async ({
 	const pop = page.locator(".ann-pop");
 	await expect(pop).toBeVisible();
 	// The create box is the fixed 19rem fresh pill; file a note and
-	// reopen the review card to measure the scaled menu.
+	// open the dock to measure it (filed notes never open edit
+	// cards anymore — the dock is the overlay that must cap).
 	await pop.locator("textarea").fill("riverbank note");
-	// Slow the mock answer: the badge click below must open the edit
-	// card for the width read, not the ready-answer card.
-	await page.evaluate(() =>
-		localStorage.setItem("ccez-mock-chat-ms", "15000")
-	);
 	await page.keyboard.press("Enter");
 	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1);
 	await expect(pop).toHaveCount(0, { timeout: 5_000 });
-	await page.locator("button.ccez-ann-badge").click();
-	const card = page.locator(".ann-pop:not(.fresh)");
-	await expect(card).toBeVisible();
-	// 24rem at 200% would be 768px: capped at 32rem (512px).
+	await page.locator(".prompt-tools .ann-pill").click();
+	const card = page.locator(".ann-wrap .review");
+	await expect(card).toHaveCSS("opacity", "1");
+	// Content-sized up to its cap: 30rem (480px) plus borders.
 	const width = await card.evaluate((el) => el.getBoundingClientRect().width);
-	expect(width).toBeGreaterThan(384);
-	expect(width).toBeLessThanOrEqual(514);
+	expect(width).toBeLessThanOrEqual(482);
+	expect(width).toBeGreaterThan(200);
 });
 
 test("desktop right-click never opens the native menu", async ({ page }) => {
@@ -368,7 +364,9 @@ test("annotations-only messages render as an em-dash with the count pill above",
 	expect(parseFloat(sizes.fontSize)).toBeGreaterThanOrEqual(13);
 });
 
-test("review pencil card cancels on Escape", async ({ page }) => {
+test("badge tap opens the dock on its row, never an edit", async ({
+	page
+}) => {
 	await seedChat(page, [
 		{ role: "assistant", content: "alpha beta gamma delta" }
 	]);
@@ -380,22 +378,27 @@ test("review pencil card cancels on Escape", async ({ page }) => {
 	await page.locator('.sel-menu button:has-text("Annotate")').click();
 	await page.keyboard.type("first");
 	await page.keyboard.press("Enter");
-	// The pill toggles the review (hover never opens it); the pencil
-	// opens the floating edit card at the mark.
-	await page.locator(".prompt-tools .ann-pill").click();
+	const badge = page.locator("button.ccez-ann-badge");
+	await expect(badge).toBeVisible({ timeout: 15_000 });
+	// The thread sits top-scrolled under the sticky header, which
+	// intercepts pointer events over the badge: keyboard-activate
+	// instead (buttons act on Enter without hit-testing).
+	await badge.focus();
+	await page.keyboard.press("Enter");
+	// The dock opens on this row — no floating edit card, no
+	// composer transplant, the saved comment stands.
 	await expect(page.locator(".ann-wrap .review")).toHaveCSS("opacity", "1");
-	await page.locator(".review-pencil").first().click();
-	const card = page.locator('.ann-pop[aria-label="Edit annotation"]');
-	await expect(card).toBeVisible();
-	// Escape cancels the card (the open review closes with it, per the
-	// global ladder): the saved comment stands.
-	await card.locator("textarea").click();
-	await page.keyboard.type("!");
-	await page.keyboard.press("Escape");
-	await expect(card).toHaveCount(0);
-	await page.locator(".prompt-tools .ann-pill").click();
-	await expect(page.locator(".ann-wrap .review")).toHaveCSS("opacity", "1");
+	await expect(page.locator(".review-item.highlight")).toBeVisible();
 	await expect(page.locator(".review-comment").first()).toHaveText("first");
+	await expect(page.locator(".ann-pop")).toHaveCount(0);
+	await expect(page.locator(".prompt .ta-input")).not.toHaveAttribute(
+		"placeholder",
+		"Edit annotation"
+	);
+	// Re-tap keeps the dock on the row (idempotent, never a toggle).
+	await page.keyboard.press("Enter");
+	await expect(page.locator(".ann-wrap .review")).toHaveCSS("opacity", "1");
+	await expect(page.locator(".review-item.highlight")).toBeVisible();
 });
 
 test("gutter drags never highlight above the cursor line", async ({ page }) => {

@@ -412,11 +412,10 @@ const AR_PARAGRAPH =
 /** Hovering an answered Arabic badge moves nothing: no duplicated
 words, no reflow — hovering والأفكار once pulled أدرك up a line
 and shoved the quote sideways. */
-test("hovering an answered arabic badge moves no text", async ({ page }) => {
+test("hovering an arabic badge moves no text", async ({ page }) => {
 	test.setTimeout(120_000);
 	await seedChat(page, [{ role: "assistant", content: AR_PARAGRAPH }]);
 	await page.addInitScript(() => {
-		localStorage.setItem("ccez-mock-chat-ms", "2500");
 		const raw = window.localStorage.getItem("ccez-llm-settings-v1");
 		const prev = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
 		window.localStorage.setItem(
@@ -428,8 +427,9 @@ test("hovering an answered arabic badge moves no text", async ({ page }) => {
 	await expect(
 		page.locator("article .rendered").first()
 	).toBeVisible({ timeout: 60_000 });
-	// A second annotation on the message, left waiting (blue): the
-	// shift showed with two badges up, mid-restyle.
+	// A second annotation on the message, filed blue (unasked —
+	// filing never sends): the shift showed with two badges up,
+	// mid-restyle. Both hold steady blue: nothing ever blinks.
 	await dragQuote(page, 0, "العربية");
 	await page.locator('.sel-menu button:has-text("Annotate")').click();
 	await expect(page.locator(".ann-pop")).toBeVisible();
@@ -440,8 +440,12 @@ test("hovering an answered arabic badge moves no text", async ({ page }) => {
 	await expect(page.locator(".ann-pop")).toBeVisible();
 	await page.locator(".ann-pop textarea").fill("what does this mean?");
 	await page.keyboard.press("Enter");
-	const readies = page.locator("button.ccez-ann-badge.ans-ready");
+	const readies = page.locator("button.ccez-ann-badge.ans-waiting");
 	await expect(readies).toHaveCount(2, { timeout: 20_000 });
+	const steady = await readies
+		.nth(1)
+		.evaluate((el) => getComputedStyle(el).animationName);
+	expect(steady).not.toContain("ann-badge-wait");
 	const ready = readies.nth(1);
 	const snap = (): Promise<{
 		base: string;
@@ -522,36 +526,31 @@ test("hovering an answered arabic badge moves no text", async ({ page }) => {
 	}
 });
 
-/** Escape closes the badge edit box without writing. */
-test("escape closes the badge edit without saving", async ({ page }) => {
+/** Escape closes the dock without losing the note (filed notes
+never edit: there is no edit box to write into). */
+test("escape closes the dock without losing the note", async ({ page }) => {
 	await openAnnotate(page, "確認しました");
-	// Slow the mock answer: the badge clicks below must open the edit
-	// card, not the ready-answer card.
-	await page.evaluate(() =>
-		localStorage.setItem("ccez-mock-chat-ms", "15000")
-	);
 	await page.locator(".ann-pop textarea").fill("go");
-	// File without sending: a send bakes annotations into the outgoing
-	// message and clears the live list (withAnnotations), so no badge
-	// survives it.
+	// File without sending: a staged send would ask the note and
+	// clear the live list, so no badge survives it.
 	await page.keyboard.press("Enter");
 	const badge = page.locator("button.ccez-ann-badge").first();
 	await expect(badge).toHaveCount(1);
-	const box = await badge.boundingBox();
-	if (!box) throw new Error("badge has no box");
-	await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-	await expect(page.locator(".ann-pop")).toBeVisible();
-	await page.keyboard.type("scratch");
+	// Keyboard-activate (the sticky header intercepts pointer hits
+	// over badges): the dock opens on this row.
+	await badge.focus();
+	await page.keyboard.press("Enter");
+	const dock = page.locator(".ann-wrap .review");
+	await expect(dock).toHaveCSS("opacity", "1");
+	await expect(page.locator(".review-item.highlight")).toBeVisible();
+	// Escape closes the dock; the note stands.
 	await page.keyboard.press("Escape");
-	await expect(page.locator(".ann-pop")).toHaveCount(0);
-	// The saved comment is untouched: reopening shows "go", not "goscratch".
-	await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-	await expect(page.locator(".ann-pop textarea")).toHaveValue("go");
-	await page.keyboard.press("Escape");
-	await expect(page.locator(".ann-pop")).toHaveCount(0);
-	// Click off the badge (the click that opened it left the mouse
-	// hovering it, which legitimately keeps the hover wash): closing
-	// the edit and leaving must unwash.
+	await expect(dock).toHaveCSS("opacity", "0");
+	await page.locator(".prompt-tools .ann-pill").click();
+	await expect(dock).toHaveCSS("opacity", "1");
+	await expect(page.locator(".review-comment").first()).toHaveText("go");
+	// Leaving the badge must unwash (the pill click above left the
+	// mouse far from it; park off-message and the hover wash dies).
 	await page.mouse.move(4, 4);
 	await page.waitForTimeout(600);
 	const leftover = await page.evaluate(() => {
@@ -615,99 +614,113 @@ test("draft annotations survive a reload", async ({ page }) => {
 	await expect(page.locator(".prompt-tools .ann-pill")).toHaveText("1");
 });
 
-/** Re-pressing the open badge closes its edit menu like cancel. */
-test("badge re-press closes the edit menu", async ({ page }) => {
+/** Re-pressing the answered badge closes its answer card like cancel. */
+test("answer card re-press toggles shut", async ({ page }) => {
+	test.setTimeout(120_000);
 	await openAnnotate(page, "確認しました");
-	// File without sending: a send bakes annotations into the outgoing
-	// message and clears the live list (withAnnotations), so no badge
-	// survives it.
-	// Slow the mock answer: the badge clicks below must open the edit
-	// card, not the ready-answer card.
-	await page.evaluate(() =>
-		localStorage.setItem("ccez-mock-chat-ms", "15000")
-	);
+	await page.locator(".ann-pop textarea").fill("what does this mean?");
 	await page.keyboard.press("Enter");
-	const badge = page.locator("button.ccez-ann-badge").first();
-	await expect(badge).toHaveCount(1);
-	const box = await badge.boundingBox();
-	if (!box) throw new Error("badge has no box");
-	await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-	await expect(page.locator(".ann-pop")).toBeVisible();
-	await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-	await expect(page.locator(".ann-pop")).toHaveCount(0);
-});
-
-/** Saving the badge edit writes the new comment back to the annotation. */
-test("badge save files the edited comment", async ({ page }) => {
-	await openAnnotate(page, "確認しました");
-	// Slow the mock answer: the badge clicks below must open the edit
-	// card, not the ready-answer card.
-	await page.evaluate(() =>
-		localStorage.setItem("ccez-mock-chat-ms", "15000")
-	);
-	await page.keyboard.press("Enter");
-	const badge = page.locator("button.ccez-ann-badge").first();
-	await expect(badge).toHaveCount(1);
-	const openMenu = async (): Promise<void> => {
-		const box = await badge.boundingBox();
-		if (!box) throw new Error("badge has no box");
-		await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-		await expect(page.locator(".ann-pop")).toBeVisible();
-	};
-	await openMenu();
-	await page.locator(".ann-pop textarea").fill("edited note");
-	await page.locator(".ann-pop .ann-save").click();
-	await expect(page.locator(".ann-pop")).toHaveCount(0);
-	await openMenu();
-	await expect(page.locator(".ann-pop textarea")).toHaveValue("edited note");
-});
-
-/** Keyboard Enter on a focused badge opens the edit (click dedup uninvolved). */
-test("keyboard enter opens the badge edit", async ({ page }) => {
-	await openAnnotate(page, "確認しました");
-	await page.locator(".ann-pop textarea").fill("typed");
-	// Slow the mock answer: the badge Enter below must open the edit
-	// card, not the ready-answer card.
-	await page.evaluate(() =>
-		localStorage.setItem("ccez-mock-chat-ms", "15000")
-	);
-	await page.keyboard.press("Enter");
-	const badge = page.locator("button.ccez-ann-badge").first();
-	await expect(badge).toHaveCount(1);
+	// Ask through the send prompt: the inclusion chip's pencil
+	// stages the wording, the arrow sends it as one request.
+	const chip = page.locator(".inclusion-chip");
+	await expect(chip).toBeVisible({ timeout: 10_000 });
+	await chip.locator("button").click();
+	await expect(page.locator(".staged-pill")).toBeVisible();
+	await page.locator(".send-btn").click();
+	const badge = page.locator("button.ccez-ann-badge.ans-ready").first();
+	await expect(badge).toBeVisible({ timeout: 30_000 });
+	// Keyboard-activate (the sticky header intercepts pointer hits
+	// over badges): the card opens, re-press toggles it shut.
 	await badge.focus();
 	await page.keyboard.press("Enter");
-	await expect(page.locator(".ann-pop")).toBeVisible();
-	await expect(page.locator(".ann-pop textarea")).toHaveValue("typed");
+	const card = page.locator(".ann-answer");
+	await expect(card).toBeVisible({ timeout: 10_000 });
+	await page.keyboard.press("Enter");
+	await expect(card).toHaveCount(0);
 });
 
-/** Escape drops the badge edit without touching the saved comment
-(no Cancel button: click-off and Esc close the card). */
-test("badge cancel drops the edit", async ({ page }) => {
+/** The staged send files its wording into the annotation (the dock
+row carries the asked question under its answer afterwards). */
+test("staged send files the wording into the annotation", async ({
+	page
+}) => {
+	test.setTimeout(120_000);
 	await openAnnotate(page, "確認しました");
-	await page.locator(".ann-pop textarea").fill("kept");
-	// Slow the mock answer: the badge clicks below must open the edit
-	// card, not the ready-answer card.
-	await page.evaluate(() =>
-		localStorage.setItem("ccez-mock-chat-ms", "15000")
-	);
 	await page.keyboard.press("Enter");
-	const badge = page.locator("button.ccez-ann-badge").first();
-	await expect(badge).toHaveCount(1);
-	const box = await badge.boundingBox();
-	if (!box) throw new Error("badge has no box");
-	await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-	await expect(page.locator(".ann-pop")).toBeVisible();
-	await page.locator(".ann-pop textarea").fill("scratch");
-	await expect(page.locator(".ann-pop .ann-cancel")).toHaveCount(0);
-	await page.keyboard.press("Escape");
-	await expect(page.locator(".ann-pop")).toHaveCount(0);
-	const reopened = await badge.boundingBox();
-	if (!reopened) throw new Error("badge has no box");
-	await page.mouse.click(
-		reopened.x + reopened.width / 2,
-		reopened.y + reopened.height / 2
+	await page.locator(".prompt-tools .ann-pill").click();
+	await expect(page.locator(".ann-wrap .review")).toHaveCSS("opacity", "1");
+	// Blank questions stage from the dock (the only Add-to-prompt):
+	// keyboard-activated, like badges under the header.
+	const add = page.locator('button:has-text("Add to prompt")');
+	await expect(add).toBeVisible({ timeout: 10_000 });
+	await add.focus();
+	await page.keyboard.press("Enter");
+	const pill = page.locator(".staged-pill");
+	await expect(pill).toBeVisible();
+	await pill.locator("textarea").fill("why here?");
+	await page.locator(".send-btn").click();
+	// The reply lands as the answer; the row keeps the wording.
+	const badge = page.locator("button.ccez-ann-badge.ans-ready").first();
+	await expect(badge).toBeVisible({ timeout: 30_000 });
+	await page.locator(".prompt-tools .ann-pill").click();
+	await expect(page.locator(".review-comment").first()).toHaveText("why here?");
+	await expect(page.locator(".review-answer").first()).not.toBeEmpty();
+});
+
+/** Keyboard Enter on a focused chip pencil stages the wording
+(click dedup uninvolved): the pill opens prefilled, asking nothing
+until the arrow. */
+test("chip pencil stages the wording", async ({ page }) => {
+	await openAnnotate(page, "確認しました");
+	await page.locator(".ann-pop textarea").fill("typed");
+	await page.keyboard.press("Enter");
+	const chip = page.locator(".inclusion-chip");
+	await expect(chip).toBeVisible({ timeout: 10_000 });
+	const pencil = chip.locator("button");
+	await pencil.focus();
+	await page.keyboard.press("Enter");
+	const pill = page.locator(".staged-pill");
+	await expect(pill).toBeVisible();
+	await expect(pill.locator(".staged-quote")).toContainText("確認しました");
+	await expect(pill.locator("textarea")).toHaveValue("typed");
+	// Still unasked: the badge holds steady blue, no answer anywhere.
+	await expect(
+		page.locator("button.ccez-ann-badge.ans-waiting")
+	).toHaveCount(1);
+	await expect(page.locator(".review-answer")).toHaveCount(0);
+});
+
+/** Unstage drops the staged wording without asking (no send, no
+answer): the annotation slides back to the drawer with its filed
+comment, and a touched draft toasts. */
+test("unstage drops the staged wording", async ({ page }) => {
+	await openAnnotate(page, "確認しました");
+	await page.keyboard.press("Enter");
+	await page.locator(".prompt-tools .ann-pill").click();
+	await expect(page.locator(".ann-wrap .review")).toHaveCSS("opacity", "1");
+	// Keyboard-activated (the card floats over the thread's bottom
+	// edge): rows never edit, so the dock's Unstage is the no-send
+	// close here.
+	const add = page.locator('button:has-text("Add to prompt")');
+	await add.focus();
+	await page.keyboard.press("Enter");
+	const pill = page.locator(".staged-pill");
+	await expect(pill).toBeVisible();
+	await pill.locator("textarea").fill("scratch");
+	const unstage = page.locator('button:has-text("Unstage")');
+	await unstage.focus();
+	await page.keyboard.press("Enter");
+	await expect(pill).toHaveCount(0);
+	await expect(page.locator(".toast:not(.error)")).toHaveText(
+		"Draft discarded"
 	);
-	await expect(page.locator(".ann-pop textarea")).toHaveValue("kept");
+	// Back in the drawer with the filed (empty) comment, offering
+	// Add to prompt again — nothing asked, nothing answered.
+	await expect(page.locator(".review-comment").first()).toHaveText("—");
+	await expect(page.locator('button:has-text("Add to prompt")')).toBeVisible();
+	await expect(
+		page.locator("button.ccez-ann-badge.ans-waiting")
+	).toHaveCount(1);
 });
 
 /** The review popup shows quotes with hyphen labels (never "note:"),
@@ -1872,7 +1885,7 @@ test("annotations-only messages render as an em-dash with the count pill above",
 	expect(parseFloat(sizes.fontSize)).toBeGreaterThanOrEqual(13);
 });
 
-test("review pencil edits at the mark in the floating card", async ({
+test("empty questions stage from the dock; rows never edit", async ({
 	page
 }) => {
 	await seedChat(page, [
@@ -1884,27 +1897,51 @@ test("review pencil edits at the mark in the floating card", async ({
 	await para.dblclick({ position: { x: 10, y: 10 } });
 	await expect(page.locator(".sel-menu")).toBeVisible();
 	await page.locator('.sel-menu button:has-text("Annotate")').click();
-	await page.keyboard.type("first");
+	// Enter with no text files the empty question (no ghost).
 	await page.keyboard.press("Enter");
-	// A chat draft is already underway: the card edit must not clobber it.
+	// A chat draft is already underway: staging must not clobber it.
 	await page.locator(".prompt .ta-input").click();
 	await page.keyboard.type("chat draft");
-	// The pill toggles the review (hover never opens it); the pencil
-	// jumps to the mark and opens the floating edit card there.
+	// The pill toggles the review (hover never opens it); the empty
+	// row offers Add to prompt — no pencil, no inline editor.
 	await page.locator(".prompt-tools .ann-pill").click();
 	await expect(page.locator(".ann-wrap .review")).toHaveCSS("opacity", "1");
-	await page.locator(".review-pencil").first().click();
-	const card = page.locator('.ann-pop[aria-label="Edit annotation"]');
-	await expect(card).toBeVisible();
-	await expect(card.locator("textarea")).toHaveValue("first");
-	// Enter files the note back into the draft (the guard swallows the
-	// keypress so it never doubles as a send).
-	await card.locator("textarea").click();
-	await page.keyboard.type("!");
+	await expect(page.locator(".review-comment").first()).toHaveText("—");
+	await expect(page.locator(".review-pencil")).toHaveCount(0);
+	await expect(page.locator(".review textarea")).toHaveCount(0);
+	const add = page.locator('button:has-text("Add to prompt")');
+	await expect(add).toBeVisible();
+	// Staging opens the send-prompt pill on the exact text with an
+	// empty wording field. Keyboard-activated: the card floats over
+	// the thread's bottom edge, where the runner's hit-test meets
+	// the transparent messages layer instead of the button (real
+	// mouse clicks land — probed out-of-runner — and buttons act
+	// on Enter without hit-testing, like badges under the header).
+	await add.focus();
 	await page.keyboard.press("Enter");
-	await expect(card).toHaveCount(0);
-	await expect(page.locator(".review-comment").first()).toHaveText("first!");
-	// The composer draft survived untouched.
+	const pill = page.locator(".staged-pill");
+	await expect(pill).toBeVisible();
+	await expect(pill.locator(".staged-quote")).toContainText("alpha");
+	await expect(pill.locator("textarea")).toHaveValue("");
+	// Esc with untouched wording slides back silently (no toast);
+	// the row is still there offering Add to prompt.
+	await pill.locator("textarea").click();
+	await page.keyboard.press("Escape");
+	await expect(pill).toHaveCount(0);
+	await expect(page.locator(".toast")).toHaveCount(0);
+	// Touched wording discards with a toast; the filed comment is
+	// still empty afterwards.
+	await add.focus();
+	await page.keyboard.press("Enter");
+	await expect(pill).toBeVisible();
+	await pill.locator("textarea").fill("first?");
+	await page.keyboard.press("Escape");
+	await expect(pill).toHaveCount(0);
+	await expect(page.locator(".toast:not(.error)")).toHaveText(
+		"Draft discarded"
+	);
+	await expect(page.locator(".review-comment").first()).toHaveText("—");
+	// The composer draft survived untouched (the pill fields its own box).
 	const draft = await page.evaluate(
 		() =>
 			(
@@ -1916,10 +1953,10 @@ test("review pencil edits at the mark in the floating card", async ({
 	expect(draft).toBe("chat draft");
 });
 
-/** Hovering the review pencil moves nothing: the row's icons keep
+/** Hovering the row controls moves nothing: the row's buttons keep
 their boxes (a hover style that grows the box jitters the whole
 card under the cursor). */
-test("review pencil hover moves no icons", async ({ page }) => {
+test("row control hover moves no buttons", async ({ page }) => {
 	await seedChat(page, [
 		{ role: "assistant", content: "alpha beta gamma delta" }
 	]);
@@ -1949,7 +1986,7 @@ test("review pencil hover moves no icons", async ({ page }) => {
 			return {
 				copy: box(".review-copy"),
 				del: box('.review-head button[title="Delete annotation"]'),
-				pencil: box(".review-pencil"),
+				omit: box(".review-omit"),
 				quote: box(".review-quote"),
 				comment: box(".review-comment")
 			};
@@ -1962,22 +1999,20 @@ test("review pencil hover moves no icons", async ({ page }) => {
 			before.copy.y + before.copy.h / 2 - (before.del.y + before.del.h / 2)
 		)
 	).toBeLessThanOrEqual(1);
-	await page.locator(".review-pencil").first().hover();
+	await page.locator(".review-omit").first().hover();
 	// Hover transitions run 0.15s; measure past them.
 	await page.waitForTimeout(400);
 	expect(await boxes()).toEqual(before);
 	// And the hover paints no box-bleeding artifacts: icon buttons
-	// never underline, the pencil signals with color alone (no
-	// background, no glow).
+	// never underline, the omit toggle links like the quote (color
+	// alone carries the icon hover — no background, no glow).
 	const paint = await page.evaluate(() => {
 		const style = (sel: string) =>
 			getComputedStyle(document.querySelector(sel) as HTMLElement);
 		return {
 			copyDeco: style(".review-copy").textDecorationLine,
-			pencilDeco: style(".review-pencil").textDecorationLine,
-			pencilColor: style(".review-pencil").color,
-			pencilBg: style(".review-pencil").backgroundColor,
-			pencilFilter: style(".review-pencil").filter,
+			omitDeco: style(".review-omit").textDecorationLine,
+			omitColor: style(".review-omit").color,
 			// The row itself navigates nowhere: default cursor on the
 			// item, pointer only on the quote button.
 			itemCursor: style(".review-item").cursor,
@@ -1986,10 +2021,8 @@ test("review pencil hover moves no icons", async ({ page }) => {
 	});
 	expect(paint).toEqual({
 		copyDeco: "none",
-		pencilDeco: "none",
-		pencilColor: "rgb(0, 122, 255)",
-		pencilBg: "rgba(0, 0, 0, 0)",
-		pencilFilter: "none",
+		omitDeco: "underline",
+		omitColor: "rgb(28, 28, 30)",
 		itemCursor: "auto",
 		quoteCursor: "pointer"
 	});
@@ -2015,6 +2048,27 @@ test("review pencil hover moves no icons", async ({ page }) => {
 				.textDecorationLine
 	);
 	expect(quoteDeco).toBe("underline");
+	// Omitting dims the row and the toggle reads pressed-accent
+	// while omitted. Geometry assertions stop here: the toggle's
+	// own box legitimately grows ("Omit" to "Include") with the
+	// click, and hover stability is already pinned above.
+	await page.locator(".review-omit").first().click();
+	const omitted = await page.evaluate(() => {
+		const omit = document.querySelector(".review-omit") as HTMLElement;
+		const quote = document.querySelector(".review-quote") as HTMLElement;
+		return {
+			pressed: omit.getAttribute("aria-pressed"),
+			color: getComputedStyle(omit).color,
+			label: omit.textContent?.trim(),
+			dimmed: getComputedStyle(quote).opacity
+		};
+	});
+	expect(omitted).toEqual({
+		pressed: "true",
+		color: "rgb(0, 122, 255)",
+		label: "Include",
+		dimmed: "0.55"
+	});
 });
 
 /** A long review quote clips with an ellipsis inside the row: the card
@@ -2132,74 +2186,58 @@ test("sent refs card dismisses on Escape and outside press", async ({
 
 /** Tabbing through the badge edit card keeps it open: blur-save only
 fires when focus leaves the card, not between its own buttons. */
-test("tab through the badge edit keeps the card open", async ({ page }) => {
+test("tab through the staged pill keeps it open", async ({ page }) => {
 	await openAnnotate(page, "確認しました");
-	// Slow the mock answer: the badge click below must open the edit
-	// card, not the ready-answer card.
-	await page.evaluate(() =>
-		localStorage.setItem("ccez-mock-chat-ms", "15000")
-	);
+	await page.locator(".ann-pop textarea").fill("typed");
 	await page.keyboard.press("Enter");
-	const badge = page.locator("button.ccez-ann-badge").first();
-	await expect(badge).toHaveCount(1);
-	const box = await badge.boundingBox();
-	if (!box) throw new Error("badge has no box");
-	await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-	const pop = page.locator(".ann-pop");
-	await expect(pop).toBeVisible();
-	await expect(pop.locator("textarea")).toBeFocused();
-	await page.keyboard.press("Tab");
-	await expect(pop).toBeVisible();
-	await expect(
-		pop.locator('button[aria-label="Delete annotation"]')
-	).toBeFocused();
-	// Every further Tab walks the card's own row (dictation joins it
-	// when the mic is available) until Save; the card must never
-	// close under keyboard traversal.
-	const focusedName = (): Promise<string> =>
-		page.evaluate(() => {
-			const active = document.activeElement;
-			if (!(active instanceof HTMLElement)) return "none";
-			return (
-				active.getAttribute("aria-label") ??
-				active.textContent ??
-				""
-			).trim();
-		});
-	for (let n = 0; n < 6; n++) {
-		if ((await focusedName()) === "Save") break;
+	const chip = page.locator(".inclusion-chip");
+	await expect(chip).toBeVisible({ timeout: 10_000 });
+	// Staging never steals focus (phones must not pop the keyboard
+	// on stage): the pencil keeps it.
+	const pencil = chip.locator("button");
+	await pencil.focus();
+	await page.keyboard.press("Enter");
+	const pill = page.locator(".staged-pill");
+	await expect(pill).toBeVisible();
+	await expect(pencil).toBeFocused();
+	// Tab walks the pill's own row — copy, pencil, close, field —
+	// and the pill must never close under keyboard traversal.
+	const field = pill.locator("textarea");
+	const labels = [
+		"Copy staged wording",
+		"Edit staged question",
+		"Unstage annotation"
+	];
+	for (const label of labels) {
 		await page.keyboard.press("Tab");
-		await expect(pop).toBeVisible();
+		await expect(pill).toBeVisible();
+		await expect(
+			page.locator(`.staged-pill button[aria-label="${label}"]`)
+		).toBeFocused();
 	}
-	await expect(pop.locator(".ann-save")).toBeFocused();
-	await expect(pop).toBeVisible();
+	await page.keyboard.press("Tab");
+	await expect(pill).toBeVisible();
+	await expect(field).toBeFocused();
 });
 
-/** Badge-edit focus holds: the box keeps the caret a beat after open
-and after clicking back in (a delayed steal must fail this, not the
-instant assertion above). */
-test("badge edit keeps focus after open and re-click", async ({ page }) => {
+/** Staged-field focus holds: the box keeps the caret a beat after
+clicking in (a delayed steal must fail this, not an instant
+assertion). Staging itself never steals focus — see above. */
+test("staged field keeps focus after clicking in", async ({ page }) => {
 	await openAnnotate(page, "確認しました");
-	// Slow the mock answer: the badge clicks below must open the edit
-	// card, not the ready-answer card.
-	await page.evaluate(() =>
-		localStorage.setItem("ccez-mock-chat-ms", "15000")
-	);
+	await page.locator(".ann-pop textarea").fill("typed");
 	await page.keyboard.press("Enter");
-	const badge = page.locator("button.ccez-ann-badge").first();
-	await expect(badge).toHaveCount(1);
-	const box = await badge.boundingBox();
-	if (!box) throw new Error("badge has no box");
-	await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-	const pop = page.locator(".ann-pop");
-	await expect(pop).toBeVisible();
-	const area = pop.locator("textarea");
-	await expect(area).toBeFocused();
+	const chip = page.locator(".inclusion-chip");
+	await expect(chip).toBeVisible({ timeout: 10_000 });
+	await chip.locator("button").click();
+	const pill = page.locator(".staged-pill");
+	await expect(pill).toBeVisible();
+	const field = pill.locator("textarea");
+	await field.click();
+	await expect(field).toBeFocused();
 	await page.waitForTimeout(800);
-	await expect(area).toBeFocused();
-	await area.click();
-	await page.waitForTimeout(800);
-	await expect(area).toBeFocused();
+	await expect(field).toBeFocused();
+	await expect(pill).toBeVisible();
 });
 
 /** Hovering badges across two messages washes every quote: the shared

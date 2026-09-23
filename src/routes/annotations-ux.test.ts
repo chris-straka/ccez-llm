@@ -52,6 +52,13 @@ function reviewDockSource(): string {
 	);
 }
 
+function composerSource(): string {
+	return readFileSync(
+		new URL("../lib/components/Composer.svelte", import.meta.url),
+		"utf8"
+	);
+}
+
 function sentRefsSource(): string {
 	return readFileSync(
 		new URL("../lib/components/SentRefs.svelte", import.meta.url),
@@ -87,17 +94,22 @@ describe("annotation edit Save animation", () => {
 		expect(css).toContain(".ann-save:hover");
 	});
 
-	it("animates the review edit buttons symmetrically on hover in/out", () => {
+	it("animates the Add to prompt pill symmetrically on hover in/out", () => {
 		const css = componentStyle(reviewDockSource(), "ReviewDock.svelte");
-		expect(css).toMatch(/\.review-edit-actions button\s*\{[^}]*transition:/);
+		// Symmetric means the transition lives on the base rule, not
+		// :hover (a hover-only transition snaps back on leave).
+		expect(css).toMatch(/\.review-add\s*\{[^}]*transition:/);
+		expect(css).toContain(".review-add:hover");
 	});
 
-	it("keeps the review edit textarea readable in dark mode", () => {
-		const source = reviewDockSource();
-		// The field surface is near-black; the edit box must override it.
-		expect(source).toContain(':global(html[data-theme="dark"]) .review textarea');
-		expect(source).toMatch(
-			/\.review textarea\s*\{[^}]*background:\s*#3a3a3c/
+	it("keeps the staged pill on token surfaces, field included", () => {
+		const css = componentStyle(composerSource(), "Composer.svelte");
+		// Panel surface with an accent ring; the wording field rides
+		// the shared field token (dark-readable by token contract).
+		expect(css).toMatch(/\.staged-pill\s*\{[^}]*background:\s*var\(--panel\)/);
+		expect(css).toMatch(/\.staged-pill\s*\{[^}]*border-color:\s*var\(--accent\)/);
+		expect(css).toMatch(
+			/\.staged-field textarea\s*\{[^}]*background:\s*var\(--field\)/
 		);
 	});
 });
@@ -137,18 +149,26 @@ describe("annotations-only messages", () => {
 	});
 });
 
-describe("review pencil hover", () => {
-	it("signals with color only — no background, glow, or underline", () => {
+describe("review omit toggle hover", () => {
+	it("links like the quote — underline fade, no background or glow", () => {
 		const css = componentStyle(reviewDockSource(), "ReviewDock.svelte");
-		expect(css).toMatch(/button\.review-pencil\s*\{[^}]*transition:/);
+		expect(css).toMatch(/button\.review-omit\s*\{[^}]*transition:/);
 		const hover =
-			css.match(/button\.review-pencil:hover\s*\{[^}]*\}/)?.[0] ?? "";
+			css.match(/button\.review-omit:hover\s*\{[^}]*\}/)?.[0] ?? "";
 		expect(hover).toContain("color:");
 		expect(hover).not.toContain("background");
 		expect(hover).not.toContain("drop-shadow");
 		expect(hover).not.toContain("filter");
+		expect(hover).toMatch(/text-decoration-color:\s*currentcolor/);
 		expect(css).toMatch(
 			/button\.review-copy:hover\s*\{[^}]*text-decoration:\s*none/
+		);
+	});
+
+	it("reads pressed-accent while omitted", () => {
+		const css = componentStyle(reviewDockSource(), "ReviewDock.svelte");
+		expect(css).toMatch(
+			/button\.review-omit\[aria-pressed="true"\]\s*\{[^}]*var\(--accent\)/
 		);
 	});
 });
@@ -203,13 +223,9 @@ describe("review quote clipping and link contract", () => {
 		}
 	});
 
-	it("lights all three icons on the same color beat", () => {
+	it("lights both icons on the same color beat", () => {
 		const css = componentStyle(reviewDockSource(), "ReviewDock.svelte");
-		for (const sel of [
-			"button\\.review-copy",
-			"button\\.review-del",
-			"button\\.review-pencil"
-		]) {
+		for (const sel of ["button\\.review-copy", "button\\.review-del"]) {
 			expect(css).toMatch(new RegExp(`${sel}\\s*\\{[^}]*transition:\\s*color`));
 		}
 	});

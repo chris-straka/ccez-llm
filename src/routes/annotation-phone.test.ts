@@ -2,16 +2,18 @@ import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
 
 /**
- * Phone annotation-edit invariants (Android/iOS share the phone UI).
+ * Phone annotation invariants (Android/iOS share the phone UI).
  *
  * Layout and gesture facts jsdom cannot see, so these assert on
  * +page.svelte source like the other route style tests:
  * - marker taps must survive the tap-out rule (the capture-phase
- *   press opens the edit before the bubble-phase tap-out check runs,
+ *   press opens the dock before the bubble-phase tap-out check runs,
  *   so badges need an explicit carve-out or every tap opens and
- *   cancels its edit in the same gesture);
- * - in-prompt edits (composer owns the screen) must wash their quote;
+ *   cancels its dock in the same gesture);
+ * - the pending create (composer owns the screen) must wash its quote;
  * - assistant messages shrink-wrap below the full-bleed text size.
+ * Filed notes never transplant on phones: badge taps open the dock
+ * on the row, and questions ask through the staged pill.
  */
 function pageSource(): string {
 	return readFileSync(new URL("./+page.svelte", import.meta.url), "utf8");
@@ -49,25 +51,29 @@ describe("phone marker taps survive tap-out", () => {
 			"Badges never tap out either (see the mousedown twin)"
 		);
 	});
-	it("starts marker-tap edits with an empty composer", () => {
-		// Review-pencil edits keep loading the saved comment; marker
-		// taps rewrite from empty (the wash shows what is rewritten).
+	it("opens the dock on the tapped row, never a transplant", () => {
+		// Marker taps file nothing into the composer: the dock opens
+		// on the row (a staged pill closes first, the badge's no-send
+		// close), and no filed-note transplant exists anymore.
 		const source = pageSource();
-		expect(source).toContain('editAnnotationInPrompt({ id }, "");');
+		expect(source).not.toContain("editAnnotationInPrompt({ id }");
+		expect(source).toContain("if (id === stagedAnnId) closeStagedAnnotation();");
+		expect(source).toContain("reviewOpen = true;");
 	});
 });
 
-describe("phone edits wash their quote", () => {
-	it("feeds the in-prompt edit into the wash id", () => {
+describe("phone creates wash their quote", () => {
+	it("feeds the in-prompt create into the wash id", () => {
 		// The wash feeds the row through the article now: the page
-		// computes it per message, the article forwards it.
-		expect(pageSource()).toMatch(/promptAnnWashId\(\) \?\?\s+editingId \?\?/);
+		// computes it per message, the article forwards it. Filed
+		// notes never wash (no transplant, no dock edit).
+		expect(pageSource()).toMatch(/promptAnnWashId\(\) \?\?\s+hoverBadgeId/);
 		expect(articleSource()).toContain("washId={washId ?? null}");
 	});
-	it("washes pending filings and saved notes alike", () => {
+	it("washes the pending filing", () => {
 		// The branches live in annotations.promptAnnWashIdFor
-		// (unit-tested); the seal follows the wiring so neither the
-		// pending filing nor the saved note can silently drop.
+		// (unit-tested); the seal follows the wiring so the pending
+		// filing can't silently drop its wash.
 		expect(pageSource()).toContain(
 			"promptAnnWashIdFor(promptAnnEdit, pendingAnn?.id ?? null)"
 		);

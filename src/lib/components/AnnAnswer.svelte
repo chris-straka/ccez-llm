@@ -1,32 +1,24 @@
-<!-- Annotation answer popup (the remodel): the separate request's
-answer, read below its highlight with the quote's wash held. Pure
-presentational: the page owns open state, below-quote placement,
-and fade-out; this component owns the card markup and its surface
-(Svelte scoping binds the CSS to this markup). The quote itself
-never renders here (the highlighted word upstream is the title,
-with Han readings in the panels above it) — answer text renders
-as plain text, never HTML, so model output can't inject markup.
-No close button: clicking off the card closes it (Esc too). -->
+<!-- Annotation answer popup: a staged send's reply, read below its
+highlight with the quote's wash held. Pure presentational: the page
+owns open state, below-quote placement, and fade-out; this component
+owns the card markup and its surface (Svelte scoping binds the CSS to
+this markup). The quote itself never renders here (the highlighted
+word upstream is the title, with Han readings in the panels above
+it) — answer text renders as plain text, never HTML, so model output
+can't inject markup. No close button: clicking off the card closes
+it (Esc too). No Add-to-prompt: empty questions stage from the dock,
+never from an answer. -->
 <script lang="ts">
-	import type { AnnotationId } from "$lib/annotations";
-
-	/** Page-owned answer behaviors. */
-	export interface AnnAnswerActions {
-		addToPrompt: (id: AnnotationId) => void;
-	}
-
 	interface Props {
-		id: AnnotationId;
 		answer: string;
 		/** Fade-out in flight (unmounts when the ramp ends). */
 		closing: boolean;
 		x: number;
 		y: number;
 		width: number;
-		actions: AnnAnswerActions;
 	}
 
-	let { id, answer, closing, x, y, width, actions }: Props = $props();
+	let { answer, closing, x, y, width }: Props = $props();
 </script>
 
 <div
@@ -37,15 +29,6 @@ No close button: clicking off the card closes it (Esc too). -->
 	aria-label="Annotation answer"
 >
 	<p class="ann-answer-text">{answer}</p>
-	<div class="ann-answer-row">
-		<button
-			type="button"
-			class="ann-answer-add"
-			aria-label="Add answer to prompt"
-			title="Add answer to prompt"
-			onclick={() => actions.addToPrompt(id)}>Add to prompt</button
-		>
-	</div>
 </div>
 
 <style>
@@ -94,23 +77,8 @@ No close button: clicking off the card closes it (Esc too). -->
 		pointer-events: none;
 	}
 	.ann-answer-text {
-		margin: 0 0 0.5rem;
+		margin: 0;
 		line-height: 1.45;
-	}
-	.ann-answer-row {
-		display: flex;
-		align-items: center;
-	}
-	.ann-answer-add {
-		border: 0;
-		border-radius: 999px;
-		padding: 0.3rem 0.8rem;
-		background: #007aff;
-		background: var(--accent);
-		color: #fff;
-		color: var(--accent-ink);
-		font-weight: 700;
-		cursor: pointer;
 	}
 	@media (prefers-reduced-motion: reduce) {
 		.ann-answer {

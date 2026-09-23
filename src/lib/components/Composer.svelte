@@ -16,6 +16,15 @@ shared `.error` look. -->
 	import ActionIcon from "./ActionIcon.svelte";
 	import ReviewDock, { type ReviewDockActions } from "./ReviewDock.svelte";
 
+	/** Page-owned staged-pill behaviors (the send prompt's overlay
+	pencil): pencil toggles the wording field, close unstages without
+	sending, copy copies the exact text plus draft. */
+	export interface StagedAnnActions {
+		pencil: (id: AnnotationId) => void;
+		close: () => void;
+		copy: () => void;
+	}
+
 	/** Page-owned composer behaviors. */
 	export interface ComposerActions {
 		floorClick: (event: MouseEvent) => void;
@@ -35,6 +44,7 @@ shared `.error` look. -->
 		speak: () => void;
 		inspect: () => void;
 		review: ReviewDockActions;
+		staged: StagedAnnActions;
 	}
 
 	interface Props {
@@ -52,9 +62,17 @@ shared `.error` look. -->
 		inspectEnabled: boolean;
 		annotations: Annotation[];
 		reviewOpen: boolean;
-		editingId?: AnnotationId | null;
-		draft?: string;
-		box?: HTMLTextAreaElement | null;
+		/** Prompt inclusions with a question (chips): each carries a
+		pencil that stages it — unasked ones to ask, answered ones to
+		redo as a new request. Blank annotations stage from the dock. */
+		inclusions: { id: AnnotationId; n: number }[];
+		/** Staged annotation pill (null when nothing stages): the exact
+		text renders once here and once in the sent bake. */
+		staged: { id: AnnotationId; n: number; quote: string } | null;
+		/** Wording field open (pencil toggles). */
+		stagedEditing: boolean;
+		/** Live staged wording (bound to the page). */
+		stagedDraft?: string;
 		highlightId?: AnnotationId | null;
 		pillEl?: HTMLButtonElement | null;
 		attachBusy: number;
@@ -90,9 +108,10 @@ shared `.error` look. -->
 		inspectEnabled,
 		annotations,
 		reviewOpen,
-		editingId = $bindable(null),
-		draft = $bindable(""),
-		box = $bindable(null),
+		inclusions,
+		staged,
+		stagedEditing,
+		stagedDraft = $bindable(""),
 		highlightId = $bindable(null),
 		pillEl = $bindable(null),
 		attachBusy,
@@ -165,6 +184,83 @@ shared `.error` look. -->
 		}
 	}}
 >
+	<!-- Card-flow staging, above the field: inclusion chips (one
+	pencil per annotation riding the send) and the staged pill.
+	They live here — never inside .prompt-tools (its absolute
+	cluster would stretch over the send button). -->
+	{#if inclusions.length > 0}
+		<div class="inclusion-chips" role="group" aria-label="Annotations in this send">
+			{#each inclusions as inc (inc.id)}
+				<span class="inclusion-chip">
+					#{inc.n}
+					<button
+						type="button"
+						class="staged-icon"
+						class:open={staged?.id === inc.id && stagedEditing}
+						title="Ask through the send prompt"
+						aria-label="Ask annotation {inc.n} through the send prompt"
+						aria-pressed={staged?.id === inc.id}
+						onclick={() => actions.staged.pencil(inc.id)}
+					>
+						<ActionIcon kind="pencil" />
+					</button>
+				</span>
+			{/each}
+		</div>
+	{/if}
+	{#if staged}
+		<div class="staged-pill" role="dialog" aria-label="Staged annotation question">
+			<div class="staged-head">
+				<span class="staged-num">{staged.n}.</span>
+				<span class="staged-quote">“{staged.quote}”</span>
+				<button
+					type="button"
+					class="staged-icon"
+					title="Copy staged wording"
+					aria-label="Copy staged wording"
+					onclick={actions.staged.copy}
+				>
+					<ActionIcon kind="copy" />
+				</button>
+				<button
+					type="button"
+					class="staged-icon"
+					class:open={stagedEditing}
+					title="Edit staged question"
+					aria-label="Edit staged question"
+					aria-pressed={stagedEditing}
+					onclick={() => actions.staged.pencil(staged.id)}
+				>
+					<ActionIcon kind="pencil" />
+				</button>
+				<button
+					type="button"
+					class="staged-icon"
+					title="Unstage (back to the drawer, sends nothing)"
+					aria-label="Unstage annotation"
+					onclick={actions.staged.close}
+				>
+					<ActionIcon kind="close" />
+				</button>
+			</div>
+			{#if stagedEditing}
+				<label class="staged-field">
+					<span class="staged-label">Ask</span>
+					<textarea
+						rows="2"
+						bind:value={stagedDraft}
+						placeholder="What about this selection?"
+						aria-label="Staged annotation question. Send asks it, Escape unstages."
+						onkeydown={(e) => {
+							if (e.key === "Escape") {
+								e.preventDefault();
+								actions.staged.close();
+							}
+						}}></textarea>
+				</label>
+			{/if}
+		</div>
+	{/if}
 	<div class="prompt-tools">
 		{#if android && hasSelMenu && !preview}
 			<!-- Phone action dock: Speak and Inspect (Annotate
@@ -224,14 +320,13 @@ shared `.error` look. -->
 		{/if}
 		{#if annotations.length > 0}
 			<!-- New-annotations dock through ReviewDock: the page
-			keeps the array, ids, draft, and behaviors; the component
-			owns the dock, the inline editor, and their surfaces. -->
+			keeps the array, ids, and behaviors; the component owns
+			the dock and its surfaces (no inline editor: questions
+			are asked through the staged send-prompt pill). -->
 			<ReviewDock
 				items={annotations}
 				open={reviewOpen}
-				bind:editingId
-				bind:draft
-				bind:box
+				stagedId={staged?.id ?? null}
 				bind:highlightId
 				bind:pillEl
 				actions={actions.review}
@@ -522,8 +617,132 @@ shared `.error` look. -->
 	:global(.app[data-android]) .prompt:has(.ann-dock) :global(.ta-input::placeholder) {
 		color: transparent;
 	}
+	/* Phones track the chat text size in the staged pill, like the
+	review rows do. */
+	:global(.app[data-android]) .staged-head {
+		font-size: calc(0.82rem * var(--font-scale, 1));
+	}
+	:global(.app[data-android]) .staged-field {
+		font-size: calc(0.82rem * var(--font-scale, 1));
+	}
 	.hidden-input {
 		display: none;
+	}
+	/* Prompt-inclusion chips: one quiet row above the pill, a
+	number plus pencil per annotation riding the send. */
+	.inclusion-chips {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.35rem;
+		margin: 0.5rem 1.2rem 0;
+	}
+	.inclusion-chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.25rem;
+		border: 1px solid #c7c7cc;
+		border-color: var(--line);
+		border-radius: 999px;
+		padding: 0.1rem 0.3rem 0.1rem 0.55rem;
+		font-size: 0.78rem;
+		font-weight: 700;
+		color: #6e6e73;
+		color: var(--muted);
+		user-select: none;
+		-webkit-user-select: none;
+	}
+	/* Staged Add-to-prompt pill: one overlay card in the send
+	prompt, seated like the review dock (same margins, same panel
+	surface). The exact text reads once here; the send bakes it
+	once more — nowhere else. */
+	.staged-pill {
+		margin: 0.5rem 1.2rem 0;
+		border: 1px solid #007aff;
+		border-color: var(--accent);
+		border-radius: 10px;
+		padding: 0.6rem 0.8rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.45rem;
+		background: #fafafc;
+		background: var(--panel);
+		box-sizing: border-box;
+	}
+	.staged-head {
+		display: flex;
+		align-items: baseline;
+		gap: 0.45rem;
+		font-size: 1rem;
+	}
+	.staged-num {
+		font-weight: 700;
+	}
+	.staged-quote {
+		font-weight: 550;
+		min-width: 0;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.staged-icon {
+		display: inline-flex;
+		align-items: center;
+		align-self: center;
+		flex-shrink: 0;
+		border: 0;
+		background: none;
+		cursor: pointer;
+		padding: 0.15rem;
+		border-radius: 6px;
+		color: #6e6e73;
+		color: var(--muted);
+		transition: color 0.15s ease;
+	}
+	.staged-icon:first-of-type {
+		margin-left: auto;
+	}
+	.staged-icon :global(.action-glyph) {
+		height: 0.95rem;
+	}
+	.staged-icon:hover {
+		color: #1c1c1e;
+		color: var(--ink);
+	}
+	.staged-icon.open {
+		color: #007aff;
+		color: var(--accent);
+	}
+	.staged-field {
+		display: flex;
+		align-items: baseline;
+		gap: 0.45rem;
+		font-size: 1rem;
+	}
+	.staged-label {
+		color: #6e6e73;
+		color: var(--muted);
+		font-size: 0.85rem;
+		flex-shrink: 0;
+	}
+	.staged-field textarea {
+		display: block;
+		flex: 1;
+		min-width: 0;
+		box-sizing: border-box;
+		font: inherit;
+		color: inherit;
+		background: #fff;
+		background: var(--field);
+		border: 1px solid #c7c7cc;
+		border-color: var(--line);
+		border-radius: 10px;
+		padding: 0.4rem 0.6rem;
+		resize: vertical;
+	}
+	.staged-field textarea:focus {
+		outline: none;
+		border-color: #007aff;
+		border-color: var(--accent);
 	}
 	.error-banner {
 		margin: 0 1.2rem;

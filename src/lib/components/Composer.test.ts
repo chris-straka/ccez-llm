@@ -104,4 +104,31 @@ describe("composer contract", () => {
 		expect(css).toContain(".prompt-tools");
 		expect(css).toContain(".error-banner");
 	});
+
+	it("stages annotation questions in one pill with inclusion chips", () => {
+		const source = componentSource();
+		// Inclusion chips: one pencil per annotation riding the send
+		// (asks the unasked, redos the answered) — no edit in the dock.
+		expect(source).toContain('class="inclusion-chips"');
+		expect(source).toContain("Ask annotation {inc.n} through the send prompt");
+		// Staged pill: exact text once, copy plus pencil plus close,
+		// wording field with Esc-to-unstage.
+		expect(source).toContain('class="staged-pill"');
+		expect(source).toContain("“{staged.quote}”");
+		expect(source).toContain("Copy staged wording");
+		expect(source).toContain("Unstage annotation");
+		expect(source).toContain("bind:value={stagedDraft}");
+		const css = componentStyle();
+		expect(css).toContain(".staged-pill");
+		expect(css).toContain(".inclusion-chip");
+		expect(css).toContain(".staged-field textarea");
+		// The page owns staging state and behaviors.
+		const page = pageSource();
+		expect(page).toContain("inclusions={inclusionsForPrompt()}");
+		expect(page).toContain("staged={stagedForPrompt()}");
+		expect(page).toContain("function stageAnnotation");
+		expect(page).toContain("function pencilStagedAnnotation");
+		expect(page).toContain("function closeStagedAnnotation");
+		expect(page).toContain("function landAskedAnswers");
+	});
 });

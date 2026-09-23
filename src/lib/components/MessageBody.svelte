@@ -1564,12 +1564,11 @@
 		white-space: nowrap;
 		cursor: pointer;
 	}
-	/* Answer states (the remodel): waiting rides the accent blue,
-	ready the orange token — explicit in both themes so the accent
-	never mutes the signal. The tail inherits via
-	`background: inherit`. Ready holds steady orange; the waiting
-	pulse lives below, past the mount fade, so it wins the
-	cascade while a request is in flight. */
+	/* Answer states: waiting (filed but not yet asked) rides the
+	accent blue, ready (asked and answered) the orange token —
+	explicit in both themes so the accent never mutes the signal.
+	The tail inherits via `background: inherit`. Both hold steady:
+	there is no separate request anymore, so nothing ever blinks. */
 	.rendered :global(button.ccez-ann-badge.ans-waiting) {
 		background: #007aff;
 		background: var(--accent);
@@ -1620,26 +1619,10 @@
 	.rendered :global(button.ccez-ann-badge.fresh) {
 		animation: ann-badge-in 0.2s ease;
 	}
-	/* Waiting pulses so filing shows its request in flight. Sits
-	past the mount fade above: same specificity, later wins, so a
-	waiting badge pulses instead of replaying the mount fade. */
-	@keyframes ann-badge-wait {
-		0%,
-		100% {
-			opacity: 1;
-		}
-		50% {
-			opacity: 0.68;
-		}
-	}
-	.rendered :global(button.ccez-ann-badge.ans-waiting) {
-		animation: ann-badge-wait 1.1s ease-in-out infinite;
-	}
-	@media (prefers-reduced-motion: reduce) {
-		.rendered :global(button.ccez-ann-badge.ans-waiting) {
-			animation: none;
-		}
-	}
+	/* Waiting holds steady blue past the mount fade above: same
+	specificity, later wins, so a waiting badge never replays the
+	mount fade on re-stamp. (The old in-flight pulse is gone with
+	the separate request — unasked blue never blinks.) */
 	/* Shiki emits light colors inline + dark variants as CSS variables. */
 	/* Dark theme, gated on the resolved scheme (<html data-theme>)
 	instead of the OS query, so the settings switch can pin it.

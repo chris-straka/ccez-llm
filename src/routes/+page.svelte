@@ -162,9 +162,7 @@
 	import {
 		plainBody,
 		sourcesAsked,
-		messageCopyText,
-		sanitize,
-		escapeHtml
+		messageCopyText
 	} from "$lib/render";
 	import {
 		clearNotice,
@@ -201,10 +199,14 @@
 	} from "$lib/attachments";
 	import {
 		duplicateAnnotationId,
-		editAnnotationComment,
 		deleteAnnotation,
 		clearAnnotations,
 		withAnnotations,
+		promptInclusions,
+		canAddToPrompt,
+		setPromptExcluded,
+		fileStagedComment,
+		attachStagedAnswers,
 		quoteFragmentText,
 		equationBodyOf,
 		equationBodyRange,
@@ -245,6 +247,7 @@
 		menuBtnTouchAction,
 		selMenuDragTarget,
 		annEditCommitToast,
+		annotationNumber,
 		type Annotation,
 		type AnnotationId,
 		type AnnotationMark
@@ -402,7 +405,6 @@
 		extractWordAt,
 		hanOverlayLangFor,
 		runModelAid,
-		annotationAnswer,
 		aidTargetLines,
 		aidFailureToast,
 		selectAidInput,
@@ -783,17 +785,28 @@
 	 * already address the annotation it will become.
 	 */
 	let pendingAnn = $state<Annotation | null>(null);
-	/** Annotations with a model answer in flight (the remodel):
-	badges read blue until the answer lands, orange after. Memory-only
-	like the request itself — answers persist on the annotation, the
-	waiting flag does not survive a reload. */
-	let annAnswering = new SvelteSet<AnnotationId>();
+	/** Staged annotation question (the send prompt's overlay pencil):
+	the annotation being asked through the next send, with its wording
+	draft. Closing the pill without sending discards the draft (toast)
+	and unstages back to the drawer; sending files the wording and the
+	reply lands as the annotation's answer. Memory-only like the
+	composer text. */
+	let stagedAnnId = $state<AnnotationId | null>(null);
+	let stagedDraft = $state("");
+	/** Staged asks awaiting their reply (chat id plus annotation ids):
+	the send bundled their wording into one request, so the reply
+	lands as their answers (see afterSend) — on any route, in any
+	chat. Consumed on landing; memory-only like the request. */
+	let askedAnnotations: { chatId: ChatId; ids: AnnotationId[] }[] = [];
+	/** Whether the staged pill's editing field is open (pencil): the
+	chip alone stages, the pencil asks. A no-send close after the
+	pencil opened toasts "Draft discarded". */
+	let stagedEditing = $state(false);
 	let reviewOpen = $state(false);
 	/** Focus refs: after a control unmounts mid-touch, focus must
 	land on a live node inside .ann-wrap — never on a dying button
 	(focus drops to <body> and strands the keyboard). */
 	let annPill: HTMLButtonElement | null = $state(null);
-	let editBox: HTMLTextAreaElement | null = $state(null);
 	function focusPill(): void {
 		annPill?.focus({ preventScroll: true });
 	}
@@ -949,16 +962,15 @@
 	let searchStore: ChatSearchStore | null = null;
 	let searchIndexTimer: ReturnType<typeof setTimeout> | null = null;
 	let searchQueryTimer: ReturnType<typeof setTimeout> | null = null;
-	let editingId: AnnotationId | null = $state(null);
-	let editDraft = $state("");
 	/**
-	 * Mobile in-prompt annotation edit: the composer holds the comment
-	 * (the transplanted popover textbox can't reliably summon the
-	 * phone keyboard), the send arrow files it, tapping out cancels.
-	 * Desktop never sets this — popover and review textarea stay. The
-	 * stash restores the drafted chat text on file and on cancel.
+	 * Mobile in-prompt annotation create: the composer holds the
+	 * pending comment (the transplanted popover textbox can't reliably
+	 * summon the phone keyboard), the send arrow files it, tapping out
+	 * cancels. Filed notes never transplant — they open the dock.
+	 * Desktop never sets this — the popover stays. The stash restores
+	 * the drafted chat text on file and on cancel.
 	 */
-	let promptAnnEdit: { id: string } | { pending: true } | null = $state(null);
+	let promptAnnEdit: { pending: true } | null = $state(null);
 	let promptAnnStash = $state("");
 	/**
 	 * Click-toggled overlays (desktop has no hover-open anywhere):
@@ -3156,7 +3168,7 @@
 		start: number;
 		end: number;
 	} | null {
-		let range: Range | null = null;
+		let range: Range | null;
 		try {
 			range = document.caretRangeFromPoint(lastPointer.x, lastPointer.y);
 		} catch {
@@ -3522,8 +3534,9 @@
 	function resetDraftExtras(): void {
 		annotations = [];
 		reviewOpen = false;
-		editingId = null;
-		editDraft = "";
+		stagedAnnId = null;
+		stagedDraft = "";
+		stagedEditing = false;
 		editingMsgId = null;
 		editingAttachments = [];
 		editor?.setPlaceholder(promptPlaceholder());
@@ -4738,53 +4751,19 @@
 		return paragraphForQuote(msg ? aidDisplayText(msg.content) : "", quote);
 	}
 
-	/** Fire one annotation's separate model request (the remodel):
-	never linked to the main prompt or history — later questions file
-	while earlier ones are still waiting. Failures banner (toast on
-	phones) and leave the badge neutral; the question keeps its note. */
-	async function askAnnotation(ann: Annotation): Promise<void> {
-		annAnswering.add(ann.id);
-		try {
-			const provider = await resolveProviderActive();
-			if (!provider) {
-				flashMissingKey();
-				return;
-			}
-			clearNotice(notices, "banner");
-			const answer = await annotationAnswer(provider, {
-				quote: ann.quote,
-				question: ann.comment,
-				context: answerContextFor(ann.messageId, ann.quote)
-			});
-			annotations = annotations.map((a) =>
-				a.id === ann.id ? { ...a, answer } : a
-			);
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			showNotice(notices, "banner", message);
-			if (androidUI) flashErrorToast(message);
-		} finally {
-			annAnswering.delete(ann.id);
-		}
-	}
-
 	/** Submit the annotation being composed (Enter or Save). The id is
 	kept from composition so wash, pill, and badge address one thing.
-	Filing also fires the answer request (the remodel). */
+	Filing never sends anything: the badge paints steady blue
+	(unasked) until a staged send asks it and the reply answers. */
 	function commitPending(): void {
 		const filed = filePendingAnnotation(annotations, pendingAnn, annDraft);
 		if (!filed) return;
 		annotations = filed;
-		const id = pendingAnn?.id;
 		pendingAnn = null;
 		// The filed draft owned the highlight (kept for readings
 		// panels while creating): both go with the submit.
 		clearSelection();
 		dismissSelPanels();
-		if (id) {
-			const ann = annotations.find((a) => a.id === id);
-			if (ann) void askAnnotation(ann);
-		}
 	}
 
 	/** Fade the pill out, then unmount it. Data writes stay synchronous
@@ -4812,12 +4791,11 @@
 	function saveAnnPop(fromEnter = false): void {
 		if (!annPop || annPopClosing) return;
 		stopPillMic();
-		// The pop id decides (see annPopSaveKind): a pop still
-		// addressing its pending annotation commits it, otherwise the
-		// saved comment of the existing one is edited.
+		// The pop only ever addresses its pending annotation now
+		// (filed notes open the dock, never a pill): save commits it.
+		// A stale pop addressing anything else just closes.
 		if (annPopSaveKind(annPop.id, pendingAnn?.id ?? null) === "commit-pending")
 			commitPending();
-		else annotations = editAnnotationComment(annotations, annPop.id, annDraft);
 		hideAnnPop();
 		// Only the Enter key needs the anti-double-send guard: a click-away
 		// save involves no Enter that could leak into a send.
@@ -4886,42 +4864,28 @@
 	}
 
 	/**
-	 * Badge click edits in the floating card on desktop, in the
-	 * composer on phones (see editAnnotationInPrompt): the saved
-	 * comment loads as the draft, Enter or the arrow files it back,
-	 * tapping out cancels. Re-pressing the editing badge cancels too.
+	 * Badge click: a ready answer opens in its own popup, anything
+	 * else opens the review dock on the annotation's row — filed
+	 * notes never edit in an overlay. Re-press toggles shut.
 	 */
-	function openBadge(
-		id: AnnotationId,
-		anchor?: { x: number; y: number },
-		forEdit = false
-	): void {
-		// Re-pressing the open badge closes it, like cancel: the edit
-		// menu toggles instead of reopening under the cursor.
+	function openBadge(id: AnnotationId, anchor?: { x: number; y: number }): void {
+		// Re-pressing the open badge closes it, like cancel: the card
+		// toggles instead of reopening under the cursor.
 		if (annPop && !annPopClosing && annPop.id === id) {
 			cancelAnnPop();
 			return;
 		}
 		const current = annotations.find((a) => a.id === id);
 		if (!current) return;
-		// A ready answer opens in its own popup (the remodel): the note
-		// still edits from the review dock. Re-press toggles it shut;
-		// an open pill for the same note settles first through the
-		// proper cancel path so typed text is never dropped. The
-		// review pencil passes forEdit: it is the edit path, so a
-		// ready answer must not hijack it.
-		if (current.answer && !forEdit) {
+		// A ready answer opens in its own popup: re-press toggles it
+		// shut; an open pill for the same note settles first through
+		// the proper cancel path so typed text is never dropped.
+		if (current.answer) {
 			if (answerPop?.id === id) {
 				closeAnswerPop();
 				return;
 			}
 			if (annPop && !annPopClosing && annPop.id === id) cancelAnnPop();
-			if (
-				promptAnnEdit &&
-				!("pending" in promptAnnEdit) &&
-				promptAnnEdit.id === id
-			)
-				cancelPromptAnnEdit();
 			const anchorAt = anchor ?? {
 				x: window.innerWidth / 2,
 				y: window.innerHeight / 2
@@ -5002,48 +4966,22 @@
 			}
 			return;
 		}
-		// Phones edit in the composer, never the card: the transplanted
-		// textbox can't reliably summon the phone keyboard — see
-		// editAnnotationInPrompt. Re-pressing the editing badge cancels
-		// back out (toggle). Desktop keeps the floating edit menu.
-		if (
-			promptAnnEdit &&
-			!("pending" in promptAnnEdit) &&
-			promptAnnEdit.id === id
-		) {
-			cancelPromptAnnEdit();
-			return;
-		}
+		// No answer yet: open the review dock on this row (both
+		// platforms — the dock renders in the composer everywhere).
+		// Filed notes never edit in an overlay: the row offers stage
+		// (empty questions), inclusion toggle, copy, and delete, and
+		// the question itself is asked through the staged pill. A
+		// badge tap on the staged annotation closes its pill first
+		// (the badge's way to close a no-send), then opens its row.
 		stopPillMic();
-		editingId = null;
+		if (id === stagedAnnId) closeStagedAnnotation();
 		highlightAnnId = id;
-		if (androidUI) {
-			// Marker taps start the note empty (the quote's wash shows
-			// what is being rewritten): typing then files through the
-			// arrow, like a fresh annotation. Review-pencil edits keep
-			// loading the saved comment — see editAnnotationInPrompt.
-			editAnnotationInPrompt({ id }, "");
-			return;
-		}
-		annDraft = current.comment;
 		settleAnnPop();
-		const anchorAt = anchor ?? {
-			x: window.innerWidth / 2,
-			y: window.innerHeight / 2
-		};
-		const width = popWidth(false);
-		const { x, y } = placeAnnCard({
-			anchorX: anchorAt.x,
-			anchorY: anchorAt.y,
-			width,
-			viewportWidth: window.innerWidth,
-			viewportHeight: window.innerHeight
-		});
-		annPop = { id, x, y, fresh: false };
-		// The box can morph from a still-fading fresh pill (same
-		// element, no remount, so growPill's mount focus never fires):
-		// land the caret explicitly, like the create path does.
-		void tick().then(() => annPopBox?.focus({ preventScroll: true }));
+		if (annPop && !annPopClosing) {
+			settleAnnPop();
+			annPop = null;
+		}
+		reviewOpen = true;
 	}
 
 	/**
@@ -5064,16 +5002,6 @@
 		)
 			return;
 		openBadge(id, anchor);
-	}
-
-	/** File the answer into the next prompt (the remodel): blank-line
-	joined onto the draft, then the composer takes focus. */
-	function addAnswerToPrompt(id: AnnotationId): void {
-		const current = annotations.find((a) => a.id === id);
-		if (!current?.answer) return;
-		editor?.setText(joinExternalDraft(editor?.getText() ?? "", current.answer));
-		editor?.focus();
-		closeAnswerPop();
 	}
 
 	/** Fade the answer card out, then unmount it. The quote's wash
@@ -5135,70 +5063,148 @@
 		};
 	}
 
-	function saveEdit(id: string): void {
-		annotations = editAnnotationComment(annotations, id, editDraft);
-		editingId = null;
-		highlightAnnId = null;
-		// The Save button unmounts with the edit box: park focus on the
-		// pill or the overlay drops on touch (see focus refs above).
-		focusPill();
-	}
-
 	function removeAnnotation(id: string): void {
 		// Annotation deletes thump like message deletes (the shared
 		// triple-beat contract: call sites carry no haptic of their own).
 		buzzBeat("done", androidUI);
 		annotations = deleteAnnotation(annotations, id);
-		if (editingId === id) editingId = null;
 		if (highlightAnnId === id) highlightAnnId = null;
+		if (stagedAnnId === id) {
+			stagedAnnId = null;
+			stagedDraft = "";
+			stagedEditing = false;
+		}
 		if (annPop?.id === id) {
 			settleAnnPop();
 			annPop = null;
 		}
-		if (
-			promptAnnEdit &&
-			!("pending" in promptAnnEdit) &&
-			promptAnnEdit.id === id
-		) {
-			exitPromptAnnEdit();
+	}
+
+	/** Stage an empty annotation's question in the send prompt (the
+	only Add-to-prompt in the app): the overlay pill opens on its
+	exact text with the wording field ready. Anything already
+	carrying a question rides the send baked — it never stages. */
+	function stageAnnotation(id: AnnotationId): void {
+		const current = annotations.find((a) => a.id === id);
+		if (!current) {
+			flashErrorToast("Annotation no longer exists");
+			return;
 		}
+		if (!canAddToPrompt(current)) return;
+		// Already staged: re-staging would clobber the typed draft
+		// with the filed comment — the pill is already open on it.
+		if (stagedAnnId === id) return;
+		highlightAnnId = id;
+		stagedAnnId = id;
+		stagedDraft = current.comment;
+		stagedEditing = true;
+	}
+
+	/** Pencil on a send-prompt annotation: rebuild the staged pill
+	prefilled — prior wording for an answered redo, current wording
+	otherwise — and resend as a new request on the arrow. */
+	function pencilStagedAnnotation(id: AnnotationId): void {
+		const current = annotations.find((a) => a.id === id);
+		if (!current) {
+			flashErrorToast("Annotation no longer exists");
+			return;
+		}
+		highlightAnnId = id;
+		stagedAnnId = id;
+		stagedDraft = current.comment;
+		stagedEditing = true;
+	}
+
+	/** Remove one annotation from prompt inclusions (or add it back):
+	the annotation stays listed — only the send omits it, with no
+	footnote trace. */
+	function setAnnotationExcluded(id: AnnotationId, excluded: boolean): void {
+		annotations = setPromptExcluded(annotations, id, excluded);
+	}
+
+	/** Close the staged pill without sending: the annotation slides
+	back to the drawer and the chip deletes — nothing sends, nothing
+	is asked. Touched wording discards with a toast; an untouched
+	pill just slides back. */
+	function closeStagedAnnotation(): void {
+		const id = stagedAnnId;
+		if (!id) return;
+		const filed = annotations.find((a) => a.id === id)?.comment ?? "";
+		const touched = stagedDraft !== filed;
+		stagedAnnId = null;
+		stagedDraft = "";
+		stagedEditing = false;
+		if (highlightAnnId === id) highlightAnnId = null;
+		if (touched) flashToast("Draft discarded");
+		else focusPill();
+	}
+
+	/** Copy the staged wording (exact text plus draft question). */
+	function copyStagedAnnotation(): void {
+		const current = stagedAnnId
+			? annotations.find((a) => a.id === stagedAnnId)
+			: undefined;
+		if (!current) return;
+		copyPlain(annotationCopyText(current.quote, stagedDraft), "Copied");
+	}
+
+	/** Staged pill facts for the composer (null when nothing stages):
+	single message position — the exact text renders once, in the
+	pill, and once more in the sent bake, nowhere else. */
+	function stagedForPrompt(): {
+		id: AnnotationId;
+		n: number;
+		quote: string;
+	} | null {
+		if (!stagedAnnId) return null;
+		const current = annotations.find((a) => a.id === stagedAnnId);
+		if (!current) return null;
+		return {
+			id: current.id,
+			n: annotationNumber(annotations, current.id),
+			quote: current.quote
+		};
+	}
+
+	/** Prompt-inclusion chips for the composer: annotations with a
+	question riding the next send (blanks stage from the dock, the
+	removed stay out). Each chip's pencil stages it — unasked to
+	ask, answered to redo as a new request. */
+	function inclusionsForPrompt(): { id: AnnotationId; n: number }[] {
+		return promptInclusions(annotations)
+			.filter((a) => a.comment.trim() !== "")
+			.map((a) => ({ id: a.id, n: annotationNumber(annotations, a.id) }));
 	}
 
 	/**
-	 * Move an annotation comment into the composer (every phone edit —
-	 * the transplanted textboxes can't reliably summon keyboards or
-	 * hold focus; desktop edits at the mark instead, see
-	 * editAnnotationAtMark): the pending annotation files
-	 * on the arrow, a saved one's comment rewrites. The review
-	 * closes so the composer owns the screen; the wash keeps the
-	 * quote visible.
+	 * Move a pending annotation comment into the composer (phone
+	 * create only — the transplanted textboxes can't reliably summon
+	 * keyboards or hold focus): the pending annotation files on the
+	 * arrow. Filed notes never transplant; they open the dock. The
+	 * review closes so the composer owns the screen; the wash keeps
+	 * the quote visible.
 	 */
 	/**
-	 * Wash id for an in-prompt note edit (phones): the composer owns
-	 * the screen while editing, so the quote washes like any draft —
-	 * a pending filing washes its preview, a saved note its quote.
-	 * Without this the comment box floats over an unmarked thread.
+	 * Wash id for an in-prompt note create (phones): the composer owns
+	 * the screen while creating, so the pending filing washes its
+	 * preview. Without this the comment box floats over an unmarked
+	 * thread.
 	 */
 	function promptAnnWashId(): string | null {
 		return promptAnnWashIdFor(promptAnnEdit, pendingAnn?.id ?? null);
 	}
 	function editAnnotationInPrompt(
-		target: { id: string } | { pending: true },
+		target: { pending: true },
 		comment: string
 	): void {
-		// A fresh popover open underneath files first: typed comments
-		// are never silently dropped (same rule as annotate()).
-		if (pendingAnn && !("pending" in target)) commitPending();
 		settleAnnPop();
 		annPop = null;
 		promptAnnStash = editor?.getText() ?? "";
 		promptAnnEdit = target;
 		reviewOpen = false;
 		editor?.setText(comment);
-		// A saved note being revised says so; a fresh filing asks.
-		editor?.setPlaceholder(
-			"pending" in target ? "Add an annotation" : "Edit annotation"
-		);
+		// A fresh filing asks.
+		editor?.setPlaceholder("Add an annotation");
 		editor?.caretToEnd();
 		// Phones scroll the quote into the upper clear area first (the
 		// keyboard plus composer own the bottom): no manual scroll is
@@ -5269,41 +5275,27 @@
 		if (dy !== null) scrollBox.scrollBy({ top: dy, behavior: "smooth" });
 	}
 
-	/** Send-arrow commit for an in-prompt note edit (see doSend). */
+	/** Send-arrow commit for an in-prompt note create (see doSend):
+	files the pending annotation, never sends anything. */
 	function commitPromptAnnEdit(): void {
-		const target = promptAnnEdit;
-		if (!target) return;
+		if (!promptAnnEdit) return;
 		buzzBeat("send");
 		const comment = editor?.getText() ?? "";
-		const pending = "pending" in target;
-		if (pending) {
-			const filed = filePendingAnnotation(annotations, pendingAnn, comment);
-			if (filed) annotations = filed;
-			const id = pendingAnn?.id;
-			pendingAnn = null;
-			if (id) {
-				const ann = annotations.find((a) => a.id === id);
-				if (ann) void askAnnotation(ann);
-			}
-		} else {
-			annotations = editAnnotationComment(annotations, target.id, comment);
-		}
+		const filed = filePendingAnnotation(annotations, pendingAnn, comment);
+		if (filed) annotations = filed;
+		pendingAnn = null;
 		highlightAnnId = null;
-		// Pending filings save for the first time; a saved note's
-		// comment rewrites — the toast names which happened (a bare
-		// "Note saved" never said). Plain on every platform: no draft
-		// vocabulary, the note files straight from the composer.
 		exitPromptAnnEdit();
-		flashToast(annEditCommitToast(pending));
+		flashToast(annEditCommitToast(true));
 		void tick().then(() => editor?.focus());
 	}
 
-	/** Tapping out drops an in-prompt note edit: a pending filing
-	never existed, a saved note keeps its stored comment (typing only
-	lived in the composer — nothing writes until the arrow). */
+	/** Tapping out drops an in-prompt note create: a pending filing
+	never existed (typing only lived in the composer — nothing writes
+	until the arrow). */
 	function cancelPromptAnnEdit(): void {
 		if (!promptAnnEdit) return;
-		if ("pending" in promptAnnEdit) pendingAnn = null;
+		pendingAnn = null;
 		highlightAnnId = null;
 		exitPromptAnnEdit();
 	}
@@ -5675,58 +5667,6 @@
 	}
 
 	/**
-	 * Pencil edit at the mark (new-overlay rows, desktop): jump to the
-	 * quote, then open the same floating edit card a badge tap summons
-	 * — one edit UI on desktop. Phones keep the composer path (the
-	 * transplanted textbox can't reliably summon the phone keyboard —
-	 * see editAnnotationInPrompt).
-	 */
-	function editAnnotationAtMark(id: AnnotationId): void {
-		const current = annotations.find((a) => a.id === id);
-		if (!current) {
-			flashErrorToast("Annotation no longer exists");
-			return;
-		}
-		if (androidUI) {
-			editAnnotationInPrompt({ id }, current.comment);
-			return;
-		}
-		gotoAnnotation({ id, messageId: current.messageId });
-		openEditCardAtSettledBadge(id, true);
-	}
-
-	/**
-	 * Open the desktop edit card once the jump's scroll settles. The
-	 * card is fixed-position, so anchoring mid-scroll strands it away
-	 * from the quote: scroll events re-arm a short settle timer, and
-	 * an already-visible mark (no scroll at all) opens on a near tick.
-	 */
-	function openEditCardAtSettledBadge(id: AnnotationId, forEdit = false): void {
-		let done = false;
-		let timer: ReturnType<typeof setTimeout> | null = null;
-		const onScroll = (): void => {
-			if (timer !== null) clearTimeout(timer);
-			timer = setTimeout(finish, 150);
-		};
-		const finish = (): void => {
-			if (done) return;
-			done = true;
-			if (timer !== null) clearTimeout(timer);
-			window.removeEventListener("scroll", onScroll, true);
-			const badge = document.querySelector(`[data-ann-badge="${id}"]`);
-			const rect =
-				badge instanceof HTMLElement ? badge.getBoundingClientRect() : null;
-			openBadge(
-				id,
-				rect ? { x: rect.left + rect.width / 2, y: rect.bottom } : undefined,
-				forEdit
-			);
-		};
-		window.addEventListener("scroll", onScroll, true);
-		timer = setTimeout(finish, 80);
-	}
-
-	/**
 	 * Previous-menu pencil (desktop): the row swaps its note for a
 	 * single-line field — the card's rows stay one line, so the editor
 	 * is an <input>, never a textarea (Enter saves, Escape cancels via
@@ -5822,7 +5762,9 @@
 		annotations = clearAnnotations();
 		pendingAnn = null;
 		reviewOpen = false;
-		editingId = null;
+		stagedAnnId = null;
+		stagedDraft = "";
+		stagedEditing = false;
 		highlightAnnId = null;
 		// An in-prompt edit dies with the list: hand the composer
 		// back its drafted chat text instead of stranding the note.
@@ -5844,13 +5786,7 @@
 	function marksFor(messageId: ChatMsgId): AnnotationMark[] {
 		return memoMarks(
 			messageId,
-			buildMarksFor(
-				annotations,
-				messageId,
-				aidModelPin.has(messageId),
-				pendingAnn,
-				annAnswering
-			)
+			buildMarksFor(annotations, messageId, aidModelPin.has(messageId), pendingAnn)
 		);
 	}
 
@@ -6715,11 +6651,43 @@
 	stream, read back, notify, and settle the composer. Reads pin to
 	the origin id, never the live chat. A deleted origin skips the
 	readback (there is nothing left to read aloud). */
+	/** Land a staged send's reply as its annotations' answers: blue
+	asked through the pill turn orange. Consumes this chat's pending
+	asks either way — a blank or failed reply renders as a plain
+	message and leaves its annotations blue, never stranded. A
+	background landing patches the origin chat's stored drafts; the
+	active chat's live list is only touched when it is the origin. */
+	function landAskedAnswers(
+		originId: ChatId,
+		reply: string
+	): void {
+		const at = askedAnnotations.findIndex((e) => e.chatId === originId);
+		if (at === -1) return;
+		const [entry] = askedAnnotations.splice(at, 1);
+		if (!entry || entry.ids.length === 0) return;
+		if (originId === chat.id) {
+			annotations = attachStagedAnswers(annotations, entry.ids, reply);
+		} else {
+			const stored = loadDraftAnnotations(originId);
+			const patched = attachStagedAnswers(stored, entry.ids, reply);
+			if (patched !== stored)
+				saveDraftAnnotations(
+					originId,
+					patched,
+					chatState.chats.map((c) => c.id)
+				);
+		}
+	}
+
 	function afterSend(originId: ChatId): void {
 		const { sent, stillHere } = resolveSendCompletion(
 			chatState,
 			originId,
 			chat.id
+		);
+		landAskedAnswers(
+			originId,
+			sent?.role === "assistant" && !sent.error ? (sent.content ?? "") : ""
 		);
 		if (sent?.role === "assistant" && !sent.error) {
 			// Same-chat only: the new chat must not thump for the old
@@ -7079,19 +7047,45 @@
 			editor?.getPastes() ?? []
 		);
 		const outgoing = attachments;
-		const outgoingAnnotations = annotations;
+		// A staged question files into its annotation before the bake:
+		// the send bundles the staged wording into one request (a
+		// staged ask always includes, even a removed inclusion). The
+		// reply lands as that annotation's answer — see afterSend. A
+		// fresh send supersedes its chat's stale asks.
+		askedAnnotations = askedAnnotations.filter((e) => e.chatId !== chat.id);
+		let outgoingAnnotations = annotations;
+		let askedIds: AnnotationId[] = [];
+		if (stagedAnnId) {
+			const staged = outgoingAnnotations.find((a) => a.id === stagedAnnId);
+			if (staged) {
+				outgoingAnnotations = setPromptExcluded(
+					fileStagedComment(outgoingAnnotations, staged.id, stagedDraft),
+					staged.id,
+					false
+				);
+				askedIds = [staged.id];
+				askedAnnotations = [
+					...askedAnnotations,
+					{ chatId: chat.id, ids: askedIds }
+				];
+			}
+			stagedAnnId = null;
+			stagedDraft = "";
+			stagedEditing = false;
+		}
 		// The prompt empties the moment the message goes out — not when the
-		// (possibly long) reply finishes streaming in. The annotation pill
-		// and count go with it: the block is already baked into the sent
-		// message, so nothing waits on the reply. Attachment pills clear
-		// with it (`outgoing` already captured them for the send).
+		// (possibly long) reply finishes streaming in. Asked annotations
+		// survive the clear (blue until their reply lands); everything
+		// else baked and goes. Attachment pills clear with it (`outgoing`
+		// already captured them for the send).
 		editor?.clear();
 		attachments = [];
 		expandedPastes = [];
-		annotations = [];
+		annotations = outgoingAnnotations.filter(
+			(a) => askedIds.includes(a.id) || a.answer !== undefined
+		);
 		pendingAnn = null;
 		reviewOpen = false;
-		editingId = null;
 		highlightAnnId = null;
 		settleAnnPop();
 		annPop = null;
@@ -7155,9 +7149,9 @@
 		if (stuck) scrollAfterRender();
 		await sending;
 		// Keep drafts when the reply failed so nothing silently drops.
-		// Filed (or staged) annotations survive the landing: the
-		// send-time reset above already dropped the baked pills, so
-		// nothing resets here — later work belongs to the user.
+		// Asked and answered annotations survive the landing (the
+		// send-time reset keeps them); the reply lands on them in
+		// afterSend, so nothing resets here.
 		afterSend(sentFrom.id);
 	}
 
@@ -7207,6 +7201,9 @@
 		}
 		missingKey = false;
 		const resentFrom = chat;
+		// A resend never asks: supersede this chat's stale staged asks
+		// so a racing earlier ask can't land on the retried reply.
+		askedAnnotations = askedAnnotations.filter((e) => e.chatId !== chat.id);
 		await resendLast(
 			chatState,
 			provider,
@@ -7358,7 +7355,9 @@
 		editingPrevFileMarkers = countMarkers(editingSeed, FILE_MARKER);
 		editingPrevPasted = countPastedTags(editingSeed);
 		reviewOpen = false;
-		editingId = null;
+		stagedAnnId = null;
+		stagedDraft = "";
+		stagedEditing = false;
 		highlightAnnId = null;
 		settleAnnPop();
 		annPop = null;
@@ -7379,8 +7378,9 @@
 	function resetInlineEdit(): void {
 		annotations = [];
 		reviewOpen = false;
-		editingId = null;
-		editDraft = "";
+		stagedAnnId = null;
+		stagedDraft = "";
+		stagedEditing = false;
 		editingMsgId = null;
 		editingAttachments = [];
 		highlightAnnId = null;
@@ -9859,6 +9859,11 @@
 				// A modal always wins Esc, even from inside the prompt.
 				shortcutsOpen = false;
 				inspectChar = null;
+			} else if (stagedAnnId) {
+				// The staged pill discards from anywhere (its
+				// field's own Esc handler sits bubble-phase; this
+				// capture branch pre-empts it).
+				closeStagedAnnotation();
 			} else if (chatSwitcherOpen) {
 				// The phone switcher dismisses like any modal.
 				closeChatSwitcher();
@@ -9877,10 +9882,9 @@
 				// The find bar closes from anywhere (its input included).
 				closeFind();
 			} else if (reviewOpen) {
-				// The annotations review closes from anywhere (its
-				// textarea keeps its own Esc-to-cancel below).
+				// The annotations review closes from anywhere (the
+				// staged pill keeps its own Esc-to-discard below).
 				reviewOpen = false;
-				editingId = null;
 			} else if (refsPopOpen) {
 				// A sent message's filed-annotations card sits below
 				// the review in z, so it dismisses right after it —
@@ -10994,7 +10998,7 @@
 		/**
 		 * Click-off closes the annotations review (desktop): a press
 		 * outside the pill/card unpins it. Presses inside .ann-wrap
-		 * (pill toggle, quote jumps, edit buttons) keep their own
+		 * (pill toggle, quote jumps, row buttons) keep their own
 		 * behavior; phones keep tap-driven flow and skip this.
 		 */
 		const dismissReview = (event: MouseEvent) => {
@@ -11002,7 +11006,6 @@
 			const target = event.target instanceof Element ? event.target : null;
 			if (target?.closest(".ann-wrap")) return;
 			reviewOpen = false;
-			editingId = null;
 		};
 		// Double-click summons the menu for the native word pick (the
 		// pick finalizes after mouseup, so mouseup alone never sees it).
@@ -12402,7 +12405,6 @@
 			aidPreferred={preferredLocalAid(activeReplyCode)}
 			washId={pillWashId(annPop, annPopClosing) ??
 				promptAnnWashId() ??
-				editingId ??
 				hoverBadgeId}
 			sending={isSending(chatState, viewChat.id)}
 			sendingChatId={chatState.sendingChatId}
@@ -12552,9 +12554,10 @@
 			inspectEnabled={settings.inspectEnabled}
 			annotations={annotations}
 			reviewOpen={reviewOpen}
-			bind:editingId
-			bind:draft={editDraft}
-			bind:box={editBox}
+			inclusions={inclusionsForPrompt()}
+			staged={stagedForPrompt()}
+			stagedEditing={stagedEditing}
+			bind:stagedDraft
 			bind:highlightId={highlightAnnId}
 			bind:pillEl={annPill}
 			attachBusy={attachBusy}
@@ -12602,8 +12605,20 @@
 					quote: reviewQuoteClick,
 					copy: copyAnnotation,
 					remove: removeAnnotation,
-					save: saveEdit,
-					pencil: editAnnotationAtMark
+					stage: stageAnnotation,
+					setExcluded: setAnnotationExcluded,
+					unstage: closeStagedAnnotation
+				},
+				staged: {
+					pencil: (id: AnnotationId) => {
+						// The pill's own pencil toggles its wording
+						// field; a chip's pencil stages that
+						// annotation (ask, or redo answered).
+						if (id === stagedAnnId) stagedEditing = !stagedEditing;
+						else pencilStagedAnnotation(id);
+					},
+					close: closeStagedAnnotation,
+					copy: copyStagedAnnotation
 				}
 			}}
 		/>
@@ -12665,7 +12680,6 @@
 				key: annPopKey,
 				blur: blurAnnPop,
 				save: saveAnnPop,
-				cancel: cancelAnnPop,
 				remove: (id: string) => {
 					removeAnnotation(id);
 					editor?.focus();
@@ -12685,15 +12699,11 @@
 		{@const answered = annotations.find((a) => a.id === pop.id)}
 		{#if answered?.answer}
 			<AnnAnswer
-				id={answered.id}
 				answer={answered.answer}
 				closing={answerClosing}
 				x={pop.x}
 				y={pop.y}
 				width={pop.w}
-				actions={{
-					addToPrompt: addAnswerToPrompt
-				}}
 			/>
 		{/if}
 	{/if}
@@ -13347,7 +13357,8 @@
 	/* Dark primary: light pill, dark text (mirrors the send
 	button's inversion); Cancel stays quiet gray text. */
 	/* edit-actions ride --invert/--invert-ink/--muted/--ink now. */
-	/* .muted rides --muted now (sole use: the translating note). */
+	/* (The old translating-note .muted is gone with the separate
+	request: unasked annotations hold steady blue, never a placeholder.) */
 	/* .prompt rides --bg/--line/--line-hover/--focus now; no dark overrides needed. */
 	/* Lang menus ride --ink/--strong/--line/--bg-raised/--bg-wash/--focus now. */
 	/* .send-btn rides --invert/--invert-ink now. */

@@ -43,16 +43,14 @@ describe("review dock extraction", () => {
 		expect(dockSource()).toContain('class="ann-wrap"');
 		expect(dockSource()).toContain('class="review"');
 		expect(dockSource()).toContain("Clear all");
-		expect(dockSource()).toContain('aria-label="Edit annotation {n + 1}"');
 		// The dock usage moved into the composer with the tools row;
 		// the page renders the composer instead.
 		expect(composerSource()).toContain("<ReviewDock");
 		expect(pageSource()).toContain("<Composer");
 		expect(pageSource()).not.toContain('class="ann-wrap"');
 		expect(pageSource()).not.toContain('class="review-item"');
-		// The page keeps the array, ids, draft, and behaviors.
+		// The page keeps the array, ids, and behaviors.
 		expect(pageSource()).toContain("let annotations = $state");
-		expect(pageSource()).toContain("function saveEdit");
 		expect(pageSource()).toContain("function reviewQuoteClick");
 	});
 
@@ -60,10 +58,40 @@ describe("review dock extraction", () => {
 		const css = dockStyle();
 		expect(css).toContain(".ann-wrap .review");
 		expect(css).toContain(".review-item.highlight");
-		expect(css).toContain(".review-edit-actions button:last-child");
 		expect(css).toContain(".ann-wrap.pinned .review");
 		expect(pageStyle()).not.toMatch(/\.review\s*\{/);
 		expect(pageStyle()).not.toContain(".review-item");
 		expect(pageStyle()).not.toContain(".ann-wrap .review");
+	});
+
+	it("carries no edit affordances in the overlay", () => {
+		const source = dockSource();
+		expect(source).not.toContain("review-pencil");
+		expect(source).not.toContain("review-edit-actions");
+		expect(source).not.toContain("<textarea");
+		expect(source).not.toContain("Edit annotation");
+	});
+
+	it("stages only empty questions, toggles inclusions, shows answers", () => {
+		const source = dockSource();
+		// Add to prompt gates on the empty question (canAddToPrompt),
+		// never offered beside a written one.
+		expect(source).toContain("canAddToPrompt(ann)");
+		expect(source).toContain("Add to prompt");
+		// Inclusion toggle keeps the annotation, omits it from send.
+		expect(source).toContain("Remove from prompt inclusions");
+		expect(source).toContain("setExcluded");
+		// A staged row offers Unstage: the dock's no-send close.
+		expect(source).toContain("Unstage");
+		expect(source).toContain("stagedId");
+		// Answered quotes read as green annotated-text chips with
+		// their answer always displayed below.
+		expect(source).toContain("Annotated text");
+		expect(source).toContain("review-answer");
+		const css = dockStyle();
+		expect(css).toContain(".review-add");
+		expect(css).toContain(".review-omit");
+		expect(css).toContain(".review-answer");
+		expect(css).toContain(".review-quote.annotated");
 	});
 });

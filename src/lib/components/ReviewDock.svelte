@@ -1,14 +1,15 @@
 <!-- New-annotations dock: unsent drafts filed from this chat,
 reviewed before sending (the filed half lives in the
 previous-annotations sent-refs card on sent messages). The page owns
-the annotations array, the open/edit/highlight ids, the draft, and
-the save/quote/copy/remove behaviors; this component owns the dock
-markup, the inline editor, and their surfaces (Svelte scoping binds
-the CSS to this markup). -->
+the annotations array, the open/highlight ids, and the
+quote/copy/remove/stage/exclusion behaviors; this component owns the
+dock markup and its surfaces (Svelte scoping binds the CSS to this
+markup). No edit affordances live here: questions are asked through
+the staged send-prompt pill, never revised in the overlay. -->
 <script lang="ts">
 	import {
 		annotationCountLabel,
-		reviewEditKey,
+		canAddToPrompt,
 		type Annotation,
 		type AnnotationId
 	} from "$lib/annotations";
@@ -21,18 +22,19 @@ the CSS to this markup). -->
 		quote: (ann: Annotation) => void;
 		copy: (quote: string, comment: string) => void;
 		remove: (id: AnnotationId) => void;
-		save: (id: AnnotationId) => void;
-		pencil: (id: AnnotationId) => void;
+		stage: (id: AnnotationId) => void;
+		unstage: (id: AnnotationId) => void;
+		setExcluded: (id: AnnotationId, excluded: boolean) => void;
 	}
 
 	interface Props {
 		items: Annotation[];
 		open: boolean;
-		editingId?: AnnotationId | null;
-		draft?: string;
-		box?: HTMLTextAreaElement | null;
+		/** Annotation currently staged in the send prompt (its row
+		offers Unstage: the dock's way to close a no-send). */
+		stagedId?: AnnotationId | null;
 		highlightId?: AnnotationId | null;
-		/** Pill button (the page parks focus here after saves). */
+		/** Pill button (the page parks focus here after actions). */
 		pillEl?: HTMLButtonElement | null;
 		actions: ReviewDockActions;
 	}
@@ -40,37 +42,11 @@ the CSS to this markup). -->
 	let {
 		items,
 		open,
-		editingId = $bindable(null),
-		draft = $bindable(""),
-		box = $bindable(null),
+		stagedId = null,
 		highlightId = $bindable(null),
 		pillEl = $bindable(null),
 		actions
 	}: Props = $props();
-
-	function focusPill(): void {
-		pillEl?.focus({ preventScroll: true });
-	}
-
-	function cancelEdit(): void {
-		editingId = null;
-		highlightId = null;
-		// Cancel unmounts the focused textarea:
-		// park focus on the pill or the
-		// overlay drops on touch.
-		focusPill();
-	}
-
-	function editKey(event: KeyboardEvent, id: AnnotationId): void {
-		const action = reviewEditKey(event.key, event.shiftKey);
-		if (action === "save") {
-			event.preventDefault();
-			actions.save(id);
-		} else if (action === "cancel") {
-			event.preventDefault();
-			cancelEdit();
-		}
-	}
 </script>
 
 <!-- New-annotations dock: unsent drafts filed from
@@ -84,8 +60,8 @@ sent messages). -->
 		bind:this={pillEl}
 		title="Review annotations"
 		aria-label={items.length === 1
-			? "1 unsent annotation"
-			: `${items.length} unsent annotations`}
+			? "1 annotation"
+			: `${items.length} annotations`}
 		aria-expanded={open}
 		onclick={actions.toggle}
 	>
@@ -115,13 +91,20 @@ sent messages). -->
 			<div
 				class="review-item"
 				class:highlight={highlightId === ann.id}
+				class:omitted={ann.excludedFromPrompt === true}
 			>
 				<div class="review-head">
 					<span class="review-num">{n + 1}.</span>
 					<button
 						type="button"
 						class="review-quote"
-						title="Jump to this annotation in the chat"
+						class:annotated={ann.answer !== undefined}
+						title={ann.answer !== undefined
+							? "Annotated text — jump to it in the chat"
+							: "Jump to this annotation in the chat"}
+						aria-label={ann.answer !== undefined
+							? `Annotated text ${n + 1}: ${ann.quote}`
+							: `Jump to annotation ${n + 1}`}
 						onclick={() => actions.quote(ann)}
 					>
 						“{ann.quote}”
@@ -137,6 +120,24 @@ sent messages). -->
 					</button>
 					<button
 						type="button"
+						class="review-omit"
+						title={ann.excludedFromPrompt === true
+							? "Add back to prompt inclusions"
+							: "Remove from prompt inclusions (keeps the annotation)"}
+						aria-label={ann.excludedFromPrompt === true
+							? `Add annotation ${n + 1} back to prompt inclusions`
+							: `Remove annotation ${n + 1} from prompt inclusions`}
+						aria-pressed={ann.excludedFromPrompt === true}
+						onclick={() =>
+							actions.setExcluded(
+								ann.id,
+								ann.excludedFromPrompt !== true
+							)}
+					>
+						{ann.excludedFromPrompt === true ? "Include" : "Omit"}
+					</button>
+					<button
+						type="button"
 						class="review-del"
 						aria-label="Delete annotation {n + 1}"
 						title="Delete annotation"
@@ -145,46 +146,43 @@ sent messages). -->
 						<ActionIcon kind="close" />
 					</button>
 				</div>
-				{#if editingId === ann.id}
-					<label>
-						<span class="review-label">-</span>
-						<textarea
-							rows="2"
-							bind:this={box}
-							bind:value={draft}
-							placeholder="Add an optional annotation…"
-							aria-label="Edit annotation. Enter saves, Shift+Enter adds a line, Escape cancels."
-							onkeydown={(e) => editKey(e, ann.id)}></textarea>
-					</label>
-					<div class="review-edit-actions">
-						<button type="button" onclick={() => actions.save(ann.id)}
-							>Save</button
-						>
-						<button type="button" onclick={cancelEdit}>Cancel</button>
-					</div>
-				{:else}
-					<div class="review-head">
-						<span class="review-label">-</span>
-						<span class="review-comment">{ann.comment || "—"}</span>
+				<div class="review-head">
+					<span class="review-label">-</span>
+					<span class="review-comment">{ann.comment || "—"}</span>
+					{#if stagedId === ann.id}
+						<!-- The dock's way to close a no-send: unstages
+						back here, deleting the send-prompt chip. -->
 						<button
 							type="button"
-							class="review-pencil"
-							title="Edit annotation"
-							aria-label="Edit annotation {n + 1}"
-							onclick={() => {
-								// Desktop edits at the mark in the
-								// floating card, phones in the
-								// composer (see
-								// editAnnotationAtMark) — the
-								// inline textarea below stays
-								// retired.
-								highlightId = ann.id;
-								actions.pencil(ann.id);
-							}}
+							class="review-add"
+							title="Unstage this annotation (back to the drawer)"
+							aria-label="Unstage annotation {n + 1}"
+							onclick={() => actions.unstage(ann.id)}
 						>
-							<ActionIcon kind="pencil" />
+							Unstage
 						</button>
-					</div>
+					{:else if canAddToPrompt(ann)}
+						<!-- The only Add-to-prompt in the app: blank
+						questions stage their wording in the send prompt
+						instead of baking a bare "?". The button rides
+						the note row (far edge, like delete above) so
+						the card stays two rows tall and never slides
+						under the messages layer, where its clicks die. -->
+						<button
+							type="button"
+							class="review-add"
+							title="Stage this annotation in the send prompt"
+							aria-label="Add annotation {n + 1} to prompt"
+							onclick={() => actions.stage(ann.id)}
+						>
+							Add to prompt
+						</button>
+					{/if}
+				</div>
+				{#if ann.answer !== undefined}
+					<!-- Answers display always: the reply that asked
+					this annotation stays readable under it. -->
+					<p class="review-answer">{ann.answer}</p>
 				{/if}
 			</div>
 		{/each}
@@ -288,96 +286,51 @@ sent messages). -->
 		overflow-x: auto;
 		min-width: 0;
 	}
-	.review label {
-		display: block;
-		font-size: 1rem;
-		margin-top: 0.3rem;
+	/* Omitted inclusions dim but stay listed: the quote still
+	jumps, the note still reads — only the send skips them. */
+	.review-item.omitted .review-quote,
+	.review-item.omitted .review-comment {
+		opacity: 0.55;
 	}
-	.review textarea {
-		display: block;
-		width: 100%;
-		box-sizing: border-box;
-		margin-top: 0.25rem;
-		font: inherit;
-		color: inherit;
-		background: #fff;
-		background: var(--field);
-		border: 1px solid #c7c7cc;
-		border-color: var(--line);
-		border-radius: 10px;
-		padding: 0.4rem 0.6rem;
-		resize: vertical;
-	}
-	.review textarea:focus {
-		outline: none;
-		border-color: #1c1c1e;
-		border-color: var(--strong);
-	}
-	/* The edit box stays readable in dark mode: the near-black field
-	surface swallows typed text under dim panels, so edits ride a
-	raised surface with light ink instead. */
-	:global(html[data-theme="dark"]) .review textarea {
-		background: #3a3a3c;
-		color: #f2f2f7;
-		border-color: #636366;
-	}
-	:global(html[data-theme="dark"]) .review textarea::placeholder {
-		color: #aeaeb2;
-	}
-	/* Save is the solid primary pill (same fill as the send button);
-	Cancel is quiet text — the two never look like twins. */
-	.review-edit-actions {
-		display: flex;
-		align-items: center;
-		gap: 0.25rem;
-		margin-top: 0.35rem;
-	}
-	.review-edit-actions button {
+	/* Add to prompt: the solid primary pill (same fill as the send
+	button) — the row's one call to action, never a quiet twin. */
+	.review-add {
 		font-size: 0.78rem;
 		font-weight: 600;
 		cursor: pointer;
 		border-radius: 999px;
 		padding: 0.28rem 0.9rem;
-		border: 1px solid #1c1c1e;
-		border-color: var(--invert);
-		background: #1c1c1e;
-		background: var(--invert);
-		color: #fff;
-		color: var(--invert-ink);
-		/* On the base (not :hover) so Save and Cancel animate
-		symmetrically in and back out, instead of snapping one way. */
-		transition:
-			opacity 0.15s ease,
-			color 0.15s ease,
-			background-color 0.15s ease,
-			border-color 0.15s ease;
-	}
-	.review-edit-actions button:hover {
-		opacity: 0.8;
-	}
-	/* Light theme Save: the accent fill like the send button (dark keeps
-	the inverted fill). Cancel rides the quiet rule below, untouched. */
-	:global(html[data-theme="light"])
-		.review-edit-actions
-		button:not(:last-child) {
-		border-color: #007aff;
+		border: 1px solid #007aff;
 		border-color: var(--accent);
 		background: #007aff;
 		background: var(--accent);
 		color: #fff;
+		color: var(--accent-ink);
+		transition: opacity 0.15s ease;
 	}
-	.review-edit-actions button:last-child {
-		border-color: transparent;
-		background: none;
-		color: #6e6e73;
-		color: var(--muted);
-		font-weight: 400;
+	.review-add:hover {
+		opacity: 0.8;
 	}
-	.review-edit-actions button:last-child:hover {
-		opacity: 1;
-		color: #1c1c1e;
-		color: var(--ink);
-		text-decoration: underline;
+	/* The answer always shows under its annotation: plain text at
+	note size, never a popup-only reveal. */
+	.review-answer {
+		margin: 0.35rem 0 0;
+		font-size: 0.85rem;
+		line-height: 1.45;
+		color: inherit;
+		white-space: pre-wrap;
+	}
+	/* Annotated-text chip: the answered quote reads green, marking
+	which text the answer below belongs to. */
+	.review-head button.review-quote.annotated {
+		background: #e6f4ea;
+		background: var(--ok-wash);
+		color: #1f7a4d;
+		color: var(--ok);
+		border-radius: 999px;
+		padding: 0.05rem 0.55rem;
+		font-weight: 600;
+		text-decoration: none;
 	}
 	/* Merged pill: the wrap carries the single border; the count and ×
 	buttons inside are bare segments. Later than the prompt tool buttons
@@ -441,41 +394,43 @@ sent messages). -->
 	:global(.app[data-android]) .review-label {
 		font-size: calc(0.75rem * var(--font-scale, 1));
 	}
-	:global(.app[data-android]) .review label {
-		font-size: calc(0.82rem * var(--font-scale, 1));
-	}
 	:global(.app[data-android]) .review-head button.review-copy :global(.action-glyph) {
 		height: calc(0.8rem * var(--font-scale, 1));
 	}
 	:global(.app[data-android]) .review-head button.review-del :global(.action-glyph) {
 		height: calc(0.8rem * var(--font-scale, 1));
 	}
-	/* Per-note edit is a pencil in the message-action style (same
-	stroke icon, same quiet gray) instead of a text button. It rides
-	right after the note text — not margin-left:auto at the card's far
-	edge, where the cursor overshoots the card reaching it and the
-	whole overlay drops. */
-	.review-head button.review-pencil {
-		display: inline-flex;
-		align-items: center;
-		/* Top of the note line, not the row's middle: centered sits
-		a breath low next to the italic note. */
-		align-self: flex-start;
-		margin-top: 0.2em;
-		margin-left: 0;
+	:global(.app[data-android]) .review-answer {
+		font-size: calc(0.78rem * var(--font-scale, 1));
+	}
+	/* Omit/Include rides between copy and delete as quiet text:
+	the row's only toggle, never an icon twin. Pressed (omitted)
+	reads accent; hover underlines like the quote jump. */
+	.review-head button.review-omit {
 		flex-shrink: 0;
+		align-self: center;
+		font-size: 0.78rem;
 		color: #6e6e73;
 		color: var(--muted);
-		padding: 0.15rem;
-		border-radius: 6px;
-		/* On the base (not :hover) so the color animates symmetrically
-		in and back out, instead of snapping one way. */
-		transition: color 0.15s ease;
+		border: 0;
+		background: none;
+		cursor: pointer;
+		padding: 0.15rem 0.2rem;
+		text-decoration: underline;
+		text-decoration-color: transparent;
+		transition: text-decoration-color 0.15s ease;
 	}
-	.review-head button.review-pencil :global(.action-glyph) {
-		height: 0.95rem;
+	.review-head button.review-omit:hover {
+		color: #1c1c1e;
+		color: var(--ink);
+		text-decoration-color: currentcolor;
 	}
-	/* Per-note copy rides at the row's end in the pencil's style:
+	.review-head button.review-omit[aria-pressed="true"] {
+		color: #007aff;
+		color: var(--accent);
+		font-weight: 600;
+	}
+	/* Per-note copy rides at the row's end in the icon style:
 	icon only, no text. margin-left:0 keeps it with the quote while
 	the delete button's auto margin holds the row's right edge.
 	Rows stay one line tall, so the icon never floats in dead
@@ -490,8 +445,8 @@ sent messages). -->
 		color: var(--muted);
 		padding: 0.15rem;
 		border-radius: 6px;
-		/* Same 0.15s color beat as the pencil: all three icons light
-		up together instead of the copy snapping first. */
+		/* Same 0.15s color beat as delete: both icons light up
+		together instead of the copy snapping first. */
 		transition: color 0.15s ease;
 	}
 	.review-head button.review-copy :global(.action-glyph) {
@@ -519,7 +474,7 @@ sent messages). -->
 		color: var(--muted);
 		padding: 0.15rem;
 		border-radius: 6px;
-		/* Same 0.15s color beat as copy and pencil. */
+		/* Same 0.15s color beat as copy. */
 		transition: color 0.15s ease;
 	}
 	.review-head button.review-del :global(.action-glyph) {
@@ -554,15 +509,6 @@ sent messages). -->
 		color: inherit;
 		text-decoration: underline;
 		text-decoration-color: currentcolor;
-	}
-	/* Hover goes accent-blue instead of going ink: the pencil is small
-	and quiet-gray, so an ink hover read as disappearing. Color only —
-	no background, no glow, no underline: the signal stays inside the
-	glyph's own box. */
-	.review-head button.review-pencil:hover {
-		color: #007aff;
-		color: var(--accent);
-		text-decoration: none;
 	}
 	/* Annotation popover: collapsed to the pill, expands on hover,
 	focus, or pinned click. Beats the centered-column group rule.
@@ -619,11 +565,6 @@ sent messages). -->
 	:global(.app[data-android]) :global(.prompt-tools) .ann-wrap {
 		order: 4;
 		position: static;
-	}
-	/* Thumb-sized edit targets on phones. */
-	:global(.app[data-android]) .review-edit-actions button {
-		padding: 0.6rem 1.2rem;
-		min-height: 2.75rem;
 	}
 	/* Dock tools hide with the composer tools when the phone dock
 	owns the composer (other half stays paged with the buttons). */

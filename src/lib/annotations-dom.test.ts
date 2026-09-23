@@ -425,6 +425,19 @@ describe("draft annotation persistence", () => {
 		expect(loadDraftAnnotations("c2")).toEqual([]);
 	});
 
+	it("restores answers and prompt exclusions with drafts", () => {
+		// A reload must not un-ask an answered annotation back to
+		// blue, nor re-include a removed inclusion.
+		saveDraftAnnotations(
+			"c1",
+			[ann({ answer: "because", excludedFromPrompt: true })],
+			["c1"]
+		);
+		expect(loadDraftAnnotations("c1")).toEqual([
+			ann({ answer: "because", excludedFromPrompt: true })
+		]);
+	});
+
 	it("clearing a chat drops its entry, orphans prune on save", () => {
 		saveDraftAnnotations("c1", [ann()], ["c1", "c2"]);
 		saveDraftAnnotations(

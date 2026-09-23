@@ -625,12 +625,14 @@ test.describe("ios", () => {
 		await expect(dock).toBeVisible();
 	});
 
-	/** Tapping an annotation's marker opens its note edit: the tap's
-	compatibility mousedown opens it, and the trailing compatibility
-	click must not toggle it straight back shut (desktop Chrome eats
-	that click via mousedown's preventDefault; iOS Safari fires it).
-	Phones edit through the composer, never a floating card. */
-	test("tapping a badge opens its note edit", async ({ page }) => {
+	/** Tapping an annotation's marker opens the dock on its row: the
+	tap's compatibility mousedown opens it, and the trailing
+	compatibility click must not toggle it straight back shut
+	(desktop Chrome eats that click via mousedown's preventDefault;
+	iOS Safari fires it). Filed notes never edit — phones and
+	desktop alike open the row; questions ask through the staged
+	pill, never a floating card or composer transplant. */
+	test("tapping a badge opens its dock row", async ({ page }) => {
 		await seedChat(page, [
 			{ role: "assistant", content: "漢字を読むテストです" }
 		]);
@@ -679,10 +681,22 @@ test.describe("ios", () => {
 			el.dispatchEvent(new MouseEvent("mouseup", { ...at, button: 0 }));
 			el.dispatchEvent(new MouseEvent("click", { ...at, button: 0 }));
 		});
-		// The trailing click must not toggle the edit straight back
-		// shut: the composer keeps asking for the note afterwards.
-		await expect(composer).toHaveAttribute("placeholder", "Edit annotation");
+		// The trailing click must not toggle the dock straight back
+		// shut: the review stays open on the tapped row afterwards,
+		// and the composer never transplants the filed note.
+		await expect(page.locator(".ann-wrap .review")).toHaveCSS(
+			"opacity",
+			"1"
+		);
+		await expect(page.locator(".review-item.highlight")).toBeVisible();
+		await expect(composer).not.toHaveAttribute(
+			"placeholder",
+			"Edit annotation"
+		);
 		await page.waitForTimeout(400);
-		await expect(composer).toHaveAttribute("placeholder", "Edit annotation");
+		await expect(page.locator(".ann-wrap .review")).toHaveCSS(
+			"opacity",
+			"1"
+		);
 	});
 });
