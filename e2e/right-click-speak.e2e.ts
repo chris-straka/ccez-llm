@@ -336,3 +336,47 @@ test("right-click outside a live selection reads the word under the cursor", asy
 		""
 	);
 });
+
+test("right-click on CJK repoints a missed highlight onto the clicked word", async ({
+	page
+}) => {
+	await seedChat(page, [{ role: "assistant", content: "日本語でお答えします" }]);
+	await page.goto("/");
+	const para = page.locator("article.assistant .rendered p").first();
+	await expect(para).toBeVisible({ timeout: 60_000 });
+	// Pin a live selection on 日本語, then right-click squarely on 答.
+	await page.evaluate(() => {
+		const p = document.querySelector("article.assistant .rendered p");
+		const node = p?.firstChild;
+		if (!p || !node || node.nodeType !== Node.TEXT_NODE)
+			throw new Error("no text to select");
+		const range = document.createRange();
+		range.setStart(node, 0);
+		range.setEnd(node, 3);
+		const live = window.getSelection();
+		live?.removeAllRanges();
+		live?.addRange(range);
+	});
+	const point = await para.evaluate((el) => {
+		const text = el.firstChild;
+		if (!text || text.nodeType !== Node.TEXT_NODE)
+			throw new Error("no text node");
+		const idx = (text.textContent ?? "").indexOf("答");
+		if (idx < 0) throw new Error("no 答 to click");
+		const range = document.createRange();
+		range.setStart(text, idx);
+		range.setEnd(text, idx + 1);
+		const rect = range.getBoundingClientRect();
+		return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+	});
+	await page.mouse.click(point.x, point.y, { button: "right" });
+	// The audio reads the clicked word, and the wash repoints onto
+	// that same word — highlight and audio never disagree.
+	await expect
+		.poll(() => spoken(page), { timeout: 10_000 })
+		.not.toHaveLength(0);
+	const texts = await spoken(page);
+	const sel = await page.evaluate(() => window.getSelection()?.toString() ?? "");
+	expect(sel).toContain("答");
+	expect(texts.join("")).toContain(sel);
+});

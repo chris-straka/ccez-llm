@@ -12413,16 +12413,30 @@
 			if (msg && !clickInSelection) {
 				const word = wordUnderCursor(event, body);
 				if (word) {
-					if (quoted) {
-						// Drop the misleading wash: the audio reads the
-						// clicked word, so the highlight must not keep
-						// painting the engine's pick.
-						try {
-							window.getSelection()?.removeAllRanges();
-						} catch {
-							// A disturbed selection keeps its wash; speech
-							// still follows the point.
+					// Repoint the wash onto the clicked word so the
+					// highlight always matches the audio: WebKit's
+					// mousedown pick uses its own breaker (and Chromium
+					// leaves nothing), so only the point-anchored CJK
+					// range is trustworthy — other scripts keep the
+					// engine's pick when it exists, else no wash at
+					// all. Programmatic ranges summon no menu (the
+					// selectionchange watcher stands down with none
+					// open), and speech stays on the instant word path.
+					const wordRange = cjkWordRangeAtPoint(
+						event.clientX,
+						event.clientY
+					);
+					try {
+						const live = window.getSelection();
+						if (wordRange) {
+							live?.removeAllRanges();
+							live?.addRange(wordRange);
+						} else if (quoted) {
+							live?.removeAllRanges();
 						}
+					} catch {
+						// A disturbed selection keeps its wash; speech
+						// still follows the point.
 					}
 					void speakQuote(word, msg.id, false, speechText(msg.content));
 					return;
