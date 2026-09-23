@@ -12108,6 +12108,30 @@
 		const CJK_WORD_RE =
 			/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
 
+		/** True when the live message selection's on-screen span covers
+		the point (same pad as rangeContainsPoint below): a right-click
+		with a highlight reads the highlight only when the click lands
+		inside it. WebKit word-selects on right-mousedown with its own
+		breaker (ルーブル beside a 館 click); Chromium leaves no
+		selection at all — so a highlight the click missed is the
+		engine's neighbor pick, never the user's, and the word under
+		the cursor wins instead. */
+		function selectionHitsPoint(x: number, y: number): boolean {
+			try {
+				const live = window.getSelection();
+				if (!live || live.rangeCount === 0 || live.isCollapsed)
+					return false;
+				return [...live.getRangeAt(0).getClientRects()].some(
+					(rect) =>
+						x >= rect.left - 2 &&
+						x <= rect.right + 2 &&
+						y >= rect.top - 2 &&
+						y <= rect.bottom + 2
+				);
+			} catch {
+				return false;
+			}
+		}
 		/** True when the point lands inside the node's [start, end) screen span. */
 		function rangeContainsPoint(
 			node: Node,
@@ -12365,9 +12389,13 @@
 			}
 			// Controls and links inside messages stay silent.
 			if (target?.closest("button, input, textarea, a, summary")) return;
-			// Highlighted text wins: a right-click with a live message
-			// selection reads the whole selection (same per-quote
-			// language as the sel-menu button). When the highlight
+			// Highlighted text wins — but only when the click lands
+			// inside it (same per-quote language as the sel-menu
+			// button). A live selection the click missed is the
+			// engine's right-mousedown neighbor pick (see
+			// selectionHitsPoint), never the user's, so the word
+			// under the cursor beats it; open space with no word
+			// keeps the old highlight read. When the highlight
 			// contains Han it also shows readings for just the
 			// highlight — pinyin in Chinese text, furigana in
 			// Japanese (per-kanji runs, so mixed selections like
@@ -12375,6 +12403,31 @@
 			// a silent extra. Like Inspect, a lone Han char reads
 			// its locale from the surrounding sentence.
 			const quoted = currentQuote();
+			const clickInSelection =
+				quoted !== null &&
+				selectionHitsPoint(event.clientX, event.clientY);
+			const article = body.closest('article[id^="msg-"]');
+			const msg = article
+				? chat.messages[Number(article.id.slice(4))]
+				: undefined;
+			if (msg && !clickInSelection) {
+				const word = wordUnderCursor(event, body);
+				if (word) {
+					if (quoted) {
+						// Drop the misleading wash: the audio reads the
+						// clicked word, so the highlight must not keep
+						// painting the engine's pick.
+						try {
+							window.getSelection()?.removeAllRanges();
+						} catch {
+							// A disturbed selection keeps its wash; speech
+							// still follows the point.
+						}
+					}
+					void speakQuote(word, msg.id, false, speechText(msg.content));
+					return;
+				}
+			}
 			if (quoted) {
 				// 咲き誇り map back) — speech always runs; the panel is
 				// a silent extra. Like Inspect, a lone Han char reads
@@ -12392,13 +12445,10 @@
 				})();
 				return;
 			}
-			// No selection: a word under the cursor reads just that word
-			// (same per-quote path as a selection); open message space
-			// reads nothing — not a listen moment, so no read starts.
-			const article = body.closest('article[id^="msg-"]');
-			const msg = article
-				? chat.messages[Number(article.id.slice(4))]
-				: undefined;
+			// No (matching) selection: a word under the cursor reads just
+			// that word (same per-quote path as a selection); open
+			// message space reads nothing — not a listen moment, so no
+			// read starts.
 			if (!msg) return;
 			const word = wordUnderCursor(event, body);
 			if (word) {

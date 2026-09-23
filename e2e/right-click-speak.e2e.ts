@@ -291,3 +291,48 @@ test("right-click a playing word restarts it", async ({ page }) => {
 		timeout: 10_000
 	});
 });
+
+test("right-click outside a live selection reads the word under the cursor", async ({
+	page
+}) => {
+	const para = page.locator("article.assistant .rendered p").first();
+	// Seed text is "alpha beta gamma delta": pin a live selection on
+	// "alpha" (the engine's right-mousedown neighbor pick on WebKit),
+	// then right-click squarely on "gamma".
+	await page.evaluate(() => {
+		const p = document.querySelector("article.assistant .rendered p");
+		const node = p?.firstChild;
+		if (!p || !node || node.nodeType !== Node.TEXT_NODE)
+			throw new Error("no text to select");
+		const range = document.createRange();
+		range.setStart(node, 0);
+		range.setEnd(node, 5);
+		const live = window.getSelection();
+		live?.removeAllRanges();
+		live?.addRange(range);
+	});
+	expect(await page.evaluate(() => window.getSelection()?.toString())).toBe(
+		"alpha"
+	);
+	const point = await para.evaluate((el) => {
+		const text = el.firstChild;
+		if (!text || text.nodeType !== Node.TEXT_NODE)
+			throw new Error("no text node");
+		const words = (text.textContent ?? "").split(" ");
+		const start = words[0]!.length + 1 + words[1]!.length + 1;
+		const range = document.createRange();
+		range.setStart(text, start);
+		range.setEnd(text, start + words[2]!.length);
+		const rect = range.getBoundingClientRect();
+		return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+	});
+	await page.mouse.click(point.x, point.y, { button: "right" });
+	// The click missed the highlight, so the word wins — and the stale
+	// wash drops so the highlight never contradicts the audio.
+	await expect
+		.poll(() => spoken(page), { timeout: 10_000 })
+		.toEqual(["gamma"]);
+	expect(await page.evaluate(() => window.getSelection()?.toString())).toBe(
+		""
+	);
+});
