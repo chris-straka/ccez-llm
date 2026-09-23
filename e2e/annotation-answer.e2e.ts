@@ -279,6 +279,65 @@ test("clicking off the answer closes it", async ({ page }) => {
 	await expect(card).toHaveCount(0, { timeout: 5_000 });
 });
 
+/** The open answer owns its quote's wash: moving the mouse off the
+badge leaves the highlight up for as long as the card reads, and
+closing the card releases it. */
+test("open answer keeps its quote washed until the card closes", async ({
+	page
+}) => {
+	test.setTimeout(120_000);
+	await seedChat(page, [
+		{ role: "assistant", content: "the riverbank at dawn holds the fog" }
+	]);
+	await page.addInitScript(() => {
+		localStorage.setItem("ccez-mock-chat-ms", "2500");
+	});
+	await page.goto("/");
+	const article = page.locator("article.assistant");
+	await expect(article).toBeVisible({ timeout: 60_000 });
+	await dragQuote(page, 0, "riverbank");
+	await expect(page.locator(".sel-menu")).toBeVisible({ timeout: 10_000 });
+	// Shift+A opens the box (bare A files and sends at once now).
+	await page.keyboard.press("A");
+	await askAtFile(page, "what lives here?");
+	// Open off the badge (focus + Enter: a synthetic click can't land,
+	// the sticky header covers the marker — the mouse-away half below
+	// is the real pointer path under test).
+	const ready = page.locator("button.ccez-ann-badge.ans-ready");
+	await ready.focus();
+	await page.keyboard.press("Enter");
+	const card = page.locator(".ann-answer");
+	await expect(card).toBeVisible({ timeout: 10_000 });
+	const washed = (): Promise<boolean> =>
+		page.evaluate(
+			() =>
+				["ccez-ann", "ccez-ann-d1", "ccez-ann-d2", "ccez-ann-d3"].some(
+					(n) =>
+						(
+							window as unknown as {
+								CSS?: { highlights?: { has(n: string): boolean } };
+							}
+						).CSS?.highlights?.has(n) ?? false
+				)
+		);
+	// Park clear of badge and card, past the hover-clear hysteresis:
+	// the wash must still paint while the card reads.
+	await page.mouse.move(8, 8);
+	await page.waitForTimeout(400);
+	await expect.poll(washed, { timeout: 5_000 }).toBe(true);
+	await expect(card).toBeVisible();
+	// Clicking off closes the card and releases the wash with the fade.
+	const pt = await page.evaluate(() => {
+		const main = document.querySelector("main")!.getBoundingClientRect();
+		return { x: Math.round(main.width / 2), y: Math.round(main.height - 20) };
+	});
+	await page.mouse.move(pt.x, pt.y);
+	await page.mouse.down();
+	await page.mouse.up();
+	await expect(card).toHaveCount(0, { timeout: 5_000 });
+	await expect.poll(washed, { timeout: 5_000 }).toBe(false);
+});
+
 /** The open answer card rides the thread: scrolling moves the
 card with its quote (fixed plus scroll-delta tracking reads as
 absolute), never stranding it over other messages. */

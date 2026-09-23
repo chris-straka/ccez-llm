@@ -12827,6 +12827,11 @@
 			)}
 			aidPreferred={preferredLocalAid(activeReplyCode)}
 			washId={pillWashId(annPop, annPopClosing) ??
+				// The open answer owns its quote's wash like the
+				// pill does: moving off the badge must not clear
+				// it while the card reads. The fade releases it
+				// (closing reads null, like the pill).
+				pillWashId(answerPop, answerClosing) ??
 				promptAnnWashId() ??
 				hoverBadgeId}
 			sending={isSending(chatState, viewChat.id)}
