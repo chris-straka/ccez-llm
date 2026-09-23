@@ -379,19 +379,25 @@ where the text sat, like the composer's promptEl pattern). -->
 	article.user :global(.ccez-code) {
 		text-align: left;
 	}
-	/* In-place own-message edit: same right-docked footprint as the
-	bubble, with a visible editing frame (the bubble shade would fight
-	the code colors). The bar holds the touch path — phones have no
-	Esc and no Enter-to-save. */
+	/* In-place own-message edit: the message's full lane, not a
+	shrink-wrapped box (fit-content collapses short drafts into a
+	sliver), with a visible editing frame (the bubble shade would
+	fight the code colors). The type matches the message it replaces
+	(see .rendered in MessageBody) at every text size — the draft
+	reads exactly as it will land. The bar holds the touch path —
+	phones have no Esc and no Enter-to-save. */
 	article.user .msg-edit {
 		background: var(--bg-raised);
 		border: 1px solid var(--line);
 		border-radius: 12px;
 		padding: 0.5rem 0.75rem 0.4rem;
-		width: fit-content;
+		width: 100%;
 		max-width: 100%;
+		box-sizing: border-box;
 		margin-left: auto;
 		text-align: left;
+		font-size: calc(0.92rem * var(--font-scale, 1));
+		line-height: 1.5;
 	}
 	.msg-edit-box :global(.ta-input) {
 		background: none;

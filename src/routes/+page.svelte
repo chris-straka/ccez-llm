@@ -2884,6 +2884,27 @@
 			if (expandedTags.length > 0) expandedTags = [];
 		};
 		window.addEventListener("pointerdown", onSentTagOutside, { capture: true });
+		// In-place edit dismiss: a press outside the edited message
+		// cancels back to the untouched message (click-only cancel —
+		// hover and focus-to-nowhere never do, see blurInlineEdit).
+		// Presses inside the editing article are its own row (fold,
+		// rerun, the commit checkmark) and stay live; presses in the
+		// composer keep today's blur path, so a mid-edit send still
+		// commits the message instead of dropping it.
+		const onEditOutside = (event: PointerEvent): void => {
+			if (!editingMsgId) return;
+			const target = event.target instanceof Element ? event.target : null;
+			if (!target) return;
+			const box = document.querySelector(".msg-edit");
+			if (box) {
+				if (box.contains(target)) return;
+				const article = box.closest("article");
+				if (article && article.contains(target)) return;
+			}
+			if (target.closest(".prompt")) return;
+			cancelMessageEdit();
+		};
+		window.addEventListener("pointerdown", onEditOutside, { capture: true });
 		window.addEventListener("keydown", on);
 		window.addEventListener("wheel", on, { passive: true });
 		window.addEventListener("touchstart", on, { passive: true });
@@ -2916,6 +2937,9 @@
 				capture: true
 			});
 			window.removeEventListener("pointerdown", onSentTagOutside, {
+				capture: true
+			});
+			window.removeEventListener("pointerdown", onEditOutside, {
 				capture: true
 			});
 			window.removeEventListener("keydown", on);
@@ -7398,14 +7422,20 @@
 	for a click back in (only true focus-away reverts). */
 	let blurCancelMuted = false;
 
-	/** Focus leaving the in-place editor reverts to the untouched
-	message (the draft dies with the editor, so history is safe):
-	focus landing outside the edited message cancels — but the
-	message's own action row stays live (fold stays gated, the
-	commit checkmark must reach commitMessageEdit first). */
+	/** Focus leaving the in-place editor: a real focus landing
+	outside the edited message reverts to the untouched message
+	(the draft dies with the editor, so history is safe) — but
+	focus to nowhere never cancels. Hovering another message's
+	buttons blurs the editor with no target (the row hover blur),
+	and killing the draft there strands the user's text mid-move:
+	the draft stays mounted for a click back in. Presses outside
+	cancel instead (see onEditOutside), as does Esc. The message's
+	own action row stays live (fold stays gated, the commit
+	checkmark must reach commitMessageEdit first). */
 	function blurInlineEdit(event: FocusEvent): void {
 		if (!editingMsgId || blurCancelMuted) return;
 		const next = event.relatedTarget;
+		if (next === null || next === document.body) return;
 		if (next instanceof Element) {
 			const box = event.currentTarget;
 			if (box instanceof HTMLElement) {
@@ -7441,6 +7471,10 @@
 				attachments: editingAttachments,
 				pasteFolds: keepFolds
 			});
+			// Saving is silent in the thread (the text just rewrites),
+			// so the checkmark earns the same confirmation an
+			// annotation edit gets ("Annotation edited").
+			flashToast("Message edited");
 		}
 		resetInlineEdit();
 	}

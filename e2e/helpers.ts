@@ -26,17 +26,23 @@ export interface SeedMessage {
 export async function seedChat(
 	page: Page,
 	messages: SeedMessage[],
-	replyLang: string | null = null
+	replyLang: string | null = null,
+	extraSettings: Record<string, unknown> = {}
 ): Promise<void> {
 	await page.addInitScript(
-		(seed: { messages: SeedMessage[]; replyLang: string | null }) => {
+		(seed: {
+			messages: SeedMessage[];
+			replyLang: string | null;
+			extraSettings: Record<string, unknown>;
+		}) => {
 			window.localStorage.setItem("ccez-mock-provider", "1");
 			window.localStorage.setItem(
 				"ccez-llm-settings-v1",
 				JSON.stringify({
 					hoverAssistantActions: true,
 					hoverUserActions: true,
-					promptIdleSec: 0
+					promptIdleSec: 0,
+					...seed.extraSettings
 				})
 			);
 			window.localStorage.setItem(
@@ -57,7 +63,7 @@ export async function seedChat(
 				])
 			);
 		},
-		{ messages, replyLang }
+		{ messages, replyLang, extraSettings }
 	);
 }
 

@@ -183,10 +183,14 @@ its body is just an em-dash (see REFS_ONLY_BODY). -->
 <style>
 	/* Baked-refs count floats above the message (overlay, never
 	in-flow): annotated history keeps the exact dimensions of plain
-	history. No circle, no border — just the number, quiet. */
+	history. No circle, no border — just the number, quiet. The
+	float offset tracks the text size like the count itself does:
+	the number grows with the message scale while a fixed rem would
+	not, so at huge type the badge would sit on the message's top
+	edge (seen overlapping the in-place edit frame). */
 	.ann-refs {
 		position: absolute;
-		top: -1.2rem;
+		top: calc(-1.2rem * var(--font-scale, 1));
 		/* Span the message: the card below fills this box, so the
 		sent menu is the full chat width, not a 24rem strip. */
 		left: 0.8rem;
@@ -196,10 +200,13 @@ its body is just an em-dash (see REFS_ONLY_BODY). -->
 	}
 	/* The pill floats above its message into the gap: a refs-carrying
 	article stands further off the previous message so the count never
-	crowds the row above. The article renders paged for now, so its
-	ancestor stays global. */
+	crowds the row above. The gap tracks the text size with the float
+	offset above. The article renders paged for now, so its ancestor
+	stays global. */
 	:global(article):has(.ann-refs) {
-		margin-top: calc(var(--msg-gap, 0.35rem) + 1.1rem);
+		margin-top: calc(
+			var(--msg-gap, 0.35rem) + 1.1rem * var(--font-scale, 1)
+		);
 	}
 	:global(article.user) .ann-refs {
 		/* The user bubble is narrow: span it like above, but keep
