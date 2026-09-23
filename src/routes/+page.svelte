@@ -5204,10 +5204,10 @@
 				false,
 				answerContextFor(current.messageId, current.quote)
 			);
-			// The quote highlights like a selection (its own text is
-			// the context) and Han quotes earn the right-click
-			// readings panel above it — nothing repeated in the card,
-			// no extra request.
+			// The quote highlights wash-only (its own text is the
+			// context) and Han quotes earn the right-click readings
+			// panel above it — nothing repeated in the card, no
+			// extra request, no native-blue flash.
 			const selected = selectAnswerQuote(id);
 			if (selected) void readingsForQuote(selected, true);
 			if (!androidUI && quoteRect) {
@@ -5367,6 +5367,17 @@
 	): { quote: string; messageId: ChatMsgId; context: string; at: number } | null {
 		const ann = annotations.find((a) => a.id === id);
 		if (!ann) return null;
+		const quoted = {
+			quote: ann.quote,
+			messageId: ann.messageId,
+			context: answerContextFor(ann.messageId, ann.quote),
+			at: ann.at ?? 0
+		};
+		// Readings panels ride the live range (their scroll tracker
+		// dismisses with it), so only quotes bound for panels take a
+		// live selection. Everything else highlights wash-only while
+		// its card reads — never a native-blue flash.
+		if (!quoteOffersReadings(quoted)) return quoted;
 		const index = chat.messages.findIndex((m) => m.id === ann.messageId);
 		if (index === -1) return null;
 		const root = document.querySelector(`article#msg-${index} .rendered`);
@@ -5391,12 +5402,7 @@
 		} catch {
 			return null;
 		}
-		return {
-			quote: ann.quote,
-			messageId: ann.messageId,
-			context: answerContextFor(ann.messageId, ann.quote),
-			at: ann.at ?? 0
-		};
+		return quoted;
 	}
 	/**
 	 * Screen rect for a quote re-located in its rendered message (no
