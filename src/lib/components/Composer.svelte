@@ -1080,7 +1080,11 @@ shared `.error` look. -->
 		/* Pinned (not normal): the placeholder resolves its own
 		metrics in some engines and rides above the caret otherwise —
 		both share this exact box. */
-		line-height: 1.5;
+		/* Tighter than message text (1.5): the native caret fills the
+		line box, so message rhythm makes it read taller than the
+		glyphs beside it. The composer carries no ruby, so it keeps
+		its own closer rhythm. */
+		line-height: 1.4;
 		padding: 0.6rem calc(var(--tools-pad) + var(--tools-extra)) 0.6rem 0;
 		caret-color: #1c1c1e;
 		/* Mechanical twin of the cm rules: same pairs, Android-only node. */
@@ -1097,13 +1101,22 @@ shared `.error` look. -->
 		overflow-y: auto;
 		max-height: 40vh;
 		outline: none;
+		/* No visible scrollbar: the native bar hugs the card's right
+		edge, which is exactly where the tool cluster and send button
+		float — the transient overlay bar slides underneath them.
+		Scrolling still works (wheel, keyboard, caret tracking); only
+		the bar itself is gone, so nothing can sit under a button. */
+		scrollbar-width: none;
+	}
+	.prompt :global(.ta-input::-webkit-scrollbar) {
+		display: none;
 	}
 	.prompt :global(.ta-input::placeholder) {
 		color: #8e8e93;
 		color: var(--line-hover);
 		/* Same box as the text (see the textarea rule): never the
 		engine's own placeholder metrics. */
-		line-height: 1.5;
+		line-height: 1.4;
 	}
 	/* The placeholder hint is chrome, never content: while it shows
 	(the box is empty) the field takes no pick, so a long-press on

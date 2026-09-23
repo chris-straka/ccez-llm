@@ -105,6 +105,30 @@ describe("composer contract", () => {
 		expect(css).toContain(".error-banner");
 	});
 
+	it("keeps the field rhythm tight and its scrollbar off the buttons", () => {
+		const css = componentStyle();
+		// The native caret fills the line box: message rhythm (1.5)
+		// would tower over the glyphs, so the field and its
+		// placeholder share a closer box.
+		const fields = [
+			...css.matchAll(/\.prompt\s*:global\(\.ta-input\)\s*\{([^}]*)\}/g)
+		].map((match) => match[1] ?? "");
+		// Several platform rules share the selector: the main field
+		// rule is the one owning the height.
+		const field = fields.find((body) => body.includes("field-sizing"));
+		expect(field, ".prompt .ta-input rule is gone").toBeTruthy();
+		expect(field).toMatch(/line-height:\s*1\.4/);
+		const placeholder = css.match(
+			/\.prompt\s*:global\(\.ta-input::placeholder\)\s*\{([^}]*)\}/
+		);
+		expect(placeholder, "placeholder rule is gone").toBeTruthy();
+		expect(placeholder![1]).toMatch(/line-height:\s*1\.4/);
+		// The native bar hugs the card edge under the floating tools:
+		// scrolling works, the bar itself never renders.
+		expect(field).toMatch(/scrollbar-width:\s*none/);
+		expect(css).toContain(".ta-input::-webkit-scrollbar");
+	});
+
 	it("stages annotation questions in one pill with inclusion chips", () => {
 		const source = componentSource();
 		// Inclusion chips: one pencil per annotation riding the send
