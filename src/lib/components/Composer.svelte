@@ -142,8 +142,11 @@ shared `.error` look. -->
 		if (files.length > 0) actions.intakeFiles(files);
 	}}
 />
+<!-- Floor click only focuses the editor, which keyboard users
+already reach by tabbing to the textarea itself: no second tab
+stop, so both rules below stay suppressed. -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<!-- svelte-ignore a11y_click_events_have_key_events: floor click only focuses the editor, which keyboard users already reach by tabbing to the textarea itself -->
+<!-- svelte-ignore a11y_click_events_have_key_events -->
 <div
 	class="prompt"
 	class:prompt-hidden={hidden}
