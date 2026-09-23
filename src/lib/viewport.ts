@@ -16,15 +16,20 @@
 export interface ScrollHold {
 	key: string;
 	velocity: number;
-	/** Discrete step a sub-150ms tap lands (line for j/k, skip step for d/u). */
+	/** Discrete step total a sub-150ms tap lands (line for j/k, skip
+	step for d/u): glide frames accrue from the first frame, so the
+	release lands only the remainder (see tapReleaseRest) — never
+	glide plus the full step. */
 	tapDy: number;
+	/** Signed px the glide has already applied: the release step
+	subtracts this, so taps land exact totals and slow releases
+	(which already covered the step) land nothing. */
+	glided: number;
 	downAt: number;
 	/** rAF-clock start: the velocity ramp reads age off this, never the wall clock. */
 	startT: number;
-	/** rAF-clock of the first moving frame (null while the press is
-	still inside the tap window): the ramp reads age off the glide
-	start, not the keydown — otherwise a press that outlives the
-	tap window would engage mid-ramp with a kick. */
+	/** rAF-clock of the first moving frame: the ramp ages from motion
+	start, so a hold engages at ramp speed, never with a kick. */
 	glideT: number | null;
 	lastT: number;
 	raf: number;

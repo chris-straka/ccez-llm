@@ -316,6 +316,18 @@ export function holdIsTap(
 }
 
 /**
+ * Release step for a tap: the discrete step minus glide frames already
+ * accrued, so a tap lands exactly its step total — never glide frames
+ * plus the full step (the old jump). Zero when the glide already
+ * covered it (a slow release), never a backwards correction.
+ */
+export function tapReleaseRest(tapDy: number, glided: number): number {
+	const rest = tapDy - glided;
+	if (rest === 0) return 0;
+	return Math.sign(rest) === Math.sign(tapDy) ? rest : 0;
+}
+
+/**
  * Scroll-mode entry line (REFACTOR §6): a few lines below the
  * viewport top — a bottom sliver of the message above never wins,
  * and a taller-than-viewport message still matches by coverage.

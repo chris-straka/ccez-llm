@@ -91,14 +91,35 @@ test("j/k smooth-scroll down and back up with nothing selected", async ({
 	expect(await scrollTop(page)).toBeLessThan(down);
 });
 
-test("a light d tap lands exactly one skip step, never glide frames", async ({
+test("a held j moves inside the tap window, no dead start", async ({
 	page
 }) => {
 	const before = await scrollTop(page);
-	// keyboard.press is a light tap (down+up in milliseconds): the
-	// hold's rAF loop must move nothing inside the tap window, so
-	// the landing is exactly the 216px discrete step — never step
-	// plus a few 36px glide frames.
+	const t0 = Date.now();
+	await page.keyboard.down("j");
+	// The glide accrues from the first frame: motion must register
+	// well inside the 150ms tap window (the old dead start first
+	// moved at the window's far edge).
+	await page.waitForFunction(
+		(prev) => {
+			const box = document.querySelector(".messages") as HTMLElement | null;
+			return box !== null && box.scrollTop > prev;
+		},
+		before,
+		{ timeout: 2_000 }
+	);
+	const dt = Date.now() - t0;
+	await page.keyboard.up("j");
+	expect(dt).toBeLessThan(150);
+	expect(await scrollTop(page)).toBeGreaterThan(before);
+});
+
+test("a light d tap lands exactly one skip step", async ({ page }) => {
+	const before = await scrollTop(page);
+	// keyboard.press is a light tap (down+up in milliseconds): glide
+	// frames accrue from the first frame now, but the release lands
+	// only the remainder — so the landing is exactly the 216px step
+	// total, never glide frames plus the full step.
 	await page.keyboard.press("d");
 	await page.waitForFunction(
 		(prev) => {

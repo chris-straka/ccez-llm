@@ -15,6 +15,7 @@ import {
 	holdGlideVelocity,
 	holdIsTap,
 	indexAtViewportLine,
+	tapReleaseRest,
 	viewCursorLine,
 	isEscapeHold,
 	keyFocusesEmptyPrompt,
@@ -266,6 +267,24 @@ describe("holdIsTap", () => {
 		expect(holdIsTap(1000, 1000 + SCROLL_HOLD_TAP_MS)).toBe(false);
 		expect(holdIsTap(1000, 1500)).toBe(false);
 		expect(holdIsTap(0, 50)).toBe(false);
+	});
+});
+
+describe("tapReleaseRest", () => {
+	it("lands the full step when nothing glided yet", () => {
+		expect(tapReleaseRest(28, 0)).toBe(28);
+		expect(tapReleaseRest(-28, 0)).toBe(-28);
+	});
+	it("subtracts accrued glide frames from the step", () => {
+		expect(tapReleaseRest(216, 60)).toBe(156);
+		expect(tapReleaseRest(-216, -60)).toBe(-156);
+	});
+	it("lands nothing once the glide covered the step, never backwards", () => {
+		expect(tapReleaseRest(28, 28)).toBe(0);
+		expect(tapReleaseRest(28, 100)).toBe(0);
+		expect(tapReleaseRest(-28, -100)).toBe(0);
+		// Opposite-sign accrual (a yank mid-hold) still steps forward.
+		expect(tapReleaseRest(28, -10)).toBe(38);
 	});
 });
 

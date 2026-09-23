@@ -127,6 +127,7 @@
 		STICK_PX,
 		scrollHoldVelocity,
 		stepScrollTop,
+		tapReleaseRest,
 		unselectedScrollIntent
 	} from "$lib/scrollkeys";
 	import {
@@ -8043,9 +8044,12 @@
 	/**
 	 * Start a frame-paced glide: pixels accrue per rAF tick from the first
 	 * frame, so holding never fires the cancel-and-restart stutter that
-	 * per-keydown smooth scrollBy calls produce under key repeat. d/u
+	 * per-keydown smooth scrollBy calls produce under key repeat — and a
+	 * hold moves at once instead of sitting out the tap window. d/u
 	 * ramps from j/k speed to peak over SCROLL_HOLD_RAMP_MS (see
 	 * holdGlideVelocity) instead of kicking at full speed; j/k cruise.
+	 * A tap still lands exactly its step total: the release lands only
+	 * the remainder past accrued glide frames (see releaseScrollHold).
 	 */
 	function startScrollHold(
 		key: string,
@@ -8075,6 +8079,7 @@
 				tapDy ??
 				Math.sign(velocity) *
 					scaleScrollPx(SCROLLKEY_LINE_PX, settings.fontScale),
+			glided: 0,
 			downAt: Date.now(),
 			startT: performance.now(),
 			glideT: null,
@@ -8084,33 +8089,29 @@
 		const tick = (t: number) => {
 			const hold = viewport.hold;
 			if (!hold || viewport.holdSeq !== seq || !scrollBox) return;
-			// Frames inside the tap window move nothing: a light tap
-			// lands exactly its discrete step on release (see
-			// releaseScrollHold) — never glide frames plus the step,
-			// which reads as a massive jump on d/u. Holds start
-			// gliding once the press outlives a tap.
-			if (!holdIsTap(hold.downAt, Date.now())) {
-				// The ramp ages from the first moving frame, never
-				// the keydown: the tap window would otherwise spend
-				// half the ramp standing still and engage with a
-				// kick.
-				if (hold.glideT === null) hold.glideT = t;
-				scrollBox.scrollTop = stepScrollTop(
-					scrollBox.scrollTop,
-					scaleScrollPx(
-						holdGlideVelocity(hold.key, t - hold.glideT),
-						settings.fontScale
-					),
-					t - hold.lastT
-				);
-			}
+			// Glide from the first frame: the ramp ages from motion
+			// start (glideT), so the hold engages at ramp speed with
+			// no dead window and no kick.
+			if (hold.glideT === null) hold.glideT = t;
+			const before = scrollBox.scrollTop;
+			scrollBox.scrollTop = stepScrollTop(
+				before,
+				scaleScrollPx(
+					holdGlideVelocity(hold.key, t - hold.glideT),
+					settings.fontScale
+				),
+				t - hold.lastT
+			);
+			hold.glided += scrollBox.scrollTop - before;
 			hold.lastT = t;
 			hold.raf = requestAnimationFrame(tick);
 		};
 		const first = viewport.hold;
 		if (first) first.raf = requestAnimationFrame(tick);
 	}
-	/** Release a held key: quick taps land one discrete step, holds just stop. */
+	/** Release a held key: taps land the step remainder past accrued
+	glide (exact step totals, never glide plus the step); holds and
+	slow releases (already past the step) just stop. */
 	function releaseScrollHold(event: KeyboardEvent): void {
 		const hold = viewport.hold;
 		if (!hold || event.key.toLowerCase() !== hold.key.toLowerCase()) return;
@@ -8118,11 +8119,9 @@
 		viewport.hold = null;
 		scrollBox?.style.removeProperty("scroll-behavior");
 		scrollBox?.classList.remove("scrolling");
-		// A tap lands the hold's own step: one line for j/k, the skip
-		// step for d/u (the shared scroll effect eases it — never a
-		// jump). Holds just stop.
 		if (holdIsTap(hold.downAt, Date.now()) && scrollBox) {
-			scrollChatBy(hold.tapDy);
+			const rest = tapReleaseRest(hold.tapDy, hold.glided);
+			if (rest !== 0) scrollChatBy(rest);
 		}
 	}
 	function stopScrollHold(): void {
