@@ -143,6 +143,7 @@ shared `.error` look. -->
 	}}
 />
 <!-- svelte-ignore a11y_no_static_element_interactions -->
+<!-- svelte-ignore a11y_click_events_have_key_events: floor click only focuses the editor, which keyboard users already reach by tabbing to the textarea itself -->
 <div
 	class="prompt"
 	class:prompt-hidden={hidden}
