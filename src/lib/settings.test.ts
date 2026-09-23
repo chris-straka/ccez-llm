@@ -16,7 +16,6 @@ import {
 	MESSAGE_GAP_MIN,
 	effectiveChatWidth,
 	effectivePromptWidth,
-	widenFactorForFont,
 	stepFontScale,
 	stepChatWidth,
 	PROMPT_IDLE_ALWAYS,
@@ -126,13 +125,13 @@ describe("settings", () => {
 		expect(loaded.thinking["local-gemma"]).toBeUndefined();
 	});
 
-	it("persists text size up to 800% and resets strays", () => {
+	it("persists text size up to 1400% and resets strays", () => {
 		const max = blankSettings();
-		max.fontScale = 8;
+		max.fontScale = 14;
 		saveSettings(max, memoryStore);
-		expect(loadSettings(memoryStore).fontScale).toBe(8);
+		expect(loadSettings(memoryStore).fontScale).toBe(14);
 		const over = blankSettings();
-		over.fontScale = 8.5;
+		over.fontScale = 14.5;
 		saveSettings(over, memoryStore);
 		expect(loadSettings(memoryStore).fontScale).toBe(1);
 	});
@@ -287,51 +286,45 @@ describe("settings", () => {
 		expect(loadSettings(memoryStore).replyNotifications).toBe(true);
 	});
 
-	it("sizes the chat column full-bleed on huge phone type", () => {
+	it("sizes the chat column off the slider alone, full-bleed on huge phone type", () => {
+		// Desktop: scaling the type never widens the column — the
+		// slider owns the width at every size, even grandma's 1400%.
 		expect(effectiveChatWidth(false, 1, 36)).toBe(36);
 		expect(effectiveChatWidth(false, 2, 36)).toBe(36);
-		expect(effectiveChatWidth(false, 4, 36)).toBe(72);
-		expect(effectiveChatWidth(false, 8, 120)).toBe(480);
+		expect(effectiveChatWidth(false, 4, 36)).toBe(36);
+		expect(effectiveChatWidth(false, 14, 36)).toBe(36);
+		expect(effectiveChatWidth(false, 14, 120)).toBe(120);
 		expect(effectiveChatWidth(true, 1, 36)).toBe(46);
 		expect(effectiveChatWidth(true, 3.29, 36)).toBe(46);
 		expect(effectiveChatWidth(true, 3.3, 36)).toBe(CHAT_WIDTH_FULLBLEED_REM);
-		expect(effectiveChatWidth(true, 8, 120)).toBe(CHAT_WIDTH_FULLBLEED_REM);
+		expect(effectiveChatWidth(true, 14, 120)).toBe(CHAT_WIDTH_FULLBLEED_REM);
 	});
 
-	it("widens desktop columns past 200% at half the font rate", () => {
-		expect(widenFactorForFont(1)).toBe(1);
-		expect(widenFactorForFont(1.99)).toBe(1);
-		expect(widenFactorForFont(2)).toBe(1);
-		expect(widenFactorForFont(3.7)).toBeCloseTo(1.85, 10);
-		expect(widenFactorForFont(8)).toBe(4);
-	});
-
-	it("sizes the composer off its own base, capped by the column", () => {
-		// Normal sizes: the historic 36rem pin, slider-independent.
+	it("sizes the composer off its own slider, capped by the column", () => {
+		// The historic 36rem pin, slider-independent…
 		expect(effectivePromptWidth(false, 1, 36)).toBe(36);
 		expect(effectivePromptWidth(false, 1, 60)).toBe(36);
 		expect(effectivePromptWidth(false, 1, 28)).toBe(28);
-		// Huge type: own base widens by the same factor…
-		expect(effectivePromptWidth(false, 4, 36)).toBe(72);
-		// …but never past the column.
-		expect(effectivePromptWidth(false, 4, 28)).toBe(56);
-		expect(effectivePromptWidth(false, 4, 60)).toBe(72);
+		// …and huge type moves neither knob: the composer keeps its
+		// own width at every size…
+		expect(effectivePromptWidth(false, 4, 36)).toBe(36);
+		expect(effectivePromptWidth(false, 14, 36)).toBe(36);
+		// …still capped by the column (and the 36rem base holds
+		// under a wider one).
+		expect(effectivePromptWidth(false, 4, 28)).toBe(28);
+		expect(effectivePromptWidth(false, 4, 60)).toBe(36);
 		// Phones: the touch floor still caps a narrow pin.
 		expect(effectivePromptWidth(true, 1, 36)).toBe(36);
 	});
 
-	it("rides the prompt's own scale and base when set", () => {
+	it("rides the prompt's own slider when set", () => {
 		// A set prompt width replaces the 36rem base…
-		expect(effectivePromptWidth(false, 1, 60, undefined, 48)).toBe(48);
+		expect(effectivePromptWidth(false, 1, 60, 48)).toBe(48);
 		// …still capped by the column.
-		expect(effectivePromptWidth(false, 1, 36, undefined, 60)).toBe(36);
-		// A set prompt scale widens its own base, not the global one:
-		// global 1 with prompt 4 doubles the base…
-		expect(effectivePromptWidth(false, 1, 80, 4, 36)).toBe(72);
-		// …while global 4 with prompt 1 keeps the base pinned.
-		expect(effectivePromptWidth(false, 4, 60, 1, 36)).toBe(36);
-		// Omitted prompt settings keep the legacy global widening.
-		expect(effectivePromptWidth(false, 4, 60)).toBe(72);
+		expect(effectivePromptWidth(false, 1, 36, 60)).toBe(36);
+		// Type scales on either side move neither width.
+		expect(effectivePromptWidth(false, 1, 80, 36)).toBe(36);
+		expect(effectivePromptWidth(false, 14, 60, 36)).toBe(36);
 	});
 
 	it("defaults mic dictation on and keeps an explicit off", () => {
@@ -682,10 +675,10 @@ describe("keyNeedsEditing", () => {
 });
 
 describe("step helpers", () => {
-	it("steps text size in 10% increments to one 800% cap", () => {
+	it("steps text size in 10% increments to one 1400% cap", () => {
 		expect(stepFontScale(1, 0.1)).toBe(1.1);
 		expect(stepFontScale(6, 0.1)).toBe(6.1);
-		expect(stepFontScale(8, 1)).toBe(8);
+		expect(stepFontScale(14, 1)).toBe(14);
 		expect(stepFontScale(0.5, -0.1)).toBe(0.5);
 	});
 

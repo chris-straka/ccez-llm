@@ -194,12 +194,12 @@ const LEGACY_STORAGE_KEY = "ccez-studio-settings-v1";
 export const DEFAULT_SYSTEM_PROMPT = "";
 
 /**
- * Text-size multiplier bounds (persisted): 50–800% on phones and
+ * Text-size multiplier bounds (persisted): 50–1400% on phones and
  * desktop alike — profiles roam across devices, so the stored range
  * fits the widest cap and each UI clamps to its own max.
  */
 export const FONT_SCALE_MIN = 0.5;
-export const FONT_SCALE_MAX = 8;
+export const FONT_SCALE_MAX = 14;
 
 /** Desktop chat-column width in rem: 46 is the legacy fixed width. */
 export const CHAT_WIDTH_DEFAULT = 36;
@@ -219,56 +219,41 @@ export const FULLBLEED_FONT_SCALE = 3.3;
 export const CHAT_WIDTH_FULLBLEED_REM = 999;
 /** Phone floor: the column never narrows past this, however small. */
 export const CHAT_WIDTH_PHONE_MIN_REM = 46;
-/** Font scale at/above which desktop columns auto-widen (200%). */
-export const CHAT_WIDEN_FONT_SCALE = 2;
 /** Composer's own width base (rem): independent of the chat slider. */
 export const PROMPT_WIDTH_BASE_REM = 36;
 
 /**
- * Auto-widen factor for huge type: past 200% the column grows with
- * the font at half the font rate, so the slider stays meaningful
- * (it sets the base) and mid sizes keep their measure. Continuous
- * at the threshold (2x reads exactly 1). Pure.
- */
-export function widenFactorForFont(fontScale: number): number {
-	return Math.max(1, fontScale / CHAT_WIDEN_FONT_SCALE);
-}
-
-/**
- * Effective chat column width (rem) for the --chat-width var. Phones
- * go full-bleed once huge type needs the room, and never narrower
- * than the touch floor; desktop rides the slider times the
- * auto-widen factor. Pure.
+ * Effective chat column width (rem) for the --chat-width var. The
+ * four knobs move independently: desktop rides the slider alone —
+ * scaling the type never widens the column. Phones go full-bleed
+ * once huge type needs the room, and never narrower than the touch
+ * floor. Pure.
  */
 export function effectiveChatWidth(
 	androidUI: boolean,
 	fontScale: number,
 	chatWidth: number
 ): number {
-	if (!androidUI) return chatWidth * widenFactorForFont(fontScale);
+	if (!androidUI) return chatWidth;
 	if (fontScale >= FULLBLEED_FONT_SCALE) return CHAT_WIDTH_FULLBLEED_REM;
 	return Math.max(CHAT_WIDTH_PHONE_MIN_REM, chatWidth);
 }
 
 /**
- * Effective composer width (rem) for the --prompt-width var. The
- * prompt keeps its own base (never the chat slider) widened by its
- * own scale past 200%, capped by the column — so the composer grows
- * with huge prompt type but never sticks out past the messages.
- * Unset prompt settings fall back to the legacy behavior (the
- * global font scale widens, base 36). Pure.
+ * Effective composer width (rem) for the --prompt-width var: the
+ * prompt's own slider, capped by the column so the composer never
+ * sticks out past the messages. Type scales ride their own sliders
+ * only — never each other's widths. Pure.
  */
 export function effectivePromptWidth(
 	androidUI: boolean,
 	fontScale: number,
 	chatWidth: number,
-	promptScale?: number,
 	promptWidth?: number
 ): number {
 	return Math.min(
 		effectiveChatWidth(androidUI, fontScale, chatWidth),
-		(promptWidth ?? PROMPT_WIDTH_BASE_REM) *
-			widenFactorForFont(promptScale ?? fontScale)
+		promptWidth ?? PROMPT_WIDTH_BASE_REM
 	);
 }
 
@@ -520,7 +505,7 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 			if (!Array.isArray(entry.models)) entry.models = [];
 		}
 		// Clamp the text-size multiplier (range inputs persist strings).
-		// Up to 800% everywhere (each UI clamps its own max; the
+		// Up to 1400% everywhere (each UI clamps its own max; the
 		// stored range fits the widest so roamed profiles keep
 		// working).
 		if (
@@ -544,7 +529,7 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 				Math.max(CHAT_WIDTH_MIN, Math.round(merged.chatWidth))
 			);
 		}
-		// Prompt text size rides the same 50–800% clamp as the
+		// Prompt text size rides the same 50–1400% clamp as the
 		// global one; the prompt width rides the chat-width clamp
 		// (same slider step, whole rem).
 		if (
@@ -731,7 +716,7 @@ export function keyNeedsEditing(value: string): boolean {
 }
 
 /**
- * UI text-scale step in 10% increments (REFACTOR §6): 50–800%
+ * UI text-scale step in 10% increments (REFACTOR §6): 50–1400%
  * everywhere (the old 600% desktop cap had no layout reason —
  * badges and glyphs already scale at a dampened rate, see
  * layout.e2e.ts). The page no-ops (and skips the toast) when the

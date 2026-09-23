@@ -158,7 +158,7 @@
 		</label>
 		<label class="check">
 			<input type="checkbox" bind:checked={settings.showMessageButtons} />
-			Always show message buttons
+			Enable message buttons
 		</label>
 		<label class="check">
 			<input type="checkbox" bind:checked={settings.inspectEnabled} />
@@ -209,7 +209,7 @@
 			<input
 				type="range"
 				min="80"
-				max={800}
+				max={1400}
 				step="5"
 				value={Math.round(settings.fontScale * 100)}
 				aria-label="Text size percent"
@@ -234,7 +234,7 @@
 			<input
 				type="range"
 				min="80"
-				max={800}
+				max={1400}
 				step="5"
 				value={Math.round((settings.promptScale ?? 1) * 100)}
 				aria-label="Prompt text size percent"

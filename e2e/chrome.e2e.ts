@@ -1221,11 +1221,10 @@ test("chat width setting widens the chat column", async ({ page }) => {
 		.toContain('"chatWidth":38');
 });
 
-/** Past 200% type the column and the composer auto-widen off their
-own bases (36rem slider → 66.6rem at 370%: half the font rate, so the
-slider stays meaningful), and the composer never exceeds the column.
-The language pills slot under the hero on desktop too. */
-test("huge type auto-widens the column and the composer", async ({
+/** Huge type moves no width: the four knobs stay independent (36rem
+sliders hold at 370% type), and the composer never exceeds the
+column. The language pills slot under the hero on desktop too. */
+test("huge type widens neither the column nor the composer", async ({
 	page
 }) => {
 	await page.setViewportSize({ width: 1600, height: 900 });
@@ -1251,16 +1250,17 @@ test("huge type auto-widens the column and the composer", async ({
 			)
 		};
 	});
-	// 36 × 3.7 / 2: the slider base times half the font rate.
-	expect(vars.chat).toBeCloseTo(66.6, 1);
-	expect(vars.prompt).toBeCloseTo(66.6, 1);
+	// The sliders own their widths at every size — type scales ride
+	// their own sliders only.
+	expect(vars.chat).toBeCloseTo(36, 1);
+	expect(vars.prompt).toBeCloseTo(36, 1);
 	// Rendered boxes (not max-width: engines report min() and
 	// fit-content differently): the hero rides the column cap, the
-	// prompt its own — both well past the 36rem (576px) pin…
+	// prompt its own — both at the 36rem (576px) pin…
 	const heroBox = await page.locator(".empty-state").boundingBox();
 	const promptBox = await page.locator(".prompt").boundingBox();
-	expect(heroBox!.width).toBeGreaterThan(900);
-	expect(promptBox!.width).toBeGreaterThan(900);
+	expect(heroBox!.width).toBeGreaterThan(500);
+	expect(promptBox!.width).toBeGreaterThan(500);
 	// …and the composer never exceeds the column.
 	expect(promptBox!.width).toBeLessThanOrEqual(heroBox!.width + 1);
 });

@@ -56,6 +56,7 @@
 		systemLocale,
 		CHAT_WIDTH_DEFAULT,
 		PROMPT_WIDTH_BASE_REM,
+		FONT_SCALE_MAX,
 		stepFontScale,
 		stepChatWidth,
 		MESSAGE_GAP_DEFAULT,
@@ -3263,7 +3264,7 @@
 			}
 		}
 	});
-	/** UI text scale in 10% steps (50–800% everywhere). */
+	/** UI text scale in 10% steps (50–1400% everywhere). */
 	function adjustFontScale(delta: number, quiet = false): void {
 		const next = stepFontScale(settings.fontScale, delta);
 		if (next === settings.fontScale) return;
@@ -3287,7 +3288,7 @@
 		persistSettings();
 		flashToast(`Chat width ${next} rem`);
 	}
-	/** Prompt-only text size in 10% steps (50–800%): ⌘[ / ⌘]
+	/** Prompt-only text size in 10% steps (50–1400%): ⌘[ / ⌘]
 	 * resizes the composer without touching message text. */
 	function adjustPromptScale(delta: number): void {
 		const current = settings.promptScale ?? 1;
@@ -12897,7 +12898,7 @@
 	data-fullbleed={(androidUI && settings.fontScale >= FULLBLEED_FONT_SCALE) ||
 		null}
 	style="--font-scale: {androidUI
-		? Math.min(8, settings.fontScale)
+		? Math.min(FONT_SCALE_MAX, settings.fontScale)
 		: settings.fontScale}; --chat-width: {effectiveChatWidth(
 		androidUI,
 		settings.fontScale,
@@ -12906,7 +12907,6 @@
 		androidUI,
 		settings.fontScale,
 		settings.chatWidth ?? 36,
-		settings.promptScale ?? 1,
 		settings.promptWidth ?? PROMPT_WIDTH_BASE_REM
 	)}; --prompt-font: {settings.promptScale ?? 1}; --msg-gap: {settings.messageGap ?? MESSAGE_GAP_DEFAULT}rem"
 	data-mac={(isMac && !androidUI) || null}

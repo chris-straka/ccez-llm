@@ -33,11 +33,11 @@ test("own-bubble toggle reads as Enable background on my messages", async ({
 	).toBeVisible();
 });
 
-/** Text size caps at 800% on desktop, 400% on phones. */
-test("desktop text slider caps at 800 percent", async ({ page }) => {
+/** Text size caps at 1400% on desktop, 400% on phones. */
+test("desktop text slider caps at 1400 percent", async ({ page }) => {
 	await expect(
 		page.locator('.settings-panel input[aria-label="Text size percent"]')
-	).toHaveAttribute("max", "800");
+	).toHaveAttribute("max", "1400");
 });
 
 test("text size reset button restores 100 percent", async ({ page }) => {
