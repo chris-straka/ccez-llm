@@ -140,28 +140,46 @@ test("creating an annotation keeps its furigana panel", async ({ page }) => {
 	await expect(page.locator(".ann-pop")).toBeVisible();
 	await expect(panels.locator(".srt").first()).not.toBeEmpty();
 	// And above the kanji, never stranded at the viewport corner
-	// (a detached-range zero rect must never place a panel).
+	// (a detached-range zero rect must never place a panel). The
+	// lookup spans tint splits: placed panels tint their kanji,
+	// which fragments the text nodes.
 	const word = await page.evaluate(() => {
 		const el = document.querySelector("article.assistant .rendered");
 		if (!el) return null;
 		const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-		let node: Node | null;
-		while ((node = walker.nextNode())) {
-			if (node.parentElement?.tagName === "RT") continue;
-			const i = (node.textContent ?? "").indexOf("咲き誇る");
-			if (i >= 0) {
-				const r = document.createRange();
-				r.setStart(node, i);
-				r.setEnd(node, i + 4);
-				const rect = r.getBoundingClientRect();
-				return {
-					top: rect.top,
-					left: rect.left,
-					right: rect.right
-				};
-			}
+		const nodes: Text[] = [];
+		let n: Node | null;
+		while ((n = walker.nextNode())) {
+			if (n instanceof Text && n.parentElement?.tagName !== "RT")
+				nodes.push(n);
 		}
-		return null;
+		const full = nodes.map((t) => t.textContent ?? "").join("");
+		const i = full.indexOf("咲き誇る");
+		if (i < 0) return null;
+		let acc = 0;
+		let startNode: Text | null = null;
+		let startOff = 0;
+		let endNode: Text | null = null;
+		let endOff = 0;
+		for (const t of nodes) {
+			const len = (t.textContent ?? "").length;
+			if (!startNode && acc + len > i) {
+				startNode = t;
+				startOff = i - acc;
+			}
+			if (acc + len >= i + 4) {
+				endNode = t;
+				endOff = i + 4 - acc;
+				break;
+			}
+			acc += len;
+		}
+		if (!startNode || !endNode) return null;
+		const r = document.createRange();
+		r.setStart(startNode, startOff);
+		r.setEnd(endNode, endOff);
+		const rect = r.getBoundingClientRect();
+		return { top: rect.top, left: rect.left, right: rect.right };
 	});
 	if (!word) throw new Error("quote lost its rect");
 	const placed = await panels.evaluateAll((els) =>
@@ -379,4 +397,114 @@ test("furigana panel hugs the word at large type", async ({ page }) => {
 	});
 	expect(gap).not.toBeNull();
 	expect(gap!).toBeLessThanOrEqual(24);
+});
+
+/** Creating over several kanji groups spreads every panel: the pill
+steals focus (collapsing the selection) while the worker resolves,
+so placement re-anchors each group from the document — stacked
+panels would share one x and only the topmost would show. */
+test("creating over several kanji groups spreads every panel", async ({
+	page
+}) => {
+	const JA =
+		"フランスは西ヨーロッパに位置する国で、首都はパリです。芸術や文化、美食で世界的に有名です。";
+	await seedChat(page, [{ role: "assistant", content: JA }]);
+	await page.goto("/");
+	await expect(
+		page.locator("article.assistant .rendered p").first()
+	).toBeVisible({
+		timeout: 60_000
+	});
+	await dragQuote(page, 0, "西ヨーロッパに位置する国");
+	await expect(page.locator(".sel-menu")).toBeVisible({ timeout: 10_000 });
+	await page.keyboard.press("A");
+	const pop = page.locator(".ann-pop.fresh");
+	await expect(pop).toBeVisible({ timeout: 10_000 });
+	await pop.locator("textarea").fill("what does this mean?");
+	const panels = page.locator(".sel-pinyin");
+	await expect(panels.locator(".spr").first()).toBeVisible({
+		timeout: 120_000
+	});
+	// にし/いち/くに: one panel per back-to-back kanji group, each on
+	// its own kanji — never stacked on a single x.
+	const xs = await panels.evaluateAll((els) =>
+		els.map((el) => Math.round(el.getBoundingClientRect().left))
+	);
+	expect(xs.length).toBeGreaterThanOrEqual(3);
+	expect(new Set(xs).size).toBe(xs.length);
+});
+
+/** Pinned panels re-anchor past highlight death on scroll: killing
+the live highlight (focus collapse, DOM surgery) then scrolling
+must ride the panels along — an answer card's own scroll never
+clears its readings. */
+test("pinned panels re-anchor past highlight death on scroll", async ({
+	page
+}) => {
+	const JA =
+		"フランスは西ヨーロッパに位置する国で、首都はパリです。芸術や文化、美食で世界的に有名です。エッフェル塔やルーブル美術館などの観光名所がたくさんあります。";
+	const filler = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(120);
+	await seedChat(page, [
+		{ role: "assistant", content: `${JA}\n\n${filler}` }
+	]);
+	await page.addInitScript(() => {
+		window.localStorage.setItem(
+			"ccez-llm-annotations-v1",
+			JSON.stringify({
+				"e2e-chat": [
+					{
+						id: "ann-9",
+						messageId: "e2e-m0",
+						quote: "西ヨーロッパに位置する国",
+						comment: "meaning?",
+						answer: "seeded answer"
+					}
+				]
+			})
+		);
+	});
+	await page.goto("/");
+	await expect(
+		page.locator("article.assistant .rendered p").first()
+	).toBeVisible({
+		timeout: 60_000
+	});
+	const badge = page.locator('[data-ann-badge="ann-9"]');
+	await expect(badge).toBeVisible({ timeout: 15_000 });
+	await badge.focus();
+	await page.keyboard.press("Enter");
+	await expect(page.locator(".ann-answer")).toBeVisible({ timeout: 10_000 });
+	const panels = page.locator(".sel-pinyin");
+	await expect(panels.locator(".spr").first()).toBeVisible({
+		timeout: 120_000
+	});
+	expect(await panels.count()).toBeGreaterThanOrEqual(3);
+	// The highlight dies here (what focus collapse and DOM surgery
+	// do in production); the scroll below must still ride along.
+	await page.evaluate(() => window.getSelection()?.removeAllRanges());
+	const geom = await page.evaluate(() => {
+		const box = document.querySelector(".messages") as HTMLElement | null;
+		return box
+			? { top: box.scrollTop, max: box.scrollHeight - box.clientHeight }
+			: null;
+	});
+	if (!geom) throw new Error("no scroll box");
+	// Guard the premise: the scroll must have room to move (and fire
+	// the tracker) in whichever direction fits.
+	expect(geom.max).toBeGreaterThan(500);
+	const delta = geom.top + 300 <= geom.max ? 250 : -250;
+	await page.evaluate((d: number) => {
+		document.querySelector(".messages")?.scrollBy({ top: d });
+	}, delta);
+	await page.waitForFunction(
+		({ top, d }: { top: number; d: number }) => {
+			const now = document.querySelector(".messages")?.scrollTop ?? -1;
+			return d > 0 ? now > top : now < top;
+		},
+		{ top: geom.top, d: delta },
+		{ timeout: 10_000 }
+	);
+	await page.waitForTimeout(600);
+	expect(await panels.count()).toBeGreaterThanOrEqual(3);
+	await expect(page.locator(".ann-answer")).toBeVisible();
 });

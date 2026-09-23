@@ -174,6 +174,55 @@ test.describe("desktop", () => {
 		await expect(page.locator(".ann-pop")).toBeVisible();
 	});
 
+	/** Double-clicking CJK grabs the clicked character's word, never
+	the neighbor: native double-click rounds boundaries
+	engine-dependently (塔 lands や), so a point-anchored CJK pick
+	replaces it — other scripts keep the native selection. */
+	test("double-clicking CJK keeps the clicked character", async ({
+		page
+	}) => {
+		await seedChat(page, [
+			{
+				role: "assistant",
+				content: "エッフェル塔やルーブル美術館などの観光名所がたくさんあります。"
+			}
+		]);
+		await page.goto("/");
+		const body = page.locator("article .rendered").first();
+		await expect(body).toBeVisible({ timeout: 60_000 });
+		for (const char of ["塔", "館"]) {
+			const pt = await page.evaluate((c: string) => {
+				const root = document.querySelector("article .rendered");
+				if (!root) return null;
+				const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+				let node: Text | null = null;
+				for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+					if (n instanceof Text && (n.textContent ?? "").includes(c)) {
+						node = n;
+						break;
+					}
+				}
+				if (!node) return null;
+				const i = (node.textContent ?? "").indexOf(c);
+				const range = document.createRange();
+				range.setStart(node, i);
+				range.setEnd(node, i + 1);
+				const r = range.getBoundingClientRect();
+				return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+			}, char);
+			if (!pt) throw new Error(`no point for ${char}`);
+			await page.mouse.dblclick(pt.x, pt.y);
+			const picked = await page.evaluate(
+				() => window.getSelection()?.toString() ?? ""
+			);
+			expect(
+				picked,
+				`double-click on ${char} picked ${JSON.stringify(picked)}`
+			).toContain(char);
+			await page.evaluate(() => window.getSelection()?.removeAllRanges());
+		}
+	});
+
 	/** Long CJK drag selection (the reader's case): Annotate files the
 	pill for a multi-line quote. */
 	test("Annotate files a multi-line CJK quote", async ({ page }) => {

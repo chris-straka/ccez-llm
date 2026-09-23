@@ -1106,6 +1106,8 @@
 		above: boolean;
 		quote: string;
 		messageId: ChatMsgId;
+		/** Quote occurrence for scroll re-anchoring (see rectForQuoteSpan). */
+		at: number;
 		html: string;
 	} | null>(null);
 	/** One furigana panel: a single back-to-back kanji group's
@@ -1118,6 +1120,8 @@
 		above: boolean;
 		quote: string;
 		messageId: ChatMsgId;
+		/** Quote occurrence for scroll re-anchoring (see rectForQuoteSpan). */
+		at: number;
 		runs: GroupedRun[];
 		plain: boolean;
 		/** Resolved slice offsets (sentence offsets plus the quote
@@ -1654,7 +1658,7 @@
 		});
 	}
 	function placeSelPinyin(
-		quoted: { quote: string; messageId: ChatMsgId },
+		quoted: { quote: string; messageId: ChatMsgId; at?: number },
 		html: string
 	): void {
 		const live = window.getSelection();
@@ -1670,6 +1674,7 @@
 			...panelXY(rect),
 			quote: quoted.quote,
 			messageId: quoted.messageId,
+			at: quoted.at ?? 0,
 			html
 		};
 		requestAnimationFrame(() => {
@@ -1805,11 +1810,19 @@
 			return null;
 		}
 		// Anchor each group to its own screen span and tint the
-		// document kanji; a failed walk keeps the single highlight
-		// rect for every panel rather than stranding the popup.
+		// document kanji. A dead highlight (focus collapse after the
+		// pill opens, DOM surgery under the worker) re-locates the
+		// quote in the document first: every group still measures its
+		// own span instead of stacking all panels on one rect — only
+		// a vanished quote strands the popup.
 		const selection = window.getSelection();
-		const range =
+		let range =
 			selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+		if (!range || range.collapsed || !document.contains(range.startContainer)) {
+			range =
+				rangeForQuote(quoted.messageId, quoted.quote, quoted.at ?? 0) ??
+				range;
+		}
 		const highlightRect = range?.getBoundingClientRect() ?? null;
 		const slices = range ? selectionSlices(range) : null;
 		// The live range can carry whitespace the trimmed quote
@@ -1858,6 +1871,7 @@
 				...panelXY(anchor),
 				quote: quoted.quote,
 				messageId: quoted.messageId,
+				at: quoted.at ?? 0,
 				runs,
 				plain: solo,
 				span: exact ? { start, end } : null
@@ -5420,6 +5434,30 @@
 		quote: string,
 		at = 0
 	): DOMRect | null {
+		const range = rangeForQuote(messageId, quote, at);
+		if (!range) return null;
+		try {
+			const slices = selectionSlices(range);
+			const rect = slices ? spanRect(slices, 0, quote.length) : null;
+			range.detach();
+			return rect;
+		} catch {
+			return null;
+		}
+	}
+
+	/**
+	 * Live Range for a quote re-located in its rendered message: panel
+	 * placement and scroll re-anchoring measure per-group spans off
+	 * this when the highlight itself is gone (focus collapse, DOM
+	 * surgery) — every group keeps its own screen span instead of
+	 * stacking on one rect. Null when the quote is gone.
+	 */
+	function rangeForQuote(
+		messageId: ChatMsgId,
+		quote: string,
+		at = 0
+	): Range | null {
 		const index = chat.messages.findIndex((m) => m.id === messageId);
 		if (index === -1) return null;
 		const root = document.querySelector(`article#msg-${index} .rendered`);
@@ -5438,8 +5476,30 @@
 			const range = document.createRange();
 			range.setStart(startNode, Math.min(loc.startOffset, startNode.length));
 			range.setEnd(endNode, Math.min(loc.endOffset, endNode.length));
+			return range;
+		} catch {
+			return null;
+		}
+	}
+
+	/**
+	 * Screen rect for a quote-relative span (a furigana group's slice
+	 * of its quote): scroll re-anchoring keeps every panel on its own
+	 * kanji instead of stacking the quote's single rect. First match
+	 * when the span resolves nowhere (the historical repeat rule).
+	 */
+	function rectForQuoteSpan(
+		messageId: ChatMsgId,
+		quote: string,
+		at: number,
+		start: number,
+		end: number
+	): DOMRect | null {
+		const range = rangeForQuote(messageId, quote, at);
+		if (!range) return null;
+		try {
 			const slices = selectionSlices(range);
-			const rect = slices ? spanRect(slices, 0, quote.length) : null;
+			const rect = slices ? spanRect(slices, start, end) : null;
 			range.detach();
 			return rect;
 		} catch {
@@ -11390,6 +11450,20 @@
 		};
 		const onDoubleClick = (event: MouseEvent) => {
 			if (!clickGuardsPass(event)) return;
+			// Native double-click rounds CJK boundaries
+			// engine-dependently (塔 lands や): a point-anchored
+			// CJK pick replaces it — other scripts keep the native
+			// selection untouched.
+			const cjk = cjkWordRangeAtPoint(event.clientX, event.clientY);
+			if (cjk) {
+				try {
+					const pick = window.getSelection();
+					pick?.removeAllRanges();
+					pick?.addRange(cjk);
+				} catch {
+					// Native pick stands.
+				}
+			}
 			const live = window.getSelection();
 			if (live) lockSelectionToMessage(live, articleOf);
 			// Word picks at a line's end grab the trailing newline,
@@ -12028,6 +12102,99 @@
 			}
 			return null;
 		}
+		/** CJK scripts whose double-click (and caret) boundaries round
+		engine-dependently: a click on 塔 can resolve the neighbor や. */
+		const CJK_WORD_RE =
+			/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
+
+		/** True when the point lands inside the node's [start, end) screen span. */
+		function rangeContainsPoint(
+			node: Node,
+			start: number,
+			end: number,
+			x: number,
+			y: number
+		): boolean {
+			try {
+				const span = document.createRange();
+				const length = node.textContent?.length ?? 0;
+				span.setStart(node, Math.min(start, length));
+				span.setEnd(node, Math.min(end, length));
+				return [...span.getClientRects()].some(
+					(rect) =>
+						x >= rect.left - 2 &&
+						x <= rect.right + 2 &&
+						y >= rect.top - 2 &&
+						y <= rect.bottom + 2
+				);
+			} catch {
+				return false;
+			}
+		}
+
+		/**
+		 * Point-anchored CJK word range: candidate segments around the
+		 * caret, keeping the first whose on-screen rect actually
+		 * contains the point — the click, not the rounding, decides.
+		 * Null for non-CJK points (native selection stands).
+		 */
+		function cjkWordRangeAtPoint(x: number, y: number): Range | null {
+			const at = document.elementFromPoint(x, y);
+			const body =
+				at instanceof Element ? at.closest(".messages .rendered") : null;
+			if (!(body instanceof HTMLElement)) return null;
+			const origins: Array<{ node: Text; offset: number }> = [];
+			try {
+				if (typeof document.caretRangeFromPoint === "function") {
+					const pos = document.caretRangeFromPoint(x, y);
+					const container = pos?.startContainer ?? null;
+					if (
+						container &&
+						container.nodeType === Node.TEXT_NODE &&
+						body.contains(container)
+					) {
+						origins.push({
+							node: container as Text,
+							offset: pos?.startOffset ?? 0
+						});
+					}
+				}
+			} catch {
+				// Fall through to the per-char scan below.
+			}
+			const base = baseCharAtPoint(body, x, y);
+			if (base && base.node !== origins[0]?.node)
+				origins.push({ node: base.node, offset: base.index });
+			for (const origin of origins) {
+				const text = origin.node.textContent ?? "";
+				const offsets = [
+					origin.offset,
+					origin.offset - 1,
+					origin.offset + 1
+				].filter(
+					(off, i, all) =>
+						off >= 0 && off <= text.length && all.indexOf(off) === i
+				);
+				for (const off of offsets) {
+					const bounds = wordBoundsAt(text, off);
+					if (!bounds) continue;
+					const word = text.slice(bounds[0], bounds[1]);
+					if (!word || !CJK_WORD_RE.test(word)) continue;
+					if (rangeContainsPoint(origin.node, bounds[0], bounds[1], x, y)) {
+						try {
+							const range = document.createRange();
+							range.setStart(origin.node, bounds[0]);
+							range.setEnd(origin.node, bounds[1]);
+							return range;
+						} catch {
+							continue;
+						}
+					}
+				}
+			}
+			return null;
+		}
+
 		// Word under the cursor, or "" on open space / non-text.
 		function wordUnderCursor(event: MouseEvent, body: Element): string {
 			let node: Node | null = null;
@@ -12091,7 +12258,45 @@
 			// path uses.
 			const bounds = wordBoundsAt(text, offset);
 			if (!bounds) return "";
-			return text.slice(bounds[0], bounds[1]);
+			let word = text.slice(bounds[0], bounds[1]);
+			// CJK boundary rounding is engine-dependent (a click on 塔
+			// can resolve the neighbor や): when the raw pick is CJK
+			// but its rect misses the point, retry the adjacent
+			// offsets and keep the first pick containing it — other
+			// scripts keep the raw pick untouched.
+			if (
+				word &&
+				CJK_WORD_RE.test(word) &&
+				!rangeContainsPoint(
+					node,
+					bounds[0],
+					bounds[1],
+					event.clientX,
+					event.clientY
+				)
+			) {
+				word = "";
+				for (const off of [offset - 1, offset + 1]) {
+					if (off < 0 || off > text.length) continue;
+					const retry = wordBoundsAt(text, off);
+					if (!retry) continue;
+					const candidate = text.slice(retry[0], retry[1]);
+					if (!candidate || !CJK_WORD_RE.test(candidate)) continue;
+					if (
+						rangeContainsPoint(
+							node,
+							retry[0],
+							retry[1],
+							event.clientX,
+							event.clientY
+						)
+					) {
+						word = candidate;
+						break;
+					}
+				}
+			}
+			return word;
 		}
 		// Desktop right-click reads aloud (the selection, else the word
 		// under the cursor; open space reads nothing. A second
@@ -12463,17 +12668,66 @@
 		// range dismisses them instead of stranding them. Furigana
 		// groups re-resolve their own spans, so multi-line highlights
 		// keep each panel glued to its kanji.
+		/**
+		 * Scroll re-anchor for pinned (create/answer) panels whose live
+		 * highlight is gone (focus collapse, DOM surgery): every panel
+		 * re-measures its own span in the document instead of stacking
+		 * on one rect — an answer card's own scroll must not clear its
+		 * readings. A vanished quote still dismisses.
+		 */
+		const reanchorSelPanels = (): void => {
+			if (selFurigana) {
+				let moved = false;
+				const next = selFurigana.map((panel) => {
+					const gtext = panel.runs.map((run) => run.text).join("");
+					const qs = gtext ? panel.quote.indexOf(gtext) : -1;
+					const rect =
+						qs >= 0
+							? rectForQuoteSpan(
+									panel.messageId,
+									panel.quote,
+									panel.at,
+									qs,
+									qs + gtext.length
+								)
+							: screenRectForQuote(panel.messageId, panel.quote, panel.at);
+					if (!rect) return panel;
+					const placed = panelXY(rect);
+					if (placed.y !== panel.y || placed.above !== panel.above) {
+						moved = true;
+						return { ...panel, ...placed };
+					}
+					return panel;
+				});
+				if (moved) selFurigana = next;
+			}
+			if (!selPinyin) return;
+			const anchor = screenRectForQuote(
+				selPinyin.messageId,
+				selPinyin.quote,
+				selPinyin.at
+			);
+			if (!anchor) {
+				dismissSelPanels();
+				return;
+			}
+			const placed = panelXY(anchor);
+			if (selPinyin.y !== placed.y || selPinyin.above !== placed.above)
+				selPinyin = { ...selPinyin, ...placed };
+		};
 		const trackSelPinyin = (): void => {
 			if (!selPinyin && !selFurigana) return;
 			try {
 				const live = window.getSelection();
-				if (!live || live.rangeCount === 0 || live.isCollapsed) {
-					dismissSelPanels();
-					return;
-				}
-				const range = live.getRangeAt(0);
-				if (!document.contains(range.startContainer)) {
-					dismissSelPanels();
+				const range = live && live.rangeCount > 0 ? live.getRangeAt(0) : null;
+				if (!range || range.collapsed || !document.contains(range.startContainer)) {
+					// Unpinned panels die with the highlight; pinned ones
+					// re-anchor (see above).
+					if (!panelsPinned) {
+						dismissSelPanels();
+						return;
+					}
+					reanchorSelPanels();
 					return;
 				}
 				if (selFurigana) {

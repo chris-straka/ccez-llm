@@ -431,7 +431,7 @@ blur-save fires first and Cancel/Delete can never win the race. -->
 		min-height: 2.75rem;
 	}
 	/* Annotation boxes read at the screen's message size on phones:
-	a fixed 1rem box next to 800% message type strands the eyes. */
+	a fixed 1rem box next to 1400% message type strands the eyes. */
 	:global(.app[data-android]) .ann-pop textarea {
 		font-size: calc(0.92rem * var(--font-scale, 1));
 	}
