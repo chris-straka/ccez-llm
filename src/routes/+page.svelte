@@ -13065,6 +13065,12 @@
 					// Right-click Annotate: the "a" key path — file
 					// and send at once, never the create box, never
 					// the menu (clears in the same tick, no flash).
+					// Re-read the live highlight when the stored quote
+					// went missing (the key path re-places first); a
+					// dead highlight still files nothing, as before —
+					// the button's own press collapses it, so the
+					// stored quote stays the primary source.
+					if (!selMenu?.quote.trim()) placeSelMenu();
 					annotate("", true);
 					selMenu = null;
 				},
