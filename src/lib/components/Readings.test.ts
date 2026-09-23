@@ -53,6 +53,10 @@ describe("readings panels extraction", () => {
 		expect(css).toMatch(/\.sel-pinyin\s*\{[^}]*position:\s*fixed/);
 		expect(css).toContain(".sel-pinyin.above");
 		expect(css).toContain(".sel-pinyin .pk3 .srt");
+		// Panel type rides the chat text size, never a fixed rem.
+		expect(css).toMatch(
+			/\.sel-pinyin\s*\{[^}]*font-size:\s*calc\(0\.85rem \* var\(--font-scale/
+		);
 		expect(pageStyle()).not.toMatch(/\.sel-pinyin\s*\{/);
 		expect(pageStyle()).not.toContain(".sel-pinyin .spr");
 	});

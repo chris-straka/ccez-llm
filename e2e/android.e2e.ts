@@ -124,11 +124,9 @@ test.describe("gestures", () => {
 		await expect(
 			modal.locator('dt:text-is("Delete a message") + dd')
 		).toHaveText("Three-finger tap");
+		await expect(modal.locator('dt:text-is("Delete this chat")')).toBeVisible();
 		await expect(
-			modal.locator('dt:text-is("Delete every chat")')
-		).toBeVisible();
-		await expect(
-			modal.locator('dt:text-is("Delete every chat") + dd')
+			modal.locator('dt:text-is("Delete this chat") + dd')
 		).toHaveText("Three-finger hold");
 	});
 
@@ -1819,27 +1817,36 @@ test.describe("touch", () => {
 				btnBox.y + btnBox.height / 2
 			);
 			// Phones file the annotation in the composer, never a floating
-			// box: the tap consumes the menu and the composer asks for
-			// the note instead.
+			// box: the tap consumes the menu and the composer takes the
+			// note in an empty box with no staged placeholder (the
+			// highlighted quote above it is the prompt).
 			await expect(page.locator(".sel-menu")).toHaveCount(0);
-			await expect(page.locator(".prompt textarea")).toHaveAttribute(
+			const composer = page.locator(".prompt textarea");
+			await expect(composer).toHaveValue("");
+			await expect(composer).not.toHaveAttribute(
 				"placeholder",
 				"Add an annotation"
 			);
-			// Typing files through the send arrow: the pill counts it.
-			await page.locator(".prompt textarea").click();
+			// Typing files through the send arrow: the badge files
+			// it (blue until the reply lands, orange after — the mock
+			// may answer before the poll starts, so assert the badge
+			// itself). No pill rises for an unpinned filing.
+			await composer.click();
 			await page.keyboard.type("nice point", { delay: 10 });
 			await page.locator(".send-btn").click();
 			await expect(page.locator(".toast")).toHaveText("Annotation saved");
-			await expect(page.locator(".ann-pill")).toBeVisible();
+			await expect(page.locator("button.ccez-ann-badge").first()).toBeVisible({
+				timeout: 15_000
+			});
+			await expect(page.locator(".prompt-tools .ann-pill")).toHaveCount(0);
 		});
 
-		/** Filed notes never transplant on phones: the dock row
-		carries no pencil and no inline editor — the saved comment
-		reads as text, and the question asks through the staged
-		pill. The draft is seeded in storage — filing it by touch
-		is covered by the Annotate test above. */
-		test("dock rows read filed notes without editing them", async ({
+		/** Filed notes never transplant on phones: an unpinned
+		filing raises no pill and no dock rows — the badge owns
+		it until its plus pins it. The draft is seeded in storage
+		— filing it by touch is covered by the Annotate test
+		above. */
+		test("unpinned filings show no pill and no dock rows", async ({
 			page
 		}) => {
 			await seedChat(page, [
@@ -1861,30 +1868,31 @@ test.describe("touch", () => {
 				);
 			});
 			await page.goto("/");
-			await expect(page.locator(".ann-pill")).toBeVisible();
-			await page.locator(".prompt-tools .ann-pill").click();
-			await expect(page.locator(".ann-wrap .review")).toHaveCSS("opacity", "1");
-			await expect(page.locator(".review-comment").first()).toHaveText(
-				"first"
-			);
-			// No pencil, no inline editor, no floating card on phones.
-			await expect(page.locator(".review-pencil")).toHaveCount(0);
-			await expect(page.locator(".review textarea")).toHaveCount(0);
+			const badge = page.locator("[data-ann-badge]").first();
+			await expect(badge).toBeVisible({ timeout: 15_000 });
+			// No pill, no rows, no floating card on phones.
+			await expect(page.locator(".prompt-tools .ann-pill")).toHaveCount(0);
+			await expect(page.locator(".review-item")).toHaveCount(0);
 			await expect(page.locator(".ann-pop")).toHaveCount(0);
 			// The composer keeps its chat placeholder — nothing transplants.
 			await expect(page.locator(".prompt textarea")).not.toHaveAttribute(
 				"placeholder",
 				"Edit annotation"
 			);
-			// A questioned row rides the send as an inclusion chip.
-			await expect(page.locator(".inclusion-chip")).toBeVisible();
+			await expect(page.locator(".prompt textarea")).not.toHaveAttribute(
+				"placeholder",
+				"Add an annotation"
+			);
 		});
 
-		/** Tapping a badge opens the dock on its row: the tap must
-		survive the tap-out rule (capture press opens before the
-		bubble tap-out check), nothing transplants into the composer,
-		and the send arrow sends a chat instead of filing a note. */
-		test("tapping a badge opens its dock row", async ({ page }) => {
+		/** Tapping an unpinned badge highlights its quote: the tap
+		must survive the tap-out rule (capture press opens before
+		the bubble tap-out check), nothing transplants into the
+		composer, no dock rows render for it — and the send arrow
+		sends a bare chat (only plus-pinned annotations bake). */
+		test("tapping an unpinned badge highlights without rows", async ({
+			page
+		}) => {
 			await seedChat(page, [
 				{ role: "assistant", content: "alpha beta gamma delta" }
 			]);
@@ -1912,51 +1920,26 @@ test.describe("touch", () => {
 				bbox.x + bbox.width / 2,
 				bbox.y + bbox.height / 2
 			);
-			// The dock opens on the tapped row — no floating card, no
-			// composer transplant, the saved comment stands.
-			await expect(page.locator(".ann-wrap .review")).toHaveCSS(
-				"opacity",
-				"1"
-			);
-			await expect(page.locator(".review-item.highlight")).toBeVisible();
-			await expect(page.locator(".review-comment").first()).toHaveText(
-				"first"
-			);
+			// No floating card, no composer transplant, no dock rows
+			// for the unpinned filing.
 			await expect(page.locator(".ann-pop")).toHaveCount(0);
+			await expect(page.locator(".review-item")).toHaveCount(0);
+			await expect(
+				page.locator(".prompt-tools .ann-pill")
+			).toHaveCount(0);
 			const composer = page.locator(".prompt textarea");
 			await expect(composer).not.toHaveAttribute(
 				"placeholder",
 				"Edit annotation"
 			);
-			// The send arrow sends a chat: the filed note rides the
-			// message as baked context (unstaged riders clear).
+			// The send arrow sends a bare chat: the unpinned note
+			// rides nothing (no sent-refs card).
 			await composer.click();
 			await page.keyboard.type("hello", { delay: 10 });
 			await page.locator(".send-btn").click();
-			await expect
-				.poll(
-					async () =>
-						page.evaluate(() => {
-							const content =
-								(
-									JSON.parse(
-										window.localStorage.getItem("ccez-llm-chats-v1") ??
-											"[]"
-									) as Array<{
-										messages: Array<{ role: string; content: string }>;
-									}>
-								)[0]?.messages
-									.filter((m) => m.role === "user")
-									.pop()?.content ?? "";
-							return (
-								content.includes("hello") &&
-								content.includes("Annotated selections:") &&
-								content.includes('"beta" — first')
-							);
-						}),
-					{ timeout: 60_000 }
-				)
-				.toBe(true);
+			const sent = page.locator("article.user .rendered").last();
+			await expect(sent).toContainText("hello", { timeout: 60_000 });
+			await expect(page.locator("article.user .ann-refs")).toHaveCount(0);
 		});
 
 		/** Creating washes the pending preview: the comment box
@@ -2029,11 +2012,14 @@ test.describe("touch", () => {
 				btnBox.y + btnBox.height / 2
 			);
 			// Phones file the annotation in the composer: the pending
-			// preview washes while the comment box owns the screen.
-			await expect(page.locator(".prompt textarea")).toHaveAttribute(
+			// preview washes while the empty comment box owns the
+			// screen (no staged placeholder — the highlight is the
+			// prompt).
+			const composer = page.locator(".prompt textarea");
+			await expect(composer).toHaveValue("", { timeout: 10_000 });
+			await expect(composer).not.toHaveAttribute(
 				"placeholder",
-				"Add an annotation",
-				{ timeout: 10_000 }
+				"Add an annotation"
 			);
 			await expect.poll(hasWash, { timeout: 10_000 }).toBe(true);
 		});

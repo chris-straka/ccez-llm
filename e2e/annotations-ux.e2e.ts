@@ -12,8 +12,8 @@ import { seedChat } from "./helpers";
  * 3. numbered badges scale with the message font size;
  * 4. empty annotations bake a "?" so the model sees the confusion;
  * 5. annotations-only messages render as an em-dash with the count UI above;
- * 6. staged pill: Add to prompt animates symmetrically, and the pill
- *    rides token surfaces (filed notes never edit in an overlay);
+ * 6. dock Unpin animates symmetrically, and pinned chips ride
+ *    token surfaces (filed notes never edit in an overlay);
  * 7. off-chat drags never highlight above the cursor's current line.
  */
 
@@ -63,6 +63,13 @@ test("review dock respects its width cap at 200% type", async ({
 	await page.keyboard.press("Enter");
 	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1);
 	await expect(pop).toHaveCount(0, { timeout: 5_000 });
+	// The dock lists pinned rows only: wait for the answer,
+	// pin the badge (double-click), then open the dock.
+	await expect(
+		page.locator("button.ccez-ann-badge.ans-ready")
+	).toHaveCount(1, { timeout: 30_000 });
+	await page.locator("button.ccez-ann-badge").nth(0).dblclick();
+	await page.keyboard.press("Escape");
 	await page.locator(".prompt-tools .ann-pill").click();
 	const card = page.locator(".ann-wrap .review");
 	await expect(card).toHaveCSS("opacity", "1");
@@ -127,14 +134,25 @@ test("mid-word drags snap out to whole words", async ({ page }) => {
 	await page.locator('.sel-menu button:has-text("Annotate")').click();
 	await expect(page.locator(".ann-pop")).toBeVisible();
 	await page.keyboard.press("Enter");
-	// The filed quote is the whole words, never the cut fragment.
+	// The filed quote is the whole words, never the cut fragment
+	// (the dock lists pinned rows only, so wait for the answer
+	// and pin first — keyboard, never pointer: the badge sits
+	// under the sticky header).
+	await expect(
+		page.locator("button.ccez-ann-badge.ans-ready")
+	).toHaveCount(1, { timeout: 30_000 });
+	const midBadge = page.locator("button.ccez-ann-badge").nth(0);
+	await midBadge.focus();
+	await page.keyboard.press("Enter");
+	await page.keyboard.press("Enter");
+	await page.keyboard.press("Escape");
 	await page.locator(".prompt-tools .ann-wrap").hover();
 	await expect(page.locator(".prompt-tools .review-quote").first()).toHaveText(
 		/hello world/
 	);
 });
 
-test("create box centers over narrow highlights, wide ones open at the cursor", async ({
+test("create box centers over narrow highlights, wide ones clamp to the viewport", async ({
 	page
 }) => {
 	await seedChat(page, [
@@ -188,8 +206,9 @@ test("create box centers over narrow highlights, wide ones open at the cursor", 
 	// scrolls the list) — measuring or dragging mid-fade races both.
 	await expect(page.locator(".ann-pop")).toHaveCount(0);
 
-	// Wide: dragging the whole paragraph keeps the cursor placement —
-	// the box opens at the selection end, not the paragraph center.
+	// Wide: dragging the whole paragraph opens the 90%-column
+	// pill below the highlight, clamped inside the viewport —
+	// never hugging the selection end, never covering the word.
 	const wide = await para.boundingBox();
 	if (!wide) throw new Error("message lost its box");
 	const wideY = wide.y + wide.height / 2;
@@ -198,12 +217,22 @@ test("create box centers over narrow highlights, wide ones open at the cursor", 
 	await page.mouse.move(wide.x + wide.width - 10, wideY, { steps: 8 });
 	await page.mouse.up();
 	await expect(page.locator(".sel-menu")).toBeVisible();
-	const endX = wide.x + wide.width - 10;
+	// The highlight's own bottom (element boxes carry a stray
+	// leading pixel the text never paints).
+	const hlBottom = await page.evaluate(
+		() =>
+			window.getSelection()?.rangeCount
+				? window.getSelection()!.getRangeAt(0).getBoundingClientRect().bottom
+				: null
+	);
 	await page.locator('.sel-menu button:has-text("Annotate")').click();
 	await expect(pop).toBeVisible();
 	const wideBox = await pop.boundingBox();
 	if (!wideBox) throw new Error("missing wide box");
-	expect(Math.abs(wideBox.x - (endX - 16))).toBeLessThanOrEqual(24);
+	const vw = page.viewportSize()?.width ?? 1280;
+	expect(wideBox.x).toBeGreaterThanOrEqual(8);
+	expect(wideBox.x + wideBox.width).toBeLessThanOrEqual(vw - 8);
+	if (hlBottom !== null) expect(wideBox.y).toBeGreaterThanOrEqual(hlBottom);
 	await page.keyboard.press("Escape");
 });
 
@@ -257,9 +286,17 @@ test("creation pill and Annotate button scale with font size", async ({
 	expect(parseFloat(areaSize)).toBeGreaterThan(parseFloat(btnSmall));
 	const pillBox = await pop.boundingBox();
 	if (!pillBox) throw new Error("fresh pill has no box");
-	// 19rem at 200% would be 608px: capped at 32rem (512px).
-	expect(pillBox.width).toBeGreaterThan(304);
-	expect(pillBox.width).toBeLessThanOrEqual(514);
+	// 90% of the chat column (the rem-cap era is over): read the
+	// live --chat-width var with the CSS fallback (36), never a
+	// fixed pixel number.
+	const expected = await page.evaluate(() => {
+		const raw = getComputedStyle(
+			document.querySelector(".app")!
+		).getPropertyValue("--chat-width");
+		const rem = parseFloat(raw);
+		return (Number.isFinite(rem) && rem > 0 ? rem : 36) * 16 * 0.9;
+	});
+	expect(Math.abs(pillBox.width - expected)).toBeLessThanOrEqual(4);
 });
 
 /** The sent card spans the message (not a 24rem strip) at twice
@@ -315,6 +352,17 @@ test("empty annotations bake a question mark for the model", async ({
 	await page.locator('.sel-menu button:has-text("Annotate")').click();
 	// Enter with no text files the empty annotation (click-away would cancel it).
 	await page.keyboard.press("Enter");
+	// Unpinned annotations never reach the send: wait for the
+	// answer and pin (keyboard — the badge sits under the sticky
+	// header), so the empty prompt carries it.
+	await expect(
+		page.locator("button.ccez-ann-badge.ans-ready")
+	).toHaveCount(1, { timeout: 30_000 });
+	const emptyBadge = page.locator("button.ccez-ann-badge").nth(0);
+	await emptyBadge.focus();
+	await page.keyboard.press("Enter");
+	await page.keyboard.press("Enter");
+	await page.keyboard.press("Escape");
 	await expect(page.locator(".prompt-tools .ann-wrap")).toBeVisible();
 	// Send the empty prompt with the annotation attached (mock provider).
 	await page.locator(".ta-input").click();
@@ -370,6 +418,12 @@ test("badge tap opens the dock on its row, never an edit", async ({
 	await seedChat(page, [
 		{ role: "assistant", content: "alpha beta gamma delta" }
 	]);
+	// Slow the mock answer: the tap must land while the badge is
+	// still waiting (blue), so it opens the dock row — never an
+	// answer card.
+	await page.addInitScript(() => {
+		window.localStorage.setItem("ccez-mock-chat-ms", "15000");
+	});
 	await page.goto("/");
 	const para = page.locator("article.assistant .rendered p").first();
 	await expect(para).toBeVisible({ timeout: 60_000 });

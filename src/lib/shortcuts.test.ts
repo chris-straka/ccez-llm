@@ -14,12 +14,15 @@ import {
 // A-Z (case-insensitive): shortcuts.ts sorts at return, so this pins
 // the sorted order, not the source order.
 const MAC_NAMES = [
+	"Annotate hovered word",
+	"Annotate instantly",
 	"Branch from here",
 	"Chat list",
 	"Chat width + / −",
 	"Copy message",
 	"Cut message",
 	"Delete a message",
+	"Delete annotation",
 	"Delete this chat",
 	"Edit own message",
 	"Exit fullscreen",
@@ -31,12 +34,16 @@ const MAC_NAMES = [
 	"New chat",
 	"Newer / older chat",
 	"Pasted text expand/collapse",
+	"Pin annotation",
 	"prev/next stroke step",
+	"Prompt text size up / down",
+	"Prompt width + / −",
 	"Reading aid toggle",
 	"Reply language",
 	"Rerun a prompt",
 	"Scroll",
 	"Search chats",
+	"Select sentence / paragraph",
 	"Shortcuts show/hide",
 	"Speak message",
 	"Speak paragraph",
@@ -84,6 +91,8 @@ describe("shortcuts menu copy", () => {
 			"Reply language",
 			"Text size up / down",
 			"Chat width + / −",
+			"Prompt text size up / down",
+			"Prompt width + / −",
 			"New chat"
 		];
 		for (const isMac of [true, false]) {

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { seedChat } from "./helpers";
+import { dragQuote, seedChat } from "./helpers";
 
 /**
  * Right-clicking a mixed kanji+kana highlight shows one annotated
@@ -116,6 +116,67 @@ test("right-clicking a mixed highlight shows one panel per kanji group", async (
 	await page.keyboard.press("Escape");
 	await expect(panels).toHaveCount(0);
 	expect(await body.locator('[class*="frbt"]').count()).toBe(0);
+});
+
+/**
+ * Creating an annotation keeps its furigana panel: the pill steals
+ * focus (collapsing the selection) while the worker is still
+ * resolving, but creation pins its panels — the loading mark must
+ * resolve into readings and stay up while the pill is open, exactly
+ * like a right-click panel. (Without the re-pin the collapse
+ * dismisses the panel mid-resolve and only "..." ever shows.)
+ */
+test("creating an annotation keeps its furigana panel", async ({ page }) => {
+	await dragQuote(page, 0, "咲き誇る");
+	await page.locator('.sel-menu button:has-text("Annotate")').click();
+	await expect(page.locator(".ann-pop")).toBeVisible();
+	const panels = page.locator(".sel-pinyin");
+	await expect(panels.locator(".spr").first()).toBeVisible({
+		timeout: 120_000
+	});
+	// Still up while the pill is open (not dismissed on the focus
+	// collapse), holding kana readings (panels never repeat the
+	// kanji — the highlighted word upstream is the title).
+	await expect(page.locator(".ann-pop")).toBeVisible();
+	await expect(panels.locator(".srt").first()).not.toBeEmpty();
+	// And above the kanji, never stranded at the viewport corner
+	// (a detached-range zero rect must never place a panel).
+	const word = await page.evaluate(() => {
+		const el = document.querySelector("article.assistant .rendered");
+		if (!el) return null;
+		const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+		let node: Node | null;
+		while ((node = walker.nextNode())) {
+			if (node.parentElement?.tagName === "RT") continue;
+			const i = (node.textContent ?? "").indexOf("咲き誇る");
+			if (i >= 0) {
+				const r = document.createRange();
+				r.setStart(node, i);
+				r.setEnd(node, i + 4);
+				const rect = r.getBoundingClientRect();
+				return {
+					top: rect.top,
+					left: rect.left,
+					right: rect.right
+				};
+			}
+		}
+		return null;
+	});
+	if (!word) throw new Error("quote lost its rect");
+	const placed = await panels.evaluateAll((els) =>
+		els.map((el) => {
+			const r = (el as HTMLElement).getBoundingClientRect();
+			return { top: r.top, bottom: r.bottom, left: r.left, right: r.right };
+		})
+	);
+	expect(placed.length).toBeGreaterThan(0);
+	for (const g of placed) {
+		expect(g.top).toBeGreaterThan(8);
+		expect(g.left).toBeGreaterThan(8);
+		expect(word.top - g.bottom).toBeLessThanOrEqual(24);
+	}
+	await page.keyboard.press("Escape");
 });
 
 test("right-clicking a kana-only highlight shows no popup", async ({
@@ -257,4 +318,65 @@ test("scrolling carries every group panel with the highlight", async ({
 	// The highlight moved up 300px; its first panel rode with it.
 	expect((before?.y ?? 0) - (after?.y ?? 0)).toBeGreaterThan(200);
 	expect(await panels.count()).toBeGreaterThanOrEqual(2);
+});
+
+/** At large type the furigana panel still hugs its word: the
+panel scales with the chat size (never toy-fixed) and hangs right
+above the highlight, never stranded far away. */
+test("furigana panel hugs the word at large type", async ({ page }) => {
+	await seedChat(
+		page,
+		[{ role: "assistant", content: "今日は春です" }],
+		null,
+		{ fontScale: 4 }
+	);
+	await page.goto("/");
+	await expect(
+		page.locator("article.assistant .rendered p").first()
+	).toBeVisible({
+		timeout: 60_000
+	});
+	// Select 春 (single kanji, solo panel), then right-click
+	// inside the highlight for its readings (same panelXY anchor
+	// the A path uses).
+	const selected = await page.evaluate(() => {
+		const p = document.querySelector("article.assistant .rendered p");
+		const text = p?.firstChild;
+		if (!text) return "";
+		window.getSelection()?.setBaseAndExtent(text, 3, text, 4);
+		return window.getSelection()?.toString() ?? "";
+	});
+	expect(selected).toBe("春");
+	await clickInsideHighlight(page);
+	const panels = page.locator(".sel-pinyin");
+	await expect(panels.locator(".spr").first()).toBeVisible({
+		timeout: 120_000
+	});
+	// The 4x seed reached the thread: message type ≈ 64px.
+	const msgSize = await page
+		.locator("article.assistant .rendered p")
+		.first()
+		.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+	expect(msgSize).toBeGreaterThan(48);
+	// Panel type scales with the chat (0.85rem at 4x ≈ 54px).
+	const size = await panels.first().evaluate(
+		(el) => parseFloat(getComputedStyle(el).fontSize)
+	);
+	expect(size).toBeGreaterThan(40);
+	// The above panel's bottom sits a hair above the word's top.
+	const gap = await page.evaluate(() => {
+		const range = window.getSelection()?.rangeCount
+			? window.getSelection()!.getRangeAt(0)
+			: null;
+		const word = range?.getBoundingClientRect() ?? null;
+		if (!word) return null;
+		let worst = 0;
+		for (const el of document.querySelectorAll(".sel-pinyin.above")) {
+			const r = (el as HTMLElement).getBoundingClientRect();
+			worst = Math.max(worst, word.top - r.bottom);
+		}
+		return worst;
+	});
+	expect(gap).not.toBeNull();
+	expect(gap!).toBeLessThanOrEqual(24);
 });

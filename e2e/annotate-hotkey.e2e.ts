@@ -39,10 +39,12 @@ test("selected word plus A sends at once", async ({ page }) => {
 	await page.keyboard.press("a");
 	// No pill ever opens; the badge files (the answer request may
 	// banner without a dev key, but filing never depends on it).
+	// The selection menu never opens either.
 	await expect(page.locator(".ann-pop")).toHaveCount(0);
 	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1, {
 		timeout: 10_000
 	});
+	await expect(page.locator(".sel-menu")).toHaveCount(0);
 });
 
 /** Hovering a word (no selection) plus A files and sends the
@@ -89,10 +91,100 @@ test("hovered word plus A sends at once", async ({ page }) => {
 	await page.keyboard.press("a");
 	// No pill ever opens; the badge files (the answer request may
 	// banner without a dev key, but filing never depends on it).
+	// The selection menu never opens either: the quote travels
+	// through selMenu state, which clears in the same tick.
 	await expect(page.locator(".ann-pop")).toHaveCount(0);
 	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1, {
 		timeout: 10_000
 	});
+	await expect(page.locator(".sel-menu")).toHaveCount(0);
+});
+
+/** Hovering a Japanese word plus A files it and hangs its
+furigana above the kanji — never stranded at the viewport corner
+(a zero-area anchor rect must never place a panel). */
+test("hovered japanese word plus A hangs furigana above it", async ({
+	page
+}) => {
+	test.setTimeout(180_000);
+	await seedChat(page, [{ role: "assistant", content: "今日は春です" }]);
+	await page.goto("/");
+	const article = page.locator("article.assistant");
+	await expect(article).toBeVisible({ timeout: 60_000 });
+	await page.keyboard.press("Escape");
+	// Mid-kanji hover with no selection: caret rect of 春 so the
+	// pointer lands on the glyph, not a gap.
+	const pt = await page.evaluate(() => {
+		const el = document.querySelector("article.assistant .rendered");
+		if (!el) return null;
+		const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+		let node: Node | null;
+		while ((node = walker.nextNode())) {
+			if (node.parentElement?.tagName === "RT") continue;
+			const i = (node.textContent ?? "").indexOf("春");
+			if (i >= 0) {
+				const r = document.createRange();
+				r.setStart(node, i);
+				r.setEnd(node, i + 1);
+				const rect = r.getBoundingClientRect();
+				return {
+					x: rect.left + rect.width / 2,
+					y: rect.top + rect.height / 2
+				};
+			}
+		}
+		return null;
+	});
+	if (!pt) throw new Error("word has no caret rect");
+	await page.evaluate(() => window.getSelection()?.removeAllRanges());
+	await page.mouse.move(pt.x, pt.y);
+	await page.keyboard.press("a");
+	// Filed instantly: the badge stamps (readings may resolve or
+	// not — either way no panel may strand at the corner).
+	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1, {
+		timeout: 10_000
+	});
+	const panels = page.locator(".sel-pinyin");
+	await expect(panels.locator(".spr").first()).toBeVisible({
+		timeout: 120_000
+	});
+	// Every panel hangs right above the kanji (a hairline gap),
+	// inside the viewport — never the (8, 0) corner.
+	const kanji = await page.evaluate(() => {
+		const el = document.querySelector("article.assistant .rendered");
+		if (!el) return null;
+		const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+		let node: Node | null;
+		while ((node = walker.nextNode())) {
+			if (node.parentElement?.tagName === "RT") continue;
+			const i = (node.textContent ?? "").indexOf("春");
+			if (i >= 0) {
+				const r = document.createRange();
+				r.setStart(node, i);
+				r.setEnd(node, i + 1);
+				const rect = r.getBoundingClientRect();
+				return { top: rect.top, left: rect.left, right: rect.right };
+			}
+		}
+		return null;
+	});
+	if (!kanji) throw new Error("kanji lost its rect");
+	const gaps = await panels.evaluateAll((els) =>
+		els.map((el) => {
+			const r = (el as HTMLElement).getBoundingClientRect();
+			return { top: r.top, bottom: r.bottom, left: r.left, right: r.right };
+		})
+	);
+	expect(gaps.length).toBeGreaterThan(0);
+	for (const g of gaps) {
+		expect(g.top).toBeGreaterThan(8);
+		expect(g.left).toBeGreaterThan(8);
+		expect(kanji.top - g.bottom).toBeLessThanOrEqual(24);
+		expect(g.left).toBeLessThanOrEqual(kanji.right);
+		expect(g.right).toBeGreaterThanOrEqual(kanji.left);
+	}
+	// No menu ever opens on the instant path either.
+	await expect(page.locator(".sel-menu")).toHaveCount(0);
 });
 
 /** Shift+A opens the create box with nothing staged — over a live

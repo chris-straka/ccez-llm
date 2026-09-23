@@ -202,6 +202,56 @@ test("shift-cmd-j steps chats without focusing the prompt", async ({
 	expect(focused).toBe(false);
 });
 
+/** ⇧⌘J past the newest mints a fresh chat AND lands in the prompt:
+opening a new chat is an invitation to type. */
+test("shift-cmd-j mint lands focus in the prompt", async ({ page }) => {
+	await page.addInitScript(() => {
+		window.localStorage.setItem("ccez-mock-provider", "1");
+		window.localStorage.setItem(
+			"ccez-llm-chats-v1",
+			JSON.stringify([
+				{
+					id: "e2e-only",
+					createdAt: 1,
+					replyLang: null,
+					messages: [
+						{
+							id: "e2e-only-m0",
+							role: "assistant",
+							content: "only chat here",
+							usage: null,
+							error: null
+						}
+					]
+				}
+			])
+		);
+	});
+	await page.goto("/");
+	await expect(page.locator("article .rendered")).toContainText(
+		"only chat here",
+		{ timeout: 60_000 }
+	);
+	await page.keyboard.press("Meta+Shift+J");
+	// Minted: the fresh chat is blank (hero back, no articles).
+	await expect(page.locator(".hero")).toBeVisible({ timeout: 10_000 });
+	await expect(page.locator("article")).toHaveCount(0);
+	// And the prompt woke: focus sits inside it, ready to type.
+	const focused = await page.evaluate(
+		() => !!document.activeElement?.closest?.(".prompt")
+	);
+	expect(focused).toBe(true);
+	// Again on the still-empty newest (a stay, not a second mint):
+	// the fresh chat still opens ready to type.
+	await page.locator(".hero").click();
+	await page.keyboard.press("Meta+Shift+J");
+	await expect(page.locator("article")).toHaveCount(0);
+	const refocused = await page.evaluate(
+		() => !!document.activeElement?.closest?.(".prompt")
+	);
+	expect(refocused).toBe(true);
+});
+
 /** The Thinking row keeps breathing room: explicit margins stand it
 off the last message above (never the pair-hug gap alone). */
 test("thinking row keeps breathing room", async ({ page }) => {

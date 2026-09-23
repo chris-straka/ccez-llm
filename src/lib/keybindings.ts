@@ -75,6 +75,8 @@ export interface MessageKeyFacts extends KeyModifiers {
 	selInMessage: boolean;
 	/** Word under the pointer (no selection): A sends it at once. */
 	hoverWord?: string | null;
+	/** Annotation badge under the pointer: Delete drops it. */
+	hoverBadgeId?: string | null;
 	hoveredIdx: number;
 	escDownAt: number;
 }
@@ -92,6 +94,7 @@ export type MessageKeyAction =
 	| "copy-hovered"
 	| "cut-hovered"
 	| "delete-hovered"
+	| "delete-badge"
 	| "branch-hovered"
 	| "speak-hovered"
 	| "speak-word"
@@ -196,6 +199,22 @@ export function messageKeyAction(
 		!facts.inInteractive
 	)
 		return "delete-hovered";
+	// Bare Delete/Backspace on a hovered annotation badge drops the
+	// annotation (orange or blue — badges are small targets, so the
+	// hover alone authorizes it). Messages still need Shift+D: bare
+	// Delete never touches them.
+	if (
+		(facts.key === "Delete" || facts.key === "Backspace") &&
+		!facts.metaKey &&
+		!facts.ctrlKey &&
+		!facts.altKey &&
+		!facts.shiftKey &&
+		!facts.inField &&
+		!facts.inEditor &&
+		!facts.inEditable &&
+		(facts.hoverBadgeId ?? null) !== null
+	)
+		return "delete-badge";
 	// Shift+C branches from the hovered message, Shift+R reads it
 	// aloud. Physical codes like Shift+D, so any layout's keys work
 	// (Shift+CapsLock spellings included); fields and rich editors
@@ -256,6 +275,37 @@ export interface SpaceKeyFacts extends KeyModifiers {
 	hasAttachments: boolean;
 	composerEmpty: boolean;
 	inPrompt: boolean;
+}
+
+/** Facts for the open answer card's E key: rewording lives on the
+card's open state, never on hover or fields. */
+export interface AnswerCardKeyFacts extends KeyModifiers {
+	key: string;
+	/** An answer card is open and settled (not fading out). */
+	cardOpen: boolean;
+	inField: boolean;
+	inEditor: boolean;
+	inEditable: boolean;
+}
+
+export type AnswerCardKeyAction = "edit-answer";
+
+/** E with an answer card open rewords its annotation (the edit card
+opens in place where the answer sat). Typing in any field keeps the
+key — only a bare E outside fields edits. */
+export function answerCardKeyAction(
+	facts: AnswerCardKeyFacts
+): AnswerCardKeyAction | null {
+	if (
+		facts.cardOpen &&
+		facts.key === "e" &&
+		bare(facts) &&
+		!facts.inField &&
+		!facts.inEditor &&
+		!facts.inEditable
+	)
+		return "edit-answer";
+	return null;
 }
 
 export type SpaceKeyAction = "dismiss-composer" | "swallow-repeat";
@@ -554,10 +604,9 @@ export interface ChromeChordFacts extends KeyModifiers {
 	/** True in the Tauri shell; false in the browser preview, where
 	 * browser-chrome chords (tab switching) must pass through. */
 	inShell: boolean;
-	/** True once the active chat holds messages: digit chords jump
-	 * chats instead of picking the reply language (0.5.3 field
-	 * notes — the language locked in with the first send). */
-	chatLocked: boolean;
+	/** Annotation badge under the pointer (null when hovering plain
+	 * message text): it owns Cmd+D over its message. */
+	hoverBadgeId?: string | null;
 }
 
 export type ChromeChord =
@@ -569,8 +618,10 @@ export type ChromeChord =
 	| "step-chat-newer"
 	| "step-chat-older"
 	| "zoom"
+	| "prompt-zoom"
+	| "prompt-width"
 	| "quick-lang"
-	| "jump-chat"
+	| "delete-badge"
 	| "delete-message";
 
 /** Digit order for the Cmd+1..0 quick-language chords (see `quickLangIndexForKey`). */
@@ -586,13 +637,20 @@ export function quickLangIndexForKey(key: string): number {
  * zoom, shift-comma, then the plain panel block). Same token across
  * spellings: BracketLeft and Cmd+B both read "toggle-sidebar", all
  * three settings spellings read "toggle-settings". Bodies keep their
- * splits (the KeyH/KeyL close-and-land variants, the zoom
- * narrow/widen derivation, the quick-lang/jump-chat code lookup, the
- * Cmd+D target-exists check); only the chord match moves here.
- * Callers chain `if (chrome === ...)` — never a switch.
+ * splits (the KeyH/KeyL close-and-land variants, the zoom and
+ * prompt narrow/widen derivation, the quick-lang code lookup,
+ * the Cmd+D target-exists check); only the chord match
+ * moves here. Callers chain `if (chrome === ...)` — never a switch.
  */
 export function chromeChord(facts: ChromeChordFacts): ChromeChord | null {
 	const cmd = facts.metaKey || facts.ctrlKey;
+	// Shell only: the browser claims ⇧⌘/Ctrl+[ / ] (tab switching) —
+	// in the shell they widen/narrow the prompt instead, never the
+	// column. The body derives the direction from the bracket code.
+	if (facts.inShell && cmd && facts.shiftKey && !facts.altKey) {
+		if (facts.code === "BracketLeft") return "prompt-width";
+		if (facts.code === "BracketRight") return "prompt-width";
+	}
 	if (cmd && facts.shiftKey && !facts.altKey) {
 		if (facts.code === "BracketLeft") return "toggle-sidebar";
 		if (facts.code === "BracketRight") return "toggle-settings";
@@ -632,20 +690,21 @@ export function chromeChord(facts: ChromeChordFacts): ChromeChord | null {
 		if (facts.key === ".") return "toggle-settings";
 		if (facts.key === ",") return "toggle-settings";
 		// Shell only: in a browser ⌘1…⌘0 / Ctrl+1…0 switch tabs, and
-		// the page must not swallow them. Empty chats pick the reply
-		// language; chats with messages jump instead (the language
-		// locked in with the first send — 0.5.3 field notes).
+		// the page must not swallow them. In the shell the digits
+		// always pick the reply language, empty chat or not — never
+		// a chat jump.
 		if (facts.inShell && quickLangIndexForKey(facts.key) !== -1) {
-			if (facts.chatLocked) return "jump-chat";
 			return "quick-lang";
 		}
 		// Shell only: the browser claims ⌘[ / ⌘] (history) and
-		// ⌘↑ / ⌘↓ (scroll edges) — in the shell they step chats
-		// (0.5.3 field notes), same tokens as ⇧⌘J/K. Fields and the
-		// prompt keep them for caret travel.
+		// ⌘↑ / ⌘↓ (scroll edges) — in the shell the brackets resize
+		// the prompt's text instead (never the messages; the body
+		// derives the direction from the bracket code), while the
+		// arrows keep stepping chats like ⇧⌘J/K. Fields and the
+		// prompt keep them all for caret travel.
 		if (facts.inShell && !facts.inField && !facts.inEditor) {
-			if (facts.code === "BracketLeft") return "step-chat-older";
-			if (facts.code === "BracketRight") return "step-chat-newer";
+			if (facts.code === "BracketLeft") return "prompt-zoom";
+			if (facts.code === "BracketRight") return "prompt-zoom";
 			if (facts.key === "ArrowDown") return "step-chat-newer";
 			if (facts.key === "ArrowUp") return "step-chat-older";
 		}
@@ -659,9 +718,13 @@ export function chromeChord(facts: ChromeChordFacts): ChromeChord | null {
 			facts.hovered &&
 			!facts.inField
 		) {
-			// Cmd+D deletes the hovered message. Ctrl+D is deliberately
-			// excluded: the prompt keeps it for editing and scroll
-			// mode fast-scrolls on it instead.
+			// A hovered annotation badge owns Cmd+D: the annotation
+			// goes, never the message underneath (bare Delete drops
+			// badges the same way — same small-target authorization).
+			// Otherwise Cmd+D deletes the hovered message. Ctrl+D is
+			// deliberately excluded: the prompt keeps it for editing
+			// and scroll mode fast-scrolls on it instead.
+			if (facts.hoverBadgeId) return "delete-badge";
 			return "delete-message";
 		}
 	}

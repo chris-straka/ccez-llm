@@ -51,11 +51,15 @@ export interface Annotation {
 	 */
 	answer?: string;
 	/**
-	 * Removed from prompt inclusions: the annotation stays listed
-	 * (badge, dock) but the send omits it — no bake, no number, no
-	 * footnote trace. Absent means included.
+	 * Pinned to the send prompt (the badge's plus on an answered
+	 * annotation): the prompt overlay lists it as quote, question,
+	 * and answer, and the next send bakes all three as context.
+	 * Unpinned annotations never enter the prompt — creating one
+	 * only files its badge. Absent means unpinned; consumed (reset)
+	 * by the send that bakes it, and never persisted (fresh loads
+	 * start unpinned, so a stale approval can't ride a later send).
 	 */
-	excludedFromPrompt?: boolean;
+	pinnedToPrompt?: boolean;
 }
 
 export function newAnnotationId(): AnnotationId {
@@ -132,9 +136,18 @@ export function clearAnnotations(): Annotation[] {
 	return [];
 }
 
-/** 1-based badge number of an annotation within the composer list. */
+/** 1-based badge number of an annotation within its own message:
+ * every message restarts at 1 (twenty annotations on one message
+ * never push the next message's first badge to 21). Missing ids
+ * read 0, like before. */
 export function annotationNumber(list: Annotation[], id: AnnotationId): number {
-	return list.findIndex((a) => a.id === id) + 1;
+	const target = list.find((a) => a.id === id);
+	if (!target) return 0;
+	return (
+		list
+			.filter((a) => a.messageId === target.messageId)
+			.findIndex((a) => a.id === id) + 1
+	);
 }
 
 /**
@@ -623,6 +636,40 @@ export interface AnnotationMark {
 	 * the open one, but stamps no badge — badges appear on submit only.
 	 */
 	preview?: boolean;
+}
+
+/**
+ * Badge face for a mark: always its per-message number, always
+ * titled to open. Pinning happens by double-click (badge or keyboard
+ * Enter with the card open) and never rewrites the face — numbers
+ * stay put from filing to delete.
+ */
+export function badgeFace(item: { number: number }): {
+	text: string;
+	title: string;
+} {
+	return { text: String(item.number), title: "Open annotation" };
+}
+
+/**
+ * Sync mounted badge faces to their marks (text and title only —
+ * never nodes, never marks): renumbers must not move any text.
+ * Writes only when the face differs, so steady re-stamps are DOM
+ * no-ops. Unknown ids (deleted mid-flight) keep their last face.
+ */
+function syncBadgeFaces(root: ParentNode, items: AnnotationMark[]): void {
+	const byId = new Map(items.map((i) => [i.id, i]));
+	for (const badge of root.querySelectorAll<HTMLButtonElement>(
+		"button[data-ann-badge]"
+	)) {
+		const item = byId.get(
+			(badge.getAttribute("data-ann-badge") ?? "") as AnnotationId
+		);
+		if (!item) continue;
+		const face = badgeFace(item);
+		if (badge.textContent !== face.text) badge.textContent = face.text;
+		if (badge.title !== face.title) badge.title = face.title;
+	}
 }
 
 /**
@@ -1130,11 +1177,12 @@ function washRanges(
  */
 let liveWashId: string | null = null;
 
-/** Step interval for the wash fade ramp. The fade-in walks slower
-(~240ms): the hover yellow used to snap on in ~100ms, which reads
-as a flicker over a blinking blue badge. The fade-out stays quick
-(~140ms) so a leaving pointer never trails paint. */
-const WASH_FADE_IN_STEP_MS = 80;
+/** Step interval for the wash fade ramp. The fade-in walks quick
+(~105ms, same beat as the fade-out): hovering a marker must read
+at once, and the old blink-over-blink rationale is gone with the
+in-flight pulse. The fade-out stays quick (~140ms) so a leaving
+pointer never trails paint. */
+const WASH_FADE_IN_STEP_MS = 35;
 const WASH_FADE_STEP_MS = 35;
 /**
  * The one in-flight ramp, if any (a single wash id feeds every
@@ -1501,8 +1549,9 @@ function stampBadges(
 		if (!settled.has(item.id)) badge.classList.add("fresh");
 		else badge.classList.remove("fresh");
 		badge.dataset.annBadge = item.id;
-		badge.textContent = String(item.number);
-		badge.title = "Open annotation";
+		const face = badgeFace(item);
+		badge.textContent = face.text;
+		badge.title = face.title;
 		mirrorBadgeForDirection(badge, anchor);
 		anchor.append(badge);
 	}
@@ -1532,6 +1581,10 @@ function stampLegacy(
 	// need the full path to re-stamp them.
 	const wantBadges = skip ? 0 : items.filter((i) => !i.preview).length;
 	const haveBadges = root.querySelectorAll("[data-ann-badge]").length;
+	// Faces sync ahead of every branch (steady returns below): a
+	// renumber rewrites badge text/titles in place, never nodes,
+	// never marks — hovering a badge moves nothing at all.
+	syncBadgeFaces(root, items);
 	if (!skip && root.dataset.legacyStamped === sig && haveBadges === wantBadges) {
 		// A steady re-stamp drops the one-shot fades (marks and
 		// badges alike) and moves nothing at all.
@@ -1642,8 +1695,9 @@ function stampLegacy(
 		if (!settled.has(item.id)) badge.classList.add("fresh");
 		else badge.classList.remove("fresh");
 		badge.dataset.annBadge = item.id;
-		badge.textContent = String(item.number);
-		badge.title = "Open annotation";
+		const face = badgeFace(item);
+		badge.textContent = face.text;
+		badge.title = face.title;
 		mirrorBadgeForDirection(badge, anchor);
 		anchor.append(badge);
 	}
@@ -1728,6 +1782,10 @@ function stampMarks(
 	if (!badgesCurrent) {
 		root.dataset.marksStamped = sig;
 		stampBadges(root, items, skip);
+	} else {
+		// Badges current but faces may have flipped (pin/arm): sync
+		// text/titles in place, same no-node rule as legacy.
+		syncBadgeFaces(root, items);
 	}
 	paintWashHighlight(root, items, skip, wash);
 }
@@ -1959,96 +2017,124 @@ function wrapRange(
  * numbered quote plus comment.
  */
 export function formatAnnotations(
-	list: { quote: string; comment: string }[]
+	list: { quote: string; comment: string; answer?: string }[]
 ): string {
 	return list
 		.map((a, i) => {
 			const head = `${i + 1}. "${a.quote}"`;
 			// Empty comments file as "?" so the model sees the confusion
 			// instead of a bare quote that reads as settled context.
-			return a.comment.trim() ? `${head} — ${a.comment.trim()}` : `${head} — ?`;
+			const asked = a.comment.trim()
+				? `${head} — ${a.comment.trim()}`
+				: `${head} — ?`;
+			// The reply rides on its own continuation line, newlines
+			// collapsed: answers stay short (capped at ask time), and a
+			// single line keeps the block line-parseable — a raw
+			// multi-line reply could fake an entry boundary.
+			const reply = a.answer?.trim().replace(/\s+/g, " ");
+			return reply ? `${asked}\n   Answer: ${reply}` : asked;
 		})
 		.join("\n");
 }
 
 /**
- * Append the annotation block to outgoing prompt text. Removed
- * prompt inclusions never bake: they filter here, so numbering
- * resequences from the kept order with no gaps and no footnote
- * trace of the omitted ones.
+ * Append the annotation block to outgoing prompt text. Only pinned
+ * annotations ever reach here (see promptInclusions) — approval is
+ * the pin, and deleting the annotation is the only removal.
+ * Numbering sequences from the kept order with no gaps.
  */
 export function withAnnotations(
 	prompt: string,
-	list: { quote: string; comment: string; excludedFromPrompt?: boolean }[]
+	list: {
+		quote: string;
+		comment: string;
+		answer?: string;
+	}[]
 ): string {
-	const kept = list.filter((a) => a.excludedFromPrompt !== true);
-	if (kept.length === 0) return prompt;
-	const block = `Annotated selections:\n${formatAnnotations(kept)}`;
+	if (list.length === 0) return prompt;
+	const block = `Annotated selections:\n${formatAnnotations(list)}`;
 	return prompt ? `${prompt}\n\n${block}` : block;
 }
 
 /**
- * Prompt inclusions for a send: filed annotations not removed from
- * the prompt. The dock lists everything; the message carries these.
+ * Prompt inclusions for a send: pinned annotations only. Creating
+ * one never includes it — only the badge's plus pins it. The
+ * dock lists the same pinned set; the message carries these
+ * (quote, question, and answer each).
  */
 export function promptInclusions(list: Annotation[]): Annotation[] {
-	return list.filter((a) => a.excludedFromPrompt !== true);
+	return list.filter((a) => a.pinnedToPrompt === true);
 }
 
 /**
- * Add-to-prompt eligibility: the affordance exists only for an empty
- * question — a staged pill asks what the blank annotation means.
- * Annotations already carrying a question ride the send as baked.
+ * Add-to-prompt eligibility: answered annotations only. Blue
+ * (waiting) annotations are never asked, edited, or prompted —
+ * creating one only files its badge until the reply lands.
  */
-export function canAddToPrompt(ann: { comment: string }): boolean {
-	return ann.comment.trim() === "";
-}
-
-/** Flip one annotation's prompt inclusion (never deletes it). */
-export function setPromptExcluded(
-	list: Annotation[],
-	id: AnnotationId,
-	excluded: boolean
-): Annotation[] {
-	return list.map((a) => {
-		if (a.id !== id) return a;
-		if (excluded) return { ...a, excludedFromPrompt: true };
-		const next = { ...a };
-		delete next.excludedFromPrompt;
-		return next;
-	});
-}
-
-/** File staged wording into an annotation (the staged pill's send). */
-export function fileStagedComment(
-	list: Annotation[],
-	id: AnnotationId,
-	comment: string
-): Annotation[] {
-	return list.map((a) => (a.id === id ? { ...a, comment } : a));
+export function canPinAnnotation(ann: { answer?: string }): boolean {
+	return ann.answer !== undefined;
 }
 
 /**
- * Land a staged send's reply as its annotations' answers (asked and
- * answered): only the ids asked through the pill attach — bundled
- * context riders stay blue. A blank/blocked reply attaches nothing
- * (the annotations stay blue); the reply itself still renders as a
- * plain message. Returns the list unchanged when nothing attaches.
+ * Remove every prompt-pinned annotation, keeping the rest filed:
+ * the dock's clear-all empties the prompt overlay, never the
+ * badges. Pure — filed-but-unpinned notes survive the call.
  */
-export function attachStagedAnswers(
+export function clearPromptPinned(list: Annotation[]): Annotation[] {
+	return list.filter((a) => a.pinnedToPrompt !== true);
+}
+
+/** Pin one annotation to the send prompt (never deletes it). */
+export function setPromptPinned(
 	list: Annotation[],
-	ids: readonly AnnotationId[],
-	reply: string
+	id: AnnotationId,
+	pinned: boolean
 ): Annotation[] {
-	if (!reply.trim() || ids.length === 0) return list;
-	const wanted = new Set<AnnotationId>(ids);
 	let touched = false;
 	const next = list.map((a) => {
-		if (!wanted.has(a.id) || a.answer === reply) return a;
+		if (a.id !== id) return a;
+		if (pinned) {
+			if (a.pinnedToPrompt === true) return a;
+			touched = true;
+			return { ...a, pinnedToPrompt: true };
+		}
+		if (a.pinnedToPrompt !== true) return a;
+		touched = true;
+		const rest = { ...a };
+		delete rest.pinnedToPrompt;
+		return rest;
+	});
+	return touched ? next : list;
+}
+
+/** Ask one annotation right away (every filing asks its own
+separate request): attach a fresh reply as its answer. A blank reply
+attaches nothing — the annotation stays blue. Returns the list
+unchanged when nothing attaches. */
+export function attachAnnotationAnswer(
+	list: Annotation[],
+	id: AnnotationId,
+	reply: string
+): Annotation[] {
+	if (!reply.trim()) return list;
+	let touched = false;
+	const next = list.map((a) => {
+		if (a.id !== id || a.answer === reply) return a;
 		touched = true;
 		return { ...a, answer: reply };
 	});
 	return touched ? next : list;
+}
+
+/**
+ * Filed annotations still waiting on their answer: persisted drafts
+ * carry no request state (pending never reaches storage — only filed
+ * notes do), so every answerless draft is a request the restart took
+ * off the wire. Answered ones stay out. Pure — the boot/switch scan
+ * refires exactly these.
+ */
+export function unansweredAnnotations(list: Annotation[]): Annotation[] {
+	return list.filter((a) => a.answer === undefined);
 }
 
 /**
@@ -2098,10 +2184,12 @@ function cleanDraftList(raw: unknown): Annotation[] {
 			at: typeof a.at === "number" ? a.at : 0,
 			// Answers persist with drafts like the comment: a reload
 			// must not un-ask an answered annotation back to blue.
+			// Pins never persist (fresh loads start unpinned, so a
+			// stale approval can't ride a later send); there is no
+			// omit state anymore — deleting is the only removal.
 			...(typeof a.answer === "string" && a.answer
 				? { answer: a.answer }
-				: {}),
-			...(a.excludedFromPrompt === true ? { excludedFromPrompt: true } : {})
+				: {})
 		});
 	}
 	return out;
@@ -2153,6 +2241,8 @@ export interface AnnotationRef {
 	n: number;
 	quote: string;
 	comment: string;
+	/** Baked reply (see formatAnnotations): absent on older blocks. */
+	answer?: string;
 }
 
 /**
@@ -2179,15 +2269,18 @@ export function splitAnnotationBlock(
 		body = content.slice(head.length);
 	} else return null;
 	const refs: AnnotationRef[] = [];
-	const entry = /(\d+)\.\s+"([\s\S]*?)"(?:\s+—\s+([^\n]*))?(?=\n\d+\.\s+"|$)/g;
+	const entry =
+		/(\d+)\.\s+"([\s\S]*?)"(?:\s+—\s+([^\n]*))?(?:\n[ \t]+Answer:[ \t]*([^\n]*))?(?=\n\d+\.\s+"|$)/g;
 	let m: RegExpExecArray | null;
 	let covered = 0;
 	while ((m = entry.exec(body)) !== null) {
 		covered = m.index + m[0].length;
+		const reply = (m[4] ?? "").trim();
 		refs.push({
 			n: Number(m[1] ?? 0),
 			quote: m[2] ?? "",
-			comment: (m[3] ?? "").trim()
+			comment: (m[3] ?? "").trim(),
+			...(reply ? { answer: reply } : {})
 		});
 	}
 	if (refs.length === 0) return null;
@@ -2865,20 +2958,23 @@ export function buildMarksFor(
 	tashkeelOn: boolean,
 	pending: Annotation | null
 ): AnnotationMark[] {
-	const saved: AnnotationMark[] = list
-		.filter((a) => a.messageId === messageId && aidMarkVisible(a.aidScope, tashkeelOn))
-		.map((a) => ({
-			id: a.id,
-			number: annotationNumber(list, a.id),
-			quote: a.quote,
-			at: a.at ?? 0,
-			...(a.aidScope ? { aidScope: a.aidScope } : {}),
-			answer: a.answer ? "ready" : "waiting"
-		}));
+	const mine = list.filter(
+		(a) => a.messageId === messageId && aidMarkVisible(a.aidScope, tashkeelOn)
+	);
+	const saved: AnnotationMark[] = mine.map((a, i) => ({
+		id: a.id,
+		// Per-message numbers (see annotationNumber): the message's
+		// own index, never the chat-global one.
+		number: i + 1,
+		quote: a.quote,
+		at: a.at ?? 0,
+		...(a.aidScope ? { aidScope: a.aidScope } : {}),
+		answer: a.answer ? "ready" : "waiting"
+	}));
 	if (pending && pending.messageId === messageId) {
 		saved.push({
 			id: pending.id,
-			number: list.length + 1,
+			number: mine.length + 1,
 			quote: pending.quote,
 			at: pending.at ?? 0,
 			preview: true

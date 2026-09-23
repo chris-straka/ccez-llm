@@ -94,23 +94,26 @@ describe("annotation edit Save animation", () => {
 		expect(css).toContain(".ann-save:hover");
 	});
 
-	it("animates the Add to prompt pill symmetrically on hover in/out", () => {
+	it("animates the dock Unpin pill symmetrically on hover in/out", () => {
 		const css = componentStyle(reviewDockSource(), "ReviewDock.svelte");
 		// Symmetric means the transition lives on the base rule, not
 		// :hover (a hover-only transition snaps back on leave).
-		expect(css).toMatch(/\.review-add\s*\{[^}]*transition:/);
-		expect(css).toContain(".review-add:hover");
+		expect(css).toMatch(/\.review-head button\.review-add\s*\{[^}]*transition:/);
+		expect(css).toContain(".review-head button.review-add:hover");
 	});
 
-	it("keeps the staged pill on token surfaces, field included", () => {
-		const css = componentStyle(composerSource(), "Composer.svelte");
-		// Panel surface with an accent ring; the wording field rides
-		// the shared field token (dark-readable by token contract).
-		expect(css).toMatch(/\.staged-pill\s*\{[^}]*background:\s*var\(--panel\)/);
-		expect(css).toMatch(/\.staged-pill\s*\{[^}]*border-color:\s*var\(--accent\)/);
-		expect(css).toMatch(
-			/\.staged-field textarea\s*\{[^}]*background:\s*var\(--field\)/
+	it("keeps the dock pill on token surfaces", () => {
+		const css = componentStyle(reviewDockSource(), "ReviewDock.svelte");
+		// Panel surface; hover/focus ring rides the accent token
+		// (dark-readable by token contract). Chips are gone from
+		// the prompt: the button count plus the overlay rows are
+		// the whole pin surface.
+		expect(componentStyle(composerSource(), "Composer.svelte")).not.toContain(
+			".inclusion-chip"
 		);
+		expect(css).toContain(".ann-pill");
+		expect(css).not.toContain(".staged-pill");
+		expect(css).not.toContain(".staged-field");
 	});
 });
 
@@ -118,6 +121,24 @@ describe("annotation create wiring", () => {
 	it("snaps the create marker to word edges before the menu reads it", () => {
 		const source = pageSource();
 		expect(source).toContain("snapSelectionToWordEdges(live)");
+	});
+
+	it("reads the annotated text when a waiting badge opens", () => {
+		// Blue badges speak like answered ones (quote with its
+		// paragraph context), so the listen moment survives the wait.
+		const source = pageSource();
+		const dockPath = source.slice(source.indexOf("No answer yet: open the review dock"));
+		expect(dockPath).toContain("void speakQuote(");
+		expect(dockPath).toContain("answerContextFor(current.messageId, current.quote)");
+	});
+
+	it("rides the orange pill with its quote through scrolls", () => {
+		// Fixed plus scroll-delta tracking reads as absolute: the
+		// pill never sticks to the viewport, and the mount stays
+		// outside the scroll container.
+		const source = pageSource();
+		expect(source).toContain("annPop = { ...annPop, y: annPop.y - dy }");
+		expect(source).toContain("annPopTop = scrollBox?.scrollTop ?? 0");
 	});
 
 	it("centers narrow create boxes, keeps cursor placement for wide ones", () => {
@@ -137,8 +158,10 @@ describe("annotation create wiring", () => {
 		expect(fresh?.[0]).toContain("{#if android}");
 		expect(fresh?.[0]).toContain("ann-pill-save");
 		expect(fresh?.[0]).toContain("actions.save");
-		// The page still wires that action to the real save path.
-		expect(pageSource()).toContain("save: saveAnnPop");
+		// The page still wires that action to the real save path —
+		// wrapped, so the button's click event never rides in as
+		// fromEnter (only Enter sets it).
+		expect(pageSource()).toContain("save: () => saveAnnPop()");
 	});
 });
 
@@ -149,27 +172,17 @@ describe("annotations-only messages", () => {
 	});
 });
 
-describe("review omit toggle hover", () => {
-	it("links like the quote — underline fade, no background or glow", () => {
-		const css = componentStyle(reviewDockSource(), "ReviewDock.svelte");
-		expect(css).toMatch(/button\.review-omit\s*\{[^}]*transition:/);
-		const hover =
-			css.match(/button\.review-omit:hover\s*\{[^}]*\}/)?.[0] ?? "";
-		expect(hover).toContain("color:");
-		expect(hover).not.toContain("background");
-		expect(hover).not.toContain("drop-shadow");
-		expect(hover).not.toContain("filter");
-		expect(hover).toMatch(/text-decoration-color:\s*currentcolor/);
-		expect(css).toMatch(
-			/button\.review-copy:hover\s*\{[^}]*text-decoration:\s*none/
-		);
-	});
-
-	it("reads pressed-accent while omitted", () => {
-		const css = componentStyle(reviewDockSource(), "ReviewDock.svelte");
-		expect(css).toMatch(
-			/button\.review-omit\[aria-pressed="true"\]\s*\{[^}]*var\(--accent\)/
-		);
+describe("no omit affordance", () => {
+	it("offers no omit/include toggle anywhere: deleting is the only removal", () => {
+		const source = reviewDockSource();
+		expect(source).not.toContain("review-omit");
+		expect(source).not.toContain("setExcluded");
+		expect(source).not.toContain("Omit");
+		const css = componentStyle(source, "ReviewDock.svelte");
+		expect(css).not.toContain("review-omit");
+		expect(css).not.toContain(".review-item.omitted");
+		// The delete button stays the row's removal.
+		expect(source).toContain('class="review-del"');
 	});
 });
 

@@ -21,6 +21,11 @@ export interface ScrollHold {
 	downAt: number;
 	/** rAF-clock start: the velocity ramp reads age off this, never the wall clock. */
 	startT: number;
+	/** rAF-clock of the first moving frame (null while the press is
+	still inside the tap window): the ramp reads age off the glide
+	start, not the keydown — otherwise a press that outlives the
+	tap window would engage mid-ramp with a kick. */
+	glideT: number | null;
 	lastT: number;
 	raf: number;
 }

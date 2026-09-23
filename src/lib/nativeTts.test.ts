@@ -163,6 +163,18 @@ describe("quoteLangForContext", () => {
 			quoteLangForContext("this is a fairly long english sentence", JA, "en-US")
 		).resolves.toBe("en-US");
 	});
+
+	it("reads a shared-kanji date Chinese inside a Chinese sentence", async () => {
+		// The bridge reads bare shared-kanji dates as Japanese, so a
+		// probe carrying distinctive forms (风, 气) must never reach
+		// it — even with a Japanese seed voice.
+		const ZH =
+			"今天是九月二十三日，凉爽的秋风带来了秋天的气息，天空高远而清澈。";
+		await expect(
+			quoteLangForContext("九月二十三日", ZH, "ja-JP")
+		).resolves.toBe("zh-CN");
+		expect(mockInvoke).not.toHaveBeenCalled();
+	});
 });
 
 /** Payload text of a mocked `tts_identify_lang` call. */

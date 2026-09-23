@@ -91,6 +91,29 @@ test("j/k smooth-scroll down and back up with nothing selected", async ({
 	expect(await scrollTop(page)).toBeLessThan(down);
 });
 
+test("a light d tap lands exactly one skip step, never glide frames", async ({
+	page
+}) => {
+	const before = await scrollTop(page);
+	// keyboard.press is a light tap (down+up in milliseconds): the
+	// hold's rAF loop must move nothing inside the tap window, so
+	// the landing is exactly the 216px discrete step — never step
+	// plus a few 36px glide frames.
+	await page.keyboard.press("d");
+	await page.waitForFunction(
+		(prev) => {
+			const box = document.querySelector(".messages") as HTMLElement | null;
+			return box !== null && box.scrollTop - prev >= 200;
+		},
+		before,
+		{ timeout: 10_000 }
+	);
+	await page.waitForTimeout(600);
+	const down = await scrollTop(page);
+	expect(down - before).toBeGreaterThanOrEqual(200);
+	expect(down - before).toBeLessThanOrEqual(240);
+});
+
 test("bare d/u skip one smooth step; ctrl+d jumps and ctrl+u climbs back", async ({
 	page
 }) => {

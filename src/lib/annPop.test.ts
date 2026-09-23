@@ -54,34 +54,20 @@ describe("pillWashId", () => {
 });
 
 describe("annPopWidth", () => {
-	it("keeps the fresh pill at 19rem inside the viewport", () => {
-		expect(
-			annPopWidth({ fresh: true, android: false, fontScale: 1, viewportWidth: 1280 })
-		).toBe(304);
-		expect(
-			annPopWidth({ fresh: true, android: false, fontScale: 1, viewportWidth: 300 })
-		).toBe(284);
+	it("runs every popup at 90% of the chat column", () => {
+		// Default 36rem column: 32.4rem = 518.4px.
+		expect(annPopWidth({ chatWidthRem: 36, viewportWidth: 1280 })).toBeCloseTo(
+			518.4,
+			10
+		);
+		// Wide columns earn wide popups (no fixed cap anymore).
+		expect(annPopWidth({ chatWidthRem: 60, viewportWidth: 1280 })).toBeCloseTo(
+			864,
+			10
+		);
 	});
-	it("scales the fresh pill with font size up to 32rem", () => {
-		expect(
-			annPopWidth({ fresh: true, android: false, fontScale: 1.5, viewportWidth: 1280 })
-		).toBe(456);
-		expect(
-			annPopWidth({ fresh: true, android: false, fontScale: 4, viewportWidth: 1280 })
-		).toBe(512);
-	});
-	it("scales the card with font size up to 32rem", () => {
-		expect(
-			annPopWidth({ fresh: false, android: false, fontScale: 1, viewportWidth: 1280 })
-		).toBe(384);
-		expect(
-			annPopWidth({ fresh: false, android: false, fontScale: 4, viewportWidth: 1280 })
-		).toBe(512);
-	});
-	it("caps phone cards at 8x scale", () => {
-		expect(
-			annPopWidth({ fresh: false, android: true, fontScale: 10, viewportWidth: 1280 })
-		).toBe(512);
+	it("clamps to the viewport on narrow phones", () => {
+		expect(annPopWidth({ chatWidthRem: 36, viewportWidth: 300 })).toBe(284);
 	});
 });
 

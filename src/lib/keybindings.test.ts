@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+	answerCardKeyAction,
 	chromeChord,
 	commandChord,
 	deleteChatScope,
@@ -344,6 +345,67 @@ describe("messageKeyAction", () => {
 		expect(messageKeyAction({ ...shiftD, metaKey: true })).toBe(null);
 		// Bare D (any layout) is not a binding.
 		expect(messageKeyAction({ ...msgBase, key: "d", code: "KeyD" })).toBe(null);
+	});
+
+	it("drops a hovered badge on bare Delete/Backspace, nothing else", () => {
+		const badge = { ...msgBase, hoverBadgeId: "ann-1" };
+		expect(messageKeyAction({ ...badge, key: "Delete" })).toBe(
+			"delete-badge"
+		);
+		expect(messageKeyAction({ ...badge, key: "Backspace" })).toBe(
+			"delete-badge"
+		);
+		// No badge hovered: bare Delete stays dead (messages still
+		// need Shift+D, chats need Cmd).
+		expect(messageKeyAction({ ...msgBase, key: "Delete" })).toBe(null);
+		expect(messageKeyAction({ ...badge, hoverBadgeId: null, key: "Delete" })).toBe(
+			null
+		);
+		// Modifiers and typing targets keep their keys.
+		expect(messageKeyAction({ ...badge, key: "Delete", shiftKey: true })).toBe(
+			null
+		);
+		expect(messageKeyAction({ ...badge, key: "Delete", metaKey: true })).toBe(
+			null
+		);
+		expect(messageKeyAction({ ...badge, key: "Delete", inField: true })).toBe(
+			null
+		);
+		expect(messageKeyAction({ ...badge, key: "Delete", inEditor: true })).toBe(
+			null
+		);
+		expect(messageKeyAction({ ...badge, key: "Delete", inEditable: true })).toBe(
+			null
+		);
+	});
+});
+
+describe("answerCardKeyAction", () => {
+	const open = {
+		key: "e",
+		metaKey: false,
+		ctrlKey: false,
+		altKey: false,
+		shiftKey: false,
+		cardOpen: true,
+		inField: false,
+		inEditor: false,
+		inEditable: false
+	};
+	it("rewords on bare E with a card open, never while typing", () => {
+		expect(answerCardKeyAction(open)).toBe("edit-answer");
+		expect(answerCardKeyAction({ ...open, cardOpen: false })).toBeNull();
+		expect(answerCardKeyAction({ ...open, key: "E" })).toBeNull();
+		expect(answerCardKeyAction({ ...open, key: "a" })).toBeNull();
+		expect(answerCardKeyAction({ ...open, inField: true })).toBeNull();
+		expect(answerCardKeyAction({ ...open, inEditor: true })).toBeNull();
+		expect(answerCardKeyAction({ ...open, inEditable: true })).toBeNull();
+		expect(answerCardKeyAction({ ...open, metaKey: true })).toBeNull();
+	});
+
+	it("needs the key spelling exactly", () => {
+		expect(answerCardKeyAction({ ...open, key: "Enter" })).toBeNull();
+		expect(answerCardKeyAction({ ...open, key: "Escape" })).toBeNull();
 	});
 });
 
@@ -806,7 +868,6 @@ const chromeBase: ChromeChordFacts = {
 	ctrlKey: false,
 	altKey: false,
 	shiftKey: false,
-	chatLocked: false,
 	inEditor: false,
 	hovered: false,
 	inField: false,
@@ -815,14 +876,26 @@ const chromeBase: ChromeChordFacts = {
 
 describe("chromeChord", () => {
 	it("reads the same token across spellings", () => {
+		// The browser keeps the panel spellings (the shell spends
+		// ⇧⌘[ / ⇧⌘] on the prompt width instead — see below).
 		expect(
-			chromeChord({ ...chromeBase, shiftKey: true, code: "BracketLeft" })
+			chromeChord({
+				...chromeBase,
+				inShell: false,
+				shiftKey: true,
+				code: "BracketLeft"
+			})
 		).toBe("toggle-sidebar");
 		expect(chromeChord({ ...chromeBase, key: "b", code: "KeyB" })).toBe(
 			"toggle-sidebar"
 		);
 		expect(
-			chromeChord({ ...chromeBase, shiftKey: true, code: "BracketRight" })
+			chromeChord({
+				...chromeBase,
+				inShell: false,
+				shiftKey: true,
+				code: "BracketRight"
+			})
 		).toBe("toggle-settings");
 		expect(chromeChord({ ...chromeBase, key: ".", code: "Period" })).toBe(
 			"toggle-settings"
@@ -860,19 +933,16 @@ describe("chromeChord", () => {
 		expect(chromeChord({ ...chromeBase, key: "1", code: "Digit1" })).toBe(
 			"quick-lang"
 		);
-		// Locked chats (messages sent) jump instead of picking.
-		expect(
-			chromeChord({ ...chromeBase, chatLocked: true, key: "1", code: "Digit1" })
-		).toBe("jump-chat");
-		expect(
-			chromeChord({ ...chromeBase, chatLocked: true, key: "0", code: "Digit0" })
-		).toBe("jump-chat");
+		// Digits always pick the reply language, empty chat or
+		// not — never a chat jump.
+		expect(chromeChord({ ...chromeBase, key: "0", code: "Digit0" })).toBe(
+			"quick-lang"
+		);
 		// Preview keeps tab switching either way.
 		expect(
 			chromeChord({
 				...chromeBase,
 				inShell: false,
-				chatLocked: true,
 				key: "1",
 				code: "Digit1"
 			})
@@ -911,39 +981,62 @@ describe("chromeChord", () => {
 		expect(
 			chromeChord({ ...chromeBase, key: "d", code: "KeyD", hovered: true })
 		).toBe("delete-message");
+		// A hovered badge owns Cmd+D: the annotation goes, never
+		// the message underneath.
+		expect(
+			chromeChord({
+				...chromeBase,
+				key: "d",
+				code: "KeyD",
+				hovered: true,
+				hoverBadgeId: "ann-1"
+			})
+		).toBe("delete-badge");
 		expect(quickLangIndexForKey("1")).toBe(0);
 		expect(quickLangIndexForKey("0")).toBe(9);
 		expect(quickLangIndexForKey("x")).toBe(-1);
 	});
 
-	it("steps chats on plain ⌘[ / ⌘] / ⌘↑ / ⌘↓ (shell only, fields keep them)", () => {
+	it("resizes the prompt on ⌘[ / ⌘] and ⇧⌘[ / ⇧⌘] (shell only, fields keep them)", () => {
 		expect(chromeChord({ ...chromeBase, key: "[", code: "BracketLeft" })).toBe(
-			"step-chat-older"
+			"prompt-zoom"
 		);
 		expect(chromeChord({ ...chromeBase, key: "]", code: "BracketRight" })).toBe(
-			"step-chat-newer"
+			"prompt-zoom"
 		);
+		expect(
+			chromeChord({ ...chromeBase, shiftKey: true, code: "BracketLeft" })
+		).toBe("prompt-width");
+		expect(
+			chromeChord({ ...chromeBase, shiftKey: true, code: "BracketRight" })
+		).toBe("prompt-width");
+		// ⌘↑ / ⌘↓ still step chats like ⇧⌘J/K; bare arrows never step.
 		expect(
 			chromeChord({ ...chromeBase, key: "ArrowDown", code: "ArrowDown" })
 		).toBe("step-chat-newer");
 		expect(chromeChord({ ...chromeBase, key: "ArrowUp", code: "ArrowUp" })).toBe(
 			"step-chat-older"
 		);
-		// Bare arrows never step; shift keeps the shift spelling.
 		expect(chromeChord({ ...chromeBase, metaKey: false, key: "ArrowDown" })).toBe(
 			null
 		);
-		expect(
-			chromeChord({ ...chromeBase, shiftKey: true, code: "BracketLeft" })
-		).toBe("toggle-sidebar");
-		// Browser preview: history and scroll edges stay native.
+		// Browser preview: history, tab switching, and scroll edges
+		// stay native.
 		expect(
 			chromeChord({ ...chromeBase, inShell: false, key: "[", code: "BracketLeft" })
 		).toBeNull();
 		expect(
+			chromeChord({
+				...chromeBase,
+				inShell: false,
+				shiftKey: true,
+				code: "BracketLeft"
+			})
+		).toBe("toggle-sidebar");
+		expect(
 			chromeChord({ ...chromeBase, inShell: false, key: "ArrowUp", code: "ArrowUp" })
 		).toBeNull();
-		// Fields and the prompt keep them for caret travel.
+		// Fields and the prompt keep the plain brackets for caret travel.
 		expect(
 			chromeChord({ ...chromeBase, key: "[", code: "BracketLeft", inField: true })
 		).toBeNull();

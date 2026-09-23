@@ -61,6 +61,8 @@ test("list runs A-Z; modal toggle sits in place", async ({ page }) => {
 		"Reply language",
 		"Text size up / down",
 		"Chat width + / −",
+		"Prompt text size up / down",
+		"Prompt width + / −",
 		"New chat"
 	]) {
 		await expect(keys.locator("div > dt", { hasText: name })).toHaveCount(0);

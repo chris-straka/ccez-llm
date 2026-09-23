@@ -47,6 +47,61 @@ test.describe("desktop", () => {
 		await expect(page.locator(".ann-pop")).toBeVisible();
 	});
 
+	/** Right-click Annotate files and sends at once (the "a" key
+	path): no create box, no menu flash — the badge files and the
+	answer request fires. */
+	test("right-click Annotate sends at once", async ({ page }) => {
+		await waitForToastToFade(page);
+		await selectWord(page);
+		const button = page.locator('.sel-menu button:has-text("Annotate")');
+		await button.click({ button: "right" });
+		await expect(page.locator(".ann-pop")).toHaveCount(0);
+		await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1, {
+			timeout: 10_000
+		});
+		await expect(page.locator(".sel-menu")).toHaveCount(0);
+	});
+
+	/** Triple-click takes the sentence (never the native paragraph
+	pick); quadruple-click takes the whole paragraph block. */
+	test("triple-click selects the sentence", async ({ page }) => {
+		await seedChat(page, [
+			{
+				role: "assistant",
+				content: "First sentence here. Second sentence there.\n\nNext paragraph follows."
+			}
+		]);
+		await page.goto("/");
+		const para = page.locator("article .rendered p").first();
+		await expect(para).toBeVisible();
+		const box = await para.boundingBox();
+		if (!box) throw new Error("paragraph has no box");
+		await page.mouse.click(box.x + 30, box.y + 8, { clickCount: 3 });
+		const picked = await page.evaluate(() =>
+			window.getSelection()?.toString().trim()
+		);
+		expect(picked).toBe("First sentence here.");
+	});
+
+	test("quadruple-click selects the paragraph", async ({ page }) => {
+		await seedChat(page, [
+			{
+				role: "assistant",
+				content: "First sentence here. Second sentence there.\n\nNext paragraph follows."
+			}
+		]);
+		await page.goto("/");
+		const para = page.locator("article .rendered p").first();
+		await expect(para).toBeVisible();
+		const box = await para.boundingBox();
+		if (!box) throw new Error("paragraph has no box");
+		await page.mouse.click(box.x + 30, box.y + 8, { clickCount: 4 });
+		const picked = await page.evaluate(() =>
+			window.getSelection()?.toString().trim()
+		);
+		expect(picked).toBe("First sentence here. Second sentence there.");
+	});
+
 	/** A plain click on another message clears the in-flight highlight
 	and drops the menu: click-away always dismisses (controls,
 	composer, and message text alike — only menu presses, drags, and
@@ -594,10 +649,12 @@ test.describe("ios", () => {
 		await expect(dock).toHaveText("Annotate");
 		// The dock files the annotation through the composer, never a
 		// floating box (its textbox can't summon the phone keyboard):
-		// the composer asks for the note instead.
+		// the composer takes the note in an empty box with no staged
+		// placeholder (the highlighted quote above it is the prompt).
 		await dock.click();
 		const composer = page.locator(".prompt textarea");
-		await expect(composer).toHaveAttribute("placeholder", "Add an annotation");
+		await expect(composer).toHaveValue("");
+		await expect(composer).not.toHaveAttribute("placeholder", "Add an annotation");
 		await composer.click();
 		await page.keyboard.type("nice point", { delay: 10 });
 		await page.locator(".send-btn").click();
@@ -636,16 +693,25 @@ test.describe("ios", () => {
 		await seedChat(page, [
 			{ role: "assistant", content: "漢字を読むテストです" }
 		]);
+		// Slow the mock answer: the tap must land while the badge
+		// is still waiting (blue), so it opens the review — never
+		// the answer card.
+		await page.addInitScript(() => {
+			window.localStorage.setItem("ccez-mock-chat-ms", "15000");
+		});
 		await page.goto("/");
 		await expect(page.locator("article .rendered").first()).toBeVisible({
 			timeout: 60_000
 		});
-		// File an annotation through the composer's docked button.
+		// File an annotation through the composer's docked button
+		// (empty box, no staged placeholder — the highlight above
+		// is the prompt).
 		await page.locator("article .rendered").first().selectText();
 		await page.mouse.up();
 		await page.locator(".prompt-tools .ann-dock").click();
 		const composer = page.locator(".prompt textarea");
-		await expect(composer).toHaveAttribute("placeholder", "Add an annotation");
+		await expect(composer).toHaveValue("");
+		await expect(composer).not.toHaveAttribute("placeholder", "Add an annotation");
 		await composer.click();
 		await page.keyboard.type("go", { delay: 10 });
 		await page.locator(".send-btn").click();

@@ -1343,8 +1343,10 @@
 			}
 		}
 	}
+	/* Fresh washes read at once (~120ms, same beat as the
+	registry ramp): hovering a marker must never feel late. */
 	.rendered :global(mark.ccez-ann.fresh) {
-		animation: ann-wash-in 0.3s ease;
+		animation: ann-wash-in 0.12s ease;
 	}
 	@keyframes ann-wash-in-dark {
 		from {

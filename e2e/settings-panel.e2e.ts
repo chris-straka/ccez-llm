@@ -117,6 +117,48 @@ test("chat width slider narrows the column and persists", async ({ page }) => {
 		.toContain('"chatWidth":32');
 });
 
+/** Prompt sliders resize only the composer: text size drives the
+ * --prompt-font var (message --font-scale untouched), width drives
+ * --prompt-width capped by the column. Both persist. */
+test("prompt sliders resize the composer only and persist", async ({
+	page
+}) => {
+	const appVar = (name: string) =>
+		page.evaluate(
+			(n) =>
+				getComputedStyle(document.querySelector(".app") as Element)
+					.getPropertyValue(n)
+					.trim(),
+			name
+		);
+	const size = page.locator(
+		'.settings-panel input[aria-label="Prompt text size percent"]'
+	);
+	const width = page.locator(
+		'.settings-panel input[aria-label="Prompt width in rem"]'
+	);
+	await expect(size).toBeVisible();
+	await expect(width).toBeVisible();
+	// Prompt text to 200%: its own var moves, the message scale stays.
+	await size.fill("200");
+	expect(await appVar("--prompt-font")).toBe("2");
+	expect(await appVar("--font-scale")).toBe("1");
+	// Prompt width to 32rem under the 36rem column: the var follows.
+	await width.fill("32");
+	expect(await appVar("--prompt-width")).toBe("32");
+	expect(await appVar("--chat-width")).toBe("36");
+	await expect
+		.poll(() =>
+			page.evaluate(() => window.localStorage.getItem("ccez-llm-settings-v1"))
+		)
+		.toContain('"promptScale":2');
+	await expect
+		.poll(() =>
+			page.evaluate(() => window.localStorage.getItem("ccez-llm-settings-v1"))
+		)
+		.toContain('"promptWidth":32');
+});
+
 /** Gutter double-click reads the live column: wide ignores, narrow opens. */
 test("gutter double-click recomputes from the live width", async ({ page }) => {
 	// A full-width assistant reply marks the column edges (a lone short

@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { identifyLangOffline, identifyLangShort } from "./langId";
-import { hasPinyinTones, ttsLangFor } from "./reading";
+import { hasDistinctiveChinese, hasPinyinTones, ttsLangFor } from "./reading";
 import {
 	effectiveSpeechLang,
 	speechLangsFor,
@@ -291,6 +291,12 @@ export async function quoteLangForContext(
 	const probe = quoteProbeFor(context, quote);
 	const sentenceLang = ttsLangFor(probe, "");
 	if (sentenceLang && sentenceLang !== "zh-CN") return sentenceLang;
+	// Curated distinctive Han forms never occur in Japanese, so a
+	// probe carrying them skips the recognizer entirely: the bridge
+	// reads short shared-kanji strings (dates like 九月二十三日) as
+	// Japanese even inside a Chinese sentence, and no seed may
+	// overrule the characters.
+	if (hasDistinctiveChinese(probe)) return "zh-CN";
 	try {
 		const tag = await invoke<string | null>("tts_identify_lang", {
 			text: probe

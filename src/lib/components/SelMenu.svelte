@@ -35,6 +35,9 @@ can't be suppressed, so a floating menu would double it. -->
 		enter: () => void;
 		leave: () => void;
 		annotate: () => void;
+		/** Right-click Annotate: file and send at once (the "a" key
+		path), never the create box. */
+		annotateInstant: () => void;
 		annotateTouch: (event: TouchEvent) => void;
 		copy: () => void;
 		copyTouch: (event: TouchEvent) => void;
@@ -93,6 +96,10 @@ can't be suppressed, so a floating menu would double it. -->
 			type="button"
 			onmousedown={actions.press}
 			onclick={actions.annotate}
+			oncontextmenu={(e) => {
+				e.preventDefault();
+				actions.annotateInstant();
+			}}
 			ontouchstart={actions.btnTouch}
 			ontouchend={actions.annotateTouch}>Annotate</button
 		>
@@ -113,8 +120,13 @@ can't be suppressed, so a floating menu would double it. -->
 		else gets Annotate alone. -->
 		<button
 			type="button"
+			title="Annotate (right-click files and sends at once)"
 			onmousedown={actions.press}
 			onclick={actions.annotate}
+			oncontextmenu={(e) => {
+				e.preventDefault();
+				actions.annotateInstant();
+			}}
 			ontouchstart={actions.btnTouch}
 			ontouchend={actions.annotateTouch}>Annotate</button
 		>

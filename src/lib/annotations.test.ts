@@ -38,12 +38,14 @@ import {
 	filePendingAnnotation,
 	promptAnnWashIdFor,
 	promptInclusions,
-	canAddToPrompt,
-	setPromptExcluded,
-	fileStagedComment,
-	attachStagedAnswers,
+	clearPromptPinned,
+	canPinAnnotation,
+	setPromptPinned,
+	attachAnnotationAnswer,
+	unansweredAnnotations,
 	paragraphForQuote,
 	badgeAnswerClass,
+	badgeFace,
 	clampMenuDrag,
 	menuBtnTouchAction,
 	selMenuDragTarget,
@@ -83,7 +85,11 @@ describe("annotations", () => {
 			"b"
 		);
 		expect(clearAnnotations()).toEqual([]);
-		expect(annotationNumber(list, list[1]!.id)).toBe(2);
+		// Numbers restart at 1 on every message.
+		expect(annotationNumber(list, list[0]!.id)).toBe(1);
+		expect(annotationNumber(list, list[1]!.id)).toBe(1);
+		list = addAnnotation(list, "m2" as ChatMsgId, "c");
+		expect(annotationNumber(list, list[2]!.id)).toBe(2);
 		expect(annotationNumber(list, "missing" as AnnotationId)).toBe(0);
 	});
 
@@ -109,70 +115,129 @@ describe("annotations", () => {
 		expect(withAnnotations("explain", [])).toBe("explain");
 	});
 
-	it("omits removed prompt inclusions with no footnote trace", () => {
-		const list = setPromptExcluded(
-			addAnnotation(
-				addAnnotation([], "m1" as ChatMsgId, "langue", "meaning?"),
-				"m1" as ChatMsgId,
-				"alphabet",
-				"letters?"
-			),
-			"missing" as AnnotationId,
+	it("bakes only pinned annotations; deleting is the only removal", () => {
+		const filed = addAnnotation(
+			addAnnotation([], "m1" as ChatMsgId, "langue", "meaning?"),
+			"m1" as ChatMsgId,
+			"alphabet",
+			"letters?"
+		);
+		// Nothing pinned: the prompt goes out bare (no omit state —
+		// creating never includes).
+		expect(withAnnotations("explain", promptInclusions(filed))).toBe(
+			"explain"
+		);
+		const list = setPromptPinned(
+			setPromptPinned(filed, filed[0]!.id, true),
+			filed[1]!.id,
 			true
 		);
-		// Unknown id: nothing changes.
-		expect(withAnnotations("explain", list)).toBe(
+		expect(withAnnotations("explain", promptInclusions(list))).toBe(
 			'explain\n\nAnnotated selections:\n1. "langue" — meaning?\n2. "alphabet" — letters?'
 		);
-		const excluded = setPromptExcluded(list, list[0]!.id, true);
-		expect(promptInclusions(excluded)).toHaveLength(1);
-		// Numbering resequences from the kept order: no gaps.
-		expect(withAnnotations("explain", excluded)).toBe(
+		// Unpinning one resequences numbering from the kept order.
+		const oneOut = setPromptPinned(list, list[0]!.id, false);
+		expect(promptInclusions(oneOut)).toHaveLength(1);
+		expect(withAnnotations("explain", promptInclusions(oneOut))).toBe(
 			'explain\n\nAnnotated selections:\n1. "alphabet" — letters?'
 		);
-		// All excluded: the prompt goes out bare.
-		const allOut = setPromptExcluded(excluded, excluded[1]!.id, true);
-		expect(withAnnotations("explain", allOut)).toBe("explain");
-		// Re-including restores the bake and drops the flag.
-		const back = setPromptExcluded(allOut, list[0]!.id, false);
-		expect(back[0]).not.toHaveProperty("excludedFromPrompt");
-		expect(withAnnotations("explain", back)).toBe(
-			'explain\n\nAnnotated selections:\n1. "langue" — meaning?'
-		);
-		const full = setPromptExcluded(back, list[1]!.id, false);
-		expect(withAnnotations("explain", full)).toBe(
-			'explain\n\nAnnotated selections:\n1. "langue" — meaning?\n2. "alphabet" — letters?'
+		// None pinned: bare again.
+		const noneOut = setPromptPinned(oneOut, oneOut[1]!.id, false);
+		expect(withAnnotations("explain", promptInclusions(noneOut))).toBe(
+			"explain"
 		);
 	});
 
-	it("offers Add to prompt only for empty questions, files staged wording", () => {
-		expect(canAddToPrompt({ comment: "" })).toBe(true);
-		expect(canAddToPrompt({ comment: "   " })).toBe(true);
-		expect(canAddToPrompt({ comment: "meaning?" })).toBe(false);
-		const list = addAnnotation([], "m1" as ChatMsgId, "langue", "");
-		const filed = fileStagedComment(list, list[0]!.id, "meaning?");
-		expect(filed[0]?.comment).toBe("meaning?");
-		expect(list[0]?.comment).toBe("");
+	it("clear-all removes only prompt-pinned annotations", () => {
+		const filed = addAnnotation(
+			addAnnotation([], "m1" as ChatMsgId, "langue", "meaning?"),
+			"m1" as ChatMsgId,
+			"alphabet",
+			"letters?"
+		);
+		const pinned = setPromptPinned(filed, filed[0]!.id, true);
+		const cleared = clearPromptPinned(pinned);
+		expect(cleared.map((a) => a.quote)).toEqual(["alphabet"]);
+		expect(clearPromptPinned(filed)).toHaveLength(2);
 	});
 
-	it("lands staged replies only on asked ids, never on blank replies", () => {
+	it("offers pinning only for answered annotations, pins them", () => {
+		expect(canPinAnnotation({})).toBe(false);
+		expect(canPinAnnotation({ answer: "because reasons" })).toBe(true);
+		const list = addAnnotation([], "m1" as ChatMsgId, "langue", "meaning?");
+		// Creating never includes: the prompt goes out bare.
+		expect(promptInclusions(list)).toHaveLength(0);
+		expect(withAnnotations("explain", promptInclusions(list))).toBe(
+			"explain"
+		);
+		const pinned = setPromptPinned(list, list[0]!.id, true);
+		expect(pinned[0]?.pinnedToPrompt).toBe(true);
+		expect(list[0]?.pinnedToPrompt).toBeUndefined();
+		expect(promptInclusions(pinned)).toHaveLength(1);
+		// Unpinning drops the flag (the annotation itself stays).
+		const unpinned = setPromptPinned(pinned, list[0]!.id, false);
+		expect(unpinned[0]).not.toHaveProperty("pinnedToPrompt");
+		expect(promptInclusions(unpinned)).toHaveLength(0);
+		// Unknown id: nothing changes.
+		expect(setPromptPinned(list, "missing" as AnnotationId, true)).toBe(
+			list
+		);
+	});
+
+	it("restarts refire exactly the answerless drafts", () => {
 		const list = addAnnotation(
 			addAnnotation([], "m1" as ChatMsgId, "langue", "meaning?"),
 			"m1" as ChatMsgId,
 			"alphabet",
 			"letters?"
 		);
-		const asked = attachStagedAnswers(list, [list[0]!.id], "because reasons");
+		const asked = attachAnnotationAnswer(list, list[0]!.id, "because reasons");
+		const waiting = unansweredAnnotations(asked);
+		expect(waiting.map((a) => a.quote)).toEqual(["alphabet"]);
+		expect(unansweredAnnotations([])).toEqual([]);
+	});
+
+	it("lands instant replies only on the asked id, never on blanks", () => {
+		const list = addAnnotation(
+			addAnnotation([], "m1" as ChatMsgId, "langue", "meaning?"),
+			"m1" as ChatMsgId,
+			"alphabet",
+			"letters?"
+		);
+		const asked = attachAnnotationAnswer(list, list[0]!.id, "because reasons");
 		expect(asked[0]?.answer).toBe("because reasons");
-		// Bundled context riders stay blue.
+		// Other annotations stay blue.
 		expect(asked[1]?.answer).toBeUndefined();
 		expect(list[0]?.answer).toBeUndefined();
-		// Blank/blocked replies attach nothing (same ref back).
-		expect(attachStagedAnswers(list, [list[0]!.id], "   ")).toBe(list);
-		expect(attachStagedAnswers(list, [], "because")).toBe(list);
-		expect(
-			attachStagedAnswers(list, ["missing" as AnnotationId], "because")
-		).toBe(list);
+		// Blank replies attach nothing (same ref back).
+		expect(attachAnnotationAnswer(list, list[0]!.id, "   ")).toBe(list);
+		expect(attachAnnotationAnswer(list, "missing" as AnnotationId, "x")).toBe(
+			list
+		);
+	});
+
+	it("bakes pinned answers as quote, question, and reply", () => {
+		const list = addAnnotation([], "m1" as ChatMsgId, "langue", "meaning?");
+		const answered = attachAnnotationAnswer(
+			list,
+			list[0]!.id,
+			"because reasons\nsecond line"
+		);
+		const pinned = setPromptPinned(answered, list[0]!.id, true);
+		expect(withAnnotations("explain", promptInclusions(pinned))).toBe(
+			'explain\n\nAnnotated selections:\n1. "langue" — meaning?\n   Answer: because reasons second line'
+		);
+		const split = splitAnnotationBlock(
+			withAnnotations("explain", promptInclusions(pinned))
+		);
+		expect(split?.refs).toEqual([
+			{
+				n: 1,
+				quote: "langue",
+				comment: "meaning?",
+				answer: "because reasons second line"
+			}
+		]);
 	});
 
 	it("round-trips baked blocks back into text plus refs", () => {
@@ -969,6 +1034,29 @@ describe("buildMarksFor", () => {
 		expect(marks[0]!.preview).toBeUndefined();
 	});
 
+	it("keeps pin and arm states off the mark (page-side only)", () => {
+		const pinned = setPromptPinned(list, list[0]!.id, true);
+		const marks = buildMarksFor(pinned, m1, false, null);
+		expect(marks[0]).not.toHaveProperty("pinned");
+		expect(marks[0]).not.toHaveProperty("armed");
+		const loose = buildMarksFor(list, m1, false, null);
+		expect(loose[0]).not.toHaveProperty("pinned");
+		expect(loose[0]).not.toHaveProperty("armed");
+	});
+
+	it("faces every badge as its number, always", () => {
+		// Numbers never swap (no plus/minus): pinning happens by
+		// double-click and leaves the face alone.
+		expect(badgeFace({ number: 3 })).toEqual({
+			text: "3",
+			title: "Open annotation"
+		});
+		expect(badgeFace({ number: 12 })).toEqual({
+			text: "12",
+			title: "Open annotation"
+		});
+	});
+
 	it("hides aid-scoped quotes while the aid is off", () => {
 		const scoped: Annotation = {
 			...list[0]!,
@@ -988,7 +1076,9 @@ describe("buildMarksFor", () => {
 		const marks = buildMarksFor(list, m1, false, pending);
 		expect(marks).toHaveLength(2);
 		expect(marks[1]).toMatchObject({
-			number: 3,
+			// Next per-message number (m1 holds one), never the
+			// chat-global count.
+			number: 2,
 			quote: "draft",
 			preview: true
 		});

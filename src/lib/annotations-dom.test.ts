@@ -425,17 +425,17 @@ describe("draft annotation persistence", () => {
 		expect(loadDraftAnnotations("c2")).toEqual([]);
 	});
 
-	it("restores answers and prompt exclusions with drafts", () => {
+	it("restores answers with drafts but resets pins", () => {
 		// A reload must not un-ask an answered annotation back to
-		// blue, nor re-include a removed inclusion.
+		// blue — but pins never persist, so a stale approval can't
+		// ride a later send. There is no omit state: deleting is
+		// the only removal.
 		saveDraftAnnotations(
 			"c1",
-			[ann({ answer: "because", excludedFromPrompt: true })],
+			[ann({ answer: "because", pinnedToPrompt: true })],
 			["c1"]
 		);
-		expect(loadDraftAnnotations("c1")).toEqual([
-			ann({ answer: "because", excludedFromPrompt: true })
-		]);
+		expect(loadDraftAnnotations("c1")).toEqual([ann({ answer: "because" })]);
 	});
 
 	it("clearing a chat drops its entry, orphans prune on save", () => {

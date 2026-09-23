@@ -13,7 +13,8 @@ import { describe, it, expect } from "vitest";
  * - the pending create (composer owns the screen) must wash its quote;
  * - assistant messages shrink-wrap below the full-bleed text size.
  * Filed notes never transplant on phones: badge taps open the dock
- * on the row, and questions ask through the staged pill.
+ * on the row, and pinned questions bake into the send (pin-only —
+ * no staged pill anywhere).
  */
 function pageSource(): string {
 	return readFileSync(new URL("./+page.svelte", import.meta.url), "utf8");
@@ -52,12 +53,14 @@ describe("phone marker taps survive tap-out", () => {
 		);
 	});
 	it("opens the dock on the tapped row, never a transplant", () => {
-		// Marker taps file nothing into the composer: the dock opens
-		// on the row (a staged pill closes first, the badge's no-send
-		// close), and no filed-note transplant exists anymore.
+		// Marker taps file nothing into the composer: with no answer
+		// yet the badge opens the review dock on the row (the badge's
+		// own re-press toggles shut instead), and no filed-note
+		// transplant — nor any staged pill — exists anymore.
 		const source = pageSource();
 		expect(source).not.toContain("editAnnotationInPrompt({ id }");
-		expect(source).toContain("if (id === stagedAnnId) closeStagedAnnotation();");
+		expect(source).not.toContain("stagedAnnId");
+		expect(source).toContain("function openBadge(");
 		expect(source).toContain("reviewOpen = true;");
 	});
 });

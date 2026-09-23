@@ -105,6 +105,15 @@ export interface AppSettings {
 	 * Phones always fill the viewport; the slider hides there.
 	 */
 	chatWidth: number;
+	/** Prompt-only text-size multiplier (1 = default): ⌘[ / ⌘]
+	 * resizes the composer without touching message text. */
+	promptScale: number;
+	/**
+	 * Desktop-only composer width in rem (36 = the default):
+	 * ⇧⌘[ / ⇧⌘] widens the prompt, never the column. Phones
+	 * always fill the viewport; the slider hides there.
+	 */
+	promptWidth: number;
 	/**
 	 * The user explicitly picked the voice locale (voice-language field),
 	 * so restarts must keep it. Unset when a reply pill overrides the
@@ -243,18 +252,23 @@ export function effectiveChatWidth(
 
 /**
  * Effective composer width (rem) for the --prompt-width var. The
- * prompt keeps its own base (never the slider) widened by the same
- * factor past 200%, capped by the column — so the composer grows
- * with huge type but never sticks out past the messages. Pure.
+ * prompt keeps its own base (never the chat slider) widened by its
+ * own scale past 200%, capped by the column — so the composer grows
+ * with huge prompt type but never sticks out past the messages.
+ * Unset prompt settings fall back to the legacy behavior (the
+ * global font scale widens, base 36). Pure.
  */
 export function effectivePromptWidth(
 	androidUI: boolean,
 	fontScale: number,
-	chatWidth: number
+	chatWidth: number,
+	promptScale?: number,
+	promptWidth?: number
 ): number {
 	return Math.min(
 		effectiveChatWidth(androidUI, fontScale, chatWidth),
-		PROMPT_WIDTH_BASE_REM * widenFactorForFont(fontScale)
+		(promptWidth ?? PROMPT_WIDTH_BASE_REM) *
+			widenFactorForFont(promptScale ?? fontScale)
 	);
 }
 
@@ -364,6 +378,8 @@ export function defaultSettings(): AppSettings {
 		sidebarCollapsed: true,
 		fontScale: 1,
 		chatWidth: CHAT_WIDTH_DEFAULT,
+		promptScale: 1,
+		promptWidth: PROMPT_WIDTH_BASE_REM,
 		ownBubble: false,
 		hoverUserActions: true,
 		hoverAssistantActions: true,
@@ -526,6 +542,29 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 			merged.chatWidth = Math.min(
 				CHAT_WIDTH_MAX,
 				Math.max(CHAT_WIDTH_MIN, Math.round(merged.chatWidth))
+			);
+		}
+		// Prompt text size rides the same 50–800% clamp as the
+		// global one; the prompt width rides the chat-width clamp
+		// (same slider step, whole rem).
+		if (
+			typeof merged.promptScale !== "number" ||
+			!(
+				merged.promptScale >= FONT_SCALE_MIN &&
+				merged.promptScale <= FONT_SCALE_MAX
+			)
+		) {
+			merged.promptScale = 1;
+		}
+		if (
+			typeof merged.promptWidth !== "number" ||
+			Number.isNaN(merged.promptWidth)
+		) {
+			merged.promptWidth = PROMPT_WIDTH_BASE_REM;
+		} else {
+			merged.promptWidth = Math.min(
+				CHAT_WIDTH_MAX,
+				Math.max(CHAT_WIDTH_MIN, Math.round(merged.promptWidth))
 			);
 		}
 		// Theme pins from older saves predate the switch: anything that

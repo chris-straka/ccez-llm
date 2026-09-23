@@ -75,6 +75,8 @@ const WEB_HIDDEN_ROWS = new Set([
 	"Reply language",
 	"Text size up / down",
 	"Chat width + / −",
+	"Prompt text size up / down",
+	"Prompt width + / −",
 	"New chat"
 ]);
 
@@ -95,8 +97,13 @@ export function desktopShortcuts(isMac: boolean, inShell = true): ShortcutRow[] 
 		{ name: "Thinking level", keys: `Ctrl+${altm}+↓ / ↑` },
 		{
 			name: "Scroll",
-			keys: "j/k, ctrl+u/ctrl+d, gg/G, z/Z, h/l"
+			keys: "j/k, u/d, ctrl+u/ctrl+d, gg/G, z/Z, h/l"
 		},
+		{ name: "Annotate hovered word", keys: "Hover + A" },
+		{ name: "Annotate instantly", keys: "Right-click Annotate" },
+		{ name: "Delete annotation", keys: "Hover badge + Delete" },
+		{ name: "Pin annotation", keys: "Double-click badge" },
+		{ name: "Select sentence / paragraph", keys: "Triple-click / quadruple-click" },
 		{ name: "Exit fullscreen", keys: "Hold Esc 2s · Esc+F" },
 		{
 			name: "Chat list",
@@ -114,9 +121,7 @@ export function desktopShortcuts(isMac: boolean, inShell = true): ShortcutRow[] 
 		{
 			name: "Newer / older chat",
 			keys: `${
-				isMac
-					? "⇧⌘J / ⇧⌘K / ⌘[ / ⌘] / ⌘↑ / ⌘↓"
-					: "Ctrl+Shift+J / Ctrl+Shift+K / Ctrl+[ / Ctrl+] / Ctrl+↑ / Ctrl+↓"
+				isMac ? "⇧⌘J / ⇧⌘K / ⌘↑ / ⌘↓" : "Ctrl+Shift+J / Ctrl+Shift+K / Ctrl+↑ / Ctrl+↓"
 			}`
 		},
 		{
@@ -147,7 +152,7 @@ export function desktopShortcuts(isMac: boolean, inShell = true): ShortcutRow[] 
 			name: "Reply language",
 			keys: `${
 				isMac ? "⌘1, ⌘0" : "Ctrl+1, Ctrl+0"
-			} · repeat clears · empty picks · messaged jumps chat`
+			} · repeat clears · empty picks · always picks`
 		},
 		{
 			name: "Delete this chat",
@@ -164,7 +169,9 @@ export function desktopShortcuts(isMac: boolean, inShell = true): ShortcutRow[] 
 		{ name: "Reading aid toggle", keys: "M pinyin · N furigana" },
 		{ name: "prev/next stroke step", keys: "H / L with Inspect open" },
 		{ name: "Text size up / down", keys: `${mod}+ / ${mod}−` },
-		{ name: "Chat width + / −", keys: `⇧${mod}+ / ⇧${mod}−` }
+		{ name: "Chat width + / −", keys: `⇧${mod}+ / ⇧${mod}−` },
+		{ name: "Prompt text size up / down", keys: `${mod}[ / ${mod}]` },
+		{ name: "Prompt width + / −", keys: `⇧${mod}[ / ⇧${mod}]` }
 	];
 	return (inShell ? rows : rows.filter((row) => !WEB_HIDDEN_ROWS.has(row.name))).sort(
 		byName

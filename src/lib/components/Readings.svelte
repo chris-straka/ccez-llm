@@ -101,7 +101,9 @@ panels. -->
 		inner padding of their own). */
 		padding: 0.3rem 0.2rem;
 		border-radius: 8px;
-		font-size: 0.85rem;
+		/* Rides the chat text size (never the prompt's own): a fixed
+		0.85rem panel next to 370% type reads as a toy. */
+		font-size: calc(0.85rem * var(--font-scale, 1));
 		background: rgba(255, 255, 255, 0.88);
 		-webkit-backdrop-filter: blur(18px) saturate(1.6);
 		backdrop-filter: blur(18px) saturate(1.6);

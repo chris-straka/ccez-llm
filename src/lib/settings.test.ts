@@ -320,6 +320,20 @@ describe("settings", () => {
 		expect(effectivePromptWidth(true, 1, 36)).toBe(36);
 	});
 
+	it("rides the prompt's own scale and base when set", () => {
+		// A set prompt width replaces the 36rem base…
+		expect(effectivePromptWidth(false, 1, 60, undefined, 48)).toBe(48);
+		// …still capped by the column.
+		expect(effectivePromptWidth(false, 1, 36, undefined, 60)).toBe(36);
+		// A set prompt scale widens its own base, not the global one:
+		// global 1 with prompt 4 doubles the base…
+		expect(effectivePromptWidth(false, 1, 80, 4, 36)).toBe(72);
+		// …while global 4 with prompt 1 keeps the base pinned.
+		expect(effectivePromptWidth(false, 4, 60, 1, 36)).toBe(36);
+		// Omitted prompt settings keep the legacy global widening.
+		expect(effectivePromptWidth(false, 4, 60)).toBe(72);
+	});
+
 	it("defaults mic dictation on and keeps an explicit off", () => {
 		expect(defaultSettings().micEnabled).toBe(true);
 		const off = blankSettings();

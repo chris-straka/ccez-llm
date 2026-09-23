@@ -42,7 +42,7 @@ describe("review dock extraction", () => {
 	it("renders the dock from the component, not the page", () => {
 		expect(dockSource()).toContain('class="ann-wrap"');
 		expect(dockSource()).toContain('class="review"');
-		expect(dockSource()).toContain("Clear all");
+		expect(dockSource()).toContain("Clear pinned");
 		// The dock usage moved into the composer with the tools row;
 		// the page renders the composer instead.
 		expect(composerSource()).toContain("<ReviewDock");
@@ -64,33 +64,40 @@ describe("review dock extraction", () => {
 		expect(pageStyle()).not.toContain(".ann-wrap .review");
 	});
 
-	it("carries no edit affordances in the overlay", () => {
+	it("edits through the card, never inline in the dock", () => {
 		const source = dockSource();
-		expect(source).not.toContain("review-pencil");
+		// The pencil opens the edit card (reword-and-re-ask); no
+		// textarea ever mounts in the dock itself.
+		expect(source).toContain("review-pencil");
 		expect(source).not.toContain("review-edit-actions");
 		expect(source).not.toContain("<textarea");
-		expect(source).not.toContain("Edit annotation");
 	});
 
-	it("stages only empty questions, toggles inclusions, shows answers", () => {
+	it("rows jump, copy, unpin, reword, and delete — answers always show", () => {
 		const source = dockSource();
-		// Add to prompt gates on the empty question (canAddToPrompt),
-		// never offered beside a written one.
-		expect(source).toContain("canAddToPrompt(ann)");
-		expect(source).toContain("Add to prompt");
-		// Inclusion toggle keeps the annotation, omits it from send.
-		expect(source).toContain("Remove from prompt inclusions");
-		expect(source).toContain("setExcluded");
-		// A staged row offers Unstage: the dock's no-send close.
-		expect(source).toContain("Unstage");
-		expect(source).toContain("stagedId");
-		// Answered quotes read as green annotated-text chips with
-		// their answer always displayed below.
-		expect(source).toContain("Annotated text");
+		// Pinned rows only: pinning happens by double-clicking the
+		// badge, so no per-row Add exists — Unpin is the only prompt
+		// action, gated on answered rows like the pencil.
+		expect(source).toContain("canPinAnnotation(ann)");
+		expect(source).not.toContain("Add to prompt");
+		expect(source).not.toContain("actions.pin(ann.id)");
+		expect(source).toContain("actions.unpin(ann.id)");
+		// No omit/include toggle: deleting is the only removal.
+		expect(source).not.toContain("setExcluded");
+		expect(source).not.toContain("review-omit");
+		expect(source).not.toContain("Omit");
+		// The orange pencil rewords answered rows (saving re-asks).
+		expect(source).toContain("review-pencil");
+		expect(source).toContain("actions.editOrange(ann.id)");
+		// Quote jump, copy, and delete stay on every row; answers
+		// display always under their question.
+		expect(source).toContain("actions.quote(ann)");
+		expect(source).toContain("review-copy");
+		expect(source).toContain("review-del");
 		expect(source).toContain("review-answer");
 		const css = dockStyle();
 		expect(css).toContain(".review-add");
-		expect(css).toContain(".review-omit");
+		expect(css).not.toContain(".review-omit");
 		expect(css).toContain(".review-answer");
 		expect(css).toContain(".review-quote.annotated");
 	});

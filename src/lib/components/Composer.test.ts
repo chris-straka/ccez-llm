@@ -44,6 +44,11 @@ describe("composer contract", () => {
 		expect(source).toContain('class="error-banner"');
 		expect(source).toContain('class="hidden-input"');
 		expect(source).toContain("<ReviewDock");
+		// The dock lists double-click-pinned rows, plus the open
+		// row while the review sits open (a badge tap opens its
+		// row before it is pinned).
+		expect(source).toContain("items={dockItems}");
+		expect(source).toContain("a.pinnedToPrompt === true");
 		// Gates ride props, not page state.
 		expect(source).toContain("class:prompt-idle={parked}");
 		expect(source).toContain("disabled={!canSubmit && !hasAnnEdit}");
@@ -129,30 +134,25 @@ describe("composer contract", () => {
 		expect(css).toContain(".ta-input::-webkit-scrollbar");
 	});
 
-	it("stages annotation questions in one pill with inclusion chips", () => {
+	it("keeps pinned annotations out of the prompt text", () => {
 		const source = componentSource();
-		// Inclusion chips: one pencil per annotation riding the send
-		// (asks the unasked, redos the answered) — no edit in the dock.
-		expect(source).toContain('class="inclusion-chips"');
-		expect(source).toContain("Ask annotation {inc.n} through the send prompt");
-		// Staged pill: exact text once, copy plus pencil plus close,
-		// wording field with Esc-to-unstage.
-		expect(source).toContain('class="staged-pill"');
-		expect(source).toContain("“{staged.quote}”");
-		expect(source).toContain("Copy staged wording");
-		expect(source).toContain("Unstage annotation");
-		expect(source).toContain("bind:value={stagedDraft}");
+		// Nothing renders inside the prompt itself: no chips, no
+		// staged pill — the annotation button's rising count plus
+		// its overlay is the whole surface (the send still bakes
+		// pins as context invisibly).
+		expect(source).not.toContain("inclusion-chip");
+		expect(source).not.toContain("jumpPinned");
+		expect(source).not.toContain('class="staged-pill"');
+		expect(source).not.toContain("stagedDraft");
 		const css = componentStyle();
-		expect(css).toContain(".staged-pill");
-		expect(css).toContain(".inclusion-chip");
-		expect(css).toContain(".staged-field textarea");
-		// The page owns staging state and behaviors.
+		expect(css).not.toContain(".staged-pill");
+		expect(css).not.toContain(".inclusion-chip");
+		// The page passes no inclusions and wires no chip jump.
 		const page = pageSource();
-		expect(page).toContain("inclusions={inclusionsForPrompt()}");
-		expect(page).toContain("staged={stagedForPrompt()}");
-		expect(page).toContain("function stageAnnotation");
-		expect(page).toContain("function pencilStagedAnnotation");
-		expect(page).toContain("function closeStagedAnnotation");
-		expect(page).toContain("function landAskedAnswers");
+		expect(page).not.toContain("inclusionsForPrompt");
+		expect(page).not.toContain("jumpPinned");
+		expect(page).not.toContain("staged={stagedForPrompt()}");
+		expect(page).not.toContain("function stageAnnotation");
+		expect(page).not.toContain("function closeStagedAnnotation");
 	});
 });

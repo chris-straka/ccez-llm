@@ -8,7 +8,9 @@ import { readFileSync } from "node:fs";
  * The quote itself never renders here (the highlighted word
  * upstream is the title, with Han readings in the panels above
  * it). Answer text renders as text (never {@html}). No close
- * button: clicking off the card (or Esc) closes it.
+ * button: clicking off the card (or Esc) closes it. The card
+ * carries no tools at all: the reply takes the whole card
+ * (rewording is the E key, a second Enter on the badge pins).
  */
 function answerSource(): string {
 	return readFileSync(new URL("./AnnAnswer.svelte", import.meta.url), "utf8");
@@ -24,17 +26,24 @@ function pageSource(): string {
 describe("annotation answer extraction", () => {
 	it("renders the answer card from the component, not the page", () => {
 		expect(answerSource()).toContain('class="ann-answer"');
-		// No Add-to-prompt anywhere in the answer overlay: empty
-		// questions stage from the dock, never from an answer.
-		expect(answerSource()).not.toContain("Add to prompt");
-		expect(answerSource()).not.toContain("addToPrompt");
 		expect(pageSource()).not.toContain('class="ann-answer"');
+	});
+
+	it("carries no tools: the reply takes the whole card", () => {
+		expect(answerSource()).not.toContain("<button");
+		expect(answerSource()).not.toContain("ann-answer-pin");
+		expect(answerSource()).not.toContain("ontogglepin");
 	});
 
 	it("carries no quote title and no close button", () => {
 		expect(answerSource()).not.toContain("ann-answer-quote");
 		expect(answerSource()).not.toContain("Close answer");
 		expect(answerSource()).not.toContain("{quote}");
+	});
+
+	it("carries no pencil either: rewording is the E key", () => {
+		expect(answerSource()).not.toContain("ann-answer-edit");
+		expect(answerSource()).not.toContain("onedit");
 	});
 
 	it("renders answer text as text, never HTML", () => {
@@ -50,9 +59,9 @@ describe("annotation answer extraction", () => {
 		expect(answerSource()).toContain("closing");
 	});
 
-	it("paints an opaque surface, pinned for stark contrast", () => {
-		expect(answerSource()).not.toMatch(/rgba\(255,\s*255,\s*255,\s*0\./);
-		expect(answerSource()).not.toMatch(/rgba\(30,\s*30,\s*32,\s*0\./);
+	it("floats near-opaque, fully opaque only for stark contrast", () => {
+		expect(answerSource()).toMatch(/rgba\(255,\s*255,\s*255,\s*0\.98\)/);
+		expect(answerSource()).toMatch(/rgba\(30,\s*30,\s*32,\s*0\.98\)/);
 		expect(answerSource()).toContain("prefers-contrast");
 	});
 });

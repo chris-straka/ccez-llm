@@ -131,7 +131,6 @@ blur-save fires first and Cancel/Delete can never win the race. -->
 		rows={1}
 		bind:this={box}
 		bind:value={draft}
-		placeholder="Add an annotation"
 		aria-label="Annotation text. Enter or clicking away saves, Escape cancels."
 		use:growPill
 		onkeydown={actions.key}
@@ -196,13 +195,19 @@ blur-save fires first and Cancel/Delete can never win the race. -->
 				</button>
 			{/if}
 			<!-- No Cancel button: clicking off the card (or Escape)
-			closes it — an empty draft cancels, typed text saves. -->
+			closes it — an empty draft cancels, typed text saves.
+			The save is an icon twin of mic/delete (same seat, same
+			size), never a text button. -->
 			<button
 				type="button"
-				class="ann-save"
+				class="ann-tool"
+				aria-label="Save annotation"
+				title="Save annotation"
 				onmousedown={(e) => e.preventDefault()}
-				onclick={actions.save}>Save</button
+				onclick={actions.save}
 			>
+				<ActionIcon kind="save" />
+			</button>
 		</div>
 	{/if}
 </div>
@@ -231,15 +236,17 @@ blur-save fires first and Cancel/Delete can never win the race. -->
 		the rounded corners on phones. Shadows paint outside, so they
 		are unaffected. */
 		overflow: hidden;
-		/* Font-scaled, capped: roomier text at large sizes, never past
-		32rem (popWidth mirrors this math for centering). */
-		width: min(32rem, calc(24rem * var(--font-scale, 1)));
+		/* 90% of the chat column: wide columns earn wide popups
+		instead of a fixed cap (the column already widens with huge
+		type, so no separate font term). The vw clamp folds into the
+		min — phones never spill past the viewport edge.
+		popWidth mirrors this math for centering. */
+		width: min(calc(var(--chat-width, 36) * 0.9rem), calc(100vw - 1rem));
 		/* Border-box: without it the padding and border stack outside
-		the rem width and the vw clamp (content-box), spilling past
-		the viewport edge on phones. The responsive units only
-		contain the card on every OS with this set. */
+		the rem width (content-box), spilling past the viewport edge
+		on phones. The responsive units only contain the card on
+		every OS with this set. */
 		box-sizing: border-box;
-		max-width: calc(100vw - 1rem);
 		padding: 1rem 1.1rem 0.9rem;
 		border: 1px solid #38383a;
 		border-radius: 20px;
@@ -300,9 +307,6 @@ blur-save fires first and Cancel/Delete can never win the race. -->
 	}
 	.ann-pop textarea:focus {
 		outline: none;
-	}
-	.ann-pop textarea::placeholder {
-		color: #8e8e93;
 	}
 	.ann-pop-row {
 		display: flex;
@@ -371,9 +375,6 @@ blur-save fires first and Cancel/Delete can never win the race. -->
 	:global(html[data-theme="light"]) .ann-pop textarea {
 		color: #1c1c1e;
 	}
-	:global(html[data-theme="light"]) .ann-pop textarea::placeholder {
-		color: #6e6e73;
-	}
 	:global(html[data-theme="light"]) .ann-pop .ann-tool {
 		color: #6e6e73;
 	}
@@ -407,11 +408,12 @@ blur-save fires first and Cancel/Delete can never win the race. -->
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		/* The creation pill scales with the text size like the edit
-		card's width does (a fixed 19rem pill next to 370% type is a
-		toy): the save arrow rides along via font inheritance.
-		popWidth mirrors this math for centering. */
-		width: min(32rem, calc(19rem * var(--font-scale, 1)));
+		/* Same 90%-of-column width as the edit card: the pill
+		stretches into a long capsule on wide columns (its 999px
+		radius still rounds the ends), and the save arrow rides
+		along via font inheritance. popWidth mirrors this math
+		for centering. */
+		width: min(calc(var(--chat-width, 36) * 0.9rem), calc(100vw - 1rem));
 		padding: 0.55rem 0.6rem 0.55rem 1rem;
 		border-radius: 999px;
 		font-size: calc(1rem * var(--font-scale, 1));

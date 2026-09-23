@@ -3,6 +3,7 @@
 		CHAT_WIDTH_DEFAULT,
 		CHAT_WIDTH_MAX,
 		CHAT_WIDTH_MIN,
+		PROMPT_WIDTH_BASE_REM,
 		MESSAGE_GAP_DEFAULT,
 		MESSAGE_GAP_MAX,
 		MESSAGE_GAP_MIN,
@@ -29,7 +30,8 @@
 
 	let { settings = $bindable(), androidUI }: Props = $props();
 	/**
-	 * Slider reset gestures (text size, chat width, idle timeout): only
+	 * Slider reset gestures (text size, prompt size, chat width,
+	 * prompt width, idle timeout): only
 	 * the inner reset buttons and an upward drag past the slider's top
 	 * edge restore the default — label clicks never reset (they fight
 	 * text selection and misfire on touch).
@@ -220,6 +222,62 @@
 			<output>{Math.round(settings.fontScale * 100)}%</output>
 		</span>
 	</label>
+	<label class="slider-row">
+		Prompt text size
+		<button
+			type="button"
+			class="reset-width"
+			title="Reset to the default prompt size"
+			onclick={() => (settings.promptScale = 1)}>(100%)</button
+		>
+		<span class="font-row">
+			<input
+				type="range"
+				min="80"
+				max={800}
+				step="5"
+				value={Math.round((settings.promptScale ?? 1) * 100)}
+				aria-label="Prompt text size percent"
+				onpointerdown={noteSliderPress}
+				onpointerup={(e) => sliderRelease(e, () => (settings.promptScale = 1))}
+				oninput={(e) => {
+					settings.promptScale = Number(e.currentTarget.value) / 100;
+				}}
+			/>
+			<output>{Math.round((settings.promptScale ?? 1) * 100)}%</output>
+		</span>
+	</label>
+	{#if !androidUI}
+		<label class="slider-row">
+			Prompt width
+			<button
+				type="button"
+				class="reset-width"
+				title="Reset to the default prompt width"
+				onclick={() => (settings.promptWidth = PROMPT_WIDTH_BASE_REM)}
+				>({PROMPT_WIDTH_BASE_REM})</button
+			>
+			<span class="font-row">
+				<input
+					type="range"
+					min={CHAT_WIDTH_MIN}
+					max={CHAT_WIDTH_MAX}
+					step="1"
+					value={settings.promptWidth ?? PROMPT_WIDTH_BASE_REM}
+					aria-label="Prompt width in rem"
+					onpointerdown={noteSliderPress}
+					onpointerup={(e) =>
+						sliderRelease(e, () => (settings.promptWidth = PROMPT_WIDTH_BASE_REM))}
+					oninput={(e) => {
+						settings.promptWidth = Number(e.currentTarget.value);
+					}}
+				/>
+				<output style="min-width: 3.6rem;"
+					>{settings.promptWidth ?? PROMPT_WIDTH_BASE_REM} rem</output
+				>
+			</span>
+		</label>
+	{/if}
 	<label class="slider-row">
 		Gap size
 		<button

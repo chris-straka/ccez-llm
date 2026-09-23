@@ -49,6 +49,11 @@ describe("annotation pill extraction", () => {
 		expect(pageSource()).toContain("annPopBox?.focus");
 	});
 
+	it("edit-card save is an icon twin, never a text button", () => {
+		expect(pillSource()).toContain('kind="save"');
+		expect(pillSource()).not.toContain(">Save<");
+	});
+
 	it("keeps the pill surfaces scoped to the component", () => {
 		const css = pillStyle();
 		expect(css).toMatch(/\.ann-pop\s*\{[^}]*position:\s*fixed/);

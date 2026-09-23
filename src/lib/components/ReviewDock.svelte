@@ -1,38 +1,36 @@
-<!-- New-annotations dock: unsent drafts filed from this chat,
-reviewed before sending (the filed half lives in the
-previous-annotations sent-refs card on sent messages). The page owns
-the annotations array, the open/highlight ids, and the
-quote/copy/remove/stage/exclusion behaviors; this component owns the
+<!-- Pinned-annotations dock: answered annotations whose badge
+plus pinned them to the send prompt (quote, question, and answer
+each). Unpinned rows live at their badges until pinned. The page
+owns the annotations array, the open/highlight ids, and the
+quote/copy/remove/unpin/edit behaviors; this component owns the
 dock markup and its surfaces (Svelte scoping binds the CSS to this
-markup). No edit affordances live here: questions are asked through
-the staged send-prompt pill, never revised in the overlay. -->
+markup). No inline editor lives here: the pencil opens the edit
+card, which rewords and re-asks at once. -->
 <script lang="ts">
 	import {
 		annotationCountLabel,
-		canAddToPrompt,
+		canPinAnnotation,
 		type Annotation,
 		type AnnotationId
 	} from "$lib/annotations";
 	import ActionIcon from "./ActionIcon.svelte";
 
-	/** Page-owned dock behaviors. */
+	/** Page-owned dock behaviors. Pinning lives on the badge
+	(double-click; the dock lists pinned rows only), so no pin
+	action crosses here — only unpin. */
 	export interface ReviewDockActions {
 		toggle: () => void;
 		clearAll: () => void;
 		quote: (ann: Annotation) => void;
 		copy: (quote: string, comment: string) => void;
 		remove: (id: AnnotationId) => void;
-		stage: (id: AnnotationId) => void;
-		unstage: (id: AnnotationId) => void;
-		setExcluded: (id: AnnotationId, excluded: boolean) => void;
+		unpin: (id: AnnotationId) => void;
+		editOrange: (id: AnnotationId) => void;
 	}
 
 	interface Props {
 		items: Annotation[];
 		open: boolean;
-		/** Annotation currently staged in the send prompt (its row
-		offers Unstage: the dock's way to close a no-send). */
-		stagedId?: AnnotationId | null;
 		highlightId?: AnnotationId | null;
 		/** Pill button (the page parks focus here after actions). */
 		pillEl?: HTMLButtonElement | null;
@@ -42,17 +40,14 @@ the staged send-prompt pill, never revised in the overlay. -->
 	let {
 		items,
 		open,
-		stagedId = null,
 		highlightId = $bindable(null),
 		pillEl = $bindable(null),
 		actions
 	}: Props = $props();
 </script>
 
-<!-- New-annotations dock: unsent drafts filed from
-this chat, reviewed before sending (the filed half
-lives in the previous-annotations sent-refs card on
-sent messages). -->
+<!-- Pinned-annotations dock: plus-pinned rows only, each with
+its quote, question, and answer. -->
 <div class="ann-wrap" class:pinned={open}>
 	<button
 		type="button"
@@ -76,11 +71,11 @@ sent messages). -->
 		<div class="review-tools">
 			<button
 				type="button"
-				aria-label="Delete all annotations"
-				title="Delete all annotations"
+				aria-label="Remove pinned annotations"
+				title="Remove pinned annotations"
 				onclick={actions.clearAll}
 			>
-				Clear all
+				Clear pinned
 			</button>
 		</div>
 		{#each items as ann, n (ann.id)}
@@ -91,7 +86,6 @@ sent messages). -->
 			<div
 				class="review-item"
 				class:highlight={highlightId === ann.id}
-				class:omitted={ann.excludedFromPrompt === true}
 			>
 				<div class="review-head">
 					<span class="review-num">{n + 1}.</span>
@@ -120,24 +114,6 @@ sent messages). -->
 					</button>
 					<button
 						type="button"
-						class="review-omit"
-						title={ann.excludedFromPrompt === true
-							? "Add back to prompt inclusions"
-							: "Remove from prompt inclusions (keeps the annotation)"}
-						aria-label={ann.excludedFromPrompt === true
-							? `Add annotation ${n + 1} back to prompt inclusions`
-							: `Remove annotation ${n + 1} from prompt inclusions`}
-						aria-pressed={ann.excludedFromPrompt === true}
-						onclick={() =>
-							actions.setExcluded(
-								ann.id,
-								ann.excludedFromPrompt !== true
-							)}
-					>
-						{ann.excludedFromPrompt === true ? "Include" : "Omit"}
-					</button>
-					<button
-						type="button"
 						class="review-del"
 						aria-label="Delete annotation {n + 1}"
 						title="Delete annotation"
@@ -149,34 +125,33 @@ sent messages). -->
 				<div class="review-head">
 					<span class="review-label">-</span>
 					<span class="review-comment">{ann.comment || "—"}</span>
-					{#if stagedId === ann.id}
-						<!-- The dock's way to close a no-send: unstages
-						back here, deleting the send-prompt chip. -->
+					{#if canPinAnnotation(ann)}
+						<!-- Answered rows own the wording: the pencil
+						rewords and re-asks at once. Pinning happens at
+						the badge's plus, so the only prompt action here
+						is Unpin — no per-row Add exists by design. The
+						highlighted open row may still be waiting (blue):
+						it reads and deletes here until its answer lands. -->
 						<button
 							type="button"
-							class="review-add"
-							title="Unstage this annotation (back to the drawer)"
-							aria-label="Unstage annotation {n + 1}"
-							onclick={() => actions.unstage(ann.id)}
+							class="review-pencil"
+							title="Edit this annotation's question (saving re-asks at once)"
+							aria-label="Edit annotation {n + 1}"
+							onclick={() => actions.editOrange(ann.id)}
 						>
-							Unstage
+							<ActionIcon kind="pencil" />
 						</button>
-					{:else if canAddToPrompt(ann)}
-						<!-- The only Add-to-prompt in the app: blank
-						questions stage their wording in the send prompt
-						instead of baking a bare "?". The button rides
-						the note row (far edge, like delete above) so
-						the card stays two rows tall and never slides
-						under the messages layer, where its clicks die. -->
-						<button
-							type="button"
-							class="review-add"
-							title="Stage this annotation in the send prompt"
-							aria-label="Add annotation {n + 1} to prompt"
-							onclick={() => actions.stage(ann.id)}
-						>
-							Add to prompt
-						</button>
+						{#if ann.pinnedToPrompt === true}
+							<button
+								type="button"
+								class="review-add"
+								title="Remove this annotation from the send prompt"
+								aria-label="Remove annotation {n + 1} from prompt"
+								onclick={() => actions.unpin(ann.id)}
+							>
+								Unpin
+							</button>
+						{/if}
 					{/if}
 				</div>
 				{#if ann.answer !== undefined}
@@ -286,15 +261,11 @@ sent messages). -->
 		overflow-x: auto;
 		min-width: 0;
 	}
-	/* Omitted inclusions dim but stay listed: the quote still
-	jumps, the note still reads — only the send skips them. */
-	.review-item.omitted .review-quote,
-	.review-item.omitted .review-comment {
-		opacity: 0.55;
-	}
-	/* Add to prompt: the solid primary pill (same fill as the send
-	button) — the row's one call to action, never a quiet twin. */
-	.review-add {
+	/* Unpin: the solid primary pill (same fill as the send
+	button) — the row's one call to action, never a quiet twin.
+	The qualified selector outranks the generic head-button ghost
+	base, which would otherwise paint it transparent. */
+	.review-head button.review-add {
 		font-size: 0.78rem;
 		font-weight: 600;
 		cursor: pointer;
@@ -308,7 +279,7 @@ sent messages). -->
 		color: var(--accent-ink);
 		transition: opacity 0.15s ease;
 	}
-	.review-add:hover {
+	.review-head button.review-add:hover {
 		opacity: 0.8;
 	}
 	/* The answer always shows under its annotation: plain text at
@@ -397,38 +368,14 @@ sent messages). -->
 	:global(.app[data-android]) .review-head button.review-copy :global(.action-glyph) {
 		height: calc(0.8rem * var(--font-scale, 1));
 	}
+	:global(.app[data-android]) .review-head button.review-pencil :global(.action-glyph) {
+		height: calc(0.8rem * var(--font-scale, 1));
+	}
 	:global(.app[data-android]) .review-head button.review-del :global(.action-glyph) {
 		height: calc(0.8rem * var(--font-scale, 1));
 	}
 	:global(.app[data-android]) .review-answer {
 		font-size: calc(0.78rem * var(--font-scale, 1));
-	}
-	/* Omit/Include rides between copy and delete as quiet text:
-	the row's only toggle, never an icon twin. Pressed (omitted)
-	reads accent; hover underlines like the quote jump. */
-	.review-head button.review-omit {
-		flex-shrink: 0;
-		align-self: center;
-		font-size: 0.78rem;
-		color: #6e6e73;
-		color: var(--muted);
-		border: 0;
-		background: none;
-		cursor: pointer;
-		padding: 0.15rem 0.2rem;
-		text-decoration: underline;
-		text-decoration-color: transparent;
-		transition: text-decoration-color 0.15s ease;
-	}
-	.review-head button.review-omit:hover {
-		color: #1c1c1e;
-		color: var(--ink);
-		text-decoration-color: currentcolor;
-	}
-	.review-head button.review-omit[aria-pressed="true"] {
-		color: #007aff;
-		color: var(--accent);
-		font-weight: 600;
 	}
 	/* Per-note copy rides at the row's end in the icon style:
 	icon only, no text. margin-left:0 keeps it with the quote while
@@ -458,6 +405,28 @@ sent messages). -->
 		/* Icon buttons never underline: the generic button hover above
 		draws a line under the glyph that flashes during traversal and
 		reads as the row jumping. */
+		text-decoration: none;
+	}
+	/* The orange pencil twins the copy icon (same seat, same beat):
+	rewording an answered annotation re-asks it at once on save. */
+	.review-head button.review-pencil {
+		display: inline-flex;
+		align-items: center;
+		align-self: center;
+		margin-left: 0;
+		flex-shrink: 0;
+		color: #6e6e73;
+		color: var(--muted);
+		padding: 0.15rem;
+		border-radius: 6px;
+		transition: color 0.15s ease;
+	}
+	.review-head button.review-pencil :global(.action-glyph) {
+		height: 0.95rem;
+	}
+	.review-head button.review-pencil:hover {
+		color: #1c1c1e;
+		color: var(--ink);
 		text-decoration: none;
 	}
 	/* Delete rides the row's far edge as a geometric X (same icon

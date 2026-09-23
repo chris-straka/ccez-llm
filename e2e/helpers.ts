@@ -68,12 +68,16 @@ export async function seedChat(
 }
 
 /**
- * Toggle the chat-list sidebar the browser-safe way. Plain Cmd/Ctrl+B is
- * shell-only (the browser runtime passes it through), so specs use
- * Shift+Cmd+[ — the chord that toggles on every runtime.
+ * Toggle the chat-list sidebar the runtime-safe way. Plain Cmd/Ctrl+B
+ * is shell-only (the browser passes it to the bookmarks bar), while
+ * Shift+Cmd+[ toggles on web but resizes the prompt in the shell —
+ * so specs pick the chord per runtime.
  */
 export async function toggleSidebar(page: Page): Promise<void> {
-	await page.keyboard.press("Meta+Shift+BracketLeft");
+	const inShell = await page.evaluate(
+		() => "__TAURI_INTERNALS__" in window
+	);
+	await page.keyboard.press(inShell ? "Meta+b" : "Meta+Shift+BracketLeft");
 }
 
 /**

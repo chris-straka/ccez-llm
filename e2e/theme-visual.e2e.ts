@@ -388,6 +388,14 @@ for (const t of THEMES) {
 		);
 		await page.keyboard.type("note");
 		await page.keyboard.press("Enter");
+		// Unpinned filings show no pill: pin with two Enters
+		// first, then the pill rises (the number never changes).
+		const badge = page.locator("button.ccez-ann-badge.ans-ready").first();
+		await expect(badge).toBeVisible({ timeout: 30_000 });
+		await badge.focus();
+		await page.keyboard.press("Enter");
+		await page.keyboard.press("Enter");
+		await expect(badge).toHaveText("1");
 		const pill = page.locator(".prompt-tools .ann-pill");
 		await expect(pill).toBeVisible();
 		// Fresh saves highlight their review row.
@@ -416,7 +424,7 @@ for (const t of THEMES) {
 		const del = page.locator(".review-head button.review-del").first();
 		await expect(del).toHaveCSS("color", v.muted);
 		await del.hover();
-		// Deletes hover danger, like the sidebar × and Clear all —
+		// Deletes hover danger, like the sidebar × and Clear pinned —
 		// never ink.
 		await expect(del).toHaveCSS("color", v.danger);
 		await expect(page.locator(".ann-wrap")).toHaveCSS("border-color", v.line);
@@ -425,21 +433,13 @@ for (const t of THEMES) {
 		await expect(clear).toHaveCSS("color", v.muted);
 		await clear.hover();
 		await expect(clear).toHaveCSS("color", v.danger);
-		// The inclusion chip's pencil stages the wording in the
-		// send-prompt pill: panel surface, accent ring, field
-		// surface — and the composer stays empty.
-		await page.locator(".inclusion-chip button").click();
-		const staged = page.locator(".staged-pill");
-		await expect(staged).toBeVisible({ timeout: 10_000 });
-		await expect(staged).toHaveCSS("background-color", v.panel);
-		await expect(staged).toHaveCSS(
-			"border-color",
-			L ? "rgb(0, 122, 255)" : "rgb(10, 132, 255)"
-		);
-		await expect(staged.locator("textarea")).toHaveValue("note");
-		await expect(staged.locator("textarea")).toHaveCSS(
+		// The dock's Unpin is the solid accent pill: accent fill,
+		// readable ink — and the composer stays empty (pins never
+		// render in the prompt itself).
+		const unpin = page.locator(".review-add");
+		await expect(unpin).toHaveCSS(
 			"background-color",
-			v.field
+			L ? "rgb(0, 122, 255)" : "rgb(10, 132, 255)"
 		);
 		await page.mouse.click(4, 300);
 		// The hint is a placeholder attribute, never draft text:

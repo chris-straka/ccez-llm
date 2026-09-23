@@ -67,22 +67,17 @@ export function pillWashId(
 }
 
 /**
- * Popover width in px (16px root): the card scales with font size up
- * to 32rem (see .ann-pop); the fresh pill stays 19rem. The viewport
- * clamp keeps narrow phones inside the screen.
+ * Popover width in px (16px root): every orange popup — card and
+ * creation pill alike — runs 90% of the chat column (see .ann-pop),
+ * so wide columns earn wide popups instead of a fixed 32rem cap.
+ * The column already widens with huge type, so no separate font
+ * term: the viewport clamp keeps narrow phones inside the screen.
  */
 export function annPopWidth(facts: {
-	fresh: boolean;
-	android: boolean;
-	fontScale: number;
+	chatWidthRem: number;
 	viewportWidth: number;
 }): number {
-	const scale = facts.android ? Math.min(8, facts.fontScale) : facts.fontScale;
-	// The creation pill scales with the text size like the card does
-	// (19rem base, same 32rem cap): mirrors the fresh width in CSS.
-	if (facts.fresh)
-		return Math.min(Math.min(19 * scale, 32) * 16, facts.viewportWidth - 16);
-	return Math.min(Math.min(24 * scale, 32) * 16, facts.viewportWidth - 16);
+	return Math.min(facts.chatWidthRem * 0.9 * 16, facts.viewportWidth - 16);
 }
 
 /**
