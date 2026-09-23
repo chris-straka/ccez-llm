@@ -328,6 +328,24 @@ export function tapReleaseRest(tapDy: number, glided: number): number {
 }
 
 /**
+ * Discrete tap totals stay taps at huge type: a font-scaled skip step
+ * at 240% crosses 65% of a viewport per tap. Clamp tap totals to a
+ * viewport fraction (holds are velocity-driven and need no clamp).
+ */
+export const TAP_STEP_VIEWPORT_FRAC = 0.4;
+
+/** Clamp a discrete tap total to a viewport fraction, sign-preserving. */
+export function clampTapDy(
+	dy: number,
+	clientHeight: number,
+	frac = TAP_STEP_VIEWPORT_FRAC
+): number {
+	const cap = Math.max(0, clientHeight) * frac;
+	if (Math.abs(dy) <= cap) return dy;
+	return Math.sign(dy) * cap;
+}
+
+/**
  * Scroll-mode entry line (REFACTOR §6): a few lines below the
  * viewport top — a bottom sliver of the message above never wins,
  * and a taller-than-viewport message still matches by coverage.

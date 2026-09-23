@@ -114,6 +114,59 @@ test("a held j moves inside the tap window, no dead start", async ({
 	expect(await scrollTop(page)).toBeGreaterThan(before);
 });
 
+test("a d tap at 240% type stays within a viewport fraction", async ({
+	page
+}) => {
+	// Huge type scales the 216px skip step past half the viewport:
+	// taps clamp to 40% instead of lurching. Fresh reload (focus is
+	// already on the body, nothing selected).
+	await page.addInitScript(() => {
+		window.localStorage.setItem(
+			"ccez-llm-settings-v1",
+			JSON.stringify({ fontScale: 2.4 })
+		);
+	});
+	await page.reload();
+	// Composer-independent: the idle park hides it at any scale, so
+	// wait for scroll room like beforeEach (body keeps focus, nothing
+	// selected after a fresh load).
+	await page.waitForFunction(
+		() => {
+			const box = document.querySelector(".messages") as HTMLElement | null;
+			return box !== null && box.scrollHeight > box.clientHeight + 500;
+		},
+		{ timeout: 15_000 }
+	);
+	await expect
+		.poll(
+			() => page.evaluate(() => document.activeElement === document.body),
+			{ timeout: 10_000 }
+		)
+		.toBe(true);
+	const before = await scrollTop(page);
+	const cap = await page.evaluate(() => {
+		const box = document.querySelector(".messages") as HTMLElement | null;
+		return box ? box.clientHeight * 0.4 : -1;
+	});
+	// Guard the test's own premise: the viewport must be small enough
+	// that the unclamped 518px step would actually exceed the cap.
+	expect(cap).toBeGreaterThan(0);
+	expect(cap).toBeLessThan(518);
+	await page.keyboard.press("d");
+	await page.waitForFunction(
+		({ prev, min }) => {
+			const box = document.querySelector(".messages") as HTMLElement | null;
+			return box !== null && box.scrollTop - prev >= min;
+		},
+		{ prev: before, min: 50 },
+		{ timeout: 10_000 }
+	);
+	await page.waitForTimeout(800);
+	const dist = (await scrollTop(page)) - before;
+	expect(dist).toBeGreaterThan(0);
+	expect(dist).toBeLessThanOrEqual(cap + 24);
+});
+
 test("a light d tap lands exactly one skip step", async ({ page }) => {
 	const before = await scrollTop(page);
 	// keyboard.press is a light tap (down+up in milliseconds): glide

@@ -12,6 +12,7 @@ import {
 	ggArmed,
 	scaleScrollPx,
 	halfPageDy,
+	clampTapDy,
 	holdGlideVelocity,
 	holdIsTap,
 	indexAtViewportLine,
@@ -285,6 +286,24 @@ describe("tapReleaseRest", () => {
 		expect(tapReleaseRest(-28, -100)).toBe(0);
 		// Opposite-sign accrual (a yank mid-hold) still steps forward.
 		expect(tapReleaseRest(28, -10)).toBe(38);
+	});
+});
+
+describe("clampTapDy", () => {
+	it("leaves ordinary steps alone", () => {
+		expect(clampTapDy(216, 800)).toBe(216);
+		expect(clampTapDy(-216, 800)).toBe(-216);
+		expect(clampTapDy(0, 800)).toBe(0);
+	});
+	it("clamps huge-type skip steps to a viewport fraction", () => {
+		// 216px at 240% type against an 800px viewport: 518px would
+		// cross 65% per tap, so the tap stays at 40% instead.
+		expect(clampTapDy(518.4, 800)).toBeCloseTo(320, 6);
+		expect(clampTapDy(-518.4, 800)).toBeCloseTo(-320, 6);
+	});
+	it("never flips sign or invents distance", () => {
+		expect(clampTapDy(500, 0)).toBe(0);
+		expect(clampTapDy(-500, 0)).toBe(-0);
 	});
 });
 

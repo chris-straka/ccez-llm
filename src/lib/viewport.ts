@@ -17,9 +17,9 @@ export interface ScrollHold {
 	key: string;
 	velocity: number;
 	/** Discrete step total a sub-150ms tap lands (line for j/k, skip
-	step for d/u): glide frames accrue from the first frame, so the
-	release lands only the remainder (see tapReleaseRest) — never
-	glide plus the full step. */
+	step for d/u, viewport-clamped at huge type): glide frames accrue
+	from the first frame, so the release lands only the remainder
+	(see tapReleaseRest) — never glide plus the full step. */
 	tapDy: number;
 	/** Signed px the glide has already applied: the release step
 	subtracts this, so taps land exact totals and slow releases

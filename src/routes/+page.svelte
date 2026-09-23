@@ -125,6 +125,7 @@
 		resolveSidebarSpaceEnter,
 		scaleScrollPx,
 		STICK_PX,
+		clampTapDy,
 		scrollHoldVelocity,
 		stepScrollTop,
 		tapReleaseRest,
@@ -8075,10 +8076,12 @@
 		viewport.hold = {
 			key,
 			velocity,
-			tapDy:
+			tapDy: clampTapDy(
 				tapDy ??
-				Math.sign(velocity) *
-					scaleScrollPx(SCROLLKEY_LINE_PX, settings.fontScale),
+					Math.sign(velocity) *
+						scaleScrollPx(SCROLLKEY_LINE_PX, settings.fontScale),
+				scrollBox.clientHeight
+			),
 			glided: 0,
 			downAt: Date.now(),
 			startT: performance.now(),
