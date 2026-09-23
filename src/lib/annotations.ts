@@ -1135,11 +1135,26 @@ function washRanges(
 ): Range[] {
 	const item = items.find((i) => i.id === wash);
 	if (!item) return [];
-	const nodes = quoteTextNodes(root);
+	return washRangesForText(
+		quoteTextNodes(root),
+		item.quote,
+		item.at ?? 0,
+		root.ownerDocument
+	);
+}
+/** Wash ranges for a located quote under a root: the shared core of
+ * washRanges above and the post-surgery repaint below. Pure DOM
+ * reads, never throws. */
+function washRangesForText(
+	nodes: Text[],
+	quote: string,
+	at: number,
+	doc: Document
+): Range[] {
 	const loc = locateQuote(
 		nodes.map((n) => n.textContent ?? ""),
-		item.quote,
-		item.at ?? 0
+		quote,
+		at
 	);
 	if (!loc) return [];
 	try {
@@ -1148,7 +1163,7 @@ function washRanges(
 		if (!startNode || !endNode) return [];
 		const startText = startNode.textContent ?? "";
 		const endText = endNode.textContent ?? "";
-		const range = root.ownerDocument.createRange();
+		const range = doc.createRange();
 		range.setStart(
 			startNode,
 			expandWrapStart(startText, Math.min(loc.startOffset, startText.length))
@@ -1176,6 +1191,55 @@ function washRanges(
  * badge slides leave every quote dark.
  */
 let liveWashId: string | null = null;
+/** Location of the live wash paint: DOM surgery outside the stamp
+ * (furigana tint wraps) yanks quoted text nodes out from under the
+ * registered ranges — a removed endpoint collapses to its parent
+ * and the paint goes blank — so the repair repaint below re-locates
+ * from here. Set on every paint, valid only while liveWashId still
+ * names the same wash. */
+let liveWashPaint: {
+	id: string;
+	root: HTMLElement;
+	quote: string;
+	at: number;
+} | null = null;
+/** Record the live paint's location (same sites that own liveWashId). */
+function noteLiveWash(
+	root: HTMLElement,
+	items: AnnotationMark[],
+	wash: string
+): void {
+	const item = items.find((i) => i.id === wash);
+	if (!item) return;
+	liveWashPaint = { id: wash, root, quote: item.quote, at: item.at ?? 0 };
+}
+/**
+ * Re-paint the live wash after external DOM surgery moved its quote
+ * text (furigana tint wraps/unwraps): re-locates the recorded quote
+ * under its root and replaces the registry ranges. Repairs instead
+ * of replacing — a dead or foreign wash never conjures paint, and
+ * an unresolvable quote keeps the dead ranges rather than painting
+ * a wrong one. Cosmetic: never throws.
+ */
+export function repaintLiveWash(): void {
+	try {
+		const cur = liveWashPaint;
+		if (!cur || liveWashId !== cur.id) return;
+		if (!highlightsSupported()) return;
+		if (!document.contains(cur.root)) return;
+		const ranges = washRangesForText(
+			quoteTextNodes(cur.root),
+			cur.quote,
+			cur.at,
+			cur.root.ownerDocument
+		);
+		if (ranges.length === 0) return;
+		paintAnnotationWash(ranges);
+		invalidateWashPaint(cur.root);
+	} catch {
+		// The dead wash stays dead; the next stamp repaints anyway.
+	}
+}
 
 /** Step interval for the wash fade ramp. The fade-in walks quick
 (~105ms, same beat as the fade-out): hovering a marker must read
@@ -1299,12 +1363,14 @@ function paintWashHighlight(
 				}
 				root.dataset.washStamped = wash;
 				root.dataset.washPainted = wash;
+				noteLiveWash(root, items, wash);
 				return;
 			}
 			cancelWashRamp(root);
 			clearAnnotationWashes();
 			root.dataset.washPainted = wash;
 			liveWashId = wash;
+			noteLiveWash(root, items, wash);
 			if (washSnaps()) {
 				paintAnnotationWash(ranges);
 				// Same-body slides land here too: the clear above

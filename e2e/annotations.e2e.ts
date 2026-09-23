@@ -2428,3 +2428,106 @@ test("rtl quotes wash through dom marks, latin through the registry", async ({
 	expect(latin.ranges).toBeGreaterThan(0);
 	expect(latin.marks).toEqual([]);
 });
+
+/** Opening an answered badge keeps its wash after the readings tint
+wraps the quote: tint wraps yank quoted text nodes out from under
+the registry ranges (a removed endpoint collapses to its parent
+and the paint goes blank), so the live wash re-locates off the
+post-surgery DOM. Annotating the repeated 新羅 pins the occurrence
+too. */
+test("answered badge keeps its wash past the readings tint", async ({
+	page
+}) => {
+	test.setTimeout(180_000);
+	const SENT =
+		"7世紀に新羅が政治的に統一したため、新羅の言葉が一番よく残っています。4世紀頃から漢文が使われ、6世紀には吏読（りとう）という漢字を使った表記法が発達しました。";
+	await seedChat(page, [{ role: "assistant", content: SENT }], null, {});
+	await page.goto("/");
+	const para = page.locator("article.assistant .rendered p").first();
+	await expect(para).toBeVisible({ timeout: 60_000 });
+	// Select the second 新羅 through the real menu path.
+	await para.evaluate((el) => {
+		const text = el.firstChild;
+		if (!text || text.nodeType !== Node.TEXT_NODE)
+			throw new Error("no text node");
+		const full = text.textContent ?? "";
+		const idx = full.indexOf("新羅", full.indexOf("新羅") + 1);
+		if (idx < 0) throw new Error("no second 新羅");
+		const range = document.createRange();
+		range.setStart(text, idx);
+		range.setEnd(text, idx + 2);
+		const live = window.getSelection();
+		live?.removeAllRanges();
+		live?.addRange(range);
+		const r = range.getBoundingClientRect();
+		el.dispatchEvent(
+			new MouseEvent("mouseup", {
+				bubbles: true,
+				button: 0,
+				detail: 1,
+				clientX: r.x + r.width / 2,
+				clientY: r.y + r.height / 2
+			})
+		);
+	});
+	await expect(page.locator(".sel-menu")).toBeVisible({ timeout: 10_000 });
+	await page.locator('.sel-menu button:has-text("Annotate")').click();
+	await expect(page.locator(".ann-pop")).toBeVisible();
+	await page.locator(".ann-pop textarea").fill("which unification?");
+	await page.keyboard.press("Enter");
+	const badge = page.locator("button.ccez-ann-badge.ans-ready").first();
+	await expect(badge).toBeVisible({ timeout: 90_000 });
+	await badge.focus();
+	await page.keyboard.press("Enter");
+	await expect(page.locator(".ann-answer")).toBeVisible({ timeout: 10_000 });
+	// Readings resolve (mock) and tint the quote; the wash must survive
+	// the wrap surgery. The fade ramp restarts on every re-stamp while
+	// the mock resolves, so poll the live name past the churn.
+	const readWash = () =>
+		page.evaluate(() => {
+			const out: Record<string, string> = {};
+			try {
+				const g = window as unknown as { CSS?: unknown };
+				out.typeofCSS = typeof CSS;
+				const css = CSS as unknown as {
+					highlights?: {
+						keys: () => Iterable<string>;
+						get: (k: string) => { forEach: (cb: (r: Range) => void) => void } | undefined;
+					};
+				};
+				out.hasHighlights = String(!!css.highlights);
+				const keys: string[] = [];
+				try {
+					for (const k of css.highlights?.keys() ?? []) keys.push(k);
+				} catch (e) {
+					keys.push(`keys-threw:${String(e)}`);
+				}
+				out.keys = keys.join(",");
+				for (const k of keys) {
+					if (k.startsWith("keys-threw")) continue;
+					let text = "";
+					try {
+						css.highlights
+							?.get(k)
+							?.forEach((r: Range) => {
+								try {
+									text += r.toString();
+								} catch (e) {
+									text += `[range-threw:${String(e)}]`;
+								}
+							});
+					} catch (e) {
+						text = `[get-threw:${String(e)}]`;
+					}
+					out[k] = text;
+				}
+				void g;
+			} catch (e) {
+				out.outer = `threw:${String(e)}`;
+			}
+			return out;
+		});
+	await expect
+		.poll(async () => JSON.stringify(await readWash()), { timeout: 30_000 })
+		.toContain('"ccez-ann":"新羅"');
+});

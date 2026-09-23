@@ -226,6 +226,7 @@
 		lockSelectionToMessage,
 		quoteTextNodes,
 		locateQuote,
+		repaintLiveWash,
 		occurrenceAtPosition,
 		snapSelectionToWordEdges,
 		selMenuPlacement,
@@ -1145,6 +1146,9 @@
 		selPinyin = null;
 		selFurigana = null;
 		unwrapFuriganaTint();
+		// Unwrap surgery breaks live wash ranges the same way wraps
+		// do (see above): repair a wash that outlives its panels.
+		repaintLiveWash();
 	}
 	/**
 	 * An unanswered selection menu never lingers (clicking away still
@@ -1886,7 +1890,17 @@
 				});
 			}
 		}
-		if (exact && slices && !solo) tintSelectionSpans(slices, tintSpans);
+		// Tint wraps yank quoted text nodes out from under a live
+		// registry wash (a removed endpoint collapses to its parent
+		// and the paint goes blank): re-locate and repaint the live
+		// wash off the post-surgery DOM. Unconditional: a failed
+		// tint can still have partially wrapped, and the repair is a
+		// no-op with no live wash or no resolvable quote. Unwrap
+		// sites ride dismissSelPanels below, same repair.
+		if (exact && slices && !solo) {
+			tintSelectionSpans(slices, tintSpans);
+			repaintLiveWash();
+		}
 		selPinyin = null;
 		selFurigana = panels;
 		// True-width pass: placement only knows highlight centers,
