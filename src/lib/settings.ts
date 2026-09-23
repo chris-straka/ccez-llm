@@ -194,12 +194,12 @@ const LEGACY_STORAGE_KEY = "ccez-studio-settings-v1";
 export const DEFAULT_SYSTEM_PROMPT = "";
 
 /**
- * Text-size multiplier bounds (persisted): 50–1400% on phones and
+ * Text-size multiplier bounds (persisted): 50–2000% on phones and
  * desktop alike — profiles roam across devices, so the stored range
  * fits the widest cap and each UI clamps to its own max.
  */
 export const FONT_SCALE_MIN = 0.5;
-export const FONT_SCALE_MAX = 14;
+export const FONT_SCALE_MAX = 20;
 
 /** Desktop chat-column width in rem: 46 is the legacy fixed width. */
 export const CHAT_WIDTH_DEFAULT = 36;
@@ -505,7 +505,7 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 			if (!Array.isArray(entry.models)) entry.models = [];
 		}
 		// Clamp the text-size multiplier (range inputs persist strings).
-		// Up to 1400% everywhere (each UI clamps its own max; the
+		// Up to 2000% everywhere (each UI clamps its own max; the
 		// stored range fits the widest so roamed profiles keep
 		// working).
 		if (
@@ -529,7 +529,7 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 				Math.max(CHAT_WIDTH_MIN, Math.round(merged.chatWidth))
 			);
 		}
-		// Prompt text size rides the same 50–1400% clamp as the
+		// Prompt text size rides the same 50–2000% clamp as the
 		// global one; the prompt width rides the chat-width clamp
 		// (same slider step, whole rem).
 		if (
@@ -716,7 +716,7 @@ export function keyNeedsEditing(value: string): boolean {
 }
 
 /**
- * UI text-scale step in 10% increments (REFACTOR §6): 50–1400%
+ * UI text-scale step in 10% increments (REFACTOR §6): 50–2000%
  * everywhere (the old 600% desktop cap had no layout reason —
  * badges and glyphs already scale at a dampened rate, see
  * layout.e2e.ts). The page no-ops (and skips the toast) when the

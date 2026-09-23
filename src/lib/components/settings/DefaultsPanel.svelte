@@ -209,7 +209,7 @@
 			<input
 				type="range"
 				min="80"
-				max={1400}
+				max={2000}
 				step="5"
 				value={Math.round(settings.fontScale * 100)}
 				aria-label="Text size percent"
@@ -234,7 +234,7 @@
 			<input
 				type="range"
 				min="80"
-				max={1400}
+				max={2000}
 				step="5"
 				value={Math.round((settings.promptScale ?? 1) * 100)}
 				aria-label="Prompt text size percent"

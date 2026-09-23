@@ -125,13 +125,13 @@ describe("settings", () => {
 		expect(loaded.thinking["local-gemma"]).toBeUndefined();
 	});
 
-	it("persists text size up to 1400% and resets strays", () => {
+	it("persists text size up to 2000% and resets strays", () => {
 		const max = blankSettings();
-		max.fontScale = 14;
+		max.fontScale = 20;
 		saveSettings(max, memoryStore);
-		expect(loadSettings(memoryStore).fontScale).toBe(14);
+		expect(loadSettings(memoryStore).fontScale).toBe(20);
 		const over = blankSettings();
-		over.fontScale = 14.5;
+		over.fontScale = 20.5;
 		saveSettings(over, memoryStore);
 		expect(loadSettings(memoryStore).fontScale).toBe(1);
 	});
@@ -288,16 +288,16 @@ describe("settings", () => {
 
 	it("sizes the chat column off the slider alone, full-bleed on huge phone type", () => {
 		// Desktop: scaling the type never widens the column — the
-		// slider owns the width at every size, even grandma's 1400%.
+		// slider owns the width at every size, even grandma's 2000%.
 		expect(effectiveChatWidth(false, 1, 36)).toBe(36);
 		expect(effectiveChatWidth(false, 2, 36)).toBe(36);
 		expect(effectiveChatWidth(false, 4, 36)).toBe(36);
-		expect(effectiveChatWidth(false, 14, 36)).toBe(36);
-		expect(effectiveChatWidth(false, 14, 120)).toBe(120);
+		expect(effectiveChatWidth(false, 20, 36)).toBe(36);
+		expect(effectiveChatWidth(false, 20, 120)).toBe(120);
 		expect(effectiveChatWidth(true, 1, 36)).toBe(46);
 		expect(effectiveChatWidth(true, 3.29, 36)).toBe(46);
 		expect(effectiveChatWidth(true, 3.3, 36)).toBe(CHAT_WIDTH_FULLBLEED_REM);
-		expect(effectiveChatWidth(true, 14, 120)).toBe(CHAT_WIDTH_FULLBLEED_REM);
+		expect(effectiveChatWidth(true, 20, 120)).toBe(CHAT_WIDTH_FULLBLEED_REM);
 	});
 
 	it("sizes the composer off its own slider, capped by the column", () => {
@@ -675,10 +675,10 @@ describe("keyNeedsEditing", () => {
 });
 
 describe("step helpers", () => {
-	it("steps text size in 10% increments to one 1400% cap", () => {
+	it("steps text size in 10% increments to one 2000% cap", () => {
 		expect(stepFontScale(1, 0.1)).toBe(1.1);
 		expect(stepFontScale(6, 0.1)).toBe(6.1);
-		expect(stepFontScale(14, 1)).toBe(14);
+		expect(stepFontScale(20, 1)).toBe(20);
 		expect(stepFontScale(0.5, -0.1)).toBe(0.5);
 	});
 

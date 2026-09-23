@@ -3264,7 +3264,7 @@
 			}
 		}
 	});
-	/** UI text scale in 10% steps (50–1400% everywhere). */
+	/** UI text scale in 10% steps (50–2000% everywhere). */
 	function adjustFontScale(delta: number, quiet = false): void {
 		const next = stepFontScale(settings.fontScale, delta);
 		if (next === settings.fontScale) return;
@@ -3288,7 +3288,7 @@
 		persistSettings();
 		flashToast(`Chat width ${next} rem`);
 	}
-	/** Prompt-only text size in 10% steps (50–1400%): ⌘[ / ⌘]
+	/** Prompt-only text size in 10% steps (50–2000%): ⌘[ / ⌘]
 	 * resizes the composer without touching message text. */
 	function adjustPromptScale(delta: number): void {
 		const current = settings.promptScale ?? 1;
