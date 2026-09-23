@@ -60,8 +60,8 @@ test("thinking stays in its own chat across a switch", async ({ page }) => {
 });
 
 /** Entering another chat never summons the prompt: the parked
-composer stays parked, focus never lands in it, and only the
-messages crossfade (sidebar + prompt cut instantly). */
+composer stays parked, focus never lands in it, and the switch cuts
+instantly (no view transition anywhere). */
 test("entering another chat never summons the prompt", async ({ page }) => {
 	await page.addInitScript(() => {
 		window.localStorage.setItem("ccez-mock-provider", "1");
@@ -107,29 +107,23 @@ test("entering another chat never summons the prompt", async ({ page }) => {
 			])
 		);
 	});
-	// Record the snapshot scope at capture time: the `messages` name
-	// must be on exactly while a transition snapshots (sidebar +
-	// prompt cut), and off at rest (a standing name traps annotation
-	// badges under the header strip).
+	// Chat switching snaps instantly: no view transition ever runs
+	// (sidebar + prompt + messages all cut in the same flush).
 	await page.addInitScript(() => {
-		const seen: string[] = [];
-		(window as unknown as Record<string, unknown>).__vtNames = seen;
+		(window as unknown as Record<string, unknown>).__vtCalls = 0;
 		const proto = Document.prototype as unknown as {
 			startViewTransition?: (opts: { update: () => void }) => {
 				finished: Promise<unknown>;
 			};
 		};
-		const real = proto.startViewTransition;
-		if (typeof real === "function") {
-			proto.startViewTransition = function (
-				this: Document,
-				opts: { update: () => void }
-			): { finished: Promise<unknown> } {
-				seen.push(
-					getComputedStyle(document.querySelector(".messages")!)
-						.viewTransitionName
-				);
-				return real.call(this, opts);
+		if (typeof proto.startViewTransition === "function") {
+			proto.startViewTransition = function (): {
+				finished: Promise<unknown>;
+			} {
+				(window as unknown as Record<string, unknown>).__vtCalls = Number(
+					(window as unknown as Record<string, unknown>).__vtCalls
+				) + 1;
+				throw new Error("view transitions are gone");
 			};
 		}
 	});
@@ -154,19 +148,12 @@ test("entering another chat never summons the prompt", async ({ page }) => {
 		() => !!document.activeElement?.closest?.(".prompt")
 	);
 	expect(focused).toBe(false);
-	// The crossfade was scoped to the messages (every snapshot saw
-	// the name), and the scope is off again at rest.
-	const vtNames = await page.evaluate(
-		() => (window as unknown as Record<string, unknown>).__vtNames as string[]
+	// No view transition ran for the switch (the spy throws, so any
+	// call would have failed the switch assertions above).
+	const vtCalls = await page.evaluate(
+		() => (window as unknown as Record<string, unknown>).__vtCalls as number
 	);
-	expect(vtNames.length).toBeGreaterThan(0);
-	for (const name of vtNames) expect(name).toBe("messages");
-	const vtRest = await page.evaluate(
-		() =>
-			getComputedStyle(document.querySelector(".messages") as Element)
-				.viewTransitionName
-	);
-	expect(vtRest).toBe("none");
+	expect(vtCalls).toBe(0);
 });
 
 /** ⇧⌘J steps to the newer chat without touching the prompt:

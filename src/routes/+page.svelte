@@ -263,10 +263,6 @@
 	import { badgeHover } from "$lib/hoverWash";
 	import { startBlink, startHighlightFade, startMarkFade } from "$lib/blink";
 	import { createRefMemo } from "$lib/aidLoading";
-	import {
-		scopeMessagesTransition,
-		switchChatWithTransition
-	} from "$lib/viewTransitions";
 	/* decomposeTree + onKunLine render in `InspectOverlay.svelte`. */
 	import {
 		getInspectData,
@@ -2348,17 +2344,16 @@
 		}, 120);
 	}
 
-	/** Chat switching wrapped in a View Transition where supported
-	 * (instant cut elsewhere) — identical end state either way. */
+	/** Chat switching cuts instantly — no crossfade, no slide: one
+	chat is replaced by the next in the same frame. */
 	function transitionToChat(id: Parameters<typeof selectChat>[1]): void {
 		const from = chatState.activeChatId;
 		dismissSelPanels();
 		const mutate = (): void => {
 			// File the leaving chat's scroll first (a no-op mid-peek,
 			// where the box shows another chat), then clear the hover
-			// preview inside the transition, never before it: clearing
-			// first renders the old chat for a frame (and the
-			// view-transition snapshot catches it), so picking a
+			// preview in the same flush, never before it: clearing
+			// first renders the old chat for a frame, so picking a
 			// previewed row flashes back before landing.
 			saveChatScroll();
 			previewChatId = null;
@@ -2377,25 +2372,15 @@
 			restoreChatScroll(id);
 		};
 		// Re-entering the live chat (preview-as-you-go already landed
-		// here, or Enter on the active row): identical end state, so
-		// skip the crossfade — it only flashes settled content.
-		// Cycling inside the open phone switcher cuts the same way:
-		// the crossfade paints above the dimming veil, so the new
-		// text would flash bright before dimming back down.
-		if (id === from || chatSwitcherOpen) {
-			mutate();
-			return;
+		// here, or Enter on the active row) is identical state either
+		// way; cycling inside the open phone switcher cuts the same
+		// way. Every path lands in the same flush below.
+		if (id !== from && !chatSwitcherOpen) {
+			// Leaving for another chat stops the voice: the readout
+			// belongs to the old chat, and a new chat never inherits it.
+			stopVoice();
 		}
-		// Leaving for another chat stops the voice: the readout
-		// belongs to the old chat, and a new chat never inherits it.
-		stopVoice();
-		// The snapshot scope lives only around the transition (see
-		// scopeMessagesTransition): a standing name would trap the
-		// annotation badges under the header strip's hit-testing. The
-		// release rides `ready`, not `finished` — the animation phase
-		// can stall on slow frames while the trap stays live.
-		const unscope = scopeMessagesTransition(scrollBox ?? null);
-		void switchChatWithTransition(mutate, unscope);
+		mutate();
 	}
 
 	// Every chat switch lands the box: chats with a filed scroll
@@ -3495,7 +3480,6 @@
 			persistSettings();
 			if (focus) enterEditMode();
 			buzzBeat("send");
-			restartStepSlide(direction);
 			return;
 		}
 		if (step.kind !== "goto") return;
@@ -3505,22 +3489,6 @@
 		// Landing is the switch effect's job (filed position, else
 		// top): a smooth top-scroll here would fight the restore.
 		if (focus) enterEditMode();
-		restartStepSlide(direction);
-	}
-
-	/**
-	 * Chat-step slide (touch swipes): the incoming chat glides in from
-	 * the swipe side instead of jumping. Null-then-frame restarts the
-	 * keyframes even for same-direction repeats; the animationend
-	 * handler clears the class. Phone-only via the classes below —
-	 * desktop steps instant.
-	 */
-	let chatStepDir: 1 | -1 | null = $state(null);
-	function restartStepSlide(direction: 1 | -1): void {
-		chatStepDir = null;
-		requestAnimationFrame(() => {
-			chatStepDir = direction;
-		});
 	}
 
 	/** Enter the cursor chat from the keyboard, close the list, and land in its prompt. */
@@ -12453,7 +12421,6 @@
 					: null}
 			{sendElapsed}
 			waitingLabel={thinkingLabelFor(activeReplyCode ?? settings.replyLang)}
-			{chatStepDir}
 			{useMock}
 			{openLangMenu}
 			{langMenuAnchor}
@@ -12466,7 +12433,6 @@
 				noteScrolling,
 				freezeScroll,
 				releaseScroll,
-				clearStepDir: () => (chatStepDir = null),
 				hoverRow: (i: number) => {
 					hoveredIdx = i;
 					lastHoverChangeAt = Date.now();
@@ -13023,20 +12989,6 @@
 	(single-column override moved with the dialog). */
 	/* (Waypoint nav in `Waypoints.svelte`: the last paged nav moved
 	with its buttons.) */
-	/* Chat-switch crossfade covers the messages only: an unscoped
-	transition snapshots the whole page, so the closing sidebar and
-	the parking prompt ghost mid-switch — the prompt reads as
-	summoned twice, flickering. The root pair cuts instantly while
-	message bodies keep the crossfade (:global — these pseudos live
-	on the document, and the scope hash would break them). The
-	`messages` name lives only around the switch (see
-	scopeMessagesTransition): a standing name makes .messages a
-	stacking context, trapping the annotation badges under the
-	header strip so their clicks land on the chrome beneath. */
-	:global(::view-transition-old(root)),
-	:global(::view-transition-new(root)) {
-		animation: none;
-	}
 	/* Every other scroller fades exactly like the main chat: invisible
 	until a scroll is in flight (one capture-phase listener below toggles
 	.scrolling with the same short hold). Global: extracted components

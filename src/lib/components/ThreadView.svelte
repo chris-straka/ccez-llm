@@ -33,7 +33,6 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		noteScrolling: () => void;
 		freezeScroll: () => void;
 		releaseScroll: () => void;
-		clearStepDir: () => void;
 		hoverRow: (index: number) => void;
 		sentTagModels: (msg: ChatMsg, base: string) => AttachTagModel[];
 		marksFor: (messageId: ChatMsgId) => AnnotationMark[];
@@ -120,7 +119,6 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		sendingPhase: "fetch" | "waiting" | null;
 		sendElapsed: number;
 		waitingLabel: string;
-		chatStepDir: 1 | -1 | null;
 		useMock: boolean;
 		openLangMenu: LanguageMenu["id"] | null;
 		langMenuAnchor: {
@@ -175,7 +173,6 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		sendingPhase,
 		sendElapsed,
 		waitingLabel,
-		chatStepDir,
 		useMock,
 		openLangMenu,
 		langMenuAnchor,
@@ -191,16 +188,11 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
 	class="messages"
-	class:step-newer={android && chatStepDir === 1}
-	class:step-older={android && chatStepDir === -1}
 	bind:this={scrollBox}
 	onscroll={() => actions.noteScrolling()}
 	ontouchstart={() => actions.freezeScroll()}
 	ontouchend={() => actions.releaseScroll()}
 	ontouchcancel={() => actions.releaseScroll()}
-	onanimationend={(e) => {
-		if (e.target === e.currentTarget) actions.clearStepDir();
-	}}
 >
 	{#if messages.length === 0}
 		<!-- Empty hero through `EmptyHero.svelte` (the pills slot under
@@ -511,39 +503,6 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		overflow-wrap: break-word;
 	}
 
-	/* Chat-step slide: the incoming chat glides in from the swipe
-	side (newer from the right, older from the left). Phone-only;
-	reduced-motion keeps the instant switch. */
-	@keyframes step-in-right {
-		from {
-			transform: translateX(2.5rem);
-			opacity: 0;
-		}
-		to {
-			transform: none;
-			opacity: 1;
-		}
-	}
-	@keyframes step-in-left {
-		from {
-			transform: translateX(-2.5rem);
-			opacity: 0;
-		}
-		to {
-			transform: none;
-			opacity: 1;
-		}
-	}
-	:global(.app[data-android]) .messages.step-newer {
-		animation: step-in-right 0.18s ease-out;
-	}
-	:global(.app[data-android]) .messages.step-older {
-		animation: step-in-left 0.18s ease-out;
-	}
-	@media (prefers-reduced-motion: reduce) {
-		:global(.app[data-android]) .messages.step-newer,
-		:global(.app[data-android]) .messages.step-older {
-			animation: none;
-		}
-	}
+	/* Chat switching snaps instantly on every platform: no slide,
+	no fade — the next chat replaces the current one in place. */
 </style>

@@ -192,11 +192,12 @@ describe("hover-only message actions", () => {
 
 /**
  * Chat-switch ordering: picking a previewed row must land directly,
- * never flash the old chat first.
+ * never flash the old chat first — and the switch cuts instantly,
+ * with no view transition anywhere.
  */
 function transitionBody(): string {
 	const fn = pageSource().match(
-		/function transitionToChat\(id: Parameters<typeof selectChat>\[1\]\): void \{([\s\S]*?)switchChatWithTransition\(mutate/
+		/function transitionToChat\(id: Parameters<typeof selectChat>\[1\]\): void \{([\s\S]*?)\n\t\tmutate\(\);\n\t\}/
 	);
 	expect(
 		fn,
@@ -205,12 +206,12 @@ function transitionBody(): string {
 	return fn![1]!;
 }
 
-describe("chat-switch transition", () => {
+describe("chat-switch cut", () => {
 	it("clears the hover preview inside the switch, never before it", () => {
-		// Clearing first renders the old chat for a frame (and the
-		// view-transition snapshot catches it), so the mutate block
-		// owns the only switch-path clear.
+		// Clearing first renders the old chat for a frame, so the
+		// mutate block owns the only switch-path clear.
 		expect(transitionBody()).toContain("previewChatId = null;");
+		expect(pageSource()).not.toContain("startViewTransition");
 	});
 
 	it("stops the voice when leaving for another chat", () => {
