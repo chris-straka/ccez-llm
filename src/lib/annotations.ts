@@ -1130,7 +1130,11 @@ function washRanges(
  */
 let liveWashId: string | null = null;
 
-/** Step interval for the wash fade ramp (~100ms in, ~140ms out). */
+/** Step interval for the wash fade ramp. The fade-in walks slower
+(~240ms): the hover yellow used to snap on in ~100ms, which reads
+as a flicker over a blinking blue badge. The fade-out stays quick
+(~140ms) so a leaving pointer never trails paint. */
+const WASH_FADE_IN_STEP_MS = 80;
 const WASH_FADE_STEP_MS = 35;
 /**
  * The one in-flight ramp, if any (a single wash id feeds every
@@ -1310,7 +1314,7 @@ function paintWashHighlight(
 								clearAnnotationWash(ANN_HIGHLIGHT_D1);
 								invalidateWashPaint(root);
 							}
-						}, WASH_FADE_STEP_MS),
+						}, WASH_FADE_IN_STEP_MS),
 						root,
 						wash
 					};

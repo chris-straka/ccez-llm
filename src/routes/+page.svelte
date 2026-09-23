@@ -13197,10 +13197,12 @@
 	:global(.tdots span:nth-child(3)) {
 		animation-delay: 0.4s;
 	}
+	/* The dim end of the cycle stays readable: at 0.2 the dots
+	vanished mid-cycle and the wait read as stalled. */
 	@keyframes tdot-pulse {
 		0%,
 		100% {
-			opacity: 0.2;
+			opacity: 0.55;
 		}
 		50% {
 			opacity: 1;
