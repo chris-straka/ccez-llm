@@ -338,6 +338,58 @@ test("open answer keeps its quote washed until the card closes", async ({
 	await expect.poll(washed, { timeout: 5_000 }).toBe(false);
 });
 
+/** Waiting badges breathe while the ask flies; the answer lands with
+a single glow ring, then the mark rests steady orange. (Computed
+animation names are substring-matched: Svelte may suffix keyframes.) */
+test("waiting badge breathes until the answer lands glowing", async ({
+	page
+}) => {
+	test.setTimeout(120_000);
+	await seedChat(page, [
+		{ role: "assistant", content: "the riverbank at dawn holds the fog" }
+	]);
+	await page.addInitScript(() => {
+		localStorage.setItem("ccez-mock-chat-ms", "12000");
+	});
+	await page.goto("/");
+	const article = page.locator("article.assistant");
+	await expect(article).toBeVisible({ timeout: 60_000 });
+	await dragQuote(page, 0, "riverbank");
+	await expect(page.locator(".sel-menu")).toBeVisible({ timeout: 10_000 });
+	// Shift+A opens the box (bare A files and sends at once now).
+	await page.keyboard.press("A");
+	const pop = page.locator(".ann-pop.fresh");
+	await expect(pop).toBeVisible({ timeout: 10_000 });
+	await pop.locator("textarea").fill("what lives here?");
+	await page.keyboard.press("Enter");
+	await expect(pop).toHaveCount(0);
+	const animName = (sel: string): Promise<string> =>
+		page.evaluate(
+			(s: string) => {
+				const el = document.querySelector(s);
+				return el ? getComputedStyle(el).animationName : "";
+			},
+			sel
+		);
+	// The filed badge waits blue and breathes (motion = in-flight).
+	const waiting = page.locator("button.ccez-ann-badge.ans-waiting");
+	await expect(waiting).toBeVisible({ timeout: 10_000 });
+	await expect
+		.poll(() => animName("button.ccez-ann-badge.ans-waiting"), {
+			timeout: 5_000
+		})
+		.toContain("ccez-ann-breathe");
+	// The answer lands orange with one arrival ring, then rests.
+	const ready = page.locator("button.ccez-ann-badge.ans-ready");
+	await expect(ready).toBeVisible({ timeout: 30_000 });
+	await expect(ready).toHaveClass(/arrived/);
+	await expect
+		.poll(() => animName("button.ccez-ann-badge.ans-ready"), {
+			timeout: 5_000
+		})
+		.toContain("ccez-ann-arrive");
+});
+
 /** The open answer card rides the thread: scrolling moves the
 card with its quote (fixed plus scroll-delta tracking reads as
 absolute), never stranding it over other messages. */

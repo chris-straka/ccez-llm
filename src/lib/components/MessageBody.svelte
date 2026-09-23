@@ -1569,8 +1569,8 @@
 	/* Answer states: waiting (filed but not yet asked) rides the
 	accent blue, ready (asked and answered) the orange token —
 	explicit in both themes so the accent never mutes the signal.
-	The tail inherits via `background: inherit`. Both hold steady:
-	there is no separate request anymore, so nothing ever blinks. */
+	The tail inherits via `background: inherit`. Motion lives
+	below, past the mount fade (see below). */
 	.rendered :global(button.ccez-ann-badge.ans-waiting) {
 		background: #007aff;
 		background: var(--accent);
@@ -1621,10 +1621,62 @@
 	.rendered :global(button.ccez-ann-badge.fresh) {
 		animation: ann-badge-in 0.2s ease;
 	}
-	/* Waiting holds steady blue past the mount fade above: same
-	specificity, later wins, so a waiting badge never replays the
-	mount fade on re-stamp. (The old in-flight pulse is gone with
-	the separate request — unasked blue never blinks.) */
+	/* State motion, past the mount fade so equal specificity resolves
+	here: waiting breathes (motion reads as in-flight — fresh mounts
+	play the fade first, then breathe on a delay); the arrival glow
+	fires once on the waiting-to-ready flip (see `arrived`, stamped
+	in annotations.ts — mounts and re-renders never replay it);
+	then the mark rests steady orange. */
+	@keyframes ccez-ann-breathe {
+		0%,
+		100% {
+			opacity: 1;
+		}
+		50% {
+			opacity: 0.5;
+		}
+	}
+	.rendered :global(button.ccez-ann-badge.ans-waiting) {
+		animation: ccez-ann-breathe 1.2s ease-in-out infinite;
+	}
+	.rendered :global(button.ccez-ann-badge.ans-waiting.fresh) {
+		animation:
+			ann-badge-in 0.2s ease,
+			ccez-ann-breathe 1.2s ease-in-out 0.2s infinite;
+	}
+	/* Keyframes can't sit behind a selector, so the dark arrival
+	variant is renamed like the wash ones. */
+	@keyframes ccez-ann-arrive {
+		from {
+			box-shadow: 0 0 0 0 rgba(178, 94, 9, 0.5);
+		}
+		to {
+			box-shadow: 0 0 0 7px rgba(178, 94, 9, 0);
+		}
+	}
+	@keyframes ccez-ann-arrive-dark {
+		from {
+			box-shadow: 0 0 0 0 rgba(255, 159, 10, 0.55);
+		}
+		to {
+			box-shadow: 0 0 0 7px rgba(255, 159, 10, 0);
+		}
+	}
+	.rendered :global(button.ccez-ann-badge.ans-ready.arrived) {
+		animation: ccez-ann-arrive 0.45s ease-out 1;
+	}
+	:global(html[data-theme="dark"])
+		.rendered
+		:global(button.ccez-ann-badge.ans-ready.arrived) {
+		animation-name: ccez-ann-arrive-dark;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.rendered :global(button.ccez-ann-badge.ans-waiting),
+		.rendered :global(button.ccez-ann-badge.ans-waiting.fresh),
+		.rendered :global(button.ccez-ann-badge.ans-ready.arrived) {
+			animation: none;
+		}
+	}
 	/* Shiki emits light colors inline + dark variants as CSS variables. */
 	/* Dark theme, gated on the resolved scheme (<html data-theme>)
 	instead of the OS query, so the settings switch can pin it.

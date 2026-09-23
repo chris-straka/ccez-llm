@@ -1486,6 +1486,34 @@ export function badgeAnswerClass(
 	return "";
 }
 
+/**
+ * Badge classes on stamp: the answer state first (the className
+ * overwrite), then the transient marks. `fresh` only for new mounts
+ * — re-stamps must not replay the mount fade. `arrived` only for a
+ * settled badge flipping waiting-to-ready — the arrival glow's
+ * single shot. The overwrite already clears it on any state change
+ * (fresh mounts, re-asks), so while steady-ready it simply persists
+ * in its finished state and never replays.
+ */
+function paintBadgeClasses(
+	badge: HTMLButtonElement,
+	answer: "waiting" | "ready" | undefined,
+	id: string,
+	settled: Set<string>
+): void {
+	const wasWaiting = badge.classList.contains("ans-waiting");
+	badge.className = `ccez-ann-badge${badgeAnswerClass(answer)}`;
+	if (!settled.has(id)) badge.classList.add("fresh");
+	else badge.classList.remove("fresh");
+	if (
+		wasWaiting &&
+		settled.has(id) &&
+		badge.classList.contains("ans-ready")
+	) {
+		badge.classList.add("arrived");
+	}
+}
+
 function stampBadges(
 	root: HTMLElement,
 	items: AnnotationMark[],
@@ -1545,9 +1573,7 @@ function stampBadges(
 		// the swap mid-flight and oscillate.
 		const badge = live.get(item.id) ?? document.createElement("button");
 		badge.type = "button";
-		badge.className = `ccez-ann-badge${badgeAnswerClass(item.answer)}`;
-		if (!settled.has(item.id)) badge.classList.add("fresh");
-		else badge.classList.remove("fresh");
+		paintBadgeClasses(badge, item.answer, item.id, settled);
 		badge.dataset.annBadge = item.id;
 		const face = badgeFace(item);
 		badge.textContent = face.text;
@@ -1691,9 +1717,7 @@ function stampLegacy(
 		if (!anchor) continue;
 		const badge = live.get(item.id) ?? document.createElement("button");
 		badge.type = "button";
-		badge.className = `ccez-ann-badge${badgeAnswerClass(item.answer)}`;
-		if (!settled.has(item.id)) badge.classList.add("fresh");
-		else badge.classList.remove("fresh");
+		paintBadgeClasses(badge, item.answer, item.id, settled);
 		badge.dataset.annBadge = item.id;
 		const face = badgeFace(item);
 		badge.textContent = face.text;
