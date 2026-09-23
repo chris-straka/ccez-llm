@@ -2,14 +2,13 @@ import { expect, test } from "@playwright/test";
 import { dragQuote, seedChat } from "./helpers";
 
 /**
- * Word selection plus A files an annotation with "?" staged as the
- * note — send to file the question, or type over it. (Phones
- * double-tap the word; desktop drags it: both leave a live
- * selection, which is what owns A.) Hovering a word with no
- * selection plus A files and sends at once, no pill; Shift+A opens
- * the create box empty instead. Bare-message A still toggles aids.
+ * Word selection plus A files and sends at once — no pill, no staged
+ * note. (Phones double-tap the word; desktop drags it: both leave a
+ * live selection, which is what owns A.) Hovering a word with no
+ * selection sends it the same way; Shift+A opens the create box
+ * empty instead. Bare-message A still toggles aids.
  */
-test("selected word plus A stages a question note", async ({ page }) => {
+test("selected word plus A sends at once", async ({ page }) => {
 	await seedChat(page, [
 		{ role: "assistant", content: "the riverbank at dawn holds the fog" }
 	]);
@@ -21,10 +20,29 @@ test("selected word plus A stages a question note", async ({ page }) => {
 		() => window.getSelection()?.toString() ?? ""
 	);
 	expect(selText.trim().length).toBeGreaterThan(0);
+	// Hands off the prompt: a focused composer eats the A into typed
+	// text. Blurring keeps the selection (Escape might dismiss it).
+	await page.evaluate(() =>
+		(document.activeElement as HTMLElement | null)?.blur?.()
+	);
+	// Steal :hover outright (the summoned menu does this on its own
+	// when it opens under a stationary cursor): the live selection
+	// still owns A with no hover index at all.
+	await page.mouse.move(2, 2);
+	await expect
+		.poll(() =>
+			page.evaluate(
+				() => document.querySelector("article.assistant:hover") === null
+			)
+		)
+		.toBe(true);
 	await page.keyboard.press("a");
-	const pop = page.locator(".ann-pop.fresh");
-	await expect(pop).toBeVisible({ timeout: 10_000 });
-	await expect(pop.locator("textarea")).toHaveValue("?");
+	// No pill ever opens; the badge files (the answer request may
+	// banner without a dev key, but filing never depends on it).
+	await expect(page.locator(".ann-pop")).toHaveCount(0);
+	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1, {
+		timeout: 10_000
+	});
 });
 
 /** Hovering a word (no selection) plus A files and sends the

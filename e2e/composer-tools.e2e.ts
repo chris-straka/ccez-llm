@@ -613,10 +613,11 @@ test("send-hold clears the reply language past a staged annotation", async ({
 	await expect(page.locator("article.assistant .rendered")).toBeVisible({
 		timeout: 60_000
 	});
-	// Stage an annotation (the "?" note files on Enter); the composer
-	// text stays empty.
+	// Stage an annotation (Shift+A opens the box empty — bare A
+	// files and sends at once now; the empty note files on Enter);
+	// the composer text stays empty.
 	await dragQuote(page, 0, "beta");
-	await page.keyboard.press("a");
+	await page.keyboard.press("A");
 	const pop = page.locator(".ann-pop.fresh");
 	await expect(pop).toBeVisible({ timeout: 10_000 });
 	await page.keyboard.press("Enter");

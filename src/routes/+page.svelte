@@ -10373,18 +10373,36 @@
 				inInteractive: isInteractiveTarget(event.target),
 				inFieldOrFilter: isInspectFieldTarget(event.target),
 				hasSelection: (window.getSelection()?.toString() ?? "") !== "",
+				selInMessage: (() => {
+					// The summoned menu opens under a stationary
+					// cursor and steals :hover (clearing the hover
+					// index) while the selection stands: a selection
+					// in message text owns A with or without hover.
+					try {
+						const live = window.getSelection();
+						if (!live || live.isCollapsed) return false;
+						const anchor = live.anchorNode;
+						const el =
+							anchor instanceof Element
+								? anchor
+								: anchor?.parentElement;
+						return !!el?.closest(".messages .rendered");
+					} catch {
+						return false;
+					}
+				})(),
 				hoverWord: hoverHit?.word ?? null,
 				hoveredIdx,
 				escDownAt
 			};
 			const msgAction = messageKeyAction(msgFacts);
 			if (msgAction === "annotate-selection") {
-				// Double-tap a word, hit A: file the live selection as
-				// an annotation with "?" staged as the note — send to
-				// file the question, or type over it.
+				// A live selection plus A: file and send at once, exactly
+				// like a hovered word — the pill never opens (Shift+A
+				// opens it empty for a typed note instead).
 				event.preventDefault();
 				placeSelMenu();
-				annotate("?");
+				annotate("", true);
 				return;
 			}
 			if (msgAction === "annotate-hovered-instant") {

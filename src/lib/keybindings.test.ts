@@ -50,6 +50,7 @@ const msgBase: MessageKeyFacts = {
 	inInteractive: false,
 	inFieldOrFilter: false,
 	hasSelection: false,
+	selInMessage: false,
 	hoveredIdx: 2,
 	escDownAt: 0
 };
@@ -105,6 +106,28 @@ describe("messageKeyAction", () => {
 		expect(messageKeyAction({ ...msgBase, hoverWord: null })).toBe(
 			"toggle-aids"
 		);
+	});
+	it("files a message selection on A with no hover (menu stole it)", () => {
+		// The summoned menu opens under a stationary cursor and
+		// clears the hover index while the selection stands: the
+		// selection still owns A.
+		expect(
+			messageKeyAction({
+				...msgBase,
+				hasSelection: true,
+				selInMessage: true,
+				hoveredIdx: -1
+			})
+		).toBe("annotate-selection");
+		// A selection outside messages owns nothing.
+		expect(
+			messageKeyAction({
+				...msgBase,
+				hasSelection: true,
+				selInMessage: false,
+				hoveredIdx: -1
+			})
+		).toBe(null);
 	});
 	it("opens an empty create box on Shift+A (selection or hover)", () => {
 		const shiftA = {

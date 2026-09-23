@@ -425,9 +425,9 @@ test.describe("ruby-geometry", () => {
 });
 
 test.describe("keyboard", () => {
-	/** Hovering a Chinese word + a files it as an annotation ("?"
-	 * staged): the hover word owns bare A now. Aids pinning moved to
-	 * M / N and the gap-hover fallback below. */
+	/** Hovering a Chinese word + a files and sends it at once: the
+	 * hover word owns bare A now, no pill. Aids pinning moved to M /
+	 * N and the gap-hover fallback below. */
 	test("hovering Chinese and pressing a annotates the word", async ({
 		page
 	}) => {
@@ -440,9 +440,10 @@ test.describe("keyboard", () => {
 			(document.activeElement as HTMLElement | null)?.blur?.()
 		);
 		await page.keyboard.press("a");
-		const pop = page.locator(".ann-pop.fresh");
-		await expect(pop).toBeVisible({ timeout: 10_000 });
-		await expect(pop.locator("textarea")).toHaveValue("?");
+		await expect(page.locator(".ann-pop")).toHaveCount(0);
+		await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1, {
+			timeout: 10_000
+		});
 	});
 
 	/** Hovering a Japanese word + a files it the same way (the old
@@ -459,9 +460,10 @@ test.describe("keyboard", () => {
 			(document.activeElement as HTMLElement | null)?.blur?.()
 		);
 		await page.keyboard.press("a");
-		const pop = page.locator(".ann-pop.fresh");
-		await expect(pop).toBeVisible({ timeout: 10_000 });
-		await expect(pop.locator("textarea")).toHaveValue("?");
+		await expect(page.locator(".ann-pop")).toHaveCount(0);
+		await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1, {
+			timeout: 10_000
+		});
 	});
 
 	/** Bare A over no word (below the text, above the actions)
@@ -617,8 +619,9 @@ test.describe("keyboard", () => {
 });
 
 test.describe("keyboard mixed", () => {
-	/** Hovering mixed text + a files the hovered word ("?" staged):
-	the hover word owns bare A now (M / N still pin both aids). */
+	/** Hovering mixed text + a files and sends the hovered word, no
+	pill: the hover word owns bare A now (M / N still pin both
+	aids). */
 	test("hovering mixed text and pressing a annotates the word", async ({
 		page
 	}) => {
@@ -633,8 +636,9 @@ test.describe("keyboard mixed", () => {
 			(document.activeElement as HTMLElement | null)?.blur?.()
 		);
 		await page.keyboard.press("a");
-		const pop = page.locator(".ann-pop.fresh");
-		await expect(pop).toBeVisible({ timeout: 10_000 });
-		await expect(pop.locator("textarea")).toHaveValue("?");
+		await expect(page.locator(".ann-pop")).toHaveCount(0);
+		await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1, {
+			timeout: 10_000
+		});
 	});
 });

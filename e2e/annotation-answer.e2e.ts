@@ -73,7 +73,8 @@ test("staged question asks on send and the reply lands as its answer", async ({
 	);
 	expect(selText.trim().length).toBeGreaterThan(0);
 	await expect(page.locator(".sel-menu")).toBeVisible({ timeout: 10_000 });
-	await page.keyboard.press("a");
+	// Shift+A opens the box (bare A files and sends at once now).
+	await page.keyboard.press("A");
 	await askThroughSend(page, "what lives here?");
 	const ready = page.locator("button.ccez-ann-badge.ans-ready");
 	// The thread sits top-scrolled under the sticky header, which
@@ -128,7 +129,8 @@ test("clicking off the answer closes it", async ({ page }) => {
 	await expect(article).toBeVisible({ timeout: 60_000 });
 	await dragQuote(page, 0, "riverbank");
 	await expect(page.locator(".sel-menu")).toBeVisible({ timeout: 10_000 });
-	await page.keyboard.press("a");
+	// Shift+A opens the box (bare A files and sends at once now).
+	await page.keyboard.press("A");
 	await askThroughSend(page, "what lives here?");
 	const ready = page.locator("button.ccez-ann-badge.ans-ready");
 	await ready.focus();
@@ -163,7 +165,8 @@ test("chinese answer spawns the pinyin panel above the quote", async ({
 	await expect(article).toBeVisible({ timeout: 60_000 });
 	await dragQuote(page, 0, "雨过");
 	await expect(page.locator(".sel-menu")).toBeVisible({ timeout: 10_000 });
-	await page.keyboard.press("a");
+	// Shift+A opens the box (bare A files and sends at once now).
+	await page.keyboard.press("A");
 	await askThroughSend(page, "what does this mean?");
 	const ready = page.locator("button.ccez-ann-badge.ans-ready");
 	await ready.focus();
@@ -206,10 +209,13 @@ test("creating a chinese annotation shows its pinyin panel", async ({
 	await expect(article).toBeVisible({ timeout: 60_000 });
 	await dragQuote(page, 0, "雨过");
 	await expect(page.locator(".sel-menu")).toBeVisible({ timeout: 10_000 });
-	await page.keyboard.press("a");
+	// Shift+A opens the create box empty (bare A files and sends at
+	// once now): the Han quote earns its pinyin panel above it while
+	// creating.
+	await page.keyboard.press("A");
 	const pop = page.locator(".ann-pop.fresh");
 	await expect(pop).toBeVisible({ timeout: 10_000 });
-	await expect(pop.locator("textarea")).toHaveValue("?");
+	await expect(pop.locator("textarea")).toHaveValue("");
 	const panel = page.locator(".sel-pinyin");
 	await expect(panel).toBeVisible({ timeout: 10_000 });
 	await expect(panel).toContainText("yǔ");
@@ -268,7 +274,8 @@ test("bottom answer scrolls the thread to make room", async ({ page }) => {
 	// (the last line has no room to scroll into at max scroll).
 	await dragQuote(page, 11, "paragraph number 11");
 	await expect(page.locator(".sel-menu")).toBeVisible({ timeout: 10_000 });
-	await page.keyboard.press("a");
+	// Shift+A opens the box (bare A files and sends at once now).
+	await page.keyboard.press("A");
 	await askThroughSend(page, "what lives here?");
 	const ready = page.locator("button.ccez-ann-badge.ans-ready");
 	const scrolled = async (): Promise<number> =>

@@ -68,6 +68,11 @@ export interface MessageKeyFacts extends KeyModifiers {
 	inFieldOrFilter: boolean;
 	/** A text selection is live: hovered copy yields to it. */
 	hasSelection: boolean;
+	/** The live selection sits in message text: it owns A even when
+	the pointer already left (the summoned menu opens under a
+	stationary cursor and steals :hover, clearing the hover index
+	while the selection stands). */
+	selInMessage: boolean;
 	/** Word under the pointer (no selection): A sends it at once. */
 	hoverWord?: string | null;
 	hoveredIdx: number;
@@ -99,13 +104,13 @@ export function messageKeyAction(
 	facts: MessageKeyFacts
 ): MessageKeyAction | null {
 	const hovered = !facts.inEditor && facts.hoveredIdx >= 0;
-	// A live selection owns A: double-tap a word and hit A to file it
-	// as an annotation (the note stages "?"). Hovering a word with
-	// no selection files and sends that word at once, no pill;
-	// Shift+A opens the create box empty instead (selection or
-	// hover). Bare message A over anything else still toggles aids
-	// below.
-	if (facts.key === "a" && hovered && facts.hasSelection && bare(facts) && !facts.inField)
+	// A live selection owns A: double-tap a word and hit A to file
+	// and send it at once, no pill — hovering is not required (see
+	// selInMessage). Hovering a word with no selection sends it the
+	// same way; Shift+A opens the create box empty instead
+	// (selection or hover). Bare message A over anything else still
+	// toggles aids below.
+	if (facts.key === "a" && (hovered || facts.selInMessage) && facts.hasSelection && bare(facts) && !facts.inField)
 		return "annotate-selection";
 	if (facts.key === "a" && hovered && !facts.hasSelection && facts.hoverWord && bare(facts) && !facts.inField)
 		return "annotate-hovered-instant";
@@ -117,7 +122,7 @@ export function messageKeyAction(
 		!facts.metaKey &&
 		!facts.ctrlKey &&
 		!facts.altKey &&
-		hovered &&
+		(hovered || (facts.selInMessage && facts.hasSelection)) &&
 		!facts.inField &&
 		!facts.inEditable &&
 		(facts.hasSelection || facts.hoverWord)
