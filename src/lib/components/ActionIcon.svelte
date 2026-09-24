@@ -22,7 +22,8 @@
 		| "save"
 		| "mark"
 		| "export"
-		| "check";
+		| "check"
+		| "capture";
 
 	interface Props {
 		kind: ActionKind;
@@ -108,6 +109,12 @@
 		/>
 	{:else if kind === "check"}
 		<path d="M3 8.5l3.5 3.5L13 4.5" />
+	{:else if kind === "capture"}
+		<!-- Viewfinder corners: window capture, not a lens. -->
+		<path d="M2 5.5V4a2 2 0 0 1 2-2h1.5" />
+		<path d="M10.5 2H12a2 2 0 0 1 2 2v1.5" />
+		<path d="M14 10.5V12a2 2 0 0 1-2 2h-1.5" />
+		<path d="M5.5 14H4a2 2 0 0 1-2-2v-1.5" />
 	{/if}
 </svg>
 

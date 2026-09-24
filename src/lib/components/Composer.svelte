@@ -13,10 +13,20 @@ shared `.error` look. -->
 	import { shouldShowInspect } from "$lib/inspect";
 	import type { Annotation, AnnotationId } from "$lib/annotations";
 	import type { ReplyLanguage } from "$lib/languages";
+	import {
+		captureSourceLabel,
+		type CaptureWindow
+	} from "$lib/nativeCapture";
 	import ActionIcon from "./ActionIcon.svelte";
 	import ReviewDock, { type ReviewDockActions } from "./ReviewDock.svelte";
 
 	/** Page-owned composer behaviors. */
+	export interface CaptureMenuState {
+		open: boolean;
+		loading: boolean;
+		error: string | null;
+		windows: CaptureWindow[];
+	}
 	export interface ComposerActions {
 		floorClick: (event: MouseEvent) => void;
 		holdStart: (x: number, y: number) => void;
@@ -24,6 +34,8 @@ shared `.error` look. -->
 		intakeFiles: (files: File[]) => void;
 		mic: () => void;
 		voice: () => void;
+		captureToggle: () => void;
+		capturePick: (id: number | null, fullscreen: boolean) => void;
 		wpToggle: () => void;
 		submit: (alt: boolean) => void;
 		menuPress: () => void;
@@ -57,6 +69,13 @@ shared `.error` look. -->
 		attachBusy: number;
 		canMic: boolean;
 		micEnabled: boolean;
+		/** Window capture available (backend probe) and enabled
+		(settings kill-switch); the source menu rides below. */
+		canCapture: boolean;
+		captureEnabled: boolean;
+		captureMenu: CaptureMenuState;
+		captureSourceId: number | null;
+		captureFullscreen: boolean;
 		dictating: boolean;
 		voiceOn: boolean;
 		speaking: boolean;
@@ -92,6 +111,11 @@ shared `.error` look. -->
 		attachBusy,
 		canMic,
 		micEnabled,
+		canCapture,
+		captureEnabled,
+		captureMenu,
+		captureSourceId,
+		captureFullscreen,
 		dictating,
 		voiceOn,
 		speaking,
@@ -294,6 +318,23 @@ stop, so both rules below stay suppressed. -->
 		>
 			<ActionIcon kind="speak" />
 		</button>
+		{#if canCapture && captureEnabled}
+			<!-- Window capture for OCR: the source menu below lists
+			windows (the pick persists, the chord reuses it). Gated on
+			the backend probe and the settings kill-switch, so phones
+			and the browser preview never see it. -->
+			<button
+				type="button"
+				class="capture-btn"
+				title="Capture a window for OCR"
+				aria-label="Capture a window for OCR"
+				aria-haspopup="menu"
+				aria-expanded={captureMenu.open}
+				onclick={() => actions.captureToggle()}
+			>
+				<ActionIcon kind="capture" />
+			</button>
+		{/if}
 		{#if android && waypointCount > 3 && !hasSelMenu}
 			<!-- Touch-only jump-to-message trigger, right of the
 			audio button like the other tools: DOM order matches the
@@ -312,6 +353,49 @@ stop, so both rules below stay suppressed. -->
 			>
 				<ActionIcon kind="jump" />
 			</button>
+		{/if}
+		{#if canCapture && captureEnabled && captureMenu.open}
+			<!-- Source menu: fullscreen plus on-screen windows, the
+			pick persisting for the chord. A scrim takes click-off
+			(the tools row has no click-away exemption); Esc closes
+			through the page ladder. -->
+			<button
+				type="button"
+				class="capture-scrim"
+				aria-label="Close capture menu"
+				onclick={() => actions.captureToggle()}
+			></button>
+			<div class="capture-menu" role="menu" aria-label="Capture source">
+				{#if captureMenu.loading}
+					<p class="capture-status">Listing windows…</p>
+				{:else if captureMenu.error}
+					<p class="capture-status" role="alert">{captureMenu.error}</p>
+				{:else}
+					<button
+						type="button"
+						role="menuitemradio"
+						aria-checked={captureFullscreen}
+						class:picked={captureFullscreen}
+						onclick={() => actions.capturePick(null, true)}
+					>
+						Fullscreen
+					</button>
+					{#each captureMenu.windows as win (win.id)}
+						<button
+							type="button"
+							role="menuitemradio"
+							aria-checked={!captureFullscreen &&
+								win.id === captureSourceId}
+							class:picked={!captureFullscreen &&
+								win.id === captureSourceId}
+							title={captureSourceLabel(win, false)}
+							onclick={() => actions.capturePick(win.id, false)}
+						>
+							{captureSourceLabel(win, false)}
+						</button>
+					{/each}
+				{/if}
+			</div>
 		{/if}
 	</div>
 	<span class="send-hold"><button
@@ -750,6 +834,7 @@ stop, so both rules below stay suppressed. -->
 	.attach-btn,
 	.voice-float,
 	.mic-btn,
+	.capture-btn,
 	.wp-jump {
 		display: inline-flex;
 		align-items: center;
@@ -774,10 +859,69 @@ stop, so both rules below stay suppressed. -->
 		opacity: 0.55;
 	}
 	/* Tool glyphs ride the row's font size (em, not the component's
-	fixed rem): paperclip, mic, voice, and jump icons scale with the
-	composer instead of staying tiny at large text. */
+	fixed rem): paperclip, mic, voice, capture, and jump icons scale
+	with the composer instead of staying tiny at large text. */
 	.prompt-tools :global(.action-glyph) {
 		height: 1.05em;
+	}
+	/* Capture source menu: drops from the tools row, right-aligned,
+	growing down-and-left so it never runs off the column. The scrim
+	takes click-off (the row has no click-away exemption); Esc closes
+	through the page ladder. */
+	.capture-scrim {
+		position: fixed;
+		inset: 0;
+		z-index: 65;
+		border: 0;
+		background: transparent;
+		cursor: default;
+	}
+	.capture-menu {
+		position: absolute;
+		top: calc(100% + 0.4rem);
+		right: 0;
+		z-index: 70;
+		min-width: 14rem;
+		max-width: min(22rem, calc(100vw - 3rem));
+		max-height: 16rem;
+		overflow-y: auto;
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+		padding: 0.4rem;
+		border: 1px solid #c7c7cc;
+		border-color: var(--line);
+		border-radius: 10px;
+		background: #fff;
+		background: var(--bg-raised);
+		box-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
+	}
+	.capture-menu button[role="menuitemradio"] {
+		border: 0;
+		background: none;
+		color: inherit;
+		font: inherit;
+		font-size: 0.85rem;
+		text-align: left;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		padding: 0.35rem 0.5rem;
+		border-radius: 6px;
+		cursor: pointer;
+	}
+	.capture-menu button[role="menuitemradio"]:hover {
+		background: rgba(120, 120, 128, 0.16);
+	}
+	.capture-menu button[role="menuitemradio"].picked {
+		font-weight: 600;
+	}
+	.capture-status {
+		margin: 0;
+		padding: 0.35rem 0.5rem;
+		font-size: 0.85rem;
+		color: #6e6e73;
+		color: var(--muted);
 	}
 
 	/* iOS selection dock: the Annotate control lives in the composer
@@ -800,6 +944,7 @@ stop, so both rules below stay suppressed. -->
 	.attach-btn:hover,
 	.voice-float:hover,
 	.wp-jump:hover,
+	.capture-btn:hover,
 	.mic-btn:hover {
 		color: #1c1c1e;
 		color: var(--ink);
@@ -811,6 +956,7 @@ stop, so both rules below stay suppressed. -->
 		.attach-btn:hover,
 		.voice-float:hover,
 		.wp-jump:hover,
+		.capture-btn:hover,
 		.mic-btn:hover {
 			color: #6e6e73;
 			color: var(--muted);
@@ -926,9 +1072,13 @@ stop, so both rules below stay suppressed. -->
 	/* Tool seating rides the DOM, not JS classes: .mic-btn renders
 	exactly when dictation is available and .ann-wrap exactly when
 	drafts exist, so :has() below is the single source of truth.
-	The mic tier is the measured cluster (attach + mic + voice ≈
-	4.9rem in-page) plus ~1rem of breathing room — never more, or
-	single-line text wraps a word early with empty card beside it. */
+	Tiers track the buttons actually present: three icons ≈ 4.9rem
+	in-page, four with capture ≈ 6.7rem — each plus ~1rem of
+	breathing room, never more, or single-line text wraps a word
+	early with empty card beside it. */
+	.prompt:has(.mic-btn):has(.capture-btn) :global(.ta-input) {
+		--tools-pad: 7.5rem;
+	}
 	.prompt:has(.mic-btn) :global(.ta-input) {
 		--tools-pad: 6rem;
 	}

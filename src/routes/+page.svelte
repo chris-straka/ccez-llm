@@ -560,8 +560,12 @@
 		captureWindow,
 		capturePromptTemplate,
 		friendlyCaptureError,
-		shouldStageCapture
+		shouldStageCapture,
+		listCaptureWindows,
+		captureSupported,
+		type CaptureWindow
 	} from "$lib/nativeCapture";
+	import CaptureOverlay from "$lib/components/CaptureOverlay.svelte";
 	import { voiceLocaleForInputSource } from "$lib/keyboardLang";
 	import { joinExternalDraft, routeExternalText } from "$lib/externalText";
 	import {
@@ -4272,10 +4276,73 @@
 		}
 	}
 
+	/** Source menu toggle (composer capture button): opening loads
+	 * the rows live, so a closed-then-reopened menu never lists
+	 * stale windows. Failures render in-menu with the fix attached,
+	 * never a toast over the thread. */
+	async function toggleCaptureMenu(): Promise<void> {
+		if (captureMenu.open) {
+			captureMenu = { open: false, loading: false, error: null, windows: [] };
+			return;
+		}
+		if (!settings.captureEnabled) return;
+		captureMenu = { open: true, loading: true, error: null, windows: [] };
+		try {
+			const windows = await listCaptureWindows();
+			captureMenu = { open: true, loading: false, error: null, windows };
+		} catch (error) {
+			const raw = error instanceof Error ? error.message : String(error);
+			captureMenu = {
+				open: true,
+				loading: false,
+				error: friendlyCaptureError(raw),
+				windows: []
+			};
+		}
+	}
+	/** Source-menu pick: the pick persists for the chord, then the
+	 * flow runs off the saved source (no special-case path). */
+	function pickCaptureSource(id: number | null, fullscreen: boolean): void {
+		settings.captureSourceId = id;
+		settings.captureFullscreen = fullscreen;
+		saveSettingsNow();
+		captureMenu = { open: false, loading: false, error: null, windows: [] };
+		void runCaptureFlow();
+	}
+	/** Overlay confirm: the checked text sends exactly like a typed
+	 * prompt (doSend owns every guard). */
+	function confirmCaptureStaged(text: string): void {
+		const staged = captureStaged;
+		captureStaged = null;
+		if (!staged || text.trim().length === 0) return;
+		editor?.setText(capturePromptTemplate(text.trim()));
+		void doSend();
+	}
+	/** Overlay dismiss: back to the composer, caret ready. */
+	function dismissCaptureStaged(): void {
+		captureStaged = null;
+		editor?.focus();
+	}
 	/** Re-entrant guard: the chord can double-fire (repeat, both
 	 * chords at once) — one capture at a time. Plain let, no UI
 	 * binds it. */
 	let captureBusy = false;
+	/** Window capture available (backend probe, cached on success):
+	the composer button rides it plus the settings kill-switch. */
+	let canCapture = $state(false);
+	/** Source-menu state (closed by default; opened by the composer
+	button, which also loads the rows). */
+	let captureMenu = $state<{
+		open: boolean;
+		loading: boolean;
+		error: string | null;
+		windows: CaptureWindow[];
+	}>({ open: false, loading: false, error: null, windows: [] });
+	/** Low-confidence read awaiting a check (overlay card owns it;
+	null sends straight through). */
+	let captureStaged = $state<{ text: string; confidence: number } | null>(
+		null
+	);
 	/** Capture-any-window OCR: screenshot the saved source (or the
 	 * frontmost window), recognize it like an attachment, and send
 	 * "what does this mean" with the text quoted. Weak reads stage
@@ -4330,12 +4397,13 @@
 					flashErrorToast("No text found in this capture.");
 					return;
 				}
-				editor?.setText(capturePromptTemplate(text));
 				if (shouldStageCapture(result.confidence)) {
-					editor?.focus();
-					flashToast("Weak read — check the text, then send.");
+					// The overlay card owns the check (autofocused
+					// input; Enter sends, Esc dismisses + refocuses).
+					captureStaged = { text, confidence: result.confidence };
 					return;
 				}
+				editor?.setText(capturePromptTemplate(text));
 				await doSend();
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
@@ -10332,6 +10400,16 @@
 			} else if (find.open) {
 				// The find bar closes from anywhere (its input included).
 				closeFind();
+			} else if (captureStaged) {
+				// The weak-capture overlay dismisses from anywhere (its
+				// input included) and hands the caret back — the
+				// component owns no Esc of its own, so this is the
+				// only closer and it cannot double-fire.
+				dismissCaptureStaged();
+			} else if (captureMenu.open) {
+				// The source menu sits below the overlay in z, so it
+				// dismisses right after it.
+				captureMenu = { open: false, loading: false, error: null, windows: [] };
 			} else if (reviewOpen) {
 				// The annotations review closes from anywhere (the
 				// staged pill keeps its own Esc-to-discard below).
@@ -12658,6 +12736,12 @@
 			isAndroidUserAgent(navigator.userAgent),
 			isIOSUserAgent(navigator.userAgent)
 		);
+		// Window-capture availability arrives async (mac-only
+		// build): the composer button rides it plus the settings
+		// kill-switch, so phones and the preview never see it.
+		void captureSupported().then((ok) => {
+			canCapture = ok;
+		});
 		// Voice inventory arrives async (slow on phones): the first
 		// getVoices() kicks the load, voiceschanged bumps the gates.
 		try {
@@ -13448,6 +13532,11 @@
 			attachBusy={attachBusy}
 			canMic={canMic}
 			micEnabled={settings.micEnabled}
+			canCapture={canCapture}
+			captureEnabled={settings.captureEnabled}
+			captureMenu={captureMenu}
+			captureSourceId={settings.captureSourceId}
+			captureFullscreen={settings.captureFullscreen}
 			dictating={dictating}
 			voiceOn={voiceOn()}
 			speaking={speakingId !== null}
@@ -13471,6 +13560,9 @@
 					void addFiles(files).then((kinds) => insertAttachmentMarkers(kinds)),
 				mic: () => void toggleMic(),
 				voice: toggleVoice,
+				captureToggle: () => void toggleCaptureMenu(),
+				capturePick: (id: number | null, fullscreen: boolean) =>
+					pickCaptureSource(id, fullscreen),
 				wpToggle: () => {
 					wpOpen = !wpOpen;
 					buzzTap();
@@ -13498,6 +13590,21 @@
 				}
 			}}
 		/>
+
+		{#if captureStaged}
+			<!-- Weak-capture overlay: the staged read waits for a
+			check (Enter sends, Esc dismisses + refocuses). The page
+			keeps the staged text and both paths; the component owns
+			the card, the input, and their surfaces. -->
+			<CaptureOverlay
+				text={captureStaged.text}
+				confidence={captureStaged.confidence}
+				actions={{
+					confirm: (text: string) => confirmCaptureStaged(text),
+					dismiss: () => dismissCaptureStaged()
+				}}
+			/>
+		{/if}
 
 		<!-- Speech errors render from `Toasts.svelte` (top notice,
 		tap to dismiss); the banner below stays paged. -->
