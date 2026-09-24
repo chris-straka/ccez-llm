@@ -351,6 +351,22 @@ describe("settings", () => {
 		expect(loadSettings(memoryStore).captureEnabled).toBe(true);
 	});
 
+	it("defaults annotation popups to message size and heals strays", () => {
+		expect(defaultSettings().annPopScale).toBe(1);
+		const half = blankSettings();
+		half.annPopScale = 0.5;
+		saveSettings(half, memoryStore);
+		expect(loadSettings(memoryStore).annPopScale).toBe(0.5);
+		const junk = blankSettings();
+		(junk as unknown as Record<string, unknown>).annPopScale = "big";
+		saveSettings(junk, memoryStore);
+		expect(loadSettings(memoryStore).annPopScale).toBe(1);
+		const wild = blankSettings();
+		wild.annPopScale = 5;
+		saveSettings(wild, memoryStore);
+		expect(loadSettings(memoryStore).annPopScale).toBe(1);
+	});
+
 	it("defaults the capture source to frontmost windowed", () => {
 		const fresh = defaultSettings();
 		expect(fresh.captureSourceId).toBe(null);

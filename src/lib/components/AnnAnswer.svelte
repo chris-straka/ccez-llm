@@ -51,8 +51,9 @@ badge's plus/minus. -->
 		padding: 0.6rem 0.7rem 0.5rem;
 		border-radius: 10px;
 		/* Same size as the create pill root: the card reads at
-		message size, never toy-fixed beside scaled type. */
-		font-size: calc(1rem * var(--font-scale, 1));
+		message size, never toy-fixed beside scaled type. The
+		popup-size setting rides on top (--annpop-scale). */
+		font-size: calc(1rem * var(--font-scale, 1) * var(--annpop-scale, 1));
 		/* Near-opaque surface by default (a whisper of the thread
 		behind the answer); stark-contrast preference pins it fully
 		opaque below. */

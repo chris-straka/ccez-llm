@@ -13193,7 +13193,7 @@
 		settings.fontScale,
 		settings.chatWidth ?? 36,
 		settings.promptWidth ?? PROMPT_WIDTH_BASE_REM
-	)}; --prompt-font: {settings.promptScale ?? 1}; --msg-gap: {settings.messageGap ?? MESSAGE_GAP_DEFAULT}rem"
+	)}; --prompt-font: {settings.promptScale ?? 1}; --annpop-scale: {settings.annPopScale ?? 1}; --msg-gap: {settings.messageGap ?? MESSAGE_GAP_DEFAULT}rem"
 	data-mac={(isMac && !androidUI) || null}
 >
 	<Sidebar

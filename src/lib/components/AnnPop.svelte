@@ -416,7 +416,11 @@ blur-save fires first and Cancel/Delete can never win the race. -->
 		width: min(calc(var(--chat-width, 36) * 0.9rem), calc(100vw - 1rem));
 		padding: 0.55rem 0.6rem 0.55rem 1rem;
 		border-radius: 999px;
-		font-size: calc(1rem * var(--font-scale, 1));
+		/* Own size track (--annpop-scale, set on .app from the
+		popup-size setting): rides on top of message text, so huge
+		type does not force huge popups. The fallback keeps
+		standalone renders (tests, previews) at message size. */
+		font-size: calc(1rem * var(--font-scale, 1) * var(--annpop-scale, 1));
 	}
 	.ann-pop.fresh textarea {
 		flex: 1;
@@ -438,9 +442,9 @@ blur-save fires first and Cancel/Delete can never win the race. -->
 	/* The desktop edit card scales with the text size like the
 	creation pill does: a fixed 1rem field next to 370% type is
 	unreadable. em units ride the card root, so Save and the tools
-	scale with the field. */
+	scale with the field. The popup-size setting rides on top. */
 	.ann-pop:not(.fresh) {
-		font-size: calc(1rem * var(--font-scale, 1));
+		font-size: calc(1rem * var(--font-scale, 1) * var(--annpop-scale, 1));
 	}
 	.ann-pop:not(.fresh) textarea {
 		font-size: 1.05em;

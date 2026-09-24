@@ -251,6 +251,31 @@
 			<output>{Math.round((settings.promptScale ?? 1) * 100)}%</output>
 		</span>
 	</label>
+	<label class="slider-row">
+		Annotation popup size
+		<button
+			type="button"
+			class="reset-width"
+			title="Reset to the default popup size"
+			onclick={() => (settings.annPopScale = 1)}>(100%)</button
+		>
+		<span class="font-row">
+			<input
+				type="range"
+				min="10"
+				max={200}
+				step="5"
+				value={Math.round((settings.annPopScale ?? 1) * 100)}
+				aria-label="Annotation popup size percent"
+				onpointerdown={noteSliderPress}
+				onpointerup={(e) => sliderRelease(e, () => (settings.annPopScale = 1))}
+				oninput={(e) => {
+					settings.annPopScale = Number(e.currentTarget.value) / 100;
+				}}
+			/>
+			<output>{Math.round((settings.annPopScale ?? 1) * 100)}%</output>
+		</span>
+	</label>
 	{#if !androidUI}
 		<label class="slider-row">
 			Prompt width

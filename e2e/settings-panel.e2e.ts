@@ -40,6 +40,21 @@ test("desktop text slider caps at 2000 percent", async ({ page }) => {
 	).toHaveAttribute("max", "2000");
 });
 
+/** Annotation popups scale 10–200% of message text, reset to 100%. */
+test("annotation popup slider caps at 200 percent", async ({ page }) => {
+	const slider = page.locator(
+		'.settings-panel input[aria-label="Annotation popup size percent"]'
+	);
+	await expect(slider).toHaveAttribute("max", "200");
+	await expect(slider).toHaveAttribute("min", "10");
+	await slider.fill("50");
+	await expect(slider).toHaveValue("50");
+	await page
+		.locator('.settings-panel button[title="Reset to the default popup size"]')
+		.click();
+	await expect(slider).toHaveValue("100");
+});
+
 test("text size reset button restores 100 percent", async ({ page }) => {
 	const slider = page.locator(
 		'.settings-panel input[aria-label="Text size percent"]'

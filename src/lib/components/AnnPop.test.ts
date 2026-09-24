@@ -64,4 +64,20 @@ describe("annotation pill extraction", () => {
 		expect(pageStyle()).not.toContain(".ann-save");
 		expect(pageStyle()).not.toContain("@keyframes ann-pop-in");
 	});
+
+	it("rides the popup-size setting on top of message text", () => {
+		const css = pillStyle();
+		// Both roots (create pill, edit card) multiply message text
+		// by the setting, so huge type does not force huge popups.
+		// Inner fields ride em and stay untouched.
+		expect(css).toMatch(
+			/\.ann-pop\.fresh\s*\{[^}]*font-size:\s*calc\(1rem \* var\(--font-scale, 1\) \* var\(--annpop-scale, 1\)\)/
+		);
+		expect(css).toMatch(
+			/\.ann-pop:not\(\.fresh\)\s*\{[^}]*font-size:\s*calc\(1rem \* var\(--font-scale, 1\) \* var\(--annpop-scale, 1\)\)/
+		);
+		// The var is set on .app from settings (same track as the
+		// prompt font), never hardcoded in the component.
+		expect(pageSource()).toContain("--annpop-scale: {settings.annPopScale ?? 1}");
+	});
 });

@@ -64,4 +64,10 @@ describe("annotation answer extraction", () => {
 		expect(answerSource()).toMatch(/rgba\(30,\s*30,\s*32,\s*0\.98\)/);
 		expect(answerSource()).toContain("prefers-contrast");
 	});
+
+	it("rides the popup-size setting on top of message text", () => {
+		expect(answerSource()).toMatch(
+			/\.ann-answer\s*\{[^}]*font-size:\s*calc\(1rem \* var\(--font-scale, 1\) \* var\(--annpop-scale, 1\)\)/
+		);
+	});
 });

@@ -117,6 +117,10 @@ export interface AppSettings {
 	/** Prompt-only text-size multiplier (1 = default): ⌘[ / ⌘]
 	 * resizes the composer without touching message text. */
 	promptScale: number;
+	/** Annotation-popup size multiplier (1 = default): rides on top
+	 * of the message text size, so huge type does not force huge
+	 * popups. The slider runs 10–200%. */
+	annPopScale: number;
 	/**
 	 * Desktop-only composer width in rem (36 = the default):
 	 * ⇧⌘[ / ⇧⌘] widens the prompt, never the column. Phones
@@ -210,6 +214,9 @@ export const DEFAULT_SYSTEM_PROMPT = "";
 export const FONT_SCALE_MIN = 0.5;
 export const FONT_SCALE_MAX = 20;
 
+/** Annotation-popup size multiplier bounds: 10–200% of message text. */
+export const ANN_POP_SCALE_MIN = 0.1;
+export const ANN_POP_SCALE_MAX = 2;
 /** Desktop chat-column width in rem: 46 is the legacy fixed width. */
 export const CHAT_WIDTH_DEFAULT = 36;
 export const CHAT_WIDTH_MIN = 28;
@@ -376,6 +383,7 @@ export function defaultSettings(): AppSettings {
 		fontScale: 1,
 		chatWidth: CHAT_WIDTH_DEFAULT,
 		promptScale: 1,
+		annPopScale: 1,
 		promptWidth: PROMPT_WIDTH_BASE_REM,
 		ownBubble: false,
 		hoverUserActions: true,
@@ -552,6 +560,17 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 			)
 		) {
 			merged.promptScale = 1;
+		}
+		// Annotation popups scale 10–200% of message text (range
+		// inputs persist strings; out-of-range heals to 100%).
+		if (
+			typeof merged.annPopScale !== "number" ||
+			!(
+				merged.annPopScale >= ANN_POP_SCALE_MIN &&
+				merged.annPopScale <= ANN_POP_SCALE_MAX
+			)
+		) {
+			merged.annPopScale = 1;
 		}
 		if (
 			typeof merged.promptWidth !== "number" ||
