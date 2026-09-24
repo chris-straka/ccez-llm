@@ -125,13 +125,18 @@ export function editMessageAction(
 /**
  * True when the first-token rumble belongs to the visible chat. A
  * mid-stream chat switch must not rumble the new chat for the old
- * one's reply — both `doSend` and `resend` share this guard.
+ * one's reply, and a backgrounded app must stay silent — the
+ * reply-ready ping owns the backgrounded moment, so the start
+ * rumble would buzz twice for one reply. Both `doSend` and
+ * `resend` share this guard; callers pass
+ * `document.visibilityState === "visible"`.
  */
 export function shouldRumbleOnFirstToken(
 	currentChatId: unknown,
-	sentFromChatId: unknown
+	sentFromChatId: unknown,
+	visible: boolean
 ): boolean {
-	return currentChatId === sentFromChatId;
+	return visible && currentChatId === sentFromChatId;
 }
 
 /**

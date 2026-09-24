@@ -7379,7 +7379,14 @@
 		nativeText.set(turn_id, full);
 		if (!hasReplyStarted(chatState, owned.chatId)) {
 			markReplyStarted(chatState, owned.chatId);
-			buzzBeat("first", chatState.activeChatId === owned.chatId);
+			// Foreground only: backgrounded, the reply-ready ping owns
+			// the moment — a start rumble would buzz before the reply
+			// has been received.
+			buzzBeat(
+				"first",
+				chatState.activeChatId === owned.chatId &&
+					document.visibilityState === "visible"
+			);
 		}
 		target.messages = target.messages.map((m) =>
 			m.id === owned.replyId ? { ...m, content: full } : m
@@ -7673,7 +7680,13 @@
 				// its chat is still open. A mid-stream switch must not
 				// rumble the new chat for the old one's reply.
 				onFirstToken: () => {
-					if (shouldRumbleOnFirstToken(chat.id, sentFrom.id))
+					if (
+						shouldRumbleOnFirstToken(
+							chat.id,
+							sentFrom.id,
+							document.visibilityState === "visible"
+						)
+					)
 						buzzBeat("first");
 				}
 			}
@@ -7740,7 +7753,13 @@
 			{
 				thinking: activeThinkingId(settings),
 				onFirstToken: () => {
-					if (shouldRumbleOnFirstToken(chat.id, resentFrom.id))
+					if (
+						shouldRumbleOnFirstToken(
+							chat.id,
+							resentFrom.id,
+							document.visibilityState === "visible"
+						)
+					)
 						buzzBeat("first");
 				}
 			}

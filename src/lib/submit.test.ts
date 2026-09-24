@@ -174,10 +174,14 @@ describe("commitEditTarget", () => {
 
 describe("shouldRumbleOnFirstToken", () => {
 	it("rumbles while the sent-from chat is still open", () => {
-		expect(shouldRumbleOnFirstToken("c1", "c1")).toBe(true);
+		expect(shouldRumbleOnFirstToken("c1", "c1", true)).toBe(true);
 	});
 
 	it("stays silent after a mid-stream chat switch", () => {
-		expect(shouldRumbleOnFirstToken("c2", "c1")).toBe(false);
+		expect(shouldRumbleOnFirstToken("c2", "c1", true)).toBe(false);
+	});
+
+	it("stays silent while backgrounded even on the same chat", () => {
+		expect(shouldRumbleOnFirstToken("c1", "c1", false)).toBe(false);
 	});
 });
