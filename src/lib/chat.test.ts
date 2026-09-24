@@ -32,6 +32,8 @@ import {
 	setPasteFold,
 	resolveSendCompletion,
 	landingSignal,
+	replyPhase,
+	REPLY_STALL_MS,
 	apiContent,
 	buildApiMessages,
 	isSending,
@@ -1068,6 +1070,55 @@ describe("landingSignal", () => {
 
 	it("stays silent while backgrounded on another chat", () => {
 		expect(landingSignal(false, false, true)).toBe("silent");
+	});
+});
+
+describe("replyPhase", () => {
+	const base = {
+		sending: true,
+		fetching: false,
+		started: false,
+		tick: 0,
+		nowMs: 10_000,
+		lastTokenMs: null as number | null
+	};
+	it("rests while nothing sends", () => {
+		expect(replyPhase({ ...base, sending: false })).toBeNull();
+	});
+	it("fetches while a page downloads, started or not", () => {
+		expect(replyPhase({ ...base, fetching: true })).toBe("fetch");
+		expect(
+			replyPhase({ ...base, fetching: true, started: true })
+		).toBe("fetch");
+	});
+	it("waits before the first token", () => {
+		expect(replyPhase(base)).toBe("waiting");
+	});
+	it("rests while text flows", () => {
+		expect(
+			replyPhase({ ...base, started: true, lastTokenMs: 9_500 })
+		).toBeNull();
+	});
+	it("waits again when tokens stall between tool rounds", () => {
+		expect(
+			replyPhase({
+				...base,
+				started: true,
+				lastTokenMs: 10_000 - REPLY_STALL_MS - 1
+			})
+		).toBe("waiting");
+	});
+	it("waits at exactly the stall threshold", () => {
+		expect(
+			replyPhase({
+				...base,
+				started: true,
+				lastTokenMs: 10_000 - REPLY_STALL_MS
+			})
+		).toBe("waiting");
+	});
+	it("waits when started but no token stamp survived", () => {
+		expect(replyPhase({ ...base, started: true })).toBe("waiting");
 	});
 });
 

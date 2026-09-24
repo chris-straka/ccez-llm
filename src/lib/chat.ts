@@ -478,6 +478,7 @@ export async function resendLast(
 		store?: KeyValueStore | undefined;
 		thinking?: string | undefined;
 		onFirstToken?: (() => void) | undefined;
+		onToken?: (() => void) | undefined;
 	} = {}
 ): Promise<void> {
 	const chat = activeChat(state);
@@ -488,7 +489,11 @@ export async function resendLast(
 		state,
 		provider,
 		systemPrompt,
-		{ thinking: opts.thinking, onFirstToken: opts.onFirstToken },
+		{
+			thinking: opts.thinking,
+			onFirstToken: opts.onFirstToken,
+			onToken: opts.onToken
+		},
 		opts.store
 	);
 }
@@ -628,6 +633,7 @@ export async function sendMessage(
 		thinking?: string | undefined;
 		pasteFolds?: PasteFold[] | undefined;
 		onFirstToken?: (() => void) | undefined;
+		onToken?: (() => void) | undefined;
 	} = {},
 	store?: KeyValueStore
 ): Promise<void> {
@@ -662,7 +668,8 @@ export async function sendMessage(
 		{
 			signal: opts.signal,
 			thinking: opts.thinking,
-			onFirstToken: opts.onFirstToken
+			onFirstToken: opts.onFirstToken,
+			onToken: opts.onToken
 		},
 		store
 	);
@@ -683,6 +690,7 @@ export async function streamAssistantReply(
 		signal?: AbortSignal | undefined;
 		thinking?: string | undefined;
 		onFirstToken?: (() => void) | undefined;
+		onToken?: (() => void) | undefined;
 	} = {},
 	store?: KeyValueStore
 ): Promise<void> {
@@ -746,6 +754,7 @@ export async function streamAssistantReply(
 					}
 					streamed += token;
 					replaceReply({ content: streamed });
+					if (token !== "") opts.onToken?.();
 				}
 			},
 			{ signal: controller.signal, thinking: opts.thinking }
@@ -913,6 +922,41 @@ export function landingSignal(
 	if (!visible) return "silent";
 	if (stillHere) return "done";
 	return androidUI ? "tick" : "silent";
+}
+
+/**
+ * Silence that reads as stalled: tokens normally flow sub-second,
+ * so no token for this long means the think between tool rounds.
+ * The 1s send ticker re-evaluates, so the chip returns within about
+ * a tick after the threshold.
+ */
+export const REPLY_STALL_MS = 3000;
+
+/**
+ * Phase chip for a live send: fetching while a page downloads,
+ * waiting before the first token and whenever tokens stall (round-1
+ * text must not retire the chip for the think that follows it),
+ * null while text flows or the turn settles. Callers pass
+ * Date.now() plus the last token stamp; `tick` only subscribes the
+ * 1s send ticker so stalls surface without new timers. Pure.
+ */
+export function replyPhase(facts: {
+	sending: boolean;
+	fetching: boolean;
+	started: boolean;
+	tick: number;
+	nowMs: number;
+	lastTokenMs: number | null;
+}): "fetch" | "waiting" | null {
+	if (!facts.sending) return null;
+	if (facts.fetching) return "fetch";
+	if (!facts.started) return "waiting";
+	if (
+		facts.lastTokenMs === null ||
+		facts.nowMs - facts.lastTokenMs >= REPLY_STALL_MS
+	)
+		return "waiting";
+	return null;
 }
 
 /** Persisted shape owner (chats array only — runtime flags never touch disk). */

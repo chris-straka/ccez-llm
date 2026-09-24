@@ -41,6 +41,7 @@
 		settleNativeSend,
 		resolveSendCompletion,
 		landingSignal,
+		replyPhase,
 		type PasteFold,
 		type Chat,
 		type ChatMsg,
@@ -722,6 +723,10 @@
 	>();
 	/** Streamed text per native turn (a retry recompute clears its own). */
 	const nativeText = new SvelteMap<TurnId, string>();
+	/** Last token stamp per chat (both engines): the phase chip reads
+	staleness off the 1s send ticker, so the think between tool
+	rounds brings Thinking back instead of leaving a dead gap. */
+	const lastTokenAt = new SvelteMap<ChatId, number>();
 	/** Chats with a native page fetch in flight: the Fetching chip reads
 	this alongside the TypeScript provider's flag, so both engines drive
 	one indicator. */
@@ -7231,6 +7236,7 @@
 			originId,
 			chat.id
 		);
+		lastTokenAt.delete(originId);
 		if (sent?.role === "assistant" && !sent.error) {
 			// Foreground only: backgrounded, the reply-ready ping owns
 			// the moment — any haptic here would buzz behind the user's
@@ -7376,6 +7382,7 @@
 		if (!target) return;
 		const full = (nativeText.get(turn_id) ?? "") + token;
 		nativeText.set(turn_id, full);
+		lastTokenAt.set(owned.chatId, Date.now());
 		if (!hasReplyStarted(chatState, owned.chatId)) {
 			markReplyStarted(chatState, owned.chatId);
 			// Foreground only: backgrounded, the reply-ready ping owns
@@ -7687,6 +7694,9 @@
 						)
 					)
 						buzzBeat("first");
+				},
+				onToken: () => {
+					lastTokenAt.set(sentFrom.id, Date.now());
 				}
 			}
 		);
@@ -7760,6 +7770,9 @@
 						)
 					)
 						buzzBeat("first");
+				},
+				onToken: () => {
+					lastTokenAt.set(resentFrom.id, Date.now());
 				}
 			}
 		);
@@ -13434,15 +13447,19 @@
 				hoverBadgeId}
 			sending={isSending(chatState, viewChat.id)}
 			sendingChatId={chatState.sendingChatId}
-			sendingPhase={(isSending(chatState, viewChat.id) &&
-				hasFetchActive(chatState, viewChat.id)) ||
-			nativeFetching.has(viewChat.id)
-				? "fetch"
-				: (isSending(chatState, viewChat.id) ||
-							liveNative.has(viewChat.id)) &&
-					  !hasReplyStarted(chatState, viewChat.id)
-					? "waiting"
-					: null}
+			sendingPhase={replyPhase({
+				sending:
+					isSending(chatState, viewChat.id) ||
+					liveNative.has(viewChat.id),
+				fetching:
+					(isSending(chatState, viewChat.id) &&
+						hasFetchActive(chatState, viewChat.id)) ||
+					nativeFetching.has(viewChat.id),
+				started: hasReplyStarted(chatState, viewChat.id),
+				tick: sendElapsed,
+				nowMs: Date.now(),
+				lastTokenMs: lastTokenAt.get(viewChat.id) ?? null
+			})}
 			{sendElapsed}
 			waitingLabel={thinkingLabelFor(activeReplyCode ?? settings.replyLang)}
 			{useMock}
