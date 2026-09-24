@@ -83,7 +83,11 @@ panels. -->
 <style>
 	.sel-pinyin {
 		position: fixed;
-		z-index: 50;
+		/* Above every thread popup (answer card, pills, dock, and
+		menus sit at 60; toasts own 100): the readings annotate the
+		live highlight, so an open answer card must never bury them.
+		Below app chrome by the same token. */
+		z-index: 70;
 		pointer-events: none;
 		/* Hug the characters: when long readings scrunch onto
 		several lines, the width pass (see shrinkPanelToContent)
@@ -102,8 +106,9 @@ panels. -->
 		padding: 0.3rem 0.2rem;
 		border-radius: 8px;
 		/* Rides the chat text size (never the prompt's own): a fixed
-		0.85rem panel next to 370% type reads as a toy. */
-		font-size: calc(0.85rem * var(--font-scale, 1));
+		0.85rem panel next to 370% type reads as a toy. The
+		popup-size setting rides on top (--annpop-scale). */
+		font-size: calc(0.85rem * var(--font-scale, 1) * var(--annpop-scale, 1));
 		background: rgba(255, 255, 255, 0.88);
 		-webkit-backdrop-filter: blur(18px) saturate(1.6);
 		backdrop-filter: blur(18px) saturate(1.6);

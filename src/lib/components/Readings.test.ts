@@ -35,6 +35,24 @@ function pageStyle(): string {
 	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
+function answerStyle(): string {
+	const source = readFileSync(
+		new URL("./AnnAnswer.svelte", import.meta.url),
+		"utf8"
+	);
+	const match = source.match(/<style>([\s\S]*)<\/style>/);
+	if (!match) throw new Error("AnnAnswer.svelte has no <style> block");
+	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
+}
+
+function zIndexOf(style: string, selector: string): number {
+	const match = style.match(
+		new RegExp(`${selector}\\s*\\{[^}]*z-index:\\s*(\\d+)`)
+	);
+	if (!match) throw new Error(`${selector} has no z-index`);
+	return Number(match[1]);
+}
+
 describe("readings panels extraction", () => {
 	it("renders the panels from the component, not the page", () => {
 		expect(readingsSource()).toContain('class="sel-pinyin"');
@@ -59,5 +77,20 @@ describe("readings panels extraction", () => {
 		);
 		expect(pageStyle()).not.toMatch(/\.sel-pinyin\s*\{/);
 		expect(pageStyle()).not.toContain(".sel-pinyin .spr");
+	});
+
+	it("paints above the answer card", () => {
+		// The card hangs over the highlight it answers; the readings
+		// for that same highlight must stay visible above it (below
+		// app chrome like toasts).
+		const panels = zIndexOf(readingsStyle(), "\\.sel-pinyin");
+		const card = zIndexOf(answerStyle(), "\\.ann-answer");
+		expect(panels).toBeGreaterThan(card);
+	});
+
+	it("rides the popup-size setting on top of message text", () => {
+		expect(readingsStyle()).toMatch(
+			/font-size:\s*calc\(0\.85rem \* var\(--font-scale, 1\) \* var\(--annpop-scale, 1\)\)/
+		);
 	});
 });
