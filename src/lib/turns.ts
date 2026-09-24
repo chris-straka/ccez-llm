@@ -346,6 +346,22 @@ export function errorTurnFile(
 	};
 }
 
+/**
+ * Ids of one chat's live turns, oldest first. Pure: chat delete
+ * stops exactly these, so the runners settle and the shade notice
+ * dismisses with the chat.
+ */
+export function ownedNativeTurnIds(
+	turns: ReadonlyMap<TurnId, { chatId: ChatId }>,
+	chatId: ChatId
+): TurnId[] {
+	const ids: TurnId[] = [];
+	for (const [turnId, owned] of turns) {
+		if (owned.chatId === chatId) ids.push(turnId);
+	}
+	return ids;
+}
+
 /** Live ownership one turn holds: its accumulator, fetch flag, and liveness. */
 export interface NativeTurnOwnership {
 	turns: Map<TurnId, { chatId: ChatId; replyId: ChatMsgId }>;

@@ -9,6 +9,7 @@ import {
 	nativeTurnAvailable,
 	nativeTurnConfig,
 	nativeRouteFor,
+	ownedNativeTurnIds,
 	errorTurnFile,
 	releaseNativeTurn,
 	resumableKilledTurn,
@@ -426,5 +427,23 @@ describe("frontendPingOnDone", () => {
 
 	it("keeps the frontend ping for TypeScript-engine turns", () => {
 		expect(frontendPingOnDone(false)).toBe(true);
+	});
+});
+
+describe("ownedNativeTurnIds", () => {
+	const t1 = "t1" as TurnId;
+	const t2 = "t2" as TurnId;
+	const c1 = "c1" as ChatId;
+	const c2 = "c2" as ChatId;
+	it("selects one chat's turns in order, ignoring the rest", () => {
+		const turns = new Map([
+			[t1, { chatId: c1 }],
+			[t2, { chatId: c2 }]
+		]);
+		expect(ownedNativeTurnIds(turns, c1)).toEqual([t1]);
+		expect(ownedNativeTurnIds(turns, c2)).toEqual([t2]);
+	});
+	it("comes back empty when nothing runs there", () => {
+		expect(ownedNativeTurnIds(new Map(), c1)).toEqual([]);
 	});
 });

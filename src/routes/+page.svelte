@@ -299,6 +299,7 @@
 		dismissNativeTurn,
 		markTurnInterrupted,
 		nativeRouteFor,
+		ownedNativeTurnIds,
 		errorTurnFile,
 		pollNativeTurn,
 		releaseNativeTurn,
@@ -307,6 +308,7 @@
 		frontendPingOnDone,
 		seenNativeTurn,
 		startNativeTurn,
+		stopNativeTurn,
 		turnHistory,
 		type NativeTurnConfig,
 		type NativeTurnFile,
@@ -2507,6 +2509,26 @@
 
 	/** Chat switching cuts instantly — no crossfade, no slide: one
 	chat is replaced by the next in the same frame. */
+	/**
+	 * Stop one chat's live native turns: the runners settle each
+	 * stopped turn, releasing its service claim so the shade notice
+	 * dismisses with the chat instead of orphaning. Local ownership
+	 * releases up front, so late completions find nothing and only
+	 * dismiss their files. Best-effort per turn, never throws.
+	 */
+	async function stopChatNativeTurns(chatId: ChatId): Promise<void> {
+		const owned = ownedNativeTurnIds(nativeTurns, chatId);
+		for (const turnId of owned) {
+			try {
+				await stopNativeTurn(turnId);
+			} catch {
+				// Settling releases locally either way below.
+			}
+			releaseNativeTurn(nativeOwn, turnId, chatId);
+		}
+		if (owned.length > 0) settleNativeSend(chatState, chatId);
+	}
+
 	function transitionToChat(id: Parameters<typeof selectChat>[1]): void {
 		const from = chatState.activeChatId;
 		dismissSelPanels();
@@ -8721,6 +8743,9 @@
 				chatState.chats.map((c) => c.id).filter((c) => c !== id)
 			);
 			resetDraftExtras();
+			// A live turn must not outlive its chat: stop it so the
+			// runner settles and the shade notice dismisses too.
+			void stopChatNativeTurns(id);
 			deleteChat(chatState, id);
 			chatScrollTops.delete(id);
 			annotations = loadDraftAnnotations(chatState.activeChatId);
@@ -8728,7 +8753,9 @@
 		} else {
 			// Dropping a background chat must not touch the open
 			// composer's in-memory drafts or attachments: only prune the
-			// deleted id out of storage.
+			// deleted id out of storage — but its live turns still stop,
+			// or the shade notice orphans.
+			void stopChatNativeTurns(id);
 			deleteChat(chatState, id);
 			chatScrollTops.delete(id);
 			saveDraftAnnotations(
