@@ -7252,7 +7252,7 @@
 				// toast — a reply must not finish silently in a thread
 				// the user left. Tapping opens the origin chat.
 				buzzTap();
-				flashToast("Reply ready — tap to open", () =>
+				flashToast("Reply ready", () =>
 					transitionToChat(originId)
 				);
 			}
