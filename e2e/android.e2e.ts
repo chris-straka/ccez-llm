@@ -28,7 +28,7 @@ test.describe("gestures", () => {
 	 * Android milestone (S24 Galaxy): key chords don't exist on a phone, so
 	 * the shortcuts modal teaches touch gestures. Double-tap on empty
 	 * space is the only sidebar opener — rightward strokes only dismiss,
-	 * two-finger double-tap jumps to the bottom, three-finger tap
+	 * two-finger double-tap never scrolls, three-finger tap
 	 * deletes the message, three-finger hold wipes. These specs pin
 	 * the UA-gated branches that ship on desktop today.
 	 */
@@ -116,10 +116,7 @@ test.describe("gestures", () => {
 		await expect(modal.locator('dt:text-is("Chat switcher") + dd')).toHaveText(
 			"Two-finger hold · double-tap empty space · swipe cycles · loops"
 		);
-		await expect(modal.locator('dt:text-is("Message end")')).toBeVisible();
-		await expect(modal.locator('dt:text-is("Message end") + dd')).toHaveText(
-			"Double two-finger tap"
-		);
+		await expect(modal.locator('dt:text-is("Message end")')).toHaveCount(0);
 		await expect(modal.locator('dt:text-is("Delete a message")')).toBeVisible();
 		await expect(
 			modal.locator('dt:text-is("Delete a message") + dd')
@@ -408,7 +405,7 @@ test.describe("touch", () => {
 	/**
 	 * Android touch batch: one-line region pills, the chats drawer, the
 	 * touch selection menu with Speak, three-finger chat steps,
-	 * two-finger bottom jump, three-finger message delete plus hold
+	 * no double-tap scroll, three-finger message delete plus hold
 	 * wipe, sidebar mutual exclusion, and the theme pin. Same
 	 * UA-gated branches as android.e2e.ts, S24-class viewport.
 	 */
@@ -581,7 +578,7 @@ test.describe("touch", () => {
 		expect(pos.width).toBeLessThanOrEqual(340);
 	});
 
-	/** Synthetic two-finger double-tap (bottom jump on Android). */
+	/** Synthetic two-finger double-tap (a no-op scroll-wise on Android). */
 	async function doubleTapTwoFinger(page: Page): Promise<void> {
 		for (let tap = 0; tap < 2; tap++) {
 			await page.evaluate(() => {
@@ -692,7 +689,7 @@ test.describe("touch", () => {
 		await swipeX(page, 268, 128);
 		await expect(aside).toHaveClass(/collapsed/);
 		await expect(panel).toHaveClass(/closed/);
-		// Two-finger double-tap jumps instead of summoning (and
+		// Two-finger double-tap does nothing instead of summoning (and
 		// never deletes): the list stays shut, the chat remains.
 		const chats = await page.locator("aside button.side-chat").count();
 		await doubleTapTwoFinger(page);
@@ -978,7 +975,7 @@ test.describe("touch", () => {
 		await expect(panel).not.toHaveClass(/closed/);
 	});
 
-	test("double two-finger tap jumps to the thread bottom, never deletes", async ({
+	test("double two-finger tap never scrolls on Android, never deletes", async ({
 		page
 	}) => {
 		// Long thread so the jump has somewhere to go; the pair lands
@@ -1051,16 +1048,15 @@ test.describe("touch", () => {
 			);
 			if (tap === 0) await page.waitForTimeout(120);
 		}
-		// Smooth scroll lands the thread bottom; nothing deleted.
-		await expect
-			.poll(
-				async () =>
-					page.evaluate(
-						() => document.querySelector(".messages")?.scrollTop ?? 0
-					),
-				{ timeout: 5000 }
+		// Double-taps never scroll: the pair lands mid-thread and the
+		// scroll position must not move — past the hold timer, so a
+		// slow jump would still show. Nothing deleted either.
+		await page.waitForTimeout(800);
+		expect(
+			await page.evaluate(
+				() => document.querySelector(".messages")?.scrollTop ?? -1
 			)
-			.toBeGreaterThan(100);
+		).toBe(0);
 		expect(await page.locator("aside button.side-chat").count()).toBe(1);
 	});
 

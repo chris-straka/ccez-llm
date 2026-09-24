@@ -3,9 +3,8 @@ import { test, expect, type Page } from "@playwright/test";
 /**
  * Touch action rows: every row sits in flow under its message and
  * fades like the desktop rows. Tapping a message reveals its row
- * for 3s; double-tapping pins it open while word-selecting natively
- * (the message-end jump moved to the two-finger double-tap). There
- * is no overlay pill and no overlay checkbox.
+ * for 3s; double-tapping pins it open while word-selecting natively,
+ * never scrolling. There is no overlay pill and no overlay checkbox.
  */
 test.use({
 	userAgent:

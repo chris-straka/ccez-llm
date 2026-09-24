@@ -3589,7 +3589,7 @@
 		shownActionsId = id;
 		// No haptic on a single reveal tap: a reveal is a quiet UI
 		// affordance, not a sent action. Double-tap keeps its own
-		// beat (the message-end jump); the send paths keep theirs.
+		// beat; the send paths keep theirs.
 		// The tap can land mid-frame with keyboard or viewport churn:
 		// settle a re-measure after paint (same settle the send paths
 		// use) so the composer can't strand at zero height, and the
@@ -4579,30 +4579,6 @@
 		const article = target ? articleOf(target) : null;
 		if (!(article instanceof HTMLElement)) return null;
 		return messageIndexFromId(article.id, viewChat.messages.length);
-	}
-
-	/** Two-finger double-tap: land the tapped message's end above the
-	composer dock (prompt plus the message's own buttons row, which
-	sits below its text) — the old single-finger pair's math, moved
-	here so single taps keep native word select. Empty space jumps
-	the thread bottom instead. */
-	function scrollMessageEndIntoView(clientX: number, clientY: number): void {
-		const tapEl = document.elementFromPoint(clientX, clientY);
-		const art = tapEl ? articleOf(tapEl) : null;
-		const dockReserve =
-			(document.querySelector(".prompt")?.getBoundingClientRect().height ?? 0) +
-			48;
-		if (art instanceof HTMLElement && scrollBox) {
-			const area = scrollBox.getBoundingClientRect();
-			const dy =
-				art.getBoundingClientRect().bottom - (area.bottom - dockReserve);
-			if (dy > 0) scrollBox.scrollBy({ top: dy, behavior: "smooth" });
-		} else if (scrollBox) {
-			scrollBox.scrollTo({ top: scrollBox.scrollHeight, behavior: "smooth" });
-		}
-		// Quiet-tick gate (Android-only, honors the haptic toggle):
-		// a jump is a UI affordance, not a sent action.
-		buzzTap();
 	}
 
 	/** Prose block owning a tap point's text (rendered message only),
@@ -9879,9 +9855,10 @@
 		// (up to the top, down to the bottom — gg and G); a three-finger
 		// horizontal swipe steps chats (left = newer, right = older, no
 		// focus: the keyboard stays down); a two-finger double tap
-		// jumps to the bottom on Android (sidebar toggle on iOS); a
-		// three-finger tap deletes the tapped message; a three-finger
-		// hold wipes every chat on Android (current chat on iOS).
+		// toggles the sidebar on iOS and does nothing on Android
+		// (double-taps never scroll); a three-finger tap deletes the
+		// tapped message; a three-finger hold wipes every chat on
+		// Android (current chat on iOS).
 		// Taps start away from controls, drawers, and the modal;
 		// swipes and slides track from anywhere a modal isn't open, and
 		// the swipe's pinch veto (see twoFingerSwipeDir) keeps page zoom.
@@ -10226,18 +10203,19 @@
 								chatSwitcherOpen = false;
 							} else stepChat(dir, false);
 						}
-						// Still two-finger taps pair into a bottom jump
-						// (Android: no Home/End keys, and a tap lands
-						// where a slide stroke can't start); swipes take
-						// the step path instead. Message delete moved
-						// to the three-finger tap, the chat wipe to the
-						// three-finger hold. iOS keeps the sidebar
-						// toggle. Never mid-select: opening settings
-						// stopped vetoing on a highlight, but a jump
-						// must not fire under one.
+						// Two-finger taps pair into the iOS sidebar toggle
+						// only: double-taps never scroll anywhere (a thumb
+						// heel resting mid-tap used to read as a second
+						// finger and fire the old message-end jump under
+						// word selects). Swipes take the step path
+						// instead. Message delete moved to the
+						// three-finger tap, the chat wipe to the
+						// three-finger hold. Never mid-select: opening
+						// settings stopped vetoing on a highlight, but
+						// the toggle must not fire under one.
 						else if (
 							!pinchMoved &&
-							androidUI &&
+							iosUI &&
 							twoTapAt > 0 &&
 							moved <= 12 &&
 							now - twoTapAt <= 400 &&
@@ -10245,18 +10223,10 @@
 						) {
 							if (now - lastTwoTapAt < 600) {
 								lastTwoTapAt = 0;
-								if (iosUI) {
-									// The open keyboard would cover the sidebar.
-									if (document.activeElement instanceof HTMLElement)
-										document.activeElement.blur();
-									toggleSidebar();
-								} else {
-									// On a message: its end lands above the
-									// dock. On empty space: the thread
-									// bottom. The quiet tick lives inside
-									// the jump.
-									scrollMessageEndIntoView(twoEnd[0].x, twoEnd[0].y);
-								}
+								// The open keyboard would cover the sidebar.
+								if (document.activeElement instanceof HTMLElement)
+									document.activeElement.blur();
+								toggleSidebar();
 							} else lastTwoTapAt = now;
 						}
 						// Phones: a two-finger vertical slide jumps the chat —

@@ -31,7 +31,6 @@ export function touchShortcuts(): ShortcutRow[] {
 		},
 		{ name: "Delete a message", keys: "Three-finger tap" },
 		{ name: "Delete this chat", keys: "Three-finger hold" },
-		{ name: "Message end", keys: "Double two-finger tap" },
 		{ name: "Annotate", keys: "Hover + A · Select + Annotate" },
 		{ name: "Speak selection", keys: "Select text · Speak" },
 		{
@@ -49,7 +48,7 @@ export function touchShortcuts(): ShortcutRow[] {
 		},
 		{
 			name: "Message buttons",
-			keys: "Tap a message · double-tap jumps to its end"
+			keys: "Tap a message · double-tap selects the word"
 		},
 		{ name: "Fold a message", keys: "Swipe left on it" }
 	].sort(byName);

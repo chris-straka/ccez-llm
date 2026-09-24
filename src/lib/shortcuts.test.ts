@@ -163,7 +163,6 @@ describe("shortcuts menu copy", () => {
 			"Inspect character",
 			"Keep an annotation while scrolling",
 			"Message buttons",
-			"Message end",
 			"Move the selection menu",
 			"Newer / older chat",
 			"Settings",
@@ -189,7 +188,6 @@ describe("shortcuts menu copy", () => {
 		);
 		expect(byName.get("Top of chat")).toBe("Two-finger swipe up · gg");
 		expect(byName.get("Bottom of chat")).toBe("Two-finger swipe down · G");
-		expect(byName.get("Message end")).toBe("Double two-finger tap");
 		expect(byName.get("Delete a message")).toBe("Three-finger tap");
 		expect(byName.get("Delete this chat")).toBe("Three-finger hold");
 		expect(byName.get("Copy selection")).toBe("Select text · Copy");
