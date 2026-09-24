@@ -62,7 +62,8 @@
 			}
 			/* First-paint background before SvelteKit CSS loads: mirrors the
       app's light/dark --bg so Android cold start doesn't flash white.
-      The app stylesheet takes over from here. */
+      The inline theme script below refines this to the saved theme
+      before first paint; the app stylesheet takes over from here. */
 			html {
 				background: #fff;
 			}
@@ -72,6 +73,38 @@
 				}
 			}
 		</style>
+		<script>
+			/* Cold-start theme paint: resolve the saved theme before first
+      paint so a returning cold start (process died while away) opens
+      on the app's own background. The static style above only knows
+      the system scheme, so a saved theme that differs (light theme
+      on a dark phone) would flash black until Svelte mounts. Same
+      resolution as the settings effect in +page.svelte, which
+      re-applies the value on mount. Never throws. */
+			try {
+				var ccezTheme = null;
+				try {
+					var ccezRaw =
+						window.localStorage &&
+						(window.localStorage.getItem("ccez-llm-settings-v1") ||
+							window.localStorage.getItem("ccez-studio-settings-v1"));
+					var ccezParsed = ccezRaw ? JSON.parse(ccezRaw) : null;
+					if (
+						ccezParsed &&
+						(ccezParsed.theme === "light" ||
+							ccezParsed.theme === "dark" ||
+							ccezParsed.theme === "system")
+					)
+						ccezTheme = ccezParsed.theme;
+				} catch (ccezStoreError) {}
+				var ccezDark =
+					ccezTheme === "dark" ||
+					(ccezTheme !== "light" &&
+						window.matchMedia &&
+						window.matchMedia("(prefers-color-scheme: dark)").matches);
+				document.documentElement.dataset.theme = ccezDark ? "dark" : "light";
+			} catch (ccezThemeError) {}
+		</script>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">
