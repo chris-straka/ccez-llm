@@ -28,6 +28,7 @@ import androidx.core.app.NotificationCompat
  * A service failure never fails a turn: the runner already survives
  * WebView suspension on process life alone.
  */
+private const val TAG = "CcezTurns"
 object TurnSvc {
     private lateinit var appContext: Context
 
@@ -69,7 +70,12 @@ object TurnSvc {
             } else {
                 context.startService(intent)
             }
-        } catch (_: Exception) {
+            android.util.Log.d(TAG, "keeperStart: service intent sent")
+        } catch (e: Exception) {
+            // A failed claim must never fail the turn, but it must be
+            // visible: without the service there is no shade notice and
+            // no background protection.
+            android.util.Log.e(TAG, "keeperStart failed: ${e.message}")
         }
     }
 
@@ -78,8 +84,10 @@ object TurnSvc {
     fun keeperStop() {
         try {
             val context = appContext
-            context.stopService(Intent(context, TurnService::class.java))
-        } catch (_: Exception) {
+            val stopped = context.stopService(Intent(context, TurnService::class.java))
+            android.util.Log.d(TAG, "keeperStop: stopService returned $stopped")
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "keeperStop failed: ${e.message}")
         }
     }
 }
@@ -95,14 +103,28 @@ class TurnService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        startForegroundTyped(buildNotification())
+        android.util.Log.d(TAG, "TurnService.onCreate")
+        postNotice("create")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // Reaffirm the foreground state on every start (a second turn
         // starting while one runs re-sends the intent).
-        startForegroundTyped(buildNotification())
+        android.util.Log.d(TAG, "TurnService.onStartCommand startId=$startId")
+        postNotice("start")
         return START_NOT_STICKY
+    }
+
+    /** Build-and-post with its own log line: a silent failure here is
+    the missing-notice bug, so the outcome is always recorded. */
+    private fun postNotice(phase: String) {
+        try {
+            val notification = buildNotification()
+            startForegroundTyped(notification)
+            android.util.Log.d(TAG, "notice posted ($phase)")
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "notice post failed ($phase): ${e.message}")
+        }
     }
 
     private fun buildNotification(): Notification {
