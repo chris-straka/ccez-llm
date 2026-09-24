@@ -550,8 +550,16 @@ test("prompt review card toggles on pill click", async ({ page }) => {
 	await expect(page.locator(".sel-menu")).toBeVisible();
 	await page.locator('.sel-menu button:has-text("Annotate")').click();
 	await page.keyboard.press("Enter");
+	// Pin the filing (nothing pins on file): Enter opens its answer
+	// card, re-press pins it, Escape shuts the card.
+	const ready = page.locator("button.ccez-ann-badge.ans-ready").first();
+	await expect(ready).toBeVisible({ timeout: 30_000 });
+	await ready.focus();
+	await page.keyboard.press("Enter");
+	await page.keyboard.press("Enter");
 	const pill = page.locator(".prompt-tools .ann-pill");
 	await expect(pill).toBeVisible();
+	await page.keyboard.press("Escape");
 	const card = page.locator(".ann-wrap .review");
 	const opacity = () => card.evaluate((el) => getComputedStyle(el).opacity);
 	// Closed: invisible but laid out (display fade needs the box).

@@ -11,7 +11,8 @@ test.beforeEach(async ({ page }) => {
 	});
 });
 
-/** Select a word and save it as an annotation; resolves with the badge. */
+/** Select a word, save it as an annotation, and pin it; resolves
+with the pill. Nothing pins on file anymore. */
 async function addAnnotation(page: Page) {
 	// Click on the text itself: the container's center is empty space
 	// for short left-aligned messages and selects nothing.
@@ -24,8 +25,18 @@ async function addAnnotation(page: Page) {
 	// files nothing.
 	await expect(page.locator(".ann-pop")).toBeVisible({ timeout: 10_000 });
 	await page.keyboard.press("Enter");
+	// Pin the filing (keyboard: the sticky header eats pointer hits
+	// over badges): Enter opens its answer card, re-press pins it.
+	const ready = page.locator("button.ccez-ann-badge.ans-ready").first();
+	await expect(ready).toBeVisible({ timeout: 30_000 });
+	await ready.focus();
+	await page.keyboard.press("Enter");
+	await page.keyboard.press("Enter");
 	const badge = page.locator(".prompt-tools .ann-pill");
 	await expect(badge).toHaveText("1");
+	// The pin path leaves the answer card open: shut it so later
+	// steps start from a clean layer stack.
+	await page.keyboard.press("Escape");
 	return badge;
 }
 
@@ -621,9 +632,17 @@ test("send-hold clears the reply language past a staged annotation", async ({
 	const pop = page.locator(".ann-pop.fresh");
 	await expect(pop).toBeVisible({ timeout: 10_000 });
 	await page.keyboard.press("Enter");
+	// Pin the staged filing (nothing pins on file): Enter opens its
+	// answer card, re-press pins it, Escape shuts the card.
+	const ready = page.locator("button.ccez-ann-badge.ans-ready").first();
+	await expect(ready).toBeVisible({ timeout: 30_000 });
+	await ready.focus();
+	await page.keyboard.press("Enter");
+	await page.keyboard.press("Enter");
 	await expect(page.locator(".prompt-tools .ann-pill")).toBeVisible({
 		timeout: 10_000
 	});
+	await page.keyboard.press("Escape");
 	// Hold the send: the stash clears despite the staged annotation.
 	const send = page.locator(".send-btn");
 	const box = await send.boundingBox();

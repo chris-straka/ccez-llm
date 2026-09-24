@@ -74,6 +74,35 @@ async function annotateWord(page: Page): Promise<void> {
 	await filePickedAnnotation(page);
 }
 
+/** Pin the filed annotation into the prompt dock: wait for its
+answer, focus the badge, Enter opens its card, Enter re-press pins
+it — then the pill exists. Nothing pins on file anymore. */
+async function pinFiled(page: Page): Promise<void> {
+	const badge = page.locator("button.ccez-ann-badge.ans-ready").first();
+	await expect(badge).toBeVisible({ timeout: 30_000 });
+	await badge.focus();
+	await page.keyboard.press("Enter");
+	await page.keyboard.press("Enter");
+	await expect(page.locator(".prompt-tools .ann-pill")).toHaveCount(1);
+	// The pin path leaves the answer card open: shut it so later
+	// steps start from a clean layer stack.
+	await page.keyboard.press("Escape");
+}
+
+/** Open the dock on an unanswered filed row through the keyboard
+(the sticky header eats pointer hits over badges): focus + Enter
+opens the dock on the row, no pin or pill needed. Only for rows
+whose answer cannot have landed yet. */
+async function openBadgeDock(page: Page): Promise<void> {
+	const badge = page.locator("button.ccez-ann-badge").first();
+	await expect(badge).toBeVisible();
+	await badge.focus();
+	await page.keyboard.press("Enter");
+	await expect(page.locator(".ann-wrap.pinned .review")).toBeVisible({
+		timeout: 5_000
+	});
+}
+
 async function badgeCenter(page: Page): Promise<{ x: number; y: number }> {
 	const badge = page.locator("button.ccez-ann-badge").first();
 	const box = await badge.boundingBox();
@@ -192,29 +221,26 @@ test("badges slide beneath the composer", async ({ page }) => {
 focus instead of dropping it. The badge sits mid-thread: edge badges
 park under the chrome and take no hits by design (see the composer
 test above). */
-test("badge click opens the edit card with stable focus", async ({ page }) => {
+test("badge click opens the dock on its row", async ({ page }) => {
 	// Slow the mock answer: the badge is still unanswered at click
-	// time, so it opens the edit card — a ready answer opens the
-	// answer card instead (pinned in annotation-answer.e2e.ts).
+	// time, so it opens the review dock on its row — a ready answer
+	// opens the answer card instead (pinned in annotation-answer.e2e.ts).
+	// Filed notes never edit inline, so no edit card opens.
 	await page.addInitScript(() => {
 		localStorage.setItem("ccez-mock-chat-ms", "10000");
 	});
 	await seedTriple(page);
 	await annotateMiddle(page);
-	const at = await badgeCenter(page);
-	await page.mouse.click(at.x, at.y);
-	const box = page.locator(".ann-pop textarea");
-	await expect(box).toBeVisible({ timeout: 5_000 });
-	await expect(box).toBeFocused();
-	await page.waitForTimeout(600);
-	await expect(box).toBeFocused();
-	await expect(page.locator(".ann-pop")).not.toHaveClass(/fresh/);
+	await openBadgeDock(page);
+	await expect(page.locator(".ann-wrap .review-item")).toHaveCount(1);
+	await expect(page.locator(".ann-pop")).toHaveCount(0);
 });
 
 /** The review card toggles on its pill, closes on click-off, and
 closes on Escape. */
 test("review card closes on click-off and Escape", async ({ page }) => {
 	await annotateWord(page);
+	await pinFiled(page);
 	const pill = page.locator(".prompt-tools .ann-pill");
 	await pill.click();
 	await expect(page.locator(".ann-wrap.pinned .review")).toBeVisible();
@@ -243,6 +269,7 @@ test("review quote jumps to the message with a wash flash", async ({
 	await page.goto("/");
 	await expect(page.locator("article .rendered").first()).toBeVisible();
 	await annotateWord(page);
+	await pinFiled(page);
 	// Park at the bottom so the jump has room to travel back up.
 	await page.evaluate(() => {
 		const box = document.querySelector(".messages") as HTMLElement;
@@ -292,25 +319,13 @@ test("down jump lands the quote clear of the dock", async ({ page }) => {
 		(_, i) => `Paragraph ${i}. ${para}`
 	).join("\n\n");
 	await seedChat(page, [{ role: "assistant", content }]);
-	// A live draft on the last paragraph (seeded in storage — the UI
-	// filing path is covered elsewhere, this test owns the jump).
-	await page.addInitScript(() => {
-		window.localStorage.setItem(
-			"ccez-llm-annotations-v1",
-			JSON.stringify({
-				"e2e-chat": [
-					{
-						id: "ann-late",
-						messageId: "e2e-m0",
-						quote: "Paragraph 11",
-						comment: ""
-					}
-				]
-			})
-		);
-	});
 	await page.goto("/");
-	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1);
+	// File on the last paragraph through the UI (seeding the store
+	// can't reach the dock: pins never persist and only pinned rows
+	// list) — this test owns the jump, not the filing.
+	await dblclickWord(page, page.locator("article .rendered p").nth(11));
+	await filePickedAnnotation(page);
+	await pinFiled(page);
 	// Park at the top: the badge must start below the viewport.
 	await page.evaluate(() => {
 		const box = document.querySelector(".messages") as HTMLElement;
@@ -372,6 +387,7 @@ test("down jump lands the quote clear of the dock", async ({ page }) => {
 jumps nowhere — no wash, no scroll, the review stays open. */
 test("review note click does not jump", async ({ page }) => {
 	await annotateWord(page);
+	await pinFiled(page);
 	await page.locator(".prompt-tools .ann-pill").click();
 	await expect(page.locator(".ann-wrap.pinned .review")).toBeVisible();
 	const top = await page.evaluate(
@@ -422,6 +438,8 @@ test("selecting review text summons no menu and stays put", async ({
 	// The filing pill fades first (see annotateWord): clicking
 	// through the fade would hit the badge instead of the pill.
 	await expect(page.locator(".ann-pop")).toHaveCount(0, { timeout: 5_000 });
+	// Nothing pins on file: pin before the pill exists.
+	await pinFiled(page);
 	await page.locator(".prompt-tools .ann-pill").click();
 	await expect(page.locator(".ann-wrap.pinned .review")).toBeVisible();
 	const comment = page.locator(".review-comment").first();
@@ -445,6 +463,7 @@ the note scrolls sideways, and the copy icon sits at the row's
 end (no dead space for it to float in). */
 test("review rows are one line with copy at the end", async ({ page }) => {
 	await annotateWord(page);
+	await pinFiled(page);
 	await page.locator(".prompt-tools .ann-pill").click();
 	await expect(page.locator(".ann-wrap.pinned .review")).toBeVisible();
 	const style = await page.evaluate(() => {
@@ -486,6 +505,7 @@ for (const theme of ["light", "dark"] as const) {
 		await expect(page.locator("article .rendered").first()).toBeVisible();
 		await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
 		await annotateWord(page);
+		await pinFiled(page);
 		await page.locator(".prompt-tools .ann-pill").click();
 		await expect(page.locator(".ann-wrap.pinned .review")).toBeVisible();
 		await expect(page.locator(".review-comment").first()).toHaveCSS(
@@ -504,6 +524,7 @@ test("jump leaves a clear mark exactly where it is", async ({ page }) => {
 	await page.reload();
 	await expect(page.locator("article .rendered").first()).toBeVisible();
 	await annotateWord(page);
+	await pinFiled(page);
 	await page.locator(".prompt-tools .ann-pill").click();
 	await expect(page.locator(".ann-wrap.pinned .review")).toBeVisible();
 	// Drop the filing word-pick: a live selection would (correctly)
@@ -541,23 +562,27 @@ test("jump leaves a clear mark exactly where it is", async ({ page }) => {
 test("orphaned review quote toasts that the annotation is gone", async ({
 	page
 }) => {
-	await page.addInitScript(() => {
-		window.localStorage.setItem(
-			"ccez-llm-annotations-v1",
-			JSON.stringify({
-				"e2e-chat": [
-					{
-						id: "ann-ghost",
-						messageId: "e2e-missing",
-						quote: "gone",
-						comment: "stale note"
-					}
-				]
-			})
-		);
-	});
-	await page.reload();
+	// File and pin on the first of two messages (seeding the store
+	// can't reach the dock: pins never persist), then delete that
+	// message: the pinned row orphans with it.
+	await seedChat(page, [
+		{ role: "assistant", content: "alpha beta gamma delta" },
+		{ role: "assistant", content: "second message here" }
+	]);
+	await page.goto("/");
 	await expect(page.locator("article .rendered").first()).toBeVisible();
+	await dblclickWord(page, page.locator("article .rendered").first());
+	await expect(page.locator(".sel-menu")).toBeVisible({ timeout: 5_000 });
+	await page.locator('.sel-menu button:has-text("Annotate")').click();
+	await page.locator(".ann-pop textarea").fill("doomed note");
+	await page.keyboard.press("Enter");
+	await pinFiled(page);
+	const first = page.locator("article.assistant").first();
+	await first.hover();
+	await first
+		.locator('button[aria-label^="Delete this message"]')
+		.click();
+	await expect(page.locator("article.assistant")).toHaveCount(1);
 	await page.locator(".prompt-tools .ann-pill").click();
 	await expect(page.locator(".ann-wrap.pinned .review")).toBeVisible();
 	await page.locator(".review-quote").first().click();
