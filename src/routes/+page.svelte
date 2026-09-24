@@ -764,7 +764,7 @@
 		const id = settings.activeProviderId;
 		if (keyToastFor === id) return;
 		keyToastFor = id;
-		flashErrorToast("No API key — open Settings to add one");
+		flashErrorToast("No API key");
 	});
 	$effect(() => {
 		if (!androidUI) return;
