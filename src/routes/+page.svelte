@@ -5352,10 +5352,10 @@
 	 * Badge click: a ready answer opens in its own popup, anything
 	 * else opens the review dock on the annotation's row — filed
 	 * notes never edit inline in the dock (the pencil opens the
-	 * edit card). Re-pressing an open card's badge pins it (a
-	 * double-click's second press lands here); the card stays put
-	 * and the badge keeps its number — Esc and click-away close,
-	 * the dock's Unpin removes.
+	 * edit card). Re-pressing an open card's badge toggles its
+	 * prompt pin (a double-click's second press lands here); the
+	 * card stays put and the badge keeps its number — Esc and
+	 * click-away close, the dock's Unpin removes.
 	 */
 	function openBadge(id: AnnotationId, anchor?: { x: number; y: number }): void {
 		// Re-pressing a badge with its create pill open cancels the
@@ -5366,14 +5366,15 @@
 		}
 		const current = annotations.find((a) => a.id === id);
 		if (!current) return;
-		// A ready answer opens in its own popup: re-press pins it
-		// (idempotent — already-pinned stays pinned) instead of
-		// shutting the card; an open pill for the same note
-		// settles first through the proper cancel path so typed text
-		// is never dropped.
+		// A ready answer opens in its own popup: re-press toggles
+		// its prompt pin instead of shutting the card — pin, or
+		// unpin when already pinned (double-click both ways). An
+		// open pill for the same note settles first through the
+		// proper cancel path so typed text is never dropped.
 		if (current.answer) {
 			if (answerPop && !answerClosing && answerPop.id === id) {
-				pinAnnotation(id);
+				if (current.pinnedToPrompt === true) unpinAnnotation(id);
+				else pinAnnotation(id);
 				return;
 			}
 			if (annPop && !annPopClosing && annPop.id === id) cancelAnnPop();

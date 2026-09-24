@@ -101,7 +101,8 @@ test("staged question asks on send and the reply lands as its answer", async ({
 
 /** The badge keeps its number: opening the card reads, a second
 Enter (a double-click's second press) pins the annotation into the
-send, the dock's Unpin removes it again. The sent message carries
+send, a further re-press unpins it again (double-click toggles),
+the dock's Unpin removes it again. The sent message carries
 the approved block (quote, question, answer). */
 test("badge re-press pins the send, dock Unpin removes it", async ({
 	page
@@ -140,6 +141,15 @@ test("badge re-press pins the send, dock Unpin removes it", async ({
 	const pill = page.locator(".prompt-tools .ann-pill");
 	await expect(pill).toHaveAttribute("aria-label", "1 annotation");
 	await expect(card).toBeVisible();
+	// A further re-press unpins again (double-click toggles):
+	// number stays, pill gone, card still open.
+	await page.keyboard.press("Enter");
+	await expect(badge).toHaveText("1");
+	await expect(page.locator(".prompt-tools .ann-pill")).toHaveCount(0);
+	await expect(card).toBeVisible();
+	// And back: re-press pins once more.
+	await page.keyboard.press("Enter");
+	await expect(pill).toHaveAttribute("aria-label", "1 annotation");
 	// The dock's Unpin removes again: number stays, pill gone.
 	await pill.click();
 	await page.locator('button:has-text("Unpin")').click();

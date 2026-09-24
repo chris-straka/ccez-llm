@@ -135,9 +135,10 @@ shared `.error` look. -->
 	let attachInput: HTMLInputElement | undefined = $state();
 	/** The dock lists pinned annotations only: unpinned rows live
 	at their badges (the orange popup edits/deletes, the answer
-	card reads) until a double-click pins them here — plus the
-	highlighted open row, so tapping a badge opens its dock row
-	even before it is pinned. */
+	card reads) until a double-click pins them here — a second
+	double-click unpins them back. The highlighted open row joins
+	too, so tapping a badge opens its dock row even before it is
+	pinned. */
 	const pinnedAnnotations = $derived(
 		annotations.filter((a) => a.pinnedToPrompt === true)
 	);
