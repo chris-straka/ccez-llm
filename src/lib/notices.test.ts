@@ -78,7 +78,7 @@ describe("notice queue", () => {
 		expect(toastTimeoutFor("Copied")).toBe(2500 + 6 * 40);
 		// Long failure notices hold: ~40ms/char over base.
 		expect(toastTimeoutFor("x".repeat(100))).toBe(2500 + 4000);
-		expect(errorToastTimeoutFor("x".repeat(100))).toBe(4000 + 4000);
+		expect(errorToastTimeoutFor("x".repeat(50))).toBe(4000 + 2000);
 		// Paragraphs never linger past the cap.
 		expect(toastTimeoutFor("x".repeat(1000))).toBe(9000);
 		expect(errorToastTimeoutFor("x".repeat(1000))).toBe(7500);
