@@ -44,10 +44,6 @@ const BACKOFF_SECS: [u64; 2] = [2, 10];
 /// A hung socket must not hold the service forever: an attempt older
 /// than this reads as a retryable failure instead.
 const ATTEMPT_DEADLINE_SECS: u64 = 600;
-/// Grace after completion before a "reply ready" ping: a foreground
-/// page marks the turn seen on its done event inside this window, so
-/// only genuinely backgrounded turns ping.
-const SEEN_GRACE_SECS: u64 = 5;
 
 /// One history message, already flattened to text by the page (the
 /// native path is text-only: chats with image attachments stay on the
@@ -723,8 +719,7 @@ const REPLY_NOTIFICATION_ID: i32 = 4201;
 /// Activity foreground ground truth (Android): MainActivity reports
 /// onResume/onPause through `nativeOnForeground`. Defaults false so
 /// desktop — which has no reporter — keeps the window-focus query as
-/// its only veto input. Read after the seen-grace, so a return
-/// mid-grace still vetoes the ping.
+/// its only veto input. Read at completion, beside the ping verdict.
 static FOREGROUND: AtomicBool = AtomicBool::new(false);
 
 fn set_foreground(active: bool) {
@@ -950,14 +945,15 @@ async fn finish_turn(
     );
     drop_turn(&req.turn_id);
     turn_service_settle();
-    // Foreground pages mark the turn seen on the done event inside the
-    // grace window; backgrounded ones never do, and only they ping.
-    // A raced ping must still never land in front of the user (the
-    // page renders the reply, then the grace expires onto nothing to
-    // dismiss), so either witness of the user in the app — the
-    // Activity lifecycle flag or a focused window — vetoes outright.
-    // Both unknown reads as background: the ping is the safe side.
-    sleep_secs(SEEN_GRACE_SECS).await;
+    // Instant replace, never a blank gap: the settle above drops
+    // Reply coming and a backgrounded done turn pings in the same
+    // breath, so the shade swaps one row for the other (owner demand,
+    // Sep 2026). A raced ping must still never land in front of the
+    // user, so either witness of the user in the app — the Activity
+    // lifecycle flag or a focused window — vetoes outright. Both
+    // unknown reads as background: the ping is the safe side. A
+    // backgrounded user who returns onto the finished reply finds
+    // the ping already dismissed by the foreground return.
     if should_ping(
         live.seen.load(Ordering::Relaxed),
         status == "done",
