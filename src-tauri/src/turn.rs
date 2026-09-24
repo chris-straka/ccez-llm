@@ -355,9 +355,20 @@ fn usage_from(value: &serde_json::Value) -> Option<TurnUsage> {
 
 /// How one attempt ended: recompute, fail, or user stop.
 enum AttemptEnd {
-    Retryable,
+    /// Recompute the turn; the note surfaces when attempts exhaust.
+    /// None keeps the friendly transport note (never blame the radio);
+    /// Some carries the server's own verdict (rate limit, overload).
+    Retryable(Option<String>),
     Fatal(String),
     Stopped,
+}
+
+/// HTTP statuses worth another attempt (bounded by MAX_ATTEMPTS):
+/// 429 rate limits and 5xx overloads are transient by nature — the
+/// provider's own "please retry" — while other 4xx (bad key, bad
+/// request) would fail identically again.
+fn retryable_http_status(status: u16) -> bool {
+    status == 429 || status >= 500
 }
 
 struct AttemptEvents {
@@ -389,7 +400,7 @@ fn classify_send_error(error: reqwest::Error) -> AttemptEnd {
     if error.is_builder() {
         return AttemptEnd::Fatal(format!("request failed: {error}"));
     }
-    AttemptEnd::Retryable
+    AttemptEnd::Retryable(None)
 }
 
 /// Read one SSE stream into content + joined tool fragments, emitting
@@ -411,7 +422,7 @@ async fn read_stream(
             return Err(AttemptEnd::Stopped);
         }
         if Instant::now() > deadline {
-            return Err(AttemptEnd::Retryable);
+            return Err(AttemptEnd::Retryable(None));
         }
         match response.chunk().await {
             Ok(Some(bytes)) => {
@@ -443,7 +454,7 @@ async fn read_stream(
                 if error.is_builder() {
                     return Err(AttemptEnd::Fatal(format!("stream failed: {error}")));
                 }
-                return Err(AttemptEnd::Retryable);
+                return Err(AttemptEnd::Retryable(None));
             }
         }
     }
@@ -485,9 +496,12 @@ async fn post_stream(
         let status = res.status().as_u16();
         let head = res.text().await.unwrap_or_default();
         let head: String = head.chars().take(300).collect();
-        return Err(AttemptEnd::Fatal(format!(
-            "stream failed (HTTP {status}): {head}"
-        )));
+        let message = format!("stream failed (HTTP {status}): {head}");
+        return Err(if retryable_http_status(status) {
+            AttemptEnd::Retryable(Some(message))
+        } else {
+            AttemptEnd::Fatal(message)
+        });
     }
     read_stream(res, deadline, ev)
         .await
@@ -519,16 +533,19 @@ async fn post_plain(
         let status = res.status().as_u16();
         let head = res.text().await.unwrap_or_default();
         let head: String = head.chars().take(300).collect();
-        return Err(AttemptEnd::Fatal(format!(
-            "request failed (HTTP {status}): {head}"
-        )));
+        let message = format!("request failed (HTTP {status}): {head}");
+        return Err(if retryable_http_status(status) {
+            AttemptEnd::Retryable(Some(message))
+        } else {
+            AttemptEnd::Fatal(message)
+        });
     }
     // No `json` feature either: read bytes, parse by hand. Transport
     // cuts stay retryable; malformed payloads fail the turn (a second
     // identical response would parse the same way).
     let bytes = res.bytes().await.map_err(|error| {
         if error.is_timeout() || error.is_connect() || error.is_body() {
-            AttemptEnd::Retryable
+            AttemptEnd::Retryable(None)
         } else {
             AttemptEnd::Fatal(format!("bad response: {error}"))
         }
@@ -932,14 +949,15 @@ async fn drive_attempts(
             Ok((content, usage)) => return TurnOutcome::Done(content, usage),
             Err(AttemptEnd::Stopped) => return TurnOutcome::Stopped,
             Err(AttemptEnd::Fatal(error)) => return TurnOutcome::Failed(error),
-            Err(AttemptEnd::Retryable) if attempt >= MAX_ATTEMPTS => {
+            Err(AttemptEnd::Retryable(note)) if attempt >= MAX_ATTEMPTS => {
                 // Transport gave up, usually a sleeping radio behind a
-                // backgrounded app — never blame the user's network.
+                // backgrounded app — never blame the user's network. A
+                // server verdict outlives the retries verbatim instead.
                 return TurnOutcome::Failed(
-                    "Couldn't finish the reply. Try again.".to_string(),
+                    note.unwrap_or_else(|| "Couldn't finish the reply. Try again.".to_string()),
                 )
             }
-            Err(AttemptEnd::Retryable) => {
+            Err(AttemptEnd::Retryable(_)) => {
                 (ev.on_retry_note)();
                 let wait = backoff.get((attempt - 1) as usize).copied().unwrap_or(30);
                 sleep_secs(wait).await;
@@ -1536,5 +1554,111 @@ mod tests {
         }
         assert_eq!(*rec.retries.lock().unwrap(), 1);
         assert_eq!(bodies.lock().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn retryable_http_status_covers_limits_and_overloads() {
+        for status in [429, 500, 502, 503, 529] {
+            assert!(retryable_http_status(status), "{status} should retry");
+        }
+        for status in [200, 400, 401, 403, 404] {
+            assert!(!retryable_http_status(status), "{status} should fail");
+        }
+    }
+
+    #[test]
+    fn drive_retries_a_503_then_finishes() {
+        let bodies = Arc::new(Mutex::new(Vec::new()));
+        let port = run_stub(
+            vec![
+                StubStep::Respond {
+                    status: 503,
+                    content_type: "application/json",
+                    body: br#"{"error":{"message":"overloaded"}}"#.to_vec(),
+                },
+                StubStep::Respond {
+                    status: 200,
+                    content_type: "text/event-stream",
+                    body: sse_text_body("recovered"),
+                },
+            ],
+            Arc::clone(&bodies),
+        );
+        let page_fetch: PageFetch = Arc::new(|_url: String| {
+            Box::pin(async move { Ok::<String, String>("unused".to_string()) })
+                as Pin<Box<dyn Future<Output = Result<String, String>> + Send>>
+        });
+        let rec = Recorder {
+            tokens: Arc::new(Mutex::new(Vec::new())),
+            fetches: Arc::new(Mutex::new(Vec::new())),
+            retries: Arc::new(Mutex::new(0)),
+        };
+        let client = reqwest_client().unwrap();
+        let req = test_request(port);
+        let outcome = tauri::async_runtime::block_on(drive_attempts(
+            &client,
+            &req,
+            &page_fetch,
+            &[0],
+            &mut || test_events(&rec),
+        ));
+        match outcome {
+            TurnOutcome::Done(content, _) => assert_eq!(content, "recovered"),
+            other => panic!("expected done, got {other:?}"),
+        }
+        assert_eq!(*rec.retries.lock().unwrap(), 1);
+        assert_eq!(bodies.lock().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn drive_surfaces_the_last_http_error_when_overloaded_persists() {
+        let bodies = Arc::new(Mutex::new(Vec::new()));
+        let port = run_stub(
+            vec![
+                StubStep::Respond {
+                    status: 503,
+                    content_type: "application/json",
+                    body: br#"{"error":{"message":"overloaded"}}"#.to_vec(),
+                },
+                StubStep::Respond {
+                    status: 503,
+                    content_type: "application/json",
+                    body: br#"{"error":{"message":"overloaded"}}"#.to_vec(),
+                },
+                StubStep::Respond {
+                    status: 503,
+                    content_type: "application/json",
+                    body: br#"{"error":{"message":"overloaded"}}"#.to_vec(),
+                },
+            ],
+            Arc::clone(&bodies),
+        );
+        let page_fetch: PageFetch = Arc::new(|_url: String| {
+            Box::pin(async move { Ok::<String, String>("unused".to_string()) })
+                as Pin<Box<dyn Future<Output = Result<String, String>> + Send>>
+        });
+        let rec = Recorder {
+            tokens: Arc::new(Mutex::new(Vec::new())),
+            fetches: Arc::new(Mutex::new(Vec::new())),
+            retries: Arc::new(Mutex::new(0)),
+        };
+        let client = reqwest_client().unwrap();
+        let req = test_request(port);
+        let outcome = tauri::async_runtime::block_on(drive_attempts(
+            &client,
+            &req,
+            &page_fetch,
+            &[0],
+            &mut || test_events(&rec),
+        ));
+        match outcome {
+            TurnOutcome::Failed(error) => assert!(
+                error.contains("503"),
+                "exhausted overload should name the status, got: {error}"
+            ),
+            other => panic!("expected failed, got {other:?}"),
+        }
+        assert_eq!(*rec.retries.lock().unwrap(), 2);
+        assert_eq!(bodies.lock().unwrap().len(), 3);
     }
 }
