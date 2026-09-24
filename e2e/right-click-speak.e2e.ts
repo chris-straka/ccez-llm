@@ -380,3 +380,72 @@ test("right-click on CJK repoints a missed highlight onto the clicked word", asy
 	expect(sel).toContain("答");
 	expect(texts.join("")).toContain(sel);
 });
+
+test("right-click press that extends the highlight repoints the new word", async ({
+	page
+}) => {
+	await seedChat(page, [{ role: "assistant", content: "声调很难学" }]);
+	await page.goto("/");
+	const para = page.locator("article.assistant .rendered p").first();
+	await expect(para).toBeVisible({ timeout: 60_000 });
+	// Pin a live selection on 声调, then press right on 很: a press
+	// micro-drag extends the old highlight instead of replacing it
+	// (the OS grows the anchor), so extend it the same way here and
+	// let the real release fire contextmenu.
+	await page.evaluate(() => {
+		const p = document.querySelector("article.assistant .rendered p");
+		const node = p?.firstChild;
+		if (!p || !node || node.nodeType !== Node.TEXT_NODE)
+			throw new Error("no text to select");
+		const range = document.createRange();
+		range.setStart(node, 0);
+		range.setEnd(node, 2);
+		const live = window.getSelection();
+		live?.removeAllRanges();
+		live?.addRange(range);
+	});
+	const point = await para.evaluate((el) => {
+		const text = el.firstChild;
+		if (!text || text.nodeType !== Node.TEXT_NODE)
+			throw new Error("no text node");
+		const range = document.createRange();
+		range.setStart(text, 2);
+		range.setEnd(text, 3);
+		const rect = range.getBoundingClientRect();
+		return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+	});
+	// A press micro-drag grows the old anchor instead of replacing
+	// it — headless Chromium never drag-extends on the right button,
+	// so grow it the same way synchronously inside the press (after
+	// the app's own press snapshot, before the engine default): the
+	// release then fires contextmenu off the extended range, exactly
+	// like the OS does on a real trackpad.
+	await page.evaluate(() => {
+		window.addEventListener(
+			"mousedown",
+			() => {
+				const p = document.querySelector("article.assistant .rendered p");
+				const node = p?.firstChild;
+				if (!p || !node || node.nodeType !== Node.TEXT_NODE)
+					throw new Error("no text to extend");
+				const range = document.createRange();
+				range.setStart(node, 0);
+				range.setEnd(node, 3);
+				const live = window.getSelection();
+				live?.removeAllRanges();
+				live?.addRange(range);
+			},
+			{ once: true, capture: true }
+		);
+	});
+	await page.mouse.click(point.x, point.y, { button: "right" });
+	// The press grew the highlight it should have replaced: the
+	// point-anchored word wins, never the expanded span.
+	const resel = () =>
+		page.evaluate(() => window.getSelection()?.toString() ?? "");
+	await expect.poll(resel, { timeout: 10_000 }).toContain("很");
+	await expect.poll(resel, { timeout: 10_000 }).not.toContain("声调");
+	await expect
+		.poll(() => spoken(page), { timeout: 10_000 })
+		.toContain("很");
+});

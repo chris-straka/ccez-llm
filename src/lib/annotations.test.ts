@@ -52,7 +52,8 @@ import {
 	annEditCommitToast,
 	REFS_ONLY_BODY,
 	isRefsOnly,
-	redactedCopyText
+	redactedCopyText,
+	pressExpandedSelection
 } from "./annotations";
 import type { ChatMsgId } from "./chat";
 import type { Annotation, AnnotationId } from "./annotations";
@@ -1294,5 +1295,18 @@ describe("paragraphForQuote", () => {
 	it("falls back to the quote when missing or blank", () => {
 		expect(paragraphForQuote(text, "absent")).toBe("absent");
 		expect(paragraphForQuote(text, "  ")).toBe("");
+	});
+});
+
+describe("pressExpandedSelection", () => {
+	it("flags growth out of the press snapshot", () => {
+		expect(pressExpandedSelection("声调", "声调很难")).toBe(true);
+	});
+
+	it("ignores steady presses, fresh picks, and empty priors", () => {
+		expect(pressExpandedSelection("声调", "声调")).toBe(false);
+		expect(pressExpandedSelection("声调", "很难")).toBe(false);
+		expect(pressExpandedSelection("", "很难")).toBe(false);
+		expect(pressExpandedSelection("", "")).toBe(false);
 	});
 });

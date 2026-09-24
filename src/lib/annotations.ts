@@ -2756,6 +2756,18 @@ export function snapSelectionToWordEdges(selection: Selection): boolean {
 }
 
 /**
+ * True when a press grew the live selection out of its press-time
+ * snapshot: a right-press micro-drag extends the old highlight
+ * instead of replacing it, so the click point sits inside a range
+ * the user never picked. Steady presses (same text) and fresh
+ * engine picks (a replacement, never containing the old text) both
+ * read false — only growth repoints. Pure.
+ */
+export function pressExpandedSelection(prior: string, live: string): boolean {
+	return prior !== "" && live !== prior && live.includes(prior);
+}
+
+/**
  * Horizontal placement for the create-annotation textbox: centered
  * over the highlight when the highlight is narrower than the box,
  * otherwise the current end-of-selection (cursor) placement. Either

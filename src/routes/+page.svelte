@@ -228,6 +228,7 @@
 		locateQuote,
 		repaintLiveWash,
 		occurrenceAtPosition,
+		pressExpandedSelection,
 		snapSelectionToWordEdges,
 		selMenuPlacement,
 		readingPanelPlacement,
@@ -12417,8 +12418,16 @@
 			// a silent extra. Like Inspect, a lone Han char reads
 			// its locale from the surrounding sentence.
 			const quoted = currentQuote();
+			// A press that grew the highlight (a right-button
+			// micro-drag extends the old range instead of replacing
+			// it) is a fresh point pick, not a click inside a
+			// deliberate selection: the point-anchored word below
+			// wins over the expanded span.
+			const expanded =
+				quoted !== null && pressExpandedSelection(downSel, quoted.quote);
 			const clickInSelection =
 				quoted !== null &&
+				!expanded &&
 				selectionHitsPoint(event.clientX, event.clientY);
 			const article = body.closest('article[id^="msg-"]');
 			const msg = article
