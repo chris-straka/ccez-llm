@@ -61,7 +61,7 @@ object TurnSvc {
     }
 
     /** Chat the notice tap opens (latest claiming turn). Blank clears. */
-    private var openChatId: String? = null
+    internal var openChatId: String? = null
 
     /** First live turn: start (or reaffirm) the foreground service,
     retargeting the notice tap at this turn's chat. */
@@ -160,7 +160,7 @@ class TurnService : Service() {
     open-chat extra (handled in onCreate and onNewIntent). Null while
     no turn named a chat — the tap then just opens the app. */
     private fun openChatTap(): PendingIntent? {
-        val chatId = openChatId ?: return null
+        val chatId = TurnSvc.openChatId ?: return null
         val tap = Intent(this, MainActivity::class.java)
             .setAction(MainActivity.OPEN_CHAT_ACTION)
             .putExtra(MainActivity.OPEN_CHAT_EXTRA, chatId)
