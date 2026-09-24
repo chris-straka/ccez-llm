@@ -297,6 +297,16 @@ export async function dismissNativeTurn(turnId: TurnId): Promise<boolean> {
  * (including keyless: the provider resolution raises missing-key
  * with the draft intact, same as any TypeScript send).
  */
+/**
+ * Who pings a finished turn: native completions are pinged by Rust
+ * (seen-grace plus foreground veto); the frontend ping re-posts the
+ * same id ~5s later and double-buzzes. TypeScript-engine turns have
+ * no Rust side, so only they keep the frontend ping.
+ */
+export function frontendPingOnDone(nativeTurn: boolean): boolean {
+	return !nativeTurn;
+}
+
 export function nativeRouteFor(
 	facts: {
 		androidUI: boolean;

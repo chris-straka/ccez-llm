@@ -4,6 +4,7 @@ import {
 	INTERRUPTED_COPY,
 	applyTurnFile,
 	dismissNativeTurn,
+	frontendPingOnDone,
 	markTurnInterrupted,
 	nativeTurnAvailable,
 	nativeTurnConfig,
@@ -415,5 +416,15 @@ describe("releaseNativeTurn", () => {
 		releaseNativeTurn(own, "t2" as TurnId, "c1" as ChatId);
 		expect(own.turns.size).toBe(0);
 		expect(own.live.has("c1" as ChatId)).toBe(false);
+	});
+});
+
+describe("frontendPingOnDone", () => {
+	it("leaves native turns to Rust (same id would double-buzz)", () => {
+		expect(frontendPingOnDone(true)).toBe(false);
+	});
+
+	it("keeps the frontend ping for TypeScript-engine turns", () => {
+		expect(frontendPingOnDone(false)).toBe(true);
 	});
 });

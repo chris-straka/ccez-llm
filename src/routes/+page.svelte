@@ -302,6 +302,7 @@
 		releaseNativeTurn,
 		resumableKilledTurn,
 		scanNativeTurns,
+		frontendPingOnDone,
 		seenNativeTurn,
 		startNativeTurn,
 		turnHistory,
@@ -7181,7 +7182,7 @@
 	message and leaves its annotations blue, never stranded. A
 	background landing patches the origin chat's stored drafts; the
 	active chat's live list is only touched when it is the origin. */
-	function afterSend(originId: ChatId): void {
+	function afterSend(originId: ChatId, opts?: { native?: boolean }): void {
 		const { sent, stillHere } = resolveSendCompletion(
 			chatState,
 			originId,
@@ -7209,7 +7210,9 @@
 		if (stillHere && stuckToBottom()) scrollToBottom();
 		const origin = chatState.chats.find((c) => c.id === originId);
 		if (origin) maybeSpeakReply(origin);
-		maybeNotifyReplyDone(sent);
+		// Native completions skip the frontend ping: Rust pings the
+		// same id ~5s later (seen-grace) and the re-post double-buzzes.
+		if (frontendPingOnDone(opts?.native ?? false)) maybeNotifyReplyDone(sent);
 		// The reply's layout churn (hero unmount, list growth, keyboard
 		// transitions on phones) can strand the emptied composer's cached
 		// line boxes at zero height: settle a re-measure after paint, like
@@ -7276,7 +7279,7 @@
 				finished_at: Math.floor(Date.now() / 1000)
 			});
 			settleNativeSend(chatState, chatId);
-			afterSend(chatId);
+			afterSend(chatId, { native: true });
 		}
 	}
 
@@ -7399,7 +7402,7 @@
 		} catch {
 			// Scans dismiss what they settle; late events find nothing.
 		}
-		if (outcome === "applied") afterSend(owned.chatId);
+		if (outcome === "applied") afterSend(owned.chatId, { native: true });
 	}
 
 	/** Restart a turn whose process died mid-flight: the request the
@@ -7472,12 +7475,12 @@
 					// still dismisses below.
 				} else if (markTurnInterrupted(chatState, file)) {
 					settleNativeSend(chatState, file.chat_id);
-					if (wasLive) afterSend(file.chat_id);
+					if (wasLive) afterSend(file.chat_id, { native: true });
 				}
 			} else {
 				if (applyTurnFile(chatState, file) === "applied") {
 					settleNativeSend(chatState, file.chat_id);
-					if (wasLive) afterSend(file.chat_id);
+					if (wasLive) afterSend(file.chat_id, { native: true });
 				}
 			}
 			try {
