@@ -121,7 +121,6 @@ class TurnService : Service() {
         }
         val builder = NotificationCompat.Builder(this, QUIET_CHANNEL_ID)
             .setContentTitle("Reply coming…")
-            .setContentText("Your reply will be ready when you return.")
             .setSmallIcon(R.mipmap.ic_launcher)
             .setOngoing(true)
             .setShowWhen(false)
