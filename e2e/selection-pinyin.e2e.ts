@@ -77,6 +77,35 @@ test("right-clicking a hanzi highlight shows its pinyin only", async ({
 	await expect(panel).toHaveCount(0);
 });
 
+test("right-clicking past the highlight repoints the panel onto the new word", async ({
+	page
+}) => {
+	// First click inside the highlight: the panel reads 你好.
+	const selected = await selectFirstTwo(page);
+	expect(selected).toBe("你好");
+	await clickOnText(page);
+	const panel = page.locator(".sel-pinyin");
+	await expect(panel).toBeVisible({ timeout: 10_000 });
+	await expect(panel).toContainText("nǐ");
+	// Then click past it on 世界: the wash repoints onto the new
+	// word, and the panel follows it instead of stranding on the
+	// old one (a second right-click reads like the first).
+	const point = await page.evaluate(() => {
+		const p = document.querySelector("article.assistant .rendered p");
+		const text = p?.firstChild;
+		if (!text || text.nodeType !== Node.TEXT_NODE)
+			throw new Error("no text node");
+		const range = document.createRange();
+		range.setStart(text, 2);
+		range.setEnd(text, 4);
+		const rect = range.getBoundingClientRect();
+		return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+	});
+	await page.mouse.click(point.x, point.y, { button: "right" });
+	await expect(panel).toContainText("shì", { timeout: 10_000 });
+	await expect(panel).not.toContainText("nǐ");
+});
+
 test("clicking off dismisses the panel with the highlight live", async ({
 	page
 }) => {
@@ -210,7 +239,7 @@ test("right-clicking hanzi with no highlight still speaks", async ({
 	page
 }) => {
 	// On the glyph itself (not the padding): the word path reads
-	// the segmented word back, never a panel.
+	// the segmented word back, with its readings like any pick.
 	const point = await page.evaluate(() => {
 		const p = document.querySelector("article.assistant .rendered p");
 		const text = p?.firstChild;
@@ -224,7 +253,11 @@ test("right-clicking hanzi with no highlight still speaks", async ({
 	});
 	await page.mouse.click(point.x, point.y, { button: "right" });
 	await expect.poll(() => spoken(page), { timeout: 10_000 }).toEqual(["你好"]);
-	await expect(page.locator(".sel-pinyin")).toHaveCount(0);
+	// The point pick is trustworthy (not an engine guess), so the
+	// panel shows the segmented word's pinyin too.
+	const panel = page.locator(".sel-pinyin");
+	await expect(panel).toBeVisible({ timeout: 10_000 });
+	await expect(panel).toContainText("nǐ");
 });
 
 test("right-clicking kanji in japanese shows furigana and speaks", async ({

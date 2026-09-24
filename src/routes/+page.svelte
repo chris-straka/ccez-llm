@@ -12453,6 +12453,13 @@
 						// still follows the point.
 					}
 					void speakQuote(word, msg.id, false, speechText(msg.content));
+					// The repoint leaves a live highlight on the clicked
+					// word: show its readings like the quoted branch
+					// would below — a second right-click reads like the
+					// first, panel included. Speech already ran above;
+					// readingsForQuote only places the panel.
+					const fresh = currentQuote();
+					if (fresh) void readingsForQuote(fresh);
 					return;
 				}
 			}
