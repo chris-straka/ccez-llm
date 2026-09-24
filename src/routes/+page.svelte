@@ -6834,17 +6834,16 @@
 	/**
 	 * Backgrounded reply ping (study sessions): when a reply
 	 * finishes while the window is hidden/backgrounded, a
-	 * permission-gated notification + badge carries its head. Silent
-	 * when focused, silent for failures.
+	 * permission-gated title-only notification + badge fires. Silent
+	 * when focused, silent for failures and blank replies.
 	 */
 	function maybeNotifyReplyDone(msg: ChatMsg | undefined): void {
 		if (!settings.replyNotifications) return;
 		if (!msg || msg.role !== "assistant" || msg.error) return;
-		const body = msg.content.trim();
-		if (!body) return;
+		if (!msg.content.trim()) return;
 		// Shell goes native (Android WebView has no Notification ctor);
 		// the async ping still fires when the reply lands backgrounded.
-		void notifyReplyDoneAsync("Reply finished", body, {
+		void notifyReplyDoneAsync("Reply finished", {
 			shell: tauriBackendAvailable()
 		}).then((pinged) => {
 			if (pinged) setStudyBadge(1);

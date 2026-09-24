@@ -249,14 +249,14 @@ export function waveformBars(level: number, bars: number): number[] {
  */
 export const REPLY_NOTIFICATION_ID = 4201;
 /**
- * Pings clear themselves after six seconds (out of the shade, not
+ * Pings clear themselves after two seconds (out of the shade, not
  * just silent). Best-effort while backgrounded: a suspended WebView
  * runs the timer late, never early. Replies channel (mirrors
  * turn.rs): the ping buzzes like the old flow did — Android buzzes
  * per channel, and the default stays silent.
  */
 export const REPLY_NOTIFICATION_CHANNEL_ID = "replies";
-export const REPLY_NOTIFICATION_TIMEOUT_MS = 6_000;
+export const REPLY_NOTIFICATION_TIMEOUT_MS = 2_000;
 
 export interface ReplyDoneGate {
 	hidden: boolean;
@@ -351,18 +351,16 @@ export async function ensureReplyNotificationPermission(
 }
 
 /**
- * Ping for a finished reply while backgrounded. Silent (false) when
- * focused, empty, unpermitted, or unsupported. Never throws.
+ * Title-only ping for a finished reply while backgrounded. Silent
+ * (false) when focused, unpermitted, or unsupported. Never throws.
  */
 export function notifyReplyDone(
 	title: string,
-	body: string,
 	input?: { notif?: unknown; hidden?: boolean; focused?: boolean }
 ): boolean {
 	const source = input?.notif ?? globalOf("Notification");
 	const ctor = notificationCtor(source);
 	if (!ctor) return false;
-	if (!body.trim()) return false;
 	const permission = replyNotificationPermission(source);
 	const hidden = input?.hidden ?? documentHiddenNow();
 	const focused = input?.focused ?? windowFocusedNow();
@@ -370,7 +368,7 @@ export function notifyReplyDone(
 		return false;
 	}
 	try {
-		const note = new ctor(title, { body: body.slice(0, 160) }) as {
+		const note = new ctor(title) as {
 			close?: unknown;
 		};
 		if (note && typeof note.close === "function") {
@@ -646,30 +644,8 @@ export async function ensureReplyNotificationPermissionAsync(input?: {
  * Silent (false) when foregrounded, short, unpermitted, or
  * unsupported. Never throws.
  */
-/**
- * Notification plain text (mirrors turn.rs `notification_plain`): strip
- * the reply's markdown so the shade never shows `**bold**`, backticks,
- * headings, quotes, or link targets. Display-only. Pure.
- */
-export function notificationPlainText(head: string): string {
-	const inline = head.replace(/[*`~]/g, "");
-	const lines = inline.split("\n").map((line) => {
-		let t = line.trimStart();
-		if (t.startsWith("#")) t = t.slice(1).trimStart();
-		if (t.startsWith(">")) t = t.slice(1).trimStart();
-		return t.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1");
-	});
-	return lines
-		.join("\n")
-		.replace(/\|/g, " ")
-		.split(/\s+/)
-		.filter((w) => w.length > 0)
-		.join(" ");
-}
-
 export async function notifyReplyDoneAsync(
 	title: string,
-	body: string,
 	input?: {
 		notif?: unknown;
 		hidden?: boolean;
@@ -678,8 +654,6 @@ export async function notifyReplyDoneAsync(
 		plugin?: NativeNotifier | null;
 	}
 ): Promise<boolean> {
-	const text = notificationPlainText(body);
-	if (!text) return false;
 	const hidden = input?.hidden ?? documentHiddenNow();
 	const focused = input?.focused ?? windowFocusedNow();
 	if (!(hidden || !focused)) return false;
@@ -711,7 +685,6 @@ export async function notifyReplyDoneAsync(
 					id: REPLY_NOTIFICATION_ID,
 					...(channelId ? { channelId } : {}),
 					title,
-					body: text.slice(0, 160),
 					autoCancel: true
 				});
 				scheduleReplyNotificationClear(plugin);
@@ -720,9 +693,9 @@ export async function notifyReplyDoneAsync(
 		} catch {
 			// Fall through to the Web channel below.
 		}
-		return notifyReplyDone(title, body, input);
+		return notifyReplyDone(title, input);
 	}
-	return notifyReplyDone(title, body, input);
+	return notifyReplyDone(title, input);
 }
 
 /** Best-effort stale-ping clear (a backgrounded timer may run late). */

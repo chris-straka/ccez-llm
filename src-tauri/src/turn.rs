@@ -712,7 +712,7 @@ async fn sleep_secs(secs: u64) {
 
 /// Fixed reply-ping id, shared with the frontend's
 /// `REPLY_NOTIFICATION_ID` (studyMedia.ts): one ping replaces the
-/// last, and every clearer (the 6s timer below, the foreground-return
+/// last, and every clearer (the 2s timer below, the foreground-return
 /// dismiss) targets the same notice instead of stranding it.
 const REPLY_NOTIFICATION_ID: i32 = 4201;
 
@@ -784,7 +784,7 @@ fn notify_ready(app: &AppHandle) {
     }
     let _ = ping.show();
     // The shade is not storage: a native timer clears the ping after
-    // 6s (the page's own timer freezes while backgrounded, which is
+    // 2s (the page's own timer freezes while backgrounded, which is
     // exactly when this ping exists). Same id the foreground return
     // dismisses, so a revisit clears it even sooner. Android-only:
     // desktop plugin builds (2.x) expose no cancel API, and desktop
@@ -793,7 +793,7 @@ fn notify_ready(app: &AppHandle) {
     {
         let handle = app.clone();
         tauri::async_runtime::spawn_blocking(move || {
-            std::thread::sleep(Duration::from_secs(6));
+            std::thread::sleep(Duration::from_secs(2));
             let _ = handle.notification().cancel(vec![REPLY_NOTIFICATION_ID]);
         });
     }

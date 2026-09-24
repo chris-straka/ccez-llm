@@ -12,7 +12,6 @@ import {
 	hapticBeat,
 	hapticBeatAsync,
 	mediaRecorderSupported,
-	notificationPlainText,
 	notifyReplyDone,
 	notifyReplyDoneAsync,
 	releaseStudyWakeLock,
@@ -223,64 +222,47 @@ describe("notification wrappers", () => {
 		);
 	});
 
-	it("notifies only through the gate, never throws", () => {
+	it("notifies title-only through the gate, never throws", () => {
 		const ctor = notifCtor("granted");
-		const body = "a backgrounded reply of any length";
 		expect(
-			notifyReplyDone("Reply finished", body, { notif: ctor, hidden: true })
+			notifyReplyDone("Reply finished", { notif: ctor, hidden: true })
 		).toBe(true);
 		expect(ctor).toHaveBeenCalledTimes(1);
+		expect(ctor).toHaveBeenCalledWith("Reply finished");
 		// Focused: silent.
 		expect(
-			notifyReplyDone("Reply finished", body, {
+			notifyReplyDone("Reply finished", {
 				notif: ctor,
 				hidden: false,
 				focused: true
 			})
 		).toBe(false);
-		// Empty: silent.
-		expect(
-			notifyReplyDone("Reply finished", "   ", { notif: ctor, hidden: true })
-		).toBe(false);
 		// Unpermitted: silent.
 		expect(
-			notifyReplyDone("Reply finished", body, {
+			notifyReplyDone("Reply finished", {
 				notif: notifCtor("default"),
 				hidden: true
 			})
 		).toBe(false);
 		// Unsupported: silent.
 		expect(
-			notifyReplyDone("Reply finished", body, {
+			notifyReplyDone("Reply finished", {
 				notif: undefined,
 				hidden: true
 			})
 		).toBe(false);
 	});
 
-	it("strips markdown from the ping body", () => {
-		expect(notificationPlainText("**Bold** and `code` speak")).toBe(
-			"Bold and code speak"
-		);
-		expect(
-			notificationPlainText("# Head\n> quote [text](https://x.y/z) | cell")
-		).toBe("Head quote text cell");
-		expect(notificationPlainText(" plain words ")).toBe("plain words");
-		expect(notificationPlainText("")).toBe("");
-	});
-
-	it("closes the web ping after six seconds", () => {
-		expect(REPLY_NOTIFICATION_TIMEOUT_MS).toBe(6_000);
+	it("closes the web ping after two seconds", () => {
+		expect(REPLY_NOTIFICATION_TIMEOUT_MS).toBe(2_000);
 		vi.useFakeTimers();
 		try {
 			const close = vi.fn();
 			class StubNotif {
 				static permission = "granted";
 				title: string;
-				options?: { body?: string } | undefined;
-				constructor(title: string, options?: { body?: string }) {
+				constructor(title: string) {
 					this.title = title;
-					this.options = options;
 				}
 				close(): void {
 					close();
@@ -288,7 +270,7 @@ describe("notification wrappers", () => {
 			}
 			const ctor = StubNotif;
 			expect(
-				notifyReplyDone("Reply finished", "hello", {
+				notifyReplyDone("Reply finished", {
 					notif: ctor,
 					hidden: true
 				})
@@ -429,8 +411,6 @@ describe("hapticBeat", () => {
 });
 
 describe("shell-aware notifications", () => {
-	const long = "a backgrounded reply";
-
 	function plugin(granted: boolean) {
 		return {
 			isPermissionGranted: vi.fn(async () => granted),
@@ -463,17 +443,27 @@ describe("shell-aware notifications", () => {
 	it("notifies natively when granted, silently otherwise", async () => {
 		const p = plugin(true);
 		expect(
-			await notifyReplyDoneAsync("Reply finished", long, {
+			await notifyReplyDoneAsync("Reply finished", {
 				shell: true,
 				plugin: p,
 				hidden: true
 			})
 		).toBe(true);
 		expect(p.sendNotification).toHaveBeenCalledTimes(1);
+		// Title-only: no reply excerpt rides along.
+		const sent = p.sendNotification.mock.calls[0]?.[0] as
+			| Record<string, unknown>
+			| undefined;
+		expect(sent).not.toHaveProperty("body");
+		// The ping carries the fixed id with autoCancel, so finishes
+		// replace each other instead of stacking in the shade.
+		expect(p.sendNotification).toHaveBeenCalledWith(
+			expect.objectContaining({ id: REPLY_NOTIFICATION_ID, autoCancel: true })
+		);
 		// Focused: silent without touching the plugin sender.
 		p.sendNotification.mockClear();
 		expect(
-			await notifyReplyDoneAsync("Reply finished", long, {
+			await notifyReplyDoneAsync("Reply finished", {
 				shell: true,
 				plugin: p,
 				hidden: false,
@@ -481,24 +471,11 @@ describe("shell-aware notifications", () => {
 			})
 		).toBe(false);
 		expect(p.sendNotification).not.toHaveBeenCalled();
-		// Short backgrounded replies ping too (no length floor).
-		expect(
-			await notifyReplyDoneAsync("Reply finished", "short", {
-				shell: true,
-				plugin: p,
-				hidden: true
-			})
-		).toBe(true);
-		// The ping carries the fixed id with autoCancel, so finishes
-		// replace each other instead of stacking in the shade.
-		expect(p.sendNotification).toHaveBeenCalledWith(
-			expect.objectContaining({ id: REPLY_NOTIFICATION_ID, autoCancel: true })
-		);
 		// Ungranted shell without a web ctor: silent.
 		const denied = plugin(false);
 		denied.requestPermission = vi.fn(async () => "denied");
 		expect(
-			await notifyReplyDoneAsync("Reply finished", long, {
+			await notifyReplyDoneAsync("Reply finished", {
 				shell: true,
 				plugin: { ...denied, isPermissionGranted: async () => false },
 				notif: undefined,
@@ -509,7 +486,7 @@ describe("shell-aware notifications", () => {
 
 	it("buzzes through the replies channel, default when it fails", async () => {
 		const p = plugin(true);
-		await notifyReplyDoneAsync("Reply finished", long, {
+		await notifyReplyDoneAsync("Reply finished", {
 			shell: true,
 			plugin: p,
 			hidden: true
@@ -529,7 +506,7 @@ describe("shell-aware notifications", () => {
 		failing.createChannel = vi.fn(async () => {
 			throw new Error("no channels");
 		});
-		await notifyReplyDoneAsync("Reply finished", long, {
+		await notifyReplyDoneAsync("Reply finished", {
 			shell: true,
 			plugin: failing,
 			hidden: true
