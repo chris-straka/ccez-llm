@@ -5292,6 +5292,42 @@
 	}
 
 	/**
+	 * Refit an open Android card to its measured height: the open-time
+	 * estimate overshoots short cards (daylight above bottom badges)
+	 * and collapses to the top whenever the keyboard shortens the
+	 * viewport. Re-reads the live badge anchor, so scrolls and keyboard
+	 * transitions re-land the card instead of stranding the estimate.
+	 * y-only: x rides the known width already (re-clamped through the
+	 * same math). No-op unless this exact card is still open.
+	 */
+	function refitAndroidCard(kind: "answer" | "edit", id: string): void {
+		if (!androidUI) return;
+		const width = kind === "answer" ? answerPop?.w : popWidth();
+		const open = kind === "answer" ? answerPop : annPop;
+		if (!open || open.id !== id || width === undefined) return;
+		if (kind === "answer" ? answerClosing : annPopClosing) return;
+		const card = document.querySelector(
+			kind === "answer" ? ".ann-answer" : ".ann-pop"
+		);
+		if (!(card instanceof HTMLElement)) return;
+		const height = card.getBoundingClientRect().height;
+		if (!(height > 0)) return;
+		const badge = document.querySelector(`[data-ann-badge="${id}"]`);
+		const rect = badge?.getBoundingClientRect();
+		if (!rect) return;
+		const y = placeAnnCard({
+			anchorX: open.x + width / 2,
+			anchorY: rect.bottom,
+			width,
+			viewportWidth: window.innerWidth,
+			viewportHeight: window.innerHeight,
+			cardHeight: height
+		}).y;
+		if (kind === "answer" && answerPop) answerPop = { ...answerPop, y };
+		if (kind === "edit" && annPop) annPop = { ...annPop, y };
+	}
+
+	/**
 	 * Badge click: a ready answer opens in its own popup, anything
 	 * else opens the review dock on the annotation's row — filed
 	 * notes never edit inline in the dock (the pencil opens the
@@ -5349,7 +5385,10 @@
 							anchorY: anchorAt.y,
 							width,
 							viewportWidth: window.innerWidth,
-							viewportHeight: window.innerHeight
+							viewportHeight: window.innerHeight,
+							// Open-time estimate; the tick below refits
+							// to the measured card on Android.
+							cardHeight: 240
 						});
 			if (answerTimer) {
 				clearTimeout(answerTimer);
@@ -5358,6 +5397,7 @@
 			answerClosing = false;
 			answerPop = { id, x: placed.x, y: placed.y, w: width };
 			answerPopTop = scrollBox?.scrollTop ?? 0;
+			if (androidUI) void tick().then(() => refitAndroidCard("answer", id));
 			// The quote stays highlighted while its answer reads, and
 			// opening the reply always reads the annotated thing back
 			// out — same listen moment as creating the annotation.
@@ -5490,13 +5530,17 @@
 						anchorY: quoteRect ? quoteRect.bottom : window.innerHeight / 2,
 						width,
 						viewportWidth: window.innerWidth,
-						viewportHeight: window.innerHeight
+						viewportHeight: window.innerHeight,
+						// Open-time estimate; the tick below refits
+						// to the measured card on Android.
+						cardHeight: 240
 					});
 		highlightAnnId = id;
 		annDraft = current.comment;
 		settleAnnPop();
 		annPop = { id, x: placed.x, y: placed.y, fresh: false };
 		annPopTop = scrollBox?.scrollTop ?? 0;
+		if (androidUI) void tick().then(() => refitAndroidCard("edit", id));
 		// The card mounts async: land the caret once it flushes,
 		// like the create pill.
 		void tick().then(() => annPopBox?.focus({ preventScroll: true }));
@@ -12852,6 +12896,17 @@
 					}
 				}
 				editor?.remeasure();
+				// Settled keyboard geometry re-lands open cards: the
+				// open-time estimate strands them when the viewport
+				// grew or shrank underneath (edit focus summons the
+				// keyboard, badge taps dismiss it). Android only —
+				// desktop re-places its own way.
+				if (androidUI) {
+					const openAnswer = answerPop;
+					const openEdit = annPop;
+					if (openAnswer) refitAndroidCard("answer", openAnswer.id);
+					if (openEdit) refitAndroidCard("edit", openEdit.id);
+				}
 			}, 250);
 		};
 		window.visualViewport?.addEventListener("resize", onViewportResize);

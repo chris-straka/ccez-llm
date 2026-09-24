@@ -74,7 +74,7 @@ describe("annPopWidth", () => {
 describe("placeAnnCard", () => {
 	it("centers over the anchor inside the viewport", () => {
 		expect(
-			placeAnnCard({ anchorX: 640, anchorY: 400, width: 384, viewportWidth: 1280, viewportHeight: 800 })
+			placeAnnCard({ anchorX: 640, anchorY: 400, width: 384, viewportWidth: 1280, viewportHeight: 800, cardHeight: 240 })
 		).toEqual({ x: 448, y: 408 });
 	});
 	it("clamps narrow viewports instead of running off-screen", () => {
@@ -83,14 +83,31 @@ describe("placeAnnCard", () => {
 			anchorY: 400,
 			width: 384,
 			viewportWidth: 412,
-			viewportHeight: 915
+			viewportHeight: 915,
+			cardHeight: 240
 		});
 		expect(x).toBe(8);
 	});
 	it("drops above the anchor past the bottom edge", () => {
 		expect(
-			placeAnnCard({ anchorX: 640, anchorY: 780, width: 384, viewportWidth: 1280, viewportHeight: 800 })
+			placeAnnCard({ anchorX: 640, anchorY: 780, width: 384, viewportWidth: 1280, viewportHeight: 800, cardHeight: 240 })
 		).toEqual({ x: 448, y: 532 });
+	});
+	it("lands a short card right above a bottom badge", () => {
+		// The old fixed 240px estimate left ~100px of daylight here.
+		expect(
+			placeAnnCard({ anchorX: 200, anchorY: 660, width: 320, viewportWidth: 412, viewportHeight: 700, cardHeight: 140 })
+		).toEqual({ x: 40, y: 512 });
+	});
+	it("fits below the badge when the keyboard shortens the viewport", () => {
+		expect(
+			placeAnnCard({ anchorX: 200, anchorY: 100, width: 320, viewportWidth: 412, viewportHeight: 400, cardHeight: 140 })
+		).toEqual({ x: 40, y: 108 });
+	});
+	it("pins an overflowing card to the top", () => {
+		expect(
+			placeAnnCard({ anchorX: 200, anchorY: 150, width: 320, viewportWidth: 412, viewportHeight: 300, cardHeight: 280 })
+		).toEqual({ x: 40, y: 8 });
 	});
 });
 

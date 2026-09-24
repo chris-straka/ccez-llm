@@ -707,7 +707,7 @@ test.describe("ios", () => {
 		await composer.click();
 		await page.keyboard.type("nice point", { delay: 10 });
 		await page.locator(".send-btn").click();
-		await expect(page.locator(".toast")).toHaveText("Annotation saved");
+		await expect(page.locator(".toast")).toHaveText("Annotation sent");
 		await expect(page.locator("button.ccez-ann-badge").first()).toBeVisible();
 	});
 
@@ -764,7 +764,7 @@ test.describe("ios", () => {
 		await composer.click();
 		await page.keyboard.type("go", { delay: 10 });
 		await page.locator(".send-btn").click();
-		await expect(page.locator(".toast")).toHaveText("Annotation saved");
+		await expect(page.locator(".toast")).toHaveText("Annotation sent");
 		const badge = page.locator("button.ccez-ann-badge").first();
 		await expect(badge).toHaveCount(1);
 		// The iOS Safari tap sequence, dispatched verbatim: touch events

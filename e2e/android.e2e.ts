@@ -1830,7 +1830,7 @@ test.describe("touch", () => {
 			await composer.click();
 			await page.keyboard.type("nice point", { delay: 10 });
 			await page.locator(".send-btn").click();
-			await expect(page.locator(".toast")).toHaveText("Annotation saved");
+			await expect(page.locator(".toast")).toHaveText("Annotation sent");
 			await expect(page.locator("button.ccez-ann-badge").first()).toBeVisible({
 				timeout: 15_000
 			});
@@ -1936,6 +1936,100 @@ test.describe("touch", () => {
 			const sent = page.locator("article.user .rendered").last();
 			await expect(sent).toContainText("hello", { timeout: 60_000 });
 			await expect(page.locator("article.user .ann-refs")).toHaveCount(0);
+		});
+
+		/** Answered badge taps land the card by its measured height:
+		with a keyboard-short viewport the card fits below the badge
+		instead of collapsing to the top, and a bottom badge earns
+		the card right above it instead of mid-screen daylight. */
+		test("answered badge card fits a short viewport and hugs a bottom badge", async ({
+			page
+		}) => {
+			const lines = Array.from(
+				{ length: 60 },
+				(_, n) => `entry ${n} of a long assistant reply`
+			).join("\n");
+			await seedChat(page, [{ role: "assistant", content: lines }]);
+			await page.addInitScript(() => {
+				window.localStorage.setItem(
+					"ccez-llm-annotations-v1",
+					JSON.stringify({
+						"e2e-chat": [
+							{
+								id: "ann-top",
+								messageId: "e2e-m0",
+								quote: "entry 2 of a long assistant reply",
+								comment: "?",
+								answer: "seeded answer",
+								at: 0
+							},
+							{
+								id: "ann-bottom",
+								messageId: "e2e-m0",
+								quote: "entry 59 of a long assistant reply",
+								comment: "?",
+								answer:
+									"seeded answer line 01\nseeded answer line 02\nseeded answer line 03\nseeded answer line 04\nseeded answer line 05\nseeded answer line 06\nseeded answer line 07\nseeded answer line 08\nseeded answer line 09\nseeded answer line 10\nseeded answer line 11\nseeded answer line 12\nseeded answer line 13\nseeded answer line 14\nseeded answer line 15\nseeded answer line 16\nseeded answer line 17\nseeded answer line 18\nseeded answer line 19\nseeded answer line 20",
+								at: 0
+							}
+						]
+					})
+				);
+			});
+			// Keyboard-open geometry: short viewport, badge visible.
+			await page.setViewportSize({ width: 412, height: 420 });
+			await page.goto("/");
+			const badges = page.locator("button.ccez-ann-badge.ans-ready");
+			await expect(badges).toHaveCount(2, { timeout: 15_000 });
+			const tapBadge = async (badge: typeof badges) => {
+				const box = await badge.boundingBox();
+				if (!box) throw new Error("badge has no box");
+				await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+				const card = page.locator(".ann-answer");
+				await expect(card).toBeVisible({ timeout: 15_000 });
+				await page.waitForTimeout(500);
+				const cardBox = await card.boundingBox();
+				const badgeBox = await badge.boundingBox();
+				if (!cardBox || !badgeBox) throw new Error("card or badge lost its box");
+				return {
+					cardTop: cardBox.y,
+					cardBottom: cardBox.y + cardBox.height,
+					badgeTop: badgeBox.y,
+					badgeBottom: badgeBox.y + badgeBox.height
+				};
+			};
+			// Short card, badge mid-viewport: below fits, so the old
+			// fixed estimate (which flipped and collapsed to the top)
+			// must not move it. Land the badge mid-screen first.
+			await page.evaluate(() => {
+				const scroller = document.querySelector(".messages");
+				const badge = document.querySelector(
+					"button.ccez-ann-badge.ans-ready"
+				);
+				if (!(scroller instanceof HTMLElement) || !(badge instanceof HTMLElement))
+					return;
+				const target = badge.getBoundingClientRect().top + scroller.scrollTop - 220;
+				scroller.scrollTo({ top: Math.max(0, target) });
+			});
+			const above = await tapBadge(badges.first());
+			expect(above.cardTop).toBeGreaterThanOrEqual(above.badgeBottom - 2);
+			expect(above.cardBottom).toBeLessThanOrEqual(420);
+			await page.keyboard.press("Escape");
+			await expect(page.locator(".ann-answer")).toHaveCount(0);
+			// Keyboard closed, tall card, badge at the bottom edge: the
+			// card sits right above the badge — refit lands its bottom
+			// exactly 8px over the badge, inside the viewport.
+			await page.setViewportSize({ width: 412, height: 915 });
+			await page.evaluate(() =>
+				document
+					.querySelector(".messages")
+					?.scrollTo({ top: Number.MAX_SAFE_INTEGER })
+			);
+			const below = await tapBadge(badges.last());
+			expect(below.cardTop).toBeGreaterThanOrEqual(0);
+			expect(Math.abs(below.cardBottom - (below.badgeBottom - 8))).toBeLessThanOrEqual(
+				16
+			);
 		});
 
 		/** Creating washes the pending preview: the comment box

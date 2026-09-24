@@ -82,9 +82,12 @@ export function annPopWidth(facts: {
 
 /**
  * Edit-card placement from a badge anchor: centered over the anchor,
- * clamped inside the viewport; drops above the anchor when the 240px
- * card would run past the bottom edge. Narrow viewports clamp first
- * or x goes negative and the popover runs off-screen.
+ * clamped inside the viewport; drops above the anchor when the card
+ * would run past the bottom edge. The height is measured post-mount,
+ * never estimated: a fixed estimate overshoots short cards (daylight
+ * above bottom badges) and collapses to the top whenever the keyboard
+ * shortens the viewport. Narrow viewports clamp first or x goes
+ * negative and the popover runs off-screen.
  */
 export function placeAnnCard(facts: {
 	anchorX: number;
@@ -92,12 +95,13 @@ export function placeAnnCard(facts: {
 	width: number;
 	viewportWidth: number;
 	viewportHeight: number;
+	cardHeight: number;
 }): { x: number; y: number } {
 	const x = Math.min(
 		Math.max(8, facts.anchorX - facts.width / 2),
 		facts.viewportWidth - facts.width - 8
 	);
-	const height = 240;
+	const height = Math.max(1, Math.ceil(facts.cardHeight));
 	let y = facts.anchorY + 8;
 	if (y + height > facts.viewportHeight - 8)
 		y = Math.max(8, facts.anchorY - height - 8);
