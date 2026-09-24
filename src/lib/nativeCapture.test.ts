@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
+	capturePromptTemplate,
 	captureSourceLabel,
 	friendlyCaptureError,
-	isCaptureUnsupported
+	isCaptureUnsupported,
+	shouldStageCapture
 } from "./nativeCapture";
 
 describe("capture source labels", () => {
@@ -54,5 +56,23 @@ describe("capture errors", () => {
 		expect(friendlyCaptureError("the window list is unavailable")).toBe(
 			"the window list is unavailable"
 		);
+	});
+});
+
+describe("capture send shape", () => {
+	it("quotes the recognized text under the question", () => {
+		expect(capturePromptTemplate("Bonjour le monde")).toBe(
+			"What does this mean?\n\n> Bonjour le monde"
+		);
+		expect(capturePromptTemplate("line one\nline two")).toBe(
+			"What does this mean?\n\n> line one\n> line two"
+		);
+	});
+
+	it("stages weak reads instead of auto-sending", () => {
+		expect(shouldStageCapture(0)).toBe(true);
+		expect(shouldStageCapture(0.59)).toBe(true);
+		expect(shouldStageCapture(0.6)).toBe(false);
+		expect(shouldStageCapture(0.95)).toBe(false);
 	});
 });

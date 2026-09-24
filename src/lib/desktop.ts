@@ -203,6 +203,23 @@ export async function listenDeepLinks(
 	}
 }
 
+/**
+ * Capture-chord listener: the OS-global ⇧⌘/Ctrl+O in desktop.rs emits
+ * `game-capture` while another app is focused, and the page runs the
+ * capture→OCR→send pipeline off it. Null outside the shell (same
+ * three-runtime contract as `listenDeepLinks`).
+ */
+export async function listenGameCapture(
+	callback: () => void
+): Promise<UnlistenFn | null> {
+	if (!tauriBackendAvailable()) return null;
+	try {
+		return await listen("game-capture", () => callback());
+	} catch {
+		return null;
+	}
+}
+
 function payloadToLink(payload: {
 	action: string;
 	chat_id?: string | null;

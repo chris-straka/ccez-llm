@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { OCR_RETRY_BELOW } from "./nativeOcr";
 
 /**
  * Capture-any-window screenshots (Stage: capture OCR): thin invoke
@@ -100,4 +101,27 @@ export function friendlyCaptureError(message: string): string {
 	if (isCaptureUnsupported(message))
 		return "Window capture is not available on this device.";
 	return message;
+}
+
+/**
+ * Auto-send template: the question first, the recognized text quoted
+ * below as a blockquote (the chat renders markdown, so the capture
+ * reads as a citation, not a pasted blob). Pure and unit-tested.
+ */
+export function capturePromptTemplate(text: string): string {
+	const quoted = text
+		.split("\n")
+		.map((line) => `> ${line}`)
+		.join("\n");
+	return `What does this mean?\n\n${quoted}`;
+}
+
+/**
+ * True when the read is too weak to auto-send: below the same
+ * mean-confidence floor the OCR retry uses, the text is likely a
+ * misread, so the caller stages it for a check instead of spending
+ * the round trip. Pure and unit-tested.
+ */
+export function shouldStageCapture(confidence: number): boolean {
+	return confidence < OCR_RETRY_BELOW;
 }

@@ -63,7 +63,8 @@ test("list runs A-Z; modal toggle sits in place", async ({ page }) => {
 		"Chat width + / −",
 		"Prompt text size up / down",
 		"Prompt width + / −",
-		"New chat"
+		"New chat",
+		"Capture window text"
 	]) {
 		await expect(keys.locator("div > dt", { hasText: name })).toHaveCount(0);
 	}

@@ -547,6 +547,7 @@ pub fn wire(app: &AppHandle) -> tauri::Result<()> {
     #[cfg(not(target_os = "macos"))]
     build_tray(app)?;
     install_summon_hotkey(app);
+    install_capture_hotkey(app);
     handle_startup_args(app);
     Ok(())
 }
@@ -692,6 +693,36 @@ fn install_summon_hotkey(app: &AppHandle) {
         },
     ) {
         eprintln!("[desktop] global summon shortcut unavailable: {error}");
+    }
+}
+
+/// Capture-any-window OCR chord: fires while another app (game, browser,
+/// emulator) is focused. The chord brings our window forward first (the
+/// user summoned us — the auto-sent question and its answer should be
+/// visible), then emits `game-capture` for the frontend pipeline (saved
+/// source or frontmost window, OCR, auto-send). The frontend ignores the
+/// event while the capture setting is off, so the checkbox reads as a
+/// disable. A failed registration logs and the in-app chord still works
+/// (same contract as summon). Desktop only: the plugin crate does not
+/// compile for mobile. UNVERIFIED ON DEVICE — no headless harness can
+/// press a system-wide chord.
+#[cfg(desktop)]
+fn install_capture_hotkey(app: &AppHandle) {
+    use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+    if let Err(error) = app.global_shortcut().on_shortcut(
+        "CommandOrControl+Shift+O",
+        move |app, _shortcut, event| {
+            if event.state != ShortcutState::Pressed {
+                return;
+            }
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+            let _ = app.emit("game-capture", ());
+        },
+    ) {
+        eprintln!("[desktop] global capture shortcut unavailable: {error}");
     }
 }
 

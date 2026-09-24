@@ -701,6 +701,33 @@ describe("commandChord", () => {
 		expect(commandChord({ ...chordBase, ctrlKey: true, key: "o" })).toBe(
 			"toggle-pastes"
 		);
+		// The capture chord wins over pastes when shift joins.
+		expect(
+			commandChord({
+				...chordBase,
+				metaKey: true,
+				shiftKey: true,
+				code: "KeyO"
+			})
+		).toBe("capture-window");
+		expect(
+			commandChord({
+				...chordBase,
+				ctrlKey: true,
+				shiftKey: true,
+				code: "KeyO",
+				key: "O"
+			})
+		).toBe("capture-window");
+		expect(
+			commandChord({
+				...chordBase,
+				metaKey: true,
+				shiftKey: true,
+				altKey: true,
+				code: "KeyO"
+			})
+		).toBe(null);
 		expect(commandChord({ ...chordBase, metaKey: true, key: "Enter" })).toBe(
 			"send"
 		);

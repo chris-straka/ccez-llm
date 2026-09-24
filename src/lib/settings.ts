@@ -83,6 +83,11 @@ export interface AppSettings {
 	button. On unless toggled — nothing fires until the user invokes
 	it, so this is a kill-switch, not a permission. */
 	captureEnabled: boolean;
+	/** Last capture source (window id from the source menu; null =
+	frontmost window) and its fullscreen flag. The chord reuses the
+	pick; a stale id falls back frontmost in the backend. */
+	captureSourceId: number | null;
+	captureFullscreen: boolean;
 	voiceEngine: VoiceEngine;
 	/**
 	 * Explicit native voice (registry identifier from the voice picker);
@@ -358,6 +363,8 @@ export function defaultSettings(): AppSettings {
 		voice: false,
 		micEnabled: true,
 		captureEnabled: true,
+		captureSourceId: null,
+		captureFullscreen: false,
 		// Native first: this is a Mac-first app, and every runtime without
 		// system voices corrects itself back to web on the support probe.
 		voiceEngine: "native",
@@ -588,6 +595,13 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 		if (typeof merged.micEnabled !== "boolean") merged.micEnabled = true;
 		if (typeof merged.captureEnabled !== "boolean")
 			merged.captureEnabled = true;
+		if (
+			typeof merged.captureSourceId !== "number" &&
+			merged.captureSourceId !== null
+		)
+			merged.captureSourceId = null;
+		if (typeof merged.captureFullscreen !== "boolean")
+			merged.captureFullscreen = false;
 		if (typeof merged.hideButtons !== "boolean") merged.hideButtons = true;
 		if (typeof merged.foldOnSwipe !== "boolean") merged.foldOnSwipe = false;
 		if (typeof merged.autoSpeakSelection !== "boolean")

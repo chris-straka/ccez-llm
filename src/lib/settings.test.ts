@@ -351,6 +351,26 @@ describe("settings", () => {
 		expect(loadSettings(memoryStore).captureEnabled).toBe(true);
 	});
 
+	it("defaults the capture source to frontmost windowed", () => {
+		const fresh = defaultSettings();
+		expect(fresh.captureSourceId).toBe(null);
+		expect(fresh.captureFullscreen).toBe(false);
+		const picked = blankSettings();
+		picked.captureSourceId = 42;
+		picked.captureFullscreen = true;
+		saveSettings(picked, memoryStore);
+		const loaded = loadSettings(memoryStore);
+		expect(loaded.captureSourceId).toBe(42);
+		expect(loaded.captureFullscreen).toBe(true);
+		const junk = blankSettings();
+		(junk as unknown as Record<string, unknown>).captureSourceId = "nope";
+		(junk as unknown as Record<string, unknown>).captureFullscreen = 1;
+		saveSettings(junk, memoryStore);
+		const healed = loadSettings(memoryStore);
+		expect(healed.captureSourceId).toBe(null);
+		expect(healed.captureFullscreen).toBe(false);
+	});
+
 	it("migrates the shared thinking dial to per-provider native ids", () => {
 		const raw = blankSettings();
 		(raw as unknown as Record<string, unknown>)["thinkingLevel"] = "high";

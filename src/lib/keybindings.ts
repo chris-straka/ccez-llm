@@ -476,7 +476,8 @@ export type CommandChord =
 	| "thinking-next"
 	| "thinking-prev"
 	| "new-chat"
-	| "toggle-voice";
+	| "toggle-voice"
+	| "capture-window";
 
 /**
  * Modifier-chord table in handler dispatch order: each condition is the
@@ -510,6 +511,12 @@ export function commandChord(facts: CommandChordFacts): CommandChord | null {
 		if (facts.inShell) return "find-toggle";
 		return null;
 	}
+	// Capture-any-window OCR (mirrors the OS-global ⇧⌘/Ctrl+O chord in
+	// desktop.rs): claimed ahead of pastes, so Ctrl+Shift+O captures
+	// while bare Ctrl+O still toggles pastes. Fires in every runtime —
+	// the flow toasts where no backend answers.
+	if (cmd && facts.shiftKey && !facts.altKey && facts.code === "KeyO")
+		return "capture-window";
 	if (facts.ctrlKey && (facts.key === "o" || facts.key === "O"))
 		return "toggle-pastes";
 	if (cmd && !facts.altKey && !facts.shiftKey && facts.key === "Enter")

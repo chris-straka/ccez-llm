@@ -556,10 +556,17 @@
 		friendlyFallbackError,
 		ocrSupported
 	} from "$lib/nativeOcr";
+	import {
+		captureWindow,
+		capturePromptTemplate,
+		friendlyCaptureError,
+		shouldStageCapture
+	} from "$lib/nativeCapture";
 	import { voiceLocaleForInputSource } from "$lib/keyboardLang";
 	import { joinExternalDraft, routeExternalText } from "$lib/externalText";
 	import {
 		listenDeepLinks,
+		listenGameCapture,
 		isSummonHotkey,
 		studySheetMarkdown,
 		sheetTitle,
@@ -4262,6 +4269,82 @@
 			);
 		} finally {
 			ocrBusyId = null;
+		}
+	}
+
+	/** Re-entrant guard: the chord can double-fire (repeat, both
+	 * chords at once) — one capture at a time. Plain let, no UI
+	 * binds it. */
+	let captureBusy = false;
+	/** Capture-any-window OCR: screenshot the saved source (or the
+	 * frontmost window), recognize it like an attachment, and send
+	 * "what does this mean" with the text quoted. Weak reads stage
+	 * in the composer for a check (the unit-3 overlay card takes
+	 * that over); misses and backend failures toast, never throw.
+	 * The settings checkbox gates both chords; a send in flight or
+	 * a missing key behaves exactly like a typed send (doSend owns
+	 * every guard).
+	 */
+	async function runCaptureFlow(): Promise<void> {
+		if (captureBusy || !settings.captureEnabled) return;
+		captureBusy = true;
+		try {
+			let pixels: string;
+			try {
+				pixels = await captureWindow(
+					null,
+					settings.captureSourceId,
+					settings.captureFullscreen
+				);
+			} catch (error) {
+				const raw = error instanceof Error ? error.message : String(error);
+				flashErrorToast(friendlyCaptureError(raw));
+				return;
+			}
+			const dataUrl = `data:image/png;base64,${pixels}`;
+			// Same routing as attachments: native first, WASM
+			// fallback where Vision has no model, one reply-led
+			// retry under the floor, keep the better pass.
+			const native = await ocrSupported();
+			const fallbackLangs =
+				!native || !visionSupports(activeReplyCode)
+					? ocrFallbackLangs(activeReplyCode)
+					: null;
+			try {
+				let result = fallbackLangs
+					? await recognizeFallbackText(dataUrl, fallbackLangs)
+					: await recognizeImageText(dataUrl, null);
+				if (!fallbackLangs && result.confidence < OCR_RETRY_BELOW) {
+					try {
+						const retry = await recognizeImageText(
+							dataUrl,
+							ocrRetryHint(activeReplyCode)
+						);
+						result = keepBestRecognition(result, retry);
+					} catch {
+						// First pass stands.
+					}
+				}
+				const text = result.text.trim();
+				if (!text) {
+					flashErrorToast("No text found in this capture.");
+					return;
+				}
+				editor?.setText(capturePromptTemplate(text));
+				if (shouldStageCapture(result.confidence)) {
+					editor?.focus();
+					flashToast("Weak read — check the text, then send.");
+					return;
+				}
+				await doSend();
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				flashErrorToast(
+					fallbackLangs ? friendlyFallbackError(message) : friendlyOcrError(message)
+				);
+			}
+		} finally {
+			captureBusy = false;
 		}
 	}
 
@@ -10569,6 +10652,14 @@
 				setVoiceEnabled(!voiceOn());
 				return;
 			}
+			if (chord === "capture-window") {
+				// Screen-capture OCR from anywhere, editor included:
+				// the flow gates on the settings checkbox and toasts
+				// where no backend answers (browser preview).
+				consumeEvent(event);
+				void runCaptureFlow();
+				return;
+			}
 			const delScope = deleteChatScope({
 				...keyFacts(event),
 				inEditor: inEditor !== null,
@@ -12583,6 +12674,15 @@
 			// Speech stays gated off, as before.
 		}
 		window.addEventListener("focus", onWinFocus);
+		// OS-global capture chord (desktop.rs): the frontend runs the
+		// capture→OCR→send pipeline off it. Null outside the shell;
+		// the settings checkbox gates inside runCaptureFlow.
+		let unlistenCapture: (() => void) | null = null;
+		void listenGameCapture(() => {
+			void runCaptureFlow();
+		}).then((stop) => {
+			unlistenCapture = stop;
+		});
 		// Soft-keyboard transitions resize the visual viewport without
 		// ever touching the document, and old phone WebViews time
 		// resizes unreliably around them — the emptied composer can
@@ -12930,6 +13030,13 @@
 			window.visualViewport?.removeEventListener("scroll", onViewportResize);
 			if (viewportTimer !== undefined) window.clearTimeout(viewportTimer);
 			window.removeEventListener("focus", onWinFocus);
+			// Never let invoke throw into teardown (three-runtime rule).
+			try {
+				unlistenCapture?.();
+			} catch {
+				// Already torn down.
+			}
+			unlistenCapture = null;
 			window.removeEventListener("keydown", onKey, true);
 			window.removeEventListener("keydown", onAlt);
 			window.removeEventListener("keyup", onAlt);

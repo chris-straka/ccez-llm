@@ -17,6 +17,7 @@ const MAC_NAMES = [
 	"Annotate hovered word",
 	"Annotate instantly",
 	"Branch from here",
+	"Capture window text",
 	"Chat list",
 	"Chat width + / −",
 	"Copy message",
@@ -82,6 +83,9 @@ describe("shortcuts menu copy", () => {
 		expect(rows.find((r) => r.name === "Speak text aloud")?.keys).toBe(
 			"Right-click"
 		);
+		expect(rows.find((r) => r.name === "Capture window text")?.keys).toBe(
+			"⇧⌘O"
+		);
 	});
 
 	it("drops browser-dead rows on the web, still A-Z", () => {
@@ -93,7 +97,8 @@ describe("shortcuts menu copy", () => {
 			"Chat width + / −",
 			"Prompt text size up / down",
 			"Prompt width + / −",
-			"New chat"
+			"New chat",
+			"Capture window text"
 		];
 		for (const isMac of [true, false]) {
 			const names = desktopShortcuts(isMac, false).map((r) => r.name);
