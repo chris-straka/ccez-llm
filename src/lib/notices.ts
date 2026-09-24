@@ -22,7 +22,7 @@ export type NoticeKind = "inline" | "banner" | "voice" | "toast" | "errorToast";
  * Plain toasts clear fast (confirmations, not reading material);
  * error toasts hold the long delay so failures can actually be read. */
 export const TOAST_TIMEOUT_MS = 2500;
-export const ERROR_TOAST_TIMEOUT_MS = 8000;
+export const ERROR_TOAST_TIMEOUT_MS = 4000;
 /** Self-clear delays scale with message length (reading time): a long
  * failure notice holds while a "Copied" tick still clears fast.
  * ~40ms/char over the base above, capped so a paragraph never lingers. */
@@ -30,7 +30,7 @@ export function toastTimeoutFor(message: string): number {
 	return Math.min(9000, TOAST_TIMEOUT_MS + message.length * 40);
 }
 export function errorToastTimeoutFor(message: string): number {
-	return Math.min(15000, ERROR_TOAST_TIMEOUT_MS + message.length * 40);
+	return Math.min(7500, ERROR_TOAST_TIMEOUT_MS + message.length * 40);
 }
 /**
  * Above this length a toast wraps into a card instead of a pill: the
