@@ -14180,6 +14180,16 @@
 		height: calc(1rem * min(var(--font-scale, 1), 4));
 		width: calc(1rem * min(var(--font-scale, 1), 4));
 	}
+	/* Same opt-in for the top room: the pair above grows with the
+	text size but the body's 2.2rem headroom is fixed, so at large
+	scales the buttons overlap the first line (worst in the raw
+	source view, where code starts at the very top). The room grows
+	with the same box height — 0.3rem offset + button + 0.6rem gap,
+	which is exactly 2.2rem at 1x, so unscaled rendering is unchanged. */
+	main.scale-actions :global(.ccez-math-body),
+	main.scale-actions :global(.ccez-math-raw) {
+		padding-top: calc(0.9rem + 1.3rem * min(var(--font-scale, 1), 4));
+	}
 	/* Sending status renders in `SendingIndicator.svelte` now
 	(line, colored dots, elapsed). */
 	/* Loading dots exist only while busy, so an idle aid button is

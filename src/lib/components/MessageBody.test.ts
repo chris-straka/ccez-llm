@@ -190,6 +190,23 @@ describe("math chrome alignment", () => {
 		expect(inlineChromeRule()).toMatch(/align-self\s*:\s*center/);
 		expect(inlineChromeRule()).not.toMatch(/vertical-align\s*:\s*baseline/);
 	});
+	/** Base inline wrapper rule (not the body, raw, or chrome overrides). */
+	function inlineRule(): string {
+		const css = bodyStyle();
+		const rules = [
+			...css.matchAll(/([^{}]*\.ccez-math-inline[^{}]*)\{([^}]*)\}/g)
+		];
+		const base = rules.find(
+			(rule) =>
+				/\(\.ccez-math-inline\)$/.test(rule[1]!.trim()) &&
+				!/body|raw|tex|copy/.test(rule[1]!)
+		);
+		if (!base) throw new Error("no base .ccez-math-inline rule");
+		return base[2]!;
+	}
+	it("never wraps an inline equation onto a second line", () => {
+		expect(inlineRule()).toMatch(/white-space\s*:\s*nowrap/);
+	});
 });
 
 describe("badge hover hysteresis", () => {

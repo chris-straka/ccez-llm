@@ -302,6 +302,83 @@ test("math chrome follows the message-button scale opt-in", async ({
 	expect(after.width).toBeGreaterThan(before.width * 1.5);
 });
 
+/** Scaled top room: with the scale opt-in at 2x text, the grown `$` +
+copy pair must clear the raw source's first line. The body's fixed
+2.2rem headroom only fits the 1x pair, so the raw view's code started
+underneath the buttons. A narrow column matches the reporter's setup. */
+test("scaled raw view clears the chrome", async ({ browser }) => {
+	const scaled = await browser.newContext({
+		viewport: { width: 500, height: 800 }
+	});
+	const second = await scaled.newPage();
+	await seedChat(
+		second,
+		[
+			{ role: "user", content: "show me the levels" },
+			{
+				role: "assistant",
+				content:
+					"Levels:\n\n$$E_n = x$$\n\nSlope review: $m = \\frac{y_2 - y_1}{x_2 - x_1} + \\frac{y_2 - y_1}{x_2 - x_1}$ ok"
+			}
+		],
+		null,
+		{ scaleActionsWithFont: true, fontScale: 2 }
+	);
+	await second.goto("/");
+	const block = second.locator(".ccez-math").first();
+	await expect(block).toBeVisible({ timeout: 60_000 });
+	await block.locator(".ccez-math-tex").click();
+	await expect(block.locator(".ccez-math-raw")).toBeVisible();
+	const geom = await block.evaluate((el) => {
+		const btn = el.querySelector(".ccez-math-copy") as HTMLElement;
+		const raw = el.querySelector(".ccez-math-raw") as HTMLElement;
+		const b = btn.getBoundingClientRect();
+		const r = raw.getBoundingClientRect();
+		return {
+			btnBottom: b.bottom,
+			rawContentTop: r.top + parseFloat(getComputedStyle(raw).paddingTop)
+		};
+	});
+	await scaled.close();
+	expect(geom.rawContentTop).toBeGreaterThanOrEqual(geom.btnBottom - 1);
+});
+
+/** Inline math holds one line: a long run must never split after a
+relation onto a second line. Same narrow scaled setup as the raw-room
+test above, so wrap pressure is real if the wrapper ever allows it. */
+test("inline math holds one line", async ({ browser }) => {
+	const scaled = await browser.newContext({
+		viewport: { width: 500, height: 800 }
+	});
+	const second = await scaled.newPage();
+	await seedChat(
+		second,
+		[
+			{ role: "user", content: "show me the slope" },
+			{
+				role: "assistant",
+				content:
+					"Slope review: $m = \\frac{y_2 - y_1}{x_2 - x_1} + \\frac{y_2 - y_1}{x_2 - x_1}$ ok"
+			}
+		],
+		null,
+		{ scaleActionsWithFont: true, fontScale: 2 }
+	);
+	await second.goto("/");
+	const inline = second.locator(".ccez-math-inline").first();
+	await expect(inline).toBeVisible({ timeout: 60_000 });
+	expect(
+		await inline.evaluate((el) => getComputedStyle(el).whiteSpace)
+	).toBe("nowrap");
+	const box = await inline.boundingBox();
+	if (!box) throw new Error("inline math has no box");
+	const fs = await inline.evaluate((el) =>
+		parseFloat(getComputedStyle(el).fontSize)
+	);
+	await scaled.close();
+	expect(box.height).toBeLessThan(fs * 2.2);
+});
+
 /** Equation granularity decision: a partial pick inside one equation
 snaps to the whole equation (a glyph shard never re-matches, so the
 entry point expands the range before quoting). Stale-highlight and

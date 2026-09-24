@@ -1188,6 +1188,9 @@
 		border-radius: 6px;
 		padding: 0 0.3rem;
 		background: #fff;
+		/* One equation, one line: an inline run must never split
+		after a relation onto a second line. */
+		white-space: nowrap;
 	}
 	.rendered :global(.ccez-math-inline .ccez-math-body) {
 		padding: 0;
