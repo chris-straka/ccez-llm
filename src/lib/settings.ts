@@ -79,6 +79,10 @@ export interface AppSettings {
 	voice: boolean;
 	/** Microphone dictation buttons (prompt + annotation drafts). On unless toggled. */
 	micEnabled: boolean;
+	/** Screen-capture OCR: the global chord and the composer capture
+	button. On unless toggled — nothing fires until the user invokes
+	it, so this is a kill-switch, not a permission. */
+	captureEnabled: boolean;
 	voiceEngine: VoiceEngine;
 	/**
 	 * Explicit native voice (registry identifier from the voice picker);
@@ -353,6 +357,7 @@ export function defaultSettings(): AppSettings {
 		thinking: {},
 		voice: false,
 		micEnabled: true,
+		captureEnabled: true,
 		// Native first: this is a Mac-first app, and every runtime without
 		// system voices corrects itself back to web on the support probe.
 		voiceEngine: "native",
@@ -581,6 +586,8 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 			merged.inspectEnabled = true;
 		if (typeof merged.hideMessages !== "boolean") merged.hideMessages = false;
 		if (typeof merged.micEnabled !== "boolean") merged.micEnabled = true;
+		if (typeof merged.captureEnabled !== "boolean")
+			merged.captureEnabled = true;
 		if (typeof merged.hideButtons !== "boolean") merged.hideButtons = true;
 		if (typeof merged.foldOnSwipe !== "boolean") merged.foldOnSwipe = false;
 		if (typeof merged.autoSpeakSelection !== "boolean")

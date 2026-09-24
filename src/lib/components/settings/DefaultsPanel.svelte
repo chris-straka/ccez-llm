@@ -172,6 +172,10 @@
 			<input type="checkbox" bind:checked={settings.micEnabled} />
 			Enable microphone dictation
 		</label>
+		<label class="check">
+			<input type="checkbox" bind:checked={settings.captureEnabled} />
+			Enable screen-capture OCR (global shortcut + composer button)
+		</label>
 	{/if}
 	<VoicePanel {settings} {androidUI} />
 	<!-- Study-fonts and lesson-audio sections removed (lesson-audio

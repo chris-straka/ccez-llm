@@ -339,6 +339,18 @@ describe("settings", () => {
 		expect(loadSettings(memoryStore).micEnabled).toBe(true);
 	});
 
+	it("defaults capture OCR on and keeps an explicit off", () => {
+		expect(defaultSettings().captureEnabled).toBe(true);
+		const off = blankSettings();
+		off.captureEnabled = false;
+		saveSettings(off, memoryStore);
+		expect(loadSettings(memoryStore).captureEnabled).toBe(false);
+		const junk = blankSettings();
+		(junk as unknown as Record<string, unknown>).captureEnabled = "yes";
+		saveSettings(junk, memoryStore);
+		expect(loadSettings(memoryStore).captureEnabled).toBe(true);
+	});
+
 	it("migrates the shared thinking dial to per-provider native ids", () => {
 		const raw = blankSettings();
 		(raw as unknown as Record<string, unknown>)["thinkingLevel"] = "high";

@@ -3,6 +3,7 @@
 #[cfg(all(target_os = "macos", debug_assertions))]
 mod dev_icon;
 mod annotate;
+mod capture;
 mod coderun;
 #[cfg(desktop)]
 mod desktop;
@@ -258,6 +259,9 @@ pub fn run() {
             tts::tts_identify_lang,
             ocr::ocr_supported,
             ocr::ocr_recognize,
+            capture::capture_supported,
+            capture::list_windows,
+            capture::capture_window,
             dictate_start,
             dictate_stop,
             coderun::run_code,
