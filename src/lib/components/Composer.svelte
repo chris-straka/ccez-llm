@@ -925,9 +925,12 @@ stop, so both rules below stay suppressed. -->
 	}
 	/* Tool seating rides the DOM, not JS classes: .mic-btn renders
 	exactly when dictation is available and .ann-wrap exactly when
-	drafts exist, so :has() below is the single source of truth. */
+	drafts exist, so :has() below is the single source of truth.
+	The mic tier is the measured cluster (attach + mic + voice ≈
+	4.9rem in-page) plus ~1rem of breathing room — never more, or
+	single-line text wraps a word early with empty card beside it. */
 	.prompt:has(.mic-btn) :global(.ta-input) {
-		--tools-pad: 8.6rem;
+		--tools-pad: 6rem;
 	}
 	/* Tool seating for the dock's presence rides with the dock
 	(`ReviewDock.svelte`): :has() matches the dock in the DOM at

@@ -24,6 +24,16 @@ function pageSource(): string {
 	return readFileSync(new URL("../../routes/+page.svelte", import.meta.url), "utf8");
 }
 
+function reviewDockStyle(): string {
+	const source = readFileSync(
+		new URL("./ReviewDock.svelte", import.meta.url),
+		"utf8"
+	);
+	const match = source.match(/<style>([\s\S]*)<\/style>/);
+	if (!match) throw new Error("ReviewDock.svelte has no <style> block");
+	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
+}
+
 function pageStyle(): string {
 	const match = pageSource().match(/<style>([\s\S]*)<\/style>/);
 	if (!match) throw new Error("+page.svelte has no <style> block");
@@ -154,5 +164,38 @@ describe("composer contract", () => {
 		expect(page).not.toContain("staged={stagedForPrompt()}");
 		expect(page).not.toContain("function stageAnnotation");
 		expect(page).not.toContain("function closeStagedAnnotation");
+	});
+});
+
+describe("composer text reservation", () => {
+	it("sizes the mic tier to the measured icon cluster", () => {
+		const css = componentStyle();
+		// attach + mic + voice measure ~4.9rem in-page: the tier
+		// keeps ~1rem of breathing room, never ~3.7rem of dead
+		// space that wraps text a word early.
+		expect(css).toMatch(
+			/\.prompt:has\(\.mic-btn\) :global\(\.ta-input\)\s*\{[^}]*--tools-pad:\s*6rem/
+		);
+	});
+
+	it("keeps the mic-less base tier at its measured size", () => {
+		const css = componentStyle();
+		expect(css).toMatch(/--tools-pad:\s*4\.2rem/);
+	});
+
+	it("reserves room only for buttons that are actually present", () => {
+		const css = componentStyle();
+		const dock = reviewDockStyle();
+		// The mic tier rides the mic button's DOM presence: no mic,
+		// no reservation. The dock tiers ride the wrap's presence.
+		expect(css).toContain(".prompt:has(.mic-btn)");
+		expect(dock).toContain(":global(.prompt:has(.ann-wrap))");
+		expect(dock).toContain(":global(.prompt:has(.mic-btn):has(.ann-wrap))");
+	});
+
+	it("composes the jump trigger on top instead of restating tiers", () => {
+		const css = componentStyle();
+		expect(css).toMatch(/\.prompt:has\(\.wp-jump\)\s*\{[^}]*--tools-extra:\s*1\.8rem/);
+		expect(css).toContain("calc(var(--tools-pad) + var(--tools-extra))");
 	});
 });
