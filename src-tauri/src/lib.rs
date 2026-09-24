@@ -273,6 +273,7 @@ pub fn run() {
             turn::turn_stop,
             turn::turn_seen,
             turn::turn_dismiss,
+            turn::turn_drain_pending_chat,
             ondevice::ondevice_status,
             ondevice::ondevice_generate,
             ondevice::ondevice_open_aicore_page,
@@ -283,6 +284,9 @@ pub fn run() {
             // External-text bridge (Android PROCESS_TEXT / action-mode):
             // capture the handle before any intent can fire the native fns.
             annotate::remember(_app.handle());
+            // Notice-tap bridge (Android turn notice): same capture so
+            // taps emit live or park for the frontend drain.
+            turn::remember_open_chat(_app.handle());
             // Dev-only: shrink the oversized runtime Dock tile (see dev_icon).
             #[cfg(all(target_os = "macos", debug_assertions))]
             if let Some(window) = tauri::Manager::get_webview_window(_app.handle(), "main") {

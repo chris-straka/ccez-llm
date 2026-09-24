@@ -54,6 +54,7 @@ class MainActivity : TauriActivity() {
     }
     handleProcessText(intent)
     handleSend(intent)
+    handleOpenChat(intent)
   }
 
   /** Last dispatched IME height; -1 until the first dispatch lands. */
@@ -146,6 +147,9 @@ class MainActivity : TauriActivity() {
   companion object {
     /** Extra naming the tapped native menu entry for handleProcessText. */
     const val EXTERNAL_ACTION_EXTRA = "studio.ccez.app.EXTERNAL_ACTION"
+    /** Notice-tap action carrying [OPEN_CHAT_EXTRA] to open one chat. */
+    const val OPEN_CHAT_ACTION = "studio.ccez.app.OPEN_CHAT"
+    const val OPEN_CHAT_EXTRA = "studio.ccez.app.OPEN_CHAT_ID"
   }
 
   override fun onNewIntent(intent: Intent) {
@@ -154,9 +158,27 @@ class MainActivity : TauriActivity() {
     setIntent(intent)
     handleProcessText(intent)
     handleSend(intent)
+    handleOpenChat(intent)
   }
 
   private external fun nativeOnExternalText(text: String?, action: String?)
+
+  /**
+   * Turn-notice tap: open the claiming turn's chat (see TurnSvc).
+   * Rust parks it for the frontend drain when cold, or emits live.
+   * Never throws; the extra is consumed so a recreation never
+   * re-opens.
+   */
+  private fun handleOpenChat(intent: Intent?) {
+    if (intent?.action != OPEN_CHAT_ACTION) return
+    try {
+      nativeOnOpenChat(intent.getStringExtra(OPEN_CHAT_EXTRA))
+    } catch (_: Exception) {
+    }
+    intent.removeExtra(OPEN_CHAT_EXTRA)
+  }
+
+  private external fun nativeOnOpenChat(chatId: String?)
 
   // Foreground ground truth for the reply-ping veto (see turn.rs):
   // true between onResume and onPause. The window-focus query alone

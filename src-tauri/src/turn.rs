@@ -755,52 +755,6 @@ pub unsafe extern "C" fn Java_studio_ccez_app_MainActivity_nativeOnForeground(
     set_foreground(active != 0);
 }
 
-/// Notification plain text: strip the reply's markdown so the shade
-/// never shows `**bold**`, backticks, headings, quotes, or link
-/// targets. Display-only — the reply itself is untouched. Pure and
-/// unit-tested.
-fn notification_plain(head: &str) -> String {
-    let inline = head.replace(['*', '`', '~'], "");
-    let mut out = String::new();
-    for line in inline.lines() {
-        let t = line.trim_start();
-        let t = t.strip_prefix('#').map(str::trim_start).unwrap_or(t);
-        let t = t.strip_prefix('>').map(str::trim_start).unwrap_or(t);
-        out.push_str(&link_text(t));
-        out.push('\n');
-    }
-    out.replace('|', " ")
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
-}
-
-/// `[text](url)` (and `![alt](url)`) renders as its text in a ping.
-fn link_text(line: &str) -> String {
-    let mut out = String::new();
-    let mut rest = line;
-    while let Some(open) = rest.find('[') {
-        out.push_str(&rest[..open]);
-        let after = &rest[open + 1..];
-        match after.find("](") {
-            Some(close) => {
-                out.push_str(&after[..close]);
-                let target = &after[close + 2..];
-                rest = match target.find(')') {
-                    Some(end) => &target[end + 1..],
-                    None => "",
-                };
-            }
-            None => {
-                out.push_str(after);
-                rest = "";
-            }
-        }
-    }
-    out.push_str(rest);
-    out
-}
-
 /// Replies channel: the ping must buzz (the finished-while-away thump
 /// callers asked back), and on Android buzz means a channel with
 /// vibration — the default channel stays silent. Creating an existing
@@ -809,10 +763,10 @@ fn link_text(line: &str) -> String {
 #[cfg(target_os = "android")]
 const REPLY_CHANNEL_ID: &str = "replies";
 
-fn notify_ready(app: &AppHandle, head: &str) {
+/// The ping is title-only ("Reply ready"): no reply excerpt, no
+/// fallback sentence. Owner demand (Sep 2026).
+fn notify_ready(app: &AppHandle) {
     use tauri_plugin_notification::NotificationExt;
-    let stripped = notification_plain(&head.chars().take(280).collect::<String>());
-    let body: String = stripped.chars().take(140).collect();
     #[cfg(target_os = "android")]
     {
         use tauri_plugin_notification::Channel;
@@ -828,12 +782,7 @@ fn notify_ready(app: &AppHandle, head: &str) {
         .notification()
         .builder()
         .id(REPLY_NOTIFICATION_ID)
-        .title("Reply ready")
-        .body(if body.is_empty() {
-            "Your reply finished while you were away.".to_string()
-        } else {
-            body
-        });
+        .title("Reply ready");
     #[cfg(target_os = "android")]
     {
         ping = ping.channel_id(REPLY_CHANNEL_ID);
@@ -1017,7 +966,7 @@ async fn finish_turn(
             .and_then(|window| window.is_focused().ok())
             .unwrap_or(false),
     ) {
-        notify_ready(app, &content);
+        notify_ready(app);
     }
     let _ = error;
 }
@@ -1044,7 +993,7 @@ pub fn turn_start(app: AppHandle, req: TurnRequest) -> Result<String, String> {
             finished_at: now_secs(),
         },
     )?;
-    turn_service_claim();
+    turn_service_claim(&req.chat_id);
     let spawned = req.clone();
     tauri::async_runtime::spawn(async move {
         run_turn(app, spawned, default_page_fetch()).await;
@@ -1137,14 +1086,14 @@ pub fn turn_dismiss(app: AppHandle, turn_id: String) -> Result<bool, String> {
 /// last settle stops it. Without this a backgrounded app is killed
 /// mid-turn; killed turns auto-resume with dots on return instead.
 #[cfg(target_os = "android")]
-fn turn_service_claim() {
-    crate::turn_service::service_claim();
+fn turn_service_claim(chat_id: &str) {
+    crate::turn_service::service_claim(chat_id);
 }
 
 /// Non-Android builds keep no service: the turn still outlives page
 /// stalls wherever the process itself lives (desktop).
 #[cfg(not(target_os = "android"))]
-fn turn_service_claim() {}
+fn turn_service_claim(_chat_id: &str) {}
 
 #[cfg(target_os = "android")]
 fn turn_service_settle() {
@@ -1153,6 +1102,106 @@ fn turn_service_settle() {
 
 #[cfg(not(target_os = "android"))]
 fn turn_service_settle() {}
+
+/// Cap for an inbound notice-tap chat id (same flood rule as the
+/// desktop deep-link ids).
+const MAX_OPEN_CHAT_ID_CHARS: usize = 200;
+
+/// Window event carrying an [`OpenChatPayload`]: the notice tap
+/// reuses the desktop deep-link bus and payload shape, so the
+/// existing frontend listener handles it on every platform. Live
+/// only via the Android JNI entry below, so non-Android builds
+/// would warn as dead code without the allow.
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
+const OPEN_CHAT_EVENT: &str = "deep-link";
+
+/// Frontend payload for [`OPEN_CHAT_EVENT`]: open one chat.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OpenChatPayload {
+    action: String,
+    chat_id: Option<String>,
+}
+
+static OPEN_CHAT_APP: OnceLock<AppHandle> = OnceLock::new();
+static OPEN_CHAT_PENDING: OnceLock<Mutex<Option<OpenChatPayload>>> = OnceLock::new();
+
+fn open_chat_slot() -> &'static Mutex<Option<OpenChatPayload>> {
+    OPEN_CHAT_PENDING.get_or_init(|| Mutex::new(None))
+}
+
+fn lock_open_chat() -> std::sync::MutexGuard<'static, Option<OpenChatPayload>> {
+    open_chat_slot().lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// Capture the handle for notice-tap emits. Called once from
+/// `setup`, before any tap can reach the native fn.
+pub fn remember_open_chat(app: &AppHandle) {
+    let _ = OPEN_CHAT_APP.set(app.clone());
+}
+
+/// Notice-tap chat ids are app ids, not free text: trim, drop
+/// empties, and cap length. Live only via the Android JNI entry
+/// below (plus tests), so non-Android builds would warn as dead
+/// code without the allow.
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
+pub fn clean_open_chat_id(id: &str) -> Option<String> {
+    let trimmed = id.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    Some(trimmed.chars().take(MAX_OPEN_CHAT_ID_CHARS).collect())
+}
+
+/// Stash + emit an open-chat tap: live listeners get
+/// [`OPEN_CHAT_EVENT`], early arrivals wait in the drain slot.
+/// Same Android-only liveness as `clean_open_chat_id`.
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
+fn deliver_open_chat(app: &AppHandle, id: String) {
+    let payload = OpenChatPayload {
+        action: "open-chat".to_string(),
+        chat_id: Some(id),
+    };
+    *lock_open_chat() = Some(payload.clone());
+    let _ = app.emit(OPEN_CHAT_EVENT, payload);
+}
+
+/// Re-emit a parked notice-tap chat, if any. Invoked by the
+/// frontend after its deep-link listener is registered; takes
+/// (clears) so a tap is never delivered twice.
+#[tauri::command]
+pub fn turn_drain_pending_chat() -> Result<Option<OpenChatPayload>, String> {
+    Ok(lock_open_chat().take())
+}
+
+/// Turn-notice tap (content intent on the quiet notice): open the
+/// claiming turn's chat. Null/empty taps emit nothing.
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub unsafe extern "C" fn Java_studio_ccez_app_MainActivity_nativeOnOpenChat(
+    mut env: jni::JNIEnv,
+    _this: jni::objects::JObject,
+    chat_id: jni::objects::JObject,
+) {
+    let incoming: Option<String> = if chat_id.as_raw().is_null() {
+        None
+    } else {
+        env.get_string(&jni::objects::JString::from(chat_id))
+            .ok()
+            .map(|s| s.to_string_lossy().into_owned())
+            .and_then(|s| clean_open_chat_id(&s))
+    };
+    let Some(id) = incoming else { return };
+    match OPEN_CHAT_APP.get() {
+        Some(app) => deliver_open_chat(app, id),
+        // No handle yet (cold start): park it for the drain above.
+        None => {
+            *lock_open_chat() = Some(OpenChatPayload {
+                action: "open-chat".to_string(),
+                chat_id: Some(id),
+            });
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -1185,17 +1234,21 @@ mod tests {
     }
 
     #[test]
-    fn notification_plain_strips_markdown() {
-        assert_eq!(
-            notification_plain("**Bold** and `code` speak"),
-            "Bold and code speak"
-        );
-        assert_eq!(
-            notification_plain("# Head\n> quote [text](https://x.y/z) | cell"),
-            "Head quote text cell"
-        );
-        assert_eq!(notification_plain(""), "");
-        assert_eq!(notification_plain(" plain words "), "plain words");
+    fn open_chat_id_trims_and_keeps() {
+        assert_eq!(clean_open_chat_id("  abc123  "), Some("abc123".into()));
+    }
+
+    #[test]
+    fn open_chat_id_drops_empties() {
+        assert_eq!(clean_open_chat_id(""), None);
+        assert_eq!(clean_open_chat_id("   \n  "), None);
+    }
+
+    #[test]
+    fn open_chat_id_caps_length() {
+        let long = "x".repeat(500);
+        let out = clean_open_chat_id(&long).expect("non-empty");
+        assert_eq!(out.chars().count(), MAX_OPEN_CHAT_ID_CHARS);
     }
 
     #[test]

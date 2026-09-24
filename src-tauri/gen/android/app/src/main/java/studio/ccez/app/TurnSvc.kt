@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -59,9 +60,14 @@ object TurnSvc {
         }
     }
 
-    /** First live turn: start (or reaffirm) the foreground service. */
+    /** Chat the notice tap opens (latest claiming turn). Blank clears. */
+    private var openChatId: String? = null
+
+    /** First live turn: start (or reaffirm) the foreground service,
+    retargeting the notice tap at this turn's chat. */
     @JvmStatic
-    fun keeperStart() {
+    fun keeperStart(chatId: String) {
+        openChatId = chatId.ifBlank { null }
         try {
             val context = appContext
             val intent = Intent(context, TurnService::class.java)
@@ -146,7 +152,29 @@ class TurnService : Service() {
             .setSmallIcon(R.mipmap.ic_launcher)
             .setOngoing(true)
             .setShowWhen(false)
+            .setContentIntent(openChatTap())
         return builder.build()
+    }
+
+    /** Tap target: the claiming turn's chat, via MainActivity's
+    open-chat extra (handled in onCreate and onNewIntent). Null while
+    no turn named a chat — the tap then just opens the app. */
+    private fun openChatTap(): PendingIntent? {
+        val chatId = openChatId ?: return null
+        val tap = Intent(this, MainActivity::class.java)
+            .setAction(MainActivity.OPEN_CHAT_ACTION)
+            .putExtra(MainActivity.OPEN_CHAT_EXTRA, chatId)
+        return try {
+            PendingIntent.getActivity(
+                this,
+                OPEN_TAP_REQUEST,
+                tap,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        } catch (e: Exception) {
+            android.util.Log.e(TAG, "open-chat tap failed: ${e.message}")
+            null
+        }
     }
 
     private fun startForegroundTyped(notification: Notification) {
@@ -165,5 +193,6 @@ class TurnService : Service() {
         private const val CHANNEL_ID = "ccez-turns"
         private const val QUIET_CHANNEL_ID = "ccez-turns-quiet"
         private const val NOTIFICATION_ID = 41
+        private const val OPEN_TAP_REQUEST = 7
     }
 }

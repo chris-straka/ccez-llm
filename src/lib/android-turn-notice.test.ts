@@ -40,6 +40,27 @@ function onVisibleBody(): string {
 	return source.slice(start, end);
 }
 
+describe("android reply ping", () => {
+	it("stays title-only with no body text", () => {
+		const source = readFileSync(
+			new URL("../../src-tauri/src/turn.rs", import.meta.url),
+			"utf8"
+		);
+		expect(source).toContain('.title("Reply ready")');
+		expect(source).not.toContain("finished while you were away");
+	});
+});
+
+describe("android notice tap", () => {
+	it("retargets a content intent at the claiming turn's chat", () => {
+		const source = turnSvc();
+		expect(source).toContain("setContentIntent");
+		expect(source).toContain("OPEN_CHAT_ACTION");
+		expect(source).toContain("OPEN_CHAT_EXTRA");
+		expect(source).toContain("FLAG_IMMUTABLE");
+	});
+});
+
 describe("android service observability", () => {
 	it("logs every claim, post, and failure instead of swallowing", () => {
 		const source = turnSvc();

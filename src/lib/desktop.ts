@@ -197,6 +197,19 @@ export async function listenDeepLinks(
 		} catch {
 			// Live events still flow; the drain is best-effort.
 		}
+		try {
+			// Android turn-notice taps park under the same payload
+			// shape; the desktop drain above throws off-shell, so a
+			// parked tap waits here instead. Same take-once contract.
+			const parked = await invoke<{
+				action: string;
+				chat_id?: string | null;
+			} | null>("turn_drain_pending_chat");
+			const tap = parked ? payloadToLink(parked) : null;
+			if (tap) callback(tap);
+		} catch {
+			// Desktop shells own no turn drain; nothing parked to lose.
+		}
 		return stop;
 	} catch {
 		return null;

@@ -23,7 +23,7 @@ use std::sync::{Mutex, OnceLock};
 
 use jni::{
     JNIEnv,
-    objects::{GlobalRef, JClass, JObject},
+    objects::{GlobalRef, JClass, JObject, JValue},
 };
 
 static VM: OnceLock<jni::JavaVM> = OnceLock::new();
@@ -87,21 +87,28 @@ pub unsafe extern "C" fn Java_studio_ccez_app_TurnSvc_nativeInit(
     }
 }
 
-/// First live turn starts the service; later ones only bump the count.
-pub fn service_claim() {
-    let start = match live_count().lock() {
+/// Every claim (re)starts the service with this turn's chat: the
+/// first starts it, later concurrent ones reaffirm through
+/// onStartCommand and retarget the notice tap at the latest turn.
+pub fn service_claim(chat_id: &str) {
+    match live_count().lock() {
         Ok(mut count) => {
             *count += 1;
-            *count == 1
         }
-        Err(_) => false,
-    };
-    if !start {
-        return;
+        Err(_) => return,
     }
     if let Err(error) = with_env("service_claim", |env, cls| {
-        env.call_static_method(cls, "keeperStart", "()V", &[])
-            .map_err(|e| format!("keeperStart() failed: {e:?}"))?;
+        let id: JObject = env
+            .new_string(chat_id)
+            .map_err(|e| format!("keeperStart() string failed: {e:?}"))?
+            .into();
+        env.call_static_method(
+            cls,
+            "keeperStart",
+            "(Ljava/lang/String;)V",
+            &[JValue::from(&id)],
+        )
+        .map_err(|e| format!("keeperStart() failed: {e:?}"))?;
         Ok(())
     }) {
         // The turn still runs without the claim; log-shaped error that
