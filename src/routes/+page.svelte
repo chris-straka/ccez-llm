@@ -1330,18 +1330,11 @@
 		// Native turns reconcile here too — files finished while
 		// suspended render now, dead ones mark interrupted.
 		const onVisible = (): void => {
-			if (document.visibilityState !== "visible") {
-				// Leaving with a live native turn: one quiet tick that
-				// the reply keeps working — the shade notice itself is
-				// silent by design. Honors the haptics toggle.
-				if (nativeTurns.size > 0) {
-					void hapticBeatAsync("tap", {
-						enabled: settings.hapticsEnabled,
-						shell: tauriBackendAvailable()
-					});
-				}
-				return;
-			}
+			// Leaving is silent by design: the shade notice already
+			// says the reply keeps working, and the ready ping owns
+			// the background — no haptic here, the service claim
+			// needs none.
+			if (document.visibilityState !== "visible") return;
 			clearStudyBadge();
 			void dismissReplyNotificationAsync({
 				shell: tauriBackendAvailable()
