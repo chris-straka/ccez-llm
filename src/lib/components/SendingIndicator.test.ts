@@ -39,10 +39,14 @@ describe("sending indicator contract", () => {
 	it("computes the phase from live send/fetch state in the page", () => {
 		const page = pageSource();
 		expect(page).toContain("<ThreadView");
-		expect(page).toContain('? "fetch"');
-		expect(page).toContain('? "waiting"');
+		// Phase priority (fetch first, then waiting, else nothing)
+		// lives in the unit-tested replyPhase helper; the page only
+		// feeds it live facts, including the token stamp that brings
+		// Thinking back after stalls between tool rounds.
+		expect(page).toContain("sendingPhase={replyPhase({");
 		expect(page).toContain("hasFetchActive(chatState, viewChat.id)");
 		expect(page).toContain("hasReplyStarted(chatState, viewChat.id)");
+		expect(page).toContain("lastTokenAt.get(viewChat.id)");
 		expect(page).toContain("waitingLabel={thinkingLabelFor(");
 		const thread = threadSource();
 		expect(thread).toContain("<SendingIndicator");
