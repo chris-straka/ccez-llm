@@ -31,6 +31,7 @@ import {
 	sendMessage,
 	setPasteFold,
 	resolveSendCompletion,
+	landingSignal,
 	apiContent,
 	buildApiMessages,
 	isSending,
@@ -1045,6 +1046,28 @@ describe("resolveSendCompletion", () => {
 		const gone = resolveSendCompletion(state, first.id, second.id);
 		expect(gone.sent).toBeUndefined();
 		expect(gone.stillHere).toBe(false);
+	});
+});
+
+describe("landingSignal", () => {
+	it("thumps the open chat while foreground", () => {
+		expect(landingSignal(true, true, true)).toBe("done");
+	});
+
+	it("ticks another chat's reply on phones while foreground", () => {
+		expect(landingSignal(false, true, true)).toBe("tick");
+	});
+
+	it("stays silent for another chat's reply on desktop", () => {
+		expect(landingSignal(false, true, false)).toBe("silent");
+	});
+
+	it("stays silent while backgrounded even on the open chat", () => {
+		expect(landingSignal(true, false, true)).toBe("silent");
+	});
+
+	it("stays silent while backgrounded on another chat", () => {
+		expect(landingSignal(false, false, true)).toBe("silent");
 	});
 });
 

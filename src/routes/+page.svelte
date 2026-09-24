@@ -40,6 +40,7 @@
 		beginNativeResend,
 		settleNativeSend,
 		resolveSendCompletion,
+		landingSignal,
 		type PasteFold,
 		type Chat,
 		type ChatMsg,
@@ -7238,11 +7239,16 @@
 			chat.id
 		);
 		if (sent?.role === "assistant" && !sent.error) {
-			// Same-chat only: the new chat must not thump for the old
-			// one's reply (a genuinely missed finish is the background
-			// ping's job).
-			if (stillHere) buzzBeat("done");
-			else if (androidUI) {
+			// Foreground only: backgrounded, the reply-ready ping owns
+			// the moment — any haptic here would buzz behind the user's
+			// back and double the ping.
+			const signal = landingSignal(
+				stillHere,
+				document.visibilityState === "visible",
+				androidUI
+			);
+			if (signal === "done") buzzBeat("done");
+			else if (signal === "tick") {
 				// Other-chat landing on phones: tick plus a tappable
 				// toast — a reply must not finish silently in a thread
 				// the user left. Tapping opens the origin chat.

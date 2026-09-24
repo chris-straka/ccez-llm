@@ -897,6 +897,24 @@ export function resolveSendCompletion(
 	};
 }
 
+/**
+ * Landing signal for a finished reply: the open chat thumps (done),
+ * another chat's reply on phones ticks plus a tappable toast, and a
+ * backgrounded app stays silent — the reply-ready ping owns that
+ * moment, so any haptic here would buzz behind the user's back and
+ * double the ping. Callers pass
+ * `document.visibilityState === "visible"`. Pure.
+ */
+export function landingSignal(
+	stillHere: boolean,
+	visible: boolean,
+	androidUI: boolean
+): "done" | "tick" | "silent" {
+	if (!visible) return "silent";
+	if (stillHere) return "done";
+	return androidUI ? "tick" : "silent";
+}
+
 /** Persisted shape owner (chats array only — runtime flags never touch disk). */
 export function persistChats(state: ChatState, store?: KeyValueStore): void {
 	try {
