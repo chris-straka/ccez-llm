@@ -1278,7 +1278,7 @@ describe("selMenuDragTarget", () => {
 
 describe("annEditCommitToast", () => {
 	it("names filings vs rewrites", () => {
-		expect(annEditCommitToast(true)).toBe("Annotation saved");
+		expect(annEditCommitToast(true)).toBe("Annotation sent");
 		expect(annEditCommitToast(false)).toBe("Annotation edited");
 	});
 });

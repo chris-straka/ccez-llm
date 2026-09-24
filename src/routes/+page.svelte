@@ -2091,8 +2091,12 @@
 	copying. The generation pins the lifetime — an expired toast
 	never fires a stale action. */
 	let toastAction = $state<{ seq: number; run: () => void } | null>(null);
-	function flashToast(message: string, action?: () => void): void {
-		flashNotice(notices, "toast", message, toastTimeoutFor(message));
+	function flashToast(
+		message: string,
+		action?: () => void,
+		timeoutMs = toastTimeoutFor(message)
+	): void {
+		flashNotice(notices, "toast", message, timeoutMs);
 		toastAction = action ? { seq: notices.toast.seq, run: action } : null;
 	}
 	function dismissToast(): void {
@@ -5801,7 +5805,8 @@
 		pendingAnn = null;
 		highlightAnnId = null;
 		exitPromptAnnEdit();
-		flashToast(annEditCommitToast(true));
+		// Brisk confirmation tick, not the standard read-timed hold.
+		flashToast(annEditCommitToast(true), undefined, 1500);
 		void tick().then(() => editor?.focus());
 		if (id) {
 			const ann = annotations.find((a) => a.id === id);

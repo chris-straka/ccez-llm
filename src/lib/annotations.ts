@@ -3303,5 +3303,5 @@ export function selMenuDragTarget(
  * save for the first time, a saved note's comment rewrites.
  */
 export function annEditCommitToast(pending: boolean): string {
-	return pending ? "Annotation saved" : "Annotation edited";
+	return pending ? "Annotation sent" : "Annotation edited";
 }
