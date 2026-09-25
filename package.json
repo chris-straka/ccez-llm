@@ -1,6 +1,6 @@
 {
 	"name": "ccez-llm",
-	"version": "0.6.9",
+	"version": "0.6.10",
 	"description": "macOS desktop chatbot (Tauri + Svelte 5) — BYOK chat with language-learner aids",
 	"type": "module",
 	"scripts": {
