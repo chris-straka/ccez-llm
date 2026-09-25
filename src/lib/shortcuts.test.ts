@@ -44,6 +44,7 @@ const MAC_NAMES = [
 	"Scroll",
 	"Search chats",
 	"Select sentence / paragraph",
+	"Set capture area",
 	"Shortcuts show/hide",
 	"Speak message",
 	"Speak paragraph",
@@ -84,6 +85,9 @@ describe("shortcuts menu copy", () => {
 		expect(rows.find((r) => r.name === "Capture window text")?.keys).toBe(
 			"⇧⌘O"
 		);
+		expect(rows.find((r) => r.name === "Set capture area")?.keys).toBe(
+			"⇧⌘U"
+		);
 	});
 
 	it("drops browser-dead rows on the web, still A-Z", () => {
@@ -96,7 +100,8 @@ describe("shortcuts menu copy", () => {
 			"Prompt text size up / down",
 			"Prompt width + / −",
 			"New chat",
-			"Capture window text"
+			"Capture window text",
+			"Set capture area"
 		];
 		for (const isMac of [true, false]) {
 			const names = desktopShortcuts(isMac, false).map((r) => r.name);

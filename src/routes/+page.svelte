@@ -576,7 +576,10 @@
 	import {
 		listenDeepLinks,
 		listenGameCapture,
+		openAreaPicker,
+		listenAreaPicked,
 		isSummonHotkey,
+		type AreaPick,
 		studySheetMarkdown,
 		sheetTitle,
 		shareStudySheet,
@@ -10824,6 +10827,19 @@
 				void runCaptureFlow();
 				return;
 			}
+			if (chord === "set-capture-area") {
+				// Set-area overlay from anywhere: the opener gates on
+				// the settings checkbox and toasts where no backend
+				// answers (browser preview).
+				consumeEvent(event);
+				void (async () => {
+					if (!settings.captureEnabled) return;
+					const opened = await openAreaPicker();
+					if (!opened)
+						flashErrorToast("Area picking needs the desktop app.");
+				})();
+				return;
+			}
 			const delScope = deleteChatScope({
 				...keyFacts(event),
 				inEditor: inEditor !== null,
@@ -12855,6 +12871,27 @@
 			void runCaptureFlow();
 		}).then((stop) => {
 			unlistenCapture = stop;
+		});
+		// Area-picker reports (the ⇧⌘U overlay): saves persist the
+		// square the capture chord reuses, clears drop it, Esc
+		// cancels silently with no event at all.
+		void listenAreaPicked((pick: AreaPick) => {
+			if (pick.clear) {
+				settings.captureArea = null;
+				saveSettingsNow();
+				flashToast("Capture area cleared.");
+				return;
+			}
+			if (pick.rect) {
+				settings.captureArea = {
+					x: Math.round(pick.rect.x),
+					y: Math.round(pick.rect.y),
+					width: Math.round(pick.rect.width),
+					height: Math.round(pick.rect.height)
+				};
+				saveSettingsNow();
+				flashToast("Capture area saved.");
+			}
 		});
 		// Soft-keyboard transitions resize the visual viewport without
 		// ever touching the document, and old phone WebViews time

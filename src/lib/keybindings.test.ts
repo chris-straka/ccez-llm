@@ -728,6 +728,23 @@ describe("commandChord", () => {
 				code: "KeyO"
 			})
 		).toBe(null);
+		expect(
+			commandChord({
+				...chordBase,
+				metaKey: true,
+				shiftKey: true,
+				code: "KeyU"
+			})
+		).toBe("set-capture-area");
+		expect(
+			commandChord({
+				...chordBase,
+				metaKey: true,
+				shiftKey: true,
+				altKey: true,
+				code: "KeyU"
+			})
+		).toBe(null);
 		expect(commandChord({ ...chordBase, metaKey: true, key: "Enter" })).toBe(
 			"send"
 		);

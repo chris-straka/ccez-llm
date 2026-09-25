@@ -130,6 +130,62 @@ pub fn rect_flag(x: u32, y: u32, width: u32, height: u32) -> String {
     format!("-R{x},{y},{width},{height}")
 }
 
+/// Saved square from the area picker, device pixels in global
+/// display space (the overlay multiplies by its display scale).
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+pub struct AreaRect {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+/// Area-picker result: a square to save, or a clear of the saved
+/// one. Both/neither empty is a silent cancel.
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+pub struct AreaPick {
+    pub rect: Option<AreaRect>,
+    pub clear: bool,
+}
+
+/// Open the set-area overlay: a transparent maximized always-on-top
+/// window over the active Space (no fullscreen Space of its own, so
+/// the game stays put). Reuses the live picker when one is already
+/// open. The overlay reports back through `submit_area_rect`.
+#[tauri::command]
+pub fn open_area_picker(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
+    if let Some(picker) = app.get_webview_window("area-pick") {
+        let _ = picker.set_focus();
+        return Ok(());
+    }
+    WebviewWindowBuilder::new(&app, "area-pick", WebviewUrl::App("/area-pick".into()))
+        .transparent(true)
+        .decorations(false)
+        .maximized(true)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .focused(true)
+        .build()
+        .map(|_| ())
+        .map_err(|_| "the area picker could not open".to_string())
+}
+
+/// Area-picker report: closes the overlay, then forwards saves and
+/// clears to the main window (`area-picked`). A silent cancel
+/// (Esc: neither set) closes only.
+#[tauri::command]
+pub fn submit_area_rect(app: tauri::AppHandle, pick: AreaPick) -> Result<(), String> {
+    use tauri::{Emitter, Manager};
+    if let Some(picker) = app.get_webview_window("area-pick") {
+        let _ = picker.close();
+    }
+    if pick.clear || pick.rect.is_some() {
+        let _ = app.emit_to("main", "area-picked", &pick);
+    }
+    Ok(())
+}
+
 /// Capture a screen rect (device pixels, global display space) as
 /// base64 PNG. The area picker saves its square in these units and
 /// the chord reuses it; empty rects report instead of screenshotting.

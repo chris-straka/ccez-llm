@@ -79,7 +79,8 @@ const WEB_HIDDEN_ROWS = new Set([
 	"Prompt width + / −",
 	"New chat",
 	// No backend answers in the preview: the chord fires, then toasts.
-	"Capture window text"
+	"Capture window text",
+	"Set capture area"
 ]);
 
 export function desktopShortcuts(isMac: boolean, inShell = true): ShortcutRow[] {
@@ -134,6 +135,10 @@ export function desktopShortcuts(isMac: boolean, inShell = true): ShortcutRow[] 
 		{
 			name: "Capture window text",
 			keys: `${isMac ? "⇧⌘O" : "Ctrl+Shift+O"}`
+		},
+		{
+			name: "Set capture area",
+			keys: `${isMac ? "⇧⌘U" : "Ctrl+Shift+U"}`
 		},
 		{ name: "Pasted text expand/collapse", keys: "Ctrl+O" },
 		{ name: "Stop voice / close", keys: "Esc" },

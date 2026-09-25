@@ -477,7 +477,8 @@ export type CommandChord =
 	| "thinking-prev"
 	| "new-chat"
 	| "toggle-voice"
-	| "capture-window";
+	| "capture-window"
+	| "set-capture-area";
 
 /**
  * Modifier-chord table in handler dispatch order: each condition is the
@@ -517,6 +518,11 @@ export function commandChord(facts: CommandChordFacts): CommandChord | null {
 	// the flow toasts where no backend answers.
 	if (cmd && facts.shiftKey && !facts.altKey && facts.code === "KeyO")
 		return "capture-window";
+	// Set-area overlay (mirrors the OS-global ⇧⌘/Ctrl+U chord in
+	// desktop.rs): saves the square the capture chord reuses. Same
+	// every-runtime contract — the opener toasts with no backend.
+	if (cmd && facts.shiftKey && !facts.altKey && facts.code === "KeyU")
+		return "set-capture-area";
 	if (facts.ctrlKey && (facts.key === "o" || facts.key === "O"))
 		return "toggle-pastes";
 	if (cmd && !facts.altKey && !facts.shiftKey && facts.key === "Enter")

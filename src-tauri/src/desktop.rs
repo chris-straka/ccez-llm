@@ -548,6 +548,7 @@ pub fn wire(app: &AppHandle) -> tauri::Result<()> {
     build_tray(app)?;
     install_summon_hotkey(app);
     install_capture_hotkey(app);
+    install_area_hotkey(app);
     handle_startup_args(app);
     Ok(())
 }
@@ -723,6 +724,26 @@ fn install_capture_hotkey(app: &AppHandle) {
         },
     ) {
         eprintln!("[desktop] global capture shortcut unavailable: {error}");
+    }
+}
+
+/// Set-area chord: opens the overlay that saves the square the
+/// capture chord reuses. The overlay opens over the active Space and
+/// our window stays down — the game never loses focus to a Space
+/// slide. UNVERIFIED ON DEVICE, same contract as the capture chord.
+#[cfg(desktop)]
+fn install_area_hotkey(app: &AppHandle) {
+    use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+    if let Err(error) = app.global_shortcut().on_shortcut(
+        "CommandOrControl+Shift+U",
+        move |app, _shortcut, event| {
+            if event.state != ShortcutState::Pressed {
+                return;
+            }
+            let _ = crate::capture::open_area_picker(app.clone());
+        },
+    ) {
+        eprintln!("[desktop] global area shortcut unavailable: {error}");
     }
 }
 

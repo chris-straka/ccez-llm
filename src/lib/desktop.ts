@@ -233,6 +233,44 @@ export async function listenGameCapture(
 	}
 }
 
+/** Area-picker report from the overlay (`submit_area_rect`). */
+export interface AreaPick {
+	rect: { x: number; y: number; width: number; height: number } | null;
+	clear: boolean;
+}
+
+/**
+ * Open the set-area overlay (the ⇧⌘U chord). True when the backend
+ * accepted; false outside the shell, where the caller toasts.
+ */
+export async function openAreaPicker(): Promise<boolean> {
+	if (!tauriBackendAvailable()) return false;
+	try {
+		await invoke("open_area_picker");
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Area-picker listener: the overlay reports saves and clears through
+ * `area-picked` (Esc cancels silently, no event). Null outside the
+ * shell.
+ */
+export async function listenAreaPicked(
+	callback: (pick: AreaPick) => void
+): Promise<UnlistenFn | null> {
+	if (!tauriBackendAvailable()) return null;
+	try {
+		return await listen<AreaPick>("area-picked", (event) =>
+			callback(event.payload)
+		);
+	} catch {
+		return null;
+	}
+}
+
 function payloadToLink(payload: {
 	action: string;
 	chat_id?: string | null;
