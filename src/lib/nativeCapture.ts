@@ -114,7 +114,8 @@ export async function captureWindow(
 }
 
 /**
- * Capture a saved square (device pixels, global display space) as
+ * Capture a saved square (screen points, global display space —
+ * `screencapture -R` takes points, never device pixels) as
  * base64 PNG. Rejects with a raw bridge message the caller maps
  * through `friendlyCaptureError`.
  */

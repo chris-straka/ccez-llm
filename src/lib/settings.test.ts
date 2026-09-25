@@ -424,6 +424,36 @@ describe("settings", () => {
 		expect(loadSettings(memoryStore).captureArea).toBe(null);
 	});
 
+	it("drops a pre-v2 capture square once (device pixels, wrong region)", () => {
+		const stale = blankSettings();
+		(stale as unknown as Record<string, unknown>).version = 1;
+		(stale as unknown as Record<string, unknown>).captureArea = {
+			x: 20,
+			y: 40,
+			width: 200,
+			height: 80
+		};
+		saveSettings(stale, memoryStore);
+		const healed = loadSettings(memoryStore);
+		expect(healed.captureArea).toBe(null);
+		expect(healed.version).toBe(2);
+		// A v2 save keeps its square: the drop runs once.
+		const fresh = blankSettings();
+		(fresh as unknown as Record<string, unknown>).captureArea = {
+			x: 10,
+			y: 20,
+			width: 100,
+			height: 40
+		};
+		saveSettings(fresh, memoryStore);
+		expect(loadSettings(memoryStore).captureArea).toEqual({
+			x: 10,
+			y: 20,
+			width: 100,
+			height: 40
+		});
+	});
+
 	it("migrates the shared thinking dial to per-provider native ids", () => {
 		const raw = blankSettings();
 		(raw as unknown as Record<string, unknown>)["thinkingLevel"] = "high";

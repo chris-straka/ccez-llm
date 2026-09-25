@@ -4394,8 +4394,8 @@
 	}
 	/** Set-area overlay (global ⇧⌘U or the in-app chord): opens the
 	 * plain transparent overlay on the desktop Space — no photo,
-	 * no capture flash, no focus yank. The square is display-global
-	 * device pixels with no window affinity, so drawing it on the
+	 * no capture flash, no focus yank. The square is global screen
+	 * points with no window affinity, so drawing it on the
 	 * desktop is enough wherever the game shares the resolution; a
 	 * mismatch toasts truthfully instead of blaming permissions.
 	 * The settings checkbox gates both chords.

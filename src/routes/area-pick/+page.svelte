@@ -1,38 +1,28 @@
 <!-- Set-area overlay (the ⇧⌘U chord): a transparent maximized window
 on the desktop Space — no overlay fights the game, the square is
-display-global device pixels with no window affinity. Drag to save
-the square the capture chord reuses (device pixels, display scale
-applied); press-release without moving takes the whole display; Esc
-cancels silently. Clear drops a saved square. Outside the shell the
-submit fails and a note renders instead — same three-runtime degrade
-as every backend call. -->
+global screen points with no window affinity. Drag to save
+the square the capture chord reuses (points: `screencapture -R`
+takes points, never device pixels); press-release without moving
+takes the whole display; Esc cancels silently. Clear drops a saved
+square. Outside the shell the submit fails and a note renders
+instead — same three-runtime degrade as every backend call. -->
 <script lang="ts">
 	import { invoke } from "@tauri-apps/api/core";
-
-	interface DeviceRect {
-		x: number;
-		y: number;
-		width: number;
-		height: number;
-	}
+	import {
+		dragRect,
+		isClickPick,
+		toGlobalRect,
+		type AreaRect
+	} from "$lib/areaPick";
 
 	let start = $state<{ x: number; y: number } | null>(null);
 	let current = $state<{ x: number; y: number } | null>(null);
 	let failed = $state(false);
 
-	const selecting = $derived(
-		start !== null && current !== null
-			? {
-					x: Math.min(start.x, current.x),
-					y: Math.min(start.y, current.y),
-					width: Math.abs(current.x - start.x),
-					height: Math.abs(current.y - start.y)
-				}
-			: null
-	);
+	const selecting = $derived(dragRect(start, current));
 
 	async function submit(pick: {
-		rect: DeviceRect | null;
+		rect: AreaRect | null;
 		clear: boolean;
 	}): Promise<void> {
 		try {
@@ -42,21 +32,12 @@ as every backend call. -->
 		}
 	}
 
-	function toDevice(rect: {
-		x: number;
-		y: number;
-		width: number;
-		height: number;
-	}): DeviceRect {
-		// Live overlay measures nothing: the display scale alone
-		// maps the drag, so no settling window can skew it.
-		const scale = window.devicePixelRatio || 1;
-		return {
-			x: Math.round(rect.x * scale),
-			y: Math.round(rect.y * scale),
-			width: Math.round(rect.width * scale),
-			height: Math.round(rect.height * scale)
-		};
+	function windowOrigin(): { x: number; y: number } {
+		// The maximized overlay's viewport starts at its window
+		// origin (below the menu bar on the main display, at the
+		// display origin elsewhere): adding it maps the drag to
+		// global points with no measuring and no scale multiply.
+		return { x: window.screenX, y: window.screenY };
 	}
 
 	function onPointerDown(event: PointerEvent): void {
@@ -78,20 +59,17 @@ as every backend call. -->
 		current = null;
 		if (!done) return;
 		// Press-release without moving takes the whole display.
-		if (done.width < 5 && done.height < 5) {
-			const scale = window.devicePixelRatio || 1;
+		if (isClickPick(done)) {
 			void submit({
-				rect: {
-					x: 0,
-					y: 0,
-					width: Math.round(window.innerWidth * scale),
-					height: Math.round(window.innerHeight * scale)
-				},
+				rect: toGlobalRect(
+					{ x: 0, y: 0, width: window.innerWidth, height: window.innerHeight },
+					windowOrigin()
+				),
 				clear: false
 			});
 			return;
 		}
-		void submit({ rect: toDevice(done), clear: false });
+		void submit({ rect: toGlobalRect(done, windowOrigin()), clear: false });
 	}
 
 	function onKeyDown(event: KeyboardEvent): void {

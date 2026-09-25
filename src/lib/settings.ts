@@ -66,7 +66,7 @@ export interface ProviderSettings {
 }
 
 export interface AppSettings {
-	version: 1;
+	version: 2;
 	activeProviderId: ProviderId;
 	providers: Record<string, ProviderSettings>;
 	/** User-added provider defs (Cline-style); settings live in `providers`. */
@@ -88,8 +88,9 @@ export interface AppSettings {
 	pick; a stale id falls back frontmost in the backend. */
 	captureSourceId: number | null;
 	captureFullscreen: boolean;
-	/** Saved capture square in device pixels, global display space
-	(the set-area chord): null = no square, the chord screenshots
+	/** Saved capture square in screen points, global display space
+	(the set-area chord: `screencapture -R` takes points, never
+	device pixels): null = no square, the chord screenshots
 	the saved/frontmost window instead. */
 	captureArea: { x: number; y: number; width: number; height: number } | null;
 	voiceEngine: VoiceEngine;
@@ -387,7 +388,7 @@ export function systemLocale(): string {
 export function defaultSettings(): AppSettings {
 	const providers = envProviderDefaults(devEnv());
 	return {
-		version: 1,
+		version: 2,
 		activeProviderId: builtin("muse"),
 		providers,
 		customProviders: [],
@@ -500,9 +501,16 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 		const merged: AppSettings = {
 			...fresh,
 			...parsed,
-			version: 1,
+			version: 2,
 			providers: { ...fresh.providers, ...(parsed.providers ?? {}) }
 		};
+		// Squares saved before v2 were scaled by the display scale
+		// (device pixels); `screencapture -R` takes points, so those
+		// squares capture a 4x region shifted down-right — drop them
+		// once and the chord falls back to window capture until the
+		// square is drawn again.
+		if ((parsed as { version?: unknown }).version !== 2)
+			merged.captureArea = null;
 		// Drop the removed translate-target setting from older saves,
 		// the retired iOS native-bubble toggle the same way (Apple's
 		// callout now always stays, with Annotate above it), and the

@@ -124,8 +124,9 @@ pub fn capture_interactive(
     }
 }
 
-/// `screencapture -R` flag for a rect in device pixels (global
-/// display space). Pure (unit-tested).
+/// `screencapture -R` flag for a rect in screen points (global
+/// display space — the CLI takes points, never device pixels).
+/// Pure (unit-tested).
 pub fn rect_flag(x: u32, y: u32, width: u32, height: u32) -> String {
     format!("-R{x},{y},{width},{height}")
 }
@@ -148,8 +149,9 @@ pub fn capture_failure_message(stderr: &str) -> String {
         .to_string()
 }
 
-/// Saved square from the area picker, device pixels in global
-/// display space (the overlay multiplies by its display scale).
+/// Saved square from the area picker, screen points in global
+/// display space (the overlay adds its window origin; no scale
+/// multiply — `screencapture -R` takes points).
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub struct AreaRect {
     pub x: f64,
@@ -168,7 +170,7 @@ pub struct AreaPick {
 
 /// Open the set-area overlay: a transparent maximized always-on-top
 /// window on the desktop Space. No overlay fights the game — the
-/// square is display-global device pixels with no window affinity,
+/// square is global screen points with no window affinity,
 /// so drawing it on the desktop is enough (see the `area-pick`
 /// route). Reuses the live picker when one is already open. The
 /// overlay reports back through `submit_area_rect`.
@@ -235,7 +237,7 @@ pub fn submit_area_rect(app: tauri::AppHandle, pick: AreaPick) -> Result<(), Str
     Ok(())
 }
 
-/// Capture a screen rect (device pixels, global display space) as
+/// Capture a screen rect (points, global display space) as
 /// base64 PNG. The area picker saves its square in these units and
 /// the chord reuses it; empty rects report instead of screenshotting.
 #[tauri::command]
