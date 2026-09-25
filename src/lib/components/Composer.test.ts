@@ -53,6 +53,17 @@ describe("composer contract", () => {
 		expect(source).toContain('class="capture-btn"');
 		expect(source).toContain('class="capture-menu"');
 		expect(source).toContain("CaptureMenuState");
+		// Three static actions, no window list: the OS picker runs
+		// after the pick.
+		expect(source).toContain('captureAction({ kind: "fullscreen" })');
+		expect(source).toContain(
+			'captureAction({ kind: "interactive", mode: "window" })'
+		);
+		expect(source).toContain(
+			'captureAction({ kind: "interactive", mode: "area" })'
+		);
+		expect(source).not.toContain("menuitemradio");
+		expect(source).not.toContain("capturePick");
 		expect(source).toContain('class="wp-jump"');
 		expect(source).toContain('class="error-banner"');
 		expect(source).toContain('class="hidden-input"');

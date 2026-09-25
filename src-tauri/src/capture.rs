@@ -37,6 +37,26 @@ pub struct WindowInfo {
     pub title: String,
 }
 
+/// Interactive capture mode: the OS picker instead of our window
+/// list. `Window` is the native hover-tint window choice (camera
+/// cursor, click captures, Esc cancels); `Area` is the crosshair
+/// area drag. Deserializes from the frontend's lowercase kind.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum InteractiveKind {
+    Window,
+    Area,
+}
+
+/// `screencapture -i` mode flag per kind. Pure (unit-tested beside
+/// [`choose_source`]).
+pub fn interactive_flag(kind: InteractiveKind) -> &'static str {
+    match kind {
+        InteractiveKind::Window => "-w",
+        InteractiveKind::Area => "-s",
+    }
+}
+
 /// Pick the window to capture: an explicit or saved id wins when it is
 /// still on screen, otherwise the frontmost entry (the list order).
 /// Nothing on screen resolves to nothing — the caller reports that,
@@ -78,6 +98,32 @@ pub fn list_windows() -> Result<Vec<WindowInfo>, String> {
 /// the menu pick; when it is missing the saved pick in
 /// `saved_window_id` wins if still on screen, else the frontmost
 /// non-app window. `fullscreen` ignores both ids (`screencapture -m`).
+/// Interactive capture (`screencapture -i`): the OS runs its native
+/// picker — hover-tint window choice or crosshair area drag — so the
+/// composer offers three static actions and no window list. Our
+/// window hides first while it is focused (the button path fires
+/// with us frontmost; without the hide we would capture ourselves),
+/// restoring right after; an unfocused start (the chord path never
+/// lands here) leaves focus alone. Esc/right-click writes no file:
+/// that resolves to `Ok(None)` — a silent cancel, never an error
+/// toast. A failed launch or a denial (stderr names Screen
+/// Recording) reports instead.
+#[tauri::command]
+pub fn capture_interactive(
+    app: tauri::AppHandle,
+    kind: InteractiveKind,
+) -> Result<Option<String>, String> {
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (&app, kind);
+        Err("window capture is not supported on this platform".to_string())
+    }
+    #[cfg(target_os = "macos")]
+    {
+        imp::capture_interactive(app, kind)
+    }
+}
+
 #[tauri::command]
 pub fn capture_window(
     window_id: Option<u32>,
@@ -208,6 +254,49 @@ mod imp {
         std::env::temp_dir().join(format!("ccez-capture-{}-{nanos}.png", std::process::id()))
     }
 
+    pub fn capture_interactive(
+        app: tauri::AppHandle,
+        kind: super::InteractiveKind,
+    ) -> Result<Option<String>, String> {
+        use tauri::Manager as _;
+        let main = app.get_webview_window("main");
+        let hide = main
+            .as_ref()
+            .map(|window| window.is_focused().unwrap_or(false))
+            .unwrap_or(false);
+        if hide {
+            if let Some(window) = main.as_ref() {
+                let _ = window.hide();
+            }
+        }
+        let path = temp_png();
+        let path_arg = path.to_string_lossy().into_owned();
+        let output = std::process::Command::new("/usr/sbin/screencapture")
+            .args(["-x", "-o", "-i", super::interactive_flag(kind), &path_arg])
+            .output()
+            .map_err(|_| "screen capture could not start".to_string());
+        if hide {
+            if let Some(window) = main.as_ref() {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }
+        let output = output?;
+        if path.exists() {
+            let bytes = std::fs::read(&path)
+                .map_err(|_| "the captured image could not be read".to_string())?;
+            let _ = std::fs::remove_file(&path);
+            return Ok(Some(BASE64.encode(&bytes)));
+        }
+        let _ = std::fs::remove_file(&path);
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        if stderr.is_empty() {
+            return Ok(None);
+        }
+        let capped: String = stderr.chars().take(300).collect();
+        Err(capped)
+    }
+
     pub fn capture_window(
         window_id: Option<u32>,
         saved_window_id: Option<u32>,
@@ -247,7 +336,7 @@ mod imp {
 
 #[cfg(test)]
 mod tests {
-    use super::{WindowInfo, choose_source};
+    use super::{InteractiveKind, WindowInfo, choose_source, interactive_flag};
 
     fn window(id: u32, owner: &str) -> WindowInfo {
         WindowInfo {
@@ -279,5 +368,11 @@ mod tests {
     fn empty_list_resolves_to_nothing() {
         assert_eq!(choose_source(Some(11), &[]), None);
         assert_eq!(choose_source(None, &[]), None);
+    }
+
+    #[test]
+    fn interactive_modes_map_to_picker_flags() {
+        assert_eq!(interactive_flag(InteractiveKind::Window), "-w");
+        assert_eq!(interactive_flag(InteractiveKind::Area), "-s");
     }
 }

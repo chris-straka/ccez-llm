@@ -13,19 +13,13 @@ shared `.error` look. -->
 	import { shouldShowInspect } from "$lib/inspect";
 	import type { Annotation, AnnotationId } from "$lib/annotations";
 	import type { ReplyLanguage } from "$lib/languages";
-	import {
-		captureSourceLabel,
-		type CaptureWindow
-	} from "$lib/nativeCapture";
+	import type { CaptureOneShot } from "$lib/nativeCapture";
 	import ActionIcon from "./ActionIcon.svelte";
 	import ReviewDock, { type ReviewDockActions } from "./ReviewDock.svelte";
 
 	/** Page-owned composer behaviors. */
 	export interface CaptureMenuState {
 		open: boolean;
-		loading: boolean;
-		error: string | null;
-		windows: CaptureWindow[];
 	}
 	export interface ComposerActions {
 		floorClick: (event: MouseEvent) => void;
@@ -35,7 +29,7 @@ shared `.error` look. -->
 		mic: () => void;
 		voice: () => void;
 		captureToggle: () => void;
-		capturePick: (id: number | null, fullscreen: boolean) => void;
+		captureAction: (source: CaptureOneShot) => void;
 		wpToggle: () => void;
 		submit: (alt: boolean) => void;
 		menuPress: () => void;
@@ -70,12 +64,10 @@ shared `.error` look. -->
 		canMic: boolean;
 		micEnabled: boolean;
 		/** Window capture available (backend probe) and enabled
-		(settings kill-switch); the source menu rides below. */
+		(settings kill-switch); the source menu rides above. */
 		canCapture: boolean;
 		captureEnabled: boolean;
 		captureMenu: CaptureMenuState;
-		captureSourceId: number | null;
-		captureFullscreen: boolean;
 		dictating: boolean;
 		voiceOn: boolean;
 		speaking: boolean;
@@ -114,8 +106,6 @@ shared `.error` look. -->
 		canCapture,
 		captureEnabled,
 		captureMenu,
-		captureSourceId,
-		captureFullscreen,
 		dictating,
 		voiceOn,
 		speaking,
@@ -320,15 +310,16 @@ stop, so both rules below stay suppressed. -->
 			<ActionIcon kind="speak" />
 		</button>
 		{#if canCapture && captureEnabled}
-			<!-- Window capture for OCR: the source menu below lists
-			windows (the pick persists, the chord reuses it). Gated on
-			the backend probe and the settings kill-switch, so phones
-			and the browser preview never see it. -->
+			<!-- Window capture for OCR: the source menu offers three
+			static actions (the global chord keeps its own saved
+			source). Gated on the backend probe and the settings
+			kill-switch, so phones and the browser preview never
+			see it. -->
 			<button
 				type="button"
 				class="capture-btn"
-				title="Capture a window for OCR"
-				aria-label="Capture a window for OCR"
+				title="Capture for OCR"
+				aria-label="Capture for OCR"
 				aria-haspopup="menu"
 				aria-expanded={captureMenu.open}
 				onclick={() => actions.captureToggle()}
@@ -356,10 +347,11 @@ stop, so both rules below stay suppressed. -->
 			</button>
 		{/if}
 		{#if canCapture && captureEnabled && captureMenu.open}
-			<!-- Source menu: fullscreen plus on-screen windows, the
-			pick persisting for the chord. A scrim takes click-off
-			(the tools row has no click-away exemption); Esc closes
-			through the page ladder. -->
+			<!-- Source menu: three static actions, no window list —
+			the OS runs its native picker for window (hover tint,
+			camera cursor) and area (crosshair). A scrim takes
+			click-off (the tools row has no click-away exemption);
+			Esc closes through the page ladder. -->
 			<button
 				type="button"
 				class="capture-scrim"
@@ -367,35 +359,29 @@ stop, so both rules below stay suppressed. -->
 				onclick={() => actions.captureToggle()}
 			></button>
 			<div class="capture-menu" role="menu" aria-label="Capture source">
-				{#if captureMenu.loading}
-					<p class="capture-status">Listing windows…</p>
-				{:else if captureMenu.error}
-					<p class="capture-status" role="alert">{captureMenu.error}</p>
-				{:else}
-					<button
-						type="button"
-						role="menuitemradio"
-						aria-checked={captureFullscreen}
-						class:picked={captureFullscreen}
-						onclick={() => actions.capturePick(null, true)}
-					>
-						Fullscreen
-					</button>
-					{#each captureMenu.windows as win (win.id)}
-						<button
-							type="button"
-							role="menuitemradio"
-							aria-checked={!captureFullscreen &&
-								win.id === captureSourceId}
-							class:picked={!captureFullscreen &&
-								win.id === captureSourceId}
-							title={captureSourceLabel(win, false)}
-							onclick={() => actions.capturePick(win.id, false)}
-						>
-							{captureSourceLabel(win, false)}
-						</button>
-					{/each}
-				{/if}
+				<button
+					type="button"
+					role="menuitem"
+					onclick={() => actions.captureAction({ kind: "fullscreen" })}
+				>
+					Fullscreen
+				</button>
+				<button
+					type="button"
+					role="menuitem"
+					onclick={() =>
+						actions.captureAction({ kind: "interactive", mode: "window" })}
+				>
+					Window
+				</button>
+				<button
+					type="button"
+					role="menuitem"
+					onclick={() =>
+						actions.captureAction({ kind: "interactive", mode: "area" })}
+				>
+					Area
+				</button>
 			</div>
 		{/if}
 	</div>
@@ -898,7 +884,7 @@ stop, so both rules below stay suppressed. -->
 		background: var(--bg-raised);
 		box-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
 	}
-	.capture-menu button[role="menuitemradio"] {
+	.capture-menu button[role="menuitem"] {
 		border: 0;
 		background: none;
 		color: inherit;
@@ -912,18 +898,8 @@ stop, so both rules below stay suppressed. -->
 		border-radius: 6px;
 		cursor: pointer;
 	}
-	.capture-menu button[role="menuitemradio"]:hover {
+	.capture-menu button[role="menuitem"]:hover {
 		background: rgba(120, 120, 128, 0.16);
-	}
-	.capture-menu button[role="menuitemradio"].picked {
-		font-weight: 600;
-	}
-	.capture-status {
-		margin: 0;
-		padding: 0.35rem 0.5rem;
-		font-size: 0.85rem;
-		color: #6e6e73;
-		color: var(--muted);
 	}
 
 	/* iOS selection dock: the Annotate control lives in the composer

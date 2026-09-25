@@ -563,12 +563,12 @@
 	} from "$lib/nativeOcr";
 	import {
 		captureWindow,
+		captureInteractive,
 		capturePromptTemplate,
 		friendlyCaptureError,
 		shouldStageCapture,
-		listCaptureWindows,
 		captureSupported,
-		type CaptureWindow
+		type CaptureOneShot
 	} from "$lib/nativeCapture";
 	import CaptureOverlay from "$lib/components/CaptureOverlay.svelte";
 	import { voiceLocaleForInputSource } from "$lib/keyboardLang";
@@ -4302,38 +4302,18 @@
 		}
 	}
 
-	/** Source menu toggle (composer capture button): opening loads
-	 * the rows live, so a closed-then-reopened menu never lists
-	 * stale windows. Failures render in-menu with the fix attached,
-	 * never a toast over the thread. */
-	async function toggleCaptureMenu(): Promise<void> {
-		if (captureMenu.open) {
-			captureMenu = { open: false, loading: false, error: null, windows: [] };
-			return;
-		}
+	/** Source menu toggle (composer capture button): three static
+	 * actions, no listing — the OS picker runs after the pick. */
+	function toggleCaptureMenu(): void {
 		if (!settings.captureEnabled) return;
-		captureMenu = { open: true, loading: true, error: null, windows: [] };
-		try {
-			const windows = await listCaptureWindows();
-			captureMenu = { open: true, loading: false, error: null, windows };
-		} catch (error) {
-			const raw = error instanceof Error ? error.message : String(error);
-			captureMenu = {
-				open: true,
-				loading: false,
-				error: friendlyCaptureError(raw),
-				windows: []
-			};
-		}
+		captureMenu = { open: !captureMenu.open };
 	}
-	/** Source-menu pick: the pick persists for the chord, then the
-	 * flow runs off the saved source (no special-case path). */
-	function pickCaptureSource(id: number | null, fullscreen: boolean): void {
-		settings.captureSourceId = id;
-		settings.captureFullscreen = fullscreen;
-		saveSettingsNow();
-		captureMenu = { open: false, loading: false, error: null, windows: [] };
-		void runCaptureFlow();
+	/** Source-menu action: one-shot off the picked source (the
+	 * global chord keeps its own saved source). An interactive
+	 * cancel (Esc/right-click in the OS picker) stays silent. */
+	function runCaptureAction(source: CaptureOneShot): void {
+		captureMenu = { open: false };
+		void runCaptureFlow(source);
 	}
 	/** Overlay confirm: the checked text sends exactly like a typed
 	 * prompt (doSend owns every guard). */
@@ -4357,38 +4337,44 @@
 	the composer button rides it plus the settings kill-switch. */
 	let canCapture = $state(false);
 	/** Source-menu state (closed by default; opened by the composer
-	button, which also loads the rows). */
-	let captureMenu = $state<{
-		open: boolean;
-		loading: boolean;
-		error: string | null;
-		windows: CaptureWindow[];
-	}>({ open: false, loading: false, error: null, windows: [] });
+	button). */
+	let captureMenu = $state<{ open: boolean }>({ open: false });
 	/** Low-confidence read awaiting a check (overlay card owns it;
 	null sends straight through). */
 	let captureStaged = $state<{ text: string; confidence: number } | null>(
 		null
 	);
-	/** Capture-any-window OCR: screenshot the saved source (or the
-	 * frontmost window), recognize it like an attachment, and send
-	 * "what does this mean" with the text quoted. Weak reads stage
-	 * in the composer for a check (the unit-3 overlay card takes
-	 * that over); misses and backend failures toast, never throw.
-	 * The settings checkbox gates both chords; a send in flight or
-	 * a missing key behaves exactly like a typed send (doSend owns
-	 * every guard).
+	/** Capture-any-window OCR: screenshot the source, recognize it
+	 * like an attachment, and send "what does this mean" with the
+	 * text quoted. A one-shot runs the composer's picked action
+	 * (fullscreen or the OS window/area picker); without one the
+	 * flow screenshots the saved source (or the frontmost window)
+	 * for the global chord. Weak reads stage in the composer for a
+	 * check (the unit-3 overlay card takes that over); misses and
+	 * backend failures toast, never throw — except an interactive
+	 * cancel (Esc/right-click), which stays silent. The settings
+	 * checkbox gates both chords; a send in flight or a missing key
+	 * behaves exactly like a typed send (doSend owns every guard).
 	 */
-	async function runCaptureFlow(): Promise<void> {
+	async function runCaptureFlow(oneShot?: CaptureOneShot): Promise<void> {
 		if (captureBusy || !settings.captureEnabled) return;
 		captureBusy = true;
 		try {
-			let pixels: string;
+			let pixels: string | null;
 			try {
-				pixels = await captureWindow(
-					null,
-					settings.captureSourceId,
-					settings.captureFullscreen
-				);
+				if (oneShot?.kind === "interactive") {
+					pixels = await captureInteractive(oneShot.mode);
+					// The OS picker died silent: Esc or right-click.
+					if (pixels === null) return;
+				} else if (oneShot?.kind === "fullscreen") {
+					pixels = await captureWindow(null, null, true);
+				} else {
+					pixels = await captureWindow(
+						null,
+						settings.captureSourceId,
+						settings.captureFullscreen
+					);
+				}
 			} catch (error) {
 				const raw = error instanceof Error ? error.message : String(error);
 				flashErrorToast(friendlyCaptureError(raw));
@@ -10509,7 +10495,7 @@
 			} else if (captureMenu.open) {
 				// The source menu sits below the overlay in z, so it
 				// dismisses right after it.
-				captureMenu = { open: false, loading: false, error: null, windows: [] };
+				captureMenu = { open: false };
 			} else if (reviewOpen) {
 				// The annotations review closes from anywhere (the
 				// staged pill keeps its own Esc-to-discard below).
@@ -13653,8 +13639,6 @@
 			canCapture={canCapture}
 			captureEnabled={settings.captureEnabled}
 			captureMenu={captureMenu}
-			captureSourceId={settings.captureSourceId}
-			captureFullscreen={settings.captureFullscreen}
 			dictating={dictating}
 			voiceOn={voiceOn()}
 			speaking={speakingId !== null}
@@ -13678,9 +13662,8 @@
 					void addFiles(files).then((kinds) => insertAttachmentMarkers(kinds)),
 				mic: () => void toggleMic(),
 				voice: toggleVoice,
-				captureToggle: () => void toggleCaptureMenu(),
-				capturePick: (id: number | null, fullscreen: boolean) =>
-					pickCaptureSource(id, fullscreen),
+				captureToggle: () => toggleCaptureMenu(),
+				captureAction: (source: CaptureOneShot) => runCaptureAction(source),
 				wpToggle: () => {
 					wpOpen = !wpOpen;
 					buzzTap();

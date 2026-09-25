@@ -129,7 +129,9 @@ describe("annotation create wiring", () => {
 		const source = pageSource();
 		const dockPath = source.slice(source.indexOf("No answer yet: open the review dock"));
 		expect(dockPath).toContain("void speakQuote(");
-		expect(dockPath).toContain("answerContextFor(current.messageId, current.quote)");
+		expect(dockPath).toContain(
+			"answerContextFor(current.messageId, current.quote, current.at ?? 0)"
+		);
 	});
 
 	it("rides the orange pill with its quote through scrolls", () => {

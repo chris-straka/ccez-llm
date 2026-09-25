@@ -1,33 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
 	capturePromptTemplate,
-	captureSourceLabel,
 	friendlyCaptureError,
 	isCaptureUnsupported,
 	shouldStageCapture
 } from "./nativeCapture";
-
-describe("capture source labels", () => {
-	it("names titled windows owner-first", () => {
-		expect(
-			captureSourceLabel({ id: 11, owner: "BlueStacks", title: "Game" }, false)
-		).toBe("BlueStacks — Game");
-	});
-
-	it("falls back to the owner for untitled windows", () => {
-		expect(
-			captureSourceLabel({ id: 11, owner: "BlueStacks", title: "" }, false)
-		).toBe("BlueStacks");
-	});
-
-	it("labels fullscreen and the frontmost fallback", () => {
-		expect(captureSourceLabel(null, true)).toBe("Fullscreen");
-		expect(
-			captureSourceLabel({ id: 11, owner: "BlueStacks", title: "Game" }, true)
-		).toBe("Fullscreen");
-		expect(captureSourceLabel(null, false)).toBe("Frontmost window");
-	});
-});
 
 describe("capture errors", () => {
 	it("detects unsupported builds", () => {

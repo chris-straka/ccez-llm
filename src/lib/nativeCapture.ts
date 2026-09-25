@@ -3,13 +3,15 @@ import { OCR_RETRY_BELOW } from "./nativeOcr";
 
 /**
  * Capture-any-window screenshots (Stage: capture OCR): thin invoke
- * wrapper over the Rust `capture_supported` / `list_windows` /
- * `capture_window` commands (`src-tauri/src/capture.rs`, macOS-only
- * Quartz listing plus the `screencapture` CLI, `#[cfg]`-gated with
- * stubs elsewhere — same pattern as `nativeOcr.ts`).
+ * wrapper over the Rust `capture_supported` / `capture_window` /
+ * `capture_interactive` commands (`src-tauri/src/capture.rs`,
+ * macOS-only Quartz plus the `screencapture` CLI, `#[cfg]`-gated
+ * with stubs elsewhere — same pattern as `nativeOcr.ts`).
  *
- * Pixels come back as base64 PNG, which feeds `recognizeImageText`
- * (raw base64 in) with no new types.
+ * The composer offers three static actions (no window list): the OS
+ * runs its native picker for window (hover tint, camera cursor) and
+ * area (crosshair). Pixels come back as base64 PNG, which feeds
+ * `recognizeImageText` (raw base64 in) with no new types.
  *
  * Every function fails cleanly outside the Tauri shell (plain `vite
  * dev`, Vitest): `invoke` rejects, the support probe is false, and
@@ -17,12 +19,10 @@ import { OCR_RETRY_BELOW } from "./nativeOcr";
  * text.
  */
 
-/** One on-screen window: the source menu's row model (mirrors Rust). */
-export interface CaptureWindow {
-	id: number;
-	owner: string;
-	title: string;
-}
+/** One-shot composer source: fullscreen, or the OS picker kind. */
+export type CaptureOneShot =
+	| { kind: "fullscreen" }
+	| { kind: "interactive"; mode: "window" | "area" };
 
 let supportedCache: boolean | null = null;
 
@@ -42,19 +42,10 @@ export async function captureSupported(): Promise<boolean> {
 }
 
 /**
- * On-screen windows front-to-back, own app excluded (the backend
- * drops our PID so the composer button never captures itself).
- * Rejects with a raw bridge message the caller maps through
- * `friendlyCaptureError`.
- */
-export async function listCaptureWindows(): Promise<CaptureWindow[]> {
-	return await invoke<CaptureWindow[]>("list_windows");
-}
-
-/**
  * Capture a window (or the full screen) as base64 PNG. `windowId` is
- * the source menu's pick; when missing, `savedWindowId` wins if still
- * on screen, else the frontmost window. `fullscreen` ignores both.
+ * an explicit pick; when missing, `savedWindowId` wins if still on
+ * screen, else the frontmost window. `fullscreen` ignores both. The
+ * global chord runs off the saved source through this path.
  */
 export async function captureWindow(
 	windowId: number | null = null,
@@ -69,18 +60,18 @@ export async function captureWindow(
 }
 
 /**
- * Source-menu row label: "owner — title", owner alone when untitled.
- * Fullscreen is not a window and labels itself. Pure and unit-tested.
+ * Interactive capture: the OS picker (hover-tint window choice or
+ * crosshair area drag). Resolves null when the user cancels
+ * (Esc/right-click) — the caller stays silent, never a toast.
+ * Rejects with a raw bridge message the caller maps through
+ * `friendlyCaptureError`.
  */
-export function captureSourceLabel(
-	window: CaptureWindow | null,
-	fullscreen: boolean
-): string {
-	if (fullscreen) return "Fullscreen";
-	if (!window) return "Frontmost window";
-	return window.title.length > 0
-		? `${window.owner} — ${window.title}`
-		: window.owner;
+export async function captureInteractive(
+	mode: "window" | "area"
+): Promise<string | null> {
+	return await invoke<string | null>("capture_interactive", {
+		kind: mode
+	});
 }
 
 /**

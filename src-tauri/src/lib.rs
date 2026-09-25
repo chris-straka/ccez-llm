@@ -262,6 +262,7 @@ pub fn run() {
             capture::capture_supported,
             capture::list_windows,
             capture::capture_window,
+            capture::capture_interactive,
             dictate_start,
             dictate_stop,
             coderun::run_code,
