@@ -154,12 +154,28 @@ pub struct AreaPick {
 /// open. The overlay reports back through `submit_area_rect`.
 #[tauri::command]
 pub fn open_area_picker(app: tauri::AppHandle) -> Result<(), String> {
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    {
+        let _ = &app;
+        return Err("the area picker is not supported on this platform".to_string());
+    }
+    #[cfg(desktop)]
+    {
+        open_area_picker_desktop(&app)
+    }
+}
+
+/// Desktop half of `open_area_picker` (separate so the mobile stub
+/// above keeps the command registered everywhere): the builder chain
+/// uses desktop-only window methods.
+#[cfg(desktop)]
+fn open_area_picker_desktop(app: &tauri::AppHandle) -> Result<(), String> {
     use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
     if let Some(picker) = app.get_webview_window("area-pick") {
         let _ = picker.set_focus();
         return Ok(());
     }
-    WebviewWindowBuilder::new(&app, "area-pick", WebviewUrl::App("/area-pick".into()))
+    WebviewWindowBuilder::new(app, "area-pick", WebviewUrl::App("/area-pick".into()))
         .transparent(true)
         .decorations(false)
         .maximized(true)
