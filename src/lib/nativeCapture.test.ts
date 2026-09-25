@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
 	capturePromptTemplate,
+	captureSourceFor,
 	friendlyCaptureError,
 	isCaptureUnsupported,
 	shouldStageCapture
@@ -51,5 +52,36 @@ describe("capture send shape", () => {
 		expect(shouldStageCapture(0.59)).toBe(true);
 		expect(shouldStageCapture(0.6)).toBe(false);
 		expect(shouldStageCapture(0.95)).toBe(false);
+	});
+});
+
+describe("capture source resolution", () => {
+	const chord = { windowId: null, savedWindowId: 42, fullscreen: false };
+	const area = { x: 1, y: 2, width: 3, height: 4 };
+
+	it("runs one-shots outright", () => {
+		expect(
+			captureSourceFor({ kind: "fullscreen" }, area, chord)
+		).toEqual({ kind: "fullscreen" });
+		expect(
+			captureSourceFor({ kind: "interactive", mode: "area" }, area, chord)
+		).toEqual({ kind: "interactive", mode: "area" });
+	});
+
+	it("prefers the saved square on the chord path", () => {
+		expect(captureSourceFor(undefined, area, chord)).toEqual({
+			kind: "rect",
+			area
+		});
+	});
+
+	it("falls back to the window source without a square", () => {
+		expect(captureSourceFor(undefined, null, chord)).toEqual({
+			kind: "window",
+			source: chord
+		});
+		expect(
+			captureSourceFor(undefined, { x: 0, y: 0, width: 0, height: 1 }, chord)
+		).toEqual({ kind: "window", source: chord });
 	});
 });

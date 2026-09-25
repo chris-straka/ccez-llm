@@ -240,6 +240,20 @@ export interface AreaPick {
 }
 
 /**
+ * Bring the main window forward (show plus focus, best-effort): the
+ * capture chord needs it visible on the paths without a saved
+ * square. Silent outside the shell and on failure.
+ */
+export async function showMainWindow(): Promise<void> {
+	if (!tauriBackendAvailable()) return;
+	try {
+		await invoke("show_main");
+	} catch {
+		// Best-effort: the flow toasts for real failures below.
+	}
+}
+
+/**
  * Open the set-area overlay (the ⇧⌘U chord). True when the backend
  * accepted; false outside the shell, where the caller toasts.
  */

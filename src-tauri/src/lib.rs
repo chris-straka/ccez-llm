@@ -266,6 +266,7 @@ pub fn run() {
             capture::capture_rect,
             capture::open_area_picker,
             capture::submit_area_rect,
+            capture::show_main,
             dictate_start,
             dictate_stop,
             coderun::run_code,

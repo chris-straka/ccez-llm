@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { OCR_RETRY_BELOW } from "./nativeOcr";
+import { validCaptureArea } from "./settings";
 
 /**
  * Capture-any-window screenshots (Stage: capture OCR): thin invoke
@@ -23,6 +24,59 @@ import { OCR_RETRY_BELOW } from "./nativeOcr";
 export type CaptureOneShot =
 	| { kind: "fullscreen" }
 	| { kind: "interactive"; mode: "window" | "area" };
+
+/** Saved chord source: an explicit window, the saved pick, or the
+frontmost window — the global chord's non-area path. */
+export interface ChordWindowSource {
+	windowId: number | null;
+	savedWindowId: number | null;
+	fullscreen: boolean;
+}
+
+/** Resolved pixel source: a one-shot wins outright, else the saved
+square, else the chord window source. Pure and unit-tested. */
+export type CaptureSource =
+	| { kind: "rect"; area: { x: number; y: number; width: number; height: number } }
+	| { kind: "window"; source: ChordWindowSource }
+	| { kind: "fullscreen" }
+	| { kind: "interactive"; mode: "window" | "area" };
+
+export function captureSourceFor(
+	oneShot: CaptureOneShot | null | undefined,
+	area: { x: number; y: number; width: number; height: number } | null,
+	chord: ChordWindowSource
+): CaptureSource {
+	if (oneShot?.kind === "interactive")
+		return { kind: "interactive", mode: oneShot.mode };
+	if (oneShot?.kind === "fullscreen") return { kind: "fullscreen" };
+	if (area && validCaptureArea(area)) return { kind: "rect", area };
+	return { kind: "window", source: chord };
+}
+
+/**
+ * Pixels for a resolved source. Resolves null on interactive cancel
+ * (Esc/right-click) — the caller stays silent, never a toast.
+ * Rejects with a raw bridge message the caller maps through
+ * `friendlyCaptureError`.
+ */
+export async function capturePixels(
+	source: CaptureSource
+): Promise<string | null> {
+	switch (source.kind) {
+		case "rect":
+			return await captureRect(source.area);
+		case "fullscreen":
+			return await captureWindow(null, null, true);
+		case "interactive":
+			return await captureInteractive(source.mode);
+		case "window":
+			return await captureWindow(
+				source.source.windowId,
+				source.source.savedWindowId,
+				source.source.fullscreen
+			);
+	}
+}
 
 let supportedCache: boolean | null = null;
 

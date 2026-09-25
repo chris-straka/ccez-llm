@@ -171,6 +171,19 @@ pub fn open_area_picker(app: tauri::AppHandle) -> Result<(), String> {
         .map_err(|_| "the area picker could not open".to_string())
 }
 
+/// Bring the main window forward (show plus focus, best-effort).
+/// The capture chord needs it visible on the paths without a saved
+/// square — the saved-square path stays silent behind the game.
+#[tauri::command]
+pub fn show_main(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Manager as _;
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+    Ok(())
+}
+
 /// Area-picker report: closes the overlay, then forwards saves and
 /// clears to the main window (`area-picked`). A silent cancel
 /// (Esc: neither set) closes only.

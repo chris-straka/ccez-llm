@@ -562,8 +562,8 @@
 		ocrSupported
 	} from "$lib/nativeOcr";
 	import {
-		captureWindow,
-		captureInteractive,
+		captureSourceFor,
+		capturePixels,
 		capturePromptTemplate,
 		friendlyCaptureError,
 		shouldStageCapture,
@@ -578,6 +578,7 @@
 		listenGameCapture,
 		openAreaPicker,
 		listenAreaPicked,
+		showMainWindow,
 		isSummonHotkey,
 		type AreaPick,
 		studySheetMarkdown,
@@ -4348,16 +4349,18 @@
 		null
 	);
 	/** Capture-any-window OCR: screenshot the source, recognize it
-	 * like an attachment, and send "what does this mean" with the
-	 * text quoted. A one-shot runs the composer's picked action
+	 * like an attachment, and send the learner's explanation with
+	 * the text quoted. A one-shot runs the composer's picked action
 	 * (fullscreen or the OS window/area picker); without one the
-	 * flow screenshots the saved source (or the frontmost window)
-	 * for the global chord. Weak reads stage in the composer for a
-	 * check (the unit-3 overlay card takes that over); misses and
-	 * backend failures toast, never throw — except an interactive
-	 * cancel (Esc/right-click), which stays silent. The settings
-	 * checkbox gates both chords; a send in flight or a missing key
-	 * behaves exactly like a typed send (doSend owns every guard).
+	 * saved square wins silently behind the game, else the window
+	 * comes forward and the flow screenshots the saved source (or
+	 * the frontmost window) for the global chord. Weak reads stage
+	 * in the composer for a check (the unit-3 overlay card takes
+	 * that over); misses and backend failures toast, never throw —
+	 * except an interactive cancel (Esc/right-click), which stays
+	 * silent. The settings checkbox gates both chords; a send in
+	 * flight or a missing key behaves exactly like a typed send
+	 * (doSend owns every guard).
 	 */
 	async function runCaptureFlow(oneShot?: CaptureOneShot): Promise<void> {
 		if (captureBusy || !settings.captureEnabled) return;
@@ -4365,19 +4368,18 @@
 		try {
 			let pixels: string | null;
 			try {
-				if (oneShot?.kind === "interactive") {
-					pixels = await captureInteractive(oneShot.mode);
-					// The OS picker died silent: Esc or right-click.
-					if (pixels === null) return;
-				} else if (oneShot?.kind === "fullscreen") {
-					pixels = await captureWindow(null, null, true);
-				} else {
-					pixels = await captureWindow(
-						null,
-						settings.captureSourceId,
-						settings.captureFullscreen
-					);
-				}
+				const source = captureSourceFor(oneShot, settings.captureArea, {
+					windowId: null,
+					savedWindowId: settings.captureSourceId,
+					fullscreen: settings.captureFullscreen
+				});
+				// No saved square: the chord path needs the window
+				// visible (legacy show-first); the square path stays
+				// silent behind the game.
+				if (source.kind === "window" && !oneShot) await showMainWindow();
+				pixels = await capturePixels(source);
+				// The OS picker died silent: Esc or right-click.
+				if (pixels === null) return;
 			} catch (error) {
 				const raw = error instanceof Error ? error.message : String(error);
 				flashErrorToast(friendlyCaptureError(raw));
