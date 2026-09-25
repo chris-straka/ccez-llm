@@ -149,6 +149,37 @@ pub fn capture_failure_message(stderr: &str) -> String {
         .to_string()
 }
 
+/// Rect-path failure message: the same decision as
+/// [`capture_failure_message`], but the toast carries the failing
+/// rect and the CLI's own reason, so a toast never reads vaguer
+/// than the backend log (the frontend passes it through verbatim).
+/// Pure and unit-tested.
+pub fn capture_rect_failure_message(
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+    stderr: &str,
+) -> String {
+    if stderr.contains("does not intersect any displays")
+        || stderr.contains("requires a valid rect")
+    {
+        return format!(
+            "saved capture area {x},{y} {width}x{height} is off screen ({}): set it again with Shift+Cmd+U",
+            first_stderr_line(stderr)
+        );
+    }
+    capture_failure_message(stderr)
+}
+
+/// First stderr line, trimmed and capped: toasts are copy-on-tap,
+/// but a full CLI dump still doesn't belong in one.
+fn first_stderr_line(stderr: &str) -> String {
+    const CAP: usize = 200;
+    let line = stderr.lines().next().unwrap_or("").trim();
+    line.chars().take(CAP).collect()
+}
+
 /// Saved square from the area picker, screen points in global
 /// display space (the overlay adds its window origin; no scale
 /// multiply — `screencapture -R` takes points).
@@ -400,7 +431,9 @@ mod imp {
             // mean the display mode moved under it (game res switch)
             // or the draw never saved and this is a stale square.
             eprintln!("[ccez] saved area {x},{y},{width}x{height} failed: {stderr}");
-            return Err(super::capture_failure_message(&stderr));
+            return Err(super::capture_rect_failure_message(
+                x, y, width, height, &stderr,
+            ));
         }
         read_capture(&path)
     }
@@ -534,7 +567,7 @@ mod tests {
     }
 
     #[test]
-    fn rect_flag_formats_global_device_pixels() {
+    fn rect_flag_formats_global_points() {
         assert_eq!(rect_flag(10, 20, 300, 150), "-R10,20,300,150");
     }
 
@@ -551,6 +584,38 @@ mod tests {
                 "screencapture: -R requires a valid rect (x,y,w,h)\n"
             ),
             "saved capture area is off screen: set it again with Shift+Cmd+U"
+        );
+    }
+
+    #[test]
+    fn rect_failure_carries_rect_and_cli_reason() {
+        assert_eq!(
+            super::capture_rect_failure_message(
+                246,
+                1661,
+                709,
+                128,
+                "rect (246.0, 1661.0, 709.0, 128.0) does not intersect any displays\n"
+            ),
+            "saved capture area 246,1661 709x128 is off screen (rect (246.0, 1661.0, 709.0, 128.0) does not intersect any displays): set it again with Shift+Cmd+U"
+        );
+        assert_eq!(
+            super::capture_rect_failure_message(
+                10,
+                20,
+                300,
+                150,
+                "screencapture: -R requires a valid rect (x,y,w,h)\n"
+            ),
+            "saved capture area 10,20 300x150 is off screen (screencapture: -R requires a valid rect (x,y,w,h)): set it again with Shift+Cmd+U"
+        );
+    }
+
+    #[test]
+    fn rect_failure_keeps_recording_fix_for_denials() {
+        assert_eq!(
+            super::capture_rect_failure_message(10, 20, 300, 150, ""),
+            "screen capture failed: allow Screen Recording for Ccez LLM, then relaunch and retry"
         );
     }
 
