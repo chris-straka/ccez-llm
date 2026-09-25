@@ -1,8 +1,9 @@
 <!-- Weak-capture overlay: a low-confidence read stages here instead of
-auto-sending (see runCaptureFlow in +page.svelte). The page owns the
-staged text and both behaviors; this component owns the card markup.
-Enter sends (IME composition excluded — learners type CJK here), Esc
-dismisses through the page ladder, which also returns focus. -->
+filing straight to chat (see runCaptureFlow in +page.svelte). The
+page owns the staged text and both behaviors; this component owns
+the card markup. Enter files (IME composition excluded — learners
+type CJK here), Esc dismisses through the page ladder, which also
+returns focus. -->
 <script lang="ts">
 	/** Page-owned overlay behaviors. */
 	export interface CaptureOverlayActions {
@@ -30,7 +31,7 @@ dismisses through the page ladder, which also returns focus. -->
 <div class="capture-overlay" role="dialog" aria-label="Weak capture">
 	<p class="capture-note">
 		Weak capture ({Math.round(confidence * 100)}%) — check the text, then
-		send.
+		file it to chat.
 	</p>
 	<input
 		class="capture-edit"
@@ -48,7 +49,7 @@ dismisses through the page ladder, which also returns focus. -->
 		<button
 			type="button"
 			class="capture-send"
-			onclick={() => actions.confirm(draft)}>Send</button
+			onclick={() => actions.confirm(draft)}>File to chat</button
 		>
 		<button
 			type="button"

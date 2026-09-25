@@ -29,6 +29,7 @@ import {
 	waypointIndexAt,
 	waypointLabel,
 	sendMessage,
+	fileAssistantMessage,
 	setPasteFold,
 	resolveSendCompletion,
 	landingSignal,
@@ -99,6 +100,29 @@ describe("chat", () => {
 		expect(chat.messages[1]?.usage?.total).toBe(2);
 		expect(tokenTotal(state)).toBe(2);
 		expect(state.sending).toBe(false);
+	});
+
+	it("files a capture as an assistant message with no send", () => {
+		const { state, store } = stateWith(freshStore());
+		newChat(state, store);
+		const id = fileAssistantMessage(state, "  なんのヘンテツもない  ", store);
+		expect(id).not.toBe(null);
+		const messages = activeChat(state).messages;
+		expect(messages).toHaveLength(1);
+		expect(messages[0]?.role).toBe("assistant");
+		expect(messages[0]?.content).toBe("なんのヘンテツもない");
+		expect(messages[0]?.id).toBe(id);
+		expect(state.sending).toBe(false);
+	});
+
+	it("files into a fresh chat and ignores blanks", () => {
+		const { state, store } = stateWith(freshStore());
+		expect(fileAssistantMessage(state, "   ", store)).toBe(null);
+		const id = fileAssistantMessage(state, "hello", store);
+		expect(id).not.toBe(null);
+		expect(activeChat(state).messages.map((m) => m.role)).toEqual([
+			"assistant"
+		]);
 	});
 
 	it("fires onFirstToken once on the first visible token", async () => {

@@ -5,8 +5,8 @@ import { seedChat } from "./helpers";
  * Capture chord without a backend (browser preview): the chord fires,
  * the flow reaches for the bridge, and the failure toasts instead of
  * crashing — the composer keeps working. The shell path (real
- * capture→OCR→send) cannot run headless; decisions, template, and
- * staging rules are pinned unit-side (keybindings, nativeCapture).
+ * capture→OCR→file) cannot run headless; decisions and staging
+ * rules are pinned unit-side (keybindings, nativeCapture).
  */
 test("capture chord degrades to an error toast in the preview", async ({
 	page

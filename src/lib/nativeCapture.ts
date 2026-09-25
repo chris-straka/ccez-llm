@@ -188,22 +188,6 @@ export function friendlyCaptureError(message: string): string {
 }
 
 /**
- * Auto-send template: the question first, the recognized text quoted
- * below as a blockquote (the chat renders markdown, so the capture
- * reads as a citation, not a pasted blob). It asks for a learner's
- * explanation — readings, key words, one grammar point, then a
- * natural translation — never a bare direct translation. Pure and
- * unit-tested.
- */
-export function capturePromptTemplate(text: string): string {
-	const quoted = text
-		.split("\n")
-		.map((line) => `> ${line}`)
-		.join("\n");
-	return `Explain this for a language learner — readings, key words, one grammar point, then a natural translation:\n\n${quoted}`;
-}
-
-/**
  * CJK block ranges (hiragana, katakana, han, hangul, bopomofo, CJK
  * symbols/punctuation, fullwidth forms): decorative glyphs like ・・・・
  * score low even when read perfectly, so their presence explains a

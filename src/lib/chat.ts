@@ -676,6 +676,32 @@ export async function sendMessage(
 }
 
 /**
+ * File a captured read as an assistant message: no model call, no
+ * send — the text lands in the thread ready to annotate and
+ * question. Wholesale replacement, never in-place mutation (Svelte
+ * proxy signals capture values on first read). Returns the new
+ * message id, or null when there is nothing to file. Pure apart
+ * from the persist; unit-tested.
+ */
+export function fileAssistantMessage(
+	state: ChatState,
+	text: string,
+	store?: KeyValueStore
+): ChatMsgId | null {
+	const trimmed = text.trim();
+	if (!trimmed) return null;
+	if (!state.activeChatId) newChat(state, store);
+	const chat = activeChat(state);
+	const id = newChatMsgId();
+	chat.messages = [
+		...chat.messages,
+		{ id, role: "assistant", content: trimmed, usage: null, error: null }
+	];
+	persistChats(state, store);
+	return id;
+}
+
+/**
  * Stream one assistant reply onto the messages already there. The
  * last message must be the user turn being answered: resends reuse
  * it in place (same id, same attachments and paste folds) instead of

@@ -31,6 +31,7 @@
 		waypoints,
 		waypointIndexAt,
 		sendMessage,
+		fileAssistantMessage,
 		setPasteFold,
 		isSending,
 		hasReplyStarted,
@@ -566,7 +567,6 @@
 	import {
 		captureSourceFor,
 		capturePixels,
-		capturePromptTemplate,
 		friendlyCaptureError,
 		isScreenRecordingDenial,
 		openScreenRecordingSettings,
@@ -4331,14 +4331,25 @@
 		captureMenu = { open: false };
 		void runCaptureFlow(source);
 	}
-	/** Overlay confirm: the checked text sends exactly like a typed
-	 * prompt (doSend owns every guard). */
+	/** File a capture as an assistant message: no model call, no
+	 * send — the read lands in the thread ready to annotate and
+	 * question. Follows the send path's scroll contract (snapshot
+	 * stuck-to-bottom first, scroll after render). */
+	function fileCaptureAsAssistant(text: string): void {
+		const trimmed = text.trim();
+		if (!trimmed) return;
+		const stuck = stuckToBottom();
+		fileAssistantMessage(chatState, trimmed);
+		if (stuck) scrollAfterRender();
+		flashToast("Capture filed to chat.");
+	}
+	/** Overlay confirm: the checked text files as an assistant
+	 * message (never a model call). */
 	function confirmCaptureStaged(text: string): void {
 		const staged = captureStaged;
 		captureStaged = null;
 		if (!staged || text.trim().length === 0) return;
-		editor?.setText(capturePromptTemplate(text.trim()));
-		void doSend();
+		fileCaptureAsAssistant(text);
 	}
 	/** Overlay dismiss: back to the composer, caret ready. */
 	function dismissCaptureStaged(): void {
@@ -4361,18 +4372,16 @@
 		null
 	);
 	/** Capture-any-window OCR: screenshot the source, recognize it
-	 * like an attachment, and send the learner's explanation with
-	 * the text quoted. A one-shot runs the composer's picked action
-	 * (fullscreen or the OS window/area picker); without one the
-	 * saved square wins silently behind the game, else the window
-	 * comes forward and the flow screenshots the saved source (or
-	 * the frontmost window) for the global chord. Weak reads stage
-	 * in the composer for a check (the unit-3 overlay card takes
-	 * that over); misses and backend failures toast, never throw —
-	 * except an interactive cancel (Esc/right-click), which stays
-	 * silent. The settings checkbox gates both chords; a send in
-	 * flight or a missing key behaves exactly like a typed send
-	 * (doSend owns every guard).
+	 * like an attachment, and file the read as an assistant message
+	 * — no model call, no send, ready to annotate and question. A
+	 * one-shot runs the composer's picked action (fullscreen or the
+	 * OS window/area picker); without one the saved square wins
+	 * silently behind the game, else the window comes forward and
+	 * the flow screenshots the saved source (or the frontmost
+	 * window) for the global chord. Weak reads stage in the overlay
+	 * card for a check; misses and backend failures toast, never
+	 * throw — except an interactive cancel (Esc/right-click), which
+	 * stays silent. The settings checkbox gates both chords.
 	 */
 	/** Open the screen-capture privacy row (macOS System Settings →
 	Privacy & Security → Screen Recording): the denial toast's tap
@@ -4469,12 +4478,11 @@
 				}
 				if (shouldStageCapture(text, result.confidence)) {
 					// The overlay card owns the check (autofocused
-					// input; Enter sends, Esc dismisses + refocuses).
+					// input; Enter files, Esc dismisses + refocuses).
 					captureStaged = { text, confidence: result.confidence };
 					return;
 				}
-				editor?.setText(capturePromptTemplate(text));
-				await doSend();
+				fileCaptureAsAssistant(text);
 			} catch (error) {
 				const message = error instanceof Error ? error.message : String(error);
 				flashErrorToast(
@@ -13810,7 +13818,7 @@
 
 		{#if captureStaged}
 			<!-- Weak-capture overlay: the staged read waits for a
-			check (Enter sends, Esc dismisses + refocuses). The page
+			check (Enter files, Esc dismisses + refocuses). The page
 			keeps the staged text and both paths; the component owns
 			the card, the input, and their surfaces. -->
 			<CaptureOverlay

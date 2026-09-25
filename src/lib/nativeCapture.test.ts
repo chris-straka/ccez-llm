@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import {
-	capturePromptTemplate,
 	captureSourceFor,
 	friendlyCaptureError,
 	hasCjkText,
@@ -52,15 +51,6 @@ describe("capture errors", () => {
 });
 
 describe("capture send shape", () => {
-	it("quotes the recognized text under the question", () => {
-		expect(capturePromptTemplate("Bonjour le monde")).toBe(
-			"Explain this for a language learner — readings, key words, one grammar point, then a natural translation:\n\n> Bonjour le monde"
-		);
-		expect(capturePromptTemplate("line one\nline two")).toBe(
-			"Explain this for a language learner — readings, key words, one grammar point, then a natural translation:\n\n> line one\n> line two"
-		);
-	});
-
 	it("stages weak reads instead of auto-sending", () => {
 		expect(shouldStageCapture("hello", 0)).toBe(true);
 		expect(shouldStageCapture("hello", 0.59)).toBe(true);
