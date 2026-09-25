@@ -865,10 +865,11 @@ stop, so both rules below stay suppressed. -->
 	.prompt-tools :global(.action-glyph) {
 		height: 1.05em;
 	}
-	/* Capture source menu: drops from the tools row, right-aligned,
-	growing down-and-left so it never runs off the column. The scrim
-	takes click-off (the row has no click-away exemption); Esc closes
-	through the page ladder. */
+	/* Capture source menu: rises above the tools row, right-aligned,
+	growing up-and-left — the composer sits at the viewport bottom,
+	so a downward menu clips off-screen. The scrim takes click-off
+	(the row has no click-away exemption); Esc closes through the
+	page ladder. */
 	.capture-scrim {
 		position: fixed;
 		inset: 0;
@@ -879,7 +880,7 @@ stop, so both rules below stay suppressed. -->
 	}
 	.capture-menu {
 		position: absolute;
-		top: calc(100% + 0.4rem);
+		bottom: calc(100% + 0.4rem);
 		right: 0;
 		z-index: 70;
 		min-width: 14rem;

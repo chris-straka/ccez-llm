@@ -207,4 +207,12 @@ describe("composer text reservation", () => {
 		expect(css).toMatch(/\.prompt:has\(\.wp-jump\)\s*\{[^}]*--tools-extra:\s*1\.8rem/);
 		expect(css).toContain("calc(var(--tools-pad) + var(--tools-extra))");
 	});
+
+	it("opens the capture menu upward from the tools row", () => {
+		const css = componentStyle();
+		// The composer sits at the viewport bottom: a downward menu
+		// clips off-screen, so the menu anchors above the row.
+		expect(css).toMatch(/\.capture-menu\s*\{[^}]*bottom:\s*calc\(100%/);
+		expect(css).not.toMatch(/\.capture-menu\s*\{[^}]*top:\s*calc\(100%/);
+	});
 });
