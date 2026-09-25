@@ -50,6 +50,11 @@ privileged (Keychain, updater, native TTS).
   password prompt for the user, so launches are budgeted — no probe specs,
   no re-runs to "just look", no parallel same-file runs. When prompts are
   already firing, stop launching entirely and say so.
+- Dev-server hygiene (user instruction Sep 2026): stop the user's other
+  dev shells (`vite dev`, `tauri dev`) before e2e runs — stale shells
+  serve old builds. MCP servers and browsers belong to other sessions:
+  only ever stop an MCP server that is orphaned (parent session dead);
+  otherwise relay the fix (`--user-data-dir`) to its owner instead.
 - Read failure output from that same run (list reporter prints the error);
   don't re-run just to collect details.
 - Pristine-tree attribution (`git stash` + rerun) only when a failure
