@@ -60,6 +60,25 @@ export async function captureWindow(
 }
 
 /**
+ * Capture a saved square (device pixels, global display space) as
+ * base64 PNG. Rejects with a raw bridge message the caller maps
+ * through `friendlyCaptureError`.
+ */
+export async function captureRect(area: {
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+}): Promise<string> {
+	return await invoke<string>("capture_rect", {
+		x: Math.round(area.x),
+		y: Math.round(area.y),
+		width: Math.round(area.width),
+		height: Math.round(area.height)
+	});
+}
+
+/**
  * Interactive capture: the OS picker (hover-tint window choice or
  * crosshair area drag). Resolves null when the user cancels
  * (Esc/right-click) — the caller stays silent, never a toast.

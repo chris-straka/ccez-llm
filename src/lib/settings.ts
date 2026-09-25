@@ -88,6 +88,10 @@ export interface AppSettings {
 	pick; a stale id falls back frontmost in the backend. */
 	captureSourceId: number | null;
 	captureFullscreen: boolean;
+	/** Saved capture square in device pixels, global display space
+	(the set-area chord): null = no square, the chord screenshots
+	the saved/frontmost window instead. */
+	captureArea: { x: number; y: number; width: number; height: number } | null;
 	voiceEngine: VoiceEngine;
 	/**
 	 * Explicit native voice (registry identifier from the voice picker);
@@ -347,6 +351,28 @@ export function envProviderDefaults(
  * locale — key labels only — so this is the closest signal. Stored profiles
  * keep their own value; this only shapes first boot.
  */
+/**
+ * True for a storable capture square: finite non-negative origin and
+ * a positive size. Anything else (older saves predate it, corrupt
+ * writes) falls back to null — no square. Pure and unit-tested.
+ */
+export function validCaptureArea(
+	value: unknown
+): value is { x: number; y: number; width: number; height: number } {
+	if (typeof value !== "object" || value === null) return false;
+	const area = value as Record<string, unknown>;
+	for (const key of ["x", "y", "width", "height"] as const) {
+		if (typeof area[key] !== "number" || !Number.isFinite(area[key])) return false;
+	}
+	const { x, y, width, height } = area as unknown as {
+		x: number;
+		y: number;
+		width: number;
+		height: number;
+	};
+	return x >= 0 && y >= 0 && width > 0 && height > 0;
+}
+
 export function systemLocale(): string {
 	try {
 		const tag = typeof navigator !== "undefined" ? navigator.language : "";
@@ -372,6 +398,7 @@ export function defaultSettings(): AppSettings {
 		captureEnabled: true,
 		captureSourceId: null,
 		captureFullscreen: false,
+		captureArea: null,
 		// Native first: this is a Mac-first app, and every runtime without
 		// system voices corrects itself back to web on the support probe.
 		voiceEngine: "native",
@@ -621,6 +648,7 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 			merged.captureSourceId = null;
 		if (typeof merged.captureFullscreen !== "boolean")
 			merged.captureFullscreen = false;
+		if (!validCaptureArea(merged.captureArea)) merged.captureArea = null;
 		if (typeof merged.hideButtons !== "boolean") merged.hideButtons = true;
 		if (typeof merged.foldOnSwipe !== "boolean") merged.foldOnSwipe = false;
 		if (typeof merged.autoSpeakSelection !== "boolean")

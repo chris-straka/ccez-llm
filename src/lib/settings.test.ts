@@ -30,6 +30,7 @@ import {
 	LOOKUP_CAPABILITY_HINT,
 	systemLocale,
 	resolveTheme,
+	validCaptureArea,
 	type AppSettings
 } from "./settings";
 
@@ -385,6 +386,42 @@ describe("settings", () => {
 		const healed = loadSettings(memoryStore);
 		expect(healed.captureSourceId).toBe(null);
 		expect(healed.captureFullscreen).toBe(false);
+	});
+
+	it("keeps a valid capture square and heals junk to null", () => {
+		expect(defaultSettings().captureArea).toBe(null);
+		expect(
+			validCaptureArea({ x: 10, y: 20, width: 300, height: 150 })
+		).toBe(true);
+		expect(validCaptureArea({ x: 0, y: 0, width: 0, height: 10 })).toBe(
+			false
+		);
+		expect(validCaptureArea({ x: -1, y: 0, width: 5, height: 5 })).toBe(
+			false
+		);
+		expect(validCaptureArea("nope")).toBe(false);
+		const wild = blankSettings();
+		(wild as unknown as Record<string, unknown>).captureArea = {
+			x: 1,
+			y: 2,
+			width: 3,
+			height: 4
+		};
+		saveSettings(wild, memoryStore);
+		expect(loadSettings(memoryStore).captureArea).toEqual({
+			x: 1,
+			y: 2,
+			width: 3,
+			height: 4
+		});
+		(wild as unknown as Record<string, unknown>).captureArea = {
+			x: 1,
+			y: 2,
+			width: 0,
+			height: 4
+		};
+		saveSettings(wild, memoryStore);
+		expect(loadSettings(memoryStore).captureArea).toBe(null);
 	});
 
 	it("migrates the shared thinking dial to per-provider native ids", () => {

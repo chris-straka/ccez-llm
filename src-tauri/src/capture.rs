@@ -124,6 +124,31 @@ pub fn capture_interactive(
     }
 }
 
+/// `screencapture -R` flag for a rect in device pixels (global
+/// display space). Pure (unit-tested).
+pub fn rect_flag(x: u32, y: u32, width: u32, height: u32) -> String {
+    format!("-R{x},{y},{width},{height}")
+}
+
+/// Capture a screen rect (device pixels, global display space) as
+/// base64 PNG. The area picker saves its square in these units and
+/// the chord reuses it; empty rects report instead of screenshotting.
+#[tauri::command]
+pub fn capture_rect(x: u32, y: u32, width: u32, height: u32) -> Result<String, String> {
+    if width == 0 || height == 0 {
+        return Err("the capture area is empty".to_string());
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (x, y, width, height);
+        Err("window capture is not supported on this platform".to_string())
+    }
+    #[cfg(target_os = "macos")]
+    {
+        imp::capture_rect(x, y, width, height)
+    }
+}
+
 #[tauri::command]
 pub fn capture_window(
     window_id: Option<u32>,
@@ -244,6 +269,32 @@ mod imp {
         Ok(windows)
     }
 
+    /// Read a finished capture off disk as base64 PNG, removing the
+    /// temp file either way.
+    fn read_capture(path: &std::path::Path) -> Result<String, String> {
+        let bytes = std::fs::read(path)
+            .map_err(|_| "the captured image could not be read".to_string())?;
+        let _ = std::fs::remove_file(path);
+        Ok(BASE64.encode(&bytes))
+    }
+
+    pub fn capture_rect(x: u32, y: u32, width: u32, height: u32) -> Result<String, String> {
+        let path = temp_png();
+        let path_arg = path.to_string_lossy().into_owned();
+        let status = std::process::Command::new("/usr/sbin/screencapture")
+            .args(["-x", "-o", &super::rect_flag(x, y, width, height), &path_arg])
+            .status()
+            .map_err(|_| "screen capture could not start".to_string())?;
+        if !status.success() {
+            let _ = std::fs::remove_file(&path);
+            return Err(
+                "screen capture failed: allow Screen Recording for Ccez LLM, then retry"
+                    .to_string(),
+            );
+        }
+        read_capture(&path)
+    }
+
     /// Unique temp PNG per capture (chord taps can double-fire):
     /// pid plus a nanos stamp, removed right after the read.
     fn temp_png() -> std::path::PathBuf {
@@ -327,16 +378,13 @@ mod imp {
                     .to_string(),
             );
         }
-        let bytes = std::fs::read(&path)
-            .map_err(|_| "the captured image could not be read".to_string())?;
-        let _ = std::fs::remove_file(&path);
-        Ok(BASE64.encode(&bytes))
+        read_capture(&path)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{InteractiveKind, WindowInfo, choose_source, interactive_flag};
+    use super::{InteractiveKind, WindowInfo, choose_source, interactive_flag, rect_flag};
 
     fn window(id: u32, owner: &str) -> WindowInfo {
         WindowInfo {
@@ -374,5 +422,10 @@ mod tests {
     fn interactive_modes_map_to_picker_flags() {
         assert_eq!(interactive_flag(InteractiveKind::Window), "-w");
         assert_eq!(interactive_flag(InteractiveKind::Area), "-s");
+    }
+
+    #[test]
+    fn rect_flag_formats_global_device_pixels() {
+        assert_eq!(rect_flag(10, 20, 300, 150), "-R10,20,300,150");
     }
 }
