@@ -3,6 +3,7 @@ import {
 	capturePromptTemplate,
 	captureSourceFor,
 	friendlyCaptureError,
+	hasCjkText,
 	isCaptureUnsupported,
 	isScreenRecordingDenial,
 	shouldStageCapture
@@ -61,10 +62,31 @@ describe("capture send shape", () => {
 	});
 
 	it("stages weak reads instead of auto-sending", () => {
-		expect(shouldStageCapture(0)).toBe(true);
-		expect(shouldStageCapture(0.59)).toBe(true);
-		expect(shouldStageCapture(0.6)).toBe(false);
-		expect(shouldStageCapture(0.95)).toBe(false);
+		expect(shouldStageCapture("hello", 0)).toBe(true);
+		expect(shouldStageCapture("hello", 0.59)).toBe(true);
+		expect(shouldStageCapture("hello", 0.6)).toBe(false);
+		expect(shouldStageCapture("hello", 0.95)).toBe(false);
+	});
+
+	it("detects CJK text across scripts", () => {
+		expect(hasCjkText("hello")).toBe(false);
+		expect(hasCjkText("")).toBe(false);
+		expect(hasCjkText("なんのヘンテツもない")).toBe(true);
+		expect(hasCjkText("（・・・・一見）")).toBe(true);
+		expect(hasCjkText("控室から一歩")).toBe(true);
+		expect(hasCjkText("한국어")).toBe(true);
+		expect(hasCjkText("简体中文")).toBe(true);
+		expect(hasCjkText("mixed 一 text")).toBe(true);
+	});
+
+	it("sends accurate CJK reads at 0.4 and stages below", () => {
+		const game = "（・・・・一見、なんのヘンテツもない）";
+		expect(shouldStageCapture(game, 0.39)).toBe(true);
+		expect(shouldStageCapture(game, 0.4)).toBe(false);
+		expect(shouldStageCapture(game, 0.5)).toBe(false);
+		// Latin keeps the 0.6 floor at the same confidence.
+		expect(shouldStageCapture("screenshot", 0.4)).toBe(true);
+		expect(shouldStageCapture("screenshot", 0.5)).toBe(true);
 	});
 });
 

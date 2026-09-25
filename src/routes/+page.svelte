@@ -4467,7 +4467,7 @@
 					flashErrorToast("No text found in this capture.");
 					return;
 				}
-				if (shouldStageCapture(result.confidence)) {
+				if (shouldStageCapture(text, result.confidence)) {
 					// The overlay card owns the check (autofocused
 					// input; Enter sends, Esc dismisses + refocuses).
 					captureStaged = { text, confidence: result.confidence };

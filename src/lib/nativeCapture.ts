@@ -204,11 +204,36 @@ export function capturePromptTemplate(text: string): string {
 }
 
 /**
- * True when the read is too weak to auto-send: below the same
- * mean-confidence floor the OCR retry uses, the text is likely a
- * misread, so the caller stages it for a check instead of spending
- * the round trip. Pure and unit-tested.
+ * CJK block ranges (hiragana, katakana, han, hangul, bopomofo, CJK
+ * symbols/punctuation, fullwidth forms): decorative glyphs like ・・・・
+ * score low even when read perfectly, so their presence explains a
+ * depressed mean confidence. Pure and unit-tested.
  */
-export function shouldStageCapture(confidence: number): boolean {
-	return confidence < OCR_RETRY_BELOW;
+const CJK_RANGES =
+	/[\u1100-\u11FF\u3000-\u303F\u3040-\u30FF\u3100-\u312F\u3130-\u318F\u31F0-\u31FF\u3200-\u32FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF\uFF00-\uFFEF]/u;
+
+/** True when the text holds any CJK character. Pure and unit-tested. */
+export function hasCjkText(text: string): boolean {
+	return CJK_RANGES.test(text);
+}
+
+/**
+ * Staging floor for CJK reads: observed game-text captures read
+ * perfectly at 0.4–0.5 mean confidence, so CJK sends at 0.4 while
+ * Latin keeps the 0.6 retry floor. Pure and unit-tested.
+ */
+export const OCR_CJK_STAGE_BELOW = 0.4;
+
+/**
+ * True when the read is too weak to auto-send: below the
+ * mean-confidence floor the OCR retry uses (0.4 for CJK reads, whose
+ * decorative glyphs depress confidence without hurting accuracy),
+ * the text is likely a misread, so the caller stages it for a check
+ * instead of spending the round trip. Pure and unit-tested.
+ */
+export function shouldStageCapture(
+	text: string,
+	confidence: number
+): boolean {
+	return confidence < (hasCjkText(text) ? OCR_CJK_STAGE_BELOW : OCR_RETRY_BELOW);
 }
