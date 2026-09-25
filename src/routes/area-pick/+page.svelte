@@ -27,9 +27,13 @@ every backend call. -->
 	Space. Null renders the live transparent overlay (browser
 	preview, or the photo arriving too late). */
 	let photo = $state<string | null>(null);
-	/** Photo natural/displayed ratio (the photo is same-display
-	fullscreen, so one uniform scale covers both axes). */
-	let photoScale = $state(1);
+	/** Natural photo width (device pixels): the scale divides at
+	submit time, never at load — the window may still be settling
+	into maximized while the data-URL image resolves instantly, and
+	a stale load-time width inflates every square off screen. The
+	photo is same-display fullscreen, so one uniform scale covers
+	both axes. */
+	let photoNaturalWidth = $state(0);
 
 	onMount(() => {
 		void requestAreaPhoto().then((dataUrl) => {
@@ -40,11 +44,11 @@ every backend call. -->
 	function onPhotoLoad(image: HTMLImageElement): void {
 		// Broken frame: fall back to the live overlay rather than
 		// mapping against a zero size.
-		if (!image.naturalWidth || !window.innerWidth) {
+		if (!image.naturalWidth) {
 			photo = null;
 			return;
 		}
-		photoScale = image.naturalWidth / window.innerWidth;
+		photoNaturalWidth = image.naturalWidth;
 	}
 
 	const selecting = $derived(
@@ -70,7 +74,9 @@ every backend call. -->
 	}
 
 	function currentScale(): number {
-		return photo === null ? window.devicePixelRatio || 1 : photoScale;
+		if (photo === null || !window.innerWidth)
+			return window.devicePixelRatio || 1;
+		return photoNaturalWidth / window.innerWidth;
 	}
 
 	function toDevice(rect: {

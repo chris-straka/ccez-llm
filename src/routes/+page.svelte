@@ -4397,14 +4397,16 @@
 	not UI state — no markup reads it. */
 	let pendingAreaPhoto: string | null = null;
 	/** Set-area flow (global ⇧⌘U or the in-app chord): capture the
-	 * current screen frozen, bring the app forward, and open the
-	 * picker on the photo — the square gets set from inside the
-	 * game without any overlay fighting its Space (three rounds of
-	 * aux/level/order-front treatment never surfaced a live overlay
-	 * above fullscreen, while `screencapture` provably sees the
-	 * active Space). A capture failure toasts truthfully and stops
-	 * (never yanks focus for nothing); a missing photo falls back
-	 * to the live overlay. The settings checkbox gates both chords.
+	 * current screen frozen and open the picker on the photo — the
+	 * square gets set from inside the game without any overlay
+	 * fighting its Space (three rounds of aux/level/order-front
+	 * treatment never surfaced a live overlay above fullscreen,
+	 * while `screencapture` provably sees the active Space). The
+	 * app stays down (no show-main yank); the picker waits on the
+	 * desktop Space and the user tabs back to draw. A capture
+	 * failure toasts truthfully and stops; a missing photo falls
+	 * back to the live overlay. The settings checkbox gates both
+	 * chords.
 	 */
 	async function runAreaPhotoFlow(): Promise<void> {
 		if (!tauriBackendAvailable()) {
@@ -4426,7 +4428,9 @@
 		}
 		if (pixels === null) return;
 		pendingAreaPhoto = `data:image/png;base64,${pixels}`;
-		await showMainWindow();
+		// No show-main: the app stays down so the game is never
+		// yanked out from under the chord. The picker waits with
+		// the photo on the desktop Space — tab back to draw.
 		const opened = await openAreaPicker();
 		if (!opened) {
 			pendingAreaPhoto = null;
