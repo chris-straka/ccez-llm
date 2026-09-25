@@ -30,12 +30,11 @@ const MAC_NAMES = [
 	"Find in chat",
 	"Fold / unfold code",
 	"Fold / unfold message",
-	"Fold message by drag",
 	"Fullscreen",
 	"New chat",
 	"Newer / older chat",
 	"Pasted text expand/collapse",
-	"Pin annotation",
+	"Pin / unpin annotation",
 	"prev/next stroke step",
 	"Prompt text size up / down",
 	"Prompt width + / −",
@@ -53,7 +52,6 @@ const MAC_NAMES = [
 	"Speak word",
 	"Stop voice / close",
 	"Summon / hide window",
-	"Switch chat by drag",
 	"Switch model / key",
 	"Text size up / down",
 	"Thinking level",
@@ -165,6 +163,7 @@ describe("shortcuts menu copy", () => {
 			"Message buttons",
 			"Move the selection menu",
 			"Newer / older chat",
+			"Pin / unpin annotation",
 			"Settings",
 			"Speak selection",
 			"Top of chat"
@@ -191,6 +190,7 @@ describe("shortcuts menu copy", () => {
 		expect(byName.get("Delete a message")).toBe("Three-finger tap");
 		expect(byName.get("Delete this chat")).toBe("Three-finger hold");
 		expect(byName.get("Copy selection")).toBe("Select text · Copy");
+		expect(byName.get("Pin / unpin annotation")).toBe("Double-tap badge");
 	});
 
 	it("filters case-insensitively on name or keys", () => {

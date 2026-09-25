@@ -42,6 +42,7 @@ export function touchShortcuts(): ShortcutRow[] {
 			keys: "Select text · Copy"
 		},
 		{ name: "Move the selection menu", keys: "Drag it" },
+		{ name: "Pin / unpin annotation", keys: "Double-tap badge" },
 		{
 			name: "Keep an annotation while scrolling",
 			keys: "Scroll freely · only tap-away cancels"
@@ -101,9 +102,9 @@ export function desktopShortcuts(isMac: boolean, inShell = true): ShortcutRow[] 
 			keys: "j/k, u/d, ctrl+u/ctrl+d, gg/G, z/Z, h/l"
 		},
 		{ name: "Annotate hovered word", keys: "Hover + A" },
-		{ name: "Annotate instantly", keys: "Right-click Annotate" },
+		{ name: "Annotate instantly", keys: "a · Right-click Annotate" },
 		{ name: "Delete annotation", keys: "Hover badge + Delete" },
-		{ name: "Pin annotation", keys: "Double-click badge" },
+		{ name: "Pin / unpin annotation", keys: "Double-click badge" },
 		{ name: "Select sentence / paragraph", keys: "Triple-click / quadruple-click" },
 		{ name: "Exit fullscreen", keys: "Hold Esc 2s · Esc+F" },
 		{
@@ -146,8 +147,6 @@ export function desktopShortcuts(isMac: boolean, inShell = true): ShortcutRow[] 
 			name: "Fold / unfold message",
 			keys: `Hover + F / ${isMac ? "Option" : "Alt"}-click`
 		},
-		{ name: "Fold message by drag", keys: "Middle-drag left / right" },
-		{ name: "Switch chat by drag", keys: "Middle-drag up / down" },
 		{
 			name: "Fold / unfold code",
 			keys: "Right-click toggles · left-click unfolds"

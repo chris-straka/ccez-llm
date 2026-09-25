@@ -49,8 +49,7 @@ test("list runs A-Z; modal toggle sits in place", async ({ page }) => {
 		"Scroll",
 		"Edit own message",
 		"Summon / hide window",
-		"Fold message by drag",
-		"Switch chat by drag"
+		"Pin / unpin annotation"
 	]) {
 		await expect(keys.locator("div > dt", { hasText: name })).toBeVisible();
 	}
