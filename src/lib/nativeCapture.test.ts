@@ -39,10 +39,10 @@ describe("capture errors", () => {
 describe("capture send shape", () => {
 	it("quotes the recognized text under the question", () => {
 		expect(capturePromptTemplate("Bonjour le monde")).toBe(
-			"What does this mean?\n\n> Bonjour le monde"
+			"Explain this for a language learner — readings, key words, one grammar point, then a natural translation:\n\n> Bonjour le monde"
 		);
 		expect(capturePromptTemplate("line one\nline two")).toBe(
-			"What does this mean?\n\n> line one\n> line two"
+			"Explain this for a language learner — readings, key words, one grammar point, then a natural translation:\n\n> line one\n> line two"
 		);
 	});
 
