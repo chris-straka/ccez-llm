@@ -259,3 +259,67 @@ export function thinkingLabelFor(code: string | null): string {
 export function switchToastFor(lang: ReplyLanguage): string {
 	return `${lang.native} ${lang.badge}`;
 }
+
+/**
+ * Display name for a voice tag ("Japanese" for ja-JP, bare tag when
+ * the language is unknown): exact match, then the primary subtag.
+ * Shared by the settings pickers so labels never drift. Pure.
+ */
+export function langNameForTag(tag: string): string {
+	const trimmed = tag.trim();
+	return (
+		replyLanguageFor(trimmed)?.name ??
+		replyLanguageFor(trimmed.split("-")[0] ?? "")?.name ??
+		trimmed
+	);
+}
+
+/**
+ * Pill voice state: the applied pill code, the pre-pill voice it
+ * overrides, and the effective voice tag plus its pin. The page
+ * effect owns the reactive wiring; this step is the whole decision.
+ */
+export interface PillVoiceState {
+	appliedPill: string | null;
+	pillBaseVoice: string | null;
+	voiceLang: string;
+	voiceLangPinned: boolean;
+}
+
+/**
+ * One step of the pill-follows-voice rule: a newly applied pill
+ * installs its locale (unpinned, so a later launch without the pill
+ * falls back); leaving the pill restores the pre-pill voice only
+ * while it still matches the pill's — a manual pick the leaving
+ * pill doesn't match stands untouched. Reruns with the same pill
+ * are no-ops. Unknown pill codes never apply. Pure and unit-tested.
+ */
+export function stepPillVoice(
+	state: PillVoiceState,
+	activeCode: string | null,
+	localeForCode: (code: string) => string | null
+): PillVoiceState {
+	if (activeCode === state.appliedPill) return state;
+	const oldVoice = state.appliedPill
+		? localeForCode(state.appliedPill)
+		: null;
+	const { pillBaseVoice } = state;
+	let { voiceLang, voiceLangPinned } = state;
+	if (oldVoice && pillBaseVoice !== null && voiceLang === oldVoice) {
+		voiceLang = pillBaseVoice;
+		voiceLangPinned = true;
+	}
+	if (!activeCode) {
+		return { appliedPill: null, pillBaseVoice, voiceLang, voiceLangPinned };
+	}
+	const voice = localeForCode(activeCode);
+	if (!voice) {
+		return { appliedPill: null, pillBaseVoice, voiceLang, voiceLangPinned };
+	}
+	return {
+		appliedPill: activeCode,
+		pillBaseVoice: voiceLang,
+		voiceLang: voice,
+		voiceLangPinned: false
+	};
+}

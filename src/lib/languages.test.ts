@@ -7,10 +7,13 @@ import {
 	CLASSICAL_LANGUAGES,
 	QUICK_LANG_CODES,
 	langMenuAnchorFor,
+	langNameForTag,
 	quickKeyFor,
 	replyLanguageFor,
+	stepPillVoice,
 	switchToastFor,
-	thinkingLabelFor
+	thinkingLabelFor,
+	type PillVoiceState
 } from "./languages";
 
 describe("reply languages", () => {
@@ -214,5 +217,76 @@ describe("langMenuAnchorFor", () => {
 			langMenuAnchorFor({ ...base, btnLeft: 1200 }).left
 		).toBe(1092);
 		expect(langMenuAnchorFor({ ...base, btnLeft: -50 }).left).toBe(8);
+	});
+});
+
+describe("langNameForTag", () => {
+	it("names exact voice locales", () => {
+		expect(langNameForTag("ja-JP")).toBe("Japanese");
+		expect(langNameForTag("fr-FR")).toBe("French");
+	});
+	it("falls back to the primary subtag, then the bare tag", () => {
+		expect(langNameForTag("fr-CA")).toBe("French");
+		expect(langNameForTag("xx-YY")).toBe("xx-YY");
+	});
+});
+
+describe("stepPillVoice", () => {
+	const locale = (code: string): string | null =>
+		replyLanguageFor(code)?.voice ?? null;
+	const state = (over: Partial<PillVoiceState> = {}): PillVoiceState => ({
+		appliedPill: null,
+		pillBaseVoice: null,
+		voiceLang: "en-US",
+		voiceLangPinned: false,
+		...over
+	});
+
+	it("installs the pill locale unpinned", () => {
+		expect(stepPillVoice(state(), "fr", locale)).toEqual({
+			appliedPill: "fr",
+			pillBaseVoice: "en-US",
+			voiceLang: "fr-FR",
+			voiceLangPinned: false
+		});
+	});
+	it("reruns with the same pill are no-ops", () => {
+		const applied = stepPillVoice(state(), "fr", locale);
+		expect(stepPillVoice(applied, "fr", locale)).toBe(applied);
+	});
+	it("restores the base voice when the pill leaves", () => {
+		const applied = stepPillVoice(state(), "fr", locale);
+		expect(stepPillVoice(applied, null, locale)).toEqual({
+			appliedPill: null,
+			pillBaseVoice: "en-US",
+			voiceLang: "en-US",
+			voiceLangPinned: true
+		});
+	});
+	it("a manual pick the leaving pill doesn't match stands untouched", () => {
+		const manual = state({
+			appliedPill: "fr",
+			pillBaseVoice: "en-US",
+			voiceLang: "de-DE",
+			voiceLangPinned: true
+		});
+		expect(stepPillVoice(manual, null, locale)).toEqual({
+			appliedPill: null,
+			pillBaseVoice: "en-US",
+			voiceLang: "de-DE",
+			voiceLangPinned: true
+		});
+	});
+	it("switching pills restores then reinstalls", () => {
+		const applied = stepPillVoice(state(), "fr", locale);
+		expect(stepPillVoice(applied, "de", locale)).toEqual({
+			appliedPill: "de",
+			pillBaseVoice: "en-US",
+			voiceLang: "de-DE",
+			voiceLangPinned: false
+		});
+	});
+	it("unknown pill codes never apply", () => {
+		expect(stepPillVoice(state(), "xx", locale)).toEqual(state());
 	});
 });

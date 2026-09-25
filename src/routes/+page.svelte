@@ -74,8 +74,10 @@
 		LANGUAGE_MENUS,
 		QUICK_LANG_CODES,
 		langMenuAnchorFor,
+		langNameForTag,
 		quickKeyFor,
 		replyLanguageFor,
+		stepPillVoice,
 		switchToastFor,
 		thinkingLabelFor,
 		type LangMenuAnchor,
@@ -8639,7 +8641,9 @@
 	 * Voice follow for per-chat pills. appliedPill is the code whose voice
 	 * is currently installed; pillBaseVoice is the locale from before it.
 	 * Switching chats releases the old pill (restoring the base unless the
-	 * user picked their own meanwhile) and installs the new one.
+	 * user picked their own meanwhile) and installs the new one. The
+	 * decision is the pure stepPillVoice (unit-tested); the effect only
+	 * wires it to state and persists on change.
 	 */
 	let appliedPill: string | null = null;
 	let pillBaseVoice: string | null = null;
@@ -8647,27 +8651,42 @@
 		const current =
 			chatState.chats.find((c) => c.id === chatState.activeChatId) ?? null;
 		const code = current?.replyLang ?? null;
-		if (code === appliedPill) return;
-		const old = appliedPill ? replyLanguageFor(appliedPill) : null;
-		if (old && pillBaseVoice !== null && settings.voiceLang === old.voice) {
-			settings.voiceLang = pillBaseVoice;
-			// The restored value regains its standing, deliberate or not.
-			settings.voiceLangPinned = true;
-			persistSettings();
-		}
-		appliedPill = null;
-		if (!code) return;
-		const lang = replyLanguageFor(code);
-		if (!lang) return;
-		pillBaseVoice = settings.voiceLang;
-		appliedPill = code;
-		settings.voiceLang = lang.voice;
-		// The pill owns the voice from here, unpinned: a launch without
-		// the pill falls back to the system default, while the persisted
+		const next = stepPillVoice(
+			{
+				appliedPill,
+				pillBaseVoice,
+				voiceLang: settings.voiceLang,
+				voiceLangPinned: settings.voiceLangPinned
+			},
+			code,
+			(check) => replyLanguageFor(check)?.voice ?? null
+		);
+		appliedPill = next.appliedPill;
+		pillBaseVoice = next.pillBaseVoice;
+		if (
+			next.voiceLang === settings.voiceLang &&
+			next.voiceLangPinned === settings.voiceLangPinned
+		)
+			return;
+		settings.voiceLang = next.voiceLang;
+		// The restored value regains its standing, deliberate or not;
+		// the pill owns the voice from an install, unpinned, so a
+		// launch without the pill falls back while the persisted
 		// pill reinstalls its override on launch.
-		settings.voiceLangPinned = false;
+		settings.voiceLangPinned = next.voiceLangPinned;
 		persistSettings();
 	});
+	/** Follow-chat target for the voice-language picker: the pill
+	locale while one is set, else the current (base) tag. Choosing
+	it unpins back to automatic. */
+	const followVoice = $derived(
+		activeReplyLang
+			? { tag: activeReplyLang.voice, name: activeReplyLang.name }
+			: {
+					tag: settings.voiceLang,
+					name: langNameForTag(settings.voiceLang)
+				}
+	);
 
 	/** Pill lives on the active chat; the voice-follow effect above
 	installs its voice. Unknown codes never reach the field. */
@@ -13914,6 +13933,7 @@
 	<SettingsDrawer
 		open={settingsOpen}
 		{settings}
+		{followVoice}
 		tokensLabel="{formatTokens(split.prompt)} in / {formatTokens(
 			split.completion
 		)} out"

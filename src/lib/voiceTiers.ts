@@ -25,6 +25,51 @@ export interface VoiceOption {
 	tier: string;
 }
 
+/** Follow-chat target for the voice-language picker: the pill locale,
+or the pre-pill base when no pill is set. */
+export interface VoiceLangFollow {
+	tag: string;
+	name: string;
+}
+
+/** One voice-language picker row. */
+export interface VoiceLangOption {
+	value: string;
+	label: string;
+}
+
+/**
+ * Language options for the voice-language picker (desktop and Android
+ * share it): the follow-chat row first, then installed engine tags,
+ * then the current tag when it matches nothing installed (a custom
+ * locale stays selectable, never silently dropped). An installed tag
+ * duplicating the follow tag collapses into the follow row. Pure and
+ * unit-tested.
+ */
+export function voiceLangOptions(
+	installed: string[],
+	current: string,
+	follow: VoiceLangFollow | null,
+	labelFor: (tag: string) => string
+): VoiceLangOption[] {
+	const options: VoiceLangOption[] = [];
+	if (follow) {
+		options.push({
+			value: follow.tag,
+			label: `Follow chat language (${follow.name})`
+		});
+	}
+	const seen = new Set(options.map((option) => option.value));
+	for (const tag of installed) {
+		if (seen.has(tag)) continue;
+		seen.add(tag);
+		options.push({ value: tag, label: labelFor(tag) });
+	}
+	if (!seen.has(current))
+		options.push({ value: current, label: labelFor(current) });
+	return options;
+}
+
 function toOption(voice: NativeVoice): VoiceOption {
 	return {
 		id: voice.id,

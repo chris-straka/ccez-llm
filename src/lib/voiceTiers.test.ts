@@ -5,7 +5,8 @@ import {
 	voicesForLang,
 	allVoicesForLang,
 	autoVoiceForLang,
-	installedLangs
+	installedLangs,
+	voiceLangOptions
 } from "./voiceTiers";
 import type { NativeVoice } from "./nativeTts";
 
@@ -185,5 +186,30 @@ describe("installedLangs", () => {
 			])
 		).toEqual(["en-GB", "en-US", "ja-JP"]);
 		expect(installedLangs([])).toEqual([]);
+	});
+});
+
+describe("voiceLangOptions", () => {
+	const label = (tag: string): string => `${tag}-label`;
+
+	it("leads with follow, then installed, collapsing duplicates", () => {
+		expect(
+			voiceLangOptions(["en-US", "ja-JP"], "en-US", { tag: "ja-JP", name: "Japanese" }, label)
+		).toEqual([
+			{ value: "ja-JP", label: "Follow chat language (Japanese)" },
+			{ value: "en-US", label: "en-US-label" }
+		]);
+	});
+	it("keeps the current tag when nothing installed matches", () => {
+		expect(voiceLangOptions(["en-US"], "xx-YY", null, label)).toEqual([
+			{ value: "en-US", label: "en-US-label" },
+			{ value: "xx-YY", label: "xx-YY-label" }
+		]);
+	});
+	it("lists installed tags with no follow row", () => {
+		expect(voiceLangOptions(["ja-JP", "en-US"], "en-US", null, label)).toEqual([
+			{ value: "ja-JP", label: "ja-JP-label" },
+			{ value: "en-US", label: "en-US-label" }
+		]);
 	});
 });

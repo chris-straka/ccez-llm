@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { AppSettings } from "$lib/settings";
+	import type { VoiceLangFollow } from "$lib/voiceTiers";
 	import { hydrateSecrets, tauriBackendAvailable } from "$lib/secrets";
 	import { getCurrentWindow } from "@tauri-apps/api/window";
 	import { onMount } from "svelte";
@@ -22,6 +23,9 @@
 		tokensTitle?: string | null;
 		/** Phone UI: hover doesn't exist, so the hover toggles read as a note. */
 		androidUI?: boolean;
+		/** Follow-chat voice target (page pill state); omitted in
+		unit renders, where the voice panel falls back. */
+		followVoice?: VoiceLangFollow | null;
 		/** Double-tap the settings top: expand the window like the main
 		top bar (the page owns the shell zoom). */
 		onExpand?: (event: MouseEvent) => void;
@@ -39,6 +43,7 @@
 		tokensLabel = null,
 		tokensTitle = null,
 		androidUI = false,
+		followVoice = null,
 		onToast,
 		onExpand
 	}: Props = $props();
@@ -158,7 +163,7 @@
 	{/if}
 </div>
 <ProviderPanel {settings} {onCommit} />
-<DefaultsPanel {settings} {androidUI} />
+<DefaultsPanel {settings} {androidUI} {followVoice} />
 <AppearancePanel {settings} />
 <div class="keys-updates">
 	<section aria-labelledby="keys-heading">

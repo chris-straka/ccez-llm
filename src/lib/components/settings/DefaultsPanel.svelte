@@ -20,15 +20,19 @@
 		idleSliderToSetting
 	} from "$lib/chrome";
 	import { thinkingFor, resolveThinkingId } from "$lib/providers/thinking";
+	import type { VoiceLangFollow } from "$lib/voiceTiers";
 	import VoicePanel from "./VoicePanel.svelte";
 	import "./panels.css";
 
 	interface Props {
 		settings: AppSettings;
 		androidUI: boolean;
+		/** Follow-chat voice target (page pill state); omitted in
+		unit renders, where the voice panel falls back. */
+		followVoice?: VoiceLangFollow | null;
 	}
 
-	let { settings = $bindable(), androidUI }: Props = $props();
+	let { settings = $bindable(), androidUI, followVoice = null }: Props = $props();
 	/**
 	 * Slider reset gestures (text size, prompt size, chat width,
 	 * prompt width, idle timeout): only
@@ -177,30 +181,14 @@
 			Enable screen-capture OCR (global shortcut + composer button)
 		</label>
 	{/if}
-	<VoicePanel {settings} {androidUI} />
+	<VoicePanel {settings} {androidUI} {followVoice} />
 	<!-- Study-fonts and lesson-audio sections removed (lesson-audio
 	froze the app): the inventory helpers stay in
 	fontCoverage.ts and nativeTts.ts for their remaining callers. -->
 
-	{#if !androidUI}
-		<!-- Android picks the language from the installed inventory
-			inside VoicePanel above; desktop keeps the free-text tag. -->
-		<div class="field">
-			<span id="voice-lang-label">Voice language</span>
-			<input
-				type="text"
-				aria-labelledby="voice-lang-label"
-				bind:value={settings.voiceLang}
-				placeholder="en-US"
-				autocomplete="off"
-				spellcheck="false"
-				onchange={() => {
-					// A typed locale is deliberate: restarts keep it.
-					settings.voiceLangPinned = true;
-				}}
-			/>
-		</div>
-	{/if}
+	<!-- The language picker lives inside VoicePanel above on every
+	platform now: every tag on offer names an installed voice, so
+	nothing needs typing. -->
 	<label class="slider-row">
 		Text Size
 		<button

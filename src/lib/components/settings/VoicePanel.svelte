@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { AppSettings } from "$lib/settings";
-	import { replyLanguageFor } from "$lib/languages";
+	import { langNameForTag } from "$lib/languages";
 	import { tauriBackendAvailable } from "$lib/secrets";
 	import { currentPlatform } from "$lib/platform";
 	import {
@@ -15,7 +15,9 @@
 		voicesForLang,
 		allVoicesForLang,
 		autoVoiceForLang,
-		installedLangs
+		installedLangs,
+		voiceLangOptions,
+		type VoiceLangFollow
 	} from "$lib/voiceTiers";
 	import ActionIcon from "../ActionIcon.svelte";
 	import { onMount } from "svelte";
@@ -24,9 +26,12 @@
 	interface Props {
 		settings: AppSettings;
 		androidUI: boolean;
+		/** Follow-chat voice target (page pill state); omitted in
+		unit renders, where it falls back to the current tag. */
+		followVoice?: VoiceLangFollow | null;
 	}
 
-	let { settings, androidUI }: Props = $props();
+	let { settings, androidUI, followVoice = null }: Props = $props();
 	/** Native macOS voice engine present (Tauri shell on macOS). */
 	let nativeVoice = $state(false);
 	/** Plain browser on a Mac: no inventory API, but download guidance applies. */
@@ -47,11 +52,7 @@
 	/** Picker options follow the Latin-script voice language field. */
 	const voiceLangTag = $derived(settings.voiceLang?.trim() || "en-US");
 	/** Human language name for the empty-voice note (falls back to the tag). */
-	const voiceLangName = $derived(
-		replyLanguageFor(voiceLangTag)?.name ??
-			replyLanguageFor(voiceLangTag.split("-")[0] ?? "")?.name ??
-			voiceLangTag
-	);
+	const voiceLangName = $derived(langNameForTag(voiceLangTag));
 	/* Desktop picker source: macOS tiers premium/enhanced out of the
 	registry, but Windows (SAPI) and Linux (Speech Dispatcher/espeak)
 	report every voice at quality 1 — the premium/enhanced gate would
@@ -66,18 +67,41 @@
 	const androidVoiceOptions = $derived(
 		allVoicesForLang(installedVoices, voiceLangTag)
 	);
-	/** Android language picker: installed engine tags first, the current
-	tag kept even when it matches nothing installed (a custom locale is
-	still selectable, never silently dropped). */
-	const androidLangOptions = $derived.by(() => {
-		const tags = installedLangs(installedVoices);
-		return tags.includes(voiceLangTag) ? tags : [voiceLangTag, ...tags];
-	});
+	/** Follow-chat target, resolved: the pill locale from the page,
+	else the current tag (choosing it unpins back to automatic). */
+	const follow = $derived(
+		followVoice ?? { tag: voiceLangTag, name: voiceLangName }
+	);
 	/** Picker label for a language tag ("English · en-US", bare tag
 	when the name is unknown). */
-	function androidLangLabel(tag: string): string {
-		const name = replyLanguageFor(tag)?.name;
-		return name ? `${name} · ${tag}` : tag;
+	function langTagLabel(tag: string): string {
+		const name = langNameForTag(tag);
+		return name === tag ? tag : `${name} · ${tag}`;
+	}
+	/** Language picker options (desktop and Android share them):
+	follow-chat first, installed engine tags next, the current tag
+	kept even when it matches nothing installed (a custom locale is
+	still selectable, never silently dropped). */
+	const langOptions = $derived(
+		voiceLangOptions(
+			installedLangs(installedVoices),
+			voiceLangTag,
+			follow,
+			langTagLabel
+		)
+	);
+	/** Language commit: the follow row unpins back to automatic, any
+	other tag pins as a deliberate pick. Like every settings field,
+	persistence rides onCommit — nothing saves mid-pick. */
+	function commitLangTag(next: string): void {
+		if (!next) return;
+		if (next === follow.tag) {
+			settings.voiceLang = follow.tag;
+			settings.voiceLangPinned = false;
+		} else {
+			settings.voiceLang = next;
+			settings.voiceLangPinned = true;
+		}
 	}
 	/** The voice Auto would use next for the tag above (label only —
 	the bridge stays authoritative at speak time). */
@@ -212,14 +236,10 @@
 				<select
 					value={voiceLangTag}
 					aria-labelledby="voice-lang-label-android"
-					onchange={(e) => {
-						settings.voiceLang = e.currentTarget.value;
-						// A picked locale is deliberate: restarts keep it.
-						settings.voiceLangPinned = true;
-					}}
+					onchange={(e) => commitLangTag(e.currentTarget.value)}
 				>
-					{#each androidLangOptions as tag (tag)}
-						<option value={tag}>{androidLangLabel(tag)}</option>
+					{#each langOptions as option (option.value)}
+						<option value={option.value}>{option.label}</option>
 					{/each}
 				</select>
 			</div>
@@ -328,6 +348,25 @@
 			</p>
 		{/if}
 		{#if !voiceLoadError}
+			<!-- Language first: the picker below lists voices for this tag.
+				Every option names an installed voice (or the follow-chat
+				target), so no tag ever needs typing. -->
+			<div class="voice-pick">
+				<span class="voice-pick-label" id="voice-lang-label"
+					>Voice language</span
+				>
+				<div class="voice-pick-row">
+					<select
+						value={voiceLangTag}
+						aria-labelledby="voice-lang-label"
+						onchange={(e) => commitLangTag(e.currentTarget.value)}
+					>
+						{#each langOptions as option (option.value)}
+							<option value={option.value}>{option.label}</option>
+						{/each}
+					</select>
+				</div>
+			</div>
 			{#if voiceOptions.length > 0}
 				<!-- Plain div + aria, not a <label>: label clicks yank focus
 					into the select, which fights selecting this text. -->

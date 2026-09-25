@@ -6,6 +6,7 @@ their surfaces. The panel node crosses as $bindable (page focus
 bookkeeping reads it). -->
 <script lang="ts">
 	import type { AppSettings } from "$lib/settings";
+	import type { VoiceLangFollow } from "$lib/voiceTiers";
 	import SettingsPanel from "./SettingsPanel.svelte";
 
 	/** Page-owned drawer behaviors. */
@@ -24,6 +25,9 @@ bookkeeping reads it). -->
 		tokensLabel: string;
 		tokensTitle: string;
 		android: boolean;
+		/** Follow-chat voice target (page pill state); omitted in
+		unit renders, where the panel falls back to the current tag. */
+		followVoice?: VoiceLangFollow | null;
 		/** Panel node (page focus bookkeeping reads it). */
 		panelEl?: HTMLElement | undefined;
 		actions: SettingsDrawerActions;
@@ -35,6 +39,7 @@ bookkeeping reads it). -->
 		tokensLabel,
 		tokensTitle,
 		android,
+		followVoice = null,
 		panelEl = $bindable(),
 		actions
 	}: Props = $props();
@@ -62,6 +67,7 @@ bookkeeping reads it). -->
 	<div class="settings-inner">
 		<SettingsPanel
 			{settings}
+			{followVoice}
 			onCommit={actions.commit}
 			onToast={actions.toast}
 			onClose={actions.panelClose}
