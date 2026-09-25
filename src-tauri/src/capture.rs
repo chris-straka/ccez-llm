@@ -197,6 +197,24 @@ pub struct AreaRect {
 pub struct AreaPick {
     pub rect: Option<AreaRect>,
     pub clear: bool,
+    /// Overlay geometry at submit time (window origin, viewport,
+    /// display scale): logged by `submit_area_rect` so a misplaced
+    /// square can be traced to its inputs. Optional so older
+    /// overlays still parse.
+    #[serde(default)]
+    pub debug: Option<AreaDebug>,
+}
+
+/// Overlay geometry snapshot for the backend log: where the overlay
+/// window reported itself (`origin_*`, CSS px), how big its viewport
+/// was (`viewport_*`), and its display scale. Pure data.
+#[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
+pub struct AreaDebug {
+    pub origin_x: f64,
+    pub origin_y: f64,
+    pub viewport_w: f64,
+    pub viewport_h: f64,
+    pub scale: f64,
 }
 
 /// Open the set-area overlay: a transparent maximized always-on-top
@@ -259,6 +277,18 @@ pub fn show_main(app: tauri::AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub fn submit_area_rect(app: tauri::AppHandle, pick: AreaPick) -> Result<(), String> {
     use tauri::{Emitter, Manager};
+    if let Some(debug) = &pick.debug {
+        eprintln!(
+            "[ccez] area pick origin=({},{}) viewport={}x{} scale={} rect={:?} clear={}",
+            debug.origin_x,
+            debug.origin_y,
+            debug.viewport_w,
+            debug.viewport_h,
+            debug.scale,
+            pick.rect,
+            pick.clear
+        );
+    }
     if let Some(picker) = app.get_webview_window("area-pick") {
         let _ = picker.close();
     }
@@ -609,6 +639,33 @@ mod tests {
             ),
             "saved capture area 10,20 300x150 is off screen (screencapture: -R requires a valid rect (x,y,w,h)): set it again with Shift+Cmd+U"
         );
+    }
+
+    #[test]
+    fn area_pick_debug_defaults_to_none() {
+        let pick: super::AreaPick =
+            serde_json::from_value(serde_json::json!({"rect": null, "clear": false}))
+                .expect("parses");
+        assert!(pick.debug.is_none());
+    }
+
+    #[test]
+    fn area_pick_debug_round_trips() {
+        let pick: super::AreaPick = serde_json::from_value(serde_json::json!({
+            "rect": {"x": 10.0, "y": 20.0, "width": 100.0, "height": 40.0},
+            "clear": false,
+            "debug": {
+                "origin_x": 0.0,
+                "origin_y": 25.0,
+                "viewport_w": 1920.0,
+                "viewport_h": 1055.0,
+                "scale": 2.0
+            }
+        }))
+        .expect("parses");
+        let debug = pick.debug.expect("debug kept");
+        assert_eq!(debug.origin_y, 25.0);
+        assert_eq!(debug.scale, 2.0);
     }
 
     #[test]

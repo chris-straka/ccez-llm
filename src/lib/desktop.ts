@@ -237,6 +237,16 @@ export async function listenGameCapture(
 export interface AreaPick {
 	rect: { x: number; y: number; width: number; height: number } | null;
 	clear: boolean;
+	/** Overlay geometry at submit time (window origin, viewport,
+	display scale): the backend logs it, the main window ignores
+	it. Snake case matches the Rust field names, no renames. */
+	debug?: {
+		origin_x: number;
+		origin_y: number;
+		viewport_w: number;
+		viewport_h: number;
+		scale: number;
+	};
 }
 
 /**

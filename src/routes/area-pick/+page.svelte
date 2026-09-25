@@ -24,12 +24,37 @@ instead — same three-runtime degrade as every backend call. -->
 	async function submit(pick: {
 		rect: AreaRect | null;
 		clear: boolean;
+		debug: {
+			origin_x: number;
+			origin_y: number;
+			viewport_w: number;
+			viewport_h: number;
+			scale: number;
+		};
 	}): Promise<void> {
 		try {
 			await invoke("submit_area_rect", { pick });
 		} catch {
 			failed = true;
 		}
+	}
+
+	function debugInfo(): {
+		origin_x: number;
+		origin_y: number;
+		viewport_w: number;
+		viewport_h: number;
+		scale: number;
+	} {
+		// Geometry snapshot for the backend log: if a saved square
+		// ever lands off screen, this names the inputs it came from.
+		return {
+			origin_x: window.screenX,
+			origin_y: window.screenY,
+			viewport_w: window.innerWidth,
+			viewport_h: window.innerHeight,
+			scale: window.devicePixelRatio || 1
+		};
 	}
 
 	function windowOrigin(): { x: number; y: number } {
@@ -65,15 +90,21 @@ instead — same three-runtime degrade as every backend call. -->
 					{ x: 0, y: 0, width: window.innerWidth, height: window.innerHeight },
 					windowOrigin()
 				),
-				clear: false
+				clear: false,
+				debug: debugInfo()
 			});
 			return;
 		}
-		void submit({ rect: toGlobalRect(done, windowOrigin()), clear: false });
+		void submit({
+			rect: toGlobalRect(done, windowOrigin()),
+			clear: false,
+			debug: debugInfo()
+		});
 	}
 
 	function onKeyDown(event: KeyboardEvent): void {
-		if (event.key === "Escape") void submit({ rect: null, clear: false });
+		if (event.key === "Escape")
+			void submit({ rect: null, clear: false, debug: debugInfo() });
 	}
 </script>
 
@@ -99,7 +130,7 @@ instead — same three-runtime degrade as every backend call. -->
 			<span>Drag to set the square · Click for fullscreen · Esc cancels</span>
 			<button
 				type="button"
-				onclick={() => void submit({ rect: null, clear: true })}
+				onclick={() => void submit({ rect: null, clear: true, debug: debugInfo() })}
 			>
 				Clear saved area
 			</button>
