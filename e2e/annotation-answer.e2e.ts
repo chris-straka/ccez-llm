@@ -569,6 +569,41 @@ test("chinese answer spawns the pinyin panel above the quote", async ({
 	expect((cardBox?.y ?? -1) >= (quoteBottom ?? 1e9)).toBe(true);
 });
 
+/** Clicking a Chinese answer's badge spawns the pinyin panel above
+the quote just like the keyboard path: the mouseup after the press
+must not clear the live selection the panel rides on. */
+test("badge click spawns the pinyin panel above the quote", async ({
+	page
+}) => {
+	test.setTimeout(120_000);
+	await seedChat(page, [{ role: "assistant", content: "雨过天晴" }]);
+	await page.addInitScript(() => {
+		localStorage.setItem("ccez-mock-chat-ms", "2500");
+	});
+	await page.goto("/");
+	const article = page.locator("article.assistant");
+	await expect(article).toBeVisible({ timeout: 60_000 });
+	await dragQuote(page, 0, "雨过");
+	await expect(page.locator(".sel-menu")).toBeVisible({ timeout: 10_000 });
+	// Shift+A opens the box (bare A files and sends at once now).
+	await page.keyboard.press("A");
+	await askAtFile(page, "what does this mean?");
+	const ready = page.locator("button.ccez-ann-badge.ans-ready");
+	// Real mouse click (mousedown + mouseup), not keyboard Enter.
+	await ready.click();
+	const card = page.locator(".ann-answer");
+	await expect(card).toBeVisible({ timeout: 10_000 });
+	// The pinyin popup appears above the hanzi and survives the click.
+	const panel = page.locator(".sel-pinyin");
+	await expect(panel).toBeVisible({ timeout: 10_000 });
+	await expect(panel).toContainText("yǔ");
+	await expect(panel).not.toContainText("雨过");
+	// Clicking off closes the card and drops its pinyin panel with it.
+	await article.click({ position: { x: 5, y: 5 } });
+	await expect(card).toHaveCount(0);
+	await expect(panel).toHaveCount(0);
+});
+
 /** Creating a Chinese annotation shows its pinyin panel above the
 quote while the pill is open (pinned past the pill's focus
 collapse); cancelling drops both. */

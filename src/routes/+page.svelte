@@ -5433,7 +5433,16 @@
 			// The quote highlights wash-only (its own text is the
 			// context) and Han quotes earn the right-click readings
 			// panel above it — nothing repeated in the card, no
-			// extra request, no native-blue flash.
+			// extra request, no native-blue flash. A quote with no
+			// readings to offer drops a previous quote's panel (the
+			// press no longer clears it above): the panel goes away
+			// with the card it rode in on.
+			const quoted = {
+				quote: current.quote,
+				messageId: current.messageId,
+				context: answerContextFor(current.messageId, current.quote)
+			};
+			if (!quoteOffersReadings(quoted)) dismissSelPanels();
 			const selected = selectAnswerQuote(id);
 			if (selected) void readingsForQuote(selected, true);
 			if (!androidUI && quoteRect) {
@@ -5469,8 +5478,11 @@
 		// Filed notes never edit inline in the dock: the row offers
 		// pin, pencil (answered only — it opens the edit card),
 		// inclusion toggle, copy, and delete. Opening still reads
-		// the annotated text back out, like the answer path.
+		// the annotated text back out, like the answer path. The
+		// dock summons no readings panel, so a previous quote's
+		// panel goes with the press (it no longer clears above).
 		stopPillMic();
+		dismissSelPanels();
 		void speakQuote(
 			current.quote,
 			current.messageId,
@@ -12001,7 +12013,10 @@
 			// highlight itself lingers (the panel is pointer-transparent,
 			// so every press lands outside it). A right-click re-summons
 			// through contextmenu right after when it still applies.
-			dismissSelPanels();
+			// Badge presses never dismiss: their own open path summons
+			// the readings panel for Han quotes (see openBadge), and
+			// this listener runs after it in the same gesture.
+			if (!target?.closest("[data-ann-badge]")) dismissSelPanels();
 			selectingInMessage =
 				event.button === 0 && !!target?.closest(".messages .rendered");
 			offChatDragArmed =
