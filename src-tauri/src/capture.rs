@@ -392,9 +392,13 @@ mod imp {
             .map_err(|_| "screen capture could not start".to_string())?;
         if !output.status.success() {
             let _ = std::fs::remove_file(&path);
-            return Err(super::capture_failure_message(
-                &String::from_utf8_lossy(&output.stderr),
-            ));
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            // Support line for the dev shell: absurd numbers here mean
+            // the saved rect is corrupt (mapping bug); sane numbers
+            // mean the display mode moved under it (game res switch)
+            // or the draw never saved and this is a stale square.
+            eprintln!("[ccez] saved area {x},{y},{width}x{height} failed: {stderr}");
+            return Err(super::capture_failure_message(&stderr));
         }
         read_capture(&path)
     }
