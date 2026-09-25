@@ -496,7 +496,7 @@ dependencies = [
 
 [[package]]
 name = "ccez-llm"
-version = "0.6.7"
+version = "0.6.8"
 dependencies = [
  "base64 0.22.1",
  "block2 0.6.2",
@@ -508,6 +508,7 @@ dependencies = [
  "objc2-foundation 0.3.2",
  "objc2-natural-language",
  "objc2-vision",
+ "raw-window-handle",
  "reqwest 0.12.28",
  "rustls",
  "serde",

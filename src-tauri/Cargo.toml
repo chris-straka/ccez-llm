@@ -1,6 +1,6 @@
 [package]
 name = "ccez-llm"
-version = "0.6.7"
+version = "0.6.8"
 description = "A personalized/opinionated LLM client"
 authors = ["ccez"]
 edition = "2021"
@@ -68,6 +68,9 @@ objc2-natural-language = "0.3"
 # NSEvent's local monitor (dictate/tts use block2 directly, not
 # through AppKit types).
 objc2-app-kit = { version = "0.3", features = ["block2"] }
+# NSWindow handle for the area picker (FullScreenAuxiliary over the
+# game Space): same 0.6 line Tauri itself builds against.
+raw-window-handle = "0.6"
 # Speech-recognition authorization callback (dictate_macos only).
 block2 = "0.6"
 # On-device text recognition (Vision VNRecognizeTextRequest, ocr.rs).

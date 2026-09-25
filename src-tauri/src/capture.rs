@@ -130,6 +130,24 @@ pub fn rect_flag(x: u32, y: u32, width: u32, height: u32) -> String {
     format!("-R{x},{y},{width},{height}")
 }
 
+/// Failure message for a dead `screencapture` run: the CLI prints
+/// the geometry reason on stderr (a saved square that no longer
+/// intersects the displays, or a degenerate rect), while a TCC
+/// denial dies silent — so stderr decides. Geometry names its fix
+/// (set the square again); everything else keeps the Screen
+/// Recording fix (relaunch: macOS only applies fresh grants to
+/// fresh launches). Pure and unit-tested.
+pub fn capture_failure_message(stderr: &str) -> String {
+    if stderr.contains("does not intersect any displays")
+        || stderr.contains("requires a valid rect")
+    {
+        return "saved capture area is off screen: set it again with Shift+Cmd+U"
+            .to_string();
+    }
+    "screen capture failed: allow Screen Recording for Ccez LLM, then relaunch and retry"
+        .to_string()
+}
+
 /// Saved square from the area picker, device pixels in global
 /// display space (the overlay multiplies by its display scale).
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
@@ -177,18 +195,68 @@ fn open_area_picker_desktop(app: &tauri::AppHandle) -> Result<(), String> {
         let _ = picker.set_focus();
         return Ok(());
     }
-    WebviewWindowBuilder::new(app, "area-pick", WebviewUrl::App("/area-pick".into()))
-        .transparent(true)
-        .decorations(false)
-        .maximized(true)
-        .always_on_top(true)
-        .visible_on_all_workspaces(true)
-        .skip_taskbar(true)
-        .focused(true)
-        .build()
-        .map(|_| ())
-        .map_err(|_| "the area picker could not open".to_string())
+    let picker =
+        WebviewWindowBuilder::new(app, "area-pick", WebviewUrl::App("/area-pick".into()))
+            .transparent(true)
+            .decorations(false)
+            .maximized(true)
+            .always_on_top(true)
+            .visible_on_all_workspaces(true)
+            .skip_taskbar(true)
+            .focused(true)
+            .build()
+            .map_err(|_| "the area picker could not open".to_string())?;
+    join_fullscreen_spaces(&picker);
+    Ok(())
 }
+
+/// Join fullscreen Spaces too: `visible_on_all_workspaces` only sets
+/// CanJoinAllSpaces, which never reaches a fullscreen game Space —
+/// macOS shows a window above fullscreen only with
+/// FullScreenAuxiliary OR-ed into the collection behavior (the same
+/// generated objc2 bindings the TTS bridge uses, no Objective-C).
+/// Main-threaded like every AppKit call (the dev-icon pattern);
+/// best-effort — a missed bit keeps the desktop-Space behavior,
+/// never an error.
+#[cfg(target_os = "macos")]
+fn join_fullscreen_spaces(picker: &tauri::WebviewWindow) {
+    let _ = picker.run_on_main_thread({
+        let picker = picker.clone();
+        move || {
+            use objc2::rc::Retained;
+            use objc2_app_kit::{NSView, NSWindow, NSWindowCollectionBehavior};
+            use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+            let Ok(handle) = picker.window_handle() else {
+                return;
+            };
+            let RawWindowHandle::AppKit(appkit) = handle.as_raw() else {
+                return;
+            };
+            let ns_view = appkit.ns_view.as_ptr() as *const NSView;
+            if ns_view.is_null() {
+                return;
+            }
+            // SAFETY: the pointer is the live NSView tao built the
+            // webview in, read on the main thread; only the integer
+            // behavior flags are touched, no allocation or callback
+            // involved.
+            unsafe {
+                let ns_view: &NSView = &*ns_view;
+                let Some(ns_window): Option<Retained<NSWindow>> = ns_view.window()
+                else {
+                    return;
+                };
+                ns_window.setCollectionBehavior(
+                    ns_window.collectionBehavior()
+                        | NSWindowCollectionBehavior::FullScreenAuxiliary,
+                );
+            }
+        }
+    });
+}
+
+#[cfg(not(target_os = "macos"))]
+fn join_fullscreen_spaces(_picker: &tauri::WebviewWindow) {}
 
 /// Bring the main window forward (show plus focus, best-effort).
 /// The capture chord needs it visible on the paths without a saved
@@ -369,16 +437,15 @@ mod imp {
     pub fn capture_rect(x: u32, y: u32, width: u32, height: u32) -> Result<String, String> {
         let path = temp_png();
         let path_arg = path.to_string_lossy().into_owned();
-        let status = std::process::Command::new("/usr/sbin/screencapture")
+        let output = std::process::Command::new("/usr/sbin/screencapture")
             .args(["-x", "-o", &super::rect_flag(x, y, width, height), &path_arg])
-            .status()
+            .output()
             .map_err(|_| "screen capture could not start".to_string())?;
-        if !status.success() {
+        if !output.status.success() {
             let _ = std::fs::remove_file(&path);
-            return Err(
-                "screen capture failed: allow Screen Recording for Ccez LLM, then relaunch and retry"
-                    .to_string(),
-            );
+            return Err(super::capture_failure_message(
+                &String::from_utf8_lossy(&output.stderr),
+            ));
         }
         read_capture(&path)
     }
@@ -455,16 +522,15 @@ mod imp {
                 None => return Err("no capturable window is on screen".to_string()),
             }
         }
-        let status = std::process::Command::new("/usr/sbin/screencapture")
+        let output = std::process::Command::new("/usr/sbin/screencapture")
             .args(&args)
-            .status()
+            .output()
             .map_err(|_| "screen capture could not start".to_string())?;
-        if !status.success() {
+        if !output.status.success() {
             let _ = std::fs::remove_file(&path);
-            return Err(
-                "screen capture failed: allow Screen Recording for Ccez LLM, then relaunch and retry"
-                    .to_string(),
-            );
+            return Err(super::capture_failure_message(
+                &String::from_utf8_lossy(&output.stderr),
+            ));
         }
         read_capture(&path)
     }
@@ -515,5 +581,29 @@ mod tests {
     #[test]
     fn rect_flag_formats_global_device_pixels() {
         assert_eq!(rect_flag(10, 20, 300, 150), "-R10,20,300,150");
+    }
+
+    #[test]
+    fn failure_names_offscreen_square() {
+        assert_eq!(
+            super::capture_failure_message(
+                "rect (9000.0, 9000.0, 100.0, 100.0) does not intersect any displays\n"
+            ),
+            "saved capture area is off screen: set it again with Shift+Cmd+U"
+        );
+        assert_eq!(
+            super::capture_failure_message(
+                "screencapture: -R requires a valid rect (x,y,w,h)\n"
+            ),
+            "saved capture area is off screen: set it again with Shift+Cmd+U"
+        );
+    }
+
+    #[test]
+    fn failure_keeps_screen_recording_fix_for_denials() {
+        assert_eq!(
+            super::capture_failure_message(""),
+            "screen capture failed: allow Screen Recording for Ccez LLM, then relaunch and retry"
+        );
     }
 }

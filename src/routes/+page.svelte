@@ -4379,6 +4379,10 @@
 		if (!tauriBackendAvailable()) return;
 		try {
 			await openScreenRecordingSettings();
+			// The deep link gives no landing confirmation and
+			// sub-anchors can be swallowed: always print the
+			// in-pane row alongside (voice-settings convention).
+			flashToast("Screen Recording row: Privacy & Security → Screen Recording.");
 		} catch {
 			flashToast(
 				"Screen Recording lives in System Settings → Privacy & Security."

@@ -1,9 +1,11 @@
 <!-- Set-area overlay (the ⇧⌘U chord): a transparent maximized window
-over the active Space. Drag to save the square the capture chord
-reuses (device pixels, display scale applied); press-release without
-moving takes the whole display; Esc cancels silently. Clear drops a
-saved square. Outside the shell the submit fails and a note renders
-instead — same three-runtime degrade as every backend call. -->
+on every Space, fullscreen game included (FullScreenAuxiliary — plain
+maximized windows never leave the app Space). Drag to save the square
+the capture chord reuses (device pixels, display scale applied);
+press-release without moving takes the whole display; Esc cancels
+silently. Clear drops a saved square. Outside the shell the submit
+fails and a note renders instead — same three-runtime degrade as
+every backend call. -->
 <script lang="ts">
 	import { invoke } from "@tauri-apps/api/core";
 
