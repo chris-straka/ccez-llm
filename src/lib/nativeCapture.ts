@@ -157,6 +157,23 @@ export function isCaptureUnsupported(message: string): boolean {
 }
 
 /**
+ * CSS selection → device pixels at an explicit scale: area-photo
+ * frames report their own natural/displayed ratio, the live overlay
+ * passes `devicePixelRatio`. Pure and unit-tested.
+ */
+export function scaleRectToDevice(
+	rect: { x: number; y: number; width: number; height: number },
+	scale: number
+): { x: number; y: number; width: number; height: number } {
+	return {
+		x: Math.round(rect.x * scale),
+		y: Math.round(rect.y * scale),
+		width: Math.round(rect.width * scale),
+		height: Math.round(rect.height * scale)
+	};
+}
+
+/**
  * True for rejections that mean "macOS denied Screen Recording" —
  * the caller arms the error toast with the System Settings action.
  * Pure and unit-tested.

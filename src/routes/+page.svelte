@@ -580,6 +580,9 @@
 		listenGameCapture,
 		openAreaPicker,
 		listenAreaPicked,
+		listenAreaPickRequested,
+		listenAreaPhotoRequest,
+		answerAreaPhoto,
 		showMainWindow,
 		isSummonHotkey,
 		type AreaPick,
@@ -4387,6 +4390,47 @@
 			flashToast(
 				"Screen Recording lives in System Settings → Privacy & Security."
 			);
+		}
+	}
+	/** Frozen frame awaiting picker pickup (the ⇧⌘U photo flow):
+	null outside a flow and again once answered. Plain module state,
+	not UI state — no markup reads it. */
+	let pendingAreaPhoto: string | null = null;
+	/** Set-area flow (global ⇧⌘U or the in-app chord): capture the
+	 * current screen frozen, bring the app forward, and open the
+	 * picker on the photo — the square gets set from inside the
+	 * game without any overlay fighting its Space (three rounds of
+	 * aux/level/order-front treatment never surfaced a live overlay
+	 * above fullscreen, while `screencapture` provably sees the
+	 * active Space). A capture failure toasts truthfully and stops
+	 * (never yanks focus for nothing); a missing photo falls back
+	 * to the live overlay. The settings checkbox gates both chords.
+	 */
+	async function runAreaPhotoFlow(): Promise<void> {
+		if (!tauriBackendAvailable()) {
+			flashErrorToast("Area picking needs the desktop app.");
+			return;
+		}
+		if (!settings.captureEnabled) return;
+		let pixels: string | null;
+		try {
+			pixels = await capturePixels({ kind: "fullscreen" });
+		} catch (error) {
+			const raw = error instanceof Error ? error.message : String(error);
+			if (isScreenRecordingDenial(raw))
+				flashErrorToast(friendlyCaptureError(raw), () =>
+					void openCaptureSettings()
+				);
+			else flashErrorToast(friendlyCaptureError(raw));
+			return;
+		}
+		if (pixels === null) return;
+		pendingAreaPhoto = `data:image/png;base64,${pixels}`;
+		await showMainWindow();
+		const opened = await openAreaPicker();
+		if (!opened) {
+			pendingAreaPhoto = null;
+			flashErrorToast("Area picking needs the desktop app.");
 		}
 	}
 	async function runCaptureFlow(oneShot?: CaptureOneShot): Promise<void> {
@@ -10863,16 +10907,12 @@
 				return;
 			}
 			if (chord === "set-capture-area") {
-				// Set-area overlay from anywhere: the opener gates on
-				// the settings checkbox and toasts where no backend
-				// answers (browser preview).
+				// Set-area from anywhere: the photo flow gates on the
+				// settings checkbox and toasts where no backend
+				// answers (browser preview) — same flow as the
+				// global chord, one path for both.
 				consumeEvent(event);
-				void (async () => {
-					if (!settings.captureEnabled) return;
-					const opened = await openAreaPicker();
-					if (!opened)
-						flashErrorToast("Area picking needs the desktop app.");
-				})();
+				void runAreaPhotoFlow();
 				return;
 			}
 			const delScope = deleteChatScope({
@@ -12906,6 +12946,20 @@
 			void runCaptureFlow();
 		}).then((stop) => {
 			unlistenCapture = stop;
+		});
+		// Set-area request (global ⇧⌘U, desktop.rs): the photo flow
+		// owns it — the checkbox gates like the capture chord, and
+		// a late picker just renders the live overlay.
+		void listenAreaPickRequested(() => {
+			void runAreaPhotoFlow();
+		});
+		// Area-photo handoff (picker → main): answer once with the
+		// frozen frame, then drop it so a stale photo never serves
+		// a later open.
+		void listenAreaPhotoRequest(() => {
+			const photo = pendingAreaPhoto;
+			pendingAreaPhoto = null;
+			void answerAreaPhoto(photo);
 		});
 		// Area-picker reports (the ⇧⌘U overlay): saves persist the
 		// square the capture chord reuses, clears drop it, Esc

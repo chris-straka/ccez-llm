@@ -8,6 +8,9 @@ fails and a note renders instead — same three-runtime degrade as
 every backend call. -->
 <script lang="ts">
 	import { invoke } from "@tauri-apps/api/core";
+	import { onMount } from "svelte";
+	import { requestAreaPhoto } from "$lib/desktop";
+	import { scaleRectToDevice } from "$lib/nativeCapture";
 
 	interface DeviceRect {
 		x: number;
@@ -19,6 +22,30 @@ every backend call. -->
 	let start = $state<{ x: number; y: number } | null>(null);
 	let current = $state<{ x: number; y: number } | null>(null);
 	let failed = $state(false);
+	/** Frozen fullscreen frame (the ⇧⌘U photo flow): the square is
+	drawn on the photo, never on a live overlay fighting the game
+	Space. Null renders the live transparent overlay (browser
+	preview, or the photo arriving too late). */
+	let photo = $state<string | null>(null);
+	/** Photo natural/displayed ratio (the photo is same-display
+	fullscreen, so one uniform scale covers both axes). */
+	let photoScale = $state(1);
+
+	onMount(() => {
+		void requestAreaPhoto().then((dataUrl) => {
+			photo = dataUrl;
+		});
+	});
+
+	function onPhotoLoad(image: HTMLImageElement): void {
+		// Broken frame: fall back to the live overlay rather than
+		// mapping against a zero size.
+		if (!image.naturalWidth || !window.innerWidth) {
+			photo = null;
+			return;
+		}
+		photoScale = image.naturalWidth / window.innerWidth;
+	}
 
 	const selecting = $derived(
 		start !== null && current !== null
@@ -42,19 +69,17 @@ every backend call. -->
 		}
 	}
 
+	function currentScale(): number {
+		return photo === null ? window.devicePixelRatio || 1 : photoScale;
+	}
+
 	function toDevice(rect: {
 		x: number;
 		y: number;
 		width: number;
 		height: number;
 	}): DeviceRect {
-		const scale = window.devicePixelRatio || 1;
-		return {
-			x: Math.round(rect.x * scale),
-			y: Math.round(rect.y * scale),
-			width: Math.round(rect.width * scale),
-			height: Math.round(rect.height * scale)
-		};
+		return scaleRectToDevice(rect, currentScale());
 	}
 
 	function onPointerDown(event: PointerEvent): void {
@@ -77,7 +102,7 @@ every backend call. -->
 		if (!done) return;
 		// Press-release without moving takes the whole display.
 		if (done.width < 5 && done.height < 5) {
-			const scale = window.devicePixelRatio || 1;
+			const scale = currentScale();
 			void submit({
 				rect: {
 					x: 0,
@@ -106,6 +131,15 @@ every backend call. -->
 	onpointermove={onPointerMove}
 	onpointerup={onPointerUp}
 >
+	{#if photo}
+		<img
+			class="area-photo"
+			src={photo}
+			alt=""
+			draggable={false}
+			onload={(event) => onPhotoLoad(event.currentTarget as HTMLImageElement)}
+		/>
+	{/if}
 	{#if selecting && (selecting.width >= 1 || selecting.height >= 1)}
 		<div
 			class="area-rect"
@@ -142,6 +176,14 @@ every backend call. -->
 		user-select: none;
 		-webkit-user-select: none;
 		touch-action: none;
+	}
+	.area-photo {
+		position: fixed;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		object-fit: fill;
+		pointer-events: none;
 	}
 	.area-rect {
 		position: absolute;
