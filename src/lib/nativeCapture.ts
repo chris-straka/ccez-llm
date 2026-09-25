@@ -157,11 +157,30 @@ export function isCaptureUnsupported(message: string): boolean {
 }
 
 /**
+ * True for rejections that mean "macOS denied Screen Recording" —
+ * the caller arms the error toast with the System Settings action.
+ * Pure and unit-tested.
+ */
+export function isScreenRecordingDenial(message: string): boolean {
+	return /screen recording/i.test(message);
+}
+
+/**
+ * Open the OS screen-capture privacy settings (macOS System Settings
+ * → Privacy & Security → Screen Recording): the denial toast's tap
+ * action. Rejects off-macOS and outside the Tauri shell — the caller
+ * falls back to printing the in-pane path.
+ */
+export async function openScreenRecordingSettings(): Promise<void> {
+	await invoke("open_screen_recording_settings");
+}
+
+/**
  * Human-facing capture failure: the Screen Recording denial names its
  * fix, everything else passes through. Pure and unit-tested.
  */
 export function friendlyCaptureError(message: string): string {
-	if (/screen recording/i.test(message)) return message;
+	if (isScreenRecordingDenial(message)) return message;
 	if (isCaptureUnsupported(message))
 		return "Window capture is not available on this device.";
 	return message;

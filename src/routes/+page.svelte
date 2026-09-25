@@ -566,6 +566,8 @@
 		capturePixels,
 		capturePromptTemplate,
 		friendlyCaptureError,
+		isScreenRecordingDenial,
+		openScreenRecordingSettings,
 		shouldStageCapture,
 		captureSupported,
 		type CaptureOneShot
@@ -2108,14 +2110,21 @@
 		clearNotice(notices, "toast");
 	}
 	/** Transient top error toast: action failures (send errors, export,
-	attach, mic) render in the red pairing, themed both ways. */
-	function flashErrorToast(message: string): void {
+	attach, mic) render in the red pairing, themed both ways. An
+	optional tap action (same generation-pinned lifetime as the
+	plain-toast action) opens the fix instead of copying — the
+	Screen Recording denial arms the System Settings pane. */
+	let errorToastAction = $state<{ seq: number; run: () => void } | null>(null);
+	function flashErrorToast(message: string, action?: () => void): void {
 		flashNotice(
 			notices,
 			"errorToast",
 			message,
 			errorToastTimeoutFor(message)
 		);
+		errorToastAction = action
+			? { seq: notices.errorToast.seq, run: action }
+			: null;
 	}
 	/** Missing-key notice, one source: banner everywhere, toast on
 	phones. Ask, aids, and locked taps share it so the copy and the
@@ -4362,6 +4371,20 @@
 	 * flight or a missing key behaves exactly like a typed send
 	 * (doSend owns every guard).
 	 */
+	/** Open the screen-capture privacy row (macOS System Settings →
+	Privacy & Security → Screen Recording): the denial toast's tap
+	action. The command declines off-macOS, so the fallback prints
+	the in-pane path the deep link can't open. */
+	async function openCaptureSettings(): Promise<void> {
+		if (!tauriBackendAvailable()) return;
+		try {
+			await openScreenRecordingSettings();
+		} catch {
+			flashToast(
+				"Screen Recording lives in System Settings → Privacy & Security."
+			);
+		}
+	}
 	async function runCaptureFlow(oneShot?: CaptureOneShot): Promise<void> {
 		if (captureBusy || !settings.captureEnabled) return;
 		captureBusy = true;
@@ -4382,7 +4405,13 @@
 				if (pixels === null) return;
 			} catch (error) {
 				const raw = error instanceof Error ? error.message : String(error);
-				flashErrorToast(friendlyCaptureError(raw));
+				// A denial tap opens the privacy row; every other
+				// failure keeps the copy-on-tap error toast.
+				if (isScreenRecordingDenial(raw))
+					flashErrorToast(friendlyCaptureError(raw), () =>
+						void openCaptureSettings()
+					);
+				else flashErrorToast(friendlyCaptureError(raw));
 				return;
 			}
 			const dataUrl = `data:image/png;base64,${pixels}`;
@@ -13405,7 +13434,12 @@
 		<!-- Reply-language pills render in `LangMenus.svelte` (hero call
 		site in `ThreadView` below); the page keeps the open menu, the
 		sheet anchor, the active code, and the behaviors. -->
-		<Toasts {notices} bind:toastAction android={androidUI} />
+		<Toasts
+			{notices}
+			bind:toastAction
+			bind:errorToastAction
+			android={androidUI}
+		/>
 		<!-- Empty drag strip: nothing but the traffic-light clearance
 		(the active reply language shows on the send button instead).
 		Double-click zooms. -->

@@ -17,12 +17,21 @@
 		of copying. The generation pins the lifetime — an expired
 		toast never fires a stale action. */
 		toastAction: { seq: number; run: () => void } | null;
+		/** Tap action armed on the current error-toast generation
+		(Screen Recording denial → System Settings): same
+		generation-pinned lifetime as the plain-toast action. */
+		errorToastAction: { seq: number; run: () => void } | null;
 		/** Phone gate: speech errors ride the error toast on phones
 		(see setVoiceError), so the top notice is desktop-only. */
 		android: boolean;
 	}
 
-	let { notices, toastAction = $bindable(), android }: Props = $props();
+	let {
+	notices,
+	toastAction = $bindable(),
+	errorToastAction = $bindable(),
+	android
+}: Props = $props();
 
 	/** Plain-toast copy: silent on success (the toast is the
 	confirmation); a failed write says so, guarded against clobbering
@@ -61,9 +70,21 @@
 		clearNotice(notices, "toast");
 	}
 
-	/** Error toast tap: copies the failure text (bug reports, keys
-	from 401s), then dismisses. A failed copy re-flashes red. */
+	/** Error toast tap: an armed action (same generation) opens the
+	fix — Screen Recording denial → System Settings; otherwise the
+	tap copies the failure text (bug reports, keys from 401s), then
+	dismisses. A failed copy re-flashes red. */
 	function errorToastTap(): void {
+		if (
+			errorToastAction &&
+			errorToastAction.seq === notices.errorToast.seq
+		) {
+			const run = errorToastAction.run;
+			errorToastAction = null;
+			dismissErrorToast();
+			run();
+			return;
+		}
 		const text = notices.errorToast.message;
 		dismissErrorToast();
 		if (!text) return;
@@ -93,7 +114,10 @@
 		class={toastLong(notices.errorToast.message)
 			? "toast error long"
 			: "toast error"}
-		title="Click to copy"
+		title={errorToastAction &&
+		errorToastAction.seq === notices.errorToast.seq
+			? "Open"
+			: "Click to copy"}
 		aria-live="polite"
 		transition:fade={{ duration: 160 }}
 		onclick={errorToastTap}>{notices.errorToast.message}</button

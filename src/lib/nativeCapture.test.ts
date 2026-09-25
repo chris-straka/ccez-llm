@@ -4,6 +4,7 @@ import {
 	captureSourceFor,
 	friendlyCaptureError,
 	isCaptureUnsupported,
+	isScreenRecordingDenial,
 	shouldStageCapture
 } from "./nativeCapture";
 
@@ -20,8 +21,20 @@ describe("capture errors", () => {
 
 	it("keeps the Screen Recording fix verbatim", () => {
 		const denial =
-			"screen capture failed: allow Screen Recording for Ccez LLM, then retry";
+			"screen capture failed: allow Screen Recording for Ccez LLM, then relaunch and retry";
 		expect(friendlyCaptureError(denial)).toBe(denial);
+	});
+
+	it("arms the settings action only on the denial", () => {
+		expect(
+			isScreenRecordingDenial(
+				"screen capture failed: allow Screen Recording for Ccez LLM, then relaunch and retry"
+			)
+		).toBe(true);
+		expect(isScreenRecordingDenial("no capturable window is on screen")).toBe(
+			false
+		);
+		expect(isScreenRecordingDenial("")).toBe(false);
 	});
 
 	it("maps unsupported builds to the device message", () => {

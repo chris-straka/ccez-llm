@@ -180,6 +180,36 @@ fn open_voice_settings() -> Result<(), String> {
     }
 }
 
+/// Open the OS screen-capture privacy settings: macOS System Settings
+/// at the Privacy & Security pane, where the Screen Recording row
+/// lives; Windows has no per-app capture toggle page, so that arm
+/// declines and the caller keeps the plain toast. macOS uses the
+/// `open` CLI directly like `open_voice_settings` (no plugin scope
+/// to misconfigure, no permission needed). No public Apple API goes
+/// deeper (sub-anchors are swallowed), so the toast copy always
+/// prints the in-pane row alongside.
+#[tauri::command]
+fn open_screen_recording_settings() -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        const URL: &str =
+            "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture";
+        let status = std::process::Command::new("open")
+            .arg(URL)
+            .status()
+            .map_err(|e| e.to_string())?;
+        return if status.success() {
+            Ok(())
+        } else {
+            Err("System Settings did not open".into())
+        };
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        return Err("screen capture settings need macOS System Settings".into());
+    }
+}
+
 /// Delete a secret; missing entries are not an error.
 #[tauri::command]
 fn keychain_delete(account: String) -> Result<(), String> {
@@ -250,6 +280,7 @@ pub fn run() {
             keychain_set,
             keychain_delete,
             open_voice_settings,
+            open_screen_recording_settings,
             keyboard::current_input_source,
             tts::tts_supported,
             tts::tts_speak,

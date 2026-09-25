@@ -149,9 +149,11 @@ pub struct AreaPick {
 }
 
 /// Open the set-area overlay: a transparent maximized always-on-top
-/// window over the active Space (no fullscreen Space of its own, so
-/// the game stays put). Reuses the live picker when one is already
-/// open. The overlay reports back through `submit_area_rect`.
+/// window on every Space (no fullscreen Space of its own, so the
+/// game stays put — including a fullscreen game Space, which plain
+/// maximized windows never reach). Reuses the live picker when one
+/// is already open. The overlay reports back through
+/// `submit_area_rect`.
 #[tauri::command]
 pub fn open_area_picker(app: tauri::AppHandle) -> Result<(), String> {
     #[cfg(any(target_os = "android", target_os = "ios"))]
@@ -180,6 +182,7 @@ fn open_area_picker_desktop(app: &tauri::AppHandle) -> Result<(), String> {
         .decorations(false)
         .maximized(true)
         .always_on_top(true)
+        .visible_on_all_workspaces(true)
         .skip_taskbar(true)
         .focused(true)
         .build()
@@ -373,7 +376,7 @@ mod imp {
         if !status.success() {
             let _ = std::fs::remove_file(&path);
             return Err(
-                "screen capture failed: allow Screen Recording for Ccez LLM, then retry"
+                "screen capture failed: allow Screen Recording for Ccez LLM, then relaunch and retry"
                     .to_string(),
             );
         }
@@ -459,7 +462,7 @@ mod imp {
         if !status.success() {
             let _ = std::fs::remove_file(&path);
             return Err(
-                "screen capture failed: allow Screen Recording for Ccez LLM, then retry"
+                "screen capture failed: allow Screen Recording for Ccez LLM, then relaunch and retry"
                     .to_string(),
             );
         }
