@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { emit, emitTo, listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { tauriBackendAvailable } from "./secrets";
 
 /**
@@ -287,10 +287,9 @@ export async function listenAreaPicked(
 
 /**
  * Set-area request (the global ⇧⌘U chord): the Rust side only emits
- * `area-pick-requested` — the main window owns the flow (frozen
- * fullscreen photo, show, open) so no overlay ever fights the game
- * Space, and the settings checkbox gates it like the capture chord.
- * Null outside the shell.
+ * `area-pick-requested` — the main window opens the plain overlay
+ * and the settings checkbox gates it like the capture chord. Null
+ * outside the shell.
  */
 export async function listenAreaPickRequested(
 	callback: () => void
@@ -298,76 +297,6 @@ export async function listenAreaPickRequested(
 	if (!tauriBackendAvailable()) return null;
 	try {
 		return await listen("area-pick-requested", () => callback());
-	} catch {
-		return null;
-	}
-}
-
-/**
- * Area-photo handoff (picker → main): resolves the picker's pending
- * `area-photo-request` with the frozen frame (or null). Null
- * outside the shell.
- */
-export async function listenAreaPhotoRequest(
-	callback: () => void
-): Promise<UnlistenFn | null> {
-	if (!tauriBackendAvailable()) return null;
-	try {
-		return await listen("area-photo-request", () => callback());
-	} catch {
-		return null;
-	}
-}
-
-/**
- * Area-photo reply (main → picker): the frozen fullscreen frame the
- * picker draws the square on. Fire-and-forget; the picker falls back
- * to the live overlay when nothing arrives in time. No-op outside
- * the shell.
- */
-export async function answerAreaPhoto(dataUrl: string | null): Promise<void> {
-	if (!tauriBackendAvailable()) return;
-	try {
-		await emitTo("area-pick", "area-photo", { dataUrl });
-	} catch {
-		// The picker closed first: nothing to answer.
-	}
-}
-
-/**
- * Area-photo request (picker → main): resolves with the frozen frame
- * or null when there is none (browser preview) or it arrives too
- * late — the picker renders the live overlay instead. Never throws.
- */
-export async function requestAreaPhoto(
-	timeoutMs = 2500
-): Promise<string | null> {
-	if (!tauriBackendAvailable()) return null;
-	try {
-		return await new Promise<string | null>((resolve) => {
-			let stopListening: (() => void) | null = null;
-			let done = false;
-			const timer: ReturnType<typeof setTimeout> = setTimeout(
-				() => settle(null),
-				timeoutMs
-			);
-			const settle = (value: string | null): void => {
-				if (done) return;
-				done = true;
-				clearTimeout(timer);
-				stopListening?.();
-				resolve(value);
-			};
-			void listen<{ dataUrl: string | null }>("area-photo", (event) =>
-				settle(event.payload.dataUrl)
-			)
-				.then((stop) => {
-					stopListening = stop;
-					if (done) stop();
-				})
-				.catch(() => settle(null));
-			void emit("area-photo-request").catch(() => settle(null));
-		});
 	} catch {
 		return null;
 	}

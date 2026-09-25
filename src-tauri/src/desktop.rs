@@ -725,15 +725,11 @@ fn install_capture_hotkey(app: &AppHandle) {
 }
 
 /// Set-area chord: only emits `area-pick-requested` — the frontend
-/// owns the flow (frozen fullscreen photo, show, open), so no overlay
-/// ever fights the game Space: three rounds of collection-behavior,
-/// level, and order-front treatment never surfaced a live overlay
-/// above fullscreen, while `screencapture` provably sees the active
-/// Space. The frontend ignores the event while the capture setting
-/// is off, so the checkbox reads as a disable (same contract as the
-/// capture chord). Desktop only: the plugin crate does not compile
-/// for mobile. UNVERIFIED ON DEVICE — no headless harness can press
-/// a system-wide chord.
+/// opens the plain desktop overlay and ignores the event while the
+/// capture setting is off, so the checkbox reads as a disable (same
+/// contract as the capture chord). Desktop only: the plugin crate
+/// does not compile for mobile. UNVERIFIED ON DEVICE — no headless
+/// harness can press a system-wide chord.
 #[cfg(desktop)]
 fn install_area_hotkey(app: &AppHandle) {
     use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};

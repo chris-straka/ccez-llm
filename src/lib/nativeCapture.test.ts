@@ -5,7 +5,6 @@ import {
 	friendlyCaptureError,
 	isCaptureUnsupported,
 	isScreenRecordingDenial,
-	scaleRectToDevice,
 	shouldStageCapture
 } from "./nativeCapture";
 
@@ -24,21 +23,6 @@ describe("capture errors", () => {
 		const denial =
 			"screen capture failed: allow Screen Recording for Ccez LLM, then relaunch and retry";
 		expect(friendlyCaptureError(denial)).toBe(denial);
-	});
-
-	it("scales selections to device pixels at the frame ratio", () => {
-		// Photo frame: 3840-wide natural on a 1920-wide view.
-		expect(scaleRectToDevice({ x: 100, y: 50, width: 300, height: 150 }, 2)).toEqual(
-			{ x: 200, y: 100, width: 600, height: 300 }
-		);
-		// Live overlay at devicePixelRatio 1: identity.
-		expect(scaleRectToDevice({ x: 100, y: 50, width: 300, height: 150 }, 1)).toEqual(
-			{ x: 100, y: 50, width: 300, height: 150 }
-		);
-		// Fractional ratios round to whole pixels.
-		expect(scaleRectToDevice({ x: 1, y: 1, width: 1, height: 1 }, 1.5)).toEqual(
-			{ x: 2, y: 2, width: 2, height: 2 }
-		);
 	});
 
 	it("arms the settings action only on the denial", () => {

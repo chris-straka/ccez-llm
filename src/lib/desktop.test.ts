@@ -9,10 +9,7 @@ import {
 	sheetTitle,
 	shareStudySheet,
 	printStudySheet,
-	requestAreaPhoto,
 	listenAreaPickRequested,
-	listenAreaPhotoRequest,
-	answerAreaPhoto,
 	desktopSleepBlock,
 	desktopSleepUnblock,
 	exportStudySheet,
@@ -21,11 +18,7 @@ import {
 } from "./desktop";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
-vi.mock("@tauri-apps/api/event", () => ({
-	listen: vi.fn(),
-	emit: vi.fn(),
-	emitTo: vi.fn()
-}));
+vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn() }));
 
 const mockInvoke = vi.mocked(invoke);
 
@@ -216,12 +209,8 @@ describe("shareOutcomeToast", () => {
 	});
 });
 
-describe("area photo handoff", () => {
+describe("area pick request", () => {
 	it("stays quiet outside the shell", async () => {
-		const noop = (): void => {};
-		await expect(requestAreaPhoto(10)).resolves.toBe(null);
-		expect(await listenAreaPickRequested(noop)).toBe(null);
-		expect(await listenAreaPhotoRequest(noop)).toBe(null);
-		await expect(answerAreaPhoto("data:image/png;base64,x")).resolves.toBeUndefined();
+		expect(await listenAreaPickRequested(() => undefined)).toBe(null);
 	});
 });

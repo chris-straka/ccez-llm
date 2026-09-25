@@ -581,8 +581,6 @@
 		openAreaPicker,
 		listenAreaPicked,
 		listenAreaPickRequested,
-		listenAreaPhotoRequest,
-		answerAreaPhoto,
 		showMainWindow,
 		isSummonHotkey,
 		type AreaPick,
@@ -4392,50 +4390,22 @@
 			);
 		}
 	}
-	/** Frozen frame awaiting picker pickup (the ⇧⌘U photo flow):
-	null outside a flow and again once answered. Plain module state,
-	not UI state — no markup reads it. */
-	let pendingAreaPhoto: string | null = null;
-	/** Set-area flow (global ⇧⌘U or the in-app chord): capture the
-	 * current screen frozen and open the picker on the photo — the
-	 * square gets set from inside the game without any overlay
-	 * fighting its Space (three rounds of aux/level/order-front
-	 * treatment never surfaced a live overlay above fullscreen,
-	 * while `screencapture` provably sees the active Space). The
-	 * app stays down (no show-main yank); the picker waits on the
-	 * desktop Space and the user tabs back to draw. A capture
-	 * failure toasts truthfully and stops; a missing photo falls
-	 * back to the live overlay. The settings checkbox gates both
-	 * chords.
+	/** Set-area overlay (global ⇧⌘U or the in-app chord): opens the
+	 * plain transparent overlay on the desktop Space — no photo,
+	 * no capture flash, no focus yank. The square is display-global
+	 * device pixels with no window affinity, so drawing it on the
+	 * desktop is enough wherever the game shares the resolution; a
+	 * mismatch toasts truthfully instead of blaming permissions.
+	 * The settings checkbox gates both chords.
 	 */
-	async function runAreaPhotoFlow(): Promise<void> {
+	async function openAreaOverlay(): Promise<void> {
 		if (!tauriBackendAvailable()) {
 			flashErrorToast("Area picking needs the desktop app.");
 			return;
 		}
 		if (!settings.captureEnabled) return;
-		let pixels: string | null;
-		try {
-			pixels = await capturePixels({ kind: "fullscreen" });
-		} catch (error) {
-			const raw = error instanceof Error ? error.message : String(error);
-			if (isScreenRecordingDenial(raw))
-				flashErrorToast(friendlyCaptureError(raw), () =>
-					void openCaptureSettings()
-				);
-			else flashErrorToast(friendlyCaptureError(raw));
-			return;
-		}
-		if (pixels === null) return;
-		pendingAreaPhoto = `data:image/png;base64,${pixels}`;
-		// No show-main: the app stays down so the game is never
-		// yanked out from under the chord. The picker waits with
-		// the photo on the desktop Space — tab back to draw.
 		const opened = await openAreaPicker();
-		if (!opened) {
-			pendingAreaPhoto = null;
-			flashErrorToast("Area picking needs the desktop app.");
-		}
+		if (!opened) flashErrorToast("Area picking needs the desktop app.");
 	}
 	async function runCaptureFlow(oneShot?: CaptureOneShot): Promise<void> {
 		if (captureBusy || !settings.captureEnabled) return;
@@ -10911,12 +10881,12 @@
 				return;
 			}
 			if (chord === "set-capture-area") {
-				// Set-area from anywhere: the photo flow gates on the
+				// Set-area from anywhere: the overlay gates on the
 				// settings checkbox and toasts where no backend
 				// answers (browser preview) — same flow as the
 				// global chord, one path for both.
 				consumeEvent(event);
-				void runAreaPhotoFlow();
+				void openAreaOverlay();
 				return;
 			}
 			const delScope = deleteChatScope({
@@ -12951,19 +12921,11 @@
 		}).then((stop) => {
 			unlistenCapture = stop;
 		});
-		// Set-area request (global ⇧⌘U, desktop.rs): the photo flow
-		// owns it — the checkbox gates like the capture chord, and
-		// a late picker just renders the live overlay.
+		// Set-area request (global ⇧⌘U, desktop.rs): the checkbox
+		// gates like the capture chord; the picker waits on the
+		// desktop Space and the user tabs back to draw.
 		void listenAreaPickRequested(() => {
-			void runAreaPhotoFlow();
-		});
-		// Area-photo handoff (picker → main): answer once with the
-		// frozen frame, then drop it so a stale photo never serves
-		// a later open.
-		void listenAreaPhotoRequest(() => {
-			const photo = pendingAreaPhoto;
-			pendingAreaPhoto = null;
-			void answerAreaPhoto(photo);
+			void openAreaOverlay();
 		});
 		// Area-picker reports (the ⇧⌘U overlay): saves persist the
 		// square the capture chord reuses, clears drop it, Esc
