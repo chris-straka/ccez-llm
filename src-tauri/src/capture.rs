@@ -193,6 +193,7 @@ fn open_area_picker_desktop(app: &tauri::AppHandle) -> Result<(), String> {
     use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
     if let Some(picker) = app.get_webview_window("area-pick") {
         let _ = picker.set_focus();
+        treat_area_picker(&picker);
         return Ok(());
     }
     let picker =
@@ -206,25 +207,31 @@ fn open_area_picker_desktop(app: &tauri::AppHandle) -> Result<(), String> {
             .focused(true)
             .build()
             .map_err(|_| "the area picker could not open".to_string())?;
-    join_fullscreen_spaces(&picker);
+    treat_area_picker(&picker);
     Ok(())
 }
 
-/// Join fullscreen Spaces too: `visible_on_all_workspaces` only sets
-/// CanJoinAllSpaces, which never reaches a fullscreen game Space —
-/// macOS shows a window above fullscreen only with
-/// FullScreenAuxiliary OR-ed into the collection behavior (the same
-/// generated objc2 bindings the TTS bridge uses, no Objective-C).
-/// Main-threaded like every AppKit call (the dev-icon pattern);
-/// best-effort — a missed bit keeps the desktop-Space behavior,
-/// never an error.
+/// Show the picker above a fullscreen game Space: `always_on_top`
+/// plus `visible_on_all_workspaces` only buy a floating level and
+/// CanJoinAllSpaces, neither of which reaches a fullscreen Space.
+/// macOS shows a window above fullscreen only with FullScreenAuxiliary
+/// in the collection behavior (Stationary keeps it put across Space
+/// switches), a status level, and an explicit order-front — the same
+/// generated objc2 bindings the TTS bridge uses, no Objective-C.
+/// Main-threaded (the dev-icon pattern) on every open, not just
+/// build, so a reused window gets the same treatment. Best-effort
+/// throughout: a missed step keeps the desktop-Space behavior, never
+/// an error. The stderr line lets a dev-shell session confirm the
+/// treatment landed.
 #[cfg(target_os = "macos")]
-fn join_fullscreen_spaces(picker: &tauri::WebviewWindow) {
+fn treat_area_picker(picker: &tauri::WebviewWindow) {
     let _ = picker.run_on_main_thread({
         let picker = picker.clone();
         move || {
             use objc2::rc::Retained;
-            use objc2_app_kit::{NSView, NSWindow, NSWindowCollectionBehavior};
+            use objc2_app_kit::{
+                NSStatusWindowLevel, NSView, NSWindow, NSWindowCollectionBehavior,
+            };
             use raw_window_handle::{HasWindowHandle, RawWindowHandle};
             let Ok(handle) = picker.window_handle() else {
                 return;
@@ -237,9 +244,9 @@ fn join_fullscreen_spaces(picker: &tauri::WebviewWindow) {
                 return;
             }
             // SAFETY: the pointer is the live NSView tao built the
-            // webview in, read on the main thread; only the integer
-            // behavior flags are touched, no allocation or callback
-            // involved.
+            // webview in, read on the main thread; only integer
+            // flags, the level, and the ordering are touched — no
+            // allocation or callback involved.
             unsafe {
                 let ns_view: &NSView = &*ns_view;
                 let Some(ns_window): Option<Retained<NSWindow>> = ns_view.window()
@@ -248,15 +255,20 @@ fn join_fullscreen_spaces(picker: &tauri::WebviewWindow) {
                 };
                 ns_window.setCollectionBehavior(
                     ns_window.collectionBehavior()
-                        | NSWindowCollectionBehavior::FullScreenAuxiliary,
+                        | NSWindowCollectionBehavior::CanJoinAllSpaces
+                        | NSWindowCollectionBehavior::FullScreenAuxiliary
+                        | NSWindowCollectionBehavior::Stationary,
                 );
+                ns_window.setLevel(NSStatusWindowLevel);
+                ns_window.orderFrontRegardless();
+                eprintln!("[ccez] area picker treated for fullscreen Spaces");
             }
         }
     });
 }
 
 #[cfg(not(target_os = "macos"))]
-fn join_fullscreen_spaces(_picker: &tauri::WebviewWindow) {}
+fn treat_area_picker(_picker: &tauri::WebviewWindow) {}
 
 /// Bring the main window forward (show plus focus, best-effort).
 /// The capture chord needs it visible on the paths without a saved
