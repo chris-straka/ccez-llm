@@ -1,17 +1,19 @@
 <!-- Set-area overlay (the ⇧⌘U chord): a transparent maximized window
 on the desktop Space — no overlay fights the game, the square is
-global screen points with no window affinity. Drag to save
+viewport-relative points with no window affinity. Drag to save
 the square the capture chord reuses (points: `screencapture -R`
-takes points, never device pixels); press-release without moving
-takes the whole display; Esc cancels silently. Clear drops a saved
-square. Outside the shell the submit fails and a note renders
-instead — same three-runtime degrade as every backend call. -->
+takes points, never device pixels; the backend adds the window's
+true frame origin, the overlay never maps to global);
+press-release without moving takes the whole display; Esc cancels
+silently. Clear drops a saved square. Outside the shell the
+submit fails and a note renders instead — same three-runtime
+degrade as every backend call. -->
 <script lang="ts">
 	import { invoke } from "@tauri-apps/api/core";
 	import {
 		dragRect,
 		isClickPick,
-		toGlobalRect,
+		roundRect,
 		type AreaRect
 	} from "$lib/areaPick";
 
@@ -57,13 +59,7 @@ instead — same three-runtime degrade as every backend call. -->
 		};
 	}
 
-	function windowOrigin(): { x: number; y: number } {
-		// The maximized overlay's viewport starts at its window
-		// origin (below the menu bar on the main display, at the
-		// display origin elsewhere): adding it maps the drag to
-		// global points with no measuring and no scale multiply.
-		return { x: window.screenX, y: window.screenY };
-	}
+
 
 	function onPointerDown(event: PointerEvent): void {
 		if (event.button !== 0 || event.isPrimary === false) return;
@@ -86,17 +82,22 @@ instead — same three-runtime degrade as every backend call. -->
 		// Press-release without moving takes the whole display.
 		if (isClickPick(done)) {
 			void submit({
-				rect: toGlobalRect(
-					{ x: 0, y: 0, width: window.innerWidth, height: window.innerHeight },
-					windowOrigin()
-				),
+				rect: roundRect({
+					x: 0,
+					y: 0,
+					width: window.innerWidth,
+					height: window.innerHeight
+				}),
 				clear: false,
 				debug: debugInfo()
 			});
 			return;
 		}
+		// Viewport-relative: the backend adds the overlay window's
+		// true frame origin (measured itself — `window.screenY`
+		// cannot be trusted here).
 		void submit({
-			rect: toGlobalRect(done, windowOrigin()),
+			rect: roundRect(done),
 			clear: false,
 			debug: debugInfo()
 		});

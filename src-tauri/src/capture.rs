@@ -181,8 +181,9 @@ fn first_stderr_line(stderr: &str) -> String {
 }
 
 /// Saved square from the area picker, screen points in global
-/// display space (the overlay adds its window origin; no scale
-/// multiply — `screencapture -R` takes points).
+/// display space (the overlay sends its drag viewport-relative;
+/// `submit_area_rect` adds the window's true frame origin — no
+/// scale multiply, `screencapture -R` takes points).
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub struct AreaRect {
     pub x: f64,
@@ -271,20 +272,57 @@ pub fn show_main(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// Area-picker report: closes the overlay, then forwards saves and
-/// clears to the main window (`area-picked`). A silent cancel
-/// (Esc: neither set) closes only.
+/// Viewport-relative square to global screen points: add the
+/// overlay window's true frame origin (physical pixels over its
+/// scale factor). The backend measures the frame itself because the
+/// overlay's `window.screenY` reports a display height too much —
+/// trusting it shifts every square a full screen down. Pure and
+/// unit-tested.
+pub fn place_rect(rect: &AreaRect, origin_points: (f64, f64)) -> AreaRect {
+    AreaRect {
+        x: (rect.x + origin_points.0).round(),
+        y: (rect.y + origin_points.1).round(),
+        width: rect.width.round(),
+        height: rect.height.round(),
+    }
+}
+
+/// Area-picker report: translates the viewport-relative square to
+/// global points (measuring the overlay window's frame before
+/// closing it), closes the overlay, then forwards saves and clears
+/// to the main window (`area-picked`). A silent cancel (Esc:
+/// neither set) closes only. When the frame cannot be measured the
+/// rect passes through untouched — a stale overlay at worst saves
+/// a viewport-relative square, never nothing.
 #[tauri::command]
 pub fn submit_area_rect(app: tauri::AppHandle, pick: AreaPick) -> Result<(), String> {
     use tauri::{Emitter, Manager};
+    let mut pick = pick;
+    let mut measured: Option<(f64, f64)> = None;
+    if pick.rect.is_some() {
+        if let Some(picker) = app.get_webview_window("area-pick") {
+            if let (Ok(pos), Ok(scale)) =
+                (picker.outer_position(), picker.scale_factor())
+            {
+                if scale > 0.0 {
+                    let origin = (pos.x as f64 / scale, pos.y as f64 / scale);
+                    measured = Some(origin);
+                    if let Some(rect) = pick.rect.take() {
+                        pick.rect = Some(place_rect(&rect, origin));
+                    }
+                }
+            }
+        }
+    }
     if let Some(debug) = &pick.debug {
         eprintln!(
-            "[ccez] area pick origin=({},{}) viewport={}x{} scale={} rect={:?} clear={}",
+            "[ccez] area pick reported=({},{}) viewport={}x{} scale={} measured={:?} rect={:?} clear={}",
             debug.origin_x,
             debug.origin_y,
             debug.viewport_w,
             debug.viewport_h,
             debug.scale,
+            measured,
             pick.rect,
             pick.clear
         );
@@ -639,6 +677,44 @@ mod tests {
             ),
             "saved capture area 10,20 300x150 is off screen (screencapture: -R requires a valid rect (x,y,w,h)): set it again with Shift+Cmd+U"
         );
+    }
+
+    #[test]
+    fn place_rect_adds_true_origin() {
+        // The reported case: a (244,422) viewport drag with the
+        // overlay window really at (0,25) lands at (244,447) — the
+        // webview's reported screenY of 1080 would have put it a
+        // full screen down, which the backend never trusts.
+        let placed = super::place_rect(
+            &super::AreaRect {
+                x: 244.0,
+                y: 422.0,
+                width: 1412.0,
+                height: 491.0,
+            },
+            (0.0, 25.0),
+        );
+        assert_eq!(placed.x, 244.0);
+        assert_eq!(placed.y, 447.0);
+        assert_eq!(placed.width, 1412.0);
+        assert_eq!(placed.height, 491.0);
+    }
+
+    #[test]
+    fn place_rect_rounds_to_integer_points() {
+        let placed = super::place_rect(
+            &super::AreaRect {
+                x: 10.4,
+                y: 20.6,
+                width: 100.2,
+                height: 40.7,
+            },
+            (0.3, 0.0),
+        );
+        assert_eq!(placed.x, 11.0);
+        assert_eq!(placed.y, 21.0);
+        assert_eq!(placed.width, 100.0);
+        assert_eq!(placed.height, 41.0);
     }
 
     #[test]

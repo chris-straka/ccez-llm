@@ -424,20 +424,32 @@ describe("settings", () => {
 		expect(loadSettings(memoryStore).captureArea).toBe(null);
 	});
 
-	it("drops a pre-v2 capture square once (device pixels, wrong region)", () => {
-		const stale = blankSettings();
-		(stale as unknown as Record<string, unknown>).version = 1;
-		(stale as unknown as Record<string, unknown>).captureArea = {
+	it("drops a pre-v3 capture square once (wrong units, wrong region)", () => {
+		const v1 = blankSettings();
+		(v1 as unknown as Record<string, unknown>).version = 1;
+		(v1 as unknown as Record<string, unknown>).captureArea = {
 			x: 20,
 			y: 40,
 			width: 200,
 			height: 80
 		};
-		saveSettings(stale, memoryStore);
-		const healed = loadSettings(memoryStore);
-		expect(healed.captureArea).toBe(null);
-		expect(healed.version).toBe(2);
-		// A v2 save keeps its square: the drop runs once.
+		saveSettings(v1, memoryStore);
+		const healedV1 = loadSettings(memoryStore);
+		expect(healedV1.captureArea).toBe(null);
+		expect(healedV1.version).toBe(3);
+		// A v2 square carries the phantom window-origin offset, so
+		// it drops too.
+		const v2 = blankSettings();
+		(v2 as unknown as Record<string, unknown>).version = 2;
+		(v2 as unknown as Record<string, unknown>).captureArea = {
+			x: 244,
+			y: 1502,
+			width: 1412,
+			height: 491
+		};
+		saveSettings(v2, memoryStore);
+		expect(loadSettings(memoryStore).captureArea).toBe(null);
+		// A v3 save keeps its square: the drop runs once.
 		const fresh = blankSettings();
 		(fresh as unknown as Record<string, unknown>).captureArea = {
 			x: 10,

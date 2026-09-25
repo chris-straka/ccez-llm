@@ -3,7 +3,7 @@ import {
 	CLICK_PICK_PX,
 	dragRect,
 	isClickPick,
-	toGlobalRect
+	roundRect
 } from "./areaPick";
 
 describe("drag normalization", () => {
@@ -48,37 +48,20 @@ describe("click pick", () => {
 	});
 });
 
-describe("global mapping", () => {
-	it("adds the window origin without any display-scale multiply", () => {
+describe("viewport rounding", () => {
+	it("keeps viewport-relative points unscaled and unshifted", () => {
 		// A 100x40 drag on a 2x display stays 100x40 points: the old
 		// devicePixelRatio multiply saved 200x80, and screencapture
-		// read that as points — a 4x region shifted down-right.
+		// read that as points — a 4x region shifted down-right. The
+		// backend adds the window origin; the overlay never does.
 		expect(
-			toGlobalRect({ x: 10, y: 20, width: 100, height: 40 }, { x: 0, y: 0 })
+			roundRect({ x: 10, y: 20, width: 100, height: 40 })
 		).toEqual({ x: 10, y: 20, width: 100, height: 40 });
-		expect(
-			toGlobalRect(
-				{ x: 10, y: 20, width: 100, height: 40 },
-				{ x: 0, y: 25 }
-			)
-		).toEqual({ x: 10, y: 45, width: 100, height: 40 });
 	});
 
 	it("rounds to integer points for the backend", () => {
 		expect(
-			toGlobalRect(
-				{ x: 10.4, y: 20.6, width: 100.2, height: 40.7 },
-				{ x: 0.3, y: 0 }
-			)
-		).toEqual({ x: 11, y: 21, width: 100, height: 41 });
-	});
-
-	it("maps the click-pick fullscreen rect to the overlay display", () => {
-		expect(
-			toGlobalRect(
-				{ x: 0, y: 0, width: 1920, height: 1080 },
-				{ x: 0, y: 0 }
-			)
-		).toEqual({ x: 0, y: 0, width: 1920, height: 1080 });
+			roundRect({ x: 10.4, y: 20.6, width: 100.2, height: 40.7 })
+		).toEqual({ x: 10, y: 21, width: 100, height: 41 });
 	});
 });

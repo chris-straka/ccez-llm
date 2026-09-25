@@ -5,9 +5,11 @@
  *
  * Units are screen points throughout: `screencapture -R` takes
  * points, never device pixels (verified on a 2x display: `-R0,0,100,100`
- * yields a 200x200px shot). The overlay viewport already measures in
- * CSS px == points, so the only mapping is adding the window's
- * screen origin — no `devicePixelRatio` multiply anywhere.
+ * yields a 200x200px shot). The overlay sends viewport-relative
+ * rects and the backend adds the window's true frame origin itself
+ * (`window.screenY` in the webview reports a display height too
+ * much, so the overlay never maps to global) — no
+ * `devicePixelRatio` multiply anywhere.
  */
 
 export interface AreaPoint {
@@ -54,14 +56,13 @@ export function isClickPick(rect: AreaRect): boolean {
 }
 
 /**
- * Viewport-relative rect to global screen points: add the overlay
- * window's screen origin (`window.screenX/screenY`), then round —
- * the backend takes integer points. Pure.
+ * Round a viewport-relative rect to integer points for the backend
+ * (which adds the overlay window's true frame origin). Pure.
  */
-export function toGlobalRect(rect: AreaRect, origin: AreaPoint): AreaRect {
+export function roundRect(rect: AreaRect): AreaRect {
 	return {
-		x: Math.round(rect.x + origin.x),
-		y: Math.round(rect.y + origin.y),
+		x: Math.round(rect.x),
+		y: Math.round(rect.y),
 		width: Math.round(rect.width),
 		height: Math.round(rect.height)
 	};
