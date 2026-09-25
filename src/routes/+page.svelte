@@ -5108,11 +5108,19 @@
 	}
 
 	/** Paragraph holding a quote, for the answer request's context. */
-	function answerContextFor(messageId: ChatMsgId, quote: string): string {
+	function answerContextFor(
+		messageId: ChatMsgId,
+		quote: string,
+		occurrence = 0
+	): string {
 		const msg = chatState.chats
 			.flatMap((c) => c.messages)
 			.find((m) => m.id === messageId);
-		return paragraphForQuote(msg ? aidDisplayText(msg.content) : "", quote);
+		return paragraphForQuote(
+			msg ? aidDisplayText(msg.content) : "",
+			quote,
+			occurrence
+		);
 	}
 
 	/** Annotation ids with a model request in flight (plain set,
@@ -5152,7 +5160,7 @@
 			const answer = await annotationAnswer(provider, {
 				quote: ann.quote,
 				question: ann.comment,
-				context: answerContextFor(ann.messageId, ann.quote)
+				context: answerContextFor(ann.messageId, ann.quote, ann.at ?? 0)
 			});
 			annotations = attachAnnotationAnswer(annotations, ann.id, answer);
 		} catch (error) {
@@ -5428,7 +5436,7 @@
 				current.quote,
 				current.messageId,
 				false,
-				answerContextFor(current.messageId, current.quote)
+				answerContextFor(current.messageId, current.quote, current.at ?? 0)
 			);
 			// The quote highlights wash-only (its own text is the
 			// context) and Han quotes earn the right-click readings
@@ -5440,7 +5448,7 @@
 			const quoted = {
 				quote: current.quote,
 				messageId: current.messageId,
-				context: answerContextFor(current.messageId, current.quote)
+				context: answerContextFor(current.messageId, current.quote, current.at ?? 0)
 			};
 			if (!quoteOffersReadings(quoted)) dismissSelPanels();
 			const selected = selectAnswerQuote(id);
@@ -5487,7 +5495,7 @@
 			current.quote,
 			current.messageId,
 			false,
-			answerContextFor(current.messageId, current.quote)
+			answerContextFor(current.messageId, current.quote, current.at ?? 0)
 		);
 		highlightAnnId = id;
 		settleAnnPop();
@@ -5612,7 +5620,7 @@
 		const quoted = {
 			quote: ann.quote,
 			messageId: ann.messageId,
-			context: answerContextFor(ann.messageId, ann.quote),
+			context: answerContextFor(ann.messageId, ann.quote, ann.at ?? 0),
 			at: ann.at ?? 0
 		};
 		// Readings panels ride the live range (their scroll tracker

@@ -396,13 +396,37 @@ export function quoteRange(
  * split (or missing) falls back to the quote itself, never the whole
  * message — the request stays small either way.
  */
-export function paragraphForQuote(text: string, quote: string): string {
+export function paragraphForQuote(
+	text: string,
+	quote: string,
+	occurrence = 0
+): string {
 	const clean = quote.trim();
 	if (!clean) return "";
+	// Occurrence-aware like locateQuote: a quote living in two
+	// paragraphs (Japanese 旅行 and Chinese 旅行 in one reply)
+	// resolves to the paragraph holding its nth match, so speech
+	// and readings inherit the right language. Counting uses the
+	// same stripped matching, and an overrun falls back to the
+	// first match — the old behavior.
+	const q = stripForMatch(clean).stripped;
+	if (!q) return "";
+	let seen = 0;
+	let first = "";
 	for (const para of text.split(/\n\s*\n/)) {
-		if (para.includes(clean)) return para.trim();
+		const hay = stripForMatch(para).stripped;
+		if (!hay.includes(q)) continue;
+		if (!first) first = para.trim();
+		let from = 0;
+		for (;;) {
+			const at = hay.indexOf(q, from);
+			if (at === -1) break;
+			if (seen === occurrence) return para.trim();
+			seen++;
+			from = at + q.length;
+		}
 	}
-	return clean;
+	return first || clean;
 }
 
 /**

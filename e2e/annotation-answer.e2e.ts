@@ -604,6 +604,83 @@ test("badge click spawns the pinyin panel above the quote", async ({
 	await expect(panel).toHaveCount(0);
 });
 
+/** A quote living in two same-reply paragraphs resolves its own: the
+Chinese 旅行 (second match) opens its paragraph's pinyin, never the
+Japanese paragraph's furigana. */
+test("second-occurrence quote opens its own paragraph's readings", async ({
+	page
+}) => {
+	test.setTimeout(120_000);
+	await seedChat(page, [
+		{ role: "assistant", content: "日本語の旅行は楽しいです。\n\n北京旅行很好。" }
+	]);
+	await page.addInitScript(() => {
+		localStorage.setItem("ccez-mock-chat-ms", "2500");
+	});
+	await page.goto("/");
+	const article = page.locator("article.assistant");
+	await expect(article).toBeVisible({ timeout: 60_000 });
+	// Rect of the second 旅行 (the Chinese one): badge chrome stays
+	// out so offsets map onto visible text, like quoteRect.
+	const rect = await page.evaluate(() => {
+		const root = document.querySelectorAll("article .rendered")[0];
+		if (!root) throw new Error("no article");
+		const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+		const texts: Text[] = [];
+		while (walker.nextNode()) {
+			const node = walker.currentNode;
+			const parent = node.parentNode;
+			if (parent instanceof Element && parent.closest("[data-ann-badge]"))
+				continue;
+			if (node instanceof Text) texts.push(node);
+		}
+		const hay = texts.map((t) => t.textContent ?? "").join("");
+		const first = hay.indexOf("旅行");
+		const at = hay.indexOf("旅行", first + 1);
+		if (at < 0) throw new Error("second match missing");
+		const nodeAt = (flat: number): [Text, number] => {
+			let rest = flat;
+			for (const t of texts) {
+				const len = (t.textContent ?? "").length;
+				if (rest <= len) return [t, rest];
+				rest -= len;
+			}
+			const last = texts[texts.length - 1];
+			if (!last) throw new Error("no text");
+			return [last, (last.textContent ?? "").length];
+		};
+		const [startNode, startOff] = nodeAt(at);
+		const [endNode, endOff] = nodeAt(at + 2);
+		const range = document.createRange();
+		range.setStart(startNode, startOff);
+		range.setEnd(endNode, endOff);
+		return range.getBoundingClientRect().toJSON() as {
+			x: number;
+			y: number;
+			width: number;
+			height: number;
+		};
+	});
+	await page.mouse.move(rect.x + 1, rect.y + rect.height / 2);
+	await page.mouse.down();
+	await page.mouse.move(rect.x + rect.width - 1, rect.y + rect.height / 2, {
+		steps: 8
+	});
+	await page.mouse.up();
+	await expect(page.locator(".sel-menu")).toBeVisible({ timeout: 10_000 });
+	// Shift+A opens the box (bare A files and sends at once now).
+	await page.keyboard.press("A");
+	await askAtFile(page, "what does this mean?");
+	const ready = page.locator("button.ccez-ann-badge.ans-ready");
+	await ready.click();
+	const card = page.locator(".ann-answer");
+	await expect(card).toBeVisible({ timeout: 10_000 });
+	// Pinyin for the Chinese quote (lǚ), never Japanese furigana.
+	const panel = page.locator(".sel-pinyin");
+	await expect(panel).toBeVisible({ timeout: 10_000 });
+	await expect(panel).toContainText("lǚ");
+});
+
 /** Creating a Chinese annotation shows its pinyin panel above the
 quote while the pill is open (pinned past the pill's focus
 collapse); cancelling drops both. */
