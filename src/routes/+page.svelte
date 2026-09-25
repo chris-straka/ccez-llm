@@ -4934,6 +4934,10 @@
 			messageId: found.messageId,
 			range: stored
 		};
+		// Selecting unpins the stream follow: a reply must not yank
+		// the view out from under the highlight (scrolling back to
+		// the bottom re-pins, like any unpin).
+		viewport.stick = false;
 		// No prompt summon: the menu floats viewport-fixed on every
 		// platform now (the old phone dock needed the composer shown).
 	}
@@ -5418,6 +5422,9 @@
 	 * click-away close, the dock's Unpin removes.
 	 */
 	function openBadge(id: AnnotationId, anchor?: { x: number; y: number }): void {
+		// A badge press unpins the stream follow, like a selection:
+		// the card reads against a still thread.
+		viewport.stick = false;
 		// Re-pressing a badge with its create pill open cancels the
 		// pill, like cancel.
 		if (annPop && !annPopClosing && annPop.id === id) {
@@ -5529,6 +5536,9 @@
 					const gap = Math.max(2, Math.round(2 + (settings.fontScale - 1) * 12));
 					answerPop = { ...answerPop, y: Math.floor(fresh.bottom + gap) };
 					answerPopTop = scrollBox?.scrollTop ?? 0;
+					// The room-making scroll above re-pinned the bottom:
+					// unpin again, the card still reads against stillness.
+					viewport.stick = false;
 				})();
 			}
 			return;
@@ -5588,6 +5598,9 @@
 	function editOrangeAnnotation(id: AnnotationId): void {
 		const current = annotations.find((a) => a.id === id);
 		if (!current || current.answer === undefined) return;
+		// The edit card unpins the stream follow like any badge
+		// press: typing must not fight the follow.
+		viewport.stick = false;
 		stopPillMic();
 		if (answerTimer) {
 			clearTimeout(answerTimer);
@@ -5856,6 +5869,11 @@
 		annPop = null;
 		promptAnnStash = editor?.getText() ?? "";
 		promptAnnEdit = target;
+		// The in-prompt edit unpins the stream follow: the quote
+		// landing below re-pins geometrically when it scrolls, so an
+		// already-visible quote (no scroll) would otherwise keep the
+		// follow yanking under the typing.
+		viewport.stick = false;
 		reviewOpen = false;
 		editor?.setText(comment);
 		// The box stays empty with no placeholder: the highlighted
@@ -7898,14 +7916,16 @@
 		// here as effects.
 		const action = submitAction({
 			annPopOpen: annPop !== null && !annPopClosing,
+			annEdit: promptAnnEdit !== null,
 			canSubmit,
 			sendGuardTripped: Date.now() < sendGuardUntil,
 			kind
 		});
 		if (action === "ignore") {
 			// A send attempted while this chat's reply streams buzzes
-			// denial (annotations or not — nothing goes out mid-thought).
-			// Empty Enter stays silent, like before.
+			// denial — except an in-prompt note edit, which files
+			// through (decided above; doSend commits it, never a
+			// chat turn). Empty Enter stays silent, like before.
 			if (
 				isSending(chatState) &&
 				(hasText || attachments.length > 0 || annotations.length > 0)
@@ -8274,6 +8294,17 @@
 		const box = scrollBox;
 		if (viewport.stick && !viewport.holding && box)
 			box.scrollTo({ top: box.scrollHeight, behavior: "instant" });
+	});
+	/** Mirror the stick flag onto the scroller for specs: e2e pins
+	unpin-on-annotate against this (geometry can't — a one-line
+	wrap plus the one-token effect lag plus the completion slop
+	make scroll deltas unassertable). Change-guarded, so steady
+	scrolling writes nothing. */
+	$effect(() => {
+		const box = scrollBox;
+		if (!box) return;
+		const want = viewport.stick ? "true" : "false";
+		if (box.dataset.stick !== want) box.dataset.stick = want;
 	});
 
 	function jumpTo(index: number) {

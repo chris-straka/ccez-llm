@@ -1837,6 +1837,107 @@ test.describe("touch", () => {
 			await expect(page.locator(".prompt-tools .ann-pill")).toHaveCount(0);
 		});
 
+		/** An in-prompt note files mid-stream: the send arrow commits
+		the annotation (never a chat turn) while the main reply still
+		streams, instead of buzzing denial. The note's instant answer
+		lands before the slowed stream finishes. */
+		test("a note files mid-stream through the composer", async ({
+			page
+		}) => {
+			test.setTimeout(120_000);
+			await seedChat(page, [
+				{ role: "user", content: "first" },
+				{
+					role: "assistant",
+					content: "the riverbank at dawn holds the fog over the field"
+				}
+			]);
+			await page.addInitScript(() => {
+				localStorage.setItem("ccez-mock-word-ms", "800");
+			});
+			await page.goto("/");
+			await expect(
+				page.locator("article .rendered").first()
+			).toBeVisible({ timeout: 60_000 });
+			// Phone composer: Enter is a newline, the arrow sends.
+			const sent = "a long winding river road tale for slow streaming";
+			await page.locator(".ta-input").click();
+			await page.keyboard.type(sent, { delay: 0 });
+			await page.locator(".send-btn").click();
+			const full = `Mock reply to: ${sent}`;
+			const last = page.locator("article.assistant .rendered").last();
+			await expect(last).toContainText("Mock reply", { timeout: 60_000 });
+			// Select the just-sent user turn (index 2, static while
+			// the reply streams below it): same synthetic touch +
+			// programmatic range as the Annotate test above.
+			const box = await page
+				.locator("article")
+				.nth(2)
+				.boundingBox();
+			if (!box) throw new Error("no sent-message box");
+			await page.evaluate(
+				({ x, y }: { x: number; y: number }) => {
+					const touch = (id: number) =>
+						new Touch({
+							identifier: id,
+							target: document.body,
+							clientX: x,
+							clientY: y
+						});
+					window.dispatchEvent(
+						new TouchEvent("touchstart", {
+							bubbles: true,
+							cancelable: true,
+							composed: true,
+							touches: [touch(1)]
+						})
+					);
+					const rendered = document.querySelectorAll(
+						"article .rendered"
+					)[2];
+					const sel = window.getSelection();
+					sel?.removeAllRanges();
+					const range = document.createRange();
+					if (rendered) range.selectNodeContents(rendered);
+					sel?.addRange(range);
+					window.dispatchEvent(
+						new TouchEvent("touchend", {
+							bubbles: true,
+							cancelable: true,
+							composed: true,
+							touches: [],
+							changedTouches: [touch(1)]
+						})
+					);
+				},
+				{ x: box.x + box.width / 2, y: box.y + box.height / 2 }
+			);
+			const btn = page.locator('.sel-menu button:has-text("Annotate")');
+			await expect(btn).toBeVisible({ timeout: 10_000 });
+			const btnBox = await btn.boundingBox();
+			if (!btnBox) throw new Error("no annotate box");
+			await page.touchscreen.tap(
+				btnBox.x + btnBox.width / 2,
+				btnBox.y + btnBox.height / 2
+			);
+			// The composer takes the note; the arrow files it even
+			// though the reply still streams.
+			const composer = page.locator(".prompt textarea");
+			await expect(composer).toHaveValue("", { timeout: 10_000 });
+			await composer.click();
+			await page.keyboard.type("why rivers?", { delay: 10 });
+			await page.locator(".send-btn").click();
+			await expect(page.locator(".toast")).toHaveText("Annotation sent");
+			const badge = page.locator("button.ccez-ann-badge").first();
+			await expect(badge).toBeVisible({ timeout: 15_000 });
+			await expect(badge).toHaveClass(/ans-ready/, { timeout: 30_000 });
+			// Answered while the main reply still streams (no false
+			// pass on a reply that finished first).
+			await expect(last).not.toContainText(full);
+			await expect(last).toContainText(full, { timeout: 60_000 });
+			await expect(badge).toBeVisible();
+		});
+
 		/** Filed notes never transplant on phones: an unpinned
 		filing raises no pill and no dock rows — the badge owns
 		it until its plus pins it. The draft is seeded in storage

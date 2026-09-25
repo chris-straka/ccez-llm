@@ -1,5 +1,5 @@
 import { devices, expect, test } from "@playwright/test";
-import { seedChat } from "./helpers";
+import { dragQuote, seedChat } from "./helpers";
 
 /**
  * Stick-to-bottom: submit pins the view to the newest content and the
@@ -168,4 +168,45 @@ test("send and completion never yank a mid-thread reader", async ({
 	});
 	expect(rest.top).toBeLessThanOrEqual(100);
 	expect(rest.gap).toBeGreaterThan(500);
+});
+
+/** Selecting mid-stream unpins the follow: the stick flag reads
+true while the reply streams into a stuck view, and summoning
+the selection menu flips it false so the follow stops yanking
+under the highlight. Scrolling back to the bottom re-pins.
+Pinned on the flag (see the data-stick mirror): scroll geometry
+can't catch a one-line wrap through the one-token effect lag and
+the completion slop. */
+test("selecting text mid-stream unpins the follow", async ({ page }) => {
+	await seedChat(page, [
+		{ role: "user", content: "first" },
+		{ role: "assistant", content: LONG },
+		{ role: "user", content: "second" },
+		{ role: "assistant", content: LONG }
+	]);
+	await page.addInitScript(() => {
+		localStorage.setItem("ccez-mock-word-ms", "800");
+	});
+	await page.goto("/");
+	await page.locator(".ta-input").waitFor({ timeout: 60_000 });
+	const box = page.locator(".messages");
+	// Read to the end first: only a stuck submit pins the follow
+	// (an unstuck submit never scrolls, so there would be nothing
+	// to unpin and the test would pass on any tree).
+	await page.evaluate(() => {
+		const el = document.querySelector(".messages") as HTMLElement;
+		el.scrollTo({ top: el.scrollHeight, behavior: "instant" });
+	});
+	await expect(box).toHaveAttribute("data-stick", "true");
+	await sendLong(page);
+	// Still pinned while the reply streams...
+	const last = page.locator("article.assistant .rendered").last();
+	await expect(last).toContainText("Mock reply", { timeout: 60_000 });
+	await expect(box).toHaveAttribute("data-stick", "true");
+	// ...until a selection unpins it. The just-sent user turn is
+	// visible at the bottom, mid-viewport, so the drag scrolls
+	// nothing (a scroll would re-pin geometrically either way).
+	await dragQuote(page, 4, "lorem");
+	await expect(page.locator(".sel-menu")).toBeVisible({ timeout: 10_000 });
+	await expect(box).toHaveAttribute("data-stick", "false");
 });

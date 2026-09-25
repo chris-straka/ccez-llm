@@ -37,6 +37,7 @@ describe("submitAction", () => {
 		expect(
 			submitAction({
 				annPopOpen: true,
+				annEdit: false,
 				canSubmit: true,
 				sendGuardTripped: false,
 				kind: "send"
@@ -45,6 +46,7 @@ describe("submitAction", () => {
 		expect(
 			submitAction({
 				annPopOpen: true,
+				annEdit: false,
 				canSubmit: false,
 				sendGuardTripped: false,
 				kind: "stage"
@@ -56,6 +58,44 @@ describe("submitAction", () => {
 		expect(
 			submitAction({
 				annPopOpen: false,
+				annEdit: false,
+				canSubmit: false,
+				sendGuardTripped: false,
+				kind: "send"
+			})
+		).toBe("ignore");
+	});
+
+	it("files an in-prompt note edit through the streaming gate", () => {
+		// Mid-stream arrow files the note (doSend commits it, never
+		// a chat turn) instead of buzzing denial.
+		expect(
+			submitAction({
+				annPopOpen: false,
+				annEdit: true,
+				canSubmit: false,
+				sendGuardTripped: false,
+				kind: "send"
+			})
+		).toBe("send");
+		// Alt+Enter files too — staging never steals the note.
+		expect(
+			submitAction({
+				annPopOpen: false,
+				annEdit: true,
+				canSubmit: false,
+				sendGuardTripped: false,
+				kind: "stage"
+			})
+		).toBe("send");
+		// The pill still wins its corner: both open at once keeps
+		// Enter with the pill (unreachable by construction — the
+		// edit nulls the pill on entry and annotate commits the
+		// edit before summoning).
+		expect(
+			submitAction({
+				annPopOpen: true,
+				annEdit: true,
 				canSubmit: false,
 				sendGuardTripped: false,
 				kind: "send"
@@ -67,6 +107,7 @@ describe("submitAction", () => {
 		expect(
 			submitAction({
 				annPopOpen: false,
+				annEdit: false,
 				canSubmit: true,
 				sendGuardTripped: true,
 				kind: "send"
@@ -75,6 +116,7 @@ describe("submitAction", () => {
 		expect(
 			submitAction({
 				annPopOpen: false,
+				annEdit: false,
 				canSubmit: true,
 				sendGuardTripped: true,
 				kind: "stage"
@@ -86,6 +128,7 @@ describe("submitAction", () => {
 		expect(
 			submitAction({
 				annPopOpen: false,
+				annEdit: false,
 				canSubmit: true,
 				sendGuardTripped: false,
 				kind: "send"
@@ -94,6 +137,7 @@ describe("submitAction", () => {
 		expect(
 			submitAction({
 				annPopOpen: false,
+				annEdit: false,
 				canSubmit: true,
 				sendGuardTripped: false,
 				kind: "stage"

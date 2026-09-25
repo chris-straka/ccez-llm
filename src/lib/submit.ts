@@ -15,6 +15,9 @@ import type { SubmitKind } from "./editor";
 export interface SubmitFacts {
 	/** Annotation pill open and not fading: it owns Enter. */
 	annPopOpen: boolean;
+	/** An in-prompt annotation edit owns the composer: the arrow
+	files the note (never a chat turn), even mid-stream. */
+	annEdit: boolean;
 	/** Composer send gate (the same boolean the send button uses). */
 	canSubmit: boolean;
 	/** Now is inside the double-Enter window (time half of the guard). */
@@ -29,12 +32,16 @@ export type SubmitAction = "ignore" | "stage" | "send";
  * Which submit path a key/button press takes. Guard order is the
  * contract: the pill owns Enter while open (a pill already fading
  * out owns nothing, but the time guard below still eats the bare
- * double-Enter that saved it), then the send gate holds the draft
- * while a reply streams, then the double-Enter window — which only
- * ever blocks a bare send, never a stage.
+ * double-Enter that saved it), then an in-prompt annotation edit
+ * files through the streaming gate (its arrow commits the note,
+ * never a chat turn — `doSend` owns that branch), then the send
+ * gate holds the draft while a reply streams, then the
+ * double-Enter window — which only ever blocks a bare send, never
+ * a stage.
  */
 export function submitAction(facts: SubmitFacts): SubmitAction {
 	if (facts.annPopOpen) return "ignore";
+	if (facts.annEdit) return "send";
 	if (!facts.canSubmit) return "ignore";
 	if (facts.kind === "send" && facts.sendGuardTripped) return "ignore";
 	if (facts.kind === "stage") return "stage";
