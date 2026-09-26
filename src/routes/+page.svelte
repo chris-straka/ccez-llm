@@ -13520,6 +13520,7 @@
 		class:hide-messages={settings.hideMessages}
 		class:hide-buttons={settings.hideButtons}
 		class:plain-user={!settings.ownBubble}
+		data-own-ink={settings.ownInk}
 		class:hover-user={settings.hoverUserActions}
 		class:hover-assistant={settings.hoverAssistantActions}
 		class:scale-actions={settings.scaleActionsWithFont}

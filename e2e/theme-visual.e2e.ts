@@ -122,18 +122,40 @@ test("empty-state hero stays centered", async ({ page }) => {
 	await expect(hero).toHaveCSS("text-align", "center");
 });
 
+/** The Appearance swatch repaints own messages live (boots light). */
+test("my message color swatch repaints own messages", async ({ page }) => {
+	await seedChat(page, [{ role: "user", content: "ink me" }]);
+	await page.goto("/");
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
+	await page.keyboard.press("Meta+,");
+	await page
+		.locator('.settings-panel [aria-label="My message color"]')
+		.getByRole("radio", { name: "Blue" })
+		.click();
+	await expect(page.locator("article.user .bubble").first()).toHaveCSS(
+		"color",
+		"rgb(29, 78, 216)"
+	);
+});
+
 const THEMES = [
 	{
 		name: "light" as const,
 		bg: "rgb(255, 255, 255)",
 		wash: "rgb(241, 241, 244)",
-		softLine: "rgb(229, 229, 234)"
+		softLine: "rgb(229, 229, 234)",
+		ink: "rgb(28, 28, 30)",
+		ownInk: "rgb(190, 24, 93)"
 	},
 	{
 		name: "dark" as const,
 		bg: "rgb(23, 23, 26)",
 		wash: "rgb(44, 44, 46)",
-		softLine: "rgb(56, 56, 58)"
+		softLine: "rgb(56, 56, 58)",
+		ink: "rgb(242, 242, 247)",
+		ownInk: "rgb(249, 168, 212)"
 	}
 ];
 
@@ -222,6 +244,27 @@ for (const t of THEMES) {
 			"background-color",
 			t.wash
 		);
+	});
+
+	test(`own ink paints ${t.name}`, async ({ page }) => {
+		await seedChat(page, [{ role: "user", content: "ink me" }]);
+		await seedTheme(page, t.name);
+		await page.goto("/");
+		// Pink default, no click needed: deep rose on light, pink on dark.
+		const bubble = page.locator("article.user .bubble").first();
+		await expect(bubble).toBeVisible({ timeout: 60_000 });
+		await expect(bubble).toHaveCSS("color", t.ownInk);
+	});
+
+	test(`own ink off paints plain ink on ${t.name}`, async ({ page }) => {
+		await seedChat(page, [{ role: "user", content: "ink me" }], null, {
+			ownInk: "off"
+		});
+		await seedTheme(page, t.name);
+		await page.goto("/");
+		const bubble = page.locator("article.user .bubble").first();
+		await expect(bubble).toBeVisible({ timeout: 60_000 });
+		await expect(bubble).toHaveCSS("color", t.ink);
 	});
 
 	test(`settings panel paints ${t.name}`, async ({ page }) => {

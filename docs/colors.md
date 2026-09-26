@@ -72,6 +72,11 @@ platforms can't share one vendor's identity. So the palette is
 | `--focus`      | `#3a3a3c`             | `#aeaeb2`             | Focus rings, selected-row marker                                                                                                                                                 |
 | `--thinking-2` | `#5ac8fa`             | `#64d2ff`             | Thinking dots middle step (sky; dot 1 rides `--accent`)                                                                                                                          |
 | `--thinking-3` | `#34c759`             | `#30d158`             | Thinking dots last step (green)                                                                                                                                                  |
+| `--own-pink`   | `#be185d`             | `#f9a8d4`             | Own-message ink: default swatch (deep rose / pink), wired via `main[data-own-ink]`                                                                                               |
+| `--own-blue`   | `#1d4ed8`             | `#93c5fd`             | Own-message ink swatch                                                                                                                                                           |
+| `--own-green`  | `#15803d`             | `#86efac`             | Own-message ink swatch                                                                                                                                                           |
+| `--own-amber`  | `#b45309`             | `#fcd34d`             | Own-message ink swatch                                                                                                                                                           |
+| `--own-purple` | `#7e22ce`             | `#d8b4fe`             | Own-message ink swatch                                                                                                                                                           |
 
 ## Exceptions (raw hex allowed, documented here)
 
@@ -101,6 +106,13 @@ platforms can't share one vendor's identity. So the palette is
 
 ## Log
 
+- **2026-09-26 — Own messages get ink.** Your messages default to
+  pink text on dark / deep rose on light (`--own-pink`), so the
+  speaker reads on return without the bubble background (which stays
+  for whoever wants it). Swatches (blue/green/amber/purple, plus
+  Off for plain ink) live in Settings → Appearance → My message
+  color, wired as `main[data-own-ink]` → per-theme tokens; code
+  tokens, badges, and links keep their explicit colors.
 - **2026-09-18 — Thinking dots go tricolor, pill removed.** The
   sending chip's blue backplate is gone (plain status text); the
   three dots run accent blue → `--thinking-2` sky → `--thinking-3`

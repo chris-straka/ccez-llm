@@ -506,6 +506,36 @@ margins would not take). */
 	color: #1c1c1e;
 	font-weight: 600;
 }
+/* Own-ink swatches: the dot previews the hue through the themed
+token, so it tracks light/dark like the messages do. Off reads as
+a hollow dot (no color). */
+.settings-inner .segmented .dot {
+	display: inline-block;
+	width: 0.7em;
+	height: 0.7em;
+	border-radius: 50%;
+	margin-right: 0.4em;
+	vertical-align: baseline;
+}
+.settings-inner .segmented .dot[data-choice="pink"] {
+	background: var(--own-pink);
+}
+.settings-inner .segmented .dot[data-choice="blue"] {
+	background: var(--own-blue);
+}
+.settings-inner .segmented .dot[data-choice="green"] {
+	background: var(--own-green);
+}
+.settings-inner .segmented .dot[data-choice="amber"] {
+	background: var(--own-amber);
+}
+.settings-inner .segmented .dot[data-choice="purple"] {
+	background: var(--own-purple);
+}
+.settings-inner .segmented .dot[data-choice="off"] {
+	background: transparent;
+	border: 1px solid var(--muted);
+}
 .settings-inner .provider-row button:not(.selected):not(:disabled):hover,
 .settings-inner .segmented button:not(.selected):not(:disabled):hover {
 	border-color: #1c1c1e;

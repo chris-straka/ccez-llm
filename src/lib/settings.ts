@@ -18,6 +18,23 @@ export type VoiceEngine = "web" | "native";
 /** Color-scheme override: follow the OS, or pin light/dark. */
 export type ThemeMode = "system" | "light" | "dark";
 
+/**
+ * Own-message text color: hue family resolved per theme by the
+ * `--own-*` tokens, or off for plain ink. A free `custom` hex rides
+ * a second field later — this list stays the swatch order.
+ */
+export type OwnInkChoice = "pink" | "blue" | "green" | "amber" | "purple" | "off";
+
+/** Swatch order in Settings → Appearance (also the heal allowlist). */
+export const OWN_INK_CHOICES: readonly OwnInkChoice[] = [
+	"pink",
+	"blue",
+	"green",
+	"amber",
+	"purple",
+	"off"
+];
+
 /** Resolved scheme for a mode: pins hold, system mirrors the OS. */
 export function resolveTheme(
 	mode: ThemeMode,
@@ -140,6 +157,8 @@ export interface AppSettings {
 	voiceLangPinned: boolean;
 	/** Shade the user's own messages like a bubble. Off = plain like replies. */
 	ownBubble: boolean;
+	/** Recolor the user's own message text (pink default). Off = plain ink. */
+	ownInk: OwnInkChoice;
 	/** My message action buttons appear only on hover/focus. Off = always shown. */
 	hoverUserActions: boolean;
 	/** AI message action buttons appear only on hover/focus. Off = always shown. */
@@ -414,6 +433,7 @@ export function defaultSettings(): AppSettings {
 		annPopScale: 1,
 		promptWidth: PROMPT_WIDTH_BASE_REM,
 		ownBubble: false,
+		ownInk: "pink",
 		hoverUserActions: true,
 		hoverAssistantActions: true,
 		scaleActionsWithFont: true,
@@ -628,6 +648,9 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 		) {
 			merged.theme = "system";
 		}
+		// Own-ink swatches postdate older saves the same way: unknown
+		// values heal to pink.
+		if (!OWN_INK_CHOICES.includes(merged.ownInk)) merged.ownInk = "pink";
 		// Clamp the prompt idle-hide timeout (older saves predate it;
 		// 0 = "never hide" is a legal stored value, everything else
 		// outside 2–10s falls back to the default).

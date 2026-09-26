@@ -76,6 +76,13 @@ html[data-theme="light"] {
 	--dim: #6e6e73;
 	--thinking-2: #5ac8fa;
 	--thinking-3: #34c759;
+	/* Own-message ink swatches (see docs/colors.md): deep enough to
+	read on white at body size. */
+	--own-pink: #be185d;
+	--own-blue: #1d4ed8;
+	--own-green: #15803d;
+	--own-amber: #b45309;
+	--own-purple: #7e22ce;
 	--alarm: #ff3b30;
 	--error-bg: #fdecea;
 	--error-ink: #94250a;
@@ -114,6 +121,13 @@ html[data-theme="dark"] {
 	--dim: #aeaeb2;
 	--thinking-2: #64d2ff;
 	--thinking-3: #30d158;
+	/* Own-message ink swatches (see docs/colors.md): light enough to
+	read on the dark surface at body size. */
+	--own-pink: #f9a8d4;
+	--own-blue: #93c5fd;
+	--own-green: #86efac;
+	--own-amber: #fcd34d;
+	--own-purple: #d8b4fe;
 	--alarm: #ff6b62;
 	--error-bg: #3d1008;
 	--error-ink: #ffb4a2;

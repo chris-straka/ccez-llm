@@ -136,3 +136,38 @@ describe("color tokens", () => {
 		}
 	});
 });
+
+describe("own-message ink", () => {
+	/** Swatch, light twin, dark twin (see docs/colors.md). */
+	const OWN_INKS: Array<[string, string, string]> = [
+		["pink", "#be185d", "#f9a8d4"],
+		["blue", "#1d4ed8", "#93c5fd"],
+		["green", "#15803d", "#86efac"],
+		["amber", "#b45309", "#fcd34d"],
+		["purple", "#7e22ce", "#d8b4fe"]
+	];
+	it("defines every swatch per theme in app.css", () => {
+		const app = readFileSync(new URL("../app.css", import.meta.url), "utf8");
+		for (const [choice, light, dark] of OWN_INKS) {
+			expect(app).toContain(`--own-${choice}: ${light}`);
+			expect(app).toContain(`--own-${choice}: ${dark}`);
+		}
+	});
+	it("pairs every swatch rule in MessageArticle (fallback hex, then the token)", () => {
+		const style = styleOf("../lib/components/MessageArticle.svelte");
+		for (const [choice, light] of OWN_INKS) {
+			expect(style).toContain(`main[data-own-ink="${choice}"]`);
+			expect(style).toMatch(
+				new RegExp(
+					`color: ${light};\\s*color: var\\(--own-${choice}\\);`
+				)
+			);
+		}
+		// Off has no rule — plain ink.
+		expect(style).not.toContain('data-own-ink="off"');
+	});
+	it("wires the setting through main[data-own-ink]", () => {
+		const page = readFileSync(new URL("./+page.svelte", import.meta.url), "utf8");
+		expect(page).toContain("data-own-ink={settings.ownInk}");
+	});
+});

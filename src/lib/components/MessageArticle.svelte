@@ -475,6 +475,30 @@ where the text sat, like the composer's promptEl pattern). -->
 		max-width: 100%;
 		margin-left: auto;
 	}
+	/* Own-message ink: main[data-own-ink] selects the hue, the token
+	resolves per theme ("off" has no rule — plain ink). Applies in
+	plain and bubble modes alike; code tokens, badges, and links keep
+	their explicit colors. Fallback hex first per docs/colors.md. */
+	:global(main[data-own-ink="pink"]) article.user .bubble {
+		color: #be185d;
+		color: var(--own-pink);
+	}
+	:global(main[data-own-ink="blue"]) article.user .bubble {
+		color: #1d4ed8;
+		color: var(--own-blue);
+	}
+	:global(main[data-own-ink="green"]) article.user .bubble {
+		color: #15803d;
+		color: var(--own-green);
+	}
+	:global(main[data-own-ink="amber"]) article.user .bubble {
+		color: #b45309;
+		color: var(--own-amber);
+	}
+	:global(main[data-own-ink="purple"]) article.user .bubble {
+		color: #7e22ce;
+		color: var(--own-purple);
+	}
 	article.selected {
 		outline: 2px solid #3a3a3c;
 		outline-color: var(--focus);

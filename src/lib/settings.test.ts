@@ -30,6 +30,7 @@ import {
 	LOOKUP_CAPABILITY_HINT,
 	systemLocale,
 	resolveTheme,
+	OWN_INK_CHOICES,
 	validCaptureArea,
 	type AppSettings
 } from "./settings";
@@ -707,6 +708,26 @@ describe("theme", () => {
 		const s = blankSettings();
 		saveSettings({ ...s, theme: "midnight" as never }, store);
 		expect(loadSettings(store).theme).toBe("system");
+	});
+});
+
+describe("ownInk", () => {
+	it("defaults to pink", () => {
+		expect(blankSettings().ownInk).toBe("pink");
+	});
+	it("heals unknown saved values back to pink", () => {
+		const store = memoryStore;
+		const s = blankSettings();
+		saveSettings({ ...s, ownInk: "chartreuse" as never }, store);
+		expect(loadSettings(store).ownInk).toBe("pink");
+	});
+	it("round-trips every swatch, off included", () => {
+		const store = memoryStore;
+		for (const choice of OWN_INK_CHOICES) {
+			const s = blankSettings();
+			saveSettings({ ...s, ownInk: choice }, store);
+			expect(loadSettings(store).ownInk).toBe(choice);
+		}
 	});
 });
 

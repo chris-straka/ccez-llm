@@ -176,3 +176,27 @@ describe("provider gating wiring", () => {
 		expect(source).toContain("probeFacts(");
 	});
 });
+
+describe("own-ink swatches", () => {
+	// The Appearance control iterates the shared choice list, so a
+	// future `custom` swatch appears there without a second edit —
+	// and the total labels record fails compile until it is named.
+	it("iterates OWN_INK_CHOICES behind the My message color group", () => {
+		const source = panelSource("AppearancePanel.svelte");
+		expect(source).toContain("OWN_INK_CHOICES");
+		expect(source).toMatch(/\{#each OWN_INK_CHOICES as/);
+		expect(source).toContain('aria-label="My message color"');
+		expect(source).toContain("settings.ownInk = choice");
+	});
+	it("previews every swatch through its themed token, off hollow", () => {
+		const css = panelsCss();
+		for (const choice of ["pink", "blue", "green", "amber", "purple"]) {
+			expect(
+				ruleBody(css, `.segmented .dot[data-choice="${choice}"]`)
+			).toMatch(new RegExp(`background:\\s*var\\(--own-${choice}\\)`));
+		}
+		expect(ruleBody(css, '.segmented .dot[data-choice="off"]')).toMatch(
+			/background:\s*transparent/
+		);
+	});
+});
