@@ -973,6 +973,32 @@ to whole words` in `annotations-ux.e2e.ts`. No code change needed.)
       in `keybindings.test.ts`; effect rides the existing new-chat
       path; shortcuts menu lists ⌘T under New chat.
 
+## Capture-any-window OCR (Sep 23–24, main)
+
+Plan of record `PLAN.md` (tracked alongside). Shipped shape,
+condensed from the Sep 23–24 chain (`0cda353`–`051257b`, tail
+`8908f70`):
+
+- [x] Window listing + capture commands (`list_windows`,
+      `capture_window(id)`, `capture_rect`) over the `screencapture`
+      CLI (`-l<id>` one window, `-R` rect in points, `-m`
+      fullscreen), own app excluded, `unsupported` stubs off-macOS;
+      settings enable gate (default on) plus saved source/square
+      persistence; CLI reason surfaces in area errors.
+- [x] Global `CommandOrControl+Shift+O` chord (mirrored in-app)
+      runs capture → `ocr_recognize` with the chat reply language
+      as hint → filed as an assistant message (no template send);
+      low-confidence reads (CJK stage threshold 0.4) land in the
+      type-in overlay instead (Enter sends, Esc hides); saved
+      square preferred, silent behind games.
+- [x] Composer capture button with the window/fullscreen/area
+      source menu (last pick persisted); `⇧⌘U` set-area overlay
+      (plain desktop overlay at status level, order-front, joins
+      all Spaces; backend-measured frame translates the square);
+      area picker desktop-gated for mobile compile; Screen
+      Recording denial toast opens settings; `⇧⌘O` / `⇧⌘U` rows
+      pinned in unit + e2e.
+
 ## Dropped (Sep 2026, owner call — not bugs, removed from TODO)
 
 - [x] Win/Linux device-proof pile DROPPED: no hardware exists and none
