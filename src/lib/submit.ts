@@ -130,6 +130,20 @@ export function editMessageAction(
 }
 
 /**
+ * Index of the newest user message for the ⌘E chord, or null when the
+ * chat holds no own message to edit (empty chat, assistant-only
+ * transcript): the caller buzzes instead of opening an edit.
+ */
+export function newestUserMessageIndex(
+	messages: ReadonlyArray<EditTargetMessage>
+): number | null {
+	for (let i = messages.length - 1; i >= 0; i--) {
+		if (messages[i]?.role === "user") return i;
+	}
+	return null;
+}
+
+/**
  * True when the first-token rumble belongs to the visible chat. A
  * mid-stream chat switch must not rumble the new chat for the old
  * one's reply, and a backgrounded app must stay silent — the

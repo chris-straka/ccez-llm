@@ -692,8 +692,11 @@ describe("commandChord", () => {
 		expect(commandChord({ ...chordBase, metaKey: true, code: "KeyP" })).toBe(
 			"toggle-palette"
 		);
+		expect(
+			commandChord({ ...chordBase, metaKey: true, ctrlKey: true, code: "KeyF" })
+		).toBe("toggle-fullscreen");
 		expect(commandChord({ ...chordBase, metaKey: true, code: "KeyE" })).toBe(
-			"toggle-fullscreen"
+			"edit-newest"
 		);
 		expect(commandChord({ ...chordBase, metaKey: true, code: "KeyF" })).toBe(
 			"find-toggle"
@@ -809,8 +812,8 @@ describe("commandChord", () => {
 	});
 
 	it("passes browser-claimed chords through on the web only", () => {
-		// Print, find, and the ⌘E fullscreen arm belong to the
-		// browser outside the shell.
+		// Print, find, and ⌘E (use selection for find) belong to
+		// the browser outside the shell.
 		expect(
 			commandChord({ ...chordBase, inShell: false, metaKey: true, code: "KeyP" })
 		).toBe(null);
@@ -820,7 +823,7 @@ describe("commandChord", () => {
 		expect(
 			commandChord({ ...chordBase, inShell: false, metaKey: true, code: "KeyE" })
 		).toBe(null);
-		// The ⌘+Ctrl+F fullscreen arm has no browser claim: it works
+		// The ⌘+Ctrl+F fullscreen chord has no browser claim: it works
 		// everywhere, as do send and the deliberate Ctrl+O swallow.
 		expect(
 			commandChord({
@@ -869,7 +872,7 @@ describe("commandChord", () => {
 				code: "KeyN"
 			})
 		).toBe("new-chat");
-		// Alt/shift break the palette/fullscreen/find/send chords.
+		// Alt/shift break the palette/fullscreen/edit/find/send chords.
 		expect(
 			commandChord({ ...chordBase, metaKey: true, altKey: true, code: "KeyP" })
 		).toBe(null);
@@ -880,6 +883,10 @@ describe("commandChord", () => {
 				shiftKey: true,
 				code: "KeyE"
 			})
+		).toBe(null);
+		// ⌘E is meta-only: Ctrl joining breaks the edit chord.
+		expect(
+			commandChord({ ...chordBase, metaKey: true, ctrlKey: true, code: "KeyE" })
 		).toBe(null);
 		expect(
 			commandChord({

@@ -463,6 +463,7 @@
 		sendAction,
 		composerLocked,
 		editMessageAction,
+		newestUserMessageIndex,
 		commitEditTarget,
 		shouldRumbleOnFirstToken
 	} from "$lib/submit";
@@ -10849,11 +10850,26 @@
 				return;
 			}
 			if (chord === "toggle-fullscreen") {
-				// Fullscreen toggle: Cmd+E and Ctrl+Cmd+F. Claimed
-				// before find below, so the dual-modifier chord never
-				// reads as Cmd/Ctrl+F.
+				// Fullscreen toggle: Ctrl+Cmd+F only (⌘E edits now).
+				// Claimed before find below, so the dual-modifier
+				// chord never reads as Cmd/Ctrl+F.
 				consumeEvent(event);
 				void toggleFullscreen();
+				return;
+			}
+			if (chord === "edit-newest") {
+				// ⌘E pulls the newest own message into in-place
+				// editing from anywhere — same gates as E (no-op
+				// mid-send, a second press toggles back off). With
+				// no own message it buzzes instead, like an
+				// off-text speak chord.
+				consumeEvent(event);
+				const newest = newestUserMessageIndex(chat.messages);
+				if (newest === null) {
+					buzzNo();
+					return;
+				}
+				editMessage(newest);
 				return;
 			}
 			if (chord === "find-toggle") {

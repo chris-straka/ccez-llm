@@ -468,6 +468,7 @@ export interface CommandChordFacts extends KeyModifiers {
 export type CommandChord =
 	| "toggle-palette"
 	| "toggle-fullscreen"
+	| "edit-newest"
 	| "find-toggle"
 	| "toggle-pastes"
 	| "send"
@@ -493,21 +494,33 @@ export function commandChord(facts: CommandChordFacts): CommandChord | null {
 	const cmd = facts.metaKey || facts.ctrlKey;
 	// Shell only: a browser claims ⌘/Ctrl+P (print) and ⌘/Ctrl+F
 	// (find) and the page must not swallow them. The ⌘+Ctrl+F
-	// fullscreen arm stays everywhere — no browser binds it.
+	// fullscreen chord stays everywhere — no browser binds it.
 	if (cmd && !facts.altKey && !facts.shiftKey && facts.code === "KeyP") {
 		if (facts.inShell) return "toggle-palette";
 		return null;
 	}
+	// Claimed before find below, so the dual-modifier chord never
+	// reads as ⌘/Ctrl+F.
 	if (
+		facts.metaKey &&
+		facts.ctrlKey &&
 		!facts.altKey &&
 		!facts.shiftKey &&
-		((facts.metaKey &&
-			!facts.ctrlKey &&
-			facts.code === "KeyE" &&
-			facts.inShell) ||
-			(facts.metaKey && facts.ctrlKey && facts.code === "KeyF"))
+		facts.code === "KeyF"
 	)
 		return "toggle-fullscreen";
+	// Shell only: a browser claims ⌘E (use selection for find) and
+	// the page must not swallow it — in the shell it edits the
+	// newest own message instead.
+	if (
+		facts.metaKey &&
+		!facts.ctrlKey &&
+		!facts.altKey &&
+		!facts.shiftKey &&
+		facts.code === "KeyE" &&
+		facts.inShell
+	)
+		return "edit-newest";
 	if (cmd && !facts.altKey && !facts.shiftKey && facts.code === "KeyF") {
 		if (facts.inShell) return "find-toggle";
 		return null;

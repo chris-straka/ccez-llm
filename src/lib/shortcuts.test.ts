@@ -25,6 +25,7 @@ const MAC_NAMES = [
 	"Delete a message",
 	"Delete annotation",
 	"Delete this chat",
+	"Edit newest message",
 	"Edit own message",
 	"Exit fullscreen",
 	"Find in chat",
@@ -88,6 +89,10 @@ describe("shortcuts menu copy", () => {
 		expect(rows.find((r) => r.name === "Set capture area")?.keys).toBe(
 			"⇧⌘U"
 		);
+		expect(rows.find((r) => r.name === "Fullscreen")?.keys).toBe("Ctrl+⌘F");
+		expect(rows.find((r) => r.name === "Edit newest message")?.keys).toBe(
+			"⌘E"
+		);
 	});
 
 	it("drops browser-dead rows on the web, still A-Z", () => {
@@ -101,7 +106,8 @@ describe("shortcuts menu copy", () => {
 			"Prompt width + / −",
 			"New chat",
 			"Capture window text",
-			"Set capture area"
+			"Set capture area",
+			"Edit newest message"
 		];
 		for (const isMac of [true, false]) {
 			const names = desktopShortcuts(isMac, false).map((r) => r.name);
@@ -126,6 +132,12 @@ describe("shortcuts menu copy", () => {
 		expect(rows.find((r) => r.name === "Search chats")?.keys).toBe("Ctrl+P");
 		expect(rows.find((r) => r.name === "Delete a message")?.keys).toBe(
 			"Hover + Shift+D"
+		);
+		expect(rows.find((r) => r.name === "Fullscreen")?.keys).toBe(
+			"Ctrl+Meta+F"
+		);
+		expect(rows.find((r) => r.name === "Edit newest message")?.keys).toBe(
+			"Meta+E"
 		);
 	});
 

@@ -6,9 +6,9 @@ import { describe, it, expect } from "vitest";
  * Tauri window through getCurrentWindow().isFullscreen() /
  * setFullscreen(), and Tauri 2 gates every window command behind an
  * explicit capability permission. A trimmed capability list once made
- * both fullscreen chords (Cmd+E, Ctrl+Cmd+F) die with zero feedback,
- * while the browser path (covered by the Meta+E e2e) kept passing —
- * so this pins the shell path's permissions here.
+ * the fullscreen chord (Ctrl+Cmd+F) die with zero feedback, while
+ * the browser path kept passing — so this pins the shell path's
+ * permissions here.
  */
 function capabilities(): { permissions: string[] } {
 	const raw = readFileSync(

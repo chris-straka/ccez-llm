@@ -80,7 +80,9 @@ const WEB_HIDDEN_ROWS = new Set([
 	"New chat",
 	// No backend answers in the preview: the chord fires, then toasts.
 	"Capture window text",
-	"Set capture area"
+	"Set capture area",
+	// Shell-only chord: the browser claims ⌘E out there.
+	"Edit newest message"
 ]);
 
 export function desktopShortcuts(isMac: boolean, inShell = true): ShortcutRow[] {
@@ -120,7 +122,7 @@ export function desktopShortcuts(isMac: boolean, inShell = true): ShortcutRow[] 
 			name: "Find in chat",
 			keys: `${meta}F`
 		},
-		{ name: "Fullscreen", keys: `${isMac ? "⌘E, F" : "Ctrl+Meta+F"}` },
+		{ name: "Fullscreen", keys: `${isMac ? "Ctrl+⌘F" : "Ctrl+Meta+F"}` },
 		{
 			name: "Newer / older chat",
 			keys: `${
@@ -168,6 +170,7 @@ export function desktopShortcuts(isMac: boolean, inShell = true): ShortcutRow[] 
 			keys: isMac ? "⌘Delete · ⇧⌘Delete" : "Ctrl+Delete · Ctrl+Shift+Delete"
 		},
 		{ name: "Cut message", keys: "x" },
+		{ name: "Edit newest message", keys: `${isMac ? "⌘E" : "Meta+E"}` },
 		{ name: "Edit own message", keys: "hover + e" },
 		{ name: "Copy message", keys: "Hover + C" },
 		{ name: "Branch from here", keys: "Hover + Shift+C" },

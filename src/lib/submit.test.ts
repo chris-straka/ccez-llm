@@ -4,6 +4,7 @@ import {
 	sendAction,
 	composerLocked,
 	editMessageAction,
+	newestUserMessageIndex,
 	commitEditTarget,
 	shouldRumbleOnFirstToken
 } from "./submit";
@@ -195,6 +196,28 @@ describe("editMessageAction", () => {
 		expect(
 			editMessageAction([user], 0, { sending: false, editingId: "u9" })
 		).toBe("open");
+	});
+});
+
+describe("newestUserMessageIndex", () => {
+	const user = (id: string) => ({ role: "user", id });
+	const assistant = (id: string) => ({ role: "assistant", id });
+
+	it("lands on the newest user message, skipping later replies", () => {
+		expect(
+			newestUserMessageIndex([
+				user("u1"),
+				assistant("a1"),
+				user("u2"),
+				assistant("a2")
+			])
+		).toBe(2);
+		expect(newestUserMessageIndex([user("u1")])).toBe(0);
+	});
+
+	it("vanishes cleanly with no own message to edit", () => {
+		expect(newestUserMessageIndex([])).toBeNull();
+		expect(newestUserMessageIndex([assistant("a1")])).toBeNull();
 	});
 });
 
