@@ -89,10 +89,17 @@ describe("wash fade-in settle", () => {
 
 describe("live wash repair", () => {
 	afterEach(() => {
+		vi.useRealTimers();
 		vi.unstubAllGlobals();
 	});
 
 	it("repaints the live wash after tint-style node surgery", () => {
+		// Fake timers: applyMarks starts a real 35ms ramp chain, and
+		// this body finishes in microseconds — under parallel load
+		// the chain outlives the file and fires against unstubbed
+		// globals (flaky unhandled error), so the ramp drains on
+		// fake time instead.
+		vi.useFakeTimers();
 		const store = installHighlightStubs();
 		const root = document.createElement("div");
 		root.textContent = "昔新羅があり新羅が残る";
@@ -149,6 +156,11 @@ describe("live wash repair", () => {
 		expect(painted()).toBe("");
 		repaintLiveWash();
 		expect(painted()).toBe("新羅");
+		// Drain the ramp and repaint nudges: nothing pending may
+		// outlive the file (see above), and the count pins the
+		// ramp terminates instead of re-arming forever.
+		vi.advanceTimersByTime(5000);
+		expect(vi.getTimerCount()).toBe(0);
 		root.remove();
 	});
 });
