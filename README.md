@@ -1,4 +1,4 @@
-# Ccez LLM
+# [Ccez LLM](https://github.com/chris-straka/ccez-llm)
 
 A private BYOK chatbot for everyday questions, with built-in language-learner aids — Tauri 2 on macOS/Windows/Linux with a touch-first Android UI, Svelte 5
 runes + TypeScript frontend, and a thin Rust backend (Keychain, updater,
