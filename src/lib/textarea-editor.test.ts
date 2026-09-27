@@ -408,3 +408,77 @@ describe("image-tag copy/cut roundtrip", () => {
 		);
 	});
 });
+
+describe("pasted-tag copy/cut expansion", () => {
+	const TAG = "[Pasted 11 chars] ";
+	const PROSE = "hello world";
+
+	function textClipboard(writeText: ReturnType<typeof vi.fn>) {
+		Object.defineProperty(window.navigator, "clipboard", {
+			value: { writeText },
+			configurable: true
+		});
+	}
+
+	afterEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	it("copy writes the stored prose, never the tag label", async () => {
+		const writeText = vi.fn(async () => {});
+		textClipboard(writeText);
+		const take = vi.fn(() => [PROSE]);
+		const { ta } = setup({ onCopyPastedTexts: take });
+		ta.value = `see ${TAG}end`;
+		ta.setSelectionRange(4, 4 + TAG.length);
+		const event = new Event("copy", { bubbles: true, cancelable: true });
+		ta.dispatchEvent(event);
+		expect(event.defaultPrevented).toBe(true);
+		expect(take).toHaveBeenCalledWith([0]);
+		await vi.waitFor(() =>
+			expect(writeText).toHaveBeenCalledWith(`${PROSE} `)
+		);
+		expect(ta.value).toBe(`see ${TAG}end`);
+	});
+
+	it("cut deletes the range and reports the pasted index", async () => {
+		const writeText = vi.fn(async () => {});
+		textClipboard(writeText);
+		const take = vi.fn(() => [PROSE]);
+		const { ta, options } = setup({ onCopyPastedTexts: take });
+		ta.value = TAG;
+		ta.setSelectionRange(0, TAG.length);
+		const event = new Event("cut", { bubbles: true, cancelable: true });
+		ta.dispatchEvent(event);
+		expect(event.defaultPrevented).toBe(true);
+		expect(ta.value).toBe("");
+		await vi.waitFor(() =>
+			expect(writeText).toHaveBeenCalledWith(`${PROSE} `)
+		);
+		await vi.waitFor(() =>
+			expect(options.onDocChange).toHaveBeenCalledWith("", {
+				image: [],
+				file: [],
+				pasted: [0]
+			})
+		);
+	});
+
+	it("falls through to native copy without stored prose", () => {
+		const { ta } = setup({ onCopyPastedTexts: () => [null] });
+		ta.value = TAG;
+		ta.setSelectionRange(0, TAG.length);
+		const event = new Event("copy", { bubbles: true, cancelable: true });
+		ta.dispatchEvent(event);
+		expect(event.defaultPrevented).toBe(false);
+	});
+
+	it("falls through without a host callback", () => {
+		const { ta } = setup();
+		ta.value = TAG;
+		ta.setSelectionRange(0, TAG.length);
+		const event = new Event("copy", { bubbles: true, cancelable: true });
+		ta.dispatchEvent(event);
+		expect(event.defaultPrevented).toBe(false);
+	});
+});

@@ -101,10 +101,6 @@
 	import { getCurrentWindow } from "@tauri-apps/api/window";
 	import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 	import {
-		PROMPT_PLACEHOLDER,
-		SCROLL_PLACEHOLDER,
-		ANDROID_PROMPT_PLACEHOLDER,
-		ANDROID_SCROLL_PLACEHOLDER,
 		sendPasteFolds,
 		bakeEditedMessage,
 		caretAfterPaste,
@@ -196,6 +192,7 @@
 		isPastedTextAttachment,
 		makePastedTextAttachment,
 		pastedMarkerInsert,
+		pastedTextsAt,
 		spliceSendText,
 		syncTagRemovals,
 		stripPastedMarkers,
@@ -2346,13 +2343,6 @@
 	 */
 	let isMac = $state(true);
 	const altm = $derived(altKeyLabel(isMac));
-	/** Composer hints: touch wording on phones, shortcut wording elsewhere. */
-	function promptPlaceholder(): string {
-		return androidUI ? ANDROID_PROMPT_PLACEHOLDER : PROMPT_PLACEHOLDER;
-	}
-	function scrollPlaceholder(): string {
-		return androidUI ? ANDROID_SCROLL_PLACEHOLDER : SCROLL_PLACEHOLDER;
-	}
 	let hasText = $state(false);
 	let altHeld = $state(false);
 	// Quiet to send: while a reply streams, the lib drops every send
@@ -2479,26 +2469,11 @@
 		editor?.focus();
 	}
 
-	$effect(() => {
-		// Desktop Cmd+scroll rides the app's text size in 0.1 steps
-		// (the browser's own page zoom would blur the shell and fight
-		// the layout; phones pinch instead, so this stays desktop).
-		// Non-passive: swallowing the gesture must also swallow the
-		// browser zoom it would otherwise trigger.
-		const onZoomWheel = (event: WheelEvent): void => {
-			if (androidUI || !event.metaKey) return;
-			event.preventDefault();
-			// Rides adjustFontScale so the wheel toasts the new size
-			// like pinch/keyboard steps do (the toast re-arms per tick,
-			// so a held scroll reads live, then dismisses on idle).
-			adjustFontScale(event.deltaY < 0 ? 0.1 : -0.1);
-		};
-		window.addEventListener("wheel", onZoomWheel, { passive: false });
-		return () => {
-			window.removeEventListener("wheel", onZoomWheel);
-		};
-	});
-
+	// No Cmd+scroll text zoom, deliberately: trackpad momentum keeps
+	// firing wheel events with Cmd held after the fingers lift, and
+	// WheelEvent exposes no finger-contact signal — every swipe ran
+	// away past its gesture. Cmd+= / Cmd+- (menu and chrome chords),
+	// pinch, and the sliders remain the zoom paths.
 	function runSearchQuery(): void {
 		if (searchQueryTimer) clearTimeout(searchQueryTimer);
 		const query = palette.query;
@@ -3765,7 +3740,6 @@
 		reviewOpen = false;
 		editingMsgId = null;
 		editingAttachments = [];
-		editor?.setPlaceholder(promptPlaceholder());
 		highlightAnnId = null;
 		settleAnnPop();
 		annPop = null;
@@ -3854,13 +3828,12 @@
 	$effect(() => {
 		editor?.setDisabled(noKeyLock);
 		// Locking wipes the live composer text (a provider switch must
-		// not strand a dead draft over the locked hint); unlocking
-		// restores the default hint. Nothing persists text drafts, so
-		// nothing needs saving here.
+		// not strand a dead draft over the locked field). Nothing
+		// persists text drafts, so nothing needs saving here. The
+		// prompt itself stays hintless either way — the missing key
+		// explains through the banner and tap-to-explain, never a
+		// placeholder.
 		if (noKeyLock && !wasLocked) editor?.clear();
-		if (noKeyLock)
-			editor?.setPlaceholder("Set an API key in Settings to chat");
-		else editor?.setPlaceholder(promptPlaceholder());
 		wasLocked = noKeyLock;
 	});
 	const chat = $derived(activeChat(chatState));
@@ -5982,14 +5955,12 @@
 	}
 
 	/** Leave in-prompt edit mode and give the composer back its
-	drafted chat text and placeholder. Focus stays where it is (the
-	commit path re-focuses explicitly; a tap-out cancel must not
-	steal it back). */
+	drafted chat text. Focus stays where it is (the commit path
+	re-focuses explicitly; a tap-out cancel must not steal it back). */
 	function exitPromptAnnEdit(): void {
 		promptAnnEdit = null;
 		editor?.setText(promptAnnStash);
 		promptAnnStash = "";
-		editor?.setPlaceholder(promptPlaceholder());
 	}
 
 	/**
@@ -7688,9 +7659,8 @@
 		if (action === "commit-edit") {
 			// Saving an edit rewrites the message in place, never
 			// resends — and the composer text below still sends as a
-			// fresh message. If the edited message vanished mid-edit,
-			// reset the placeholder, then send fresh either way.
-			if (!commitMessageEdit()) editor?.setPlaceholder(promptPlaceholder());
+			// fresh message either way.
+			commitMessageEdit();
 		}
 		// Native route (Android shell, network text turns): decided
 		// before the provider resolves and the composer clears, so the
@@ -8201,6 +8171,8 @@
 			onImagesPasted: onInlineImagesPasted,
 			onCopyImageTags: (indexes) =>
 				copyImageTagBlobs(editingAttachments, indexes),
+			onCopyPastedTexts: (indexes) =>
+				pastedTextsAt(editingAttachments, indexes),
 			onDocChange: (text, removed) => {
 				// Tag → attachment half of two-way removal, mirrored
 				// from the composer: deleted occurrences drop the
@@ -8374,11 +8346,10 @@
 
 	function enterScrollMode() {
 		focusMode = "scroll";
-		// The prompt goes fully dormant: no caret, a hop-back hint, and
-		// no typing — keystrokes land on the window, where scroll mode
-		// owns the J/K keys and ignores the rest.
+		// The prompt goes fully dormant: no caret and no typing —
+		// keystrokes land on the window, where scroll mode owns the
+		// J/K keys and ignores the rest.
 		editor?.blur();
-		editor?.setPlaceholder(scrollPlaceholder());
 		if (selectedIdx < 0 && chat.messages.length > 0) {
 			selectedIdx = chat.messages.length - 1;
 		}
@@ -8390,7 +8361,6 @@
 			active: describeActiveElement()
 		});
 		focusMode = "edit";
-		editor?.setPlaceholder(promptPlaceholder());
 		// A fresh editing context always shows the prompt: a minted
 		// chat (or any landing here) must never inherit a hidden bar.
 		restorePrompt();
@@ -8908,6 +8878,7 @@
 			onImagesPasted: onImagesPasted,
 			onLongTextPasted: onLongTextPasted,
 			onCopyImageTags: (indexes) => copyImageTagBlobs(attachments, indexes),
+			onCopyPastedTexts: (indexes) => pastedTextsAt(attachments, indexes),
 			onDocChange: (text, removed) => {
 				hasText = text.trim().length > 0;
 				// Tag → attachment half of two-way removal: tags are the
@@ -10552,7 +10523,6 @@
 		// Plain-textarea composer: no measurement cache (no collapse)
 		// and no compositor layer games (no tap ghost).
 		editor = createTextareaEditor(promptEl, promptOptions());
-		editor.setPlaceholder(promptPlaceholder());
 		// Desktop lands in the prompt on launch; phones don't — popping
 		// the keyboard on every cold start is the mobile annoyance.
 		// Always-hide mode never takes focus on its own: the prompt is

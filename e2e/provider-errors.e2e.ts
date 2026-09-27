@@ -161,10 +161,10 @@ test("switching to a keyless-less provider wipes the stranded draft", async ({
 		)
 		.getByRole("radio", { name: "DeepSeek" })
 		.click();
-	// The pill switch locks and wipes: locked hint, empty field.
+	// The pill switch locks and wipes: disabled, empty, hintless.
 	await expect(composer).toBeDisabled({ timeout: 10_000 });
 	await expect(composer).toHaveValue("");
-	await expect(composer).toHaveAttribute(
+	await expect(composer).not.toHaveAttribute(
 		"placeholder",
 		"Set an API key in Settings to chat"
 	);
@@ -176,10 +176,10 @@ test("blank key locks the composer and explains on tap", async ({ page }) => {
 	await expect(page.locator(".ta-input").first()).toBeVisible({
 		timeout: 60_000
 	});
-	// Locked: the field takes no typing and names the missing key.
+	// Locked: the field takes no typing and stays hintless.
 	const composer = page.locator(".ta-input").first();
 	await expect(composer).toBeDisabled({ timeout: 10_000 });
-	await expect(composer).toHaveAttribute(
+	await expect(composer).not.toHaveAttribute(
 		"placeholder",
 		"Set an API key in Settings to chat"
 	);

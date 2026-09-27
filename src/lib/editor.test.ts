@@ -12,6 +12,8 @@ import {
 	attachTagRanges,
 	tagCopyPlan,
 	tagCopyIndexes,
+	pastedCopyIndexes,
+	expandPastedTags,
 	removedMarkerIndexes,
 	dataUrlsToImageFiles,
 	expandDeletionUnits,
@@ -272,6 +274,52 @@ describe("tagCopyIndexes", () => {
 		expect(tagCopyIndexes(`${FILE_MARKER} notes`, 0, 20)).toEqual([]);
 		expect(tagCopyIndexes(`${IMAGE_MARKER} `, 3, 3)).toEqual([]);
 		expect(tagCopyIndexes(`${IMAGE_MARKER} `, 5, 2)).toEqual([]);
+	});
+});
+
+describe("pastedCopyIndexes", () => {
+	it("addresses a selection's pasted tags in global document order", () => {
+		const one = pastedTextMarker(10);
+		const two = pastedTextMarker(20);
+		const three = pastedTextMarker(30);
+		const doc = `${one} one\n${two} two\n${three} three`;
+		const firstEnd = `${one} one`.length;
+		expect(pastedCopyIndexes(doc, 0, firstEnd)).toEqual([0]);
+		const secondStart = firstEnd + 1;
+		const secondEnd = secondStart + `${two} two`.length;
+		expect(pastedCopyIndexes(doc, secondStart, secondEnd)).toEqual([1]);
+		expect(pastedCopyIndexes(doc, 0, doc.length)).toEqual([0, 1, 2]);
+	});
+
+	it("stays empty without pasted tags or with an empty range", () => {
+		expect(pastedCopyIndexes("plain text", 0, 11)).toEqual([]);
+		expect(pastedCopyIndexes(`${IMAGE_MARKER} notes`, 0, 20)).toEqual([]);
+		expect(pastedCopyIndexes(`${pastedTextMarker(5)} `, 3, 3)).toEqual([]);
+		expect(pastedCopyIndexes(`${pastedTextMarker(5)} `, 5, 2)).toEqual([]);
+	});
+});
+
+describe("expandPastedTags", () => {
+	it("splices stored prose at tag positions in order", () => {
+		const selected = `see ${pastedTextMarker(3)} and ${pastedTextMarker(3)} end`;
+		expect(expandPastedTags(selected, ["AAA", "BBB"])).toBe(
+			"see AAA and BBB end"
+		);
+	});
+
+	it("leaves text without tags alone", () => {
+		expect(expandPastedTags("plain", ["AAA"])).toBe("plain");
+		expect(expandPastedTags("", [])).toBe("");
+	});
+
+	it("keeps tags literal without a stored text (hand-typed, dropped pill)", () => {
+		const selected = `see ${pastedTextMarker(3)} end`;
+		expect(expandPastedTags(selected, [])).toBe(selected);
+		expect(expandPastedTags(selected, [null])).toBe(selected);
+		const two = `${pastedTextMarker(3)} ${pastedTextMarker(3)}`;
+		expect(expandPastedTags(two, ["AAA"])).toBe(
+			`AAA ${pastedTextMarker(3)}`
+		);
 	});
 });
 

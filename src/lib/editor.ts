@@ -24,6 +24,8 @@ export {
 	attachTagRanges,
 	tagCopyPlan,
 	tagCopyIndexes,
+	pastedCopyIndexes,
+	expandPastedTags,
 	dataUrlsToImageFiles,
 	pastedCutAt,
 	expandDeletionUnits,
@@ -51,16 +53,3 @@ export type {
 	PromptEditorOptions,
 	SubmitKind
 } from "./textarea-editor";
-
-/** Composer hint in edit mode. Leading U+00A0 nbsp (invisible in
-the source — do not "fix" to a plain space, which collapses in
-placeholder rendering) so the caret never sits under the glyphs. */
-export const PROMPT_PLACEHOLDER = " Ctrl+G message scroll";
-/** Composer hint while scrolled out hopping messages. */
-export const SCROLL_PLACEHOLDER = " Ctrl+G to hop back in";
-/**
- * Touch variants: no Ctrl key to name, and shortcuts keep working (a
- * keyboard may be attached) — only the hint text changes.
- */
-export const ANDROID_PROMPT_PLACEHOLDER = "Type a message";
-export const ANDROID_SCROLL_PLACEHOLDER = "Tap to write again";

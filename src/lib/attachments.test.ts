@@ -33,6 +33,7 @@ import {
 	dropAttachmentsAtIndexes,
 	attachmentImageBlobsAt,
 	attachmentDataUrlsAt,
+	pastedTextsAt,
 	removeTags,
 	splicePastedText,
 	splicePastedFolds,
@@ -640,6 +641,24 @@ describe("pasted-aware index drops", () => {
 
 	it("never mistakes fixed markers for pasted tags", () => {
 		expect(`${IMAGE_MARKER} ${FILE_MARKER}`.match(PASTED_TAG_RE)).toBeNull();
+	});
+});
+
+describe("pastedTextsAt", () => {
+	const pasted = (id: string, text: string | null) => ({
+		...testAttachment({ id, kind: "text", text }),
+		pastedText: true
+	});
+	it("reads stored prose in pasted order, null where missing", () => {
+		const list = [
+			testAttachment({ id: "f", kind: "text", text: "file prose" }),
+			pasted("p0", "first paste"),
+			pasted("p1", null)
+		];
+		// File attachments never shift pasted indexes.
+		expect(pastedTextsAt(list, [0, 1])).toEqual(["first paste", null]);
+		expect(pastedTextsAt(list, [1])).toEqual([null]);
+		expect(pastedTextsAt(list, [4, -1])).toEqual([null, null]);
 	});
 });
 

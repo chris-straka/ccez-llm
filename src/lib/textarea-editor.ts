@@ -2,8 +2,10 @@ import {
 	PASTE_THRESHOLD,
 	dataUrlsToImageFiles,
 	expandDeletionUnits,
+	expandPastedTags,
 	markerCut,
 	markerCutAt,
+	pastedCopyIndexes,
 	pastedCutAt,
 	removedMarkerIndexes,
 	tagCopyIndexes,
@@ -85,7 +87,7 @@ export interface PromptEditor {
 	focus(): void;
 	/** Drop the caret (scroll mode must show no cursor in the prompt). */
 	blur(): void;
-	/** Swap the empty-prompt hint (edit vs scroll mode). */
+	/** Replace the field's placeholder text (the composer keeps it empty). */
 	setPlaceholder(text: string): void;
 	/** No-key lock: the field refuses typing and focus (send
 	 * explains through the existing notice path). */
@@ -123,6 +125,15 @@ export interface PromptEditorOptions {
 	 * deletion can't race it. Absent, tags copy as plain text.
 	 */
 	onCopyImageTags?: (indexes: number[]) => Promise<Blob[]>;
+	/**
+	 * A composer selection holding pasted-text tags is copied/cut:
+	 * the host supplies the stored prose at these document-order
+	 * indexes (Nth tag pairs with the Nth pasted-text attachment),
+	 * so the clipboard carries content, never the tag label. Null
+	 * entries keep their tags literal (hand-typed). Absent, tags
+	 * copy as plain text.
+	 */
+	onCopyPastedTexts?: (indexes: number[]) => (string | null)[];
 	/**
 	 * Document text changed (drives the submit button's faded state).
 	 * `removed` carries the deleted tag occurrences' document-order
@@ -368,16 +379,17 @@ export function createTextareaEditor(
 		}
 	};
 	/**
-	 * Copy/cut enrichment for image tags: the clipboard gets the
+	 * Copy/cut enrichment for tags: image selections carry the
 	 * pictures (one rich-text item with embedded images, then
 	 * per-image items, then plain text) so pasting in another chat
-	 * lands images, not dead tags. The host maps the selection's
-	 * global tag indexes onto its attachments (Nth tag pairs with the
-	 * Nth attachment); the read runs synchronously at call time so a
-	 * cut's own deletion can't race it. An in-app stash carries the
-	 * same pictures for pastes whose clipboard lost the rich item.
-	 * Selections without image tags fall through to the default
-	 * handler.
+	 * lands images, not dead tags. Pasted-text tags expand to their
+	 * stored prose in the plain text, with or without images. The
+	 * host maps the selection's global tag indexes onto its
+	 * attachments (Nth tag pairs with the Nth attachment); the read
+	 * runs synchronously at call time so a cut's own deletion can't
+	 * race it. An in-app stash carries the same pictures for pastes
+	 * whose clipboard lost the rich item. Selections with nothing
+	 * to enrich fall through to the default handler.
 	 */
 	/** Plain-text insert at a snapshot range (clipboard failure
 	paths land the words; the host reconciles the tags). */
@@ -388,36 +400,22 @@ export function createTextareaEditor(
 	const onCopyCut =
 		(isCut: boolean) =>
 		(event: ClipboardEvent): void => {
-			const takeImageBlobs = options.onCopyImageTags;
-			if (!takeImageBlobs) return;
 			const start = ta.selectionStart ?? 0;
 			const end = ta.selectionEnd ?? 0;
 			if (start >= end) return;
 			const doc = ta.value;
-			const clipboardWrite =
-				typeof ClipboardItem !== "undefined" && !!navigator.clipboard?.write;
-			const plan = tagCopyPlan(doc.slice(start, end), clipboardWrite);
-			if (!plan) return;
-			// Snapshot the blobs before a cut deletes its own tags;
-			// the stash resolves the same pictures to data URLs for
-			// the in-app roundtrip (never rejects — an empty set just
-			// falls through to the clipboard items at paste time).
-			// First, before the ClipboardItem gate: the stash needs no
-			// clipboard API, so runtimes without rich writes still
-			// paste their previews back from a native cut.
-			const pending = takeImageBlobs(tagCopyIndexes(doc, start, end));
-			cutImageStash = {
-				text: plan.text,
-				urls: pending.then(
-					(blobs) => Promise.all(blobs.map((blob) => blobToDataUrl(blob))),
-					() => []
-				)
-			};
-			if (!clipboardWrite) return;
-			event.preventDefault();
-			if (isCut) {
-				// Precise tag indexes (the input event carries no change
-				// ranges), so a middle cut drops its own attachments.
+			const selected = doc.slice(start, end);
+			// Pasted-text tags expand to their stored prose for the
+			// clipboard: the tag label alone would strand the content
+			// — a cut also drops the pill, so the label is all that
+			// would survive.
+			const pastedTexts =
+				options.onCopyPastedTexts?.(pastedCopyIndexes(doc, start, end)) ?? [];
+			const expanded = expandPastedTags(selected, pastedTexts);
+			// A cut's own deletion with precise tag indexes (the input
+			// event carries no change ranges), so a middle cut drops
+			// its own attachments.
+			const deleteSelection = (): void => {
 				const before = doc;
 				ta.setRangeText("", start, end, "end");
 				autogrow();
@@ -428,59 +426,102 @@ export function createTextareaEditor(
 					removed = undefined;
 				}
 				options.onDocChange?.(ta.value, removed);
+			};
+			const clipboardWrite =
+				typeof ClipboardItem !== "undefined" && !!navigator.clipboard?.write;
+			const takeImageBlobs = options.onCopyImageTags;
+			const rawPlan =
+				takeImageBlobs === undefined
+					? null
+					: tagCopyPlan(selected, clipboardWrite);
+			if (rawPlan && takeImageBlobs) {
+				// Image counting rides the raw selection (stored prose
+				// must never shift tag pairing); the clipboard text
+				// carries the expanded prose.
+				const plan = { ...rawPlan, text: expanded };
+				// Snapshot the blobs before a cut deletes its own tags;
+				// the stash resolves the same pictures to data URLs for
+				// the in-app roundtrip (never rejects — an empty set just
+				// falls through to the clipboard items at paste time).
+				// First, before the ClipboardItem gate: the stash needs no
+				// clipboard API, so runtimes without rich writes still
+				// paste their previews back from a native cut.
+				const pending = takeImageBlobs(tagCopyIndexes(doc, start, end));
+				cutImageStash = {
+					text: plan.text,
+					urls: pending.then(
+						(blobs) => Promise.all(blobs.map((blob) => blobToDataUrl(blob))),
+						() => []
+					)
+				};
+				if (!clipboardWrite) return;
+				event.preventDefault();
+				if (isCut) deleteSelection();
+				void (async () => {
+					const textBlob = new Blob([plan.text], { type: "text/plain" });
+					// 1. One rich-text item carrying text plus the whole
+					// image set as embedded pictures: multi-tag cuts paste
+					// back complete, and foreign apps get text plus images.
+					try {
+						const blobs = await pending;
+						if (blobs.length === 0) throw new Error("no image data");
+						const urls = await Promise.all(
+							blobs.map((blob) => blobToDataUrl(blob))
+						);
+						const imgs = urls.map((url) => `<img src="${url}">`).join("");
+						const html = new Blob(
+							[`${IMAGE_SET_MARKER}<p>${escapeHtml(plan.text)}</p>${imgs}`],
+							{ type: "text/html" }
+						);
+						await navigator.clipboard.write([
+							new ClipboardItem({ "text/plain": textBlob, "text/html": html })
+						]);
+						return;
+					} catch {
+						// Fall through to per-image items below.
+					}
+					// 2. One item per image (single-image universal; several
+					// items only where the engine allows them).
+					try {
+						const blobs = await pending;
+						if (blobs.length === 0) throw new Error("no image data");
+						const pngs = await Promise.all(
+							blobs.map((blob) => clipboardPngBlob(blob))
+						);
+						await navigator.clipboard.write(
+							pngs.map(
+								(png) =>
+									new ClipboardItem({
+										"text/plain": textBlob,
+										[png.type || "image/jpeg"]: png
+									})
+							)
+						);
+						return;
+					} catch {
+						// Fall through to plain text below.
+					}
+					// 3. Plain text, like any other copy.
+					try {
+						await navigator.clipboard.writeText(plan.text);
+					} catch {
+						// Clipboard unavailable: a cut already deleted (native
+						// cut deletes the same way when its own write fails).
+					}
+				})();
+				return;
 			}
-			void (async () => {
-				const textBlob = new Blob([plan.text], { type: "text/plain" });
-				// 1. One rich-text item carrying text plus the whole
-				// image set as embedded pictures: multi-tag cuts paste
-				// back complete, and foreign apps get text plus images.
-				try {
-					const blobs = await pending;
-					if (blobs.length === 0) throw new Error("no image data");
-					const urls = await Promise.all(
-						blobs.map((blob) => blobToDataUrl(blob))
-					);
-					const imgs = urls.map((url) => `<img src="${url}">`).join("");
-					const html = new Blob(
-						[`${IMAGE_SET_MARKER}<p>${escapeHtml(plan.text)}</p>${imgs}`],
-						{ type: "text/html" }
-					);
-					await navigator.clipboard.write([
-						new ClipboardItem({ "text/plain": textBlob, "text/html": html })
-					]);
-					return;
-				} catch {
-					// Fall through to per-image items below.
-				}
-				// 2. One item per image (single-image universal; several
-				// items only where the engine allows them).
-				try {
-					const blobs = await pending;
-					if (blobs.length === 0) throw new Error("no image data");
-					const pngs = await Promise.all(
-						blobs.map((blob) => clipboardPngBlob(blob))
-					);
-					await navigator.clipboard.write(
-						pngs.map(
-							(png) =>
-								new ClipboardItem({
-									"text/plain": textBlob,
-									[png.type || "image/jpeg"]: png
-								})
-						)
-					);
-					return;
-				} catch {
-					// Fall through to plain text below.
-				}
-				// 3. Plain text, like any other copy.
-				try {
-					await navigator.clipboard.writeText(plan.text);
-				} catch {
+			// Pasted-only expansion: plain-text write, no ClipboardItem
+			// needed. Unchanged text (no tags, no host, no stored prose)
+			// falls through to the native handler below.
+			if (expanded !== selected && navigator.clipboard?.writeText) {
+				event.preventDefault();
+				if (isCut) deleteSelection();
+				void navigator.clipboard.writeText(expanded).catch(() => {
 					// Clipboard unavailable: a cut already deleted (native
 					// cut deletes the same way when its own write fails).
-				}
-			})();
+				});
+			}
 		};
 	const onPaste = (event: ClipboardEvent): void => {
 		const clipboard = event.clipboardData;

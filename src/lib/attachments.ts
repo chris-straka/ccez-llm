@@ -607,6 +607,20 @@ export function attachmentDataUrlsAt(
 }
 
 /**
+ * Stored prose for the pasted-text attachments at these document-order
+ * indexes (Nth pasted tag pairs with the Nth pasted-text attachment —
+ * the composer contract). One entry per index, null where the text is
+ * missing, so clipboard expansion keeps tag order. Pure.
+ */
+export function pastedTextsAt(
+	list: Attachment[],
+	indexes: number[]
+): (string | null)[] {
+	const pasted = list.filter(isPastedTextAttachment);
+	return indexes.map((i) => pasted[i]?.text ?? null);
+}
+
+/**
  * Drop the attachments of one kind at these document-order indexes
  * (tag deletions carry their positions now, not just counts).
  * Out-of-range and negative indexes drop nothing. Pure.

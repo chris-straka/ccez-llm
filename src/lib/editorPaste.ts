@@ -469,6 +469,45 @@ export function tagCopyIndexes(
 }
 
 /**
+ * Global document-order indexes of the pasted-text tags in `[from, to)`
+ * (pure, unit-tested): the image-tag mirror above — the tags before
+ * the range set the base, so a selection's tags address the host's
+ * pasted-text attachments directly. Empty when the range holds no
+ * pasted tags.
+ */
+export function pastedCopyIndexes(
+	doc: string,
+	from: number,
+	to: number
+): number[] {
+	if (from >= to) return [];
+	const base = countPastedTags(doc.slice(0, Math.max(0, from)));
+	const count = countPastedTags(doc.slice(from, to));
+	return Array.from({ length: count }, (_, i) => base + i);
+}
+
+/**
+ * Splice stored pasted prose back at tag positions inside a copied or
+ * cut selection (pure, unit-tested): the Nth `[Pasted N chars]` tag in
+ * the selection is replaced by the Nth entry of `texts`, so the
+ * clipboard carries content, never the tag label. Null or missing
+ * entries keep their tags literal (hand-typed, or resurrected by undo
+ * after the pill dropped); unlike send-time splicing, leftover texts
+ * never append — the clipboard holds the selection only.
+ */
+export function expandPastedTags(
+	selected: string,
+	texts: (string | null)[]
+): string {
+	let at = 0;
+	return selected.replace(PASTED_TAG_RE, (tag) => {
+		const prose = at < texts.length ? texts[at] : undefined;
+		at++;
+		return prose ?? tag;
+	});
+}
+
+/**
  * Data URLs back into paste-ready image files, unreadable entries
  * skipped (pure apart from fetch).
  */

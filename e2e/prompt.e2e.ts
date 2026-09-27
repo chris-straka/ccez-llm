@@ -485,13 +485,11 @@ test("prompt types and sends without vim", async ({ page }) => {
 	await expect(page.locator("article.user .rendered")).toContainText(
 		"hello world"
 	);
-	// Ctrl+G still hops out to scroll mode.
+	// Ctrl+G still hops out to scroll mode (the prompt stays hintless).
 	await page.locator(".ta-input").click();
 	await page.keyboard.press("Control+g");
-	await expect(page.locator(".ta-input")).toHaveAttribute(
-		"placeholder",
-		" Ctrl+G to hop back in"
-	);
+	await expect(page.locator('.app[data-focus-mode="scroll"]')).toHaveCount(1);
+	await expect(page.locator(".ta-input")).toHaveValue("");
 });
 
 /** j past the newest message drops back into the prompt. */
