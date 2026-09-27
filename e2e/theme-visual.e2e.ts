@@ -338,16 +338,17 @@ for (const t of THEMES) {
 			"caret-color",
 			t.name === "light" ? "rgb(28, 28, 30)" : "rgb(242, 242, 247)"
 		);
+		// Hintless by decision (the composer carries no placeholder
+		// text since 4d9d592), so there is no hint color to pin — the
+		// emptiness itself is the assertion. A computed ::placeholder
+		// read here only echoes the element ink.
 		const hint = await page.evaluate(
 			() =>
-				getComputedStyle(
-					document.querySelector(".prompt .ta-input")!,
-					"::placeholder"
-				).color
+				document
+					.querySelector(".prompt .ta-input")!
+					.getAttribute("placeholder") ?? ""
 		);
-		expect(hint).toBe(
-			t.name === "light" ? "rgb(142, 142, 147)" : "rgb(99, 99, 102)"
-		);
+		expect(hint).toBe("");
 		// Resting/hover rims share the same tokens; the app holds editor
 		// focus while typing, so e2e can't isolate those two states
 		// without fighting focus management — bg + focus rim pin the theme.
