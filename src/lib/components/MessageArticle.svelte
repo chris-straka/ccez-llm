@@ -378,18 +378,23 @@ where the text sat, like the composer's promptEl pattern). -->
 	article.user :global(.ccez-code) {
 		text-align: left;
 	}
-	/* In-place own-message edit: the message's full lane, not a
-	shrink-wrapped box (fit-content collapses short drafts into a
-	sliver), with a visible editing frame (the bubble shade would
-	fight the code colors). The type matches the message it replaces
-	(see .rendered in MessageBody) at every text size — the draft
-	reads exactly as it will land. The bar holds the touch path —
-	phones have no Esc and no Enter-to-save. */
+	/* In-place own-message edit: invisible — the box matches the
+	message it replaces (same wash, radius, padding, type), so the
+	text just gains a cursor instead of moving onto a new frame.
+	Full lane, not shrink-wrapped (fit-content collapses short
+	drafts into a sliver): shaded messages show full-lane wash
+	while editing, plain ones (see below) stay bare either way.
+	The type matches the message it replaces (see .rendered in
+	MessageBody) at every text size — the draft reads exactly as
+	it will land. */
 	article.user .msg-edit {
-		background: var(--bg-raised);
-		border: 1px solid var(--line);
-		border-radius: 12px;
-		padding: 0.5rem 0.75rem 0.4rem;
+		background: #f1f1f4;
+		background: var(--bg-wash);
+		border: 0;
+		border-radius: calc(1.75rem * min(var(--font-scale, 1), 2));
+		padding: calc(0.45rem * min(var(--font-scale, 1), 2))
+			calc(1rem * min(var(--font-scale, 1), 2))
+			calc(0.55rem * min(var(--font-scale, 1), 2));
 		width: 100%;
 		max-width: 100%;
 		box-sizing: border-box;
@@ -409,6 +414,13 @@ where the text sat, like the composer's promptEl pattern). -->
 		font: inherit;
 		resize: none;
 		outline: none;
+		padding: 0;
+		/* The editor stands down from manual sizing wherever the
+		engine claims field-sizing support (see autogrow), so this
+		rule must own the height — without it the field stays one
+		row tall and only the first line shows. */
+		field-sizing: content;
+		overflow-y: auto;
 	}
 	/* In-place edit on phones: the textarea editor misses the
 	prompt-scoped textarea styles, so it falls back to native chrome;
@@ -474,6 +486,12 @@ where the text sat, like the composer's promptEl pattern). -->
 		max-width: 100%;
 		margin-left: auto;
 	}
+	/* Plain-mode edit: bare like the message — no wash, no frame,
+	only the cursor says editing. */
+	:global(main.plain-user) article.user .msg-edit {
+		background: none;
+		padding: 0.5rem 0 0;
+	}
 	/* Own-message ink: main[data-own-ink] selects the hue, the token
 	resolves per theme ("off" has no rule — plain ink). Applies in
 	plain and bubble modes alike; code tokens, badges, and links keep
@@ -495,6 +513,29 @@ where the text sat, like the composer's promptEl pattern). -->
 		color: var(--own-amber);
 	}
 	:global(main[data-own-ink="purple"]) article.user .bubble {
+		color: #7e22ce;
+		color: var(--own-purple);
+	}
+	/* Tinted ink reaches the edit box too (it replaces the bubble,
+	so it inherits nothing from it): the draft reads in the same
+	hue it will land in. Fallback hex first per docs/colors.md. */
+	:global(main[data-own-ink="pink"]) article.user .msg-edit {
+		color: #be185d;
+		color: var(--own-pink);
+	}
+	:global(main[data-own-ink="blue"]) article.user .msg-edit {
+		color: #1d4ed8;
+		color: var(--own-blue);
+	}
+	:global(main[data-own-ink="green"]) article.user .msg-edit {
+		color: #15803d;
+		color: var(--own-green);
+	}
+	:global(main[data-own-ink="amber"]) article.user .msg-edit {
+		color: #b45309;
+		color: var(--own-amber);
+	}
+	:global(main[data-own-ink="purple"]) article.user .msg-edit {
 		color: #7e22ce;
 		color: var(--own-purple);
 	}
