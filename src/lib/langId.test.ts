@@ -77,5 +77,14 @@ describe("identifyLangShort", () => {
 		// café votes three ways at once: no contestant leads.
 		expect(identifyLangShort("café")).toBe(null);
 		expect(identifyLangShort("connects, joins, combines")).toBe(null);
+		// Shared-only ties stay null: every hit votes two lists.
+		expect(identifyLangShort("un una")).toBe(null);
+	});
+
+	it("lets an exclusive stop word decide a contested fragment", () => {
+		// "avec" belongs to no other list, so French wins despite
+		// "un" voting three ways — without this the fragment falls
+		// back to the seed voice (English TTS on French text).
+		expect(identifyLangShort("avec un tiret")).toBe("fr-FR");
 	});
 });

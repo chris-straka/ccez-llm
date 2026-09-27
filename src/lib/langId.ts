@@ -537,6 +537,18 @@ const STOP_WORDS: Array<{ lang: string; words: string[] }> = [
 	}
 ];
 
+/** How many stop-word lists own each word: 1 means the word decides
+ * a contested fragment for its only owner (see identifyLangShort). */
+const STOP_WORD_OWNERS: Map<string, number> = (() => {
+	const owners = new Map<string, number>();
+	for (const entry of STOP_WORDS) {
+		for (const word of new Set(entry.words)) {
+			owners.set(word, (owners.get(word) ?? 0) + 1);
+		}
+	}
+	return owners;
+})();
+
 /** Minimum scored words before a Latin sample counts as classifiable. */
 export const LANG_ID_MIN_WORDS = 10;
 
@@ -610,7 +622,10 @@ export function identifyLangOffline(text: string): string | null {
  * (diacritics, ß, elisions, German mid-sentence capitals and noun
  * suffixes, Dutch ij). Needs a score of 2 with a clear margin, so
  * scoreless or contested fragments still return null and callers
- * keep their seed voice.
+ * keep their seed voice — except a fragment whose leader owns an
+ * exclusive stop-word hit (a word in no other list): that word
+ * decides the contest ("avec" is only French, so "avec un tiret"
+ * reads French despite "un" voting three ways).
  *
  * Pure and unit-tested.
  */
@@ -672,6 +687,17 @@ export function identifyLangShort(text: string): string | null {
 		if (score === 1 && margin === 1 && tokens.length <= 4) return lang;
 		return null;
 	}
-	if (margin < 2 && score < 3) return null;
+	if (margin < 2 && score < 3) {
+		// Contested but decided: a stop word the leader alone owns
+		// breaks the tie; shared-only hits stay null on the seed.
+		const leaderWords = new Set(
+			STOP_WORDS.find((entry) => entry.lang === lang)?.words ?? []
+		);
+		const decided = tokens.some(
+			(token) =>
+				leaderWords.has(token) && STOP_WORD_OWNERS.get(token) === 1
+		);
+		if (!decided) return null;
+	}
 	return lang;
 }
