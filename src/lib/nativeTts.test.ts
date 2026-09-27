@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import {
 	sentenceAtOffset,
 	friendlyNativeError,
+	reconcileQuoteLang,
 	quoteLangFor,
 	quoteLangForContext,
 	latinSentencesLang,
@@ -124,6 +125,44 @@ describe("quoteLangFor", () => {
 				"en-US"
 			)
 		).resolves.toBe("de-DE");
+	});
+
+	it("reads a French elision with the sentence voice over a stray bridge tag", async () => {
+		// NLLanguageRecognizer reads "l'accident" as Catalan (~0.82);
+		// the orthographic elision plus the French seed overrule it.
+		mockInvoke.mockResolvedValue("ca");
+		await expect(quoteLangFor("l'accident", "fr-FR")).resolves.toBe(
+			"fr-FR"
+		);
+	});
+
+	it("keeps the bridge tag when it matches the sentence voice", async () => {
+		// "y'all" trips the French elision rule (y'), but the bridge
+		// and the English seed agree — the seed match wins.
+		mockInvoke.mockResolvedValue("en");
+		await expect(quoteLangFor("y'all", "en-US")).resolves.toBe("en");
+	});
+});
+
+describe("reconcileQuoteLang", () => {
+	it("takes either side alone, null when both are silent", () => {
+		expect(reconcileQuoteLang("de", null, "en-US")).toBe("de");
+		expect(reconcileQuoteLang(null, "fr-FR", "en-US")).toBe("fr-FR");
+		expect(reconcileQuoteLang(null, null, "en-US")).toBeNull();
+	});
+
+	it("takes the bridge tag when both sides agree", () => {
+		expect(reconcileQuoteLang("fr", "fr-FR", "en-US")).toBe("fr");
+		expect(reconcileQuoteLang("zh-Hans", "zh-CN", "en-US")).toBe("zh-Hans");
+	});
+
+	it("breaks disagreements toward the sentence voice", () => {
+		// Elision plus French seed overrule stray Catalan.
+		expect(reconcileQuoteLang("ca", "fr-FR", "fr-FR")).toBe("fr-FR");
+		// Bridge plus English seed overrule the y' elision.
+		expect(reconcileQuoteLang("en", "fr-FR", "en-US")).toBe("en");
+		// Neither matches the seed: the bridge stands (old behavior).
+		expect(reconcileQuoteLang("pt", "fr-FR", "es-ES")).toBe("pt");
 	});
 });
 

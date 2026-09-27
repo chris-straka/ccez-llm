@@ -44,6 +44,12 @@ export interface StreamCallbacks {
 	 * providers without tools never fire them. */
 	onFetchStart?: ((url: string) => void) | undefined;
 	onFetchEnd?: (() => void) | undefined;
+	/** Tool-round retract: fired when a streamed round turns out to
+	 * lead into tool calls, so the UI can clear the provisional
+	 * prefix (back to thinking dots) instead of showing text the
+	 * final answer later replaces. The final round streams fresh.
+	 * Optional — providers without tools never fire it. */
+	onRoundRetract?: (() => void) | undefined;
 }
 
 export interface ChatOptions {

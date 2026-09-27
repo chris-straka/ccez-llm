@@ -106,6 +106,8 @@ export function ocrFallbackLangs(code: string | null): string[] {
 			return ["heb", "eng"];
 		case "hi":
 			return ["hin", "eng"];
+		case "pa":
+			return ["pan", "eng"];
 		case "sa":
 			return ["san", "eng"];
 		case "bn":

@@ -180,8 +180,10 @@ describe("action-row ownership", () => {
 
 	it("gates row toggles on platform and settings", () => {
 		expect(messageActionsTapAllowed(false, true, true, false)).toBe(true);
-		expect(messageActionsTapAllowed(true, false, false, true)).toBe(true);
+		expect(messageActionsTapAllowed(true, true, false, true)).toBe(true);
+		// The Messages checkbox removes the row on both platforms.
 		expect(messageActionsTapAllowed(false, false, true, false)).toBe(false);
+		expect(messageActionsTapAllowed(true, false, false, true)).toBe(false);
 		expect(messageActionsTapAllowed(false, true, false, false)).toBe(false);
 		expect(messageActionsTapAllowed(true, false, false, false)).toBe(false);
 	});

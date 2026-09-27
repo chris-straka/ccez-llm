@@ -128,11 +128,40 @@ export function friendlyNativeError(message: string): string {
 }
 
 /**
+ * Bridge-vs-orthography verdict for one quote (pure, unit-tested):
+ * either side alone wins; agreement takes the bridge tag; a
+ * disagreement breaks toward the sentence voice (`fallback`) — the
+ * side matching it wins. The recognizer reads "l'accident" as
+ * Catalan (~0.82), so without the seed the French elision would
+ * lose; conversely "y'all" trips the French elision rule while the
+ * bridge and an English seed agree. Neither side matching the seed
+ * keeps the bridge (old behavior). Null only when both are silent.
+ */
+export function reconcileQuoteLang(
+	bridge: string | null,
+	short: string | null,
+	fallback: string
+): string | null {
+	if (!bridge) return short;
+	if (!short) return bridge;
+	const primary = (tag: string): string =>
+		tag.split(/[-_]/)[0]?.toLowerCase() ?? "";
+	const bridgePrimary = primary(bridge);
+	const shortPrimary = primary(short);
+	if (bridgePrimary === shortPrimary) return bridge;
+	const seedPrimary = primary(fallback);
+	if (shortPrimary === seedPrimary) return short;
+	return bridge;
+}
+
+/**
  * Language for a highlighted quote: script detection first (reliable for
  * CJK/Arabic/…, needs no bridge), then the language recognizer for
  * Latin scripts (French vs English) — Apple's `NLLanguageRecognizer`
  * in the shell, the offline stop-word scorer elsewhere — else the
- * fallback. Never throws.
+ * fallback. A confident bridge tag still wins outright, except
+ * against orthography that matches the sentence voice (see
+ * `reconcileQuoteLang`). Never throws.
  */
 export async function quoteLangFor(
 	quote: string,
@@ -149,7 +178,13 @@ export async function quoteLangFor(
 		const tag = await invoke<string | null>("tts_identify_lang", {
 			text: quote
 		});
-		if (tag?.trim()) return tag.trim();
+		const bridge = tag?.trim() ? tag.trim() : null;
+		const verdict = reconcileQuoteLang(
+			bridge,
+			identifyLangShort(quote),
+			fallback
+		);
+		if (verdict) return verdict;
 	} catch {
 		// Bridge unavailable (browser preview, tests): offline scorer below.
 	}

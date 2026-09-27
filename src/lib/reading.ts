@@ -387,6 +387,7 @@ const SCRIPT_LOCALE: Array<{ test: (word: string) => boolean; lang: string }> =
 		{ test: (w) => /\p{Script=Hebrew}/u.test(w), lang: "he-IL" },
 		{ test: (w) => /\p{Script=Thai}/u.test(w), lang: "th-TH" },
 		{ test: (w) => /\p{Script=Devanagari}/u.test(w), lang: "hi-IN" },
+		{ test: (w) => /\p{Script=Gurmukhi}/u.test(w), lang: "pa-IN" },
 		{ test: (w) => /\p{Script=Armenian}/u.test(w), lang: "hy-AM" },
 		{ test: (w) => /\p{Script=Georgian}/u.test(w), lang: "ka-GE" }
 	];

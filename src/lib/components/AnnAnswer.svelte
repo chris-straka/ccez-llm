@@ -48,6 +48,10 @@ badge's plus/minus. -->
 	.ann-answer {
 		position: fixed;
 		z-index: 60;
+		/* Border-box: the page sizes the card to the clear width, so
+		padding must live inside it — content-box spilled the card
+		past the viewport edge on narrow phones. */
+		box-sizing: border-box;
 		padding: 0.6rem 0.7rem 0.5rem;
 		border-radius: 10px;
 		/* Same size as the create pill root: the card reads at

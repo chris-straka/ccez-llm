@@ -133,6 +133,7 @@ describe("ocrFallbackLangs", () => {
 		expect(ocrFallbackLangs("ur")).toEqual(["urd", "eng"]);
 		expect(ocrFallbackLangs("he")).toEqual(["heb", "eng"]);
 		expect(ocrFallbackLangs("hi")).toEqual(["hin", "eng"]);
+		expect(ocrFallbackLangs("pa")).toEqual(["pan", "eng"]);
 		expect(ocrFallbackLangs("sa")).toEqual(["san", "eng"]);
 		expect(ocrFallbackLangs("bn")).toEqual(["ben", "eng"]);
 		expect(ocrFallbackLangs("ta")).toEqual(["tam", "eng"]);

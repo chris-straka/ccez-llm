@@ -191,8 +191,8 @@ export function rowWorkRunning(
 
 /**
  * Whether a tap may toggle a message's action row (REFACTOR §6):
- * phones always render the row (no master off-switch), so taps
- * always toggle there; desktop honors the Messages checkbox.
+ * both platforms honor the Messages checkbox (off removes the row
+ * outright), then the reveal-style gates decide tap toggling.
  */
 export function messageActionsTapAllowed(
 	android: boolean,
@@ -200,7 +200,7 @@ export function messageActionsTapAllowed(
 	hideMessages: boolean,
 	hideButtons: boolean
 ): boolean {
-	if (!android && !showMessageButtons) return false;
+	if (!showMessageButtons) return false;
 	if (!hideMessages && !(android && hideButtons)) return false;
 	return true;
 }

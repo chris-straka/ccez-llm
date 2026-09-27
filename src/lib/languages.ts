@@ -67,6 +67,9 @@ export const ASIAN_LANGUAGES: ReplyLanguage[] = [
 	LANG("ko", "Korean", "ko-KR", "🇰🇷", "한국어", "지워짐"),
 	LANG("ar", "Arabic (MSA)", "ar-SA", "🇸🇦", "العربية", "تم المسح", "Reply in Modern Standard Arabic."),
 	LANG("hi", "Hindi", "hi-IN", "🇮🇳", "हिन्दी", "साफ़ किया गया"),
+	// No unclaimed flag (🇮🇳/🇵🇰 ride with Hindi/Urdu), so the
+	// Gurmukhi initial marks it — still non-ASCII and menu-unique.
+	LANG("pa", "Punjabi", "pa-IN", "ਪ", "ਪੰਜਾਬੀ", "ਸਾਫ਼ ਕੀਤਾ ਗਿਆ"),
 	LANG("id", "Indonesian", "id-ID", "🇮🇩", "Bahasa Indonesia", "Dihapus"),
 	LANG("tr", "Turkish", "tr-TR", "🇹🇷", "Türkçe", "Temizlendi"),
 	LANG("fa", "Persian", "fa-IR", "🇮🇷", "فارسی", "پاک شد"),
@@ -225,6 +228,7 @@ const THINKING_LABEL: Record<string, string> = {
 	ko: "생각 중",
 	ar: "تفكير",
 	hi: "सोच रहे हैं",
+	pa: "ਸੋਚ ਰਹੇ ਹਾਂ",
 	id: "Berpikir",
 	tr: "Düşünüyor",
 	fa: "تفکر",

@@ -6,12 +6,12 @@ import { tauriBackendAvailable } from "./secrets";
  * Prompt-and-settings native OS text menu.
  *
  * The Activity swaps every floating selection menu for an empty dummy
- * except while a live selection sits inside the main prompt or the
- * settings panel: then the real OS menu (Copy / Cut / Paste /
- * Select All) shows, since selectable labels are only honest with a
- * menu behind them. Chat text matches neither. The page owns the
- * anchor fact and reports transitions to Rust, which the Activity
- * reads synchronously at menu time.
+ * except while a live selection sits inside the main prompt, the
+ * settings panel, or the annotation answer card: then the real OS
+ * menu (Copy / Cut / Paste / Select All) shows, since selectable
+ * labels are only honest with a menu behind them. Chat text matches
+ * none. The page owns the anchor fact and reports transitions to
+ * Rust, which the Activity reads synchronously at menu time.
  */
 
 export type ContainsNode = Pick<Node, "contains">;

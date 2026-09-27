@@ -362,6 +362,11 @@ export class OpenAICompatProvider implements ChatProvider {
 		let pending = this.executableCalls(first.calls);
 		if (pending.length === 0)
 			return { content: first.content, usage: first.usage };
+		// Tool round: the streamed prefix was provisional chatter, not
+		// the answer — retract it (thinking dots again) before the
+		// fetch runs, so the reply never shows text the final round
+		// later replaces.
+		callbacks.onRoundRetract?.();
 		let usage: TokenUsage | null = first.usage;
 		let assistantText = first.content;
 		for (

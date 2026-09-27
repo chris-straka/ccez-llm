@@ -36,6 +36,7 @@
 		isSending,
 		hasReplyStarted,
 		markReplyStarted,
+		unmarkReplyStarted,
 		hasFetchActive,
 		beginNativeSend,
 		beginNativeResend,
@@ -246,7 +247,6 @@
 		aidedTextForMsg,
 		commitRefsEdit,
 		planClearSentRefs,
-		promptAnnLookup,
 		seedAnnotationsFromRefs,
 		annotationCopyText,
 		filePendingAnnotation,
@@ -468,7 +468,6 @@
 		emptyViewport,
 		rectInClear,
 		clearLandingDelta,
-		editViewDelta,
 		type ViewportState
 	} from "$lib/viewport";
 	import { ChatSearchStore, createSearchWorker } from "$lib/chatSearchStore";
@@ -3564,8 +3563,8 @@
 		armActionsTimer(shownActionsId);
 	}
 	function toggleMessageActions(id: ChatMsgId, event: MouseEvent): void {
-		// Phones always render the row (no master off-switch), so taps
-		// always toggle there; desktop honors the Messages checkbox.
+		// Both platforms honor the Messages checkbox (off removes the
+		// row outright); the gate below decides tap toggling.
 		if (
 			!messageActionsTapAllowed(
 				androidUI,
@@ -5853,73 +5852,13 @@
 		// The box stays empty with no placeholder: the highlighted
 		// quote above the composer is the whole prompt.
 		editor?.caretToEnd();
-		// Phones scroll the quote into the upper clear area first (the
-		// keyboard plus composer own the bottom): no manual scroll is
-		// needed to see the highlighted text, so the scroll gesture
-		// never cancels the edit out from under the typing.
-		if (androidUI) {
-			const lookup = promptAnnLookup(target, pendingAnn, annotations);
-			if (lookup) {
-				// Land the quote only after the focus growth settles:
-				// measuring against the small at-rest card strands the
-				// smooth scroll mid-flight when the card grows and the
-				// keyboard opens (top-of-screen flash). A re-tap
-				// retargets: the stale timer no-ops on the new edit.
-				const landed = promptAnnEdit;
-				setTimeout(() => {
-					if (promptAnnEdit !== landed) return;
-					scrollQuoteIntoEditView(lookup.messageId, lookup.quote, lookup.at);
-				}, 350);
-			}
-		}
+		// Filing never scrolls: the view stays exactly where the reader
+		// put it (phones used to hoist the quote above the keyboard,
+		// which yanked long threads on every annotation).
 		// Best-effort: the opening tap's canceled gesture can block
 		// the summon on some WebViews, but a plain tap on the
 		// composer always works — it summons for chat typing today.
 		void tick().then(() => editor?.focus());
-	}
-
-	/**
-	 * Scroll a quote into the upper clear area for in-prompt note
-	 * edits (phones): the keyboard plus composer own the bottom, so
-	 * the only visible space while typing is at the top. Lands the
-	 * quote a fifth down the visible chat; already-visible quotes
-	 * never move.
-	 */
-	function scrollQuoteIntoEditView(
-		messageId: ChatMsgId,
-		quote: string,
-		at: number
-	): void {
-		if (!scrollBox) return;
-		const index = viewChat.messages.findIndex((m) => m.id === messageId);
-		if (index < 0) return;
-		const article = document.querySelector(`#msg-${index}`);
-		const root = article?.querySelector(".rendered") ?? article;
-		if (!(root instanceof HTMLElement)) return;
-		let range: Range | null;
-		try {
-			range = quoteRange(root, quote, at);
-		} catch {
-			return;
-		}
-		if (!range) return;
-		const area = scrollBox.getBoundingClientRect();
-		const appEl = document.querySelector(".app");
-		const kb = appEl
-			? Number.parseFloat(
-					getComputedStyle(appEl).getPropertyValue("--kb-height")
-				) || 0
-			: 0;
-		const promptH =
-			document.querySelector(".prompt")?.getBoundingClientRect().height ?? 0;
-		const visibleBottom = area.bottom - promptH - kb;
-		if (visibleBottom <= area.top) return;
-		const dy = editViewDelta(
-			range.getBoundingClientRect().top,
-			area.top,
-			visibleBottom
-		);
-		if (dy !== null) scrollBox.scrollBy({ top: dy, behavior: "smooth" });
 	}
 
 	/** Send-arrow commit for an in-prompt note create (see doSend):
@@ -7499,6 +7438,9 @@
 		const owned = nativeTurns.get(turn_id);
 		if (!owned) return;
 		nativeText.set(turn_id, "");
+		// A cleared reply goes back to thinking dots — for transport
+		// retries and tool-round retracts alike (same wire event).
+		unmarkReplyStarted(chatState, owned.chatId);
 		const target = chatState.chats.find((c) => c.id === owned.chatId);
 		if (!target) return;
 		target.messages = target.messages.map((m) =>
@@ -11856,27 +11798,10 @@
 					// Cosmetic: the untrimmed pick still summons.
 				}
 			}
+			// Word-select plus the menu only: a double-tap must never
+			// scroll — dragging the view down to the action row
+			// disoriented phone readers (the row stays where it is).
 			placeSelMenu(event.clientX, event.clientY);
-			if (androidUI) scrollActionsIntoView(event);
-		};
-		/**
-		 * Double-tapping a message whose action row is off-screen
-		 * scrolls the row into view: its buttons live below the fold
-		 * and a phone has no hover to reveal them. Rows already
-		 * visible never move (nearest), and desktop keeps word-select
-		 * only. Own and assistant rows share the .actions class.
-		 */
-		const scrollActionsIntoView = (event: MouseEvent): void => {
-			const target = event.target instanceof Element ? event.target : null;
-			const actions = target?.closest("article")?.querySelector(".actions");
-			const box = scrollBox;
-			if (!(actions instanceof HTMLElement) || !(box instanceof HTMLElement))
-				return;
-			const row = actions.getBoundingClientRect();
-			const view = box.getBoundingClientRect();
-			if (row.bottom > view.bottom || row.top < view.top) {
-				actions.scrollIntoView({ block: "nearest", behavior: "smooth" });
-			}
 		};
 		// No triple-click handler: native paragraph selection finalizes
 		// on the third mouseup, where onSelectEnd already locks it to the
@@ -12157,15 +12082,16 @@
 					dismissSelPanels();
 			}
 		};
-		// Native OS menu in the prompt and across the settings
-		// panel: while a live selection sits inside either, the
-		// Activity shows the real OS menu (Copy / Cut / Paste)
-		// instead of the empty dummy — selectable labels are only
-		// honest with a menu behind them. Native fields hide their
-		// range from window.getSelection(), so the focused
-		// field's own start/end is read too. The select event covers
-		// field selections where selectionchange never fires.
-		// Transitions only — handle drags stay silent on the bridge.
+		// Native OS menu in the prompt, across the settings panel,
+		// and inside the annotation answer card: while a live
+		// selection sits inside any of them, the Activity shows the
+		// real OS menu (Copy / Cut / Paste) instead of the empty dummy
+		// — selectable labels are only honest with a menu behind
+		// them. Native fields hide their range from
+		// window.getSelection(), so the focused field's own start/end
+		// is read too. The select event covers field selections
+		// where selectionchange never fires. Transitions only —
+		// handle drags stay silent on the bridge.
 		const notePromptSelection = (): void => {
 			const live = window.getSelection();
 			const focused = document.activeElement;
@@ -12184,7 +12110,7 @@
 				}
 			}
 			reportOsMenu(
-				[promptEl, settingsEl],
+				[promptEl, settingsEl, document.querySelector(".ann-answer")],
 				live?.anchorNode ?? null,
 				live?.isCollapsed ?? true,
 				undefined,

@@ -236,14 +236,13 @@ where the text sat, like the composer's promptEl pattern). -->
 		{ocrBusyId}
 		actions={actions.tags}
 	/>
-	{#if (android || showButtons) && !(streaming && msg.content.trim() === "")}
+	{#if showButtons && !(streaming && msg.content.trim() === "")}
 		<!-- Preview renders the same row inert: the peek
 		reserves the row's space (opening the chat moves
 		nothing) while honoring the hover-only rhythm, so
 		no peek button is ever visible or firing. The
-		desktop Messages toggle removes the row outright
-		(its shortcuts keep working); phones always render
-		it — no shortcuts exist to cover an off state. -->
+		Messages toggle removes the row outright on both
+		platforms (desktop shortcuts keep working). -->
 		<!-- Action row renders in `MessageActions.svelte`;
 		the page keeps voice/aid/selection state and every
 		behavior behind computed props and actions. -->

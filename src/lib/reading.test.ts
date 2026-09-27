@@ -212,6 +212,7 @@ describe("speech locales", () => {
 		expect(ttsLangFor("שלום")).toBe("he-IL");
 		expect(ttsLangFor("สวัสดี")).toBe("th-TH");
 		expect(ttsLangFor("नमस्ते")).toBe("hi-IN");
+		expect(ttsLangFor("ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ")).toBe("pa-IN");
 	});
 
 	it("falls back for Latin script (French/German/English)", () => {

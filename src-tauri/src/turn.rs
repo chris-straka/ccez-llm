@@ -370,6 +370,7 @@ fn retryable_http_status(status: u16) -> bool {
 struct AttemptEvents {
     on_token: Box<dyn FnMut(String) + Send>,
     on_retry_note: Box<dyn FnMut() + Send>,
+    on_round_retract: Box<dyn FnMut() + Send>,
     on_fetch: Box<dyn FnMut(bool, String) + Send>,
     stop: Arc<AtomicBool>,
 }
@@ -597,6 +598,12 @@ async fn run_attempt(
     if pending.is_empty() {
         return Ok((first_content, first_usage));
     }
+    // Tool round: the streamed prefix was provisional chatter, not the
+    // answer — retract it (the page clears back to thinking dots)
+    // before the fetch runs, so the reply never shows text the final
+    // round later replaces. Same wire event as a transport retry: both
+    // mean "discard the prefix, starting over".
+    (ev.on_round_retract)();
     let mut usage = first_usage;
     let mut assistant_text = first_content;
     for _ in 0..MAX_TOOL_ROUNDS {
@@ -821,6 +828,21 @@ async fn run_turn(app: AppHandle, req: TurnRequest, page_fetch: PageFetch) {
             }
         }),
         on_retry_note: Box::new({
+            let app = app.clone();
+            let turn_id = req.turn_id.clone();
+            move || {
+                let _ = app.emit(
+                    "turn-retry",
+                    TokenEvent {
+                        turn_id: turn_id.clone(),
+                        token: String::new(),
+                    },
+                );
+            }
+        }),
+        // Tool-round retract rides the same wire event: the page
+        // clears its accumulator either way (see run_attempt).
+        on_round_retract: Box::new({
             let app = app.clone();
             let turn_id = req.turn_id.clone();
             move || {
@@ -1467,6 +1489,7 @@ mod tests {
         tokens: Arc<Mutex<Vec<String>>>,
         fetches: Arc<Mutex<Vec<(bool, String)>>>,
         retries: Arc<Mutex<u32>>,
+        retracts: Arc<Mutex<u32>>,
     }
 
     fn test_request(port: u16) -> TurnRequest {
@@ -1490,12 +1513,16 @@ mod tests {
         let tokens = Arc::clone(&rec.tokens);
         let fetches = Arc::clone(&rec.fetches);
         let retries = Arc::clone(&rec.retries);
+        let retracts = Arc::clone(&rec.retracts);
         AttemptEvents {
             on_token: Box::new(move |token: String| {
                 tokens.lock().unwrap().push(token);
             }),
             on_retry_note: Box::new(move || {
                 *retries.lock().unwrap() += 1;
+            }),
+            on_round_retract: Box::new(move || {
+                *retracts.lock().unwrap() += 1;
             }),
             on_fetch: Box::new(move |start: bool, url: String| {
                 fetches.lock().unwrap().push((start, url));
@@ -1538,6 +1565,7 @@ mod tests {
             tokens: Arc::new(Mutex::new(Vec::new())),
             fetches: Arc::new(Mutex::new(Vec::new())),
             retries: Arc::new(Mutex::new(0)),
+            retracts: Arc::new(Mutex::new(0)),
         };
         let client = reqwest_client().unwrap();
         let req = test_request(port);
@@ -1558,6 +1586,8 @@ mod tests {
             vec![(true, "http://example.test/page".to_string()), (false, "http://example.test/page".to_string())]
         );
         assert_eq!(*rec.retries.lock().unwrap(), 0);
+        // Tool round retracts the streamed prefix (no transport retry).
+        assert_eq!(*rec.retracts.lock().unwrap(), 1);
         // Three requests; the follow-up carries the tool result.
         let bodies = bodies.lock().unwrap();
         assert_eq!(bodies.len(), 3);
@@ -1587,6 +1617,7 @@ mod tests {
             tokens: Arc::new(Mutex::new(Vec::new())),
             fetches: Arc::new(Mutex::new(Vec::new())),
             retries: Arc::new(Mutex::new(0)),
+            retracts: Arc::new(Mutex::new(0)),
         };
         let client = reqwest_client().unwrap();
         let req = test_request(port);
@@ -1641,6 +1672,7 @@ mod tests {
             tokens: Arc::new(Mutex::new(Vec::new())),
             fetches: Arc::new(Mutex::new(Vec::new())),
             retries: Arc::new(Mutex::new(0)),
+            retracts: Arc::new(Mutex::new(0)),
         };
         let client = reqwest_client().unwrap();
         let req = test_request(port);
@@ -1690,6 +1722,7 @@ mod tests {
             tokens: Arc::new(Mutex::new(Vec::new())),
             fetches: Arc::new(Mutex::new(Vec::new())),
             retries: Arc::new(Mutex::new(0)),
+            retracts: Arc::new(Mutex::new(0)),
         };
         let client = reqwest_client().unwrap();
         let req = test_request(port);

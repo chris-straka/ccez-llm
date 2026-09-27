@@ -148,6 +148,17 @@ describe("desktop voice copy and controls", () => {
 		);
 		expect(defaults.slice(desktop)).toMatch(/Enable microphone dictation/);
 	});
+	it("offers the message-buttons master switch on both platforms", () => {
+		// Phones used to render the row unconditionally (no shortcuts
+		// to cover an off state); the toggle now lives in both branches.
+		const defaults = panelSource("DefaultsPanel.svelte");
+		const android = defaults.indexOf("{#if androidUI}");
+		if (android === -1) throw new Error("no android branch");
+		const desktop = defaults.indexOf("{:else}", android);
+		if (desktop === -1) throw new Error("no desktop branch");
+		expect(defaults.slice(android, desktop)).toMatch(/Enable message buttons/);
+		expect(defaults.slice(desktop)).toMatch(/Enable message buttons/);
+	});
 });
 
 describe("provider gating wiring", () => {

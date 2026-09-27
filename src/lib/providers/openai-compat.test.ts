@@ -322,6 +322,79 @@ describe("stream", () => {
 		});
 	});
 
+	it("retracts the streamed prefix when the first round calls fetch", async () => {
+		const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+			const body = JSON.parse(init.body as string) as { stream?: boolean };
+			if (fetchMock.mock.calls.length === 1) {
+				// Pre-tool chatter streams, then the call assembles.
+				const wire = `data: ${JSON.stringify({
+					choices: [{ delta: { content: "Looking that up. " } }]
+				})}\n\ndata: ${JSON.stringify({
+					choices: [
+						{
+							delta: {
+								tool_calls: [
+									{
+										index: 0,
+										id: "call_1",
+										function: {
+											name: "fetch_url",
+											arguments: JSON.stringify({
+												url: "https://example.com/"
+											})
+										}
+									}
+								]
+							}
+						}
+					]
+				})}\n\ndata: [DONE]\n\n`;
+				return sseResponse([wire]);
+			}
+			if (body.stream === false) {
+				return jsonResponse({ choices: [{ message: { content: "" } }] });
+			}
+			return sseResponse([
+				`data: {"choices":[{"delta":{"content":"fetched!"}}]}\n\ndata: [DONE]\n\n`
+			]);
+		});
+		vi.stubGlobal("fetch", fetchMock);
+		const provider = new OpenAICompatProvider("probe", CONFIG, {
+			fetchPage: vi.fn(async () => "page text")
+		});
+		const seen: string[] = [];
+		let retracted = 0;
+		const result = await provider.stream([{ role: "user", content: "x" }], {
+			onToken: (t) => void seen.push(t),
+			onRoundRetract: () => {
+				retracted += 1;
+			}
+		});
+		expect(retracted).toBe(1);
+		expect(result.content).toBe("fetched!");
+		expect(seen.join("")).toBe("Looking that up. fetched!");
+	});
+
+	it("never retracts a plain turn with no tool calls", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () =>
+				sseResponse([
+					`data: {"choices":[{"delta":{"content":"plain"}}]}\n\ndata: [DONE]\n\n`
+				])
+			)
+		);
+		const provider = new OpenAICompatProvider("probe", CONFIG);
+		let retracted = 0;
+		await provider.stream([{ role: "user", content: "x" }], {
+			onToken: () => {},
+			onRoundRetract: () => {
+				retracted += 1;
+			}
+		});
+		expect(retracted).toBe(0);
+	});
+
 	it("reports the fetch phase around each page fetch", async () => {
 		const wire = `data: ${JSON.stringify({
 			choices: [

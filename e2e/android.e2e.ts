@@ -1971,7 +1971,7 @@ test.describe("touch", () => {
 			await expect(page.locator(".prompt-tools .ann-pill")).toHaveCount(0);
 			await expect(page.locator(".review-item")).toHaveCount(0);
 			await expect(page.locator(".ann-pop")).toHaveCount(0);
-			// The composer keeps its chat placeholder — nothing transplants.
+			// The composer keeps its hintless chat box — nothing transplants.
 			await expect(page.locator(".prompt textarea")).not.toHaveAttribute(
 				"placeholder",
 				"Edit annotation"
@@ -2332,7 +2332,7 @@ test.describe("touch", () => {
 		/** Double-tapping a message taller than the screen scrolls its
 		action row into view: phones have no hover to reveal it. Rows
 		already visible never move. */
-		test("double-tapping a tall message reveals its action row", async ({
+		test("double-tapping a tall message never scrolls to its action row", async ({
 			page
 		}) => {
 			const long = Array.from(
@@ -2371,12 +2371,15 @@ test.describe("touch", () => {
 			await page.waitForTimeout(800);
 			const below = await actions.boundingBox();
 			expect(below?.y ?? 0).toBeGreaterThan(915);
+			const scroller = page.locator("main .messages");
+			const before = await scroller.evaluate((el) => el.scrollTop);
 			await article.locator(".rendered").first().dblclick();
-			await expect
-				.poll(async () => (await actions.boundingBox())?.y ?? 9999, {
-					timeout: 10_000
-				})
-				.toBeLessThan(915);
+			// The menu owns the whole gesture: a word pick summons it,
+			// and the view never drags down to the buttons.
+			await expect(page.locator(".sel-menu")).toBeVisible({ timeout: 10_000 });
+			await page.waitForTimeout(800);
+			const after = await scroller.evaluate((el) => el.scrollTop);
+			expect(Math.abs(after - before)).toBeLessThan(4);
 		});
 	});
 
@@ -2398,9 +2401,10 @@ test.describe("touch", () => {
 			return el instanceof HTMLElement ? el.getBoundingClientRect().height : -1;
 		});
 		// One small empty line (~26px on the 1.5rem floor): the
-		// stranded state measured ~0 here with no placeholder at all.
+		// stranded state measured ~0 here. The prompt stays
+		// hintless, so the height alone proves the composer healed.
 		expect(heights).toBeGreaterThan(16);
-		expect(await box.getAttribute("placeholder")).toBeTruthy();
+		await expect(box).toHaveValue("");
 		// A keyboard transition settles through the same re-measure path
 		// without disturbing the healthy composer.
 		await page.evaluate(() =>
@@ -2466,7 +2470,7 @@ test.describe("touch", () => {
 
 	/** A stale master-off save never hides rows on a phone: with no
 	shortcuts, redo/speak/copy would strand behind a setting. */
-	test("master-off save still renders rows on a phone", async ({ page }) => {
+	test("master-off removes rows on a phone", async ({ page }) => {
 		await seedChat(page, [{ role: "assistant", content: "hello" }]);
 		await page.addInitScript(() => {
 			window.localStorage.setItem(
@@ -2478,7 +2482,8 @@ test.describe("touch", () => {
 		await expect(page.locator("article .rendered").first()).toBeVisible({
 			timeout: 60_000
 		});
-		await expect(page.locator("article .actions")).toHaveCount(1);
+		// The Messages checkbox removes the row outright on phones too.
+		await expect(page.locator("article .actions")).toHaveCount(0);
 	});
 
 	test("haptics toggle is on (enabled) by default and persists", async ({

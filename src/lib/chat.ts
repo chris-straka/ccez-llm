@@ -119,6 +119,16 @@ export function markReplyStarted(state: ChatState, id?: ChatId): void {
 		state.replyStartedChatIds = [...state.replyStartedChatIds, chatId];
 }
 
+/** Clear a chat's reply-started flag — a retracted tool round (or a
+retried native turn) goes back to thinking dots until tokens land
+again. Both engines lower it the same way. */
+export function unmarkReplyStarted(state: ChatState, id?: ChatId): void {
+	const chatId = id ?? state.activeChatId;
+	state.replyStartedChatIds = state.replyStartedChatIds.filter(
+		(c) => c !== chatId
+	);
+}
+
 /** True when the given chat has a page fetch in flight right now. */
 export function hasFetchActive(state: ChatState, id?: ChatId): boolean {
 	return state.fetchActiveChatIds.includes(id ?? state.activeChatId);
@@ -781,6 +791,14 @@ export async function streamAssistantReply(
 					streamed += token;
 					replaceReply({ content: streamed });
 					if (token !== "") opts.onToken?.();
+				},
+				// Tool round: the streamed prefix was provisional —
+				// clear it and go back to thinking dots; the fetch
+				// lands, then the final round streams fresh.
+				onRoundRetract: () => {
+					streamed = "";
+					replaceReply({ content: "" });
+					unmarkReplyStarted(state, chatId);
 				}
 			},
 			{ signal: controller.signal, thinking: opts.thinking }

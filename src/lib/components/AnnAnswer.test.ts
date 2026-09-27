@@ -70,4 +70,10 @@ describe("annotation answer extraction", () => {
 			/\.ann-answer\s*\{[^}]*font-size:\s*calc\(1rem \* var\(--font-scale, 1\) \* var\(--annpop-scale, 1\)\)/
 		);
 	});
+
+	it("sizes border-box so padding never spills past the viewport", () => {
+		// The page sizes the card to the clear width: content-box
+		// padding pushed the card past the edge on narrow phones.
+		expect(answerSource()).toMatch(/\.ann-answer\s*\{[^}]*box-sizing:\s*border-box/);
+	});
 });

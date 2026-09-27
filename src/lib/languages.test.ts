@@ -58,6 +58,7 @@ describe("reply languages", () => {
 			"ko",
 			"ar",
 			"hi",
+			"pa",
 			"id",
 			"tr",
 			"fa",

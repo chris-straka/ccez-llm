@@ -62,6 +62,23 @@ export class MockProvider implements ChatProvider {
 			/* storage unavailable: plain chat */
 		}
 		if (Number.isFinite(fetchMs) && fetchMs >= 0) {
+			// Test hook: stream provisional chatter first (like a real
+			// tool round), then retract it before the fetch runs — specs
+			// assert the final reply never shows the prefix. Unset
+			// keeps the fetch-first simulation.
+			let prefetch: string | null = null;
+			try {
+				prefetch =
+					typeof localStorage === "undefined"
+						? null
+						: localStorage.getItem("ccez-mock-prefetch-text");
+			} catch {
+				/* storage unavailable: fetch-first simulation */
+			}
+			if (prefetch !== null && prefetch !== "") {
+				callbacks.onToken(prefetch);
+				callbacks.onRoundRetract?.();
+			}
 			callbacks.onFetchStart?.("https://example.com/");
 			await new Promise((r) => setTimeout(r, fetchMs));
 			opts?.signal?.throwIfAborted();

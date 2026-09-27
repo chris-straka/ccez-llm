@@ -46,7 +46,11 @@ import {
 	type ChatState,
 	type ChatId
 } from "./chat";
-import type { ChatProvider, ChatResult } from "./providers/types";
+import type {
+	ChatProvider,
+	ChatResult,
+	StreamCallbacks
+} from "./providers/types";
 import { MockProvider } from "./providers/mock";
 
 function freshStore() {
@@ -364,6 +368,48 @@ describe("chat", () => {
 		takeBackLastReply(state, store);
 		await resendLast(state, flaky, "sys", { store });
 		expect(activeChat(state).messages).toHaveLength(2);
+	});
+
+	it("retracts pre-tool text back to thinking when the round discards it", async () => {
+		const { state, store } = stateWith(freshStore());
+		let callbacks!: StreamCallbacks;
+		let resolveStream!: (result: ChatResult) => void;
+		const tooly: ChatProvider = {
+			id: "tooly",
+			async chat(): Promise<ChatResult> {
+				throw new Error("unused");
+			},
+			stream(_m, cb): Promise<ChatResult> {
+				callbacks = cb;
+				return new Promise<ChatResult>((resolve) => {
+					resolveStream = resolve;
+				});
+			}
+		};
+		const sending = sendMessage(state, tooly, "sys", "hi", {}, store);
+		await new Promise((r) => setTimeout(r, 20));
+		callbacks.onToken("Let me look that up. ");
+		expect(activeChat(state).messages[1]?.content).toBe(
+			"Let me look that up. "
+		);
+		expect(hasReplyStarted(state)).toBe(true);
+		// Tool round: the streamed prefix retracts (thinking dots
+		// again), the fetch runs, and the final answer streams fresh.
+		callbacks.onRoundRetract?.();
+		expect(activeChat(state).messages[1]?.content).toBe("");
+		expect(hasReplyStarted(state)).toBe(false);
+		callbacks.onToken("Found it.");
+		expect(activeChat(state).messages[1]?.content).toBe("Found it.");
+		expect(hasReplyStarted(state)).toBe(true);
+		resolveStream({
+			content: "Found it.",
+			usage: { prompt: 1, completion: 1, total: 2 }
+		});
+		await sending;
+		expect(activeChat(state).messages.map((m) => m.content)).toEqual([
+			"hi",
+			"Found it."
+		]);
 	});
 
 	it("aborts the in-flight send when its chat is dropped", async () => {

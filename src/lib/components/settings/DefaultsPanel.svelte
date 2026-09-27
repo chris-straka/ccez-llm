@@ -112,10 +112,10 @@
 				<input type="checkbox" bind:checked={settings.foldOnSwipe} />
 				Enable fold on swipe
 			</label>
-			<!-- No master off-switch on phones: with no shortcuts,
-			hiding the row would strand redo/speak/copy behind a
-			setting. The row always renders; the toggle above
-			declutters it. -->
+			<label class="check">
+				<input type="checkbox" bind:checked={settings.showMessageButtons} />
+				Enable message buttons
+			</label>
 			<label class="check">
 				<input type="checkbox" bind:checked={settings.ownBubble} />
 				Enable background on my messages
