@@ -516,6 +516,10 @@ where the text sat, like the composer's promptEl pattern). -->
 		color: #7e22ce;
 		color: var(--own-purple);
 	}
+	:global(main[data-own-ink="white"]) article.user .bubble {
+		color: #1c1c1e;
+		color: var(--own-white);
+	}
 	/* Tinted ink reaches the edit box too (it replaces the bubble,
 	so it inherits nothing from it): the draft reads in the same
 	hue it will land in. Fallback hex first per docs/colors.md. */
@@ -538,6 +542,10 @@ where the text sat, like the composer's promptEl pattern). -->
 	:global(main[data-own-ink="purple"]) article.user .msg-edit {
 		color: #7e22ce;
 		color: var(--own-purple);
+	}
+	:global(main[data-own-ink="white"]) article.user .msg-edit {
+		color: #1c1c1e;
+		color: var(--own-white);
 	}
 	article.selected {
 		outline: 2px solid #3a3a3c;

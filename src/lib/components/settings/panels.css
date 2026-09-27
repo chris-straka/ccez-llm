@@ -532,6 +532,9 @@ a hollow dot (no color). */
 .settings-inner .segmented .dot[data-choice="purple"] {
 	background: var(--own-purple);
 }
+.settings-inner .segmented .dot[data-choice="white"] {
+	background: var(--own-white);
+}
 .settings-inner .segmented .dot[data-choice="off"] {
 	background: transparent;
 	border: 1px solid var(--muted);

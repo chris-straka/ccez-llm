@@ -83,6 +83,9 @@ html[data-theme="light"] {
 	--own-green: #15803d;
 	--own-amber: #b45309;
 	--own-purple: #7e22ce;
+	/* White reads nowhere on light, so its light twin is the theme
+	ink (near-black): the swatch stays readable in both themes. */
+	--own-white: #1c1c1e;
 	--alarm: #ff3b30;
 	--error-bg: #fdecea;
 	--error-ink: #94250a;
@@ -128,6 +131,7 @@ html[data-theme="dark"] {
 	--own-green: #86efac;
 	--own-amber: #fcd34d;
 	--own-purple: #d8b4fe;
+	--own-white: #ffffff;
 	--alarm: #ff6b62;
 	--error-bg: #3d1008;
 	--error-ink: #ffb4a2;

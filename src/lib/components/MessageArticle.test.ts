@@ -131,7 +131,7 @@ describe("message article contract", () => {
 		expect(css).toContain(
 			":global(main.plain-user) article.user .msg-edit"
 		);
-		for (const ink of ["pink", "blue", "green", "amber", "purple"]) {
+		for (const ink of ["pink", "blue", "green", "amber", "purple", "white"]) {
 			expect(css).toContain(
 				`:global(main[data-own-ink="${ink}"]) article.user .msg-edit`
 			);

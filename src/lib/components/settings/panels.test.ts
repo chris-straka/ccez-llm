@@ -201,7 +201,7 @@ describe("own-ink swatches", () => {
 	});
 	it("previews every swatch through its themed token, off hollow", () => {
 		const css = panelsCss();
-		for (const choice of ["pink", "blue", "green", "amber", "purple"]) {
+		for (const choice of ["pink", "blue", "green", "amber", "purple", "white"]) {
 			expect(
 				ruleBody(css, `.segmented .dot[data-choice="${choice}"]`)
 			).toMatch(new RegExp(`background:\\s*var\\(--own-${choice}\\)`));

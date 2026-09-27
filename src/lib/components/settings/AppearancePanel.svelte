@@ -18,6 +18,7 @@
 		green: "Green",
 		amber: "Amber",
 		purple: "Purple",
+		white: "White",
 		off: "Off"
 	};
 </script>

@@ -77,6 +77,7 @@ platforms can't share one vendor's identity. So the palette is
 | `--own-green`  | `#15803d`             | `#86efac`             | Own-message ink swatch                                                                                                                                                           |
 | `--own-amber`  | `#b45309`             | `#fcd34d`             | Own-message ink swatch                                                                                                                                                           |
 | `--own-purple` | `#7e22ce`             | `#d8b4fe`             | Own-message ink swatch                                                                                                                                                           |
+| `--own-white`  | `#1c1c1e`             | `#ffffff`             | Own-message ink swatch: white on dark, theme ink on light (white reads nowhere on light)                                                                                         |
 
 ## Exceptions (raw hex allowed, documented here)
 

@@ -23,7 +23,14 @@ export type ThemeMode = "system" | "light" | "dark";
  * `--own-*` tokens, or off for plain ink. A free `custom` hex rides
  * a second field later — this list stays the swatch order.
  */
-export type OwnInkChoice = "pink" | "blue" | "green" | "amber" | "purple" | "off";
+export type OwnInkChoice =
+	| "pink"
+	| "blue"
+	| "green"
+	| "amber"
+	| "purple"
+	| "white"
+	| "off";
 
 /** Swatch order in Settings → Appearance (also the heal allowlist). */
 export const OWN_INK_CHOICES: readonly OwnInkChoice[] = [
@@ -32,6 +39,7 @@ export const OWN_INK_CHOICES: readonly OwnInkChoice[] = [
 	"green",
 	"amber",
 	"purple",
+	"white",
 	"off"
 ];
 

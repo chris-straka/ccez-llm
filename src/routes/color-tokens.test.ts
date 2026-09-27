@@ -144,7 +144,8 @@ describe("own-message ink", () => {
 		["blue", "#1d4ed8", "#93c5fd"],
 		["green", "#15803d", "#86efac"],
 		["amber", "#b45309", "#fcd34d"],
-		["purple", "#7e22ce", "#d8b4fe"]
+		["purple", "#7e22ce", "#d8b4fe"],
+		["white", "#1c1c1e", "#ffffff"]
 	];
 	it("defines every swatch per theme in app.css", () => {
 		const app = readFileSync(new URL("../app.css", import.meta.url), "utf8");

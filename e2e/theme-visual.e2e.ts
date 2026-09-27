@@ -256,6 +256,21 @@ for (const t of THEMES) {
 		await expect(bubble).toHaveCSS("color", t.ownInk);
 	});
 
+	test(`own ink white paints ${t.name}`, async ({ page }) => {
+		await seedChat(page, [{ role: "user", content: "ink me" }], null, {
+			ownInk: "white"
+		});
+		await seedTheme(page, t.name);
+		await page.goto("/");
+		// White on dark; theme ink on light (white reads nowhere there).
+		const bubble = page.locator("article.user .bubble").first();
+		await expect(bubble).toBeVisible({ timeout: 60_000 });
+		await expect(bubble).toHaveCSS(
+			"color",
+			t.name === "dark" ? "rgb(255, 255, 255)" : t.ink
+		);
+	});
+
 	test(`own ink off paints plain ink on ${t.name}`, async ({ page }) => {
 		await seedChat(page, [{ role: "user", content: "ink me" }], null, {
 			ownInk: "off"
