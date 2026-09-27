@@ -93,6 +93,12 @@ describe("shortcuts menu copy", () => {
 		expect(rows.find((r) => r.name === "Edit newest message")?.keys).toBe(
 			"⌘E"
 		);
+		expect(rows.find((r) => r.name === "Delete a message")?.keys).toBe(
+			"Hover + ⌘Delete / ⌘D / Shift+D"
+		);
+		expect(rows.find((r) => r.name === "Delete this chat")?.keys).toBe(
+			"⇧⌘Delete"
+		);
 	});
 
 	it("drops browser-dead rows on the web, still A-Z", () => {
@@ -131,7 +137,10 @@ describe("shortcuts menu copy", () => {
 		);
 		expect(rows.find((r) => r.name === "Search chats")?.keys).toBe("Ctrl+P");
 		expect(rows.find((r) => r.name === "Delete a message")?.keys).toBe(
-			"Hover + Shift+D"
+			"Hover + Ctrl+Delete / Shift+D"
+		);
+		expect(rows.find((r) => r.name === "Delete this chat")?.keys).toBe(
+			"Ctrl+Shift+Delete"
 		);
 		expect(rows.find((r) => r.name === "Fullscreen")?.keys).toBe(
 			"Ctrl+Meta+F"

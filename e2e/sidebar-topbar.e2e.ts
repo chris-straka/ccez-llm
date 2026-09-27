@@ -46,14 +46,27 @@ test.beforeEach(async ({ page }) => {
 	await expect(page.locator("article .rendered").first()).toBeVisible();
 });
 
-/** Ctrl+Delete drops the current chat and lands on the next one. */
-test("ctrl-delete drops the current chat", async ({ page }) => {
+/** Ctrl+Delete drops the hovered message; the chat itself survives. */
+test("ctrl-delete drops the hovered message", async ({ page }) => {
 	await expect(page.locator("article .rendered").first()).toContainText(ALPHA);
-	// Focus leaves the composer so the chord isn't line-kill.
+	// Focus leaves the composer so the chord isn't line-kill; the
+	// pointer stays over the article, making it the hover target.
 	await page.locator("article .rendered").first().click();
 	await page.keyboard.press("Control+Delete");
-	await expect(page.locator("article .rendered").first()).toContainText(BRAVO);
+	await expect(page.locator("article .rendered")).toHaveCount(0);
+	await openSidebar(page);
+	await expect(chatRows(page)).toHaveCount(2);
+});
+
+/** Ctrl+Delete with nothing hovered is a no-op — never the chat. */
+test("ctrl-delete without hover keeps chat and message", async ({ page }) => {
+	await expect(page.locator("article .rendered").first()).toContainText(ALPHA);
+	await page.locator("article .rendered").first().click();
+	// Park the pointer where no message sits (top-left chrome).
+	await page.mouse.move(4, 4);
+	await page.keyboard.press("Control+Delete");
 	await expect(page.locator("article .rendered")).toHaveCount(1);
+	await expect(page.locator("article .rendered").first()).toContainText(ALPHA);
 });
 
 /** Ctrl+Shift+Delete drops the current chat too (no drop-everything). */

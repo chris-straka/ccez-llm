@@ -3,7 +3,7 @@ import {
 	answerCardKeyAction,
 	chromeChord,
 	commandChord,
-	deleteChatScope,
+	deleteScope,
 	enterKeyAction,
 	inspectStepAction,
 	keyFacts,
@@ -77,7 +77,8 @@ const delBase: DeleteKeyFacts = {
 	shiftKey: false,
 	key: "Backspace",
 	inEditor: false,
-	inEditable: false
+	inEditable: false,
+	hovered: true
 };
 
 describe("messageKeyAction", () => {
@@ -458,30 +459,40 @@ describe("enterKeyAction", () => {
 	});
 });
 
-describe("deleteChatScope", () => {
-	it("drops one chat, Shift included", () => {
-		expect(deleteChatScope(delBase)).toBe("chat");
-		expect(deleteChatScope({ ...delBase, shiftKey: true })).toBe("chat");
-		expect(deleteChatScope({ ...delBase, key: "Delete" })).toBe("chat");
+describe("deleteScope", () => {
+	it("drops the hovered message, forward-delete included", () => {
+		expect(deleteScope(delBase)).toBe("message");
+		expect(deleteScope({ ...delBase, key: "Delete" })).toBe("message");
+		expect(deleteScope({ ...delBase, metaKey: false, ctrlKey: true })).toBe(
+			"message"
+		);
+	});
+
+	it("no-ops with nothing hovered — the plain chord never takes the chat", () => {
+		expect(deleteScope({ ...delBase, hovered: false })).toBe(null);
+	});
+
+	it("Shift widens to the chat, even from typing targets", () => {
+		expect(deleteScope({ ...delBase, shiftKey: true })).toBe("chat");
+		expect(deleteScope({ ...delBase, shiftKey: true, hovered: false })).toBe(
+			"chat"
+		);
+		expect(
+			deleteScope({ ...delBase, shiftKey: true, inEditor: true })
+		).toBe("chat");
+		expect(
+			deleteScope({ ...delBase, shiftKey: true, inEditable: true })
+		).toBe("chat");
 	});
 
 	it("keeps the plain chord for typing and line-kill habits", () => {
-		expect(deleteChatScope({ ...delBase, altKey: true })).toBe(null);
+		expect(deleteScope({ ...delBase, altKey: true })).toBe(null);
 		expect(
-			deleteChatScope({ ...delBase, metaKey: false, ctrlKey: false })
+			deleteScope({ ...delBase, metaKey: false, ctrlKey: false })
 		).toBe(null);
-		expect(deleteChatScope({ ...delBase, inEditor: true })).toBe(null);
-		expect(deleteChatScope({ ...delBase, inEditable: true })).toBe(null);
-		expect(deleteChatScope({ ...delBase, key: "d" })).toBe(null);
-	});
-
-	it("Shift drops the chat even from typing targets", () => {
-		expect(
-			deleteChatScope({ ...delBase, shiftKey: true, inEditor: true })
-		).toBe("chat");
-		expect(
-			deleteChatScope({ ...delBase, shiftKey: true, inEditable: true })
-		).toBe("chat");
+		expect(deleteScope({ ...delBase, inEditor: true })).toBe(null);
+		expect(deleteScope({ ...delBase, inEditable: true })).toBe(null);
+		expect(deleteScope({ ...delBase, key: "d" })).toBe(null);
 	});
 });
 

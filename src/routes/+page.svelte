@@ -356,7 +356,7 @@
 	import {
 		chromeChord,
 		commandChord,
-		deleteChatScope,
+		deleteScope,
 		inspectStepAction,
 		keyFacts,
 		answerCardKeyAction,
@@ -10875,22 +10875,34 @@
 				void openAreaOverlay();
 				return;
 			}
-			const delScope = deleteChatScope({
+			const delScope = deleteScope({
 				...keyFacts(event),
 				inEditor: inEditor !== null,
-				inEditable: isEditableTarget(event.target)
+				inEditable: isEditableTarget(event.target),
+				hovered: hoveredIdx >= 0
 			});
 			if (delScope === "chat") {
-				// ⌘Delete drops the whole current chat (a blank one takes
+				// ⇧⌘Delete drops the whole current chat (a blank one takes
 				// its place, so the composer never strands) and resets the
-				// voice language to the checked keyboard. Mac Delete-key
-				// reports Backspace; forward-delete reports Delete. Typing
-				// targets keep the plain chord for line-kill habits; the
-				// ⇧⌘Delete variant works everywhere, same single chat.
+				// voice language to the checked keyboard. Works from
+				// anywhere, typing targets included.
 				consumeEvent(event);
 				dropChat(chat.id);
 				editor?.focus();
 				return;
+			}
+			if (delScope === "message") {
+				// ⌘Delete drops the hovered message, never the chat (Mac
+				// Delete-key reports Backspace; forward-delete reports
+				// Delete). Typing targets keep the plain chord for
+				// line-kill habits, and with nothing hovered it no-ops.
+				const target = chat.messages[hoveredIdx];
+				if (target) {
+					consumeEvent(event);
+					stopAudioForMessage(target.id);
+					deleteMessage(chatState, hoveredIdx);
+					return;
+				}
 			}
 			// One snapshot for the sidebar/settings/zoom cluster (see
 			// chromeChord): same token across spellings, bodies stay

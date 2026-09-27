@@ -148,7 +148,9 @@ export function desktopShortcuts(isMac: boolean, inShell = true): ShortcutRow[] 
 		// ⌘D is meta-only (Ctrl+D fast-scrolls in scroll mode); Shift+D works everywhere.
 		{
 			name: "Delete a message",
-			keys: isMac ? "Hover + ⌘D / Shift+D" : "Hover + Shift+D"
+			keys: isMac
+				? "Hover + ⌘Delete / ⌘D / Shift+D"
+				: "Hover + Ctrl+Delete / Shift+D"
 		},
 		{
 			name: "Fold / unfold message",
@@ -167,7 +169,7 @@ export function desktopShortcuts(isMac: boolean, inShell = true): ShortcutRow[] 
 		},
 		{
 			name: "Delete this chat",
-			keys: isMac ? "⌘Delete · ⇧⌘Delete" : "Ctrl+Delete · Ctrl+Shift+Delete"
+			keys: isMac ? "⇧⌘Delete" : "Ctrl+Shift+Delete"
 		},
 		{ name: "Cut message", keys: "x" },
 		{ name: "Edit newest message", keys: `${isMac ? "⌘E" : "Meta+E"}` },

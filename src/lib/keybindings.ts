@@ -1003,17 +1003,23 @@ export interface DeleteKeyFacts extends KeyModifiers {
 	key: string;
 	inEditor: boolean;
 	inEditable: boolean;
+	/** A message row sits under the pointer. */
+	hovered: boolean;
 }
 
-export type DeleteChatScope = "chat";
+export type DeleteScope = "chat" | "message";
 
-/** Cmd/Ctrl+Delete drops the current chat — with Shift too, and from
- * typing targets, where the plain chord stays reserved for line-kill
- * habits (Shift has no line-kill meaning). There is no drop-everything:
- * one chat goes at a time, a blank taking its place. */
-export function deleteChatScope(facts: DeleteKeyFacts): DeleteChatScope | null {
+/** Cmd/Ctrl+Delete drops the hovered message; Shift widens the same
+ * chord to the whole current chat (one chat at a time, a blank taking
+ * its place — no drop-everything). Typing targets keep the plain
+ * chord for line-kill habits (Shift has no line-kill meaning, so it
+ * works from anywhere), and with nothing hovered the plain chord is
+ * a no-op — it never takes the chat. */
+export function deleteScope(facts: DeleteKeyFacts): DeleteScope | null {
 	if (!(facts.metaKey || facts.ctrlKey) || facts.altKey) return null;
 	if (facts.key !== "Backspace" && facts.key !== "Delete") return null;
-	if ((facts.inEditor || facts.inEditable) && !facts.shiftKey) return null;
-	return "chat";
+	if (facts.shiftKey) return "chat";
+	if (facts.inEditor || facts.inEditable) return null;
+	if (!facts.hovered) return null;
+	return "message";
 }
