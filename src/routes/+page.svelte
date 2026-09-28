@@ -10879,7 +10879,8 @@
 				...keyFacts(event),
 				inEditor: inEditor !== null,
 				inEditable: isEditableTarget(event.target),
-				hovered: hoveredIdx >= 0
+				hovered: hoveredIdx >= 0,
+				hoverBadgeId
 			});
 			if (delScope === "chat") {
 				// ⇧⌘Delete drops the whole current chat (a blank one takes
@@ -10889,6 +10890,14 @@
 				consumeEvent(event);
 				dropChat(chat.id);
 				editor?.focus();
+				return;
+			}
+			if (delScope === "badge" && hoverBadgeId !== null) {
+				// ⌘Delete over a hovered badge drops its annotation,
+				// never the message underneath (same path as bare
+				// Delete on the badge).
+				consumeEvent(event);
+				removeAnnotation(hoverBadgeId);
 				return;
 			}
 			if (delScope === "message") {

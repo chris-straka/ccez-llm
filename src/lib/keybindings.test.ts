@@ -472,6 +472,18 @@ describe("deleteScope", () => {
 		expect(deleteScope({ ...delBase, hovered: false })).toBe(null);
 	});
 
+	it("drops the hovered annotation badge, never the message underneath", () => {
+		expect(deleteScope({ ...delBase, hoverBadgeId: "a1" })).toBe("badge");
+		expect(deleteScope({ ...delBase, hoverBadgeId: null })).toBe("message");
+		expect(deleteScope(delBase)).toBe("message");
+	});
+
+	it("Shift still widens to the chat over a badge", () => {
+		expect(
+			deleteScope({ ...delBase, shiftKey: true, hoverBadgeId: "a1" })
+		).toBe("chat");
+	});
+
 	it("Shift widens to the chat, even from typing targets", () => {
 		expect(deleteScope({ ...delBase, shiftKey: true })).toBe("chat");
 		expect(deleteScope({ ...delBase, shiftKey: true, hovered: false })).toBe(

@@ -1005,21 +1005,27 @@ export interface DeleteKeyFacts extends KeyModifiers {
 	inEditable: boolean;
 	/** A message row sits under the pointer. */
 	hovered: boolean;
+	/** Annotation badge under the pointer: it owns the plain chord. */
+	hoverBadgeId?: string | null;
 }
 
-export type DeleteScope = "chat" | "message";
+export type DeleteScope = "chat" | "message" | "badge";
 
-/** Cmd/Ctrl+Delete drops the hovered message; Shift widens the same
- * chord to the whole current chat (one chat at a time, a blank taking
- * its place — no drop-everything). Typing targets keep the plain
- * chord for line-kill habits (Shift has no line-kill meaning, so it
- * works from anywhere), and with nothing hovered the plain chord is
- * a no-op — it never takes the chat. */
+/** Cmd/Ctrl+Delete drops the hovered annotation badge when one sits
+ * under the pointer (never the message underneath — same
+ * small-target authorization as bare Delete on a badge); otherwise
+ * it drops the hovered message. Shift widens the same chord to the
+ * whole current chat (one chat at a time, a blank taking its place
+ * — no drop-everything), badge or not. Typing targets keep the
+ * plain chord for line-kill habits (Shift has no line-kill meaning,
+ * so it works from anywhere), and with nothing hovered the plain
+ * chord is a no-op — it never takes the chat. */
 export function deleteScope(facts: DeleteKeyFacts): DeleteScope | null {
 	if (!(facts.metaKey || facts.ctrlKey) || facts.altKey) return null;
 	if (facts.key !== "Backspace" && facts.key !== "Delete") return null;
 	if (facts.shiftKey) return "chat";
 	if (facts.inEditor || facts.inEditable) return null;
+	if ((facts.hoverBadgeId ?? null) !== null) return "badge";
 	if (!facts.hovered) return null;
 	return "message";
 }

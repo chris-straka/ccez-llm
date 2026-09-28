@@ -150,6 +150,16 @@ describe("annotation create wiring", () => {
 		expect(source).toContain("placeAnnComposer({");
 	});
 
+	it("drops the annotation — never the message — on Cmd+Delete over a badge", () => {
+		// The deleteScope badge branch owns the chord (same path as
+		// bare Delete on the badge); the message branch below never
+		// sees it.
+		const source = pageSource();
+		expect(source).toContain(
+			'if (delScope === "badge" && hoverBadgeId !== null) {'
+		);
+	});
+
 	it("ends the phone create pill with a Save button", () => {
 		const source = annPopSource();
 		// The fresh pill is textarea + mic only on desktop (Enter
