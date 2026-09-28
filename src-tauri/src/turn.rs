@@ -35,6 +35,10 @@ use tauri::{AppHandle, Emitter, Manager};
 /// engines stop in the same places.
 const MAX_TOOL_ROUNDS: usize = 3;
 const MAX_CALLS_PER_ROUND: usize = 3;
+/// Extra streamed rounds when the final answer keeps calling fetch
+/// (each retracts its prefix, runs the calls, and re-streams):
+/// mirrors `EXTRA_FINAL_ROUNDS` there.
+const EXTRA_FINAL_ROUNDS: usize = 2;
 /// Whole-turn attempt budget: the first try plus this many recomputes
 /// on retryable network failures (the user's "retry when the network
 /// is back" — bounded, because every attempt spends tokens).
@@ -242,7 +246,7 @@ fn stream_body(req: &TurnRequest, history: &[serde_json::Value], tools: bool) ->
             "type": "function",
             "function": {
                 "name": "fetch_url",
-                "description": "Fetch a web page and return its readable text.",
+                "description": "Fetch a web page and return its readable text. Call it at once when you need a page — never write that you will fetch without calling. When a fetch fails, call again with a different URL instead of stopping.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -568,7 +572,50 @@ async fn post_plain(
     Ok((content, frags, usage_from(&json)))
 }
 
-/// One full attempt: stream (with tools), fetch rounds, final stream.
+/// One fetch batch run into the history: the assistant tool_calls
+/// message first, then each page's text (or its one-line failure) as
+/// a tool result. Stop-aware; the fetch bracket wraps each page.
+/// Shared by the follow-up rounds and the extra final rounds below.
+async fn run_fetch_batch(
+    history: &mut Vec<serde_json::Value>,
+    assistant_text: &str,
+    pending: &[ExecCall],
+    page_fetch: &PageFetch,
+    ev: &mut AttemptEvents,
+) -> Result<(), AttemptEnd> {
+    if ev.stop.load(Ordering::Relaxed) {
+        return Err(AttemptEnd::Stopped);
+    }
+    history.push(serde_json::json!({
+        "role": "assistant",
+        "content": assistant_text,
+        "tool_calls": pending.iter().map(raw_tool_call).collect::<Vec<_>>()
+    }));
+    for call in pending {
+        if ev.stop.load(Ordering::Relaxed) {
+            return Err(AttemptEnd::Stopped);
+        }
+        // The page's Fetching chip reads this bracket — same contract
+        // as the TypeScript provider's onFetchStart/onFetchEnd, so
+        // both engines drive one indicator.
+        (ev.on_fetch)(true, call.url.clone());
+        let text = match page_fetch(call.url.clone()).await {
+            Ok(text) => text,
+            Err(code) => fetch_error_copy(&code),
+        };
+        (ev.on_fetch)(false, call.url.clone());
+        history.push(serde_json::json!({
+            "role": "tool",
+            "content": text,
+            "tool_call_id": call.id
+        }));
+    }
+    Ok(())
+}
+
+/// One full attempt: stream (with tools), fetch rounds, final stream
+/// (with tools still on, so a last retry can act). A follow-up that
+/// answers with no calls IS the reply.
 /// Credentials mirror the TypeScript provider: Bearer auth when a key
 /// exists, no credential header for keyless servers.
 async fn run_attempt(
@@ -610,33 +657,7 @@ async fn run_attempt(
         if pending.is_empty() {
             break;
         }
-        if ev.stop.load(Ordering::Relaxed) {
-            return Err(AttemptEnd::Stopped);
-        }
-        history.push(serde_json::json!({
-            "role": "assistant",
-            "content": assistant_text,
-            "tool_calls": pending.iter().map(raw_tool_call).collect::<Vec<_>>()
-        }));
-        for call in &pending {
-            if ev.stop.load(Ordering::Relaxed) {
-                return Err(AttemptEnd::Stopped);
-            }
-            // The page's Fetching chip reads this bracket — same contract
-            // as the TypeScript provider's onFetchStart/onFetchEnd, so
-            // both engines drive one indicator.
-            (ev.on_fetch)(true, call.url.clone());
-            let text = match page_fetch(call.url.clone()).await {
-                Ok(text) => text,
-                Err(code) => fetch_error_copy(&code),
-            };
-            (ev.on_fetch)(false, call.url.clone());
-            history.push(serde_json::json!({
-                "role": "tool",
-                "content": text,
-                "tool_call_id": call.id
-            }));
-        }
+        run_fetch_batch(&mut history, &assistant_text, &pending, page_fetch, ev).await?;
         let (content, frags, round_usage) = post_plain(client, req, &history, true).await?;
         if round_usage.is_some() {
             usage = round_usage;
@@ -646,10 +667,38 @@ async fn run_attempt(
             .into_iter()
             .take(MAX_CALLS_PER_ROUND)
             .collect::<Vec<_>>();
+        if pending.is_empty() && !assistant_text.is_empty() {
+            // The follow-up is the answer (no more calls): emit it as
+            // the reply instead of discarding it and re-asking — the
+            // re-ask regenerated blind and stalled promising retries
+            // it could never make (its tools were off).
+            (ev.on_token)(assistant_text.clone());
+            return Ok((assistant_text, usage));
+        }
     }
-    let (_, final_content, _, final_usage) =
-        post_stream(client, req, &history, false, deadline, ev).await?;
-    Ok((final_content, final_usage.or(usage)))
+    // The final answer streams WITH tools: after failed fetches the
+    // model often wants one more source, and with tools off that
+    // promise always stalled. Calls here run bounded extra rounds
+    // (retract the prefix, fetch, re-stream) before the reply must
+    // land.
+    let mut extra = 0;
+    loop {
+        let (_, final_content, final_frags, final_usage) =
+            post_stream(client, req, &history, true, deadline, ev).await?;
+        let more = join_calls(&final_frags)
+            .into_iter()
+            .take(MAX_CALLS_PER_ROUND)
+            .collect::<Vec<_>>();
+        if more.is_empty() || extra >= EXTRA_FINAL_ROUNDS {
+            return Ok((final_content, final_usage.or(usage)));
+        }
+        extra += 1;
+        (ev.on_round_retract)();
+        if final_usage.is_some() {
+            usage = final_usage;
+        }
+        run_fetch_batch(&mut history, &final_content, &more, page_fetch, ev).await?;
+    }
 }
 
 async fn post_stream_plain_fallback(
@@ -1373,6 +1422,20 @@ mod tests {
         assert_eq!(stream["stream"], true);
         assert_eq!(stream["reasoning_effort"], "low");
         assert_eq!(stream["tools"][0]["function"]["name"], "fetch_url");
+        // Failed fetches once stalled the turn on a narrated "I'll
+        // try another source" with no call behind it (same order as
+        // the TypeScript tool definition).
+        let description = stream["tools"][0]["function"]["description"]
+            .as_str()
+            .unwrap_or("");
+        assert!(
+            description.contains("never write that you will fetch without calling"),
+            "tool must order call-don't-narrate"
+        );
+        assert!(
+            description.contains("call again with a different URL instead of stopping"),
+            "tool must order retry-on-failure"
+        );
         assert!(plain_body(&req, &history, true)["stream"] == false);
         assert!(stream_body(&req, &history, false).get("tools").is_none());
     }
@@ -1456,12 +1519,16 @@ mod tests {
     }
 
     fn sse_tool_body(url: &str) -> Vec<u8> {
+        sse_tool_body_as("call_1", url)
+    }
+
+    fn sse_tool_body_as(id: &str, url: &str) -> Vec<u8> {
         let wire = serde_json::json!({
             "choices": [{
                 "delta": {
                     "tool_calls": [{
                         "index": 0,
-                        "id": "call_1",
+                        "id": id,
                         "function": {
                             "name": "fetch_url",
                             "arguments": serde_json::json!({ "url": url }).to_string()
@@ -1480,7 +1547,11 @@ mod tests {
     }
 
     fn json_followup_body() -> Vec<u8> {
-        serde_json::json!({ "choices": [{ "message": { "content": "" } }] })
+        json_followup_body_with("")
+    }
+
+    fn json_followup_body_with(content: &str) -> Vec<u8> {
+        serde_json::json!({ "choices": [{ "message": { "content": content } }] })
             .to_string()
             .into_bytes()
     }
@@ -1593,6 +1664,128 @@ mod tests {
         assert_eq!(bodies.len(), 3);
         assert!(bodies[1].contains("call_1"));
         assert!(bodies[1].contains("page text here"));
+    }
+
+    #[test]
+    fn drive_lands_the_followup_answer_instead_of_reasking() {
+        let bodies = Arc::new(Mutex::new(Vec::new()));
+        let port = run_stub(
+            vec![
+                StubStep::Respond {
+                    status: 200,
+                    content_type: "text/event-stream",
+                    body: sse_tool_body("http://example.test/page"),
+                },
+                StubStep::Respond {
+                    status: 200,
+                    content_type: "application/json",
+                    body: json_followup_body_with("answered from the page"),
+                },
+            ],
+            Arc::clone(&bodies),
+        );
+        let page_fetch: PageFetch = Arc::new(|_url: String| {
+            Box::pin(async move { Ok::<String, String>("page text here".to_string()) })
+                as Pin<Box<dyn Future<Output = Result<String, String>> + Send>>
+        });
+        let rec = Recorder {
+            tokens: Arc::new(Mutex::new(Vec::new())),
+            fetches: Arc::new(Mutex::new(Vec::new())),
+            retries: Arc::new(Mutex::new(0)),
+            retracts: Arc::new(Mutex::new(0)),
+        };
+        let client = reqwest_client().unwrap();
+        let req = test_request(port);
+        let outcome = tauri::async_runtime::block_on(drive_attempts(
+            &client,
+            &req,
+            &page_fetch,
+            &[0],
+            &mut || test_events(&rec),
+        ));
+        match outcome {
+            TurnOutcome::Done(content, _) => {
+                assert_eq!(content, "answered from the page")
+            }
+            other => panic!("expected done, got {other:?}"),
+        }
+        // Two requests, not three: the follow-up's text is emitted as
+        // the reply instead of discarded for a regenerating re-ask.
+        assert_eq!(bodies.lock().unwrap().len(), 2);
+        assert_eq!(
+            *rec.tokens.lock().unwrap(),
+            vec!["answered from the page"]
+        );
+    }
+
+    #[test]
+    fn drive_runs_extra_rounds_when_final_keeps_calling_fetch() {
+        let bodies = Arc::new(Mutex::new(Vec::new()));
+        let port = run_stub(
+            vec![
+                StubStep::Respond {
+                    status: 200,
+                    content_type: "text/event-stream",
+                    body: sse_tool_body("http://a.test/"),
+                },
+                StubStep::Respond {
+                    status: 200,
+                    content_type: "application/json",
+                    body: json_followup_body(),
+                },
+                StubStep::Respond {
+                    status: 200,
+                    content_type: "text/event-stream",
+                    body: sse_tool_body_as("call_2", "http://b.test/"),
+                },
+                StubStep::Respond {
+                    status: 200,
+                    content_type: "text/event-stream",
+                    body: sse_text_body("done after retry"),
+                },
+            ],
+            Arc::clone(&bodies),
+        );
+        let fetched = Arc::new(Mutex::new(Vec::new()));
+        let seen = Arc::clone(&fetched);
+        let page_fetch: PageFetch = Arc::new(move |url: String| {
+            let seen = Arc::clone(&seen);
+            Box::pin(async move {
+                seen.lock().unwrap().push(url);
+                Ok::<String, String>("page text here".to_string())
+            })
+                as Pin<Box<dyn Future<Output = Result<String, String>> + Send>>
+        });
+        let rec = Recorder {
+            tokens: Arc::new(Mutex::new(Vec::new())),
+            fetches: Arc::new(Mutex::new(Vec::new())),
+            retries: Arc::new(Mutex::new(0)),
+            retracts: Arc::new(Mutex::new(0)),
+        };
+        let client = reqwest_client().unwrap();
+        let req = test_request(port);
+        let outcome = tauri::async_runtime::block_on(drive_attempts(
+            &client,
+            &req,
+            &page_fetch,
+            &[0],
+            &mut || test_events(&rec),
+        ));
+        match outcome {
+            TurnOutcome::Done(content, _) => assert_eq!(content, "done after retry"),
+            other => panic!("expected done, got {other:?}"),
+        }
+        assert_eq!(
+            *fetched.lock().unwrap(),
+            vec!["http://a.test/".to_string(), "http://b.test/".to_string()]
+        );
+        assert_eq!(*rec.tokens.lock().unwrap(), vec!["done after retry"]);
+        assert_eq!(*rec.retracts.lock().unwrap(), 2);
+        let bodies = bodies.lock().unwrap();
+        assert_eq!(bodies.len(), 4);
+        // Finals stream WITH tools, so a last retry can act.
+        assert!(bodies[2].contains("fetch_url"), "final must offer tools");
+        assert!(bodies[3].contains("fetch_url"), "final must offer tools");
     }
 
     #[test]

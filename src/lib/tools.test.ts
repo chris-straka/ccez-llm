@@ -28,6 +28,18 @@ describe("fetchToolDef", () => {
 			"The user doesn't know it exists."
 		);
 	});
+	it("orders call-don't-narrate plus retry-on-failure", () => {
+		// Failed fetches once stalled the turn on a narrated "I'll
+		// try another source" with no call behind it: the tool must
+		// order an immediate call and a different URL on failure.
+		const description = fetchToolDef().function.description;
+		expect(description).toContain(
+			"never write that you will fetch without calling"
+		);
+		expect(description).toContain(
+			"call again with a different URL instead of stopping"
+		);
+	});
 });
 
 describe("validFetchUrl", () => {

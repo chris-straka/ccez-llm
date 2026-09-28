@@ -28,6 +28,27 @@ function sseResponse(chunks: string[]): Response {
 	});
 }
 
+function sseToolCall(id: string, url: string): string {
+	return `data: ${JSON.stringify({
+		choices: [
+			{
+				delta: {
+					tool_calls: [
+						{
+							index: 0,
+							id,
+							function: {
+								name: "fetch_url",
+								arguments: JSON.stringify({ url })
+							}
+						}
+					]
+				}
+			}
+		]
+	})}\n\ndata: [DONE]\n\n`;
+}
+
 afterEach(() => {
 	vi.unstubAllGlobals();
 });
@@ -320,6 +341,82 @@ describe("stream", () => {
 			tool_call_id: "call_1",
 			content: "text of https://example.com/"
 		});
+	});
+
+	it("lands the follow-up answer instead of re-asking when it carries no calls", async () => {
+		const fetchMock = vi.fn(async () => {
+			if (fetchMock.mock.calls.length === 1)
+				return sseResponse([sseToolCall("call_1", "https://example.com/")]);
+			return jsonResponse({
+				choices: [{ message: { content: "answered from the page" } }]
+			});
+		});
+		vi.stubGlobal("fetch", fetchMock);
+		const fetchPage = vi.fn(async () => "page text");
+		const provider = new OpenAICompatProvider("probe", CONFIG, { fetchPage });
+		const seen: string[] = [];
+		const result = await provider.stream([{ role: "user", content: "x" }], {
+			onToken: (t) => void seen.push(t)
+		});
+		// Two requests, not three: the follow-up's text is emitted as
+		// the reply instead of discarded for a regenerating re-ask
+		// (which stalled promising retries its tools-off round could
+		// never make).
+		expect(fetchMock.mock.calls.length).toBe(2);
+		expect(result.content).toBe("answered from the page");
+		expect(seen.join("")).toBe("answered from the page");
+	});
+
+	it("runs extra rounds when the final stream keeps calling fetch", async () => {
+		const fetchMock = vi.fn(async (url: string, init: RequestInit) => {
+			const body = JSON.parse(init.body as string) as {
+				stream?: boolean;
+				tools?: unknown;
+			};
+			const n = fetchMock.mock.calls.length;
+			if (n === 1)
+				return sseResponse([sseToolCall("call_1", "https://a.example/")]);
+			if (n === 2) {
+				expect(body.stream).toBe(false);
+				return jsonResponse({ choices: [{ message: { content: "" } }] });
+			}
+			// Finals stream WITH tools, so a last retry can act.
+			expect(body.stream).toBe(true);
+			expect(body.tools).toBeDefined();
+			if (n === 3)
+				return sseResponse([sseToolCall("call_2", "https://b.example/")]);
+			return sseResponse([
+				`data: {"choices":[{"delta":{"content":"done after retry"}}]}\n\ndata: [DONE]\n\n`
+			]);
+		});
+		vi.stubGlobal("fetch", fetchMock);
+		const fetchPage = vi.fn(async (url: string) => `text of ${url}`);
+		const provider = new OpenAICompatProvider("probe", CONFIG, { fetchPage });
+		const seen: string[] = [];
+		let retracted = 0;
+		const events: string[] = [];
+		const result = await provider.stream([{ role: "user", content: "x" }], {
+			onToken: (t) => void seen.push(t),
+			onRoundRetract: () => {
+				retracted += 1;
+			},
+			onFetchStart: (fetchUrl) => void events.push(`start ${fetchUrl}`),
+			onFetchEnd: () => void events.push("end")
+		});
+		expect(fetchPage.mock.calls.map((call) => call[0])).toEqual([
+			"https://a.example/",
+			"https://b.example/"
+		]);
+		expect(result.content).toBe("done after retry");
+		expect(seen.join("")).toBe("done after retry");
+		expect(retracted).toBe(2);
+		expect(events).toEqual([
+			"start https://a.example/",
+			"end",
+			"start https://b.example/",
+			"end"
+		]);
+		expect(fetchMock.mock.calls.length).toBe(4);
 	});
 
 	it("retracts the streamed prefix when the first round calls fetch", async () => {

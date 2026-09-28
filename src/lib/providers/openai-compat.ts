@@ -46,6 +46,9 @@ type WireMessage =
 const MAX_TOOL_ROUNDS = 3;
 /** Fetches executed per round (serially, abort-aware). */
 const MAX_CALLS_PER_ROUND = 3;
+/** Extra streamed rounds when the final answer keeps calling fetch
+ * (each retracts its prefix, runs the calls, and re-streams). */
+const EXTRA_FINAL_ROUNDS = 2;
 
 /**
  * Minimal OpenAI-compatible chat client used by every provider in this app
@@ -338,6 +341,43 @@ export class OpenAICompatProvider implements ChatProvider {
 			.slice(0, MAX_CALLS_PER_ROUND);
 	}
 
+	/**
+	 * One fetch batch run into the history: the assistant tool_calls
+	 * message first, then each page's text (or its one-line failure)
+	 * as a tool result. Abort-aware; the fetch phase brackets each
+	 * page. Shared by the follow-up rounds and the extra final
+	 * rounds below.
+	 */
+	private async runFetchBatch(
+		history: WireMessage[],
+		assistantText: string,
+		pending: Array<{
+			raw: WireToolCall;
+			parsed: { id: string; url: string };
+		}>,
+		callbacks: StreamCallbacks,
+		opts: ChatOptions
+	): Promise<void> {
+		history.push({
+			role: "assistant",
+			content: assistantText,
+			tool_calls: pending.map((entry) => entry.raw)
+		});
+		for (const entry of pending) {
+			if (opts.signal?.aborted) throw new ProviderError("Reply stopped.");
+			callbacks.onFetchStart?.(entry.parsed.url);
+			try {
+				history.push({
+					role: "tool",
+					content: await this.runFetch(entry.parsed, opts.signal),
+					tool_call_id: entry.parsed.id
+				});
+			} finally {
+				callbacks.onFetchEnd?.();
+			}
+		}
+	}
+
 	async stream(
 		messages: ChatMessage[],
 		callbacks: StreamCallbacks,
@@ -346,10 +386,12 @@ export class OpenAICompatProvider implements ChatProvider {
 		// Model-driven lookup: the first request streams WITH tools, so
 		// a no-fetch turn costs exactly one request, like before. When
 		// the model calls fetch_url, the calls run serially into the
-		// history and the answer streams after (follow-up fetches ride
-		// capped non-streaming rounds). Providers that reject `tools`
-		// fall back to a plain turn once; anything else throws exactly
-		// as before.
+		// history (follow-up fetches ride capped non-streaming rounds;
+		// a follow-up that answers with no calls IS the reply) and the
+		// answer streams last — with tools still on, so a last "let me
+		// try another source" can act instead of stalling. Providers
+		// that reject `tools` fall back to a plain turn once; anything
+		// else throws exactly as before.
 		const history: WireMessage[] = [...messages];
 		let first: Awaited<ReturnType<OpenAICompatProvider["streamOnce"]>>;
 		try {
@@ -374,34 +416,44 @@ export class OpenAICompatProvider implements ChatProvider {
 			round < MAX_TOOL_ROUNDS && pending.length > 0;
 			round++
 		) {
-			history.push({
-				role: "assistant",
-				content: assistantText,
-				tool_calls: pending.map((entry) => entry.raw)
-			});
-			for (const entry of pending) {
-				if (opts.signal?.aborted) throw new ProviderError("Reply stopped.");
-				callbacks.onFetchStart?.(entry.parsed.url);
-				try {
-					history.push({
-						role: "tool",
-						content: await this.runFetch(entry.parsed, opts.signal),
-						tool_call_id: entry.parsed.id
-					});
-				} finally {
-					callbacks.onFetchEnd?.();
-				}
-			}
+			await this.runFetchBatch(
+				history,
+				assistantText,
+				pending,
+				callbacks,
+				opts
+			);
 			// Follow-up fetches ride capped non-streaming rounds; the
-			// answer itself always streams last.
+			// answer itself always streams last (or lands here when a
+			// follow-up answers with no calls left to make).
 			if (round + 1 >= MAX_TOOL_ROUNDS) break;
 			const follow = await this.complete(history, opts, true);
 			if (follow.usage) usage = follow.usage;
 			assistantText = follow.content;
 			pending = this.executableCalls(follow.calls);
+			if (pending.length === 0 && assistantText !== "") {
+				// The follow-up is the answer (no more calls): emit it
+				// as the reply instead of discarding it and re-asking —
+				// the re-ask regenerated blind and stalled promising
+				// retries it could never make (its tools were off).
+				callbacks.onToken(assistantText);
+				return { content: assistantText, usage };
+			}
 		}
-		const final = await this.streamOnce(history, callbacks, opts, false);
-		return { content: final.content, usage: final.usage ?? usage };
+		// The final answer streams WITH tools: after failed fetches the
+		// model often wants one more source, and with tools off that
+		// promise always stalled. Calls here run bounded extra rounds
+		// (retract the prefix, fetch, re-stream) before the reply must
+		// land.
+		for (let extra = 0; ; extra++) {
+			const final = await this.streamOnce(history, callbacks, opts, true);
+			const more = this.executableCalls(final.calls);
+			if (more.length === 0 || extra >= EXTRA_FINAL_ROUNDS)
+				return { content: final.content, usage: final.usage ?? usage };
+			callbacks.onRoundRetract?.();
+			if (final.usage) usage = final.usage;
+			await this.runFetchBatch(history, final.content, more, callbacks, opts);
+		}
 	}
 
 	/**

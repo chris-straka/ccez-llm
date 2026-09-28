@@ -38,7 +38,9 @@ export function fetchToolDef(): FetchToolDef {
 				"Do not use it when no external information is required. It returns the page text " +
 				"(truncated when long) or a one-line error — never raw HTML. " +
 				"RSS/Atom feeds work too and are the best route to recent news: a feed returns its latest " +
-				"headlines as one line each. Prefer a feed URL you know for the outlet asked about.",
+				"headlines as one line each. Prefer a feed URL you know for the outlet asked about. " +
+				"Call it at once when you need a page — never write that you will fetch without calling. " +
+				"When a fetch fails, call again with a different URL instead of stopping.",
 			parameters: {
 				type: "object",
 				properties: {
