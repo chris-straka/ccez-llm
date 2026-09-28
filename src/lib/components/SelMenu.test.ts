@@ -53,4 +53,13 @@ describe("selection menu extraction", () => {
 		expect(css).toContain(".sel-menu.sel-menu-drag");
 		expect(pageStyle()).not.toMatch(/\.sel-menu\s*\{/);
 	});
+
+	it("fades in fast and dismisses on the app beat", () => {
+		// The summon must read instant (80ms intro); the dismiss
+		// keeps the shared 150ms fade so it never pops.
+		const source = selMenuSource();
+		expect(source).toContain("in:fade={{ duration: 80 }}");
+		expect(source).toContain("out:fade={{ duration: 150 }}");
+		expect(source).not.toContain("transition:fade");
+	});
 });

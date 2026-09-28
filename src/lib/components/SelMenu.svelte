@@ -67,6 +67,8 @@ can't be suppressed, so a floating menu would double it. -->
 	}: Props = $props();
 </script>
 
+<!-- Intro lands fast (80ms — the summon must read instant);
+the dismiss keeps the 150ms app beat so it never pops. -->
 <div
 	class="sel-menu"
 	class:sel-menu-drag={dragging}
@@ -74,7 +76,8 @@ can't be suppressed, so a floating menu would double it. -->
 	style="left: {menu.x}px; top: {menu.y}px"
 	role="menu"
 	tabindex="-1"
-	transition:fade={{ duration: 150 }}
+	in:fade={{ duration: 80 }}
+	out:fade={{ duration: 150 }}
 	onmousedown={actions.press}
 	ontouchstart={(e) => {
 		actions.press();
