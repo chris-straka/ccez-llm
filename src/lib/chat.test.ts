@@ -37,6 +37,14 @@ import {
 	REPLY_STALL_MS,
 	apiContent,
 	buildApiMessages,
+	selectHistoryWindow,
+	refreshChatSummary,
+	buildSummaryRefreshMessages,
+	renderFoldText,
+	summaryBlock,
+	estimateTokens,
+	HISTORY_WINDOW_CHARS,
+	MIN_VERBATIM_MESSAGES,
 	isSending,
 	hasReplyStarted,
 	hasFetchActive,
@@ -47,6 +55,7 @@ import {
 	type ChatId
 } from "./chat";
 import type {
+	ChatMessage,
 	ChatProvider,
 	ChatResult,
 	StreamCallbacks
@@ -1249,5 +1258,305 @@ describe("messageIndexFromId", () => {
 		expect(messageIndexFromId("msg-3", 3)).toBeNull();
 		expect(messageIndexFromId("msg-x", 3)).toBeNull();
 		expect(messageIndexFromId("other-1", 3)).toBeNull();
+	});
+});
+
+describe("history compaction", () => {
+	function seedTurns(state: ChatState, turns: number, chars: number): void {
+		const chat = activeChat(state);
+		for (let i = 0; i < turns; i++) {
+			chat.messages = [
+				...chat.messages,
+				{
+					id: newChatMsgId(),
+					role: "user",
+					content: `u${i} ${"x".repeat(chars)}`,
+					usage: null,
+					error: null
+				},
+				{
+					id: newChatMsgId(),
+					role: "assistant",
+					content: `a${i} ${"y".repeat(chars)}`,
+					usage: null,
+					error: null
+				}
+			];
+		}
+	}
+
+	function countingProvider(summary: string): {
+		provider: ChatProvider;
+		chats: ChatMessage[][];
+		streams: ChatMessage[][];
+	} {
+		const chats: ChatMessage[][] = [];
+		const streams: ChatMessage[][] = [];
+		const usage = { prompt: 1, completion: 1, total: 2 };
+		return {
+			provider: {
+				id: "counting",
+				async chat(messages): Promise<ChatResult> {
+					chats.push(messages);
+					return { content: summary, usage };
+				},
+				async stream(messages, callbacks): Promise<ChatResult> {
+					streams.push(messages);
+					callbacks.onToken("hi");
+					return { content: "hi", usage };
+				}
+			},
+			chats,
+			streams
+		};
+	}
+
+	it("estimates tokens at chars/4, rounded up", () => {
+		expect(estimateTokens("")).toBe(0);
+		expect(estimateTokens("abcd")).toBe(1);
+		expect(estimateTokens("abcde")).toBe(2);
+	});
+
+	it("keeps small chats whole with no fold", () => {
+		const { state } = stateWith(freshStore());
+		seedTurns(state, 3, 10);
+		const chat = activeChat(state);
+		const window = selectHistoryWindow(chat);
+		expect(window.summary).toBeNull();
+		expect(window.turns.map((m) => m.id)).toEqual(
+			chat.messages.map((m) => m.id)
+		);
+		expect(window.fold).toEqual([]);
+	});
+
+	it("windows large chats newest-first and folds the oldest", () => {
+		const { state } = stateWith(freshStore());
+		seedTurns(state, 10, 4000);
+		const chat = activeChat(state);
+		const window = selectHistoryWindow(chat);
+		// No overlap, fold strictly older than turns (a dropped
+		// middle may sit between them on giant histories — it folds
+		// on later sends).
+		const turnIds = new Set(window.turns.map((m) => m.id));
+		const foldIds = window.fold.map((m) => m.id);
+		expect(foldIds.length).toBeGreaterThan(0);
+		expect(foldIds.every((id) => !turnIds.has(id))).toBe(true);
+		const firstTurn = chat.messages.findIndex(
+			(m) => m.id === window.turns[0]?.id
+		);
+		const lastFold = chat.messages.findIndex(
+			(m) => m.id === foldIds[foldIds.length - 1]
+		);
+		expect(lastFold).toBeLessThan(firstTurn);
+		// Window bounded, newest kept.
+		const chars = window.turns.reduce((n, m) => n + m.content.length, 0);
+		expect(chars).toBeLessThanOrEqual(HISTORY_WINDOW_CHARS);
+		expect(window.turns[window.turns.length - 1]?.content).toContain("a9");
+	});
+
+	it("always keeps the floor count verbatim, however large", () => {
+		const { state } = stateWith(freshStore());
+		seedTurns(state, 1, HISTORY_WINDOW_CHARS);
+		const untouchable = selectHistoryWindow(activeChat(state));
+		// Two giant messages: both stay, nothing folds (chat cap,
+		// never per-message).
+		expect(untouchable.turns).toHaveLength(2);
+		expect(untouchable.fold).toEqual([]);
+		seedTurns(state, 2, HISTORY_WINDOW_CHARS);
+		const floored = selectHistoryWindow(activeChat(state));
+		expect(floored.turns).toHaveLength(MIN_VERBATIM_MESSAGES);
+		// One giant per round (each counts capped at the fold
+		// budget): the watermark still advances instead of wedging.
+		expect(floored.fold).toHaveLength(1);
+	});
+
+	it("resumes after the watermark and heals an orphaned one", () => {
+		const { state } = stateWith(freshStore());
+		seedTurns(state, 3, 10);
+		const chat = activeChat(state);
+		const through = chat.messages[1]?.id;
+		if (!through) throw new Error("seed failed");
+		chat.summary = "old stuff";
+		chat.summaryThrough = through;
+		const resumed = selectHistoryWindow(chat);
+		expect(resumed.summary).toBe("old stuff");
+		expect(resumed.turns.map((m) => m.id)).toEqual(
+			chat.messages.slice(2).map((m) => m.id)
+		);
+		// Watermark id gone (deleted, truncated): the orphaned
+		// summary drops and the full history is eligible again —
+		// lossless, since compaction never deletes messages.
+		chat.summaryThrough = newChatMsgId();
+		const healed = selectHistoryWindow(chat);
+		expect(healed.summary).toBeNull();
+		expect(healed.turns).toHaveLength(chat.messages.length);
+	});
+
+	it("excludes the live placeholder and failed replies", () => {
+		const { state } = stateWith(freshStore());
+		seedTurns(state, 3, 10);
+		const chat = activeChat(state);
+		const last = chat.messages[chat.messages.length - 1];
+		if (!last) throw new Error("seed failed");
+		const window = selectHistoryWindow(chat, last.id);
+		expect(window.turns.map((m) => m.id)).not.toContain(last.id);
+		expect(window.fold.map((m) => m.id)).not.toContain(last.id);
+		const failed = chat.messages[0];
+		if (!failed || failed.role !== "user") throw new Error("seed failed");
+		const failedReply = chat.messages[1];
+		if (!failedReply) throw new Error("seed failed");
+		chat.messages = chat.messages.map((m) =>
+			m.id === failedReply.id ? { ...m, error: "boom" } : m
+		);
+		const dropped = selectHistoryWindow(activeChat(state));
+		expect(dropped.turns.map((m) => m.id)).not.toContain(failedReply.id);
+	});
+
+	it("sends the summary as a labeled second system message", () => {
+		const { state } = stateWith(freshStore());
+		seedTurns(state, 2, 10);
+		const chat = activeChat(state);
+		const api = buildApiMessages(chat, "sys");
+		expect(api.map((m) => m.role)).toEqual([
+			"system",
+			"user",
+			"assistant",
+			"user",
+			"assistant"
+		]);
+		const through = chat.messages[1]?.id;
+		if (!through) throw new Error("seed failed");
+		chat.summary = "old stuff";
+		chat.summaryThrough = through;
+		const compacted = buildApiMessages(chat, "sys");
+		expect(compacted.map((m) => m.role)).toEqual([
+			"system",
+			"system",
+			"user",
+			"assistant"
+		]);
+		expect(compacted[1]).toEqual({
+			role: "system",
+			content: summaryBlock("old stuff")
+		});
+		expect(summaryBlock("old stuff")).toContain("old stuff");
+	});
+
+	it("renders fold turns as labeled lines for the refresh call", () => {
+		const { state } = stateWith(freshStore());
+		seedTurns(state, 1, 0);
+		const chat = activeChat(state);
+		expect(renderFoldText(chat.messages)).toBe("User: u0 \n\nAssistant: a0 ");
+		const messages = buildSummaryRefreshMessages(null, "folded");
+		expect(messages).toHaveLength(2);
+		expect(messages[1]?.content).toBe("folded");
+		const merged = buildSummaryRefreshMessages("prior", "folded");
+		expect(merged[1]?.content).toContain("Previous summary:\nprior");
+		expect(merged[1]?.content).toContain("More history:\nfolded");
+		expect(messages[0]?.content).toContain("400 words");
+	});
+
+	it("refreshes once on overflow and persists summary plus watermark", async () => {
+		const store = freshStore();
+		const { state } = stateWith(store);
+		seedTurns(state, 10, 4000);
+		const { provider, chats } = countingProvider("  fresh summary  ");
+		await refreshChatSummary(state, activeChat(state), provider, {}, store);
+		expect(chats).toHaveLength(1);
+		expect(chats[0]).toHaveLength(2);
+		const chat = activeChat(state);
+		expect(chat.summary).toBe("fresh summary");
+		const through = chat.summaryThrough;
+		expect(through).toBeDefined();
+		const persisted = JSON.parse(
+			store.data.get("ccez-llm-chats-v1") ?? "[]"
+		) as Array<{ summary?: string }>;
+		expect(persisted[0]?.summary).toBe("fresh summary");
+		// Giant histories converge over refreshes, then go quiet (no
+		// call once the watermark covers everything past the window).
+		await refreshChatSummary(state, activeChat(state), provider, {});
+		await refreshChatSummary(state, activeChat(state), provider, {});
+		expect(chats).toHaveLength(2);
+		expect(chat.summaryThrough).not.toBe(through);
+	});
+
+	it("never calls for chats under the cap", async () => {
+		const { state } = stateWith(freshStore());
+		seedTurns(state, 2, 10);
+		const { provider, chats } = countingProvider("unused");
+		await refreshChatSummary(state, activeChat(state), provider, {});
+		expect(chats).toHaveLength(0);
+		expect(activeChat(state).summary).toBeUndefined();
+	});
+
+	it("fails silent so the send still goes out windowed", async () => {
+		const { state, store } = stateWith(freshStore());
+		seedTurns(state, 10, 4000);
+		const failing: ChatProvider = {
+			id: "failing",
+			async chat(): Promise<ChatResult> {
+				throw new Error("down");
+			},
+			async stream(_messages, callbacks): Promise<ChatResult> {
+				callbacks.onToken("hi");
+				return {
+					content: "hi",
+					usage: { prompt: 1, completion: 1, total: 2 }
+				};
+			}
+		};
+		await refreshChatSummary(state, activeChat(state), failing, {});
+		expect(activeChat(state).summary).toBeUndefined();
+		// And the full send still lands (bounded fallback).
+		await sendMessage(state, failing, "sys", "again", {}, store);
+		const messages = activeChat(state).messages;
+		expect(messages[messages.length - 1]?.content).toBe("hi");
+		expect(messages[messages.length - 1]?.error).toBeNull();
+	});
+
+	it("rethrows a stop instead of swallowing it", async () => {
+		const { state } = stateWith(freshStore());
+		seedTurns(state, 10, 4000);
+		const controller = new AbortController();
+		controller.abort();
+		const aborting: ChatProvider = {
+			id: "aborting",
+			async chat(): Promise<ChatResult> {
+				throw new DOMException("aborted", "AbortError");
+			},
+			async stream(_messages, callbacks): Promise<ChatResult> {
+				callbacks.onToken("hi");
+				return {
+					content: "hi",
+					usage: { prompt: 1, completion: 1, total: 2 }
+				};
+			}
+		};
+		await expect(
+			refreshChatSummary(state, activeChat(state), aborting, {
+				signal: controller.signal
+			})
+		).rejects.toThrow();
+		expect(activeChat(state).summary).toBeUndefined();
+	});
+
+	it("sends overflowed chats with the fresh summary ahead of the window", async () => {
+		const { state, store } = stateWith(freshStore());
+		seedTurns(state, 10, 4000);
+		const { provider, chats, streams } = countingProvider("rolled up");
+		await sendMessage(state, provider, "sys", "one more", {}, store);
+		expect(chats).toHaveLength(1);
+		expect(streams).toHaveLength(1);
+		const sent = streams[0] ?? [];
+		expect(sent[0]).toEqual({ role: "system", content: "sys" });
+		expect(sent[1]).toEqual({
+			role: "system",
+			content: summaryBlock("rolled up")
+		});
+		// Oldest turns folded out of the verbatim window.
+		const text = JSON.stringify(sent);
+		expect(text).not.toContain("u0 xxxx");
+		expect(text).toContain("one more");
+		expect(activeChat(state).summary).toBe("rolled up");
 	});
 });

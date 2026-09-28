@@ -2,6 +2,10 @@ import { invoke } from "@tauri-apps/api/core";
 import {
 	apiContent,
 	persistChats,
+	renderFoldText,
+	selectHistoryWindow,
+	summaryBlock,
+	type Chat,
 	type ChatId,
 	type ChatMsgId,
 	type ChatMsg,
@@ -46,6 +50,10 @@ export interface NativeTurnFile {
 	content: string;
 	error?: string | undefined;
 	usage?: NativeTurnUsage | undefined;
+	/** Refreshed rolling summary (present only when this turn folded). */
+	summary?: string | undefined;
+	/** Watermark id the refreshed summary covers. */
+	summary_through?: string | undefined;
 	finished_at: number;
 }
 
@@ -150,6 +158,53 @@ export function turnHistory(
 	return out;
 }
 
+/**
+ * One native turn's history: windowed turns (summary block first when
+ * a prior summary stands and no fold is pending) plus the fold inputs
+ * the Rust runner resolves before its first POST. Pure over the chat.
+ */
+export interface NativeHistoryInput {
+	messages: Array<{ role: string; content: string }>;
+	priorSummary: string;
+	foldText: string;
+	foldThrough: string;
+}
+
+/**
+ * History for one native turn: the shared window rule (failed replies
+ * and the live placeholder never send), the prior summary as a system
+ * block when no fold is pending, and the fold text plus watermark for
+ * the runner to refresh first. When a fold IS pending the messages
+ * carry no summary block — Rust inserts the freshly resolved one
+ * (prior on refresh failure), so the history never holds two.
+ */
+export function nativeHistoryInput(
+	chat: Chat | undefined,
+	excludeId: ChatMsgId | null
+): NativeHistoryInput {
+	const empty: NativeHistoryInput = {
+		messages: [],
+		priorSummary: "",
+		foldText: "",
+		foldThrough: ""
+	};
+	if (!chat) return empty;
+	const { summary, turns, fold } = selectHistoryWindow(
+		chat,
+		excludeId ?? undefined
+	);
+	const messages = turnHistory(turns);
+	if (summary && fold.length === 0)
+		messages.unshift({ role: "system", content: summaryBlock(summary) });
+	const newest = fold.length > 0 ? fold[fold.length - 1] : undefined;
+	return {
+		messages,
+		priorSummary: summary ?? "",
+		foldText: fold.length > 0 ? renderFoldText(fold) : "",
+		foldThrough: newest ? newest.id : ""
+	};
+}
+
 /** Copy for turns a dead process left behind (boot/return scan). */
 export const INTERRUPTED_COPY =
 	"Reply interrupted — the app closed before it finished.";
@@ -192,6 +247,17 @@ export function applyTurnFile(
 				? { ...m, error: file.error ?? "Reply failed." }
 				: m
 		);
+	}
+	// A refreshed summary rides along even on errors — the fold work
+	// stands — and persists with the chat.
+	if (
+		typeof file.summary === "string" &&
+		file.summary.length > 0 &&
+		typeof file.summary_through === "string" &&
+		file.summary_through.length > 0
+	) {
+		chat.summary = file.summary;
+		chat.summaryThrough = file.summary_through as ChatMsgId;
 	}
 	persistChats(state, store);
 	return "applied";
@@ -255,6 +321,12 @@ export async function startNativeTurn(req: {
 	extraBody: unknown;
 	system: string;
 	messages: Array<{ role: string; content: string }>;
+	/** Prior rolling summary ("" when none): stands unless a fold refreshes it. */
+	priorSummary: string;
+	/** Rendered overflow for the runner to fold ("" when no fold pending). */
+	foldText: string;
+	/** Watermark id the fold covers ("" when no fold pending). */
+	foldThrough: string;
 }): Promise<string> {
 	return invoke<string>("turn_start", {
 		req: {
@@ -266,7 +338,10 @@ export async function startNativeTurn(req: {
 			model: req.model,
 			extra_body: req.extraBody,
 			system: req.system,
-			messages: req.messages
+			messages: req.messages,
+			prior_summary: req.priorSummary,
+			fold_text: req.foldText,
+			fold_through: req.foldThrough
 		}
 	});
 }

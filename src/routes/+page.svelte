@@ -306,10 +306,11 @@
 		resumableKilledTurn,
 		scanNativeTurns,
 		frontendPingOnDone,
+		nativeHistoryInput,
 		seenNativeTurn,
 		startNativeTurn,
 		stopNativeTurn,
-		turnHistory,
+		type NativeHistoryInput,
 		type NativeTurnConfig,
 		type NativeTurnFile,
 		type NativeTurnOwnership,
@@ -7331,7 +7332,7 @@
 		replyId: ChatMsgId,
 		config: NativeTurnConfig,
 		system: string,
-		history: Array<{ role: string; content: string }>
+		history: NativeHistoryInput
 	): Promise<void> {
 		const turnId = crypto.randomUUID() as TurnId;
 		nativeTurns.set(turnId, { chatId, replyId });
@@ -7347,7 +7348,10 @@
 				model: config.model,
 				extraBody: config.extraBody,
 				system,
-				messages: history
+				messages: history.messages,
+				priorSummary: history.priorSummary,
+				foldText: history.foldText,
+				foldThrough: history.foldThrough
 			});
 		} catch {
 			// The spawn itself failed: settle locally as a failed turn
@@ -7389,9 +7393,7 @@
 		// A duplicate send racing in: the first one owns the chat.
 		if (!opened) return;
 		const target = chatState.chats.find((c) => c.id === opened.chatId);
-		const history = turnHistory(
-			(target?.messages ?? []).filter((m) => m.id !== opened.replyId)
-		);
+		const history = nativeHistoryInput(target, opened.replyId);
 		if (stuck) scrollAfterRender();
 		await startNativeTurnFor(
 			opened.chatId,
@@ -7520,9 +7522,7 @@
 		// instead of erroring.
 		const config = nativeRoute(prev.attachments ?? []);
 		if (!config) return false;
-		const history = turnHistory(
-			target.messages.filter((m) => m.id !== last.id)
-		);
+		const history = nativeHistoryInput(target, last.id);
 		chatState.sendingChatIds = [...chatState.sendingChatIds, target.id];
 		chatState.sending = true;
 		chatState.sendingChatId = target.id;
@@ -7763,11 +7763,7 @@
 			const resendTarget = chatState.chats.find(
 				(c) => c.id === reopened.chatId
 			);
-			const resendHistory = turnHistory(
-				(resendTarget?.messages ?? []).filter(
-					(m) => m.id !== reopened.replyId
-				)
-			);
+			const resendHistory = nativeHistoryInput(resendTarget, reopened.replyId);
 			if (stuck) scrollAfterRender();
 			await startNativeTurnFor(
 				reopened.chatId,

@@ -20,6 +20,7 @@ import {
 	seenNativeTurn,
 	startNativeTurn,
 	stopNativeTurn,
+	nativeHistoryInput,
 	turnHistory,
 	type NativeTurnFile
 } from "./turns";
@@ -144,6 +145,71 @@ describe("turnHistory", () => {
 	});
 });
 
+describe("nativeHistoryInput", () => {
+	function bigChat(turns: number): ReturnType<typeof stateWithMessages> {
+		const messages: ChatMsg[] = [];
+		for (let i = 0; i < turns; i++) {
+			messages.push(msg(`u${i}`, "user", `u${i} ${"x".repeat(4000)}`));
+			messages.push(msg(`a${i}`, "assistant", `a${i} ${"y".repeat(4000)}`));
+		}
+		return stateWithMessages(messages);
+	}
+
+	it("sends small chats whole with no fold inputs", () => {
+		const seeded = stateWithMessages([
+			msg("u1", "user", "hi"),
+			msg("r1", "assistant", "")
+		]);
+		const input = nativeHistoryInput(
+			seeded.state.chats[0],
+			"r1" as ChatMsg["id"]
+		);
+		expect(input.messages).toEqual([{ role: "user", content: "hi" }]);
+		expect(input.priorSummary).toBe("");
+		expect(input.foldText).toBe("");
+		expect(input.foldThrough).toBe("");
+	});
+
+	it("returns empty inputs for a missing chat", () => {
+		expect(nativeHistoryInput(undefined, null)).toEqual({
+			messages: [],
+			priorSummary: "",
+			foldText: "",
+			foldThrough: ""
+		});
+	});
+
+	it("leads with the prior summary block when no fold is pending", () => {
+		const seeded = stateWithMessages([
+			msg("u1", "user", "hi"),
+			msg("a1", "assistant", "there")
+		]);
+		const chat = seeded.state.chats[0]!;
+		chat.summary = "old stuff";
+		chat.summaryThrough = "a1" as ChatMsg["id"];
+		const input = nativeHistoryInput(chat, null);
+		// Watermark covers everything: no turns, just the block.
+		expect(input.messages).toHaveLength(1);
+		expect(input.messages[0]?.role).toBe("system");
+		expect(input.messages[0]?.content).toContain("old stuff");
+		expect(input.priorSummary).toBe("old stuff");
+		expect(input.foldText).toBe("");
+	});
+
+	it("passes fold inputs and no summary block when a fold is pending", () => {
+		const seeded = bigChat(10);
+		const input = nativeHistoryInput(seeded.state.chats[0], null);
+		// Rust inserts the resolved summary itself, so the messages
+		// must not already carry one (never two blocks).
+		expect(input.messages[0]?.role).not.toBe("system");
+		expect(input.priorSummary).toBe("");
+		expect(input.foldText).toContain("User: u0");
+		expect(input.foldText).not.toContain("u9 xxxx");
+		// Watermark: the newest folded message (7 oldest of 20).
+		expect(input.foldThrough).toBe("u3");
+	});
+});
+
 describe("applyTurnFile", () => {
 	const file = (
 		status: string,
@@ -206,6 +272,54 @@ describe("applyTurnFile", () => {
 				seeded.store
 			)
 		).toBe("missing");
+	});
+
+	it("persists a refreshed summary with its watermark", () => {
+		const seeded = stateWithPlaceholder();
+		expect(
+			applyTurnFile(
+				seeded.state,
+				{
+					...file("done", "hello"),
+					summary: "rolled up",
+					summary_through: "u1"
+				},
+				seeded.store
+			)
+		).toBe("applied");
+		const chat = seeded.state.chats[0]!;
+		expect(chat.summary).toBe("rolled up");
+		expect(chat.summaryThrough).toBe("u1");
+		const persisted = JSON.parse(
+			seeded.store.data.get("ccez-llm-chats-v1") ?? "[]"
+		) as Array<{ summary?: string }>;
+		expect(persisted[0]?.summary).toBe("rolled up");
+	});
+
+	it("keeps the fold work even when the turn itself failed", () => {
+		const seeded = stateWithPlaceholder();
+		expect(
+			applyTurnFile(
+				seeded.state,
+				{
+					...file("error", "", "boom"),
+					summary: "rolled up",
+					summary_through: "u1"
+				},
+				seeded.store
+			)
+		).toBe("applied");
+		expect(seeded.state.chats[0]!.messages[1]?.error).toBe("boom");
+		expect(seeded.state.chats[0]!.summary).toBe("rolled up");
+	});
+
+	it("leaves the summary alone when the file carries none", () => {
+		const seeded = stateWithPlaceholder();
+		seeded.state.chats[0]!.summary = "old";
+		expect(
+			applyTurnFile(seeded.state, file("done", "hello"), seeded.store)
+		).toBe("applied");
+		expect(seeded.state.chats[0]!.summary).toBe("old");
 	});
 });
 
@@ -307,7 +421,10 @@ describe("invoke wrappers", () => {
 				model: "m",
 				extraBody: {},
 				system: "sys",
-				messages: [{ role: "user", content: "hi" }]
+				messages: [{ role: "user", content: "hi" }],
+				priorSummary: "old",
+				foldText: "folded",
+				foldThrough: "m9"
 			})
 		).resolves.toBe("t1");
 		expect(mockInvoke).toHaveBeenCalledWith("turn_start", {
@@ -320,7 +437,10 @@ describe("invoke wrappers", () => {
 				model: "m",
 				extra_body: {},
 				system: "sys",
-				messages: [{ role: "user", content: "hi" }]
+				messages: [{ role: "user", content: "hi" }],
+				prior_summary: "old",
+				fold_text: "folded",
+				fold_through: "m9"
 			}
 		});
 	});

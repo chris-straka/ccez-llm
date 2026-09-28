@@ -76,6 +76,16 @@ pub struct TurnRequest {
     pub extra_body: serde_json::Value,
     pub system: String,
     pub messages: Vec<TurnWireMessage>,
+    /// Rolling-summary inputs, computed by the page's shared window
+    /// rule (`nativeHistoryInput`): the prior summary ("" when none)
+    /// plus the overflow fold to refresh first ("" when no fold is
+    /// pending). Defaulted so older senders still parse.
+    #[serde(default)]
+    pub prior_summary: String,
+    #[serde(default)]
+    pub fold_text: String,
+    #[serde(default)]
+    pub fold_through: String,
 }
 
 /// Finished-turn file: the contract the returning page polls.
@@ -90,6 +100,13 @@ pub struct TurnFile {
     pub error: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub usage: Option<TurnUsage>,
+    /// Refreshed rolling summary plus the watermark id it covers:
+    /// present only when this turn folded (even on failed turns —
+    /// the fold work stands). The page persists both onto the chat.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary_through: Option<String>,
     pub finished_at: u64,
 }
 
@@ -227,6 +244,67 @@ fn fetch_error_copy(code: &str) -> String {
             "That page is too large.".to_string()
         }
         _ => "That page couldn't be fetched.".to_string(),
+    }
+}
+
+/// Stored summary cap (chars): mirrors `MAX_SUMMARY_CHARS` in chat.ts.
+const MAX_SUMMARY_CHARS: usize = 2500;
+
+/// Refresh instruction: mirrors `buildSummaryRefreshMessages` in
+/// chat.ts (the 400 words mirror `SUMMARY_WORDS`) — both engines
+/// fold overflow into the same shape.
+const SUMMARY_REFRESH_SYSTEM: &str = "Summarize the earlier part of an ongoing chat so a future reply can use it as context. Keep names, decisions, open questions, and language-learning goals. Third person, at most 400 words, plain prose.";
+
+/// Summary as the model reads it: mirrors `summaryBlock` in chat.ts
+/// — keep the marker text identical.
+fn summary_block(summary: &str) -> String {
+    format!("Earlier in this chat (summarized for context, not verbatim):\n{summary}")
+}
+
+/// Refresh user text: mirrors the second message of
+/// `buildSummaryRefreshMessages` in chat.ts.
+fn refresh_user_text(prior: &str, fold: &str) -> String {
+    if prior.is_empty() {
+        fold.to_string()
+    } else {
+        format!("Previous summary:\n{prior}\n\nMore history:\n{fold}")
+    }
+}
+
+/// One refreshed summary plus the watermark id it covers, for the
+/// result file (the page persists both onto the chat).
+struct SummaryRefresh {
+    text: String,
+    through: String,
+}
+
+/// Rolling-summary resolve, once per turn (not per attempt): when the
+/// page folded overflowed history, one non-streaming POST merges it
+/// into a fresh summary; otherwise the prior text stands. A failed
+/// refresh falls back to the prior summary — the turn still runs
+/// windowed — so only the (to_use, refreshed) pair escapes.
+async fn resolve_summary(
+    client: &reqwest::Client,
+    req: &TurnRequest,
+) -> (String, Option<String>) {
+    if req.fold_text.is_empty() {
+        return (req.prior_summary.clone(), None);
+    }
+    let history = vec![
+        wire_message("system", SUMMARY_REFRESH_SYSTEM),
+        wire_message("user", &refresh_user_text(&req.prior_summary, &req.fold_text)),
+    ];
+    match post_plain(client, req, &history, false).await {
+        Ok((content, _, _)) => {
+            let trimmed = content.trim();
+            if trimmed.is_empty() {
+                (req.prior_summary.clone(), None)
+            } else {
+                let capped: String = trimmed.chars().take(MAX_SUMMARY_CHARS).collect();
+                (capped.clone(), Some(capped))
+            }
+        }
+        Err(_) => (req.prior_summary.clone(), None),
     }
 }
 
@@ -621,12 +699,20 @@ async fn run_fetch_batch(
 async fn run_attempt(
     client: &reqwest::Client,
     req: &TurnRequest,
+    summary: &str,
     page_fetch: &PageFetch,
     ev: &mut AttemptEvents,
 ) -> Result<(String, Option<TurnUsage>), AttemptEnd> {
     let deadline = Instant::now() + Duration::from_secs(ATTEMPT_DEADLINE_SECS);
     let mut history: Vec<serde_json::Value> = Vec::new();
     history.push(wire_message("system", &req.system));
+    // Resolved rolling summary (same position as the TypeScript
+    // engine's second system message): the page sends windowed turns
+    // plus, when a fold was pending, no block at all — the resolved
+    // text here is the only summary the history ever holds.
+    if !summary.is_empty() {
+        history.push(wire_message("system", &summary_block(summary)));
+    }
     for message in &req.messages {
         history.push(wire_message(&message.role, &message.content));
     }
@@ -922,19 +1008,50 @@ async fn run_turn(app: AppHandle, req: TurnRequest, page_fetch: PageFetch) {
         // backoff) lands on the next chunk check without re-wiring.
         stop: Arc::clone(&live.stop),
     };
+    // Rolling summary, resolved once per turn (not per attempt):
+    // a pending fold costs one short refresh POST before the first
+    // attempt; a stop on either side of it stays a clean stop. The
+    // refresh rides every finish below — fold work stands even when
+    // the turn itself fails, so the retry inherits it.
+    let mut refreshed: Option<SummaryRefresh> = None;
     let outcome = match reqwest_client() {
-        Ok(client) => drive_attempts(&client, &req, &page_fetch, &BACKOFF_SECS, &mut make_events).await,
+        Ok(client) => {
+            if live.stop.load(Ordering::Relaxed) {
+                TurnOutcome::Stopped
+            } else {
+                let (summary, fresh) = resolve_summary(&client, &req).await;
+                if let Some(text) = fresh {
+                    refreshed = Some(SummaryRefresh {
+                        text,
+                        through: req.fold_through.clone(),
+                    });
+                }
+                if live.stop.load(Ordering::Relaxed) {
+                    TurnOutcome::Stopped
+                } else {
+                    drive_attempts(
+                        &client,
+                        &req,
+                        &summary,
+                        &page_fetch,
+                        &BACKOFF_SECS,
+                        &mut make_events,
+                    )
+                    .await
+                }
+            }
+        }
         Err(error) => TurnOutcome::Failed(error),
     };
     match outcome {
         TurnOutcome::Done(content, usage) => {
-            finish_turn(&app, &req, &live, Ok((content, usage))).await;
+            finish_turn(&app, &req, &live, Ok((content, usage)), refreshed).await;
         }
         TurnOutcome::Stopped => {
-            finish_turn(&app, &req, &live, Err("Reply stopped.".to_string())).await;
+            finish_turn(&app, &req, &live, Err("Reply stopped.".to_string()), refreshed).await;
         }
         TurnOutcome::Failed(error) => {
-            finish_turn(&app, &req, &live, Err(error)).await;
+            finish_turn(&app, &req, &live, Err(error), refreshed).await;
         }
     }
 }
@@ -952,6 +1069,7 @@ enum TurnOutcome {
 async fn drive_attempts(
     client: &reqwest::Client,
     req: &TurnRequest,
+    summary: &str,
     page_fetch: &PageFetch,
     backoff: &[u64],
     make_events: &mut (dyn FnMut() -> AttemptEvents + Send),
@@ -960,7 +1078,7 @@ async fn drive_attempts(
     loop {
         attempt += 1;
         let mut ev = make_events();
-        match run_attempt(client, req, page_fetch, &mut ev).await {
+        match run_attempt(client, req, summary, page_fetch, &mut ev).await {
             Ok((content, usage)) => return TurnOutcome::Done(content, usage),
             Err(AttemptEnd::Stopped) => return TurnOutcome::Stopped,
             Err(AttemptEnd::Fatal(error)) => return TurnOutcome::Failed(error),
@@ -990,10 +1108,15 @@ async fn finish_turn(
     req: &TurnRequest,
     live: &TurnLive,
     outcome: Result<(String, Option<TurnUsage>), String>,
+    refreshed: Option<SummaryRefresh>,
 ) {
     let (status, content, error, usage) = match outcome {
         Ok((content, usage)) => ("done".to_string(), content, None, usage),
         Err(error) => ("error".to_string(), String::new(), Some(error), None),
+    };
+    let (summary, summary_through) = match refreshed {
+        Some(refresh) => (Some(refresh.text), Some(refresh.through)),
+        None => (None, None),
     };
     let file = TurnFile {
         turn_id: req.turn_id.clone(),
@@ -1003,6 +1126,8 @@ async fn finish_turn(
         content: content.clone(),
         error: error.clone(),
         usage,
+        summary,
+        summary_through,
         finished_at: now_secs(),
     };
     let _ = write_turn_file(app, &file);
@@ -1057,6 +1182,8 @@ pub fn turn_start(app: AppHandle, req: TurnRequest) -> Result<String, String> {
             content: String::new(),
             error: None,
             usage: None,
+            summary: None,
+            summary_through: None,
             finished_at: now_secs(),
         },
     )?;
@@ -1415,6 +1542,9 @@ mod tests {
                 role: "user".to_string(),
                 content: "hi".to_string(),
             }],
+            prior_summary: String::new(),
+            fold_text: String::new(),
+            fold_through: String::new(),
         };
         let history = vec![wire_message("system", "sys")];
         let stream = stream_body(&req, &history, true);
@@ -1577,6 +1707,9 @@ mod tests {
                 role: "user".to_string(),
                 content: "hi".to_string(),
             }],
+            prior_summary: String::new(),
+            fold_text: String::new(),
+            fold_through: String::new(),
         }
     }
 
@@ -1643,6 +1776,7 @@ mod tests {
         let outcome = tauri::async_runtime::block_on(drive_attempts(
             &client,
             &req,
+            "",
             &page_fetch,
             &[0],
             &mut || test_events(&rec),
@@ -1699,6 +1833,7 @@ mod tests {
         let outcome = tauri::async_runtime::block_on(drive_attempts(
             &client,
             &req,
+            "",
             &page_fetch,
             &[0],
             &mut || test_events(&rec),
@@ -1767,6 +1902,7 @@ mod tests {
         let outcome = tauri::async_runtime::block_on(drive_attempts(
             &client,
             &req,
+            "",
             &page_fetch,
             &[0],
             &mut || test_events(&rec),
@@ -1786,6 +1922,117 @@ mod tests {
         // Finals stream WITH tools, so a last retry can act.
         assert!(bodies[2].contains("fetch_url"), "final must offer tools");
         assert!(bodies[3].contains("fetch_url"), "final must offer tools");
+    }
+
+    #[test]
+    fn resolve_summary_refreshes_a_pending_fold() {
+        let bodies = Arc::new(Mutex::new(Vec::new()));
+        let port = run_stub(
+            vec![StubStep::Respond {
+                status: 200,
+                content_type: "application/json",
+                body: json_followup_body_with("fresh summary"),
+            }],
+            Arc::clone(&bodies),
+        );
+        let client = reqwest_client().unwrap();
+        let mut req = test_request(port);
+        req.prior_summary = "old stuff".to_string();
+        req.fold_text = "User: hi".to_string();
+        req.fold_through = "m1".to_string();
+        let (to_use, refreshed) =
+            tauri::async_runtime::block_on(resolve_summary(&client, &req));
+        assert_eq!(to_use, "fresh summary");
+        assert_eq!(refreshed, Some("fresh summary".to_string()));
+        let bodies = bodies.lock().unwrap();
+        assert_eq!(bodies.len(), 1);
+        // One short tools-off POST merging prior plus fold.
+        assert!(bodies[0].contains("Third person"), "refresh instruction");
+        assert!(bodies[0].contains("Previous summary"), "prior carried");
+        assert!(bodies[0].contains("old stuff"), "prior carried");
+        assert!(bodies[0].contains("User: hi"), "fold carried");
+        assert!(!bodies[0].contains("fetch_url"), "refresh takes no tools");
+    }
+
+    #[test]
+    fn resolve_summary_stands_pat_without_a_fold() {
+        // No fold pending means no POST at all (any port: unused).
+        let client = reqwest_client().unwrap();
+        let mut req = test_request(1);
+        req.prior_summary = "old stuff".to_string();
+        let (to_use, refreshed) =
+            tauri::async_runtime::block_on(resolve_summary(&client, &req));
+        assert_eq!(to_use, "old stuff");
+        assert_eq!(refreshed, None);
+    }
+
+    #[test]
+    fn resolve_summary_falls_back_to_prior_on_failure() {
+        let bodies = Arc::new(Mutex::new(Vec::new()));
+        let port = run_stub(
+            vec![StubStep::Respond {
+                status: 500,
+                content_type: "application/json",
+                body: b"{}".to_vec(),
+            }],
+            Arc::clone(&bodies),
+        );
+        let client = reqwest_client().unwrap();
+        let mut req = test_request(port);
+        req.prior_summary = "old stuff".to_string();
+        req.fold_text = "User: hi".to_string();
+        let (to_use, refreshed) =
+            tauri::async_runtime::block_on(resolve_summary(&client, &req));
+        // The turn still runs windowed on the prior text.
+        assert_eq!(to_use, "old stuff");
+        assert_eq!(refreshed, None);
+    }
+
+    #[test]
+    fn drive_sends_the_resolved_summary_ahead_of_history() {
+        let bodies = Arc::new(Mutex::new(Vec::new()));
+        let port = run_stub(
+            vec![StubStep::Respond {
+                status: 200,
+                content_type: "text/event-stream",
+                body: sse_text_body("hi there"),
+            }],
+            Arc::clone(&bodies),
+        );
+        let page_fetch: PageFetch = Arc::new(|_url: String| {
+            Box::pin(async move { Ok::<String, String>("unused".to_string()) })
+                as Pin<Box<dyn Future<Output = Result<String, String>> + Send>>
+        });
+        let rec = Recorder {
+            tokens: Arc::new(Mutex::new(Vec::new())),
+            fetches: Arc::new(Mutex::new(Vec::new())),
+            retries: Arc::new(Mutex::new(0)),
+            retracts: Arc::new(Mutex::new(0)),
+        };
+        let client = reqwest_client().unwrap();
+        let req = test_request(port);
+        let outcome = tauri::async_runtime::block_on(drive_attempts(
+            &client,
+            &req,
+            "rolled up",
+            &page_fetch,
+            &[0],
+            &mut || test_events(&rec),
+        ));
+        match outcome {
+            TurnOutcome::Done(content, _) => assert_eq!(content, "hi there"),
+            other => panic!("expected done, got {other:?}"),
+        }
+        let bodies = bodies.lock().unwrap();
+        assert_eq!(bodies.len(), 1);
+        // Second system message: after the system prompt, before turns.
+        let sys = bodies[0].find("sys").unwrap_or(usize::MAX);
+        let marker = bodies[0]
+            .find("summarized for context")
+            .unwrap_or(usize::MAX);
+        let turn = bodies[0].find("\"content\":\"hi\"").unwrap_or(usize::MAX);
+        assert!(sys < marker && marker < turn, "summary sits second");
+        assert!(bodies[0].contains("rolled up"), "summary text sent");
     }
 
     #[test]
@@ -1817,6 +2064,7 @@ mod tests {
         let outcome = tauri::async_runtime::block_on(drive_attempts(
             &client,
             &req,
+            "",
             &page_fetch,
             &[0],
             &mut || test_events(&rec),
@@ -1872,6 +2120,7 @@ mod tests {
         let outcome = tauri::async_runtime::block_on(drive_attempts(
             &client,
             &req,
+            "",
             &page_fetch,
             &[0],
             &mut || test_events(&rec),
@@ -1922,6 +2171,7 @@ mod tests {
         let outcome = tauri::async_runtime::block_on(drive_attempts(
             &client,
             &req,
+            "",
             &page_fetch,
             &[0],
             &mut || test_events(&rec),

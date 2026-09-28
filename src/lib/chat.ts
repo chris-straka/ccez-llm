@@ -4,6 +4,7 @@ import type {
 	ContentPart,
 	TokenUsage
 } from "./providers/types";
+import { messageText } from "./providers/types";
 import type { Attachment } from "./attachments";
 import { stripAttachmentMarkers } from "./attachments";
 import type { KeyValueStore } from "./settings";
@@ -56,6 +57,21 @@ export interface Chat {
 	 * before the override existed (see loadChats healing).
 	 */
 	voice: boolean | null;
+	/**
+	 * Rolling summary of this chat's compacted prefix (see
+	 * selectHistoryWindow): what the model reads instead of the old
+	 * turns. Absent until the first compaction; persisted with the
+	 * chat, invisible plumbing (never rendered).
+	 */
+	summary?: string;
+	/**
+	 * Newest message id folded into `summary`: everything at or
+	 * before it sends as summary, everything after sends verbatim.
+	 * An id (not an index), so deletes and truncates can't silently
+	 * shift it — a missing id heals by rebuilding from full history
+	 * (lossless: compaction never deletes messages).
+	 */
+	summaryThrough?: ChatMsgId;
 }
 
 /**
@@ -593,15 +609,226 @@ export function waypointLabel(content: string, max = 60): string {
 	return Array.from(content.replace(/\s+/g, " ").trim()).slice(0, max).join("");
 }
 
+/**
+ * History compaction budget (chat cap, never per-message: long single
+ * messages always send whole). Recent turns send verbatim up to the
+ * window; older ones roll into the chat summary (see
+ * selectHistoryWindow). Every send stays bounded no matter how long
+ * the chat runs.
+ */
+/** Verbatim window per send (~8k tokens estimated). */
+export const HISTORY_WINDOW_CHARS = 32000;
+/** Last turns that always stay verbatim, however large (2 turns). */
+export const MIN_VERBATIM_MESSAGES = 4;
+/** Smallest overflow worth a refresh call (below this the middle
+ * drops for one send and accumulates toward the next). */
+export const MIN_FOLD_CHARS = 2000;
+/** Most overflow folded per refresh (giant histories converge over
+ * several sends instead of one huge summary call). */
+export const MAX_FOLD_CHARS = 32000;
+/** Stored summary cap (code-point safe). */
+export const MAX_SUMMARY_CHARS = 2500;
+/** Summary length the refresh prompt asks for. */
+export const SUMMARY_WORDS = 400;
+
+/**
+ * Rough token estimate for cap decisions (chars/4, rounded up):
+ * deliberately crude — the cap bounds growth, it doesn't budget
+ * precisely (CJK-dense chats undercount; 128k-context models don't
+ * care). Pure.
+ */
+export function estimateTokens(text: string): number {
+	return Math.ceil(text.length / 4);
+}
+
+/** Chars of one message as sent (markers stripped, text attachments inlined). */
+function sentChars(m: ChatMsg): number {
+	const content = apiContent(m);
+	return (typeof content === "string" ? content : messageText(content)).length;
+}
+
+/** One history window: what sends verbatim, what folds this round. */
+export interface HistoryWindow {
+	/** Resolved prior summary (null when absent or orphaned). */
+	summary: string | null;
+	/** Newest turns, verbatim. */
+	turns: ChatMsg[];
+	/** Oldest-beyond-window turns to fold now (empty when no refresh). */
+	fold: ChatMsg[];
+}
+
+/**
+ * Split a chat's history for one send: the resolved prior summary
+ * plus a newest-first verbatim window (failed replies never send,
+ * the live placeholder never counts), and the oldest-beyond-window
+ * chunk to fold into the summary next. Pure over the chat; both
+ * engines share it (TypeScript refreshes inline, the native runner
+ * refreshes in Rust — same rule, same bounds).
+ *
+ * Healing without loss: a summary whose watermark id is gone
+ * (deleted, truncated) rebuilds from full history — compaction
+ * never deletes messages, so the content is all still there. An
+ * edit inside the summarized prefix leaves the summary slightly
+ * stale (accepted: ancient-turn edits are rare and harmless).
+ */
+export function selectHistoryWindow(
+	chat: Chat,
+	excludeId?: ChatMsgId
+): HistoryWindow {
+	const eligible = chat.messages.filter(
+		(m) => m.id !== excludeId && !(m.role === "assistant" && m.error)
+	);
+	let summary: string | null =
+		chat.summary && chat.summary.length > 0 ? chat.summary : null;
+	let throughIdx = -1;
+	if (summary !== null) {
+		const at = eligible.findIndex((m) => m.id === chat.summaryThrough);
+		if (at === -1) summary = null;
+		else throughIdx = at;
+	}
+	const fresh = eligible.slice(throughIdx + 1);
+	// Newest-first window: fill to the cap, but always keep the
+	// floor count (long single messages send whole, per the chat
+	// cap — never per-message).
+	const turns: ChatMsg[] = [];
+	let kept = 0;
+	for (let i = fresh.length - 1; i >= 0; i--) {
+		const m = fresh[i];
+		if (!m) continue;
+		if (
+			turns.length >= MIN_VERBATIM_MESSAGES &&
+			kept + sentChars(m) > HISTORY_WINDOW_CHARS
+		)
+			break;
+		turns.unshift(m);
+		kept += sentChars(m);
+	}
+	// Fold oldest-first up to the per-refresh cap (giant histories
+	// converge over several sends); below the minimum the middle
+	// drops for this send and accumulates toward the next refresh.
+	// Each message counts capped, so a lone giant message folds its
+	// head (see renderFoldText) instead of wedging the watermark
+	// behind it forever.
+	const candidates = fresh.slice(0, fresh.length - turns.length);
+	const fold: ChatMsg[] = [];
+	let folded = 0;
+	for (const m of candidates) {
+		const size = Math.min(sentChars(m), MAX_FOLD_CHARS);
+		if (folded + size > MAX_FOLD_CHARS) break;
+		fold.push(m);
+		folded += size;
+	}
+	if (folded < MIN_FOLD_CHARS) fold.length = 0;
+	return { summary, turns, fold };
+}
+
+/** Summary as the model reads it: a labeled system block, never prose
+ * that could pass as chat history. Mirrored in Rust (`summary_block`
+ * in turn.rs) — keep the marker text identical. */
+export function summaryBlock(summary: string): string {
+	return `Earlier in this chat (summarized for context, not verbatim):\n${summary}`;
+}
+
+/** Folded turns rendered for the refresh call (text only: old images
+ * fall out of refresh scope, their captions ride the prose). Each
+ * message caps at the fold budget (code-point safe), so giant old
+ * messages fold truncated instead of ballooning the refresh call.
+ * Pure. */
+export function renderFoldText(fold: ChatMsg[]): string {
+	return fold
+		.map((m) => {
+			const content = apiContent(m);
+			const text = typeof content === "string" ? content : messageText(content);
+			const points = Array.from(text);
+			const body =
+				points.length > MAX_FOLD_CHARS
+					? `${points.slice(0, MAX_FOLD_CHARS).join("")}\n[…message truncated…]`
+					: text;
+			return `${m.role === "user" ? "User" : "Assistant"}: ${body}`;
+		})
+		.join("\n\n");
+}
+
+/**
+ * One-shot messages merging overflowed history into the rolling
+ * summary: the system caps the length, the user carries the prior
+ * summary (when one exists) plus the newly folded turns. Pure; the
+ * Rust engine mirrors the text (`SUMMARY_REFRESH_SYSTEM` there).
+ */
+export function buildSummaryRefreshMessages(
+	prior: string | null,
+	foldText: string
+): ChatMessage[] {
+	return [
+		{
+			role: "system",
+			content:
+				`Summarize the earlier part of an ongoing chat so a future reply can use it ` +
+				`as context. Keep names, decisions, open questions, and language-learning ` +
+				`goals. Third person, at most ${SUMMARY_WORDS} words, plain prose.`
+		},
+		{
+			role: "user",
+			content:
+				prior !== null && prior.length > 0
+					? `Previous summary:\n${prior}\n\nMore history:\n${foldText}`
+					: foldText
+		}
+	];
+}
+
+/**
+ * Roll the chat's summary forward when overflowed history awaits a
+ * fold: one short non-streaming call, then the summary and watermark
+ * advance and persist. No fold pending means no call (the common
+ * case costs nothing). Failures are silent by design — the send
+ * still goes out windowed (bounded, middle dropped for that send),
+ * and the next send retries the fold. Only a stop aborts: it
+ * rethrows so the send settles like any mid-stream stop.
+ */
+export async function refreshChatSummary(
+	state: ChatState,
+	chat: Chat,
+	provider: ChatProvider,
+	opts: { signal?: AbortSignal | undefined; excludeId?: ChatMsgId | undefined },
+	store?: KeyValueStore
+): Promise<void> {
+	const { summary, fold } = selectHistoryWindow(chat, opts.excludeId);
+	if (fold.length === 0) return;
+	let result: { content: string };
+	try {
+		result = await provider.chat(
+			buildSummaryRefreshMessages(summary, renderFoldText(fold)),
+			{ signal: opts.signal }
+		);
+	} catch (error) {
+		if (
+			opts.signal?.aborted ||
+			(error instanceof Error && error.name === "AbortError")
+		)
+			throw error;
+		return;
+	}
+	const text = Array.from(result.content.trim())
+		.slice(0, MAX_SUMMARY_CHARS)
+		.join("");
+	if (!text) return;
+	const newest = fold[fold.length - 1];
+	if (!newest) return;
+	chat.summary = text;
+	chat.summaryThrough = newest.id;
+	persistChats(state, store);
+}
+
 export function buildApiMessages(
 	chat: Chat,
-	systemPrompt: string
+	systemPrompt: string,
+	excludeId?: ChatMsgId
 ): ChatMessage[] {
 	const api: ChatMessage[] = [{ role: "system", content: systemPrompt }];
-	for (const m of chat.messages) {
-		if (m.role === "assistant" && m.error) continue;
-		api.push({ role: m.role, content: apiContent(m) });
-	}
+	const { summary, turns } = selectHistoryWindow(chat, excludeId);
+	if (summary) api.push({ role: "system", content: summaryBlock(summary) });
+	for (const m of turns) api.push({ role: m.role, content: apiContent(m) });
 	return api;
 }
 
@@ -733,7 +960,6 @@ export async function streamAssistantReply(
 	const chat = activeChat(state);
 	const chatId = chat.id;
 	if (state.sendingChatIds.includes(chatId)) return;
-	const apiMessages = buildApiMessages(chat, systemPrompt);
 	const replyId = newChatMsgId();
 	chat.messages = [
 		...chat.messages,
@@ -767,6 +993,17 @@ export async function streamAssistantReply(
 		);
 	};
 	try {
+		// Roll the summary forward before the send (no-op unless
+		// overflow awaits a fold). Inside the try so a stop during
+		// the refresh settles like any mid-stream abort.
+		await refreshChatSummary(
+			state,
+			chat,
+			provider,
+			{ signal: controller.signal, excludeId: replyId },
+			store
+		);
+		const apiMessages = buildApiMessages(chat, systemPrompt, replyId);
 		const result = await provider.stream(
 			apiMessages,
 			{
