@@ -46,6 +46,7 @@ import {
 	speechKanaForQuote,
 	quoteStartForContext,
 	wordBoundsAt,
+	isCjkChar,
 	groupRuns,
 	wordAtNodeOffset,
 	paragraphBounds
@@ -823,6 +824,52 @@ describe("wordBoundsAt", () => {
 		// the run instead of silence.
 		expect(wordBoundsAt("a々b", 1)).toEqual([0, 3]);
 		expect(wordBoundsAt("hi, there", 2)).toBe(null);
+	});
+
+	it("falls back to the single CJK char, never the whole run", () => {
+		// Without a segmenter the old fallback spanned the whole
+		// unspaced run (handles off-screen, reading as no
+		// selection); native double-tap takes one hanzi instead.
+		vi.stubGlobal("Intl", {});
+		try {
+			expect(wordBoundsAt("日本語は繊細です", 4)).toEqual([4, 5]);
+			expect(wordBoundsAt("你好世界", 0)).toEqual([0, 1]);
+			expect(wordBoundsAt("한글", 1)).toEqual([1, 2]);
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
+
+	it("still spans the Latin run without a segmenter", () => {
+		vi.stubGlobal("Intl", {});
+		try {
+			expect(wordBoundsAt("hello world", 1)).toEqual([0, 5]);
+			expect(wordBoundsAt("hi, there", 2)).toBe(null);
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
+
+	it("keeps astral Han whole in the single-char fallback", () => {
+		vi.stubGlobal("Intl", {});
+		try {
+			// U+2000B is Han astral: the span covers both units.
+			expect(wordBoundsAt("a\u{2000B}b", 1)).toEqual([1, 3]);
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
+});
+
+describe("isCjkChar", () => {
+	it("claims Han, kana, and Hangul — nothing else", () => {
+		expect(isCjkChar("塔")).toBe(true);
+		expect(isCjkChar("や")).toBe(true);
+		expect(isCjkChar("ル")).toBe(true);
+		expect(isCjkChar("한")).toBe(true);
+		expect(isCjkChar("a")).toBe(false);
+		expect(isCjkChar("。")).toBe(false);
+		expect(isCjkChar(undefined)).toBe(false);
 	});
 });
 

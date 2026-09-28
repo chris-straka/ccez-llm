@@ -31,4 +31,41 @@ describe("android gesture wiring", () => {
 			/reportOsMenu\(\s*\[promptEl,\s*settingsEl,\s*document\.querySelector\("\.ann-answer"\)\]/
 		);
 	});
+
+	it("toasts Loading — nothing else — on a blue badge tap", () => {
+		// The answer is still on the wire: no card opens, and the
+		// review dock must not open either (it used to strand the
+		// tap there).
+		expect(pageSource()).toMatch(
+			/if \(androidUI && !iosUI && current && !current\.answer\) \{\s+flashToast\("Loading"\);\s+return;\s+\}/
+		);
+	});
+
+	it("deletes an answered badge after a still 2s hold", () => {
+		const source = pageSource();
+		// Orange only, both at arm time and at fire time (blue
+		// holds do nothing).
+		expect(
+			source.match(
+				/if \(!annotations\.some\(\(a\) => a\.id === id && a\.answer\)\) return;/g
+			)?.length
+		).toBe(2);
+		expect(source).toMatch(
+			/badgeHoldTimer = setTimeout\(\(\) => \{[\s\S]*?removeAnnotation\(id\);[\s\S]*?\}, 2000\);/
+		);
+		// The trailing compatibility press can't reopen the gone badge.
+		expect(source).toContain("badgeHoldFired !== null");
+	});
+
+	it("resolves CJK double-taps through the point-anchored range first", () => {
+		// Aid readings split the DOM: the caret can land on a reading
+		// instead of the base char (no selection, no handles). The
+		// span engine stays as the fallback.
+		const source = pageSource();
+		const run = source.slice(source.indexOf("if (msgTapSeq.count === 2) {"));
+		expect(run).toMatch(
+			/const cjk = cjkWordRangeAtPoint\(\s*ended\.clientX,\s*ended\.clientY\s*\);/
+		);
+		expect(run).toContain("pick?.addRange(cjk);");
+	});
 });

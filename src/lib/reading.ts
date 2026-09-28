@@ -233,6 +233,20 @@ function loadWordSegmenter(): WordSegmenter | null {
 	}
 }
 
+/** Han, kana, and Hangul (same classes as the page's CJK word gate). */
+const CJK_CHAR_RE =
+	/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
+
+/** True for one CJK char (iteration marks included — callers exempt them). */
+export function isCjkChar(char: string | undefined): boolean {
+	return char !== undefined && char !== "" && CJK_CHAR_RE.test(char);
+}
+
+/** Iteration marks glue to their neighbors (々 in 時々): they never
+ * stand alone, so the CJK single-char fallback below skips them and
+ * they keep the maximal run (right-click TTS still speaks it). */
+const CJK_ITERATION_RE = /[々ゝゞヽヾ〻]/;
+
 /**
  * Word span holding `offset` (a UTF-16 index into `text`) for
  * double-tap select: Intl.Segmenter word bounds — the same ICU word
@@ -241,7 +255,10 @@ function loadWordSegmenter(): WordSegmenter | null {
  * (on html/body, against zoom jumps) eats the native double-tap
  * gesture for touch; mouse double-click is unaffected. A caret on
  * whitespace or punctuation yields null — nothing to select. Without
- * a segmenter, the span expands over word chars instead. Pure.
+ * a segmenter (or a non-word-like claim), the span expands over word
+ * chars instead — except CJK, which falls back to the single char
+ * under the tap (native double-tap takes a word or one hanzi, never
+ * the whole unspaced run, whose handles land off-screen). Pure.
  */
 export function wordBoundsAt(
 	text: string,
@@ -260,7 +277,7 @@ export function wordBoundsAt(
 					if (part.isWordLike) return [start, end];
 					// Claimed but not word-like (a locale's idea of a
 					// boundary): a real word char still falls through
-					// to the maximal run below instead of silence —
+					// to the expansion below instead of silence —
 					// whitespace and punctuation yield null there.
 					break;
 				}
@@ -271,6 +288,12 @@ export function wordBoundsAt(
 	}
 	const idx = at >= text.length && at > 0 ? at - 1 : at;
 	if (!isWordChar(text[idx])) return null;
+	// Single CJK char under the tap (astral-safe: astral Han spans
+	// two UTF-16 units). Iteration marks keep the maximal run —
+	// they never stand alone.
+	const point = String.fromCodePoint(text.codePointAt(idx) ?? 0);
+	if (isCjkChar(point) && !CJK_ITERATION_RE.test(point))
+		return [idx, idx + point.length];
 	let start = idx;
 	while (start > 0 && isWordChar(text[start - 1])) start--;
 	let end = idx;

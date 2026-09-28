@@ -5395,6 +5395,15 @@
 	 * click-away close, the dock's Unpin removes.
 	 */
 	function openBadge(id: AnnotationId, anchor?: { x: number; y: number }): void {
+		const current = annotations.find((a) => a.id === id);
+		// Android: tapping a blue (unanswered) badge only toasts
+		// Loading — the answer is still on the wire, so there is no
+		// card to open and the review dock must not open either (it
+		// used to open and strand the tap there).
+		if (androidUI && !iosUI && current && !current.answer) {
+			flashToast("Loading");
+			return;
+		}
 		// A badge press unpins the stream follow, like a selection:
 		// the card reads against a still thread.
 		viewport.stick = false;
@@ -5404,7 +5413,6 @@
 			cancelAnnPop();
 			return;
 		}
-		const current = annotations.find((a) => a.id === id);
 		if (!current) return;
 		// A ready answer opens in its own popup: re-press toggles
 		// its prompt pin instead of shutting the card — pin, or
@@ -9714,10 +9722,24 @@
 						// Double-tap takes the word itself (native never
 						// fires under `touch-action: manipulation`): the
 						// pin holds the revealed row open while the pick
-						// lands.
+						// lands. CJK taps resolve through the
+						// point-anchored range first (same as desktop
+						// double-click): aid readings split the DOM, so
+						// the caret can land on a reading instead of the
+						// base char — selecting nothing, with no
+						// handles. Other scripts keep the span engine.
 						if (msgTapSeq.count === 2) {
 							msgDoubleTapPin = { id: start.msgId, at: now };
-							selectWordAtPoint(ended.clientX, ended.clientY);
+							const cjk = cjkWordRangeAtPoint(ended.clientX, ended.clientY);
+							if (cjk) {
+								try {
+									const pick = window.getSelection();
+									pick?.removeAllRanges();
+									pick?.addRange(cjk);
+								} catch {
+									selectWordAtPoint(ended.clientX, ended.clientY);
+								}
+							} else selectWordAtPoint(ended.clientX, ended.clientY);
 						}
 						// Triple-tap takes the sentence, quadruple-tap the
 						// paragraph (this counter only ever sees
@@ -9863,6 +9885,75 @@
 			},
 			{ passive: true }
 		);
+		// Orange-badge hold-to-delete (Android): a still 2s press on
+		// an answered badge deletes its annotation (the delete thumps
+		// like any other). Blue badges never arm — their tap only
+		// toasts Loading. Lift, travel, scroll, or a second finger
+		// cancels; the fire re-checks the badge is still answered
+		// and the thread never scrolled (destructive, so strict).
+		// The fire stamps its id so the trailing compatibility mouse
+		// press can't reopen the now-gone badge on its way up.
+		let badgeHoldTimer: ReturnType<typeof setTimeout> | null = null;
+		let badgeHold: { x: number; y: number; top: number } | null = null;
+		let badgeHoldFired: { id: string; at: number } | null = null;
+		const clearBadgeHoldTimer = (): void => {
+			if (badgeHoldTimer) {
+				clearTimeout(badgeHoldTimer);
+				badgeHoldTimer = null;
+			}
+			badgeHold = null;
+		};
+		window.addEventListener(
+			"touchstart",
+			(event) => {
+				clearBadgeHoldTimer();
+				if (!androidUI || iosUI || event.touches.length !== 1) return;
+				const first = event.touches[0];
+				const target = event.target instanceof Element ? event.target : null;
+				const badge = target?.closest("[data-ann-badge]");
+				if (!first || !badge) return;
+				const id = badge.getAttribute("data-ann-badge") ?? "";
+				// Orange only (answered): blue holds do nothing.
+				if (!annotations.some((a) => a.id === id && a.answer)) return;
+				badgeHold = {
+					x: first.clientX,
+					y: first.clientY,
+					top: scrollBox?.scrollTop ?? 0
+				};
+				badgeHoldTimer = setTimeout(() => {
+					badgeHoldTimer = null;
+					const held = badgeHold;
+					badgeHold = null;
+					if (!held) return;
+					if ((scrollBox?.scrollTop ?? 0) !== held.top) return;
+					if (!annotations.some((a) => a.id === id && a.answer)) return;
+					removeAnnotation(id);
+					badgeHoldFired = { id, at: Date.now() };
+				}, 2000);
+			},
+			{ passive: true }
+		);
+		window.addEventListener(
+			"touchmove",
+			(event) => {
+				if (!badgeHoldTimer || !badgeHold || event.touches.length !== 1) return;
+				const touch = event.touches[0];
+				if (
+					touch &&
+					Math.hypot(touch.clientX - badgeHold.x, touch.clientY - badgeHold.y) >
+						12
+				) {
+					clearBadgeHoldTimer();
+				}
+			},
+			{ passive: true }
+		);
+		window.addEventListener("touchend", clearBadgeHoldTimer, {
+			passive: true
+		});
+		window.addEventListener("touchcancel", clearBadgeHoldTimer, {
+			passive: true
+		});
 		// A dead highlight drops its menu at once: taps elsewhere (and
 		// handle collapses) clear the selection without touching the
 		// mouse/touch summon paths, so without this the menu stranded
@@ -11733,8 +11824,18 @@
 			const target = event.target instanceof Element ? event.target : null;
 			const badge = target?.closest<HTMLElement>("[data-ann-badge]");
 			if (!badge) return;
-			event.preventDefault();
 			const id = (badge.dataset.annBadge ?? "") as AnnotationId;
+			// A hold-delete just fired for this badge (Android): the
+			// trailing compatibility press is the gesture's end,
+			// never a re-press — swallowing it keeps the deleted
+			// badge's card shut.
+			if (
+				badgeHoldFired !== null &&
+				badgeHoldFired.id === id &&
+				Date.now() - badgeHoldFired.at < 1500
+			)
+				return;
+			event.preventDefault();
 			// A re-press toggles closed (cancel): saving first would
 			// restart the fade the toggle is about to cancel.
 			if (!(annPop && !annPopClosing && annPop.id === id)) saveAnnPop();
