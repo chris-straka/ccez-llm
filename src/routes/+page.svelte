@@ -8923,11 +8923,11 @@
 		if (story && kind === "talk" && level) {
 			instruction = newsConversationInstruction(story, level.level, current.langName);
 		} else if (story && kind === "read" && size) {
-			// Summaries carry a level too: the picker's row, B1 until tapped.
+			// Summaries carry a level too: the picker's row, B2 until tapped.
 			const summaryLevel =
 				newsPicker?.kind === "read" && newsPicker.link === link
-					? (newsPicker.level ?? "B1")
-					: "B1";
+					? (newsPicker.level ?? "B2")
+					: "B2";
 			instruction = newsSummaryInstruction(
 				story,
 				size.size,

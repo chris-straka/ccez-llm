@@ -303,7 +303,7 @@ export interface NewsPanelState {
 export interface NewsPicker {
 	link: string;
 	kind: NewsKind;
-	/** Chosen summary level (read only, B1 until tapped). */
+	/** Chosen summary level (read only, B2 until tapped). */
 	level?: CefrLevel;
 }
 

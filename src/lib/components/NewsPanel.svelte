@@ -140,8 +140,8 @@ either); everything else is theme tokens, never raw hex. -->
 								<button
 									type="button"
 									class="news-opt"
-									class:on={(picker.level ?? "B1") === level.level}
-									aria-pressed={(picker.level ?? "B1") === level.level}
+									class:on={(picker.level ?? "B2") === level.level}
+									aria-pressed={(picker.level ?? "B2") === level.level}
 									title={level.tag}
 									onclick={() => actions.level(story.link, level.level)}
 								>

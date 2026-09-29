@@ -46,7 +46,7 @@ describe("news panel contract", () => {
 		expect(source).toContain("aria-expanded");
 		// Summary levels select without launching (length taps launch).
 		expect(source).toContain("actions.level(story.link, level.level)");
-		expect(source).toContain('picker.level ?? "B1"');
+		expect(source).toContain('picker.level ?? "B2"');
 	});
 
 	it("chips plain country labels, hidden for single editions", () => {
