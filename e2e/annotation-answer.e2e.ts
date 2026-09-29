@@ -854,3 +854,181 @@ test("bottom answer scrolls the thread to make room", async ({ page }) => {
 		vh - 8
 	);
 });
+
+/** Below-fold badge press: the room-making scroll moves the badge
+mid-press, so WebKit's trailing click (fired after the
+preventDefaulted mousedown; Chromium eats it) lands off-badge on a
+common ancestor. It must not shut the card it just opened — the
+opening press's own click is never a click-off. (Chromium cannot
+fire that trailing click itself, so the test dispatches its exact
+shape: a non-drag click at the press point, targeted off-card and
+off-badge, inside the window.) */
+test("below-fold badge press survives its own trailing click", async ({
+	page
+}) => {
+	test.setTimeout(120_000);
+	const paras = Array.from(
+		{ length: 12 },
+		(_, i) => `filler paragraph number ${i} with enough words to wrap`
+	);
+	await seedChat(page, [
+		...paras.map((content) => ({ role: "assistant" as const, content })),
+		{ role: "assistant", content: "the annotated riverbank holds the fog" }
+	]);
+	// Long seeded answer: a tall card that cannot fit below a
+	// composer-parked badge, so the open must scroll the thread.
+	const answer = Array.from(
+		{ length: 18 },
+		() => "the riverbank holds its fog through the morning light"
+	).join(". ");
+	await page.addInitScript(
+		(seed: { answer: string }) => {
+			window.localStorage.setItem("ccez-mock-provider", "1");
+			window.localStorage.setItem(
+				"ccez-llm-annotations-v1",
+				JSON.stringify({
+					"e2e-chat": [
+						{
+							id: "ann-e2e",
+							messageId: "e2e-m12",
+							quote: "riverbank",
+							comment: "what lives here?",
+							answer: seed.answer,
+							at: 0
+						}
+					]
+				})
+			);
+		},
+		{ answer }
+	);
+	await page.goto("/");
+	// Short viewport: the last quote sits where the tall card
+	// cannot fit below it, so opening must scroll the thread.
+	await page.setViewportSize({ width: 1280, height: 500 });
+	const articles = page.locator("article.assistant");
+	await expect(articles.last()).toBeVisible({ timeout: 60_000 });
+	const ready = page.locator("button.ccez-ann-badge.ans-ready");
+	await expect(ready).toBeVisible({ timeout: 10_000 });
+	const scrolled = async (): Promise<number> =>
+		page.evaluate(() => {
+			let el: Element | null = document.querySelector(
+				"article.assistant:last-of-type"
+			);
+			while (el) {
+				if (
+					el instanceof HTMLElement &&
+					el.scrollHeight > el.clientHeight + 4
+				)
+					return el.scrollTop;
+				el = el.parentElement;
+			}
+			return -1;
+		});
+	// Open once to measure the real card height, then close: the
+	// park below needs it to predict the overflow.
+	await ready.focus();
+	await page.keyboard.press("Enter");
+	const card = page.locator(".ann-answer");
+	await expect(card).toBeVisible({ timeout: 10_000 });
+	const cardH = await page.evaluate(
+		() => document.querySelector(".ann-answer")?.getBoundingClientRect().height ?? null
+	);
+	expect(cardH).not.toBeNull();
+	await page.keyboard.press("Escape");
+	await expect(card).toHaveCount(0);
+	// Park the badge just above the fixed composer (clickable,
+	// never under it), with the tall card overflowing the fold.
+	// The thread eases programmatic jumps (smooth scrolling), so
+	// pin instant first — otherwise the park is still animating
+	// when the press below measures its point.
+	const parked = await page.evaluate((h: number) => {
+		const badge = document.querySelector("[data-ann-badge]");
+		const prompt = document.querySelector(".prompt");
+		if (!(badge instanceof HTMLElement) || !(prompt instanceof HTMLElement))
+			return null;
+		const top = prompt.getBoundingClientRect().top;
+		const wantBottom = top - 12;
+		let el: Element | null = badge;
+		while (el) {
+			const parent = el.parentElement;
+			if (
+				parent instanceof HTMLElement &&
+				parent.scrollHeight > parent.clientHeight + 4
+			) {
+				parent.style.scrollBehavior = "auto";
+				parent.scrollTop +=
+					badge.getBoundingClientRect().bottom - wantBottom;
+				break;
+			}
+			el = parent;
+		}
+		const r = badge.getBoundingClientRect();
+		const x = Math.round(r.left + r.width / 2);
+		const y = Math.round(r.top + r.height / 2);
+		const hit = document.elementFromPoint(x, y);
+		return {
+			x,
+			y,
+			clickable: hit instanceof Element && !!hit.closest("[data-ann-badge]"),
+			overflow: r.bottom + 2 + h - (window.innerHeight - 8)
+		};
+	}, cardH as number);
+	expect(parked).not.toBeNull();
+	// Preconditions: the badge takes a real press, and the card
+	// overflows the fold (otherwise no room scroll runs and the
+	// test passes vacuously).
+	expect(parked!.clickable).toBe(true);
+	expect(parked!.overflow).toBeGreaterThan(20);
+	await page.waitForTimeout(300);
+	// Real press on the badge: mousedown opens the card (plus the
+	// room scroll), mouseup follows with the pointer unmoved.
+	const topBefore = await scrolled();
+	await page.mouse.move(parked!.x, parked!.y);
+	await page.mouse.down();
+	await expect(card).toBeVisible({ timeout: 10_000 });
+	await page.mouse.up();
+	await expect.poll(() => scrolled(), { timeout: 10_000 }).toBeGreaterThan(
+		topBefore
+	);
+	// WebKit's trailing click in its exact shape: a non-drag click
+	// at the press point, targeted at the common ancestor (main)
+	// the displaced mouseup yields — off-card, off-badge.
+	await page.evaluate(({ x, y }) => {
+		document.querySelector("main")!.dispatchEvent(
+			new MouseEvent("click", {
+				bubbles: true,
+				screenX: x,
+				screenY: y,
+				clientX: x,
+				clientY: y
+			})
+		);
+	}, { x: parked!.x, y: parked!.y });
+	// Past the 160ms fade-out: a shut card would be gone by now.
+	await page.waitForTimeout(500);
+	await expect(card).toBeVisible();
+	// The guard expires: a later click-off still closes. The point
+	// must sit under neither card nor badge (topmost element in
+	// main, outside both), or the click is not a click-off.
+	await page.waitForTimeout(800);
+	const off = await page.evaluate(() => {
+		const main = document.querySelector("main");
+		if (!(main instanceof HTMLElement)) return null;
+		const r = main.getBoundingClientRect();
+		for (let y = r.top + 40; y < r.bottom - 10; y += 40) {
+			for (let x = r.left + 40; x < r.right - 10; x += 40) {
+				const top = document.elementFromPoint(x, y);
+				if (!(top instanceof Element) || !main.contains(top)) continue;
+				if (top.closest(".ann-answer, [data-ann-badge]")) continue;
+				return { x: Math.round(x), y: Math.round(y) };
+			}
+		}
+		return null;
+	});
+	expect(off).not.toBeNull();
+	await page.mouse.move(off!.x, off!.y);
+	await page.mouse.down();
+	await page.mouse.up();
+	await expect(card).toHaveCount(0, { timeout: 5_000 });
+});

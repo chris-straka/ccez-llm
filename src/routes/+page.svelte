@@ -1078,9 +1078,13 @@
 	viewport), so scrolls shift it by the delta. */
 	let answerPopTop = 0;
 	/** Last badge a mousedown press opened (or toggled): its trailing
-	click re-fire is the same gesture, never a new one. Plain field —
-	only the handlers below touch it, never the template. */
-	let lastBadgePress: { id: AnnotationId; at: number } | null = null;
+	click re-fire is the same gesture, never a new one (openBadgeClick
+	and the answer click-off guard both stand down for it). `seq`
+	pins the press itself: pointerdown always precedes its
+	mousedown, so a click with no press since is the trailing one.
+	Plain field — only the handlers touch it, never the template. */
+	let lastBadgePress: { id: AnnotationId; at: number; seq: number } | null =
+		null;
 	/** Pill fade-out in flight (unmounts when the ramp ends). */
 	let annPopClosing = $state(false);
 	let annPopTimer: ReturnType<typeof setTimeout> | null = null;
@@ -3367,7 +3371,12 @@
 
 	/** Pointer-down spot for click-off-to-close (select-drags must not count). */
 	let mainDown: { x: number; y: number } | null = null;
+	/** Main-press serial: every pointerdown counts, so the answer
+	click-off guard can tell the opening press's own trailing
+	click (no press since) from a new click-off (a new press). */
+	let mainPressSeq = 0;
 	function noteMainDown(event: PointerEvent): void {
+		mainPressSeq++;
 		mainDown = { x: event.screenX, y: event.screenY };
 	}
 	/** Last pointer position over the chat (plain field, never state):
@@ -3428,7 +3437,21 @@
 			!dragged &&
 			event.target instanceof Element &&
 			!event.target.closest(".ann-answer") &&
-			!event.target.closest("[data-ann-badge]")
+			!event.target.closest("[data-ann-badge]") &&
+			// The opening press's own trailing click (WebKit fires
+			// it after a preventDefaulted mousedown; Chromium eats
+			// it): the room-making scroll below the fold moves the
+			// badge mid-press, so the click lands off-badge on a
+			// common ancestor and would shut the card it just
+			// opened. Same press only (no pointerdown since, same
+			// 800ms window as openBadgeClick): a new click-off
+			// always brings its own press and still closes.
+			!(
+				lastBadgePress &&
+				lastBadgePress.id === answerPop.id &&
+				lastBadgePress.seq === mainPressSeq &&
+				Date.now() - lastBadgePress.at < 800
+			)
 		) {
 			closeAnswerPop();
 		}
@@ -11867,7 +11890,7 @@
 			// edit in the composer and ignore it.
 			focusLog("badge-press", { id, active: describeActiveElement() });
 			openBadge(id, { x: event.clientX, y: event.clientY });
-			lastBadgePress = { id, at: Date.now() };
+			lastBadgePress = { id, at: Date.now(), seq: mainPressSeq };
 		};
 		/**
 		 * Click-off closes the annotations review (desktop): a press
