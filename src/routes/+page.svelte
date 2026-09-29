@@ -2676,12 +2676,14 @@
 	let find = $state<FindState>(emptyFind());
 	let findInputEl: HTMLInputElement | undefined = $state();
 	function currentFindHits(): number[] {
-		return find.open
-			? findMessageIndices(
-					viewChat.messages.map((m) => m.content),
-					find.query
-				)
-			: [];
+		if (!find.open) return [];
+		// Find searches the visible thread: trimmed rows match nothing
+		// (undo the trim to search the whole history).
+		const floor = Math.max(trimPointIndex(viewChat), 0);
+		return findMessageIndices(
+			viewChat.messages.map((m) => m.content),
+			find.query
+		).filter((i) => i >= floor);
 	}
 	function landFindHit(): void {
 		const index = currentFindHits()[find.cursor];
@@ -8395,9 +8397,11 @@
 	});
 
 	function jumpTo(index: number) {
-		selectedIdx = index;
+		// A trim hides the prefix: selection never parks on an
+		// unmounted row (gg lands on the first visible message).
+		selectedIdx = Math.max(index, Math.max(trimPointIndex(viewChat), 0));
 		document
-			.getElementById(`msg-${index}`)
+			.getElementById(`msg-${selectedIdx}`)
 			?.scrollIntoView({ block: "start", behavior: "smooth" });
 	}
 

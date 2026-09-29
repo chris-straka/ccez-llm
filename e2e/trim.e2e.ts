@@ -86,6 +86,33 @@ test("trim refuses the head of the chat", async ({ page }) => {
 	await expect(page.locator(".trim-marker")).toHaveCount(0);
 });
 
+// NOTE: no find-bar test — the bar only opens in the shell
+// (find-toggle is shell-only, and no shell e2e project exists),
+// so trim+find is an on-device check. The currentFindHits filter
+// is a no-op untrimmed (floor 0 keeps every hit).
+test("scroll selection stops at the trim point", async ({ page }) => {
+	await seedChat(page, seedMessages());
+	await page.goto("/");
+	await expect(page.locator("#msg-5")).toBeVisible({ timeout: 60_000 });
+	await hoverArticle(page, "msg-3");
+	await page.keyboard.press("t");
+	await expect(page.locator(".trim-marker")).toContainText("3 messages trimmed", {
+		timeout: 10_000
+	});
+	await page.keyboard.press("Control+g");
+	await expect(page.locator(".app[data-focus-mode='scroll']")).toHaveCount(1, {
+		timeout: 5_000
+	});
+	// gg goes to the first visible message, k holds there, j walks on.
+	await page.keyboard.press("g");
+	await page.keyboard.press("g");
+	await expect(page.locator("#msg-3.selected")).toBeVisible({ timeout: 5_000 });
+	await page.keyboard.press("k");
+	await expect(page.locator("#msg-3.selected")).toBeVisible({ timeout: 5_000 });
+	await page.keyboard.press("j");
+	await expect(page.locator("#msg-4.selected")).toBeVisible({ timeout: 5_000 });
+});
+
 test("a persisted trim restores its marker on boot", async ({ page }) => {
 	await seedChat(page, seedMessages());
 	await page.addInitScript(() => {
