@@ -991,9 +991,20 @@ describe("annotationAnswer", () => {
 		expect(user!.content).toContain("Regarde la neige");
 	});
 
-	it("asks what the quote means for an empty comment", () => {
+	it("teaches the quote's language, never a gist summary", () => {
+		const [system] = buildAnnotationAnswerMessages(q);
+		expect(system!.content).toContain("as language, not gist");
+		expect(system!.content).toContain("word forms");
+		expect(system!.content).toContain("how the words fit together");
+		expect(system!.content).toContain("reusable vocabulary");
+		expect(system!.content).toContain("what it means in this paragraph");
+	});
+
+	it("asks to be taught the quote for an empty comment", () => {
 		const [, user] = buildAnnotationAnswerMessages({ ...q, question: "  " });
-		expect(user!.content).toContain("What does this mean?");
+		expect(user!.content).toContain(
+			"Teach me the language of this quote and what it means here."
+		);
 	});
 
 	it("asks once per filing, rejecting blanks and empties", async () => {
