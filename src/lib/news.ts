@@ -20,19 +20,26 @@ export interface NewsRegion {
 	label: string;
 }
 
-/** Feed config for one app language: `hl` plus editions, default first. */
+/**
+ * Feed config for one app language: `hl` plus editions, default
+ * first. `fallback` marks a language with no edition of its own —
+ * a home-country English edition where one exists (ur → Pakistani
+ * English), else US English. Headlines read in English, sessions
+ * run in the learner's language (the panel says so).
+ */
 export interface NewsFeed {
 	hl: string;
 	regions: NewsRegion[];
+	fallback?: true;
 }
 
 /**
  * Google News editions per app language code, every `hl` verified
- * live (unknown codes redirect to English or a neighbor language,
- * so anything unverified stays OUT rather than mislabel). Default
- * region first (rendered as 🌍 Global — Google has no true world
- * edition, so the default is the broadest sensible one). Absent
- * codes have no edition and get the honest empty state.
+ * live (unknown codes redirect to English or a neighbor language —
+ * da → Norwegian, hy → Russian, la/grc/sa → Italian/Greek/Hindi —
+ * so anything unverified stays OUT rather than mislabel). Chips
+ * show plain country labels, default first. Absent codes (unknown
+ * to the app) keep the honest empty state.
  */
 export const NEWS_FEEDS: Record<string, NewsFeed> = {
 	fr: {
@@ -125,6 +132,7 @@ export const NEWS_FEEDS: Record<string, NewsFeed> = {
 		hl: "zh-TW",
 		regions: [
 			{ gl: "TW", label: "Taiwan" },
+			{ gl: "CN", label: "China" },
 			{ gl: "HK", label: "Hong Kong" },
 			{ gl: "SG", label: "Singapore" }
 		]
@@ -154,12 +162,39 @@ export const NEWS_FEEDS: Record<string, NewsFeed> = {
 		]
 	},
 	ta: { hl: "ta", regions: [{ gl: "IN", label: "India" }] },
-	ms: { hl: "ms-MY", regions: [{ gl: "MY", label: "Malaysia" }] }
+	ms: { hl: "ms-MY", regions: [{ gl: "MY", label: "Malaysia" }] },
+	// Fallback editions (verified redirect targets above): no
+	// in-language edition exists, so English carries the headlines.
+	da: { hl: "en-US", regions: [{ gl: "US", label: "U.S." }], fallback: true },
+	hy: { hl: "en-US", regions: [{ gl: "US", label: "U.S." }], fallback: true },
+	fa: { hl: "en-US", regions: [{ gl: "US", label: "U.S." }], fallback: true },
+	is: { hl: "en-US", regions: [{ gl: "US", label: "U.S." }], fallback: true },
+	yue: { hl: "en-US", regions: [{ gl: "US", label: "U.S." }], fallback: true },
+	la: { hl: "en-US", regions: [{ gl: "US", label: "U.S." }], fallback: true },
+	grc: { hl: "en-US", regions: [{ gl: "US", label: "U.S." }], fallback: true },
+	non: { hl: "en-US", regions: [{ gl: "US", label: "U.S." }], fallback: true },
+	sux: { hl: "en-US", regions: [{ gl: "US", label: "U.S." }], fallback: true },
+	akk: { hl: "en-US", regions: [{ gl: "US", label: "U.S." }], fallback: true },
+	ur: { hl: "en-PK", regions: [{ gl: "PK", label: "Pakistan" }], fallback: true },
+	tl: {
+		hl: "en-PH",
+		regions: [{ gl: "PH", label: "Philippines" }],
+		fallback: true
+	},
+	am: { hl: "en-ET", regions: [{ gl: "ET", label: "Ethiopia" }], fallback: true },
+	sw: { hl: "en-KE", regions: [{ gl: "KE", label: "Kenya" }], fallback: true },
+	sa: { hl: "en-IN", regions: [{ gl: "IN", label: "India" }], fallback: true },
+	ang: { hl: "en-GB", regions: [{ gl: "GB", label: "Britain" }], fallback: true }
 };
 
 /** True when the language has a Google News edition. */
 export function isNewsSupported(code: string): boolean {
 	return NEWS_FEEDS[code] !== undefined;
+}
+
+/** True when the language reads a fallback English edition. */
+export function isNewsFallback(code: string): boolean {
+	return NEWS_FEEDS[code]?.fallback === true;
 }
 
 /** Editions for a language, default first; null when unsupported. */
@@ -260,12 +295,16 @@ export interface NewsPanelState {
 	status: NewsStatus;
 	stories: NewsStory[];
 	error: string;
+	/** True when the headlines come from an English fallback edition. */
+	fallback: boolean;
 }
 
-/** One card's expanded option row (page-owned, cleared on launch). */
+/** One card's expanded option rows (page-owned, cleared on launch). */
 export interface NewsPicker {
 	link: string;
 	kind: NewsKind;
+	/** Chosen summary level (read only, B1 until tapped). */
+	level?: CefrLevel;
 }
 
 /** CEFR levels for conversation sessions. */
@@ -302,14 +341,17 @@ export const SUMMARY_SIZES: Array<{
 export function newsSummaryInstruction(
 	story: NewsStory,
 	size: SummarySize,
+	level: CefrLevel,
 	langName: string
 ): string {
 	const words =
 		SUMMARY_SIZES.find((s) => s.size === size)?.words ?? 200;
+	const tag = CEFR_LEVELS.find((l) => l.level === level)?.tag ?? "";
 	const byline = story.source ? ` (${story.source})` : "";
 	return (
 		`📰 "${story.title}"${byline}\n` +
-		`Summarize the pasted article in ${langName}, about ${words} words.`
+		`Summarize the pasted article in ${langName} at CEFR ${level} (${tag}), ` +
+		`about ${words} words.`
 	);
 }
 

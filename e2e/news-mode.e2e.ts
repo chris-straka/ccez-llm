@@ -36,14 +36,16 @@ test("empty-chat language pick opens news, close returns to welcome", async ({
 	await expect(page.locator(".empty-state h1")).toBeVisible();
 });
 
-test("unsupported language shows the no-edition note", async ({ page }) => {
-	await page.locator('.lang-menu button:has-text("Classics")').click();
+test("fallback language notes its English headlines", async ({ page }) => {
+	await page.locator('.lang-menu button:has-text("Europe")').click();
 	const list = page.locator(".lang-list");
 	await expect(list).toBeVisible();
-	await list.getByRole("menuitem", { name: "Latin" }).click();
+	await list.getByRole("menuitem", { name: "Danish" }).click();
 	const panel = page.locator(".news-panel");
 	await expect(panel).toBeVisible({ timeout: 10_000 });
-	await expect(panel).toContainText("no Latin edition yet");
+	await expect(panel).toContainText("No Danish edition yet");
+	await expect(panel).toContainText("headlines in English; sessions run in Danish");
+	await expect(panel).toContainText("needs the app shell");
 	await panel.getByRole("button", { name: "Close news" }).click();
 	await expect(panel).toHaveCount(0);
 });

@@ -7,8 +7,9 @@ import { readFileSync } from "node:fs";
  * the component owns the cards markup and their surfaces. Story
  * buttons are icon-only by explicit user call (emoji with text
  * alternatives); option rows expand inline under their card.
- * Region chips hide for single-edition languages; the default chip
- * always reads Global. All color rides theme tokens.
+ * Region chips hide for single-edition languages; chips show plain
+ * country labels, and fallback editions note their English headlines.
+ * All color rides theme tokens.
  */
 function panelSource(): string {
 	return readFileSync(new URL("./NewsPanel.svelte", import.meta.url), "utf8");
@@ -38,17 +39,34 @@ describe("news panel contract", () => {
 	it("expands CEFR and length pickers inline per card", () => {
 		const source = panelSource();
 		expect(source).toContain('aria-label="Conversation level"');
+		expect(source).toContain('aria-label="Summary level"');
 		expect(source).toContain('aria-label="Summary length"');
 		expect(source).toContain("CEFR_LEVELS");
 		expect(source).toContain("SUMMARY_SIZES");
 		expect(source).toContain("aria-expanded");
+		// Summary levels select without launching (length taps launch).
+		expect(source).toContain("actions.level(story.link, level.level)");
+		expect(source).toContain('picker.level ?? "B1"');
 	});
 
-	it("chips regions with Global first, hidden for single editions", () => {
+	it("chips plain country labels, hidden for single editions", () => {
 		const source = panelSource();
 		expect(source).toContain("panel.regions.length > 1");
-		expect(source).toContain("🌍 Global");
+		expect(source).not.toContain("🌍 Global");
+		expect(source).toContain("{region.label}");
 		expect(source).toContain("aria-pressed");
+	});
+
+	it("notes fallback English headlines with sessions in-language", () => {
+		const source = panelSource();
+		expect(source).toContain("panel.fallback");
+		expect(source).toContain("headlines in English; sessions run in");
+	});
+
+	it("lays cards out as a responsive grid", () => {
+		const css = panelSource().split("<style>")[1] ?? "";
+		expect(css).toContain("display: grid");
+		expect(css).toContain("auto-fill");
 	});
 
 	it("covers every fetch state with retry where retry helps", () => {

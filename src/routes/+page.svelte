@@ -76,7 +76,6 @@
 	} from "$lib/settings";
 	import { cycleThinkingId } from "$lib/providers/thinking";
 	import {
-		LANGUAGE_MENUS,
 		QUICK_LANG_CODES,
 		langMenuAnchorFor,
 		langNameForTag,
@@ -282,12 +281,14 @@
 		SUMMARY_SIZES,
 		decodeNewsLink,
 		fetchRawPage,
+		isNewsFallback,
 		loadNewsStories,
 		newsConversationInstruction,
 		newsErrorCopy,
 		newsRegionsFor,
 		newsSummaryInstruction,
 		resolveArticleText,
+		type CefrLevel,
 		type NewsKind,
 		type NewsPanelState,
 		type NewsPicker
@@ -2192,13 +2193,11 @@
 			promptEl?.getBoundingClientRect().top ?? window.innerHeight;
 		// Smart anchor geometry lives in languages (pure, tested);
 		// only the DOM reads stay here.
-		const menu = LANGUAGE_MENUS.find((m) => m.id === id);
 		langMenuAnchor = langMenuAnchorFor({
 			btnLeft: r.left,
 			btnBottom: r.bottom,
 			composerTop,
-			viewportWidth: window.innerWidth,
-			itemCount: menu?.languages.length ?? 8
+			viewportWidth: window.innerWidth
 		});
 	}
 	$effect(() => {
@@ -3066,6 +3065,15 @@
 			find.open = false;
 		};
 		window.addEventListener("pointerdown", onFindOutside, { passive: true });
+		// Card picker outside dismiss: a press outside the panel folds
+		// open option rows (the launch flow owns busy cards, never this).
+		const onNewsPickerOutside = (event: PointerEvent): void => {
+			if (!newsPicker || newsBusy) return;
+			const target = event.target instanceof Element ? event.target : null;
+			if (target?.closest(".news-panel")) return;
+			newsPicker = null;
+		};
+		window.addEventListener("pointerdown", onNewsPickerOutside, { passive: true });
 		// Filed-annotations card dismiss: a press outside the card's
 		// own wrap closes it (capture, so the press never also acts
 		// behind the card). Presses on the pill or inside the card
@@ -8854,7 +8862,8 @@
 				region: "",
 				status: "unsupported",
 				stories: [],
-				error: ""
+				error: "",
+				fallback: false
 			};
 			return;
 		}
@@ -8865,7 +8874,8 @@
 			region: regions[0]?.gl ?? "",
 			status: "loading",
 			stories: [],
-			error: ""
+			error: "",
+			fallback: isNewsFallback(code)
 		};
 		void fetchNewsStories();
 	}
@@ -8913,7 +8923,17 @@
 		if (story && kind === "talk" && level) {
 			instruction = newsConversationInstruction(story, level.level, current.langName);
 		} else if (story && kind === "read" && size) {
-			instruction = newsSummaryInstruction(story, size.size, current.langName);
+			// Summaries carry a level too: the picker's row, B1 until tapped.
+			const summaryLevel =
+				newsPicker?.kind === "read" && newsPicker.link === link
+					? (newsPicker.level ?? "B1")
+					: "B1";
+			instruction = newsSummaryInstruction(
+				story,
+				size.size,
+				summaryLevel,
+				current.langName
+			);
 		} else {
 			return;
 		}
@@ -8970,6 +8990,12 @@
 		},
 		pick: (link: string, kind: NewsKind, value: string) => {
 			void launchNewsSession(link, kind, value);
+		},
+		level: (link: string, level: CefrLevel) => {
+			if (newsBusy) return;
+			if (newsPicker?.link === link && newsPicker.kind === "read") {
+				newsPicker = { ...newsPicker, level };
+			}
 		},
 		close: () => {
 			news = null;
@@ -10956,6 +10982,10 @@
 				// so it sits in the ladder beside the filed-annotations
 				// card: Esc closes it.
 				expandedTags = [];
+			} else if (newsPicker) {
+				// A card's open option rows are the same class of inline
+				// expansion: Esc folds them (the panel keeps its ✕).
+				newsPicker = null;
 			} else if (answerPop) {
 				// The answer card has no close button: Esc fades it.
 				closeAnswerPop();

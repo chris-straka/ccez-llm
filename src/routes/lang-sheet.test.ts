@@ -5,13 +5,12 @@ import { describe, it, expect } from "vitest";
  * Phone language-sheet anchoring invariants.
  *
  * Asserted on LangMenus.svelte source because the behavior they guard —
- * the fixed sheet dropping under its pill or centering on the
- * screen — is invisible to jsdom (no layout, no viewport). Short
- * lists drop under their pill like a plain menu; long ones
- * (Europe/Asia never fit between pill and composer) center on the
- * screen via top:50% plus translateY(-50%). A top/bottom pair is
- * forbidden — an over-constrained fixed box stretches full-band
- * (margins compute to zero) and reads as a massive empty panel.
+ * the fixed sheet dropping under its pill — is invisible to jsdom
+ * (no layout, no viewport). Every list drops under its pill like a
+ * plain menu, capped with an internal scroll; nothing centers. A
+ * top/bottom pair is forbidden — an over-constrained fixed box
+ * stretches full-band (margins compute to zero) and reads as a
+ * massive empty panel.
  */
 /** Pill row moved to LangMenus.svelte with its styles. */
 function menuSource(): string {
@@ -29,14 +28,13 @@ function menuStyle(): string {
 }
 
 describe("phone language sheet", () => {
-	it("centers long lists with top:50% plus translateY", () => {
+	it("never centers: no top:50% or translateY anywhere", () => {
 		const css = menuStyle();
-		expect(css).toMatch(
-			/\.lang-list-fixed\s*\{[^}]*top:\s*50%[^}]*transform:\s*translateY\(-50%\)/
-		);
+		expect(css).not.toMatch(/top:\s*50%/);
+		expect(css).not.toMatch(/translateY\(-50%\)/);
 	});
 
-	it("drops short lists with no translate", () => {
+	it("drops every list with no translate", () => {
 		const css = menuStyle();
 		expect(css).toMatch(
 			/\.lang-list-fixed\.lang-list-drop\s*\{[^}]*transform:\s*none/
@@ -59,11 +57,12 @@ describe("phone language sheet", () => {
 		}
 	});
 
-	it("anchors the sheet with left, max-height, and drop-only top", () => {
+	it("anchors the sheet with left, max-height, and drop top", () => {
 		const source = menuSource();
 		expect(source).toContain("left: ${anchor.left}px;");
 		expect(source).toContain("max-height: ${anchor.maxH}px;");
-		expect(source).toContain('anchor.mode === "drop"');
+		expect(source).toContain("top: ${anchor.top}px;");
+		expect(source).not.toContain("anchor.mode");
 		expect(source).not.toContain("anchor.bottom");
 	});
 });

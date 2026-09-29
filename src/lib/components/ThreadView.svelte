@@ -24,6 +24,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 	} from "$lib/reading";
 	import type { LanguageMenu, ReplyLanguage } from "$lib/languages";
 	import type {
+		CefrLevel,
 		NewsKind,
 		NewsPanelState,
 		NewsPicker
@@ -130,7 +131,6 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		langMenuAnchor: {
 			left: number;
 			maxH: number;
-			mode: "drop" | "center";
 			top: number;
 		} | null;
 		// Mirrors LangMenusActions (kept structural: type imports from
@@ -149,6 +149,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 			region: (gl: string) => void;
 			toggle: (link: string, kind: NewsKind) => void;
 			pick: (link: string, kind: NewsKind, value: string) => void;
+			level: (link: string, level: CefrLevel) => void;
 			close: () => void;
 			retry: () => void;
 		};

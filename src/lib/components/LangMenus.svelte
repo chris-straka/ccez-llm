@@ -2,9 +2,9 @@
 same pills, inert: they preview the empty state, but every tap belongs
 to the active chat — hovering away restores it. Rendered under the
 hero on every platform; an open pill escapes as a fitted fixed
-sheet (drop under the pill, or centered for long lists). The page
-owns the open menu, the sheet anchor, the active code, and every
-behavior; this component owns the row markup and its surfaces. -->
+sheet dropping under its pill. The page owns the open menu, the
+sheet anchor, the active code, and every behavior; this component
+owns the row markup and its surfaces. -->
 <script lang="ts">
 	import {
 		LANGUAGE_MENUS,
@@ -25,7 +25,6 @@ behavior; this component owns the row markup and its surfaces. -->
 		anchor: {
 			left: number;
 			maxH: number;
-			mode: "drop" | "center";
 			top: number;
 		} | null;
 		activeCode: string | null;
@@ -52,18 +51,16 @@ behavior; this component owns the row markup and its surfaces. -->
 			</button>
 			{#if openId === menu.id}
 				<!-- The open list escapes the thread scroller as a fitted
-				fixed sheet (left/max-height ride inline from the pill
-				rect): in-flow it would clip past the scroller box. Short
-				lists drop under their pill, long ones center. -->
+				fixed sheet (left/top/max-height ride inline from the
+				pill rect): in-flow it would clip past the scroller box.
+				Every list drops under its pill, capped with a scroll. -->
 				<div
 					class="lang-list"
 					class:lang-list-fixed={anchor !== null}
-					class:lang-list-drop={
-						anchor !== null && anchor.mode === "drop"
-					}
+					class:lang-list-drop={anchor !== null}
 					role="menu"
 					style={anchor
-						? `left: ${anchor.left}px; max-height: ${anchor.maxH}px;${anchor.mode === "drop" ? ` top: ${anchor.top}px;` : ""}`
+						? `left: ${anchor.left}px; max-height: ${anchor.maxH}px; top: ${anchor.top}px;`
 						: undefined}
 				>
 					<!-- Menu-click clears only languages without a number key
@@ -108,26 +105,22 @@ behavior; this component owns the row markup and its surfaces. -->
 		bottom: auto;
 	}
 	/* The open sheet escapes the thread scroller as a fitted fixed
-	panel (left/max-height ride inline from the pill rect): the
-	scroller clips anything past its box, which read as five
-	languages cut by a rectangle. Short lists drop under their
-	pill (.lang-list-drop, top rides inline); long ones center on
-	the screen (top:50% plus translateY). The list never sets a
-	top/bottom pair (an over-constrained fixed box stretches
-	full-band and reads as a massive empty panel). Long lists cap
-	at max-height and scroll. */
+	panel (left/top/max-height ride inline from the pill rect):
+	the scroller clips anything past its box, which read as five
+	languages cut by a rectangle. Every list drops under its pill
+	(.lang-list-drop); long ones cap at max-height and scroll. The
+	list never sets a top/bottom pair (an over-constrained fixed
+	box stretches full-band and reads as a massive empty panel). */
 	.lang-menu .lang-list-fixed {
 		position: fixed;
-		top: 50%;
+		top: auto;
 		bottom: auto;
 		left: auto;
 		right: auto;
-		transform: translateY(-50%);
 		z-index: 60;
 		overflow-y: auto;
 	}
 	.lang-menu .lang-list-fixed.lang-list-drop {
-		top: auto;
 		transform: none;
 	}
 	:global(.app[data-android]) .lang-menu > button {
@@ -201,7 +194,7 @@ behavior; this component owns the row markup and its surfaces. -->
 		min-width: 0;
 		width: max-content;
 		max-width: calc(100vw - 1rem);
-		/* Full extent, never a scrollbar: the longest menu is 15 items
+		/* Full extent, never a scrollbar: the longest menu is 21 items
 		and the list opens upward over the messages. */
 		display: flex;
 		flex-direction: column;
@@ -214,7 +207,7 @@ behavior; this component owns the row markup and its surfaces. -->
 		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
 	}
 	@media (hover: none) {
-		/* A phone can't fit the 15-item list above the pills, so it
+		/* A phone can't fit the 21-item list above the pills, so it
 		gets a capped sheet with its own scroll instead of flying off
 		the top of the screen. Desktop keeps full extent, no scrollbar. */
 		.lang-list {

@@ -174,7 +174,17 @@ const VISION_PRIMARIES = new Set([
 
 /** Reply codes in Latin script with no dedicated Vision model — the
  * default pass reads them through its English model. */
-const LATIN_SCRIPT_CODES = new Set(["hu", "fi", "sk", "tl", "sw", "la"]);
+const LATIN_SCRIPT_CODES = new Set([
+	"hu",
+	"fi",
+	"sk",
+	"tl",
+	"sw",
+	"la",
+	"is",
+	"non",
+	"ang"
+]);
 
 /** Reply codes in Cyrillic with no dedicated Vision model — the
  * shared Cyrillic base (ru/uk request) reads them on retry. */

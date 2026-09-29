@@ -7,6 +7,7 @@ either); everything else is theme tokens, never raw hex. -->
 	import {
 		CEFR_LEVELS,
 		SUMMARY_SIZES,
+		type CefrLevel,
 		type NewsKind,
 		type NewsPanelState,
 		type NewsPicker
@@ -20,6 +21,7 @@ either); everything else is theme tokens, never raw hex. -->
 			region: (gl: string) => void;
 			toggle: (link: string, kind: NewsKind) => void;
 			pick: (link: string, kind: NewsKind, value: string) => void;
+			level: (link: string, level: CefrLevel) => void;
 			close: () => void;
 			retry: () => void;
 		};
@@ -40,9 +42,15 @@ either); everything else is theme tokens, never raw hex. -->
 			✕
 		</button>
 	</div>
+	{#if panel.fallback}
+		<p class="news-note">
+			No {panel.langName} edition yet — showing {panel.regions[0]?.label ??
+				"global"} headlines in English; sessions run in {panel.langName}.
+		</p>
+	{/if}
 	{#if panel.regions.length > 1 && panel.status !== "unsupported" && panel.status !== "needs-shell"}
 		<div class="news-chips" role="group" aria-label="News region">
-			{#each panel.regions as region, i (region.gl)}
+			{#each panel.regions as region (region.gl)}
 				<button
 					type="button"
 					class="news-chip"
@@ -50,7 +58,7 @@ either); everything else is theme tokens, never raw hex. -->
 					aria-pressed={panel.region === region.gl}
 					onclick={() => actions.region(region.gl)}
 				>
-					{i === 0 ? "🌍 Global" : region.label}
+					{region.label}
 				</button>
 			{/each}
 		</div>
@@ -127,6 +135,20 @@ either); everything else is theme tokens, never raw hex. -->
 						</div>
 					{/if}
 					{#if picker?.link === story.link && picker?.kind === "read" && busy === null}
+						<div class="news-pick" role="group" aria-label="Summary level">
+							{#each CEFR_LEVELS as level (level.level)}
+								<button
+									type="button"
+									class="news-opt"
+									class:on={(picker.level ?? "B1") === level.level}
+									aria-pressed={(picker.level ?? "B1") === level.level}
+									title={level.tag}
+									onclick={() => actions.level(story.link, level.level)}
+								>
+									{level.level}
+								</button>
+							{/each}
+						</div>
 						<div class="news-pick" role="group" aria-label="Summary length">
 							{#each SUMMARY_SIZES as size (size.size)}
 								<button
@@ -233,8 +255,8 @@ either); everything else is theme tokens, never raw hex. -->
 		list-style: none;
 		margin: 0;
 		padding: 0;
-		display: flex;
-		flex-direction: column;
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
 		gap: 0.6rem;
 	}
 	.news-card {
@@ -312,5 +334,13 @@ either); everything else is theme tokens, never raw hex. -->
 		font-weight: 600;
 		min-height: 2.75rem;
 		cursor: pointer;
+	}
+	.news-opt.on {
+		background: #007aff;
+		background: var(--accent);
+		border-color: #007aff;
+		border-color: var(--accent);
+		color: #fff;
+		color: var(--accent-ink);
 	}
 </style>

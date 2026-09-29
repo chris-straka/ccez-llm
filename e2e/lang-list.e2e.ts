@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { seedChat } from "./helpers";
 
 /**
- * Phone viewports can't fit the 15-language Europe list above the
+ * Phone viewports can't fit the 21-language Europe list above the
  * pills, so on touch it renders as a capped sheet: the whole list box
  * must stay inside the viewport (it used to fly off the top).
  */
@@ -59,22 +59,24 @@ test("classics list stays inside a phone viewport", async ({ page }) => {
 	expect(box!.y + box!.height).toBeLessThanOrEqual(915);
 });
 
-/** Long sheets center shrink-wrapped on the screen: the top/bottom
-pin read as a massive empty panel (Europe stretched full-band). */
-test("europe sheet centers shrink-wrapped on the screen", async ({
-	page
-}) => {
-	await page.locator('.lang-menu button:has-text("Europe")').click();
+/** Long sheets drop under their pill like short ones (capped with a
+scroll), never floating centered away from the button that opened them. */
+test("europe sheet drops capped under its pill", async ({ page }) => {
+	const pill = page.locator('.lang-menu button:has-text("Europe")');
+	await pill.click();
 	const list = page.locator(".lang-list");
 	await expect(list).toBeVisible();
+	await expect(list).toHaveClass(/lang-list-drop/);
+	const pillBox = await pill.boundingBox();
 	const box = await list.boundingBox();
 	expect(box, "language list has a box").toBeTruthy();
-	expect(box!.height, "sheet caps instead of stretching").toBeLessThan(915);
-	const center = (915 - box!.height) / 2;
-	expect(
-		Math.abs(box!.y - center),
-		"sheet centers vertically on the screen"
-	).toBeLessThan(16);
+	expect(box!.height, "long sheet caps instead of stretching").toBeLessThan(915);
+	expect(box!.y, "sheet hugs its pill").toBeGreaterThanOrEqual(
+		pillBox!.y + pillBox!.height + 2
+	);
+	expect(box!.y, "sheet hugs its pill").toBeLessThanOrEqual(
+		pillBox!.y + pillBox!.height + 14
+	);
 });
 
 /** Short sheets drop under their own pill like a plain menu instead

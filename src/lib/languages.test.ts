@@ -47,7 +47,8 @@ describe("reply languages", () => {
 			"da",
 			"fi",
 			"sr",
-			"sk"
+			"sk",
+			"is"
 		]);
 	});
 
@@ -93,7 +94,15 @@ describe("reply languages", () => {
 	});
 
 	it("lists Latin, Ancient Greek, Sanskrit", () => {
-		expect(CLASSICAL_LANGUAGES.map((l) => l.code)).toEqual(["la", "grc", "sa"]);
+		expect(CLASSICAL_LANGUAGES.map((l) => l.code)).toEqual([
+			"la",
+			"grc",
+			"sa",
+			"non",
+			"ang",
+			"sux",
+			"akk"
+		]);
 	});
 
 	it("gives every language a distinct emoji marker", () => {
@@ -191,26 +200,19 @@ describe("langMenuAnchorFor", () => {
 		btnLeft: 100,
 		btnBottom: 200,
 		composerTop: 800,
-		viewportWidth: 1280,
-		itemCount: 4
+		viewportWidth: 1280
 	};
 
-	it("drops short lists under the pill, capped at the composer", () => {
+	it("drops every list under its pill, capped at the composer", () => {
 		expect(langMenuAnchorFor(base)).toEqual({
 			left: 100,
 			maxH: 578,
-			mode: "drop",
 			top: 206
 		});
 	});
 
-	it("centers long lists that never fit the gap", () => {
-		expect(
-			langMenuAnchorFor({ ...base, itemCount: 30 }).mode
-		).toBe("center");
-		expect(
-			langMenuAnchorFor({ ...base, itemCount: 30 }).maxH
-		).toBe(784);
+	it("floors the cap so cramped pills still show rows", () => {
+		expect(langMenuAnchorFor({ ...base, composerTop: 250 }).maxH).toBe(140);
 	});
 
 	it("keeps the left edge on-screen", () => {

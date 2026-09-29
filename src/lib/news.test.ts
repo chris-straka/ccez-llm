@@ -8,6 +8,7 @@ import {
 	cachedArticle,
 	cachedNewsUrl,
 	fetchArticleText,
+	isNewsFallback,
 	isNewsSupported,
 	jinaUrl,
 	loadNewsStories,
@@ -55,10 +56,11 @@ describe("news feeds", () => {
 		expect(newsRssUrl("fr", "DE")).toBeNull();
 	});
 
-	it("covers every reply language or names it unsupported", () => {
+	it("covers every reply language, fallback where no edition exists", () => {
 		// Live-verified gaps: Google redirects these to English or a
-		// neighbor language (da → Norwegian!), so they stay out.
-		const unsupported = new Set([
+		// neighbor language (da → Norwegian, hy → Russian), so they
+		// read a fallback English edition instead of nothing.
+		const fallback = new Set([
 			"tl",
 			"yue",
 			"hy",
@@ -69,7 +71,12 @@ describe("news feeds", () => {
 			"da",
 			"fa",
 			"ur",
-			"sw"
+			"sw",
+			"is",
+			"non",
+			"sux",
+			"akk",
+			"ang"
 		]);
 		const codes = [
 			...EUROPEAN_LANGUAGES,
@@ -79,23 +86,31 @@ describe("news feeds", () => {
 		].map((l) => l.code);
 		expect(codes.length).toBeGreaterThan(40);
 		for (const code of codes) {
-			if (unsupported.has(code)) {
-				expect(isNewsSupported(code)).toBe(false);
-				expect(newsRegionsFor(code)).toBeNull();
-			} else {
-				expect(isNewsSupported(code)).toBe(true);
-				const regions = newsRegionsFor(code);
-				expect(regions!.length).toBeGreaterThanOrEqual(1);
-				// Default region first, every region addressable.
-				for (const region of regions!) {
-					expect(newsRssUrl(code, region.gl)).toContain(`gl=${region.gl}`);
-				}
+			expect(isNewsSupported(code)).toBe(true);
+			const regions = newsRegionsFor(code);
+			expect(regions!.length).toBeGreaterThanOrEqual(1);
+			expect(isNewsFallback(code)).toBe(fallback.has(code));
+			if (fallback.has(code)) {
+				// One English edition, home-country where one exists.
+				expect(regions!.length).toBe(1);
+				expect(newsRssUrl(code, regions![0]!.gl)).toContain("hl=en");
+			}
+			// Default region first, every region addressable.
+			for (const region of regions!) {
+				expect(newsRssUrl(code, region.gl)).toContain(`gl=${region.gl}`);
 			}
 		}
 		// No feed orphans: every table entry is a real language.
 		for (const code of Object.keys(NEWS_FEEDS)) {
 			expect(codes).toContain(code);
 		}
+		// Mainland China rides the Chinese feed past Taiwan.
+		expect(newsRegionsFor("zh")!.map((r) => r.gl)).toEqual([
+			"TW",
+			"CN",
+			"HK",
+			"SG"
+		]);
 	});
 });
 
@@ -182,16 +197,20 @@ describe("session prompts", () => {
 	});
 
 	it("writes short summary openers with outlet and word target", () => {
-		const short = newsSummaryInstruction(story, "short", "French");
+		const short = newsSummaryInstruction(story, "short", "B1", "French");
 		expect(short).toContain("📰");
 		expect(short).toContain("Markets rally");
 		expect(short).toContain("BBC News");
 		expect(short).toContain("French");
 		expect(short).toContain("80 words");
-		expect(newsSummaryInstruction(story, "long", "French")).toContain("450 words");
+		expect(short).toContain("CEFR B1");
+		expect(short).toContain("Intermediate");
+		expect(newsSummaryInstruction(story, "long", "C1", "French")).toContain(
+			"450 words"
+		);
 		// Sourceless stories skip the byline, never dangling parens.
 		expect(
-			newsSummaryInstruction({ ...story, source: "" }, "short", "French")
+			newsSummaryInstruction({ ...story, source: "" }, "short", "B1", "French")
 		).not.toContain("()");
 	});
 

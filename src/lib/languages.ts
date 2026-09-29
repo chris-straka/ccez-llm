@@ -58,7 +58,8 @@ export const EUROPEAN_LANGUAGES: ReplyLanguage[] = [
 	LANG("da", "Danish", "da-DK", "🇩🇰", "Dansk", "Rydet"),
 	LANG("fi", "Finnish", "fi-FI", "🇫🇮", "Suomi", "Tyhjennetty"),
 	LANG("sr", "Serbian", "sr-RS", "🇷🇸", "Српски", "Obrisano"),
-	LANG("sk", "Slovak", "sk-SK", "🇸🇰", "Slovenčina", "Vymazané")
+	LANG("sk", "Slovak", "sk-SK", "🇸🇰", "Slovenčina", "Vymazané"),
+	LANG("is", "Icelandic", "is-IS", "🇮🇸", "Íslenska", "Hreinsað")
 ];
 
 export const ASIAN_LANGUAGES: ReplyLanguage[] = [
@@ -88,7 +89,14 @@ export const ASIAN_LANGUAGES: ReplyLanguage[] = [
 export const CLASSICAL_LANGUAGES: ReplyLanguage[] = [
 	LANG("la", "Latin", "it-IT", "🏛", "Latina", "Deletum", "Reply in Latin."),
 	LANG("grc", "Ancient Greek", "el-GR", "🏺", "Ἀρχαία Ἑλληνικά", "Διαγέγραπται", "Reply in Ancient Greek."),
-	LANG("sa", "Sanskrit", "hi-IN", "🪷", "संस्कृतम्", "विलुप्तम्", "Reply in Sanskrit.")
+	LANG("sa", "Sanskrit", "hi-IN", "🪷", "संस्कृतम्", "विलुप्तम्", "Reply in Sanskrit."),
+	// Voices are modern approximations (Icelandic for Old Norse,
+	// British English for Old English, Iraqi Arabic for the
+	// Mesopotamian isolates); runes and cuneiform badge them.
+	LANG("non", "Old Norse", "is-IS", "ᚠ", "Norrœnt", "Hreinsat", "Reply in Old Norse."),
+	LANG("ang", "Old English", "en-GB", "ᚦ", "Englisċ", "Āclǣnsod", "Reply in Old English."),
+	LANG("sux", "Sumerian", "ar-SA", "𒆠", "Emegir", "dadag-ga", "Reply in Sumerian."),
+	LANG("akk", "Babylonian", "ar-SA", "𒀭", "Akkadûm", "ebbu", "Reply in Babylonian.")
 ];
 
 export const AFRICAN_LANGUAGES: ReplyLanguage[] = [
@@ -107,40 +115,31 @@ export interface LanguageMenu {
 export interface LangMenuAnchor {
 	left: number;
 	maxH: number;
-	mode: "drop" | "center";
 	top: number;
 }
 
 /**
- * Smart anchor for a language menu: a short list drops under its own
- * pill like a plain menu (Africa/Classics hug their buttons); a long
- * one centers on the screen instead. Europe/Asia never fit between
- * pill and composer, and a top/bottom pair is forbidden — an
- * over-constrained fixed box stretches full-band (margins compute to
- * zero), which reads as a massive empty panel. Height is estimated
- * from the item count (~35px a row, measured); the drop caps at the
- * composer and the centered sheet scrolls past maxH. Left edge stays
- * pill-anchored, shifted to stay on-screen. Pure and unit-tested.
+ * Smart anchor for a language menu: every list drops under its own
+ * pill like a plain menu, capped at the composer with an internal
+ * scroll past maxH — one alignment for all four families, so long
+ * lists hug their button exactly like short ones. A top/bottom
+ * pair is forbidden — an over-constrained fixed box stretches
+ * full-band (margins compute to zero), which reads as a massive
+ * empty panel. Left edge stays pill-anchored, shifted to stay
+ * on-screen. Pure and unit-tested.
  */
 export function langMenuAnchorFor(opts: {
 	btnLeft: number;
 	btnBottom: number;
 	composerTop: number;
 	viewportWidth: number;
-	itemCount: number;
 }): LangMenuAnchor {
-	const estH = opts.itemCount * 35 + 12;
 	const dropTop = Math.round(opts.btnBottom + 6);
-	const drop = dropTop + estH + 8 <= opts.composerTop;
 	return {
 		left: Math.round(
 			Math.max(8, Math.min(opts.btnLeft, opts.viewportWidth - 8 - 180))
 		),
-		maxH: Math.max(
-			140,
-			Math.round((drop ? opts.composerTop - dropTop : opts.composerTop) - 8 - 8)
-		),
-		mode: drop ? "drop" : "center",
+		maxH: Math.max(140, Math.round(opts.composerTop - dropTop - 8 - 8)),
 		top: dropTop
 	};
 }
@@ -246,8 +245,13 @@ const THINKING_LABEL: Record<string, string> = {
 	yue: "諗緊",
 	la: "Cogito",
 	grc: "Φρονῶ",
-	sa: "चिन्तयामि"
+	sa: "चिन्तयामि",
+	is: "Hugsar",
+	non: "Hugsar",
+	ang: "Þenceþ"
 };
+// Sumerian and Akkadian keep no thinking label (English fallback):
+// coining short status forms risks wrong words worse than none.
 
 /** Sending-status label for a reply-language code; English fallback. */
 export function thinkingLabelFor(code: string | null): string {

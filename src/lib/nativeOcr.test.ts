@@ -207,7 +207,7 @@ describe("visionSupports", () => {
 			expect(visionSupports(code)).toBe(true);
 		}
 		// Latin without its own model reads through English …
-		for (const code of ["hu", "fi", "sk", "tl", "sw", "la"]) {
+		for (const code of ["hu", "fi", "sk", "tl", "sw", "la", "is", "non", "ang"]) {
 			expect(visionSupports(code)).toBe(true);
 		}
 		// … as does unmodeled Cyrillic through the shared base.
