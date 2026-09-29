@@ -1,4 +1,9 @@
-import { ttsLangFor, scriptRunKey, hasDistinctiveChinese } from "./reading";
+import {
+	ttsLangFor,
+	scriptRunKey,
+	hasDistinctiveChinese,
+	transliterateGurmukhi
+} from "./reading";
 import type { VoiceEngine } from "./settings";
 
 /**
@@ -105,6 +110,25 @@ export function effectiveSpeechLang(
 	const fallback = spokenFallbackFor(lang);
 	if (fallback && webVoiceAvailable(fallback, voices)) return fallback;
 	return lang;
+}
+
+/**
+ * Speakable text for an utterance: Gurmukhi runs become Devanagari
+ * when no Punjabi voice is installed but a Hindi one is, so the
+ * downstream Hindi voice reads ~the right sounds instead of the
+ * default voice rendering silence (see `transliterateGurmukhi`).
+ * Text without Gurmukhi, a real Punjabi voice, a missing Hindi
+ * voice, and an unloaded inventory all pass through untouched. Pure.
+ */
+export function punjabiSpeechText(
+	text: string,
+	voices: ReadonlyArray<{ lang: string }>
+): string {
+	if (voices.length === 0) return text;
+	if (!/\p{Script=Gurmukhi}/u.test(text)) return text;
+	if (webVoiceAvailable("pa-IN", voices)) return text;
+	if (!webVoiceAvailable("hi-IN", voices)) return text;
+	return transliterateGurmukhi(text);
 }
 
 /** One speakable sentence with its own voice locale. */

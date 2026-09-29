@@ -17,6 +17,7 @@ import {
 	ttsLangFor,
 	scriptRunKey,
 	speakWord,
+	transliterateGurmukhi,
 	vocalizeArabic,
 	buildVocalizeMessages,
 	buildAidMessages,
@@ -232,6 +233,26 @@ describe("speech locales", () => {
 		expect(scriptRunKey(" ")).toBe("other");
 		expect(scriptRunKey("5")).toBe("other");
 		expect(scriptRunKey("。")).toBe("other");
+	});
+
+	it("transliterates Gurmukhi to Devanagari for the Hindi-voice fallback", () => {
+		expect(transliterateGurmukhi("ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ ! ਤੁਸੀਂ ਕਿਵੇਂ ਹੋ ?")).toBe(
+			"सति स्री अकाल ! तुसीं किवें हो ?"
+		);
+		// Addak doubles the next consonant through the halant.
+		expect(transliterateGurmukhi("ਪੱਤਾ")).toBe("पत्ता");
+		// Nukta consonants, precomposed and decomposed alike.
+		expect(transliterateGurmukhi("ਜ਼ਰੂਰ")).toBe("ज़रूर");
+		expect(transliterateGurmukhi("ਸ\u0A3C")).toBe("स\u093C");
+		expect(transliterateGurmukhi("ਸ\u0A03")).toBe("स\u0903");
+		expect(transliterateGurmukhi("੧੨੩")).toBe("१२३");
+		// Bindi (U+0A02) and tippi (U+0A70) both nasalize — escapes
+		// because the two render identically.
+		expect(transliterateGurmukhi("ਸ\u0A02")).toBe("स\u0902");
+		expect(transliterateGurmukhi("ਸ\u0A70")).toBe("स\u0902");
+		// Non-Gurmukhi passes through untouched.
+		expect(transliterateGurmukhi("hello ਸਤਿ 123 !")).toBe("hello सति 123 !");
+		expect(transliterateGurmukhi("hello")).toBe("hello");
 	});
 
 	it("reports unavailable synthesis without throwing", () => {

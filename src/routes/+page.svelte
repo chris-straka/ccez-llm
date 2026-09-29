@@ -516,6 +516,7 @@
 		micUnavailableMessage,
 		startSpeechError,
 		speechErrorStep,
+		punjabiSpeechText,
 		effectiveSpeechLang,
 		stopSpeaking,
 		micAvailable,
@@ -6784,18 +6785,21 @@
 		if (!text) return;
 		const fallback = latinFallback(settings.voiceLang);
 		const voices = webVoices();
+		// No Punjabi voice on the device: the Hindi voice reads the
+		// transliteration instead of the default voice going silent.
+		const speakable = punjabiSpeechText(text, voices);
 		if (!messageSpeakableFor(settings.voiceEngine, msg.content, fallback, voices)) {
 			if (!quiet) setVoiceError("No voice for this language.");
 			return;
 		}
-		const stripped = text.replace(/```[\s\S]*?```/g, " ");
+		const stripped = speakable.replace(/```[\s\S]*?```/g, " ");
 		// Whole-message voice seeds the Latin sentences; each one then
 		// resolves its own language, so four languages read in four
 		// voices (see sentenceLangsFor).
 		const seed = await quoteLangFor(stripped, fallback);
 		startSpeech(
 			msg.id,
-			text,
+			speakable,
 			await sentenceLangsFor(
 				stripped,
 				seed,
@@ -6978,9 +6982,13 @@
 		// kanji identify nothing on their own (Han reads Chinese by
 		// default), so a kanji-only highlight inside Japanese text
 		// reads Japanese — the quote alone would read Chinese.
+		const voices = webVoices();
+		// No Punjabi voice on the device: the Hindi voice reads the
+		// transliteration instead of the default voice going silent.
+		quote = punjabiSpeechText(quote, voices);
+		context = punjabiSpeechText(context, voices);
 		const sentence = sentenceForQuote(context, quote);
 		const probe = sentence ?? context;
-		const voices = webVoices();
 		const lang = effectiveSpeechLang(
 			await quoteLangForContext(
 				probe,

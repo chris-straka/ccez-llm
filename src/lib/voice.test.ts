@@ -14,6 +14,7 @@ import {
 	sentenceSpeechLang,
 	webVoiceAvailable,
 	effectiveSpeechLang,
+	punjabiSpeechText,
 	splitGlossHalves,
 	splitSpeechSegments,
 	speakText,
@@ -281,6 +282,26 @@ describe("effectiveSpeechLang", () => {
 	});
 	it("never routes on an unloaded inventory", () => {
 		expect(effectiveSpeechLang("la", [])).toBe("la");
+	});
+});
+
+describe("punjabiSpeechText", () => {
+	const NO_PA = [{ lang: "en-US" }, { lang: "hi-IN" }];
+	it("transliterates Gurmukhi when Punjabi has no voice but Hindi does", () => {
+		expect(punjabiSpeechText("ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ", NO_PA)).toBe("सति स्री अकाल");
+		expect(punjabiSpeechText("hello ਸਤਿ", NO_PA)).toBe("hello सति");
+	});
+	it("passes text through with a Punjabi voice, no Hindi voice, or no Gurmukhi", () => {
+		expect(
+			punjabiSpeechText("ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ", [...NO_PA, { lang: "pa-IN" }])
+		).toBe("ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ");
+		expect(punjabiSpeechText("ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ", [{ lang: "en-US" }])).toBe(
+			"ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ"
+		);
+		expect(punjabiSpeechText("hello", NO_PA)).toBe("hello");
+	});
+	it("never routes on an unloaded inventory", () => {
+		expect(punjabiSpeechText("ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ", [])).toBe("ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ");
 	});
 });
 

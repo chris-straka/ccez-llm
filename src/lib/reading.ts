@@ -522,6 +522,123 @@ export function speakWord(word: string, fallback = "en-US"): SpeakResult {
 	}
 }
 
+// --- Gurmukhi → Devanagari (Punjabi speech fallback) ---
+
+/**
+ * Mechanical Gurmukhi → Devanagari map: both scripts share the Brahmi
+ * phonetic grid, so nearly every letter has a 1:1 counterpart. Apple
+ * ships no Punjabi TTS voice, and the default voice renders Gurmukhi
+ * as ~0.01s of silence (proven with `say` Sep 2026) — so Punjabi
+ * speech falls back to the Hindi voice over transliterated text
+ * (see `punjabiSpeechText` in voice.ts). Non-Gurmukhi chars pass
+ * through untouched, so callers transliterate whole utterances.
+ * Addak (ੱ) is not in the table: it doubles the next consonant,
+ * which the function below expands (ਪੱਤਾ → पत्ता). Pure.
+ */
+const GURMUKHI_TO_DEVANAGARI: Record<string, string> = {
+	"ੳ": "ऑ",
+	"ਅ": "अ",
+	"ਆ": "आ",
+	"ਇ": "इ",
+	"ਈ": "ई",
+	"ਉ": "उ",
+	"ਊ": "ऊ",
+	"ਏ": "ए",
+	"ਐ": "ऐ",
+	"ਓ": "ओ",
+	"ਔ": "औ",
+	"ਕ": "क",
+	"ਖ": "ख",
+	"ਗ": "ग",
+	"ਘ": "घ",
+	"ਙ": "ङ",
+	"ਚ": "च",
+	"ਛ": "छ",
+	"ਜ": "ज",
+	"ਝ": "झ",
+	"ਞ": "ञ",
+	"ਟ": "ट",
+	"ਠ": "ठ",
+	"ਡ": "ड",
+	"ਢ": "ढ",
+	"ਣ": "ण",
+	"ਤ": "त",
+	"ਥ": "थ",
+	"ਦ": "द",
+	"ਧ": "ध",
+	"ਨ": "न",
+	"ਪ": "प",
+	"ਫ": "फ",
+	"ਬ": "ब",
+	"ਭ": "भ",
+	"ਮ": "म",
+	"ਯ": "य",
+	"ਰ": "र",
+	"ਲ": "ल",
+	"ਵ": "व",
+	"ਸ਼": "श",
+	"ਸ": "स",
+	"ਹ": "ह",
+	"ਖ਼": "ख़",
+	"ਗ਼": "ग़",
+	"ਜ਼": "ज़",
+	"ੜ": "ड़",
+	"ਫ਼": "फ़",
+	"ੴ": "इक ओंकार",
+	"ੵ": "्य",
+	"ਁ": "ँ",
+	// Bindi (U+0A02) and tippi (U+0A70) render identically — escapes
+	// keep them distinct. Both nasalize like Devanagari anusvara.
+	"\u0A02": "ं",
+	"\u0A70": "ं",
+"ਃ": "ः",
+	"਼": "़",
+	"ਾ": "ा",
+	"ਿ": "ि",
+	"ੀ": "ी",
+	"ੁ": "ु",
+	"ੂ": "ू",
+	"ੇ": "े",
+	"ੈ": "ै",
+	"ੋ": "ो",
+	"ੌ": "ौ",
+	"੍": "्",
+	"ੑ": "॑",
+	"੦": "०",
+	"੧": "१",
+	"੨": "२",
+	"੩": "३",
+	"੪": "४",
+	"੫": "५",
+	"੬": "६",
+	"੭": "७",
+	"੮": "८",
+	"੯": "९"
+};
+
+/** Gurmukhi runs read as Devanagari; everything else passes through. Pure. */
+export function transliterateGurmukhi(text: string): string {
+	if (!/\p{Script=Gurmukhi}/u.test(text)) return text;
+	const chars = [...text];
+	let out = "";
+	for (let i = 0; i < chars.length; i++) {
+		const ch = chars[i] ?? "";
+		// Addak (ੱ) geminates the next consonant: ੱਤ closes the
+		// previous syllable with the consonant plus a halant, and
+		// the consonant itself still maps next (ਪੱਤਾ → पत्ता).
+		// A bare halant here would voice the wrong conjunct instead.
+		if (ch === "ੱ") {
+			const next = chars[i + 1];
+			const mapped =
+				next === undefined ? undefined : GURMUKHI_TO_DEVANAGARI[next];
+			out += mapped === undefined ? "्" : `${mapped}्`;
+			continue;
+		}
+		out += GURMUKHI_TO_DEVANAGARI[ch] ?? ch;
+	}
+	return out;
+}
+
 // --- Model-assisted reading aids (tashkeel first, not special) ---
 
 export interface ModelAid {
