@@ -157,6 +157,9 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		refsDraft?: string;
 		refsBox?: HTMLInputElement | null;
 		actions: ThreadViewActions;
+		/** Trim-point index (-1 untrimmed): rows above it hide. */
+		trimIdx: number;
+		onUndoTrim: () => void;
 	}
 
 	let {
@@ -204,7 +207,9 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		popOpen = $bindable(null),
 		refsDraft = $bindable(""),
 		refsBox = $bindable(null),
-		actions
+		actions,
+		trimIdx,
+		onUndoTrim
 	}: Props = $props();
 </script>
 
@@ -240,6 +245,17 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 			{/if}
 		</EmptyHero>
 	{/if}
+	{#if trimIdx > 0}
+		<!-- Trim marker: the hidden prefix reads as one slim divider
+		row (the count is the trim-point index); Undo restores the
+		rows, the rolling summary stays compacted either way. -->
+		<div class="trim-marker" role="status">
+			<span class="trim-rule" aria-hidden="true"></span>
+			<span>{trimIdx === 1 ? "1 message trimmed" : `${trimIdx} messages trimmed`}</span>
+			<button type="button" class="trim-undo" onclick={onUndoTrim}>Undo</button>
+			<span class="trim-rule" aria-hidden="true"></span>
+		</div>
+	{/if}
 	{#each messages as msg, i (msg.id)}
 		{@const sentRefs = annRefsFor(msg.content)}
 		{@const refsOnly = sentRefs ? sentRefs.text.trim() === "" : false}
@@ -263,7 +279,10 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 				: null) ?? msg.content}
 		<!-- Message row renders in `MessageArticle.svelte`; the thread
 		keeps the lists, all row state, and every behavior behind
-		computed props and action groups. -->
+		computed props and action groups. Trimmed rows skip the render
+		(the guard keeps every index and #msg-N anchor stable while
+		the prefix hides). -->
+		{#if trimIdx <= 0 || i >= trimIdx}
 		<MessageArticle
 			{msg}
 			index={i}
@@ -383,6 +402,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 				}
 			}}
 		/>
+		{/if}
 	{/each}
 	<!-- Sending status renders in `SendingIndicator.svelte`; the page
 	keeps send/fetch state and labels. -->
@@ -465,6 +485,31 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		with the opt-in off keeps tight gaps (the buttons stay
 		small too). */
 		gap: var(--msg-gap, 0.35rem);
+	}
+	/* Trim marker: one slim divider row for the hidden prefix —
+	status text flanked by hairlines, Undo riding the accent. The
+	top margin matches scroll-padding-top (strip plus breathing
+	room): the marker is always first content, so without it the
+	Undo button would sit under the drag strip, unclickable. */
+	.trim-marker {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		color: #6e6e73;
+		font-size: calc(0.85rem * var(--font-scale, 1));
+		margin: calc(1.75rem + 1rem) 0 0.4rem;
+	}
+	.trim-rule {
+		flex: 1;
+		border-top: 1px solid var(--line-soft);
+	}
+	.trim-undo {
+		background: none;
+		border: 0;
+		padding: 0;
+		color: var(--accent);
+		font: inherit;
+		cursor: pointer;
 	}
 	/* Button-scaling opt-in: roomy type keeps airy gaps. */
 	:global(main.scale-actions) .messages {

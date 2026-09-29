@@ -62,10 +62,10 @@ export default [
 						"vendor/*.ts",
 						"scripts/*.ts"
 					],
-					// Headroom over the ~60 e2e specs: these files run base
+					// Headroom over the ~85 e2e specs: these files run base
 					// rules only (disableTypeChecked above), so the
 					// program is parse-only and the extra cost is small.
-					maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 96
+					maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 128
 				},
 				tsconfigRootDir: import.meta.dirname
 			}

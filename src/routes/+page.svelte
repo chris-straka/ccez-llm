@@ -41,6 +41,9 @@
 		beginNativeSend,
 		beginNativeResend,
 		settleNativeSend,
+		refreshTrimSummary,
+		setTrimPoint,
+		trimPointIndex,
 		resolveSendCompletion,
 		landingSignal,
 		replyPhase,
@@ -4573,6 +4576,94 @@
 				scrollBox.scrollTop += now.getBoundingClientRect().top - top;
 			}
 		}
+	}
+
+	function articleTop(index: number): number | null {
+		const article = document.querySelector(`#msg-${index}`);
+		return article instanceof HTMLElement
+			? article.getBoundingClientRect().top
+			: null;
+	}
+
+	// Keep an article parked across a height change above it: the trim
+	// hides rows (undo restores them), so shift the scroller by the
+	// anchor's drift instead of letting the viewport jump.
+	function holdArticle(index: number, top: number | null): void {
+		if (top === null || !(scrollBox instanceof HTMLElement)) return;
+		flushSync();
+		const now = document.querySelector(`#msg-${index}`);
+		if (now instanceof HTMLElement) {
+			scrollBox.scrollTop += now.getBoundingClientRect().top - top;
+		}
+	}
+
+	async function trimAbove(chat: Chat, index: number): Promise<void> {
+		const target = chat.messages[index];
+		if (!target || target.role !== "assistant" || index <= 0) return;
+		if (chat.trimmedThrough === target.id) return;
+		// An edit box above the point would hide with its draft
+		// stranded (the hazard the fold gate guards) — finish it first.
+		if (editingMsgId !== null) {
+			const at = chat.messages.findIndex((m) => m.id === editingMsgId);
+			if (at !== -1 && at < index) {
+				flashToast("Finish the edit first — trim keeps it.");
+				return;
+			}
+		}
+		if (refsEditing !== null) {
+			const refsId = refsEditing.messageId;
+			const at = chat.messages.findIndex((m) => m.id === refsId);
+			if (at !== -1 && at < index) {
+				flashToast("Finish the refs edit first — trim keeps it.");
+				return;
+			}
+		}
+		const provider = await resolveProviderActive();
+		if (!provider) {
+			const message = "Set an API key first — open Settings.";
+			showNotice(notices, "banner", message);
+			if (androidUI) flashErrorToast(message);
+			return;
+		}
+		buzzTap();
+		const top = articleTop(index);
+		setTrimPoint(chatState, chat, target.id);
+		holdArticle(index, top);
+		// The marker lands above the parked point — if the toolbar
+		// covers it, nudge the least that clears it (nearest moves
+		// nothing when the marker already reads; scroll-padding keeps
+		// it below the strip like any jumped-to row).
+		const marker = document.querySelector(".trim-marker");
+		if (marker instanceof HTMLElement && scrollBox instanceof HTMLElement) {
+			scrollBox.style.scrollBehavior = "auto";
+			marker.scrollIntoView({ block: "nearest" });
+			scrollBox.style.scrollBehavior = "";
+		}
+		try {
+			await refreshTrimSummary(chatState, chat, provider, target.id);
+		} catch (error) {
+			// Summary failed: unhide rather than strand the prefix out
+			// of context (the next send still windows normally).
+			const retop = articleTop(index);
+			setTrimPoint(chatState, chat, null);
+			holdArticle(index, retop);
+			const message = error instanceof Error ? error.message : String(error);
+			showNotice(notices, "banner", message);
+			if (androidUI) flashErrorToast(message);
+		}
+	}
+
+	function undoTrim(chat: Chat): void {
+		if (!chat.trimmedThrough) return;
+		const index = chat.messages.findIndex(
+			(m) => m.id === chat.trimmedThrough
+		);
+		const top = index >= 0 ? articleTop(index) : null;
+		buzzTap();
+		setTrimPoint(chatState, chat, null);
+		// The rolling summary stays compacted: undo restores the
+		// scrollback, not the verbatim context.
+		if (index >= 0) holdArticle(index, top);
 	}
 
 	/** Light UI tick (phones): button taps with no visible
@@ -11563,6 +11654,24 @@
 					return;
 				}
 			}
+			if (msgAction === "trim-hovered") {
+				// T trims everything above the hovered assistant message:
+				// the prefix hides behind a marker and folds into the
+				// rolling summary (assistant messages only — the point
+				// stays on screen as the new head).
+				const target = chat.messages[hoveredIdx];
+				if (!target || target.role !== "assistant") {
+					flashToast("Hover an assistant message to trim above it.");
+					return;
+				}
+				if (hoveredIdx <= 0) {
+					flashToast("Nothing above to trim.");
+					return;
+				}
+				event.preventDefault();
+				void trimAbove(chat, hoveredIdx);
+				return;
+			}
 			if (msgAction === "cut-hovered") {
 				// X cuts the hovered message (copies, then deletes): Shift+D
 				// below deletes without touching the clipboard.
@@ -13863,6 +13972,8 @@
 		<ThreadView
 			messages={viewChat.messages}
 			chatId={viewChat.id}
+			trimIdx={trimPointIndex(viewChat)}
+			onUndoTrim={() => undoTrim(viewChat)}
 			{focusMode}
 			{selectedIdx}
 			{speakingId}

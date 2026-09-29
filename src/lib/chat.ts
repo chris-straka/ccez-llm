@@ -72,6 +72,13 @@ export interface Chat {
 	 * (lossless: compaction never deletes messages).
 	 */
 	summaryThrough?: ChatMsgId;
+	/**
+	 * Visual trim watermark: everything strictly above this message id
+	 * hides behind the slim "N messages trimmed" marker (hover+T sets
+	 * it, Undo clears it). Independent of the compaction watermark —
+	 * a missing id heals to untrimmed (trimming never deletes).
+	 */
+	trimmedThrough?: ChatMsgId;
 }
 
 /**
@@ -818,6 +825,92 @@ export async function refreshChatSummary(
 	chat.summary = text;
 	chat.summaryThrough = newest.id;
 	persistChats(state, store);
+}
+
+/**
+ * Index of the trim-point message: rows at and below it render, rows
+ * above it hide behind the marker. -1 when untrimmed or the point is
+ * gone (deleted) — the view heals to whole without a write. Pure.
+ */
+export function trimPointIndex(chat: Chat): number {
+	if (!chat.trimmedThrough) return -1;
+	return chat.messages.findIndex((m) => m.id === chat.trimmedThrough);
+}
+
+/**
+ * Point (or clear, with null) the visual trim watermark, persisted
+ * with the chat. The summary refresh is a separate step — the point
+ * lands first so the collapse reads instant.
+ */
+export function setTrimPoint(
+	state: ChatState,
+	chat: Chat,
+	id: ChatMsgId | null,
+	store?: KeyValueStore
+): void {
+	if (id === null) delete chat.trimmedThrough;
+	else chat.trimmedThrough = id;
+	persistChats(state, store);
+}
+
+/**
+ * Fold a manual trim's prefix into the rolling summary: the uncovered
+ * turns above `topId` (failed replies excluded, like the window)
+ * merge over the prior summary in one short non-streaming call, and
+ * the watermark advances to the newest folded turn. Budget-capped
+ * like the automatic fold — a giant prefix converges over later
+ * sends while the middle windows normally. Returns the folded count
+ * (0 means no call: already covered or below the floor). Throws on
+ * model failure — a manual trim is an explicit gesture, never silent
+ * (the caller unhides and banners). Races with the automatic refresh
+ * are safe by construction: every fold is a prefix from the last
+ * watermark, so concurrent writers stay pairwise consistent and the
+ * smaller watermark simply refolds later.
+ */
+export async function refreshTrimSummary(
+	state: ChatState,
+	chat: Chat,
+	provider: ChatProvider,
+	topId: ChatMsgId,
+	opts: { signal?: AbortSignal | undefined } = {},
+	store?: KeyValueStore
+): Promise<number> {
+	const eligible = chat.messages.filter(
+		(m) => !(m.role === "assistant" && m.error)
+	);
+	const topIdx = eligible.findIndex((m) => m.id === topId);
+	if (topIdx <= 0) return 0;
+	let startIdx = 0;
+	if (chat.summary && chat.summary.length > 0 && chat.summaryThrough) {
+		const at = eligible.findIndex((m) => m.id === chat.summaryThrough);
+		if (at !== -1) startIdx = at + 1;
+	}
+	const fold: ChatMsg[] = [];
+	let folded = 0;
+	for (const m of eligible.slice(startIdx, topIdx)) {
+		const size = Math.min(sentChars(m), MAX_FOLD_CHARS);
+		if (folded + size > MAX_FOLD_CHARS) break;
+		fold.push(m);
+		folded += size;
+	}
+	if (fold.length === 0 || folded < MIN_FOLD_CHARS) return 0;
+	const result = await provider.chat(
+		buildSummaryRefreshMessages(
+			chat.summary && chat.summary.length > 0 ? chat.summary : null,
+			renderFoldText(fold)
+		),
+		{ signal: opts.signal }
+	);
+	const text = Array.from(result.content.trim())
+		.slice(0, MAX_SUMMARY_CHARS)
+		.join("");
+	if (!text) return 0;
+	const newest = fold[fold.length - 1];
+	if (!newest) return 0;
+	chat.summary = text;
+	chat.summaryThrough = newest.id;
+	persistChats(state, store);
+	return fold.length;
 }
 
 export function buildApiMessages(

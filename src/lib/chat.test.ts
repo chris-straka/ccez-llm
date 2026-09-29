@@ -39,6 +39,9 @@ import {
 	buildApiMessages,
 	selectHistoryWindow,
 	refreshChatSummary,
+	refreshTrimSummary,
+	setTrimPoint,
+	trimPointIndex,
 	buildSummaryRefreshMessages,
 	renderFoldText,
 	summaryBlock,
@@ -1558,5 +1561,179 @@ describe("history compaction", () => {
 		expect(text).not.toContain("u0 xxxx");
 		expect(text).toContain("one more");
 		expect(activeChat(state).summary).toBe("rolled up");
+	});
+});
+
+describe("manual trim", () => {
+	function seedLong(state: ChatState, turns: number, chars: number): void {
+		const chat = activeChat(state);
+		for (let i = 0; i < turns; i++) {
+			for (const role of ["user", "assistant"] as const) {
+				chat.messages = [
+					...chat.messages,
+					{
+						id: newChatMsgId(),
+						role,
+						content: `${role}${i} ${"z".repeat(chars)}`,
+						usage: null,
+						error: null
+					}
+				];
+			}
+		}
+	}
+
+	function recording(summary: string): {
+		provider: ChatProvider;
+		chats: ChatMessage[][];
+	} {
+		const chats: ChatMessage[][] = [];
+		const usage = { prompt: 1, completion: 1, total: 2 };
+		return {
+			provider: {
+				id: "recording",
+				async chat(messages): Promise<ChatResult> {
+					chats.push(messages);
+					return { content: summary, usage };
+				},
+				async stream(): Promise<ChatResult> {
+					throw new Error("no stream in trim tests");
+				}
+			},
+			chats
+		};
+	}
+
+	it("pins the trim point by id and heals a deleted one", () => {
+		const { state, store } = stateWith(freshStore());
+		seedLong(state, 2, 10);
+		const chat = activeChat(state);
+		expect(trimPointIndex(chat)).toBe(-1);
+		const top = chat.messages[2];
+		if (!top) throw new Error("seed short");
+		setTrimPoint(state, chat, top.id, store);
+		expect(trimPointIndex(chat)).toBe(2);
+		const persisted = JSON.parse(
+			store.data.get("ccez-llm-chats-v1") ?? "[]"
+		) as Array<{ trimmedThrough?: string }>;
+		expect(persisted[0]?.trimmedThrough).toBe(top.id);
+		setTrimPoint(state, chat, null, store);
+		expect(trimPointIndex(chat)).toBe(-1);
+		chat.trimmedThrough = newChatMsgId();
+		expect(trimPointIndex(chat)).toBe(-1);
+	});
+
+	it("folds the uncovered prefix and keeps the top message verbatim", async () => {
+		const store = freshStore();
+		const { state } = stateWith(store);
+		seedLong(state, 4, 800);
+		const chat = activeChat(state);
+		const top = chat.messages[5];
+		if (!top) throw new Error("seed short");
+		const { provider, chats } = recording("trimmed down");
+		const folded = await refreshTrimSummary(
+			state,
+			chat,
+			provider,
+			top.id,
+			{},
+			store
+		);
+		expect(folded).toBe(5);
+		expect(chats).toHaveLength(1);
+		// The watermark stops below the top message (it stays on
+		// screen, so it must stay in context verbatim).
+		expect(chat.summary).toBe("trimmed down");
+		expect(chat.summaryThrough).toBe(chat.messages[4]?.id);
+		const sent = buildApiMessages(chat, "sys");
+		expect(sent[1]).toEqual({
+			role: "system",
+			content: summaryBlock("trimmed down")
+		});
+		const text = JSON.stringify(sent);
+		expect(text).not.toContain("user0");
+		expect(text).toContain(top.content.slice(0, 20));
+		const persisted = JSON.parse(
+			store.data.get("ccez-llm-chats-v1") ?? "[]"
+		) as Array<{ summary?: string }>;
+		expect(persisted[0]?.summary).toBe("trimmed down");
+	});
+
+	it("skips covered prefixes and folds only the rest on retrim", async () => {
+		const { state } = stateWith(freshStore());
+		seedLong(state, 5, 800);
+		const chat = activeChat(state);
+		const first = chat.messages[3];
+		const second = chat.messages[7];
+		if (!first || !second) throw new Error("seed short");
+		const { provider, chats } = recording("first pass");
+		await refreshTrimSummary(state, chat, provider, first.id);
+		expect(chats).toHaveLength(1);
+		// Same point again: covered, no call.
+		expect(await refreshTrimSummary(state, chat, provider, first.id)).toBe(0);
+		expect(chats).toHaveLength(1);
+		// Later point: folds only the gap, merging the prior.
+		const folded = await refreshTrimSummary(state, chat, provider, second.id);
+		expect(folded).toBe(4);
+		expect(chats).toHaveLength(2);
+		expect(chats[1]?.[1]?.content).toContain("Previous summary:\nfirst pass");
+		expect(chat.summaryThrough).toBe(chat.messages[6]?.id);
+	});
+
+	it("calls nothing below the floor, at the head, or off-chat", async () => {
+		const { state } = stateWith(freshStore());
+		seedLong(state, 2, 10);
+		const chat = activeChat(state);
+		const { provider, chats } = recording("unused");
+		const top = chat.messages[3];
+		if (!top) throw new Error("seed short");
+		expect(await refreshTrimSummary(state, chat, provider, top.id)).toBe(0);
+		const head = chat.messages[0];
+		if (!head) throw new Error("seed short");
+		expect(await refreshTrimSummary(state, chat, provider, head.id)).toBe(0);
+		expect(await refreshTrimSummary(state, chat, provider, newChatMsgId())).toBe(
+			0
+		);
+		expect(chats).toHaveLength(0);
+		expect(chat.summary).toBeUndefined();
+	});
+
+	it("skips failed replies in the fold like the window does", async () => {
+		const { state } = stateWith(freshStore());
+		seedLong(state, 3, 800);
+		const chat = activeChat(state);
+		const failed = chat.messages[1];
+		if (!failed) throw new Error("seed short");
+		failed.error = "down";
+		const top = chat.messages[4];
+		if (!top) throw new Error("seed short");
+		const { provider, chats } = recording("no failures");
+		const folded = await refreshTrimSummary(state, chat, provider, top.id);
+		expect(folded).toBe(3);
+		const foldText = chats[0]?.[1]?.content ?? "";
+		expect(foldText).not.toContain("assistant0");
+		expect(foldText).toContain("user0");
+	});
+
+	it("throws on model failure and leaves the summary alone", async () => {
+		const { state } = stateWith(freshStore());
+		seedLong(state, 4, 800);
+		const chat = activeChat(state);
+		const top = chat.messages[5];
+		if (!top) throw new Error("seed short");
+		const failing: ChatProvider = {
+			id: "failing",
+			async chat(): Promise<ChatResult> {
+				throw new Error("down");
+			},
+			async stream(): Promise<ChatResult> {
+				throw new Error("down");
+			}
+		};
+		await expect(
+			refreshTrimSummary(state, chat, failing, top.id)
+		).rejects.toThrow("down");
+		expect(chat.summary).toBeUndefined();
+		expect(chat.summaryThrough).toBeUndefined();
 	});
 });

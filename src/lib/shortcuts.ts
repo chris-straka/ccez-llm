@@ -175,6 +175,7 @@ export function desktopShortcuts(isMac: boolean, inShell = true): ShortcutRow[] 
 		{ name: "Edit newest message", keys: `${isMac ? "⌘E" : "Meta+E"}` },
 		{ name: "Edit own message", keys: "hover + e" },
 		{ name: "Copy message", keys: "Hover + C" },
+		{ name: "Trim above here", keys: "Hover + T" },
 		{ name: "Branch from here", keys: "Hover + Shift+C" },
 		{ name: "Speak message", keys: "Hover + Shift+R" },
 		{ name: "Speak word", keys: "Hover + Shift+W" },

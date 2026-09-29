@@ -178,6 +178,24 @@ describe("messageKeyAction", () => {
 		expect(messageKeyAction({ ...msgBase, key: "x", code: "KeyX" })).toBe(
 			"cut-hovered"
 		);
+		expect(messageKeyAction({ ...msgBase, key: "t", code: "KeyT" })).toBe(
+			"trim-hovered"
+		);
+		// CapsLock spelling (no shift flag) trims the same way.
+		expect(messageKeyAction({ ...msgBase, key: "T", code: "KeyT" })).toBe(
+			"trim-hovered"
+		);
+	});
+
+	it("trims only hovered, never shifted or in fields", () => {
+		const trim = { ...msgBase, key: "t", code: "KeyT" };
+		expect(messageKeyAction(trim)).toBe("trim-hovered");
+		// Physical Shift+T is not the trim key (bare T only).
+		expect(messageKeyAction({ ...trim, shiftKey: true })).toBe(null);
+		expect(messageKeyAction({ ...trim, hoveredIdx: -1 })).toBe(null);
+		expect(messageKeyAction({ ...trim, inEditor: true })).toBe(null);
+		expect(messageKeyAction({ ...trim, inField: true })).toBe(null);
+		expect(messageKeyAction({ ...trim, metaKey: true })).toBe(null);
 	});
 
 	it("copies only with nothing selected, and never shifted", () => {

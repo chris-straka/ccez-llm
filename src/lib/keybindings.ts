@@ -91,6 +91,7 @@ export type MessageKeyAction =
 	| "exit-fullscreen"
 	| "fold-hovered"
 	| "edit-hovered"
+	| "trim-hovered"
 	| "copy-hovered"
 	| "cut-hovered"
 	| "delete-hovered"
@@ -167,6 +168,13 @@ export function messageKeyAction(
 		!facts.inField
 	)
 		return "edit-hovered";
+	if (
+		(facts.key === "t" || facts.key === "T") &&
+		hovered &&
+		bare(facts) &&
+		!facts.inField
+	)
+		return "trim-hovered";
 	// Bare C copies the hovered message — but only with nothing
 	// selected (a live selection keeps its keys: the copy would
 	// otherwise eat the selection menu's own C). Rich editors own

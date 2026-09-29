@@ -57,6 +57,7 @@ const MAC_NAMES = [
 	"Switch model / key",
 	"Text size up / down",
 	"Thinking level",
+	"Trim above here",
 	"Voice readback on/off"
 ];
 
