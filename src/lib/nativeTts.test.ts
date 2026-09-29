@@ -129,7 +129,7 @@ describe("quoteLangFor", () => {
 
 	it("reads a French elision with the sentence voice over a stray bridge tag", async () => {
 		// NLLanguageRecognizer reads "l'accident" as Catalan (~0.82);
-		// the orthographic elision plus the French seed overrule it.
+		// Catalan is outside the supported set, so orthography wins.
 		mockInvoke.mockResolvedValue("ca");
 		await expect(quoteLangFor("l'accident", "fr-FR")).resolves.toBe(
 			"fr-FR"
@@ -163,6 +163,14 @@ describe("reconcileQuoteLang", () => {
 		expect(reconcileQuoteLang("en", "fr-FR", "en-US")).toBe("en");
 		// Neither matches the seed: the bridge stands (old behavior).
 		expect(reconcileQuoteLang("pt", "fr-FR", "es-ES")).toBe("pt");
+	});
+
+	it("lets orthography beat bridge guesses outside the supported set", () => {
+		// Vietnamese for "essuyât", Catalan for "l'accident": the
+		// app has no voice for either, so orthography wins even
+		// against the seed.
+		expect(reconcileQuoteLang("vi", "fr-FR", "en-US")).toBe("fr-FR");
+		expect(reconcileQuoteLang("ca", "fr-FR", "en-US")).toBe("fr-FR");
 	});
 });
 

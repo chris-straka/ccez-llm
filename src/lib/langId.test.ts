@@ -74,8 +74,33 @@ describe("identifyLangShort", () => {
 		expect(identifyLangShort("qwerty asdf")).toBe(null);
 		expect(identifyLangShort("miteinander")).toBe(null);
 		expect(identifyLangShort("tief = deep / deeply")).toBe(null);
-		// café votes three ways at once: no contestant leads.
-		expect(identifyLangShort("café")).toBe(null);
+		// Shared-only ties stay null: every hit votes two lists.
+		expect(identifyLangShort("un una")).toBe(null);
+	});
+
+	it("defaults French-diacritic fragments to French without exclusive rivals", () => {
+		// Bare é ties three ways with no leader — the tiebreak
+		// claims it (Spanish/Italian é-only words read French too;
+		// exclusive markers still route, covered below).
+		expect(identifyLangShort("café")).toBe("fr-FR");
+		expect(identifyLangShort("révise")).toBe("fr-FR");
+		expect(identifyLangShort("essuyât")).toBe("fr-FR");
+		expect(identifyLangShort("façonnée")).toBe("fr-FR");
+		// Exclusive evidence vetoes the default: Spanish ñ,
+		// Portuguese ã (contested ç stays null, as before), German
+		// ß, and non-French stop words (English "the" over "café").
+		expect(identifyLangShort("niño")).toBe("es-ES");
+		expect(identifyLangShort("coração")).toBe(null);
+		expect(identifyLangShort("não")).toBe("pt-PT");
+		expect(identifyLangShort("Straße")).toBe("de-DE");
+		expect(identifyLangShort("the café")).toBe(null);
+		// Italian keeps its own: exclusive stop words ("è", "più")
+		// and lone-accent hits ("così") decide before the tiebreak,
+		// while bare à-only ("città") never triggers it.
+		expect(identifyLangShort("è")).toBe("it-IT");
+		expect(identifyLangShort("più")).toBe("it-IT");
+		expect(identifyLangShort("così")).toBe("it-IT");
+		expect(identifyLangShort("città")).toBe(null);
 		expect(identifyLangShort("connects, joins, combines")).toBe(null);
 		// Shared-only ties stay null: every hit votes two lists.
 		expect(identifyLangShort("un una")).toBe(null);

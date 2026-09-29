@@ -127,15 +127,28 @@ export function friendlyNativeError(message: string): string {
 	return message;
 }
 
+/** Primaries the offline scorer can produce: a bridge guess outside
+ * this set is a misfire the app has no voice for anyway. */
+const SUPPORTED_BRIDGE_PRIMARIES: Set<string> = new Set([
+	"en",
+	"fr",
+	"de",
+	"es",
+	"it",
+	"pt",
+	"nl"
+]);
+
 /**
  * Bridge-vs-orthography verdict for one quote (pure, unit-tested):
- * either side alone wins; agreement takes the bridge tag; a
+ * either side alone wins; agreement takes the bridge tag; a bridge
+ * guess outside the supported set (Vietnamese for "essuyât",
+ * Catalan for "l'accident") always loses to orthography; any other
  * disagreement breaks toward the sentence voice (`fallback`) — the
- * side matching it wins. The recognizer reads "l'accident" as
- * Catalan (~0.82), so without the seed the French elision would
- * lose; conversely "y'all" trips the French elision rule while the
- * bridge and an English seed agree. Neither side matching the seed
- * keeps the bridge (old behavior). Null only when both are silent.
+ * side matching it wins ("y'all" trips the French elision rule
+ * while the bridge and an English seed agree). Neither side
+ * matching the seed keeps the bridge (old behavior). Null only
+ * when both are silent.
  */
 export function reconcileQuoteLang(
 	bridge: string | null,
@@ -149,6 +162,7 @@ export function reconcileQuoteLang(
 	const bridgePrimary = primary(bridge);
 	const shortPrimary = primary(short);
 	if (bridgePrimary === shortPrimary) return bridge;
+	if (!SUPPORTED_BRIDGE_PRIMARIES.has(bridgePrimary)) return short;
 	const seedPrimary = primary(fallback);
 	if (shortPrimary === seedPrimary) return short;
 	return bridge;

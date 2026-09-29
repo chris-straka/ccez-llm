@@ -549,6 +549,37 @@ const STOP_WORD_OWNERS: Map<string, number> = (() => {
 	return owners;
 })();
 
+/** French word list: shared stop words never veto the tiebreak below. */
+const FR_WORDS: Set<string> = new Set(
+	STOP_WORDS.find((entry) => entry.lang === "fr-FR")?.words ?? []
+);
+
+/**
+ * French default for a scoreless or contested fragment: single tapped
+ * words like "révise" never reach the word minimum, and bare é ties
+ * French/Spanish/Italian with no leader — so a fragment with
+ * French-leaning diacritics reads French unless another language
+ * shows exclusive evidence of its own. Bare è/à/ù-only stays out
+ * (Italian "è", "città", "più" keep their fallback); Spanish and
+ * Italian words with shared-only é read French too — that misfire
+ * beats the old silence (fallback voice) for a French learner, and
+ * exclusive markers (ñ, ã/õ, ß, ì/ò, …) still route correctly.
+ * Pure and unit-tested.
+ */
+function frenchTiebreak(tokens: string[], trimmed: string): string | null {
+	if (!tokens.some((t) => /[éêëâîïôçœæ]/.test(t))) return null;
+	// Exclusive markers of another language veto the default:
+	// Spanish/Italian/Portuguese/German-only diacritics, German
+	// mid-sentence capitals, or a stop word no French list owns.
+	if (tokens.some((t) => /[áíóúüñãõìòäöß]/.test(t))) return null;
+	if (/ [A-ZÀ-Þ]/.test(trimmed)) return null;
+	const vetoed = tokens.some(
+		(token) => !FR_WORDS.has(token) && (STOP_WORD_OWNERS.get(token) ?? 0) > 0
+	);
+	if (vetoed) return null;
+	return "fr-FR";
+}
+
 /** Minimum scored words before a Latin sample counts as classifiable. */
 export const LANG_ID_MIN_WORDS = 10;
 
@@ -625,7 +656,9 @@ export function identifyLangOffline(text: string): string | null {
  * keep their seed voice — except a fragment whose leader owns an
  * exclusive stop-word hit (a word in no other list): that word
  * decides the contest ("avec" is only French, so "avec un tiret"
- * reads French despite "un" voting three ways).
+ * reads French despite "un" voting three ways). Past that, the
+ * French tiebreak still claims French-diacritic fragments with no
+ * exclusive other-language evidence ("révise", "essuyât").
  *
  * Pure and unit-tested.
  */
@@ -685,11 +718,12 @@ export function identifyLangShort(text: string): string | null {
 	if (lang === null) return null;
 	if (score < 2) {
 		if (score === 1 && margin === 1 && tokens.length <= 4) return lang;
-		return null;
+		return frenchTiebreak(tokens, trimmed);
 	}
 	if (margin < 2 && score < 3) {
 		// Contested but decided: a stop word the leader alone owns
-		// breaks the tie; shared-only hits stay null on the seed.
+		// breaks the tie; shared-only hits fall through to the
+		// French tiebreak (null past that, on the seed).
 		const leaderWords = new Set(
 			STOP_WORDS.find((entry) => entry.lang === lang)?.words ?? []
 		);
@@ -697,7 +731,7 @@ export function identifyLangShort(text: string): string | null {
 			(token) =>
 				leaderWords.has(token) && STOP_WORD_OWNERS.get(token) === 1
 		);
-		if (!decided) return null;
+		if (!decided) return frenchTiebreak(tokens, trimmed);
 	}
 	return lang;
 }
