@@ -211,6 +211,7 @@
 		withAnnotations,
 		promptInclusions,
 		canPinAnnotation,
+		canHoldDeleteBadge,
 		setPromptPinned,
 		attachAnnotationAnswer,
 		unansweredAnnotations,
@@ -9917,8 +9918,9 @@
 				const badge = target?.closest("[data-ann-badge]");
 				if (!first || !badge) return;
 				const id = badge.getAttribute("data-ann-badge") ?? "";
-				// Orange only (answered): blue holds do nothing.
-				if (!annotations.some((a) => a.id === id && a.answer)) return;
+				// Every filed badge holds to delete, blue or orange.
+				if (!canHoldDeleteBadge(annotations.find((a) => a.id === id)))
+					return;
 				badgeHold = {
 					x: first.clientX,
 					y: first.clientY,
@@ -9930,7 +9932,8 @@
 					badgeHold = null;
 					if (!held) return;
 					if ((scrollBox?.scrollTop ?? 0) !== held.top) return;
-					if (!annotations.some((a) => a.id === id && a.answer)) return;
+					if (!canHoldDeleteBadge(annotations.find((a) => a.id === id)))
+						return;
 					removeAnnotation(id);
 					badgeHoldFired = { id, at: Date.now() };
 				}, 2000);

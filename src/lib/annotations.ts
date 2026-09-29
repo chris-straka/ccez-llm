@@ -2190,6 +2190,18 @@ export function canPinAnnotation(ann: { answer?: string }): boolean {
 }
 
 /**
+ * Hold-to-delete eligibility: every filed badge, blue (waiting)
+ * or orange (answered) alike. Late answers landing after a
+ * waiting badge's delete attach to nothing (see
+ * attachAnnotationAnswer), so deleting early is safe. Pure.
+ */
+export function canHoldDeleteBadge(
+	ann: { id: string } | undefined
+): boolean {
+	return ann !== undefined;
+}
+
+/**
  * Remove every prompt-pinned annotation, keeping the rest filed:
  * the dock's clear-all empties the prompt overlay, never the
  * badges. Pure — filed-but-unpinned notes survive the call.

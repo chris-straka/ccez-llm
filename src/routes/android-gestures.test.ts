@@ -41,13 +41,14 @@ describe("android gesture wiring", () => {
 		);
 	});
 
-	it("deletes an answered badge after a still 2s hold", () => {
+	it("deletes any filed badge after a still 2s hold", () => {
 		const source = pageSource();
-		// Orange only, both at arm time and at fire time (blue
-		// holds do nothing).
+		// Every filed badge holds to delete, blue or orange — the
+		// rule lives in canHoldDeleteBadge, checked both at arm
+		// time and at fire time.
 		expect(
 			source.match(
-				/if \(!annotations\.some\(\(a\) => a\.id === id && a\.answer\)\) return;/g
+				/if \(!canHoldDeleteBadge\(annotations\.find\(\(a\) => a\.id === id\)\)\)/g
 			)?.length
 		).toBe(2);
 		expect(source).toMatch(

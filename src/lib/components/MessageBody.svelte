@@ -1570,10 +1570,12 @@
 		cursor: pointer;
 	}
 	/* Answer states: waiting (filed but not yet asked) rides the
-	accent blue, ready (asked and answered) the orange token —
-	explicit in both themes so the accent never mutes the signal.
-	The tail inherits via `background: inherit`. Motion lives
-	below, past the mount fade (see below). */
+	accent blue, ready (asked and answered) the ans-ready token —
+	near-black on light (orange melted into the yellow wash),
+	orange on dark where black would vanish. Explicit in both
+	themes so the accent never mutes the signal. The tail
+	inherits via `background: inherit`. Motion lives below, past
+	the mount fade (see below). */
 	.rendered :global(button.ccez-ann-badge.ans-waiting) {
 		background: #007aff;
 		background: var(--accent);
@@ -1651,10 +1653,10 @@
 	variant is renamed like the wash ones. */
 	@keyframes ccez-ann-arrive {
 		from {
-			box-shadow: 0 0 0 0 rgba(178, 94, 9, 0.5);
+			box-shadow: 0 0 0 0 rgba(28, 28, 30, 0.5);
 		}
 		to {
-			box-shadow: 0 0 0 7px rgba(178, 94, 9, 0);
+			box-shadow: 0 0 0 7px rgba(28, 28, 30, 0);
 		}
 	}
 	@keyframes ccez-ann-arrive-dark {

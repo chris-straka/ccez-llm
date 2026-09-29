@@ -39,6 +39,7 @@ import {
 	promptInclusions,
 	clearPromptPinned,
 	canPinAnnotation,
+	canHoldDeleteBadge,
 	setPromptPinned,
 	attachAnnotationAnswer,
 	unansweredAnnotations,
@@ -159,6 +160,11 @@ describe("annotations", () => {
 		const cleared = clearPromptPinned(pinned);
 		expect(cleared.map((a) => a.quote)).toEqual(["alphabet"]);
 		expect(clearPromptPinned(filed)).toHaveLength(2);
+	});
+
+	it("holds every filed badge to delete, blue or orange", () => {
+		expect(canHoldDeleteBadge(undefined)).toBe(false);
+		expect(canHoldDeleteBadge({ id: "blue" })).toBe(true);
 	});
 
 	it("offers pinning only for answered annotations, pins them", () => {
