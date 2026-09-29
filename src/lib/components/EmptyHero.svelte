@@ -3,20 +3,24 @@ slot (phones render LangMenus here; the composer dock site is a
 separate call). The page owns emptiness and the pills; this component
 owns the hero markup and its surfaces. Pills cross as a children
 snippet so their props stay with their own usage, not drilled
-through the hero. -->
+through the hero. In news mode the welcome text goes away and the
+pills become the top rail above the story cards. -->
 <script lang="ts">
 	import type { Snippet } from "svelte";
 
 	interface Props {
 		mock: boolean;
+		newsMode: boolean;
 		children: Snippet;
 	}
 
-	let { mock, children }: Props = $props();
+	let { mock, newsMode, children }: Props = $props();
 </script>
 
 <div class="empty-state">
-	<h1 class="hero">What can I do for you?</h1>
+	{#if !newsMode}
+		<h1 class="hero">What can I do for you?</h1>
+	{/if}
 	{#if mock}
 		<p class="mock-note"><strong>Mock provider active.</strong></p>
 	{/if}

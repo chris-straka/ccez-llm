@@ -193,6 +193,7 @@
 		isPastedTextAttachment,
 		makePastedTextAttachment,
 		pastedMarkerInsert,
+		pastedTextMarker,
 		pastedTextsAt,
 		writePastedTextAt,
 		splicePastedText,
@@ -273,6 +274,21 @@
 	import { badgeHover } from "$lib/hoverWash";
 	import { startBlink, startHighlightFade, startMarkFade } from "$lib/blink";
 	import { createRefMemo } from "$lib/aidLoading";
+	import {
+		CEFR_LEVELS,
+		SUMMARY_SIZES,
+		decodeNewsLink,
+		fetchRawPage,
+		loadNewsStories,
+		newsConversationInstruction,
+		newsErrorCopy,
+		newsRegionsFor,
+		newsSummaryInstruction,
+		resolveArticleText,
+		type NewsKind,
+		type NewsPanelState,
+		type NewsPicker
+	} from "$lib/news";
 	/* decomposeTree + onKunLine render in `InspectOverlay.svelte`. */
 	import {
 		getInspectData,
@@ -2151,6 +2167,14 @@
 	five languages cut by a rectangle. Short lists drop under
 	their pill, long ones center (see .lang-list-fixed). */
 	let langMenuAnchor: LangMenuAnchor | null = $state(null);
+	/** Learner news mode (empty chats only): picking a language
+	opens its story cards under the pill rail; launching a session
+	collapses the panel and the chat holds only the session.
+	`newsSeq` drops stale fetches (region/language hops). */
+	let news = $state<NewsPanelState | null>(null);
+	let newsPicker = $state<NewsPicker | null>(null);
+	let newsBusy = $state<string | null>(null);
+	let newsSeq = 0;
 	function toggleLangMenu(id: LanguageMenu["id"], btn: HTMLElement): void {
 		// Family open/close ticks on phones (buzzTap self-gates to
 		// Android and honors the haptics toggle).
@@ -2532,6 +2556,8 @@
 	function transitionToChat(id: Parameters<typeof selectChat>[1]): void {
 		const from = chatState.activeChatId;
 		dismissSelPanels();
+		news = null;
+		newsPicker = null;
 		const mutate = (): void => {
 			// File the leaving chat's scroll first (a no-op mid-peek,
 			// where the box shows another chat), then clear the hover
@@ -3816,6 +3842,8 @@
 		);
 		resetDraftExtras();
 		newChat(chatState);
+		news = null;
+		newsPicker = null;
 		scrollBox?.scrollTo({ top: 0, behavior: "smooth" });
 		// A minted chat always shows its composer: focusing a hidden
 		// bar focuses nothing (and the hidden restyle drops focus). An
@@ -7632,6 +7660,10 @@
 		// the preamble and both continuations stay here as effects.
 		const action = sendAction({ canSubmit, editing: editingMsgId !== null });
 		if (action === "ignore") return;
+		// Typing past the news panel sends a normal turn: the panel
+		// stands down (session launches already cleared it).
+		news = null;
+		newsPicker = null;
 		// Haptic tap on send (silenced by the haptics toggle; native
 		// haptics in the shell, Web vibrator in the preview).
 		buzzBeat("send");
@@ -8695,12 +8727,164 @@
 		if (!replyLanguageFor(code)) return;
 		setChatReplyLang(chatState, chatState.activeChatId, code);
 		openLangMenu = null;
+		// Empty chats open learner news for the picked language (the
+		// submenu and ⌘number share this funnel); anywhere else the
+		// pick just switches and any open panel goes away.
+		if (activeChat(chatState).messages.length === 0) enterNewsMode(code);
+		else news = null;
 	}
 
 	function clearReplyLang(): void {
 		setChatReplyLang(chatState, chatState.activeChatId, null);
 		openLangMenu = null;
+		news = null;
+		newsPicker = null;
 	}
+
+	/** Open the story cards for a language (default region first). */
+	function enterNewsMode(code: string): void {
+		const lang = replyLanguageFor(code);
+		if (!lang) {
+			news = null;
+			return;
+		}
+		const regions = newsRegionsFor(code) ?? [];
+		newsPicker = null;
+		if (regions.length === 0) {
+			news = {
+				code,
+				langName: lang.name,
+				regions: [],
+				region: "",
+				status: "unsupported",
+				stories: [],
+				error: ""
+			};
+			return;
+		}
+		news = {
+			code,
+			langName: lang.name,
+			regions,
+			region: regions[0]?.gl ?? "",
+			status: "loading",
+			stories: [],
+			error: ""
+		};
+		void fetchNewsStories();
+	}
+
+	/** Headlines for the current panel language + region. */
+	async function fetchNewsStories(): Promise<void> {
+		const current = news;
+		if (!current) return;
+		const seq = ++newsSeq;
+		const { code, region } = current;
+		try {
+			const stories = await loadNewsStories(code, region, fetchRawPage);
+			if (newsSeq !== seq || news?.code !== code || news?.region !== region) return;
+			news = { ...current, status: "ready", stories, error: "" };
+		} catch (error) {
+			if (newsSeq !== seq || news?.code !== code) return;
+			const message = error instanceof Error ? error.message : "";
+			news = {
+				...current,
+				status: message.includes("news-needs-shell") ? "needs-shell" : "error",
+				stories: [],
+				error: newsErrorCopy(error)
+			};
+		}
+	}
+
+	/**
+	 * Story session launch: resolve + fetch the article, seed the
+	 * composer with the short opener plus the article as a pasted
+	 * attachment (spliced at send, folded back to a tag after), drop
+	 * the news panel, and send — the chat holds only the session.
+	 * Failures toast and stay in news mode to retry.
+	 */
+	async function launchNewsSession(
+		link: string,
+		kind: NewsKind,
+		value: string
+	): Promise<void> {
+		const current = news;
+		if (!current || current.status !== "ready" || newsBusy || !editor) return;
+		const story = current.stories.find((s) => s.link === link);
+		const level = CEFR_LEVELS.find((l) => l.level === value) ?? null;
+		const size = SUMMARY_SIZES.find((s) => s.size === value) ?? null;
+		let instruction: string;
+		if (story && kind === "talk" && level) {
+			instruction = newsConversationInstruction(story, level.level, current.langName);
+		} else if (story && kind === "read" && size) {
+			instruction = newsSummaryInstruction(story, size.size, current.langName);
+		} else {
+			return;
+		}
+		if (composerText() !== "" || attachments.length > 0) {
+			flashErrorToast("Clear the composer first — the story needs an empty draft.");
+			return;
+		}
+		let seeded = false;
+		newsBusy = link;
+		try {
+			const { text } = await resolveArticleText(
+				link,
+				decodeNewsLink,
+				fetchRawPage,
+				localStorage
+			);
+			// Closed or language-hopped mid-flight: don't seed a dead panel.
+			if (news?.code !== current.code) return;
+			const att = makePastedTextAttachment(text);
+			attachments = [att];
+			news = null;
+			newsPicker = null;
+			markerSyncMuted = true;
+			try {
+				editor.setText(
+					`${instruction} ${pastedTextMarker(att.text?.length ?? text.length)} `
+				);
+				syncMarkerCounts();
+			} finally {
+				markerSyncMuted = false;
+			}
+			seeded = true;
+		} catch (error) {
+			flashErrorToast(newsErrorCopy(error));
+		} finally {
+			newsBusy = null;
+		}
+		if (seeded) void doSend();
+	}
+
+	const newsActions = {
+		region: (gl: string) => {
+			if (!news || news.region === gl || newsBusy) return;
+			newsPicker = null;
+			news = { ...news, region: gl, status: "loading", stories: [], error: "" };
+			void fetchNewsStories();
+		},
+		toggle: (link: string, kind: NewsKind) => {
+			if (newsBusy) return;
+			newsPicker =
+				newsPicker?.link === link && newsPicker.kind === kind
+					? null
+					: { link, kind };
+		},
+		pick: (link: string, kind: NewsKind, value: string) => {
+			void launchNewsSession(link, kind, value);
+		},
+		close: () => {
+			news = null;
+			newsPicker = null;
+		},
+		retry: () => {
+			if (!news || newsBusy) return;
+			news = { ...news, status: "loading", stories: [], error: "" };
+			void fetchNewsStories();
+		}
+	};
 
 	/** Shared by the `LangMenus` hero call site (see `ThreadView`). */
 	const langMenusActions = {
@@ -13738,6 +13922,10 @@
 			{openLangMenu}
 			{langMenuAnchor}
 			{langMenusActions}
+			newsPanel={news}
+			newsPicker={newsPicker}
+			newsBusy={newsBusy}
+			{newsActions}
 			bind:scrollBox
 			bind:popOpen={refsPopOpen}
 			bind:refsDraft={refsEditDraft}

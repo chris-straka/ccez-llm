@@ -9,6 +9,7 @@ mod coderun;
 mod desktop;
 mod dictation;
 mod fetch;
+mod news;
 mod ocr;
 #[cfg(target_os = "windows")]
 mod ocr_windows;
@@ -302,6 +303,7 @@ pub fn run() {
             dictate_stop,
             coderun::run_code,
             fetch::fetch_page,
+            news::news_decode_url,
             promptmenu::set_prompt_menu_allowed,
             turn::turn_start,
             turn::turn_poll,

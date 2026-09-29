@@ -41,11 +41,13 @@ describe("empty hero contract", () => {
 		expect(source).toContain('class="mock-note"');
 		expect(source).toContain("{#if mock}");
 		expect(source).toContain("{@render children()}");
+		// News mode trades the welcome text for the story panel.
+		expect(source).toContain("{#if !newsMode}");
 	});
 
 	it("keeps emptiness and the pills paged", () => {
 		const thread = threadSource();
-		expect(thread).toContain("<EmptyHero mock={useMock}>");
+		expect(thread).toContain("<EmptyHero mock={useMock} newsMode={newsPanel !== null}>");
 		expect(thread).toContain("{#if messages.length === 0}");
 	});
 

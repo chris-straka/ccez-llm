@@ -19,7 +19,7 @@ const MAX_HTML_BYTES: usize = 512 * 1024;
 
 /// The URL back when fetchable, `None` when not. Mirrors
 /// `validFetchUrl` in the frontend seam (both stay dumb string gates).
-fn fetchable_url(url: &str) -> Option<&str> {
+pub(crate) fn fetchable_url(url: &str) -> Option<&str> {
     if url.is_empty() || url.len() > MAX_URL_CHARS {
         return None;
     }
@@ -40,7 +40,7 @@ fn fetchable_url(url: &str) -> Option<&str> {
 /// Transport failure to its machine code: timeouts read as
 /// `timeout` (send-time and mid-stream alike), everything else as
 /// `failed`.
-fn transport_code(error: &reqwest::Error) -> String {
+pub(crate) fn transport_code(error: &reqwest::Error) -> String {
     (if error.is_timeout() {
         "timeout"
     } else {

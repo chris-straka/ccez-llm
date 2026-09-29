@@ -23,9 +23,15 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		type LocalAid
 	} from "$lib/reading";
 	import type { LanguageMenu, ReplyLanguage } from "$lib/languages";
+	import type {
+		NewsKind,
+		NewsPanelState,
+		NewsPicker
+	} from "$lib/news";
 	import MessageArticle from "./MessageArticle.svelte";
 	import EmptyHero from "./EmptyHero.svelte";
 	import LangMenus from "./LangMenus.svelte";
+	import NewsPanel from "./NewsPanel.svelte";
 	import SendingIndicator from "./SendingIndicator.svelte";
 
 	/** Page-owned behaviors the thread drives (row binding happens here). */
@@ -133,6 +139,19 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 			toggle: (id: LanguageMenu["id"], el: HTMLElement) => void;
 			pick: (lang: ReplyLanguage) => void;
 		};
+		// Learner news (null off): the hero hides its welcome text and
+		// the pills become the top rail above the story cards.
+		newsPanel: NewsPanelState | null;
+		newsPicker: NewsPicker | null;
+		newsBusy: string | null;
+		// Mirrors NewsPanel actions (structural, same rule as above).
+		newsActions: {
+			region: (gl: string) => void;
+			toggle: (link: string, kind: NewsKind) => void;
+			pick: (link: string, kind: NewsKind, value: string) => void;
+			close: () => void;
+			retry: () => void;
+		};
 		scrollBox?: HTMLElement | undefined;
 		popOpen?: ChatMsgId | null;
 		refsDraft?: string;
@@ -177,6 +196,10 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		openLangMenu,
 		langMenuAnchor,
 		langMenusActions,
+		newsPanel,
+		newsPicker,
+		newsBusy,
+		newsActions,
 		scrollBox = $bindable<HTMLElement | undefined>(undefined),
 		popOpen = $bindable(null),
 		refsDraft = $bindable(""),
@@ -197,8 +220,9 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 	{#if messages.length === 0}
 		<!-- Empty hero through `EmptyHero.svelte` (the pills slot under
 		the welcome text on every platform); the page keeps emptiness
-		and the pill state. -->
-		<EmptyHero mock={useMock}>
+		and the pill state. In news mode the welcome text goes away
+		and the pills rail the story cards below them. -->
+		<EmptyHero mock={useMock} newsMode={newsPanel !== null}>
 			<LangMenus
 				openId={openLangMenu}
 				anchor={langMenuAnchor}
@@ -206,6 +230,14 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 				{previewing}
 				actions={langMenusActions}
 			/>
+			{#if newsPanel}
+				<NewsPanel
+					panel={newsPanel}
+					picker={newsPicker}
+					busy={newsBusy}
+					actions={newsActions}
+				/>
+			{/if}
 		</EmptyHero>
 	{/if}
 	{#each messages as msg, i (msg.id)}
