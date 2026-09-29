@@ -48,6 +48,54 @@ test("unsupported language shows the no-edition note", async ({ page }) => {
 	await expect(panel).toHaveCount(0);
 });
 
+test("news mode lists from the top: uncentered pane, strip clearance, tail room", async ({
+	page
+}) => {
+	await page.locator('.lang-menu button:has-text("Europe")').click();
+	await page.locator(".lang-list").getByRole("menuitem", { name: "French" }).click();
+	const panel = page.locator(".news-panel");
+	await expect(panel).toBeVisible({ timeout: 10_000 });
+	// The thread stops being a centered hero: full-height list.
+	await expect(page.locator("main.news")).toHaveCount(1);
+	const styles = await page.evaluate(() => {
+		const box = document.querySelector(".messages") as HTMLElement;
+		const hero = document.querySelector(".empty-state") as HTMLElement;
+		const bs = getComputedStyle(box);
+		return {
+			justify: bs.justifyContent,
+			maxH: bs.maxHeight,
+			heroMargin: getComputedStyle(hero).marginTop,
+			heroNews: hero.classList.contains("news-mode")
+		};
+	});
+	expect(styles.justify).toBe("flex-start");
+	expect(styles.maxH).toBe("none");
+	expect(styles.heroNews).toBe(true);
+	// Strip clearance (1.75rem) and tail clearance (composer + gap,
+	// applied async by the resize sync).
+	expect(parseFloat(styles.heroMargin)).toBeGreaterThanOrEqual(28);
+	const boxPad = () =>
+		page.evaluate(
+			() =>
+				getComputedStyle(document.querySelector(".messages") as HTMLElement)
+					.paddingBottom
+		);
+	await expect.poll(boxPad, { timeout: 5_000 }).not.toBe("0px");
+	// Closing restores the centered hero.
+	await panel.getByRole("button", { name: "Close news" }).click();
+	await expect(panel).toHaveCount(0);
+	await expect(page.locator("main.news")).toHaveCount(0);
+	const after = await page.evaluate(() => {
+		const bs = getComputedStyle(
+			document.querySelector(".messages") as HTMLElement
+		);
+		return { justify: bs.justifyContent, maxH: bs.maxHeight };
+	});
+	expect(after.justify).toBe("center");
+	expect(after.maxH).not.toBe("none");
+	await expect.poll(boxPad, { timeout: 5_000 }).toBe("0px");
+});
+
 test("picking a second language switches the panel over", async ({
 	page
 }) => {

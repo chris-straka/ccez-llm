@@ -3225,8 +3225,9 @@
 			// Thread clearance lives INSIDE the scroller: the thread
 			// runs full-height behind the solid card, and the tail
 			// still lands above it at the bottom. Empty chats keep
-			// none: no tail to protect, hero owns the space.
-			const emptyChat = viewChat.messages.length === 0;
+			// none: no tail to protect, hero owns the space — except
+			// news mode, whose card list is a tail like any thread.
+			const emptyChat = viewChat.messages.length === 0 && news === null;
 			const boxPad = emptyChat ? "0px" : `${clearPx + trayH + trayGap}px`;
 			if (boxPad !== lastBoxPad) {
 				box.style.paddingBottom = boxPad;
@@ -13878,6 +13879,7 @@
 	<!-- Click-off closes the settings panel (keyboard users get Esc and ⌘,). -->
 	<main
 		class:empty={viewChat.messages.length === 0}
+		class:news={news !== null}
 		class:hide-messages={settings.hideMessages}
 		class:hide-buttons={settings.hideButtons}
 		class:plain-user={!settings.ownBubble}

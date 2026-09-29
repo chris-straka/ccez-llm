@@ -561,6 +561,15 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		below the fold of the hero, neither middle nor bottom. */
 		max-height: 60%;
 	}
+	/* News mode is a scrolling list, not a centered hero: top-align
+	and uncap the pane, or the tall panel centers with its head
+	above the reachable scroll origin and a void below. Same
+	specificity as the empty rule, later wins (news implies empty:
+	every send, switch, and new chat clears the panel). */
+	:global(main.news) .messages {
+		justify-content: flex-start;
+		max-height: none;
+	}
 
 	/* Message text never spills sideways off a phone: inner scrollers
 	(code blocks, aid-label rows) keep their own axes. */

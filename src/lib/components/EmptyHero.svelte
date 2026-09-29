@@ -17,7 +17,7 @@ pills become the top rail above the story cards. -->
 	let { mock, newsMode, children }: Props = $props();
 </script>
 
-<div class="empty-state">
+<div class="empty-state" class:news-mode={newsMode}>
 	{#if !newsMode}
 		<h1 class="hero">What can I do for you?</h1>
 	{/if}
@@ -40,6 +40,15 @@ pills become the top rail above the story cards. -->
 		width: 100%;
 		max-width: min(100%, calc(var(--chat-width, 36) * 1rem));
 		box-sizing: border-box;
+	}
+	/* News mode drops the greeting, so the pill rail becomes first
+	content: stand it off the drag strip like the first article
+	(browser strip, shell strip taller by its padding). */
+	.empty-state.news-mode {
+		margin-top: 1.75rem;
+	}
+	:global(.app[data-shell="tauri"]) .empty-state.news-mode {
+		margin-top: calc(1.75rem + 1.15rem);
 	}
 	.hero {
 		margin: 0;
