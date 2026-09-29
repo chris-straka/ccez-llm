@@ -14,6 +14,9 @@ import {
 	tagCopyIndexes,
 	pastedCopyIndexes,
 	expandPastedTags,
+	pasteSlotHit,
+	expandPasteSlot,
+	collapsePasteSlot,
 	removedMarkerIndexes,
 	dataUrlsToImageFiles,
 	expandDeletionUnits,
@@ -23,8 +26,10 @@ import {
 	stripAttachmentMarkers,
 	removeMarker,
 	removePastedAt,
-	countPastedTags,
+	countPasteSlots,
 	pastedTextMarker,
+	PASTE_CLOSE,
+	PASTE_OPEN,
 	IMAGE_MARKER,
 	FILE_MARKER
 } from "./attachments";
@@ -297,6 +302,14 @@ describe("pastedCopyIndexes", () => {
 		expect(pastedCopyIndexes(`${pastedTextMarker(5)} `, 3, 3)).toEqual([]);
 		expect(pastedCopyIndexes(`${pastedTextMarker(5)} `, 5, 2)).toEqual([]);
 	});
+
+	it("addresses expanded regions in slot order with tags", () => {
+		const region = `${PASTE_OPEN}xy${PASTE_CLOSE}`;
+		const doc = `${pastedTextMarker(3)} one\n${region} two`;
+		const secondStart = doc.indexOf(region);
+		expect(pastedCopyIndexes(doc, secondStart, doc.length)).toEqual([1]);
+		expect(pastedCopyIndexes(doc, 0, doc.length)).toEqual([0, 1]);
+	});
 });
 
 describe("expandPastedTags", () => {
@@ -321,6 +334,67 @@ describe("expandPastedTags", () => {
 			`AAA ${pastedTextMarker(3)}`
 		);
 	});
+
+	it("splices region inner prose with brackets stripped", () => {
+		const region = `${PASTE_OPEN}XY${PASTE_CLOSE}`;
+		expect(expandPastedTags(`see ${region} end`, ["STALE"])).toBe(
+			"see XY end"
+		);
+		// Mixed slots stay positional: tags take stored text,
+		// regions take inner prose (stored entries ignored).
+		expect(
+			expandPastedTags(`${pastedTextMarker(3)} ${region}`, ["AAA", "STALE"])
+		).toBe("AAA XY");
+	});
+});
+
+describe("paste slot toggles", () => {
+	const tag = pastedTextMarker(3);
+	const region = (inner: string): string =>
+		`${PASTE_OPEN}${inner}${PASTE_CLOSE}`;
+
+	it("hits tags on the label and brackets from either side", () => {
+		const doc = `a ${tag} b`;
+		expect(pasteSlotHit(doc, 2)).toEqual({ index: 0, kind: "tag" });
+		expect(pasteSlotHit(doc, 5)).toEqual({ index: 0, kind: "tag" });
+		// Far edge belongs to the prose after it, or every click
+		// past a tag would unfold it.
+		expect(pasteSlotHit(doc, 2 + tag.length)).toBeNull();
+		expect(pasteSlotHit(doc, 0)).toBeNull();
+		const open = `a ${region("xy")} b`;
+		expect(pasteSlotHit(open, 2)).toEqual({ index: 0, kind: "region" });
+		expect(pasteSlotHit(open, 3)).toEqual({ index: 0, kind: "region" });
+		// Interior carets edit, never toggle.
+		expect(pasteSlotHit(open, 4)).toBeNull();
+		expect(pasteSlotHit(open, 5)).toEqual({ index: 0, kind: "region" });
+		expect(pasteSlotHit(open, 6)).toEqual({ index: 0, kind: "region" });
+	});
+
+	it("expands tags to bracketed prose with the caret just inside", () => {
+		const doc = `a ${tag} b`;
+		expect(expandPasteSlot(doc, 0, "XY")).toEqual({
+			from: 2,
+			to: 2 + tag.length,
+			insert: region("XY"),
+			caret: 3
+		});
+		expect(expandPasteSlot(doc, 1, "XY")).toBeNull();
+		expect(expandPasteSlot(`a ${region("XY")} b`, 0, "ZZ")).toBeNull();
+	});
+
+	it("collapses regions to a recounted tag and hands back the prose", () => {
+		const doc = `a ${region("XY!")} b`;
+		const tag3 = pastedTextMarker(3);
+		expect(collapsePasteSlot(doc, 0)).toEqual({
+			from: 2,
+			to: 2 + region("XY!").length,
+			insert: tag3,
+			caret: 2 + tag3.length,
+			inner: "XY!"
+		});
+		expect(collapsePasteSlot(`a ${tag} b`, 0)).toBeNull();
+		expect(collapsePasteSlot("plain", 0)).toBeNull();
+	});
 });
 
 describe("removedMarkerIndexes", () => {
@@ -342,6 +416,21 @@ describe("removedMarkerIndexes", () => {
 			image: [1],
 			file: []
 		});
+	});
+
+	it("reports deleted regions at their slot index", () => {
+		const tag = pastedTextMarker(3);
+		const region = `${PASTE_OPEN}xy${PASTE_CLOSE}`;
+		const doc = `${tag} ${region}`;
+		expect(
+			removedMarkerIndexes(doc, [
+				{ from: tag.length + 1, to: doc.length }
+			])
+		).toEqual({ image: [], file: [], pasted: [1] });
+		// Whole-document wipes take both slots in order.
+		expect(removedMarkerIndexes(doc, [{ from: 0, to: doc.length }])).toEqual(
+			{ image: [], file: [], pasted: [0, 1] }
+		);
 	});
 
 	it("separates kinds and spans whole-document wipes", () => {
@@ -406,6 +495,22 @@ describe("expandDeletionUnits", () => {
 		]);
 		expect(expandDeletionUnits(doc, [], [{ from: 13, to: 14 }])).toEqual([
 			{ from: 0, to: 14 }
+		]);
+	});
+
+	it("takes the whole region on bracket touches, interior edits pass", () => {
+		// "a ⟦wxyz⟧ b": region [2, 8), brackets at 2 and 7.
+		const doc = `a ${PASTE_OPEN}wxyz${PASTE_CLOSE} b`;
+		// Backspace over either bracket takes the region.
+		expect(expandDeletionUnits(doc, [], [{ from: 2, to: 3 }])).toEqual([
+			{ from: 2, to: 8 }
+		]);
+		expect(expandDeletionUnits(doc, [], [{ from: 7, to: 8 }])).toEqual([
+			{ from: 2, to: 8 }
+		]);
+		// Interior word edits pass through untouched.
+		expect(expandDeletionUnits(doc, [], [{ from: 4, to: 5 }])).toEqual([
+			{ from: 4, to: 5 }
 		]);
 	});
 
@@ -482,18 +587,24 @@ describe("expandDeletionUnits", () => {
 });
 
 describe("pastedCutAt", () => {
+	const region = (inner: string): string =>
+		`${PASTE_OPEN}${inner}${PASTE_CLOSE}`;
 	const battery = [
 		"plain text",
 		`look ${pastedTextMarker(12)} here`,
 		`${pastedTextMarker(7)} `,
 		`before\n${pastedTextMarker(200)} \nafter`,
 		`a ${pastedTextMarker(9)} b ${pastedTextMarker(44)}`,
-		`${IMAGE_MARKER} ${pastedTextMarker(5)}`
+		`${IMAGE_MARKER} ${pastedTextMarker(5)}`,
+		`look ${region("xy")} here`,
+		`a ${region("x\ny")} b`,
+		`before\n${region("xy")}\nafter`,
+		`${pastedTextMarker(9)} ${region("xy")}`
 	];
 
 	it("matches removePastedAt on every battery doc and index", () => {
 		for (const doc of battery) {
-			const count = countPastedTags(doc);
+			const count = countPasteSlots(doc);
 			for (let index = 0; index < count + 1; index++) {
 				const cut = pastedCutAt(doc, index);
 				if (index >= count) {

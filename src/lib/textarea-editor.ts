@@ -1,12 +1,15 @@
 import {
 	PASTE_THRESHOLD,
+	collapsePasteSlot,
 	dataUrlsToImageFiles,
 	expandDeletionUnits,
 	expandPastedTags,
+	expandPasteSlot,
 	markerCut,
 	markerCutAt,
 	pastedCopyIndexes,
 	pastedCutAt,
+	pasteSlotHit,
 	removedMarkerIndexes,
 	tagCopyIndexes,
 	tagCopyPlan,
@@ -134,6 +137,14 @@ export interface PromptEditorOptions {
 	 * copy as plain text.
 	 */
 	onCopyPastedTexts?: (indexes: number[]) => (string | null)[];
+	/**
+	 * A bracket click collapsed the index-th region: the host writes
+	 * the current inner prose (edits included) back to the Nth
+	 * pasted-text attachment, so the pill, copy, and re-expand agree
+	 * with the recounted tag. Regions with no pill (hand-typed)
+	 * still collapse; the host just has nothing to update.
+	 */
+	onPasteSlotCollapsed?: (index: number, inner: string) => void;
 	/**
 	 * Document text changed (drives the submit button's faded state).
 	 * `removed` carries the deleted tag occurrences' document-order
@@ -610,9 +621,48 @@ export function createTextareaEditor(
 		// Engine path: the nested input event owns notify/autogrow.
 	};
 
+	/**
+	 * Click-to-toggle for paste slots: a collapsed caret landing on
+	 * a tag expands it to its `⟦prose⟧` region (stored prose via
+	 * the copy hook; hand-typed tags open empty for typing into),
+	 * and a caret on either bracket collapses back to a recounted
+	 * tag, writing the (possibly edited) prose back to the pill.
+	 * Through the editing engine so Cmd+Z restores the toggle;
+	 * selections keep native behavior.
+	 */
+	const onClick = (): void => {
+		const start = ta.selectionStart ?? 0;
+		const end = ta.selectionEnd ?? 0;
+		if (start !== end) return;
+		const doc = ta.value;
+		const hit = pasteSlotHit(doc, start);
+		if (!hit) return;
+		if (hit.kind === "region") {
+			const collapsed = collapsePasteSlot(doc, hit.index);
+			if (!collapsed) return;
+			if (!undoableReplace(collapsed.from, collapsed.to, collapsed.insert)) {
+				ta.setRangeText(collapsed.insert, collapsed.from, collapsed.to, "end");
+				notify();
+			}
+			ta.setSelectionRange(collapsed.caret, collapsed.caret);
+			options.onPasteSlotCollapsed?.(hit.index, collapsed.inner);
+			return;
+		}
+		const prose =
+			options.onCopyPastedTexts?.([hit.index])[0] ?? "";
+		const expanded = expandPasteSlot(doc, hit.index, prose);
+		if (!expanded) return;
+		if (!undoableReplace(expanded.from, expanded.to, expanded.insert)) {
+			ta.setRangeText(expanded.insert, expanded.from, expanded.to, "end");
+			notify();
+		}
+		ta.setSelectionRange(expanded.caret, expanded.caret);
+	};
+
 	ta.addEventListener("input", onInput);
 	ta.addEventListener("keydown", onKeyDown);
 	ta.addEventListener("beforeinput", onBeforeInput as EventListener);
+	ta.addEventListener("click", onClick);
 	ta.addEventListener("paste", onPaste);
 	const onCopy = onCopyCut(false);
 	const onCut = onCopyCut(true);
@@ -706,6 +756,7 @@ export function createTextareaEditor(
 			ta.removeEventListener("input", onInput);
 			ta.removeEventListener("keydown", onKeyDown);
 			ta.removeEventListener("beforeinput", onBeforeInput as EventListener);
+			ta.removeEventListener("click", onClick);
 			ta.removeEventListener("paste", onPaste);
 			ta.removeEventListener("copy", onCopy);
 			ta.removeEventListener("cut", onCut);

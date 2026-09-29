@@ -12,9 +12,13 @@ import {
 	FILE_MARKER,
 	IMAGE_MARKER,
 	PASTED_TAG_RE,
+	PASTE_CLOSE,
+	PASTE_OPEN,
 	appendImageMarkers,
 	countMarkers,
-	countPastedTags,
+	countPasteSlots,
+	findPasteSlots,
+	pasteSlotCut,
 	removeTags
 } from "./attachments";
 
@@ -158,10 +162,11 @@ export function expandDeletionUnits(
 		units.push({ from, to: from + match[0].length });
 	}
 	// Pasted-text tags delete atomically too, or Backspace leaves a
-	// half-tag that reads as prose and strands its attachment.
-	for (const match of docText.matchAll(PASTED_TAG_RE)) {
-		const from = match.index ?? 0;
-		units.push({ from, to: from + match[0].length });
+	// half-tag that reads as prose and strands its attachment. Tags
+	// inside expanded regions are literal prose, never units.
+	for (const slot of findPasteSlots(docText)) {
+		if (slot.kind !== "tag") continue;
+		units.push({ from: slot.start, to: slot.end });
 	}
 	for (const span of spans) {
 		if (span.from < 0 || span.to > docText.length || span.from >= span.to)
@@ -169,8 +174,29 @@ export function expandDeletionUnits(
 		units.push({ from: span.from, to: span.to });
 	}
 	units.sort((a, b) => a.from - b.from);
+	// Expanded regions widen bracket-touching deletions to the whole
+	// region (a half-deleted bracket would strand the slot as prose
+	// with its attachment dropped); interior edits pass through
+	// untouched, or the revealed prose could never change.
+	const regions = findPasteSlots(docText).filter(
+		(slot) => slot.kind === "region"
+	);
+	const widened = deletions.map((del) => {
+		if (del.from >= del.to) return { ...del };
+		let from = del.from;
+		let to = del.to;
+		for (const region of regions) {
+			const touchesOpen = from < region.start + 1 && to > region.start;
+			const touchesClose = from < region.end && to > region.end - 1;
+			if (touchesOpen || touchesClose) {
+				from = Math.min(from, region.start);
+				to = Math.max(to, region.end);
+			}
+		}
+		return { from, to };
+	});
 	const out: DeletionRange[] = [];
-	for (const del of deletions) {
+	for (const del of widened) {
 		if (del.from >= del.to) {
 			out.push({ ...del });
 			continue;
@@ -296,26 +322,14 @@ function markerCutSpan(
 
 /**
  * Locate the cut `removePastedAt` would make for the index-th
- * pasted-text tag in document order (pure, unit-tested): same line
- * surgery as the fixed-marker path, anchored at that tag's span.
- * Null when the occurrence is absent.
+ * paste slot in document order, tag or expanded region alike
+ * (pure, unit-tested): computed in attachments so the locator and
+ * the removal agree by construction. Null when absent.
  */
 export function pastedCutAt(doc: string, index: number): MarkerCut | null {
-	if (index < 0) return null;
-	const matches = [...doc.matchAll(PASTED_TAG_RE)];
-	const found = matches[index];
-	if (!found || found.index === undefined) return null;
-	const absStart = found.index;
-	const marker = found[0];
-	const lineStart = doc.lastIndexOf("\n", absStart - 1) + 1;
-	const at = doc.slice(0, absStart).split("\n").length - 1;
-	const lineCount = doc.split("\n").length;
-	const lineEnd = doc.indexOf("\n", absStart);
-	const raw = doc.slice(lineStart, lineEnd === -1 ? doc.length : lineEnd);
-	const tagAt = absStart - lineStart;
-	const cutLen =
-		marker.length + (raw.slice(tagAt + marker.length).startsWith(" ") ? 1 : 0);
-	return markerCutSpan(raw, tagAt, cutLen, lineStart, at, lineCount);
+	const cut = pasteSlotCut(doc, index);
+	if (!cut) return null;
+	return { from: cut.from, to: cut.to, insert: cut.insert };
 }
 
 /** Removed marker-tag occurrences in pre-change document order. */
@@ -331,7 +345,9 @@ export interface RemovedMarkerTags {
  * Which tag occurrences a change set deleted (pure, unit-tested):
  * per-kind document-order indexes over the pre-change text, so the
  * host drops the matching attachments (Nth tag pairs with the Nth
- * attachment). Ranges arrive in pre-change coordinates.
+ * attachment). Ranges arrive in pre-change coordinates. Pasted
+ * slots (collapsed tags and expanded regions alike) index together,
+ * so deleting an open region drops its own attachment.
  */
 export function removedMarkerIndexes(
 	beforeText: string,
@@ -341,7 +357,7 @@ export function removedMarkerIndexes(
 	const file: number[] = [];
 	const pasted: number[] = [];
 	const tagRe = new RegExp(
-		`${escapeRegExp(IMAGE_MARKER)}|${escapeRegExp(FILE_MARKER)}|\\[Pasted \\d+ chars\\]`,
+		`${escapeRegExp(IMAGE_MARKER)}|${escapeRegExp(FILE_MARKER)}`,
 		"g"
 	);
 	for (const { from, to } of removed) {
@@ -349,12 +365,13 @@ export function removedMarkerIndexes(
 		const slice = beforeText.slice(from, to);
 		let seenImage = countMarkers(beforeText.slice(0, from));
 		let seenFile = countMarkers(beforeText.slice(0, from), FILE_MARKER);
-		let seenPasted = countPastedTags(beforeText.slice(0, from));
+		let seenPasted = countPasteSlots(beforeText.slice(0, from));
 		for (const m of slice.matchAll(tagRe)) {
 			if (m[0] === IMAGE_MARKER) image.push(seenImage++);
-			else if (m[0] === FILE_MARKER) file.push(seenFile++);
-			else pasted.push(seenPasted++);
+			else file.push(seenFile++);
 		}
+		const slots = findPasteSlots(slice).length;
+		for (let i = 0; i < slots; i++) pasted.push(seenPasted++);
 	}
 	return pasted.length > 0 ? { image, file, pasted } : { image, file };
 }
@@ -481,30 +498,138 @@ export function pastedCopyIndexes(
 	to: number
 ): number[] {
 	if (from >= to) return [];
-	const base = countPastedTags(doc.slice(0, Math.max(0, from)));
-	const count = countPastedTags(doc.slice(from, to));
+	const base = countPasteSlots(doc.slice(0, Math.max(0, from)));
+	const count = countPasteSlots(doc.slice(from, to));
 	return Array.from({ length: count }, (_, i) => base + i);
 }
 
 /**
- * Splice stored pasted prose back at tag positions inside a copied or
- * cut selection (pure, unit-tested): the Nth `[Pasted N chars]` tag in
- * the selection is replaced by the Nth entry of `texts`, so the
- * clipboard carries content, never the tag label. Null or missing
- * entries keep their tags literal (hand-typed, or resurrected by undo
- * after the pill dropped); unlike send-time splicing, leftover texts
- * never append — the clipboard holds the selection only.
+ * Splice stored pasted prose back at slot positions inside a copied
+ * or cut selection (pure, unit-tested): the Nth slot in the
+ * selection takes the Nth entry of `texts`, so the clipboard
+ * carries content, never the tag label. Expanded regions splice
+ * their current inner prose (edits included) with the brackets
+ * stripped; null or missing entries keep their tags literal
+ * (hand-typed, or resurrected by undo after the pill dropped).
+ * Unlike send-time splicing, leftover texts never append — the
+ * clipboard holds the selection only.
  */
 export function expandPastedTags(
 	selected: string,
 	texts: (string | null)[]
 ): string {
 	let at = 0;
-	return selected.replace(PASTED_TAG_RE, (tag) => {
-		const prose = at < texts.length ? texts[at] : undefined;
+	let out = "";
+	let last = 0;
+	for (const slot of findPasteSlots(selected)) {
+		out += selected.slice(last, slot.start);
+		if (slot.kind === "region") {
+			out += slot.inner ?? "";
+		} else {
+			const prose = at < texts.length ? texts[at] : undefined;
+			out += prose ?? selected.slice(slot.start, slot.end);
+		}
+		last = slot.end;
 		at++;
-		return prose ?? tag;
-	});
+	}
+	out += selected.slice(last);
+	return out;
+}
+
+/** A caret sitting on a paste slot (pure click target, unit-tested). */
+export interface PasteSlotHit {
+	index: number;
+	kind: "tag" | "region";
+}
+
+/**
+ * Which paste slot a collapsed caret hits (pure, unit-tested):
+ * brackets trigger from either side of the glyph (a one-char mark
+ * lands the caret before or after it); tags need the caret on the
+ * label itself — the far edge belongs to the prose after it, or
+ * every click past a tag would unfold it. Brackets win over tags
+ * (more specific).
+ */
+export function pasteSlotHit(doc: string, caret: number): PasteSlotHit | null {
+	const slots = findPasteSlots(doc);
+	for (let i = 0; i < slots.length; i++) {
+		const slot = slots[i];
+		if (!slot || slot.kind !== "region") continue;
+		if (
+			caret === slot.start ||
+			caret === slot.start + 1 ||
+			caret === slot.end - 1 ||
+			caret === slot.end
+		) {
+			return { index: i, kind: "region" };
+		}
+	}
+	for (let i = 0; i < slots.length; i++) {
+		const slot = slots[i];
+		if (!slot || slot.kind !== "tag") continue;
+		if (caret >= slot.start && caret < slot.end) {
+			return { index: i, kind: "tag" };
+		}
+	}
+	return null;
+}
+
+/**
+ * One tag↔region toggle as a cut plus caret: the editor applies it
+ * through the editing engine (Cmd+Z restores the tag), the same
+ * shape as the pill-drop cuts.
+ */
+export interface PasteSlotToggle {
+	from: number;
+	to: number;
+	insert: string;
+	caret: number;
+}
+
+/**
+ * Swap the index-th tag for its expanded `⟦prose⟧` region (pure,
+ * unit-tested): caret lands just inside, at the revealed prose.
+ * Only tag slots expand — regions and missing slots return null.
+ */
+export function expandPasteSlot(
+	doc: string,
+	index: number,
+	prose: string
+): PasteSlotToggle | null {
+	const slots = findPasteSlots(doc);
+	const slot = slots[index];
+	if (!slot || slot.kind !== "tag") return null;
+	return {
+		from: slot.start,
+		to: slot.end,
+		insert: `${PASTE_OPEN}${prose}${PASTE_CLOSE}`,
+		caret: slot.start + PASTE_OPEN.length
+	};
+}
+
+/**
+ * Collapse the index-th region back to a fresh tag (pure,
+ * unit-tested): the tag recounts the current inner prose (edits
+ * included) and the caret lands past it. `inner` writes back to
+ * the attachment — only regions collapse, anything else returns
+ * null.
+ */
+export function collapsePasteSlot(
+	doc: string,
+	index: number
+): (PasteSlotToggle & { inner: string }) | null {
+	const slots = findPasteSlots(doc);
+	const slot = slots[index];
+	if (!slot || slot.kind !== "region") return null;
+	const inner = slot.inner ?? "";
+	const tag = pastedLabel(inner.length);
+	return {
+		from: slot.start,
+		to: slot.end,
+		insert: tag,
+		caret: slot.start + tag.length,
+		inner
+	};
 }
 
 /**

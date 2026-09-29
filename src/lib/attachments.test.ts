@@ -9,6 +9,10 @@ import {
 	PASTED_TAG_RE,
 	countMarkers,
 	countPastedTags,
+	countPasteSlots,
+	findPasteSlots,
+	PASTE_CLOSE,
+	PASTE_OPEN,
 	dropFileAttachmentsAtIndexes,
 	dropNewestWhere,
 	dropPastedAttachmentsAtIndexes,
@@ -34,6 +38,7 @@ import {
 	attachmentImageBlobsAt,
 	attachmentDataUrlsAt,
 	pastedTextsAt,
+	writePastedTextAt,
 	removeTags,
 	splicePastedText,
 	splicePastedFolds,
@@ -571,6 +576,20 @@ describe("splicePastedText", () => {
 		expect(splicePastedText("", ["AAA"])).toBe("AAA");
 		expect(splicePastedText("hi", [])).toBe("hi");
 	});
+
+	it("strips region brackets with no texts (edit-save normalization)", () => {
+		// Regions dissolve to inner prose even with nothing stored;
+		// tags stay literal exactly as typed.
+		expect(
+			splicePastedText(`a ${PASTE_OPEN}EDIT${PASTE_CLOSE} b`, [])
+		).toBe("a EDIT b");
+		expect(
+			splicePastedText(
+				`${pastedTextMarker(3)} ${PASTE_OPEN}x${PASTE_CLOSE}`,
+				[]
+			)
+		).toBe(`${pastedTextMarker(3)} x`);
+	});
 });
 
 describe("splicePastedFolds", () => {
@@ -608,6 +627,59 @@ describe("splicePastedFolds", () => {
 		]);
 		expect(text).toBe("AAA");
 		expect(folds).toEqual([{ start: 0, end: 3, chars: 3 }]);
+	});
+});
+
+describe("paste slots", () => {
+	const tag = pastedTextMarker(3);
+	const region = (inner: string): string =>
+		`${PASTE_OPEN}${inner}${PASTE_CLOSE}`;
+
+	it("finds tags and regions in document order", () => {
+		const doc = `a ${tag} b ${region("xy")} c`;
+		const slots = findPasteSlots(doc);
+		expect(slots.map((s) => s.kind)).toEqual(["tag", "region"]);
+		expect(slots[1]).toMatchObject({ kind: "region", inner: "xy" });
+		expect(doc.slice(slots[0]!.start, slots[0]!.end)).toBe(tag);
+		expect(doc.slice(slots[1]!.start, slots[1]!.end)).toBe(region("xy"));
+		expect(countPasteSlots(doc)).toBe(2);
+		expect(countPastedTags(doc)).toBe(1);
+	});
+
+	it("ignores tags inside regions and unbalanced markers", () => {
+		// A tag inside pasted prose is literal content, never a slot.
+		expect(findPasteSlots(region(`x ${tag} y`))).toHaveLength(1);
+		// Unbalanced markers scan as plain text.
+		expect(findPasteSlots(`a ${PASTE_OPEN}b`)).toHaveLength(0);
+		expect(findPasteSlots(`a b${PASTE_CLOSE}`)).toHaveLength(0);
+		// Nested openers still end at the first close.
+		const nested = `${PASTE_OPEN}a ${PASTE_OPEN}b${PASTE_CLOSE} c${PASTE_CLOSE}`;
+		const slots = findPasteSlots(nested);
+		expect(slots).toHaveLength(1);
+		expect(slots[0]!.inner).toBe(`a ${PASTE_OPEN}b`);
+	});
+
+	it("removes regions whole with tag-identical line surgery", () => {
+		expect(removePastedAt(`a ${region("xy")} b`, 0)).toBe("a b");
+		expect(removePastedAt(`a\n${region("xy")}\nb`, 0)).toBe("a\nb");
+		expect(removePastedAt(`a ${region("x\ny")} b`, 0)).toBe("a b");
+		// Second slot of mixed kinds drops its own, never the first.
+		expect(removePastedAt(`${tag} ${region("xy")}`, 1)).toBe(tag);
+	});
+
+	it("strips regions on reset and splices their inner prose", () => {
+		expect(stripPastedMarkers(`a ${region("xy")} b`)).toBe("a b");
+		// Regions splice current inner prose (edits included);
+		// tags still take stored text positionally.
+		expect(splicePastedText(`${tag} ${region("EDIT")}`, ["AAA"])).toBe(
+			"AAA EDIT"
+		);
+		const { text, folds } = splicePastedFolds(
+			`a ${region("EDIT")} b`,
+			[]
+		);
+		expect(text).toBe("a EDIT b");
+		expect(folds).toEqual([{ start: 2, end: 6, chars: 4 }]);
 	});
 });
 
@@ -659,6 +731,33 @@ describe("pastedTextsAt", () => {
 		expect(pastedTextsAt(list, [0, 1])).toEqual(["first paste", null]);
 		expect(pastedTextsAt(list, [1])).toEqual([null]);
 		expect(pastedTextsAt(list, [4, -1])).toEqual([null, null]);
+	});
+});
+
+describe("writePastedTextAt", () => {
+	const pasted = (id: string, text: string | null) => ({
+		...testAttachment({ id, kind: "text", text }),
+		pastedText: true
+	});
+	it("rewrites the Nth pasted prose and retokens, files untouched", () => {
+		const file = testAttachment({ id: "f", kind: "text", text: "file prose" });
+		const before = estimateTextTokens("first paste");
+		const list = [file, pasted("p0", "first paste"), pasted("p1", "second")];
+		const next = writePastedTextAt(list, 0, "edited prose here");
+		expect(next[1]?.text).toBe("edited prose here");
+		expect(next[1]?.tokens).toBe(estimateTextTokens("edited prose here"));
+		expect(next[1]?.tokens).not.toBe(before);
+		expect(next[0]?.text).toBe("file prose");
+		expect(next[2]?.text).toBe("second");
+		// The input list is untouched (Svelte reactivity needs a new array).
+		expect(list[1]?.text).toBe("first paste");
+	});
+	it("caps overlong prose like a fresh paste and ignores bad indexes", () => {
+		const list = [pasted("p0", "first paste")];
+		const next = writePastedTextAt(list, 0, "a".repeat(MAX_FILE_CHARS + 10));
+		expect(next[0]?.text?.length).toBe(MAX_FILE_CHARS);
+		expect(writePastedTextAt(list, 1, "nope")).toBe(list);
+		expect(writePastedTextAt(list, -1, "nope")).toBe(list);
 	});
 });
 

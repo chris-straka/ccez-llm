@@ -482,3 +482,83 @@ describe("pasted-tag copy/cut expansion", () => {
 		expect(event.defaultPrevented).toBe(false);
 	});
 });
+
+describe("paste slot click toggle", () => {
+	const TAG = "[Pasted 11 chars]";
+	const PROSE = "hello world";
+
+	function click(ta: HTMLTextAreaElement): void {
+		ta.dispatchEvent(new Event("click", { bubbles: true }));
+	}
+
+	it("expands a clicked tag to its stored prose, caret just inside", () => {
+		const take = vi.fn(() => [PROSE]);
+		const { ta, options } = setup({ onCopyPastedTexts: take });
+		ta.value = `see ${TAG} end`;
+		ta.setSelectionRange(6, 6);
+		click(ta);
+		expect(take).toHaveBeenCalledWith([0]);
+		expect(ta.value).toBe(`see ⟦${PROSE}⟧ end`);
+		expect(ta.selectionStart).toBe(5);
+		expect(ta.selectionEnd).toBe(5);
+		expect(options.onDocChange).toHaveBeenCalledWith(`see ⟦${PROSE}⟧ end`);
+	});
+
+	it("opens hand-typed tags empty for typing into", () => {
+		const { ta } = setup({ onCopyPastedTexts: () => [null] });
+		ta.value = `see ${TAG} end`;
+		ta.setSelectionRange(6, 6);
+		click(ta);
+		expect(ta.value).toBe("see ⟦⟧ end");
+		expect(ta.selectionStart).toBe(5);
+	});
+
+	it("collapses a clicked bracket and writes the prose back", () => {
+		const collapsed = vi.fn();
+		const { ta, options } = setup({ onPasteSlotCollapsed: collapsed });
+		ta.value = `see ⟦${PROSE}!!!⟧ end`;
+		// Caret on the opening bracket.
+		ta.setSelectionRange(4, 4);
+		click(ta);
+		// The tag recounts the edited prose (14 chars, not 11).
+		expect(ta.value).toBe("see [Pasted 14 chars] end");
+		expect(ta.selectionStart).toBe(4 + "[Pasted 14 chars]".length);
+		expect(collapsed).toHaveBeenCalledWith(0, `${PROSE}!!!`);
+		expect(options.onDocChange).toHaveBeenCalledWith(
+			"see [Pasted 14 chars] end"
+		);
+	});
+
+	it("collapses from the closing bracket too", () => {
+		const collapsed = vi.fn();
+		const { ta } = setup({ onPasteSlotCollapsed: collapsed });
+		ta.value = `see ⟦${PROSE}⟧ end`;
+		// Caret just past the closing bracket.
+		ta.setSelectionRange(4 + PROSE.length + 2, 4 + PROSE.length + 2);
+		click(ta);
+		expect(ta.value).toBe(`see ${TAG} end`);
+		expect(collapsed).toHaveBeenCalledWith(0, PROSE);
+	});
+
+	it("leaves selections and plain prose clicks alone", () => {
+		const take = vi.fn(() => [PROSE]);
+		const collapsed = vi.fn();
+		const { ta, options } = setup({
+			onCopyPastedTexts: take,
+			onPasteSlotCollapsed: collapsed
+		});
+		(options.onDocChange as ReturnType<typeof vi.fn>).mockClear();
+		ta.value = `see ${TAG} end`;
+		// A selection over the tag keeps native behavior.
+		ta.setSelectionRange(4, 4 + TAG.length);
+		click(ta);
+		expect(ta.value).toBe(`see ${TAG} end`);
+		// A caret in plain prose is no slot.
+		ta.setSelectionRange(1, 1);
+		click(ta);
+		expect(ta.value).toBe(`see ${TAG} end`);
+		expect(take).not.toHaveBeenCalled();
+		expect(collapsed).not.toHaveBeenCalled();
+		expect(options.onDocChange).not.toHaveBeenCalled();
+	});
+});

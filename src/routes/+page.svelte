@@ -189,11 +189,13 @@
 		attachmentImageBlobsAt,
 		clipboardPngBlob,
 		countMarkers,
-		countPastedTags,
+		countPasteSlots,
 		isPastedTextAttachment,
 		makePastedTextAttachment,
 		pastedMarkerInsert,
 		pastedTextsAt,
+		writePastedTextAt,
+		splicePastedText,
 		spliceSendText,
 		syncTagRemovals,
 		stripPastedMarkers,
@@ -3757,7 +3759,7 @@
 				if (
 					countMarkers(doc) > 0 ||
 					countMarkers(doc, FILE_MARKER) > 0 ||
-					countPastedTags(doc) > 0
+					countPasteSlots(doc) > 0
 				) {
 					editor.setText(stripPastedMarkers(stripAttachmentMarkers(doc)));
 				}
@@ -3966,7 +3968,7 @@
 		const doc = editor.getText();
 		prevMarkerCount = countMarkers(doc);
 		prevFileMarkerCount = countMarkers(doc, FILE_MARKER);
-		prevPastedCount = countPastedTags(doc);
+		prevPastedCount = countPasteSlots(doc);
 	}
 
 	/* Tag → attachment reconciliation lives in $lib/attachments. */
@@ -7953,7 +7955,7 @@
 		editingSeed = refs ? refs.text : msg.content;
 		editingPrevMarkers = countMarkers(editingSeed);
 		editingPrevFileMarkers = countMarkers(editingSeed, FILE_MARKER);
-		editingPrevPasted = countPastedTags(editingSeed);
+		editingPrevPasted = countPasteSlots(editingSeed);
 		reviewOpen = false;
 		highlightAnnId = null;
 		settleAnnPop();
@@ -8032,8 +8034,12 @@
 		if (id) {
 			const src = msgEditor ?? editor;
 			const prev = activeChat(chatState).messages.find((m) => m.id === id);
+			// Regions never persist: an expanded hand-typed tag saves
+			// as its inner prose (brackets stripped, tags untouched),
+			// so no ⟦⟧ leaks into storage. Region-free drafts pass
+			// through identical, keeping the untouched-save shortcut.
 			const { stored, folds: keepFolds } = bakeEditedMessage(
-				src?.getText() ?? "",
+				splicePastedText(src?.getText() ?? "", []),
 				src?.getPastes() ?? [],
 				editingAttachments.filter((a) => a.kind === "image").length,
 				editingSeed,
@@ -8128,6 +8134,13 @@
 				copyImageTagBlobs(editingAttachments, indexes),
 			onCopyPastedTexts: (indexes) =>
 				pastedTextsAt(editingAttachments, indexes),
+			onPasteSlotCollapsed: (index, inner) => {
+				editingAttachments = writePastedTextAt(
+					editingAttachments,
+					index,
+					inner
+				);
+			},
 			onDocChange: (text, removed) => {
 				// Tag → attachment half of two-way removal, mirrored
 				// from the composer: deleted occurrences drop the
@@ -8834,6 +8847,9 @@
 			onLongTextPasted: onLongTextPasted,
 			onCopyImageTags: (indexes) => copyImageTagBlobs(attachments, indexes),
 			onCopyPastedTexts: (indexes) => pastedTextsAt(attachments, indexes),
+			onPasteSlotCollapsed: (index, inner) => {
+				attachments = writePastedTextAt(attachments, index, inner);
+			},
 			onDocChange: (text, removed) => {
 				hasText = text.trim().length > 0;
 				// Tag → attachment half of two-way removal: tags are the

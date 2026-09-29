@@ -365,6 +365,72 @@ export function countPastedTags(text: string): number {
 }
 
 /**
+ * Brackets framing an expanded paste region in the draft: clicking
+ * a `[Pasted N chars]` tag swaps it for `⟦prose⟧` inline, and
+ * clicking either bracket collapses back to the tag. Single chars
+ * so textarea clicks resolve by caret position — the rendered
+ * message's blue bracket buttons have no textarea equivalent.
+ */
+export const PASTE_OPEN = "⟦";
+export const PASTE_CLOSE = "⟧";
+
+/**
+ * One paste slot in document order: a collapsed tag or an expanded
+ * region. Pairing is positional (Nth slot ↔ Nth pasted-text
+ * attachment), so every tag-indexed operation runs over slots and
+ * open regions never shift the attachments behind them.
+ */
+export interface PasteSlot {
+	kind: "tag" | "region";
+	/** Whole-slot range (tag text, or brackets plus prose). */
+	start: number;
+	end: number;
+	/** Region inner prose (tag slots carry undefined). */
+	inner?: string;
+}
+
+/**
+ * Paste slots in document order, tags and expanded regions alike
+ * (pure, unit-tested): regions scan first so a tag inside pasted
+ * prose never double-counts. Single-level: a ⟦ inside a region
+ * still ends at the first ⟧ (nested markers corrupt pairing — the
+ * same accepted class as hand-typed tags). Unbalanced markers scan
+ * as literal text, never slots.
+ */
+export function findPasteSlots(doc: string): PasteSlot[] {
+	const regions: PasteSlot[] = [];
+	let from = 0;
+	while (from < doc.length) {
+		const open = doc.indexOf(PASTE_OPEN, from);
+		if (open < 0) break;
+		const close = doc.indexOf(PASTE_CLOSE, open + PASTE_OPEN.length);
+		if (close < 0) break;
+		regions.push({
+			kind: "region",
+			start: open,
+			end: close + PASTE_CLOSE.length,
+			inner: doc.slice(open + PASTE_OPEN.length, close)
+		});
+		from = close + PASTE_CLOSE.length;
+	}
+	const inRegion = (pos: number): boolean =>
+		regions.some((r) => pos >= r.start && pos < r.end);
+	const slots: PasteSlot[] = [...regions];
+	for (const m of doc.matchAll(PASTED_TAG_RE)) {
+		const at = m.index ?? 0;
+		if (inRegion(at)) continue;
+		slots.push({ kind: "tag", start: at, end: at + m[0].length });
+	}
+	slots.sort((a, b) => a.start - b.start);
+	return slots;
+}
+
+/** How many paste slots (tags plus expanded regions) a draft holds. Pure. */
+export function countPasteSlots(doc: string): number {
+	return findPasteSlots(doc).length;
+}
+
+/**
  * Composer insertion for a newly pasted long text: same contract as
  * the image/file tags (same line, one trailing space, caret after
  * it). Pure and unit-tested.
@@ -410,7 +476,9 @@ export function isPastedTextAttachment(att: Attachment): boolean {
  * opened. The textarea composer tracks no paste spans, so without
  * this the send stores unfolded prose with no marker at all. Tags
  * without a stored text stay literal with no fold (hand-typed, or
- * resurrected by undo after the pill dropped).
+ * resurrected by undo after the pill dropped). Expanded regions
+ * splice their current inner prose (edits included) and fold like
+ * tags, so sending with regions open matches sending collapsed.
  */
 export function splicePastedFolds(
 	doc: string,
@@ -423,16 +491,25 @@ export function splicePastedFolds(
 	let out = "";
 	let last = 0;
 	let index = 0;
-	for (const match of doc.matchAll(PASTED_TAG_RE)) {
-		const at = match.index ?? 0;
+	for (const slot of findPasteSlots(doc)) {
+		if (slot.kind === "region") {
+			out += doc.slice(last, slot.start);
+			const prose = slot.inner ?? "";
+			const start = out.length;
+			out += prose;
+			folds.push({ start, end: start + prose.length, chars: prose.length });
+			last = slot.end;
+			index++;
+			continue;
+		}
 		const prose = index < texts.length ? texts[index] : undefined;
 		index++;
 		if (prose === undefined) continue;
-		out += doc.slice(last, at);
+		out += doc.slice(last, slot.start);
 		const start = out.length;
 		out += prose;
 		folds.push({ start, end: start + prose.length, chars: prose.length });
-		last = at + match[0].length;
+		last = slot.end;
 	}
 	out += doc.slice(last);
 	// The send stores trimmed text: shift folds past leading
@@ -452,16 +529,17 @@ export function splicePastedFolds(
 }
 
 /**
- * Drop every pasted-text tag (reset path: pills are gone, so their
- * tags go too). A host line left blank by the removal drops, while
- * the user's own blank lines stay put. Pure and unit-tested.
+ * Drop every pasted-text tag and expanded region (reset path: pills
+ * are gone, so their tags go too). A host line left blank by the
+ * removal drops, while the user's own blank lines stay put. Pure
+ * and unit-tested.
  */
 export function stripPastedMarkers(text: string): string {
-	// One exact surgery per tag (same helper the pill uses), so prose
+	// One exact surgery per slot (same helper the pill uses), so prose
 	// spacing elsewhere on the line is untouched.
 	let out = text;
-	let guard = countPastedTags(out);
-	while (guard > 0 && countPastedTags(out) > 0) {
+	let guard = countPasteSlots(out);
+	while (guard > 0 && countPasteSlots(out) > 0) {
 		out = removePastedAt(out, 0);
 		guard--;
 	}
@@ -469,21 +547,32 @@ export function stripPastedMarkers(text: string): string {
 }
 
 /**
- * Splice stored pasted text back at tag positions (pure,
- * unit-tested): the Nth `[Pasted N chars]` tag in document order is
- * replaced by the Nth entry of `texts` — the send-time mirror of
- * render.ts kind-order pairing. Tags without a text stay literal
- * (hand-typed, or resurrected by undo after the pill dropped);
- * texts without a tag end-append blank-line separated, like files.
+ * Splice stored pasted text back at slot positions (pure,
+ * unit-tested): the Nth slot in document order takes the Nth entry
+ * of `texts` — the send-time mirror of render.ts kind-order
+ * pairing. Expanded regions splice their current inner prose
+ * (edits included) instead of the stored text. Tags without a text
+ * stay literal (hand-typed, or resurrected by undo after the pill
+ * dropped); texts without a slot end-append blank-line separated,
+ * like files.
  */
 export function splicePastedText(doc: string, texts: string[]): string {
 	let at = 0;
-	const out = doc.replace(PASTED_TAG_RE, (match) => {
-		if (at >= texts.length) return match;
-		const stored = texts[at] ?? "";
+	let out = "";
+	let last = 0;
+	for (const slot of findPasteSlots(doc)) {
+		out += doc.slice(last, slot.start);
+		if (slot.kind === "region") {
+			out += slot.inner ?? "";
+		} else if (at < texts.length) {
+			out += texts[at] ?? "";
+		} else {
+			out += doc.slice(slot.start, slot.end);
+		}
+		last = slot.end;
 		at++;
-		return stored;
-	});
+	}
+	out += doc.slice(last);
 	const rest = texts.slice(at).filter((t) => t !== "");
 	if (rest.length === 0) return out;
 	const tail = rest.join("\n\n");
@@ -618,6 +707,33 @@ export function pastedTextsAt(
 ): (string | null)[] {
 	const pasted = list.filter(isPastedTextAttachment);
 	return indexes.map((i) => pasted[i]?.text ?? null);
+}
+
+/**
+ * Collapse write-back: the Nth pasted-text attachment takes the
+ * region's current inner prose (edits included), capped and
+ * retokened like a fresh paste so the pill, copy, and re-expand
+ * agree with the recounted tag. Out-of-range writes (hand-typed
+ * regions with no pill) leave the list alone. Pure and unit-tested.
+ */
+export function writePastedTextAt(
+	list: Attachment[],
+	index: number,
+	text: string
+): Attachment[] {
+	if (index < 0) return list;
+	const capped =
+		text.length > MAX_FILE_CHARS ? text.slice(0, MAX_FILE_CHARS) : text;
+	let seen = -1;
+	let written = false;
+	const next = list.map((att) => {
+		if (!isPastedTextAttachment(att)) return att;
+		seen++;
+		if (seen !== index) return att;
+		written = true;
+		return { ...att, text: capped, tokens: estimateTextTokens(capped) };
+	});
+	return written ? next : list;
 }
 
 /**
@@ -840,36 +956,72 @@ export function removeMarkerAt(
 }
 
 /**
- * Remove the index-th pasted-text tag in document order (a pill drops
+ * One paste-slot excision in document coordinates: the shape
+ * `pastedCutAt` (editorPaste) returns, computed here so the cut
+ * locator and `removePastedAt` agree by construction.
+ */
+export interface PasteSlotCut {
+	from: number;
+	to: number;
+	insert: string;
+}
+
+/**
+ * Locate the cut removing the index-th paste slot in document
+ * order, tag or expanded region alike (pure, unit-tested): the
+ * slot takes one following space when present, the joined line is
+ * end-trimmed like the tag path, and a host line left blank drops
+ * with its newline. Single-line tags reproduce the old surgery
+ * exactly; multi-line regions join their start/end lines. Null
+ * when the slot is absent.
+ */
+export function pasteSlotCut(doc: string, index: number): PasteSlotCut | null {
+	if (index < 0) return null;
+	const slots = findPasteSlots(doc);
+	const slot = slots[index];
+	if (!slot) return null;
+	let end = slot.end;
+	if (doc[end] === " ") end += 1;
+	const lineStart = doc.lastIndexOf("\n", slot.start - 1) + 1;
+	const head = doc.slice(lineStart, slot.start);
+	const lineEndNl = doc.indexOf("\n", end);
+	const endLineEnd = lineEndNl === -1 ? doc.length : lineEndNl;
+	const tail = doc.slice(end, endLineEnd);
+	const keepAfter = tail.slice(0, tail.trimEnd().length);
+	if ((head + keepAfter).trim() === "") {
+		const isLast = endLineEnd === doc.length;
+		if (!isLast)
+			return { from: lineStart, to: endLineEnd + 1, insert: "" };
+		if (lineStart === 0) return { from: 0, to: endLineEnd, insert: "" };
+		return { from: lineStart - 1, to: endLineEnd, insert: "" };
+	}
+	if (keepAfter === "") {
+		return {
+			from: lineStart + head.trimEnd().length,
+			to: endLineEnd,
+			insert: ""
+		};
+	}
+	return { from: slot.start, to: endLineEnd, insert: keepAfter };
+}
+
+/** Apply a paste-slot cut (pure). */
+export function applyPasteSlotCut(doc: string, cut: PasteSlotCut): string {
+	return doc.slice(0, cut.from) + cut.insert + doc.slice(cut.to);
+}
+
+/**
+ * Remove the index-th paste slot in document order (a pill drops
  * its own tag now, not the first): same line surgery as
- * `removeMarkerAt` — the tag takes one following space with it when
- * present, a host line left blank drops with its newline, prose typed
- * beside the tag survives. Out-of-range indexes leave the text
- * untouched. Pure and unit-tested.
+ * `removeMarkerAt` — the slot takes one following space with it
+ * when present, a host line left blank drops with its newline,
+ * prose typed beside the slot survives. Out-of-range indexes
+ * leave the text untouched. Pure and unit-tested.
  */
 export function removePastedAt(text: string, index: number = 0): string {
-	if (index < 0) return text;
-	const matches = [...text.matchAll(PASTED_TAG_RE)];
-	const found = matches[index];
-	if (!found || found.index === undefined) return text;
-	const absStart = found.index;
-	const marker = found[0];
-	const lines = text.split("\n");
-	let offset = 0;
-	for (let i = 0; i < lines.length; i++) {
-		const raw = lines[i] ?? "";
-		if (absStart >= offset && absStart < offset + raw.length) {
-			const tagAt = absStart - offset;
-			const after = raw.slice(tagAt + marker.length);
-			const cutEnd = tagAt + marker.length + (after.startsWith(" ") ? 1 : 0);
-			const noTag = (raw.slice(0, tagAt) + raw.slice(cutEnd)).trimEnd();
-			const next = [...lines.slice(0, i), ...lines.slice(i + 1)];
-			if (noTag.trim() !== "") next.splice(i, 0, noTag);
-			return next.join("\n");
-		}
-		offset += raw.length + 1;
-	}
-	return text;
+	const cut = pasteSlotCut(text, index);
+	if (!cut) return text;
+	return applyPasteSlotCut(text, cut);
 }
 
 /**
@@ -1096,6 +1248,7 @@ export function sentTagModelsFor(
 export interface TagSyncCounts {
 	markers: number;
 	fileMarkers: number;
+	/** Paste slots (collapsed tags plus expanded regions), never tags alone. */
 	pasted: number;
 }
 
@@ -1114,7 +1267,7 @@ export function syncTagRemovals(
 ): { kept: Attachment[]; counts: TagSyncCounts; cleared: boolean } {
 	const imagesNow = countMarkers(text);
 	const filesNow = countMarkers(text, FILE_MARKER);
-	const pastedNow = countPastedTags(text);
+	const pastedNow = countPasteSlots(text);
 	const kept = reconcileTagRemovals(
 		list,
 		imagesNow,
