@@ -561,6 +561,69 @@ export function contentImageFromMarkdown(markdown: string): string | null {
 }
 
 /**
+ * Serializes reader calls `spacingMs` apart (the keyless quota is
+ * 20/min — parallel workers would burn it in one region open).
+ * Clock and sleep inject for tests. Pure-ish: one chain per gate.
+ */
+export function createRateGate(
+	spacingMs: number,
+	now: () => number = () => Date.now(),
+	sleep: (ms: number) => Promise<void> = (ms) =>
+		new Promise((r) => setTimeout(r, ms))
+): () => Promise<void> {
+	let ready: Promise<void> = Promise.resolve();
+	let last = -spacingMs;
+	return (): Promise<void> => {
+		const wait = ready.then(async () => {
+			const gap = now() - last;
+			if (gap < spacingMs) await sleep(spacingMs - gap);
+			last = now();
+		});
+		ready = wait.catch(() => {});
+		return wait;
+	};
+}
+
+export interface StoryImageDeps {
+	decode: (link: string) => Promise<string>;
+	fetchPage: (url: string) => Promise<string>;
+	gateJina: () => Promise<void>;
+	fresh: () => boolean;
+	cachedUrl: (link: string) => string | null;
+	storeUrl: (link: string, url: string) => void;
+}
+
+/**
+ * One story's preview image: direct og:image first, the gated
+ * reader leg second. `complete` is false when a leg threw or the
+ * region went stale mid-flight — the caller must not cache those
+ * as misses, or transient failures stick for the session.
+ */
+export async function resolveStoryImage(
+	link: string,
+	deps: StoryImageDeps
+): Promise<{ found: string | null; complete: boolean }> {
+	try {
+		const url = deps.cachedUrl(link) ?? (await deps.decode(link));
+		deps.storeUrl(link, url);
+		let found: string | null = null;
+		try {
+			found = articleImageFromHtml(await deps.fetchPage(url), url);
+		} catch {
+			found = null;
+		}
+		if (found) return { found, complete: true };
+		if (!deps.fresh()) return { found: null, complete: false };
+		await deps.gateJina();
+		if (!deps.fresh()) return { found: null, complete: false };
+		found = contentImageFromMarkdown(await deps.fetchPage(jinaUrl(url)));
+		return { found, complete: true };
+	} catch {
+		return { found: null, complete: false };
+	}
+}
+
+/**
  * Article body for a story link. Jina first (clean markdown, used
  * raw); direct fetch plus HTML cleaning when Jina fails or comes
  * back a stub. Throws NewsArticleError when both legs fail.

@@ -10,6 +10,7 @@ import {
 	cachedNewsImage,
 	cachedNewsUrl,
 	contentImageFromMarkdown,
+	createRateGate,
 	extractArticleText,
 	fetchArticleText,
 	isNewsFallback,
@@ -26,6 +27,7 @@ import {
 	parseTranslatedLines,
 	translateNewsTitles,
 	resolveArticleText,
+	resolveStoryImage,
 	shapeStory,
 	storeArticle,
 	storeNewsImage,
@@ -856,6 +858,106 @@ describe("article resolution", () => {
 		).toBe("https://img/photo.jpg");
 		expect(contentImageFromMarkdown("no images here")).toBeNull();
 		expect(contentImageFromMarkdown("![Logo](https://img/logo.png)")).toBeNull();
+	});
+
+	it("spaces gated reader calls, first one immediate", async () => {
+		let at = 1000;
+		const slept: number[] = [];
+		const gate = createRateGate(
+			3000,
+			() => at,
+			async (ms) => {
+				slept.push(ms);
+				at += ms;
+			}
+		);
+		await gate();
+		expect(slept).toEqual([]);
+		await gate();
+		expect(slept).toEqual([3000]);
+		at += 3000;
+		await gate();
+		expect(slept).toEqual([3000]);
+	});
+
+	it("serializes concurrent gated calls through one chain", async () => {
+		let at = 0;
+		const slept: number[] = [];
+		const gate = createRateGate(
+			100,
+			() => at,
+			async (ms) => {
+				slept.push(ms);
+				at += ms;
+			}
+		);
+		await Promise.all([gate(), gate(), gate()]);
+		expect(slept).toEqual([100, 100]);
+	});
+
+	it("resolves one story image, complete only when settled", async () => {
+		const og = '<meta property="og:image" content="https://img/a.jpg"/>';
+		const html = (head: string) =>
+			`<!doctype html><html><head>${head}</head><body><p>Body</p></body></html>`;
+		const deps = (fetchPage: (url: string) => Promise<string>, fresh = true) => ({
+			decode: async () => "https://outlet.test/s",
+			fetchPage,
+			gateJina: async () => {},
+			fresh: () => fresh,
+			cachedUrl: () => null,
+			storeUrl: () => {}
+		});
+		// Direct hit: reader leg never runs.
+		let jina = 0;
+		const direct = deps(async (url) => {
+			if (url.includes("r.jina.ai")) jina++;
+			return html(og);
+		});
+		expect(await resolveStoryImage("https://g", direct)).toEqual({
+			found: "https://img/a.jpg",
+			complete: true
+		});
+		expect(jina).toBe(0);
+		// Walled direct fetch falls through to the reader leg.
+		const walled = deps(async (url) => {
+			if (url.includes("r.jina.ai")) return "![Crowd](https://img/b.jpg)";
+			throw new Error("bad-status");
+		});
+		expect(await resolveStoryImage("https://g", walled)).toEqual({
+			found: "https://img/b.jpg",
+			complete: true
+		});
+		// Both legs dry is a settled miss, cacheable as null.
+		const dry = deps(async (url) => {
+			if (url.includes("r.jina.ai")) return "no images here";
+			return html("");
+		});
+		expect(await resolveStoryImage("https://g", dry)).toEqual({
+			found: null,
+			complete: true
+		});
+		// A throwing reader leg is transient: never a settled miss.
+		const flaky = deps(async (url) => {
+			if (url.includes("r.jina.ai")) throw new Error("bad-status");
+			return html("");
+		});
+		expect(await resolveStoryImage("https://g", flaky)).toEqual({
+			found: null,
+			complete: false
+		});
+		// Stale before the reader leg: incomplete, gate untouched.
+		let gated = 0;
+		const stale = {
+			...deps(async () => html(""), false),
+			gateJina: async () => {
+				gated++;
+			}
+		};
+		expect(await resolveStoryImage("https://g", stale)).toEqual({
+			found: null,
+			complete: false
+		});
+		expect(gated).toBe(0);
 	});
 
 	it("caches preview images, capped and corruption-proof", () => {

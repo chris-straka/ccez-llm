@@ -277,20 +277,19 @@
 	import { startBlink, startHighlightFade, startMarkFade } from "$lib/blink";
 	import { createRefMemo } from "$lib/aidLoading";
 	import {
-		articleImageFromHtml,
 		cachedNewsImage,
 		cachedNewsUrl,
-		contentImageFromMarkdown,
+		createRateGate,
 		decodeNewsLink,
 		fetchRawPage,
 		isNewsFallback,
-		jinaUrl,
 		loadNewsStories,
 		newsConversationInstruction,
 		newsErrorCopy,
 		newsRegionsFor,
 		newsSummaryInstruction,
 		resolveArticleText,
+		resolveStoryImage,
 		storeNewsImage,
 		storeNewsUrl,
 		translateNewsTitles,
@@ -2191,6 +2190,8 @@
 	/** Scraped preview images by story link (null = none found). */
 	let newsImages = $state<Record<string, string | null>>({});
 	const newsImageSession = new SvelteMap<string, string | null>();
+	/** One reader quota shared by every image worker (20/min keyless). */
+	const newsJinaGate = createRateGate(3000);
 	function toggleLangMenu(id: LanguageMenu["id"], btn: HTMLElement): void {
 		// Family open/close ticks on phones (buzzTap self-gates to
 		// Android and honors the haptics toggle).
@@ -8932,26 +8933,20 @@
 			const next = queue.shift();
 			if (!next) return;
 			if (fresh()) {
-				let found: string | null = null;
-				try {
-					const url =
-						cachedNewsUrl(localStorage, next.link) ?? (await decodeNewsLink(next.link));
-					storeNewsUrl(localStorage, next.link, url);
-					try {
-						found = articleImageFromHtml(await fetchRawPage(url), url);
-					} catch {
-						// Blocked or bare: the reader leg below gets its turn.
-					}
-					if (!found && fresh()) {
-						found = contentImageFromMarkdown(await fetchRawPage(jinaUrl(url)));
-					}
-				} catch {
-					// Misses stay silent; the card falls back to text.
-				}
-				if (fresh()) {
+				// Complete results cache even when stale — only the UI
+				// write is freshness-guarded, so hops never waste fetches.
+				const { found, complete } = await resolveStoryImage(next.link, {
+					decode: decodeNewsLink,
+					fetchPage: fetchRawPage,
+					gateJina: newsJinaGate,
+					fresh,
+					cachedUrl: (link) => cachedNewsUrl(localStorage, link),
+					storeUrl: (link, url) => storeNewsUrl(localStorage, link, url)
+				});
+				if (complete) {
 					newsImageSession.set(next.link, found);
 					if (found) storeNewsImage(localStorage, next.link, found);
-					newsImages = { ...newsImages, [next.link]: found };
+					if (fresh()) newsImages = { ...newsImages, [next.link]: found };
 				}
 			}
 			await runOne();
