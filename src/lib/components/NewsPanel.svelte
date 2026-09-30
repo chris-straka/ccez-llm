@@ -124,6 +124,10 @@ either); everything else is theme tokens, never raw hex. -->
 							/>
 						{:else if !story.image && images[story.link] === undefined}
 							<span class="news-skel" aria-hidden="true"></span>
+						{:else}
+							<span class="news-img-fallback" aria-hidden="true"
+								>{story.source.trim().charAt(0)}</span
+							>
 						{/if}
 						<span class="news-card-title">{story.title}</span>
 						{#if story.source}
@@ -305,13 +309,23 @@ either); everything else is theme tokens, never raw hex. -->
 		background: #e5e5ea;
 		background: var(--line-soft);
 	}
-	.news-skel {
+	.news-skel,
+	.news-img-fallback {
 		display: block;
 		width: 100%;
 		aspect-ratio: 16 / 9;
 		border-radius: 0.5rem;
 		background: #e5e5ea;
 		background: var(--line-soft);
+	}
+	.news-img-fallback {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: #6e6e73;
+		color: var(--muted);
+		font-size: 2rem;
+		font-weight: 700;
 	}
 	@media (prefers-reduced-motion: no-preference) {
 		.news-skel {

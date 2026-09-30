@@ -112,6 +112,9 @@ describe("news panel contract", () => {
 		expect(source).toContain("images[story.link]");
 		expect(source).toContain("news-skel");
 		expect(source).toContain("prefers-reduced-motion: no-preference");
+		// Resolved misses hold the same box with the outlet initial.
+		expect(source).toContain("news-img-fallback");
+		expect(source).toContain("story.source.trim().charAt(0)");
 	});
 
 	it("covers every fetch state with retry where retry helps", () => {
