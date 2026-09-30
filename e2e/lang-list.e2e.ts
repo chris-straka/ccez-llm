@@ -45,6 +45,19 @@ test("picking a language leaves the composer unfocused", async ({ page }) => {
 	await expect(page.locator(".prompt .ta-input")).not.toBeFocused();
 });
 
+/** The pick toast seats top-center over the sheets: reopening any
+submenu folds the lingering confirmation instead of painting
+over the options. */
+test("opening a submenu dismisses the pick toast", async ({ page }) => {
+	await page.locator('.lang-menu button:has-text("Europe")').click();
+	const list = page.locator(".lang-list");
+	await list.getByRole("menuitem", { name: "French" }).click();
+	await expect(page.locator(".toast")).toBeVisible();
+	await page.locator('.lang-menu button:has-text("Asia")').click();
+	await expect(list).toBeVisible();
+	await expect(page.locator(".toast")).toHaveCount(0);
+});
+
 /** The last menu hugs the right edge: its long nowrap names used to
 trail off the page (left-anchored like the rest). */
 test("classics list stays inside a phone viewport", async ({ page }) => {

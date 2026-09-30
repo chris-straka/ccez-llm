@@ -2196,6 +2196,10 @@
 			openLangMenu = null;
 			return;
 		}
+		// A fresh sheet covers the top-center toast seat: fold any
+		// lingering confirmation (the pick toast names its language)
+		// instead of painting over the options.
+		dismissToast();
 		openLangMenu = id;
 		const r = btn.getBoundingClientRect();
 		const composerTop =
