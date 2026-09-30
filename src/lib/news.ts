@@ -215,8 +215,8 @@ const editionTarget = (hl: string, gl: string): { url: string; lang: string } =>
 
 /**
  * World headlines in the learner's language, derived for every
- * feed, ordered Global, U.S., Canada, Latin America, Europe,
- * U.K., Asia, Australia: Global mixes the BBC and Al Jazeera
+ * feed, ordered Global, U.S., Canada, Europe, U.K.,
+ * Australia, Latin America, Asia: Global mixes the BBC and Al Jazeera
  * world desks (Google has no true global edition, and these link
  * straight to articles — no redirect decoding); Europe mixes the
  * French, German, Spanish, Italian, and Russian editions, Asia
@@ -243,17 +243,6 @@ const WORLD_REGIONS: NewsRegion[] = [
 	{ gl: "US", label: "U.S.", hl: "en-US", translate: true, icon: "🇺🇸" },
 	{ gl: "CA", label: "Canada", hl: "en-CA", translate: true, icon: "🇨🇦" },
 	{
-		gl: "LAT",
-		label: "Latin America",
-		translate: true,
-		icon: "🌎",
-		merge: [
-			editionTarget("es-MX", "MX"),
-			editionTarget("pt-BR", "BR"),
-			editionTarget("es-AR", "AR")
-		]
-	},
-	{
 		gl: "EUR",
 		label: "Europe",
 		translate: true,
@@ -267,6 +256,18 @@ const WORLD_REGIONS: NewsRegion[] = [
 		]
 	},
 	{ gl: "GB", label: "U.K.", hl: "en-GB", translate: true, icon: "🇬🇧" },
+	{ gl: "AU", label: "Australia", hl: "en-AU", translate: true, icon: "🇦🇺" },
+	{
+		gl: "LAT",
+		label: "Latin America",
+		translate: true,
+		icon: "🌎",
+		merge: [
+			editionTarget("es-MX", "MX"),
+			editionTarget("pt-BR", "BR"),
+			editionTarget("es-AR", "AR")
+		]
+	},
 	{
 		gl: "ASI",
 		label: "Asia",
@@ -278,8 +279,7 @@ const WORLD_REGIONS: NewsRegion[] = [
 			editionTarget("ko", "KR"),
 			editionTarget("zh-CN", "CN")
 		]
-	},
-	{ gl: "AU", label: "Australia", hl: "en-AU", translate: true, icon: "🇦🇺" }
+	}
 ];
 
 export function newsRegionsFor(code: string): NewsRegion[] | null {

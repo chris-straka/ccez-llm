@@ -113,7 +113,7 @@ describe("news feeds", () => {
 				}
 				const home = NEWS_FEEDS[code]!.regions;
 				const native = home.length;
-				const world = ["GBL", "US", "CA", "LAT", "EUR", "GB", "ASI", "AU"].filter(
+				const world = ["GBL", "US", "CA", "EUR", "GB", "AU", "LAT", "ASI"].filter(
 					(gl) => !home.some((r) => r.gl === gl)
 				).length;
 				expect(regions!.length).toBe(native + world);
@@ -141,11 +141,11 @@ describe("news feeds", () => {
 			"GBL",
 			"US",
 			"CA",
-			"LAT",
 			"EUR",
 			"GB",
-			"ASI",
-			"AU"
+			"AU",
+			"LAT",
+			"ASI"
 		]);
 	});
 
@@ -156,11 +156,11 @@ describe("news feeds", () => {
 		expect(fr.slice(-7).map((r) => r.gl)).toEqual([
 			"GBL",
 			"US",
-			"LAT",
 			"EUR",
 			"GB",
-			"ASI",
-			"AU"
+			"AU",
+			"LAT",
+			"ASI"
 		]);
 		expect(fr.slice(-7).every((r) => r.translate)).toBe(true);
 		expect(fr.find((r) => r.gl === "GBL")).toMatchObject({
@@ -243,11 +243,11 @@ describe("news feeds", () => {
 		expect(fr.slice(-7).map((r) => r.icon)).toEqual([
 			"🌐",
 			"🇺🇸",
-			"🌎",
 			"🇪🇺",
 			"🇬🇧",
-			"🌏",
-			"🇦🇺"
+			"🇦🇺",
+			"🌎",
+			"🌏"
 		]);
 		expect(fr.slice(0, -7).every((r) => r.icon === undefined)).toBe(true);
 		expect(newsRegionsFor("da")!.find((r) => r.gl === "CA")?.icon).toBe(
@@ -288,22 +288,22 @@ describe("news feeds", () => {
 		expect(es.slice(-7).map((r) => r.gl)).toEqual([
 			"GBL",
 			"CA",
-			"LAT",
 			"EUR",
 			"GB",
-			"ASI",
-			"AU"
+			"AU",
+			"LAT",
+			"ASI"
 		]);
 		// Pure-U.S. fallbacks: native US first, seven translated chips.
 		expect(newsRegionsFor("da")!.map((r) => r.gl)).toEqual([
 			"US",
 			"GBL",
 			"CA",
-			"LAT",
 			"EUR",
 			"GB",
-			"ASI",
-			"AU"
+			"AU",
+			"LAT",
+			"ASI"
 		]);
 		// Home-English fallbacks gain the world row (ang's native GB
 		// stands in for the U.K. chip only).
@@ -312,21 +312,21 @@ describe("news feeds", () => {
 			"GBL",
 			"US",
 			"CA",
-			"LAT",
 			"EUR",
 			"GB",
-			"ASI",
-			"AU"
+			"AU",
+			"LAT",
+			"ASI"
 		]);
 		expect(newsRegionsFor("ang")!.map((r) => r.gl)).toEqual([
 			"GB",
 			"GBL",
 			"US",
 			"CA",
-			"LAT",
 			"EUR",
-			"ASI",
-			"AU"
+			"AU",
+			"LAT",
+			"ASI"
 		]);
 	});
 
