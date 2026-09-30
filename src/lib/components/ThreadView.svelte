@@ -145,6 +145,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		newsPanel: NewsPanelState | null;
 		newsPicker: NewsPicker | null;
 		newsBusy: string | null;
+		newsImages: Record<string, string | null>;
 		// Mirrors NewsPanel actions (structural, same rule as above).
 		newsActions: {
 			region: (gl: string) => void;
@@ -205,6 +206,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		newsPanel,
 		newsPicker,
 		newsBusy,
+		newsImages,
 		newsActions,
 		scrollBox = $bindable<HTMLElement | undefined>(undefined),
 		popOpen = $bindable(null),
@@ -243,6 +245,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 					panel={newsPanel}
 					picker={newsPicker}
 					busy={newsBusy}
+					images={newsImages}
 					actions={newsActions}
 				/>
 			{/if}

@@ -19,6 +19,7 @@ either); everything else is theme tokens, never raw hex. -->
 		panel: NewsPanelState;
 		picker: NewsPicker | null;
 		busy: string | null;
+		images: Record<string, string | null>;
 		actions: {
 			region: (gl: string) => void;
 			menu: (link: string) => void;
@@ -30,7 +31,7 @@ either); everything else is theme tokens, never raw hex. -->
 		};
 	}
 
-	let { panel, picker, busy, actions }: Props = $props();
+	let { panel, picker, busy, images, actions }: Props = $props();
 	const activeRegion = $derived(panel.regions.find((r) => r.gl === panel.region));
 	const reduceMotion =
 		typeof matchMedia !== "undefined" &&
@@ -100,6 +101,7 @@ either); everything else is theme tokens, never raw hex. -->
 		<ul class="news-cards">
 			{#each panel.stories as story (story.link)}
 				{@const open = picker?.link === story.link}
+				{@const resolved = story.image ?? images[story.link] ?? undefined}
 				<li class="news-card" class:open>
 					<button
 						type="button"
@@ -112,14 +114,16 @@ either); everything else is theme tokens, never raw hex. -->
 							actions.menu(story.link);
 						}}
 					>
-						{#if story.image}
+						{#if resolved}
 							<img
 								class="news-img"
-								src={story.image}
+								src={resolved}
 								alt=""
 								loading="lazy"
 								onerror={(e) => e.currentTarget.remove()}
 							/>
+						{:else if !story.image && images[story.link] === undefined}
+							<span class="news-skel" aria-hidden="true"></span>
 						{/if}
 						<span class="news-card-title">{story.title}</span>
 						{#if story.source}
@@ -300,6 +304,24 @@ either); everything else is theme tokens, never raw hex. -->
 		border-radius: 0.5rem;
 		background: #e5e5ea;
 		background: var(--line-soft);
+	}
+	.news-skel {
+		display: block;
+		width: 100%;
+		aspect-ratio: 16 / 9;
+		border-radius: 0.5rem;
+		background: #e5e5ea;
+		background: var(--line-soft);
+	}
+	@media (prefers-reduced-motion: no-preference) {
+		.news-skel {
+			animation: news-pulse 1.6s ease-in-out infinite;
+		}
+		@keyframes news-pulse {
+			50% {
+				opacity: 0.55;
+			}
+		}
 	}
 	.news-card {
 		background: #fff;

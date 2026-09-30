@@ -451,6 +451,28 @@ export function jinaUrl(url: string): string {
 }
 
 /**
+ * Best preview image out of raw article HTML: og:image, then
+ * twitter:image, resolved against the page URL. Pure (needs DOM).
+ */
+export function articleImageFromHtml(html: string, baseUrl: string): string | null {
+	let doc: Document;
+	try {
+		doc = new DOMParser().parseFromString(html, "text/html");
+	} catch {
+		return null;
+	}
+	const content = (attr: "property" | "name", key: string): string =>
+		doc.querySelector(`meta[${attr}="${key}"]`)?.getAttribute("content")?.trim() ?? "";
+	const raw = content("property", "og:image") || content("name", "twitter:image");
+	if (!raw) return null;
+	try {
+		return new URL(raw, baseUrl).href;
+	} catch {
+		return null;
+	}
+}
+
+/**
  * Article body for a story link. Jina first (clean markdown, used
  * raw); direct fetch plus HTML cleaning when Jina fails or comes
  * back a stub. Throws NewsArticleError when both legs fail.
@@ -730,6 +752,43 @@ export function storeNewsUrl(store: KeyValueStore, link: string, url: string): v
 		store.setItem(NEWS_URL_KEY, JSON.stringify(urls));
 	} catch {
 		// Mapping cache is a speedup, never load-bearing.
+	}
+}
+
+const NEWS_IMAGE_KEY = "ccez-news-images-v1";
+const NEWS_IMAGE_MAX = 100;
+
+function readNewsImages(store: KeyValueStore): Record<string, string> {
+	try {
+		const raw = store.getItem(NEWS_IMAGE_KEY);
+		if (!raw) return {};
+		const parsed: unknown = JSON.parse(raw);
+		if (typeof parsed !== "object" || parsed === null) return {};
+		return parsed as Record<string, string>;
+	} catch {
+		return {};
+	}
+}
+
+/** Cached preview image for a story link, else null. Never throws. */
+export function cachedNewsImage(store: KeyValueStore, link: string): string | null {
+	const found = readNewsImages(store)[link];
+	return typeof found === "string" && found.startsWith("http") ? found : null;
+}
+
+/** File a preview image (oldest evicted past the cap). Never throws. */
+export function storeNewsImage(store: KeyValueStore, link: string, image: string): void {
+	try {
+		const images = readNewsImages(store);
+		delete images[link];
+		images[link] = image;
+		const keys = Object.keys(images);
+		for (const key of keys.slice(0, Math.max(0, keys.length - NEWS_IMAGE_MAX))) {
+			delete images[key];
+		}
+		store.setItem(NEWS_IMAGE_KEY, JSON.stringify(images));
+	} catch {
+		// Image cache is a speedup, never load-bearing.
 	}
 }
 

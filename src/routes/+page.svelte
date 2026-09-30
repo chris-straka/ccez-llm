@@ -277,6 +277,9 @@
 	import { startBlink, startHighlightFade, startMarkFade } from "$lib/blink";
 	import { createRefMemo } from "$lib/aidLoading";
 	import {
+		articleImageFromHtml,
+		cachedNewsImage,
+		cachedNewsUrl,
 		decodeNewsLink,
 		fetchRawPage,
 		isNewsFallback,
@@ -286,11 +289,14 @@
 		newsRegionsFor,
 		newsSummaryInstruction,
 		resolveArticleText,
+		storeNewsImage,
+		storeNewsUrl,
 		translateNewsTitles,
 		type CefrLevel,
 		type NewsKind,
 		type NewsPanelState,
 		type NewsPicker,
+		type NewsStory,
 		type SummarySize
 	} from "$lib/news";
 	/* decomposeTree + onKunLine render in `InspectOverlay.svelte`. */
@@ -2179,6 +2185,9 @@
 	let newsPicker = $state<NewsPicker | null>(null);
 	let newsBusy = $state<string | null>(null);
 	let newsSeq = 0;
+	/** Scraped preview images by story link (null = none found). */
+	let newsImages = $state<Record<string, string | null>>({});
+	const newsImageSession = new SvelteMap<string, string | null>();
 	function toggleLangMenu(id: LanguageMenu["id"], btn: HTMLElement): void {
 		// Family open/close ticks on phones (buzzTap self-gates to
 		// Android and honors the haptics toggle).
@@ -8900,6 +8909,41 @@
 		void fetchNewsStories();
 	}
 
+	/**
+	 * Preview images for stories the feed left imageless: decode,
+	 * fetch the article HTML, and read its og:image — four at a
+	 * time, hits filed for later, misses silent. Stale runs (region
+	 * hops) file nothing visible.
+	 */
+	async function resolveNewsImages(code: string, region: string, stories: NewsStory[]): Promise<void> {
+		const fresh = () => news?.code === code && news?.region === region;
+		const queue = stories.filter(
+			(s) => !s.image && !newsImageSession.has(s.link) && !cachedNewsImage(localStorage, s.link)
+		);
+		const runOne = async (): Promise<void> => {
+			const next = queue.shift();
+			if (!next) return;
+			if (fresh()) {
+				let found: string | null = null;
+				try {
+					const url =
+						cachedNewsUrl(localStorage, next.link) ?? (await decodeNewsLink(next.link));
+					storeNewsUrl(localStorage, next.link, url);
+					found = articleImageFromHtml(await fetchRawPage(url), url);
+				} catch {
+					// Misses stay silent; the card falls back to text.
+				}
+				if (fresh()) {
+					newsImageSession.set(next.link, found);
+					if (found) storeNewsImage(localStorage, next.link, found);
+					newsImages = { ...newsImages, [next.link]: found };
+				}
+			}
+			await runOne();
+		};
+		await Promise.all(Array.from({ length: 4 }, runOne));
+	}
+
 	async function fetchNewsStories(): Promise<void> {
 		const current = news;
 		if (!current) return;
@@ -8925,6 +8969,15 @@
 			}
 			if (newsSeq !== seq || news?.code !== code || news?.region !== region) return;
 			news = { ...current, status: "ready", stories, error: "" };
+			const prefill: Record<string, string | null> = {};
+			for (const s of stories) {
+				if (s.image) continue;
+				const hit = newsImageSession.get(s.link) ?? cachedNewsImage(localStorage, s.link);
+				if (hit) prefill[s.link] = hit;
+				else if (newsImageSession.get(s.link) === null) prefill[s.link] = null;
+			}
+			newsImages = prefill;
+			void resolveNewsImages(code, region, stories);
 		} catch (error) {
 			if (newsSeq !== seq || news?.code !== code) return;
 			const message = error instanceof Error ? error.message : "";
@@ -14097,6 +14150,7 @@
 			newsPanel={news}
 			newsPicker={newsPicker}
 			newsBusy={newsBusy}
+			newsImages={newsImages}
 			{newsActions}
 			bind:scrollBox
 			bind:popOpen={refsPopOpen}

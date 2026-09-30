@@ -5,7 +5,9 @@ import {
 	NEWS_CACHE_TTL_MS,
 	NEWS_FEEDS,
 	SUMMARY_SIZES,
+	articleImageFromHtml,
 	cachedArticle,
+	cachedNewsImage,
 	cachedNewsUrl,
 	fetchArticleText,
 	isNewsFallback,
@@ -24,6 +26,7 @@ import {
 	resolveArticleText,
 	shapeStory,
 	storeArticle,
+	storeNewsImage,
 	storeNewsUrl,
 	stripTags
 } from "./news";
@@ -551,6 +554,40 @@ describe("article resolution", () => {
 		const broken = memStore();
 		broken.setItem("ccez-news-urls-v1", "{{{nope");
 		expect(cachedNewsUrl(broken, "https://g")).toBeNull();
+	});
+
+	it("reads preview images out of article HTML", () => {
+		const html = (head: string) =>
+			`<!doctype html><html><head>${head}</head><body><p>Body</p></body></html>`;
+		expect(
+			articleImageFromHtml(
+				html('<meta property="og:image" content="https://img/a.jpg"/>'),
+				"https://outlet.test/s"
+			)
+		).toBe("https://img/a.jpg");
+		// Twitter fallback, relative URLs resolved, junk yields null.
+		expect(
+			articleImageFromHtml(
+				html('<meta name="twitter:image" content="/pic/b.jpg"/>'),
+				"https://outlet.test/s"
+			)
+		).toBe("https://outlet.test/pic/b.jpg");
+		expect(articleImageFromHtml(html(""), "https://outlet.test/s")).toBeNull();
+		expect(articleImageFromHtml("not html {{{", "https://outlet.test/s")).toBeNull();
+	});
+
+	it("caches preview images, capped and corruption-proof", () => {
+		const store = memStore();
+		storeNewsImage(store, "https://g", "https://img/a.jpg");
+		expect(cachedNewsImage(store, "https://g")).toBe("https://img/a.jpg");
+		for (let i = 0; i < 105; i++) {
+			storeNewsImage(store, `https://g${i}`, `https://img/${i}.jpg`);
+		}
+		expect(cachedNewsImage(store, "https://g0")).toBeNull();
+		expect(cachedNewsImage(store, "https://g104")).toBe("https://img/104.jpg");
+		const broken = memStore();
+		broken.setItem("ccez-news-images-v1", "{{{nope");
+		expect(cachedNewsImage(broken, "https://g")).toBeNull();
 	});
 });
 
