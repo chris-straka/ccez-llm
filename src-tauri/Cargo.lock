@@ -496,7 +496,7 @@ dependencies = [
 
 [[package]]
 name = "ccez-llm"
-version = "0.6.47"
+version = "0.6.48"
 dependencies = [
  "base64 0.22.1",
  "block2 0.6.2",
