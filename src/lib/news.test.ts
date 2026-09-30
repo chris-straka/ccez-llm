@@ -12,6 +12,7 @@ import {
 	contentImageFromMarkdown,
 	createRateGate,
 	extractArticleText,
+	imageMissSettles,
 	fetchArticleText,
 	isNewsFallback,
 	isNewsSupported,
@@ -945,6 +946,27 @@ describe("article resolution", () => {
 			found: null,
 			complete: false
 		});
+		// Quota blips retry; a standing reader wall settles now.
+		const quota = deps(async (url) => {
+			if (url.includes("r.jina.ai")) throw new Error("bad-status:429");
+			return html("");
+		});
+		expect(await resolveStoryImage("https://g", quota)).toEqual({
+			found: null,
+			complete: false
+		});
+		const stood = deps(async (url) => {
+			if (url.includes("r.jina.ai")) throw new Error("bad-status:403");
+			throw new Error("bad-status:403");
+		});
+		expect(await resolveStoryImage("https://g", stood)).toEqual({
+			found: null,
+			complete: true
+		});
+		expect(imageMissSettles(new Error("bad-status:500"))).toBe(true);
+		expect(imageMissSettles(new Error("timeout"))).toBe(false);
+		expect(imageMissSettles(new Error("failed"))).toBe(false);
+		expect(imageMissSettles("bad-status:403")).toBe(false);
 		// Stale before the reader leg: incomplete, gate untouched.
 		let gated = 0;
 		const stale = {

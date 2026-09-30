@@ -594,10 +594,24 @@ export interface StoryImageDeps {
 }
 
 /**
+ * Whether a reader-leg failure settles the story to a miss. A
+ * standing wall (any status but quota) will never clear, so the
+ * card should fall back now; quota, transport, and encoding blips
+ * stay pending and retry next open. Bare `bad-status` (old
+ * shells) reads transient. Pure.
+ */
+export function imageMissSettles(error: unknown): boolean {
+	const message = error instanceof Error ? error.message : "";
+	const code = /bad-status:(\d{3})/.exec(message)?.[1];
+	return code !== undefined && code !== "429";
+}
+
+/**
  * One story's preview image: direct og:image first, the gated
- * reader leg second. `complete` is false when a leg threw or the
- * region went stale mid-flight — the caller must not cache those
- * as misses, or transient failures stick for the session.
+ * reader leg second. `complete` is false when a leg threw
+ * transiently or the region went stale mid-flight — the caller
+ * must not cache those as misses; a standing reader wall settles
+ * instead (see imageMissSettles).
  */
 export async function resolveStoryImage(
 	link: string,
@@ -616,7 +630,11 @@ export async function resolveStoryImage(
 		if (!deps.fresh()) return { found: null, complete: false };
 		await deps.gateJina();
 		if (!deps.fresh()) return { found: null, complete: false };
-		found = contentImageFromMarkdown(await deps.fetchPage(jinaUrl(url)));
+		try {
+			found = contentImageFromMarkdown(await deps.fetchPage(jinaUrl(url)));
+		} catch (error) {
+			return { found: null, complete: imageMissSettles(error) };
+		}
 		return { found, complete: true };
 	} catch {
 		return { found: null, complete: false };

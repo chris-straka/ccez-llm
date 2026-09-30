@@ -65,6 +65,13 @@ fn decode_head(taken: Vec<u8>, truncated: bool) -> Result<String, String> {
     }
 }
 
+/// Non-2xx status into its machine code. The code rides along
+/// (`bad-status:403`) so the frontend can tell a standing wall from
+/// a quota blip; the copy matcher only reads the prefix. Pure.
+pub(crate) fn bad_status(status: reqwest::StatusCode) -> String {
+    format!("bad-status:{}", status.as_u16())
+}
+
 /// One page of HTML (bounded), or a short machine code the frontend
 /// maps to its one-sentence copy (`timeout`, `bad-status`, `bad-url`,
 /// `bad-encoding`, `failed`).
@@ -82,7 +89,7 @@ pub async fn fetch_page(url: String) -> Result<String, String> {
         .await
         .map_err(|e| transport_code(&e))?;
     if !res.status().is_success() {
-        return Err("bad-status".into());
+        return Err(bad_status(res.status()));
     }
     // Capped read: large pages truncate to the head instead of
     // failing, so a big demographics page still answers from its
@@ -133,6 +140,18 @@ mod tests {
         assert!(PAGE_USER_AGENT.starts_with("Mozilla/5.0"));
         assert!(PAGE_USER_AGENT.contains("Chrome/"));
         assert!(!PAGE_USER_AGENT.contains("ccez"));
+    }
+
+    #[test]
+    fn bad_status_carries_its_code() {
+        assert_eq!(
+            bad_status(reqwest::StatusCode::FORBIDDEN),
+            "bad-status:403"
+        );
+        assert_eq!(
+            bad_status(reqwest::StatusCode::TOO_MANY_REQUESTS),
+            "bad-status:429"
+        );
     }
 
     #[test]
