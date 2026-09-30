@@ -1,6 +1,7 @@
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import { tauriBackendAvailable } from "./secrets";
 import {
+	MAX_FEED_ITEMS,
 	htmlToText,
 	parseFeedItems,
 	type FeedItem
@@ -25,7 +26,7 @@ export interface NewsRegion {
 	label: string;
 	hl?: string;
 	translate?: true;
-	merge?: { hl: string; gl: string }[];
+	merge?: { url: string; source?: string }[];
 }
 
 /**
@@ -210,10 +211,11 @@ export function isNewsFallback(code: string): boolean {
  * World headlines in the learner's language, derived for every
  * feed: U.S., Europe (Britain — the only European English
  * edition), Asia (Singapore, the regional English hub), and a
- * Global mix merged from all three (no true global edition
- * exists). Appended after the native regions, skipping any `gl`
- * the feed already carries natively (only es-US does — every
- * other `hl`+US request redirects home).
+ * Global mix of the BBC and Al Jazeera world desks (Google has
+ * no true global edition, and these link straight to articles —
+ * no redirect decoding). Appended after the native regions,
+ * skipping any `gl` the feed already carries natively (es-US,
+ * zh-SG, ang-GB — every other `hl`+US request redirects home).
  */
 const WORLD_REGIONS: NewsRegion[] = [
 	{ gl: "US", label: "U.S.", hl: "en-US", translate: true },
@@ -224,9 +226,8 @@ const WORLD_REGIONS: NewsRegion[] = [
 		label: "Global",
 		translate: true,
 		merge: [
-			{ hl: "en-US", gl: "US" },
-			{ hl: "en-GB", gl: "GB" },
-			{ hl: "en-SG", gl: "SG" }
+			{ url: "https://feeds.bbci.co.uk/news/world/rss.xml", source: "BBC" },
+			{ url: "https://www.aljazeera.com/xml/rss/all.xml", source: "Al Jazeera" }
 		]
 	}
 ];
@@ -493,11 +494,14 @@ export async function decodeNewsLink(link: string): Promise<string> {
 
 /** Stories for a language + region (transport injected). Pure flow. */
 /**
- * Several editions interleaved round-robin (US, Europe, Asia, …)
- * so no one country's agenda leads, deduped by normalized
- * headline, capped at single-feed scale. Pure.
+ * Several feeds interleaved round-robin (BBC, Al Jazeera, …) so
+ * no one desk's agenda leads, deduped by normalized headline,
+ * capped at single-feed depth. Pure.
  */
-export function mergeNewsStories(feeds: NewsStory[][], cap = 40): NewsStory[] {
+export function mergeNewsStories(
+	feeds: NewsStory[][],
+	cap = MAX_FEED_ITEMS
+): NewsStory[] {
 	const seen = new Set<string>();
 	const merged: NewsStory[] = [];
 	const depth = Math.max(0, ...feeds.map((feed) => feed.length));
@@ -523,10 +527,16 @@ export async function loadNewsStories(
 	const region = newsRegionsFor(code)?.find((r) => r.gl === gl);
 	if (!region) throw new Error("news-unsupported");
 	if (region.merge) {
-		const xmls = await Promise.all(
-			region.merge.map((target) => fetchXml(feedUrl(target.hl, target.gl)))
-		);
-		return mergeNewsStories(xmls.map(newsStoriesFromXml));
+		const targets = region.merge;
+		const xmls = await Promise.all(targets.map((target) => fetchXml(target.url)));
+		// Single-desk feeds carry no outlet suffix — stamp the desk.
+		const feeds = xmls.map((xml, i) => {
+			const desk = targets[i]?.source ?? "";
+			return newsStoriesFromXml(xml).map((story) =>
+				story.source || !desk ? story : { ...story, source: desk }
+			);
+		});
+		return mergeNewsStories(feeds);
 	}
 	const url = newsRssUrl(code, gl);
 	if (!url) throw new Error("news-unsupported");

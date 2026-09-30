@@ -27,6 +27,7 @@ import {
 	storeNewsUrl,
 	stripTags
 } from "./news";
+import { MAX_FEED_ITEMS } from "./tools";
 import {
 	AFRICAN_LANGUAGES,
 	ASIAN_LANGUAGES,
@@ -144,9 +145,14 @@ describe("news feeds", () => {
 		expect(fr.at(-1)).toMatchObject({
 			label: "Global",
 			merge: [
-				{ hl: "en-US", gl: "US" },
-				{ hl: "en-GB", gl: "GB" },
-				{ hl: "en-SG", gl: "SG" }
+				{
+					url: "https://feeds.bbci.co.uk/news/world/rss.xml",
+					source: "BBC"
+				},
+				{
+					url: "https://www.aljazeera.com/xml/rss/all.xml",
+					source: "Al Jazeera"
+				}
 			]
 		});
 		expect(newsRssUrl("fr", "US")).toContain("hl=en-US&gl=US");
@@ -198,20 +204,25 @@ describe("news feeds", () => {
 			mergeNewsStories([[story("A")], [story("B")]], 1).map((s) => s.title)
 		).toEqual(["A"]);
 		expect(mergeNewsStories([])).toEqual([]);
+		// Default depth matches a single feed.
+		const many = Array.from({ length: 20 }, (_, i) => story(`S${i}`));
+		expect(mergeNewsStories([many, many])).toHaveLength(MAX_FEED_ITEMS);
 	});
 
-	it("fans Global loads out across the three editions", async () => {
+	it("fans Global loads out across both world desks", async () => {
 		const seen: string[] = [];
 		const xml = (title: string) =>
-			`<?xml version="1.0"?><rss><channel><item><title>${title} - S</title><link>https://${title}</link></item></channel></rss>`;
+			`<?xml version="1.0"?><rss><channel><item><title>${title}</title><link>https://desk/${title}</link></item></channel></rss>`;
 		const stories = await loadNewsStories("fr", "GBL", async (url) => {
 			seen.push(url);
-			if (url.includes("gl=US")) return xml("Us");
-			if (url.includes("gl=GB")) return xml("Eu");
-			return xml("As");
+			if (url.includes("bbci")) return xml("Bbc");
+			if (url.includes("aljazeera")) return xml("Aj");
+			throw new Error(`unexpected feed ${url}`);
 		});
-		expect(seen).toHaveLength(3);
-		expect(stories.map((s) => s.title)).toEqual(["Us", "Eu", "As"]);
+		expect(seen).toHaveLength(2);
+		expect(stories.map((s) => s.title)).toEqual(["Bbc", "Aj"]);
+		// Suffix-less desk headlines get stamped with their desk.
+		expect(stories.map((s) => s.source)).toEqual(["BBC", "Al Jazeera"]);
 		await expect(loadNewsStories("xx", "US", async () => "")).rejects.toThrow(
 			"news-unsupported"
 		);
