@@ -44,6 +44,8 @@ describe("news panel contract", () => {
 		expect(source).toContain("news-hint");
 		expect(source).toContain('aria-label="Story options"');
 		expect(source).toContain("transition:slide");
+		expect(source).toContain("in:fly");
+		expect(source).toContain("motionMs");
 		// Hover affordances live on the button alone, so the underline
 		// and the pointer cursor never disagree.
 		expect(source).toContain(".news-open:hover .news-card-title");
@@ -105,6 +107,14 @@ describe("news panel contract", () => {
 		expect(source).toContain('class="news-img"');
 		expect(source).toContain('loading="lazy"');
 		expect(source).toContain("currentTarget.remove()");
+	});
+
+	it("presses buttons in and kills all motion when reduced", () => {
+		const css = panelSource().split("<style>")[1] ?? "";
+		expect(css).toContain(".news-go:active");
+		expect(css).toContain("scale(0.96)");
+		expect(css).toContain("prefers-reduced-motion: reduce");
+		expect(css).toContain("transition: none !important");
 	});
 
 	it("skeletons pending scrapes, still under reduced motion", () => {

@@ -4,7 +4,7 @@ picker, launch); this component owns the cards markup and their
 surfaces. Emoji buttons are the user's explicit call (no text on
 either); everything else is theme tokens, never raw hex. -->
 <script lang="ts">
-	import { slide } from "svelte/transition";
+	import { slide, fly, fade } from "svelte/transition";
 	import {
 		CEFR_LEVELS,
 		SUMMARY_SIZES,
@@ -36,6 +36,7 @@ either); everything else is theme tokens, never raw hex. -->
 	const reduceMotion =
 		typeof matchMedia !== "undefined" &&
 		matchMedia("(prefers-reduced-motion: reduce)").matches;
+	const motionMs = (ms: number): number => (reduceMotion ? 0 : ms);
 </script>
 
 <div class="news-panel" role="region" aria-label="{panel.langName} news">
@@ -68,6 +69,7 @@ either); everything else is theme tokens, never raw hex. -->
 					class:on={panel.region === region.gl}
 					aria-pressed={panel.region === region.gl}
 					onclick={() => actions.region(region.gl)}
+					in:fly={{ y: 8, duration: motionMs(200), delay: motionMs(i * 30) }}
 				>
 					{region.label}
 				</button>
@@ -78,9 +80,13 @@ either); everything else is theme tokens, never raw hex. -->
 		<p class="news-note">Translated from {activeRegion.label} headlines.</p>
 	{/if}
 	{#if panel.status === "loading"}
-		<p class="news-note">Fetching {panel.langName} headlines…</p>
+		<p class="news-note" in:fade={{ duration: motionMs(150) }}>
+			Fetching {panel.langName} headlines…
+		</p>
 	{:else if panel.status === "translating"}
-		<p class="news-note">Translating headlines into {panel.langName}…</p>
+		<p class="news-note" in:fade={{ duration: motionMs(150) }}>
+			Translating headlines into {panel.langName}…
+		</p>
 	{:else if panel.status === "error"}
 		<p class="news-note" role="alert">{panel.error}</p>
 		<button type="button" class="news-retry" onclick={() => actions.retry()}>
@@ -99,10 +105,14 @@ either); everything else is theme tokens, never raw hex. -->
 		</button>
 	{:else}
 		<ul class="news-cards">
-			{#each panel.stories as story (story.link)}
+			{#each panel.stories as story, i (story.link)}
 				{@const open = picker?.link === story.link}
 				{@const resolved = story.image ?? images[story.link] ?? undefined}
-				<li class="news-card" class:open>
+				<li
+					class="news-card"
+					class:open
+					in:fly={{ y: 14, duration: motionMs(260), delay: motionMs(Math.min(i * 45, 400)) }}
+				>
 					<button
 						type="button"
 						class="news-open"
@@ -121,11 +131,15 @@ either); everything else is theme tokens, never raw hex. -->
 								alt=""
 								loading="lazy"
 								onerror={(e) => e.currentTarget.remove()}
+								in:fade={{ duration: motionMs(250) }}
 							/>
 						{:else if !story.image && images[story.link] === undefined}
 							<span class="news-skel" aria-hidden="true"></span>
 						{:else}
-							<span class="news-img-fallback" aria-hidden="true"
+							<span
+								class="news-img-fallback"
+								aria-hidden="true"
+								in:fade={{ duration: motionMs(250) }}
 								>{story.source.trim().charAt(0)}</span
 							>
 						{/if}
@@ -143,9 +157,12 @@ either); everything else is theme tokens, never raw hex. -->
 							class="news-menu"
 							role="group"
 							aria-label="Story options"
-							transition:slide={{ duration: reduceMotion ? 0 : 180 }}
+							transition:slide={{ duration: motionMs(200) }}
 						>
-							<div class="news-launch">
+							<div
+								class="news-launch"
+								in:fly={{ y: 10, duration: motionMs(220), delay: motionMs(60) }}
+							>
 								<button
 									type="button"
 									class="news-go"
@@ -165,7 +182,12 @@ either); everything else is theme tokens, never raw hex. -->
 									📰
 								</button>
 							</div>
-							<div class="news-pick" role="group" aria-label="Level">
+							<div
+								class="news-pick"
+								role="group"
+								aria-label="Level"
+								in:fly={{ y: 10, duration: motionMs(220), delay: motionMs(130) }}
+							>
 								{#each CEFR_LEVELS as level (level.level)}
 									<button
 										type="button"
@@ -179,7 +201,12 @@ either); everything else is theme tokens, never raw hex. -->
 									</button>
 								{/each}
 							</div>
-							<div class="news-pick" role="group" aria-label="Summary length">
+							<div
+								class="news-pick"
+								role="group"
+								aria-label="Summary length"
+								in:fly={{ y: 10, duration: motionMs(220), delay: motionMs(200) }}
+							>
 								{#each SUMMARY_SIZES as size (size.size)}
 									<button
 										type="button"
@@ -263,6 +290,9 @@ either); everything else is theme tokens, never raw hex. -->
 		min-height: 2.75rem;
 		cursor: pointer;
 		white-space: nowrap;
+		transition:
+			background-color 0.15s ease,
+			border-color 0.15s ease;
 	}
 	.news-chip.on {
 		background: #007aff;
@@ -337,6 +367,14 @@ either); everything else is theme tokens, never raw hex. -->
 			}
 		}
 	}
+	@media (prefers-reduced-motion: reduce) {
+		.news-panel *,
+		.news-panel *::before,
+		.news-panel *::after {
+			animation: none !important;
+			transition: none !important;
+		}
+	}
 	.news-card {
 		background: #fff;
 		background: var(--bg-raised);
@@ -403,10 +441,15 @@ either); everything else is theme tokens, never raw hex. -->
 		font-size: 0.85rem;
 		line-height: 1.4;
 		opacity: 0;
+		transform: translateY(4px);
+		transition:
+			opacity 0.15s ease,
+			transform 0.15s ease;
 	}
 	.news-open:hover .news-hint,
 	.news-open:focus-visible .news-hint {
 		opacity: 1;
+		transform: none;
 	}
 	.news-card.open .news-hint {
 		display: none;
@@ -435,6 +478,13 @@ either); everything else is theme tokens, never raw hex. -->
 		line-height: 1;
 		min-height: 2.75rem;
 		cursor: pointer;
+		transition:
+			transform 0.1s ease,
+			background-color 0.15s ease,
+			border-color 0.15s ease;
+	}
+	.news-go:active {
+		transform: scale(0.96);
 	}
 	.news-busy {
 		font-size: 0.8rem;
@@ -463,6 +513,13 @@ either); everything else is theme tokens, never raw hex. -->
 		text-align: center;
 		white-space: nowrap;
 		cursor: pointer;
+		transition:
+			transform 0.1s ease,
+			background-color 0.15s ease,
+			border-color 0.15s ease;
+	}
+	.news-opt:active {
+		transform: scale(0.96);
 	}
 	.news-opt.on {
 		background: #007aff;
