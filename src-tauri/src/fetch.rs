@@ -1,8 +1,8 @@
 //! Model-driven page fetch (`fetch_page` command, the executor behind
 //! the chat `fetch_url` tool).
 //!
-//! Thin by design: GET with a timeout and a byte cap, http/https only,
-//! no credentialed URLs. Returns the raw HTML (bounded); the frontend
+//! Thin by design: GET with a timeout, a per-fetch cookie jar, and a
+//! byte cap, http/https only, no credentialed URLs. Returns the raw HTML (bounded); the frontend
 //! cleans it to readable text, so the browser-preview fallback shares
 //! the cap and the copy. Compiled everywhere; only invoked from the
 //! shell (browser dev never reaches here).
@@ -137,6 +137,9 @@ pub async fn fetch_page(url: String) -> Result<String, String> {
     let url = fetchable_url(&url).ok_or_else(|| "bad-url".to_string())?;
     let client = rquest::Client::builder()
         .impersonate(rquest::impersonate::Impersonate::Safari17_5)
+        // Anonymous-ID dances (Québecor, Tamedia) 307-loop without a
+        // jar; it lives for this fetch only and is dropped after.
+        .cookie_store(true)
         .timeout(Duration::from_secs(FETCH_TIMEOUT_SECS))
         .build()
         .map_err(|_| "failed".to_string())?;
@@ -162,6 +165,8 @@ pub async fn fetch_page(url: String) -> Result<String, String> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(FETCH_TIMEOUT_SECS))
         .user_agent(PAGE_USER_AGENT)
+        // Same anonymous-ID dances as the main leg (see above).
+        .cookie_store(true)
         .build()
         .map_err(|_| "failed".to_string())?;
     let mut res = client
@@ -246,6 +251,92 @@ mod tests {
             parts: parts.into(),
         };
         tauri::async_runtime::block_on(async { capped_body!(res, stub_code) })
+    }
+
+    /// Local cookie dance: `/` 307-loops through `/cb` (which sets
+    /// the cookie) until the cookie comes back — the Québecor/Tamedia
+    /// anonymous-ID shape. `fetch_page` must complete it: no jar, no
+    /// content. Loopback-only, ephemeral port, no outside network.
+    #[test]
+    fn fetch_page_completes_a_cookie_dance() {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+
+        fn respond(mut stream: std::net::TcpStream, deadline: std::time::Instant) -> bool {
+            let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
+            let mut raw = vec![0u8; 1024];
+            let mut head = Vec::new();
+            loop {
+                match stream.read(&mut raw) {
+                    Ok(0) => break,
+                    Ok(n) => {
+                        head.extend_from_slice(&raw[..n]);
+                        if head.windows(4).any(|w| w == b"\r\n\r\n") || head.len() > 8192 {
+                            break;
+                        }
+                    }
+                    Err(e)
+                        if matches!(
+                            e.kind(),
+                            std::io::ErrorKind::TimedOut | std::io::ErrorKind::Interrupted
+                        ) && std::time::Instant::now() < deadline =>
+                    {
+                        continue;
+                    }
+                    Err(_) => break,
+                }
+            }
+            let head = String::from_utf8_lossy(&head);
+            let target = head.lines().next().unwrap_or("");
+            let jarred = head.to_ascii_lowercase().contains("cookie:");
+            let response = if target.starts_with("GET /cb") {
+                "HTTP/1.1 307 Temporary Redirect\r\nlocation: /\r\nset-cookie: anon=1; Path=/\r\nconnection: close\r\ncontent-length: 0\r\n\r\n"
+            } else if target.starts_with("GET / ") && jarred {
+                "HTTP/1.1 200 OK\r\nconnection: close\r\ncontent-length: 6\r\n\r\ndanced"
+            } else if target.starts_with("GET / ") {
+                "HTTP/1.1 307 Temporary Redirect\r\nlocation: /cb\r\nconnection: close\r\ncontent-length: 0\r\n\r\n"
+            } else {
+                "HTTP/1.1 404 Not Found\r\nconnection: close\r\ncontent-length: 0\r\n\r\n"
+            };
+            let done = response.starts_with("HTTP/1.1 200");
+            let _ = stream.write_all(response.as_bytes());
+            done
+        }
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let server = std::thread::spawn(move || {
+            // Progress deadlines, not a spawn deadline: a loaded
+            // machine may stall the test thread before the dance
+            // starts (that flaked a fixed 10s clock), so the clock
+            // starts at first accept and refreshes per request.
+            let spawned = std::time::Instant::now();
+            let mut progress: Option<std::time::Instant> = None;
+            loop {
+                match listener.accept() {
+                    Ok((stream, _)) => {
+                        let deadline = std::time::Instant::now() + Duration::from_secs(15);
+                        progress = Some(deadline);
+                        if respond(stream, deadline) {
+                            break;
+                        }
+                    }
+                    Err(_) => {
+                        let now = std::time::Instant::now();
+                        let stalled = progress.map_or(false, |d| now > d);
+                        let never_started = now.duration_since(spawned) > Duration::from_secs(30);
+                        if stalled || never_started {
+                            break;
+                        }
+                        std::thread::sleep(Duration::from_millis(10));
+                    }
+                }
+            }
+        });
+        let out = tauri::async_runtime::block_on(fetch_page(format!("http://{addr}/")));
+        let _ = server.join();
+        assert_eq!(out.unwrap(), "danced");
     }
 
     #[test]
