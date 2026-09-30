@@ -113,7 +113,7 @@ describe("news feeds", () => {
 				}
 				const home = NEWS_FEEDS[code]!.regions;
 				const native = home.length;
-				const world = ["GBL", "US", "CA", "EUR", "GB", "SG", "AU"].filter(
+				const world = ["GBL", "US", "CA", "EUR", "GB", "ASI", "AU"].filter(
 					(gl) => !home.some((r) => r.gl === gl)
 				).length;
 				expect(regions!.length).toBe(native + world);
@@ -132,7 +132,7 @@ describe("news feeds", () => {
 			expect(codes).toContain(code);
 		}
 		// Mainland China rides the Chinese feed past Taiwan; native
-		// Singapore stands in for the Asia chip (no duplicate gl).
+		// Singapore no longer blocks the Asia mix (synthetic key).
 		expect(newsRegionsFor("zh")!.map((r) => r.gl)).toEqual([
 			"TW",
 			"CN",
@@ -143,6 +143,7 @@ describe("news feeds", () => {
 			"CA",
 			"EUR",
 			"GB",
+			"ASI",
 			"AU"
 		]);
 	});
@@ -156,7 +157,7 @@ describe("news feeds", () => {
 			"US",
 			"EUR",
 			"GB",
-			"SG",
+			"ASI",
 			"AU"
 		]);
 		expect(fr.slice(-6).every((r) => r.translate)).toBe(true);
@@ -173,7 +174,7 @@ describe("news feeds", () => {
 				}
 			]
 		});
-		// Europe mixes the continental four except the learner's own
+		// Europe mixes the continental five except the learner's own
 		// (fr drops the French feed); the U.K. reads Britain alone.
 		expect(fr.find((r) => r.gl === "EUR")).toMatchObject({
 			label: "Europe",
@@ -189,12 +190,43 @@ describe("news feeds", () => {
 				{
 					url: "https://news.google.com/rss?hl=it&gl=IT&ceid=IT:it",
 					lang: "it"
+				},
+				{
+					url: "https://news.google.com/rss?hl=ru&gl=RU&ceid=RU:ru",
+					lang: "ru"
 				}
 			]
 		});
 		expect(newsRegionsFor("da")!.find((r) => r.gl === "EUR")?.merge).toHaveLength(
-			4
+			5
 		);
+		// Asia mixes the four giants; learners outside the mix keep
+		// all four, insiders drop their own (the compound hl still
+		// matches by bare language).
+		expect(fr.find((r) => r.gl === "ASI")).toMatchObject({
+			label: "Asia",
+			merge: [
+				{
+					url: "https://news.google.com/rss?hl=en-IN&gl=IN&ceid=IN:en-IN",
+					lang: "en"
+				},
+				{
+					url: "https://news.google.com/rss?hl=ja&gl=JP&ceid=JP:ja",
+					lang: "ja"
+				},
+				{
+					url: "https://news.google.com/rss?hl=ko&gl=KR&ceid=KR:ko",
+					lang: "ko"
+				},
+				{
+					url: "https://news.google.com/rss?hl=zh-CN&gl=CN&ceid=CN:zh-CN",
+					lang: "zh"
+				}
+			]
+		});
+		expect(
+			newsRegionsFor("zh")!.find((r) => r.gl === "ASI")?.merge
+		).toHaveLength(3);
 		expect(fr.find((r) => r.gl === "GB")).toMatchObject({
 			label: "U.K.",
 			hl: "en-GB"
@@ -203,6 +235,7 @@ describe("news feeds", () => {
 		expect(newsRssUrl("fr", "GB")).toContain("hl=en-GB&gl=GB");
 		expect(newsRssUrl("fr", "GBL")).toBeNull();
 		expect(newsRssUrl("fr", "EUR")).toBeNull();
+		expect(newsRssUrl("fr", "ASI")).toBeNull();
 		expect(newsRssUrl("es", "CA")).toContain("hl=en-CA&gl=CA");
 		expect(newsRssUrl("es", "AU")).toContain("hl=en-AU&gl=AU");
 		// Spanish keeps its native US, gains the other six translated.
@@ -214,7 +247,7 @@ describe("news feeds", () => {
 			"CA",
 			"EUR",
 			"GB",
-			"SG",
+			"ASI",
 			"AU"
 		]);
 		// Pure-U.S. fallbacks: native US first, six translated chips.
@@ -224,7 +257,7 @@ describe("news feeds", () => {
 			"CA",
 			"EUR",
 			"GB",
-			"SG",
+			"ASI",
 			"AU"
 		]);
 		// Home-English fallbacks gain the world row (ang's native GB
@@ -236,7 +269,7 @@ describe("news feeds", () => {
 			"CA",
 			"EUR",
 			"GB",
-			"SG",
+			"ASI",
 			"AU"
 		]);
 		expect(newsRegionsFor("ang")!.map((r) => r.gl)).toEqual([
@@ -245,7 +278,7 @@ describe("news feeds", () => {
 			"US",
 			"CA",
 			"EUR",
-			"SG",
+			"ASI",
 			"AU"
 		]);
 	});
@@ -298,17 +331,53 @@ describe("news feeds", () => {
 		const feed = async (url: string) => {
 			seen.push(url);
 			const gl = new URL(url).searchParams.get("gl");
-			if (gl === "FR" || gl === "DE" || gl === "ES" || gl === "IT")
+			if (
+				gl === "FR" ||
+				gl === "DE" ||
+				gl === "ES" ||
+				gl === "IT" ||
+				gl === "RU"
+			)
 				return xml(gl);
 			throw new Error(`unexpected feed ${url}`);
 		};
 		const stories = await loadNewsStories("da", "EUR", feed);
-		expect(seen).toHaveLength(4);
-		expect(stories.map((s) => s.title)).toEqual(["FR", "DE", "ES", "IT"]);
+		expect(seen).toHaveLength(5);
+		expect(stories.map((s) => s.title)).toEqual([
+			"FR",
+			"DE",
+			"ES",
+			"IT",
+			"RU"
+		]);
 		seen.length = 0;
 		await loadNewsStories("es", "EUR", feed);
-		expect(seen).toHaveLength(3);
+		expect(seen).toHaveLength(4);
 		expect(seen.some((u) => u.includes("gl=ES"))).toBe(false);
+	});
+
+	it("fans Asia loads out across the four giants, minus home", async () => {
+		const seen: string[] = [];
+		const xml = (title: string) =>
+			`<?xml version="1.0"?><rss><channel><item><title>${title}</title><link>https://desk/${title}</link></item></channel></rss>`;
+		const feed = async (url: string) => {
+			seen.push(url);
+			const gl = new URL(url).searchParams.get("gl");
+			if (gl === "IN" || gl === "JP" || gl === "KR" || gl === "CN")
+				return xml(gl);
+			throw new Error(`unexpected feed ${url}`);
+		};
+		const stories = await loadNewsStories("da", "ASI", feed);
+		expect(seen).toHaveLength(4);
+		expect(stories.map((s) => s.title)).toEqual(["IN", "JP", "KR", "CN"]);
+		seen.length = 0;
+		await loadNewsStories("ko", "ASI", feed);
+		expect(seen).toHaveLength(3);
+		expect(seen.some((u) => u.includes("gl=KR"))).toBe(false);
+		seen.length = 0;
+		await loadNewsStories("zh", "ASI", feed);
+		expect(seen).toHaveLength(3);
+		expect(seen.some((u) => u.includes("gl=CN"))).toBe(false);
 	});
 
 	it("applies translated titles, dropping cross-language dupes", () => {

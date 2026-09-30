@@ -209,7 +209,7 @@ export function isNewsFallback(code: string): boolean {
 /** A Google edition as a merge target (single-sourced URL shape). */
 const editionTarget = (hl: string, gl: string): { url: string; lang: string } => ({
 	url: feedUrl(hl, gl),
-	lang: hl
+	lang: hl.split("-")[0]!
 });
 
 /**
@@ -218,12 +218,13 @@ const editionTarget = (hl: string, gl: string): { url: string; lang: string } =>
  * Australia: Global mixes the BBC and Al Jazeera world desks
  * (Google has no true global edition, and these link straight to
  * articles — no redirect decoding); Europe mixes the French,
- * German, Spanish, and Italian editions (minus the learner's own
- * when it is one of the four — the home chips cover that); the
- * rest read their country's English edition. Appended after the
- * native regions, skipping any `gl` the feed already carries
- * natively (es-US, zh-SG, ang-GB, fr-CA — every other `hl`+US
- * request redirects home).
+ * German, Spanish, Italian, and Russian editions, Asia the
+ * Indian (English), Japanese, Korean, and mainland Chinese ones
+ * (each minus the learner's own feed when it is one of the mix —
+ * the home chips cover that); the rest read their country's
+ * English edition. Appended after the native regions, skipping
+ * any `gl` the feed already carries natively (es-US, ang-GB,
+ * fr-CA — every other `hl`+US request redirects home).
  */
 const WORLD_REGIONS: NewsRegion[] = [
 	{
@@ -241,10 +242,26 @@ const WORLD_REGIONS: NewsRegion[] = [
 		gl: "EUR",
 		label: "Europe",
 		translate: true,
-		merge: [editionTarget("fr", "FR"), editionTarget("de", "DE"), editionTarget("es", "ES"), editionTarget("it", "IT")]
+		merge: [
+			editionTarget("fr", "FR"),
+			editionTarget("de", "DE"),
+			editionTarget("es", "ES"),
+			editionTarget("it", "IT"),
+			editionTarget("ru", "RU")
+		]
 	},
 	{ gl: "GB", label: "U.K.", hl: "en-GB", translate: true },
-	{ gl: "SG", label: "Asia", hl: "en-SG", translate: true },
+	{
+		gl: "ASI",
+		label: "Asia",
+		translate: true,
+		merge: [
+			editionTarget("en-IN", "IN"),
+			editionTarget("ja", "JP"),
+			editionTarget("ko", "KR"),
+			editionTarget("zh-CN", "CN")
+		]
+	},
 	{ gl: "AU", label: "Australia", hl: "en-AU", translate: true }
 ];
 
@@ -269,7 +286,8 @@ function feedUrl(hl: string, gl: string): string {
  * Google News RSS URL for a language + region. Null when the pair
  * is unknown (unsupported language, or a `gl` outside its list —
  * never let callers invent editions), or when the region is a
- * merge with no single URL (Global — the loader fans out).
+ * merge with no single URL (Global, Europe, Asia — the
+ * loader fans out).
  */
 export function newsRssUrl(code: string, gl: string): string | null {
 	const feed = NEWS_FEEDS[code];
