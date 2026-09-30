@@ -864,6 +864,7 @@ const REPLY_NOTIFICATION_ID: i32 = 4201;
 /// its only veto input. Read at completion, beside the ping verdict.
 static FOREGROUND: AtomicBool = AtomicBool::new(false);
 
+#[cfg(any(test, target_os = "android"))]
 fn set_foreground(active: bool) {
     FOREGROUND.store(active, Ordering::SeqCst);
 }
@@ -915,6 +916,7 @@ fn notify_ready(app: &AppHandle) {
         // but a channel failure must never fail the turn itself.
         let _ = app.notification().create_channel(channel);
     }
+    #[cfg_attr(not(target_os = "android"), allow(unused_mut))]
     let mut ping = app
         .notification()
         .builder()

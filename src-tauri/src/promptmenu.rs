@@ -31,6 +31,7 @@ pub fn set_prompt_menu_allowed(allowed: bool) {
     PROMPT_MENU_ALLOWED.store(allowed, Ordering::SeqCst);
 }
 
+#[cfg(any(test, target_os = "android"))]
 fn prompt_menu_allowed() -> bool {
     PROMPT_MENU_ALLOWED.load(Ordering::SeqCst)
 }

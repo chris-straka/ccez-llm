@@ -5,11 +5,15 @@
 //! Only Android registers real bodies; every other target gets Err
 //! stubs so the handler list stays uniform.
 
+#[cfg(target_os = "android")]
 use std::time::Duration;
 
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::AppHandle;
+#[cfg(target_os = "android")]
+use tauri::{Emitter, Manager};
 
 /// Progress event name the frontend listens for while downloading.
+#[cfg(target_os = "android")]
 pub const DOWNLOAD_PROGRESS_EVENT: &str = "update-download-progress";
 
 /// Expected release host suffixes. The frontend picks the asset URL
@@ -28,6 +32,7 @@ fn asset_host_ok(url: &str) -> bool {
 }
 
 /// One progress tick: bytes so far, total when the server reports it.
+#[cfg(target_os = "android")]
 #[derive(Clone, serde::Serialize)]
 struct DownloadProgress {
     received: u64,
@@ -35,7 +40,7 @@ struct DownloadProgress {
 }
 
 /// Fetch `url` (a GitHub release APK) into the app cache, emitting
-/// [`DOWNLOAD_PROGRESS_EVENT`] per chunk. Resolves the absolute path
+/// `DOWNLOAD_PROGRESS_EVENT` per chunk. Resolves the absolute path
 /// for `update_install_apk`. Machine codes: `bad-url`, `bad-status`,
 /// `failed`, `timeout`.
 #[tauri::command]

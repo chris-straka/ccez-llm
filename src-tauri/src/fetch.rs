@@ -109,6 +109,12 @@ macro_rules! capped_body {
             match $res.chunk().await.map_err(|e| $code(&e))? {
                 Some(bytes) => {
                     let room = MAX_HTML_BYTES - taken.len();
+                    if bytes.len() > room {
+                        // The chunk straddles the cap: its tail is
+                        // dropped, so the head is truncated even when
+                        // no further chunk arrives to say so.
+                        truncated = true;
+                    }
                     taken.extend_from_slice(&bytes[..bytes.len().min(room)]);
                 }
                 None => break,
@@ -186,9 +192,10 @@ mod tests {
     }
 
     #[test]
-    fn page_fetch_ships_a_browser_user_agent() {
+    fn android_leg_ships_a_browser_user_agent() {
         // Bot-labeled UAs eat WAF denials on major outlets; the
-        // fetch must always look like the reader it is.
+        // non-impersonating Android leg must still look like the
+        // reader it is (off Android the profile sets its own UA).
         assert!(PAGE_USER_AGENT.starts_with("Mozilla/5.0"));
         assert!(PAGE_USER_AGENT.contains("Chrome/"));
         assert!(!PAGE_USER_AGENT.contains("ccez"));
@@ -215,5 +222,61 @@ mod tests {
             decode_head(vec![0xFF], false).unwrap_err(),
             "bad-encoding"
         );
+    }
+
+    struct StubErr;
+
+    fn stub_code(_: &StubErr) -> String {
+        "failed".to_string()
+    }
+
+    /// Stand-in response body: canned chunks, no network.
+    struct ChunkStub {
+        parts: std::collections::VecDeque<Vec<u8>>,
+    }
+
+    impl ChunkStub {
+        async fn chunk(&mut self) -> Result<Option<Vec<u8>>, StubErr> {
+            Ok(self.parts.pop_front())
+        }
+    }
+
+    fn read_body(parts: Vec<Vec<u8>>) -> Result<String, String> {
+        let mut res = ChunkStub {
+            parts: parts.into(),
+        };
+        tauri::async_runtime::block_on(async { capped_body!(res, stub_code) })
+    }
+
+    #[test]
+    fn capped_body_decodes_small_pages_strictly() {
+        assert_eq!(read_body(vec![b"hi".to_vec()]).unwrap(), "hi");
+        assert_eq!(read_body(vec![vec![0xFF]]).unwrap_err(), "bad-encoding");
+    }
+
+    #[test]
+    fn capped_body_decodes_cap_exact_pages_strictly() {
+        // The head ends exactly at the cap with nothing after: the
+        // probe chunk reads end-of-stream, so the page is whole.
+        let out = read_body(vec![vec![b'a'; MAX_HTML_BYTES]]).unwrap();
+        assert_eq!(out.len(), MAX_HTML_BYTES);
+        assert!(out.bytes().all(|b| b == b'a'));
+    }
+
+    #[test]
+    fn capped_body_truncates_over_cap_pages_lossily() {
+        // One byte past the cap, ending the head mid-char: truncation
+        // decodes lossily (replacement mark) instead of failing.
+        let out = read_body(vec![vec![b'a'; MAX_HTML_BYTES - 1], vec![0xC3], vec![0xA9]]).unwrap();
+        assert_eq!(out, format!("{}\u{FFFD}", "a".repeat(MAX_HTML_BYTES - 1)));
+    }
+
+    #[test]
+    fn capped_body_counts_a_straddling_chunk_as_truncated() {
+        // The last chunk straddles the cap (its tail is dropped with
+        // no further chunk after): still truncated, still lossy —
+        // never a strict-decode failure on a dropped tail.
+        let out = read_body(vec![vec![b'a'; MAX_HTML_BYTES - 1], vec![0xC3, 0xA9]]).unwrap();
+        assert_eq!(out, format!("{}\u{FFFD}", "a".repeat(MAX_HTML_BYTES - 1)));
     }
 }
