@@ -206,23 +206,23 @@ export function isNewsFallback(code: string): boolean {
 }
 
 /** Editions for a language, default first; null when unsupported. */
+/** A Google edition as a merge target (single-sourced URL shape). */
+const editionTarget = (hl: string, gl: string): { url: string } => ({
+	url: feedUrl(hl, gl)
+});
+
 /**
  * World headlines in the learner's language, derived for every
- * feed: U.S., Canada, Europe (Britain — the only European English
- * edition, so no separate UK chip), Asia (Singapore, the regional
- * English hub), Australia, and a Global mix of the BBC and Al
- * Jazeera world desks (Google has no true global edition, and
- * these link straight to articles — no redirect decoding).
+ * feed, ordered Global, U.S., Canada, Europe, U.K., Asia,
+ * Australia: Global mixes the BBC and Al Jazeera world desks
+ * (Google has no true global edition, and these link straight to
+ * articles — no redirect decoding); Europe mixes the British and
+ * Irish editions; the rest read their country's English edition.
  * Appended after the native regions, skipping any `gl` the feed
  * already carries natively (es-US, zh-SG, ang-GB, fr-CA — every
  * other `hl`+US request redirects home).
  */
 const WORLD_REGIONS: NewsRegion[] = [
-	{ gl: "US", label: "U.S.", hl: "en-US", translate: true },
-	{ gl: "CA", label: "Canada", hl: "en-CA", translate: true },
-	{ gl: "GB", label: "Europe", hl: "en-GB", translate: true },
-	{ gl: "SG", label: "Asia", hl: "en-SG", translate: true },
-	{ gl: "AU", label: "Australia", hl: "en-AU", translate: true },
 	{
 		gl: "GBL",
 		label: "Global",
@@ -231,7 +231,18 @@ const WORLD_REGIONS: NewsRegion[] = [
 			{ url: "https://feeds.bbci.co.uk/news/world/rss.xml", source: "BBC" },
 			{ url: "https://www.aljazeera.com/xml/rss/all.xml", source: "Al Jazeera" }
 		]
-	}
+	},
+	{ gl: "US", label: "U.S.", hl: "en-US", translate: true },
+	{ gl: "CA", label: "Canada", hl: "en-CA", translate: true },
+	{
+		gl: "EUR",
+		label: "Europe",
+		translate: true,
+		merge: [editionTarget("en-GB", "GB"), editionTarget("en-IE", "IE")]
+	},
+	{ gl: "GB", label: "U.K.", hl: "en-GB", translate: true },
+	{ gl: "SG", label: "Asia", hl: "en-SG", translate: true },
+	{ gl: "AU", label: "Australia", hl: "en-AU", translate: true }
 ];
 
 export function newsRegionsFor(code: string): NewsRegion[] | null {

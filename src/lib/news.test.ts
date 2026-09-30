@@ -112,7 +112,7 @@ describe("news feeds", () => {
 				}
 				const home = NEWS_FEEDS[code]!.regions;
 				const native = home.length;
-				const world = ["US", "CA", "GB", "SG", "AU", "GBL"].filter(
+				const world = ["GBL", "US", "CA", "EUR", "GB", "SG", "AU"].filter(
 					(gl) => !home.some((r) => r.gl === gl)
 				).length;
 				expect(regions!.length).toBe(native + world);
@@ -137,11 +137,12 @@ describe("news feeds", () => {
 			"CN",
 			"HK",
 			"SG",
+			"GBL",
 			"US",
 			"CA",
+			"EUR",
 			"GB",
-			"AU",
-			"GBL"
+			"AU"
 		]);
 	});
 
@@ -149,9 +150,16 @@ describe("news feeds", () => {
 		// French gains the world row minus Canada (native French
 		// Canada stands in), home edition first.
 		const fr = newsRegionsFor("fr")!;
-		expect(fr.slice(-5).map((r) => r.gl)).toEqual(["US", "GB", "SG", "AU", "GBL"]);
-		expect(fr.slice(-5).every((r) => r.translate)).toBe(true);
-		expect(fr.at(-1)).toMatchObject({
+		expect(fr.slice(-6).map((r) => r.gl)).toEqual([
+			"GBL",
+			"US",
+			"EUR",
+			"GB",
+			"SG",
+			"AU"
+		]);
+		expect(fr.slice(-6).every((r) => r.translate)).toBe(true);
+		expect(fr.find((r) => r.gl === "GBL")).toMatchObject({
 			label: "Global",
 			merge: [
 				{
@@ -164,43 +172,66 @@ describe("news feeds", () => {
 				}
 			]
 		});
+		// Europe mixes Britain and Ireland; the U.K. reads Britain alone.
+		expect(fr.find((r) => r.gl === "EUR")).toMatchObject({
+			label: "Europe",
+			merge: [
+				{ url: "https://news.google.com/rss?hl=en-GB&gl=GB&ceid=GB:en-GB" },
+				{ url: "https://news.google.com/rss?hl=en-IE&gl=IE&ceid=IE:en-IE" }
+			]
+		});
+		expect(fr.find((r) => r.gl === "GB")).toMatchObject({
+			label: "U.K.",
+			hl: "en-GB"
+		});
 		expect(newsRssUrl("fr", "US")).toContain("hl=en-US&gl=US");
 		expect(newsRssUrl("fr", "GB")).toContain("hl=en-GB&gl=GB");
 		expect(newsRssUrl("fr", "GBL")).toBeNull();
+		expect(newsRssUrl("fr", "EUR")).toBeNull();
 		expect(newsRssUrl("es", "CA")).toContain("hl=en-CA&gl=CA");
 		expect(newsRssUrl("es", "AU")).toContain("hl=en-AU&gl=AU");
-		// Spanish keeps its native US, gains the other five translated.
+		// Spanish keeps its native US, gains the other six translated.
 		const es = newsRegionsFor("es")!;
 		expect(es.filter((r) => r.gl === "US")).toHaveLength(1);
 		expect(es.find((r) => r.gl === "US")?.translate).toBeUndefined();
-		expect(es.slice(-5).map((r) => r.gl)).toEqual(["CA", "GB", "SG", "AU", "GBL"]);
-		// Pure-U.S. fallbacks: native US first, five translated chips.
+		expect(es.slice(-6).map((r) => r.gl)).toEqual([
+			"GBL",
+			"CA",
+			"EUR",
+			"GB",
+			"SG",
+			"AU"
+		]);
+		// Pure-U.S. fallbacks: native US first, six translated chips.
 		expect(newsRegionsFor("da")!.map((r) => r.gl)).toEqual([
 			"US",
+			"GBL",
 			"CA",
+			"EUR",
 			"GB",
 			"SG",
-			"AU",
-			"GBL"
+			"AU"
 		]);
 		// Home-English fallbacks gain the world row (ang's native GB
-		// stands in for Europe).
+		// stands in for the U.K. chip only).
 		expect(newsRegionsFor("ur")!.map((r) => r.gl)).toEqual([
 			"PK",
+			"GBL",
 			"US",
 			"CA",
+			"EUR",
 			"GB",
 			"SG",
-			"AU",
-			"GBL"
+			"AU"
 		]);
 		expect(newsRegionsFor("ang")!.map((r) => r.gl)).toEqual([
 			"GB",
+			"GBL",
 			"US",
 			"CA",
+			"EUR",
 			"SG",
-			"AU",
-			"GBL"
+			"AU"
 		]);
 	});
 
@@ -243,6 +274,20 @@ describe("news feeds", () => {
 		await expect(loadNewsStories("xx", "US", async () => "")).rejects.toThrow(
 			"news-unsupported"
 		);
+	});
+
+	it("fans Europe loads out across Britain and Ireland", async () => {
+		const seen: string[] = [];
+		const xml = (title: string) =>
+			`<?xml version="1.0"?><rss><channel><item><title>${title}</title><link>https://desk/${title}</link></item></channel></rss>`;
+		const stories = await loadNewsStories("es", "EUR", async (url) => {
+			seen.push(url);
+			if (url.includes("gl=GB")) return xml("Brit");
+			if (url.includes("gl=IE")) return xml("Ire");
+			throw new Error(`unexpected feed ${url}`);
+		});
+		expect(seen).toHaveLength(2);
+		expect(stories.map((s) => s.title)).toEqual(["Brit", "Ire"]);
 	});
 
 	it("parses numbered translation lines, count-exact", () => {
