@@ -16,6 +16,10 @@ const MAX_URL_CHARS: usize = 2048;
 /// promises "truncated when long", so a big page still answers from
 /// its head instead of failing.
 const MAX_HTML_BYTES: usize = 512 * 1024;
+/// Browser user agent, not a bot label: bot-labeled fetches eat
+/// WAF denials (Akamai, DataDome) on major outlets, and this is the
+/// user's own device reading pages they tapped — reader convention.
+const PAGE_USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 
 /// The URL back when fetchable, `None` when not. Mirrors
 /// `validFetchUrl` in the frontend seam (both stay dumb string gates).
@@ -69,7 +73,7 @@ pub async fn fetch_page(url: String) -> Result<String, String> {
     let url = fetchable_url(&url).ok_or_else(|| "bad-url".to_string())?;
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(FETCH_TIMEOUT_SECS))
-        .user_agent("ccez-llm page fetch")
+        .user_agent(PAGE_USER_AGENT)
         .build()
         .map_err(|_| "failed".to_string())?;
     let mut res = client
@@ -120,6 +124,15 @@ mod tests {
         assert!(fetchable_url("https://example.com/a b").is_none());
         assert!(fetchable_url("").is_none());
         assert!(fetchable_url("https://").is_none());
+    }
+
+    #[test]
+    fn page_fetch_ships_a_browser_user_agent() {
+        // Bot-labeled UAs eat WAF denials on major outlets; the
+        // fetch must always look like the reader it is.
+        assert!(PAGE_USER_AGENT.starts_with("Mozilla/5.0"));
+        assert!(PAGE_USER_AGENT.contains("Chrome/"));
+        assert!(!PAGE_USER_AGENT.contains("ccez"));
     }
 
     #[test]
