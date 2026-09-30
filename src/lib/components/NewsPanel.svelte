@@ -67,11 +67,14 @@ either); everything else is theme tokens, never raw hex. -->
 					type="button"
 					class="news-chip"
 					class:on={panel.region === region.gl}
+					class:icon={!!region.icon}
 					aria-pressed={panel.region === region.gl}
+					aria-label={region.label}
+					title={region.label}
 					onclick={() => actions.region(region.gl)}
 					in:fly={{ y: 8, duration: motionMs(200), delay: motionMs(i * 30) }}
 				>
-					{region.label}
+					{region.icon ?? region.label}
 				</button>
 			{/each}
 		</div>
@@ -302,6 +305,11 @@ either); everything else is theme tokens, never raw hex. -->
 		color: #fff;
 		color: var(--accent-ink);
 		font-weight: 650;
+	}
+	.news-chip.icon {
+		font-size: 1.15rem;
+		line-height: 1;
+		padding: 0.45rem 0.7rem;
 	}
 	.news-note {
 		margin: 0;

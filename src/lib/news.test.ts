@@ -113,7 +113,7 @@ describe("news feeds", () => {
 				}
 				const home = NEWS_FEEDS[code]!.regions;
 				const native = home.length;
-				const world = ["GBL", "US", "CA", "EUR", "GB", "ASI", "AU"].filter(
+				const world = ["GBL", "US", "CA", "LAT", "EUR", "GB", "ASI", "AU"].filter(
 					(gl) => !home.some((r) => r.gl === gl)
 				).length;
 				expect(regions!.length).toBe(native + world);
@@ -141,6 +141,7 @@ describe("news feeds", () => {
 			"GBL",
 			"US",
 			"CA",
+			"LAT",
 			"EUR",
 			"GB",
 			"ASI",
@@ -152,15 +153,16 @@ describe("news feeds", () => {
 		// French gains the world row minus Canada (native French
 		// Canada stands in), home edition first.
 		const fr = newsRegionsFor("fr")!;
-		expect(fr.slice(-6).map((r) => r.gl)).toEqual([
+		expect(fr.slice(-7).map((r) => r.gl)).toEqual([
 			"GBL",
 			"US",
+			"LAT",
 			"EUR",
 			"GB",
 			"ASI",
 			"AU"
 		]);
-		expect(fr.slice(-6).every((r) => r.translate)).toBe(true);
+		expect(fr.slice(-7).every((r) => r.translate)).toBe(true);
 		expect(fr.find((r) => r.gl === "GBL")).toMatchObject({
 			label: "Global",
 			merge: [
@@ -236,25 +238,68 @@ describe("news feeds", () => {
 		expect(newsRssUrl("fr", "GBL")).toBeNull();
 		expect(newsRssUrl("fr", "EUR")).toBeNull();
 		expect(newsRssUrl("fr", "ASI")).toBeNull();
+		expect(newsRssUrl("fr", "LAT")).toBeNull();
+		// World chips carry icons, home chips don't.
+		expect(fr.slice(-7).map((r) => r.icon)).toEqual([
+			"🌐",
+			"🇺🇸",
+			"🌎",
+			"🇪🇺",
+			"🇬🇧",
+			"🌏",
+			"🇦🇺"
+		]);
+		expect(fr.slice(0, -7).every((r) => r.icon === undefined)).toBe(true);
+		expect(newsRegionsFor("da")!.find((r) => r.gl === "CA")?.icon).toBe(
+			"🇨🇦"
+		);
+		// Latin America mixes Mexico, Brazil, Argentina; Spanish
+		// keeps Brazil only (its home chips cover the Spanish
+		// editions), Portuguese the two Spanish ones.
+		expect(fr.find((r) => r.gl === "LAT")).toMatchObject({
+			label: "Latin America",
+			merge: [
+				{
+					url: "https://news.google.com/rss?hl=es-MX&gl=MX&ceid=MX:es-MX",
+					lang: "es"
+				},
+				{
+					url: "https://news.google.com/rss?hl=pt-BR&gl=BR&ceid=BR:pt-BR",
+					lang: "pt"
+				},
+				{
+					url: "https://news.google.com/rss?hl=es-AR&gl=AR&ceid=AR:es-AR",
+					lang: "es"
+				}
+			]
+		});
+		const esLat = newsRegionsFor("es")!.find((r) => r.gl === "LAT")?.merge;
+		expect(esLat).toHaveLength(1);
+		expect(esLat?.[0]?.url).toContain("gl=BR");
+		expect(
+			newsRegionsFor("pt")!.find((r) => r.gl === "LAT")?.merge
+		).toHaveLength(2);
 		expect(newsRssUrl("es", "CA")).toContain("hl=en-CA&gl=CA");
 		expect(newsRssUrl("es", "AU")).toContain("hl=en-AU&gl=AU");
-		// Spanish keeps its native US, gains the other six translated.
+		// Spanish keeps its native US, gains the other seven translated.
 		const es = newsRegionsFor("es")!;
 		expect(es.filter((r) => r.gl === "US")).toHaveLength(1);
 		expect(es.find((r) => r.gl === "US")?.translate).toBeUndefined();
-		expect(es.slice(-6).map((r) => r.gl)).toEqual([
+		expect(es.slice(-7).map((r) => r.gl)).toEqual([
 			"GBL",
 			"CA",
+			"LAT",
 			"EUR",
 			"GB",
 			"ASI",
 			"AU"
 		]);
-		// Pure-U.S. fallbacks: native US first, six translated chips.
+		// Pure-U.S. fallbacks: native US first, seven translated chips.
 		expect(newsRegionsFor("da")!.map((r) => r.gl)).toEqual([
 			"US",
 			"GBL",
 			"CA",
+			"LAT",
 			"EUR",
 			"GB",
 			"ASI",
@@ -267,6 +312,7 @@ describe("news feeds", () => {
 			"GBL",
 			"US",
 			"CA",
+			"LAT",
 			"EUR",
 			"GB",
 			"ASI",
@@ -277,6 +323,7 @@ describe("news feeds", () => {
 			"GBL",
 			"US",
 			"CA",
+			"LAT",
 			"EUR",
 			"ASI",
 			"AU"
@@ -378,6 +425,30 @@ describe("news feeds", () => {
 		await loadNewsStories("zh", "ASI", feed);
 		expect(seen).toHaveLength(3);
 		expect(seen.some((u) => u.includes("gl=CN"))).toBe(false);
+	});
+
+	it("fans Latin America out across Mexico, Brazil, Argentina", async () => {
+		const seen: string[] = [];
+		const xml = (title: string) =>
+			`<?xml version="1.0"?><rss><channel><item><title>${title}</title><link>https://desk/${title}</link></item></channel></rss>`;
+		const feed = async (url: string) => {
+			seen.push(url);
+			const gl = new URL(url).searchParams.get("gl");
+			if (gl === "MX" || gl === "BR" || gl === "AR") return xml(gl);
+			throw new Error(`unexpected feed ${url}`);
+		};
+		const stories = await loadNewsStories("da", "LAT", feed);
+		expect(seen).toHaveLength(3);
+		expect(stories.map((s) => s.title)).toEqual(["MX", "BR", "AR"]);
+		seen.length = 0;
+		await loadNewsStories("es", "LAT", feed);
+		expect(seen).toEqual([
+			"https://news.google.com/rss?hl=pt-BR&gl=BR&ceid=BR:pt-BR"
+		]);
+		seen.length = 0;
+		await loadNewsStories("pt", "LAT", feed);
+		expect(seen).toHaveLength(2);
+		expect(seen.some((u) => u.includes("gl=BR"))).toBe(false);
 	});
 
 	it("applies translated titles, dropping cross-language dupes", () => {

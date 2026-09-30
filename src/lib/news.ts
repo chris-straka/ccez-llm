@@ -25,6 +25,7 @@ export interface NewsRegion {
 	label: string;
 	hl?: string;
 	translate?: true;
+	icon?: string;
 	merge?: { url: string; source?: string; lang?: string }[];
 }
 
@@ -214,34 +215,49 @@ const editionTarget = (hl: string, gl: string): { url: string; lang: string } =>
 
 /**
  * World headlines in the learner's language, derived for every
- * feed, ordered Global, U.S., Canada, Europe, U.K., Asia,
- * Australia: Global mixes the BBC and Al Jazeera world desks
- * (Google has no true global edition, and these link straight to
- * articles — no redirect decoding); Europe mixes the French,
- * German, Spanish, Italian, and Russian editions, Asia the
- * Indian (English), Japanese, Korean, and mainland Chinese ones
+ * feed, ordered Global, U.S., Canada, Latin America, Europe,
+ * U.K., Asia, Australia: Global mixes the BBC and Al Jazeera
+ * world desks (Google has no true global edition, and these link
+ * straight to articles — no redirect decoding); Europe mixes the
+ * French, German, Spanish, Italian, and Russian editions, Asia
+ * the Indian (English), Japanese, Korean, and mainland Chinese
+ * ones, Latin America the Mexican, Brazilian, and Argentine ones
  * (each minus the learner's own feed when it is one of the mix —
  * the home chips cover that); the rest read their country's
- * English edition. Appended after the native regions, skipping
- * any `gl` the feed already carries natively (es-US, ang-GB,
- * fr-CA — every other `hl`+US request redirects home).
+ * English edition. World chips show `icon`, home chips the
+ * label. Appended after the native regions, skipping any `gl`
+ * the feed already carries natively (es-US, ang-GB, fr-CA —
+ * every other `hl`+US request redirects home).
  */
 const WORLD_REGIONS: NewsRegion[] = [
 	{
 		gl: "GBL",
 		label: "Global",
 		translate: true,
+		icon: "🌐",
 		merge: [
 			{ url: "https://feeds.bbci.co.uk/news/world/rss.xml", source: "BBC" },
 			{ url: "https://www.aljazeera.com/xml/rss/all.xml", source: "Al Jazeera" }
 		]
 	},
-	{ gl: "US", label: "U.S.", hl: "en-US", translate: true },
-	{ gl: "CA", label: "Canada", hl: "en-CA", translate: true },
+	{ gl: "US", label: "U.S.", hl: "en-US", translate: true, icon: "🇺🇸" },
+	{ gl: "CA", label: "Canada", hl: "en-CA", translate: true, icon: "🇨🇦" },
+	{
+		gl: "LAT",
+		label: "Latin America",
+		translate: true,
+		icon: "🌎",
+		merge: [
+			editionTarget("es-MX", "MX"),
+			editionTarget("pt-BR", "BR"),
+			editionTarget("es-AR", "AR")
+		]
+	},
 	{
 		gl: "EUR",
 		label: "Europe",
 		translate: true,
+		icon: "🇪🇺",
 		merge: [
 			editionTarget("fr", "FR"),
 			editionTarget("de", "DE"),
@@ -250,11 +266,12 @@ const WORLD_REGIONS: NewsRegion[] = [
 			editionTarget("ru", "RU")
 		]
 	},
-	{ gl: "GB", label: "U.K.", hl: "en-GB", translate: true },
+	{ gl: "GB", label: "U.K.", hl: "en-GB", translate: true, icon: "🇬🇧" },
 	{
 		gl: "ASI",
 		label: "Asia",
 		translate: true,
+		icon: "🌏",
 		merge: [
 			editionTarget("en-IN", "IN"),
 			editionTarget("ja", "JP"),
@@ -262,7 +279,7 @@ const WORLD_REGIONS: NewsRegion[] = [
 			editionTarget("zh-CN", "CN")
 		]
 	},
-	{ gl: "AU", label: "Australia", hl: "en-AU", translate: true }
+	{ gl: "AU", label: "Australia", hl: "en-AU", translate: true, icon: "🇦🇺" }
 ];
 
 export function newsRegionsFor(code: string): NewsRegion[] | null {
@@ -286,8 +303,8 @@ function feedUrl(hl: string, gl: string): string {
  * Google News RSS URL for a language + region. Null when the pair
  * is unknown (unsupported language, or a `gl` outside its list —
  * never let callers invent editions), or when the region is a
- * merge with no single URL (Global, Europe, Asia — the
- * loader fans out).
+ * merge with no single URL (Global, Latin America, Europe,
+ * Asia — the loader fans out).
  */
 export function newsRssUrl(code: string, gl: string): string | null {
 	const feed = NEWS_FEEDS[code];

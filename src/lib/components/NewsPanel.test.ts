@@ -7,8 +7,8 @@ import { readFileSync } from "node:fs";
  * the component owns the cards markup and their surfaces. Story
  * buttons are icon-only by explicit user call (emoji with text
  * alternatives); option rows expand inline under their card.
- * Region chips hide for single-edition languages; chips show plain
- * country labels, and fallback editions note their English headlines.
+ * Region chips hide for single-edition languages; world chips show
+ * icons with label alternatives, home chips plain country labels.
  * All color rides theme tokens.
  */
 function panelSource(): string {
@@ -74,13 +74,15 @@ describe("news panel contract", () => {
 		expect(source).toContain('actions.launch(story.link, "read")');
 	});
 
-	it("chips plain country labels, hidden for single editions", () => {
+	it("chips world icons with label alternatives, hidden for single editions", () => {
 		const source = panelSource();
 		expect(source).toContain("panel.regions.length > 1");
 		expect(source).not.toContain("🌍 Global");
-		expect(source).toContain("{region.label}");
+		expect(source).toContain("{region.icon ?? region.label}");
+		expect(source).toContain("aria-label={region.label}");
 		expect(source).toContain("aria-pressed");
 		expect(source).toContain("news-sep");
+		expect(source).toContain(".news-chip.icon");
 	});
 
 	it("notes fallback English headlines with sessions in-language", () => {
