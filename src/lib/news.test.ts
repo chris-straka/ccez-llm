@@ -354,15 +354,20 @@ describe("session prompts", () => {
 		).not.toContain("()");
 	});
 
-	it("writes conversation openers with level, invite, and corrections", () => {
+	it("writes conversation openers: analysis, open end, one voice", () => {
 		const opener = newsConversationInstruction(story, "B1", "French");
 		expect(opener).toContain("🗣️");
 		expect(opener).toContain("Markets rally");
 		expect(opener).toContain("CEFR B1");
 		expect(opener).toContain("Intermediate");
-		expect(opener).toContain("third participant");
+		expect(opener).toContain("Two named locals");
+		expect(opener).toContain("never a retelling");
+		expect(opener).toContain("nothing concluded");
+		expect(opener).toContain("one voice answers");
 		expect(opener).toContain("correct my mistakes");
+		expect(opener).toContain("Never explain grammar or words unless I");
 		expect(opener).toContain("Stay in French");
+		expect(opener).not.toContain("invite");
 	});
 });
 

@@ -401,9 +401,12 @@ export function newsSummaryInstruction(
 }
 
 /**
- * Visible session opener for a conversation: two locals discuss the
- * story at the learner's level, then the learner joins as a third
- * voice and gets corrected. Same attachment ride as summaries.
+ * Visible session opener for a conversation: two named locals open
+ * a substantial discussion of the story at the learner's level —
+ * analysis over retelling — then go quiet as a pair; once the
+ * learner barges in, one voice answers and corrects. Teaching
+ * lives in the corrections only, never in unprompted lectures.
+ * Same attachment ride as summaries.
  */
 export function newsConversationInstruction(
 	story: NewsStory,
@@ -414,10 +417,13 @@ export function newsConversationInstruction(
 	const byline = story.source ? ` (${story.source})` : "";
 	return (
 		`🗣️ "${story.title}"${byline}\n` +
-		`Two friends discuss and analyze the pasted article in ${langName} ` +
-		`at CEFR ${level} (${tag}). After their first exchange, invite me ` +
-		`in as a third participant; when I reply in ${langName}, briefly ` +
-		`correct my mistakes and continue the discussion. Stay in ${langName}.`
+		`Two named locals open a substantial discussion of the pasted article in ${langName} ` +
+		`at CEFR ${level} (${tag}): reactions, background, and analysis — why it matters, ` +
+		`what follows — never a retelling. Varied structures and connectors, spoken texture, ` +
+		`key vocabulary reused across turns. End the opener mid-thread: nothing concluded, ` +
+		`nobody addressing me. Once I join, one voice answers; when I write in ${langName}, ` +
+		`briefly correct my mistakes and continue. Never explain grammar or words unless I ` +
+		`ask. Stay in ${langName}.`
 	);
 }
 
