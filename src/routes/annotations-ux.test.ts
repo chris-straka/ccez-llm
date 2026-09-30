@@ -130,6 +130,14 @@ describe("annotation create wiring", () => {
 		expect(source).toContain("data-story-link");
 	});
 
+	it("pins answered story notes so review lists them", () => {
+		// No badge to pin from: the answer landing files the
+		// note into the dock (and the launched session) itself.
+		const source = pageSource();
+		const askPath = source.slice(source.indexOf("async function askAnnotation("));
+		expect(askPath).toContain("setPromptPinned(annotations, ann.id, true)");
+	});
+
 	it("reads the annotated text when a waiting badge opens", () => {
 		// Blue badges speak like answered ones (quote with its
 		// paragraph context), so the listen moment survives the wait.

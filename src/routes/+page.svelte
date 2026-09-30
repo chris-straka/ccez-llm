@@ -5442,17 +5442,16 @@
 				context: answerContextFor(ann, ann.quote, ann.at ?? 0)
 			});
 			annotations = attachAnnotationAnswer(annotations, ann.id, answer);
-			// Story notes have no badge to turn orange: open the
-			// answer card itself while its story is still on
-			// screen, so the payoff is visible (resume scans for
-			// long-closed panels attach silently, never pop up).
-			if (
-				!ann.messageId &&
-				ann.story &&
-				answer.trim() &&
-				news?.stories.some((s) => s.link === ann.story?.link)
-			)
-				openBadge(ann.id);
+			// Story notes have no badge to turn orange or pin from:
+			// an answered one joins the review dock directly (and
+			// rides the launched session as context), and its card
+			// opens while the story is still on screen (resume
+			// scans for long-closed panels attach silently).
+			if (!ann.messageId && ann.story && answer.trim()) {
+				annotations = setPromptPinned(annotations, ann.id, true);
+				if (news?.stories.some((s) => s.link === ann.story?.link))
+					openBadge(ann.id);
+			}
 		} catch (error) {
 			askFailedIds.add(ann.id);
 			const message = error instanceof Error ? error.message : String(error);
