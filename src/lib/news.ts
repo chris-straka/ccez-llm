@@ -257,12 +257,13 @@ export function newsRssUrl(code: string, gl: string): string | null {
 	return feedUrl(region.hl ?? feed.hl, gl);
 }
 
-/** One story card: headline, outlet, link, and snippet. */
+/** One story card: headline, outlet, link, snippet, image. */
 export interface NewsStory {
 	title: string;
 	source: string;
 	link: string;
 	snippet: string;
+	image?: string;
 }
 
 /** Tags out of feed descriptions (Google wraps links in HTML). Pure. */
@@ -292,11 +293,13 @@ export function shapeStory(item: FeedItem): NewsStory | null {
 	const dash = title.lastIndexOf(" - ");
 	const tail = dash >= 0 ? title.slice(dash + 3).trim() : "";
 	const source = tail && tail.length <= 48 ? tail : "";
+	const image = (item.image ?? "").trim();
 	return {
 		title: source ? title.slice(0, dash).trim() : title,
 		source,
 		link: item.link.trim(),
-		snippet: stripTags(item.description ?? "").trim()
+		snippet: stripTags(item.description ?? "").trim(),
+		...(image ? { image } : {})
 	};
 }
 

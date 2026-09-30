@@ -88,6 +88,7 @@ export interface FeedItem {
 	title: string;
 	link: string;
 	description: string;
+	image?: string;
 }
 
 /**
@@ -140,13 +141,28 @@ export function parseFeedItems(markup: string): FeedItem[] {
 		}
 		const title = child(node, "title");
 		if (!title) continue;
+		// Largest declared media image (BBC thumbs, Guardian sizes);
+		// Atom body `<content>` carries no url and falls through.
+		let image = "";
+		let width = -1;
+		for (const el of node.children) {
+			if (el.localName !== "thumbnail" && el.localName !== "content") continue;
+			const url = (el.getAttribute("url") ?? "").trim();
+			if (!url) continue;
+			const w = Number(el.getAttribute("width") ?? 0) || 0;
+			if (w >= width) {
+				image = url;
+				width = w;
+			}
+		}
 		out.push({
 			title,
 			link,
 			description: (child(node, "description") || child(node, "summary")).slice(
 				0,
 				MAX_FEED_DESC_CHARS
-			)
+			),
+			...(image ? { image } : {})
 		});
 	}
 	return out;

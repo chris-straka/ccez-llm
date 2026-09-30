@@ -127,6 +127,16 @@ describe("parseFeedItems", () => {
 		});
 	});
 
+	it("takes the largest declared media image, else none", () => {
+		const xml = `<?xml version="1.0"?><rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/"><channel>
+<item><title>Pic</title><link>https://example.com/1</link><media:thumbnail width="240" url="https://img/small.jpg"/><media:content width="700" url="https://img/big.jpg"/><media:content width="140" url="https://img/tiny.jpg"/></item>
+<item><title>No pic</title><link>https://example.com/2</link></item>
+</channel></rss>`;
+		const items = parseFeedItems(xml);
+		expect(items[0]?.image).toBe("https://img/big.jpg");
+		expect(items[1]).not.toHaveProperty("image");
+	});
+
 	it("caps items and never throws on junk", () => {
 		const many = `<rss><channel>${"<item><title>t</title></item>".repeat(50)}</channel></rss>`;
 		expect(parseFeedItems(many).length).toBe(MAX_FEED_ITEMS);

@@ -99,6 +99,14 @@ describe("news panel contract", () => {
 		expect(css).toContain("auto-fill");
 	});
 
+	it("shows feed thumbnails when present, lazy and self-hiding", () => {
+		const source = panelSource();
+		expect(source).toContain("{#if story.image}");
+		expect(source).toContain('class="news-img"');
+		expect(source).toContain('loading="lazy"');
+		expect(source).toContain("currentTarget.remove()");
+	});
+
 	it("covers every fetch state with retry where retry helps", () => {
 		const source = panelSource();
 		for (const status of [

@@ -282,6 +282,15 @@ describe("story shaping", () => {
 		});
 	});
 
+	it("carries feed images through, else no key", () => {
+		expect(
+			shapeStory({ title: "T", link: "https://x", description: "", image: "https://img/a.jpg" })
+		).toMatchObject({ image: "https://img/a.jpg" });
+		expect(
+			shapeStory({ title: "T", link: "https://x", description: "" })
+		).not.toHaveProperty("image");
+	});
+
 	it("drops linkless and titleless items (dead cards)", () => {
 		expect(shapeStory({ title: "No link - BBC", link: "", description: "" })).toBeNull();
 		expect(shapeStory({ title: "   ", link: "https://x", description: "" })).toBeNull();

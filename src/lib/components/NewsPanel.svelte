@@ -112,6 +112,15 @@ either); everything else is theme tokens, never raw hex. -->
 							actions.menu(story.link);
 						}}
 					>
+						{#if story.image}
+							<img
+								class="news-img"
+								src={story.image}
+								alt=""
+								loading="lazy"
+								onerror={(e) => e.currentTarget.remove()}
+							/>
+						{/if}
 						<span class="news-card-title">{story.title}</span>
 						{#if story.source}
 							<span class="news-card-source">{story.source}</span>
@@ -281,7 +290,16 @@ either); everything else is theme tokens, never raw hex. -->
 		padding: 0;
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+		align-items: start;
 		gap: 0.6rem;
+	}
+	.news-img {
+		width: 100%;
+		aspect-ratio: 16 / 9;
+		object-fit: cover;
+		border-radius: 0.5rem;
+		background: #e5e5ea;
+		background: var(--line-soft);
 	}
 	.news-card {
 		background: #fff;
