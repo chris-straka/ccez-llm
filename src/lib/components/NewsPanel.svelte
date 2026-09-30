@@ -34,6 +34,9 @@ either); everything else is theme tokens, never raw hex. -->
 
 	let { panel, picker, busy, images, actions }: Props = $props();
 	const activeRegion = $derived(panel.regions.find((r) => r.gl === panel.region));
+	// Hotlink-dead images fall back to the outlet initial (same box);
+	// removing the node left a bare gap instead of a tile.
+	let broken = $state<Record<string, boolean>>({});
 	// Press-down point (one press at a time component-wide): a
 	// drag-release ending on a card belongs to text selection.
 	let downAt: { x: number; y: number } | null = null;
@@ -119,14 +122,21 @@ either); everything else is theme tokens, never raw hex. -->
 					class:open
 					in:fly={{ y: 14, duration: motionMs(260), delay: motionMs(Math.min(i * 45, 400)) }}
 				>
-					<button
-						type="button"
+					<div
+						role="button"
+						tabindex="0"
 						class="news-open"
 						aria-label="{story.title} — options"
 						aria-expanded={open}
 						data-story-link={story.link}
 						onpointerdown={(e) => {
 							downAt = { x: e.clientX, y: e.clientY };
+						}}
+						onkeydown={(e) => {
+							if (e.key === "Enter" || e.key === " ") {
+								e.preventDefault();
+								actions.menu(story.link);
+							}
 						}}
 						onclick={(e) => {
 							// Keyboard clicks (detail 0) never dragged: a
@@ -153,13 +163,16 @@ either); everything else is theme tokens, never raw hex. -->
 							actions.menu(story.link);
 						}}
 					>
-						{#if resolved}
+						{#if resolved && !broken[story.link]}
 							<img
 								class="news-img"
 								src={resolved}
 								alt=""
 								loading="lazy"
-								onerror={(e) => e.currentTarget.remove()}
+								draggable="false"
+								onerror={() => {
+									broken[story.link] = true;
+								}}
 								in:fade={{ duration: motionMs(250) }}
 							/>
 						{:else if !story.image && images[story.link] === undefined}
@@ -177,7 +190,7 @@ either); everything else is theme tokens, never raw hex. -->
 							<span class="news-card-source">{story.source}</span>
 						{/if}
 						<span class="news-hint" aria-hidden="true">⋯</span>
-					</button>
+					</div>
 					{#if busy === story.link}
 						<span class="news-busy" role="status">Fetching the article…</span>
 					{/if}
@@ -427,6 +440,7 @@ either); everything else is theme tokens, never raw hex. -->
 		line-height: 1.35;
 		color: #1c1c1e;
 		color: var(--ink);
+		transition: color 0.15s ease;
 		display: -webkit-box;
 		-webkit-line-clamp: 3;
 		line-clamp: 3;

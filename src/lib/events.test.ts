@@ -127,6 +127,26 @@ describe("page event idioms", () => {
 		expect(isSpaceInteractiveTarget(byId("p"))).toBe(false);
 	});
 
+	it("treats the news card surface as button-behaved", () => {
+		// The card is a div (buttons swallow drag-selection), so it
+		// matches the control guards by class: keys, presses, and
+		// summons treat it exactly like the button it was.
+		document.body.innerHTML =
+			'<div class="news-open" id="card"><span class="news-card-title" id="title">Rivière en crue</span></div><p id="p">w</p>';
+		const byId = (id: string): Element | null => document.getElementById(id);
+		for (const probe of [
+			isInteractiveTarget,
+			isSpaceInteractiveTarget,
+			isIdleOwnedTarget,
+			isScrollEnterOwnedTarget,
+			isClickControlTarget
+		]) {
+			expect(probe(byId("card"))).toBe(true);
+			expect(probe(byId("title"))).toBe(true);
+			expect(probe(byId("p"))).toBe(false);
+		}
+	});
+
 	it("spots click controls, math, and tap overlays", () => {
 		document.body.innerHTML =
 			'<button id="b">x</button><summary id="s">y</summary><div class="ccez-code" id="c">z</div>' +

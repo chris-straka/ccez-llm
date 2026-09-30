@@ -293,6 +293,7 @@
 		newsRegionsFor,
 		newsSummaryInstruction,
 		resolveArticleText,
+		resolveImageBatch,
 		resolveStoryImage,
 		storeNewsImage,
 		storeNewsUrl,
@@ -3478,10 +3479,11 @@
 		if (!range) return null;
 		const node = range.startContainer;
 		if (!(node instanceof Text)) return null;
-		// Message text only: action-row buttons, badges, and pills
-		// are words too, but filing UI chrome as an annotation is
-		// nonsense — those hovers keep the old aids behavior.
-		if (!node.parentElement?.closest(".rendered")) return null;
+		// Message text and news headlines only: action-row buttons,
+		// badges, and pills are words too, but filing UI chrome as an
+		// annotation is nonsense — those hovers keep the old aids
+		// behavior.
+		if (!node.parentElement?.closest(".rendered, .news-card-title")) return null;
 		const text = node.textContent ?? "";
 		const bounds = wordBoundsAt(text, range.startOffset);
 		if (!bounds) return null;
@@ -4937,8 +4939,8 @@
 	}
 
 	/** Quote off a news headline: both ends must sit in one
-	 * title (the cross-card trim — messages trim in onSelectEnd,
-	 * headlines have no lock), anchored to the live story row. */
+	 * title (onSelectEnd trims cross-card drags to the anchor
+	 * title's edge, like messages), anchored to the live story row. */
 	function headlineQuote(selection: Selection): {
 		quote: string;
 		context: string;
@@ -5025,9 +5027,10 @@
 					: selectParagraphAtPoint(event.clientX, event.clientY);
 			if (!picked) return;
 		}
-		// Selections never span messages: a drag crossing into another
-		// article trims back to the anchor message's edge first.
-		if (live) lockSelectionToMessage(live, articleOf);
+		// Selections never span messages or headlines: a drag
+		// crossing into another article or card trims back to the
+		// anchor's edge first.
+		if (live) lockSelectionToMessage(live, (n) => articleOf(n) ?? headlineOf(n));
 		// Multi-click picks grab the block terminator newline,
 		// painting the line beneath the highlight (the quote trims it
 		// anyway): drop it before the menu reads the quote. A word
@@ -9000,6 +9003,7 @@
 		openLangMenu = null;
 		news = null;
 		newsPicker = null;
+		restorePrompt();
 	}
 
 	/** Open the story cards for a language (default region first). */
@@ -9034,6 +9038,10 @@
 			error: "",
 			fallback: isNewsFallback(code)
 		};
+		// Headlines own the screen: park the composer on the idle
+		// path (summon keys, tap, and swipe-up all restore it —
+		// sending from it drops the panel in doSend).
+		promptIdle = true;
 		void fetchNewsStories();
 	}
 
@@ -9062,46 +9070,44 @@
 	 * fetch the article HTML, and read its og:image — four at a
 	 * time, hits filed for later, misses silent. Blocked or bare
 	 * pages fall through to the reader's first content image.
-	 * Stale runs (region hops) file nothing visible.
+	 * Stale runs (region hops) file nothing visible; leftover
+	 * transients settle to the letter tile, uncached, and retry
+	 * next open.
 	 */
 	async function resolveNewsImages(code: string, region: string, stories: NewsStory[]): Promise<void> {
 		const fresh = () => news?.code === code && news?.region === region;
-		const queue = stories.filter(
-			(s) => !s.image && !newsImageSession.has(s.link) && !cachedNewsImage(localStorage, s.link)
-		);
-		const runOne = async (): Promise<void> => {
-			const next = queue.shift();
-			if (!next) return;
-			try {
-				if (fresh()) {
-					// Complete results cache even when stale — only the UI
-					// write is freshness-guarded, so hops never waste fetches.
-					const { found, complete } = await resolveStoryImage(next.link, {
-						decode: decodeNewsLink,
-						fetchPage: fetchRawPage,
-						gateJina: newsJinaGate,
-						fresh,
-						cachedUrl: (link) => cachedNewsUrl(localStorage, link),
-						storeUrl: (link, url) => storeNewsUrl(localStorage, link, url),
-						jinaQuotaBlown: () => Date.now() < jinaQuotaUntil,
-						flagJinaQuota: () => {
-							jinaQuotaUntil = Date.now() + JINA_QUOTA_COOLDOWN_MS;
-						}
-					});
-					if (complete) {
-						newsImageSession.set(next.link, found);
-						if (found) storeNewsImage(localStorage, next.link, found);
-						if (fresh()) newsImages = { ...newsImages, [next.link]: found };
+		const links = stories
+			.filter(
+				(s) => !s.image && !newsImageSession.has(s.link) && !cachedNewsImage(localStorage, s.link)
+			)
+			.map((s) => s.link);
+		await resolveImageBatch(links, {
+			resolveOne: (link) =>
+				resolveStoryImage(link, {
+					decode: decodeNewsLink,
+					fetchPage: fetchRawPage,
+					gateJina: newsJinaGate,
+					fresh,
+					cachedUrl: (l) => cachedNewsUrl(localStorage, l),
+					storeUrl: (l, url) => storeNewsUrl(localStorage, l, url),
+					jinaQuotaBlown: () => Date.now() < jinaQuotaUntil,
+					flagJinaQuota: () => {
+						jinaQuotaUntil = Date.now() + JINA_QUOTA_COOLDOWN_MS;
 					}
+				}),
+			fresh,
+			onSettled: (link, found, complete) => {
+				// Complete results cache even when stale — only the
+				// UI write is freshness-guarded, so hops never waste
+				// fetches. Leftover transients file UI-only (no
+				// session stamp), so next open retries them.
+				if (complete) {
+					newsImageSession.set(link, found);
+					if (found) storeNewsImage(localStorage, link, found);
 				}
-			} catch {
-				// resolveStoryImage never throws by contract; a store or
-				// session surprise must not kill this worker — the story
-				// stays unresolved and retries next open.
+				if (fresh()) newsImages = { ...newsImages, [link]: found };
 			}
-			await runOne();
-		};
-		await Promise.all(Array.from({ length: 4 }, runOne));
+		});
 	}
 
 	async function fetchNewsStories(): Promise<void> {
@@ -9239,6 +9245,7 @@
 		close: () => {
 			news = null;
 			newsPicker = null;
+			restorePrompt();
 		},
 		retry: () => {
 			if (!news || newsBusy) return;
@@ -9269,11 +9276,12 @@
 			// composer on desktop: typing starts there
 			// next, and focus never lingers on the
 			// unmounted option (which left a stuck
-			// pointer behind). Phones stay unfocused:
-			// auto-focus pops the keyboard over the
-			// composer instead of pushing it up. Tap
-			// in when ready.
-			if (!androidUI) editor?.focus();
+			// pointer behind). News mode skips it (the
+			// composer parks hidden — summon to type).
+			// Phones stay unfocused: auto-focus pops
+			// the keyboard over the composer instead
+			// of pushing it up. Tap in when ready.
+			if (!androidUI && news === null) editor?.focus();
 		}
 	};
 
@@ -11747,7 +11755,7 @@
 				!event.shiftKey;
 			const hoverHit =
 				(bareAOnly || shiftAOnly) &&
-				hoveredIdx >= 0 &&
+				(hoveredIdx >= 0 || news !== null) &&
 				(window.getSelection()?.toString() ?? "") === ""
 					? hoverWordRange()
 					: null;
@@ -11778,6 +11786,7 @@
 					}
 				})(),
 				hoverWord: hoverHit?.word ?? null,
+				hoverHot: hoverHit !== null,
 				hoverBadgeId,
 				hoveredIdx,
 				escDownAt

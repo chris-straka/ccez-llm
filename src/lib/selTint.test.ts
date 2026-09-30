@@ -162,6 +162,31 @@ describe("textBlockAtPoint", () => {
 	it("is null where the caret API is missing", () => {
 		expect(textBlockAtPoint(10, 10)).toBeNull();
 	});
+
+	it("reads a news headline as its own block", () => {
+		document.body.innerHTML =
+			'<div class="messages"><ul><li class="news-card"><div class="news-open"><span class="news-card-title">Rivière en crue</span></div></li></ul></div>';
+		const title = document.querySelector(".news-card-title");
+		if (!(title instanceof HTMLElement) || !title.firstChild)
+			throw new Error("no headline");
+		const range = document.createRange();
+		range.setStart(title.firstChild, 2);
+		range.setEnd(title.firstChild, 2);
+		// jsdom has no caret API (see the test above): stub an own
+		// prop for the call, then remove exactly what was added.
+		Object.defineProperty(document, "caretRangeFromPoint", {
+			value: () => range,
+			configurable: true,
+			writable: true
+		});
+		try {
+			const found = textBlockAtPoint(4, 4);
+			expect(found?.block).toBe(title);
+			expect(found?.range).toBe(range);
+		} finally {
+			Reflect.deleteProperty(document, "caretRangeFromPoint");
+		}
+	});
 });
 
 describe("spanRect", () => {

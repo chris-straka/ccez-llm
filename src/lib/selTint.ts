@@ -127,9 +127,9 @@ export function speechBlockOf(
 
 /**
  * Rendered text block under a window point: the caret range's block
- * (paragraph, item, cell…), contained in a message body. Null off
- * text, without the API, or outside the thread. DOM-bound; the tap
- * selectors share it.
+ * (paragraph, item, cell…), contained in a message body — or a news
+ * headline, which is its own block. Null off text, without the API,
+ * or outside the thread. DOM-bound; the tap selectors share it.
  */
 export function textBlockAtPoint(
 	clientX: number,
@@ -141,6 +141,8 @@ export function textBlockAtPoint(
 		const node = range?.startContainer;
 		if (!range || !node) return null;
 		const element = node instanceof Element ? node : node.parentElement;
+		const headline = element?.closest(".news-card-title") ?? null;
+		if (headline instanceof Element) return { block: headline, range };
 		const rendered = element?.closest(".messages .rendered") ?? null;
 		if (!(rendered instanceof Element)) return null;
 		const block =

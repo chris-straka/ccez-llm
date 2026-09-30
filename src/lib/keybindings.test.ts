@@ -93,9 +93,23 @@ describe("messageKeyAction", () => {
 	});
 
 	it("sends a hovered word on A with no selection (no pill)", () => {
+		expect(messageKeyAction({ ...msgBase, hoverWord: "riverbank" })).toBe(
+			"annotate-hovered-instant"
+		);
+		// Headline hovers carry no message index: the hot word alone
+		// authorizes the instant file.
 		expect(
-			messageKeyAction({ ...msgBase, hoverWord: "riverbank" })
+			messageKeyAction({
+				...msgBase,
+				hoveredIdx: -1,
+				hoverHot: true,
+				hoverWord: "riverbank"
+			})
 		).toBe("annotate-hovered-instant");
+		// No hot word, no hover: nothing to file.
+		expect(
+			messageKeyAction({ ...msgBase, hoveredIdx: -1, hoverHot: false })
+		).toBeNull();
 		// A selection still wins over the hover word.
 		expect(
 			messageKeyAction({
@@ -157,6 +171,16 @@ describe("messageKeyAction", () => {
 		).toBe("annotate-empty");
 		// Shift+A yields to fields like every other message hotkey.
 		expect(messageKeyAction({ ...shiftA, inField: true })).toBe(null);
+		// Headline hover word, no message index: opens empty too.
+		expect(
+			messageKeyAction({
+				...shiftA,
+				hoveredIdx: -1,
+				hoverHot: true,
+				hasSelection: false,
+				hoverWord: "riverbank"
+			})
+		).toBe("annotate-empty");
 	});
 	it("fires the hovered-message hotkeys bare and hovered", () => {
 		expect(messageKeyAction(msgBase)).toBe("toggle-aids");

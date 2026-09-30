@@ -75,6 +75,10 @@ export interface MessageKeyFacts extends KeyModifiers {
 	selInMessage: boolean;
 	/** Word under the pointer (no selection): A sends it at once. */
 	hoverWord?: string | null;
+	/** A word sits under the pointer in annotatable text (message
+	 * or headline): the A chords treat it as hovered. Only ever set
+	 * for the A chords, so no other binding sees it. */
+	hoverHot?: boolean;
 	/** Annotation badge under the pointer: Delete drops it. */
 	hoverBadgeId?: string | null;
 	hoveredIdx: number;
@@ -107,7 +111,8 @@ export type MessageKeyAction =
 export function messageKeyAction(
 	facts: MessageKeyFacts
 ): MessageKeyAction | null {
-	const hovered = !facts.inEditor && facts.hoveredIdx >= 0;
+	const hovered =
+		!facts.inEditor && (facts.hoveredIdx >= 0 || facts.hoverHot === true);
 	// A live selection owns A: double-tap a word and hit A to file
 	// and send it at once, no pill — hovering is not required (see
 	// selInMessage). Hovering a word with no selection sends it the

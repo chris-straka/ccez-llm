@@ -17,7 +17,7 @@ const PROMPT_SELECTOR = ".prompt";
  * on top of every field and rich editor.
  */
 const INTERACTIVE_SELECTOR =
-	"input, textarea, select, button, a, [contenteditable]";
+	"input, textarea, select, button, a, [contenteditable], .news-open";
 /**
  * The Inspect field guard (also the Esc+f filter carve-out): typing in
  * the shortcuts filter must not step the preview or exit fullscreen.
@@ -26,20 +26,20 @@ const INSPECT_FIELD_SELECTOR =
 	"input, textarea, select, [contenteditable], .shortcuts-filter";
 /** Fields and buttons keep their native Space (empty-chat summon check). */
 const SPACE_INTERACTIVE_SELECTOR =
-	"input, textarea, select, [contenteditable], button, a";
+	"input, textarea, select, [contenteditable], button, a, .news-open";
 /**
  * Idle-restore owned stage: an open overlay, sidebar, or panel owns bare
  * keys, so Space out there never summons the prompt from behind it.
  */
 const IDLE_OWNED_SELECTOR =
-	"input, textarea, select, [contenteditable], button, a, summary, aside, .modal, .modal-veil, .find-bar, .search-palette, .sel-menu, .review, .lang-menu";
+	"input, textarea, select, [contenteditable], button, a, summary, aside, .modal, .modal-veil, .find-bar, .search-palette, .sel-menu, .review, .lang-menu, .news-open";
 /**
  * Ctrl+G entry owned stage: same idea one branch below, minus summary
  * and the language menu — the two spellings differ on purpose, so they
  * stay separate predicates instead of sharing one.
  */
 const SCROLL_ENTER_OWNED_SELECTOR =
-	"input, textarea, select, [contenteditable], button, a, aside, .modal, .modal-veil, .find-bar, .search-palette, .sel-menu, .review";
+	"input, textarea, select, [contenteditable], button, a, aside, .modal, .modal-veil, .find-bar, .search-palette, .sel-menu, .review, .news-open";
 
 /**
  * Closest matching ancestor for an event target (or the focused
@@ -174,7 +174,7 @@ export function mouseupKeepsSelection(
  * click onto an ancestor, but the press is still a control press.
  */
 const CLICK_CONTROL_SELECTOR =
-	"button, a, input, textarea, select, summary, [contenteditable], .ccez-code";
+	"button, a, input, textarea, select, summary, [contenteditable], .ccez-code, .news-open";
 
 /** True on controls (see above). */
 export function isClickControlTarget(target: EventTarget | null): boolean {

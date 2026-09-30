@@ -667,6 +667,60 @@ export async function resolveStoryImage(
 	}
 }
 
+export interface ImageBatchDeps {
+	resolveOne: (link: string) => Promise<{
+		found: string | null;
+		complete: boolean;
+	}>;
+	fresh: () => boolean;
+	/** Settled per link: complete hits/misses, then leftover
+	 * transients as UI-only misses (the caller decides what
+	 * persists — uncached misses retry next open). */
+	onSettled: (link: string, found: string | null, complete: boolean) => void;
+}
+
+/**
+ * Preview images for a link batch: `lanes` workers drain the
+ * queue, transient misses re-queue for a second round, and
+ * leftovers settle to the letter tile — skeletons never stick.
+ * Stale runs settle nothing visible. Transport injected.
+ */
+export async function resolveImageBatch(
+	links: string[],
+	deps: ImageBatchDeps,
+	rounds = 2,
+	lanes = 4
+): Promise<void> {
+	let pending = [...links];
+	for (let round = 0; round < rounds && pending.length > 0; round++) {
+		if (!deps.fresh()) return;
+		const queue = pending;
+		pending = [];
+		const runOne = async (): Promise<void> => {
+			const next = queue.shift();
+			if (!next) return;
+			try {
+				if (!deps.fresh()) return;
+				const { found, complete } = await deps.resolveOne(next);
+				if (complete) deps.onSettled(next, found, true);
+				else pending.push(next);
+			} catch {
+				pending.push(next);
+			}
+			await runOne();
+		};
+		await Promise.all(Array.from({ length: lanes }, runOne));
+	}
+	if (!deps.fresh()) return;
+	for (const link of pending) {
+		try {
+			deps.onSettled(link, null, false);
+		} catch {
+			// A UI-write surprise skips one tile, never the batch.
+		}
+	}
+}
+
 /**
  * Article body for a story link. Direct fetch plus HTML cleaning
  * first (static HTML beats reader chrome); reader-rendered

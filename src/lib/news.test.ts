@@ -29,6 +29,7 @@ import {
 	parseTranslatedLines,
 	translateNewsTitles,
 	resolveArticleText,
+	resolveImageBatch,
 	resolveStoryImage,
 	shapeStory,
 	storeArticle,
@@ -1037,6 +1038,84 @@ describe("article resolution", () => {
 			complete: false
 		});
 		expect(gated).toBe(0);
+	});
+
+	it("retries transient images once, then settles the letter tile", async () => {
+		const settled: Array<[string, string | null, boolean]> = [];
+		const calls = new Map<string, number>();
+		const script: Record<string, Array<{ found: string | null; complete: boolean }>> = {
+			hit: [{ found: "https://img/h.jpg", complete: true }],
+			miss: [{ found: null, complete: true }],
+			flaky: [
+				{ found: null, complete: false },
+				{ found: "https://img/f.jpg", complete: true }
+			],
+			dead: [
+				{ found: null, complete: false },
+				{ found: null, complete: false }
+			]
+		};
+		await resolveImageBatch(Object.keys(script), {
+			resolveOne: async (link) => {
+				calls.set(link, (calls.get(link) ?? 0) + 1);
+				const step = script[link]?.[(calls.get(link) ?? 1) - 1];
+				if (!step) throw new Error("no script step");
+				return step;
+			},
+			fresh: () => true,
+			onSettled: (link, found, complete) => void settled.push([link, found, complete])
+		});
+		// Complete links settle once, never retried.
+		expect(calls.get("hit")).toBe(1);
+		expect(calls.get("miss")).toBe(1);
+		// Flaky recovers on round two; dead settles UI-only.
+		expect(calls.get("flaky")).toBe(2);
+		expect(calls.get("dead")).toBe(2);
+		const byLink = new Map(settled.map(([link, found, complete]) => [link, [found, complete]]));
+		expect(byLink.get("hit")).toEqual(["https://img/h.jpg", true]);
+		expect(byLink.get("miss")).toEqual([null, true]);
+		expect(byLink.get("flaky")).toEqual(["https://img/f.jpg", true]);
+		expect(byLink.get("dead")).toEqual([null, false]);
+		expect(settled.filter(([link]) => link === "dead").length).toBe(1);
+	});
+
+	it("settles nothing visible once stale, and never throws", async () => {
+		const settled: string[] = [];
+		const calls: string[] = [];
+		let fresh = true;
+		await resolveImageBatch(
+			["a", "b"],
+			{
+				resolveOne: async (link) => {
+					calls.push(link);
+					if (link === "b") {
+						fresh = false;
+						return { found: null, complete: false };
+					}
+					return { found: `https://img/${link}.jpg`, complete: true };
+				},
+				fresh: () => fresh,
+				onSettled: (link) => void settled.push(link)
+			},
+			2,
+			1
+		);
+		// One lane runs the links in order: the first settles, the
+		// stale second never retries and the leftover pass stays home.
+		expect(settled).toEqual(["a"]);
+		expect(calls).toEqual(["a", "b"]);
+		// Throwing legs and listeners still resolve the batch.
+		await expect(
+			resolveImageBatch(["x"], {
+				resolveOne: async () => {
+					throw new Error("timeout");
+				},
+				fresh: () => true,
+				onSettled: () => {
+					throw new Error("listener blew up");
+				}
+			})
+		).resolves.toBeUndefined();
 	});
 
 	it("caches preview images, capped and corruption-proof", () => {

@@ -110,3 +110,20 @@ test("picking a second language switches the panel over", async ({
 	await page.locator(".lang-list").getByRole("menuitem", { name: "Japanese" }).click();
 	await expect(panel).toContainText("Japanese news");
 });
+
+test("headlines park the composer; summon brings it back over them", async ({
+	page
+}) => {
+	await page.locator('.lang-menu button:has-text("Europe")').click();
+	await page.locator(".lang-list").getByRole("menuitem", { name: "French" }).click();
+	const panel = page.locator(".news-panel");
+	await expect(panel).toBeVisible({ timeout: 10_000 });
+	const prompt = page.locator(".prompt");
+	await expect(prompt).toHaveClass(/prompt-idle/);
+	await page.keyboard.press("i");
+	await expect(prompt).not.toHaveClass(/prompt-idle/);
+	await expect(panel).toBeVisible();
+	await panel.getByRole("button", { name: "Close news" }).click();
+	await expect(panel).toHaveCount(0);
+	await expect(prompt).not.toHaveClass(/prompt-idle/);
+});

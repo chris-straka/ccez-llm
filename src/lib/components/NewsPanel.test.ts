@@ -49,12 +49,15 @@ describe("news panel contract", () => {
 		expect(source).toContain("transition:slide");
 		expect(source).toContain("in:fly");
 		expect(source).toContain("motionMs");
-		// Hover affordances live on the button alone, so the underline
-		// and the pointer cursor never disagree.
+		// Hover affordances live on the card surface alone, so the
+		// underline and the pointer cursor never disagree — and the
+		// title color eases instead of snapping.
 		expect(source).toContain(".news-open:hover .news-card-title");
 		expect(source).not.toContain(".news-card:hover .news-card-title");
-		// The hint overlays instead of reserving card space.
 		const css = source.split("<style>")[1] ?? "";
+		const title = css.match(/\.news-card-title\s*\{[^}]*\}/)?.[0] ?? "";
+		expect(title).toContain("transition: color");
+		// The hint overlays instead of reserving card space.
 		const hint = css.match(/\.news-hint\s*\{[^}]*\}/)?.[0] ?? "";
 		expect(hint).toContain("position: absolute");
 	});
@@ -120,12 +123,31 @@ describe("news panel contract", () => {
 		expect(css).toContain("text-overflow: ellipsis");
 	});
 
-	it("shows feed thumbnails when present, lazy and self-hiding", () => {
+	it("shows feed thumbnails when present, lazy and tile-falling", () => {
 		const source = panelSource();
-		expect(source).toContain("{#if resolved}");
+		expect(source).toContain("{#if resolved && !broken[story.link]}");
 		expect(source).toContain('class="news-img"');
 		expect(source).toContain('loading="lazy"');
-		expect(source).toContain("currentTarget.remove()");
+		// A dead hotlink falls back to the outlet initial (same
+		// box), never a bare gap.
+		expect(source).toContain("broken[story.link] = true");
+		expect(source).not.toContain("currentTarget.remove()");
+	});
+
+	it("keeps headlines selectable on a keyboard-operated card", () => {
+		// Buttons swallow drag-selection in browsers, so the card is
+		// a div wearing the button contract (role, tab stop, menu
+		// on Enter/Space) — text selects natively for annotate.
+		const source = panelSource();
+		expect(source).toContain('role="button"');
+		expect(source).toContain('tabindex="0"');
+		expect(source).toContain("onkeydown");
+		expect(source).toContain('e.key === "Enter" || e.key === " "');
+		// The card surface itself is the div, not a button.
+		const openAt = source.indexOf('class="news-open"');
+		expect(openAt).toBeGreaterThan(0);
+		const tagStart = source.lastIndexOf("<", openAt);
+		expect(source.slice(tagStart, openAt)).toContain("<div");
 	});
 
 	it("presses buttons in and kills all motion when reduced", () => {

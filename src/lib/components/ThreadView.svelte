@@ -232,7 +232,11 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		the welcome text on every platform); the page keeps emptiness
 		and the pill state. In news mode the welcome text goes away
 		and the pills rail the story cards below them. -->
-		<EmptyHero mock={useMock} newsMode={newsPanel !== null}>
+		<EmptyHero
+			mock={useMock}
+			newsMode={newsPanel !== null}
+			langHint={activeReplyCode === null}
+		>
 			<LangMenus
 				openId={openLangMenu}
 				anchor={langMenuAnchor}
