@@ -2,6 +2,9 @@
 //!
 //! This crate provides a safe interface to the BoringSSL cryptography library.
 
+// Vendored: silence new-rustc lints on old upstream code.
+#![allow(invalid_value, mismatched_lifetime_syntaxes, unexpected_cfgs)]
+
 #[macro_use]
 extern crate bitflags;
 #[macro_use]

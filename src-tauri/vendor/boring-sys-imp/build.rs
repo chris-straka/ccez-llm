@@ -1,3 +1,5 @@
+// Vendored: silence new-rustc lints on old upstream code.
+#![allow(unexpected_cfgs)]
 #[cfg(feature = "old_bindgen")]
 use old_bindgen as bindgen;
 

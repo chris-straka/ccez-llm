@@ -6,7 +6,7 @@ use crate::{
     ClientBuilder,
 };
 use h2::profile::AgentProfile;
-use http::{HeaderMap, HeaderValue};
+use http::HeaderMap;
 use std::str::FromStr;
 
 /// Configure the client to impersonate the given version

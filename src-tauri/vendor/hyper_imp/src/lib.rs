@@ -5,6 +5,8 @@
 #![cfg_attr(all(test, feature = "full"), deny(warnings))]
 #![cfg_attr(all(test, feature = "nightly"), feature(test))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
+// Vendored: silence new-rustc lints on old upstream code.
+#![allow(mismatched_lifetime_syntaxes, unused)]
 
 //! # hyper
 //!

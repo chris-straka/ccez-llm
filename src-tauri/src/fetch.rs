@@ -21,6 +21,7 @@ const MAX_HTML_BYTES: usize = 512 * 1024;
 /// (Akamai, DataDome) on major outlets, and this is the user's own
 /// device reading pages they tapped — reader convention. Off
 /// Android the impersonation profile sets its own matching UA.
+#[cfg(any(test, target_os = "android"))]
 const PAGE_USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 
 /// The URL back when fetchable, `None` when not. Mirrors

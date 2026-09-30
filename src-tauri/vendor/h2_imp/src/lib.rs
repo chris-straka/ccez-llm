@@ -85,7 +85,9 @@
     clippy::missing_safety_doc,
     clippy::undocumented_unsafe_blocks
 )]
+// Vendored: silence new-rustc lints on old upstream code.
 #![allow(clippy::type_complexity, clippy::manual_range_contains)]
+#![allow(mismatched_lifetime_syntaxes)]
 #![cfg_attr(test, deny(warnings))]
 
 macro_rules! proto_err {
