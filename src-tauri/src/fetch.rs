@@ -16,9 +16,11 @@ const MAX_URL_CHARS: usize = 2048;
 /// promises "truncated when long", so a big page still answers from
 /// its head instead of failing.
 const MAX_HTML_BYTES: usize = 512 * 1024;
-/// Browser user agent, not a bot label: bot-labeled fetches eat
-/// WAF denials (Akamai, DataDome) on major outlets, and this is the
-/// user's own device reading pages they tapped — reader convention.
+/// Browser user agent for the Android leg (which doesn't
+/// impersonate — see below): bot-labeled fetches eat WAF denials
+/// (Akamai, DataDome) on major outlets, and this is the user's own
+/// device reading pages they tapped — reader convention. Off
+/// Android the impersonation profile sets its own matching UA.
 const PAGE_USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 
 /// The URL back when fetchable, `None` when not. Mirrors
@@ -53,6 +55,17 @@ pub(crate) fn transport_code(error: &reqwest::Error) -> String {
     .to_string()
 }
 
+/// Same mapping for the impersonating client (off Android only).
+#[cfg(not(target_os = "android"))]
+fn impersonated_transport_code(error: &rquest::Error) -> String {
+    (if error.is_timeout() {
+        "timeout"
+    } else {
+        "failed"
+    })
+    .to_string()
+}
+
 /// Bytes kept to page text: a truncated head decodes lossily (the cut
 /// may split a char — a replacement mark beats an error when the head
 /// is otherwise readable), while a whole page keeps the strict decode
@@ -67,15 +80,76 @@ fn decode_head(taken: Vec<u8>, truncated: bool) -> Result<String, String> {
 
 /// Non-2xx status into its machine code. The code rides along
 /// (`bad-status:403`) so the frontend can tell a standing wall from
-/// a quota blip; the copy matcher only reads the prefix. Pure.
-pub(crate) fn bad_status(status: reqwest::StatusCode) -> String {
-    format!("bad-status:{}", status.as_u16())
+/// a quota blip; the copy matcher only reads the prefix. Takes the
+/// bare code because the two HTTP stacks type statuses differently.
+/// Pure.
+pub(crate) fn bad_status(code: u16) -> String {
+    format!("bad-status:{code}")
+}
+
+/// Capped read of one response body: large pages truncate to the
+/// head instead of failing, so a big page still answers from its
+/// first bytes (the frontend cleans and caps the text anyway). The
+/// two fetch legs share everything below the client.
+macro_rules! capped_body {
+    ($res:expr, $code:ident) => {{
+        let mut taken: Vec<u8> = Vec::new();
+        let mut truncated = false;
+        loop {
+            if taken.len() >= MAX_HTML_BYTES {
+                // At the cap: one more chunk decides truncated vs
+                // exact end (an exact end still decodes strictly).
+                match $res.chunk().await.map_err(|e| $code(&e))? {
+                    Some(rest) if !rest.is_empty() => truncated = true,
+                    _ => {}
+                }
+                break;
+            }
+            match $res.chunk().await.map_err(|e| $code(&e))? {
+                Some(bytes) => {
+                    let room = MAX_HTML_BYTES - taken.len();
+                    taken.extend_from_slice(&bytes[..bytes.len().min(room)]);
+                }
+                None => break,
+            }
+        }
+        decode_head(taken, truncated)
+    }};
 }
 
 /// One page of HTML (bounded), or a short machine code the frontend
 /// maps to its one-sentence copy (`timeout`, `bad-status`, `bad-url`,
-/// `bad-encoding`, `failed`).
+/// `bad-encoding`, `failed`). The client impersonates Safari 17.5
+/// (TLS + HTTP/2 fingerprints plus the profile's own UA — verified
+/// live against Akamai-fronted outlets, where the Chrome profile
+/// still eats 403s), so WAF-fronted outlets answer the same reader
+/// they'd serve in a browser.
 #[tauri::command]
+#[cfg(not(target_os = "android"))]
+pub async fn fetch_page(url: String) -> Result<String, String> {
+    let url = fetchable_url(&url).ok_or_else(|| "bad-url".to_string())?;
+    let client = rquest::Client::builder()
+        .impersonate(rquest::impersonate::Impersonate::Safari17_5)
+        .timeout(Duration::from_secs(FETCH_TIMEOUT_SECS))
+        .build()
+        .map_err(|_| "failed".to_string())?;
+    let mut res = client
+        .get(url)
+        .send()
+        .await
+        .map_err(|e| impersonated_transport_code(&e))?;
+    if !res.status().is_success() {
+        return Err(bad_status(res.status().as_u16()));
+    }
+    capped_body!(res, impersonated_transport_code)
+}
+
+/// Android leg of `fetch_page`: plain reqwest, no impersonation
+/// (boring-sys has no verified NDK cross-compile from here).
+/// Same contract, same codes — WAF-fronted outlets just answer it
+/// with denials, and the frontend falls back from there.
+#[tauri::command]
+#[cfg(target_os = "android")]
 pub async fn fetch_page(url: String) -> Result<String, String> {
     let url = fetchable_url(&url).ok_or_else(|| "bad-url".to_string())?;
     let client = reqwest::Client::builder()
@@ -89,32 +163,9 @@ pub async fn fetch_page(url: String) -> Result<String, String> {
         .await
         .map_err(|e| transport_code(&e))?;
     if !res.status().is_success() {
-        return Err(bad_status(res.status()));
+        return Err(bad_status(res.status().as_u16()));
     }
-    // Capped read: large pages truncate to the head instead of
-    // failing, so a big demographics page still answers from its
-    // first bytes (the frontend cleans and caps the text anyway).
-    let mut taken: Vec<u8> = Vec::new();
-    let mut truncated = false;
-    loop {
-        if taken.len() >= MAX_HTML_BYTES {
-            // At the cap: one more chunk decides truncated vs exact
-            // end (an exact end still decodes strictly below).
-            match res.chunk().await.map_err(|e| transport_code(&e))? {
-                Some(rest) if !rest.is_empty() => truncated = true,
-                _ => {}
-            }
-            break;
-        }
-        match res.chunk().await.map_err(|e| transport_code(&e))? {
-            Some(bytes) => {
-                let room = MAX_HTML_BYTES - taken.len();
-                taken.extend_from_slice(&bytes[..bytes.len().min(room)]);
-            }
-            None => break,
-        }
-    }
-    decode_head(taken, truncated)
+    capped_body!(res, transport_code)
 }
 
 #[cfg(test)]
@@ -144,14 +195,8 @@ mod tests {
 
     #[test]
     fn bad_status_carries_its_code() {
-        assert_eq!(
-            bad_status(reqwest::StatusCode::FORBIDDEN),
-            "bad-status:403"
-        );
-        assert_eq!(
-            bad_status(reqwest::StatusCode::TOO_MANY_REQUESTS),
-            "bad-status:429"
-        );
+        assert_eq!(bad_status(403), "bad-status:403");
+        assert_eq!(bad_status(429), "bad-status:429");
     }
 
     #[test]
