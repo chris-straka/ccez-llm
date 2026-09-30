@@ -28,7 +28,7 @@ describe("news panel contract", () => {
 			["talk", "🗣️"],
 			["read", "📰"]
 		]) {
-			const at = source.indexOf(`actions.toggle(story.link, "${kind}")}`);
+			const at = source.indexOf(`actions.launch(story.link, "${kind}")}`);
 			expect(at).toBeGreaterThan(0);
 			const end = source.indexOf("</button>", at);
 			const inner = source.slice(at, end).split(">").pop()?.trim();
@@ -36,17 +36,28 @@ describe("news panel contract", () => {
 		}
 	});
 
-	it("expands CEFR and length pickers inline per card", () => {
+	it("opens one menu from the whole card, click or right-click", () => {
 		const source = panelSource();
-		expect(source).toContain('aria-label="Conversation level"');
-		expect(source).toContain('aria-label="Summary level"');
+		expect(source).toContain("actions.menu(story.link)");
+		expect(source).toContain("oncontextmenu");
+		expect(source).toContain("aria-expanded");
+		expect(source).toContain("news-hint");
+		expect(source).toContain('aria-label="Story options"');
+	});
+
+	it("menus launch icon-only at the selected level and length", () => {
+		const source = panelSource();
+		expect(source).toContain('aria-label="Level"');
 		expect(source).toContain('aria-label="Summary length"');
 		expect(source).toContain("CEFR_LEVELS");
 		expect(source).toContain("SUMMARY_SIZES");
-		expect(source).toContain("aria-expanded");
-		// Summary levels select without launching (length taps launch).
+		// Level and length select without launching; the icons launch.
 		expect(source).toContain("actions.level(story.link, level.level)");
-		expect(source).toContain('picker.level ?? "B2"');
+		expect(source).toContain("actions.size(story.link, size.size)");
+		expect(source).toContain('picker?.level ?? "B2"');
+		expect(source).toContain('picker?.size ?? "medium"');
+		expect(source).toContain('actions.launch(story.link, "talk")');
+		expect(source).toContain('actions.launch(story.link, "read")');
 	});
 
 	it("chips plain country labels, hidden for single editions", () => {
@@ -87,9 +98,9 @@ describe("news panel contract", () => {
 			expect(source).toContain(`panel.status === ${status}`);
 		}
 		expect(source).toContain("actions.retry()");
-		// Busy cards announce and lock their buttons.
+		// Busy cards announce and fold the menu away.
 		expect(source).toContain('role="status"');
-		expect(source).toContain("disabled={busy !== null}");
+		expect(source).toContain("open && busy === null");
 	});
 
 	it("paints only theme tokens, never raw hex", () => {

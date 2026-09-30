@@ -277,8 +277,6 @@
 	import { startBlink, startHighlightFade, startMarkFade } from "$lib/blink";
 	import { createRefMemo } from "$lib/aidLoading";
 	import {
-		CEFR_LEVELS,
-		SUMMARY_SIZES,
 		decodeNewsLink,
 		fetchRawPage,
 		isNewsFallback,
@@ -292,7 +290,8 @@
 		type CefrLevel,
 		type NewsKind,
 		type NewsPanelState,
-		type NewsPicker
+		type NewsPicker,
+		type SummarySize
 	} from "$lib/news";
 	/* decomposeTree + onKunLine render in `InspectOverlay.svelte`. */
 	import {
@@ -8946,31 +8945,17 @@
 	async function launchNewsSession(
 		link: string,
 		kind: NewsKind,
-		value: string
+		level: CefrLevel,
+		size: SummarySize
 	): Promise<void> {
 		const current = news;
 		if (!current || current.status !== "ready" || newsBusy || !editor) return;
 		const story = current.stories.find((s) => s.link === link);
-		const level = CEFR_LEVELS.find((l) => l.level === value) ?? null;
-		const size = SUMMARY_SIZES.find((s) => s.size === value) ?? null;
-		let instruction: string;
-		if (story && kind === "talk" && level) {
-			instruction = newsConversationInstruction(story, level.level, current.langName);
-		} else if (story && kind === "read" && size) {
-			// Summaries carry a level too: the picker's row, B2 until tapped.
-			const summaryLevel =
-				newsPicker?.kind === "read" && newsPicker.link === link
-					? (newsPicker.level ?? "B2")
-					: "B2";
-			instruction = newsSummaryInstruction(
-				story,
-				size.size,
-				summaryLevel,
-				current.langName
-			);
-		} else {
-			return;
-		}
+		if (!story) return;
+		const instruction =
+			kind === "talk"
+				? newsConversationInstruction(story, level, current.langName)
+				: newsSummaryInstruction(story, size, level, current.langName);
 		if (composerText() !== "" || attachments.length > 0) {
 			flashErrorToast("Clear the composer first — the story needs an empty draft.");
 			return;
@@ -9012,21 +8997,28 @@
 		region: (gl: string) => {
 			void switchNewsRegion(gl);
 		},
-		toggle: (link: string, kind: NewsKind) => {
+		menu: (link: string) => {
 			if (newsBusy) return;
-			newsPicker =
-				newsPicker?.link === link && newsPicker.kind === kind
-					? null
-					: { link, kind };
-		},
-		pick: (link: string, kind: NewsKind, value: string) => {
-			void launchNewsSession(link, kind, value);
+			newsPicker = newsPicker?.link === link ? null : { link };
 		},
 		level: (link: string, level: CefrLevel) => {
 			if (newsBusy) return;
-			if (newsPicker?.link === link && newsPicker.kind === "read") {
+			if (newsPicker?.link === link) {
 				newsPicker = { ...newsPicker, level };
 			}
+		},
+		size: (link: string, size: SummarySize) => {
+			if (newsBusy) return;
+			if (newsPicker?.link === link) {
+				newsPicker = { ...newsPicker, size };
+			}
+		},
+		launch: (link: string, kind: NewsKind) => {
+			const level =
+				newsPicker?.link === link ? (newsPicker.level ?? "B2") : "B2";
+			const size =
+				newsPicker?.link === link ? (newsPicker.size ?? "medium") : "medium";
+			void launchNewsSession(link, kind, level, size);
 		},
 		close: () => {
 			news = null;

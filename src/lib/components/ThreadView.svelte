@@ -27,7 +27,8 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		CefrLevel,
 		NewsKind,
 		NewsPanelState,
-		NewsPicker
+		NewsPicker,
+		SummarySize
 	} from "$lib/news";
 	import MessageArticle from "./MessageArticle.svelte";
 	import EmptyHero from "./EmptyHero.svelte";
@@ -147,9 +148,10 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		// Mirrors NewsPanel actions (structural, same rule as above).
 		newsActions: {
 			region: (gl: string) => void;
-			toggle: (link: string, kind: NewsKind) => void;
-			pick: (link: string, kind: NewsKind, value: string) => void;
+			menu: (link: string) => void;
 			level: (link: string, level: CefrLevel) => void;
+			size: (link: string, size: SummarySize) => void;
+			launch: (link: string, kind: NewsKind) => void;
 			close: () => void;
 			retry: () => void;
 		};

@@ -10,7 +10,8 @@ either); everything else is theme tokens, never raw hex. -->
 		type CefrLevel,
 		type NewsKind,
 		type NewsPanelState,
-		type NewsPicker
+		type NewsPicker,
+		type SummarySize
 	} from "$lib/news";
 
 	interface Props {
@@ -19,9 +20,10 @@ either); everything else is theme tokens, never raw hex. -->
 		busy: string | null;
 		actions: {
 			region: (gl: string) => void;
-			toggle: (link: string, kind: NewsKind) => void;
-			pick: (link: string, kind: NewsKind, value: string) => void;
+			menu: (link: string) => void;
 			level: (link: string, level: CefrLevel) => void;
+			size: (link: string, size: SummarySize) => void;
+			launch: (link: string, kind: NewsKind) => void;
 			close: () => void;
 			retry: () => void;
 		};
@@ -91,82 +93,78 @@ either); everything else is theme tokens, never raw hex. -->
 	{:else}
 		<ul class="news-cards">
 			{#each panel.stories as story (story.link)}
-				<li class="news-card">
-					<p class="news-card-title">{story.title}</p>
-					{#if story.source}
-						<p class="news-card-source">{story.source}</p>
-					{/if}
-					<div class="news-card-btns">
-						<button
-							type="button"
-							class="news-btn"
-							class:open={picker?.link === story.link && picker?.kind === "talk"}
-							aria-label="Discuss this story"
-							title="Discuss with two locals (pick a level)"
-							aria-expanded={picker?.link === story.link &&
-								picker?.kind === "talk"}
-							disabled={busy !== null}
-							onclick={() => actions.toggle(story.link, "talk")}
-						>
-							🗣️
-						</button>
-						<button
-							type="button"
-							class="news-btn"
-							class:open={picker?.link === story.link && picker?.kind === "read"}
-							aria-label="Summarize this story"
-							title="Summarize (pick a length)"
-							aria-expanded={picker?.link === story.link &&
-								picker?.kind === "read"}
-							disabled={busy !== null}
-							onclick={() => actions.toggle(story.link, "read")}
-						>
-							📰
-						</button>
-						{#if busy === story.link}
-							<span class="news-busy" role="status">Fetching the article…</span>
+				{@const open = picker?.link === story.link}
+				<li class="news-card" class:open>
+					<button
+						type="button"
+						class="news-open"
+						aria-label="{story.title} — options"
+						aria-expanded={open}
+						onclick={() => actions.menu(story.link)}
+						oncontextmenu={(e) => {
+							e.preventDefault();
+							actions.menu(story.link);
+						}}
+					>
+						<span class="news-card-title">{story.title}</span>
+						{#if story.source}
+							<span class="news-card-source">{story.source}</span>
 						{/if}
-					</div>
-					{#if picker?.link === story.link && picker?.kind === "talk" && busy === null}
-						<div class="news-pick" role="group" aria-label="Conversation level">
-							{#each CEFR_LEVELS as level (level.level)}
-								<button
-									type="button"
-									class="news-opt"
-									title={level.tag}
-									onclick={() => actions.pick(story.link, "talk", level.level)}
-								>
-									{level.level}
-								</button>
-							{/each}
-						</div>
+						<span class="news-hint" aria-hidden="true">🗣️ 📰</span>
+					</button>
+					{#if busy === story.link}
+						<span class="news-busy" role="status">Fetching the article…</span>
 					{/if}
-					{#if picker?.link === story.link && picker?.kind === "read" && busy === null}
-						<div class="news-pick" role="group" aria-label="Summary level">
-							{#each CEFR_LEVELS as level (level.level)}
+					{#if open && busy === null}
+						<div class="news-menu" role="group" aria-label="Story options">
+							<div class="news-launch">
 								<button
 									type="button"
-									class="news-opt"
-									class:on={(picker.level ?? "B2") === level.level}
-									aria-pressed={(picker.level ?? "B2") === level.level}
-									title={level.tag}
-									onclick={() => actions.level(story.link, level.level)}
+									class="news-go"
+									aria-label="Discuss this story"
+									title="Discuss with two locals"
+									onclick={() => actions.launch(story.link, "talk")}
 								>
-									{level.level}
+									🗣️
 								</button>
-							{/each}
-						</div>
-						<div class="news-pick" role="group" aria-label="Summary length">
-							{#each SUMMARY_SIZES as size (size.size)}
 								<button
 									type="button"
-									class="news-opt"
-									title="About {size.words} words"
-									onclick={() => actions.pick(story.link, "read", size.size)}
+									class="news-go"
+									aria-label="Summarize this story"
+									title="Summarize at this level and length"
+									onclick={() => actions.launch(story.link, "read")}
 								>
-									{size.label}
+									📰
 								</button>
-							{/each}
+							</div>
+							<div class="news-pick" role="group" aria-label="Level">
+								{#each CEFR_LEVELS as level (level.level)}
+									<button
+										type="button"
+										class="news-opt"
+										class:on={(picker?.level ?? "B2") === level.level}
+										aria-pressed={(picker?.level ?? "B2") === level.level}
+										title={level.tag}
+										onclick={() => actions.level(story.link, level.level)}
+									>
+										{level.level}
+									</button>
+								{/each}
+							</div>
+							<div class="news-pick" role="group" aria-label="Summary length">
+								{#each SUMMARY_SIZES as size (size.size)}
+									<button
+										type="button"
+										class="news-opt"
+										class:on={(picker?.size ?? "medium") === size.size}
+										aria-pressed={(picker?.size ?? "medium") === size.size}
+										title="About {size.words} words"
+										onclick={() => actions.size(story.link, size.size)}
+									>
+										{size.label}
+									</button>
+								{/each}
+							</div>
 						</div>
 					{/if}
 				</li>
@@ -304,28 +302,67 @@ either); everything else is theme tokens, never raw hex. -->
 		color: #6e6e73;
 		color: var(--muted);
 	}
-	.news-card-btns {
+	.news-open {
 		display: flex;
-		align-items: center;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 0.15rem;
+		width: 100%;
+		padding: 0;
+		border: 0;
+		background: none;
+		font: inherit;
+		color: inherit;
+		text-align: left;
+		cursor: pointer;
+	}
+	.news-open:focus-visible,
+	.news-go:focus-visible,
+	.news-opt:focus-visible {
+		outline: 2px solid #007aff;
+		outline-color: var(--accent);
+		outline-offset: 2px;
+	}
+	.news-card:hover .news-card-title,
+	.news-card:focus-within .news-card-title {
+		text-decoration: underline;
+	}
+	.news-hint {
+		font-size: 0.85rem;
+		line-height: 1.4;
+		opacity: 0;
+	}
+	.news-card:hover .news-hint,
+	.news-card:focus-within .news-hint {
+		opacity: 1;
+	}
+	.news-card.open .news-hint {
+		display: none;
+	}
+	@media (hover: none) {
+		.news-hint {
+			display: none;
+		}
+	}
+	.news-menu {
+		display: flex;
+		flex-direction: column;
 		gap: 0.35rem;
 	}
-	.news-btn {
-		border: 1px solid transparent;
+	.news-launch {
+		display: flex;
+		gap: 0.35rem;
+	}
+	.news-go {
+		flex: 1;
+		border: 1px solid #e5e5ea;
+		border-color: var(--line-soft);
 		background: transparent;
 		border-radius: 0.6rem;
 		font-size: 1.3rem;
 		line-height: 1;
-		min-width: 2.75rem;
 		min-height: 2.75rem;
 		cursor: pointer;
-	}
-	.news-btn.open {
-		border-color: #007aff;
-		border-color: var(--accent);
-	}
-	.news-btn:disabled {
-		opacity: 0.45;
-		cursor: default;
 	}
 	.news-busy {
 		font-size: 0.8rem;
@@ -337,6 +374,9 @@ either); everything else is theme tokens, never raw hex. -->
 		flex-wrap: wrap;
 		gap: 0.35rem;
 	}
+	.news-pick > .news-opt {
+		flex: 1 1 auto;
+	}
 	.news-opt {
 		border: 1px solid #e5e5ea;
 		border-color: var(--line-soft);
@@ -344,10 +384,12 @@ either); everything else is theme tokens, never raw hex. -->
 		color: #1c1c1e;
 		color: var(--ink);
 		border-radius: 0.55rem;
-		padding: 0.4rem 0.7rem;
-		font-size: 0.85rem;
+		padding: 0.4rem 0.5rem;
+		font-size: 0.8rem;
 		font-weight: 600;
 		min-height: 2.75rem;
+		text-align: center;
+		white-space: nowrap;
 		cursor: pointer;
 	}
 	.news-opt.on {

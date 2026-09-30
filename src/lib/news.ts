@@ -346,9 +346,10 @@ export interface NewsPanelState {
 /** One card's expanded option rows (page-owned, cleared on launch). */
 export interface NewsPicker {
 	link: string;
-	kind: NewsKind;
-	/** Chosen summary level (read only, B2 until tapped). */
+	/** Chosen level (B2 until tapped) — talk and read share it. */
 	level?: CefrLevel;
+	/** Chosen summary length (medium until tapped). */
+	size?: SummarySize;
 }
 
 /** CEFR levels for conversation sessions. */
