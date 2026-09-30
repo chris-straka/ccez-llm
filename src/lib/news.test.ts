@@ -9,6 +9,7 @@ import {
 	cachedArticle,
 	cachedNewsImage,
 	cachedNewsUrl,
+	contentImageFromMarkdown,
 	extractArticleText,
 	fetchArticleText,
 	isNewsFallback,
@@ -111,7 +112,7 @@ describe("news feeds", () => {
 				}
 				const home = NEWS_FEEDS[code]!.regions;
 				const native = home.length;
-				const world = ["US", "GB", "SG", "GBL"].filter(
+				const world = ["US", "CA", "GB", "SG", "AU", "GBL"].filter(
 					(gl) => !home.some((r) => r.gl === gl)
 				).length;
 				expect(regions!.length).toBe(native + world);
@@ -137,16 +138,19 @@ describe("news feeds", () => {
 			"HK",
 			"SG",
 			"US",
+			"CA",
 			"GB",
+			"AU",
 			"GBL"
 		]);
 	});
 
 	it("derives translated world regions unless one is native", () => {
-		// French gains U.S./Europe/Asia/Global chips, home edition first.
+		// French gains the world row minus Canada (native French
+		// Canada stands in), home edition first.
 		const fr = newsRegionsFor("fr")!;
-		expect(fr.slice(-4).map((r) => r.gl)).toEqual(["US", "GB", "SG", "GBL"]);
-		expect(fr.slice(-4).every((r) => r.translate)).toBe(true);
+		expect(fr.slice(-5).map((r) => r.gl)).toEqual(["US", "GB", "SG", "AU", "GBL"]);
+		expect(fr.slice(-5).every((r) => r.translate)).toBe(true);
 		expect(fr.at(-1)).toMatchObject({
 			label: "Global",
 			merge: [
@@ -163,16 +167,20 @@ describe("news feeds", () => {
 		expect(newsRssUrl("fr", "US")).toContain("hl=en-US&gl=US");
 		expect(newsRssUrl("fr", "GB")).toContain("hl=en-GB&gl=GB");
 		expect(newsRssUrl("fr", "GBL")).toBeNull();
-		// Spanish keeps its native US, gains the other three translated.
+		expect(newsRssUrl("es", "CA")).toContain("hl=en-CA&gl=CA");
+		expect(newsRssUrl("es", "AU")).toContain("hl=en-AU&gl=AU");
+		// Spanish keeps its native US, gains the other five translated.
 		const es = newsRegionsFor("es")!;
 		expect(es.filter((r) => r.gl === "US")).toHaveLength(1);
 		expect(es.find((r) => r.gl === "US")?.translate).toBeUndefined();
-		expect(es.slice(-3).map((r) => r.gl)).toEqual(["GB", "SG", "GBL"]);
-		// Pure-U.S. fallbacks: native US first, three translated chips.
+		expect(es.slice(-5).map((r) => r.gl)).toEqual(["CA", "GB", "SG", "AU", "GBL"]);
+		// Pure-U.S. fallbacks: native US first, five translated chips.
 		expect(newsRegionsFor("da")!.map((r) => r.gl)).toEqual([
 			"US",
+			"CA",
 			"GB",
 			"SG",
+			"AU",
 			"GBL"
 		]);
 		// Home-English fallbacks gain the world row (ang's native GB
@@ -180,14 +188,18 @@ describe("news feeds", () => {
 		expect(newsRegionsFor("ur")!.map((r) => r.gl)).toEqual([
 			"PK",
 			"US",
+			"CA",
 			"GB",
 			"SG",
+			"AU",
 			"GBL"
 		]);
 		expect(newsRegionsFor("ang")!.map((r) => r.gl)).toEqual([
 			"GB",
 			"US",
+			"CA",
 			"SG",
+			"AU",
 			"GBL"
 		]);
 	});
@@ -607,6 +619,14 @@ describe("article resolution", () => {
 		).toBe("https://outlet.test/pic/b.jpg");
 		expect(articleImageFromHtml(html(""), "https://outlet.test/s")).toBeNull();
 		expect(articleImageFromHtml("not html {{{", "https://outlet.test/s")).toBeNull();
+		// Reader markdown: first content image, chrome skipped.
+		expect(
+			contentImageFromMarkdown(
+				"![Image 1: Logo](https://img/logo.png)\n\n![](https://img/t.gif?pixel=1)\n\n![Protesters march](https://img/photo.jpg)"
+			)
+		).toBe("https://img/photo.jpg");
+		expect(contentImageFromMarkdown("no images here")).toBeNull();
+		expect(contentImageFromMarkdown("![Logo](https://img/logo.png)")).toBeNull();
 	});
 
 	it("caches preview images, capped and corruption-proof", () => {

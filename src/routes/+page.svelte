@@ -280,9 +280,11 @@
 		articleImageFromHtml,
 		cachedNewsImage,
 		cachedNewsUrl,
+		contentImageFromMarkdown,
 		decodeNewsLink,
 		fetchRawPage,
 		isNewsFallback,
+		jinaUrl,
 		loadNewsStories,
 		newsConversationInstruction,
 		newsErrorCopy,
@@ -8916,8 +8918,9 @@
 	/**
 	 * Preview images for stories the feed left imageless: decode,
 	 * fetch the article HTML, and read its og:image — four at a
-	 * time, hits filed for later, misses silent. Stale runs (region
-	 * hops) file nothing visible.
+	 * time, hits filed for later, misses silent. Blocked or bare
+	 * pages fall through to the reader's first content image.
+	 * Stale runs (region hops) file nothing visible.
 	 */
 	async function resolveNewsImages(code: string, region: string, stories: NewsStory[]): Promise<void> {
 		const fresh = () => news?.code === code && news?.region === region;
@@ -8933,7 +8936,14 @@
 					const url =
 						cachedNewsUrl(localStorage, next.link) ?? (await decodeNewsLink(next.link));
 					storeNewsUrl(localStorage, next.link, url);
-					found = articleImageFromHtml(await fetchRawPage(url), url);
+					try {
+						found = articleImageFromHtml(await fetchRawPage(url), url);
+					} catch {
+						// Blocked or bare: the reader leg below gets its turn.
+					}
+					if (!found && fresh()) {
+						found = contentImageFromMarkdown(await fetchRawPage(jinaUrl(url)));
+					}
 				} catch {
 					// Misses stay silent; the card falls back to text.
 				}

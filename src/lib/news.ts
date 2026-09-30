@@ -208,18 +208,21 @@ export function isNewsFallback(code: string): boolean {
 /** Editions for a language, default first; null when unsupported. */
 /**
  * World headlines in the learner's language, derived for every
- * feed: U.S., Europe (Britain — the only European English
- * edition), Asia (Singapore, the regional English hub), and a
- * Global mix of the BBC and Al Jazeera world desks (Google has
- * no true global edition, and these link straight to articles —
- * no redirect decoding). Appended after the native regions,
- * skipping any `gl` the feed already carries natively (es-US,
- * zh-SG, ang-GB — every other `hl`+US request redirects home).
+ * feed: U.S., Canada, Europe (Britain — the only European English
+ * edition, so no separate UK chip), Asia (Singapore, the regional
+ * English hub), Australia, and a Global mix of the BBC and Al
+ * Jazeera world desks (Google has no true global edition, and
+ * these link straight to articles — no redirect decoding).
+ * Appended after the native regions, skipping any `gl` the feed
+ * already carries natively (es-US, zh-SG, ang-GB, fr-CA — every
+ * other `hl`+US request redirects home).
  */
 const WORLD_REGIONS: NewsRegion[] = [
 	{ gl: "US", label: "U.S.", hl: "en-US", translate: true },
+	{ gl: "CA", label: "Canada", hl: "en-CA", translate: true },
 	{ gl: "GB", label: "Europe", hl: "en-GB", translate: true },
 	{ gl: "SG", label: "Asia", hl: "en-SG", translate: true },
+	{ gl: "AU", label: "Australia", hl: "en-AU", translate: true },
 	{
 		gl: "GBL",
 		label: "Global",
@@ -469,6 +472,38 @@ export function articleImageFromHtml(html: string, baseUrl: string): string | nu
 	} catch {
 		return null;
 	}
+}
+
+const CHROME_IMAGE_HINTS = [
+	"logo",
+	"icon",
+	"avatar",
+	"sprite",
+	"pixel",
+	"spacer",
+	"transparent",
+	"placeholder",
+	"tracking",
+	"badge",
+	"favicon"
+];
+
+/**
+ * First content image out of reader markdown, skipping chrome
+ * (logos, icons, pixels) by alt and URL. Pure.
+ */
+export function contentImageFromMarkdown(markdown: string): string | null {
+	const pattern = /!\[([^\]]*)\]\((https?:\/\/[^)\s]+)\)/g;
+	let match: RegExpExecArray | null;
+	while ((match = pattern.exec(markdown)) !== null) {
+		const alt = (match[1] ?? "").toLowerCase();
+		const url = match[2] ?? "";
+		if (!url) continue;
+		const hay = `${alt} ${url.toLowerCase()}`;
+		if (CHROME_IMAGE_HINTS.some((hint) => hay.includes(hint))) continue;
+		return url;
+	}
+	return null;
 }
 
 /**
