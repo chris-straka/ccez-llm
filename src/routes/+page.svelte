@@ -8892,7 +8892,7 @@
 			const provider = await resolveProviderActive();
 			if (news !== current) return;
 			if (!provider) {
-				flashToast("Set an API key to translate U.S. headlines.");
+				flashToast(`Set an API key to translate ${region.label} headlines.`);
 				return;
 			}
 		}

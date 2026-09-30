@@ -25,6 +25,7 @@ export interface NewsRegion {
 	label: string;
 	hl?: string;
 	translate?: true;
+	merge?: { hl: string; gl: string }[];
 }
 
 /**
@@ -206,36 +207,53 @@ export function isNewsFallback(code: string): boolean {
 
 /** Editions for a language, default first; null when unsupported. */
 /**
- * Translated U.S. headlines, derived for every feed without a
- * native US edition (only es-US exists — every other `hl`+US
- * request redirects home). Appended last, so the home edition
- * stays default and the chip row gains one 🇺🇸.
+ * World headlines in the learner's language, derived for every
+ * feed: U.S., Europe (Britain — the only European English
+ * edition), Asia (Singapore, the regional English hub), and a
+ * Global mix merged from all three (no true global edition
+ * exists). Appended after the native regions, skipping any `gl`
+ * the feed already carries natively (only es-US does — every
+ * other `hl`+US request redirects home).
  */
-const US_TRANSLATED_REGION: NewsRegion = {
-	gl: "US",
-	label: "U.S.",
-	hl: "en-US",
-	translate: true
-};
+const WORLD_REGIONS: NewsRegion[] = [
+	{ gl: "US", label: "U.S.", hl: "en-US", translate: true },
+	{ gl: "GB", label: "Europe", hl: "en-GB", translate: true },
+	{ gl: "SG", label: "Asia", hl: "en-SG", translate: true },
+	{
+		gl: "GBL",
+		label: "Global",
+		translate: true,
+		merge: [
+			{ hl: "en-US", gl: "US" },
+			{ hl: "en-GB", gl: "GB" },
+			{ hl: "en-SG", gl: "SG" }
+		]
+	}
+];
 
 export function newsRegionsFor(code: string): NewsRegion[] | null {
 	const feed = NEWS_FEEDS[code];
 	if (!feed) return null;
-	if (feed.regions.some((r) => r.gl === "US")) return feed.regions;
-	return [...feed.regions, US_TRANSLATED_REGION];
+	const have = new Set(feed.regions.map((r) => r.gl));
+	return [...feed.regions, ...WORLD_REGIONS.filter((r) => !have.has(r.gl))];
+}
+
+/** Raw Top Stories URL for one edition. */
+function feedUrl(hl: string, gl: string): string {
+	return `https://news.google.com/rss?hl=${hl}&gl=${gl}&ceid=${gl}:${hl}`;
 }
 
 /**
  * Google News RSS URL for a language + region. Null when the pair
  * is unknown (unsupported language, or a `gl` outside its list —
- * never let callers invent editions).
+ * never let callers invent editions), or when the region is a
+ * merge with no single URL (Global — the loader fans out).
  */
 export function newsRssUrl(code: string, gl: string): string | null {
 	const feed = NEWS_FEEDS[code];
 	const region = newsRegionsFor(code)?.find((r) => r.gl === gl);
-	if (!feed || !region) return null;
-	const hl = region.hl ?? feed.hl;
-	return `https://news.google.com/rss?hl=${hl}&gl=${gl}&ceid=${gl}:${hl}`;
+	if (!feed || !region || region.merge) return null;
+	return feedUrl(region.hl ?? feed.hl, gl);
 }
 
 /** One story card: headline, outlet, link, and snippet. */
@@ -474,11 +492,42 @@ export async function decodeNewsLink(link: string): Promise<string> {
 }
 
 /** Stories for a language + region (transport injected). Pure flow. */
+/**
+ * Several editions interleaved round-robin (US, Europe, Asia, …)
+ * so no one country's agenda leads, deduped by normalized
+ * headline, capped at single-feed scale. Pure.
+ */
+export function mergeNewsStories(feeds: NewsStory[][], cap = 40): NewsStory[] {
+	const seen = new Set<string>();
+	const merged: NewsStory[] = [];
+	const depth = Math.max(0, ...feeds.map((feed) => feed.length));
+	for (let i = 0; i < depth && merged.length < cap; i++) {
+		for (const feed of feeds) {
+			const story = feed[i];
+			if (!story) continue;
+			const key = story.title.toLowerCase().replace(/[^a-z0-9]+/g, "");
+			if (seen.has(key)) continue;
+			seen.add(key);
+			merged.push(story);
+			if (merged.length >= cap) break;
+		}
+	}
+	return merged;
+}
+
 export async function loadNewsStories(
 	code: string,
 	gl: string,
 	fetchXml: (url: string) => Promise<string>
 ): Promise<NewsStory[]> {
+	const region = newsRegionsFor(code)?.find((r) => r.gl === gl);
+	if (!region) throw new Error("news-unsupported");
+	if (region.merge) {
+		const xmls = await Promise.all(
+			region.merge.map((target) => fetchXml(feedUrl(target.hl, target.gl)))
+		);
+		return mergeNewsStories(xmls.map(newsStoriesFromXml));
+	}
 	const url = newsRssUrl(code, gl);
 	if (!url) throw new Error("news-unsupported");
 	return newsStoriesFromXml(await fetchXml(url));

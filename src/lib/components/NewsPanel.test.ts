@@ -55,6 +55,7 @@ describe("news panel contract", () => {
 		expect(source).not.toContain("🌍 Global");
 		expect(source).toContain("{region.label}");
 		expect(source).toContain("aria-pressed");
+		expect(source).toContain("news-sep");
 	});
 
 	it("notes fallback English headlines with sessions in-language", () => {
@@ -63,10 +64,10 @@ describe("news panel contract", () => {
 		expect(source).toContain("headlines in English; sessions run in");
 	});
 
-	it("notes translated regions as translated U.S. headlines", () => {
+	it("notes translated regions with the source edition", () => {
 		const source = panelSource();
 		expect(source).toContain("?.translate");
-		expect(source).toContain("Translated from U.S. headlines.");
+		expect(source).toContain("Translated from {activeRegion.label} headlines.");
 	});
 
 	it("lays cards out as a responsive grid", () => {

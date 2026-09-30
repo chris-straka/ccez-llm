@@ -28,6 +28,7 @@ either); everything else is theme tokens, never raw hex. -->
 	}
 
 	let { panel, picker, busy, actions }: Props = $props();
+	const activeRegion = $derived(panel.regions.find((r) => r.gl === panel.region));
 </script>
 
 <div class="news-panel" role="region" aria-label="{panel.langName} news">
@@ -42,7 +43,7 @@ either); everything else is theme tokens, never raw hex. -->
 			✕
 		</button>
 	</div>
-	{#if panel.fallback}
+	{#if panel.fallback && !activeRegion?.translate}
 		<p class="news-note">
 			No {panel.langName} edition yet — showing {panel.regions[0]?.label ??
 				"global"} headlines in English; sessions run in {panel.langName}.
@@ -50,7 +51,10 @@ either); everything else is theme tokens, never raw hex. -->
 	{/if}
 	{#if panel.regions.length > 1 && panel.status !== "unsupported" && panel.status !== "needs-shell"}
 		<div class="news-chips" role="group" aria-label="News region">
-			{#each panel.regions as region (region.gl)}
+			{#each panel.regions as region, i (region.gl)}
+				{#if i > 0 && !!region.translate !== !!panel.regions[i - 1]?.translate}
+					<span class="news-sep" aria-hidden="true"></span>
+				{/if}
 				<button
 					type="button"
 					class="news-chip"
@@ -63,8 +67,8 @@ either); everything else is theme tokens, never raw hex. -->
 			{/each}
 		</div>
 	{/if}
-	{#if panel.regions.find((r) => r.gl === panel.region)?.translate}
-		<p class="news-note">Translated from U.S. headlines.</p>
+	{#if activeRegion?.translate}
+		<p class="news-note">Translated from {activeRegion.label} headlines.</p>
 	{/if}
 	{#if panel.status === "loading"}
 		<p class="news-note">Fetching {panel.langName} headlines…</p>
@@ -211,6 +215,14 @@ either); everything else is theme tokens, never raw hex. -->
 		overflow-x: auto;
 		padding-bottom: 0.25rem;
 		scrollbar-width: thin;
+	}
+	.news-sep {
+		flex: 0 0 auto;
+		width: 1px;
+		align-self: stretch;
+		margin: 0.35rem 0.2rem;
+		background: #e5e5ea;
+		background: var(--line-soft);
 	}
 	.news-chip {
 		flex: 0 0 auto;

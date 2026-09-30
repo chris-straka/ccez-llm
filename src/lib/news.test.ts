@@ -12,6 +12,7 @@ import {
 	isNewsSupported,
 	jinaUrl,
 	loadNewsStories,
+	mergeNewsStories,
 	newsConversationInstruction,
 	newsErrorCopy,
 	newsRegionsFor,
@@ -93,27 +94,28 @@ describe("news feeds", () => {
 			expect(regions!.length).toBeGreaterThanOrEqual(1);
 			expect(isNewsFallback(code)).toBe(fallback.has(code));
 			if (fallback.has(code)) {
-				// English hl throughout; home-English editions gain a
-				// translated U.S. second chip, pure-U.S. ones stay single.
+				// English hl throughout (the merge has no single URL);
+				// home regions plus world chips, minus gls already native.
 				for (const region of regions!) {
+					if (region.merge) {
+						expect(newsRssUrl(code, region.gl)).toBeNull();
+						continue;
+					}
 					expect(newsRssUrl(code, region.gl)).toContain("hl=en");
 				}
-				const pureUs = new Set([
-					"da",
-					"hy",
-					"fa",
-					"is",
-					"yue",
-					"la",
-					"grc",
-					"non",
-					"sux",
-					"akk"
-				]);
-				expect(regions!.length).toBe(pureUs.has(code) ? 1 : 2);
+				const home = NEWS_FEEDS[code]!.regions;
+				const native = home.length;
+				const world = ["US", "GB", "SG", "GBL"].filter(
+					(gl) => !home.some((r) => r.gl === gl)
+				).length;
+				expect(regions!.length).toBe(native + world);
 			}
-			// Default region first, every region addressable.
+			// Default region first, every region addressable (merges fan out).
 			for (const region of regions!) {
+				if (region.merge) {
+					expect(newsRssUrl(code, region.gl)).toBeNull();
+					continue;
+				}
 				expect(newsRssUrl(code, region.gl)).toContain(`gl=${region.gl}`);
 			}
 		}
@@ -121,35 +123,98 @@ describe("news feeds", () => {
 		for (const code of Object.keys(NEWS_FEEDS)) {
 			expect(codes).toContain(code);
 		}
-		// Mainland China rides the Chinese feed past Taiwan.
+		// Mainland China rides the Chinese feed past Taiwan; native
+		// Singapore stands in for the Asia chip (no duplicate gl).
 		expect(newsRegionsFor("zh")!.map((r) => r.gl)).toEqual([
 			"TW",
 			"CN",
 			"HK",
 			"SG",
-			"US"
+			"US",
+			"GB",
+			"GBL"
 		]);
 	});
 
-	it("derives a translated U.S. region unless one is native", () => {
-		// French gains translated U.S. headlines, home edition first.
+	it("derives translated world regions unless one is native", () => {
+		// French gains U.S./Europe/Asia/Global chips, home edition first.
 		const fr = newsRegionsFor("fr")!;
-		expect(fr[fr.length - 1]).toEqual({
-			gl: "US",
-			label: "U.S.",
-			hl: "en-US",
-			translate: true
+		expect(fr.slice(-4).map((r) => r.gl)).toEqual(["US", "GB", "SG", "GBL"]);
+		expect(fr.slice(-4).every((r) => r.translate)).toBe(true);
+		expect(fr.at(-1)).toMatchObject({
+			label: "Global",
+			merge: [
+				{ hl: "en-US", gl: "US" },
+				{ hl: "en-GB", gl: "GB" },
+				{ hl: "en-SG", gl: "SG" }
+			]
 		});
 		expect(newsRssUrl("fr", "US")).toContain("hl=en-US&gl=US");
-		// Spanish and pure-U.S. fallbacks keep their native single US.
-		for (const code of ["es", "da", "la"]) {
-			const regions = newsRegionsFor(code)!;
-			expect(regions.filter((r) => r.gl === "US")).toHaveLength(1);
-			expect(regions.some((r) => r.translate)).toBe(false);
-		}
-		// Home-English fallbacks gain a translated second chip.
-		expect(newsRegionsFor("ur")!.map((r) => r.gl)).toEqual(["PK", "US"]);
-		expect(newsRegionsFor("ang")!.map((r) => r.gl)).toEqual(["GB", "US"]);
+		expect(newsRssUrl("fr", "GB")).toContain("hl=en-GB&gl=GB");
+		expect(newsRssUrl("fr", "GBL")).toBeNull();
+		// Spanish keeps its native US, gains the other three translated.
+		const es = newsRegionsFor("es")!;
+		expect(es.filter((r) => r.gl === "US")).toHaveLength(1);
+		expect(es.find((r) => r.gl === "US")?.translate).toBeUndefined();
+		expect(es.slice(-3).map((r) => r.gl)).toEqual(["GB", "SG", "GBL"]);
+		// Pure-U.S. fallbacks: native US first, three translated chips.
+		expect(newsRegionsFor("da")!.map((r) => r.gl)).toEqual([
+			"US",
+			"GB",
+			"SG",
+			"GBL"
+		]);
+		// Home-English fallbacks gain the world row (ang's native GB
+		// stands in for Europe).
+		expect(newsRegionsFor("ur")!.map((r) => r.gl)).toEqual([
+			"PK",
+			"US",
+			"GB",
+			"SG",
+			"GBL"
+		]);
+		expect(newsRegionsFor("ang")!.map((r) => r.gl)).toEqual([
+			"GB",
+			"US",
+			"SG",
+			"GBL"
+		]);
+	});
+
+	it("merges editions round-robin, deduped and capped", () => {
+		const story = (title: string) => ({
+			title,
+			source: "S",
+			link: `https://${title}`,
+			snippet: ""
+		});
+		const merged = mergeNewsStories(
+			[[story("A"), story("B")], [story("C"), story("a!")], [story("D")]],
+			10
+		);
+		// US, Europe, Asia, US, … — the case/punct twin of A drops out.
+		expect(merged.map((s) => s.title)).toEqual(["A", "C", "D", "B"]);
+		expect(
+			mergeNewsStories([[story("A")], [story("B")]], 1).map((s) => s.title)
+		).toEqual(["A"]);
+		expect(mergeNewsStories([])).toEqual([]);
+	});
+
+	it("fans Global loads out across the three editions", async () => {
+		const seen: string[] = [];
+		const xml = (title: string) =>
+			`<?xml version="1.0"?><rss><channel><item><title>${title} - S</title><link>https://${title}</link></item></channel></rss>`;
+		const stories = await loadNewsStories("fr", "GBL", async (url) => {
+			seen.push(url);
+			if (url.includes("gl=US")) return xml("Us");
+			if (url.includes("gl=GB")) return xml("Eu");
+			return xml("As");
+		});
+		expect(seen).toHaveLength(3);
+		expect(stories.map((s) => s.title)).toEqual(["Us", "Eu", "As"]);
+		await expect(loadNewsStories("xx", "US", async () => "")).rejects.toThrow(
+			"news-unsupported"
+		);
 	});
 
 	it("parses numbered translation lines, count-exact", () => {
