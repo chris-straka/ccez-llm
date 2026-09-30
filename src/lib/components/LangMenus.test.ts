@@ -89,4 +89,15 @@ describe("language menus contract", () => {
 		expect(css).toContain(":global(.empty-state) .lang-menus");
 		expect(css).toContain(":global(main.empty) .lang-menus");
 	});
+
+	it("fixes the badge metric box so fallback glyphs can't stretch it", () => {
+		// Cuneiform badges (sux/akk) render in a fallback font with
+		// taller metrics than flag emoji: the box must fix its own
+		// line box and clip, never follow the glyph.
+		const css = componentStyle();
+		const badge = css.match(/\.badge\s*\{([^}]*)\}/)?.[1] ?? "";
+		expect(badge).toContain("line-height:");
+		expect(badge).toContain("overflow:");
+		expect(badge).toContain("vertical-align:");
+	});
 });

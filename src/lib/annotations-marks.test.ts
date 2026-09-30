@@ -289,6 +289,33 @@ describe("applyMarks badges over reading overlays", () => {
 		).toBe(false);
 	});
 
+	it("lets the quote direction overrule the paragraph", () => {
+		// Arabic quote inside an LTR paragraph still mirrors; a
+		// Latin quote inside an RTL paragraph stays unmirrored.
+		const mixed = document.createElement("div");
+		mixed.innerHTML = '<p dir="ltr">say اليوم today</p>';
+		applyMarks(
+			mixed,
+			[{ id: "a1" as AnnotationId, number: 1, quote: "اليوم" }],
+			false,
+			null
+		);
+		expect(
+			mixed.querySelector("[data-ann-badge]")?.classList.contains("rtl")
+		).toBe(true);
+		const mixedRtl = document.createElement("div");
+		mixedRtl.innerHTML = '<p dir="rtl">قال hello اليوم</p>';
+		applyMarks(
+			mixedRtl,
+			[{ id: "a1" as AnnotationId, number: 1, quote: "hello" }],
+			false,
+			null
+		);
+		expect(
+			mixedRtl.querySelector("[data-ann-badge]")?.classList.contains("rtl")
+		).toBe(false);
+	});
+
 	it("parks a lone word in its neighboring gap", () => {
 		const root = rootWith("say hello world today");
 		applyMarks(

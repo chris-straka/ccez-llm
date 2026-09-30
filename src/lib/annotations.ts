@@ -1543,14 +1543,23 @@ function paintWashHighlight(
  * Mirror the badge for right-to-left quotes: the tail leans down-left
  * toward the quote in LTR, so RTL quotes get the mirrored geometry
  * (badge past the visual quote end, tail pointing back at it).
- * Resolved from the nearest explicit dir, else the computed
- * direction (dir=auto paragraphs resolve per content). Toggle, never
- * add-only, so reused buttons unmirror. Never throws.
+ * Resolved from the quote's first strong character first, else the
+ * nearest explicit dir, else the computed direction (dir=auto
+ * paragraphs resolve per content). Toggle, never add-only, so
+ * reused buttons unmirror. Never throws.
  */
 function mirrorBadgeForDirection(
 	badge: HTMLButtonElement,
-	anchor: HTMLElement
+	anchor: HTMLElement,
+	quote?: string
 ): void {
+	if (quote !== undefined) {
+		const directed = quoteDirection(quote);
+		if (directed !== null) {
+			badge.classList.toggle("rtl", directed === "rtl");
+			return;
+		}
+	}
 	let rtl = false;
 	try {
 		const explicit = anchor.closest("[dir]")?.getAttribute("dir");
@@ -1668,7 +1677,7 @@ function stampBadges(
 		const face = badgeFace(item);
 		badge.textContent = face.text;
 		badge.title = face.title;
-		mirrorBadgeForDirection(badge, anchor);
+		mirrorBadgeForDirection(badge, anchor, item.quote);
 		anchor.append(badge);
 	}
 }
@@ -1812,7 +1821,7 @@ function stampLegacy(
 		const face = badgeFace(item);
 		badge.textContent = face.text;
 		badge.title = face.title;
-		mirrorBadgeForDirection(badge, anchor);
+		mirrorBadgeForDirection(badge, anchor, item.quote);
 		anchor.append(badge);
 	}
 	if (fading) wrapLeaving(root, items, fading);
@@ -1850,6 +1859,22 @@ const RTL_QUOTE_RE =
 	/[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/u;
 export function hasRtlQuote(quote: string): boolean {
 	return RTL_QUOTE_RE.test(quote);
+}
+
+const LTR_LETTER_RE = /\p{L}/u;
+/**
+ * Quote direction from its first strong character: an Arabic
+ * quote mirrors its badge even inside an LTR paragraph, and a
+ * Latin quote inside an RTL paragraph stays unmirrored.
+ * Neutral-only quotes (digits, punctuation) return null for the
+ * paragraph fallback. Pure.
+ */
+export function quoteDirection(quote: string): "rtl" | "ltr" | null {
+	for (const ch of quote) {
+		if (RTL_QUOTE_RE.test(ch)) return "rtl";
+		if (LTR_LETTER_RE.test(ch)) return "ltr";
+	}
+	return null;
 }
 
 function stampMarks(

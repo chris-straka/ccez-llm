@@ -129,6 +129,7 @@ blur-save fires first and Cancel/Delete can never win the race. -->
 >
 	<textarea
 		rows={1}
+		dir="auto"
 		bind:this={box}
 		bind:value={draft}
 		aria-label="Annotation text. Enter or clicking away saves, Escape cancels."

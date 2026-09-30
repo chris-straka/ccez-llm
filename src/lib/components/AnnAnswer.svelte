@@ -33,7 +33,7 @@ badge's plus/minus. -->
 	Rewording is the E key while the card is open; prompt approval
 	is the badge's plus/minus. Both live outside so the answer
 	reads edge to edge. -->
-	<p class="ann-answer-text">{answer}</p>
+	<p class="ann-answer-text" dir="auto">{answer}</p>
 </div>
 
 <style>

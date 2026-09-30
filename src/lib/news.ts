@@ -33,8 +33,8 @@ export interface NewsRegion {
  * Feed config for one app language: `hl` plus editions, default
  * first. `fallback` marks a language with no edition of its own —
  * a home-country English edition where one exists (ur → Pakistani
- * English), else US English. Headlines read in English, sessions
- * run in the learner's language (the panel says so).
+ * English), else US English. Fallback headlines translate into the
+ * learner's language (the model key gates it); sessions run there too.
  */
 export interface NewsFeed {
 	hl: string;
@@ -287,7 +287,11 @@ export function newsRegionsFor(code: string): NewsRegion[] | null {
 	if (!feed) return null;
 	const have = new Set(feed.regions.map((r) => r.gl));
 	return [
-		...feed.regions,
+		// Fallback editions read English, so their headlines always
+		// translate into the learner's language (never English).
+		...feed.regions.map((r) =>
+			feed.fallback ? { ...r, translate: true as const } : r
+		),
 		...WORLD_REGIONS.filter((r) => !have.has(r.gl)).map((r) =>
 			r.merge ? { ...r, merge: r.merge.filter((t) => t.lang !== code) } : r
 		)
@@ -642,10 +646,11 @@ export async function resolveStoryImage(
 }
 
 /**
- * Article body for a story link. Jina first (clean markdown, used
- * raw); direct fetch plus HTML cleaning when Jina fails or comes
- * back a stub. Throws NewsArticleError when both legs fail.
- * Transport is injected; cleaning decisions are pure below.
+ * Article body for a story link. Direct fetch plus HTML cleaning
+ * first (static HTML beats reader chrome); reader-rendered
+ * markdown second (JS shells and bot walls need it). Throws
+ * NewsArticleError when both legs fail. Transport is injected;
+ * cleaning decisions are pure below.
  */
 const ARTICLE_DROP =
 	"script, style, noscript, template, header, nav, footer, aside, form, dialog, menu, " +

@@ -274,6 +274,9 @@ owns the row markup and its surfaces. -->
 		min-width: 2rem;
 		text-align: center;
 		font-size: 0.7rem;
+		line-height: 1;
+		overflow: hidden;
+		vertical-align: middle;
 		font-weight: 700;
 		letter-spacing: 0.04em;
 		color: #3a3a3c;

@@ -85,10 +85,13 @@ describe("news panel contract", () => {
 		expect(source).toContain(".news-chip.icon");
 	});
 
-	it("notes fallback English headlines with sessions in-language", () => {
+	it("never shows fallback headlines in English", () => {
+		// Fallback editions translate into the learner's language
+		// (their regions carry translate), so no English note exists;
+		// the translated-from line attributes the source instead.
 		const source = panelSource();
-		expect(source).toContain("panel.fallback");
-		expect(source).toContain("headlines in English; sessions run in");
+		expect(source).not.toContain("headlines in English");
+		expect(source).toContain("Translated from {activeRegion.label} headlines.");
 	});
 
 	it("notes translated regions with the source edition", () => {

@@ -51,12 +51,6 @@ either); everything else is theme tokens, never raw hex. -->
 			✕
 		</button>
 	</div>
-	{#if panel.fallback && !activeRegion?.translate}
-		<p class="news-note">
-			No {panel.langName} edition yet — showing {panel.regions[0]?.label ??
-				"global"} headlines in English; sessions run in {panel.langName}.
-		</p>
-	{/if}
 	{#if panel.regions.length > 1 && panel.status !== "unsupported" && panel.status !== "needs-shell"}
 		<div class="news-chips" role="group" aria-label="News region">
 			{#each panel.regions as region, i (region.gl)}

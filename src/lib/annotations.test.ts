@@ -46,6 +46,7 @@ import {
 	paragraphForQuote,
 	badgeAnswerClass,
 	badgeFace,
+	quoteDirection,
 	clampMenuDrag,
 	menuBtnTouchAction,
 	selMenuDragTarget,
@@ -903,6 +904,19 @@ describe("reviewEditKey", () => {
 		expect(reviewEditKey("Enter", true)).toBeNull();
 		expect(reviewEditKey("Escape", false)).toBe("cancel");
 		expect(reviewEditKey("a", false)).toBeNull();
+	});
+});
+
+describe("quoteDirection", () => {
+	it("reads the first strong character, not the paragraph", () => {
+		expect(quoteDirection("اليوم")).toBe("rtl");
+		expect(quoteDirection("hello")).toBe("ltr");
+		expect(quoteDirection("«اليوم»")).toBe("rtl");
+		expect(quoteDirection("…hello")).toBe("ltr");
+		expect(quoteDirection("abc عربي")).toBe("ltr");
+		expect(quoteDirection("عربي abc")).toBe("rtl");
+		expect(quoteDirection("123?!")).toBeNull();
+		expect(quoteDirection("")).toBeNull();
 	});
 });
 

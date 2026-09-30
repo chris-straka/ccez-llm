@@ -607,6 +607,16 @@ describe("splicePastedFolds", () => {
 		}
 	});
 
+	it("keeps a bracketed paste region whole under one fold", () => {
+		// News launches bracket the article as a paste region: the
+		// brackets ride into storage and the fold spans them.
+		const prose = `${PASTE_OPEN}BBB${PASTE_CLOSE}`;
+		const doc = `intro ${pastedTextMarker(prose.length)} end`;
+		const { text, folds } = splicePastedFolds(doc, [prose]);
+		expect(text).toBe(`intro ${prose} end`);
+		expect(folds).toEqual([{ start: 6, end: 6 + prose.length, chars: prose.length }]);
+	});
+
 	it("leaves textless tags literal with no fold and ignores tagless docs", () => {
 		expect(splicePastedFolds(`a ${pastedTextMarker(3)}`, [])).toEqual({
 			text: `a ${pastedTextMarker(3)}`,

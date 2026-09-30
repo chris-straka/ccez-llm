@@ -152,6 +152,16 @@ describe("news feeds", () => {
 		]);
 	});
 
+	it("translates fallback natives so headlines never show English", () => {
+		// Old Norse reads a US English edition: its default region
+		// must translate, while native editions (fr) stay as-is.
+		const non = newsRegionsFor("non")!;
+		expect(non[0]?.gl).toBe("US");
+		expect(non[0]?.translate).toBe(true);
+		const fr = newsRegionsFor("fr")!;
+		expect(fr[0]?.translate).toBeFalsy();
+	});
+
 	it("derives translated world regions unless one is native", () => {
 		// French gains the world row minus Canada (native French
 		// Canada stands in), home edition first.

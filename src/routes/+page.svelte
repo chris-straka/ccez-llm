@@ -194,6 +194,8 @@
 		countPasteSlots,
 		isPastedTextAttachment,
 		makePastedTextAttachment,
+		PASTE_CLOSE,
+		PASTE_OPEN,
 		pastedMarkerInsert,
 		pastedTextMarker,
 		pastedTextsAt,
@@ -9003,9 +9005,10 @@
 	/**
 	 * Story session launch: resolve + fetch the article, seed the
 	 * composer with the short opener plus the article as a pasted
-	 * attachment (spliced at send, folded back to a tag after), drop
-	 * the news panel, and send — the chat holds only the session.
-	 * Failures toast and stay in news mode to retry.
+	 * attachment (bracketed as a paste region, spliced at send,
+	 * folded back to a tag after), drop the news panel, and send —
+	 * the chat holds only the session. Failures toast and stay in
+	 * news mode to retry.
 	 */
 	async function launchNewsSession(
 		link: string,
@@ -9036,7 +9039,7 @@
 			);
 			// Closed or language-hopped mid-flight: don't seed a dead panel.
 			if (news?.code !== current.code) return;
-			const att = makePastedTextAttachment(text);
+			const att = makePastedTextAttachment(`${PASTE_OPEN}${text}${PASTE_CLOSE}`);
 			attachments = [att];
 			news = null;
 			newsPicker = null;
