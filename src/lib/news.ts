@@ -25,7 +25,7 @@ export interface NewsRegion {
 	label: string;
 	hl?: string;
 	translate?: true;
-	merge?: { url: string; source?: string }[];
+	merge?: { url: string; source?: string; lang?: string }[];
 }
 
 /**
@@ -207,8 +207,9 @@ export function isNewsFallback(code: string): boolean {
 
 /** Editions for a language, default first; null when unsupported. */
 /** A Google edition as a merge target (single-sourced URL shape). */
-const editionTarget = (hl: string, gl: string): { url: string } => ({
-	url: feedUrl(hl, gl)
+const editionTarget = (hl: string, gl: string): { url: string; lang: string } => ({
+	url: feedUrl(hl, gl),
+	lang: hl
 });
 
 /**
@@ -216,11 +217,13 @@ const editionTarget = (hl: string, gl: string): { url: string } => ({
  * feed, ordered Global, U.S., Canada, Europe, U.K., Asia,
  * Australia: Global mixes the BBC and Al Jazeera world desks
  * (Google has no true global edition, and these link straight to
- * articles — no redirect decoding); Europe mixes the British and
- * Irish editions; the rest read their country's English edition.
- * Appended after the native regions, skipping any `gl` the feed
- * already carries natively (es-US, zh-SG, ang-GB, fr-CA — every
- * other `hl`+US request redirects home).
+ * articles — no redirect decoding); Europe mixes the French,
+ * German, Spanish, and Italian editions (minus the learner's own
+ * when it is one of the four — the home chips cover that); the
+ * rest read their country's English edition. Appended after the
+ * native regions, skipping any `gl` the feed already carries
+ * natively (es-US, zh-SG, ang-GB, fr-CA — every other `hl`+US
+ * request redirects home).
  */
 const WORLD_REGIONS: NewsRegion[] = [
 	{
@@ -238,7 +241,7 @@ const WORLD_REGIONS: NewsRegion[] = [
 		gl: "EUR",
 		label: "Europe",
 		translate: true,
-		merge: [editionTarget("en-GB", "GB"), editionTarget("en-IE", "IE")]
+		merge: [editionTarget("fr", "FR"), editionTarget("de", "DE"), editionTarget("es", "ES"), editionTarget("it", "IT")]
 	},
 	{ gl: "GB", label: "U.K.", hl: "en-GB", translate: true },
 	{ gl: "SG", label: "Asia", hl: "en-SG", translate: true },
@@ -249,7 +252,12 @@ export function newsRegionsFor(code: string): NewsRegion[] | null {
 	const feed = NEWS_FEEDS[code];
 	if (!feed) return null;
 	const have = new Set(feed.regions.map((r) => r.gl));
-	return [...feed.regions, ...WORLD_REGIONS.filter((r) => !have.has(r.gl))];
+	return [
+		...feed.regions,
+		...WORLD_REGIONS.filter((r) => !have.has(r.gl)).map((r) =>
+			r.merge ? { ...r, merge: r.merge.filter((t) => t.lang !== code) } : r
+		)
+	];
 }
 
 /** Raw Top Stories URL for one edition. */
@@ -632,6 +640,10 @@ export async function decodeNewsLink(link: string): Promise<string> {
  * no one desk's agenda leads, deduped by normalized headline,
  * capped at single-feed depth. Pure.
  */
+function normTitle(title: string): string {
+	return title.toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
 export function mergeNewsStories(
 	feeds: NewsStory[][],
 	cap = MAX_FEED_ITEMS
@@ -643,7 +655,7 @@ export function mergeNewsStories(
 		for (const feed of feeds) {
 			const story = feed[i];
 			if (!story) continue;
-			const key = story.title.toLowerCase().replace(/[^a-z0-9]+/g, "");
+			const key = normTitle(story.title);
 			if (seen.has(key)) continue;
 			seen.add(key);
 			merged.push(story);
@@ -651,6 +663,26 @@ export function mergeNewsStories(
 		}
 	}
 	return merged;
+}
+
+/**
+ * Applies translated headlines (same order, exact count — the
+ * translator throws otherwise) and drops stories whose translated
+ * titles collide: a multilingual merge reads the same event two or
+ * three times, and the pre-translation dedupe can't see across
+ * languages. Keeps the first of each pair.
+ */
+export function withTranslatedTitles(stories: NewsStory[], translated: string[]): NewsStory[] {
+	const seen = new Set<string>();
+	const out: NewsStory[] = [];
+	for (let i = 0; i < stories.length; i++) {
+		const title = translated[i] ?? stories[i]!.title;
+		const key = normTitle(title);
+		if (seen.has(key)) continue;
+		seen.add(key);
+		out.push({ ...stories[i]!, title });
+	}
+	return out;
 }
 
 export async function loadNewsStories(

@@ -294,6 +294,7 @@
 		storeNewsImage,
 		storeNewsUrl,
 		translateNewsTitles,
+		withTranslatedTitles,
 		type CefrLevel,
 		type NewsKind,
 		type NewsPanelState,
@@ -8979,7 +8980,7 @@
 							await provider.chat([{ role: "user", content: prompt }], {})
 						).content
 				);
-				stories = stories.map((s, i) => ({ ...s, title: titles[i] ?? s.title }));
+				stories = withTranslatedTitles(stories, titles);
 			}
 			if (newsSeq !== seq || news?.code !== code || news?.region !== region) return;
 			news = { ...current, status: "ready", stories, error: "" };

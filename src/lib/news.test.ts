@@ -31,7 +31,8 @@ import {
 	storeNewsImage,
 	storeNewsUrl,
 	stripMarkdownMedia,
-	stripTags
+	stripTags,
+	withTranslatedTitles
 } from "./news";
 import { MAX_FEED_ITEMS } from "./tools";
 import {
@@ -172,14 +173,28 @@ describe("news feeds", () => {
 				}
 			]
 		});
-		// Europe mixes Britain and Ireland; the U.K. reads Britain alone.
+		// Europe mixes the continental four except the learner's own
+		// (fr drops the French feed); the U.K. reads Britain alone.
 		expect(fr.find((r) => r.gl === "EUR")).toMatchObject({
 			label: "Europe",
 			merge: [
-				{ url: "https://news.google.com/rss?hl=en-GB&gl=GB&ceid=GB:en-GB" },
-				{ url: "https://news.google.com/rss?hl=en-IE&gl=IE&ceid=IE:en-IE" }
+				{
+					url: "https://news.google.com/rss?hl=de&gl=DE&ceid=DE:de",
+					lang: "de"
+				},
+				{
+					url: "https://news.google.com/rss?hl=es&gl=ES&ceid=ES:es",
+					lang: "es"
+				},
+				{
+					url: "https://news.google.com/rss?hl=it&gl=IT&ceid=IT:it",
+					lang: "it"
+				}
 			]
 		});
+		expect(newsRegionsFor("da")!.find((r) => r.gl === "EUR")?.merge).toHaveLength(
+			4
+		);
 		expect(fr.find((r) => r.gl === "GB")).toMatchObject({
 			label: "U.K.",
 			hl: "en-GB"
@@ -276,18 +291,47 @@ describe("news feeds", () => {
 		);
 	});
 
-	it("fans Europe loads out across Britain and Ireland", async () => {
+	it("fans Europe loads out across the continent, minus home", async () => {
 		const seen: string[] = [];
 		const xml = (title: string) =>
 			`<?xml version="1.0"?><rss><channel><item><title>${title}</title><link>https://desk/${title}</link></item></channel></rss>`;
-		const stories = await loadNewsStories("es", "EUR", async (url) => {
+		const feed = async (url: string) => {
 			seen.push(url);
-			if (url.includes("gl=GB")) return xml("Brit");
-			if (url.includes("gl=IE")) return xml("Ire");
+			const gl = new URL(url).searchParams.get("gl");
+			if (gl === "FR" || gl === "DE" || gl === "ES" || gl === "IT")
+				return xml(gl);
 			throw new Error(`unexpected feed ${url}`);
+		};
+		const stories = await loadNewsStories("da", "EUR", feed);
+		expect(seen).toHaveLength(4);
+		expect(stories.map((s) => s.title)).toEqual(["FR", "DE", "ES", "IT"]);
+		seen.length = 0;
+		await loadNewsStories("es", "EUR", feed);
+		expect(seen).toHaveLength(3);
+		expect(seen.some((u) => u.includes("gl=ES"))).toBe(false);
+	});
+
+	it("applies translated titles, dropping cross-language dupes", () => {
+		const story = (title: string) => ({
+			title,
+			link: `https://x/${title}`,
+			source: "s",
+			snippet: ""
 		});
-		expect(seen).toHaveLength(2);
-		expect(stories.map((s) => s.title)).toEqual(["Brit", "Ire"]);
+		const stories = [story("Un"), story("Deux"), story("Trois")];
+		expect(
+			withTranslatedTitles(stories, ["One", "Two", "Three"]).map((s) => s.title)
+		).toEqual(["One", "Two", "Three"]);
+		// Same event in two languages collapses to the first telling.
+		expect(
+			withTranslatedTitles(stories, ["One", "one!", "Three"]).map((s) => s.title)
+		).toEqual(["One", "Three"]);
+		// A short list keeps the original rather than blanking a card.
+		expect(withTranslatedTitles(stories, ["One"]).map((s) => s.title)).toEqual([
+			"One",
+			"Deux",
+			"Trois"
+		]);
 	});
 
 	it("parses numbered translation lines, count-exact", () => {
