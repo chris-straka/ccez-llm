@@ -283,6 +283,7 @@
 		cachedNewsImage,
 		cachedNewsUrl,
 		createRateGate,
+		JINA_QUOTA_COOLDOWN_MS,
 		decodeNewsLink,
 		fetchRawPage,
 		isNewsFallback,
@@ -2203,6 +2204,9 @@
 	const newsImageSession = new SvelteMap<string, string | null>();
 	/** One reader quota shared by every image worker (20/min keyless). */
 	const newsJinaGate = createRateGate(3000);
+	/** Quota-breaker deadline: a Jina 429 parks image reader legs
+	 * until this timestamp (epoch ms) instead of burning quota. */
+	let jinaQuotaUntil = 0;
 	function toggleLangMenu(id: LanguageMenu["id"], btn: HTMLElement): void {
 		// Family open/close ticks on phones (buzzTap self-gates to
 		// Android and honors the haptics toggle).
@@ -9068,22 +9072,32 @@
 		const runOne = async (): Promise<void> => {
 			const next = queue.shift();
 			if (!next) return;
-			if (fresh()) {
-				// Complete results cache even when stale — only the UI
-				// write is freshness-guarded, so hops never waste fetches.
-				const { found, complete } = await resolveStoryImage(next.link, {
-					decode: decodeNewsLink,
-					fetchPage: fetchRawPage,
-					gateJina: newsJinaGate,
-					fresh,
-					cachedUrl: (link) => cachedNewsUrl(localStorage, link),
-					storeUrl: (link, url) => storeNewsUrl(localStorage, link, url)
-				});
-				if (complete) {
-					newsImageSession.set(next.link, found);
-					if (found) storeNewsImage(localStorage, next.link, found);
-					if (fresh()) newsImages = { ...newsImages, [next.link]: found };
+			try {
+				if (fresh()) {
+					// Complete results cache even when stale — only the UI
+					// write is freshness-guarded, so hops never waste fetches.
+					const { found, complete } = await resolveStoryImage(next.link, {
+						decode: decodeNewsLink,
+						fetchPage: fetchRawPage,
+						gateJina: newsJinaGate,
+						fresh,
+						cachedUrl: (link) => cachedNewsUrl(localStorage, link),
+						storeUrl: (link, url) => storeNewsUrl(localStorage, link, url),
+						jinaQuotaBlown: () => Date.now() < jinaQuotaUntil,
+						flagJinaQuota: () => {
+							jinaQuotaUntil = Date.now() + JINA_QUOTA_COOLDOWN_MS;
+						}
+					});
+					if (complete) {
+						newsImageSession.set(next.link, found);
+						if (found) storeNewsImage(localStorage, next.link, found);
+						if (fresh()) newsImages = { ...newsImages, [next.link]: found };
+					}
 				}
+			} catch {
+				// resolveStoryImage never throws by contract; a store or
+				// session surprise must not kill this worker — the story
+				// stays unresolved and retries next open.
 			}
 			await runOne();
 		};

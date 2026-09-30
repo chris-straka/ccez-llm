@@ -595,34 +595,52 @@ export interface StoryImageDeps {
 	fresh: () => boolean;
 	cachedUrl: (link: string) => string | null;
 	storeUrl: (link: string, url: string) => void;
+	/** Quota breaker: skip the reader leg while blown. */
+	jinaQuotaBlown: () => boolean;
+	flagJinaQuota: () => void;
+}
+
+/** Cooldown after a Jina 429 before images try the reader leg again. */
+export const JINA_QUOTA_COOLDOWN_MS = 90_000;
+
+/** True when the failure is Jina quota (HTTP 429). Pure. */
+function isJinaQuota(error: unknown): boolean {
+	const message = error instanceof Error ? error.message : "";
+	return /bad-status:429/.test(message);
 }
 
 /**
- * Whether a reader-leg failure settles the story to a miss. A
- * standing wall (any status but quota) will never clear, so the
- * card should fall back now; quota, transport, and encoding blips
- * stay pending and retry next open. Bare `bad-status` (old
- * shells) reads transient. Pure.
+ * Whether a reader-leg failure settles the story to a miss. Any
+ * status settles (walls never clear; quota settles too — the
+ * breaker stops the burn and next launch retries with fresh
+ * quota); transport and encoding blips stay pending and retry
+ * next open. Bare `bad-status` (old shells) reads transient. Pure.
  */
 export function imageMissSettles(error: unknown): boolean {
 	const message = error instanceof Error ? error.message : "";
-	const code = /bad-status:(\d{3})/.exec(message)?.[1];
-	return code !== undefined && code !== "429";
+	return /bad-status:(\d{3})/.test(message);
 }
 
 /**
  * One story's preview image: direct og:image first, the gated
  * reader leg second. `complete` is false when a leg threw
  * transiently or the region went stale mid-flight — the caller
- * must not cache those as misses; a standing reader wall settles
- * instead (see imageMissSettles).
+ * must not cache those as misses; walls, quota, and undecodable
+ * links settle instead (see imageMissSettles).
  */
 export async function resolveStoryImage(
 	link: string,
 	deps: StoryImageDeps
 ): Promise<{ found: string | null; complete: boolean }> {
+	let url: string;
 	try {
-		const url = deps.cachedUrl(link) ?? (await deps.decode(link));
+		url = deps.cachedUrl(link) ?? (await deps.decode(link));
+	} catch {
+		// Undecodable links can never resolve an image (no URL to
+		// fetch): settle to the letter tile, don't skeleton forever.
+		return { found: null, complete: true };
+	}
+	try {
 		deps.storeUrl(link, url);
 		let found: string | null = null;
 		try {
@@ -632,11 +650,15 @@ export async function resolveStoryImage(
 		}
 		if (found) return { found, complete: true };
 		if (!deps.fresh()) return { found: null, complete: false };
+		// Blown quota: skip the doomed reader leg (no gate wait,
+		// no burn) and settle — next launch retries fresh.
+		if (deps.jinaQuotaBlown()) return { found: null, complete: true };
 		await deps.gateJina();
 		if (!deps.fresh()) return { found: null, complete: false };
 		try {
 			found = contentImageFromMarkdown(await deps.fetchPage(jinaUrl(url)));
 		} catch (error) {
+			if (isJinaQuota(error)) deps.flagJinaQuota();
 			return { found: null, complete: imageMissSettles(error) };
 		}
 		return { found, complete: true };

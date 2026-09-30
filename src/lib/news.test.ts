@@ -911,13 +911,20 @@ describe("article resolution", () => {
 		const og = '<meta property="og:image" content="https://img/a.jpg"/>';
 		const html = (head: string) =>
 			`<!doctype html><html><head>${head}</head><body><p>Body</p></body></html>`;
-		const deps = (fetchPage: (url: string) => Promise<string>, fresh = true) => ({
+		const deps = (
+			fetchPage: (url: string) => Promise<string>,
+			fresh = true,
+			over: Record<string, unknown> = {}
+		) => ({
 			decode: async () => "https://outlet.test/s",
 			fetchPage,
 			gateJina: async () => {},
 			fresh: () => fresh,
 			cachedUrl: () => null,
-			storeUrl: () => {}
+			storeUrl: () => {},
+			jinaQuotaBlown: () => false,
+			flagJinaQuota: () => {},
+			...over
 		});
 		// Direct hit: reader leg never runs.
 		let jina = 0;
@@ -957,14 +964,53 @@ describe("article resolution", () => {
 			found: null,
 			complete: false
 		});
-		// Quota blips retry; a standing reader wall settles now.
-		const quota = deps(async (url) => {
-			if (url.includes("r.jina.ai")) throw new Error("bad-status:429");
-			return html("");
-		});
+		// Quota settles to the letter tile (retrying every open
+		// skeletons the card forever and hammers a blown quota);
+		// a standing reader wall settles now.
+		let flagged = 0;
+		const quota = deps(
+			async (url) => {
+				if (url.includes("r.jina.ai")) throw new Error("bad-status:429");
+				return html("");
+			},
+			true,
+			{ flagJinaQuota: () => void flagged++ }
+		);
 		expect(await resolveStoryImage("https://g", quota)).toEqual({
 			found: null,
-			complete: false
+			complete: true
+		});
+		expect(flagged).toBe(1);
+		// Blown quota skips the reader leg entirely: no gate wait,
+		// no fetch burn, straight to the settled letter.
+		let jinaBurned = 0;
+		let gatedQuota = 0;
+		const blown = deps(
+			async (url) => {
+				if (url.includes("r.jina.ai")) jinaBurned++;
+				return html("");
+			},
+			true,
+			{
+				jinaQuotaBlown: () => true,
+				gateJina: async () => void gatedQuota++
+			}
+		);
+		expect(await resolveStoryImage("https://g", blown)).toEqual({
+			found: null,
+			complete: true
+		});
+		expect(jinaBurned).toBe(0);
+		expect(gatedQuota).toBe(0);
+		// Undecodable links settle too (no URL, no image possible).
+		const undecodable = deps(async () => html(""), true, {
+			decode: async () => {
+				throw new Error("news-decode-failed");
+			}
+		});
+		expect(await resolveStoryImage("https://g", undecodable)).toEqual({
+			found: null,
+			complete: true
 		});
 		const stood = deps(async (url) => {
 			if (url.includes("r.jina.ai")) throw new Error("bad-status:403");
