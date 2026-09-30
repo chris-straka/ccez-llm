@@ -2,7 +2,8 @@
 //! the chat `fetch_url` tool).
 //!
 //! Thin by design: GET with a timeout, a per-fetch cookie jar, and a
-//! byte cap, http/https only, no credentialed URLs. Returns the raw HTML (bounded); the frontend
+//! byte cap, http/https only, no credentialed URLs. Consent shells get
+//! one plain retry, legacy charsets transcode. Returns the raw HTML (bounded); the frontend
 //! cleans it to readable text, so the browser-preview fallback shares
 //! the cap and the copy. Compiled everywhere; only invoked from the
 //! shell (browser dev never reaches here).
@@ -67,16 +68,60 @@ fn impersonated_transport_code(error: &rquest::Error) -> String {
     .to_string()
 }
 
-/// Bytes kept to page text: a truncated head decodes lossily (the cut
-/// may split a char — a replacement mark beats an error when the head
-/// is otherwise readable), while a whole page keeps the strict decode
+/// `charset` out of a Content-Type header value (`text/html;
+/// charset=windows-1250`), quotes stripped. Pure.
+fn charset_from_content_type(value: &str) -> Option<&str> {
+    value.split(';').find_map(|part| {
+        let (name, label) = part.split_once('=')?;
+        if !name.trim().eq_ignore_ascii_case("charset") {
+            return None;
+        }
+        let label = label.trim().trim_matches('"').trim();
+        if label.is_empty() {
+            None
+        } else {
+            Some(label)
+        }
+    })
+}
+
+/// Bytes kept to page text: a declared legacy charset transcodes
+/// (Mafra serves windows-1250 — strict UTF-8 would fail real
+/// pages); otherwise a truncated head decodes lossily (the cut may
+/// split a char — a replacement mark beats an error when the head is
+/// otherwise readable), while a whole page keeps the strict decode
 /// (genuinely broken encodings still fail loudly). Pure.
-fn decode_head(taken: Vec<u8>, truncated: bool) -> Result<String, String> {
+fn decode_head(taken: Vec<u8>, truncated: bool, charset: Option<&str>) -> Result<String, String> {
+    if let Some(label) = charset {
+        let lower = label.trim().to_ascii_lowercase();
+        if lower != "utf-8" && lower != "utf8" {
+            if let Some(enc) = encoding_rs::Encoding::for_label(label.trim().as_bytes()) {
+                let (text, _, _) = enc.decode(&taken);
+                return Ok(text.into_owned());
+            }
+        }
+    }
     if truncated {
         Ok(String::from_utf8_lossy(&taken).into_owned())
     } else {
         String::from_utf8(taken).map_err(|_| "bad-encoding".into())
     }
+}
+
+/// Consent shell sniff: some consent walls (Seznam/Novinky) serve a
+/// shell page to browser fingerprints while plain clients get the
+/// article, so a consent-titled body is worth one plain retry. Title
+/// only — a miss just costs one extra fetch, never a wrong page.
+/// Pure.
+fn looks_like_consent_shell(html: &str) -> bool {
+    html.find("<title>")
+        .and_then(|i| {
+            html[i + 7..]
+                .find("</title>")
+                .map(|j| html[i + 7..i + 7 + j].to_ascii_lowercase())
+        })
+        .map(|t| t.contains("souhlas") || t.contains("consent"))
+        .unwrap_or(false)
 }
 
 /// Non-2xx status into its machine code. The code rides along
@@ -93,7 +138,7 @@ pub(crate) fn bad_status(code: u16) -> String {
 /// first bytes (the frontend cleans and caps the text anyway). The
 /// two fetch legs share everything below the client.
 macro_rules! capped_body {
-    ($res:expr, $code:ident) => {{
+    ($res:expr, $code:ident, $charset:expr) => {{
         let mut taken: Vec<u8> = Vec::new();
         let mut truncated = false;
         loop {
@@ -120,7 +165,7 @@ macro_rules! capped_body {
                 None => break,
             }
         }
-        decode_head(taken, truncated)
+        decode_head(taken, truncated, $charset)
     }};
 }
 
@@ -131,6 +176,41 @@ macro_rules! capped_body {
 /// live against Akamai-fronted outlets, where the Chrome profile
 /// still eats 403s), so WAF-fronted outlets answer the same reader
 /// they'd serve in a browser.
+/// One GET through a built rquest client: status gate, capped
+/// body, legacy charsets transcoded. The impersonated first try and
+/// the plain consent retry share it.
+#[cfg(not(target_os = "android"))]
+async fn send_capped(client: &rquest::Client, url: &str) -> Result<String, String> {
+    let mut res = client
+        .get(url)
+        .send()
+        .await
+        .map_err(|e| impersonated_transport_code(&e))?;
+    if !res.status().is_success() {
+        return Err(bad_status(res.status().as_u16()));
+    }
+    let charset = res
+        .headers()
+        .get(rquest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .and_then(charset_from_content_type)
+        .map(str::to_owned);
+    capped_body!(res, impersonated_transport_code, charset.as_deref())
+}
+
+/// Plain-client second try for consent shells (see
+/// `looks_like_consent_shell`). Whatever it returns stands — no
+/// third try.
+#[cfg(not(target_os = "android"))]
+async fn fetch_plain(url: &str) -> Result<String, String> {
+    let client = rquest::Client::builder()
+        .cookie_store(true)
+        .timeout(Duration::from_secs(FETCH_TIMEOUT_SECS))
+        .build()
+        .map_err(|_| "failed".to_string())?;
+    send_capped(&client, url).await
+}
+
 #[tauri::command]
 #[cfg(not(target_os = "android"))]
 pub async fn fetch_page(url: String) -> Result<String, String> {
@@ -143,15 +223,11 @@ pub async fn fetch_page(url: String) -> Result<String, String> {
         .timeout(Duration::from_secs(FETCH_TIMEOUT_SECS))
         .build()
         .map_err(|_| "failed".to_string())?;
-    let mut res = client
-        .get(url)
-        .send()
-        .await
-        .map_err(|e| impersonated_transport_code(&e))?;
-    if !res.status().is_success() {
-        return Err(bad_status(res.status().as_u16()));
+    let html = send_capped(&client, url).await?;
+    if looks_like_consent_shell(&html) {
+        return fetch_plain(url).await;
     }
-    capped_body!(res, impersonated_transport_code)
+    Ok(html)
 }
 
 /// Android leg of `fetch_page`: plain reqwest, no impersonation
@@ -177,7 +253,13 @@ pub async fn fetch_page(url: String) -> Result<String, String> {
     if !res.status().is_success() {
         return Err(bad_status(res.status().as_u16()));
     }
-    capped_body!(res, transport_code)
+    let charset = res
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .and_then(charset_from_content_type)
+        .map(str::to_owned);
+    capped_body!(res, transport_code, charset.as_deref())
 }
 
 #[cfg(test)]
@@ -217,14 +299,14 @@ mod tests {
         // Truncated mid-char (the head ends inside é): a lossy head
         // with a replacement mark, never an error.
         assert_eq!(
-            decode_head(vec![0x68, 0x69, 0xC3], true).unwrap(),
+            decode_head(vec![0x68, 0x69, 0xC3], true, None).unwrap(),
             "hi\u{FFFD}"
         );
         // Whole pages keep the strict decode: clean text passes,
         // broken encodings still fail loudly.
-        assert_eq!(decode_head(b"hi".to_vec(), false).unwrap(), "hi");
+        assert_eq!(decode_head(b"hi".to_vec(), false, None).unwrap(), "hi");
         assert_eq!(
-            decode_head(vec![0xFF], false).unwrap_err(),
+            decode_head(vec![0xFF], false, None).unwrap_err(),
             "bad-encoding"
         );
     }
@@ -250,7 +332,7 @@ mod tests {
         let mut res = ChunkStub {
             parts: parts.into(),
         };
-        tauri::async_runtime::block_on(async { capped_body!(res, stub_code) })
+        tauri::async_runtime::block_on(async { capped_body!(res, stub_code, None) })
     }
 
     /// Local cookie dance: `/` 307-loops through `/cb` (which sets
@@ -263,6 +345,8 @@ mod tests {
         use std::net::TcpListener;
 
         fn respond(mut stream: std::net::TcpStream, deadline: std::time::Instant) -> bool {
+            // Accepted sockets inherit nonblocking: restore blocking so reads wait for bytes.
+            let _ = stream.set_nonblocking(false);
             let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
             let mut raw = vec![0u8; 1024];
             let mut head = Vec::new();
@@ -337,6 +421,189 @@ mod tests {
         let out = tauri::async_runtime::block_on(fetch_page(format!("http://{addr}/")));
         let _ = server.join();
         assert_eq!(out.unwrap(), "danced");
+    }
+
+    #[test]
+    fn charset_from_content_type_reads_the_label() {
+        assert_eq!(
+            charset_from_content_type("text/html; charset=windows-1250"),
+            Some("windows-1250")
+        );
+        assert_eq!(
+            charset_from_content_type("text/html; charset=\"utf-8\""),
+            Some("utf-8")
+        );
+        assert_eq!(
+            charset_from_content_type("text/html; Charset=ISO-8859-2 "),
+            Some("ISO-8859-2")
+        );
+        assert_eq!(charset_from_content_type("text/html"), None);
+        assert_eq!(charset_from_content_type("text/html; charset="), None);
+    }
+
+    #[test]
+    fn decode_head_transcodes_declared_legacy_charsets() {
+        // windows-1250 "Příliš" is not valid UTF-8: the declared
+        // label transcodes it instead of failing.
+        let (bytes, _, _) = encoding_rs::WINDOWS_1250.encode("Příliš");
+        assert_eq!(
+            decode_head(bytes.into_owned(), false, Some("windows-1250")).unwrap(),
+            "Příliš"
+        );
+        // UTF-8 labels and unknown labels keep the strict path.
+        assert_eq!(
+            decode_head(vec![0xFF], false, Some("utf-8")).unwrap_err(),
+            "bad-encoding"
+        );
+        assert_eq!(
+            decode_head(vec![0xFF], false, Some("x-unknown")).unwrap_err(),
+            "bad-encoding"
+        );
+    }
+
+    #[test]
+    fn looks_like_consent_shell_reads_the_title() {
+        assert!(looks_like_consent_shell(
+            "<html><head><title>Nastavení souhlasu s personalizací</title></head></html>"
+        ));
+        assert!(looks_like_consent_shell(
+            "<title>Cookie consent settings</title>"
+        ));
+        assert!(!looks_like_consent_shell(
+            "<title>Minus 79 haléřů. Vláda oznámila</title>"
+        ));
+        assert!(!looks_like_consent_shell("<title></title>"));
+        assert!(!looks_like_consent_shell("no title here"));
+    }
+
+    /// Stub outlet for the fallback tests: `/consent` serves a
+    /// consent shell to browser fingerprints and the article
+    /// otherwise (the Seznam shape); `/win` serves windows-1250
+    /// bytes under a 1250 header (the Mafra shape). Loopback-only,
+    /// ephemeral port, no outside network.
+    fn spawn_outlet_stub() -> (std::net::SocketAddr, std::thread::JoinHandle<()>) {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+
+        const STUB: &str = "<html><head><title>Nastavení souhlasu s personalizací</title></head><body>wall</body></html>";
+        const ARTICLE: &str = "<html><head><title>Real story</title><meta property=\"og:image\" content=\"http://x/y.jpg\"></head><body>story</body></html>";
+
+        fn respond(mut stream: std::net::TcpStream, deadline: std::time::Instant) -> bool {
+            // Accepted sockets inherit nonblocking: restore blocking so reads wait for bytes.
+            let _ = stream.set_nonblocking(false);
+            let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
+            let mut raw = vec![0u8; 1024];
+            let mut head = Vec::new();
+            loop {
+                match stream.read(&mut raw) {
+                    Ok(0) => break,
+                    Ok(n) => {
+                        head.extend_from_slice(&raw[..n]);
+                        if head.windows(4).any(|w| w == b"\r\n\r\n") || head.len() > 8192 {
+                            break;
+                        }
+                    }
+                    Err(e)
+                        if matches!(
+                            e.kind(),
+                            std::io::ErrorKind::TimedOut | std::io::ErrorKind::Interrupted
+                        ) && std::time::Instant::now() < deadline =>
+                    {
+                        continue;
+                    }
+                    Err(_) => break,
+                }
+            }
+            let head = String::from_utf8_lossy(&head);
+            let lower = head.to_ascii_lowercase();
+            let target = head.lines().next().unwrap_or("");
+            let mut response = Vec::new();
+            let mut done = false;
+            if target.starts_with("GET /consent") {
+                let browser = lower.contains("safari") && lower.contains("version/");
+                let body = if browser { STUB } else { ARTICLE };
+                done = !browser;
+                response.extend_from_slice(
+                    format!(
+                        "HTTP/1.1 200 OK\r\ncontent-type: text/html; charset=utf-8\r\nconnection: close\r\ncontent-length: {}\r\n\r\n",
+                        body.len()
+                    )
+                    .as_bytes(),
+                );
+                response.extend_from_slice(body.as_bytes());
+            } else if target.starts_with("GET /win") {
+                let text =
+                    "<html><head><title>Kůň</title></head><body>Příliš žluťoučký kůň</body></html>";
+                let (body, _, _) = encoding_rs::WINDOWS_1250.encode(text);
+                done = true;
+                response.extend_from_slice(
+                    format!(
+                        "HTTP/1.1 200 OK\r\ncontent-type: text/html; charset=windows-1250\r\nconnection: close\r\ncontent-length: {}\r\n\r\n",
+                        body.len()
+                    )
+                    .as_bytes(),
+                );
+                response.extend_from_slice(&body);
+            } else {
+                response.extend_from_slice(
+                    b"HTTP/1.1 404 Not Found\r\nconnection: close\r\ncontent-length: 0\r\n\r\n",
+                );
+            }
+            let _ = stream.write_all(&response);
+            done
+        }
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let server = std::thread::spawn(move || {
+            let spawned = std::time::Instant::now();
+            let mut progress: Option<std::time::Instant> = None;
+            loop {
+                match listener.accept() {
+                    Ok((stream, _)) => {
+                        let deadline = std::time::Instant::now() + Duration::from_secs(15);
+                        progress = Some(deadline);
+                        if respond(stream, deadline) {
+                            break;
+                        }
+                    }
+                    Err(_) => {
+                        let now = std::time::Instant::now();
+                        let stalled = progress.map_or(false, |d| now > d);
+                        let never_started = now.duration_since(spawned) > Duration::from_secs(30);
+                        if stalled || never_started {
+                            break;
+                        }
+                        std::thread::sleep(Duration::from_millis(10));
+                    }
+                }
+            }
+        });
+        (addr, server)
+    }
+
+    #[test]
+    fn fetch_page_retries_consent_shells_plain() {
+        let (addr, server) = spawn_outlet_stub();
+        let out = tauri::async_runtime::block_on(fetch_page(format!("http://{addr}/consent")));
+        let _ = server.join();
+        let html = out.unwrap();
+        assert!(
+            html.contains("Real story"),
+            "stuck on the consent shell: {html}"
+        );
+    }
+
+    #[test]
+    fn fetch_page_transcodes_legacy_charsets() {
+        let (addr, server) = spawn_outlet_stub();
+        let out = tauri::async_runtime::block_on(fetch_page(format!("http://{addr}/win")));
+        let _ = server.join();
+        assert_eq!(
+            out.unwrap(),
+            "<html><head><title>Kůň</title></head><body>Příliš žluťoučký kůň</body></html>"
+        );
     }
 
     #[test]

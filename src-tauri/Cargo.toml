@@ -54,6 +54,7 @@ rustls = { version = "0.23", default-features = false, features = ["std", "ring"
 # webpki roots work on every target including Android (native-tls does
 # not). Version pins against the copy already in Cargo.lock.
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-webpki-roots", "cookies"] }
+encoding_rs = "0.8"
 # reqwest also serves the Google News decoder (news.rs) and the
 # Android fetch path, neither of which impersonates.
 

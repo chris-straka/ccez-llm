@@ -580,6 +580,7 @@ version = "0.6.55"
 dependencies = [
  "base64 0.22.1",
  "block2 0.6.2",
+ "encoding_rs",
  "jni 0.21.1",
  "keyring",
  "objc2 0.6.4",

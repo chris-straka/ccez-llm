@@ -443,7 +443,8 @@ either); everything else is theme tokens, never raw hex. -->
 	}
 	.news-open:hover .news-card-title,
 	.news-open:focus-visible .news-card-title {
-		text-decoration: underline;
+		color: #007aff;
+		color: var(--accent);
 	}
 	.news-hint {
 		position: absolute;
