@@ -11,20 +11,15 @@ pills become the top rail above the story cards. -->
 	interface Props {
 		mock: boolean;
 		newsMode: boolean;
-		/** No reply language yet: invite one for headlines. */
-		langHint: boolean;
 		children: Snippet;
 	}
 
-	let { mock, newsMode, langHint, children }: Props = $props();
+	let { mock, newsMode, children }: Props = $props();
 </script>
 
 <div class="empty-state" class:news-mode={newsMode}>
 	{#if !newsMode}
 		<h1 class="hero">What can I do for you?</h1>
-		{#if langHint}
-			<p class="lang-hint">Pick a language below for today's headlines.</p>
-		{/if}
 	{/if}
 	{#if mock}
 		<p class="mock-note"><strong>Mock provider active.</strong></p>
@@ -71,14 +66,5 @@ pills become the top rail above the story cards. -->
 		margin: 0;
 		color: #6e6e73;
 		font-size: 0.85rem;
-	}
-	.lang-hint {
-		margin: 0;
-		color: #6e6e73;
-		color: var(--muted);
-		font-size: 0.9rem;
-		user-select: none;
-		-webkit-user-select: none;
-		cursor: default;
 	}
 </style>
