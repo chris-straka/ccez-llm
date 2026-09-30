@@ -43,6 +43,15 @@ describe("news panel contract", () => {
 		expect(source).toContain("aria-expanded");
 		expect(source).toContain("news-hint");
 		expect(source).toContain('aria-label="Story options"');
+		expect(source).toContain("transition:slide");
+		// Hover affordances live on the button alone, so the underline
+		// and the pointer cursor never disagree.
+		expect(source).toContain(".news-open:hover .news-card-title");
+		expect(source).not.toContain(".news-card:hover .news-card-title");
+		// The hint overlays instead of reserving card space.
+		const css = source.split("<style>")[1] ?? "";
+		const hint = css.match(/\.news-hint\s*\{[^}]*\}/)?.[0] ?? "";
+		expect(hint).toContain("position: absolute");
 	});
 
 	it("menus launch icon-only at the selected level and length", () => {
@@ -79,6 +88,9 @@ describe("news panel contract", () => {
 		const source = panelSource();
 		expect(source).toContain("?.translate");
 		expect(source).toContain("Translated from {activeRegion.label} headlines.");
+		// Only once loaded — never over the loading crumbs.
+		expect(source).toContain('activeRegion?.translate && panel.status === "ready"');
+		expect(source).toContain("Translating headlines into");
 	});
 
 	it("lays cards out as a responsive grid", () => {
@@ -91,6 +103,7 @@ describe("news panel contract", () => {
 		const source = panelSource();
 		for (const status of [
 			'"loading"',
+			'"translating"',
 			'"error"',
 			'"unsupported"',
 			'"needs-shell"'

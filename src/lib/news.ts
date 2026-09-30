@@ -325,6 +325,7 @@ export type NewsKind = "talk" | "read";
 /** News panel fetch state. */
 export type NewsStatus =
 	| "loading"
+	| "translating"
 	| "ready"
 	| "error"
 	| "unsupported"

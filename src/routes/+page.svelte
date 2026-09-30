@@ -8909,6 +8909,8 @@
 			let stories = await loadNewsStories(code, region, fetchRawPage);
 			const target = newsRegionsFor(code)?.find((r) => r.gl === region);
 			if (target?.translate) {
+				if (newsSeq !== seq || news?.code !== code || news?.region !== region) return;
+				news = { ...current, status: "translating", stories: [], error: "" };
 				const provider = await resolveProviderActive();
 				if (!provider) throw new Error("news-translate");
 				const titles = await translateNewsTitles(

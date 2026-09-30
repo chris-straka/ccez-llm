@@ -4,6 +4,7 @@ picker, launch); this component owns the cards markup and their
 surfaces. Emoji buttons are the user's explicit call (no text on
 either); everything else is theme tokens, never raw hex. -->
 <script lang="ts">
+	import { slide } from "svelte/transition";
 	import {
 		CEFR_LEVELS,
 		SUMMARY_SIZES,
@@ -31,6 +32,9 @@ either); everything else is theme tokens, never raw hex. -->
 
 	let { panel, picker, busy, actions }: Props = $props();
 	const activeRegion = $derived(panel.regions.find((r) => r.gl === panel.region));
+	const reduceMotion =
+		typeof matchMedia !== "undefined" &&
+		matchMedia("(prefers-reduced-motion: reduce)").matches;
 </script>
 
 <div class="news-panel" role="region" aria-label="{panel.langName} news">
@@ -69,11 +73,13 @@ either); everything else is theme tokens, never raw hex. -->
 			{/each}
 		</div>
 	{/if}
-	{#if activeRegion?.translate}
+	{#if activeRegion?.translate && panel.status === "ready"}
 		<p class="news-note">Translated from {activeRegion.label} headlines.</p>
 	{/if}
 	{#if panel.status === "loading"}
 		<p class="news-note">Fetching {panel.langName} headlines…</p>
+	{:else if panel.status === "translating"}
+		<p class="news-note">Translating headlines into {panel.langName}…</p>
 	{:else if panel.status === "error"}
 		<p class="news-note" role="alert">{panel.error}</p>
 		<button type="button" class="news-retry" onclick={() => actions.retry()}>
@@ -116,7 +122,12 @@ either); everything else is theme tokens, never raw hex. -->
 						<span class="news-busy" role="status">Fetching the article…</span>
 					{/if}
 					{#if open && busy === null}
-						<div class="news-menu" role="group" aria-label="Story options">
+						<div
+							class="news-menu"
+							role="group"
+							aria-label="Story options"
+							transition:slide={{ duration: reduceMotion ? 0 : 180 }}
+						>
 							<div class="news-launch">
 								<button
 									type="button"
@@ -303,6 +314,7 @@ either); everything else is theme tokens, never raw hex. -->
 		color: var(--muted);
 	}
 	.news-open {
+		position: relative;
 		display: flex;
 		flex-direction: column;
 		align-items: flex-start;
@@ -323,17 +335,23 @@ either); everything else is theme tokens, never raw hex. -->
 		outline-color: var(--accent);
 		outline-offset: 2px;
 	}
-	.news-card:hover .news-card-title,
-	.news-card:focus-within .news-card-title {
+	.news-open:hover .news-card-title,
+	.news-open:focus-visible .news-card-title {
 		text-decoration: underline;
 	}
 	.news-hint {
+		position: absolute;
+		right: 0;
+		bottom: 0;
+		padding-left: 0.4rem;
+		background: #fff;
+		background: var(--bg-raised);
 		font-size: 0.85rem;
 		line-height: 1.4;
 		opacity: 0;
 	}
-	.news-card:hover .news-hint,
-	.news-card:focus-within .news-hint {
+	.news-open:hover .news-hint,
+	.news-open:focus-visible .news-hint {
 		opacity: 1;
 	}
 	.news-card.open .news-hint {
