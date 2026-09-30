@@ -9,6 +9,7 @@ import {
 	cachedArticle,
 	cachedNewsImage,
 	cachedNewsUrl,
+	extractArticleText,
 	fetchArticleText,
 	isNewsFallback,
 	isNewsSupported,
@@ -28,6 +29,7 @@ import {
 	storeArticle,
 	storeNewsImage,
 	storeNewsUrl,
+	stripMarkdownMedia,
 	stripTags
 } from "./news";
 import { MAX_FEED_ITEMS } from "./tools";
@@ -386,36 +388,37 @@ describe("session prompts", () => {
 describe("article fetch", () => {
 	const body = "x".repeat(500);
 
-	it("reads Jina markdown raw, no HTML pass", async () => {
+	it("extracts direct HTML first, no reader pass", async () => {
 		const seen: string[] = [];
 		const text = await fetchArticleText("https://outlet.test/a", async (url) => {
 			seen.push(url);
-			return `# Headline\n\n${body}`;
+			return `<html><body><nav>Home Politics Sport</nav><article><h1>Head</h1><p>${body}</p></article></body></html>`;
 		});
-		expect(seen).toEqual(["https://r.jina.ai/https://outlet.test/a"]);
-		expect(text.startsWith("# Headline")).toBe(true);
-	});
-
-	it("falls back to direct fetch plus cleaning on Jina failure", async () => {
-		const seen: string[] = [];
-		const text = await fetchArticleText("https://outlet.test/a", async (url) => {
-			seen.push(url);
-			if (url.includes("jina")) throw new Error("rate limited");
-			return `<html><body><article><p>${body}</p></article></body></html>`;
-		});
-		expect(seen).toEqual([
-			"https://r.jina.ai/https://outlet.test/a",
-			"https://outlet.test/a"
-		]);
+		expect(seen).toEqual(["https://outlet.test/a"]);
 		expect(text).toContain(body.slice(0, 20));
+		expect(text).not.toContain("Sport");
 	});
 
-	it("retries direct when Jina returns a stub, throws past both", async () => {
-		const direct = await fetchArticleText("https://outlet.test/a", async (url) => {
-			if (url.includes("jina")) return "consent stub";
-			return `<html><body><article><p>${body}</p></article></body></html>`;
+	it("falls back to reader markdown on direct failure or shells", async () => {
+		const seen: string[] = [];
+		const text = await fetchArticleText("https://outlet.test/a", async (url) => {
+			seen.push(url);
+			if (!url.includes("jina")) throw new Error("refused");
+			return `Title: Head\nURL Source: https://outlet.test/a\nMarkdown Content:\n# Head\n\n[Lede](${url}) ${body}`;
 		});
-		expect(direct.length).toBeGreaterThanOrEqual(400);
+		expect(seen).toEqual(["https://outlet.test/a", "https://r.jina.ai/https://outlet.test/a"]);
+		// Stripped to prose: no envelope, no URLs.
+		expect(text).not.toContain("URL Source");
+		expect(text).not.toContain("https://");
+		expect(text).toContain("Lede");
+	});
+
+	it("retries reader when direct returns a stub, throws past both", async () => {
+		const text = await fetchArticleText("https://outlet.test/a", async (url) => {
+			if (url.includes("jina")) return `# Head\n\n${body}`;
+			return "<html><body><div id='root'></div></body></html>";
+		});
+		expect(text.length).toBeGreaterThanOrEqual(400);
 		await expect(
 			fetchArticleText("https://outlet.test/a", async () => "stub")
 		).rejects.toMatchObject({ code: "unreadable" });
@@ -426,6 +429,35 @@ describe("article fetch", () => {
 				throw new Error("timeout");
 			})
 		).rejects.toThrow("timeout");
+	});
+
+	it("extracts article scope, dropping chrome and crumbs", () => {
+		const text = extractArticleText(`<html><body>
+			<header>Site name</header><nav><a>Home</a><a>Politics</a></nav>
+			<div class="cookie-wall">We value your privacy and use cookies to improve everything you see here daily.</div>
+			<article><h1>A real headline here</h1><p>${body}</p><p>Ok</p>
+			<aside>Related: other stories</aside></article>
+			<footer>Copyright 2026</footer></body></html>`);
+		expect(text).toContain(body.slice(0, 20));
+		expect(text).not.toContain("Politics");
+		expect(text).not.toContain("cookies");
+		expect(text).not.toContain("Related");
+		expect(text).not.toContain("Copyright");
+		// Main/body scope when no article; crumbs fall away.
+		expect(
+			extractArticleText(`<html><body><main><p>${body}</p><p>Hi</p></main></body></html>`)
+		).toContain(body.slice(0, 20));
+		expect(extractArticleText("<html><body><p>Hi</p></body></html>")).toBe("");
+		expect(extractArticleText("not html {{{")).toBe("");
+	});
+
+	it("strips reader markdown to prose without URLs", () => {
+		expect(
+			stripMarkdownMedia(
+				"Title: T\nMarkdown Content:\n![Photo of X](https://img/a.jpg)\n\nSee [the report](https://o/r) now.\n\n[ref]: https://o/ref\n\nText[1]."
+			)
+		).toBe("Photo of X\n\nSee the report now.\n\nText[1].");
+		expect(stripMarkdownMedia("![](https://img/a.jpg)\n\nBody here.")).toBe("Body here.");
 	});
 
 	it("builds Jina URLs by prefix", () => {
@@ -491,12 +523,13 @@ describe("article resolution", () => {
 		expect(first).toEqual({ url: "https://outlet.test/a", text: `# T\n\n${body}` });
 		expect(calls).toEqual([
 			"decode:https://news.google.com/rss/articles/AAA",
+			"fetch:https://outlet.test/a",
 			"fetch:https://r.jina.ai/https://outlet.test/a"
 		]);
 		// Second run serves both legs from the cache: no transport.
 		const second = await run();
 		expect(second).toEqual(first);
-		expect(calls.length).toBe(2);
+		expect(calls.length).toBe(3);
 	});
 
 	it("reuses a cached mapping with a fresh body fetch", async () => {

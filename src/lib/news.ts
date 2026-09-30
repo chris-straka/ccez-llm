@@ -2,7 +2,6 @@ import { invoke as tauriInvoke } from "@tauri-apps/api/core";
 import { tauriBackendAvailable } from "./secrets";
 import {
 	MAX_FEED_ITEMS,
-	htmlToText,
 	parseFeedItems,
 	type FeedItem
 } from "./tools";
@@ -478,16 +477,72 @@ export function articleImageFromHtml(html: string, baseUrl: string): string | nu
  * back a stub. Throws NewsArticleError when both legs fail.
  * Transport is injected; cleaning decisions are pure below.
  */
+const ARTICLE_DROP =
+	"script, style, noscript, template, header, nav, footer, aside, form, dialog, menu, " +
+	"[role='navigation'], [role='banner'], [role='contentinfo'], [role='complementary'], " +
+	"[role='search'], [role='dialog'], " +
+	"[id*='cookie' i], [class*='cookie' i], [id*='consent' i], [class*='consent' i], " +
+	"[id*='cmp' i], [class*='cmp' i], [class*='gdpr' i], " +
+	"[class*='newsletter' i], [class*='subscribe' i], [class*='paywall' i], " +
+	"[class*='share' i], [class*='social' i], [class*='related' i], [class*='comment' i], " +
+	"[class*='advert' i], [class*='popup' i], [class*='modal' i], [class*='overlay' i], " +
+	"[class*='breadcrumb' i]";
+
+/**
+ * Article prose out of raw page HTML: chrome stripped (nav, cookie
+ * walls, share/related/comment blocks), then the article/main/body
+ * scope read as paragraphs. Short crumbs fall away. Pure (needs DOM).
+ */
+export function extractArticleText(html: string): string {
+	let doc: Document;
+	try {
+		doc = new DOMParser().parseFromString(html, "text/html");
+	} catch {
+		return "";
+	}
+	doc.querySelectorAll(ARTICLE_DROP).forEach((el) => el.remove());
+	const scope = doc.querySelector("article") ?? doc.querySelector("main") ?? doc.body;
+	if (!scope) return "";
+	const blocks: string[] = [];
+	scope.querySelectorAll("h1, h2, h3, p").forEach((el) => {
+		const text = (el.textContent ?? "").replace(/\s+/g, " ").trim();
+		if (text.length >= 40) blocks.push(text);
+	});
+	return blocks.join("\n\n").slice(0, MAX_ARTICLE_CHARS);
+}
+
+/**
+ * Markdown down to its readable text: reader envelope dropped,
+ * images shed to alt (or gone), links shed to their label,
+ * reference definitions dropped. The model gets prose, not URLs.
+ * Pure.
+ */
+export function stripMarkdownMedia(markdown: string): string {
+	return markdown
+		.replace(/^(Title|URL Source|Published Time|Markdown Content):.*$/gm, "")
+		.replace(/!\[([^\]]*)\]\([^)\s]*(?:\s+"[^"]*")?\)/g, "$1")
+		.replace(/^\[[^\]]+\]:\s*\S+.*$/gm, "")
+		.replace(/\[([^\]]+)\]\[[^\]]*\]/g, "$1")
+		.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+		.replace(/<https?:\/\/[^>\s]+>/g, "")
+		.replace(/\n{3,}/g, "\n\n")
+		.trim();
+}
+
+/**
+ * Article prose, direct extraction first (static HTML beats reader
+ * chrome), reader-rendered markdown second (JS shells need it).
+ */
 export async function fetchArticleText(
 	link: string,
 	fetchHtml: (url: string) => Promise<string>
 ): Promise<string> {
 	let firstFailure: unknown = null;
 	let threw = 0;
-	for (const direct of [false, true]) {
+	for (const direct of [true, false]) {
 		try {
 			const raw = await fetchHtml(direct ? link : jinaUrl(link));
-			const text = direct ? htmlToText(raw).trim() : raw.trim();
+			const text = direct ? extractArticleText(raw) : stripMarkdownMedia(raw);
 			if (text.length >= MIN_ARTICLE_CHARS) {
 				return text.slice(0, MAX_ARTICLE_CHARS);
 			}
