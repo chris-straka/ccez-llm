@@ -63,6 +63,12 @@ describe("news panel contract", () => {
 		expect(source).toContain("headlines in English; sessions run in");
 	});
 
+	it("notes translated regions as translated U.S. headlines", () => {
+		const source = panelSource();
+		expect(source).toContain("?.translate");
+		expect(source).toContain("Translated from U.S. headlines.");
+	});
+
 	it("lays cards out as a responsive grid", () => {
 		const css = panelSource().split("<style>")[1] ?? "";
 		expect(css).toContain("display: grid");

@@ -63,6 +63,9 @@ either); everything else is theme tokens, never raw hex. -->
 			{/each}
 		</div>
 	{/if}
+	{#if panel.regions.find((r) => r.gl === panel.region)?.translate}
+		<p class="news-note">Translated from U.S. headlines.</p>
+	{/if}
 	{#if panel.status === "loading"}
 		<p class="news-note">Fetching {panel.langName} headlines…</p>
 	{:else if panel.status === "error"}

@@ -288,6 +288,7 @@
 		newsRegionsFor,
 		newsSummaryInstruction,
 		resolveArticleText,
+		translateNewsTitles,
 		type CefrLevel,
 		type NewsKind,
 		type NewsPanelState,
@@ -8881,13 +8882,46 @@
 	}
 
 	/** Headlines for the current panel language + region. */
+	async function switchNewsRegion(gl: string): Promise<void> {
+		const current = news;
+		if (!current || current.region === gl || newsBusy) return;
+		const region = current.regions.find((r) => r.gl === gl);
+		if (!region) return;
+		// Translated headlines need the model: no key, no switch.
+		if (region.translate) {
+			const provider = await resolveProviderActive();
+			if (news !== current) return;
+			if (!provider) {
+				flashToast("Set an API key to translate U.S. headlines.");
+				return;
+			}
+		}
+		newsPicker = null;
+		news = { ...current, region: gl, status: "loading", stories: [], error: "" };
+		void fetchNewsStories();
+	}
+
 	async function fetchNewsStories(): Promise<void> {
 		const current = news;
 		if (!current) return;
 		const seq = ++newsSeq;
 		const { code, region } = current;
 		try {
-			const stories = await loadNewsStories(code, region, fetchRawPage);
+			let stories = await loadNewsStories(code, region, fetchRawPage);
+			const target = newsRegionsFor(code)?.find((r) => r.gl === region);
+			if (target?.translate) {
+				const provider = await resolveProviderActive();
+				if (!provider) throw new Error("news-translate");
+				const titles = await translateNewsTitles(
+					stories.map((s) => s.title),
+					current.langName,
+					async (prompt) =>
+						(
+							await provider.chat([{ role: "user", content: prompt }], {})
+						).content
+				);
+				stories = stories.map((s, i) => ({ ...s, title: titles[i] ?? s.title }));
+			}
 			if (newsSeq !== seq || news?.code !== code || news?.region !== region) return;
 			news = { ...current, status: "ready", stories, error: "" };
 		} catch (error) {
@@ -8976,10 +9010,7 @@
 
 	const newsActions = {
 		region: (gl: string) => {
-			if (!news || news.region === gl || newsBusy) return;
-			newsPicker = null;
-			news = { ...news, region: gl, status: "loading", stories: [], error: "" };
-			void fetchNewsStories();
+			void switchNewsRegion(gl);
 		},
 		toggle: (link: string, kind: NewsKind) => {
 			if (newsBusy) return;

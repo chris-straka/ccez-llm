@@ -18,6 +18,8 @@ import {
 	newsRssUrl,
 	newsStoriesFromXml,
 	newsSummaryInstruction,
+	parseTranslatedLines,
+	translateNewsTitles,
 	resolveArticleText,
 	shapeStory,
 	storeArticle,
@@ -91,9 +93,24 @@ describe("news feeds", () => {
 			expect(regions!.length).toBeGreaterThanOrEqual(1);
 			expect(isNewsFallback(code)).toBe(fallback.has(code));
 			if (fallback.has(code)) {
-				// One English edition, home-country where one exists.
-				expect(regions!.length).toBe(1);
-				expect(newsRssUrl(code, regions![0]!.gl)).toContain("hl=en");
+				// English hl throughout; home-English editions gain a
+				// translated U.S. second chip, pure-U.S. ones stay single.
+				for (const region of regions!) {
+					expect(newsRssUrl(code, region.gl)).toContain("hl=en");
+				}
+				const pureUs = new Set([
+					"da",
+					"hy",
+					"fa",
+					"is",
+					"yue",
+					"la",
+					"grc",
+					"non",
+					"sux",
+					"akk"
+				]);
+				expect(regions!.length).toBe(pureUs.has(code) ? 1 : 2);
 			}
 			// Default region first, every region addressable.
 			for (const region of regions!) {
@@ -109,8 +126,55 @@ describe("news feeds", () => {
 			"TW",
 			"CN",
 			"HK",
-			"SG"
+			"SG",
+			"US"
 		]);
+	});
+
+	it("derives a translated U.S. region unless one is native", () => {
+		// French gains translated U.S. headlines, home edition first.
+		const fr = newsRegionsFor("fr")!;
+		expect(fr[fr.length - 1]).toEqual({
+			gl: "US",
+			label: "U.S.",
+			hl: "en-US",
+			translate: true
+		});
+		expect(newsRssUrl("fr", "US")).toContain("hl=en-US&gl=US");
+		// Spanish and pure-U.S. fallbacks keep their native single US.
+		for (const code of ["es", "da", "la"]) {
+			const regions = newsRegionsFor(code)!;
+			expect(regions.filter((r) => r.gl === "US")).toHaveLength(1);
+			expect(regions.some((r) => r.translate)).toBe(false);
+		}
+		// Home-English fallbacks gain a translated second chip.
+		expect(newsRegionsFor("ur")!.map((r) => r.gl)).toEqual(["PK", "US"]);
+		expect(newsRegionsFor("ang")!.map((r) => r.gl)).toEqual(["GB", "US"]);
+	});
+
+	it("parses numbered translation lines, count-exact", () => {
+		expect(parseTranslatedLines("1. Un\n2. Deux", 2)).toEqual(["Un", "Deux"]);
+		expect(parseTranslatedLines("1) Un\n\n2) Deux\n", 2)).toEqual([
+			"Un",
+			"Deux"
+		]);
+		expect(parseTranslatedLines("1. Un", 2)).toBeNull();
+		expect(parseTranslatedLines("1. Un\n2. Deux\n3. Trois", 2)).toBeNull();
+	});
+
+	it("translates titles in one call, failing loudly when short", async () => {
+		const seen: string[] = [];
+		const out = await translateNewsTitles(["Markets rally"], "French", async (prompt) => {
+			seen.push(prompt);
+			return "1. Les marchés montent";
+		});
+		expect(out).toEqual(["Les marchés montent"]);
+		expect(seen).toHaveLength(1);
+		expect(seen[0]).toContain("French");
+		await expect(
+			translateNewsTitles(["A", "B"], "French", async () => "1. Seul")
+		).rejects.toThrow("news-translate");
+		expect(await translateNewsTitles([], "French", async () => "")).toEqual([]);
 	});
 });
 

@@ -14,10 +14,17 @@ import type { KeyValueStore } from "./settings";
  * module is pure logic plus thin fetch/cache wrappers.
  */
 
-/** One Google News edition: `gl` region plus its chip label. */
+/**
+ * One Google News edition: `gl` region plus its chip label. `hl`
+ * overrides the feed language for cross-language editions, and
+ * `translate` marks headlines shown translated into the learner's
+ * language (the U.S. feed, which only Spanish has natively).
+ */
 export interface NewsRegion {
 	gl: string;
 	label: string;
+	hl?: string;
+	translate?: true;
 }
 
 /**
@@ -198,8 +205,24 @@ export function isNewsFallback(code: string): boolean {
 }
 
 /** Editions for a language, default first; null when unsupported. */
+/**
+ * Translated U.S. headlines, derived for every feed without a
+ * native US edition (only es-US exists — every other `hl`+US
+ * request redirects home). Appended last, so the home edition
+ * stays default and the chip row gains one 🇺🇸.
+ */
+const US_TRANSLATED_REGION: NewsRegion = {
+	gl: "US",
+	label: "U.S.",
+	hl: "en-US",
+	translate: true
+};
+
 export function newsRegionsFor(code: string): NewsRegion[] | null {
-	return NEWS_FEEDS[code]?.regions ?? null;
+	const feed = NEWS_FEEDS[code];
+	if (!feed) return null;
+	if (feed.regions.some((r) => r.gl === "US")) return feed.regions;
+	return [...feed.regions, US_TRANSLATED_REGION];
 }
 
 /**
@@ -209,8 +232,10 @@ export function newsRegionsFor(code: string): NewsRegion[] | null {
  */
 export function newsRssUrl(code: string, gl: string): string | null {
 	const feed = NEWS_FEEDS[code];
-	if (!feed || !feed.regions.some((r) => r.gl === gl)) return null;
-	return `https://news.google.com/rss?hl=${feed.hl}&gl=${gl}&ceid=${gl}:${feed.hl}`;
+	const region = newsRegionsFor(code)?.find((r) => r.gl === gl);
+	if (!feed || !region) return null;
+	const hl = region.hl ?? feed.hl;
+	return `https://news.google.com/rss?hl=${hl}&gl=${gl}&ceid=${gl}:${hl}`;
 }
 
 /** One story card: headline, outlet, link, and snippet. */
@@ -460,6 +485,42 @@ export async function loadNewsStories(
 }
 
 /**
+ * Numbered translation lines back into titles: strips "1. "/"1) ",
+ * drops blanks, and demands the exact count (a model that merges
+ * or splits lines fails loudly instead of mislabeling cards).
+ * Pure.
+ */
+export function parseTranslatedLines(text: string, count: number): string[] | null {
+	const lines = text
+		.split("\n")
+		.map((line) => line.replace(/^\s*\d+[.)]\s*/, "").trim())
+		.filter((line) => line.length > 0);
+	return lines.length === count ? lines : null;
+}
+
+/**
+ * U.S. headlines into the learner's language in one batched model
+ * call (completion injected, like the feed transport). Throws
+ * news-translate on a short reply — the feed errors retryably
+ * rather than showing half-translated cards.
+ */
+export async function translateNewsTitles(
+	titles: string[],
+	langName: string,
+	complete: (prompt: string) => Promise<string>
+): Promise<string[]> {
+	if (titles.length === 0) return [];
+	const numbered = titles.map((t, i) => `${i + 1}. ${t}`).join("\n");
+	const out = await complete(
+		`Translate these ${titles.length} headlines into ${langName}. ` +
+			`Reply with exactly ${titles.length} numbered lines ("1. …") and nothing else:\n${numbered}`
+	);
+	const lines = parseTranslatedLines(out, titles.length);
+	if (!lines) throw new Error("news-translate");
+	return lines;
+}
+
+/**
  * One machine-readable failure into its notice sentence. Covers the
  * news codes plus the shared fetch_page codes (timeout, bad-status,
  * too-large, bad-url, failed) and the article unreadable case.
@@ -471,6 +532,9 @@ export function newsErrorCopy(error: unknown): string {
 	}
 	if (message.includes("news-unsupported")) {
 		return "Google News has no edition in this language yet.";
+	}
+	if (message.includes("news-translate")) {
+		return "The headlines wouldn't translate — retry in a bit.";
 	}
 	if (message.includes("news-empty") || message.includes("unreadable")) {
 		return "That story wouldn't open — try another one.";
