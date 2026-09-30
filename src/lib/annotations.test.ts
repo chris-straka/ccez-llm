@@ -347,15 +347,15 @@ describe("duplicateAnnotationId", () => {
 		const kyoto = list[0];
 		if (!kyoto) throw new Error("no annotation");
 		// Same message, quote, and repeat: a twin.
-		expect(duplicateAnnotationId(list, msg, "  Kyoto ", 0)).toBe(kyoto.id);
+		expect(duplicateAnnotationId(list, { messageId: msg }, "  Kyoto ", 0)).toBe(kyoto.id);
 		// A different repeat of the same text is its own span.
-		expect(duplicateAnnotationId(list, msg, "Kyoto", 2)).toBeNull();
+		expect(duplicateAnnotationId(list, { messageId: msg }, "Kyoto", 2)).toBeNull();
 		// Same quote in another message is unrelated.
 		expect(
-			duplicateAnnotationId(list, "m2" as ChatMsgId, "Kyoto", 0)
+			duplicateAnnotationId(list, { messageId: "m2" as ChatMsgId }, "Kyoto", 0)
 		).toBeNull();
 		// Blank quotes never match.
-		expect(duplicateAnnotationId(list, msg, "   ", 0)).toBeNull();
+		expect(duplicateAnnotationId(list, { messageId: msg }, "   ", 0)).toBeNull();
 	});
 
 	it("treats aid scope as part of span identity", () => {
@@ -370,17 +370,17 @@ describe("duplicateAnnotationId", () => {
 			}
 		];
 		// Same span in the bare text is not a twin of the vocalized one.
-		expect(duplicateAnnotationId(scoped, msg, "Kyoto", 0)).toBeNull();
-		expect(duplicateAnnotationId(scoped, msg, "Kyoto", 0, "tashkeel")).toBe(
+		expect(duplicateAnnotationId(scoped, { messageId: msg }, "Kyoto", 0)).toBeNull();
+		expect(duplicateAnnotationId(scoped, { messageId: msg }, "Kyoto", 0, "tashkeel")).toBe(
 			"a1"
 		);
 		// Unscoped lists match unscoped lookups, as before.
 		const plain = addAnnotation([], msg, "Kyoto");
-		expect(duplicateAnnotationId(plain, msg, "Kyoto", 0)).toBe(
+		expect(duplicateAnnotationId(plain, { messageId: msg }, "Kyoto", 0)).toBe(
 			plain[0]?.id ?? null
 		);
 		expect(
-			duplicateAnnotationId(plain, msg, "Kyoto", 0, "tashkeel")
+			duplicateAnnotationId(plain, { messageId: msg }, "Kyoto", 0, "tashkeel")
 		).toBeNull();
 	});
 });
@@ -917,6 +917,39 @@ describe("quoteDirection", () => {
 		expect(quoteDirection("عربي abc")).toBe("rtl");
 		expect(quoteDirection("123?!")).toBeNull();
 		expect(quoteDirection("")).toBeNull();
+	});
+});
+
+describe("story-anchored annotations", () => {
+	const story = { link: "https://x/y", title: "T", outlet: "O", lang: "fr" };
+	const storyNote = (id: string, quote: string): Annotation => ({
+		id: id as AnnotationId,
+		story,
+		quote,
+		comment: ""
+	});
+	it("groups dupes and numbers per story link, apart from messages", () => {
+		const list: Annotation[] = [
+			storyNote("s1", "q"),
+			storyNote("s2", "qq"),
+			{
+				id: "m1a" as AnnotationId,
+				messageId: "m1" as ChatMsgId,
+				quote: "q",
+				comment: ""
+			}
+		];
+		expect(duplicateAnnotationId(list, { story }, "q")).toBe("s1");
+		expect(duplicateAnnotationId(list, { story }, "missing")).toBeNull();
+		expect(annotationNumber(list, "s1" as AnnotationId)).toBe(1);
+		expect(annotationNumber(list, "s2" as AnnotationId)).toBe(2);
+		expect(annotationNumber(list, "m1a" as AnnotationId)).toBe(1);
+	});
+	it("excludes story notes from message marks", () => {
+		const list: Annotation[] = [storyNote("s1", "q")];
+		expect(
+			buildMarksFor(list, "m1" as ChatMsgId, false, null)
+		).toEqual([]);
 	});
 });
 

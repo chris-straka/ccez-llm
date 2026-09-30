@@ -8,6 +8,7 @@ either); everything else is theme tokens, never raw hex. -->
 	import {
 		CEFR_LEVELS,
 		SUMMARY_SIZES,
+		newsCardPressOpensMenu,
 		type CefrLevel,
 		type NewsKind,
 		type NewsPanelState,
@@ -33,6 +34,14 @@ either); everything else is theme tokens, never raw hex. -->
 
 	let { panel, picker, busy, images, actions }: Props = $props();
 	const activeRegion = $derived(panel.regions.find((r) => r.gl === panel.region));
+	// Press-down point (one press at a time component-wide): a
+	// drag-release ending on a card belongs to text selection.
+	let downAt: { x: number; y: number } | null = null;
+	/** Live headline selection inside a card owns the press. */
+	function cardSelected(card: HTMLElement): boolean {
+		const live = window.getSelection();
+		return !!live && !live.isCollapsed && card.contains(live.anchorNode);
+	}
 	const reduceMotion =
 		typeof matchMedia !== "undefined" &&
 		matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -115,8 +124,31 @@ either); everything else is theme tokens, never raw hex. -->
 						class="news-open"
 						aria-label="{story.title} — options"
 						aria-expanded={open}
-						onclick={() => actions.menu(story.link)}
+						data-story-link={story.link}
+						onpointerdown={(e) => {
+							downAt = { x: e.clientX, y: e.clientY };
+						}}
+						onclick={(e) => {
+							// Keyboard clicks (detail 0) never dragged: a
+							// stale down-point must not eat the menu.
+							const dragged =
+								downAt && e.detail > 0
+									? Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y)
+									: 0;
+							downAt = null;
+							if (
+								newsCardPressOpensMenu({
+									draggedPx: dragged,
+									headlineSelected: cardSelected(e.currentTarget)
+								})
+							)
+								actions.menu(story.link);
+						}}
 						oncontextmenu={(e) => {
+							// A standing selection owns long-press and
+							// right-click (the page summons or speaks);
+							// plain presses open the card menu as before.
+							if (cardSelected(e.currentTarget)) return;
 							e.preventDefault();
 							actions.menu(story.link);
 						}}

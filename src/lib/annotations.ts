@@ -23,10 +23,22 @@ import {
 /** Opaque annotation identifier (see ChatId/ChatMsgId in chat.ts). */
 export type AnnotationId = string & { readonly kind: "annotation" };
 
+/** News-headline anchor: news lives in an empty chat, so the
+ * story itself owns the note. Mutually exclusive with messageId. */
+export interface StoryAnchor {
+	link: string;
+	title: string;
+	outlet: string;
+	lang: string;
+}
+
 export interface Annotation {
 	id: AnnotationId;
-	/** Message the selection came from (drives badge placement). */
-	messageId: ChatMsgId;
+	/** Message the selection came from (drives badge placement).
+	 * Absent on story-anchored notes (no message row exists). */
+	messageId?: ChatMsgId;
+	/** News story the headline selection came from. */
+	story?: StoryAnchor;
 	quote: string;
 	comment: string;
 	/**
@@ -94,25 +106,31 @@ export function aidMarkVisible(
 	return aidScope !== "tashkeel" || tashkeelOn;
 }
 
+/** Anchor identity for grouping: the message, or the story link. Pure. */
+function anchorKey(a: Pick<Annotation, "messageId" | "story">): string {
+	return a.messageId ?? a.story?.link ?? "";
+}
+
 /**
  * Id of the saved annotation already quoting the same span of the same
- * message (same text, same repeat), if any: annotating it again would
+ * anchor (same text, same repeat), if any: annotating it again would
  * stack two badges on one anchor, and hovering them oscillates as the
  * re-stamp swaps which badge sits under the cursor. Null when the
  * quote is blank or unquoted yet.
  */
 export function duplicateAnnotationId(
 	list: Annotation[],
-	messageId: ChatMsgId,
+	anchor: Pick<Annotation, "messageId" | "story">,
 	quote: string,
 	at = 0,
 	aidScope?: "tashkeel"
 ): AnnotationId | null {
 	const trimmed = quote.trim();
 	if (!trimmed) return null;
+	const key = anchorKey(anchor);
 	const found = list.find(
 		(a) =>
-			a.messageId === messageId &&
+			anchorKey(a) === key &&
 			a.quote === trimmed &&
 			(a.at ?? 0) === at &&
 			(a.aidScope ?? null) === (aidScope ?? null)
@@ -136,18 +154,15 @@ export function clearAnnotations(): Annotation[] {
 	return [];
 }
 
-/** 1-based badge number of an annotation within its own message:
- * every message restarts at 1 (twenty annotations on one message
- * never push the next message's first badge to 21). Missing ids
- * read 0, like before. */
+/** 1-based badge number of an annotation within its own anchor:
+ * every message (and every story) restarts at 1 (twenty annotations
+ * on one message never push the next message's first badge to 21).
+ * Missing ids read 0, like before. */
 export function annotationNumber(list: Annotation[], id: AnnotationId): number {
 	const target = list.find((a) => a.id === id);
 	if (!target) return 0;
-	return (
-		list
-			.filter((a) => a.messageId === target.messageId)
-			.findIndex((a) => a.id === id) + 1
-	);
+	const key = anchorKey(target);
+	return list.filter((a) => anchorKey(a) === key).findIndex((a) => a.id === id) + 1;
 }
 
 /**
@@ -579,7 +594,7 @@ export type SentRefTarget =
 	| { kind: "gone" };
 
 export function resolveSentRefTarget(
-	live: { id: AnnotationId; messageId: ChatMsgId; quote: string }[],
+	live: { id: AnnotationId; messageId?: ChatMsgId; quote: string }[],
 	messages: { id: ChatMsgId; content: string }[],
 	messageId: ChatMsgId,
 	quote: string
@@ -2319,17 +2334,34 @@ const DRAFT_KEY = "ccez-llm-annotations-v1";
 /** Pre-rename key (ccez-studio era): read once, then saves move to DRAFT_KEY. */
 const LEGACY_DRAFT_KEY = "ccez-studio-annotations-v1";
 
+function validStoryAnchor(raw: unknown): StoryAnchor | undefined {
+	if (!raw || typeof raw !== "object") return undefined;
+	const s = raw as Partial<StoryAnchor>;
+	if (typeof s.link !== "string" || !s.link) return undefined;
+	if (
+		typeof s.title !== "string" ||
+		typeof s.outlet !== "string" ||
+		typeof s.lang !== "string"
+	)
+		return undefined;
+	return { link: s.link, title: s.title, outlet: s.outlet, lang: s.lang };
+}
+
 function cleanDraftList(raw: unknown): Annotation[] {
 	if (!Array.isArray(raw)) return [];
 	const out: Annotation[] = [];
 	for (const item of raw) {
 		if (!item || typeof item !== "object") continue;
 		const a = item as Partial<Annotation>;
-		if (typeof a.id !== "string" || typeof a.messageId !== "string") continue;
+		if (typeof a.id !== "string") continue;
+		const messageId = typeof a.messageId === "string" ? a.messageId : undefined;
+		const story = validStoryAnchor(a.story);
+		if (!messageId && !story) continue;
 		if (typeof a.quote !== "string" || typeof a.comment !== "string") continue;
 		out.push({
 			id: a.id,
-			messageId: a.messageId,
+			...(messageId ? { messageId } : {}),
+			...(story ? { story } : {}),
 			quote: a.quote,
 			comment: a.comment,
 			at: typeof a.at === "number" ? a.at : 0,

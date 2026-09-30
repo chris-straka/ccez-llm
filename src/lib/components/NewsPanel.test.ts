@@ -85,6 +85,14 @@ describe("news panel contract", () => {
 		expect(source).toContain(".news-chip.icon");
 	});
 
+	it("yields card presses to live headline selections", () => {
+		// The card carries its story link for headline anchoring;
+		// drags and standing selections own the press, never the menu.
+		const source = panelSource();
+		expect(source).toContain("data-story-link={story.link}");
+		expect(source).toContain("newsCardPressOpensMenu({");
+	});
+
 	it("never shows fallback headlines in English", () => {
 		// Fallback editions translate into the learner's language
 		// (their regions carry translate), so no English note exists;

@@ -36,15 +36,16 @@ test("empty-chat language pick opens news, close returns to welcome", async ({
 	await expect(page.locator(".empty-state h1")).toBeVisible();
 });
 
-test("fallback language notes its English headlines", async ({ page }) => {
+test("fallback language never shows English headlines", async ({ page }) => {
 	await page.locator('.lang-menu button:has-text("Europe")').click();
 	const list = page.locator(".lang-list");
 	await expect(list).toBeVisible();
 	await list.getByRole("menuitem", { name: "Danish" }).click();
 	const panel = page.locator(".news-panel");
 	await expect(panel).toBeVisible({ timeout: 10_000 });
-	await expect(panel).toContainText("No Danish edition yet");
-	await expect(panel).toContainText("headlines in English; sessions run in Danish");
+	// Fallback regions translate; the English note is gone. No
+	// shell in the preview: the honest state, not headlines.
+	await expect(panel).not.toContainText("headlines in English");
 	await expect(panel).toContainText("needs the app shell");
 	await panel.getByRole("button", { name: "Close news" }).click();
 	await expect(panel).toHaveCount(0);

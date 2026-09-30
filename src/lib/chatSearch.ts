@@ -133,7 +133,7 @@ export interface SearchableChat {
 
 export interface SearchableAnnotation {
 	chatId: string;
-	messageId: string;
+	messageId?: string;
 	quote: string;
 	comment: string;
 }
@@ -142,7 +142,7 @@ export interface SearchableAnnotation {
 this module stays dependency-free). */
 export interface IndexableAnnotation {
 	id: string;
-	messageId: string;
+	messageId?: string;
 	quote: string;
 	comment: string;
 }
@@ -174,7 +174,7 @@ export function collectSearchAnnotations(
 			seen.add(key);
 			anns.push({
 				chatId: chat.id,
-				messageId: ann.messageId,
+				...(ann.messageId ? { messageId: ann.messageId } : {}),
 				quote: ann.quote,
 				comment: ann.comment
 			});
@@ -205,7 +205,7 @@ export function buildSearchDocs(
 		if (!text) continue;
 		docs.push({
 			chatId: ann.chatId,
-			msgId: ann.messageId,
+			msgId: ann.messageId ?? null,
 			kind: "annotation",
 			text
 		});

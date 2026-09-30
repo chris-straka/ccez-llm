@@ -123,6 +123,13 @@ describe("annotation create wiring", () => {
 		expect(source).toContain("snapSelectionToWordEdges(live)");
 	});
 
+	it("quotes headline picks against their story, not a message", () => {
+		const source = pageSource();
+		expect(source).toContain("function headlineQuote(");
+		expect(source).toContain("function storyOfHeadline(");
+		expect(source).toContain("data-story-link");
+	});
+
 	it("reads the annotated text when a waiting badge opens", () => {
 		// Blue badges speak like answered ones (quote with its
 		// paragraph context), so the listen moment survives the wait.
@@ -130,7 +137,7 @@ describe("annotation create wiring", () => {
 		const dockPath = source.slice(source.indexOf("No answer yet: open the review dock"));
 		expect(dockPath).toContain("void speakQuote(");
 		expect(dockPath).toContain(
-			"answerContextFor(current.messageId, current.quote, current.at ?? 0)"
+			"answerContextFor(current, current.quote, current.at ?? 0)"
 		);
 	});
 

@@ -19,6 +19,7 @@ import {
 	jinaUrl,
 	loadNewsStories,
 	mergeNewsStories,
+	newsCardPressOpensMenu,
 	newsConversationInstruction,
 	newsErrorCopy,
 	newsRegionsFor,
@@ -1036,5 +1037,19 @@ describe("article cache", () => {
 			}
 		};
 		expect(() => storeArticle(hostile, "https://a", "b")).not.toThrow();
+	});
+
+	it("opens the card menu only for plain presses, never selections", () => {
+		expect(
+			newsCardPressOpensMenu({ draggedPx: 0, headlineSelected: false })
+		).toBe(true);
+		// A drag-release ending on the card belongs to selection.
+		expect(
+			newsCardPressOpensMenu({ draggedPx: 5, headlineSelected: false })
+		).toBe(false);
+		// A live headline selection owns long-press and right-click.
+		expect(
+			newsCardPressOpensMenu({ draggedPx: 0, headlineSelected: true })
+		).toBe(false);
 	});
 });

@@ -265,7 +265,8 @@
 		annEditCommitToast,
 		type Annotation,
 		type AnnotationId,
-		type AnnotationMark
+		type AnnotationMark,
+		type StoryAnchor
 	} from "$lib/annotations";
 	import {
 		ANN_FLASH_NAME,
@@ -1150,7 +1151,10 @@
 		quote: string;
 		/** Containing paragraph text: the single-char guess reads it for kana. */
 		context: string;
-		messageId: ChatMsgId;
+		/** Owning message, null for headline picks (the story owns those). */
+		messageId: ChatMsgId | null;
+		/** News story owning a headline pick. */
+		story?: StoryAnchor;
 		/** Live range at summon time: menu hover puts the highlight
 		back when WebKit empties it (no DOM change, so still valid). */
 		range: Range | null;
@@ -1551,7 +1555,10 @@
 		// no sentence to correct it. showSelectionFurigana also shows
 		// the popup, so this path skips popupSelectionReadings.
 		const probe = sentenceForQuote(menu.context, menu.quote) ?? menu.context;
+		// Headline picks read aloud with no readings panels
+		// (message-DOM placement has nothing to place on).
 		if (
+			menu.messageId &&
 			[...menu.quote].some((ch) => isHanChar(ch)) &&
 			hanOverlayLangFor(probe) === "ja"
 		) {
@@ -1559,18 +1566,20 @@
 				quote: menu.quote,
 				messageId: menu.messageId
 			});
-			void speakQuote(kana ?? menu.quote, menu.messageId, true, menu.context);
+			void speakQuote(kana ?? menu.quote, selSpeakKey(menu), true, menu.context);
 			if (androidUI) liftSelMenuAboveReadings();
 			return;
 		}
-		void popupSelectionReadings(
-			menu.quote,
-			menu.messageId,
-			menu.context
-		).then(() => {
-			if (androidUI) liftSelMenuAboveReadings();
-		});
-		void speakQuote(menu.quote, menu.messageId, true, menu.context);
+		if (menu.messageId) {
+			void popupSelectionReadings(
+				menu.quote,
+				menu.messageId,
+				menu.context
+			).then(() => {
+				if (androidUI) liftSelMenuAboveReadings();
+			});
+		}
+		void speakQuote(menu.quote, selSpeakKey(menu), true, menu.context);
 	}
 	/**
 	 * Rise the selection menu above the readings panels a speak tap
@@ -4788,6 +4797,24 @@
 		return element?.closest('article[id^="msg-"]') ?? null;
 	}
 
+	/** Headline span owning a selection node, or null outside titles. */
+	function headlineOf(node: Node | null): Element | null {
+		const element = node instanceof Element ? node : node?.parentElement;
+		return element?.closest(".news-card-title") ?? null;
+	}
+
+	/** Story anchor for a headline span: the card carries the
+	 * link, the live panel row carries the rest. Null when the
+	 * panel moved on (stale highlight, never garbage). */
+	function storyOfHeadline(headline: Element): StoryAnchor | null {
+		if (!news) return null;
+		const link = headline.closest(".news-open")?.getAttribute("data-story-link");
+		if (!link) return null;
+		const story = news.stories.find((s) => s.link === link);
+		if (!story) return null;
+		return { link, title: story.title, outlet: story.source, lang: news.langName };
+	}
+
 	/** Message id owning the selection anchor, or null outside messages. */
 	function selectedMessageId(selection: Selection): ChatMsgId | null {
 		const article = articleOf(selection.anchorNode);
@@ -4892,7 +4919,8 @@
 	function currentQuote(): {
 		quote: string;
 		context: string;
-		messageId: ChatMsgId;
+		messageId: ChatMsgId | null;
+		story?: StoryAnchor;
 	} | null {
 		const selection = window.getSelection();
 		if (!selection || selection.isCollapsed) return null;
@@ -4900,7 +4928,35 @@
 			selection.anchorNode instanceof Element
 				? selection.anchorNode
 				: selection.anchorNode?.parentElement;
-		if (!inRendered?.closest(".rendered")) return null;
+		if (!inRendered?.closest(".rendered")) return headlineQuote(selection);
+		return messageQuote(selection);
+	}
+
+	/** Quote off a news headline: both ends must sit in one
+	 * title (the cross-card trim — messages trim in onSelectEnd,
+	 * headlines have no lock), anchored to the live story row. */
+	function headlineQuote(selection: Selection): {
+		quote: string;
+		context: string;
+		messageId: null;
+		story: StoryAnchor;
+	} | null {
+		const headline = headlineOf(selection.anchorNode);
+		if (!headline || headlineOf(selection.focusNode) !== headline) return null;
+		const frag = selection.getRangeAt(0).cloneContents();
+		const quote = quoteFragmentText(frag);
+		if (!quote) return null;
+		const story = storyOfHeadline(headline);
+		if (!story) return null;
+		const context = (headline.textContent ?? "").slice(0, 2000);
+		return { quote, context, messageId: null, story };
+	}
+
+	function messageQuote(selection: Selection): {
+		quote: string;
+		context: string;
+		messageId: ChatMsgId;
+	} | null {
 		// Math picks normalize to the whole equation: a partial glyph
 		// pick quotes a shard that never re-matches, so when both ends
 		// sit in one equation the range expands over its body first.
@@ -5082,6 +5138,7 @@
 			quote: found.quote,
 			context: found.context,
 			messageId: found.messageId,
+			...(found.story ? { story: found.story } : {}),
 			range: stored
 		};
 		// Selecting unpins the stream follow: a reply must not yank
@@ -5187,14 +5244,18 @@
 		// Repeats disambiguate here, from the live selection: the
 		// last "c" in "ccc" records occurrence 2, so its badge
 		// lands where the highlight was. Anything unresolvable
-		// keeps 0 (first match, the old behavior).
-		const at = occurrenceFromSelection(selMenu.messageId, quote);
+		// keeps 0 (first match, the old behavior) — headlines
+		// always keep 0 (no message row to locate in).
+		const at = selMenu.messageId
+			? occurrenceFromSelection(selMenu.messageId, quote)
+			: 0;
 		// A quote picked from vocalized (tashkeel) text locates against
 		// that text only: its badge shows while the aid is on, never on
-		// the bare form.
-		const aidScope = aidModelPin.has(selMenu.messageId)
-			? ("tashkeel" as const)
-			: undefined;
+		// the bare form. Headlines never carry aid scope.
+		const aidScope =
+			selMenu.messageId && aidModelPin.has(selMenu.messageId)
+				? ("tashkeel" as const)
+				: undefined;
 		// Same span twice would stack two badges on one anchor (and
 		// hovering them oscillates): delete the existing annotation
 		// and start the new one clean — no toast, no lockout, the
@@ -5202,7 +5263,10 @@
 		// the instant path: re-annotating means rewriting).
 		const dupe = duplicateAnnotationId(
 			annotations,
-			selMenu.messageId,
+			{
+				...(selMenu.messageId ? { messageId: selMenu.messageId } : {}),
+				...(selMenu.story ? { story: selMenu.story } : {})
+			},
 			quote,
 			at,
 			aidScope
@@ -5222,7 +5286,8 @@
 		}
 		const pending: Annotation = {
 			id: newAnnotationId(),
-			messageId: selMenu.messageId,
+			...(selMenu.messageId ? { messageId: selMenu.messageId } : {}),
+			...(selMenu.story ? { story: selMenu.story } : {}),
 			quote,
 			comment: "",
 			at,
@@ -5232,19 +5297,23 @@
 		// Creating an annotation always reads the quote back out
 		// (no readback gate): filing is an explicit listen moment,
 		// exactly like tapping Speak on the highlight.
-		void speakQuote(quote, selMenu.messageId, true, selMenu.context);
+		void speakQuote(quote, selSpeakKey(selMenu), true, selMenu.context);
 		// Han quotes earn their readings panel above the quote while
 		// creating too: the highlight stays (instead of clearing) so
 		// the panels have a live rect — the selectionchange watcher
-		// drops them with it on submit or cancel.
+		// drops them with it on submit or cancel. Headlines skip
+		// readings (message-DOM panels have nothing to place on).
 		const quoted = {
 			quote,
 			messageId: selMenu.messageId,
 			context: selMenu.context,
 			at
 		};
-		const keepHighlight = quoteOffersReadings(quoted);
-		if (keepHighlight) void readingsForQuote(quoted, true);
+		const keepHighlight =
+			quoted.messageId != null &&
+			quoteOffersReadings({ ...quoted, messageId: quoted.messageId });
+		if (keepHighlight && quoted.messageId != null)
+			void readingsForQuote({ ...quoted, messageId: quoted.messageId }, true);
 		else clearSelection();
 		// Instant file (hover A): the pill never opens — the empty
 		// note files at once and the request fires, on desktop and
@@ -5315,13 +5384,17 @@
 
 	/** Paragraph holding a quote, for the answer request's context. */
 	function answerContextFor(
-		messageId: ChatMsgId,
+		ann: Pick<Annotation, "messageId" | "story">,
 		quote: string,
 		occurrence = 0
 	): string {
+		if (!ann.messageId && ann.story) {
+			const story = ann.story;
+			return `${story.title} — ${story.outlet} (${story.lang})`;
+		}
 		const msg = chatState.chats
 			.flatMap((c) => c.messages)
-			.find((m) => m.id === messageId);
+			.find((m) => m.id === ann.messageId);
 		return paragraphForQuote(
 			msg ? aidDisplayText(msg.content) : "",
 			quote,
@@ -5366,9 +5439,20 @@
 			const answer = await annotationAnswer(provider, {
 				quote: ann.quote,
 				question: ann.comment,
-				context: answerContextFor(ann.messageId, ann.quote, ann.at ?? 0)
+				context: answerContextFor(ann, ann.quote, ann.at ?? 0)
 			});
 			annotations = attachAnnotationAnswer(annotations, ann.id, answer);
+			// Story notes have no badge to turn orange: open the
+			// answer card itself while its story is still on
+			// screen, so the payoff is visible (resume scans for
+			// long-closed panels attach silently, never pop up).
+			if (
+				!ann.messageId &&
+				ann.story &&
+				answer.trim() &&
+				news?.stories.some((s) => s.link === ann.story?.link)
+			)
+				openBadge(ann.id);
 		} catch (error) {
 			askFailedIds.add(ann.id);
 			const message = error instanceof Error ? error.message : String(error);
@@ -5651,9 +5735,9 @@
 			highlightAnnId = id;
 			void speakQuote(
 				current.quote,
-				current.messageId,
+				annSpeakKey(current),
 				false,
-				answerContextFor(current.messageId, current.quote, current.at ?? 0)
+				answerContextFor(current, current.quote, current.at ?? 0)
 			);
 			// The quote highlights wash-only (its own text is the
 			// context) and Han quotes earn the right-click readings
@@ -5661,13 +5745,18 @@
 			// extra request, no native-blue flash. A quote with no
 			// readings to offer drops a previous quote's panel (the
 			// press no longer clears it above): the panel goes away
-			// with the card it rode in on.
+			// with the card it rode in on. Story notes offer no
+			// readings (no message row to place on).
 			const quoted = {
 				quote: current.quote,
 				messageId: current.messageId,
-				context: answerContextFor(current.messageId, current.quote, current.at ?? 0)
+				context: answerContextFor(current, current.quote, current.at ?? 0)
 			};
-			if (!quoteOffersReadings(quoted)) dismissSelPanels();
+			if (
+				!current.messageId ||
+				!quoteOffersReadings({ ...quoted, messageId: current.messageId })
+			)
+				dismissSelPanels();
 			const selected = selectAnswerQuote(id);
 			if (selected) void readingsForQuote(selected, true);
 			if (!androidUI && quoteRect) {
@@ -5713,9 +5802,9 @@
 		dismissSelPanels();
 		void speakQuote(
 			current.quote,
-			current.messageId,
+			annSpeakKey(current),
 			false,
-			answerContextFor(current.messageId, current.quote, current.at ?? 0)
+			answerContextFor(current, current.quote, current.at ?? 0)
 		);
 		highlightAnnId = id;
 		settleAnnPop();
@@ -5840,10 +5929,13 @@
 	): { quote: string; messageId: ChatMsgId; context: string; at: number } | null {
 		const ann = annotations.find((a) => a.id === id);
 		if (!ann) return null;
+		// Story notes select nothing (no message row to locate
+		// in): their card still opens, panel-less.
+		if (!ann.messageId) return null;
 		const quoted = {
 			quote: ann.quote,
 			messageId: ann.messageId,
-			context: answerContextFor(ann.messageId, ann.quote, ann.at ?? 0),
+			context: answerContextFor(ann, ann.quote, ann.at ?? 0),
 			at: ann.at ?? 0
 		};
 		// Readings panels ride the live range (their scroll tracker
@@ -6102,7 +6194,8 @@
 	 */
 	function reviewQuoteClick(ann: {
 		id: AnnotationId;
-		messageId: ChatMsgId;
+		messageId?: ChatMsgId | null;
+		story?: StoryAnchor;
 	}): void {
 		if (!window.getSelection()?.isCollapsed) return;
 		reviewOpen = false;
@@ -6111,8 +6204,36 @@
 
 	function gotoAnnotation(ann: {
 		id: AnnotationId;
-		messageId: ChatMsgId;
+		messageId?: ChatMsgId | null;
+		story?: StoryAnchor;
 	}): void {
+		// Story notes have no message row: scroll their card into
+		// view while news is open (flashing the quote in the
+		// title), else open the answer card when answered.
+		if (!ann.messageId) {
+			const current = annotations.find((a) => a.id === ann.id);
+			const story = ann.story ?? current?.story;
+			const card = story
+				? document.querySelector(
+						`.news-open[data-story-link="${CSS.escape(story.link)}"]`
+					)
+				: null;
+			if (card instanceof HTMLElement) {
+				highlightAnnId = ann.id;
+				scrollRectIntoClear(card.getBoundingClientRect());
+				if (current) {
+					const quote = current.quote;
+					flashJumpMark(() => quoteRange(card, quote, 0));
+				}
+				return;
+			}
+			if (current?.answer) {
+				openBadge(ann.id);
+				return;
+			}
+			flashErrorToast("That story is no longer open");
+			return;
+		}
 		const index = viewChat.messages.findIndex((m) => m.id === ann.messageId);
 		if (index < 0) {
 			flashErrorToast("Annotation no longer exists");
@@ -6244,7 +6365,7 @@
 			quote
 		);
 		if (target.kind === "live") {
-			gotoAnnotation({ id: target.id, messageId: target.messageId });
+			gotoAnnotation({ id: target.id, messageId: target.messageId ?? null });
 			return;
 		}
 		if (target.kind === "quoted") {
@@ -7144,9 +7265,23 @@
 	 * Latin scripts), so a French highlight gets a French voice even when
 	 * the message around it is English.
 	 */
+	/** Speech ownership key for a selection: the message id, or
+	 * the story link for headline picks (opaque either way). */
+	function selSpeakKey(sel: {
+		messageId: ChatMsgId | null;
+		story?: StoryAnchor;
+	}): string {
+		return sel.messageId ?? `story:${sel.story?.link ?? ""}`;
+	}
+
+	/** Same key for a filed annotation (message ids stay bare). */
+	function annSpeakKey(ann: Pick<Annotation, "messageId" | "story">): string {
+		return ann.messageId ?? `story:${ann.story?.link ?? ""}`;
+	}
+
 	async function speakQuote(
 		quote: string,
-		messageId: ChatMsgId,
+		messageId: string,
 		keepMenu = false,
 		context: string = quote
 	): Promise<void> {
@@ -10309,7 +10444,7 @@
 				// equality check below filters them), and lifts outside text
 				// fail the .rendered check.
 				const el = document.elementFromPoint(touch.clientX, touch.clientY);
-				if (!el?.closest(".messages .rendered")) return;
+				if (!el?.closest(".messages .rendered, .news-card-title")) return;
 				const live = window.getSelection()?.toString() ?? "";
 				if (live === "" || live === start.sel) return;
 				placeSelMenu(touch.clientX, touch.clientY);
@@ -10321,7 +10456,7 @@
 				if (!androidUI && settings.autoSpeakSelection) {
 					const fresh = currentQuote();
 					if (fresh)
-						void speakQuote(fresh.quote, fresh.messageId, true, fresh.context);
+						void speakQuote(fresh.quote, selSpeakKey(fresh), true, fresh.context);
 				}
 			},
 			{ passive: true }
@@ -11120,7 +11255,7 @@
 				if (
 					liveEsc &&
 					!liveEsc.isCollapsed &&
-					escAnchor?.closest(".messages .rendered")
+					escAnchor?.closest(".messages .rendered, .news-card-title")
 				) {
 					clearSelection();
 				}
@@ -11624,7 +11759,7 @@
 							anchor instanceof Element
 								? anchor
 								: anchor?.parentElement;
-						return !!el?.closest(".messages .rendered");
+						return !!el?.closest(".messages .rendered, .news-card-title");
 					} catch {
 						return false;
 					}
@@ -12850,10 +12985,13 @@
 					}
 				}
 			}
+			// News cards exempt: headline drags must reach the summon
+			// below (the card's own click stands down on selections).
 			if (
 				target?.closest(
 					".sel-menu, .ann-dock, .review, button, input, textarea"
-				)
+				) &&
+				!target?.closest(".news-open")
 			) {
 				// Clicking away into the prompt or a control clears the
 				// highlight and drops the menu with it — but never the
@@ -13239,7 +13377,7 @@
 			// beside ours. The selection (and its handles) stay live
 			// for handle-dragging; the lift below drops the highlight
 			// once the quote is stored.
-			if (androidUI && target?.closest(".messages .rendered")) {
+			if (androidUI && target?.closest(".messages .rendered, .news-card-title")) {
 				event.preventDefault();
 				if (currentQuote()) {
 					placeSelMenu(event.clientX, event.clientY);
@@ -13248,7 +13386,7 @@
 				return;
 			}
 			if (androidUI) return;
-			const body = target?.closest(".messages .rendered");
+			const body = target?.closest(".messages .rendered, .news-card-title");
 			if (!body) return;
 			// Code comes before the control check below on purpose: the
 			// copy icon is a button, but a code block (body or folded
@@ -13282,8 +13420,13 @@
 				else mathWrap.dataset.folded = "1";
 				return;
 			}
-			// Controls and links inside messages stay silent.
-			if (target?.closest("button, input, textarea, a, summary")) return;
+			// Controls and links inside messages stay silent — except
+			// a headline pick, which reads like a message quote (a
+			// bare card press falls through to the card menu below).
+			if (target?.closest("button, input, textarea, a, summary")) {
+				const pick = currentQuote();
+				if (!pick?.story) return;
+			}
 			// Highlighted text wins — but only when the click lands
 			// inside it (same per-quote language as the sel-menu
 			// button). A live selection the click missed is the
@@ -13348,7 +13491,8 @@
 					// first, panel included. Speech already ran above;
 					// readingsForQuote only places the panel.
 					const fresh = currentQuote();
-					if (fresh) void readingsForQuote(fresh);
+					if (fresh?.messageId)
+						void readingsForQuote({ ...fresh, messageId: fresh.messageId });
 					return;
 				}
 			}
@@ -13359,10 +13503,14 @@
 				// waits for the sentence-correct kana: the raw kanji
 				// would read with default guesses.
 				void (async () => {
-					const kana = await readingsForQuote(quoted);
+					// Headlines skip readings (message-DOM panels have
+					// nothing to place on) but still read aloud.
+					const kana = quoted.messageId
+						? await readingsForQuote({ ...quoted, messageId: quoted.messageId })
+						: null;
 					void speakQuote(
 						kana ?? quoted.quote,
-						quoted.messageId,
+						selSpeakKey(quoted),
 						false,
 						quoted.context
 					);

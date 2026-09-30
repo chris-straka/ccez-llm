@@ -9,6 +9,7 @@ can't be suppressed, so a floating menu would double it. -->
 	import { fade } from "svelte/transition";
 	import { shouldShowInspect } from "$lib/inspect";
 	import type { ChatMsgId } from "$lib/chat";
+	import type { StoryAnchor } from "$lib/annotations";
 
 	/** Mirrors the page's selMenu state (structural, not nominal). */
 	export interface SelMenuState {
@@ -20,7 +21,10 @@ can't be suppressed, so a floating menu would double it. -->
 		quote: string;
 		/** Containing paragraph text: the single-char guess reads it for kana. */
 		context: string;
-		messageId: ChatMsgId;
+		/** Owning message, null for headline picks (the story owns those). */
+		messageId: ChatMsgId | null;
+		/** News story owning a headline pick. */
+		story?: StoryAnchor;
 		/** Live range at summon time: menu hover puts the highlight
 		back when WebKit empties it (no DOM change, so still valid). */
 		range: Range | null;

@@ -903,6 +903,18 @@ export function newsErrorCopy(error: unknown): string {
 	return "The news fetch failed — retry in a bit.";
 }
 
+/**
+ * Whether a news-card press opens the story menu: drags moved
+ * past the tap slop and presses landing on a live headline
+ * selection belong to text selection, never the menu. Pure.
+ */
+export function newsCardPressOpensMenu(args: {
+	draggedPx: number;
+	headlineSelected: boolean;
+}): boolean {
+	return args.draggedPx <= 4 && !args.headlineSelected;
+}
+
 /** Article cache record: body plus fetch time. */
 export interface NewsCacheEntry {
 	text: string;

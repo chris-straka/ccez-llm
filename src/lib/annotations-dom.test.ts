@@ -407,7 +407,7 @@ describe("snapSelectionToWordEdges", () => {
 describe("draft annotation persistence", () => {
 	const ann = (over: Partial<Annotation> = {}): Annotation => ({
 		id: "a1" as Annotation["id"],
-		messageId: "m1" as Annotation["messageId"],
+		messageId: "m1" as Exclude<Annotation["messageId"], undefined>,
 		quote: "散歩",
 		comment: "walk",
 		at: 0,
