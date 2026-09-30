@@ -42,6 +42,9 @@ describe("news panel contract", () => {
 		expect(source).toContain("oncontextmenu");
 		expect(source).toContain("aria-expanded");
 		expect(source).toContain("news-hint");
+		// One neutral ellipsis, never the action emoji it isn't.
+		expect(source).toContain("⋯");
+		expect(source).not.toContain("🗣️ 📰");
 		expect(source).toContain('aria-label="Story options"');
 		expect(source).toContain("transition:slide");
 		expect(source).toContain("in:fly");
@@ -99,6 +102,9 @@ describe("news panel contract", () => {
 		const css = panelSource().split("<style>")[1] ?? "";
 		expect(css).toContain("display: grid");
 		expect(css).toContain("auto-fill");
+		// Uniform cards: titles pad to three lines, sources to one.
+		expect(css).toContain("min-height: 4.05em");
+		expect(css).toContain("text-overflow: ellipsis");
 	});
 
 	it("shows feed thumbnails when present, lazy and self-hiding", () => {

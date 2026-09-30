@@ -147,7 +147,7 @@ either); everything else is theme tokens, never raw hex. -->
 						{#if story.source}
 							<span class="news-card-source">{story.source}</span>
 						{/if}
-						<span class="news-hint" aria-hidden="true">🗣️ 📰</span>
+						<span class="news-hint" aria-hidden="true">⋯</span>
 					</button>
 					{#if busy === story.link}
 						<span class="news-busy" role="status">Fetching the article…</span>
@@ -398,12 +398,18 @@ either); everything else is theme tokens, never raw hex. -->
 		line-clamp: 3;
 		-webkit-box-orient: vertical;
 		overflow: hidden;
+		/* Short titles pad up: every card holds three lines. */
+		min-height: 4.05em;
 	}
 	.news-card-source {
 		margin: 0;
+		max-width: 100%;
 		font-size: 0.78rem;
 		color: #6e6e73;
 		color: var(--muted);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 	.news-open {
 		position: relative;
