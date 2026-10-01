@@ -257,7 +257,7 @@ describe("news feeds", () => {
 			]
 		});
 		expect(
-			newsRegionsFor("zh")!.find((r) => r.gl === "ASI")?.merge
+			newsRegionsFor("ko")!.find((r) => r.gl === "ASI")?.merge
 		).toHaveLength(3);
 		expect(fr.find((r) => r.gl === "GB")).toMatchObject({
 			label: "U.K.",
@@ -463,6 +463,34 @@ describe("news feeds", () => {
 				expect(gbl.merge?.[i]?.source?.length).toBeGreaterThan(0);
 			}
 		}
+		// VOA and RFI/France 24 section desks beyond Global.
+		const sections: Array<[string, string, string[]]> = [
+			["ru", "US", ["golosameriki.com/api/"]],
+			["fa", "US", ["ir.voanews.com/api/"]],
+			["vi", "US", ["voatiengviet.com/api/"]],
+			["th", "US", ["voathai.com/api/"]],
+			["id", "US", ["voaindonesia.com/api/"]],
+			["pt", "US", ["rfi.fr/br/am"]],
+			["es", "EUR", ["france24.com/es/europa", "rfi.fr/es/europa"]],
+			["pt", "EUR", ["rfi.fr/br/europa"]],
+			["ar", "EUR", ["france24.com/ar/"]],
+			["zh", "ASI", ["rfi.fr/cn/"]]
+		];
+		for (const [code, gl, hosts] of sections) {
+			const region = newsRegionsFor(code)!.find((r) => r.gl === gl)!;
+			expect(region.translate).toBeUndefined();
+			expect(region.merge?.map((t) => t.url)).toHaveLength(hosts.length);
+			for (const [i, host] of hosts.entries()) {
+				expect(region.merge?.[i]?.url).toContain(host);
+				expect(region.merge?.[i]?.source?.length).toBeGreaterThan(0);
+			}
+		}
+		// A native desk stands in for a fallback home region too
+		// (Persian U.S. reads VOA first, untranslated).
+		const faHome = newsRegionsFor("fa")!;
+		expect(faHome[0]?.gl).toBe("US");
+		expect(faHome[0]?.translate).toBeUndefined();
+		expect(faHome[0]?.merge).toHaveLength(1);
 		// Overrides keep chip position, label, and icon.
 		expect(newsRegionsFor("fr")!.slice(-7).map((r) => r.gl)).toEqual([
 			"GBL",
@@ -584,9 +612,14 @@ describe("news feeds", () => {
 			"RU"
 		]);
 		seen.length = 0;
-		await loadNewsStories("es", "EUR", feed);
-		expect(seen).toHaveLength(4);
-		expect(seen.some((u) => u.includes("gl=ES"))).toBe(false);
+		await loadNewsStories("es", "EUR", async (url) => {
+			seen.push(url);
+			return xml("Europa");
+		});
+		expect(seen).toEqual([
+			"https://www.france24.com/es/europa/rss",
+			"https://www.rfi.fr/es/europa/rss"
+		]);
 	});
 
 	it("fans Asia loads out across the four giants, minus home", async () => {
@@ -608,9 +641,11 @@ describe("news feeds", () => {
 		expect(seen).toHaveLength(3);
 		expect(seen.some((u) => u.includes("gl=KR"))).toBe(false);
 		seen.length = 0;
-		await loadNewsStories("zh", "ASI", feed);
-		expect(seen).toHaveLength(3);
-		expect(seen.some((u) => u.includes("gl=CN"))).toBe(false);
+		await loadNewsStories("zh", "ASI", async (url) => {
+			seen.push(url);
+			return xml("Asia");
+		});
+		expect(seen).toEqual(["https://www.rfi.fr/cn/%E4%BA%9A%E6%B4%B2/rss"]);
 	});
 
 	it("fans Latin America out across Mexico, Brazil, Argentina", async () => {

@@ -339,6 +339,15 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			merge: [
 				{ url: "https://www.france24.com/es/am%C3%A9rica-latina/rss", source: "France 24" }
 			]
+		},
+		EUR: {
+			gl: "EUR",
+			label: "Europe",
+			icon: "🇪🇺",
+			merge: [
+				{ url: "https://www.france24.com/es/europa/rss", source: "France 24" },
+				{ url: "https://www.rfi.fr/es/europa/rss", source: "RFI" }
+			]
 		}
 	},
 	ar: {
@@ -349,6 +358,14 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			merge: [
 				{ url: "https://feeds.bbci.co.uk/arabic/rss.xml", source: "BBC Arabic" },
 				{ url: "https://www.france24.com/ar/rss", source: "France 24" }
+			]
+		},
+		EUR: {
+			gl: "EUR",
+			label: "Europe",
+			icon: "🇪🇺",
+			merge: [
+				{ url: "https://www.france24.com/ar/%D8%A3%D9%88%D8%B1%D9%88%D8%A8%D8%A7/rss", source: "France 24" }
 			]
 		}
 	},
@@ -361,6 +378,14 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 				{ url: "https://feeds.bbci.co.uk/russian/rss.xml", source: "BBC Russian" },
 				{ url: "https://www.rfi.fr/ru/rss", source: "RFI" }
 			]
+		},
+		US: {
+			gl: "US",
+			label: "U.S.",
+			icon: "🇺🇸",
+			merge: [
+				{ url: "https://www.golosameriki.com/api/zjj_rl-vomx-tpeb_to", source: "VOA" }
+			]
 		}
 	},
 	fa: {
@@ -372,6 +397,12 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 				{ url: "https://feeds.bbci.co.uk/persian/rss.xml", source: "BBC Persian" },
 				{ url: "https://www.rfi.fr/fa/rss", source: "RFI" }
 			]
+		},
+		US: {
+			gl: "US",
+			label: "U.S.",
+			icon: "🇺🇸",
+			merge: [{ url: "https://ir.voanews.com/api/", source: "VOA" }]
 		}
 	},
 	vi: {
@@ -383,6 +414,12 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 				{ url: "https://feeds.bbci.co.uk/vietnamese/rss.xml", source: "BBC Vietnamese" },
 				{ url: "https://www.rfi.fr/vi/rss", source: "RFI" }
 			]
+		},
+		US: {
+			gl: "US",
+			label: "U.S.",
+			icon: "🇺🇸",
+			merge: [{ url: "https://www.voatiengviet.com/api/zruyyl-vomx-tpeoiut", source: "VOA" }]
 		}
 	},
 	sw: {
@@ -418,6 +455,12 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "Global",
 			icon: "🌐",
 			merge: [{ url: "https://feeds.bbci.co.uk/indonesia/rss.xml", source: "BBC Indonesia" }]
+		},
+		US: {
+			gl: "US",
+			label: "U.S.",
+			icon: "🇺🇸",
+			merge: [{ url: "https://www.voaindonesia.com/api/z_qroml-vomx-tpevuoom", source: "VOA" }]
 		}
 	},
 	uk: {
@@ -466,6 +509,12 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "Global",
 			icon: "🌐",
 			merge: [{ url: "https://feeds.bbci.co.uk/thai/rss.xml", source: "BBC Thai" }]
+		},
+		US: {
+			gl: "US",
+			label: "U.S.",
+			icon: "🇺🇸",
+			merge: [{ url: "https://www.voathai.com/api/zgkyvl-vomx-tpe-put", source: "VOA" }]
 		}
 	},
 	pt: {
@@ -477,6 +526,18 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 				{ url: "https://feeds.bbci.co.uk/portuguese/rss.xml", source: "BBC Brasil" },
 				{ url: "https://www.rfi.fr/br/rss", source: "RFI Brasil" }
 			]
+		},
+		US: {
+			gl: "US",
+			label: "U.S.",
+			icon: "🇺🇸",
+			merge: [{ url: "https://www.rfi.fr/br/am%C3%A9ricas/rss", source: "RFI" }]
+		},
+		EUR: {
+			gl: "EUR",
+			label: "Europe",
+			icon: "🇪🇺",
+			merge: [{ url: "https://www.rfi.fr/br/europa/rss", source: "RFI" }]
 		}
 	},
 	de: {
@@ -512,6 +573,12 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "Global",
 			icon: "🌐",
 			merge: [{ url: "https://www.rfi.fr/cn/rss", source: "RFI" }]
+		},
+		ASI: {
+			gl: "ASI",
+			label: "Asia",
+			icon: "🌏",
+			merge: [{ url: "https://www.rfi.fr/cn/%E4%BA%9A%E6%B4%B2/rss", source: "RFI" }]
 		}
 	},
 	ja: {
@@ -544,10 +611,13 @@ export function newsRegionsFor(code: string): NewsRegion[] | null {
 	const have = new Set(feed.regions.map((r) => r.gl));
 	return [
 		// Fallback editions read English, so their headlines always
-		// translate into the learner's language (never English).
-		...feed.regions.map((r) =>
-			feed.fallback ? { ...r, translate: true as const } : r
-		),
+		// translate into the learner's language (never English) —
+		// unless a native desk stands in for the home region.
+		...feed.regions.map((r) => {
+			const native = NATIVE_REGIONS[code]?.[r.gl];
+			if (native) return native;
+			return feed.fallback ? { ...r, translate: true as const } : r;
+		}),
 		...WORLD_REGIONS.filter((r) => !have.has(r.gl)).map((r) => {
 			const region = NATIVE_REGIONS[code]?.[r.gl] ?? r;
 			return region.merge
