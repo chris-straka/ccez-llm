@@ -148,12 +148,11 @@ checkout: a commit is already on the user's disk, so never say "pull".
 
 Never let git or a browser prompt for a password. The remote is HTTPS via
 the `gh` token (`gh auth setup-git`); if a push would prompt, stop and
-report. `gh` keeps its token in the login keychain, and a Homebrew
-upgrade swaps the binary, so the old "Always Allow" no longer applies:
-every push then prompts until the owner clicks Always Allow once for
-the new `gh`. After a `brew upgrade` (check `ls -l /opt/homebrew/bin/gh`),
-expect one prompt, ask the owner to click Always Allow, and hold pushes
-until they confirm. Playwright Chromium launches with `--use-mock-keychain` (see
+report. Keychain dialogs during a session are almost always the dev app
+(`target/debug/ccez-llm`), not git: check with
+`/usr/bin/log show --last 1h --predicate 'process == "securityd" AND
+eventMessage CONTAINS "displaying keychain prompt"'` before blaming a
+tool (zsh shadows `log`, so use the full path). Playwright Chromium launches with `--use-mock-keychain` (see
 `playwright.config.ts`; same flag for any `/tmp` browser probe). The
 bundled Chromium is ad-hoc-signed, so Always Allow never sticks to it;
 prompts from `playwright-mcp` servers mean they launched without the flag
