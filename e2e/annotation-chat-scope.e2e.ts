@@ -2,7 +2,9 @@ import { expect, test } from "@playwright/test";
 import { seedChat, toggleSidebar } from "./helpers";
 
 /** Draft annotations belong to one chat: leaving files them away,
-restoring them on return, and the other chat's composer stays clean. */
+restoring them on return, and the other chat stays clean. Drafts
+live at their badges now (the composer dock lists pinned notes
+only), so the badge is the scope signal. */
 test("annotation drafts stay with their chat", async ({ page }) => {
 	await seedChat(page, [
 		{
@@ -20,7 +22,7 @@ test("annotation drafts stay with their chat", async ({ page }) => {
 	await page.locator('.sel-menu button:has-text("Annotate")').click();
 	await expect(page.locator(".ann-pop")).toBeVisible();
 	await page.keyboard.press("Enter");
-	const draft = page.locator(".prompt-tools .ann-wrap");
+	const draft = page.locator("article.assistant button.ccez-ann-badge");
 	await expect(draft).toHaveCount(1);
 
 	// New chat B: composer starts clean.
@@ -29,7 +31,7 @@ test("annotation drafts stay with their chat", async ({ page }) => {
 	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
 	await page.locator('button[aria-label="New chat"]').click();
 	await expect(page.locator(".hero")).toBeVisible();
-	await expect(page.locator(".prompt-tools .ann-wrap")).toHaveCount(0);
+	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(0);
 
 	// Back to chat A: the draft is restored, not duplicated. New chats
 	// append at the bottom (see newChat), so A is still the first row.
@@ -39,5 +41,7 @@ test("annotation drafts stay with their chat", async ({ page }) => {
 	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
 	const rows = page.locator("aside ul li button.side-chat");
 	await rows.nth(0).click();
-	await expect(page.locator(".prompt-tools .ann-wrap")).toHaveCount(1);
+	await expect(
+		page.locator("article.assistant button.ccez-ann-badge")
+	).toHaveCount(1);
 });
