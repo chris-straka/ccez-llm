@@ -188,6 +188,13 @@ export interface AppSettings {
 	 * with type size, so the owner picks what reads best. */
 	lineHeight: number;
 	/**
+	 * Big-word reader (reader.ts): "off" reads aloud as before;
+	 * "follow" opens the full-screen phrase view and moves on with the
+	 * voice; "tap" reads one phrase per tap. Applies to the read-aloud
+	 * button and right-click / selection Speak. Default off.
+	 */
+	readerMode: "off" | "follow" | "tap";
+	/**
 	 * Seconds of no mouse/keyboard/touch input before the main prompt
 	 * slides down out of view (any input restores it instantly).
 	 */
@@ -460,6 +467,7 @@ export function defaultSettings(): AppSettings {
 		showMessageButtons: true,
 		messageGap: MESSAGE_GAP_DEFAULT,
 		lineHeight: LINE_HEIGHT_DEFAULT,
+		readerMode: "off",
 		promptIdleSec: PROMPT_IDLE_DEFAULT,
 		voiceLangPinned: false,
 		theme: "system",
@@ -735,6 +743,7 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 				Math.max(MESSAGE_GAP_MIN, merged.messageGap)
 			);
 		}
+		if (!["off", "follow", "tap"].includes(merged.readerMode)) merged.readerMode = "off";
 		// Backfill line spacing on older saves; clamp strays into range.
 		if (typeof merged.lineHeight !== "number" || Number.isNaN(merged.lineHeight))
 			merged.lineHeight = LINE_HEIGHT_DEFAULT;

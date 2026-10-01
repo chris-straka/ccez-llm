@@ -185,6 +185,20 @@
 		</label>
 	{/if}
 	<VoicePanel {settings} {androidUI} {followVoice} />
+	<fieldset>
+		<legend>Big-word reader</legend>
+		<div class="segmented" role="radiogroup" aria-label="Big-word reader">
+			{#each [["off", "Off"], ["follow", "Follows the voice"], ["tap", "Tap for next"]] as const as [mode, label] (mode)}
+				<button
+					type="button"
+					role="radio"
+					aria-checked={settings.readerMode === mode}
+					class:selected={settings.readerMode === mode}
+					onclick={() => (settings.readerMode = mode)}>{label}</button
+				>
+			{/each}
+		</div>
+	</fieldset>
 	<!-- Study-fonts and lesson-audio sections removed (lesson-audio
 	froze the app): the inventory helpers stay in
 	fontCoverage.ts and nativeTts.ts for their remaining callers. -->

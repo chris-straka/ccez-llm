@@ -490,6 +490,16 @@
 	} from "$lib/chatExport";
 	import { nativeSaveMarkdown, nativeSaveText } from "$lib/nativeExport";
 	import FlashcardDeck from "$lib/components/FlashcardDeck.svelte";
+	import ReaderView from "$lib/components/ReaderView.svelte";
+	import {
+		phraseIndexAtOffset,
+		readerKeyAction,
+		readerPhrases,
+		readerStep,
+		startReader,
+		type ReaderEvent,
+		type ReaderState
+	} from "$lib/reader";
 	import {
 		ankiExport,
 		ankiFilename,
@@ -1480,6 +1490,11 @@
 		if (!annotateMode.selMenu) return;
 		const menu = annotateMode.selMenu;
 		buzzTap();
+		if (settings.readerMode !== "off") {
+			annotateMode.selMenu = null;
+			void openReader(menu.quote);
+			return;
+		}
 		// Japanese kanji speak their sentence reading, never the raw
 		// fragment (right-click parity): になる美 alone converts to
 		// になるうつくしい — the bare quote would read 美 as ビ with
@@ -2421,6 +2436,56 @@
 		} catch (error) {
 			if (!isPermissionDismissal(error)) flashErrorToast("Could not export flashcards");
 		}
+	}
+	/**
+	 * Big-word reader (see reader.ts): the open session (null closed)
+	 * and the voice routing for its text. The reader speaks phrase by
+	 * phrase through startSpeech; a generation guard drops ends from
+	 * phrases a pause, jump, or close already replaced.
+	 */
+	let reader = $state<ReaderState | null>(null);
+	const readerOpen = $derived(reader !== null);
+	let readerLang: string | ((sentence: string) => string) = "en-US";
+	let readerSeq = 0;
+	async function openReader(text: string, offset = 0): Promise<void> {
+		const mode = settings.readerMode;
+		if (mode === "off") return;
+		const phrases = readerPhrases(text);
+		if (phrases.length === 0) return;
+		const fallback = latinFallback(settings.voiceLang);
+		const voices = webVoices();
+		const seed = await quoteLangFor(text, fallback);
+		readerLang = await sentenceLangsFor(text, seed, voices, fallback);
+		reader = startReader(phrases, mode, phraseIndexAtOffset(text, phrases, offset));
+		speakReaderPhrase();
+	}
+	function speakReaderPhrase(): void {
+		const phrase = reader?.phrases[reader.index];
+		if (!phrase) return;
+		const seq = ++readerSeq;
+		const lang = typeof readerLang === "function" ? readerLang(phrase.sentence) : readerLang;
+		startSpeech("reader", phrase.text, lang, false, () => {
+			if (seq === readerSeq) stepReader("spoken");
+		});
+	}
+	function stepReader(event: ReaderEvent): void {
+		if (!reader) return;
+		const next = readerStep(reader, event);
+		reader = next.state;
+		if (next.effects.close) {
+			closeReader();
+			return;
+		}
+		if (next.effects.stop) {
+			readerSeq++;
+			stopVoice();
+		}
+		if (next.effects.speak) speakReaderPhrase();
+	}
+	function closeReader(): void {
+		readerSeq++;
+		reader = null;
+		if (speakingId === "reader") stopVoice();
 	}
 	/** Filter text for the shortcuts modal (⌘F focuses it while open). */
 	let shortcutQuery = $state("");
@@ -6296,7 +6361,9 @@
 		id: string,
 		text: string,
 		lang: string | ((sentence: string) => string),
-		quiet = false
+		quiet = false,
+		/** Natural end only (never stop/cancel): the reader's advance. */
+		onNaturalEnd?: () => void
 	): void {
 		stopSpeaking();
 		stopNative();
@@ -6326,6 +6393,7 @@
 		let fellBack = false;
 		const callbacks: SpeakCallbacks = {
 			onEnd: resetVoice,
+			onNaturalEnd,
 			onError: (message) => {
 				if (speechErrorStep({ useNative, fellBack }) === "fallback") {
 					// The bridge failed: say why, then read this utterance
@@ -6338,6 +6406,7 @@
 						);
 					const ok = speakWeb({
 						onEnd: resetVoice,
+						onNaturalEnd,
 						onError: (webMessage) => {
 							if (!quiet) setVoiceError(webMessage);
 							resetVoice();
@@ -6380,6 +6449,10 @@
 			return;
 		}
 		const stripped = speakable.replace(/```[\s\S]*?```/g, " ");
+		if (!quiet && settings.readerMode !== "off") {
+			void openReader(stripped);
+			return;
+		}
 		// Whole-message voice seeds the Latin sentences; each one then
 		// resolves its own language, so four languages read in four
 		// voices (see sentenceLangsFor).
@@ -6545,6 +6618,11 @@
 		} else quote = paragraph;
 		if (!quote.trim()) {
 			buzzNo();
+			return;
+		}
+		// Reader on: read from this sentence to the end of the message.
+		if (settings.readerMode !== "off") {
+			void openReader(full, at);
 			return;
 		}
 		void speakQuote(quote, msg.id, false, paragraph);
@@ -8941,7 +9019,7 @@
 			start: { x: number; y: number; clean: boolean },
 			ended: { clientX: number; clientY: number }
 		): EdgePanel | null {
-			if (!androidUI || !start.clean || shortcutsOpen || flashcardsOpen || inspectChar)
+			if (!androidUI || !start.clean || shortcutsOpen || flashcardsOpen || readerOpen || inspectChar)
 				return null;
 			if (window.getSelection()?.isCollapsed === false) return null;
 			return contentSwipeTarget(
@@ -9502,7 +9580,7 @@
 				} else if (multiTouchSeen) {
 					return;
 				}
-				if (!androidUI || shortcutsOpen || flashcardsOpen || inspectChar || !start) return;
+				if (!androidUI || shortcutsOpen || flashcardsOpen || readerOpen || inspectChar || !start) return;
 				const touch = event.changedTouches[0];
 				if (!touch) return;
 				// No travel limit: dragging the selection handles across
@@ -9814,7 +9892,7 @@
 			);
 		}
 		const gestureClean = (event: TouchEvent): boolean => {
-			if (!androidUI || shortcutsOpen || flashcardsOpen) return false;
+			if (!androidUI || shortcutsOpen || flashcardsOpen || readerOpen) return false;
 			const target = event.target;
 			return (
 				!(target instanceof Element) ||
@@ -9844,7 +9922,7 @@
 					// slide; only clean ones pair taps, and taps never
 					// pair mid-select (see the guards below).
 					const modalBusy =
-						shortcutsOpen || flashcardsOpen || palette.open || inspectChar !== null;
+						shortcutsOpen || flashcardsOpen || readerOpen || palette.open || inspectChar !== null;
 					const clean = !modalBusy && gestureClean(event);
 					twoTrack =
 						a && b && androidUI && !modalBusy
@@ -10334,6 +10412,16 @@
 		};
 
 		const onKey = (event: KeyboardEvent) => {
+			// The reader owns the keyboard while open (same fence as
+			// the deck below): Space taps, arrows step, Esc closes.
+			if (reader) {
+				const readerKey = readerKeyAction({ ...keyFacts(event), repeat: event.repeat });
+				if (readerKey === "pass") return;
+				consumeEvent(event);
+				if (readerKey === "close") closeReader();
+				else if (readerKey !== "swallow") stepReader(readerKey);
+				return;
+			}
 			// Flashcards own the keyboard while open: deck keys act,
 			// other bare keys stop here so the chat behind stays put.
 			if (deck) {
@@ -12542,6 +12630,12 @@
 			const msg = article
 				? chat.messages[Number(article.id.slice(4))]
 				: undefined;
+			// Reader on: the click opens the big-word reader from the
+			// sentence under the cursor (speakUnitAtPoint routes it).
+			if (msg && !clickInSelection && settings.readerMode !== "off") {
+				speakUnitAtPoint(event.clientX, event.clientY, "sentence");
+				return;
+			}
 			if (msg && !clickInSelection) {
 				const word = wordUnderCursor(event, body);
 				if (word) {
@@ -13760,6 +13854,9 @@
 		/>
 	{/if}
 
+	{#if reader}
+		<ReaderView {reader} onEvent={stepReader} onClose={closeReader} />
+	{/if}
 	{#if deck}
 		<FlashcardDeck
 			session={deck}
