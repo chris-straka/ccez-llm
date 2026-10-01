@@ -11,30 +11,44 @@
 //! never steal focus or touch the taskbar, and throttling stays off
 //! so challenge scripts run while hidden.
 
+#[cfg(any(test, desktop))]
 use std::sync::atomic::{AtomicU64, Ordering};
+#[cfg(desktop)]
 use std::sync::{mpsc, OnceLock};
+#[cfg(desktop)]
 use std::time::{Duration, Instant};
 
+use tauri::AppHandle;
+#[cfg(desktop)]
 use tauri::utils::config::BackgroundThrottlingPolicy;
-use tauri::{AppHandle, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+#[cfg(desktop)]
+use tauri::{WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
+#[cfg(desktop)]
 use crate::fetch::fetchable_url;
 
 /// Load budget per story (passive challenge solves land inside it).
+#[cfg(desktop)]
 const LOAD_BUDGET: Duration = Duration::from_secs(12);
 /// Ready-poll beat.
+#[cfg(desktop)]
 const POLL_BEAT: Duration = Duration::from_millis(300);
 /// One eval round-trip cap (a wedged renderer must not eat the budget).
+#[cfg(desktop)]
 const EVAL_TIMEOUT: Duration = Duration::from_secs(2);
 /// Settle after `complete` (challenge redirects, late metas).
+#[cfg(desktop)]
 const SETTLE_AFTER_COMPLETE: Duration = Duration::from_millis(1500);
 /// Share-meta read cap.
+#[cfg(desktop)]
 const META_TIMEOUT: Duration = Duration::from_secs(3);
 
 /// Ready-state probe: always a JSON string (Windows swallows eval
 /// exceptions, so every snippet try/catches and stringifies).
+#[cfg(any(test, desktop))]
 const READY_JS: &str = r#"(() => { try { return document.readyState; } catch (e) { return "unknown"; } })()"#;
 /// Share metas as one JSON string: og:image first, twitter:image next.
+#[cfg(any(test, desktop))]
 const METAS_JS: &str = r#"(() => { try {
   const meta = (sel, attr) => {
     const el = document.querySelector(sel);
@@ -47,23 +61,28 @@ const METAS_JS: &str = r#"(() => { try {
   });
 } catch (e) { return JSON.stringify({ og: null, tw: null }); } })()"#;
 
+#[cfg(desktop)]
 fn lane() -> &'static tauri::async_runtime::Mutex<()> {
     static LANE: OnceLock<tauri::async_runtime::Mutex<()>> = OnceLock::new();
     LANE.get_or_init(|| tauri::async_runtime::Mutex::new(()))
 }
 
+#[cfg(any(test, desktop))]
 static LABEL_SEQ: AtomicU64 = AtomicU64::new(0);
 
+#[cfg(any(test, desktop))]
 fn next_label() -> String {
     format!("ogimg-{}", LABEL_SEQ.fetch_add(1, Ordering::Relaxed))
 }
 
 /// Bridge JSON string out of an eval result (results arrive
 /// JSON-serialized, so a returned string arrives quoted). Pure.
+#[cfg(any(test, desktop))]
 fn eval_string(result: &str) -> Option<String> {
     serde_json::from_str(result).ok()
 }
 
+#[cfg(any(test, desktop))]
 #[derive(serde::Deserialize)]
 struct ShareMetas {
     og: Option<String>,
@@ -71,6 +90,7 @@ struct ShareMetas {
 }
 
 /// First non-blank candidate, og:image before twitter:image. Pure.
+#[cfg(any(test, desktop))]
 fn pick_share_image(og: Option<&str>, tw: Option<&str>) -> Option<String> {
     [og, tw]
         .into_iter()
@@ -84,6 +104,7 @@ fn pick_share_image(og: Option<&str>, tw: Option<&str>) -> Option<String> {
 /// protocol-relative, and data: candidates pass through; root- and
 /// path-relative ones join the page origin/dir by string ops (no url
 /// crate at hand). Pure.
+#[cfg(any(test, desktop))]
 fn resolve_candidate(page_url: &str, candidate: &str) -> Option<String> {
     let cand = candidate.trim();
     if cand.is_empty() {
@@ -120,6 +141,7 @@ fn resolve_candidate(page_url: &str, candidate: &str) -> Option<String> {
 
 /// One eval round-trip on the blocking pool (std channel: no new
 /// async deps for this module).
+#[cfg(desktop)]
 fn eval_blocking(window: &WebviewWindow, js: &str, wait: Duration) -> Option<String> {
     let (tx, rx) = mpsc::channel();
     window
@@ -130,6 +152,7 @@ fn eval_blocking(window: &WebviewWindow, js: &str, wait: Duration) -> Option<Str
     rx.recv_timeout(wait).ok()
 }
 
+#[cfg(desktop)]
 fn page_ready(window: &WebviewWindow) -> bool {
     eval_blocking(window, READY_JS, EVAL_TIMEOUT)
         .and_then(|s| eval_string(&s))
@@ -138,6 +161,7 @@ fn page_ready(window: &WebviewWindow) -> bool {
 
 /// Load, settle, and read one hidden window. Blocking: runs on the
 /// blocking pool under the lane mutex; the caller destroys the window.
+#[cfg(desktop)]
 fn read_from_window(window: &WebviewWindow, page_url: &str) -> Result<Option<String>, String> {
     let deadline = Instant::now() + LOAD_BUDGET;
     loop {
@@ -157,6 +181,7 @@ fn read_from_window(window: &WebviewWindow, page_url: &str) -> Result<Option<Str
     Ok(picked.and_then(|c| resolve_candidate(page_url, &c)))
 }
 
+#[cfg(desktop)]
 fn read_share_image(app: AppHandle, page_url: &str) -> Result<Option<String>, String> {
     let url = tauri::Url::parse(page_url).map_err(|_| "bad-url".to_string())?;
     let window = WebviewWindowBuilder::new(&app, next_label(), WebviewUrl::External(url))

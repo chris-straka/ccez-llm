@@ -13,7 +13,7 @@ on:
   pull_request:
 
 # A newer push to the same ref supersedes the older run: the old jobs
-# are cancelled instead of burning three OS runners on stale code.
+# are cancelled instead of burning four OS runners on stale code.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -105,3 +105,37 @@ jobs:
           workspaces: "src-tauri -> target"
           shared-key: "windows"
       - run: cargo check --locked --target ${{ matrix.target }}
+
+  # The release's Android leg is the only `not(desktop)` target shipped:
+  # mobile shells run a single webview, so window-builder methods like
+  # `focused`/`skip_taskbar` don't exist there and only this job compiles
+  # that cfg. v0.7.0 proved the gap: every gate stayed green while the
+  # release's Android leg failed on `og_image.rs`. Build scripts still
+  # compile C for the target under `cargo check`, so the NDK install is
+  # required (same revision the release leg uses); the Android platform
+  # package is not — only the Gradle APK build needs that.
+  rust-android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src-tauri
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Install Android NDK
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          [ -x "$SDKMANAGER" ] || SDKMANAGER="$(echo "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | cut -d' ' -f1)"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" "ndk;30.0.16138531"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/30.0.16138531" >> "$GITHUB_ENV"
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "src-tauri -> target"
+      - run: cargo check --locked --target aarch64-linux-android
