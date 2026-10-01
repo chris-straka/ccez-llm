@@ -237,6 +237,7 @@
 		commitRefsEdit,
 		planClearSentRefs,
 		seedAnnotationsFromRefs,
+		annotationsAfterEdit,
 		annotationCopyText,
 		filePendingAnnotation,
 		promptAnnWashIdFor,
@@ -825,7 +826,7 @@
 	$effect(() => {
 		saveDraftAnnotations(
 			chatState.activeChatId,
-			annotations,
+			filedAnnotations(),
 			chatState.chats.map((c) => c.id)
 		);
 	});
@@ -1049,6 +1050,20 @@
 	/** Own message under in-place edit (null when no edit is open).
 	Enter saves + resends; Alt+Enter saves without resending; Esc cancels. */
 	let editingMsgId: ChatMsgId | null = $state(null);
+	/**
+	 * The chat's filed annotations while an own-message edit borrows
+	 * the live list for its ref seeds (see annotationsAfterEdit):
+	 * stashed at entry, restored when the edit ends.
+	 */
+	let editAnnStash: { chatId: ChatId; list: Annotation[]; seedIds: Set<string> } | null =
+		null;
+	/** The active chat's annotations as storage should see them: mid-edit
+	 * the live list holds the edited message's seeds, not the drafts. */
+	function filedAnnotations(): Annotation[] {
+		const stash = editAnnStash;
+		if (!stash) return annotations;
+		return annotationsAfterEdit(stash.list, annotations, stash.seedIds, false);
+	}
 	/** In-place editor handle (null unless an own-message edit is mounted). */
 	let msgEditor: PromptEditor | null = null;
 	/** Seed text for the in-place editor (prose plus image-marker lines). */
@@ -2342,7 +2357,7 @@
 	/** Every chat's answered annotations; the active chat reads live. */
 	function harvestAllCards(): ReviewCard[] {
 		return harvestCards(chatState.chats, (id) =>
-			id === chatState.activeChatId ? annotations : loadDraftAnnotations(id)
+			id === chatState.activeChatId ? filedAnnotations() : loadDraftAnnotations(id)
 		);
 	}
 	/** Due count for the empty-chat entry, recounted when a chat empties. */
@@ -2725,7 +2740,7 @@
 			// drafts under another's id.
 			saveDraftAnnotations(
 				from,
-				annotations,
+				filedAnnotations(),
 				chatState.chats.map((c) => c.id)
 			);
 			selectChat(chatState, id);
@@ -3895,7 +3910,7 @@
 			// on return would come back blank).
 			saveDraftAnnotations(
 				chatState.activeChatId,
-				annotations,
+				filedAnnotations(),
 				chats.map((c) => c.id)
 			);
 			resetDraftExtras();
@@ -3957,6 +3972,7 @@
 
 	/** Unsent composer extras quote one chat's messages — never carry over. */
 	function resetDraftExtras(): void {
+		editAnnStash = null;
 		annotations = [];
 		reviewOpen = false;
 		editingMsgId = null;
@@ -4005,7 +4021,7 @@
 		// blank (same ordering as transitionToChat's save-before-load).
 		saveDraftAnnotations(
 			chatState.activeChatId,
-			annotations,
+			filedAnnotations(),
 			chatState.chats.map((c) => c.id)
 		);
 		resetDraftExtras();
@@ -7520,7 +7536,13 @@
 		const msg = chat.messages[index];
 		if (!msg) return;
 		const refs = annRefsFor(msg.content);
-		annotations = refs ? seedAnnotationsFromRefs(msg.id, refs.refs) : [];
+		const seeds = refs ? seedAnnotationsFromRefs(msg.id, refs.refs) : [];
+		editAnnStash = {
+			chatId: chatState.activeChatId,
+			list: annotations,
+			seedIds: new Set(seeds.map((a) => a.id))
+		};
+		annotations = seeds;
 		editingAttachments = msg.attachments ? [...msg.attachments] : [];
 		// Message content carries no stripped markers on save, so the
 		// seed keeps its marker lines: recount instead of reconciling,
@@ -7548,8 +7570,15 @@
 	 * Inline-edit-only reset: drops the edit (annotations, attachments,
 	 * edit id) while leaving the composer's own draft exactly alone.
 	 */
-	function resetInlineEdit(): void {
-		annotations = [];
+	function resetInlineEdit(saved = false): void {
+		const stash = editAnnStash;
+		editAnnStash = null;
+		annotations = annotationsAfterEdit(
+			stash && stash.chatId === chatState.activeChatId ? stash.list : null,
+			annotations,
+			stash?.seedIds ?? new Set(),
+			saved
+		);
 		reviewOpen = false;
 		editingMsgId = null;
 		editingAttachments = [];
@@ -7628,7 +7657,7 @@
 			// annotation edit gets ("Annotation edited").
 			flashToast("Message edited");
 		}
-		resetInlineEdit();
+		resetInlineEdit(id !== null);
 	}
 
 	/**
@@ -8402,7 +8431,7 @@
 			chatScrollTops.delete(id);
 			saveDraftAnnotations(
 				chatState.activeChatId,
-				annotations,
+				filedAnnotations(),
 				chatState.chats.map((c) => c.id)
 			);
 		}
@@ -8575,7 +8604,7 @@
 				if (!exists) return;
 				saveDraftAnnotations(
 					chatState.activeChatId,
-					annotations,
+					filedAnnotations(),
 					chatState.chats.map((c) => c.id)
 				);
 				selectChat(chatState, link.chatId as ChatId);

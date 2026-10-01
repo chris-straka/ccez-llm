@@ -489,9 +489,10 @@ export function formatAnnotations(
 			const head = `${i + 1}. "${a.quote}"`;
 			// Empty comments file as "?" so the model sees the confusion
 			// instead of a bare quote that reads as settled context.
-			const asked = a.comment.trim()
-				? `${head} — ${a.comment.trim()}`
-				: `${head} — ?`;
+			// Newlines collapse like the reply's: a Shift+Enter comment
+			// would otherwise split the entry and corrupt the parse.
+			const comment = a.comment.trim().replace(/\s+/g, " ");
+			const asked = comment ? `${head} — ${comment}` : `${head} — ?`;
 			// The reply rides on its own continuation line, newlines
 			// collapsed: answers stay short (capped at ask time), and a
 			// single line keeps the block line-parseable — a raw
@@ -631,7 +632,9 @@ export function rewriteAnnotationComment(
 	if (!split.refs.some((ref) => ref.n === n)) return null;
 	return withAnnotations(
 		split.text,
-		split.refs.map((ref) => (ref.n === n ? { quote: ref.quote, comment } : ref))
+		// Rewording the note keeps the reply it already got (the pencil
+		// never re-asks), so the Answer line survives the rebake.
+		split.refs.map((ref) => (ref.n === n ? { ...ref, comment } : ref))
 	);
 }
 
@@ -1424,9 +1427,12 @@ export function planClearSentRefs(
 }
 
 /**
- * Seed pending annotations from a message's baked refs (REFACTOR §6):
- * the baked block is provider context, not edit text, so saving
- * re-bakes the same context from these seeds.
+ * Seed pending annotations from a message's baked refs: the baked
+ * block is provider context, not edit text, so saving re-bakes the
+ * same context from these seeds. They arrive pinned (already approved
+ * once — unpinning or deleting one in the dock drops it from the
+ * save) with their answers, so an untouched save rebakes the block
+ * as it was. The bake's "?" placeholder reads back as no comment.
  */
 export function seedAnnotationsFromRefs(
 	messageId: ChatMsgId,
@@ -1436,8 +1442,30 @@ export function seedAnnotationsFromRefs(
 		id: newAnnotationId(),
 		messageId,
 		quote: r.quote,
-		comment: r.comment
+		comment: r.comment === "?" ? "" : r.comment,
+		...(r.answer ? { answer: r.answer } : {}),
+		pinnedToPrompt: true
 	}));
+}
+
+/**
+ * The chat's annotations once an own-message edit ends. The edit
+ * swaps the live list for the message's ref seeds, so the filed list
+ * is stashed at entry and comes back here, plus anything filed during
+ * the edit that the save didn't bake (seeds never survive: they live
+ * in the message). Null stash (edit opened in another chat) keeps the
+ * live extras only.
+ */
+export function annotationsAfterEdit(
+	stash: Annotation[] | null,
+	live: Annotation[],
+	seedIds: ReadonlySet<string>,
+	saved: boolean
+): Annotation[] {
+	const extras = live.filter(
+		(a) => !seedIds.has(a.id) && !(saved && a.pinnedToPrompt === true)
+	);
+	return [...(stash ?? []), ...extras];
 }
 
 /**

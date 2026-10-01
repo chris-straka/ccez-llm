@@ -35,6 +35,7 @@ import {
 	commitRefsEdit,
 	planClearSentRefs,
 	seedAnnotationsFromRefs,
+	annotationsAfterEdit,
 	annotationCopyText,
 	filePendingAnnotation,
 	promptAnnWashIdFor,
@@ -317,6 +318,27 @@ describe("rewriteAnnotationComment", () => {
 
 	it("rebakes byte-for-byte when the comment is unchanged", () => {
 		expect(rewriteAnnotationComment(baked, 1, "greeting?")).toBe(baked);
+	});
+
+	it("keeps the edited ref's answer line", () => {
+		const answered = withAnnotations("", [
+			{ quote: "bonjour", comment: "greeting?", answer: "hello" }
+		]);
+		const out = rewriteAnnotationComment(answered, 1, "formal?");
+		expect(splitAnnotationBlock(out ?? "")?.refs).toEqual([
+			{ n: 1, quote: "bonjour", comment: "formal?", answer: "hello" }
+		]);
+	});
+
+	it("collapses a multi-line comment so the block still parses", () => {
+		const out = withAnnotations("", [
+			{ quote: "bonjour", comment: "line one\nline two", answer: "hi" },
+			{ quote: "merci", comment: "", answer: "thanks" }
+		]);
+		expect(splitAnnotationBlock(out)?.refs).toEqual([
+			{ n: 1, quote: "bonjour", comment: "line one line two", answer: "hi" },
+			{ n: 2, quote: "merci", comment: "?", answer: "thanks" }
+		]);
 	});
 
 	it("files an empty comment as the ? marker, like the bake", () => {
@@ -1242,6 +1264,44 @@ describe("seedAnnotationsFromRefs", () => {
 		expect(seeded[0]).toMatchObject({ messageId: m1, quote: "a", comment: "x" });
 		expect(seeded[0]!.id).not.toBe(seeded[1]!.id);
 		expect(seedAnnotationsFromRefs(m1, [])).toEqual([]);
+	});
+
+	it("rebakes an untouched block byte-for-byte (pins and answers kept)", () => {
+		const content = withAnnotations("hallo", [
+			{ quote: "Bahnhof", comment: "", answer: "train station" },
+			{ quote: "Nähe", comment: "near?" }
+		]);
+		const split = splitAnnotationBlock(content)!;
+		const seeds = seedAnnotationsFromRefs("m1" as ChatMsgId, split.refs);
+		expect(seeds[0]?.comment).toBe("");
+		expect(withAnnotations(split.text, promptInclusions(seeds))).toBe(content);
+	});
+});
+
+describe("annotationsAfterEdit", () => {
+	const ann = (id: string, pinned = false): Annotation => ({
+		id: id as AnnotationId,
+		messageId: "m" as ChatMsgId,
+		quote: id,
+		comment: "",
+		...(pinned ? { pinnedToPrompt: true } : {})
+	});
+
+	it("restores the filed list and drops the seeds", () => {
+		const filed = [ann("filed")];
+		const live = [ann("seed", true)];
+		expect(annotationsAfterEdit(filed, live, new Set(["seed"]), false)).toEqual(filed);
+		expect(annotationsAfterEdit(filed, live, new Set(["seed"]), true)).toEqual(filed);
+	});
+
+	it("keeps notes filed mid-edit unless the save baked them", () => {
+		const live = [ann("seed", true), ann("new"), ann("newPinned", true)];
+		const ids = (list: Annotation[]) => list.map((a) => a.id);
+		expect(ids(annotationsAfterEdit([], live, new Set(["seed"]), true))).toEqual(["new"]);
+		expect(ids(annotationsAfterEdit(null, live, new Set(["seed"]), false))).toEqual([
+			"new",
+			"newPinned"
+		]);
 	});
 });
 

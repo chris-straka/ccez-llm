@@ -154,3 +154,59 @@ test("buttons hold still while another row is hovered mid-edit", async ({
 	);
 	expect(after).toEqual(before);
 });
+
+/** Editing a sent message keeps its baked annotations and the chat's
+filed ones: the edit used to strip the block on save and wipe the
+chat's drafts (answers included) from storage. */
+test("editing a message keeps baked refs and filed annotations", async ({
+	page
+}) => {
+	const baked =
+		'wo ist er?\n\nAnnotated selections:\n1. "Bahnhof" — ?\n   Answer: train station';
+	await seedChat(page, [
+		{ role: "assistant", content: "Der Bahnhof ist ganz in der Nähe." },
+		{ role: "user", content: baked }
+	]);
+	await page.addInitScript(() => {
+		window.localStorage.setItem(
+			"ccez-llm-annotations-v1",
+			JSON.stringify({
+				"e2e-chat": [
+					{
+						id: "filed",
+						messageId: "e2e-m0",
+						quote: "Nähe",
+						comment: "",
+						answer: "vicinity"
+					}
+				]
+			})
+		);
+	});
+	await page.goto("/");
+	const article = page.locator("article.user");
+	await article.hover();
+	await article
+		.locator('.actions button[aria-label="Edit this message"]')
+		.click();
+	const inline = page.locator(".msg-edit .ta-input");
+	await expect(inline).toHaveValue("wo ist er?");
+	await inline.click();
+	await page.keyboard.press("End");
+	await page.keyboard.type(" bitte");
+	await page.keyboard.press("Enter");
+	await expect(page.locator(".msg-edit")).toHaveCount(0);
+
+	const stored = await page.evaluate(() => ({
+		chats: JSON.parse(window.localStorage.getItem("ccez-llm-chats-v1") ?? "[]"),
+		drafts: JSON.parse(
+			window.localStorage.getItem("ccez-llm-annotations-v1") ?? "{}"
+		)
+	}));
+	expect(stored.chats[0].messages[1].content).toBe(
+		'wo ist er? bitte\n\nAnnotated selections:\n1. "Bahnhof" — ?\n   Answer: train station'
+	);
+	expect(stored.drafts["e2e-chat"]).toEqual([
+		expect.objectContaining({ id: "filed", answer: "vicinity" })
+	]);
+});
