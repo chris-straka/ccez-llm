@@ -301,6 +301,10 @@ export class NewsMode {
 		const { code, region } = current;
 		try {
 			let stories = await loadNewsStories(code, region, fetchRawPage);
+			// Images resolve off links alone, so start them while the
+			// (slower) headline translation runs — not after. Dropped
+			// dupes may resolve needlessly; the keyed writes ignore them.
+			void this.resolveNewsImages(code, region, stories);
 			const target = newsRegionsFor(code)?.find((r) => r.gl === region);
 			if (target?.translate) {
 				if (this.newsSeq !== seq || this.news?.code !== code || this.news?.region !== region) return;
@@ -326,8 +330,9 @@ export class NewsMode {
 				if (hit) prefill[s.link] = hit;
 				else if (this.newsImageSession.get(s.link) === null) prefill[s.link] = null;
 			}
+			// Images already resolving since load (see above) —
+			// completed hits prefill here, the rest settle in.
 			this.newsImages = prefill;
-			void this.resolveNewsImages(code, region, stories);
 		} catch (error) {
 			if (this.newsSeq !== seq || this.news?.code !== code) return;
 			const message = error instanceof Error ? error.message : "";
