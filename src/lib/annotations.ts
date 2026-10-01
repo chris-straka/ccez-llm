@@ -150,19 +150,6 @@ export interface AnnotationMark {
 }
 
 /**
- * Badge face for a mark: always its per-message number, always
- * titled to open. Pinning happens by double-click (badge or keyboard
- * Enter with the card open) and never rewrites the face — numbers
- * stay put from filing to delete.
- */
-export function badgeFace(item: { number: number }): {
-	text: string;
-	title: string;
-} {
-	return { text: String(item.number), title: "Open annotation" };
-}
-
-/**
  * Prompt badge count for the annotation tracker: the number, capped at
  * 99+ so the badge never stretches the prompt tools.
  */
@@ -308,6 +295,37 @@ export function unansweredAnnotations(list: Annotation[]): Annotation[] {
 }
 
 /**
+ * Numbering/preview core behind buildMarksFor/buildStoryMarks: filed
+ * notes take their filing order (per message or story, never
+ * chat-global), plus the pending preview when it belongs here.
+ */
+function numberMarks(
+	mine: Annotation[],
+	pending: Annotation | null,
+	pendingHere: boolean,
+	withAidScope: boolean
+): AnnotationMark[] {
+	const saved: AnnotationMark[] = mine.map((a, i) => ({
+		id: a.id,
+		number: i + 1,
+		quote: a.quote,
+		at: a.at ?? 0,
+		...(withAidScope && a.aidScope ? { aidScope: a.aidScope } : {}),
+		answer: a.answer ? "ready" : "waiting"
+	}));
+	if (pending && pendingHere) {
+		saved.push({
+			id: pending.id,
+			number: mine.length + 1,
+			quote: pending.quote,
+			at: pending.at ?? 0,
+			preview: true
+		});
+	}
+	return saved;
+}
+
+/**
  * Badge array for one message, unmemoized (REFACTOR §6): aid-scoped
  * quotes only show while the aid is on (they locate against aided
  * text), and a composed-but-unsubmitted annotation washes while its
@@ -325,32 +343,13 @@ export function buildMarksFor(
 	const mine = list.filter(
 		(a) => a.messageId === messageId && aidMarkVisible(a.aidScope, tashkeelOn)
 	);
-	const saved: AnnotationMark[] = mine.map((a, i) => ({
-		id: a.id,
-		// Per-message numbers (see annotationNumber): the message's
-		// own index, never the chat-global one.
-		number: i + 1,
-		quote: a.quote,
-		at: a.at ?? 0,
-		...(a.aidScope ? { aidScope: a.aidScope } : {}),
-		answer: a.answer ? "ready" : "waiting"
-	}));
-	if (pending && pending.messageId === messageId) {
-		saved.push({
-			id: pending.id,
-			number: mine.length + 1,
-			quote: pending.quote,
-			at: pending.at ?? 0,
-			preview: true
-		});
-	}
-	return saved;
+	return numberMarks(mine, pending, pending?.messageId === messageId, true);
 }
 
 /**
- * Badge array for one news headline: the story's own filing order
- * (see annotationNumber), pending preview included, no aid scope
- * (headlines never carry aids). Mirrors buildMarksFor.
+ * Badge array for one news headline: the story's own filing order,
+ * pending preview included, no aid scope (headlines never carry
+ * aids). Mirrors buildMarksFor.
  */
 export function buildStoryMarks(
 	list: Annotation[],
@@ -358,23 +357,7 @@ export function buildStoryMarks(
 	pending: Annotation | null
 ): AnnotationMark[] {
 	const mine = list.filter((a) => a.story?.link === link);
-	const saved: AnnotationMark[] = mine.map((a, i) => ({
-		id: a.id,
-		number: i + 1,
-		quote: a.quote,
-		at: a.at ?? 0,
-		answer: a.answer ? "ready" : "waiting"
-	}));
-	if (pending?.story?.link === link) {
-		saved.push({
-			id: pending.id,
-			number: mine.length + 1,
-			quote: pending.quote,
-			at: pending.at ?? 0,
-			preview: true
-		});
-	}
-	return saved;
+	return numberMarks(mine, pending, pending?.story?.link === link, false);
 }
 
 /** Headline marks grouped by story link (see buildStoryMarks). */

@@ -21,6 +21,12 @@ function badges(root: HTMLElement): string[] {
 	);
 }
 
+function badgeTitles(root: HTMLElement): (string | null)[] {
+	return [...root.querySelectorAll("[data-ann-badge]")].map((b) =>
+		b.getAttribute("title")
+	);
+}
+
 describe("applyMarks with several annotations in one message", () => {
 	it("stamps an adjacent later quote (no overlap)", () => {
 		const root = arabicBody();
@@ -30,6 +36,9 @@ describe("applyMarks with several annotations in one message", () => {
 		];
 		applyMarks(root, items, false, "a2");
 		expect(badges(root)).toEqual(["1", "2"]);
+		// Faces are numbers only (no plus/minus): pinning happens by
+		// double-click and leaves the face alone.
+		expect(badgeTitles(root)).toEqual(["Open annotation", "Open annotation"]);
 		expect(root.querySelectorAll("mark.ccez-ann").length).toBeGreaterThan(0);
 	});
 

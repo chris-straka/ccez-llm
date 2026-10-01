@@ -63,7 +63,7 @@ export type WashRampStep = string | null;
  * Pure fade schedule both directions. In runs D3 → D1 → live
  * (~100ms: fast enough to feel responsive); out runs D1 → D2 → D3
  * → clear (~140ms on top of the hover hysteresis). The walker lives
- * in annotations.ts next to the registry ownership.
+ * in annotations-stamp.ts next to the registry ownership.
  */
 export function washRampSchedule(ramp: "in" | "out"): WashRampStep[] {
 	return ramp === "in"

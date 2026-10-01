@@ -6,10 +6,8 @@
  */
 import {
 	badgeAnswerClass,
-	badgeFace,
 	hasRtlQuote,
 	quoteDirection,
-	type AnnotationId,
 	type AnnotationMark
 } from "./annotations";
 import {
@@ -33,7 +31,8 @@ import {
 	liveWashRanges,
 	paintAnnotationWash,
 	sameWashRanges,
-	washRampSchedule
+	washRampSchedule,
+	type WashRampStep
 } from "./annHighlights";
 
 /** Minimal grapheme-segment view (Intl.Segmenter when present). */
@@ -283,26 +282,6 @@ export function unwrapMark(mark: HTMLElement): void {
 		if (mark.isConnected) mark.replaceWith(...[...mark.childNodes]);
 	} catch {
 		mark.remove();
-	}
-}
-/**
- * Sync mounted badge faces to their marks (text and title only —
- * never nodes, never marks): renumbers must not move any text.
- * Writes only when the face differs, so steady re-stamps are DOM
- * no-ops. Unknown ids (deleted mid-flight) keep their last face.
- */
-function syncBadgeFaces(root: ParentNode, items: AnnotationMark[]): void {
-	const byId = new Map(items.map((i) => [i.id, i]));
-	for (const badge of root.querySelectorAll<HTMLButtonElement>(
-		"button[data-ann-badge]"
-	)) {
-		const item = byId.get(
-			(badge.getAttribute("data-ann-badge") ?? "") as AnnotationId
-		);
-		if (!item) continue;
-		const face = badgeFace(item);
-		if (badge.textContent !== face.text) badge.textContent = face.text;
-		if (badge.title !== face.title) badge.title = face.title;
 	}
 }
 /**
@@ -941,6 +920,65 @@ export function invalidateWashPaint(root: HTMLElement): void {
 }
 
 /**
+ * One registry wash-ramp walker, shared by the fade-in (D3 → D1 →
+ * live) and the fade-out (D1 → D2 → D3 → clear): each timer step
+ * guards on the tracked wash id (a superseding paint owns it now),
+ * then re-locates (a mid-ramp re-stamp detaches the captured
+ * ranges, and repainting dead ranges would blink nothing), paints
+ * the next grade BEFORE dropping the one it replaces (the registry
+ * never sits empty mid-fade — an empty frame reads as a blink —
+ * and paint+clear land in one task so no two grades visibly
+ * stack), and forces the shell overlay to display (un-nudged steps
+ * surface late and partial — bottom-up bands, never a fade). One
+ * grade on screen at a time: stacked twins overlap and read as a
+ * stuck dim copy that blinks on the next paint. The null schedule
+ * terminator (fade-out) and the exhausted schedule (fade-in, whose
+ * first grade lands synchronously) both settle through `settle`.
+ */
+function runWashRamp(opts: {
+	root: HTMLElement;
+	items: AnnotationMark[];
+	track: string;
+	schedule: WashRampStep[];
+	stepMs: number;
+	step: number;
+	prev: string;
+	settle: () => void;
+}): void {
+	let { step, prev } = opts;
+	const { root, items, track, schedule, stepMs, settle } = opts;
+	const tick = (): void => {
+		washRamp = {
+			timer: setTimeout(() => {
+				washRamp = null;
+				if (liveWashId !== track) return;
+				const name = schedule[step++] ?? null;
+				if (name === null) {
+					settle();
+					return;
+				}
+				const fresh = washRanges(root, items, track);
+				if (fresh.length === 0) {
+					liveWashId = null;
+					clearAnnotationWashes();
+					invalidateWashPaint(root);
+					return;
+				}
+				paintAnnotationWash(fresh, name);
+				if (prev !== name) clearAnnotationWash(prev);
+				invalidateWashPaint(root);
+				prev = name;
+				if (step >= schedule.length) settle();
+				else tick();
+			}, stepMs),
+			root,
+			wash: track
+		};
+	};
+	tick();
+}
+
+/**
  * Paint the wash through the Highlight API: ranges over the untouched
  * DOM — hovering a badge or opening a draft moves zero DOM nodes, so
  * markers never flicker and shaping never breaks. The fade walks
@@ -1002,61 +1040,33 @@ function paintWashHighlight(
 				invalidateWashPaint(root);
 			} else {
 				// First grade lands now (no extra lag), the rest walk in.
-				// Every step re-locates: a mid-ramp re-stamp (streaming
-				// tokens) detaches the captured ranges, and repainting
-				// dead ranges would blink nothing.
 				const schedule = washRampSchedule("in");
 				paintAnnotationWash(ranges, schedule[0]!);
 				// The clear above drops the old id's ranges, which this
 				// paint never repaints — force the whole root so a
 				// same-body slide leaves no ghost of the old wash.
 				invalidateWashPaint(root);
-				// One grade on screen at a time: stacked twins overlap
-				// each other and read as a stuck dim copy that blinks on
-				// the next paint — each step drops the grade it replaces.
-				let prev = schedule[0]!;
-				let step = 1;
-				const tick = (): void => {
-					washRamp = {
-						timer: setTimeout(() => {
-							washRamp = null;
-							// Re-hovered or cleared mid-step: the fresh paint owns it now.
-							if (liveWashId !== wash) return;
-							const fresh = washRanges(root, items, wash);
-							if (fresh.length === 0) {
-								liveWashId = null;
-								clearAnnotationWashes();
-								invalidateWashPaint(root);
-								return;
-							}
-							const name = schedule[step++]!;
-							paintAnnotationWash(fresh, name);
-							if (prev !== name) clearAnnotationWash(prev);
-							// Force every step to display: the shell
-							// overlay repaints only on forced frames, so
-							// un-nudged steps surface late and partial —
-							// bottom-up bands, never a fade.
-							invalidateWashPaint(root);
-							prev = name;
-							if (step < schedule.length) tick();
-							else {
-								// Settled on live: drop the twins so only the live
-								// name holds ranges (a leftover twin reads as a
-								// stuck wash and blinks on the next paint), then
-								// force the repaint: registry deletes alone don't
-								// invalidate the shell overlay, so a stale twin
-								// sliver would stick above the wash until the next
-								// incidental repaint (scroll, hover, selection).
-								clearAnnotationWash(ANN_HIGHLIGHT_D3);
-								clearAnnotationWash(ANN_HIGHLIGHT_D1);
-								invalidateWashPaint(root);
-							}
-						}, WASH_FADE_IN_STEP_MS),
-						root,
-						wash
-					};
-				};
-				tick();
+				runWashRamp({
+					root,
+					items,
+					track: wash,
+					schedule,
+					stepMs: WASH_FADE_IN_STEP_MS,
+					step: 1,
+					prev: schedule[0]!,
+					settle: () => {
+						// Settled on live: drop the twins so only the live
+						// name holds ranges (a leftover twin reads as a
+						// stuck wash and blinks on the next paint), then
+						// force the repaint: registry deletes alone don't
+						// invalidate the shell overlay, so a stale twin
+						// sliver would stick above the wash until the next
+						// incidental repaint (scroll, hover, selection).
+						clearAnnotationWash(ANN_HIGHLIGHT_D3);
+						clearAnnotationWash(ANN_HIGHLIGHT_D1);
+						invalidateWashPaint(root);
+					}
+				});
 			}
 			return;
 		}
@@ -1078,54 +1088,26 @@ function paintWashHighlight(
 			invalidateWashPaint(root);
 		} else {
 			// Live is already on screen — step dim → faint → clear.
-			// Every step re-locates (see the fade-in walker above).
 			const ranges = washRanges(root, items, painted);
 			if (ranges.length === 0) {
 				liveWashId = null;
 				clearAnnotationWashes();
 				invalidateWashPaint(root);
 			} else {
-				// Each step paints its grade BEFORE dropping the
-				// previous one: the registry never sits empty mid-fade
-				// (an empty frame reads as a blink), and paint+clear
-				// land in one task so no two grades visibly stack.
-				let prev: string | null = ANN_HIGHLIGHT_NAME;
-				const schedule = washRampSchedule("out");
-				let step = 0;
-				const tick = (): void => {
-					washRamp = {
-						timer: setTimeout(() => {
-							washRamp = null;
-							// A superseding paint already replaced it — stopping
-							// now never wipes the live wash.
-							if (liveWashId !== painted) return;
-							const name = schedule[step++]!;
-							if (name === null) {
-								liveWashId = null;
-								clearAnnotationWashes();
-								invalidateWashPaint(root);
-							} else {
-								const fresh = washRanges(root, items, painted);
-								if (fresh.length === 0) {
-									liveWashId = null;
-									clearAnnotationWashes();
-									invalidateWashPaint(root);
-								} else {
-									paintAnnotationWash(fresh, name);
-									if (prev !== null) clearAnnotationWash(prev);
-									// Same forced display as the fade-in
-									// walker above: un-nudged steps band.
-									invalidateWashPaint(root);
-									prev = name;
-									tick();
-								}
-							}
-						}, WASH_FADE_STEP_MS),
-						root,
-						wash: painted
-					};
-				};
-				tick();
+				runWashRamp({
+					root,
+					items,
+					track: painted,
+					schedule: washRampSchedule("out"),
+					stepMs: WASH_FADE_STEP_MS,
+					step: 0,
+					prev: ANN_HIGHLIGHT_NAME,
+					settle: () => {
+						liveWashId = null;
+						clearAnnotationWashes();
+						invalidateWashPaint(root);
+					}
+				});
 			}
 		}
 	}
@@ -1198,6 +1180,30 @@ function paintBadgeClasses(
 	}
 }
 
+/**
+ * Mount one badge on its anchor: reuse the live button when one is
+ * already on screen (same node, same anchor, same stacking — a hover
+ * can never catch the swap mid-flight and oscillate), then classes,
+ * face, and the direction mirror. Shared by the registry and legacy
+ * stamp loops; faces rewrite on every stamp, so renumbers land
+ * without a sync pass.
+ */
+function placeBadge(
+	anchor: HTMLElement,
+	item: AnnotationMark,
+	live: Map<string, HTMLButtonElement>,
+	settled: Set<string>
+): void {
+	const badge = live.get(item.id) ?? document.createElement("button");
+	badge.type = "button";
+	paintBadgeClasses(badge, item.answer, item.id, settled);
+	badge.dataset.annBadge = item.id;
+	badge.textContent = String(item.number);
+	badge.title = "Open annotation";
+	mirrorBadgeForDirection(badge, anchor, item.quote);
+	anchor.append(badge);
+}
+
 function stampBadges(
 	root: HTMLElement,
 	items: AnnotationMark[],
@@ -1252,18 +1258,7 @@ function stampBadges(
 		if (!loc) continue;
 		const anchor = anchorSpan(nodes, loc);
 		if (!anchor) continue;
-		// Reuse the live button when one is already on screen: same
-		// node, same anchor, same stacking — a hover can never catch
-		// the swap mid-flight and oscillate.
-		const badge = live.get(item.id) ?? document.createElement("button");
-		badge.type = "button";
-		paintBadgeClasses(badge, item.answer, item.id, settled);
-		badge.dataset.annBadge = item.id;
-		const face = badgeFace(item);
-		badge.textContent = face.text;
-		badge.title = face.title;
-		mirrorBadgeForDirection(badge, anchor, item.quote);
-		anchor.append(badge);
+		placeBadge(anchor, item, live, settled);
 	}
 }
 
@@ -1291,10 +1286,6 @@ function stampLegacy(
 	// need the full path to re-stamp them.
 	const wantBadges = skip ? 0 : items.filter((i) => !i.preview).length;
 	const haveBadges = root.querySelectorAll("[data-ann-badge]").length;
-	// Faces sync ahead of every branch (steady returns below): a
-	// renumber rewrites badge text/titles in place, never nodes,
-	// never marks — hovering a badge moves nothing at all.
-	syncBadgeFaces(root, items);
 	if (!skip && root.dataset.legacyStamped === sig && haveBadges === wantBadges) {
 		// A steady re-stamp drops the one-shot fades (marks and
 		// badges alike) and moves nothing at all.
@@ -1399,15 +1390,7 @@ function stampLegacy(
 		if (!freshLoc) continue;
 		const anchor = anchorSpan(freshNodes, freshLoc);
 		if (!anchor) continue;
-		const badge = live.get(item.id) ?? document.createElement("button");
-		badge.type = "button";
-		paintBadgeClasses(badge, item.answer, item.id, settled);
-		badge.dataset.annBadge = item.id;
-		const face = badgeFace(item);
-		badge.textContent = face.text;
-		badge.title = face.title;
-		mirrorBadgeForDirection(badge, anchor, item.quote);
-		anchor.append(badge);
+		placeBadge(anchor, item, live, settled);
 	}
 	if (fading) wrapLeaving(root, items, fading);
 }
@@ -1474,11 +1457,9 @@ function stampMarks(
 	if (!badgesCurrent) {
 		root.dataset.marksStamped = sig;
 		stampBadges(root, items, skip);
-	} else {
-		// Badges current but faces may have flipped (pin/arm): sync
-		// text/titles in place, same no-node rule as legacy.
-		syncBadgeFaces(root, items);
 	}
+	// Faces ride the loops above (numbers only): a matching signature
+	// means identical faces, so current badges need no sync pass.
 	paintWashHighlight(root, items, skip, wash);
 }
 

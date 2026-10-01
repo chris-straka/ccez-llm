@@ -21,7 +21,6 @@ import {
 	attachAnnotationAnswer,
 	unansweredAnnotations,
 	badgeAnswerClass,
-	badgeFace,
 	quoteDirection,
 	annEditCommitToast
 } from "./annotations";
@@ -288,19 +287,6 @@ describe("buildMarksFor", () => {
 		const loose = buildMarksFor(list, m1, false, null);
 		expect(loose[0]).not.toHaveProperty("pinned");
 		expect(loose[0]).not.toHaveProperty("armed");
-	});
-
-	it("faces every badge as its number, always", () => {
-		// Numbers never swap (no plus/minus): pinning happens by
-		// double-click and leaves the face alone.
-		expect(badgeFace({ number: 3 })).toEqual({
-			text: "3",
-			title: "Open annotation"
-		});
-		expect(badgeFace({ number: 12 })).toEqual({
-			text: "12",
-			title: "Open annotation"
-		});
 	});
 
 	it("hides aid-scoped quotes while the aid is off", () => {
