@@ -1082,3 +1082,11 @@ condensed from the Sep 23–24 chain (`0cda353`–`051257b`, tail
       `placeBadge`, and `runWashRamp` cores; `badgeFace` /
       `syncBadgeFaces` deleted (sync dead); face values re-pinned
       on real DOM; e2e 189/189 over the 12 gate runs (`4d9f97d`).
+- [x] E Prune refactor-history tests: 36 component source tests
+      deleted (ownership, prop/bind/actions wiring, retired
+      staged-pill/menuitemradio absence, hoverWash timer internals);
+      CSS/layout, scoping, security, a11y, and owner-decision pins
+      kept (AnnAnswer, AnnPop, CaptureOverlay, NewsPanel,
+      SettingsPanel untouched); 10 e2e trivia deleted (em-dash
+      keeper in annotations-ux). Gates: unit 2096, check/lint
+      clean, touched e2e 72/72 (`ef2e813`).
