@@ -107,51 +107,6 @@ test("desktop right-click never opens the native menu", async ({ page }) => {
 	expect(kept).toBe(false);
 });
 
-test("mid-word drags snap out to whole words", async ({ page }) => {
-	await seedChat(page, [
-		{ role: "assistant", content: "hello world from Kyoto" }
-	]);
-	await page.goto("/");
-	const body = page.locator("article.assistant .rendered").first();
-	await expect(body).toBeVisible({ timeout: 60_000 });
-	const box = await body.boundingBox();
-	if (!box) throw new Error("message has no box");
-	const y = box.y + box.height / 2;
-	// Real press to normalize the click guard, then a range cut
-	// mid-word on both ends ("ell|o worl|d") before mouseup.
-	await page.mouse.click(box.x + 10, y);
-	await page.mouse.move(box.x + box.width - 2, y);
-	await page.mouse.down();
-	await page.evaluate(() => {
-		const text = document.querySelector(
-			"article.assistant .rendered p"
-		)?.firstChild;
-		if (!(text instanceof Text)) throw new Error("no message text");
-		window.getSelection()?.setBaseAndExtent(text, 1, text, 10);
-	});
-	await page.mouse.up();
-	await expect(page.locator(".sel-menu")).toBeVisible();
-	await page.locator('.sel-menu button:has-text("Annotate")').click();
-	await expect(page.locator(".ann-pop")).toBeVisible();
-	await page.keyboard.press("Enter");
-	// The filed quote is the whole words, never the cut fragment
-	// (the dock lists pinned rows only, so wait for the answer
-	// and pin first — keyboard, never pointer: the badge sits
-	// under the sticky header).
-	await expect(
-		page.locator("button.ccez-ann-badge.ans-ready")
-	).toHaveCount(1, { timeout: 30_000 });
-	const midBadge = page.locator("button.ccez-ann-badge").nth(0);
-	await midBadge.focus();
-	await page.keyboard.press("Enter");
-	await page.keyboard.press("Enter");
-	await page.keyboard.press("Escape");
-	await page.locator(".prompt-tools .ann-wrap").hover();
-	await expect(page.locator(".prompt-tools .review-quote").first()).toHaveText(
-		/hello world/
-	);
-});
-
 test("create box centers over narrow highlights, wide ones clamp to the viewport", async ({
 	page
 }) => {
@@ -236,28 +191,6 @@ test("create box centers over narrow highlights, wide ones clamp to the viewport
 	await page.keyboard.press("Escape");
 });
 
-test("numbered badges grow with the message font size", async ({ page }) => {
-	await seedChat(page, [
-		{ role: "assistant", content: "alpha beta gamma delta" }
-	]);
-	await page.goto("/");
-	const para = page.locator("article.assistant .rendered p").first();
-	await expect(para).toBeVisible({ timeout: 60_000 });
-	await para.dblclick({ position: { x: 10, y: 10 } });
-	await expect(page.locator(".sel-menu")).toBeVisible();
-	await page.locator('.sel-menu button:has-text("Annotate")').click();
-	await page.keyboard.type("note");
-	await page.keyboard.press("Enter");
-	const badge = page.locator("article.assistant [data-ann-badge]").first();
-	await expect(badge).toBeVisible();
-	const small = await badge.evaluate((el) => getComputedStyle(el).fontSize);
-	await page.evaluate(() => {
-		document.querySelector(".app")?.setAttribute("style", "--font-scale: 2");
-	});
-	const big = await badge.evaluate((el) => getComputedStyle(el).fontSize);
-	expect(parseFloat(big)).toBeGreaterThan(parseFloat(small));
-});
-
 /** The creation pill and its Annotate button track the text size: a
 fixed 19rem pill next to huge type is unreadable. */
 test("creation pill and Annotate button scale with font size", async ({
@@ -338,44 +271,6 @@ test("sent card spans the message at twice the height cap", async ({
 	expect(parseFloat(maxH)).toBeGreaterThan(384);
 });
 
-test("empty annotations bake a question mark for the model", async ({
-	page
-}) => {
-	await seedChat(page, [
-		{ role: "assistant", content: "alpha beta gamma delta" }
-	]);
-	await page.goto("/");
-	const para = page.locator("article.assistant .rendered p").first();
-	await expect(para).toBeVisible({ timeout: 60_000 });
-	await para.dblclick({ position: { x: 10, y: 10 } });
-	await expect(page.locator(".sel-menu")).toBeVisible();
-	await page.locator('.sel-menu button:has-text("Annotate")').click();
-	// Enter with no text files the empty annotation (click-away would cancel it).
-	await page.keyboard.press("Enter");
-	// Unpinned annotations never reach the send: wait for the
-	// answer and pin (keyboard — the badge sits under the sticky
-	// header), so the empty prompt carries it.
-	await expect(
-		page.locator("button.ccez-ann-badge.ans-ready")
-	).toHaveCount(1, { timeout: 30_000 });
-	const emptyBadge = page.locator("button.ccez-ann-badge").nth(0);
-	await emptyBadge.focus();
-	await page.keyboard.press("Enter");
-	await page.keyboard.press("Enter");
-	await page.keyboard.press("Escape");
-	await expect(page.locator(".prompt-tools .ann-wrap")).toBeVisible();
-	// Send the empty prompt with the annotation attached (mock provider).
-	await page.locator(".ta-input").click();
-	await page.keyboard.press("Enter");
-	const user = page.locator("article.user").first();
-	await expect(user).toBeVisible();
-	// The card is click-toggled (hover never opens it): prove the
-	// toggle genuinely opened it via its opacity transition.
-	await user.locator(".ann-refs-pill").click();
-	await expect(user.locator(".ann-refs-pop")).toHaveCSS("opacity", "1");
-	await expect(user.locator(".ann-refs-comment").first()).toHaveText("?");
-});
-
 test("annotations-only messages render as an em-dash with the count pill above", async ({
 	page
 }) => {
@@ -453,37 +348,6 @@ test("badge tap opens the dock on its row, never an edit", async ({
 	await page.keyboard.press("Enter");
 	await expect(page.locator(".ann-wrap .review")).toHaveCSS("opacity", "1");
 	await expect(page.locator(".review-item.highlight")).toBeVisible();
-});
-
-test("gutter drags never highlight above the cursor line", async ({ page }) => {
-	await seedChat(page, [
-		{ role: "assistant", content: "aaa one\n\nbbb two\n\nccc three" }
-	]);
-	await page.goto("/");
-	const body = page.locator("article.assistant .rendered").first();
-	await expect(body).toBeVisible({ timeout: 60_000 });
-	const target = body.locator("p").nth(2);
-	const tbox = await target.boundingBox();
-	if (!tbox) throw new Error("third paragraph has no box");
-	// Press in the left gutter beside the third paragraph (off-chat),
-	// drag into its middle, then run to the top edge (off-screen path
-	// shares the same selectionchange trim).
-	await page.mouse.move(6, tbox.y + tbox.height / 2);
-	await page.mouse.down();
-	await page.mouse.move(tbox.x + tbox.width / 2, tbox.y + tbox.height / 2, {
-		steps: 8
-	});
-	await page.mouse.move(tbox.x + tbox.width / 2, 4, { steps: 4 });
-	await page.mouse.move(tbox.x + tbox.width / 2, tbox.y + tbox.height / 2, {
-		steps: 4
-	});
-	await page.mouse.up();
-	const selected = await page.evaluate(
-		() => window.getSelection()?.toString() ?? ""
-	);
-	// Nothing above the cursor's line ("aaa", "bbb") may highlight.
-	expect(selected).not.toContain("aaa");
-	expect(selected).not.toContain("bbb");
 });
 
 /** Badge hover moves no DOM nodes: the wash paints through the

@@ -125,32 +125,12 @@ export function duplicateAnnotationId(
 	return found ? found.id : null;
 }
 
-export function editAnnotationComment(
-	list: Annotation[],
-	id: string,
-	comment: string
-): Annotation[] {
-	return list.map((a) => (a.id === id ? { ...a, comment } : a));
-}
 
 export function deleteAnnotation(list: Annotation[], id: string): Annotation[] {
 	return list.filter((a) => a.id !== id);
 }
 
-export function clearAnnotations(): Annotation[] {
-	return [];
-}
 
-/** 1-based badge number of an annotation within its own anchor:
- * every message (and every story) restarts at 1 (twenty annotations
- * on one message never push the next message's first badge to 21).
- * Missing ids read 0, like before. */
-export function annotationNumber(list: Annotation[], id: AnnotationId): number {
-	const target = list.find((a) => a.id === id);
-	if (!target) return 0;
-	const key = anchorKey(target);
-	return list.filter((a) => anchorKey(a) === key).findIndex((a) => a.id === id) + 1;
-}
 
 /**
  * Single-character typographic folds so quotes match across markdown
@@ -843,11 +823,6 @@ export function redactedCopyText(body: string): string {
 	return split.refs.map((ref) => ref.quote).join("\n");
 }
 
-/** True when a baked block is the message's whole content (redact to REFS_ONLY_BODY). */
-export function isRefsOnly(content: string): boolean {
-	const split = annRefsFor(content);
-	return split !== null && split.text.trim() === "";
-}
 
 const WORD_CHAR_RE = /[\p{L}\p{N}_]/u;
 const COMBINING_RE = /\p{M}/u;
@@ -1257,19 +1232,6 @@ export function clampDragAnchorToFocusLine(
 	return anchorOffset < lineStart ? lineStart : anchorOffset;
 }
 
-/**
- * Key handling for the annotation review edit box: Enter saves
- * (Shift+Enter still newlines), Escape cancels. Anything else is
- * the textarea's own business.
- */
-export function reviewEditKey(
-	key: string,
-	shiftKey: boolean
-): "save" | "cancel" | null {
-	if (key === "Enter" && !shiftKey) return "save";
-	if (key === "Escape") return "cancel";
-	return null;
-}
 
 /**
  * Badge array for one message, unmemoized (REFACTOR §6): aid-scoped

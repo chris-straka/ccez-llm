@@ -4,10 +4,7 @@ import {
 	clearBakedAnnotations,
 	duplicateAnnotationId,
 	aidMarkVisible,
-	editAnnotationComment,
 	deleteAnnotation,
-	clearAnnotations,
-	annotationNumber,
 	formatAnnotations,
 	withAnnotations,
 	rewriteAnnotationComment,
@@ -27,7 +24,6 @@ import {
 	panelCenterMoved,
 	lineStartOffset,
 	clampDragAnchorToFocusLine,
-	reviewEditKey,
 	buildMarksFor,
 	buildStoryMarks,
 	buildNewsMarks,
@@ -35,6 +31,7 @@ import {
 	commitRefsEdit,
 	planClearSentRefs,
 	seedAnnotationsFromRefs,
+	annRefsFor,
 	annotationsAfterEdit,
 	annotationCopyText,
 	filePendingAnnotation,
@@ -55,7 +52,6 @@ import {
 	selMenuDragTarget,
 	annEditCommitToast,
 	REFS_ONLY_BODY,
-	isRefsOnly,
 	redactedCopyText,
 	pressExpandedSelection
 } from "./annotations";
@@ -63,7 +59,7 @@ import type { ChatMsgId } from "./chat";
 import type { Annotation, AnnotationId } from "./annotations";
 
 describe("annotations", () => {
-	it("adds, edits, deletes, and clears", () => {
+	it("adds and deletes", () => {
 		let list = addAnnotation(
 			[],
 			"m1" as ChatMsgId,
@@ -78,24 +74,8 @@ describe("annotations", () => {
 		list = addAnnotation(list, "m1" as ChatMsgId, "   ");
 		expect(list).toHaveLength(1);
 
-		list = editAnnotationComment(list, list[0]!.id, "edited");
-		expect(list[0]?.comment).toBe("edited");
-
 		list = deleteAnnotation(list, list[0]!.id);
 		expect(list).toEqual([]);
-
-		list = addAnnotation(
-			addAnnotation([], "m1" as ChatMsgId, "a"),
-			"m2" as ChatMsgId,
-			"b"
-		);
-		expect(clearAnnotations()).toEqual([]);
-		// Numbers restart at 1 on every message.
-		expect(annotationNumber(list, list[0]!.id)).toBe(1);
-		expect(annotationNumber(list, list[1]!.id)).toBe(1);
-		list = addAnnotation(list, "m2" as ChatMsgId, "c");
-		expect(annotationNumber(list, list[2]!.id)).toBe(2);
-		expect(annotationNumber(list, "missing" as AnnotationId)).toBe(0);
 	});
 
 	it("formats numbered quote/comment pairs for the prompt", () => {
@@ -922,15 +902,6 @@ describe("off-chat drag clamp", () => {
 	});
 });
 
-describe("reviewEditKey", () => {
-	it("maps Enter to save, Shift+Enter to nothing, Escape to cancel", () => {
-		expect(reviewEditKey("Enter", false)).toBe("save");
-		expect(reviewEditKey("Enter", true)).toBeNull();
-		expect(reviewEditKey("Escape", false)).toBe("cancel");
-		expect(reviewEditKey("a", false)).toBeNull();
-	});
-});
-
 describe("quoteDirection", () => {
 	it("reads the first strong character, not the paragraph", () => {
 		expect(quoteDirection("اليوم")).toBe("rtl");
@@ -952,7 +923,7 @@ describe("story-anchored annotations", () => {
 		quote,
 		comment: ""
 	});
-	it("groups dupes and numbers per story link, apart from messages", () => {
+	it("finds dupes per story link, apart from messages", () => {
 		const list: Annotation[] = [
 			storyNote("s1", "q"),
 			storyNote("s2", "qq"),
@@ -965,9 +936,6 @@ describe("story-anchored annotations", () => {
 		];
 		expect(duplicateAnnotationId(list, { story }, "q")).toBe("s1");
 		expect(duplicateAnnotationId(list, { story }, "missing")).toBeNull();
-		expect(annotationNumber(list, "s1" as AnnotationId)).toBe(1);
-		expect(annotationNumber(list, "s2" as AnnotationId)).toBe(2);
-		expect(annotationNumber(list, "m1a" as AnnotationId)).toBe(1);
 	});
 	it("excludes story notes from message marks", () => {
 		const list: Annotation[] = [storyNote("s1", "q")];
@@ -1017,10 +985,8 @@ describe("refs-only display", () => {
 	it("renders an annotations-only message as an em-dash", () => {
 		expect(REFS_ONLY_BODY).toBe("—");
 		const list = addAnnotation([], "m1" as ChatMsgId, "langue", "meaning?");
-		const content = withAnnotations("", list);
-		expect(isRefsOnly(content)).toBe(true);
-		expect(isRefsOnly(withAnnotations("explain", list))).toBe(false);
-		expect(isRefsOnly("just a prompt")).toBe(false);
+		expect(annRefsFor(withAnnotations("", list))?.text).toBe("");
+		expect(annRefsFor(withAnnotations("explain", list))?.text).toBe("explain");
 	});
 
 	it("redacts the baked block from message copy", () => {
