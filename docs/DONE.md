@@ -1074,3 +1074,7 @@ condensed from the Sep 23–24 chain (`0cda353`–`051257b`, tail
       assigns the list nowhere; controller (22) and
       `annotate()`/`openBadge()` (12) suites; e2e 133/133 over the
       11 gate files (`6b12202`).
+- [x] C Split annotations.ts: model stays, quote-match /
+      annotation-block / annotation-drafts-store / sel-geometry move
+      out verbatim (75 exports preserved); tests move with their
+      functions; stale comments fixed; e2e 69/69 (`b6b3ae9`).
