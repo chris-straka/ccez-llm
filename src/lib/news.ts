@@ -624,6 +624,12 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "Australia",
 			icon: "🇦🇺",
 			merge: [{ url: "https://www.rfi.fr/sw/lebo/australia/rss", source: "RFI" }]
+		},
+		CA: {
+			gl: "CA",
+			label: "Canada",
+			icon: "🇨🇦",
+			merge: [{ url: "https://www.rfi.fr/sw/lebo/canada/rss", source: "RFI" }]
 		}
 	},
 	ur: {
@@ -747,6 +753,12 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "Asia",
 			icon: "🌏",
 			merge: [{ url: "https://www.rfi.fr/br/tag/%C3%A1sia/rss", source: "RFI" }]
+		},
+		CA: {
+			gl: "CA",
+			label: "Canada",
+			icon: "🇨🇦",
+			merge: [{ url: "https://www.rfi.fr/br/tag/canad%C3%A1/rss", source: "RFI" }]
 		}
 	},
 	de: {

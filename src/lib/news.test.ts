@@ -188,18 +188,13 @@ describe("news feeds", () => {
 				.filter((r) => r.translate)
 				.map((r) => r.gl)
 		).toEqual([]);
-		// French, Spanish, Chinese, and Persian read every
-		// world chip natively; Portuguese keeps one translated
-		// chip (Canada has no RFI tag feed).
-		for (const code of ["fr", "es", "zh", "fa"]) {
+		// French, Spanish, Portuguese, Chinese, and Persian
+		// read every world chip natively — nothing left to
+		// translate.
+		for (const code of ["fr", "es", "pt", "zh", "fa"]) {
 			const regions = newsRegionsFor(code)!;
 			expect(regions.some((r) => r.translate)).toBe(false);
 		}
-		expect(
-			newsRegionsFor("pt")!
-				.filter((r) => r.translate)
-				.map((r) => r.gl)
-		).toEqual(["CA"]);
 		expect(fr.find((r) => r.gl === "GBL")?.translate).toBeUndefined();
 		expect(fr.find((r) => r.gl === "GBL")).toMatchObject({
 			label: "Global",
@@ -548,7 +543,9 @@ describe("news feeds", () => {
 			["fa", "ASI", ["rfi.fr/fa/"]],
 			["fa", "LAT", ["rfi.fr/fa/"]],
 			["ko", "US", ["voakorea.com/api/"]],
-			["am", "US", ["amharic.voanews.com/api/"]]
+			["am", "US", ["amharic.voanews.com/api/"]],
+			["sw", "CA", ["rfi.fr/sw/"]],
+			["pt", "CA", ["rfi.fr/br/tag/"]]
 		];
 		for (const [code, gl, hosts] of sections) {
 			const region = newsRegionsFor(code)!.find((r) => r.gl === gl)!;
