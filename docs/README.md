@@ -14,6 +14,6 @@ lives here, by kind.
   plugin inventory), `refactor.md` (extraction history and candidates).
 - `investigations/` — case files for hard bugs and evaluations:
   `tap-ghost-artifact.md` + `tap-ghost-log.md` (Android paint ghost),
-  `focus-drop.md` (desktop focus drops; `src/lib/focusDebug.ts` is its
-  opt-in probe), `cjkdecomp-eval.md`.
+  `focus-drop.md` (closed 2026-10-01: desktop focus drops fixed,
+  owner-verified gone on Mac, probe removed), `cjkdecomp-eval.md`.
 - `plans/` — dated plans of record. Finished plans stay as history.

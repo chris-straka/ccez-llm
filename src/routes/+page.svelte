@@ -381,11 +381,6 @@ import {
 		enterKeyAction
 	} from "$lib/keybindings";
 	import {
-		describeActiveElement,
-		describeFocusTarget,
-		focusLog
-	} from "$lib/focusDebug";
-	import {
 		closestFromTarget,
 		consumeEvent,
 		isClickControlTarget,
@@ -3067,10 +3062,6 @@ import {
 	}
 	/** Allowlisted restore: show the hidden prompt again. */
 	function restorePrompt(): void {
-		focusLog("restore-prompt", {
-			active: describeActiveElement(),
-			wasIdle: promptIdle
-		});
 		stampInput();
 		promptIdle = false;
 	}
@@ -3112,10 +3103,6 @@ import {
 		)
 			return;
 		promptIdle = true;
-		focusLog("hide-for-always", {
-			next: describeFocusTarget(next),
-			active: describeActiveElement()
-		});
 	}
 	/**
 	 * Idle-prompt key decisions live in `promptIdleKeyAction`
@@ -3239,10 +3226,6 @@ import {
 		const onFocusInIdle = (event: FocusEvent): void => {
 			if (settings.promptIdleSec !== PROMPT_IDLE_ALWAYS) return;
 			if (!closestFromTarget(event.target, ".prompt .ta-input")) return;
-			focusLog("focusin-idle", {
-				target: describeFocusTarget(event.target),
-				active: describeActiveElement()
-			});
 			restorePrompt();
 		};
 		const onFocusOutIdle = (event: FocusEvent): void => {
@@ -3266,13 +3249,6 @@ import {
 				if (event.target.closest("[inert]")) return;
 			}
 			const next: EventTarget | null = event.relatedTarget ?? null;
-			focusLog("focusout-idle", {
-				target: describeFocusTarget(event.target),
-				next: describeFocusTarget(next),
-				active: describeActiveElement(),
-				promptIdle,
-				pressAgeMs: Date.now() - promptPressAt
-			});
 			if (
 				(next === null || next === document.body) &&
 				Date.now() - promptPressAt < 1500
@@ -7892,10 +7868,6 @@ import {
 	}
 
 	function enterEditMode() {
-		focusLog("enter-edit-mode", {
-			from: focusMode,
-			active: describeActiveElement()
-		});
 		focusMode = "edit";
 		// A fresh editing context always shows the prompt: a minted
 		// chat (or any landing here) must never inherit a hidden bar.
@@ -7946,10 +7918,6 @@ import {
 	 * deactivated state (nothing selected, no focus stolen).
 	 */
 	function exitScrollMode(): void {
-		focusLog("exit-scroll-mode", {
-			from: focusMode,
-			active: describeActiveElement()
-		});
 		focusMode = "edit";
 		selectedIdx = -1;
 		if (document.activeElement instanceof HTMLElement)
@@ -10332,11 +10300,6 @@ import {
 					inOwnedTarget: isIdleOwnedTarget(event.target)
 				});
 				if (idleAction === "restore") {
-					focusLog("key-idle-restore", {
-						key: event.key,
-						target: describeFocusTarget(event.target),
-						active: describeActiveElement()
-					});
 					event.preventDefault();
 					restorePrompt();
 					// The visibility flip flushes async: focusing now
@@ -10346,11 +10309,6 @@ import {
 					return;
 				}
 				if (idleAction === "swallow") {
-					focusLog("key-idle-swallow", {
-						key: event.key,
-						target: describeFocusTarget(event.target),
-						active: describeActiveElement()
-					});
 					event.preventDefault();
 					return;
 				}
@@ -11066,15 +11024,6 @@ import {
 			// it owns j/k/space/l/Delete with preview-as-you-go. Bodies
 			// stay here as `if (sideAction === ...)` chains, never a switch.
 			const inSidebar = isSidebarTarget(event.target);
-			if (isFieldTarget(event.target)) {
-				focusLog("key-in-field", {
-					key: event.key,
-					target: describeFocusTarget(event.target),
-					active: describeActiveElement(),
-					focusMode,
-					promptIdle
-				});
-			}
 			const sideAction = sidebarListAction({
 				...keyFacts(event),
 				listOpen: !settings.sidebarCollapsed,
@@ -11082,14 +11031,6 @@ import {
 				inField: isFieldTarget(event.target),
 				inChatRow: isChatRowTarget(event.target)
 			});
-			if (sideAction !== null) {
-				focusLog("key-sidebar-consume", {
-					key: event.key,
-					action: sideAction,
-					target: describeFocusTarget(event.target),
-					active: describeActiveElement()
-				});
-			}
 			if (sideAction === "walk-down" || sideAction === "walk-up") {
 				// Walking switches to each chat (preview-as-you-go).
 				event.preventDefault();
@@ -11319,13 +11260,6 @@ import {
 				if (isFindBarTarget(event.target)) return;
 				return;
 			}
-			focusLog("key-scroll-consume", {
-				key: event.key,
-				action: scrollAction,
-				target: describeFocusTarget(event.target),
-				active: describeActiveElement(),
-				focusMode
-			});
 			if (scrollAction === "arm-g") {
 				// A lone g starts the gg beat without consuming the key.
 				lastGAt = Date.now();
@@ -11412,11 +11346,6 @@ import {
 			}
 		};
 		const onFocusIn = (event: FocusEvent) => {
-			focusLog("focusin", {
-				target: describeFocusTarget(event.target),
-				active: describeActiveElement(),
-				focusMode
-			});
 			if (closestFromTarget(event.target, ".ta-input")) {
 				focusMode = "edit";
 				// A frame later, like the annotation pill paths: the
@@ -11485,7 +11414,6 @@ import {
 			// Same boundary as MessageBody's badge click: stamped ids.
 			// The press point anchors the desktop edit menu; phones
 			// edit in the composer and ignore it.
-			focusLog("badge-press", { id, active: describeActiveElement() });
 			annotateMode.openBadge(id, { x: event.clientX, y: event.clientY });
 			annotateMode.lastBadgePress = { id, at: Date.now(), seq: mainPressSeq };
 		};
@@ -12050,10 +11978,6 @@ import {
 							) > 4
 						: false;
 					if (!endedDrag) {
-						focusLog("mouseup-clear-on-control", {
-							target: describeFocusTarget(event.target),
-							active: describeActiveElement()
-						});
 						// WebKit: clearing the selection on mouseup after a
 						// field took focus destroys the just-placed caret —
 						// later keystrokes dispatch yet never become text

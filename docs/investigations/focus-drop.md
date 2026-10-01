@@ -1,4 +1,4 @@
-# Focus-drop issue log (open, owner-reported)
+# Focus-drop issue log (closed 2026-10-01: owner checked all text fields on Mac, all good; probe removed)
 
 ## Symptoms (owner, macOS app AND browser preview)
 

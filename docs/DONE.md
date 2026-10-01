@@ -1090,3 +1090,6 @@ condensed from the Sep 23–24 chain (`0cda353`–`051257b`, tail
       SettingsPanel untouched); 10 e2e trivia deleted (em-dash
       keeper in annotations-ux). Gates: unit 2096, check/lint
       clean, touched e2e 72/72 (`ef2e813`).
+- [x] F Focus-drop probe: owner checked all text fields on Mac,
+      all good — deleted `focusDebug.ts`, its test, and all 14
+      `focusLog` calls; investigation doc closed in `docs/README.md`.
