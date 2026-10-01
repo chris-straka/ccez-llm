@@ -1103,4 +1103,4 @@ condensed from the Sep 23–24 chain (`0cda353`–`051257b`, tail
       the diff shows under the user message (struck dels,
       underlined inss), annotatable like any text; mock
       `ccez-mock-reply` hook. Gates: unit 2123, check/lint clean,
-      `correction.e2e.ts` 2/2 + render-adjacent 18/18.
+      `correction.e2e.ts` 2/2 + render-adjacent 18/18 (`40aafe3`).
