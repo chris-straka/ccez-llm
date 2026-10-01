@@ -278,31 +278,23 @@ export const CHAT_WIDTH_PHONE_MIN_REM = 46;
 /** Composer's own width base (rem): independent of the chat slider. */
 export const PROMPT_WIDTH_BASE_REM = 36;
 
-/**
- * Desktop line floor: the column never holds fewer than about this
- * many average characters (~0.5em each), whatever the slider says.
- * Below ~360% type the slider always wins; above it the column grows
- * with the type until `min(100%, …)` makes it the whole window
- * (owner call 2026-10-01: low-vision reading at up to 2000% left one
- * or two letters per line in a fixed 36rem strip).
- */
-export const MIN_LINE_CHARS = 20;
 /** Type scale at/above which message text hyphenates (300%). */
 export const HYPHENATE_FONT_SCALE = 3;
-const AVG_CHAR_EM = 0.5;
 
 /**
- * Effective chat column width (rem) for the --chat-width var. Desktop
- * rides the slider, floored so a line still holds MIN_LINE_CHARS at
- * the current type size. Phones go full-bleed once huge type needs
- * the room, and never narrower than the touch floor. Pure.
+ * Effective chat column width (rem) for the --chat-width var. The
+ * knobs move independently: desktop rides the slider alone, and
+ * scaling the type never widens the column (owner call, twice: the
+ * old auto-widen was removed in `146cb47`, and a ~20-character floor
+ * was tried and reverted 2026-10-01). Phones go full-bleed once huge
+ * type needs the room, and never narrower than the touch floor. Pure.
  */
 export function effectiveChatWidth(
 	androidUI: boolean,
 	fontScale: number,
 	chatWidth: number
 ): number {
-	if (!androidUI) return Math.max(chatWidth, MIN_LINE_CHARS * AVG_CHAR_EM * fontScale);
+	if (!androidUI) return chatWidth;
 	if (fontScale >= FULLBLEED_FONT_SCALE) return CHAT_WIDTH_FULLBLEED_REM;
 	return Math.max(CHAT_WIDTH_PHONE_MIN_REM, chatWidth);
 }

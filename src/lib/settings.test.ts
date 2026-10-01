@@ -311,17 +311,15 @@ describe("settings", () => {
 		expect(loadSettings(memoryStore).replyNotifications).toBe(true);
 	});
 
-	it("sizes the chat column off the slider, floored to ~20 characters, full-bleed on huge phone type", () => {
-		// Desktop: the slider owns the width until a line would drop
-		// under MIN_LINE_CHARS; then the column grows with the type
-		// (200rem at 2000% reads as the whole window via min(100%)).
+	it("sizes the chat column off the slider alone, full-bleed on huge phone type", () => {
+		// Desktop: scaling the type never widens the column — the
+		// slider owns the width at every size, even grandma's 2000%
+		// (a character floor was tried and reverted 2026-10-01).
 		expect(effectiveChatWidth(false, 1, 36)).toBe(36);
 		expect(effectiveChatWidth(false, 2, 36)).toBe(36);
-		expect(effectiveChatWidth(false, 3.6, 36)).toBe(36);
-		expect(effectiveChatWidth(false, 4, 36)).toBe(40);
-		expect(effectiveChatWidth(false, 4, 60)).toBe(60);
-		expect(effectiveChatWidth(false, 20, 36)).toBe(200);
-		expect(effectiveChatWidth(false, 1, 120)).toBe(120);
+		expect(effectiveChatWidth(false, 4, 36)).toBe(36);
+		expect(effectiveChatWidth(false, 20, 36)).toBe(36);
+		expect(effectiveChatWidth(false, 20, 120)).toBe(120);
 		expect(effectiveChatWidth(true, 1, 36)).toBe(46);
 		expect(effectiveChatWidth(true, 3.29, 36)).toBe(46);
 		expect(effectiveChatWidth(true, 3.3, 36)).toBe(CHAT_WIDTH_FULLBLEED_REM);
@@ -338,10 +336,8 @@ describe("settings", () => {
 		expect(effectivePromptWidth(false, 4, 36)).toBe(36);
 		expect(effectivePromptWidth(false, 14, 36)).toBe(36);
 		// …still capped by the column (and the 36rem base holds
-		// under a wider one). At 4x the line floor already widens a
-		// 28rem column to 40rem, so the base holds there too.
-		expect(effectivePromptWidth(false, 2, 28)).toBe(28);
-		expect(effectivePromptWidth(false, 4, 28)).toBe(36);
+		// under a wider one).
+		expect(effectivePromptWidth(false, 4, 28)).toBe(28);
 		expect(effectivePromptWidth(false, 4, 60)).toBe(36);
 		// Phones: the touch floor still caps a narrow pin.
 		expect(effectivePromptWidth(true, 1, 36)).toBe(36);
