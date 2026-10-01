@@ -187,7 +187,7 @@ describe("news feeds", () => {
 				.slice(-7)
 				.filter((r) => r.translate)
 				.map((r) => r.gl)
-		).toEqual(["GB", "AU", "LAT", "ASI"]);
+		).toEqual(["LAT", "ASI"]);
 		expect(fr.find((r) => r.gl === "GBL")?.translate).toBeUndefined();
 		expect(fr.find((r) => r.gl === "GBL")).toMatchObject({
 			label: "Global",
@@ -261,10 +261,19 @@ describe("news feeds", () => {
 		).toHaveLength(3);
 		expect(fr.find((r) => r.gl === "GB")).toMatchObject({
 			label: "U.K.",
-			hl: "en-GB"
+			merge: [
+				{
+					url: "https://www.france24.com/fr/tag/royaume-uni/rss",
+					source: "France 24"
+				},
+				{
+					url: "https://www.rfi.fr/fr/tag/royaume-uni/rss",
+					source: "RFI"
+				}
+			]
 		});
 		expect(newsRssUrl("fr", "US")).toBeNull();
-		expect(newsRssUrl("fr", "GB")).toContain("hl=en-GB&gl=GB");
+		expect(newsRssUrl("fr", "GB")).toBeNull();
 		expect(newsRssUrl("fr", "GBL")).toBeNull();
 		expect(newsRssUrl("fr", "EUR")).toBeNull();
 		expect(newsRssUrl("fr", "ASI")).toBeNull();
@@ -284,7 +293,7 @@ describe("news feeds", () => {
 			"🇨🇦"
 		);
 		// Latin America mixes Mexico, Brazil, Argentina; Spanish
-		// reads a native desk, Portuguese the two Spanish ones.
+		// and Portuguese read native desks.
 		expect(fr.find((r) => r.gl === "LAT")).toMatchObject({
 			label: "Latin America",
 			merge: [
@@ -310,11 +319,16 @@ describe("news feeds", () => {
 				source: "France 24"
 			}
 		]);
-		expect(
-			newsRegionsFor("pt")!.find((r) => r.gl === "LAT")?.merge
-		).toHaveLength(2);
+		const ptLat = newsRegionsFor("pt")!.find((r) => r.gl === "LAT");
+		expect(ptLat?.translate).toBeUndefined();
+		expect(ptLat?.merge).toMatchObject([
+			{
+				url: "https://www.rfi.fr/br/tag/am%C3%A9rica-latina/rss",
+				source: "RFI"
+			}
+		]);
 		expect(newsRssUrl("es", "CA")).toContain("hl=en-CA&gl=CA");
-		expect(newsRssUrl("es", "AU")).toContain("hl=en-AU&gl=AU");
+		expect(newsRssUrl("es", "AU")).toBeNull();
 		// Spanish keeps its native US, gains the other seven translated.
 		const es = newsRegionsFor("es")!;
 		expect(es.filter((r) => r.gl === "US")).toHaveLength(1);
@@ -474,7 +488,18 @@ describe("news feeds", () => {
 			["es", "EUR", ["france24.com/es/europa", "rfi.fr/es/europa"]],
 			["pt", "EUR", ["rfi.fr/br/europa"]],
 			["ar", "EUR", ["france24.com/ar/"]],
-			["zh", "ASI", ["rfi.fr/cn/"]]
+			["zh", "ASI", ["rfi.fr/cn/"]],
+			["fr", "GB", ["france24.com/fr/tag/", "rfi.fr/fr/tag/"]],
+			["fr", "AU", ["france24.com/fr/tag/", "rfi.fr/fr/tag/"]],
+			["es", "GB", ["france24.com/es/tag/", "rfi.fr/es/tag/"]],
+			["es", "AU", ["france24.com/es/tag/", "rfi.fr/es/tag/"]],
+			["pt", "GB", ["rfi.fr/br/tag/"]],
+			["pt", "AU", ["rfi.fr/br/tag/"]],
+			["pt", "LAT", ["rfi.fr/br/tag/"]],
+			["zh", "GB", ["rfi.fr/cn/"]],
+			["zh", "AU", ["rfi.fr/cn/"]],
+			["ru", "GB", ["rfi.fr/ru/"]],
+			["ru", "AU", ["rfi.fr/ru/"]]
 		];
 		for (const [code, gl, hosts] of sections) {
 			const region = newsRegionsFor(code)!.find((r) => r.gl === gl)!;
@@ -668,9 +693,11 @@ describe("news feeds", () => {
 		});
 		expect(seen).toEqual(["https://www.france24.com/es/am%C3%A9rica-latina/rss"]);
 		seen.length = 0;
-		await loadNewsStories("pt", "LAT", feed);
-		expect(seen).toHaveLength(2);
-		expect(seen.some((u) => u.includes("gl=BR"))).toBe(false);
+		await loadNewsStories("pt", "LAT", async (url) => {
+			seen.push(url);
+			return xml("AmLat");
+		});
+		expect(seen).toEqual(["https://www.rfi.fr/br/tag/am%C3%A9rica-latina/rss"]);
 	});
 
 	it("applies translated titles, dropping cross-language dupes", () => {
