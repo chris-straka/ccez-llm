@@ -1,192 +1,163 @@
 # Ccez LLM — agent handoff
 
-Tauri 2 + Svelte 5 (runes) + TypeScript desktop chatbot (macOS). BYOK chat with
-language-learner aids. Frontend owns UI/state; Rust backend is thin and
-privileged (Keychain, updater, native TTS).
+Tauri 2 + Svelte 5 (runes) + TypeScript BYOK chatbot with language-learner
+aids. Desktop (macOS primary, Windows/Linux) plus Android from the same
+codebase. The frontend owns UI and state; the Rust backend is thin and
+privileged (Keychain, updater, native TTS/OCR/dictation, page fetch,
+background turns).
+
+## Repo map
+
+- `src/routes/+page.svelte` — the app: state, effects, wiring (~13k lines
+  of script; markup lives in components). See "Structural debt".
+- `src/lib/components/` — markup + CSS for each surface (Composer,
+  ThreadView, MessageArticle, NewsPanel, settings panels, …).
+- `src/lib/*.ts` — pure, unit-tested logic, one concern per module:
+  `chat.ts` (chat state + branded ids), `settings.ts`, `keybindings.ts`
+  (key decisions), `annotations*.ts`, `reading.ts` / `furigana*.ts` /
+  `pinyin.ts` (reading aids), `voice.ts` + `nativeTts.ts` (speech),
+  `news.ts` (news feed), `tools.ts` + `fetchPage.ts` (model web lookup),
+  `providers/` (OpenAI-compatible streaming + tool loop), `native*.ts`
+  (Tauri bridges).
+- `src-tauri/src/` — Rust commands. `turn.rs` runs the same turn loop
+  natively (Android background turns) and must mirror the TypeScript
+  provider; `page_text.rs` mirrors the `tools.ts` cleaners for it.
+- `e2e/*.e2e.ts` — Playwright, seeded via `e2e/helpers.ts`.
+- `scripts/` — release, dev-shell signing, data generators.
+- `docs/` — everything that isn't README/AGENTS/TODO (index:
+  `docs/README.md`).
 
 ## Commands
 
-- `bun run dev` — browser-only preview at http://127.0.0.1:5200/ (no Tauri APIs;
-  everything must degrade cleanly here).
-- `bun run tauri dev` — full shell: Vite on :1420 + Rust backend + app window.
-  Use this when touching `src-tauri/` or Tauri invokes. First build compiles
-  ~400 crates; be patient.
-- Dev Keychain (macOS): unsigned relinks get a fresh code identity, so the
-  shell re-prompts once per Keychain item on every backend rebuild — and
-  no watcher can close that race (the app hits the Keychain before any
-  poll re-signs). `scripts/tauri-dev.sh` is the only supported launch:
-  it builds first, signs the fresh binary with the persistent local
-  self-signed "Ccez Dev" cert (login keychain, dev machine only, never
-  committed), then runs with `--no-watch` so no mid-session rebuild
-  disturbs the identity. Rust edits need Ctrl-C plus relaunch. Click
-  Always Allow, never Allow (Allow is single-use and repeats every
-  launch). Deny never sticks — each new access re-prompts, so
-  deny-clicking loops forever; quit the app instead and Always Allow
-  on relaunch (2 items: `provider:muse`, `providers`). Re-minting the
-  "Ccez Dev" keypair voids old grants (same name, new identity), so
-  never re-mint once grants exist. `scripts/sign-dev-binary.sh`
-  remains for manual use.
-- MCP driver sessions (see the running app like the user does):
-  `tauri-plugin-mcp-bridge` is debug-only and localhost-bound, so it
-  never ships — but it only loads after a dev-shell relaunch. Attach
-  with a driver `start`, verify with `status`, `stop` when done.
-- `bun run test` — Vitest, colocated `*.test.ts`. Safe anytime.
-- Spec-only changes (`e2e/`, `*.test.ts`) never touch the running app:
-  no restart, reload, or rerun needed — say so instead of implying one.
-- `bun run check` / `lint` / `build` — run `svelte-kit sync` and/or invalidate
-  HMR. Per owner instruction (Sep 2026): run these whenever needed, dev
-  servers or not — no idle batching.
+- `bun run dev` — browser-only preview at http://127.0.0.1:5200/. No Tauri
+  APIs; everything must degrade cleanly here.
+- `scripts/tauri-dev.sh` (`bun run tauri:dev`) — the only supported full
+  shell launch on macOS. It builds, signs the binary with the local
+  self-signed "Ccez Dev" cert so Keychain grants survive, then runs with
+  `--no-watch`. Rust edits need Ctrl-C and relaunch. Click Always Allow
+  (never Allow, never Deny) on the two Keychain items (`provider:muse`,
+  `providers`). Never re-mint the "Ccez Dev" keypair. First build compiles
+  ~400 crates.
+- MCP driver sessions: `tauri-plugin-mcp-bridge` is debug-only and
+  localhost-bound; it loads after a dev-shell relaunch. `start`, `status`,
+  `stop` when done.
+- `bun run test` (Vitest), `bun run check` (svelte-check strict),
+  `bun run lint`, `bun run build`. Run them whenever needed, dev servers
+  or not.
+- Rust: `cd src-tauri && cargo test --lib` (CI runs `cargo check --locked`
+  per target plus `cargo test --locked`).
+- Spec-only changes (`e2e/`, `*.test.ts`) never touch the running app: say
+  no restart is needed rather than implying one.
 
-## Verification economy (slow gates, run once)
+## Verification economy
 
-- Unit: run only the touched `*.test.ts` while iterating; full `bun run test`
-  once at the end.
-- `check`: once at the end, not after every edit.
-- Playwright: one invocation per file with combined `-g` patterns for every
-  new/affected test in it, then the full file once at the end. Never one
-  single-test invocation after another — each pays the dev-server wait again.
-  Batch across files too (multiple files in one invocation, separate ports
-  only for parallel runs): every fresh browser launch risks a login-keychain
-  password prompt for the user, so launches are budgeted — no probe specs,
-  no re-runs to "just look", no parallel same-file runs. When prompts are
-  already firing, stop launching entirely and say so.
-- Dev-server hygiene (user instruction Sep 2026): stop the user's other
-  dev shells (`vite dev`, `tauri dev`) before e2e runs — stale shells
-  serve old builds. MCP servers and browsers belong to other sessions:
-  only ever stop an MCP server that is orphaned (parent session dead);
-  otherwise relay the fix (`--user-data-dir`) to its owner instead.
-- Read failure output from that same run (list reporter prints the error);
-  don't re-run just to collect details.
-- Pristine-tree attribution (`git stash` + rerun) only when a failure
-  plausibly relates to the change and blocks; no throwaway debug specs when
-  reasoning plus one targeted run can answer it.
+- Iterate on the touched `*.test.ts`; full `bun run test` and `check` once
+  at the end.
+- Playwright: one invocation per file with combined `-g` patterns, then the
+  whole file once. Batch files into one invocation. Every browser launch
+  risks a login-keychain prompt for the user, so launches are budgeted: no
+  probe specs, no re-runs "just to look", no parallel same-file runs. If
+  prompts are firing, stop launching and say so.
+- Stop the user's other `vite dev` / `tauri dev` shells before e2e (stale
+  builds). Never stop another session's MCP server or browser unless its
+  parent is dead; relay the fix instead.
+- Read failures from the run that produced them; don't re-run for details.
+- `git stash` attribution only when a failure plausibly relates to the
+  change and blocks.
 
 ## Architecture rules (learned the hard way)
 
 - Chat state is a plain object in `$state` with function updates
-  (`src/lib/chat.ts`). Class instances in `$state` never re-render — do not use
-  them for UI state.
-- Never mutate a message object in place: Svelte proxy signals capture values
-  on first read, so streaming updates must replace (`map` + local accumulator).
-- Keyboard shortcuts need a capture-phase listener — CodeMirror swallows combos
-  (see the `event.code` guards; ⌥R once produced `®`).
-- Reads that must subscribe need a synchronous read inside the render effect;
-  async-only reads never subscribe (annotation badge marks).
-- Every Tauri call must work in three runtimes: Tauri shell, plain browser dev,
-  and jsdom tests. Guard with `tauriBackendAvailable()` (see `src/lib/secrets.ts`)
-  or try/catch with a local fallback. Never let `invoke` throw into UI teardown.
-- Voice has two engines behind one callback contract (`SpeakCallbacks` in
-  `src/lib/voice.ts`): web `speechSynthesis` and native `AVSpeechSynthesizer`
-  (`src/lib/nativeTts.ts` + `src-tauri/src/tts.rs`, macOS-only, `#[cfg]`-gated
-  with stubs elsewhere). Progress returns as `tts-word` / `tts-done` window
-  events tagged with a per-utterance id — always check the id, stale cancels
-  must not reset newer speech.
-- Apple frameworks from Rust go through `objc2` generated bindings only. No
-  Objective-C (`.m`), no Swift sidecar: both were evaluated and rejected (same
-  engine underneath, worse bundling/signing story). See `src-tauri/src/tts.rs`.
-- There is no API that downloads Apple voices. The app picks the best
-  _installed_ voice per locale and deep-links System Settings to the
-  Accessibility pane
-  (`x-apple.systempreferences:com.apple.preference.universalaccess`)
-  for the rest — sub-anchors are swallowed by System Settings, so UI copy
-  must always print the in-pane path. Premium quality requires voices
-  downloaded in Accessibility → Read & Speak → System Voice → Manage
-  Voices ("Spoken Content" was the pre-26 name).
-- Installed-voice inventory is `AVSpeechSynthesisVoice.speechVoices()`, a
-  system registry — not a folder scan. There is no user-visible voice
-  directory to display.
-
-## Source control
-
-Standing authorization: commit and push as you go, without waiting
-for review — the user has granted this once for all future turns.
-Each finished unit of work gets its own commit the moment its gates
-are green, pushed straight to `origin/main` in the same motion; never
-batch unrelated work into one commit and never sit on green work.
-Scope is commit + push only:
-never amend, rebase, force-push, tag, or cut a release without an
-explicit ask in that turn. Name committed files explicitly, never
-`git add -A`. One shared local checkout: a commit is already on the
-user's disk, so never say "pull" — report it as in place.
-Credentials: the user hates typing passwords — git must never prompt
-interactively. The remote stays HTTPS authed through the `gh` token
-(`gh auth setup-git`, osxkeychain-backed). If a push would prompt,
-stop and report instead of asking for a password.
-Automation browsers must never touch the login keychain either:
-Playwright Chromium launches with `--use-mock-keychain` (see
-`playwright.config.ts`; same flag for any `/tmp` browser probe),
-or every fresh profile pops a password prompt per launch. The
-bundled Chromium builds are ad-hoc-signed, so Always Allow can
-never stick to them — spamming it does nothing; Deny re-prompts
-forever. Prompts from `playwright-mcp` servers mean those servers
-launched without the flag (stale ones get stopped, not clicked
-through). The only prompt-proof browser is a Google-signed one
-(system Chrome channel), which holds an Always Allow grant.
+  (`chat.ts`). Class instances in `$state` never re-render.
+- Never mutate a message in place: streaming replaces (`map` + local
+  accumulator) because proxy signals capture values on first read.
+- Reads that must subscribe need a synchronous read inside the render
+  effect; async-only reads never subscribe.
+- Keyboard shortcuts use a capture-phase listener (the editor swallows
+  combos); guard on `event.code` (⌥R once produced `®`).
+- Three runtimes for every Tauri call: shell, plain browser, jsdom. Guard
+  with `tauriBackendAvailable()` (`secrets.ts`) or try/catch with a local
+  fallback; dynamic-import plugins so node/jsdom never load them. Never let
+  `invoke` throw into UI teardown.
+- Two engines, one contract, kept in lockstep: the TS provider
+  (`providers/openai-compat.ts`) and `turn.rs` share tool rounds, caps,
+  error copy, and the `fetch_url` description. Change one, change both.
+- Voice: `SpeakCallbacks` in `voice.ts` fronts web `speechSynthesis` and
+  native `AVSpeechSynthesizer` (`nativeTts.ts` + `tts.rs`). Progress
+  arrives as `tts-word` / `tts-done` events tagged with an utterance id;
+  always check the id so stale cancels can't reset newer speech.
+- Apple frameworks from Rust go through `objc2` bindings only. No `.m`, no
+  Swift sidecar (evaluated, rejected).
+- No API downloads Apple voices. The app picks the best installed voice per
+  locale (`AVSpeechSynthesisVoice.speechVoices()`, a registry, not a
+  folder) and deep-links
+  `x-apple.systempreferences:com.apple.preference.universalaccess`; UI copy
+  prints the in-pane path: Accessibility → Read & Speak → System Voice →
+  Manage Voices. Never write "Spoken Content" (pre-26 name).
 
 ## Conventions
 
-- Settings: `src/lib/settings.ts` (`defaultSettings`, `saveSettings`); secrets
-  go to Keychain via `src/lib/secrets.ts`, never into persisted settings.
-- Types are load-bearing compiler feedback, not decoration: `strict` plus
-  `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes` (every index and
-  optional is guilty until proven defined), type-aware `recommendedTypeChecked`
-  lint (`no-floating-promises` enforces the `void`-your-promises convention),
-  and branded ids (`ChatId` / `ChatMsgId` / `AnnotationId` in `chat.ts` /
-  `annotations.ts`) so a chat id can never be passed as a message id. Zod was
-  evaluated and rejected (runtime errors, not compiler feedback; boundaries
-  already narrow by hand). TS stays at v6 until `svelte-check` peers allow v7.
-- `@types/node` is install-but-never-global (`tsconfig` `types: []`): tooling
-  imports it explicitly from `node:*`. Frontend code must never see a global
-  `process` — it doesn't exist in the webview.
-- Dev-only macOS icon fix lives in `src-tauri/src/dev_icon.rs`
-  (`#[cfg(all(target_os = "macos", debug_assertions))]`): `tauri dev` runs
-  unbundled, so the switcher tile comes from raw `.icns` bytes reporting
-  512pt — the watcher swaps a 128pt tile after Tauri's own lands. Release
-  bundles are unaffected (IconServices picks the right rep).
-- Tests live next to code (`foo.test.ts`); pure logic must be importable without
-  Tauri or DOM (extract `sentenceAtOffset`-style pure helpers to test them).
-- Two runners, no more: colocated Vitest (`bun run test`) and Playwright
-  (`bun run test:e2e`, specs in `e2e/*.e2e.ts`, seeded via `e2e/helpers.ts`,
-  invisible to Vitest by extension). No Testing Library, no other frameworks.
-- Vitest environment is node by default; files needing DOM opt in with a
-  `// @vitest-environment jsdom` first line. What jsdom can't see (layout,
-  layers), assert on source instead (see `actions-reveal.test.ts`, which
-  reads `+page.svelte`'s `<style>`).
-- Agent-captured verification screenshots go in `.screenshots/` (gitignored),
-  never the repo root.
-- UI copy: plain prose, no emojis. Enter sends, Shift+Enter newline.
-- Shortcuts menu (`desktopShortcuts()` in `src/routes/+page.svelte`): entries
-  stay pithy, `dd` copy never carries parentheses (pinned by
-  `e2e/shortcuts-modal.e2e.ts`). These rows were deliberately removed —
-  do not re-add them: New line, Stage message, Scroll messages, Export
-  chat, Translate selection, and the `· Enter cycles · repeat closes ·
-1 hit closes bare`, `· past newest mints one`, `· again stops`
-  trailers. Phones show no `h2` (the filter owns the head row).
-- Spec history: `README.md` (what), `PLAN.md` (full plan), `TODO.md` (open
-  work only — finished stages move to `DONE.md`, never deleted).
+- Settings: `settings.ts` (`defaultSettings`, `saveSettings`). Secrets go
+  to the Keychain via `secrets.ts`, never into persisted settings.
+- Types are compiler feedback: `strict`, `noUncheckedIndexedAccess`,
+  `exactOptionalPropertyTypes`, type-aware lint (`no-floating-promises`:
+  `void` your promises), branded ids (`ChatId` / `ChatMsgId` /
+  `AnnotationId`). Zod was rejected. TS stays on v6 until `svelte-check`
+  allows v7.
+- `@types/node` is never global (`types: []`); tooling imports `node:*`
+  explicitly. The webview has no `process`.
+- Tests sit next to code (`foo.test.ts`). Pure logic must import without
+  Tauri or DOM. Vitest defaults to node; DOM tests start with
+  `// @vitest-environment jsdom`. What jsdom can't see (layout, layers) is
+  asserted on source (see `src/routes/actions-reveal.test.ts`).
+- Two runners only: Vitest and Playwright. No Testing Library.
+- Verification screenshots go in `.screenshots/` (gitignored).
+- UI copy: plain prose, no emojis. Enter sends, Shift+Enter newline. No
+  unsolicited notifications.
+- Shortcuts menu (`desktopShortcuts()` in `+page.svelte`, registry in
+  `shortcuts.ts`): entries stay pithy, `dd` copy has no parentheses (pinned
+  by `e2e/shortcuts-modal.e2e.ts`). Deliberately removed, do not re-add:
+  New line, Stage message, Scroll messages, Export chat, Translate
+  selection, and the `· Enter cycles · repeat closes · 1 hit closes bare`,
+  `· past newest mints one`, `· again stops` trailers. Phones show no `h2`.
+- Rust: `cargo clippy` warnings exist in older modules; keep new code
+  clippy-clean and `rustfmt`-formatted.
+- Planning docs: `TODO.md` holds open work only; finished items move to
+  `docs/DONE.md`, never deleted. Dated plans go in `docs/plans/`.
+
+## Structural debt
+
+`+page.svelte` script is the hotspot. Decompose it the `keybindings.ts`
+way: pure decisions over an explicit facts snapshot in `src/lib`
+(unit-tested, priority encoded inside), with state and effects left in the
+component. New `onKey` branches follow that split, never new untested
+guard soup. History and remaining candidates: `docs/design/refactor.md`.
+
+## Source control
+
+Standing authorization: commit and push as you go. Each finished unit of
+work gets its own commit once its gates are green, pushed straight to
+`origin/main`. Never batch unrelated work. Commit + push only: never
+amend, rebase, force-push, tag, or release without an explicit ask in
+that turn. Name files explicitly, never `git add -A`. One shared local
+checkout: a commit is already on the user's disk, so never say "pull".
+
+Never let git or a browser prompt for a password. The remote is HTTPS via
+the `gh` token (`gh auth setup-git`); if a push would prompt, stop and
+report. Playwright Chromium launches with `--use-mock-keychain` (see
+`playwright.config.ts`; same flag for any `/tmp` browser probe). The
+bundled Chromium is ad-hoc-signed, so Always Allow never sticks to it;
+prompts from `playwright-mcp` servers mean they launched without the flag
+(stop stale ones, don't click through). Only system Chrome holds a lasting
+grant.
 
 ## Environment (user's machine)
 
-- macOS 26.6.2 (build 25G83). System Settings → Accessibility has NO
-  "Spoken Content" entry — the Vision section lists "Read & Speak"
-  instead, and downloadable voices live under Read & Speak → System
-  Voice → Manage Voices. Speech → Live Speech is type-to-speak, NOT
-  where voices download. Never write "Spoken Content" in UI copy.
-- CJK TTS voices are installed on this machine (`say -v '?'` lists
-  Eddy/Flo for zh_CN, zh_TW, ja_JP, ko_KR): multilingual read-aloud
-  is verifiable locally, and missing-voice failures elsewhere are
-  the device's gap, not the app's.
-
-## Known structural debt
-
-- `src/routes/+page.svelte` markup is decomposed (13 components own
-  their markup/CSS; page owns state/behavior/wiring, ~13.5k lines).
-  Script-level decomposition follows the `keybindings.ts` pattern:
-  pure decisions over explicit facts snapshots in lib (unit-tested),
-  state and effects stay in the component.
-  The `onKey` dispatcher is being hollowed out branch by branch into
-  `src/lib/keybindings.ts`: decisions are pure functions over an explicit
-  facts snapshot (unit-tested, priority encoded inside), effects stay in the
-  component. New dispatcher branches follow that split — no new untested
-  guard soup in `onKey`. Testing Library stays deferred:
-  test pure logic and bridge contracts with colocated Vitest instead.
+- macOS 26.6.2 (25G83). Accessibility → Vision lists "Read & Speak", not
+  "Spoken Content". Speech → Live Speech is type-to-speak, not voice
+  downloads.
+- CJK voices are installed (`say -v '?'` lists Eddy/Flo for zh_CN, zh_TW,
+  ja_JP, ko_KR), so multilingual read-aloud is verifiable locally.
+- Android verification device: Samsung S24 (release APKs + adb).
+- The user studies French and German (chats) and Japanese (Ace Attorney
+  via BlueStacks, read through the capture-OCR chord).

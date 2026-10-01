@@ -1,6 +1,6 @@
 # Ccez LLM — TODO (only open work)
 
-Finished stages live in `DONE.md` (archive) — check items off by moving
+Finished stages live in `docs/DONE.md` (archive) — check items off by moving
 them there, never by deleting. Spec is `README.md`; agent handoff
 (commands, gates, architecture) is `AGENTS.md`.
 
@@ -28,7 +28,7 @@ same codebase via the Tauri mobile target.
 
 ## Pile: 0.5.3 remainder (mac app, 370% font size)
 
-Every other 0.5.3 field note is closed in `DONE.md` (speech chords,
+Every other 0.5.3 field note is closed in `docs/DONE.md` (speech chords,
 chat-step aliases, digit dual-mode, annotation sizing, TTS floor,
 text-size uncap, furigana backdrop, shell Cmd+T). One stays open:
 

@@ -211,7 +211,7 @@
 	enough to notice, same dark-red pairing as the old banner so it
 	reads in both themes. A tap dismisses; silence still expires it.
 	Raw dark hexes both ways (documented always-dark exception, see
-	docs/colors.md) — never tokens. */
+	docs/design/colors.md) — never tokens. */
 	.voice-error {
 		position: fixed;
 		top: max(6.75rem, calc(3rem + env(safe-area-inset-top, 0px)));

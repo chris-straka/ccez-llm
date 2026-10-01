@@ -495,7 +495,7 @@ where the text sat, like the composer's promptEl pattern). -->
 	/* Own-message ink: main[data-own-ink] selects the hue, the token
 	resolves per theme ("off" has no rule — plain ink). Applies in
 	plain and bubble modes alike; code tokens, badges, and links keep
-	their explicit colors. Fallback hex first per docs/colors.md. */
+	their explicit colors. Fallback hex first per docs/design/colors.md. */
 	:global(main[data-own-ink="pink"]) article.user .bubble {
 		color: #be185d;
 		color: var(--own-pink);
@@ -522,7 +522,7 @@ where the text sat, like the composer's promptEl pattern). -->
 	}
 	/* Tinted ink reaches the edit box too (it replaces the bubble,
 	so it inherits nothing from it): the draft reads in the same
-	hue it will land in. Fallback hex first per docs/colors.md. */
+	hue it will land in. Fallback hex first per docs/design/colors.md. */
 	:global(main[data-own-ink="pink"]) article.user .msg-edit {
 		color: #be185d;
 		color: var(--own-pink);

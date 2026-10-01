@@ -15,7 +15,7 @@ html {
 	var(--bg) line paints every layer. Scoped to data-theme so first
 	paint keeps app.html's cold-start background. */
 	--strong: #1c1c1e;
-	/* One accent blue both themes (see docs/colors.md): the old
+	/* One accent blue both themes (see docs/design/colors.md): the old
 	indigo selection tint died here. sel-tint repeats the accent
 	as plain rgba (not color-mix) so computed styles serialize to
 	rgba everywhere — Chromium leaves color-mix() unresolved. */
@@ -76,7 +76,7 @@ html[data-theme="light"] {
 	--dim: #6e6e73;
 	--thinking-2: #5ac8fa;
 	--thinking-3: #34c759;
-	/* Own-message ink swatches (see docs/colors.md): deep enough to
+	/* Own-message ink swatches (see docs/design/colors.md): deep enough to
 	read on white at body size. */
 	--own-pink: #be185d;
 	--own-blue: #1d4ed8;
@@ -124,7 +124,7 @@ html[data-theme="dark"] {
 	--dim: #aeaeb2;
 	--thinking-2: #64d2ff;
 	--thinking-3: #30d158;
-	/* Own-message ink swatches (see docs/colors.md): light enough to
+	/* Own-message ink swatches (see docs/design/colors.md): light enough to
 	read on the dark surface at body size. */
 	--own-pink: #f9a8d4;
 	--own-blue: #93c5fd;

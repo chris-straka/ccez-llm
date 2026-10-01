@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
 
 /**
- * Color-token invariants (see docs/colors.md): component styles name
+ * Color-token invariants (see docs/design/colors.md): component styles name
  * tokens instead of hardcoding accents, so the palette keeps one
  * source of truth in src/app.css. jsdom cannot see paint, so these
  * assert on source instead.
@@ -49,7 +49,7 @@ function unpairedHexLines(css: string): string[] {
 
 function pageStyle(): string {
 	// .voice-error is the documented always-dark exception (see
-	// docs/colors.md): it keeps raw dark hexes in both themes, so it
+	// docs/design/colors.md): it keeps raw dark hexes in both themes, so it
 	// scans outside the pairing rule.
 	return styleOf("./+page.svelte").replace(/\.voice-error\s*\{[^}]*\}/g, "");
 }
@@ -138,7 +138,7 @@ describe("color tokens", () => {
 });
 
 describe("own-message ink", () => {
-	/** Swatch, light twin, dark twin (see docs/colors.md). */
+	/** Swatch, light twin, dark twin (see docs/design/colors.md). */
 	const OWN_INKS: Array<[string, string, string]> = [
 		["pink", "#be185d", "#f9a8d4"],
 		["blue", "#1d4ed8", "#93c5fd"],

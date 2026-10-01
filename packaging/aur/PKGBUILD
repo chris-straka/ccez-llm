@@ -6,7 +6,7 @@
 # repackage its contents. No compilation happens here, so this works on any
 # Arch machine without the webkit2gtk build toolchain.
 #
-# Install notes (see docs/linux.md for details):
+# Install notes (see docs/platforms/linux.md for details):
 #   git clone https://aur.archlinux.org/ccez-llm-bin.git
 #   cd ccez-llm-bin
 #   makepkg -si

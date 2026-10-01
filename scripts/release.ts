@@ -5,7 +5,7 @@
 // plus the windows/linux/web sibling jobs). All targets read the same four
 // version files below, so a single bump versions everything at once.
 // No Apple Developer account, no notarization: the macOS bundle is ad-hoc
-// signed (see docs/mac.md for the first-launch Gatekeeper steps).
+// signed (see docs/platforms/mac.md for the first-launch Gatekeeper steps).
 // Usage: `bun run release [--major | --minor] [--dry-run]` (default: patch)
 import { execSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";

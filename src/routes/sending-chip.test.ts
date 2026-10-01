@@ -70,7 +70,7 @@ describe("sending chip restyle", () => {
 		).not.toMatch(/background/);
 	});
 	it("names dot colors as tokens (dot 1 is the accent)", () => {
-		// Palette rule (see docs/colors.md): components name tokens,
+		// Palette rule (see docs/design/colors.md): components name tokens,
 		// never bare accent hexes — dot 1 rides var(--accent), dots 2-3
 		// the per-theme thinking tokens with hex fallback lines.
 		const css = pageStyle();

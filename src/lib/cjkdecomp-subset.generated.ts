@@ -7,9 +7,9 @@
  *
  * Data compiled by Gavin Grover, fork by Aaron Madlon-Kay (amake), used
  * here under the MIT choice of the data file's six-license grant (see
- * docs/cjkdecomp-eval.md). This file carries no GPL obligations.
+ * docs/investigations/cjkdecomp-eval.md). This file carries no GPL obligations.
  *
- * Caveats (see docs/cjkdecomp-eval.md): Mainland-Chinese typeface
+ * Caveats (see docs/investigations/cjkdecomp-eval.md): Mainland-Chinese typeface
  * (expect 飠/卄/simplified parts on fallback chars); finer grain than
  * the hand TABLE, which stays authoritative on conflict. Strokes-block
  * leaves (㇑ etc.) need an app-font render check before calling them done.

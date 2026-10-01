@@ -1,5 +1,8 @@
 # Ccez LLM — DONE (archive of finished stages)
 
+> Archive. Paths below are as they were when written; loose root docs moved
+> under `docs/` on 2026-10-01 (see `docs/README.md`).
+
 Moved here from `TODO.md` so the working file holds open work only.
 History is preserved, newest last within each section. The full verbatim
 requests behind old items live in git history (`PROMPT.md`, `PLAN.md`, …).

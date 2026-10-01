@@ -1,5 +1,5 @@
 /**
- * Temporary focus-drop instrumentation (see issue-focus.md).
+ * Temporary focus-drop instrumentation (see docs/investigations/focus-drop.md).
  *
  * Everything here is read-only observability: no behavior changes, no
  * state writes. All logging is gated on {@link focusDebugEnabled} so

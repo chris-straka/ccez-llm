@@ -1,5 +1,5 @@
 /**
- * Native chat-export save (Tauri `dialog` + `fs` plugins, PLUGIN.md #1).
+ * Native chat-export save (Tauri `dialog` + `fs` plugins, docs/design/plugins.md #1).
  *
  * The File System Access picker exists in no webview, so the desktop
  * shell fell back to blob-download. This bridge offers the native
