@@ -92,7 +92,9 @@ describe("news feeds", () => {
 			"non",
 			"sux",
 			"akk",
-			"ang"
+			"ang",
+			"lzh",
+			"hbo"
 		]);
 		const codes = [
 			...EUROPEAN_LANGUAGES,

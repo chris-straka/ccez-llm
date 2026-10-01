@@ -101,8 +101,29 @@ describe("reply languages", () => {
 			"non",
 			"ang",
 			"sux",
-			"akk"
+			"akk",
+			"lzh",
+			"hbo"
 		]);
+	});
+
+	it("badges the literary isolates distinctly with modern voices", () => {
+		expect(replyLanguageFor("lzh")).toMatchObject({
+			name: "Classical Chinese",
+			voice: "zh-CN",
+			badge: "文",
+			native: "文言文",
+			prompt: "Reply in Classical Chinese."
+		});
+		expect(replyLanguageFor("hbo")).toMatchObject({
+			name: "Biblical Hebrew",
+			voice: "he-IL",
+			badge: "📜",
+			native: "עברית מקראית",
+			prompt: "Reply in Biblical Hebrew."
+		});
+		expect(thinkingLabelFor("lzh")).toBe("思");
+		expect(thinkingLabelFor("hbo")).toBe("חושב");
 	});
 
 	it("gives every language a distinct emoji marker", () => {

@@ -92,11 +92,15 @@ export const CLASSICAL_LANGUAGES: ReplyLanguage[] = [
 	LANG("sa", "Sanskrit", "hi-IN", "🪷", "संस्कृतम्", "विलुप्तम्", "Reply in Sanskrit."),
 	// Voices are modern approximations (Icelandic for Old Norse,
 	// British English for Old English, Iraqi Arabic for the
-	// Mesopotamian isolates); runes and cuneiform badge them.
+	// Mesopotamian isolates, Mandarin for Classical Chinese,
+	// Israeli Hebrew for Biblical Hebrew); runes and cuneiform
+	// badge them.
 	LANG("non", "Old Norse", "is-IS", "ᚠ", "Norrœnt", "Hreinsat", "Reply in Old Norse."),
 	LANG("ang", "Old English", "en-GB", "ᚦ", "Englisċ", "Āclǣnsod", "Reply in Old English."),
 	LANG("sux", "Sumerian", "ar-SA", "𒆠", "Emegir", "dadag-ga", "Reply in Sumerian."),
-	LANG("akk", "Babylonian", "ar-SA", "𒀭", "Akkadûm", "ebbu", "Reply in Babylonian.")
+	LANG("akk", "Babylonian", "ar-SA", "𒀭", "Akkadûm", "ebbu", "Reply in Babylonian."),
+	LANG("lzh", "Classical Chinese", "zh-CN", "文", "文言文", "已清", "Reply in Classical Chinese."),
+	LANG("hbo", "Biblical Hebrew", "he-IL", "📜", "עברית מקראית", "נמחה", "Reply in Biblical Hebrew.")
 ];
 
 export const AFRICAN_LANGUAGES: ReplyLanguage[] = [
@@ -248,7 +252,9 @@ const THINKING_LABEL: Record<string, string> = {
 	sa: "चिन्तयामि",
 	is: "Hugsar",
 	non: "Hugsar",
-	ang: "Þenceþ"
+	ang: "Þenceþ",
+	lzh: "思",
+	hbo: "חושב"
 };
 // Sumerian and Akkadian keep no thinking label (English fallback):
 // coining short status forms risks wrong words worse than none.

@@ -2906,6 +2906,9 @@
 	 * focus is heading; null when it leaves the window).
 	 */
 	function hideForAlways(next: EventTarget | null): void {
+		// Phones never park: no summon gesture exists there, so a
+		// parked composer strands with no way back.
+		if (androidUI) return;
 		if (
 			!shouldHideForAlways({
 				alwaysMode: settings.promptIdleSec === PROMPT_IDLE_ALWAYS,
@@ -2979,11 +2982,11 @@
 		 * Desktop clicks never restore the hidden prompt — summoning
 		 * is keys-only (bare i / Enter / Space) — so selecting,
 		 * double-clicking, and dismissing text never flash it. iOS
-		 * keeps tap-to-summon (no keyboard to press i on, no swipe
-		 * gestures there); Android summons with swipe-up instead, so
-		 * taps keep native behavior and buttons never fire behind a
-		 * summoned prompt. The visible floor tap stays for all: with
-		 * the prompt already up, tapping its floor lands the caret.
+		 * keeps tap-to-summon (no keyboard to press i on); Android
+		 * has no summon gesture, so phones never park at all and
+		 * taps keep native behavior everywhere. The visible floor
+		 * tap stays for all: with the prompt already up, tapping
+		 * its floor lands the caret.
 		 */
 		const onIdleClick = (event: MouseEvent): void => {
 			const target = event.target instanceof Element ? event.target : null;
@@ -2995,8 +2998,8 @@
 				if (target?.closest(".prompt")) focusPromptFloor(event);
 				return;
 			}
-			// Hidden on desktop: no click summons, full stop. Hidden on
-			// Android: swipe up summons, taps stay native.
+			// Hidden on desktop: no click summons, full stop. Only
+			// iOS tap-summons from here (Android never parks).
 			if (!androidUI || !iosUI) return;
 			if (event.button !== 0) return;
 			const down = idleDown;
@@ -9041,10 +9044,12 @@
 			error: "",
 			fallback: isNewsFallback(code)
 		};
-		// Headlines own the screen: park the composer on the idle
-		// path (summon keys, tap, and swipe-up all restore it —
-		// sending from it drops the panel in doSend).
-		promptIdle = true;
+		// Headlines own the screen on desktop: park the composer
+		// on the idle path (summon keys restore it — sending from
+		// it drops the panel in doSend). Phones keep it up: there
+		// is no summon gesture there, so parking would strand the
+		// composer with no way to type past the headlines.
+		if (!androidUI) promptIdle = true;
 		void fetchNewsStories();
 	}
 

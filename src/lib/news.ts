@@ -184,6 +184,8 @@ export const NEWS_FEEDS: Record<string, NewsFeed> = {
 	non: { hl: "en-US", regions: [{ gl: "US", label: "U.S." }], fallback: true },
 	sux: { hl: "en-US", regions: [{ gl: "US", label: "U.S." }], fallback: true },
 	akk: { hl: "en-US", regions: [{ gl: "US", label: "U.S." }], fallback: true },
+	lzh: { hl: "en-US", regions: [{ gl: "US", label: "U.S." }], fallback: true },
+	hbo: { hl: "en-US", regions: [{ gl: "US", label: "U.S." }], fallback: true },
 	ur: { hl: "en-PK", regions: [{ gl: "PK", label: "Pakistan" }], fallback: true },
 	tl: {
 		hl: "en-PH",

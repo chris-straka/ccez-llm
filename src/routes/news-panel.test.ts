@@ -10,12 +10,15 @@ function pageSource(): string {
 }
 
 describe("news-mode composer", () => {
-	it("parks the composer on the idle path while headlines show", () => {
+	it("parks the composer on desktop, never on phones", () => {
 		const source = pageSource();
 		const at = source.indexOf("function enterNewsMode(");
 		expect(at).toBeGreaterThan(0);
 		const body = source.slice(at, source.indexOf("void fetchNewsStories();", at));
-		expect(body).toContain("promptIdle = true");
+		// No summon gesture exists on phones: parking there would
+		// strand the composer with no way to type past headlines.
+		expect(body).toContain("if (!androidUI) promptIdle = true;");
+		expect(body).not.toMatch(/^\s*promptIdle = true;$/m);
 	});
 
 	it("restores the composer when news closes or the language clears", () => {
