@@ -1094,3 +1094,13 @@ condensed from the Sep 23–24 chain (`0cda353`–`051257b`, tail
       all good — deleted `focusDebug.ts`, its test, and all 14
       `focusLog` calls; investigation doc closed in `docs/README.md`
       (`190aeb4`).
+- [x] G Correction mode: per-chat toggle beside the reply-language
+      pill (shows only with a language set); system prompt asks for
+      a ```correction block (both engines inherit it via the
+      page-built system + shared history builder — no turn.rs
+      change); `correction.ts` parses + word-diffs (CJK
+      char-level); the block hides from assistant render/copy and
+      the diff shows under the user message (struck dels,
+      underlined inss), annotatable like any text; mock
+      `ccez-mock-reply` hook. Gates: unit 2123, check/lint clean,
+      `correction.e2e.ts` 2/2 + render-adjacent 18/18.

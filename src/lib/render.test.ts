@@ -127,6 +127,17 @@ describe("markdown rendering", () => {
 		expect(codes).toHaveLength(1);
 	});
 
+	it("strips correction blocks: the answer renders, the block diffs elsewhere", () => {
+		const { html, codes } = renderMessage(
+			"Bien sûr !\n\n```correction\nJe vais au parc\n```",
+			false
+		);
+		expect(html).toContain("Bien sûr");
+		expect(html).not.toContain("correction");
+		expect(html).not.toContain("Je vais au parc");
+		expect(codes).toHaveLength(0);
+	});
+
 	it("keeps code indices unique across the body", () => {
 		const { html, codes } = renderMessage(
 			"```py\na\n```\n\n```js\nb\n```",
@@ -389,5 +400,15 @@ describe("messageCopyText", () => {
 	it("redacts message bodies for copy", () => {
 		expect(messageCopyText("hello", "user", false)).toBe("hello");
 		expect(messageCopyText("hello", "assistant", false)).toBe("hello");
+	});
+
+	it("excludes correction blocks from assistant copy", () => {
+		expect(
+			messageCopyText(
+				"Bien sûr !\n\n```correction\nJe vais au parc\n```",
+				"assistant",
+				false
+			)
+		).toBe("Bien sûr !");
 	});
 });

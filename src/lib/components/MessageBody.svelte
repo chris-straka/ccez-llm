@@ -132,6 +132,12 @@ import {
 		 * never visibly stirs while glancing at another chat.
 		 */
 		preview?: boolean;
+		/**
+		 * Correction diff HTML for under a user message (see
+		 * correctionHtmlFor): escaped at build, null when none.
+		 * Inside .rendered so it annotates like any text.
+		 */
+		correction?: string | null;
 	}
 
 	let {
@@ -152,6 +158,7 @@ import {
 		onBadgeHover,
 		textOverride = null,
 		contentOverride = null,
+		correction = null,
 		aidPreview = false,
 		preview = false,
 		aidKinds = undefined,
@@ -653,6 +660,13 @@ import {
 		>
 			<!-- eslint-disable-next-line svelte/no-at-html-tags -- html is DOMPurify-sanitized in render.ts -->
 			{@html html}
+			{#if correction}
+				<!-- Correction diff under the user's own words: deleted
+				runs strike, inserted runs underline. Tokens are escaped
+				in correction.ts, so no sanitizer runs here. -->
+				<!-- eslint-disable-next-line svelte/no-at-html-tags -- escaped in correction.ts, spans only -->
+				<div class="correction">{@html correction}</div>
+			{/if}
 		</div>
 	{/key}
 {/if}
@@ -668,6 +682,26 @@ import {
 		user-select: text;
 		-webkit-user-select: text;
 		cursor: text;
+	}
+	/* Correction diff under the user's own words: small, separated
+	by a hairline, quiet enough to scan past. Deleted runs strike in
+	the quiet voice, inserted runs underline in the ok color. */
+	.correction {
+		margin-top: 0.45rem;
+		padding-top: 0.35rem;
+		border-top: 1px solid #e5e5ea;
+		border-top: 1px solid var(--line);
+		font-size: 0.85em;
+		color: #6e6e73;
+		color: var(--muted);
+	}
+	.correction :global(.corr-del) {
+		text-decoration: line-through;
+	}
+	.correction :global(.corr-ins) {
+		text-decoration: underline;
+		color: #1f7a4d;
+		color: var(--ok);
 	}
 	.folded-preview {
 		display: block;

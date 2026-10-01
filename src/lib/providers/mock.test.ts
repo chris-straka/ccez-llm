@@ -78,4 +78,13 @@ describe("mock fetch hook", () => {
 		});
 		expect(events).toEqual([]);
 	});
+
+	test("fixed-reply hook overrides the echo", async () => {
+		window.localStorage.setItem(
+			"ccez-mock-reply",
+			"Bien sûr !\n\n```correction\nJe vais au parc\n```"
+		);
+		const result = await new MockProvider().chat([{ role: "user", content: "hi" }]);
+		expect(result.content).toContain("```correction");
+	});
 });

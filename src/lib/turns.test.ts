@@ -143,6 +143,17 @@ describe("turnHistory", () => {
 			{ role: "assistant", content: "kept" }
 		]);
 	});
+
+	it("keeps correction blocks verbatim for both engines", () => {
+		// The TS provider and turn.rs share this builder: neither strips
+		// the block, so both engines see the model's corrections alike
+		// (the render hides them; see renderMessage).
+		const reply = "Bien sûr !\n\n```correction\nJe vais au parc\n```";
+		expect(turnHistory([msg("u1", "user", "hi"), msg("a1", "assistant", reply)])).toEqual([
+			{ role: "user", content: "hi" },
+			{ role: "assistant", content: reply }
+		]);
+	});
 });
 
 describe("nativeHistoryInput", () => {

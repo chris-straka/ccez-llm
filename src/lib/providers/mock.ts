@@ -105,6 +105,17 @@ function mockFlagMs(key: string): number | null {
 }
 
 function canned(messages: ChatMessage[]): string {
+	// Test hook: fix the whole reply (correction blocks, fetch chatter)
+	// so specs can assert on exact model text. Unset keeps the echo.
+	try {
+		const fixed =
+			typeof localStorage === "undefined"
+				? null
+				: localStorage.getItem("ccez-mock-reply");
+		if (fixed !== null && fixed !== "") return fixed;
+	} catch {
+		/* storage unavailable: echo */
+	}
 	const last = [...messages].reverse().find((m) => m.role === "user");
 	const excerpt = messageText(last?.content ?? "").slice(0, 60);
 	return `Mock reply to: ${excerpt || "(empty)"}`;

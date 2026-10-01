@@ -16,6 +16,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 	annRefsFor,
 	REFS_ONLY_BODY
 } from "$lib/annotation-block";
+	import { correctionHtmlFor } from "$lib/correction";
 	import {
 		detectScript,
 		offeredLocalAids,
@@ -282,6 +283,10 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 	{/if}
 	{#each messages as msg, i (msg.id)}
 		{@const sentRefs = annRefsFor(msg.content)}
+		{@const correction =
+			msg.role === "user"
+				? correctionHtmlFor(msg.content, messages[i + 1]?.content ?? null)
+				: null}
 		{@const refsOnly = sentRefs ? sentRefs.text.trim() === "" : false}
 		{@const isFolded = foldedIds.has(msg.id)}
 		{@const script = detectScript(sentRefs ? sentRefs.text : msg.content)}
@@ -342,6 +347,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 					? REFS_ONLY_BODY
 					: sentRefs.text
 				: null}
+			{correction}
 			aidPreview={aidPeek?.id === msg.id && !aidPin.has(msg.id)}
 			{previewing}
 			aidKinds={actions.localAidsOverrideFor(msg)}

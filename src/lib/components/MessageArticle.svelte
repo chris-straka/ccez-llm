@@ -81,6 +81,8 @@ import type {
 		expandedTags: string[];
 		textOverride: string | null;
 		contentOverride: string | null;
+		/** Correction diff HTML for under a user message (null when none). */
+		correction: string | null;
 		aidPreview: boolean;
 		previewing: boolean;
 		aidKinds: LocalAid[] | undefined;
@@ -128,6 +130,7 @@ import type {
 		expandedTags,
 		textOverride,
 		contentOverride,
+		correction,
 		aidPreview,
 		previewing,
 		aidKinds,
@@ -219,6 +222,7 @@ import type {
 				onUnfold={actions.unfold}
 				{textOverride}
 				{contentOverride}
+				{correction}
 				{aidPreview}
 				preview={previewing}
 				{aidKinds}

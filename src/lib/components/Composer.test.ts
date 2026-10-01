@@ -135,6 +135,14 @@ describe("composer text reservation", () => {
 		expect(css).toContain("calc(var(--tools-pad) + var(--tools-extra))");
 	});
 
+	it("reserves the correction toggle's seat, stacking with the jump trigger", () => {
+		const css = componentStyle();
+		expect(css).toMatch(/\.prompt:has\(\.correct-btn\)\s*\{[^}]*--tools-extra:\s*1\.8rem/);
+		expect(css).toMatch(
+			/\.prompt:has\(\.correct-btn\):has\(\.wp-jump\)\s*\{[^}]*--tools-extra:\s*3\.6rem/
+		);
+	});
+
 	it("opens the capture menu upward from the tools row", () => {
 		const css = componentStyle();
 		// The composer sits at the viewport bottom: a downward menu

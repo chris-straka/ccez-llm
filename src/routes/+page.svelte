@@ -12,6 +12,7 @@
 		newChat,
 		selectChat,
 		setChatReplyLang,
+		setChatCorrection,
 		swapReplyLang,
 		chatVoiceReadback,
 		setChatVoice,
@@ -248,6 +249,7 @@ import {
 	menuBtnTouchAction,
 	selMenuDragTarget
 } from "$lib/sel-geometry";
+import { correctionPromptOn } from "$lib/correction";
 	import { AnnotationDrafts } from "$lib/annotation-drafts.svelte";
 	import {
 		trimParagraphTerminator,
@@ -7086,7 +7088,12 @@ import {
 			target.id,
 			last.id,
 			config,
-			effectiveSystemPrompt(settings, activeReplyCode),
+			effectiveSystemPrompt(
+				settings,
+				activeReplyCode,
+				false,
+				correctionPromptOn(target.correction, target.replyLang)
+			),
 			history
 		);
 		return true;
@@ -7179,7 +7186,8 @@ import {
 			? effectiveSystemPrompt(
 					settings,
 					activeReplyCode,
-					!isOnDeviceProvider(settings.activeProviderId)
+					!isOnDeviceProvider(settings.activeProviderId),
+					correctionPromptOn(chat.correction, chat.replyLang)
 				)
 			: "";
 		// The local model either answers or refuses here: no send into
@@ -7260,7 +7268,8 @@ import {
 			effectiveSystemPrompt(
 				settings,
 				activeReplyCode,
-				!isOnDeviceProvider(settings.activeProviderId)
+				!isOnDeviceProvider(settings.activeProviderId),
+				correctionPromptOn(chat.correction, chat.replyLang)
 			),
 			baked,
 			{
@@ -7321,7 +7330,12 @@ import {
 				reopened.chatId,
 				reopened.replyId,
 				resendConfig,
-				effectiveSystemPrompt(settings, activeReplyCode),
+				effectiveSystemPrompt(
+					settings,
+					activeReplyCode,
+					false,
+					correctionPromptOn(resendTarget?.correction, resendTarget?.replyLang ?? null)
+				),
 				resendHistory
 			);
 			return;
@@ -7339,7 +7353,12 @@ import {
 		await resendLast(
 			chatState,
 			provider,
-			effectiveSystemPrompt(settings, activeReplyCode),
+			effectiveSystemPrompt(
+				settings,
+				activeReplyCode,
+				false,
+				correctionPromptOn(chat.correction, chat.replyLang)
+			),
 			{
 				thinking: activeThinkingId(settings),
 				onFirstToken: () => {
@@ -8224,6 +8243,12 @@ import {
 		setChatReplyLang(chatState, chatState.activeChatId, null);
 		openLangMenu = null;
 		newsMode.close();
+	}
+
+	/** Correction toggle lives on the active chat; default off. */
+	function toggleCorrection(): void {
+		const current = activeChat(chatState).correction ?? false;
+		setChatCorrection(chatState, chatState.activeChatId, !current);
 	}
 
 	/** Shared by the `LangMenus` hero call site (see `ThreadView`). */
@@ -13434,6 +13459,7 @@ import {
 			speaking={speakingId !== null}
 			altKey={altm}
 			replyLang={activeReplyLang}
+			correctionOn={chat.correction ?? false}
 			altHeld={altHeld}
 			canSubmit={canSubmit}
 			hasAnnEdit={promptAnnEdit !== null}
@@ -13458,6 +13484,7 @@ import {
 					wpOpen = !wpOpen;
 					buzzTap();
 				},
+				correctionToggle: () => toggleCorrection(),
 				submit: (alt: boolean) => onSubmit(alt ? "stage" : "send"),
 				menuPress: noteMenuPress,
 				menuTouch: noteMenuBtnTouch,

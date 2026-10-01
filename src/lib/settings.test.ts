@@ -31,6 +31,7 @@ import {
 	maskKey,
 	effectiveSystemPrompt,
 	LOOKUP_CAPABILITY_HINT,
+	CORRECTION_HINT,
 	systemLocale,
 	resolveTheme,
 	OWN_INK_CHOICES,
@@ -597,6 +598,19 @@ describe("settings", () => {
 		expect(effectiveSystemPrompt(s, null, false)).toBe("Be brief.");
 		expect(effectiveSystemPrompt(s, null, true)).toBe(
 			`Be brief. ${LOOKUP_CAPABILITY_HINT}`
+		);
+	});
+
+	it("adds the correction line only when the toggle is on", () => {
+		const s = defaultSettings();
+		s.systemPrompt = "Be brief.";
+		expect(effectiveSystemPrompt(s)).toBe("Be brief.");
+		expect(effectiveSystemPrompt(s, null, false, false)).toBe("Be brief.");
+		expect(effectiveSystemPrompt(s, null, false, true)).toBe(
+			`Be brief. ${CORRECTION_HINT}`
+		);
+		expect(effectiveSystemPrompt(s, "fr", true, true)).toBe(
+			`Be brief. Reply in French. ${CORRECTION_HINT} ${LOOKUP_CAPABILITY_HINT}`
 		);
 	});
 

@@ -6,6 +6,7 @@ import { runnerFor } from "./coderun";
 import {
 	redactedCopyText
 } from "./annotation-block";
+import { extractCorrection } from "./correction";
 import {
 	ATTACH_TAG_RE,
 	FILE_MARKER,
@@ -84,8 +85,8 @@ export function sourcesAsked(userTexts: string[]): boolean {
  * that consume it (re-exported here so existing import sites hold). */
 export { estimateTextTokens } from "./attachments";
 
-/** Copy body for a message: thoughts and unasked sources stripped for
- * assistants, raw content otherwise. */
+/** Copy body for a message: thoughts, correction blocks, and unasked
+ * sources stripped for assistants, raw content otherwise. */
 export function plainBody(
 	content: string,
 	role: string,
@@ -93,7 +94,8 @@ export function plainBody(
 ): string {
 	if (role !== "assistant") return content;
 	const { body } = extractThoughts(content);
-	return stripSourcesIfUnasked(body, sourcesWanted);
+	const { body: uncorrected } = extractCorrection(body);
+	return stripSourcesIfUnasked(uncorrected, sourcesWanted);
 }
 
 export interface RenderedMessage {
@@ -191,10 +193,13 @@ export function renderMessage(
 	sourcesWanted: boolean,
 	attachModels?: AttachTagModel[]
 ): RenderedMessage {
-	// Thoughts never display; extraction still strips them (and unasked
-	// sources) so only the answer renders. Copy uses the same strip.
+	// Thoughts and correction blocks never display; extraction still
+	// strips them (and unasked sources) so only the answer renders.
+	// Copy uses the same strip. The correction diffs under the user's
+	// message instead (see correctionHtmlFor).
 	const { body } = extractThoughts(markdownText);
-	const clean = stripSourcesIfUnasked(body, sourcesWanted);
+	const { body: uncorrected } = extractCorrection(body);
+	const clean = stripSourcesIfUnasked(uncorrected, sourcesWanted);
 	const rendered: RenderedMessage = { html: "", codes: [], maths: [] };
 	rendered.html = sanitize(
 		renderInto(clean, rendered.codes, rendered.maths, attachModels)

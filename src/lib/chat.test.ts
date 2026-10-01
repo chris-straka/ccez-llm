@@ -7,6 +7,7 @@ import {
 	newChatMsgId,
 	selectChat,
 	setChatReplyLang,
+	setChatCorrection,
 	swapReplyLang,
 	chatVoiceReadback,
 	setChatVoice,
@@ -863,6 +864,28 @@ describe("chat", () => {
 		store.setItem("ccez-llm-chats-v1", JSON.stringify(raw));
 		const healed = createChatState(store);
 		expect(healed.chats[1]?.replyLang).toBeNull();
+	});
+
+	it("keeps a correction toggle per chat, healing pre-toggle chats to off", async () => {
+		const { state, store } = stateWith(freshStore());
+		newChat(state, store);
+		const [first, second] = state.chats;
+		expect(first!.correction).toBe(false);
+		setChatCorrection(state, second!.id, true, store);
+		expect(state.chats[0]?.correction).toBe(false);
+		expect(state.chats[1]?.correction).toBe(true);
+		const again = createChatState(store);
+		expect(again.chats[0]?.correction).toBe(false);
+		expect(again.chats[1]?.correction).toBe(true);
+		// Missing flags (written before the toggle) heal to off.
+		const raw = JSON.parse(
+			store.getItem("ccez-llm-chats-v1") as string
+		) as Array<Record<string, unknown>>;
+		for (const c of raw) delete c["correction"];
+		store.setItem("ccez-llm-chats-v1", JSON.stringify(raw));
+		const healed = createChatState(store);
+		expect(healed.chats[0]?.correction).toBe(false);
+		expect(healed.chats[1]?.correction).toBe(false);
 	});
 
 	it("keeps a voice-readback override per chat, following the global default when unset", async () => {

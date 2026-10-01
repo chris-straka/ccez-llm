@@ -509,11 +509,23 @@ export const LOOKUP_CAPABILITY_HINT =
 	"You can look up current information with the fetch_url tool instead of refusing: " +
 	"fetch pages or feeds (RSS/Atom) and answer from what they return.";
 
+/**
+ * Correction-mode line: without it the model replies but never corrects.
+ * Per-chat toggle only (see correctionPromptOn) — the corrected text
+ * rides a ```correction block the render hides and diffs under the
+ * user's message instead.
+ */
+export const CORRECTION_HINT =
+	"Also correct the user's last message: append a ```correction fenced block " +
+	"holding the corrected full text and nothing else (repeat it unchanged when " +
+	"it needs no correction; ignore any 'Annotated selections:' block when correcting).";
+
 /** Base prompt + thinking hint (generic providers only) + reply-language suffix. */
 export function effectiveSystemPrompt(
 	settings: AppSettings,
 	replyCode?: string | null,
-	lookupTools = false
+	lookupTools = false,
+	correction = false
 ): string {
 	const parts = [settings.systemPrompt.trim()];
 	const hint = activeThinkingSupport(settings).promptHint(
@@ -522,6 +534,7 @@ export function effectiveSystemPrompt(
 	if (hint) parts.push(hint);
 	const lang = replyLanguageFor(replyCode ?? settings.replyLang);
 	if (lang) parts.push(lang.prompt);
+	if (correction) parts.push(CORRECTION_HINT);
 	if (lookupTools) parts.push(LOOKUP_CAPABILITY_HINT);
 	return parts.filter(Boolean).join(" ");
 }

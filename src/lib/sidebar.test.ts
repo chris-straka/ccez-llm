@@ -12,6 +12,7 @@ function chat(id: string, createdAt: number, messages: ChatMsg[]): Chat {
 		createdAt,
 		messages,
 		replyLang: null,
+		correction: false,
 		voice: null
 	};
 }

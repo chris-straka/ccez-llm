@@ -52,6 +52,13 @@ export interface Chat {
 	/** Reply-language pill code for this chat only (null = off). */
 	replyLang: string | null;
 	/**
+	 * Correction mode for this chat only (default off): the model also
+	 * corrects the user's last message into a ```correction block.
+	 * False for every chat written before the toggle existed (see
+	 * loadChats healing).
+	 */
+	correction: boolean;
+	/**
 	 * Voice-readback override for this chat only: true/false wins over
 	 * the global default, null follows it. Null for every chat written
 	 * before the override existed (see loadChats healing).
@@ -175,6 +182,7 @@ function blankChat(): Chat {
 		createdAt: Date.now(),
 		messages: [],
 		replyLang: null,
+		correction: false,
 		voice: null
 	};
 }
@@ -284,6 +292,19 @@ export function setChatReplyLang(
 	const target = state.chats.find((c) => c.id === id);
 	if (!target) return;
 	target.replyLang = code;
+	persistChats(state, store);
+}
+
+/** Set (or clear) one chat's correction-mode toggle. Persists like siblings. */
+export function setChatCorrection(
+	state: ChatState,
+	id: ChatId,
+	on: boolean,
+	store?: KeyValueStore
+): void {
+	const target = state.chats.find((c) => c.id === id);
+	if (!target) return;
+	target.correction = on;
 	persistChats(state, store);
 }
 
@@ -1374,6 +1395,8 @@ function loadChats(state: ChatState, store: KeyValueStore): void {
 					// voice flag: they follow the global default, never a
 					// guessed value.
 					if (typeof c.voice !== "boolean") c.voice = null;
+					// Pre-correction chats carry no toggle: default off.
+					if (typeof c.correction !== "boolean") c.correction = false;
 					// A missing timestamp renders "Invalid Date" in the
 					// sidebar and switcher: stamp it now instead.
 					if (typeof c.createdAt !== "number" || Number.isNaN(c.createdAt)) {

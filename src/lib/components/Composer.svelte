@@ -31,6 +31,7 @@ shared `.error` look. -->
 		captureToggle: () => void;
 		captureAction: (source: CaptureOneShot) => void;
 		wpToggle: () => void;
+		correctionToggle: () => void;
 		submit: (alt: boolean) => void;
 		menuPress: () => void;
 		menuTouch: (event: TouchEvent) => void;
@@ -73,6 +74,8 @@ shared `.error` look. -->
 		speaking: boolean;
 		altKey: string;
 		replyLang: ReplyLanguage | null;
+		/** Correction mode for this chat (toggle shows only with a reply language). */
+		correctionOn: boolean;
 		altHeld: boolean;
 		canSubmit: boolean;
 		hasAnnEdit: boolean;
@@ -111,6 +114,7 @@ shared `.error` look. -->
 		speaking,
 		altKey,
 		replyLang,
+		correctionOn,
 		altHeld,
 		canSubmit,
 		hasAnnEdit,
@@ -325,6 +329,24 @@ stop, so both rules below stay suppressed. -->
 				onclick={() => actions.captureToggle()}
 			>
 				<ActionIcon kind="capture" />
+			</button>
+		{/if}
+		{#if replyLang}
+			<!-- Correction mode, beside the reply-language pill on the
+			send button: the model also corrects the learner's last
+			message into a hidden block that diffs under it. Per chat,
+			default off; hidden without a reply language so the row
+			stays minimal. -->
+			<button
+				type="button"
+				class="correct-btn"
+				class:on={correctionOn}
+				title={`Correct my ${replyLang.name} as well as replying`}
+				aria-label="Toggle correction mode"
+				aria-pressed={correctionOn}
+				onclick={() => actions.correctionToggle()}
+			>
+				<ActionIcon kind="pencil" />
 			</button>
 		{/if}
 		{#if android && waypointCount > 3 && !hasSelMenu}
@@ -549,6 +571,7 @@ stop, so both rules below stay suppressed. -->
 	:global(.app[data-android]) .attach-btn,
 	:global(.app[data-android]) .mic-btn,
 	:global(.app[data-android]) .voice-float,
+	:global(.app[data-android]) .correct-btn,
 	:global(.app[data-android]) .wp-jump {
 		width: 1.7rem;
 		height: 1.7rem;
@@ -563,6 +586,7 @@ stop, so both rules below stay suppressed. -->
 	:global(.app[data-android]) .attach-btn :global(.action-glyph),
 	:global(.app[data-android]) .mic-btn :global(.action-glyph),
 	:global(.app[data-android]) .voice-float :global(.action-glyph),
+	:global(.app[data-android]) .correct-btn :global(.action-glyph),
 	:global(.app[data-android]) .wp-jump :global(.action-glyph) {
 		height: 1.15em;
 	}
@@ -598,6 +622,7 @@ stop, so both rules below stay suppressed. -->
 	:global(.app[data-android]) .prompt:has(.ann-dock) .attach-btn,
 	:global(.app[data-android]) .prompt:has(.ann-dock) .mic-btn,
 	:global(.app[data-android]) .prompt:has(.ann-dock) .voice-float,
+	:global(.app[data-android]) .prompt:has(.ann-dock) .correct-btn,
 	:global(.app[data-android]) .prompt:has(.ann-dock) .wp-jump,
 	:global(.app[data-android]) .prompt:has(.ann-dock) .send-btn {
 		visibility: hidden;
@@ -822,6 +847,7 @@ stop, so both rules below stay suppressed. -->
 	.voice-float,
 	.mic-btn,
 	.capture-btn,
+	.correct-btn,
 	.wp-jump {
 		display: inline-flex;
 		align-items: center;
@@ -923,6 +949,7 @@ stop, so both rules below stay suppressed. -->
 	.voice-float:hover,
 	.wp-jump:hover,
 	.capture-btn:hover,
+	.correct-btn:hover,
 	.mic-btn:hover {
 		color: #1c1c1e;
 		color: var(--ink);
@@ -935,11 +962,13 @@ stop, so both rules below stay suppressed. -->
 		.voice-float:hover,
 		.wp-jump:hover,
 		.capture-btn:hover,
+		.correct-btn:hover,
 		.mic-btn:hover {
 			color: #6e6e73;
 			color: var(--muted);
 		}
-		.voice-float.on:hover {
+		.voice-float.on:hover,
+		.correct-btn.on:hover {
 			color: #1f7a4d;
 			color: var(--ok);
 		}
@@ -966,7 +995,8 @@ stop, so both rules below stay suppressed. -->
 			-webkit-user-select: none;
 		}
 	}
-	.voice-float.on {
+	.voice-float.on,
+	.correct-btn.on {
 		color: #1f7a4d;
 		color: var(--ok);
 	}
@@ -987,6 +1017,15 @@ stop, so both rules below stay suppressed. -->
 	/* Jump trigger joins the cluster in long threads: reserve its seat
 	on top of whichever combo is live (var composition, not ×4 rules). */
 	.prompt:has(.wp-jump) {
+		--tools-extra: 1.8rem;
+	}
+	/* Correction toggle joins beside a set reply language: same seat.
+	Both present stack (the double-:has wins by specificity, so no
+	order dependence between the two singles). */
+	.prompt:has(.correct-btn):has(.wp-jump) {
+		--tools-extra: 3.6rem;
+	}
+	.prompt:has(.correct-btn) {
 		--tools-extra: 1.8rem;
 	}
 	/* Textarea composer: the typed text tracks the prompt's own
