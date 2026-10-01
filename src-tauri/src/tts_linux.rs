@@ -85,21 +85,57 @@ impl Backend {
     /// `spd-say -l <lang>` routes the configured module voice by
     /// language; espeak takes an `-v` voice name (see
     /// [`espeak_voice_for`]), overridden by an explicit settings voice.
-    pub fn speak_argv(&self, lang: &str, voice: Option<&str>, text: &str) -> Vec<String> {
+    /// Both carry the Voice speed multiplier (`rate`, 1.0 = normal):
+    /// `spd-say -r` and espeak `-s` (see [`spd_rate`] /
+    /// [`espeak_speed`]).
+    pub fn speak_argv(
+        &self,
+        lang: &str,
+        voice: Option<&str>,
+        rate: f32,
+        text: &str,
+    ) -> Vec<String> {
         match self {
             Backend::SpeechDispatcher => {
                 let _ = voice;
-                vec!["-l".into(), lang.into(), text.into()]
+                vec![
+                    "-l".into(),
+                    lang.into(),
+                    "-r".into(),
+                    spd_rate(rate).to_string(),
+                    text.into(),
+                ]
             }
             Backend::EspeakNg | Backend::Espeak => {
                 let pick = voice
                     .filter(|v| !v.is_empty())
                     .map(|v| v.to_string())
                     .unwrap_or_else(|| espeak_voice_for(lang));
-                vec!["-v".into(), pick, text.into()]
+                vec![
+                    "-v".into(),
+                    pick,
+                    "-s".into(),
+                    espeak_speed(rate).to_string(),
+                    text.into(),
+                ]
             }
         }
     }
+}
+
+/// `spd-say -r` value (-100..100, 0 is the default) for the Voice
+/// speed multiplier (1.0 = normal, clamped 0.5x–1.5x upstream).
+/// Pure: out-of-range multipliers saturate at the rails, never a
+/// panic (`as` casts saturate; NaN reads as 0). Unit-tested.
+pub fn spd_rate(rate: f32) -> i32 {
+    (((rate - 1.0) * 100.0).round() as i32).clamp(-100, 100)
+}
+
+/// `espeak-ng`/`espeak` `-s` words-per-minute for the Voice speed
+/// multiplier: 175 is espeak's default pace. Pure (floored at 1 so a
+/// wild multiplier never formats a non-positive speed). Unit-tested.
+pub fn espeak_speed(rate: f32) -> i32 {
+    ((175.0 * rate).round() as i32).max(1)
 }
 
 /// `espeak-ng`/`espeak` voice name for a BCP-47 lang: the primary
@@ -251,12 +287,13 @@ pub fn tts_speak(
     text: String,
     lang: String,
     voice: Option<String>,
+    rate: f32,
 ) -> Result<u64, String> {
     #[cfg(target_os = "linux")]
-    return imp::speak(&app, text, lang, voice);
+    return imp::speak(&app, text, lang, voice, rate);
     #[cfg(not(target_os = "linux"))]
     {
-        let _ = (app, text, lang, voice);
+        let _ = (app, text, lang, voice, rate);
         return Err("native TTS requires Linux".into());
     }
 }
@@ -317,6 +354,7 @@ mod imp {
             text: String,
             lang: String,
             voice: Option<String>,
+            rate: f32,
         },
         Stop,
         Voices(Sender<Result<Vec<NativeVoice>, String>>),
@@ -371,7 +409,7 @@ mod imp {
         rx: &Receiver<Cmd>,
         child: &mut std::process::Child,
         id: u64,
-    ) -> Option<(u64, String, String, Option<String>)> {
+    ) -> Option<(u64, String, String, Option<String>, f32)> {
         loop {
             match rx.recv_timeout(Duration::from_millis(50)) {
                 Ok(Cmd::Stop) => {
@@ -385,11 +423,12 @@ mod imp {
                     text,
                     lang,
                     voice,
+                    rate: next_rate,
                 }) => {
                     let _ = child.kill();
                     let _ = child.wait();
                     emit_done(id, false);
-                    return Some((next, text, lang, voice));
+                    return Some((next, text, lang, voice, next_rate));
                 }
                 Ok(Cmd::Voices(reply)) => {
                     let _ = reply.send(list_voices());
@@ -413,9 +452,10 @@ mod imp {
         backend: Backend,
         lang: &str,
         voice: Option<&str>,
+        rate: f32,
         text: &str,
     ) -> std::io::Result<std::process::Child> {
-        let argv = backend.speak_argv(lang, voice, text);
+        let argv = backend.speak_argv(lang, voice, rate, text);
         std::process::Command::new(backend.program())
             .args(&argv)
             .spawn()
@@ -467,13 +507,15 @@ mod imp {
                     text,
                     lang,
                     voice,
+                    rate,
                 } => {
                     let Some(backend) = detect() else {
                         eprintln!("[tts] speak id={id}: {}", missing_stack());
                         emit_done(id, false);
                         continue;
                     };
-                    let mut child = match spawn_speak(backend, &lang, voice.as_deref(), &text) {
+                    let mut child = match spawn_speak(backend, &lang, voice.as_deref(), rate, &text)
+                    {
                         Ok(child) => child,
                         Err(e) => {
                             eprintln!("[tts] speak id={id} lang={lang}: spawn failed: {e}");
@@ -483,13 +525,13 @@ mod imp {
                     };
                     eprintln!("[tts] speak id={id} lang={lang} backend={backend:?}");
                     let mut next = serve(&rx, &mut child, id);
-                    while let Some((id, text, lang, voice)) = next {
+                    while let Some((id, text, lang, voice, rate)) = next {
                         let Some(backend) = detect() else {
                             emit_done(id, false);
                             next = None;
                             continue;
                         };
-                        match spawn_speak(backend, &lang, voice.as_deref(), &text) {
+                        match spawn_speak(backend, &lang, voice.as_deref(), rate, &text) {
                             Ok(mut child) => {
                                 next = serve(&rx, &mut child, id);
                             }
@@ -518,6 +560,7 @@ mod imp {
         text: String,
         lang: String,
         voice: Option<String>,
+        rate: f32,
     ) -> Result<u64, String> {
         if text.trim().is_empty() {
             return Ok(0);
@@ -533,6 +576,7 @@ mod imp {
                 text,
                 lang,
                 voice,
+                rate,
             })
             .map_err(|e| e.to_string())?;
         Ok(id)
@@ -560,8 +604,8 @@ mod imp {
 #[cfg(test)]
 mod linux_tts_tests {
     use super::{
-        candidate_paths, espeak_voice_for, parse_espeak_voices, parse_spd_voices, pick_backend,
-        Backend,
+        candidate_paths, espeak_speed, espeak_voice_for, parse_espeak_voices, parse_spd_voices,
+        pick_backend, spd_rate, Backend,
     };
 
     #[test]
@@ -580,21 +624,43 @@ mod linux_tts_tests {
     #[test]
     fn speak_argv_routes_by_backend() {
         assert_eq!(
-            Backend::SpeechDispatcher.speak_argv("de-DE", Some("ignored"), "Hallo"),
-            vec!["-l", "de-DE", "Hallo"]
+            Backend::SpeechDispatcher.speak_argv("de-DE", Some("ignored"), 1.0, "Hallo"),
+            vec!["-l", "de-DE", "-r", "0", "Hallo"]
         );
         assert_eq!(
-            Backend::EspeakNg.speak_argv("en-US", None, "hi"),
-            vec!["-v", "en", "hi"]
+            Backend::EspeakNg.speak_argv("en-US", None, 1.0, "hi"),
+            vec!["-v", "en", "-s", "175", "hi"]
         );
         assert_eq!(
-            Backend::EspeakNg.speak_argv("zh-CN", None, "ni hao"),
-            vec!["-v", "zh", "ni hao"]
+            Backend::EspeakNg.speak_argv("zh-CN", None, 1.0, "ni hao"),
+            vec!["-v", "zh", "-s", "175", "ni hao"]
         );
         // An explicit settings voice overrides the language-derived one.
         assert_eq!(
-            Backend::EspeakNg.speak_argv("en-US", Some("english-mb-en1"), "hi"),
-            vec!["-v", "english-mb-en1", "hi"]
+            Backend::EspeakNg.speak_argv("en-US", Some("english-mb-en1"), 1.0, "hi"),
+            vec!["-v", "english-mb-en1", "-s", "175", "hi"]
+        );
+    }
+
+    #[test]
+    fn speak_argv_carries_voice_speed() {
+        assert_eq!(spd_rate(1.0), 0);
+        assert_eq!(spd_rate(0.5), -50);
+        assert_eq!(spd_rate(1.5), 50);
+        assert_eq!(spd_rate(3.0), 100);
+        assert_eq!(spd_rate(-1.0), -100);
+        assert_eq!(spd_rate(f32::NAN), 0);
+        assert_eq!(espeak_speed(1.0), 175);
+        assert_eq!(espeak_speed(0.5), 88);
+        assert_eq!(espeak_speed(1.5), 263);
+        assert_eq!(espeak_speed(f32::NAN), 1);
+        assert_eq!(
+            Backend::SpeechDispatcher.speak_argv("de-DE", None, 0.5, "Hallo"),
+            vec!["-l", "de-DE", "-r", "-50", "Hallo"]
+        );
+        assert_eq!(
+            Backend::EspeakNg.speak_argv("en-US", None, 1.5, "hi"),
+            vec!["-v", "en", "-s", "263", "hi"]
         );
     }
 

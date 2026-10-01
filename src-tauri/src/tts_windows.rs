@@ -129,6 +129,16 @@ pub fn sapi_rate_for(lang: &str) -> i32 {
     }
 }
 
+/// SAPI speech rate for a speak request: the per-language base from
+/// [`sapi_rate_for`] plus the Voice speed multiplier (1.0 = normal,
+/// clamped 0.5x–1.5x upstream) mapped linearly onto ±5 steps. Pure:
+/// out-of-range multipliers saturate at the SAPI −10..10 rails, never
+/// a panic (`as` casts saturate; NaN reads as 0). Unit-tested.
+pub fn sapi_speak_rate(lang: &str, rate: f32) -> i32 {
+    let steps = ((rate - 1.0) * 10.0).round() as i32;
+    (sapi_rate_for(lang) + steps).clamp(-10, 10)
+}
+
 /// Pick the voice token id for a speak request out of the inventoried
 /// `(id, lang)` pairs. Priority: the explicit settings voice (exact
 /// inventoried id) > exact locale (`en-GB` for `en-GB`) >
@@ -174,12 +184,13 @@ pub fn tts_speak(
     text: String,
     lang: String,
     voice: Option<String>,
+    rate: f32,
 ) -> Result<u64, String> {
     #[cfg(target_os = "windows")]
-    return imp::speak(&app, text, lang, voice);
+    return imp::speak(&app, text, lang, voice, rate);
     #[cfg(not(target_os = "windows"))]
     {
-        let _ = (app, text, lang, voice);
+        let _ = (app, text, lang, voice, rate);
         return Err("native TTS requires Windows".into());
     }
 }
@@ -226,7 +237,7 @@ mod imp {
         CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_ALL, COINIT_APARTMENTTHREADED,
     };
 
-    use super::{sapi_rate_for, select_token, DoneEvent, NativeVoice};
+    use super::{sapi_speak_rate, select_token, DoneEvent, NativeVoice};
 
     static APP: OnceLock<AppHandle> = OnceLock::new();
     static ENGINE: OnceLock<EngineResult> = OnceLock::new();
@@ -238,6 +249,7 @@ mod imp {
             text: String,
             lang: String,
             voice: Option<String>,
+            rate: f32,
         },
         Stop,
         Voices(Sender<Result<Vec<NativeVoice>, String>>),
@@ -417,7 +429,8 @@ mod imp {
         text: String,
         lang: String,
         voice_pick: Option<String>,
-    ) -> Option<(u64, String, String, Option<String>)> {
+        rate: f32,
+    ) -> Option<(u64, String, String, Option<String>, f32)> {
         // A newer speak replaces the current audio: purge first so the
         // tails never overlap, then select the voice for this language.
         purge(voice);
@@ -426,7 +439,7 @@ mod imp {
             apply_voice(voice, &token_id);
         }
         unsafe {
-            let _ = voice.SetRate(sapi_rate_for(&lang));
+            let _ = voice.SetRate(sapi_speak_rate(&lang, rate));
             if voice
                 .Speak(&BSTR::from(text.as_str()), SVSFlagsAsync)
                 .is_err()
@@ -449,10 +462,11 @@ mod imp {
                     text,
                     lang,
                     voice: voice_pick,
+                    rate: next_rate,
                 }) => {
                     purge(voice);
                     emit_done(id, false);
-                    return Some((next, text, lang, voice_pick));
+                    return Some((next, text, lang, voice_pick, next_rate));
                 }
                 Ok(Cmd::Voices(reply)) => {
                     let _ = reply.send(Ok(inventory_public(voice)));
@@ -505,10 +519,11 @@ mod imp {
                     text,
                     lang,
                     voice,
+                    rate,
                 } => {
-                    let mut next = serve(&synth, &rx, id, text, lang, voice);
-                    while let Some((id, text, lang, voice)) = next {
-                        next = serve(&synth, &rx, id, text, lang, voice);
+                    let mut next = serve(&synth, &rx, id, text, lang, voice, rate);
+                    while let Some((id, text, lang, voice, rate)) = next {
+                        next = serve(&synth, &rx, id, text, lang, voice, rate);
                     }
                 }
                 Cmd::Stop => {}
@@ -528,6 +543,7 @@ mod imp {
         text: String,
         lang: String,
         voice: Option<String>,
+        rate: f32,
     ) -> Result<u64, String> {
         if text.trim().is_empty() {
             return Ok(0);
@@ -541,6 +557,7 @@ mod imp {
                     text,
                     lang,
                     voice,
+                    rate,
                 })
                 .map_err(|e| e.to_string())?;
                 Ok(id)
@@ -580,7 +597,8 @@ mod imp {
 #[cfg(test)]
 mod windows_tts_tests {
     use super::{
-        bcp47_from_lcid_attr, lcid_to_bcp47, parse_lcid_hex, sapi_rate_for, select_token, DoneEvent,
+        bcp47_from_lcid_attr, lcid_to_bcp47, parse_lcid_hex, sapi_rate_for, sapi_speak_rate,
+        select_token, DoneEvent,
     };
 
     #[test]
@@ -603,6 +621,20 @@ mod windows_tts_tests {
         assert_eq!(sapi_rate_for("cmn"), -2);
         assert_eq!(sapi_rate_for("en-US"), 0);
         assert_eq!(sapi_rate_for("ja"), 0);
+    }
+
+    #[test]
+    fn speak_rate_adds_speed_to_language_base() {
+        assert_eq!(sapi_speak_rate("en-US", 1.0), 0);
+        assert_eq!(sapi_speak_rate("en-US", 0.5), -5);
+        assert_eq!(sapi_speak_rate("en-US", 1.5), 5);
+        assert_eq!(sapi_speak_rate("zh-CN", 1.0), -2);
+        assert_eq!(sapi_speak_rate("zh-CN", 0.5), -7);
+        assert_eq!(sapi_speak_rate("zh-CN", 1.5), 3);
+        // Out-of-range multipliers saturate at the SAPI rails.
+        assert_eq!(sapi_speak_rate("en-US", 3.0), 10);
+        assert_eq!(sapi_speak_rate("en-US", -1.0), -10);
+        assert_eq!(sapi_speak_rate("en-US", f32::NAN), 0);
     }
 
     #[test]

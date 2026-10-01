@@ -904,19 +904,10 @@ pub fn tts_speak(
     return imp::speak(&app, text, lang, voice, rate);
     #[cfg(target_os = "android")]
     return super::tts_android::speak(&app, text, lang, voice, rate);
-    // Windows and Linux read at their engine default for now: their
-    // speak paths only compile on their own targets, so the rate waits
-    // for a session that can build and hear them.
     #[cfg(target_os = "windows")]
-    return {
-        let _ = rate;
-        super::tts_windows::tts_speak(app, text, lang, voice)
-    };
+    return super::tts_windows::tts_speak(app, text, lang, voice, rate);
     #[cfg(target_os = "linux")]
-    return {
-        let _ = rate;
-        super::tts_linux::tts_speak(app, text, lang, voice)
-    };
+    return super::tts_linux::tts_speak(app, text, lang, voice, rate);
     #[cfg(not(any(
         target_os = "macos",
         target_os = "ios",
