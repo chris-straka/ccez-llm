@@ -194,6 +194,8 @@ export interface AppSettings {
 	 * button and right-click / selection Speak. Default off.
 	 */
 	readerMode: "off" | "follow" | "tap";
+	/** Reader words per screen: 1-3, or 0 for Auto (fit ~18 characters). */
+	readerWords: number;
 	/**
 	 * Seconds of no mouse/keyboard/touch input before the main prompt
 	 * slides down out of view (any input restores it instantly).
@@ -468,6 +470,7 @@ export function defaultSettings(): AppSettings {
 		messageGap: MESSAGE_GAP_DEFAULT,
 		lineHeight: LINE_HEIGHT_DEFAULT,
 		readerMode: "off",
+		readerWords: 0,
 		promptIdleSec: PROMPT_IDLE_DEFAULT,
 		voiceLangPinned: false,
 		theme: "system",
@@ -744,6 +747,7 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 			);
 		}
 		if (!["off", "follow", "tap"].includes(merged.readerMode)) merged.readerMode = "off";
+		if (![0, 1, 2, 3].includes(merged.readerWords)) merged.readerWords = 0;
 		// Backfill line spacing on older saves; clamp strays into range.
 		if (typeof merged.lineHeight !== "number" || Number.isNaN(merged.lineHeight))
 			merged.lineHeight = LINE_HEIGHT_DEFAULT;

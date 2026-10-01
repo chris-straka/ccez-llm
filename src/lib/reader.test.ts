@@ -32,6 +32,22 @@ describe("readerPhrases", () => {
 		});
 	});
 
+	it("caps words per phrase when the setting asks (one big word at a time)", () => {
+		expect(
+			readerPhrases("Gehen Sie geradeaus, bitte.", 18, 1).map((p) => p.text)
+		).toEqual(["Gehen", "Sie", "geradeaus,", "bitte."]);
+		expect(
+			readerPhrases("Gehen Sie geradeaus, bitte.", 18, 2).map((p) => p.text)
+		).toEqual(["Gehen Sie", "geradeaus, bitte."]);
+	});
+
+	it("records where each phrase sits in its sentence", () => {
+		const phrases = readerPhrases("die Katze und die Maus", 18, 1);
+		expect(phrases.map((p) => p.at)).toEqual([0, 4, 10, 14, 18]);
+		for (const p of phrases)
+			expect(p.sentence.slice(p.at, p.at + p.text.length)).toBe(p.text);
+	});
+
 	it("keeps an over-long word whole", () => {
 		const phrases = readerPhrases(
 			"Die Donaudampfschifffahrtsgesellschaft fährt."

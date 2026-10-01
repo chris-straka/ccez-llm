@@ -123,6 +123,32 @@ test.describe("phone", () => {
 			"Mozilla/5.0 (Linux; Android 14; SM-S921B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36",
 		viewport: { width: 412, height: 915 }
 	});
+	test("one word at a time shows a single huge word", async ({ page }) => {
+		await stubSpeech(page);
+		await seedChat(page, [{ role: "assistant", content: TEXT }], null, {
+			readerMode: "tap",
+			readerWords: 1,
+			voiceEngine: "web"
+		});
+		await page.goto("/");
+		const article = page.locator("article.assistant");
+		await expect(article).toBeVisible({ timeout: 60_000 });
+		await article.locator(".rendered").tap();
+		await article.locator('button[aria-label="Read this message aloud"]').tap();
+		const phrase = page.locator(".reader-phrase");
+		await expect(phrase).toHaveText("Der");
+		await page.locator(".reader").tap();
+		await expect(phrase).toHaveText("Bahnhof");
+		expect(await spoken(page)).toEqual(["Der", "Bahnhof"]);
+		const size = await phrase.evaluate((el) =>
+			parseFloat(getComputedStyle(el).fontSize)
+		);
+		// "Bahnhof" fills the 412px width at ~80px; shorter words go bigger.
+		expect(size).toBeGreaterThanOrEqual(80);
+		await page.waitForTimeout(250);
+		await page.screenshot({ path: ".screenshots/reader-phone-one-word.png" });
+	});
+
 	test("the phrase fills a phone screen", async ({ page }) => {
 		await stubSpeech(page);
 		await seedChat(page, [{ role: "assistant", content: TEXT }], null, {

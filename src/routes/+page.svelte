@@ -2450,7 +2450,7 @@
 	async function openReader(text: string, offset = 0): Promise<void> {
 		const mode = settings.readerMode;
 		if (mode === "off") return;
-		const phrases = readerPhrases(text);
+		const phrases = readerPhrases(text, undefined, settings.readerWords ?? 0);
 		if (phrases.length === 0) return;
 		const fallback = latinFallback(settings.voiceLang);
 		const voices = webVoices();

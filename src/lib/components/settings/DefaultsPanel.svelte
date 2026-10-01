@@ -198,6 +198,19 @@
 				>
 			{/each}
 		</div>
+		{#if settings.readerMode !== "off"}
+			<div class="segmented" role="radiogroup" aria-label="Words at a time">
+				{#each [[1, "1 word"], [2, "2"], [3, "3"], [0, "Auto"]] as const as [n, label] (n)}
+					<button
+						type="button"
+						role="radio"
+						aria-checked={settings.readerWords === n}
+						class:selected={settings.readerWords === n}
+						onclick={() => (settings.readerWords = n)}>{label}</button
+					>
+				{/each}
+			</div>
+		{/if}
 	</fieldset>
 	<!-- Study-fonts and lesson-audio sections removed (lesson-audio
 	froze the app): the inventory helpers stay in

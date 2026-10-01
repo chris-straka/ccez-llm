@@ -28,7 +28,9 @@ the overlay, the fit, and the gestures. -->
 	/** The sentence split around the current phrase (first match). */
 	const sentenceParts = $derived.by(() => {
 		if (!phrase) return null;
-		const at = phrase.sentence.indexOf(phrase.text);
+		const at = phrase.sentence.startsWith(phrase.text, phrase.at)
+			? phrase.at
+			: phrase.sentence.indexOf(phrase.text);
 		if (at === -1) return { before: phrase.sentence, now: "", after: "" };
 		return {
 			before: phrase.sentence.slice(0, at),

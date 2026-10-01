@@ -17,6 +17,8 @@ export interface ReaderPhrase {
 	/** The sentence it belongs to (the faded line under the phrase). */
 	sentence: string;
 	sentenceIndex: number;
+	/** Where the phrase starts in its sentence (repeated words mark right). */
+	at: number;
 }
 
 /** Characters per phrase before a break (a word never splits). */
@@ -49,26 +51,43 @@ function wordSegments(sentence: string): { segment: string; word: boolean }[] {
 
 /**
  * Split text into screen-sized phrases: sentences first, then words
- * grouped up to `maxChars` (punctuation rides with its word, and a
- * word longer than the cap stands alone). CJK splits on ICU word
+ * grouped up to `maxChars`, or exactly up to `maxWords` when set
+ * (punctuation rides with its word, and a word longer than the cap
+ * stands alone). CJK splits on ICU word
  * boundaries, so Japanese phrases break between words too.
  */
 export function readerPhrases(
 	text: string,
-	maxChars = PHRASE_MAX_CHARS
+	maxChars = PHRASE_MAX_CHARS,
+	/** Words per phrase cap (the "Words at a time" setting; 0 = no cap). */
+	maxWords = 0
 ): ReaderPhrase[] {
 	const out: ReaderPhrase[] = [];
 	sentencesOf(text.replace(/\s+/g, " ")).forEach((sentence, sentenceIndex) => {
 		let buf = "";
+		let words = 0;
+		let pos = 0;
 		const flush = (): void => {
 			const t = buf.trim();
-			if (t) out.push({ text: t, sentence, sentenceIndex });
+			const lead = buf.length - buf.trimStart().length;
+			if (t)
+				out.push({
+					text: t,
+					sentence,
+					sentenceIndex,
+					at: pos - buf.length + lead
+				});
 			buf = "";
+			words = 0;
 		};
 		for (const { segment, word } of wordSegments(sentence)) {
-			if (word && buf.trim() && (buf + segment).trim().length > maxChars)
-				flush();
+			const full =
+				(maxWords > 0 && words >= maxWords) ||
+				(maxWords === 0 && (buf + segment).trim().length > maxChars);
+			if (word && buf.trim() && full) flush();
 			buf += segment;
+			pos += segment.length;
+			if (word) words++;
 		}
 		flush();
 	});
