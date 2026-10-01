@@ -23,7 +23,13 @@
 	import { badgeHover } from "$lib/hoverWash";
 	import type { AttachTagModel, SentTagAction } from "$lib/attachments";
 	import type { ChatMsg, ChatMsgId } from "$lib/chat";
-	import { annRefsFor, type AnnotationMark, type AnnotationId } from "$lib/annotations";
+	import {
+	type AnnotationMark,
+	type AnnotationId
+} from "$lib/annotations";
+import {
+	annRefsFor
+} from "$lib/annotation-block";
 	import { applyMarks } from "$lib/annotations-stamp";
 
 	interface Props {

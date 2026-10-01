@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { Annotation, AnnotationId } from "./annotations";
-import { withAnnotations } from "./annotations";
+import {
+	withAnnotations
+} from "./annotation-block";
 import type { ChatId, ChatMsgId } from "./chat";
 import {
 	RELEARN_MS,

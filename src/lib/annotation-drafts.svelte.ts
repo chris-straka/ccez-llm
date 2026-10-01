@@ -5,14 +5,16 @@ import {
 	clearPromptPinned,
 	deleteAnnotation,
 	filePendingAnnotation,
-	loadDraftAnnotations,
 	promptInclusions,
-	saveDraftAnnotations,
 	setPromptPinned,
 	unansweredAnnotations,
 	type Annotation,
 	type AnnotationId
 } from "./annotations";
+import {
+	loadDraftAnnotations,
+	saveDraftAnnotations
+} from "./annotation-drafts-store";
 import type { ChatId } from "./chat";
 import type { ChatProvider } from "./providers/types";
 import type { AnnotationQuestion } from "./reading";

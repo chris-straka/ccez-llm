@@ -7,7 +7,9 @@
  * re-verified by ear. Bodies keep their liveness guards
  * (`!annPop || annPopClosing`) and fall through unchanged.
  */
-import { placeAnnPopX } from "$lib/annotations";
+import {
+	placeAnnPopX
+} from "$lib/sel-geometry";
 
 export type AnnPopSaveKind = "commit-pending" | "save-edit";
 

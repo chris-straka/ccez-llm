@@ -7,17 +7,21 @@
 import {
 	badgeAnswerClass,
 	badgeFace,
+	hasRtlQuote,
+	quoteDirection,
+	type AnnotationId,
+	type AnnotationMark
+} from "./annotations";
+import {
+	locateQuote,
+	type QuoteLocation
+} from "./quote-match";
+import {
 	edgeOffsetForAnchor,
 	gapOffsetForAnchor,
-	hasRtlQuote,
 	isWordChar,
-	locateQuote,
-	quoteDirection,
-	splitSafeOffset,
-	type AnnotationId,
-	type AnnotationMark,
-	type QuoteLocation
-} from "./annotations";
+	splitSafeOffset
+} from "./sel-geometry";
 import {
 	ANN_HIGHLIGHT_D1,
 	ANN_HIGHLIGHT_D2,

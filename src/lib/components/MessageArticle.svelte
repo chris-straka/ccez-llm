@@ -12,10 +12,12 @@ where the text sat, like the composer's promptEl pattern). -->
 	import type { LocalAid } from "$lib/reading";
 	import type { AttachTagModel, SentTagAction } from "$lib/attachments";
 	import type {
-		AnnotationId,
-		AnnotationMark,
-		AnnotationRef
-	} from "$lib/annotations";
+	AnnotationId,
+	AnnotationMark
+} from "$lib/annotations";
+import type {
+	AnnotationRef
+} from "$lib/annotation-block";
 	import SentAttachments, {
 		type SentAttachmentsActions
 	} from "./SentAttachments.svelte";

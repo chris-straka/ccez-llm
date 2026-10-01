@@ -4,15 +4,19 @@ import {
 	deleteAnnotation,
 	canPinAnnotation,
 	setPromptPinned,
-	locateQuote,
 	newAnnotationId,
-	occurrenceAtPosition,
-	paragraphForQuote,
-	selMenuPlacement,
 	type Annotation,
 	type AnnotationId,
 	type StoryAnchor
 } from "./annotations";
+import {
+	locateQuote,
+	occurrenceAtPosition,
+	paragraphForQuote
+} from "./quote-match";
+import {
+	selMenuPlacement
+} from "./sel-geometry";
 import { selMenuWidthEstimate } from "./selSlices";
 import { messageIndexFromId, type ChatMsg, type ChatMsgId } from "./chat";
 import {

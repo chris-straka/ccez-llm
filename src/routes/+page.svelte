@@ -211,37 +211,43 @@
 		type SentTagAction
 	} from "$lib/attachments";
 	import {
-		withAnnotations,
-		promptInclusions,
-		canHoldDeleteBadge,
-		resolveSentRefTarget,
-		annRefsFor,
-		locateQuote,
-		pressExpandedSelection,
-		selMenuPlacement,
-		readingPanelPlacement,
-		menuYAbovePanel,
-		clampPanelCenterX,
-		highlightSteady,
-		panelCenterMoved,
-		lineStartOffset,
-		clampDragAnchorToFocusLine,
-		buildMarksFor,
-		buildNewsMarks,
-		aidedTextForMsg,
-		commitRefsEdit,
-		planClearSentRefs,
-		seedAnnotationsFromRefs,
-		annotationCopyText,
-		promptAnnWashIdFor,
-		menuBtnTouchAction,
-		selMenuDragTarget,
-		annEditCommitToast,
-		type Annotation,
-		type AnnotationId,
-		type AnnotationMark,
-		type StoryAnchor
-	} from "$lib/annotations";
+	promptInclusions,
+	canHoldDeleteBadge,
+	buildMarksFor,
+	buildNewsMarks,
+	aidedTextForMsg,
+	seedAnnotationsFromRefs,
+	annotationCopyText,
+	promptAnnWashIdFor,
+	annEditCommitToast,
+	type Annotation,
+	type AnnotationId,
+	type AnnotationMark,
+	type StoryAnchor
+} from "$lib/annotations";
+import {
+	resolveSentRefTarget,
+	locateQuote
+} from "$lib/quote-match";
+import {
+	withAnnotations,
+	annRefsFor,
+	commitRefsEdit,
+	planClearSentRefs
+} from "$lib/annotation-block";
+import {
+	pressExpandedSelection,
+	selMenuPlacement,
+	readingPanelPlacement,
+	menuYAbovePanel,
+	clampPanelCenterX,
+	highlightSteady,
+	panelCenterMoved,
+	lineStartOffset,
+	clampDragAnchorToFocusLine,
+	menuBtnTouchAction,
+	selMenuDragTarget
+} from "$lib/sel-geometry";
 	import { AnnotationDrafts } from "$lib/annotation-drafts.svelte";
 	import {
 		trimParagraphTerminator,

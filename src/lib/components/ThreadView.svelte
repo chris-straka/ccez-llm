@@ -13,9 +13,9 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 	} from "$lib/attachments";
 	import type { AnnotationId, AnnotationMark } from "$lib/annotations";
 	import {
-		annRefsFor,
-		REFS_ONLY_BODY
-	} from "$lib/annotations";
+	annRefsFor,
+	REFS_ONLY_BODY
+} from "$lib/annotation-block";
 	import {
 		detectScript,
 		offeredLocalAids,

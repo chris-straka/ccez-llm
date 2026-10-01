@@ -19,10 +19,12 @@
  */
 import type { Annotation } from "./annotations";
 import {
-	annRefsFor,
 	findQuotedMessage,
 	paragraphForQuote
-} from "./annotations";
+} from "./quote-match";
+import {
+	annRefsFor
+} from "./annotation-block";
 import type { ChatId, ChatMsgId } from "./chat";
 import { identifyLangShort } from "./langId";
 

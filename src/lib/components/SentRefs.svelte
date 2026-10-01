@@ -9,7 +9,9 @@ popOpen toggles here, the draft and its focus live here. The
 extracts (it renders paged for now). -->
 <script lang="ts">
 	import type { ChatMsgId } from "$lib/chat";
-	import type { AnnotationRef } from "$lib/annotations";
+	import type {
+	AnnotationRef
+} from "$lib/annotation-block";
 	import { annotationCountLabel } from "$lib/annotations";
 	import ActionIcon from "./ActionIcon.svelte";
 

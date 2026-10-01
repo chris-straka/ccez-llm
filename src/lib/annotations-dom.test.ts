@@ -1,12 +1,14 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from "vitest";
 import {
-	loadDraftAnnotations,
-	saveDraftAnnotations,
 	type Annotation,
 	type AnnotationId,
 	type AnnotationMark
 } from "./annotations";
+import {
+	loadDraftAnnotations,
+	saveDraftAnnotations
+} from "./annotation-drafts-store";
 import {
 	applyMarks,
 	quoteFragmentText,

@@ -34,9 +34,9 @@ function appHtml(): string {
 	return readFileSync(new URL("../app.html", import.meta.url), "utf8");
 }
 
-function annotationsSource(): string {
+function selGeometrySource(): string {
 	return readFileSync(
-		new URL("../lib/annotations.ts", import.meta.url),
+		new URL("../lib/sel-geometry.ts", import.meta.url),
 		"utf8"
 	);
 }
@@ -94,10 +94,10 @@ describe("platform seal", () => {
 	});
 
 	it("keeps the iOS selection-menu slot split from Android's", () => {
-		// The slot math lives in annotations.ts since selMenuPlacement
-		// moved there (unit-tested); the seal follows it so the split
+		// The slot math lives in sel-geometry.ts since the section-C
+		// split (unit-tested); the seal follows it so the split
 		// can't silently merge into the phone gate.
-		const source = annotationsSource();
+		const source = selGeometrySource();
 		expect(source).toContain("if (androidUI && !iosUI) {");
 		expect(source).toContain("} else if (iosUI) {");
 	});

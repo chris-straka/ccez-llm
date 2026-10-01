@@ -1,5 +1,7 @@
 import type { ChatProvider } from "./providers/types";
-import { annRefsFor } from "./annotations";
+import {
+	annRefsFor
+} from "./annotation-block";
 import { escapeHtml } from "./render-math";
 
 /**

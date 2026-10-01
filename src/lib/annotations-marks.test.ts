@@ -2,13 +2,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
 	annotationCountLabel,
-	edgeOffsetForAnchor,
-	gapOffsetForAnchor,
 	hasRtlQuote,
-	locateQuote,
 	type AnnotationMark,
 	type AnnotationId
 } from "./annotations";
+import {
+	locateQuote
+} from "./quote-match";
+import {
+	edgeOffsetForAnchor,
+	gapOffsetForAnchor
+} from "./sel-geometry";
 import {
 	applyMarks,
 	lockSelectionToMessage,

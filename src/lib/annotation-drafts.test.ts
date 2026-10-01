@@ -2,11 +2,13 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { AnnotationDrafts, type AnnotationDraftsDeps } from "./annotation-drafts.svelte";
 import {
-	loadDraftAnnotations,
-	saveDraftAnnotations,
 	type Annotation,
 	type AnnotationId
 } from "./annotations";
+import {
+	loadDraftAnnotations,
+	saveDraftAnnotations
+} from "./annotation-drafts-store";
 import type { ChatId, ChatMsgId } from "./chat";
 import type { ChatProvider } from "./providers/types";
 import type { AnnotationQuestion } from "./reading";

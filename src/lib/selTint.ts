@@ -1,4 +1,6 @@
-import { firstContentRect } from "$lib/annotations";
+import {
+	firstContentRect
+} from "$lib/sel-geometry";
 import {
 	slicePoint,
 	spanSliceOverlap,
