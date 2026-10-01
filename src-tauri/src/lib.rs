@@ -101,6 +101,33 @@ use dictate_unsupported::{dictate_start, dictate_stop};
 /// Confirming the re-prompt is gone needs a real Mac rebuild cycle.
 const KEYCHAIN_SERVICE: &str = "studio.ccez.app";
 
+/// Keychain answers for this process: each account is read from the
+/// OS at most once per launch, and writes/deletes update the memo. On
+/// macOS every read of an item this exact binary isn't granted shows a
+/// password dialog (a self-signed dev build is re-identified by content
+/// hash on every rebuild), and webview reloads or provider retries used
+/// to re-read — one dialog after another. A denied read is remembered
+/// too, so dismissing the dialog never summons it again this launch.
+#[cfg(not(target_os = "android"))]
+static KEYCHAIN_MEMO: std::sync::Mutex<
+    Option<std::collections::HashMap<String, Result<Option<String>, String>>>,
+> = std::sync::Mutex::new(None);
+
+#[cfg(not(target_os = "android"))]
+fn memo_get(account: &str) -> Option<Result<Option<String>, String>> {
+    let guard = KEYCHAIN_MEMO.lock().ok()?;
+    guard.as_ref()?.get(account).cloned()
+}
+
+#[cfg(not(target_os = "android"))]
+fn memo_put(account: &str, value: Result<Option<String>, String>) {
+    if let Ok(mut guard) = KEYCHAIN_MEMO.lock() {
+        guard
+            .get_or_insert_with(Default::default)
+            .insert(account.to_string(), value);
+    }
+}
+
 /// Read a secret; `None` when nothing is stored under `account`.
 #[tauri::command]
 fn keychain_get(account: String) -> Result<Option<String>, String> {
@@ -108,13 +135,18 @@ fn keychain_get(account: String) -> Result<Option<String>, String> {
     return secrets_android::get(KEYCHAIN_SERVICE, &account);
     #[cfg(not(target_os = "android"))]
     {
+        if let Some(known) = memo_get(&account) {
+            return known;
+        }
         let entry =
             keyring::Entry::new(KEYCHAIN_SERVICE, &account).map_err(|e| e.to_string())?;
-        match entry.get_password() {
+        let read = match entry.get_password() {
             Ok(secret) => Ok(Some(secret)),
             Err(keyring::Error::NoEntry) => Ok(None),
             Err(e) => Err(e.to_string()),
-        }
+        };
+        memo_put(&account, read.clone());
+        read
     }
 }
 
@@ -127,7 +159,9 @@ fn keychain_set(account: String, secret: String) -> Result<(), String> {
     {
         let entry =
             keyring::Entry::new(KEYCHAIN_SERVICE, &account).map_err(|e| e.to_string())?;
-        entry.set_password(&secret).map_err(|e| e.to_string())
+        entry.set_password(&secret).map_err(|e| e.to_string())?;
+        memo_put(&account, Ok(Some(secret)));
+        Ok(())
     }
 }
 
@@ -223,10 +257,28 @@ fn keychain_delete(account: String) -> Result<(), String> {
         let entry =
             keyring::Entry::new(KEYCHAIN_SERVICE, &account).map_err(|e| e.to_string())?;
         match entry.delete_credential() {
-            Ok(()) => Ok(()),
-            Err(keyring::Error::NoEntry) => Ok(()),
+            Ok(()) | Err(keyring::Error::NoEntry) => {
+                memo_put(&account, Ok(None));
+                Ok(())
+            }
             Err(e) => Err(e.to_string()),
         }
+    }
+}
+
+#[cfg(all(test, not(target_os = "android")))]
+mod keychain_memo_tests {
+    use super::{memo_get, memo_put};
+
+    #[test]
+    fn remembers_reads_writes_and_denials() {
+        assert!(memo_get("test:memo-a").is_none());
+        memo_put("test:memo-a", Ok(Some("k".into())));
+        assert_eq!(memo_get("test:memo-a"), Some(Ok(Some("k".into()))));
+        memo_put("test:memo-a", Ok(None));
+        assert_eq!(memo_get("test:memo-a"), Some(Ok(None)));
+        memo_put("test:memo-b", Err("denied".into()));
+        assert_eq!(memo_get("test:memo-b"), Some(Err("denied".into())));
     }
 }
 

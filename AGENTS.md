@@ -33,8 +33,12 @@ background turns).
   APIs; everything must degrade cleanly here.
 - `scripts/tauri-dev.sh` (`bun run tauri:dev`) — the only supported full
   shell launch on macOS. It builds, signs the binary with the local
-  self-signed "Ccez Dev" cert so Keychain grants survive, then runs with
-  `--no-watch`. Rust edits need Ctrl-C and relaunch. Click Always Allow
+  self-signed "Ccez Dev" cert, then runs with `--no-watch`. On macOS 26
+  the Keychain still keys the grant to the binary's content hash (no
+  Team ID on a self-signed cert: the log reads "ACL partition mismatch:
+  client cdhash"), so every Rust rebuild asks once per item again.
+  `keychain_get` remembers answers per launch, so it is one dialog per
+  item per rebuild, never a loop. Rust edits need Ctrl-C and relaunch. Click Always Allow
   (never Allow, never Deny) on the two Keychain items (`provider:muse`,
   `providers`). Never re-mint the "Ccez Dev" keypair. First build compiles
   ~400 crates.
