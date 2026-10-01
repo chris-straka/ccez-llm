@@ -8,6 +8,9 @@
 		LINE_HEIGHT_DEFAULT,
 		LINE_HEIGHT_MAX,
 		LINE_HEIGHT_MIN,
+		VOICE_SPEED_DEFAULT,
+		VOICE_SPEED_MAX,
+		VOICE_SPEED_MIN,
 		MESSAGE_GAP_MAX,
 		MESSAGE_GAP_MIN,
 		PROMPT_IDLE_DEFAULT,
@@ -185,6 +188,35 @@
 		</label>
 	{/if}
 	<VoicePanel {settings} {androidUI} {followVoice} />
+	<label class="slider-row">
+		Voice speed
+		<button
+			type="button"
+			class="reset-width"
+			title="Reset to normal speed"
+			onclick={() => (settings.voiceSpeed = VOICE_SPEED_DEFAULT)}
+			>({VOICE_SPEED_DEFAULT}×)</button
+		>
+		<span class="font-row">
+			<input
+				type="range"
+				min={VOICE_SPEED_MIN}
+				max={VOICE_SPEED_MAX}
+				step="0.05"
+				value={settings.voiceSpeed ?? VOICE_SPEED_DEFAULT}
+				aria-label="Voice speed"
+				onpointerdown={noteSliderPress}
+				onpointerup={(e) =>
+					sliderRelease(e, () => (settings.voiceSpeed = VOICE_SPEED_DEFAULT))}
+				oninput={(e) => {
+					settings.voiceSpeed = Number(e.currentTarget.value);
+				}}
+			/>
+			<output style="min-width: 3.6rem;"
+				>{(settings.voiceSpeed ?? VOICE_SPEED_DEFAULT).toFixed(2)}×</output
+			>
+		</span>
+	</label>
 	<fieldset>
 		<legend>Big-word reader</legend>
 		<div class="segmented" role="radiogroup" aria-label="Big-word reader">

@@ -3,6 +3,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { identifyLangOffline, identifyLangShort } from "./langId";
 import { hasDistinctiveChinese, hasPinyinTones, ttsLangFor } from "./reading";
 import {
+	currentSpeechRate,
 	effectiveSpeechLang,
 	speechLangsFor,
 	splitGlossHalves,
@@ -508,7 +509,8 @@ export function speakNative(
 			return invoke<number>("tts_speak", {
 				text: utterance,
 				lang,
-				voice: voiceId
+				voice: voiceId,
+				rate: currentSpeechRate()
 			});
 		})
 		.then((rustId) => {
@@ -589,7 +591,12 @@ export function speakNativeWord(
 	onError?: (message: string) => void,
 	voiceId: string | null = null
 ): void {
-	invoke<number>("tts_speak", { text: word, lang, voice: voiceId }).catch(
+	invoke<number>("tts_speak", {
+		text: word,
+		lang,
+		voice: voiceId,
+		rate: currentSpeechRate()
+	}).catch(
 		(error: unknown) => {
 			onError?.(error instanceof Error ? error.message : String(error));
 		}

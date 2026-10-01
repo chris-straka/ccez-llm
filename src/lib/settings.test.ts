@@ -254,6 +254,22 @@ describe("settings", () => {
 		expect(loadSettings(memoryStore).showMessageButtons).toBe(true);
 	});
 
+	it("defaults voice speed to normal and clamps strays", () => {
+		expect(defaultSettings().voiceSpeed).toBe(1);
+		const slow = blankSettings();
+		slow.voiceSpeed = 0.7;
+		saveSettings(slow, memoryStore);
+		expect(loadSettings(memoryStore).voiceSpeed).toBe(0.7);
+		const fast = blankSettings();
+		fast.voiceSpeed = 4;
+		saveSettings(fast, memoryStore);
+		expect(loadSettings(memoryStore).voiceSpeed).toBe(1.5);
+		const junk = blankSettings();
+		(junk as unknown as Record<string, unknown>).voiceSpeed = "slow";
+		saveSettings(junk, memoryStore);
+		expect(loadSettings(memoryStore).voiceSpeed).toBe(1);
+	});
+
 	it("defaults line spacing to 1.5, keeps picks, clamps strays", () => {
 		expect(defaultSettings().lineHeight).toBe(LINE_HEIGHT_DEFAULT);
 		const missing = blankSettings();

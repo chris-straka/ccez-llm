@@ -12,8 +12,9 @@ const TEXT =
 
 async function stubSpeech(page: Page): Promise<void> {
 	await page.addInitScript(() => {
-		const w = window as unknown as { __spoken: string[] };
+		const w = window as unknown as { __spoken: string[]; __rates: number[] };
 		w.__spoken = [];
+		w.__rates = [];
 		const synth = window.speechSynthesis;
 		if (!synth) return;
 		let pending: number[] = [];
@@ -23,6 +24,7 @@ async function stubSpeech(page: Page): Promise<void> {
 		};
 		synth.speak = ((u: SpeechSynthesisUtterance) => {
 			w.__spoken.push(u.text);
+			w.__rates.push(u.rate);
 			clear();
 			pending.push(
 				window.setTimeout(
@@ -83,7 +85,8 @@ test("tap mode from right-click starts at that sentence and waits", async ({
 	await stubSpeech(page);
 	await seedChat(page, [{ role: "assistant", content: TEXT }], null, {
 		readerMode: "tap",
-		voiceEngine: "web"
+		voiceEngine: "web",
+		voiceSpeed: 0.7
 	});
 	await page.goto("/");
 	const word = page.locator("article.assistant .rendered p");
@@ -105,6 +108,13 @@ test("tap mode from right-click starts at that sentence and waits", async ({
 	await page.waitForTimeout(400);
 	// Spoken once, then it waits for a tap.
 	expect(await spoken(page)).toEqual(["Gehen Sie"]);
+	// Voice speed reaches the utterance.
+	const rates = await page.evaluate(
+		() => (window as unknown as { __rates: number[] }).__rates
+	);
+	// The browser stores rate as a 32-bit float (0.699999988…).
+	expect(rates).toHaveLength(1);
+	expect(rates[0]).toBeCloseTo(0.7, 5);
 	await expect(reader.locator(".reader-phrase")).toHaveText("Gehen Sie");
 	await page.keyboard.press("Space");
 	await expect(reader.locator(".reader-phrase")).toHaveText(

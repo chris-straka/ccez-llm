@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
 import {
+	currentSpeechRate,
+	setSpeechRate,
 	splitScriptRuns,
 	splitSentences,
 	speechText,
@@ -468,5 +470,18 @@ describe("dictation text", () => {
 		expect(micUnavailableMessage(false)).toBe(
 			"Mic input not available in this browser."
 		);
+	});
+});
+
+describe("speech rate", () => {
+	it("clamps the voice speed multiplier and falls back to normal", () => {
+		setSpeechRate(0.7);
+		expect(currentSpeechRate()).toBe(0.7);
+		setSpeechRate(0.1);
+		expect(currentSpeechRate()).toBe(0.5);
+		setSpeechRate(9);
+		expect(currentSpeechRate()).toBe(1.5);
+		setSpeechRate(Number.NaN);
+		expect(currentSpeechRate()).toBe(1);
 	});
 });

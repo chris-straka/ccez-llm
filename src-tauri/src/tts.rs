@@ -142,6 +142,7 @@ mod imp {
             text: String,
             lang: String,
             voice: Option<String>,
+            rate: f32,
         },
         Stop,
         Voices(Sender<Vec<NativeVoice>>),
@@ -518,6 +519,8 @@ mod imp {
         lang: &str,
         voice: Option<&str>,
         ctx: &str,
+        // Voice speed multiplier (1.0 = the per-language default rate).
+        rate: f32,
     ) -> Retained<AVSpeechUtterance> {
         unsafe {
             let ns = NSString::from_str(text);
@@ -537,18 +540,30 @@ mod imp {
                     );
                 }
             }
-            utterance.setRate(speech_rate_for(lang));
+            utterance.setRate((speech_rate_for(lang) * rate).clamp(0.0, 1.0));
             utterance
         }
     }
 
-    fn speak_on_main(app: &AppHandle, id: u64, text: String, lang: String, voice: Option<String>) {
+    fn speak_on_main(
+        app: &AppHandle,
+        id: u64,
+        text: String,
+        lang: String,
+        voice: Option<String>,
+        rate: f32,
+    ) {
         let _ = app.run_on_main_thread(move || {
             with_main_synth(|synth| unsafe {
                 synth.stopSpeakingAtBoundary(AVSpeechBoundary::Immediate);
                 CURRENT_ID.store(id, Ordering::SeqCst);
-                let utterance =
-                    build_utterance(&text, &lang, voice.as_deref(), &format!("speak id={id}"));
+                let utterance = build_utterance(
+                    &text,
+                    &lang,
+                    voice.as_deref(),
+                    &format!("speak id={id}"),
+                    rate,
+                );
                 synth.speakUtterance(&utterance);
             });
         });
@@ -570,9 +585,9 @@ mod imp {
         // MAIN_STATE), and voice inventory is a plain registry read.
         for cmd in rx {
             match cmd {
-                Cmd::Speak { id, text, lang, voice } => {
+                Cmd::Speak { id, text, lang, voice, rate } => {
                     if let Some(app) = APP.get() {
-                        speak_on_main(app, id, text, lang, voice);
+                        speak_on_main(app, id, text, lang, voice, rate);
                     }
                 }
                 Cmd::Stop => {
@@ -650,11 +665,13 @@ mod imp {
                     picked.identifier().to_string(),
                     picked.name().to_string(),
                 );
+                // Saved files keep the default pace (lesson audio).
                 let utterance = build_utterance(
                     &text,
                     &lang,
                     Some(&picked.identifier().to_string()),
                     &main_ctx,
+                    1.0,
                 );
                 // The voice's own settings describe the buffer format
                 // below (the documented pairing for this method).
@@ -754,6 +771,7 @@ mod imp {
         text: String,
         lang: String,
         voice: Option<String>,
+        rate: f32,
     ) -> Result<u64, String> {
         if text.trim().is_empty() {
             return Ok(0);
@@ -761,7 +779,13 @@ mod imp {
         let id = NEXT_ID.fetch_add(1, Ordering::SeqCst);
         engine(app)
             .tx
-            .send(Cmd::Speak { id, text, lang, voice })
+            .send(Cmd::Speak {
+                id,
+                text,
+                lang,
+                voice,
+                rate,
+            })
             .map_err(|e| e.to_string())?;
         Ok(id)
     }
@@ -871,15 +895,28 @@ pub fn tts_speak(
     text: String,
     lang: String,
     voice: Option<String>,
+    // Voice speed multiplier (Settings > Voice speed; 1.0 = normal).
+    // Older frontends omit it.
+    rate: Option<f32>,
 ) -> Result<u64, String> {
+    let rate = clamp_rate(rate);
     #[cfg(any(target_os = "macos", target_os = "ios"))]
-    return imp::speak(&app, text, lang, voice);
+    return imp::speak(&app, text, lang, voice, rate);
     #[cfg(target_os = "android")]
-    return super::tts_android::speak(&app, text, lang, voice);
+    return super::tts_android::speak(&app, text, lang, voice, rate);
+    // Windows and Linux read at their engine default for now: their
+    // speak paths only compile on their own targets, so the rate waits
+    // for a session that can build and hear them.
     #[cfg(target_os = "windows")]
-    return super::tts_windows::tts_speak(app, text, lang, voice);
+    return {
+        let _ = rate;
+        super::tts_windows::tts_speak(app, text, lang, voice)
+    };
     #[cfg(target_os = "linux")]
-    return super::tts_linux::tts_speak(app, text, lang, voice);
+    return {
+        let _ = rate;
+        super::tts_linux::tts_speak(app, text, lang, voice)
+    };
     #[cfg(not(any(
         target_os = "macos",
         target_os = "ios",
@@ -888,8 +925,31 @@ pub fn tts_speak(
         target_os = "linux"
     )))]
     {
-        let _ = (app, text, lang, voice);
+        let _ = (app, text, lang, voice, rate);
         return Err("native TTS requires macOS or iOS".into());
+    }
+}
+
+/// Speed multiplier from the frontend, clamped to 0.5x-1.5x (missing or
+/// non-finite reads as 1.0). Pure.
+pub fn clamp_rate(rate: Option<f32>) -> f32 {
+    match rate {
+        Some(r) if r.is_finite() => r.clamp(0.5, 1.5),
+        _ => 1.0,
+    }
+}
+
+#[cfg(test)]
+mod rate_tests {
+    use super::clamp_rate;
+
+    #[test]
+    fn clamps_the_speed_multiplier() {
+        assert_eq!(clamp_rate(None), 1.0);
+        assert_eq!(clamp_rate(Some(f32::NAN)), 1.0);
+        assert_eq!(clamp_rate(Some(0.1)), 0.5);
+        assert_eq!(clamp_rate(Some(3.0)), 1.5);
+        assert_eq!(clamp_rate(Some(0.8)), 0.8);
     }
 }
 

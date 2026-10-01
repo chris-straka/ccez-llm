@@ -409,6 +409,20 @@ function synthesis(): SpeechSynthesis | null {
  * Queue one utterance per segment (voice matched per segment locale).
  * Single-lang input queues exactly what the old per-sentence loop did.
  */
+/**
+ * Voice speed multiplier (Settings > Voice speed, 1 = normal), shared
+ * by web and native speech. Module state on purpose: every speak path
+ * reads it, and threading it through each caller would touch dozens
+ * of call sites for one number. The page pushes the setting here.
+ */
+let speechRate = 1;
+export function setSpeechRate(rate: number): void {
+	speechRate = Number.isFinite(rate) ? Math.min(1.5, Math.max(0.5, rate)) : 1;
+}
+export function currentSpeechRate(): number {
+	return speechRate;
+}
+
 function queueUtterances(
 	synth: SpeechSynthesis,
 	segments: SpeechSegment[],
@@ -418,6 +432,7 @@ function queueUtterances(
 	segments.forEach((segment, index) => {
 		const utterance = new SpeechSynthesisUtterance(segment.text);
 		utterance.lang = segment.lang;
+		utterance.rate = speechRate;
 		try {
 			const voice = synth
 				.getVoices()

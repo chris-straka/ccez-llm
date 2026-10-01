@@ -122,6 +122,7 @@ pub fn speak(
     text: String,
     lang: String,
     voice: Option<String>,
+    rate: f32,
 ) -> Result<u64, String> {
     remember(app);
     let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
@@ -135,12 +136,13 @@ pub fn speak(
         env.call_static_method(
             cls,
             "speak",
-            "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;J)V",
+            "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;JF)V",
             &[
                 JValue::from(&text),
                 JValue::from(&lang),
                 JValue::from(&voice),
                 JValue::from(id as jlong),
+                JValue::Float(rate),
             ],
         )
         .map_err(|e| format!("speak() failed: {e:?}"))?;

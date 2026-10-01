@@ -196,6 +196,8 @@ export interface AppSettings {
 	readerMode: "off" | "follow" | "tap";
 	/** Reader words per screen: 1-3, or 0 for Auto (fit ~18 characters). */
 	readerWords: number;
+	/** Voice speed multiplier for every read-aloud (0.5-1.5, 1 = normal). */
+	voiceSpeed: number;
 	/**
 	 * Seconds of no mouse/keyboard/touch input before the main prompt
 	 * slides down out of view (any input restores it instantly).
@@ -278,6 +280,10 @@ export const MESSAGE_GAP_MAX = 1.5;
 export const LINE_HEIGHT_DEFAULT = 1.5;
 export const LINE_HEIGHT_MIN = 1;
 export const LINE_HEIGHT_MAX = 2.2;
+/** Voice speed multiplier (1 = the engine's normal pace). */
+export const VOICE_SPEED_DEFAULT = 1;
+export const VOICE_SPEED_MIN = 0.5;
+export const VOICE_SPEED_MAX = 1.5;
 /** Phone font scale at/above which the chat goes full-bleed (330%). */
 export const FULLBLEED_FONT_SCALE = 3.3;
 /** Absurdly wide column: min(100%, …) consumers read it as full width. */
@@ -471,6 +477,7 @@ export function defaultSettings(): AppSettings {
 		lineHeight: LINE_HEIGHT_DEFAULT,
 		readerMode: "off",
 		readerWords: 0,
+		voiceSpeed: VOICE_SPEED_DEFAULT,
 		promptIdleSec: PROMPT_IDLE_DEFAULT,
 		voiceLangPinned: false,
 		theme: "system",
@@ -748,6 +755,13 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 		}
 		if (!["off", "follow", "tap"].includes(merged.readerMode)) merged.readerMode = "off";
 		if (![0, 1, 2, 3].includes(merged.readerWords)) merged.readerWords = 0;
+		if (typeof merged.voiceSpeed !== "number" || Number.isNaN(merged.voiceSpeed))
+			merged.voiceSpeed = VOICE_SPEED_DEFAULT;
+		else
+			merged.voiceSpeed = Math.min(
+				VOICE_SPEED_MAX,
+				Math.max(VOICE_SPEED_MIN, merged.voiceSpeed)
+			);
 		// Backfill line spacing on older saves; clamp strays into range.
 		if (typeof merged.lineHeight !== "number" || Number.isNaN(merged.lineHeight))
 			merged.lineHeight = LINE_HEIGHT_DEFAULT;

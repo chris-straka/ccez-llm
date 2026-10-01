@@ -536,6 +536,7 @@
 		promptParkedFor
 	} from "$lib/chrome";
 	import {
+		setSpeechRate,
 		speakText,
 		speakMultilingual,
 		speechText,
@@ -2443,6 +2444,9 @@
 	 * phrase through startSpeech; a generation guard drops ends from
 	 * phrases a pause, jump, or close already replaced.
 	 */
+	// Voice speed rides module state in voice.ts (every speak path,
+	// web and native, reads it there).
+	$effect(() => setSpeechRate(settings.voiceSpeed ?? 1));
 	let reader = $state<ReaderState | null>(null);
 	const readerOpen = $derived(reader !== null);
 	let readerLang: string | ((sentence: string) => string) = "en-US";

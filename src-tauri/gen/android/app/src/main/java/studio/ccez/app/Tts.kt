@@ -81,9 +81,11 @@ object Tts {
      * slightly slower for learners. Android rates multiply the engine
      * default (1.0); only Chinese deviates.
      */
-    private fun tuneFor(tts: TextToSpeech, locale: Locale) {
+    private fun tuneFor(tts: TextToSpeech, locale: Locale, rate: Float = 1.0f) {
         try {
-            tts.setSpeechRate(if (locale.language == "zh") 0.9f else 1.0f)
+            // [rate] is the Voice speed setting (multiplier, 1.0 = normal);
+            // saved files keep the default.
+            tts.setSpeechRate((if (locale.language == "zh") 0.9f else 1.0f) * rate)
         } catch (_: Exception) {
             // Engine default stands in; still speak.
         }
@@ -156,7 +158,7 @@ object Tts {
      * Never blocks the caller; completion arrives via [nativeOnTtsDone].
      */
     @JvmStatic
-    fun speak(text: String, lang: String, voiceName: String?, id: Long) {
+    fun speak(text: String, lang: String, voiceName: String?, id: Long, rate: Float) {
         main.post {
             ensure()
             val tts = engine
@@ -176,7 +178,7 @@ object Tts {
             } catch (_: Exception) {
                 // Engine default stands in; still speak.
             }
-            tuneFor(tts, locale)
+            tuneFor(tts, locale, rate)
             if (voiceName != null) {
                 try {
                     // The pinned voice only applies to its own language:
