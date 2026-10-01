@@ -1060,3 +1060,11 @@ condensed from the Sep 23–24 chain (`0cda353`–`051257b`, tail
       footer, wrapped chords); `e2e/interface-size.e2e.ts` pins all
       four surfaces in-viewport at 250% on desktop + phone
       (`5efac6e`).
+- [x] A7b Voice speed on Windows/Linux: `rate` threaded through
+      `Cmd::Speak` into SAPI `SetRate` (`sapi_speak_rate`) and
+      spd-say `-r` / espeak `-s` (`speak_argv`); pure mappings
+      unit-tested. Cross-target `cargo check` unverified (no Linux
+      sysroot / MSVC toolchain on the Mac); `imp` threadings
+      typechecked via a stub harness instead. Android: no code
+      needed (JNI sig matches); on-device listening check still
+      open (S24 not attached) (`2fa7079`).
