@@ -15,6 +15,7 @@ import {
 	imageMissSettles,
 	fetchArticleText,
 	isNewsFallback,
+	isWebviewUnsupported,
 	isNewsSupported,
 	jinaUrl,
 	loadNewsStories,
@@ -1040,6 +1041,96 @@ describe("article resolution", () => {
 			complete: false
 		});
 		expect(gated).toBe(0);
+	});
+
+	it("reads walled stories through the hidden browser last", async () => {
+		const html = (head: string) =>
+			`<!doctype html><html><head>${head}</head><body><p>Body</p></body></html>`;
+		const wall = async (url: string) => {
+			if (url.includes("r.jina.ai")) return "no images here";
+			throw new Error("bad-status:403");
+		};
+		const deps = (over: Record<string, unknown> = {}) => ({
+			decode: async () => "https://outlet.test/s",
+			fetchPage: wall,
+			gateJina: async () => {},
+			fresh: () => true,
+			cachedUrl: () => null,
+			storeUrl: () => {},
+			jinaQuotaBlown: () => false,
+			flagJinaQuota: () => {},
+			...over
+		});
+		// Walled direct + dry reader + hidden hit: the wall falls.
+		let attempts = 0;
+		const hit = deps({
+			fetchWebview: async (url: string) => {
+				attempts++;
+				expect(url).toBe("https://outlet.test/s");
+				return "https://outlet.test/w.jpg";
+			}
+		});
+		expect(await resolveStoryImage("https://g", hit)).toEqual({
+			found: "https://outlet.test/w.jpg",
+			complete: true
+		});
+		expect(attempts).toBe(1);
+		// Dry hidden read keeps the reader leg's miss verdict.
+		const dry = deps({ fetchWebview: async () => null });
+		expect(await resolveStoryImage("https://g", dry)).toEqual({
+			found: null,
+			complete: true
+		});
+		// Hidden timeout stays transient (retry next open).
+		const slow = deps({
+			fetchWebview: async () => {
+				throw new Error("timeout");
+			}
+		});
+		expect(await resolveStoryImage("https://g", slow)).toEqual({
+			found: null,
+			complete: false
+		});
+		// No hidden leg: the reader verdict stands, silently.
+		expect(isWebviewUnsupported(new Error("unsupported"))).toBe(true);
+		expect(isWebviewUnsupported(new Error("timeout"))).toBe(false);
+		const bare = deps({
+			fetchWebview: async () => {
+				throw new Error("unsupported");
+			}
+		});
+		expect(await resolveStoryImage("https://g", bare)).toEqual({
+			found: null,
+			complete: true
+		});
+		// Blown quota skips the reader burn but still tries hidden.
+		let quotaGate = 0;
+		const quota = deps({
+			jinaQuotaBlown: () => true,
+			gateJina: async () => {
+				quotaGate++;
+			},
+			fetchWebview: async () => "https://outlet.test/q.jpg"
+		});
+		expect(await resolveStoryImage("https://g", quota)).toEqual({
+			found: "https://outlet.test/q.jpg",
+			complete: true
+		});
+		expect(quotaGate).toBe(0);
+		// Direct-imageless pages never pay for the hidden leg.
+		let wasted = 0;
+		const seen = deps({
+			fetchPage: async () => html(""),
+			fetchWebview: async () => {
+				wasted++;
+				return "https://outlet.test/w.jpg";
+			}
+		});
+		expect(await resolveStoryImage("https://g", seen)).toEqual({
+			found: null,
+			complete: true
+		});
+		expect(wasted).toBe(0);
 	});
 
 	it("retries transient images once, then settles the letter tile", async () => {

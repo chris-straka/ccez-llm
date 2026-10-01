@@ -11,6 +11,7 @@ mod dictation;
 mod fetch;
 mod news;
 mod ocr;
+mod og_image;
 #[cfg(target_os = "windows")]
 mod ocr_windows;
 #[cfg(target_os = "linux")]
@@ -304,6 +305,7 @@ pub fn run() {
             coderun::run_code,
             fetch::fetch_page,
             news::news_decode_url,
+            og_image::fetch_og_image,
             promptmenu::set_prompt_menu_allowed,
             turn::turn_start,
             turn::turn_poll,

@@ -600,6 +600,9 @@ export interface StoryImageDeps {
 	/** Quota breaker: skip the reader leg while blown. */
 	jinaQuotaBlown: () => boolean;
 	flagJinaQuota: () => void;
+	/** Hidden-browser share-image read (desktop shells). Absent on
+	 * phones; `unsupported` errors skip the leg silently. */
+	fetchWebview?: ((url: string) => Promise<string | null>) | undefined;
 }
 
 /** Cooldown after a Jina 429 before images try the reader leg again. */
@@ -623,9 +626,17 @@ export function imageMissSettles(error: unknown): boolean {
 	return /bad-status:(\d{3})/.test(message);
 }
 
+/** True when the shell has no hidden-browser leg (mobile). Pure. */
+export function isWebviewUnsupported(error: unknown): boolean {
+	const message = error instanceof Error ? error.message : "";
+	return /unsupported/.test(message);
+}
+
 /**
  * One story's preview image: direct og:image first, the gated
- * reader leg second. `complete` is false when a leg threw
+ * reader leg second, the hidden browser last (direct failures
+ * only — it exists to beat bot walls, not to re-read pages the
+ * fetcher already saw). `complete` is false when a leg threw
  * transiently or the region went stale mid-flight — the caller
  * must not cache those as misses; walls, quota, and undecodable
  * links settle instead (see imageMissSettles).
@@ -644,26 +655,45 @@ export async function resolveStoryImage(
 	}
 	try {
 		deps.storeUrl(link, url);
+		let directFailed = false;
 		let found: string | null = null;
+		// A dry hidden read keeps the reader leg's own verdict; a
+		// hit completes; anything else stays transient (retry next
+		// open) unless the shell has no hidden leg at all.
+		const webviewOr = async (fallback: {
+			found: string | null;
+			complete: boolean;
+		}): Promise<{ found: string | null; complete: boolean }> => {
+			if (!directFailed || !deps.fetchWebview || !deps.fresh()) return fallback;
+			try {
+				const hit = await deps.fetchWebview(url);
+				if (hit) return { found: hit, complete: true };
+				return fallback;
+			} catch (error) {
+				if (isWebviewUnsupported(error)) return fallback;
+				return { found: null, complete: false };
+			}
+		};
 		try {
 			found = articleImageFromHtml(await deps.fetchPage(url), url);
 		} catch {
+			directFailed = true;
 			found = null;
 		}
 		if (found) return { found, complete: true };
 		if (!deps.fresh()) return { found: null, complete: false };
 		// Blown quota: skip the doomed reader leg (no gate wait,
-		// no burn) and settle — next launch retries fresh.
-		if (deps.jinaQuotaBlown()) return { found: null, complete: true };
+		// no burn) — the hidden leg still runs, it spends no quota.
+		if (deps.jinaQuotaBlown()) return webviewOr({ found: null, complete: true });
 		await deps.gateJina();
 		if (!deps.fresh()) return { found: null, complete: false };
 		try {
 			found = contentImageFromMarkdown(await deps.fetchPage(jinaUrl(url)));
 		} catch (error) {
 			if (isJinaQuota(error)) deps.flagJinaQuota();
-			return { found: null, complete: imageMissSettles(error) };
+			return webviewOr({ found: null, complete: imageMissSettles(error) });
 		}
-		return { found, complete: true };
+		return webviewOr({ found, complete: true });
 	} catch {
 		return { found: null, complete: false };
 	}
@@ -819,6 +849,16 @@ export async function fetchArticleText(
 export async function fetchRawPage(url: string): Promise<string> {
 	if (!tauriBackendAvailable()) throw new Error("news-needs-shell");
 	const out = await tauriInvoke<unknown>("fetch_page", { url });
+	if (typeof out !== "string" || !out) throw new Error("news-empty");
+	return out;
+}
+
+/** Share image through the hidden desktop browser (shell only,
+ * null when the page holds none). Mobile answers `unsupported`. */
+export async function fetchWebviewImage(url: string): Promise<string | null> {
+	if (!tauriBackendAvailable()) throw new Error("news-needs-shell");
+	const out = await tauriInvoke<unknown>("fetch_og_image", { url });
+	if (out === null || out === undefined) return null;
 	if (typeof out !== "string" || !out) throw new Error("news-empty");
 	return out;
 }

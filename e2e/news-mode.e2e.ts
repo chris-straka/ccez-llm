@@ -4,6 +4,7 @@ import {
 	MOCK_SOURCE_MISS,
 	MOCK_TITLE_IMG,
 	MOCK_TITLE_MISS,
+	MOCK_TITLE_WALL,
 	seedMockShell
 } from "./mock-shell";
 
@@ -163,9 +164,10 @@ test.describe("mock shell feed", () => {
 		const panel = page.locator(".news-panel");
 		await expect(panel).toBeVisible({ timeout: 10_000 });
 		const cards = panel.locator(".news-card");
-		await expect(cards).toHaveCount(2);
+		await expect(cards).toHaveCount(3);
 		await expect(cards.nth(0)).toContainText(MOCK_TITLE_IMG);
 		await expect(cards.nth(1)).toContainText(MOCK_TITLE_MISS);
+		await expect(cards.nth(2)).toContainText(MOCK_TITLE_WALL);
 		await expect(panel).not.toContainText("needs the app shell");
 		// The feed-image story renders its picture, no fetch.
 		await expect(cards.nth(0).locator("img.news-img")).toBeVisible();
@@ -174,7 +176,7 @@ test.describe("mock shell feed", () => {
 	test("drag-select plus A files a headline badge", async ({ page }) => {
 		await openFrenchNews(page);
 		const panel = page.locator(".news-panel");
-		await expect(panel.locator(".news-card")).toHaveCount(2);
+		await expect(panel.locator(".news-card")).toHaveCount(3);
 		await dragHeadline(page, 1, "croissant");
 		const selText = await page.evaluate(
 			() => window.getSelection()?.toString() ?? ""
@@ -199,11 +201,23 @@ test.describe("mock shell feed", () => {
 		await openFrenchNews(page);
 		const panel = page.locator(".news-panel");
 		const cards = panel.locator(".news-card");
-		await expect(cards).toHaveCount(2);
+		await expect(cards).toHaveCount(3);
 		// The imageless story: outlet initial, never a stuck skeleton.
 		const tile = cards.nth(1).locator(".news-img-fallback");
 		await expect(tile).toBeVisible({ timeout: 10_000 });
 		await expect(tile).toHaveText(MOCK_SOURCE_MISS.trim().charAt(0));
 		await expect(panel.locator(".news-skel")).toHaveCount(0);
+	});
+
+	test("walled story resolves through the hidden leg", async ({ page }) => {
+		await openFrenchNews(page);
+		const panel = page.locator(".news-panel");
+		const cards = panel.locator(".news-card");
+		await expect(cards).toHaveCount(3);
+		// Direct 403s and the reader walls: the hidden browser is
+		// the only leg that can picture this card.
+		const img = cards.nth(2).locator("img.news-img");
+		await expect(img).toBeVisible({ timeout: 10_000 });
+		await expect(cards.nth(2).locator(".news-img-fallback")).toHaveCount(0);
 	});
 });

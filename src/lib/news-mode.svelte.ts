@@ -1,4 +1,4 @@
-import { SvelteMap } from "svelte/reactivity";
+import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import { replyLanguageFor } from "./languages";
 import {
 	PASTE_CLOSE,
@@ -18,7 +18,9 @@ import {
 	createRateGate,
 	decodeNewsLink,
 	fetchRawPage,
+	fetchWebviewImage,
 	isNewsFallback,
+	isWebviewUnsupported,
 	JINA_QUOTA_COOLDOWN_MS,
 	loadNewsStories,
 	newsConversationInstruction,
@@ -92,6 +94,11 @@ export class NewsMode {
 	/** Quota-breaker deadline: a Jina 429 parks image reader legs
 	 * until this timestamp (epoch ms) instead of burning quota. */
 	jinaQuotaUntil = 0;
+	/** Hidden-leg attempts to skip this session (one slow timeout
+	 * per story is enough; direct/reader legs still retry). */
+	webviewSkips = new SvelteSet<string>();
+	/** The shell answered `unsupported`: no hidden leg exists. */
+	webviewUnsupported = false;
 	readonly actions: NewsModeActions;
 	private readonly deps: NewsModeDeps;
 
@@ -254,7 +261,22 @@ export class NewsMode {
 					jinaQuotaBlown: () => Date.now() < this.jinaQuotaUntil,
 					flagJinaQuota: () => {
 						this.jinaQuotaUntil = Date.now() + JINA_QUOTA_COOLDOWN_MS;
-					}
+					},
+					// Phones have no hidden leg; timed-out stories
+					// skip it for the session (rethrow keeps the
+					// transient verdict so cheap legs still retry).
+					fetchWebview: this.deps.isPhone()
+						? undefined
+						: async (articleUrl) => {
+								if (this.webviewUnsupported || this.webviewSkips.has(link)) return null;
+								try {
+									return await fetchWebviewImage(articleUrl);
+								} catch (error) {
+									if (isWebviewUnsupported(error)) this.webviewUnsupported = true;
+									else this.webviewSkips.add(link);
+									throw error;
+								}
+							}
 				}),
 			fresh,
 			onSettled: (link, found, complete) => {
