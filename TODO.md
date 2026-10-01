@@ -31,7 +31,8 @@ same codebase via the Tauri mobile target.
 Full specs, acceptance criteria, and gates live in
 `docs/plans/2026-10-01-handoff.md`. Work top to bottom.
 
-- [ ] A. Giant text: hyphenation, desktop full-bleed, phone 2000% overflow, line height
+- [ ] A6. Reader view: spoken word full screen while reading aloud (A itself shipped in `74c47e3`)
+- [ ] Fix two e2e failures that predate the plan (see the plan's "Known failing")
 - [ ] B. Annotation drafts controller out of `+page.svelte`
 - [ ] C. Split `annotations.ts` by concern
 - [ ] D. Deduplicate `annotations-stamp.ts` loops and ramps
