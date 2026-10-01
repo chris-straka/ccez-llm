@@ -1068,3 +1068,9 @@ condensed from the Sep 23–24 chain (`0cda353`–`051257b`, tail
       typechecked via a stub harness instead. Android: no code
       needed (JNI sig matches); on-device listening check still
       open (S24 not attached) (`2fa7079`).
+- [x] B Annotation drafts controller: list, stash, per-chat
+      load/save, pins, merged `filePending` filing core, and the ask
+      flow move verbatim into `annotation-drafts.svelte.ts`; page
+      assigns the list nowhere; controller (22) and
+      `annotate()`/`openBadge()` (12) suites; e2e 133/133 over the
+      11 gate files (`6b12202`).
