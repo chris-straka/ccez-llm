@@ -461,14 +461,15 @@ export interface DeckKeyFacts {
 }
 
 /**
- * Keys while the deck is open. Space/Enter flip, 1/2 grade, Delete or
- * Backspace drops the card, Esc or the toggle chord closes. Other bare
+ * Keys while the deck is open. Space/Enter flip, 1/2 grade, S reads the
+ * quote aloud, Delete or Backspace drops the card, Esc or the toggle
+ * chord closes. Other bare
  * keys are swallowed so j/k/a never reach the chat behind the veil;
  * other modified chords pass through ("pass").
  */
 export function deckKeyAction(
 	facts: DeckKeyFacts
-): DeckAction | "close" | "swallow" | "pass" {
+): DeckAction | "speak" | "close" | "swallow" | "pass" {
 	if (facts.key === "Escape") return "close";
 	if (isFlashcardsChord(facts)) return "close";
 	if (facts.metaKey || facts.ctrlKey || facts.altKey) return "pass";
@@ -477,6 +478,7 @@ export function deckKeyAction(
 	if (facts.key === "1") return "again";
 	if (facts.key === "2") return "good";
 	if (facts.key === "Delete" || facts.key === "Backspace") return "dismiss";
+	if (facts.code === "KeyS") return "speak";
 	return "swallow";
 }
 

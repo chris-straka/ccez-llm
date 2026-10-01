@@ -48,6 +48,10 @@ export interface NoticeSlot {
 	/** Generation: bumped on every show, captured by the clear timer. */
 	seq: number;
 	message: string | null;
+	/** Pointer or finger resting on the notice: its timer can't clear it. */
+	held?: boolean;
+	/** The timer fired while held: release clears after a grace beat. */
+	expired?: boolean;
 }
 
 export interface NoticeState {
@@ -90,6 +94,7 @@ export function showNotice(
 	const slot = state[kind];
 	slot.seq += 1;
 	slot.message = message;
+	slot.expired = false;
 	return slot.seq;
 }
 
@@ -104,12 +109,47 @@ export function expireNotice(
 	seq: number
 ): void {
 	const slot = state[kind];
-	if (slot.seq === seq) slot.message = null;
+	if (slot.seq !== seq) return;
+	if (slot.held) slot.expired = true;
+	else slot.message = null;
+}
+
+/** Grace after release before a held notice that ran out fades. */
+export const RELEASE_GRACE_MS = 1000;
+
+/**
+ * Hover or touch on a self-clearing notice: it stays while held, so a
+ * fast toast can still be read. Pure; the component wires the events.
+ */
+export function holdNotice(state: NoticeState, kind: NoticeKind): void {
+	state[kind].held = true;
+}
+
+/**
+ * End a hold. Returns the generation to expire after RELEASE_GRACE_MS
+ * when the notice's own timer already ran out meanwhile, else null
+ * (its timer is still pending and clears it on schedule).
+ */
+export function releaseNotice(state: NoticeState, kind: NoticeKind): number | null {
+	const slot = state[kind];
+	slot.held = false;
+	if (!slot.expired || slot.message === null) return null;
+	slot.expired = false;
+	return slot.seq;
+}
+
+/** releaseNotice plus the grace timer (the effectful half). */
+export function releaseNoticeLater(state: NoticeState, kind: NoticeKind): void {
+	const seq = releaseNotice(state, kind);
+	if (seq !== null)
+		setTimeout(() => expireNotice(state, kind, seq), RELEASE_GRACE_MS);
 }
 
 /** Immediate clear: tap-to-dismiss, next-attempt reset. */
 export function clearNotice(state: NoticeState, kind: NoticeKind): void {
 	state[kind].message = null;
+	state[kind].held = false;
+	state[kind].expired = false;
 }
 
 /**

@@ -4,6 +4,8 @@
 		clearNotice,
 		errorToastTimeoutFor,
 		flashNotice,
+		holdNotice,
+		releaseNoticeLater,
 		toastLong,
 		type NoticeState
 	} from "$lib/notices";
@@ -120,6 +122,8 @@
 			: "Click to copy"}
 		aria-live="polite"
 		transition:fade={{ duration: 160 }}
+		onpointerenter={() => holdNotice(notices, "errorToast")}
+		onpointerleave={() => releaseNoticeLater(notices, "errorToast")}
 		onclick={errorToastTap}>{notices.errorToast.message}</button
 	>
 {:else if notices.toast.message}
@@ -131,6 +135,8 @@
 			: "Click to copy"}
 		aria-live="polite"
 		transition:fade={{ duration: 160 }}
+		onpointerenter={() => holdNotice(notices, "toast")}
+		onpointerleave={() => releaseNoticeLater(notices, "toast")}
 		onclick={toastTap}>{notices.toast.message}</button
 	>
 {/if}
@@ -143,6 +149,8 @@
 		class="voice-error"
 		title="Dismiss"
 		transition:fade={{ duration: 160 }}
+		onpointerenter={() => holdNotice(notices, "voice")}
+		onpointerleave={() => releaseNoticeLater(notices, "voice")}
 		onclick={dismissVoiceError}
 	>
 		<span role="alert">{notices.voice.message}</span>

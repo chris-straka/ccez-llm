@@ -491,6 +491,7 @@
 	import {
 		ankiExport,
 		ankiFilename,
+		currentCard,
 		deckKeyAction,
 		dueCards,
 		harvestCards,
@@ -2371,8 +2372,16 @@
 		deck = startSession(deckCards, deckSchedule, deckNow);
 	}
 	function closeFlashcards(): void {
+		if (speakingSelection?.startsWith("flashcard:")) stopVoice();
 		deck = null;
 		if (!androidUI) editor?.focus();
+	}
+	/** Read the current card's quote in its own language; the context
+	 * sentence routes the voice (see speakQuote). */
+	function speakFlashcard(): void {
+		const card = deck ? currentCard(deck) : null;
+		if (!card) return;
+		void speakQuote(card.quote, `flashcard:${card.key}`, true, card.context || card.quote);
 	}
 	function stepFlashcards(action: DeckAction): void {
 		if (!deck) return;
@@ -10330,6 +10339,7 @@
 				if (deckKey === "pass") return;
 				consumeEvent(event);
 				if (deckKey === "close") closeFlashcards();
+				else if (deckKey === "speak") speakFlashcard();
 				else if (deckKey !== "swallow") stepFlashcards(deckKey);
 				return;
 			}
@@ -13754,8 +13764,11 @@
 			total={deckCards.filter((c) => !deckSchedule[c.key]?.dismissed).length}
 			nextDue={nextDueAt(deckCards, deckSchedule, deckNow)}
 			now={deckNow}
+			speaking={deck !== null &&
+				speakingSelection === `flashcard:${currentCard(deck)?.key ?? ""}`}
 			actions={{
 				flip: () => stepFlashcards("flip"),
+				speak: speakFlashcard,
 				again: () => stepFlashcards("again"),
 				good: () => stepFlashcards("good"),
 				dismiss: () => stepFlashcards("dismiss"),

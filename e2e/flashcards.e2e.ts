@@ -117,6 +117,20 @@ test("flashcards flip, grade, delete, and skip English quotes", async ({
 		dialog.getByRole("button", { name: "Export to Anki" })
 	).toBeVisible();
 
+	// Export downloads the Anki file; its toast holds while hovered
+	// (past its own timeout) and fades a beat after the pointer leaves.
+	const download = page.waitForEvent("download");
+	await dialog.getByRole("button", { name: "Export to Anki" }).click();
+	expect((await download).suggestedFilename()).toMatch(
+		/^ccez-flashcards-.*\.txt$/
+	);
+	const toast = page.locator(".toast", { hasText: "Flashcards downloaded" });
+	await toast.hover();
+	await page.waitForTimeout(4500);
+	await expect(toast).toBeVisible();
+	await page.mouse.move(5, 5);
+	await expect(toast).toBeHidden({ timeout: 3000 });
+
 	const schedule = await page.evaluate(() =>
 		JSON.parse(window.localStorage.getItem("ccez-llm-flashcards-v1") ?? "{}")
 	);

@@ -352,6 +352,7 @@ describe("deckKeyAction", () => {
 		expect(
 			deckKeyAction(k("R", "KeyR", { metaKey: true, shiftKey: true }))
 		).toBe("close");
+		expect(deckKeyAction(k("s", "KeyS"))).toBe("speak");
 		expect(deckKeyAction(k("j", "KeyJ"))).toBe("swallow");
 		expect(deckKeyAction(k("2", "Digit2", { repeat: true }))).toBe("swallow");
 		expect(deckKeyAction(k("q", "KeyQ", { metaKey: true }))).toBe("pass");

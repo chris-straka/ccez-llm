@@ -13,10 +13,13 @@ behavior; this component owns the card markup and its flip. -->
 		type DeckSession,
 		type ReviewSchedule
 	} from "$lib/flashcards";
+	import ActionIcon from "./ActionIcon.svelte";
 	import Modal from "./Modal.svelte";
 
 	export interface FlashcardDeckActions {
 		flip: () => void;
+		/** Read the quote aloud in its own language (S). */
+		speak: () => void;
 		again: () => void;
 		good: () => void;
 		dismiss: () => void;
@@ -31,11 +34,14 @@ behavior; this component owns the card markup and its flip. -->
 		total: number;
 		/** Soonest upcoming due time, for the done screen. */
 		nextDue: number | null;
+		/** This card's quote is being read aloud. */
+		speaking: boolean;
 		now: number;
 		actions: FlashcardDeckActions;
 	}
 
-	let { session, schedule, total, nextDue, now, actions }: Props = $props();
+	let { session, schedule, total, nextDue, speaking, now, actions }: Props =
+		$props();
 
 	const card = $derived(currentCard(session));
 	const left = $derived(session.queue.length - session.index);
@@ -64,9 +70,19 @@ behavior; this component owns the card markup and its flip. -->
 <Modal label="Flashcards" cardClass="flashcards-modal" onVeilClick={veilClick}>
 	<div class="deck">
 		{#if card}
-			<p class="deck-count" aria-live="polite">
-				{left === 1 ? "1 card left" : `${left} cards left`}
-			</p>
+			<div class="deck-top">
+				<p class="deck-count" aria-live="polite">
+					{left === 1 ? "1 card left" : `${left} cards left`}
+				</p>
+				<button
+					type="button"
+					class="deck-speak"
+					class:speaking
+					title="Read aloud (S)"
+					aria-label="Read aloud"
+					onclick={actions.speak}><ActionIcon kind="speak" /></button
+				>
+			</div>
 			<button
 				type="button"
 				class="flashcard"
@@ -155,6 +171,37 @@ behavior; this component owns the card markup and its flip. -->
 		display: flex;
 		flex-direction: column;
 		gap: 0.8rem;
+	}
+	/* Count centered, speaker parked at the right edge. */
+	.deck-top {
+		display: grid;
+		grid-template-columns: 2rem 1fr 2rem;
+		align-items: center;
+	}
+	.deck-top .deck-count {
+		grid-column: 2;
+	}
+	.deck-speak {
+		grid-column: 3;
+		display: grid;
+		place-items: center;
+		width: 2rem;
+		height: 2rem;
+		padding: 0;
+		border: none;
+		border-radius: 999px;
+		background: none;
+		color: var(--muted);
+		cursor: pointer;
+		transition: color 0.15s ease;
+	}
+	.deck-speak:hover,
+	.deck-speak.speaking {
+		color: var(--accent);
+	}
+	.deck-speak :global(.action-glyph) {
+		width: 1.1em;
+		height: 1.1em;
 	}
 	.deck-count {
 		margin: 0;

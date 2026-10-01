@@ -1,5 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
 import {
+	RELEASE_GRACE_MS,
+	holdNotice,
+	releaseNotice,
+	releaseNoticeLater,
 	emptyNotices,
 	showNotice,
 	expireNotice,
@@ -104,5 +108,44 @@ describe("notice queue", () => {
 		} finally {
 			vi.useRealTimers();
 		}
+	});
+});
+
+describe("held notices", () => {
+	it("stays while held, then clears after the release grace", () => {
+		vi.useFakeTimers();
+		try {
+			const state = emptyNotices();
+			flashNotice(state, "toast", "Saved", 2500);
+			holdNotice(state, "toast");
+			vi.advanceTimersByTime(5000);
+			expect(state.toast.message).toBe("Saved");
+			releaseNoticeLater(state, "toast");
+			vi.advanceTimersByTime(RELEASE_GRACE_MS - 1);
+			expect(state.toast.message).toBe("Saved");
+			vi.advanceTimersByTime(1);
+			expect(state.toast.message).toBeNull();
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("a release before the timer leaves the original schedule alone", () => {
+		const state = emptyNotices();
+		const seq = showNotice(state, "toast", "Copied");
+		holdNotice(state, "toast");
+		expect(releaseNotice(state, "toast")).toBeNull();
+		expireNotice(state, "toast", seq);
+		expect(state.toast.message).toBeNull();
+	});
+
+	it("a newer notice shown during the hold is not cleared by the old timer", () => {
+		const state = emptyNotices();
+		const first = showNotice(state, "toast", "one");
+		holdNotice(state, "toast");
+		showNotice(state, "toast", "two");
+		expireNotice(state, "toast", first);
+		expect(releaseNotice(state, "toast")).toBeNull();
+		expect(state.toast.message).toBe("two");
 	});
 });
