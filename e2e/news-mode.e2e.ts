@@ -1,12 +1,18 @@
-import { test, expect } from "@playwright/test";
-import { seedChat } from "./helpers";
+import { test, expect, type Page } from "@playwright/test";
+import { dragHeadline, seedChat } from "./helpers";
+import {
+	MOCK_SOURCE_MISS,
+	MOCK_TITLE_IMG,
+	MOCK_TITLE_MISS,
+	seedMockShell
+} from "./mock-shell";
 
 /**
  * Learner news mode: on an empty chat, picking a reply language
  * trades the welcome text for story cards under the pill rail. The
- * browser preview has no shell transport, so these pin entry, the
- * honest needs-shell state, and the exit — the live feed and
- * session launches are shell-only.
+ * browser preview has no shell transport, so the first strand pins
+ * entry, the honest needs-shell state, and the exit — while the
+ * mock-shell strand below runs the live feed past needs-shell.
  */
 test.beforeEach(async ({ page }) => {
 	await seedChat(page, []);
@@ -126,4 +132,78 @@ test("headlines park the composer; summon brings it back over them", async ({
 	await panel.getByRole("button", { name: "Close news" }).click();
 	await expect(panel).toHaveCount(0);
 	await expect(prompt).not.toHaveClass(/prompt-idle/);
+});
+
+/**
+ * Mock-shell strand: the bridge (see mock-shell.ts) feeds the live
+ * fetch path a two-story feed, so these pin headlines, headline
+ * annotation, and image misses without the app shell. The outer
+ * seed already loaded once unmocked; the reload replays both init
+ * scripts, mock included, before the app boots.
+ */
+test.describe("mock shell feed", () => {
+	test.beforeEach(async ({ page }) => {
+		await seedMockShell(page);
+		await page.reload();
+		await expect(page.locator(".empty-state h1")).toBeVisible({
+			timeout: 60_000
+		});
+	});
+
+	async function openFrenchNews(page: Page): Promise<void> {
+		await page.locator('.lang-menu button:has-text("Europe")').click();
+		await page
+			.locator(".lang-list")
+			.getByRole("menuitem", { name: "French" })
+			.click();
+	}
+
+	test("headlines render from the mock feed", async ({ page }) => {
+		await openFrenchNews(page);
+		const panel = page.locator(".news-panel");
+		await expect(panel).toBeVisible({ timeout: 10_000 });
+		const cards = panel.locator(".news-card");
+		await expect(cards).toHaveCount(2);
+		await expect(cards.nth(0)).toContainText(MOCK_TITLE_IMG);
+		await expect(cards.nth(1)).toContainText(MOCK_TITLE_MISS);
+		await expect(panel).not.toContainText("needs the app shell");
+		// The feed-image story renders its picture, no fetch.
+		await expect(cards.nth(0).locator("img.news-img")).toBeVisible();
+	});
+
+	test("drag-select plus A files a headline badge", async ({ page }) => {
+		await openFrenchNews(page);
+		const panel = page.locator(".news-panel");
+		await expect(panel.locator(".news-card")).toHaveCount(2);
+		await dragHeadline(page, 1, "croissant");
+		const selText = await page.evaluate(
+			() => window.getSelection()?.toString() ?? ""
+		);
+		expect(selText.trim().length).toBeGreaterThan(0);
+		// Hands off the prompt: a focused composer eats the A into
+		// typed text. Blurring keeps the selection.
+		await page.evaluate(() =>
+			(document.activeElement as HTMLElement | null)?.blur?.()
+		);
+		await page.mouse.move(2, 2);
+		await page.keyboard.press("a");
+		// Instant path: the badge files, no pill, no menu.
+		await expect(panel.locator("button.ccez-ann-badge")).toHaveCount(1, {
+			timeout: 10_000
+		});
+		await expect(panel.locator(".news-card.has-marks")).toHaveCount(1);
+		await expect(page.locator(".sel-menu")).toHaveCount(0);
+	});
+
+	test("image miss settles to a letter tile", async ({ page }) => {
+		await openFrenchNews(page);
+		const panel = page.locator(".news-panel");
+		const cards = panel.locator(".news-card");
+		await expect(cards).toHaveCount(2);
+		// The imageless story: outlet initial, never a stuck skeleton.
+		const tile = cards.nth(1).locator(".news-img-fallback");
+		await expect(tile).toBeVisible({ timeout: 10_000 });
+		await expect(tile).toHaveText(MOCK_SOURCE_MISS.trim().charAt(0));
+		await expect(panel.locator(".news-skel")).toHaveCount(0);
+	});
 });

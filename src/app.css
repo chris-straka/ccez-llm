@@ -200,14 +200,14 @@ body {
 
 /* Bare Custom Highlight rule for the badge hover wash (see
  * paintAnnotationWash in annotations.ts, ANN_HIGHLIGHT_NAME in
- * annHighlights.ts). The component-scoped twin
- * (.rendered::highlight(...)) carries the same declarations and
- * stays the primary path where the engine applies compound
- * highlight selectors; the bare form covers engines that only match
- * ::highlight() alone (desktop-shell invisible washes with a
- * populated registry). The name is app-unique, so document-wide
- * match paints exactly the washed ranges. Jumps flash DOM marks
- * only, never this name. Keep both forms declaring the same colors. */
+ * annHighlights.ts). The .rendered-scoped rules below carry the
+ * same declarations and stay the primary path where the engine
+ * applies compound highlight selectors; the bare form covers
+ * engines that only match ::highlight() alone (desktop-shell
+ * invisible washes with a populated registry). The name is
+ * app-unique, so document-wide match paints exactly the washed
+ * ranges. Jumps flash DOM marks only, never this name. Keep both
+ * forms declaring the same colors. */
 ::highlight(ccez-ann) {
 	background-color: #fff3b0;
 	color: inherit;
@@ -269,4 +269,445 @@ html[data-theme="dark"] ::highlight(ccez-ann-flash) {
 	::highlight(ccez-ann-flash) {
 		background-color: #ffe066;
 	}
+}
+
+/* Annotation badge + quote-wash paint (moved out of
+ * MessageBody.svelte: chat `.rendered` bodies and `.news-card-title`
+ * headlines share every rule — one look, two scopes. The
+ * `.rendered::highlight(...)` grades below stay message-only:
+ * headlines ride the bare rules above (flash-d grades never
+ * painted there — preserved). Order matters: the trailing dark
+ * wash rules win over the earlier translucent ones. */
+.rendered mark.ccez-ann,
+.news-card-title mark.ccez-ann {
+	background: #fff3b0;
+	border-radius: 3px;
+	/* Annotated text reads interactive (the badge above it opens
+	the edit); clicks still select normally. */
+	cursor: pointer;
+	/* 1px of visual bleed each side, paid back with negative margin
+	so the wash never reflows the line when it appears. */
+	padding: 0 1px;
+	margin: 0 -1px;
+	color: inherit;
+}
+/* The pale wash turns to mud in dark mode (and swallows the
+selection tint stacked on annotated CJK): a translucent amber
+keeps annotated text readable in both themes. */
+html[data-theme="dark"] .rendered mark.ccez-ann,
+html[data-theme="dark"] .news-card-title mark.ccez-ann {
+	background: rgba(245, 158, 11, 0.3);
+}
+/* Sent-jump destination flash: the same draft yellow, so arriving
+from history reads exactly like arriving from a draft. Plain DOM
+(not the Highlight API) so it renders in every engine; the caller
+wraps and unwraps it around the blink. */
+.rendered mark.ccez-ann-flash,
+.news-card-title mark.ccez-ann-flash {
+	background: #fff3b0;
+	border-radius: 3px;
+	padding: 0 1px;
+	margin: 0 -1px;
+	color: inherit;
+}
+html[data-theme="dark"] .rendered mark.ccez-ann-flash,
+html[data-theme="dark"] .news-card-title mark.ccez-ann-flash {
+	background: rgba(245, 158, 11, 0.45);
+}
+/* Jump-landing fade-out for engines whose highlight overlay never
+repaints between registry writes (the app shell): real marks with
+a plain background animation, which every engine displays. Light
+and contrast reuse the wash-out keyframes (same start color);
+dark starts from the flash amber, not the wash yellow. */
+.rendered mark.ccez-ann-flash.fading,
+.news-card-title mark.ccez-ann-flash.fading {
+	animation: ann-wash-out 0.25s ease forwards;
+}
+@keyframes ann-flash-out-dark {
+	from {
+		background-color: rgba(245, 158, 11, 0.45);
+	}
+	to {
+		background-color: transparent;
+	}
+}
+html[data-theme="dark"] .rendered mark.ccez-ann-flash.fading,
+html[data-theme="dark"] .news-card-title mark.ccez-ann-flash.fading {
+	animation-name: ann-flash-out-dark;
+}
+/* The wash mounts/unmounts imperatively (applyMarks), so a plain
+transition has nothing to run between: fade-in plays on mount for
+newly arrived washes only, and fade-out plays on .leaving marks
+that applyMarks unwraps after WASH_FADE_MS. */
+@keyframes ann-wash-in {
+	from {
+		background-color: transparent;
+	}
+	to {
+		background-color: #fff3b0;
+	}
+}
+@keyframes ann-wash-out {
+	from {
+		background-color: #fff3b0;
+	}
+	to {
+		background-color: transparent;
+	}
+}
+/* More-contrast fallback path (see the highlight rules below):
+stronger marker yellow on marks, flash, and keyframes. */
+@media (prefers-contrast: more) {
+	.rendered mark.ccez-ann,
+	.news-card-title mark.ccez-ann {
+		background: #ffe066;
+	}
+	.rendered mark.ccez-ann-flash,
+	.news-card-title mark.ccez-ann-flash {
+		background: #ffe066;
+	}
+	@keyframes ann-wash-in {
+		from {
+			background-color: transparent;
+		}
+		to {
+			background-color: #ffe066;
+		}
+	}
+	@keyframes ann-wash-out {
+		from {
+			background-color: #ffe066;
+		}
+		to {
+			background-color: transparent;
+		}
+	}
+}
+/* Fresh washes read at once (~120ms, same beat as the
+registry ramp): hovering a marker must never feel late. */
+.rendered mark.ccez-ann.fresh,
+.news-card-title mark.ccez-ann.fresh {
+	animation: ann-wash-in 0.12s ease;
+}
+@keyframes ann-wash-in-dark {
+	from {
+		background-color: transparent;
+	}
+	to {
+		background-color: rgba(245, 158, 11, 0.3);
+	}
+}
+html[data-theme="dark"] .rendered mark.ccez-ann.fresh,
+html[data-theme="dark"] .news-card-title mark.ccez-ann.fresh {
+	animation-name: ann-wash-in-dark;
+}
+.rendered mark.ccez-ann.leaving,
+.news-card-title mark.ccez-ann.leaving {
+	animation: ann-wash-out 0.18s ease forwards;
+}
+@keyframes ann-wash-out-dark {
+	from {
+		background-color: rgba(245, 158, 11, 0.3);
+	}
+	to {
+		background-color: transparent;
+	}
+}
+html[data-theme="dark"] .rendered mark.ccez-ann.leaving,
+html[data-theme="dark"] .news-card-title mark.ccez-ann.leaving {
+	animation-name: ann-wash-out-dark;
+}
+/* Custom Highlight API wash (see annHighlights.paintAnnotationWash):
+paints the same yellow over untouched DOM where CSS.highlights is
+supported, so future stamps can skip mark-DOM wrapping. The mark
+path above stays the live fallback. */
+.rendered::highlight(ccez-ann) {
+	background-color: #fff3b0;
+	color: inherit;
+}
+/* Graded dimmers for the wash fade ramp (see washRampSchedule):
+same hue stepping down — the eye reads the steps as a fade. */
+.rendered::highlight(ccez-ann-d1) {
+	background-color: rgba(255, 243, 176, 0.72);
+	color: inherit;
+}
+.rendered::highlight(ccez-ann-d2) {
+	background-color: rgba(255, 243, 176, 0.45);
+	color: inherit;
+}
+.rendered::highlight(ccez-ann-d3) {
+	background-color: rgba(255, 243, 176, 0.18);
+	color: inherit;
+}
+/* More-contrast users get the stronger marker yellow (dark
+scoped rules win on specificity, so dark is untouched). */
+@media (prefers-contrast: more) {
+	.rendered::highlight(ccez-ann) {
+		background-color: #ffe066;
+	}
+	.rendered::highlight(ccez-ann-d1) {
+		background-color: rgba(255, 224, 102, 0.72);
+	}
+	.rendered::highlight(ccez-ann-d2) {
+		background-color: rgba(255, 224, 102, 0.45);
+	}
+	.rendered::highlight(ccez-ann-d3) {
+		background-color: rgba(255, 224, 102, 0.18);
+	}
+}
+html[data-theme="dark"] .rendered::highlight(ccez-ann) {
+	background-color: rgba(245, 158, 11, 0.45);
+}
+html[data-theme="dark"] .rendered::highlight(ccez-ann-d1) {
+	background-color: rgba(245, 158, 11, 0.3);
+}
+html[data-theme="dark"] .rendered::highlight(ccez-ann-d2) {
+	background-color: rgba(245, 158, 11, 0.18);
+}
+html[data-theme="dark"] .rendered::highlight(ccez-ann-d3) {
+	background-color: rgba(245, 158, 11, 0.08);
+}
+/* Jump-landing flash (see ANN_FLASH_NAME in annHighlights.ts):
+same draft yellow as the live wash — the jump clears the hover
+wash first, so one landing paints exactly one highlight. */
+.rendered::highlight(ccez-ann-flash) {
+	background-color: #fff3b0;
+	color: inherit;
+}
+html[data-theme="dark"] .rendered::highlight(ccez-ann-flash) {
+	background-color: rgba(245, 158, 11, 0.45);
+}
+@media (prefers-contrast: more) {
+	.rendered::highlight(ccez-ann-flash) {
+		background-color: #ffe066;
+	}
+}
+/* Jump-landing fade grades (see flashFadeSchedule): the landing
+holds full, then steps down these to clear — a fade-out, never a
+blink-off. Same hue as the flash, stepping down like the wash. */
+.rendered::highlight(ccez-ann-flash-d1) {
+	background-color: rgba(255, 243, 176, 0.72);
+	color: inherit;
+}
+.rendered::highlight(ccez-ann-flash-d2) {
+	background-color: rgba(255, 243, 176, 0.45);
+	color: inherit;
+}
+.rendered::highlight(ccez-ann-flash-d3) {
+	background-color: rgba(255, 243, 176, 0.18);
+	color: inherit;
+}
+html[data-theme="dark"] .rendered::highlight(ccez-ann-flash-d1) {
+	background-color: rgba(245, 158, 11, 0.3);
+}
+html[data-theme="dark"] .rendered::highlight(ccez-ann-flash-d2) {
+	background-color: rgba(245, 158, 11, 0.18);
+}
+html[data-theme="dark"] .rendered::highlight(ccez-ann-flash-d3) {
+	background-color: rgba(245, 158, 11, 0.08);
+}
+@media (prefers-contrast: more) {
+	.rendered::highlight(ccez-ann-flash-d1) {
+		background-color: rgba(255, 224, 102, 0.72);
+	}
+	.rendered::highlight(ccez-ann-flash-d2) {
+		background-color: rgba(255, 224, 102, 0.45);
+	}
+	.rendered::highlight(ccez-ann-flash-d3) {
+		background-color: rgba(255, 224, 102, 0.18);
+	}
+}
+/* Badge anchors ride on the quote's last character (or its wash
+mark): unstyled inline wrappers, so stamping never reflows text. */
+.rendered .ccez-ann-anchor,
+.news-card-title .ccez-ann-anchor {
+	position: relative;
+}
+/* Numbered badges float above-right of their quote, overlaying ruby
+readings instead of shoving them: zero layout in every mode. */
+.rendered button.ccez-ann-badge,
+.news-card-title button.ccez-ann-badge {
+	position: absolute;
+	bottom: 100%;
+	left: 100%;
+	transform: translate(-40%, 10%);
+	/* Below the composer card (z-30): scrolled-under badges take
+	no hits — the chrome owns those pixels. The edit card (z-60)
+	and refs popover (z-40) still open above everything, so a
+	covered badge is one scroll away from clickable. */
+	z-index: 20;
+	user-select: none;
+	-webkit-user-select: none;
+	/* Dampened text-size tracking (≈30% of the message scale, so a
+	600% reading size makes a ~2.5× badge, never a 6× one): rem
+	units keep it absolute, never compounding the message size. */
+	min-width: calc(1.15rem * (1 + (var(--font-scale, 1) - 1) * 0.3));
+	height: calc(1.15rem * (1 + (var(--font-scale, 1) - 1) * 0.3));
+	padding: 0 0.25rem;
+	border: 0;
+	border-radius: 999px;
+	background: #007aff;
+	background: var(--accent);
+	color: #fff;
+	color: var(--accent-ink);
+	font-size: calc(0.7rem * (1 + (var(--font-scale, 1) - 1) * 0.3));
+	font-weight: 700;
+	line-height: calc(1.15rem * (1 + (var(--font-scale, 1) - 1) * 0.3));
+	text-align: center;
+	white-space: nowrap;
+	cursor: pointer;
+}
+/* Answer states: waiting (filed but not yet asked) rides the
+accent blue, ready (asked and answered) the ans-ready token —
+near-black on light (orange melted into the yellow wash),
+orange on dark where black would vanish. Explicit in both
+themes so the accent never mutes the signal. The tail
+inherits via `background: inherit`. Motion lives below, past
+the mount fade (see below). */
+.rendered button.ccez-ann-badge.ans-waiting,
+.news-card-title button.ccez-ann-badge.ans-waiting {
+	background: #007aff;
+	background: var(--accent);
+}
+.rendered button.ccez-ann-badge.ans-ready,
+.news-card-title button.ccez-ann-badge.ans-ready {
+	background: #ff9f0a;
+	background: var(--ans-ready);
+}
+/* Speech-bubble tail: a slash leaning down-left toward the quote
+it annotates — tip at the bottom-left corner, wide top tucked 5px
+under the badge (same color, so the join can never gap — the circle
+curves away at the sides, which is why the tail seats left of
+center instead of off the rim). Clicks land on the button, so the
+open still works. */
+.rendered button.ccez-ann-badge::after,
+.news-card-title button.ccez-ann-badge::after {
+	content: "";
+	position: absolute;
+	top: calc(100% - 5px);
+	left: 14%;
+	width: 0.5rem;
+	height: 0.72rem;
+	background: inherit;
+	clip-path: polygon(38% 0, 100% 0, 0 100%);
+}
+/* RTL quotes: mirror the whole badge geometry — the badge parks
+past the visual quote end on the left, tail tip pointing back
+down-right at it. */
+.rendered button.ccez-ann-badge.rtl,
+.news-card-title button.ccez-ann-badge.rtl {
+	left: auto;
+	right: 100%;
+	transform: translate(40%, 10%);
+}
+.rendered button.ccez-ann-badge.rtl::after,
+.news-card-title button.ccez-ann-badge.rtl::after {
+	left: auto;
+	right: 14%;
+	clip-path: polygon(62% 0, 0 0, 100% 100%);
+}
+/* Newly stamped badges fade in; re-stamps skip the class so steady
+marks never flicker on re-render. */
+@keyframes ann-badge-in {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+.rendered button.ccez-ann-badge.fresh,
+.news-card-title button.ccez-ann-badge.fresh {
+	animation: ann-badge-in 0.2s ease;
+}
+/* State motion, past the mount fade so equal specificity resolves
+here: waiting breathes (motion reads as in-flight — fresh mounts
+play the fade first, then breathe on a delay); the arrival glow
+fires once on the waiting-to-ready flip (see `arrived`, stamped
+in annotations.ts — mounts and re-renders never replay it);
+then the mark rests steady orange. */
+@keyframes ccez-ann-breathe {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.5;
+	}
+}
+.rendered button.ccez-ann-badge.ans-waiting,
+.news-card-title button.ccez-ann-badge.ans-waiting {
+	animation: ccez-ann-breathe 1.2s ease-in-out infinite;
+}
+.rendered button.ccez-ann-badge.ans-waiting.fresh,
+.news-card-title button.ccez-ann-badge.ans-waiting.fresh {
+	animation:
+		ann-badge-in 0.2s ease,
+		ccez-ann-breathe 1.2s ease-in-out 0.2s infinite;
+}
+/* Keyframes can't sit behind a selector, so the dark arrival
+variant is renamed like the wash ones. */
+@keyframes ccez-ann-arrive {
+	from {
+		box-shadow: 0 0 0 0 rgba(28, 28, 30, 0.5);
+	}
+	to {
+		box-shadow: 0 0 0 7px rgba(28, 28, 30, 0);
+	}
+}
+@keyframes ccez-ann-arrive-dark {
+	from {
+		box-shadow: 0 0 0 0 rgba(255, 159, 10, 0.55);
+	}
+	to {
+		box-shadow: 0 0 0 7px rgba(255, 159, 10, 0);
+	}
+}
+.rendered button.ccez-ann-badge.ans-ready.arrived,
+.news-card-title button.ccez-ann-badge.ans-ready.arrived {
+	animation: ccez-ann-arrive 0.45s ease-out 1;
+}
+html[data-theme="dark"] .rendered button.ccez-ann-badge.ans-ready.arrived,
+html[data-theme="dark"] .news-card-title button.ccez-ann-badge.ans-ready.arrived {
+	animation-name: ccez-ann-arrive-dark;
+}
+@media (prefers-reduced-motion: reduce) {
+	.rendered button.ccez-ann-badge.ans-waiting,
+	.rendered button.ccez-ann-badge.ans-waiting.fresh,
+	.rendered button.ccez-ann-badge.ans-ready.arrived,
+	.news-card-title button.ccez-ann-badge.ans-waiting,
+	.news-card-title button.ccez-ann-badge.ans-waiting.fresh,
+	.news-card-title button.ccez-ann-badge.ans-ready.arrived {
+		animation: none;
+	}
+}
+/* Keyframes can't sit behind a selector, so the dark wash variants
+are renamed and picked up by the animation-name overrides below. */
+html[data-theme="dark"] .rendered mark.ccez-ann,
+html[data-theme="dark"] .news-card-title mark.ccez-ann {
+	background: #5c4d00;
+}
+@keyframes ann-wash-in-dark {
+	from {
+		background-color: transparent;
+	}
+	to {
+		background-color: #5c4d00;
+	}
+}
+@keyframes ann-wash-out-dark {
+	from {
+		background-color: #5c4d00;
+	}
+	to {
+		background-color: transparent;
+	}
+}
+html[data-theme="dark"] .rendered mark.ccez-ann.fresh,
+html[data-theme="dark"] .news-card-title mark.ccez-ann.fresh {
+	animation-name: ann-wash-in-dark;
+}
+html[data-theme="dark"] .rendered mark.ccez-ann.leaving,
+html[data-theme="dark"] .news-card-title mark.ccez-ann.leaving {
+	animation-name: ann-wash-out-dark;
 }

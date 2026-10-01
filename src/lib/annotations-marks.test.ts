@@ -1,19 +1,21 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
-	applyMarks,
 	annotationCountLabel,
 	edgeOffsetForAnchor,
 	gapOffsetForAnchor,
 	hasRtlQuote,
 	locateQuote,
-	lockSelectionToMessage,
-	saveSelection,
-	restoreSelection,
-	WASH_FADE_MS,
 	type AnnotationMark,
 	type AnnotationId
 } from "./annotations";
+import {
+	applyMarks,
+	lockSelectionToMessage,
+	saveSelection,
+	restoreSelection,
+	WASH_FADE_MS
+} from "./annotations-stamp";
 import {
 	ANN_HIGHLIGHT_D1,
 	ANN_HIGHLIGHT_NAME,

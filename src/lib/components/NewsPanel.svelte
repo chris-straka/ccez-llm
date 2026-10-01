@@ -16,11 +16,8 @@ either); everything else is theme tokens, never raw hex. -->
 		type NewsPicker,
 		type SummarySize
 	} from "$lib/news";
-	import {
-		applyMarks,
-		type AnnotationId,
-		type AnnotationMark
-	} from "$lib/annotations";
+	import type { AnnotationId, AnnotationMark } from "$lib/annotations";
+	import { applyMarks } from "$lib/annotations-stamp";
 	import { badgeHover } from "$lib/hoverWash";
 
 	interface Props {

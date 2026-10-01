@@ -1,12 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, afterEach } from "vitest";
-import {
-	applyMarks,
-	quoteTextNodes,
-	repaintLiveWash,
-	type AnnotationMark,
-	type AnnotationId
-} from "./annotations";
+import type { AnnotationMark, AnnotationId } from "./annotations";
+import { applyMarks, quoteTextNodes, repaintLiveWash } from "./annotations-stamp";
 import {
 	ANN_HIGHLIGHT_D1,
 	ANN_HIGHLIGHT_D2,

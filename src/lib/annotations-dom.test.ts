@@ -1,24 +1,26 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from "vitest";
 import {
+	loadDraftAnnotations,
+	saveDraftAnnotations,
+	type Annotation,
+	type AnnotationId,
+	type AnnotationMark
+} from "./annotations";
+import {
 	applyMarks,
 	quoteFragmentText,
 	quoteTextNodes,
 	equationBodyOf,
 	equationBodyRange,
 	trimParagraphTerminator,
-	loadDraftAnnotations,
-	saveDraftAnnotations,
 	snapSelectionToWordEdges,
 	quoteRange,
 	rangesExcludingReadings,
 	wrapRangeInMark,
 	wrapRangeExcludingBadges,
-	unwrapMark,
-	type Annotation,
-	type AnnotationId,
-	type AnnotationMark
-} from "./annotations";
+	unwrapMark
+} from "./annotations-stamp";
 
 function fragment(html: string): DocumentFragment {
 	const template = document.createElement("template");

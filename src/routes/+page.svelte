@@ -194,10 +194,7 @@
 		countPasteSlots,
 		isPastedTextAttachment,
 		makePastedTextAttachment,
-		PASTE_CLOSE,
-		PASTE_OPEN,
 		pastedMarkerInsert,
-		pastedTextMarker,
 		pastedTextsAt,
 		writePastedTextAt,
 		splicePastedText,
@@ -222,25 +219,12 @@
 		setPromptPinned,
 		attachAnnotationAnswer,
 		unansweredAnnotations,
-		quoteFragmentText,
-		equationBodyOf,
-		equationBodyRange,
-		trimParagraphTerminator,
 		newAnnotationId,
-		quoteRange,
-		rangesExcludingReadings,
-		wrapRangeExcludingBadges,
-		unwrapMark,
-		invalidateWashPaint,
 		resolveSentRefTarget,
 		annRefsFor,
-		lockSelectionToMessage,
-		quoteTextNodes,
 		locateQuote,
-		repaintLiveWash,
 		occurrenceAtPosition,
 		pressExpandedSelection,
-		snapSelectionToWordEdges,
 		selMenuPlacement,
 		readingPanelPlacement,
 		menuYAbovePanel,
@@ -270,6 +254,21 @@
 		type StoryAnchor
 	} from "$lib/annotations";
 	import {
+		quoteFragmentText,
+		equationBodyOf,
+		equationBodyRange,
+		trimParagraphTerminator,
+		quoteRange,
+		rangesExcludingReadings,
+		wrapRangeExcludingBadges,
+		unwrapMark,
+		invalidateWashPaint,
+		lockSelectionToMessage,
+		quoteTextNodes,
+		repaintLiveWash,
+		snapSelectionToWordEdges
+	} from "$lib/annotations-stamp";
+	import {
 		ANN_FLASH_NAME,
 		clearAnnotationWash,
 		flashFadeSchedule,
@@ -280,33 +279,7 @@
 	import { badgeHover } from "$lib/hoverWash";
 	import { startBlink, startHighlightFade, startMarkFade } from "$lib/blink";
 	import { createRefMemo } from "$lib/aidLoading";
-	import {
-		cachedNewsImage,
-		cachedNewsUrl,
-		createRateGate,
-		JINA_QUOTA_COOLDOWN_MS,
-		decodeNewsLink,
-		fetchRawPage,
-		isNewsFallback,
-		loadNewsStories,
-		newsConversationInstruction,
-		newsErrorCopy,
-		newsRegionsFor,
-		newsSummaryInstruction,
-		resolveArticleText,
-		resolveImageBatch,
-		resolveStoryImage,
-		storeNewsImage,
-		storeNewsUrl,
-		translateNewsTitles,
-		withTranslatedTitles,
-		type CefrLevel,
-		type NewsKind,
-		type NewsPanelState,
-		type NewsPicker,
-		type NewsStory,
-		type SummarySize
-	} from "$lib/news";
+	import { NewsMode } from "$lib/news-mode.svelte";
 	/* decomposeTree + onKunLine render in `InspectOverlay.svelte`. */
 	import {
 		getInspectData,
@@ -2193,24 +2166,47 @@
 	five languages cut by a rectangle. Short lists drop under
 	their pill, long ones center (see .lang-list-fixed). */
 	let langMenuAnchor: LangMenuAnchor | null = $state(null);
+	/** Headline badges by story link (filed + pending preview). */
+	const newsMarks = $derived(buildNewsMarks(annotations, pendingAnn));
 	/** Learner news mode (empty chats only): picking a language
 	opens its story cards under the pill rail; launching a session
 	collapses the panel and the chat holds only the session.
-	`newsSeq` drops stale fetches (region/language hops). */
-	let news = $state<NewsPanelState | null>(null);
-	let newsPicker = $state<NewsPicker | null>(null);
-	let newsBusy = $state<string | null>(null);
-	let newsSeq = 0;
-	/** Scraped preview images by story link (null = none found). */
-	let newsImages = $state<Record<string, string | null>>({});
-	/** Headline badges by story link (filed + pending preview). */
-	const newsMarks = $derived(buildNewsMarks(annotations, pendingAnn));
-	const newsImageSession = new SvelteMap<string, string | null>();
-	/** One reader quota shared by every image worker (20/min keyless). */
-	const newsJinaGate = createRateGate(3000);
-	/** Quota-breaker deadline: a Jina 429 parks image reader legs
-	 * until this timestamp (epoch ms) instead of burning quota. */
-	let jinaQuotaUntil = 0;
+	State and behavior live in `NewsMode`; the page only wires
+	its collaborators here. */
+	const newsMode = new NewsMode({
+		getEditor: () => editor,
+		getAttachments: () => attachments,
+		setAttachments: (next) => {
+			attachments = next;
+		},
+		seedComposer: (text) => {
+			const ed = editor;
+			if (!ed) throw new Error("news-no-editor");
+			markerSyncMuted = true;
+			try {
+				ed.setText(text);
+				syncMarkerCounts();
+			} finally {
+				markerSyncMuted = false;
+			}
+		},
+		toast: (message) => flashToast(message),
+		toastError: (message) => flashErrorToast(message),
+		resolveProvider: () => resolveProviderActive(),
+		getStorage: () => localStorage,
+		isPhone: () => androidUI,
+		parkPrompt: () => {
+			promptIdle = true;
+		},
+		restorePrompt: () => restorePrompt(),
+		requestSend: () => {
+			void doSend();
+		},
+		onBadge: (id, x, y) => openBadgeClick(id, { x, y }),
+		onBadgeHover: (id) => {
+			hoverBadgeId = id;
+		}
+	});
 	function toggleLangMenu(id: LanguageMenu["id"], btn: HTMLElement): void {
 		// Family open/close ticks on phones (buzzTap self-gates to
 		// Android and honors the haptics toggle).
@@ -2594,8 +2590,7 @@
 	function transitionToChat(id: Parameters<typeof selectChat>[1]): void {
 		const from = chatState.activeChatId;
 		dismissSelPanels();
-		news = null;
-		newsPicker = null;
+		newsMode.clear();
 		const mutate = (): void => {
 			// File the leaving chat's scroll first (a no-op mid-peek,
 			// where the box shows another chat), then clear the hover
@@ -3107,10 +3102,10 @@
 		// Card picker outside dismiss: a press outside the panel folds
 		// open option rows (the launch flow owns busy cards, never this).
 		const onNewsPickerOutside = (event: PointerEvent): void => {
-			if (!newsPicker || newsBusy) return;
+			if (!newsMode.newsPicker || newsMode.newsBusy) return;
 			const target = event.target instanceof Element ? event.target : null;
 			if (target?.closest(".news-panel")) return;
-			newsPicker = null;
+			newsMode.dismissPicker();
 		};
 		window.addEventListener("pointerdown", onNewsPickerOutside, { passive: true });
 		// Filed-annotations card dismiss: a press outside the card's
@@ -3274,7 +3269,7 @@
 			// still lands above it at the bottom. Empty chats keep
 			// none: no tail to protect, hero owns the space — except
 			// news mode, whose card list is a tail like any thread.
-			const emptyChat = viewChat.messages.length === 0 && news === null;
+			const emptyChat = viewChat.messages.length === 0 && newsMode.news === null;
 			const boxPad = emptyChat ? "0px" : `${clearPx + trayH + trayGap}px`;
 			if (boxPad !== lastBoxPad) {
 				box.style.paddingBottom = boxPad;
@@ -3896,8 +3891,7 @@
 		);
 		resetDraftExtras();
 		newChat(chatState);
-		news = null;
-		newsPicker = null;
+		newsMode.clear();
 		scrollBox?.scrollTo({ top: 0, behavior: "smooth" });
 		// A minted chat always shows its composer: focusing a hidden
 		// bar focuses nothing (and the hidden restyle drops focus). An
@@ -4819,12 +4813,12 @@
 	 * link, the live panel row carries the rest. Null when the
 	 * panel moved on (stale highlight, never garbage). */
 	function storyOfHeadline(headline: Element): StoryAnchor | null {
-		if (!news) return null;
+		if (!newsMode.news) return null;
 		const link = headline.closest(".news-open")?.getAttribute("data-story-link");
 		if (!link) return null;
-		const story = news.stories.find((s) => s.link === link);
+		const story = newsMode.news.stories.find((s) => s.link === link);
 		if (!story) return null;
-		return { link, title: story.title, outlet: story.source, lang: news.langName };
+		return { link, title: story.title, outlet: story.source, lang: newsMode.news.langName };
 	}
 
 	/** Message id owning the selection anchor, or null outside messages. */
@@ -5462,7 +5456,7 @@
 			// scans for long-closed panels attach silently).
 			if (!ann.messageId && ann.story && answer.trim()) {
 				annotations = setPromptPinned(annotations, ann.id, true);
-				if (news?.stories.some((s) => s.link === ann.story?.link))
+				if (newsMode.news?.stories.some((s) => s.link === ann.story?.link))
 					openBadge(ann.id);
 			}
 		} catch (error) {
@@ -7930,8 +7924,7 @@
 		if (action === "ignore") return;
 		// Typing past the news panel sends a normal turn: the panel
 		// stands down (session launches already cleared it).
-		news = null;
-		newsPicker = null;
+		newsMode.clear();
 		// Haptic tap on send (silenced by the haptics toggle; native
 		// haptics in the shell, Web vibrator in the preview).
 		buzzBeat("send");
@@ -9000,273 +8993,15 @@
 		// Empty chats open learner news for the picked language (the
 		// submenu and ⌘number share this funnel); anywhere else the
 		// pick just switches and any open panel goes away.
-		if (activeChat(chatState).messages.length === 0) enterNewsMode(code);
-		else news = null;
+		if (activeChat(chatState).messages.length === 0) newsMode.enterNewsMode(code);
+		else newsMode.news = null;
 	}
 
 	function clearReplyLang(): void {
 		setChatReplyLang(chatState, chatState.activeChatId, null);
 		openLangMenu = null;
-		news = null;
-		newsPicker = null;
-		restorePrompt();
+		newsMode.close();
 	}
-
-	/** Open the story cards for a language (default region first). */
-	function enterNewsMode(code: string): void {
-		const lang = replyLanguageFor(code);
-		if (!lang) {
-			news = null;
-			return;
-		}
-		const regions = newsRegionsFor(code) ?? [];
-		newsPicker = null;
-		if (regions.length === 0) {
-			news = {
-				code,
-				langName: lang.name,
-				regions: [],
-				region: "",
-				status: "unsupported",
-				stories: [],
-				error: "",
-				fallback: false
-			};
-			return;
-		}
-		news = {
-			code,
-			langName: lang.name,
-			regions,
-			region: regions[0]?.gl ?? "",
-			status: "loading",
-			stories: [],
-			error: "",
-			fallback: isNewsFallback(code)
-		};
-		// Headlines own the screen on desktop: park the composer
-		// on the idle path (summon keys restore it — sending from
-		// it drops the panel in doSend). Phones keep it up: there
-		// is no summon gesture there, so parking would strand the
-		// composer with no way to type past the headlines.
-		if (!androidUI) promptIdle = true;
-		void fetchNewsStories();
-	}
-
-	/** Headlines for the current panel language + region. */
-	async function switchNewsRegion(gl: string): Promise<void> {
-		const current = news;
-		if (!current || current.region === gl || newsBusy) return;
-		const region = current.regions.find((r) => r.gl === gl);
-		if (!region) return;
-		// Translated headlines need the model: no key, no switch.
-		if (region.translate) {
-			const provider = await resolveProviderActive();
-			if (news !== current) return;
-			if (!provider) {
-				flashToast(`Set an API key to translate ${region.label} headlines.`);
-				return;
-			}
-		}
-		newsPicker = null;
-		news = { ...current, region: gl, status: "loading", stories: [], error: "" };
-		void fetchNewsStories();
-	}
-
-	/**
-	 * Preview images for stories the feed left imageless: decode,
-	 * fetch the article HTML, and read its og:image — four at a
-	 * time, hits filed for later, misses silent. Blocked or bare
-	 * pages fall through to the reader's first content image.
-	 * Stale runs (region hops) file nothing visible; leftover
-	 * transients settle to the letter tile, uncached, and retry
-	 * next open.
-	 */
-	async function resolveNewsImages(code: string, region: string, stories: NewsStory[]): Promise<void> {
-		const fresh = () => news?.code === code && news?.region === region;
-		const links = stories
-			.filter(
-				(s) => !s.image && !newsImageSession.has(s.link) && !cachedNewsImage(localStorage, s.link)
-			)
-			.map((s) => s.link);
-		await resolveImageBatch(links, {
-			resolveOne: (link) =>
-				resolveStoryImage(link, {
-					decode: decodeNewsLink,
-					fetchPage: fetchRawPage,
-					gateJina: newsJinaGate,
-					fresh,
-					cachedUrl: (l) => cachedNewsUrl(localStorage, l),
-					storeUrl: (l, url) => storeNewsUrl(localStorage, l, url),
-					jinaQuotaBlown: () => Date.now() < jinaQuotaUntil,
-					flagJinaQuota: () => {
-						jinaQuotaUntil = Date.now() + JINA_QUOTA_COOLDOWN_MS;
-					}
-				}),
-			fresh,
-			onSettled: (link, found, complete) => {
-				// Complete results cache even when stale — only the
-				// UI write is freshness-guarded, so hops never waste
-				// fetches. Leftover transients file UI-only (no
-				// session stamp), so next open retries them.
-				if (complete) {
-					newsImageSession.set(link, found);
-					if (found) storeNewsImage(localStorage, link, found);
-				}
-				if (fresh()) newsImages = { ...newsImages, [link]: found };
-			}
-		});
-	}
-
-	async function fetchNewsStories(): Promise<void> {
-		const current = news;
-		if (!current) return;
-		const seq = ++newsSeq;
-		const { code, region } = current;
-		try {
-			let stories = await loadNewsStories(code, region, fetchRawPage);
-			const target = newsRegionsFor(code)?.find((r) => r.gl === region);
-			if (target?.translate) {
-				if (newsSeq !== seq || news?.code !== code || news?.region !== region) return;
-				news = { ...current, status: "translating", stories: [], error: "" };
-				const provider = await resolveProviderActive();
-				if (!provider) throw new Error("news-translate");
-				const titles = await translateNewsTitles(
-					stories.map((s) => s.title),
-					current.langName,
-					async (prompt) =>
-						(
-							await provider.chat([{ role: "user", content: prompt }], {})
-						).content
-				);
-				stories = withTranslatedTitles(stories, titles);
-			}
-			if (newsSeq !== seq || news?.code !== code || news?.region !== region) return;
-			news = { ...current, status: "ready", stories, error: "" };
-			const prefill: Record<string, string | null> = {};
-			for (const s of stories) {
-				if (s.image) continue;
-				const hit = newsImageSession.get(s.link) ?? cachedNewsImage(localStorage, s.link);
-				if (hit) prefill[s.link] = hit;
-				else if (newsImageSession.get(s.link) === null) prefill[s.link] = null;
-			}
-			newsImages = prefill;
-			void resolveNewsImages(code, region, stories);
-		} catch (error) {
-			if (newsSeq !== seq || news?.code !== code) return;
-			const message = error instanceof Error ? error.message : "";
-			news = {
-				...current,
-				status: message.includes("news-needs-shell") ? "needs-shell" : "error",
-				stories: [],
-				error: newsErrorCopy(error)
-			};
-		}
-	}
-
-	/**
-	 * Story session launch: resolve + fetch the article, seed the
-	 * composer with the short opener plus the article as a pasted
-	 * attachment (bracketed as a paste region, spliced at send,
-	 * folded back to a tag after), drop the news panel, and send —
-	 * the chat holds only the session. Failures toast and stay in
-	 * news mode to retry.
-	 */
-	async function launchNewsSession(
-		link: string,
-		kind: NewsKind,
-		level: CefrLevel,
-		size: SummarySize
-	): Promise<void> {
-		const current = news;
-		if (!current || current.status !== "ready" || newsBusy || !editor) return;
-		const story = current.stories.find((s) => s.link === link);
-		if (!story) return;
-		const instruction =
-			kind === "talk"
-				? newsConversationInstruction(story, level, current.langName)
-				: newsSummaryInstruction(story, size, level, current.langName);
-		if (composerText() !== "" || attachments.length > 0) {
-			flashErrorToast("Clear the composer first — the story needs an empty draft.");
-			return;
-		}
-		let seeded = false;
-		newsBusy = link;
-		try {
-			const { text } = await resolveArticleText(
-				link,
-				decodeNewsLink,
-				fetchRawPage,
-				localStorage
-			);
-			// Closed or language-hopped mid-flight: don't seed a dead panel.
-			if (news?.code !== current.code) return;
-			const att = makePastedTextAttachment(`${PASTE_OPEN}${text}${PASTE_CLOSE}`);
-			attachments = [att];
-			news = null;
-			newsPicker = null;
-			markerSyncMuted = true;
-			try {
-				editor.setText(
-					`${instruction} ${pastedTextMarker(att.text?.length ?? text.length)} `
-				);
-				syncMarkerCounts();
-			} finally {
-				markerSyncMuted = false;
-			}
-			seeded = true;
-		} catch (error) {
-			flashErrorToast(newsErrorCopy(error));
-		} finally {
-			newsBusy = null;
-		}
-		if (seeded) void doSend();
-	}
-
-	const newsActions = {
-		region: (gl: string) => {
-			void switchNewsRegion(gl);
-		},
-		menu: (link: string) => {
-			if (newsBusy) return;
-			newsPicker = newsPicker?.link === link ? null : { link };
-		},
-		level: (link: string, level: CefrLevel) => {
-			if (newsBusy) return;
-			if (newsPicker?.link === link) {
-				newsPicker = { ...newsPicker, level };
-			}
-		},
-		size: (link: string, size: SummarySize) => {
-			if (newsBusy) return;
-			if (newsPicker?.link === link) {
-				newsPicker = { ...newsPicker, size };
-			}
-		},
-		launch: (link: string, kind: NewsKind) => {
-			const level =
-				newsPicker?.link === link ? (newsPicker.level ?? "B2") : "B2";
-			const size =
-				newsPicker?.link === link ? (newsPicker.size ?? "medium") : "medium";
-			void launchNewsSession(link, kind, level, size);
-		},
-		close: () => {
-			news = null;
-			newsPicker = null;
-			restorePrompt();
-		},
-		badge: (id: AnnotationId, x: number, y: number) => {
-			openBadgeClick(id, { x, y });
-		},
-		badgeHover: (id: string | null) => {
-			hoverBadgeId = id;
-		},
-		retry: () => {
-			if (!news || newsBusy) return;
-			news = { ...news, status: "loading", stories: [], error: "" };
-			void fetchNewsStories();
-		}
-	};
 
 	/** Shared by the `LangMenus` hero call site (see `ThreadView`). */
 	const langMenusActions = {
@@ -9295,7 +9030,7 @@
 			// Phones stay unfocused: auto-focus pops
 			// the keyboard over the composer instead
 			// of pushing it up. Tap in when ready.
-			if (!androidUI && news === null) editor?.focus();
+			if (!androidUI && newsMode.news === null) editor?.focus();
 		}
 	};
 
@@ -11243,10 +10978,10 @@
 				// so it sits in the ladder beside the filed-annotations
 				// card: Esc closes it.
 				expandedTags = [];
-			} else if (newsPicker) {
+			} else if (newsMode.newsPicker) {
 				// A card's open option rows are the same class of inline
 				// expansion: Esc folds them (the panel keeps its ✕).
-				newsPicker = null;
+				newsMode.dismissPicker();
 			} else if (answerPop) {
 				// The answer card has no close button: Esc fades it.
 				closeAnswerPop();
@@ -11769,7 +11504,7 @@
 				!event.shiftKey;
 			const hoverHit =
 				(bareAOnly || shiftAOnly) &&
-				(hoveredIdx >= 0 || news !== null) &&
+				(hoveredIdx >= 0 || newsMode.news !== null) &&
 				(window.getSelection()?.toString() ?? "") === ""
 					? hoverWordRange()
 					: null;
@@ -14185,7 +13920,7 @@
 	<!-- Click-off closes the settings panel (keyboard users get Esc and ⌘,). -->
 	<main
 		class:empty={viewChat.messages.length === 0}
-		class:news={news !== null}
+		class:news={newsMode.news !== null}
 		class:hide-messages={settings.hideMessages}
 		class:hide-buttons={settings.hideButtons}
 		class:plain-user={!settings.ownBubble}
@@ -14345,12 +14080,12 @@
 			{openLangMenu}
 			{langMenuAnchor}
 			{langMenusActions}
-			newsPanel={news}
-			newsPicker={newsPicker}
-			newsBusy={newsBusy}
-			newsImages={newsImages}
+			newsPanel={newsMode.news}
+			newsPicker={newsMode.newsPicker}
+			newsBusy={newsMode.newsBusy}
+			newsImages={newsMode.newsImages}
 			newsMarks={newsMarks}
-			{newsActions}
+			newsActions={newsMode.actions}
 			bind:scrollBox
 			bind:popOpen={refsPopOpen}
 			bind:refsDraft={refsEditDraft}

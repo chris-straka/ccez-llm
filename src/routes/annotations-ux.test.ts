@@ -27,6 +27,13 @@ function messageBodyStyle(): string {
 	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
+/** Badge/wash paint lives global in app.css (chat + headlines share
+every rule), so badge assertions read it, not the component. */
+function appCss(): string {
+	const source = readFileSync(new URL("../app.css", import.meta.url), "utf8");
+	return source.replace(/\/\*[\s\S]*?\*\//g, "");
+}
+
 /**
  * Popover (AnnPop) and review dock (ReviewDock) renders moved out of
  * +page.svelte with their markup and styles; the assertions below
@@ -70,15 +77,17 @@ describe("annotation badge font-size tracking", () => {
 	it("scales numbered badges with the message font size", () => {
 		// Dampened tracking (never compounding rem): the badge rule must
 		// read the message scale instead of pinning an absolute size.
-		const css = messageBodyStyle();
-		expect(css).toContain("button.ccez-ann-badge");
-		expect(css).toContain("var(--font-scale, 1)");
+		const css = appCss();
+		const badge = [...css.matchAll(/([^{}]*button\.ccez-ann-badge[^{}]*)\{([^{}]*)\}/g)].find(
+			(rule) => !/ans-|rtl|fresh|arrived|::after/.test(rule[1]!)
+		);
+		expect(badge?.[2]).toContain("var(--font-scale, 1)");
 	});
 });
 
 describe("annotation badge RTL mirror", () => {
 	it("mirrors badge geometry and tail for RTL quotes", () => {
-		const css = messageBodyStyle();
+		const css = appCss();
 		expect(css).toContain("button.ccez-ann-badge.rtl");
 		expect(css).toContain("right: 100%");
 		expect(css).toContain("polygon(62% 0, 0 0, 100% 100%)");
@@ -87,28 +96,64 @@ describe("annotation badge RTL mirror", () => {
 
 describe("headline badge twins", () => {
 	it("paints stamped headline marks exactly like message marks", () => {
-		// Every badge/wash rule carries a .news-card-title twin
-		// sharing its declarations: one look, two scopes.
-		const css = messageBodyStyle();
+		// Every badge/wash rule in app.css covers both scopes in one
+		// rule sharing its declarations: one look, two selectors.
+		const css = appCss();
+		const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)];
 		for (const inner of [
-			".news-card-title .ccez-ann-anchor",
-			".news-card-title button.ccez-ann-badge",
-			".news-card-title button.ccez-ann-badge.ans-waiting",
-			".news-card-title button.ccez-ann-badge.ans-ready",
-			".news-card-title button.ccez-ann-badge::after",
-			".news-card-title button.ccez-ann-badge.rtl",
-			".news-card-title button.ccez-ann-badge.rtl::after",
-			".news-card-title button.ccez-ann-badge.fresh",
-			".news-card-title button.ccez-ann-badge.ans-waiting.fresh",
-			".news-card-title button.ccez-ann-badge.ans-ready.arrived",
-			".news-card-title mark.ccez-ann",
-			".news-card-title mark.ccez-ann.fresh",
-			".news-card-title mark.ccez-ann.leaving",
-			".news-card-title mark.ccez-ann-flash",
-			".news-card-title mark.ccez-ann-flash.fading"
+			".ccez-ann-anchor",
+			"button.ccez-ann-badge",
+			"button.ccez-ann-badge.ans-waiting",
+			"button.ccez-ann-badge.ans-ready",
+			"button.ccez-ann-badge::after",
+			"button.ccez-ann-badge.rtl",
+			"button.ccez-ann-badge.rtl::after",
+			"button.ccez-ann-badge.fresh",
+			"button.ccez-ann-badge.ans-waiting.fresh",
+			"button.ccez-ann-badge.ans-ready.arrived",
+			"mark.ccez-ann",
+			"mark.ccez-ann.fresh",
+			"mark.ccez-ann.leaving",
+			"mark.ccez-ann-flash",
+			"mark.ccez-ann-flash.fading"
 		]) {
-			expect(css, inner).toContain(`:global(${inner})`);
+			const shared = rules.some((rule) => {
+				const sels = rule[1]!.split(",").map((s) => s.trim());
+				return (
+					sels.includes(`.rendered ${inner}`) &&
+					sels.includes(`.news-card-title ${inner}`)
+				);
+			});
+			expect(shared, inner).toBe(true);
 		}
+	});
+});
+
+describe("badge/wash home", () => {
+	it("lives in app.css, not MessageBody's <style>", () => {
+		// The move is total: MessageBody keeps no badge/wash
+		// selectors, keyframes, or highlight names of its own.
+		const css = appCss();
+		for (const sel of [
+			"button.ccez-ann-badge",
+			"mark.ccez-ann",
+			".ccez-ann-anchor"
+		])
+			expect(css, sel).toContain(sel);
+		const body = messageBodyStyle();
+		for (const sel of [
+			"ccez-ann-badge",
+			"ccez-ann-anchor",
+			"mark.ccez-ann",
+			"ann-badge-in",
+			"ann-wash-in",
+			"ann-wash-out",
+			"ann-flash-out",
+			"ccez-ann-breathe",
+			"ccez-ann-arrive",
+			"::highlight(ccez-ann"
+		])
+			expect(body, sel).not.toContain(sel);
 	});
 });
 

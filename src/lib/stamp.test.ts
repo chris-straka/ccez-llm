@@ -1,10 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
-import {
-	applyMarks,
-	type AnnotationMark,
-	type AnnotationId
-} from "./annotations";
+import type { AnnotationMark, AnnotationId } from "./annotations";
+import { applyMarks } from "./annotations-stamp";
 
 /**
  * Two annotations in one message, the second overlapping the first's

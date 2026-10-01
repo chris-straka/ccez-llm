@@ -126,15 +126,17 @@ export async function rowBoxes(
 }
 
 /** Rect of a quote's visible text inside one article's rendered body
-(badge chrome excluded so node offsets map onto visible text). */
+(badge chrome excluded so node offsets map onto visible text).
+`root` scopes the same walk at news headlines. */
 export async function quoteRect(
 	page: Page,
 	article: number,
-	quote: string
+	quote: string,
+	rootSelector = "article .rendered"
 ): Promise<{ x: number; y: number; width: number; height: number }> {
 	return page.evaluate(
-		([n, text]: [number, string]) => {
-			const root = document.querySelectorAll("article .rendered")[n];
+		([n, text, sel]: [number, string, string]) => {
+			const root = document.querySelectorAll(sel)[n];
 			if (!root) throw new Error("no article");
 			const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
 			const texts: Text[] = [];
@@ -171,7 +173,7 @@ export async function quoteRect(
 				height: number;
 			};
 		},
-		[article, quote] as [number, string]
+		[article, quote, rootSelector] as [number, string, string]
 	);
 }
 
@@ -180,15 +182,25 @@ stays inside the message, never on a control that would clear it. */
 export async function dragQuote(
 	page: Page,
 	article: number,
-	quote: string
+	quote: string,
+	rootSelector = "article .rendered"
 ): Promise<void> {
-	const rect = await quoteRect(page, article, quote);
+	const rect = await quoteRect(page, article, quote, rootSelector);
 	await page.mouse.move(rect.x + 1, rect.y + rect.height / 2);
 	await page.mouse.down();
 	await page.mouse.move(rect.x + rect.width - 1, rect.y + rect.height / 2, {
 		steps: 8
 	});
 	await page.mouse.up();
+}
+
+/** True drag-select of a quote inside one news headline card. */
+export async function dragHeadline(
+	page: Page,
+	card: number,
+	quote: string
+): Promise<void> {
+	await dragQuote(page, card, quote, ".news-card-title");
 }
 
 /** Assert two box snapshots match within a pixel (no hover nudges). */
