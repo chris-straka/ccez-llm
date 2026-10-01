@@ -1092,4 +1092,5 @@ condensed from the Sep 23–24 chain (`0cda353`–`051257b`, tail
       clean, touched e2e 72/72 (`ef2e813`).
 - [x] F Focus-drop probe: owner checked all text fields on Mac,
       all good — deleted `focusDebug.ts`, its test, and all 14
-      `focusLog` calls; investigation doc closed in `docs/README.md`.
+      `focusLog` calls; investigation doc closed in `docs/README.md`
+      (`190aeb4`).
