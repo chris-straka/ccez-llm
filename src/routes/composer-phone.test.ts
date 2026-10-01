@@ -264,8 +264,11 @@ describe("phone annotation focus stability", () => {
 
 	it("keeps the desktop focus call a single preventScroll focus", () => {
 		const source = pageSource();
+		// The create pill opens through the annotate-mode dep now
+		// (one nesting deeper); the desktop branch stays a lone
+		// preventScroll focus with no scroll restore.
 		expect(source).toContain(
-			"} else {\n\t\t\tvoid tick().then(() => annPopBox?.focus({ preventScroll: true }));"
+			"} else {\n\t\t\t\tvoid tick().then(() => annPopBox?.focus({ preventScroll: true }));"
 		);
 	});
 });

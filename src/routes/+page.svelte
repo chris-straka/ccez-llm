@@ -209,21 +209,17 @@
 		type SentTagAction
 	} from "$lib/attachments";
 	import {
-		duplicateAnnotationId,
 		deleteAnnotation,
 		clearPromptPinned,
 		withAnnotations,
 		promptInclusions,
-		canPinAnnotation,
 		canHoldDeleteBadge,
 		setPromptPinned,
 		attachAnnotationAnswer,
 		unansweredAnnotations,
-		newAnnotationId,
 		resolveSentRefTarget,
 		annRefsFor,
 		locateQuote,
-		occurrenceAtPosition,
 		pressExpandedSelection,
 		selMenuPlacement,
 		readingPanelPlacement,
@@ -244,7 +240,6 @@
 		annotationCopyText,
 		filePendingAnnotation,
 		promptAnnWashIdFor,
-		paragraphForQuote,
 		menuBtnTouchAction,
 		selMenuDragTarget,
 		annEditCommitToast,
@@ -254,9 +249,6 @@
 		type StoryAnchor
 	} from "$lib/annotations";
 	import {
-		quoteFragmentText,
-		equationBodyOf,
-		equationBodyRange,
 		trimParagraphTerminator,
 		quoteRange,
 		rangesExcludingReadings,
@@ -280,6 +272,7 @@
 	import { startBlink, startHighlightFade, startMarkFade } from "$lib/blink";
 	import { createRefMemo } from "$lib/aidLoading";
 	import { NewsMode } from "$lib/news-mode.svelte";
+	import { AnnotateMode } from "$lib/annotate-mode.svelte";
 	/* decomposeTree + onKunLine render in `InspectOverlay.svelte`. */
 	import {
 		getInspectData,
@@ -458,8 +451,7 @@
 		annPopWidth,
 		pillWashId,
 		placeAnnAnswer,
-		placeAnnCard,
-		placeAnnComposer
+		placeAnnCard
 	} from "$lib/annPop";
 	import {
 		idleTapAction,
@@ -672,7 +664,7 @@
 		// selection and its OS menu stay up across scrolls, so ours
 		// must too. Only a collapsed selection dismisses the menu.
 		if (!androidUI || (window.getSelection()?.toString() ?? "") === "")
-			selMenu = null;
+			annotateMode.selMenu = null;
 		/* The language sheet is fitted to its open-frame geometry:
 		a thread scroll invalidates the fit, so it closes instead of
 		floating mis-anchored. */
@@ -689,11 +681,11 @@
 				annPop = { ...annPop, y: annPop.y - dy };
 			}
 		}
-		if (answerPop && !answerClosing && scrollBox) {
-			const dy = scrollBox.scrollTop - answerPopTop;
+		if (annotateMode.answerPop && !annotateMode.answerClosing && scrollBox) {
+			const dy = scrollBox.scrollTop - annotateMode.answerPopTop;
 			if (dy !== 0) {
-				answerPopTop = scrollBox.scrollTop;
-				answerPop = { ...answerPop, y: answerPop.y - dy };
+				annotateMode.answerPopTop = scrollBox.scrollTop;
+				annotateMode.answerPop = { ...annotateMode.answerPop, y: annotateMode.answerPop.y - dy };
 			}
 		}
 		saveChatScroll();
@@ -1053,8 +1045,6 @@
 	/** Programmatic inline edits must not reconcile against themselves. */
 	let editingMarkerMuted = false;
 	let highlightAnnId: AnnotationId | null = $state(null);
-	/** Badge currently hovered (paints its quote wash as a preview). */
-	let hoverBadgeId: string | null = $state(null);
 	/** Cursor-anchored annotation pill (ChatGPT-style). Null when closed. */
 	let annPop = $state<{
 		id: string;
@@ -1066,32 +1056,6 @@
 	its document point (never the viewport), so scrolls shift it by
 	the delta — fixed plus tracking, no mount move needed. */
 	let annPopTop = 0;
-	/** Answer popup (the remodel): open answer read in context. Null
-	when closed; the card self-heals (renders nothing) if its
-	annotation is deleted or sent while open. The quote itself never
-	renders in the card — the highlighted word upstream is the
-	title, with Han readings in the panels above it. */
-	let answerPop = $state<{
-		id: AnnotationId;
-		x: number;
-		y: number;
-		w: number;
-	} | null>(null);
-	/** Answer fade-out in flight (unmounts when the ramp ends). */
-	let answerClosing = $state(false);
-	let answerTimer: ReturnType<typeof setTimeout> | null = null;
-	/** Thread scroll offset when the answer card opened: like the
-	pill, the card sticks to its document point (never the
-	viewport), so scrolls shift it by the delta. */
-	let answerPopTop = 0;
-	/** Last badge a mousedown press opened (or toggled): its trailing
-	click re-fire is the same gesture, never a new one (openBadgeClick
-	and the answer click-off guard both stand down for it). `seq`
-	pins the press itself: pointerdown always precedes its
-	mousedown, so a click with no press since is the trailing one.
-	Plain field — only the handlers touch it, never the template. */
-	let lastBadgePress: { id: AnnotationId; at: number; seq: number } | null =
-		null;
 	/** Pill fade-out in flight (unmounts when the ramp ends). */
 	let annPopClosing = $state(false);
 	let annPopTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1114,27 +1078,6 @@
 	 * departure. Plain timestamp, never state: no render may hinge on it.
 	 */
 	let promptPressAt = 0;
-	let selMenu = $state<{
-		x: number;
-		y: number;
-		/** Highlight rect (viewport px): centers the create box when narrow. */
-		left: number;
-		w: number;
-		/** Highlight vertical span: the create box hangs below it with
-		an em-scaled gap, never covering the word. */
-		hlTop: number;
-		hlBottom: number;
-		quote: string;
-		/** Containing paragraph text: the single-char guess reads it for kana. */
-		context: string;
-		/** Owning message, null for headline picks (the story owns those). */
-		messageId: ChatMsgId | null;
-		/** News story owning a headline pick. */
-		story?: StoryAnchor;
-		/** Live range at summon time: menu hover puts the highlight
-		back when WebKit empties it (no DOM change, so still valid). */
-		range: Range | null;
-	} | null>(null);
 	/**
 	 * Selection readings overlay: right-clicking a highlight that
 	 * contains Han shows readings for just the highlight. The
@@ -1216,18 +1159,12 @@
 	 */
 	const MULTI_CLICK_SETTLE_MS = 300;
 	let multiClickMenuAt: ReturnType<typeof setTimeout> | null = null;
-	/**
-	 * True while the pointer hovers the selection menu: the auto-dismiss
-	 * timer stands down, so moving the mouse from the highlight to the
-	 * Annotate button never cancels it. Leaving re-arms the timer.
-	 */
-	let selMenuHover = $state(false);
 	$effect(() => {
-		if (!selMenu) {
-			selMenuHover = false;
+		if (!annotateMode.selMenu) {
+			annotateMode.selMenuHover = false;
 			return;
 		}
-		if (selMenuHover) return;
+		if (annotateMode.selMenuHover) return;
 		if (selMenuTimer) clearTimeout(selMenuTimer);
 		// Phones: the dock tracks the native bubble — while a highlight
 		// is live the bubble is up, so hold the dock past the timer
@@ -1245,7 +1182,7 @@
 							android: androidUI,
 							selectionLive:
 								(window.getSelection()?.toString() ?? "") !== "",
-							hover: selMenuHover,
+							hover: annotateMode.selMenuHover,
 							lastInputAt,
 							now: Date.now(),
 							idleMs: SEL_MENU_IDLE_MS
@@ -1254,7 +1191,7 @@
 						arm();
 						return;
 					}
-					selMenu = null;
+					annotateMode.selMenu = null;
 				},
 				androidUI ? 4500 : SEL_MENU_IDLE_MS
 			);
@@ -1274,7 +1211,7 @@
 	 * corrected x never re-triggers it.
 	 */
 	$effect(() => {
-		const menu = selMenu;
+		const menu = annotateMode.selMenu;
 		const el = selMenuEl;
 		if (!menu || !el) return;
 		// Phones ride the selection's middle by measured width (the
@@ -1287,7 +1224,7 @@
 			window.innerWidth,
 			androidUI && !iosUI
 		);
-		if (x !== null) selMenu = { ...menu, x };
+		if (x !== null) annotateMode.selMenu = { ...menu, x };
 	});
 	/**
 	 * Last press that began inside the selection menu: whatever
@@ -1299,23 +1236,6 @@
 	function noteMenuPress(): void {
 		menuPressAt = Date.now();
 	}
-	/**
-	 * Selection-menu open stamp: the rescue in the selectionchange
-	 * auto-dismiss below puts the stored range back while NEITHER a
-	 * press/key NOR a programmatic clear landed since the menu
-	 * opened. lastPressAt covers pointerdown AND keydown, and the
-	 * summoning drag's own press predates the open — so the rescue
-	 * fires exactly for press-less engine clears (the pointer
-	 * cruising other messages, the menu's own shadow), while
-	 * click-away, new drags, arrow-collapses, and Escape all stamp
-	 * newer and keep dismissing. Same-millisecond ties read as the
-	 * summoning gesture, never as a newer press.
-	 */
-	let selMenuOpenedAt = 0;
-	/** Last clearSelection() call: programmatic clears dismiss, engine
-	hover-clears rescue (see above). Every caller also drops the menu,
-	so this is belt-and-braces for future paths. */
-	let lastProgrammaticClearAt = 0;
 	/** The floating menu element: its measured width pulls the
 	estimated x back on screen (see the effect below). */
 	let selMenuEl: HTMLElement | null = $state(null);
@@ -1452,14 +1372,14 @@
 	let menuDragSuppressAt = 0;
 	function menuDragStart(event: TouchEvent): void {
 		const t = event.changedTouches[0];
-		if (!t || !selMenu) return;
-		selMenuDrag = { mx: t.clientX, my: t.clientY, x0: selMenu.x, y0: selMenu.y };
+		if (!t || !annotateMode.selMenu) return;
+		selMenuDrag = { mx: t.clientX, my: t.clientY, x0: annotateMode.selMenu.x, y0: annotateMode.selMenu.y };
 		selMenuDragging = true;
 	}
 	function menuDragMove(event: TouchEvent): void {
 		const drag = selMenuDrag;
 		const t = event.changedTouches[0];
-		if (!drag || !t || !selMenu) return;
+		if (!drag || !t || !annotateMode.selMenu) return;
 		// Target resolution lives in selMenuDragTarget (pinned in
 		// annotations.test.ts); the suppress stamp and assignment stay
 		// here as effects.
@@ -1471,7 +1391,7 @@
 		);
 		if (!at) return;
 		menuDragSuppressAt = Date.now();
-		selMenu = { ...selMenu, x: at.x, y: at.y };
+		annotateMode.selMenu = { ...annotateMode.selMenu, x: at.x, y: at.y };
 	}
 	function menuDragEnd(): void {
 		selMenuDrag = null;
@@ -1508,7 +1428,7 @@
 		run();
 	}
 	function annotateTouch(event: TouchEvent): void {
-		menuBtnTouch(event, annotate);
+		menuBtnTouch(event, () => annotateMode.annotate());
 	}
 	function speakTouch(event: TouchEvent): void {
 		menuBtnTouch(event, () => void speakSelection());
@@ -1522,8 +1442,8 @@
 	phones the menu rises above the popup (see
 	liftSelMenuAboveReadings) so Annotate stays one tap away. */
 	async function speakSelection(): Promise<void> {
-		if (!selMenu) return;
-		const menu = selMenu;
+		if (!annotateMode.selMenu) return;
+		const menu = annotateMode.selMenu;
 		buzzTap();
 		// Japanese kanji speak their sentence reading, never the raw
 		// fragment (right-click parity): になる美 alone converts to
@@ -1569,7 +1489,7 @@
 	 * .sel-menu transition); a drag in flight stays 1:1.
 	 */
 	function liftSelMenuAboveReadings(): void {
-		if (!androidUI || !selMenu) return;
+		if (!androidUI || !annotateMode.selMenu) return;
 		if (!selPinyin?.above && !selFurigana?.some((panel) => panel.above))
 			return;
 		requestAnimationFrame(() => {
@@ -1579,13 +1499,13 @@
 					tops.push(el.getBoundingClientRect().top);
 			});
 			const menu = selMenuEl;
-			const current = selMenu;
+			const current = annotateMode.selMenu;
 			if (!(menu instanceof HTMLElement) || !current || tops.length === 0)
 				return;
 			const mr = menu.getBoundingClientRect();
 			if (mr.width === 0 || mr.height === 0) return;
 			const y = menuYAbovePanel(Math.min(...tops), mr.height);
-			if (y < current.y) selMenu = { ...current, y };
+			if (y < current.y) annotateMode.selMenu = { ...current, y };
 		});
 	}
 	/** Dock the readings overlay centered on the highlight span
@@ -1776,7 +1696,7 @@
 		// worker lands. Unpinned (right-click) stays unpinned.
 		if (explicitContext !== undefined) panelsPinned = true;
 		placeSelPinyin(quoted, "…");
-		const live = currentQuote();
+		const live = annotateMode.currentQuote();
 		const context =
 			live && live.messageId === quoted.messageId && live.quote === quoted.quote
 				? live.context
@@ -1795,7 +1715,7 @@
 		} catch {
 			html = "";
 		}
-		const now = currentQuote();
+		const now = annotateMode.currentQuote();
 		const anchored =
 			selPinyin?.quote === quoted.quote &&
 			selPinyin.messageId === quoted.messageId;
@@ -2051,7 +1971,7 @@
 	The native menu is suppressed on Android, so this replaces its
 	Copy entry. */
 	function copySelection(): void {
-		const quote = selMenu?.quote ?? "";
+		const quote = annotateMode.selMenu?.quote ?? "";
 		if (quote === "") return;
 		copyPlain(quote, "Copied");
 	}
@@ -2202,10 +2122,126 @@
 		requestSend: () => {
 			void doSend();
 		},
-		onBadge: (id, x, y) => openBadgeClick(id, { x, y }),
+		onBadge: (id, x, y) => annotateMode.openBadgeClick(id, { x, y }),
 		onBadgeHover: (id) => {
-			hoverBadgeId = id;
+			annotateMode.hoverBadgeId = id;
 		}
+	});
+	// Annotation orchestration (selection menu, create/commit, badge
+	// cards, review jumps, quote helpers): state and verbs live in
+	// the module; effects, gestures, onKey, the send pipeline, the
+	// pill, and readings stay paged and delegate in.
+	const annotateMode = new AnnotateMode({
+		getAnnotations: () => annotations,
+		setAnnotations: (next) => {
+			annotations = next;
+		},
+		getPending: () => pendingAnn,
+		setPending: (next) => {
+			pendingAnn = next;
+		},
+		getAnnDraft: () => annDraft,
+		setAnnDraft: (next) => {
+			annDraft = next;
+		},
+		getHighlight: () => highlightAnnId,
+		setHighlight: (id) => {
+			highlightAnnId = id;
+		},
+		setReviewOpen: (open) => {
+			reviewOpen = open;
+		},
+		getChatMessages: () => chat.messages,
+		getViewMessages: () => viewChat.messages,
+		getMessageContent: (id) =>
+			chatState.chats.flatMap((c) => c.messages).find((m) => m.id === id)
+				?.content ?? null,
+		isAidPinned: (messageId) => aidModelPin.has(messageId),
+		getNews: () => newsMode.news,
+		getSettings: () => ({
+			fontScale: settings.fontScale,
+			inspectEnabled: settings.inspectEnabled,
+			hapticsEnabled: settings.hapticsEnabled
+		}),
+		isPhone: () => androidUI,
+		isIOS: () => iosUI,
+		isPreviewing: () => previewing,
+		getScrollBox: () => scrollBox,
+		ensureSwapObserver: () => ensureSwapObserver(),
+		speak: (quote, key, keepMenu, context) => {
+			void speakQuote(quote, key, keepMenu, context);
+		},
+		selSpeakKey: (sel) => selSpeakKey(sel),
+		annSpeakKey: (ann) => annSpeakKey(ann),
+		quoteOffers: (quoted) => quoteOffersReadings(quoted),
+		readingsFor: (quoted, pin) => {
+			void readingsForQuote(quoted, pin);
+		},
+		dismissSelPanels: () => dismissSelPanels(),
+		openCreatePill: (id, x, y, draft) => {
+			annDraft = draft;
+			settleAnnPop();
+			annPop = { id, x, y, fresh: true };
+			annPopTop = scrollBox?.scrollTop ?? 0;
+			// The pill mounts async: land the caret once it flushes, or
+			// phone users get a comment box with no keyboard (and desktop
+			// users an extra click). Focus-only — selection is already filed.
+			// Phones re-pin the scroll behind the focus: some WebViews pan
+			// on textbox focus despite preventScroll, snapping the thread.
+			if (androidUI) {
+				const sx = window.scrollX;
+				const sy = window.scrollY;
+				const box = scrollBox;
+				const st = box?.scrollTop ?? 0;
+				void tick().then(() => {
+					annPopBox?.focus({ preventScroll: true });
+					window.scrollTo(sx, sy);
+					if (box) box.scrollTop = st;
+				});
+			} else {
+				void tick().then(() => annPopBox?.focus({ preventScroll: true }));
+			}
+			if (settings.hapticsEnabled) vibrateTick(6);
+		},
+		cancelPillFor: (id) => {
+			if (annPop && !annPopClosing && annPop.id === id) {
+				cancelAnnPop();
+				return true;
+			}
+			return false;
+		},
+		dismissPill: (id) => {
+			if (id !== undefined && id !== null) {
+				if (annPop?.id === id) {
+					settleAnnPop();
+					annPop = null;
+				}
+				return;
+			}
+			settleAnnPop();
+			if (annPop && !annPopClosing) {
+				settleAnnPop();
+				annPop = null;
+			}
+		},
+		stopPillMic: () => stopPillMic(),
+		refitAnswerCard: (id) => refitAndroidCard("answer", id),
+		popWidth: () => popWidth(),
+		hasPromptEdit: () => promptAnnEdit !== null,
+		commitPromptEdit: () => commitPromptAnnEdit(),
+		editInPrompt: (comment) => editAnnotationInPrompt({ pending: true }, comment),
+		requestAsk: (id) => {
+			const ann = annotations.find((a) => a.id === id);
+			if (ann) void askAnnotation(ann);
+		},
+		scrollRectIntoClear: (rect) => scrollRectIntoClear(rect),
+		flashJumpMark: (locate) => flashJumpMark(locate),
+		unstick: () => {
+			viewport.stick = false;
+		},
+		toast: (message) => flashToast(message),
+		toastError: (message) => flashErrorToast(message),
+		buzzDelete: () => buzzBeat("done", androidUI)
 	});
 	function toggleLangMenu(id: LanguageMenu["id"], btn: HTMLElement): void {
 		// Family open/close ticks on phones (buzzTap self-gates to
@@ -2366,16 +2402,16 @@
 	}
 	/** Open the Inspect overlay for the live selection (single Han char only). */
 	function openInspect(): void {
-		if (!selMenu) return;
-		const quote = selMenu.quote.trim();
+		if (!annotateMode.selMenu) return;
+		const quote = annotateMode.selMenu.quote.trim();
 		if (!shouldShowInspect(quote, settings.inspectEnabled)) return;
 		// One delegated tick for every open path (dock, menu, key):
 		// Android-only and toggle-gated inside, so desktop stays silent.
 		buzzTap();
 		inspectChar = quote;
-		inspectLang = inspectLangFor(quote, selMenu.context);
-		clearSelection();
-		selMenu = null;
+		inspectLang = inspectLangFor(quote, annotateMode.selMenu.context);
+		annotateMode.clearSelection();
+		annotateMode.selMenu = null;
 	}
 	/**
 	 * Android (phone) UI: the shortcuts modal shows touch gestures
@@ -3508,7 +3544,7 @@
 		const dragged =
 			!!down && Math.hypot(event.screenX - down.x, event.screenY - down.y) > 5;
 		if (
-			answerPop &&
+			annotateMode.answerPop &&
 			!dragged &&
 			event.target instanceof Element &&
 			!event.target.closest(".ann-answer") &&
@@ -3522,13 +3558,13 @@
 			// 800ms window as openBadgeClick): a new click-off
 			// always brings its own press and still closes.
 			!(
-				lastBadgePress &&
-				lastBadgePress.id === answerPop.id &&
-				lastBadgePress.seq === mainPressSeq &&
-				Date.now() - lastBadgePress.at < 800
+				annotateMode.lastBadgePress &&
+				annotateMode.lastBadgePress.id === annotateMode.answerPop.id &&
+				annotateMode.lastBadgePress.seq === mainPressSeq &&
+				Date.now() - annotateMode.lastBadgePress.at < 800
 			)
 		) {
-			closeAnswerPop();
+			annotateMode.closeAnswerPop();
 		}
 		if (!settingsOpen && settings.sidebarCollapsed) return;
 		if (dragged) return;
@@ -3868,7 +3904,7 @@
 		} finally {
 			markerSyncMuted = false;
 		}
-		selMenu = null;
+		annotateMode.selMenu = null;
 	}
 
 	function doNewChat(): void {
@@ -3956,7 +3992,7 @@
 	 * a passing glance — the hover previews again once it clears.
 	 */
 	function previewHover(id: ChatId): void {
-		if (selMenu) return;
+		if (annotateMode.selMenu) return;
 		if ((window.getSelection()?.toString() ?? "") !== "") return;
 		// The preview renders its own inert copy of the empty chrome
 		// below, so a live-open language list must not linger over it.
@@ -4797,39 +4833,6 @@
 		);
 	}
 
-	/** Article element owning a DOM node, or null outside messages. */
-	function articleOf(node: Node | null): Element | null {
-		const element = node instanceof Element ? node : node?.parentElement;
-		return element?.closest('article[id^="msg-"]') ?? null;
-	}
-
-	/** Headline span owning a selection node, or null outside titles. */
-	function headlineOf(node: Node | null): Element | null {
-		const element = node instanceof Element ? node : node?.parentElement;
-		return element?.closest(".news-card-title") ?? null;
-	}
-
-	/** Story anchor for a headline span: the card carries the
-	 * link, the live panel row carries the rest. Null when the
-	 * panel moved on (stale highlight, never garbage). */
-	function storyOfHeadline(headline: Element): StoryAnchor | null {
-		if (!newsMode.news) return null;
-		const link = headline.closest(".news-open")?.getAttribute("data-story-link");
-		if (!link) return null;
-		const story = newsMode.news.stories.find((s) => s.link === link);
-		if (!story) return null;
-		return { link, title: story.title, outlet: story.source, lang: newsMode.news.langName };
-	}
-
-	/** Message id owning the selection anchor, or null outside messages. */
-	function selectedMessageId(selection: Selection): ChatMsgId | null {
-		const article = articleOf(selection.anchorNode);
-		if (!article) return null;
-		const index = messageIndexFromId(article.id, chat.messages.length);
-		if (index === null) return null;
-		return chat.messages[index]?.id ?? null;
-	}
-
 	/** Viewed-message index under a tap point (multi-finger deletes):
 	articles carry msg-{index} ids; anything else is not a message. */
 	function messageIndexAtPoint(
@@ -4837,7 +4840,7 @@
 		clientY: number
 	): number | null {
 		const target = document.elementFromPoint(clientX, clientY);
-		const article = target ? articleOf(target) : null;
+		const article = target ? annotateMode.articleOf(target) : null;
 		if (!(article instanceof HTMLElement)) return null;
 		return messageIndexFromId(article.id, viewChat.messages.length);
 	}
@@ -4922,86 +4925,6 @@
 		return !selection.isCollapsed;
 	}
 
-	function currentQuote(): {
-		quote: string;
-		context: string;
-		messageId: ChatMsgId | null;
-		story?: StoryAnchor;
-	} | null {
-		const selection = window.getSelection();
-		if (!selection || selection.isCollapsed) return null;
-		const inRendered =
-			selection.anchorNode instanceof Element
-				? selection.anchorNode
-				: selection.anchorNode?.parentElement;
-		if (!inRendered?.closest(".rendered")) return headlineQuote(selection);
-		return messageQuote(selection);
-	}
-
-	/** Quote off a news headline: both ends must sit in one
-	 * title (onSelectEnd trims cross-card drags to the anchor
-	 * title's edge, like messages), anchored to the live story row. */
-	function headlineQuote(selection: Selection): {
-		quote: string;
-		context: string;
-		messageId: null;
-		story: StoryAnchor;
-	} | null {
-		const headline = headlineOf(selection.anchorNode);
-		if (!headline || headlineOf(selection.focusNode) !== headline) return null;
-		const frag = selection.getRangeAt(0).cloneContents();
-		const quote = quoteFragmentText(frag);
-		if (!quote) return null;
-		const story = storyOfHeadline(headline);
-		if (!story) return null;
-		const context = (headline.textContent ?? "").slice(0, 2000);
-		return { quote, context, messageId: null, story };
-	}
-
-	function messageQuote(selection: Selection): {
-		quote: string;
-		context: string;
-		messageId: ChatMsgId;
-	} | null {
-		// Math picks normalize to the whole equation: a partial glyph
-		// pick quotes a shard that never re-matches, so when both ends
-		// sit in one equation the range expands over its body first.
-		const anchorBody = equationBodyOf(selection.anchorNode);
-		if (anchorBody && equationBodyOf(selection.focusNode) === anchorBody) {
-			try {
-				const whole = equationBodyRange(anchorBody);
-				if (!whole) return null;
-				selection.removeAllRanges();
-				selection.addRange(whole);
-			} catch {
-				// A disturbed range keeps the partial pick below.
-			}
-		}
-		// Clone the range and drop badge buttons and ruby readings:
-		// selecting across an existing annotation would otherwise bake
-		// its number into the new quote ("Kyoto1 in two sentences"),
-		// and ruby would bake its readings in with the base text.
-		const frag = selection.getRangeAt(0).cloneContents();
-		const quote = quoteFragmentText(frag);
-		if (!quote) return null;
-		const messageId = selectedMessageId(selection);
-		if (!messageId) return null;
-		// The paragraph holding the highlight: a lone Han char can
-		// never carry kana itself, so Inspect guesses its locale from
-		// this text instead. Ruby readings ride along in textContent,
-		// but furigana only annotates Japanese lines, so the guess
-		// still points the right way.
-		const anchorEl =
-			selection.anchorNode instanceof Element
-				? selection.anchorNode
-				: selection.anchorNode?.parentElement;
-		const context = (anchorEl?.closest("p, li")?.textContent ?? "").slice(
-			0,
-			2000
-		);
-		return { quote, context, messageId };
-	}
-
 	function onSelectEnd(event: MouseEvent, cursorX?: number): void {
 		if (event.altKey) return; // Option-click folds; never a menu.
 		const live = window.getSelection();
@@ -5030,7 +4953,7 @@
 		// Selections never span messages or headlines: a drag
 		// crossing into another article or card trims back to the
 		// anchor's edge first.
-		if (live) lockSelectionToMessage(live, (n) => articleOf(n) ?? headlineOf(n));
+		if (live) lockSelectionToMessage(live, (n) => annotateMode.articleOf(n) ?? annotateMode.headlineOf(n));
 		// Multi-click picks grab the block terminator newline,
 		// painting the line beneath the highlight (the quote trims it
 		// anyway): drop it before the menu reads the quote. A word
@@ -5057,356 +4980,11 @@
 			const cy = event.clientY;
 			multiClickMenuAt = setTimeout(() => {
 				multiClickMenuAt = null;
-				placeSelMenu(cx, cy);
+				annotateMode.placeSelMenu(cx, cy);
 			}, MULTI_CLICK_SETTLE_MS);
 		} else {
-			placeSelMenu(cursorX, event.clientY);
+			annotateMode.placeSelMenu(cursorX, event.clientY);
 		}
-	}
-
-	function placeSelMenu(cursorX?: number, cursorY?: number): void {
-		ensureSwapObserver();
-		// Never summon off preview content: the main column is showing
-		// another chat, so the quote would pair with the active chat's
-		// message id and Annotate would anchor garbage. The hover gate
-		// (previewHover) normally prevents reaching here mid-preview.
-		if (previewing) {
-			selMenu = null;
-			return;
-		}
-		const found = currentQuote();
-		if (!found) {
-			selMenu = null;
-			return;
-		}
-		const live = window.getSelection();
-		const rect = live?.rangeCount
-			? live.getRangeAt(0).getBoundingClientRect()
-			: null;
-		if (!rect) {
-			selMenu = null;
-			return;
-		}
-		// A release in another article than the highlight (the drag
-		// crossed messages) would dock the menu to the stray cursor,
-		// stranding Annotate on a message with no highlight: fall back
-		// to the highlight's own rect so the menu stays on the quoted
-		// message. Releases outside any article keep the cursor (the
-		// gap below a message still docks near the pointer).
-		let atX = cursorX;
-		let atY = cursorY;
-		if (atX !== undefined && atY !== undefined && live && live.rangeCount > 0) {
-			const at = document.elementFromPoint(atX, atY);
-			const quoteArticle = articleOf(live.anchorNode);
-			if (
-				quoteArticle &&
-				at &&
-				articleOf(at) &&
-				articleOf(at) !== quoteArticle
-			) {
-				atX = undefined;
-				atY = undefined;
-			}
-		}
-		// The live range, so menu hover can put the highlight back:
-		// WebKit empties the document selection when the pointer moves
-		// onto the floating menu (no DOM change, no press). Nothing
-		// mutates in that path, so these nodes stay valid.
-		const stored =
-			live && live.rangeCount > 0 ? live.getRangeAt(0).cloneRange() : null;
-		const { x, y } = selMenuPlacement({
-			cursorX: atX,
-			cursorY: atY,
-			rectLeft: rect.left,
-			rectTop: rect.top,
-			rectBottom: rect.bottom,
-			rectWidth: rect.width,
-			viewportWidth: window.innerWidth,
-			viewportHeight: window.innerHeight,
-			androidUI,
-			iosUI,
-			menuWidth: selMenuWidthEstimate(
-				found.quote,
-				androidUI,
-				settings.inspectEnabled
-			),
-			fontScale: settings.fontScale
-		});
-		// The rescue in the selectionchange auto-dismiss restores the
-		// stored range while nothing newer landed (see selMenuOpenedAt).
-		selMenuOpenedAt = Date.now();
-		selMenu = {
-			x,
-			y,
-			left: rect.left,
-			w: rect.width,
-			hlTop: rect.top,
-			hlBottom: rect.bottom,
-			quote: found.quote,
-			context: found.context,
-			messageId: found.messageId,
-			...(found.story ? { story: found.story } : {}),
-			range: stored
-		};
-		// Selecting unpins the stream follow: a reply must not yank
-		// the view out from under the highlight (scrolling back to
-		// the bottom re-pins, like any unpin).
-		viewport.stick = false;
-		// No prompt summon: the menu floats viewport-fixed on every
-		// platform now (the old phone dock needed the composer shown).
-	}
-
-	/**
-	 * Menu hover enter: WebKit empties the document selection when the
-	 * pointer moves onto the floating menu (no DOM change, no press —
-	 * Chromium keeps it), so put the stored live range back and the
-	 * highlight survives the trip to Annotate. Nothing mutated, so the
-	 * stored nodes are still valid; never stomps a non-empty selection,
-	 * and one restore per enter is enough (the engine clears once).
-	 */
-	function enterSelMenu(): void {
-		selMenuHover = true;
-		const range = selMenu?.range;
-		if (!range) return;
-		const live = window.getSelection();
-		if (!live || live.toString() !== "") return;
-		try {
-			if (
-				!document.contains(range.startContainer) ||
-				!document.contains(range.endContainer)
-			)
-				return;
-			live.removeAllRanges();
-			live.addRange(range);
-		} catch {
-			// Cosmetic: the menu stands on its stored quote regardless.
-		}
-	}
-
-	function clearSelection(): void {
-		lastProgrammaticClearAt = Date.now();
-		window.getSelection()?.removeAllRanges();
-	}
-
-	/**
-	 * Which repeat of a quote the live selection starts in: resolves the
-	 * range start against the message's rendered text nodes and counts
-	 * the stripped occurrence holding it. Never throws — selection APIs
-	 * disagree across engines, and anything odd keeps 0 (first match).
-	 */
-	function occurrenceFromSelection(
-		messageId: ChatMsgId,
-		quote: string
-	): number {
-		try {
-			const selection = window.getSelection();
-			if (!selection || selection.rangeCount === 0) return 0;
-			const range = selection.getRangeAt(0);
-			let node: Node | null = range.startContainer;
-			let offset = range.startOffset;
-			// Whole-node starts (triple-click paragraphs) resolve to
-			// their first text: the occurrence holding the span's start.
-			if (!(node instanceof Text)) {
-				const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
-				const firstText = walker.nextNode();
-				if (!(firstText instanceof Text)) return 0;
-				node = firstText;
-				offset = 0;
-			}
-			const index = chat.messages.findIndex((m) => m.id === messageId);
-			if (index === -1) return 0;
-			const root = document.querySelector(`article#msg-${index} .rendered`);
-			if (!(root instanceof HTMLElement)) return 0;
-			const nodes = quoteTextNodes(root);
-			const nodeIndex = node instanceof Text ? nodes.indexOf(node) : -1;
-			if (nodeIndex === -1) return 0;
-			return occurrenceAtPosition(
-				nodes.map((n) => n.textContent ?? ""),
-				quote,
-				nodeIndex,
-				offset
-			);
-		} catch {
-			return 0;
-		}
-	}
-
-	/** Annotate at the cursor: the comment pill opens where the selection
-	was — never down in the composer. Enter saves, Escape cancels. The
-	annotation stays pending (no badge, no count) until submit. */
-	function annotate(initialComment: string = "", instant = false): void {
-		if (!selMenu) return;
-		if (!selMenu.quote.trim()) {
-			clearSelection();
-			selMenu = null;
-			return;
-		}
-		// Starting over submits whatever is being composed first: typed
-		// comments are never silently dropped.
-		if (pendingAnn) commitPending();
-		// An in-prompt note edit owns the composer: filing it first
-		// hands the draft back before the new annotation takes over.
-		if (promptAnnEdit) commitPromptAnnEdit();
-		const quote = selMenu.quote.trim();
-		// Repeats disambiguate here, from the live selection: the
-		// last "c" in "ccc" records occurrence 2, so its badge
-		// lands where the highlight was. Anything unresolvable
-		// keeps 0 (first match, the old behavior) — headlines
-		// always keep 0 (no message row to locate in).
-		const at = selMenu.messageId
-			? occurrenceFromSelection(selMenu.messageId, quote)
-			: 0;
-		// A quote picked from vocalized (tashkeel) text locates against
-		// that text only: its badge shows while the aid is on, never on
-		// the bare form. Headlines never carry aid scope.
-		const aidScope =
-			selMenu.messageId && aidModelPin.has(selMenu.messageId)
-				? ("tashkeel" as const)
-				: undefined;
-		// Same span twice would stack two badges on one anchor (and
-		// hovering them oscillates): delete the existing annotation
-		// and start the new one clean — no toast, no lockout, the
-		// create box opens for the fresh wording either way (even on
-		// the instant path: re-annotating means rewriting).
-		const dupe = duplicateAnnotationId(
-			annotations,
-			{
-				...(selMenu.messageId ? { messageId: selMenu.messageId } : {}),
-				...(selMenu.story ? { story: selMenu.story } : {})
-			},
-			quote,
-			at,
-			aidScope
-		);
-		if (dupe) {
-			annotations = deleteAnnotation(annotations, dupe);
-			if (answerPop?.id === dupe) {
-				if (answerTimer) {
-					clearTimeout(answerTimer);
-					answerTimer = null;
-				}
-				answerClosing = false;
-				answerPop = null;
-			}
-			if (highlightAnnId === dupe) highlightAnnId = null;
-			instant = false;
-		}
-		const pending: Annotation = {
-			id: newAnnotationId(),
-			...(selMenu.messageId ? { messageId: selMenu.messageId } : {}),
-			...(selMenu.story ? { story: selMenu.story } : {}),
-			quote,
-			comment: "",
-			at,
-			...(aidScope ? { aidScope } : {})
-		};
-		pendingAnn = pending;
-		// Creating an annotation always reads the quote back out
-		// (no readback gate): filing is an explicit listen moment,
-		// exactly like tapping Speak on the highlight.
-		void speakQuote(quote, selSpeakKey(selMenu), true, selMenu.context);
-		// Han quotes earn their readings panel above the quote while
-		// creating too: the highlight stays (instead of clearing) so
-		// the panels have a live rect — the selectionchange watcher
-		// drops them with it on submit or cancel. Headlines skip
-		// readings (message-DOM panels have nothing to place on).
-		const quoted = {
-			quote,
-			messageId: selMenu.messageId,
-			context: selMenu.context,
-			at
-		};
-		const keepHighlight =
-			quoted.messageId != null &&
-			quoteOffersReadings({ ...quoted, messageId: quoted.messageId });
-		if (keepHighlight && quoted.messageId != null)
-			void readingsForQuote({ ...quoted, messageId: quoted.messageId }, true);
-		else clearSelection();
-		// Instant file (hover A): the pill never opens — the empty
-		// note files at once and the request fires, on desktop and
-		// phones alike (no in-prompt edit either).
-		if (instant) {
-			annDraft = initialComment;
-			commitPending();
-			return;
-		}
-		// Phones file the comment in the composer, never the
-		// transplanted pill (its textbox can't reliably summon the
-		// phone keyboard — see editAnnotationInPrompt). Desktop
-		// falls through to the popover below.
-		if (androidUI) {
-			selMenu = null;
-			highlightAnnId = pending.id;
-			editAnnotationInPrompt({ pending: true }, initialComment);
-			if (settings.hapticsEnabled) vibrateTick(6);
-			return;
-		}
-		const width = popWidth();
-		// The comment box hangs below the highlight itself (never
-		// covering the word, at any font size): narrow highlights
-		// center the box over themselves; wide ones keep the
-		// end-of-selection placement. The Annotate button itself
-		// never moves (stays at the cursor end). Phone: the keyboard
-		// eats the lower screen, so the composer pins high and
-		// centered instead of at the selection — it is never
-		// covered, wherever the quote sits.
-		const { x, y } = placeAnnComposer({
-			android: androidUI,
-			viewportWidth: window.innerWidth,
-			viewportHeight: window.innerHeight,
-			width,
-			menuX: selMenu.x,
-			highlightLeft: selMenu.left,
-			highlightWidth: selMenu.w,
-			highlightTop: selMenu.hlTop,
-			highlightBottom: selMenu.hlBottom,
-			fontScale: settings.fontScale
-		});
-		selMenu = null;
-		highlightAnnId = pending.id;
-		annDraft = initialComment;
-		settleAnnPop();
-		annPop = { id: pending.id, x, y, fresh: true };
-		annPopTop = scrollBox?.scrollTop ?? 0;
-		// The pill mounts async: land the caret once it flushes, or
-		// phone users get a comment box with no keyboard (and desktop
-		// users an extra click). Focus-only — selection is already filed.
-		// Phones re-pin the scroll behind the focus: some WebViews pan
-		// on textbox focus despite preventScroll, snapping the thread.
-		if (androidUI) {
-			const sx = window.scrollX;
-			const sy = window.scrollY;
-			const box = scrollBox;
-			const st = box?.scrollTop ?? 0;
-			void tick().then(() => {
-				annPopBox?.focus({ preventScroll: true });
-				window.scrollTo(sx, sy);
-				if (box) box.scrollTop = st;
-			});
-		} else {
-			void tick().then(() => annPopBox?.focus({ preventScroll: true }));
-		}
-		if (settings.hapticsEnabled) vibrateTick(6);
-	}
-
-	/** Paragraph holding a quote, for the answer request's context. */
-	function answerContextFor(
-		ann: Pick<Annotation, "messageId" | "story">,
-		quote: string,
-		occurrence = 0
-	): string {
-		if (!ann.messageId && ann.story) {
-			const story = ann.story;
-			return `${story.title} — ${story.outlet} (${story.lang})`;
-		}
-		const msg = chatState.chats
-			.flatMap((c) => c.messages)
-			.find((m) => m.id === ann.messageId);
-		return paragraphForQuote(
-			msg ? aidDisplayText(msg.content) : "",
-			quote,
-			occurrence
-		);
 	}
 
 	/** Annotation ids with a model request in flight (plain set,
@@ -5446,7 +5024,7 @@
 			const answer = await annotationAnswer(provider, {
 				quote: ann.quote,
 				question: ann.comment,
-				context: answerContextFor(ann, ann.quote, ann.at ?? 0)
+				context: annotateMode.answerContextFor(ann, ann.quote, ann.at ?? 0)
 			});
 			annotations = attachAnnotationAnswer(annotations, ann.id, answer);
 			// Story notes have no badge to turn orange or pin from:
@@ -5457,7 +5035,7 @@
 			if (!ann.messageId && ann.story && answer.trim()) {
 				annotations = setPromptPinned(annotations, ann.id, true);
 				if (newsMode.news?.stories.some((s) => s.link === ann.story?.link))
-					openBadge(ann.id);
+					annotateMode.openBadge(ann.id);
 			}
 		} catch (error) {
 			askFailedIds.add(ann.id);
@@ -5482,26 +5060,6 @@
 			void askAnnotation(ann, { skipWhenKeyless: true });
 		}
 	}
-	/** Submit the annotation being composed (Enter or Save). The id is
-	kept from composition so wash, pill, and badge address one thing.
-	Filing fires the annotation's own request at once — blue while it
-	waits, orange when the reply lands. */
-	function commitPending(): void {
-		const filed = filePendingAnnotation(annotations, pendingAnn, annDraft);
-		if (!filed) return;
-		annotations = filed;
-		const id = pendingAnn?.id;
-		pendingAnn = null;
-		// The filed draft owned the highlight (kept for readings
-		// panels while creating): both go with the submit.
-		clearSelection();
-		dismissSelPanels();
-		if (id) {
-			const ann = annotations.find((a) => a.id === id);
-			if (ann) void askAnnotation(ann);
-		}
-	}
-
 	/** Fade the pill out, then unmount it. Data writes stay synchronous
 	in the caller — only the unmount (and its highlight) waits out the ramp. */
 	function hideAnnPop(): void {
@@ -5532,7 +5090,7 @@
 		// re-asks at once. A stale pop addressing anything else
 		// just closes.
 		if (annPopSaveKind(annPop.id, pendingAnn?.id ?? null) === "commit-pending") {
-			commitPending();
+			annotateMode.commitPending();
 		} else if (annPop.fresh === false) {
 			const id = annPop.id;
 			const draft = annDraft;
@@ -5580,7 +5138,7 @@
 			pendingAnn = null;
 			// The dropped draft owned the highlight (kept for
 			// readings panels while creating): both go with it.
-			clearSelection();
+			annotateMode.clearSelection();
 			dismissSelPanels();
 		} else if (cancelKind === "delete-fresh")
 			annotations = deleteAnnotation(annotations, id);
@@ -5627,10 +5185,10 @@
 	 */
 	function refitAndroidCard(kind: "answer" | "edit", id: string): void {
 		if (!androidUI) return;
-		const width = kind === "answer" ? answerPop?.w : popWidth();
-		const open = kind === "answer" ? answerPop : annPop;
+		const width = kind === "answer" ? annotateMode.answerPop?.w : popWidth();
+		const open = kind === "answer" ? annotateMode.answerPop : annPop;
 		if (!open || open.id !== id || width === undefined) return;
-		if (kind === "answer" ? answerClosing : annPopClosing) return;
+		if (kind === "answer" ? annotateMode.answerClosing : annPopClosing) return;
 		const card = document.querySelector(
 			kind === "answer" ? ".ann-answer" : ".ann-pop"
 		);
@@ -5648,197 +5206,8 @@
 			viewportHeight: window.innerHeight,
 			cardHeight: height
 		}).y;
-		if (kind === "answer" && answerPop) answerPop = { ...answerPop, y };
+		if (kind === "answer" && annotateMode.answerPop) annotateMode.answerPop = { ...annotateMode.answerPop, y };
 		if (kind === "edit" && annPop) annPop = { ...annPop, y };
-	}
-
-	/**
-	 * Badge click: a ready answer opens in its own popup, anything
-	 * else opens the review dock on the annotation's row — filed
-	 * notes never edit inline in the dock (the pencil opens the
-	 * edit card). Re-pressing an open card's badge toggles its
-	 * prompt pin (a double-click's second press lands here); the
-	 * card stays put and the badge keeps its number — Esc and
-	 * click-away close, the dock's Unpin removes.
-	 */
-	function openBadge(id: AnnotationId, anchor?: { x: number; y: number }): void {
-		const current = annotations.find((a) => a.id === id);
-		// Android: tapping a blue (unanswered) badge only toasts
-		// Loading — the answer is still on the wire, so there is no
-		// card to open and the review dock must not open either (it
-		// used to open and strand the tap there).
-		if (androidUI && !iosUI && current && !current.answer) {
-			flashToast("Loading");
-			return;
-		}
-		// A badge press unpins the stream follow, like a selection:
-		// the card reads against a still thread.
-		viewport.stick = false;
-		// Re-pressing a badge with its create pill open cancels the
-		// pill, like cancel.
-		if (annPop && !annPopClosing && annPop.id === id) {
-			cancelAnnPop();
-			return;
-		}
-		if (!current) return;
-		// A ready answer opens in its own popup: re-press toggles
-		// its prompt pin instead of shutting the card — pin, or
-		// unpin when already pinned (double-click both ways). An
-		// open pill for the same note settles first through the
-		// proper cancel path so typed text is never dropped.
-		if (current.answer) {
-			if (answerPop && !answerClosing && answerPop.id === id) {
-				if (current.pinnedToPrompt === true) unpinAnnotation(id);
-				else pinAnnotation(id);
-				return;
-			}
-			if (annPop && !annPopClosing && annPop.id === id) cancelAnnPop();
-			const anchorAt = anchor ?? {
-				x: window.innerWidth / 2,
-				y: window.innerHeight / 2
-			};
-			const width = popWidth();
-			// The card hangs below the quote like the create pill
-			// (same gap and x math), never flipped above and never
-			// covering the word: when the bottom edge would clip, the
-			// thread scrolls to make room instead (below). Phones
-			// keep the centered card (keyboard geometry).
-			const quoteRect = document
-				.querySelector(`[data-ann-badge="${id}"]`)
-				?.parentElement?.getBoundingClientRect();
-			const placed =
-				!androidUI && quoteRect
-					? placeAnnAnswer({
-							viewportWidth: window.innerWidth,
-							menuX: anchorAt.x,
-							highlightLeft: quoteRect.left,
-							highlightWidth: quoteRect.width,
-							highlightBottom: quoteRect.bottom,
-							width,
-							fontScale: settings.fontScale
-						})
-					: placeAnnCard({
-							anchorX: anchorAt.x,
-							anchorY: anchorAt.y,
-							width,
-							viewportWidth: window.innerWidth,
-							viewportHeight: window.innerHeight,
-							// Open-time estimate; the tick below refits
-							// to the measured card on Android.
-							cardHeight: 240
-						});
-			if (answerTimer) {
-				clearTimeout(answerTimer);
-				answerTimer = null;
-			}
-			answerClosing = false;
-			answerPop = { id, x: placed.x, y: placed.y, w: width };
-			answerPopTop = scrollBox?.scrollTop ?? 0;
-			if (androidUI) void tick().then(() => refitAndroidCard("answer", id));
-			// The quote stays highlighted while its answer reads, and
-			// opening the reply always reads the annotated thing back
-			// out — same listen moment as creating the annotation.
-			highlightAnnId = id;
-			void speakQuote(
-				current.quote,
-				annSpeakKey(current),
-				false,
-				answerContextFor(current, current.quote, current.at ?? 0)
-			);
-			// The quote highlights wash-only (its own text is the
-			// context) and Han quotes earn the right-click readings
-			// panel above it — nothing repeated in the card, no
-			// extra request, no native-blue flash. A quote with no
-			// readings to offer drops a previous quote's panel (the
-			// press no longer clears it above): the panel goes away
-			// with the card it rode in on. Story notes offer no
-			// readings (no message row to place on).
-			const quoted = {
-				quote: current.quote,
-				messageId: current.messageId,
-				context: answerContextFor(current, current.quote, current.at ?? 0)
-			};
-			if (
-				!current.messageId ||
-				!quoteOffersReadings({ ...quoted, messageId: current.messageId })
-			)
-				dismissSelPanels();
-			const selected = selectAnswerQuote(id);
-			if (selected) void readingsForQuote(selected, true);
-			if (!androidUI && quoteRect) {
-				void (async () => {
-					await tick();
-					if (answerPop?.id !== id || answerClosing) return;
-					const card = document.querySelector(".ann-answer");
-					if (!(card instanceof HTMLElement)) return;
-					const overflow =
-						card.getBoundingClientRect().bottom - (window.innerHeight - 8);
-					if (overflow <= 0 || !scrollBox) return;
-					// Instant: a smooth scroll would still be animating
-					// when the re-place below measures the quote.
-					scrollBox.scrollTo({
-						top: scrollBox.scrollTop + overflow,
-						behavior: "instant"
-					});
-					await tick();
-					if (answerPop?.id !== id || answerClosing) return;
-					const fresh = document
-						.querySelector(`[data-ann-badge="${id}"]`)
-						?.parentElement?.getBoundingClientRect();
-					if (!fresh) return;
-					const gap = Math.max(2, Math.round(2 + (settings.fontScale - 1) * 12));
-					answerPop = { ...answerPop, y: Math.floor(fresh.bottom + gap) };
-					answerPopTop = scrollBox?.scrollTop ?? 0;
-					// The room-making scroll above re-pinned the bottom:
-					// unpin again, the card still reads against stillness.
-					viewport.stick = false;
-				})();
-			}
-			return;
-		}
-		// No answer yet: open the review dock on this row (both
-		// platforms — the dock renders in the composer everywhere).
-		// Filed notes never edit inline in the dock: the row offers
-		// pin, pencil (answered only — it opens the edit card),
-		// inclusion toggle, copy, and delete. Opening still reads
-		// the annotated text back out, like the answer path. The
-		// dock summons no readings panel, so a previous quote's
-		// panel goes with the press (it no longer clears above).
-		stopPillMic();
-		dismissSelPanels();
-		void speakQuote(
-			current.quote,
-			annSpeakKey(current),
-			false,
-			answerContextFor(current, current.quote, current.at ?? 0)
-		);
-		highlightAnnId = id;
-		settleAnnPop();
-		if (annPop && !annPopClosing) {
-			settleAnnPop();
-			annPop = null;
-		}
-		reviewOpen = true;
-	}
-
-	/**
-	 * Delegated badge click (MessageBody): the keyboard path, plus the
-	 * trailing click of a press gesture. A press's own click re-fire —
-	 * same badge within the tap window — is the gesture just handled,
-	 * not a re-press: running the toggle would shut the menu the press
-	 * opened (the iOS tap bug). Anything else toggles as before.
-	 */
-	function openBadgeClick(
-		id: AnnotationId,
-		anchor: { x: number; y: number }
-	): void {
-		if (
-			lastBadgePress &&
-			lastBadgePress.id === id &&
-			Date.now() - lastBadgePress.at < 800
-		)
-			return;
-		openBadge(id, anchor);
 	}
 
 	/**
@@ -5855,12 +5224,12 @@
 		// press: typing must not fight the follow.
 		viewport.stick = false;
 		stopPillMic();
-		if (answerTimer) {
-			clearTimeout(answerTimer);
-			answerTimer = null;
+		if (annotateMode.answerTimer) {
+			clearTimeout(annotateMode.answerTimer);
+			annotateMode.answerTimer = null;
 		}
-		answerClosing = false;
-		if (answerPop?.id === id) answerPop = null;
+		annotateMode.answerClosing = false;
+		if (annotateMode.answerPop?.id === id) annotateMode.answerPop = null;
 		if (annPop && !annPopClosing) {
 			settleAnnPop();
 			annPop = null;
@@ -5907,74 +5276,6 @@
 		if (settings.hapticsEnabled) vibrateTick(6);
 	}
 
-	/** Fade the answer card out, then unmount it. The quote's wash
-	releases with the fade, not after it. */
-	function closeAnswerPop(): void {
-		if (!answerPop || answerClosing) return;
-		if (highlightAnnId === answerPop.id) highlightAnnId = null;
-		// The answer owned the quote highlight (and its readings
-		// panels): both go with the card.
-		clearSelection();
-		dismissSelPanels();
-		answerClosing = true;
-		if (answerTimer) clearTimeout(answerTimer);
-		answerTimer = setTimeout(() => {
-			answerTimer = null;
-			answerPop = null;
-			answerClosing = false;
-		}, 160);
-	}
-
-	/** Select an answered quote's text (anchors are empty gap
-	markers, never wraps): the answer highlights its quote like a
-	selection, so the existing text reads as context and the
-	readings panels place against it. Null when the quote is gone
-	(aid swap, edit). */
-	function selectAnswerQuote(
-		id: AnnotationId
-	): { quote: string; messageId: ChatMsgId; context: string; at: number } | null {
-		const ann = annotations.find((a) => a.id === id);
-		if (!ann) return null;
-		// Story notes select nothing (no message row to locate
-		// in): their card still opens, panel-less.
-		if (!ann.messageId) return null;
-		const quoted = {
-			quote: ann.quote,
-			messageId: ann.messageId,
-			context: answerContextFor(ann, ann.quote, ann.at ?? 0),
-			at: ann.at ?? 0
-		};
-		// Readings panels ride the live range (their scroll tracker
-		// dismisses with it), so only quotes bound for panels take a
-		// live selection. Everything else highlights wash-only while
-		// its card reads — never a native-blue flash.
-		if (!quoteOffersReadings(quoted)) return quoted;
-		const index = chat.messages.findIndex((m) => m.id === ann.messageId);
-		if (index === -1) return null;
-		const root = document.querySelector(`article#msg-${index} .rendered`);
-		if (!(root instanceof HTMLElement)) return null;
-		const nodes = quoteTextNodes(root);
-		const loc = locateQuote(
-			nodes.map((n) => n.textContent ?? ""),
-			ann.quote,
-			ann.at ?? 0
-		);
-		if (!loc) return null;
-		const startNode = nodes[loc.startNode];
-		const endNode = nodes[loc.endNode];
-		if (!startNode || !endNode) return null;
-		try {
-			window.getSelection()?.setBaseAndExtent(
-				startNode,
-				Math.min(loc.startOffset, startNode.length),
-				endNode,
-				Math.min(loc.endOffset, endNode.length)
-			);
-		} catch {
-			return null;
-		}
-		return quoted;
-	}
 	/**
 	 * Screen rect for a quote re-located in its rendered message (no
 	 * live selection needed): the resolve-time anchor when focus
@@ -6060,39 +5361,6 @@
 		} catch {
 			return null;
 		}
-	}
-
-	function removeAnnotation(id: string): void {
-		// Annotation deletes thump like message deletes (the shared
-		// triple-beat contract: call sites carry no haptic of their own).
-		buzzBeat("done", androidUI);
-		annotations = deleteAnnotation(annotations, id);
-		if (highlightAnnId === id) highlightAnnId = null;
-		if (annPop?.id === id) {
-			settleAnnPop();
-			annPop = null;
-		}
-	}
-
-	/** Pin an answered annotation to the send prompt (the only
-	Add-to-prompt in the app): the overlay chip lists it as quote,
-	question, and answer, and the next send bakes all three as
-	context. Blue annotations never pin — creating one only files
-	its badge until the reply lands. */
-	function pinAnnotation(id: AnnotationId): void {
-		const current = annotations.find((a) => a.id === id);
-		if (!current) {
-			flashErrorToast("Annotation no longer exists");
-			return;
-		}
-		if (!canPinAnnotation(current)) return;
-		annotations = setPromptPinned(annotations, id, true);
-	}
-
-	/** Unpin: the annotation stays filed (badge, dock) — only the
-	next send omits it. */
-	function unpinAnnotation(id: AnnotationId): void {
-		annotations = setPromptPinned(annotations, id, false);
 	}
 
 	/** Prompt-inclusion chips for the composer: pinned annotations
@@ -6186,99 +5454,6 @@
 	}
 
 	/**
-	 * Quote tap lands on the annotation's marker: the message scrolls
-	 * into view and its yellow wash holds, then fades out (hover
-	 * previews own the wash again after). Only quote taps
-	 * navigate — notes, buttons, and fields never do.
-	 */
-	/**
-	 * Quote-tap jumps to the mark — and only the quote taps: the note
-	 * stays selectable text, buttons keep their clicks, and the row's
-	 * dead space navigates nowhere. A drag-select ending here is a pick
-	 * (the click still fires), so only collapsed selections navigate.
-	 * The review closes so the landing clears the composer dock.
-	 */
-	function reviewQuoteClick(ann: {
-		id: AnnotationId;
-		messageId?: ChatMsgId | null;
-		story?: StoryAnchor;
-	}): void {
-		if (!window.getSelection()?.isCollapsed) return;
-		reviewOpen = false;
-		gotoAnnotation(ann);
-	}
-
-	function gotoAnnotation(ann: {
-		id: AnnotationId;
-		messageId?: ChatMsgId | null;
-		story?: StoryAnchor;
-	}): void {
-		// Story notes have no message row: scroll their card into
-		// view while news is open (flashing the quote in the
-		// title), else open the answer card when answered.
-		if (!ann.messageId) {
-			const current = annotations.find((a) => a.id === ann.id);
-			const story = ann.story ?? current?.story;
-			const card = story
-				? document.querySelector(
-						`.news-open[data-story-link="${CSS.escape(story.link)}"]`
-					)
-				: null;
-			if (card instanceof HTMLElement) {
-				highlightAnnId = ann.id;
-				scrollRectIntoClear(card.getBoundingClientRect());
-				if (current) {
-					const quote = current.quote;
-					flashJumpMark(() => quoteRange(card, quote, 0));
-				}
-				return;
-			}
-			if (current?.answer) {
-				openBadge(ann.id);
-				return;
-			}
-			flashErrorToast("That story is no longer open");
-			return;
-		}
-		const index = viewChat.messages.findIndex((m) => m.id === ann.messageId);
-		if (index < 0) {
-			flashErrorToast("Annotation no longer exists");
-			return;
-		}
-		highlightAnnId = ann.id;
-		// Scroll the mark itself, clear of the composer dock: an
-		// already-clear mark never moves (like nearest), but a covered
-		// one lands in the open instead of stranding behind the dock
-		// (nearest's down-landing trap). Fall back to the message when
-		// the badge is somehow missing.
-		const badge = document.querySelector(`[data-ann-badge="${ann.id}"]`);
-		if (badge instanceof HTMLElement)
-			scrollRectIntoClear(badge.getBoundingClientRect());
-		else {
-			document
-				.querySelector(`#msg-${index}`)
-				?.scrollIntoView({ block: "center", behavior: "smooth" });
-		}
-		// The quote flashes once like a sent jump (one registry
-		// flash; the jump clears the hover wash first, so no twin
-		// layers under it): the badge
-		// scroll lands the eye nearby, the flash lands it on the
-		// words. Every paint re-locates against the repeat it was
-		// filed from.
-		const current = annotations.find((a) => a.id === ann.id);
-		if (current) {
-			const quote = current.quote;
-			const at = current.at ?? 0;
-			const locate = (): Range | null => {
-				const article = document.querySelector(`#msg-${index}`);
-				const root = article?.querySelector(".rendered") ?? article;
-				return root instanceof HTMLElement ? quoteRange(root, quote, at) : null;
-			};
-			flashJumpMark(locate);
-		}
-	}
-
-	/**
 	 * Land a located rect where it stays visible: inside the chat
 	 * column, above the composer dock (prompt plus the open review).
 	 * Already-clear rects never move; covered ones settle at a third
@@ -6325,7 +5500,7 @@
 
 	/**
 	 * Previous-annotations quote press: only the quote text navigates
-	 * (see reviewQuoteClick) — the note stays selectable, buttons keep
+	 * (see annotateMode.reviewQuoteClick) — the note stays selectable, buttons keep
 	 * their clicks, dead space navigates nowhere. A drag-select ending
 	 * here is a pick, so only collapsed selections navigate. The jump
 	 * lands on the quoted message with a flash when it still holds the
@@ -6371,7 +5546,7 @@
 			quote
 		);
 		if (target.kind === "live") {
-			gotoAnnotation({ id: target.id, messageId: target.messageId ?? null });
+			annotateMode.gotoAnnotation({ id: target.id, messageId: target.messageId ?? null });
 			return;
 		}
 		if (target.kind === "quoted") {
@@ -6485,7 +5660,7 @@
 		// cursor (the jump scrolled the message beneath it) would
 		// twin the flash with offset edges. Route the clear through
 		// the shared machine so a later re-hover still reports.
-		badgeHover((id: string | null) => (hoverBadgeId = id), null);
+		badgeHover((id: string | null) => (annotateMode.hoverBadgeId = id), null);
 		// Registry fade everywhere but the shell: its overlay only
 		// repaints on forced frames, so grades never show there.
 		if (highlightsSupported() && !tauriBackendAvailable()) {
@@ -6749,7 +5924,7 @@
 		// A live selection menu owns the highlight: hover previews swap
 		// the body HTML, which collapses the selection (and strands the
 		// menu) mid-slide toward Annotate. Previews resume on close.
-		if (selMenu) return;
+		if (annotateMode.selMenu) return;
 		if (aidNoPeek.has(msg.id)) return;
 		// Pinyin previews on click alone, never hover: after its
 		// readings render, the button under a stationary cursor is
@@ -6777,7 +5952,7 @@
 	function unpeekAid(msg: ChatMsg): void {
 		// Frozen with peek above: clearing mid-menu would swap the body
 		// back and take the highlight with it.
-		if (selMenu) return;
+		if (annotateMode.selMenu) return;
 		if (aidPeek?.id === msg.id) aidPeek = null;
 		aidNoPeek.delete(msg.id);
 	}
@@ -6849,7 +6024,7 @@
 		if (aidPeek?.id === msg.id) aidPeek = null;
 		// The pointer genuinely left: release the swap lock with it.
 		aidNoPeek.delete(msg.id);
-		hoverBadgeId = null;
+		annotateMode.hoverBadgeId = null;
 		releaseRowFocus(event);
 	}
 
@@ -7314,11 +6489,11 @@
 			voices
 		);
 		if (!speechAttemptable(settings.voiceEngine, lang, voices)) {
-			selMenu = null;
+			annotateMode.selMenu = null;
 			setVoiceError("No voice for this language.");
 			return;
 		}
-		if (!keepMenu) selMenu = null;
+		if (!keepMenu) annotateMode.selMenu = null;
 		speakingSelection = messageId;
 		// The surrounding voice seeds; each Latin sentence in the
 		// highlight still resolves its own language (see
@@ -9534,8 +8709,8 @@
 							editor?.focus();
 							return;
 						}
-						placeSelMenu();
-						if (!selMenu?.quote.trim()) {
+						annotateMode.placeSelMenu();
+						if (!annotateMode.selMenu?.quote.trim()) {
 							flashToast(
 								`Select text first, then ${route === "speak" ? "Speak" : route === "inspect" ? "Inspect" : "Annotate"}.`
 							);
@@ -9543,7 +8718,7 @@
 						}
 						if (route === "speak") void speakSelection();
 						else if (route === "inspect") openInspect();
-						else annotate();
+						else annotateMode.annotate();
 					}
 				).then(() => {
 					// Cold start: a share that arrived before setup parked
@@ -9784,7 +8959,7 @@
 			)
 				return "other";
 			if (el.closest(".prompt")) return "prompt";
-			if (articleOf(el)) return "message";
+			if (annotateMode.articleOf(el)) return "message";
 			if (
 				el.closest("main") &&
 				el.closest(
@@ -9847,7 +9022,7 @@
 					) === null;
 				// Message the stroke starts on (for swipe-to-fold). The
 				// article id carries the viewChat index (see msg-{i}).
-				const art = target instanceof Element ? articleOf(target) : null;
+				const art = target instanceof Element ? annotateMode.articleOf(target) : null;
 				const msgIndex = art ? Number(art.id.slice(4)) : NaN;
 				const msgId = Number.isInteger(msgIndex)
 					? (viewChat.messages[msgIndex]?.id ?? null)
@@ -10217,14 +9392,14 @@
 				if (!el?.closest(".messages .rendered, .news-card-title")) return;
 				const live = window.getSelection()?.toString() ?? "";
 				if (live === "" || live === start.sel) return;
-				placeSelMenu(touch.clientX, touch.clientY);
+				annotateMode.placeSelMenu(touch.clientX, touch.clientY);
 				touchMenuAt = Date.now();
 				// Headphones in: the fresh selection reads itself aloud
 				// on release (when a voice fits). The menu stays up, so
 				// Annotate is still one tap away after listening.
 				// Phones never do this: every selection would talk.
 				if (!androidUI && settings.autoSpeakSelection) {
-					const fresh = currentQuote();
+					const fresh = annotateMode.currentQuote();
 					if (fresh)
 						void speakQuote(fresh.quote, selSpeakKey(fresh), true, fresh.context);
 				}
@@ -10275,7 +9450,7 @@
 					if ((scrollBox?.scrollTop ?? 0) !== held.top) return;
 					if (!canHoldDeleteBadge(annotations.find((a) => a.id === id)))
 						return;
-					removeAnnotation(id);
+					annotateMode.removeAnnotation(id);
 					badgeHoldFired = { id, at: Date.now() };
 				}, 2000);
 			},
@@ -10309,7 +9484,7 @@
 		// down (see menuPressAt): the button's own release collapses
 		// the highlight, and Annotate runs off the stored quote.
 		document.addEventListener("selectionchange", () => {
-			if (!selMenu) return;
+			if (!annotateMode.selMenu) return;
 			if (Date.now() - menuPressAt < 1000) return;
 			// A hover transition's engine collapse (no press at all):
 			// put the stored range back while the hover change is
@@ -10318,10 +9493,10 @@
 			// land here.
 			if (Date.now() - lastHoverChangeAt < 500) {
 				const liveKeep = window.getSelection();
-				if (selMenu?.range && (!liveKeep || liveKeep.toString() === "")) {
+				if (annotateMode.selMenu?.range && (!liveKeep || liveKeep.toString() === "")) {
 					try {
 						liveKeep?.removeAllRanges();
-						liveKeep?.addRange(selMenu.range.cloneRange());
+						liveKeep?.addRange(annotateMode.selMenu.range.cloneRange());
 					} catch {
 						// Detached since the click: fall through below.
 					}
@@ -10342,12 +9517,12 @@
 			const liveBefore = window.getSelection();
 			const rescueRange =
 				!liveBefore || liveBefore.isCollapsed || liveBefore.toString() === ""
-					? selMenu?.range
+					? annotateMode.selMenu?.range
 					: null;
 			if (
 				rescueRange &&
-				lastPressAt <= selMenuOpenedAt &&
-				lastProgrammaticClearAt <= selMenuOpenedAt
+				lastPressAt <= annotateMode.selMenuOpenedAt &&
+				annotateMode.lastProgrammaticClearAt <= annotateMode.selMenuOpenedAt
 			) {
 				const liveRescue = window.getSelection();
 				try {
@@ -10378,10 +9553,10 @@
 					// capture collapse that drops the native toolbar)
 					// strands no range to restore, but the stored quote
 					// still stands: keep the menu. Every other
-					// clearSelection() caller nulls the menu in the same
+					// annotateMode.clearSelection() caller nulls the menu in the same
 					// tick, so this only ever fires for the capture.
-					if (lastProgrammaticClearAt > selMenuOpenedAt) return;
-					if (!selMenuHover) selMenu = null;
+					if (annotateMode.lastProgrammaticClearAt > annotateMode.selMenuOpenedAt) return;
+					if (!annotateMode.selMenuHover) annotateMode.selMenu = null;
 					return;
 				}
 				// A body swap under the highlight (stream chunk, aid
@@ -10403,32 +9578,32 @@
 				// quote and Annotate keeps working. The message must
 				// still be there: a Delete/cut with the pointer parked
 				// over the menu really does clear, and must dismiss.
-				const menuMessageId = selMenu?.messageId;
+				const menuMessageId = annotateMode.selMenu?.messageId;
 				if (
-					selMenuHover &&
+					annotateMode.selMenuHover &&
 					menuMessageId !== undefined &&
 					chat.messages.some((m) => m.id === menuMessageId)
 				)
 					return;
-				selMenu = null;
+				annotateMode.selMenu = null;
 			}
 			// Live reselects refresh the stored quote in place
 			// (replacement, never mutation, so the dock re-renders):
 			// extending past one character hides Inspect, shrinking
 			// back restores it. Rescue paths returned above, so a live
 			// selection here is new work.
-			if (live && !live.isCollapsed && live.toString() !== "" && selMenu) {
-				const refreshed = currentQuote();
-				if (refreshed && refreshed.quote !== selMenu.quote) {
-					selMenu = {
-						...selMenu,
+			if (live && !live.isCollapsed && live.toString() !== "" && annotateMode.selMenu) {
+				const refreshed = annotateMode.currentQuote();
+				if (refreshed && refreshed.quote !== annotateMode.selMenu.quote) {
+					annotateMode.selMenu = {
+						...annotateMode.selMenu,
 						quote: refreshed.quote,
 						context: refreshed.context,
 						messageId: refreshed.messageId,
 						range:
 							live.rangeCount > 0
 								? live.getRangeAt(0).cloneRange()
-								: selMenu.range
+								: annotateMode.selMenu.range
 					};
 				}
 			}
@@ -10982,9 +10157,9 @@
 				// A card's open option rows are the same class of inline
 				// expansion: Esc folds them (the panel keeps its ✕).
 				newsMode.dismissPicker();
-			} else if (answerPop) {
+			} else if (annotateMode.answerPop) {
 				// The answer card has no close button: Esc fades it.
-				closeAnswerPop();
+				annotateMode.closeAnswerPop();
 			} else if (editingMsgId) {
 				// An in-progress message edit cancels from anywhere,
 				// including inside the prompt (capture phase pre-empts
@@ -10996,7 +10171,7 @@
 				// (it has its own toggle); modals, search, and
 				// message edits keep their earlier branches above.
 				editor?.blur();
-				selMenu = null;
+				annotateMode.selMenu = null;
 				dismissSelPanels();
 				openLangMenu = null;
 			} else {
@@ -11007,7 +10182,7 @@
 				// (bubble phase), which this capture branch pre-empts —
 				// so close it here, or Esc strands an open box.
 				cancelAnnPop();
-				selMenu = null;
+				annotateMode.selMenu = null;
 				dismissSelPanels();
 				inspectChar = null;
 				openLangMenu = null;
@@ -11027,7 +10202,7 @@
 					!liveEsc.isCollapsed &&
 					escAnchor?.closest(".messages .rendered, .news-card-title")
 				) {
-					clearSelection();
+					annotateMode.clearSelection();
 				}
 				// Scroll mode entered from a deactivated prompt steps
 				// back out on Esc (prompt-entry Esc keeps scroll mode).
@@ -11323,7 +10498,7 @@
 				inEditor: inEditor !== null,
 				inEditable: isEditableTarget(event.target),
 				hovered: hoveredIdx >= 0,
-				hoverBadgeId
+				hoverBadgeId: annotateMode.hoverBadgeId
 			});
 			if (delScope === "chat") {
 				// ⇧⌘Delete drops the whole current chat (a blank one takes
@@ -11335,12 +10510,12 @@
 				editor?.focus();
 				return;
 			}
-			if (delScope === "badge" && hoverBadgeId !== null) {
+			if (delScope === "badge" && annotateMode.hoverBadgeId !== null) {
 				// ⌘Delete over a hovered badge drops its annotation,
 				// never the message underneath (same path as bare
 				// Delete on the badge).
 				consumeEvent(event);
-				removeAnnotation(hoverBadgeId);
+				annotateMode.removeAnnotation(annotateMode.hoverBadgeId);
 				return;
 			}
 			if (delScope === "message") {
@@ -11367,7 +10542,7 @@
 				// Browser preview has tab switching on these chords;
 				// only the shell owns them.
 				inShell: tauriBackendAvailable(),
-				hoverBadgeId
+				hoverBadgeId: annotateMode.hoverBadgeId
 			});
 			if (chrome === "toggle-sidebar") {
 				// ⇧⌘[ and ⌘B: physical key codes for the shifted
@@ -11468,12 +10643,12 @@
 					return;
 				}
 			}
-			if (chrome === "delete-badge" && hoverBadgeId !== null) {
+			if (chrome === "delete-badge" && annotateMode.hoverBadgeId !== null) {
 				// Shell Cmd+D over a hovered badge drops its
 				// annotation, never the message underneath (same
 				// path as bare Delete on the badge).
 				event.preventDefault();
-				removeAnnotation(hoverBadgeId);
+				annotateMode.removeAnnotation(annotateMode.hoverBadgeId);
 				return;
 			}
 			if (chrome === "delete-message") {
@@ -11536,7 +10711,7 @@
 				})(),
 				hoverWord: hoverHit?.word ?? null,
 				hoverHot: hoverHit !== null,
-				hoverBadgeId,
+				hoverBadgeId: annotateMode.hoverBadgeId,
 				hoveredIdx,
 				escDownAt
 			};
@@ -11545,14 +10720,14 @@
 			// E below; typing in any field keeps the key).
 			const cardEdit = answerCardKeyAction({
 				...keyFacts(event),
-				cardOpen: answerPop !== null && !answerClosing,
+				cardOpen: annotateMode.answerPop !== null && !annotateMode.answerClosing,
 				inField: isFieldTarget(event.target),
 				inEditor: inEditor !== null,
 				inEditable: isEditableTarget(event.target)
 			});
-			if (cardEdit === "edit-answer" && answerPop) {
+			if (cardEdit === "edit-answer" && annotateMode.answerPop) {
 				event.preventDefault();
-				editOrangeAnnotation(answerPop.id);
+				editOrangeAnnotation(annotateMode.answerPop.id);
 				return;
 			}
 			const msgAction = messageKeyAction(msgFacts);
@@ -11564,9 +10739,9 @@
 				// quote into annotate, then the state clears in the
 				// same tick (Svelte batches — no flash).
 				event.preventDefault();
-				placeSelMenu();
-				annotate("", true);
-				selMenu = null;
+				annotateMode.placeSelMenu();
+				annotateMode.annotate("", true);
+				annotateMode.selMenu = null;
 				return;
 			}
 			if (msgAction === "annotate-hovered-instant") {
@@ -11585,9 +10760,9 @@
 							hoverHit.node,
 							hoverHit.end
 						);
-					placeSelMenu();
-					annotate("", true);
-					selMenu = null;
+					annotateMode.placeSelMenu();
+					annotateMode.annotate("", true);
+					annotateMode.selMenu = null;
 					return;
 				}
 			}
@@ -11597,8 +10772,8 @@
 				// itself first (same selection prelude, no "?" staged).
 				if (msgFacts.hasSelection) {
 					event.preventDefault();
-					placeSelMenu();
-					annotate("");
+					annotateMode.placeSelMenu();
+					annotateMode.annotate("");
 					return;
 				}
 				if (hoverHit) {
@@ -11611,8 +10786,8 @@
 							hoverHit.node,
 							hoverHit.end
 						);
-					placeSelMenu();
-					annotate("");
+					annotateMode.placeSelMenu();
+					annotateMode.annotate("");
 					return;
 				}
 			}
@@ -11723,13 +10898,13 @@
 				deleteMessage(chatState, hoveredIdx);
 				return;
 			}
-			if (msgAction === "delete-badge" && hoverBadgeId !== null) {
+			if (msgAction === "delete-badge" && annotateMode.hoverBadgeId !== null) {
 				// Bare Delete/Backspace on a hovered badge drops its
 				// annotation (no modifier needed — the tiny target is
 				// the authorization). Unknown ids (deleted mid-flight)
-				// no-op inside removeAnnotation.
+				// no-op inside annotateMode.removeAnnotation.
 				event.preventDefault();
-				removeAnnotation(hoverBadgeId);
+				annotateMode.removeAnnotation(annotateMode.hoverBadgeId);
 				return;
 			}
 			if (msgAction === "copy-hovered") {
@@ -12214,8 +11389,8 @@
 			// The press point anchors the desktop edit menu; phones
 			// edit in the composer and ignore it.
 			focusLog("badge-press", { id, active: describeActiveElement() });
-			openBadge(id, { x: event.clientX, y: event.clientY });
-			lastBadgePress = { id, at: Date.now(), seq: mainPressSeq };
+			annotateMode.openBadge(id, { x: event.clientX, y: event.clientY });
+			annotateMode.lastBadgePress = { id, at: Date.now(), seq: mainPressSeq };
 		};
 		/**
 		 * Click-off closes the annotations review (desktop): a press
@@ -12280,7 +11455,7 @@
 				}
 			}
 			const live = window.getSelection();
-			if (live) lockSelectionToMessage(live, articleOf);
+			if (live) lockSelectionToMessage(live, (n) => annotateMode.articleOf(n));
 			// Word picks at a line's end grab the trailing newline,
 			// painting the line beneath (same terminator as triple-click
 			// paragraph picks, which trims in onSelectEnd instead).
@@ -12294,7 +11469,7 @@
 			// Word-select plus the menu only: a double-tap must never
 			// scroll — dragging the view down to the action row
 			// disoriented phone readers (the row stays where it is).
-			placeSelMenu(event.clientX, event.clientY);
+			annotateMode.placeSelMenu(event.clientX, event.clientY);
 		};
 		// No triple-click handler: native paragraph selection finalizes
 		// on the third mouseup, where onSelectEnd already locks it to the
@@ -12492,7 +11667,7 @@
 			const anchorNode = live.anchorNode;
 			const focusNode = live.focusNode;
 			if (!anchorNode || !focusNode) return;
-			const anchorArticle = articleOf(anchorNode);
+			const anchorArticle = annotateMode.articleOf(anchorNode);
 			if (anchorArticle && anchorArticle === dragAnchorArticle) {
 				lastGoodDragRange = {
 					an: anchorNode,
@@ -12507,7 +11682,7 @@
 			if (!movedSinceDown() || !lastGoodDragRange) return false;
 			// Dragging home to the anchor point cancels: only resurrect
 			// collapses stranded outside the anchor article.
-			if (articleOf(live.anchorNode) === dragAnchorArticle) return false;
+			if (annotateMode.articleOf(live.anchorNode) === dragAnchorArticle) return false;
 			// Collapses inside the prompt or a control are that
 			// gesture's business (editor selections), never the
 			// message drag's.
@@ -12543,7 +11718,7 @@
 			offChatDragArmed =
 				event.button === 0 && !target?.closest(".messages .rendered");
 			lastGoodDragRange = null;
-			containDragTo(selectingInMessage ? articleOf(target) : null);
+			containDragTo(selectingInMessage ? annotateMode.articleOf(target) : null);
 		};
 		const trimMessageDrag = (): void => {
 			if (selectingInMessage) {
@@ -12551,7 +11726,7 @@
 				if (live) {
 					restoreDragSelection(live);
 					trackDragSelection(live);
-					lockSelectionToMessage(live, articleOf);
+					lockSelectionToMessage(live, (n) => annotateMode.articleOf(n));
 				}
 				return;
 			}
@@ -12560,7 +11735,7 @@
 			// or cleared selection dismisses them (mid-drag leaves them
 			// until release, like the menu's own paths).
 			if (selPinyin || selFurigana) {
-				const now = currentQuote();
+				const now = annotateMode.currentQuote();
 				const anchor = selPinyin ?? selFurigana?.[0];
 				if (!anchor) dismissSelPanels();
 				// A pinned highlight (create/answer) collapses under
@@ -12638,7 +11813,7 @@
 				if (anchorEl?.closest("input, textarea")) return;
 				if (
 					anchorEl?.closest(".messages .rendered") &&
-					articleOf(anchorNode) === articleOf(focusNode)
+					annotateMode.articleOf(anchorNode) === annotateMode.articleOf(focusNode)
 				)
 					return;
 				// Only the upward side clamps: an anchor below the
@@ -12661,10 +11836,10 @@
 					// highlight below them untouched.
 					if (
 						anchorEl?.closest(".messages .rendered") &&
-						articleOf(anchorNode) !== articleOf(focusNode) &&
+						annotateMode.articleOf(anchorNode) !== annotateMode.articleOf(focusNode) &&
 						focusNode instanceof Text
 					) {
-						containDragTo(articleOf(focusNode));
+						containDragTo(annotateMode.articleOf(focusNode));
 						const text = focusNode.textContent ?? "";
 						const start = lineStartOffset(text, live.focusOffset);
 						live.setBaseAndExtent(
@@ -12680,7 +11855,7 @@
 				// First contact with message text anchors the drag: later
 				// moves into other articles clamp at this article's edge
 				// instead of flipping the anchor (see containDragTo).
-				containDragTo(articleOf(focusNode));
+				containDragTo(annotateMode.articleOf(focusNode));
 				if (anchorNode instanceof Text && anchorNode === focusNode) {
 					const text = anchorNode.textContent ?? "";
 					const fixed = clampDragAnchorToFocusLine(
@@ -12791,9 +11966,9 @@
 						if (!mouseupKeepsSelection(event.target, document.activeElement)) {
 							window.getSelection()?.removeAllRanges();
 						}
-						selMenu = null;
+						annotateMode.selMenu = null;
 					} else if ((window.getSelection()?.toString() ?? "") === "") {
-						selMenu = null;
+						annotateMode.selMenu = null;
 					}
 				}
 				return;
@@ -12841,7 +12016,7 @@
 				// pick before mouseup, which would misread as "nothing
 				// changed" — onSelectEnd's paragraph override owns them.
 				if (liveText !== "") live?.removeAllRanges();
-				selMenu = null;
+				annotateMode.selMenu = null;
 				return;
 			}
 			if (
@@ -12851,7 +12026,7 @@
 				liveText === downSel
 			) {
 				live?.removeAllRanges();
-				selMenu = null;
+				annotateMode.selMenu = null;
 				return;
 			}
 			onSelectEnd(event, event.clientX);
@@ -13151,8 +12326,8 @@
 			// once the quote is stored.
 			if (androidUI && target?.closest(".messages .rendered, .news-card-title")) {
 				event.preventDefault();
-				if (currentQuote()) {
-					placeSelMenu(event.clientX, event.clientY);
+				if (annotateMode.currentQuote()) {
+					annotateMode.placeSelMenu(event.clientX, event.clientY);
 					touchMenuAt = Date.now();
 				}
 				return;
@@ -13196,7 +12371,7 @@
 			// a headline pick, which reads like a message quote (a
 			// bare card press falls through to the card menu below).
 			if (target?.closest("button, input, textarea, a, summary")) {
-				const pick = currentQuote();
+				const pick = annotateMode.currentQuote();
 				if (!pick?.story) return;
 			}
 			// Highlighted text wins — but only when the click lands
@@ -13212,7 +12387,7 @@
 			// 咲き誇り map back) — speech always runs; the panel is
 			// a silent extra. Like Inspect, a lone Han char reads
 			// its locale from the surrounding sentence.
-			const quoted = currentQuote();
+			const quoted = annotateMode.currentQuote();
 			// A press that grew the highlight (a right-button
 			// micro-drag extends the old range instead of replacing
 			// it) is a fresh point pick, not a click inside a
@@ -13262,7 +12437,7 @@
 					// would below — a second right-click reads like the
 					// first, panel included. Speech already ran above;
 					// readingsForQuote only places the panel.
-					const fresh = currentQuote();
+					const fresh = annotateMode.currentQuote();
 					if (fresh?.messageId)
 						void readingsForQuote({ ...fresh, messageId: fresh.messageId });
 					return;
@@ -13538,7 +12713,7 @@
 				// keyboard, badge taps dismiss it). Android only —
 				// desktop re-places its own way.
 				if (androidUI) {
-					const openAnswer = answerPop;
+					const openAnswer = annotateMode.answerPop;
 					const openEdit = annPop;
 					if (openAnswer) refitAndroidCard("answer", openAnswer.id);
 					if (openEdit) refitAndroidCard("edit", openEdit.id);
@@ -13731,14 +12906,14 @@
 		const trackSelMenu = (): void => {
 			// Readings panels ride the same scroll/resize beats.
 			trackReadingsPanels();
-			if (!selMenu?.range) return;
+			if (!annotateMode.selMenu?.range) return;
 			try {
-				const { range } = selMenu;
+				const { range } = annotateMode.selMenu;
 				if (
 					!document.contains(range.startContainer) ||
 					!document.contains(range.endContainer)
 				) {
-					selMenu = null;
+					annotateMode.selMenu = null;
 					return;
 				}
 				const rect = range.getBoundingClientRect();
@@ -13754,21 +12929,21 @@
 					androidUI,
 					iosUI,
 					menuWidth: selMenuWidthEstimate(
-						selMenu.quote,
+						annotateMode.selMenu.quote,
 						androidUI,
 						settings.inspectEnabled
 					),
 					fontScale: settings.fontScale
 				});
 				if (
-					selMenu.x !== x ||
-					selMenu.y !== y ||
-					selMenu.left !== rect.left ||
-					selMenu.w !== rect.width
+					annotateMode.selMenu.x !== x ||
+					annotateMode.selMenu.y !== y ||
+					annotateMode.selMenu.left !== rect.left ||
+					annotateMode.selMenu.w !== rect.width
 				)
-					selMenu = { ...selMenu, x, y, left: rect.left, w: rect.width };
+					annotateMode.selMenu = { ...annotateMode.selMenu, x, y, left: rect.left, w: rect.width };
 			} catch {
-				selMenu = null;
+				annotateMode.selMenu = null;
 			}
 		};
 		window.addEventListener("scroll", trackSelMenu, true);
@@ -14056,9 +13231,9 @@
 				// pill does: moving off the badge must not clear
 				// it while the card reads. The fade releases it
 				// (closing reads null, like the pill).
-				pillWashId(answerPop, answerClosing) ??
+				pillWashId(annotateMode.answerPop, annotateMode.answerClosing) ??
 				promptAnnWashId() ??
-				hoverBadgeId}
+				annotateMode.hoverBadgeId}
 			sending={isSending(chatState, viewChat.id)}
 			sendingChatId={chatState.sendingChatId}
 			sendingPhase={replyPhase({
@@ -14120,8 +13295,9 @@
 				startRefsEdit,
 				saveRefsEdit,
 				cancelRefsEdit,
-				setHoverBadge: (id: string | null) => (hoverBadgeId = id),
-				badgeClick: openBadgeClick,
+				setHoverBadge: (id: string | null) => (annotateMode.hoverBadgeId = id),
+				badgeClick: (id: AnnotationId, anchor: { x: number; y: number }) =>
+					annotateMode.openBadgeClick(id, anchor),
 				attachAction: sentTagAction,
 				toast: flashToast,
 				togglePasteFold,
@@ -14210,8 +13386,8 @@
 			hasText={hasText}
 			android={androidUI}
 			ios={iosUI}
-			hasSelMenu={selMenu !== null}
-			inspectQuote={selMenu?.quote ?? ""}
+			hasSelMenu={annotateMode.selMenu !== null}
+			inspectQuote={annotateMode.selMenu?.quote ?? ""}
 			inspectEnabled={settings.inspectEnabled}
 			annotations={annotations}
 			reviewOpen={reviewOpen}
@@ -14261,16 +13437,16 @@
 				// Wrapped: Svelte hands the click event to a bare
 				// reference, and the event would file as the note
 				// ("[object PointerEvent]" in the composer).
-				annotate: () => annotate(),
+				annotate: () => annotateMode.annotate(),
 				speak: () => void speakSelection(),
 				inspect: openInspect,
 				review: {
 					toggle: () => (reviewOpen = !reviewOpen),
 					clearAll: clearAllAnnotations,
-					quote: reviewQuoteClick,
+					quote: (ann: Annotation) => annotateMode.reviewQuoteClick(ann),
 					copy: copyAnnotation,
-					remove: removeAnnotation,
-					unpin: unpinAnnotation,
+					remove: (id: AnnotationId) => annotateMode.removeAnnotation(id),
+					unpin: (id: AnnotationId) => annotateMode.unpinAnnotation(id),
 					editOrange: editOrangeAnnotation
 				}
 			}}
@@ -14295,12 +13471,12 @@
 		tap to dismiss); the banner below stays paged. -->
 		</main>
 
-	{#if selMenu && !previewing && !iosUI}
-		<!-- Floating Annotate/Copy/Inspect menu: the page owns the
-		state, placement, drag, and idle-dismiss; SelMenu owns the
-		buttons and surfaces. -->
+	{#if annotateMode.selMenu && !previewing && !iosUI}
+		<!-- Floating Annotate/Copy/Inspect menu: annotate-mode owns the
+		state and verbs, the page keeps placement, drag, and
+		idle-dismiss; SelMenu owns the buttons and surfaces. -->
 		<SelMenu
-			menu={selMenu}
+			menu={annotateMode.selMenu}
 			dragging={selMenuDragging}
 			android={androidUI}
 			inspectEnabled={settings.inspectEnabled}
@@ -14310,12 +13486,12 @@
 				dragStart: menuDragStart,
 				dragMove: menuDragMove,
 				dragEnd: menuDragEnd,
-				enter: enterSelMenu,
-				leave: () => (selMenuHover = false),
+				enter: () => annotateMode.enterSelMenu(),
+				leave: () => (annotateMode.selMenuHover = false),
 				// Wrapped: Svelte hands the click event to a bare
 				// reference, and the event would become the draft and
 				// crash the pill's trim on render.
-				annotate: () => annotate(),
+				annotate: () => annotateMode.annotate(),
 				annotateInstant: () => {
 					// Right-click Annotate: the "a" key path — file
 					// and send at once, never the create box, never
@@ -14325,9 +13501,9 @@
 					// dead highlight still files nothing, as before —
 					// the button's own press collapses it, so the
 					// stored quote stays the primary source.
-					if (!selMenu?.quote.trim()) placeSelMenu();
-					annotate("", true);
-					selMenu = null;
+					if (!annotateMode.selMenu?.quote.trim()) annotateMode.placeSelMenu();
+					annotateMode.annotate("", true);
+					annotateMode.selMenu = null;
 				},
 				annotateTouch,
 				copy: () => void copySelection(),
@@ -14365,7 +13541,7 @@
 				// guard on every button save (only Enter sets it).
 				save: () => saveAnnPop(),
 				remove: (id: string) => {
-					removeAnnotation(id);
+					annotateMode.removeAnnotation(id);
 					editor?.focus();
 				},
 				mic: () => void togglePillMic()
@@ -14373,19 +13549,19 @@
 		/>
 	{/if}
 
-	{#if answerPop}
-		<!-- Answer popup through AnnAnswer: the page keeps open state,
-		below-word quote placement, and fade-out; the component owns
+	{#if annotateMode.answerPop}
+		<!-- Answer popup through AnnAnswer: annotate-mode owns open
+		state and fade-out, the page keeps scroll tracking; the component owns
 		the card and its surface only — the reply takes the whole
 		card (rewording is E, approval is the badge plus/minus).
 		Self-heals when its annotation is deleted or sent while open.
 		No close button: click-off and Esc close it. -->
-		{@const pop = answerPop}
+		{@const pop = annotateMode.answerPop}
 		{@const answered = annotations.find((a) => a.id === pop.id)}
 		{#if answered?.answer}
 			<AnnAnswer
 				answer={answered.answer}
-				closing={answerClosing}
+				closing={annotateMode.answerClosing}
 				x={pop.x}
 				y={pop.y}
 				width={pop.w}

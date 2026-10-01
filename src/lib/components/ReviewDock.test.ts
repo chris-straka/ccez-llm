@@ -26,6 +26,14 @@ function pageSource(): string {
 	);
 }
 
+/** Quote jumps moved to annotate-mode.svelte.ts (STAGE 1). */
+function annotateModeSource(): string {
+	return readFileSync(
+		new URL("../annotate-mode.svelte.ts", import.meta.url),
+		"utf8"
+	);
+}
+
 function dockStyle(): string {
 	const match = dockSource().match(/<style>([\s\S]*)<\/style>/);
 	if (!match) throw new Error("ReviewDock.svelte has no <style> block");
@@ -49,9 +57,10 @@ describe("review dock extraction", () => {
 		expect(pageSource()).toContain("<Composer");
 		expect(pageSource()).not.toContain('class="ann-wrap"');
 		expect(pageSource()).not.toContain('class="review-item"');
-		// The page keeps the array, ids, and behaviors.
+		// The page keeps the array and ids; quote jumps live in
+		// the annotate module with the rest of the orchestration.
 		expect(pageSource()).toContain("let annotations = $state");
-		expect(pageSource()).toContain("function reviewQuoteClick");
+		expect(annotateModeSource()).toContain("reviewQuoteClick(ann: {");
 	});
 
 	it("keeps the dock surfaces scoped to the component", () => {

@@ -73,6 +73,14 @@ function sentRefsSource(): string {
 	);
 }
 
+/** Annotation orchestration moved to annotate-mode.svelte.ts (STAGE 1). */
+function annotateModeSource(): string {
+	return readFileSync(
+		new URL("../lib/annotate-mode.svelte.ts", import.meta.url),
+		"utf8"
+	);
+}
+
 describe("annotation badge font-size tracking", () => {
 	it("scales numbered badges with the message font size", () => {
 		// Dampened tracking (never compounding rem): the badge rule must
@@ -196,9 +204,9 @@ describe("annotation create wiring", () => {
 	});
 
 	it("quotes headline picks against their story, not a message", () => {
-		const source = pageSource();
-		expect(source).toContain("function headlineQuote(");
-		expect(source).toContain("function storyOfHeadline(");
+		const source = annotateModeSource();
+		expect(source).toContain("headlineQuote(selection: Selection)");
+		expect(source).toContain("storyOfHeadline(headline: Element)");
 		expect(source).toContain("data-story-link");
 	});
 
@@ -213,11 +221,11 @@ describe("annotation create wiring", () => {
 	it("reads the annotated text when a waiting badge opens", () => {
 		// Blue badges speak like answered ones (quote with its
 		// paragraph context), so the listen moment survives the wait.
-		const source = pageSource();
+		const source = annotateModeSource();
 		const dockPath = source.slice(source.indexOf("No answer yet: open the review dock"));
-		expect(dockPath).toContain("void speakQuote(");
+		expect(dockPath).toContain("this.deps.speak(");
 		expect(dockPath).toContain(
-			"answerContextFor(current, current.quote, current.at ?? 0)"
+			"this.answerContextFor(current, current.quote, current.at ?? 0)"
 		);
 	});
 
@@ -233,7 +241,7 @@ describe("annotation create wiring", () => {
 	it("centers narrow create boxes, keeps cursor placement for wide ones", () => {
 		// The geometry lives in annPop.placeAnnComposer (unit-tested);
 		// the seal follows the summon wiring.
-		const source = pageSource();
+		const source = annotateModeSource();
 		expect(source).toContain("placeAnnComposer({");
 	});
 
@@ -243,7 +251,7 @@ describe("annotation create wiring", () => {
 		// sees it.
 		const source = pageSource();
 		expect(source).toContain(
-			'if (delScope === "badge" && hoverBadgeId !== null) {'
+			'if (delScope === "badge" && annotateMode.hoverBadgeId !== null) {'
 		);
 	});
 

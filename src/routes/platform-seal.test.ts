@@ -56,6 +56,14 @@ function composerSource(): string {
 	);
 }
 
+/** Annotation orchestration moved to annotate-mode.svelte.ts (STAGE 1). */
+function annotateModeSource(): string {
+	return readFileSync(
+		new URL("../lib/annotate-mode.svelte.ts", import.meta.url),
+		"utf8"
+	);
+}
+
 describe("platform seal", () => {
 	it("defines androidUI as any phone, so data-android means phone", () => {
 		const source = pageSource();
@@ -75,7 +83,9 @@ describe("platform seal", () => {
 		// The phone dock gates moved with the composer (prop form);
 		// the floating menu gate stays paged.
 		expect(composerSource()).toContain("{#if android && hasSelMenu && !preview}");
-		expect(pageSource()).toContain("{#if selMenu && !previewing && !iosUI}");
+		expect(pageSource()).toContain(
+			"{#if annotateMode.selMenu && !previewing && !iosUI}"
+		);
 		// The floating menu's platform branches render from
 		// `SelMenu.svelte` now; the seal follows the markers.
 		const menu = selMenuSource();
@@ -179,8 +189,10 @@ describe("desktop seal", () => {
 	});
 
 	it("keeps the badge click delegating to the toggle (desktop re-press closes)", () => {
-		const source = pageSource();
-		expect(source).toContain("function openBadgeClick(");
-		expect(source).toContain("openBadge(id, anchor);");
+		const source = annotateModeSource();
+		expect(source).toContain(
+			"openBadgeClick(id: AnnotationId, anchor: { x: number; y: number }): void {"
+		);
+		expect(source).toContain("this.openBadge(id, anchor);");
 	});
 });

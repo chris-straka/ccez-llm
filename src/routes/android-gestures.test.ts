@@ -11,6 +11,14 @@ function pageSource(): string {
 	return readFileSync(new URL("./+page.svelte", import.meta.url), "utf8");
 }
 
+/** Badge open moved to annotate-mode.svelte.ts (STAGE 1). */
+function annotateModeSource(): string {
+	return readFileSync(
+		new URL("../lib/annotate-mode.svelte.ts", import.meta.url),
+		"utf8"
+	);
+}
+
 describe("android gesture wiring", () => {
 	it("never scrolls to the action row on double-tap", () => {
 		// The menu owns the whole gesture; dragging the view down
@@ -36,8 +44,8 @@ describe("android gesture wiring", () => {
 		// The answer is still on the wire: no card opens, and the
 		// review dock must not open either (it used to strand the
 		// tap there).
-		expect(pageSource()).toMatch(
-			/if \(androidUI && !iosUI && current && !current\.answer\) \{\s+flashToast\("Loading"\);\s+return;\s+\}/
+		expect(annotateModeSource()).toMatch(
+			/if \(this\.deps\.isPhone\(\) && !this\.deps\.isIOS\(\) && current && !current\.answer\) \{\s+this\.deps\.toast\("Loading"\);\s+return;\s+\}/
 		);
 	});
 
@@ -52,7 +60,7 @@ describe("android gesture wiring", () => {
 			)?.length
 		).toBe(2);
 		expect(source).toMatch(
-			/badgeHoldTimer = setTimeout\(\(\) => \{[\s\S]*?removeAnnotation\(id\);[\s\S]*?\}, 2000\);/
+			/badgeHoldTimer = setTimeout\(\(\) => \{[\s\S]*?annotateMode\.removeAnnotation\(id\);[\s\S]*?\}, 2000\);/
 		);
 		// The trailing compatibility press can't reopen the gone badge.
 		expect(source).toContain("badgeHoldFired !== null");

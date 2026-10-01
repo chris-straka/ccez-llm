@@ -58,7 +58,7 @@ describe("headline annotate wiring", () => {
 
 	it("locks cross-card drags to the anchor title like messages", () => {
 		const source = pageSource();
-		expect(source).toContain("lockSelectionToMessage(live, (n) => articleOf(n) ?? headlineOf(n))");
+		expect(source).toContain("lockSelectionToMessage(live, (n) => annotateMode.articleOf(n) ?? annotateMode.headlineOf(n))");
 	});
 
 	it("hands headline marks and badge actions to the cards", () => {
@@ -69,7 +69,7 @@ describe("headline annotate wiring", () => {
 		expect(mode).toContain("badge: (id: AnnotationId, x: number, y: number) => {");
 		expect(mode).toContain("this.deps.onBadge(id, x, y);");
 		expect(mode).toContain("badgeHover: (id: string | null) => {");
-		expect(source).toContain("openBadgeClick(id, { x, y })");
+		expect(source).toContain("annotateMode.openBadgeClick(id, { x, y })");
 		expect(source).toContain("onBadgeHover: (id) => {");
 	});
 });

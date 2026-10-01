@@ -20,6 +20,14 @@ function pageSource(): string {
 	return readFileSync(new URL("./+page.svelte", import.meta.url), "utf8");
 }
 
+/** Badge open moved to annotate-mode.svelte.ts (STAGE 1). */
+function annotateModeSource(): string {
+	return readFileSync(
+		new URL("../lib/annotate-mode.svelte.ts", import.meta.url),
+		"utf8"
+	);
+}
+
 /** Article row moved to MessageArticle.svelte with its styles. */
 function articleSource(): string {
 	return readFileSync(
@@ -60,8 +68,11 @@ describe("phone marker taps survive tap-out", () => {
 		const source = pageSource();
 		expect(source).not.toContain("editAnnotationInPrompt({ id }");
 		expect(source).not.toContain("stagedAnnId");
-		expect(source).toContain("function openBadge(");
-		expect(source).toContain("reviewOpen = true;");
+		const mode = annotateModeSource();
+		expect(mode).toContain(
+			"openBadge(id: AnnotationId, anchor?: { x: number; y: number }): void {"
+		);
+		expect(mode).toContain("this.deps.setReviewOpen(true);");
 	});
 });
 
@@ -70,7 +81,9 @@ describe("phone creates wash their quote", () => {
 		// The wash feeds the row through the article now: the page
 		// computes it per message, the article forwards it. Filed
 		// notes never wash (no transplant, no dock edit).
-		expect(pageSource()).toMatch(/promptAnnWashId\(\) \?\?\s+hoverBadgeId/);
+		expect(pageSource()).toMatch(
+			/promptAnnWashId\(\) \?\?\s+annotateMode\.hoverBadgeId/
+		);
 		expect(articleSource()).toContain("washId={washId ?? null}");
 	});
 	it("washes the pending filing", () => {
