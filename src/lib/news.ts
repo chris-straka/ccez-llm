@@ -380,6 +380,36 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			icon: "🇪🇺",
 			merge: [{ url: "https://it.euronews.com/rss", source: "Euronews" }]
 		}
+	},
+	zh: {
+		US: {
+			gl: "US",
+			label: "U.S.",
+			icon: "🇺🇸",
+			merge: [{ url: "https://www.rfi.fr/cn/%E7%BE%8E%E6%B4%B2/rss", source: "RFI" }]
+		},
+		GBL: {
+			gl: "GBL",
+			label: "Global",
+			icon: "🌐",
+			merge: [{ url: "https://www.rfi.fr/cn/rss", source: "RFI" }]
+		}
+	},
+	ja: {
+		GBL: {
+			gl: "GBL",
+			label: "Global",
+			icon: "🌐",
+			merge: [{ url: "https://www3.nhk.or.jp/rss/news/cat6.xml", source: "NHK" }]
+		}
+	},
+	ko: {
+		GBL: {
+			gl: "GBL",
+			label: "Global",
+			icon: "🌐",
+			merge: [{ url: "https://www.yna.co.kr/rss/international.xml", source: "Yonhap" }]
+		}
 	}
 };
 

@@ -415,6 +415,26 @@ describe("news feeds", () => {
 				source: "tagesschau"
 			}
 		]);
+		const zhUs = newsRegionsFor("zh")!.find((r) => r.gl === "US")!;
+		expect(zhUs.translate).toBeUndefined();
+		expect(zhUs.merge).toMatchObject([
+			{ url: "https://www.rfi.fr/cn/%E7%BE%8E%E6%B4%B2/rss", source: "RFI" }
+		]);
+		const zhGbl = newsRegionsFor("zh")!.find((r) => r.gl === "GBL")!;
+		expect(zhGbl.translate).toBeUndefined();
+		expect(zhGbl.merge).toMatchObject([
+			{ url: "https://www.rfi.fr/cn/rss", source: "RFI" }
+		]);
+		const jaGbl = newsRegionsFor("ja")!.find((r) => r.gl === "GBL")!;
+		expect(jaGbl.translate).toBeUndefined();
+		expect(jaGbl.merge).toMatchObject([
+			{ url: "https://www3.nhk.or.jp/rss/news/cat6.xml", source: "NHK" }
+		]);
+		const koGbl = newsRegionsFor("ko")!.find((r) => r.gl === "GBL")!;
+		expect(koGbl.translate).toBeUndefined();
+		expect(koGbl.merge).toMatchObject([
+			{ url: "https://www.yna.co.kr/rss/international.xml", source: "Yonhap" }
+		]);
 		// Overrides keep chip position, label, and icon.
 		expect(newsRegionsFor("fr")!.slice(-7).map((r) => r.gl)).toEqual([
 			"GBL",
@@ -432,7 +452,7 @@ describe("news feeds", () => {
 			hl: "en-US",
 			translate: true
 		});
-		expect(newsRegionsFor("ja")!.find((r) => r.gl === "GBL")?.merge).toMatchObject([
+		expect(newsRegionsFor("ru")!.find((r) => r.gl === "GBL")?.merge).toMatchObject([
 			{ url: "https://feeds.bbci.co.uk/news/world/rss.xml", source: "BBC" },
 			{ url: "https://www.aljazeera.com/xml/rss/all.xml", source: "Al Jazeera" }
 		]);
@@ -464,7 +484,7 @@ describe("news feeds", () => {
 		const seen: string[] = [];
 		const xml = (title: string) =>
 			`<?xml version="1.0"?><rss><channel><item><title>${title}</title><link>https://desk/${title}</link></item></channel></rss>`;
-		const stories = await loadNewsStories("ja", "GBL", async (url) => {
+		const stories = await loadNewsStories("ru", "GBL", async (url) => {
 			seen.push(url);
 			if (url.includes("bbci")) return xml("Bbc");
 			if (url.includes("aljazeera")) return xml("Aj");
@@ -482,14 +502,14 @@ describe("news feeds", () => {
 	it("degrades a merge when one desk dies", async () => {
 		const xml = (title: string) =>
 			`<?xml version="1.0"?><rss><channel><item><title>${title}</title><link>https://desk/${title}</link></item></channel></rss>`;
-		const stories = await loadNewsStories("ja", "GBL", async (url) => {
+		const stories = await loadNewsStories("ru", "GBL", async (url) => {
 			if (url.includes("aljazeera")) throw new Error("bad-status:403");
 			return xml("Bbc");
 		});
 		expect(stories.map((s) => s.title)).toEqual(["Bbc"]);
 		expect(stories.map((s) => s.source)).toEqual(["BBC"]);
 		// Both desks dead: no cards, not an error.
-		const empty = await loadNewsStories("ja", "GBL", async () => {
+		const empty = await loadNewsStories("ru", "GBL", async () => {
 			throw new Error("timeout");
 		});
 		expect(empty).toEqual([]);
