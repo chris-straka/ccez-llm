@@ -79,6 +79,16 @@ export async function nativeSaveMarkdown(
 	text: string,
 	deps: NativeSaveDeps = {}
 ): Promise<"saved" | "dismissed" | null> {
+	return nativeSaveText(filename, text, { name: "Markdown", extensions: ["md"] }, deps);
+}
+
+/** Same contract as nativeSaveMarkdown, any one file type. */
+export async function nativeSaveText(
+	filename: string,
+	text: string,
+	filter: { name: string; extensions: string[] },
+	deps: NativeSaveDeps = {}
+): Promise<"saved" | "dismissed" | null> {
 	if (!(deps.shell ?? tauriBackendAvailable())) return null;
 	// Explicit null injects absence (tests); undefined lazy-loads.
 	const dialog = deps.dialog !== undefined ? deps.dialog : await nativeDialog();
@@ -86,7 +96,7 @@ export async function nativeSaveMarkdown(
 	if (!dialog || !fs) return null;
 	const path = await dialog.save({
 		defaultPath: filename,
-		filters: [{ name: "Markdown", extensions: ["md"] }]
+		filters: [filter]
 	});
 	if (!path) return "dismissed";
 	await fs.writeTextFile(path, text);

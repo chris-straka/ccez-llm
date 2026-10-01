@@ -81,8 +81,9 @@ const WEB_HIDDEN_ROWS = new Set([
 	// No backend answers in the preview: the chord fires, then toasts.
 	"Capture window text",
 	"Set capture area",
-	// Shell-only chord: the browser claims ⌘E out there.
-	"Edit newest message"
+	// Shell-only chords: the browser claims ⌘E and ⇧⌘R out there.
+	"Edit newest message",
+	"Flashcards"
 ]);
 
 export function desktopShortcuts(isMac: boolean, inShell = true): ShortcutRow[] {
@@ -123,6 +124,10 @@ export function desktopShortcuts(isMac: boolean, inShell = true): ShortcutRow[] 
 			keys: `${meta}F`
 		},
 		{ name: "Fullscreen", keys: `${isMac ? "Ctrl+⌘F" : "Ctrl+Meta+F"}` },
+		{
+			name: "Flashcards",
+			keys: `${isMac ? "⇧⌘R" : "Ctrl+Shift+R"} · Space flips · 1 / 2 grade`
+		},
 		{
 			name: "Newer / older chat",
 			keys: `${

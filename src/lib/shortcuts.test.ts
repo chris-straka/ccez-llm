@@ -29,6 +29,7 @@ const MAC_NAMES = [
 	"Edit own message",
 	"Exit fullscreen",
 	"Find in chat",
+	"Flashcards",
 	"Fold / unfold code",
 	"Fold / unfold message",
 	"Fullscreen",
@@ -114,7 +115,8 @@ describe("shortcuts menu copy", () => {
 			"New chat",
 			"Capture window text",
 			"Set capture area",
-			"Edit newest message"
+			"Edit newest message",
+			"Flashcards"
 		];
 		for (const isMac of [true, false]) {
 			const names = desktopShortcuts(isMac, false).map((r) => r.name);

@@ -485,7 +485,24 @@
 		exportFailureToast,
 		fileSaveAccessAvailable
 	} from "$lib/chatExport";
-	import { nativeSaveMarkdown } from "$lib/nativeExport";
+	import { nativeSaveMarkdown, nativeSaveText } from "$lib/nativeExport";
+	import FlashcardDeck from "$lib/components/FlashcardDeck.svelte";
+	import {
+		ankiExport,
+		ankiFilename,
+		deckKeyAction,
+		dueCards,
+		harvestCards,
+		isFlashcardsChord,
+		loadReviewSchedule,
+		nextDueAt,
+		saveReviewSchedule,
+		startSession,
+		stepSession,
+		type DeckAction,
+		type DeckSession,
+		type ReviewCard
+	} from "$lib/flashcards";
 	import {
 		isKeyboardOpen,
 		kbFreshOpen,
@@ -2313,6 +2330,72 @@
 		setTimeout(restore, 100);
 	}
 	let shortcutsOpen = $state(false);
+	/**
+	 * Flashcards (see flashcards.ts): the open sitting (null closed),
+	 * the persisted schedule, and the cards harvested at open time.
+	 */
+	let deck = $state<DeckSession | null>(null);
+	let deckSchedule = $state(loadReviewSchedule());
+	let deckCards = $state<ReviewCard[]>([]);
+	let deckNow = $state(Date.now());
+	const flashcardsOpen = $derived(deck !== null);
+	/** Every chat's answered annotations; the active chat reads live. */
+	function harvestAllCards(): ReviewCard[] {
+		return harvestCards(chatState.chats, (id) =>
+			id === chatState.activeChatId ? annotations : loadDraftAnnotations(id)
+		);
+	}
+	/** Due count for the empty-chat entry, recounted when a chat empties. */
+	const flashcardsDue = $derived.by(() => {
+		if (activeChat(chatState).messages.length > 0) return 0;
+		return dueCards(harvestAllCards(), deckSchedule, Date.now()).length;
+	});
+	function openFlashcards(): void {
+		deckNow = Date.now();
+		deckCards = harvestAllCards();
+		deck = startSession(deckCards, deckSchedule, deckNow);
+	}
+	function closeFlashcards(): void {
+		deck = null;
+		if (!androidUI) editor?.focus();
+	}
+	function stepFlashcards(action: DeckAction): void {
+		if (!deck) return;
+		deckNow = Date.now();
+		const next = stepSession(deck, deckSchedule, action, deckNow);
+		deck = next.session;
+		if (next.schedule !== deckSchedule) {
+			deckSchedule = next.schedule;
+			saveReviewSchedule(next.schedule);
+		}
+	}
+	/** Anki file: native save in the shell, download in a browser,
+	 * clipboard on the shell phone (its webview drops downloads). */
+	async function exportFlashcards(): Promise<void> {
+		const text = ankiExport(deckCards, deckSchedule);
+		const filename = ankiFilename();
+		const shellPhone = androidUI && tauriBackendAvailable();
+		try {
+			const native = await nativeSaveText(filename, text, {
+				name: "Anki import",
+				extensions: ["txt"]
+			});
+			if (native === "dismissed") return;
+			if (native === "saved") {
+				flashToast("Flashcards saved");
+				return;
+			}
+			if (shellPhone) {
+				await copyExportText(text);
+				flashToast("Flashcards copied to clipboard");
+				return;
+			}
+			downloadMarkdownFile(text, filename);
+			flashToast("Flashcards downloaded");
+		} catch (error) {
+			if (!isPermissionDismissal(error)) flashErrorToast("Could not export flashcards");
+		}
+	}
 	/** Filter text for the shortcuts modal (⌘F focuses it while open). */
 	let shortcutQuery = $state("");
 	let shortcutInputEl: HTMLInputElement | null = $state(null);
@@ -8818,7 +8901,7 @@
 			start: { x: number; y: number; clean: boolean },
 			ended: { clientX: number; clientY: number }
 		): EdgePanel | null {
-			if (!androidUI || !start.clean || shortcutsOpen || inspectChar)
+			if (!androidUI || !start.clean || shortcutsOpen || flashcardsOpen || inspectChar)
 				return null;
 			if (window.getSelection()?.isCollapsed === false) return null;
 			return contentSwipeTarget(
@@ -9379,7 +9462,7 @@
 				} else if (multiTouchSeen) {
 					return;
 				}
-				if (!androidUI || shortcutsOpen || inspectChar || !start) return;
+				if (!androidUI || shortcutsOpen || flashcardsOpen || inspectChar || !start) return;
 				const touch = event.changedTouches[0];
 				if (!touch) return;
 				// No travel limit: dragging the selection handles across
@@ -9691,7 +9774,7 @@
 			);
 		}
 		const gestureClean = (event: TouchEvent): boolean => {
-			if (!androidUI || shortcutsOpen) return false;
+			if (!androidUI || shortcutsOpen || flashcardsOpen) return false;
 			const target = event.target;
 			return (
 				!(target instanceof Element) ||
@@ -9721,7 +9804,7 @@
 					// slide; only clean ones pair taps, and taps never
 					// pair mid-select (see the guards below).
 					const modalBusy =
-						shortcutsOpen || palette.open || inspectChar !== null;
+						shortcutsOpen || flashcardsOpen || palette.open || inspectChar !== null;
 					const clean = !modalBusy && gestureClean(event);
 					twoTrack =
 						a && b && androidUI && !modalBusy
@@ -10211,6 +10294,21 @@
 		};
 
 		const onKey = (event: KeyboardEvent) => {
+			// Flashcards own the keyboard while open: deck keys act,
+			// other bare keys stop here so the chat behind stays put.
+			if (deck) {
+				const deckKey = deckKeyAction({ ...keyFacts(event), repeat: event.repeat });
+				if (deckKey === "pass") return;
+				consumeEvent(event);
+				if (deckKey === "close") closeFlashcards();
+				else if (deckKey !== "swallow") stepFlashcards(deckKey);
+				return;
+			}
+			if (tauriBackendAvailable() && isFlashcardsChord(keyFacts(event))) {
+				consumeEvent(event);
+				openFlashcards();
+				return;
+			}
 			// Idle-prompt restore allowlist: while hidden, only bare
 			// i / Enter / Space / backslash bring the prompt back
 			// (never typed — the key is a summon, like scroll mode's
@@ -13261,6 +13359,8 @@
 			newsImages={newsMode.newsImages}
 			newsMarks={newsMarks}
 			newsActions={newsMode.actions}
+			{flashcardsDue}
+			onFlashcards={openFlashcards}
 			bind:scrollBox
 			bind:popOpen={refsPopOpen}
 			bind:refsDraft={refsEditDraft}
@@ -13614,6 +13714,24 @@
 				step: stepSwitcher,
 				newChat: doNewChat,
 				deleteActive: () => dropChat(chatState.activeChatId)
+			}}
+		/>
+	{/if}
+
+	{#if deck}
+		<FlashcardDeck
+			session={deck}
+			schedule={deckSchedule}
+			total={deckCards.filter((c) => !deckSchedule[c.key]?.dismissed).length}
+			nextDue={nextDueAt(deckCards, deckSchedule, deckNow)}
+			now={deckNow}
+			actions={{
+				flip: () => stepFlashcards("flip"),
+				again: () => stepFlashcards("again"),
+				good: () => stepFlashcards("good"),
+				dismiss: () => stepFlashcards("dismiss"),
+				exportAnki: () => void exportFlashcards(),
+				close: closeFlashcards
 			}}
 		/>
 	{/if}

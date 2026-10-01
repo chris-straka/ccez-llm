@@ -65,7 +65,8 @@ test("list runs A-Z; modal toggle sits in place", async ({ page }) => {
 		"New chat",
 		"Capture window text",
 		"Set capture area",
-		"Edit newest message"
+		"Edit newest message",
+		"Flashcards"
 	]) {
 		await expect(keys.locator("div > dt", { hasText: name })).toHaveCount(0);
 	}

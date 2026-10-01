@@ -134,4 +134,9 @@ move here verbatim. -->
 	.inspect-modal {
 		width: min(28rem, calc(100vw - 3rem));
 	}
+	/* Flashcards box: one card wide, sized like a real card. */
+	.flashcards-modal {
+		width: min(30rem, calc(100vw - 3rem));
+		padding: 1rem 1.2rem;
+	}
 </style>
