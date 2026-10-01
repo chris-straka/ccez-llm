@@ -384,6 +384,12 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 				{ url: "https://www.france24.com/es/tag/australia/rss", source: "France 24" },
 				{ url: "https://www.rfi.fr/es/tag/australia/rss", source: "RFI" }
 			]
+		},
+		CA: {
+			gl: "CA",
+			label: "Canada",
+			icon: "🇨🇦",
+			merge: [{ url: "https://www.france24.com/es/tag/canad%C3%A1/rss", source: "France 24" }]
 		}
 	},
 	ar: {
@@ -438,6 +444,22 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			merge: [
 				{ url: "https://www.rfi.fr/ru/%D1%82%D0%B5%D0%B3/%D0%B0%D0%B2%D1%81%D1%82%D1%80%D0%B0%D0%BB%D0%B8%D1%8F/rss", source: "RFI" }
 			]
+		},
+		EUR: {
+			gl: "EUR",
+			label: "Europe",
+			icon: "🇪🇺",
+			merge: [
+				{ url: "https://www.rfi.fr/ru/%D1%82%D0%B5%D0%B3/%D0%B5%D0%B2%D1%80%D0%BE%D0%BF%D0%B0/rss", source: "RFI" }
+			]
+		},
+		CA: {
+			gl: "CA",
+			label: "Canada",
+			icon: "🇨🇦",
+			merge: [
+				{ url: "https://www.rfi.fr/ru/%D1%82%D0%B5%D0%B3/%D0%BA%D0%B0%D0%BD%D0%B0%D0%B4%D0%B0/rss", source: "RFI" }
+			]
 		}
 	},
 	fa: {
@@ -471,7 +493,28 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			gl: "US",
 			label: "U.S.",
 			icon: "🇺🇸",
-			merge: [{ url: "https://www.voatiengviet.com/api/zruyyl-vomx-tpeoiut", source: "VOA" }]
+			merge: [
+				{ url: "https://www.voatiengviet.com/api/zruyyl-vomx-tpeoiut", source: "VOA" },
+				{ url: "https://www.rfi.fr/vi/t%E1%BB%AB-kh%C3%B3a/m%E1%BB%B9/rss", source: "RFI" }
+			]
+		},
+		EUR: {
+			gl: "EUR",
+			label: "Europe",
+			icon: "🇪🇺",
+			merge: [{ url: "https://www.rfi.fr/vi/t%E1%BB%AB-kh%C3%B3a/ch%C3%A2u-%C3%A2u/rss", source: "RFI" }]
+		},
+		AU: {
+			gl: "AU",
+			label: "Australia",
+			icon: "🇦🇺",
+			merge: [{ url: "https://www.rfi.fr/vi/t%E1%BB%AB-kh%C3%B3a/%C3%BAc/rss", source: "RFI" }]
+		},
+		CA: {
+			gl: "CA",
+			label: "Canada",
+			icon: "🇨🇦",
+			merge: [{ url: "https://www.rfi.fr/vi/t%E1%BB%AB-kh%C3%B3a/canada/rss", source: "RFI" }]
 		}
 	},
 	sw: {
@@ -483,6 +526,30 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 				{ url: "https://feeds.bbci.co.uk/swahili/rss.xml", source: "BBC Swahili" },
 				{ url: "https://www.rfi.fr/sw/rss", source: "RFI" }
 			]
+		},
+		US: {
+			gl: "US",
+			label: "U.S.",
+			icon: "🇺🇸",
+			merge: [{ url: "https://www.rfi.fr/sw/lebo/marekani/rss", source: "RFI" }]
+		},
+		GB: {
+			gl: "GB",
+			label: "U.K.",
+			icon: "🇬🇧",
+			merge: [{ url: "https://www.rfi.fr/sw/lebo/uingereza/rss", source: "RFI" }]
+		},
+		EUR: {
+			gl: "EUR",
+			label: "Europe",
+			icon: "🇪🇺",
+			merge: [{ url: "https://www.rfi.fr/sw/lebo/ulaya/rss", source: "RFI" }]
+		},
+		AU: {
+			gl: "AU",
+			label: "Australia",
+			icon: "🇦🇺",
+			merge: [{ url: "https://www.rfi.fr/sw/lebo/australia/rss", source: "RFI" }]
 		}
 	},
 	ur: {
@@ -664,6 +731,30 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			icon: "🇦🇺",
 			merge: [
 				{ url: "https://www.rfi.fr/cn/%E5%85%B3%E9%94%AE%E8%AF%8D/%E6%BE%B3%E5%A4%A7%E5%88%A9%E4%BA%9A/rss", source: "RFI" }
+			]
+		},
+		EUR: {
+			gl: "EUR",
+			label: "Europe",
+			icon: "🇪🇺",
+			merge: [
+				{ url: "https://www.rfi.fr/cn/%E5%85%B3%E9%94%AE%E8%AF%8D/%E6%AC%A7%E6%B4%B2/rss", source: "RFI" }
+			]
+		},
+		LAT: {
+			gl: "LAT",
+			label: "Latin America",
+			icon: "🌎",
+			merge: [
+				{ url: "https://www.rfi.fr/cn/%E5%85%B3%E9%94%AE%E8%AF%8D/%E6%8B%89%E4%B8%81%E7%BE%8E%E6%B4%B2/rss", source: "RFI" }
+			]
+		},
+		CA: {
+			gl: "CA",
+			label: "Canada",
+			icon: "🇨🇦",
+			merge: [
+				{ url: "https://www.rfi.fr/cn/%E5%85%B3%E9%94%AE%E8%AF%8D/%E5%8A%A0%E6%8B%BF%E5%A4%A7/rss", source: "RFI" }
 			]
 		}
 	},

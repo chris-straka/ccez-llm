@@ -327,7 +327,7 @@ describe("news feeds", () => {
 				source: "RFI"
 			}
 		]);
-		expect(newsRssUrl("es", "CA")).toContain("hl=en-CA&gl=CA");
+		expect(newsRssUrl("es", "CA")).toBeNull();
 		expect(newsRssUrl("es", "AU")).toBeNull();
 		// Spanish keeps its native US, gains the other seven translated.
 		const es = newsRegionsFor("es")!;
@@ -481,7 +481,7 @@ describe("news feeds", () => {
 		const sections: Array<[string, string, string[]]> = [
 			["ru", "US", ["golosameriki.com/api/"]],
 			["fa", "US", ["ir.voanews.com/api/"]],
-			["vi", "US", ["voatiengviet.com/api/"]],
+			["vi", "US", ["voatiengviet.com/api/", "rfi.fr/vi/"]],
 			["th", "US", ["voathai.com/api/"]],
 			["id", "US", ["voaindonesia.com/api/"]],
 			["pt", "US", ["rfi.fr/br/am"]],
@@ -499,7 +499,20 @@ describe("news feeds", () => {
 			["zh", "GB", ["rfi.fr/cn/"]],
 			["zh", "AU", ["rfi.fr/cn/"]],
 			["ru", "GB", ["rfi.fr/ru/"]],
-			["ru", "AU", ["rfi.fr/ru/"]]
+			["ru", "AU", ["rfi.fr/ru/"]],
+			["ru", "EUR", ["rfi.fr/ru/"]],
+			["ru", "CA", ["rfi.fr/ru/"]],
+			["sw", "US", ["rfi.fr/sw/"]],
+			["sw", "GB", ["rfi.fr/sw/"]],
+			["sw", "EUR", ["rfi.fr/sw/"]],
+			["sw", "AU", ["rfi.fr/sw/"]],
+			["vi", "EUR", ["rfi.fr/vi/"]],
+			["vi", "AU", ["rfi.fr/vi/"]],
+			["vi", "CA", ["rfi.fr/vi/"]],
+			["es", "CA", ["france24.com/es/tag/"]],
+			["zh", "EUR", ["rfi.fr/cn/"]],
+			["zh", "LAT", ["rfi.fr/cn/"]],
+			["zh", "CA", ["rfi.fr/cn/"]]
 		];
 		for (const [code, gl, hosts] of sections) {
 			const region = newsRegionsFor(code)!.find((r) => r.gl === gl)!;
