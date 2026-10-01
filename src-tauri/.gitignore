@@ -11,3 +11,7 @@
 /gen/android/keystore.properties
 *.jks
 *.keystore
+
+# Dev-build API keys (dev_secrets.rs): never commit.
+/.dev-secrets.json
+/.dev-secrets.json.tmp

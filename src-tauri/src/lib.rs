@@ -2,6 +2,8 @@
 
 #[cfg(all(target_os = "macos", debug_assertions))]
 mod dev_icon;
+#[cfg(all(debug_assertions, not(target_os = "android")))]
+mod dev_secrets;
 mod annotate;
 mod capture;
 mod coderun;
@@ -109,18 +111,19 @@ const KEYCHAIN_SERVICE: &str = "studio.ccez.app";
 /// to re-read — one dialog after another. A denied read is remembered
 /// too, so dismissing the dialog never summons it again this launch.
 #[cfg(not(target_os = "android"))]
-static KEYCHAIN_MEMO: std::sync::Mutex<
-    Option<std::collections::HashMap<String, Result<Option<String>, String>>>,
-> = std::sync::Mutex::new(None);
+type KeychainRead = Result<Option<String>, String>;
+#[cfg(not(target_os = "android"))]
+static KEYCHAIN_MEMO: std::sync::Mutex<Option<std::collections::HashMap<String, KeychainRead>>> =
+    std::sync::Mutex::new(None);
 
 #[cfg(not(target_os = "android"))]
-fn memo_get(account: &str) -> Option<Result<Option<String>, String>> {
+fn memo_get(account: &str) -> Option<KeychainRead> {
     let guard = KEYCHAIN_MEMO.lock().ok()?;
     guard.as_ref()?.get(account).cloned()
 }
 
 #[cfg(not(target_os = "android"))]
-fn memo_put(account: &str, value: Result<Option<String>, String>) {
+fn memo_put(account: &str, value: KeychainRead) {
     if let Ok(mut guard) = KEYCHAIN_MEMO.lock() {
         guard
             .get_or_insert_with(Default::default)
@@ -135,6 +138,13 @@ fn keychain_get(account: String) -> Result<Option<String>, String> {
     return secrets_android::get(KEYCHAIN_SERVICE, &account);
     #[cfg(not(target_os = "android"))]
     {
+        // Dev builds: the gitignored key file answers first (see
+        // dev_secrets); only a key it has never seen reads the
+        // Keychain, once, and is copied into the file.
+        #[cfg(debug_assertions)]
+        if let Some(known) = dev_secrets::lookup(&dev_secrets::store_path(), &account) {
+            return Ok(known);
+        }
         if let Some(known) = memo_get(&account) {
             return known;
         }
@@ -145,6 +155,10 @@ fn keychain_get(account: String) -> Result<Option<String>, String> {
             Err(keyring::Error::NoEntry) => Ok(None),
             Err(e) => Err(e.to_string()),
         };
+        #[cfg(debug_assertions)]
+        if let Ok(Some(secret)) = &read {
+            let _ = dev_secrets::record(&dev_secrets::store_path(), &account, Some(secret.clone()));
+        }
         memo_put(&account, read.clone());
         read
     }
@@ -157,11 +171,18 @@ fn keychain_set(account: String, secret: String) -> Result<(), String> {
     return secrets_android::set(KEYCHAIN_SERVICE, &account, &secret);
     #[cfg(not(target_os = "android"))]
     {
-        let entry =
-            keyring::Entry::new(KEYCHAIN_SERVICE, &account).map_err(|e| e.to_string())?;
-        entry.set_password(&secret).map_err(|e| e.to_string())?;
-        memo_put(&account, Ok(Some(secret)));
-        Ok(())
+        // Dev builds write the key file only: a Keychain write from a
+        // rebuilt dev binary asks for the password too.
+        #[cfg(debug_assertions)]
+        return dev_secrets::record(&dev_secrets::store_path(), &account, Some(secret));
+        #[cfg(not(debug_assertions))]
+        {
+            let entry =
+                keyring::Entry::new(KEYCHAIN_SERVICE, &account).map_err(|e| e.to_string())?;
+            entry.set_password(&secret).map_err(|e| e.to_string())?;
+            memo_put(&account, Ok(Some(secret)));
+            Ok(())
+        }
     }
 }
 
@@ -254,8 +275,14 @@ fn keychain_delete(account: String) -> Result<(), String> {
     return secrets_android::delete(KEYCHAIN_SERVICE, &account);
     #[cfg(not(target_os = "android"))]
     {
+        // Dev builds: remember the deletion in the key file (its null
+        // keeps the old Keychain copy from coming back).
+        #[cfg(debug_assertions)]
+        return dev_secrets::record(&dev_secrets::store_path(), &account, None);
+        #[cfg(not(debug_assertions))]
         let entry =
             keyring::Entry::new(KEYCHAIN_SERVICE, &account).map_err(|e| e.to_string())?;
+        #[cfg(not(debug_assertions))]
         match entry.delete_credential() {
             Ok(()) | Err(keyring::Error::NoEntry) => {
                 memo_put(&account, Ok(None));

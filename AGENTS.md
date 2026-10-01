@@ -37,8 +37,8 @@ background turns).
   the Keychain still keys the grant to the binary's content hash (no
   Team ID on a self-signed cert: the log reads "ACL partition mismatch:
   client cdhash"), so every Rust rebuild asks once per item again.
-  `keychain_get` remembers answers per launch, so it is one dialog per
-  item per rebuild, never a loop. Rust edits need Ctrl-C and relaunch. Click Always Allow
+  Debug builds therefore keep keys in `src-tauri/.dev-secrets.json`
+  (see Conventions) and stop asking after the first launch. Rust edits need Ctrl-C and relaunch. Click Always Allow
   (never Allow, never Deny) on the two Keychain items (`provider:muse`,
   `providers`). Never re-mint the "Ccez Dev" keypair. First build compiles
   ~400 crates.
@@ -102,7 +102,10 @@ background turns).
 ## Conventions
 
 - Settings: `settings.ts` (`defaultSettings`, `saveSettings`). Secrets go
-  to the Keychain via `secrets.ts`, never into persisted settings.
+  to the Keychain via `secrets.ts`, never into persisted settings. Debug
+  desktop builds use the gitignored owner-only `src-tauri/.dev-secrets.json`
+  instead (`dev_secrets.rs`; first read migrates from the Keychain once),
+  so dev rebuilds never ask for the login password. Never commit it.
 - Types are compiler feedback: `strict`, `noUncheckedIndexedAccess`,
   `exactOptionalPropertyTypes`, type-aware lint (`no-floating-promises`:
   `void` your promises), branded ids (`ChatId` / `ChatMsgId` /
