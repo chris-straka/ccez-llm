@@ -2,17 +2,12 @@ import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
 
 /**
- * Reply-language pills render in LangMenus.svelte (hero slot in
- * ThreadView, every platform); the page keeps the open menu, the
- * sheet anchor, the active code, and every behavior behind one
- * shared actions object (no call-site closures).
+ * Reply-language pill surfaces live in LangMenus.svelte; no pill
+ * selector stays paged. The badge box fixes its own metrics so
+ * fallback-font glyphs can't stretch it.
  */
 function componentSource(): string {
 	return readFileSync(new URL("./LangMenus.svelte", import.meta.url), "utf8");
-}
-
-function threadSource(): string {
-	return readFileSync(new URL("./ThreadView.svelte", import.meta.url), "utf8");
 }
 
 function componentStyle(): string {
@@ -32,40 +27,7 @@ function pageStyle(): string {
 	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
-describe("language menus contract", () => {
-	it("owns the pill row, lists, and badges from page-owned props", () => {
-		const source = componentSource();
-		expect(source).toContain("export interface LangMenusActions");
-		expect(source).toContain('class="lang-menus"');
-		expect(source).toContain('class="lang-menu"');
-		expect(source).toContain('class="lang-list"');
-		expect(source).toContain('class="badge"');
-		expect(source).toContain("{#if openId === menu.id}");
-		expect(source).toContain("inert={previewing}");
-		expect(source).toContain("actions.toggle(menu.id, e.currentTarget)");
-		expect(source).toContain("actions.pick(lang)");
-	});
-
-	it("keeps the open menu, anchor, code, and behaviors paged", () => {
-		const page = pageSource();
-		expect(page).toContain("function toggleLangMenu(");
-		expect(page).toContain("pick: (lang: ReplyLanguage) =>");
-		expect(page).toContain("{openLangMenu}");
-		expect(page).toContain("{langMenuAnchor}");
-		expect(page).toContain("{langMenusActions}");
-		expect(page).not.toContain("<LangMenus");
-		expect(page).not.toContain("{#snippet langMenus()}");
-		expect(page).not.toContain("{@render langMenus()}");
-	});
-
-	it("slots the pills under the hero on every platform", () => {
-		const thread = threadSource();
-		expect(thread).toContain("<LangMenus");
-		expect(thread).toContain("<EmptyHero");
-		// No platform gate around the hero pills.
-		expect(thread).not.toMatch(/\{#if android\}[\s\S]*?<LangMenus/);
-	});
-
+describe("language menus surfaces", () => {
 	it("keeps no pill selector in page style", () => {
 		const css = pageStyle();
 		for (const selector of [

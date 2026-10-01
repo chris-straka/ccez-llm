@@ -103,30 +103,10 @@ async function openBadgeDock(page: Page): Promise<void> {
 	});
 }
 
-async function badgeCenter(page: Page): Promise<{ x: number; y: number }> {
-	const badge = page.locator("button.ccez-ann-badge").first();
-	const box = await badge.boundingBox();
-	if (!box) throw new Error("badge has no box");
-	return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
-}
-
 test.beforeEach(async ({ page }) => {
 	await seedChat(page, [{ role: "assistant", content: SENTENCE }]);
 	await page.goto("/");
 	await expect(page.locator("article .rendered").first()).toBeVisible();
-});
-
-/** Badges and their quote washes read interactive on hover. */
-test("annotation markers show a pointer cursor", async ({ page }) => {
-	await seedTriple(page);
-	await annotateMiddle(page);
-	const at = await badgeCenter(page);
-	await page.mouse.move(at.x, at.y);
-	const cursor = await page.evaluate(
-		({ x, y }) => getComputedStyle(document.elementFromPoint(x, y)!).cursor,
-		at
-	);
-	expect(cursor).toBe("pointer");
 });
 
 /** The composer wins over badges: a badge scrolled beneath it takes

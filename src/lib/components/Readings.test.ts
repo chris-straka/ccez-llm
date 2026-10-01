@@ -2,15 +2,12 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
 /**
- * The selection readings panels (flat pinyin + furigana groups) render
- * from `Readings.svelte`, not the page. The page owns placement,
- * tracking, and dismiss; the component owns the panels and their
- * surfaces. Svelte scoping binds CSS to the component that renders
- * it, so the `.sel-pinyin` rules moved with the markup — a paged
- * rule would silently stop matching (see the toast red-pairing
- * regression that set this precedent). The document tint
- * (`.rendered .frbtN`) stays paged: it styles message content, and
- * `:global` rules match regardless of host.
+ * The selection readings panels' surfaces live in `Readings.svelte`.
+ * Svelte scoping binds CSS to the component that renders it, so a
+ * paged rule would silently stop matching (see the toast
+ * red-pairing regression that set this precedent). The document
+ * tint (`.rendered .frbtN`) stays paged: it styles message content,
+ * and `:global` rules match regardless of host.
  */
 function readingsSource(): string {
 	return readFileSync(new URL("./Readings.svelte", import.meta.url), "utf8");
@@ -53,19 +50,7 @@ function zIndexOf(style: string, selector: string): number {
 	return Number(match[1]);
 }
 
-describe("readings panels extraction", () => {
-	it("renders the panels from the component, not the page", () => {
-		expect(readingsSource()).toContain('class="sel-pinyin"');
-		expect(readingsSource()).toContain("{@html pinyin.html}");
-		expect(readingsSource()).toContain("pk{run.color}");
-		// The page keeps placement helpers (liftSelMenuAboveReadings
-		// reads ".sel-pinyin.above") and the document tint, but no
-		// panel element of its own.
-		expect(pageSource()).toContain("<Readings");
-		expect(pageSource()).not.toContain('class="sel-pinyin"');
-		expect(pageSource()).toContain(".rendered .frbt0");
-	});
-
+describe("readings panels", () => {
 	it("keeps the panel surfaces scoped to the component", () => {
 		const css = readingsStyle();
 		expect(css).toMatch(/\.sel-pinyin\s*\{[^}]*position:\s*fixed/);

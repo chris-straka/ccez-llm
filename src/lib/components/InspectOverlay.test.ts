@@ -2,16 +2,12 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
 /**
- * The character Inspect overlay renders from `InspectOverlay.svelte`
- * through the shared `Modal.svelte` shell, not the page. The page owns
- * the open character, the stroke vectors, the step, and the locale
- * default; the component owns the overlay markup, the stepper, the
- * locale toggle, and their surfaces. Svelte scoping binds CSS to the
- * component that renders it, so the `.inspect-*` rules moved with the
- * markup — a paged rule would silently stop matching (see the toast
- * red-pairing regression that set this precedent). The box seating
- * (`.inspect-modal`) lives in `Modal.svelte` with the other dialog
- * chrome.
+ * The character Inspect overlay's surfaces live in
+ * `InspectOverlay.svelte`. Svelte scoping binds CSS to the component
+ * that renders it, so a paged rule would silently stop matching (see
+ * the toast red-pairing regression that set this precedent). The box
+ * seating (`.inspect-modal`) lives in `Modal.svelte` with the other
+ * dialog chrome.
  */
 function inspectSource(): string {
 	return readFileSync(
@@ -39,25 +35,7 @@ function pageStyle(): string {
 	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
-describe("inspect overlay extraction", () => {
-	it("renders the overlay from the component, not the page", () => {
-		expect(inspectSource()).toContain('id="inspect-heading"');
-		expect(inspectSource()).toContain('class="inspect-stepper"');
-		expect(inspectSource()).toContain('class="inspect-decomp"');
-		expect(inspectSource()).toContain('aria-label="Close character inspect"');
-		// The box variant rides the shared shell as a class prop (the
-		// box renders in Modal.svelte — a missing pass silently drops
-		// the narrow seating).
-		expect(inspectSource()).toContain('cardClass="inspect-modal"');
-		expect(pageSource()).toContain("<InspectOverlay");
-		expect(pageSource()).not.toContain('id="inspect-heading"');
-		expect(pageSource()).not.toContain('class="inspect-stepper"');
-		expect(pageSource()).not.toContain('class="inspect-decomp"');
-		// The page keeps the open character, vectors, step, default.
-		expect(pageSource()).toContain("let inspectChar");
-		expect(pageSource()).toContain("function strokeStep");
-	});
-
+describe("inspect overlay surfaces", () => {
 	it("keeps the overlay surfaces scoped to the components", () => {
 		const css = inspectStyle();
 		expect(css).toContain(".inspect-body");

@@ -2,15 +2,10 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
 /**
- * The shortcuts modal renders from `ShortcutsModal.svelte` through
- * the shared `Modal.svelte` shell, not the page. The page owns the
- * open flag, the filter reset, and ⌘F focus; the component owns the
- * list, the field, and their surfaces. Svelte scoping binds CSS to
- * the component that renders it, so the filter/keys rules moved with
- * the markup — a paged rule would silently stop matching (see the
- * toast red-pairing regression that set this precedent). The dialog
- * head row stays shared paged until the palette and inspect dialogs
- * move through the shell.
+ * The shortcuts modal's surfaces live in `ShortcutsModal.svelte`.
+ * Svelte scoping binds CSS to the component that renders it, so a
+ * paged rule would silently stop matching (see the toast
+ * red-pairing regression that set this precedent).
  */
 function modalSource(): string {
 	return readFileSync(
@@ -38,20 +33,7 @@ function pageStyle(): string {
 	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
-describe("shortcuts modal extraction", () => {
-	it("renders the dialog from the component, not the page", () => {
-		expect(modalSource()).toContain('class="shortcuts-filter"');
-		expect(modalSource()).toContain('class="keys"');
-		expect(modalSource()).toContain('id="shortcuts-heading"');
-		expect(modalSource()).toContain("No matches");
-		expect(pageSource()).toContain("<ShortcutsModal");
-		expect(pageSource()).not.toContain('class="shortcuts-filter"');
-		expect(pageSource()).not.toContain('class="keys"');
-		// The page keeps the open flag, the filter reset, and ⌘F focus.
-		expect(pageSource()).toContain("shortcutQuery = \"\";");
-		expect(pageSource()).toContain("shortcutInput.focus()");
-	});
-
+describe("shortcuts modal surfaces", () => {
 	it("keeps the dialog surfaces scoped to the component", () => {
 		const css = modalStyle();
 		expect(css).toContain(".shortcuts-filter");

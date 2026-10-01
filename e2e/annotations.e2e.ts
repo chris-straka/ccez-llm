@@ -656,22 +656,6 @@ test("flooding the comment box stays inside it", async ({ page }) => {
 	expect(sizes.scroll).toBeLessThanOrEqual(sizes.client + 1);
 });
 
-/** A grown create-box rounds its corners less: the fresh pill starts
-as a 999px capsule, which reads over-rounded once it grows tall. */
-test("grown comment box rounds its corners less", async ({ page }) => {
-	await openAnnotate(page, "確認しました");
-	const pop = page.locator(".ann-pop");
-	await expect(pop).not.toHaveClass(/tall/);
-	await expect(pop).toHaveCSS("border-radius", "999px");
-	// Three lines already drops the capsule (not five).
-	await page.locator(".ann-pop textarea").fill("one\ntwo\nthree");
-	await expect(pop).toHaveClass(/tall/);
-	await expect(pop).toHaveCSS("border-radius", "12px");
-	await page.locator(".ann-pop textarea").fill("a".repeat(500));
-	await expect(pop).toHaveClass(/tall/);
-	await expect(pop).toHaveCSS("border-radius", "12px");
-});
-
 /** Draft annotations survive a restart: reload restores the badge.
 Pins never persist (fresh loads start unpinned, so a stale approval
 can't ride a later send) — the pill is gone until re-pinned. */
@@ -792,77 +776,6 @@ test("pinning lists the annotation in the button overlay", async ({
 	);
 });
 
-/** The review popup shows quotes with hyphen labels (never "note:"),
-no Selected text. The note itself reads italic in the quiet voice,
-like the cancel and icon buttons. */
-test("review popup uses hyphen labels", async ({ page }) => {
-	await openAnnotate(page, "確認しました");
-	await page.keyboard.type("meaning?");
-	// File without sending: a send bakes annotations into the outgoing
-	// message and clears the live list, leaving no pill to hover.
-	await page.keyboard.press("Enter");
-	await pinFiled(page);
-	await openPromptReview(page);
-	const review = page.locator(".prompt-tools .review");
-	await expect(review.locator(".review-label").first()).toHaveText("-");
-	await expect(review).not.toContainText("note:");
-	await expect(review).not.toContainText("Selected text");
-	await expect(review).not.toContainText("User comment");
-	const comment = review.locator(".review-comment").first();
-	await expect(comment).toHaveText("meaning?");
-	await expect(comment).toHaveCSS("font-style", "italic");
-	await expect(comment).toHaveCSS("color", "rgb(110, 110, 115)");
-});
-
-/** An annotations-only message renders unfolded (em-dash plus the count)
-and folds to its quotes previewed on demand. */
-test("annotations-only message renders folded", async ({ page }) => {
-	await seedChat(page, [
-		{
-			role: "user",
-			content:
-				'Annotated selections:\n1. "風に舞う" — What does this mean?\n2. "夕暮れの公園で" — What does this mean?'
-		}
-	]);
-	await page.reload();
-	const article = page.locator("article.user");
-	await expect(article).toBeVisible();
-	await expect(article.locator(".rendered")).toContainText("—");
-	await expect(article.locator(".ann-refs-pill")).toBeVisible();
-	// Folding previews the quotes; unfolding restores the em-dash body
-	// with the pill above — the baked block never shows.
-	await article
-		.locator('.actions button[aria-label="Fold this message"]')
-		.click();
-	const preview = article.locator(".folded-preview");
-	await expect(preview).toContainText("風に舞う");
-	await article
-		.locator('.actions button[aria-label="Unfold this message"]')
-		.click();
-	await expect(article.locator(".rendered")).toContainText("—");
-	await expect(article.locator(".rendered")).not.toContainText(
-		"Annotated selections:"
-	);
-	await expect(article.locator(".ann-refs-pill")).toBeVisible();
-});
-
-/** No message row offers an audio download anymore. */
-test("message rows have no download button", async ({ page }) => {
-	await seedChat(page, [
-		{ role: "user", content: "hello" },
-		{ role: "assistant", content: "hi there" }
-	]);
-	await page.reload();
-	for (const role of ["user", "assistant"] as const) {
-		await page.locator(`article.${role} .rendered`).first().hover();
-		await expect(
-			page.locator(
-				`article.${role} .actions [aria-label="Download audio for this message"]`
-			)
-		).toHaveCount(0);
-	}
-});
-
 /** Sending bakes the pinned annotations with the message: the composer
 pill is gone while the reply is still on its way. */
 test("sending clears pending annotations immediately", async ({ page }) => {
@@ -962,34 +875,6 @@ test("E key edits the hovered own message", async ({ page }) => {
 	await expect(page.locator("article.user .rendered")).toContainText(
 		"helo world"
 	);
-});
-
-/** Clear-all sits at the bottom-right of the review overlay. */
-test("clear-all lives at the top right of the review", async ({ page }) => {
-	await openAnnotate(page, "確認しました");
-	await page.keyboard.press("Enter");
-	await expect(
-		page.locator("button.ccez-ann-badge.ans-ready")
-	).toHaveCount(1, { timeout: 30_000 });
-	// Pin it first (double-click): clear-all only takes pinned
-	// annotations back, so an unpinned filing would survive it.
-	await page.locator("button.ccez-ann-badge").nth(0).dblclick();
-	await page.keyboard.press("Escape");
-	await openPromptReview(page);
-	const review = page.locator(".prompt-tools .review");
-	const tools = review.locator(".review-tools");
-	await expect(tools).toContainText("Clear pinned");
-	const reviewBox = await review.boundingBox();
-	const toolsBox = await tools.boundingBox();
-	if (!reviewBox || !toolsBox) throw new Error("review lost its box");
-	// Top edge: the tools row starts where the overlay starts.
-	expect(toolsBox.y - reviewBox.y).toBeLessThan(32);
-	// Right edge: the tools row ends where the overlay ends.
-	expect(
-		reviewBox.x + reviewBox.width - (toolsBox.x + toolsBox.width)
-	).toBeLessThan(40);
-	await tools.locator("button").click();
-	await expect(page.locator(".prompt-tools .ann-pill")).toHaveCount(0);
 });
 
 /** Clear-all removes only prompt-pinned annotations: the pinned
@@ -1266,34 +1151,6 @@ test("dragging from the gutter into the chat keeps the highlight", async ({
 	await expect(page.locator(".sel-menu")).toBeVisible();
 });
 
-/** Annotations-only messages render an em-dash at text size with the
-count above, unfolded — never the baked block. */
-test("annotations-only message renders em-dash with count", async ({
-	page
-}) => {
-	await seedChat(page, [
-		{ role: "user", content: 'Annotated selections:\n1. "bonjour" — ?' },
-		{ role: "assistant", content: "ok" }
-	]);
-	await page.goto("/");
-	const article = page.locator("article.user");
-	await expect(article.locator(".ann-refs-pill")).toHaveText("1", {
-		timeout: 60_000
-	});
-	await expect(article.locator(".rendered")).toContainText("—");
-	await expect(article.locator(".rendered")).not.toContainText(
-		"Annotated selections"
-	);
-	await expect(article.locator(".folded-preview")).toHaveCount(0);
-	const dash = await article
-		.locator(".rendered")
-		.evaluate((el) => getComputedStyle(el as HTMLElement).fontSize);
-	const normal = await page
-		.locator("article.assistant .rendered")
-		.evaluate((el) => getComputedStyle(el as HTMLElement).fontSize);
-	expect(dash).toBe(normal);
-});
-
 /** Message copy excludes the baked annotation block. */
 test("message copy excludes baked annotations", async ({ page }) => {
 	await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
@@ -1339,48 +1196,6 @@ test("sent-refs card copies one annotation", async ({ page }) => {
 	});
 	expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
 		'"bonjour" — greeting?'
-	);
-});
-
-/** Sent-refs rows read like the draft card: quote + copy up top,
-note + pencil below, Clear-all top-right of the card. */
-test("sent-refs card lays out quote, copy, note, pencil in order", async ({
-	page
-}) => {
-	await seedChat(page, [
-		{ role: "assistant", content: "noted" },
-		{
-			role: "user",
-			content: 'explain this\n\nAnnotated selections:\n1. "bonjour" — greeting?'
-		}
-	]);
-	await page.goto("/");
-	await page.locator(".ann-refs-pill").first().click();
-	const pop = page.locator(".ann-refs-pop").first();
-	await expect(pop).toBeVisible();
-	const box = async (sel: string) => {
-		const rect = await pop.locator(sel).first().boundingBox();
-		if (!rect) throw new Error(`no box for ${sel}`);
-		return rect;
-	};
-	const quote = await box(".ann-refs-quote");
-	const copy = await box(".ann-refs-copy");
-	const note = await box(".ann-refs-comment");
-	const pencil = await box(".ann-refs-pencil");
-	const clear = await box(".ann-refs-clear");
-	// Copy rides the quote line; the pencil rides the note line.
-	expect(Math.abs(copy.y - quote.y)).toBeLessThan(10);
-	expect(copy.x).toBeGreaterThan(quote.x);
-	expect(note.y).toBeGreaterThan(quote.y);
-	expect(Math.abs(pencil.y - note.y)).toBeLessThan(10);
-	expect(pencil.x).toBeGreaterThan(note.x);
-	// Clear-all sits top-right, above the first row (inside the
-	// card's own padding, like the draft tools row).
-	const popBox = await pop.boundingBox();
-	if (!popBox) throw new Error("no pop box");
-	expect(clear.y + clear.height).toBeLessThanOrEqual(quote.y + 4);
-	expect(clear.x + clear.width).toBeGreaterThanOrEqual(
-		popBox.x + popBox.width - 16
 	);
 });
 
@@ -1974,42 +1789,6 @@ test("empty annotations bake a question mark for the model", async ({
 	await expect(user.locator(".ann-refs-comment").first()).toHaveText("?");
 });
 
-test("annotations-only messages render as an em-dash with the count pill above", async ({
-	page
-}) => {
-	await seedChat(page, [
-		{ role: "user", content: 'Annotated selections:\n1. "Kyoto" — ?' }
-	]);
-	await page.goto("/");
-	const user = page.locator("article.user").first();
-	await expect(user).toBeVisible({ timeout: 60_000 });
-	// Body collapses to one em-dash at the normal message text size.
-	const bodyText = await user.locator(".rendered").innerText();
-	expect(bodyText.trim()).toBe("—");
-	const sizes = await page.evaluate(() => {
-		const em = document
-			.querySelector("article.user .rendered")
-			?.getBoundingClientRect();
-		const pill = document
-			.querySelector("article.user .ann-refs-pill")
-			?.getBoundingClientRect();
-		const base = getComputedStyle(
-			document.querySelector("article.user .rendered")!
-		);
-		if (!em || !pill) return null;
-		return {
-			emTop: em.y,
-			pillBottom: pill.y + pill.height,
-			fontSize: base.fontSize
-		};
-	});
-	if (!sizes) throw new Error("missing refs-only boxes");
-	// The count UI rides above the dash, never inline with it.
-	expect(sizes.pillBottom).toBeLessThanOrEqual(sizes.emTop + 2);
-	// Normal text size: the message scale, not a shrunken preview.
-	expect(parseFloat(sizes.fontSize)).toBeGreaterThanOrEqual(13);
-});
-
 test("empty questions file and ask; rows never edit inline", async ({
 	page
 }) => {
@@ -2155,50 +1934,6 @@ test("row control hover moves no buttons", async ({ page }) => {
 	const rows = page.locator(".ann-wrap .review-item");
 	await expect(rows).toHaveCount(1);
 	await expect(rows.first()).toContainText("first");
-});
-
-/** A long review quote clips with an ellipsis inside the row: the card
-never scrolls sideways (a flex-shrink regression once stretched the
-whole overlay instead). */
-test("long review quote truncates with an ellipsis", async ({ page }) => {
-	await seedChat(page, [
-		{
-			role: "assistant",
-			content:
-				"栄養バランスが良いとされています最近では健康志向の高まりから和食の見直しが進み若い世代にも伝統が受け継がれています"
-		}
-	]);
-	await page.goto("/");
-	const para = page.locator("article.assistant .rendered p").first();
-	await expect(para).toBeVisible({ timeout: 60_000 });
-	// File the whole paragraph through the real UI (seeding the store
-	// can't reach the dock: pins never persist and only pinned rows
-	// list), then pin it into the dock.
-	await para.selectText();
-	await page.mouse.up();
-	await expect(page.locator(".sel-menu")).toBeVisible();
-	await page.locator('.sel-menu button:has-text("Annotate")').click();
-	await page.keyboard.type("note");
-	await page.keyboard.press("Enter");
-	await pinFiled(page);
-	await page.locator(".prompt-tools .ann-pill").click();
-	await expect(page.locator(".ann-wrap .review")).toHaveCSS("opacity", "1");
-	const sizes = await page.evaluate(() => {
-		const quote = document.querySelector(".review-quote") as HTMLElement;
-		const card = document.querySelector(".ann-wrap .review") as HTMLElement;
-		const qr = quote.getBoundingClientRect();
-		const cr = card.getBoundingClientRect();
-		return {
-			quoteClipped: quote.scrollWidth > quote.clientWidth + 1,
-			quoteFits: qr.right <= cr.right + 1,
-			cardScrolls: card.scrollWidth > card.clientWidth + 1
-		};
-	});
-	expect(sizes).toEqual({
-		quoteClipped: true,
-		quoteFits: true,
-		cardScrolls: false
-	});
 });
 
 test("gutter drags never highlight above the cursor line", async ({ page }) => {

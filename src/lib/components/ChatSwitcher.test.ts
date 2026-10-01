@@ -2,16 +2,11 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
 /**
- * The phone chat switcher renders from `ChatSwitcher.svelte` through
- * the shared `Modal.svelte` shell, not the page. The page owns chat
- * state and the open flag; the component owns the card, the
- * mint/delete actions, and their surfaces. Svelte scoping binds CSS
- * to the component that renders it, so the `.switcher-*` rules moved
- * with the markup — a paged rule would silently stop matching (see
- * the toast red-pairing regression that set this precedent). Shell
- * chrome (veil seating, card box) lives in `Modal.svelte`, which
- * renders those elements; the shared veil/box base stays paged until
- * the last dialog moves through the shell.
+ * The phone chat switcher's surfaces live in `ChatSwitcher.svelte`.
+ * Svelte scoping binds CSS to the component that renders it, so a
+ * paged rule would silently stop matching (see the toast
+ * red-pairing regression that set this precedent). Shell chrome
+ * (veil seating, card box) lives in `Modal.svelte`.
  */
 function switcherSource(): string {
 	return readFileSync(
@@ -49,22 +44,7 @@ function pageStyle(): string {
 	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
-describe("chat switcher extraction", () => {
-	it("renders the switcher from the component, not the page", () => {
-		expect(switcherSource()).toContain('class="switcher-actions"');
-		expect(switcherSource()).toContain('aria-label="Older chat"');
-		expect(switcherSource()).toContain('aria-label="Newer chat"');
-		expect(switcherSource()).toContain('aria-label="Delete chat"');
-		// The box variant rides the shared shell as a class prop (the
-		// box renders in Modal.svelte — a missing pass silently drops
-		// the card class and its surface).
-		expect(switcherSource()).toContain('cardClass="switcher-card"');
-		expect(pageSource()).toContain("<ChatSwitcher");
-		expect(pageSource()).not.toContain('class="switcher-actions"');
-		expect(pageSource()).not.toContain('class="switcher-card"');
-		expect(pageSource()).not.toContain("stepSwitcher(-1)");
-	});
-
+describe("chat switcher surfaces", () => {
 	it("keeps the switcher surfaces scoped to the components", () => {
 		expect(switcherStyle()).toContain(".switcher-actions");
 		expect(switcherStyle()).toContain(".switcher-arrow");

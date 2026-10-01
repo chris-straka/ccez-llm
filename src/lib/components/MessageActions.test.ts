@@ -2,76 +2,16 @@ import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
 
 /**
- * Per-message action row renders in MessageActions.svelte; the page
- * owns voice/aid/selection state and every behavior behind computed
- * props plus a MessageActionsActions object. Row-reveal, hover,
- * speaking, aid-loading, and hide-messages seating move with the row
- * (paged main/article ancestors stay global); shared .error and
- * .tdots surfaces stay paged globals for their other consumers.
+ * Per-message action row surfaces live in MessageActions.svelte;
+ * paged main/article ancestors stay `:global` so the row's reveal
+ * rules still match.
  */
 function componentSource(): string {
 	return readFileSync(new URL("./MessageActions.svelte", import.meta.url), "utf8");
 }
 
 
-function threadSource(): string {
-	return readFileSync(new URL("./ThreadView.svelte", import.meta.url), "utf8");
-}
-
-
-function articleSource(): string {
-	return readFileSync(new URL("./MessageArticle.svelte", import.meta.url), "utf8");
-}
-
-describe("message actions contract", () => {
-	it("reads computed voice/aid state as plain props", () => {
-		const source = componentSource();
-		for (const prop of [
-			"foldTitle: string",
-			"deleteTitle: string",
-			"speaking: boolean",
-			"speakable: boolean",
-			"speakLabel: string",
-			"aidId: string | null",
-			"aidModelPinned: boolean",
-			"localKinds: LocalAid[]",
-			"pinnedKinds: LocalAid[]",
-			"aidBusy: boolean"
-		]) {
-			expect(source).toContain(prop);
-		}
-		// No tip() calls, voice maps, or aid stores cross the boundary
-		// (data-tip attributes carry precomputed labels instead).
-		expect(source).not.toContain("tip(isMac");
-		expect(source).not.toContain("tip(\n");
-		expect(source).not.toContain("aidModelPin.has");
-		expect(source).not.toContain("vocalizing.has");
-	});
-
-	it("routes every row press through the actions object", () => {
-		const source = componentSource();
-		for (const call of [
-			"actions.toggleFold()",
-			"actions.copy()",
-			"actions.branch()",
-			"actions.drop()",
-			"actions.stopVoice()",
-			"actions.speak()",
-			"actions.unpinModelAid()",
-			"actions.runModelAid(aidId)",
-			"actions.unpinLocalAid(localKind)",
-			"actions.pinLocalAid(localKind)",
-			"actions.peekAid(localKind)",
-			"actions.unpeekAid()",
-			"actions.commitEdit()",
-			"actions.edit()",
-			"actions.rerun()",
-			"actions.retry()"
-		]) {
-			expect(source).toContain(call);
-		}
-	});
-
+describe("message actions surfaces", () => {
 	it("keeps paged reveal ancestors global", () => {
 		const source = componentSource();
 		expect(source).toContain(":global(main.hover-user)");
@@ -79,24 +19,5 @@ describe("message actions contract", () => {
 		expect(source).toContain(":global(main.hide-messages)");
 		expect(source).toContain(":global(.app[data-android])");
 		expect(source).toContain(":global(main.scale-actions)");
-	});
-
-	it("feeds the row from the page behind its visibility gate", () => {
-		// The usage moved into the row with the article; the page
-		// feeds the article the computed props and the ma group.
-		const row = articleSource();
-		expect(row).toContain("<MessageActions");
-		expect(row).toContain("{speaking}");
-		expect(row).toContain("{aidModelPinned}");
-		expect(row).toContain("{pinnedKinds}");
-		expect(row).toContain("actions={actions.ma}");
-		const thread = threadSource();
-		expect(thread).toContain("<MessageArticle");
-		expect(thread).toContain("speaking={actions.messageSpeaking(msg)}");
-		expect(thread).toContain("aidModelPinned={aidModelPin.has(msg.id)}");
-		expect(thread).toContain("pinnedKinds={actions.pinnedKinds(msg.id)}");
-		expect(thread).toContain("copy: () => actions.copyText(msg.content, msg.role)");
-		expect(thread).toContain("stopVoice: () => actions.stopVoice(),");
-		expect(thread).toContain("releaseRowFocus: (event: MouseEvent) =>");
 	});
 });

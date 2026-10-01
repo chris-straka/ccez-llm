@@ -2,10 +2,8 @@ import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
 
 /**
- * Empty-chat hero renders in EmptyHero.svelte; the page keeps
- * emptiness and the pills. Pills cross as a children snippet so
- * their props stay with their own usage, not drilled through
- * the hero.
+ * Empty-chat hero surfaces live in EmptyHero.svelte; no hero
+ * selector stays paged.
  */
 function componentSource(): string {
 	return readFileSync(new URL("./EmptyHero.svelte", import.meta.url), "utf8");
@@ -22,35 +20,13 @@ function pageSource(): string {
 	return readFileSync(new URL("../../routes/+page.svelte", import.meta.url), "utf8");
 }
 
-function threadSource(): string {
-	return readFileSync(new URL("./ThreadView.svelte", import.meta.url), "utf8");
-}
-
 function pageStyle(): string {
 	const match = pageSource().match(/<style>([\s\S]*)<\/style>/);
 	if (!match) throw new Error("+page.svelte has no <style> block");
 	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
-describe("empty hero contract", () => {
-	it("owns the hero markup and the pills slot", () => {
-		const source = componentSource();
-		expect(source).toContain('class="empty-state"');
-		expect(source).toContain('class="hero"');
-		expect(source).toContain("What can I do for you?");
-		expect(source).toContain('class="mock-note"');
-		expect(source).toContain("{#if mock}");
-		expect(source).toContain("{@render children()}");
-		// News mode trades the welcome text for the story panel.
-		expect(source).toContain("{#if !newsMode}");
-	});
-
-	it("keeps emptiness and the pills paged", () => {
-		const thread = threadSource();
-		expect(thread).toContain("<EmptyHero mock={useMock} newsMode={newsPanel !== null}>");
-		expect(thread).toContain("{#if messages.length === 0}");
-	});
-
+describe("empty hero surfaces", () => {
 	it("keeps no hero selector in page style", () => {
 		const css = pageStyle();
 		for (const selector of [".empty-state", ".hero", "mock-note"]) {

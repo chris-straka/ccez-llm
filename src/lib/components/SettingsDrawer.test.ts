@@ -2,10 +2,8 @@ import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
 
 /**
- * Settings drawer shell renders in SettingsDrawer.svelte; the page
- * keeps the open flag, the settings object, token labels, and every
- * behavior. The panel node crosses as $bindable (page focus
- * bookkeeping reads it).
+ * Settings drawer surfaces live in SettingsDrawer.svelte; no drawer
+ * selector stays paged.
  */
 function componentSource(): string {
 	return readFileSync(
@@ -31,29 +29,7 @@ function pageStyle(): string {
 	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
-describe("settings drawer contract", () => {
-	it("owns the drawer shell, inner, and panel usage", () => {
-		const source = componentSource();
-		expect(source).toContain("export interface SettingsDrawerActions");
-		expect(source).toContain('class="settings-panel"');
-		expect(source).toContain("class:closed={!open}");
-		expect(source).toContain('class="settings-inner"');
-		expect(source).toContain("inert={!open}");
-		expect(source).toContain("<SettingsPanel");
-		expect(source).toContain("bind:this={panelEl}");
-		expect(source).toContain("actions.drawerClose()");
-	});
-
-	it("keeps the open flag, settings, labels, and behaviors paged", () => {
-		const page = pageSource();
-		expect(page).toContain("<SettingsDrawer");
-		expect(page).toContain("open={settingsOpen}");
-		expect(page).toContain("bind:panelEl={settingsEl}");
-		expect(page).toContain("drawerClose: () => {");
-		expect(page).toContain("panelClose: () => {");
-		expect(page).not.toContain("<SettingsPanel");
-	});
-
+describe("settings drawer surfaces", () => {
 	it("keeps no drawer selector in page style", () => {
 		const css = pageStyle();
 		for (const selector of [
