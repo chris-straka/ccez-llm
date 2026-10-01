@@ -187,7 +187,19 @@ describe("news feeds", () => {
 				.slice(-7)
 				.filter((r) => r.translate)
 				.map((r) => r.gl)
-		).toEqual(["LAT", "ASI"]);
+		).toEqual([]);
+		// French, Spanish, Chinese, and Persian read every
+		// world chip natively; Portuguese keeps one translated
+		// chip (Canada has no RFI tag feed).
+		for (const code of ["fr", "es", "zh", "fa"]) {
+			const regions = newsRegionsFor(code)!;
+			expect(regions.some((r) => r.translate)).toBe(false);
+		}
+		expect(
+			newsRegionsFor("pt")!
+				.filter((r) => r.translate)
+				.map((r) => r.gl)
+		).toEqual(["CA"]);
 		expect(fr.find((r) => r.gl === "GBL")?.translate).toBeUndefined();
 		expect(fr.find((r) => r.gl === "GBL")).toMatchObject({
 			label: "Global",
@@ -234,8 +246,8 @@ describe("news feeds", () => {
 		);
 		// Asia mixes the four giants; learners outside the mix keep
 		// all four, insiders drop their own (the compound hl still
-		// matches by bare language).
-		expect(fr.find((r) => r.gl === "ASI")).toMatchObject({
+		// matches by bare language). French reads a native desk.
+		expect(newsRegionsFor("da")!.find((r) => r.gl === "ASI")).toMatchObject({
 			label: "Asia",
 			merge: [
 				{
@@ -292,9 +304,9 @@ describe("news feeds", () => {
 		expect(newsRegionsFor("da")!.find((r) => r.gl === "CA")?.icon).toBe(
 			"🇨🇦"
 		);
-		// Latin America mixes Mexico, Brazil, Argentina; Spanish
-		// and Portuguese read native desks.
-		expect(fr.find((r) => r.gl === "LAT")).toMatchObject({
+		// Latin America mixes Mexico, Brazil, Argentina; Spanish,
+		// Portuguese, French, Chinese, and Persian read native desks.
+		expect(newsRegionsFor("da")!.find((r) => r.gl === "LAT")).toMatchObject({
 			label: "Latin America",
 			merge: [
 				{
@@ -308,6 +320,15 @@ describe("news feeds", () => {
 				{
 					url: "https://news.google.com/rss?hl=es-AR&gl=AR&ceid=AR:es-AR",
 					lang: "es"
+				}
+			]
+		});
+		expect(fr.find((r) => r.gl === "LAT")).toMatchObject({
+			label: "Latin America",
+			merge: [
+				{
+					url: "https://www.france24.com/fr/tag/am%C3%A9rique-latine/rss",
+					source: "France 24"
 				}
 			]
 		});
@@ -329,7 +350,7 @@ describe("news feeds", () => {
 		]);
 		expect(newsRssUrl("es", "CA")).toBeNull();
 		expect(newsRssUrl("es", "AU")).toBeNull();
-		// Spanish keeps its native US, gains the other seven translated.
+		// Spanish keeps its native US; every world chip is native.
 		const es = newsRegionsFor("es")!;
 		expect(es.filter((r) => r.gl === "US")).toHaveLength(1);
 		expect(es.find((r) => r.gl === "US")?.translate).toBeUndefined();
@@ -466,7 +487,9 @@ describe("news feeds", () => {
 			["pa", ["bbci.co.uk/punjabi"]],
 			["am", ["bbci.co.uk/amharic"]],
 			["ta", ["bbci.co.uk/tamil"]],
-			["th", ["bbci.co.uk/thai"]]
+			["th", ["bbci.co.uk/thai"]],
+			["tr", ["voaturkce.com/api/"]],
+			["it", ["ansa.it/sito/notizie/mondo/"]]
 		];
 		for (const [code, hosts] of desks) {
 			const gbl = newsRegionsFor(code)!.find((r) => r.gl === "GBL")!;
@@ -512,7 +535,20 @@ describe("news feeds", () => {
 			["es", "CA", ["france24.com/es/tag/"]],
 			["zh", "EUR", ["rfi.fr/cn/"]],
 			["zh", "LAT", ["rfi.fr/cn/"]],
-			["zh", "CA", ["rfi.fr/cn/"]]
+			["zh", "CA", ["rfi.fr/cn/"]],
+			["fr", "LAT", ["france24.com/fr/tag/"]],
+			["fr", "ASI", ["france24.com/fr/asie-pacifique"]],
+			["es", "ASI", ["france24.com/es/tag/"]],
+			["pt", "ASI", ["rfi.fr/br/tag/"]],
+			["ar", "ASI", ["france24.com/ar/"]],
+			["fa", "GB", ["rfi.fr/fa/"]],
+			["fa", "EUR", ["rfi.fr/fa/"]],
+			["fa", "AU", ["rfi.fr/fa/"]],
+			["fa", "CA", ["rfi.fr/fa/"]],
+			["fa", "ASI", ["rfi.fr/fa/"]],
+			["fa", "LAT", ["rfi.fr/fa/"]],
+			["ko", "US", ["voakorea.com/api/"]],
+			["am", "US", ["amharic.voanews.com/api/"]]
 		];
 		for (const [code, gl, hosts] of sections) {
 			const region = newsRegionsFor(code)!.find((r) => r.gl === gl)!;

@@ -338,6 +338,20 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 				{ url: "https://www.france24.com/fr/tag/australie/rss", source: "France 24" },
 				{ url: "https://www.rfi.fr/fr/tag/australie/rss", source: "RFI" }
 			]
+		},
+		LAT: {
+			gl: "LAT",
+			label: "Latin America",
+			icon: "🌎",
+			merge: [
+				{ url: "https://www.france24.com/fr/tag/am%C3%A9rique-latine/rss", source: "France 24" }
+			]
+		},
+		ASI: {
+			gl: "ASI",
+			label: "Asia",
+			icon: "🌏",
+			merge: [{ url: "https://www.france24.com/fr/asie-pacifique/rss", source: "France 24" }]
 		}
 	},
 	es: {
@@ -390,6 +404,12 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "Canada",
 			icon: "🇨🇦",
 			merge: [{ url: "https://www.france24.com/es/tag/canad%C3%A1/rss", source: "France 24" }]
+		},
+		ASI: {
+			gl: "ASI",
+			label: "Asia",
+			icon: "🌏",
+			merge: [{ url: "https://www.france24.com/es/tag/asia/rss", source: "France 24" }]
 		}
 	},
 	ar: {
@@ -409,6 +429,12 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			merge: [
 				{ url: "https://www.france24.com/ar/%D8%A3%D9%88%D8%B1%D9%88%D8%A8%D8%A7/rss", source: "France 24" }
 			]
+		},
+		ASI: {
+			gl: "ASI",
+			label: "Asia",
+			icon: "🌏",
+			merge: [{ url: "https://www.france24.com/ar/%D8%A2%D8%B3%D9%8A%D8%A7/rss", source: "France 24" }]
 		}
 	},
 	ru: {
@@ -477,6 +503,54 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "U.S.",
 			icon: "🇺🇸",
 			merge: [{ url: "https://ir.voanews.com/api/", source: "VOA" }]
+		},
+		GB: {
+			gl: "GB",
+			label: "U.K.",
+			icon: "🇬🇧",
+			merge: [
+				{ url: "https://www.rfi.fr/fa/%DA%AF%D8%B1%D9%88%D9%87-%D9%88%D8%A7%DA%98%D9%87/%D8%A8%D8%B1%DB%8C%D8%AA%D8%A7%D9%86%DB%8C%D8%A7/rss", source: "RFI" }
+			]
+		},
+		EUR: {
+			gl: "EUR",
+			label: "Europe",
+			icon: "🇪🇺",
+			merge: [
+				{ url: "https://www.rfi.fr/fa/%DA%AF%D8%B1%D9%88%D9%87-%D9%88%D8%A7%DA%98%D9%87/%D8%A7%D8%B1%D9%88%D9%BE%D8%A7/rss", source: "RFI" }
+			]
+		},
+		AU: {
+			gl: "AU",
+			label: "Australia",
+			icon: "🇦🇺",
+			merge: [
+				{ url: "https://www.rfi.fr/fa/%DA%AF%D8%B1%D9%88%D9%87-%D9%88%D8%A7%DA%98%D9%87/%D8%A7%D8%B3%D8%AA%D8%B1%D8%A7%D9%84%DB%8C%D8%A7/rss", source: "RFI" }
+			]
+		},
+		CA: {
+			gl: "CA",
+			label: "Canada",
+			icon: "🇨🇦",
+			merge: [
+				{ url: "https://www.rfi.fr/fa/%DA%AF%D8%B1%D9%88%D9%87-%D9%88%D8%A7%DA%98%D9%87/%DA%A9%D8%A7%D9%86%D8%A7%D8%AF%D8%A7/rss", source: "RFI" }
+			]
+		},
+		ASI: {
+			gl: "ASI",
+			label: "Asia",
+			icon: "🌏",
+			merge: [
+				{ url: "https://www.rfi.fr/fa/%DA%AF%D8%B1%D9%88%D9%87-%D9%88%D8%A7%DA%98%D9%87/%D8%A2%D8%B3%DB%8C%D8%A7/rss", source: "RFI" }
+			]
+		},
+		LAT: {
+			gl: "LAT",
+			label: "Latin America",
+			icon: "🌎",
+			merge: [
+				{ url: "https://www.rfi.fr/fa/%DA%AF%D8%B1%D9%88%D9%87-%D9%88%D8%A7%DA%98%D9%87/%D8%A2%D9%85%D8%B1%DB%8C%DA%A9%D8%A7%DB%8C-%D9%84%D8%A7%D8%AA%DB%8C%D9%86/rss", source: "RFI" }
+			]
 		}
 	},
 	vi: {
@@ -606,14 +680,6 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			merge: [{ url: "https://feeds.bbci.co.uk/punjabi/rss.xml", source: "BBC Punjabi" }]
 		}
 	},
-	am: {
-		GBL: {
-			gl: "GBL",
-			label: "Global",
-			icon: "🌐",
-			merge: [{ url: "https://feeds.bbci.co.uk/amharic/rss.xml", source: "BBC Amharic" }]
-		}
-	},
 	ta: {
 		GBL: {
 			gl: "GBL",
@@ -675,6 +741,12 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "Latin America",
 			icon: "🌎",
 			merge: [{ url: "https://www.rfi.fr/br/tag/am%C3%A9rica-latina/rss", source: "RFI" }]
+		},
+		ASI: {
+			gl: "ASI",
+			label: "Asia",
+			icon: "🌏",
+			merge: [{ url: "https://www.rfi.fr/br/tag/%C3%A1sia/rss", source: "RFI" }]
 		}
 	},
 	de: {
@@ -688,14 +760,6 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 					source: "tagesschau"
 				}
 			]
-		}
-	},
-	it: {
-		EUR: {
-			gl: "EUR",
-			label: "Europe",
-			icon: "🇪🇺",
-			merge: [{ url: "https://it.euronews.com/rss", source: "Euronews" }]
 		}
 	},
 	zh: {
@@ -778,6 +842,48 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 				{ url: "https://www.yna.co.kr/rss/international.xml", source: "Yonhap" },
 				{ url: "https://feeds.bbci.co.uk/korean/rss.xml", source: "BBC Korean" }
 			]
+		},
+		US: {
+			gl: "US",
+			label: "U.S.",
+			icon: "🇺🇸",
+			merge: [{ url: "https://www.voakorea.com/api/zkboq_l-vomx-tpejvmqv", source: "VOA" }]
+		}
+	},
+	am: {
+		GBL: {
+			gl: "GBL",
+			label: "Global",
+			icon: "🌐",
+			merge: [{ url: "https://feeds.bbci.co.uk/amharic/rss.xml", source: "BBC Amharic" }]
+		},
+		US: {
+			gl: "US",
+			label: "U.S.",
+			icon: "🇺🇸",
+			merge: [{ url: "https://amharic.voanews.com/api/zqbjqpl-vomx-tpeivro_", source: "VOA" }]
+		}
+	},
+	tr: {
+		GBL: {
+			gl: "GBL",
+			label: "Global",
+			icon: "🌐",
+			merge: [{ url: "https://www.voaturkce.com/api/", source: "VOA" }]
+		}
+	},
+	it: {
+		EUR: {
+			gl: "EUR",
+			label: "Europe",
+			icon: "🇪🇺",
+			merge: [{ url: "https://it.euronews.com/rss", source: "Euronews" }]
+		},
+		GBL: {
+			gl: "GBL",
+			label: "Global",
+			icon: "🌐",
+			merge: [{ url: "https://www.ansa.it/sito/notizie/mondo/mondo_rss.xml", source: "ANSA" }]
 		}
 	}
 };
