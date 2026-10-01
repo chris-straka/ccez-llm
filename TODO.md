@@ -26,6 +26,22 @@ same codebase via the Tauri mobile target.
   never pass claims.
 - Ghost features: user believes all fixed — verify, then drop this item.
 
+## Pile: Oct 2026 handoff
+
+Full specs, acceptance criteria, and gates live in
+`docs/plans/2026-10-01-handoff.md`. Work top to bottom.
+
+- [ ] A. Giant text: hyphenation, desktop full-bleed, phone 2000% overflow, line height
+- [ ] B. Annotation drafts controller out of `+page.svelte`
+- [ ] C. Split `annotations.ts` by concern
+- [ ] D. Deduplicate `annotations-stamp.ts` loops and ramps
+- [ ] E. Prune refactor-history component tests and e2e trivia
+- [ ] F. Focus-drop probe: ask the owner, then remove or keep
+- [ ] G. Correction mode (French/German)
+- [ ] H. Ace Attorney overlay window (macOS first)
+- [ ] I. Hands-free conversation loop
+- [ ] J. Desktop/phone shell split (after B, C)
+
 ## Non-goals
 
 - No app-build/agentic features. No cloud sync / sharing / plugins.
