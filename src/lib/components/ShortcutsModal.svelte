@@ -169,6 +169,7 @@ CSS to this markup). Row data already lives in `$lib/shortcuts`
 	}
 	.keys div {
 		display: flex;
+		flex-wrap: wrap;
 		gap: 0.7rem;
 		padding: 0.26rem 0;
 		border-top: 1px solid #e5e5ea;
@@ -180,7 +181,13 @@ CSS to this markup). Row data already lives in `$lib/shortcuts`
 		border-top: 0;
 	}
 	.keys dt {
-		flex: 0 0 8rem;
+		/* Shrinkable basis: at 100% the 8rem name column fits every
+		row, so nothing shrinks or wraps; under the interface zoom
+		in a capped box the fixed basis would hog the row and starve
+		the chord (and stretch every row tall). The name wraps
+		instead, and the chord drops below when even that overflows. */
+		flex: 0 1 8rem;
+		min-width: 0;
 		color: #3a3a3c;
 		color: var(--focus);
 	}

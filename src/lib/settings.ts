@@ -151,6 +151,10 @@ export interface AppSettings {
 	 * of the message text size, so huge type does not force huge
 	 * popups. The slider runs 10–200%. */
 	annPopScale: number;
+	/** Interface-size multiplier (1 = default): zooms the settings
+	 * drawer, the chat list, dialogs, and toasts — never messages
+	 * or the composer, which keep their own sliders. Runs 100–250%. */
+	uiScale: number;
 	/**
 	 * Desktop-only composer width in rem (36 = the default):
 	 * ⇧⌘[ / ⇧⌘] widens the prompt, never the column. Phones
@@ -264,6 +268,9 @@ export const FONT_SCALE_MAX = 20;
 /** Annotation-popup size multiplier bounds: 10–200% of message text. */
 export const ANN_POP_SCALE_MIN = 0.1;
 export const ANN_POP_SCALE_MAX = 2;
+/** Interface-size multiplier bounds: 100–250%, step 10. */
+export const UI_SCALE_MIN = 1;
+export const UI_SCALE_MAX = 2.5;
 /** Desktop chat-column width in rem: 46 is the legacy fixed width. */
 export const CHAT_WIDTH_DEFAULT = 36;
 export const CHAT_WIDTH_MIN = 28;
@@ -466,6 +473,7 @@ export function defaultSettings(): AppSettings {
 		chatWidth: CHAT_WIDTH_DEFAULT,
 		promptScale: 1,
 		annPopScale: 1,
+		uiScale: 1,
 		promptWidth: PROMPT_WIDTH_BASE_REM,
 		ownBubble: false,
 		ownInk: "pink",
@@ -666,6 +674,14 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 			)
 		) {
 			merged.annPopScale = 1;
+		}
+		// Interface chrome scales 100–250% (same string/out-of-range
+		// healing as the popup slider above).
+		if (
+			typeof merged.uiScale !== "number" ||
+			!(merged.uiScale >= UI_SCALE_MIN && merged.uiScale <= UI_SCALE_MAX)
+		) {
+			merged.uiScale = 1;
 		}
 		if (
 			typeof merged.promptWidth !== "number" ||

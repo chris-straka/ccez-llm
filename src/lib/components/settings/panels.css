@@ -97,6 +97,10 @@ html[data-theme="dark"] .settings-inner .head-tokens {
 }
 .settings-inner .font-row {
 	display: flex;
+	/* The output drops below the slider when the row outgrows a
+	zoomed sheet (the range input won't shrink past its intrinsic
+	floor); at 100% everything fits, so this never wraps. */
+	flex-wrap: wrap;
 	align-items: center;
 	gap: 0.7rem;
 	margin-top: 0.55rem;
@@ -178,6 +182,29 @@ html[data-theme="dark"] .settings-inner .head-tokens {
 }
 .settings-inner .keys-updates h2 {
 	margin: 0;
+}
+/* Narrow sheet (zoomed phone, tiny window): the 2x2 footer no longer
+fits, so stack it in DOM order. The inner is the container (see
+SettingsDrawer.svelte); 17rem clears the two nowrap buttons + gap. */
+@container (max-width: 17rem) {
+	.settings-inner .keys-updates {
+		grid-template-columns: 1fr;
+	}
+	.settings-inner .keys-updates > section:first-of-type > h2,
+	.settings-inner .keys-updates > section:first-of-type > button,
+	.settings-inner
+		.keys-updates
+		> section[aria-labelledby="updates-heading"]
+		> h2,
+	.settings-inner
+		.keys-updates
+		> section[aria-labelledby="updates-heading"]
+		> button {
+		grid-area: auto;
+	}
+	.settings-inner .keys-updates > section:first-of-type > button {
+		white-space: normal;
+	}
 }
 .settings-inner h2 {
 	font-size: 1rem;
@@ -575,12 +602,28 @@ a hollow dot (no color). */
 	padding: 0;
 	margin-bottom: 0.4rem;
 }
+/* Fieldsets default to min-width:min-content, so one wide row would
+widen the whole sheet past a zoomed panel instead of wrapping
+inside it. Zero lets rows (checks, segmented, sliders) wrap in the
+available width; at 100% everything fits, so this never binds. */
+.settings-inner fieldset {
+	min-width: 0;
+}
 .settings-inner .check {
 	display: flex;
 	align-items: center;
 	gap: 0.5rem;
 	font-weight: 400;
 	cursor: pointer;
+}
+/* The label text rides in a span (see DefaultsPanel): as a bare
+anonymous flex item it keeps min-width:auto, so the label holds
+its unwrapped max-content width and spills past a zoomed sheet.
+The span shrinks and wraps instead; at 100% every label fits, so
+this renders exactly as the bare text did. */
+.settings-inner .check > span {
+	flex: 1;
+	min-width: 0;
 }
 /* Stacked checkboxes share one vertical rhythm whether they sit
 	in a fieldset or straight in the section: the box-to-text gap

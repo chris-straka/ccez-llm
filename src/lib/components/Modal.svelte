@@ -82,6 +82,14 @@ move here verbatim. -->
 		width: min(52rem, calc(100vw - 3rem));
 		max-height: min(38rem, calc(100vh - 3rem));
 		max-height: min(38rem, calc(100dvh - 3rem));
+		/* Interface-size zoom (see the settings drawer): zoom
+		multiplies the 52rem width as well, so reciprocal caps hold
+		the rendered box inside the veil — identical to the width
+		and max-height rules above at 100%. */
+		zoom: var(--ui-scale, 1);
+		max-width: min(52rem, calc((100vw - 3rem) * var(--ui-scale-inv, 1)));
+		max-height: min(38rem, calc((100vh - 3rem) * var(--ui-scale-inv, 1)));
+		max-height: min(38rem, calc((100dvh - 3rem) * var(--ui-scale-inv, 1)));
 		overflow-y: auto;
 		background: #fff;
 		background: var(--bg);

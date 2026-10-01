@@ -165,6 +165,11 @@
 		top: max(3.5rem, calc(0.5rem + env(safe-area-inset-top, 0px)));
 		left: 50%;
 		transform: translateX(-50%);
+		/* Interface-size zoom (see the settings drawer): the
+		translate recenters the zoomed box, so the pill stays
+		centered. Desktop pills are uncapped shrink-wrap, as today
+		(long toasts already rode past the edge at 100%). */
+		zoom: var(--ui-scale, 1);
 		z-index: 100;
 		background: #1c1c1e;
 		color: #f2f2f7;
@@ -205,8 +210,8 @@
 	:global(.app[data-android]) .toast {
 		font-size: 0.95rem;
 		white-space: normal;
-		max-width: calc(100vw - 2rem);
-		max-height: 30vh;
+		max-width: calc((100vw - 2rem) * var(--ui-scale-inv, 1));
+		max-height: calc(30vh * var(--ui-scale-inv, 1));
 		overflow-y: auto;
 	}
 	/* Long copy wraps into a card: the 999px stadium radius reads

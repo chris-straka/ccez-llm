@@ -96,6 +96,13 @@ bookkeeping reads it). -->
 		top: 0;
 		bottom: 0;
 		width: 22rem;
+		/* Interface-size zoom (Settings > Interface size): text,
+		padding, and widths scale together per surface, which rem
+		can't do. Zoom multiplies the fixed width too (22rem reads
+		55rem at 250%), so the reciprocal var caps the rendered box
+		to the viewport — a no-op at 100% on any sane window. */
+		zoom: var(--ui-scale, 1);
+		max-width: calc(100vw * var(--ui-scale-inv, 1));
 		z-index: 55;
 		box-shadow: -8px 0 24px rgba(0, 0, 0, 0.12);
 		border-left: 1px solid #e5e5ea;
@@ -116,6 +123,10 @@ bookkeeping reads it). -->
 		opacity: 0;
 	}
 	.settings-inner {
+		/* Container for the narrow-sheet footer query (panels.css). All
+		inner widths are definite, so inline-size containment changes
+		nothing except enabling the query. */
+		container-type: inline-size;
 		width: 20.6rem;
 		flex-shrink: 0;
 		/* Right-docked panels clip from the left: the header (the close
@@ -130,15 +141,28 @@ bookkeeping reads it). -->
 	:global(.app[data-android]) .settings-panel {
 		box-sizing: border-box;
 		left: 0;
-		right: 0;
-		width: auto;
+		/* Definite reciprocal width, not left+right constraints: under
+		zoom the constraints fix the border box but leave the layout
+		width indefinite, so content sizes to min-content and spills
+		past the sheet. The reciprocal renders exactly full-width
+		(identical to the constraints at 100%) while giving children
+		a definite width to wrap in. */
+		right: auto;
+		width: calc(100vw * var(--ui-scale-inv, 1));
 		padding-top: calc(1.2rem + env(safe-area-inset-top, 0px));
 	}
 	:global(.app[data-android]) .settings-inner {
-		width: auto;
+		/* Fill the sheet exactly: auto margins would beat align-items:
+		stretch and pin the inner to min-content (overflowing under zoom),
+		so size it explicitly and center only the max-width-capped box.
+		Leave the base flex-shrink: 0 alone: in this column container it
+		governs height, protecting the scroll content. */
+		width: 100%;
 		max-width: 26rem;
-		margin-left: auto;
-		margin-right: auto;
+		min-width: 0;
+		align-self: center;
+		margin-left: 0;
+		margin-right: 0;
 	}
 	/* The drawers slide on transform (plus their collapse widths),
 	which the shared fade shorthand would replace: restate the full

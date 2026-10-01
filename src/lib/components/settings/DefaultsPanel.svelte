@@ -108,39 +108,39 @@
 			<legend>Messages</legend>
 			<label class="check">
 				<input type="checkbox" bind:checked={settings.scaleActionsWithFont} />
-				Scale message icons with text size
+				<span>Scale message icons with text size</span>
 			</label>
 			<label class="check">
 				<input type="checkbox" bind:checked={settings.hideButtons} />
-				Show message buttons only when tapped
+				<span>Show message buttons only when tapped</span>
 			</label>
 			<label class="check">
 				<input type="checkbox" bind:checked={settings.foldOnSwipe} />
-				Enable fold on swipe
+				<span>Enable fold on swipe</span>
 			</label>
 			<label class="check">
 				<input type="checkbox" bind:checked={settings.showMessageButtons} />
-				Enable message buttons
+				<span>Enable message buttons</span>
 			</label>
 			<label class="check">
 				<input type="checkbox" bind:checked={settings.ownBubble} />
-				Enable background on my messages
+				<span>Enable background on my messages</span>
 			</label>
 			<label class="check">
 				<input type="checkbox" bind:checked={settings.inspectEnabled} />
-				Enable inspect for han characters
+				<span>Enable inspect for han characters</span>
 			</label>
 			<label class="check">
 				<input type="checkbox" bind:checked={settings.hapticsEnabled} />
-				Enable haptic feedback
+				<span>Enable haptic feedback</span>
 			</label>
 			<label class="check">
 				<input type="checkbox" bind:checked={settings.replyNotifications} />
-				Enable notifications
+				<span>Enable notifications</span>
 			</label>
 			<label class="check">
 				<input type="checkbox" bind:checked={settings.micEnabled} />
-				Enable microphone dictation
+				<span>Enable microphone dictation</span>
 			</label>
 		</fieldset>
 	{:else}
@@ -151,40 +151,40 @@
 			<legend>Show message buttons on hover for:</legend>
 			<label class="check">
 				<input type="checkbox" bind:checked={settings.hoverUserActions} />
-				My messages
+				<span>My messages</span>
 			</label>
 			<label class="check">
 				<input type="checkbox" bind:checked={settings.hoverAssistantActions} />
-				LLM messages
+				<span>LLM messages</span>
 			</label>
 		</fieldset>
 		<label class="check">
 			<input type="checkbox" bind:checked={settings.ownBubble} />
-			Enable background on my messages
+			<span>Enable background on my messages</span>
 		</label>
 		<label class="check">
 			<input type="checkbox" bind:checked={settings.scaleActionsWithFont} />
-			Scale message icons with text size
+			<span>Scale message icons with text size</span>
 		</label>
 		<label class="check">
 			<input type="checkbox" bind:checked={settings.showMessageButtons} />
-			Enable message buttons
+			<span>Enable message buttons</span>
 		</label>
 		<label class="check">
 			<input type="checkbox" bind:checked={settings.inspectEnabled} />
-			Enable inspect for han characters
+			<span>Enable inspect for han characters</span>
 		</label>
 		<label class="check">
 			<input type="checkbox" bind:checked={settings.replyNotifications} />
-			Enable notifications
+			<span>Enable notifications</span>
 		</label>
 		<label class="check">
 			<input type="checkbox" bind:checked={settings.micEnabled} />
-			Enable microphone dictation
+			<span>Enable microphone dictation</span>
 		</label>
 		<label class="check">
 			<input type="checkbox" bind:checked={settings.captureEnabled} />
-			Enable screen-capture OCR (global shortcut + composer button)
+			<span>Enable screen-capture OCR (global shortcut + composer button)</span>
 		</label>
 	{/if}
 	<VoicePanel {settings} {androidUI} {followVoice} />
@@ -274,6 +274,34 @@
 				}}
 			/>
 			<output>{Math.round(settings.fontScale * 100)}%</output>
+		</span>
+	</label>
+	<!-- Interface size commits on change, not input: the drawer it
+	sits in zooms with the value, so live updates would resize the
+	panel under the dragging thumb. No drag-up reset either: the
+	release-time change commit lands after pointerup and would
+	overwrite the gesture — the (100%) button resets. -->
+	<label class="slider-row">
+		Interface size
+		<button
+			type="button"
+			class="reset-width"
+			title="Reset to the default interface size"
+			onclick={() => (settings.uiScale = 1)}>(100%)</button
+		>
+		<span class="font-row">
+			<input
+				type="range"
+				min="100"
+				max="250"
+				step="10"
+				value={Math.round((settings.uiScale ?? 1) * 100)}
+				aria-label="Interface size percent"
+				onchange={(e) => {
+					settings.uiScale = Number(e.currentTarget.value) / 100;
+				}}
+			/>
+			<output>{Math.round((settings.uiScale ?? 1) * 100)}%</output>
 		</span>
 	</label>
 	<label class="slider-row">

@@ -409,6 +409,26 @@ describe("settings", () => {
 		expect(loadSettings(memoryStore).annPopScale).toBe(1);
 	});
 
+	it("defaults interface chrome to 100% and heals strays", () => {
+		expect(defaultSettings().uiScale).toBe(1);
+		const big = blankSettings();
+		big.uiScale = 2.5;
+		saveSettings(big, memoryStore);
+		expect(loadSettings(memoryStore).uiScale).toBe(2.5);
+		const junk = blankSettings();
+		(junk as unknown as Record<string, unknown>).uiScale = "250%";
+		saveSettings(junk, memoryStore);
+		expect(loadSettings(memoryStore).uiScale).toBe(1);
+		const wild = blankSettings();
+		wild.uiScale = 0.5;
+		saveSettings(wild, memoryStore);
+		expect(loadSettings(memoryStore).uiScale).toBe(1);
+		const over = blankSettings();
+		over.uiScale = 5;
+		saveSettings(over, memoryStore);
+		expect(loadSettings(memoryStore).uiScale).toBe(1);
+	});
+
 	it("defaults the capture source to frontmost windowed", () => {
 		const fresh = defaultSettings();
 		expect(fresh.captureSourceId).toBe(null);

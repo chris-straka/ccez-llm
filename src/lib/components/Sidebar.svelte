@@ -190,6 +190,11 @@ only this drawer through scoping. -->
 		top: 0;
 		bottom: 0;
 		width: 13rem;
+		/* Interface-size zoom (see the settings drawer): the
+		reciprocal cap keeps the rendered box on narrow windows
+		and phones, where 13rem at 250% would spill past 412px. */
+		zoom: var(--ui-scale, 1);
+		max-width: calc(100vw * var(--ui-scale-inv, 1));
 		z-index: 55;
 		background: #fff;
 		background: var(--bg);

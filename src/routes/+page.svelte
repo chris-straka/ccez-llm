@@ -13280,7 +13280,7 @@
 		settings.fontScale,
 		settings.chatWidth ?? 36,
 		settings.promptWidth ?? PROMPT_WIDTH_BASE_REM
-	)}; --prompt-font: {settings.promptScale ?? 1}; --annpop-scale: {settings.annPopScale ?? 1}; --msg-gap: {settings.messageGap ?? MESSAGE_GAP_DEFAULT}rem; --msg-line-height: {settings.lineHeight ?? LINE_HEIGHT_DEFAULT}"
+	)}; --prompt-font: {settings.promptScale ?? 1}; --annpop-scale: {settings.annPopScale ?? 1}; --msg-gap: {settings.messageGap ?? MESSAGE_GAP_DEFAULT}rem; --msg-line-height: {settings.lineHeight ?? LINE_HEIGHT_DEFAULT}; --ui-scale: {settings.uiScale ?? 1}; --ui-scale-inv: {1 / (settings.uiScale ?? 1)}"
 	data-mac={(isMac && !androidUI) || null}
 >
 	<Sidebar
