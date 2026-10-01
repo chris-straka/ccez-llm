@@ -1,8 +1,25 @@
 # Refactor candidates (Sep 2026)
 
-Standing constraint: `src/routes/+page.svelte` stays one file by explicit
-decision (P23 in TODO.md). The refactors below extract logic into tested
-modules — they never split the template for size alone.
+Revised 2026-10-01. The old "stays one file (P23)" constraint is gone
+(P23 was dropped in `48419ca`), and so is "nothing fixed so far was
+caused by size": the annotation edit data-loss fix (`64e1b90`) traced
+to one `annotations` array shared by drafts and the message editor,
+with six save sites scattered across the page. The rule now:
+
+- Pure decisions still go to `src/lib/*.ts` over a facts snapshot
+  (the `keybindings.ts` way, unit-tested).
+- Domain state plus its effects may leave the page into a
+  `src/lib/*.svelte.ts` controller that owns its `$state` fields
+  (`annotate-mode.svelte.ts`, `news-mode.svelte.ts`). That is not the
+  forbidden "class instance in `$state`": the controller is a plain
+  `const`, its fields are runes.
+- Template markup keeps moving into `src/lib/components/` as today.
+- Still never split for line count alone; split where one domain's
+  state is mutated from many unrelated places.
+
+Next candidate: an annotation drafts controller owning `annotations`,
+the edit stash, the save sites, pins, and the ask flow, so `annotate()`
+and `openBadge()` become unit-testable (audit item 5, 2026-10-01).
 
 ## 1. Hollow out `onKey` into `src/lib/keybindings.ts` (biggest win, substantially complete)
 
@@ -306,8 +323,8 @@ target pattern for no tested gain.
 - The §3 render-path unification (redesign, not slicing: mid-stream
   ordering risks for stable, rarely-touched code — verdict Sep 2026:
   no; revisit only if aids churn forces it).
-- Splitting `+page.svelte` for size alone (decided against; nothing fixed so
-  far was caused by size).
+- Splitting `+page.svelte` for size alone (still no; see the revised
+  rule at the top for when a domain does leave the page).
 - Classes or method-bearing stores in `$state` (breaks re-render).
 - Touching the Rust per-platform `tts`/`dictate`/`ocr` files without first
   verifying they actually duplicate logic — look-first, lower priority.
