@@ -1078,3 +1078,7 @@ condensed from the Sep 23–24 chain (`0cda353`–`051257b`, tail
       annotation-block / annotation-drafts-store / sel-geometry move
       out verbatim (75 exports preserved); tests move with their
       functions; stale comments fixed; e2e 69/69 (`b6b3ae9`).
+- [x] D Deduplicate annotations-stamp: shared `numberMarks`,
+      `placeBadge`, and `runWashRamp` cores; `badgeFace` /
+      `syncBadgeFaces` deleted (sync dead); face values re-pinned
+      on real DOM; e2e 189/189 over the 12 gate runs (`4d9f97d`).
