@@ -26,17 +26,17 @@ same codebase via the Tauri mobile target.
   never pass claims.
 - Ghost features: user believes all fixed — verify, then drop this item.
 
-## Pile: Oct 2026 handoff
+## Pile: Oct 2026 handoff (Muse)
 
-Full specs, acceptance criteria, and gates live in
-`docs/plans/2026-10-01-handoff.md`. Work top to bottom.
+Full specs, order, acceptance criteria, and gates live in
+`docs/plans/2026-10-01-handoff.md` ("Who does what" has the order).
 
-- [ ] A7. Voice speed slider (web + macOS + Android)
-- [ ] A8. Interface size slider for settings, chat list, and menus (owner to confirm)
-- [ ] Fix two e2e failures that predate the plan (see the plan's "Known failing")
+- [ ] Fix two e2e failures that predate the plan ("Known failing")
+- [ ] A8. Interface size slider (settings, chat list, dialogs, toasts)
+- [ ] A7b. Voice speed on Windows/Linux; verify Android on the S24
 - [ ] B. Annotation drafts controller out of `+page.svelte`
 - [ ] C. Split `annotations.ts` by concern
-- [ ] D. Deduplicate `annotations-stamp.ts` loops and ramps
+- [ ] D. Deduplicate `annotations-stamp.ts` loops and ramps (after C)
 - [ ] E. Prune refactor-history component tests and e2e trivia
 - [ ] F. Focus-drop probe: ask the owner, then remove or keep
 - [ ] G. Correction mode (French/German)

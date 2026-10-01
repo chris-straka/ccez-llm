@@ -1029,3 +1029,14 @@ condensed from the Sep 23–24 chain (`0cda353`–`051257b`, tail
       owner's call (`638cc61`).
 - [x] Big-word reader: full-screen phrase-by-phrase read-aloud,
       follow or tap pace (`acd8042`).
+- [x] Reader Words at a time (1, 2, 3, Auto) and per-phrase offsets
+      (`431d64d`).
+- [x] Voice speed slider: web, macOS, Android; Windows/Linux pending
+      (`d58a4a2`).
+
+## Dev keychain dialogs (Oct 1, 2026)
+
+- [x] Diagnosed via `/usr/bin/log`: all 42 dialogs came from the dev
+      binary (cdhash ACL mismatch per rebuild, plus repeated reads).
+      `keychain_get` memoizes per launch (`eaa294d`); debug builds keep
+      keys in gitignored `src-tauri/.dev-secrets.json` (`73c20f0`).
