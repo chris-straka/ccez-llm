@@ -138,4 +138,13 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: "src-tauri -> target"
+      # Plain `cargo check` gets none of the NDK compiler env that
+      # `tauri android build` sets up in the release leg, and cc-rs
+      # (ring's build script) does not read ANDROID_NDK_HOME itself —
+      # without these it dies looking for `aarch64-linux-android-clang`
+      # on PATH. Wrapper API 36 matches the app's compileSdk.
       - run: cargo check --locked --target aarch64-linux-android
+        env:
+          CC_aarch64_linux_android: ${{ env.ANDROID_NDK_HOME }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android36-clang
+          CXX_aarch64_linux_android: ${{ env.ANDROID_NDK_HOME }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android36-clang++
+          AR_aarch64_linux_android: ${{ env.ANDROID_NDK_HOME }}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
