@@ -4,7 +4,6 @@ import {
 	deleteAnnotation,
 	canPinAnnotation,
 	setPromptPinned,
-	filePendingAnnotation,
 	locateQuote,
 	newAnnotationId,
 	occurrenceAtPosition,
@@ -67,6 +66,13 @@ export interface AnnotateModeDeps {
 	setPending: (next: Annotation | null) => void;
 	getAnnDraft: () => string;
 	setAnnDraft: (next: string) => void;
+	/** File a pending annotation + ask it (the drafts controller's
+	merged filing core): returns the filed id, null when nothing
+	was pending. */
+	filePendingDraft: (
+		pending: Annotation | null,
+		draft: string
+	) => AnnotationId | null;
 	getHighlight: () => AnnotationId | null;
 	setHighlight: (id: AnnotationId | null) => void;
 	setReviewOpen: (open: boolean) => void;
@@ -120,8 +126,6 @@ export interface AnnotateModeDeps {
 	hasPromptEdit: () => boolean;
 	commitPromptEdit: () => void;
 	editInPrompt: (comment: string) => void;
-	/** File-and-ask for a filed id (page looks it up, asks once). */
-	requestAsk: (id: AnnotationId) => void;
 	scrollRectIntoClear: (rect: DOMRect) => void;
 	flashJumpMark: (locate: () => Range | null) => void;
 	/** Unpin the stream follow (selections/cards read still). */
@@ -618,21 +622,16 @@ export class AnnotateMode {
 	Filing fires the annotation's own request at once — blue while it
 	waits, orange when the reply lands. */
 	commitPending(): void {
-		const pending = this.deps.getPending();
-		const filed = filePendingAnnotation(
-			this.deps.getAnnotations(),
-			pending,
+		const id = this.deps.filePendingDraft(
+			this.deps.getPending(),
 			this.deps.getAnnDraft()
 		);
-		if (!filed) return;
-		this.deps.setAnnotations(filed);
-		const id = pending?.id;
+		if (!id) return;
 		this.deps.setPending(null);
 		// The filed draft owned the highlight (kept for readings
 		// panels while creating): both go with the submit.
 		this.clearSelection();
 		this.deps.dismissSelPanels();
-		if (id) this.deps.requestAsk(id);
 	}
 
 	/** Paragraph holding a quote, for the answer request's context. */

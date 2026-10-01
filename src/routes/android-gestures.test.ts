@@ -56,7 +56,7 @@ describe("android gesture wiring", () => {
 		// time and at fire time.
 		expect(
 			source.match(
-				/if \(!canHoldDeleteBadge\(annotations\.find\(\(a\) => a\.id === id\)\)\)/g
+				/if \(!canHoldDeleteBadge\(drafts\.list\.find\(\(a\) => a\.id === id\)\)\)/g
 			)?.length
 		).toBe(2);
 		expect(source).toMatch(

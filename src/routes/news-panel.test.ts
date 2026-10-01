@@ -63,7 +63,7 @@ describe("headline annotate wiring", () => {
 
 	it("hands headline marks and badge actions to the cards", () => {
 		const source = pageSource();
-		expect(source).toContain("buildNewsMarks(annotations, pendingAnn)");
+		expect(source).toContain("buildNewsMarks(drafts.list, pendingAnn)");
 		expect(source).toContain("newsMarks={newsMarks}");
 		const mode = newsModeSource();
 		expect(mode).toContain("badge: (id: AnnotationId, x: number, y: number) => {");

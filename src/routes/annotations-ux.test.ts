@@ -81,6 +81,13 @@ function annotateModeSource(): string {
 	);
 }
 
+function draftsSource(): string {
+	return readFileSync(
+		new URL("../lib/annotation-drafts.svelte.ts", import.meta.url),
+		"utf8"
+	);
+}
+
 describe("annotation badge font-size tracking", () => {
 	it("scales numbered badges with the message font size", () => {
 		// Dampened tracking (never compounding rem): the badge rule must
@@ -213,9 +220,9 @@ describe("annotation create wiring", () => {
 	it("pins answered story notes so review lists them", () => {
 		// No badge to pin from: the answer landing files the
 		// note into the dock (and the launched session) itself.
-		const source = pageSource();
-		const askPath = source.slice(source.indexOf("async function askAnnotation("));
-		expect(askPath).toContain("setPromptPinned(annotations, ann.id, true)");
+		const source = draftsSource();
+		const askPath = source.slice(source.indexOf("async ask("));
+		expect(askPath).toContain("setPromptPinned(this.list, ann.id, true)");
 	});
 
 	it("reads the annotated text when a waiting badge opens", () => {

@@ -211,14 +211,9 @@
 		type SentTagAction
 	} from "$lib/attachments";
 	import {
-		deleteAnnotation,
-		clearPromptPinned,
 		withAnnotations,
 		promptInclusions,
 		canHoldDeleteBadge,
-		setPromptPinned,
-		attachAnnotationAnswer,
-		unansweredAnnotations,
 		resolveSentRefTarget,
 		annRefsFor,
 		locateQuote,
@@ -231,17 +226,13 @@
 		panelCenterMoved,
 		lineStartOffset,
 		clampDragAnchorToFocusLine,
-		loadDraftAnnotations,
-		saveDraftAnnotations,
 		buildMarksFor,
 		buildNewsMarks,
 		aidedTextForMsg,
 		commitRefsEdit,
 		planClearSentRefs,
 		seedAnnotationsFromRefs,
-		annotationsAfterEdit,
 		annotationCopyText,
-		filePendingAnnotation,
 		promptAnnWashIdFor,
 		menuBtnTouchAction,
 		selMenuDragTarget,
@@ -251,6 +242,7 @@
 		type AnnotationMark,
 		type StoryAnchor
 	} from "$lib/annotations";
+	import { AnnotationDrafts } from "$lib/annotation-drafts.svelte";
 	import {
 		trimParagraphTerminator,
 		quoteRange,
@@ -828,21 +820,30 @@
 	While nonzero the paperclip dims and reports progress. */
 	let attachBusy = $state(0);
 	let foldedIds = new SvelteSet<string>();
-	/**
-	 * Draft annotations for the active chat, restored from storage on
-	 * launch: unsent quotes survive a restart (sending still bakes and
-	 * clears, switching chats still starts clean — the save below
-	 * records the empty list either way).
-	 */
-	let annotations = $state<Annotation[]>(
-		loadDraftAnnotations(chatState.activeChatId)
-	);
+	// Draft annotations for the active chat (filed list, edit stash,
+	// per-chat load/save, pins, filing, ask flow): state and verbs
+	// live in the module; effects, gestures, onKey, the send pipeline,
+	// the pill, and readings stay paged and delegate in. Forward
+	// closures (notices, newsMode, annotateMode, androidUI) all
+	// resolve before the first call, like newsMode's onBadge. Annotated
+	// (not inferred): the two controllers reference each other.
+	const drafts: AnnotationDrafts = new AnnotationDrafts({
+		getActiveChatId: () => chatState.activeChatId,
+		getChatIds: () => chatState.chats.map((c) => c.id),
+		resolveProvider: () => resolveProviderActive(),
+		answerQuestion: (provider, q) => annotationAnswer(provider, q),
+		answerContextFor: (ann) =>
+			annotateMode.answerContextFor(ann, ann.quote, ann.at ?? 0),
+		notifyBanner: (message) => showNotice(notices, "banner", message),
+		clearBanner: () => clearNotice(notices, "banner"),
+		toastError: (message) => flashErrorToast(message),
+		isPhone: () => androidUI,
+		isNewsStoryOpen: (link) =>
+			newsMode.news?.stories.some((s) => s.link === link) ?? false,
+		openBadge: (id) => annotateMode.openBadge(id)
+	});
 	$effect(() => {
-		saveDraftAnnotations(
-			chatState.activeChatId,
-			filedAnnotations(),
-			chatState.chats.map((c) => c.id)
-		);
+		drafts.autosave();
 	});
 	/**
 	 * Search index stays fresh: any chat/message/draft change re-indexes
@@ -857,7 +858,7 @@
 					`${c.id}:${c.messages.length}:${c.messages.map((m) => m.content.length).join(",")}`
 			)
 			.join("|");
-		const draftCount = annotations.length;
+		const draftCount = drafts.list.length;
 		void fingerprint;
 		void draftCount;
 		scheduleSearchIndex();
@@ -1064,20 +1065,7 @@
 	/** Own message under in-place edit (null when no edit is open).
 	Enter saves + resends; Alt+Enter saves without resending; Esc cancels. */
 	let editingMsgId: ChatMsgId | null = $state(null);
-	/**
-	 * The chat's filed annotations while an own-message edit borrows
-	 * the live list for its ref seeds (see annotationsAfterEdit):
-	 * stashed at entry, restored when the edit ends.
-	 */
-	let editAnnStash: { chatId: ChatId; list: Annotation[]; seedIds: Set<string> } | null =
-		null;
-	/** The active chat's annotations as storage should see them: mid-edit
-	 * the live list holds the edited message's seeds, not the drafts. */
-	function filedAnnotations(): Annotation[] {
-		const stash = editAnnStash;
-		if (!stash) return annotations;
-		return annotationsAfterEdit(stash.list, annotations, stash.seedIds, false);
-	}
+	/** Draft list stash and filed view live in the drafts controller. */
 	/** In-place editor handle (null unless an own-message edit is mounted). */
 	let msgEditor: PromptEditor | null = null;
 	/** Seed text for the in-place editor (prose plus image-marker lines). */
@@ -2138,7 +2126,7 @@
 	their pill, long ones center (see .lang-list-fixed). */
 	let langMenuAnchor: LangMenuAnchor | null = $state(null);
 	/** Headline badges by story link (filed + pending preview). */
-	const newsMarks = $derived(buildNewsMarks(annotations, pendingAnn));
+	const newsMarks = $derived(buildNewsMarks(drafts.list, pendingAnn));
 	/** Learner news mode (empty chats only): picking a language
 	opens its story cards under the pill rail; launching a session
 	collapses the panel and the chat holds only the session.
@@ -2183,10 +2171,11 @@
 	// the module; effects, gestures, onKey, the send pipeline, the
 	// pill, and readings stay paged and delegate in.
 	const annotateMode = new AnnotateMode({
-		getAnnotations: () => annotations,
+		getAnnotations: () => drafts.list,
 		setAnnotations: (next) => {
-			annotations = next;
+			drafts.setList(next);
 		},
+		filePendingDraft: (pending, draft) => drafts.filePending(pending, draft),
 		getPending: () => pendingAnn,
 		setPending: (next) => {
 			pendingAnn = next;
@@ -2281,10 +2270,6 @@
 		hasPromptEdit: () => promptAnnEdit !== null,
 		commitPromptEdit: () => commitPromptAnnEdit(),
 		editInPrompt: (comment) => editAnnotationInPrompt({ pending: true }, comment),
-		requestAsk: (id) => {
-			const ann = annotations.find((a) => a.id === id);
-			if (ann) void askAnnotation(ann);
-		},
 		scrollRectIntoClear: (rect) => scrollRectIntoClear(rect),
 		flashJumpMark: (locate) => flashJumpMark(locate),
 		unstick: () => {
@@ -2375,9 +2360,7 @@
 	const flashcardsOpen = $derived(deck !== null);
 	/** Every chat's answered annotations; the active chat reads live. */
 	function harvestAllCards(): ReviewCard[] {
-		return harvestCards(chatState.chats, (id) =>
-			id === chatState.activeChatId ? filedAnnotations() : loadDraftAnnotations(id)
-		);
+		return harvestCards(chatState.chats, (id) => drafts.draftsFor(id));
 	}
 	/** Due count for the empty-chat entry, recounted when a chat empties. */
 	const flashcardsDue = $derived.by(() => {
@@ -2635,7 +2618,7 @@
 	const canSubmit = $derived(
 		!isSending(chatState) &&
 			!liveNative.has(chatState.activeChatId) &&
-			(hasText || attachments.length > 0 || annotations.length > 0)
+			(hasText || attachments.length > 0 || drafts.list.length > 0)
 	);
 	/** No-key lock lives below, next to `useMock` (it reads it). */
 
@@ -2711,8 +2694,8 @@
 				const anns = collectSearchAnnotations(
 					chatState.chats,
 					chatState.activeChatId,
-					annotations,
-					loadDraftAnnotations
+					drafts.list,
+					(id) => drafts.draftsFor(id)
 				);
 				void ensureSearchStore()
 					.index(buildSearchDocs(currentSearchDocs(), anns))
@@ -2818,17 +2801,13 @@
 			// inside the transition keeps the autosave effect (which
 			// also keys on activeChatId) from ever filing one chat's
 			// drafts under another's id.
-			saveDraftAnnotations(
-				from,
-				filedAnnotations(),
-				chatState.chats.map((c) => c.id)
-			);
+			drafts.fileChat(from);
 			selectChat(chatState, id);
-			annotations = loadDraftAnnotations(id);
+			drafts.restoreChat(id);
 			// Answers lost crossing chats (or a restart) refire here:
 			// inflight asks stay single via the asking set, answered
 			// drafts never refire.
-			resumeUnansweredAnnotations();
+			drafts.resumeUnanswered();
 			restoreChatScroll(id);
 		};
 		// Re-entering the live chat (preview-as-you-go already landed
@@ -3985,14 +3964,10 @@
 		}
 		if (step.kind === "mint") {
 			// File the leaving chat's drafts away first: resetDraftExtras
-			// empties `annotations`, and the autosave effect would then
+			// empties the list, and the autosave effect would then
 			// persist the empty list under the old id (draft restore
 			// on return would come back blank).
-			saveDraftAnnotations(
-				chatState.activeChatId,
-				filedAnnotations(),
-				chats.map((c) => c.id)
-			);
+			drafts.fileChat(chatState.activeChatId);
 			resetDraftExtras();
 			// Minting switches without a transition, so the preview
 			// clears here (transitionToChat covers its own path).
@@ -4052,8 +4027,7 @@
 
 	/** Unsent composer extras quote one chat's messages — never carry over. */
 	function resetDraftExtras(): void {
-		editAnnStash = null;
-		annotations = [];
+		drafts.clearForNewChat();
 		reviewOpen = false;
 		editingMsgId = null;
 		editingAttachments = [];
@@ -4099,11 +4073,7 @@
 		// empties them — otherwise the autosave effect files the empty
 		// list under the old chat's id and return-restore comes back
 		// blank (same ordering as transitionToChat's save-before-load).
-		saveDraftAnnotations(
-			chatState.activeChatId,
-			filedAnnotations(),
-			chatState.chats.map((c) => c.id)
-		);
+		drafts.fileChat(chatState.activeChatId);
 		resetDraftExtras();
 		newChat(chatState);
 		newsMode.clear();
@@ -5166,79 +5136,8 @@
 		}
 	}
 
-	/** Annotation ids with a model request in flight (plain set,
-	never state): the resume scan below never doubles one. */
-	const askingAnnIds = new SvelteSet<string>();
-	/** Annotation ids whose ask already failed this session: the
-	switch scan leaves those for an explicit re-ask (browsing chats
-	must never banner-fail the same note on every visit). A restart
-	starts empty, so last session's failures still resume. */
-	const askFailedIds = new SvelteSet<string>();
-	/** Fire one annotation's own model request: never linked to the
-	main prompt or history — later questions file while earlier ones
-	are still waiting. Failures banner (toast on phones) and leave
-	the badge blue; the question keeps its note for a re-ask. */
-	async function askAnnotation(
-		ann: Annotation,
-		opts: { skipWhenKeyless?: boolean } = {}
-	): Promise<void> {
-		// One request per annotation: the boot/switch resume scan
-		// refires answerless drafts, but never one already asking
-		// (its reply still lands on the same id).
-		if (askingAnnIds.has(ann.id)) return;
-		askingAnnIds.add(ann.id);
-		try {
-			const provider = await resolveProviderActive();
-			if (!provider) {
-				// Resume scans stay silent without a key: banner
-				// spam for stale drafts helps nobody (an explicit
-				// ask still banners like today).
-				if (opts.skipWhenKeyless) return;
-				const message = "Set an API key first — open Settings.";
-				showNotice(notices, "banner", message);
-				if (androidUI) flashErrorToast(message);
-				return;
-			}
-			clearNotice(notices, "banner");
-			const answer = await annotationAnswer(provider, {
-				quote: ann.quote,
-				question: ann.comment,
-				context: annotateMode.answerContextFor(ann, ann.quote, ann.at ?? 0)
-			});
-			annotations = attachAnnotationAnswer(annotations, ann.id, answer);
-			// Story notes have no badge to turn orange or pin from:
-			// an answered one joins the review dock directly (and
-			// rides the launched session as context), and its card
-			// opens while the story is still on screen (resume
-			// scans for long-closed panels attach silently).
-			if (!ann.messageId && ann.story && answer.trim()) {
-				annotations = setPromptPinned(annotations, ann.id, true);
-				if (newsMode.news?.stories.some((s) => s.link === ann.story?.link))
-					annotateMode.openBadge(ann.id);
-			}
-		} catch (error) {
-			askFailedIds.add(ann.id);
-			const message = error instanceof Error ? error.message : String(error);
-			showNotice(notices, "banner", message);
-			if (androidUI) flashErrorToast(message);
-		} finally {
-			askingAnnIds.delete(ann.id);
-		}
-	}
-	/**
-	 * Relaunch the current chat's answerless drafts: a restart takes
-	 * filed requests off the wire (pending never reaches storage, so
-	 * every persisted answerless draft is inflight work), and a chat
-	 * switch heals answers lost crossing chats the same way. Silent
-	 * without a key; answered drafts never refire.
-	 */
-	function resumeUnansweredAnnotations(): void {
-		for (const ann of unansweredAnnotations(annotations)) {
-			if (askingAnnIds.has(ann.id)) continue;
-			if (askFailedIds.has(ann.id)) continue;
-			void askAnnotation(ann, { skipWhenKeyless: true });
-		}
-	}
+	/** Ask flow (single-flight sets, ask, resume scan) lives in the
+	drafts controller. */
 	/** Fade the pill out, then unmount it. Data writes stay synchronous
 	in the caller — only the unmount (and its highlight) waits out the ramp. */
 	function hideAnnPop(): void {
@@ -5271,18 +5170,8 @@
 		if (annPopSaveKind(annPop.id, pendingAnn?.id ?? null) === "commit-pending") {
 			annotateMode.commitPending();
 		} else if (annPop.fresh === false) {
-			const id = annPop.id;
-			const draft = annDraft;
-			const target = annotations.find((a) => a.id === id);
-			// An emptied draft keeps the old comment — the no-loss
-			// rule cancel already follows. A deleted-while-editing
-			// note just closes.
-			if (target && target.answer !== undefined && draft.trim()) {
-				const edited = { ...target, comment: draft };
-				annotations = annotations.map((a) => (a.id === id ? edited : a));
+			if (drafts.commitCommentEdit(annPop.id, annDraft))
 				flashToast(annEditCommitToast(false));
-				void askAnnotation(edited);
-			}
 		}
 		hideAnnPop();
 		// Only the Enter key needs the anti-double-send guard: a click-away
@@ -5319,8 +5208,7 @@
 			// readings panels while creating): both go with it.
 			annotateMode.clearSelection();
 			dismissSelPanels();
-		} else if (cancelKind === "delete-fresh")
-			annotations = deleteAnnotation(annotations, id);
+		} else if (cancelKind === "delete-fresh") drafts.deleteById(id);
 		editor?.focus();
 	}
 
@@ -5397,7 +5285,7 @@
 	 * comment and re-asks at once (see saveAnnPop).
 	 */
 	function editOrangeAnnotation(id: AnnotationId): void {
-		const current = annotations.find((a) => a.id === id);
+		const current = drafts.list.find((a) => a.id === id);
 		if (!current || current.answer === undefined) return;
 		// The edit card unpins the stream follow like any badge
 		// press: typing must not fight the follow.
@@ -5598,19 +5486,13 @@
 		if (!promptAnnEdit) return;
 		buzzBeat("send");
 		const comment = editor?.getText() ?? "";
-		const filed = filePendingAnnotation(annotations, pendingAnn, comment);
-		if (filed) annotations = filed;
-		const id = pendingAnn?.id;
+		drafts.filePending(pendingAnn, comment);
 		pendingAnn = null;
 		highlightAnnId = null;
 		exitPromptAnnEdit();
 		// Brisk confirmation tick, not the standard read-timed hold.
 		flashToast(annEditCommitToast(true), undefined, 1500);
 		void tick().then(() => editor?.focus());
-		if (id) {
-			const ann = annotations.find((a) => a.id === id);
-			if (ann) void askAnnotation(ann);
-		}
 	}
 
 	/** Tapping out drops an in-prompt note create: a pending filing
@@ -5719,7 +5601,7 @@
 
 	function gotoSentRef(messageId: ChatMsgId, quote: string): void {
 		const target = resolveSentRefTarget(
-			annotations,
+			drafts.list,
 			viewChat.messages,
 			messageId,
 			quote
@@ -6018,7 +5900,7 @@
 	function clearAllAnnotations(): void {
 		// Pinned only: filed-but-unpinned badges survive (double-click
 		// adds to the prompt; clear-all only takes those back).
-		annotations = clearPromptPinned(annotations);
+		drafts.clearPromptPins();
 		pendingAnn = null;
 		reviewOpen = false;
 		highlightAnnId = null;
@@ -6045,7 +5927,7 @@
 		return memoMarks(
 			messageId,
 			buildMarksFor(
-				annotations,
+				drafts.list,
 				messageId,
 				aidModelPin.has(messageId),
 				pendingAnn
@@ -7341,7 +7223,7 @@
 		// each); everything else filed stays filed — badges outlive
 		// the send, and pins consume (the baked message carries them
 		// now, so the next send starts unpinned).
-		const outgoingAnnotations = promptInclusions(annotations);
+		const outgoingAnnotations = drafts.consumePromptPins();
 		// The prompt empties the moment the message goes out — not when the
 		// (possibly long) reply finishes streaming in. Filed annotations
 		// survive the send (badges stay, answered or not); only pins
@@ -7350,12 +7232,6 @@
 		editor?.clear();
 		attachments = [];
 		expandedPastes = [];
-		annotations = annotations.map((a) => {
-			if (a.pinnedToPrompt !== true) return a;
-			const next = { ...a };
-			delete next.pinnedToPrompt;
-			return next;
-		});
 		pendingAnn = null;
 		reviewOpen = false;
 		highlightAnnId = null;
@@ -7539,7 +7415,7 @@
 			// chat turn). Empty Enter stays silent, like before.
 			if (
 				isSending(chatState) &&
-				(hasText || attachments.length > 0 || annotations.length > 0)
+				(hasText || attachments.length > 0 || drafts.list.length > 0)
 			) {
 				buzzNo();
 			}
@@ -7630,12 +7506,7 @@
 		if (!msg) return;
 		const refs = annRefsFor(msg.content);
 		const seeds = refs ? seedAnnotationsFromRefs(msg.id, refs.refs) : [];
-		editAnnStash = {
-			chatId: chatState.activeChatId,
-			list: annotations,
-			seedIds: new Set(seeds.map((a) => a.id))
-		};
-		annotations = seeds;
+		drafts.beginOwnEdit(chatState.activeChatId, seeds);
 		editingAttachments = msg.attachments ? [...msg.attachments] : [];
 		// Message content carries no stripped markers on save, so the
 		// seed keeps its marker lines: recount instead of reconciling,
@@ -7664,14 +7535,7 @@
 	 * edit id) while leaving the composer's own draft exactly alone.
 	 */
 	function resetInlineEdit(saved = false): void {
-		const stash = editAnnStash;
-		editAnnStash = null;
-		annotations = annotationsAfterEdit(
-			stash && stash.chatId === chatState.activeChatId ? stash.list : null,
-			annotations,
-			stash?.seedIds ?? new Set(),
-			saved
-		);
+		drafts.endOwnEdit(chatState.activeChatId, saved);
 		reviewOpen = false;
 		editingMsgId = null;
 		editingAttachments = [];
@@ -7741,7 +7605,7 @@
 				editingSeed,
 				prev?.pasteFolds
 			);
-			editMessageContent(chatState, id, withAnnotations(stored, promptInclusions(annotations)), {
+			editMessageContent(chatState, id, withAnnotations(stored, promptInclusions(drafts.list)), {
 				attachments: editingAttachments,
 				pasteFolds: keepFolds
 			});
@@ -8506,9 +8370,8 @@
 			// into its place restores its own filed drafts — and its
 			// filed scroll position, via the switch effect.
 			saveChatScroll();
-			saveDraftAnnotations(
+			drafts.discardChat(
 				id,
-				[],
 				chatState.chats.map((c) => c.id).filter((c) => c !== id)
 			);
 			resetDraftExtras();
@@ -8517,7 +8380,7 @@
 			void stopChatNativeTurns(id);
 			deleteChat(chatState, id);
 			chatScrollTops.delete(id);
-			annotations = loadDraftAnnotations(chatState.activeChatId);
+			drafts.restoreChat(chatState.activeChatId);
 			restoreChatScroll(chatState.activeChatId);
 		} else {
 			// Dropping a background chat must not touch the open
@@ -8527,11 +8390,7 @@
 			void stopChatNativeTurns(id);
 			deleteChat(chatState, id);
 			chatScrollTops.delete(id);
-			saveDraftAnnotations(
-				chatState.activeChatId,
-				filedAnnotations(),
-				chatState.chats.map((c) => c.id)
-			);
+			drafts.fileChat(chatState.activeChatId);
 		}
 		if (
 			chatState.chats.length === 1 &&
@@ -8700,13 +8559,9 @@
 				}
 				const exists = chatState.chats.some((c) => c.id === link.chatId);
 				if (!exists) return;
-				saveDraftAnnotations(
-					chatState.activeChatId,
-					filedAnnotations(),
-					chatState.chats.map((c) => c.id)
-				);
+				drafts.fileChat(chatState.activeChatId);
 				selectChat(chatState, link.chatId as ChatId);
-				annotations = loadDraftAnnotations(link.chatId);
+				drafts.restoreChat(link.chatId);
 				enterEditMode();
 			});
 		} catch (error) {
@@ -8953,7 +8808,7 @@
 		// Filed annotation asks a restart took off the wire relaunch
 		// here (answered drafts never refire, keyless boots stay
 		// silent) — blue badges turn orange on their own.
-		resumeUnansweredAnnotations();
+		drafts.resumeUnanswered();
 		// File Handling launch: a .md file opened with the app lands
 		// its text in the composer (blank-line joined like shared
 		// text); anything else rides the attachments path. Where
@@ -9645,7 +9500,7 @@
 				if (!first || !badge) return;
 				const id = badge.getAttribute("data-ann-badge") ?? "";
 				// Every filed badge holds to delete, blue or orange.
-				if (!canHoldDeleteBadge(annotations.find((a) => a.id === id)))
+				if (!canHoldDeleteBadge(drafts.list.find((a) => a.id === id)))
 					return;
 				badgeHold = {
 					x: first.clientX,
@@ -9658,7 +9513,7 @@
 					badgeHold = null;
 					if (!held) return;
 					if ((scrollBox?.scrollTop ?? 0) !== held.top) return;
-					if (!canHoldDeleteBadge(annotations.find((a) => a.id === id)))
+					if (!canHoldDeleteBadge(drafts.list.find((a) => a.id === id)))
 						return;
 					annotateMode.removeAnnotation(id);
 					badgeHoldFired = { id, at: Date.now() };
@@ -13634,7 +13489,7 @@
 			hasSelMenu={annotateMode.selMenu !== null}
 			inspectQuote={annotateMode.selMenu?.quote ?? ""}
 			inspectEnabled={settings.inspectEnabled}
-			annotations={annotations}
+			annotations={drafts.list}
 			reviewOpen={reviewOpen}
 			bind:highlightId={highlightAnnId}
 			bind:pillEl={annPill}
@@ -13802,7 +13657,7 @@
 		Self-heals when its annotation is deleted or sent while open.
 		No close button: click-off and Esc close it. -->
 		{@const pop = annotateMode.answerPop}
-		{@const answered = annotations.find((a) => a.id === pop.id)}
+		{@const answered = drafts.list.find((a) => a.id === pop.id)}
 		{#if answered?.answer}
 			<AnnAnswer
 				answer={answered.answer}
