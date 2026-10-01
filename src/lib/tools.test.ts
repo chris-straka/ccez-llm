@@ -5,11 +5,14 @@ import {
 	fetchToolDef,
 	formatFeedItems,
 	htmlToText,
+	isSearchUrl,
 	looksLikeFeed,
 	MAX_FEED_ITEMS,
 	MAX_FETCH_TEXT_CHARS,
 	parseFetchCall,
 	parseFeedItems,
+	parseSearchResults,
+	SEARCH_URL_PREFIX,
 	validFetchUrl
 } from "./tools";
 
@@ -185,5 +188,62 @@ describe("parseFetchCall", () => {
 				function: { name: "fetch_url", arguments: "nope{" }
 			})
 		).toBe(null);
+	});
+});
+
+/** Trimmed from a live html.duckduckgo.com page (Oct 2026): one ad, two organic hits. */
+const SEARCH_HTML = `<div class="serp__results">
+<div class="result results_links results_links_deep result--ad">
+  <h2 class="result__title"><a class="result__a" href="https://duckduckgo.com/y.js?ad=1">Sponsored</a></h2>
+  <a class="result__snippet" href="https://duckduckgo.com/y.js?ad=1">Buy now</a>
+</div>
+<div class="result results_links results_links_deep web-result ">
+  <h2 class="result__title">
+    <a rel="nofollow" class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fde.wikipedia.org%2Fwiki%2FBundestagswahl_2025&amp;rut=2e1c">Bundestagswahl 2025 - Wikipedia</a>
+  </h2>
+  <a class="result__snippet" href="//duckduckgo.com/l/?uddg=x">Die Wahl zum
+     21. Deutschen <b>Bundestag</b> fand am 23. Februar 2025 statt.</a>
+</div>
+<div class="result results_links web-result ">
+  <h2 class="result__title"><a class="result__a" href="https://www.tagesschau.de/wahl/">Wahlarchiv</a></h2>
+</div>
+</div>`;
+
+describe("web search", () => {
+	it("teaches the model the keyless search prefix", () => {
+		expect(fetchToolDef().function.description).toContain(SEARCH_URL_PREFIX);
+		expect(
+			validFetchUrl(`${SEARCH_URL_PREFIX}${encodeURIComponent("Wahl 2025")}`)
+		).toBe(true);
+	});
+
+	it("recognizes only the search host", () => {
+		expect(isSearchUrl(`${SEARCH_URL_PREFIX}x`)).toBe(true);
+		expect(isSearchUrl("https://duckduckgo.com/?q=x")).toBe(false);
+		expect(isSearchUrl("not a url")).toBe(false);
+	});
+
+	it("reads organic results with unwrapped links, ads dropped", () => {
+		expect(parseSearchResults(SEARCH_HTML)).toEqual([
+			{
+				title: "Bundestagswahl 2025 - Wikipedia",
+				link: "https://de.wikipedia.org/wiki/Bundestagswahl_2025",
+				description:
+					"Die Wahl zum 21. Deutschen Bundestag fand am 23. Februar 2025 statt."
+			},
+			{
+				title: "Wahlarchiv",
+				link: "https://www.tagesschau.de/wahl/",
+				description: ""
+			}
+		]);
+	});
+
+	it("yields nothing for a challenge page", () => {
+		expect(
+			parseSearchResults(
+				"<html><body><form>Are you a robot?</form></body></html>"
+			)
+		).toEqual([]);
 	});
 });

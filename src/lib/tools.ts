@@ -40,7 +40,9 @@ export function fetchToolDef(): FetchToolDef {
 				"RSS/Atom feeds work too and are the best route to recent news: a feed returns its latest " +
 				"headlines as one line each. Prefer a feed URL you know for the outlet asked about. " +
 				"Call it at once when you need a page — never write that you will fetch without calling. " +
-				"When a fetch fails, call again with a different URL instead of stopping.",
+				"When a fetch fails, call again with a different URL instead of stopping. " +
+				`To search the web, fetch ${SEARCH_URL_PREFIX}<url-encoded query>: it returns the top results ` +
+				"as one line each with their URLs, so fetch the best result next instead of guessing a URL.",
 			parameters: {
 				type: "object",
 				properties: {
@@ -53,6 +55,23 @@ export function fetchToolDef(): FetchToolDef {
 			}
 		}
 	};
+}
+
+/**
+ * Keyless web search: DuckDuckGo's no-JS HTML endpoint, fetched like
+ * any page. The tool description teaches the model this prefix, and
+ * {@link parseSearchResults} turns the result page into feed-style
+ * lines (title — snippet (url)) so the model can follow a link.
+ */
+export const SEARCH_URL_PREFIX = "https://html.duckduckgo.com/html/?q=";
+
+/** True when the URL is a search-results page this module can parse. */
+export function isSearchUrl(url: string): boolean {
+	try {
+		return new URL(url).hostname === "html.duckduckgo.com";
+	} catch {
+		return false;
+	}
 }
 
 /** Longest URL the tool accepts (guards log spam, not a security line). */
@@ -179,6 +198,46 @@ export function formatFeedItems(items: FeedItem[]): string {
 		})
 		.join("\n")
 		.slice(0, MAX_FETCH_TEXT_CHARS);
+}
+
+/**
+ * Real target out of a DuckDuckGo redirect (`//duckduckgo.com/l/?uddg=…`);
+ * direct links pass through. Pure.
+ */
+function unwrapSearchLink(href: string): string {
+	try {
+		const url = new URL(href, "https://duckduckgo.com");
+		return url.searchParams.get("uddg") ?? url.href;
+	} catch {
+		return href;
+	}
+}
+
+/**
+ * Organic results out of a DuckDuckGo HTML result page, ads dropped,
+ * shaped as feed items so {@link formatFeedItems} renders them. Pure
+ * over the markup (DOMParser is the only host need).
+ */
+export function parseSearchResults(html: string): FeedItem[] {
+	const doc = new DOMParser().parseFromString(html, "text/html");
+	const out: FeedItem[] = [];
+	for (const node of doc.querySelectorAll(".result")) {
+		if (out.length >= MAX_FEED_ITEMS) break;
+		if (node.classList.contains("result--ad")) continue;
+		const anchor = node.querySelector("a.result__a");
+		const title = (anchor?.textContent ?? "").trim();
+		const href = anchor?.getAttribute("href") ?? "";
+		if (!title || !href) continue;
+		out.push({
+			title,
+			link: unwrapSearchLink(href),
+			description: (node.querySelector(".result__snippet")?.textContent ?? "")
+				.replace(/\s+/g, " ")
+				.trim()
+				.slice(0, MAX_FEED_DESC_CHARS)
+		});
+	}
+	return out;
 }
 
 /**

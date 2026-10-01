@@ -12,6 +12,7 @@ mod fetch;
 mod news;
 mod ocr;
 mod og_image;
+mod page_text;
 #[cfg(target_os = "windows")]
 mod ocr_windows;
 #[cfg(target_os = "linux")]

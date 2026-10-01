@@ -3,8 +3,10 @@ import { tauriBackendAvailable } from "./secrets";
 import {
 	formatFeedItems,
 	htmlToText,
+	isSearchUrl,
 	looksLikeFeed,
 	parseFeedItems,
+	parseSearchResults,
 	validFetchUrl
 } from "./tools";
 
@@ -29,6 +31,11 @@ export async function fetchPageText(
 	const html = tauriBackendAvailable()
 		? await invokeHtml(url)
 		: await browserHtml(url, signal);
+	if (isSearchUrl(url)) {
+		const text = formatFeedItems(parseSearchResults(html));
+		if (!text) throw new FetchPageError("That search returned no results.");
+		return text;
+	}
 	if (looksLikeFeed(html)) {
 		const text = formatFeedItems(parseFeedItems(html));
 		if (!text) throw new FetchPageError("That feed had no readable headlines.");

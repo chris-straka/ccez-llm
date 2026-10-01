@@ -54,4 +54,30 @@ describe("fetchPageText", () => {
 			"HTTP 404"
 		);
 	});
+
+	it("formats search pages as result lines, empty searches error short", async () => {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(
+				async () =>
+					new Response(
+						`<div class="result"><a class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.com%2Fa">A</a><a class="result__snippet">Snip</a></div>`,
+						{ status: 200 }
+					)
+			)
+		);
+		await expect(
+			fetchPageText("https://html.duckduckgo.com/html/?q=a")
+		).resolves.toBe("- A — Snip (https://example.com/a)");
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(
+				async () =>
+					new Response("<html><body>robot?</body></html>", { status: 200 })
+			)
+		);
+		await expect(
+			fetchPageText("https://html.duckduckgo.com/html/?q=a")
+		).rejects.toThrow("That search returned no results.");
+	});
 });

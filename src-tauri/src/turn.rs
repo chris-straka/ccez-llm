@@ -324,7 +324,7 @@ fn stream_body(req: &TurnRequest, history: &[serde_json::Value], tools: bool) ->
             "type": "function",
             "function": {
                 "name": "fetch_url",
-                "description": "Fetch a web page and return its readable text. Call it at once when you need a page — never write that you will fetch without calling. When a fetch fails, call again with a different URL instead of stopping.",
+                "description": "Fetch a web page and return its readable text. Call it at once when you need a page — never write that you will fetch without calling. When a fetch fails, call again with a different URL instead of stopping. To search the web, fetch https://html.duckduckgo.com/html/?q=<url-encoded query>: it returns the top results as one line each with their URLs, so fetch the best result next instead of guessing a URL.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -357,7 +357,12 @@ type PageFetch = Arc<
 
 fn default_page_fetch() -> PageFetch {
     Arc::new(|url: String| {
-        Box::pin(async move { crate::fetch::fetch_page(url).await })
+        // Same cleaning as the TypeScript executor (`fetchPageText`):
+        // the model reads text, never raw markup.
+        Box::pin(async move {
+            let markup = crate::fetch::fetch_page(url.clone()).await?;
+            Ok(crate::page_text::tool_text(&url, &markup))
+        })
             as Pin<Box<dyn Future<Output = Result<String, String>> + Send>>
     })
 }
