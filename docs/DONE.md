@@ -1053,3 +1053,10 @@ condensed from the Sep 23–24 chain (`0cda353`–`051257b`, tail
       Space-dismissed composer and restore it via focusin — the loop
       now stops once the prompt idles — and the space spec clears the
       cross-test browser clipboard before asserting an empty copy.
+- [x] A8 Interface size slider: `uiScale` 1–2.5 (Settings, under Text
+      Size, `onchange`), zooms drawer/list/dialogs/toasts via
+      `--ui-scale` / `--ui-scale-inv`, thread and composer untouched;
+      phone sheet layout fixes (inner fill, wrapped labels, stacked
+      footer, wrapped chords); `e2e/interface-size.e2e.ts` pins all
+      four surfaces in-viewport at 250% on desktop + phone
+      (`5efac6e`).
