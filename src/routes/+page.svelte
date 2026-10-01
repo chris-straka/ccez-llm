@@ -252,6 +252,7 @@
 		loadDraftAnnotations,
 		saveDraftAnnotations,
 		buildMarksFor,
+		buildNewsMarks,
 		aidedTextForMsg,
 		commitRefsEdit,
 		planClearSentRefs,
@@ -2202,6 +2203,8 @@
 	let newsSeq = 0;
 	/** Scraped preview images by story link (null = none found). */
 	let newsImages = $state<Record<string, string | null>>({});
+	/** Headline badges by story link (filed + pending preview). */
+	const newsMarks = $derived(buildNewsMarks(annotations, pendingAnn));
 	const newsImageSession = new SvelteMap<string, string | null>();
 	/** One reader quota shared by every image worker (20/min keyless). */
 	const newsJinaGate = createRateGate(3000);
@@ -9247,6 +9250,12 @@
 			newsPicker = null;
 			restorePrompt();
 		},
+		badge: (id: AnnotationId, x: number, y: number) => {
+			openBadgeClick(id, { x, y });
+		},
+		badgeHover: (id: string | null) => {
+			hoverBadgeId = id;
+		},
 		retry: () => {
 			if (!news || newsBusy) return;
 			news = { ...news, status: "loading", stories: [], error: "" };
@@ -13076,7 +13085,8 @@
 				!dragged &&
 				liveText === downSel &&
 				(event.detail <= 1 ||
-					(event.detail >= 4 && !target?.closest(".rendered"))) &&
+					(event.detail >= 4 &&
+						!target?.closest(".rendered, .news-card-title"))) &&
 				!multiTapOwnsRelease(msgTapSeq, Date.now())
 			) {
 				// A plain click changed nothing: blank space, a collapsed
@@ -14334,6 +14344,7 @@
 			newsPicker={newsPicker}
 			newsBusy={newsBusy}
 			newsImages={newsImages}
+			newsMarks={newsMarks}
 			{newsActions}
 			bind:scrollBox
 			bind:popOpen={refsPopOpen}

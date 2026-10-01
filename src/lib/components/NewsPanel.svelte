@@ -5,6 +5,7 @@ surfaces. Emoji buttons are the user's explicit call (no text on
 either); everything else is theme tokens, never raw hex. -->
 <script lang="ts">
 	import { slide, fly, fade } from "svelte/transition";
+	import { tick } from "svelte";
 	import {
 		CEFR_LEVELS,
 		SUMMARY_SIZES,
@@ -15,12 +16,22 @@ either); everything else is theme tokens, never raw hex. -->
 		type NewsPicker,
 		type SummarySize
 	} from "$lib/news";
+	import {
+		applyMarks,
+		type AnnotationId,
+		type AnnotationMark
+	} from "$lib/annotations";
+	import { badgeHover } from "$lib/hoverWash";
 
 	interface Props {
 		panel: NewsPanelState;
 		picker: NewsPicker | null;
 		busy: string | null;
 		images: Record<string, string | null>;
+		/** Headline badges by story link (see buildNewsMarks). */
+		marks: Record<string, AnnotationMark[]>;
+		/** The one annotation whose quote also washes (shared id). */
+		washId: string | null;
 		actions: {
 			region: (gl: string) => void;
 			menu: (link: string) => void;
@@ -29,10 +40,30 @@ either); everything else is theme tokens, never raw hex. -->
 			launch: (link: string, kind: NewsKind) => void;
 			close: () => void;
 			retry: () => void;
+			badge: (id: AnnotationId, x: number, y: number) => void;
+			badgeHover: (id: string | null) => void;
 		};
 	}
 
-	let { panel, picker, busy, images, actions }: Props = $props();
+	let { panel, picker, busy, images, marks, washId, actions }: Props = $props();
+	// Marks stamp after Svelte flushes the cards (see applyMarks):
+	// one root per headline, same call as message bodies.
+	let panelEl: HTMLElement | undefined = $state();
+	$effect(() => {
+		const stories = panel.stories;
+		const byLink = marks;
+		const wash = washId;
+		void tick().then(() => {
+			if (!panelEl) return;
+			for (const card of panelEl.querySelectorAll(".news-open")) {
+				const link = (card as HTMLElement).dataset.storyLink;
+				const title = card.querySelector(".news-card-title");
+				if (!link || !(title instanceof HTMLElement)) continue;
+				applyMarks(title, byLink[link] ?? [], false, wash);
+			}
+			void stories;
+		});
+	});
 	const activeRegion = $derived(panel.regions.find((r) => r.gl === panel.region));
 	// Hotlink-dead images fall back to the outlet initial (same box);
 	// removing the node left a bare gap instead of a tile.
@@ -45,13 +76,47 @@ either); everything else is theme tokens, never raw hex. -->
 		const live = window.getSelection();
 		return !!live && !live.isCollapsed && card.contains(live.anchorNode);
 	}
+	/** Badge owning an event target, or null. Badge presses open
+	 * their answer card — never the story menu, even unmoved. */
+	function badgeOf(target: EventTarget | null): HTMLElement | null {
+		const badge =
+			target instanceof Element ? target.closest("[data-ann-badge]") : null;
+		return badge instanceof HTMLElement ? badge : null;
+	}
+	function openBadgeFrom(badge: HTMLElement): void {
+		const rect = badge.getBoundingClientRect();
+		// Stamped from AnnotationMark ids (applyMarks); dataset
+		// erases the brand, so cast it back at this boundary.
+		actions.badge(
+			(badge.dataset.annBadge ?? "") as AnnotationId,
+			rect.left + rect.width / 2,
+			rect.bottom
+		);
+	}
 	const reduceMotion =
 		typeof matchMedia !== "undefined" &&
 		matchMedia("(prefers-reduced-motion: reduce)").matches;
 	const motionMs = (ms: number): number => (reduceMotion ? 0 : ms);
 </script>
 
-<div class="news-panel" role="region" aria-label="{panel.langName} news">
+<!-- svelte-ignore a11y_mouse_events_have_key_events -->
+<!-- Badge wash is hover-only by decision (see MessageBody): Tab reaches markers, never highlights. -->
+<div
+	class="news-panel"
+	role="region"
+	aria-label="{panel.langName} news"
+	bind:this={panelEl}
+	onmouseover={(e) => {
+		badgeHover(actions.badgeHover, badgeOf(e.target)?.dataset.annBadge ?? null);
+	}}
+	onmouseout={(e) => {
+		const to =
+			e.relatedTarget instanceof Element
+				? e.relatedTarget.closest("[data-ann-badge]")
+				: null;
+		badgeHover(actions.badgeHover, null, { toBadge: to !== null });
+	}}
+>
 	<div class="news-head">
 		<span class="news-title">📰 {panel.langName} news</span>
 		<button
@@ -120,6 +185,7 @@ either); everything else is theme tokens, never raw hex. -->
 				<li
 					class="news-card"
 					class:open
+					class:has-marks={(marks[story.link]?.length ?? 0) > 0}
 					in:fly={{ y: 14, duration: motionMs(260), delay: motionMs(Math.min(i * 45, 400)) }}
 				>
 					<div
@@ -134,6 +200,9 @@ either); everything else is theme tokens, never raw hex. -->
 						}}
 						onkeydown={(e) => {
 							if (e.key === "Enter" || e.key === " ") {
+								// Badge keys click through to their card
+								// below; the menu never steals them.
+								if (badgeOf(e.target)) return;
 								e.preventDefault();
 								actions.menu(story.link);
 							}
@@ -146,6 +215,13 @@ either); everything else is theme tokens, never raw hex. -->
 									? Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y)
 									: 0;
 							downAt = null;
+							// Badges open their answer card — drags ending
+							// on one still belong to text selection.
+							const hit = badgeOf(e.target);
+							if (hit && !dragged) {
+								openBadgeFrom(hit);
+								return;
+							}
 							if (
 								newsCardPressOpensMenu({
 									draggedPx: dragged,
@@ -157,8 +233,10 @@ either); everything else is theme tokens, never raw hex. -->
 						oncontextmenu={(e) => {
 							// A standing selection owns long-press and
 							// right-click (the page summons or speaks);
-							// plain presses open the card menu as before.
+							// badges are never menu presses either.
+							// Plain presses open the card menu as before.
 							if (cardSelected(e.currentTarget)) return;
+							if (badgeOf(e.target)) return;
 							e.preventDefault();
 							actions.menu(story.link);
 						}}
@@ -441,6 +519,7 @@ either); everything else is theme tokens, never raw hex. -->
 		color: #1c1c1e;
 		color: var(--ink);
 		transition: color 0.15s ease;
+		cursor: text;
 		display: -webkit-box;
 		-webkit-line-clamp: 3;
 		line-clamp: 3;
@@ -448,6 +527,12 @@ either); everything else is theme tokens, never raw hex. -->
 		overflow: hidden;
 		/* Short titles pad up: every card holds three lines. */
 		min-height: 4.05em;
+	}
+	/* Annotated cards grow a badge lane above the title: badges
+	float a line above their quote and the clamp would eat them.
+	Same dampened scale as the badge itself. */
+	.news-card.has-marks .news-card-title {
+		padding-top: calc(1.25rem * (1 + (var(--font-scale, 1) - 1) * 0.3));
 	}
 	.news-card-source {
 		margin: 0;
@@ -473,6 +558,10 @@ either); everything else is theme tokens, never raw hex. -->
 		color: inherit;
 		text-align: left;
 		cursor: pointer;
+		/* Headlines opt back into selection: .messages disables
+		it thread-wide and only .rendered re-enables it. */
+		user-select: text;
+		-webkit-user-select: text;
 	}
 	.news-open:focus-visible,
 	.news-go:focus-visible,

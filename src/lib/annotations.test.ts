@@ -29,6 +29,8 @@ import {
 	clampDragAnchorToFocusLine,
 	reviewEditKey,
 	buildMarksFor,
+	buildStoryMarks,
+	buildNewsMarks,
 	aidedTextForMsg,
 	commitRefsEdit,
 	planClearSentRefs,
@@ -950,6 +952,42 @@ describe("story-anchored annotations", () => {
 		expect(
 			buildMarksFor(list, "m1" as ChatMsgId, false, null)
 		).toEqual([]);
+	});
+	it("builds numbered headline badges per story, waiting or ready", () => {
+		const other = { ...story, link: "https://x/z" };
+		const list: Annotation[] = [
+			storyNote("s1", "q"),
+			{ ...storyNote("s2", "qq"), answer: "because" },
+			{ id: "s3" as AnnotationId, story: other, quote: "other", comment: "" }
+		];
+		const marks = buildStoryMarks(list, "https://x/y", null);
+		expect(marks).toHaveLength(2);
+		expect(marks[0]).toMatchObject({ number: 1, quote: "q", answer: "waiting" });
+		expect(marks[1]).toMatchObject({ number: 2, quote: "qq", answer: "ready" });
+		expect(marks[0]).not.toHaveProperty("aidScope");
+		// Another story's pill never leaks in; pending previews next.
+		const pending: Annotation = {
+			id: "p" as AnnotationId,
+			story: other,
+			quote: "draft",
+			comment: ""
+		};
+		expect(buildStoryMarks(list, "https://x/y", pending)).toHaveLength(2);
+		const ours = buildStoryMarks(list, "https://x/z", pending);
+		expect(ours).toHaveLength(2);
+		expect(ours[1]).toMatchObject({ number: 2, quote: "draft", preview: true });
+	});
+	it("groups headline marks by story link", () => {
+		const other = { ...story, link: "https://x/z" };
+		const list: Annotation[] = [
+			storyNote("s1", "q"),
+			{ id: "s3" as AnnotationId, story: other, quote: "other", comment: "" }
+		];
+		const grouped = buildNewsMarks(list, null);
+		expect(Object.keys(grouped).sort()).toEqual(["https://x/y", "https://x/z"]);
+		expect(grouped["https://x/y"]).toHaveLength(1);
+		expect(grouped["https://x/z"]).toHaveLength(1);
+		expect(buildNewsMarks([], null)).toEqual({});
 	});
 });
 

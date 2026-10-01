@@ -148,6 +148,34 @@ describe("news panel contract", () => {
 		expect(openAt).toBeGreaterThan(0);
 		const tagStart = source.lastIndexOf("<", openAt);
 		expect(source.slice(tagStart, openAt)).toContain("<div");
+		// The thread disables selection wholesale: the card opts
+		// back in and the title reads an I-beam, like .rendered.
+		const css = source.split("<style>")[1] ?? "";
+		const open = css.match(/\.news-open\s*\{[^}]*\}/)?.[0] ?? "";
+		expect(open).toContain("user-select: text");
+		expect(open).toContain("-webkit-user-select: text");
+		const title = css.match(/\.news-card-title\s*\{[^}]*\}/)?.[0] ?? "";
+		expect(title).toContain("cursor: text");
+	});
+
+	it("stamps headline badges like message bodies do", () => {
+		// Marks cross per story link and stamp onto each title
+		// with the shared wash id; badges open their answer card
+		// instead of the story menu, by mouse or keyboard.
+		const source = panelSource();
+		expect(source).toContain("marks: Record<string, AnnotationMark[]>");
+		expect(source).toContain("washId: string | null");
+		expect(source).toContain("applyMarks(title, byLink[link] ?? [], false, wash)");
+		expect(source).toContain("badge: (id: AnnotationId, x: number, y: number) => void");
+		expect(source).toContain("badgeHover: (id: string | null) => void");
+		expect(source).toContain("[data-ann-badge]");
+		expect(source).toContain("openBadgeFrom(hit)");
+		expect(source).toContain("if (badgeOf(e.target)) return;");
+		// Annotated cards grow a badge lane: the clamp would eat
+		// badges floating above the first line.
+		expect(source).toContain("has-marks");
+		expect(source).toContain(".news-card.has-marks .news-card-title");
+		expect(source).toContain("padding-top: calc(1.25rem");
 	});
 
 	it("presses buttons in and kills all motion when reduced", () => {

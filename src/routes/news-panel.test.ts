@@ -46,4 +46,13 @@ describe("headline annotate wiring", () => {
 		const source = pageSource();
 		expect(source).toContain("lockSelectionToMessage(live, (n) => articleOf(n) ?? headlineOf(n))");
 	});
+
+	it("hands headline marks and badge actions to the cards", () => {
+		const source = pageSource();
+		expect(source).toContain("buildNewsMarks(annotations, pendingAnn)");
+		expect(source).toContain("newsMarks={newsMarks}");
+		expect(source).toContain("badge: (id: AnnotationId, x: number, y: number) => {");
+		expect(source).toContain("openBadgeClick(id, { x, y });");
+		expect(source).toContain("badgeHover: (id: string | null) => {");
+	});
 });

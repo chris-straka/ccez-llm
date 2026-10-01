@@ -3179,6 +3179,51 @@ export function buildMarksFor(
 }
 
 /**
+ * Badge array for one news headline: the story's own filing order
+ * (see annotationNumber), pending preview included, no aid scope
+ * (headlines never carry aids). Mirrors buildMarksFor.
+ */
+export function buildStoryMarks(
+	list: Annotation[],
+	link: string,
+	pending: Annotation | null
+): AnnotationMark[] {
+	const mine = list.filter((a) => a.story?.link === link);
+	const saved: AnnotationMark[] = mine.map((a, i) => ({
+		id: a.id,
+		number: i + 1,
+		quote: a.quote,
+		at: a.at ?? 0,
+		answer: a.answer ? "ready" : "waiting"
+	}));
+	if (pending?.story?.link === link) {
+		saved.push({
+			id: pending.id,
+			number: mine.length + 1,
+			quote: pending.quote,
+			at: pending.at ?? 0,
+			preview: true
+		});
+	}
+	return saved;
+}
+
+/** Headline marks grouped by story link (see buildStoryMarks). */
+export function buildNewsMarks(
+	list: Annotation[],
+	pending: Annotation | null
+): Record<string, AnnotationMark[]> {
+	const links = new Set<string>();
+	for (const a of list) {
+		if (a.story?.link) links.add(a.story.link);
+	}
+	if (pending?.story?.link) links.add(pending.story.link);
+	return Object.fromEntries(
+		[...links].map((link) => [link, buildStoryMarks(list, link, pending)])
+	);
+}
+
+/**
  * Pinned or hover-peeked model-aid text for a message (REFACTOR §6):
  * the peeked message reads its cached vocalization, otherwise the
  * model pin shows the cache when present. The cache survives unpin

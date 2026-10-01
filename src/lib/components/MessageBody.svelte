@@ -1247,7 +1247,8 @@
 	.rendered :global(.ccez-math-inline .katex) {
 		color: inherit;
 	}
-	.rendered :global(mark.ccez-ann) {
+	.rendered :global(mark.ccez-ann),
+	:global(.news-card-title mark.ccez-ann) {
 		background: #fff3b0;
 		border-radius: 3px;
 		/* Annotated text reads interactive (the badge above it opens
@@ -1262,21 +1263,24 @@
 	/* The pale wash turns to mud in dark mode (and swallows the
 	selection tint stacked on annotated CJK): a translucent amber
 	keeps annotated text readable in both themes. */
-	:global(html[data-theme="dark"]) .rendered :global(mark.ccez-ann) {
+	:global(html[data-theme="dark"]) .rendered :global(mark.ccez-ann),
+	:global(html[data-theme="dark"] .news-card-title mark.ccez-ann) {
 		background: rgba(245, 158, 11, 0.3);
 	}
 	/* Sent-jump destination flash: the same draft yellow, so arriving
 	from history reads exactly like arriving from a draft. Plain DOM
 	(not the Highlight API) so it renders in every engine; the caller
 	wraps and unwraps it around the blink. */
-	.rendered :global(mark.ccez-ann-flash) {
+	.rendered :global(mark.ccez-ann-flash),
+	:global(.news-card-title mark.ccez-ann-flash) {
 		background: #fff3b0;
 		border-radius: 3px;
 		padding: 0 1px;
 		margin: 0 -1px;
 		color: inherit;
 	}
-	:global(html[data-theme="dark"]) .rendered :global(mark.ccez-ann-flash) {
+	:global(html[data-theme="dark"]) .rendered :global(mark.ccez-ann-flash),
+	:global(html[data-theme="dark"] .news-card-title mark.ccez-ann-flash) {
 		background: rgba(245, 158, 11, 0.45);
 	}
 	/* Jump-landing fade-out for engines whose highlight overlay never
@@ -1284,7 +1288,8 @@
 	a plain background animation, which every engine displays. Light
 	and contrast reuse the wash-out keyframes (same start color);
 	dark starts from the flash amber, not the wash yellow. */
-	.rendered :global(mark.ccez-ann-flash.fading) {
+	.rendered :global(mark.ccez-ann-flash.fading),
+	:global(.news-card-title mark.ccez-ann-flash.fading) {
 		animation: ann-wash-out 0.25s ease forwards;
 	}
 	@keyframes ann-flash-out-dark {
@@ -1297,7 +1302,8 @@
 	}
 	:global(html[data-theme="dark"])
 		.rendered
-		:global(mark.ccez-ann-flash.fading) {
+		:global(mark.ccez-ann-flash.fading),
+	:global(html[data-theme="dark"] .news-card-title mark.ccez-ann-flash.fading) {
 		animation-name: ann-flash-out-dark;
 	}
 	/* The wash mounts/unmounts imperatively (applyMarks), so a plain
@@ -1323,10 +1329,12 @@
 	/* More-contrast fallback path (see the highlight rules below):
 	stronger marker yellow on marks, flash, and keyframes. */
 	@media (prefers-contrast: more) {
-		.rendered :global(mark.ccez-ann) {
+		.rendered :global(mark.ccez-ann),
+		:global(.news-card-title mark.ccez-ann) {
 			background: #ffe066;
 		}
-		.rendered :global(mark.ccez-ann-flash) {
+		.rendered :global(mark.ccez-ann-flash),
+		:global(.news-card-title mark.ccez-ann-flash) {
 			background: #ffe066;
 		}
 		@keyframes ann-wash-in {
@@ -1348,7 +1356,8 @@
 	}
 	/* Fresh washes read at once (~120ms, same beat as the
 	registry ramp): hovering a marker must never feel late. */
-	.rendered :global(mark.ccez-ann.fresh) {
+	.rendered :global(mark.ccez-ann.fresh),
+	:global(.news-card-title mark.ccez-ann.fresh) {
 		animation: ann-wash-in 0.12s ease;
 	}
 	@keyframes ann-wash-in-dark {
@@ -1359,10 +1368,12 @@
 			background-color: rgba(245, 158, 11, 0.3);
 		}
 	}
-	:global(html[data-theme="dark"]) .rendered :global(mark.ccez-ann.fresh) {
+	:global(html[data-theme="dark"]) .rendered :global(mark.ccez-ann.fresh),
+	:global(html[data-theme="dark"] .news-card-title mark.ccez-ann.fresh) {
 		animation-name: ann-wash-in-dark;
 	}
-	.rendered :global(mark.ccez-ann.leaving) {
+	.rendered :global(mark.ccez-ann.leaving),
+	:global(.news-card-title mark.ccez-ann.leaving) {
 		animation: ann-wash-out 0.18s ease forwards;
 	}
 	@keyframes ann-wash-out-dark {
@@ -1373,7 +1384,8 @@
 			background-color: transparent;
 		}
 	}
-	:global(html[data-theme="dark"]) .rendered :global(mark.ccez-ann.leaving) {
+	:global(html[data-theme="dark"]) .rendered :global(mark.ccez-ann.leaving),
+	:global(html[data-theme="dark"] .news-card-title mark.ccez-ann.leaving) {
 		animation-name: ann-wash-out-dark;
 	}
 	/* Custom Highlight API wash (see annHighlights.paintAnnotationWash):
@@ -1533,12 +1545,14 @@
 	}
 	/* Badge anchors ride on the quote's last character (or its wash
 	mark): unstyled inline wrappers, so stamping never reflows text. */
-	.rendered :global(.ccez-ann-anchor) {
+	.rendered :global(.ccez-ann-anchor),
+	:global(.news-card-title .ccez-ann-anchor) {
 		position: relative;
 	}
 	/* Numbered badges float above-right of their quote, overlaying ruby
 	readings instead of shoving them: zero layout in every mode. */
-	.rendered :global(button.ccez-ann-badge) {
+	.rendered :global(button.ccez-ann-badge),
+	:global(.news-card-title button.ccez-ann-badge) {
 		position: absolute;
 		bottom: 100%;
 		left: 100%;
@@ -1576,11 +1590,13 @@
 	themes so the accent never mutes the signal. The tail
 	inherits via `background: inherit`. Motion lives below, past
 	the mount fade (see below). */
-	.rendered :global(button.ccez-ann-badge.ans-waiting) {
+	.rendered :global(button.ccez-ann-badge.ans-waiting),
+	:global(.news-card-title button.ccez-ann-badge.ans-waiting) {
 		background: #007aff;
 		background: var(--accent);
 	}
-	.rendered :global(button.ccez-ann-badge.ans-ready) {
+	.rendered :global(button.ccez-ann-badge.ans-ready),
+	:global(.news-card-title button.ccez-ann-badge.ans-ready) {
 		background: #ff9f0a;
 		background: var(--ans-ready);
 	}
@@ -1590,7 +1606,8 @@
 	curves away at the sides, which is why the tail seats left of
 	center instead of off the rim). Clicks land on the button, so the
 	open still works. */
-	.rendered :global(button.ccez-ann-badge::after) {
+	.rendered :global(button.ccez-ann-badge::after),
+	:global(.news-card-title button.ccez-ann-badge::after) {
 		content: "";
 		position: absolute;
 		top: calc(100% - 5px);
@@ -1603,12 +1620,14 @@
 	/* RTL quotes: mirror the whole badge geometry — the badge parks
 	past the visual quote end on the left, tail tip pointing back
 	down-right at it. */
-	.rendered :global(button.ccez-ann-badge.rtl) {
+	.rendered :global(button.ccez-ann-badge.rtl),
+	:global(.news-card-title button.ccez-ann-badge.rtl) {
 		left: auto;
 		right: 100%;
 		transform: translate(40%, 10%);
 	}
-	.rendered :global(button.ccez-ann-badge.rtl::after) {
+	.rendered :global(button.ccez-ann-badge.rtl::after),
+	:global(.news-card-title button.ccez-ann-badge.rtl::after) {
 		left: auto;
 		right: 14%;
 		clip-path: polygon(62% 0, 0 0, 100% 100%);
@@ -1623,7 +1642,8 @@
 			opacity: 1;
 		}
 	}
-	.rendered :global(button.ccez-ann-badge.fresh) {
+	.rendered :global(button.ccez-ann-badge.fresh),
+	:global(.news-card-title button.ccez-ann-badge.fresh) {
 		animation: ann-badge-in 0.2s ease;
 	}
 	/* State motion, past the mount fade so equal specificity resolves
@@ -1641,10 +1661,12 @@
 			opacity: 0.5;
 		}
 	}
-	.rendered :global(button.ccez-ann-badge.ans-waiting) {
+	.rendered :global(button.ccez-ann-badge.ans-waiting),
+	:global(.news-card-title button.ccez-ann-badge.ans-waiting) {
 		animation: ccez-ann-breathe 1.2s ease-in-out infinite;
 	}
-	.rendered :global(button.ccez-ann-badge.ans-waiting.fresh) {
+	.rendered :global(button.ccez-ann-badge.ans-waiting.fresh),
+	:global(.news-card-title button.ccez-ann-badge.ans-waiting.fresh) {
 		animation:
 			ann-badge-in 0.2s ease,
 			ccez-ann-breathe 1.2s ease-in-out 0.2s infinite;
@@ -1667,18 +1689,23 @@
 			box-shadow: 0 0 0 7px rgba(255, 159, 10, 0);
 		}
 	}
-	.rendered :global(button.ccez-ann-badge.ans-ready.arrived) {
+	.rendered :global(button.ccez-ann-badge.ans-ready.arrived),
+	:global(.news-card-title button.ccez-ann-badge.ans-ready.arrived) {
 		animation: ccez-ann-arrive 0.45s ease-out 1;
 	}
 	:global(html[data-theme="dark"])
 		.rendered
-		:global(button.ccez-ann-badge.ans-ready.arrived) {
+		:global(button.ccez-ann-badge.ans-ready.arrived),
+	:global(html[data-theme="dark"] .news-card-title button.ccez-ann-badge.ans-ready.arrived) {
 		animation-name: ccez-ann-arrive-dark;
 	}
 	@media (prefers-reduced-motion: reduce) {
 		.rendered :global(button.ccez-ann-badge.ans-waiting),
 		.rendered :global(button.ccez-ann-badge.ans-waiting.fresh),
-		.rendered :global(button.ccez-ann-badge.ans-ready.arrived) {
+		.rendered :global(button.ccez-ann-badge.ans-ready.arrived),
+		:global(.news-card-title button.ccez-ann-badge.ans-waiting),
+		:global(.news-card-title button.ccez-ann-badge.ans-waiting.fresh),
+		:global(.news-card-title button.ccez-ann-badge.ans-ready.arrived) {
 			animation: none;
 		}
 	}
@@ -1687,7 +1714,8 @@
 	instead of the OS query, so the settings switch can pin it.
 	Keyframes can't sit behind a selector, so the dark wash variants
 	are renamed and picked up by the animation-name overrides below. */
-	:global(html[data-theme="dark"]) .rendered :global(mark.ccez-ann) {
+	:global(html[data-theme="dark"]) .rendered :global(mark.ccez-ann),
+	:global(html[data-theme="dark"] .news-card-title mark.ccez-ann) {
 		background: #5c4d00;
 	}
 	@keyframes ann-wash-in-dark {
@@ -1706,10 +1734,12 @@
 			background-color: transparent;
 		}
 	}
-	:global(html[data-theme="dark"]) .rendered :global(mark.ccez-ann.fresh) {
+	:global(html[data-theme="dark"]) .rendered :global(mark.ccez-ann.fresh),
+	:global(html[data-theme="dark"] .news-card-title mark.ccez-ann.fresh) {
 		animation-name: ann-wash-in-dark;
 	}
-	:global(html[data-theme="dark"]) .rendered :global(mark.ccez-ann.leaving) {
+	:global(html[data-theme="dark"]) .rendered :global(mark.ccez-ann.leaving),
+	:global(html[data-theme="dark"] .news-card-title mark.ccez-ann.leaving) {
 		animation-name: ann-wash-out-dark;
 	}
 	:global(html[data-theme="dark"]) .folded-preview {

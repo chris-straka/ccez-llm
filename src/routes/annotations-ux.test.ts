@@ -85,6 +85,33 @@ describe("annotation badge RTL mirror", () => {
 	});
 });
 
+describe("headline badge twins", () => {
+	it("paints stamped headline marks exactly like message marks", () => {
+		// Every badge/wash rule carries a .news-card-title twin
+		// sharing its declarations: one look, two scopes.
+		const css = messageBodyStyle();
+		for (const inner of [
+			".news-card-title .ccez-ann-anchor",
+			".news-card-title button.ccez-ann-badge",
+			".news-card-title button.ccez-ann-badge.ans-waiting",
+			".news-card-title button.ccez-ann-badge.ans-ready",
+			".news-card-title button.ccez-ann-badge::after",
+			".news-card-title button.ccez-ann-badge.rtl",
+			".news-card-title button.ccez-ann-badge.rtl::after",
+			".news-card-title button.ccez-ann-badge.fresh",
+			".news-card-title button.ccez-ann-badge.ans-waiting.fresh",
+			".news-card-title button.ccez-ann-badge.ans-ready.arrived",
+			".news-card-title mark.ccez-ann",
+			".news-card-title mark.ccez-ann.fresh",
+			".news-card-title mark.ccez-ann.leaving",
+			".news-card-title mark.ccez-ann-flash",
+			".news-card-title mark.ccez-ann-flash.fading"
+		]) {
+			expect(css, inner).toContain(`:global(${inner})`);
+		}
+	});
+});
+
 describe("annotation edit Save animation", () => {
 	it("animates the popover Save symmetrically on hover in/out", () => {
 		const css = componentStyle(annPopSource(), "AnnPop.svelte");

@@ -146,6 +146,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		newsPicker: NewsPicker | null;
 		newsBusy: string | null;
 		newsImages: Record<string, string | null>;
+		newsMarks: Record<string, AnnotationMark[]>;
 		// Mirrors NewsPanel actions (structural, same rule as above).
 		newsActions: {
 			region: (gl: string) => void;
@@ -155,6 +156,8 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 			launch: (link: string, kind: NewsKind) => void;
 			close: () => void;
 			retry: () => void;
+			badge: (id: AnnotationId, x: number, y: number) => void;
+			badgeHover: (id: string | null) => void;
 		};
 		scrollBox?: HTMLElement | undefined;
 		popOpen?: ChatMsgId | null;
@@ -207,6 +210,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		newsPicker,
 		newsBusy,
 		newsImages,
+		newsMarks,
 		newsActions,
 		scrollBox = $bindable<HTMLElement | undefined>(undefined),
 		popOpen = $bindable(null),
@@ -246,6 +250,8 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 					picker={newsPicker}
 					busy={newsBusy}
 					images={newsImages}
+					marks={newsMarks}
+					washId={washId ?? null}
 					actions={newsActions}
 				/>
 			{/if}
