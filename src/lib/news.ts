@@ -346,7 +346,126 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			gl: "GBL",
 			label: "Global",
 			icon: "🌐",
-			merge: [{ url: "https://feeds.bbci.co.uk/arabic/rss.xml", source: "BBC Arabic" }]
+			merge: [
+				{ url: "https://feeds.bbci.co.uk/arabic/rss.xml", source: "BBC Arabic" },
+				{ url: "https://www.france24.com/ar/rss", source: "France 24" }
+			]
+		}
+	},
+	ru: {
+		GBL: {
+			gl: "GBL",
+			label: "Global",
+			icon: "🌐",
+			merge: [
+				{ url: "https://feeds.bbci.co.uk/russian/rss.xml", source: "BBC Russian" },
+				{ url: "https://www.rfi.fr/ru/rss", source: "RFI" }
+			]
+		}
+	},
+	fa: {
+		GBL: {
+			gl: "GBL",
+			label: "Global",
+			icon: "🌐",
+			merge: [
+				{ url: "https://feeds.bbci.co.uk/persian/rss.xml", source: "BBC Persian" },
+				{ url: "https://www.rfi.fr/fa/rss", source: "RFI" }
+			]
+		}
+	},
+	vi: {
+		GBL: {
+			gl: "GBL",
+			label: "Global",
+			icon: "🌐",
+			merge: [
+				{ url: "https://feeds.bbci.co.uk/vietnamese/rss.xml", source: "BBC Vietnamese" },
+				{ url: "https://www.rfi.fr/vi/rss", source: "RFI" }
+			]
+		}
+	},
+	sw: {
+		GBL: {
+			gl: "GBL",
+			label: "Global",
+			icon: "🌐",
+			merge: [
+				{ url: "https://feeds.bbci.co.uk/swahili/rss.xml", source: "BBC Swahili" },
+				{ url: "https://www.rfi.fr/sw/rss", source: "RFI" }
+			]
+		}
+	},
+	ur: {
+		GBL: {
+			gl: "GBL",
+			label: "Global",
+			icon: "🌐",
+			merge: [{ url: "https://feeds.bbci.co.uk/urdu/rss.xml", source: "BBC Urdu" }]
+		}
+	},
+	hi: {
+		GBL: {
+			gl: "GBL",
+			label: "Global",
+			icon: "🌐",
+			merge: [{ url: "https://feeds.bbci.co.uk/hindi/rss.xml", source: "BBC Hindi" }]
+		}
+	},
+	id: {
+		GBL: {
+			gl: "GBL",
+			label: "Global",
+			icon: "🌐",
+			merge: [{ url: "https://feeds.bbci.co.uk/indonesia/rss.xml", source: "BBC Indonesia" }]
+		}
+	},
+	uk: {
+		GBL: {
+			gl: "GBL",
+			label: "Global",
+			icon: "🌐",
+			merge: [{ url: "https://feeds.bbci.co.uk/ukrainian/rss.xml", source: "BBC Ukrainian" }]
+		}
+	},
+	bn: {
+		GBL: {
+			gl: "GBL",
+			label: "Global",
+			icon: "🌐",
+			merge: [{ url: "https://feeds.bbci.co.uk/bengali/rss.xml", source: "BBC Bengali" }]
+		}
+	},
+	pa: {
+		GBL: {
+			gl: "GBL",
+			label: "Global",
+			icon: "🌐",
+			merge: [{ url: "https://feeds.bbci.co.uk/punjabi/rss.xml", source: "BBC Punjabi" }]
+		}
+	},
+	am: {
+		GBL: {
+			gl: "GBL",
+			label: "Global",
+			icon: "🌐",
+			merge: [{ url: "https://feeds.bbci.co.uk/amharic/rss.xml", source: "BBC Amharic" }]
+		}
+	},
+	ta: {
+		GBL: {
+			gl: "GBL",
+			label: "Global",
+			icon: "🌐",
+			merge: [{ url: "https://feeds.bbci.co.uk/tamil/rss.xml", source: "BBC Tamil" }]
+		}
+	},
+	th: {
+		GBL: {
+			gl: "GBL",
+			label: "Global",
+			icon: "🌐",
+			merge: [{ url: "https://feeds.bbci.co.uk/thai/rss.xml", source: "BBC Thai" }]
 		}
 	},
 	pt: {
@@ -400,7 +519,10 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			gl: "GBL",
 			label: "Global",
 			icon: "🌐",
-			merge: [{ url: "https://www3.nhk.or.jp/rss/news/cat6.xml", source: "NHK" }]
+			merge: [
+				{ url: "https://www3.nhk.or.jp/rss/news/cat6.xml", source: "NHK" },
+				{ url: "https://feeds.bbci.co.uk/japanese/rss.xml", source: "BBC Japanese" }
+			]
 		}
 	},
 	ko: {
@@ -408,7 +530,10 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			gl: "GBL",
 			label: "Global",
 			icon: "🌐",
-			merge: [{ url: "https://www.yna.co.kr/rss/international.xml", source: "Yonhap" }]
+			merge: [
+				{ url: "https://www.yna.co.kr/rss/international.xml", source: "Yonhap" },
+				{ url: "https://feeds.bbci.co.uk/korean/rss.xml", source: "BBC Korean" }
+			]
 		}
 	}
 };

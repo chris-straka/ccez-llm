@@ -388,7 +388,8 @@ describe("news feeds", () => {
 		const arGbl = newsRegionsFor("ar")!.find((r) => r.gl === "GBL")!;
 		expect(arGbl.translate).toBeUndefined();
 		expect(arGbl.merge).toMatchObject([
-			{ url: "https://feeds.bbci.co.uk/arabic/rss.xml", source: "BBC Arabic" }
+			{ url: "https://feeds.bbci.co.uk/arabic/rss.xml", source: "BBC Arabic" },
+			{ url: "https://www.france24.com/ar/rss", source: "France 24" }
 		]);
 		const frEur = newsRegionsFor("fr")!.find((r) => r.gl === "EUR")!;
 		expect(frEur.translate).toBeUndefined();
@@ -428,13 +429,40 @@ describe("news feeds", () => {
 		const jaGbl = newsRegionsFor("ja")!.find((r) => r.gl === "GBL")!;
 		expect(jaGbl.translate).toBeUndefined();
 		expect(jaGbl.merge).toMatchObject([
-			{ url: "https://www3.nhk.or.jp/rss/news/cat6.xml", source: "NHK" }
+			{ url: "https://www3.nhk.or.jp/rss/news/cat6.xml", source: "NHK" },
+			{ url: "https://feeds.bbci.co.uk/japanese/rss.xml", source: "BBC Japanese" }
 		]);
 		const koGbl = newsRegionsFor("ko")!.find((r) => r.gl === "GBL")!;
 		expect(koGbl.translate).toBeUndefined();
 		expect(koGbl.merge).toMatchObject([
-			{ url: "https://www.yna.co.kr/rss/international.xml", source: "Yonhap" }
+			{ url: "https://www.yna.co.kr/rss/international.xml", source: "Yonhap" },
+			{ url: "https://feeds.bbci.co.uk/korean/rss.xml", source: "BBC Korean" }
 		]);
+		// BBC/RFI world services across Asia, Africa, and Europe.
+		const desks: Array<[string, string[]]> = [
+			["ru", ["bbci.co.uk/russian", "rfi.fr/ru"]],
+			["fa", ["bbci.co.uk/persian", "rfi.fr/fa"]],
+			["vi", ["bbci.co.uk/vietnamese", "rfi.fr/vi"]],
+			["sw", ["bbci.co.uk/swahili", "rfi.fr/sw"]],
+			["ur", ["bbci.co.uk/urdu"]],
+			["hi", ["bbci.co.uk/hindi"]],
+			["id", ["bbci.co.uk/indonesia"]],
+			["uk", ["bbci.co.uk/ukrainian"]],
+			["bn", ["bbci.co.uk/bengali"]],
+			["pa", ["bbci.co.uk/punjabi"]],
+			["am", ["bbci.co.uk/amharic"]],
+			["ta", ["bbci.co.uk/tamil"]],
+			["th", ["bbci.co.uk/thai"]]
+		];
+		for (const [code, hosts] of desks) {
+			const gbl = newsRegionsFor(code)!.find((r) => r.gl === "GBL")!;
+			expect(gbl.translate).toBeUndefined();
+			expect(gbl.merge?.map((t) => t.url)).toHaveLength(hosts.length);
+			for (const [i, host] of hosts.entries()) {
+				expect(gbl.merge?.[i]?.url).toContain(host);
+				expect(gbl.merge?.[i]?.source?.length).toBeGreaterThan(0);
+			}
+		}
 		// Overrides keep chip position, label, and icon.
 		expect(newsRegionsFor("fr")!.slice(-7).map((r) => r.gl)).toEqual([
 			"GBL",
@@ -452,7 +480,7 @@ describe("news feeds", () => {
 			hl: "en-US",
 			translate: true
 		});
-		expect(newsRegionsFor("ru")!.find((r) => r.gl === "GBL")?.merge).toMatchObject([
+		expect(newsRegionsFor("pl")!.find((r) => r.gl === "GBL")?.merge).toMatchObject([
 			{ url: "https://feeds.bbci.co.uk/news/world/rss.xml", source: "BBC" },
 			{ url: "https://www.aljazeera.com/xml/rss/all.xml", source: "Al Jazeera" }
 		]);
@@ -484,7 +512,7 @@ describe("news feeds", () => {
 		const seen: string[] = [];
 		const xml = (title: string) =>
 			`<?xml version="1.0"?><rss><channel><item><title>${title}</title><link>https://desk/${title}</link></item></channel></rss>`;
-		const stories = await loadNewsStories("ru", "GBL", async (url) => {
+		const stories = await loadNewsStories("pl", "GBL", async (url) => {
 			seen.push(url);
 			if (url.includes("bbci")) return xml("Bbc");
 			if (url.includes("aljazeera")) return xml("Aj");
@@ -502,14 +530,14 @@ describe("news feeds", () => {
 	it("degrades a merge when one desk dies", async () => {
 		const xml = (title: string) =>
 			`<?xml version="1.0"?><rss><channel><item><title>${title}</title><link>https://desk/${title}</link></item></channel></rss>`;
-		const stories = await loadNewsStories("ru", "GBL", async (url) => {
+		const stories = await loadNewsStories("pl", "GBL", async (url) => {
 			if (url.includes("aljazeera")) throw new Error("bad-status:403");
 			return xml("Bbc");
 		});
 		expect(stories.map((s) => s.title)).toEqual(["Bbc"]);
 		expect(stories.map((s) => s.source)).toEqual(["BBC"]);
 		// Both desks dead: no cards, not an error.
-		const empty = await loadNewsStories("ru", "GBL", async () => {
+		const empty = await loadNewsStories("pl", "GBL", async () => {
 			throw new Error("timeout");
 		});
 		expect(empty).toEqual([]);
