@@ -31,7 +31,8 @@ same codebase via the Tauri mobile target.
 Full specs, acceptance criteria, and gates live in
 `docs/plans/2026-10-01-handoff.md`. Work top to bottom.
 
-- [ ] A6. Reader view: spoken word full screen while reading aloud (A itself shipped in `74c47e3`)
+- [ ] A7. Voice speed slider (web + macOS + Android)
+- [ ] A8. Interface size slider for settings, chat list, and menus (owner to confirm)
 - [ ] Fix two e2e failures that predate the plan (see the plan's "Known failing")
 - [ ] B. Annotation drafts controller out of `+page.svelte`
 - [ ] C. Split `annotations.ts` by concern

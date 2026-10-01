@@ -1020,3 +1020,12 @@ condensed from the Sep 23–24 chain (`0cda353`–`051257b`, tail
 - [x] Android in-app update Install failure (reported on 0.5.2):
       `Update.kt` catches `Throwable` + logs; owner confirms in-app
       updates install cleanly on the S24 since.
+
+## Low-vision reading (Oct 1, 2026)
+
+- [x] Giant text: hyphenated breaks at >= 300%, manual Line spacing
+      slider, aid labels capped at 6x, `e2e/giant-text.e2e.ts`
+      (`74c47e3`). Desktop column floor tried and reverted at the
+      owner's call (`638cc61`).
+- [x] Big-word reader: full-screen phrase-by-phrase read-aloud,
+      follow or tap pace (`acd8042`).
