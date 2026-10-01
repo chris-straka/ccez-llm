@@ -1011,3 +1011,12 @@ condensed from the Sep 23–24 chain (`0cda353`–`051257b`, tail
 - [x] Sidebar-swipe directional lock DROPPED: never misfired once and
       the owner is tired of seeing it. If it ever fires, file it as a
       new bug with a repro instead of resurrecting the tripwire.
+
+## Owner-confirmed closures (Oct 1, 2026)
+
+- [x] Chat switching slow at 370% font (0.5.3 field note): the Shiki
+      per-(lang, code) cache in `render.ts` shipped; owner confirms
+      switching feels fine in the Mac client.
+- [x] Android in-app update Install failure (reported on 0.5.2):
+      `Update.kt` catches `Throwable` + logs; owner confirms in-app
+      updates install cleanly on the S24 since.

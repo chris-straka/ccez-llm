@@ -26,37 +26,6 @@ same codebase via the Tauri mobile target.
   never pass claims.
 - Ghost features: user believes all fixed — verify, then drop this item.
 
-## Pile: 0.5.3 remainder (mac app, 370% font size)
-
-Every other 0.5.3 field note is closed in `docs/DONE.md` (speech chords,
-chat-step aliases, digit dual-mode, annotation sizing, TTS floor,
-text-size uncap, furigana backdrop, shell Cmd+T). One stays open:
-
-- [ ] Chat switching feels slow (2s down a chat, 1s up at 370% font).
-      Profiled Sep 2026 in Chromium (scratch server, seeded
-      30-message threads): Shiki re-highlighted every code block on
-      every mount (~0.4s JS on code-heavy threads) — now cached per
-      (lang, code) in `render.ts`, so repeat switches replay.
-      Residual: ~0.4s render/layout baseline per thread, plus
-      whatever the release WebKit client adds at 370% with real
-      data — still needs Mac-client confirmation before more fixes.
-
-## Pile: Android in-app update install fails (reported on 0.5.2, Sep 2026)
-
-- [ ] 0.5.2 sees the new version and downloads it, but Install errors:
-      "installer did not start: Error invoking postMessage: Java
-      exception was raised during method invocation." Diagnosed Sep
-      2026 on the S24 (0.5.3 installed, same code): the string
-      assembles as Kotlin catch → Rust passthrough → frontend
-      prefix, so the invoke itself failed at the bridge with a Java
-      exception pending — an uncaught `Error` (Kotlin caught only
-      `Exception`) stayed pending across JNI and masked the real
-      cause. `Update.init` wiring, manifest FileProvider, and dex
-      contents all verified present on-device. Fix in `Update.kt`:
-      catch `Throwable` + `Log.e` the stack, so any recurrence
-      reports its real cause and logcat carries it. Still needs:
-      release APK on the S24, retry Install, read logcat.
-
 ## Non-goals
 
 - No app-build/agentic features. No cloud sync / sharing / plugins.
