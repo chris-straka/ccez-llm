@@ -311,6 +311,15 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 				{ url: "https://www.france24.com/fr/rss", source: "France 24" },
 				{ url: "https://www.rfi.fr/fr/rss", source: "RFI" }
 			]
+		},
+		EUR: {
+			gl: "EUR",
+			label: "Europe",
+			icon: "🇪🇺",
+			merge: [
+				{ url: "https://www.france24.com/fr/europe/rss", source: "France 24" },
+				{ url: "https://www.rfi.fr/fr/europe/rss", source: "RFI" }
+			]
 		}
 	},
 	es: {
@@ -322,6 +331,14 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 				{ url: "https://feeds.bbci.co.uk/mundo/rss.xml", source: "BBC Mundo" },
 				{ url: "https://www.france24.com/es/rss", source: "France 24" }
 			]
+		},
+		LAT: {
+			gl: "LAT",
+			label: "Latin America",
+			icon: "🌎",
+			merge: [
+				{ url: "https://www.france24.com/es/am%C3%A9rica-latina/rss", source: "France 24" }
+			]
 		}
 	},
 	ar: {
@@ -330,6 +347,38 @@ const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
 			label: "Global",
 			icon: "🌐",
 			merge: [{ url: "https://feeds.bbci.co.uk/arabic/rss.xml", source: "BBC Arabic" }]
+		}
+	},
+	pt: {
+		GBL: {
+			gl: "GBL",
+			label: "Global",
+			icon: "🌐",
+			merge: [
+				{ url: "https://feeds.bbci.co.uk/portuguese/rss.xml", source: "BBC Brasil" },
+				{ url: "https://www.rfi.fr/br/rss", source: "RFI Brasil" }
+			]
+		}
+	},
+	de: {
+		GBL: {
+			gl: "GBL",
+			label: "Global",
+			icon: "🌐",
+			merge: [
+				{
+					url: "https://www.tagesschau.de/infoservices/alle-meldungen-100~rss2.xml",
+					source: "tagesschau"
+				}
+			]
+		}
+	},
+	it: {
+		EUR: {
+			gl: "EUR",
+			label: "Europe",
+			icon: "🇪🇺",
+			merge: [{ url: "https://it.euronews.com/rss", source: "Euronews" }]
 		}
 	}
 };

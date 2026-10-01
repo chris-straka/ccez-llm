@@ -187,7 +187,7 @@ describe("news feeds", () => {
 				.slice(-7)
 				.filter((r) => r.translate)
 				.map((r) => r.gl)
-		).toEqual(["EUR", "GB", "AU", "LAT", "ASI"]);
+		).toEqual(["GB", "AU", "LAT", "ASI"]);
 		expect(fr.find((r) => r.gl === "GBL")?.translate).toBeUndefined();
 		expect(fr.find((r) => r.gl === "GBL")).toMatchObject({
 			label: "Global",
@@ -203,10 +203,14 @@ describe("news feeds", () => {
 			]
 		});
 		// Europe mixes the continental five except the learner's own
-		// (fr drops the French feed); the U.K. reads Britain alone.
-		expect(fr.find((r) => r.gl === "EUR")).toMatchObject({
+		// (da keeps all five); French and Italian read native desks.
+		expect(newsRegionsFor("da")!.find((r) => r.gl === "EUR")).toMatchObject({
 			label: "Europe",
 			merge: [
+				{
+					url: "https://news.google.com/rss?hl=fr&gl=FR&ceid=FR:fr",
+					lang: "fr"
+				},
 				{
 					url: "https://news.google.com/rss?hl=de&gl=DE&ceid=DE:de",
 					lang: "de"
@@ -280,8 +284,7 @@ describe("news feeds", () => {
 			"🇨🇦"
 		);
 		// Latin America mixes Mexico, Brazil, Argentina; Spanish
-		// keeps Brazil only (its home chips cover the Spanish
-		// editions), Portuguese the two Spanish ones.
+		// reads a native desk, Portuguese the two Spanish ones.
 		expect(fr.find((r) => r.gl === "LAT")).toMatchObject({
 			label: "Latin America",
 			merge: [
@@ -299,9 +302,14 @@ describe("news feeds", () => {
 				}
 			]
 		});
-		const esLat = newsRegionsFor("es")!.find((r) => r.gl === "LAT")?.merge;
-		expect(esLat).toHaveLength(1);
-		expect(esLat?.[0]?.url).toContain("gl=BR");
+		const esLat = newsRegionsFor("es")!.find((r) => r.gl === "LAT");
+		expect(esLat?.translate).toBeUndefined();
+		expect(esLat?.merge).toMatchObject([
+			{
+				url: "https://www.france24.com/es/am%C3%A9rica-latina/rss",
+				source: "France 24"
+			}
+		]);
 		expect(
 			newsRegionsFor("pt")!.find((r) => r.gl === "LAT")?.merge
 		).toHaveLength(2);
@@ -382,6 +390,31 @@ describe("news feeds", () => {
 		expect(arGbl.merge).toMatchObject([
 			{ url: "https://feeds.bbci.co.uk/arabic/rss.xml", source: "BBC Arabic" }
 		]);
+		const frEur = newsRegionsFor("fr")!.find((r) => r.gl === "EUR")!;
+		expect(frEur.translate).toBeUndefined();
+		expect(frEur.merge).toMatchObject([
+			{ url: "https://www.france24.com/fr/europe/rss", source: "France 24" },
+			{ url: "https://www.rfi.fr/fr/europe/rss", source: "RFI" }
+		]);
+		const itEur = newsRegionsFor("it")!.find((r) => r.gl === "EUR")!;
+		expect(itEur.translate).toBeUndefined();
+		expect(itEur.merge).toMatchObject([
+			{ url: "https://it.euronews.com/rss", source: "Euronews" }
+		]);
+		const ptGbl = newsRegionsFor("pt")!.find((r) => r.gl === "GBL")!;
+		expect(ptGbl.translate).toBeUndefined();
+		expect(ptGbl.merge).toMatchObject([
+			{ url: "https://feeds.bbci.co.uk/portuguese/rss.xml", source: "BBC Brasil" },
+			{ url: "https://www.rfi.fr/br/rss", source: "RFI Brasil" }
+		]);
+		const deGbl = newsRegionsFor("de")!.find((r) => r.gl === "GBL")!;
+		expect(deGbl.translate).toBeUndefined();
+		expect(deGbl.merge).toMatchObject([
+			{
+				url: "https://www.tagesschau.de/infoservices/alle-meldungen-100~rss2.xml",
+				source: "tagesschau"
+			}
+		]);
 		// Overrides keep chip position, label, and icon.
 		expect(newsRegionsFor("fr")!.slice(-7).map((r) => r.gl)).toEqual([
 			"GBL",
@@ -399,7 +432,7 @@ describe("news feeds", () => {
 			hl: "en-US",
 			translate: true
 		});
-		expect(newsRegionsFor("de")!.find((r) => r.gl === "GBL")?.merge).toMatchObject([
+		expect(newsRegionsFor("ja")!.find((r) => r.gl === "GBL")?.merge).toMatchObject([
 			{ url: "https://feeds.bbci.co.uk/news/world/rss.xml", source: "BBC" },
 			{ url: "https://www.aljazeera.com/xml/rss/all.xml", source: "Al Jazeera" }
 		]);
@@ -431,7 +464,7 @@ describe("news feeds", () => {
 		const seen: string[] = [];
 		const xml = (title: string) =>
 			`<?xml version="1.0"?><rss><channel><item><title>${title}</title><link>https://desk/${title}</link></item></channel></rss>`;
-		const stories = await loadNewsStories("de", "GBL", async (url) => {
+		const stories = await loadNewsStories("ja", "GBL", async (url) => {
 			seen.push(url);
 			if (url.includes("bbci")) return xml("Bbc");
 			if (url.includes("aljazeera")) return xml("Aj");
@@ -449,14 +482,14 @@ describe("news feeds", () => {
 	it("degrades a merge when one desk dies", async () => {
 		const xml = (title: string) =>
 			`<?xml version="1.0"?><rss><channel><item><title>${title}</title><link>https://desk/${title}</link></item></channel></rss>`;
-		const stories = await loadNewsStories("de", "GBL", async (url) => {
+		const stories = await loadNewsStories("ja", "GBL", async (url) => {
 			if (url.includes("aljazeera")) throw new Error("bad-status:403");
 			return xml("Bbc");
 		});
 		expect(stories.map((s) => s.title)).toEqual(["Bbc"]);
 		expect(stories.map((s) => s.source)).toEqual(["BBC"]);
 		// Both desks dead: no cards, not an error.
-		const empty = await loadNewsStories("de", "GBL", async () => {
+		const empty = await loadNewsStories("ja", "GBL", async () => {
 			throw new Error("timeout");
 		});
 		expect(empty).toEqual([]);
@@ -546,10 +579,11 @@ describe("news feeds", () => {
 		expect(seen).toHaveLength(3);
 		expect(stories.map((s) => s.title)).toEqual(["MX", "BR", "AR"]);
 		seen.length = 0;
-		await loadNewsStories("es", "LAT", feed);
-		expect(seen).toEqual([
-			"https://news.google.com/rss?hl=pt-BR&gl=BR&ceid=BR:pt-BR"
-		]);
+		await loadNewsStories("es", "LAT", async (url) => {
+			seen.push(url);
+			return xml("AmLat");
+		});
+		expect(seen).toEqual(["https://www.france24.com/es/am%C3%A9rica-latina/rss"]);
 		seen.length = 0;
 		await loadNewsStories("pt", "LAT", feed);
 		expect(seen).toHaveLength(2);
