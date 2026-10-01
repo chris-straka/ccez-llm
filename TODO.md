@@ -31,7 +31,7 @@ same codebase via the Tauri mobile target.
 Full specs, order, acceptance criteria, and gates live in
 `docs/plans/2026-10-01-handoff.md` ("Who does what" has the order).
 
-- [ ] Fix two e2e failures that predate the plan ("Known failing")
+- [x] Fix two e2e failures that predate the plan ("Known failing")
 - [ ] A8. Interface size slider (settings, chat list, dialogs, toasts)
 - [ ] A7b. Voice speed on Windows/Linux; verify Android on the S24
 - [ ] B. Annotation drafts controller out of `+page.svelte`

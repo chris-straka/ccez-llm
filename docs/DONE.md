@@ -1040,3 +1040,16 @@ condensed from the Sep 23–24 chain (`0cda353`–`051257b`, tail
       binary (cdhash ACL mismatch per rebuild, plus repeated reads).
       `keychain_get` memoizes per launch (`eaa294d`); debug builds keep
       keys in gitignored `src-tauri/.dev-secrets.json` (`73c20f0`).
+
+## Oct 2026 handoff (Muse)
+
+- [x] Known-failing e2e (predate the plan): `layout` now pins the
+      composer to its own prompt slider (main size never touches it);
+      `chrome` language re-pick pins news-mode open + parked composer
+      on picks and the composer focus handoff on clear (empty picks
+      open news since `9353065`, so the old focus expectation was
+      stale, not a focus bug). Also fixed a third failure found on the
+      way: `enterEditMode`'s focus-retry frame could refocus a
+      Space-dismissed composer and restore it via focusin — the loop
+      now stops once the prompt idles — and the space spec clears the
+      cross-test browser clipboard before asserting an empty copy.

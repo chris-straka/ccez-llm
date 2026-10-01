@@ -599,6 +599,10 @@ test("space dismisses an empty composer, types after text", async ({
 	await page.keyboard.press("i");
 	await expect(prompt).not.toHaveClass(/prompt-idle/, { timeout: 5_000 });
 	await expect.poll(inPrompt).toBe(true);
+	// The browser clipboard outlives each test (an earlier spec copies
+	// code there), so clear it: the "" below must mean the empty
+	// composer copied nothing, not leftover state.
+	await page.evaluate(() => navigator.clipboard.writeText(""));
 	await page.keyboard.press("Meta+a");
 	await page.keyboard.press("Meta+c");
 	expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("");
@@ -1385,8 +1389,9 @@ test("short thread boots with the prompt visible", async ({ page }) => {
 });
 
 /** Picking a reply language updates the send button instantly — first
-pick and re-pick alike, with no prompt hover in between — and hands
-focus to the composer. */
+pick and re-pick alike, with no prompt hover in between. Empty-chat
+picks open learner news (which parks the composer, so focus stays
+out); clearing the pick closes news and hands focus to the composer. */
 test("language re-pick updates send instantly and focuses prompt", async ({
 	page
 }) => {
@@ -1398,6 +1403,7 @@ test("language re-pick updates send instantly and focuses prompt", async ({
 	const send = page.locator(".send-btn");
 	await expect(send).toBeVisible({ timeout: 60_000 });
 	const pill = page.locator(".lang-menus .lang-menu button").first();
+	const panel = page.locator(".news-panel");
 	const focusedComposer = () =>
 		page.evaluate(
 			() =>
@@ -1408,10 +1414,19 @@ test("language re-pick updates send instantly and focuses prompt", async ({
 	await pill.click();
 	await page.locator('.lang-list button:has-text("Bulgarian")').click();
 	await expect(send).toContainText("🇧🇬", { timeout: 10_000 });
-	expect(await focusedComposer()).toBe(true);
+	await expect(panel).toContainText("Bulgarian news", { timeout: 10_000 });
+	expect(await focusedComposer()).toBe(false);
 	// Re-pick without ever touching the prompt: the badge swaps at once.
 	await pill.click();
 	await page.locator('.lang-list button:has-text("Czech")').click();
 	await expect(send).toContainText("🇨🇿", { timeout: 10_000 });
+	await expect(panel).toContainText("Czech news");
+	expect(await focusedComposer()).toBe(false);
+	// Re-picking the active option clears (no number key): news
+	// closes and focus lands in the composer.
+	await pill.click();
+	await page.locator(".lang-list button.selected").click();
+	await expect(send).toHaveText("↑");
+	await expect(panel).toHaveCount(0);
 	expect(await focusedComposer()).toBe(true);
 });

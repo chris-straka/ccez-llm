@@ -79,8 +79,9 @@ test("chat width setting scales the column", async ({ page }) => {
 });
 
 /** Text size scales messages, never the composer input; annotation
-badges track it at a dampened rate (30%: 600% reads ≈2.5× badges). */
-test("text size scales messages, badges, and the composer", async ({
+badges track it at a dampened rate (30%: 600% reads ≈2.5× badges).
+The composer follows only its own Prompt text size slider. */
+test("text size scales messages and badges, prompt slider scales the composer", async ({
 	page
 }) => {
 	await seedChat(page, [{ role: "assistant", content: "hello" }]);
@@ -113,8 +114,17 @@ test("text size scales messages, badges, and the composer", async ({
 	await expect
 		.poll(() => px("article .rendered"), { timeout: 5_000 })
 		.toBeCloseTo(msgBefore * 1.1, 1);
-	expect(await px(".prompt .ta-input")).toBeCloseTo(editorBefore * 1.1, 1);
+	expect(await px(".prompt .ta-input")).toBeCloseTo(editorBefore, 1);
 	expect(await px("button.ccez-ann-badge")).toBeCloseTo(badgeBefore * 1.03, 1);
+	// The prompt slider moves only the composer: messages stay put.
+	const promptSize = page.locator(
+		'.settings-panel input[aria-label="Prompt text size percent"]'
+	);
+	await promptSize.fill("200");
+	await expect
+		.poll(() => px(".prompt .ta-input"), { timeout: 5_000 })
+		.toBeCloseTo(editorBefore * 2, 1);
+	expect(await px("article .rendered")).toBeCloseTo(msgBefore * 1.1, 1);
 });
 
 /** The attachment strip sits on top of the prompt: past a 36rem chat

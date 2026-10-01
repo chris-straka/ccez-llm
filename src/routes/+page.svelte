@@ -8039,6 +8039,11 @@
 		void tick().then(() => {
 			let frames = 0;
 			const land = (): void => {
+				// A frame scheduled before a dismiss must not fire
+				// after it: focusing a re-hidden composer restores it
+				// via focusin, undoing the dismiss (or un-idling under
+				// a summon key, which then types instead of summoning).
+				if (promptIdle) return;
 				const active = document.activeElement;
 				// A closing sidebar's row is not a settled home: entering
 				// from the list focuses the composer only after the
