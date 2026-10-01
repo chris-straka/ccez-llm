@@ -11,9 +11,11 @@ import {
 	cachedNewsUrl,
 	contentImageFromMarkdown,
 	createRateGate,
+	decodeNewsLink,
 	extractArticleText,
 	imageMissSettles,
 	fetchArticleText,
+	isDirectStoryLink,
 	isNewsFallback,
 	isWebviewUnsupported,
 	isNewsSupported,
@@ -180,17 +182,23 @@ describe("news feeds", () => {
 			"LAT",
 			"ASI"
 		]);
-		expect(fr.slice(-7).every((r) => r.translate)).toBe(true);
+		expect(
+			fr
+				.slice(-7)
+				.filter((r) => r.translate)
+				.map((r) => r.gl)
+		).toEqual(["EUR", "GB", "AU", "LAT", "ASI"]);
+		expect(fr.find((r) => r.gl === "GBL")?.translate).toBeUndefined();
 		expect(fr.find((r) => r.gl === "GBL")).toMatchObject({
 			label: "Global",
 			merge: [
 				{
-					url: "https://feeds.bbci.co.uk/news/world/rss.xml",
-					source: "BBC"
+					url: "https://www.france24.com/fr/rss",
+					source: "France 24"
 				},
 				{
-					url: "https://www.aljazeera.com/xml/rss/all.xml",
-					source: "Al Jazeera"
+					url: "https://www.rfi.fr/fr/rss",
+					source: "RFI"
 				}
 			]
 		});
@@ -251,7 +259,7 @@ describe("news feeds", () => {
 			label: "U.K.",
 			hl: "en-GB"
 		});
-		expect(newsRssUrl("fr", "US")).toContain("hl=en-US&gl=US");
+		expect(newsRssUrl("fr", "US")).toBeNull();
 		expect(newsRssUrl("fr", "GB")).toContain("hl=en-GB&gl=GB");
 		expect(newsRssUrl("fr", "GBL")).toBeNull();
 		expect(newsRssUrl("fr", "EUR")).toBeNull();
@@ -348,6 +356,55 @@ describe("news feeds", () => {
 		]);
 	});
 
+	it("reads native desks where a world service publishes the language", () => {
+		// French U.S. and Global go fully native (no AI
+		// translation); German keeps the translated feeds.
+		const frUs = newsRegionsFor("fr")!.find((r) => r.gl === "US")!;
+		expect(frUs.translate).toBeUndefined();
+		expect(frUs.merge).toMatchObject([
+			{ url: "https://www.france24.com/fr/am%C3%A9riques/rss", source: "France 24" },
+			{ url: "https://www.rfi.fr/fr/am%C3%A9riques/rss", source: "RFI" }
+		]);
+		const frGbl = newsRegionsFor("fr")!.find((r) => r.gl === "GBL")!;
+		expect(frGbl.translate).toBeUndefined();
+		expect(frGbl.merge).toMatchObject([
+			{ url: "https://www.france24.com/fr/rss", source: "France 24" },
+			{ url: "https://www.rfi.fr/fr/rss", source: "RFI" }
+		]);
+		const esGbl = newsRegionsFor("es")!.find((r) => r.gl === "GBL")!;
+		expect(esGbl.translate).toBeUndefined();
+		expect(esGbl.merge).toMatchObject([
+			{ url: "https://feeds.bbci.co.uk/mundo/rss.xml", source: "BBC Mundo" },
+			{ url: "https://www.france24.com/es/rss", source: "France 24" }
+		]);
+		const arGbl = newsRegionsFor("ar")!.find((r) => r.gl === "GBL")!;
+		expect(arGbl.translate).toBeUndefined();
+		expect(arGbl.merge).toMatchObject([
+			{ url: "https://feeds.bbci.co.uk/arabic/rss.xml", source: "BBC Arabic" }
+		]);
+		// Overrides keep chip position, label, and icon.
+		expect(newsRegionsFor("fr")!.slice(-7).map((r) => r.gl)).toEqual([
+			"GBL",
+			"US",
+			"EUR",
+			"GB",
+			"AU",
+			"LAT",
+			"ASI"
+		]);
+		expect(frUs).toMatchObject({ label: "U.S.", icon: "🇺🇸" });
+		expect(frGbl).toMatchObject({ label: "Global", icon: "🌐" });
+		// Everyone else keeps the translated English feeds.
+		expect(newsRegionsFor("de")!.find((r) => r.gl === "US")).toMatchObject({
+			hl: "en-US",
+			translate: true
+		});
+		expect(newsRegionsFor("de")!.find((r) => r.gl === "GBL")?.merge).toMatchObject([
+			{ url: "https://feeds.bbci.co.uk/news/world/rss.xml", source: "BBC" },
+			{ url: "https://www.aljazeera.com/xml/rss/all.xml", source: "Al Jazeera" }
+		]);
+	});
+
 	it("merges editions round-robin, deduped and capped", () => {
 		const story = (title: string) => ({
 			title,
@@ -374,7 +431,7 @@ describe("news feeds", () => {
 		const seen: string[] = [];
 		const xml = (title: string) =>
 			`<?xml version="1.0"?><rss><channel><item><title>${title}</title><link>https://desk/${title}</link></item></channel></rss>`;
-		const stories = await loadNewsStories("fr", "GBL", async (url) => {
+		const stories = await loadNewsStories("de", "GBL", async (url) => {
 			seen.push(url);
 			if (url.includes("bbci")) return xml("Bbc");
 			if (url.includes("aljazeera")) return xml("Aj");
@@ -387,6 +444,36 @@ describe("news feeds", () => {
 		await expect(loadNewsStories("xx", "US", async () => "")).rejects.toThrow(
 			"news-unsupported"
 		);
+	});
+
+	it("degrades a merge when one desk dies", async () => {
+		const xml = (title: string) =>
+			`<?xml version="1.0"?><rss><channel><item><title>${title}</title><link>https://desk/${title}</link></item></channel></rss>`;
+		const stories = await loadNewsStories("de", "GBL", async (url) => {
+			if (url.includes("aljazeera")) throw new Error("bad-status:403");
+			return xml("Bbc");
+		});
+		expect(stories.map((s) => s.title)).toEqual(["Bbc"]);
+		expect(stories.map((s) => s.source)).toEqual(["BBC"]);
+		// Both desks dead: no cards, not an error.
+		const empty = await loadNewsStories("de", "GBL", async () => {
+			throw new Error("timeout");
+		});
+		expect(empty).toEqual([]);
+	});
+
+	it("passes direct desk links through, decoding only Google links", async () => {
+		expect(isDirectStoryLink("https://news.google.com/rss/articles/AAA")).toBe(false);
+		expect(isDirectStoryLink("https://www.france24.com/fr/a")).toBe(true);
+		expect(isDirectStoryLink("not a url")).toBe(false);
+		// Passthrough needs no shell: native-desk cards launch anywhere.
+		await expect(decodeNewsLink("https://www.rfi.fr/fr/a")).resolves.toBe(
+			"https://www.rfi.fr/fr/a"
+		);
+		// Google links still need the shell decoder.
+		await expect(
+			decodeNewsLink("https://news.google.com/rss/articles/AAA")
+		).rejects.toThrow("news-needs-shell");
 	});
 
 	it("fans Europe loads out across the continent, minus home", async () => {

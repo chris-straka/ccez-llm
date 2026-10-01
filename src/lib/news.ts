@@ -284,6 +284,56 @@ const WORLD_REGIONS: NewsRegion[] = [
 	}
 ];
 
+/**
+ * Native-desk overrides for world regions, by learner language
+ * then `gl`: where a world service publishes a live feed in the
+ * learner's language, the chip reads it instead of the
+ * translated English feed (native phrasing beats machine
+ * translation; feed images ride along). Every URL verified
+ * live with items and thumbnails.
+ */
+const NATIVE_REGIONS: Record<string, Record<string, NewsRegion>> = {
+	fr: {
+		US: {
+			gl: "US",
+			label: "U.S.",
+			icon: "🇺🇸",
+			merge: [
+				{ url: "https://www.france24.com/fr/am%C3%A9riques/rss", source: "France 24" },
+				{ url: "https://www.rfi.fr/fr/am%C3%A9riques/rss", source: "RFI" }
+			]
+		},
+		GBL: {
+			gl: "GBL",
+			label: "Global",
+			icon: "🌐",
+			merge: [
+				{ url: "https://www.france24.com/fr/rss", source: "France 24" },
+				{ url: "https://www.rfi.fr/fr/rss", source: "RFI" }
+			]
+		}
+	},
+	es: {
+		GBL: {
+			gl: "GBL",
+			label: "Global",
+			icon: "🌐",
+			merge: [
+				{ url: "https://feeds.bbci.co.uk/mundo/rss.xml", source: "BBC Mundo" },
+				{ url: "https://www.france24.com/es/rss", source: "France 24" }
+			]
+		}
+	},
+	ar: {
+		GBL: {
+			gl: "GBL",
+			label: "Global",
+			icon: "🌐",
+			merge: [{ url: "https://feeds.bbci.co.uk/arabic/rss.xml", source: "BBC Arabic" }]
+		}
+	}
+};
+
 export function newsRegionsFor(code: string): NewsRegion[] | null {
 	const feed = NEWS_FEEDS[code];
 	if (!feed) return null;
@@ -294,9 +344,12 @@ export function newsRegionsFor(code: string): NewsRegion[] | null {
 		...feed.regions.map((r) =>
 			feed.fallback ? { ...r, translate: true as const } : r
 		),
-		...WORLD_REGIONS.filter((r) => !have.has(r.gl)).map((r) =>
-			r.merge ? { ...r, merge: r.merge.filter((t) => t.lang !== code) } : r
-		)
+		...WORLD_REGIONS.filter((r) => !have.has(r.gl)).map((r) => {
+			const region = NATIVE_REGIONS[code]?.[r.gl] ?? r;
+			return region.merge
+				? { ...region, merge: region.merge.filter((t) => t.lang !== code) }
+				: region;
+		})
 	];
 }
 
@@ -863,8 +916,30 @@ export async function fetchWebviewImage(url: string): Promise<string | null> {
 	return out;
 }
 
-/** One Google News link into its publisher URL (shell only). */
+/**
+ * True for direct desk links: fetchable http(s), never a Google
+ * redirect. Garbage matches nothing and keeps the old path
+ * (shell check, then the shell's bad-url). Pure.
+ */
+export function isDirectStoryLink(link: string): boolean {
+	try {
+		const url = new URL(link);
+		return (
+			(url.protocol === "http:" || url.protocol === "https:") &&
+			url.hostname !== "news.google.com"
+		);
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * A story link into its publisher URL: Google redirect links
+ * decode (shell only), direct desk links pass through (the
+ * decode hop is skipped; fetching still needs the shell).
+ */
 export async function decodeNewsLink(link: string): Promise<string> {
+	if (isDirectStoryLink(link)) return link;
 	if (!tauriBackendAvailable()) throw new Error("news-needs-shell");
 	const out = await tauriInvoke<unknown>("news_decode_url", { link });
 	if (typeof out !== "string" || !out.startsWith("http")) {
@@ -933,10 +1008,14 @@ export async function loadNewsStories(
 	if (!region) throw new Error("news-unsupported");
 	if (region.merge) {
 		const targets = region.merge;
-		const xmls = await Promise.all(targets.map((target) => fetchXml(target.url)));
+		// One dead desk degrades the mix, never blanks the chip.
+		const settled = await Promise.allSettled(
+			targets.map((target) => fetchXml(target.url))
+		);
 		// Single-desk feeds carry no outlet suffix — stamp the desk.
-		const feeds = xmls.map((xml, i) => {
+		const feeds = settled.map((result, i) => {
 			const desk = targets[i]?.source ?? "";
+			const xml = result.status === "fulfilled" ? result.value : "";
 			return newsStoriesFromXml(xml).map((story) =>
 				story.source || !desk ? story : { ...story, source: desk }
 			);
