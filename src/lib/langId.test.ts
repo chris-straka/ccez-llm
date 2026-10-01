@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { identifyLangOffline, identifyLangShort } from "./langId";
+import {
+	hyphenationLang,
+	identifyLangOffline,
+	identifyLangShort
+} from "./langId";
 
 describe("identifyLangOffline", () => {
 	it("resolves non-Latin scripts without statistics", () => {
@@ -50,9 +54,7 @@ describe("identifyLangShort", () => {
 			)
 		).toBe("en-US");
 		expect(identifyLangShort("the cat")).toBe("en-US");
-		expect(identifyLangShort("deeply shaped / profoundly shaped")).toBe(
-			null
-		);
+		expect(identifyLangShort("deeply shaped / profoundly shaped")).toBe(null);
 	});
 
 	it("reads French by accents and elisions", () => {
@@ -111,5 +113,20 @@ describe("identifyLangShort", () => {
 		// "un" voting three ways — without this the fragment falls
 		// back to the seed voice (English TTS on French text).
 		expect(identifyLangShort("avec un tiret")).toBe("fr-FR");
+	});
+});
+
+describe("hyphenationLang", () => {
+	it("tags identified Latin-script text, never CJK or unknowns", () => {
+		expect(
+			hyphenationLang("Der Bahnhof ist ganz in der Nähe und wir gehen zu Fuß.")
+		).toBe("de-DE");
+		expect(
+			hyphenationLang("Je ne sais pas ce que tu veux dire avec cette phrase.")
+		).toBe("fr-FR");
+		expect(
+			hyphenationLang("日本語でも説明します。これは長い言葉です。")
+		).toBeUndefined();
+		expect(hyphenationLang("ok")).toBeUndefined();
 	});
 });

@@ -555,8 +555,11 @@ cover an off state. -->
 	.actions button.aid-btn {
 		font-size: calc(0.92rem * 0.85);
 	}
+	/* Labels track the type up to 6x (the icons stop at 4x): past
+	that a one-word button outgrows a laptop screen and reads no
+	better for it. */
 	:global(main.scale-actions) .actions button.aid-btn {
-		font-size: calc(0.92rem * var(--font-scale, 1) * 0.85);
+		font-size: calc(0.92rem * min(var(--font-scale, 1), 6) * 0.85);
 	}
 	/* Opt-in (Settings): the logo icons grow with the text-size
 	setting (text buttons track at 85% by default now, so only the

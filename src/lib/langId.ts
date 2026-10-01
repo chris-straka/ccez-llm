@@ -687,8 +687,7 @@ export function identifyLangShort(text: string): string | null {
 	bump("de-DE", Math.min(3, caps));
 	const deSuffix = tokens.filter(
 		(t) =>
-			t.length > 4 &&
-			/(ung|heit|keit|isch|lich|los|bar|sam|haft|tum)$/.test(t)
+			t.length > 4 && /(ung|heit|keit|isch|lich|los|bar|sam|haft|tum)$/.test(t)
 	).length;
 	bump("de-DE", Math.min(2, deSuffix));
 	// French: accented words, guillemets, single-letter elisions
@@ -728,10 +727,23 @@ export function identifyLangShort(text: string): string | null {
 			STOP_WORDS.find((entry) => entry.lang === lang)?.words ?? []
 		);
 		const decided = tokens.some(
-			(token) =>
-				leaderWords.has(token) && STOP_WORD_OWNERS.get(token) === 1
+			(token) => leaderWords.has(token) && STOP_WORD_OWNERS.get(token) === 1
 		);
 		if (!decided) return frenchTiebreak(tokens, trimmed);
 	}
 	return lang;
+}
+
+/** Latin-script languages the stop-word scorer knows (all hyphenate). */
+const HYPHENATION_LANGS = new Set(STOP_WORDS.map((entry) => entry.lang));
+
+/**
+ * `lang` tag for hyphenating a message body, or undefined. Latin
+ * scripts only: hyphenation needs the right dictionary (German breaks
+ * "Donau-dampf", English rules would not), and leaving CJK untagged
+ * keeps its glyph selection exactly as it was. Pure.
+ */
+export function hyphenationLang(text: string): string | undefined {
+	const lang = identifyLangOffline(text);
+	return lang && HYPHENATION_LANGS.has(lang) ? lang : undefined;
 }

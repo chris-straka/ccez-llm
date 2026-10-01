@@ -30,21 +30,26 @@ async function overflowReport(page: Page): Promise<string[]> {
 				`page scrolls sideways: ${document.documentElement.scrollWidth} > ${vw}`
 			);
 		const box = document.querySelector(".messages");
-		if (box && box.scrollWidth > box.clientWidth + 1)
+		// Phones clip the thread sideways (overflow-x: clip): a wide
+		// tooltip there can't scroll it, so only a scrollable box counts.
+		const scrolls =
+			box && !["clip", "hidden"].includes(getComputedStyle(box).overflowX);
+		if (box && scrolls && box.scrollWidth > box.clientWidth + 1)
 			out.push(
 				`.messages scrolls sideways: ${box.scrollWidth} > ${box.clientWidth}`
 			);
-		for (const el of document.querySelectorAll(".messages .rendered *")) {
+		for (const el of document.querySelectorAll(".messages *")) {
 			const r = el.getBoundingClientRect();
 			if (r.width === 0) continue;
-			// Code blocks and tables may scroll inside themselves.
-			if (el.closest("pre, table, .table-wrap")) continue;
+			// Content inside code blocks, tables, and the action row
+			// scrolls within its own box; the boxes themselves must fit.
+			if (el.parentElement?.closest("pre, table, .actions")) continue;
 			if (r.right > vw + 1 || r.left < -1)
 				out.push(
-					`${el.tagName.toLowerCase()} spills: ${Math.round(r.left)}..${Math.round(r.right)} of ${vw}`
+					`${el.tagName.toLowerCase()}.${[...el.classList].join(".")} spills: ${Math.round(r.left)}..${Math.round(r.right)} of ${vw}`
 				);
 		}
-		return [...new Set(out)].slice(0, 12);
+		return [...new Set(out)].slice(0, 20);
 	});
 }
 
@@ -59,6 +64,28 @@ for (const scale of [8, 20]) {
 	});
 }
 
+/** Settings stay usable at 2000%: the panel fits the window and its
+sliders (text size included) stay reachable. */
+test("desktop settings fit at 2000% text", async ({ page }) => {
+	await page.setViewportSize({ width: 1280, height: 800 });
+	await seedChat(page, THREAD, null, { fontScale: 20 });
+	await page.goto("/");
+	// The send button marks a fully mounted app (keys are live).
+	await expect(page.locator(".send-btn")).toBeVisible({ timeout: 60_000 });
+	await page.keyboard.press("Meta+,");
+	const panel = page.locator(".settings-panel");
+	await expect(panel).not.toHaveClass(/closed/);
+	// The panel slides in: poll until it settles inside the window.
+	await expect
+		.poll(async () => {
+			const box = await panel.boundingBox();
+			return box ? box.x + box.width : Infinity;
+		})
+		.toBeLessThanOrEqual(1281);
+	await page.screenshot({ path: ".screenshots/giant-desktop-settings-20.png" });
+	expect.soft(await overflowReport(page)).toEqual([]);
+});
+
 test.describe("phone", () => {
 	test.use({
 		hasTouch: true,
@@ -68,9 +95,6 @@ test.describe("phone", () => {
 	});
 	for (const scale of [8, 20]) {
 		test(`phone thread fits at ${scale * 100}% text`, async ({ page }) => {
-			// Known: at 2000% the phone thread scrolls sideways (574 > 412).
-			// Remove once docs/plans/2026-10-01-handoff.md §A lands.
-			test.fail(scale === 20, "phone overflows sideways at 2000%");
 			await seedChat(page, THREAD, null, { fontScale: scale });
 			await page.goto("/");
 			await expect(page.locator("article.assistant")).toBeVisible();

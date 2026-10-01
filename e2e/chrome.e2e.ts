@@ -1221,10 +1221,11 @@ test("chat width setting widens the chat column", async ({ page }) => {
 		.toContain('"chatWidth":38');
 });
 
-/** Huge type moves no width: the four knobs stay independent (36rem
-sliders hold at 370% type), and the composer never exceeds the
+/** Huge type keeps the composer on its own slider and floors the
+column at ~20 characters (MIN_LINE_CHARS): at 370% the 36rem slider
+gives way to 37rem; the composer holds 36 and never exceeds the
 column. The language pills slot under the hero on desktop too. */
-test("huge type widens neither the column nor the composer", async ({
+test("huge type floors the column, never the composer", async ({
 	page
 }) => {
 	await page.setViewportSize({ width: 1600, height: 900 });
@@ -1250,9 +1251,9 @@ test("huge type widens neither the column nor the composer", async ({
 			)
 		};
 	});
-	// The sliders own their widths at every size — type scales ride
-	// their own sliders only.
-	expect(vars.chat).toBeCloseTo(36, 1);
+	// 20 chars × 0.5em × 3.7 = 37rem beats the 36rem slider; the
+	// composer rides its own 36rem base.
+	expect(vars.chat).toBeCloseTo(37, 1);
 	expect(vars.prompt).toBeCloseTo(36, 1);
 	// Rendered boxes (not max-width: engines report min() and
 	// fit-content differently): the hero rides the column cap, the

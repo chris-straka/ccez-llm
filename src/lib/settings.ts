@@ -183,6 +183,10 @@ export interface AppSettings {
 	/** Gap between messages in rem (the Gap size slider); pair
 	 * separation rides 0.1rem above whatever it holds. */
 	messageGap: number;
+	/** Message line spacing (the Line spacing slider): a unitless
+	 * line-height on message text. Manual on purpose: it never eases
+	 * with type size, so the owner picks what reads best. */
+	lineHeight: number;
 	/**
 	 * Seconds of no mouse/keyboard/touch input before the main prompt
 	 * slides down out of view (any input restores it instantly).
@@ -261,6 +265,10 @@ export const CHAT_WIDTH_MAX = 120;
 export const MESSAGE_GAP_DEFAULT = 0.35;
 export const MESSAGE_GAP_MIN = 0;
 export const MESSAGE_GAP_MAX = 1.5;
+/** Message line spacing (unitless line-height): 1.5 is the historic value. */
+export const LINE_HEIGHT_DEFAULT = 1.5;
+export const LINE_HEIGHT_MIN = 1;
+export const LINE_HEIGHT_MAX = 2.2;
 /** Phone font scale at/above which the chat goes full-bleed (330%). */
 export const FULLBLEED_FONT_SCALE = 3.3;
 /** Absurdly wide column: min(100%, …) consumers read it as full width. */
@@ -271,18 +279,30 @@ export const CHAT_WIDTH_PHONE_MIN_REM = 46;
 export const PROMPT_WIDTH_BASE_REM = 36;
 
 /**
- * Effective chat column width (rem) for the --chat-width var. The
- * four knobs move independently: desktop rides the slider alone —
- * scaling the type never widens the column. Phones go full-bleed
- * once huge type needs the room, and never narrower than the touch
- * floor. Pure.
+ * Desktop line floor: the column never holds fewer than about this
+ * many average characters (~0.5em each), whatever the slider says.
+ * Below ~360% type the slider always wins; above it the column grows
+ * with the type until `min(100%, …)` makes it the whole window
+ * (owner call 2026-10-01: low-vision reading at up to 2000% left one
+ * or two letters per line in a fixed 36rem strip).
+ */
+export const MIN_LINE_CHARS = 20;
+/** Type scale at/above which message text hyphenates (300%). */
+export const HYPHENATE_FONT_SCALE = 3;
+const AVG_CHAR_EM = 0.5;
+
+/**
+ * Effective chat column width (rem) for the --chat-width var. Desktop
+ * rides the slider, floored so a line still holds MIN_LINE_CHARS at
+ * the current type size. Phones go full-bleed once huge type needs
+ * the room, and never narrower than the touch floor. Pure.
  */
 export function effectiveChatWidth(
 	androidUI: boolean,
 	fontScale: number,
 	chatWidth: number
 ): number {
-	if (!androidUI) return chatWidth;
+	if (!androidUI) return Math.max(chatWidth, MIN_LINE_CHARS * AVG_CHAR_EM * fontScale);
 	if (fontScale >= FULLBLEED_FONT_SCALE) return CHAT_WIDTH_FULLBLEED_REM;
 	return Math.max(CHAT_WIDTH_PHONE_MIN_REM, chatWidth);
 }
@@ -447,6 +467,7 @@ export function defaultSettings(): AppSettings {
 		scaleActionsWithFont: true,
 		showMessageButtons: true,
 		messageGap: MESSAGE_GAP_DEFAULT,
+		lineHeight: LINE_HEIGHT_DEFAULT,
 		promptIdleSec: PROMPT_IDLE_DEFAULT,
 		voiceLangPinned: false,
 		theme: "system",
@@ -722,6 +743,14 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 				Math.max(MESSAGE_GAP_MIN, merged.messageGap)
 			);
 		}
+		// Backfill line spacing on older saves; clamp strays into range.
+		if (typeof merged.lineHeight !== "number" || Number.isNaN(merged.lineHeight))
+			merged.lineHeight = LINE_HEIGHT_DEFAULT;
+		else
+			merged.lineHeight = Math.min(
+				LINE_HEIGHT_MAX,
+				Math.max(LINE_HEIGHT_MIN, merged.lineHeight)
+			);
 		// Retire the old "Be brief, no summaries." default: profiles that
 		// never customized it inherit the new (empty) default instead.
 		if (merged.systemPrompt === "Be brief, no summaries.") {

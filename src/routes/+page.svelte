@@ -67,9 +67,11 @@
 		stepFontScale,
 		stepChatWidth,
 		MESSAGE_GAP_DEFAULT,
+		LINE_HEIGHT_DEFAULT,
 		effectiveChatWidth,
 		effectivePromptWidth,
 		FULLBLEED_FONT_SCALE,
+		HYPHENATE_FONT_SCALE,
 		PROMPT_IDLE_ALWAYS,
 		PROMPT_IDLE_NEVER,
 		type AppSettings
@@ -13163,6 +13165,7 @@
 	data-ios={iosUI || null}
 	data-fullbleed={(androidUI && settings.fontScale >= FULLBLEED_FONT_SCALE) ||
 		null}
+	data-hyphenate={settings.fontScale >= HYPHENATE_FONT_SCALE || null}
 	style="--font-scale: {androidUI
 		? Math.min(FONT_SCALE_MAX, settings.fontScale)
 		: settings.fontScale}; --chat-width: {effectiveChatWidth(
@@ -13174,7 +13177,7 @@
 		settings.fontScale,
 		settings.chatWidth ?? 36,
 		settings.promptWidth ?? PROMPT_WIDTH_BASE_REM
-	)}; --prompt-font: {settings.promptScale ?? 1}; --annpop-scale: {settings.annPopScale ?? 1}; --msg-gap: {settings.messageGap ?? MESSAGE_GAP_DEFAULT}rem"
+	)}; --prompt-font: {settings.promptScale ?? 1}; --annpop-scale: {settings.annPopScale ?? 1}; --msg-gap: {settings.messageGap ?? MESSAGE_GAP_DEFAULT}rem; --msg-line-height: {settings.lineHeight ?? LINE_HEIGHT_DEFAULT}"
 	data-mac={(isMac && !androidUI) || null}
 >
 	<Sidebar

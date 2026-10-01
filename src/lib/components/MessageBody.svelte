@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { hyphenationLang } from "$lib/langId";
 	import { tick, untrack } from "svelte";
 	import { SvelteSet } from "svelte/reactivity";
 	// KaTeX stylesheet (fonts bundle relative to it, so math renders offline).
@@ -152,6 +153,9 @@
 		onAidLoadingChange,
 		onAidError
 	}: Props = $props();
+	/** Hyphenation dictionary for giant type (see .app[data-hyphenate]):
+	settled replies only, so streaming never re-scores every token. */
+	const bodyLang = $derived(streaming ? undefined : hyphenationLang(message.content));
 
 	let html = $state("");
 	let bodyEl: HTMLElement | undefined = $state();
@@ -631,6 +635,7 @@
 		<!-- Badge wash is hover-only by decision (see onBadgeOver): Tab reaches markers, never highlights. -->
 		<div
 			class="rendered"
+			lang={bodyLang}
 			class:aid-swap={!preview}
 			class:aid-space={aidSpace}
 			class:aid-tall={aidSpace && aidTall}
@@ -650,7 +655,8 @@
 	.rendered {
 		word-break: break-word;
 		font-size: calc(0.92rem * var(--font-scale, 1));
-		line-height: 1.5;
+		/* Line spacing slider (Settings → Messages), never automatic. */
+		line-height: var(--msg-line-height, 1.5);
 		/* The one selectable surface in the article (see article's
 		user-select: none): I-beam lives here and only here. */
 		user-select: text;
@@ -1377,5 +1383,16 @@
 		font-style: var(--shiki-dark-font-style) !important;
 		font-weight: var(--shiki-dark-font-weight) !important;
 		text-decoration: var(--shiki-dark-text-decoration) !important;
+	}
+	/* Giant type (>= 300%): break long words at syllables with a
+	hyphen instead of at a bare letter. Needs the body's lang (set for
+	identified Latin-script replies); code and links never hyphenate. */
+	:global(.app[data-hyphenate]) .rendered {
+		-webkit-hyphens: auto;
+		hyphens: auto;
+	}
+	:global(.app[data-hyphenate]) .rendered :global(:is(pre, code, a)) {
+		-webkit-hyphens: manual;
+		hyphens: manual;
 	}
 </style>

@@ -5,6 +5,9 @@
 		CHAT_WIDTH_MIN,
 		PROMPT_WIDTH_BASE_REM,
 		MESSAGE_GAP_DEFAULT,
+		LINE_HEIGHT_DEFAULT,
+		LINE_HEIGHT_MAX,
+		LINE_HEIGHT_MIN,
 		MESSAGE_GAP_MAX,
 		MESSAGE_GAP_MIN,
 		PROMPT_IDLE_DEFAULT,
@@ -321,6 +324,35 @@
 			/>
 			<output style="min-width: 3.6rem;"
 				>{settings.messageGap ?? MESSAGE_GAP_DEFAULT} rem</output
+			>
+		</span>
+	</label>
+	<label class="slider-row">
+		Line spacing
+		<button
+			type="button"
+			class="reset-width"
+			title="Reset to the default line spacing"
+			onclick={() => (settings.lineHeight = LINE_HEIGHT_DEFAULT)}
+			>({LINE_HEIGHT_DEFAULT})</button
+		>
+		<span class="font-row">
+			<input
+				type="range"
+				min={LINE_HEIGHT_MIN}
+				max={LINE_HEIGHT_MAX}
+				step="0.05"
+				value={settings.lineHeight ?? LINE_HEIGHT_DEFAULT}
+				aria-label="Line spacing"
+				onpointerdown={noteSliderPress}
+				onpointerup={(e) =>
+					sliderRelease(e, () => (settings.lineHeight = LINE_HEIGHT_DEFAULT))}
+				oninput={(e) => {
+					settings.lineHeight = Number(e.currentTarget.value);
+				}}
+			/>
+			<output style="min-width: 3.6rem;"
+				>{(settings.lineHeight ?? LINE_HEIGHT_DEFAULT).toFixed(2)}</output
 			>
 		</span>
 	</label>
