@@ -899,10 +899,11 @@ export interface AnnotationQuestion {
 
 /**
  * One-shot messages answering an annotation in its original context:
- * the system teaches the quote's language (never a gist summary)
- * and caps the length so the answer fits its popup; the user
- * carries the paragraph, the quote, and the question (an empty
- * comment asks to be taught the quote).
+ * the system states what the quote means in its paragraph first,
+ * then teaches the quote's language (never a gist summary), and
+ * caps the length so the answer fits its popup; the user carries
+ * the paragraph, the quote, and the question (an empty comment
+ * asks to be taught the quote).
  */
 export function buildAnnotationAnswerMessages(
 	q: AnnotationQuestion
@@ -913,12 +914,12 @@ export function buildAnnotationAnswerMessages(
 		{
 			role: "system",
 			content:
-				`Teach the quoted text below as language, not gist: name the key ` +
-				`word forms (what each part is and why it looks that way), how ` +
-				`the words fit together, and the reusable vocabulary — then ` +
-				`give what it means in this paragraph. Reply in at most ` +
-				`${ANNOTATION_ANSWER_WORDS} words, plain text with no markdown ` +
-				`headings, so the answer fits on screen.`
+				`First give what it means in this paragraph, then teach the ` +
+				`quoted text below as language, not gist: name the key word ` +
+				`forms (what each part is and why it looks that way), how the ` +
+				`words fit together, and the reusable vocabulary. Reply in at ` +
+				`most ${ANNOTATION_ANSWER_WORDS} words, plain text with no ` +
+				`markdown headings, so the answer fits on screen.`
 		},
 		{
 			role: "user",

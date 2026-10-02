@@ -988,8 +988,41 @@ export function shapeStory(item: FeedItem): NewsStory | null {
 }
 
 /**
+ * Outlets that never open, matched against the normalized story
+ * source (the only list-time signal — links decode lazily). NZZ
+ * serves a teaser plus a paywall barrier to reader fetches
+ * (verified 2026-10-02: ~140 static chars, the rest behind
+ * `paywall_container`), so its cards always dead-end on "That
+ * story wouldn't open" — they read as missing instead. One line
+ * per outlet; WAF-walled-but-readable desks (Les Echos, Le Monde
+ * free articles via the reader leg) stay listed on purpose.
+ */
+const UNOPENABLE_OUTLETS = ["nzz", "neue zurcher zeitung"];
+
+/** True when a story source can never open (paywalled shut). Pure. */
+export function isUnopenableOutlet(source: string): boolean {
+	const norm = source
+		.toLowerCase()
+		.normalize("NFKD")
+		.replace(/[\u0300-\u036f]/g, "")
+		.replace(/[^a-z0-9]+/g, " ")
+		.trim();
+	if (!norm) return false;
+	// Whole-word hits only ("nzz" must not catch a hypothetical
+	// "anzz-ledger"); multi-word outlets match as a phrase.
+	return UNOPENABLE_OUTLETS.some(
+		(outlet) =>
+			norm === outlet ||
+			norm.startsWith(`${outlet} `) ||
+			norm.endsWith(` ${outlet}`) ||
+			norm.includes(` ${outlet} `)
+	);
+}
+
+/**
  * Stories out of raw feed markup (transport stays with the caller).
  * Never throws: malformed feeds yield no cards, not an error.
+ * Unopenable outlets never take a card (see isUnopenableOutlet).
  */
 export function newsStoriesFromXml(markup: string): NewsStory[] {
 	let items: FeedItem[];
@@ -1001,7 +1034,8 @@ export function newsStoriesFromXml(markup: string): NewsStory[] {
 	const stories: NewsStory[] = [];
 	for (const item of items) {
 		const story = shapeStory(item);
-		if (story) stories.push(story);
+		if (!story || isUnopenableOutlet(story.source)) continue;
+		stories.push(story);
 	}
 	return stories;
 }

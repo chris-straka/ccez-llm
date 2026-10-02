@@ -1,6 +1,7 @@
 /**
  * Shared DOM-event idioms for page-level handlers.
  */
+import type { FlickZone } from "./platform";
 
 const FIELD_SELECTOR = "input, textarea, select";
 const EDITABLE_SELECTOR = "input, textarea, select, [contenteditable]";
@@ -40,6 +41,16 @@ const IDLE_OWNED_SELECTOR =
  */
 const SCROLL_ENTER_OWNED_SELECTOR =
 	"input, textarea, select, [contenteditable], button, a, aside, .modal, .modal-veil, .find-bar, .search-palette, .sel-menu, .review, .news-open";
+/** The learner-news story panel (region chips plus story cards). */
+const NEWS_PANEL_SELECTOR = ".news-panel";
+/** The horizontally scrolling region-chip rail inside the news panel. */
+const NEWS_CHIPS_SELECTOR = ".news-chips";
+/** Flick-zone controls: taps keep native behavior here, never a gesture. */
+const FLICK_CONTROL_SELECTOR =
+	"button, a, input, textarea, select, summary, [contenteditable], .actions";
+/** Flick-zone overlays: strokes here belong to their owner, never a gesture. */
+const FLICK_OVERLAY_SELECTOR =
+	"aside, .modal, .modal-veil, .settings-panel, .find-bar, .search-palette, .sel-menu, .review, .lang-menu, .lang-menus, .hero, .toast";
 
 /**
  * Closest matching ancestor for an event target (or the focused
@@ -115,6 +126,47 @@ export function isChatRowTarget(target: EventTarget | null): boolean {
 	return (
 		closestFromTarget(target, "aside ul li button.side-chat") !== null
 	);
+}
+
+/** True anywhere inside the learner-news story panel. */
+export function isNewsPanelTarget(target: EventTarget | null): boolean {
+	return closestFromTarget(target, NEWS_PANEL_SELECTOR) !== null;
+}
+
+/**
+ * True when a stroke starts on the region-chip rail: the rail
+ * scrolls horizontally, so the stroke belongs to its scroller —
+ * never to a sidebar summon (same ownership as the action row).
+ */
+export function isNewsChipsTarget(target: EventTarget | null): boolean {
+	return closestFromTarget(target, NEWS_CHIPS_SELECTOR) !== null;
+}
+
+/**
+ * Where a single-finger stroke began, for the vertical-flick
+ * gestures (message / prompt / empty). Controls, fields, and
+ * chrome count as "other": taps there keep native behavior and
+ * strokes there belong to their owner, never to a gesture. News
+ * cards read "other" too: the panel sits in main-column dead
+ * space, so without the carve-out every story tap read as
+ * "empty" — focusing the composer on tap and summoning the quick
+ * switcher on hold instead of the annotate menu. The article
+ * predicate stays injected (the page's articleOf), so this owns
+ * the zone priority and nothing else.
+ */
+export function flickZoneOfTarget(
+	target: EventTarget | null,
+	isArticle: (el: Element) => boolean
+): FlickZone {
+	const el = target instanceof Element ? target : null;
+	if (!el) return "other";
+	if (el.closest(FLICK_CONTROL_SELECTOR)) return "other";
+	if (el.closest(NEWS_PANEL_SELECTOR)) return "other";
+	if (el.closest(PROMPT_SELECTOR)) return "prompt";
+	if (isArticle(el)) return "message";
+	if (el.closest("main") && el.closest(FLICK_OVERLAY_SELECTOR) === null)
+		return "empty";
+	return "other";
 }
 
 /** True anywhere inside the prompt subtree (editor or chrome). */

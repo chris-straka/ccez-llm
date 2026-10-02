@@ -62,6 +62,11 @@ badge's plus/minus. -->
 		behind the answer); stark-contrast preference pins it fully
 		opaque below. */
 		background: rgba(255, 255, 255, 0.98);
+		/* Hairline ring (same as the selection menu): the edgeless
+		card dissolved into the thread on phones — the shadow alone
+		didn't seat it. */
+		border: 1px solid #e5e5ea;
+		border-color: var(--line-soft);
 		box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
 		color: #1c1c1e;
 		color: var(--ink);

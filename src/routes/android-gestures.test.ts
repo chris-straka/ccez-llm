@@ -66,6 +66,35 @@ describe("android gesture wiring", () => {
 		expect(source).toContain("badgeHoldFired !== null");
 	});
 
+	it("never summons a sidebar off the news chip rail", () => {
+		// The region flags scroll horizontally: a sideways stroke
+		// there scrolls the rail, never the drawers (same ownership
+		// as the action row and code blocks).
+		const source = pageSource();
+		expect(source).toContain("const chipSwipe = isNewsChipsTarget(target);");
+		expect(source).toMatch(
+			/start\.rowSwipe \|\| start\.codeSwipe \|\| start\.chipSwipe\s+\? null/
+		);
+	});
+
+	it("ticks haptics on the annotate-button hold", () => {
+		// The instant (hold/right-click) path skips annotate()'s
+		// own phone tick, so the page action ticks the hold that
+		// filed — otherwise the hold felt like nothing happened.
+		expect(pageSource()).toMatch(
+			/annotateInstant: \(\) => \{[\s\S]*?buzzTap\(\);[\s\S]*?annotateMode\.annotate\("", true\);/
+		);
+	});
+
+	it("zones news taps outside empty (no focus, no switcher)", () => {
+		// Story taps delegate to flickZoneOfTarget (pinned in
+		// events.test.ts): tap focuses nothing, hold selects for
+		// the annotate menu instead of the quick switcher.
+		expect(pageSource()).toMatch(
+			/return flickZoneOfTarget\(\s+target,\s+\(el\) => annotateMode\.articleOf\(el\) !== null\s+\);/
+		);
+	});
+
 	it("resolves CJK double-taps through the point-anchored range first", () => {
 		// Aid readings split the DOM: the caret can land on a reading
 		// instead of the base char (no selection, no handles). The

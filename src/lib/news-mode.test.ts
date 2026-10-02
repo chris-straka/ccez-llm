@@ -15,6 +15,8 @@ function harness(phone = false): {
 		toasts: string[];
 		errors: string[];
 		seeds: string[];
+		ticks: number;
+		denials: number;
 	};
 	setEditorText: (text: string | null) => void;
 	setAttachments: (next: Attachment[]) => void;
@@ -25,7 +27,9 @@ function harness(phone = false): {
 		sends: 0,
 		toasts: [] as string[],
 		errors: [] as string[],
-		seeds: [] as string[]
+		seeds: [] as string[],
+		ticks: 0,
+		denials: 0
 	};
 	let editorText: string | null = null;
 	let attachments: Attachment[] = [];
@@ -51,6 +55,12 @@ function harness(phone = false): {
 		},
 		toastError: (message) => {
 			calls.errors.push(message);
+		},
+		tapTick: () => {
+			calls.ticks++;
+		},
+		denyBuzz: () => {
+			calls.denials++;
 		},
 		resolveProvider: async () => null,
 		getStorage: () => storage,
@@ -124,7 +134,7 @@ describe("enterNewsMode", () => {
 
 describe("picker actions", () => {
 	it("toggles the menu, blocked while busy", () => {
-		const { mode } = harness();
+		const { mode, calls } = harness();
 		mode.news = readyPanel();
 		mode.actions.menu("link-1");
 		expect(mode.newsPicker).toEqual({ link: "link-1" });
@@ -133,6 +143,8 @@ describe("picker actions", () => {
 		mode.newsBusy = "link-1";
 		mode.actions.menu("link-1");
 		expect(mode.newsPicker).toBeNull();
+		// Accepted taps tick; the busy one stays silent.
+		expect(calls.ticks).toBe(2);
 	});
 
 	it("sets level/size only on the open card", () => {
@@ -187,13 +199,14 @@ describe("switchNewsRegion", () => {
 	});
 
 	it("reloads a native region", async () => {
-		const { mode } = harness();
+		const { mode, calls } = harness();
 		mode.news = readyPanel();
 		mode.newsPicker = { link: "link-1" };
 		await mode.switchNewsRegion("CA");
 		expect(mode.news?.region).toBe("CA");
 		expect(mode.news?.status).toBe("loading");
 		expect(mode.newsPicker).toBeNull();
+		expect(calls.ticks).toBe(1);
 	});
 
 	it("refuses a translated region without a key", async () => {
@@ -205,6 +218,8 @@ describe("switchNewsRegion", () => {
 		expect(mode.news?.region).toBe("FR");
 		expect(mode.news?.status).toBe("ready");
 		expect(calls.toasts).toEqual(["Set an API key to translate U.S. headlines."]);
+		expect(calls.denials).toBe(1);
+		expect(calls.ticks).toBe(0);
 	});
 });
 
@@ -217,18 +232,33 @@ describe("launchNewsSession", () => {
 		expect(calls.errors).toEqual([]);
 	});
 
-	it("refuses a dirty composer and stays in news", async () => {
+	it("launches over a dirty draft instead of refusing", async () => {
+		const { mode, calls, setEditorText } = harness();
+		mode.news = readyPanel();
+		setEditorText("half-typed thought");
+		// Shell-less, so the fetch fails — but the draft never blocks:
+		// the failure copy (not a composer complaint) is the error,
+		// and the seed only ever lands after a fetch that worked.
+		await mode.launchNewsSession("link-1", "talk", "B2", "medium");
+		expect(calls.errors).toEqual([
+			"News needs the app shell — the browser preview can't reach it."
+		]);
+		expect(calls.seeds).toEqual([]);
+		expect(calls.denials).toBe(1);
+		expect(mode.news?.status).toBe("ready");
+		expect(mode.newsBusy).toBeNull();
+	});
+
+	it("still blocks on staged attachments (never silently dropped)", async () => {
 		const { mode, calls, setEditorText, setAttachments } = harness();
 		mode.news = readyPanel();
-		setEditorText("draft");
-		await mode.launchNewsSession("link-1", "talk", "B2", "medium");
 		setEditorText("");
 		setAttachments([{ id: "a" } as unknown as Attachment]);
 		await mode.launchNewsSession("link-1", "talk", "B2", "medium");
 		expect(calls.errors).toEqual([
-			"Clear the composer first — the story needs an empty draft.",
-			"Clear the composer first — the story needs an empty draft."
+			"Remove attachments first — the story brings its own article."
 		]);
+		expect(calls.denials).toBe(1);
 		expect(mode.news?.status).toBe("ready");
 		expect(mode.newsBusy).toBeNull();
 	});
@@ -245,6 +275,7 @@ describe("launchNewsSession", () => {
 		expect(calls.errors).toEqual([
 			"News needs the app shell — the browser preview can't reach it."
 		]);
+		expect(calls.denials).toBe(1);
 	});
 });
 

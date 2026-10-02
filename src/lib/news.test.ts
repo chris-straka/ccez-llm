@@ -19,6 +19,7 @@ import {
 	isNewsFallback,
 	isWebviewUnsupported,
 	isNewsSupported,
+	isUnopenableOutlet,
 	jinaUrl,
 	loadNewsStories,
 	mergeNewsStories,
@@ -863,6 +864,27 @@ describe("story shaping", () => {
 		]);
 		expect(newsStoriesFromXml("not xml at all {{{")).toEqual([]);
 		expect(newsStoriesFromXml("")).toEqual([]);
+	});
+
+	it("matches unopenable outlets whole-word, diacritics folded", () => {
+		expect(isUnopenableOutlet("NZZ")).toBe(true);
+		expect(isUnopenableOutlet("NZZ am Sonntag")).toBe(true);
+		expect(isUnopenableOutlet("Neue Zürcher Zeitung")).toBe(true);
+		expect(isUnopenableOutlet("  nzz.ch ")).toBe(true);
+		expect(isUnopenableOutlet("Le Monde")).toBe(false);
+		expect(isUnopenableOutlet("Les Echos")).toBe(false);
+		expect(isUnopenableOutlet("Anzz Ledger")).toBe(false);
+		expect(isUnopenableOutlet("")).toBe(false);
+	});
+
+	it("drops unopenable outlets before they take a card", () => {
+		const xml = `<?xml version="1.0"?><rss><channel>
+			<item><title>Rates rise - NZZ</title><link>https://a</link></item>
+			<item><title>Rates rise - BBC</title><link>https://b</link></item>
+		</channel></rss>`;
+		expect(newsStoriesFromXml(xml)).toEqual([
+			{ title: "Rates rise", source: "BBC", link: "https://b", snippet: "" }
+		]);
 	});
 });
 

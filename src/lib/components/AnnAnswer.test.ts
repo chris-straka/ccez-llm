@@ -33,4 +33,13 @@ describe("annotation answer card", () => {
 		// padding pushed the card past the edge on narrow phones.
 		expect(answerSource()).toMatch(/\.ann-answer\s*\{[^}]*box-sizing:\s*border-box/);
 	});
+
+	it("rings the card so it never dissolves into the thread", () => {
+		// The near-opaque card sat edgeless on the thread (the shadow
+		// alone didn't seat it on phones); the hairline matches the
+		// selection menu's ring, stark-contrast keeps its stronger one.
+		expect(answerSource()).toMatch(
+			/\.ann-answer\s*\{[^}]*border-color:\s*var\(--line-soft\)/
+		);
+	});
 });

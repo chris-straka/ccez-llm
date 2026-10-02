@@ -5,7 +5,6 @@ import {
 	PASTE_OPEN,
 	makePastedTextAttachment,
 	pastedTextMarker,
-	stripAttachmentMarkers,
 	type Attachment
 } from "./attachments";
 import type { PromptEditor } from "./editor";
@@ -51,6 +50,10 @@ export interface NewsModeDeps {
 	seedComposer: (text: string) => void;
 	toast: (message: string) => void;
 	toastError: (message: string) => void;
+	/** Light tick for accepted news taps (the page's buzzTap). */
+	tapTick: () => void;
+	/** Denial buzz for refused news taps (the page's buzzNo). */
+	denyBuzz: () => void;
 	resolveProvider: () => Promise<ChatProvider | null>;
 	/** Lazy: only async legs touch storage (SSR-safe construct). */
 	getStorage: () => KeyValueStore;
@@ -110,6 +113,7 @@ export class NewsMode {
 			},
 			menu: (link: string) => {
 				if (this.newsBusy) return;
+				this.deps.tapTick();
 				this.newsPicker =
 					this.newsPicker?.link === link ? null : { link };
 			},
@@ -224,9 +228,11 @@ export class NewsMode {
 			if (this.news !== current) return;
 			if (!provider) {
 				this.deps.toast(`Set an API key to translate ${region.label} headlines.`);
+				this.deps.denyBuzz();
 				return;
 			}
 		}
+		this.deps.tapTick();
 		this.newsPicker = null;
 		this.news = { ...current, region: gl, status: "loading", stories: [], error: "" };
 		void this.fetchNewsStories();
@@ -367,9 +373,14 @@ export class NewsMode {
 			kind === "talk"
 				? newsConversationInstruction(story, level, current.langName)
 				: newsSummaryInstruction(story, size, level, current.langName);
-		const draft = stripAttachmentMarkers(this.deps.getEditor()?.getText() ?? "").trim();
-		if (draft !== "" || this.deps.getAttachments().length > 0) {
-			this.deps.toastError("Clear the composer first — the story needs an empty draft.");
+		// The story takes the composer: its opener replaces any dirty
+		// draft (the seed lands after the fetch, so a failed launch
+		// never eats typed text). Staged attachments still block —
+		// those are explicit user files, never silently dropped, and
+		// the launch sets its own pasted article over the slot.
+		if (this.deps.getAttachments().length > 0) {
+			this.deps.toastError("Remove attachments first — the story brings its own article.");
+			this.deps.denyBuzz();
 			return;
 		}
 		let seeded = false;
@@ -393,6 +404,7 @@ export class NewsMode {
 			seeded = true;
 		} catch (error) {
 			this.deps.toastError(newsErrorCopy(error));
+			this.deps.denyBuzz();
 		} finally {
 			this.newsBusy = null;
 		}

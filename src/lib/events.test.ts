@@ -22,7 +22,10 @@ import {
 	isTapOverlayTarget,
 	mouseupKeepsSelection,
 	isAnnotationUiTarget,
-	middleDragGesture
+	middleDragGesture,
+	flickZoneOfTarget,
+	isNewsChipsTarget,
+	isNewsPanelTarget
 } from "./events";
 
 describe("page event idioms", () => {
@@ -224,5 +227,47 @@ describe("page event idioms", () => {
 		// Near-diagonal stays a press: never fold and switch at once.
 		expect(middleDragGesture(40, 38)).toBeNull();
 		expect(middleDragGesture(30, 60)).toBe("newer-chat");
+	});
+
+	it("spots the news panel and its chip rail", () => {
+		document.body.innerHTML =
+			'<main><div class="news-panel" id="panel">' +
+			'<div class="news-chips" id="rail"><button id="chip">x</button></div>' +
+			'<span class="news-card-title" id="title">y</span></div>' +
+			'<p id="dead">z</p></main>';
+		const byId = (id: string): Element | null => document.getElementById(id);
+		expect(isNewsPanelTarget(byId("panel"))).toBe(true);
+		expect(isNewsPanelTarget(byId("chip"))).toBe(true);
+		expect(isNewsPanelTarget(byId("title"))).toBe(true);
+		expect(isNewsPanelTarget(byId("dead"))).toBe(false);
+		expect(isNewsPanelTarget(null)).toBe(false);
+		expect(isNewsChipsTarget(byId("rail"))).toBe(true);
+		expect(isNewsChipsTarget(byId("chip"))).toBe(true);
+		expect(isNewsChipsTarget(byId("title"))).toBe(false);
+		expect(isNewsChipsTarget(byId("dead"))).toBe(false);
+		expect(isNewsChipsTarget(null)).toBe(false);
+	});
+
+	it("zones news taps as other, never empty", () => {
+		document.body.innerHTML =
+			'<main><div class="news-panel">' +
+			'<div class="news-chips"><button id="chip">x</button></div>' +
+			'<div class="news-open"><span class="news-card-title" id="title">y</span></div></div>' +
+			'<article id="msg-0"><div class="rendered" id="body">z</div></article>' +
+			'<p id="dead">w</p></main>' +
+			'<div class="prompt"><div id="card">v</div></div>';
+		const byId = (id: string): Element | null => document.getElementById(id);
+		const isArticle = (el: Element): boolean =>
+			el.closest('article[id^="msg-"]') !== null;
+		// Story taps own themselves (menu, selection): the panel sits
+		// in main-column dead space, so without the carve-out they
+		// read "empty" — focusing the composer on tap, summoning the
+		// quick switcher on hold instead of the annotate menu.
+		expect(flickZoneOfTarget(byId("title"), isArticle)).toBe("other");
+		expect(flickZoneOfTarget(byId("chip"), isArticle)).toBe("other");
+		expect(flickZoneOfTarget(byId("body"), isArticle)).toBe("message");
+		expect(flickZoneOfTarget(byId("dead"), isArticle)).toBe("empty");
+		expect(flickZoneOfTarget(byId("card"), isArticle)).toBe("prompt");
+		expect(flickZoneOfTarget(null, isArticle)).toBe("other");
 	});
 });

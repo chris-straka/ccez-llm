@@ -1000,6 +1000,19 @@ describe("annotationAnswer", () => {
 		expect(system!.content).toContain("what it means in this paragraph");
 	});
 
+	it("states the in-paragraph meaning before the grammar details", () => {
+		const [system] = buildAnnotationAnswerMessages(q);
+		const text = system!.content;
+		// The popup leads with what the quote means here; the word
+		// forms and fit-together come after, never first.
+		expect(text.indexOf("what it means in this paragraph")).toBeGreaterThanOrEqual(
+			0
+		);
+		expect(text.indexOf("what it means in this paragraph")).toBeLessThan(
+			text.indexOf("word forms")
+		);
+	});
+
 	it("asks to be taught the quote for an empty comment", () => {
 		const [, user] = buildAnnotationAnswerMessages({ ...q, question: "  " });
 		expect(user!.content).toContain(

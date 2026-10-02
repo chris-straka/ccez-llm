@@ -428,7 +428,9 @@ import {
 		isTapOverlayTarget,
 		mouseupKeepsSelection,
 		isAnnotationUiTarget,
-		middleDragGesture
+		middleDragGesture,
+		flickZoneOfTarget,
+		isNewsChipsTarget
 	} from "$lib/events";
 	import {
 		aidDisplayText,
@@ -2179,6 +2181,8 @@ import {
 		},
 		toast: (message) => flashToast(message),
 		toastError: (message) => flashErrorToast(message),
+		tapTick: () => buzzTap(),
+		denyBuzz: () => buzzNo(),
 		resolveProvider: () => resolveProviderActive(),
 		getStorage: () => localStorage,
 		isPhone: () => androidUI,
@@ -9297,6 +9301,7 @@ import {
 			clean: boolean;
 			rowSwipe: boolean;
 			codeSwipe: boolean;
+			chipSwipe: boolean;
 			msgId: ChatMsgId | null;
 			zone: FlickZone;
 			inSwitcher: boolean;
@@ -9331,24 +9336,13 @@ import {
 		Own pairing — empty-space taps keep theirs above. */
 		let msgTapSeq: TapSequence | null = null;
 		function flickZoneOf(target: EventTarget | null): FlickZone {
-			const el = target instanceof Element ? target : null;
-			if (!el) return "other";
-			if (
-				el.closest(
-					"button, a, input, textarea, select, summary, [contenteditable], .actions"
-				)
-			)
-				return "other";
-			if (el.closest(".prompt")) return "prompt";
-			if (annotateMode.articleOf(el)) return "message";
-			if (
-				el.closest("main") &&
-				el.closest(
-					"aside, .modal, .modal-veil, .settings-panel, .find-bar, .search-palette, .sel-menu, .review, .lang-menu, .lang-menus, .hero, .toast"
-				) === null
-			)
-				return "empty";
-			return "other";
+			// Priority lives in flickZoneOfTarget (pinned in
+			// events.test.ts); the page only injects its article
+			// test here.
+			return flickZoneOfTarget(
+				target,
+				(el) => annotateMode.articleOf(el) !== null
+			);
 		}
 		// Desktop twin of the tap-out rule below: a press starting
 		// outside the composer cancels an in-prompt note edit.
@@ -9419,6 +9413,10 @@ import {
 				const codeSwipe =
 					target instanceof Element &&
 					target.closest(".ccez-code, .ccez-math") !== null;
+				// Same for the news region-chip rail: it scrolls
+				// horizontally, so a sideways stroke there scrolls
+				// the flags — never summons a sidebar.
+				const chipSwipe = isNewsChipsTarget(target);
 				// Strokes inside the chat switcher belong to the switcher
 				// card (cycle on swipe): the window paths below stay out.
 				const inSwitcher =
@@ -9438,6 +9436,7 @@ import {
 					clean,
 					rowSwipe,
 					codeSwipe,
+					chipSwipe,
 					msgId,
 					zone: flickZoneOf(target),
 					inSwitcher,
@@ -9657,9 +9656,9 @@ import {
 				// thumb in a case can't land). Rightward strokes summon
 				// the chats list from anywhere on the main chat (see
 				// middleSwipeTarget) — except strokes starting on the
-				// action row or inside code/math blocks, where the inner
-				// scroller owns the stroke.
-				const target = start.rowSwipe || start.codeSwipe
+				// action row, inside code/math blocks, or on the news
+				// chip rail, where the inner scroller owns the stroke.
+				const target = start.rowSwipe || start.codeSwipe || start.chipSwipe
 					? null
 					: (edgeSwipeTarget(
 							start.x,
@@ -13882,8 +13881,12 @@ import {
 					// went missing (the key path re-places first); a
 					// dead highlight still files nothing, as before —
 					// the button's own press collapses it, so the
-					// stored quote stays the primary source.
+					// stored quote stays the primary source. The hold
+					// ticks: the instant path skips annotate()'s own
+					// phone tick, so without this the hold that filed
+					// felt like nothing happened.
 					if (!annotateMode.selMenu?.quote.trim()) annotateMode.placeSelMenu();
+					buzzTap();
 					annotateMode.annotate("", true);
 					annotateMode.selMenu = null;
 				},
