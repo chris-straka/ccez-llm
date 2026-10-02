@@ -1,4 +1,4 @@
-# Web deploy (Cloudflare Pages + cstraka.dev)
+# Web deploy (Cloudflare Pages + llm.ccez.uk)
 
 The web build is the same SvelteKit app as the desktop shell, compiled to a
 static site. Every Tauri bridge is runtime-guarded (`tauriBackendAvailable()`),
@@ -32,17 +32,19 @@ bun run build:web   # == vite build; adapter-static writes ./build
    Environment: no secrets needed — the app is BYOK, keys stay in the visitor's browser.
 3. First deploy: verify `/`, `/manifest.webmanifest`, and `index.html` fallback load.
 
-## Custom domain (cstraka.dev)
+## Custom domain (llm.ccez.uk)
 
-1. Pages project → Custom domains → Set up a custom domain → enter `cstraka.dev`
-   (add `www.cstraka.dev` too if wanted; Pages can be the apex).
-2. If Cloudflare already manages the zone's DNS, Pages adds the CNAME
-   automatically. Otherwise, at the registrar/DNS host point the apex at the
-   Pages project (flattened CNAME/`ALIAS` to `<project>.pages.dev`; `www` via
-   CNAME), then confirm in the Pages dashboard.
-3. TLS is issued automatically; enforce HTTPS + HSTS in the domain's SSL/TLS settings.
-4. Re-verify after cutover: `https://cstraka.dev/` loads the app and the PWA
-   manifest at `https://cstraka.dev/manifest.webmanifest` resolves.
+Live: https://llm.ccez.uk (Pages project `personalized-llm-client`,
+production branch `main`). The old `llm.cstraka.dev` hostname was retired
+2026-10-02 when the domain moved to ccez.uk.
+
+1. Pages project → Custom domains → Set up a custom domain → enter
+   `llm.ccez.uk`.
+2. Cloudflare manages the zone's DNS, so Pages adds the CNAME
+   (`llm` → `<project>.pages.dev`, proxied) automatically.
+3. TLS is issued automatically; HTTPS is enforced in the zone's SSL/TLS settings.
+4. Re-verify after cutover: `https://llm.ccez.uk/` loads the app and the PWA
+   manifest at `https://llm.ccez.uk/manifest.webmanifest` resolves.
 
 ## PWA status
 
