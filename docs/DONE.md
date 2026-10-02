@@ -1115,4 +1115,4 @@ condensed from the Sep 23–24 chain (`0cda353`–`051257b`, tail
       `appendAssistantMessage` appends through it. Verified on
       the owner's Mac via the dev shell (open/push/furigana/
       speak/annotate/file/close-mirror + a real capture loop);
-      Windows/Linux tray + window unverified on device.
+      Windows/Linux tray + window unverified on device (`3a8193a`).
