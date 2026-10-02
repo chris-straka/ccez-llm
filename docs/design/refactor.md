@@ -17,9 +17,16 @@ with six save sites scattered across the page. The rule now:
 - Still never split for line count alone; split where one domain's
   state is mutated from many unrelated places.
 
-Next candidate: an annotation drafts controller owning `annotations`,
-the edit stash, the save sites, pins, and the ask flow, so `annotate()`
-and `openBadge()` become unit-testable (audit item 5, 2026-10-01).
+Next candidate: none open. The annotation drafts controller above
+shipped as handoff item B (`AnnotationDrafts` in
+`src/lib/annotation-drafts.svelte.ts`, `6b12202`, same day as this
+revision), fulfilling audit item 5. Every other endorsed slice in
+§§1–7 is marked DONE inline; what remains in the page is timers and
+DOM glue the Sep 14 review deliberately left ("Deliberately not
+doing"). A further hotspot push needs either a fresh audit for new
+candidates or new justification to reopen a rejected one (§2
+controller, §3 render-path unification, size-alone split) — not a
+continuation of this list.
 
 ## 1. Hollow out `onKey` into `src/lib/keybindings.ts` (biggest win, substantially complete)
 
