@@ -17,6 +17,7 @@ lives here, by kind.
   `focus-drop.md` (closed 2026-10-01: desktop focus drops fixed,
   owner-verified gone on Mac, probe removed), `cjkdecomp-eval.md`.
 - `plans/` — dated plans of record. Finished plans stay as history.
-- `ccez-llm-android.zip` — archived native Android port (Kotlin,
-  Sep 29 2026 snapshot): the pre-Tauri-mobile app, kept in case we
-  come back to it. Untracked: local disk only, not in git.
+- `archive/android-native` branch — archived native Android port
+  (Kotlin, Sep 29 2026 snapshot): the pre-Tauri-mobile app, kept in
+  case we come back to it. Orphan branch; resurrect with
+  `git worktree add ../ccez-llm-android archive/android-native`.
