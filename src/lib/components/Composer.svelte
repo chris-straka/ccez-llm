@@ -14,6 +14,7 @@ shared `.error` look. -->
 	import type { Annotation, AnnotationId } from "$lib/annotations";
 	import type { ReplyLanguage } from "$lib/languages";
 	import type { CaptureOneShot } from "$lib/nativeCapture";
+	import type { HandsFreePhase } from "$lib/handsFree";
 	import ActionIcon from "./ActionIcon.svelte";
 	import ReviewDock, { type ReviewDockActions } from "./ReviewDock.svelte";
 
@@ -28,6 +29,7 @@ shared `.error` look. -->
 		intakeFiles: (files: File[]) => void;
 		mic: () => void;
 		voice: () => void;
+		converse: () => void;
 		captureToggle: () => void;
 		captureAction: (source: CaptureOneShot) => void;
 		wpToggle: () => void;
@@ -72,6 +74,10 @@ shared `.error` look. -->
 		dictating: boolean;
 		voiceOn: boolean;
 		speaking: boolean;
+		/** Hands-free loop phase (idle hides the live state). */
+		conversePhase: HandsFreePhase;
+		/** No-key lock pins the toggle (never while live: Esc/stop stays). */
+		converseDisabled: boolean;
 		altKey: string;
 		replyLang: ReplyLanguage | null;
 		/** Correction mode for this chat (toggle shows only with a reply language). */
@@ -112,6 +118,8 @@ shared `.error` look. -->
 		dictating,
 		voiceOn,
 		speaking,
+		conversePhase,
+		converseDisabled,
 		altKey,
 		replyLang,
 		correctionOn,
@@ -146,6 +154,17 @@ shared `.error` look. -->
 		openAnnotation && openAnnotation.pinnedToPrompt !== true && reviewOpen
 			? [...pinnedAnnotations, openAnnotation]
 			: pinnedAnnotations
+	);
+	/** Hands-free toggle copy: idle invites, live names the phase. */
+	const converseLive = $derived(conversePhase !== "idle");
+	const converseTitle = $derived(
+		conversePhase === "idle"
+			? "Converse hands-free"
+			: conversePhase === "listening"
+				? "Listening — stop (Esc)"
+				: conversePhase === "sending"
+					? "Waiting for the reply — stop (Esc)"
+					: "Reading the reply — stop (Esc)"
 	);
 </script>
 
@@ -296,6 +315,26 @@ stop, so both rules below stay suppressed. -->
 				onclick={actions.mic}
 			>
 				<ActionIcon kind="mic" />
+			</button>
+		{/if}
+		{#if canMic && micEnabled}
+			<!-- Hands-free conversation: the loop listens, sends, and
+			reads replies back until stopped. Same mic gate as
+			one-shot dictation, so phones and the browser preview
+			never see it without a mic. -->
+			<button
+				type="button"
+				class="converse-btn"
+				class:on={converseLive}
+				title={converseTitle}
+				aria-label={converseLive
+					? "Stop hands-free conversation"
+					: "Start hands-free conversation"}
+				aria-pressed={converseLive}
+				disabled={converseDisabled}
+				onclick={actions.converse}
+			>
+				<ActionIcon kind="converse" />
 			</button>
 		{/if}
 		<button
@@ -570,6 +609,7 @@ stop, so both rules below stay suppressed. -->
 	outlier. Desktop keeps its optical sizes. */
 	:global(.app[data-android]) .attach-btn,
 	:global(.app[data-android]) .mic-btn,
+	:global(.app[data-android]) .converse-btn,
 	:global(.app[data-android]) .voice-float,
 	:global(.app[data-android]) .correct-btn,
 	:global(.app[data-android]) .wp-jump {
@@ -585,6 +625,7 @@ stop, so both rules below stay suppressed. -->
 	}
 	:global(.app[data-android]) .attach-btn :global(.action-glyph),
 	:global(.app[data-android]) .mic-btn :global(.action-glyph),
+	:global(.app[data-android]) .converse-btn :global(.action-glyph),
 	:global(.app[data-android]) .voice-float :global(.action-glyph),
 	:global(.app[data-android]) .correct-btn :global(.action-glyph),
 	:global(.app[data-android]) .wp-jump :global(.action-glyph) {
@@ -621,6 +662,7 @@ stop, so both rules below stay suppressed. -->
 	}
 	:global(.app[data-android]) .prompt:has(.ann-dock) .attach-btn,
 	:global(.app[data-android]) .prompt:has(.ann-dock) .mic-btn,
+	:global(.app[data-android]) .prompt:has(.ann-dock) .converse-btn,
 	:global(.app[data-android]) .prompt:has(.ann-dock) .voice-float,
 	:global(.app[data-android]) .prompt:has(.ann-dock) .correct-btn,
 	:global(.app[data-android]) .prompt:has(.ann-dock) .wp-jump,
@@ -846,6 +888,7 @@ stop, so both rules below stay suppressed. -->
 	.attach-btn,
 	.voice-float,
 	.mic-btn,
+	.converse-btn,
 	.capture-btn,
 	.correct-btn,
 	.wp-jump {
@@ -950,6 +993,7 @@ stop, so both rules below stay suppressed. -->
 	.wp-jump:hover,
 	.capture-btn:hover,
 	.correct-btn:hover,
+	.converse-btn:hover,
 	.mic-btn:hover {
 		color: #1c1c1e;
 		color: var(--ink);
@@ -963,12 +1007,14 @@ stop, so both rules below stay suppressed. -->
 		.wp-jump:hover,
 		.capture-btn:hover,
 		.correct-btn:hover,
+		.converse-btn:hover,
 		.mic-btn:hover {
 			color: #6e6e73;
 			color: var(--muted);
 		}
 		.voice-float.on:hover,
-		.correct-btn.on:hover {
+		.correct-btn.on:hover,
+		.converse-btn.on:hover {
 			color: #1f7a4d;
 			color: var(--ok);
 		}
@@ -996,9 +1042,16 @@ stop, so both rules below stay suppressed. -->
 		}
 	}
 	.voice-float.on,
-	.correct-btn.on {
+	.correct-btn.on,
+	.converse-btn.on {
 		color: #1f7a4d;
 		color: var(--ok);
+	}
+	/* No-key lock pins the toggle (the loop stays stoppable: the
+	page only disables while idle). */
+	.converse-btn:disabled {
+		cursor: default;
+		opacity: 0.4;
 	}
 	/* Dictation in progress reads alarm red, like the popover's
 	recording dot. */
@@ -1089,15 +1142,16 @@ stop, so both rules below stay suppressed. -->
 	/* Tool seating rides the DOM, not JS classes: .mic-btn renders
 	exactly when dictation is available and .ann-wrap exactly when
 	drafts exist, so :has() below is the single source of truth.
-	Tiers track the buttons actually present: three icons ≈ 4.9rem
-	in-page, four with capture ≈ 6.7rem — each plus ~1rem of
-	breathing room, never more, or single-line text wraps a word
-	early with empty card beside it. */
+	Tiers track the buttons actually present: four icons (converse
+	rides with the mic) ≈ 6.5rem in-page, five with capture ≈
+	8.3rem — each plus ~1rem of breathing room, never more, or
+	single-line text wraps a word early with empty card beside
+	it. */
 	.prompt:has(.mic-btn):has(.capture-btn) :global(.ta-input) {
-		--tools-pad: 7.5rem;
+		--tools-pad: 9.1rem;
 	}
 	.prompt:has(.mic-btn) :global(.ta-input) {
-		--tools-pad: 6rem;
+		--tools-pad: 7.6rem;
 	}
 	/* Tool seating for the dock's presence rides with the dock
 	(`ReviewDock.svelte`): :has() matches the dock in the DOM at

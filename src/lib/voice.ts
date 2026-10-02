@@ -561,6 +561,24 @@ export function dictateOnce(
 	onResult: (transcript: string) => void,
 	onError: (message: string) => void
 ): (() => void) | null {
+	// Test hook (see mock.ts ccez-mock-reply): fix the transcript so
+	// converse specs can drive full turns headless, where no
+	// recognizer exists. Consumed on read — dictate-once means once,
+	// so a re-listen never replays a stale transcript. Unset listens
+	// for real.
+	try {
+		const fixed =
+			typeof localStorage === "undefined"
+				? null
+				: localStorage.getItem("ccez-mock-transcript");
+		if (fixed !== null && fixed.trim() !== "") {
+			localStorage.removeItem("ccez-mock-transcript");
+			const timer = setTimeout(() => onResult(fixed), 0);
+			return () => clearTimeout(timer);
+		}
+	} catch {
+		/* storage unavailable: listen for real */
+	}
 	const Ctor = recognitionCtor();
 	if (!Ctor) return null;
 	try {

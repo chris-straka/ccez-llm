@@ -153,6 +153,28 @@ describe("speech unavailability", () => {
 	});
 });
 
+describe("dictateOnce mock transcript", () => {
+	it("consumes the fixed transcript on read", () => {
+		localStorage.setItem("ccez-mock-transcript", "hello");
+		const stop = dictateOnce(
+			"en-US",
+			() => {},
+			() => {}
+		);
+		expect(stop).not.toBeNull();
+		stop?.();
+		// Dictate-once means once: a re-listen never replays it.
+		expect(localStorage.getItem("ccez-mock-transcript")).toBeNull();
+		expect(
+			dictateOnce(
+				"en-US",
+				() => {},
+				() => {}
+			)
+		).toBeNull();
+	});
+});
+
 describe("splitScriptRuns", () => {
 	it("keeps single-script sentences whole", () => {
 		expect(splitScriptRuns("Hello world.")).toEqual(["Hello world."]);

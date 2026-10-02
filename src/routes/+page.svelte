@@ -13,6 +13,7 @@
 		selectChat,
 		ensureGameChat,
 		appendAssistantMessage,
+		abortSend,
 		newChatMsgId,
 		setChatReplyLang,
 		setChatCorrection,
@@ -259,6 +260,11 @@ import {
 	loadDraftAnnotations,
 	saveDraftAnnotations
 } from "$lib/annotation-drafts-store";
+import {
+	handsFreeNext,
+	type HandsFreeEvent,
+	type HandsFreePhase
+} from "$lib/handsFree";
 import {
 	GAME_LINE_CLOSED_EVENT,
 	GAME_LINE_EVENT,
@@ -6422,9 +6428,14 @@ import {
 		}
 	}
 
-	async function speakReply(msg: ChatMsg, quiet = false): Promise<void> {
+	async function speakReply(
+		msg: ChatMsg,
+		quiet = false,
+		/** Natural end only (never stop/cancel): the converse loop's re-listen. */
+		onNaturalEnd?: () => void
+	): Promise<boolean> {
 		const text = speechText(msg.content);
-		if (!text) return;
+		if (!text) return false;
 		const fallback = latinFallback(settings.voiceLang);
 		const voices = webVoices();
 		// No Punjabi voice on the device: the Hindi voice reads the
@@ -6432,12 +6443,12 @@ import {
 		const speakable = punjabiSpeechText(text, voices);
 		if (!messageSpeakableFor(settings.voiceEngine, msg.content, fallback, voices)) {
 			if (!quiet) setVoiceError("No voice for this language.");
-			return;
+			return false;
 		}
 		const stripped = speakable.replace(/```[\s\S]*?```/g, " ");
 		if (!quiet && settings.readerMode !== "off") {
 			void openReader(stripped);
-			return;
+			return true;
 		}
 		// Whole-message voice seeds the Latin sentences; each one then
 		// resolves its own language, so four languages read in four
@@ -6452,8 +6463,10 @@ import {
 				voices,
 				latinFallback(settings.voiceLang)
 			),
-			quiet
+			quiet,
+			onNaturalEnd
 		);
+		return true;
 	}
 
 	/** Speak-button label. */
@@ -6783,6 +6796,8 @@ import {
 	}
 
 	async function toggleMic(): Promise<void> {
+		// The mic serves one master: a one-shot tap stops the loop first.
+		if (converse !== "idle") dispatchConverse({ type: "toggle" });
 		await runDictationFlow({
 			startArmed: !micStarting,
 			stopActive: dictating,
@@ -6801,6 +6816,166 @@ import {
 				stopDictation = null;
 			}
 		});
+	}
+
+	/**
+	 * Hands-free conversation (learner chats): the machine in
+	 * handsFree.ts owns the phase; this dispatcher runs its effects
+	 * (dictation, send, readback) and feeds outcomes back as events.
+	 * One-shot dictation and converse never overlap: starting one
+	 * stops the other.
+	 */
+	let converse = $state<HandsFreePhase>("idle");
+	/** Pending utterance text for the send effect. */
+	let converseUtterance = "";
+	/** Chat the converse send went to (readback + abort pin). */
+	let converseOriginId: ChatId | null = null;
+	/** True from a converse send until its completion lands: the
+	 * reply belongs to the loop even when the user stopped or
+	 * switched chats mid-stream (no stray normal readback). */
+	let converseOwnedSend = false;
+	let stopConverseListen: (() => void) | null = null;
+
+	function dispatchConverse(event: HandsFreeEvent): void {
+		const step = handsFreeNext(converse, event);
+		converse = step.phase;
+		for (const effect of step.effects) {
+			if (effect === "startListening") void converseListen();
+			else if (effect === "stopListening") converseHaltListen();
+			else if (effect === "send") converseSend();
+			else if (effect === "readback") void converseReadback();
+			else if (effect === "stopAll") converseStopAll();
+		}
+	}
+
+	async function converseListen(): Promise<void> {
+		converseHaltListen();
+		dismissToast();
+		const stop = await dictateNativeFirst(
+			(transcript) => {
+				if (noKeyLock) {
+					// The key vanished mid-loop: every turn is doomed
+					// (the composer locks too), so end it.
+					dispatchConverse({ type: "failed" });
+					return;
+				}
+				// Silence re-arms in the machine; a refused send comes
+				// back as sendBlocked from the send effect.
+				converseUtterance = transcript;
+				dispatchConverse({ type: "utterance", text: transcript });
+			},
+			(message) => {
+				flashErrorToast(message);
+				dispatchConverse({ type: "failed" });
+			}
+		);
+		if (!stop) {
+			flashErrorToast(micUnavailableMessage(tauriBackendAvailable()));
+			dispatchConverse({ type: "failed" });
+			return;
+		}
+		// A stop (or a newer listen) may have landed mid-start: only
+		// the live listener keeps its handle.
+		if (converse !== "listening") {
+			stop();
+			return;
+		}
+		stopConverseListen = stop;
+	}
+
+	function converseHaltListen(): void {
+		stopConverseListen?.();
+		stopConverseListen = null;
+	}
+
+	function converseSend(): void {
+		const utterance = converseUtterance;
+		converseUtterance = "";
+		// Append, never replace: the user may have typed while we
+		// listened, and their draft is not ours to wipe.
+		editor?.insertText(dictationInsert(utterance));
+		const action = submitAction({
+			annPopOpen: annPop !== null && !annPopClosing,
+			annEdit: promptAnnEdit !== null,
+			canSubmit:
+				!noKeyLock &&
+				!isSending(chatState) &&
+				!liveNative.has(chatState.activeChatId),
+			sendGuardTripped: Date.now() < sendGuardUntil,
+			kind: "send"
+		});
+		if (action !== "send" || promptAnnEdit !== null || editingMsgId !== null) {
+			// Refused (busy, locked, popup, guard) or rerouted (an
+			// in-prompt note edit / message edit would file through
+			// instead of starting a turn, stranding the loop): the
+			// words stay in the composer and the loop listens again.
+			dispatchConverse({ type: "sendBlocked" });
+			return;
+		}
+		converseOwnedSend = true;
+		converseOriginId = chatState.activeChatId;
+		onSubmit("send");
+	}
+
+	async function converseReadback(): Promise<void> {
+		const origin =
+			(converseOriginId &&
+				chatState.chats.find((c) => c.id === converseOriginId)) ||
+			chat;
+		const last = origin.messages[origin.messages.length - 1];
+		if (!last || last.role !== "assistant" || !last.content.trim()) {
+			dispatchConverse({ type: "failed" });
+			return;
+		}
+		// Quiet (no reader detour): the loop owns the re-listen.
+		const started = await speakReply(last, true, () =>
+			dispatchConverse({ type: "speakDone" })
+		);
+		if (!started) {
+			flashErrorToast("No voice for this language.");
+			dispatchConverse({ type: "failed" });
+		}
+	}
+
+	function converseStopAll(): void {
+		converseHaltListen();
+		stopVoice();
+		if (converseOriginId) abortSend(converseOriginId);
+		converseUtterance = "";
+	}
+
+	function toggleConverse(): void {
+		if (converse === "idle") {
+			// One-shot dictation yields to the loop (and stays off:
+			// its transcript tail would double-send otherwise).
+			if (dictating) {
+				stopDictation?.();
+				stopDictation = null;
+				dictating = false;
+			}
+		}
+		dispatchConverse({ type: "toggle" });
+	}
+
+	/**
+	 * Converse-owned completions skip the normal readback: while the
+	 * loop runs, the machine reads; after a mid-send stop, nothing
+	 * reads at all. Returns true when this completion belonged to
+	 * the loop (consumed either way).
+	 */
+	function maybeHandsFreeReply(origin: Chat, sent: ChatMsg | undefined): boolean {
+		if (!converseOwnedSend) return false;
+		converseOwnedSend = false;
+		if (converse === "sending") {
+			if (sent?.role === "assistant" && !sent.error && sent.content.trim()) {
+				dispatchConverse({ type: "replyDone" });
+			} else {
+				// Errored/empty reply: end the loop audibly (the
+				// failed effect toasts).
+				dispatchConverse({ type: "failed" });
+			}
+		}
+		return true;
 	}
 
 	/**
@@ -6968,7 +7143,7 @@ import {
 		// its own scroll position.
 		if (stillHere && stuckToBottom()) scrollToBottom();
 		const origin = chatState.chats.find((c) => c.id === originId);
-		if (origin) maybeSpeakReply(origin);
+		if (origin && !maybeHandsFreeReply(origin, sent)) maybeSpeakReply(origin);
 		// Native completions skip the frontend ping: Rust pings the
 		// same id ~5s later (seen-grace) and the re-post double-buzzes.
 		if (frontendPingOnDone(opts?.native ?? false)) maybeNotifyReplyDone(sent);
@@ -10374,9 +10549,12 @@ import {
 			} else if (inEditor) {
 				// ESC with the composer focused: drop the caret and
 				// dismiss composer-adjacent overlays. Voice keeps playing
-				// (it has its own toggle); modals, search, and
-				// message edits keep their earlier branches above.
+				// (it has its own toggle), but a live converse loop
+				// stops — Esc is its off switch from anywhere below
+				// the modals. Modals, search, and message edits keep
+				// their earlier branches above.
 				editor?.blur();
+				if (converse !== "idle") dispatchConverse({ type: "toggle" });
 				annotateMode.selMenu = null;
 				dismissSelPanels();
 				openLangMenu = null;
@@ -10395,6 +10573,7 @@ import {
 				settingsOpen = false;
 				shortcutsOpen = false;
 				stopVoice();
+				if (converse !== "idle") dispatchConverse({ type: "toggle" });
 				// Bare Esc drops a lingering message highlight with the
 				// menu (click-away parity): editor and field selections
 				// are another gesture's business and keep theirs.
@@ -13600,6 +13779,8 @@ import {
 			dictating={dictating}
 			voiceOn={voiceOn()}
 			speaking={speakingId !== null}
+			conversePhase={converse}
+			converseDisabled={noKeyLock && converse === "idle"}
 			altKey={altm}
 			replyLang={activeReplyLang}
 			correctionOn={chat.correction ?? false}
@@ -13621,6 +13802,7 @@ import {
 					void addFiles(files).then((kinds) => insertAttachmentMarkers(kinds)),
 				mic: () => void toggleMic(),
 				voice: toggleVoice,
+				converse: () => toggleConverse(),
 				captureToggle: () => toggleCaptureMenu(),
 				captureAction: (source: CaptureOneShot) => runCaptureAction(source),
 				wpToggle: () => {

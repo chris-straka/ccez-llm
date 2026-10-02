@@ -548,7 +548,7 @@ its quote, question, and answer. -->
 		--tools-pad: 9.5rem;
 	}
 	:global(.prompt:has(.mic-btn):has(.ann-wrap)) :global(.ta-input) {
-		--tools-pad: 11.5rem;
+		--tools-pad: 13.1rem;
 	}
 	:global(.app[data-android]) :global(.prompt-tools) .ann-wrap .review {
 		position: absolute;

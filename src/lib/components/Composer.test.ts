@@ -100,14 +100,15 @@ describe("composer surfaces", () => {
 describe("composer text reservation", () => {
 	it("sizes the mic tier to the measured icon cluster", () => {
 		const css = componentStyle();
-		// attach + mic + voice measure ~4.9rem in-page (capture adds
-		// a fourth icon): each tier keeps ~1rem of breathing room,
-		// never ~2rem of dead space that wraps text a word early.
+		// attach + mic + converse + voice measure ~6.5rem in-page
+		// (capture adds a fifth icon): each tier keeps ~1rem of
+		// breathing room, never ~2rem of dead space that wraps text
+		// a word early.
 		expect(css).toMatch(
-			/\.prompt:has\(\.mic-btn\):has\(\.capture-btn\) :global\(\.ta-input\)\s*\{[^}]*--tools-pad:\s*7\.5rem/
+			/\.prompt:has\(\.mic-btn\):has\(\.capture-btn\) :global\(\.ta-input\)\s*\{[^}]*--tools-pad:\s*9\.1rem/
 		);
 		expect(css).toMatch(
-			/\.prompt:has\(\.mic-btn\) :global\(\.ta-input\)\s*\{[^}]*--tools-pad:\s*6rem/
+			/\.prompt:has\(\.mic-btn\) :global\(\.ta-input\)\s*\{[^}]*--tools-pad:\s*7\.6rem/
 		);
 	});
 
@@ -122,8 +123,8 @@ describe("composer text reservation", () => {
 		// The mic tier rides the mic button's DOM presence: no mic,
 		// no reservation. The dock tiers ride the wrap's presence.
 		expect(css).toContain(".prompt:has(.mic-btn)");
-		// The four-icon tier needs the capture button too — the
-		// preview (no backend, no button) keeps the three-icon tier.
+		// The five-icon tier needs the capture button too — the
+		// preview (no backend, no button) keeps the four-icon tier.
 		expect(css).toContain(".prompt:has(.mic-btn):has(.capture-btn)");
 		expect(dock).toContain(":global(.prompt:has(.ann-wrap))");
 		expect(dock).toContain(":global(.prompt:has(.mic-btn):has(.ann-wrap))");
