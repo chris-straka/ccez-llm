@@ -1116,3 +1116,16 @@ condensed from the Sep 23–24 chain (`0cda353`–`051257b`, tail
       the owner's Mac via the dev shell (open/push/furigana/
       speak/annotate/file/close-mirror + a real capture loop);
       Windows/Linux tray + window unverified on device (`3a8193a`).
+- [x] I Hands-free conversation: pure `handsFree.ts` machine
+      (idle/listening/sending/speaking) with unit-tested
+      transitions, driven by a page dispatcher reusing
+      `dictateNativeFirst`, the send pipeline, and `speakReply`;
+      the mic re-arms only on the utterance's natural end, never
+      over the app's own voice. Composer toggle with a converse
+      glyph beside the mic (same mic gate + settings kill-switch,
+      green while live); Esc or a tap stops from anywhere below
+      the modals; refused sends re-listen via `sendBlocked`
+      (words stay in the composer); converse-owned completions
+      skip the normal readback. Mock `ccez-mock-transcript` hook
+      consumes on read. Gates: unit 2137, check/lint clean,
+      `converse.e2e.ts` 2/2 (`234c0dc`).
