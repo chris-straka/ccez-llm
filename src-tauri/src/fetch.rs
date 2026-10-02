@@ -17,13 +17,6 @@ const MAX_URL_CHARS: usize = 2048;
 /// promises "truncated when long", so a big page still answers from
 /// its head instead of failing.
 const MAX_HTML_BYTES: usize = 512 * 1024;
-/// Browser user agent for the Android leg (which doesn't
-/// impersonate — see below): bot-labeled fetches eat WAF denials
-/// (Akamai, DataDome) on major outlets, and this is the user's own
-/// device reading pages they tapped — reader convention. Off
-/// Android the impersonation profile sets its own matching UA.
-#[cfg(any(test, target_os = "android"))]
-const PAGE_USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 
 /// The URL back when fetchable, `None` when not. Mirrors
 /// `validFetchUrl` in the frontend seam (both stay dumb string gates).
@@ -57,8 +50,7 @@ pub(crate) fn transport_code(error: &reqwest::Error) -> String {
     .to_string()
 }
 
-/// Same mapping for the impersonating client (off Android only).
-#[cfg(not(target_os = "android"))]
+/// Same mapping for the impersonating client.
 fn impersonated_transport_code(error: &rquest::Error) -> String {
     (if error.is_timeout() {
         "timeout"
@@ -179,7 +171,6 @@ macro_rules! capped_body {
 /// One GET through a built rquest client: status gate, capped
 /// body, legacy charsets transcoded. The impersonated first try and
 /// the plain consent retry share it.
-#[cfg(not(target_os = "android"))]
 async fn send_capped(client: &rquest::Client, url: &str) -> Result<String, String> {
     let mut res = client
         .get(url)
@@ -201,7 +192,6 @@ async fn send_capped(client: &rquest::Client, url: &str) -> Result<String, Strin
 /// Plain-client second try for consent shells (see
 /// `looks_like_consent_shell`). Whatever it returns stands — no
 /// third try.
-#[cfg(not(target_os = "android"))]
 async fn fetch_plain(url: &str) -> Result<String, String> {
     let client = rquest::Client::builder()
         .cookie_store(true)
@@ -212,7 +202,6 @@ async fn fetch_plain(url: &str) -> Result<String, String> {
 }
 
 #[tauri::command]
-#[cfg(not(target_os = "android"))]
 pub async fn fetch_page(url: String) -> Result<String, String> {
     let url = fetchable_url(&url).ok_or_else(|| "bad-url".to_string())?;
     let client = rquest::Client::builder()
@@ -230,38 +219,6 @@ pub async fn fetch_page(url: String) -> Result<String, String> {
     Ok(html)
 }
 
-/// Android leg of `fetch_page`: plain reqwest, no impersonation
-/// (boring-sys has no verified NDK cross-compile from here).
-/// Same contract, same codes — WAF-fronted outlets just answer it
-/// with denials, and the frontend falls back from there.
-#[tauri::command]
-#[cfg(target_os = "android")]
-pub async fn fetch_page(url: String) -> Result<String, String> {
-    let url = fetchable_url(&url).ok_or_else(|| "bad-url".to_string())?;
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(FETCH_TIMEOUT_SECS))
-        .user_agent(PAGE_USER_AGENT)
-        // Same anonymous-ID dances as the main leg (see above).
-        .cookie_store(true)
-        .build()
-        .map_err(|_| "failed".to_string())?;
-    let mut res = client
-        .get(url)
-        .send()
-        .await
-        .map_err(|e| transport_code(&e))?;
-    if !res.status().is_success() {
-        return Err(bad_status(res.status().as_u16()));
-    }
-    let charset = res
-        .headers()
-        .get(reqwest::header::CONTENT_TYPE)
-        .and_then(|v| v.to_str().ok())
-        .and_then(charset_from_content_type)
-        .map(str::to_owned);
-    capped_body!(res, transport_code, charset.as_deref())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -276,16 +233,6 @@ mod tests {
         assert!(fetchable_url("https://example.com/a b").is_none());
         assert!(fetchable_url("").is_none());
         assert!(fetchable_url("https://").is_none());
-    }
-
-    #[test]
-    fn android_leg_ships_a_browser_user_agent() {
-        // Bot-labeled UAs eat WAF denials on major outlets; the
-        // non-impersonating Android leg must still look like the
-        // reader it is (off Android the profile sets its own UA).
-        assert!(PAGE_USER_AGENT.starts_with("Mozilla/5.0"));
-        assert!(PAGE_USER_AGENT.contains("Chrome/"));
-        assert!(!PAGE_USER_AGENT.contains("ccez"));
     }
 
     #[test]

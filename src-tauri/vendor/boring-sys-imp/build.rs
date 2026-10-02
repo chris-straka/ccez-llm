@@ -170,7 +170,12 @@ fn get_boringssl_cmake_config() -> cmake::Config {
 
             // 21 is the minimum level tested. You can give higher value.
             boringssl_cmake.define("ANDROID_NATIVE_API_LEVEL", "21");
-            boringssl_cmake.define("ANDROID_STL", "c++_shared");
+            // ccez patch: c++_static, not upstream's c++_shared — the
+            // app .so must stay self-contained (a shared-STL link
+            // would need libc++_shared.so bundled in the APK, which
+            // the Tauri template does not do, and the app would fail
+            // to load without it).
+            boringssl_cmake.define("ANDROID_STL", "c++_static");
 
             boringssl_cmake
         }
@@ -263,6 +268,7 @@ fn verify_fips_clang_version() -> (&'static str, &'static str) {
 
 fn get_extra_clang_args_for_bindgen() -> Vec<String> {
     let os = std::env::var("CARGO_CFG_TARGET_OS").unwrap();
+    let arch = std::env::var("CARGO_CFG_TARGET_ARCH").unwrap();
 
     let mut params = Vec::new();
 
@@ -297,12 +303,42 @@ fn get_extra_clang_args_for_bindgen() -> Vec<String> {
         "android" => {
             let android_ndk_home = std::env::var("ANDROID_NDK_HOME")
                 .expect("Please set ANDROID_NDK_HOME for Android build");
-            let mut android_sysroot = std::path::PathBuf::from(android_ndk_home);
-            android_sysroot.push("sysroot");
+            // ccez patch: upstream points at the top-level `$NDK/sysroot`,
+            // which NDK r19+ removed — the sysroot lives under the LLVM
+            // toolchain prebuilt dir now. Resolve it off the rustc host
+            // triple (the NDK ships one prebuilt per host OS), falling
+            // back to the legacy top-level path on ancient NDKs.
+            let base = std::path::PathBuf::from(&android_ndk_home);
+            let host = std::env::var("HOST").unwrap_or_default();
+            let prebuilt = if host.contains("apple-darwin") {
+                "darwin-x86_64"
+            } else if host.contains("windows") {
+                "windows-x86_64"
+            } else {
+                "linux-x86_64"
+            };
+            let modern = base
+                .join("toolchains/llvm/prebuilt")
+                .join(prebuilt)
+                .join("sysroot");
+            let legacy = base.join("sysroot");
+            let android_sysroot = if modern.is_dir() { modern } else { legacy };
             params.push("--sysroot".to_string());
             // If ANDROID_NDK_HOME weren't a valid UTF-8 string,
             // we'd already know from std::env::var.
             params.push(android_sysroot.into_os_string().into_string().unwrap());
+            // NDK r19+ headers reject unversioned triples, so target
+            // the app's minSdk (26) per arch — the sysroot headers
+            // parse and the emitted declarations match every device
+            // the app installs on.
+            let triple = match arch.as_str() {
+                "aarch64" => "aarch64-linux-android26",
+                "arm" => "armv7a-linux-androideabi26",
+                "x86" => "i686-linux-android26",
+                "x86_64" => "x86_64-linux-android26",
+                _ => "aarch64-linux-android26",
+            };
+            params.push(format!("--target={triple}"));
         }
         _ => {}
     }

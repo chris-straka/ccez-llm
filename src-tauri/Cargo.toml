@@ -55,8 +55,15 @@ rustls = { version = "0.23", default-features = false, features = ["std", "ring"
 # not). Version pins against the copy already in Cargo.lock.
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-webpki-roots", "cookies"] }
 encoding_rs = "0.8"
-# reqwest also serves the Google News decoder (news.rs) and the
-# Android fetch path, neither of which impersonates.
+# reqwest also serves the Google News decoder (news.rs), which never
+# impersonates (Google answers plain clients).
+# Impersonating page fetch (fetch.rs): Chrome TLS + HTTP/2
+# fingerprints so WAF-fronted outlets (Akamai) answer the same reader
+# they'd serve in a browser — on every target including Android
+# (boring-sys cross-compiles under the release NDK; the vendor tree
+# pins ANDROID_STL to c++_static so the app .so stays
+# self-contained — c++_shared would need the STL .so bundled).
+rquest = { version = "0.11", default-features = false, features = ["boring-tls", "impersonate", "cookies"] }
 
 # Native TTS (AVSpeechSynthesizer) on macOS and iOS. Pure-Rust
 # bindings via objc2 — no Objective-C is written anywhere in this
@@ -128,8 +135,12 @@ strip = true
 # release resolves from vendor/ instead of the index — along with the
 # yanked BoringSSL/HTTP forks it renames its deps to. Same bytes as
 # the published .crates (checksums verified against the index) plus
-# one compat shim (rquest's profile.rs: h2_imp never shipped the
-# marker API 0.11.91 calls); CI builds from these paths too.
+# three patches: one compat shim (rquest's profile.rs: h2_imp never
+# shipped the marker API 0.11.91 calls), one Android link fix
+# (boring-sys-imp ANDROID_STL c++_shared -> c++_static: the app .so
+# must not need the STL .so bundled), and one Android bindgen fix
+# (boring-sys-imp sysroot: NDK r19+ moved it under the LLVM prebuilt
+# dir); CI builds from these paths too.
 [patch.crates-io]
 rquest = { path = "vendor/rquest" }
 boring-imp = { path = "vendor/boring-imp" }
@@ -138,11 +149,3 @@ h2_imp = { path = "vendor/h2_imp" }
 hyper_imp = { path = "vendor/hyper_imp" }
 hyper-boring-imp = { path = "vendor/hyper-boring-imp" }
 tokio-boring-imp = { path = "vendor/tokio-boring-imp" }
-
-# Impersonating page fetch (fetch.rs image/article legs): Chrome TLS +
-# HTTP/2 fingerprints so WAF-fronted outlets (Akamai) answer the same
-# reader they'd serve in a browser. Off Android: boring-sys has no
-# verified NDK cross-compile here, so Android keeps the reqwest path
-# (WAF outlets fall back to letters there, as today).
-[target.'cfg(not(target_os = "android"))'.dependencies]
-rquest = { version = "0.11", default-features = false, features = ["boring-tls", "impersonate", "cookies"] }
