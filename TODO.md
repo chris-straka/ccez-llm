@@ -42,8 +42,6 @@ Full specs, order, acceptance criteria, and gates live in
 - [ ] G. Correction mode (French/German)
 - [ ] H. Ace Attorney overlay window (macOS first)
 - [ ] I. Hands-free conversation loop
-- [ ] J. Desktop/phone shell split (after B, C)
-
 ## Found while working (open)
 
 - Send-hold e2e fails on base: `composer-tools.e2e.ts` "desktop

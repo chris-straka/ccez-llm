@@ -1011,6 +1011,20 @@ condensed from the Sep 23–24 chain (`0cda353`–`051257b`, tail
 - [x] Sidebar-swipe directional lock DROPPED: never misfired once and
       the owner is tired of seeing it. If it ever fires, file it as a
       new bug with a repro instead of resurrecting the tripwire.
+- [x] J Desktop/phone shell split DROPPED (Oct 1, owner call): the
+      handoff's premise didn't survive scoping. The page's ~120
+      `androidUI` checks are almost all in script, not markup: the
+      top-level template is already pure composition of extracted
+      components with a ~50-line platform delta (six small blocks),
+      `<main>`'s gesture wiring is identical on both platforms
+      (divergence lives inside the handler impls), and platform CSS
+      already lives in the components (`:global(.app[data-android])`).
+      Literal twin shells would duplicate ~650 lines of identical
+      call sites (ThreadView alone takes ~60 props) for no
+      behavioral gain, plus Svelte-scoped-CSS risk on the root
+      `.app` div. If the script-level interleaving ever hurts,
+      extract platform gesture/behavior controllers instead of
+      forking markup.
 
 ## Owner-confirmed closures (Oct 1, 2026)
 
