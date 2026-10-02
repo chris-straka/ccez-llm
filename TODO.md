@@ -44,11 +44,7 @@ Full specs, order, acceptance criteria, and gates live in
 - [ ] I. Hands-free conversation loop
 ## Found while working (open)
 
-- Send-hold e2e fails on base: `composer-tools.e2e.ts` "desktop
-  send-hold stashes and restores the reply language" — the 700ms
-  hold never produces the "Effacé" toast (fails solo on a clean
-  stash too, so it predates I). Not diagnosed; the hold path and
-  `sendBtnEl` bind look intact statically.
+(none — the send-hold setup staleness is fixed in `composer-tools.e2e.ts`.)
 
 ## Non-goals
 
