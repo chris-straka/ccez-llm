@@ -144,9 +144,12 @@ guard soup. History and remaining candidates: `docs/design/refactor.md`.
 
 Standing authorization: commit and push as you go. Each finished unit of
 work gets its own commit once its gates are green, pushed straight to
-`origin/main`. Never batch unrelated work. Commit + push only: never
-amend, rebase, force-push, tag, or release without an explicit ask in
-that turn. Name files explicitly, never `git add -A`. One shared local
+`origin/main`. Never batch unrelated work. Standing authorization
+(granted Oct 1, 2026, until revoked): tag and cut releases via
+`scripts/release.ts` without asking, picking the bump from the
+changes (features since the last tag → minor, fixes only → patch),
+with gates green first. Never amend, rebase, or force-push without
+an explicit ask in that turn. Name files explicitly, never `git add -A`. One shared local
 checkout: a commit is already on the user's disk, so never say "pull".
 
 Never let git or a browser prompt for a password. The remote is HTTPS via
