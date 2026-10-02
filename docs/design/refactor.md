@@ -336,6 +336,41 @@ target pattern for no tested gain.
 - Touching the Rust per-platform `tts`/`dictate`/`ocr` files without first
   verifying they actually duplicate logic — look-first, lower priority.
 
+## Fresh audit (Oct 1, 2026 — page at 14.6k lines: 94 `$state` cells, 324 functions, 29 effects)
+
+One genuine-but-small candidate, two tidiness-only groupings; the
+rest is timers, DOM glue, and thin orchestration over already
+extracted lib decisions (the Sep 14 end-state, confirmed).
+
+- A. Flick-zone + edge-stroke gesture decisions (only real
+  candidate). `flickZoneOf` classifies touch zones with INLINE
+  selectors, against the §1 rule that target spellings live once
+  in `events.ts`; `applyEdgeTarget` is a small state machine
+  (target × settingsOpen × collapsed → drawer actions).
+  Extract predicates + `flickZoneFor` / `edgeTargetAction` facts
+  → token decisions, effects inline. Small-medium, unit
+  testable. Do it only if phone-gesture churn justifies it —
+  the logic is stable and gestures verify on device anyway.
+- B. Message-edit state grouping (weak). `editingMsgId` /
+  `editingSeed` / `editingAttachments` (20 refs, 6 fns) → one
+  `EditState`, §4 `FindState` pattern. Mechanical, near-zero
+  risk, near-zero value (no shared effects touch these).
+- C. Refs-card grouping (weak). 5 cells + 8 fns → `RefsState`.
+  Same verdict as B; the commit decision is already lib
+  (`commitRefsEdit`), the page part is focus/timing glue.
+- Looked at, leave alone: flashcards and reader (lib owns the
+  logic, page is ~40 lines of glue each); inspect (thin glue
+  over `shouldShowInspect` / `inspectLangFor`); `transitionToChat`
+  (ordering-critical flush/DOM, not decisions); selmenu/readings
+  placement (thin wrappers over lib); CJK word geometry (DOM
+  orchestration over lib `wordBoundsAt`); speech + converse (§2
+  rejection stands; converse already splits machine/page);
+  dictation (`runDictationFlow` engine exists); capture/OCR and
+  native turns (bridge glue, device-verified); attach intake
+  (§6d done); send (§6a) and scroll (§6b) remainders; settings
+  adjusters (trivial verbs); `middleSwipeTarget` (thin wrapper
+  over lib `contentSwipeTarget`); effects (lifecycle).
+
 ## Agent sessions
 
 - 2026-09-13 — Muse Code: `01a09c11-282a-7023-9e5a-8461b7164df8`
