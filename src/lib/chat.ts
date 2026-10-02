@@ -59,6 +59,13 @@ export interface Chat {
 	 */
 	correction: boolean;
 	/**
+	 * Dedicated game-annotations chat (one per store): overlay
+	 * annotations file here so Flashcards pick them up. False for
+	 * every chat written before the overlay existed (see loadChats
+	 * healing).
+	 */
+	game: boolean;
+	/**
 	 * Voice-readback override for this chat only: true/false wins over
 	 * the global default, null follows it. Null for every chat written
 	 * before the override existed (see loadChats healing).
@@ -183,6 +190,7 @@ function blankChat(): Chat {
 		messages: [],
 		replyLang: null,
 		correction: false,
+		game: false,
 		voice: null
 	};
 }
@@ -243,6 +251,50 @@ export function newChat(state: ChatState, store?: KeyValueStore): void {
 
 export function selectChat(state: ChatState, id: ChatId): void {
 	if (state.chats.some((c) => c.id === id)) state.activeChatId = id;
+}
+
+/**
+ * The dedicated game-annotations chat, minting it when absent.
+ * Never activates (game filing stays behind the game) and never
+ * duplicates (first `game` chat wins). The minted chat carries the
+ * Japanese pill so its voice and aids match the overlay's lines.
+ * Returns the live entry (re-found after the mint): the raw minted
+ * object bypasses $state signals, so mutating it would never
+ * persist — callers must only touch the returned proxy.
+ */
+export function ensureGameChat(state: ChatState, store?: KeyValueStore): Chat {
+	const found = state.chats.find((c) => c.game === true);
+	if (found) return found;
+	const chat = blankChat();
+	chat.game = true;
+	chat.replyLang = "ja";
+	state.chats = [...state.chats, chat];
+	persistChats(state, store);
+	return state.chats.find((c) => c.id === chat.id) ?? chat;
+}
+
+/**
+ * Append an assistant message to one chat by id, replacing the
+ * messages array (never pushing — proxy signals need the swap).
+ * Returns the new message id, or null on a missing chat or empty
+ * text. Persists like siblings.
+ */
+export function appendAssistantMessage(
+	state: ChatState,
+	chatId: ChatId,
+	text: string,
+	store?: KeyValueStore
+): ChatMsgId | null {
+	const target = state.chats.find((c) => c.id === chatId);
+	const trimmed = text.trim();
+	if (!target || !trimmed) return null;
+	const id = newChatMsgId();
+	target.messages = [
+		...target.messages,
+		{ id, role: "assistant", content: trimmed, usage: null, error: null }
+	];
+	persistChats(state, store);
+	return id;
 }
 
 /**
@@ -1397,6 +1449,8 @@ function loadChats(state: ChatState, store: KeyValueStore): void {
 					if (typeof c.voice !== "boolean") c.voice = null;
 					// Pre-correction chats carry no toggle: default off.
 					if (typeof c.correction !== "boolean") c.correction = false;
+					// Pre-overlay chats are never the game chat.
+					if (typeof c.game !== "boolean") c.game = false;
 					// A missing timestamp renders "Invalid Date" in the
 					// sidebar and switcher: stamp it now instead.
 					if (typeof c.createdAt !== "number" || Number.isNaN(c.createdAt)) {

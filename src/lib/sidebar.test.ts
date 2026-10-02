@@ -13,6 +13,7 @@ function chat(id: string, createdAt: number, messages: ChatMsg[]): Chat {
 		messages,
 		replyLang: null,
 		correction: false,
+		game: false,
 		voice: null
 	};
 }

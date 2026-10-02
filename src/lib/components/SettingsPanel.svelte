@@ -17,6 +17,8 @@
 		onCommit: () => void;
 		/** Opens the shortcuts modal (owned by the page). */
 		onShortcuts: () => void;
+		/** Game-line overlay toggle (page opens/closes the window). */
+		onGameLineToggle: () => void;
 		/** Active-chat token tally shown right of the heading. */
 		tokensLabel?: string | null;
 		/** Tooltip for the tally (exact total). */
@@ -40,6 +42,7 @@
 		onClose,
 		onCommit,
 		onShortcuts,
+		onGameLineToggle,
 		tokensLabel = null,
 		tokensTitle = null,
 		androidUI = false,
@@ -163,7 +166,12 @@
 	{/if}
 </div>
 <ProviderPanel {settings} {onCommit} />
-<DefaultsPanel {settings} {androidUI} {followVoice} />
+<DefaultsPanel
+		{settings}
+		{androidUI}
+		{followVoice}
+		gameLineToggle={onGameLineToggle}
+	/>
 <AppearancePanel {settings} />
 <div class="keys-updates">
 	<section aria-labelledby="keys-heading">

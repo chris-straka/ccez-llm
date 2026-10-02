@@ -108,6 +108,10 @@ export interface AppSettings {
 	button. On unless toggled — nothing fires until the user invokes
 	it, so this is a kill-switch, not a permission. */
 	captureEnabled: boolean;
+	/** Game-line overlay window (desktop only): the last captured
+	line with furigana, translation, and speak. Off unless opened —
+	mirrors the window (closing it flips this back). */
+	gameLine: boolean;
 	/** Last capture source (window id from the source menu; null =
 	frontmost window) and its fullscreen flag. The chord reuses the
 	pick; a stale id falls back frontmost in the backend. */
@@ -458,6 +462,7 @@ export function defaultSettings(): AppSettings {
 		voice: false,
 		micEnabled: true,
 		captureEnabled: true,
+		gameLine: false,
 		captureSourceId: null,
 		captureFullscreen: false,
 		captureArea: null,
@@ -741,6 +746,7 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 		if (typeof merged.micEnabled !== "boolean") merged.micEnabled = true;
 		if (typeof merged.captureEnabled !== "boolean")
 			merged.captureEnabled = true;
+		if (typeof merged.gameLine !== "boolean") merged.gameLine = false;
 		if (
 			typeof merged.captureSourceId !== "number" &&
 			merged.captureSourceId !== null

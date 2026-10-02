@@ -17,6 +17,7 @@ bookkeeping reads it). -->
 		shortcuts: () => void;
 		expand: (event: MouseEvent) => void;
 		drawerClose: () => void;
+		gameLine: () => void;
 	}
 
 	interface Props {
@@ -72,6 +73,7 @@ bookkeeping reads it). -->
 			onToast={actions.toast}
 			onClose={actions.panelClose}
 			onShortcuts={actions.shortcuts}
+			onGameLineToggle={actions.gameLine}
 			onExpand={(event: MouseEvent) => actions.expand(event)}
 			{tokensLabel}
 			{tokensTitle}

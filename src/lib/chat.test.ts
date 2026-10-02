@@ -6,6 +6,8 @@ import {
 	newChat,
 	newChatMsgId,
 	selectChat,
+	appendAssistantMessage,
+	ensureGameChat,
 	setChatReplyLang,
 	setChatCorrection,
 	swapReplyLang,
@@ -886,6 +888,39 @@ describe("chat", () => {
 		const healed = createChatState(store);
 		expect(healed.chats[0]?.correction).toBe(false);
 		expect(healed.chats[1]?.correction).toBe(false);
+	});
+
+	it("mints one unactivated game chat with the Japanese pill", async () => {
+		const { state, store } = stateWith(freshStore());
+		newChat(state, store);
+		const active = activeChat(state).id;
+		const game = ensureGameChat(state, store);
+		expect(game.game).toBe(true);
+		expect(game.replyLang).toBe("ja");
+		expect(activeChat(state).id).toBe(active);
+		expect(ensureGameChat(state, store).id).toBe(game.id);
+		expect(state.chats.filter((c) => c.game)).toHaveLength(1);
+		const again = createChatState(store);
+		expect(again.chats.filter((c) => c.game)).toHaveLength(1);
+		// Pre-overlay chats heal to non-game.
+		expect(again.chats[0]?.game).toBe(false);
+	});
+
+	it("appends assistant lines to one chat by id", async () => {
+		const { state, store } = stateWith(freshStore());
+		newChat(state, store);
+		const game = ensureGameChat(state, store);
+		const id = appendAssistantMessage(state, game.id, "  行くぞ！  ", store);
+		expect(id).toBeTruthy();
+		expect(state.chats[0]?.messages).toHaveLength(0);
+		expect(game.messages.map((m) => m.content)).toEqual(["行くぞ！"]);
+		const again = createChatState(store);
+		const regame = again.chats.find((c) => c.game === true);
+		expect(regame?.messages.map((m) => m.content)).toEqual(["行くぞ！"]);
+		expect(appendAssistantMessage(state, game.id, "   ", store)).toBeNull();
+		expect(
+			appendAssistantMessage(state, "missing" as never, "x", store)
+		).toBeNull();
 	});
 
 	it("keeps a voice-readback override per chat, following the global default when unset", async () => {

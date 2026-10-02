@@ -7,6 +7,7 @@ mod dev_secrets;
 mod annotate;
 mod capture;
 mod coderun;
+mod game_line;
 #[cfg(desktop)]
 mod desktop;
 mod dictation;
@@ -380,6 +381,8 @@ pub fn run() {
             capture::open_area_picker,
             capture::submit_area_rect,
             capture::show_main,
+            game_line::open_game_line,
+            game_line::close_game_line,
             dictate_start,
             dictate_stop,
             coderun::run_code,

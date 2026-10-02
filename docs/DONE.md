@@ -1104,3 +1104,15 @@ condensed from the Sep 23–24 chain (`0cda353`–`051257b`, tail
       underlined inss), annotatable like any text; mock
       `ccez-mock-reply` hook. Gates: unit 2123, check/lint clean,
       `correction.e2e.ts` 2/2 + render-adjacent 18/18 (`40aafe3`).
+- [x] H Ace Attorney overlay: always-on-top "Game line" window
+      (`game_line.rs`, settings toggle + Win/Linux tray item)
+      showing the last capture with furigana, a cached one-line
+      translation, and Speak; captures push, never pop; overlay
+      annotations file answered into the Game chat (minted with
+      the Japanese pill) for Flashcards. Fixed live: filing
+      through a raw minted chat bypasses $state signals and never
+      persists — `ensureGameChat` returns the live entry and
+      `appendAssistantMessage` appends through it. Verified on
+      the owner's Mac via the dev shell (open/push/furigana/
+      speak/annotate/file/close-mirror + a real capture loop);
+      Windows/Linux tray + window unverified on device.

@@ -394,6 +394,18 @@ describe("settings", () => {
 		expect(loadSettings(memoryStore).captureEnabled).toBe(true);
 	});
 
+	it("defaults the game line off and heals strays", () => {
+		expect(defaultSettings().gameLine).toBe(false);
+		const on = blankSettings();
+		on.gameLine = true;
+		saveSettings(on, memoryStore);
+		expect(loadSettings(memoryStore).gameLine).toBe(true);
+		const junk = blankSettings();
+		(junk as unknown as Record<string, unknown>).gameLine = "yes";
+		saveSettings(junk, memoryStore);
+		expect(loadSettings(memoryStore).gameLine).toBe(false);
+	});
+
 	it("defaults annotation popups to message size and heals strays", () => {
 		expect(defaultSettings().annPopScale).toBe(1);
 		const half = blankSettings();

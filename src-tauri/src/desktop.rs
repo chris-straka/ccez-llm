@@ -47,6 +47,9 @@ pub const TRAY_SHOW_ID: &str = "tray-show";
 /// Tray menu item: quit the app (Windows/Linux only).
 #[cfg(all(desktop, not(target_os = "macos")))]
 pub const TRAY_QUIT_ID: &str = "tray-quit";
+/// Tray menu item: open the game-line overlay (Windows/Linux only).
+#[cfg(all(desktop, not(target_os = "macos")))]
+pub const TRAY_GAME_LINE_ID: &str = "tray-game-line";
 /// Cap for an exported study sheet: a foreign chat id or a giant
 /// history must not flood the temp dir.
 pub const MAX_SHEET_CHARS: usize = 200_000;
@@ -563,6 +566,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
         app,
         &[
             &MenuItem::with_id(app, TRAY_SHOW_ID, "Show Ccez LLM", true, None::<&str>)?,
+            &MenuItem::with_id(app, TRAY_GAME_LINE_ID, "Game line", true, None::<&str>)?,
             &MenuItem::with_id(app, TRAY_QUIT_ID, "Quit", true, None::<&str>)?,
         ],
     )?;
@@ -574,6 +578,9 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {
             TRAY_SHOW_ID => focus_main(app),
+            TRAY_GAME_LINE_ID => {
+                let _ = crate::game_line::open_game_line(app.clone());
+            }
             TRAY_QUIT_ID => app.exit(0),
             _ => {}
         })

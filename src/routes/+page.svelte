@@ -11,6 +11,9 @@
 		activeChat,
 		newChat,
 		selectChat,
+		ensureGameChat,
+		appendAssistantMessage,
+		newChatMsgId,
 		setChatReplyLang,
 		setChatCorrection,
 		swapReplyLang,
@@ -105,7 +108,7 @@
 		onDeviceStatus
 	} from "$lib/ondevice/bridge";
 	import { getCurrentWindow } from "@tauri-apps/api/window";
-	import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+	import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 	import {
 		sendPasteFolds,
 		bakeEditedMessage,
@@ -221,6 +224,8 @@
 	annotationCopyText,
 	promptAnnWashIdFor,
 	annEditCommitToast,
+	addAnnotation,
+	attachAnnotationAnswer,
 	type Annotation,
 	type AnnotationId,
 	type AnnotationMark,
@@ -250,6 +255,20 @@ import {
 	selMenuDragTarget
 } from "$lib/sel-geometry";
 import { correctionPromptOn } from "$lib/correction";
+import {
+	loadDraftAnnotations,
+	saveDraftAnnotations
+} from "$lib/annotation-drafts-store";
+import {
+	GAME_LINE_CLOSED_EVENT,
+	GAME_LINE_EVENT,
+	GAME_LINE_FILE_EVENT,
+	GAME_LINE_OPEN_EVENT,
+	closeGameLine,
+	openGameLine,
+	translateGameLine,
+	type GameLineFile
+} from "$lib/gameLine";
 	import { AnnotationDrafts } from "$lib/annotation-drafts.svelte";
 	import {
 		trimParagraphTerminator,
@@ -4588,6 +4607,103 @@ import { correctionPromptOn } from "$lib/correction";
 		fileAssistantMessage(chatState, trimmed);
 		if (stuck) scrollAfterRender();
 		flashToast("Capture filed to chat.");
+		lastGameLine = trimmed;
+		if (settings.gameLine) void pushGameLine();
+	}
+
+	/** Last captured line for the game overlay (pushed on open +
+	 * capture). Plain — handlers only, never the template. */
+	let lastGameLine: string | null = null;
+
+	/** Settings toggle: open/close the overlay window. The checkbox
+	 * bind flips the flag first; a failed invoke reverts it, so the
+	 * box never shows a window that isn't there (the browser preview
+	 * rejects and toasts instead of pretending). */
+	async function toggleGameLine(): Promise<void> {
+		const on = settings.gameLine;
+		try {
+			if (on) await openGameLine();
+			else await closeGameLine();
+		} catch {
+			settings.gameLine = !on;
+			persistSettings();
+			flashErrorToast("The game line needs the desktop app.");
+			return;
+		}
+		persistSettings();
+		if (on) void pushGameLine();
+	}
+
+	/** Push the last line (translated, cached per line) to the
+	 * overlay. No line, no provider, or no backend: silent — the
+	 * overlay keeps whatever it shows. */
+	async function pushGameLine(): Promise<void> {
+		const line = lastGameLine?.trim();
+		if (!line || !settings.gameLine || !tauriBackendAvailable()) return;
+		let translation: string | null = null;
+		try {
+			const provider = await resolveProviderActive();
+			if (provider) translation = await translateGameLine(provider, line);
+		} catch {
+			translation = null;
+		}
+		const theme =
+			typeof document === "undefined"
+				? "light"
+				: (document.documentElement.dataset.theme ?? "light");
+		try {
+			await emit(GAME_LINE_EVENT, { line, translation, theme });
+		} catch {
+			// Overlay closed mid-push: the next open re-requests.
+		}
+	}
+
+	/** File an overlay selection into the Game chat: the line lands
+	 * as an assistant message (context + history), the annotation
+	 * files answered against it, and Flashcards harvest it from the
+	 * game drafts. Never touches the active chat or its view. */
+	async function fileGameAnnotation(file: GameLineFile): Promise<void> {
+		if (!file || typeof file.quote !== "string") return;
+		const quote = file.quote.trim();
+		if (!quote) return;
+		const line = lastGameLine?.trim() || quote;
+		const game = ensureGameChat(chatState);
+		// The line lands through the live entry (see ensureGameChat):
+		// appending to a stale reference would never persist.
+		const lineId =
+			appendAssistantMessage(chatState, game.id, line) ?? newChatMsgId();
+		let list = addAnnotation(
+			loadDraftAnnotations(game.id),
+			lineId,
+			quote,
+			file.comment.trim()
+		);
+		try {
+			const provider = await resolveProviderActive();
+			if (provider) {
+				const answer = await annotationAnswer(provider, {
+					quote,
+					question: file.comment.trim(),
+					context: line
+				});
+				const added = list[list.length - 1];
+				if (added) list = attachAnnotationAnswer(list, added.id, answer);
+			}
+		} catch {
+			saveDraftAnnotations(
+				game.id,
+				list,
+				chatState.chats.map((c) => c.id)
+			);
+			flashErrorToast("Filed to Game chat, but the answer failed.");
+			return;
+		}
+		saveDraftAnnotations(
+			game.id,
+			list,
+			chatState.chats.map((c) => c.id)
+		);
+		flashToast("Filed to Game chat.");
 	}
 	/** Overlay confirm: the checked text files as an assistant
 	 * message (never a model call). */
@@ -8537,6 +8653,32 @@ import { correctionPromptOn } from "$lib/correction";
 		} catch (error) {
 			console.warn(
 				"Menu events unavailable:",
+				error instanceof Error ? error.message : String(error)
+			);
+		}
+	}
+
+	/**
+	 * Game-line overlay channel (desktop shell only): the overlay
+	 * requests the current line on boot, files selections into the
+	 * Game chat, and the backend reports its close so the settings
+	 * toggle mirrors the window.
+	 */
+	async function listenGameLine(): Promise<void> {
+		if (!tauriBackendAvailable()) return;
+		try {
+			await listen(GAME_LINE_OPEN_EVENT, () => void pushGameLine());
+			await listen<GameLineFile>(GAME_LINE_FILE_EVENT, (event) =>
+				void fileGameAnnotation(event.payload)
+			);
+			await listen(GAME_LINE_CLOSED_EVENT, () => {
+				if (!settings.gameLine) return;
+				settings.gameLine = false;
+				persistSettings();
+			});
+		} catch (error) {
+			console.warn(
+				"Game-line events unavailable:",
 				error instanceof Error ? error.message : String(error)
 			);
 		}
@@ -12775,6 +12917,7 @@ import { correctionPromptOn } from "$lib/correction";
 		window.visualViewport?.addEventListener("resize", onViewportResize);
 		window.visualViewport?.addEventListener("scroll", onViewportResize);
 		void listenMenuActions();
+		void listenGameLine();
 		void wireDeepLinks();
 		window.addEventListener("keydown", onKey, true);
 		window.addEventListener("keydown", onAlt);
@@ -13652,7 +13795,8 @@ import { correctionPromptOn } from "$lib/correction";
 			expand: zoomWindow,
 			drawerClose: () => {
 				settingsOpen = false;
-			}
+			},
+			gameLine: () => void toggleGameLine()
 		}}
 	/>
 

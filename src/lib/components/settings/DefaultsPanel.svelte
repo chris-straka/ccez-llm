@@ -36,9 +36,16 @@
 		/** Follow-chat voice target (page pill state); omitted in
 		unit renders, where the voice panel falls back. */
 		followVoice?: VoiceLangFollow | null;
+		/** Game-line toggle (page opens/closes the window). */
+		gameLineToggle: () => void;
 	}
 
-	let { settings = $bindable(), androidUI, followVoice = null }: Props = $props();
+	let {
+		settings = $bindable(),
+		androidUI,
+		followVoice = null,
+		gameLineToggle
+	}: Props = $props();
 	/**
 	 * Slider reset gestures (text size, prompt size, chat width,
 	 * prompt width, idle timeout): only
@@ -185,6 +192,14 @@
 		<label class="check">
 			<input type="checkbox" bind:checked={settings.captureEnabled} />
 			<span>Enable screen-capture OCR (global shortcut + composer button)</span>
+		</label>
+		<label class="check">
+			<input
+				type="checkbox"
+				bind:checked={settings.gameLine}
+				onchange={() => gameLineToggle()}
+			/>
+			<span>Game line overlay (last capture with furigana + translation)</span>
 		</label>
 	{/if}
 	<VoicePanel {settings} {androidUI} {followVoice} />
