@@ -19,7 +19,10 @@ TTS/OCR/dictation, page fetch, Android background turns).
 - `src-tauri/src/` — Rust commands. `turn.rs` runs the same turn loop
   natively (Android background turns) and must mirror the TypeScript
   provider; `page_text.rs` mirrors the `tools.ts` cleaners for it.
-- `e2e/*.e2e.ts` — Playwright, seeded via `e2e/helpers.ts`.
+- `e2e/*.e2e.ts` — Playwright, seeded via `e2e/helpers.ts`. Specs import
+  `test`/`expect` from `e2e/fixtures.ts`, which fails any test that
+  throws an uncaught page error; Tauri stubs need `transformCallback`
+  (copy `e2e/mock-shell.ts`).
 - `scripts/` — release, dev-shell signing, data generators.
 - `docs/` — platform notes and standing design decisions (index:
   `docs/README.md`).
