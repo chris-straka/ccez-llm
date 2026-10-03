@@ -3140,11 +3140,12 @@ import {
 			// teardown) is removal, not intent to leave: hiding on it
 			// strands keyboard flows that already called enterEditMode.
 			// Click-away and tab-out targets stay attached and outside
-			// inert roots, so those hides are untouched.
-			if (event.target instanceof Element) {
-				if (!document.contains(event.target)) return;
-				if (event.target.closest("[inert]")) return;
-			}
+			// inert roots, so those hides are untouched. Chromium fires
+			// a removal's focusout while the node is still attached, in
+			// the middle of Svelte's DOM update (where a state write
+			// throws), so the decision waits a microtask: by then a
+			// removed node reads detached.
+			const target = event.target;
 			const next: EventTarget | null = event.relatedTarget ?? null;
 			if (
 				(next === null || next === document.body) &&
@@ -3152,7 +3153,13 @@ import {
 			) {
 				return;
 			}
-			hideForAlways(next);
+			queueMicrotask(() => {
+				if (target instanceof Element) {
+					if (!document.contains(target)) return;
+					if (target.closest("[inert]")) return;
+				}
+				hideForAlways(next);
+			});
 		};
 		window.addEventListener("pointermove", on, { passive: true });
 		window.addEventListener("focusin", onFocusInIdle);
