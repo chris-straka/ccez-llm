@@ -1620,12 +1620,16 @@ test.describe("touch", () => {
 		await swipeTwoFinger(page, 300, 150);
 		const panel = page.locator(".settings-panel");
 		await expect(panel).not.toHaveClass(/closed/);
-		const panelWidth = (await panel.boundingBox())?.width ?? 0;
 		const viewport = await page.evaluate(() => window.innerWidth);
 		// Full-width settings sheet on phones by design (no sliver to
 		// tap, no one-tap-close strip): shut settings, summon the
-		// list, compare against its own contract.
-		expect(Math.abs(panelWidth - viewport)).toBeLessThanOrEqual(1);
+		// list, compare against its own contract. Polled: the sheet
+		// slides in, so an early read lands mid-transition.
+		await expect
+			.poll(async () =>
+				Math.abs(((await panel.boundingBox())?.width ?? 0) - viewport)
+			)
+			.toBeLessThanOrEqual(1);
 		await swipeX(page, 4, 144);
 		await expect(panel).toHaveClass(/closed/);
 		await swipeX(page, 4, 144);
@@ -2970,7 +2974,11 @@ test.describe("always-visible prompt", () => {
 		const pre = article.locator(".ccez-code pre");
 		await expect(pre).toBeVisible({ timeout: 20_000 });
 		const pan = async (sel: string): Promise<void> => {
-			const box = await page.locator(sel).first().boundingBox();
+			// Math typesets after first paint and swaps its node: wait
+			// for a laid-out box instead of reading one mid-swap.
+			const target = page.locator(sel).first();
+			await expect.poll(() => target.boundingBox()).not.toBeNull();
+			const box = await target.boundingBox();
 			if (!box) throw new Error(`no pan target: ${sel}`);
 			await flick(
 				page,

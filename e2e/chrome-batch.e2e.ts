@@ -90,7 +90,9 @@ test("slider label text never resets any row", async ({ page }) => {
 	await expect(text).toHaveValue("250");
 	await clickLabelText(page, "Text size percent");
 	await expect(text).toHaveValue("250");
-	await page.locator(".settings-panel button", { hasText: "(100%)" }).click();
+	await page
+		.locator('.settings-panel button[title="Reset to the default size"]')
+		.click();
 	await expect(text).toHaveValue("100");
 
 	const width = page.locator(
@@ -100,7 +102,9 @@ test("slider label text never resets any row", async ({ page }) => {
 	await expect(width).toHaveValue("60");
 	await clickLabelText(page, "Chat width in rem");
 	await expect(width).toHaveValue("60");
-	await page.locator(".settings-panel button", { hasText: "(36)" }).click();
+	await page
+		.locator('.settings-panel button[title="Reset to the default width"]')
+		.click();
 	await expect(width).toHaveValue("36");
 
 	const idle = page.locator(
@@ -114,7 +118,9 @@ test("slider label text never resets any row", async ({ page }) => {
 	);
 	await expect(idle).toHaveValue("10");
 	// The idle default is always-on (bottom of the slider), not 6s.
-	await page.locator(".settings-panel button", { hasText: "(always)" }).click();
+	await page
+		.locator('.settings-panel button[title="Reset to the default idle time"]')
+		.click();
 	await expect(idle).toHaveValue("1");
 });
 

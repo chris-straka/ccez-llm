@@ -151,7 +151,7 @@ test("mid-stream switch keeps the new chat's drafts and scroll", async ({
 		.toBe(3);
 	// Chat 2's draft survived the foreign completion (the old code
 	// cleared it) and its scroll never yanked.
-	await expect(page.locator(".prompt-tools .ann-wrap")).toHaveCount(1);
+	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1);
 	const scroller = () =>
 		page.evaluate(() => {
 			const el = document.querySelector("main .messages") as HTMLElement | null;
@@ -192,13 +192,16 @@ async function annotateDraft(
 	// reaps it mid-aim while the click waits for stability.
 	await target.scrollIntoViewIfNeeded();
 	await settleScroller(page);
+	const badges = page.locator("button.ccez-ann-badge");
+	const before = await badges.count();
 	await target.dblclick({ position: { x: 10, y: 10 } });
 	await expect(page.locator(".sel-menu")).toBeVisible();
 	await page.locator('.sel-menu button:has-text("Annotate")').click();
 	await expect(page.locator(".ann-pop")).toBeVisible();
 	await page.keyboard.type(note);
 	await page.keyboard.press("Enter");
-	await expect(page.locator(".prompt-tools .ann-wrap")).toHaveCount(1);
+	// Filed notes show as message badges (the dock lists pinned ones only).
+	await expect(badges).toHaveCount(before + 1);
 }
 
 /** Annotating the just-sent message mid-stream survives the reply: the
@@ -268,7 +271,6 @@ test("mid-stream annotation on the sent message survives the reply", async ({
 		}
 	);
 	await expect(page.locator("button.ccez-ann-badge")).toHaveCount(1);
-	await expect(page.locator(".prompt-tools .ann-wrap")).toHaveCount(1);
 });
 
 /** The thinking chip localizes to the chat reply language while the

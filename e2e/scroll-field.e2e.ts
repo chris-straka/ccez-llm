@@ -64,20 +64,17 @@ test("scroll mode keeps field keys in the badge edit card", async ({
 	await page.locator('.sel-menu button:has-text("Annotate")').click();
 	await expect(page.locator(".ann-pop")).toBeVisible();
 	await page.locator(".ann-pop textarea").fill("seed note");
-	// Slow the mock answer: the badge Enter below must open the edit
-	// card, not the ready-answer card.
-	await page.evaluate(() =>
-		localStorage.setItem("ccez-mock-chat-ms", "15000")
-	);
 	await page.keyboard.press("Enter");
 	const badge = page.locator("button.ccez-ann-badge").first();
-	await expect(badge).toHaveCount(1);
-	// Now enter scroll mode, open the EDIT card, and type command letters.
-	// Keyboard-first (focus + Enter): scroll mode owns the pointer
-	// stage, so mouse-clicking the badge fights it.
+	await expect(badge).toHaveClass(/ans-ready/);
+	// Now enter scroll mode and open the EDIT card the keyboard way:
+	// the badge opens the answer card, E rewords it. Keyboard-first:
+	// scroll mode owns the pointer stage, so clicking fights it.
 	await enterScroll(page);
 	await badge.focus();
 	await page.keyboard.press("Enter");
+	await expect(page.locator(".ann-answer")).toBeVisible();
+	await page.keyboard.press("e");
 	const area = page.locator(".ann-pop textarea");
 	await expect(area).toBeFocused();
 	await area.click();
