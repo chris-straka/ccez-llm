@@ -327,6 +327,24 @@ describe("NativeTurns.reconcile", () => {
 		expect(calls.map((c) => c.cmd)).toEqual(["turn_scan", "turn_start", "turn_dismiss"]);
 	});
 
+	it("overlapping scans resume a dead turn once, never mark it interrupted", async () => {
+		const h = harness();
+		const chat = placeholderChat(h, false);
+		let dismissed = false;
+		const { calls } = stubInvoke({
+			turn_scan: () => (dismissed ? [] : [file(chat.id, "streaming")]),
+			turn_dismiss: () => {
+				dismissed = true;
+				return true;
+			}
+		});
+		await Promise.all([h.turns.reconcile(), h.turns.reconcile()]);
+		expect(calls.filter((c) => c.cmd === "turn_start")).toHaveLength(1);
+		expect(chat.messages[1]?.error).toBeNull();
+		expect(h.state.sendingChatIds).toEqual([chat.id]);
+		expect(h.calls.afterSend).toEqual([]);
+	});
+
 	it("marks a dead turn interrupted when it cannot be rebuilt", async () => {
 		const h = harness({ facts: { mock: true } });
 		const chat = placeholderChat(h, false);

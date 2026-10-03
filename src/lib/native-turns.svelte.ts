@@ -110,6 +110,10 @@ export class NativeTurns {
 		live: this.live
 	};
 
+	/** The scan in flight (see reconcile). */
+	private reconciling: Promise<void> | null = null;
+	private rescan = false;
+
 	constructor(deps: NativeTurnsDeps) {
 		this.deps = deps;
 	}
@@ -417,9 +421,30 @@ export class NativeTurns {
 	user returns to dots, never Retry), or dismissed (placeholder
 	gone). Resume can fail (no key, chat busy): only then does the
 	interrupted copy apply. Tail effects run only for chats that were
-	actually waiting, so a boot scan never thumps for old news. */
-	async reconcile(): Promise<void> {
-		if (!this.deps.isShell()) return;
+	actually waiting, so a boot scan never thumps for old news.
+	Scans never overlap: a second one would see the first's resume as
+	a busy chat and stamp its live placeholder interrupted. A call
+	during a scan queues one rescan after it instead. */
+	reconcile(): Promise<void> {
+		if (!this.deps.isShell()) return Promise.resolve();
+		if (this.reconciling) {
+			this.rescan = true;
+			return this.reconciling;
+		}
+		this.reconciling = (async () => {
+			try {
+				do {
+					this.rescan = false;
+					await this.scanOnce();
+				} while (this.rescan);
+			} finally {
+				this.reconciling = null;
+			}
+		})();
+		return this.reconciling;
+	}
+
+	private async scanOnce(): Promise<void> {
 		let files: NativeTurnFile[];
 		try {
 			files = await scanNativeTurns();
