@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { seedChat } from "./helpers";
 
 /** Stub the Tauri shell with no updater backend: the update check
@@ -7,8 +7,11 @@ test.beforeEach(async ({ page }) => {
 	await page.addInitScript(() => {
 		(window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {
 			invoke: async (cmd: string) => {
+				if (cmd === "plugin:event|listen") return 1;
 				throw new Error(`unmocked command: ${cmd}`);
-			}
+			},
+			transformCallback: (): number => 0,
+			unregisterCallback: (): void => {}
 		};
 	});
 	await seedChat(page, [{ role: "user", content: "hi" }]);

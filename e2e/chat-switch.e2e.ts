@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { seedChat, toggleSidebar } from "./helpers";
 
 /** New chat mid-stream: the fresh chat stays clean, the origin keeps

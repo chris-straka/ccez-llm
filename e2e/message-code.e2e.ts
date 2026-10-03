@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { seedChat } from "./helpers";
 
 const ASSISTANT = `<think>Let me think about what hello.py needs.</think>

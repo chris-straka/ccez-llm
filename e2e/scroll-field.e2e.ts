@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { seedChat, settleScroller, toggleSidebar } from "./helpers";
 
 /** Scroll mode must own the stage, not typing: command letters in a

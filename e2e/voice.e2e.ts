@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { seedChat } from "./helpers";
 
 test.describe("voice-data", () => {
@@ -250,10 +250,13 @@ test.describe("ios-voice", () => {
 		await page.addInitScript((voices: typeof IOS_VOICES) => {
 			(window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {
 				invoke: async (cmd: string) => {
+					if (cmd === "plugin:event|listen") return 1;
 					if (cmd === "tts_supported") return true;
 					if (cmd === "tts_voices") return voices;
 					throw new Error(`unmocked command: ${cmd}`);
-				}
+				},
+				transformCallback: (): number => 0,
+				unregisterCallback: (): void => {}
 			};
 		}, IOS_VOICES);
 	}

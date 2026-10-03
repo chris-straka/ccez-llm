@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures";
 import { seedChat, toggleSidebar } from "./helpers";
 
 /** Gutter double-click on a fresh (empty) chat: with no articles, the

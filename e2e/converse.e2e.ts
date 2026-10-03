@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { seedChat } from "./helpers";
 
 const TRANSCRIPT = "hello can you hear me";

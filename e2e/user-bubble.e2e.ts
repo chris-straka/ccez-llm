@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures";
 import { seedChat } from "./helpers";
 
 /** A short own message stays on one line: the bubble shrink-wraps the

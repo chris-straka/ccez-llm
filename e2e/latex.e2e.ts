@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { seedChat, toggleSidebar } from "./helpers";
 
 const ASSISTANT = `The energy levels:

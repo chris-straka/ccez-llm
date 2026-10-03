@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "./fixtures";
 
 /** Same phone emulation as the Android suite: UA-gated branches on. */
 test.use({

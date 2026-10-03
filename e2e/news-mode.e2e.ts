@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "./fixtures";
 import { dragHeadline, seedChat } from "./helpers";
 import {
 	MOCK_SOURCE_MISS,

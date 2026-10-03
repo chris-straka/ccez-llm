@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { Buffer } from "node:buffer";
 import { dragQuote, quoteRect, seedChat } from "./helpers";
 

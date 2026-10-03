@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures";
 import { seedChat, rowBoxes, expectBoxesStable } from "./helpers";
 
 test.setTimeout(120_000);

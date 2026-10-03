@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures";
 import { seedChat, toggleSidebar } from "./helpers";
 
 /** Empty-composer caret: a plain textarea owns exactly one native caret,

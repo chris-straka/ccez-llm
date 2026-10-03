@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { seedChat, toggleSidebar } from "./helpers";
 
 /** Draft annotations belong to one chat: leaving files them away,

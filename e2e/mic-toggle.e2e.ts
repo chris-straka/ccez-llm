@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures";
 
 test("mic toggle hides prompt mic button", async ({ page }) => {
 	await page.addInitScript(() => {

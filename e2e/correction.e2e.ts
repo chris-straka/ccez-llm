@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures";
 import { seedChat } from "./helpers";
 
 const REPLY_WITH_BLOCK = "Bien sûr !\n\n```correction\nJe vais au grand parc\n```";

@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "./fixtures";
 import { seedChat, toggleSidebar } from "./helpers";
 
 /** Drop a canvas-painted PNG onto the composer (in-page: DataTransfer

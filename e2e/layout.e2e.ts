@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { seedChat, toggleSidebar } from "./helpers";
 
 /** The chat pill spans the full row width flush with the + button

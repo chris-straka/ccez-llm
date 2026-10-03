@@ -1,14 +1,13 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures";
 
 /**
  * Retrying a failed reply (or rerunning) reuses the user message in
  * place: previous articles keep their DOM nodes instead of remounting
  * (the full-list flash). Only the fresh reply mounts. The focused Retry
- * button unmounts mid-update, so its focusout must not throw either.
+ * button unmounts mid-update, so its focusout must not throw either
+ * (the shared fixture fails any page error).
  */
 test("retry keeps previous articles mounted", async ({ page }) => {
-	const errors: string[] = [];
-	page.on("pageerror", (error) => errors.push(error.message));
 	await page.addInitScript(() => {
 		window.localStorage.setItem("ccez-mock-provider", "1");
 		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
@@ -54,5 +53,4 @@ test("retry keeps previous articles mounted", async ({ page }) => {
 	);
 	expect(marks[0]).toBe(0);
 	expect(await page.locator("article .rendered").count()).toBeGreaterThan(0);
-	expect(errors.filter((m) => !m.includes("ResizeObserver"))).toEqual([]);
 });

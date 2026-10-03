@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { seedChat } from "./helpers";
 
 /** Settings panel: five thinking pills share one row, labels stay terse. */
@@ -349,6 +349,7 @@ test("on-device note renders probe facts", async ({ page }) => {
 		);
 		(window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {
 			invoke: async (cmd: string) => {
+				if (cmd === "plugin:event|listen") return 1;
 				if (cmd === "ondevice_status")
 					return {
 						state: "error",
@@ -360,7 +361,9 @@ test("on-device note renders probe facts", async ({ page }) => {
 						aicore: "241912009"
 					};
 				throw new Error(`unmocked command: ${cmd}`);
-			}
+			},
+			transformCallback: (): number => 0,
+			unregisterCallback: (): void => {}
 		};
 	});
 	await page.goto("/");
@@ -385,6 +388,7 @@ test("ml kit pill hides on all-606 when inactive", async ({ page }) => {
 	await page.addInitScript(() => {
 		(window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {
 			invoke: async (cmd: string) => {
+				if (cmd === "plugin:event|listen") return 1;
 				if (cmd === "ondevice_status")
 					return {
 						state: "error",
@@ -393,7 +397,9 @@ test("ml kit pill hides on all-606 when inactive", async ({ page }) => {
 						aicore: "241912009"
 					};
 				throw new Error(`unmocked command: ${cmd}`);
-			}
+			},
+			transformCallback: (): number => 0,
+			unregisterCallback: (): void => {}
 		};
 	});
 	await page.goto("/");

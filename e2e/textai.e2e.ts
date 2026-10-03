@@ -5,7 +5,7 @@
  * contiguous (mark-DOM fallback), chat switching lands on the target
  * chat, and DOMPurify keeps its allow-list (code chrome + data-*).
  */
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { seedChat, toggleSidebar } from "./helpers";
 
 test("CJK composition Enter does not half-send the composer", async ({

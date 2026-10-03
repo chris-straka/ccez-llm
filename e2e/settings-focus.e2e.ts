@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { toggleSidebar } from "./helpers";
 
 const LONG = "Line of chat text for height. ".repeat(200);

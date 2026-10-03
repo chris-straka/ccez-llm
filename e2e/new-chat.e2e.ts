@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "./fixtures";
 import { seedChat, toggleSidebar } from "./helpers";
 
 /** New-chat sidebar behavior: creation toasts, empty rows stay quiet,

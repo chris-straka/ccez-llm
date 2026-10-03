@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures";
 import { seedChat } from "./helpers";
 
 function fourTurns(): Array<{ role: "user" | "assistant"; content: string }> {
