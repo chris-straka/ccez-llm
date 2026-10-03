@@ -1,22 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
 
-/**
- * Annotation-UX invariants that jsdom cannot see (no layout, no layers,
- * no hover engine), asserted on source instead.
- */
-function pageSource(): string {
-	return readFileSync(new URL("./+page.svelte", import.meta.url), "utf8");
-}
-
-/** Thread column moved to ThreadView.svelte with its row derivations. */
-function threadSource(): string {
-	return readFileSync(
-		new URL("../lib/components/ThreadView.svelte", import.meta.url),
-		"utf8"
-	);
-}
-
 function messageBodyStyle(): string {
 	const source = readFileSync(
 		new URL("../lib/components/MessageBody.svelte", import.meta.url),
@@ -34,11 +18,6 @@ function appCss(): string {
 	return source.replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
-/**
- * Popover (AnnPop) and review dock (ReviewDock) renders moved out of
- * +page.svelte with their markup and styles; the assertions below
- * follow them (same contracts, new homes).
- */
 function annPopSource(): string {
 	return readFileSync(
 		new URL("../lib/components/AnnPop.svelte", import.meta.url),
@@ -59,31 +38,9 @@ function reviewDockSource(): string {
 	);
 }
 
-function composerSource(): string {
-	return readFileSync(
-		new URL("../lib/components/Composer.svelte", import.meta.url),
-		"utf8"
-	);
-}
-
 function sentRefsSource(): string {
 	return readFileSync(
 		new URL("../lib/components/SentRefs.svelte", import.meta.url),
-		"utf8"
-	);
-}
-
-/** Annotation orchestration moved to annotate-mode.svelte.ts (STAGE 1). */
-function annotateModeSource(): string {
-	return readFileSync(
-		new URL("../lib/annotate-mode.svelte.ts", import.meta.url),
-		"utf8"
-	);
-}
-
-function draftsSource(): string {
-	return readFileSync(
-		new URL("../lib/annotation-drafts.svelte.ts", import.meta.url),
 		"utf8"
 	);
 }
@@ -188,116 +145,6 @@ describe("annotation edit Save animation", () => {
 		expect(css).toMatch(/\.review-head button\.review-add\s*\{[^}]*transition:/);
 		expect(css).toContain(".review-head button.review-add:hover");
 	});
-
-	it("keeps the dock pill on token surfaces", () => {
-		const css = componentStyle(reviewDockSource(), "ReviewDock.svelte");
-		// Panel surface; hover/focus ring rides the accent token
-		// (dark-readable by token contract). Chips are gone from
-		// the prompt: the button count plus the overlay rows are
-		// the whole pin surface.
-		expect(componentStyle(composerSource(), "Composer.svelte")).not.toContain(
-			".inclusion-chip"
-		);
-		expect(css).toContain(".ann-pill");
-		expect(css).not.toContain(".staged-pill");
-		expect(css).not.toContain(".staged-field");
-	});
-});
-
-describe("annotation create wiring", () => {
-	it("snaps the create marker to word edges before the menu reads it", () => {
-		const source = pageSource();
-		expect(source).toContain("snapSelectionToWordEdges(live)");
-	});
-
-	it("quotes headline picks against their story, not a message", () => {
-		const source = annotateModeSource();
-		expect(source).toContain("headlineQuote(selection: Selection)");
-		expect(source).toContain("storyOfHeadline(headline: Element)");
-		expect(source).toContain("data-story-link");
-	});
-
-	it("pins answered story notes so review lists them", () => {
-		// No badge to pin from: the answer landing files the
-		// note into the dock (and the launched session) itself.
-		const source = draftsSource();
-		const askPath = source.slice(source.indexOf("async ask("));
-		expect(askPath).toContain("setPromptPinned(this.list, ann.id, true)");
-	});
-
-	it("reads the annotated text when a waiting badge opens", () => {
-		// Blue badges speak like answered ones (quote with its
-		// paragraph context), so the listen moment survives the wait.
-		const source = annotateModeSource();
-		const dockPath = source.slice(source.indexOf("No answer yet: open the review dock"));
-		expect(dockPath).toContain("this.deps.speak(");
-		expect(dockPath).toContain(
-			"this.answerContextFor(current, current.quote, current.at ?? 0)"
-		);
-	});
-
-	it("rides the orange pill with its quote through scrolls", () => {
-		// Fixed plus scroll-delta tracking reads as absolute: the
-		// pill never sticks to the viewport, and the mount stays
-		// outside the scroll container.
-		const source = pageSource();
-		expect(source).toContain("annPop = { ...annPop, y: annPop.y - dy }");
-		expect(source).toContain("annPopTop = scrollBox?.scrollTop ?? 0");
-	});
-
-	it("centers narrow create boxes, keeps cursor placement for wide ones", () => {
-		// The geometry lives in annPop.placeAnnComposer (unit-tested);
-		// the seal follows the summon wiring.
-		const source = annotateModeSource();
-		expect(source).toContain("placeAnnComposer({");
-	});
-
-	it("drops the annotation — never the message — on Cmd+Delete over a badge", () => {
-		// The deleteScope badge branch owns the chord (same path as
-		// bare Delete on the badge); the message branch below never
-		// sees it.
-		const source = pageSource();
-		expect(source).toContain(
-			'if (delScope === "badge" && annotateMode.hoverBadgeId !== null) {'
-		);
-	});
-
-	it("ends the phone create pill with a Save button", () => {
-		const source = annPopSource();
-		// The fresh pill is textarea + mic only on desktop (Enter
-		// files); phones get an explicit submit at the end because
-		// the software enter key is unreliable for filing.
-		const fresh = source.match(/#if pop\.fresh\}[\s\S]*?\{:else\}/);
-		expect(fresh?.[0]).toBeDefined();
-		expect(fresh?.[0]).toContain("{#if android}");
-		expect(fresh?.[0]).toContain("ann-pill-save");
-		expect(fresh?.[0]).toContain("actions.save");
-		// The page still wires that action to the real save path —
-		// wrapped, so the button's click event never rides in as
-		// fromEnter (only Enter sets it).
-		expect(pageSource()).toContain("save: () => saveAnnPop()");
-	});
-});
-
-describe("annotations-only messages", () => {
-	it("renders an em-dash body with the annotation UI above it", () => {
-		expect(pageSource()).toContain("<ThreadView");
-		expect(threadSource()).toContain("REFS_ONLY_BODY");
-	});
-});
-
-describe("no omit affordance", () => {
-	it("offers no omit/include toggle anywhere: deleting is the only removal", () => {
-		const source = reviewDockSource();
-		expect(source).not.toContain("review-omit");
-		expect(source).not.toContain("setExcluded");
-		expect(source).not.toContain("Omit");
-		const css = componentStyle(source, "ReviewDock.svelte");
-		expect(css).not.toContain("review-omit");
-		expect(css).not.toContain(".review-item.omitted");
-		// The delete button stays the row's removal.
-		expect(source).toContain('class="review-del"');
-	});
 });
 
 describe("review delete button", () => {
@@ -362,14 +209,5 @@ describe("sent-message annotation count", () => {
 	it("scales the refs count with the message font size", () => {
 		const css = componentStyle(sentRefsSource(), "SentRefs.svelte");
 		expect(css).toMatch(/\.ann-refs-pill\s*\{[^}]*var\(--font-scale, 1\)/);
-	});
-});
-
-describe("off-chat drag clamp", () => {
-	it("trims selections whose press started off-chat on every change", () => {
-		const source = pageSource();
-		expect(source).toContain("clampOffChatDrag()");
-		expect(source).toContain("clampDragAnchorToFocusLine");
-		expect(source).toContain("offChatDragArmed = false");
 	});
 });

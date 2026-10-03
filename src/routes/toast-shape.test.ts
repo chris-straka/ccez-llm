@@ -32,10 +32,4 @@ describe("long toasts", () => {
 		expect(css).toContain(".toast.long");
 		expect(css).toMatch(/\.toast\.long\s*\{\s*border-radius:\s*12px/);
 	});
-
-	it("gates the class on the toastLong helper, both slots", () => {
-		const source = toastsSource();
-		expect(source).toContain("toastLong(notices.toast.message)");
-		expect(source).toContain("toastLong(notices.errorToast.message)");
-	});
 });

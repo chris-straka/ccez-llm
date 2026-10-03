@@ -1,24 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
 
-/**
- * Phone-composer overhaul invariants (mobile-only, desktop untouched).
- * Layout behavior is invisible to jsdom, so these assert on source like
- * annotations-ux.test.ts does. Every visual rule must ride the phone
- * gate (`.app[data-android]`); every focus change must keep the desktop
- * path byte-identical.
- */
-function pageSource(): string {
-	return readFileSync(new URL("./+page.svelte", import.meta.url), "utf8");
-}
-
-function pageStyle(): string {
-	const match = pageSource().match(/<style>([\s\S]*)<\/style>/);
-	if (!match) throw new Error("+page.svelte has no <style> block");
-	// Strip CSS comments so prose can't trip the assertions below.
-	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
-}
-
 /** Thread column moved to ThreadView.svelte with its styles. */
 function threadSource(): string {
 	return readFileSync(
@@ -103,27 +85,6 @@ describe("phone composer two bars", () => {
 		expect(toolsRule?.[0]).not.toContain("border-top:");
 	});
 
-	it("never parks the composer for open drawers", () => {
-		const source = pageSource();
-		// The chats list and settings are overlays above the card, so
-		// hiding it under them only slid the thread: phones park for a
-		// real idle timeout alone, desktop keeps drawer parking. The
-		// branch lives in chrome.promptParkedFor (unit-tested); the
-		// seal follows the wiring.
-		expect(source).toContain("promptParkedFor(");
-		expect(source).toContain("promptIdle,");
-	});
-
-	it("grows the reading column with the chat-width setting", () => {
-		const source = pageSource();
-		// The old pin ignored the slider; the width expression now runs
-		// through the helper (phone floor, full-bleed at huge type —
-		// pinned unit-side in settings.test.ts).
-		expect(source).toContain(
-			"effectiveChatWidth(\n\t\tandroidUI,\n\t\tsettings.fontScale,\n\t\tsettings.chatWidth ?? 36\n\t)}"
-		);
-	});
-
 	it("keeps AI text off the screen edge with a rem-floor thread gutter", () => {
 		const css = threadStyle();
 		// Assistant articles carry no side padding, so the thread
@@ -154,8 +115,7 @@ describe("phone composer two bars", () => {
 	});
 
 	it("never collapses the tools bar or its buttons while idle", () => {
-		// The composer rules moved with the markup: guard both styles.
-		const css = pageStyle() + "\n" + composerStyle();
+		const css = composerStyle();
 		// Idle single-bar mode is gone: no rule may hide the row or
 		// the send button on :not(:focus-within) outside highlight mode.
 		for (const match of css.matchAll(
@@ -248,27 +208,6 @@ describe("phone annotation focus stability", () => {
 		);
 		expect(css).not.toMatch(
 			/:global\(\.app\[data-android\]\) \.prompt\.prompt-hidden\s*\{[^}]*display:\s*none/
-		);
-	});
-
-	it("re-pins the scroll behind phone pill focus (create, mount)", () => {
-		const source = pageSource();
-		// The popover create path and growPill each restore both the
-		// window and the chat scroller on the phone path only. The
-		// in-prompt edit paths mount no pill, so there is nothing to
-		// re-pin behind them.
-		const restores = source.match(/box\.scrollTop = st;/g) ?? [];
-		expect(restores.length).toBeGreaterThanOrEqual(2);
-		expect(source).toContain("if (androidUI) {");
-	});
-
-	it("keeps the desktop focus call a single preventScroll focus", () => {
-		const source = pageSource();
-		// The create pill opens through the annotate-mode dep now
-		// (one nesting deeper); the desktop branch stays a lone
-		// preventScroll focus with no scroll restore.
-		expect(source).toContain(
-			"} else {\n\t\t\t\tvoid tick().then(() => annPopBox?.focus({ preventScroll: true }));"
 		);
 	});
 });

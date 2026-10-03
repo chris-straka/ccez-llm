@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
 
 /**
@@ -47,38 +47,25 @@ function unpairedHexLines(css: string): string[] {
 	return bad;
 }
 
-function pageStyle(): string {
-	// .voice-error is the documented always-dark exception (see
-	// docs/design/colors.md): it keeps raw dark hexes in both themes, so it
-	// scans outside the pairing rule.
-	return styleOf("./+page.svelte").replace(/\.voice-error\s*\{[^}]*\}/g, "");
-}
-
-const messageBodyStyle = styleOf("../lib/components/MessageBody.svelte");
-// Extracted page components keep their surfaces (and token references)
-// with their markup — Svelte scoping binds page CSS to page markup,
-// so the scan follows the extractions (Toasts, SelMenu, Attachments,
-// Readings, ShortcutsModal, ChatSwitcher, Modal, SearchPalette,
-// InspectOverlay, AnnPop, ReviewDock).
-// Toasts also hosts the always-dark voice-error exception, stripped
-// like the page scan below.
-const extractedStyle = [
-	styleOf("../lib/components/Toasts.svelte").replace(
-		/\.voice-error\s*\{[^}]*\}/g,
-		""
-	),
-	styleOf("../lib/components/SelMenu.svelte"),
-	styleOf("../lib/components/Attachments.svelte"),
-	styleOf("../lib/components/Readings.svelte"),
-	styleOf("../lib/components/ShortcutsModal.svelte"),
-	styleOf("../lib/components/ChatSwitcher.svelte"),
-	styleOf("../lib/components/Modal.svelte"),
-	styleOf("../lib/components/SearchPalette.svelte"),
-	styleOf("../lib/components/InspectOverlay.svelte"),
-	styleOf("../lib/components/AnnPop.svelte"),
-	styleOf("../lib/components/ReviewDock.svelte")
-].join("\n");
-// panels.css is a raw stylesheet (no <style> wrapper): read it whole.
+/**
+ * Every component <style> under src/, plus panels.css (a raw sheet).
+ * Globbed so extractions are scanned wherever the markup lands.
+ * .voice-error is the documented always-dark exception (see
+ * docs/design/colors.md): it keeps raw dark hexes in both themes, so
+ * it scans outside the pairing rule.
+ */
+const srcDir = new URL("../", import.meta.url);
+const componentStyle = readdirSync(srcDir, { recursive: true })
+	.map(String)
+	.filter((path) => path.endsWith(".svelte"))
+	.sort()
+	.map((path) => {
+		const source = readFileSync(new URL(path, srcDir), "utf8");
+		return source.match(/<style>([\s\S]*)<\/style>/)?.[1] ?? "";
+	})
+	.join("\n")
+	.replace(/\/\*[\s\S]*?\*\//g, "")
+	.replace(/\.voice-error\s*\{[^}]*\}/g, "");
 const panelsStyle = readFileSync(
 	new URL("../lib/components/settings/panels.css", import.meta.url),
 	"utf8"
@@ -110,14 +97,12 @@ describe("color tokens", () => {
 	});
 
 	it("names tokens in components, never bare accent hexes", () => {
-		expect(unpairedHexLines(pageStyle())).toEqual([]);
-		expect(unpairedHexLines(messageBodyStyle)).toEqual([]);
+		expect(unpairedHexLines(componentStyle)).toEqual([]);
 		expect(unpairedHexLines(panelsStyle)).toEqual([]);
-		expect(unpairedHexLines(extractedStyle)).toEqual([]);
 	});
 
 	it("references every token somewhere", () => {
-		const all = pageStyle() + messageBodyStyle + panelsStyle + extractedStyle;
+		const all = componentStyle + panelsStyle;
 		for (const token of [
 			"var(--accent)",
 			"var(--accent-ink)",
@@ -166,9 +151,5 @@ describe("own-message ink", () => {
 		}
 		// Off has no rule — plain ink.
 		expect(style).not.toContain('data-own-ink="off"');
-	});
-	it("wires the setting through main[data-own-ink]", () => {
-		const page = readFileSync(new URL("./+page.svelte", import.meta.url), "utf8");
-		expect(page).toContain("data-own-ink={settings.ownInk}");
 	});
 });

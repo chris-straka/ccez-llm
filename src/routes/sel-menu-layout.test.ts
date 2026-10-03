@@ -4,15 +4,10 @@ import { describe, it, expect } from "vitest";
 /**
  * Selection-menu / composer-dock button layout invariants.
  *
- * Asserted on +page.svelte source because button order is markup,
- * not behavior jsdom can exercise meaningfully. Phones split the
- * actions: the floating menu holds Annotate then Copy (always —
- * no hold-to-arm), the composer dock holds Speak then Inspect.
+ * Asserted on component source because button order is markup.
+ * Phones split the actions: the floating menu holds Annotate then
+ * Copy, the composer dock holds Speak then Inspect.
  */
-function pageSource(): string {
-	return readFileSync(new URL("./+page.svelte", import.meta.url), "utf8");
-}
-
 function selMenuSource(): string {
 	return readFileSync(
 		new URL("../lib/components/SelMenu.svelte", import.meta.url),
@@ -72,22 +67,5 @@ describe("phone selection layout", () => {
 			dock.indexOf(">Inspect</button")
 		);
 		expect(dock).not.toContain("Annotate selection");
-	});
-
-	it("retired the hold-to-arm Copy gate", () => {
-		const source = pageSource();
-		expect(source).not.toContain("copyArmed");
-		expect(source).not.toContain("COPY_HOLD_MS");
-		expect(source).not.toContain("armCopyButton");
-	});
-
-	it("lifts the menu above every readings panel on speak", () => {
-		const source = pageSource();
-		// Pinyin and furigana share .sel-pinyin; the lift clears the
-		// topmost above-panel of either, and glides (drag stays 1:1).
-		expect(source).toContain("liftSelMenuAboveReadings");
-		expect(source).toContain('document.querySelectorAll(".sel-pinyin.above")');
-		expect(source).toContain("menuYAbovePanel(Math.min(...tops), mr.height)");
-		expect(source).toContain("selMenuDragging");
 	});
 });

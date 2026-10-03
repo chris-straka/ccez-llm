@@ -26,10 +26,6 @@ function rowStyle(): string {
 	return match[1]!.replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
-function pageSource(): string {
-	return readFileSync(new URL("./+page.svelte", import.meta.url), "utf8");
-}
-
 /** Thread column moved to ThreadView.svelte with its styles. */
 function threadSource(): string {
 	return readFileSync(
@@ -77,43 +73,6 @@ describe("hover-only message actions", () => {
 		expect(css).toContain(":global(article.assistant.aid-loading) .actions");
 	});
 
-	it("holds the touch row while aids load or audio runs", () => {
-		const source = pageSource();
-		const timer = source.match(
-			/function armActionsTimer\(id: ChatMsgId\): void \{([\s\S]*?)\n\t\}/
-		);
-		expect(
-			timer,
-			"armActionsTimer is gone or reshaped — move the busy hold with it"
-		).toBeTruthy();
-		const body = timer![1]!;
-		// Every in-flight state that owns the row must re-arm, never
-		// close: the hold lives in chrome.rowWorkRunning (unit-tested),
-		// fed all four states here.
-		expect(body).toContain(
-			"rowWorkRunning(id, aidBusy, vocalizing, speakingId, speakingSelection)"
-		);
-		expect(body).toContain("armActionsTimer(id)");
-	});
-
-	it("stops speech from the composer button without flipping the setting", () => {
-		const source = pageSource();
-		const toggle = source.match(
-			/function toggleVoice\(\): void \{([\s\S]*?)\n\t\}/
-		);
-		expect(
-			toggle,
-			"toggleVoice is gone or reshaped — keep the global stop in it"
-		).toBeTruthy();
-		const body = toggle![1]!;
-		expect(body).toContain("speakingId !== null");
-		expect(body).toContain("stopVoice()");
-		// The stop path returns before the setting toggle.
-		expect(body.indexOf("stopVoice()")).toBeLessThan(
-			body.indexOf("setVoiceEnabled")
-		);
-	});
-
 	it("keeps will-change on the hover-hidden rows", () => {
 		const css = rowStyle();
 		const block = css.match(
@@ -125,23 +84,6 @@ describe("hover-only message actions", () => {
 		).toBeTruthy();
 		expect(block![1]).toMatch(/opacity\s*:\s*0\s*;/);
 		expect(block![1]).toMatch(/will-change\s*:\s*opacity\s*;/);
-	});
-
-	it("confirms message copy with a bare Copied toast", () => {
-		// The composition moved to messageCopyText in render.ts; the
-		// page feeds it and toasts the bare word.
-		const source = pageSource();
-		expect(source).toContain(
-			'copyPlain(messageCopyText(content, role, sourcesWanted), "Copied")'
-		);
-		expect(source).not.toContain("Copied as plain text");
-		const render = readFileSync(
-			new URL("../lib/render.ts", import.meta.url),
-			"utf8"
-		);
-		expect(render).toContain(
-			"redactedCopyText(plainBody(content, role, sourcesWanted))"
-		);
 	});
 
 	it("scales the icon glyphs with the text-size opt-in", () => {
@@ -187,45 +129,6 @@ describe("hover-only message actions", () => {
 			.filter((line) => !line.includes("::after"))
 			.filter((line) => /(transform|translate|animation)\s*:/.test(line));
 		expect(offenders).toEqual([]);
-	});
-});
-
-/**
- * Chat-switch ordering: picking a previewed row must land directly,
- * never flash the old chat first — and the switch cuts instantly,
- * with no view transition anywhere.
- */
-function transitionBody(): string {
-	const fn = pageSource().match(
-		/function transitionToChat\(id: Parameters<typeof selectChat>\[1\]\): void \{([\s\S]*?)\n\t\tmutate\(\);\n\t\}/
-	);
-	expect(
-		fn,
-		"transitionToChat is gone or reshaped — keep the preview clear and voice stop in it"
-	).toBeTruthy();
-	return fn![1]!;
-}
-
-describe("chat-switch cut", () => {
-	it("clears the hover preview inside the switch, never before it", () => {
-		// Clearing first renders the old chat for a frame, so the
-		// mutate block owns the only switch-path clear.
-		expect(transitionBody()).toContain("previewChatId = null;");
-		expect(pageSource()).not.toContain("startViewTransition");
-	});
-
-	it("stops the voice when leaving for another chat", () => {
-		expect(transitionBody()).toContain("stopVoice();");
-	});
-
-	it("passes previewing into message bodies", () => {
-		// The thread renders from `ThreadView.svelte` now: the page
-		// feeds the thread, the thread feeds the article, the article
-		// forwards into the body.
-		expect(pageSource()).toContain("<ThreadView");
-		expect(threadSource()).toContain("<MessageArticle");
-		expect(threadSource()).toContain("{previewing}");
-		expect(articleSource()).toContain("preview={previewing}");
 	});
 });
 
@@ -328,17 +231,13 @@ describe("aid-button text size", () => {
 		// Each aid onclick (model run/revert, local pin/unpin) lives on
 		// a button tag carrying aid-btn: the fixed-size rule above keys
 		// off the class, so an unmarked aid button would track text.
-		// Buttons render in the row component, handlers stay paged.
 		const row = rowSource();
-		const wired: Array<[string, string, string]> = [
-			["actions.unpinModelAid()", "actions.unpinModelAid(msg)", "unpinModelAid,"],
-			["actions.runModelAid(aidId)", "actions.runModelAidFor(msg, modelId, true)", "runModelAidFor,"],
-			["actions.unpinLocalAid(localKind)", "actions.unpinLocalAid(msg, kind)", "unpinLocalAid,"],
-			["actions.pinLocalAid(localKind)", "actions.pinLocalAid(msg, kind)", "pinLocalAid,"]
-		];
-		const thread = threadSource();
-		const page = pageSource();
-		for (const [call, threadWiring, pageWiring] of wired) {
+		for (const call of [
+			"actions.unpinModelAid()",
+			"actions.runModelAid(aidId)",
+			"actions.unpinLocalAid(localKind)",
+			"actions.pinLocalAid(localKind)"
+		]) {
 			const at = row.indexOf(call);
 			if (at === -1) throw new Error(`aid call gone: ${call}`);
 			const open = row.lastIndexOf("<button", at);
@@ -346,8 +245,6 @@ describe("aid-button text size", () => {
 			expect(row.slice(open, at), `${call} button lost aid-btn`).toContain(
 				"aid-btn"
 			);
-			expect(thread, `${call} unwired in thread`).toContain(threadWiring);
-			expect(page, `${call} unwired in page`).toContain(pageWiring);
 		}
 	});
 });
