@@ -13,9 +13,7 @@ they ship — the commit is the record.
 
 ## Open
 
-- `e2e/settings-focus.e2e.ts` "enter on the active chat skips the
-  crossfade" fails on main (0 view transitions after `j`, expected 1);
-  predates the 2026-10-02 session (fails with its changes reverted).
+(none)
 
 ## Non-goals
 

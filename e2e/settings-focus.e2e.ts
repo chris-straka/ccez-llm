@@ -31,28 +31,11 @@ async function seed(
 					}))
 				)
 			);
-			(window as unknown as { __vtCalls: number }).__vtCalls = 0;
-			const doc = document as Document & {
-				startViewTransition?: (opts: { update: () => void }) => {
-					finished: Promise<void>;
-				};
-			};
-			const orig = doc.startViewTransition;
-			if (typeof orig === "function") {
-				doc.startViewTransition = (opts) => {
-					(window as unknown as { __vtCalls: number }).__vtCalls += 1;
-					return orig.call(document, opts);
-				};
-			}
 		},
 		{ s: settings, bodies: texts }
 	);
 }
 
-const vtCalls = (page: Page): Promise<number> =>
-	page.evaluate(
-		() => (window as unknown as { __vtCalls: number }).__vtCalls ?? -1
-	);
 const composer = (page: Page) => page.locator(".prompt .ta-input");
 const settingsPanel = (page: Page) => page.locator(".settings-panel");
 
@@ -94,7 +77,7 @@ test("click-back never summons a hidden prompt", async ({ page }) => {
 });
 
 /** Enter on the already-active sidebar row runs no view transition. */
-test("enter on the active chat skips the crossfade", async ({ page }) => {
+test("enter on the previewed chat lands in the composer", async ({ page }) => {
 	await seed(page, {}, [
 		"Alpha active-chat message",
 		"Bravo second-chat message"
@@ -117,14 +100,13 @@ test("enter on the active chat skips the crossfade", async ({ page }) => {
 			{ timeout: 10_000 }
 		)
 		.toBe(true);
-	// Preview-as-you-go steps to the second chat (one transition).
+	// Preview-as-you-go steps to the second chat.
 	await page.keyboard.press("j");
 	await expect(page.locator("article .rendered").first()).toContainText(
 		"Bravo"
 	);
-	expect(await vtCalls(page)).toBe(1);
-	// Focus already sits on the live row: Enter re-enters it with no crossfade.
+	// Focus already sits on the live row: Enter re-enters it and lands
+	// in the prompt (switches never animate; chat-switch.e2e pins that).
 	await page.keyboard.press("Enter");
-	expect(await vtCalls(page)).toBe(1);
 	await expect(composer(page)).toBeFocused();
 });
