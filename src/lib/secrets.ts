@@ -364,8 +364,8 @@ export async function deleteSecret(account: string): Promise<void> {
  *
  * One stored read (the bundle), so at most one Keychain prompt at launch
  * no matter how many providers exist — never a per-provider fan-out.
- * Legacy per-provider items are NOT touched here; they migrate on demand
- * via migrateLegacySecret when their provider is actually used.
+ * Legacy per-provider items are NOT touched here; the caller
+ * migrates the active provider's via migrateLegacySecret.
  */
 export async function hydrateSecrets(settings: AppSettings): Promise<string[]> {
 	const hydrated: string[] = [];
@@ -394,12 +394,12 @@ export async function hydrateSecrets(settings: AppSettings): Promise<string[]> {
 }
 
 /**
- * One legacy per-provider item, migrated the moment its provider is
- * actually used: read once, folded into the bundle, removed
- * best-effort. Returns true when a key was recovered. Never throws.
- * This is the only path that ever reads a legacy item, so upgraders
- * meet at most one prompt per legacy key, in context — never a
- * launch-time fan-out across providers they may never use.
+ * One legacy per-provider item, migrated when its provider becomes
+ * active (launch, provider switch, or send): read once, folded into
+ * the bundle, removed best-effort. Returns true when a key was
+ * recovered. Never throws. Only the active provider is ever read, so
+ * upgraders meet at most one prompt per legacy key — never a fan-out
+ * across providers they may never use.
  */
 export async function migrateLegacySecret(
 	settings: AppSettings,

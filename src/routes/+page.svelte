@@ -689,11 +689,19 @@ import {
 	so they start loaded). The no-key lock waits on this. */
 	const secureKeys = tauriBackendAvailable();
 	let keysLoaded = $state(!secureKeys);
+	/** Providers whose pre-bundle per-provider item was already tried. */
+	const legacyTried = new SvelteSet<string>();
 	if (secureKeys) {
-		// Pull Keychain keys into memory before the first send.
-		void hydrateSecrets(settings).finally(() => {
-			keysLoaded = true;
-		});
+		// Pull Keychain keys into memory before the first send. A key
+		// still parked in a pre-bundle item migrates here too: the
+		// no-key lock blocks typing, so waiting for a send would strand it.
+		const launchId = settings.activeProviderId;
+		legacyTried.add(launchId);
+		void hydrateSecrets(settings)
+			.then(() => migrateLegacySecret(settings, launchId))
+			.finally(() => {
+				keysLoaded = true;
+			});
 	}
 	let editor: PromptEditor | null = $state(null);
 	let promptEl: HTMLElement | undefined = $state();
@@ -4132,6 +4140,14 @@ import {
 			apiKey: settings.providers[settings.activeProviderId]?.apiKey ?? ""
 		})
 	);
+	// Switching to a locked provider tries its pre-bundle item once.
+	$effect(() => {
+		if (!secureKeys || !noKeyLock) return;
+		const id = settings.activeProviderId;
+		if (legacyTried.has(id)) return;
+		legacyTried.add(id);
+		void migrateLegacySecret(settings, id);
+	});
 	let wasLocked = false;
 	$effect(() => {
 		editor?.setDisabled(noKeyLock);
