@@ -16,9 +16,3 @@ Root keeps what every session needs: `README.md` (what the app is),
   (Sep 29 2026 snapshot). Resurrect with
   `git worktree add ../ccez-llm-android archive/android-native`.
 
-## Frozen history (not maintained; may describe code that no longer exists)
-
-`DONE.md`, `design/refactor.md`, `plans/*`,
-`investigations/{focus-drop,tap-ghost-artifact,tap-ghost-log}.md`,
-`platforms/{android-phone-bugs,android-voice}.md`. Git history keeps all
-of these; they are candidates for deletion.
