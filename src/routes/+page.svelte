@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { flushSync, onMount, tick } from "svelte";
+	import { flushSync, onMount, tick, untrack } from "svelte";
 	import { SvelteMap, SvelteSet } from "svelte/reactivity";
 
 	// Document theme tokens + print sheet: global CSS
@@ -2413,6 +2413,7 @@ import {
 	}
 	/** Due count for the empty-chat entry, recounted when a chat empties. */
 	const flashcardsDue = $derived.by(() => {
+		if (!settings.flashcardsEnabled) return 0;
 		if (activeChat(chatState).messages.length > 0) return 0;
 		return dueCards(harvestAllCards(), deckSchedule, Date.now()).length;
 	});
@@ -2426,6 +2427,11 @@ import {
 		deck = null;
 		if (!androidUI) editor?.focus();
 	}
+	// Turning flashcards off mid-sitting closes the deck.
+	$effect(() => {
+		if (!settings.flashcardsEnabled && untrack(() => deck) !== null)
+			closeFlashcards();
+	});
 	/** Read the current card's quote in its own language; the context
 	 * sentence routes the voice (see speakQuote). */
 	function speakFlashcard(): void {
@@ -10644,7 +10650,11 @@ import {
 				else if (deckKey !== "swallow") stepFlashcards(deckKey);
 				return;
 			}
-			if (tauriBackendAvailable() && isFlashcardsChord(keyFacts(event))) {
+			if (
+				settings.flashcardsEnabled &&
+				tauriBackendAvailable() &&
+				isFlashcardsChord(keyFacts(event))
+			) {
 				consumeEvent(event);
 				openFlashcards();
 				return;
@@ -14065,6 +14075,7 @@ import {
 		<ShortcutsModal
 			android={androidUI}
 			mac={isMac}
+			flashcards={settings.flashcardsEnabled}
 			bind:query={shortcutQuery}
 			bind:inputEl={shortcutInputEl}
 			closeTitle={tip(

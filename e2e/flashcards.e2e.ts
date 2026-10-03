@@ -11,7 +11,7 @@ async function seedDeck(page: Page): Promise<void> {
 		window.localStorage.setItem("ccez-mock-provider", "1");
 		window.localStorage.setItem(
 			"ccez-llm-settings-v1",
-			JSON.stringify({ promptIdleSec: 0 })
+			JSON.stringify({ promptIdleSec: 0, flashcardsEnabled: true })
 		);
 		const msg = (id: string, role: string, content: string) => ({
 			id,

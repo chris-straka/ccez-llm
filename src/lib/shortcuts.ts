@@ -86,7 +86,11 @@ const WEB_HIDDEN_ROWS = new Set([
 	"Flashcards"
 ]);
 
-export function desktopShortcuts(isMac: boolean, inShell = true): ShortcutRow[] {
+export function desktopShortcuts(
+	isMac: boolean,
+	inShell = true,
+	flashcards = true
+): ShortcutRow[] {
 	const altm = altKeyLabel(isMac);
 	const mod = modKeyLabel(isMac);
 	const meta = isMac ? "⌘" : "Ctrl+";
@@ -193,7 +197,12 @@ export function desktopShortcuts(isMac: boolean, inShell = true): ShortcutRow[] 
 		{ name: "Prompt text size up / down", keys: `${mod}[ / ${mod}]` },
 		{ name: "Prompt width + / −", keys: `⇧${mod}[ / ⇧${mod}]` }
 	];
-	return (inShell ? rows : rows.filter((row) => !WEB_HIDDEN_ROWS.has(row.name))).sort(
+	const shown = rows.filter(
+		(row) =>
+			(inShell || !WEB_HIDDEN_ROWS.has(row.name)) &&
+			(flashcards || row.name !== "Flashcards")
+	);
+	return shown.sort(
 		byName
 	);
 }

@@ -138,6 +138,10 @@
 				<span>Enable inspect for han characters</span>
 			</label>
 			<label class="check">
+				<input type="checkbox" bind:checked={settings.flashcardsEnabled} />
+				<span>Enable flashcards</span>
+			</label>
+			<label class="check">
 				<input type="checkbox" bind:checked={settings.hapticsEnabled} />
 				<span>Enable haptic feedback</span>
 			</label>
@@ -180,6 +184,10 @@
 		<label class="check">
 			<input type="checkbox" bind:checked={settings.inspectEnabled} />
 			<span>Enable inspect for han characters</span>
+		</label>
+		<label class="check">
+			<input type="checkbox" bind:checked={settings.flashcardsEnabled} />
+			<span>Enable flashcards</span>
 		</label>
 		<label class="check">
 			<input type="checkbox" bind:checked={settings.replyNotifications} />

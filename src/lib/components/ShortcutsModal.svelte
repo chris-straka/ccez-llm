@@ -18,6 +18,8 @@ CSS to this markup). Row data already lives in `$lib/shortcuts`
 	interface Props {
 		android: boolean;
 		mac: boolean;
+		/** Flashcards setting: off hides their row. */
+		flashcards: boolean;
 		/** Filter text (the page clears it on open). */
 		query?: string;
 		/** Filter field (the page focuses it on ⌘F). */
@@ -30,6 +32,7 @@ CSS to this markup). Row data already lives in `$lib/shortcuts`
 	let {
 		android,
 		mac,
+		flashcards,
 		query = $bindable(""),
 		inputEl = $bindable(null),
 		closeTitle,
@@ -45,7 +48,7 @@ CSS to this markup). Row data already lives in `$lib/shortcuts`
 	const rows = $derived(
 		android
 			? filteredShortcuts(touchShortcuts(), query)
-			: filteredShortcuts(desktopShortcuts(mac, tauriBackendAvailable()), query)
+			: filteredShortcuts(desktopShortcuts(mac, tauriBackendAvailable(), flashcards), query)
 	);
 </script>
 

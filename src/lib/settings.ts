@@ -253,6 +253,11 @@ export interface AppSettings {
 	 * anywhere. Opt-in: older saves backfill false.
 	 */
 	inspectEnabled: boolean;
+	/**
+	 * Flashcards from answered annotations: the empty-chat "N due"
+	 * entry, the deck chord, and its shortcuts row. Off by default.
+	 */
+	flashcardsEnabled: boolean;
 }
 
 const STORAGE_KEY = "ccez-llm-settings-v1";
@@ -500,7 +505,8 @@ export function defaultSettings(): AppSettings {
 		autoSpeakSelection: true,
 		hapticsEnabled: true,
 		replyNotifications: true,
-		inspectEnabled: true
+		inspectEnabled: true,
+		flashcardsEnabled: false
 	};
 }
 
@@ -742,6 +748,8 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 		// Touch-only toggles postdate older saves the same way.
 		if (typeof merged.inspectEnabled !== "boolean")
 			merged.inspectEnabled = true;
+		if (typeof merged.flashcardsEnabled !== "boolean")
+			merged.flashcardsEnabled = false;
 		if (typeof merged.hideMessages !== "boolean") merged.hideMessages = false;
 		if (typeof merged.micEnabled !== "boolean") merged.micEnabled = true;
 		if (typeof merged.captureEnabled !== "boolean")

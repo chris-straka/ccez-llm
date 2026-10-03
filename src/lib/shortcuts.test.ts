@@ -132,6 +132,11 @@ describe("shortcuts menu copy", () => {
 		);
 	});
 
+	it("hides the Flashcards row when flashcards are off", () => {
+		const names = desktopShortcuts(true, true, false).map((r) => r.name);
+		expect(names).toEqual(MAC_NAMES.filter((n) => n !== "Flashcards"));
+	});
+
 	it("uses Ctrl labels off-mac with the same row names", () => {
 		const rows = desktopShortcuts(false);
 		expect(rows.map((r) => r.name)).toEqual(MAC_NAMES);
