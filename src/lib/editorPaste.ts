@@ -1,5 +1,5 @@
 /**
- * Paste pure helpers (editor slice, REFACTOR §7).
+ * Paste pure helpers.
  *
  * The textarea composer never collapses: long pastes become
  * pasted-text pills via `onLongTextPasted`, so everything sends
@@ -655,7 +655,7 @@ export async function dataUrlsToImageFiles(urls: string[]): Promise<File[]> {
 }
 
 /**
- * Bake an in-place edit for storage (REFACTOR §6): paste folds from
+ * Bake an in-place edit for storage: paste folds from
  * the send transforms, image markers appended, annotations baked by
  * the caller. Untouched text keeps its stored folds — recomputing
  * from an empty span set would silently unfold the message's pasted
@@ -675,7 +675,7 @@ export function bakeEditedMessage(
 
 /**
  * True when the caret sits right after a collapsed paste
- * (REFACTOR §6): fresh marker tags then ride the same line, one
+ *: fresh marker tags then ride the same line, one
  * space apart, instead of taking the usual prefix.
  */
 export function caretAfterPaste(
@@ -686,7 +686,7 @@ export function caretAfterPaste(
 }
 
 /**
- * Merge two fold lists into send order (REFACTOR §6): span folds
+ * Merge two fold lists into send order: span folds
  * plus spliced-paste folds, ascending by start. Both send paths
  * (TypeScript and native) store the same order.
  */

@@ -182,7 +182,7 @@ export function redactedCopyText(body: string): string {
 	return split.refs.map((ref) => ref.quote).join("\n");
 }
 
-/** Row-edit commit outcome (REFACTOR §6): rebake, no-op, or gone. */
+/** Row-edit commit outcome: rebake, no-op, or gone. */
 export type RefsEditCommit =
 	| { kind: "rewrote"; content: string }
 	| { kind: "untouched" }
@@ -207,7 +207,7 @@ export function commitRefsEdit(
 	return { kind: "rewrote", content: next };
 }
 
-/** Sent-card Clear-all outcome (REFACTOR §6). */
+/** Sent-card Clear-all outcome. */
 export type ClearSentRefsPlan =
 	| { kind: "skip" }
 	| { kind: "gone" }

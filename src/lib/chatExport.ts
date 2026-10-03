@@ -1,7 +1,7 @@
 /**
  * Chat export: one chat as a Markdown file.
  *
- * Split out of `intake.ts` (REFACTOR §6): `exportChatMarkdown` uses
+ * Split out of `intake.ts`: `exportChatMarkdown` uses
  * the File System Access picker where available with an injected
  * download fallback (unit-tested in node); only
  * `downloadMarkdownFile` needs a live browser. User aborts propagate
@@ -178,7 +178,7 @@ export function downloadMarkdownFile(text: string, filename: string): void {
 export type ExportOutcome = "picker" | "native" | "download";
 
 /**
- * Success toast for an export (REFACTOR §6): the shell phone copies
+ * Success toast for an export: the shell phone copies
  * instead of downloading, so its tap lands somewhere visible.
  */
 export function exportSuccessToast(
@@ -191,7 +191,7 @@ export function exportSuccessToast(
 }
 
 /**
- * Failure toast for an export (REFACTOR §6): a dismissed picker
+ * Failure toast for an export: a dismissed picker
  * stays silent, but a shell-phone clipboard denial must say so —
  * unlike a dismissal, a dead copy button must not stay silent.
  * Anything else is a plain export failure. Null stays silent.

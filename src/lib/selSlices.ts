@@ -1,7 +1,7 @@
 import { shouldShowInspect } from "$lib/inspect";
 
 /**
- * Selection-slice helpers (selection-menu slice, REFACTOR §6).
+ * Selection-slice helpers.
  *
  * The page walks the highlight into per-text-node `SelSlice`s (chrome
  * nodes skipped) and resolves absolute highlight offsets back into

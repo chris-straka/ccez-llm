@@ -907,7 +907,7 @@ export function keyNeedsEditing(value: string): boolean {
 }
 
 /**
- * UI text-scale step in 10% increments (REFACTOR §6): 50–2000%
+ * UI text-scale step in 10% increments: 50–2000%
  * everywhere (the old 600% desktop cap had no layout reason —
  * badges and glyphs already scale at a dampened rate, see
  * layout.e2e.ts). The page no-ops (and skips the toast) when the
@@ -921,7 +921,7 @@ export function stepFontScale(current: number, delta: number): number {
 }
 
 /**
- * Chat-column width step in 2rem (REFACTOR §6): desktop only —
+ * Chat-column width step in 2rem: desktop only —
  * phones fix it at 46rem. The page toasts the limit when the step
  * lands back on the current value.
  */

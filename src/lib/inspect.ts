@@ -227,7 +227,7 @@ export function getInspectData(char: string): InspectData {
 }
 
 /**
- * Step the stroke preview (REFACTOR §6): clamped to 1..total,
+ * Step the stroke preview: clamped to 1..total,
  * never wraps. The caller feeds the stroke count or the data
  * fallback; unknown totals still pin at 1.
  */
@@ -241,7 +241,7 @@ export function clampStrokeStep(
 }
 
 /**
- * Whether a selection speaks Japanese (REFACTOR §6): kanji present
+ * Whether a selection speaks Japanese: kanji present
  * and the sentence probe reads Japanese. Such fragments speak
  * their sentence reading, never the raw quote.
  * Page call-site deferred while the selection-pinyin E2E flake is

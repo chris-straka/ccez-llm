@@ -105,7 +105,7 @@ export function stageOwnedByOverlay(flags: StageOwnerFlags): boolean {
 }
 
 /**
- * True when a point sits inside a rect (REFACTOR §6): the send
+ * True when a point sits inside a rect: the send
  * button is absolutely positioned inside a display:contents span
  * (no box of its own) and disabled buttons eat their events — so
  * holds arm from the prompt's own handlers by geometry, never by
@@ -122,7 +122,7 @@ export function pointInRect(
 }
 
 /**
- * Whether a send-button hold may arm (REFACTOR §6): the composer
+ * Whether a send-button hold may arm: the composer
  * must read empty (no text, pills, or annotations) with no timer
  * already running and no in-prompt note edit owning the gesture.
  */
@@ -135,7 +135,7 @@ export function sendHoldArmed(
 }
 
 /**
- * Chat-column bounds for gutter clicks (REFACTOR §6): min left and
+ * Chat-column bounds for gutter clicks: min left and
  * max right across the message boxes (plus the empty state, which
  * holds the column alone). Null with nothing laid out. Pure and
  * unit-tested.
@@ -153,7 +153,7 @@ export function columnBounds(
 }
 
 /**
- * Gutter side for a double-click (REFACTOR §6): left of the column
+ * Gutter side for a double-click: left of the column
  * opens the chat list, right of it opens settings, inside the
  * column summons the composer. Edges belong to the column.
  */
@@ -168,7 +168,7 @@ export function gutterSide(
 }
 
 /**
- * Whether live work owns a message's action row (REFACTOR §6): a
+ * Whether live work owns a message's action row: a
  * loading aid or running audio holds the row like a held press —
  * closing now would strand the spinner with no buttons, or the
  * stop button out of reach mid-utterance. The timer re-arms and a
@@ -190,7 +190,7 @@ export function rowWorkRunning(
 }
 
 /**
- * Whether a tap may toggle a message's action row (REFACTOR §6):
+ * Whether a tap may toggle a message's action row:
  * both platforms honor the Messages checkbox (off removes the row
  * outright), then the reveal-style gates decide tap toggling.
  */
@@ -206,7 +206,7 @@ export function messageActionsTapAllowed(
 }
 
 /**
- * Parked composer (REFACTOR §6): idle-hidden OR a sidebar owns the
+ * Parked composer: idle-hidden OR a sidebar owns the
  * stage (chats list or settings). Parking is visual only — idle
  * keeps its own state, so closing the sidebar returns exactly the
  * prior idle state instead of summoning a hidden prompt. Phones

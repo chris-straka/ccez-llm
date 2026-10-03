@@ -1,5 +1,5 @@
 /**
- * Viewport state object (scroll/viewport slice, REFACTOR §6).
+ * Viewport state object.
  *
  * Stick-to-bottom, the held-finger freeze, the scroll-hold rAF loop,
  * the scrollbar fade timer, and the stream-follow cache lived as
@@ -77,8 +77,7 @@ export function emptyViewport(): ViewportState {
 }
 
 /**
- * True when a rect already reads in the clear viewport (REFACTOR
- * §6): inside the column and above the composer dock. The jump
+ * True when a rect already reads in the clear viewport: inside the column and above the composer dock. The jump
  * flash gates on this, so its hold only burns once the eye can
  * land on it.
  */
@@ -93,7 +92,7 @@ export function rectInClear(
 }
 
 /**
- * Scroll delta landing a rect in the clear (REFACTOR §6): covered
+ * Scroll delta landing a rect in the clear: covered
  * rects settle at a third of the clear height so the quote reads
  * with context around it.
  */

@@ -1,7 +1,7 @@
 /**
  * File Handling launch intake: OS-opened files into composer/attachments.
  *
- * Split out of `intake.ts` (REFACTOR §6): `consumeLaunchFiles` routes
+ * Split out of `intake.ts`: `consumeLaunchFiles` routes
  * `launchQueue` handles with everything injected (unit-tested in
  * node), and `splitLaunchFiles` sends markdown to the composer and
  * the rest to attachments.

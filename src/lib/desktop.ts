@@ -440,7 +440,7 @@ export async function exportStudySheet(
 }
 
 /**
- * Toast for a study-sheet share outcome (REFACTOR §6): one toast
+ * Toast for a study-sheet share outcome: one toast
  * names where the sheet landed; unavailable is the error path.
  */
 export function shareOutcomeToast(

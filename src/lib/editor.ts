@@ -1,5 +1,5 @@
 /**
- * Prompt editor helpers barrel (REFACTOR §7, done).
+ * Prompt editor helpers barrel.
  *
  * The textarea composer (`textarea-editor`) is the only editor, on
  * desktop and phone alike, and owns the `PromptEditor` contract next

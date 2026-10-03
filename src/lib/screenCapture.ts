@@ -1,7 +1,7 @@
 /**
  * Screen capture intake: one screen frame into the attachments path.
  *
- * Split out of `intake.ts` (REFACTOR §6): `screenshotCaptureAvailable`
+ * Split out of `intake.ts`: `screenshotCaptureAvailable`
  * gates the UI, `captureScreenToFile` orchestrates with everything
  * injected (unit-tested in node), and only `grabVideoFrame` needs a
  * live browser (video + canvas). Dismissals propagate — callers stay

@@ -612,7 +612,7 @@ export function stopNative(): void {
 }
 
 /**
- * Sentence probe for a quote (REFACTOR §6): the sentence holding
+ * Sentence probe for a quote: the sentence holding
  * the quote when found, else the context. Readings and language
  * resolve against the probe, never the bare fragment.
  */

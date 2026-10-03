@@ -1291,7 +1291,7 @@ export function annotatedRuns(html: string): AnnotatedRun[] | null {
 
 
 /**
- * Local-aid kinds a message renders (REFACTOR §6): pinned kinds that
+ * Local-aid kinds a message renders: pinned kinds that
  * the message still offers (edited text filters the rest out), plus
  * a hover-peeked kind alongside them; empty renders the original.
  * Offer computation is shared with hotkeys and vocalize; the page

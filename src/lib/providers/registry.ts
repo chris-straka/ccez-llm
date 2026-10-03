@@ -102,7 +102,7 @@ export function createProvider(
 }
 
 /**
- * Whether a provider key is missing (REFACTOR §6): blank on a
+ * Whether a provider key is missing: blank on a
  * provider that needs one. Keyless on-device endpoints carry no
  * key by design. The conf-presence check stays at the call site
  * so narrowing keeps working.

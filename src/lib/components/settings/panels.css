@@ -1,4 +1,4 @@
-/* Settings sub-panel stylesheet (REFACTOR §6: SettingsPanel slice).
+/* Settings sub-panel stylesheet.
  *
  * The whole SettingsPanel <style> block, mechanically scoped under
  * .settings-inner (the page-owned wrapper around the panel) so the

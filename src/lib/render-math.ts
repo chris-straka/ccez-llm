@@ -1,7 +1,7 @@
 /**
  * Render math: LaTeX placeholder codec, previews, and KaTeX emission.
  *
- * Split out of `render.ts` (REFACTOR §7). The math cluster is
+ * Split out of `render.ts`. The math cluster is
  * self-contained: placeholder codec (`extractMath` through the
  * restore regex), preview/copy text, LaTeX fence de-duping, and HTML
  * emission (`mathHtml`). It also owns the two emission helpers it

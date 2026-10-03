@@ -1,4 +1,4 @@
-/* App-wide document theme (moved out of +page.svelte, REFACTOR §6).
+/* App-wide document theme.
  *
  * Token definitions, document base rules, and the print sheet.
  * These compiled unscoped already (:global), so the move is

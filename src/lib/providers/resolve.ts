@@ -11,8 +11,8 @@ import type { ProviderSettings } from "../settings";
 import type { ChatProvider } from "./types";
 
 /**
- * Active-provider construction (REFACTOR: pure decision over an
- * explicit snapshot, so the branches unit-test without the shell).
+ * Active-provider construction: a pure decision over an
+ * explicit snapshot, so the branches unit-test without the shell.
  * On-device Nano is keyless and conf-free; failures downstream throw
  * the seam's short copy, never a reroute. Keyless on-device endpoints
  * carry no key by design.

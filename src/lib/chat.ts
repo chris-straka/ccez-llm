@@ -1468,7 +1468,7 @@ function loadChats(state: ChatState, store: KeyValueStore): void {
 	}
 }
 
-/** Chat-step decision (REFACTOR §6): where a sidebar-closed step lands. */
+/** Chat-step decision: where a sidebar-closed step lands. */
 export type ChatStep =
 	| { kind: "none" }
 	| { kind: "stay" }
@@ -1504,7 +1504,7 @@ export function planChatStep(
 }
 
 /**
- * Clamp a chat-list cursor into range (REFACTOR §6): sidebar focus,
+ * Clamp a chat-list cursor into range: sidebar focus,
  * keyboard enter, and post-delete landing share the one clamp. Null
  * on an empty list.
  */
@@ -1514,8 +1514,7 @@ export function clampChatIndex(index: number, length: number): number | null {
 }
 
 /**
- * Viewed-message index from a `msg-{index}` article id (REFACTOR
- * §6): tap points, selection anchors, and scroll targets share the
+ * Viewed-message index from a `msg-{index}` article id: tap points, selection anchors, and scroll targets share the
  * one parse. Null outside messages or past the list end.
  */
 export function messageIndexFromId(

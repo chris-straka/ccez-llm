@@ -487,7 +487,7 @@ export function multiTapOwnsRelease(
 }
 
 /**
- * One step through a cyclic id list (REFACTOR §6): the provider
+ * One step through a cyclic id list: the provider
  * cycle wraps through the visible ids. Unknown currents land on
  * the neighbor past the insertion point (indexOf -1 + direction +
  * length), never stuck; empty lists stay undefined.
@@ -504,7 +504,7 @@ export function stepCyclicId<T>(
 }
 
 /**
- * True when a touch traveled past the tap slop (REFACTOR §6): menu
+ * True when a touch traveled past the tap slop: menu
  * drags, button taps, and scroll-stroke tracking share the one
  * distance check with their own slops.
  */

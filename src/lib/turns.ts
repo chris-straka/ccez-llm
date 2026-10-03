@@ -367,7 +367,7 @@ export async function dismissNativeTurn(turnId: TurnId): Promise<boolean> {
 }
 
 /**
- * Native route decision (REFACTOR §6): the provider config for the
+ * Native route decision: the provider config for the
  * native runner, or null when the TypeScript engine stays on
  * (including keyless: the provider resolution raises missing-key
  * with the draft intact, same as any TypeScript send).
@@ -401,7 +401,7 @@ export function nativeRouteFor(
 }
 
 /**
- * Error file for an unpollable turn (REFACTOR §6): a completion
+ * Error file for an unpollable turn: a completion
  * whose file never materialized still settles as a failed reply —
  * the shared tail raises Retry on the chat instead of hanging.
  */

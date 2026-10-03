@@ -1174,7 +1174,7 @@ export interface AttachTagModel {
 }
 
 /**
- * Outgoing send payload from the composer draft (REFACTOR §6):
+ * Outgoing send payload from the composer draft:
  * pasted-text pills splice back inline at their tag positions (Nth
  * tag pairs with the Nth pasted attachment — the send-time mirror of
  * render.ts kind-order pairing) AND refold over the inserted prose,
@@ -1223,7 +1223,7 @@ export function toggleTagKey(
 }
 
 /**
- * Preview models for the leftovers strip (REFACTOR §6): one per
+ * Preview models for the leftovers strip: one per
  * attachment with no literal left in the message text (literals
  * rebuild inline instead, so each file shows exactly once).
  */
@@ -1253,7 +1253,7 @@ export interface TagSyncCounts {
 }
 
 /**
- * One tag→attachment reconciliation step (REFACTOR §6): count the
+ * One tag→attachment reconciliation step: count the
  * three marker kinds in the new text, drop matching attachments,
  * and report the fresh counts. The composer and the in-place
  * editor share the step; each keeps its own counts. `cleared`

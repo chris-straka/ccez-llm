@@ -414,7 +414,7 @@ export function clampDragAnchorToFocusLine(
 }
 
 /**
- * Clamp a dragged menu spot on screen (REFACTOR §6): the finger's
+ * Clamp a dragged menu spot on screen: the finger's
  * own stroke stays 1:1, pinned inside the viewport by a margin.
  */
 export function clampMenuDrag(

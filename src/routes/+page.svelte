@@ -2,7 +2,7 @@
 	import { flushSync, onMount, tick } from "svelte";
 	import { SvelteMap, SvelteSet } from "svelte/reactivity";
 
-	// Document theme tokens + print sheet (REFACTOR §6): global CSS
+	// Document theme tokens + print sheet: global CSS
 	// lives in src/app.css, imported here (single route).
 	import "../app.css";
 	import {
@@ -701,7 +701,7 @@ import {
 	let scrollBox: HTMLElement | undefined = $state();
 	/** App root (pinned to the visual height while the phone keyboard is up). */
 	let appEl: HTMLElement | undefined = $state();
-	/** Scroll/viewport values (REFACTOR §6): one grouped object, so
+	/** Scroll/viewport values: one grouped object, so
 	scroll effects stop sharing subscription accidents with unrelated
 	domains. The element and the wiring stay here. */
 	let viewport = $state<ViewportState>(emptyViewport());

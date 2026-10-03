@@ -346,7 +346,7 @@ export function clampTapDy(
 }
 
 /**
- * Scroll-mode entry line (REFACTOR §6): a few lines below the
+ * Scroll-mode entry line: a few lines below the
  * viewport top — a bottom sliver of the message above never wins,
  * and a taller-than-viewport message still matches by coverage.
  */

@@ -1,5 +1,5 @@
 /**
- * Unified notice queue (REFACTOR §7).
+ * Unified notice queue.
  *
  * Five one-off error states each owned a flag plus (sometimes) a
  * timer: `attachError`, `vocalizeError`, `voiceError` +

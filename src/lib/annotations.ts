@@ -326,7 +326,7 @@ function numberMarks(
 }
 
 /**
- * Badge array for one message, unmemoized (REFACTOR §6): aid-scoped
+ * Badge array for one message, unmemoized: aid-scoped
  * quotes only show while the aid is on (they locate against aided
  * text), and a composed-but-unsubmitted annotation washes while its
  * pill is open with no badge. Filed-but-unasked annotations paint
@@ -376,7 +376,7 @@ export function buildNewsMarks(
 }
 
 /**
- * Pinned or hover-peeked model-aid text for a message (REFACTOR §6):
+ * Pinned or hover-peeked model-aid text for a message:
  * the peeked message reads its cached vocalization, otherwise the
  * model pin shows the cache when present. The cache survives unpin
  * for one click back (the page keeps it, this only reads).
@@ -438,14 +438,14 @@ export function annotationsAfterEdit(
 }
 
 /**
- * Copy one annotation (REFACTOR §6): quote plus comment, no numbers.
+ * Copy one annotation: quote plus comment, no numbers.
  */
 export function annotationCopyText(quote: string, comment: string): string {
 	return comment.trim() ? `"${quote}" — ${comment.trim()}` : `"${quote}"`;
 }
 
 /**
- * File a pending annotation with its draft comment (REFACTOR §6):
+ * File a pending annotation with its draft comment:
  * the pill commit path. Null when nothing is pending.
  */
 export function filePendingAnnotation(
@@ -458,7 +458,7 @@ export function filePendingAnnotation(
 }
 
 /**
- * Wash id for an in-prompt note edit (REFACTOR §6): a pending
+ * Wash id for an in-prompt note edit: a pending
  * filing washes its preview, a saved note its quote.
  */
 export function promptAnnWashIdFor(
@@ -471,7 +471,7 @@ export function promptAnnWashIdFor(
 }
 
 /**
- * Toast for an in-prompt note commit (REFACTOR §6): pending filings
+ * Toast for an in-prompt note commit: pending filings
  * save for the first time, a saved note's comment rewrites.
  */
 export function annEditCommitToast(pending: boolean): string {

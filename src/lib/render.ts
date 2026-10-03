@@ -607,7 +607,7 @@ export async function highlightRendered(
 }
 
 /**
- * Copy body for a message (REFACTOR §6): baked annotations are
+ * Copy body for a message: baked annotations are
  * metadata, not prose, so refs-only messages fall back to their
  * quotes, never "".
  */

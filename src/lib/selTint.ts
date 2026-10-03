@@ -8,7 +8,7 @@ import {
 } from "$lib/selSlices";
 
 /**
- * Selection tint slice ( REFACTOR: tintSelectionSpans and friends).
+ * Selection tint: tintSelectionSpans and friends.
  *
  * The furigana overlay tints the selected kanji spans in the document
  * (backwards wraps, so offsets hold) and restores the highlight over

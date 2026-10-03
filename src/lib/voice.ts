@@ -633,7 +633,7 @@ export function friendlyMicError(message: string): string {
 }
 
 /**
- * Speak-button state per message (REFACTOR §6): a playing message
+ * Speak-button state per message: a playing message
  * always offers Stop. One derivation feeds the row, the send gate,
  * and the background readback so all three agree on attemptability.
  */
@@ -652,7 +652,7 @@ export function messageSpeakableFor(
 }
 
 /**
- * Whether a message owns the live utterance (REFACTOR §6): a
+ * Whether a message owns the live utterance: a
  * whole-reply readback or a right-click quote pick from it. The
  * speak button reads as stop either way.
  */
@@ -664,14 +664,14 @@ export function isMessageSpeaking(
 	return speakingId === messageId || speakingSelection === messageId;
 }
 
-/** Speak-button label (REFACTOR §6). */
+/** Speak-button label. */
 export function speakTitleFor(speaking: boolean): string {
 	if (speaking) return "Stop reading aloud";
 	return "Read this message aloud";
 }
 
 /**
- * Append a dictation transcript to a draft (REFACTOR §6): spacing
+ * Append a dictation transcript to a draft: spacing
  * rides the draft's tail, so words never glue or double-space.
  */
 export function appendDictation(draft: string, transcript: string): string {
@@ -679,7 +679,7 @@ export function appendDictation(draft: string, transcript: string): string {
 }
 
 /**
- * Dictation text for editor insertion (REFACTOR §6): trailing space
+ * Dictation text for editor insertion: trailing space
  * so the next typed word starts clean.
  */
 export function dictationInsert(transcript: string): string {
@@ -687,7 +687,7 @@ export function dictationInsert(transcript: string): string {
 }
 
 /**
- * Mic-unavailable message (REFACTOR §6): shells lack the function,
+ * Mic-unavailable message: shells lack the function,
  * browsers lack the support — say which.
  */
 export function micUnavailableMessage(inShell: boolean): string {

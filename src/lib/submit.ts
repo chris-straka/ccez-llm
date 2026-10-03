@@ -1,5 +1,5 @@
 /**
- * Submit/send decision functions (send-controller slice, REFACTOR §6).
+ * Submit/send decision functions.
  *
  * `onSubmit` / `doSend` / `editMessage` / `commitMessageEdit` mix
  * guards (pill ownership, send gates, edit state) with effects

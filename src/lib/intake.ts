@@ -1,7 +1,7 @@
 /**
  * Intake kernel: the two helpers every content path shares.
  *
- * Split down in REFACTOR §6 — the three intakes live beside it:
+ * The three intakes live beside it:
  * screen capture (`screenCapture.ts`), File Handling launches
  * (`launchFiles.ts`), and chat export (`chatExport.ts`). Drag-and-drop
  * files land in the same `addFiles` path the attach button and paste
