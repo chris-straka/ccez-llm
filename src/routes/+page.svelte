@@ -91,12 +91,11 @@
 	} from "$lib/languages";
 	import {
 		listProviders,
-		getProviderDef,
 		type ProviderId
 	} from "$lib/providers/registry";
 	import { offlineTarget, onlineRestore } from "$lib/offline";
 	import { mockProviderEnabled } from "$lib/providers/mock";
-	import { resolveProviderFor } from "$lib/providers/resolve";
+	import { ProviderKeys } from "$lib/provider-keys.svelte";
 	import {
 		isOnDeviceProvider,
 		onDeviceNotReadyCopy,
@@ -149,7 +148,6 @@
 		toggleAidKinds,
 		toggleSingleAid
 	} from "$lib/message-actions";
-	import type { ChatProvider } from "$lib/providers/types";
 	import Toasts from "$lib/components/Toasts.svelte";
 	import SelMenu from "$lib/components/SelMenu.svelte";
 	import Attachments from "$lib/components/Attachments.svelte";
@@ -459,7 +457,6 @@ import {
 	import {
 		submitAction,
 		sendAction,
-		composerLocked,
 		editMessageAction,
 		newestUserMessageIndex,
 		commitEditTarget,
@@ -649,24 +646,16 @@ import {
 		};
 	});
 
-	/** Secure-storage keys are in memory (browsers keep keys in settings,
-	so they start loaded). The no-key lock waits on this. */
-	const secureKeys = tauriBackendAvailable();
-	let keysLoaded = $state(!secureKeys);
-	/** Providers whose pre-bundle per-provider item was already tried. */
-	const legacyTried = new SvelteSet<string>();
-	if (secureKeys) {
-		// Pull Keychain keys into memory before the first send. A key
-		// still parked in a pre-bundle item migrates here too: the
-		// no-key lock blocks typing, so waiting for a send would strand it.
-		const launchId = settings.activeProviderId;
-		legacyTried.add(launchId);
-		void hydrateSecrets(settings)
-			.then(() => migrateLegacySecret(settings, launchId))
-			.finally(() => {
-				keysLoaded = true;
-			});
-	}
+	const useMock = mockProviderEnabled();
+	/** Keys, the no-key lock, and provider resolution (see provider-keys). */
+	const providerKeys = new ProviderKeys({
+		getSettings: () => settings,
+		mock: useMock,
+		secure: tauriBackendAvailable(),
+		isPhone: () => androidUI,
+		hydrate: hydrateSecrets,
+		migrateLegacy: migrateLegacySecret
+	});
 	let editor: PromptEditor | null = $state(null);
 	/** Composer height glide (attached with the editor on mount). */
 	let promptGlide: PromptGlide | null = null;
@@ -755,9 +744,6 @@ import {
 	 * hover and keep dismissing.
 	 */
 	let lastHoverChangeAt = 0;
-	let missingKey = $state(false);
-	/** Provider id already toasted for a missing key (one toast per episode). */
-	let keyToastFor: string | null = null;
 	/** Message ids already toasted for send errors (Android shows no inline error). */
 	const errorToasted = new SvelteSet<ChatMsgId>();
 	/** Last token stamp per chat (both engines): the phase chip reads
@@ -799,17 +785,7 @@ import {
 	 */
 	$effect(() => {
 		if (!androidUI) return;
-		// Never from inside Settings: switching to a keyless-less
-		// provider mid-panel must not toast before the key can be
-		// entered — closing the panel still keyless reminds once.
-		if ((!missingKey && !noKeyLock) || settingsOpen) {
-			if (!missingKey && !noKeyLock) keyToastFor = null;
-			return;
-		}
-		const id = settings.activeProviderId;
-		if (keyToastFor === id) return;
-		keyToastFor = id;
-		flashErrorToast("No API key");
+		if (providerKeys.noKeyToastDue(settingsOpen)) flashErrorToast("No API key");
 	});
 	$effect(() => {
 		if (!androidUI) return;
@@ -841,7 +817,7 @@ import {
 	const drafts: AnnotationDrafts = new AnnotationDrafts({
 		getActiveChatId: () => chatState.activeChatId,
 		getChatIds: () => chatState.chats.map((c) => c.id),
-		resolveProvider: () => resolveProviderActive(),
+		resolveProvider: () => providerKeys.resolveActive(),
 		answerQuestion: (provider, q) => annotationAnswer(provider, q),
 		answerContextFor: (ann) =>
 			annotateMode.answerContextFor(ann, ann.quote, ann.at ?? 0),
@@ -2144,7 +2120,7 @@ import {
 		toastError: (message) => flashErrorToast(message),
 		tapTick: () => buzzTap(),
 		denyBuzz: () => buzzNo(),
-		resolveProvider: () => resolveProviderActive(),
+		resolveProvider: () => providerKeys.resolveActive(),
 		getStorage: () => localStorage,
 		isPhone: () => androidUI,
 		parkPrompt: () => {
@@ -2569,7 +2545,6 @@ import {
 			!nativeTurns.live.has(chatState.activeChatId) &&
 			(hasText || attachments.length > 0 || drafts.list.length > 0)
 	);
-	/** No-key lock lives below, next to `useMock` (it reads it). */
 
 	function toggleSidebar(): void {
 		settings.sidebarCollapsed = !settings.sidebarCollapsed;
@@ -4004,44 +3979,21 @@ import {
 		flashToast("Chat created");
 	}
 
-	const useMock = mockProviderEnabled();
 	/** Dev servers (and `tauri dev`) wear the red-dot tab logo. */
 	const devBuild = import.meta.env.DEV === true;
-	/**
-	 * No-key lock: a keyed provider with a blank stored key locks the
-	 * composer (no typing, locked hint) instead of accepting a draft
-	 * into a doomed turn. Mock and keyless (on-device) never lock.
-	 */
-	const noKeyLock = $derived(
-		composerLocked({
-			mock: useMock,
-			keyless:
-				getProviderDef(settings.activeProviderId, settings.customProviders)
-					.keyless === true ||
-				isOnDeviceProvider(settings.activeProviderId),
-			keysLoaded,
-			apiKey: settings.providers[settings.activeProviderId]?.apiKey ?? ""
-		})
-	);
 	// Switching to a locked provider tries its pre-bundle item once.
-	$effect(() => {
-		if (!secureKeys || !noKeyLock) return;
-		const id = settings.activeProviderId;
-		if (legacyTried.has(id)) return;
-		legacyTried.add(id);
-		void migrateLegacySecret(settings, id);
-	});
+	$effect(() => providerKeys.tryLegacyWhenLocked());
 	let wasLocked = false;
 	$effect(() => {
-		editor?.setDisabled(noKeyLock);
+		editor?.setDisabled(providerKeys.locked);
 		// Locking wipes the live composer text (a provider switch must
 		// not strand a dead draft over the locked field). Nothing
 		// persists text drafts, so nothing needs saving here. The
 		// prompt itself stays hintless either way — the missing key
 		// explains through the banner and tap-to-explain, never a
 		// placeholder.
-		if (noKeyLock && !wasLocked) editor?.clear();
-		wasLocked = noKeyLock;
+		if (providerKeys.locked && !wasLocked) editor?.clear();
+		wasLocked = providerKeys.locked;
 	});
 	const chat = $derived(activeChat(chatState));
 	/**
@@ -4558,7 +4510,7 @@ import {
 		if (!line || !settings.gameLine || !tauriBackendAvailable()) return;
 		let translation: string | null = null;
 		try {
-			const provider = await resolveProviderActive();
+			const provider = await providerKeys.resolveActive();
 			if (provider) translation = await translateGameLine(provider, line);
 		} catch {
 			translation = null;
@@ -4595,7 +4547,7 @@ import {
 			file.comment.trim()
 		);
 		try {
-			const provider = await resolveProviderActive();
+			const provider = await providerKeys.resolveActive();
 			if (provider) {
 				const answer = await annotationAnswer(provider, {
 					quote,
@@ -4864,7 +4816,7 @@ import {
 				return;
 			}
 		}
-		const provider = await resolveProviderActive();
+		const provider = await providerKeys.resolveActive();
 		if (!provider) {
 			const message = "Set an API key first — open Settings.";
 			showNotice(notices, "banner", message);
@@ -6169,7 +6121,7 @@ import {
 			if (pin) pendingPin.add(msg.id);
 			return;
 		}
-		const provider = await resolveProviderActive();
+		const provider = await providerKeys.resolveActive();
 		if (!provider) {
 			flashMissingKey();
 			return;
@@ -6779,7 +6731,7 @@ import {
 		dismissToast();
 		const stop = await dictateNativeFirst(
 			(transcript) => {
-				if (noKeyLock) {
+				if (providerKeys.locked) {
 					// The key vanished mid-loop: every turn is doomed
 					// (the composer locks too), so end it.
 					dispatchConverse({ type: "failed" });
@@ -6824,7 +6776,7 @@ import {
 			annPopOpen: annPop !== null && !annPopClosing,
 			annEdit: promptAnnEdit !== null,
 			canSubmit:
-				!noKeyLock &&
+				!providerKeys.locked &&
 				!isSending(chatState) &&
 				!nativeTurns.live.has(chatState.activeChatId),
 			sendGuardTripped: Date.now() < sendGuardUntil,
@@ -6945,33 +6897,6 @@ import {
 		if (!restore) return;
 		settings.activeProviderId = restore;
 		persistSettings();
-	}
-
-	function resolveProvider(): ChatProvider | null {
-		return resolveProviderFor({
-			useMock,
-			activeProviderId: settings.activeProviderId,
-			providers: settings.providers,
-			customProviders: settings.customProviders,
-			mobile: androidUI
-		});
-	}
-
-	/**
-	 * resolveProvider plus one legacy migration attempt: when the active
-	 * provider's key is blank, a pre-bundle per-provider item may still
-	 * hold it — read that single item, fold it into the bundle, and
-	 * re-resolve before concluding the key is missing. The launch path
-	 * never does this fan-out; it fires only here, in the user's send
-	 * context, at most once per legacy key.
-	 */
-	async function resolveProviderActive(): Promise<ChatProvider | null> {
-		const direct = resolveProvider();
-		if (direct) return direct;
-		if (await migrateLegacySecret(settings, settings.activeProviderId)) {
-			return resolveProvider();
-		}
-		return null;
 	}
 
 	/**
@@ -7126,12 +7051,12 @@ import {
 		// The local model either answers or refuses here: no send into
 		// a missing/downloading Nano, and the draft stays for a retry.
 		if (!nativeConfig && (await blockUnreadyOnDevice())) return;
-		const provider = nativeConfig ? null : await resolveProviderActive();
+		const provider = nativeConfig ? null : await providerKeys.resolveActive();
 		if (!provider && !nativeConfig) {
-			missingKey = true;
+			providerKeys.missing = true;
 			return;
 		}
-		missingKey = false;
+		providerKeys.missing = false;
 		focusMode = "edit";
 		stopVoice();
 		// Paste folds ride the send: same text composerText would give,
@@ -7188,7 +7113,7 @@ import {
 		// Unreachable with a live provider (null returns above), but the
 		// narrowing keeps the call below honest without an assertion.
 		if (!provider) {
-			missingKey = true;
+			providerKeys.missing = true;
 			return;
 		}
 		// Before the append below (see stuckToBottom): the provider
@@ -7246,19 +7171,19 @@ import {
 		const lastResend = chat.messages[chat.messages.length - 1];
 		const resendConfig = nativeTurns.route(lastResend?.attachments ?? []);
 		if (resendConfig) {
-			missingKey = false;
+			providerKeys.missing = false;
 			await nativeTurns.resend(resendConfig);
 			return;
 		}
 		// TypeScript resends resolve the provider (Keychain on first
 		// use); the native branch above never gets here.
 		if (await blockUnreadyOnDevice()) return;
-		const provider = await resolveProviderActive();
+		const provider = await providerKeys.resolveActive();
 		if (!provider) {
-			missingKey = true;
+			providerKeys.missing = true;
 			return;
 		}
-		missingKey = false;
+		providerKeys.missing = false;
 		const resentFrom = chat;
 		await resendLast(
 			chatState,
@@ -7299,7 +7224,7 @@ import {
 		// Locked taps explain instead of focusing (the disabled field
 		// takes no focus and pops no keyboard) — except on controls
 		// with their own behavior, which keep it.
-		if (noKeyLock && !target?.closest("button, input, select, a, .ann-wrap")) {
+		if (providerKeys.locked && !target?.closest("button, input, select, a, .ann-wrap")) {
 			flashMissingKey();
 			return;
 		}
@@ -13328,7 +13253,7 @@ import {
 			}}
 		/>
 
-		{#if (missingKey || (noKeyLock && !settingsOpen)) && !androidUI}
+		{#if (providerKeys.missing || (providerKeys.locked && !settingsOpen)) && !androidUI}
 			<p class="error-banner" role="alert">
 				Set an API key first —
 				<button
@@ -13407,7 +13332,7 @@ import {
 			voiceOn={voiceOn()}
 			speaking={speakingId !== null}
 			conversePhase={converse}
-			converseDisabled={noKeyLock && converse === "idle"}
+			converseDisabled={providerKeys.locked && converse === "idle"}
 			altKey={altm}
 			replyLang={activeReplyLang}
 			correctionOn={chat.correction ?? false}
