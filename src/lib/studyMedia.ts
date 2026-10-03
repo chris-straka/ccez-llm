@@ -440,8 +440,8 @@ export function vibrateTick(
 }
 
 /** Haptic beats: send taps, the first reply token rumbles, stream
-end thumps, UI taps tick, denial buzzes. */
-export type HapticBeat = "send" | "first" | "done" | "tap" | "no";
+end thumps, UI taps tick, slider steps click, denial buzzes. */
+export type HapticBeat = "send" | "first" | "done" | "tap" | "step" | "no";
 
 /**
  * Vibration pattern per beat: a short single tap on send, a longer
@@ -454,7 +454,18 @@ const HAPTIC_PATTERNS: Record<HapticBeat, number[]> = {
 	first: [70],
 	done: [35, 60, 110],
 	tap: [15],
+	step: [6],
 	no: [50, 70, 50]
+};
+
+/** Single-pulse length per beat when the plugin only has `vibrate`. */
+const NATIVE_VIBRATE_MS: Record<HapticBeat, number> = {
+	send: 20,
+	first: 70,
+	done: 110,
+	tap: 15,
+	step: 6,
+	no: 80
 };
 
 /**
@@ -527,7 +538,10 @@ export async function hapticBeatAsync(
 			// Send taps light, the first token rumbles medium, arrival
 			// thumps a success, UI taps tick, denials buzz an error — the
 			// same five beats as the web patterns.
-			if ((kind === "send" || kind === "tap") && haptics.selectionFeedback) {
+			if (
+				(kind === "send" || kind === "tap" || kind === "step") &&
+				haptics.selectionFeedback
+			) {
 				await haptics.selectionFeedback();
 				return true;
 			}
@@ -544,17 +558,7 @@ export async function hapticBeatAsync(
 				return true;
 			}
 			if (haptics.vibrate) {
-				await haptics.vibrate(
-					kind === "send"
-						? 20
-						: kind === "first"
-							? 70
-							: kind === "tap"
-								? 15
-								: kind === "no"
-									? 80
-									: 110
-				);
+				await haptics.vibrate(NATIVE_VIBRATE_MS[kind]);
 				return true;
 			}
 			return false;
@@ -718,7 +722,8 @@ export async function dismissReplyNotificationAsync(input?: {
 	shell?: boolean;
 }): Promise<void> {
 	try {
-		const plugin = input?.plugin ?? (await nativeNotifier(input?.shell ?? true));
+		const plugin =
+			input?.plugin ?? (await nativeNotifier(input?.shell ?? true));
 		if (!plugin) return;
 		if (typeof plugin.cancel === "function") {
 			await plugin.cancel([REPLY_NOTIFICATION_ID]);

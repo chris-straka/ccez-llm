@@ -513,6 +513,12 @@ import {
 	import { nativeSaveMarkdown, nativeSaveText } from "$lib/nativeExport";
 	import FlashcardDeck from "$lib/components/FlashcardDeck.svelte";
 	import { createPromptGlide, type PromptGlide } from "$lib/promptGlide";
+	import {
+		AMBIENT_GAP_MS,
+		PRESS_SELECTOR,
+		STEP_GAP_MS,
+		beatAllowed
+	} from "$lib/uiHaptics";
 	import ReaderView from "$lib/components/ReaderView.svelte";
 	import {
 		phraseIndexAtOffset,
@@ -2290,7 +2296,10 @@ import {
 			} else {
 				void tick().then(() => annPopBox?.focus({ preventScroll: true }));
 			}
-			if (settings.hapticsEnabled) vibrateTick(6);
+			if (settings.hapticsEnabled) {
+				lastBeatAt = performance.now();
+				vibrateTick(6);
+			}
 		},
 		cancelPillFor: (id) => {
 			if (annPop && !annPopClosing && annPop.id === id) {
@@ -5038,10 +5047,21 @@ import {
 		if (index >= 0) holdArticle(index, top);
 	}
 
+	/** Last haptic beat of any kind (see uiHaptics.ts). */
+	let lastBeatAt = 0;
+	/** Ambient tick for a control press or slider step (phones). */
+	function ambientBeat(kind: "tap" | "step", gap: number): void {
+		if (!androidUI || !settings.hapticsEnabled) return;
+		const now = performance.now();
+		if (!beatAllowed(now, lastBeatAt, gap)) return;
+		lastBeatAt = now;
+		void hapticBeatAsync(kind, { shell: tauriBackendAvailable() });
+	}
 	/** Light UI tick (phones): button taps with no visible
 	confirmation of their own. Gated by the haptics toggle. */
 	function buzzTap(): void {
 		if (!androidUI) return;
+		lastBeatAt = performance.now();
 		void hapticBeatAsync("tap", {
 			enabled: settings.hapticsEnabled,
 			shell: tauriBackendAvailable()
@@ -5050,6 +5070,7 @@ import {
 	/** Stern denial buzz (phones): refused actions. */
 	function buzzNo(): void {
 		if (!androidUI) return;
+		lastBeatAt = performance.now();
 		void hapticBeatAsync("no", {
 			enabled: settings.hapticsEnabled,
 			shell: tauriBackendAvailable()
@@ -5062,6 +5083,7 @@ import {
 	 */
 	function buzzBeat(kind: "first" | "send" | "done", active = true): void {
 		if (!active) return;
+		lastBeatAt = performance.now();
 		void hapticBeatAsync(kind, {
 			enabled: settings.hapticsEnabled,
 			shell: tauriBackendAvailable()
@@ -5482,7 +5504,10 @@ import {
 		// The card mounts async: land the caret once it flushes,
 		// like the create pill.
 		void tick().then(() => annPopBox?.focus({ preventScroll: true }));
-		if (settings.hapticsEnabled) vibrateTick(6);
+		if (settings.hapticsEnabled) {
+			lastBeatAt = performance.now();
+			vibrateTick(6);
+		}
 	}
 
 	/**
@@ -10493,6 +10518,23 @@ import {
 		// and no compositor layer games (no tap ghost).
 		editor = createTextareaEditor(promptEl, promptOptions());
 		promptGlide = createPromptGlide(promptEl);
+		// Ambient haptics: bubble phase, so a handler's own explicit
+		// beat lands first and the tick behind it stands down.
+		const onPressHaptic = (event: MouseEvent): void => {
+			const control =
+				event.target instanceof Element
+					? event.target.closest(PRESS_SELECTOR)
+					: null;
+			if (!control || control.matches(":disabled")) return;
+			ambientBeat("tap", AMBIENT_GAP_MS);
+		};
+		const onStepHaptic = (event: Event): void => {
+			const el = event.target;
+			if (el instanceof HTMLInputElement && el.type === "range")
+				ambientBeat("step", STEP_GAP_MS);
+		};
+		document.addEventListener("click", onPressHaptic);
+		document.addEventListener("input", onStepHaptic);
 		// Desktop lands in the prompt on launch; phones don't — popping
 		// the keyboard on every cold start is the mobile annoyance.
 		// Always-hide mode never takes focus on its own: the prompt is
@@ -13367,6 +13409,8 @@ import {
 		return () => {
 			promptGlide?.detach();
 			promptGlide = null;
+			document.removeEventListener("click", onPressHaptic);
+			document.removeEventListener("input", onStepHaptic);
 			window.visualViewport?.removeEventListener("resize", onViewportResize);
 			window.visualViewport?.removeEventListener("scroll", onViewportResize);
 			if (viewportTimer !== undefined) window.clearTimeout(viewportTimer);
