@@ -171,7 +171,9 @@ test("clicking the chat-width label text keeps the value", async ({ page }) => {
 	await page.mouse.click(box!.x + 20, box!.y + 10);
 	await expect(slider).toHaveValue("60");
 	// The inner reset button still restores the default.
-	await page.locator(".settings-panel button", { hasText: "(36)" }).click();
+	await page
+		.locator('.settings-panel button[title="Reset to the default width"]')
+		.click();
 	await expect(slider).toHaveValue("36");
 });
 test("top bar shows no text and survives a double-click", async ({ page }) => {
