@@ -23,6 +23,12 @@ test.beforeEach(async ({ page }) => {
 	await expect(page.locator(".ccez-math").first()).toBeVisible({
 		timeout: 60_000
 	});
+	// The reply's tex fence highlights async, and the highlighted HTML
+	// replaces the whole body (math chrome included) ~100ms after the
+	// first render: start every test after that swap, never across it.
+	await expect(page.locator(".ccez-code .shiki span").first()).toBeAttached({
+		timeout: 60_000
+	});
 });
 
 /** Display math renders KaTeX with copy + `$` chrome and a hidden folded label. */
