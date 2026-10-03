@@ -41,7 +41,12 @@ test("pinned menu dismisses on outside press", async ({ page }) => {
 	await btn.focus();
 	await btn.press("Enter");
 	await expect(menu).toHaveCSS("visibility", "visible");
-	await expect(btn).toHaveCSS("opacity", "0");
+	// The open panel hides its trigger, except a keyboard-focused one
+	// (:focus-visible keeps it, so focus never sits on an invisible
+	// toggle). Whether Enter after a programmatic focus counts as
+	// keyboard focus varies run to run, so check the rule for both.
+	const focusVisible = await btn.evaluate((el) => el.matches(":focus-visible"));
+	await expect(btn).toHaveCSS("opacity", focusVisible ? "1" : "0");
 
 	await page.mouse.click(10, 300);
 	await expect(menu).toHaveCSS("visibility", "hidden");

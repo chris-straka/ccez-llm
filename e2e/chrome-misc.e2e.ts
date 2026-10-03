@@ -164,11 +164,12 @@ test("clicking the chat-width label text keeps the value", async ({ page }) => {
 	const label = page
 		.locator(".settings-panel label")
 		.filter({ has: page.locator('input[aria-label="Chat width in rem"]') });
-	const box = await label.boundingBox();
-	expect(box).toBeTruthy();
 	// Top-left of the label is the label text row, clear of the
 	// slider, readout, and reset button: the value must survive.
-	await page.mouse.click(box!.x + 20, box!.y + 10);
+	// Click through the locator, never a cached box: the drawer is
+	// still sliding in, and a stale point lands on the reset button
+	// under load (same as chrome-batch's clickLabelText).
+	await label.click({ position: { x: 20, y: 10 } });
 	await expect(slider).toHaveValue("60");
 	// The inner reset button still restores the default.
 	await page
