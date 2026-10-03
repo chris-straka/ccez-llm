@@ -529,23 +529,7 @@ import {
 		type ReaderEvent,
 		type ReaderState
 	} from "$lib/reader";
-	import {
-		ankiExport,
-		ankiFilename,
-		currentCard,
-		deckKeyAction,
-		dueCards,
-		harvestCards,
-		isFlashcardsChord,
-		loadReviewSchedule,
-		nextDueAt,
-		saveReviewSchedule,
-		startSession,
-		stepSession,
-		type DeckAction,
-		type DeckSession,
-		type ReviewCard
-	} from "$lib/flashcards";
+	import { FlashcardsMode } from "$lib/flashcards-mode.svelte";
 	import {
 		isKeyboardOpen,
 		kbFreshOpen,
@@ -2407,84 +2391,31 @@ import {
 		setTimeout(restore, 100);
 	}
 	let shortcutsOpen = $state(false);
-	/**
-	 * Flashcards (see flashcards.ts): the open sitting (null closed),
-	 * the persisted schedule, and the cards harvested at open time.
-	 */
-	let deck = $state<DeckSession | null>(null);
-	let deckSchedule = $state(loadReviewSchedule());
-	let deckCards = $state<ReviewCard[]>([]);
-	let deckNow = $state(Date.now());
-	const flashcardsOpen = $derived(deck !== null);
-	/** Every chat's answered annotations; the active chat reads live. */
-	function harvestAllCards(): ReviewCard[] {
-		return harvestCards(chatState.chats, (id) => drafts.draftsFor(id));
-	}
-	/** Due count for the empty-chat entry, recounted when a chat empties. */
-	const flashcardsDue = $derived.by(() => {
-		if (!settings.flashcardsEnabled) return 0;
-		if (activeChat(chatState).messages.length > 0) return 0;
-		return dueCards(harvestAllCards(), deckSchedule, Date.now()).length;
+	/** Flashcards: sitting, schedule, and export (see flashcards-mode). */
+	const flashcards = new FlashcardsMode({
+		getChats: () => chatState.chats,
+		draftsFor: (id) => drafts.draftsFor(id),
+		isEnabled: () => settings.flashcardsEnabled,
+		isChatEmpty: () => activeChat(chatState).messages.length === 0,
+		isShell: () => tauriBackendAvailable(),
+		isPhone: () => androidUI,
+		focusComposer: () => editor?.focus(),
+		speakQuote: (quote, id, context) => void speakQuote(quote, id, true, context),
+		getSpeakingSelection: () => speakingSelection,
+		stopVoice: () => stopVoice(),
+		saveText: (filename, text) =>
+			nativeSaveText(filename, text, { name: "Anki import", extensions: ["txt"] }),
+		copyText: (text) => copyExportText(text),
+		downloadText: (text, filename) => downloadMarkdownFile(text, filename),
+		isDismissal: (error) => isPermissionDismissal(error),
+		toast: (message) => flashToast(message),
+		toastError: (message) => flashErrorToast(message)
 	});
-	function openFlashcards(): void {
-		deckNow = Date.now();
-		deckCards = harvestAllCards();
-		deck = startSession(deckCards, deckSchedule, deckNow);
-	}
-	function closeFlashcards(): void {
-		if (speakingSelection?.startsWith("flashcard:")) stopVoice();
-		deck = null;
-		if (!androidUI) editor?.focus();
-	}
 	// Turning flashcards off mid-sitting closes the deck.
 	$effect(() => {
-		if (!settings.flashcardsEnabled && untrack(() => deck) !== null)
-			closeFlashcards();
+		if (!settings.flashcardsEnabled && untrack(() => flashcards.isOpen))
+			flashcards.close();
 	});
-	/** Read the current card's quote in its own language; the context
-	 * sentence routes the voice (see speakQuote). */
-	function speakFlashcard(): void {
-		const card = deck ? currentCard(deck) : null;
-		if (!card) return;
-		void speakQuote(card.quote, `flashcard:${card.key}`, true, card.context || card.quote);
-	}
-	function stepFlashcards(action: DeckAction): void {
-		if (!deck) return;
-		deckNow = Date.now();
-		const next = stepSession(deck, deckSchedule, action, deckNow);
-		deck = next.session;
-		if (next.schedule !== deckSchedule) {
-			deckSchedule = next.schedule;
-			saveReviewSchedule(next.schedule);
-		}
-	}
-	/** Anki file: native save in the shell, download in a browser,
-	 * clipboard on the shell phone (its webview drops downloads). */
-	async function exportFlashcards(): Promise<void> {
-		const text = ankiExport(deckCards, deckSchedule);
-		const filename = ankiFilename();
-		const shellPhone = androidUI && tauriBackendAvailable();
-		try {
-			const native = await nativeSaveText(filename, text, {
-				name: "Anki import",
-				extensions: ["txt"]
-			});
-			if (native === "dismissed") return;
-			if (native === "saved") {
-				flashToast("Flashcards saved");
-				return;
-			}
-			if (shellPhone) {
-				await copyExportText(text);
-				flashToast("Flashcards copied to clipboard");
-				return;
-			}
-			downloadMarkdownFile(text, filename);
-			flashToast("Flashcards downloaded");
-		} catch (error) {
-			if (!isPermissionDismissal(error)) flashErrorToast("Could not export flashcards");
-		}
-	}
 	/**
 	 * Big-word reader (see reader.ts): the open session (null closed)
 	 * and the voice routing for its text. The reader speaks phrase by
@@ -9261,7 +9192,7 @@ import {
 			start: { x: number; y: number; clean: boolean },
 			ended: { clientX: number; clientY: number }
 		): EdgePanel | null {
-			if (!androidUI || !start.clean || shortcutsOpen || flashcardsOpen || readerOpen || inspectChar)
+			if (!androidUI || !start.clean || shortcutsOpen || flashcards.isOpen || readerOpen || inspectChar)
 				return null;
 			if (window.getSelection()?.isCollapsed === false) return null;
 			return contentSwipeTarget(
@@ -9817,7 +9748,7 @@ import {
 				} else if (multiTouchSeen) {
 					return;
 				}
-				if (!androidUI || shortcutsOpen || flashcardsOpen || readerOpen || inspectChar || !start) return;
+				if (!androidUI || shortcutsOpen || flashcards.isOpen || readerOpen || inspectChar || !start) return;
 				const touch = event.changedTouches[0];
 				if (!touch) return;
 				// No travel limit: dragging the selection handles across
@@ -10129,7 +10060,7 @@ import {
 			);
 		}
 		const gestureClean = (event: TouchEvent): boolean => {
-			if (!androidUI || shortcutsOpen || flashcardsOpen || readerOpen) return false;
+			if (!androidUI || shortcutsOpen || flashcards.isOpen || readerOpen) return false;
 			const target = event.target;
 			return (
 				!(target instanceof Element) ||
@@ -10159,7 +10090,7 @@ import {
 					// slide; only clean ones pair taps, and taps never
 					// pair mid-select (see the guards below).
 					const modalBusy =
-						shortcutsOpen || flashcardsOpen || readerOpen || palette.open || inspectChar !== null;
+						shortcutsOpen || flashcards.isOpen || readerOpen || palette.open || inspectChar !== null;
 					const clean = !modalBusy && gestureClean(event);
 					twoTrack =
 						a && b && androidUI && !modalBusy
@@ -10681,24 +10612,10 @@ import {
 				else if (readerKey !== "swallow") stepReader(readerKey);
 				return;
 			}
-			// Flashcards own the keyboard while open: deck keys act,
-			// other bare keys stop here so the chat behind stays put.
-			if (deck) {
-				const deckKey = deckKeyAction({ ...keyFacts(event), repeat: event.repeat });
-				if (deckKey === "pass") return;
+			// Flashcards own the keyboard while open; closed, the
+			// shell chord opens them.
+			if (flashcards.key({ ...keyFacts(event), repeat: event.repeat })) {
 				consumeEvent(event);
-				if (deckKey === "close") closeFlashcards();
-				else if (deckKey === "speak") speakFlashcard();
-				else if (deckKey !== "swallow") stepFlashcards(deckKey);
-				return;
-			}
-			if (
-				settings.flashcardsEnabled &&
-				tauriBackendAvailable() &&
-				isFlashcardsChord(keyFacts(event))
-			) {
-				consumeEvent(event);
-				openFlashcards();
 				return;
 			}
 			// Idle-prompt restore allowlist: while hidden, only bare
@@ -13719,8 +13636,8 @@ import {
 			newsImages={newsMode.newsImages}
 			newsMarks={newsMarks}
 			newsActions={newsMode.actions}
-			{flashcardsDue}
-			onFlashcards={openFlashcards}
+			flashcardsDue={flashcards.due}
+			onFlashcards={() => flashcards.open()}
 			bind:scrollBox
 			bind:popOpen={refsPopOpen}
 			bind:refsDraft={refsEditDraft}
@@ -14091,23 +14008,22 @@ import {
 	{#if reader}
 		<ReaderView {reader} onEvent={stepReader} onClose={closeReader} />
 	{/if}
-	{#if deck}
+	{#if flashcards.session}
 		<FlashcardDeck
-			session={deck}
-			schedule={deckSchedule}
-			total={deckCards.filter((c) => !deckSchedule[c.key]?.dismissed).length}
-			nextDue={nextDueAt(deckCards, deckSchedule, deckNow)}
-			now={deckNow}
-			speaking={deck !== null &&
-				speakingSelection === `flashcard:${currentCard(deck)?.key ?? ""}`}
+			session={flashcards.session}
+			schedule={flashcards.schedule}
+			total={flashcards.total}
+			nextDue={flashcards.nextDue}
+			now={flashcards.now}
+			speaking={flashcards.speaking}
 			actions={{
-				flip: () => stepFlashcards("flip"),
-				speak: speakFlashcard,
-				again: () => stepFlashcards("again"),
-				good: () => stepFlashcards("good"),
-				dismiss: () => stepFlashcards("dismiss"),
-				exportAnki: () => void exportFlashcards(),
-				close: closeFlashcards
+				flip: () => flashcards.step("flip"),
+				speak: () => flashcards.speak(),
+				again: () => flashcards.step("again"),
+				good: () => flashcards.step("good"),
+				dismiss: () => flashcards.step("dismiss"),
+				exportAnki: () => void flashcards.exportAnki(),
+				close: () => flashcards.close()
 			}}
 		/>
 	{/if}

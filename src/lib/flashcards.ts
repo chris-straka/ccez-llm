@@ -304,7 +304,7 @@ export function ankiFilename(now: Date = new Date()): string {
 
 const SCHEDULE_KEY = "ccez-llm-flashcards-v1";
 
-interface ScheduleStore {
+export interface ScheduleStore {
 	getItem(key: string): string | null;
 	setItem(key: string, value: string): void;
 }
