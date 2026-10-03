@@ -512,6 +512,7 @@ import {
 	} from "$lib/chatExport";
 	import { nativeSaveMarkdown, nativeSaveText } from "$lib/nativeExport";
 	import FlashcardDeck from "$lib/components/FlashcardDeck.svelte";
+	import { createPromptGlide, type PromptGlide } from "$lib/promptGlide";
 	import ReaderView from "$lib/components/ReaderView.svelte";
 	import {
 		phraseIndexAtOffset,
@@ -704,6 +705,8 @@ import {
 			});
 	}
 	let editor: PromptEditor | null = $state(null);
+	/** Composer height glide (attached with the editor on mount). */
+	let promptGlide: PromptGlide | null = null;
 	let promptEl: HTMLElement | undefined = $state();
 	let settingsEl: HTMLElement | undefined = $state();
 	let scrollBox: HTMLElement | undefined = $state();
@@ -8736,6 +8739,7 @@ import {
 			onPasteSlotCollapsed: (index, inner) => {
 				attachments = writePastedTextAt(attachments, index, inner);
 			},
+			onAutogrow: () => promptGlide?.measure(),
 			onDocChange: (text, removed) => {
 				hasText = text.trim().length > 0;
 				// Tag → attachment half of two-way removal: tags are the
@@ -10482,6 +10486,7 @@ import {
 		// Plain-textarea composer: no measurement cache (no collapse)
 		// and no compositor layer games (no tap ghost).
 		editor = createTextareaEditor(promptEl, promptOptions());
+		promptGlide = createPromptGlide(promptEl);
 		// Desktop lands in the prompt on launch; phones don't — popping
 		// the keyboard on every cold start is the mobile annoyance.
 		// Always-hide mode never takes focus on its own: the prompt is
@@ -13350,6 +13355,8 @@ import {
 		window.addEventListener("auxclick", onMiddleClick);
 		window.addEventListener("contextmenu", onContextMenu, true);
 		return () => {
+			promptGlide?.detach();
+			promptGlide = null;
 			window.visualViewport?.removeEventListener("resize", onViewportResize);
 			window.visualViewport?.removeEventListener("scroll", onViewportResize);
 			if (viewportTimer !== undefined) window.clearTimeout(viewportTimer);

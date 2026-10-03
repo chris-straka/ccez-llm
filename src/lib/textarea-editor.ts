@@ -102,6 +102,8 @@ export interface PromptEditor {
 
 export interface PromptEditorOptions {
 	initialDoc?: string;
+	/** After every content-driven resize, synchronously (see promptGlide.ts). */
+	onAutogrow?: () => void;
 	onSubmit: (kind: SubmitKind) => void;
 	/**
 	 * Enter submits (send, Alt+Enter stages). False leaves Enter as a
@@ -173,10 +175,12 @@ export function createTextareaEditor(
 	const cssOwnsHeight =
 		typeof CSS !== "undefined" && CSS.supports("field-sizing: content");
 	const autogrow = (): void => {
-		if (cssOwnsHeight) return;
-		// Height follows content up to the CSS max-height, then scrolls.
-		ta.style.height = "auto";
-		ta.style.height = `${ta.scrollHeight}px`;
+		if (!cssOwnsHeight) {
+			// Height follows content up to the CSS max-height, then scrolls.
+			ta.style.height = "auto";
+			ta.style.height = `${ta.scrollHeight}px`;
+		}
+		options.onAutogrow?.();
 	};
 	const notify = (): void => {
 		autogrow();
