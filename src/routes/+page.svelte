@@ -55,7 +55,6 @@
 	import {
 		loadSettings,
 		saveSettings,
-		effectiveSystemPrompt,
 		activeThinkingSupport,
 		activeThinkingId,
 		resolveTheme,
@@ -247,7 +246,6 @@ import {
 	menuBtnTouchAction,
 	selMenuDragTarget
 } from "$lib/sel-geometry";
-import { correctionPromptOn } from "$lib/correction";
 import {
 	loadDraftAnnotations,
 	saveDraftAnnotations
@@ -321,6 +319,7 @@ import {
 		frontendPingOnDone
 	} from "$lib/turns";
 	import { NativeTurns } from "$lib/native-turns.svelte";
+	import { replySystemPrompt } from "$lib/replyPrompt";
 	import { pinyinRuby } from "$lib/pinyin";
 	import { furiganaHtml } from "$lib/furigana";
 	import { fetchStrokePaths } from "$lib/kanjivg";
@@ -761,12 +760,7 @@ import {
 			onDevice: isOnDeviceProvider(settings.activeProviderId)
 		}),
 		systemFor: (target) =>
-			effectiveSystemPrompt(
-				settings,
-				activeReplyCode,
-				false,
-				correctionPromptOn(target?.correction, target?.replyLang ?? null)
-			),
+			replySystemPrompt(settings, activeReplyCode, target),
 		isShell: () => tauriBackendAvailable(),
 		isVisible: () => document.visibilityState === "visible",
 		stuckToBottom: () => stuckToBottom(),
@@ -7041,12 +7035,7 @@ import {
 		// turn request instead) and a missing key keeps the draft.
 		const nativeConfig = nativeTurns.route(attachments);
 		const nativeSystem = nativeConfig
-			? effectiveSystemPrompt(
-					settings,
-					activeReplyCode,
-					!isOnDeviceProvider(settings.activeProviderId),
-					correctionPromptOn(chat.correction, chat.replyLang)
-				)
+			? replySystemPrompt(settings, activeReplyCode, chat)
 			: "";
 		// The local model either answers or refuses here: no send into
 		// a missing/downloading Nano, and the draft stays for a retry.
@@ -7122,12 +7111,7 @@ import {
 		const sending = sendMessage(
 			chatState,
 			provider,
-			effectiveSystemPrompt(
-				settings,
-				activeReplyCode,
-				!isOnDeviceProvider(settings.activeProviderId),
-				correctionPromptOn(chat.correction, chat.replyLang)
-			),
+			replySystemPrompt(settings, activeReplyCode, chat),
 			baked,
 			{
 				attachments: kept,
@@ -7188,12 +7172,7 @@ import {
 		await resendLast(
 			chatState,
 			provider,
-			effectiveSystemPrompt(
-				settings,
-				activeReplyCode,
-				false,
-				correctionPromptOn(chat.correction, chat.replyLang)
-			),
+			replySystemPrompt(settings, activeReplyCode, chat),
 			{
 				thinking: activeThinkingId(settings),
 				onFirstToken: () => {
