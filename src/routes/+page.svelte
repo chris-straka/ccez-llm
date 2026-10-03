@@ -40,19 +40,13 @@
 		setPasteFold,
 		isSending,
 		hasReplyStarted,
-		markReplyStarted,
-		unmarkReplyStarted,
 		hasFetchActive,
-		beginNativeSend,
-		beginNativeResend,
-		settleNativeSend,
 		refreshTrimSummary,
 		setTrimPoint,
 		trimPointIndex,
 		resolveSendCompletion,
 		landingSignal,
 		replyPhase,
-		type PasteFold,
 		type Chat,
 		type ChatMsg,
 		type ChatId,
@@ -109,7 +103,7 @@
 		onDeviceStatus
 	} from "$lib/ondevice/bridge";
 	import { getCurrentWindow } from "@tauri-apps/api/window";
-	import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
+	import { emit, listen } from "@tauri-apps/api/event";
 	import {
 		sendPasteFolds,
 		bakeEditedMessage,
@@ -326,30 +320,9 @@ import {
 	} from "$lib/selTint";
 	import { caretOffsetInBlock, nodeAtBlockOffset } from "$lib/caret";
 	import {
-		applyTurnFile,
-		dismissNativeTurn,
-		markTurnInterrupted,
-		nativeRouteFor,
-		ownedNativeTurnIds,
-		errorTurnFile,
-		pollNativeTurn,
-		releaseNativeTurn,
-		resumableKilledTurn,
-		scanNativeTurns,
-		frontendPingOnDone,
-		nativeHistoryInput,
-		seenNativeTurn,
-		startNativeTurn,
-		stopNativeTurn,
-		type NativeHistoryInput,
-		type NativeTurnConfig,
-		type NativeTurnFile,
-		type NativeTurnOwnership,
-		type TurnId,
-		type TurnDoneEvent,
-		type TurnFetchEvent,
-		type TurnTokenEvent
+		frontendPingOnDone
 	} from "$lib/turns";
+	import { NativeTurns } from "$lib/native-turns.svelte";
 	import { pinyinRuby } from "$lib/pinyin";
 	import { furiganaHtml } from "$lib/furigana";
 	import { fetchStrokePaths } from "$lib/kanjivg";
@@ -787,36 +760,37 @@ import {
 	let keyToastFor: string | null = null;
 	/** Message ids already toasted for send errors (Android shows no inline error). */
 	const errorToasted = new SvelteSet<ChatMsgId>();
-	/** Native turns in flight (Android shell): turn id → owning chat
-	and the placeholder the runner fills. Survives nothing — a killed
-	page rebuilds ownership from the turn files on boot instead. */
-	const nativeTurns = new SvelteMap<
-		TurnId,
-		{ chatId: ChatId; replyId: ChatMsgId }
-	>();
-	/** Streamed text per native turn (a retry recompute clears its own). */
-	const nativeText = new SvelteMap<TurnId, string>();
 	/** Last token stamp per chat (both engines): the phase chip reads
 	staleness off the 1s send ticker, so the think between tool
 	rounds brings Thinking back instead of leaving a dead gap. */
 	const lastTokenAt = new SvelteMap<ChatId, number>();
-	/** Chats with a native page fetch in flight: the Fetching chip reads
-	this alongside the TypeScript provider's flag, so both engines drive
-	one indicator. */
-	const nativeFetching = new SvelteSet<ChatId>();
-	/** Chats with a native turn in flight: the Thinking chip and the
-	submit gate read this — native turns never raise the TypeScript
-	sending flag, so without it a backgrounded-then-revisited reply
-	would show neither dots nor a dead send button. */
-	const liveNative = new SvelteSet<ChatId>();
-	/** Shared ownership bundle for releaseNativeTurn: same map
-	identity, so the deletes stay reactive. */
-	const nativeOwn: NativeTurnOwnership = {
-		turns: nativeTurns,
-		texts: nativeText,
-		fetching: nativeFetching,
-		live: liveNative
-	};
+	/** Android background turns (see native-turns.svelte.ts). */
+	const nativeTurns = new NativeTurns({
+		getChatState: () => chatState,
+		getSettings: () => settings,
+		routeFacts: () => ({
+			androidUI,
+			shell: tauriBackendAvailable(),
+			mock: useMock,
+			onDevice: isOnDeviceProvider(settings.activeProviderId)
+		}),
+		systemFor: (target) =>
+			effectiveSystemPrompt(
+				settings,
+				activeReplyCode,
+				false,
+				correctionPromptOn(target?.correction, target?.replyLang ?? null)
+			),
+		isShell: () => tauriBackendAvailable(),
+		isVisible: () => document.visibilityState === "visible",
+		stuckToBottom: () => stuckToBottom(),
+		scrollAfterRender: () => scrollAfterRender(),
+		afterSend: (chatId) => afterSend(chatId, { native: true }),
+		markToken: (chatId) => lastTokenAt.set(chatId, Date.now()),
+		buzzFirst: (foreground) => buzzBeat("first", foreground),
+		dismissReplyNotification: () =>
+			void dismissReplyNotificationAsync({ shell: tauriBackendAvailable() })
+	});
 	/**
 	 * Android reports errors as toasts, never inline chrome: a phone
 	 * column has no room for a persistent banner, and a font-scaled
@@ -1362,26 +1336,12 @@ import {
 			void dismissReplyNotificationAsync({
 				shell: tauriBackendAvailable()
 			});
-			void reconcileNativeTurns();
+			void nativeTurns.reconcile();
 		};
 		// Native turn events (Android shell): token stream, fetch phase,
 		// retry resets, and completion. Suspension-safe by design —
 		// anything missed lands through the return/boot scan instead.
-		const turnUnlistens: UnlistenFn[] = [];
-		if (tauriBackendAvailable()) {
-			void listen<TurnTokenEvent>("turn-token", (event) =>
-				onNativeToken(event.payload)
-			).then((off) => turnUnlistens.push(off));
-			void listen<TurnFetchEvent>("turn-fetch", (event) =>
-				onNativeFetch(event.payload)
-			).then((off) => turnUnlistens.push(off));
-			void listen<TurnTokenEvent>("turn-retry", (event) =>
-				onNativeRetry(event.payload)
-			).then((off) => turnUnlistens.push(off));
-			void listen<TurnDoneEvent>("turn-done", (event) => {
-				void onNativeDone(event.payload);
-			}).then((off) => turnUnlistens.push(off));
-		}
+		const unlistenTurns = nativeTurns.listen(listen);
 		window.addEventListener("pointerdown", stampPress, { passive: true });
 		window.addEventListener("keydown", stampPress);
 		document.addEventListener("visibilitychange", onVisible);
@@ -1395,18 +1355,12 @@ import {
 		// starts visible), so reconcile on mount too — a turn that
 		// died with the process restarts here (dots again, reply
 		// completes) instead of stranding its placeholder.
-		void reconcileNativeTurns();
+		void nativeTurns.reconcile();
 		return () => {
 			window.removeEventListener("pointerdown", stampPress);
 			window.removeEventListener("keydown", stampPress);
 			document.removeEventListener("visibilitychange", onVisible);
-			for (const off of turnUnlistens.splice(0)) {
-				try {
-					off();
-				} catch {
-					// Already unlistened; shutdown is best-effort.
-				}
-			}
+			unlistenTurns();
 			window.removeEventListener("touchstart", trackAnnTouchStart);
 			window.removeEventListener("touchmove", trackAnnTouchMove);
 		};
@@ -2612,7 +2566,7 @@ import {
 	// this composer's send — only this chat's own stream gates it.
 	const canSubmit = $derived(
 		!isSending(chatState) &&
-			!liveNative.has(chatState.activeChatId) &&
+			!nativeTurns.live.has(chatState.activeChatId) &&
 			(hasText || attachments.length > 0 || drafts.list.length > 0)
 	);
 	/** No-key lock lives below, next to `useMock` (it reads it). */
@@ -2759,26 +2713,6 @@ import {
 
 	/** Chat switching cuts instantly — no crossfade, no slide: one
 	chat is replaced by the next in the same frame. */
-	/**
-	 * Stop one chat's live native turns: the runners settle each
-	 * stopped turn, releasing its service claim so the shade notice
-	 * dismisses with the chat instead of orphaning. Local ownership
-	 * releases up front, so late completions find nothing and only
-	 * dismiss their files. Best-effort per turn, never throws.
-	 */
-	async function stopChatNativeTurns(chatId: ChatId): Promise<void> {
-		const owned = ownedNativeTurnIds(nativeTurns, chatId);
-		for (const turnId of owned) {
-			try {
-				await stopNativeTurn(turnId);
-			} catch {
-				// Settling releases locally either way below.
-			}
-			releaseNativeTurn(nativeOwn, turnId, chatId);
-		}
-		if (owned.length > 0) settleNativeSend(chatState, chatId);
-	}
-
 	function transitionToChat(id: Parameters<typeof selectChat>[1]): void {
 		const from = chatState.activeChatId;
 		dismissSelPanels();
@@ -6892,7 +6826,7 @@ import {
 			canSubmit:
 				!noKeyLock &&
 				!isSending(chatState) &&
-				!liveNative.has(chatState.activeChatId),
+				!nativeTurns.live.has(chatState.activeChatId),
 			sendGuardTripped: Date.now() < sendGuardUntil,
 			kind: "send"
 		});
@@ -7072,8 +7006,8 @@ import {
 		// turn counts the wait up on its own liveness instead.
 		const sending =
 			isSending(chatState, viewChat.id) ||
-			nativeFetching.has(viewChat.id) ||
-			liveNative.has(viewChat.id);
+			nativeTurns.fetching.has(viewChat.id) ||
+			nativeTurns.live.has(viewChat.id);
 		if (sending && !wasSending) {
 			wasSending = true;
 			sendElapsed = 0;
@@ -7148,290 +7082,6 @@ import {
 		);
 	}
 
-	/** Native route decision (Android shell, network text turns).
-	Returns the provider config for the native runner, or null when
-	the TypeScript engine stays on (including keyless: the provider
-	resolution below raises missing-key with the draft intact, same
-	as any TypeScript send). */
-	function nativeRoute(outgoing: Attachment[]): NativeTurnConfig | null {
-		return nativeRouteFor(
-			{
-				androidUI,
-				shell: tauriBackendAvailable(),
-				mock: useMock,
-				onDevice: isOnDeviceProvider(settings.activeProviderId)
-			},
-			outgoing,
-			settings
-		);
-	}
-
-	/** Start one native turn for an already-opened placeholder. */
-	async function startNativeTurnFor(
-		chatId: ChatId,
-		replyId: ChatMsgId,
-		config: NativeTurnConfig,
-		system: string,
-		history: NativeHistoryInput
-	): Promise<void> {
-		const turnId = crypto.randomUUID() as TurnId;
-		nativeTurns.set(turnId, { chatId, replyId });
-		nativeText.set(turnId, "");
-		liveNative.add(chatId);
-		try {
-			await startNativeTurn({
-				turn_id: turnId,
-				chat_id: chatId,
-				message_id: replyId,
-				baseUrl: config.baseUrl,
-				apiKey: config.apiKey,
-				model: config.model,
-				extraBody: config.extraBody,
-				system,
-				messages: history.messages,
-				priorSummary: history.priorSummary,
-				foldText: history.foldText,
-				foldThrough: history.foldThrough
-			});
-		} catch {
-			// The spawn itself failed: settle locally as a failed turn
-			// so the existing Retry UI applies (same shape as any
-			// provider error, never a wedged send).
-			releaseNativeTurn(nativeOwn, turnId, chatId);
-			applyTurnFile(chatState, {
-				turn_id: turnId,
-				chat_id: chatId,
-				message_id: replyId,
-				status: "error",
-				content: "",
-				error: "Couldn't start the reply.",
-				finished_at: Math.floor(Date.now() / 1000)
-			});
-			settleNativeSend(chatState, chatId);
-			afterSend(chatId, { native: true });
-		}
-	}
-
-	/** Native fresh send (Android): same preamble contract as the
-	TypeScript path — baked text, kept attachments, folds — then the
-	turn detaches and this returns. Tokens, fetch phase, retries, and
-	completion land via the turn listeners below. */
-	async function doNativeSend(opts: {
-		baked: string;
-		kept: Attachment[];
-		folds: PasteFold[];
-		pastedFolds: PasteFold[];
-		config: NativeTurnConfig;
-		system: string;
-	}): Promise<void> {
-		// Before the append below (see stuckToBottom).
-		const stuck = stuckToBottom();
-		const opened = beginNativeSend(chatState, opts.baked, {
-			attachments: opts.kept,
-			pasteFolds: mergeFolds(opts.folds, opts.pastedFolds)
-		});
-		// A duplicate send racing in: the first one owns the chat.
-		if (!opened) return;
-		const target = chatState.chats.find((c) => c.id === opened.chatId);
-		const history = nativeHistoryInput(target, opened.replyId);
-		if (stuck) scrollAfterRender();
-		await startNativeTurnFor(
-			opened.chatId,
-			opened.replyId,
-			opts.config,
-			opts.system,
-			history
-		);
-	}
-
-	/** Live-token event: accumulate per turn and swap the placeholder
-	content wholesale (never mutate in place — same discipline as the
-	TypeScript stream). Unknown turns (settled by a scan while
-	suspended) only dismiss. */
-	function onNativeToken({ turn_id, token }: TurnTokenEvent): void {
-		const owned = nativeTurns.get(turn_id);
-		if (!owned) return;
-		const target = chatState.chats.find((c) => c.id === owned.chatId);
-		if (!target) return;
-		const full = (nativeText.get(turn_id) ?? "") + token;
-		nativeText.set(turn_id, full);
-		lastTokenAt.set(owned.chatId, Date.now());
-		if (!hasReplyStarted(chatState, owned.chatId)) {
-			markReplyStarted(chatState, owned.chatId);
-			// Foreground only: backgrounded, the reply-ready ping owns
-			// the moment — a start rumble would buzz before the reply
-			// has been received.
-			buzzBeat(
-				"first",
-				chatState.activeChatId === owned.chatId &&
-					document.visibilityState === "visible"
-			);
-		}
-		target.messages = target.messages.map((m) =>
-			m.id === owned.replyId ? { ...m, content: full } : m
-		);
-	}
-
-	/** Fetch-phase event: the Fetching chip reads `nativeFetching`
-	alongside the TypeScript flag, so both engines drive one indicator. */
-	function onNativeFetch({ turn_id, phase }: TurnFetchEvent): void {
-		const owned = nativeTurns.get(turn_id);
-		if (!owned) return;
-		if (phase === "start") nativeFetching.add(owned.chatId);
-		else nativeFetching.delete(owned.chatId);
-	}
-
-	/** Retry event: the runner recomputes from scratch, so the
-	accumulator (and its placeholder) clears — the final content still
-	heals everything at completion. */
-	function onNativeRetry({ turn_id }: TurnTokenEvent): void {
-		const owned = nativeTurns.get(turn_id);
-		if (!owned) return;
-		nativeText.set(turn_id, "");
-		// A cleared reply goes back to thinking dots — for transport
-		// retries and tool-round retracts alike (same wire event).
-		unmarkReplyStarted(chatState, owned.chatId);
-		const target = chatState.chats.find((c) => c.id === owned.chatId);
-		if (!target) return;
-		target.messages = target.messages.map((m) =>
-			m.id === owned.replyId ? { ...m, content: "" } : m
-		);
-	}
-
-	/** Completion event: poll the file, render, settle, and run the
-	shared tail — but only while the turn still owns its chat. A scan
-	that settled first releases ownership, so a late event only
-	dismisses the file instead of double-rendering. */
-	async function onNativeDone({ turn_id }: TurnDoneEvent): Promise<void> {
-		const owned = nativeTurns.get(turn_id);
-		if (!owned) {
-			try {
-				await dismissNativeTurn(turn_id);
-			} catch {
-				// Already gone: scans dismiss what they settle.
-			}
-			return;
-		}
-		releaseNativeTurn(nativeOwn, turn_id, owned.chatId);
-		let file: NativeTurnFile;
-		try {
-			file = await pollNativeTurn(turn_id);
-		} catch {
-			file = errorTurnFile(turn_id, owned.chatId, owned.replyId);
-		}
-		const outcome = applyTurnFile(chatState, file);
-		settleNativeSend(chatState, owned.chatId);
-		// A visible page marks the turn seen, which stands down the
-		// runner's background ping; backgrounded pages never call it.
-		// Either way a ping for a reply rendering in front of the user
-		// is always wrong (grace-expiry races), so it dies here too.
-		if (document.visibilityState === "visible") {
-			try {
-				await seenNativeTurn(turn_id);
-			} catch {
-				// A stray ping beats a lost reply.
-			}
-			void dismissReplyNotificationAsync({
-				shell: tauriBackendAvailable()
-			});
-		}
-		try {
-			await dismissNativeTurn(turn_id);
-		} catch {
-			// Scans dismiss what they settle; late events find nothing.
-		}
-		if (outcome === "applied") afterSend(owned.chatId, { native: true });
-	}
-
-	/** Restart a turn whose process died mid-flight: the request the
-	provider API never held gets re-sent onto its own placeholder, so
-	the user returns to thinking dots and a completed reply — never
-	Retry. Strict shape (clean assistant placeholder still last,
-	chat idle, key resolves), otherwise false and the caller falls
-	back to interrupted. A resumed-then-killed turn resumes again on
-	the next return; each restart owns a fresh turn id, so nothing
-	loops inside one session. */
-	async function resumeKilledTurn(file: NativeTurnFile): Promise<boolean> {
-		if (!resumableKilledTurn(chatState, file)) return false;
-		const target = chatState.chats.find((c) => c.id === file.chat_id);
-		const last = target?.messages[target.messages.length - 1];
-		const prev = target?.messages[(target?.messages.length ?? 0) - 2];
-		if (!target || !last || !prev || prev.role !== "user") return false;
-		// Same route as a manual Retry (last user message's own
-		// attachments decide images); a missing key keeps the draft
-		// instead of erroring.
-		const config = nativeRoute(prev.attachments ?? []);
-		if (!config) return false;
-		const history = nativeHistoryInput(target, last.id);
-		chatState.sendingChatIds = [...chatState.sendingChatIds, target.id];
-		chatState.sending = true;
-		chatState.sendingChatId = target.id;
-		if (stuckToBottom()) scrollAfterRender();
-		await startNativeTurnFor(
-			target.id,
-			last.id,
-			config,
-			effectiveSystemPrompt(
-				settings,
-				activeReplyCode,
-				false,
-				correctionPromptOn(target.correction, target.replyLang)
-			),
-			history
-		);
-		return true;
-	}
-
-	/** Foreground-return and boot reconciliation: every turn file the
-	live listeners don't own gets rendered (finished), resumed
-	(streaming with no live owner — a dead process — restarts, so the
-	user returns to dots, never Retry), or dismissed (placeholder
-	gone). Resume can fail (no key, chat busy): only then does the
-	interrupted copy apply. Tail effects run only for chats that were
-	actually waiting, so a boot scan never thumps for old news. */
-	async function reconcileNativeTurns(): Promise<void> {
-		if (!tauriBackendAvailable()) return;
-		let files: NativeTurnFile[];
-		try {
-			files = await scanNativeTurns();
-		} catch {
-			return;
-		}
-		for (const file of files) {
-			// Live turns stream through their listeners; the scan only
-			// covers what suspension (or death) took off the event path.
-			if (file.status === "streaming" && nativeTurns.has(file.turn_id)) {
-				continue;
-			}
-			releaseNativeTurn(nativeOwn, file.turn_id, file.chat_id);
-			const wasLive = isSending(chatState, file.chat_id);
-			if (file.status === "streaming") {
-				// A dead process never strands the user on Retry: the
-				// turn restarts onto its own placeholder (dots again),
-				// and a late completion heals everything. Only a
-				// resume the page cannot rebuild falls back to
-				// interrupted.
-				if (await resumeKilledTurn(file)) {
-					// Ownership moved to the new turn; the stale file
-					// still dismisses below.
-				} else if (markTurnInterrupted(chatState, file)) {
-					settleNativeSend(chatState, file.chat_id);
-					if (wasLive) afterSend(file.chat_id, { native: true });
-				}
-			} else {
-				if (applyTurnFile(chatState, file) === "applied") {
-					settleNativeSend(chatState, file.chat_id);
-					if (wasLive) afterSend(file.chat_id, { native: true });
-				}
-			}
-			try {
-				await dismissNativeTurn(file.turn_id);
-			} catch {
-				// A done event settling the same file first already did.
-			}
-		}
-	}
-
 	async function doSend() {
 		// Mobile in-prompt note edit owns the send arrow: file the
 		// comment instead of sending a chat (see commitPromptAnnEdit).
@@ -7464,7 +7114,7 @@ import {
 		// before the provider resolves and the composer clears, so the
 		// native path never touches the Keychain (its key rides the
 		// turn request instead) and a missing key keeps the draft.
-		const nativeConfig = nativeRoute(attachments);
+		const nativeConfig = nativeTurns.route(attachments);
 		const nativeSystem = nativeConfig
 			? effectiveSystemPrompt(
 					settings,
@@ -7526,11 +7176,10 @@ import {
 		// Native turns detach here and complete via turn-done (or the
 		// return/boot scan); the shared tail runs at completion, not here.
 		if (nativeConfig) {
-			await doNativeSend({
+			await nativeTurns.send({
 				baked,
 				kept,
-				folds,
-				pastedFolds,
+				pasteFolds: mergeFolds(folds, pastedFolds),
 				config: nativeConfig,
 				system: nativeSystem
 			});
@@ -7595,32 +7244,10 @@ import {
 		// background exactly like a fresh one. Guards mirror the fresh
 		// send; the last user message's own attachments decide images.
 		const lastResend = chat.messages[chat.messages.length - 1];
-		const resendConfig = nativeRoute(lastResend?.attachments ?? []);
+		const resendConfig = nativeTurns.route(lastResend?.attachments ?? []);
 		if (resendConfig) {
 			missingKey = false;
-			// Before the append below (see stuckToBottom).
-			const stuck = stuckToBottom();
-			const reopened = beginNativeResend(chatState);
-			// Non-user-last (or a racing send): resendLast no-ops the
-			// same way, so return silently here too.
-			if (!reopened) return;
-			const resendTarget = chatState.chats.find(
-				(c) => c.id === reopened.chatId
-			);
-			const resendHistory = nativeHistoryInput(resendTarget, reopened.replyId);
-			if (stuck) scrollAfterRender();
-			await startNativeTurnFor(
-				reopened.chatId,
-				reopened.replyId,
-				resendConfig,
-				effectiveSystemPrompt(
-					settings,
-					activeReplyCode,
-					false,
-					correctionPromptOn(resendTarget?.correction, resendTarget?.replyLang ?? null)
-				),
-				resendHistory
-			);
+			await nativeTurns.resend(resendConfig);
 			return;
 		}
 		// TypeScript resends resolve the provider (Keychain on first
@@ -8659,7 +8286,7 @@ import {
 			resetDraftExtras();
 			// A live turn must not outlive its chat: stop it so the
 			// runner settles and the shade notice dismisses too.
-			void stopChatNativeTurns(id);
+			void nativeTurns.stopChat(id);
 			deleteChat(chatState, id);
 			chatScrollTops.delete(id);
 			drafts.restoreChat(chatState.activeChatId);
@@ -8669,7 +8296,7 @@ import {
 			// composer's in-memory drafts or attachments: only prune the
 			// deleted id out of storage — but its live turns still stop,
 			// or the shade notice orphans.
-			void stopChatNativeTurns(id);
+			void nativeTurns.stopChat(id);
 			deleteChat(chatState, id);
 			chatScrollTops.delete(id);
 			drafts.fileChat(chatState.activeChatId);
@@ -9113,7 +8740,7 @@ import {
 		// (rendered onto their placeholders). Chats load at module
 		// level, so the scan runs on hydrated state; live turns stream
 		// through the listeners below, which the scan skips.
-		void reconcileNativeTurns();
+		void nativeTurns.reconcile();
 		// Filed annotation asks a restart took off the wire relaunch
 		// here (answered drafts never refire, keyless boots stay
 		// silent) — blue badges turn orange on their own.
@@ -13614,11 +13241,11 @@ import {
 			sendingPhase={replyPhase({
 				sending:
 					isSending(chatState, viewChat.id) ||
-					liveNative.has(viewChat.id),
+					nativeTurns.live.has(viewChat.id),
 				fetching:
 					(isSending(chatState, viewChat.id) &&
 						hasFetchActive(chatState, viewChat.id)) ||
-					nativeFetching.has(viewChat.id),
+					nativeTurns.fetching.has(viewChat.id),
 				started: hasReplyStarted(chatState, viewChat.id),
 				tick: sendElapsed,
 				nowMs: Date.now(),
