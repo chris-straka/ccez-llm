@@ -210,7 +210,7 @@
 			<span>Game line overlay (last capture with furigana + translation)</span>
 		</label>
 	{/if}
-	<VoicePanel {settings} {androidUI} {followVoice} />
+	<VoicePanel bind:settings {androidUI} {followVoice} />
 	<label class="slider-row">
 		Voice speed
 		<button

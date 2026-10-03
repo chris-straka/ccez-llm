@@ -38,7 +38,7 @@
 	}
 
 	let {
-		settings,
+		settings = $bindable(),
 		onClose,
 		onCommit,
 		onShortcuts,
@@ -165,14 +165,14 @@
 		</span>
 	{/if}
 </div>
-<ProviderPanel {settings} {onCommit} />
+<ProviderPanel bind:settings {onCommit} />
 <DefaultsPanel
-		{settings}
+		bind:settings
 		{androidUI}
 		{followVoice}
 		gameLineToggle={onGameLineToggle}
 	/>
-<AppearancePanel {settings} />
+<AppearancePanel bind:settings />
 <div class="keys-updates">
 	<section aria-labelledby="keys-heading">
 		<h2 id="keys-heading">

@@ -612,13 +612,17 @@ import {
 	} from "$lib/desktop";
 
 	let chatState = $state(createChatState());
-	let settings = $state(loadSettings());
+	/** Settings as loaded, with the launch-only resets applied (boot
+	reads go through this; the live object below is bound into the
+	settings panels). */
+	const bootSettings = loadSettings();
 	// The chat list always starts closed — a persisted open state never
 	// survives a start or refresh.
-	settings.sidebarCollapsed = true;
+	bootSettings.sidebarCollapsed = true;
 	// Voice readback always starts off for the same reason: every launch
 	// begins quiet, no matter what it was left on.
-	settings.voice = false;
+	bootSettings.voice = false;
+	let settings = $state(bootSettings);
 
 	// Settings save themselves: every change persists (debounced), with
 	// secrets mirrored to the Keychain in the Tauri shell. No Save button.
@@ -2950,7 +2954,7 @@ import {
 	 * (async loads keep today's hide-on-arrival).
 	 */
 	let bootParked =
-		settings.promptIdleSec === PROMPT_IDLE_ALWAYS &&
+		bootSettings.promptIdleSec === PROMPT_IDLE_ALWAYS &&
 		(activeChat(chatState)?.messages.length ?? 0) > 0;
 	let promptIdle = $state(bootParked);
 	/** Any activity delays the hide; restoring is allowlisted below. */
@@ -13500,7 +13504,7 @@ import {
 	and their surfaces. -->
 	<SettingsDrawer
 		open={settingsOpen}
-		{settings}
+		bind:settings
 		{followVoice}
 		tokensLabel="{formatTokens(split.prompt)} in / {formatTokens(
 			split.completion

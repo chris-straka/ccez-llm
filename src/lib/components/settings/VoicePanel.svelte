@@ -31,7 +31,7 @@
 		followVoice?: VoiceLangFollow | null;
 	}
 
-	let { settings, androidUI, followVoice = null }: Props = $props();
+	let { settings = $bindable(), androidUI, followVoice = null }: Props = $props();
 	/** Native macOS voice engine present (Tauri shell on macOS). */
 	let nativeVoice = $state(false);
 	/** Plain browser on a Mac: no inventory API, but download guidance applies. */

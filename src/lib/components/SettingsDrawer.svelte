@@ -36,7 +36,7 @@ bookkeeping reads it). -->
 
 	let {
 		open,
-		settings,
+		settings = $bindable(),
 		tokensLabel,
 		tokensTitle,
 		android,
@@ -67,7 +67,7 @@ bookkeeping reads it). -->
 	<!-- Fixed-width inner: the panel clips instead of reflowing text mid-collapse. -->
 	<div class="settings-inner">
 		<SettingsPanel
-			{settings}
+			bind:settings
 			{followVoice}
 			onCommit={actions.commit}
 			onToast={actions.toast}
