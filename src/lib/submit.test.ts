@@ -12,24 +12,59 @@ import {
 describe("composerLocked", () => {
 	it("locks a keyed provider with a blank key", () => {
 		expect(
-			composerLocked({ mock: false, keyless: false, apiKey: "" })
+			composerLocked({
+				mock: false,
+				keyless: false,
+				keysLoaded: true,
+				apiKey: ""
+			})
 		).toBe(true);
 		expect(
-			composerLocked({ mock: false, keyless: false, apiKey: "   " })
+			composerLocked({
+				mock: false,
+				keyless: false,
+				keysLoaded: true,
+				apiKey: "   "
+			})
 		).toBe(true);
 	});
 	it("leaves a stored key alone", () => {
 		expect(
-			composerLocked({ mock: false, keyless: false, apiKey: "sk-x" })
+			composerLocked({
+				mock: false,
+				keyless: false,
+				keysLoaded: true,
+				apiKey: "sk-x"
+			})
+		).toBe(false);
+	});
+	it("waits for secure storage before locking", () => {
+		expect(
+			composerLocked({
+				mock: false,
+				keyless: false,
+				keysLoaded: false,
+				apiKey: ""
+			})
 		).toBe(false);
 	});
 	it("exempts the mock provider and keyless endpoints", () => {
-		expect(composerLocked({ mock: true, keyless: false, apiKey: "" })).toBe(
-			false
-		);
-		expect(composerLocked({ mock: false, keyless: true, apiKey: "" })).toBe(
-			false
-		);
+		expect(
+			composerLocked({
+				mock: true,
+				keyless: false,
+				keysLoaded: true,
+				apiKey: ""
+			})
+		).toBe(false);
+		expect(
+			composerLocked({
+				mock: false,
+				keyless: true,
+				keysLoaded: true,
+				apiKey: ""
+			})
+		).toBe(false);
 	});
 });
 

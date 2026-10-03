@@ -75,24 +75,31 @@ export function sendAction(facts: SendFacts): SendAction {
  * Facts for the no-key composer lock: with no usable credential the
  * composer locks (no typing, send explains) instead of accepting a
  * draft into a doomed turn. Mock (tests/dev) and keyless providers
- * (on-device Nano) never lock. Pure.
+ * (on-device Nano) never lock, and neither does a key that hasn't
+ * loaded yet: secure storage resolves after first paint, and locking
+ * on the blank in-memory key toasted "No API key" at every Android
+ * launch. Pure.
  */
 export interface ComposerLockFacts {
 	/** Test/dev mock provider owns sends. */
 	mock: boolean;
 	/** Provider needs no credential by design. */
 	keyless: boolean;
+	/** Secure-storage hydration has finished (keys in memory are final). */
+	keysLoaded: boolean;
 	/** Stored key for the active provider (blank when unset). */
 	apiKey: string;
 }
 
 /**
  * True when the composer must refuse typing. Guard order is the
- * contract: exemptions first, then the blank-key lock.
+ * contract: exemptions first, then the load wait, then the blank-key
+ * lock.
  */
 export function composerLocked(facts: ComposerLockFacts): boolean {
 	if (facts.mock) return false;
 	if (facts.keyless) return false;
+	if (!facts.keysLoaded) return false;
 	return facts.apiKey.trim() === "";
 }
 

@@ -685,9 +685,15 @@ import {
 		};
 	});
 
-	if (tauriBackendAvailable()) {
-		// Pull Keychain keys into memory before the first send; no-op in browsers.
-		void hydrateSecrets(settings);
+	/** Secure-storage keys are in memory (browsers keep keys in settings,
+	so they start loaded). The no-key lock waits on this. */
+	const secureKeys = tauriBackendAvailable();
+	let keysLoaded = $state(!secureKeys);
+	if (secureKeys) {
+		// Pull Keychain keys into memory before the first send.
+		void hydrateSecrets(settings).finally(() => {
+			keysLoaded = true;
+		});
 	}
 	let editor: PromptEditor | null = $state(null);
 	let promptEl: HTMLElement | undefined = $state();
@@ -4122,6 +4128,7 @@ import {
 				getProviderDef(settings.activeProviderId, settings.customProviders)
 					.keyless === true ||
 				isOnDeviceProvider(settings.activeProviderId),
+			keysLoaded,
 			apiKey: settings.providers[settings.activeProviderId]?.apiKey ?? ""
 		})
 	);
