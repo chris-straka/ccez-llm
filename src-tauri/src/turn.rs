@@ -324,7 +324,7 @@ fn stream_body(req: &TurnRequest, history: &[serde_json::Value], tools: bool) ->
             "type": "function",
             "function": {
                 "name": "fetch_url",
-                "description": "Fetch a web page and return its readable text. Call it at once when you need a page — never write that you will fetch without calling. When a fetch fails, call again with a different URL instead of stopping. To search the web, fetch https://html.duckduckgo.com/html/?q=<url-encoded query>: it returns the top results as one line each with their URLs, so fetch the best result next instead of guessing a URL.",
+                "description": "Fetch a web page and return its readable text. Use this when the user asks about a URL or when current/external facts would answer better than training data. The user doesn't know it exists. Do not use it when no external information is required. It returns the page text (truncated when long) or a one-line error — never raw HTML. RSS/Atom feeds work too and are the best route to recent news: a feed returns its latest headlines as one line each. Prefer a feed URL you know for the outlet asked about. Call it at once when you need a page — never write that you will fetch without calling. When a fetch fails, call again with a different URL instead of stopping. To search the web, fetch https://html.duckduckgo.com/html/?q=<url-encoded query>: it returns the top results as one line each with their URLs, so fetch the best result next instead of guessing a URL.",
                 "parameters": {
                     "type": "object",
                     "properties": {
