@@ -282,12 +282,14 @@ test("j hold glides near SCROLLKEY_JK_VELOCITY_PX_S with no discrete jump", asyn
 test("d hold ramps: second window outruns the first, then cruises fast", async ({
 	page
 }) => {
-	// Park mid-chat first so both windows have room below.
+	// Park mid-chat first so both windows have room below: half a
+	// second of hold travels ~1100px, more than two short viewports,
+	// and a window that hits the bottom reads as a slow cruise.
 	await page.evaluate(() => {
 		const box = document.querySelector(".messages") as HTMLElement | null;
 		if (box)
 			box.scrollTo({
-				top: Math.max(0, box.scrollHeight - box.clientHeight * 2),
+				top: Math.max(0, box.scrollHeight - box.clientHeight - 1600),
 				behavior: "instant"
 			});
 	});
@@ -319,6 +321,11 @@ test("d hold ramps: second window outruns the first, then cruises fast", async (
 	await page.waitForTimeout(250);
 	const m2 = await scrollTop(page);
 	await page.keyboard.up("d");
+	const max = await page.evaluate(() => {
+		const box = document.querySelector(".messages") as HTMLElement | null;
+		return box ? box.scrollHeight - box.clientHeight : 0;
+	});
+	expect(m2, "the hold ran out of room before window two closed").toBeLessThan(max);
 	// First window rides the ramp (starts at j/k speed), the second
 	// cruises near peak: the hold accelerates instead of kicking.
 	// Bounds stay wide for headless rAF pacing.

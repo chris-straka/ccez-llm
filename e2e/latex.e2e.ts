@@ -532,6 +532,19 @@ test("preview settles latex chrome", async ({ page }) => {
 	// with them) while loading: settle first so any delta across the
 	// hover is chrome motion, never a font swap.
 	await page.evaluate(() => document.fonts.ready);
+	// The load-time entrance fade (aid-swap, 0.18s) can still be
+	// running on a fast boot: let it finish so the trace reads only
+	// what the hover itself animates.
+	await page.evaluate(() =>
+		Promise.all(
+			document
+				.getAnimations()
+				.filter(
+					(a) => a instanceof CSSAnimation && a.animationName.endsWith("aid-swap")
+				)
+				.map((a) => a.finished)
+		)
+	);
 	await toggleSidebar(page);
 	await expect(page.locator("aside").first()).not.toHaveClass(/collapsed/);
 	// Trace the chrome box at 60fps across the hover instant.
