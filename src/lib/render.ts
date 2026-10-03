@@ -546,23 +546,24 @@ export function getHighlighter(): Promise<Highlighter> {
 }
 
 /**
- * Replace each `code[data-code-index]` body with Shiki-highlighted HTML
+ * Shiki-highlighted body per code block, indexed like `rendered.codes`
  * (dual light/dark CSS variables; the stylesheet picks by media query).
- * Unknown languages keep their plain rendering.
+ * A null entry keeps that block's plain rendering (unknown language
+ * grammar failure); null overall when the highlighter can't load.
  */
-export async function highlightRendered(
+export async function highlightFragments(
 	rendered: RenderedMessage
-): Promise<string> {
-	if (rendered.codes.length === 0) return rendered.html;
+): Promise<(string | null)[] | null> {
+	if (rendered.codes.length === 0) return [];
 	let highlighter: Highlighter;
 	try {
 		highlighter = await getHighlighter();
 	} catch {
-		return rendered.html;
+		return null;
 	}
 	const loaded = new Set(highlighter.getLoadedLanguages());
 	// Synchronous throughout (codeToHtml is not async): no Promise.all.
-	const highlighted = rendered.codes.map(({ lang, code }) => {
+	return rendered.codes.map(({ lang, code }) => {
 		const language = loaded.has(lang) ? lang : "plaintext";
 		const key = `${language}\n${code}`;
 		const hit = highlightCache.get(key);
@@ -589,18 +590,44 @@ export async function highlightRendered(
 		}
 		return fragment;
 	});
+}
+
+/**
+ * Paint highlighted fragments into the `code[data-code-index]` blocks
+ * under `root`, in place: only code bodies change, so the rest of the
+ * message (math chrome, badges, a live selection outside code) keeps
+ * its nodes. Blocks already painted are skipped — same markup means
+ * same code, so a re-run never re-parses them. The `shiki` class
+ * anchors the dark-mode CSS-variable override (the original pre.shiki
+ * wrapper is not carried over).
+ */
+export function applyHighlightFragments(
+	root: ParentNode,
+	fragments: readonly (string | null)[]
+): void {
+	root.querySelectorAll("code[data-code-index]").forEach((el) => {
+		if (el.classList.contains("shiki")) return;
+		const fragment = fragments[Number(el.getAttribute("data-code-index"))];
+		if (!fragment) return;
+		el.innerHTML = fragment;
+		el.classList.add("shiki");
+	});
+}
+
+/**
+ * The rendered HTML with every code block highlighted, as a string
+ * (for passes that rewrite the whole body anyway, like furigana).
+ * Unknown languages keep their plain rendering.
+ */
+export async function highlightRendered(
+	rendered: RenderedMessage
+): Promise<string> {
+	const fragments = await highlightFragments(rendered);
+	if (!fragments || fragments.length === 0) return rendered.html;
 	if (typeof document === "undefined") return rendered.html;
 	const template = document.createElement("template");
 	template.innerHTML = rendered.html;
-	template.content.querySelectorAll("code[data-code-index]").forEach((el) => {
-		const fragment = highlighted[Number(el.getAttribute("data-code-index"))];
-		// The `shiki` class anchors the dark-mode CSS-variable override
-		// (the original pre.shiki wrapper is not carried over).
-		if (fragment) {
-			el.innerHTML = fragment;
-			el.classList.add("shiki");
-		}
-	});
+	applyHighlightFragments(template.content, fragments);
 	const wrapper = document.createElement("div");
 	wrapper.append(template.content.cloneNode(true));
 	return wrapper.innerHTML;

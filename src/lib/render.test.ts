@@ -14,7 +14,9 @@ import {
 	foldSegments,
 	pasteFoldButton,
 	htmlToText,
-	highlightRendered
+	highlightRendered,
+	highlightFragments,
+	applyHighlightFragments
 } from "./render";
 import type { AttachTagModel } from "./attachments";
 
@@ -278,6 +280,40 @@ describe("sent-message tags", () => {
 });
 
 describe("highlighting", () => {
+	it("paints code bodies in place, leaving every other node", async () => {
+		const rendered = renderMarkdown(
+			"Before $x$ text.\n\n```js\nconst x = 1;\n```\n\nAfter."
+		);
+		const root = document.createElement("div");
+		root.innerHTML = rendered.html;
+		const before = [...root.querySelectorAll("*")].filter(
+			(el) => !el.closest("code[data-code-index]")
+		);
+		const fragments = await highlightFragments(rendered);
+		expect(fragments).toHaveLength(1);
+		applyHighlightFragments(root, fragments ?? []);
+		const code = root.querySelector("code[data-code-index]");
+		expect(code?.classList.contains("shiki")).toBe(true);
+		expect(code?.innerHTML).toContain("--shiki-dark");
+		// Same nodes outside code: nothing re-parsed, nothing detached.
+		for (const el of before) expect(root.contains(el)).toBe(true);
+		// Matches the string form exactly.
+		expect(root.innerHTML).toBe(await highlightRendered(rendered));
+	}, 30000);
+
+	it("skips painted blocks and keeps plain code for missing fragments", () => {
+		const root = document.createElement("div");
+		root.innerHTML =
+			'<pre><code data-code-index="0" class="shiki"><span>kept</span></code></pre>' +
+			'<pre><code data-code-index="1">plain</code></pre>';
+		const painted = root.querySelector("code")?.firstChild;
+		applyHighlightFragments(root, ["<i>new</i>", null]);
+		expect(root.querySelector("code")?.firstChild).toBe(painted);
+		expect(root.querySelectorAll("code")[1]?.outerHTML).toBe(
+			'<code data-code-index="1">plain</code>'
+		);
+	});
+
 	it("highlights known languages, leaves unknown ones plain", async () => {
 		const rendered = renderMarkdown(
 			"```js\nconst x = 1;\n```\n\n```zzz\n???\n```"

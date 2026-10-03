@@ -23,12 +23,36 @@ test.beforeEach(async ({ page }) => {
 	await expect(page.locator(".ccez-math").first()).toBeVisible({
 		timeout: 60_000
 	});
-	// The reply's tex fence highlights async, and the highlighted HTML
-	// replaces the whole body (math chrome included) ~100ms after the
-	// first render: start every test after that swap, never across it.
+	// The reply's tex fence highlights async (painted in place): start
+	// every test with the page fully settled, code colors included.
 	await expect(page.locator(".ccez-code .shiki span").first()).toBeAttached({
 		timeout: 60_000
 	});
+});
+
+/** Highlighting paints code bodies in place: the math chrome mounted
+on first render keeps its nodes (a whole-body swap once rebuilt it
+~100ms after load, eating clicks and selections in that window). */
+test("code highlighting leaves the math nodes in place", async ({ page }) => {
+	await page.addInitScript(() => {
+		const removed: string[] = [];
+		(window as unknown as { __mathRemoved: string[] }).__mathRemoved = removed;
+		new MutationObserver((records) => {
+			for (const record of records)
+				for (const node of record.removedNodes)
+					if (node instanceof Element && node.matches(".ccez-math"))
+						removed.push(node.className);
+		}).observe(document, { childList: true, subtree: true });
+	});
+	await page.reload();
+	await expect(page.locator(".ccez-code .shiki span").first()).toBeAttached({
+		timeout: 60_000
+	});
+	await expect(page.locator(".ccez-math").first()).toBeVisible();
+	const removed = await page.evaluate(
+		() => (window as unknown as { __mathRemoved: string[] }).__mathRemoved
+	);
+	expect(removed).toEqual([]);
 });
 
 /** Display math renders KaTeX with copy + `$` chrome and a hidden folded label. */

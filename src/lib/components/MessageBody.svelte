@@ -14,6 +14,8 @@
 		renderMessage,
 		renderMarkdown,
 		applyPasteFolds,
+		applyHighlightFragments,
+		highlightFragments,
 		highlightRendered,
 		type RenderedMessage
 	} from "$lib/render";
@@ -297,6 +299,24 @@ import {
 				() => (fresh() ? snapshot.html : null)
 			);
 		};
+		// Code bodies highlight in place once the plain HTML is in the
+		// DOM: only code nodes change, so math chrome, badges, and a
+		// live selection elsewhere keep their nodes (a whole-html swap
+		// rebuilt the body ~100ms after first paint). `fresh` drops a
+		// superseded render; failures keep the plain code.
+		const paintCode = (
+			snapshot: RenderedMessage,
+			fresh: () => boolean
+		): Promise<void> =>
+			highlightFragments(snapshot).then(
+				async (fragments) => {
+					if (!fragments || !fresh()) return;
+					await tick();
+					if (!fresh() || !bodyEl) return;
+					applyHighlightFragments(bodyEl, fragments);
+				},
+				() => {}
+			);
 		const furigana = localAids.includes("furigana");
 		const pinyin = localAids.includes("pinyin");
 		// Marks apply after Svelte flushes the new HTML (see applyMarks).
@@ -320,18 +340,20 @@ import {
 			furiganaKey = null;
 			reportAidLoading(false);
 			// Ruby stamps onto the rendered HTML (sync, no worker), so
-			// code and math blocks stay blocks. The shiki pass only
-			// repaints code: reconvert after it anyway (whole-html swap).
+			// code and math blocks stay blocks; ruby never enters code
+			// (aidTextNodes skips it), so the shiki pass paints code
+			// bodies in place without reconverting.
 			const run = aidRun;
 			html = aidPinyinHtml(snapshot.html, aidPreferred);
-			void enhanceBase(snapshot, run).then((base) => {
-				if (base === null) {
-					stamp();
-					return;
-				}
-				if (base !== snapshot.html) html = aidPinyinHtml(base, aidPreferred);
+			if (streaming || snapshot.codes.length === 0) {
 				stamp();
-			});
+				return;
+			}
+			const highlight = ++highlightRun;
+			void paintCode(
+				snapshot,
+				() => run === aidRun && highlight === highlightRun
+			).then(stamp);
 			return;
 		}
 		if (furigana) {
@@ -395,10 +417,8 @@ import {
 		html = snapshot.html;
 		if (!streaming && snapshot.codes.length > 0) {
 			const run = ++highlightRun;
-			void highlightRendered(snapshot).then((enhanced) => {
-				if (run !== highlightRun) return;
-				html = enhanced;
-				stamp();
+			void paintCode(snapshot, () => run === highlightRun).then(() => {
+				if (run === highlightRun) stamp();
 			});
 		} else {
 			stamp();
