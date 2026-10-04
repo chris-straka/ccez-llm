@@ -605,6 +605,12 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 	(code blocks, aid-label rows) keep their own axes. */
 	:global(.app[data-android]) .messages {
 		overflow-x: clip;
+		/* A pinch here is the text-size gesture, never page zoom. The
+		touchmove veto in +page.svelte only holds while touchmoves are
+		cancelable; a second finger joining a running scroll gets
+		uncancelable ones, and the page zoomed (native scrollbars,
+		panning to blank corners). touch-action binds at touchstart. */
+		touch-action: pan-x pan-y;
 	}
 
 	/* CJK wraps at the column edge on phones, like desktop: the shared

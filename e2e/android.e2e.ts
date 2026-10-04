@@ -283,9 +283,7 @@ test.describe("gestures", () => {
 		);
 	}
 
-	test("mid-screen swipe right summons the chat sidebar", async ({
-		page
-	}) => {
+	test("mid-screen swipe right summons the chat sidebar", async ({ page }) => {
 		const aside = page.locator("aside:has(button.side-chat)");
 		const panel = page.locator(".settings-panel");
 		// Fresh load starts shut; a mid-screen rightward summons the
@@ -1291,7 +1289,9 @@ test.describe("touch", () => {
 			return { highlightTop: highlight.top, menuBottom: box.bottom };
 		});
 		expect(geometry).not.toBeNull();
-		expect(geometry!.menuBottom).toBeLessThanOrEqual(geometry!.highlightTop + 4);
+		expect(geometry!.menuBottom).toBeLessThanOrEqual(
+			geometry!.highlightTop + 4
+		);
 	});
 
 	test("a tap on Speak reads the highlight and keeps the menu", async ({
@@ -1397,15 +1397,13 @@ test.describe("touch", () => {
 				async () => {
 					const geometry = await page.evaluate(() => {
 						const menuEl = document.querySelector(".sel-menu");
-						const above = [
-							...document.querySelectorAll(".sel-pinyin.above")
-						];
+						const above = [...document.querySelectorAll(".sel-pinyin.above")];
 						if (!(menuEl instanceof HTMLElement) || above.length === 0)
 							return null;
 						const box = menuEl.getBoundingClientRect();
 						const top = Math.min(
-							...above.map((el) =>
-								(el as HTMLElement).getBoundingClientRect().top
+							...above.map(
+								(el) => (el as HTMLElement).getBoundingClientRect().top
 							)
 						);
 						return { menuBottom: box.bottom, panelTop: top };
@@ -1845,9 +1843,7 @@ test.describe("touch", () => {
 		the annotation (never a chat turn) while the main reply still
 		streams, instead of buzzing denial. The note's instant answer
 		lands before the slowed stream finishes. */
-		test("a note files mid-stream through the composer", async ({
-			page
-		}) => {
+		test("a note files mid-stream through the composer", async ({ page }) => {
 			test.setTimeout(120_000);
 			await seedChat(page, [
 				{ role: "user", content: "first" },
@@ -1860,9 +1856,9 @@ test.describe("touch", () => {
 				localStorage.setItem("ccez-mock-word-ms", "800");
 			});
 			await page.goto("/");
-			await expect(
-				page.locator("article .rendered").first()
-			).toBeVisible({ timeout: 60_000 });
+			await expect(page.locator("article .rendered").first()).toBeVisible({
+				timeout: 60_000
+			});
 			// Phone composer: Enter is a newline, the arrow sends.
 			const sent = "a long winding river road tale for slow streaming";
 			await page.locator(".ta-input").click();
@@ -1874,10 +1870,7 @@ test.describe("touch", () => {
 			// Select the just-sent user turn (index 2, static while
 			// the reply streams below it): same synthetic touch +
 			// programmatic range as the Annotate test above.
-			const box = await page
-				.locator("article")
-				.nth(2)
-				.boundingBox();
+			const box = await page.locator("article").nth(2).boundingBox();
 			if (!box) throw new Error("no sent-message box");
 			await page.evaluate(
 				({ x, y }: { x: number; y: number }) => {
@@ -1896,9 +1889,7 @@ test.describe("touch", () => {
 							touches: [touch(1)]
 						})
 					);
-					const rendered = document.querySelectorAll(
-						"article .rendered"
-					)[2];
+					const rendered = document.querySelectorAll("article .rendered")[2];
 					const sel = window.getSelection();
 					sel?.removeAllRanges();
 					const range = document.createRange();
@@ -1947,9 +1938,7 @@ test.describe("touch", () => {
 		it until its plus pins it. The draft is seeded in storage
 		— filing it by touch is covered by the Annotate test
 		above. */
-		test("unpinned filings show no pill and no dock rows", async ({
-			page
-		}) => {
+		test("unpinned filings show no pill and no dock rows", async ({ page }) => {
 			await seedChat(page, [
 				{ role: "assistant", content: "alpha beta gamma delta" }
 			]);
@@ -2025,9 +2014,7 @@ test.describe("touch", () => {
 			// for the unpinned filing.
 			await expect(page.locator(".ann-pop")).toHaveCount(0);
 			await expect(page.locator(".review-item")).toHaveCount(0);
-			await expect(
-				page.locator(".prompt-tools .ann-pill")
-			).toHaveCount(0);
+			await expect(page.locator(".prompt-tools .ann-pill")).toHaveCount(0);
 			const composer = page.locator(".prompt textarea");
 			await expect(composer).not.toHaveAttribute(
 				"placeholder",
@@ -2089,13 +2076,17 @@ test.describe("touch", () => {
 			const tapBadge = async (badge: typeof badges) => {
 				const box = await badge.boundingBox();
 				if (!box) throw new Error("badge has no box");
-				await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+				await page.touchscreen.tap(
+					box.x + box.width / 2,
+					box.y + box.height / 2
+				);
 				const card = page.locator(".ann-answer");
 				await expect(card).toBeVisible({ timeout: 15_000 });
 				await page.waitForTimeout(500);
 				const cardBox = await card.boundingBox();
 				const badgeBox = await badge.boundingBox();
-				if (!cardBox || !badgeBox) throw new Error("card or badge lost its box");
+				if (!cardBox || !badgeBox)
+					throw new Error("card or badge lost its box");
 				return {
 					cardTop: cardBox.y,
 					cardBottom: cardBox.y + cardBox.height,
@@ -2108,12 +2099,14 @@ test.describe("touch", () => {
 			// must not move it. Land the badge mid-screen first.
 			await page.evaluate(() => {
 				const scroller = document.querySelector(".messages");
-				const badge = document.querySelector(
-					"button.ccez-ann-badge.ans-ready"
-				);
-				if (!(scroller instanceof HTMLElement) || !(badge instanceof HTMLElement))
+				const badge = document.querySelector("button.ccez-ann-badge.ans-ready");
+				if (
+					!(scroller instanceof HTMLElement) ||
+					!(badge instanceof HTMLElement)
+				)
 					return;
-				const target = badge.getBoundingClientRect().top + scroller.scrollTop - 220;
+				const target =
+					badge.getBoundingClientRect().top + scroller.scrollTop - 220;
 				scroller.scrollTo({ top: Math.max(0, target) });
 			});
 			const above = await tapBadge(badges.first());
@@ -2132,15 +2125,17 @@ test.describe("touch", () => {
 			);
 			const below = await tapBadge(badges.last());
 			expect(below.cardTop).toBeGreaterThanOrEqual(0);
-			expect(Math.abs(below.cardBottom - (below.badgeBottom - 8))).toBeLessThanOrEqual(
-				16
-			);
+			expect(
+				Math.abs(below.cardBottom - (below.badgeBottom - 8))
+			).toBeLessThanOrEqual(16);
 		});
 
 		/** Creating washes the pending preview: the comment box
 		otherwise floats over an unmarked thread. (Filed notes never
 		transplant, so only the create path washes now.) */
-		test("creating washes the pending quote in the thread", async ({ page }) => {
+		test("creating washes the pending quote in the thread", async ({
+			page
+		}) => {
 			await seedChat(page, [
 				{ role: "assistant", content: "alpha beta gamma delta" }
 			]);
@@ -2178,9 +2173,7 @@ test.describe("touch", () => {
 							touches: [touch(1)]
 						})
 					);
-					const p = document.querySelector(
-						"article.assistant .rendered p"
-					);
+					const p = document.querySelector("article.assistant .rendered p");
 					const sel = window.getSelection();
 					sel?.removeAllRanges();
 					const range = document.createRange();
@@ -2689,6 +2682,49 @@ test.describe("always-visible prompt", () => {
 		const grown = await px();
 		await pinch(page, "article.assistant .rendered", 320, 200);
 		await expect.poll(px, { timeout: 5000 }).toBeLessThan(grown);
+	});
+
+	/** A pinch in the thread is the text-size gesture, never page zoom,
+	even when a one-finger scroll is already under way (its touchmoves
+	are no longer cancelable, so only touch-action can refuse the zoom).
+	A zoomed page panned to blank corners with native scrollbars on the
+	S24. Raw CDP touches run the browser's own gesture recognizer. */
+	test("scroll-then-pinch in messages never zooms the page", async ({
+		page
+	}) => {
+		await seed(page, { fontScale: 1 }, [LONG]);
+		await page.goto("/");
+		await expect(page.locator("article .rendered").first()).toBeVisible();
+		const cdp = await page.context().newCDPSession(page);
+		const touch = (
+			type: "touchStart" | "touchMove" | "touchEnd",
+			points: { x: number; y: number }[]
+		) =>
+			cdp.send("Input.dispatchTouchEvent", {
+				type,
+				touchPoints: points.map((p, id) => ({ ...p, id }))
+			});
+		let ay = 500;
+		await touch("touchStart", [{ x: 200, y: ay }]);
+		for (let i = 0; i < 10; i++) {
+			ay -= 12;
+			await touch("touchMove", [{ x: 200, y: ay }]);
+		}
+		let by = 560;
+		await touch("touchStart", [
+			{ x: 200, y: ay },
+			{ x: 200, y: by }
+		]);
+		for (let i = 0; i < 20; i++) {
+			ay -= 10;
+			by += 10;
+			await touch("touchMove", [
+				{ x: 200, y: ay },
+				{ x: 200, y: by }
+			]);
+		}
+		await touch("touchEnd", []);
+		expect(await page.evaluate(() => window.visualViewport?.scale)).toBe(1);
 	});
 
 	/** Empty-state pills stay tappable at big fonts on small screens. */
