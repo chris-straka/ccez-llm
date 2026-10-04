@@ -57,6 +57,18 @@ class MainActivity : TauriActivity() {
     handleOpenChat(intent)
   }
 
+  /**
+   * Phones scroll by thumb: no scrollbar chrome anywhere. CSS hides
+   * every in-page bar (`.app[data-android] *`), but the WebView draws
+   * its own native bars over the page, which CSS cannot reach; giant
+   * text made them show. Touch scrolling is untouched.
+   */
+  override fun onWebViewCreate(webView: android.webkit.WebView) {
+    super.onWebViewCreate(webView)
+    webView.isVerticalScrollBarEnabled = false
+    webView.isHorizontalScrollBarEnabled = false
+  }
+
   /** Last dispatched IME height; -1 until the first dispatch lands. */
   private var lastImeBottom = -1
 
