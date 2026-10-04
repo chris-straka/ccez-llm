@@ -86,6 +86,34 @@ test("desktop settings fit at 2000% text", async ({ page }) => {
 	expect.soft(await overflowReport(page)).toEqual([]);
 });
 
+/** Every box that scrolls, or is styled to, yet paints a scrollbar. Phones
+scroll by thumb, so at any text size this must stay empty there. */
+async function paintedScrollbars(page: Page): Promise<string[]> {
+	return page.evaluate(() => {
+		const out: string[] = [];
+		for (const el of [
+			document.documentElement,
+			...document.querySelectorAll("body *")
+		]) {
+			const cs = getComputedStyle(el);
+			const canScroll = (axis: string, over: boolean) =>
+				over &&
+				(["auto", "scroll"].includes(axis) || el === document.documentElement);
+			const scrolls =
+				canScroll(cs.overflowY, el.scrollHeight > el.clientHeight + 1) ||
+				canScroll(cs.overflowX, el.scrollWidth > el.clientWidth + 1);
+			const latent =
+				["auto", "scroll"].includes(cs.overflowY) ||
+				["auto", "scroll"].includes(cs.overflowX);
+			if (!(scrolls || latent) || cs.scrollbarWidth === "none") continue;
+			out.push(
+				`${el.tagName.toLowerCase()}.${[...el.classList].join(".")} (scrollbar-width: ${cs.scrollbarWidth})`
+			);
+		}
+		return [...new Set(out)].slice(0, 20);
+	});
+}
+
 test.describe("phone", () => {
 	test.use({
 		hasTouch: true,
@@ -102,4 +130,40 @@ test.describe("phone", () => {
 			expect.soft(await overflowReport(page)).toEqual([]);
 		});
 	}
+
+	/** Nothing paints a scrollbar at giant sizes: the thread, the chats
+	list, and settings all scroll by thumb with no chrome. */
+	test("phone shows no scrollbars at 2000% text", async ({ page }) => {
+		await seedChat(page, THREAD, null, { fontScale: 20 });
+		await page.goto("/");
+		await expect(page.locator("article.assistant")).toBeVisible();
+		expect.soft(await paintedScrollbars(page), "thread").toEqual([]);
+		// Synthetic edge swipe opens the chats list (as in android.e2e).
+		await page.evaluate(() => {
+			const touch = (x: number, y: number) =>
+				new Touch({
+					identifier: 7,
+					target: document.body,
+					clientX: x,
+					clientY: y
+				});
+			const fire = (type: string, init: TouchEventInit) =>
+				window.dispatchEvent(
+					new TouchEvent(type, {
+						bubbles: true,
+						cancelable: true,
+						composed: true,
+						...init
+					})
+				);
+			fire("touchstart", { touches: [touch(4, 600)] });
+			fire("touchend", { touches: [], changedTouches: [touch(140, 604)] });
+		});
+		await expect(page.locator("aside button.side-settings")).toBeVisible();
+		expect.soft(await paintedScrollbars(page), "chats list").toEqual([]);
+		await page.locator("aside button.side-settings").click();
+		await expect(page.locator(".settings-panel")).not.toHaveClass(/closed/);
+		await page.screenshot({ path: ".screenshots/giant-phone-settings-20.png" });
+		expect.soft(await paintedScrollbars(page), "settings").toEqual([]);
+	});
 });
