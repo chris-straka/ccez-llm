@@ -6,6 +6,7 @@ composer trigger and keyboard nav), the wrap node (keyboard nav and
 nearness read it), the points, and jump; this component owns the
 nav markup and its surfaces. -->
 <script lang="ts">
+	import ActionIcon from "./ActionIcon.svelte";
 	import { fade } from "svelte/transition";
 	import { waypointLabel, type ChatMsg } from "$lib/chat";
 
@@ -120,7 +121,7 @@ nav markup and its surfaces. -->
 					<button
 						type="button"
 						aria-label="Close message list"
-						onclick={actions.close}>×</button
+						onclick={actions.close}><ActionIcon kind="close" /></button
 					>
 				</div>
 				{#each points as index, n (index)}
@@ -451,5 +452,10 @@ nav markup and its surfaces. -->
 	:global(html[data-theme="dark"]) .wp-sheet-head {
 		color: #98989f;
 		color: var(--muted);
+	}
+	/* Close is a geometric X sized to the button's text: a text ×
+	sits low on its font bearings. */
+	.wp-sheet-head button :global(.action-glyph) {
+		height: 0.8em;
 	}
 </style>

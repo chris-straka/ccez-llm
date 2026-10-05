@@ -5,6 +5,7 @@ Query and input element cross as bindables (same pattern as the
 sidebar search box): typing resets the cursor and lands here,
 Enter cycles or closes on a lone hit. -->
 <script lang="ts">
+	import ActionIcon from "./ActionIcon.svelte";
 	export interface FindBarActions {
 		input: () => void;
 		enter: (shift: boolean) => void;
@@ -77,7 +78,7 @@ Enter cycles or closes on a lone hit. -->
 		type="button"
 		aria-label="Close find"
 		title="Close (Esc)"
-		onclick={() => actions.close()}>×</button
+		onclick={() => actions.close()}><ActionIcon kind="close" /></button
 	>
 </div>
 
@@ -160,5 +161,10 @@ Enter cycles or closes on a lone hit. -->
 		font-size: inherit;
 		min-width: 2.75rem;
 		min-height: 2.75rem;
+	}
+	/* Close is a geometric X sized to the button's text: a text ×
+	sits low on its font bearings. */
+	.find-bar button :global(.action-glyph) {
+		height: 0.8em;
 	}
 </style>

@@ -7,6 +7,7 @@ markup). Field writes ride the shared object like the notices proxy
 (see Toasts.svelte). The box seating (`.search-palette`) lives in
 `Modal.svelte` with the other dialog chrome. -->
 <script lang="ts">
+	import ActionIcon from "./ActionIcon.svelte";
 	import type { SearchHit } from "$lib/chatSearch";
 	import type { PaletteState } from "$lib/palette";
 	import Modal from "./Modal.svelte";
@@ -98,7 +99,7 @@ markup). Field writes ride the shared object like the notices proxy
 			title="Close (Esc)"
 			onclick={actions.close}
 		>
-			×
+			<ActionIcon kind="close" />
 		</button>
 	</div>
 	<SearchResults
@@ -176,5 +177,10 @@ markup). Field writes ride the shared object like the notices proxy
 		background: #fff;
 		background: var(--field);
 		color: inherit;
+	}
+	/* Close is a geometric X sized to the button's text: a text ×
+	sits low on its font bearings. */
+	.modal-head button :global(.action-glyph) {
+		height: 0.8em;
 	}
 </style>

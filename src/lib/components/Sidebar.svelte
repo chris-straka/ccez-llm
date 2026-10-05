@@ -110,7 +110,7 @@ only this drawer through scoping. -->
 				type="button"
 				class="side-search-clear"
 				aria-label="Clear chat search"
-				onclick={() => actions.clearSearch()}>×</button
+				onclick={() => actions.clearSearch()}><ActionIcon kind="close" /></button
 			>
 		{/if}
 	</div>
@@ -597,5 +597,10 @@ only this drawer through scoping. -->
 	}
 	:global(.app[data-android]) aside:not(.settings-panel).collapsed {
 		transform: translateX(-105%);
+	}
+	/* Close is a geometric X sized to the button's text: a text ×
+	sits low on its font bearings. */
+	.side-search-clear :global(.action-glyph) {
+		height: 0.8em;
 	}
 </style>

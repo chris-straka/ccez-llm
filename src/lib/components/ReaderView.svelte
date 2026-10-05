@@ -5,6 +5,7 @@ swipes or arrows step sentences, swipe down or the close button
 leaves. The page owns the session and speech; this component owns
 the overlay, the fit, and the gestures. -->
 <script lang="ts">
+	import ActionIcon from "./ActionIcon.svelte";
 	import { fade } from "svelte/transition";
 	import {
 		phraseFontPx,
@@ -79,7 +80,7 @@ the overlay, the fit, and the gestures. -->
 		title="Close (Esc)"
 		onpointerdown={(e) => e.stopPropagation()}
 		onpointerup={(e) => e.stopPropagation()}
-		onclick={onClose}>×</button
+		onclick={onClose}><ActionIcon kind="close" /></button
 	>
 	{#if phrase}
 		{#key reader.index}
@@ -180,5 +181,10 @@ the overlay, the fit, and the gestures. -->
 	}
 	.reader-close:focus-visible {
 		outline: 2px solid var(--focus);
+	}
+	/* Close is a geometric X sized to the button's text: a text ×
+	sits low on its font bearings. */
+	.reader-close :global(.action-glyph) {
+		height: 0.8em;
 	}
 </style>

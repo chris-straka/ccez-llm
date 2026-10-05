@@ -8,6 +8,7 @@ locale toggle, and their surfaces (Svelte scoping binds the CSS to
 this markup). Data lookups already live in `$lib/inspect` and
 `$lib/reading` (unit-pinned). -->
 <script lang="ts">
+	import ActionIcon from "./ActionIcon.svelte";
 	import {
 		decomposeTree,
 		onKunLine,
@@ -82,7 +83,7 @@ this markup). Data lookups already live in `$lib/inspect` and
 			title="Close (Esc)"
 			onclick={actions.close}
 		>
-			×
+			<ActionIcon kind="close" />
 		</button>
 	</div>
 	{#if uncertain}
@@ -442,5 +443,10 @@ this markup). Data lookups already live in `$lib/inspect` and
 		color: #6e6e73;
 		color: var(--muted);
 		font-size: 0.85rem;
+	}
+	/* Close is a geometric X sized to the button's text: a text ×
+	sits low on its font bearings. */
+	.modal-head > button :global(.action-glyph) {
+		height: 0.8em;
 	}
 </style>

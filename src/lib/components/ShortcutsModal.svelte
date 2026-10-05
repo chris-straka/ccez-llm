@@ -7,6 +7,7 @@ CSS to this markup). Row data already lives in `$lib/shortcuts`
 (unit-pinned); the close-button title rides a prop so the page's
 `tip()` helper stays paged with its other users. -->
 <script lang="ts">
+	import ActionIcon from "./ActionIcon.svelte";
 	import { tauriBackendAvailable } from "$lib/secrets";
 	import {
 		desktopShortcuts,
@@ -80,7 +81,7 @@ CSS to this markup). Row data already lives in `$lib/shortcuts`
 			spellcheck={false}
 		/>
 		<button type="button" aria-label="Close shortcuts" title={closeTitle} onclick={onClose}>
-			×
+			<ActionIcon kind="close" />
 		</button>
 	</div>
 	<!-- Sections in usage order (hovered-message keys lead on
@@ -275,5 +276,10 @@ CSS to this markup). Row data already lives in `$lib/shortcuts`
 	}
 	:global(.app[data-android]) .chip {
 		white-space: normal;
+	}
+	/* Close is a geometric X sized to the button's text: a text ×
+	sits low on its font bearings. */
+	.modal-head button :global(.action-glyph) {
+		height: 0.8em;
 	}
 </style>
