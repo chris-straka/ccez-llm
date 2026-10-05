@@ -47,6 +47,7 @@
 	instead of the OS query, so the settings switch can pin it. */
 html[data-theme="dark"] .settings-inner .head-tokens {
 	color: #98989f;
+	color: var(--muted);
 }
 .settings-inner .panel-head:focus-visible {
 	outline: 2px solid #1c1c1e;
@@ -272,9 +273,11 @@ SettingsDrawer.svelte); 17rem clears the two nowrap buttons + gap. */
 }
 html[data-theme="dark"] .settings-inner .voice-refresh {
 	color: #98989f;
+	color: var(--muted);
 }
 html[data-theme="dark"] .settings-inner .voice-refresh:hover:not(:disabled) {
 	color: #f2f2f7;
+	color: var(--ink);
 }
 /* Native select chrome (Aqua in the shell) sizes itself, so the
 	picker would never match the text field: draw it as a twin with a
@@ -505,8 +508,144 @@ margins would not take). */
 .settings-inner .theme {
 	margin-bottom: 0.3rem;
 }
-.settings-inner .theme .segmented {
-	margin-bottom: 0.5rem;
+/* Color-scheme tiles: each paints a thumbnail of its theme (page,
+drawer edge, own-message line, text lines, composer) from raw preview
+hexes, because the tokens only resolve for the theme that is active. */
+.settings-inner .theme-tiles {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 0.5rem;
+	margin-bottom: 0.6rem;
+}
+.settings-inner .theme-tile {
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	gap: 0.3rem;
+	min-width: 0;
+	padding: 0.3rem 0.3rem 0.25rem;
+	border: 1px solid #e5e5ea;
+	border-color: var(--line-soft);
+	border-radius: 10px;
+	background: none;
+	color: inherit;
+	font: inherit;
+	cursor: pointer;
+	transition:
+		border-color 0.15s ease,
+		box-shadow 0.15s ease;
+}
+.settings-inner .theme-tile:hover {
+	border-color: #8e8e93;
+	border-color: var(--line-hover);
+}
+.settings-inner .theme-tile:not([data-state="idle"]) {
+	border-color: #007aff;
+	border-color: var(--accent);
+	box-shadow: 0 0 0 1px var(--accent);
+}
+.settings-inner .theme-tile[data-tile="light"] {
+	--tp-bg: #fff;
+	--tp-drawer: #f4f4f6;
+	--tp-edge: #c7c7cc;
+	--tp-text: #1c1c1e;
+	--tp-own: #be185d;
+	--tp-composer: #fff;
+}
+.settings-inner .theme-tile[data-tile="graphite"] {
+	--tp-bg: #121214;
+	--tp-drawer: #19191c;
+	--tp-edge: #3a3a3f;
+	--tp-text: #f2f2f7;
+	--tp-own: #f9a8d4;
+	--tp-composer: #1e1e22;
+}
+.settings-inner .theme-tile[data-tile="ink"] {
+	--tp-bg: #000;
+	--tp-drawer: #0e0e0f;
+	--tp-edge: #2c2c2e;
+	--tp-text: #e6e4df;
+	--tp-own: #f9a8d4;
+	--tp-composer: #161618;
+}
+.settings-inner .theme-tile[data-tile="warm"] {
+	--tp-bg: #171412;
+	--tp-drawer: #1d1a17;
+	--tp-edge: #3d3731;
+	--tp-text: #ece4d8;
+	--tp-own: #f9a8d4;
+	--tp-composer: #231f1b;
+}
+.settings-inner .theme-preview {
+	position: relative;
+	display: block;
+	aspect-ratio: 4 / 3;
+	border-radius: 6px;
+	overflow: hidden;
+	background: var(--tp-bg);
+	/* Light's white thumbnail needs its own edge on a white drawer. */
+	box-shadow: inset 0 0 0 1px var(--tp-edge);
+}
+.settings-inner .theme-preview > span {
+	position: absolute;
+	display: block;
+}
+.settings-inner .tp-drawer {
+	left: 0;
+	top: 0;
+	bottom: 0;
+	width: 24%;
+	background: var(--tp-drawer);
+	border-right: 1px solid var(--tp-edge);
+}
+.settings-inner .tp-line {
+	left: 34%;
+	right: 10%;
+	top: 36%;
+	height: 7%;
+	border-radius: 999px;
+	background: var(--tp-text);
+	opacity: 0.8;
+}
+.settings-inner .tp-line.tp-own {
+	left: 60%;
+	right: 8%;
+	top: 16%;
+	background: var(--tp-own);
+	opacity: 1;
+}
+.settings-inner .tp-line.tp-short {
+	right: 32%;
+	top: 50%;
+}
+.settings-inner .tp-composer {
+	left: 34%;
+	right: 8%;
+	bottom: 10%;
+	height: 16%;
+	border-radius: 4px;
+	background: var(--tp-composer);
+	box-shadow: inset 0 0 0 1px var(--tp-edge);
+}
+.settings-inner .theme-name {
+	font-size: 0.81rem;
+	text-align: center;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.settings-inner .theme-tile:not([data-state="idle"]) .theme-name {
+	font-weight: 600;
+}
+/* Day / Night captions while following the system; the empty line
+holds its height so tiles never jump when the switch flips. */
+.settings-inner .theme-when {
+	min-height: 1.2em;
+	font-size: 0.7rem;
+	line-height: 1.2;
+	text-align: center;
+	color: #6e6e73;
+	color: var(--muted);
 }
 .settings-inner .provider-row button,
 .settings-inner .segmented button {
@@ -703,6 +842,7 @@ html[data-theme="dark"] .settings-inner .panel-head:focus-visible {
 }
 html[data-theme="dark"] .settings-inner section {
 	border-color: #38383a;
+	border-color: var(--line-soft);
 }
 html[data-theme="dark"] .settings-inner input[type="url"],
 html[data-theme="dark"] .settings-inner input[type="text"],
@@ -714,8 +854,11 @@ html[data-theme="dark"] .settings-inner .segmented button,
 html[data-theme="dark"] .settings-inner .key-state button,
 html[data-theme="dark"] .settings-inner section > button {
 	background: #1c1c1e;
+	background: var(--bg-raised);
 	border-color: #48484a;
+	border-color: var(--line);
 	color: #f2f2f7;
+	color: var(--ink);
 }
 html[data-theme="dark"]
 	.settings-inner
@@ -729,7 +872,9 @@ html[data-theme="dark"] .settings-inner .key-state button:hover,
 html[data-theme="dark"] .settings-inner section > button:not(:disabled):hover,
 html[data-theme="dark"] .settings-inner .note button:hover {
 	border-color: #aeaeb2;
+	border-color: var(--focus);
 	color: #f2f2f7;
+	color: var(--ink);
 }
 html[data-theme="dark"] .settings-inner input[type="url"]:hover,
 html[data-theme="dark"] .settings-inner input[type="text"]:hover,
@@ -737,6 +882,7 @@ html[data-theme="dark"] .settings-inner input[type="password"]:hover,
 html[data-theme="dark"] .settings-inner select:hover,
 html[data-theme="dark"] .settings-inner textarea:hover {
 	border-color: #636366;
+	border-color: var(--line-hover);
 }
 html[data-theme="dark"] .settings-inner .voice-pick select {
 	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23aeaeb2' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
@@ -751,6 +897,7 @@ html[data-theme="dark"] .settings-inner input[type="password"]:focus,
 html[data-theme="dark"] .settings-inner select:focus,
 html[data-theme="dark"] .settings-inner textarea:focus {
 	border-color: #aeaeb2;
+	border-color: var(--focus);
 }
 html[data-theme="dark"] .settings-inner .font-row input[type="range"] {
 	accent-color: #f2f2f7;
@@ -760,6 +907,7 @@ html[data-theme="dark"]
 	.font-row
 	input[type="range"]::-webkit-slider-runnable-track {
 	background: #48484a;
+	background: var(--line);
 	border-radius: 999px;
 }
 html[data-theme="dark"]
@@ -767,6 +915,7 @@ html[data-theme="dark"]
 	.font-row
 	input[type="range"]::-moz-range-track {
 	background: #48484a;
+	background: var(--line);
 	border-radius: 999px;
 }
 html[data-theme="dark"]
@@ -774,30 +923,42 @@ html[data-theme="dark"]
 	.font-row
 	input[type="range"]::-moz-range-progress {
 	background: #48484a;
+	background: var(--line);
 	border-radius: 999px;
 }
 html[data-theme="dark"] .settings-inner .model-row button {
 	background: #1c1c1e;
+	background: var(--bg-raised);
 	border-color: #48484a;
+	border-color: var(--line);
 	color: #f2f2f7;
+	color: var(--ink);
 }
 html[data-theme="dark"] .settings-inner .model-row button:not(:disabled):hover {
 	border-color: #aeaeb2;
+	border-color: var(--focus);
 }
 html[data-theme="dark"] .settings-inner .provider-row button.selected,
 html[data-theme="dark"] .settings-inner .segmented button.selected {
 	background: #f2f2f7;
+	background: var(--invert);
 	border-color: #f2f2f7;
+	border-color: var(--invert);
 	color: #1c1c1e;
+	color: var(--invert-ink);
 }
 html[data-theme="dark"] .settings-inner .segmented button:disabled {
 	background: #2c2c2e;
+	background: var(--bg-wash);
 	border-color: #38383a;
+	border-color: var(--line-soft);
 	color: #636366;
+	color: var(--line-hover);
 }
 html[data-theme="dark"] .settings-inner .hint,
 html[data-theme="dark"] .settings-inner .note,
 html[data-theme="dark"] .settings-inner .build-stamp {
 	color: #98989f;
+	color: var(--muted);
 }
 /* .result rides --ok-wash now: no dark override needed. */

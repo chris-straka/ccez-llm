@@ -43,6 +43,75 @@ export const OWN_INK_CHOICES: readonly OwnInkChoice[] = [
 	"off"
 ];
 
+/** Dark palette preset, applied as `<html data-dark-style>`. */
+export type DarkStyle = "graphite" | "ink" | "warm";
+
+/** Tile order in Settings → Appearance (also the heal allowlist). */
+export const DARK_STYLES: readonly DarkStyle[] = ["graphite", "ink", "warm"];
+
+/** One tile in the color-scheme picker: the light theme or a dark style. */
+export type ThemeTile = "light" | DarkStyle;
+
+/** Picker tiles in display order. */
+export const THEME_TILES: readonly ThemeTile[] = ["light", ...DARK_STYLES];
+
+/** The two settings the color-scheme picker owns. */
+export interface SchemeChoice {
+	theme: ThemeMode;
+	darkStyle: DarkStyle;
+}
+
+/**
+ * How a tile reads: the pinned theme is selected; while following
+ * the system, Light reads as the day theme and the chosen dark
+ * style as the night theme.
+ */
+export function themeTileState(
+	choice: SchemeChoice,
+	tile: ThemeTile
+): "selected" | "day" | "night" | "idle" {
+	if (choice.theme === "system") {
+		if (tile === "light") return "day";
+		return tile === choice.darkStyle ? "night" : "idle";
+	}
+	if (choice.theme === "light") return tile === "light" ? "selected" : "idle";
+	return tile === choice.darkStyle ? "selected" : "idle";
+}
+
+/**
+ * A tile press. Pinned: the tile becomes the theme. Following the
+ * system: a dark tile becomes the night theme and the follow stays
+ * on (Light is the only day theme, so pressing it changes nothing).
+ */
+export function pickThemeTile(
+	choice: SchemeChoice,
+	tile: ThemeTile
+): SchemeChoice {
+	if (tile === "light") {
+		return choice.theme === "system"
+			? choice
+			: { theme: "light", darkStyle: choice.darkStyle };
+	}
+	return {
+		theme: choice.theme === "system" ? "system" : "dark",
+		darkStyle: tile
+	};
+}
+
+/**
+ * The follow-system switch. Turning it off pins whatever shows right
+ * now, so the screen never jumps on the click.
+ */
+export function setFollowSystem(
+	choice: SchemeChoice,
+	follow: boolean,
+	systemDark: boolean
+): SchemeChoice {
+	if (follow) return { theme: "system", darkStyle: choice.darkStyle };
+	if (choice.theme !== "system") return choice;
+	return { theme: systemDark ? "dark" : "light", darkStyle: choice.darkStyle };
+}
+
 /** Resolved scheme for a mode: pins hold, system mirrors the OS. */
 export function resolveTheme(
 	mode: ThemeMode,
@@ -213,6 +282,8 @@ export interface AppSettings {
 	promptIdleSec: number;
 	/** Color-scheme override (system follows the OS). */
 	theme: ThemeMode;
+	/** Dark palette used whenever the resolved scheme is dark. */
+	darkStyle: DarkStyle;
 	/**
 	 * Touch only: hide message bodies until tapped (tap reveals one
 	 * message for 3s). The checkbox lives in Appearance on phones.
@@ -499,6 +570,7 @@ export function defaultSettings(): AppSettings {
 		promptIdleSec: PROMPT_IDLE_DEFAULT,
 		voiceLangPinned: false,
 		theme: "system",
+		darkStyle: "graphite",
 		hideMessages: false,
 		hideButtons: true,
 		foldOnSwipe: false,
@@ -727,6 +799,9 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 		) {
 			merged.theme = "system";
 		}
+		// Dark styles postdate older saves: unknown values heal to
+		// the default palette.
+		if (!DARK_STYLES.includes(merged.darkStyle)) merged.darkStyle = "graphite";
 		// Own-ink swatches postdate older saves the same way: unknown
 		// values heal to pink.
 		if (!OWN_INK_CHOICES.includes(merged.ownInk)) merged.ownInk = "pink";

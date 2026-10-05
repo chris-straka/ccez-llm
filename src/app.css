@@ -180,6 +180,56 @@ html[data-theme="dark"] {
 	--bg-chrome: #19191c;
 	--shadow-raised: 0 10px 30px rgba(0, 0, 0, 0.35);
 }
+/* Dark styles (Settings → Appearance): each restates only the surface,
+line, and ink tokens; accents and semantic colors stay shared. Graphite
+is the plain dark block above. */
+html[data-theme="dark"][data-dark-style="ink"] {
+	/* True black for OLED phones, warm off-white ink against glare. */
+	--bg: #000;
+	--bg-chrome: #0e0e0f;
+	--bg-raised: #161618;
+	--panel: #0e0e0f;
+	--field: #0a0a0b;
+	--line: #2c2c2e;
+	--line-soft: #1f1f21;
+	--line-hover: #48484a;
+	--hover-wash: #1c1c1e;
+	--bg-wash: #1c1c1e;
+	--ink: #e6e4df;
+	--muted: #8e8c88;
+	--dim: #a8a6a1;
+	--invert: #e6e4df;
+	--bg-overlay: #1f1f21;
+	--line-overlay: #3a3a3c;
+	--overlay-hover: #2c2c2e;
+	--overlay-glass: rgba(31, 31, 33, 0.92);
+	/* Shadows vanish on black: the composer keeps a hairline lift. */
+	--shadow-raised: 0 0 0 1px #1f1f21;
+}
+html[data-theme="dark"][data-dark-style="warm"] {
+	/* Lamplight: brown-tinted darks and parchment ink for long reads. */
+	--bg: #171412;
+	--bg-chrome: #1d1a17;
+	--bg-raised: #231f1b;
+	--panel: #1d1a17;
+	--field: #120f0d;
+	--line: #3d3731;
+	--line-soft: #2c2723;
+	--line-hover: #5a5148;
+	--hover-wash: #2a2521;
+	--bg-wash: #2a2521;
+	--ink: #ece4d8;
+	--muted: #a39888;
+	--dim: #b8ad9c;
+	--focus: #b8ad9c;
+	--strong: #b8ad9c;
+	--invert: #ece4d8;
+	--invert-ink: #231f1b;
+	--bg-overlay: #2b2621;
+	--line-overlay: #554b40;
+	--overlay-hover: #36302a;
+	--overlay-glass: rgba(43, 38, 33, 0.92);
+}
 body {
 	margin: 0;
 }

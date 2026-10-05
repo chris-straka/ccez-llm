@@ -290,9 +290,11 @@ this markup). Data lookups already live in `$lib/inspect` and
 	}
 	:global(html[data-theme="dark"]) .modal-head button:hover {
 		color: #f2f2f7;
+		color: var(--ink);
 	}
 	:global(html[data-theme="dark"]) .modal-head button:hover {
 		color: #f2f2f7;
+		color: var(--ink);
 	}
 	/* Reading-locale toggle: small JP/中文 pair for ambiguous Han text. */
 	.inspect-lang {

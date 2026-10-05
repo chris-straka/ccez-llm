@@ -97,12 +97,16 @@ test("theme choice survives a reload", async ({ page }) => {
 	// NOTE: sidebar collapse is NOT covered here on purpose — the app
 	// forces `sidebarCollapsed = true` at boot by design ("always starts
 	// closed"), so it can never survive a reload. Theme is a genuinely
-	// persisted setting: pick the non-default Dark, then reload.
+	// persisted setting: pick the non-default Ink, then reload.
 	await page.keyboard.press("Meta+,");
 	const panel = page.locator(".settings-panel");
 	await expect(panel).not.toHaveClass(/closed/);
-	await panel.locator("fieldset.theme button", { hasText: "Dark" }).click();
+	// Following the system (the default) only moves the night style:
+	// pin first so the tile press sets the theme itself.
+	await panel.getByRole("checkbox", { name: "Follow the system" }).uncheck();
+	await panel.locator('.theme-tile[data-tile="ink"]').click();
 	await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+	await expect(page.locator("html")).toHaveAttribute("data-dark-style", "ink");
 	// The choice persists asynchronously; wait for the stored value.
 	await expect
 		.poll(
@@ -120,4 +124,10 @@ test("theme choice survives a reload", async ({ page }) => {
 		timeout: 60_000
 	});
 	await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+	await expect(page.locator("html")).toHaveAttribute("data-dark-style", "ink");
+	// Ink paints true black from the first frame on.
+	await expect(page.locator(".app")).toHaveCSS(
+		"background-color",
+		"rgb(0, 0, 0)"
+	);
 });

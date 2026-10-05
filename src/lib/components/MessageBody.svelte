@@ -1369,13 +1369,16 @@ import {
 	instead of the OS query, so the settings switch can pin it. */
 	:global(html[data-theme="dark"]) .folded-preview {
 		color: #98989f;
+		color: var(--muted);
 	}
 	:global(html[data-theme="dark"]) .rendered :global(pre) {
 		background: #1c1c1e;
+		background: var(--bg-raised);
 	}
 	:global(html[data-theme="dark"]) .rendered :global(th),
 	:global(html[data-theme="dark"]) .rendered :global(td) {
 		border-color: #48484a;
+		border-color: var(--line);
 	}
 	:global(html[data-theme="dark"]) .rendered :global(blockquote) {
 		border-color: #636366;
@@ -1385,56 +1388,74 @@ import {
 	}
 	:global(html[data-theme="dark"]) .rendered :global(.ccez-code) {
 		border-color: #38383a;
+		border-color: var(--line-soft);
 	}
 	:global(html[data-theme="dark"]) .rendered :global(.ccez-code-copy) {
 		color: #98989f;
+		color: var(--muted);
 	}
 	:global(html[data-theme="dark"]) .rendered :global(.ccez-code-copy:hover) {
 		color: #f2f2f7;
+		color: var(--ink);
 	}
 	:global(html[data-theme="dark"]) .rendered :global(.ccez-code-run) {
 		color: #98989f;
+		color: var(--muted);
 	}
 	:global(html[data-theme="dark"]) .rendered :global(.ccez-code-run:hover) {
 		color: #f2f2f7;
+		color: var(--ink);
 	}
 	:global(html[data-theme="dark"]) .rendered :global(.ccez-code-output) {
 		border-color: #38383a;
+		border-color: var(--line-soft);
 		background: #101013;
+		background: var(--field);
 	}
 	:global(html[data-theme="dark"]) .rendered :global(.ccez-math),
 	:global(html[data-theme="dark"]) .rendered :global(.ccez-math-inline) {
 		border-color: #38383a;
+		border-color: var(--line-soft);
 	}
 	:global(html[data-theme="dark"]) .rendered :global(.ccez-math-body),
 	:global(html[data-theme="dark"]) .rendered :global(.ccez-math-inline) {
 		background: #101013;
+		background: var(--field);
 	}
 	:global(html[data-theme="dark"]) .rendered :global(.ccez-math-copy),
 	:global(html[data-theme="dark"]) .rendered :global(.ccez-math-tex) {
 		color: #98989f;
+		color: var(--muted);
 	}
 	:global(html[data-theme="dark"]) .rendered :global(.ccez-math-copy:hover),
 	:global(html[data-theme="dark"]) .rendered :global(.ccez-math-tex:hover) {
 		color: #f2f2f7;
+		color: var(--ink);
 	}
 	:global(html[data-theme="dark"]) .rendered :global(.ccez-math-foldedlabel),
 	:global(html[data-theme="dark"]) .rendered :global(.ccez-math-raw) {
 		background: #101013;
+		background: var(--field);
 		color: #98989f;
+		color: var(--muted);
 	}
 	:global(html[data-theme="dark"]) .rendered :global(.ccez-code pre) {
 		background: #101013;
+		background: var(--field);
 	}
 	:global(html[data-theme="dark"]) .rendered :global(.ccez-code-foldedlabel) {
 		background: #101013;
+		background: var(--field);
 		color: #98989f;
+		color: var(--muted);
 	}
 	/* Inline code pills: the light background has no dark twin, so
 	filenames read white-on-white without this. */
 	:global(html[data-theme="dark"]) .rendered :global(:not(pre) > code) {
 		background: #2c2c2e;
+		background: var(--bg-wash);
 		color: #f2f2f7;
+		color: var(--ink);
 	}
 	:global(html[data-theme="dark"]) .rendered :global(.shiki),
 	:global(html[data-theme="dark"]) .rendered :global(.shiki span) {

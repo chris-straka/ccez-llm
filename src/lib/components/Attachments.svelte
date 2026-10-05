@@ -351,6 +351,7 @@ whenever the tray area is active. -->
 	dark --ink); strip buttons ride light ink. */
 	:global(html[data-theme="dark"]) .attachments button {
 		color: #f2f2f7;
+		color: var(--ink);
 	}
 	/* Idle-hide rides the prompt's slide/fade so no pill lingers over
 	the chat, and restores with it on the next input. */

@@ -605,6 +605,7 @@ cover an off state. -->
 	:global(html[data-theme="dark"]) .actions .icon-btn.active,
 	:global(html[data-theme="dark"]) .actions .icon-btn.active:hover {
 		color: #7cc3a3;
+		color: var(--ok);
 	}
 	/* Fold chevron points right while collapsed. Glyph-only transform,
 	so no box moves (the row-reveal stylesheet test forbids motion on

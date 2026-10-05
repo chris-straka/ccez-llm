@@ -165,6 +165,7 @@ markup). Field writes ride the shared object like the notices proxy
 	}
 	:global(html[data-theme="dark"]) .modal-head button:hover {
 		color: #f2f2f7;
+		color: var(--ink);
 	}
 	.modal-head button:hover {
 		border-color: #1c1c1e;

@@ -136,6 +136,7 @@ CSS to this markup). Row data already lives in `$lib/shortcuts`
 	}
 	:global(html[data-theme="dark"]) .modal-head button:hover {
 		color: #f2f2f7;
+		color: var(--ink);
 	}
 	/* Shortcuts filter: sits between the heading and ×, same field
 	chrome as the search palette input. */
@@ -219,5 +220,6 @@ CSS to this markup). Row data already lives in `$lib/shortcuts`
 	}
 	:global(html[data-theme="dark"]) :global(.app[data-android]) .keys div:nth-child(2) {
 		border-top-color: #38383a;
+		border-top-color: var(--line-soft);
 	}
 </style>

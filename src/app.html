@@ -72,6 +72,20 @@
 					background: #121214;
 				}
 			}
+			/* The script below pins the saved scheme and dark style
+      before first paint; these mirror each style's --bg. */
+			html[data-theme="light"] {
+				background: #fff;
+			}
+			html[data-theme="dark"] {
+				background: #121214;
+			}
+			html[data-theme="dark"][data-dark-style="ink"] {
+				background: #000;
+			}
+			html[data-theme="dark"][data-dark-style="warm"] {
+				background: #171412;
+			}
 		</style>
 		<script>
 			/* Cold-start theme paint: resolve the saved theme before first
@@ -83,6 +97,7 @@
       re-applies the value on mount. Never throws. */
 			try {
 				var ccezTheme = null;
+				var ccezStyle = "graphite";
 				try {
 					var ccezRaw =
 						window.localStorage &&
@@ -96,6 +111,11 @@
 							ccezParsed.theme === "system")
 					)
 						ccezTheme = ccezParsed.theme;
+					if (
+						ccezParsed &&
+						(ccezParsed.darkStyle === "ink" || ccezParsed.darkStyle === "warm")
+					)
+						ccezStyle = ccezParsed.darkStyle;
 				} catch (ccezStoreError) {}
 				var ccezDark =
 					ccezTheme === "dark" ||
@@ -103,6 +123,7 @@
 						window.matchMedia &&
 						window.matchMedia("(prefers-color-scheme: dark)").matches);
 				document.documentElement.dataset.theme = ccezDark ? "dark" : "light";
+				document.documentElement.dataset.darkStyle = ccezStyle;
 			} catch (ccezThemeError) {}
 		</script>
 		%sveltekit.head%

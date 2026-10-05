@@ -450,5 +450,6 @@ nav markup and its surfaces. -->
 	}
 	:global(html[data-theme="dark"]) .wp-sheet-head {
 		color: #98989f;
+		color: var(--muted);
 	}
 </style>

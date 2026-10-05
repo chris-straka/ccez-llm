@@ -3667,6 +3667,12 @@ import {
 		return () => query.removeEventListener("change", apply);
 	});
 
+	/** Dark palette preset: the dark tokens gate on this attribute
+	alongside data-theme, so it can sit set while light shows. */
+	$effect(() => {
+		document.documentElement.dataset.darkStyle = settings.darkStyle;
+	});
+
 	/**
 	 * Hide-messages mode (touch): every body stays hidden until its
 	 * message is tapped — the open one shows text and buttons, then

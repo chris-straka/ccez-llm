@@ -87,6 +87,24 @@ platforms can't share one vendor's identity. So the palette is
 | `--own-purple` | `#7e22ce`             | `#d8b4fe`             | Own-message ink swatch                                                                                                                                                           |
 | `--own-white`  | `#1c1c1e`             | `#ffffff`             | Own-message ink swatch: white on dark, theme ink on light (white reads nowhere on light)                                                                                         |
 
+## Dark styles
+
+Dark has three palettes, picked in Settings → Appearance (`darkStyle`
+in `settings.ts`, applied as `<html data-dark-style>`, pinned before
+first paint by the `app.html` boot script):
+
+- **Graphite** (default): the plain `html[data-theme="dark"]` block.
+- **Ink**: true black page for OLED phones, warm off-white ink
+  (`#e6e4df`); the composer lifts by a hairline since shadows vanish
+  on black.
+- **Warm**: brown-tinted darks (`#171412` page) and parchment ink
+  (`#ece4d8`) for long reads.
+
+Each style block restates only surface, line, and ink tokens; accents,
+semantic colors, and own-ink swatches are shared. A dark override rule
+in a component must name a token (hex fallback, then `var()`), or it
+paints Graphite gray inside Ink and Warm.
+
 ## Exceptions (raw hex allowed, documented here)
 
 - **Always-dark surfaces.** `.voice-error` (the floating speech error)
@@ -95,6 +113,10 @@ platforms can't share one vendor's identity. So the palette is
 - **Light-only wash.** Settings selected rows wash `#e5f0ff` on light
   and invert on dark; the wash side has no dark twin, so it stays raw
   until dark selections want one.
+- **Scheme picker thumbnails.** The color-scheme tiles in
+  `panels.css` (`--tp-*`) paint each theme with raw hexes: the real
+  tokens only resolve for the theme that is active. Keep them in step
+  with the style blocks in `app.css`.
 - **Fallback lines.** The first line of every `hex` + `var()` pair,
   and the token definitions in `app.css` themselves.
 - **Decorative dots.** The TTS speaking dot (`#30a46c`) and the
@@ -115,6 +137,13 @@ platforms can't share one vendor's identity. So the palette is
 
 ## Log
 
+- **2026-10-04 — Dark styles: Graphite, Ink, Warm.** The scheme
+  buttons became thumbnail tiles (Light, Graphite, Ink, Warm) plus a
+  Follow the system switch; while following, Light reads Day and the
+  chosen dark style reads Night. Ink and Warm restate the surface and
+  ink tokens under `data-dark-style`. Every raw dark hex left in
+  component dark rules (code blocks, math, tables, settings fields,
+  modals) now pairs with its token, so the styles reach them.
 - **2026-10-04 — Graphite dark.** The dark theme gets real surface
   steps instead of one gray: thread `#121214`, drawers `#19191c`
   (`--bg-chrome`), composer `#1e1e22` on a soft shadow

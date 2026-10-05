@@ -835,3 +835,53 @@ test.describe("mobile attachment pills", () => {
 		);
 	});
 });
+
+/** The scheme picker: tiles pin a theme; following the system reads
+Light as Day and the chosen dark style as Night, and turning the
+follow off pins whatever shows. Playwright emulates a light OS. */
+test("scheme tiles pin themes and follow the system", async ({ page }) => {
+	await seedChat(page, [{ role: "user", content: "hi" }]);
+	await page.goto("/");
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
+	await page.keyboard.press("Meta+,");
+	const panel = page.locator(".settings-panel");
+	await expect(panel).not.toHaveClass(/closed/);
+	const html = page.locator("html");
+	const tile = (name: string) =>
+		panel.locator(`.theme-tile[data-tile="${name}"]`);
+	const follow = panel.getByRole("checkbox", { name: "Follow the system" });
+	// Default: following, light OS, Graphite at night.
+	await expect(follow).toBeChecked();
+	await expect(tile("light")).toHaveAttribute("data-state", "day");
+	await expect(tile("graphite")).toHaveAttribute("data-state", "night");
+	await expect(html).toHaveAttribute("data-theme", "light");
+	// A dark tile while following moves Night only.
+	await tile("warm").click();
+	await expect(tile("warm")).toHaveAttribute("data-state", "night");
+	await expect(tile("graphite")).toHaveAttribute("data-state", "idle");
+	await expect(follow).toBeChecked();
+	await expect(html).toHaveAttribute("data-theme", "light");
+	// Pressing a tile with the follow off pins it.
+	await follow.uncheck();
+	await expect(html).toHaveAttribute("data-theme", "light");
+	await expect(tile("light")).toHaveAttribute("data-state", "selected");
+	await tile("warm").click();
+	await expect(html).toHaveAttribute("data-theme", "dark");
+	await expect(html).toHaveAttribute("data-dark-style", "warm");
+	await expect(page.locator(".app")).toHaveCSS(
+		"background-color",
+		"rgb(23, 20, 18)"
+	);
+	await expect(page.locator(".app")).toHaveCSS(
+		"color",
+		"rgb(236, 228, 216)"
+	);
+	await tile("graphite").click();
+	await expect(page.locator(".app")).toHaveCSS(
+		"background-color",
+		"rgb(18, 18, 20)"
+	);
+	await expect(tile("graphite")).toHaveAttribute("data-state", "selected");
+});

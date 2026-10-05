@@ -34,6 +34,10 @@ import {
 	CORRECTION_HINT,
 	systemLocale,
 	resolveTheme,
+	themeTileState,
+	pickThemeTile,
+	setFollowSystem,
+	DARK_STYLES,
 	OWN_INK_CHOICES,
 	validCaptureArea,
 	type AppSettings
@@ -920,5 +924,88 @@ describe("step helpers", () => {
 		expect(stepChatWidth(36, 2)).toBe(38);
 		expect(stepChatWidth(120, 2)).toBe(120);
 		expect(stepChatWidth(28, -2)).toBe(28);
+	});
+});
+
+describe("color-scheme picker", () => {
+	it("marks the pinned theme selected", () => {
+		expect(themeTileState({ theme: "light", darkStyle: "ink" }, "light")).toBe(
+			"selected"
+		);
+		expect(themeTileState({ theme: "light", darkStyle: "ink" }, "ink")).toBe(
+			"idle"
+		);
+		expect(themeTileState({ theme: "dark", darkStyle: "warm" }, "warm")).toBe(
+			"selected"
+		);
+		expect(themeTileState({ theme: "dark", darkStyle: "warm" }, "light")).toBe(
+			"idle"
+		);
+		expect(
+			themeTileState({ theme: "dark", darkStyle: "warm" }, "graphite")
+		).toBe("idle");
+	});
+
+	it("reads Light as day and the dark style as night while following", () => {
+		const follow = { theme: "system", darkStyle: "ink" } as const;
+		expect(themeTileState(follow, "light")).toBe("day");
+		expect(themeTileState(follow, "ink")).toBe("night");
+		expect(themeTileState(follow, "graphite")).toBe("idle");
+	});
+
+	it("pins the pressed tile", () => {
+		expect(
+			pickThemeTile({ theme: "light", darkStyle: "graphite" }, "warm")
+		).toEqual({
+			theme: "dark",
+			darkStyle: "warm"
+		});
+		expect(pickThemeTile({ theme: "dark", darkStyle: "ink" }, "light")).toEqual(
+			{
+				theme: "light",
+				darkStyle: "ink"
+			}
+		);
+	});
+
+	it("moves only the night theme while following", () => {
+		const follow = { theme: "system", darkStyle: "graphite" } as const;
+		expect(pickThemeTile(follow, "ink")).toEqual({
+			theme: "system",
+			darkStyle: "ink"
+		});
+		expect(pickThemeTile(follow, "light")).toEqual(follow);
+	});
+
+	it("pins what shows when following turns off", () => {
+		const follow = { theme: "system", darkStyle: "warm" } as const;
+		expect(setFollowSystem(follow, false, true)).toEqual({
+			theme: "dark",
+			darkStyle: "warm"
+		});
+		expect(setFollowSystem(follow, false, false)).toEqual({
+			theme: "light",
+			darkStyle: "warm"
+		});
+		expect(
+			setFollowSystem({ theme: "dark", darkStyle: "ink" }, true, false)
+		).toEqual({
+			theme: "system",
+			darkStyle: "ink"
+		});
+	});
+
+	it("heals unknown dark styles to graphite", () => {
+		expect(defaultSettings().darkStyle).toBe("graphite");
+		const bad = blankSettings();
+		(bad as unknown as Record<string, unknown>).darkStyle = "neon";
+		saveSettings(bad, memoryStore);
+		expect(loadSettings(memoryStore).darkStyle).toBe("graphite");
+		for (const style of DARK_STYLES) {
+			const kept = blankSettings();
+			kept.darkStyle = style;
+			saveSettings(kept, memoryStore);
+			expect(loadSettings(memoryStore).darkStyle).toBe(style);
+		}
 	});
 });

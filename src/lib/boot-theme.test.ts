@@ -18,13 +18,13 @@ function bootThemeScript(): string {
 	return html.slice(start + "<script>".length, end);
 }
 
-function paint(opts: {
+function boot(opts: {
 	stored: string | null;
 	legacyStored?: string | null;
 	systemDark: boolean;
 	storage?: boolean;
 	media?: boolean;
-}): string {
+}): Record<string, string> {
 	const dataset: Record<string, string> = {};
 	const store = new Map<string, string>();
 	if (opts.stored !== null) store.set("ccez-llm-settings-v1", opts.stored);
@@ -46,7 +46,11 @@ function paint(opts: {
 		sandbox.window = opts.media === false ? {} : { matchMedia: () => ({ matches: opts.systemDark }) };
 	}
 	runInNewContext(bootThemeScript(), sandbox);
-	return dataset["theme"] ?? "";
+	return dataset;
+}
+
+function paint(opts: Parameters<typeof boot>[0]): string {
+	return boot(opts)["theme"] ?? "";
 }
 
 describe("boot theme paint", () => {
@@ -83,6 +87,29 @@ describe("boot theme paint", () => {
 				systemDark: false
 			})
 		).toBe("dark");
+	});
+
+	it("pins the saved dark style before first paint", () => {
+		expect(
+			boot({
+				stored: JSON.stringify({ theme: "dark", darkStyle: "ink" }),
+				systemDark: false
+			})["darkStyle"]
+		).toBe("ink");
+		expect(
+			boot({ stored: JSON.stringify({ darkStyle: "warm" }), systemDark: true })[
+				"darkStyle"
+			]
+		).toBe("warm");
+		// Unknown or missing styles paint the default palette.
+		expect(
+			boot({ stored: JSON.stringify({ darkStyle: "neon" }), systemDark: true })[
+				"darkStyle"
+			]
+		).toBe("graphite");
+		expect(boot({ stored: "{nope", systemDark: true })["darkStyle"]).toBe(
+			"graphite"
+		);
 	});
 
 	it("survives corrupt storage and missing APIs without throwing", () => {
