@@ -1167,6 +1167,49 @@ test.describe("touch", () => {
 		await expect(page.locator(".toast")).toHaveText("Chat deleted");
 	});
 
+	/** Giant text: the menu grows with the type but both buttons stay
+	whole on screen (at 400% Annotate once filled the width and
+	clipped Copy). */
+	for (const fontScale of [4, 8]) {
+		test(`touch selection menu fits the phone at ${fontScale * 100}% text`, async ({
+			page
+		}) => {
+			await seedChat(
+				page,
+				[{ role: "assistant", content: "Bonjour, comment allez-vous ?" }],
+				null,
+				{ fontScale }
+			);
+			await page.goto("/");
+			await expect(page.locator("article .rendered").first()).toBeVisible();
+			await summonTouchSelection(page);
+			const buttons = page.locator(".sel-menu button");
+			await expect(buttons).toHaveText(["Annotate", "Copy"]);
+			await page.waitForTimeout(250);
+			await page.screenshot({
+				path: `.screenshots/sel-menu-giant-${fontScale}.png`
+			});
+			const report = await page.evaluate(() => {
+				const vw = document.documentElement.clientWidth;
+				const menu = document.querySelector(".sel-menu");
+				if (!(menu instanceof HTMLElement)) return ["no menu"];
+				const box = menu.getBoundingClientRect();
+				const out: string[] = [];
+				if (box.left < 0 || box.right > vw)
+					out.push(`menu ${Math.round(box.left)}..${Math.round(box.right)} of ${vw}`);
+				for (const btn of menu.querySelectorAll("button")) {
+					const r = btn.getBoundingClientRect();
+					if (r.left < box.left - 1 || r.right > box.right + 1)
+						out.push(`${btn.textContent} clipped by the menu`);
+					if (btn.scrollWidth > btn.clientWidth + 1)
+						out.push(`${btn.textContent} label overflows`);
+				}
+				return out;
+			});
+			expect(report).toEqual([]);
+		});
+	}
+
 	test("touch selection floats Copy/Annotate/Speak, Inspect stays docked", async ({
 		page
 	}) => {
