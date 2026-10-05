@@ -901,3 +901,39 @@ html[data-theme="dark"] .rendered mark.ccez-ann.leaving,
 html[data-theme="dark"] .news-card-title mark.ccez-ann.leaving {
 	animation-name: ann-wash-out-dark;
 }
+
+/* Landing pulse: a whole-message jump (waypoint list, Reply ready
+toast) tints the landed message in the flash yellow (lighter than
+the word flash), holds, and fades it out, so the eye
+finds it after the scroll. Text-level jumps flash their words
+instead (Highlight registry). Reduced motion skips it. */
+@keyframes msg-landed {
+	0%,
+	35% {
+		background-color: rgba(255, 224, 102, 0.42);
+	}
+	100% {
+		background-color: rgba(255, 224, 102, 0);
+	}
+}
+@keyframes msg-landed-dark {
+	0%,
+	35% {
+		background-color: rgba(245, 158, 11, 0.28);
+	}
+	100% {
+		background-color: rgba(245, 158, 11, 0);
+	}
+}
+article.landed {
+	border-radius: 10px;
+	animation: msg-landed 1.4s ease-out 1 both;
+}
+html[data-theme="dark"] article.landed {
+	animation-name: msg-landed-dark;
+}
+@media (prefers-reduced-motion: reduce) {
+	article.landed {
+		animation: none;
+	}
+}

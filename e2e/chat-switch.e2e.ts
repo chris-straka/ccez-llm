@@ -398,3 +398,43 @@ test("Shift+R reads the hovered chat's name", async ({ page }) => {
 		.poll(() => page.evaluate(() => (window as unknown as { __spoken: string[] }).__spoken.join("|")))
 		.toContain("Comment dit-on window");
 });
+
+/** Picking a chat from a filtered list lands on the filter's first
+match there and flashes it. */
+test("a filtered pick flashes the match", async ({ page }) => {
+	const filler = Array.from({ length: 12 }, (_, i) => ({
+		role: (i % 2 ? "assistant" : "user") as "user" | "assistant",
+		content: `Filler paragraph ${i}. `.repeat(20)
+	}));
+	await seedChat(page, [
+		...filler,
+		{ role: "assistant", content: "Am Ende: die Straße ist lang." },
+		...filler.slice(0, 4)
+	]);
+	await page.goto("/");
+	await expect(page.locator(".send-btn")).toBeVisible({ timeout: 60_000 });
+	await toggleSidebar(page);
+	await page.locator("aside .side-search").fill("strasse");
+	await page.locator("aside ul li button.side-chat").first().click();
+	const flashSize = (): Promise<number> =>
+		page.evaluate(() => {
+			const reg = (
+				window.CSS as unknown as {
+					highlights?: { get(n: string): { size: number } | undefined };
+				}
+			).highlights;
+			return reg?.get("ccez-ann-flash")?.size ?? 0;
+		});
+	await expect.poll(flashSize, { timeout: 5_000 }).toBeGreaterThan(0);
+	await page.waitForTimeout(300);
+	await page.screenshot({ path: ".screenshots/filter-flash.png" });
+	// The flashed words sit in view.
+	const inView = await page.evaluate(() => {
+		const p = [...document.querySelectorAll("article .rendered p")].find((el) =>
+			el.textContent?.includes("Straße")
+		);
+		const r = p?.getBoundingClientRect();
+		return !!r && r.top >= 0 && r.bottom <= window.innerHeight;
+	});
+	expect(inView).toBe(true);
+});

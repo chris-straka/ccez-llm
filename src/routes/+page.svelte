@@ -439,6 +439,8 @@ import {
 		findMessageIndices,
 		findQueryFor,
 		groupHitsByChat,
+		hitMatchText,
+		matchedText,
 		type SearchHit
 	} from "$lib/chatSearch";
 	import {
@@ -2802,10 +2804,15 @@ import {
 				// composer.)
 				focusMode = "edit";
 				selectedIdx = -1;
+				// The matched words flash where the hit lands (hold, then
+				// fade), so a long message shows where to look.
+				const flashText = hitMatchText(hit);
+				const msgId = hit.doc.msgId as ChatMsgId;
 				requestAnimationFrame(() => {
 					const el = document.getElementById(`msg-${index}`);
-					el?.scrollIntoView({ block: "center", behavior: "smooth" });
 					el?.focus({ preventScroll: true });
+					if (flashText) jumpToQuotedText(msgId, flashText);
+					else el?.scrollIntoView({ block: "center", behavior: "smooth" });
 				});
 				return;
 			}
@@ -2857,10 +2864,31 @@ import {
 		if (index === undefined) return;
 		enterScrollMode();
 		selectedIdx = index;
+		const msg = viewChat.messages[index];
+		const flashText = msg ? matchedText(msg.content, find.query) : null;
 		requestAnimationFrame(() => {
-			document
-				.getElementById(`msg-${index}`)
-				?.scrollIntoView({ block: "center", behavior: "smooth" });
+			// Each stop flashes the matched words inside the message.
+			if (msg && flashText) jumpToQuotedText(msg.id, flashText);
+			else
+				document
+					.getElementById(`msg-${index}`)
+					?.scrollIntoView({ block: "center", behavior: "smooth" });
+		});
+	}
+
+	/** Picking a chat from a filtered list lands on the filter's first
+	match there, flashed, instead of wherever the chat was left. */
+	function landFilterMatch(id: ChatId, query: string): void {
+		if (!query.trim()) return;
+		requestAnimationFrame(() => {
+			if (chatState.activeChatId !== id) return;
+			for (const msg of viewChat.messages) {
+				const text = matchedText(msg.content, query);
+				if (text) {
+					jumpToQuotedText(msg.id, text);
+					return;
+				}
+			}
 		});
 	}
 	function stepFind(delta: 1 | -1): void {
@@ -7076,9 +7104,17 @@ import {
 				// toast — a reply must not finish silently in a thread
 				// the user left. Tapping opens the origin chat.
 				buzzTap();
-				flashToast("Reply ready", () =>
-					transitionToChat(originId)
-				);
+				flashToast("Reply ready", () => {
+					transitionToChat(originId);
+					// Land on the new reply's start and pulse it.
+					requestAnimationFrame(() => {
+						const last = Math.max(viewChat.messages.length - 1, 0);
+						document
+							.getElementById(`msg-${last}`)
+							?.scrollIntoView({ block: "start", behavior: "smooth" });
+						pulseLanded(last);
+					});
+				});
 			}
 		}
 		// Follow the stream only while its chat is open — and only a
@@ -7731,6 +7767,37 @@ import {
 		document
 			.getElementById(`msg-${selectedIdx}`)
 			?.scrollIntoView({ block: "start", behavior: "smooth" });
+	}
+
+	/** Tint a landed message once (see `article.landed` in app.css),
+	starting when the jump's scroll settles so the fade plays in view.
+	A repeat landing restarts it. */
+	function pulseLanded(index: number): void {
+		const start = (): void => {
+			const el = document.getElementById(`msg-${index}`);
+			if (!el) return;
+			el.classList.remove("landed");
+			void el.offsetWidth;
+			el.classList.add("landed");
+			el.addEventListener("animationend", () => el.classList.remove("landed"), {
+				once: true
+			});
+		};
+		const box = scrollBox;
+		if (!(box instanceof HTMLElement) || !("onscrollend" in box)) {
+			setTimeout(start, 450);
+			return;
+		}
+		let done = false;
+		const go = (): void => {
+			if (done) return;
+			done = true;
+			box.removeEventListener("scrollend", go);
+			start();
+		};
+		box.addEventListener("scrollend", go);
+		// No scroll (already in view) never fires scrollend.
+		setTimeout(go, 600);
 	}
 
 	/**
@@ -13111,6 +13178,7 @@ import {
 				transitionToChat(id);
 				settings.sidebarCollapsed = true;
 				persistSettings();
+				landFilterMatch(id, sideSearch);
 			},
 			exportOne: (item: Chat) => void exportOneChat(item),
 			drop: (id: ChatId) => {
@@ -13205,6 +13273,7 @@ import {
 				},
 				jump: (index: number, event: MouseEvent) => {
 					jumpTo(index);
+					pulseLanded(selectedIdx);
 					wpOpen = false;
 					buzzTap();
 					// Mouse jumps release focus so hover-outside can

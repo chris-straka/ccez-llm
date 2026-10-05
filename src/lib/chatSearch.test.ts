@@ -7,6 +7,8 @@ import {
 	findQueryFor,
 	foldText,
 	groupHitsByChat,
+	hitMatchText,
+	matchedText,
 	hitTag,
 	markSegments,
 	parseQuery,
@@ -311,5 +313,26 @@ describe("findQueryFor", () => {
 	it("drops filters and quote marks, keeps the words", () => {
 		expect(findQueryFor('"Guten Morgen" from:me')).toBe("Guten Morgen");
 		expect(findQueryFor("in:notes café")).toBe("café");
+	});
+});
+
+describe("matchedText", () => {
+	it("returns the source spelling of a folded match", () => {
+		expect(matchedText("Was heißt Über alles?", "uber")).toBe("Über");
+		expect(matchedText("Straße und Weg", "strasse")).toBe("Straße");
+		expect(matchedText("Un café noir", "Cafe noir")).toBe("café noir");
+	});
+
+	it("falls back to the first word, else null", () => {
+		expect(matchedText("miso soup today", "miso ramen")).toBe("miso");
+		expect(matchedText("nothing here", "absent")).toBeNull();
+	});
+
+	it("reads a hit's first marked span", () => {
+		const [hit] = querySearch(
+			[{ chatId: "a", msgId: "m", kind: "message", text: "Über means over." }],
+			"uber"
+		);
+		expect(hit ? hitMatchText(hit) : null).toBe("Über");
 	});
 });

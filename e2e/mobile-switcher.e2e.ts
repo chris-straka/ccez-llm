@@ -371,10 +371,23 @@ test("switcher search finds unaccented words and steps matches in the chat", asy
 	await expect(bar).toBeVisible();
 	await expect(bar.locator(".find-count")).toHaveText("3/3");
 	await expect(bar.locator("input")).not.toBeFocused();
-	await page.waitForTimeout(500);
+	// The landing flashes the matched word (Highlight registry).
+	const flashSize = (): Promise<number> =>
+		page.evaluate(() => {
+			const reg = (
+				window.CSS as unknown as {
+					highlights?: { get(n: string): { size: number } | undefined };
+				}
+			).highlights;
+			return reg?.get("ccez-ann-flash")?.size ?? 0;
+		});
+	await expect.poll(flashSize, { timeout: 5_000 }).toBeGreaterThan(0);
 	await page.screenshot({ path: ".screenshots/phone-find-bar.png" });
+	await expect.poll(flashSize, { timeout: 5_000 }).toBe(0);
 	await bar.getByRole("button", { name: "Next match" }).tap();
 	await expect(bar.locator(".find-count")).toHaveText("1/3");
+	// Each step flashes again.
+	await expect.poll(flashSize, { timeout: 5_000 }).toBeGreaterThan(0);
 	await bar.getByRole("button", { name: "Close find" }).tap();
 	await expect(bar).toHaveCount(0);
 });

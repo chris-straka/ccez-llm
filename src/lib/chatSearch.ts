@@ -534,3 +534,29 @@ export function findQueryFor(query: string): string {
 		.replace(/\s+/g, " ")
 		.trim();
 }
+
+/** The source text a folded query matched in `content` ("uber" in
+"Über alles" gives "Über"), so a landing can flash the words exactly
+as written. Tries the whole query, then its first word; null when
+neither appears. */
+export function matchedText(content: string, query: string): string | null {
+	const { folded, map } = foldWithMap(content);
+	const whole = foldText(query.trim());
+	const first = tokenizeText(whole)[0] ?? "";
+	for (const needle of [whole, first]) {
+		if (!needle) continue;
+		const at = folded.indexOf(needle);
+		if (at < 0) continue;
+		const start = toSource(map, at, content.length);
+		const end = Math.max(toSource(map, at + needle.length, content.length), start + 1);
+		return content.slice(start, end);
+	}
+	return null;
+}
+
+/** The first marked span of a hit's snippet: the words to flash where
+the hit lands (marks map back to source text, accents included). */
+export function hitMatchText(hit: SearchHit): string | null {
+	const mark = hit.marks[0];
+	return mark ? hit.snippet.slice(mark[0], mark[1]) : null;
+}
