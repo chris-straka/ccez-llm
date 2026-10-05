@@ -66,6 +66,10 @@ html {
 	--overlay-glass: rgba(255, 255, 255, 0.88);
 	--shadow-overlay: 0 12px 40px rgba(0, 0, 0, 0.18);
 	--scrim: rgba(0, 0, 0, 0.15);
+	/* Drawers (chat list, settings) and the raised composer: one step
+	off the thread on dark; light keeps the plain page. */
+	--bg-chrome: #fff;
+	--shadow-raised: none;
 }
 html[data-theme="light"] {
 	background: var(--bg);
@@ -120,6 +124,8 @@ html[data-theme="light"] {
 	--overlay-glass: rgba(255, 255, 255, 0.88);
 	--shadow-overlay: 0 12px 40px rgba(0, 0, 0, 0.18);
 	--scrim: rgba(0, 0, 0, 0.15);
+	--bg-chrome: #fff;
+	--shadow-raised: none;
 }
 html[data-theme="dark"] {
 	background: var(--bg);
@@ -135,7 +141,7 @@ html[data-theme="dark"] {
 	--sel-tint: rgba(10, 132, 255, 0.4);
 	--ok: #7cc3a3;
 	--hl: #12233d;
-	--hover-wash: #2c2c2e;
+	--hover-wash: #26262a;
 	--dim: #aeaeb2;
 	--thinking-2: #64d2ff;
 	--thinking-3: #30d158;
@@ -151,26 +157,28 @@ html[data-theme="dark"] {
 	--error-bg: #3d1008;
 	--error-ink: #ffb4a2;
 	--error-line: #7a2a1c;
-	--panel: #1c1c1e;
-	--field: #101013;
+	--panel: #19191c;
+	--field: #0e0e10;
 	--invert: #f2f2f7;
 	--invert-ink: #1c1c1e;
 	--danger: #e89a90;
-	--bg: #17171a;
-	--bg-raised: #1c1c1e;
-	--bg-wash: #2c2c2e;
+	--bg: #121214;
+	--bg-raised: #1e1e22;
+	--bg-wash: #26262a;
 	--ink: #f2f2f7;
 	--muted: #98989f;
-	--line: #48484a;
-	--line-soft: #38383a;
-	--line-hover: #636366;
+	--line: #3a3a3f;
+	--line-soft: #2a2a2e;
+	--line-hover: #55555b;
 	--focus: #aeaeb2;
-	--bg-overlay: #2c2c2e;
-	--line-overlay: #545458;
-	--overlay-hover: #3a3a3c;
-	--overlay-glass: rgba(44, 44, 46, 0.92);
+	--bg-overlay: #2a2a2f;
+	--line-overlay: #4a4a50;
+	--overlay-hover: #36363c;
+	--overlay-glass: rgba(42, 42, 47, 0.92);
 	--shadow-overlay: 0 18px 50px rgba(0, 0, 0, 0.65), 0 2px 6px rgba(0, 0, 0, 0.4);
 	--scrim: rgba(0, 0, 0, 0.45);
+	--bg-chrome: #19191c;
+	--shadow-raised: 0 10px 30px rgba(0, 0, 0, 0.35);
 }
 body {
 	margin: 0;

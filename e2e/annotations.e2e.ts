@@ -1388,7 +1388,7 @@ for (const theme of ["light", "dark"] as const) {
 		const card = page.locator(".ann-refs-pop").first();
 		await expect(card).toHaveCSS(
 			"background-color",
-			theme === "light" ? "rgb(255, 255, 255)" : "rgb(44, 44, 46)"
+			theme === "light" ? "rgb(255, 255, 255)" : "rgb(42, 42, 47)"
 		);
 		await expect(page.locator(".ann-refs-comment").first()).toHaveCSS(
 			"color",

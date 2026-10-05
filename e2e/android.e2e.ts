@@ -1676,7 +1676,7 @@ test.describe("touch", () => {
 			?.map(Number)
 			.slice(0, 3)
 			.map((v) => Math.round(bg.startsWith("color") ? v * 255 : v));
-		expect(channels).toEqual([23, 23, 26]);
+		expect(channels).toEqual([18, 18, 20]);
 	});
 
 	test.describe("dark phone", () => {

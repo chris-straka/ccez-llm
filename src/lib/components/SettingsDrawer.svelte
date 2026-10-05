@@ -113,7 +113,7 @@ bookkeeping reads it). -->
 		overflow-y: auto;
 		overflow-x: hidden;
 		background: #fff;
-		background: var(--bg);
+		background: var(--bg-chrome);
 		/* Same drawer contract as the chat list (see aside): the
 		fade used to finish first and swallow the closing slide. */
 		transition:

@@ -70,12 +70,14 @@ platforms can't share one vendor's identity. So the palette is
 | `--hl`         | `#eef4ff`             | `#12233d`             | Attachment pills, jump highlight wash                                                                                                                                            |
 | `--hover-wash` | `#ececf1`             | `#2c2c2e`             | Row hovers                                                                                                                                                                       |
 | `--focus`      | `#3a3a3c`             | `#aeaeb2`             | Focus rings, selected-row marker                                                                                                                                                 |
-| `--bg-overlay` | `#fff` | `#2c2c2e` | Floating overlay surface: annotation box, answer card, sent and draft cards. One clear step above the page on dark (`#1c1c1e` on `#17171a` read as page) |
-| `--line-overlay` | `#e5e5ea` | `#545458` | Overlay hairline edge, also the selection menu's dividers |
-| `--overlay-hover` | `#f1f1f4` | `#3a3a3c` | Hover wash on overlay buttons (`--bg-wash` equals the dark overlay) |
-| `--overlay-glass` | `rgba(255,255,255,.88)` | `rgba(44,44,46,.92)` | Frosted overlays: selection menu, readings panels |
+| `--bg-overlay` | `#fff` | `#2a2a2f` | Floating overlay surface: annotation box, answer card, sent and draft cards. One clear step above the page on dark (`#1c1c1e` on `#17171a` read as page) |
+| `--line-overlay` | `#e5e5ea` | `#4a4a50` | Overlay hairline edge, also the selection menu's dividers |
+| `--overlay-hover` | `#f1f1f4` | `#36363c` | Hover wash on overlay buttons (`--bg-wash` equals the dark overlay) |
+| `--overlay-glass` | `rgba(255,255,255,.88)` | `rgba(42,42,47,.92)` | Frosted overlays: selection menu, readings panels |
 | `--shadow-overlay` | `0 12px 40px` at `.18` | two layers, `.65` + `.4` | Overlay drop shadow; dark needs the heavier stack to show at all |
 | `--scrim` | `rgba(0,0,0,.15)` | `rgba(0,0,0,.45)` | Thread dim while the annotation box or answer card is open, painted as a `100vmax` spread ring on the overlay's own shadow (no element, click-off still lands) |
+| `--bg-chrome` | `#fff` | `#19191c` | Drawers (chat list, settings): one step off the thread on dark |
+| `--shadow-raised` | `none` | `0 10px 30px` at `.35` | The composer floats on dark; light stays flat |
 | `--thinking-2` | `#5ac8fa`             | `#64d2ff`             | Thinking dots middle step (sky; dot 1 rides `--accent`)                                                                                                                          |
 | `--thinking-3` | `#34c759`             | `#30d158`             | Thinking dots last step (green)                                                                                                                                                  |
 | `--own-pink`   | `#be185d`             | `#f9a8d4`             | Own-message ink: default swatch (deep rose / pink), wired via `main[data-own-ink]`                                                                                               |
@@ -113,6 +115,14 @@ platforms can't share one vendor's identity. So the palette is
 
 ## Log
 
+- **2026-10-04 — Graphite dark.** The dark theme gets real surface
+  steps instead of one gray: thread `#121214`, drawers `#19191c`
+  (`--bg-chrome`), composer `#1e1e22` on a soft shadow
+  (`--shadow-raised`), overlays `#2a2a2f`. Lines, washes, and field
+  step down to match (`--line #3a3a3f`, `--line-soft #2a2a2e`,
+  `--line-hover #55555b`, washes `#26262a`, `--field #0e0e10`).
+  Cold-start paints (`app.html`, web manifest, Android night theme)
+  follow the new page color. Light is unchanged.
 - **2026-10-04 — Overlays lift and dim (option B).** On dark, the
   annotation box and answer card were `#1c1c1e` on a `#17171a` page,
   so an open box read as page chrome. New overlay tokens: popups sit

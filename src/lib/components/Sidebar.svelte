@@ -197,7 +197,7 @@ only this drawer through scoping. -->
 		max-width: calc(100vw * var(--ui-scale-inv, 1));
 		z-index: 55;
 		background: #fff;
-		background: var(--bg);
+		background: var(--bg-chrome);
 		box-shadow: 8px 0 24px rgba(0, 0, 0, 0.12);
 		border-right: 1px solid #e5e5ea;
 		border-right-color: var(--line-soft);

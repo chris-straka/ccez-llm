@@ -44,12 +44,12 @@ test("dark theme paints dark surfaces", async ({ page }) => {
 	await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 	await expect(page.locator(".app")).toHaveCSS(
 		"background-color",
-		"rgb(23, 23, 26)"
+		"rgb(18, 18, 20)"
 	);
 	await expect(page.locator(".app")).toHaveCSS("color", "rgb(242, 242, 247)");
 	await expect(page.locator(".prompt")).toHaveCSS(
 		"background-color",
-		"rgb(28, 28, 30)"
+		"rgb(30, 30, 34)"
 	);
 });
 
@@ -144,6 +144,7 @@ const THEMES = [
 	{
 		name: "light" as const,
 		bg: "rgb(255, 255, 255)",
+		chrome: "rgb(255, 255, 255)",
 		wash: "rgb(241, 241, 244)",
 		softLine: "rgb(229, 229, 234)",
 		ink: "rgb(28, 28, 30)",
@@ -151,9 +152,11 @@ const THEMES = [
 	},
 	{
 		name: "dark" as const,
-		bg: "rgb(23, 23, 26)",
-		wash: "rgb(44, 44, 46)",
-		softLine: "rgb(56, 56, 58)",
+		bg: "rgb(18, 18, 20)",
+		// Drawers sit one step off the thread on dark.
+		chrome: "rgb(25, 25, 28)",
+		wash: "rgb(38, 38, 42)",
+		softLine: "rgb(42, 42, 46)",
 		ink: "rgb(242, 242, 247)",
 		ownInk: "rgb(249, 168, 212)"
 	}
@@ -181,12 +184,12 @@ for (const t of THEMES) {
 		await chat.hover();
 		await expect(chat).toHaveCSS(
 			"background-color",
-			L ? "rgb(236, 236, 241)" : "rgb(44, 44, 46)"
+			L ? "rgb(236, 236, 241)" : "rgb(38, 38, 42)"
 		);
 		const fresh = sidebar.locator(".new");
 		await expect(fresh).toHaveCSS(
 			"border-color",
-			L ? "rgb(199, 199, 204)" : "rgb(72, 72, 74)"
+			L ? "rgb(199, 199, 204)" : "rgb(58, 58, 63)"
 		);
 		await fresh.hover();
 		await expect(fresh).toHaveCSS(
@@ -214,7 +217,7 @@ for (const t of THEMES) {
 			timeout: 60_000
 		});
 		const sidebar = page.locator("aside:has(button.side-chat)");
-		await expect(sidebar).toHaveCSS("background-color", t.bg);
+		await expect(sidebar).toHaveCSS("background-color", t.chrome);
 		await expect(sidebar).toHaveCSS("border-right-color", t.softLine);
 	});
 
@@ -293,7 +296,7 @@ for (const t of THEMES) {
 		await expect(page.locator(".settings-panel")).not.toHaveClass(/closed/);
 		await expect(page.locator(".settings-panel")).toHaveCSS(
 			"background-color",
-			t.bg
+			t.chrome
 		);
 		await expect(page.locator(".settings-panel")).toHaveCSS(
 			"border-left-color",
@@ -323,7 +326,7 @@ for (const t of THEMES) {
 		const prompt = page.locator(".prompt");
 		await expect(prompt).toHaveCSS(
 			"background-color",
-			t.name === "light" ? t.bg : "rgb(28, 28, 30)"
+			t.name === "light" ? t.bg : "rgb(30, 30, 34)"
 		);
 		// The editor autofocuses on boot, so the rim starts focused.
 		await page.locator(".prompt .ta-input").click();
@@ -360,8 +363,8 @@ for (const t of THEMES) {
 		await page.goto("/");
 		await expect(page.locator(".hero")).toBeVisible({ timeout: 60_000 });
 		const ink = t.name === "light" ? "rgb(28, 28, 30)" : "rgb(242, 242, 247)";
-		const line = t.name === "light" ? "rgb(199, 199, 204)" : "rgb(72, 72, 74)";
-		const raised = t.name === "light" ? t.bg : "rgb(28, 28, 30)";
+		const line = t.name === "light" ? "rgb(199, 199, 204)" : "rgb(58, 58, 63)";
+		const raised = t.name === "light" ? t.bg : "rgb(30, 30, 34)";
 		const menu = page.locator(".lang-menu > button").first();
 		await menu.click();
 		const list = page.locator(".lang-list");
@@ -403,9 +406,9 @@ for (const t of THEMES) {
 		const v = {
 			ink: L ? "rgb(28, 28, 30)" : "rgb(242, 242, 247)",
 			muted: L ? "rgb(110, 110, 115)" : "rgb(152, 152, 159)",
-			line: L ? "rgb(199, 199, 204)" : "rgb(72, 72, 74)",
-			raised: L ? t.bg : "rgb(28, 28, 30)",
-			field: L ? "rgb(255, 255, 255)" : "rgb(16, 16, 19)",
+			line: L ? "rgb(199, 199, 204)" : "rgb(58, 58, 63)",
+			raised: L ? t.bg : "rgb(30, 30, 34)",
+			field: L ? "rgb(255, 255, 255)" : "rgb(14, 14, 16)",
 			invert: L ? "rgb(28, 28, 30)" : "rgb(242, 242, 247)",
 			invertInk: L ? "rgb(255, 255, 255)" : "rgb(28, 28, 30)",
 			danger: L ? "rgb(148, 37, 10)" : "rgb(232, 154, 144)",
@@ -413,9 +416,9 @@ for (const t of THEMES) {
 			// Overlays sit one clear step above the page with a
 			// visible edge: on dark the old raised gray matched the
 			// thread and an open box read as page chrome.
-			overlay: L ? "rgb(255, 255, 255)" : "rgb(44, 44, 46)",
-			overlayLine: L ? "rgb(229, 229, 234)" : "rgb(84, 84, 88)",
-			overlayHover: L ? "rgb(241, 241, 244)" : "rgb(58, 58, 60)"
+			overlay: L ? "rgb(255, 255, 255)" : "rgb(42, 42, 47)",
+			overlayLine: L ? "rgb(229, 229, 234)" : "rgb(74, 74, 80)",
+			overlayHover: L ? "rgb(241, 241, 244)" : "rgb(54, 54, 60)"
 		};
 		// Selection menu.
 		await page
@@ -429,7 +432,7 @@ for (const t of THEMES) {
 		// hairline ring: blur + shadow alone read as a smudge over text.
 		await expect(menu).toHaveCSS(
 			"background-color",
-			L ? "rgba(255, 255, 255, 0.88)" : "rgba(44, 44, 46, 0.92)"
+			L ? "rgba(255, 255, 255, 0.88)" : "rgba(42, 42, 47, 0.92)"
 		);
 		await expect(menu).toHaveCSS("border-top-width", "1px");
 		await expect(menu).toHaveCSS("border-top-color", v.overlayLine);
@@ -577,7 +580,7 @@ for (const t of THEMES) {
 		await tag.click();
 		await expect(
 			page.locator("article.user .rendered .sent-card").first()
-		).toHaveCSS("border-color", L ? "rgb(199, 199, 204)" : "rgb(72, 72, 74)");
+		).toHaveCSS("border-color", L ? "rgb(199, 199, 204)" : "rgb(58, 58, 63)");
 	});
 
 	// No failed-send test: without the mock the dev backend still
@@ -623,7 +626,7 @@ for (const t of THEMES) {
 			t.softLine
 		);
 		const L = t.name === "light";
-		const line = L ? "rgb(199, 199, 204)" : "rgb(72, 72, 74)";
+		const line = L ? "rgb(199, 199, 204)" : "rgb(58, 58, 63)";
 		const focus = L ? "rgb(58, 58, 60)" : "rgb(174, 174, 178)";
 		const ink = L ? "rgb(28, 28, 30)" : "rgb(242, 242, 247)";
 		const strong = L ? "rgb(28, 28, 30)" : "rgb(174, 174, 178)";
@@ -637,7 +640,7 @@ for (const t of THEMES) {
 		const key = page.locator(".keys div").nth(2);
 		await expect(key).toHaveCSS(
 			"border-top-color",
-			L ? "rgb(229, 229, 234)" : "rgb(56, 56, 58)"
+			L ? "rgb(229, 229, 234)" : "rgb(42, 42, 46)"
 		);
 		await expect(page.locator(".keys dt").first()).toHaveCSS("color", focus);
 		await expect(page.locator(".keys dd").first()).toHaveCSS("color", ink);
@@ -687,22 +690,22 @@ for (const t of THEMES) {
 		await expect(wp).toBeVisible();
 		await expect(wp).toHaveCSS(
 			"background-color",
-			L ? "rgb(255, 255, 255)" : "rgb(28, 28, 30)"
+			L ? "rgb(255, 255, 255)" : "rgb(30, 30, 34)"
 		);
 		await expect(wp).toHaveCSS(
 			"border-color",
-			L ? "rgb(199, 199, 204)" : "rgb(72, 72, 74)"
+			L ? "rgb(199, 199, 204)" : "rgb(58, 58, 63)"
 		);
 		const target = wp.locator('button[role="menuitem"]').first();
 		await expect(target).toHaveCSS("color", ink);
 		await target.hover();
 		await expect(target).toHaveCSS(
 			"background-color",
-			L ? "rgb(241, 241, 244)" : "rgb(44, 44, 46)"
+			L ? "rgb(241, 241, 244)" : "rgb(38, 38, 42)"
 		);
 		await expect(wp.locator('button[aria-current="true"]')).toHaveCSS(
 			"background-color",
-			L ? "rgb(241, 241, 244)" : "rgb(44, 44, 46)"
+			L ? "rgb(241, 241, 244)" : "rgb(38, 38, 42)"
 		);
 	});
 }
@@ -727,7 +730,7 @@ for (const t of THEMES) {
 		);
 		await expect(quote).toHaveCSS(
 			"border-left-color",
-			t.name === "light" ? "rgb(142, 142, 147)" : "rgb(99, 99, 102)"
+			t.name === "light" ? "rgb(142, 142, 147)" : "rgb(85, 85, 91)"
 		);
 		await expect(quote).toHaveCSS("border-left-width", "4px");
 	});

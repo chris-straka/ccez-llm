@@ -741,8 +741,10 @@ stop, so both rules below stay suppressed. -->
 		border-radius: 12px;
 		padding: 0 0.8rem 2.3rem;
 		background: #fff;
-		/* Raised, not flat: dark keeps the #1c1c1e card on the #17171a page. */
+		/* Raised, not flat: on dark the card sits a step above the page
+		and floats on a soft shadow (none on light). */
 		background: var(--bg-raised);
+		box-shadow: var(--shadow-raised);
 		/* Fixed floor so mounting the editor never shifts layout:
 		about three text lines plus the tools row. */
 		min-height: 6.4rem;
