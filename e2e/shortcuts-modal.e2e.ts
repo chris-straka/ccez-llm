@@ -2,9 +2,9 @@ import { expect, test } from "./fixtures";
 import { seedChat } from "./helpers";
 
 /**
- * Shortcuts-modal pile: the list runs A-Z (first entry is
- * "Branch from here"; the modal toggle "Shortcuts show/hide" +
- * middle-click sits in place), stays pithy with no parentheticals,
+ * Shortcuts-modal pile: the list runs in sections with the
+ * hovered-message keys first (the modal toggle "Shortcuts" keeps
+ * middle-click), stays pithy with no parentheticals,
  * right-click speak is listed again, and middle-click anywhere
  * opens the modal.
  */
@@ -28,56 +28,59 @@ async function openShortcuts(page): Promise<void> {
 	});
 }
 
-test("list runs A-Z; modal toggle sits in place", async ({ page }) => {
+test("list runs in sections, hovered-message keys first", async ({ page }) => {
 	await openShortcuts(page);
 	const keys = page.locator(".modal .keys");
-	// A-Z: "Branch from here" leads; the names read sorted.
-	const names = await keys.locator("div > dt").allInnerTexts();
-	const sorted = [...names].sort((a, b) =>
-		a.toLowerCase() < b.toLowerCase()
-			? -1
-			: a.toLowerCase() > b.toLowerCase()
-				? 1
-				: 0
+	const headings = await keys.locator("h3").allInnerTexts();
+	expect(headings.map((h) => h.toLowerCase())).toEqual(
+		[
+			"Hovered message",
+			"Chats",
+			"Prompt & model",
+			"Reading & study",
+			"Mouse & selection",
+			"Scrolling",
+			"Window & view"
+		].map((h) => h.toLowerCase())
 	);
-	expect(names).toEqual(sorted);
-	// The modal toggle still lists middle-click, in place.
-	const toggle = keys.locator("div", { hasText: "Shortcuts show/hide" });
+	// The modal toggle still lists middle-click.
+	const toggle = keys.locator("div", { has: page.locator('dt:text-is("Shortcuts")') });
 	await expect(toggle).toContainText("middle-click");
-	// Newer global keys are folded in.
 	for (const name of [
 		"Scroll",
-		"Edit own message",
+		"Edit your message",
 		"Summon / hide window",
-		"Pin / unpin annotation"
+		"Pin / unpin annotation",
+		"Speak text aloud"
 	]) {
-		await expect(keys.locator("div > dt", { hasText: name })).toBeVisible();
+		await expect(keys.locator(`dt:text-is("${name}")`)).toBeVisible();
 	}
 	// Browser-dead chords stay out of the web modal (shell keeps them).
 	for (const name of [
 		"Search chats",
+		"Search filters",
 		"Find in chat",
 		"Reply language",
-		"Text size up / down",
-		"Chat width + / −",
-		"Prompt text size up / down",
-		"Prompt width + / −",
+		"Text size",
+		"Chat width",
+		"Prompt text size",
+		"Prompt width",
 		"New chat",
 		"Capture window text",
 		"Set capture area",
 		"Edit newest message",
 		"Flashcards"
 	]) {
-		await expect(keys.locator("div > dt", { hasText: name })).toHaveCount(0);
+		await expect(keys.locator(`dt:text-is("${name}")`)).toHaveCount(0);
 	}
-	await expect(keys.locator("div", { hasText: "ctrl+u/ctrl+d" })).toBeVisible();
-	// Right-click speak is listed (a second right-click restarts, never stops).
+	// Each alternative is its own chip.
 	await expect(
-		keys.locator("div > dt", { hasText: "Speak text aloud" })
-	).toBeVisible();
+		keys.locator("div", { has: page.locator('dt:text-is("Half page")') }).locator(".chip")
+	).toHaveText(["Ctrl+D / Ctrl+U"]);
 	// No paren spam in the entry copy (each dd reads flat).
 	const details = await keys.locator("dd").allInnerTexts();
 	expect(details.join("\n")).not.toContain("(");
+	await page.screenshot({ path: ".screenshots/shortcuts-desktop.png" });
 });
 
 test("middle-click opens the shortcuts modal", async ({ page }) => {

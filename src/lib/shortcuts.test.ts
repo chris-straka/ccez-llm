@@ -2,65 +2,98 @@ import { describe, it, expect } from "vitest";
 import {
 	desktopShortcuts,
 	filteredShortcuts,
+	groupShortcuts,
+	HOVER_GROUP,
+	keyChips,
 	touchShortcuts
 } from "./shortcuts";
 
 /**
  * Shortcuts-menu copy guard: removed rows kept finding their way back
- * into the modal, so the full list is pinned here (unit-fast) in
+ * into the modal, so the full grouped list is pinned here (unit-fast) in
  * addition to the e2e pithiness spec. Edit this file deliberately when
  * the menu intentionally changes.
  */
-// A-Z (case-insensitive): shortcuts.ts sorts at return, so this pins
-// the sorted order, not the source order.
-const MAC_NAMES = [
-	"Annotate hovered word",
-	"Annotate instantly",
-	"Branch from here",
-	"Capture window text",
-	"Chat list",
-	"Chat width + / −",
-	"Copy message",
-	"Cut message",
-	"Delete a message",
-	"Delete annotation",
-	"Delete this chat",
-	"Edit newest message",
-	"Edit own message",
-	"Exit fullscreen",
-	"Find in chat",
-	"Flashcards",
-	"Fold / unfold code",
-	"Fold / unfold message",
-	"Fullscreen",
-	"New chat",
-	"Newer / older chat",
-	"Pasted text expand/collapse",
-	"Pin / unpin annotation",
-	"prev/next stroke step",
-	"Prompt text size up / down",
-	"Prompt width + / −",
-	"Reading aid toggle",
-	"Reply language",
-	"Rerun a prompt",
-	"Scroll",
-	"Search chats",
-	"Select sentence / paragraph",
-	"Set capture area",
-	"Shortcuts show/hide",
-	"Speak message",
-	"Speak paragraph",
-	"Speak sentence",
-	"Speak text aloud",
-	"Speak word",
-	"Stop voice / close",
-	"Summon / hide window",
-	"Switch model / key",
-	"Text size up / down",
-	"Thinking level",
-	"Trim above here",
-	"Voice readback on/off"
+// Section order, then usage order within each section.
+const MAC_SECTIONS: Array<[string, string[]]> = [
+	[
+		"Hovered message",
+		[
+			"Fold / unfold",
+			"Copy",
+			"Read aloud",
+			"Read word / sentence / paragraph",
+			"Annotate word",
+			"Edit your message",
+			"Cut",
+			"Branch from here",
+			"Trim above here",
+			"Jump to its start / end",
+			"Delete"
+		]
+	],
+	[
+		"Chats",
+		[
+			"Search chats",
+			"Search filters",
+			"Find in chat",
+			"Chat list",
+			"New chat",
+			"Newer / older chat",
+			"Delete this chat"
+		]
+	],
+	[
+		"Prompt & model",
+		[
+			"Edit newest message",
+			"Rerun a prompt",
+			"Pasted text expand / collapse",
+			"Reply language",
+			"Switch model / key",
+			"Thinking level"
+		]
+	],
+	[
+		"Reading & study",
+		[
+			"Voice readback on / off",
+			"Stop voice / close",
+			"Reading aids",
+			"Stroke order step",
+			"Flashcards",
+			"Capture window text",
+			"Set capture area"
+		]
+	],
+	[
+		"Mouse & selection",
+		[
+			"Speak text aloud",
+			"Annotate and send",
+			"Select sentence / paragraph",
+			"Delete annotation",
+			"Pin / unpin annotation",
+			"Fold / unfold code"
+		]
+	],
+	["Scrolling", ["Scroll", "Scroll further", "Half page", "Top / bottom"]],
+	[
+		"Window & view",
+		[
+			"Shortcuts",
+			"Summon / hide window",
+			"Fullscreen",
+			"Exit fullscreen",
+			"Text size",
+			"Chat width",
+			"Prompt text size",
+			"Prompt width"
+		]
+	]
 ];
+const MAC_NAMES = MAC_SECTIONS.flatMap(([, names]) => names);
 
 /** Rows deliberately removed — asserting absence, not presence. */
 const REMOVED = [
@@ -72,46 +105,42 @@ const REMOVED = [
 ];
 
 describe("shortcuts menu copy", () => {
-	it("pins the exact mac list in order", () => {
+	it("pins the exact mac list in section order", () => {
 		const rows = desktopShortcuts(true);
 		expect(rows.map((r) => r.name)).toEqual(MAC_NAMES);
-		expect(rows.find((r) => r.name === "Shortcuts show/hide")?.keys).toContain(
-			"middle-click"
-		);
-		expect(rows.find((r) => r.name === "Scroll")?.keys).toContain("h/l");
-		expect(rows.find((r) => r.name === "Reply language")?.keys).toContain(
-			"⌘1, ⌘0"
-		);
-		expect(rows.find((r) => r.name === "Speak text aloud")?.keys).toBe(
-			"Right-click"
-		);
-		expect(rows.find((r) => r.name === "Capture window text")?.keys).toBe(
-			"⇧⌘O"
-		);
-		expect(rows.find((r) => r.name === "Set capture area")?.keys).toBe(
-			"⇧⌘U"
-		);
-		expect(rows.find((r) => r.name === "Fullscreen")?.keys).toBe("Ctrl+⌘F");
-		expect(rows.find((r) => r.name === "Edit newest message")?.keys).toBe(
-			"⌘E"
-		);
-		expect(rows.find((r) => r.name === "Delete a message")?.keys).toBe(
-			"Hover + ⌘Delete / ⌘D / Shift+D"
-		);
-		expect(rows.find((r) => r.name === "Delete this chat")?.keys).toBe(
-			"⇧⌘Delete"
-		);
+		expect(
+			groupShortcuts(rows).map((g) => [g.group, g.rows.map((r) => r.name)])
+		).toEqual(MAC_SECTIONS);
+		const keys = new Map(rows.map((r) => [r.name, r.keys]));
+		expect(keys.get("Shortcuts")).toContain("middle-click");
+		expect(keys.get("Reply language")).toContain("⌘1 – ⌘0");
+		expect(keys.get("Speak text aloud")).toBe("Right-click");
+		expect(keys.get("Capture window text")).toBe("⇧⌘O");
+		expect(keys.get("Set capture area")).toBe("⇧⌘U");
+		expect(keys.get("Fullscreen")).toBe("Ctrl+⌘F");
+		expect(keys.get("Edit newest message")).toBe("⌘E");
+		expect(keys.get("Delete")).toBe("⌘Delete · ⌘D · Shift+D");
+		expect(keys.get("Delete this chat")).toBe("⇧⌘Delete");
+		// Hover is the section's premise: its keys never repeat it.
+		for (const row of rows.filter((r) => r.group === HOVER_GROUP))
+			expect(row.keys).not.toMatch(/hover/i);
 	});
 
-	it("drops browser-dead rows on the web, still A-Z", () => {
+	it("names rows in sentence case", () => {
+		for (const row of [...desktopShortcuts(true), ...touchShortcuts()])
+			expect(row.name[0]).toBe(row.name[0]?.toUpperCase());
+	});
+
+	it("drops browser-dead rows on the web, order kept", () => {
 		const gone = [
 			"Search chats",
+			"Search filters",
 			"Find in chat",
 			"Reply language",
-			"Text size up / down",
-			"Chat width + / −",
-			"Prompt text size up / down",
-			"Prompt width + / −",
+			"Text size",
+			"Chat width",
+			"Prompt text size",
+			"Prompt width",
 			"New chat",
 			"Capture window text",
 			"Set capture area",
@@ -140,22 +169,13 @@ describe("shortcuts menu copy", () => {
 	it("uses Ctrl labels off-mac with the same row names", () => {
 		const rows = desktopShortcuts(false);
 		expect(rows.map((r) => r.name)).toEqual(MAC_NAMES);
-		expect(rows.find((r) => r.name === "Shortcuts show/hide")?.keys).toContain(
-			"Ctrl+Shift+/"
-		);
-		expect(rows.find((r) => r.name === "Search chats")?.keys).toBe("Ctrl+P");
-		expect(rows.find((r) => r.name === "Delete a message")?.keys).toBe(
-			"Hover + Ctrl+Delete / Shift+D"
-		);
-		expect(rows.find((r) => r.name === "Delete this chat")?.keys).toBe(
-			"Ctrl+Shift+Delete"
-		);
-		expect(rows.find((r) => r.name === "Fullscreen")?.keys).toBe(
-			"Ctrl+Meta+F"
-		);
-		expect(rows.find((r) => r.name === "Edit newest message")?.keys).toBe(
-			"Meta+E"
-		);
+		const keys = new Map(rows.map((r) => [r.name, r.keys]));
+		expect(keys.get("Shortcuts")).toContain("Ctrl+Shift+/");
+		expect(keys.get("Search chats")).toBe("Ctrl+P");
+		expect(keys.get("Delete")).toBe("Ctrl+Delete · Shift+D");
+		expect(keys.get("Delete this chat")).toBe("Ctrl+Shift+Delete");
+		expect(keys.get("Fullscreen")).toBe("Ctrl+Meta+F");
+		expect(keys.get("Edit newest message")).toBe("Meta+E");
 	});
 
 	it("never re-adds removed rows on either platform", () => {
@@ -182,52 +202,71 @@ describe("shortcuts menu copy", () => {
 	});
 
 	it("pins the touch gestures list", () => {
-		expect(touchShortcuts().map((r) => r.name)).toEqual([
-			"Annotate",
-			"Bottom of chat",
-			"Chat switcher",
-			"Chats list",
-			"Copy selection",
-			"Delete a message",
-			"Delete this chat",
-			"Fold a message",
-			"fold chat msg",
-			"Inspect character",
-			"Keep an annotation while scrolling",
-			"Message buttons",
-			"Move the selection menu",
-			"Newer / older chat",
-			"Pin / unpin annotation",
-			"Settings",
-			"Speak selection",
-			"Top of chat"
+		expect(
+			groupShortcuts(touchShortcuts()).map((g) => [
+				g.group,
+				g.rows.map((r) => r.name)
+			])
+		).toEqual([
+			[
+				"Moving around",
+				[
+					"Chats list",
+					"Quick switcher",
+					"Search chats",
+					"Newer / older chat",
+					"Top of chat",
+					"Bottom of chat",
+					"Settings"
+				]
+			],
+			[
+				"Messages",
+				["Message buttons", "Fold a message", "Delete a message", "Delete this chat"]
+			],
+			[
+				"Selected text",
+				[
+					"Select a word",
+					"Annotate",
+					"Copy",
+					"Speak",
+					"Inspect character",
+					"Move the selection menu",
+					"Pin / unpin annotation",
+					"Cancel an annotation"
+				]
+			]
 		]);
-		// Message-start left strokes fold (never settings); everywhere
-		// else one finger opens it too. Chat steps moved to three
-		// fingers so two-finger right can summon the list, and the
-		// vertical slides read as gg / G.
 		const byName = new Map(touchShortcuts().map((r) => [r.name, r.keys]));
 		expect(byName.get("Chats list")).toBe(
 			"Swipe right · two-finger swipe right"
 		);
-		expect(byName.get("Chat switcher")).toBe(
-			"Two-finger hold · double-tap empty space · swipe cycles · loops"
+		expect(byName.get("Quick switcher")).toBe(
+			"Two-finger hold · double-tap empty space · swipe to cycle"
 		);
 		expect(byName.get("Settings")).toBe(
-			"Swipe left off messages · chats list button · two-finger swipe left"
+			"Swipe left off messages · two-finger swipe left · chats list button"
 		);
 		expect(byName.get("Newer / older chat")).toBe(
 			"Three-finger swipe left / right"
 		);
-		expect(byName.get("Top of chat")).toBe("Two-finger swipe up · gg");
-		expect(byName.get("Bottom of chat")).toBe("Two-finger swipe down · G");
+		// Phones list gestures only: gg / G are keyboard keys.
+		expect(byName.get("Top of chat")).toBe("Two-finger swipe up");
+		expect(byName.get("Bottom of chat")).toBe("Two-finger swipe down");
 		expect(byName.get("Delete a message")).toBe("Three-finger tap");
 		expect(byName.get("Delete this chat")).toBe("Three-finger hold");
-		expect(byName.get("Copy selection")).toBe("Select text · Copy");
+		expect(byName.get("Copy")).toBe("Select text, then Copy");
 		expect(byName.get("Pin / unpin annotation")).toBe("Double-tap badge");
+		const all = touchShortcuts().map((r) => r.keys).join("\n");
+		expect(all).not.toMatch(/\bgg\b|hover/i);
 	});
 
-	it("filters case-insensitively on name or keys", () => {
+	it("splits keys into chips on the middle dot", () => {
+		expect(keyChips("⌘B · ⇧⌘H · J / K walk")).toEqual(["⌘B", "⇧⌘H", "J / K walk"]);
+	});
+
+	it("filters case-insensitively on name, keys, or section", () => {
 		const rows = desktopShortcuts(true);
 		expect(filteredShortcuts(rows, "")).toBe(rows);
 		expect(filteredShortcuts(rows, "this chat").map((r) => r.name)).toEqual([
@@ -237,5 +276,10 @@ describe("shortcuts menu copy", () => {
 			filteredShortcuts(desktopShortcuts(false), "CTRL+P").map((r) => r.name)
 		).toEqual(["Search chats"]);
 		expect(filteredShortcuts(rows, "zzz-no-such-row")).toEqual([]);
+		expect(
+			filteredShortcuts(rows, "hovered message").every(
+				(r) => r.group === HOVER_GROUP
+			)
+		).toBe(true);
 	});
 });

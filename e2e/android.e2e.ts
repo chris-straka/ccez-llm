@@ -92,11 +92,11 @@ test.describe("gestures", () => {
 		await expect(modal.locator('dt:text-is("Chats list") + dd')).toHaveText(
 			"Swipe right · two-finger swipe right"
 		);
-		await expect(modal.locator('dt:text-is("fold chat msg")')).toBeVisible();
+		await expect(modal.locator('dt:text-is("Fold a message")')).toBeVisible();
 		await expect(modal.locator('dt:text-is("Settings")')).toBeVisible();
 		await expect(modal.locator('dt:has-text("Chats sidebar")')).toHaveCount(0);
 		await expect(modal.locator('dd:has-text("Chats list button")')).toHaveText(
-			"Swipe left off messages · chats list button · two-finger swipe left"
+			"Swipe left off messages · two-finger swipe left · chats list button"
 		);
 		await expect(
 			modal.locator('dt:text-is("Newer / older chat")')
@@ -107,14 +107,14 @@ test.describe("gestures", () => {
 		await expect(modal.locator('dt:text-is("Top of chat")')).toBeVisible();
 		await expect(
 			modal.locator('dd:has-text("Two-finger swipe up")')
-		).toHaveText("Two-finger swipe up · gg");
+		).toHaveText("Two-finger swipe up");
 		await expect(modal.locator('dt:text-is("Bottom of chat")')).toBeVisible();
 		await expect(
 			modal.locator('dd:has-text("Two-finger swipe down")')
-		).toHaveText("Two-finger swipe down · G");
-		await expect(modal.locator('dt:text-is("Chat switcher")')).toBeVisible();
-		await expect(modal.locator('dt:text-is("Chat switcher") + dd')).toHaveText(
-			"Two-finger hold · double-tap empty space · swipe cycles · loops"
+		).toHaveText("Two-finger swipe down");
+		await expect(modal.locator('dt:text-is("Quick switcher")')).toBeVisible();
+		await expect(modal.locator('dt:text-is("Quick switcher") + dd')).toHaveText(
+			"Two-finger hold · double-tap empty space · swipe to cycle"
 		);
 		await expect(modal.locator('dt:text-is("Message end")')).toHaveCount(0);
 		await expect(modal.locator('dt:text-is("Delete a message")')).toBeVisible();
@@ -125,6 +125,7 @@ test.describe("gestures", () => {
 		await expect(
 			modal.locator('dt:text-is("Delete this chat") + dd')
 		).toHaveText("Three-finger hold");
+		await page.screenshot({ path: ".screenshots/gestures-phone.png" });
 	});
 
 	/** Synthetic edge swipe (untrusted TouchEvents still hit window listeners). */
@@ -1801,9 +1802,14 @@ test.describe("touch", () => {
 				const dd = document.querySelector(".keys dd");
 				if (!(keys instanceof HTMLElement) || !(dd instanceof HTMLElement))
 					throw new Error("keys missing");
+				const lefts = new Set(
+					[...keys.querySelectorAll(".keys-section")].map((el) =>
+						Math.round(el.getBoundingClientRect().left)
+					)
+				);
 				return {
 					overflow: keys.scrollWidth - keys.clientWidth,
-					columns: getComputedStyle(keys).gridTemplateColumns.split(" ").length,
+					columns: lefts.size,
 					font: getComputedStyle(dd).fontFamily
 				};
 			});

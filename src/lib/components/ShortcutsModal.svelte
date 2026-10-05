@@ -11,6 +11,8 @@ CSS to this markup). Row data already lives in `$lib/shortcuts`
 	import {
 		desktopShortcuts,
 		filteredShortcuts,
+		groupShortcuts,
+		keyChips,
 		touchShortcuts
 	} from "$lib/shortcuts";
 	import Modal from "./Modal.svelte";
@@ -45,10 +47,15 @@ CSS to this markup). Row data already lives in `$lib/shortcuts`
 		onClose();
 	}
 
-	const rows = $derived(
-		android
-			? filteredShortcuts(touchShortcuts(), query)
-			: filteredShortcuts(desktopShortcuts(mac, tauriBackendAvailable(), flashcards), query)
+	const groups = $derived(
+		groupShortcuts(
+			android
+				? filteredShortcuts(touchShortcuts(), query)
+				: filteredShortcuts(
+						desktopShortcuts(mac, tauriBackendAvailable(), flashcards),
+						query
+					)
+		)
 	);
 </script>
 
@@ -76,19 +83,29 @@ CSS to this markup). Row data already lives in `$lib/shortcuts`
 			×
 		</button>
 	</div>
-	<!-- Android milestone: key chords don't exist on a phone, so the
-	same modal teaches the touch equivalents (rows switch source by
-	platform above). -->
-	<dl class="keys">
-		{#each rows as row (row.name)}
-			<div>
-				<dt>{row.name}</dt>
-				<dd>{row.keys}</dd>
-			</div>
+	<!-- Sections in usage order (hovered-message keys lead on
+	desktop); phones teach the touch equivalents from the same
+	modal. Each " · " alternative draws as its own chip. -->
+	<div class="keys">
+		{#each groups as section (section.group)}
+			<section class="keys-section">
+				<h3>{section.group}</h3>
+				<dl>
+					{#each section.rows as row (row.name)}
+						<div>
+							<dt>{row.name}</dt>
+							<dd>
+								<!-- eslint-disable-next-line svelte/no-useless-mustaches -- a bare " · " loses its spaces to Svelte's whitespace trim -->
+								{#each keyChips(row.keys) as chip, i (i)}{#if i > 0}<span class="sep">{" · "}</span>{/if}<span class="chip">{chip}</span>{/each}
+							</dd>
+						</div>
+					{/each}
+				</dl>
+			</section>
 		{:else}
 			<div class="keys-empty">No matches</div>
 		{/each}
-	</dl>
+	</div>
 </Modal>
 
 <style>
@@ -165,62 +182,98 @@ CSS to this markup). Row data already lives in `$lib/shortcuts`
 		color: var(--muted);
 		font-size: 0.8rem;
 	}
+	/* Sections flow into two columns where the box is wide enough
+	and stack on phones (and under heavy interface zoom), never
+	splitting a section across columns. */
 	.keys {
-		margin: 0;
-		display: grid;
-		grid-template-columns: 1fr 1fr;
+		columns: 2 17rem;
 		column-gap: 2rem;
 	}
-	.keys div {
+	.keys-section {
+		break-inside: avoid;
+		margin-bottom: 0.9rem;
+	}
+	.keys-section h3 {
+		margin: 0 0 0.2rem;
+		font-size: 0.72rem;
+		font-weight: 650;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		color: #6e6e73;
+		color: var(--dim);
+	}
+	.keys dl {
+		margin: 0;
+	}
+	.keys dl div {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 0.7rem;
+		align-items: baseline;
+		gap: 0.3rem 0.7rem;
 		padding: 0.26rem 0;
 		border-top: 1px solid #e5e5ea;
 		border-top-color: var(--line-soft);
 		font-size: 0.8rem;
 	}
-	/* Two-column grid: the whole first row skips the divisor. */
-	.keys div:nth-child(-n + 2) {
+	.keys dl div:first-child {
 		border-top: 0;
 	}
 	.keys dt {
-		/* Shrinkable basis: at 100% the 8rem name column fits every
-		row, so nothing shrinks or wraps; under the interface zoom
-		in a capped box the fixed basis would hog the row and starve
-		the chord (and stretch every row tall). The name wraps
-		instead, and the chord drops below when even that overflows. */
-		flex: 0 1 8rem;
+		/* Shrinkable basis: at 100% the name column fits every row,
+		so nothing shrinks or wraps; under the interface zoom in a
+		capped box the fixed basis would hog the row and starve the
+		chord. The name wraps instead, and the chord drops below
+		when even that overflows. */
+		flex: 0 1 9rem;
 		min-width: 0;
 		color: #3a3a3c;
 		color: var(--focus);
 	}
 	.keys dd {
 		margin: 0;
+		flex: 1 1 auto;
+		min-width: 0;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.25rem;
 		font-family: ui-monospace, monospace;
 		font-size: 0.75rem;
 		color: #1c1c1e;
 		color: var(--ink);
 		overflow-wrap: anywhere;
 	}
-	/* The gestures list goes single-column on phones: two columns
-	overflow a 360px viewport by ~60px, clipping the very text that
-	teaches the gestures. Touch descriptions are prose, not key
-	chords, so they drop the monospace too. The .app ancestor stays
-	global (it renders paged, unscopable). */
-	:global(.app[data-android]) .keys {
-		grid-template-columns: 1fr;
+	/* Key chip: one alternative per box, so "⌘B", "⇧⌘H", and
+	"J / K walk" read as separate ways in instead of one run. */
+	.chip {
+		padding: 0.05rem 0.4rem;
+		border: 1px solid #e5e5ea;
+		border-color: var(--line-soft);
+		border-radius: 6px;
+		background: rgba(120, 120, 128, 0.08);
+		white-space: nowrap;
+		max-width: 100%;
+		overflow-wrap: anywhere;
 	}
-	:global(.app[data-android]) .keys div:nth-child(2) {
-		border-top: 1px solid #e5e5ea;
-		border-top: 1px solid var(--line-soft);
+	/* The chips' gap shows the split; the dot stays in the text so
+	screen readers, copy, and the filter read "A · B". */
+	.sep {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+	}
+	/* Gestures are prose, not key chords: no monospace, and chips
+	may wrap inside so long phrases fit a 360px phone. */
+	:global(.app[data-android]) .keys {
+		columns: 1;
 	}
 	:global(.app[data-android]) .keys dd {
 		font-family: inherit;
 		font-size: 0.8rem;
 	}
-	:global(html[data-theme="dark"]) :global(.app[data-android]) .keys div:nth-child(2) {
-		border-top-color: #38383a;
-		border-top-color: var(--line-soft);
+	:global(.app[data-android]) .chip {
+		white-space: normal;
 	}
 </style>

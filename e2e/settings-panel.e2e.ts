@@ -254,7 +254,7 @@ test("shortcuts entry is a one-line button, chord lives in the modal", async ({
 	await btn.click();
 	const modal = page.locator(".modal-veil .modal");
 	await expect(modal).toBeVisible();
-	await expect(modal.locator("dl.keys")).toContainText("Shortcuts show/hide");
+	await expect(modal.locator(".keys")).toContainText("Summon / hide window");
 	await page.keyboard.press("Escape");
 	await expect(modal).toHaveCount(0);
 });

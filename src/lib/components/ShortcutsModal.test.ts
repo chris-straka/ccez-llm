@@ -38,7 +38,7 @@ describe("shortcuts modal surfaces", () => {
 		const css = modalStyle();
 		expect(css).toContain(".shortcuts-filter");
 		expect(css).toContain(".shortcuts-filter:focus-visible");
-		expect(css).toMatch(/\.keys\s*\{[^}]*display:\s*grid/);
+		expect(css).toMatch(/\.keys\s*\{[^}]*columns:/);
 		expect(css).toContain(".keys dd");
 		expect(pageStyle()).not.toContain(".shortcuts-filter");
 		expect(pageStyle()).not.toMatch(/\.keys\s*\{/);

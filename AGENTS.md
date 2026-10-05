@@ -119,9 +119,12 @@ TTS/OCR/dictation, page fetch, Android background turns).
   unsolicited notifications or badges. Enter sends, Shift+Enter newline.
   Honor `prefers-reduced-motion`. Text size must reach very large scales
   (an owner's relative needs giant type): never narrow the size range.
-- Shortcuts menu (`desktopShortcuts()` in `+page.svelte`, registry in
-  `shortcuts.ts`): entries stay pithy, `dd` copy has no parentheses (pinned
-  by `e2e/shortcuts-modal.e2e.ts`). Deliberately removed, do not re-add:
+- Shortcuts menu (registry in `shortcuts.ts`, rendered by
+  `ShortcutsModal.svelte`): rows sit in sections, hovered-message keys
+  first (their keys drop the "Hover +"); names are sentence case and
+  pithy; ` · ` separates alternatives (each draws as a chip), and a
+  sequence reads `, then`. `dd` copy has no parentheses (pinned by
+  `e2e/shortcuts-modal.e2e.ts`). Deliberately removed, do not re-add:
   New line, Stage message, Scroll messages, Export chat, Translate
   selection, and the `· Enter cycles · repeat closes · 1 hit closes bare`,
   `· past newest mints one`, `· again stops` trailers. Phones show no `h2`.
