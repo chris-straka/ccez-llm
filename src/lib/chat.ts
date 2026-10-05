@@ -5,6 +5,7 @@ import type {
 	TokenUsage
 } from "./providers/types";
 import { messageText } from "./providers/types";
+import { LOWEST_THINKING } from "./providers/thinking";
 import type { Attachment } from "./attachments";
 import { stripAttachmentMarkers } from "./attachments";
 import type { KeyValueStore } from "./settings";
@@ -517,7 +518,9 @@ export async function generateChatTitle(
 	if (!messages) return;
 	let content: string;
 	try {
-		content = (await provider.chat(messages)).content;
+		// Naming needs no deliberation: the bottom thinking rung keeps
+		// a title to a few hundred tokens on reasoning models.
+		content = (await provider.chat(messages, { thinking: LOWEST_THINKING })).content;
 	} catch {
 		return;
 	}

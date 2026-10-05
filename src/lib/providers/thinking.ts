@@ -119,10 +119,15 @@ export function thinkingFor(
 }
 
 /** Clamp a saved id to what the model offers. */
+/** Request-only id: the provider's bottom rung (Off where one exists,
+else Minimal / Low). Never saved as a setting. */
+export const LOWEST_THINKING = "lowest";
+
 export function resolveThinkingId(
 	support: ThinkingSupport,
 	saved: string | undefined
 ): string {
+	if (saved === LOWEST_THINKING) return support.options[0]?.id ?? support.defaultId;
 	if (saved !== undefined && support.options.some((o) => o.id === saved))
 		return saved;
 	return support.defaultId;
