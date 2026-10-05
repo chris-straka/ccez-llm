@@ -2748,6 +2748,38 @@ test.describe("always-visible prompt", () => {
 		await expect.poll(px, { timeout: 5000 }).toBeLessThan(grown);
 	});
 
+	/** At the largest size a pinch apart changes nothing: it buzzes a
+	denial instead of the growth tick. */
+	test("pinch past the largest size buzzes no", async ({ page }) => {
+		await seed(page, { fontScale: 20 }, [LONG]);
+		await page.goto("/");
+		await expect(page.locator("article .rendered").first()).toBeVisible();
+		await page.evaluate(() => {
+			const w = window as unknown as { __vib: unknown[] };
+			w.__vib = [];
+			const nav = navigator as unknown as {
+				vibrate: (pattern: unknown) => boolean;
+			};
+			nav.vibrate = (pattern: unknown) => {
+				w.__vib.push(pattern);
+				return true;
+			};
+		});
+		await pinch(page, "article.assistant .rendered", 200, 320);
+		await expect
+			.poll(() =>
+				page.evaluate(() =>
+					JSON.stringify((window as unknown as { __vib: unknown[] }).__vib)
+				)
+			)
+			.toContain("[50,70,50]");
+		expect(
+			await page.evaluate(
+				() => (window as unknown as { __vib: unknown[] }).__vib
+			)
+		).not.toContainEqual([20]);
+	});
+
 	/** A pinch in the thread is the text-size gesture, never page zoom,
 	even when a one-finger scroll is already under way (its touchmoves
 	are no longer cancelable, so only touch-action can refuse the zoom).

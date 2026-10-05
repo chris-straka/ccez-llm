@@ -9935,8 +9935,13 @@ import {
 						if (step !== 0) {
 							pinchBaseline = spread;
 							pinchStepped = true;
+							const before = settings.fontScale;
 							adjustFontScale(step * 0.1, true);
-							buzzBeat("send");
+							// At the smallest or largest size the step
+							// changes nothing: a denial buzz says so
+							// instead of a tick that feels like growth.
+							if (settings.fontScale === before) buzzNo();
+							else buzzBeat("send");
 						}
 					}
 				}
