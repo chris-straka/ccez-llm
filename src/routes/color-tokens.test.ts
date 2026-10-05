@@ -87,7 +87,13 @@ describe("color tokens", () => {
 			"--pair0:",
 			"--pair1:",
 			"--pair2:",
-			"--pair3:"
+			"--pair3:",
+			"--bg-overlay:",
+			"--line-overlay:",
+			"--overlay-hover:",
+			"--overlay-glass:",
+			"--shadow-overlay:",
+			"--scrim:"
 		]) {
 			expect(app).toContain(token);
 		}
@@ -115,7 +121,13 @@ describe("color tokens", () => {
 			"var(--pair0)",
 			"var(--pair1)",
 			"var(--pair2)",
-			"var(--pair3)"
+			"var(--pair3)",
+			"var(--bg-overlay)",
+			"var(--line-overlay)",
+			"var(--overlay-hover)",
+			"var(--overlay-glass)",
+			"var(--shadow-overlay)",
+			"var(--scrim)"
 		]) {
 			expect(all).toContain(token);
 		}

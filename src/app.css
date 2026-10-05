@@ -57,6 +57,15 @@ html {
 	--line-soft: #e5e5ea;
 	--line-hover: #8e8e93;
 	--focus: #3a3a3c;
+	/* Floating overlays (annotation box, answer card, menus): one
+	surface step above the page, a visible edge, and a scrim that
+	dims the thread while a box that takes the focus is open. */
+	--bg-overlay: #fff;
+	--line-overlay: #e5e5ea;
+	--overlay-hover: #f1f1f4;
+	--overlay-glass: rgba(255, 255, 255, 0.88);
+	--shadow-overlay: 0 12px 40px rgba(0, 0, 0, 0.18);
+	--scrim: rgba(0, 0, 0, 0.15);
 }
 html[data-theme="light"] {
 	background: var(--bg);
@@ -105,6 +114,12 @@ html[data-theme="light"] {
 	--line-soft: #e5e5ea;
 	--line-hover: #8e8e93;
 	--focus: #3a3a3c;
+	--bg-overlay: #fff;
+	--line-overlay: #e5e5ea;
+	--overlay-hover: #f1f1f4;
+	--overlay-glass: rgba(255, 255, 255, 0.88);
+	--shadow-overlay: 0 12px 40px rgba(0, 0, 0, 0.18);
+	--scrim: rgba(0, 0, 0, 0.15);
 }
 html[data-theme="dark"] {
 	background: var(--bg);
@@ -150,6 +165,12 @@ html[data-theme="dark"] {
 	--line-soft: #38383a;
 	--line-hover: #636366;
 	--focus: #aeaeb2;
+	--bg-overlay: #2c2c2e;
+	--line-overlay: #545458;
+	--overlay-hover: #3a3a3c;
+	--overlay-glass: rgba(44, 44, 46, 0.92);
+	--shadow-overlay: 0 18px 50px rgba(0, 0, 0, 0.65), 0 2px 6px rgba(0, 0, 0, 0.4);
+	--scrim: rgba(0, 0, 0, 0.45);
 }
 body {
 	margin: 0;

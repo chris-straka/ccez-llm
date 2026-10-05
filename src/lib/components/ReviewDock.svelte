@@ -502,7 +502,12 @@ its quote, question, and answer. -->
 		max-height: 18rem;
 		overflow-y: auto;
 		margin: 0;
+		background: #fff;
+		background: var(--bg-overlay);
+		border-color: #e5e5ea;
+		border-color: var(--line-overlay);
 		box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
+		box-shadow: var(--shadow-overlay);
 		/* display:none can't fade: the card always lays out but sits
 		invisible and untouchable until the pill pins it. */
 		visibility: hidden;
@@ -561,6 +566,5 @@ its quote, question, and answer. -->
 		overflow-y: auto;
 		z-index: 40;
 		font-size: calc(0.92rem * var(--font-scale, 1));
-		box-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
 	}
 </style>

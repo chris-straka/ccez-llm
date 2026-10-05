@@ -35,11 +35,11 @@ describe("annotation answer card", () => {
 	});
 
 	it("rings the card so it never dissolves into the thread", () => {
-		// The near-opaque card sat edgeless on the thread (the shadow
-		// alone didn't seat it on phones); the hairline matches the
-		// selection menu's ring, stark-contrast keeps its stronger one.
+		// The card sat edgeless on the thread (the shadow alone didn't
+		// seat it on phones); the hairline is the overlay edge shared
+		// with the selection menu, stark-contrast keeps its stronger one.
 		expect(answerSource()).toMatch(
-			/\.ann-answer\s*\{[^}]*border-color:\s*var\(--line-soft\)/
+			/\.ann-answer\s*\{[^}]*border-color:\s*var\(--line-overlay\)/
 		);
 	});
 });

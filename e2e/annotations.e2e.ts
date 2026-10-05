@@ -1363,8 +1363,8 @@ test("sent-refs rows point only on the quote", async ({ page }) => {
 	});
 });
 
-/** The sent card follows the theme: panel surface and quiet note on
-light, dark card and pale note on dark. */
+/** The sent card follows the theme: overlay surface on both, quiet
+note on light, pale note on dark. */
 for (const theme of ["light", "dark"] as const) {
 	test(`sent-refs card themes on ${theme}`, async ({ page }) => {
 		await seedChat(page, [
@@ -1388,7 +1388,7 @@ for (const theme of ["light", "dark"] as const) {
 		const card = page.locator(".ann-refs-pop").first();
 		await expect(card).toHaveCSS(
 			"background-color",
-			theme === "light" ? "rgb(250, 250, 252)" : "rgb(28, 28, 30)"
+			theme === "light" ? "rgb(255, 255, 255)" : "rgb(44, 44, 46)"
 		);
 		await expect(page.locator(".ann-refs-comment").first()).toHaveCSS(
 			"color",

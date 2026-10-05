@@ -58,35 +58,30 @@ badge's plus/minus. -->
 		message size, never toy-fixed beside scaled type. The
 		popup-size setting rides on top (--annpop-scale). */
 		font-size: calc(1rem * var(--font-scale, 1) * var(--annpop-scale, 1));
-		/* Near-opaque surface by default (a whisper of the thread
-		behind the answer); stark-contrast preference pins it fully
-		opaque below. */
-		background: rgba(255, 255, 255, 0.98);
-		/* Hairline ring (same as the selection menu): the edgeless
-		card dissolved into the thread on phones — the shadow alone
-		didn't seat it. */
+		/* Opaque overlay surface: any see-through let the covered
+		lines ghost into the answer. */
+		background: #fff;
+		background: var(--bg-overlay);
+		/* Hairline ring: the edgeless card dissolved into the thread
+		on phones — the shadow alone didn't seat it. */
 		border: 1px solid #e5e5ea;
-		border-color: var(--line-soft);
+		border-color: var(--line-overlay);
+		/* Spread ring = scrim, dimming the thread while the answer
+		is open (see .ann-pop). */
 		box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
+		box-shadow:
+			0 0 0 100vmax var(--scrim),
+			var(--shadow-overlay);
 		color: #1c1c1e;
 		color: var(--ink);
 		animation: ann-answer-in 0.16s ease;
 	}
-	:global(html[data-theme="dark"]) .ann-answer {
-		background: rgba(30, 30, 32, 0.98);
-	}
-	/* Stark-contrast preference: opaque always, with a hairline so
-	the card edge never dissolves into the thread. */
+	/* Stark-contrast preference: a strong edge so the card never
+	dissolves into the thread. */
 	@media (prefers-contrast: more) {
 		.ann-answer {
-			background: #fff;
-			background: var(--bg-raised);
 			border: 1px solid #1c1c1e;
 			border-color: var(--strong);
-		}
-		:global(html[data-theme="dark"]) .ann-answer {
-			background: #1c1c1e;
-			background: var(--bg-raised);
 		}
 	}
 	.ann-answer.closing {

@@ -110,14 +110,13 @@ panels. -->
 		popup-size setting rides on top (--annpop-scale). */
 		font-size: calc(0.85rem * var(--font-scale, 1) * var(--annpop-scale, 1));
 		background: rgba(255, 255, 255, 0.88);
+		background: var(--overlay-glass);
 		-webkit-backdrop-filter: blur(18px) saturate(1.6);
 		backdrop-filter: blur(18px) saturate(1.6);
 		box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
+		box-shadow: var(--shadow-overlay);
 		color: #1c1c1e;
 		color: var(--ink);
-	}
-	:global(html[data-theme="dark"]) .sel-pinyin {
-		background: rgba(30, 30, 32, 0.88);
 	}
 	/* Centered on the highlight whatever the panel width (and so
 	whatever the font size): the style left is the highlight's

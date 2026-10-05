@@ -252,13 +252,14 @@ its body is just an em-dash (see REFS_ONLY_BODY). -->
 		the viewport bound stays). */
 		max-height: min(60vh, 48rem);
 		overflow-y: auto;
-		background: #1c1c1e;
+		background: #2c2c2e;
+		background: var(--bg-overlay);
 		color: #f2f2f7;
-		/* Transparent by default so the light theme can paint just
-		the edge without shifting geometry on theme switch. */
-		border: 1px solid transparent;
+		border: 1px solid #545458;
+		border-color: var(--line-overlay);
 		border-radius: 10px;
 		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+		box-shadow: var(--shadow-overlay);
 		padding: 0.55rem 0.75rem;
 		/* Tracks the chat text size like the count pill above it,
 		so the saved quotes never sit tiny under huge type. */
@@ -498,15 +499,11 @@ its body is just an em-dash (see REFS_ONLY_BODY). -->
 		color: #ff6961;
 		color: var(--danger);
 	}
-	/* Light theme: the sent card matches the draft card (panel
-	surface, soft edge, ink text) instead of floating dark. */
+	/* Light theme: ink text on the light overlay surface instead of
+	the dark card's pale ink. */
 	:global(html[data-theme="light"]) .ann-refs-pop {
-		background: #fafafc;
-		background: var(--panel);
 		color: #1c1c1e;
 		color: var(--ink);
-		border-color: #e5e5ea;
-		border-color: var(--line-soft);
 	}
 	:global(html[data-theme="light"]) .ann-refs-item + .ann-refs-item {
 		border-top-color: #e5e5ea;

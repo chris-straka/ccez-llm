@@ -404,14 +404,18 @@ for (const t of THEMES) {
 			ink: L ? "rgb(28, 28, 30)" : "rgb(242, 242, 247)",
 			muted: L ? "rgb(110, 110, 115)" : "rgb(152, 152, 159)",
 			line: L ? "rgb(199, 199, 204)" : "rgb(72, 72, 74)",
-			softLine: L ? "rgb(229, 229, 234)" : "rgb(56, 56, 58)",
 			raised: L ? t.bg : "rgb(28, 28, 30)",
-			panel: L ? "rgb(250, 250, 252)" : "rgb(28, 28, 30)",
 			field: L ? "rgb(255, 255, 255)" : "rgb(16, 16, 19)",
 			invert: L ? "rgb(28, 28, 30)" : "rgb(242, 242, 247)",
 			invertInk: L ? "rgb(255, 255, 255)" : "rgb(28, 28, 30)",
 			danger: L ? "rgb(148, 37, 10)" : "rgb(232, 154, 144)",
-			strong: L ? "rgb(28, 28, 30)" : "rgb(174, 174, 178)"
+			strong: L ? "rgb(28, 28, 30)" : "rgb(174, 174, 178)",
+			// Overlays sit one clear step above the page with a
+			// visible edge: on dark the old raised gray matched the
+			// thread and an open box read as page chrome.
+			overlay: L ? "rgb(255, 255, 255)" : "rgb(44, 44, 46)",
+			overlayLine: L ? "rgb(229, 229, 234)" : "rgb(84, 84, 88)",
+			overlayHover: L ? "rgb(241, 241, 244)" : "rgb(58, 58, 60)"
 		};
 		// Selection menu.
 		await page
@@ -425,25 +429,28 @@ for (const t of THEMES) {
 		// hairline ring: blur + shadow alone read as a smudge over text.
 		await expect(menu).toHaveCSS(
 			"background-color",
-			L ? "rgba(255, 255, 255, 0.88)" : "rgba(30, 30, 32, 0.88)"
+			L ? "rgba(255, 255, 255, 0.88)" : "rgba(44, 44, 46, 0.92)"
 		);
 		await expect(menu).toHaveCSS("border-top-width", "1px");
-		await expect(menu).toHaveCSS("border-top-color", v.softLine);
+		await expect(menu).toHaveCSS("border-top-color", v.overlayLine);
 		const annBtn = menu.locator('button:has-text("Annotate")');
 		await expect(annBtn).toHaveCSS("color", v.ink);
 		await annBtn.hover();
-		await expect(annBtn).toHaveCSS("background-color", t.wash);
+		await expect(annBtn).toHaveCSS("background-color", v.overlayHover);
 		// Annotation popover: light card on light, dark card on dark.
 		await annBtn.click();
 		const pop = page.locator(".ann-pop");
 		await expect(pop).toBeVisible();
-		await expect(pop).toHaveCSS(
-			"background-color",
-			L ? "rgb(255, 255, 255)" : "rgb(28, 28, 30)"
-		);
-		await expect(pop).toHaveCSS(
-			"border-color",
-			L ? "rgb(229, 229, 234)" : "rgb(56, 56, 58)"
+		await expect(pop).toHaveCSS("background-color", v.overlay);
+		await expect(pop).toHaveCSS("border-color", v.overlayLine);
+		// The open box dims the thread: its first shadow is the
+		// full-screen scrim ring.
+		expect(
+			await pop.evaluate((el) => getComputedStyle(el).boxShadow)
+		).toMatch(
+			L
+				? /^rgba\(0, 0, 0, 0\.15\) 0px 0px 0px \d+(\.\d+)?px/
+				: /^rgba\(0, 0, 0, 0\.45\) 0px 0px 0px \d+(\.\d+)?px/
 		);
 		await page.keyboard.type("note");
 		await page.keyboard.press("Enter");
@@ -470,8 +477,8 @@ for (const t of THEMES) {
 				timeout: 2000
 			})
 			.toBe("1");
-		await expect(card).toHaveCSS("background-color", v.panel);
-		await expect(card).toHaveCSS("border-color", v.softLine);
+		await expect(card).toHaveCSS("background-color", v.overlay);
+		await expect(card).toHaveCSS("border-color", v.overlayLine);
 		// Park the cursor clear of the card: the pill click that opened
 		// it can leave it hovering the delete button, which then reads
 		// ink instead of rest.

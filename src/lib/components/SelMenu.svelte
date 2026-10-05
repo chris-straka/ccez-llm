@@ -173,20 +173,19 @@ the dismiss keeps the 150ms app beat so it never pops. -->
 		align-items: stretch;
 		padding: 0;
 		border: 1px solid #e5e5ea;
-		border-color: var(--line-soft);
+		border-color: var(--line-overlay);
 		border-radius: 12px;
 		background: rgba(255, 255, 255, 0.88);
+		background: var(--overlay-glass);
 		-webkit-backdrop-filter: blur(18px) saturate(1.6);
 		backdrop-filter: blur(18px) saturate(1.6);
 		box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
+		box-shadow: var(--shadow-overlay);
 		overflow: hidden;
 		/* The menu is chrome, not text: dragging across it must not
 		start a selection of its own label. */
 		user-select: none;
 		-webkit-user-select: none;
-	}
-	:global(html[data-theme="dark"]) .sel-menu {
-		background: rgba(30, 30, 32, 0.88);
 	}
 	.sel-menu.sel-menu-drag {
 		transition: none;
@@ -211,11 +210,11 @@ the dismiss keeps the 150ms app beat so it never pops. -->
 	a hairline between the two when a single Han character qualifies. */
 	.sel-menu button + button {
 		border-left: 1px solid #e5e5ea;
-		border-left-color: var(--line-soft);
+		border-left-color: var(--line-overlay);
 	}
 	.sel-menu button:hover {
 		background: #f1f1f4;
-		background: var(--bg-wash);
+		background: var(--overlay-hover);
 	}
 	.sel-menu button:active {
 		opacity: 0.55;

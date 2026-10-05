@@ -249,13 +249,22 @@ blur-save fires first and Cancel/Delete can never win the race. -->
 		every OS with this set. */
 		box-sizing: border-box;
 		padding: 1rem 1.1rem 0.9rem;
-		border: 1px solid #38383a;
+		border: 1px solid #545458;
+		border-color: var(--line-overlay);
 		border-radius: 20px;
 		/* Tall boxes read over-rounded at a full pill radius, so a
 		grown box (see growPill's tall flag) drops to a smaller one. */
-		background: #1c1c1e;
+		background: #2c2c2e;
+		background: var(--bg-overlay);
 		color: #f2f2f7;
-		box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+		/* The spread ring is the scrim: it dims the thread while the
+		box is open, so an open box never reads as page chrome. A
+		shadow, not an element, so click-off still lands underneath
+		and the fade carries it. */
+		box-shadow: 0 18px 50px rgba(0, 0, 0, 0.65);
+		box-shadow:
+			0 0 0 100vmax var(--scrim),
+			var(--shadow-overlay);
 		animation: ann-pop-in 0.16s ease;
 	}
 	.ann-pop.closing {
@@ -364,14 +373,11 @@ blur-save fires first and Cancel/Delete can never win the race. -->
 	.ann-save:active {
 		transform: scale(1);
 	}
-	/* Light theme edit card (dark-always above): white card, ink
-	text, quiet tools, and the same system-blue primary as the send
+	/* Light theme edit card (surface and edge ride the overlay
+	tokens): ink text, quiet tools, and the same system-blue primary as the send
 	button. Fresh pill included — it is the same surface. */
 	:global(html[data-theme="light"]) .ann-pop {
-		background: #fff;
 		color: #1c1c1e;
-		border-color: #e5e5ea;
-		box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
 	}
 	:global(html[data-theme="light"]) .ann-pop textarea {
 		color: #1c1c1e;
