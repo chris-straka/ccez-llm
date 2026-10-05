@@ -652,7 +652,13 @@ stop, so both rules below stay suppressed. -->
 		flex: 1 1 0;
 		min-height: 0;
 		height: 100%;
-		font-size: 1.3rem;
+		/* Speak and Inspect act on message text, so they grow with
+		the larger of the message and prompt sizes (--msg-font set
+		on .app), capped to the viewport so both still fit. */
+		font-size: min(
+			calc(1.3rem * max(var(--msg-font, 1), var(--font-scale, 1))),
+			9vw
+		);
 		padding: 0.55rem 0.6rem;
 	}
 	/* The overlay escapes the row: its 3rem overflow cap would clip

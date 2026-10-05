@@ -1167,16 +1167,16 @@ test.describe("touch", () => {
 		await expect(page.locator(".toast")).toHaveText("Chat deleted");
 	});
 
-	/** Giant text: the menu grows with the type but both buttons stay
-	whole on screen (at 400% Annotate once filled the width and
-	clipped Copy). */
+	/** Giant text: the menu and the Speak/Inspect dock grow with the
+	type but every button stays whole on screen (at 400% Annotate
+	once filled the width and clipped Copy, and the dock never grew). */
 	for (const fontScale of [4, 8]) {
 		test(`touch selection menu fits the phone at ${fontScale * 100}% text`, async ({
 			page
 		}) => {
 			await seedChat(
 				page,
-				[{ role: "assistant", content: "Bonjour, comment allez-vous ?" }],
+				[{ role: "assistant", content: "語" }],
 				null,
 				{ fontScale }
 			);
@@ -1185,6 +1185,7 @@ test.describe("touch", () => {
 			await summonTouchSelection(page);
 			const buttons = page.locator(".sel-menu button");
 			await expect(buttons).toHaveText(["Annotate", "Copy"]);
+			await expect(page.locator(".ann-dock")).toHaveText(["Speak", "Inspect"]);
 			await page.waitForTimeout(250);
 			await page.screenshot({
 				path: `.screenshots/sel-menu-giant-${fontScale}.png`
@@ -1201,9 +1202,20 @@ test.describe("touch", () => {
 					const r = btn.getBoundingClientRect();
 					if (r.left < box.left - 1 || r.right > box.right + 1)
 						out.push(`${btn.textContent} clipped by the menu`);
+				}
+				for (const btn of document.querySelectorAll(".sel-menu button, .ann-dock")) {
 					if (btn.scrollWidth > btn.clientWidth + 1)
 						out.push(`${btn.textContent} label overflows`);
+					if (btn.scrollHeight > btn.clientHeight + 1)
+						out.push(`${btn.textContent} label spills vertically`);
+					const r = btn.getBoundingClientRect();
+					if (r.left < 0 || r.right > vw)
+						out.push(`${btn.textContent} off screen`);
 				}
+				const dock = document.querySelector(".ann-dock");
+				const root = parseFloat(getComputedStyle(document.documentElement).fontSize);
+				if (dock && parseFloat(getComputedStyle(dock).fontSize) < 1.3 * root * 1.5)
+					out.push("dock label never grew");
 				return out;
 			});
 			expect(report).toEqual([]);

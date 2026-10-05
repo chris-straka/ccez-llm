@@ -12952,7 +12952,7 @@ import {
 	data-hyphenate={settings.fontScale >= HYPHENATE_FONT_SCALE || null}
 	style="--font-scale: {androidUI
 		? Math.min(FONT_SCALE_MAX, settings.fontScale)
-		: settings.fontScale}; --chat-width: {effectiveChatWidth(
+		: settings.fontScale}; --msg-font: {settings.fontScale}; --chat-width: {effectiveChatWidth(
 		androidUI,
 		settings.fontScale,
 		settings.chatWidth ?? 36
