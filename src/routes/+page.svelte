@@ -434,6 +434,7 @@ import {
 		buildSearchDocs,
 		collectSearchAnnotations,
 		findMessageIndices,
+		groupHitsByChat,
 		type SearchHit
 	} from "$lib/chatSearch";
 	import { chatLabel, filterSidebarChats, sideTip } from "$lib/sidebar";
@@ -2602,8 +2603,25 @@ import {
 		return chatState.chats.map((c) => ({
 			id: c.id,
 			createdAt: c.createdAt,
-			messages: c.messages.map((m) => ({ id: m.id, content: m.content }))
+			messages: c.messages.map((m) => ({
+				id: m.id,
+				content: m.content,
+				role: m.role
+			}))
 		}));
+	}
+
+	/** Search header for a chat: its time label plus the opening
+	prompt, so a hit says which conversation it came from. */
+	function searchChatTitle(chatId: string): string {
+		const target = chatState.chats.find((c) => c.id === chatId);
+		if (!target) return "";
+		const opener = target.messages
+			.find((m) => m.role === "user")
+			?.content.replace(/\s+/g, " ")
+			.trim();
+		const label = chatLabel(target.createdAt);
+		return opener ? `${label} · ${opener.slice(0, 80)}` : label;
 	}
 
 	function scheduleSearchIndex(): void {
@@ -2673,7 +2691,7 @@ import {
 			void ensureSearchStore()
 				.query(query, 30)
 				.then((hits) => {
-					palette.hits = hits;
+					palette.hits = groupHitsByChat(hits);
 					palette.cursor = 0;
 					palette.busy = false;
 				})
@@ -13610,6 +13628,7 @@ import {
 				enter: enterSearchHit,
 				focusHit: focusSearchHit
 			}}
+			chatTitle={searchChatTitle}
 		/>
 	{/if}
 	{#if inspectChar && inspectData}

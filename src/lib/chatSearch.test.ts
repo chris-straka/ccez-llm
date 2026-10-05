@@ -4,11 +4,16 @@ import {
 	chatMatchesQuery,
 	collectSearchAnnotations,
 	findMessageIndices,
+	foldText,
+	groupHitsByChat,
+	hitTag,
+	markSegments,
+	parseQuery,
 	querySearch,
-	snippetFor,
 	tokenizeText,
 	type IndexableAnnotation,
-	type SearchDoc
+	type SearchDoc,
+	type SearchHit
 } from "./chatSearch";
 
 describe("tokenizeText", () => {
@@ -70,13 +75,106 @@ describe("querySearch", () => {
 	});
 });
 
-describe("snippetFor", () => {
-	it("centers on the match with ellipses", () => {
-		const text = `start ${"x ".repeat(50)}needle${" y".repeat(50)} end`;
-		const snippet = snippetFor(text, ["needle"]);
-		expect(snippet).toContain("needle");
-		expect(snippet.startsWith("…")).toBe(true);
-		expect(snippet.endsWith("…")).toBe(true);
+describe("foldText", () => {
+	it("drops case, accents, and umlauts", () => {
+		expect(foldText("Über Café Straße")).toBe("uber cafe strasse");
+		expect(foldText("ÆØŒ Łódź")).toBe("aeooe lodz");
+	});
+
+	it("maps fullwidth to ASCII but keeps kana voicing", () => {
+		expect(foldText("ＡＢＣ")).toBe("abc");
+		expect(foldText("が")).toBe("が");
+		expect(foldText("が")).not.toBe(foldText("か"));
+	});
+});
+
+describe("parseQuery", () => {
+	it("splits phrases and filters from words", () => {
+		expect(parseQuery('from:me "Guten Morgen" Tschüss in:notes')).toEqual({
+			terms: ["tschuss"],
+			phrases: ["guten morgen"],
+			from: "user",
+			notesOnly: true
+		});
+		expect(parseQuery("from:ai hi").from).toBe("assistant");
+	});
+
+	it("leaves filter-looking words inside text alone", () => {
+		const q = parseQuery("platform:me");
+		expect(q.from).toBeNull();
+		expect(q.terms.join(" ")).toContain("platform");
+	});
+});
+
+describe("querySearch (folding, phrases, filters, pinyin)", () => {
+	const docs: SearchDoc[] = [
+		{ chatId: "de", msgId: "m1", kind: "message", role: "user", text: "Was heißt über auf Englisch?", at: 1 },
+		{ chatId: "de", msgId: "m2", kind: "message", role: "assistant", text: "Über means over or about.", at: 1 },
+		{ chatId: "fr", msgId: "m3", kind: "message", role: "assistant", text: "Un café, s'il vous plaît.", at: 2 },
+		{ chatId: "zh", msgId: "m4", kind: "message", role: "assistant", text: "我们一起学习中文吧", at: 3 },
+		{ chatId: "fr", msgId: "m5", kind: "annotation", text: "café\nask for coffee", at: 2 }
+	];
+	const ids = (q: string) => querySearch(docs, q).map((h) => h.doc.msgId);
+
+	it("matches without accents either way", () => {
+		expect(ids("uber")).toEqual(expect.arrayContaining(["m1", "m2"]));
+		expect(ids("cafe")).toEqual(expect.arrayContaining(["m3", "m5"]));
+		expect(ids("heisst")).toEqual(["m1"]);
+		expect(ids("CAFÉ")).toEqual(expect.arrayContaining(["m3", "m5"]));
+	});
+
+	it("filters by author and by notes", () => {
+		expect(ids("uber from:me")).toEqual(["m1"]);
+		expect(ids("uber from:ai")).toEqual(["m2"]);
+		expect(ids("cafe in:notes")).toEqual(["m5"]);
+		expect(ids("from:me")).toEqual([]);
+	});
+
+	it("matches quoted phrases whole", () => {
+		expect(ids('"means over"')).toEqual(["m2"]);
+		expect(ids('"over means"')).toEqual([]);
+	});
+
+	it("finds Han text by toneless pinyin, partial last syllable included", () => {
+		expect(ids("xuexi")).toEqual(["m4"]);
+		expect(ids("xuex")).toEqual(["m4"]);
+		expect(ids("zhongwen")).toEqual(["m4"]);
+		expect(ids("xuewen")).toEqual([]);
+	});
+
+	it("marks the matched text in the snippet", () => {
+		const [hit] = querySearch(docs, "xuexi");
+		const [a, b] = hit?.marks[0] ?? [0, 0];
+		expect(hit?.snippet.slice(a, b)).toBe("学习");
+		const [cafe] = querySearch(docs, "cafe from:ai");
+		const [c, d] = cafe?.marks[0] ?? [0, 0];
+		expect(cafe?.snippet.slice(c, d)).toBe("café");
+	});
+
+	it("marks words from their start only", () => {
+		const hits = querySearch(
+			[{ chatId: "a", msgId: "x", kind: "message", text: "find it in here" }],
+			"in"
+		);
+		const marked = (hits[0]?.marks ?? []).map(([a, b]) => hits[0]?.snippet.slice(a, b));
+		expect(marked).toEqual(["in"]);
+	});
+
+	it("centers long text on the match with ellipses", () => {
+		const text = `${"lorem ".repeat(30)}needle ${"ipsum ".repeat(30)}`;
+		const [hit] = querySearch([{ chatId: "a", msgId: "x", kind: "message", text }], "needle");
+		expect(hit?.snippet.startsWith("…")).toBe(true);
+		expect(hit?.snippet.endsWith("…")).toBe(true);
+		expect(hit?.snippet).toContain("needle");
+	});
+
+	it("breaks score ties toward newer chats", () => {
+		expect(ids("cafe")[0]).toBe("m3");
+		const tie: SearchDoc[] = [
+			{ chatId: "old", msgId: "o", kind: "message", text: "hallo", at: 1 },
+			{ chatId: "new", msgId: "n", kind: "message", text: "hallo", at: 9 }
+		];
+		expect(querySearch(tie, "hallo").map((h) => h.doc.msgId)).toEqual(["n", "o"]);
 	});
 });
 
@@ -97,6 +195,7 @@ describe("buildSearchDocs", () => {
 		);
 		expect(docs).toHaveLength(2);
 		expect(docs[1]?.kind).toBe("annotation");
+		expect(docs[1]?.at).toBe(1);
 	});
 });
 
@@ -153,6 +252,10 @@ describe("findMessageIndices", () => {
 		expect(findMessageIndices(["aaa", "bbb"], "z")).toEqual([]);
 		expect(findMessageIndices(["aaa"], "  ")).toEqual([]);
 	});
+
+	it("ignores accents", () => {
+		expect(findMessageIndices(["Das ist schön", "nope"], "schon")).toEqual([0]);
+	});
 });
 
 describe("chatMatchesQuery", () => {
@@ -164,5 +267,41 @@ describe("chatMatchesQuery", () => {
 		expect(chatMatchesQuery("label", ["sushi recipe"], "sushi ramen")).toBe(
 			false
 		);
+		expect(chatMatchesQuery("label", ["Grüße aus Köln"], "grusse koln")).toBe(true);
+	});
+});
+
+describe("result shaping", () => {
+	const hit = (chatId: string, msgId: string): SearchHit => ({
+		doc: { chatId, msgId, kind: "message", text: "" },
+		score: 1,
+		snippet: "",
+		marks: []
+	});
+
+	it("groups hits by chat in best-hit order", () => {
+		const ids = groupHitsByChat([
+			hit("a", "1"),
+			hit("b", "2"),
+			hit("a", "3"),
+			hit("c", "4"),
+			hit("b", "5")
+		]).map((h) => h.doc.msgId);
+		expect(ids).toEqual(["1", "3", "2", "5", "4"]);
+	});
+
+	it("splits a snippet into marked runs", () => {
+		expect(markSegments("say über it", [[4, 8]])).toEqual([
+			{ text: "say ", hit: false },
+			{ text: "über", hit: true },
+			{ text: " it", hit: false }
+		]);
+		expect(markSegments("plain", [])).toEqual([{ text: "plain", hit: false }]);
+	});
+
+	it("tags who said it", () => {
+		expect(hitTag({ chatId: "a", msgId: null, kind: "annotation", text: "" })).toBe("note");
+		expect(hitTag({ chatId: "a", msgId: "m", kind: "message", role: "user", text: "" })).toBe("you");
+		expect(hitTag({ chatId: "a", msgId: "m", kind: "message", role: "assistant", text: "" })).toBe("AI");
 	});
 });

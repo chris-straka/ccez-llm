@@ -10,6 +10,7 @@ markup). Field writes ride the shared object like the notices proxy
 	import type { SearchHit } from "$lib/chatSearch";
 	import type { PaletteState } from "$lib/palette";
 	import Modal from "./Modal.svelte";
+	import SearchResults from "./SearchResults.svelte";
 
 	/** Page-owned search behaviors. */
 	export interface SearchPaletteActions {
@@ -27,13 +28,16 @@ markup). Field writes ride the shared object like the notices proxy
 		/** Results list (the page scrolls hits into view). */
 		resultsEl?: HTMLElement | undefined;
 		actions: SearchPaletteActions;
+		/** Chat header text for grouped hits. */
+		chatTitle: (chatId: string) => string;
 	}
 
 	let {
 		palette,
 		inputEl = $bindable(undefined),
 		resultsEl = $bindable(undefined),
-		actions
+		actions,
+		chatTitle
 	}: Props = $props();
 
 	function inputKey(event: KeyboardEvent): void {
@@ -81,7 +85,7 @@ markup). Field writes ride the shared object like the notices proxy
 			bind:this={inputEl}
 			bind:value={palette.query}
 			oninput={actions.query}
-			placeholder="Search chats and annotations"
+			placeholder='Search chats · "phrase" from:me in:notes'
 			aria-label="Search chats and annotations"
 			inputmode="search"
 			enterkeyhint="search"
@@ -97,35 +101,19 @@ markup). Field writes ride the shared object like the notices proxy
 			×
 		</button>
 	</div>
-	<div
-		class="search-results"
-		bind:this={resultsEl}
-		data-fade-scroll
-		role="listbox"
-		aria-label="Search results"
-	>
-		{#if palette.busy}
-			<p class="search-status" role="status">Searching…</p>
-		{:else if palette.query.trim() && palette.hits.length === 0}
-			<p class="search-status">No matches.</p>
-		{:else}
-			{#each palette.hits as hit, n (hit.doc.chatId + (hit.doc.msgId ?? "") + hit.doc.kind)}
-				<button
-					type="button"
-					role="option"
-					aria-selected={n === palette.cursor}
-					class="search-hit"
-					class:cursor={n === palette.cursor}
-					onmouseenter={() => (palette.cursor = n)}
-					onclick={() => actions.enter(hit)}
-					onkeydown={hitKey}
-				>
-					<span class="search-kind">{hit.doc.kind}</span>
-					<span class="search-snippet">{hit.snippet}</span>
-				</button>
-			{/each}
-		{/if}
-	</div>
+	<SearchResults
+		hits={palette.hits}
+		cursor={palette.cursor}
+		busy={palette.busy}
+		query={palette.query}
+		{chatTitle}
+		bind:resultsEl
+		onPick={actions.enter}
+		onHover={(n: number) => {
+			palette.cursor = n;
+		}}
+		onHitKey={hitKey}
+	/>
 </Modal>
 
 <style>
@@ -188,54 +176,5 @@ markup). Field writes ride the shared object like the notices proxy
 		background: #fff;
 		background: var(--field);
 		color: inherit;
-	}
-	.search-results {
-		max-height: 50vh;
-		max-height: 50dvh;
-		overflow-y: auto;
-		display: flex;
-		flex-direction: column;
-		gap: 0.15rem;
-	}
-	.search-hit {
-		display: flex;
-		align-items: baseline;
-		gap: 0.6rem;
-		text-align: left;
-		font: inherit;
-		font-size: 0.85rem;
-		padding: 0.45rem 0.6rem;
-		border: 1px solid transparent;
-		border-radius: 8px;
-		background: transparent;
-		color: inherit;
-		cursor: pointer;
-	}
-	.search-hit.cursor {
-		background: #eef4ff;
-		background: var(--hl);
-		border-color: #e5e5ea;
-		border-color: var(--line-soft);
-	}
-	.search-kind {
-		flex: none;
-		font-size: 0.7rem;
-		text-transform: uppercase;
-		letter-spacing: 0.04em;
-		color: #6e6e73;
-		color: var(--dim);
-	}
-	.search-snippet {
-		min-width: 0;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-	.search-status {
-		font-size: 0.85rem;
-		color: #6e6e73;
-		color: var(--dim);
-		padding: 0.6rem;
-		margin: 0;
 	}
 </style>
