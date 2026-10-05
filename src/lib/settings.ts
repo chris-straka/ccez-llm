@@ -43,59 +43,63 @@ export const OWN_INK_CHOICES: readonly OwnInkChoice[] = [
 	"off"
 ];
 
+/** Light palette preset, applied as `<html data-light-style>`. */
+export type LightStyle = "paper" | "mist" | "sepia" | "contrast";
+
 /** Dark palette preset, applied as `<html data-dark-style>`. */
-export type DarkStyle = "graphite" | "ink" | "warm";
+export type DarkStyle = "graphite" | "ink" | "warm" | "contrast";
 
-/** Tile order in Settings → Appearance (also the heal allowlist). */
-export const DARK_STYLES: readonly DarkStyle[] = ["graphite", "ink", "warm"];
+/** Tile order in Settings → Appearance (also the heal allowlists). */
+export const LIGHT_STYLES: readonly LightStyle[] = [
+	"paper",
+	"mist",
+	"sepia",
+	"contrast"
+];
+export const DARK_STYLES: readonly DarkStyle[] = [
+	"graphite",
+	"ink",
+	"warm",
+	"contrast"
+];
 
-/** One tile in the color-scheme picker: the light theme or a dark style. */
-export type ThemeTile = "light" | DarkStyle;
+/** One side of the Light | Dark toggle. */
+export type SchemeSide = "light" | "dark";
 
-/** Picker tiles in display order. */
-export const THEME_TILES: readonly ThemeTile[] = ["light", ...DARK_STYLES];
-
-/** The two settings the color-scheme picker owns. */
+/** The settings the color-scheme picker owns. */
 export interface SchemeChoice {
 	theme: ThemeMode;
+	lightStyle: LightStyle;
 	darkStyle: DarkStyle;
 }
 
 /**
- * How a tile reads: the pinned theme is selected; while following
- * the system, Light reads as the day theme and the chosen dark
- * style as the night theme.
+ * The Light | Dark toggle. Pinned: the side becomes the theme.
+ * Following the system: the OS owns the side, so the toggle only
+ * switches which tiles show (no change here).
  */
-export function themeTileState(
+export function pickSchemeSide(
 	choice: SchemeChoice,
-	tile: ThemeTile
-): "selected" | "day" | "night" | "idle" {
-	if (choice.theme === "system") {
-		if (tile === "light") return "day";
-		return tile === choice.darkStyle ? "night" : "idle";
-	}
-	if (choice.theme === "light") return tile === "light" ? "selected" : "idle";
-	return tile === choice.darkStyle ? "selected" : "idle";
+	side: SchemeSide
+): SchemeChoice {
+	return choice.theme === "system" ? choice : { ...choice, theme: side };
 }
 
 /**
- * A tile press. Pinned: the tile becomes the theme. Following the
- * system: a dark tile becomes the night theme and the follow stays
- * on (Light is the only day theme, so pressing it changes nothing).
+ * A style tile press: the side's style becomes the tile, and a
+ * pinned theme moves to that side (pressing a dark tile while light
+ * shows means "use this").
  */
-export function pickThemeTile(
+export function pickSchemeStyle(
 	choice: SchemeChoice,
-	tile: ThemeTile
+	side: SchemeSide,
+	style: LightStyle | DarkStyle
 ): SchemeChoice {
-	if (tile === "light") {
-		return choice.theme === "system"
-			? choice
-			: { theme: "light", darkStyle: choice.darkStyle };
-	}
-	return {
-		theme: choice.theme === "system" ? "system" : "dark",
-		darkStyle: tile
-	};
+	const next =
+		side === "light"
+			? { ...choice, lightStyle: style as LightStyle }
+			: { ...choice, darkStyle: style as DarkStyle };
+	return choice.theme === "system" ? next : { ...next, theme: side };
 }
 
 /**
@@ -107,9 +111,9 @@ export function setFollowSystem(
 	follow: boolean,
 	systemDark: boolean
 ): SchemeChoice {
-	if (follow) return { theme: "system", darkStyle: choice.darkStyle };
+	if (follow) return { ...choice, theme: "system" };
 	if (choice.theme !== "system") return choice;
-	return { theme: systemDark ? "dark" : "light", darkStyle: choice.darkStyle };
+	return { ...choice, theme: systemDark ? "dark" : "light" };
 }
 
 /** Resolved scheme for a mode: pins hold, system mirrors the OS. */
@@ -282,6 +286,8 @@ export interface AppSettings {
 	promptIdleSec: number;
 	/** Color-scheme override (system follows the OS). */
 	theme: ThemeMode;
+	/** Light palette used whenever the resolved scheme is light. */
+	lightStyle: LightStyle;
 	/** Dark palette used whenever the resolved scheme is dark. */
 	darkStyle: DarkStyle;
 	/**
@@ -570,6 +576,7 @@ export function defaultSettings(): AppSettings {
 		promptIdleSec: PROMPT_IDLE_DEFAULT,
 		voiceLangPinned: false,
 		theme: "system",
+		lightStyle: "paper",
 		darkStyle: "graphite",
 		hideMessages: false,
 		hideButtons: true,
@@ -799,8 +806,9 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 		) {
 			merged.theme = "system";
 		}
-		// Dark styles postdate older saves: unknown values heal to
-		// the default palette.
+		// Scheme styles postdate older saves: unknown values heal to
+		// the default palettes.
+		if (!LIGHT_STYLES.includes(merged.lightStyle)) merged.lightStyle = "paper";
 		if (!DARK_STYLES.includes(merged.darkStyle)) merged.darkStyle = "graphite";
 		// Own-ink swatches postdate older saves the same way: unknown
 		// values heal to pink.

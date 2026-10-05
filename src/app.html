@@ -80,7 +80,14 @@
 			html[data-theme="dark"] {
 				background: #121214;
 			}
-			html[data-theme="dark"][data-dark-style="ink"] {
+			html[data-theme="light"][data-light-style="mist"] {
+				background: #f2f2f4;
+			}
+			html[data-theme="light"][data-light-style="sepia"] {
+				background: #f6eedb;
+			}
+			html[data-theme="dark"][data-dark-style="ink"],
+			html[data-theme="dark"][data-dark-style="contrast"] {
 				background: #000;
 			}
 			html[data-theme="dark"][data-dark-style="warm"] {
@@ -97,6 +104,7 @@
       re-applies the value on mount. Never throws. */
 			try {
 				var ccezTheme = null;
+				var ccezLight = "paper";
 				var ccezStyle = "graphite";
 				try {
 					var ccezRaw =
@@ -113,7 +121,16 @@
 						ccezTheme = ccezParsed.theme;
 					if (
 						ccezParsed &&
-						(ccezParsed.darkStyle === "ink" || ccezParsed.darkStyle === "warm")
+						(ccezParsed.lightStyle === "mist" ||
+							ccezParsed.lightStyle === "sepia" ||
+							ccezParsed.lightStyle === "contrast")
+					)
+						ccezLight = ccezParsed.lightStyle;
+					if (
+						ccezParsed &&
+						(ccezParsed.darkStyle === "ink" ||
+							ccezParsed.darkStyle === "warm" ||
+							ccezParsed.darkStyle === "contrast")
 					)
 						ccezStyle = ccezParsed.darkStyle;
 				} catch (ccezStoreError) {}
@@ -123,6 +140,7 @@
 						window.matchMedia &&
 						window.matchMedia("(prefers-color-scheme: dark)").matches);
 				document.documentElement.dataset.theme = ccezDark ? "dark" : "light";
+				document.documentElement.dataset.lightStyle = ccezLight;
 				document.documentElement.dataset.darkStyle = ccezStyle;
 			} catch (ccezThemeError) {}
 		</script>

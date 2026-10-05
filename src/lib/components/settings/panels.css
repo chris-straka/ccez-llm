@@ -38,6 +38,7 @@
 	margin-left: auto;
 	font-size: 0.75rem;
 	color: #6e6e73;
+	color: var(--muted);
 	white-space: nowrap;
 	user-select: text;
 	-webkit-user-select: text;
@@ -51,6 +52,7 @@ html[data-theme="dark"] .settings-inner .head-tokens {
 }
 .settings-inner .panel-head:focus-visible {
 	outline: 2px solid #1c1c1e;
+	outline: 2px solid var(--strong);
 	outline-offset: 2px;
 	border-radius: 4px;
 }
@@ -120,14 +122,17 @@ html[data-theme="dark"] .settings-inner .head-tokens {
 	track renders uniform and the thumb keeps the accent. */
 .settings-inner .font-row input[type="range"]::-webkit-slider-runnable-track {
 	background: #c7c7cc;
+	background: var(--line);
 	border-radius: 999px;
 }
 .settings-inner .font-row input[type="range"]::-moz-range-track {
 	background: #c7c7cc;
+	background: var(--line);
 	border-radius: 999px;
 }
 .settings-inner .font-row input[type="range"]::-moz-range-progress {
 	background: #c7c7cc;
+	background: var(--line);
 	border-radius: 999px;
 }
 .settings-inner .font-row output {
@@ -138,6 +143,7 @@ html[data-theme="dark"] .settings-inner .head-tokens {
 }
 .settings-inner section {
 	border-top: 1px solid #e5e5ea;
+	border-top: 1px solid var(--line-soft);
 	padding: 1.1rem 0;
 }
 /* Touch gestures and Updates form a 2x2 grid: headings share the
@@ -149,6 +155,7 @@ html[data-theme="dark"] .settings-inner .head-tokens {
 	gap: 0.6rem 1.5rem;
 	align-items: center;
 	border-top: 1px solid #e5e5ea;
+	border-top: 1px solid var(--line-soft);
 	padding: 1.1rem 0;
 }
 .settings-inner .keys-updates > section {
@@ -257,11 +264,13 @@ SettingsDrawer.svelte); 17rem clears the two nowrap buttons + gap. */
 	border-radius: 8px;
 	background: none;
 	color: #6e6e73;
+	color: var(--muted);
 	cursor: pointer;
 	transition: color 0.15s ease;
 }
 .settings-inner .voice-refresh:hover:not(:disabled) {
 	color: #1c1c1e;
+	color: var(--ink);
 }
 .settings-inner .voice-refresh:disabled {
 	cursor: default;
@@ -322,8 +331,10 @@ html[data-theme="dark"] .settings-inner .voice-refresh:hover:not(:disabled) {
 	font: inherit;
 	font-weight: 400;
 	border: 1px solid #c7c7cc;
+	border: 1px solid var(--line);
 	border-radius: 8px;
 	background: #fff;
+	background: var(--field);
 	color: inherit;
 	transition:
 		border-color 0.15s ease,
@@ -335,6 +346,7 @@ html[data-theme="dark"] .settings-inner .voice-refresh:hover:not(:disabled) {
 .settings-inner select:hover,
 .settings-inner textarea:hover {
 	border-color: #8e8e93;
+	border-color: var(--line-hover);
 }
 /* iOS zooms into text fields under 16px on focus: floor phone
 	fields at 16px so tapping one never re-scales the sheet. The
@@ -351,11 +363,13 @@ html[data-theme="dark"] .settings-inner .voice-refresh:hover:not(:disabled) {
 .settings-inner select:focus,
 .settings-inner textarea:focus {
 	border-color: #1c1c1e;
+	border-color: var(--strong);
 	outline: none;
 }
 .settings-inner .hint {
 	font-weight: 400;
 	color: #6e6e73;
+	color: var(--muted);
 	overflow-wrap: anywhere;
 }
 /* Error/note alerts under controls: a breathing top margin
@@ -375,6 +389,7 @@ select them. */
 	margin: 1rem 0 0;
 	font-size: 0.75rem;
 	color: #6e6e73;
+	color: var(--muted);
 	text-align: center;
 }
 .settings-inner .model-row {
@@ -394,8 +409,10 @@ select them. */
 	text-align: center;
 	font-size: 0.81rem;
 	border: 1px solid #c7c7cc;
+	border: 1px solid var(--line);
 	border-radius: 8px;
 	background: #fff;
+	background: var(--bg-raised);
 	cursor: pointer;
 	padding: 0.2rem 0.7rem;
 	color: inherit;
@@ -407,6 +424,7 @@ select them. */
 }
 .settings-inner .model-row button:not(:disabled):hover {
 	border-color: #1c1c1e;
+	border-color: var(--strong);
 }
 .settings-inner .model-row button:disabled {
 	opacity: 0.5;
@@ -415,6 +433,7 @@ select them. */
 .settings-inner .note {
 	font-size: 0.84rem;
 	color: #6e6e73;
+	color: var(--muted);
 	margin: 0.2rem 0 0;
 	/* Long error strings must wrap, never shove the panel sideways. */
 	overflow-wrap: anywhere;
@@ -437,6 +456,7 @@ select them. */
 }
 .settings-inner .note button:hover {
 	color: #1c1c1e;
+	color: var(--ink);
 }
 /* Empty-inventory note: breathing room below before the next
 	control, and a quiet inline re-check action in the same voice. */
@@ -480,8 +500,10 @@ margins would not take). */
 .settings-inner .key-state button {
 	font-size: 0.81rem;
 	border: 1px solid #c7c7cc;
+	border: 1px solid var(--line);
 	border-radius: 6px;
 	background: #fff;
+	background: var(--bg-raised);
 	cursor: pointer;
 	padding: 0.2rem 0.6rem;
 	color: inherit;
@@ -492,6 +514,7 @@ margins would not take). */
 }
 .settings-inner .key-state button:hover {
 	border-color: #1c1c1e;
+	border-color: var(--strong);
 }
 .settings-inner .provider-row,
 .settings-inner .segmented {
@@ -507,6 +530,9 @@ margins would not take). */
 }
 .settings-inner .theme {
 	margin-bottom: 0.3rem;
+}
+.settings-inner .theme .segmented {
+	margin-bottom: 0.6rem;
 }
 /* Color-scheme tiles: each paints a thumbnail of its theme (page,
 drawer edge, own-message line, text lines, composer) from raw preview
@@ -539,12 +565,12 @@ hexes, because the tokens only resolve for the theme that is active. */
 	border-color: #8e8e93;
 	border-color: var(--line-hover);
 }
-.settings-inner .theme-tile:not([data-state="idle"]) {
+.settings-inner .theme-tile[aria-pressed="true"] {
 	border-color: #007aff;
 	border-color: var(--accent);
 	box-shadow: 0 0 0 1px var(--accent);
 }
-.settings-inner .theme-tile[data-tile="light"] {
+.settings-inner .theme-tile[data-tile="light-paper"] {
 	--tp-bg: #fff;
 	--tp-drawer: #f4f4f6;
 	--tp-edge: #c7c7cc;
@@ -552,7 +578,31 @@ hexes, because the tokens only resolve for the theme that is active. */
 	--tp-own: #be185d;
 	--tp-composer: #fff;
 }
-.settings-inner .theme-tile[data-tile="graphite"] {
+.settings-inner .theme-tile[data-tile="light-mist"] {
+	--tp-bg: #f2f2f4;
+	--tp-drawer: #e9e9ec;
+	--tp-edge: #c2c2c8;
+	--tp-text: #26262a;
+	--tp-own: #be185d;
+	--tp-composer: #fafafb;
+}
+.settings-inner .theme-tile[data-tile="light-sepia"] {
+	--tp-bg: #f6eedb;
+	--tp-drawer: #eee3c9;
+	--tp-edge: #cbbb98;
+	--tp-text: #3a2e21;
+	--tp-own: #be185d;
+	--tp-composer: #fbf6e9;
+}
+.settings-inner .theme-tile[data-tile="light-contrast"] {
+	--tp-bg: #fff;
+	--tp-drawer: #fff;
+	--tp-edge: #595959;
+	--tp-text: #000;
+	--tp-own: #9d174d;
+	--tp-composer: #fff;
+}
+.settings-inner .theme-tile[data-tile="dark-graphite"] {
 	--tp-bg: #121214;
 	--tp-drawer: #19191c;
 	--tp-edge: #3a3a3f;
@@ -560,7 +610,7 @@ hexes, because the tokens only resolve for the theme that is active. */
 	--tp-own: #f9a8d4;
 	--tp-composer: #1e1e22;
 }
-.settings-inner .theme-tile[data-tile="ink"] {
+.settings-inner .theme-tile[data-tile="dark-ink"] {
 	--tp-bg: #000;
 	--tp-drawer: #0e0e0f;
 	--tp-edge: #2c2c2e;
@@ -568,13 +618,21 @@ hexes, because the tokens only resolve for the theme that is active. */
 	--tp-own: #f9a8d4;
 	--tp-composer: #161618;
 }
-.settings-inner .theme-tile[data-tile="warm"] {
+.settings-inner .theme-tile[data-tile="dark-warm"] {
 	--tp-bg: #171412;
 	--tp-drawer: #1d1a17;
 	--tp-edge: #3d3731;
 	--tp-text: #ece4d8;
 	--tp-own: #f9a8d4;
 	--tp-composer: #231f1b;
+}
+.settings-inner .theme-tile[data-tile="dark-contrast"] {
+	--tp-bg: #000;
+	--tp-drawer: #000;
+	--tp-edge: #a3a3a3;
+	--tp-text: #fff;
+	--tp-own: #ffc2e2;
+	--tp-composer: #000;
 }
 .settings-inner .theme-preview {
 	position: relative;
@@ -634,18 +692,8 @@ hexes, because the tokens only resolve for the theme that is active. */
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
-.settings-inner .theme-tile:not([data-state="idle"]) .theme-name {
+.settings-inner .theme-tile[aria-pressed="true"] .theme-name {
 	font-weight: 600;
-}
-/* Day / Night captions while following the system; the empty line
-holds its height so tiles never jump when the switch flips. */
-.settings-inner .theme-when {
-	min-height: 1.2em;
-	font-size: 0.7rem;
-	line-height: 1.2;
-	text-align: center;
-	color: #6e6e73;
-	color: var(--muted);
 }
 .settings-inner .provider-row button,
 .settings-inner .segmented button {
@@ -654,8 +702,10 @@ holds its height so tiles never jump when the switch flips. */
 	font-size: 0.81rem;
 	white-space: nowrap;
 	border: 1px solid #c7c7cc;
+	border: 1px solid var(--line);
 	border-radius: 999px;
 	background: #fff;
+	background: var(--bg-raised);
 	cursor: pointer;
 	color: inherit;
 	transition:
@@ -669,7 +719,9 @@ holds its height so tiles never jump when the switch flips. */
 	border-color: #007aff;
 	border-color: var(--accent);
 	background: #e5f0ff;
+	background: var(--selected-wash);
 	color: #1c1c1e;
+	color: var(--ink);
 	font-weight: 600;
 }
 /* Own-ink swatches: the dot previews the hue through the themed
@@ -708,10 +760,13 @@ a hollow dot (no color). */
 .settings-inner .provider-row button:not(.selected):not(:disabled):hover,
 .settings-inner .segmented button:not(.selected):not(:disabled):hover {
 	border-color: #1c1c1e;
+	border-color: var(--strong);
 }
 .settings-inner .segmented button:disabled {
 	background: #f3f3f4;
+	background: var(--bg-wash);
 	border-color: #e5e5ea;
+	border-color: var(--line-soft);
 	color: #aeaeb2;
 	cursor: not-allowed;
 	opacity: 1;
@@ -810,8 +865,10 @@ this renders exactly as the bare text did. */
 	font: inherit;
 	font-size: 0.87rem;
 	border: 1px solid #c7c7cc;
+	border: 1px solid var(--line);
 	border-radius: 8px;
 	background: #fff;
+	background: var(--bg-raised);
 	cursor: pointer;
 	color: inherit;
 	transition:
@@ -822,6 +879,7 @@ this renders exactly as the bare text did. */
 }
 .settings-inner section > button:not(:disabled):hover {
 	border-color: #1c1c1e;
+	border-color: var(--strong);
 }
 .settings-inner section > button:disabled {
 	opacity: 0.5;

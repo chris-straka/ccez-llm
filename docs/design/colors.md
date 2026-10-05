@@ -75,6 +75,7 @@ platforms can't share one vendor's identity. So the palette is
 | `--overlay-hover` | `#f1f1f4` | `#36363c` | Hover wash on overlay buttons (`--bg-wash` equals the dark overlay) |
 | `--overlay-glass` | `rgba(255,255,255,.88)` | `rgba(42,42,47,.92)` | Frosted overlays: selection menu, readings panels |
 | `--shadow-overlay` | `0 12px 40px` at `.18` | two layers, `.65` + `.4` | Overlay drop shadow; dark needs the heavier stack to show at all |
+| `--selected-wash` | `#e5f0ff` | (inverted fill instead) | Settings selected pills on light |
 | `--scrim` | `rgba(0,0,0,.15)` | `rgba(0,0,0,.45)` | Thread dim while the annotation box or answer card is open, painted as a `100vmax` spread ring on the overlay's own shadow (no element, click-off still lands) |
 | `--bg-chrome` | `#fff` | `#19191c` | Drawers (chat list, settings): one step off the thread on dark |
 | `--shadow-raised` | `none` | `0 10px 30px` at `.35` | The composer floats on dark; light stays flat |
@@ -87,34 +88,38 @@ platforms can't share one vendor's identity. So the palette is
 | `--own-purple` | `#7e22ce`             | `#d8b4fe`             | Own-message ink swatch                                                                                                                                                           |
 | `--own-white`  | `#1c1c1e`             | `#ffffff`             | Own-message ink swatch: white on dark, theme ink on light (white reads nowhere on light)                                                                                         |
 
-## Dark styles
+## Theme styles
 
-Dark has three palettes, picked in Settings → Appearance (`darkStyle`
-in `settings.ts`, applied as `<html data-dark-style>`, pinned before
-first paint by the `app.html` boot script):
+Settings → Appearance holds a Light | Dark toggle over four style
+tiles per side. The styles are `lightStyle` / `darkStyle` in
+`settings.ts`, applied as `<html data-light-style>` /
+`<html data-dark-style>` (both always set; `data-theme` decides which
+side shows) and pinned before first paint by the `app.html` boot
+script. While following the system, the toggle only browses sides.
 
-- **Graphite** (default): the plain `html[data-theme="dark"]` block.
-- **Ink**: true black page for OLED phones, warm off-white ink
-  (`#e6e4df`); the composer lifts by a hairline since shadows vanish
-  on black.
-- **Warm**: brown-tinted darks (`#171412` page) and parchment ink
-  (`#ece4d8`) for long reads.
+| Side  | Style      | Page      | Ink       | Note                                         |
+| ----- | ---------- | --------- | --------- | -------------------------------------------- |
+| Light | Paper      | `#fff`    | `#1c1c1e` | Default: the plain light block               |
+| Light | Mist       | `#f2f2f4` | `#26262a` | Soft gray, less glare                        |
+| Light | Sepia      | `#f6eedb` | `#3a2e21` | Book page for long reading                   |
+| Light | Contrast   | `#fff`    | `#000`    | Low vision: dark hairlines, deeper accent and swatches |
+| Dark  | Graphite   | `#121214` | `#f2f2f7` | Default: the plain dark block                |
+| Dark  | Ink        | `#000`    | `#e6e4df` | OLED black, warm ink; composer lifts by a hairline |
+| Dark  | Warm       | `#171412` | `#ece4d8` | Lamplight                                    |
+| Dark  | Contrast   | `#000`    | `#fff`    | Low vision: bright hairlines, lighter swatches |
 
-Each style block restates only surface, line, and ink tokens; accents,
-semantic colors, and own-ink swatches are shared. A dark override rule
-in a component must name a token (hex fallback, then `var()`), or it
-paints Graphite gray inside Ink and Warm.
+Each style block restates only the tokens it changes; accents and
+semantic colors are shared unless a contrast style needs them deeper.
+A component rule must name a token (hex fallback, then `var()`) or it
+ignores the styles: a raw `#fff` button stays white inside Sepia.
 
 ## Exceptions (raw hex allowed, documented here)
 
 - **Always-dark surfaces.** `.voice-error` (the floating speech error)
   is intentionally a dark pill in _both_ themes, so it keeps raw dark
   hexes — a theme token would flip it light and ruin the effect.
-- **Light-only wash.** Settings selected rows wash `#e5f0ff` on light
-  and invert on dark; the wash side has no dark twin, so it stays raw
-  until dark selections want one.
-- **Scheme picker thumbnails.** The color-scheme tiles in
-  `panels.css` (`--tp-*`) paint each theme with raw hexes: the real
+- **Scheme picker thumbnails.** The style tiles in
+  `panels.css` (`--tp-*`) paint each style with raw hexes: the real
   tokens only resolve for the theme that is active. Keep them in step
   with the style blocks in `app.css`.
 - **Fallback lines.** The first line of every `hex` + `var()` pair,
@@ -137,6 +142,13 @@ paints Graphite gray inside Ink and Warm.
 
 ## Log
 
+- **2026-10-04 — Light styles and high contrast.** The picker
+  became a Light | Dark toggle over four tiles per side: Paper, Mist,
+  Sepia, Contrast and Graphite, Ink, Warm, Contrast. The contrast
+  styles serve low vision (black on white, white on black, strong
+  hairlines). Light-side raw hexes in settings fields and buttons,
+  code, math, toasts, and quiet notes now pair with tokens, and the
+  settings selected wash became `--selected-wash`.
 - **2026-10-04 — Dark styles: Graphite, Ink, Warm.** The scheme
   buttons became thumbnail tiles (Light, Graphite, Ink, Warm) plus a
   Follow the system switch; while following, Light reads Day and the

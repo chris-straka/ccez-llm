@@ -3667,9 +3667,10 @@ import {
 		return () => query.removeEventListener("change", apply);
 	});
 
-	/** Dark palette preset: the dark tokens gate on this attribute
-	alongside data-theme, so it can sit set while light shows. */
+	/** Palette presets: each side's tokens gate on its attribute
+	alongside data-theme, so both sit set whichever side shows. */
 	$effect(() => {
+		document.documentElement.dataset.lightStyle = settings.lightStyle;
 		document.documentElement.dataset.darkStyle = settings.darkStyle;
 	});
 
@@ -13981,6 +13982,7 @@ import {
 		below says otherwise. */
 		font-size: 0.85rem;
 		color: #94250a;
+		color: var(--danger);
 	}
 	/* Same opt-in as the message buttons: row error text follows the
 	text size only when message-button scaling is on (same cap). */

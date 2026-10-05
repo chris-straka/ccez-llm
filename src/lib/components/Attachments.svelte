@@ -340,6 +340,7 @@ whenever the tray area is active. -->
 		font-weight: 700;
 		letter-spacing: 0.05em;
 		color: #6e6e73;
+		color: var(--muted);
 	}
 	/* Mobile light theme: the blue wash already shouts — the kind
 	pills and OCR read quieter at semibold instead of bold. */

@@ -34,9 +34,10 @@ import {
 	CORRECTION_HINT,
 	systemLocale,
 	resolveTheme,
-	themeTileState,
-	pickThemeTile,
+	pickSchemeSide,
+	pickSchemeStyle,
 	setFollowSystem,
+	LIGHT_STYLES,
 	DARK_STYLES,
 	OWN_INK_CHOICES,
 	validCaptureArea,
@@ -928,79 +929,68 @@ describe("step helpers", () => {
 });
 
 describe("color-scheme picker", () => {
-	it("marks the pinned theme selected", () => {
-		expect(themeTileState({ theme: "light", darkStyle: "ink" }, "light")).toBe(
-			"selected"
-		);
-		expect(themeTileState({ theme: "light", darkStyle: "ink" }, "ink")).toBe(
-			"idle"
-		);
-		expect(themeTileState({ theme: "dark", darkStyle: "warm" }, "warm")).toBe(
-			"selected"
-		);
-		expect(themeTileState({ theme: "dark", darkStyle: "warm" }, "light")).toBe(
-			"idle"
-		);
-		expect(
-			themeTileState({ theme: "dark", darkStyle: "warm" }, "graphite")
-		).toBe("idle");
+	const base = {
+		theme: "light",
+		lightStyle: "paper",
+		darkStyle: "graphite"
+	} as const;
+
+	it("pins the toggled side, and only views it while following", () => {
+		expect(pickSchemeSide(base, "dark")).toEqual({ ...base, theme: "dark" });
+		const follow = { ...base, theme: "system" } as const;
+		expect(pickSchemeSide(follow, "dark")).toEqual(follow);
 	});
 
-	it("reads Light as day and the dark style as night while following", () => {
-		const follow = { theme: "system", darkStyle: "ink" } as const;
-		expect(themeTileState(follow, "light")).toBe("day");
-		expect(themeTileState(follow, "ink")).toBe("night");
-		expect(themeTileState(follow, "graphite")).toBe("idle");
-	});
-
-	it("pins the pressed tile", () => {
-		expect(
-			pickThemeTile({ theme: "light", darkStyle: "graphite" }, "warm")
-		).toEqual({
+	it("sets the side's style and moves a pinned theme to that side", () => {
+		expect(pickSchemeStyle(base, "dark", "ink")).toEqual({
 			theme: "dark",
-			darkStyle: "warm"
-		});
-		expect(pickThemeTile({ theme: "dark", darkStyle: "ink" }, "light")).toEqual(
-			{
-				theme: "light",
-				darkStyle: "ink"
-			}
-		);
-	});
-
-	it("moves only the night theme while following", () => {
-		const follow = { theme: "system", darkStyle: "graphite" } as const;
-		expect(pickThemeTile(follow, "ink")).toEqual({
-			theme: "system",
+			lightStyle: "paper",
 			darkStyle: "ink"
 		});
-		expect(pickThemeTile(follow, "light")).toEqual(follow);
+		expect(pickSchemeStyle({ ...base, theme: "dark" }, "light", "sepia")).toEqual({
+			theme: "light",
+			lightStyle: "sepia",
+			darkStyle: "graphite"
+		});
+	});
+
+	it("keeps following the system when a style is picked", () => {
+		const follow = { ...base, theme: "system" } as const;
+		expect(pickSchemeStyle(follow, "dark", "contrast")).toEqual({
+			...follow,
+			darkStyle: "contrast"
+		});
+		expect(pickSchemeStyle(follow, "light", "mist")).toEqual({
+			...follow,
+			lightStyle: "mist"
+		});
 	});
 
 	it("pins what shows when following turns off", () => {
-		const follow = { theme: "system", darkStyle: "warm" } as const;
-		expect(setFollowSystem(follow, false, true)).toEqual({
-			theme: "dark",
-			darkStyle: "warm"
-		});
-		expect(setFollowSystem(follow, false, false)).toEqual({
-			theme: "light",
-			darkStyle: "warm"
-		});
-		expect(
-			setFollowSystem({ theme: "dark", darkStyle: "ink" }, true, false)
-		).toEqual({
-			theme: "system",
-			darkStyle: "ink"
+		const follow = { ...base, theme: "system", darkStyle: "warm" } as const;
+		expect(setFollowSystem(follow, false, true).theme).toBe("dark");
+		expect(setFollowSystem(follow, false, false).theme).toBe("light");
+		expect(setFollowSystem({ ...base, theme: "dark" }, true, false)).toEqual({
+			...base,
+			theme: "system"
 		});
 	});
 
-	it("heals unknown dark styles to graphite", () => {
+	it("heals unknown styles to the defaults", () => {
+		expect(defaultSettings().lightStyle).toBe("paper");
 		expect(defaultSettings().darkStyle).toBe("graphite");
 		const bad = blankSettings();
+		(bad as unknown as Record<string, unknown>).lightStyle = "neon";
 		(bad as unknown as Record<string, unknown>).darkStyle = "neon";
 		saveSettings(bad, memoryStore);
+		expect(loadSettings(memoryStore).lightStyle).toBe("paper");
 		expect(loadSettings(memoryStore).darkStyle).toBe("graphite");
+		for (const style of LIGHT_STYLES) {
+			const kept = blankSettings();
+			kept.lightStyle = style;
+			saveSettings(kept, memoryStore);
+			expect(loadSettings(memoryStore).lightStyle).toBe(style);
+		}
 		for (const style of DARK_STYLES) {
 			const kept = blankSettings();
 			kept.darkStyle = style;

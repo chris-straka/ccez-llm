@@ -1033,6 +1033,7 @@ stop, so both rules below stay suppressed. -->
 			justify-content: center;
 			line-height: 0;
 			color: #6e6e73;
+			color: var(--muted);
 			border: 0;
 			background: none;
 			cursor: pointer;
@@ -1102,6 +1103,7 @@ stop, so both rules below stay suppressed. -->
 		line-height: 1.4;
 		padding: 0.6rem calc(var(--tools-pad) + var(--tools-extra)) 0.6rem 0;
 		caret-color: #1c1c1e;
+		caret-color: var(--ink);
 		/* Mechanical twin of the cm rules: same pairs, Android-only node. */
 		caret-color: var(--ink);
 		width: 100%;

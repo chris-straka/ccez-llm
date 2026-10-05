@@ -112,6 +112,21 @@ describe("boot theme paint", () => {
 		);
 	});
 
+	it("pins the saved light style before first paint", () => {
+		const stored = JSON.stringify({ theme: "light", lightStyle: "sepia" });
+		expect(boot({ stored, systemDark: true })["lightStyle"]).toBe("sepia");
+		expect(
+			boot({ stored: JSON.stringify({ lightStyle: "neon" }), systemDark: false })[
+				"lightStyle"
+			]
+		).toBe("paper");
+		expect(
+			boot({ stored: JSON.stringify({ darkStyle: "contrast" }), systemDark: true })[
+				"darkStyle"
+			]
+		).toBe("contrast");
+	});
+
 	it("survives corrupt storage and missing APIs without throwing", () => {
 		expect(paint({ stored: "{nope", systemDark: true })).toBe("dark");
 		expect(

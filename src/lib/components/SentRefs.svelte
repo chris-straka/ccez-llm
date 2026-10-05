@@ -220,6 +220,7 @@ its body is just an em-dash (see REFS_ONLY_BODY). -->
 		border-radius: 0;
 		background: transparent;
 		color: #6e6e73;
+		color: var(--muted);
 		/* The count tracks the chat text size like badges do (dampened:
 		never compounding rem, just the message scale). */
 		font-size: calc(0.72rem * var(--font-scale, 1));

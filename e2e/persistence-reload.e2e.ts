@@ -101,10 +101,11 @@ test("theme choice survives a reload", async ({ page }) => {
 	await page.keyboard.press("Meta+,");
 	const panel = page.locator(".settings-panel");
 	await expect(panel).not.toHaveClass(/closed/);
-	// Following the system (the default) only moves the night style:
-	// pin first so the tile press sets the theme itself.
+	// Following the system (the default) leaves the scheme to the OS:
+	// pin first so the dark tile press sets the theme itself.
 	await panel.getByRole("checkbox", { name: "Follow the system" }).uncheck();
-	await panel.locator('.theme-tile[data-tile="ink"]').click();
+	await panel.getByRole("radio", { name: "Dark", exact: true }).click();
+	await panel.locator('.theme-tile[data-tile="dark-ink"]').click();
 	await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 	await expect(page.locator("html")).toHaveAttribute("data-dark-style", "ink");
 	// The choice persists asynchronously; wait for the stored value.

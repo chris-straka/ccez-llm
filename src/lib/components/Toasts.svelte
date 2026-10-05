@@ -190,8 +190,11 @@
 	values like that card, not tokens: there is no surface token. */
 	:global(html[data-theme="light"]) .toast:not(.error) {
 		background: #fff;
+		background: var(--bg-overlay);
 		color: #1c1c1e;
+		color: var(--ink);
 		border-color: #e5e5ea;
+		border-color: var(--line-overlay);
 	}
 	/* Error toasts pair red both ways (same pairings as the banner):
 	the tokens already resolve per theme, so no dark override block. */

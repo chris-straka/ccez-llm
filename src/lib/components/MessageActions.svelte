@@ -599,6 +599,7 @@ cover an off state. -->
 	/* The message being read aloud: its speak button reads as "stop". */
 	.actions .icon-btn.active {
 		color: #1f7a4d;
+		color: var(--ok);
 	}
 	/* Dark theme: green stop button, held on hover (the
 	equal-specificity hover above would otherwise strip it). */

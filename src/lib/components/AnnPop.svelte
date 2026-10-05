@@ -378,15 +378,19 @@ blur-save fires first and Cancel/Delete can never win the race. -->
 	button. Fresh pill included — it is the same surface. */
 	:global(html[data-theme="light"]) .ann-pop {
 		color: #1c1c1e;
+		color: var(--ink);
 	}
 	:global(html[data-theme="light"]) .ann-pop textarea {
 		color: #1c1c1e;
+		color: var(--ink);
 	}
 	:global(html[data-theme="light"]) .ann-pop .ann-tool {
 		color: #6e6e73;
+		color: var(--muted);
 	}
 	:global(html[data-theme="light"]) .ann-pop .ann-tool:hover {
 		color: #1c1c1e;
+		color: var(--ink);
 	}
 	:global(html[data-theme="light"]) .ann-pop .ann-tool.recording {
 		color: #ff3b30;

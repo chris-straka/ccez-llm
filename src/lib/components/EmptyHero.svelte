@@ -65,6 +65,7 @@ pills become the top rail above the story cards. -->
 	.mock-note {
 		margin: 0;
 		color: #6e6e73;
+		color: var(--muted);
 		font-size: 0.85rem;
 	}
 </style>

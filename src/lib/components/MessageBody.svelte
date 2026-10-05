@@ -736,6 +736,7 @@ import {
 		}
 		font-family: inherit;
 		color: #6e6e73;
+		color: var(--muted);
 		font-size: 0.85rem;
 		text-align: left;
 		white-space: nowrap;
@@ -962,6 +963,7 @@ import {
 		position: relative;
 		margin: 0.5em 0;
 		border: 1px solid #e5e5ea;
+		border: 1px solid var(--line-soft);
 		border-radius: 8px;
 		overflow: hidden;
 		/* Hug the code instead of filling the column: short snippets
@@ -1020,7 +1022,9 @@ import {
 	}
 	.rendered :global(.ccez-code-output) {
 		border-top: 1px solid #e5e5ea;
+		border-top: 1px solid var(--line-soft);
 		background: #f7f7f8;
+		background: var(--panel);
 		padding: 0.4rem 0.6rem;
 		font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 		font-size: 0.75rem;
@@ -1034,6 +1038,7 @@ import {
 		margin: 0;
 		border-radius: 0;
 		background: #fff;
+		background: var(--field);
 		/* Right gutter clears the run + copy icons pinned top-right,
 		so code never slides underneath them. */
 		padding: 0.4rem 3.4rem 0.4rem 0.6rem;
@@ -1047,9 +1052,11 @@ import {
 		display: none;
 		padding: 0.4rem 0.6rem;
 		background: #fff;
+		background: var(--field);
 		font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 		font-size: 0.75rem;
 		color: #6e6e73;
+		color: var(--muted);
 		white-space: nowrap;
 		/* Folded labels are chrome, not content: quoting
 		`python · N LOC` annotates nothing, and a badge stamped on
@@ -1095,6 +1102,7 @@ import {
 		position: relative;
 		margin: 0.5em 0;
 		border: 1px solid #e5e5ea;
+		border: 1px solid var(--line-soft);
 		border-radius: 8px;
 		overflow: hidden;
 		width: fit-content;
@@ -1182,9 +1190,11 @@ import {
 		display: none;
 		padding: 0.4rem 0.6rem;
 		background: #fff;
+		background: var(--field);
 		font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 		font-size: 0.75rem;
 		color: #6e6e73;
+		color: var(--muted);
 		white-space: nowrap;
 		/* Same as code above: folded labels are chrome, never
 		selectable text (clicks unfold; picks start unfolded). */
@@ -1206,6 +1216,7 @@ import {
 		block's width is the equation's own. */
 		padding: 2.2rem 0.8rem 0.6rem;
 		background: #fff;
+		background: var(--field);
 		overflow-x: auto;
 		cursor: text;
 		user-select: text;
@@ -1220,6 +1231,7 @@ import {
 		`$` flips rendered to source. */
 		padding: 2.2rem 0.8rem 0.6rem;
 		background: #fff;
+		background: var(--field);
 		font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 		font-size: 0.8rem;
 		white-space: pre-wrap;
@@ -1247,9 +1259,11 @@ import {
 		display: inline-flex;
 		align-items: baseline;
 		border: 1px solid #e5e5ea;
+		border: 1px solid var(--line-soft);
 		border-radius: 6px;
 		padding: 0 0.3rem;
 		background: #fff;
+		background: var(--field);
 		/* One equation, one line: an inline run must never split
 		after a relation onto a second line. */
 		white-space: nowrap;

@@ -213,6 +213,7 @@ CSS to this markup). Row data already lives in `$lib/shortcuts`
 	}
 	:global(.app[data-android]) .keys div:nth-child(2) {
 		border-top: 1px solid #e5e5ea;
+		border-top: 1px solid var(--line-soft);
 	}
 	:global(.app[data-android]) .keys dd {
 		font-family: inherit;

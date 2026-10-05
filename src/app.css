@@ -70,6 +70,7 @@ html {
 	off the thread on dark; light keeps the plain page. */
 	--bg-chrome: #fff;
 	--shadow-raised: none;
+	--selected-wash: #e5f0ff;
 }
 html[data-theme="light"] {
 	background: var(--bg);
@@ -126,6 +127,7 @@ html[data-theme="light"] {
 	--scrim: rgba(0, 0, 0, 0.15);
 	--bg-chrome: #fff;
 	--shadow-raised: none;
+	--selected-wash: #e5f0ff;
 }
 html[data-theme="dark"] {
 	background: var(--bg);
@@ -229,6 +231,115 @@ html[data-theme="dark"][data-dark-style="warm"] {
 	--line-overlay: #554b40;
 	--overlay-hover: #36302a;
 	--overlay-glass: rgba(43, 38, 33, 0.92);
+}
+html[data-theme="dark"][data-dark-style="contrast"] {
+	/* High contrast: white ink on black, bright hairlines, nothing
+	gray enough to fade for low vision. */
+	--bg: #000;
+	--bg-chrome: #000;
+	--bg-raised: #000;
+	--panel: #000;
+	--field: #000;
+	--line: #a3a3a3;
+	--line-soft: #8a8a8a;
+	--line-hover: #d4d4d4;
+	--hover-wash: #262626;
+	--bg-wash: #262626;
+	--hl: #102a52;
+	--ink: #fff;
+	--muted: #d4d4d4;
+	--dim: #e0e0e0;
+	--focus: #fff;
+	--strong: #fff;
+	--accent: #4da3ff;
+	--invert: #fff;
+	--invert-ink: #000;
+	--bg-overlay: #0a0a0a;
+	--line-overlay: #fff;
+	--overlay-hover: #262626;
+	--overlay-glass: rgba(10, 10, 10, 0.97);
+	--shadow-raised: 0 0 0 1px #8a8a8a;
+	--own-pink: #ffc2e2;
+	--own-blue: #bfdbfe;
+	--own-green: #bbf7d0;
+	--own-amber: #fde68a;
+	--own-purple: #e9d5ff;
+}
+/* Light styles: same contract as the dark ones, restating surface,
+line, and ink tokens on top of the light block. Paper is the plain
+light block. */
+html[data-theme="light"][data-light-style="mist"] {
+	/* Soft gray page: less glare than white, same neutral ink. */
+	--bg: #f2f2f4;
+	--bg-chrome: #e9e9ec;
+	--bg-raised: #fafafb;
+	--panel: #e9e9ec;
+	--field: #fff;
+	--line: #c2c2c8;
+	--line-soft: #d9d9de;
+	--hover-wash: #e2e2e6;
+	--bg-wash: #e2e2e6;
+	--hl: #e3ebf8;
+	--ink: #26262a;
+	--bg-overlay: #fafafb;
+	--line-overlay: #d4d4d9;
+	--overlay-hover: #ececef;
+	--overlay-glass: rgba(250, 250, 251, 0.9);
+	--shadow-raised: 0 2px 10px rgba(0, 0, 0, 0.05);
+	--selected-wash: #dde8f8;
+}
+html[data-theme="light"][data-light-style="sepia"] {
+	/* Book page: cream paper, brown ink, for long reading. */
+	--bg: #f6eedb;
+	--bg-chrome: #eee3c9;
+	--bg-raised: #fbf6e9;
+	--panel: #eee3c9;
+	--field: #fffbf1;
+	--line: #cbbb98;
+	--line-soft: #e0d3b4;
+	--line-hover: #a08e70;
+	--hover-wash: #ebdfc3;
+	--bg-wash: #ebdfc3;
+	--hl: #efe2bf;
+	--ink: #3a2e21;
+	--muted: #776650;
+	--dim: #776650;
+	--focus: #5a4834;
+	--strong: #3a2e21;
+	--invert: #3a2e21;
+	--invert-ink: #fbf6e9;
+	--bg-overlay: #fbf6e9;
+	--line-overlay: #d8c9a6;
+	--overlay-hover: #f1e7cf;
+	--overlay-glass: rgba(251, 246, 233, 0.92);
+	--selected-wash: #ece0bf;
+}
+html[data-theme="light"][data-light-style="contrast"] {
+	/* High contrast: black ink on white, dark hairlines, deeper
+	accent and swatches so nothing reads faint. */
+	--line: #595959;
+	--line-soft: #767676;
+	--line-hover: #000;
+	--hover-wash: #e6e6e6;
+	--bg-wash: #e6e6e6;
+	--hl: #dbe7ff;
+	--ink: #000;
+	--muted: #3d3d3d;
+	--dim: #3d3d3d;
+	--focus: #000;
+	--strong: #000;
+	--accent: #0040b0;
+	--invert: #000;
+	--line-overlay: #000;
+	--overlay-hover: #e6e6e6;
+	--overlay-glass: rgba(255, 255, 255, 0.97);
+	--shadow-overlay: 0 12px 40px rgba(0, 0, 0, 0.25);
+	--selected-wash: #dbe7ff;
+	--own-pink: #9d174d;
+	--own-blue: #1e3a8a;
+	--own-green: #14532d;
+	--own-amber: #78350f;
+	--own-purple: #581c87;
 }
 body {
 	margin: 0;

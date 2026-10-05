@@ -50,6 +50,7 @@ pulse (ink on aid buttons, accent/sky/green here). -->
 <style>
 	.sending {
 		color: #6e6e73;
+		color: var(--muted);
 		/* Status reading text: tracks the text-size setting like messages. */
 		font-size: calc(0.85rem * var(--font-scale, 1));
 		/* Breathing room, explicit (never UA margins): the status
