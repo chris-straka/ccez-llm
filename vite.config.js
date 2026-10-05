@@ -57,6 +57,10 @@ export default defineConfig(() => ({
 		watch: {
 			// 3. tell Vite to ignore watching `src-tauri`
 			ignored: ["**/src-tauri/**"]
-		}
+		},
+		// Compile the app page at server start: a cold first load
+		// otherwise spends ~9s transforming the page's import graph,
+		// past the e2e specs' 10s first-render waits.
+		warmup: { clientFiles: ["./src/routes/+page.svelte"] }
 	}
 }));
