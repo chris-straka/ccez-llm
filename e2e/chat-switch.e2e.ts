@@ -371,3 +371,30 @@ test("model titles a chat; the pencil renames it", async ({ page }) => {
 	expect(stored).toContain('"title":"German prepositions"');
 	expect(stored).toContain('"titleBy":"user"');
 });
+
+/** Shift+R over the open list reads the hovered chat's name. */
+test("Shift+R reads the hovered chat's name", async ({ page }) => {
+	await page.addInitScript(() => {
+		const spoken: string[] = [];
+		(window as unknown as { __spoken: string[] }).__spoken = spoken;
+		const synth = window.speechSynthesis;
+		if (synth) {
+			synth.speak = ((utterance: SpeechSynthesisUtterance) => {
+				spoken.push(utterance.text);
+				window.setTimeout(() => utterance.onend?.(new Event("end") as SpeechSynthesisEvent), 50);
+			}) as typeof synth.speak;
+		}
+	});
+	await seedChat(page, [
+		{ role: "user", content: "Comment dit-on window en français ?" },
+		{ role: "assistant", content: "On dit « fenêtre »." }
+	]);
+	await page.goto("/");
+	await expect(page.locator(".send-btn")).toBeVisible({ timeout: 60_000 });
+	await toggleSidebar(page);
+	await page.locator("aside ul li .side-chat").first().hover();
+	await page.keyboard.press("Shift+R");
+	await expect
+		.poll(() => page.evaluate(() => (window as unknown as { __spoken: string[] }).__spoken.join("|")))
+		.toContain("Comment dit-on window");
+});

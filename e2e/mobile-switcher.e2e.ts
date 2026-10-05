@@ -378,3 +378,26 @@ test("switcher search finds unaccented words and steps matches in the chat", asy
 	await bar.getByRole("button", { name: "Close find" }).tap();
 	await expect(bar).toHaveCount(0);
 });
+
+/** Phones rename with a still long-press on a chat row. */
+test("long-press on a chat row renames it", async ({ page }) => {
+	await seedTwo(page);
+	await page.keyboard.press("Meta+Shift+BracketLeft");
+	const row = page.locator("aside ul li button.side-chat").first();
+	await expect(row).toBeVisible({ timeout: 5_000 });
+	const box = await row.boundingBox();
+	if (!box) throw new Error("row has no box");
+	const at = { x: box.x + 30, y: box.y + box.height / 2 };
+	await row.dispatchEvent("touchstart", {
+		touches: [{ identifier: 1, clientX: at.x, clientY: at.y }]
+	});
+	await page.waitForTimeout(700);
+	await row.dispatchEvent("touchend", { touches: [], changedTouches: [] }).catch(() => {});
+	const field = page.getByLabel("Chat name");
+	await expect(field).toBeFocused();
+	await field.fill("Renamed on phone");
+	await page.keyboard.press("Enter");
+	await expect(page.locator("aside ul li .side-title").first()).toHaveText(
+		"Renamed on phone"
+	);
+});
