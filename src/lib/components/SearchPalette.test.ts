@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
 /**
- * The command palette's surfaces live in `SearchPalette.svelte`.
+ * The command palette's surfaces live in `SearchPalette.svelte`, its
+ * hit list in `SearchResults.svelte`.
  * Svelte scoping binds CSS to the component that renders it, so a
  * paged rule would silently stop matching (see the toast
  * red-pairing regression that set this precedent). The box seating
@@ -40,8 +41,13 @@ describe("search palette surfaces", () => {
 		const css = paletteStyle();
 		expect(css).toContain(".search-input");
 		expect(css).toContain(".search-input:focus-visible");
-		expect(css).toContain(".search-hit.cursor");
-		expect(css).toContain(".search-status");
+		// The hit list (shared with the phone switcher) styles itself.
+		const results = readFileSync(
+			new URL("./SearchResults.svelte", import.meta.url),
+			"utf8"
+		);
+		expect(results).toContain(".search-hit.cursor");
+		expect(results).toContain(".search-status");
 		const modal = readFileSync(
 			new URL("./Modal.svelte", import.meta.url),
 			"utf8"
