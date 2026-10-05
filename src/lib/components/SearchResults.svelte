@@ -150,4 +150,19 @@ the hits, cursor, and what a pick does. -->
 		padding: 0.6rem;
 		margin: 0;
 	}
+	/* Phones: the list tracks the text size, capped to the screen
+	width; inner sizes follow it in em. */
+	:global(.app[data-android]) .search-results {
+		font-size: min(calc(1rem * var(--font-scale, 1)), 6vw);
+	}
+	:global(.app[data-android]) .search-hit {
+		font-size: 0.85em;
+	}
+	:global(.app[data-android]) .search-chat,
+	:global(.app[data-android]) .search-kind {
+		font-size: 0.72em;
+	}
+	:global(.app[data-android]) .search-status {
+		font-size: 0.85em;
+	}
 </style>

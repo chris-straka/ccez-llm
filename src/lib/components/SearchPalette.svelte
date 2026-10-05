@@ -183,4 +183,17 @@ markup). Field writes ride the shared object like the notices proxy
 	.modal-head button :global(.action-glyph) {
 		height: 0.8em;
 	}
+	/* Phones track the text size (capped to the screen width): the
+	field and the hit list below read at giant sizes too. */
+	:global(.app[data-android]) .modal-head {
+		font-size: min(calc(1rem * var(--font-scale, 1)), 6.5vw);
+	}
+	:global(.app[data-android]) .search-input {
+		font-size: inherit;
+	}
+	:global(.app[data-android]) .modal-head button {
+		font-size: 1.1em;
+		min-width: 2.75rem;
+		min-height: 2.75rem;
+	}
 </style>

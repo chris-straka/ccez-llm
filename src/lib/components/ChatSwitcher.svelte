@@ -173,4 +173,26 @@ this markup). The veil/box shell renders through `Modal.svelte`. -->
 		color: var(--ink);
 		cursor: pointer;
 	}
+	/* Phones track the text size (capped to the screen width) so the
+	switcher reads at giant sizes; long titles take two lines there. */
+	:global(.app[data-android]) .switcher-mid {
+		font-size: min(calc(1rem * var(--font-scale, 1)), 7vw);
+	}
+	/* Thumb-sized round actions (44px) under the card. */
+	:global(.app[data-android]) .switcher-act {
+		min-width: 2.75rem;
+		width: 2.75rem;
+		height: 2.75rem;
+	}
+	:global(.app[data-android]) .switcher-pos {
+		font-size: 0.8em;
+	}
+	:global(.app[data-android]) .switcher-title {
+		white-space: normal;
+		overflow-wrap: anywhere;
+		display: -webkit-box;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 2;
+		line-clamp: 2;
+	}
 </style>
