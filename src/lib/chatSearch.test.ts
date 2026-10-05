@@ -4,6 +4,7 @@ import {
 	chatMatchesQuery,
 	collectSearchAnnotations,
 	findMessageIndices,
+	findQueryFor,
 	foldText,
 	groupHitsByChat,
 	hitTag,
@@ -303,5 +304,12 @@ describe("result shaping", () => {
 		expect(hitTag({ chatId: "a", msgId: null, kind: "annotation", text: "" })).toBe("note");
 		expect(hitTag({ chatId: "a", msgId: "m", kind: "message", role: "user", text: "" })).toBe("you");
 		expect(hitTag({ chatId: "a", msgId: "m", kind: "message", role: "assistant", text: "" })).toBe("AI");
+	});
+});
+
+describe("findQueryFor", () => {
+	it("drops filters and quote marks, keeps the words", () => {
+		expect(findQueryFor('"Guten Morgen" from:me')).toBe("Guten Morgen");
+		expect(findQueryFor("in:notes café")).toBe("café");
 	});
 });

@@ -524,3 +524,13 @@ export function hitTag(doc: SearchDoc): string {
 	if (doc.role === "assistant") return "AI";
 	return doc.kind;
 }
+
+/** Palette query as a find-bar query: filters and quote marks drop,
+the words stay (find matches one folded substring). */
+export function findQueryFor(query: string): string {
+	return query
+		.replace(FILTER_RE, " ")
+		.replace(/["“”„]/g, " ")
+		.replace(/\s+/g, " ")
+		.trim();
+}

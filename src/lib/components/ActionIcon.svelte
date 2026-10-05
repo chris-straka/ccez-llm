@@ -24,7 +24,8 @@
 		| "export"
 		| "check"
 		| "capture"
-		| "converse";
+		| "converse"
+		| "search";
 
 	interface Props {
 		kind: ActionKind;
@@ -69,6 +70,9 @@
 		<path d="M13.7 1.4v3.1h-3.1" />
 	{:else if kind === "close"}
 		<path d="M4 4l8 8M12 4l-8 8" />
+	{:else if kind === "search"}
+		<circle cx="7" cy="7" r="4.5" />
+		<path d="M10.4 10.4l3.6 3.6" />
 	{:else if kind === "mic"}
 		<rect x="6" y="1.5" width="4" height="7" rx="2" />
 		<path d="M4 8.5a4 4 0 0 0 8 0" />

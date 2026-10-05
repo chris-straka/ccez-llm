@@ -434,6 +434,7 @@ import {
 		buildSearchDocs,
 		collectSearchAnnotations,
 		findMessageIndices,
+		findQueryFor,
 		groupHitsByChat,
 		type SearchHit
 	} from "$lib/chatSearch";
@@ -2763,12 +2764,32 @@ import {
 	function enterSearchHit(hit: SearchHit): void {
 		const chat = chatState.chats.find((c) => c.id === hit.doc.chatId);
 		if (!chat) return;
+		const query = palette.query;
 		transitionToChat(chat.id);
 		palette.open = false;
 		palette.query = "";
 		palette.hits = [];
 		if (hit.doc.msgId) {
 			const index = chat.messages.findIndex((m) => m.id === hit.doc.msgId);
+			if (index >= 0 && androidUI) {
+				// Phones have no find chord: when the chat holds more
+				// matches, the find bar opens on this one with the
+				// field unfocused (no keyboard) so ‹ › step the rest.
+				const findQuery = findQueryFor(query);
+				const stops = findMessageIndices(
+					chat.messages.map((m) => m.content),
+					findQuery
+				);
+				if (stops.length > 1 && stops.includes(index)) {
+					find = { ...emptyFind(), open: true, query: findQuery };
+					requestAnimationFrame(() => {
+						// The bar counts the visible (untrimmed) thread.
+						find.cursor = Math.max(currentFindHits().indexOf(index), 0);
+						landFindHit();
+					});
+					return;
+				}
+			}
 			if (index >= 0) {
 				// The jump lands silently: the message scrolls into view
 				// and takes DOM focus (Tab still walks message order),
@@ -13072,7 +13093,7 @@ import {
 		></header>
 
 		<!-- In-chat find (Cmd/Ctrl+F): message-level cycling browser-style. -->
-		{#if find.open && !androidUI}
+		{#if find.open}
 			<!-- In-chat find renders in `FindBar.svelte`; the page keeps
 			the query/cursor/hits, landing, and focus behind bindables
 			and actions. -->
@@ -13567,7 +13588,11 @@ import {
 				close: closeChatSwitcher,
 				step: stepSwitcher,
 				newChat: doNewChat,
-				deleteActive: () => dropChat(chatState.activeChatId)
+				deleteActive: () => dropChat(chatState.activeChatId),
+				search: () => {
+					closeChatSwitcher();
+					openSearch();
+				}
 			}}
 		/>
 	{/if}

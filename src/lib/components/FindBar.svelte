@@ -135,4 +135,30 @@ Enter cycles or closes on a lone hit. -->
 	.find-bar button:hover {
 		background: rgba(120, 120, 128, 0.18);
 	}
+	/* Phones: a search hit opens the bar (no keyboard chord), so it
+	pins under the top edge clear of the centered hit, spans the
+	column, and gives thumbs full-size step targets that track the
+	text size within the screen width. */
+	:global(.app[data-android]) .find-bar {
+		top: calc(env(safe-area-inset-top, 0px) + 0.6rem);
+		transform: translateX(-50%);
+		width: calc(100vw - 1.5rem);
+		max-width: 30rem;
+		font-size: min(calc(1rem * var(--font-scale, 1)), 6vw);
+	}
+	:global(.app[data-android]) .find-bar input[type="search"] {
+		flex: 1;
+		min-width: 0;
+		width: auto;
+		font-size: inherit;
+	}
+	:global(.app[data-android]) .find-count {
+		font-size: 0.85em;
+		min-width: 0;
+	}
+	:global(.app[data-android]) .find-bar button {
+		font-size: inherit;
+		min-width: 2.75rem;
+		min-height: 2.75rem;
+	}
 </style>

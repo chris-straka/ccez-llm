@@ -1,6 +1,7 @@
 <!-- Phone chat switcher: opened by a two-finger hold on the main
 chat. Swipes (and arrows) cycle chats without closing; tapping
-away or Esc closes. Desktop never renders it. The page owns which
+away or Esc closes. The magnifier hands off to the search palette
+(the phone's full-text search). Desktop never renders it. The page owns which
 chat shows and the open flag; this component owns the card, the
 actions row, and their surfaces (Svelte scoping binds the CSS to
 this markup). The veil/box shell renders through `Modal.svelte`. -->
@@ -14,6 +15,8 @@ this markup). The veil/box shell renders through `Modal.svelte`. -->
 		step: (direction: 1 | -1) => void;
 		newChat: () => void;
 		deleteActive: () => void;
+		/** Full-text search (the palette takes over from the card). */
+		search: () => void;
 	}
 
 	interface Props {
@@ -81,6 +84,13 @@ this markup). The veil/box shell renders through `Modal.svelte`. -->
 			<button
 				type="button"
 				class="switcher-act"
+				title="Search chats"
+				aria-label="Search chats"
+				onclick={() => actions.search()}><ActionIcon kind="search" /></button
+			>
+			<button
+				type="button"
+				class="switcher-act"
 				title="Delete chat"
 				aria-label="Delete chat"
 				onclick={() => actions.deleteActive()}
@@ -93,8 +103,9 @@ this markup). The veil/box shell renders through `Modal.svelte`. -->
 <style>
 	/* Veil/box chrome (chat-switcher seating, switcher-card) lives in
 	`Modal.svelte`, which renders those elements. */
-	/* Mint/delete pair: floats centered under the card, outside
-	its panel — + opens a fresh chat and dismisses, the trash
+	/* Mint/search/delete row: floats centered under the card, outside
+	its panel — + opens a fresh chat and dismisses, the magnifier
+	swaps the card for the search palette, the trash
 	drops the shown chat and stays put so a purge streak never
 	leaves the menu. Small round buttons, same panel fill as the
 	card so they read over the dimmed thread. */

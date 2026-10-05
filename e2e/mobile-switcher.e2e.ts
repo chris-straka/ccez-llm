@@ -301,3 +301,80 @@ test("composer refocuses and types after the first reply", async ({ page }) => {
 	await page.keyboard.type("second");
 	await expect(box).toHaveValue("second");
 });
+
+/** Phone full-text search lives behind the switcher's magnifier: hits
+group under their chat, mark the matched word (accents folded), and a
+pick with more matches in that chat opens the find bar to step them
+without raising the keyboard. */
+test("switcher search finds unaccented words and steps matches in the chat", async ({
+	page
+}) => {
+	await page.addInitScript(() => {
+		window.localStorage.setItem("ccez-mock-provider", "1");
+		window.localStorage.setItem("ccez-llm-settings-v1", JSON.stringify({}));
+		const msg = (id: string, role: string, content: string) => ({
+			id,
+			role,
+			content,
+			usage: null,
+			error: null
+		});
+		window.localStorage.setItem(
+			"ccez-llm-chats-v1",
+			JSON.stringify([
+				{
+					id: "e2e-de",
+					createdAt: 1,
+					replyLang: null,
+					messages: [
+						msg("d1", "user", "Was heißt über?"),
+						msg("d2", "assistant", "Über means over."),
+						msg("d3", "assistant", "Noch einmal: über.")
+					]
+				},
+				{
+					id: "e2e-other",
+					createdAt: 2,
+					replyLang: null,
+					messages: [msg("o1", "assistant", "nothing to see")]
+				}
+			])
+		);
+	});
+	await page.goto("/");
+	await expect(page.locator("article .rendered").first()).toBeVisible({
+		timeout: 60_000
+	});
+	const at = await deadSpace(page);
+	await page.touchscreen.tap(at.x, at.y);
+	await page.waitForTimeout(120);
+	await page.touchscreen.tap(at.x, at.y);
+	await expect(page.locator(".modal-veil.chat-switcher")).toBeVisible({
+		timeout: 5_000
+	});
+	await page.waitForTimeout(700);
+	await page.getByRole("button", { name: "Search chats" }).tap();
+	await expect(page.locator(".modal-veil.chat-switcher")).toHaveCount(0);
+	const field = page.getByLabel("Search chats and annotations");
+	await expect(field).toBeFocused();
+	await field.fill("uber");
+	const hits = page.locator(".search-hit");
+	await expect(hits).toHaveCount(3, { timeout: 8_000 });
+	await expect(page.locator(".search-chat")).toHaveCount(1);
+	await expect(page.locator(".search-chat")).toContainText("Was heißt über?");
+	await expect(hits.first().locator("mark")).toHaveText(/über/i);
+	await expect(hits.first().locator(".search-kind")).toHaveText(/you|ai/i);
+	await page.screenshot({ path: ".screenshots/phone-search-results.png" });
+	// Pick the closing message: the find bar opens on it, unfocused.
+	await hits.filter({ hasText: "Noch einmal" }).tap();
+	const bar = page.locator(".find-bar");
+	await expect(bar).toBeVisible();
+	await expect(bar.locator(".find-count")).toHaveText("3/3");
+	await expect(bar.locator("input")).not.toBeFocused();
+	await page.waitForTimeout(500);
+	await page.screenshot({ path: ".screenshots/phone-find-bar.png" });
+	await bar.getByRole("button", { name: "Next match" }).tap();
+	await expect(bar.locator(".find-count")).toHaveText("1/3");
+	await bar.getByRole("button", { name: "Close find" }).tap();
+	await expect(bar).toHaveCount(0);
+});
