@@ -2812,7 +2812,10 @@ import {
 					const el = document.getElementById(`msg-${index}`);
 					el?.focus({ preventScroll: true });
 					if (flashText) jumpToQuotedText(msgId, flashText);
-					else el?.scrollIntoView({ block: "center", behavior: "smooth" });
+					else {
+						el?.scrollIntoView({ block: "center", behavior: "smooth" });
+						pulseLanded(index);
+					}
 				});
 				return;
 			}
@@ -2869,10 +2872,12 @@ import {
 		requestAnimationFrame(() => {
 			// Each stop flashes the matched words inside the message.
 			if (msg && flashText) jumpToQuotedText(msg.id, flashText);
-			else
+			else {
 				document
 					.getElementById(`msg-${index}`)
 					?.scrollIntoView({ block: "center", behavior: "smooth" });
+				pulseLanded(index);
+			}
 		});
 	}
 
@@ -5687,6 +5692,7 @@ import {
 		document
 			.querySelector(`#msg-${target.index}`)
 			?.scrollIntoView({ block: "center", behavior: "smooth" });
+		pulseLanded(target.index);
 	}
 
 	/**
@@ -5710,9 +5716,12 @@ import {
 			scrollRectIntoClear(range.getBoundingClientRect());
 			flashJumpMark(locate);
 		} else if (index >= 0) {
+			// No words to flash (folded, or the quote spans markup):
+			// tint the whole message instead.
 			const article = document.querySelector(`#msg-${index}`);
 			if (article instanceof HTMLElement) {
 				article.scrollIntoView({ block: "center", behavior: "smooth" });
+				pulseLanded(index);
 			}
 		}
 	}
@@ -11342,12 +11351,14 @@ import {
 				event.preventDefault();
 				lastGAt = 0;
 				jumpTo(0);
+				pulseLanded(selectedIdx);
 				return;
 			}
 			if (scrollAction === "go-bottom") {
 				event.preventDefault();
 				lastGAt = 0;
 				jumpTo(chat.messages.length - 1);
+				pulseLanded(selectedIdx);
 				return;
 			}
 			if (

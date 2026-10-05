@@ -401,6 +401,21 @@ test("ctrl+g lands the cursor on the message in view", async ({ page }) => {
 	await expect(page.locator("#msg-7.selected")).toBeVisible({ timeout: 5_000 });
 });
 
+/** gg/G with a cursor is a long jump: the landed message tints
+once so the eye finds it after the scroll. */
+test("cursor gg/G pulses the landed message", async ({ page }) => {
+	await page.keyboard.press("Control+g");
+	await expect(page.locator(".app[data-focus-mode='scroll']")).toHaveCount(1, {
+		timeout: 5_000
+	});
+	await page.keyboard.press("G");
+	await expect(page.locator("#msg-11.selected")).toBeVisible({ timeout: 5_000 });
+	await expect(page.locator("#msg-11.landed")).toHaveCount(1, { timeout: 3_000 });
+	await page.keyboard.press("g");
+	await page.keyboard.press("g");
+	await expect(page.locator("#msg-0.landed")).toHaveCount(1, { timeout: 3_000 });
+});
+
 test("z/Z land the hovered message top/bottom", async ({ page }) => {
 	// Hovering never moves focus, so the body focus from beforeEach
 	// survives: each press re-hovers first (leaving the article

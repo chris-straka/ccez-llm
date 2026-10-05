@@ -438,3 +438,31 @@ test("a filtered pick flashes the match", async ({ page }) => {
 	});
 	expect(inView).toBe(true);
 });
+
+/** A folded message's preview shows only its opening, so a match
+further in has no words on screen to flash: a filtered pick landing
+there tints the whole message instead. */
+test("a filtered pick into a folded message pulses it", async ({ page }) => {
+	await seedChat(page, [
+		{ role: "user", content: "Wie sagt man street?" },
+		{
+			role: "assistant",
+			content: `Kurz gesagt. ${"Noch ein Satz dazu. ".repeat(30)}Am Ende: die Straße ist lang.`
+		}
+	]);
+	await page.goto("/");
+	await expect(page.locator(".send-btn")).toBeVisible({ timeout: 60_000 });
+	const article = page.locator("article.assistant").last();
+	await article.hover();
+	await article
+		.locator('.actions button[aria-label="Fold this message"]')
+		.click();
+	await expect(article.locator(".folded-preview")).toBeVisible();
+	await expect(article.locator(".folded-preview")).not.toContainText("Straße");
+	await toggleSidebar(page);
+	await page.locator("aside .side-search").fill("strasse");
+	await page.locator("aside ul li button.side-chat").first().click();
+	await expect(page.locator("article.landed")).toHaveCount(1, {
+		timeout: 3_000
+	});
+});
