@@ -12,6 +12,7 @@ only this drawer through scoping. -->
 <script lang="ts">
 	import type { Chat, ChatId } from "$lib/chat";
 	import ActionIcon from "./ActionIcon.svelte";
+	import { chatTitle } from "$lib/sidebar";
 
 	/** Page-owned drawer behaviors (state and effects stay in the page). */
 	export interface SidebarActions {
@@ -129,7 +130,8 @@ only this drawer through scoping. -->
 					class:active={item.id === activeId}
 					onclick={() => actions.pick(item.id)}
 				>
-					{labelFor(item.createdAt)}
+					<span class="side-title">{chatTitle(item)}</span>
+					<span class="side-time">{labelFor(item.createdAt)}</span>
 				</button>
 				<!-- No export path works in the shell phone (no picker,
 				no native dialog bridge, clipboard denied): the button
@@ -393,16 +395,44 @@ only this drawer through scoping. -->
 		/* Same ButtonText trap as .sel-menu: pin the color explicitly. */
 		color: #1c1c1e;
 		color: var(--ink);
-		/* Uniform row labels: monospace keeps every chat's date/count
-		columns aligned no matter the title text. */
-		font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-		/* The overlaid icon boxes (delete 1.75rem at right 0, export
-		1.75rem at right 2.1rem) sit in this reserved padding, never on
-		the title text: the pill keeps its full-width click target while
-		the text truncates clear of both icons. */
-		padding-right: 4rem;
+		overflow: hidden;
+		min-width: 0;
+	}
+	/* The overlaid icon boxes (delete 1.75rem at right 0, export
+	1.75rem at right 2.1rem) appear on hover: the row's text fades
+	out beneath them instead of reserving their width, so idle rows
+	show the whole title and nothing moves on hover. */
+	@media (hover: hover) {
+		aside li:hover .side-chat > span,
+		aside li:focus-within .side-chat > span {
+			-webkit-mask-image: linear-gradient(
+				to right,
+				#000 calc(100% - 4.4rem),
+				transparent calc(100% - 3.6rem)
+			);
+			mask-image: linear-gradient(
+				to right,
+				#000 calc(100% - 4.4rem),
+				transparent calc(100% - 3.6rem)
+			);
+		}
+	}
+	/* Two-line row: the opening question names the chat, the time
+	sits under it, smaller and quieter (monospace keeps the times'
+	columns aligned row to row). Each line ellipsizes on its own. */
+	.side-title,
+	.side-time {
+		display: block;
 		overflow: hidden;
 		text-overflow: ellipsis;
+	}
+	.side-time {
+		margin-top: 0.05rem;
+		font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+		font-size: 0.68rem;
+		font-weight: 400;
+		color: #6e6e73;
+		color: var(--dim);
 	}
 	aside button.active {
 		background: transparent;

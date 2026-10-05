@@ -438,7 +438,12 @@ import {
 		groupHitsByChat,
 		type SearchHit
 	} from "$lib/chatSearch";
-	import { chatLabel, filterSidebarChats, sideTip } from "$lib/sidebar";
+	import {
+		chatLabel,
+		chatTitle,
+		filterSidebarChats,
+		sideTip
+	} from "$lib/sidebar";
 	import { emptyFind, stepFindCursor, type FindState } from "$lib/find";
 	import { emptyPalette, type PaletteState } from "$lib/palette";
 	import {
@@ -2612,17 +2617,12 @@ import {
 		}));
 	}
 
-	/** Search header for a chat: its time label plus the opening
-	prompt, so a hit says which conversation it came from. */
+	/** Search header for a chat: its title and time, so a hit says
+	which conversation it came from. */
 	function searchChatTitle(chatId: string): string {
 		const target = chatState.chats.find((c) => c.id === chatId);
 		if (!target) return "";
-		const opener = target.messages
-			.find((m) => m.role === "user")
-			?.content.replace(/\s+/g, " ")
-			.trim();
-		const label = chatLabel(target.createdAt);
-		return opener ? `${label} · ${opener.slice(0, 80)}` : label;
+		return `${chatTitle(target)} · ${chatLabel(target.createdAt)}`;
 	}
 
 	function scheduleSearchIndex(): void {
@@ -13579,8 +13579,10 @@ import {
 		the shared modal shell. The page owns chat state and the open
 		flag; ChatSwitcher owns the card, actions, and surfaces. -->
 		<ChatSwitcher
-			title={chatLabel(activeChat(chatState)?.createdAt ?? Date.now())}
-			position="{chatState.chats.findIndex(
+			title={chatTitle(activeChat(chatState) ?? { messages: [] })}
+			position="{chatLabel(
+				activeChat(chatState)?.createdAt ?? Date.now()
+			)} · {chatState.chats.findIndex(
 				(c) => c.id === chatState.activeChatId
 			) + 1} / {chatState.chats.length}"
 			openedAt={switcherOpenedAt}

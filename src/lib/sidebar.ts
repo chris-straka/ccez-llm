@@ -14,6 +14,40 @@ export function sideTip(item: Chat): string {
 	return `${msgs} · you ${you} · AI ${n - you}`;
 }
 
+/** Markdown chrome that reads as noise in a one-line title. */
+function plainTitleText(content: string): string {
+	return content
+		.replace(/```[\s\S]*?(```|$)/g, " ")
+		.replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
+		.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+		.replace(/^\s{0,3}(#{1,6}|>|[-*+]|\d+[.)])\s+/gm, "")
+		.replace(/[*_`~]+/g, "")
+		.replace(/\s+/g, " ")
+		.trim();
+}
+
+/** Longest title kept: the row ellipsizes to its width anyway. */
+const TITLE_MAX = 80;
+
+/**
+ * Sidebar / switcher / search title: the chat's opening question,
+ * plain and one line. A chat that opened with only an attachment
+ * reads its first reply instead; an empty chat reads "New chat".
+ */
+export function chatTitle(item: Pick<Chat, "messages">): string {
+	const pick = (role: "user" | "assistant"): string =>
+		item.messages
+			.filter((m) => m.role === role)
+			.map((m) => plainTitleText(m.content))
+			.find((t) => t.length > 0) ?? "";
+	const text = pick("user") || pick("assistant");
+	if (!text) return "New chat";
+	if (text.length <= TITLE_MAX) return text;
+	const cut = text.slice(0, TITLE_MAX);
+	const space = cut.lastIndexOf(" ");
+	return `${(space > TITLE_MAX / 2 ? cut.slice(0, space) : cut).trimEnd()}…`;
+}
+
 export function chatLabel(createdAt: number): string {
 	const date = new Date(createdAt);
 	const today = new Date();
@@ -39,7 +73,7 @@ export function filterSidebarChats(chats: Chat[], query: string): Chat[] {
 	if (!q) return chats;
 	return chats.filter((item) =>
 		chatMatchesQuery(
-			chatLabel(item.createdAt),
+			`${chatTitle(item)} ${chatLabel(item.createdAt)}`,
 			item.messages.map((m) => m.content),
 			q
 		)

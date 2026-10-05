@@ -285,3 +285,54 @@ test("thinking row keeps breathing room", async ({ page }) => {
 	expect(above).not.toBeNull();
 	expect(above ?? 0).toBeGreaterThan(12);
 });
+
+/** Rows name each chat by its opening question, the time under it;
+a chat with no messages yet reads New chat. */
+test("sidebar rows read the opening question over the time", async ({
+	page
+}) => {
+	await page.addInitScript(() => {
+		localStorage.setItem("ccez-mock-provider", "1");
+		localStorage.setItem("ccez-llm-settings-v1", "{}");
+		const msg = (id: string, role: string, content: string) => ({
+			id,
+			role,
+			content,
+			usage: null,
+			error: null
+		});
+		localStorage.setItem(
+			"ccez-llm-chats-v1",
+			JSON.stringify([
+				{ id: "c-new", createdAt: 3, replyLang: null, messages: [] },
+				{
+					id: "c-de",
+					createdAt: 2,
+					replyLang: null,
+					messages: [
+						msg("1", "user", "## Was heißt **über** auf Englisch?"),
+						msg("2", "assistant", "Über means over.")
+					]
+				},
+				{
+					id: "c-fr",
+					createdAt: 1,
+					replyLang: null,
+					messages: [msg("3", "user", "Comment dit-on « window » en français ?")]
+				}
+			])
+		);
+	});
+	await page.goto("/");
+	await expect(page.locator(".send-btn")).toBeVisible({ timeout: 60_000 });
+	await toggleSidebar(page);
+	const titles = page.locator("aside ul li .side-title");
+	await expect(titles).toHaveText([
+		"New chat",
+		"Was heißt über auf Englisch?",
+		"Comment dit-on « window » en français ?"
+	]);
+	await expect(page.locator("aside ul li .side-time").first()).not.toBeEmpty();
+	await page.waitForTimeout(400);
+	await page.screenshot({ path: ".screenshots/sidebar-titles.png" });
+});

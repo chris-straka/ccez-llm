@@ -78,9 +78,10 @@ test("ctrl-shift-delete drops the current chat", async ({ page }) => {
 	await expect(page.locator("article .rendered")).toHaveCount(1);
 });
 
-/** Row icons sit adjacent inside reserved title padding: export parks
-left of delete, never on the label text (mono titles align). */
-test("row export sits by delete, clear of the title", async ({ page }) => {
+/** Row icons sit adjacent, export left of delete; on hover the row's
+text fades out beneath them (idle rows keep the full width), and the
+time line stays monospace so times align. */
+test("row export sits by delete, title fades beneath", async ({ page }) => {
 	await openSidebar(page);
 	const row = page.locator("aside ul li").first();
 	await row.hover();
@@ -88,18 +89,19 @@ test("row export sits by delete, clear of the title", async ({ page }) => {
 		const q = (sel: string): HTMLElement | null => document.querySelector(sel);
 		const exp = q("aside ul li .exp")?.getBoundingClientRect();
 		const del = q("aside ul li .del")?.getBoundingClientRect();
-		const title = q("aside ul li .side-chat");
-		if (!exp || !del || !title) return null;
+		const title = q("aside ul li .side-title");
+		const time = q("aside ul li .side-time");
+		if (!exp || !del || !title || !time) return null;
 		const st = getComputedStyle(title);
 		return {
 			gap: Math.round(del.left - exp.right),
-			padRightPx: parseFloat(st.paddingRight),
-			mono: st.fontFamily
+			mask: st.maskImage || st.webkitMaskImage,
+			mono: getComputedStyle(time).fontFamily
 		};
 	});
 	expect(geom).not.toBeNull();
 	expect(geom!.gap).toBeLessThanOrEqual(8);
-	expect(geom!.padRightPx).toBeGreaterThan(50);
+	expect(geom!.mask).toContain("gradient");
 	expect(geom!.mono).toMatch(/monospace/i);
 });
 
