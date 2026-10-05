@@ -225,7 +225,13 @@ describe("shortcuts menu copy", () => {
 			],
 			[
 				"Messages",
-				["Message buttons", "Fold a message", "Delete a message", "Delete this chat"]
+				[
+					"Message buttons",
+					"Text size",
+					"Fold a message",
+					"Delete a message",
+					"Delete this chat"
+				]
 			],
 			[
 				"Selected text",

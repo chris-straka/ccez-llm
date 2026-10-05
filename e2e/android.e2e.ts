@@ -117,6 +117,9 @@ test.describe("gestures", () => {
 			"Two-finger hold · double-tap empty space · swipe to cycle"
 		);
 		await expect(modal.locator('dt:text-is("Message end")')).toHaveCount(0);
+		await expect(modal.locator('dt:text-is("Text size") + dd')).toHaveText(
+			"Pinch the messages"
+		);
 		await expect(modal.locator('dt:text-is("Delete a message")')).toBeVisible();
 		await expect(
 			modal.locator('dt:text-is("Delete a message") + dd')

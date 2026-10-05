@@ -56,6 +56,7 @@ export function touchShortcuts(): ShortcutRow[] {
 		},
 		{ group: move, name: "Rename a chat", keys: "Long-press it in the chats list" },
 		{ group: msg, name: "Message buttons", keys: "Tap a message" },
+		{ group: msg, name: "Text size", keys: "Pinch the messages" },
 		{ group: msg, name: "Fold a message", keys: "Swipe left on it" },
 		{ group: msg, name: "Delete a message", keys: "Three-finger tap" },
 		{ group: msg, name: "Delete this chat", keys: "Three-finger hold" },
