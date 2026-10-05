@@ -336,3 +336,38 @@ test("sidebar rows read the opening question over the time", async ({
 	await page.waitForTimeout(400);
 	await page.screenshot({ path: ".screenshots/sidebar-titles.png" });
 });
+
+/** A first reply names the chat (mock model title); the pencil
+renames it, Esc cancels, and the rename persists. */
+test("model titles a chat; the pencil renames it", async ({ page }) => {
+	await seedChat(page, []);
+	await page.goto("/");
+	await expect(page.locator(".hero")).toBeVisible({ timeout: 60_000 });
+	await page.locator(".ta-input").click();
+	await page.keyboard.type("Was heißt über bitte");
+	await page.keyboard.press("Enter");
+	await expect(page.locator("article.assistant .rendered")).toContainText("Mock reply", {
+		timeout: 15_000
+	});
+	await toggleSidebar(page);
+	const title = page.locator("aside ul li .side-title").first();
+	await expect(title).toHaveText("Mock title Was heißt über", { timeout: 10_000 });
+	const row = page.locator("aside ul li").first();
+	await row.hover();
+	await row.getByRole("button", { name: "Rename chat" }).click();
+	const field = page.getByLabel("Chat name");
+	await expect(field).toBeFocused();
+	await field.fill("Throwaway");
+	await page.keyboard.press("Escape");
+	await expect(title).toHaveText("Mock title Was heißt über");
+	await row.hover();
+	await row.getByRole("button", { name: "Rename chat" }).click();
+	await page.getByLabel("Chat name").fill("German prepositions");
+	await page.keyboard.press("Enter");
+	await expect(title).toHaveText("German prepositions");
+	// Persisted with the chat (the seed init script re-runs on a
+	// reload, so read storage instead of reloading).
+	const stored = await page.evaluate(() => localStorage.getItem("ccez-llm-chats-v1") ?? "");
+	expect(stored).toContain('"title":"German prepositions"');
+	expect(stored).toContain('"titleBy":"user"');
+});

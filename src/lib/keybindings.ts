@@ -785,6 +785,29 @@ export interface SidebarListFacts extends KeyModifiers {
 export type SidebarListAction =
 	"walk-up" | "walk-down" | "enter" | "delete-chat";
 
+/** Facts Shift+R reads over the open chat list. */
+export interface SidebarSpeakFacts extends KeyEventFacts {
+	listOpen: boolean;
+	inField: boolean;
+	/** Row under the mouse (the hover preview), null when none. */
+	hoveredRowId: string | null;
+	/** Row the keyboard walked to (focus inside the list), else null. */
+	walkedRowId: string | null;
+}
+
+/**
+ * Shift+R over the open chat list reads a chat's title aloud, the
+ * same key that reads a hovered message: the row under the mouse
+ * wins, else the keyboard-walked row. Fields keep the key (typing a
+ * capital R in search or a rename).
+ */
+export function sidebarSpeakTarget(facts: SidebarSpeakFacts): string | null {
+	if (facts.code !== "KeyR" || !facts.shiftKey) return null;
+	if (facts.metaKey || facts.ctrlKey || facts.altKey) return null;
+	if (!facts.listOpen || facts.inField) return null;
+	return facts.hoveredRowId ?? facts.walkedRowId;
+}
+
 /**
  * The open chat list owns its keys: j/k walks chats (preview-as-you-go),
  * space/l/Enter enters the cursor chat, Delete drops the focused chat.

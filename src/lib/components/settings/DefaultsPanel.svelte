@@ -142,6 +142,10 @@
 				<span>Enable flashcards</span>
 			</label>
 			<label class="check">
+				<input type="checkbox" bind:checked={settings.aiTitles} />
+				<span>Enable AI chat titles</span>
+			</label>
+			<label class="check">
 				<input type="checkbox" bind:checked={settings.hapticsEnabled} />
 				<span>Enable haptic feedback</span>
 			</label>
@@ -188,6 +192,10 @@
 		<label class="check">
 			<input type="checkbox" bind:checked={settings.flashcardsEnabled} />
 			<span>Enable flashcards</span>
+		</label>
+		<label class="check">
+			<input type="checkbox" bind:checked={settings.aiTitles} />
+			<span>Enable AI chat titles</span>
 		</label>
 		<label class="check">
 			<input type="checkbox" bind:checked={settings.replyNotifications} />

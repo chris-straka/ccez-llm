@@ -94,6 +94,12 @@ describe("chatTitle", () => {
 		).toBe("Fix this: see docs");
 	});
 
+	it("prefers a stored name", () => {
+		expect(
+			chatTitle({ ...chat("a", 1, [msg("1", "user", "Was heißt über?")]), title: "German" })
+		).toBe("German");
+	});
+
 	it("falls back to the reply, then to New chat", () => {
 		expect(
 			chatTitle(chat("a", 1, [msg("1", "user", "  "), msg("2", "assistant", "A cat photo.")]))

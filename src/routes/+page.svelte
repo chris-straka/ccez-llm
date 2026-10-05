@@ -42,6 +42,8 @@
 		hasReplyStarted,
 		hasFetchActive,
 		refreshTrimSummary,
+		generateChatTitle,
+		renameChat,
 		setTrimPoint,
 		trimPointIndex,
 		resolveSendCompletion,
@@ -374,6 +376,7 @@ import {
 		unselectedScrollAction,
 		shortcutsFilterBlocksKey,
 		sidebarListAction,
+		sidebarSpeakTarget,
 		spaceKeyAction,
 		enterKeyAction
 	} from "$lib/keybindings";
@@ -7001,6 +7004,45 @@ import {
 		}
 	});
 
+	/** Inline chat rename (sidebar row): the page owns it so the Esc
+	ladder can cancel it like every other inline edit. */
+	let renamingChatId = $state<ChatId | null>(null);
+	let renameDraft = $state("");
+	let renameEl: HTMLInputElement | undefined = $state();
+	function startRename(item: Chat): void {
+		renamingChatId = item.id;
+		renameDraft = item.title ?? (item.messages.length > 0 ? chatTitle(item) : "");
+		void tick().then(() => {
+			renameEl?.focus();
+			renameEl?.select();
+		});
+	}
+	function commitRename(): void {
+		const id = renamingChatId;
+		if (id === null) return;
+		renamingChatId = null;
+		const target = chatState.chats.find((c) => c.id === id);
+		if (!target) return;
+		// An untouched automatic title stays automatic (the model may
+		// still name the chat); anything else is the user's name.
+		if (!target.title && renameDraft.trim() === chatTitle(target)) return;
+		renameChat(chatState, id, renameDraft);
+	}
+	function cancelRename(): void {
+		renamingChatId = null;
+	}
+
+	/** Name an untitled chat once it has a reply (setting on, game
+	chat excluded): one short call to the active model, silent on
+	failure so the opening question keeps standing in. */
+	function maybeTitleChat(origin: Chat): void {
+		if (!settings.aiTitles || origin.title || origin.game) return;
+		void (async () => {
+			const provider = await providerKeys.resolveActive();
+			if (provider) await generateChatTitle(chatState, origin, provider);
+		})();
+	}
+
 	/** Shared send tail (fresh sends, resends, native completions):
 	resolve the origin chat's last message, thump or ping, follow the
 	stream, read back, notify, and settle the composer. Reads pin to
@@ -7046,6 +7088,8 @@ import {
 		if (stillHere && stuckToBottom()) scrollToBottom();
 		const origin = chatState.chats.find((c) => c.id === originId);
 		if (origin && !maybeHandsFreeReply(origin, sent)) maybeSpeakReply(origin);
+		if (origin && sent?.role === "assistant" && !sent.error)
+			maybeTitleChat(origin);
 		// Native completions skip the frontend ping: Rust pings the
 		// same id ~5s later (seen-grace) and the re-post double-buzzes.
 		if (frontendPingOnDone(opts?.native ?? false)) maybeNotifyReplyDone(sent);
@@ -10102,6 +10146,9 @@ import {
 			} else if (find.open) {
 				// The find bar closes from anywhere (its input included).
 				closeFind();
+			} else if (renamingChatId) {
+				// A chat rename cancels, leaving the old name.
+				cancelRename();
 			} else if (captureStaged) {
 				// The weak-capture overlay dismisses from anywhere (its
 				// input included) and hands the caret back — the
@@ -10713,6 +10760,23 @@ import {
 			if (cardEdit === "edit-answer" && annotateMode.answerPop) {
 				event.preventDefault();
 				editOrangeAnnotation(annotateMode.answerPop.id);
+				return;
+			}
+			// Shift+R over the open chat list reads a chat's title
+			// (hovered row, else the walked one) before message keys.
+			const speakRow = sidebarSpeakTarget({
+				...keyFacts(event),
+				listOpen: !settings.sidebarCollapsed,
+				inField: isFieldTarget(event.target),
+				hoveredRowId: previewChatId,
+				walkedRowId: isSidebarTarget(event.target) ? chatState.activeChatId : null
+			});
+			const speakChat =
+				speakRow === null ? null : chatState.chats.find((c) => c.id === speakRow);
+			if (speakChat) {
+				consumeEvent(event);
+				const title = chatTitle(speakChat);
+				void speakQuote(title, `chat-title:${speakChat.id}`, false, title);
 				return;
 			}
 			const msgAction = messageKeyAction(msgFacts);
@@ -13016,7 +13080,12 @@ import {
 		labelFor={chatLabel}
 		bind:search={sideSearch}
 		bind:searchEl={sideSearchEl}
+		renamingId={renamingChatId}
+		bind:renameDraft
+		bind:renameEl
 		actions={{
+			startRename,
+			commitRename,
 			collapse: () => {
 				settings.sidebarCollapsed = true;
 				persistSettings();

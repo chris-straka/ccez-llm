@@ -116,6 +116,17 @@ function canned(messages: ChatMessage[]): string {
 	} catch {
 		/* storage unavailable: echo */
 	}
+	// Chat-title requests get a short deterministic name from the
+	// opening question's first words.
+	const system = messages.find((m) => m.role === "system");
+	if (messageText(system?.content ?? "").startsWith("Title this conversation")) {
+		const opener = messageText(messages[1]?.content ?? "")
+			.replace(/^User:\s*/, "")
+			.split(/\s+/)
+			.slice(0, 3)
+			.join(" ");
+		return `Mock title ${opener}`;
+	}
 	const last = [...messages].reverse().find((m) => m.role === "user");
 	const excerpt = messageText(last?.content ?? "").slice(0, 60);
 	return `Mock reply to: ${excerpt || "(empty)"}`;

@@ -36,6 +36,10 @@ only this drawer through scoping. -->
 		tipFor: (item: Chat) => string;
 		newChat: () => void;
 		openSettings: () => void;
+		/** Open the inline rename field on a row. */
+		startRename: (item: Chat) => void;
+		/** Save the rename draft (blank clears the name). */
+		commitRename: () => void;
 	}
 
 	interface Props {
@@ -52,6 +56,10 @@ only this drawer through scoping. -->
 		/** Two-way search box state (page owns the filter text). */
 		search: string;
 		searchEl: HTMLInputElement | undefined;
+		/** Row being renamed (page-owned so Esc cancels it). */
+		renamingId: ChatId | null;
+		renameDraft: string;
+		renameEl: HTMLInputElement | undefined;
 		actions: SidebarActions;
 	}
 
@@ -65,8 +73,29 @@ only this drawer through scoping. -->
 		labelFor,
 		search = $bindable(""),
 		searchEl = $bindable(undefined),
+		renamingId,
+		renameDraft = $bindable(""),
+		renameEl = $bindable(undefined),
 		actions
 	}: Props = $props();
+
+	/** Phone rename: a still long-press on a row. The click that
+	follows the release must not also open the chat. */
+	const HOLD_MS = 550;
+	let holdTimer: ReturnType<typeof setTimeout> | null = null;
+	let heldOpen = false;
+	function holdStart(item: Chat): void {
+		heldOpen = false;
+		holdTimer = setTimeout(() => {
+			holdTimer = null;
+			heldOpen = true;
+			actions.startRename(item);
+		}, HOLD_MS);
+	}
+	function holdCancel(): void {
+		if (holdTimer) clearTimeout(holdTimer);
+		holdTimer = null;
+	}
 </script>
 
 <aside
@@ -124,15 +153,63 @@ only this drawer through scoping. -->
 			chat while crossing; only leaving the whole list (the ul
 			handler below) drops the preview. -->
 			<li onmouseenter={() => actions.previewHover(item.id)}>
-				<button
-					type="button"
-					class="side-chat"
-					class:active={item.id === activeId}
-					onclick={() => actions.pick(item.id)}
-				>
-					<span class="side-title">{chatTitle(item)}</span>
-					<span class="side-time">{labelFor(item.createdAt)}</span>
-				</button>
+				{#if renamingId === item.id}
+					<!-- Inline rename: Enter or tapping away saves, Esc
+					cancels (the page's Esc ladder), blank goes back to
+					the automatic title. -->
+					<input
+						class="side-rename"
+						bind:this={renameEl}
+						bind:value={renameDraft}
+						aria-label="Chat name"
+						maxlength="60"
+						autocomplete="off"
+						spellcheck={false}
+						onkeydown={(event) => {
+							if (event.key === "Enter") {
+								event.preventDefault();
+								actions.commitRename();
+							}
+						}}
+						onblur={() => actions.commitRename()}
+					/>
+				{:else}
+					<button
+						type="button"
+						class="side-chat"
+						class:active={item.id === activeId}
+						onclick={() => {
+							if (heldOpen) {
+								heldOpen = false;
+								return;
+							}
+							actions.pick(item.id);
+						}}
+						ontouchstart={() => holdStart(item)}
+						ontouchmove={holdCancel}
+						ontouchend={holdCancel}
+						ontouchcancel={holdCancel}
+						oncontextmenu={(event) => {
+							// Android raises a context menu on long-press:
+							// the hold owns that gesture here.
+							if (android) event.preventDefault();
+						}}
+					>
+						<span class="side-title">{chatTitle(item)}</span>
+						<span class="side-time">{labelFor(item.createdAt)}</span>
+					</button>
+				{/if}
+				{#if !android}
+					<button
+						type="button"
+						class="ren"
+						title="Rename chat"
+						aria-label="Rename chat"
+						onclick={() => actions.startRename(item)}
+					>
+						<ActionIcon kind="pencil" />
+					</button>
+				{/if}
 				<!-- No export path works in the shell phone (no picker,
 				no native dialog bridge, clipboard denied): the button
 				hides there instead of toasting failure. Mobile browsers
@@ -331,6 +408,56 @@ only this drawer through scoping. -->
 		color: #1c1c1e;
 		color: var(--ink);
 	}
+	/* Rename pencil: one more box left of export, same overlay
+	contract (desktop only; phones rename with a long-press). */
+	aside li .ren {
+		position: absolute;
+		right: 4.2rem;
+		top: 50%;
+		transform: translateY(-50%);
+		width: 1.75rem;
+		height: 1.75rem;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		opacity: 0;
+		will-change: opacity;
+		pointer-events: none;
+		border: 0;
+		background: none;
+		cursor: pointer;
+		color: #6e6e73;
+		color: var(--muted);
+		padding: 0;
+		line-height: 0;
+	}
+	aside li:hover .ren,
+	aside li:focus-within .ren {
+		opacity: 1;
+		pointer-events: auto;
+	}
+	aside li .ren:hover {
+		color: #1c1c1e;
+		color: var(--ink);
+	}
+	aside li .ren :global(.action-glyph) {
+		height: 0.95rem;
+	}
+	/* Inline rename field: takes the row's place at the row's size. */
+	.side-rename {
+		flex: 1;
+		min-width: 0;
+		font: inherit;
+		font-size: 0.82rem;
+		padding: 0.55rem 0.6rem;
+		border: 1px solid #c7c7cc;
+		border-color: var(--focus);
+		border-radius: 8px;
+		background: #fff;
+		background: var(--field);
+		color: #1c1c1e;
+		color: var(--ink);
+	}
 	/* The row × rides --dim, never --ink: it must read quieter than
 	the label it deletes (see the dark-theme note in the page). */
 	aside .del {
@@ -339,6 +466,7 @@ only this drawer through scoping. -->
 	}
 	@media (hover: none) {
 		aside li .del,
+		aside li .ren,
 		aside li .exp {
 			position: static;
 			transform: none;
@@ -398,8 +526,8 @@ only this drawer through scoping. -->
 		overflow: hidden;
 		min-width: 0;
 	}
-	/* The overlaid icon boxes (delete 1.75rem at right 0, export
-	1.75rem at right 2.1rem) appear on hover: the row's text fades
+	/* The overlaid icon boxes (delete at right 0, export at 2.1rem,
+	rename at 4.2rem, 1.75rem each) appear on hover: the row's text fades
 	out beneath them instead of reserving their width, so idle rows
 	show the whole title and nothing moves on hover. */
 	@media (hover: hover) {
@@ -407,13 +535,13 @@ only this drawer through scoping. -->
 		aside li:focus-within .side-chat > span {
 			-webkit-mask-image: linear-gradient(
 				to right,
-				#000 calc(100% - 4.4rem),
-				transparent calc(100% - 3.6rem)
+				#000 calc(100% - 6.6rem),
+				transparent calc(100% - 5.8rem)
 			);
 			mask-image: linear-gradient(
 				to right,
-				#000 calc(100% - 4.4rem),
-				transparent calc(100% - 3.6rem)
+				#000 calc(100% - 6.6rem),
+				transparent calc(100% - 5.8rem)
 			);
 		}
 	}

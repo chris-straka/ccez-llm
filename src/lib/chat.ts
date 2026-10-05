@@ -93,6 +93,14 @@ export interface Chat {
 	 * a missing id heals to untrimmed (trimming never deletes).
 	 */
 	trimmedThrough?: ChatMsgId;
+	/**
+	 * Display name. Absent: the sidebar reads the opening question
+	 * (see `chatTitle`). Set by a rename or, once per chat, by the
+	 * model after its first reply.
+	 */
+	title?: string;
+	/** Who set `title`: a rename always wins over the model. */
+	titleBy?: "user" | "ai";
 }
 
 /**
@@ -414,6 +422,111 @@ export function abortSend(chatId?: ChatId): void {
 	}
 	inflightByChat.get(chatId)?.abort();
 	inflightByChat.delete(chatId);
+}
+
+/** Longest stored title (renames and model titles alike). */
+export const MAX_TITLE_CHARS = 60;
+
+/** One-line title text: markdown, quotes, and a trailing period off. */
+export function cleanTitle(raw: string): string {
+	const line =
+		raw
+			.split("\n")
+			.map((l) => l.trim())
+			.find((l) => l.length > 0) ?? "";
+	const text = line
+		.replace(/^(title|titel|titre)\s*:\s*/i, "")
+		.replace(/[*_`#]+/g, "")
+		.replace(/[.。]$/, "")
+		.replace(/^["'“”«»「『]+|["'“”«»」』]+$/g, "")
+		.replace(/[.。]$/, "")
+		.replace(/\s+/g, " ")
+		.trim();
+	return Array.from(text).slice(0, MAX_TITLE_CHARS).join("").trim();
+}
+
+/**
+ * Rename a chat. Blank clears the name, so the sidebar goes back to
+ * the automatic title (the model may name it again after the next
+ * reply).
+ */
+export function renameChat(
+	state: ChatState,
+	id: ChatId,
+	raw: string,
+	store?: KeyValueStore
+): void {
+	const target = state.chats.find((c) => c.id === id);
+	if (!target) return;
+	const title = cleanTitle(raw);
+	if (title) {
+		target.title = title;
+		target.titleBy = "user";
+	} else {
+		delete target.title;
+		delete target.titleBy;
+	}
+	persistChats(state, store);
+}
+
+/** Opening text the title request reads (bounded, plain). */
+const TITLE_CONTEXT_CHARS = 1200;
+
+/** The model's naming request: the opening exchange, one short line
+back in the user's own language. */
+export function buildTitleMessages(chat: Chat): ChatMessage[] | null {
+	const user = chat.messages.find(
+		(m) => m.role === "user" && stripAttachmentMarkers(m.content).trim()
+	);
+	const reply = chat.messages.find(
+		(m) => m.role === "assistant" && !m.error && m.content.trim()
+	);
+	if (!user || !reply) return null;
+	const clip = (text: string): string =>
+		Array.from(text.trim()).slice(0, TITLE_CONTEXT_CHARS).join("");
+	return [
+		{
+			role: "system",
+			content:
+				"Title this conversation in 2 to 6 words, in the language the " +
+				"user wrote in. Reply with the title only: no quotes, no period."
+		},
+		{
+			role: "user",
+			content:
+				`User: ${clip(stripAttachmentMarkers(user.content))}\n\n` +
+				`Assistant: ${clip(reply.content)}`
+		}
+	];
+}
+
+/**
+ * Name an untitled chat from its opening exchange: one short
+ * non-streaming call. Silent on failure (the opening question keeps
+ * standing in, and the next reply retries); a rename that lands
+ * while the call is out wins.
+ */
+export async function generateChatTitle(
+	state: ChatState,
+	chat: Chat,
+	provider: ChatProvider,
+	store?: KeyValueStore
+): Promise<void> {
+	if (chat.title) return;
+	const messages = buildTitleMessages(chat);
+	if (!messages) return;
+	let content: string;
+	try {
+		content = (await provider.chat(messages)).content;
+	} catch {
+		return;
+	}
+	const title = cleanTitle(content);
+	const live = state.chats.find((c) => c.id === chat.id);
+	if (!title || !live || live.title) return;
+	live.title = title;
+	live.titleBy = "ai";
+	persistChats(state, store);
 }
 
 export function deleteChat(

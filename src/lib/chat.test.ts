@@ -60,6 +60,12 @@ import {
 	type ChatState,
 	type ChatId
 } from "./chat";
+import {
+	buildTitleMessages,
+	cleanTitle,
+	generateChatTitle,
+	renameChat
+} from "./chat";
 import type {
 	ChatMessage,
 	ChatProvider,
@@ -1793,5 +1799,73 @@ describe("manual trim", () => {
 		).rejects.toThrow("down");
 		expect(chat.summary).toBeUndefined();
 		expect(chat.summaryThrough).toBeUndefined();
+	});
+});
+
+describe("chat titles", () => {
+	async function answered(reply = "Über means over.") {
+		const { state, store } = stateWith(freshStore());
+		await sendMessage(state, scriptedProvider([reply]), "sys", "Was heißt über?", {}, store);
+		return { state, store, chat: activeChat(state) };
+	}
+
+	it("cleans a model title to one plain line", () => {
+		expect(cleanTitle('Title: "Deutsche Präpositionen".\nmore')).toBe(
+			"Deutsche Präpositionen"
+		);
+		expect(cleanTitle("**«Le mot fenêtre»**")).toBe("Le mot fenêtre");
+		expect(cleanTitle("x".repeat(200))).toHaveLength(60);
+		expect(cleanTitle("   ")).toBe("");
+	});
+
+	it("asks with the opening exchange only once a reply exists", async () => {
+		const { chat } = await answered();
+		const messages = buildTitleMessages(chat);
+		expect(messages?.[0]?.role).toBe("system");
+		const ask = messages?.[1]?.content;
+		expect(typeof ask === "string" ? ask : "").toContain("Was heißt über?");
+		expect(typeof ask === "string" ? ask : "").toContain("Über means over.");
+		expect(buildTitleMessages({ ...chat, messages: chat.messages.slice(0, 1) })).toBeNull();
+	});
+
+	it("names an untitled chat and persists it", async () => {
+		const { state, store, chat } = await answered();
+		await generateChatTitle(state, chat, scriptedProvider(["Bedeutung von über."]), store);
+		expect(activeChat(state).title).toBe("Bedeutung von über");
+		expect(activeChat(state).titleBy).toBe("ai");
+		expect(createChatState(store).chats.find((c) => c.id === chat.id)?.title).toBe(
+			"Bedeutung von über"
+		);
+	});
+
+	it("never overwrites a rename, and stays silent on failure", async () => {
+		const { state, store, chat } = await answered();
+		renameChat(state, chat.id, "  My German  ", store);
+		await generateChatTitle(state, chat, scriptedProvider(["Model name"]), store);
+		expect(activeChat(state).title).toBe("My German");
+		expect(activeChat(state).titleBy).toBe("user");
+		const failing: ChatProvider = {
+			...scriptedProvider([]),
+			async chat(): Promise<ChatResult> {
+				throw new Error("offline");
+			}
+		};
+		renameChat(state, chat.id, "", store);
+		expect(activeChat(state).title).toBeUndefined();
+		await generateChatTitle(state, chat, failing, store);
+		expect(activeChat(state).title).toBeUndefined();
+	});
+
+	it("lets a rename that lands mid-call win", async () => {
+		const { state, store, chat } = await answered();
+		const slow: ChatProvider = {
+			...scriptedProvider([]),
+			async chat(): Promise<ChatResult> {
+				renameChat(state, chat.id, "Mine", store);
+				return { content: "Model name", usage: { prompt: 1, completion: 1, total: 2 } };
+			}
+		};
+		await generateChatTitle(state, chat, slow, store);
+		expect(activeChat(state).title).toBe("Mine");
 	});
 });

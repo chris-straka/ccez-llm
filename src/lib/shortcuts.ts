@@ -54,6 +54,7 @@ export function touchShortcuts(): ShortcutRow[] {
 			name: "Settings",
 			keys: "Swipe left off messages · two-finger swipe left · chats list button"
 		},
+		{ group: move, name: "Rename a chat", keys: "Long-press it in the chats list" },
 		{ group: msg, name: "Message buttons", keys: "Tap a message" },
 		{ group: msg, name: "Fold a message", keys: "Swipe left on it" },
 		{ group: msg, name: "Delete a message", keys: "Three-finger tap" },
@@ -151,6 +152,8 @@ export function desktopShortcuts(
 			name: "Newer / older chat",
 			keys: `${shiftMeta}J / ${shiftMeta}K · ${meta}↑ / ${meta}↓`
 		},
+		{ group: chats, name: "Read a chat's name", keys: "Hover it in the list + Shift+R" },
+		{ group: chats, name: "Rename a chat", keys: "Hover it in the list, then the pencil" },
 		{ group: chats, name: "Delete this chat", keys: `${shiftMeta}Delete` },
 		{ group: prompt, name: "Edit newest message", keys: isMac ? "⌘E" : "Meta+E" },
 		{ group: prompt, name: "Rerun a prompt", keys: "Rerun button · deletes after" },

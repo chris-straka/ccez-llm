@@ -35,7 +35,8 @@ import {
 	type UnselectedScrollFacts,
 	type ShortcutsFilterFacts,
 	type SidebarListFacts,
-	type SpaceKeyFacts
+	type SpaceKeyFacts,
+	sidebarSpeakTarget
 } from "./keybindings";
 
 const msgBase: MessageKeyFacts = {
@@ -1549,5 +1550,34 @@ describe("shortcutsFilterBlocksKey", () => {
 		expect(shortcutsFilterBlocksKey({ ...filterBase, inFilter: false })).toBe(
 			false
 		);
+	});
+});
+
+describe("sidebarSpeakTarget", () => {
+	const base = {
+		key: "R",
+		code: "KeyR",
+		shiftKey: true,
+		metaKey: false,
+		ctrlKey: false,
+		altKey: false,
+		listOpen: true,
+		inField: false,
+		hoveredRowId: null as string | null,
+		walkedRowId: null as string | null
+	};
+
+	it("reads the hovered row first, else the walked row", () => {
+		expect(sidebarSpeakTarget({ ...base, hoveredRowId: "a", walkedRowId: "b" })).toBe("a");
+		expect(sidebarSpeakTarget({ ...base, walkedRowId: "b" })).toBe("b");
+		expect(sidebarSpeakTarget(base)).toBeNull();
+	});
+
+	it("needs bare Shift+R on an open list outside fields", () => {
+		const row = { ...base, hoveredRowId: "a" };
+		expect(sidebarSpeakTarget({ ...row, shiftKey: false, key: "r" })).toBeNull();
+		expect(sidebarSpeakTarget({ ...row, metaKey: true })).toBeNull();
+		expect(sidebarSpeakTarget({ ...row, listOpen: false })).toBeNull();
+		expect(sidebarSpeakTarget({ ...row, inField: true })).toBeNull();
 	});
 });

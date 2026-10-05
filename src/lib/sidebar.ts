@@ -30,11 +30,13 @@ function plainTitleText(content: string): string {
 const TITLE_MAX = 80;
 
 /**
- * Sidebar / switcher / search title: the chat's opening question,
- * plain and one line. A chat that opened with only an attachment
+ * Sidebar / switcher / search title: the chat's name when it has one
+ * (a rename or the model's), else its opening question, plain and
+ * one line. A chat that opened with only an attachment
  * reads its first reply instead; an empty chat reads "New chat".
  */
-export function chatTitle(item: Pick<Chat, "messages">): string {
+export function chatTitle(item: Pick<Chat, "messages" | "title">): string {
+	if (item.title) return item.title;
 	const pick = (role: "user" | "assistant"): string =>
 		item.messages
 			.filter((m) => m.role === role)

@@ -41,6 +41,8 @@ const MAC_SECTIONS: Array<[string, string[]]> = [
 			"Chat list",
 			"New chat",
 			"Newer / older chat",
+			"Read a chat's name",
+			"Rename a chat",
 			"Delete this chat"
 		]
 	],
@@ -217,7 +219,8 @@ describe("shortcuts menu copy", () => {
 					"Newer / older chat",
 					"Top of chat",
 					"Bottom of chat",
-					"Settings"
+					"Settings",
+					"Rename a chat"
 				]
 			],
 			[

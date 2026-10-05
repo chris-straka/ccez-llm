@@ -335,6 +335,11 @@ export interface AppSettings {
 	 * entry, the deck chord, and its shortcuts row. Off by default.
 	 */
 	flashcardsEnabled: boolean;
+	/**
+	 * Name each chat with one short model call after its first reply
+	 * (renames always win). On by default; costs a few tokens per chat.
+	 */
+	aiTitles: boolean;
 }
 
 const STORAGE_KEY = "ccez-llm-settings-v1";
@@ -585,7 +590,8 @@ export function defaultSettings(): AppSettings {
 		hapticsEnabled: true,
 		replyNotifications: true,
 		inspectEnabled: true,
-		flashcardsEnabled: false
+		flashcardsEnabled: false,
+		aiTitles: true
 	};
 }
 
@@ -833,6 +839,7 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 			merged.inspectEnabled = true;
 		if (typeof merged.flashcardsEnabled !== "boolean")
 			merged.flashcardsEnabled = false;
+		if (typeof merged.aiTitles !== "boolean") merged.aiTitles = true;
 		if (typeof merged.hideMessages !== "boolean") merged.hideMessages = false;
 		if (typeof merged.micEnabled !== "boolean") merged.micEnabled = true;
 		if (typeof merged.captureEnabled !== "boolean")
