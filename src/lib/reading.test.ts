@@ -1000,6 +1000,13 @@ describe("annotationAnswer", () => {
 		expect(system!.content).toContain("what it means in this paragraph");
 	});
 
+	it("skips the obvious and writes prose, not labeled slots", () => {
+		const [system] = buildAnnotationAnswerMessages(q);
+		expect(system!.content).toContain("Skip what any learner already knows");
+		expect(system!.content).toContain("never labeled slots");
+		expect(system!.content).toContain("Stay on the quoted words");
+	});
+
 	it("states the in-paragraph meaning before the grammar details", () => {
 		const [system] = buildAnnotationAnswerMessages(q);
 		const text = system!.content;

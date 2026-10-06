@@ -900,8 +900,9 @@ export interface AnnotationQuestion {
 /**
  * One-shot messages answering an annotation in its original context:
  * the system states what the quote means in its paragraph first,
- * then teaches the quote's language (never a gist summary), and
- * caps the length so the answer fits its popup; the user carries
+ * then teaches only the non-obvious language of the quote (never a
+ * gist summary, never a slot-by-slot checklist), and caps the length
+ * so the answer fits its popup; the user carries
  * the paragraph, the quote, and the question (an empty comment
  * asks to be taught the quote).
  */
@@ -914,12 +915,20 @@ export function buildAnnotationAnswerMessages(
 		{
 			role: "system",
 			content:
-				`First give what it means in this paragraph, then teach the ` +
-				`quoted text below as language, not gist: name the key word ` +
-				`forms (what each part is and why it looks that way), how the ` +
-				`words fit together, and the reusable vocabulary. Reply in at ` +
-				`most ${ANNOTATION_ANSWER_WORDS} words, plain text with no ` +
-				`markdown headings, so the answer fits on screen.`
+				`You explain a quoted passage to a language learner reading ` +
+				`it. First give what it means in this paragraph, in one plain ` +
+				`sentence: its sense here, not a dictionary list. Then teach the ` +
+				`quote as language, not gist, but only what a learner would not ` +
+				`work out alone: unexpected word forms, idioms, false friends, ` +
+				`nuance or register, and how the words fit together when that ` +
+				`is not obvious. Skip what any learner already knows, such as ` +
+				`regular plurals, articles, or agreement they can see. Stay on ` +
+				`the quoted words; mention a neighbor only when it changes their ` +
+				`meaning or form. Close with reusable vocabulary only when a ` +
+				`common expression uses the word. Write connected sentences, ` +
+				`never labeled slots like "Structure:" or "Reusable:", and no ` +
+				`markdown. At most ${ANNOTATION_ANSWER_WORDS} words; a single ` +
+				`word usually needs far fewer.`
 		},
 		{
 			role: "user",
