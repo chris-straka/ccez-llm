@@ -98,6 +98,48 @@ fn alpn_and_cert_settings(context: &ImpersonateContext, builder: &mut SslConnect
     if !context.certs_verification {
         builder.set_verify(boring::ssl::SslVerifyMode::NONE);
     }
+
+    #[cfg(target_os = "android")]
+    add_android_system_roots(builder);
+}
+
+/// Android keeps its trust store outside the OpenSSL default paths
+/// that `set_default_verify_paths` points at, so BoringSSL verifies
+/// against nothing and every handshake fails with "unable to get
+/// local issuer certificate". Load the system roots explicitly: the
+/// updatable Conscrypt APEX store (Android 14+) and the classic
+/// system dir. Files are PEM with a text preamble, which the PEM
+/// reader skips. Parsed once, then added to every connector.
+#[cfg(target_os = "android")]
+fn add_android_system_roots(builder: &mut SslConnectorBuilder) {
+    use boring::x509::X509;
+    use std::sync::OnceLock;
+
+    static ROOTS: OnceLock<Vec<X509>> = OnceLock::new();
+    let roots = ROOTS.get_or_init(|| {
+        let mut roots = Vec::new();
+        for dir in [
+            "/apex/com.android.conscrypt/cacerts",
+            "/system/etc/security/cacerts",
+        ] {
+            let Ok(entries) = std::fs::read_dir(dir) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                if let Ok(pem) = std::fs::read(entry.path()) {
+                    if let Ok(cert) = X509::from_pem(&pem) {
+                        roots.push(cert);
+                    }
+                }
+            }
+        }
+        roots
+    });
+    let store = builder.cert_store_mut();
+    for cert in roots {
+        // Both dirs carry most roots: the duplicate add errors, harmlessly.
+        let _ = store.add_cert(cert.clone());
+    }
 }
 
 /// Add application settings to the given `ConnectConfiguration`.

@@ -135,8 +135,10 @@ strip = true
 # release resolves from vendor/ instead of the index — along with the
 # yanked BoringSSL/HTTP forks it renames its deps to. Same bytes as
 # the published .crates (checksums verified against the index) plus
-# three patches: one compat shim (rquest's profile.rs: h2_imp never
-# shipped the marker API 0.11.91 calls), one Android link fix
+# four patches: one compat shim (rquest's profile.rs: h2_imp never
+# shipped the marker API 0.11.91 calls), one Android trust-store fix
+# (rquest's impersonate/mod.rs loads the system CA dirs, which
+# BoringSSL's default verify paths miss), one Android link fix
 # (boring-sys-imp ANDROID_STL c++_shared -> c++_static: the app .so
 # must not need the STL .so bundled), and one Android bindgen fix
 # (boring-sys-imp sysroot: NDK r19+ moved it under the LLVM prebuilt
