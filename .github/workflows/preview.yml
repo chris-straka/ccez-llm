@@ -1,0 +1,103 @@
+name: preview
+
+# Branch builds that release.yml never runs: installable Windows NSIS
+# bundles (x64 native, ARM64 cross-compiled from the x64 runner) and an
+# unsigned iOS Simulator build that boots in `xcrun simctl`, runs the
+# scripted flows in scripts/ios-sim-flows.sh, and uploads one screenshot
+# per flow. Nothing here touches a GitHub Release; every output is a
+# workflow artifact.
+#
+# Triggers: manual dispatch, or a push to a `preview/**` or
+# `release-refresh-*` branch (main's pushes stay on check.yml only).
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "preview/**"
+      - "release-refresh-*"
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows-x64
+            rust_target: x86_64-pc-windows-msvc
+          # Cross-compiled on the x64 runner on purpose: the native
+          # windows-11-arm runner's libclang makes bindgen emit opaque
+          # BoringSSL structs (E0609, see release.yml), while the x64
+          # host's LLVM generates them fine for the ARM64 target (the
+          # check.yml aarch64 leg has always been green).
+          - name: windows-arm64
+            rust_target: aarch64-pc-windows-msvc
+    name: build (${{ matrix.name }})
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "src-tauri -> target"
+          shared-key: "preview-${{ matrix.name }}"
+      - run: bun install --frozen-lockfile
+      - name: Build NSIS installer
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: bunx tauri build --target ${{ matrix.rust_target }} --bundles nsis
+      - uses: actions/upload-artifact@v6
+        with:
+          name: preview-${{ matrix.name }}
+          path: src-tauri/target/${{ matrix.rust_target }}/release/bundle/nsis
+          if-no-files-found: error
+
+  ios-simulator:
+    name: build (ios-simulator)
+    runs-on: macos-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios-sim
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "src-tauri -> target"
+          shared-key: "preview-ios"
+      - run: bun install --frozen-lockfile
+      - name: Install xcodegen
+        run: brew install xcodegen
+      # Unsigned Simulator build: the Simulator runs unsigned apps, so
+      # no Apple Developer account, certificate, or profile is needed.
+      - name: Build the Simulator app
+        run: |
+          bunx tauri ios build --target aarch64-sim --debug --ci 2>&1 | tee "$RUNNER_TEMP/ios-build.log"
+          APP="$(find src-tauri/gen/apple/build -type d -name '*.app' -path '*iphonesimulator*' | head -1)"
+          [ -n "$APP" ] || APP="$(find src-tauri/gen/apple/build -type d -name '*.app' | head -1)"
+          echo "APP=$APP" >> "$GITHUB_ENV"
+          test -d "$APP"
+      - name: Boot a Simulator and screenshot each flow
+        run: scripts/ios-sim-flows.sh "$APP" "$RUNNER_TEMP/ios-shots"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: preview-ios-simulator
+          path: |
+            ${{ runner.temp }}/ios-shots
+            ${{ runner.temp }}/ios-build.log
+          if-no-files-found: warn
