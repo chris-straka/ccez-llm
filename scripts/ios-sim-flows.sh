@@ -69,10 +69,10 @@ except ValueError:
     if els and isinstance(els[0], list):
         els = els[0]
 for e in els:
-    text = " ".join(str(e.get(k) or "") for k in ("AXLabel", "AXValue", "title"))
+    fields = [str(e.get(k) or "").strip() for k in ("AXLabel", "AXValue", "title")]
     if want_type and want_type.lower() not in str(e.get("type", "")).lower():
         continue
-    if pat.search(text):
+    if any(f and pat.search(f) for f in fields):
         f = e["frame"]
         print(int(f["x"] + f["width"] / 2), int(f["y"] + f["height"] / 2))
         sys.exit(0)
