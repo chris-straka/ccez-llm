@@ -360,6 +360,16 @@ body {
 	touch-action: manipulation;
 }
 
+/* Search fields draw no engine clear button: every one sits beside
+the app's own drawn X (clear or close), and Chromium/WebView's blue
+cancel glyph read as a second, different X next to it. */
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-webkit-search-decoration {
+	-webkit-appearance: none;
+	appearance: none;
+	display: none;
+}
+
 @media print {
 	.app > *:not(#study-sheet-print) {
 		display: none !important;

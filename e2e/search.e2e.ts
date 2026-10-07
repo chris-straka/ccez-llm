@@ -516,6 +516,25 @@ test.describe("touch paths", () => {
 			(el) => parseFloat(getComputedStyle(el).paddingRight)
 		);
 		expect(padRight).toBeGreaterThanOrEqual(btn.width);
+		// No engine cancel glyph (Chromium paints it blue) beside the
+		// app's own X: computed styles can't see the pseudo, pixels can.
+		const shot = (await box.screenshot()).toString("base64");
+		const blue = await page.evaluate(async (b64) => {
+			const img = new Image();
+			img.src = `data:image/png;base64,${b64}`;
+			await img.decode();
+			const c = document.createElement("canvas");
+			c.width = img.width;
+			c.height = img.height;
+			const g = c.getContext("2d")!;
+			g.drawImage(img, 0, 0);
+			const d = g.getImageData(0, 0, c.width, c.height).data;
+			let n = 0;
+			for (let i = 0; i < d.length; i += 4)
+				if (d[i + 2]! - d[i]! > 60 && d[i + 2]! > 120) n++;
+			return n;
+		}, shot);
+		expect(blue).toBe(0);
 		await clear.click();
 		await expect(page.locator("aside ul li")).toHaveCount(3);
 	});
