@@ -26,7 +26,7 @@ name: release
 # ORDERING (parallel builders, exactly-one writer): v0.2.2 proved that
 # concurrent jobs uploading to the same draft silently lose files (the
 # Intel .dmg, both Linux .sigs, and the x64 Windows .sig all uploaded
-# "successfully" yet never landed). The six platform legs below therefore
+# "successfully" yet never landed). The seven platform legs below therefore
 # NEVER touch the draft: they run in parallel, hold only `contents: read`,
 # and publish their bundles as workflow artifacts
 # (actions/upload-artifact). The single serial tail job `release`
@@ -47,10 +47,10 @@ on:
       - "v*"
 
 jobs:
-  # Six platform legs, fully parallel. No leg touches the GitHub Release:
+  # Seven platform legs, fully parallel. No leg touches the GitHub Release:
   # each one uploads its bundle directory as a workflow artifact that the
   # tail job collects. `fail-fast: false` so one red platform does not
-  # hide the results of the other five.
+  # hide the results of the other six.
   build:
     strategy:
       fail-fast: false
@@ -82,17 +82,20 @@ jobs:
             tauri_target_flag: --target x86_64-pc-windows-msvc --bundles nsis
             bundle_dir: src-tauri/target/x86_64-pc-windows-msvc/release/bundle
             android: false
-          # windows-arm64: DROPPED 2026-09-30. boring-imp (the vendored
-          # TLS impersonation stack) fails here with E0609 — bindgen omits
-          # fields on srtp_protection_profile_st / ssl_early_callback_ctx
-          # for aarch64-pc-windows-msvc (srtp.rs, ssl/callbacks.rs,
-          # ssl/mod.rs), and that one red leg blocked every release
-          # since v0.6.52 (the tail job never ran, so nothing published).
-          # The other five legs are green. Restore by fixing the win-arm64
-          # bindings (or cfg-gating the five server-side field uses
-          # rquest never calls), then re-add the leg (os: windows-11-arm,
-          # rust_target aarch64-pc-windows-msvc, bundles nsis) plus its
-          # RULES/expected/UPDATERS/verify rows below.
+          # ARM64 cross-compiles on the x64 runner. The native
+          # windows-11-arm runner was dropped 2026-09-30 and stays off:
+          # its ARM64 libclang (LLVM 22) makes bindgen emit opaque
+          # BoringSSL structs (E0609 on srtp_protection_profile_st /
+          # ssl_early_callback_ctx), even with an explicit clang target
+          # (probed 2026-10-07). From x64 the bindings are fine, and
+          # boring-sys-imp builds BoringSSL with OPENSSL_NO_ASM there
+          # because MSVC has no assembler for its AArch64 asm.
+          - name: windows-arm64
+            os: windows-latest
+            rust_target: aarch64-pc-windows-msvc
+            tauri_target_flag: --target aarch64-pc-windows-msvc --bundles nsis
+            bundle_dir: src-tauri/target/aarch64-pc-windows-msvc/release/bundle
+            android: false
           # Linux distribution artifacts:
           #   - .deb bundle  (Debian / Ubuntu / Pop!_OS / Asahi-Debian-remix installs)
           #   - .AppImage bundle (distro-agnostic fallback)
@@ -196,7 +199,7 @@ jobs:
           if-no-files-found: error
 
   # Serial tail: the SOLE writer to the draft release. Runs only after all
-  # six legs are green, downloads their workflow artifacts, renames every
+  # seven legs are green, downloads their workflow artifacts, renames every
   # bundle to a human-readable OS-arch name, merges the per-leg updater
   # fragments into one latest.json, attaches everything to the draft,
   # verifies the draft, then publishes it. Nothing else in this workflow
@@ -244,6 +247,8 @@ jobs:
               ("bundle-macos-x86_64", "Ccez LLM.app.tar.gz", "CcezLLM-macos-intel.app.tar.gz"),
               ("bundle-windows-x64", "-setup.exe.sig", "CcezLLM-windows-x64-setup.exe.sig"),
               ("bundle-windows-x64", "-setup.exe", "CcezLLM-windows-x64-setup.exe"),
+              ("bundle-windows-arm64", "-setup.exe.sig", "CcezLLM-windows-arm64-setup.exe.sig"),
+              ("bundle-windows-arm64", "-setup.exe", "CcezLLM-windows-arm64-setup.exe"),
               ("bundle-linux-x64", ".deb.sig", "CcezLLM-linux-x64.deb.sig"),
               ("bundle-linux-x64", ".deb", "CcezLLM-linux-x64.deb"),
               ("bundle-linux-x64", ".AppImage.sig", "CcezLLM-linux-x64.AppImage.sig"),
@@ -283,6 +288,8 @@ jobs:
               "CcezLLM-linux-x64.AppImage.sig",
               "CcezLLM-windows-x64-setup.exe",
               "CcezLLM-windows-x64-setup.exe.sig",
+              "CcezLLM-windows-arm64-setup.exe",
+              "CcezLLM-windows-arm64-setup.exe.sig",
               "CcezLLM-android-arm64.apk",
           ]
           missing = [f for f in expected if f not in placed]
@@ -339,6 +346,7 @@ jobs:
               (["darwin-x86_64", "darwin-x86_64-app"], "CcezLLM-macos-intel.app.tar.gz"),
               (["darwin-aarch64", "darwin-aarch64-app"], "CcezLLM-macos-apple-silicon.app.tar.gz"),
               (["windows-x86_64", "windows-x86_64-nsis"], "CcezLLM-windows-x64-setup.exe"),
+              (["windows-aarch64", "windows-aarch64-nsis"], "CcezLLM-windows-arm64-setup.exe"),
               (["linux-x86_64", "linux-x86_64-appimage"], "CcezLLM-linux-x64.AppImage"),
               (["linux-x86_64-deb"], "CcezLLM-linux-x64.deb"),
           ]
@@ -410,6 +418,8 @@ jobs:
             "CcezLLM-linux-x64.AppImage.sig" \
             "CcezLLM-windows-x64-setup.exe" \
             "CcezLLM-windows-x64-setup.exe.sig" \
+            "CcezLLM-windows-arm64-setup.exe" \
+            "CcezLLM-windows-arm64-setup.exe.sig" \
             "CcezLLM-android-arm64.apk" \
             "latest.json"; do
             echo "$ASSETS" | grep -qxF "$f" || { echo "MISSING: $f"; missing=1; }
@@ -422,7 +432,7 @@ jobs:
             sleep 15
           done
           [ -f "$RUNNER_TEMP/manifest/latest.json" ] || { echo "latest.json missing after retries"; exit 1; }
-          for platform in darwin-aarch64 darwin-x86_64 linux-x86_64 windows-x86_64; do
+          for platform in darwin-aarch64 darwin-x86_64 linux-x86_64 windows-x86_64 windows-aarch64; do
             grep -q "\"$platform\"" "$RUNNER_TEMP/manifest/latest.json" || { echo "MISSING PLATFORM: $platform"; missing=1; }
           done
           exit $missing
