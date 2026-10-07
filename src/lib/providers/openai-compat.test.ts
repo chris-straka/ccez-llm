@@ -666,6 +666,42 @@ describe("readSse", () => {
 		for await (const event of readSse(stream)) out.push(event);
 		expect(out).toEqual(['{"a":1}', "[DONE]"]);
 	});
+
+	const chunks = async (...parts: string[]) => {
+		const stream = new ReadableStream<Uint8Array>({
+			start(controller) {
+				for (const part of parts) controller.enqueue(new TextEncoder().encode(part));
+				controller.close();
+			}
+		});
+		const out: string[] = [];
+		for await (const event of readSse(stream)) out.push(event);
+		return out;
+	};
+
+	it("reads CRLF-framed events, even with a CRLF split across reads", async () => {
+		expect(await chunks('data: {"a":1}\r\n\r\ndata: [DONE]\r\n\r\n')).toEqual([
+			'{"a":1}',
+			"[DONE]"
+		]);
+		expect(await chunks('data: {"a":1}\r', "\n\r\ndata: [DONE]\r\n\r\n")).toEqual([
+			'{"a":1}',
+			"[DONE]"
+		]);
+	});
+
+	it("keeps a last event the server never closed with a blank line", async () => {
+		expect(await chunks('data: {"a":1}\n\ndata: {"usage":2}\n')).toEqual([
+			'{"a":1}',
+			'{"usage":2}'
+		]);
+	});
+
+	it("joins an event's data lines and skips comment-only events", async () => {
+		expect(await chunks(': keep-alive\n\ndata: {"a":\ndata: 1}\n\n')).toEqual([
+			'{"a":\n1}'
+		]);
+	});
 });
 
 describe("listModels", () => {

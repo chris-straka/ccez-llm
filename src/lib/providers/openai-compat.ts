@@ -508,26 +508,39 @@ export function parseModelIds(payload: unknown): string[] {
 	return [...ids].sort();
 }
 
-/** Split an SSE byte stream into `data:` payloads. Exported for tests. */
+/** Split an SSE byte stream into `data:` payloads, one per event.
+Lines may end CRLF, LF, or CR; an event's data lines join with `\n`
+(as `turn.rs` does); a last event the server never closed with a
+blank line still counts. Exported for tests. */
 export async function* readSse(
 	body: ReadableStream<Uint8Array>
 ): AsyncGenerator<string> {
 	const reader = body.getReader();
 	const decoder = new TextDecoder();
 	let buffer = "";
+	const payload = (block: string): string | null => {
+		const data: string[] = [];
+		for (const line of block.split("\n"))
+			if (line.startsWith("data:")) data.push(line.slice("data:".length).trim());
+		return data.length > 0 ? data.join("\n") : null;
+	};
 	for (;;) {
 		const { done, value } = await reader.read();
 		if (done) break;
 		buffer += decoder.decode(value, { stream: true });
-		const parts = buffer.split("\n\n");
-		buffer = parts.pop() ?? "";
+		// A trailing CR may be half of a CRLF split across reads: hold it.
+		const held = buffer.endsWith("\r") ? "\r" : "";
+		const text = (held ? buffer.slice(0, -1) : buffer).replace(/\r\n?/g, "\n");
+		const parts = text.split("\n\n");
+		buffer = (parts.pop() ?? "") + held;
 		for (const part of parts) {
-			for (const line of part.split("\n")) {
-				const text = line.trim();
-				if (text.startsWith("data:")) yield text.slice("data:".length).trim();
-			}
+			const data = payload(part);
+			if (data !== null) yield data;
 		}
 	}
+	buffer += decoder.decode();
+	const data = payload(buffer.replace(/\r\n?/g, "\n"));
+	if (data !== null) yield data;
 }
 
 function toUsage(
