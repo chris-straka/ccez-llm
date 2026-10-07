@@ -24,6 +24,23 @@ describe("ChatSearchStore (in-memory fallback)", () => {
 		store.destroy();
 	});
 
+	it("answers a query in flight when the worker dies", async () => {
+		const worker = {
+			onmessage: null as ((event: MessageEvent) => void) | null,
+			onerror: null as (() => void) | null,
+			postMessage(msg: { type: string }) {
+				// The worker script fails to load once queried.
+				if (msg.type === "query") setTimeout(() => worker.onerror?.());
+			},
+			terminate() {}
+		};
+		const store = new ChatSearchStore(() => worker as unknown as Worker);
+		await store.index(DOCS);
+		const hits = await store.query("delta");
+		expect(hits.map((h) => h.doc.msgId)).toEqual(["m2"]);
+		store.destroy();
+	});
+
 	it("falls back inline when the worker factory throws", async () => {
 		const store = new ChatSearchStore(() => {
 			throw new Error("no workers here");
