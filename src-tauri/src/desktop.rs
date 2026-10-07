@@ -222,6 +222,21 @@ pub fn pick_sent_text(copied: Option<String>, clipboard: Option<String>) -> Opti
         .or_else(|| clipboard.as_deref().and_then(crate::annotate::clean_external))
 }
 
+/// Window fit (pure): a window larger than the monitor's work area
+/// shrinks to fit it with a small margin; one that already fits stays
+/// as is (`None`). Sizes are physical pixels. The configured default
+/// (1280x860 on macOS, 1200x760 on Windows) overflows small or
+/// scaled screens (1366x768, 125% on 1280x800), hiding the composer.
+pub fn fit_to_work_area(window: (u32, u32), area: (u32, u32)) -> Option<(u32, u32)> {
+    let (w, h) = window;
+    let (aw, ah) = area;
+    if aw == 0 || ah == 0 || (w <= aw && h <= ah) {
+        return None;
+    }
+    let margin = |v: u32| v.saturating_sub(v / 20);
+    Some((w.min(margin(aw)), h.min(margin(ah))))
+}
+
 // ---------------------------------------------------------------------------
 // Single-instance protocol (pure)
 // ---------------------------------------------------------------------------
@@ -618,6 +633,7 @@ pub fn wire(app: &AppHandle) -> tauri::Result<()> {
     // Windows/Linux keep the tray — quitting needs it there.
     #[cfg(not(target_os = "macos"))]
     build_tray(app)?;
+    fit_main_window(app);
     install_summon_hotkey(app);
     // Window capture is macOS-only (capture.rs): elsewhere these chords
     // would only steal Ctrl+Shift+O/U from every other app.
@@ -629,6 +645,28 @@ pub fn wire(app: &AppHandle) -> tauri::Result<()> {
     crate::send_selection::install(app);
     handle_startup_args(app);
     Ok(())
+}
+
+/// Shrink and center the main window when it does not fit the work
+/// area of the monitor it opened on (see `fit_to_work_area`). Runs after
+/// the window-state plugin restored any saved size, so a size the user
+/// chose that still fits is left alone.
+#[cfg(desktop)]
+fn fit_main_window(app: &AppHandle) {
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
+    if window.is_maximized().unwrap_or(false) || window.is_fullscreen().unwrap_or(false) {
+        return;
+    }
+    let (Ok(size), Ok(Some(monitor))) = (window.outer_size(), window.current_monitor()) else {
+        return;
+    };
+    let area = monitor.work_area();
+    if let Some((w, h)) = fit_to_work_area((size.width, size.height), (area.size.width, area.size.height)) {
+        let _ = window.set_size(tauri::PhysicalSize::new(w, h));
+        let _ = window.center();
+    }
 }
 
 /// System tray (Windows/Linux only): Show focuses the window, Quit
@@ -929,6 +967,18 @@ mod tests {
         assert_eq!(pick_sent_text(s("  "), s("clip")), s("clip"));
         assert_eq!(pick_sent_text(None, None), None);
         assert_eq!(pick_sent_text(None, s("\n")), None);
+    }
+
+    #[test]
+    fn window_fits_the_work_area() {
+        // Fits: untouched.
+        assert_eq!(fit_to_work_area((1200, 760), (1920, 1040)), None);
+        // 1366x768 laptop (taskbar leaves ~720): height shrinks only.
+        assert_eq!(fit_to_work_area((1200, 760), (1366, 720)), Some((1200, 684)));
+        // 125% on 1280x800 is physical 1280x752 here: both shrink.
+        assert_eq!(fit_to_work_area((1600, 1075), (1280, 752)), Some((1216, 715)));
+        // A monitor reporting nothing never zeroes the window.
+        assert_eq!(fit_to_work_area((1200, 760), (0, 0)), None);
     }
 
     #[test]
