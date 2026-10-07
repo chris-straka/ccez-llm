@@ -928,6 +928,7 @@ describe("loopback failures", () => {
 	it("classifies loopback hosts, never the open net", async () => {
 		expect(isLoopbackBaseUrl("http://localhost:11434/v1")).toBe(true);
 		expect(isLoopbackBaseUrl("http://127.0.0.1:11434/v1")).toBe(true);
+		expect(isLoopbackBaseUrl("http://[::1]:11434/v1")).toBe(true);
 		expect(isLoopbackBaseUrl("https://example.test/v1")).toBe(false);
 		expect(isLoopbackBaseUrl("not a url")).toBe(false);
 	});

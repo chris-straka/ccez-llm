@@ -585,8 +585,9 @@ function messageOf(error: unknown): string {
  */
 export function isLoopbackBaseUrl(baseUrl: string): boolean {
 	try {
+		// URL keeps IPv6 hosts bracketed ("[::1]").
 		const host = new URL(baseUrl).hostname.toLowerCase();
-		return host === "localhost" || host === "127.0.0.1" || host === "::1";
+		return host === "localhost" || host === "127.0.0.1" || host === "[::1]";
 	} catch {
 		return false;
 	}
