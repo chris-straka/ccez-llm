@@ -193,11 +193,13 @@ export const QUICK_LANG_CODES: readonly string[] = [
 	"ru"
 ];
 
-/** "⌘1"… "⌘9", "⌘0" for a priority language, else null. */
-export function quickKeyFor(code: string): string | null {
+/** "⌘1"… "⌘9", "⌘0" (Mac) or "Ctrl+1"… "Ctrl+0" for a priority
+ * language, else null. */
+export function quickKeyFor(code: string, isMac = true): string | null {
 	const idx = QUICK_LANG_CODES.indexOf(code);
 	if (idx < 0) return null;
-	return idx === 9 ? "⌘0" : `⌘${idx + 1}`;
+	const digit = idx === 9 ? "0" : String(idx + 1);
+	return isMac ? `⌘${digit}` : `Ctrl+${digit}`;
 }
 
 /**

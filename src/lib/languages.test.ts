@@ -167,6 +167,8 @@ describe("reply languages", () => {
 			expect(replyLanguageFor(code)).not.toBeNull();
 		}
 		expect(quickKeyFor("fr")).toBe("⌘1");
+		expect(quickKeyFor("fr", false)).toBe("Ctrl+1");
+		expect(quickKeyFor("ru", false)).toBe("Ctrl+0");
 		expect(quickKeyFor("zh")).toBe("⌘4");
 		expect(quickKeyFor("hi")).toBe("⌘9");
 		expect(quickKeyFor("ru")).toBe("⌘0");

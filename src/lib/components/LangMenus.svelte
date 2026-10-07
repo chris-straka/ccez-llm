@@ -13,6 +13,7 @@ owns the row markup and its surfaces. -->
 		type ReplyLanguage
 	} from "$lib/languages";
 	import { tauriBackendAvailable } from "$lib/secrets";
+	import { currentPlatform } from "$lib/platform";
 
 	/** Page-owned language-menu behaviors. */
 	export interface LangMenusActions {
@@ -66,7 +67,7 @@ owns the row markup and its surfaces. -->
 					<!-- Menu-click clears only languages without a number key
 					(keyed ones clear by repeating the key). -->
 					{#each [...menu.languages].sort( (a, b) => a.name.localeCompare(b.name, "en") ) as lang (lang.code)}
-						{@const quickKey = quickKeyFor(lang.code)}
+						{@const quickKey = quickKeyFor(lang.code, currentPlatform().isMac)}
 						<button
 							type="button"
 							role="menuitem"

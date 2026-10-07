@@ -8247,7 +8247,7 @@ import {
 		toggle: (id: LanguageMenu["id"], el: HTMLElement) =>
 			toggleLangMenu(id, el),
 		pick: (lang: ReplyLanguage) => {
-			const quickKey = quickKeyFor(lang.code);
+			const quickKey = quickKeyFor(lang.code, isMac);
 			if (activeReplyCode === lang.code && !quickKey) {
 				clearReplyLang();
 				// Clearing names the released language
@@ -10474,7 +10474,9 @@ import {
 				...keyFacts(event),
 				// Browser preview leaves print/find to the browser;
 				// only the shell owns those chords.
-				inShell: tauriBackendAvailable()
+				inShell: tauriBackendAvailable(),
+				isMac,
+				altGraph: event.getModifierState("AltGraph")
 			});
 			if (event.key === "Escape") {
 				// One ladder for every layer (see dismissEscape):
@@ -10493,7 +10495,8 @@ import {
 				return;
 			}
 			if (chord === "toggle-fullscreen") {
-				// Fullscreen toggle: Ctrl+Cmd+F only (⌘E edits now).
+				// Fullscreen toggle: Ctrl+Cmd+F on the Mac, F11
+				// elsewhere (⌘E / Ctrl+E edits now).
 				// Claimed before find below, so the dual-modifier
 				// chord never reads as Cmd/Ctrl+F.
 				consumeEvent(event);
@@ -13149,6 +13152,7 @@ import {
 		settings.promptWidth ?? PROMPT_WIDTH_BASE_REM
 	)}; --prompt-font: {settings.promptScale ?? 1}; --annpop-scale: {settings.annPopScale ?? 1}; --msg-gap: {settings.messageGap ?? MESSAGE_GAP_DEFAULT}rem; --msg-line-height: {settings.lineHeight ?? LINE_HEIGHT_DEFAULT}; --ui-scale: {settings.uiScale ?? 1}; --ui-scale-inv: {1 / (settings.uiScale ?? 1)}"
 	data-mac={(isMac && !androidUI) || null}
+	data-titlebar={tauriBackendAvailable() && isMac && !androidUI ? "overlay" : null}
 >
 	<Sidebar
 		chats={sideVisibleChats()}
@@ -13787,7 +13791,7 @@ import {
 			bind:query={shortcutQuery}
 			bind:inputEl={shortcutInputEl}
 			closeTitle={tip(
-				isMac ? "Close (⇧⌘/)" : "Close (Ctrl+Shift/)",
+				isMac ? "Close (⇧⌘/)" : "Close (Ctrl+Shift+/)",
 				"Close"
 			)}
 			onClose={() => (shortcutsOpen = false)}
@@ -13935,10 +13939,12 @@ import {
 		padding: 0;
 	}
 	/* Overlay traffic lights sit at x:20–72, y:26 (see trafficLightPosition
-	in tauri.conf.json). The header clears them with left padding; the
+	in tauri.conf.json; macOS only, so `data-titlebar="overlay"` marks
+	the Mac shell: Windows and Linux keep a native titlebar and get the
+	browser layout). The header clears them with left padding; the
 	empty sidebar head indents by the same amount so the chat list
 	starts at the same x. */
-	.app[data-shell="tauri"] header {
+	.app[data-titlebar="overlay"] header {
 		padding-left: 5.75rem;
 		/* Sit the top chrome a touch lower so it centers on the
 		native traffic lights instead of riding above them. */

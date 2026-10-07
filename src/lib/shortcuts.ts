@@ -104,12 +104,16 @@ const WEB_HIDDEN_ROWS = new Set([
 	"Flashcards"
 ]);
 
+/** Rows whose feature only exists on macOS (screen capture). */
+const MAC_ONLY_ROWS = new Set(["Capture window text", "Set capture area"]);
+
 export const HOVER_GROUP = "Hovered message";
 
 export function desktopShortcuts(
 	isMac: boolean,
 	inShell = true,
-	flashcards = true
+	flashcards = true,
+	isWindows = false
 ): ShortcutRow[] {
 	const altm = altKeyLabel(isMac);
 	const mod = modKeyLabel(isMac);
@@ -139,7 +143,7 @@ export function desktopShortcuts(
 			name: "Delete",
 			keys: isMac ? "⌘Delete · ⌘D · Shift+D" : "Ctrl+Delete · Shift+D"
 		},
-		{ group: chats, name: "Search chats", keys: `${meta}P` },
+		{ group: chats, name: "Search chats", keys: isMac ? "⌘P" : "Ctrl+K · Ctrl+P" },
 		{ group: chats, name: "Search filters", keys: '"exact phrase" · from:me · from:ai · in:notes' },
 		{ group: chats, name: "Find in chat", keys: `${meta}F` },
 		{
@@ -156,7 +160,7 @@ export function desktopShortcuts(
 		{ group: chats, name: "Read a chat's name", keys: "Hover it in the list + Shift+R" },
 		{ group: chats, name: "Rename a chat", keys: "Hover it in the list, then the pencil" },
 		{ group: chats, name: "Delete this chat", keys: `${shiftMeta}Delete` },
-		{ group: prompt, name: "Edit newest message", keys: isMac ? "⌘E" : "Meta+E" },
+		{ group: prompt, name: "Edit newest message", keys: `${meta}E` },
 		{ group: prompt, name: "Rerun a prompt", keys: "Rerun button · deletes after" },
 		{ group: prompt, name: "Pasted text expand / collapse", keys: "Ctrl+O" },
 		{
@@ -189,17 +193,26 @@ export function desktopShortcuts(
 		{ group: scroll, name: "Top / bottom", keys: "gg / G" },
 		{ group: view, name: "Shortcuts", keys: `${isMac ? "⇧⌘/" : "Ctrl+Shift+/"} · middle-click` },
 		{ group: view, name: "Summon / hide window", keys: `${shiftMeta}Space` },
-		{ group: view, name: "Fullscreen", keys: isMac ? "Ctrl+⌘F" : "Ctrl+Meta+F" },
+		{ group: view, name: "Send selected text here", keys: "Ctrl+Alt+Space in any app" },
+		{ group: view, name: "Fullscreen", keys: isMac ? "Ctrl+⌘F" : "F11" },
 		{ group: view, name: "Exit fullscreen", keys: "Hold Esc 2s · Esc+F" },
-		{ group: view, name: "Text size", keys: `${mod}+ / ${mod}−` },
-		{ group: view, name: "Chat width", keys: `⇧${mod}+ / ⇧${mod}−` },
-		{ group: view, name: "Prompt text size", keys: `${mod}[ / ${mod}]` },
-		{ group: view, name: "Prompt width", keys: `⇧${mod}[ / ⇧${mod}]` }
+		{ group: view, name: "Text size", keys: isMac ? `${mod}+ / ${mod}−` : "Ctrl+Plus / Ctrl+Minus" },
+		{
+			group: view,
+			name: "Chat width",
+			keys: isMac ? `⇧${mod}+ / ⇧${mod}−` : "Ctrl+Shift+Plus / Ctrl+Shift+Minus"
+		},
+		{ group: view, name: "Prompt text size", keys: `${meta}[ / ${meta}]` },
+		{ group: view, name: "Prompt width", keys: `${shiftMeta}[ / ${shiftMeta}]` }
 	];
 	return rows.filter(
 		(row) =>
 			(inShell || !WEB_HIDDEN_ROWS.has(row.name)) &&
-			(flashcards || row.name !== "Flashcards")
+			(flashcards || row.name !== "Flashcards") &&
+			// Window capture is macOS-only (capture.rs).
+			(isMac || !MAC_ONLY_ROWS.has(row.name)) &&
+			// The send-text chord lives in the Windows shell only.
+			((isWindows && inShell) || row.name !== "Send selected text here")
 	);
 }
 
