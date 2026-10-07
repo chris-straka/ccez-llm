@@ -25,6 +25,7 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 pub const SEND_SELECTION_SHORTCUT: &str = "Control+Alt+Space";
 
 const VK_C: VIRTUAL_KEY = VIRTUAL_KEY(0x43);
+const VK_MENU_MASK: VIRTUAL_KEY = VIRTUAL_KEY(0xE8);
 
 pub fn install(app: &AppHandle) {
     use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
@@ -34,6 +35,11 @@ pub fn install(app: &AppHandle) {
             if event.state != ShortcutState::Pressed {
                 return;
             }
+            // Now, while Alt is still held: the hotkey swallows the
+            // Space, so releasing Alt would read as a lone Alt tap and
+            // open the foreground app's menu bar, which then eats the
+            // Ctrl+C. Seen in the test VM with Notepad.
+            mask_alt_release();
             // Off the event loop: the copy waits on other apps.
             let app = app.clone();
             std::thread::spawn(move || send(&app));
@@ -82,26 +88,39 @@ fn wait_for_keys_up(limit: Duration) {
     }
 }
 
+/// Tap an unassigned virtual key (vkE8, AutoHotkey's menu-mask key)
+/// so Windows sees Alt combined with something and skips menu
+/// activation on release. Apps ignore the key itself.
+fn mask_alt_release() {
+    send_keys(&[(VK_MENU_MASK, KEYBD_EVENT_FLAGS(0)), (VK_MENU_MASK, KEYEVENTF_KEYUP)]);
+}
+
 fn press_ctrl_c() {
-    let key = |vk: VIRTUAL_KEY, flags: KEYBD_EVENT_FLAGS| INPUT {
-        r#type: INPUT_KEYBOARD,
-        Anonymous: INPUT_0 {
-            ki: KEYBDINPUT {
-                wVk: vk,
-                wScan: 0,
-                dwFlags: flags,
-                time: 0,
-                dwExtraInfo: 0,
-            },
-        },
-    };
     let none = KEYBD_EVENT_FLAGS(0);
-    let inputs = [
-        key(VK_CONTROL, none),
-        key(VK_C, none),
-        key(VK_C, KEYEVENTF_KEYUP),
-        key(VK_CONTROL, KEYEVENTF_KEYUP),
-    ];
+    send_keys(&[
+        (VK_CONTROL, none),
+        (VK_C, none),
+        (VK_C, KEYEVENTF_KEYUP),
+        (VK_CONTROL, KEYEVENTF_KEYUP),
+    ]);
+}
+
+fn send_keys(keys: &[(VIRTUAL_KEY, KEYBD_EVENT_FLAGS)]) {
+    let inputs: Vec<INPUT> = keys
+        .iter()
+        .map(|&(vk, flags)| INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: vk,
+                    wScan: 0,
+                    dwFlags: flags,
+                    time: 0,
+                    dwExtraInfo: 0,
+                },
+            },
+        })
+        .collect();
     unsafe {
         SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
     }
