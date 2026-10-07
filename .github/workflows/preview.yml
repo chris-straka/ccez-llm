@@ -82,6 +82,23 @@ jobs:
       - run: bun install --frozen-lockfile
       - name: Install xcodegen
         run: brew install xcodegen
+      # `tauri ios init` only runs on macOS. When the committed Xcode
+      # project no longer matches the crate (renamed package, new Tauri
+      # template), regenerate it here and upload it so it can be
+      # committed; a project that is current is left untouched.
+      - name: Regenerate the Xcode project when stale
+        run: |
+          if [ ! -d src-tauri/gen/apple/ccez-llm.xcodeproj ]; then
+            rm -rf src-tauri/gen/apple
+            bunx tauri ios init --ci
+          fi
+      - uses: actions/upload-artifact@v6
+        with:
+          name: gen-apple
+          path: |
+            src-tauri/gen/apple
+            !src-tauri/gen/apple/build
+            !src-tauri/gen/apple/Externals
       # Unsigned Simulator build: the Simulator runs unsigned apps, so
       # no Apple Developer account, certificate, or profile is needed.
       - name: Build the Simulator app
