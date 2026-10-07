@@ -8829,6 +8829,10 @@ import {
 						if (route === "prefill" && text) {
 							if (!chatState.activeChatId) newChat(chatState);
 							editor?.setText(joinExternalDraft(editor?.getText() ?? "", text));
+							// A share, deep link, or send-text chord is an
+							// explicit summon: bring an idle-hidden prompt back
+							// so the text never lands in an invisible editor.
+							restorePrompt();
 							editor?.focus();
 							return;
 						}
