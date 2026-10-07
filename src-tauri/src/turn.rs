@@ -198,6 +198,48 @@ fn extract_sse_payloads(remainder: &str, chunk: &str) -> (Vec<String>, String) {
     (payloads, text[start..].to_string())
 }
 
+/// Byte-level SSE reader over `extract_sse_payloads`: network chunks
+/// can cut a UTF-8 character or a CRLF in half, so the trailing partial
+/// character and a trailing `\r` wait for the next chunk instead of
+/// decoding as U+FFFD or as an extra blank line.
+#[derive(Default)]
+struct SseDecoder {
+    bytes: Vec<u8>,
+    remainder: String,
+}
+
+impl SseDecoder {
+    fn push(&mut self, chunk: &[u8]) -> Vec<String> {
+        self.bytes.extend_from_slice(chunk);
+        let mut keep = match std::str::from_utf8(&self.bytes) {
+            Ok(_) => 0,
+            // An incomplete character at the end (no error length).
+            Err(e) if e.error_len().is_none() => self.bytes.len() - e.valid_up_to(),
+            Err(_) => 0,
+        };
+        if keep == 0 && self.bytes.last() == Some(&b'\r') {
+            keep = 1;
+        }
+        let tail = self.bytes.split_off(self.bytes.len() - keep);
+        let text = String::from_utf8_lossy(&self.bytes).into_owned();
+        self.bytes = tail;
+        let (payloads, rest) = extract_sse_payloads(&self.remainder, &text);
+        self.remainder = rest;
+        payloads
+    }
+
+    /// The stream ended: a last event without its blank line still counts.
+    fn finish(&mut self) -> Vec<String> {
+        let text = String::from_utf8_lossy(&std::mem::take(&mut self.bytes)).into_owned();
+        let (mut payloads, rest) =
+            extract_sse_payloads(&std::mem::take(&mut self.remainder), &text);
+        if rest.lines().any(|line| line.starts_with("data:")) {
+            payloads.extend(extract_sse_payloads(&rest, "\n\n").0);
+        }
+        payloads
+    }
+}
+
 /// One fragmented tool call off the wire: index-joined by the caller.
 #[derive(Clone, Debug, Default, PartialEq)]
 struct ToolFrag {
@@ -487,6 +529,32 @@ fn classify_send_error(error: reqwest::Error) -> AttemptEnd {
     AttemptEnd::Retryable(None)
 }
 
+/// Fold stream payloads into the reply: tokens, tool fragments, usage.
+fn take_payloads(
+    payloads: Vec<String>,
+    content: &mut String,
+    frags: &mut Vec<ToolFrag>,
+    usage: &mut Option<TurnUsage>,
+    ev: &mut AttemptEvents,
+) {
+    for payload in payloads {
+        if payload.trim() == "[DONE]" {
+            break;
+        }
+        if let Ok(value) = serde_json::from_str::<serde_json::Value>(&payload) {
+            if let Some(found) = usage_from(&value) {
+                *usage = Some(found);
+            }
+        }
+        let (token, frag) = delta_from_payload(&payload);
+        if !token.is_empty() {
+            content.push_str(&token);
+            (ev.on_token)(token);
+        }
+        frags.extend(frag);
+    }
+}
+
 /// Read one SSE stream into content + joined tool fragments, emitting
 /// tokens as they land. Transport cuts read as retryable (the turn
 /// recomputes); the deadline guards hung sockets.
@@ -496,8 +564,7 @@ async fn read_stream(
     ev: &mut AttemptEvents,
 ) -> Result<(String, Vec<ToolFrag>, Option<TurnUsage>), AttemptEnd> {
     let mut response = res;
-    let mut text = String::new();
-    let mut remainder = String::new();
+    let mut decoder = SseDecoder::default();
     let mut content = String::new();
     let mut frags: Vec<ToolFrag> = Vec::new();
     let mut usage: Option<TurnUsage> = None;
@@ -509,29 +576,17 @@ async fn read_stream(
             return Err(AttemptEnd::Retryable(None));
         }
         match response.chunk().await {
-            Ok(Some(bytes)) => {
-                text.push_str(&String::from_utf8_lossy(&bytes));
-                let (payloads, rest) = extract_sse_payloads(&remainder, &text);
-                remainder = rest;
-                text.clear();
-                for payload in payloads {
-                    if payload.trim() == "[DONE]" {
-                        break;
-                    }
-                    if let Ok(value) = serde_json::from_str::<serde_json::Value>(&payload) {
-                        if let Some(found) = usage_from(&value) {
-                            usage = Some(found);
-                        }
-                    }
-                    let (token, frag) = delta_from_payload(&payload);
-                    if !token.is_empty() {
-                        content.push_str(&token);
-                        (ev.on_token)(token);
-                    }
-                    frags.extend(frag);
-                }
+            Ok(Some(bytes)) => take_payloads(
+                decoder.push(&bytes),
+                &mut content,
+                &mut frags,
+                &mut usage,
+                ev,
+            ),
+            Ok(None) => {
+                take_payloads(decoder.finish(), &mut content, &mut frags, &mut usage, ev);
+                break;
             }
-            Ok(None) => break,
             Err(error) => {
                 // Same transport rule as send-time: a cut stream
                 // recomputes, whatever the hyper spelling.
@@ -573,8 +628,11 @@ async fn post_stream(
         .map_err(classify_send_error)?;
     // A tools rejection reads as a plain turn, exactly like TypeScript's
     // 400 fallback — the reply still lands, just without page fetches.
+    // The body rides along as the content so a later round can report
+    // the server's reason (see `rejected_400`).
     if res.status().as_u16() == 400 && tools {
-        return Ok((400, String::new(), Vec::new(), None));
+        let head = res.text().await.unwrap_or_default();
+        return Ok((400, head.chars().take(300).collect(), Vec::new(), None));
     }
     if !res.status().is_success() {
         let status = res.status().as_u16();
@@ -734,6 +792,14 @@ async fn run_attempt(
         .take(MAX_CALLS_PER_ROUND)
         .collect::<Vec<_>>();
     if pending.is_empty() {
+        // Only unusable calls (unknown tool, no URL, cut-off arguments)
+        // and no text: ask once more without tools rather than file a
+        // blank reply. Same rule as the TypeScript engine.
+        if first_content.trim().is_empty() && !first_frags.is_empty() {
+            let (content, _, usage) =
+                post_stream_plain_fallback(client, req, &history, deadline, ev).await?;
+            return Ok((content, usage.or(first_usage)));
+        }
         return Ok((first_content, first_usage));
     }
     // Tool round: the streamed prefix was provisional chatter, not the
@@ -744,11 +810,17 @@ async fn run_attempt(
     (ev.on_round_retract)();
     let mut usage = first_usage;
     let mut assistant_text = first_content;
-    for _ in 0..MAX_TOOL_ROUNDS {
+    for round in 0..MAX_TOOL_ROUNDS {
         if pending.is_empty() {
             break;
         }
         run_fetch_batch(&mut history, &assistant_text, &pending, page_fetch, ev).await?;
+        // The last batch goes straight to the streamed answer (as in
+        // the TypeScript engine): a plain follow-up here could only ask
+        // for fetches nothing would run.
+        if round + 1 >= MAX_TOOL_ROUNDS {
+            break;
+        }
         let (content, frags, round_usage) = post_plain(client, req, &history, true).await?;
         if round_usage.is_some() {
             usage = round_usage;
@@ -774,8 +846,14 @@ async fn run_attempt(
     // land.
     let mut extra = 0;
     loop {
-        let (_, final_content, final_frags, final_usage) =
+        let (status, final_content, final_frags, final_usage) =
             post_stream(client, req, &history, true, deadline, ev).await?;
+        // Only the first request's 400 means "no tools here"; a later
+        // one (context grown past the limit by fetched pages) is a
+        // failure, never an empty answer.
+        if status == 400 {
+            return Err(rejected_400(&final_content));
+        }
         let more = join_calls(&final_frags)
             .into_iter()
             .take(MAX_CALLS_PER_ROUND)
@@ -790,6 +868,12 @@ async fn run_attempt(
         }
         run_fetch_batch(&mut history, &final_content, &more, page_fetch, ev).await?;
     }
+}
+
+/// A 400 past the first request: the provider's own reason, in the
+/// TypeScript engine's words.
+fn rejected_400(head: &str) -> AttemptEnd {
+    AttemptEnd::Fatal(format!("stream failed (HTTP 400): {head}"))
 }
 
 async fn post_stream_plain_fallback(
@@ -1463,6 +1547,34 @@ mod tests {
     }
 
     #[test]
+    fn sse_decoder_keeps_characters_cut_between_chunks() {
+        let body = "data: {\"choices\":[{\"delta\":{\"content\":\"日本\"}}]}\n\n".as_bytes();
+        let cut = body.iter().position(|b| *b >= 0x80).expect("multibyte") + 1;
+        let mut decoder = SseDecoder::default();
+        let mut payloads = decoder.push(&body[..cut]);
+        payloads.extend(decoder.push(&body[cut..]));
+        assert_eq!(payloads.len(), 1);
+        assert_eq!(delta_from_payload(&payloads[0]).0, "日本");
+    }
+
+    #[test]
+    fn sse_decoder_holds_a_crlf_cut_between_chunks() {
+        let mut decoder = SseDecoder::default();
+        let mut payloads = decoder.push(b"data: line1\r");
+        payloads.extend(decoder.push(b"\ndata: line2\r\n\r\n"));
+        assert_eq!(payloads, vec!["line1\nline2".to_string()]);
+    }
+
+    #[test]
+    fn sse_decoder_flushes_an_unclosed_last_event() {
+        let mut decoder = SseDecoder::default();
+        let mut payloads = decoder.push(b"data: {\"a\":1}\n\ndata: {\"usage\":2}\n");
+        payloads.extend(decoder.finish());
+        assert_eq!(payloads, vec!["{\"a\":1}".to_string(), "{\"usage\":2}".to_string()]);
+        assert!(SseDecoder::default().finish().is_empty());
+    }
+
+    #[test]
     fn sse_split_joins_multiline_data_and_crlf() {
         let (payloads, rest) =
             extract_sse_payloads("", "data: line1\r\ndata: line2\r\n\r\n");
@@ -1683,6 +1795,19 @@ mod tests {
         format!("data: {}\n\ndata: [DONE]\n\n", wire).into_bytes()
     }
 
+    fn json_followup_tool_body(id: &str, url: &str) -> Vec<u8> {
+        serde_json::json!({ "choices": [{ "message": { "content": "", "tool_calls": [{
+            "id": id,
+            "type": "function",
+            "function": {
+                "name": "fetch_url",
+                "arguments": serde_json::json!({ "url": url }).to_string()
+            }
+        }] } }] })
+        .to_string()
+        .into_bytes()
+    }
+
     fn json_followup_body() -> Vec<u8> {
         json_followup_body_with("")
     }
@@ -1805,6 +1930,174 @@ mod tests {
         assert_eq!(bodies.len(), 3);
         assert!(bodies[1].contains("call_1"));
         assert!(bodies[1].contains("page text here"));
+    }
+
+    #[test]
+    fn drive_caps_tool_rounds_like_the_web_engine() {
+        // The model asks for another page every round: three fetch
+        // batches, two plain follow-ups, then the streamed answer.
+        let bodies = Arc::new(Mutex::new(Vec::new()));
+        let port = run_stub(
+            vec![
+                StubStep::Respond {
+                    status: 200,
+                    content_type: "text/event-stream",
+                    body: sse_tool_body("http://example.test/1"),
+                },
+                StubStep::Respond {
+                    status: 200,
+                    content_type: "application/json",
+                    body: json_followup_tool_body("call_2", "http://example.test/2"),
+                },
+                StubStep::Respond {
+                    status: 200,
+                    content_type: "application/json",
+                    body: json_followup_tool_body("call_3", "http://example.test/3"),
+                },
+                StubStep::Respond {
+                    status: 200,
+                    content_type: "text/event-stream",
+                    body: sse_text_body("the answer"),
+                },
+            ],
+            Arc::clone(&bodies),
+        );
+        let page_fetch: PageFetch = Arc::new(|url: String| {
+            Box::pin(async move { Ok::<String, String>(format!("text of {url}")) })
+                as Pin<Box<dyn Future<Output = Result<String, String>> + Send>>
+        });
+        let rec = Recorder {
+            tokens: Arc::new(Mutex::new(Vec::new())),
+            fetches: Arc::new(Mutex::new(Vec::new())),
+            retries: Arc::new(Mutex::new(0)),
+            retracts: Arc::new(Mutex::new(0)),
+        };
+        let client = reqwest_client().unwrap();
+        let req = test_request(port);
+        let outcome = tauri::async_runtime::block_on(drive_attempts(
+            &client,
+            &req,
+            "",
+            &page_fetch,
+            &[0],
+            &mut || test_events(&rec),
+        ));
+        match outcome {
+            TurnOutcome::Done(content, _) => assert_eq!(content, "the answer"),
+            other => panic!("expected done, got {other:?}"),
+        }
+        let started = rec
+            .fetches
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(start, _)| *start)
+            .count();
+        assert_eq!(started, 3);
+        let bodies = bodies.lock().unwrap();
+        assert_eq!(bodies.len(), 4);
+        assert!(bodies[3].contains("text of http://example.test/3"));
+    }
+
+    #[test]
+    fn drive_reports_a_late_400_instead_of_an_empty_answer() {
+        let bodies = Arc::new(Mutex::new(Vec::new()));
+        let port = run_stub(
+            vec![
+                StubStep::Respond {
+                    status: 200,
+                    content_type: "text/event-stream",
+                    body: sse_tool_body("http://example.test/page"),
+                },
+                StubStep::Respond {
+                    status: 200,
+                    content_type: "application/json",
+                    body: json_followup_body(),
+                },
+                StubStep::Respond {
+                    status: 400,
+                    content_type: "application/json",
+                    body: b"context length exceeded".to_vec(),
+                },
+            ],
+            Arc::clone(&bodies),
+        );
+        let page_fetch: PageFetch = Arc::new(|_url: String| {
+            Box::pin(async move { Ok::<String, String>("a long page".to_string()) })
+                as Pin<Box<dyn Future<Output = Result<String, String>> + Send>>
+        });
+        let rec = Recorder {
+            tokens: Arc::new(Mutex::new(Vec::new())),
+            fetches: Arc::new(Mutex::new(Vec::new())),
+            retries: Arc::new(Mutex::new(0)),
+            retracts: Arc::new(Mutex::new(0)),
+        };
+        let client = reqwest_client().unwrap();
+        let req = test_request(port);
+        let outcome = tauri::async_runtime::block_on(drive_attempts(
+            &client,
+            &req,
+            "",
+            &page_fetch,
+            &[0],
+            &mut || test_events(&rec),
+        ));
+        match outcome {
+            TurnOutcome::Failed(error) => {
+                assert!(error.contains("HTTP 400"), "{error}");
+                assert!(error.contains("context length exceeded"), "{error}");
+            }
+            other => panic!("expected failed, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn drive_reasks_without_tools_when_every_call_is_unusable() {
+        let bodies = Arc::new(Mutex::new(Vec::new()));
+        let port = run_stub(
+            vec![
+                StubStep::Respond {
+                    status: 200,
+                    content_type: "text/event-stream",
+                    body: sse_tool_body(""),
+                },
+                StubStep::Respond {
+                    status: 200,
+                    content_type: "text/event-stream",
+                    body: sse_text_body("plain answer"),
+                },
+            ],
+            Arc::clone(&bodies),
+        );
+        let page_fetch: PageFetch = Arc::new(|_url: String| {
+            Box::pin(async move { Ok::<String, String>(String::new()) })
+                as Pin<Box<dyn Future<Output = Result<String, String>> + Send>>
+        });
+        let rec = Recorder {
+            tokens: Arc::new(Mutex::new(Vec::new())),
+            fetches: Arc::new(Mutex::new(Vec::new())),
+            retries: Arc::new(Mutex::new(0)),
+            retracts: Arc::new(Mutex::new(0)),
+        };
+        let client = reqwest_client().unwrap();
+        let req = test_request(port);
+        let outcome = tauri::async_runtime::block_on(drive_attempts(
+            &client,
+            &req,
+            "",
+            &page_fetch,
+            &[0],
+            &mut || test_events(&rec),
+        ));
+        match outcome {
+            TurnOutcome::Done(content, _) => assert_eq!(content, "plain answer"),
+            other => panic!("expected done, got {other:?}"),
+        }
+        assert!(rec.fetches.lock().unwrap().is_empty());
+        let bodies = bodies.lock().unwrap();
+        assert_eq!(bodies.len(), 2);
+        assert!(bodies[0].contains("\"tools\""));
+        assert!(!bodies[1].contains("\"tools\""));
     }
 
     #[test]

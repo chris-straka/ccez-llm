@@ -44,8 +44,11 @@ export function chatTitle(item: Pick<Chat, "messages" | "title">): string {
 			.find((t) => t.length > 0) ?? "";
 	const text = pick("user") || pick("assistant");
 	if (!text) return "New chat";
-	if (text.length <= TITLE_MAX) return text;
-	const cut = text.slice(0, TITLE_MAX);
+	// Code points, not UTF-16 units: a cut through an emoji's surrogate
+	// pair would draw U+FFFD.
+	const chars = Array.from(text);
+	if (chars.length <= TITLE_MAX) return text;
+	const cut = chars.slice(0, TITLE_MAX).join("");
 	const space = cut.lastIndexOf(" ");
 	return `${(space > TITLE_MAX / 2 ? cut.slice(0, space) : cut).trimEnd()}…`;
 }

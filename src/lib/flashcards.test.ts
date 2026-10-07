@@ -358,5 +358,10 @@ describe("deckKeyAction", () => {
 		expect(deckKeyAction(k("j", "KeyJ"))).toBe("swallow");
 		expect(deckKeyAction(k("2", "Digit2", { repeat: true }))).toBe("swallow");
 		expect(deckKeyAction(k("q", "KeyQ", { metaKey: true }))).toBe("pass");
+		// Tab walks the deck's buttons; Enter/Space press a focused one.
+		expect(deckKeyAction(k("Tab", "Tab"))).toBe("pass");
+		expect(deckKeyAction(k("Tab", "Tab", { shiftKey: true }))).toBe("pass");
+		expect(deckKeyAction(k("Enter", "Enter", { onButton: true }))).toBe("pass");
+		expect(deckKeyAction(k(" ", "Space", { onButton: true }))).toBe("pass");
 	});
 });

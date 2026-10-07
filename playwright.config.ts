@@ -58,8 +58,13 @@ export default defineConfig({
 			use: { browserName: "webkit" },
 			// Field-typing regressions are WebKit-only (the mouseup
 			// caret wipe Chromium never sees); sel-menu stays for its
-			// selectionchange coverage.
-			testMatch: ["**/sel-menu.e2e.ts", "**/scroll-field.e2e.ts"]
+			// selectionchange coverage; lang-pills pins WebKit's taller
+			// emoji line box.
+			testMatch: [
+				"**/sel-menu.e2e.ts",
+				"**/scroll-field.e2e.ts",
+				"**/lang-pills.e2e.ts"
+			]
 		}
 	],
 	webServer: {

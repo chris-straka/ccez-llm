@@ -35,6 +35,7 @@
 		tokenSplit,
 		waypoints,
 		waypointIndexAt,
+		waypointOffsets,
 		sendMessage,
 		fileAssistantMessage,
 		setPasteFold,
@@ -94,7 +95,12 @@
 		listProviders,
 		type ProviderId
 	} from "$lib/providers/registry";
-	import { offlineTarget, onlineRestore } from "$lib/offline";
+	import { isImeKey } from "$lib/editContext";
+	import {
+		OFFLINE_FALLBACK_ID,
+		offlineTarget,
+		onlineRestore
+	} from "$lib/offline";
 	import { mockProviderEnabled } from "$lib/providers/mock";
 	import { ProviderKeys } from "$lib/provider-keys.svelte";
 	import {
@@ -139,6 +145,7 @@
 	} from "$lib/scrollkeys";
 	import {
 		hydrateSecrets,
+		secretsSurviveReload,
 		migrateLegacySecret,
 		persistSecrets,
 		tauriBackendAvailable,
@@ -543,6 +550,7 @@ import {
 		dictationInsert,
 		micUnavailableMessage,
 		startSpeechError,
+		webSpeechErrorCopy,
 		speechErrorStep,
 		punjabiSpeechText,
 		effectiveSpeechLang,
@@ -884,16 +892,14 @@ import {
 			wpPos = 1;
 			return;
 		}
-		// Offsets in message order (a missing node ends the run);
+		// Offsets in message order (trimmed rows count as passed);
 		// the position math lives in chat (pure, tested).
-		const top = box.scrollTop;
-		const offsets: number[] = [];
-		for (const p of points) {
-			const el = box.querySelector<HTMLElement>(`#msg-${p}`);
-			if (!el) break;
-			offsets.push(el.offsetTop);
-		}
-		wpPos = waypointIndexAt(offsets, top);
+		const offsets = waypointOffsets(
+			points,
+			trimPointIndex(activeChat(chatState)),
+			(p) => box.querySelector<HTMLElement>(`#msg-${p}`)?.offsetTop ?? null
+		);
+		wpPos = waypointIndexAt(offsets, box.scrollTop);
 	}
 	/** Pinned menu dismisses on outside press: the trigger hides while
 	the panel is up, so there is nothing left to toggle it shut. */
@@ -3886,6 +3892,25 @@ import {
 		armActionsTimer(id);
 	}
 	/** Focus a sidebar chat button by list position (clamped). */
+	/**
+	 * The chat the list's keys act on: the focused row when focus sits
+	 * on one (Tab and clicks move focus without the cursor), else the
+	 * cursor. `sideIdx` indexes the visible (filtered) rows, never the
+	 * full list. Syncs the cursor to what it returns.
+	 */
+	function sideCursorChat(
+		target: EventTarget | null
+	): (typeof chatState.chats)[number] | null {
+		const visible = sideVisibleChats();
+		const row = closestFromTarget(target, "aside ul li button.side-chat");
+		const id = row instanceof HTMLElement ? row.dataset["chatId"] : undefined;
+		const byRow = id ? visible.findIndex((c) => c.id === id) : -1;
+		const at = byRow >= 0 ? byRow : clampChatIndex(sideIdx, visible.length);
+		if (at === null) return null;
+		sideIdx = at;
+		return visible[at] ?? null;
+	}
+
 	function focusSideChat(index: number): void {
 		const items = [
 			...document.querySelectorAll<HTMLElement>("aside ul li button.side-chat")
@@ -3958,7 +3983,7 @@ import {
 			return;
 		}
 		if (step.kind !== "goto") return;
-		sideIdx = step.index;
+		sideIdx = sideVisibleChats().findIndex((c) => c.id === step.id);
 		buzzBeat("send");
 		transitionToChat(step.id);
 		// Landing is the switch effect's job (filed position, else
@@ -3967,13 +3992,9 @@ import {
 	}
 
 	/** Enter the cursor chat from the keyboard, close the list, and land in its prompt. */
-	function enterSideChat(): void {
-		const chats = chatState.chats;
-		const at = clampChatIndex(sideIdx, chats.length);
-		if (at === null) return;
-		const item = chats[at];
+	function enterSideChat(target: EventTarget | null = null): void {
+		const item = sideCursorChat(target);
 		if (!item) return;
-		sideIdx = chats.indexOf(item);
 		transitionToChat(item.id);
 		settings.sidebarCollapsed = true;
 		persistSettings();
@@ -3986,14 +4007,12 @@ import {
 	 * empties). The list re-renders async, so clamp the cursor now and
 	 * focus the laid-out row on the next frame.
 	 */
-	function deleteSideChat(): void {
-		const chats = chatState.chats;
-		const at = clampChatIndex(sideIdx, chats.length);
-		if (at === null) return;
-		const item = chats[at];
+	function deleteSideChat(target: EventTarget | null = null): void {
+		const item = sideCursorChat(target);
 		if (!item) return;
+		const at = sideIdx;
 		dropChat(item.id);
-		sideIdx = clampChatIndex(at, chatState.chats.length) ?? -1;
+		sideIdx = clampChatIndex(at, sideVisibleChats().length) ?? -1;
 		requestAnimationFrame(() => focusSideChat(sideIdx));
 	}
 
@@ -5281,6 +5300,7 @@ import {
 	}
 
 	function annPopKey(event: KeyboardEvent): void {
+		if (isImeKey(event)) return;
 		if (event.key === "Enter" && !event.shiftKey) {
 			event.preventDefault();
 			saveAnnPop(true);
@@ -6369,7 +6389,10 @@ import {
 						onEnd: resetVoice,
 						onNaturalEnd,
 						onError: (webMessage) => {
-							if (!quiet) setVoiceError(webMessage);
+							if (!quiet)
+								setVoiceError(
+									webSpeechErrorCopy(webMessage, webVoices().length === 0)
+								);
 							resetVoice();
 						}
 					});
@@ -6377,7 +6400,11 @@ import {
 					return;
 				}
 				if (!quiet)
-					setVoiceError(useNative ? friendlyNativeError(message) : message);
+					setVoiceError(
+						useNative
+							? friendlyNativeError(message)
+							: webSpeechErrorCopy(message, webVoices().length === 0)
+					);
 				resetVoice();
 			}
 		};
@@ -6949,16 +6976,24 @@ import {
 
 	/**
 	 * Immediate settings save. Keys mirror to secret storage first, then
-	 * the shell persists blanks (the browser keeps working as before).
-	 * Every save path must use this: a bare saveSettings(settings) would
-	 * write live in-memory keys to disk next to the Keychain copy.
+	 * the settings copy persists blanks wherever that storage outlives a
+	 * reload (the shell, and the web's encrypted store). Every save path
+	 * must use this: a bare saveSettings(settings) would write live
+	 * in-memory keys to disk next to the stored copy.
 	 */
 	function saveSettingsNow(source?: AppSettings): void {
-		const snapshot = source ?? $state.snapshot(settings);
+		const live = source ?? $state.snapshot(settings);
+		// Offline parking is session state: disk keeps the parked-from
+		// provider, so a reload while offline can't strand the user on
+		// the on-device fallback (the mount re-parks if still offline).
+		const snapshot =
+			offlineParkedFrom !== null && live.activeProviderId === OFFLINE_FALLBACK_ID
+				? { ...live, activeProviderId: offlineParkedFrom }
+				: live;
 		void (async () => {
 			await persistSecrets(snapshot);
 			saveSettings(
-				tauriBackendAvailable() ? withBlankedKeys(snapshot) : snapshot
+				(await secretsSurviveReload()) ? withBlankedKeys(snapshot) : snapshot
 			);
 		})();
 	}
@@ -8269,7 +8304,10 @@ import {
 			// Phones stay unfocused: auto-focus pops
 			// the keyboard over the composer instead
 			// of pushing it up. Tap in when ready.
-			if (!androidUI && newsMode.news === null) editor?.focus();
+			// After the flush: closing news un-hides the composer, and
+			// a still-hidden field drops focus silently.
+			if (!androidUI && newsMode.news === null)
+				void tick().then(() => editor?.focus());
 		}
 	};
 
@@ -8355,6 +8393,9 @@ import {
 		buzzBeat("done", androidUI);
 		stopVoice();
 		if (id === chatState.activeChatId) {
+			// The open chat's news panel (and any story launch still
+			// fetching) goes with it, as on a chat switch.
+			newsMode.clear();
 			// Dropping the open chat discards its drafts (stored entry
 			// pruned via the empty save), then the neighbor that slides
 			// into its place restores its own filed drafts — and its
@@ -10318,6 +10359,10 @@ import {
 		};
 
 		const onKey = (event: KeyboardEvent) => {
+			// An IME owns its keys mid-composition: Enter picks the
+			// candidate and Esc drops the candidate list, never an app
+			// action or a closed layer.
+			if (isImeKey(event)) return;
 			// The reader owns the keyboard while open (same fence as
 			// the deck below): Space taps, arrows step, Esc closes.
 			if (reader) {
@@ -10330,7 +10375,13 @@ import {
 			}
 			// Flashcards own the keyboard while open; closed, the
 			// shell chord opens them.
-			if (flashcards.key({ ...keyFacts(event), repeat: event.repeat })) {
+			if (
+				flashcards.key({
+					...keyFacts(event),
+					repeat: event.repeat,
+					onButton: closestFromTarget(event.target, ".deck button") !== null
+				})
+			) {
 				consumeEvent(event);
 				return;
 			}
@@ -11113,11 +11164,12 @@ import {
 				// Walking switches to each chat (preview-as-you-go).
 				event.preventDefault();
 				const delta = sideAction === "walk-down" ? 1 : -1;
-				const chats = chatState.chats;
-				const from =
-					sideIdx >= 0
-						? sideIdx
-						: chats.findIndex((c) => c.id === chatState.activeChatId);
+				const chats = sideVisibleChats();
+				let from = chats.findIndex((c) => c.id === chatState.activeChatId);
+				if (sideIdx >= 0 || isChatRowTarget(event.target)) {
+					sideCursorChat(event.target);
+					from = sideIdx;
+				}
 				focusSideChat(from + delta);
 				const landed = chats[Math.min(Math.max(sideIdx, 0), chats.length - 1)];
 				if (landed) transitionToChat(landed.id);
@@ -11132,18 +11184,19 @@ import {
 				settings.sidebarCollapsed = true;
 				persistSettings();
 				if (
-					resolveSidebarSpaceEnter(sideIdx, chatState.chats.length).kind ===
-					"stay"
+					!isChatRowTarget(event.target) &&
+					resolveSidebarSpaceEnter(sideIdx, sideVisibleChats().length).kind ===
+						"stay"
 				) {
 					enterEditMode();
-				} else enterSideChat();
+				} else enterSideChat(event.target);
 				return;
 			}
 			if (sideAction === "delete-chat") {
 				// Delete drops the focused chat and lands on the one
 				// below (or a fresh blank when the list empties).
 				event.preventDefault();
-				deleteSideChat();
+				deleteSideChat(event.target);
 				return;
 			}
 			// Bare Space never changes modes: it belongs to typing and
@@ -13194,7 +13247,7 @@ import {
 				// parked prompt stays parked — summoning is one
 				// keypress away). Keyboard Enter (enterSideChat) still
 				// lands in the prompt; hands are already on keys there.
-				sideIdx = chatState.chats.findIndex((c) => c.id === id);
+				sideIdx = sideVisibleChats().findIndex((c) => c.id === id);
 				transitionToChat(id);
 				settings.sidebarCollapsed = true;
 				persistSettings();

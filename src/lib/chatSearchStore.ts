@@ -91,6 +91,9 @@ async function persistDocs(docs: SearchDoc[]): Promise<void> {
 interface PendingQuery {
 	resolve: (hits: SearchHit[]) => void;
 	timer: ReturnType<typeof setTimeout>;
+	/** Kept so a dying worker's queries can rerun inline. */
+	query: string;
+	limit: number;
 }
 
 export class ChatSearchStore {
@@ -143,7 +146,7 @@ export class ChatSearchStore {
 		this.worker = null;
 		for (const [, entry] of this.pending) {
 			clearTimeout(entry.timer);
-			entry.resolve(querySearch(this.docs, ""));
+			entry.resolve(querySearch(this.docs, entry.query, entry.limit));
 		}
 		this.pending.clear();
 	}
@@ -190,7 +193,7 @@ export class ChatSearchStore {
 				this.pending.delete(id);
 				resolve(querySearch(this.docs, query, limit));
 			}, 1500);
-			this.pending.set(id, { resolve, timer });
+			this.pending.set(id, { resolve, timer, query, limit });
 			try {
 				this.worker?.postMessage({ type: "query", id, query, limit });
 			} catch {

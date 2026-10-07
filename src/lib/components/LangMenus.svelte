@@ -178,6 +178,13 @@ owns the row markup and its surfaces. -->
 		color: var(--ink);
 		transition: border-color 0.15s ease;
 	}
+	/* The marker's emoji font must not size the pill: WebKit gives an
+	emoji-presentation sequence (🏛️) a taller line box than plain
+	emoji, which lifted Classics off the row. */
+	.lang-menu > button > span {
+		display: inline-block;
+		line-height: 1;
+	}
 	.lang-menu > button:hover {
 		border-color: #1c1c1e;
 		border-color: var(--strong);

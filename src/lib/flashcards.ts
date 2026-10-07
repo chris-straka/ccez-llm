@@ -460,14 +460,17 @@ export interface DeckKeyFacts {
 	altKey: boolean;
 	shiftKey: boolean;
 	repeat: boolean;
+	/** Focus sits on one of the deck's buttons (grades, Done, export). */
+	onButton?: boolean;
 }
 
 /**
  * Keys while the deck is open. Space/Enter flip, 1/2 grade, S reads the
  * quote aloud, Delete or Backspace drops the card, Esc or the toggle
- * chord closes. Other bare
- * keys are swallowed so j/k/a never reach the chat behind the veil;
- * other modified chords pass through ("pass").
+ * chord closes. Tab moves focus, and Space/Enter on a focused button
+ * press that button (the done screen's Export and Done have no key of
+ * their own). Other bare keys are swallowed so j/k/a never reach the
+ * chat behind the veil; other modified chords pass through ("pass").
  */
 export function deckKeyAction(
 	facts: DeckKeyFacts
@@ -475,8 +478,10 @@ export function deckKeyAction(
 	if (facts.key === "Escape") return "close";
 	if (isFlashcardsChord(facts)) return "close";
 	if (facts.metaKey || facts.ctrlKey || facts.altKey) return "pass";
+	if (facts.key === "Tab") return "pass";
 	if (facts.repeat) return "swallow";
-	if (facts.code === "Space" || facts.key === "Enter") return "flip";
+	if (facts.code === "Space" || facts.key === "Enter")
+		return facts.onButton ? "pass" : "flip";
 	if (facts.key === "1") return "again";
 	if (facts.key === "2") return "good";
 	if (facts.key === "Delete" || facts.key === "Backspace") return "dismiss";

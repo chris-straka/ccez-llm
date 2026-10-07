@@ -237,7 +237,7 @@ test("deleting the tag drops the pill", async ({ page }) => {
 	// macOS select-all — Control+A only jumps to the line start in
 	// the editor, so typing would prepend instead of replacing.
 	await page.locator(".ta-input").click();
-	await page.keyboard.press("Meta+a");
+	await page.keyboard.press("ControlOrMeta+a");
 	await page.keyboard.type("hello");
 	await expect(card).toHaveCount(0);
 	await expect(page.locator(".ta-input")).toHaveValue("hello");
@@ -807,8 +807,8 @@ test("tray re-docks above the prompt after cut and paste", async ({ page }) => {
 		});
 	await expect.poll(gap, { timeout: 5_000 }).toBeGreaterThan(0);
 	await page.locator(".prompt .ta-input").click();
-	await page.keyboard.press("Meta+a");
-	await page.keyboard.press("Meta+x");
+	await page.keyboard.press("ControlOrMeta+a");
+	await page.keyboard.press("ControlOrMeta+x");
 	await expect(tray).toHaveCount(0);
 	// The enriched clipboard write is async (blob fetch + HTML
 	// encode): wait for the picture before pasting it back.
@@ -831,7 +831,7 @@ test("tray re-docks above the prompt after cut and paste", async ({ page }) => {
 			{ timeout: 10_000 }
 		)
 		.toBe(1);
-	await page.keyboard.press("Meta+v");
+	await page.keyboard.press("ControlOrMeta+v");
 	await expect(tray).toBeVisible({ timeout: 15_000 });
 	await expect.poll(gap, { timeout: 5_000 }).toBeGreaterThan(0);
 	expect(await gap()).toBeLessThan(24);
@@ -950,8 +950,8 @@ test("cutting three tags pastes back three images, not one", async ({
 		timeout: 15_000
 	});
 	await page.locator(".prompt .ta-input").click();
-	await page.keyboard.press("Meta+a");
-	await page.keyboard.press("Meta+x");
+	await page.keyboard.press("ControlOrMeta+a");
+	await page.keyboard.press("ControlOrMeta+x");
 	await expect(page.locator(".attachments li.card")).toHaveCount(0);
 	// The enriched clipboard write is async (blob fetch + HTML
 	// encode): wait for all three pictures before pasting back.
@@ -974,7 +974,7 @@ test("cutting three tags pastes back three images, not one", async ({
 			{ timeout: 10_000 }
 		)
 		.toBe(3);
-	await page.keyboard.press("Meta+v");
+	await page.keyboard.press("ControlOrMeta+v");
 	await expect(page.locator(".attachments li.card")).toHaveCount(3, {
 		timeout: 15_000
 	});
@@ -1052,8 +1052,8 @@ test("cutting an image tag keeps its bytes for another chat", async ({
 	await expect(card).toBeVisible({ timeout: 15_000 });
 	// Cut the tag in the composer: the tray empties with it...
 	await page.locator(".prompt .ta-input").click();
-	await page.keyboard.press("Meta+a");
-	await page.keyboard.press("Meta+x");
+	await page.keyboard.press("ControlOrMeta+a");
+	await page.keyboard.press("ControlOrMeta+x");
 	await expect(card).toHaveCount(0);
 	// ...but the clipboard kept the picture: a new chat pastes it back
 	// as a live image, not a dead tag.
@@ -1063,7 +1063,7 @@ test("cutting an image tag keeps its bytes for another chat", async ({
 	});
 	await page.locator('button[aria-label="New chat"]').click();
 	await page.locator(".prompt .ta-input").click();
-	await page.keyboard.press("Meta+v");
+	await page.keyboard.press("ControlOrMeta+v");
 	const fresh = page.locator(".attachments li.card");
 	await expect(fresh).toBeVisible({ timeout: 15_000 });
 	await expect(fresh.locator(".thumb img")).toBeVisible();
@@ -1130,8 +1130,8 @@ test("cut pastes back previews when rich clipboard writes fail", async ({
 	// (the enriched copy writes async — poll for it like the
 	// three-tag roundtrip spec does, or the capture races empty).
 	await page.locator(".prompt .ta-input").click();
-	await page.keyboard.press("Meta+a");
-	await page.keyboard.press("Meta+c");
+	await page.keyboard.press("ControlOrMeta+a");
+	await page.keyboard.press("ControlOrMeta+c");
 	await expect
 		.poll(() => page.evaluate(() => navigator.clipboard.readText()), {
 			timeout: 10_000
@@ -1151,7 +1151,7 @@ test("cut pastes back previews when rich clipboard writes fail", async ({
 			configurable: true
 		});
 	});
-	await page.keyboard.press("Meta+x");
+	await page.keyboard.press("ControlOrMeta+x");
 	await expect(cards).toHaveCount(0);
 	// Plain-text clipboard, as the shell leaves it: restore the text
 	// write only, so the paste carries words without pictures.
@@ -1162,7 +1162,7 @@ test("cut pastes back previews when rich clipboard writes fail", async ({
 			text
 		);
 	}, cutText);
-	await page.keyboard.press("Meta+v");
+	await page.keyboard.press("ControlOrMeta+v");
 	await expect(cards).toHaveCount(2, { timeout: 15_000 });
 	await expect(cards.first().locator(".thumb img")).toBeVisible();
 	await expect(cards.nth(1).locator(".thumb img")).toBeVisible();

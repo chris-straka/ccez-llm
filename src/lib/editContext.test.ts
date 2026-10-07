@@ -2,6 +2,7 @@
 import { describe, it, expect } from "vitest";
 import {
 	editContextSupported,
+	isImeKey,
 	shouldDeferForComposition,
 	attachEditContext
 } from "./editContext";
@@ -28,5 +29,14 @@ describe("editContextSupported / attachEditContext", () => {
 	it("falls back to null where unsupported, never throws", () => {
 		const ta = document.createElement("textarea");
 		expect(attachEditContext(ta)).toBeNull();
+	});
+});
+
+describe("isImeKey", () => {
+	it("flags composing keys, including WebKit's keyCode 229 confirm", () => {
+		expect(isImeKey({ isComposing: true, keyCode: 13 })).toBe(true);
+		expect(isImeKey({ isComposing: false, keyCode: 229 })).toBe(true);
+		expect(isImeKey({ isComposing: false, keyCode: 13 })).toBe(false);
+		expect(isImeKey({})).toBe(false);
 	});
 });

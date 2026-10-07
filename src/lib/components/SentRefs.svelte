@@ -14,6 +14,7 @@ extracts (it renders paged for now). -->
 } from "$lib/annotation-block";
 	import { annotationCountLabel } from "$lib/annotations";
 	import ActionIcon from "./ActionIcon.svelte";
+	import { isImeKey } from "$lib/editContext";
 
 	/** Page-owned card behaviors (state and effects stay in the page). */
 	export interface SentRefsActions {
@@ -126,7 +127,7 @@ its body is just an em-dash (see REFS_ONLY_BODY). -->
 							bind:value={editDraft}
 							aria-label="Edit note {ref.n}. Enter saves, Escape cancels."
 							onkeydown={(e) => {
-								if (e.key === "Enter") {
+								if (e.key === "Enter" && !isImeKey(e)) {
 									e.preventDefault();
 									actions.saveEdit();
 								}

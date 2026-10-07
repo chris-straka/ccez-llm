@@ -454,6 +454,46 @@ test.describe("sidebar search", () => {
 		await page.getByLabel("Clear chat search").click();
 		await expect(page.locator("aside ul li")).toHaveCount(3);
 	});
+
+	const storedIds = (page: Page) =>
+		page.evaluate(() =>
+			(
+				JSON.parse(
+					window.localStorage.getItem("ccez-llm-chats-v1") ?? "[]"
+				) as Array<{ id: string }>
+			).map((c) => c.id)
+		);
+
+	test("Delete on a filtered row drops that chat, not the cursor's", async ({
+		page
+	}) => {
+		await seedThreeChats(page);
+		await toggleSidebar(page);
+		await page.getByLabel("Search chats").fill("sushi");
+		const rows = page.locator("aside ul li button.side-chat");
+		await expect(rows).toHaveCount(1);
+		// Tab-style focus: no click, so only focus says which row.
+		await rows.first().focus();
+		await page.keyboard.press("Delete");
+		await expect.poll(() => storedIds(page)).not.toContain("chat-sushi");
+		expect(await storedIds(page)).toEqual(
+			expect.arrayContaining(["chat-ramen", "chat-cjk"])
+		);
+	});
+
+	test("Enter on a focused row opens that chat", async ({ page }) => {
+		await seedThreeChats(page);
+		await toggleSidebar(page);
+		const rows = page.locator("aside ul li button.side-chat");
+		await expect(rows).toHaveCount(3);
+		const target = rows.filter({ hasText: "sushi" });
+		await target.focus();
+		await page.keyboard.press("Enter");
+		await expect(page.locator("article .rendered").first()).toContainText(
+			"sushi rice vinegar ratio"
+		);
+		expect(await storedIds(page)).toHaveLength(3);
+	});
 });
 
 test.describe("touch paths", () => {
@@ -496,6 +536,47 @@ test.describe("touch paths", () => {
 			);
 		});
 		await expect(sidebar).not.toHaveClass(/collapsed/);
+	});
+
+	test("the sidebar search clear is a 44px thumb target", async ({
+		page
+	}) => {
+		await seedThreeChats(page);
+		await toggleSidebar(page);
+		const box = page.getByLabel("Search chats");
+		await box.fill("sushi");
+		const clear = page.getByLabel("Clear chat search");
+		const btn = (await clear.boundingBox())!;
+		const field = (await box.boundingBox())!;
+		expect(btn.width).toBeGreaterThanOrEqual(44);
+		expect(btn.height).toBeGreaterThanOrEqual(44);
+		// Inside the field, and the typed text stops short of it.
+		expect(btn.x + btn.width).toBeLessThanOrEqual(field.x + field.width);
+		const padRight = await box.evaluate(
+			(el) => parseFloat(getComputedStyle(el).paddingRight)
+		);
+		expect(padRight).toBeGreaterThanOrEqual(btn.width);
+		// No engine cancel glyph (Chromium paints it blue) beside the
+		// app's own X: computed styles can't see the pseudo, pixels can.
+		const shot = (await box.screenshot()).toString("base64");
+		const blue = await page.evaluate(async (b64) => {
+			const img = new Image();
+			img.src = `data:image/png;base64,${b64}`;
+			await img.decode();
+			const c = document.createElement("canvas");
+			c.width = img.width;
+			c.height = img.height;
+			const g = c.getContext("2d")!;
+			g.drawImage(img, 0, 0);
+			const d = g.getImageData(0, 0, c.width, c.height).data;
+			let n = 0;
+			for (let i = 0; i < d.length; i += 4)
+				if (d[i + 2]! - d[i]! > 60 && d[i + 2]! > 120) n++;
+			return n;
+		}, shot);
+		expect(blue).toBe(0);
+		await clear.click();
+		await expect(page.locator("aside ul li")).toHaveCount(3);
 	});
 
 	test("paste-images button appears with clipboard.read and reports an empty clipboard", async ({

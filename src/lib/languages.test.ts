@@ -209,10 +209,21 @@ describe("reply pill data", () => {
 		expect(replyLanguageFor("cs")?.cleared).toBe("Vymazáno");
 		expect(replyLanguageFor("ja")?.native).toBe("日本語");
 	});
+	it("draws every marker and badge as a color emoji", () => {
+		// Text-default pictographs (🏛) render as a black glyph on
+		// Linux and Android without the emoji variation selector.
+		const textDefault =
+			/(?=\p{Extended_Pictographic})\P{Emoji_Presentation}(?!\uFE0F)/u;
+		const all = [
+			...LANGUAGE_MENUS.map((m) => m.marker),
+			...LANGUAGE_MENUS.flatMap((m) => m.languages.map((l) => l.badge))
+		];
+		for (const s of all) expect(s, s).not.toMatch(textDefault);
+	});
 	it("toasts the switch as endonym plus marker", () => {
 		expect(switchToastFor(replyLanguageFor("cs")!)).toBe("Čeština 🇨🇿");
 		expect(switchToastFor(replyLanguageFor("ja")!)).toBe("日本語 🇯🇵");
-		expect(switchToastFor(replyLanguageFor("la")!)).toBe("Latina 🏛");
+		expect(switchToastFor(replyLanguageFor("la")!)).toBe("Latina 🏛\uFE0F");
 		// Language names stay lowercase where the language does so.
 		expect(switchToastFor(replyLanguageFor("fr")!)).toBe("français 🇫🇷");
 	});

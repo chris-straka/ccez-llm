@@ -87,7 +87,7 @@ export const ASIAN_LANGUAGES: ReplyLanguage[] = [
 ];
 
 export const CLASSICAL_LANGUAGES: ReplyLanguage[] = [
-	LANG("la", "Latin", "it-IT", "🏛", "Latina", "Deletum", "Reply in Latin."),
+	LANG("la", "Latin", "it-IT", "🏛\uFE0F", "Latina", "Deletum", "Reply in Latin."),
 	LANG("grc", "Ancient Greek", "el-GR", "🏺", "Ἀρχαία Ἑλληνικά", "Διαγέγραπται", "Reply in Ancient Greek."),
 	LANG("sa", "Sanskrit", "hi-IN", "🪷", "संस्कृतम्", "विलुप्तम्", "Reply in Sanskrit."),
 	// Voices are modern approximations (Icelandic for Old Norse,
@@ -159,7 +159,7 @@ export const LANGUAGE_MENUS: LanguageMenu[] = [
 	{ id: "africa", marker: "🐘", label: "Africa", languages: AFRICAN_LANGUAGES },
 	{
 		id: "classics",
-		marker: "🏛",
+		marker: "🏛\uFE0F",
 		label: "Classics",
 		languages: CLASSICAL_LANGUAGES
 	}

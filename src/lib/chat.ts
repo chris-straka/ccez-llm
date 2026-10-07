@@ -793,6 +793,29 @@ export function waypointIndexAt(offsets: number[], scrollTop: number): number {
 }
 
 /**
+ * Laid-out tops for `waypointIndexAt`, in point order. Points inside a
+ * trim (rows not rendered) sit above everything, so they count as
+ * passed; any other missing node ends the run.
+ */
+export function waypointOffsets(
+	points: readonly number[],
+	trimIdx: number,
+	offsetOf: (index: number) => number | null
+): number[] {
+	const out: number[] = [];
+	for (const p of points) {
+		if (p < trimIdx) {
+			out.push(Number.NEGATIVE_INFINITY);
+			continue;
+		}
+		const offset = offsetOf(p);
+		if (offset === null) break;
+		out.push(offset);
+	}
+	return out;
+}
+
+/**
  * Menu label for a waypoint jump target: the message's first line,
  * whitespace-collapsed and capped (may be empty for blank messages —
  * callers fall back).

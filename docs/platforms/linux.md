@@ -1,7 +1,64 @@
 # Linux distribution: .deb, AUR, AppImage
 
-> Status: **UNTESTED on Linux hardware** — static analysis only.
-> The first `v*` tag CI run is the real test.
+> Status: built and run on Ubuntu 26.04 (x86_64, GNOME, Wayland
+> session) on 2026-10-06: `tauri build --bundles deb`, the release
+> binary under Xvfb, Rust tests, Vitest, and Playwright. See
+> [Running on Linux](#running-on-linux). Still unverified: the CI
+> AppImage, Arch/Fedora, and audible web speech in WebKitGTK.
+
+## Running on Linux
+
+How it was run on `f-ms-7917` (Ubuntu 26.04, no root):
+
+1. Build headers without sudo: `scripts/linux-devroot.sh` downloads
+   the -dev packages with `apt-get download` into `~/.local/devroot`
+   and writes `env.sh`. Then `source ~/.local/devroot/env.sh` in each
+   build shell. With root, install the Debian list under
+   [System dependencies](#system-dependencies) instead.
+2. Rust: `cd src-tauri && cargo test --locked --lib` (all pass).
+3. Desktop app: `bun run tauri build --bundles deb -c
+   '{"bundle":{"createUpdaterArtifacts":false}}'` (the override skips
+   updater signing, which needs the release key). About 18 min at
+   `-j2` on an i7-4790K. Output:
+   `src-tauri/target/release/bundle/deb/Ccez LLM_<ver>_amd64.deb` and
+   the bare binary `src-tauri/target/release/ccez-llm`, which links
+   only against stock system libraries.
+4. Headless run with a throwaway profile and keyring, so nothing
+   touches the real login keyring:
+   ```sh
+   Xvfb :99 -screen 0 1280x900x24 -nolisten tcp &
+   export DISPLAY=:99 WAYLAND_DISPLAY= XDG_DATA_HOME=/tmp/ccez/data \
+     XDG_CONFIG_HOME=/tmp/ccez/config XDG_CACHE_HOME=/tmp/ccez/cache
+   dbus-run-session -- bash -c 'echo -n pw | gnome-keyring-daemon \
+     --unlock --components=secrets; src-tauri/target/release/ccez-llm'
+   ```
+   Screenshots with `import -window root shot.png` (ImageMagick);
+   input through XTest (no xdotool on the box: a 30-line Python
+   ctypes driver over `libXtst.so.6` did clicks and keys).
+5. Web build: `bun run build:web`, and `bun run dev` for Playwright.
+   Playwright's Chromium runs as is; its WebKit needs
+   `libevent-2.1-7t64`, `libmanette-0.2-0`, and `libhidapi-hidraw0`, which the devroot
+   script also unpacks (`source env.sh` before WebKit runs).
+
+What the run showed:
+
+- The app boots, renders, and takes keys; Ctrl+, opens Settings
+  through the GTK menu accelerator.
+- API keys persist through the Secret Service (gnome-keyring) across
+  restarts, with no plaintext copy in WebKit's localStorage (Q3).
+- `WM_CLASS` is `ccez-llm` / `Ccez-llm`, so the desktop file's
+  `StartupWMClass=ccez-llm` matches (Q6a).
+- The native menu draws as a GTK bar inside the window. Mac-only
+  items (Hide, Hide Others, Show All, Quit) are dropped by GTK, which
+  leaves a stray separator in the app menu. Whether Linux keeps the
+  bar is an open owner decision.
+- `deb.depends` named `libayatana-appindicator3-0`, which no Ubuntu
+  or Debian release ships, so `apt install ./ccez.deb` refused the
+  package. The list is gone; Tauri derives the right dependencies
+  (`libwebkit2gtk-4.1-0`, `libgtk-3-0`, `libayatana-appindicator3-1`).
+- Playwright on Linux: 19 Chromium specs fail here that pass on the
+  Mac, on the untouched v0.15.1 commit too (environment, not the
+  change under test). See the commit log for what was fixed.
 
 Ccez LLM is a Tauri v2 app (currently tauri 2.11.5 / tauri-build 2.6.3 per
 `src-tauri/Cargo.lock`). Every Linux build needs the WebKitGTK 4.1 stack at
@@ -24,9 +81,10 @@ sudo apt install ./CcezLLM-linux-x64.deb
 ```
 
 `apt install ./file.deb` (not `dpkg -i`) resolves the runtime deps below
-automatically. The stock Tauri .deb already declares `libwebkit2gtk-4.1-0`
-and `libgtk-3-0` (plus `libappindicator3-1` when the tray is used); extra
-deps can be appended via `bundle.linux.deb.depends` (see patch).
+automatically. The stock Tauri .deb already declares `libwebkit2gtk-4.1-0`,
+`libgtk-3-0`, and `libayatana-appindicator3-1` (the tray); only append
+to `bundle.linux.deb.depends` with names checked by
+`apt-get install --dry-run ./file.deb`.
 
 Why 22.04 and not `ubuntu-latest`: the binary links against the build
 host's glibc, so building on the oldest supported base keeps it runnable on
@@ -137,6 +195,9 @@ sudo dnf group install "c-development"
 
 ## Required tauri.conf.json patch
 
+> Superseded: the `linux.deb.depends` part below broke installs and is
+> removed from `tauri.conf.json`; the rest is applied.
+
 **Owned by another agent — report only, do NOT apply.** Merge this
 `bundle` delta into `src-tauri/tauri.conf.json` (has
 `productName: "Ccez LLM"`, `identifier: "studio.ccez.app"`, version
@@ -237,7 +298,10 @@ unchanged, but extend `friendlyNativeError` with
 `if (/not available in this build/i.test(message)) return "System voices need the Mac app (this build only has web voices).";`
 Status: confirmed by read; needs runner only for visual check.
 
-Q2 — webkit2gtk 4.1 pin matches the distro spread. `.deb depends`
+Q2 — **Wrong, fixed 2026-10-06**: `libayatana-appindicator3-0` does not
+exist (the runtime package is `-3-1`), so the pinned list made the .deb
+uninstallable; the `deb.depends` block is removed (see Running on Linux).
+Original note: webkit2gtk 4.1 pin matches the distro spread. `.deb depends`
 (`src-tauri/tauri.conf.json:46-52`:
 `libwebkit2gtk-4.1-0`, `libgtk-3-0`, `libayatana-appindicator3-0`) is
 exactly the Tauri v2 Debian-guide set; `libayatana-appindicator3-0`

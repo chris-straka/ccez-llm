@@ -220,6 +220,8 @@ function idbPutKey(key: CryptoKey): Promise<void> {
 }
 
 let webKeyPromise: Promise<CryptoKey | null> | null = null;
+/** The web data key lives in IndexedDB (not session-only). */
+let webKeyDurable = false;
 
 /**
  * AES-GCM data key for the web fallback: the persisted non-extractable
@@ -233,7 +235,10 @@ function webDataKey(): Promise<CryptoKey | null> {
 			if (!subtle) return null;
 			try {
 				const stored = await idbGetKey();
-				if (stored) return stored;
+				if (stored) {
+					webKeyDurable = true;
+					return stored;
+				}
 			} catch {
 				// No IndexedDB (private mode, tests): ephemeral below.
 			}
@@ -245,6 +250,7 @@ function webDataKey(): Promise<CryptoKey | null> {
 				);
 				try {
 					await idbPutKey(fresh);
+					webKeyDurable = true;
 				} catch {
 					// Persistence failed: the key stays session-only.
 				}
@@ -316,15 +322,32 @@ async function fallbackSet(account: string, secret: string): Promise<void> {
 	}
 }
 
-export async function getSecret(account: string): Promise<string | null> {
-	if (tauriBackendAvailable()) {
-		try {
-			return await invoke<string | null>("keychain_get", { account });
-		} catch {
-			return null;
-		}
-	}
+/** Like getSecret, but a failed shell read (locked or denied Keychain,
+no Secret Service) throws instead of reading as "nothing stored". */
+async function readSecret(account: string): Promise<string | null> {
+	if (tauriBackendAvailable())
+		return await invoke<string | null>("keychain_get", { account });
 	return fallbackGet(account);
+}
+
+export async function getSecret(account: string): Promise<string | null> {
+	try {
+		return await readSecret(account);
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Whether keys put in secret storage this session read back after a
+ * reload: always in the shell; on the web unless the AES key could not
+ * be kept in IndexedDB (then the ciphertext dies with the session, and
+ * the settings copy is the only one that lasts).
+ */
+export async function secretsSurviveReload(): Promise<boolean> {
+	if (tauriBackendAvailable()) return true;
+	const key = await webDataKey();
+	return key === null || webKeyDurable;
 }
 
 export async function setSecret(
@@ -370,7 +393,7 @@ export async function deleteSecret(account: string): Promise<void> {
 export async function hydrateSecrets(settings: AppSettings): Promise<string[]> {
 	const hydrated: string[] = [];
 	try {
-		const raw = await getSecret(SECRET_BUNDLE_ACCOUNT);
+		const raw = await readSecret(SECRET_BUNDLE_ACCOUNT);
 		if (raw !== null) {
 			const bundle = decodeSecretBundle(raw);
 			lastKnownBundle = encodeSecretBundle(bundle);
@@ -387,7 +410,10 @@ export async function hydrateSecrets(settings: AppSettings): Promise<string[]> {
 			return hydrated;
 		}
 	} catch {
-		// Locked keychain: the user types the key instead.
+		// Locked or denied Keychain: the user types the key instead.
+		// What is stored stays unknown, so the cache stays unset and a
+		// later save re-reads before it writes (never "nothing stored").
+		return hydrated;
 	}
 	lastKnownBundle = encodeSecretBundle({});
 	return hydrated;
@@ -452,7 +478,7 @@ export async function persistSecrets(settings: AppSettings): Promise<void> {
 		if (encoded === lastKnownBundle) return;
 	} else {
 		try {
-			const stored = await getSecret(SECRET_BUNDLE_ACCOUNT);
+			const stored = await readSecret(SECRET_BUNDLE_ACCOUNT);
 			if (
 				stored !== null &&
 				encodeSecretBundle(decodeSecretBundle(stored)) === encoded
@@ -466,8 +492,10 @@ export async function persistSecrets(settings: AppSettings): Promise<void> {
 				return;
 			}
 		} catch {
-			// Locked keychain: the write below fails the same way, and
-			// the blanked settings save drops the key — session-only.
+			// Unreadable Keychain: writing now would replace a bundle we
+			// can't see (every other provider's key) with this one. The
+			// key stays session-only instead.
+			return;
 		}
 	}
 	try {

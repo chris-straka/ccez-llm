@@ -58,6 +58,7 @@ export default [
 						"eslint.config.js",
 						"playwright.config.ts",
 						"package-overrides.test.ts",
+						"vite-config.test.ts",
 						"e2e/*.ts",
 						"vendor/*.ts",
 						"scripts/*.ts"

@@ -71,21 +71,29 @@ test("android browser without the shell hides the Gemma pill", async ({
 	}
 });
 
-/** Dropping offline parks a cloud provider on Gemma; reconnecting restores it. */
-test("offline parks on Gemma and online restores", async ({
+/** Dropping offline parks a cloud provider on the on-device fallback for
+the session only: disk keeps the user's provider, so a reload while
+offline can't strand them there, and reconnecting restores it. */
+test("offline parks on-device for the session and online restores", async ({
 	page,
 	context
 }) => {
 	await seedChat(page, [{ role: "user", content: "hi" }]);
+	await page.addInitScript(() =>
+		window.localStorage.removeItem("ccez-mock-provider")
+	);
 	await page.goto("/");
 	await expect(page.locator(".ta-input").first()).toBeVisible({
 		timeout: 60_000
 	});
 	expect(await activeProviderId(page)).toBe("muse");
 	await context.setOffline(true);
-	await expect
-		.poll(() => activeProviderId(page), { timeout: 10_000 })
-		.toBe("local-mlkit");
+	// Parked: a send meets the on-device gate, not a network error.
+	await page.locator(".ta-input").first().click();
+	await page.keyboard.type("hello");
+	await page.keyboard.press("Enter");
+	await expect(page.getByText("On-device chat isn't available")).toBeVisible();
+	expect(await activeProviderId(page)).toBe("muse");
 	await context.setOffline(false);
 	await expect
 		.poll(() => activeProviderId(page), { timeout: 10_000 })

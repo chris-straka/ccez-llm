@@ -42,6 +42,15 @@ export function shouldDeferForComposition(input: {
 }
 
 /**
+ * Whether a keydown belongs to an IME (picking kanji, confirming a
+ * candidate): app keys must leave it alone. WebKit can deliver the
+ * confirming Enter with `isComposing` false but keyCode 229.
+ */
+export function isImeKey(event: { isComposing?: boolean; keyCode?: number }): boolean {
+	return event.isComposing === true || event.keyCode === 229;
+}
+
+/**
  * Attach an EditContext to a textarea where supported so CJK composition
  * updates arrive with exact ranges. Returns the context, or null when
  * unsupported — the caller keeps the current `isComposing` path.
