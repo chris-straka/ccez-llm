@@ -8,6 +8,7 @@ markup). Field writes ride the shared object like the notices proxy
 `Modal.svelte` with the other dialog chrome. -->
 <script lang="ts">
 	import ActionIcon from "./ActionIcon.svelte";
+	import { isImeKey } from "$lib/editContext";
 	import type { SearchHit } from "$lib/chatSearch";
 	import type { PaletteState } from "$lib/palette";
 	import Modal from "./Modal.svelte";
@@ -42,6 +43,7 @@ markup). Field writes ride the shared object like the notices proxy
 	}: Props = $props();
 
 	function inputKey(event: KeyboardEvent): void {
+		if (isImeKey(event)) return;
 		if (event.key === "ArrowDown") {
 			event.preventDefault();
 			actions.move(1);

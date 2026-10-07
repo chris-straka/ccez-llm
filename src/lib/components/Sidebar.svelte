@@ -12,6 +12,7 @@ only this drawer through scoping. -->
 <script lang="ts">
 	import type { Chat, ChatId } from "$lib/chat";
 	import ActionIcon from "./ActionIcon.svelte";
+	import { isImeKey } from "$lib/editContext";
 	import { chatTitle } from "$lib/sidebar";
 
 	/** Page-owned drawer behaviors (state and effects stay in the page). */
@@ -166,7 +167,7 @@ only this drawer through scoping. -->
 						autocomplete="off"
 						spellcheck={false}
 						onkeydown={(event) => {
-							if (event.key === "Enter") {
+							if (event.key === "Enter" && !isImeKey(event)) {
 								event.preventDefault();
 								actions.commitRename();
 							}

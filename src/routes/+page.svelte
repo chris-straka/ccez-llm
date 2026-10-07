@@ -94,6 +94,7 @@
 		listProviders,
 		type ProviderId
 	} from "$lib/providers/registry";
+	import { isImeKey } from "$lib/editContext";
 	import {
 		OFFLINE_FALLBACK_ID,
 		offlineTarget,
@@ -5299,6 +5300,7 @@ import {
 	}
 
 	function annPopKey(event: KeyboardEvent): void {
+		if (isImeKey(event)) return;
 		if (event.key === "Enter" && !event.shiftKey) {
 			event.preventDefault();
 			saveAnnPop(true);
@@ -10344,6 +10346,10 @@ import {
 		};
 
 		const onKey = (event: KeyboardEvent) => {
+			// An IME owns its keys mid-composition: Enter picks the
+			// candidate and Esc drops the candidate list, never an app
+			// action or a closed layer.
+			if (isImeKey(event)) return;
 			// The reader owns the keyboard while open (same fence as
 			// the deck below): Space taps, arrows step, Esc closes.
 			if (reader) {

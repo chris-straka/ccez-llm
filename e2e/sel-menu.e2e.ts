@@ -47,6 +47,36 @@ test.describe("desktop", () => {
 		await expect(page.locator(".ann-pop")).toBeVisible();
 	});
 
+	/** An IME's own Enter (picking kanji) and Esc (dropping the
+	candidate list) never save or close the pill. */
+	test("the pill leaves IME keys to the IME", async ({ page }) => {
+		await waitForToastToFade(page);
+		await selectWord(page);
+		await page.locator('.sel-menu button:has-text("Annotate")').click();
+		const pop = page.locator(".ann-pop");
+		await expect(pop).toBeVisible();
+		const field = pop.locator("textarea").first();
+		await field.focus();
+		await page.keyboard.type("nihongo");
+		for (const key of ["Enter", "Escape"])
+			await field.evaluate((el, k) => {
+				el.dispatchEvent(
+					new KeyboardEvent("keydown", {
+						key: k,
+						isComposing: true,
+						bubbles: true,
+						cancelable: true
+					})
+				);
+			}, key);
+		// A save or cancel starts the pill's exit fade at once.
+		await expect(pop).not.toHaveClass(/closing/);
+		await expect(pop).toBeVisible();
+		await expect(field).toHaveValue("nihongo");
+		await page.keyboard.press("Escape");
+		await expect(pop).toHaveCount(0);
+	});
+
 	/** Right-click Annotate files and sends at once (the "a" key
 	path): no create box, no menu flash — the badge files and the
 	answer request fires. */

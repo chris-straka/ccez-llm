@@ -6,6 +6,7 @@ sidebar search box): typing resets the cursor and lands here,
 Enter cycles or closes on a lone hit. -->
 <script lang="ts">
 	import ActionIcon from "./ActionIcon.svelte";
+	import { isImeKey } from "$lib/editContext";
 	export interface FindBarActions {
 		input: () => void;
 		enter: (shift: boolean) => void;
@@ -45,7 +46,7 @@ Enter cycles or closes on a lone hit. -->
 		bind:value={query}
 		oninput={() => actions.input()}
 		onkeydown={(e) => {
-			if (e.key === "Enter") {
+			if (e.key === "Enter" && !isImeKey(e)) {
 				e.preventDefault();
 				// One hit is "done": close (the cursor dies
 				// with the bar). Several keep cycling; none
