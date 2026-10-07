@@ -139,6 +139,7 @@
 	} from "$lib/scrollkeys";
 	import {
 		hydrateSecrets,
+		secretsSurviveReload,
 		migrateLegacySecret,
 		persistSecrets,
 		tauriBackendAvailable,
@@ -6949,16 +6950,17 @@ import {
 
 	/**
 	 * Immediate settings save. Keys mirror to secret storage first, then
-	 * the shell persists blanks (the browser keeps working as before).
-	 * Every save path must use this: a bare saveSettings(settings) would
-	 * write live in-memory keys to disk next to the Keychain copy.
+	 * the settings copy persists blanks wherever that storage outlives a
+	 * reload (the shell, and the web's encrypted store). Every save path
+	 * must use this: a bare saveSettings(settings) would write live
+	 * in-memory keys to disk next to the stored copy.
 	 */
 	function saveSettingsNow(source?: AppSettings): void {
 		const snapshot = source ?? $state.snapshot(settings);
 		void (async () => {
 			await persistSecrets(snapshot);
 			saveSettings(
-				tauriBackendAvailable() ? withBlankedKeys(snapshot) : snapshot
+				(await secretsSurviveReload()) ? withBlankedKeys(snapshot) : snapshot
 			);
 		})();
 	}

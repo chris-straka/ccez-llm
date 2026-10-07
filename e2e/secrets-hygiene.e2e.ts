@@ -2,10 +2,11 @@ import { expect, test } from "./fixtures";
 import { seedChat } from "./helpers";
 
 /**
- * Secrets hygiene: a typed provider key must never leak outside the
- * settings entry (browser builds persist it there by design — see
- * `saveSettingsNow`), and the Keychain-fallback mirror must hold
- * ciphertext (`gcm1:` envelope), never the raw key.
+ * Secrets hygiene: a typed provider key must never sit in localStorage
+ * as plaintext. The Keychain-fallback mirror holds ciphertext (`gcm1:`
+ * envelope) and the settings entry a blank, since the mirror's AES key
+ * persists in IndexedDB (see `saveSettingsNow`); a reload still finds
+ * the key.
  */
 
 const RAW = "sk-e2e-hygiene-PROBE-9f8c";
@@ -57,9 +58,35 @@ test("typed key never appears outside settings storage", async ({ page }) => {
 			}
 			return hits;
 		},
-		{ raw: RAW, allow: [SETTINGS_KEY] }
+		{ raw: RAW, allow: [] as string[] }
 	);
 	expect(leaks).toEqual([]);
+	// The settings save lands after the mirror: give it a beat.
+	await expect
+		.poll(async () =>
+			page.evaluate((k) => window.localStorage.getItem(k) ?? "", SETTINGS_KEY)
+		)
+		.not.toContain(RAW);
+});
+
+test("a typed key survives a reload without a plaintext copy", async ({
+	page
+}) => {
+	await typeKey(page);
+	await expect
+		.poll(async () =>
+			page.evaluate((k) => window.localStorage.getItem(k) ?? "", SETTINGS_KEY)
+		)
+		.not.toContain(RAW);
+	await page.reload();
+	await expect(page.locator(".ta-input").first()).toBeVisible({
+		timeout: 60_000
+	});
+	await page.keyboard.press("Meta+,");
+	const panel = page.locator(".settings-panel");
+	await expect(panel).not.toHaveClass(/closed/);
+	// A stored key shows as a masked "Replace" row, never a blank field.
+	await expect(panel.getByRole("button", { name: "Replace" })).toBeVisible();
 });
 
 test("keychain-fallback mirror holds ciphertext, not the raw key", async ({
