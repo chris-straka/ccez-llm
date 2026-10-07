@@ -701,6 +701,16 @@ fn ensure_single_instance(app: &AppHandle) {
             });
         }
         Err(_) => {
+            // Windows only lets the process the user just launched take
+            // the foreground; hand that right to the running instance
+            // so its focus_main actually raises the window.
+            #[cfg(target_os = "windows")]
+            unsafe {
+                use windows::Win32::UI::WindowsAndMessaging::{
+                    AllowSetForegroundWindow, ASFW_ANY,
+                };
+                let _ = AllowSetForegroundWindow(ASFW_ANY);
+            }
             if let Ok(mut stream) =
                 std::net::TcpStream::connect(("127.0.0.1", SINGLETON_PORT))
             {
