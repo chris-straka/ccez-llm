@@ -668,7 +668,7 @@ only this drawer through scoping. -->
 	/* Shell traffic-light clearance: the empty head indents like the
 	header so the chat list starts at the same x. Android drops the
 	clearance and the empty drag strip (no lights, no drag). */
-	:global(.app[data-shell="tauri"]) .side-head {
+	:global(.app[data-titlebar="overlay"]) .side-head {
 		margin-left: 5.75rem;
 		margin-top: 0.35rem;
 	}

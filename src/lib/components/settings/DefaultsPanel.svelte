@@ -27,6 +27,9 @@
 	} from "$lib/chrome";
 	import { thinkingFor, resolveThinkingId } from "$lib/providers/thinking";
 	import type { VoiceLangFollow } from "$lib/voiceTiers";
+	import { currentPlatform, micButtonsShown } from "$lib/platform";
+	import { tauriBackendAvailable } from "$lib/secrets";
+	import { micAvailable } from "$lib/voice";
 	import VoicePanel from "./VoicePanel.svelte";
 	import "./panels.css";
 
@@ -46,6 +49,19 @@
 		followVoice = null,
 		gameLineToggle
 	}: Props = $props();
+
+	// Desktop rows only where the feature exists: window capture (and
+	// the game line it feeds) is macOS-only, and Windows/Linux shells
+	// have no dictation backend unless the webview brings one.
+	const desktopOs = currentPlatform();
+	const captureRows = desktopOs.isMac;
+	const micRow = micButtonsShown(
+		micAvailable(),
+		tauriBackendAvailable(),
+		desktopOs.isMac,
+		false,
+		false
+	);
 	/**
 	 * Slider reset gestures (text size, prompt size, chat width,
 	 * prompt width, idle timeout): only
@@ -201,22 +217,26 @@
 			<input type="checkbox" bind:checked={settings.replyNotifications} />
 			<span>Enable notifications</span>
 		</label>
-		<label class="check">
-			<input type="checkbox" bind:checked={settings.micEnabled} />
-			<span>Enable microphone dictation</span>
-		</label>
-		<label class="check">
-			<input type="checkbox" bind:checked={settings.captureEnabled} />
-			<span>Enable screen-capture OCR (global shortcut + composer button)</span>
-		</label>
-		<label class="check">
-			<input
-				type="checkbox"
-				bind:checked={settings.gameLine}
-				onchange={() => gameLineToggle()}
-			/>
-			<span>Game line overlay (last capture with furigana + translation)</span>
-		</label>
+		{#if micRow}
+			<label class="check">
+				<input type="checkbox" bind:checked={settings.micEnabled} />
+				<span>Enable microphone dictation</span>
+			</label>
+		{/if}
+		{#if captureRows}
+			<label class="check">
+				<input type="checkbox" bind:checked={settings.captureEnabled} />
+				<span>Enable screen-capture OCR (global shortcut + composer button)</span>
+			</label>
+			<label class="check">
+				<input
+					type="checkbox"
+					bind:checked={settings.gameLine}
+					onchange={() => gameLineToggle()}
+				/>
+				<span>Game line overlay (last capture with furigana + translation)</span>
+			</label>
+		{/if}
 	{/if}
 	<VoicePanel bind:settings {androidUI} {followVoice} />
 	<label class="slider-row">

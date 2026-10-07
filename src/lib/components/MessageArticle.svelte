@@ -680,7 +680,7 @@ import type {
 	}
 	/* The shell's strip is taller by that same padding: the first
 	message stands off the full height there. */
-	:global(.app[data-shell="tauri"]) article:first-of-type {
+	:global(.app[data-titlebar="overlay"]) article:first-of-type {
 		margin-top: calc(1.75rem + 1.15rem);
 	}
 </style>

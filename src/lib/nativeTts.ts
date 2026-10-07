@@ -123,7 +123,7 @@ export function friendlyNativeError(message: string): string {
 		return "System voices timed out — try again.";
 	}
 	if (/requires macos/i.test(message)) {
-		return "System voices need the Mac app (this preview only has web voices).";
+		return "System voices need the desktop app (this preview only has web voices).";
 	}
 	return message;
 }
