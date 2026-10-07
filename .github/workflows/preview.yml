@@ -116,7 +116,16 @@ jobs:
           # The share extension must ship inside the app.
           ls "$APP/PlugIns"
           test -d "$APP/PlugIns/CcezLLMShare.appex"
+      # idb taps the Simulator by accessibility label. Optional: without
+      # it the flows still screenshot, they just can't tap.
+      - name: Install idb
+        continue-on-error: true
+        run: |
+          brew tap facebook/fb
+          brew install idb-companion
+          pipx install fb-idb || pip3 install --break-system-packages fb-idb
       - name: Boot a Simulator and screenshot each flow
+        timeout-minutes: 30
         run: scripts/ios-sim-flows.sh "$APP" "$RUNNER_TEMP/ios-shots"
       - uses: actions/upload-artifact@v6
         if: always()
