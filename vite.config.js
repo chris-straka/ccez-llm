@@ -31,6 +31,13 @@ export default defineConfig(() => ({
 	// A previous `define`-globals revision never reached the Svelte
 	// bundle — release builds printed the "build release" fallback on
 	// every platform — so the stamps ride import.meta.env (above) now.
+	build: {
+		// Fonts ship as files, never data: URLs: the web build's CSP is
+		// `font-src 'self'` (static/_headers), which blocked KaTeX's
+		// small Size3 face once Vite inlined it under the 4KB limit.
+		assetsInlineLimit: (file) =>
+			/\.(woff2?|ttf|otf)$/.test(file) ? false : undefined
+	},
 	optimizeDeps: {
 		// lindera-wasm resolves its .wasm sibling via `new URL(..., import.meta.url)`;
 		// pre-bundling would relocate the glue and break that link (per its docs).
