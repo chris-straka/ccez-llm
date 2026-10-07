@@ -71,6 +71,7 @@ The app keeps its own design; these are the Windows-specific parts.
   language. AltGr (Ctrl+Alt on Windows) no longer fires the Ctrl+Alt
   chords, so Polish and similar layouts can type ś, ń. Window capture
   (Ctrl+Shift+O/U) is macOS-only and no longer registered globally.
+  **Ctrl+W is deliberately unbound** (no hide-to-tray, no delete chat).
 - **Deep links**: `ccez-llm://new`, `ccez-llm://chat/<id>`,
   `ccez-llm://send?text=…` (prefill a prompt) and
   `ccez-llm://annotate|speak|inspect?text=…`. A second launch hands the
@@ -85,6 +86,9 @@ The app keeps its own design; these are the Windows-specific parts.
 - **Tray**: Show / Quit, tooltip "Ccez LLM (Ctrl+Shift+Space to summon)".
 - **Keys**: API keys live in Windows Credential Manager (`keyring`
   windows-native).
+- **Owner-approved (Oct 2026)**: this shortcut set, Ctrl+W unbound,
+  Ctrl+Alt+Space as the send-text chord, and no in-window menu bar.
+  Ask before changing any of them.
 - **Hidden where they do nothing**: screen-capture OCR, the game line
   overlay, and the dictation toggle when WebView2 offers no recognizer.
 
