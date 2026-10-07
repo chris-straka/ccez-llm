@@ -6,7 +6,8 @@ Root keeps what every session needs: `README.md` (what the app is),
 ## Current
 
 - `platforms/` — install, signing, and deploy notes: `mac.md`,
-  `windows.md`, `linux.md`, `web-deploy.md`.
+  `windows.md`, `linux.md`, `ios.md` (Simulator CI + Android parity),
+  `web-deploy.md`.
 - `design/colors.md` — palette rules (pinned by
   `src/routes/color-tokens.test.ts`).
 - `design/plugins.md` — Tauri plugin inventory and skipped candidates.
