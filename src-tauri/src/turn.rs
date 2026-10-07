@@ -789,6 +789,14 @@ async fn run_attempt(
         .take(MAX_CALLS_PER_ROUND)
         .collect::<Vec<_>>();
     if pending.is_empty() {
+        // Only unusable calls (unknown tool, no URL, cut-off arguments)
+        // and no text: ask once more without tools rather than file a
+        // blank reply. Same rule as the TypeScript engine.
+        if first_content.trim().is_empty() && !first_frags.is_empty() {
+            let (content, _, usage) =
+                post_stream_plain_fallback(client, req, &history, deadline, ev).await?;
+            return Ok((content, usage.or(first_usage)));
+        }
         return Ok((first_content, first_usage));
     }
     // Tool round: the streamed prefix was provisional chatter, not the
@@ -1888,6 +1896,55 @@ mod tests {
         assert_eq!(bodies.len(), 3);
         assert!(bodies[1].contains("call_1"));
         assert!(bodies[1].contains("page text here"));
+    }
+
+    #[test]
+    fn drive_reasks_without_tools_when_every_call_is_unusable() {
+        let bodies = Arc::new(Mutex::new(Vec::new()));
+        let port = run_stub(
+            vec![
+                StubStep::Respond {
+                    status: 200,
+                    content_type: "text/event-stream",
+                    body: sse_tool_body(""),
+                },
+                StubStep::Respond {
+                    status: 200,
+                    content_type: "text/event-stream",
+                    body: sse_text_body("plain answer"),
+                },
+            ],
+            Arc::clone(&bodies),
+        );
+        let page_fetch: PageFetch = Arc::new(|_url: String| {
+            Box::pin(async move { Ok::<String, String>(String::new()) })
+                as Pin<Box<dyn Future<Output = Result<String, String>> + Send>>
+        });
+        let rec = Recorder {
+            tokens: Arc::new(Mutex::new(Vec::new())),
+            fetches: Arc::new(Mutex::new(Vec::new())),
+            retries: Arc::new(Mutex::new(0)),
+            retracts: Arc::new(Mutex::new(0)),
+        };
+        let client = reqwest_client().unwrap();
+        let req = test_request(port);
+        let outcome = tauri::async_runtime::block_on(drive_attempts(
+            &client,
+            &req,
+            "",
+            &page_fetch,
+            &[0],
+            &mut || test_events(&rec),
+        ));
+        match outcome {
+            TurnOutcome::Done(content, _) => assert_eq!(content, "plain answer"),
+            other => panic!("expected done, got {other:?}"),
+        }
+        assert!(rec.fetches.lock().unwrap().is_empty());
+        let bodies = bodies.lock().unwrap();
+        assert_eq!(bodies.len(), 2);
+        assert!(bodies[0].contains("\"tools\""));
+        assert!(!bodies[1].contains("\"tools\""));
     }
 
     #[test]

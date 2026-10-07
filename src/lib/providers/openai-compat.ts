@@ -225,7 +225,8 @@ export class OpenAICompatProvider implements ChatProvider {
 		try {
 			return await run(call.url, signal);
 		} catch (error) {
-			if (error instanceof Error && error.name === "AbortError") throw error;
+			if (error instanceof Error && error.name === "AbortError")
+				throw new ProviderError("Reply stopped.");
 			return error instanceof Error ? error.message : "Page fetch failed.";
 		}
 	}
@@ -402,8 +403,16 @@ export class OpenAICompatProvider implements ChatProvider {
 			return this.streamOnce(history, callbacks, opts, false);
 		}
 		let pending = this.executableCalls(first.calls);
-		if (pending.length === 0)
+		if (pending.length === 0) {
+			// Only unusable calls (unknown tool, bare domain, cut-off
+			// arguments) and no text: ask once more without tools rather
+			// than file a blank reply. Same rule as `turn.rs`.
+			if (first.content.trim() === "" && first.calls.length > 0) {
+				const plain = await this.streamOnce(history, callbacks, opts, false);
+				return { content: plain.content, usage: plain.usage ?? first.usage };
+			}
 			return { content: first.content, usage: first.usage };
+		}
 		// Tool round: the streamed prefix was provisional chatter, not
 		// the answer — retract it (thinking dots again) before the
 		// fetch runs, so the reply never shows text the final round

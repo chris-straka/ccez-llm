@@ -343,6 +343,47 @@ describe("stream", () => {
 		});
 	});
 
+	it("re-asks without tools when every call is unusable, never a blank reply", async () => {
+		const bodies: Array<{ tools?: unknown }> = [];
+		const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+			bodies.push(JSON.parse(init.body as string) as { tools?: unknown });
+			if (bodies.length === 1)
+				return sseResponse([sseToolCall("call_1", "example.com"), "data: [DONE]\n\n"]);
+			return sseResponse([
+				`data: {"choices":[{"delta":{"content":"plain answer"}}]}\n\ndata: [DONE]\n\n`
+			]);
+		});
+		vi.stubGlobal("fetch", fetchMock);
+		const fetchPage = vi.fn(async () => "never");
+		const provider = new OpenAICompatProvider("probe", CONFIG, { fetchPage });
+		const result = await provider.stream([{ role: "user", content: "x" }], {
+			onToken: () => {}
+		});
+		expect(result.content).toBe("plain answer");
+		expect(fetchPage).not.toHaveBeenCalled();
+		expect(bodies).toHaveLength(2);
+		expect(bodies[0]?.tools).toBeDefined();
+		expect(bodies[1]?.tools).toBeUndefined();
+	});
+
+	it("a stop during a page fetch reads as stopped, not a raw abort", async () => {
+		const controller = new AbortController();
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => sseResponse([sseToolCall("call_1", "https://example.com/")]))
+		);
+		const fetchPage = vi.fn(async () => {
+			controller.abort();
+			throw new DOMException("signal is aborted without reason", "AbortError");
+		});
+		const provider = new OpenAICompatProvider("probe", CONFIG, { fetchPage });
+		const err = await provider
+			.stream([{ role: "user", content: "x" }], { onToken: () => {} }, { signal: controller.signal })
+			.catch((e: unknown) => e);
+		expect(err).toBeInstanceOf(ProviderError);
+		expect((err as ProviderError).message).toBe("Reply stopped.");
+	});
+
 	it("lands the follow-up answer instead of re-asking when it carries no calls", async () => {
 		const fetchMock = vi.fn(async () => {
 			if (fetchMock.mock.calls.length === 1)
@@ -626,7 +667,8 @@ describe("stream", () => {
 		});
 		expect(result.content).toBe("");
 		expect(fetchPage).not.toHaveBeenCalled();
-		expect(fetchMock).toHaveBeenCalledOnce();
+		// One tools-off re-ask for a text answer, then done: no loop.
+		expect(fetchMock).toHaveBeenCalledTimes(2);
 	});
 
 	it("a stop before the fetch aborts the turn", async () => {
