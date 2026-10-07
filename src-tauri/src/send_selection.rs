@@ -11,6 +11,7 @@
 //! instead (`desktop::pick_sent_text`). UNVERIFIED headless: exercised
 //! by hand in the Windows test VM (docs/platforms/windows.md).
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use tauri::AppHandle;
@@ -27,12 +28,17 @@ pub const SEND_SELECTION_SHORTCUT: &str = "Control+Alt+Space";
 const VK_C: VIRTUAL_KEY = VIRTUAL_KEY(0x43);
 const VK_MENU_MASK: VIRTUAL_KEY = VIRTUAL_KEY(0xE8);
 
+/// One send at a time: holding the chord auto-repeats the hotkey, and
+/// each repeat used to start its own copy, racing the others' Ctrl+C and
+/// clipboard restore (seven copies of the text landed in the VM test).
+static SENDING: AtomicBool = AtomicBool::new(false);
+
 pub fn install(app: &AppHandle) {
     use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
     let result = app.global_shortcut().on_shortcut(
         SEND_SELECTION_SHORTCUT,
         |app, _shortcut, event| {
-            if event.state != ShortcutState::Pressed {
+            if event.state != ShortcutState::Pressed || SENDING.swap(true, Ordering::SeqCst) {
                 return;
             }
             // Now, while Alt is still held: the hotkey swallows the
@@ -42,7 +48,10 @@ pub fn install(app: &AppHandle) {
             mask_alt_release();
             // Off the event loop: the copy waits on other apps.
             let app = app.clone();
-            std::thread::spawn(move || send(&app));
+            std::thread::spawn(move || {
+                send(&app);
+                SENDING.store(false, Ordering::SeqCst);
+            });
         },
     );
     if let Err(error) = result {
