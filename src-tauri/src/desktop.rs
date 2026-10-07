@@ -790,7 +790,7 @@ fn install_summon_hotkey(app: &AppHandle) {
     if let Err(error) = app.global_shortcut().on_shortcut(
         "CommandOrControl+Shift+Space",
         move |_app, _shortcut, event| {
-            if event.state != ShortcutState::Pressed {
+            if event.state != ShortcutState::Pressed || is_key_repeat() {
                 return;
             }
             let Some(window) = handle.get_webview_window("main") else {
@@ -812,6 +812,20 @@ fn install_summon_hotkey(app: &AppHandle) {
     ) {
         eprintln!("[desktop] global summon shortcut unavailable: {error}");
     }
+}
+
+/// Held hotkeys auto-repeat (Windows re-sends WM_HOTKEY), which made
+/// the summon toggle flicker show/hide. A press counts only after 400ms
+/// without one; every repeat restarts that quiet window.
+#[cfg(desktop)]
+fn is_key_repeat() -> bool {
+    use std::time::{Duration, Instant};
+    static LAST: Mutex<Option<Instant>> = Mutex::new(None);
+    let mut last = LAST.lock().unwrap_or_else(|e| e.into_inner());
+    let now = Instant::now();
+    let repeat = last.is_some_and(|t| now.duration_since(t) < Duration::from_millis(400));
+    *last = Some(now);
+    repeat
 }
 
 /// Capture-any-window OCR chord: fires while another app (game, browser,
