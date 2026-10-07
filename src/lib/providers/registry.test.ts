@@ -9,6 +9,8 @@ import {
 	providerKeyMissing,
 	createProvider,
 	BUILTIN_PROVIDER_IDS,
+	isFreeModel,
+	pickedModels,
 	type ProviderId
 } from "./registry";
 
@@ -27,6 +29,7 @@ describe("registry", () => {
 		expect(listProviders(custom).map((p) => p.id)).toEqual([
 			"muse",
 			"deepseek",
+			"opencode-zen",
 			"local-mlkit",
 			"custom-kimi"
 		]);
@@ -54,6 +57,18 @@ describe("registry", () => {
 				custom
 			)
 		).toBeTruthy();
+	});
+
+	it("narrows OpenCode Zen's model list and marks its free models", () => {
+		expect(pickedModels("opencode-zen", ["gpt-6-sol", "glm-5.3", "exo-free"])).toEqual([
+			"exo-free",
+			"glm-5.3"
+		]);
+		// Other providers keep the list as fetched.
+		expect(pickedModels("deepseek", ["b", "a"])).toEqual(["b", "a"]);
+		expect(isFreeModel("opencode-zen", "big-pickle")).toBe(true);
+		expect(isFreeModel("opencode-zen", "glm-5.3")).toBe(false);
+		expect(isFreeModel("deepseek", "big-pickle")).toBe(false);
 	});
 
 	it("pins the built-in set: registry ids match BUILTIN_PROVIDER_IDS", () => {

@@ -14,6 +14,8 @@
 		getProviderDef,
 		listProviders,
 		createProvider,
+		isFreeModel,
+		pickedModels,
 		type ProviderId
 	} from "$lib/providers/registry";
 	import {
@@ -55,7 +57,8 @@
 	let modelNotice = $state(emptyNotices());
 	async function refreshModels() {
 		clearNotice(modelNotice, "banner");
-		if (!active.baseUrl.trim() || !active.apiKey.trim()) {
+		if (browserOnlyBlocked) return;
+		if (!active.baseUrl.trim() || (!active.apiKey.trim() && !activeDef.publicModels)) {
 			flashNotice(
 				modelNotice,
 				"banner",
@@ -66,11 +69,14 @@
 		}
 		modelLoading = true;
 		try {
-			active.models = await createProvider(
+			active.models = pickedModels(
 				settings.activeProviderId,
-				active,
-				settings.customProviders
-			).listModels();
+				await createProvider(
+					settings.activeProviderId,
+					active,
+					settings.customProviders
+				).listModels()
+			);
 		} catch (error) {
 			flashNotice(
 				modelNotice,
@@ -83,7 +89,10 @@
 		}
 	}
 	function maybeFetchModels() {
-		if (active.apiKey.trim() && active.models.length === 0)
+		if (
+			(active.apiKey.trim() || activeDef.publicModels) &&
+			active.models.length === 0
+		)
 			void refreshModels();
 	}
 	let editingKey: Record<string, boolean> = $state({});
@@ -151,6 +160,17 @@
 		settings.customProviders.some((p) => p.id === settings.activeProviderId)
 	);
 	const active = $derived(activeProviderSettings(settings));
+	/** A gateway without CORS headers is unreachable from any webview
+	 * `fetch`: only the Android shell sends turns from Rust today, so
+	 * everywhere else says so instead of failing every send. */
+	const sendsBlocked = $derived(
+		activeDef.browserBlocked === true && !(inShell && androidBridge)
+	);
+	/** The model list needs the shell's Rust read (desktop or Android). */
+	const browserOnlyBlocked = $derived(!inShell && activeDef.browserBlocked === true);
+	const activeModelFree = $derived(
+		isFreeModel(settings.activeProviderId, active.model)
+	);
 	const showKeyField = $derived(
 		!active.apiKey.trim() || editingKey[settings.activeProviderId]
 	);
@@ -431,15 +451,25 @@
 				<button
 					type="button"
 					title="Fetch the model list from this base URL"
-					disabled={modelLoading}
+					disabled={modelLoading || browserOnlyBlocked}
 					onclick={() => void refreshModels()}
 				>
 					{modelLoading ? "…" : "Refresh"}
 				</button>
 			</span>
 			<datalist id="model-list">
-				{#each active.models as id (id)}<option value={id}></option>{/each}
+				{#each active.models as id (id)}<option
+						value={id}
+						label={isFreeModel(settings.activeProviderId, id)
+							? "Free"
+							: undefined}
+					></option>{/each}
 			</datalist>
+			{#if activeModelFree}<span class="hint model-note">Free model</span>{/if}
+			{#if sendsBlocked}<span class="hint model-note" role="status"
+					>{activeDef.label} works in the Android app for now: its API
+					refuses requests from browsers and the desktop app.</span
+				>{/if}
 			{#if modelNotice.banner.message}<span class="hint" role="alert"
 					>{modelNotice.banner.message}</span
 				>{/if}

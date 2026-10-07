@@ -33,7 +33,9 @@ chats stay local.
   (Japanese, Chinese, Russian, Arabic, Hindi, …) instead of assuming
   the reply language.
 - **Study sheets.** Export or print the visible chat as a study sheet.
-- **Providers.** Muse Spark and DeepSeek out of the box, custom
+- **Providers.** Muse Spark, DeepSeek, and OpenCode Zen (its
+  /chat/completions models, free ones marked; Android app only for now,
+  since Zen's API refuses browsers and webviews) out of the box, custom
   OpenAI-compatible endpoints, per-key models, thinking-level control.
 
 ## Engineering

@@ -45,9 +45,23 @@ const MOCK_ARTICLE_HTML =
 	`<p>Bakers blame the sparrows, who blame the tourists, who keep buying croissants.</p>` +
 	`</article></body></html>`;
 
+/** OpenCode Zen `/models` ids (a slice of the 2026-10-07 list): chat
+models free and paid, plus /responses, /messages, and Gemini models
+the picker must leave out. */
+export const MOCK_ZEN_MODEL_IDS = [
+	"gpt-6-sol",
+	"claude-opus-5-5",
+	"gemini-3.8-flash",
+	"qwen3.8-flash",
+	"glm-5.3",
+	"deepseek-v4-pro",
+	"big-pickle",
+	"nemotron-3-ultra-free"
+];
+
 export async function seedMockShell(page: Page): Promise<void> {
 	await page.addInitScript(
-		(seed: { rss: string; article: string }) => {
+		(seed: { rss: string; article: string; zen: string[] }) => {
 			const decode = (link: string): string => {
 				const slug =
 					link.split("/").pop()?.split("?")[0]?.trim() || "story";
@@ -71,6 +85,18 @@ export async function seedMockShell(page: Page): Promise<void> {
 							return seed.article;
 						throw new Error("bad-status:404");
 					}
+					if (cmd === "list_models") {
+						const calls = ((window as unknown as Record<string, unknown>)
+							.__listModelsCalls ??= []) as unknown[];
+						calls.push(args);
+						return {
+							status: 200,
+							body: JSON.stringify({
+								object: "list",
+								data: seed.zen.map((id) => ({ id, object: "model" }))
+							})
+						};
+					}
 					if (cmd === "news_decode_url")
 						return decode(String(args["link"] ?? ""));
 					if (cmd === "fetch_og_image") {
@@ -92,6 +118,6 @@ export async function seedMockShell(page: Page): Promise<void> {
 			(window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ =
 				shell;
 		},
-		{ rss: MOCK_NEWS_RSS, article: MOCK_ARTICLE_HTML }
+		{ rss: MOCK_NEWS_RSS, article: MOCK_ARTICLE_HTML, zen: MOCK_ZEN_MODEL_IDS }
 	);
 }

@@ -726,6 +726,32 @@ describe("settings", () => {
 		expect(envProviderDefaults({}).muse!.apiKey).toBe("");
 	});
 
+	it("defaults OpenCode Zen to its gateway, a free model, and env keys", () => {
+		expect(envProviderDefaults({})["opencode-zen"]).toEqual({
+			baseUrl: "https://opencode.ai/zen/v1",
+			apiKey: "",
+			model: "big-pickle",
+			models: []
+		});
+		expect(
+			envProviderDefaults({ OPENCODE_API_KEY: "zen-cli", VITE_OPENCODE_ZEN_API_KEY: "zen-vite" })[
+				"opencode-zen"
+			]!.apiKey
+		).toBe("zen-vite");
+		expect(envProviderDefaults({ OPENCODE_API_KEY: "zen-cli" })["opencode-zen"]!.apiKey).toBe(
+			"zen-cli"
+		);
+	});
+
+	it("adds the OpenCode Zen entry to saves from before it existed", () => {
+		const s = blankSettings();
+		delete s.providers["opencode-zen"];
+		saveSettings(s, memoryStore);
+		expect(loadSettings(memoryStore).providers["opencode-zen"]?.baseUrl).toBe(
+			"https://opencode.ai/zen/v1"
+		);
+	});
+
 	it("starts with no custom providers and resets unknown active ids", () => {
 		expect(defaultSettings().customProviders).toEqual([]);
 		const s = blankSettings();

@@ -375,6 +375,11 @@ html[data-theme="dark"] .settings-inner .voice-refresh:hover:not(:disabled) {
 /* Error/note alerts under controls: a breathing top margin
 separates shown text from the row above. Only mounted with content,
 so empty errors never hold a blank row. */
+/* Model-field notes (free model, where a provider works) stack, one
+per line. */
+.settings-inner .model-note {
+	display: block;
+}
 .settings-inner .hint[role="alert"] {
 	display: block;
 	margin-top: 0.45rem;

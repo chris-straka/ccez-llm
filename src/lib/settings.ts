@@ -463,11 +463,13 @@ function devEnv(): Record<string, string | undefined> {
 
 const ENV_ALIASES: Record<string, string[]> = {
 	deepseek: ["VITE_DEEPSEEK_API_KEY"],
+	"opencode-zen": ["VITE_OPENCODE_ZEN_API_KEY", "OPENCODE_API_KEY"],
 	muse: ["VITE_MUSE_API_KEY", "META_OPENAI_API_KEY_MUSE_SPARK_ONE_POINT_THREE"]
 };
 
 const BASE_URL_ALIASES: Record<string, string[]> = {
 	deepseek: ["VITE_DEEPSEEK_BASE_URL"],
+	"opencode-zen": ["VITE_OPENCODE_ZEN_BASE_URL"],
 	muse: ["VITE_MUSE_BASE_URL", "META_BASE_URL"]
 };
 
