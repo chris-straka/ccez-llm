@@ -297,12 +297,16 @@ function matchDoc(
 	let score = 0;
 	const spans: Array<[number, number]> = [];
 	for (const term of q.terms) {
-		// Exact token match wins; CJK single characters still match as a
-		// prefix of a longer segmented word so one-character queries work.
+		// Exact token match wins, then a word starting with the term. Only
+		// unspaced scripts also match the other way round (a CJK query
+		// longer than the segmenter's word): in Latin text "apple" must
+		// never hit on the word "a".
 		let termScore = 2 * (p.counts.get(term) ?? 0);
 		if (termScore === 0) {
+			const reverse = !SPACED_SCRIPT_RE.test(term);
 			for (const [token, count] of p.counts)
-				if (token.startsWith(term) || term.startsWith(token)) termScore += count;
+				if (token.startsWith(term) || (reverse && term.startsWith(token)))
+					termScore += count;
 		}
 		const py = pinyinSpans(p.pinyin, term);
 		termScore += py.length;

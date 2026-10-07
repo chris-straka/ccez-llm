@@ -154,6 +154,15 @@ describe("querySearch (folding, phrases, filters, pinyin)", () => {
 		expect(cafe?.snippet.slice(c, d)).toBe("café");
 	});
 
+	it("never matches a longer word by its short prefix in the text", () => {
+		const doc: SearchDoc[] = [
+			{ chatId: "a", msgId: "x", kind: "message", text: "I went to the store with a friend." }
+		];
+		expect(querySearch(doc, "apple")).toEqual([]);
+		expect(querySearch(doc, "therapy")).toEqual([]);
+		expect(querySearch(doc, "sto")).toHaveLength(1);
+	});
+
 	it("marks words from their start only", () => {
 		const hits = querySearch(
 			[{ chatId: "a", msgId: "x", kind: "message", text: "find it in here" }],
