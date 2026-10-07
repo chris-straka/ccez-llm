@@ -810,11 +810,17 @@ async fn run_attempt(
     (ev.on_round_retract)();
     let mut usage = first_usage;
     let mut assistant_text = first_content;
-    for _ in 0..MAX_TOOL_ROUNDS {
+    for round in 0..MAX_TOOL_ROUNDS {
         if pending.is_empty() {
             break;
         }
         run_fetch_batch(&mut history, &assistant_text, &pending, page_fetch, ev).await?;
+        // The last batch goes straight to the streamed answer (as in
+        // the TypeScript engine): a plain follow-up here could only ask
+        // for fetches nothing would run.
+        if round + 1 >= MAX_TOOL_ROUNDS {
+            break;
+        }
         let (content, frags, round_usage) = post_plain(client, req, &history, true).await?;
         if round_usage.is_some() {
             usage = round_usage;
@@ -1789,6 +1795,19 @@ mod tests {
         format!("data: {}\n\ndata: [DONE]\n\n", wire).into_bytes()
     }
 
+    fn json_followup_tool_body(id: &str, url: &str) -> Vec<u8> {
+        serde_json::json!({ "choices": [{ "message": { "content": "", "tool_calls": [{
+            "id": id,
+            "type": "function",
+            "function": {
+                "name": "fetch_url",
+                "arguments": serde_json::json!({ "url": url }).to_string()
+            }
+        }] } }] })
+        .to_string()
+        .into_bytes()
+    }
+
     fn json_followup_body() -> Vec<u8> {
         json_followup_body_with("")
     }
@@ -1911,6 +1930,67 @@ mod tests {
         assert_eq!(bodies.len(), 3);
         assert!(bodies[1].contains("call_1"));
         assert!(bodies[1].contains("page text here"));
+    }
+
+    #[test]
+    fn drive_caps_tool_rounds_like_the_web_engine() {
+        // The model asks for another page every round: three fetch
+        // batches, two plain follow-ups, then the streamed answer.
+        let bodies = Arc::new(Mutex::new(Vec::new()));
+        let port = run_stub(
+            vec![
+                StubStep::Respond {
+                    status: 200,
+                    content_type: "text/event-stream",
+                    body: sse_tool_body("http://example.test/1"),
+                },
+                StubStep::Respond {
+                    status: 200,
+                    content_type: "application/json",
+                    body: json_followup_tool_body("call_2", "http://example.test/2"),
+                },
+                StubStep::Respond {
+                    status: 200,
+                    content_type: "application/json",
+                    body: json_followup_tool_body("call_3", "http://example.test/3"),
+                },
+                StubStep::Respond {
+                    status: 200,
+                    content_type: "text/event-stream",
+                    body: sse_text_body("the answer"),
+                },
+            ],
+            Arc::clone(&bodies),
+        );
+        let page_fetch: PageFetch = Arc::new(|url: String| {
+            Box::pin(async move { Ok::<String, String>(format!("text of {url}")) })
+                as Pin<Box<dyn Future<Output = Result<String, String>> + Send>>
+        });
+        let rec = Recorder {
+            tokens: Arc::new(Mutex::new(Vec::new())),
+            fetches: Arc::new(Mutex::new(Vec::new())),
+            retries: Arc::new(Mutex::new(0)),
+            retracts: Arc::new(Mutex::new(0)),
+        };
+        let client = reqwest_client().unwrap();
+        let req = test_request(port);
+        let outcome = tauri::async_runtime::block_on(drive_attempts(
+            &client,
+            &req,
+            "",
+            &page_fetch,
+            &[0],
+            &mut || test_events(&rec),
+        ));
+        match outcome {
+            TurnOutcome::Done(content, _) => assert_eq!(content, "the answer"),
+            other => panic!("expected done, got {other:?}"),
+        }
+        let started = rec.fetches.lock().unwrap().iter().filter(|(start, _)| *start).count();
+        assert_eq!(started, 3);
+        let bodies = bodies.lock().unwrap();
+        assert_eq!(bodies.len(), 4);
+        assert!(bodies[3].contains("text of http://example.test/3"));
     }
 
     #[test]
