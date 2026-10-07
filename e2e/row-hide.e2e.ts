@@ -57,7 +57,8 @@ test("assistant row hides after fold jumps the layout", async ({ page }) => {
 	await expect(row).toHaveCSS("opacity", "1");
 	await page
 		.locator(
-			'article.assistant .actions button[data-tip="Fold this message (F or Option-click)"]'
+			// "Option-click" on a Mac, "Alt-click" elsewhere.
+			'article.assistant .actions button[data-tip^="Fold this message"]'
 		)
 		.click();
 	// The collapse moves the row: leaving it must not trap it visible.

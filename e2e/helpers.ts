@@ -185,7 +185,21 @@ export async function dragQuote(
 	quote: string,
 	rootSelector = "article .rendered"
 ): Promise<void> {
-	const rect = await quoteRect(page, article, quote, rootSelector);
+	let rect = await quoteRect(page, article, quote, rootSelector);
+	// Off screen (taller font metrics on Linux): center it first. Only
+	// then — an unneeded scroll moves quotes other specs measured.
+	const vh = page.viewportSize()?.height ?? 720;
+	if (rect.y < 0 || rect.y + rect.height > vh - 120) {
+		await page.evaluate(
+			([sel, n]: [string, number]) =>
+				document
+					.querySelectorAll(sel)
+					[n]?.scrollIntoView({ block: "center", behavior: "instant" }),
+			[rootSelector, article] as [string, number]
+		);
+		await page.waitForTimeout(300);
+		rect = await quoteRect(page, article, quote, rootSelector);
+	}
 	await page.mouse.move(rect.x + 1, rect.y + rect.height / 2);
 	await page.mouse.down();
 	await page.mouse.move(rect.x + rect.width - 1, rect.y + rect.height / 2, {

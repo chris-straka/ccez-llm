@@ -1,3 +1,4 @@
+import process from "node:process";
 import { test as base, expect } from "@playwright/test";
 
 export * from "@playwright/test";
@@ -18,6 +19,20 @@ const BENIGN = /ResizeObserver loop/;
 export const test = base.extend<{ pageErrors: string[] }>({
 	pageErrors: [
 		async ({ page }, use) => {
+			// Headless Chromium on Linux has no speech engine and fails
+			// every utterance at once; the specs assume the Mac's silent
+			// accept (a reading stays "playing" until stopped).
+			if (process.platform === "linux")
+				await page.addInitScript(() => {
+					const synth = window.speechSynthesis;
+					if (synth)
+						Object.defineProperty(synth, "speak", {
+							value: () => {},
+							// Specs still assign their own spies.
+							writable: true,
+							configurable: true
+						});
+				});
 			const errors: string[] = [];
 			page.on("pageerror", (error) => {
 				if (!BENIGN.test(error.message)) errors.push(error.message);

@@ -507,9 +507,11 @@ test("clearing a highlight never summons the prompt", async ({ page }) => {
 	const body = page.locator("article.assistant .rendered").first();
 	const box = await body.boundingBox();
 	if (!box) throw new Error("message has no box");
-	await page.mouse.move(box.x + 20, box.y + box.height / 2);
+	// Along the first line: taller Linux font metrics push the middle
+	// of a long reply below the viewport.
+	await page.mouse.move(box.x + 20, box.y + 12);
 	await page.mouse.down();
-	await page.mouse.move(box.x + 120, box.y + box.height / 2, { steps: 5 });
+	await page.mouse.move(box.x + 120, box.y + 12, { steps: 5 });
 	await page.mouse.up();
 	await expect(page.locator(".sel-menu")).toBeVisible({ timeout: 5_000 });
 	await expect(prompt).toHaveClass(/prompt-idle/);
@@ -603,15 +605,15 @@ test("space dismisses an empty composer, types after text", async ({
 	// code there), so clear it: the "" below must mean the empty
 	// composer copied nothing, not leftover state.
 	await page.evaluate(() => navigator.clipboard.writeText(""));
-	await page.keyboard.press("Meta+a");
-	await page.keyboard.press("Meta+c");
+	await page.keyboard.press("ControlOrMeta+a");
+	await page.keyboard.press("ControlOrMeta+c");
 	expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("");
 	// With text, Space types and stays up.
 	await page.keyboard.type("hi");
 	await page.keyboard.press("Space");
 	await expect(prompt).not.toHaveClass(/prompt-idle/);
-	await page.keyboard.press("Meta+a");
-	await page.keyboard.press("Meta+c");
+	await page.keyboard.press("ControlOrMeta+a");
+	await page.keyboard.press("ControlOrMeta+c");
 	expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("hi ");
 });
 
