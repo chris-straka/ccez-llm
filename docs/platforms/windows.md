@@ -1,9 +1,11 @@
 # Windows
 
-> Status: **x64 verified in a Windows 11 VM** (2026-10-07: install,
-> reinstall over v0.15.1, first run, a streamed chat, deep links,
-> shortcuts, F11, 125% scaling). ARM64 builds and signs in CI but has not
-> run on ARM hardware.
+> Status: **x64 verified in a Windows 11 VM** (2026-10-07: clean
+> install, reinstall over v0.15.1, uninstall, first run, a streamed chat,
+> deep links, Ctrl+Alt+Space from Notepad, shortcuts, F11, 125% scaling,
+> Snap, remembered window state, and the in-app update from 0.15.2 to
+> v0.16.0). ARM64 builds and signs in CI (first shipped in v0.16.0) but has
+> not run on ARM hardware.
 
 ## What CI builds
 
@@ -56,7 +58,8 @@ certificate would remove the prompt; none is configured.
 The app keeps its own design; these are the Windows-specific parts.
 
 - **Window**: native title bar titled "Ccez LLM" (`tauri.windows.conf.json`:
-  1200x760, centered, opaque). No in-window menu bar: every menu item has
+  1200x760, centered, opaque; 640x480 minimum so Snap can halve it on
+  common laptop screens). No in-window menu bar: every menu item has
   an in-app key or control. Size, position and maximized state persist
   (tauri-plugin-window-state). A window that would not fit the monitor's
   work area (small or scaled screens) shrinks to fit at launch.
