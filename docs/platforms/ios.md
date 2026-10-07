@@ -1,9 +1,11 @@
 # iOS (iPhone and iPad)
 
 > Status: **builds and runs in the iOS Simulator on GitHub Actions**
-> (`.github/workflows/preview.yml`, `build (ios-simulator)`). Not signed,
-> not on TestFlight: that waits on an Apple Developer account. No device
-> run yet.
+> (`.github/workflows/preview.yml`, `build (ios-simulator)`, 2026-10-07):
+> first launch, settings by edge swipe, adding a custom provider with its
+> key saved to the Keychain, the share-extension URL prefilling a prompt,
+> and the Share extension registered with the system. Not signed, not on
+> TestFlight: that waits on an Apple Developer account. No device run yet.
 
 The iOS app is the same Tauri 2 + Svelte build as Android. iOS can only be
 built on macOS, and the owner's Mac is reserved for game dev, so every iOS
@@ -25,7 +27,11 @@ build runs on a GitHub-hosted macOS runner.
   4. `scripts/ios-sim-flows.sh` boots an iPhone Simulator, installs the
      app, and saves one screenshot per flow plus the share-extension
      registration and the app log. Download them from the run's
-     `preview-ios-simulator` artifact.
+     `preview-ios-simulator` artifact. Taps go through idb: system alerts
+     by accessibility label, WebView controls by hit-testing
+     (`idb ui describe-point`), since WKWebView content is missing from
+     the flat accessibility dump. A chat runs against
+     `scripts/mock-llm.ts` on the runner's loopback.
 
 The Xcode project in `src-tauri/gen/apple` was regenerated with
 `tauri ios init` on a runner (the old one predated the crate rename and
@@ -41,7 +47,7 @@ covers it on both.
 | --- | --- | --- |
 | Share text in from other apps | `ACTION_SEND` share target (`MainActivity.handleSend`) | **Share extension** "Ccez LLM" (`gen/apple/ShareExtension`): opens `ccez-llm://send?text=…`, which prefills a new prompt through the same `annotate-external` path |
 | Select text in another app → Annotate / Speak / Inspect | `PROCESS_TEXT` aliases | **No OS equivalent.** iOS has no third-party entries in other apps' text menus. Select → Share → Ccez LLM sends the text instead (it lands as a prompt, like Android's shares from other apps) |
-| Deep links | Notification taps only | `ccez-llm://new`, `chat/<id>`, `send/annotate/speak/inspect?text=` (URL type in Info.plist, deep-link plugin) |
+| Deep links | Notification taps only | `ccez-llm://new`, `chat/<id>`, `send/annotate/speak/inspect?text=` (URL type in Info.plist, deep-link plugin). Links from outside an app show iOS's "Open in Ccez LLM?" prompt |
 | Layout, gestures, text size, sheets | Shared web UI (`androidUI`) | Same: iOS takes the touch UI; iOS-specific: docked Annotate button (Apple's callout can't be hidden), two-finger double-tap toggles the sidebar |
 | Orientation | Portrait | iPhone portrait; iPad all four |
 | Safe areas / keyboard | Edge-to-edge + IME padding bridge | `viewport-fit=cover` + `env(safe-area-*)`; visualViewport keyboard pin |
@@ -51,7 +57,7 @@ covers it on both.
 | API keys | Android Keystore | iOS Keychain (`keyring` apple-native), debug builds too |
 | Page fetch (`fetch_url`) TLS | System CA dirs loaded into BoringSSL | Mozilla roots bundled (`webpki-root-certs`), since iOS exposes no CA files |
 | Background replies | Foreground service keeps a reply running | Runs while the app is open; iOS suspends it about 30 s after backgrounding, and the turn resumes or shows as interrupted on return (gap: no background task claim yet) |
-| "Reply ready" notification | Notification channel, tap opens the chat | Notification plugin sends it; tap-to-open-chat not wired (gap) |
+| "Reply ready" notification | Notification channel, tap opens the chat | Notification plugin sends it; the permission prompt shows at first launch, as on Android (iOS guidance prefers asking in context); tap-to-open-chat not wired (gap) |
 | In-app update | APK download + installer | None: iOS updates through the App Store / TestFlight. The panel hides the update route |
 | Haptics | Haptics plugin | Haptics plugin (Taptic Engine) |
 | On-device model | Gemini Nano (ML Kit) | None (Apple Foundation Models would be a separate provider) |
