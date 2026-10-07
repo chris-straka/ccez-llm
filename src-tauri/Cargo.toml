@@ -64,6 +64,7 @@ encoding_rs = "0.8"
 # pins ANDROID_STL to c++_static so the app .so stays
 # self-contained — c++_shared would need the STL .so bundled).
 rquest = { version = "0.11", default-features = false, features = ["boring-tls", "impersonate", "cookies"] }
+tauri-plugin-deep-link = "~2.4.10"
 
 # Native TTS (AVSpeechSynthesizer) on macOS and iOS. Pure-Rust
 # bindings via objc2 — no Objective-C is written anywhere in this
@@ -96,14 +97,16 @@ objc2-vision = "0.3"
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-mcp-bridge = "0.2"
+tauri-plugin-window-state = "~2.4.1"
 
 # Android-only native TTS (TextToSpeech over JNI into Tts.kt).
 # jni matches wry's version so JNI types unify (see cargo tree).
 [target.'cfg(target_os = "android")'.dependencies]
 jni = "0.21"
 
-# Windows-only speech bindings: WinRT SpeechRecognizer
-# (dictate_windows) and SAPI 5 automation (tts_windows). The features
+# Windows-only bindings: WinRT SpeechRecognizer (dictate_windows), SAPI 5
+# automation (tts_windows), and SendInput + the clipboard sequence number
+# for the send-text chord (send_selection). The features
 # must be declared here — nothing else in the graph enables the speech
 # APIs, so without this the Windows build finds no
 # `windows::Media::SpeechRecognition` / `windows::Win32::Media::Speech`.
@@ -118,7 +121,9 @@ windows = { version = "0.61", features = [
     "Storage_Streams",
     "Win32_Media_Speech",
     "Win32_System_Com",
+    "Win32_System_DataExchange",
     "Win32_System_Power",
+    "Win32_UI_Input_KeyboardAndMouse",
 ] }
 
 
@@ -135,7 +140,10 @@ strip = true
 # release resolves from vendor/ instead of the index — along with the
 # yanked BoringSSL/HTTP forks it renames its deps to. Same bytes as
 # the published .crates (checksums verified against the index) plus
-# four patches: one compat shim (rquest's profile.rs: h2_imp never
+# six patches. Two are boring-sys-imp build-script fixes: Windows ARM64
+# builds BoringSSL with OPENSSL_NO_ASM (no MSVC assembler for its
+# AArch64 asm), and the iOS Simulator gets an explicit clang target for
+# bindgen. The other four: one compat shim (rquest's profile.rs: h2_imp never
 # shipped the marker API 0.11.91 calls), one Android trust-store fix
 # (rquest's impersonate/mod.rs loads the system CA dirs, which
 # BoringSSL's default verify paths miss), one Android link fix

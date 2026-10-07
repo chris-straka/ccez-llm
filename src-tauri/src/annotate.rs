@@ -23,6 +23,7 @@
 //! itself is an Android-only dependency, so JNI paths stay fully
 //! qualified inside those fns).
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
 
 use tauri::{AppHandle, Emitter};
@@ -50,10 +51,10 @@ pub fn remember(app: &AppHandle) {
 }
 
 /// External selections are user text, not code: trim, drop empties, and
-/// cap length so a foreign share can't flood the composer. Live only via
-/// the Android JNI entry below (plus tests), so non-Android builds would
-/// warn as dead code without the allow.
-#[cfg_attr(not(target_os = "android"), allow(dead_code))]
+/// cap length so a foreign share can't flood the composer. Callers: the
+/// Android JNI entry below, desktop deep links and the Windows
+/// send-selection chord (desktop.rs); iOS has no caller yet.
+#[cfg_attr(not(any(target_os = "android", desktop)), allow(dead_code))]
 pub fn clean_external(text: &str) -> Option<String> {
     const MAX_CHARS: usize = 4000;
     let trimmed = text.trim();
@@ -71,7 +72,7 @@ struct ExternalPayload {
 
 /// Whitelist the tapped alias entry: anything else (including a
 /// hand-built extra) falls back to annotate.
-#[cfg_attr(not(target_os = "android"), allow(dead_code))]
+#[cfg_attr(not(any(target_os = "android", desktop)), allow(dead_code))]
 pub fn clean_action(action: &str) -> Option<String> {
     match action.trim() {
         "annotate" | "speak" | "inspect" => Some(action.trim().to_string()),
@@ -79,15 +80,19 @@ pub fn clean_action(action: &str) -> Option<String> {
     }
 }
 
-/// Same Android-only liveness as `clean_external` (plus tests).
-#[cfg_attr(not(target_os = "android"), allow(dead_code))]
-fn emit(text: Option<String>, action: Option<String>) {
+/// Set once the frontend has drained (its listener is live). Before
+/// that, an emit would reach nobody: a cold-start share, deep link, or
+/// send-selection chord parks instead, even when the handle exists.
+static FRONTEND_READY: AtomicBool = AtomicBool::new(false);
+
+/// Deliver external text: live emit once the frontend listens, else
+/// park the latest share for the drain below.
+pub fn emit(text: Option<String>, action: Option<String>) {
     match APP.get() {
-        Some(app) => {
+        Some(app) if FRONTEND_READY.load(Ordering::SeqCst) => {
             let _ = app.emit("annotate-external", ExternalPayload { text, action });
         }
-        // No handle yet (cold start): park it for the drain below.
-        None => {
+        _ => {
             if let Some(text) = text {
                 *lock_slot() = Some((text, action));
             }
@@ -100,6 +105,7 @@ fn emit(text: Option<String>, action: Option<String>) {
 /// takes (clears) so a share is never delivered twice.
 #[tauri::command]
 pub fn drain_pending_external(app: AppHandle) {
+    FRONTEND_READY.store(true, Ordering::SeqCst);
     if let Some((text, action)) = lock_slot().take() {
         let _ = app.emit(
             "annotate-external",

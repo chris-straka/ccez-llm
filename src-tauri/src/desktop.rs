@@ -20,6 +20,10 @@
 //! from `tauri-plugin-global-shortcut` (desktop-only upstream), and
 //! everything else is `std` + `serde`.
 
+// Compiled on every platform for the deep-link half; the summon kit
+// below is desktop-only, so mobile builds see unused helpers.
+#![cfg_attr(not(desktop), allow(dead_code, unused_imports))]
+
 use std::sync::{Mutex, OnceLock};
 
 use tauri::{AppHandle, Emitter, Manager, Runtime};
@@ -29,10 +33,17 @@ use tauri::{AppHandle, Emitter, Manager, Runtime};
 /// ⌘ on macOS, Ctrl elsewhere); the frontend owns the same chord
 /// while its window is focused.
 #[cfg(all(desktop, not(target_os = "macos")))]
-pub const SUMMON_SHORTCUT: &str = "CmdOrCtrl+Shift+Space";
-/// Custom URL scheme: `ccez://chat/<id>`, `ccez://chat?id=<id>`,
-/// `ccez://new`.
-pub const DEEP_LINK_SCHEME: &str = "ccez";
+pub const SUMMON_SHORTCUT_LABEL: &str = "Ctrl+Shift+Space";
+/// Custom URL scheme the OS routes to the app (registered by
+/// tauri-plugin-deep-link: NSIS registry keys on Windows, the bundle's
+/// URL types on macOS/iOS). Routes:
+/// `ccez-llm://new`, `ccez-llm://chat/<id>`, `ccez-llm://chat?id=<id>`,
+/// `ccez-llm://send?text=<text>` (prefill the composer, like Android's
+/// share target), and `ccez-llm://annotate|speak|inspect?text=<text>`
+/// (Android's PROCESS_TEXT actions).
+pub const DEEP_LINK_SCHEME: &str = "ccez-llm";
+/// The scheme before the rename, still parsed (never registered).
+pub const LEGACY_DEEP_LINK_SCHEME: &str = "ccez";
 /// Window event carrying a [`DeepLinkPayload`] to the frontend.
 pub const DEEP_LINK_EVENT: &str = "deep-link";
 /// Loopback port for the single-instance handoff. First launch binds
@@ -47,9 +58,6 @@ pub const TRAY_SHOW_ID: &str = "tray-show";
 /// Tray menu item: quit the app (Windows/Linux only).
 #[cfg(all(desktop, not(target_os = "macos")))]
 pub const TRAY_QUIT_ID: &str = "tray-quit";
-/// Tray menu item: open the game-line overlay (Windows/Linux only).
-#[cfg(all(desktop, not(target_os = "macos")))]
-pub const TRAY_GAME_LINE_ID: &str = "tray-game-line";
 /// Cap for an exported study sheet: a foreign chat id or a giant
 /// history must not flood the temp dir.
 pub const MAX_SHEET_CHARS: usize = 200_000;
@@ -85,28 +93,65 @@ impl DeepLinkPayload {
     }
 }
 
-/// Parse a `ccez://` URL into a frontend payload. Accepts
-/// `ccez://chat/<id>`, `ccez://chat?id=<id>`, and `ccez://new`.
-/// Anything else (wrong scheme, empty id, extra path) is `None` — deep
-/// links are foreign input and never panic the shell.
-pub fn parse_deep_link(url: &str) -> Option<DeepLinkPayload> {
-    let rest = url.trim().strip_prefix(&format!("{DEEP_LINK_SCHEME}://"))?;
+/// A parsed deep link: navigate (open or mint a chat) or hand text to
+/// the same `annotate-external` path Android shares use.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum DeepLink {
+    Nav(DeepLinkPayload),
+    Text {
+        text: String,
+        action: Option<String>,
+    },
+}
+
+/// Strip either accepted scheme (`ccez-llm://` or legacy `ccez://`).
+pub fn strip_link_scheme(url: &str) -> Option<&str> {
+    let url = url.trim();
+    url.strip_prefix(&format!("{DEEP_LINK_SCHEME}://"))
+        .or_else(|| url.strip_prefix(&format!("{LEGACY_DEEP_LINK_SCHEME}://")))
+}
+
+/// Is this process arg / forwarded string one of our deep links?
+pub fn is_deep_link(arg: &str) -> bool {
+    strip_link_scheme(arg).is_some()
+}
+
+/// Parse a deep link. Anything else (wrong scheme, empty id or text,
+/// extra path) is `None`: deep links are foreign input and never panic
+/// the shell. Text is trimmed and capped by `annotate::clean_external`.
+pub fn parse_link(url: &str) -> Option<DeepLink> {
+    let rest = strip_link_scheme(url)?;
     let (path, query) = match rest.split_once('?') {
         Some((p, q)) => (p, q),
         None => (rest, ""),
     };
-    if path == "new" {
-        return Some(DeepLinkPayload::new_chat());
-    }
-    if path == "chat" {
-        let id = query_param(query, "id")?;
-        return clean_link_id(&id).map(|id| DeepLinkPayload::open_chat(&id));
+    let path = path.trim_end_matches('/');
+    match path {
+        "new" => return Some(DeepLink::Nav(DeepLinkPayload::new_chat())),
+        "chat" => {
+            let id = query_param(query, "id")?;
+            return clean_link_id(&id).map(|id| DeepLink::Nav(DeepLinkPayload::open_chat(&id)));
+        }
+        "send" | "annotate" | "speak" | "inspect" => {
+            let text = crate::annotate::clean_external(&query_param(query, "text")?)?;
+            let action = crate::annotate::clean_action(path);
+            return Some(DeepLink::Text { text, action });
+        }
+        _ => {}
     }
     if let Some(id) = path.strip_prefix("chat/") {
         let id = percent_decode(id);
-        return clean_link_id(&id).map(|id| DeepLinkPayload::open_chat(&id));
+        return clean_link_id(&id).map(|id| DeepLink::Nav(DeepLinkPayload::open_chat(&id)));
     }
     None
+}
+
+/// Navigation-only view of [`parse_link`] (text links are `None`).
+pub fn parse_deep_link(url: &str) -> Option<DeepLinkPayload> {
+    match parse_link(url)? {
+        DeepLink::Nav(payload) => Some(payload),
+        DeepLink::Text { .. } => None,
+    }
 }
 
 /// One `k=v` query arg, percent-decoded. Pure so the deep-link unit
@@ -122,37 +167,40 @@ pub fn query_param(query: &str, key: &str) -> Option<String> {
     None
 }
 
-/// Minimal percent-decoder for link ids (`%20`, `%2F`, `+` as space).
-/// Malformed sequences pass through literally — never an error.
+/// Minimal percent-decoder (`%20`, `%2F`, `+` as space). Decodes to
+/// bytes first so multi-byte UTF-8 (`%C3%A9`, CJK) survives; malformed
+/// sequences pass through literally and invalid UTF-8 is replaced,
+/// never an error.
 pub fn percent_decode(input: &str) -> String {
-    let mut out = String::with_capacity(input.len());
     let bytes = input.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
     let mut i = 0;
     while i < bytes.len() {
-        let b = bytes[i];
-        if b == b'+' {
-            out.push(' ');
-            i += 1;
-        } else if b == b'%' && i + 2 < bytes.len() + 1 {
-            let hex = &input[i + 1..(i + 3).min(input.len())];
-            if hex.len() == 2 {
-                if let Ok(v) = u8::from_str_radix(hex, 16) {
-                    out.push(v as char);
-                    i += 3;
-                } else {
-                    out.push('%');
-                    i += 1;
-                }
-            } else {
-                out.push('%');
+        match bytes[i] {
+            b'+' => {
+                out.push(b' ');
                 i += 1;
             }
-        } else {
-            out.push(b as char);
-            i += 1;
+            b'%' => {
+                let hex = bytes.get(i + 1..i + 3).and_then(|h| std::str::from_utf8(h).ok());
+                match hex.and_then(|h| u8::from_str_radix(h, 16).ok()) {
+                    Some(v) => {
+                        out.push(v);
+                        i += 3;
+                    }
+                    None => {
+                        out.push(b'%');
+                        i += 1;
+                    }
+                }
+            }
+            b => {
+                out.push(b);
+                i += 1;
+            }
         }
     }
-    out
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 /// Deep-link ids are chat ids, not paths: nonempty, no slashes, capped.
@@ -162,6 +210,16 @@ fn clean_link_id(id: &str) -> Option<String> {
         return None;
     }
     Some(trimmed.chars().take(MAX_DEEP_LINK_ID_CHARS).collect())
+}
+
+/// Windows send-text chord (send_selection.rs): the copied selection
+/// wins; with nothing copied, the clipboard text the user already had
+/// goes instead. Cleaned and capped like every external share.
+pub fn pick_sent_text(copied: Option<String>, clipboard: Option<String>) -> Option<String> {
+    copied
+        .as_deref()
+        .and_then(crate::annotate::clean_external)
+        .or_else(|| clipboard.as_deref().and_then(crate::annotate::clean_external))
 }
 
 // ---------------------------------------------------------------------------
@@ -428,6 +486,17 @@ fn deliver_link<R: Runtime>(app: &AppHandle<R>, link: DeepLinkPayload) {
     let _ = app.emit(DEEP_LINK_EVENT, link);
 }
 
+/// Route one incoming deep link: navigation goes to the deep-link
+/// event, text to the `annotate-external` path Android shares use
+/// (it parks until the frontend listens, so cold starts keep it).
+pub fn route_link<R: Runtime>(app: &AppHandle<R>, url: &str) {
+    match parse_link(url) {
+        Some(DeepLink::Nav(link)) => deliver_link(app, link),
+        Some(DeepLink::Text { text, action }) => crate::annotate::emit(Some(text), action),
+        None => {}
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Platform sleep guards (desktop only)
 // ---------------------------------------------------------------------------
@@ -531,7 +600,7 @@ fn disengage_sleep_guard() {
 
 /// Show + focus the main window (tray clicks, second launch, summon).
 #[cfg(desktop)]
-fn focus_main<R: Runtime>(app: &AppHandle<R>) {
+pub(crate) fn focus_main<R: Runtime>(app: &AppHandle<R>) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.show();
         let _ = window.unminimize();
@@ -550,8 +619,14 @@ pub fn wire(app: &AppHandle) -> tauri::Result<()> {
     #[cfg(not(target_os = "macos"))]
     build_tray(app)?;
     install_summon_hotkey(app);
+    // Window capture is macOS-only (capture.rs): elsewhere these chords
+    // would only steal Ctrl+Shift+O/U from every other app.
+    #[cfg(target_os = "macos")]
     install_capture_hotkey(app);
+    #[cfg(target_os = "macos")]
     install_area_hotkey(app);
+    #[cfg(target_os = "windows")]
+    crate::send_selection::install(app);
     handle_startup_args(app);
     Ok(())
 }
@@ -566,21 +641,17 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
         app,
         &[
             &MenuItem::with_id(app, TRAY_SHOW_ID, "Show Ccez LLM", true, None::<&str>)?,
-            &MenuItem::with_id(app, TRAY_GAME_LINE_ID, "Game line", true, None::<&str>)?,
             &MenuItem::with_id(app, TRAY_QUIT_ID, "Quit", true, None::<&str>)?,
         ],
     )?;
     let icon = tauri::image::Image::from_bytes(include_bytes!("../icons/32x32.png"))?;
     TrayIconBuilder::with_id(TRAY_ID)
         .icon(icon)
-        .tooltip(format!("Ccez LLM ({SUMMON_SHORTCUT} to summon)"))
+        .tooltip(format!("Ccez LLM ({SUMMON_SHORTCUT_LABEL} to summon)"))
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {
             TRAY_SHOW_ID => focus_main(app),
-            TRAY_GAME_LINE_ID => {
-                let _ = crate::game_line::open_game_line(app.clone());
-            }
             TRAY_QUIT_ID => app.exit(0),
             _ => {}
         })
@@ -606,10 +677,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
 fn ensure_single_instance(app: &AppHandle) {
     use std::io::{Read, Write};
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let link_arg = args
-        .iter()
-        .find(|a| a.starts_with(&format!("{DEEP_LINK_SCHEME}://")))
-        .cloned();
+    let link_arg = args.iter().find(|a| is_deep_link(a)).cloned();
     match std::net::TcpListener::bind(("127.0.0.1", SINGLETON_PORT)) {
         Ok(listener) => {
             let handle = app.clone();
@@ -624,9 +692,7 @@ fn ensure_single_instance(app: &AppHandle) {
                             Some(SingletonMsg::Focus) => focus_main(&handle),
                             Some(SingletonMsg::OpenUrl(url)) => {
                                 focus_main(&handle);
-                                if let Some(link) = parse_deep_link(&url) {
-                                    deliver_link(&handle, link);
-                                }
+                                route_link(&handle, &url);
                             }
                             None => {}
                         }
@@ -649,18 +715,14 @@ fn ensure_single_instance(app: &AppHandle) {
     }
 }
 
-/// Forward a `ccez://` process arg (OS deep-link / protocol launch)
+/// Forward a deep-link process arg (Windows/Linux protocol launch)
 /// into the app. Runs at setup; early arrivals also wait in the drain
-/// slot for the frontend's first `desktop_drain_pending_link`.
+/// slots for the frontend. macOS delivers links as Apple events
+/// instead, through the deep-link plugin's `on_open_url` (lib.rs).
 #[cfg(desktop)]
 fn handle_startup_args<R: Runtime>(app: &AppHandle<R>) {
-    for arg in std::env::args().skip(1) {
-        if arg.starts_with(&format!("{DEEP_LINK_SCHEME}://")) {
-            if let Some(link) = parse_deep_link(&arg) {
-                deliver_link(app, link);
-                return;
-            }
-        }
+    if let Some(arg) = std::env::args().skip(1).find(|a| is_deep_link(a)) {
+        route_link(app, &arg);
     }
 }
 
@@ -715,7 +777,7 @@ fn install_summon_hotkey(app: &AppHandle) {
 /// in-app chord still works (same contract as summon). Desktop only:
 /// the plugin crate does not compile for mobile. UNVERIFIED ON DEVICE —
 /// no headless harness can press a system-wide chord.
-#[cfg(desktop)]
+#[cfg(target_os = "macos")]
 fn install_capture_hotkey(app: &AppHandle) {
     use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
     if let Err(error) = app.global_shortcut().on_shortcut(
@@ -737,7 +799,7 @@ fn install_capture_hotkey(app: &AppHandle) {
 /// contract as the capture chord). Desktop only: the plugin crate
 /// does not compile for mobile. UNVERIFIED ON DEVICE — no headless
 /// harness can press a system-wide chord.
-#[cfg(desktop)]
+#[cfg(target_os = "macos")]
 fn install_area_hotkey(app: &AppHandle) {
     use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
     if let Err(error) = app.global_shortcut().on_shortcut(
@@ -800,6 +862,63 @@ mod tests {
         ] {
             assert_eq!(parse_deep_link(bad), None, "{bad}");
         }
+    }
+
+    #[test]
+    fn deep_link_current_scheme() {
+        assert_eq!(
+            parse_deep_link("ccez-llm://chat/abc123"),
+            Some(DeepLinkPayload::open_chat("abc123"))
+        );
+        assert_eq!(parse_deep_link("ccez-llm://new/"), Some(DeepLinkPayload::new_chat()));
+        assert!(is_deep_link("ccez-llm://new"));
+        assert!(is_deep_link("ccez://new"));
+        assert!(!is_deep_link("ccez-llmx://new"));
+        assert!(!is_deep_link("--flag"));
+    }
+
+    #[test]
+    fn deep_link_text_routes() {
+        assert_eq!(
+            parse_link("ccez-llm://send?text=Bonjour%20%C3%A0%20tous"),
+            Some(DeepLink::Text {
+                text: "Bonjour à tous".into(),
+                action: None
+            })
+        );
+        assert_eq!(
+            parse_link("ccez-llm://speak?text=%E6%97%A5%E6%9C%AC%E8%AA%9E"),
+            Some(DeepLink::Text {
+                text: "日本語".into(),
+                action: Some("speak".into())
+            })
+        );
+        assert_eq!(
+            parse_link("ccez-llm://annotate?x=1&text=+Hallo+"),
+            Some(DeepLink::Text {
+                text: "Hallo".into(),
+                action: Some("annotate".into())
+            })
+        );
+        // Text links never pose as navigation, and empty text is dropped.
+        assert_eq!(parse_deep_link("ccez-llm://send?text=hi"), None);
+        assert_eq!(parse_link("ccez-llm://send?text=%20%20"), None);
+        assert_eq!(parse_link("ccez-llm://send"), None);
+        let long = "a".repeat(5000);
+        match parse_link(&format!("ccez-llm://send?text={long}")) {
+            Some(DeepLink::Text { text, .. }) => assert_eq!(text.chars().count(), 4000),
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn sent_text_prefers_the_selection() {
+        let s = |v: &str| Some(v.to_string());
+        assert_eq!(pick_sent_text(s(" picked "), s("clip")), s("picked"));
+        assert_eq!(pick_sent_text(None, s("clip")), s("clip"));
+        assert_eq!(pick_sent_text(s("  "), s("clip")), s("clip"));
+        assert_eq!(pick_sent_text(None, None), None);
+        assert_eq!(pick_sent_text(None, s("\n")), None);
     }
 
     #[test]
@@ -871,5 +990,8 @@ mod tests {
         assert_eq!(percent_decode("a%20b+c"), "a b c");
         assert_eq!(percent_decode("a%2Fx"), "a/x");
         assert_eq!(percent_decode("100%"), "100%");
+        assert_eq!(percent_decode("%zz%4"), "%zz%4");
+        assert_eq!(percent_decode("caf%C3%A9"), "café");
+        assert_eq!(percent_decode("bad%FF"), "bad\u{FFFD}");
     }
 }

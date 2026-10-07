@@ -2,13 +2,18 @@
 
 #[cfg(all(target_os = "macos", debug_assertions))]
 mod dev_icon;
-#[cfg(all(debug_assertions, not(target_os = "android")))]
+// iOS keeps keys in the Keychain even in debug builds: the dev key file
+// lives at a path baked in from the build host, which a phone (or a CI
+// Simulator) cannot rely on.
+#[cfg(all(debug_assertions, not(any(target_os = "android", target_os = "ios"))))]
 mod dev_secrets;
 mod annotate;
 mod capture;
 mod coderun;
 mod game_line;
-#[cfg(desktop)]
+// Deep-link parsing, routing and the pending-link drain serve every
+// platform (iOS/Android open URLs too); the summon kit, tray and sleep
+// guards inside stay `#[cfg(desktop)]`.
 mod desktop;
 mod dictation;
 mod fetch;
@@ -18,6 +23,8 @@ mod og_image;
 mod page_text;
 #[cfg(target_os = "windows")]
 mod ocr_windows;
+#[cfg(target_os = "windows")]
+mod send_selection;
 #[cfg(target_os = "linux")]
 mod ocr_linux;
 mod dictate_linux;
@@ -142,7 +149,7 @@ fn keychain_get(account: String) -> Result<Option<String>, String> {
         // Dev builds: the gitignored key file answers first (see
         // dev_secrets); only a key it has never seen reads the
         // Keychain, once, and is copied into the file.
-        #[cfg(debug_assertions)]
+        #[cfg(all(debug_assertions, not(target_os = "ios")))]
         if let Some(known) = dev_secrets::lookup(&dev_secrets::store_path(), &account) {
             return Ok(known);
         }
@@ -156,7 +163,7 @@ fn keychain_get(account: String) -> Result<Option<String>, String> {
             Err(keyring::Error::NoEntry) => Ok(None),
             Err(e) => Err(e.to_string()),
         };
-        #[cfg(debug_assertions)]
+        #[cfg(all(debug_assertions, not(target_os = "ios")))]
         if let Ok(Some(secret)) = &read {
             let _ = dev_secrets::record(&dev_secrets::store_path(), &account, Some(secret.clone()));
         }
@@ -174,9 +181,9 @@ fn keychain_set(account: String, secret: String) -> Result<(), String> {
     {
         // Dev builds write the key file only: a Keychain write from a
         // rebuilt dev binary asks for the password too.
-        #[cfg(debug_assertions)]
+        #[cfg(all(debug_assertions, not(target_os = "ios")))]
         return dev_secrets::record(&dev_secrets::store_path(), &account, Some(secret));
-        #[cfg(not(debug_assertions))]
+        #[cfg(any(not(debug_assertions), target_os = "ios"))]
         {
             let entry =
                 keyring::Entry::new(KEYCHAIN_SERVICE, &account).map_err(|e| e.to_string())?;
@@ -278,12 +285,12 @@ fn keychain_delete(account: String) -> Result<(), String> {
     {
         // Dev builds: remember the deletion in the key file (its null
         // keeps the old Keychain copy from coming back).
-        #[cfg(debug_assertions)]
+        #[cfg(all(debug_assertions, not(target_os = "ios")))]
         return dev_secrets::record(&dev_secrets::store_path(), &account, None);
-        #[cfg(not(debug_assertions))]
+        #[cfg(any(not(debug_assertions), target_os = "ios"))]
         let entry =
             keyring::Entry::new(KEYCHAIN_SERVICE, &account).map_err(|e| e.to_string())?;
-        #[cfg(not(debug_assertions))]
+        #[cfg(any(not(debug_assertions), target_os = "ios"))]
         match entry.delete_credential() {
             Ok(()) | Err(keyring::Error::NoEntry) => {
                 memo_put(&account, Ok(None));
@@ -332,7 +339,26 @@ pub fn run() {
         .plugin(tauri_plugin_haptics::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_process::init());
+        .plugin(tauri_plugin_process::init())
+        // OS URL-scheme registration (`ccez-llm://`, see desktop.rs):
+        // the bundler writes it from `plugins.deep-link` in
+        // tauri.conf.json (NSIS registry keys, macOS/iOS URL types,
+        // Android intent filters).
+        .plugin(tauri_plugin_deep_link::init());
+    // Remembered window size, position and maximized state (desktop).
+    // Visibility stays out so a launch never opens hidden; the overlay
+    // windows (area picker, game line) size themselves.
+    #[cfg(desktop)]
+    let builder = builder.plugin(
+        tauri_plugin_window_state::Builder::new()
+            .with_state_flags(
+                tauri_plugin_window_state::StateFlags::all()
+                    - tauri_plugin_window_state::StateFlags::VISIBLE
+                    - tauri_plugin_window_state::StateFlags::DECORATIONS,
+            )
+            .with_denylist(&["area-pick", "game-line"])
+            .build(),
+    );
     // Global summon chord (desktop only — the plugin crate does not
     // compile for mobile; same shape as the on_menu_event link below).
     #[cfg(desktop)]
@@ -357,7 +383,6 @@ pub fn run() {
             desktop::desktop_sleep_unblock,
             #[cfg(desktop)]
             desktop::desktop_export_study_sheet,
-            #[cfg(desktop)]
             desktop::desktop_drain_pending_link,
             keychain_get,
             keychain_set,
@@ -420,9 +445,32 @@ pub fn run() {
             if let Some(window) = tauri::Manager::get_webview_window(_app.handle(), "main") {
                 trafficlights::watch(window);
             }
-            // Native menu bar (desktop only; mobile has no menu bar).
-            #[cfg(desktop)]
+            // Native menu bar on macOS and Linux. Windows gets none: an
+            // in-window menu strip would restyle the app, and every
+            // item has an in-app key or control already.
+            #[cfg(all(desktop, not(target_os = "windows")))]
             _app.set_menu(menu::build(_app.handle())?)?;
+            // OS-delivered links (Apple events on macOS/iOS, intents on
+            // Android). Windows/Linux get links as launch args instead,
+            // handled by the singleton in desktop.rs.
+            #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                let handle = _app.handle().clone();
+                _app.deep_link().on_open_url(move |event| {
+                    for url in event.urls() {
+                        desktop::route_link(&handle, url.as_str());
+                    }
+                });
+            }
+            // Dev builds run unbundled, so nothing registered the
+            // scheme: register it for this user (installers own it in
+            // release builds, and their uninstallers remove it).
+            #[cfg(all(debug_assertions, any(target_os = "windows", target_os = "linux")))]
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                let _ = _app.deep_link().register_all();
+            }
             // Summon kit: tray, single instance, global hotkey, deep links.
             #[cfg(desktop)]
             desktop::wire(_app.handle())?;
