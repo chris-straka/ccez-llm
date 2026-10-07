@@ -94,7 +94,11 @@
 		listProviders,
 		type ProviderId
 	} from "$lib/providers/registry";
-	import { offlineTarget, onlineRestore } from "$lib/offline";
+	import {
+		OFFLINE_FALLBACK_ID,
+		offlineTarget,
+		onlineRestore
+	} from "$lib/offline";
 	import { mockProviderEnabled } from "$lib/providers/mock";
 	import { ProviderKeys } from "$lib/provider-keys.svelte";
 	import {
@@ -6969,7 +6973,14 @@ import {
 	 * in-memory keys to disk next to the stored copy.
 	 */
 	function saveSettingsNow(source?: AppSettings): void {
-		const snapshot = source ?? $state.snapshot(settings);
+		const live = source ?? $state.snapshot(settings);
+		// Offline parking is session state: disk keeps the parked-from
+		// provider, so a reload while offline can't strand the user on
+		// the on-device fallback (the mount re-parks if still offline).
+		const snapshot =
+			offlineParkedFrom !== null && live.activeProviderId === OFFLINE_FALLBACK_ID
+				? { ...live, activeProviderId: offlineParkedFrom }
+				: live;
 		void (async () => {
 			await persistSecrets(snapshot);
 			saveSettings(
