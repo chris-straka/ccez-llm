@@ -1986,7 +1986,13 @@ mod tests {
             TurnOutcome::Done(content, _) => assert_eq!(content, "the answer"),
             other => panic!("expected done, got {other:?}"),
         }
-        let started = rec.fetches.lock().unwrap().iter().filter(|(start, _)| *start).count();
+        let started = rec
+            .fetches
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(start, _)| *start)
+            .count();
         assert_eq!(started, 3);
         let bodies = bodies.lock().unwrap();
         assert_eq!(bodies.len(), 4);
