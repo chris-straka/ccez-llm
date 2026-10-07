@@ -620,6 +620,14 @@ pub(crate) fn focus_main<R: Runtime>(app: &AppHandle<R>) {
         let _ = window.show();
         let _ = window.unminimize();
         let _ = window.set_focus();
+        // Windows can activate a window without raising it (seen in the
+        // test VM: a deep link left the app active under Notepad); a
+        // topmost flip puts it above the other windows.
+        #[cfg(target_os = "windows")]
+        {
+            let _ = window.set_always_on_top(true);
+            let _ = window.set_always_on_top(false);
+        }
     }
 }
 
