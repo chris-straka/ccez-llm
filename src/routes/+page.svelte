@@ -35,6 +35,7 @@
 		tokenSplit,
 		waypoints,
 		waypointIndexAt,
+		waypointOffsets,
 		sendMessage,
 		fileAssistantMessage,
 		setPasteFold,
@@ -890,16 +891,14 @@ import {
 			wpPos = 1;
 			return;
 		}
-		// Offsets in message order (a missing node ends the run);
+		// Offsets in message order (trimmed rows count as passed);
 		// the position math lives in chat (pure, tested).
-		const top = box.scrollTop;
-		const offsets: number[] = [];
-		for (const p of points) {
-			const el = box.querySelector<HTMLElement>(`#msg-${p}`);
-			if (!el) break;
-			offsets.push(el.offsetTop);
-		}
-		wpPos = waypointIndexAt(offsets, top);
+		const offsets = waypointOffsets(
+			points,
+			trimPointIndex(activeChat(chatState)),
+			(p) => box.querySelector<HTMLElement>(`#msg-${p}`)?.offsetTop ?? null
+		);
+		wpPos = waypointIndexAt(offsets, box.scrollTop);
 	}
 	/** Pinned menu dismisses on outside press: the trigger hides while
 	the panel is up, so there is nothing left to toggle it shut. */

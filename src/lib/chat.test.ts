@@ -30,6 +30,7 @@ import {
 	formatTokens,
 	waypoints,
 	waypointIndexAt,
+	waypointOffsets,
 	waypointLabel,
 	sendMessage,
 	fileAssistantMessage,
@@ -827,6 +828,19 @@ describe("chat", () => {
 		expect(waypointIndexAt([0, 500, 1000], 2000)).toBe(3);
 		expect(waypointIndexAt([], 0)).toBe(1);
 		expect(waypointIndexAt([5000], 0)).toBe(1);
+	});
+
+	it("counts trimmed waypoints as passed instead of stopping at them", () => {
+		// Points 0 and 2 sit in the trim (unrendered); 4 and 6 render.
+		const tops = new Map([
+			[4, 0],
+			[6, 900]
+		]);
+		const offsets = waypointOffsets([0, 2, 4, 6], 3, (p) => tops.get(p) ?? null);
+		expect(waypointIndexAt(offsets, 1000)).toBe(4);
+		expect(waypointIndexAt(offsets, 0)).toBe(3);
+		// No trim: a missing node still ends the run.
+		expect(waypointOffsets([0, 2], -1, (p) => (p === 0 ? 10 : null))).toEqual([10]);
 	});
 
 	it("labels waypoint targets with a collapsed excerpt", () => {
