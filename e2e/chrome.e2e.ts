@@ -1423,7 +1423,9 @@ test("language re-pick updates send instantly and focuses prompt", async ({
 	await expect(panel).toContainText("Czech news");
 	expect(await focusedComposer()).toBe(false);
 	// Re-picking the active option clears (no number key): news
-	// closes and focus lands in the composer.
+	// closes and focus lands in the composer — even after reading the
+	// headlines longer than the composer's 0.25s hide transition.
+	await page.waitForTimeout(400);
 	await pill.click();
 	await page.locator(".lang-list button.selected").click();
 	await expect(send).toHaveText("↑");

@@ -8296,7 +8296,10 @@ import {
 			// Phones stay unfocused: auto-focus pops
 			// the keyboard over the composer instead
 			// of pushing it up. Tap in when ready.
-			if (!androidUI && newsMode.news === null) editor?.focus();
+			// After the flush: closing news un-hides the composer, and
+			// a still-hidden field drops focus silently.
+			if (!androidUI && newsMode.news === null)
+				void tick().then(() => editor?.focus());
 		}
 	};
 
