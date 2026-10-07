@@ -108,6 +108,9 @@ for _ in $(seq 1 60); do
   sleep 2
 done
 shot first-run 2
+# The app asks for notification permission at launch (reply-ready
+# pings, like Android); accept so the alert doesn't cover later flows.
+tap_ax '^Allow$' || true
 
 # The share extension registers with the system (Share sheet entry).
 xcrun simctl spawn "$UDID" pluginkit -m -v -p com.apple.share-services > "$OUT/share-extensions.txt" 2>&1
