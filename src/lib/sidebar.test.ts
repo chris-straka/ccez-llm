@@ -84,6 +84,14 @@ describe("chatTitle", () => {
 		).toBe("Was heißt über? Und unter?");
 	});
 
+	it("never cuts an emoji in half", () => {
+		const title = chatTitle(
+			chat("a", 1, [msg("1", "user", `${"x".repeat(79)}😀 and more after it`)])
+		);
+		expect(title).toBe(`${"x".repeat(79)}😀…`);
+		expect(title).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
+	});
+
 	it("drops code blocks and keeps link text", () => {
 		expect(
 			chatTitle(
