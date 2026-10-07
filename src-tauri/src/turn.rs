@@ -198,6 +198,48 @@ fn extract_sse_payloads(remainder: &str, chunk: &str) -> (Vec<String>, String) {
     (payloads, text[start..].to_string())
 }
 
+/// Byte-level SSE reader over `extract_sse_payloads`: network chunks
+/// can cut a UTF-8 character or a CRLF in half, so the trailing partial
+/// character and a trailing `\r` wait for the next chunk instead of
+/// decoding as U+FFFD or as an extra blank line.
+#[derive(Default)]
+struct SseDecoder {
+    bytes: Vec<u8>,
+    remainder: String,
+}
+
+impl SseDecoder {
+    fn push(&mut self, chunk: &[u8]) -> Vec<String> {
+        self.bytes.extend_from_slice(chunk);
+        let mut keep = match std::str::from_utf8(&self.bytes) {
+            Ok(_) => 0,
+            // An incomplete character at the end (no error length).
+            Err(e) if e.error_len().is_none() => self.bytes.len() - e.valid_up_to(),
+            Err(_) => 0,
+        };
+        if keep == 0 && self.bytes.last() == Some(&b'\r') {
+            keep = 1;
+        }
+        let tail = self.bytes.split_off(self.bytes.len() - keep);
+        let text = String::from_utf8_lossy(&self.bytes).into_owned();
+        self.bytes = tail;
+        let (payloads, rest) = extract_sse_payloads(&self.remainder, &text);
+        self.remainder = rest;
+        payloads
+    }
+
+    /// The stream ended: a last event without its blank line still counts.
+    fn finish(&mut self) -> Vec<String> {
+        let text = String::from_utf8_lossy(&std::mem::take(&mut self.bytes)).into_owned();
+        let (mut payloads, rest) =
+            extract_sse_payloads(&std::mem::take(&mut self.remainder), &text);
+        if rest.lines().any(|line| line.starts_with("data:")) {
+            payloads.extend(extract_sse_payloads(&rest, "\n\n").0);
+        }
+        payloads
+    }
+}
+
 /// One fragmented tool call off the wire: index-joined by the caller.
 #[derive(Clone, Debug, Default, PartialEq)]
 struct ToolFrag {
@@ -487,6 +529,32 @@ fn classify_send_error(error: reqwest::Error) -> AttemptEnd {
     AttemptEnd::Retryable(None)
 }
 
+/// Fold stream payloads into the reply: tokens, tool fragments, usage.
+fn take_payloads(
+    payloads: Vec<String>,
+    content: &mut String,
+    frags: &mut Vec<ToolFrag>,
+    usage: &mut Option<TurnUsage>,
+    ev: &mut AttemptEvents,
+) {
+    for payload in payloads {
+        if payload.trim() == "[DONE]" {
+            break;
+        }
+        if let Ok(value) = serde_json::from_str::<serde_json::Value>(&payload) {
+            if let Some(found) = usage_from(&value) {
+                *usage = Some(found);
+            }
+        }
+        let (token, frag) = delta_from_payload(&payload);
+        if !token.is_empty() {
+            content.push_str(&token);
+            (ev.on_token)(token);
+        }
+        frags.extend(frag);
+    }
+}
+
 /// Read one SSE stream into content + joined tool fragments, emitting
 /// tokens as they land. Transport cuts read as retryable (the turn
 /// recomputes); the deadline guards hung sockets.
@@ -496,8 +564,7 @@ async fn read_stream(
     ev: &mut AttemptEvents,
 ) -> Result<(String, Vec<ToolFrag>, Option<TurnUsage>), AttemptEnd> {
     let mut response = res;
-    let mut text = String::new();
-    let mut remainder = String::new();
+    let mut decoder = SseDecoder::default();
     let mut content = String::new();
     let mut frags: Vec<ToolFrag> = Vec::new();
     let mut usage: Option<TurnUsage> = None;
@@ -509,29 +576,17 @@ async fn read_stream(
             return Err(AttemptEnd::Retryable(None));
         }
         match response.chunk().await {
-            Ok(Some(bytes)) => {
-                text.push_str(&String::from_utf8_lossy(&bytes));
-                let (payloads, rest) = extract_sse_payloads(&remainder, &text);
-                remainder = rest;
-                text.clear();
-                for payload in payloads {
-                    if payload.trim() == "[DONE]" {
-                        break;
-                    }
-                    if let Ok(value) = serde_json::from_str::<serde_json::Value>(&payload) {
-                        if let Some(found) = usage_from(&value) {
-                            usage = Some(found);
-                        }
-                    }
-                    let (token, frag) = delta_from_payload(&payload);
-                    if !token.is_empty() {
-                        content.push_str(&token);
-                        (ev.on_token)(token);
-                    }
-                    frags.extend(frag);
-                }
+            Ok(Some(bytes)) => take_payloads(
+                decoder.push(&bytes),
+                &mut content,
+                &mut frags,
+                &mut usage,
+                ev,
+            ),
+            Ok(None) => {
+                take_payloads(decoder.finish(), &mut content, &mut frags, &mut usage, ev);
+                break;
             }
-            Ok(None) => break,
             Err(error) => {
                 // Same transport rule as send-time: a cut stream
                 // recomputes, whatever the hyper spelling.
@@ -1460,6 +1515,34 @@ mod tests {
         let (more, rest) = extract_sse_payloads(&rest, "2}\n\n");
         assert_eq!(more, vec!["{\"b\":2}".to_string()]);
         assert_eq!(rest, "");
+    }
+
+    #[test]
+    fn sse_decoder_keeps_characters_cut_between_chunks() {
+        let body = "data: {\"choices\":[{\"delta\":{\"content\":\"日本\"}}]}\n\n".as_bytes();
+        let cut = body.iter().position(|b| *b >= 0x80).expect("multibyte") + 1;
+        let mut decoder = SseDecoder::default();
+        let mut payloads = decoder.push(&body[..cut]);
+        payloads.extend(decoder.push(&body[cut..]));
+        assert_eq!(payloads.len(), 1);
+        assert_eq!(delta_from_payload(&payloads[0]).0, "日本");
+    }
+
+    #[test]
+    fn sse_decoder_holds_a_crlf_cut_between_chunks() {
+        let mut decoder = SseDecoder::default();
+        let mut payloads = decoder.push(b"data: line1\r");
+        payloads.extend(decoder.push(b"\ndata: line2\r\n\r\n"));
+        assert_eq!(payloads, vec!["line1\nline2".to_string()]);
+    }
+
+    #[test]
+    fn sse_decoder_flushes_an_unclosed_last_event() {
+        let mut decoder = SseDecoder::default();
+        let mut payloads = decoder.push(b"data: {\"a\":1}\n\ndata: {\"usage\":2}\n");
+        payloads.extend(decoder.finish());
+        assert_eq!(payloads, vec!["{\"a\":1}".to_string(), "{\"usage\":2}".to_string()]);
+        assert!(SseDecoder::default().finish().is_empty());
     }
 
     #[test]
