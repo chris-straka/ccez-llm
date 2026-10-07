@@ -28,8 +28,12 @@ export const DEV_UPDATE_MESSAGE =
 export function updateRouteFor(
 	androidUI: boolean,
 	inShell = true,
-	isDev = false
+	isDev = false,
+	isIOS = false
 ): UpdateRoute {
+	// iPhone/iPad builds update through the App Store or TestFlight:
+	// no APK, no updater manifest, so the panel offers nothing.
+	if (isIOS && inShell) return { kind: "none" };
 	// Release shells self-update in app (download + installer); dev
 	// and browser previews keep the releases link instead.
 	if (androidUI) {
