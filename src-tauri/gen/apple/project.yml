@@ -126,4 +126,4 @@ targets:
         SWIFT_VERSION: "5.0"
         ARCHS: [arm64]
         TARGETED_DEVICE_FAMILY: "1,2"
-        APPLICATION_EXTENSION_API_ONLY: false
+        APPLICATION_EXTENSION_API_ONLY: true
