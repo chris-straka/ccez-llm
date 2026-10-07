@@ -177,6 +177,7 @@ only this drawer through scoping. -->
 					<button
 						type="button"
 						class="side-chat"
+						data-chat-id={item.id}
 						class:active={item.id === activeId}
 						onclick={() => {
 							if (heldOpen) {

@@ -454,6 +454,46 @@ test.describe("sidebar search", () => {
 		await page.getByLabel("Clear chat search").click();
 		await expect(page.locator("aside ul li")).toHaveCount(3);
 	});
+
+	const storedIds = (page: Page) =>
+		page.evaluate(() =>
+			(
+				JSON.parse(
+					window.localStorage.getItem("ccez-llm-chats-v1") ?? "[]"
+				) as Array<{ id: string }>
+			).map((c) => c.id)
+		);
+
+	test("Delete on a filtered row drops that chat, not the cursor's", async ({
+		page
+	}) => {
+		await seedThreeChats(page);
+		await toggleSidebar(page);
+		await page.getByLabel("Search chats").fill("sushi");
+		const rows = page.locator("aside ul li button.side-chat");
+		await expect(rows).toHaveCount(1);
+		// Tab-style focus: no click, so only focus says which row.
+		await rows.first().focus();
+		await page.keyboard.press("Delete");
+		await expect.poll(() => storedIds(page)).not.toContain("chat-sushi");
+		expect(await storedIds(page)).toEqual(
+			expect.arrayContaining(["chat-ramen", "chat-cjk"])
+		);
+	});
+
+	test("Enter on a focused row opens that chat", async ({ page }) => {
+		await seedThreeChats(page);
+		await toggleSidebar(page);
+		const rows = page.locator("aside ul li button.side-chat");
+		await expect(rows).toHaveCount(3);
+		const target = rows.filter({ hasText: "sushi" });
+		await target.focus();
+		await page.keyboard.press("Enter");
+		await expect(page.locator("article .rendered").first()).toContainText(
+			"sushi rice vinegar ratio"
+		);
+		expect(await storedIds(page)).toHaveLength(3);
+	});
 });
 
 test.describe("touch paths", () => {

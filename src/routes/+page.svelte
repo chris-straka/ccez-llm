@@ -3887,6 +3887,25 @@ import {
 		armActionsTimer(id);
 	}
 	/** Focus a sidebar chat button by list position (clamped). */
+	/**
+	 * The chat the list's keys act on: the focused row when focus sits
+	 * on one (Tab and clicks move focus without the cursor), else the
+	 * cursor. `sideIdx` indexes the visible (filtered) rows, never the
+	 * full list. Syncs the cursor to what it returns.
+	 */
+	function sideCursorChat(
+		target: EventTarget | null
+	): (typeof chatState.chats)[number] | null {
+		const visible = sideVisibleChats();
+		const row = closestFromTarget(target, "aside ul li button.side-chat");
+		const id = row instanceof HTMLElement ? row.dataset["chatId"] : undefined;
+		const byRow = id ? visible.findIndex((c) => c.id === id) : -1;
+		const at = byRow >= 0 ? byRow : clampChatIndex(sideIdx, visible.length);
+		if (at === null) return null;
+		sideIdx = at;
+		return visible[at] ?? null;
+	}
+
 	function focusSideChat(index: number): void {
 		const items = [
 			...document.querySelectorAll<HTMLElement>("aside ul li button.side-chat")
@@ -3959,7 +3978,7 @@ import {
 			return;
 		}
 		if (step.kind !== "goto") return;
-		sideIdx = step.index;
+		sideIdx = sideVisibleChats().findIndex((c) => c.id === step.id);
 		buzzBeat("send");
 		transitionToChat(step.id);
 		// Landing is the switch effect's job (filed position, else
@@ -3968,13 +3987,9 @@ import {
 	}
 
 	/** Enter the cursor chat from the keyboard, close the list, and land in its prompt. */
-	function enterSideChat(): void {
-		const chats = chatState.chats;
-		const at = clampChatIndex(sideIdx, chats.length);
-		if (at === null) return;
-		const item = chats[at];
+	function enterSideChat(target: EventTarget | null = null): void {
+		const item = sideCursorChat(target);
 		if (!item) return;
-		sideIdx = chats.indexOf(item);
 		transitionToChat(item.id);
 		settings.sidebarCollapsed = true;
 		persistSettings();
@@ -3987,14 +4002,12 @@ import {
 	 * empties). The list re-renders async, so clamp the cursor now and
 	 * focus the laid-out row on the next frame.
 	 */
-	function deleteSideChat(): void {
-		const chats = chatState.chats;
-		const at = clampChatIndex(sideIdx, chats.length);
-		if (at === null) return;
-		const item = chats[at];
+	function deleteSideChat(target: EventTarget | null = null): void {
+		const item = sideCursorChat(target);
 		if (!item) return;
+		const at = sideIdx;
 		dropChat(item.id);
-		sideIdx = clampChatIndex(at, chatState.chats.length) ?? -1;
+		sideIdx = clampChatIndex(at, sideVisibleChats().length) ?? -1;
 		requestAnimationFrame(() => focusSideChat(sideIdx));
 	}
 
@@ -11112,11 +11125,12 @@ import {
 				// Walking switches to each chat (preview-as-you-go).
 				event.preventDefault();
 				const delta = sideAction === "walk-down" ? 1 : -1;
-				const chats = chatState.chats;
-				const from =
-					sideIdx >= 0
-						? sideIdx
-						: chats.findIndex((c) => c.id === chatState.activeChatId);
+				const chats = sideVisibleChats();
+				let from = chats.findIndex((c) => c.id === chatState.activeChatId);
+				if (sideIdx >= 0 || isChatRowTarget(event.target)) {
+					sideCursorChat(event.target);
+					from = sideIdx;
+				}
 				focusSideChat(from + delta);
 				const landed = chats[Math.min(Math.max(sideIdx, 0), chats.length - 1)];
 				if (landed) transitionToChat(landed.id);
@@ -11131,18 +11145,19 @@ import {
 				settings.sidebarCollapsed = true;
 				persistSettings();
 				if (
-					resolveSidebarSpaceEnter(sideIdx, chatState.chats.length).kind ===
-					"stay"
+					!isChatRowTarget(event.target) &&
+					resolveSidebarSpaceEnter(sideIdx, sideVisibleChats().length).kind ===
+						"stay"
 				) {
 					enterEditMode();
-				} else enterSideChat();
+				} else enterSideChat(event.target);
 				return;
 			}
 			if (sideAction === "delete-chat") {
 				// Delete drops the focused chat and lands on the one
 				// below (or a fresh blank when the list empties).
 				event.preventDefault();
-				deleteSideChat();
+				deleteSideChat(event.target);
 				return;
 			}
 			// Bare Space never changes modes: it belongs to typing and
@@ -13192,7 +13207,7 @@ import {
 				// parked prompt stays parked — summoning is one
 				// keypress away). Keyboard Enter (enterSideChat) still
 				// lands in the prompt; hands are already on keys there.
-				sideIdx = chatState.chats.findIndex((c) => c.id === id);
+				sideIdx = sideVisibleChats().findIndex((c) => c.id === id);
 				transitionToChat(id);
 				settings.sidebarCollapsed = true;
 				persistSettings();
