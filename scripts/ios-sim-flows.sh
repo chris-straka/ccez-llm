@@ -91,6 +91,45 @@ tap_ax() {
   return 1
 }
 
+# WKWebView content is missing from describe-all but answers hit tests:
+# walk a vertical line of points and report the first element whose
+# label or value matches, as "x y". Usage: scan_xy <regex> [x]
+scan_xy() {
+  [ "$HAVE_IDB" = 1 ] || return 1
+  local pat="$1" x="${2:-120}" y
+  for y in $(seq 60 10 800); do
+    idb ui describe-point --udid "$UDID" --json "$x" "$y" 2>/dev/null | python3 -c '
+import json, re, sys
+try:
+    e = json.load(sys.stdin)
+except ValueError:
+    sys.exit(1)
+if isinstance(e, list):
+    e = e[0] if e else {}
+fields = [str(e.get(k) or "").strip() for k in ("AXLabel", "AXValue", "title")]
+if any(f and re.search(sys.argv[1], f, re.I) for f in fields):
+    f = e["frame"]
+    print(int(f["x"] + f["width"] / 2), int(f["y"] + f["height"] / 2))
+    sys.exit(0)
+sys.exit(1)' "$pat" && return 0
+  done
+  return 1
+}
+
+# Tap what scan_xy finds, else the fallback point.
+# Usage: tap_scan <regex> [x] [fallback_x fallback_y]
+tap_scan() {
+  local xy
+  if ! xy="$(scan_xy "$1" "${2:-120}")"; then
+    [ -n "${3:-}" ] || { echo "  no element for /$1/"; return 1; }
+    xy="$3 $4"
+    echo "  /$1/ not found by scan; tapping $xy"
+  fi
+  # shellcheck disable=SC2086
+  idb ui tap --udid "$UDID" $xy
+  sleep 1
+}
+
 type_text() { [ "$HAVE_IDB" = 1 ] && idb ui text --udid "$UDID" "$1" && sleep 0.5; }
 
 # iOS asks before a custom-scheme URL opens an app; accept it.
@@ -116,33 +155,39 @@ tap_ax '^Allow$' || true
 xcrun simctl spawn "$UDID" pluginkit -m -v -p com.apple.share-services > "$OUT/share-extensions.txt" 2>&1
 grep -q "studio.ccez.app.share" "$OUT/share-extensions.txt" && echo "share extension: registered" || echo "share extension: NOT registered"
 
-# Share sheet path: the extension opens exactly this URL.
-open_url "ccez-llm://send?text=Bonjour%2C%20je%20voudrais%20un%20caf%C3%A9."
-shot share-text-prefill 3
-
 # Settings: swipe in from the right edge (the Android gesture).
 idb ui swipe --udid "$UDID" --duration 0.3 372 420 120 420
 shot settings 2
 
-# Chat against the mock endpoint: add it as a custom provider.
-tap_ax 'Add a custom provider'
-tap_ax '^Name' 'Text' && type_text 'Mock tutor'
-tap_ax 'Base URL' 'Text' && type_text 'http://127.0.0.1:8787/v1'
-tap_ax '^Model' 'Text' && type_text 'mock-tutor'
-tap_ax '^Add provider$'
+# Chat against the mock endpoint: add it as a custom provider. Points
+# come from the 375x812 layout; the scans find them when they move.
+tap_scan 'Add a custom provider' 100 100 200
+sleep 1
+tap_scan '^Name$|e\.g\. Kimi' 180 180 270 && type_text 'Mock tutor'
+tap_scan 'api\.example\.com' 180 180 343 && type_text 'http://127.0.0.1:8787/v1'
+tap_scan '^model-id$' 180 180 416 && type_text 'mock-tutor'
+tap_scan '^Add provider$' 60 60 462
 shot custom-provider 2
-tap_ax 'API key' 'Text' && type_text 'sk-local-mock'
+# The key field sits under its label and has no placeholder.
+if KEY="$(scan_xy '^API key' 40)"; then
+  idb ui tap --udid "$UDID" 140 $(( ${KEY#* } + 34 ))
+  type_text 'sk-local-mock'
+else
+  echo "  API key label not found"
+fi
+shot provider-key 1
 # Close the settings sheet: swipe it back out to the right.
 idb ui swipe --udid "$UDID" --duration 0.3 40 420 360 420
 sleep 2
-tap_ax 'TextArea|Message|Ask' 'Text' || idb ui tap --udid "$UDID" 187 760
+idb ui tap --udid "$UDID" 150 733
 type_text 'How do I politely order a coffee in French?'
-tap_ax '^Send' || idb ui key --udid "$UDID" 40
+idb ui tap --udid "$UDID" 328 769
 shot chat 8
 
-# A fresh chat through the deep link.
+# Share sheet path: the extension opens exactly this URL.
 open_url "ccez-llm://new"
-shot deeplink-new-chat 3
+open_url "ccez-llm://send?text=Bonjour%2C%20je%20voudrais%20un%20caf%C3%A9."
+shot share-text-prefill 3
 
 xcrun simctl spawn "$UDID" log show --last 10m --predicate "process CONTAINS 'Ccez'" --style compact > "$OUT/app.log" 2>&1
 exit 0
