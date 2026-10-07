@@ -12,6 +12,7 @@ import {
 	hitTag,
 	markSegments,
 	parseQuery,
+	plainSearchText,
 	querySearch,
 	tokenizeText,
 	type IndexableAnnotation,
@@ -208,6 +209,24 @@ describe("buildSearchDocs", () => {
 		expect(docs).toHaveLength(2);
 		expect(docs[1]?.kind).toBe("annotation");
 		expect(docs[1]?.at).toBe(1);
+	});
+
+	it("indexes messages as they read on screen, not their Markdown", () => {
+		const content =
+			"## Repères\n\nL'État d'**Israël a été fondé le 14 mai 1948**, _en bref_.\n\n" +
+			"- **15 mai 1948** : début\n> cité\n\n[la source](https://ex.test/a_b)\n\n" +
+			"```js\nlet snake_case = a * b;\n```\nUse `npm_i` and *vite*.";
+		expect(plainSearchText(content)).toBe(
+			"Repères\n\nL'État d'Israël a été fondé le 14 mai 1948, en bref.\n\n" +
+				"15 mai 1948 : début\ncité\n\nla source\n\n" +
+				" \nlet snake_case = a * b;\n \nUse npm_i and vite."
+		);
+		const [hit] = querySearch(
+			buildSearchDocs([{ id: "c", createdAt: 1, messages: [{ id: "m", content }] }], []),
+			"fonde le 14"
+		);
+		expect(hit?.snippet).not.toContain("*");
+		expect(hit?.snippet).toContain("fondé le 14 mai 1948");
 	});
 });
 

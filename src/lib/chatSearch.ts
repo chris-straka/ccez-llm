@@ -441,6 +441,24 @@ export function collectSearchAnnotations(
 }
 
 /** Flatten chats + annotations into indexable documents. */
+/**
+ * Message Markdown as it reads on screen, for indexing: emphasis,
+ * heading/quote/list markers, fence lines, and link targets go; code
+ * and link text stay. Snippets then show "14 mai 1948", never
+ * "**14 mai 1948**", and the words a hit flashes exist in the page.
+ */
+export function plainSearchText(markdown: string): string {
+	return markdown
+		.replace(/^[ \t]{0,3}(```|~~~).*$/gm, " ")
+		.replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+		.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+		.replace(/^[ \t]{0,3}(#{1,6}|>+|[-*+]|\d+[.)])[ \t]+/gm, "")
+		.replace(/(\*\*|__|~~)(?=\S)([\s\S]*?\S)\1/g, "$2")
+		.replace(/(^|[^\w*])\*(?=\S)([^*\n]*?\S)\*(?![\w*])/gm, "$1$2")
+		.replace(/(^|[^\w])_(?=\S)([^_\n]*?\S)_(?!\w)/gm, "$1$2")
+		.replace(/`([^`\n]+)`/g, "$1");
+}
+
 export function buildSearchDocs(
 	chats: SearchableChat[],
 	annotations: SearchableAnnotation[]
@@ -453,7 +471,7 @@ export function buildSearchDocs(
 				chatId: chat.id,
 				msgId: msg.id,
 				kind: "message",
-				text: msg.content,
+				text: plainSearchText(msg.content),
 				...(msg.role ? { role: msg.role } : {}),
 				at: chat.createdAt
 			});
