@@ -739,7 +739,13 @@ only this drawer through scoping. -->
 	:global(.app[data-android]) aside:not(.settings-panel) .side-search {
 		font-size: 1.15rem;
 		min-height: 4.5rem;
-		padding: 0.8rem 2.2rem 0.8rem 0.8rem;
+		padding: 0.8rem 3rem 0.8rem 0.8rem;
+	}
+	/* Thumb-sized clear (44px) inside the field's right padding. */
+	:global(.app[data-android]) aside:not(.settings-panel) .side-search-clear {
+		min-width: 2.75rem;
+		min-height: 2.75rem;
+		font-size: 1.15rem;
 	}
 	:global(.app[data-android]) aside:not(.settings-panel) ul {
 		flex: 1 1 auto;

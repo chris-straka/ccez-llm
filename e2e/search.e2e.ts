@@ -498,6 +498,28 @@ test.describe("touch paths", () => {
 		await expect(sidebar).not.toHaveClass(/collapsed/);
 	});
 
+	test("the sidebar search clear is a 44px thumb target", async ({
+		page
+	}) => {
+		await seedThreeChats(page);
+		await toggleSidebar(page);
+		const box = page.getByLabel("Search chats");
+		await box.fill("sushi");
+		const clear = page.getByLabel("Clear chat search");
+		const btn = (await clear.boundingBox())!;
+		const field = (await box.boundingBox())!;
+		expect(btn.width).toBeGreaterThanOrEqual(44);
+		expect(btn.height).toBeGreaterThanOrEqual(44);
+		// Inside the field, and the typed text stops short of it.
+		expect(btn.x + btn.width).toBeLessThanOrEqual(field.x + field.width);
+		const padRight = await box.evaluate(
+			(el) => parseFloat(getComputedStyle(el).paddingRight)
+		);
+		expect(padRight).toBeGreaterThanOrEqual(btn.width);
+		await clear.click();
+		await expect(page.locator("aside ul li")).toHaveCount(3);
+	});
+
 	test("paste-images button appears with clipboard.read and reports an empty clipboard", async ({
 		page
 	}) => {
