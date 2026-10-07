@@ -155,10 +155,23 @@ tap_ax '^Allow$' || true
 xcrun simctl spawn "$UDID" pluginkit -m -v -p com.apple.share-services > "$OUT/share-extensions.txt" 2>&1
 grep -q "studio.ccez.app.share" "$OUT/share-extensions.txt" && echo "share extension: registered" || echo "share extension: NOT registered"
 
-# Settings: swipe in from the right edge (the Android gesture).
-idb ui swipe --udid "$UDID" --duration 0.3 372 420 120 420
-shot settings 2
+# Settings: swipe in from the right edge (the Android gesture), checked
+# by hit-testing its heading; a swipe that lands during an animation is
+# retried.
+in_settings() { scan_xy '^Model provider$' 60 >/dev/null; }
+sleep 2
+for _ in 1 2 3; do
+  idb ui swipe --udid "$UDID" --duration 0.3 372 420 120 420
+  sleep 2
+  in_settings && break
+done
+shot settings 1
+if ! in_settings; then
+  echo "  settings did not open; skipping the provider and chat flows"
+  SKIP_CHAT=1
+fi
 
+if [ -z "${SKIP_CHAT:-}" ]; then
 # Chat against the mock endpoint: add it as a custom provider. Points
 # come from the 375x812 layout; the scans find them when they move.
 tap_scan 'Add a custom provider' 100 100 200
@@ -177,12 +190,20 @@ else
 fi
 shot provider-key 1
 # Close the settings sheet: swipe it back out to the right.
-idb ui swipe --udid "$UDID" --duration 0.3 40 420 360 420
-sleep 2
+for _ in 1 2 3; do
+  idb ui swipe --udid "$UDID" --duration 0.3 40 420 360 420
+  sleep 2
+  in_settings || break
+done
 idb ui tap --udid "$UDID" 150 733
 type_text 'How do I politely order a coffee in French?'
-idb ui tap --udid "$UDID" 328 769
+sleep 1
+tap_scan '^Send' 328 328 769
+sleep 3
+# One retry when the first tap only dismissed the keyboard accessory.
+grep -q "chat request" "$OUT/mock-llm.log" || tap_scan '^Send' 328 328 769
 shot chat 8
+fi
 
 # Share sheet path: the extension opens exactly this URL.
 open_url "ccez-llm://new"
