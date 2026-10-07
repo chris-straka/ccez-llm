@@ -333,6 +333,29 @@ export function startSpeechError(facts: {
 	return "Voice not available.";
 }
 
+/**
+ * Web Speech error codes (`SpeechSynthesisErrorEvent.error`) in plain
+ * words: "synthesis-failed" is what a browser with no speech engine
+ * (headless or voice-less Linux) reports for every utterance. Other
+ * text passes through.
+ */
+export function webSpeechErrorCopy(message: string, inventoryEmpty: boolean): string {
+	switch (message) {
+		case "synthesis-failed":
+		case "synthesis-unavailable":
+		case "voice-unavailable":
+		case "language-unavailable":
+			return startSpeechError({ quiet: false, useNative: false, inventoryEmpty }) ?? message;
+		case "audio-busy":
+		case "audio-hardware":
+			return "The audio output is busy.";
+		case "network":
+			return "The voice needs a connection.";
+		default:
+			return message;
+	}
+}
+
 /** `startSpeech` error outcome: retry once on web voices, or report. */
 export type SpeechErrorStep = "fallback" | "report";
 

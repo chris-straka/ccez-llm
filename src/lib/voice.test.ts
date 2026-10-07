@@ -11,6 +11,7 @@ import {
 	speechAttemptable,
 	speechLangsFor,
 	startSpeechError,
+	webSpeechErrorCopy,
 	speechErrorStep,
 	replyLangFor,
 	sentenceSpeechLang,
@@ -505,5 +506,16 @@ describe("speech rate", () => {
 		expect(currentSpeechRate()).toBe(1.5);
 		setSpeechRate(Number.NaN);
 		expect(currentSpeechRate()).toBe(1);
+	});
+});
+
+describe("webSpeechErrorCopy", () => {
+	it("words engine failures by whether any voice exists", () => {
+		expect(webSpeechErrorCopy("synthesis-failed", true)).toBe(
+			"No voices on this device — check its text-to-speech settings."
+		);
+		expect(webSpeechErrorCopy("voice-unavailable", false)).toBe("Voice not available.");
+		expect(webSpeechErrorCopy("audio-busy", false)).toBe("The audio output is busy.");
+		expect(webSpeechErrorCopy("Something else.", false)).toBe("Something else.");
 	});
 });

@@ -550,6 +550,7 @@ import {
 		dictationInsert,
 		micUnavailableMessage,
 		startSpeechError,
+		webSpeechErrorCopy,
 		speechErrorStep,
 		punjabiSpeechText,
 		effectiveSpeechLang,
@@ -6388,7 +6389,10 @@ import {
 						onEnd: resetVoice,
 						onNaturalEnd,
 						onError: (webMessage) => {
-							if (!quiet) setVoiceError(webMessage);
+							if (!quiet)
+								setVoiceError(
+									webSpeechErrorCopy(webMessage, webVoices().length === 0)
+								);
 							resetVoice();
 						}
 					});
@@ -6396,7 +6400,11 @@ import {
 					return;
 				}
 				if (!quiet)
-					setVoiceError(useNative ? friendlyNativeError(message) : message);
+					setVoiceError(
+						useNative
+							? friendlyNativeError(message)
+							: webSpeechErrorCopy(message, webVoices().length === 0)
+					);
 				resetVoice();
 			}
 		};
