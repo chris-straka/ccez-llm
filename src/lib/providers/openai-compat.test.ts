@@ -746,6 +746,42 @@ describe("readSse", () => {
 	});
 });
 
+describe("listModels through the shell (no CORS on the gateway)", () => {
+	it("parses the native body and never touches fetch", async () => {
+		const fetchMock = vi.fn();
+		vi.stubGlobal("fetch", fetchMock);
+		const native = vi.fn(async () => ({
+			status: 200,
+			body: JSON.stringify({ data: [{ id: "glm-5.3" }, { id: "big-pickle" }] })
+		}));
+		const provider = new OpenAICompatProvider("opencode-zen", CONFIG, {
+			listModelsNative: native
+		});
+		await expect(provider.listModels()).resolves.toEqual(["big-pickle", "glm-5.3"]);
+		expect(native).toHaveBeenCalledWith("https://example.test/v1", "k");
+		expect(fetchMock).not.toHaveBeenCalled();
+	});
+
+	it("words native failures like fetch ones", async () => {
+		const failing = (res: { status: number; body: string } | Error) =>
+			new OpenAICompatProvider("opencode-zen", CONFIG, {
+				listModelsNative: async () => {
+					if (res instanceof Error) throw res;
+					return res;
+				}
+			}).listModels();
+		await expect(failing({ status: 401, body: "bad key" })).rejects.toThrow(
+			"opencode-zen model list failed (HTTP 401): bad key"
+		);
+		await expect(failing({ status: 200, body: "<html>" })).rejects.toThrow(
+			"opencode-zen model list was not JSON"
+		);
+		await expect(failing(new Error("dns failed"))).rejects.toThrow(
+			"Network error listing opencode-zen models: dns failed"
+		);
+	});
+});
+
 describe("listModels", () => {
 	it("reads sorted, de-duplicated ids from an OpenAI payload", async () => {
 		vi.stubGlobal(

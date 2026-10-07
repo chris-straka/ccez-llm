@@ -32,6 +32,7 @@ mod dictate_macos;
 mod dictate_windows;
 mod keyboard;
 mod langid;
+mod models;
 mod ondevice;
 #[cfg(desktop)]
 mod menu;
@@ -386,6 +387,7 @@ pub fn run() {
             desktop::desktop_drain_pending_link,
             keychain_get,
             keychain_set,
+            models::list_models,
             keychain_delete,
             open_voice_settings,
             open_screen_recording_settings,

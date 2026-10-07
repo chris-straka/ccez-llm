@@ -23,6 +23,12 @@ export interface OpenAICompatConfig {
 /** Injected seams (tests); the live default fetches real pages. */
 export interface OpenAICompatDeps {
 	fetchPage?: (url: string, signal?: AbortSignal) => Promise<string>;
+	/** `/models` outside the webview (gateways without CORS headers):
+	 * raw status and body, parsed and worded here like a fetch. */
+	listModelsNative?: (
+		baseUrl: string,
+		apiKey: string
+	) => Promise<{ status: number; body: string }>;
 }
 
 /** One model tool call off the wire. */
@@ -471,6 +477,28 @@ export class OpenAICompatProvider implements ChatProvider {
 	 * working as free text regardless.
 	 */
 	async listModels(): Promise<string[]> {
+		const native = this.deps.listModelsNative;
+		if (native) {
+			let res: { status: number; body: string };
+			try {
+				res = await native(this.config.baseUrl, this.config.apiKey);
+			} catch (error) {
+				throw new ProviderError(
+					`Network error listing ${this.id} models: ${messageOf(error)}`
+				);
+			}
+			if (res.status < 200 || res.status >= 300) {
+				throw new ProviderError(
+					`${this.id} model list failed (HTTP ${res.status}): ${res.body.slice(0, 300)}`,
+					res.status
+				);
+			}
+			try {
+				return parseModelIds(JSON.parse(res.body));
+			} catch {
+				throw new ProviderError(`${this.id} model list was not JSON`);
+			}
+		}
 		let res: Response;
 		try {
 			res = await fetch(this.url("/models"), { headers: this.headers() });
