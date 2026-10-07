@@ -10365,7 +10365,13 @@ import {
 			}
 			// Flashcards own the keyboard while open; closed, the
 			// shell chord opens them.
-			if (flashcards.key({ ...keyFacts(event), repeat: event.repeat })) {
+			if (
+				flashcards.key({
+					...keyFacts(event),
+					repeat: event.repeat,
+					onButton: closestFromTarget(event.target, ".deck button") !== null
+				})
+			) {
 				consumeEvent(event);
 				return;
 			}
