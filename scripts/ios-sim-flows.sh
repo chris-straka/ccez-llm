@@ -181,7 +181,11 @@ idb ui swipe --udid "$UDID" --duration 0.3 40 420 360 420
 sleep 2
 idb ui tap --udid "$UDID" 150 733
 type_text 'How do I politely order a coffee in French?'
-idb ui tap --udid "$UDID" 328 769
+sleep 1
+tap_scan '^Send' 328 328 769
+sleep 3
+# One retry when the first tap only dismissed the keyboard accessory.
+grep -q "chat request" "$OUT/mock-llm.log" || tap_scan '^Send' 328 328 769
 shot chat 8
 
 # Share sheet path: the extension opens exactly this URL.
