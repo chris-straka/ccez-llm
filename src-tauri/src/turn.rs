@@ -628,8 +628,11 @@ async fn post_stream(
         .map_err(classify_send_error)?;
     // A tools rejection reads as a plain turn, exactly like TypeScript's
     // 400 fallback — the reply still lands, just without page fetches.
+    // The body rides along as the content so a later round can report
+    // the server's reason (see `rejected_400`).
     if res.status().as_u16() == 400 && tools {
-        return Ok((400, String::new(), Vec::new(), None));
+        let head = res.text().await.unwrap_or_default();
+        return Ok((400, head.chars().take(300).collect(), Vec::new(), None));
     }
     if !res.status().is_success() {
         let status = res.status().as_u16();
@@ -837,8 +840,14 @@ async fn run_attempt(
     // land.
     let mut extra = 0;
     loop {
-        let (_, final_content, final_frags, final_usage) =
+        let (status, final_content, final_frags, final_usage) =
             post_stream(client, req, &history, true, deadline, ev).await?;
+        // Only the first request's 400 means "no tools here"; a later
+        // one (context grown past the limit by fetched pages) is a
+        // failure, never an empty answer.
+        if status == 400 {
+            return Err(rejected_400(&final_content));
+        }
         let more = join_calls(&final_frags)
             .into_iter()
             .take(MAX_CALLS_PER_ROUND)
@@ -853,6 +862,12 @@ async fn run_attempt(
         }
         run_fetch_batch(&mut history, &final_content, &more, page_fetch, ev).await?;
     }
+}
+
+/// A 400 past the first request: the provider's own reason, in the
+/// TypeScript engine's words.
+fn rejected_400(head: &str) -> AttemptEnd {
+    AttemptEnd::Fatal(format!("stream failed (HTTP 400): {head}"))
 }
 
 async fn post_stream_plain_fallback(
@@ -1896,6 +1911,58 @@ mod tests {
         assert_eq!(bodies.len(), 3);
         assert!(bodies[1].contains("call_1"));
         assert!(bodies[1].contains("page text here"));
+    }
+
+    #[test]
+    fn drive_reports_a_late_400_instead_of_an_empty_answer() {
+        let bodies = Arc::new(Mutex::new(Vec::new()));
+        let port = run_stub(
+            vec![
+                StubStep::Respond {
+                    status: 200,
+                    content_type: "text/event-stream",
+                    body: sse_tool_body("http://example.test/page"),
+                },
+                StubStep::Respond {
+                    status: 200,
+                    content_type: "application/json",
+                    body: json_followup_body(),
+                },
+                StubStep::Respond {
+                    status: 400,
+                    content_type: "application/json",
+                    body: b"context length exceeded".to_vec(),
+                },
+            ],
+            Arc::clone(&bodies),
+        );
+        let page_fetch: PageFetch = Arc::new(|_url: String| {
+            Box::pin(async move { Ok::<String, String>("a long page".to_string()) })
+                as Pin<Box<dyn Future<Output = Result<String, String>> + Send>>
+        });
+        let rec = Recorder {
+            tokens: Arc::new(Mutex::new(Vec::new())),
+            fetches: Arc::new(Mutex::new(Vec::new())),
+            retries: Arc::new(Mutex::new(0)),
+            retracts: Arc::new(Mutex::new(0)),
+        };
+        let client = reqwest_client().unwrap();
+        let req = test_request(port);
+        let outcome = tauri::async_runtime::block_on(drive_attempts(
+            &client,
+            &req,
+            "",
+            &page_fetch,
+            &[0],
+            &mut || test_events(&rec),
+        ));
+        match outcome {
+            TurnOutcome::Failed(error) => {
+                assert!(error.contains("HTTP 400"), "{error}");
+                assert!(error.contains("context length exceeded"), "{error}");
+            }
+            other => panic!("expected failed, got {other:?}"),
+        }
     }
 
     #[test]
