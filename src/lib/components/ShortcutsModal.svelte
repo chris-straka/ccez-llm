@@ -9,6 +9,7 @@ CSS to this markup). Row data already lives in `$lib/shortcuts`
 <script lang="ts">
 	import ActionIcon from "./ActionIcon.svelte";
 	import { tauriBackendAvailable } from "$lib/secrets";
+	import { currentPlatform } from "$lib/platform";
 	import {
 		desktopShortcuts,
 		filteredShortcuts,
@@ -53,7 +54,12 @@ CSS to this markup). Row data already lives in `$lib/shortcuts`
 			android
 				? filteredShortcuts(touchShortcuts(), query)
 				: filteredShortcuts(
-						desktopShortcuts(mac, tauriBackendAvailable(), flashcards),
+						desktopShortcuts(
+							mac,
+							tauriBackendAvailable(),
+							flashcards,
+							currentPlatform().isWindows
+						),
 						query
 					)
 		)

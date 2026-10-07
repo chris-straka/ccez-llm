@@ -25,6 +25,12 @@ describe("updateRouteFor", () => {
 
 	it("disables the updater on the web build (no Tauri shell)", () => {
 		expect(updateRouteFor(false, false)).toEqual({ kind: "none" });
+		// iOS shells update through the App Store, never the APK route.
+		expect(updateRouteFor(true, true, false, true)).toEqual({ kind: "none" });
+		expect(updateRouteFor(true, false, false, true)).toEqual({
+			kind: "releases",
+			url: RELEASES_URL
+		});
 		// Android keeps its releases route even without a shell (browser preview).
 		expect(updateRouteFor(true, false)).toEqual({
 			kind: "releases",

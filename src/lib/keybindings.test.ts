@@ -754,6 +754,43 @@ const chordBase: CommandChordFacts = {
 };
 
 describe("commandChord", () => {
+	it("follows Windows conventions off the Mac", () => {
+		const win = { ...chordBase, isMac: false };
+		expect(commandChord({ ...win, code: "F11", key: "F11" })).toBe(
+			"toggle-fullscreen"
+		);
+		expect(commandChord({ ...win, ctrlKey: true, code: "KeyE", key: "e" })).toBe(
+			"edit-newest"
+		);
+		// Win+E belongs to Explorer.
+		expect(commandChord({ ...win, metaKey: true, code: "KeyE", key: "e" })).toBe(
+			null
+		);
+		expect(commandChord({ ...win, ctrlKey: true, code: "KeyK", key: "k" })).toBe(
+			"toggle-palette"
+		);
+		expect(
+			commandChord({ ...win, ctrlKey: true, code: "KeyK", key: "k", inShell: false })
+		).toBe(null);
+		// The Mac keeps Ctrl+E (Cocoa end of line) and Ctrl+K (kill line).
+		expect(commandChord({ ...chordBase, ctrlKey: true, code: "KeyE", key: "e" })).toBe(
+			null
+		);
+		expect(commandChord({ ...chordBase, ctrlKey: true, code: "KeyK", key: "k" })).toBe(
+			null
+		);
+	});
+
+	it("ignores Ctrl+Alt chords while AltGr types a character", () => {
+		const altGr = { ...chordBase, isMac: false, ctrlKey: true, altKey: true, altGraph: true };
+		expect(commandChord({ ...altGr, code: "KeyS", key: "ś" })).toBe(null);
+		expect(commandChord({ ...altGr, code: "KeyN", key: "ń" })).toBe(null);
+		expect(commandChord({ ...altGr, key: "ArrowRight", code: "ArrowRight" })).toBe(null);
+		const ctrlAlt = { ...altGr, altGraph: false };
+		expect(commandChord({ ...ctrlAlt, code: "KeyS", key: "s" })).toBe("toggle-voice");
+		expect(commandChord({ ...ctrlAlt, code: "KeyN", key: "n" })).toBe("new-chat");
+	});
+
 	it("matches every chord-table entry", () => {
 		expect(commandChord({ ...chordBase, metaKey: true, code: "KeyP" })).toBe(
 			"toggle-palette"

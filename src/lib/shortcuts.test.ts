@@ -168,16 +168,42 @@ describe("shortcuts menu copy", () => {
 		expect(names).toEqual(MAC_NAMES.filter((n) => n !== "Flashcards"));
 	});
 
-	it("uses Ctrl labels off-mac with the same row names", () => {
+	it("uses Ctrl labels off-mac and drops the Mac-only capture rows", () => {
 		const rows = desktopShortcuts(false);
-		expect(rows.map((r) => r.name)).toEqual(MAC_NAMES);
+		const macOnly = ["Capture window text", "Set capture area"];
+		expect(rows.map((r) => r.name)).toEqual(
+			MAC_NAMES.filter((n) => !macOnly.includes(n))
+		);
 		const keys = new Map(rows.map((r) => [r.name, r.keys]));
 		expect(keys.get("Shortcuts")).toContain("Ctrl+Shift+/");
-		expect(keys.get("Search chats")).toBe("Ctrl+P");
+		expect(keys.get("Search chats")).toBe("Ctrl+K · Ctrl+P");
 		expect(keys.get("Delete")).toBe("Ctrl+Delete · Shift+D");
 		expect(keys.get("Delete this chat")).toBe("Ctrl+Shift+Delete");
-		expect(keys.get("Fullscreen")).toBe("Ctrl+Meta+F");
-		expect(keys.get("Edit newest message")).toBe("Meta+E");
+		expect(keys.get("Fullscreen")).toBe("F11");
+		expect(keys.get("Edit newest message")).toBe("Ctrl+E");
+		expect(keys.get("Text size")).toBe("Ctrl+Plus / Ctrl+Minus");
+		expect(keys.get("Chat width")).toBe("Ctrl+Shift+Plus / Ctrl+Shift+Minus");
+		expect(keys.get("Prompt text size")).toBe("Ctrl+[ / Ctrl+]");
+		expect(keys.get("Prompt width")).toBe("Ctrl+Shift+[ / Ctrl+Shift+]");
+	});
+
+	it("never shows a Mac glyph or Meta key off-mac", () => {
+		const text = desktopShortcuts(false, true, true, true)
+			.map((r) => `${r.name} ${r.keys}`)
+			.join("\n");
+		for (const glyph of ["⌘", "⌥", "⇧", "Meta", "Cmd", "Option"]) {
+			expect(text).not.toContain(glyph);
+		}
+	});
+
+	it("lists the send-text chord in the Windows shell only", () => {
+		const row = "Send selected text here";
+		const names = (isMac: boolean, inShell: boolean, isWindows: boolean) =>
+			desktopShortcuts(isMac, inShell, true, isWindows).map((r) => r.name);
+		expect(names(false, true, true)).toContain(row);
+		expect(names(false, false, true)).not.toContain(row);
+		expect(names(false, true, false)).not.toContain(row);
+		expect(names(true, true, false)).not.toContain(row);
 	});
 
 	it("never re-adds removed rows on either platform", () => {
@@ -282,7 +308,7 @@ describe("shortcuts menu copy", () => {
 			"Delete this chat"
 		]);
 		expect(
-			filteredShortcuts(desktopShortcuts(false), "CTRL+P").map((r) => r.name)
+			filteredShortcuts(desktopShortcuts(false), "CTRL+K").map((r) => r.name)
 		).toEqual(["Search chats"]);
 		expect(filteredShortcuts(rows, "zzz-no-such-row")).toEqual([]);
 		expect(

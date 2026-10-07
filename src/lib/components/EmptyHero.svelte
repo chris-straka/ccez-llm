@@ -47,7 +47,7 @@ pills become the top rail above the story cards. -->
 	.empty-state.news-mode {
 		margin-top: 1.75rem;
 	}
-	:global(.app[data-shell="tauri"]) .empty-state.news-mode {
+	:global(.app[data-titlebar="overlay"]) .empty-state.news-mode {
 		margin-top: calc(1.75rem + 1.15rem);
 	}
 	.hero {

@@ -1,13 +1,13 @@
 # Uncomment the next line to define a global platform for your project
 
-target 'ccez-studio_iOS' do
+target 'ccez-llm_iOS' do
 platform :ios, '14.0'
-  # Pods for ccez-studio_iOS
+  # Pods for ccez-llm_iOS
 end
 
-target 'ccez-studio_macOS' do
+target 'ccez-llm_macOS' do
 platform :osx, '11.0'
-  # Pods for ccez-studio_macOS
+  # Pods for ccez-llm_macOS
 end
 
 # Delete the deployment target for iOS and macOS, causing it to be inherited from the Podfile

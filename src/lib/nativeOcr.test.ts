@@ -86,7 +86,7 @@ describe("isOcrUnsupported", () => {
 describe("friendlyOcrError", () => {
 	it("maps non-macOS builds to the browser-preview note", () => {
 		expect(friendlyOcrError("on-device OCR requires macOS")).toContain(
-			"Mac app"
+			"desktop app"
 		);
 	});
 

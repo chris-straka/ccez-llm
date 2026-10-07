@@ -8,6 +8,7 @@
 	} from "$lib/updates";
 	import type { LatestApk, UpdatePhase } from "$lib/updates";
 	import { tauriBackendAvailable } from "$lib/secrets";
+	import { isIOSUserAgent } from "$lib/platform";
 	import { check } from "@tauri-apps/plugin-updater";
 	import "./panels.css";
 
@@ -26,7 +27,12 @@
 	let checkingUpdate = $derived(updatePhase.stage !== "idle");
 	/** Where "check for updates" goes: releases page, Tauri updater, or nowhere (web). */
 	const updateRoute = $derived(
-		updateRouteFor(androidUI === true, inShell, import.meta.env.DEV)
+		updateRouteFor(
+			androidUI === true,
+			inShell,
+			import.meta.env.DEV,
+			isIOSUserAgent(navigator.userAgent)
+		)
 	);
 
 	/**

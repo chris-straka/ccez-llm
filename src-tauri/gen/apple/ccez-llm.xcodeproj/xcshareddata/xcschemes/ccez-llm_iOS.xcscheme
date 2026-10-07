@@ -15,10 +15,10 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "3CE43328ABCB35A3E0225ED8"
-               BuildableName = "ccez-studio_iOS.app"
-               BlueprintName = "ccez-studio_iOS"
-               ReferencedContainer = "container:ccez-studio.xcodeproj">
+               BlueprintIdentifier = "8D1312CB2C0C7FE19877001A"
+               BuildableName = "ccez-llm_iOS.app"
+               BlueprintName = "ccez-llm_iOS"
+               ReferencedContainer = "container:ccez-llm.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -32,10 +32,10 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "3CE43328ABCB35A3E0225ED8"
-            BuildableName = "ccez-studio_iOS.app"
-            BlueprintName = "ccez-studio_iOS"
-            ReferencedContainer = "container:ccez-studio.xcodeproj">
+            BlueprintIdentifier = "8D1312CB2C0C7FE19877001A"
+            BuildableName = "ccez-llm_iOS.app"
+            BlueprintName = "ccez-llm_iOS"
+            ReferencedContainer = "container:ccez-llm.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
       <Testables>
@@ -69,10 +69,10 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "3CE43328ABCB35A3E0225ED8"
-            BuildableName = "ccez-studio_iOS.app"
-            BlueprintName = "ccez-studio_iOS"
-            ReferencedContainer = "container:ccez-studio.xcodeproj">
+            BlueprintIdentifier = "8D1312CB2C0C7FE19877001A"
+            BuildableName = "ccez-llm_iOS.app"
+            BlueprintName = "ccez-llm_iOS"
+            ReferencedContainer = "container:ccez-llm.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
       <CommandLineArguments>
@@ -100,10 +100,10 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "3CE43328ABCB35A3E0225ED8"
-            BuildableName = "ccez-studio_iOS.app"
-            BlueprintName = "ccez-studio_iOS"
-            ReferencedContainer = "container:ccez-studio.xcodeproj">
+            BlueprintIdentifier = "8D1312CB2C0C7FE19877001A"
+            BuildableName = "ccez-llm_iOS.app"
+            BlueprintName = "ccez-llm_iOS"
+            ReferencedContainer = "container:ccez-llm.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
       <CommandLineArguments>

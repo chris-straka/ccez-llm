@@ -29,6 +29,10 @@
 		"withGlobalTauri": true
 	},
 	"plugins": {
+		"deep-link": {
+			"desktop": { "schemes": ["ccez-llm"] },
+			"mobile": [{ "scheme": ["ccez-llm"], "appLink": false }]
+		},
 		"updater": {
 			"active": true,
 			"dialog": false,

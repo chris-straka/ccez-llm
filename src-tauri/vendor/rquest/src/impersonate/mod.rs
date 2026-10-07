@@ -101,6 +101,31 @@ fn alpn_and_cert_settings(context: &ImpersonateContext, builder: &mut SslConnect
 
     #[cfg(target_os = "android")]
     add_android_system_roots(builder);
+    #[cfg(target_os = "ios")]
+    add_bundled_roots(builder);
+}
+
+/// iOS has the same hole as Android (BoringSSL's default verify paths
+/// point at files that do not exist) but no readable system store at
+/// all: apps only reach Apple's roots through SecTrust. Load Mozilla's
+/// root set (webpki-root-certs, CDLA-Permissive-2.0) instead. Parsed
+/// once, then added to every connector.
+#[cfg(target_os = "ios")]
+fn add_bundled_roots(builder: &mut SslConnectorBuilder) {
+    use boring::x509::X509;
+    use std::sync::OnceLock;
+
+    static ROOTS: OnceLock<Vec<X509>> = OnceLock::new();
+    let roots = ROOTS.get_or_init(|| {
+        webpki_root_certs::TLS_SERVER_ROOT_CERTS
+            .iter()
+            .filter_map(|der| X509::from_der(der.as_ref()).ok())
+            .collect()
+    });
+    let store = builder.cert_store_mut();
+    for cert in roots {
+        let _ = store.add_cert(cert.clone());
+    }
 }
 
 /// Android keeps its trust store outside the OpenSSL default paths

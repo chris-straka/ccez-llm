@@ -476,6 +476,13 @@ export interface CommandChordFacts extends KeyModifiers {
 	/** True in the Tauri shell; false in the browser preview, where
 	 * browser-chrome chords (find, print, tab switching) pass through. */
 	inShell: boolean;
+	/** Mac keyboard conventions. Absent reads as Mac (the original
+	 * table); Windows/Linux pass false for the Ctrl-side bindings. */
+	isMac?: boolean;
+	/** AltGr held (`getModifierState("AltGraph")`). Windows reports
+	 * AltGr as Ctrl+Alt, so layouts that type ś/ń/€ with it must not
+	 * fire the Ctrl+Alt chords. */
+	altGraph?: boolean;
 }
 
 export type CommandChord =
@@ -505,6 +512,23 @@ export type CommandChord =
  */
 export function commandChord(facts: CommandChordFacts): CommandChord | null {
 	const cmd = facts.metaKey || facts.ctrlKey;
+	const mac = facts.isMac ?? true;
+	// Ctrl+Alt chords are off while AltGr types a character.
+	const ctrlAlt = facts.ctrlKey && facts.altKey && !facts.altGraph;
+	// F11 is the Windows/Linux fullscreen key (macOS keeps it for
+	// Show Desktop, so it never reaches the page there).
+	if (bare(facts) && facts.code === "F11") return "toggle-fullscreen";
+	// Ctrl+K opens chat search off the Mac, the usual quick-switcher key
+	// there (Ctrl+P stays too). Shell only, like the P chord.
+	if (
+		!mac &&
+		facts.ctrlKey &&
+		!facts.metaKey &&
+		!facts.altKey &&
+		!facts.shiftKey &&
+		facts.code === "KeyK"
+	)
+		return facts.inShell ? "toggle-palette" : null;
 	// Shell only: a browser claims ⌘/Ctrl+P (print) and ⌘/Ctrl+F
 	// (find) and the page must not swallow them. The ⌘+Ctrl+F
 	// fullscreen chord stays everywhere — no browser binds it.
@@ -531,6 +555,19 @@ export function commandChord(facts: CommandChordFacts): CommandChord | null {
 		!facts.altKey &&
 		!facts.shiftKey &&
 		facts.code === "KeyE" &&
+		facts.inShell &&
+		mac
+	)
+		return "edit-newest";
+	// Windows/Linux: Ctrl+E (Win+E opens Explorer). The Mac keeps Ctrl+E
+	// for the Cocoa end-of-line key.
+	if (
+		!mac &&
+		facts.ctrlKey &&
+		!facts.metaKey &&
+		!facts.altKey &&
+		!facts.shiftKey &&
+		facts.code === "KeyE" &&
 		facts.inShell
 	)
 		return "edit-newest";
@@ -553,7 +590,7 @@ export function commandChord(facts: CommandChordFacts): CommandChord | null {
 		return "toggle-pastes";
 	if (cmd && !facts.altKey && !facts.shiftKey && facts.key === "Enter")
 		return "send";
-	if (facts.ctrlKey && facts.altKey && facts.key.startsWith("Arrow")) {
+	if (ctrlAlt && facts.key.startsWith("Arrow")) {
 		// Only these four exist (UI Events spec); anything else claiming
 		// the prefix falls through instead of cycling.
 		if (facts.key === "ArrowRight") return "provider-next";
@@ -562,7 +599,7 @@ export function commandChord(facts: CommandChordFacts): CommandChord | null {
 		if (facts.key === "ArrowDown") return "thinking-prev";
 		return null;
 	}
-	if (facts.ctrlKey && facts.altKey && facts.code === "KeyN") return "new-chat";
+	if (ctrlAlt && facts.code === "KeyN") return "new-chat";
 	if (cmd && !facts.altKey && facts.code === "KeyN") return "new-chat";
 	// Shell only: a browser claims ⌘/Ctrl+T (new tab) and the page
 	// must not swallow it. The app has no tabs, so the shell opens
@@ -571,8 +608,7 @@ export function commandChord(facts: CommandChordFacts): CommandChord | null {
 		if (facts.inShell) return "new-chat";
 		return null;
 	}
-	if (facts.ctrlKey && facts.altKey && facts.code === "KeyS")
-		return "toggle-voice";
+	if (ctrlAlt && facts.code === "KeyS") return "toggle-voice";
 	return null;
 }
 

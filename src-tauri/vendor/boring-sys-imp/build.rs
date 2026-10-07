@@ -205,6 +205,14 @@ fn get_boringssl_cmake_config() -> cmake::Config {
         }
 
         _ => {
+            // ccez patch: Windows ARM64 builds without BoringSSL's
+            // assembly. Cross-compiling from the x64 runner, MSVC has no
+            // assembler for the AArch64 `.S` perlasm files, so bcm.obj
+            // linked against aes_hw_*/gcm_*_v8 symbols nobody built
+            // (LNK2019). The C fallbacks cover TLS for page fetches.
+            if arch == "aarch64" && os == "windows" {
+                boringssl_cmake.define("OPENSSL_NO_ASM", "ON");
+            }
             // Configure BoringSSL for building on 32-bit non-windows platforms.
             if arch == "x86" && os != "windows" {
                 boringssl_cmake.define(
@@ -299,6 +307,13 @@ fn get_extra_clang_args_for_bindgen() -> Vec<String> {
             sysroot.truncate(sysroot.trim_end().len());
             params.push("-isysroot".to_string());
             params.push(sysroot);
+            // ccez patch: bindgen derives `arm64-apple-ios-sim` from the
+            // Rust target, which current clang rejects ("version 'sim'
+            // in target triple is invalid"). Name the simulator
+            // environment explicitly; bindgen keeps an explicit target.
+            if std::env::var("TARGET").as_deref() == Ok("aarch64-apple-ios-sim") {
+                params.push("--target=arm64-apple-ios14.0-simulator".to_string());
+            }
         }
         "android" => {
             let android_ndk_home = std::env::var("ANDROID_NDK_HOME")

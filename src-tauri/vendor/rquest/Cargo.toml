@@ -437,6 +437,11 @@ zstd = [
     "tokio-util",
 ]
 
+# ccez patch: iOS exposes no trust-store files for BoringSSL, so the
+# connector loads Mozilla's roots from this crate (impersonate/mod.rs).
+[target.'cfg(target_os = "ios")'.dependencies.webpki-root-certs]
+version = "1.0.9"
+
 [target.'cfg(target_os = "macos")'.dependencies.system-configuration]
 version = "0.5.1"
 

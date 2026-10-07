@@ -45,7 +45,8 @@ const versionFiles = [
 	"package.json",
 	"src-tauri/tauri.conf.json",
 	"src-tauri/Cargo.toml",
-	"src-tauri/Cargo.lock"
+	"src-tauri/Cargo.lock",
+	"src-tauri/gen/apple/project.yml"
 ];
 const clashes = dirty.filter((f) => versionFiles.includes(f));
 if (clashes.length > 0) {
@@ -95,6 +96,15 @@ if (!DRY) {
 		"src-tauri/Cargo.lock",
 		bumpTomlVersion("src-tauri/Cargo.lock", next, 'name = "ccez-llm"')
 	);
+	// The iOS project bakes the version into its Info.plist keys (app and
+	// Share extension); every CFBundle version line follows the release.
+	const iosPath = "src-tauri/gen/apple/project.yml";
+	const iosText = readFileSync(iosPath, "utf8");
+	const iosVersion =
+		/^(\s*CFBundle(?:ShortVersionString|Version): )"?[^"\n]*"?$/gm;
+	if (!iosVersion.test(iosText))
+		throw new Error(`${iosPath}: no CFBundle version lines`);
+	writeFileSync(iosPath, iosText.replace(iosVersion, `$1"${next}"`));
 	// The bump above writes 2-space JSON; re-format so releases stay
 	// prettier-clean under the repo .prettierrc (tabs).
 	execSync("bunx prettier --write package.json src-tauri/tauri.conf.json", {

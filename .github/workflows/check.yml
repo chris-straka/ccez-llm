@@ -106,6 +106,26 @@ jobs:
           shared-key: "windows"
       - run: cargo check --locked --target ${{ matrix.target }}
 
+  # iOS has no release leg yet (signing waits on an Apple Developer
+  # account), so nothing else compiles its cfg: `mobile` + objc2 iOS
+  # paths + the BoringSSL iOS build. preview.yml builds and runs the
+  # full Simulator app on preview branches.
+  rust-ios:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: src-tauri
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "src-tauri -> target"
+          shared-key: "ios"
+      - run: cargo check --locked --target aarch64-apple-ios
+
   # The release's Android leg is the only `not(desktop)` target shipped:
   # mobile shells run a single webview, so window-builder methods like
   # `focused`/`skip_taskbar` don't exist there and only this job compiles

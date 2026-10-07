@@ -446,7 +446,7 @@ export function friendlyFallbackError(message: string): string {
  */
 export function friendlyOcrError(message: string): string {
 	if (isOcrUnsupported(message)) {
-		return "Text recognition needs the Mac app (this preview has no on-device OCR).";
+		return "Text recognition needs the desktop app (this preview has no on-device OCR).";
 	}
 	if (/capabilit|not allowed|permission|denied/i.test(message)) {
 		return "Text recognition is blocked by the app's permissions — rebuild the app and try again.";

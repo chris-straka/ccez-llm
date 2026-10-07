@@ -69,7 +69,7 @@ describe("friendlyNativeError", () => {
 
 	it("maps non-macOS builds to the browser-preview note", () => {
 		expect(friendlyNativeError("native TTS requires macOS")).toContain(
-			"Mac app"
+			"desktop app"
 		);
 	});
 
