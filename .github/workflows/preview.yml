@@ -19,9 +19,8 @@ on:
       - "docs/**"
       - "**.md"
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+# No concurrency group: a push that only fixes one leg must not cancel
+# the other legs' long builds (public repo, runners are free).
 
 jobs:
   windows:
@@ -95,7 +94,9 @@ jobs:
           # project.yml is the source of truth (share extension target,
           # Info.plist keys); regenerate the .xcodeproj from it so a
           # hand edit there always lands in the build.
-          (cd src-tauri/gen/apple && xcodegen generate)
+          # Externals/ (Rust libs) and assets/ (frontend) are build
+          # outputs the spec references; they must exist to generate.
+          (cd src-tauri/gen/apple && mkdir -p Externals assets && xcodegen generate)
       - uses: actions/upload-artifact@v6
         with:
           name: gen-apple
