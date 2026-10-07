@@ -92,6 +92,10 @@ jobs:
             rm -rf src-tauri/gen/apple
             bunx tauri ios init --ci
           fi
+          # project.yml is the source of truth (share extension target,
+          # Info.plist keys); regenerate the .xcodeproj from it so a
+          # hand edit there always lands in the build.
+          (cd src-tauri/gen/apple && xcodegen generate)
       - uses: actions/upload-artifact@v6
         with:
           name: gen-apple
@@ -108,6 +112,9 @@ jobs:
           [ -n "$APP" ] || APP="$(find src-tauri/gen/apple/build -type d -name '*.app' | head -1)"
           echo "APP=$APP" >> "$GITHUB_ENV"
           test -d "$APP"
+          # The share extension must ship inside the app.
+          ls "$APP/PlugIns"
+          test -d "$APP/PlugIns/CcezLLMShare.appex"
       - name: Boot a Simulator and screenshot each flow
         run: scripts/ios-sim-flows.sh "$APP" "$RUNNER_TEMP/ios-shots"
       - uses: actions/upload-artifact@v6

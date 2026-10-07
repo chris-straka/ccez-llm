@@ -39,9 +39,14 @@ shot() {
 xcrun simctl launch "$UDID" "$BUNDLE_ID"
 shot 01-first-run 15
 
-# Flows driven through URLs land here as the deep-link handler grows.
-if [ -x "$(dirname "$0")/ios-sim-flows.d/run.sh" ]; then
-  UDID="$UDID" OUT="$OUT" "$(dirname "$0")/ios-sim-flows.d/run.sh"
-fi
+# The share extension registers with the system (Share sheet entry).
+xcrun simctl spawn "$UDID" pluginkit -m -v -p com.apple.share-services > "$OUT/share-extensions.txt" 2>&1 || true
+grep -q "studio.ccez.app.share" "$OUT/share-extensions.txt" && echo "share extension: registered" || echo "share extension: NOT registered"
+
+# Deep links: the same URL the share extension opens, then a fresh chat.
+xcrun simctl openurl "$UDID" "ccez-llm://send?text=Bonjour%2C%20je%20voudrais%20un%20caf%C3%A9."
+shot 02-share-text-prefill 6
+xcrun simctl openurl "$UDID" "ccez-llm://new"
+shot 03-deeplink-new-chat 5
 
 xcrun simctl spawn "$UDID" log show --last 5m --predicate "process CONTAINS 'Ccez'" --style compact > "$OUT/app.log" 2>&1 || true
