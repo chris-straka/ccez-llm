@@ -89,6 +89,10 @@ export class NewsMode {
 	newsBusy = $state<string | null>(null);
 	/** Drops stale fetches (region/language hops). */
 	newsSeq = 0;
+	/** Bumped whenever the panel goes away: a story launch still
+	fetching its article must not seed whatever chat comes next,
+	even one showing the same language's panel. */
+	private panelSeq = 0;
 	/** Scraped preview images by story link (null = none found). */
 	newsImages = $state<Record<string, string | null>>({});
 	newsImageSession = new SvelteMap<string, string | null>();
@@ -159,6 +163,7 @@ export class NewsMode {
 
 	/** Drop the panel without touching the composer (chat switches, sends). */
 	clear(): void {
+		this.panelSeq++;
 		this.news = null;
 		this.newsPicker = null;
 	}
@@ -170,6 +175,7 @@ export class NewsMode {
 
 	/** Close via ✕/language clear: panel away, composer back. */
 	close(): void {
+		this.panelSeq++;
 		this.news = null;
 		this.newsPicker = null;
 		this.deps.restorePrompt();
@@ -384,6 +390,7 @@ export class NewsMode {
 			return;
 		}
 		let seeded = false;
+		const panel = this.panelSeq;
 		this.newsBusy = link;
 		try {
 			const { text } = await resolveArticleText(
@@ -392,8 +399,9 @@ export class NewsMode {
 				fetchRawPage,
 				this.deps.getStorage()
 			);
-			// Closed or language-hopped mid-flight: don't seed a dead panel.
-			if (this.news?.code !== current.code) return;
+			// Closed, chat switched or deleted, or language-hopped
+			// mid-flight: don't seed a dead panel.
+			if (this.panelSeq !== panel || this.news?.code !== current.code) return;
 			const att = makePastedTextAttachment(`${PASTE_OPEN}${text}${PASTE_CLOSE}`);
 			this.deps.setAttachments([att]);
 			this.news = null;

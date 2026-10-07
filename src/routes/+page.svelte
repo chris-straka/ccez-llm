@@ -8383,6 +8383,9 @@ import {
 		buzzBeat("done", androidUI);
 		stopVoice();
 		if (id === chatState.activeChatId) {
+			// The open chat's news panel (and any story launch still
+			// fetching) goes with it, as on a chat switch.
+			newsMode.clear();
 			// Dropping the open chat discards its drafts (stored entry
 			// pruned via the empty save), then the neighbor that slides
 			// into its place restores its own filed drafts — and its
