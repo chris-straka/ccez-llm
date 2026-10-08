@@ -28,7 +28,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		CefrLevel,
 		NewsKind,
 		NewsPanelState,
-		NewsPicker,
+		NewsStaged,
 		SummarySize
 	} from "$lib/news";
 	import MessageArticle from "./MessageArticle.svelte";
@@ -140,25 +140,24 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		langMenusActions: {
 			toggle: (id: LanguageMenu["id"], el: HTMLElement) => void;
 			pick: (lang: ReplyLanguage) => void;
+			hover?: (lang: ReplyLanguage) => void;
 		};
 		// Learner news (null off): the hero hides its welcome text and
 		// the pills become the top rail above the story cards.
 		newsPanel: NewsPanelState | null;
-		newsPicker: NewsPicker | null;
+		newsStaged: NewsStaged | null;
 		newsBusy: string | null;
 		newsImages: Record<string, string | null>;
-		newsMarks: Record<string, AnnotationMark[]>;
 		// Mirrors NewsPanel actions (structural, same rule as above).
 		newsActions: {
 			region: (gl: string) => void;
-			menu: (link: string) => void;
-			level: (link: string, level: CefrLevel) => void;
-			size: (link: string, size: SummarySize) => void;
-			launch: (link: string, kind: NewsKind) => void;
+			pick: (link: string) => void;
+			unpick: () => void;
+			level: (level: CefrLevel) => void;
+			size: (size: SummarySize) => void;
+			launch: (kind: NewsKind) => void;
 			close: () => void;
 			retry: () => void;
-			badge: (id: AnnotationId, x: number, y: number) => void;
-			badgeHover: (id: string | null) => void;
 		};
 		/** Flashcards due now (0 hides the hero's entry). */
 		flashcardsDue: number;
@@ -211,10 +210,9 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		langMenuAnchor,
 		langMenusActions,
 		newsPanel,
-		newsPicker,
+		newsStaged,
 		newsBusy,
 		newsImages,
-		newsMarks,
 		newsActions,
 		flashcardsDue,
 		onFlashcards,
@@ -260,11 +258,9 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 			{#if newsPanel}
 				<NewsPanel
 					panel={newsPanel}
-					picker={newsPicker}
+					staged={newsStaged}
 					busy={newsBusy}
 					images={newsImages}
-					marks={newsMarks}
-					washId={washId ?? null}
 					actions={newsActions}
 				/>
 			{/if}

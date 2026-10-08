@@ -20,6 +20,7 @@ function harness(phone = false): {
 	};
 	setEditorText: (text: string | null) => void;
 	setAttachments: (next: Attachment[]) => void;
+	storage: KeyValueStore;
 } {
 	const calls = {
 		park: 0,
@@ -73,9 +74,7 @@ function harness(phone = false): {
 		},
 		requestSend: () => {
 			calls.sends++;
-		},
-		onBadge: () => {},
-		onBadgeHover: () => {}
+		}
 	};
 	return {
 		mode: new NewsMode(deps),
@@ -85,7 +84,8 @@ function harness(phone = false): {
 		},
 		setAttachments: (next) => {
 			attachments = next;
-		}
+		},
+		storage
 	};
 }
 
@@ -120,7 +120,7 @@ describe("enterNewsMode", () => {
 		expect(mode.news?.status).toBe("loading");
 		expect(mode.news?.region).toBe("FR");
 		expect(mode.news?.fallback).toBe(false);
-		expect(mode.newsPicker).toBeNull();
+		expect(mode.staged).toBeNull();
 		expect(calls.park).toBe(1);
 	});
 
@@ -132,28 +132,85 @@ describe("enterNewsMode", () => {
 	});
 });
 
-describe("picker actions", () => {
-	it("toggles the menu, blocked while busy", () => {
-		const { mode, calls } = harness();
+describe("staging a story", () => {
+	it("puts the picked story in the chat with remembered picks", () => {
+		const { mode, calls, storage } = harness();
+		storage.setItem("ccez-news-picks-v1", JSON.stringify({ level: "C1", size: "long" }));
 		mode.news = readyPanel();
-		mode.actions.menu("link-1");
-		expect(mode.newsPicker).toEqual({ link: "link-1" });
-		mode.actions.menu("link-1");
-		expect(mode.newsPicker).toBeNull();
-		mode.newsBusy = "link-1";
-		mode.actions.menu("link-1");
-		expect(mode.newsPicker).toBeNull();
-		// Accepted taps tick; the busy one stays silent.
-		expect(calls.ticks).toBe(2);
+		mode.actions.pick("link-1");
+		expect(mode.staged).toMatchObject({
+			link: "link-1",
+			level: "C1",
+			size: "long",
+			article: "loading"
+		});
+		expect(calls.ticks).toBe(1);
 	});
 
-	it("sets level/size only on the open card", () => {
+	it("ignores unknown stories, unready panels, and busy launches", () => {
 		const { mode } = harness();
 		mode.news = readyPanel();
-		mode.actions.menu("link-1");
-		mode.actions.level("link-1", "C1");
-		mode.actions.size("link-9", "long");
-		expect(mode.newsPicker).toEqual({ link: "link-1", level: "C1" });
+		mode.actions.pick("link-9");
+		expect(mode.staged).toBeNull();
+		mode.news = readyPanel({ status: "translating" });
+		mode.actions.pick("link-1");
+		expect(mode.staged).toBeNull();
+		mode.news = readyPanel();
+		mode.newsBusy = "link-1";
+		mode.actions.pick("link-1");
+		expect(mode.staged).toBeNull();
+	});
+
+	it("surfaces an article that can't be read, retry stages again", async () => {
+		const { mode } = harness();
+		mode.news = readyPanel();
+		mode.actions.pick("link-1");
+		// Shell-less: the article fetch fails honestly.
+		await new Promise((r) => setTimeout(r, 0));
+		expect(mode.staged?.article).toBe("error");
+		expect(mode.staged?.error).toContain("app shell");
+		mode.actions.retry();
+		expect(mode.staged?.article).toBe("loading");
+		expect(mode.news?.status).toBe("ready");
+	});
+
+	it("level and size change the staged story and are remembered", () => {
+		const { mode, storage } = harness();
+		mode.news = readyPanel();
+		mode.actions.level("A2");
+		expect(mode.staged).toBeNull();
+		mode.actions.pick("link-1");
+		mode.actions.level("A2");
+		mode.actions.size("short");
+		expect(mode.staged).toMatchObject({ level: "A2", size: "short" });
+		expect(JSON.parse(storage.getItem("ccez-news-picks-v1") ?? "{}")).toEqual({
+			level: "A2",
+			size: "short"
+		});
+	});
+
+	it("unpick returns to the headlines", () => {
+		const { mode } = harness();
+		mode.news = readyPanel();
+		mode.actions.pick("link-1");
+		mode.actions.unpick();
+		expect(mode.staged).toBeNull();
+		expect(mode.news?.status).toBe("ready");
+	});
+});
+
+describe("feed cache", () => {
+	it("opens a cached region instantly, no fetch", async () => {
+		const { mode, storage } = harness();
+		const stories = [{ title: "Cached", source: "Desk", link: "c-1", snippet: "" }];
+		storage.setItem(
+			"ccez-news-feeds-v1",
+			JSON.stringify({ "fr|FR": { stories, at: Date.now() } })
+		);
+		mode.enterNewsMode("fr");
+		await Promise.resolve();
+		expect(mode.news?.status).toBe("ready");
+		expect(mode.news?.stories).toEqual(stories);
 	});
 });
 
@@ -161,10 +218,10 @@ describe("close/clear/retry", () => {
 	it("close drops the panel and restores the composer", () => {
 		const { mode, calls } = harness();
 		mode.news = readyPanel();
-		mode.newsPicker = { link: "link-1" };
+		mode.actions.pick("link-1");
 		mode.actions.close();
 		expect(mode.news).toBeNull();
-		expect(mode.newsPicker).toBeNull();
+		expect(mode.staged).toBeNull();
 		expect(calls.restore).toBe(1);
 	});
 
@@ -201,12 +258,12 @@ describe("switchNewsRegion", () => {
 	it("reloads a native region", async () => {
 		const { mode, calls } = harness();
 		mode.news = readyPanel();
-		mode.newsPicker = { link: "link-1" };
+		mode.actions.pick("link-1");
 		await mode.switchNewsRegion("CA");
 		expect(mode.news?.region).toBe("CA");
 		expect(mode.news?.status).toBe("loading");
-		expect(mode.newsPicker).toBeNull();
-		expect(calls.ticks).toBe(1);
+		expect(mode.staged).toBeNull();
+		expect(calls.ticks).toBe(2);
 	});
 
 	it("refuses a translated region without a key", async () => {

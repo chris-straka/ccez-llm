@@ -19,6 +19,8 @@ owns the row markup and its surfaces. -->
 	export interface LangMenusActions {
 		toggle: (id: LanguageMenu["id"], el: HTMLElement) => void;
 		pick: (lang: ReplyLanguage) => void;
+		/** Pointer resting on a language: warm its headlines. */
+		hover?: (lang: ReplyLanguage) => void;
 	}
 
 	interface Props {
@@ -74,6 +76,8 @@ owns the row markup and its surfaces. -->
 							class:selected={activeCode === lang.code}
 							title={quickKey && tauriBackendAvailable() ? `${lang.name} (${quickKey})` : lang.name}
 							onclick={() => actions.pick(lang)}
+							onpointerenter={() => actions.hover?.(lang)}
+							onfocus={() => actions.hover?.(lang)}
 						>
 							<span class="badge" aria-hidden="true">{lang.badge}</span>
 							{lang.name}

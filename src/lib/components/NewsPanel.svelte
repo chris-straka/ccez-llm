@@ -1,398 +1,388 @@
 <!-- Learner news panel: region chips plus story cards under the hero
 language pills. The page owns the panel state (fetch, region,
-picker, launch); this component owns the cards markup and their
-surfaces. Emoji buttons are the user's explicit call (no text on
-either); everything else is theme tokens, never raw hex. -->
+staged story, launch); this component owns the markup, the card
+pick animation, and the surfaces. A picked card flies into the
+chat as the staged article, and the session choices show under
+it. Session start buttons are emoji-only by the owner's call;
+everything else is theme tokens, never raw hex. -->
 <script lang="ts">
-	import { slide, fly, fade } from "svelte/transition";
-	import { tick } from "svelte";
+	import { fly, fade } from "svelte/transition";
+	import { replyLanguageFor } from "$lib/languages";
 	import {
 		CEFR_LEVELS,
 		SUMMARY_SIZES,
-		newsCardPressOpensMenu,
 		type CefrLevel,
 		type NewsKind,
 		type NewsPanelState,
-		type NewsPicker,
+		type NewsStaged,
+		type NewsStory,
 		type SummarySize
 	} from "$lib/news";
-	import type { AnnotationId, AnnotationMark } from "$lib/annotations";
-	import { applyMarks } from "$lib/annotations-stamp";
-	import { badgeHover } from "$lib/hoverWash";
 
 	interface Props {
 		panel: NewsPanelState;
-		picker: NewsPicker | null;
+		staged: NewsStaged | null;
 		busy: string | null;
 		images: Record<string, string | null>;
-		/** Headline badges by story link (see buildNewsMarks). */
-		marks: Record<string, AnnotationMark[]>;
-		/** The one annotation whose quote also washes (shared id). */
-		washId: string | null;
 		actions: {
 			region: (gl: string) => void;
-			menu: (link: string) => void;
-			level: (link: string, level: CefrLevel) => void;
-			size: (link: string, size: SummarySize) => void;
-			launch: (link: string, kind: NewsKind) => void;
+			pick: (link: string) => void;
+			unpick: () => void;
+			level: (level: CefrLevel) => void;
+			size: (size: SummarySize) => void;
+			launch: (kind: NewsKind) => void;
 			close: () => void;
 			retry: () => void;
-			badge: (id: AnnotationId, x: number, y: number) => void;
-			badgeHover: (id: string | null) => void;
 		};
 	}
 
-	let { panel, picker, busy, images, marks, washId, actions }: Props = $props();
-	// Marks stamp after Svelte flushes the cards (see applyMarks):
-	// one root per headline, same call as message bodies.
-	let panelEl: HTMLElement | undefined = $state();
-	$effect(() => {
-		const stories = panel.stories;
-		const byLink = marks;
-		const wash = washId;
-		void tick().then(() => {
-			if (!panelEl) return;
-			for (const card of panelEl.querySelectorAll(".news-open")) {
-				const link = (card as HTMLElement).dataset.storyLink;
-				const title = card.querySelector(".news-card-title");
-				if (!link || !(title instanceof HTMLElement)) continue;
-				applyMarks(title, byLink[link] ?? [], false, wash);
-			}
-			void stories;
-		});
-	});
+	let { panel, staged, busy, images, actions }: Props = $props();
+
+	const lang = $derived(replyLanguageFor(panel.code));
 	const activeRegion = $derived(panel.regions.find((r) => r.gl === panel.region));
-	// Hotlink-dead images fall back to the outlet initial (same box);
-	// removing the node left a bare gap instead of a tile.
+	const stagedStory = $derived(
+		staged ? (panel.stories.find((s) => s.link === staged.link) ?? null) : null
+	);
+	/** Plain status words under the chips; one line, always there,
+	 * so nothing below it moves when the words change. */
+	const status = $derived.by(() => {
+		const from = activeRegion?.label ?? "";
+		if (panel.status === "loading") return "Getting today's headlines…";
+		if (panel.status === "translating")
+			return `Translating ${panel.stories.length} ${from} headlines into ${panel.langName}…`;
+		if (panel.status === "ready" && activeRegion?.translate)
+			return `Translated from ${from} headlines`;
+		if (panel.status === "ready") return `Top stories · ${from}`;
+		return "";
+	});
+	/** Cards the loading grid reserves (no jump when stories land). */
+	const SKELETONS = 8;
+
+	// Hotlink-dead images fall back to the outlet initial (same box).
 	let broken = $state<Record<string, boolean>>({});
-	// Press-down point (one press at a time component-wide): a
-	// drag-release ending on a card belongs to text selection.
-	let downAt: { x: number; y: number } | null = null;
-	/** Live headline selection inside a card owns the press. */
-	function cardSelected(card: HTMLElement): boolean {
-		const live = window.getSelection();
-		return !!live && !live.isCollapsed && card.contains(live.anchorNode);
-	}
-	/** Badge owning an event target, or null. Badge presses open
-	 * their answer card — never the story menu, even unmoved. */
-	function badgeOf(target: EventTarget | null): HTMLElement | null {
-		const badge =
-			target instanceof Element ? target.closest("[data-ann-badge]") : null;
-		return badge instanceof HTMLElement ? badge : null;
-	}
-	function openBadgeFrom(badge: HTMLElement): void {
-		const rect = badge.getBoundingClientRect();
-		// Stamped from AnnotationMark ids (applyMarks); dataset
-		// erases the brand, so cast it back at this boundary.
-		actions.badge(
-			(badge.dataset.annBadge ?? "") as AnnotationId,
-			rect.left + rect.width / 2,
-			rect.bottom
-		);
-	}
+	let loaded = $state<Record<string, boolean>>({});
 	const reduceMotion =
 		typeof matchMedia !== "undefined" &&
 		matchMedia("(prefers-reduced-motion: reduce)").matches;
 	const motionMs = (ms: number): number => (reduceMotion ? 0 : ms);
+
+	function imageFor(story: NewsStory): string | null | undefined {
+		if (broken[story.link]) return null;
+		return story.image ?? images[story.link];
+	}
+
+	/* Pick choreography: the other cards fade, then the picked one
+	flies from its grid slot into the chat (FLIP on transform only,
+	no layout animation). */
+	let leaving = $state<string | null>(null);
+	let flipFrom: DOMRect | null = null;
+	function pickCard(event: MouseEvent, story: NewsStory): void {
+		if (panel.status !== "ready" || leaving || busy) return;
+		flipFrom = (event.currentTarget as HTMLElement).getBoundingClientRect();
+		leaving = story.link;
+		setTimeout(() => {
+			leaving = null;
+			actions.pick(story.link);
+		}, motionMs(160));
+	}
+	function flipIn(node: HTMLElement): void {
+		const from = flipFrom;
+		flipFrom = null;
+		if (!from || reduceMotion || typeof node.animate !== "function") return;
+		const to = node.getBoundingClientRect();
+		if (to.width === 0 || to.height === 0) return;
+		const dx = from.left - to.left;
+		const dy = from.top - to.top;
+		const s = from.width / to.width;
+		node.animate(
+			[
+				{ transformOrigin: "top left", transform: `translate(${dx}px, ${dy}px) scale(${s})` },
+				{ transformOrigin: "top left", transform: "none" }
+			],
+			{ duration: 420, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" }
+		);
+	}
 </script>
 
-<!-- svelte-ignore a11y_mouse_events_have_key_events -->
-<!-- Badge wash is hover-only by decision (see MessageBody): Tab reaches markers, never highlights. -->
 <div
 	class="news-panel"
+	class:is-staged={stagedStory !== null}
 	role="region"
 	aria-label="{panel.langName} news"
-	bind:this={panelEl}
-	onmouseover={(e) => {
-		badgeHover(actions.badgeHover, badgeOf(e.target)?.dataset.annBadge ?? null);
-	}}
-	onmouseout={(e) => {
-		const to =
-			e.relatedTarget instanceof Element
-				? e.relatedTarget.closest("[data-ann-badge]")
-				: null;
-		badgeHover(actions.badgeHover, null, { toBadge: to !== null });
-	}}
 >
-	<div class="news-head">
-		<span class="news-title">📰 {panel.langName} news</span>
+	<div class="news-bar">
+		{#if panel.regions.length > 1 && panel.status !== "unsupported" && panel.status !== "needs-shell"}
+			<div class="news-chips" role="group" aria-label="News region">
+				{#each panel.regions as region, i (region.gl)}
+					{#if i > 0 && !!region.icon !== !!panel.regions[i - 1]?.icon}
+						<span class="news-sep" aria-hidden="true"></span>
+					{/if}
+					<button
+						type="button"
+						class="news-chip"
+						class:on={panel.region === region.gl}
+						class:icon={!!region.icon}
+						aria-pressed={panel.region === region.gl}
+						aria-label={region.label}
+						title={region.label}
+						onclick={() => actions.region(region.gl)}
+						in:fly={{ y: 8, duration: motionMs(200), delay: motionMs(i * 25) }}
+					>
+						{region.icon ?? region.label}
+					</button>
+				{/each}
+			</div>
+		{:else}
+			<span class="news-chips"></span>
+		{/if}
 		<button
 			type="button"
 			class="news-x"
 			aria-label="Close news"
+			title="Close news"
 			onclick={() => actions.close()}
 		>
 			✕
 		</button>
 	</div>
-	{#if panel.regions.length > 1 && panel.status !== "unsupported" && panel.status !== "needs-shell"}
-		<div class="news-chips" role="group" aria-label="News region">
-			{#each panel.regions as region, i (region.gl)}
-				{#if i > 0 && !!region.translate !== !!panel.regions[i - 1]?.translate}
-					<span class="news-sep" aria-hidden="true"></span>
-				{/if}
+	<p class="news-meta">
+		{#key panel.code}
+			<span class="news-lang" in:fly={{ y: 6, duration: motionMs(220) }}
+				>{lang ? `${lang.native} ${lang.badge}` : panel.langName}</span
+			>
+		{/key}
+		{#if status}
+			<span class="news-status" aria-live="polite">{status}</span>
+		{/if}
+	</p>
+
+	{#if stagedStory && staged}
+		{@const image = imageFor(stagedStory)}
+		<div class="news-stage">
+			<div class="stage-card" use:flipIn>
+				<div class="stage-thumb">
+					{#if image}
+						<img
+							src={image}
+							alt=""
+							draggable="false"
+							onerror={() => {
+								broken[stagedStory.link] = true;
+							}}
+						/>
+					{:else}
+						<span class="news-img-fallback" aria-hidden="true"
+							>{stagedStory.source.trim().charAt(0)}</span
+						>
+					{/if}
+				</div>
+				<div class="stage-text">
+					<span class="news-headline">{stagedStory.title}</span>
+					{#if stagedStory.source}
+						<span class="news-source">{stagedStory.source}</span>
+					{/if}
+				</div>
 				<button
 					type="button"
-					class="news-chip"
-					class:on={panel.region === region.gl}
-					class:icon={!!region.icon}
-					aria-pressed={panel.region === region.gl}
-					aria-label={region.label}
-					title={region.label}
-					onclick={() => actions.region(region.gl)}
-					in:fly={{ y: 8, duration: motionMs(200), delay: motionMs(i * 30) }}
+					class="stage-x"
+					aria-label="Back to headlines"
+					title="Back to headlines"
+					disabled={busy !== null}
+					onclick={() => actions.unpick()}>✕</button
 				>
-					{region.icon ?? region.label}
-				</button>
-			{/each}
-		</div>
-	{/if}
-	{#if activeRegion?.translate && panel.status === "ready"}
-		<p class="news-note">Translated from {activeRegion.label} headlines.</p>
-	{/if}
-	{#if panel.status === "loading"}
-		<p class="news-note" in:fade={{ duration: motionMs(150) }}>
-			Fetching {panel.langName} headlines…
-		</p>
-	{:else if panel.status === "translating"}
-		<p class="news-note" in:fade={{ duration: motionMs(150) }}>
-			Translating headlines into {panel.langName}…
-		</p>
-	{:else if panel.status === "error"}
-		<p class="news-note" role="alert">{panel.error}</p>
-		<button type="button" class="news-retry" onclick={() => actions.retry()}>
-			Retry
-		</button>
-	{:else if panel.status === "unsupported"}
-		<p class="news-note">Google News has no {panel.langName} edition yet.</p>
-	{:else if panel.status === "needs-shell"}
-		<p class="news-note">
-			News needs the app shell — the browser preview can't reach it.
-		</p>
-	{:else if panel.stories.length === 0}
-		<p class="news-note">No stories right now.</p>
-		<button type="button" class="news-retry" onclick={() => actions.retry()}>
-			Retry
-		</button>
-	{:else}
-		<ul class="news-cards">
-			{#each panel.stories as story, i (story.link)}
-				{@const open = picker?.link === story.link}
-				{@const resolved = story.image ?? images[story.link] ?? undefined}
-				<li
-					class="news-card"
-					class:open
-					class:has-marks={(marks[story.link]?.length ?? 0) > 0}
-					in:fly={{ y: 14, duration: motionMs(260), delay: motionMs(Math.min(i * 45, 400)) }}
-				>
-					<div
-						role="button"
-						tabindex="0"
-						class="news-open"
-						aria-label="{story.title} — options"
-						aria-expanded={open}
-						data-story-link={story.link}
-						onpointerdown={(e) => {
-							downAt = { x: e.clientX, y: e.clientY };
-						}}
-						onkeydown={(e) => {
-							if (e.key === "Enter" || e.key === " ") {
-								// Badge keys click through to their card
-								// below; the menu never steals them.
-								if (badgeOf(e.target)) return;
-								e.preventDefault();
-								actions.menu(story.link);
-							}
-						}}
-						onclick={(e) => {
-							// Keyboard clicks (detail 0) never dragged: a
-							// stale down-point must not eat the menu.
-							const dragged =
-								downAt && e.detail > 0
-									? Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y)
-									: 0;
-							downAt = null;
-							// Badges open their answer card — drags ending
-							// on one still belong to text selection.
-							const hit = badgeOf(e.target);
-							if (hit && !dragged) {
-								openBadgeFrom(hit);
-								return;
-							}
-							if (
-								newsCardPressOpensMenu({
-									draggedPx: dragged,
-									headlineSelected: cardSelected(e.currentTarget)
-								})
-							)
-								actions.menu(story.link);
-						}}
-						oncontextmenu={(e) => {
-							// A standing selection owns long-press and
-							// right-click (the page summons or speaks);
-							// badges are never menu presses either.
-							// Plain presses open the card menu as before.
-							if (cardSelected(e.currentTarget)) return;
-							if (badgeOf(e.target)) return;
-							e.preventDefault();
-							actions.menu(story.link);
-						}}
-					>
-						{#if resolved && !broken[story.link]}
-							<img
-								class="news-img"
-								src={resolved}
-								alt=""
-								loading="lazy"
-								draggable="false"
-								onerror={() => {
-									broken[story.link] = true;
-								}}
-								in:fade={{ duration: motionMs(250) }}
-							/>
-						{:else if !story.image && images[story.link] === undefined}
-							<span class="news-skel" aria-hidden="true"></span>
-						{:else}
-							<span
-								class="news-img-fallback"
-								aria-hidden="true"
-								in:fade={{ duration: motionMs(250) }}
-								>{story.source.trim().charAt(0)}</span
-							>
-						{/if}
-						<span class="news-card-title">{story.title}</span>
-						{#if story.source}
-							<span class="news-card-source">{story.source}</span>
-						{/if}
-						<span class="news-hint" aria-hidden="true">⋯</span>
-					</div>
-					{#if busy === story.link}
-						<span class="news-busy" role="status">Fetching the article…</span>
-					{/if}
-					{#if open && busy === null}
-						<div
-							class="news-menu"
-							role="group"
-							aria-label="Story options"
-							transition:slide={{ duration: motionMs(200) }}
+			</div>
+			<div class="stage-opts" in:fly={{ y: 12, duration: motionMs(260), delay: motionMs(260) }}>
+				<div class="seg" role="group" aria-label="Level">
+					{#each CEFR_LEVELS as level (level.level)}
+						<button
+							type="button"
+							class="seg-opt"
+							class:on={staged.level === level.level}
+							aria-pressed={staged.level === level.level}
+							title={level.tag}
+							onclick={() => actions.level(level.level)}
 						>
-							<div
-								class="news-launch"
-								in:fly={{ y: 10, duration: motionMs(220), delay: motionMs(60) }}
-							>
+							{level.level}
+						</button>
+					{/each}
+				</div>
+				<div class="stage-go">
+					<div class="go-tile">
+						<button
+							type="button"
+							class="news-go"
+							aria-label="Discuss this story"
+							title="Discuss with two locals"
+							disabled={busy !== null}
+							onclick={() => actions.launch("talk")}
+						>
+							🗣️
+						</button>
+					</div>
+					<div class="go-tile">
+						<button
+							type="button"
+							class="news-go"
+							aria-label="Summarize this story"
+							title="Summarize at this level and length"
+							disabled={busy !== null}
+							onclick={() => actions.launch("read")}
+						>
+							📰
+						</button>
+						<div class="seg small" role="group" aria-label="Summary length">
+							{#each SUMMARY_SIZES as size (size.size)}
 								<button
 									type="button"
-									class="news-go"
-									aria-label="Discuss this story"
-									title="Discuss with two locals"
-									onclick={() => actions.launch(story.link, "talk")}
+									class="seg-opt"
+									class:on={staged.size === size.size}
+									aria-pressed={staged.size === size.size}
+									title="About {size.words} words"
+									onclick={() => actions.size(size.size)}
 								>
-									🗣️
+									{size.label}
 								</button>
-								<button
-									type="button"
-									class="news-go"
-									aria-label="Summarize this story"
-									title="Summarize at this level and length"
-									onclick={() => actions.launch(story.link, "read")}
-								>
-									📰
-								</button>
-							</div>
-							<div
-								class="news-pick"
-								role="group"
-								aria-label="Level"
-								in:fly={{ y: 10, duration: motionMs(220), delay: motionMs(130) }}
-							>
-								{#each CEFR_LEVELS as level (level.level)}
-									<button
-										type="button"
-										class="news-opt"
-										class:on={(picker?.level ?? "B2") === level.level}
-										aria-pressed={(picker?.level ?? "B2") === level.level}
-										title={level.tag}
-										onclick={() => actions.level(story.link, level.level)}
-									>
-										{level.level}
-									</button>
-								{/each}
-							</div>
-							<div
-								class="news-pick"
-								role="group"
-								aria-label="Summary length"
-								in:fly={{ y: 10, duration: motionMs(220), delay: motionMs(200) }}
-							>
-								{#each SUMMARY_SIZES as size (size.size)}
-									<button
-										type="button"
-										class="news-opt"
-										class:on={(picker?.size ?? "medium") === size.size}
-										aria-pressed={(picker?.size ?? "medium") === size.size}
-										title="About {size.words} words"
-										onclick={() => actions.size(story.link, size.size)}
-									>
-										{size.label}
-									</button>
-								{/each}
-							</div>
+							{/each}
 						</div>
+					</div>
+				</div>
+				<p class="stage-note" aria-live="polite">
+					{#if staged.article === "error"}
+						<span role="alert">{staged.error}</span>
+						<button type="button" class="news-retry" onclick={() => actions.retry()}>
+							Retry
+						</button>
+					{:else if busy !== null}
+						<span class="news-dots">Starting</span>
+					{:else if staged.article === "loading"}
+						<span class="news-dots">Reading the article</span>
 					{/if}
+				</p>
+			</div>
+		</div>
+	{:else if panel.status === "loading"}
+		<ul class="news-cards" aria-busy="true" aria-label="Loading headlines">
+			{#each Array.from({ length: SKELETONS }, (_, i) => i) as i (i)}
+				<li class="news-card skel-card" aria-hidden="true" in:fade={{ duration: motionMs(200) }}>
+					<span class="news-thumb"><span class="news-skel"></span></span>
+					<span class="news-text">
+						<span class="skel-line"></span>
+						<span class="skel-line short"></span>
+						<span class="skel-line tiny"></span>
+					</span>
 				</li>
 			{/each}
 		</ul>
+	{:else if panel.status === "translating" || (panel.status === "ready" && panel.stories.length > 0)}
+		{@const translating = panel.status === "translating"}
+		<ul class="news-cards" class:leaving={leaving !== null} aria-busy={translating}>
+			{#each panel.stories as story, i (story.link)}
+				{@const image = imageFor(story)}
+				<li
+					class="news-item"
+					class:picked={leaving === story.link}
+					in:fly={{ y: 14, duration: motionMs(280), delay: motionMs(Math.min(i * 40, 360)) }}
+				>
+					<button
+						type="button"
+						class="news-card"
+						disabled={translating}
+						aria-label={translating ? "Headline translating" : story.title}
+						onclick={(e) => pickCard(e, story)}
+					>
+						<span class="news-thumb">
+							{#if image}
+								<img
+									class="news-img"
+									class:loaded={loaded[story.link]}
+									src={image}
+									alt=""
+									loading="lazy"
+									decoding="async"
+									draggable="false"
+									onload={() => {
+										loaded[story.link] = true;
+									}}
+									onerror={() => {
+										broken[story.link] = true;
+									}}
+								/>
+							{:else if image === undefined}
+								<span class="news-skel"></span>
+							{:else}
+								<span class="news-img-fallback" in:fade={{ duration: motionMs(250) }}
+									>{story.source.trim().charAt(0)}</span
+								>
+							{/if}
+						</span>
+						<span class="news-text">
+							{#if translating}
+								<span class="skel-line"></span>
+								<span class="skel-line short"></span>
+							{:else}
+								<span class="news-headline" in:fade={{ duration: motionMs(220) }}
+									>{story.title}</span
+								>
+							{/if}
+							{#if story.source}
+								<span class="news-source">{story.source}</span>
+							{/if}
+						</span>
+					</button>
+				</li>
+			{/each}
+		</ul>
+	{:else if panel.status === "error"}
+		<p class="news-note" role="alert">{panel.error}</p>
+		<button type="button" class="news-retry" onclick={() => actions.retry()}>Retry</button>
+	{:else if panel.status === "unsupported"}
+		<p class="news-note">Google News has no {panel.langName} edition yet.</p>
+	{:else if panel.status === "needs-shell"}
+		<p class="news-note">News needs the app shell — the browser preview can't reach it.</p>
+	{:else}
+		<p class="news-note">No stories right now.</p>
+		<button type="button" class="news-retry" onclick={() => actions.retry()}>Retry</button>
 	{/if}
 </div>
 
 <style>
 	.news-panel {
+		container-type: inline-size;
 		display: flex;
 		flex-direction: column;
-		gap: 0.6rem;
+		gap: 0.55rem;
 		width: calc(100% - 2.4rem);
-		max-width: calc(var(--chat-width, 36) * 1rem);
 		padding-bottom: 1rem;
+		/* Chrome, not content: nothing here selects on a click. */
+		user-select: none;
+		-webkit-user-select: none;
 	}
-	.news-head {
+	.news-bar {
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
 		gap: 0.5rem;
 	}
-	.news-title {
-		font-size: 1rem;
-		font-weight: 650;
-		color: #1c1c1e;
-		color: var(--ink);
-	}
-	.news-x {
-		border: 1px solid #e5e5ea;
-		border-color: var(--line-soft);
-		background: transparent;
-		color: #6e6e73;
-		color: var(--muted);
-		border-radius: 999px;
-		min-width: 2.75rem;
-		min-height: 2.75rem;
-		font-size: 1rem;
-		line-height: 1;
-		cursor: pointer;
-	}
 	.news-chips {
+		flex: 1 1 auto;
+		min-width: 0;
 		display: flex;
+		align-items: center;
 		gap: 0.4rem;
 		overflow-x: auto;
-		padding-bottom: 0.25rem;
-		scrollbar-width: thin;
+		padding: 0.15rem 0.1rem 0.25rem;
+		scrollbar-width: none;
 	}
+	.news-chips::-webkit-scrollbar {
+		display: none;
+	}
+	/* Home editions (word chips) | world desks (flag chips). */
 	.news-sep {
 		flex: 0 0 auto;
 		width: 1px;
-		align-self: stretch;
-		margin: 0.35rem 0.2rem;
-		background: #e5e5ea;
-		background: var(--line-soft);
+		height: 1.6rem;
+		margin: 0 0.3rem;
+		background: #8e8e93;
+		background: var(--line-hover);
 	}
 	.news-chip {
 		flex: 0 0 auto;
@@ -402,14 +392,23 @@ either); everything else is theme tokens, never raw hex. -->
 		color: #1c1c1e;
 		color: var(--ink);
 		border-radius: 999px;
-		padding: 0.45rem 0.8rem;
+		padding: 0.4rem 0.85rem;
 		font-size: 0.85rem;
-		min-height: 2.75rem;
+		min-height: 2.5rem;
 		cursor: pointer;
 		white-space: nowrap;
 		transition:
-			background-color 0.15s ease,
-			border-color 0.15s ease;
+			background-color 0.18s ease,
+			border-color 0.18s ease,
+			color 0.18s ease,
+			transform 0.12s ease;
+	}
+	.news-chip:hover {
+		border-color: #8e8e93;
+		border-color: var(--line-hover);
+	}
+	.news-chip:active {
+		transform: scale(0.94);
 	}
 	.news-chip.on {
 		background: #007aff;
@@ -419,11 +418,60 @@ either); everything else is theme tokens, never raw hex. -->
 		color: #fff;
 		color: var(--accent-ink);
 		font-weight: 650;
+		animation: chip-pop 0.28s cubic-bezier(0.2, 0.8, 0.2, 1.4);
+	}
+	@keyframes chip-pop {
+		from {
+			transform: scale(0.9);
+		}
+		to {
+			transform: none;
+		}
 	}
 	.news-chip.icon {
-		font-size: 1.15rem;
+		font-size: 1.1rem;
 		line-height: 1;
-		padding: 0.45rem 0.7rem;
+		padding: 0.4rem 0.65rem;
+	}
+	.news-x {
+		flex: 0 0 auto;
+		border: 1px solid #e5e5ea;
+		border-color: var(--line-soft);
+		background: transparent;
+		color: #6e6e73;
+		color: var(--muted);
+		border-radius: 999px;
+		width: 2.5rem;
+		height: 2.5rem;
+		font-size: 0.95rem;
+		line-height: 1;
+		cursor: pointer;
+		transition:
+			color 0.15s ease,
+			border-color 0.15s ease;
+	}
+	.news-x:hover {
+		color: #1c1c1e;
+		color: var(--ink);
+		border-color: #8e8e93;
+		border-color: var(--line-hover);
+	}
+	.news-meta {
+		margin: 0;
+		display: flex;
+		align-items: baseline;
+		flex-wrap: wrap;
+		gap: 0.25rem 0.6rem;
+		min-height: 1.5em;
+		font-size: 0.85rem;
+		color: #6e6e73;
+		color: var(--muted);
+	}
+	.news-lang {
+		display: inline-block;
+		font-weight: 650;
+		color: #1c1c1e;
+		color: var(--ink);
 	}
 	.news-note {
 		margin: 0;
@@ -439,53 +487,384 @@ either); everything else is theme tokens, never raw hex. -->
 		color: #1c1c1e;
 		color: var(--ink);
 		border-radius: 0.6rem;
-		padding: 0.45rem 0.9rem;
+		padding: 0.4rem 0.9rem;
 		font-size: 0.85rem;
-		min-height: 2.75rem;
+		min-height: 2.5rem;
 		cursor: pointer;
 	}
+
+	/* Grid: as many ~16rem columns as fit (three on a laptop, one
+	list column on a phone); rem-based, so giant text sizes drop
+	columns instead of squeezing headlines. */
 	.news-cards {
 		list-style: none;
 		margin: 0;
 		padding: 0;
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
-		align-items: start;
-		gap: 0.6rem;
+		grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
+		gap: 0.75rem;
 	}
-	.news-img {
+	.news-item {
+		display: flex;
+		transition:
+			opacity 0.16s ease,
+			transform 0.16s ease;
+	}
+	.news-cards.leaving .news-item:not(.picked) {
+		opacity: 0;
+		transform: scale(0.97);
+	}
+	.news-card {
+		box-sizing: border-box;
 		width: 100%;
-		aspect-ratio: 16 / 9;
-		object-fit: cover;
-		border-radius: 0.5rem;
-		background: #e5e5ea;
-		background: var(--line-soft);
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		padding: 0.55rem 0.55rem 0.7rem;
+		border: 1px solid #e5e5ea;
+		border-color: var(--line-soft);
+		border-radius: 0.85rem;
+		background: #fff;
+		background: var(--bg-raised);
+		color: inherit;
+		font: inherit;
+		text-align: left;
+		cursor: pointer;
+		transition:
+			border-color 0.15s ease,
+			transform 0.15s ease;
 	}
-	.news-skel,
-	.news-img-fallback {
+	.news-card:disabled {
+		cursor: progress;
+	}
+	@media (hover: hover) {
+		.news-card:not(:disabled):hover {
+			border-color: #8e8e93;
+			border-color: var(--line-hover);
+			transform: translateY(-2px);
+		}
+		.news-card:not(:disabled):hover .news-img.loaded {
+			transform: scale(1.03);
+		}
+	}
+	.news-card:not(:disabled):active {
+		transform: scale(0.985);
+	}
+	.news-card:focus-visible,
+	.news-go:focus-visible,
+	.seg-opt:focus-visible,
+	.news-chip:focus-visible {
+		outline: 2px solid #007aff;
+		outline-color: var(--accent);
+		outline-offset: 2px;
+	}
+	.news-thumb {
+		position: relative;
 		display: block;
 		width: 100%;
 		aspect-ratio: 16 / 9;
-		border-radius: 0.5rem;
+		border-radius: 0.55rem;
+		overflow: hidden;
 		background: #e5e5ea;
 		background: var(--line-soft);
 	}
+	.news-img {
+		display: block;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		opacity: 0;
+		transition:
+			opacity 0.3s ease,
+			transform 0.4s ease;
+	}
+	.news-img.loaded {
+		opacity: 1;
+	}
+	.news-skel {
+		position: absolute;
+		inset: 0;
+		overflow: hidden;
+	}
 	.news-img-fallback {
+		position: absolute;
+		inset: 0;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		color: #6e6e73;
 		color: var(--muted);
-		font-size: 2rem;
+		font-size: 1.8rem;
 		font-weight: 700;
 	}
-	@media (prefers-reduced-motion: no-preference) {
-		.news-skel {
-			animation: news-pulse 1.6s ease-in-out infinite;
+	.news-text {
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+		padding: 0 0.2rem;
+		min-width: 0;
+	}
+	.news-headline {
+		font-size: 0.93rem;
+		font-weight: 600;
+		line-height: 1.32;
+		color: #1c1c1e;
+		color: var(--ink);
+		display: -webkit-box;
+		-webkit-line-clamp: 3;
+		line-clamp: 3;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+		/* Three lines reserved: rows line up and nothing jumps
+		when translated titles arrive. */
+		min-height: calc(1.32em * 3);
+	}
+	.news-source {
+		font-size: 0.76rem;
+		color: #6e6e73;
+		color: var(--muted);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.skel-line {
+		position: relative;
+		display: block;
+		height: 0.8rem;
+		margin: 0.22rem 0;
+		border-radius: 0.3rem;
+		overflow: hidden;
+		background: #e5e5ea;
+		background: var(--line-soft);
+	}
+	.skel-line.short {
+		width: 70%;
+	}
+	.skel-line.tiny {
+		width: 35%;
+		height: 0.6rem;
+	}
+	.skel-card {
+		box-sizing: border-box;
+		border: 1px solid #e5e5ea;
+		border-color: var(--line-soft);
+		border-radius: 0.85rem;
+		padding: 0.55rem 0.55rem 0.7rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		background: #fff;
+		background: var(--bg-raised);
+	}
+	.skel-card .news-text {
+		/* Same footprint as a real headline block plus source. */
+		min-height: calc(0.93rem * 1.32 * 3 + 1.3rem);
+	}
+
+	/* Phone column: list rows with a thumbnail, many stories per
+	screen instead of one huge picture each. */
+	@container (max-width: 33rem) {
+		.news-cards {
+			gap: 0.5rem;
 		}
-		@keyframes news-pulse {
-			50% {
-				opacity: 0.55;
+		.news-card,
+		.skel-card {
+			display: grid;
+			grid-template-columns: 6.5rem 1fr;
+			align-items: start;
+			gap: 0.7rem;
+			padding: 0.5rem;
+		}
+		.news-thumb {
+			aspect-ratio: 4 / 3;
+		}
+		.news-text {
+			padding: 0;
+		}
+		.news-headline {
+			min-height: 0;
+		}
+		.skel-card .news-text {
+			min-height: 0;
+		}
+	}
+
+	/* Staged story: the article sits in the chat, choices under it. */
+	.news-stage {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 1rem;
+		padding-top: 0.75rem;
+	}
+	.stage-card {
+		position: relative;
+		width: min(100%, 30rem);
+		display: grid;
+		grid-template-columns: 7.5rem 1fr;
+		gap: 0.8rem;
+		align-items: center;
+		padding: 0.6rem 2.6rem 0.6rem 0.6rem;
+		border: 1px solid #007aff;
+		border-color: var(--accent);
+		border-radius: 1rem;
+		background: #fff;
+		background: var(--bg-raised);
+		will-change: transform;
+	}
+	.stage-thumb {
+		position: relative;
+		aspect-ratio: 4 / 3;
+		border-radius: 0.6rem;
+		overflow: hidden;
+		background: #e5e5ea;
+		background: var(--line-soft);
+	}
+	.stage-thumb img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
+	}
+	.stage-text {
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+		min-width: 0;
+	}
+	.stage-text .news-headline {
+		min-height: 0;
+	}
+	.stage-x {
+		position: absolute;
+		top: 0.4rem;
+		right: 0.4rem;
+		width: 2rem;
+		height: 2rem;
+		border: 0;
+		border-radius: 999px;
+		background: transparent;
+		color: #6e6e73;
+		color: var(--muted);
+		cursor: pointer;
+	}
+	.stage-x:hover:not(:disabled) {
+		color: #1c1c1e;
+		color: var(--ink);
+	}
+	.stage-opts {
+		width: min(100%, 30rem);
+		display: flex;
+		flex-direction: column;
+		gap: 0.7rem;
+	}
+	.seg {
+		display: flex;
+		gap: 0.25rem;
+		padding: 0.25rem;
+		border-radius: 0.8rem;
+		border: 1px solid #e5e5ea;
+		border-color: var(--line-soft);
+	}
+	.seg-opt {
+		flex: 1 1 0;
+		min-height: 2.4rem;
+		border: 0;
+		border-radius: 0.6rem;
+		background: transparent;
+		color: #1c1c1e;
+		color: var(--ink);
+		font: inherit;
+		font-size: 0.85rem;
+		font-weight: 600;
+		cursor: pointer;
+		transition:
+			background-color 0.18s ease,
+			color 0.18s ease,
+			transform 0.12s ease;
+	}
+	.seg-opt:active {
+		transform: scale(0.95);
+	}
+	.seg-opt.on {
+		background: #007aff;
+		background: var(--accent);
+		color: #fff;
+		color: var(--accent-ink);
+	}
+	.seg.small .seg-opt {
+		min-height: 2.1rem;
+		font-size: 0.78rem;
+	}
+	.stage-go {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 0.6rem;
+		align-items: start;
+	}
+	.go-tile {
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+	}
+	.news-go {
+		min-height: 3.4rem;
+		border: 1px solid #e5e5ea;
+		border-color: var(--line-soft);
+		border-radius: 0.8rem;
+		background: #fff;
+		background: var(--bg-raised);
+		font-size: 1.6rem;
+		line-height: 1;
+		cursor: pointer;
+		transition:
+			border-color 0.15s ease,
+			transform 0.12s ease;
+	}
+	.news-go:hover:not(:disabled) {
+		border-color: #007aff;
+		border-color: var(--accent);
+	}
+	.news-go:active:not(:disabled) {
+		transform: scale(0.96);
+	}
+	.news-go:disabled {
+		opacity: 0.5;
+		cursor: progress;
+	}
+	.stage-note {
+		margin: 0;
+		min-height: 1.4em;
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		font-size: 0.82rem;
+		color: #6e6e73;
+		color: var(--muted);
+	}
+	.news-dots::after {
+		content: "…";
+	}
+
+	@media (prefers-reduced-motion: no-preference) {
+		.news-skel::after,
+		.skel-line::after {
+			content: "";
+			position: absolute;
+			inset: 0;
+			background: linear-gradient(
+				90deg,
+				transparent,
+				var(--line-hover, rgba(142, 142, 147, 0.35)),
+				transparent
+			);
+			opacity: 0.35;
+			transform: translateX(-100%);
+			animation: news-shimmer 1.4s ease-in-out infinite;
+		}
+		@keyframes news-shimmer {
+			to {
+				transform: translateX(100%);
 			}
 		}
 	}
@@ -496,178 +875,5 @@ either); everything else is theme tokens, never raw hex. -->
 			animation: none !important;
 			transition: none !important;
 		}
-	}
-	.news-card {
-		background: #fff;
-		background: var(--bg-raised);
-		border: 1px solid #e5e5ea;
-		border-color: var(--line-soft);
-		border-radius: 0.8rem;
-		padding: 0.7rem 0.8rem;
-		display: flex;
-		flex-direction: column;
-		gap: 0.35rem;
-	}
-	.news-card-title {
-		margin: 0;
-		font-size: 0.95rem;
-		font-weight: 600;
-		line-height: 1.35;
-		color: #1c1c1e;
-		color: var(--ink);
-		transition: color 0.15s ease;
-		cursor: text;
-		display: -webkit-box;
-		-webkit-line-clamp: 3;
-		line-clamp: 3;
-		-webkit-box-orient: vertical;
-		overflow: hidden;
-		/* Short titles pad up: every card holds three lines. */
-		min-height: 4.05em;
-	}
-	/* Annotated cards grow a badge lane above the title: badges
-	float a line above their quote and the clamp would eat them.
-	Same dampened scale as the badge itself. */
-	.news-card.has-marks .news-card-title {
-		padding-top: calc(1.25rem * (1 + (var(--font-scale, 1) - 1) * 0.3));
-	}
-	.news-card-source {
-		margin: 0;
-		max-width: 100%;
-		font-size: 0.78rem;
-		color: #6e6e73;
-		color: var(--muted);
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-	.news-open {
-		position: relative;
-		display: flex;
-		flex-direction: column;
-		align-items: flex-start;
-		gap: 0.15rem;
-		width: 100%;
-		padding: 0;
-		border: 0;
-		background: none;
-		font: inherit;
-		color: inherit;
-		text-align: left;
-		cursor: pointer;
-		/* Headlines opt back into selection: .messages disables
-		it thread-wide and only .rendered re-enables it. */
-		user-select: text;
-		-webkit-user-select: text;
-	}
-	.news-open:focus-visible,
-	.news-go:focus-visible,
-	.news-opt:focus-visible {
-		outline: 2px solid #007aff;
-		outline-color: var(--accent);
-		outline-offset: 2px;
-	}
-	.news-open:hover .news-card-title,
-	.news-open:focus-visible .news-card-title {
-		color: #007aff;
-		color: var(--accent);
-	}
-	.news-hint {
-		position: absolute;
-		right: 0;
-		bottom: 0;
-		padding-left: 0.4rem;
-		background: #fff;
-		background: var(--bg-raised);
-		font-size: 0.85rem;
-		line-height: 1.4;
-		opacity: 0;
-		transform: translateY(4px);
-		transition:
-			opacity 0.15s ease,
-			transform 0.15s ease;
-	}
-	.news-open:hover .news-hint,
-	.news-open:focus-visible .news-hint {
-		opacity: 1;
-		transform: none;
-	}
-	.news-card.open .news-hint {
-		display: none;
-	}
-	@media (hover: none) {
-		.news-hint {
-			display: none;
-		}
-	}
-	.news-menu {
-		display: flex;
-		flex-direction: column;
-		gap: 0.35rem;
-	}
-	.news-launch {
-		display: flex;
-		gap: 0.35rem;
-	}
-	.news-go {
-		flex: 1;
-		border: 1px solid #e5e5ea;
-		border-color: var(--line-soft);
-		background: transparent;
-		border-radius: 0.6rem;
-		font-size: 1.3rem;
-		line-height: 1;
-		min-height: 2.75rem;
-		cursor: pointer;
-		transition:
-			transform 0.1s ease,
-			background-color 0.15s ease,
-			border-color 0.15s ease;
-	}
-	.news-go:active {
-		transform: scale(0.96);
-	}
-	.news-busy {
-		font-size: 0.8rem;
-		color: #6e6e73;
-		color: var(--muted);
-	}
-	.news-pick {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.35rem;
-	}
-	.news-pick > .news-opt {
-		flex: 1 1 auto;
-	}
-	.news-opt {
-		border: 1px solid #e5e5ea;
-		border-color: var(--line-soft);
-		background: transparent;
-		color: #1c1c1e;
-		color: var(--ink);
-		border-radius: 0.55rem;
-		padding: 0.4rem 0.5rem;
-		font-size: 0.8rem;
-		font-weight: 600;
-		min-height: 2.75rem;
-		text-align: center;
-		white-space: nowrap;
-		cursor: pointer;
-		transition:
-			transform 0.1s ease,
-			background-color 0.15s ease,
-			border-color 0.15s ease;
-	}
-	.news-opt:active {
-		transform: scale(0.96);
-	}
-	.news-opt.on {
-		background: #007aff;
-		background: var(--accent);
-		border-color: #007aff;
-		border-color: var(--accent);
-		color: #fff;
-		color: var(--accent-ink);
 	}
 </style>

@@ -208,15 +208,6 @@ export async function dragQuote(
 	await page.mouse.up();
 }
 
-/** True drag-select of a quote inside one news headline card. */
-export async function dragHeadline(
-	page: Page,
-	card: number,
-	quote: string
-): Promise<void> {
-	await dragQuote(page, card, quote, ".news-card-title");
-}
-
 /** Assert two box snapshots match within a pixel (no hover nudges). */
 export function expectBoxesStable(
 	before: Array<{ x: number; y: number; width: number; height: number } | null>,

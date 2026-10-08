@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
 import {
+	cachedFeed,
+	loadNewsPicks,
+	storeFeed,
+	storeNewsPicks,
+	NEWS_FEED_TTL_MS,
 	CEFR_LEVELS,
 	NEWS_CACHE_TTL_MS,
 	NEWS_FEEDS,
@@ -23,7 +28,6 @@ import {
 	jinaUrl,
 	loadNewsStories,
 	mergeNewsStories,
-	newsCardPressOpensMenu,
 	newsConversationInstruction,
 	newsErrorCopy,
 	newsRegionsFor,
@@ -1555,18 +1559,48 @@ describe("article cache", () => {
 		};
 		expect(() => storeArticle(hostile, "https://a", "b")).not.toThrow();
 	});
+});
 
-	it("opens the card menu only for plain presses, never selections", () => {
-		expect(
-			newsCardPressOpensMenu({ draggedPx: 0, headlineSelected: false })
-		).toBe(true);
-		// A drag-release ending on the card belongs to selection.
-		expect(
-			newsCardPressOpensMenu({ draggedPx: 5, headlineSelected: false })
-		).toBe(false);
-		// A live headline selection owns long-press and right-click.
-		expect(
-			newsCardPressOpensMenu({ draggedPx: 0, headlineSelected: true })
-		).toBe(false);
+describe("feed cache", () => {
+	const mem = (): KeyValueStore => {
+		const m = new Map<string, string>();
+		return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => void m.set(k, v) };
+	};
+	const stories = [{ title: "T", source: "S", link: "l", snippet: "" }];
+
+	it("returns fresh headlines per language and region", () => {
+		const store = mem();
+		storeFeed(store, "fr", "FR", stories, 1000);
+		expect(cachedFeed(store, "fr", "FR", 2000)).toEqual(stories);
+		expect(cachedFeed(store, "fr", "CA", 2000)).toBeNull();
+		expect(cachedFeed(store, "fr", "FR", 1000 + NEWS_FEED_TTL_MS + 1)).toBeNull();
+	});
+
+	it("evicts the oldest past the cap and never throws", () => {
+		const store = mem();
+		for (let i = 0; i < 14; i++) storeFeed(store, "fr", `R${i}`, stories, i + 1);
+		expect(cachedFeed(store, "fr", "R0", 20)).toBeNull();
+		expect(cachedFeed(store, "fr", "R13", 20)).toEqual(stories);
+		const hostile: KeyValueStore = {
+			getItem: () => "{broken",
+			setItem: () => {
+				throw new Error("full");
+			}
+		};
+		expect(() => storeFeed(hostile, "fr", "FR", stories)).not.toThrow();
+		expect(cachedFeed(hostile, "fr", "FR")).toBeNull();
 	});
 });
+
+describe("remembered session picks", () => {
+	it("defaults to B2 medium and round-trips valid picks only", () => {
+		const m = new Map<string, string>();
+		const store: KeyValueStore = { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => void m.set(k, v) };
+		expect(loadNewsPicks(store)).toEqual({ level: "B2", size: "medium" });
+		storeNewsPicks(store, { level: "A1", size: "long" });
+		expect(loadNewsPicks(store)).toEqual({ level: "A1", size: "long" });
+		m.set("ccez-news-picks-v1", JSON.stringify({ level: "Z9", size: "huge" }));
+		expect(loadNewsPicks(store)).toEqual({ level: "B2", size: "medium" });
+	});
+});
+
