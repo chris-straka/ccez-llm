@@ -1960,3 +1960,37 @@ export function storeNewsPicks(
 	}
 }
 
+/** What a sent news opener shows instead of its instructions. */
+export interface NewsLaunchTag {
+	kind: NewsKind;
+	title: string;
+	source: string;
+	level: CefrLevel;
+	/** Summary length (read sessions only). */
+	size: SummarySize | null;
+}
+
+/**
+ * Reads a sent news opener (newsConversationInstruction or
+ * newsSummaryInstruction, article tag and all) back into its tag
+ * fields, or null for any other message. Pure.
+ */
+export function parseNewsLaunch(content: string): NewsLaunchTag | null {
+	const head = /^(🗣️|📰) "(.*)"(?: \(([^\n]*)\))?\n/u.exec(content);
+	if (!head) return null;
+	const kind: NewsKind = head[1] === "🗣️" ? "talk" : "read";
+	const body = content.slice(head[0].length);
+	const lead =
+		kind === "talk"
+			? body.startsWith("Two named locals open a substantial discussion of the pasted article")
+			: body.startsWith("Summarize the pasted article");
+	if (!lead) return null;
+	const level = /CEFR (A1|A2|B1|B2|C1|C2)\b/.exec(body)?.[1] as CefrLevel | undefined;
+	if (!level) return null;
+	let size: SummarySize | null = null;
+	if (kind === "read") {
+		const words = Number(/about (\d+) words/.exec(body)?.[1]);
+		size = SUMMARY_SIZES.find((s) => s.words === words)?.size ?? "medium";
+	}
+	return { kind, title: head[2] ?? "", source: head[3] ?? "", level, size };
+}
