@@ -400,6 +400,36 @@ test("waiting badge breathes until the answer lands glowing", async ({
 		.toContain("ccez-ann-arrive");
 });
 
+/** Reduced motion keeps the waiting pulse (opacity only, slower):
+a still badge can't say it's loading. */
+test("waiting badge still breathes under reduced motion", async ({
+	page
+}) => {
+	await page.emulateMedia({ reducedMotion: "reduce" });
+	await seedChat(page, [
+		{ role: "assistant", content: "the riverbank at dawn holds the fog" }
+	]);
+	await page.addInitScript(() => {
+		localStorage.setItem("ccez-mock-chat-ms", "12000");
+	});
+	await page.goto("/");
+	await expect(page.locator("article.assistant")).toBeVisible({ timeout: 60_000 });
+	await dragQuote(page, 0, "riverbank");
+	await expect(page.locator(".sel-menu")).toBeVisible({ timeout: 10_000 });
+	await page.keyboard.press("A");
+	const pop = page.locator(".ann-pop.fresh");
+	await expect(pop).toBeVisible({ timeout: 10_000 });
+	await pop.locator("textarea").fill("what lives here?");
+	await page.keyboard.press("Enter");
+	const waiting = page.locator("button.ccez-ann-badge.ans-waiting");
+	await expect(waiting).toBeVisible({ timeout: 10_000 });
+	await expect
+		.poll(() => waiting.evaluate((el) => getComputedStyle(el).animationName), {
+			timeout: 5_000
+		})
+		.toContain("ccez-ann-breathe");
+});
+
 /** The open answer card rides the thread: scrolling moves the
 card with its quote (fixed plus scroll-delta tracking reads as
 absolute), never stranding it over other messages. */
