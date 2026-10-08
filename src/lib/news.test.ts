@@ -947,6 +947,7 @@ describe("session prompts", () => {
 		expect(opener).toContain("correct my mistakes");
 		expect(opener).toContain("Never explain grammar or words unless I");
 		expect(opener).toContain("Stay in French");
+		expect(opener).toContain("about 250 words");
 		expect(opener).not.toContain("invite");
 	});
 });
@@ -1617,7 +1618,7 @@ describe("parseNewsLaunch", () => {
 			title: "Soupçons de peste en Russie",
 			source: "CNews",
 			level: "B2",
-			size: null
+			size: "medium"
 		});
 	});
 	it("reads a summary opener with its length", () => {
@@ -1647,6 +1648,25 @@ describe("sent opener pictures", () => {
 		expect(newsLaunchImage(store, "U")).toBeNull();
 		m.set("ccez-news-launch-images-v1", "{broken");
 		expect(newsLaunchImage(store, "T")).toBeNull();
+	});
+});
+
+describe("conversation length", () => {
+	const story = { title: "T", source: "S", link: "l", snippet: "" };
+	it("names the opener's words and reads the length back", () => {
+		const short = newsConversationInstruction(story, "B1", "French", "short");
+		expect(short).toContain("about 120 words");
+		expect(parseNewsLaunch(short)?.size).toBe("short");
+		expect(parseNewsLaunch(newsConversationInstruction(story, "B1", "French", "long"))?.size).toBe(
+			"long"
+		);
+	});
+	it("older openers without a length show none", () => {
+		const old = newsConversationInstruction(story, "B1", "French").replace(
+			/ The opener runs about \d+ words\./,
+			""
+		);
+		expect(parseNewsLaunch(old)?.size).toBeNull();
 	});
 });
 
