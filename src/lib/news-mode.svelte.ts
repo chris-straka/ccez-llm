@@ -8,10 +8,10 @@ import {
 	type Attachment
 } from "./attachments";
 import type { PromptEditor } from "./editor";
-import type { AnnotationId } from "./annotations";
 import type { ChatProvider } from "./providers/types";
 import type { KeyValueStore } from "./settings";
 import {
+	cachedFeed,
 	cachedNewsImage,
 	cachedNewsUrl,
 	createRateGate,
@@ -21,6 +21,7 @@ import {
 	isNewsFallback,
 	isWebviewUnsupported,
 	JINA_QUOTA_COOLDOWN_MS,
+	loadNewsPicks,
 	loadNewsStories,
 	newsConversationInstruction,
 	newsErrorCopy,
@@ -29,14 +30,16 @@ import {
 	resolveArticleText,
 	resolveImageBatch,
 	resolveStoryImage,
+	storeFeed,
 	storeNewsImage,
+	storeNewsPicks,
 	storeNewsUrl,
 	translateNewsTitles,
 	withTranslatedTitles,
 	type CefrLevel,
 	type NewsKind,
 	type NewsPanelState,
-	type NewsPicker,
+	type NewsStaged,
 	type NewsStory,
 	type SummarySize
 } from "./news";
@@ -61,31 +64,36 @@ export interface NewsModeDeps {
 	parkPrompt: () => void;
 	restorePrompt: () => void;
 	requestSend: () => void;
-	onBadge: (id: AnnotationId, x: number, y: number) => void;
-	onBadgeHover: (id: string | null) => void;
 }
 
 /** Mirrors the ThreadView news actions (kept structural there). */
 export interface NewsModeActions {
 	region: (gl: string) => void;
-	menu: (link: string) => void;
-	level: (link: string, level: CefrLevel) => void;
-	size: (link: string, size: SummarySize) => void;
-	launch: (link: string, kind: NewsKind) => void;
+	/** Put a story in the chat (its session choices show under it). */
+	pick: (link: string) => void;
+	/** Take the staged story back out: headlines return. */
+	unpick: () => void;
+	level: (level: CefrLevel) => void;
+	size: (size: SummarySize) => void;
+	launch: (kind: NewsKind) => void;
 	close: () => void;
 	retry: () => void;
-	badge: (id: AnnotationId, x: number, y: number) => void;
-	badgeHover: (id: string | null) => void;
 }
+
+/** Raw (untranslated) headline loads stay shared this long. */
+const RAW_FEED_TTL_MS = 5 * 60 * 1000;
 
 /**
  * Learner news mode (empty chats only): story cards under the
- * pill rail; launching seeds the composer and sends. Moved out
- * of +page.svelte verbatim (STAGE 1); the page wires the deps.
+ * pill rail. Picking a card stages the story in the chat with its
+ * session choices; starting one seeds the composer and sends. The
+ * page wires the deps.
  */
 export class NewsMode {
 	news = $state<NewsPanelState | null>(null);
-	newsPicker = $state<NewsPicker | null>(null);
+	/** The story sitting in the chat, choices showing under it. */
+	staged = $state<NewsStaged | null>(null);
+	/** A launch is seeding the composer (blocks double starts). */
 	newsBusy = $state<string | null>(null);
 	/** Drops stale fetches (region/language hops). */
 	newsSeq = 0;
@@ -106,6 +114,13 @@ export class NewsMode {
 	webviewSkips = new SvelteSet<string>();
 	/** The shell answered `unsupported`: no hidden leg exists. */
 	webviewUnsupported = false;
+	/** Raw headline loads by `code|region`, shared between a hover
+	 * prefetch and the open that follows it. */
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- fetch bookkeeping, never rendered.
+	private rawFeeds = new Map<string, { at: number; stories: Promise<NewsStory[]> }>();
+	/** Article bodies in flight or done, by story link. */
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- fetch bookkeeping, never rendered.
+	private articles = new Map<string, Promise<string>>();
 	readonly actions: NewsModeActions;
 	private readonly deps: NewsModeDeps;
 
@@ -115,70 +130,114 @@ export class NewsMode {
 			region: (gl: string) => {
 				void this.switchNewsRegion(gl);
 			},
-			menu: (link: string) => {
-				if (this.newsBusy) return;
-				this.deps.tapTick();
-				this.newsPicker =
-					this.newsPicker?.link === link ? null : { link };
+			pick: (link: string) => {
+				this.pick(link);
 			},
-			level: (link: string, level: CefrLevel) => {
-				if (this.newsBusy) return;
-				if (this.newsPicker?.link === link) {
-					this.newsPicker = { ...this.newsPicker, level };
-				}
+			unpick: () => {
+				this.unpick();
 			},
-			size: (link: string, size: SummarySize) => {
-				if (this.newsBusy) return;
-				if (this.newsPicker?.link === link) {
-					this.newsPicker = { ...this.newsPicker, size };
-				}
+			level: (level: CefrLevel) => {
+				if (!this.staged || this.newsBusy) return;
+				this.staged = { ...this.staged, level };
+				this.rememberPicks();
 			},
-			launch: (link: string, kind: NewsKind) => {
-				const level =
-					this.newsPicker?.link === link
-						? (this.newsPicker.level ?? "B2")
-						: "B2";
-				const size =
-					this.newsPicker?.link === link
-						? (this.newsPicker.size ?? "medium")
-						: "medium";
-				void this.launchNewsSession(link, kind, level, size);
+			size: (size: SummarySize) => {
+				if (!this.staged || this.newsBusy) return;
+				this.staged = { ...this.staged, size };
+				this.rememberPicks();
+			},
+			launch: (kind: NewsKind) => {
+				const staged = this.staged;
+				if (!staged) return;
+				void this.launchNewsSession(staged.link, kind, staged.level, staged.size);
 			},
 			close: () => {
 				this.close();
 			},
-			badge: (id: AnnotationId, x: number, y: number) => {
-				this.deps.onBadge(id, x, y);
-			},
-			badgeHover: (id: string | null) => {
-				this.deps.onBadgeHover(id);
-			},
 			retry: () => {
 				if (!this.news || this.newsBusy) return;
+				const staged = this.staged;
+				if (staged?.article === "error") {
+					this.articles.delete(staged.link);
+					this.pick(staged.link);
+					return;
+				}
+				this.rawFeeds.delete(`${this.news.code}|${this.news.region}`);
 				this.news = { ...this.news, status: "loading", stories: [], error: "" };
 				void this.fetchNewsStories();
 			}
 		};
 	}
 
+	private rememberPicks(): void {
+		if (!this.staged) return;
+		storeNewsPicks(this.deps.getStorage(), {
+			level: this.staged.level,
+			size: this.staged.size
+		});
+	}
+
 	/** Drop the panel without touching the composer (chat switches, sends). */
 	clear(): void {
 		this.panelSeq++;
 		this.news = null;
-		this.newsPicker = null;
-	}
-
-	/** Fold open option rows (Esc, outside press). */
-	dismissPicker(): void {
-		this.newsPicker = null;
+		this.staged = null;
 	}
 
 	/** Close via ✕/language clear: panel away, composer back. */
 	close(): void {
 		this.panelSeq++;
 		this.news = null;
-		this.newsPicker = null;
+		this.staged = null;
 		this.deps.restorePrompt();
+	}
+
+	/** Stage a story in the chat and start reading its article. */
+	pick(link: string): void {
+		const current = this.news;
+		if (!current || current.status !== "ready" || this.newsBusy) return;
+		if (!current.stories.some((s) => s.link === link)) return;
+		this.deps.tapTick();
+		const picks = loadNewsPicks(this.deps.getStorage());
+		this.staged = {
+			link,
+			level: this.staged?.level ?? picks.level,
+			size: this.staged?.size ?? picks.size,
+			article: "loading",
+			error: ""
+		};
+		this.articleFor(link).then(
+			() => {
+				if (this.staged?.link === link)
+					this.staged = { ...this.staged, article: "ready", error: "" };
+			},
+			(error: unknown) => {
+				this.articles.delete(link);
+				if (this.staged?.link === link)
+					this.staged = { ...this.staged, article: "error", error: newsErrorCopy(error) };
+			}
+		);
+	}
+
+	/** Back to the headlines (Esc, the staged card's ✕). */
+	unpick(): void {
+		if (!this.staged || this.newsBusy) return;
+		this.staged = null;
+	}
+
+	/** One article fetch per link, shared by staging and launch. */
+	private articleFor(link: string): Promise<string> {
+		let pending = this.articles.get(link);
+		if (!pending) {
+			pending = resolveArticleText(
+				link,
+				decodeNewsLink,
+				fetchRawPage,
+				this.deps.getStorage()
+			).then((r) => r.text);
+			this.articles.set(link, pending);
+		}
+		return pending;
 	}
 
 	/** Open the story cards for a language (default region first). */
@@ -189,7 +248,7 @@ export class NewsMode {
 			return;
 		}
 		const regions = newsRegionsFor(code) ?? [];
-		this.newsPicker = null;
+		this.staged = null;
 		if (regions.length === 0) {
 			this.news = {
 				code,
@@ -222,6 +281,39 @@ export class NewsMode {
 		void this.fetchNewsStories();
 	}
 
+	/**
+	 * Warm a language's default headlines and their pictures before
+	 * it opens (hovering it in the language menu). Never translates:
+	 * that spends the learner's key, so it waits for a real open.
+	 */
+	prefetch(code: string): void {
+		const gl = newsRegionsFor(code)?.[0]?.gl;
+		if (!gl || this.news?.code === code) return;
+		const storage = this.deps.getStorage();
+		if (cachedFeed(storage, code, gl)) return;
+		const key = `${code}|${gl}`;
+		if (this.rawFeeds.has(key)) return;
+		this.rawStories(code, gl).then(
+			(stories) => {
+				void this.resolveNewsImages(code, gl, stories, () => true);
+			},
+			() => {}
+		);
+	}
+
+	/** Headlines straight off the feeds, shared for a few minutes. */
+	private rawStories(code: string, region: string): Promise<NewsStory[]> {
+		const key = `${code}|${region}`;
+		const hit = this.rawFeeds.get(key);
+		if (hit && Date.now() - hit.at < RAW_FEED_TTL_MS) return hit.stories;
+		const stories = loadNewsStories(code, region, fetchRawPage);
+		this.rawFeeds.set(key, { at: Date.now(), stories });
+		stories.catch(() => {
+			if (this.rawFeeds.get(key)?.stories === stories) this.rawFeeds.delete(key);
+		});
+		return stories;
+	}
+
 	/** Headlines for the current panel language + region. */
 	async switchNewsRegion(gl: string): Promise<void> {
 		const current = this.news;
@@ -229,7 +321,7 @@ export class NewsMode {
 		const region = current.regions.find((r) => r.gl === gl);
 		if (!region) return;
 		// Translated headlines need the model: no key, no switch.
-		if (region.translate) {
+		if (region.translate && !cachedFeed(this.deps.getStorage(), current.code, gl)) {
 			const provider = await this.deps.resolveProvider();
 			if (this.news !== current) return;
 			if (!provider) {
@@ -239,23 +331,28 @@ export class NewsMode {
 			}
 		}
 		this.deps.tapTick();
-		this.newsPicker = null;
+		this.staged = null;
 		this.news = { ...current, region: gl, status: "loading", stories: [], error: "" };
 		void this.fetchNewsStories();
 	}
 
 	/**
 	 * Preview images for stories the feed left imageless: decode,
-	 * fetch the article HTML, and read its og:image — four at a
-	 * time, hits filed for later, misses silent. Blocked or bare
-	 * pages fall through to the reader's first content image.
-	 * Stale runs (region hops) file nothing visible; leftover
-	 * transients settle to the letter tile, uncached, and retry
-	 * next open.
+	 * fetch the article HTML, and read its og:image — several at a
+	 * time in card order, hits filed for later, misses silent.
+	 * Blocked or bare pages fall through to the reader's first
+	 * content image. Stale runs (region hops) file nothing visible;
+	 * leftover transients settle to the letter tile, uncached, and
+	 * retry next open.
 	 */
-	async resolveNewsImages(code: string, region: string, stories: NewsStory[]): Promise<void> {
+	async resolveNewsImages(
+		code: string,
+		region: string,
+		stories: NewsStory[],
+		running: () => boolean = () => this.news?.code === code && this.news?.region === region
+	): Promise<void> {
 		const storage = this.deps.getStorage();
-		const fresh = () => this.news?.code === code && this.news?.region === region;
+		const visible = () => this.news?.code === code && this.news?.region === region;
 		const links = stories
 			.filter(
 				(s) => !s.image && !this.newsImageSession.has(s.link) && !cachedNewsImage(storage, s.link)
@@ -267,7 +364,7 @@ export class NewsMode {
 					decode: decodeNewsLink,
 					fetchPage: fetchRawPage,
 					gateJina: this.newsJinaGate,
-					fresh,
+					fresh: running,
 					cachedUrl: (l) => cachedNewsUrl(storage, l),
 					storeUrl: (l, url) => storeNewsUrl(storage, l, url),
 					jinaQuotaBlown: () => Date.now() < this.jinaQuotaUntil,
@@ -290,7 +387,7 @@ export class NewsMode {
 								}
 							}
 				}),
-			fresh,
+			fresh: running,
 			onSettled: (link, found, complete) => {
 				// Complete results cache even when stale — only the
 				// UI write is freshness-guarded, so hops never waste
@@ -300,9 +397,22 @@ export class NewsMode {
 					this.newsImageSession.set(link, found);
 					if (found) storeNewsImage(storage, link, found);
 				}
-				if (fresh()) this.newsImages = { ...this.newsImages, [link]: found };
+				if (visible()) this.newsImages = { ...this.newsImages, [link]: found };
 			}
 		});
+	}
+
+	/** Already-known pictures for a story list (session, then disk). */
+	private knownImages(stories: NewsStory[]): Record<string, string | null> {
+		const storage = this.deps.getStorage();
+		const prefill: Record<string, string | null> = {};
+		for (const s of stories) {
+			if (s.image) continue;
+			const hit = this.newsImageSession.get(s.link) ?? cachedNewsImage(storage, s.link);
+			if (hit) prefill[s.link] = hit;
+			else if (this.newsImageSession.get(s.link) === null) prefill[s.link] = null;
+		}
+		return prefill;
 	}
 
 	async fetchNewsStories(): Promise<void> {
@@ -311,16 +421,25 @@ export class NewsMode {
 		const storage = this.deps.getStorage();
 		const seq = ++this.newsSeq;
 		const { code, region } = current;
+		const stale = () =>
+			this.newsSeq !== seq || this.news?.code !== code || this.news?.region !== region;
+		const cached = cachedFeed(storage, code, region);
+		if (cached) {
+			this.newsImages = this.knownImages(cached);
+			this.news = { ...current, status: "ready", stories: cached, error: "" };
+			void this.resolveNewsImages(code, region, cached);
+			return;
+		}
 		try {
-			let stories = await loadNewsStories(code, region, fetchRawPage);
-			// Images resolve off links alone, so start them while the
-			// (slower) headline translation runs — not after. Dropped
-			// dupes may resolve needlessly; the keyed writes ignore them.
+			let stories = await this.rawStories(code, region);
+			if (stale()) return;
+			// Pictures resolve off links alone, so they start now and
+			// show on the translating cards — not after.
+			this.newsImages = this.knownImages(stories);
 			void this.resolveNewsImages(code, region, stories);
 			const target = newsRegionsFor(code)?.find((r) => r.gl === region);
 			if (target?.translate) {
-				if (this.newsSeq !== seq || this.news?.code !== code || this.news?.region !== region) return;
-				this.news = { ...current, status: "translating", stories: [], error: "" };
+				this.news = { ...current, status: "translating", stories, error: "" };
 				const provider = await this.deps.resolveProvider();
 				if (!provider) throw new Error("news-translate");
 				const titles = await translateNewsTitles(
@@ -333,18 +452,9 @@ export class NewsMode {
 				);
 				stories = withTranslatedTitles(stories, titles);
 			}
-			if (this.newsSeq !== seq || this.news?.code !== code || this.news?.region !== region) return;
+			if (stale()) return;
+			storeFeed(storage, code, region, stories);
 			this.news = { ...current, status: "ready", stories, error: "" };
-			const prefill: Record<string, string | null> = {};
-			for (const s of stories) {
-				if (s.image) continue;
-				const hit = this.newsImageSession.get(s.link) ?? cachedNewsImage(storage, s.link);
-				if (hit) prefill[s.link] = hit;
-				else if (this.newsImageSession.get(s.link) === null) prefill[s.link] = null;
-			}
-			// Images already resolving since load (see above) —
-			// completed hits prefill here, the rest settle in.
-			this.newsImages = prefill;
 		} catch (error) {
 			if (this.newsSeq !== seq || this.news?.code !== code) return;
 			const message = error instanceof Error ? error.message : "";
@@ -358,12 +468,11 @@ export class NewsMode {
 	}
 
 	/**
-	 * Story session launch: resolve + fetch the article, seed the
-	 * composer with the short opener plus the article as a pasted
-	 * attachment (bracketed as a paste region, spliced at send,
-	 * folded back to a tag after), drop the news panel, and send —
-	 * the chat holds only the session. Failures toast and stay in
-	 * news mode to retry.
+	 * Story session launch: wait for the article, seed the composer
+	 * with the short opener plus the article as a pasted attachment
+	 * (bracketed as a paste region, spliced at send, folded back to a
+	 * tag after), drop the news panel, and send — the chat holds only
+	 * the session. Failures toast and stay staged to retry.
 	 */
 	async launchNewsSession(
 		link: string,
@@ -393,24 +502,20 @@ export class NewsMode {
 		const panel = this.panelSeq;
 		this.newsBusy = link;
 		try {
-			const { text } = await resolveArticleText(
-				link,
-				decodeNewsLink,
-				fetchRawPage,
-				this.deps.getStorage()
-			);
+			const text = await this.articleFor(link);
 			// Closed, chat switched or deleted, or language-hopped
 			// mid-flight: don't seed a dead panel.
 			if (this.panelSeq !== panel || this.news?.code !== current.code) return;
 			const att = makePastedTextAttachment(`${PASTE_OPEN}${text}${PASTE_CLOSE}`);
 			this.deps.setAttachments([att]);
 			this.news = null;
-			this.newsPicker = null;
+			this.staged = null;
 			this.deps.seedComposer(
 				`${instruction} ${pastedTextMarker(att.text?.length ?? text.length)} `
 			);
 			seeded = true;
 		} catch (error) {
+			this.articles.delete(link);
 			this.deps.toastError(newsErrorCopy(error));
 			this.deps.denyBuzz();
 		} finally {

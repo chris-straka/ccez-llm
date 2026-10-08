@@ -219,7 +219,6 @@
 	promptInclusions,
 	canHoldDeleteBadge,
 	buildMarksFor,
-	buildNewsMarks,
 	aidedTextForMsg,
 	seedAnnotationsFromRefs,
 	annotationCopyText,
@@ -2108,8 +2107,6 @@ import {
 	five languages cut by a rectangle. Short lists drop under
 	their pill, long ones center (see .lang-list-fixed). */
 	let langMenuAnchor: LangMenuAnchor | null = $state(null);
-	/** Headline badges by story link (filed + pending preview). */
-	const newsMarks = $derived(buildNewsMarks(drafts.list, pendingAnn));
 	/** Learner news mode (empty chats only): picking a language
 	opens its story cards under the pill rail; launching a session
 	collapses the panel and the chat holds only the session.
@@ -2145,10 +2142,6 @@ import {
 		restorePrompt: () => restorePrompt(),
 		requestSend: () => {
 			void doSend();
-		},
-		onBadge: (id, x, y) => annotateMode.openBadgeClick(id, { x, y }),
-		onBadgeHover: (id) => {
-			annotateMode.hoverBadgeId = id;
 		}
 	});
 	// Annotation orchestration (selection menu, create/commit, badge
@@ -3263,15 +3256,6 @@ import {
 			find.open = false;
 		};
 		window.addEventListener("pointerdown", onFindOutside, { passive: true });
-		// Card picker outside dismiss: a press outside the panel folds
-		// open option rows (the launch flow owns busy cards, never this).
-		const onNewsPickerOutside = (event: PointerEvent): void => {
-			if (!newsMode.newsPicker || newsMode.newsBusy) return;
-			const target = event.target instanceof Element ? event.target : null;
-			if (target?.closest(".news-panel")) return;
-			newsMode.dismissPicker();
-		};
-		window.addEventListener("pointerdown", onNewsPickerOutside, { passive: true });
 		// Filed-annotations card dismiss: a press outside the card's
 		// own wrap closes it (capture, so the press never also acts
 		// behind the card). Presses on the pill or inside the card
@@ -8281,6 +8265,10 @@ import {
 	const langMenusActions = {
 		toggle: (id: LanguageMenu["id"], el: HTMLElement) =>
 			toggleLangMenu(id, el),
+		hover: (lang: ReplyLanguage) => {
+			// Only empty chats open news on a pick, so only they warm it.
+			if (activeChat(chatState).messages.length === 0) newsMode.prefetch(lang.code);
+		},
 		pick: (lang: ReplyLanguage) => {
 			const quickKey = quickKeyFor(lang.code, isMac);
 			if (activeReplyCode === lang.code && !quickKey) {
@@ -10301,10 +10289,10 @@ import {
 				// so it sits in the ladder beside the filed-annotations
 				// card: Esc closes it.
 				expandedTags = [];
-			} else if (newsMode.newsPicker) {
-				// A card's open option rows are the same class of inline
-				// expansion: Esc folds them (the panel keeps its ✕).
-				newsMode.dismissPicker();
+			} else if (newsMode.staged && !newsMode.newsBusy) {
+				// A staged story is the same class of inline expansion:
+				// Esc takes it back out (the panel keeps its ✕).
+				newsMode.unpick();
 			} else if (annotateMode.answerPop) {
 				// The answer card has no close button: Esc fades it.
 				annotateMode.closeAnswerPop();
@@ -13434,10 +13422,9 @@ import {
 			{langMenuAnchor}
 			{langMenusActions}
 			newsPanel={newsMode.news}
-			newsPicker={newsMode.newsPicker}
+			newsStaged={newsMode.staged}
 			newsBusy={newsMode.newsBusy}
 			newsImages={newsMode.newsImages}
-			newsMarks={newsMarks}
 			newsActions={newsMode.actions}
 			flashcardsDue={flashcards.due}
 			onFlashcards={() => flashcards.open()}

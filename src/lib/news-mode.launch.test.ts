@@ -31,9 +31,7 @@ function setup() {
 		isPhone: () => false,
 		parkPrompt: () => {},
 		restorePrompt: () => {},
-		requestSend: () => void sends++,
-		onBadge: () => {},
-		onBadgeHover: () => {}
+		requestSend: () => void sends++
 	} as unknown as NewsModeDeps;
 	return { mode: new NewsMode(deps), seeds, sends: () => sends };
 }

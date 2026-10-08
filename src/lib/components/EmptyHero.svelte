@@ -46,6 +46,9 @@ pills become the top rail above the story cards. -->
 	(browser strip, shell strip taller by its padding). */
 	.empty-state.news-mode {
 		margin-top: 1.75rem;
+		/* Headlines browse wider than a chat column reads: up to three
+		cards across on a laptop, never narrower than the chat. */
+		max-width: min(100%, max(calc(var(--chat-width, 36) * 1rem), 68rem));
 	}
 	:global(.app[data-titlebar="overlay"]) .empty-state.news-mode {
 		margin-top: calc(1.75rem + 1.15rem);

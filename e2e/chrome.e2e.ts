@@ -1416,13 +1416,13 @@ test("language re-pick updates send instantly and focuses prompt", async ({
 	await pill.click();
 	await page.locator('.lang-list button:has-text("Bulgarian")').click();
 	await expect(send).toContainText("🇧🇬", { timeout: 10_000 });
-	await expect(panel).toContainText("Bulgarian news", { timeout: 10_000 });
+	await expect(panel).toContainText("Български", { timeout: 10_000 });
 	expect(await focusedComposer()).toBe(false);
 	// Re-pick without ever touching the prompt: the badge swaps at once.
 	await pill.click();
 	await page.locator('.lang-list button:has-text("Czech")').click();
 	await expect(send).toContainText("🇨🇿", { timeout: 10_000 });
-	await expect(panel).toContainText("Czech news");
+	await expect(panel).toContainText("Čeština");
 	expect(await focusedComposer()).toBe(false);
 	// Re-picking the active option clears (no number key): news
 	// closes and focus lands in the composer — even after reading the

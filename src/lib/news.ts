@@ -1065,13 +1065,19 @@ export interface NewsPanelState {
 	fallback: boolean;
 }
 
-/** One card's expanded option rows (page-owned, cleared on launch). */
-export interface NewsPicker {
+/**
+ * The story a learner picked: it sits in the chat as an article
+ * card while the session choices (level, length, talk or read)
+ * show under it. The article body fetches as soon as it lands, so
+ * starting rarely waits.
+ */
+export interface NewsStaged {
 	link: string;
-	/** Chosen level (B2 until tapped) — talk and read share it. */
-	level?: CefrLevel;
-	/** Chosen summary length (medium until tapped). */
-	size?: SummarySize;
+	level: CefrLevel;
+	size: SummarySize;
+	article: "loading" | "ready" | "error";
+	/** Failure copy when `article` is "error". */
+	error: string;
 }
 
 /** CEFR levels for conversation sessions. */
@@ -1377,7 +1383,7 @@ export async function resolveImageBatch(
 	links: string[],
 	deps: ImageBatchDeps,
 	rounds = 2,
-	lanes = 4
+	lanes = 6
 ): Promise<void> {
 	let pending = [...links];
 	for (let round = 0; round < rounds && pending.length > 0; round++) {
@@ -1703,18 +1709,6 @@ export function newsErrorCopy(error: unknown): string {
 	return "The news fetch failed — retry in a bit.";
 }
 
-/**
- * Whether a news-card press opens the story menu: drags moved
- * past the tap slop and presses landing on a live headline
- * selection belong to text selection, never the menu. Pure.
- */
-export function newsCardPressOpensMenu(args: {
-	draggedPx: number;
-	headlineSelected: boolean;
-}): boolean {
-	return args.draggedPx <= 4 && !args.headlineSelected;
-}
-
 /** Article cache record: body plus fetch time. */
 export interface NewsCacheEntry {
 	text: string;
@@ -1877,3 +1871,92 @@ export async function resolveArticleText(
 	storeArticle(store, link, text);
 	return { url, text };
 }
+
+/** Headline list cache record: the final (translated) stories. */
+interface NewsFeedEntry {
+	stories: NewsStory[];
+	at: number;
+}
+
+const NEWS_FEED_KEY = "ccez-news-feeds-v1";
+/** Headlines go stale fast; a reopen inside this window is instant. */
+export const NEWS_FEED_TTL_MS = 20 * 60 * 1000;
+const NEWS_FEED_MAX = 12;
+
+function readNewsFeeds(store: KeyValueStore): Record<string, NewsFeedEntry> {
+	try {
+		const raw = store.getItem(NEWS_FEED_KEY);
+		if (!raw) return {};
+		const parsed: unknown = JSON.parse(raw);
+		if (typeof parsed !== "object" || parsed === null) return {};
+		return parsed as Record<string, NewsFeedEntry>;
+	} catch {
+		return {};
+	}
+}
+
+/** Fresh cached headlines for a language + region, else null. */
+export function cachedFeed(
+	store: KeyValueStore,
+	code: string,
+	region: string,
+	now = Date.now()
+): NewsStory[] | null {
+	const entry = readNewsFeeds(store)[`${code}|${region}`];
+	if (!entry || !Array.isArray(entry.stories) || entry.stories.length === 0) return null;
+	if (now - entry.at > NEWS_FEED_TTL_MS || now < entry.at) return null;
+	return entry.stories;
+}
+
+/** File headlines (oldest evicted past the cap). Never throws. */
+export function storeFeed(
+	store: KeyValueStore,
+	code: string,
+	region: string,
+	stories: NewsStory[],
+	now = Date.now()
+): void {
+	try {
+		const feeds = readNewsFeeds(store);
+		feeds[`${code}|${region}`] = { stories, at: now };
+		const keys = Object.keys(feeds);
+		if (keys.length > NEWS_FEED_MAX) {
+			keys
+				.sort((a, b) => (feeds[a]?.at ?? 0) - (feeds[b]?.at ?? 0))
+				.slice(0, keys.length - NEWS_FEED_MAX)
+				.forEach((k) => delete feeds[k]);
+		}
+		store.setItem(NEWS_FEED_KEY, JSON.stringify(feeds));
+	} catch {
+		// Feed cache is a speedup, never load-bearing.
+	}
+}
+
+const NEWS_PICKS_KEY = "ccez-news-picks-v1";
+
+/** Last level and length the learner started a session with. */
+export function loadNewsPicks(store: KeyValueStore): { level: CefrLevel; size: SummarySize } {
+	const fallback = { level: "B2" as CefrLevel, size: "medium" as SummarySize };
+	try {
+		const raw = store.getItem(NEWS_PICKS_KEY);
+		if (!raw) return fallback;
+		const parsed = JSON.parse(raw) as { level?: unknown; size?: unknown };
+		const level = CEFR_LEVELS.find((l) => l.level === parsed.level)?.level ?? fallback.level;
+		const size = SUMMARY_SIZES.find((s) => s.size === parsed.size)?.size ?? fallback.size;
+		return { level, size };
+	} catch {
+		return fallback;
+	}
+}
+
+export function storeNewsPicks(
+	store: KeyValueStore,
+	picks: { level: CefrLevel; size: SummarySize }
+): void {
+	try {
+		store.setItem(NEWS_PICKS_KEY, JSON.stringify(picks));
+	} catch {
+		// Remembered picks are a convenience only.
+	}
+}
+

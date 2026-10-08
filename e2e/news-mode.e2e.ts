@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "./fixtures";
-import { dragHeadline, seedChat } from "./helpers";
+import { seedChat } from "./helpers";
 import {
 	MOCK_SOURCE_MISS,
 	MOCK_TITLE_IMG,
@@ -33,7 +33,7 @@ test("empty-chat language pick opens news, close returns to welcome", async ({
 	// Welcome text goes away, the panel rails under the pills.
 	const panel = page.locator(".news-panel");
 	await expect(panel).toBeVisible({ timeout: 10_000 });
-	await expect(panel).toContainText("French news");
+	await expect(panel).toContainText("français");
 	await expect(page.locator(".empty-state h1")).toHaveCount(0);
 	// No shell in the preview: the honest state, not a spinner.
 	await expect(panel).toContainText("needs the app shell");
@@ -112,10 +112,10 @@ test("picking a second language switches the panel over", async ({
 	await page.locator('.lang-menu button:has-text("Europe")').click();
 	await page.locator(".lang-list").getByRole("menuitem", { name: "French" }).click();
 	const panel = page.locator(".news-panel");
-	await expect(panel).toContainText("French news", { timeout: 10_000 });
+	await expect(panel).toContainText("français", { timeout: 10_000 });
 	await page.locator('.lang-menu button:has-text("Asia")').click();
 	await page.locator(".lang-list").getByRole("menuitem", { name: "Japanese" }).click();
-	await expect(panel).toContainText("Japanese news");
+	await expect(panel).toContainText("日本語");
 });
 
 test("headlines park the composer; summon brings it back over them", async ({
@@ -173,28 +173,49 @@ test.describe("mock shell feed", () => {
 		await expect(cards.nth(0).locator("img.news-img")).toBeVisible();
 	});
 
-	test("drag-select plus A files a headline badge", async ({ page }) => {
+	test("a picked story moves into the chat with its session choices", async ({
+		page
+	}) => {
 		await openFrenchNews(page);
 		const panel = page.locator(".news-panel");
-		await expect(panel.locator(".news-card")).toHaveCount(3);
-		await dragHeadline(page, 1, "croissant");
-		const selText = await page.evaluate(
-			() => window.getSelection()?.toString() ?? ""
-		);
-		expect(selText.trim().length).toBeGreaterThan(0);
-		// Hands off the prompt: a focused composer eats the A into
-		// typed text. Blurring keeps the selection.
-		await page.evaluate(() =>
-			(document.activeElement as HTMLElement | null)?.blur?.()
-		);
-		await page.mouse.move(2, 2);
-		await page.keyboard.press("a");
-		// Instant path: the badge files, no pill, no menu.
-		await expect(panel.locator("button.ccez-ann-badge")).toHaveCount(1, {
-			timeout: 10_000
+		const cards = panel.locator("button.news-card");
+		await expect(cards).toHaveCount(3);
+		// Cards are click targets, not text: pointer, no selection.
+		const look = await cards.nth(1).evaluate((el) => {
+			const cs = getComputedStyle(el);
+			return { cursor: cs.cursor, select: cs.userSelect };
 		});
-		await expect(panel.locator(".news-card.has-marks")).toHaveCount(1);
-		await expect(page.locator(".sel-menu")).toHaveCount(0);
+		expect(look).toEqual({ cursor: "pointer", select: "none" });
+		await cards.nth(1).click();
+		const stage = panel.locator(".news-stage");
+		await expect(stage).toBeVisible();
+		await expect(stage).toContainText(MOCK_TITLE_MISS);
+		await expect(panel.locator("button.news-card")).toHaveCount(0);
+		await expect(stage.getByRole("group", { name: "Level" })).toBeVisible();
+		await stage.getByRole("button", { name: "C1" }).click();
+		await expect(stage.getByRole("button", { name: "C1" })).toHaveAttribute(
+			"aria-pressed",
+			"true"
+		);
+		await expect(stage.getByRole("button", { name: "Discuss this story" })).toBeVisible();
+		await expect(stage.getByRole("button", { name: "Summarize this story" })).toBeVisible();
+		// Esc takes the story back out; headlines return.
+		await page.keyboard.press("Escape");
+		await expect(stage).toHaveCount(0);
+		await expect(panel.locator("button.news-card")).toHaveCount(3);
+	});
+
+	test("the region rule always splits home editions from world desks", async ({
+		page
+	}) => {
+		await openFrenchNews(page);
+		const chips = page.locator(".news-chips");
+		await expect(chips.locator(".news-sep")).toHaveCount(1);
+		// The rule sits right after the last word chip.
+		const before = await chips
+			.locator(".news-sep")
+			.evaluate((el) => (el.previousElementSibling as HTMLElement).classList.contains("icon"));
+		expect(before).toBe(false);
 	});
 
 	test("image miss settles to a letter tile", async ({ page }) => {
@@ -221,3 +242,4 @@ test.describe("mock shell feed", () => {
 		await expect(cards.nth(2).locator(".news-img-fallback")).toHaveCount(0);
 	});
 });
+

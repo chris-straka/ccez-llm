@@ -2,219 +2,32 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
 /**
- * Learner news renders from `NewsPanel.svelte` under the hero pills.
- * The page owns the panel state (fetch, region, picker, launch);
- * the component owns the cards markup and their surfaces. Story
- * buttons are icon-only by explicit user call (emoji with text
- * alternatives); option rows expand inline under their card.
- * Region chips hide for single-edition languages; world chips show
- * icons with label alternatives, home chips plain country labels.
- * All color rides theme tokens.
+ * Learner news renders from `NewsPanel.svelte`; its behavior (grid,
+ * skeletons, staging a story, starting a session) is pinned in
+ * `e2e/news-mode.e2e.ts`. Only what neither jsdom nor Playwright can
+ * observe is checked here: the stylesheet's motion and color rules.
  */
-function panelSource(): string {
-	return readFileSync(new URL("./NewsPanel.svelte", import.meta.url), "utf8");
+function panelCss(): string {
+	const source = readFileSync(new URL("./NewsPanel.svelte", import.meta.url), "utf8");
+	return source.split("<style>")[1] ?? "";
 }
 
-describe("news panel contract", () => {
-	it("renders icon-only session buttons with text alternatives", () => {
-		const source = panelSource();
-		expect(source).toContain('aria-label="Discuss this story"');
-		expect(source).toContain('aria-label="Summarize this story"');
-		expect(source).toContain("🗣️");
-		expect(source).toContain("📰");
-		// No text siblings inside the session buttons: past the last
-		// attribute bracket, each holds exactly its emoji.
-		for (const [kind, emoji] of [
-			["talk", "🗣️"],
-			["read", "📰"]
-		]) {
-			const at = source.indexOf(`actions.launch(story.link, "${kind}")}`);
-			expect(at).toBeGreaterThan(0);
-			const end = source.indexOf("</button>", at);
-			const inner = source.slice(at, end).split(">").pop()?.trim();
-			expect(inner).toBe(emoji);
+describe("news panel stylesheet", () => {
+	it("animates only transform and opacity, and stops under reduced motion", () => {
+		const css = panelCss();
+		const keyframes = css.match(/@keyframes[^{]+\{[\s\S]*?\n\t\t?\}/g) ?? [];
+		expect(keyframes.length).toBeGreaterThan(0);
+		for (const block of keyframes) {
+			const props = [...block.matchAll(/([a-z-]+)\s*:/g)].map((m) => m[1]);
+			for (const prop of props) expect(["transform", "opacity"]).toContain(prop);
 		}
-	});
-
-	it("opens one menu from the whole card, click or right-click", () => {
-		const source = panelSource();
-		expect(source).toContain("actions.menu(story.link)");
-		expect(source).toContain("oncontextmenu");
-		expect(source).toContain("aria-expanded");
-		expect(source).toContain("news-hint");
-		// One neutral ellipsis, never the action emoji it isn't.
-		expect(source).toContain("⋯");
-		expect(source).not.toContain("🗣️ 📰");
-		expect(source).toContain('aria-label="Story options"');
-		expect(source).toContain("transition:slide");
-		expect(source).toContain("in:fly");
-		expect(source).toContain("motionMs");
-		// Hover affordances live on the card surface alone, so the
-		// underline and the pointer cursor never disagree — and the
-		// title color eases instead of snapping.
-		expect(source).toContain(".news-open:hover .news-card-title");
-		expect(source).not.toContain(".news-card:hover .news-card-title");
-		const css = source.split("<style>")[1] ?? "";
-		const title = css.match(/\.news-card-title\s*\{[^}]*\}/)?.[0] ?? "";
-		expect(title).toContain("transition: color");
-		// The hint overlays instead of reserving card space.
-		const hint = css.match(/\.news-hint\s*\{[^}]*\}/)?.[0] ?? "";
-		expect(hint).toContain("position: absolute");
-	});
-
-	it("menus launch icon-only at the selected level and length", () => {
-		const source = panelSource();
-		expect(source).toContain('aria-label="Level"');
-		expect(source).toContain('aria-label="Summary length"');
-		expect(source).toContain("CEFR_LEVELS");
-		expect(source).toContain("SUMMARY_SIZES");
-		// Level and length select without launching; the icons launch.
-		expect(source).toContain("actions.level(story.link, level.level)");
-		expect(source).toContain("actions.size(story.link, size.size)");
-		expect(source).toContain('picker?.level ?? "B2"');
-		expect(source).toContain('picker?.size ?? "medium"');
-		expect(source).toContain('actions.launch(story.link, "talk")');
-		expect(source).toContain('actions.launch(story.link, "read")');
-	});
-
-	it("chips world icons with label alternatives, hidden for single editions", () => {
-		const source = panelSource();
-		expect(source).toContain("panel.regions.length > 1");
-		expect(source).not.toContain("🌍 Global");
-		expect(source).toContain("{region.icon ?? region.label}");
-		expect(source).toContain("aria-label={region.label}");
-		expect(source).toContain("aria-pressed");
-		expect(source).toContain("news-sep");
-		expect(source).toContain(".news-chip.icon");
-	});
-
-	it("yields card presses to live headline selections", () => {
-		// The card carries its story link for headline anchoring;
-		// drags and standing selections own the press, never the menu.
-		const source = panelSource();
-		expect(source).toContain("data-story-link={story.link}");
-		expect(source).toContain("newsCardPressOpensMenu({");
-	});
-
-	it("never shows fallback headlines in English", () => {
-		// Fallback editions translate into the learner's language
-		// (their regions carry translate), so no English note exists;
-		// the translated-from line attributes the source instead.
-		const source = panelSource();
-		expect(source).not.toContain("headlines in English");
-		expect(source).toContain("Translated from {activeRegion.label} headlines.");
-	});
-
-	it("notes translated regions with the source edition", () => {
-		const source = panelSource();
-		expect(source).toContain("?.translate");
-		expect(source).toContain("Translated from {activeRegion.label} headlines.");
-		// Only once loaded — never over the loading crumbs.
-		expect(source).toContain('activeRegion?.translate && panel.status === "ready"');
-		expect(source).toContain("Translating headlines into");
-	});
-
-	it("lays cards out as a responsive grid", () => {
-		const css = panelSource().split("<style>")[1] ?? "";
-		expect(css).toContain("display: grid");
-		expect(css).toContain("auto-fill");
-		// Uniform cards: titles pad to three lines, sources to one.
-		expect(css).toContain("min-height: 4.05em");
-		expect(css).toContain("text-overflow: ellipsis");
-	});
-
-	it("shows feed thumbnails when present, lazy and tile-falling", () => {
-		const source = panelSource();
-		expect(source).toContain("{#if resolved && !broken[story.link]}");
-		expect(source).toContain('class="news-img"');
-		expect(source).toContain('loading="lazy"');
-		// A dead hotlink falls back to the outlet initial (same
-		// box), never a bare gap.
-		expect(source).toContain("broken[story.link] = true");
-		expect(source).not.toContain("currentTarget.remove()");
-	});
-
-	it("keeps headlines selectable on a keyboard-operated card", () => {
-		// Buttons swallow drag-selection in browsers, so the card is
-		// a div wearing the button contract (role, tab stop, menu
-		// on Enter/Space) — text selects natively for annotate.
-		const source = panelSource();
-		expect(source).toContain('role="button"');
-		expect(source).toContain('tabindex="0"');
-		expect(source).toContain("onkeydown");
-		expect(source).toContain('e.key === "Enter" || e.key === " "');
-		// The card surface itself is the div, not a button.
-		const openAt = source.indexOf('class="news-open"');
-		expect(openAt).toBeGreaterThan(0);
-		const tagStart = source.lastIndexOf("<", openAt);
-		expect(source.slice(tagStart, openAt)).toContain("<div");
-		// The thread disables selection wholesale: the card opts
-		// back in and the title reads an I-beam, like .rendered.
-		const css = source.split("<style>")[1] ?? "";
-		const open = css.match(/\.news-open\s*\{[^}]*\}/)?.[0] ?? "";
-		expect(open).toContain("user-select: text");
-		expect(open).toContain("-webkit-user-select: text");
-		const title = css.match(/\.news-card-title\s*\{[^}]*\}/)?.[0] ?? "";
-		expect(title).toContain("cursor: text");
-	});
-
-	it("stamps headline badges like message bodies do", () => {
-		// Marks cross per story link and stamp onto each title
-		// with the shared wash id; badges open their answer card
-		// instead of the story menu, by mouse or keyboard.
-		const source = panelSource();
-		expect(source).toContain("marks: Record<string, AnnotationMark[]>");
-		expect(source).toContain("washId: string | null");
-		expect(source).toContain("applyMarks(title, byLink[link] ?? [], false, wash)");
-		expect(source).toContain("badge: (id: AnnotationId, x: number, y: number) => void");
-		expect(source).toContain("badgeHover: (id: string | null) => void");
-		expect(source).toContain("[data-ann-badge]");
-		expect(source).toContain("openBadgeFrom(hit)");
-		expect(source).toContain("if (badgeOf(e.target)) return;");
-		// Annotated cards grow a badge lane: the clamp would eat
-		// badges floating above the first line.
-		expect(source).toContain("has-marks");
-		expect(source).toContain(".news-card.has-marks .news-card-title");
-		expect(source).toContain("padding-top: calc(1.25rem");
-	});
-
-	it("presses buttons in and kills all motion when reduced", () => {
-		const css = panelSource().split("<style>")[1] ?? "";
-		expect(css).toContain(".news-go:active");
-		expect(css).toContain("scale(0.96)");
 		expect(css).toContain("prefers-reduced-motion: reduce");
+		expect(css).toContain("animation: none !important");
 		expect(css).toContain("transition: none !important");
 	});
 
-	it("skeletons pending scrapes, still under reduced motion", () => {
-		const source = panelSource();
-		expect(source).toContain("images[story.link]");
-		expect(source).toContain("news-skel");
-		expect(source).toContain("prefers-reduced-motion: no-preference");
-		// Resolved misses hold the same box with the outlet initial.
-		expect(source).toContain("news-img-fallback");
-		expect(source).toContain("story.source.trim().charAt(0)");
-	});
-
-	it("covers every fetch state with retry where retry helps", () => {
-		const source = panelSource();
-		for (const status of [
-			'"loading"',
-			'"translating"',
-			'"error"',
-			'"unsupported"',
-			'"needs-shell"'
-		]) {
-			expect(source).toContain(`panel.status === ${status}`);
-		}
-		expect(source).toContain("actions.retry()");
-		// Busy cards announce and fold the menu away.
-		expect(source).toContain('role="status"');
-		expect(source).toContain("open && busy === null");
-	});
-
 	it("paints only theme tokens, never raw hex", () => {
-		const css = panelSource().split("<style>")[1] ?? "";
+		const css = panelCss();
 		const hexes = css.match(/#(?:[0-9a-fA-F]{3}){1,2}\b/g) ?? [];
 		// Every hex is a first-paint fallback directly above its var.
 		for (const hex of hexes) {
