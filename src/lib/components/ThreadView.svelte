@@ -131,6 +131,8 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		waitingLabel: string;
 		useMock: boolean;
 		openLangMenu: LanguageMenu["id"] | null;
+		/** Typeahead landing in the open language menu. */
+		langMenuTyped: string | null;
 		langMenuAnchor: {
 			left: number;
 			maxH: number;
@@ -209,6 +211,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		waitingLabel,
 		useMock,
 		openLangMenu,
+		langMenuTyped,
 		langMenuAnchor,
 		langMenusActions,
 		newsPanel,
@@ -247,6 +250,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 				openId={openLangMenu}
 				anchor={langMenuAnchor}
 				activeCode={activeReplyCode}
+				highlightCode={langMenuTyped}
 				{previewing}
 				actions={langMenusActions}
 			/>
