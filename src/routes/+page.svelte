@@ -89,6 +89,10 @@
 		switchToastFor,
 		expandAskFor,
 		expandDraft,
+		LANGUAGE_MENUS,
+		menuOrder,
+		typeaheadBuffer,
+		typeaheadMatch,
 		thinkingLabelFor,
 		type LangMenuAnchor,
 		type LanguageMenu,
@@ -2108,6 +2112,42 @@ import {
 	}
 	let stopDictation: (() => void) | null = null;
 	let openLangMenu: LanguageMenu["id"] | null = $state(null);
+	/** Typeahead inside the open language menu: the landed language
+	and the letters typed so far (reset after a pause). */
+	let langTyped = $state<string | null>(null);
+	let langTypeBuffer = { query: "", at: 0 };
+	$effect(() => {
+		void openLangMenu;
+		langTyped = null;
+		langTypeBuffer = { query: "", at: 0 };
+	});
+	/** Keys for an open language menu: letters jump, arrows step,
+	Enter picks. True when the key was the menu's. */
+	function langMenuKey(event: KeyboardEvent): boolean {
+		const menu = LANGUAGE_MENUS.find((m) => m.id === openLangMenu);
+		if (!menu || event.metaKey || event.ctrlKey || event.altKey) return false;
+		const order = menuOrder(menu);
+		const at = order.findIndex((l) => l.code === langTyped);
+		if (event.key === "Enter") {
+			const lang = order[at];
+			if (!lang) return false;
+			langMenusActions.pick(lang);
+			return true;
+		}
+		if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+			const step = event.key === "ArrowDown" ? 1 : -1;
+			const next = at < 0 ? (step > 0 ? 0 : order.length - 1) : (at + step + order.length) % order.length;
+			langTyped = order[next]?.code ?? null;
+			return true;
+		}
+		if (event.key.length === 1 && /\p{L}/u.test(event.key)) {
+			langTypeBuffer = typeaheadBuffer(langTypeBuffer, event.key, Date.now());
+			const hit = typeaheadMatch(order, langTypeBuffer.query);
+			if (hit !== null) langTyped = order[hit]?.code ?? null;
+			return true;
+		}
+		return false;
+	}
 	/* Sheet anchor: the open list escapes the thread scroller
 	(fixed, centered on the screen) because inside .messages
 	anything past its box clips — Europe's 20-item list read as
@@ -10458,6 +10498,11 @@ import {
 			// candidate and Esc drops the candidate list, never an app
 			// action or a closed layer.
 			if (isImeKey(event)) return;
+			// An open language menu owns letters, arrows, and Enter.
+			if (openLangMenu && langMenuKey(event)) {
+				consumeEvent(event);
+				return;
+			}
 			// The reader owns the keyboard while open (same fence as
 			// the deck below): Space taps, arrows step, Esc closes.
 			if (reader) {
@@ -13543,6 +13588,7 @@ import {
 			waitingLabel={thinkingLabelFor(activeReplyCode ?? settings.replyLang)}
 			{useMock}
 			{openLangMenu}
+			langMenuTyped={langTyped}
 			{langMenuAnchor}
 			{langMenusActions}
 			newsPanel={newsMode.news}

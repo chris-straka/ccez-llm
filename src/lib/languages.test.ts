@@ -3,6 +3,11 @@ import {
 	LANGUAGE_MENUS,
 	expandAskFor,
 	expandDraft,
+	menuOrder,
+	menuSections,
+	TYPEAHEAD_RESET_MS,
+	typeaheadBuffer,
+	typeaheadMatch,
 	EUROPEAN_LANGUAGES,
 	ASIAN_LANGUAGES,
 	AFRICAN_LANGUAGES,
@@ -341,5 +346,41 @@ describe("expand on this part", () => {
 			"> line one\n> line two\n\nAsk."
 		);
 		expect(expandDraft("my note ", "q", "Ask.")).toBe("my note\n\n> q\n\nAsk.");
+	});
+});
+
+describe("language menu order and typeahead", () => {
+	const europe = LANGUAGE_MENUS.find((m) => m.id === "europe")!;
+	it("puts the prominent group first, the rest A-Z", () => {
+		const { top, rest } = menuSections(europe);
+		expect(top.map((l) => l.name)).toEqual([
+			"French",
+			"German",
+			"Spanish",
+			"Italian",
+			"Portuguese",
+			"Russian"
+		]);
+		const names = rest.map((l) => l.name);
+		expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b, "en")));
+		expect(names).not.toContain("French");
+		expect(menuOrder(europe)).toHaveLength(europe.languages.length);
+		for (const menu of LANGUAGE_MENUS)
+			expect(menuOrder(menu)).toHaveLength(menu.languages.length);
+	});
+	it("matches typed prefixes by name, then native name, accent blind", () => {
+		const order = menuOrder(europe);
+		expect(order[typeaheadMatch(order, "da")!]?.name).toBe("Danish");
+		expect(order[typeaheadMatch(order, "POL")!]?.name).toBe("Polish");
+		expect(order[typeaheadMatch(order, "deu")!]?.name).toBe("German");
+		expect(order[typeaheadMatch(order, "espa")!]?.name).toBe("Spanish");
+		expect(typeaheadMatch(order, "zz")).toBeNull();
+		expect(typeaheadMatch(order, " ")).toBeNull();
+	});
+	it("buffers keystrokes until a pause", () => {
+		const a = typeaheadBuffer({ query: "", at: 0 }, "p", 1000);
+		const b = typeaheadBuffer(a, "o", 1300);
+		expect(b.query).toBe("po");
+		expect(typeaheadBuffer(b, "d", 1300 + TYPEAHEAD_RESET_MS + 1).query).toBe("d");
 	});
 });
