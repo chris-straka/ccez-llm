@@ -916,7 +916,8 @@ export function buildAnnotationAnswerMessages(
 			role: "system",
 			content:
 				`You explain a quoted passage to a language learner reading ` +
-				`it. First give what it means in this paragraph, in one plain ` +
+				`it. Write in English, whatever language the passage is in; ` +
+				`quote its words as they are. First give what it means in this paragraph, in one plain ` +
 				`sentence: its sense here, not a dictionary list. Then teach the ` +
 				`quote as language, not gist, but only what a learner would not ` +
 				`work out alone: unexpected word forms, idioms, false friends, ` +
