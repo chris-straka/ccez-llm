@@ -1000,6 +1000,11 @@ describe("annotationAnswer", () => {
 		expect(system!.content).toContain("what it means in this paragraph");
 	});
 
+	it("answers in English even when the passage is not", () => {
+		const [system] = buildAnnotationAnswerMessages(q);
+		expect(system!.content).toContain("Write in English, whatever language the passage is in");
+	});
+
 	it("skips the obvious and writes prose, not labeled slots", () => {
 		const [system] = buildAnnotationAnswerMessages(q);
 		expect(system!.content).toContain("Skip what any learner already knows");

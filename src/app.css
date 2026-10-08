@@ -876,12 +876,17 @@ html[data-theme="dark"] .rendered button.ccez-ann-badge.ans-ready.arrived,
 html[data-theme="dark"] .news-card-title button.ccez-ann-badge.ans-ready.arrived {
 	animation-name: ccez-ann-arrive-dark;
 }
+/* Reduced motion keeps the waiting pulse, slower: an opacity fade
+moves nothing, and a still badge can't say it's loading. The
+arrival ring grows, so it goes. */
 @media (prefers-reduced-motion: reduce) {
 	.rendered button.ccez-ann-badge.ans-waiting,
 	.rendered button.ccez-ann-badge.ans-waiting.fresh,
-	.rendered button.ccez-ann-badge.ans-ready.arrived,
 	.news-card-title button.ccez-ann-badge.ans-waiting,
-	.news-card-title button.ccez-ann-badge.ans-waiting.fresh,
+	.news-card-title button.ccez-ann-badge.ans-waiting.fresh {
+		animation: ccez-ann-breathe 2.4s ease-in-out infinite;
+	}
+	.rendered button.ccez-ann-badge.ans-ready.arrived,
 	.news-card-title button.ccez-ann-badge.ans-ready.arrived {
 		animation: none;
 	}

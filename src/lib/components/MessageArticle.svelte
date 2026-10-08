@@ -13,10 +13,8 @@ where the text sat, like the composer's promptEl pattern). -->
 		CEFR_LEVELS,
 		SUMMARY_SIZES,
 		newsLaunchImage,
-		parseNewsFollowUp,
 		parseNewsLaunch,
-		type CefrLevel,
-		type NewsFollowUpKind
+		type CefrLevel
 	} from "$lib/news";
 	import { cefrTag } from "$lib/cefr";
 	import { fade } from "svelte/transition";
@@ -66,7 +64,6 @@ import type {
 		busy: boolean;
 		/** Re-run the session from this opener at a new level. */
 		setLevel: (level: CefrLevel) => void;
-		followUp: (kind: NewsFollowUpKind) => void;
 	}
 
 	interface Props {
@@ -178,7 +175,6 @@ import type {
 			: null
 	);
 	let launchImageBroken = $state(false);
-	const followUp = $derived(msg.role === "user" && !launch ? parseNewsFollowUp(msg.content) : null);
 	const shownLevel = $derived<CefrLevel>(launch?.level ?? "B2");
 	let levelOpen = $state(false);
 	// The level menu closes on any press outside it.
@@ -339,28 +335,8 @@ import type {
 						<span>{launch.source}</span>
 					{/if}
 				</span>
-				{#if news}
-					<span class="launch-actions">
-						<button
-							type="button"
-							disabled={news.busy}
-							title="The article itself, rewritten at your level"
-							onclick={(e) => {
-								e.stopPropagation();
-								news.followUp("article");
-							}}>Article at {shownLevel}</button
-						>
-					</span>
-				{/if}
 			</span>
 		</div>
-	{:else if followUp && folded}
-		<div class="bubble news-follow">
-			<span class="follow-kind">Article · {followUp.level}</span>
-			<span class="follow-title">{followUp.title}</span>
-		</div>
-	{:else if followUp}
-		<div class="bubble">{@render body(msg.content, false, null)}</div>
 	{:else if launch}
 		<div class="bubble">{@render body(msg.content, false, null)}</div>
 	{:else}
@@ -435,7 +411,6 @@ import type {
 	.launch-level {
 		border: 0;
 		padding: 0.1em 0.35em;
-		margin: 0 -0.35em;
 		border-radius: 0.4em;
 		background: transparent;
 		color: inherit;
@@ -451,7 +426,7 @@ import type {
 	.level-menu {
 		position: absolute;
 		top: calc(100% + 0.3rem);
-		left: -0.35em;
+		left: 0;
 		z-index: 20;
 		display: flex;
 		flex-direction: column;
@@ -481,51 +456,6 @@ import type {
 	.level-menu button.on {
 		background: #f1f1f4;
 		background: var(--bg-wash);
-	}
-	.launch-actions {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.4rem;
-		margin-top: 0.35rem;
-	}
-	.launch-actions button {
-		border: 1px solid #e5e5ea;
-		border-color: var(--line-soft);
-		border-radius: 999px;
-		padding: 0.25em 0.75em;
-		background: transparent;
-		color: #1c1c1e;
-		color: var(--ink);
-		font: inherit;
-		font-size: calc(0.75rem * var(--font-scale, 1));
-		cursor: pointer;
-		transition:
-			border-color 0.15s ease,
-			transform 0.12s ease;
-	}
-	.launch-actions button:hover:not(:disabled) {
-		border-color: #007aff;
-		border-color: var(--accent);
-	}
-	.launch-actions button:active:not(:disabled) {
-		transform: scale(0.96);
-	}
-	.launch-actions button:disabled {
-		opacity: 0.5;
-		cursor: progress;
-	}
-	.news-follow {
-		display: flex;
-		flex-direction: column;
-		gap: 0.15rem;
-	}
-	.follow-kind {
-		font-size: calc(0.72rem * var(--font-scale, 1));
-		color: #6e6e73;
-		color: var(--muted);
-	}
-	.follow-title {
-		font-weight: 600;
 	}
 	.launch-thumb {
 		flex: none;
