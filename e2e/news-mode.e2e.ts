@@ -203,11 +203,15 @@ test.describe("mock shell feed", () => {
 			"true"
 		);
 		// Word labels: the session kind picks, Start names it, and
-		// length only shows for a summary.
+		// both kinds pick a length (its words follow the kind). No
+		// "Article ready" line once the fetch lands.
 		await expect(stage.getByRole("button", { name: "Start conversation" })).toBeVisible();
-		await expect(stage.getByRole("group", { name: "Summary length" })).toHaveCount(0);
+		await expect(stage.getByRole("group", { name: "Length" })).toBeVisible();
+		await expect(stage).toContainText("about 250 words");
+		await expect(stage).not.toContainText("Article ready");
 		await stage.getByRole("button", { name: "Summary", exact: true }).click();
-		await expect(stage.getByRole("group", { name: "Summary length" })).toBeVisible();
+		await expect(stage.getByRole("group", { name: "Length" })).toBeVisible();
+		await expect(stage).toContainText("about 200 words");
 		await expect(stage.getByRole("button", { name: "Start summary" })).toBeVisible();
 		// Esc takes the story back out; headlines return.
 		await page.keyboard.press("Escape");
@@ -267,7 +271,7 @@ test.describe("sent news opener", () => {
 		const tag = page.locator("article.user .news-launch");
 		await expect(tag).toBeVisible({ timeout: 60_000 });
 		await expect(tag).toContainText("Soupçons de peste en Russie");
-		await expect(tag).toContainText("Conversation · B2");
+		await expect(tag.locator(".launch-meta")).toContainText(/Conversation\s*·\s*B2/);
 		await expect(page.locator("article.user")).not.toContainText("Two named locals");
 		// The headline is a normal message body: his text size, selectable.
 		const title = tag.locator(".launch-title .rendered");

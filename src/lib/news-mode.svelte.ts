@@ -496,7 +496,7 @@ export class NewsMode {
 		if (!story) return;
 		const instruction =
 			kind === "talk"
-				? newsConversationInstruction(story, level, current.langName)
+				? newsConversationInstruction(story, level, current.langName, size)
 				: newsSummaryInstruction(story, size, level, current.langName);
 		// The story takes the composer: its opener replaces any dirty
 		// draft (the seed lands after the fetch, so a failed launch

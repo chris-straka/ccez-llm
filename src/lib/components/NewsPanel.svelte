@@ -11,6 +11,7 @@ everything else is theme tokens, never raw hex. -->
 	import {
 		CEFR_LEVELS,
 		SUMMARY_SIZES,
+		sessionWords,
 		type CefrLevel,
 		type NewsKind,
 		type NewsPanelState,
@@ -160,7 +161,7 @@ everything else is theme tokens, never raw hex. -->
 	{#if stagedStory && staged}
 		{@const image = imageFor(stagedStory)}
 		{@const levelTag = CEFR_LEVELS.find((l) => l.level === staged.level)?.tag ?? ""}
-		{@const words = SUMMARY_SIZES.find((sz) => sz.size === staged.size)?.words ?? 0}
+		{@const words = sessionWords(staged.kind, staged.size)}
 		<div class="news-stage">
 			<div class="session" use:flipIn>
 				<div class="stage-card">
@@ -234,25 +235,23 @@ everything else is theme tokens, never raw hex. -->
 							{/each}
 						</div>
 					</div>
-					{#if staged.kind === "read"}
-						<div class="opt-row" transition:fly={{ y: -6, duration: motionMs(180) }}>
-							<span class="opt-label" aria-hidden="true">Length · about {words} words</span>
-							<div class="seg" role="group" aria-label="Summary length">
-								{#each SUMMARY_SIZES as size (size.size)}
-									<button
-										type="button"
-										class="seg-opt"
-										class:on={staged.size === size.size}
-										aria-pressed={staged.size === size.size}
-										title="About {size.words} words"
-										onclick={() => actions.size(size.size)}
-									>
-										{size.label}
-									</button>
-								{/each}
-							</div>
+					<div class="opt-row">
+						<span class="opt-label" aria-hidden="true">Length · about {words} words</span>
+						<div class="seg" role="group" aria-label="Length">
+							{#each SUMMARY_SIZES as size (size.size)}
+								<button
+									type="button"
+									class="seg-opt"
+									class:on={staged.size === size.size}
+									aria-pressed={staged.size === size.size}
+									title="About {sessionWords(staged.kind, size.size)} words"
+									onclick={() => actions.size(size.size)}
+								>
+									{size.label}
+								</button>
+							{/each}
 						</div>
-					{/if}
+					</div>
 					<button
 						type="button"
 						class="news-start"
@@ -265,18 +264,20 @@ everything else is theme tokens, never raw hex. -->
 							{staged.kind === "talk" ? "Start conversation" : "Start summary"}
 						{/if}
 					</button>
-					<p class="stage-note" aria-live="polite">
-						{#if staged.article === "error"}
-							<span role="alert">{staged.error}</span>
-							<button type="button" class="news-retry" onclick={() => actions.retry()}>
-								Retry
-							</button>
-						{:else if staged.article === "loading" && busy === null}
-							<span class="news-dots">Reading the article</span>
-						{:else if staged.article === "ready" && busy === null}
-							Article ready
-						{/if}
-					</p>
+					<!-- Only a pending fetch or a failure speaks here: a ready
+					article needs no line. -->
+					{#if staged.article === "error" || (staged.article === "loading" && busy === null)}
+						<p class="stage-note" aria-live="polite">
+							{#if staged.article === "error"}
+								<span role="alert">{staged.error}</span>
+								<button type="button" class="news-retry" onclick={() => actions.retry()}>
+									Retry
+								</button>
+							{:else}
+								<span class="news-dots">Reading the article</span>
+							{/if}
+						</p>
+					{/if}
 				</div>
 			</div>
 		</div>
