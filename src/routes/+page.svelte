@@ -18,6 +18,7 @@
 		newChatMsgId,
 		setChatReplyLang,
 		setChatCorrection,
+		restoreChatMessages,
 		swapReplyLang,
 		chatVoiceReadback,
 		setChatVoice,
@@ -303,6 +304,14 @@ import {
 	import { startBlink, startHighlightFade, startMarkFade } from "$lib/blink";
 	import { createRefMemo } from "$lib/aidLoading";
 	import { NewsMode } from "$lib/news-mode.svelte";
+	import {
+		newsArticleInstruction,
+		newsLaunchUrl,
+		parseNewsLaunch,
+		relevelNewsOpener,
+		type CefrLevel,
+		type NewsFollowUpKind
+	} from "$lib/news";
 	import { AnnotateMode } from "$lib/annotate-mode.svelte";
 	/* decomposeTree + onKunLine render in `InspectOverlay.svelte`. */
 	import {
@@ -8388,6 +8397,61 @@ import {
 		else newsMode.news = null;
 	}
 
+	/** Article tag level: the session re-runs from its opener at the
+	new level (everything below is replaced by a fresh opener); the
+	toast's Undo puts the old replies back. */
+	function newsSetLevel(level: CefrLevel, msg: ChatMsg): void {
+		if (previewing || chatState.sending) return;
+		const live = activeChat(chatState);
+		const index = live.messages.findIndex((m) => m.id === msg.id);
+		const target = live.messages[index];
+		if (!target) return;
+		const next = relevelNewsOpener(target.content, target.pasteFolds ?? [], level);
+		if (!next) return;
+		const chatId = live.id;
+		const before = live.messages;
+		buzzTap();
+		editMessageContent(chatState, target.id, next.content, { pasteFolds: next.pasteFolds });
+		rerunFrom(index);
+		flashToast(`Restarted at ${level}`, () => {
+			const chatNow = chatState.chats.find((c) => c.id === chatId);
+			if (!chatNow) return;
+			if (isSending(chatState, chatId)) abortSend(chatId);
+			restoreChatMessages(chatState, chatId, before);
+		});
+	}
+	/** Article tag follow-ups: the article at his level, or a quiz,
+	sent as his next turn (folded to a small tag in the chat). */
+	function newsFollowUp(kind: NewsFollowUpKind, msg: ChatMsg): void {
+		const launch = parseNewsLaunch(msg.content);
+		const ed = editor;
+		if (!launch || !ed || chatState.sending) return;
+		if (ed.getText().trim() !== "" || attachments.length > 0) {
+			flashToast("Send or clear your draft first.");
+			buzzNo();
+			return;
+		}
+		const chat = activeChat(chatState);
+		const level = launch.level;
+		const langName = replyLanguageFor(chat.replyLang)?.name ?? "the article's language";
+		if (kind !== "article") return;
+		const text = newsArticleInstruction(
+			launch.title,
+			level,
+			langName,
+			newsLaunchUrl(localStorage, launch.title)
+		);
+		markerSyncMuted = true;
+		try {
+			ed.setText(text);
+			syncMarkerCounts();
+		} finally {
+			markerSyncMuted = false;
+		}
+		buzzTap();
+		void doSend();
+	}
+
 	function clearReplyLang(): void {
 		setChatReplyLang(chatState, chatState.activeChatId, null);
 		openLangMenu = null;
@@ -13622,6 +13686,8 @@ import {
 				dropMessage,
 				stopVoice,
 				speakReply,
+				newsSetLevel,
+				newsFollowUp,
 				unpinModelAid,
 				runModelAidFor,
 				unpinLocalAid,
