@@ -63,6 +63,19 @@ export interface ViewportState {
 	idleTimer: number | undefined;
 	/** Stream-follow cache: last streamed length already pinned. */
 	lastStreamLen: number;
+	/** Scroll offset at the previous scroll event (direction reads). */
+	lastTop: number;
+	/** Reading anchor while unpinned: the message at the top of the
+	view and its offset from the box top, held across re-renders. */
+	anchor: ScrollAnchor | null;
+	/** New reply text landed below an unpinned reader. */
+	missed: boolean;
+}
+
+/** A message the reader is looking at, by element id and offset. */
+export interface ScrollAnchor {
+	id: string;
+	offset: number;
 }
 
 export function emptyViewport(): ViewportState {
@@ -72,8 +85,48 @@ export function emptyViewport(): ViewportState {
 		hold: null,
 		holdSeq: 0,
 		idleTimer: undefined,
-		lastStreamLen: 0
+		lastStreamLen: 0,
+		lastTop: 0,
+		anchor: null,
+		missed: false
 	};
+}
+
+/**
+ * Stickiness after a scroll event, by intent rather than position:
+ * any upward move unpins at once (small trackpad nudges included, so
+ * a stream never drags a reader back down); the true bottom always
+ * pins; a downward move into the stick slop re-pins; anything else
+ * keeps the previous state (an in-flight glide to the bottom stays
+ * pinned). Content shrinking under a reader at the bottom clamps the
+ * offset up but leaves the gap at zero, so it never reads as intent.
+ */
+export function stickAfterScroll(facts: {
+	stick: boolean;
+	top: number;
+	lastTop: number;
+	gap: number;
+	slop: number;
+}): boolean {
+	if (facts.gap <= 1) return true;
+	if (facts.top < facts.lastTop - 0.5) return false;
+	if (facts.top > facts.lastTop + 0.5 && facts.gap <= facts.slop) return true;
+	return facts.stick;
+}
+
+/**
+ * The message a reader is looking at: the first whose bottom sits
+ * below the box top, with its top's offset from the box top (negative
+ * when it starts above the fold). Null with nothing measured.
+ */
+export function pickScrollAnchor(
+	rects: Array<{ id: string; top: number; bottom: number }>,
+	boxTop: number
+): ScrollAnchor | null {
+	for (const r of rects) {
+		if (r.bottom > boxTop) return { id: r.id, offset: r.top - boxTop };
+	}
+	return null;
 }
 
 /**
