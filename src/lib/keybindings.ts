@@ -96,6 +96,7 @@ export type MessageKeyAction =
 	| "fold-hovered"
 	| "edit-hovered"
 	| "trim-hovered"
+	| "expand-selection"
 	| "copy-hovered"
 	| "cut-hovered"
 	| "delete-hovered"
@@ -180,6 +181,18 @@ export function messageKeyAction(
 		!facts.inField
 	)
 		return "trim-hovered";
+	// Bare C over a live selection in message text asks for more on
+	// that part: same guards as the A selection rule (hover or a
+	// selection standing in a message, never from a field or editor).
+	if (
+		facts.key === "c" &&
+		(hovered || facts.selInMessage) &&
+		facts.hasSelection &&
+		bare(facts) &&
+		!facts.inField &&
+		!facts.inEditable
+	)
+		return "expand-selection";
 	// Bare C copies the hovered message — but only with nothing
 	// selected (a live selection keeps its keys: the copy would
 	// otherwise eat the selection menu's own C). Rich editors own

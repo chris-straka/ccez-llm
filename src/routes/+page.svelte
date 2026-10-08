@@ -87,6 +87,8 @@
 		replyLanguageFor,
 		stepPillVoice,
 		switchToastFor,
+		expandAskFor,
+		expandDraft,
 		LANGUAGE_MENUS,
 		menuOrder,
 		typeaheadBuffer,
@@ -11064,6 +11066,27 @@ import {
 				annotateMode.placeSelMenu();
 				annotateMode.annotate("", true);
 				annotateMode.selMenu = null;
+				return;
+			}
+			if (msgAction === "expand-selection") {
+				// Select, then C: a new message of his asking for more on
+				// that part, quoted, in the chat's language, focused so
+				// Enter sends it as is.
+				const quote = window.getSelection()?.toString() ?? "";
+				const ed = editor;
+				if (!quote.trim() || !ed) return;
+				event.preventDefault();
+				annotateMode.selMenu = null;
+				window.getSelection()?.removeAllRanges();
+				markerSyncMuted = true;
+				try {
+					ed.setText(expandDraft(ed.getText(), quote, expandAskFor(activeReplyCode)));
+					syncMarkerCounts();
+				} finally {
+					markerSyncMuted = false;
+				}
+				enterEditMode();
+				void tick().then(() => editor?.caretToEnd());
 				return;
 			}
 			if (msgAction === "annotate-hovered-instant") {

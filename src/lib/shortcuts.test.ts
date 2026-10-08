@@ -74,6 +74,7 @@ const MAC_SECTIONS: Array<[string, string[]]> = [
 		[
 			"Speak text aloud",
 			"Annotate and send",
+			"Ask to expand",
 			"Select sentence / paragraph",
 			"Delete annotation",
 			"Pin / unpin annotation",
