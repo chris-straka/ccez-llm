@@ -43,10 +43,10 @@ test("capture checkbox persists and the preview shows no button", async ({
 	await expect(page.locator(".settings-panel")).not.toHaveClass(/closed/);
 	const box = page
 		.locator(".settings-panel")
-		.getByText("Enable screen-capture OCR (global shortcut + composer button)");
+		.getByText("Screen-capture OCR", { exact: true });
 	await expect(box).toBeVisible();
 	const input = page.locator(
-		'.settings-panel label.check:has-text("Enable screen-capture OCR") input[type="checkbox"]'
+		'.settings-panel label.check:has-text("Screen-capture OCR") input[type="checkbox"]'
 	);
 	await expect(input).toBeChecked();
 	await input.uncheck();
@@ -84,7 +84,7 @@ test("seeded-off capture checkbox renders unchecked", async ({ page }) => {
 	await expect(page.locator(".settings-panel")).not.toHaveClass(/closed/);
 	await expect(
 		page.locator(
-			'.settings-panel label.check:has-text("Enable screen-capture OCR") input[type="checkbox"]'
+			'.settings-panel label.check:has-text("Screen-capture OCR") input[type="checkbox"]'
 		)
 	).not.toBeChecked();
 });
