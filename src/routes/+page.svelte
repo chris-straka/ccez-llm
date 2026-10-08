@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { flushSync, onMount, tick, untrack } from "svelte";
 	import { SvelteMap, SvelteSet } from "svelte/reactivity";
+	import { fade } from "svelte/transition";
 
 	// Document theme tokens + print sheet: global CSS
 	// lives in src/app.css, imported here (single route).
@@ -482,8 +483,11 @@ import {
 	} from "$lib/submit";
 	import {
 		emptyViewport,
+		pickScrollAnchor,
 		rectInClear,
 		clearLandingDelta,
+		stickAfterScroll,
+		type ScrollAnchor,
 		type ViewportState
 	} from "$lib/viewport";
 	import { ChatSearchStore, createSearchWorker } from "$lib/chatSearchStore";
@@ -735,7 +739,7 @@ import {
 			}
 		}
 		saveChatScroll();
-		if (scrollBox) viewport.stick = nearBottom(scrollBox);
+		if (scrollBox) noteStick(scrollBox);
 		scrollBox?.classList.add("scrolling");
 		window.clearTimeout(viewport.idleTimer);
 		viewport.idleTimer = window.setTimeout(() => {
@@ -2763,6 +2767,8 @@ import {
 		// Instant: the column eases programmatic jumps, and a smooth
 		// restore retargets (or dies) across the switch transition.
 		scrollBox.scrollTo({ top: saved ?? 0, behavior: "instant" });
+		viewport.missed = false;
+		viewport.anchor = null;
 	}
 
 	/** Jump to a palette hit: its chat, scrolled to its message. */
@@ -3495,6 +3501,8 @@ import {
 			) {
 				box.scrollTo({ top: box.scrollHeight, behavior: "instant" });
 			}
+			if (clearPx !== lastClearPx)
+				mainEl.style.setProperty("--tail-clear", `${clearPx}px`);
 			lastClearPx = clearPx;
 		};
 		sync();
@@ -7161,7 +7169,9 @@ import {
 		// stuck reader: a finished reply must not yank a mid-thread
 		// reader back to the end. After a switch the new chat keeps
 		// its own scroll position.
-		if (stillHere && stuckToBottom()) scrollToBottom();
+		// A pinned view rides the final render down via the resize
+		// hold (instant); an unpinned one is never moved.
+		if (stillHere && viewport.stick) void tick().then(() => holdScrollOnResize());
 		const origin = chatState.chats.find((c) => c.id === originId);
 		if (origin && !maybeHandsFreeReply(origin, sent)) maybeSpeakReply(origin);
 		if (origin && sent?.role === "assistant" && !sent.error)
@@ -7744,6 +7754,82 @@ import {
 		viewport.holding = false;
 		if (scrollBox) viewport.stick = nearBottom(scrollBox);
 	}
+	/** Stickiness by intent (see stickAfterScroll), plus the reading
+	anchor an unpinned reader keeps across re-renders. */
+	function noteStick(box: HTMLElement): void {
+		const top = box.scrollTop;
+		viewport.stick = stickAfterScroll({
+			stick: viewport.stick,
+			top,
+			lastTop: viewport.lastTop,
+			gap: box.scrollHeight - top - box.clientHeight,
+			slop: STICK_PX
+		});
+		viewport.lastTop = top;
+		if (viewport.stick) {
+			viewport.missed = false;
+			viewport.anchor = null;
+		} else {
+			viewport.anchor = readScrollAnchor(box);
+		}
+	}
+	function readScrollAnchor(box: HTMLElement): ScrollAnchor | null {
+		const boxTop = box.getBoundingClientRect().top;
+		const rects: Array<{ id: string; top: number; bottom: number }> = [];
+		for (const el of box.querySelectorAll<HTMLElement>('article[id^="msg-"]')) {
+			const r = el.getBoundingClientRect();
+			rects.push({ id: el.id, top: r.top, bottom: r.bottom });
+			if (r.bottom > boxTop) break;
+		}
+		return pickScrollAnchor(rects, boxTop);
+	}
+	/** Content resized (a reply finishing, its action row, readings,
+	audio, annotations): a pinned view stays at the bottom, an unpinned
+	reader stays on the line they were reading. Never anything else. */
+	function holdScrollOnResize(): void {
+		const box = scrollBox;
+		if (!box || viewport.holding) return;
+		if (viewport.stick) {
+			if (box.scrollHeight - box.scrollTop - box.clientHeight > 1)
+				box.scrollTo({ top: box.scrollHeight, behavior: "instant" });
+			return;
+		}
+		const anchor = viewport.anchor;
+		if (!anchor) return;
+		const el = document.getElementById(anchor.id);
+		if (!el || !box.contains(el)) return;
+		const delta =
+			el.getBoundingClientRect().top - box.getBoundingClientRect().top - anchor.offset;
+		if (Math.abs(delta) > 0.5) {
+			box.scrollTop += delta;
+			viewport.lastTop = box.scrollTop;
+		}
+	}
+	$effect(() => {
+		const box = scrollBox;
+		void viewChat.messages.length;
+		if (!box || typeof ResizeObserver === "undefined") return;
+		// One hold per frame, outside the observer callback: scrolling
+		// inside it re-sizes lazily laid-out rows and loops the observer.
+		let frame = 0;
+		const ro = new ResizeObserver(() => {
+			if (frame) return;
+			frame = requestAnimationFrame(() => {
+				frame = 0;
+				holdScrollOnResize();
+			});
+		});
+		for (const el of box.querySelectorAll('article[id^="msg-"]')) ro.observe(el);
+		return () => {
+			ro.disconnect();
+			if (frame) cancelAnimationFrame(frame);
+		};
+	});
+	/** "Jump to latest": back to the newest text, pinned again. */
+	function jumpToLatest(): void {
+		viewport.missed = false;
+		scrollToBottom();
+	}
 	function scrollToBottom() {
 		viewport.stick = true;
 		// Resisted at submit: a held finger means stay, not scroll.
@@ -7785,7 +7871,8 @@ import {
 		}
 		viewport.lastStreamLen = len;
 		const box = scrollBox;
-		if (viewport.stick && !viewport.holding && box)
+		if (!viewport.stick) viewport.missed = true;
+		else if (!viewport.holding && box)
 			box.scrollTo({ top: box.scrollHeight, behavior: "instant" });
 	});
 	/** Mirror the stick flag onto the scroller for specs: e2e pins
@@ -13556,6 +13643,16 @@ import {
 			</p>
 		{/if}
 
+		{#if viewport.missed && !viewport.stick && viewChat.messages.length > 0}
+			<!-- New reply text landed below a reader who scrolled up:
+			the thread stays put, this offers the way down. -->
+			<button
+				type="button"
+				class="jump-latest"
+				transition:fade={{ duration: 160 }}
+				onclick={jumpToLatest}>Jump to latest ↓</button
+			>
+		{/if}
 		<!-- Composer: file input, prompt card, tools, send, and banner
 		through `Composer.svelte` (the page keeps the editor, state,
 		and behaviors). The inline attach error above stays paged in
@@ -14325,6 +14422,25 @@ import {
 			transform 0.25s ease,
 			opacity 0.25s ease,
 			visibility 0s;
+	}
+	.jump-latest {
+		position: absolute;
+		left: 50%;
+		bottom: calc(var(--tail-clear, 6rem) + 0.5rem);
+		transform: translateX(-50%);
+		z-index: 31;
+		border: 1px solid #e5e5ea;
+		border-color: var(--line-soft);
+		border-radius: 999px;
+		padding: 0.4rem 0.9rem;
+		background: #fff;
+		background: var(--bg-raised);
+		color: #1c1c1e;
+		color: var(--ink);
+		font: inherit;
+		font-size: 0.8rem;
+		box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+		cursor: pointer;
 	}
 	.attach-error.composer-idle {
 		/* Same 0.75rem settle and ramp as the card: the old
