@@ -183,6 +183,7 @@ export function desktopShortcuts(
 		{ group: reading, name: "Set capture area", keys: `${shiftMeta}U` },
 		{ group: mouse, name: "Speak text aloud", keys: "Right-click" },
 		{ group: mouse, name: "Annotate and send", keys: "Select + A · right-click Annotate" },
+		{ group: mouse, name: "Ask to expand", keys: "Select + C" },
 		{ group: mouse, name: "Select sentence / paragraph", keys: "Triple-click / quadruple-click" },
 		{ group: mouse, name: "Delete annotation", keys: "Hover badge + Delete" },
 		{ group: mouse, name: "Pin / unpin annotation", keys: "Double-click badge" },

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "./fixtures";
-import { seedChat } from "./helpers";
+import { dragQuote, seedChat } from "./helpers";
 
 test.describe("desktop", () => {
 	const SENTENCE = "テストを確認しました。何かお手伝いできることはありますか？";
@@ -844,4 +844,28 @@ test.describe("ios", () => {
 			"1"
 		);
 	});
+});
+
+/** Select, then C: a new message of his, the selection quoted and
+the ask in the chat's language, focused so Enter sends it. */
+test("select + C drafts an expand-on-this ask in the chat's language", async ({ page }) => {
+	await seedChat(
+		page,
+		[
+			{ role: "user", content: "Salut" },
+			{ role: "assistant", content: "Les prix à la pompe n'ont fait que monter depuis février." }
+		],
+		"fr"
+	);
+	await page.goto("/");
+	const body = page.locator("article.assistant .rendered").first();
+	await expect(body).toBeVisible({ timeout: 60_000 });
+	await dragQuote(page, 1, "prix à la pompe");
+	await page.keyboard.press("c");
+	const input = page.locator(".ta-input").first();
+	await expect(input).toBeFocused();
+	await expect(input).toHaveValue(/> prix à la pompe\s+Développe ce passage\./);
+	await page.keyboard.press("Enter");
+	await expect(page.locator("article.user").last()).toContainText("Développe ce passage.");
+	await expect(page.locator("article.user").last()).toContainText("prix à la pompe");
 });

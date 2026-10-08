@@ -339,3 +339,62 @@ export function stepPillVoice(
 		voiceLangPinned: false
 	};
 }
+
+/** "Expand on this part" in the learner's language (English where
+ * the app has no wording yet, and for the classical languages). */
+const EXPAND_ASK: Record<string, string> = {
+	fr: "Développe ce passage.",
+	de: "Erkläre diesen Teil ausführlicher.",
+	es: "Amplía esta parte.",
+	it: "Approfondisci questa parte.",
+	pt: "Desenvolve esta parte.",
+	ru: "Расскажи подробнее об этой части.",
+	pl: "Rozwiń ten fragment.",
+	nl: "Werk dit deel verder uit.",
+	sv: "Utveckla den här delen.",
+	no: "Utdyp denne delen.",
+	da: "Uddyb denne del.",
+	fi: "Kerro tästä kohdasta tarkemmin.",
+	cs: "Rozveď tuto část.",
+	sk: "Rozveď túto časť.",
+	el: "Ανάπτυξε αυτό το σημείο.",
+	ro: "Dezvoltă această parte.",
+	bg: "Разкажи повече за тази част.",
+	hu: "Fejtsd ki bővebben ezt a részt.",
+	uk: "Розкажи докладніше про цю частину.",
+	sr: "Објасни детаљније овај део.",
+	is: "Útskýrðu þennan hluta nánar.",
+	zh: "请详细展开这一部分。",
+	yue: "可唔可以講多啲呢部分？",
+	ja: "この部分をもっと詳しく説明して。",
+	ko: "이 부분을 더 자세히 설명해 줘.",
+	ar: "وسّع في هذا الجزء.",
+	hi: "इस हिस्से को विस्तार से समझाओ।",
+	tr: "Bu kısmı biraz daha aç.",
+	fa: "این بخش را بیشتر توضیح بده.",
+	he: "הרחב על החלק הזה.",
+	id: "Jelaskan bagian ini lebih lanjut.",
+	ms: "Huraikan bahagian ini dengan lebih lanjut.",
+	vi: "Hãy nói rõ hơn về phần này.",
+	th: "ช่วยขยายความส่วนนี้หน่อย",
+	tl: "Ipaliwanag pa ang bahaging ito.",
+	sw: "Eleza sehemu hii zaidi."
+};
+
+export function expandAskFor(code: string | null): string {
+	return (code && EXPAND_ASK[code]) || "Expand on this part.";
+}
+
+/**
+ * Composer text for "expand on this": the quote as a Markdown block
+ * quote, a blank line, then the ask; appended under any draft. Pure.
+ */
+export function expandDraft(draft: string, quote: string, ask: string): string {
+	const block = quote
+		.trim()
+		.split(/\r?\n/)
+		.map((line) => `> ${line}`.trimEnd())
+		.join("\n");
+	const body = `${block}\n\n${ask}`;
+	return draft.trim() ? `${draft.trimEnd()}\n\n${body}` : body;
+}
