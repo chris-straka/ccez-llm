@@ -1,0 +1,278 @@
+/**
+ * Listening drills: the shapes the backend returns, what a drill chat
+ * stores, the grading prompt, and the end-of-video summary. Pure.
+ *
+ * A drill is a chat. `Chat.listen` holds the video and its clips;
+ * each clip is an assistant message whose `clip` field tracks the
+ * guess. The message content stays empty until the guess goes in,
+ * then holds the transcript (plus the translation and notes once
+ * grading lands), so every word is annotatable like any reply.
+ */
+
+import type { ClipSpan } from "./listenClips";
+import { diffGuess, heardShare, type DiffOp } from "./listenDiff";
+
+/** `VideoInfo` from the backend (`ccez-listen`, snake_case wire). */
+export interface ListenVideo {
+	id: string;
+	title: string;
+	channel: string;
+	channel_url: string;
+	duration: number;
+	thumbnail: string;
+	original_lang: string | null;
+	audio: {
+		kind: "native" | "dub";
+		lang: string;
+		format_id: string;
+		ext: string;
+		auto: boolean;
+	} | null;
+	captions: { key: string; kind: "asr" | "uploaded" } | null;
+}
+
+/** A search or channel-page row. */
+export interface ListenEntry {
+	kind: "video" | "channel";
+	/** Video id, or the channel URL. */
+	id: string;
+	title: string;
+	channel: string;
+	channel_url: string;
+	duration: number;
+	thumbnail: string;
+}
+
+export interface ListenChannelPage {
+	name: string;
+	url: string;
+	videos: ListenEntry[];
+}
+
+/** A fetched track: the json3 captions document plus the info. */
+export interface ListenFetched {
+	info: ListenVideo;
+	audio_mime: string;
+	captions: string;
+	caption_kind: "asr" | "uploaded";
+}
+
+/** A channel on the learner's own list (settings; never built in). */
+export interface ListenChannel {
+	url: string;
+	name: string;
+}
+
+/** What a drill chat stores about its video. */
+export interface ListenSession {
+	videoId: string;
+	/** App language code the drill follows ("fr"). */
+	lang: string;
+	title: string;
+	channel: string;
+	channelUrl: string;
+	thumbnail: string;
+	audio: "native" | "dub";
+	clips: ClipSpan[];
+}
+
+export interface ClipNote {
+	expr: string;
+	meaning: string;
+}
+
+/** One clip message's drill state. */
+export interface ClipState {
+	i: number;
+	/** What was typed; absent until answered. */
+	guess?: string;
+	/** "?" revealed it without a guess. */
+	skipped?: boolean;
+	/** Share of transcript words heard, 0..1. */
+	heard?: number;
+	ops?: DiffOp[];
+	translation?: string;
+	notes?: ClipNote[];
+	/** Translation + notes: in flight, landed, or failed. */
+	grade?: "pending" | "done" | "error";
+}
+
+/** Error codes from the backend into one sentence each. */
+export function listenErrorCopy(error: unknown, langName: string): string {
+	const message = error instanceof Error ? error.message : String(error);
+	if (message.includes("listen-no-ytdlp"))
+		return "Listening needs yt-dlp on this Mac: brew install yt-dlp";
+	if (message.includes("listen-needs-server"))
+		return "Listening here needs your clip server: paste its address below.";
+	if (message.includes("listen-no-track")) return `That video has no ${langName} audio.`;
+	if (message.includes("listen-no-captions"))
+		return `That video's ${langName} audio has no transcript to check against.`;
+	if (message.includes("listen-timeout")) return "YouTube took too long. Try again.";
+	if (message.includes("listen-bad-channel")) return "That doesn't look like a YouTube channel.";
+	if (message.includes("listen-origin")) return "The clip server refused this app.";
+	if (message.includes("Failed to fetch") || message.includes("NetworkError") || message.includes("Load failed"))
+		return "Can't reach the clip server.";
+	return "That didn't load. Try again.";
+}
+
+/** "French dub" / "French audio" / "no French audio yet". */
+export function availabilityLabel(video: ListenVideo | undefined, langName: string): string {
+	if (!video) return "";
+	if (!video.audio) return `no ${langName} audio yet`;
+	if (!video.captions) return `${langName} audio, no transcript`;
+	if (video.audio.kind === "native") return `${langName} audio`;
+	return video.audio.auto ? `${langName} auto-dub` : `${langName} dub`;
+}
+
+/** A video can be drilled: audio in the language plus its transcript. */
+export function drillable(video: ListenVideo | undefined): boolean {
+	return Boolean(video?.audio && video.captions);
+}
+
+/** A channel's status from its probed recent videos. */
+export function channelLabel(videos: ListenVideo[], langName: string): string {
+	if (videos.length === 0) return "";
+	if (videos.some((v) => v.audio?.kind === "native" && v.captions)) return `${langName} audio`;
+	if (videos.some((v) => drillable(v))) return `${langName} dubs`;
+	return `no ${langName} audio yet`;
+}
+
+/** Native audio first, then dubs; within each, the list's order. */
+export function rankVideos<T extends { id: string }>(
+	rows: T[],
+	info: Record<string, ListenVideo | undefined>
+): T[] {
+	const rank = (r: T): number => {
+		const v = info[r.id];
+		if (!v) return 2;
+		if (!drillable(v)) return 3;
+		return v.audio?.kind === "native" ? 0 : 1;
+	};
+	return rows
+		.map((r, k) => ({ r, k }))
+		.sort((a, b) => rank(a.r) - rank(b.r) || a.k - b.k)
+		.map(({ r }) => r);
+}
+
+/** "8:41", "1:02:03". */
+export function formatDuration(seconds: number): string {
+	const s = Math.max(0, Math.round(seconds));
+	const h = Math.floor(s / 3600);
+	const m = Math.floor((s % 3600) / 60);
+	const sec = String(s % 60).padStart(2, "0");
+	return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${sec}` : `${m}:${sec}`;
+}
+
+/**
+ * The grading request: translation plus short notes on what a
+ * learner might not catch or know. It never sees the guess (the
+ * diff is local and instant), so it can run before the learner
+ * answers and be waiting when they do.
+ */
+export function gradePrompt(text: string, langName: string, before: string | null): string {
+	const context = before ? `The line just before it (context only): «${before}»\n` : "";
+	return (
+		`A learner of ${langName} is listening to a video, one short clip at a time. ` +
+		`This clip says:\n«${text}»\n${context}\n` +
+		`Reply with JSON only, no fence: {"translation": "...", "notes": [{"expr": "...", "meaning": "..."}]}\n` +
+		`- translation: natural English for the clip.\n` +
+		`- notes: 0 to 3 items, only for what an intermediate learner could miss by ear or not know: ` +
+		`idioms, verbs with their particles or prepositions, slang, false friends, contractions or ` +
+		`liaisons that blur words. "expr" is the expression exactly as said in ${langName} ` +
+		`(the whole unit, e.g. "déboucher sur"); "meaning" is 2 to 6 English words. ` +
+		`No notes for plain words, names, or the sentence as a whole.`
+	);
+}
+
+/** Parse the grading reply; null when it isn't the JSON asked for. */
+export function parseGrade(reply: string): { translation: string; notes: ClipNote[] } | null {
+	const body = reply
+		.trim()
+		.replace(/^```(?:json)?\s*/i, "")
+		.replace(/\s*```$/, "");
+	const start = body.indexOf("{");
+	const end = body.lastIndexOf("}");
+	if (start < 0 || end <= start) return null;
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(body.slice(start, end + 1));
+	} catch {
+		return null;
+	}
+	if (!parsed || typeof parsed !== "object") return null;
+	const { translation, notes } = parsed as { translation?: unknown; notes?: unknown };
+	if (typeof translation !== "string" || !translation.trim()) return null;
+	const list = Array.isArray(notes) ? notes : [];
+	return {
+		translation: translation.trim(),
+		notes: list
+			.filter(
+				(n): n is { expr: string; meaning: string } =>
+					!!n &&
+					typeof (n as { expr?: unknown }).expr === "string" &&
+					typeof (n as { meaning?: unknown }).meaning === "string"
+			)
+			.map((n) => ({ expr: n.expr.trim(), meaning: n.meaning.trim() }))
+			.filter((n) => n.expr && n.meaning)
+			.slice(0, 3)
+	};
+}
+
+/**
+ * A clip message's body once answered: the transcript, then the
+ * translation and notes when grading has landed. Plain markdown so
+ * annotations, readings, and read-aloud work on it unchanged.
+ */
+export function clipContent(text: string, state: ClipState): string {
+	const parts = [text];
+	if (state.translation) parts.push(`*${state.translation.replace(/\*/g, "")}*`);
+	if (state.notes && state.notes.length > 0) {
+		parts.push(state.notes.map((n) => `- **${n.expr.replace(/\*/g, "")}**: ${n.meaning}`).join("\n"));
+	}
+	return parts.join("\n\n");
+}
+
+/** Answer a clip: the diff, instantly. `guess` null is a "?" skip. */
+export function answerClip(text: string, state: ClipState, guess: string | null, lang: string): ClipState {
+	const typed = guess?.trim() ?? "";
+	const diff = diffGuess(text, typed, lang);
+	return {
+		...state,
+		guess: typed,
+		skipped: guess === null,
+		heard: heardShare(diff),
+		ops: diff.ops
+	};
+}
+
+export interface DrillSummary {
+	answered: number;
+	/** Transcript words heard across answered clips. */
+	got: number;
+	total: number;
+	/** Fully heard clips. */
+	perfect: number;
+	/** Clip numbers heard worst (below 80%), worst first, at most 5. */
+	missed: number[];
+}
+
+/** End-of-video tally from the clip states. */
+export function summarizeDrill(states: ClipState[]): DrillSummary {
+	let got = 0;
+	let total = 0;
+	let perfect = 0;
+	const answered = states.filter((s) => s.heard !== undefined);
+	for (const s of answered) {
+		const ops = s.ops ?? [];
+		const refs = ops.filter((o) => o.kind !== "extra").length;
+		got += ops.filter((o) => o.kind === "ok" || o.kind === "near").length;
+		total += refs;
+		if ((s.heard ?? 0) >= 1) perfect++;
+	}
+	const missed = answered
+		.filter((s) => (s.heard ?? 0) < 0.8)
+		.sort((a, b) => (a.heard ?? 0) - (b.heard ?? 0) || a.i - b.i)
+		.slice(0, 5)
+		.map((s) => s.i);
+	return { answered: answered.length, got, total, perfect, missed };
+}
