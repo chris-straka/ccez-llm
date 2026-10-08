@@ -31,7 +31,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		NewsStaged,
 		SummarySize
 	} from "$lib/news";
-	import { parseNewsFollowUp, parseNewsLaunch, type NewsFollowUpKind } from "$lib/news";
+	import { parseNewsLaunch } from "$lib/news";
 	import MessageArticle from "./MessageArticle.svelte";
 	import EmptyHero from "./EmptyHero.svelte";
 	import LangMenus from "./LangMenus.svelte";
@@ -81,9 +81,8 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		dropMessage: (index: number) => void;
 		stopVoice: () => void;
 		speakReply: (msg: ChatMsg) => void;
-		/** News opener tag: nudge the chat's level, send a follow-up. */
+		/** News opener tag: re-run the session at another level. */
 		newsSetLevel: (level: CefrLevel, msg: ChatMsg) => void;
-		newsFollowUp: (kind: NewsFollowUpKind, msg: ChatMsg) => void;
 		unpinModelAid: (msg: ChatMsg) => void;
 		runModelAidFor: (msg: ChatMsg, aidId: string, pin: boolean) => void;
 		unpinLocalAid: (msg: ChatMsg, kind: LocalAid) => void;
@@ -295,9 +294,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		{@const refsOnly = sentRefs ? sentRefs.text.trim() === "" : false}
 		<!-- News openers rest folded as their tag: a fold toggle
 		opens what was sent, so membership means "unfolded" there. -->
-		{@const newsTag =
-			msg.role === "user" &&
-			(parseNewsLaunch(msg.content) !== null || parseNewsFollowUp(msg.content) !== null)}
+		{@const newsTag = msg.role === "user" && parseNewsLaunch(msg.content) !== null}
 		{@const isFolded = newsTag ? !foldedIds.has(msg.id) : foldedIds.has(msg.id)}
 		{@const script = detectScript(sentRefs ? sentRefs.text : msg.content)}
 		{@const aidId = script ? MODEL_AID_FOR_SCRIPT[script] : null}
@@ -363,8 +360,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 			news={newsTag && !previewing
 				? {
 						busy: sending && chatId === sendingChatId,
-						setLevel: (level: CefrLevel) => actions.newsSetLevel(level, msg),
-						followUp: (kind: NewsFollowUpKind) => actions.newsFollowUp(kind, msg)
+						setLevel: (level: CefrLevel) => actions.newsSetLevel(level, msg)
 					}
 				: null}
 			aidKinds={actions.localAidsOverrideFor(msg)}

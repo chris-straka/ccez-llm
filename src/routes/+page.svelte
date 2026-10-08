@@ -306,14 +306,7 @@ import {
 	import { startBlink, startHighlightFade, startMarkFade } from "$lib/blink";
 	import { createRefMemo } from "$lib/aidLoading";
 	import { NewsMode } from "$lib/news-mode.svelte";
-	import {
-		newsArticleInstruction,
-		newsLaunchUrl,
-		parseNewsLaunch,
-		relevelNewsOpener,
-		type CefrLevel,
-		type NewsFollowUpKind
-	} from "$lib/news";
+	import { relevelNewsOpener, type CefrLevel } from "$lib/news";
 	import { AnnotateMode } from "$lib/annotate-mode.svelte";
 	/* decomposeTree + onKunLine render in `InspectOverlay.svelte`. */
 	import {
@@ -8426,38 +8419,6 @@ import {
 			restoreChatMessages(chatState, chatId, before);
 		});
 	}
-	/** Article tag follow-ups: the article at his level, or a quiz,
-	sent as his next turn (folded to a small tag in the chat). */
-	function newsFollowUp(kind: NewsFollowUpKind, msg: ChatMsg): void {
-		const launch = parseNewsLaunch(msg.content);
-		const ed = editor;
-		if (!launch || !ed || chatState.sending) return;
-		if (ed.getText().trim() !== "" || attachments.length > 0) {
-			flashToast("Send or clear your draft first.");
-			buzzNo();
-			return;
-		}
-		const chat = activeChat(chatState);
-		const level = launch.level;
-		const langName = replyLanguageFor(chat.replyLang)?.name ?? "the article's language";
-		if (kind !== "article") return;
-		const text = newsArticleInstruction(
-			launch.title,
-			level,
-			langName,
-			newsLaunchUrl(localStorage, launch.title)
-		);
-		markerSyncMuted = true;
-		try {
-			ed.setText(text);
-			syncMarkerCounts();
-		} finally {
-			markerSyncMuted = false;
-		}
-		buzzTap();
-		void doSend();
-	}
-
 	function clearReplyLang(): void {
 		setChatReplyLang(chatState, chatState.activeChatId, null);
 		openLangMenu = null;
@@ -13714,7 +13675,6 @@ import {
 				stopVoice,
 				speakReply,
 				newsSetLevel,
-				newsFollowUp,
 				unpinModelAid,
 				runModelAidFor,
 				unpinLocalAid,

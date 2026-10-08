@@ -326,11 +326,6 @@ test.describe("news session tag controls", () => {
 		await page.locator(".toast").click();
 		await expect(page.locator(".messages")).toContainText("Deuxième réponse.");
 		await expect(tag).toContainText("B2 Upper intermediate");
-		// The article at his level goes out as a folded follow-up.
-		await tag.getByRole("button", { name: "Article at B2" }).click();
-		await expect(page.locator("article.user .news-follow")).toContainText("Article · B2", {
-			timeout: 10_000
-		});
-		await expect(page.locator("article.user").last()).not.toContainText("Rewrite the pasted");
+		await expect(tag.getByRole("button", { name: /^Article at/ })).toHaveCount(0);
 	});
 });
