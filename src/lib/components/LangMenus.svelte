@@ -8,6 +8,7 @@ owns the row markup and its surfaces. -->
 <script lang="ts">
 	import {
 		LANGUAGE_MENUS,
+		menuSections,
 		quickKeyFor,
 		type LanguageMenu,
 		type ReplyLanguage
@@ -31,16 +32,28 @@ owns the row markup and its surfaces. -->
 			top: number;
 		} | null;
 		activeCode: string | null;
+		/** Language the typed letters landed on (Enter picks it). */
+		highlightCode?: string | null;
 		previewing: boolean;
 		actions: LangMenusActions;
 	}
 
-	let { openId, anchor, activeCode, previewing, actions }: Props =
+	let { openId, anchor, activeCode, highlightCode = null, previewing, actions }: Props =
 		$props();
+	let root: HTMLElement | undefined = $state();
+	// Typed matches scroll into view inside the sheet (never the page).
+	$effect(() => {
+		const code = highlightCode;
+		if (!code || !root) return;
+		root
+			.querySelector<HTMLElement>(`.lang-list [data-lang="${CSS.escape(code)}"]`)
+			?.scrollIntoView({ block: "nearest" });
+	});
 </script>
 
-<div class="lang-menus" aria-label="Reply language" inert={previewing}>
+<div class="lang-menus" aria-label="Reply language" inert={previewing} bind:this={root}>
 	{#each LANGUAGE_MENUS as menu (menu.id)}
+		{@const sections = menuSections(menu)}
 		<div class="lang-menu">
 			<button
 				type="button"
@@ -68,20 +81,27 @@ owns the row markup and its surfaces. -->
 				>
 					<!-- Menu-click clears only languages without a number key
 					(keyed ones clear by repeating the key). -->
-					{#each [...menu.languages].sort( (a, b) => a.name.localeCompare(b.name, "en") ) as lang (lang.code)}
-						{@const quickKey = quickKeyFor(lang.code, currentPlatform().isMac)}
-						<button
-							type="button"
-							role="menuitem"
-							class:selected={activeCode === lang.code}
-							title={quickKey && tauriBackendAvailable() ? `${lang.name} (${quickKey})` : lang.name}
-							onclick={() => actions.pick(lang)}
-							onpointerenter={() => actions.hover?.(lang)}
-							onfocus={() => actions.hover?.(lang)}
-						>
-							<span class="badge" aria-hidden="true">{lang.badge}</span>
-							{lang.name}
-						</button>
+					{#each [sections.top, sections.rest] as group, g (g)}
+						{#if g === 1 && sections.top.length > 0 && group.length > 0}
+							<span class="lang-sep" role="separator"></span>
+						{/if}
+						{#each group as lang (lang.code)}
+							{@const quickKey = quickKeyFor(lang.code, currentPlatform().isMac)}
+							<button
+								type="button"
+								role="menuitem"
+								class:selected={activeCode === lang.code}
+								class:typed={highlightCode === lang.code}
+								data-lang={lang.code}
+								title={quickKey && tauriBackendAvailable() ? `${lang.name} (${quickKey})` : lang.name}
+								onclick={() => actions.pick(lang)}
+								onpointerenter={() => actions.hover?.(lang)}
+								onfocus={() => actions.hover?.(lang)}
+							>
+								<span class="badge" aria-hidden="true">{lang.badge}</span>
+								{lang.name}
+							</button>
+						{/each}
 					{/each}
 				</div>
 			{/if}
@@ -275,6 +295,20 @@ owns the row markup and its surfaces. -->
 	.lang-list button:focus-visible {
 		background: #f1f1f4;
 		background: var(--bg-wash);
+	}
+	.lang-list button.typed {
+		background: #f1f1f4;
+		background: var(--bg-wash);
+		box-shadow: inset 0 0 0 1.5px #007aff;
+		box-shadow: inset 0 0 0 1.5px var(--accent);
+	}
+	.lang-sep {
+		display: block;
+		height: 1px;
+		margin: 0.3rem 0.45rem;
+		background: #8e8e93;
+		background: var(--line-hover);
+		opacity: 0.6;
 	}
 	.lang-list button.selected {
 		font-weight: 650;

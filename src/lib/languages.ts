@@ -339,3 +339,65 @@ export function stepPillVoice(
 		voiceLangPinned: false
 	};
 }
+
+/** Languages most learners reach for, shown first in each menu. */
+const PROMINENT: Record<LanguageMenu["id"], string[]> = {
+	europe: ["fr", "de", "es", "it", "pt", "ru"],
+	asia: ["zh", "ja", "ko", "ar", "hi"],
+	africa: [],
+	classics: ["la", "grc"]
+};
+
+/**
+ * A menu's display groups: the prominent languages in their set
+ * order, then everything else A-Z by English name. Pure.
+ */
+export function menuSections(menu: LanguageMenu): {
+	top: ReplyLanguage[];
+	rest: ReplyLanguage[];
+} {
+	const codes = PROMINENT[menu.id];
+	const top = codes
+		.map((code) => menu.languages.find((l) => l.code === code))
+		.filter((l): l is ReplyLanguage => l !== undefined);
+	const rest = menu.languages
+		.filter((l) => !codes.includes(l.code))
+		.sort((a, b) => a.name.localeCompare(b.name, "en"));
+	return { top, rest };
+}
+
+/** Every language of a menu in display order (top group first). */
+export function menuOrder(menu: LanguageMenu): ReplyLanguage[] {
+	const { top, rest } = menuSections(menu);
+	return [...top, ...rest];
+}
+
+const foldForMatch = (text: string): string =>
+	text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+
+/** Typed letters pause this long before a new search starts. */
+export const TYPEAHEAD_RESET_MS = 800;
+
+/**
+ * Menu typeahead: the typed prefix (case and accent blind) against
+ * English names first, then native names, in display order. Null
+ * when nothing starts with it. Pure.
+ */
+export function typeaheadMatch(langs: ReplyLanguage[], query: string): number | null {
+	const q = foldForMatch(query.trim());
+	if (!q) return null;
+	const byName = langs.findIndex((l) => foldForMatch(l.name).startsWith(q));
+	if (byName >= 0) return byName;
+	const byNative = langs.findIndex((l) => foldForMatch(l.native).startsWith(q));
+	return byNative >= 0 ? byNative : null;
+}
+
+/** Next typeahead buffer after a keystroke (resets after a pause). */
+export function typeaheadBuffer(
+	prev: { query: string; at: number },
+	key: string,
+	now: number
+): { query: string; at: number } {
+	const fresh = now - prev.at > TYPEAHEAD_RESET_MS;
+	return { query: (fresh ? "" : prev.query) + key, at: now };
+}

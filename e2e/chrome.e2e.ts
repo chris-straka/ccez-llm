@@ -1434,3 +1434,28 @@ test("language re-pick updates send instantly and focuses prompt", async ({
 	await expect(panel).toHaveCount(0);
 	expect(await focusedComposer()).toBe(true);
 });
+
+/** Language menus lead with the most learned languages, then A-Z,
+and typing with a menu open jumps to a language (Enter picks it). */
+test("language menu: popular first, typing jumps, Enter picks", async ({ page }) => {
+	await page.setViewportSize({ width: 1280, height: 1000 });
+	await seedChat(page, []);
+	await page.goto("/");
+	await expect(page.locator(".send-btn")).toBeVisible({ timeout: 60_000 });
+	await page.locator('.lang-menu button:has-text("Europe")').click();
+	const items = page.locator(".lang-list").getByRole("menuitem");
+	await expect(items.nth(0)).toContainText("French");
+	await expect(items.nth(5)).toContainText("Russian");
+	await expect(page.locator(".lang-list .lang-sep")).toHaveCount(1);
+	await expect(items.nth(6)).toContainText("Bulgarian");
+	await page.keyboard.type("po");
+	await expect(page.locator(".lang-list button.typed")).toContainText("Portuguese");
+	await page.keyboard.type("l");
+	await expect(page.locator(".lang-list button.typed")).toContainText("Polish");
+	await page.keyboard.press("ArrowDown");
+	await expect(page.locator(".lang-list button.typed")).toContainText("Romanian");
+	await page.keyboard.press("ArrowUp");
+	await page.keyboard.press("Enter");
+	await expect(page.locator(".lang-list")).toHaveCount(0);
+	await expect(page.locator(".news-meta")).toContainText("Polski");
+});
