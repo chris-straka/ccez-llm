@@ -752,6 +752,8 @@ readings instead of shoving them: zero layout in every mode. */
 	color: var(--accent-ink);
 	font-size: calc(0.7rem * (1 + (var(--font-scale, 1) - 1) * 0.3));
 	font-weight: 700;
+	/* Even figures: 1 and 12 sit centered in the same pill. */
+	font-variant-numeric: tabular-nums;
 	line-height: calc(1.15rem * (1 + (var(--font-scale, 1) - 1) * 0.3));
 	text-align: center;
 	white-space: nowrap;
@@ -786,8 +788,11 @@ open still works. */
 	position: absolute;
 	top: calc(100% - 5px);
 	left: 14%;
-	width: 0.5rem;
-	height: 0.72rem;
+	/* em: the tail scales with the badge (whose font tracks the text
+	size), so its tip lands on the letter tops at every size instead
+	of slicing the last glyph at 1x or floating short at 3x. */
+	width: 0.7em;
+	height: 0.62em;
 	background: inherit;
 	clip-path: polygon(38% 0, 100% 0, 0 100%);
 }

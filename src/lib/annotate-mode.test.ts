@@ -140,7 +140,6 @@ function harness(opts: { phone?: boolean; quoteOffers?: boolean } = {}): {
 			calls.pillDrops.push(id);
 		},
 		stopPillMic: () => {},
-		refitAnswerCard: () => {},
 		popWidth: () => 300,
 		hasPromptEdit: () => false,
 		commitPromptEdit: () => {},
@@ -370,7 +369,7 @@ describe("annotate", () => {
 		});
 		setAnnotations([dupe]);
 		setHighlight("dupe" as AnnotationId);
-		mode.answerPop = { id: "dupe" as AnnotationId, x: 0, y: 0, w: 300 };
+		mode.answerPop = { id: "dupe" as AnnotationId, anchor: { left: 0, top: 0, right: 1, bottom: 1 }, clearTop: 0, pointX: 0, w: 300, gap: 3 };
 		mode.answerTimer = setTimeout(() => {}, 10_000);
 		mode.selMenu = menu();
 		mode.annotate();
@@ -414,7 +413,7 @@ describe("openBadge", () => {
 	it("re-pressing an open card toggles its prompt pin", () => {
 		const { mode, calls, getAnnotations, setAnnotations } = harness();
 		setAnnotations([note({ answer: "yes", pinnedToPrompt: true })]);
-		mode.answerPop = { id: "ann-1" as AnnotationId, x: 0, y: 0, w: 300 };
+		mode.answerPop = { id: "ann-1" as AnnotationId, anchor: { left: 0, top: 0, right: 1, bottom: 1 }, clearTop: 0, pointX: 0, w: 300, gap: 3 };
 		mode.openBadge("ann-1" as AnnotationId);
 		expect(getAnnotations()[0]?.pinnedToPrompt).not.toBe(true);
 		expect(mode.answerPop?.id).toBe("ann-1");

@@ -14,7 +14,8 @@ function answerSource(): string {
 
 describe("annotation answer card", () => {
 	it("renders answer text as text, never HTML", () => {
-		expect(answerSource()).toContain("{answer}");
+		// Each answer line renders through a text binding.
+		expect(answerSource()).toContain("{line}");
 		expect(answerSource()).not.toContain("{@html");
 	});
 
@@ -22,9 +23,9 @@ describe("annotation answer card", () => {
 		expect(answerSource()).not.toContain("<button");
 	});
 
-	it("rides the popup-size setting on top of message text", () => {
+	it("reads at message size with the popup-size setting on top", () => {
 		expect(answerSource()).toMatch(
-			/\.ann-answer\s*\{[^}]*font-size:\s*calc\(1rem \* var\(--font-scale, 1\) \* var\(--annpop-scale, 1\)\)/
+			/\.ann-answer\s*\{[^}]*font-size:\s*calc\(0\.92rem \* var\(--font-scale, 1\) \* var\(--annpop-scale, 1\)\)/
 		);
 	});
 

@@ -2179,8 +2179,8 @@ test.describe("touch", () => {
 			await page.keyboard.press("Escape");
 			await expect(page.locator(".ann-answer")).toHaveCount(0);
 			// Keyboard closed, tall card, badge at the bottom edge: the
-			// card sits right above the badge — refit lands its bottom
-			// exactly 8px over the badge, inside the viewport.
+			// card flips right above the badge (tail down at the word),
+			// clear of it and inside the viewport.
 			await page.setViewportSize({ width: 412, height: 915 });
 			await page.evaluate(() =>
 				document
@@ -2189,9 +2189,8 @@ test.describe("touch", () => {
 			);
 			const below = await tapBadge(badges.last());
 			expect(below.cardTop).toBeGreaterThanOrEqual(0);
-			expect(
-				Math.abs(below.cardBottom - (below.badgeBottom - 8))
-			).toBeLessThanOrEqual(16);
+			expect(below.cardBottom).toBeLessThanOrEqual(below.badgeTop);
+			expect(below.badgeTop - below.cardBottom).toBeLessThanOrEqual(24);
 		});
 
 		/** Creating washes the pending preview: the comment box

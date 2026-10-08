@@ -1,4 +1,3 @@
-import { tick } from "svelte";
 import {
 	duplicateAnnotationId,
 	deleteAnnotation,
@@ -26,7 +25,7 @@ import {
 	quoteRange,
 	quoteTextNodes
 } from "./annotations-stamp";
-import { placeAnnAnswer, placeAnnCard, placeAnnComposer } from "./annPop";
+import { placeAnnComposer, quoteAnchor, type AnchorRect } from "./annPop";
 import { aidDisplayText } from "./reading";
 import { vibrateTick } from "./studyMedia";
 import type { NewsPanelState } from "./news";
@@ -57,9 +56,16 @@ export interface SelMenuState {
 /** Open answer card (the remodel): an answered note read in context. */
 export interface AnswerPopState {
 	id: AnnotationId;
-	x: number;
-	y: number;
+	/** The quote's viewport rect (shifted by scrolls while open). */
+	anchor: AnchorRect;
+	/** Badge top kept clear above the quote. */
+	clearTop: number;
+	/** Pointer x of the opening press. */
+	pointX: number;
+	/** Widest the card may run (px). */
 	w: number;
+	/** Word-to-tail breath (px). */
+	gap: number;
 }
 
 /** Page-owned collaborators the annotate cluster calls back into. */
@@ -125,7 +131,6 @@ export interface AnnotateModeDeps {
 	/** Drop the pill: only id when given, any open pill otherwise. */
 	dismissPill: (id?: string | null) => void;
 	stopPillMic: () => void;
-	refitAnswerCard: (id: string) => void;
 	popWidth: () => number;
 	hasPromptEdit: () => boolean;
 	commitPromptEdit: () => void;
@@ -658,6 +663,65 @@ export class AnnotateMode {
 		);
 	}
 
+	/** Live anchor for an answer card: the quote's last line (whole
+	quote and badge kept clear), else the badge's own anchor, else
+	the press point when the quote is off the wire. */
+	answerAnchor(
+		ann: Annotation,
+		at: { x: number; y: number }
+	): { anchor: AnchorRect; clearTop: number } {
+		const badge = document.querySelector(`[data-ann-badge="${ann.id}"]`);
+		const badgeTop = badge?.getBoundingClientRect().top ?? null;
+		const fallback = badge?.parentElement?.getBoundingClientRect() ?? {
+			left: at.x,
+			top: at.y,
+			right: at.x + 1,
+			bottom: at.y + 1
+		};
+		return (
+			quoteAnchor(this.quoteRects(ann), badgeTop) ??
+			quoteAnchor([fallback], badgeTop) ?? { anchor: fallback, clearTop: fallback.top }
+		);
+	}
+
+	/** Re-read an open answer card's anchor from the live layout (the
+	viewport changed under it: phone keyboard, resize). */
+	reanchorAnswer(): void {
+		const open = this.answerPop;
+		if (!open || this.answerClosing) return;
+		const ann = this.deps.getAnnotations().find((a) => a.id === open.id);
+		if (!ann) return;
+		const at = { x: open.pointX, y: open.anchor.bottom };
+		this.answerPop = { ...open, ...this.answerAnchor(ann, at) };
+		this.answerPopTop = this.deps.getScrollBox()?.scrollTop ?? 0;
+	}
+
+	/** Line boxes of an annotation's quote in its rendered message
+	(empty when it is off the wire): the answer card's anchor. */
+	quoteRects(ann: Annotation): DOMRect[] {
+		if (!ann.messageId) return [];
+		const index = this.deps.getChatMessages().findIndex((m) => m.id === ann.messageId);
+		const root = document.querySelector(`article#msg-${index} .rendered`);
+		if (index === -1 || !(root instanceof HTMLElement)) return [];
+		const nodes = quoteTextNodes(root);
+		const loc = locateQuote(
+			nodes.map((n) => n.textContent ?? ""),
+			ann.quote,
+			ann.at ?? 0
+		);
+		const startNode = loc ? nodes[loc.startNode] : undefined;
+		const endNode = loc ? nodes[loc.endNode] : undefined;
+		if (!loc || !startNode || !endNode) return [];
+		try {
+			const range = document.createRange();
+			range.setStart(startNode, Math.min(loc.startOffset, startNode.length));
+			range.setEnd(endNode, Math.min(loc.endOffset, endNode.length));
+			return Array.from(range.getClientRects());
+		} catch {
+			return [];
+		}
+	}
+
 	/** Select an answered quote's text (anchors are empty gap
 	markers, never wraps): the answer highlights its quote like a
 	selection, so the existing text reads as context and the
@@ -754,43 +818,27 @@ export class AnnotateMode {
 			};
 			const settings = this.deps.getSettings();
 			const width = this.deps.popWidth();
-			// The card hangs below the quote like the create pill
-			// (same gap and x math), never flipped above and never
-			// covering the word: when the bottom edge would clip, the
-			// thread scrolls to make room instead (below). Phones
-			// keep the centered card (keyboard geometry).
-			const quoteRect = document
-				.querySelector(`[data-ann-badge="${id}"]`)
-				?.parentElement?.getBoundingClientRect();
-			const placed =
-				!this.deps.isPhone() && quoteRect
-					? placeAnnAnswer({
-							viewportWidth: window.innerWidth,
-							menuX: anchorAt.x,
-							highlightLeft: quoteRect.left,
-							highlightWidth: quoteRect.width,
-							highlightBottom: quoteRect.bottom,
-							width,
-							fontScale: settings.fontScale
-						})
-					: placeAnnCard({
-							anchorX: anchorAt.x,
-							anchorY: anchorAt.y,
-							width,
-							viewportWidth: window.innerWidth,
-							viewportHeight: window.innerHeight,
-							// Open-time estimate; the tick below refits
-							// to the measured card on Android.
-							cardHeight: 240
-						});
+			// The card places itself against the quote (AnnAnswer):
+			// below the word, flipped above when only the top has
+			// room, never covering the word or its badge and never
+			// scrolling the thread. A quote that is off the wire
+			// (no rendered badge) anchors on the press point.
+			const placedOn = this.answerAnchor(current, anchorAt);
+			const gap = Math.max(3, Math.round(3 + (settings.fontScale - 1) * 10));
 			if (this.answerTimer) {
 				clearTimeout(this.answerTimer);
 				this.answerTimer = null;
 			}
 			this.answerClosing = false;
-			this.answerPop = { id, x: placed.x, y: placed.y, w: width };
+			this.answerPop = {
+				id,
+				anchor: placedOn.anchor,
+				clearTop: placedOn.clearTop,
+				pointX: anchorAt.x,
+				w: width,
+				gap
+			};
 			this.answerPopTop = this.deps.getScrollBox()?.scrollTop ?? 0;
-			if (this.deps.isPhone()) void tick().then(() => this.deps.refitAnswerCard(id));
 			// The quote stays highlighted while its answer reads, and
 			// opening the reply always reads the annotated thing back
 			// out — same listen moment as creating the annotation.
@@ -821,38 +869,6 @@ export class AnnotateMode {
 				this.deps.dismissSelPanels();
 			const selected = this.selectAnswerQuote(id);
 			if (selected) this.deps.readingsFor(selected, true);
-			if (!this.deps.isPhone() && quoteRect) {
-				void (async () => {
-					await tick();
-					if (this.answerPop?.id !== id || this.answerClosing) return;
-					const card = document.querySelector(".ann-answer");
-					if (!(card instanceof HTMLElement)) return;
-					const overflow =
-						card.getBoundingClientRect().bottom - (window.innerHeight - 8);
-					if (overflow <= 0) return;
-					const scrollBox = this.deps.getScrollBox();
-					if (!scrollBox) return;
-					// Instant: a smooth scroll would still be animating
-					// when the re-place below measures the quote.
-					scrollBox.scrollTo({
-						top: scrollBox.scrollTop + overflow,
-						behavior: "instant"
-					});
-					await tick();
-					if (this.answerPop?.id !== id || this.answerClosing) return;
-					const fresh = document
-						.querySelector(`[data-ann-badge="${id}"]`)
-						?.parentElement?.getBoundingClientRect();
-					if (!fresh) return;
-					const gap = Math.max(2, Math.round(2 + (settings.fontScale - 1) * 12));
-					const pop = this.answerPop;
-					if (pop) this.answerPop = { ...pop, y: Math.floor(fresh.bottom + gap) };
-					this.answerPopTop = this.deps.getScrollBox()?.scrollTop ?? 0;
-					// The room-making scroll above re-pinned the bottom:
-					// unpin again, the card still reads against stillness.
-					this.deps.unstick();
-				})();
-			}
 			return;
 		}
 		// No answer yet: open the review dock on this row (both
