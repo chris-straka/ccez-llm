@@ -190,3 +190,97 @@ export function placeAnnComposer(facts: {
 		y
 	};
 }
+
+/** Viewport rect of an annotated quote (a DOMRect's edges). */
+export interface AnchorRect {
+	left: number;
+	top: number;
+	right: number;
+	bottom: number;
+}
+
+export interface AnswerPlacement {
+	x: number;
+	y: number;
+	side: "below" | "above";
+	/** Card height cap (px): the body scrolls past it. */
+	maxHeight: number;
+	/** Tail center, px from the card's left edge. */
+	tailX: number;
+}
+
+/**
+ * Answer-popover placement from the quote rect and the card's measured
+ * size: below the word when the whole card fits there, above when it
+ * fits there instead, otherwise on the roomier side with its height
+ * capped to that side (the body scrolls). Never covers the word or its
+ * badge (`clearTop` is the badge's top) and never needs the page to
+ * scroll. Centered on the word (on the pointer inside wide quotes),
+ * clamped inside the viewport; the tail points back at that x.
+ */
+export function placeAnswerPopover(facts: {
+	anchor: AnchorRect;
+	/** Top edge to keep clear above the quote (its badge). */
+	clearTop: number;
+	pointX: number;
+	cardWidth: number;
+	cardHeight: number;
+	viewportWidth: number;
+	viewportHeight: number;
+	/** Word-to-tail-tip breath (px). */
+	gap: number;
+	/** Tail depth past the card edge (px). */
+	tail: number;
+	margin?: number;
+}): AnswerPlacement {
+	const m = facts.margin ?? 8;
+	const { anchor, cardWidth: w } = facts;
+	const wordWidth = anchor.right - anchor.left;
+	const target =
+		wordWidth < w
+			? anchor.left + wordWidth / 2
+			: Math.min(Math.max(facts.pointX, anchor.left), anchor.right);
+	const x = Math.max(m, Math.min(target - w / 2, facts.viewportWidth - w - m));
+	const tailInset = Math.min(18, w / 2);
+	const tailX = Math.min(Math.max(target - x, tailInset), w - tailInset);
+	const reach = facts.gap + facts.tail;
+	const below = facts.viewportHeight - m - (anchor.bottom + reach);
+	const above = Math.min(anchor.top, facts.clearTop) - reach - m;
+	const h = Math.max(1, Math.ceil(facts.cardHeight));
+	const side: "below" | "above" =
+		h <= below || (h > above && below >= above) ? "below" : "above";
+	const maxHeight = Math.max(48, Math.floor(side === "below" ? below : above));
+	const shown = Math.min(h, maxHeight);
+	const y =
+		side === "below"
+			? Math.floor(anchor.bottom + reach)
+			: Math.ceil(Math.min(anchor.top, facts.clearTop) - reach - shown);
+	return { x: Math.round(x), y, side, maxHeight, tailX: Math.round(tailX) };
+}
+
+/**
+ * Popover anchor from a quote's line-box rects (Range.getClientRects):
+ * the last line's fragment, where the badge sits and the tail points,
+ * with the whole quote (and its badge) kept clear above it, so an
+ * above-flip never covers an earlier line of a wrapped quote. Null
+ * when the quote renders no boxes.
+ */
+export function quoteAnchor(
+	rects: readonly AnchorRect[],
+	badgeTop: number | null
+): { anchor: AnchorRect; clearTop: number } | null {
+	const boxes = rects.filter((r) => r.right - r.left > 0 && r.bottom - r.top > 0);
+	const last = boxes.at(-1);
+	if (!last) return null;
+	const line = boxes.filter(
+		(r) => Math.abs(r.bottom - last.bottom) < (last.bottom - last.top) / 2
+	);
+	const anchor = {
+		left: Math.min(...line.map((r) => r.left)),
+		top: Math.min(...line.map((r) => r.top)),
+		right: Math.max(...line.map((r) => r.right)),
+		bottom: Math.max(...line.map((r) => r.bottom))
+	};
+	const top = Math.min(...boxes.map((r) => r.top));
+	return { anchor, clearTop: badgeTop === null ? top : Math.min(top, badgeTop) };
+}

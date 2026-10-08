@@ -709,156 +709,150 @@ test("creating a chinese annotation shows its pinyin panel", async ({
 	await expect(panel).toHaveCount(0);
 });
 
-/** An answer at the viewport bottom scrolls the thread instead of
-flipping above: the card always hangs below its quote. */
-test("bottom answer scrolls the thread to make room", async ({ page }) => {
-	test.setTimeout(120_000);
+/** Seed a chat whose last message carries one answered note on
+"riverbank", for placement specs that don't need a live ask. */
+async function seedAnsweredLast(page: Page, answer: string): Promise<void> {
 	const paras = Array.from(
 		{ length: 12 },
 		(_, i) => `filler paragraph number ${i} with enough words to wrap`
 	);
 	await seedChat(page, [
 		...paras.map((content) => ({ role: "assistant" as const, content })),
-		{ role: "assistant", content: "the last riverbank holds the fog" }
+		{ role: "assistant", content: "the annotated riverbank holds the fog" }
 	]);
-	await page.addInitScript(() => {
-		localStorage.setItem("ccez-mock-chat-ms", "2500");
-	});
-	await page.goto("/");
-	// Short viewport: the last quote sits where the card cannot
-	// fit below it, so opening must scroll the thread.
-	await page.setViewportSize({ width: 1280, height: 500 });
-	await page.waitForTimeout(300);
-	const articles = page.locator("article.assistant");
-	await expect(articles.last()).toBeVisible({ timeout: 60_000 });
-	// Below the fold: jump near the bottom instantly (smooth
-	// scrolling would carry the content out from under the
-	// synthetic drag), leaving scroll room below so the card has
-	// somewhere to scroll into — at max scroll no scroll could help.
-	// Then settle before the drag starts.
-	await page.evaluate(() => {
-		const article = document.querySelectorAll("article.assistant")[12];
-		if (!(article instanceof HTMLElement)) throw new Error("no article");
-		let el: HTMLElement | null = article;
+	await page.addInitScript(
+		(seed: { answer: string }) => {
+			window.localStorage.setItem(
+				"ccez-llm-annotations-v1",
+				JSON.stringify({
+					"e2e-chat": [
+						{
+							id: "ann-e2e",
+							messageId: "e2e-m12",
+							quote: "riverbank",
+							comment: "what lives here?",
+							answer: seed.answer,
+							at: 0
+						}
+					]
+				})
+			);
+		},
+		{ answer }
+	);
+}
+
+/** Scroll the thread to its end, instantly. */
+async function scrollThreadToEnd(page: Page): Promise<number> {
+	return page.evaluate(() => {
+		let el: Element | null = document.querySelector("[data-ann-badge]");
 		while (el) {
 			const parent = el.parentElement;
 			if (
 				parent instanceof HTMLElement &&
 				parent.scrollHeight > parent.clientHeight + 4
 			) {
-				parent.scrollTop =
-					parent.scrollHeight - parent.clientHeight - 80;
-				break;
+				parent.style.scrollBehavior = "auto";
+				parent.scrollTop = parent.scrollHeight;
+				return parent.scrollTop;
 			}
 			el = parent;
 		}
+		return -1;
 	});
-	await page.waitForTimeout(300);
-	// Second-to-last article: visible with scroll room below it
-	// (the last line has no room to scroll into at max scroll).
-	await dragQuote(page, 11, "paragraph number 11");
-	await expect(page.locator(".sel-menu")).toBeVisible({ timeout: 10_000 });
-	// Shift+A opens the box (bare A files and sends at once now).
-	await page.keyboard.press("A");
-	await askAtFile(page, "what lives here?");
+}
+
+async function threadTop(page: Page): Promise<number> {
+	return page.evaluate(() => {
+		let el: Element | null = document.querySelector("[data-ann-badge]");
+		while (el) {
+			const parent = el.parentElement;
+			if (
+				parent instanceof HTMLElement &&
+				parent.scrollHeight > parent.clientHeight + 4
+			)
+				return parent.scrollTop;
+			el = parent;
+		}
+		return -1;
+	});
+}
+
+/** An answer at the bottom of the thread flips above its word (tail
+pointing down at it) instead of running off the edge or scrolling
+the page; it stays clear of the badge and inside the window. */
+test("bottom answer flips above without moving the thread", async ({
+	page
+}) => {
+	test.setTimeout(120_000);
+	await seedAnsweredLast(
+		page,
+		"riverbank: the land along a river\nLiterally the bank of a river.\nWe walked along the riverbank at dawn."
+	);
+	await page.goto("/");
+	await page.setViewportSize({ width: 1280, height: 600 });
 	const ready = page.locator("button.ccez-ann-badge.ans-ready");
-	const scrolled = async (): Promise<number> =>
-		page.evaluate(() => {
-			let el: Element | null = document.querySelector(
-				"article.assistant:last-of-type"
-			);
-			while (el) {
-				if (
-					el instanceof HTMLElement &&
-					el.scrollHeight > el.clientHeight + 4
-				)
-					return el.scrollTop;
-				el = el.parentElement;
-			}
-			return -1;
-		});
-	// Open once to measure the real card height, then close and
-	// park the quote at an exact +60px overflow: the reopen must
-	// scroll the thread by it instead of flipping above.
+	await expect(ready).toBeVisible({ timeout: 60_000 });
+	const top = await scrollThreadToEnd(page);
+	expect(top).toBeGreaterThan(0);
+	await page.waitForTimeout(300);
 	await ready.focus();
 	await page.keyboard.press("Enter");
 	const card = page.locator(".ann-answer");
 	await expect(card).toBeVisible({ timeout: 10_000 });
-	const measured = await page.evaluate(() => {
-		const el = document.querySelector(".ann-answer");
-		const badge = document.querySelector("[data-ann-badge]");
-		const qr = badge?.parentElement?.getBoundingClientRect();
-		const scrollerOf = (node: Element | null): HTMLElement | null => {
-			let el: Element | null = node;
-			while (el) {
-				const parent = el.parentElement;
-				if (
-					parent instanceof HTMLElement &&
-					parent.scrollHeight > parent.clientHeight + 4
-				)
-					return parent;
-				el = parent;
-			}
-			return null;
-		};
-		const scroller = scrollerOf(badge);
-		return {
-			cardH: el?.getBoundingClientRect().height ?? null,
-			quoteBottom: qr?.bottom ?? null,
-			vh: window.innerHeight,
-			top: scroller?.scrollTop ?? null
-		};
-	});
-	expect(measured.cardH).not.toBeNull();
-	expect(measured.quoteBottom).not.toBeNull();
-	expect(measured.top).not.toBeNull();
-	const wantOverflow = 60;
-	const quoteWant =
-		(measured.vh as number) - 8 + wantOverflow - 2 - (measured.cardH as number);
-	expect(quoteWant).toBeGreaterThan(0);
-	await page.keyboard.press("Escape");
-	await expect(card).toHaveCount(0);
-	await page.evaluate(
-		({ want }) => {
-			const badge = document.querySelector("[data-ann-badge]");
-			const qr = badge?.parentElement?.getBoundingClientRect();
-			if (!qr) throw new Error("no quote rect");
-			let el: Element | null = badge;
-			while (el) {
-				const parent = el.parentElement;
-				if (
-					parent instanceof HTMLElement &&
-					parent.scrollHeight > parent.clientHeight + 4
-				) {
-					parent.scrollTop += qr.bottom - want;
-					break;
-				}
-				el = parent;
-			}
-		},
-		{ want: quoteWant }
-	);
-	await page.waitForTimeout(300);
-	const before = await scrolled();
-	await ready.focus();
-	await page.keyboard.press("Enter");
-	await expect(card).toBeVisible({ timeout: 10_000 });
-	await expect
-		.poll(() => scrolled(), { timeout: 10_000 })
-		.toBeGreaterThan(before);
-	// The whole card fits in the viewport below its quote.
+	await expect(card).toHaveClass(/above/);
+	await page.waitForTimeout(250);
 	const cardBox = await card.boundingBox();
-	const vh = await page.evaluate(() => window.innerHeight);
-	expect(cardBox).not.toBeNull();
-	expect((cardBox?.y ?? 0) + (cardBox?.height ?? 1e9)).toBeLessThanOrEqual(
-		vh - 8
+	const badgeBox = await ready.boundingBox();
+	expect(cardBox!.y).toBeGreaterThanOrEqual(0);
+	expect(cardBox!.y + cardBox!.height).toBeLessThanOrEqual(badgeBox!.y);
+	expect(await threadTop(page)).toBe(top);
+	// The note's first line reads as its headline.
+	await expect(card.locator(".ann-answer-head")).toHaveText(
+		"riverbank: the land along a river"
 	);
 });
 
-/** Below-fold badge press: the room-making scroll moves the badge
-mid-press, so WebKit's trailing click (fired after the
-preventDefaulted mousedown; Chromium eats it) lands off-badge on a
-common ancestor. It must not shut the card it just opened — the
+/** A note taller than the room on either side caps its height and
+scrolls inside the card: never cut off, never pushing the page. */
+test("tall answer caps its height and scrolls inside", async ({ page }) => {
+	test.setTimeout(120_000);
+	const answer = Array.from(
+		{ length: 30 },
+		() => "the riverbank holds its fog through the morning light"
+	).join(". ");
+	await seedAnsweredLast(page, answer);
+	await page.goto("/");
+	await page.setViewportSize({ width: 1280, height: 420 });
+	const ready = page.locator("button.ccez-ann-badge.ans-ready");
+	await expect(ready).toBeVisible({ timeout: 60_000 });
+	const top = await scrollThreadToEnd(page);
+	await page.waitForTimeout(300);
+	await ready.focus();
+	await page.keyboard.press("Enter");
+	const card = page.locator(".ann-answer");
+	await expect(card).toBeVisible({ timeout: 10_000 });
+	await page.waitForTimeout(250);
+	const fit = await page.evaluate(() => {
+		const el = document.querySelector(".ann-answer")!;
+		const body = el.querySelector(".ann-answer-body")!;
+		const r = el.getBoundingClientRect();
+		return {
+			top: r.top,
+			bottom: r.bottom,
+			vh: window.innerHeight,
+			scrolls: body.scrollHeight > body.clientHeight + 4
+		};
+	});
+	expect(fit.top).toBeGreaterThanOrEqual(0);
+	expect(fit.bottom).toBeLessThanOrEqual(fit.vh);
+	expect(fit.scrolls).toBe(true);
+	expect(await threadTop(page)).toBe(top);
+});
+
+/** Bottom badge press: WebKit's trailing click (fired after the
+preventDefaulted mousedown; Chromium eats it) can land off-badge on
+a common ancestor once the card mounts over the press. It must not shut the card it just opened — the
 opening press's own click is never a click-off. (Chromium cannot
 fire that trailing click itself, so the test dispatches its exact
 shape: a non-drag click at the press point, targeted off-card and
@@ -925,6 +919,13 @@ test("below-fold badge press survives its own trailing click", async ({
 			}
 			return -1;
 		});
+	// Instant scrolling throughout: focusing the below-fold badge
+	// scrolls it into view, and a smooth ramp would still be moving
+	// the thread when the park below measures the press point.
+	await page.evaluate(() => {
+		const el = document.querySelector(".messages");
+		if (el instanceof HTMLElement) el.style.scrollBehavior = "auto";
+	});
 	// Open once to measure the real card height, then close: the
 	// park below needs it to predict the overflow.
 	await ready.focus();
@@ -976,21 +977,20 @@ test("below-fold badge press survives its own trailing click", async ({
 	}, cardH as number);
 	expect(parked).not.toBeNull();
 	// Preconditions: the badge takes a real press, and the card
-	// overflows the fold (otherwise no room scroll runs and the
-	// test passes vacuously).
+	// cannot fit below it (it flips above, over the press point's
+	// neighbourhood, so the trailing click is the risky shape).
 	expect(parked!.clickable).toBe(true);
 	expect(parked!.overflow).toBeGreaterThan(20);
 	await page.waitForTimeout(300);
-	// Real press on the badge: mousedown opens the card (plus the
-	// room scroll), mouseup follows with the pointer unmoved.
+	// Real press on the badge: mousedown opens the card, mouseup
+	// follows with the pointer unmoved. The thread never scrolls
+	// to make room (the card flips instead).
 	const topBefore = await scrolled();
 	await page.mouse.move(parked!.x, parked!.y);
 	await page.mouse.down();
 	await expect(card).toBeVisible({ timeout: 10_000 });
 	await page.mouse.up();
-	await expect.poll(() => scrolled(), { timeout: 10_000 }).toBeGreaterThan(
-		topBefore
-	);
+	expect(await scrolled()).toBe(topBefore);
 	// WebKit's trailing click in its exact shape: a non-drag click
 	// at the press point, targeted at the common ancestor (main)
 	// the displaced mouseup yields — off-card, off-badge.

@@ -7,7 +7,9 @@ import {
 	pillWashId,
 	placeAnnAnswer,
 	placeAnnCard,
-	placeAnnComposer
+	placeAnnComposer,
+	placeAnswerPopover,
+	quoteAnchor
 } from "./annPop";
 
 describe("annPopSaveKind", () => {
@@ -192,5 +194,97 @@ describe("placeAnnAnswer", () => {
 	});
 	it("scales the gap with the font", () => {
 		expect(placeAnnAnswer({ ...base, fontScale: 3.7 })).toEqual({ x: 8, y: 334 });
+	});
+});
+
+describe("placeAnswerPopover", () => {
+	const base = {
+		anchor: { left: 400, top: 300, right: 460, bottom: 320 },
+		clearTop: 288,
+		pointX: 430,
+		cardWidth: 300,
+		cardHeight: 200,
+		viewportWidth: 1000,
+		viewportHeight: 800,
+		gap: 2,
+		tail: 9
+	};
+	it("hangs below the word, centered, tail on the word", () => {
+		expect(placeAnswerPopover(base)).toEqual({
+			x: 280,
+			y: 331,
+			side: "below",
+			maxHeight: 461,
+			tailX: 150
+		});
+	});
+	it("flips above, clear of the badge, when the bottom has no room", () => {
+		const p = placeAnswerPopover({
+			...base,
+			anchor: { left: 400, top: 700, right: 460, bottom: 720 },
+			clearTop: 688
+		});
+		expect(p.side).toBe("above");
+		expect(p.y + 200).toBeLessThanOrEqual(688 - 11);
+		expect(p.y).toBeGreaterThanOrEqual(8);
+	});
+	it("caps the height on the roomier side when neither fits", () => {
+		const p = placeAnswerPopover({
+			...base,
+			cardHeight: 2000,
+			anchor: { left: 400, top: 500, right: 460, bottom: 520 },
+			clearTop: 488
+		});
+		expect(p.side).toBe("above");
+		expect(p.maxHeight).toBe(488 - 11 - 8);
+		expect(p.y).toBe(8);
+		const low = placeAnswerPopover({ ...base, cardHeight: 2000 });
+		expect(low.side).toBe("below");
+		expect(low.y + low.maxHeight).toBe(800 - 8);
+	});
+	it("stays inside the viewport and keeps the tail on the word at edges", () => {
+		const left = placeAnswerPopover({
+			...base,
+			anchor: { left: 4, top: 300, right: 30, bottom: 320 }
+		});
+		expect(left.x).toBe(8);
+		expect(left.tailX).toBe(18);
+		const right = placeAnswerPopover({
+			...base,
+			viewportWidth: 390,
+			anchor: { left: 360, top: 300, right: 386, bottom: 320 }
+		});
+		expect(right.x).toBe(390 - 300 - 8);
+		expect(right.x + right.tailX).toBeGreaterThan(360);
+	});
+	it("points at the pointer inside quotes wider than the card", () => {
+		const p = placeAnswerPopover({
+			...base,
+			anchor: { left: 50, top: 300, right: 950, bottom: 340 },
+			pointX: 700
+		});
+		expect(p.x + p.tailX).toBe(700);
+	});
+});
+
+describe("quoteAnchor", () => {
+	it("anchors on the last line and clears the whole quote and badge", () => {
+		const got = quoteAnchor(
+			[
+				{ left: 300, top: 100, right: 600, bottom: 120 },
+				{ left: 40, top: 124, right: 90, bottom: 144 },
+				{ left: 90, top: 126, right: 120, bottom: 142 },
+				{ left: 0, top: 0, right: 0, bottom: 0 }
+			],
+			110
+		);
+		expect(got).toEqual({
+			anchor: { left: 40, top: 124, right: 120, bottom: 144 },
+			clearTop: 100
+		});
+		expect(quoteAnchor([{ left: 1, top: 50, right: 9, bottom: 60 }], 38)?.clearTop).toBe(38);
+	});
+	it("is null without boxes", () => {
+		expect(quoteAnchor([], 10)).toBeNull();
 	});
 });

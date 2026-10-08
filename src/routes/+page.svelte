@@ -750,7 +750,16 @@ import {
 			const dy = scrollBox.scrollTop - annotateMode.answerPopTop;
 			if (dy !== 0) {
 				annotateMode.answerPopTop = scrollBox.scrollTop;
-				annotateMode.answerPop = { ...annotateMode.answerPop, y: annotateMode.answerPop.y - dy };
+				const open = annotateMode.answerPop;
+				annotateMode.answerPop = {
+					...open,
+					anchor: {
+						...open.anchor,
+						top: open.anchor.top - dy,
+						bottom: open.anchor.bottom - dy
+					},
+					clearTop: open.clearTop - dy
+				};
 			}
 		}
 		saveChatScroll();
@@ -2302,7 +2311,6 @@ import {
 			}
 		},
 		stopPillMic: () => stopPillMic(),
-		refitAnswerCard: (id) => refitAndroidCard("answer", id),
 		popWidth: () => popWidth(),
 		hasPromptEdit: () => promptAnnEdit !== null,
 		commitPromptEdit: () => commitPromptAnnEdit(),
@@ -5385,23 +5393,20 @@ import {
 	}
 
 	/**
-	 * Refit an open Android card to its measured height: the open-time
-	 * estimate overshoots short cards (daylight above bottom badges)
-	 * and collapses to the top whenever the keyboard shortens the
-	 * viewport. Re-reads the live badge anchor, so scrolls and keyboard
-	 * transitions re-land the card instead of stranding the estimate.
-	 * y-only: x rides the known width already (re-clamped through the
-	 * same math). No-op unless this exact card is still open.
+	 * Refit the open Android edit card to its measured height: the
+	 * open-time estimate overshoots short cards (daylight above bottom
+	 * badges) and collapses to the top whenever the keyboard shortens
+	 * the viewport. Re-reads the live badge anchor, so scrolls and
+	 * keyboard transitions re-land the card instead of stranding the
+	 * estimate. y-only: x rides the known width already. No-op unless
+	 * this exact card is still open. (The answer card places itself.)
 	 */
-	function refitAndroidCard(kind: "answer" | "edit", id: string): void {
+	function refitAndroidCard(id: string): void {
 		if (!androidUI) return;
-		const width = kind === "answer" ? annotateMode.answerPop?.w : popWidth();
-		const open = kind === "answer" ? annotateMode.answerPop : annPop;
-		if (!open || open.id !== id || width === undefined) return;
-		if (kind === "answer" ? annotateMode.answerClosing : annPopClosing) return;
-		const card = document.querySelector(
-			kind === "answer" ? ".ann-answer" : ".ann-pop"
-		);
+		const width = popWidth();
+		const open = annPop;
+		if (!open || open.id !== id || annPopClosing) return;
+		const card = document.querySelector(".ann-pop");
 		if (!(card instanceof HTMLElement)) return;
 		const height = card.getBoundingClientRect().height;
 		if (!(height > 0)) return;
@@ -5416,8 +5421,7 @@ import {
 			viewportHeight: window.innerHeight,
 			cardHeight: height
 		}).y;
-		if (kind === "answer" && annotateMode.answerPop) annotateMode.answerPop = { ...annotateMode.answerPop, y };
-		if (kind === "edit" && annPop) annPop = { ...annPop, y };
+		if (annPop) annPop = { ...annPop, y };
 	}
 
 	/**
@@ -5479,7 +5483,7 @@ import {
 		settleAnnPop();
 		annPop = { id, x: placed.x, y: placed.y, fresh: false };
 		annPopTop = scrollBox?.scrollTop ?? 0;
-		if (androidUI) void tick().then(() => refitAndroidCard("edit", id));
+		if (androidUI) void tick().then(() => refitAndroidCard(id));
 		// The card mounts async: land the caret once it flushes,
 		// like the create pill.
 		void tick().then(() => annPopBox?.focus({ preventScroll: true }));
@@ -13100,8 +13104,8 @@ import {
 				if (androidUI) {
 					const openAnswer = annotateMode.answerPop;
 					const openEdit = annPop;
-					if (openAnswer) refitAndroidCard("answer", openAnswer.id);
-					if (openEdit) refitAndroidCard("edit", openEdit.id);
+					if (openAnswer) annotateMode.reanchorAnswer();
+					if (openEdit) refitAndroidCard(openEdit.id);
 				}
 			}, 250);
 		};
@@ -13984,9 +13988,12 @@ import {
 			<AnnAnswer
 				answer={answered.answer}
 				closing={annotateMode.answerClosing}
-				x={pop.x}
-				y={pop.y}
-				width={pop.w}
+				anchor={pop.anchor}
+				clearTop={pop.clearTop}
+				pointX={pop.pointX}
+				maxWidth={pop.w}
+				gap={pop.gap}
+				badgeId={pop.id}
 			/>
 		{/if}
 	{/if}
