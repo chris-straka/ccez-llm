@@ -299,8 +299,9 @@ owns the row markup and its surfaces. -->
 	.lang-list button.typed {
 		background: #f1f1f4;
 		background: var(--bg-wash);
-		box-shadow: inset 0 0 0 1.5px #007aff;
-		box-shadow: inset 0 0 0 1.5px var(--accent);
+		outline: 1.5px solid #007aff;
+		outline-color: var(--accent);
+		outline-offset: -1.5px;
 	}
 	.lang-sep {
 		display: block;
