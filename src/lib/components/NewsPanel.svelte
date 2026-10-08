@@ -28,9 +28,10 @@ everything else is theme tokens, never raw hex. -->
 			region: (gl: string) => void;
 			pick: (link: string) => void;
 			unpick: () => void;
+			kind: (kind: NewsKind) => void;
 			level: (level: CefrLevel) => void;
 			size: (size: SummarySize) => void;
-			launch: (kind: NewsKind) => void;
+			launch: () => void;
 			close: () => void;
 			retry: () => void;
 		};
@@ -158,106 +159,125 @@ everything else is theme tokens, never raw hex. -->
 
 	{#if stagedStory && staged}
 		{@const image = imageFor(stagedStory)}
+		{@const levelTag = CEFR_LEVELS.find((l) => l.level === staged.level)?.tag ?? ""}
+		{@const words = SUMMARY_SIZES.find((sz) => sz.size === staged.size)?.words ?? 0}
 		<div class="news-stage">
-			<div class="stage-card" use:flipIn>
-				<div class="stage-thumb">
-					{#if image}
-						<img
-							src={image}
-							alt=""
-							draggable="false"
-							onerror={() => {
-								broken[stagedStory.link] = true;
-							}}
-						/>
-					{:else}
-						<span class="news-img-fallback" aria-hidden="true"
-							>{stagedStory.source.trim().charAt(0)}</span
-						>
-					{/if}
-				</div>
-				<div class="stage-text">
-					<span class="news-headline">{stagedStory.title}</span>
-					{#if stagedStory.source}
-						<span class="news-source">{stagedStory.source}</span>
-					{/if}
-				</div>
-				<button
-					type="button"
-					class="stage-x"
-					aria-label="Back to headlines"
-					title="Back to headlines"
-					disabled={busy !== null}
-					onclick={() => actions.unpick()}>✕</button
-				>
-			</div>
-			<div class="stage-opts" in:fly={{ y: 12, duration: motionMs(260), delay: motionMs(260) }}>
-				<div class="seg" role="group" aria-label="Level">
-					{#each CEFR_LEVELS as level (level.level)}
-						<button
-							type="button"
-							class="seg-opt"
-							class:on={staged.level === level.level}
-							aria-pressed={staged.level === level.level}
-							title={level.tag}
-							onclick={() => actions.level(level.level)}
-						>
-							{level.level}
-						</button>
-					{/each}
-				</div>
-				<div class="stage-go">
-					<div class="go-tile">
-						<button
-							type="button"
-							class="news-go"
-							aria-label="Discuss this story"
-							title="Discuss with two locals"
-							disabled={busy !== null}
-							onclick={() => actions.launch("talk")}
-						>
-							🗣️
-						</button>
+			<div class="session" use:flipIn>
+				<div class="stage-card">
+					<div class="stage-thumb">
+						{#if image}
+							<img
+								src={image}
+								alt=""
+								draggable="false"
+								onerror={() => {
+									broken[stagedStory.link] = true;
+								}}
+							/>
+						{:else}
+							<span class="news-img-fallback" aria-hidden="true"
+								>{stagedStory.source.trim().charAt(0)}</span
+							>
+						{/if}
 					</div>
-					<div class="go-tile">
-						<button
-							type="button"
-							class="news-go"
-							aria-label="Summarize this story"
-							title="Summarize at this level and length"
-							disabled={busy !== null}
-							onclick={() => actions.launch("read")}
-						>
-							📰
-						</button>
-						<div class="seg small" role="group" aria-label="Summary length">
-							{#each SUMMARY_SIZES as size (size.size)}
+					<div class="stage-text">
+						<span class="news-headline">{stagedStory.title}</span>
+						{#if stagedStory.source}
+							<span class="news-source">{stagedStory.source}</span>
+						{/if}
+					</div>
+					<button
+						type="button"
+						class="stage-x"
+						aria-label="Back to headlines"
+						title="Back to headlines"
+						disabled={busy !== null}
+						onclick={() => actions.unpick()}>✕</button
+					>
+				</div>
+				<div class="stage-opts" in:fly={{ y: 10, duration: motionMs(260), delay: motionMs(220) }}>
+					<div class="opt-row">
+						<span class="opt-label" id="news-kind">Session</span>
+						<div class="seg" role="group" aria-labelledby="news-kind">
+							<button
+								type="button"
+								class="seg-opt"
+								class:on={staged.kind === "talk"}
+								aria-pressed={staged.kind === "talk"}
+								title="Two locals discuss the story; join in any time"
+								onclick={() => actions.kind("talk")}>Conversation</button
+							>
+							<button
+								type="button"
+								class="seg-opt"
+								class:on={staged.kind === "read"}
+								aria-pressed={staged.kind === "read"}
+								title="A summary at your level and length"
+								onclick={() => actions.kind("read")}>Summary</button
+							>
+						</div>
+					</div>
+					<div class="opt-row">
+						<span class="opt-label" aria-hidden="true">Level · {staged.level} {levelTag}</span>
+						<div class="seg" role="group" aria-label="Level">
+							{#each CEFR_LEVELS as level (level.level)}
 								<button
 									type="button"
 									class="seg-opt"
-									class:on={staged.size === size.size}
-									aria-pressed={staged.size === size.size}
-									title="About {size.words} words"
-									onclick={() => actions.size(size.size)}
+									class:on={staged.level === level.level}
+									aria-pressed={staged.level === level.level}
+									title={level.tag}
+									onclick={() => actions.level(level.level)}
 								>
-									{size.label}
+									{level.level}
 								</button>
 							{/each}
 						</div>
 					</div>
-				</div>
-				<p class="stage-note" aria-live="polite">
-					{#if staged.article === "error"}
-						<span role="alert">{staged.error}</span>
-						<button type="button" class="news-retry" onclick={() => actions.retry()}>
-							Retry
-						</button>
-					{:else if busy !== null}
-						<span class="news-dots">Starting</span>
-					{:else if staged.article === "loading"}
-						<span class="news-dots">Reading the article</span>
+					{#if staged.kind === "read"}
+						<div class="opt-row" transition:fly={{ y: -6, duration: motionMs(180) }}>
+							<span class="opt-label" aria-hidden="true">Length · about {words} words</span>
+							<div class="seg" role="group" aria-label="Summary length">
+								{#each SUMMARY_SIZES as size (size.size)}
+									<button
+										type="button"
+										class="seg-opt"
+										class:on={staged.size === size.size}
+										aria-pressed={staged.size === size.size}
+										title="About {size.words} words"
+										onclick={() => actions.size(size.size)}
+									>
+										{size.label}
+									</button>
+								{/each}
+							</div>
+						</div>
 					{/if}
-				</p>
+					<button
+						type="button"
+						class="news-start"
+						disabled={busy !== null || staged.article === "error"}
+						onclick={() => actions.launch()}
+					>
+						{#if busy !== null}
+							<span class="news-dots">Starting</span>
+						{:else}
+							{staged.kind === "talk" ? "Start conversation" : "Start summary"}
+						{/if}
+					</button>
+					<p class="stage-note" aria-live="polite">
+						{#if staged.article === "error"}
+							<span role="alert">{staged.error}</span>
+							<button type="button" class="news-retry" onclick={() => actions.retry()}>
+								Retry
+							</button>
+						{:else if staged.article === "loading" && busy === null}
+							<span class="news-dots">Reading the article</span>
+						{:else if staged.article === "ready" && busy === null}
+							Article ready
+						{/if}
+					</p>
+				</div>
 			</div>
 		</div>
 	{:else if panel.status === "loading"}
@@ -530,28 +550,43 @@ everything else is theme tokens, never raw hex. -->
 		font: inherit;
 		text-align: left;
 		cursor: pointer;
-		transition:
-			border-color 0.15s ease,
-			transform 0.15s ease;
+		position: relative;
+		transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+	}
+	/* Hover ring and shadow live on a layer that only fades: no
+	border or shadow repaint per frame, same ease in and out. */
+	.news-card::after {
+		content: "";
+		position: absolute;
+		inset: -1px;
+		border-radius: inherit;
+		border: 1px solid #8e8e93;
+		border-color: var(--line-hover);
+		box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+		opacity: 0;
+		pointer-events: none;
+		transition: opacity 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
 	}
 	.news-card:disabled {
 		cursor: progress;
 	}
 	@media (hover: hover) {
 		.news-card:not(:disabled):hover {
-			border-color: #8e8e93;
-			border-color: var(--line-hover);
-			transform: translateY(-2px);
+			transform: translateY(-3px);
+		}
+		.news-card:not(:disabled):hover::after {
+			opacity: 1;
 		}
 		.news-card:not(:disabled):hover .news-img.loaded {
-			transform: scale(1.03);
+			transform: scale(1.04);
 		}
 	}
 	.news-card:not(:disabled):active {
-		transform: scale(0.985);
+		transform: translateY(-1px) scale(0.985);
+		transition-duration: 0.1s;
 	}
 	.news-card:focus-visible,
-	.news-go:focus-visible,
+	.news-start:focus-visible,
 	.seg-opt:focus-visible,
 	.news-chip:focus-visible {
 		outline: 2px solid #007aff;
@@ -576,7 +611,7 @@ everything else is theme tokens, never raw hex. -->
 		opacity: 0;
 		transition:
 			opacity 0.3s ease,
-			transform 0.4s ease;
+			transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
 	}
 	.news-img.loaded {
 		opacity: 1;
@@ -689,28 +724,32 @@ everything else is theme tokens, never raw hex. -->
 		}
 	}
 
-	/* Staged story: the article sits in the chat, choices under it. */
+	/* Staged story: one session card where the story lands, choices
+	in reading order, one Start. */
 	.news-stage {
 		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 1rem;
+		justify-content: center;
 		padding-top: 0.75rem;
+	}
+	.session {
+		width: min(100%, 32rem);
+		border: 1px solid #e5e5ea;
+		border-color: var(--line-soft);
+		border-radius: 1.1rem;
+		background: #fff;
+		background: var(--bg-raised);
+		overflow: hidden;
+		will-change: transform;
 	}
 	.stage-card {
 		position: relative;
-		width: min(100%, 30rem);
 		display: grid;
 		grid-template-columns: 7.5rem 1fr;
-		gap: 0.8rem;
+		gap: 0.9rem;
 		align-items: center;
-		padding: 0.6rem 2.6rem 0.6rem 0.6rem;
-		border: 1px solid #007aff;
-		border-color: var(--accent);
-		border-radius: 1rem;
-		background: #fff;
-		background: var(--bg-raised);
-		will-change: transform;
+		padding: 0.85rem 2.6rem 0.85rem 0.85rem;
+		border-bottom: 1px solid #e5e5ea;
+		border-bottom-color: var(--line-soft);
 	}
 	.stage-thumb {
 		position: relative;
@@ -734,11 +773,13 @@ everything else is theme tokens, never raw hex. -->
 	}
 	.stage-text .news-headline {
 		min-height: 0;
+		-webkit-line-clamp: 4;
+		line-clamp: 4;
 	}
 	.stage-x {
 		position: absolute;
-		top: 0.4rem;
-		right: 0.4rem;
+		top: 0.5rem;
+		right: 0.5rem;
 		width: 2rem;
 		height: 2rem;
 		border: 0;
@@ -747,16 +788,31 @@ everything else is theme tokens, never raw hex. -->
 		color: #6e6e73;
 		color: var(--muted);
 		cursor: pointer;
+		transition: color 0.15s ease;
 	}
 	.stage-x:hover:not(:disabled) {
 		color: #1c1c1e;
 		color: var(--ink);
 	}
 	.stage-opts {
-		width: min(100%, 30rem);
 		display: flex;
 		flex-direction: column;
-		gap: 0.7rem;
+		gap: 0.9rem;
+		padding: 0.95rem;
+	}
+	.opt-row {
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+	}
+	.opt-label {
+		padding-left: 0.15rem;
+		font-size: 0.72rem;
+		font-weight: 600;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		color: #6e6e73;
+		color: var(--muted);
 	}
 	.seg {
 		display: flex;
@@ -775,7 +831,7 @@ everything else is theme tokens, never raw hex. -->
 		color: #1c1c1e;
 		color: var(--ink);
 		font: inherit;
-		font-size: 0.85rem;
+		font-size: 0.88rem;
 		font-weight: 600;
 		cursor: pointer;
 		transition:
@@ -792,51 +848,38 @@ everything else is theme tokens, never raw hex. -->
 		color: #fff;
 		color: var(--accent-ink);
 	}
-	.seg.small .seg-opt {
-		min-height: 2.1rem;
-		font-size: 0.78rem;
-	}
-	.stage-go {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 0.6rem;
-		align-items: start;
-	}
-	.go-tile {
-		display: flex;
-		flex-direction: column;
-		gap: 0.4rem;
-	}
-	.news-go {
-		min-height: 3.4rem;
-		border: 1px solid #e5e5ea;
-		border-color: var(--line-soft);
+	.news-start {
+		min-height: 3rem;
+		border: 0;
 		border-radius: 0.8rem;
-		background: #fff;
-		background: var(--bg-raised);
-		font-size: 1.6rem;
-		line-height: 1;
+		background: #007aff;
+		background: var(--accent);
+		color: #fff;
+		color: var(--accent-ink);
+		font: inherit;
+		font-size: 0.95rem;
+		font-weight: 650;
 		cursor: pointer;
 		transition:
-			border-color 0.15s ease,
-			transform 0.12s ease;
+			transform 0.12s ease,
+			opacity 0.15s ease;
 	}
-	.news-go:hover:not(:disabled) {
-		border-color: #007aff;
-		border-color: var(--accent);
+	.news-start:hover:not(:disabled) {
+		opacity: 0.92;
 	}
-	.news-go:active:not(:disabled) {
-		transform: scale(0.96);
+	.news-start:active:not(:disabled) {
+		transform: scale(0.98);
 	}
-	.news-go:disabled {
-		opacity: 0.5;
+	.news-start:disabled {
+		opacity: 0.55;
 		cursor: progress;
 	}
 	.stage-note {
-		margin: 0;
+		margin: -0.35rem 0 0;
 		min-height: 1.4em;
 		display: flex;
 		align-items: center;
+		justify-content: center;
 		gap: 0.6rem;
 		font-size: 0.82rem;
 		color: #6e6e73;

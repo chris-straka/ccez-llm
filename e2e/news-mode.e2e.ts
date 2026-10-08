@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "./fixtures";
-import { seedChat } from "./helpers";
+import { dragQuote, seedChat } from "./helpers";
 import {
 	MOCK_SOURCE_MISS,
 	MOCK_TITLE_IMG,
@@ -202,8 +202,13 @@ test.describe("mock shell feed", () => {
 			"aria-pressed",
 			"true"
 		);
-		await expect(stage.getByRole("button", { name: "Discuss this story" })).toBeVisible();
-		await expect(stage.getByRole("button", { name: "Summarize this story" })).toBeVisible();
+		// Word labels: the session kind picks, Start names it, and
+		// length only shows for a summary.
+		await expect(stage.getByRole("button", { name: "Start conversation" })).toBeVisible();
+		await expect(stage.getByRole("group", { name: "Summary length" })).toHaveCount(0);
+		await stage.getByRole("button", { name: "Summary", exact: true }).click();
+		await expect(stage.getByRole("group", { name: "Summary length" })).toBeVisible();
+		await expect(stage.getByRole("button", { name: "Start summary" })).toBeVisible();
 		// Esc takes the story back out; headlines return.
 		await page.keyboard.press("Escape");
 		await expect(stage).toHaveCount(0);
@@ -264,5 +269,25 @@ test.describe("sent news opener", () => {
 		await expect(tag).toContainText("Soupçons de peste en Russie");
 		await expect(tag).toContainText("Conversation · B2");
 		await expect(page.locator("article.user")).not.toContainText("Two named locals");
+		// The headline is a normal message body: his text size, selectable.
+		const title = tag.locator(".launch-title .rendered");
+		await expect(title).toHaveText("Soupçons de peste en Russie");
+		const sizes = await page.evaluate(() => ({
+			title: getComputedStyle(document.querySelector(".launch-title .rendered")!).fontSize,
+			reply: getComputedStyle(document.querySelector("article.assistant .rendered")!).fontSize
+		}));
+		expect(sizes.title).toBe(sizes.reply);
+		// Unfold shows what was sent; fold returns to the tag.
+		await page.locator("article.user").hover();
+		await page.locator("article.user").getByRole("button", { name: "Unfold this message" }).click();
+		await expect(page.locator("article.user")).toContainText("Two named locals");
+		await expect(page.locator("article.user .news-launch")).toHaveCount(0);
+		await page.locator("article.user").getByRole("button", { name: "Fold this message" }).click();
+		await expect(page.locator("article.user .news-launch")).toBeVisible();
+		// Title words annotate like any message: select, then A.
+		await dragQuote(page, 0, "peste", ".launch-title .rendered");
+		await page.mouse.move(2, 2);
+		await page.keyboard.press("a");
+		await expect(tag.locator("button.ccez-ann-badge")).toHaveCount(1, { timeout: 10_000 });
 	});
 });

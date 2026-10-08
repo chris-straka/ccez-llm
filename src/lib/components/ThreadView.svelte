@@ -31,6 +31,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		NewsStaged,
 		SummarySize
 	} from "$lib/news";
+	import { parseNewsLaunch } from "$lib/news";
 	import MessageArticle from "./MessageArticle.svelte";
 	import EmptyHero from "./EmptyHero.svelte";
 	import LangMenus from "./LangMenus.svelte";
@@ -153,9 +154,10 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 			region: (gl: string) => void;
 			pick: (link: string) => void;
 			unpick: () => void;
+			kind: (kind: NewsKind) => void;
 			level: (level: CefrLevel) => void;
 			size: (size: SummarySize) => void;
-			launch: (kind: NewsKind) => void;
+			launch: () => void;
 			close: () => void;
 			retry: () => void;
 		};
@@ -284,7 +286,12 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 				? correctionHtmlFor(msg.content, messages[i + 1]?.content ?? null)
 				: null}
 		{@const refsOnly = sentRefs ? sentRefs.text.trim() === "" : false}
-		{@const isFolded = foldedIds.has(msg.id)}
+		<!-- News openers rest folded as their tag: a fold toggle
+		opens what was sent, so membership means "unfolded" there. -->
+		{@const isFolded =
+			msg.role === "user" && parseNewsLaunch(msg.content)
+				? !foldedIds.has(msg.id)
+				: foldedIds.has(msg.id)}
 		{@const script = detectScript(sentRefs ? sentRefs.text : msg.content)}
 		{@const aidId = script ? MODEL_AID_FOR_SCRIPT[script] : null}
 		{@const localKinds = offeredLocalAids(

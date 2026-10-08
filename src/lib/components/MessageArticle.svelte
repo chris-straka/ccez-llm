@@ -9,7 +9,7 @@ both ends. The in-place editor crosses as a `use:` action (mounts
 where the text sat, like the composer's promptEl pattern). -->
 <script lang="ts">
 	import type { ChatMsg, ChatMsgId } from "$lib/chat";
-	import { CEFR_LEVELS, SUMMARY_SIZES, parseNewsLaunch } from "$lib/news";
+	import { CEFR_LEVELS, SUMMARY_SIZES, newsLaunchImage, parseNewsLaunch } from "$lib/news";
 	import type { LocalAid } from "$lib/reading";
 	import type { AttachTagModel, SentTagAction } from "$lib/attachments";
 	import type {
@@ -152,7 +152,42 @@ import type {
 	/* A news session opener reads as one tag (story, mode, level):
 	its instructions are for the model, not the learner. */
 	const launch = $derived(msg.role === "user" ? parseNewsLaunch(msg.content) : null);
+	const launchImage = $derived(
+		launch && typeof localStorage !== "undefined"
+			? newsLaunchImage(localStorage, launch.title)
+			: null
+	);
+	let launchImageBroken = $state(false);
 </script>
+
+{#snippet body(override: string | null | undefined, isFolded: boolean, content: string | null | undefined)}
+	<MessageBody
+		message={msg}
+		{streaming}
+		{sourcesWanted}
+		folded={isFolded}
+		{foldPreview}
+		marks={marks ?? []}
+		washId={washId ?? null}
+		onBadgeHover={actions.setHoverBadge}
+		onBadgeClick={actions.badgeClick}
+		onAttachAction={actions.attachAction}
+		{expandedTags}
+		onTagToggle={actions.tagToggle}
+		onToast={actions.toast}
+		onFoldToggle={actions.foldToggle}
+		onUnfold={actions.unfold}
+		textOverride={override ?? null}
+		contentOverride={content ?? null}
+		correction={launch ? null : correction}
+		{aidPreview}
+		preview={previewing}
+		{aidKinds}
+		{aidPreferred}
+		onAidLoadingChange={actions.aidLoadingChange}
+		onAidError={actions.aidError}
+	/>
+{/snippet}
 
 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
 <!-- Option-click is mouse-only by design; keyboard users get the Fold button below. -->
@@ -206,11 +241,24 @@ import type {
 		<div class="msg-edit" onfocusout={actions.editFocusOut}>
 			<div class="msg-edit-box" use:actions.editAction></div>
 		</div>
-	{:else if launch}
+	{:else if launch && folded}
+		<!-- A news opener reads folded as one tag: the article's picture,
+		the headline (a normal annotatable body at the message size),
+		and the mode line. Unfolding shows what was sent. -->
 		<div class="bubble news-launch">
-			<span class="launch-icon" aria-hidden="true">{launch.kind === "talk" ? "🗣️" : "📰"}</span>
+			{#if launchImage && !launchImageBroken}
+				<img
+					class="launch-thumb"
+					src={launchImage}
+					alt=""
+					draggable="false"
+					onerror={() => (launchImageBroken = true)}
+				/>
+			{:else}
+				<span class="launch-icon" aria-hidden="true">{launch.kind === "talk" ? "🗣️" : "📰"}</span>
+			{/if}
 			<span class="launch-text">
-				<span class="launch-title">{launch.title}</span>
+				<span class="launch-title">{@render body(launch.title, false, null)}</span>
 				<span class="launch-meta"
 					>{launch.kind === "talk" ? "Conversation" : "Summary"} · {launch.level}
 					{CEFR_LEVELS.find((l) => l.level === launch.level)?.tag ?? ""}{launch.size
@@ -219,35 +267,10 @@ import type {
 				>
 			</span>
 		</div>
+	{:else if launch}
+		<div class="bubble">{@render body(msg.content, false, null)}</div>
 	{:else}
-		<div class:bubble={msg.role === "user"}>
-			<MessageBody
-				message={msg}
-				{streaming}
-				{sourcesWanted}
-				{folded}
-				{foldPreview}
-				marks={marks ?? []}
-				washId={washId ?? null}
-				onBadgeHover={actions.setHoverBadge}
-				onBadgeClick={actions.badgeClick}
-				onAttachAction={actions.attachAction}
-				{expandedTags}
-				onTagToggle={actions.tagToggle}
-				onToast={actions.toast}
-				onFoldToggle={actions.foldToggle}
-				onUnfold={actions.unfold}
-				{textOverride}
-				{contentOverride}
-				{correction}
-				{aidPreview}
-				preview={previewing}
-				{aidKinds}
-				{aidPreferred}
-				onAidLoadingChange={actions.aidLoadingChange}
-				onAidError={actions.aidError}
-			/>
-		</div>
+		<div class:bubble={msg.role === "user"}>{@render body(textOverride, folded, contentOverride)}</div>
 	{/if}
 	<!-- Sent image folds render in `SentAttachments.svelte`
 	(variant "inline"); the page keeps the models, the OCR
@@ -297,7 +320,7 @@ import type {
 		display: flex;
 		align-items: center;
 		gap: 0.7rem;
-		max-width: min(100%, 32rem) !important;
+		max-width: min(100%, calc(36rem * min(var(--font-scale, 1), 2))) !important;
 	}
 	.launch-icon {
 		font-size: 1.4em;
@@ -311,15 +334,16 @@ import type {
 	}
 	.launch-title {
 		font-weight: 600;
-		line-height: 1.3;
-		display: -webkit-box;
-		-webkit-line-clamp: 2;
-		line-clamp: 2;
-		-webkit-box-orient: vertical;
-		overflow: hidden;
+	}
+	.launch-thumb {
+		flex: none;
+		width: calc(4.5rem * min(var(--font-scale, 1), 2));
+		aspect-ratio: 4 / 3;
+		object-fit: cover;
+		border-radius: 0.6rem;
 	}
 	.launch-meta {
-		font-size: 0.78em;
+		font-size: calc(0.75rem * var(--font-scale, 1));
 		color: #6e6e73;
 		color: var(--muted);
 	}

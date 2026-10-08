@@ -1073,6 +1073,7 @@ export interface NewsPanelState {
  */
 export interface NewsStaged {
 	link: string;
+	kind: NewsKind;
 	level: CefrLevel;
 	size: SummarySize;
 	article: "loading" | "ready" | "error";
@@ -1934,25 +1935,30 @@ export function storeFeed(
 
 const NEWS_PICKS_KEY = "ccez-news-picks-v1";
 
-/** Last level and length the learner started a session with. */
-export function loadNewsPicks(store: KeyValueStore): { level: CefrLevel; size: SummarySize } {
-	const fallback = { level: "B2" as CefrLevel, size: "medium" as SummarySize };
+/** Session choices the learner last made. */
+export interface NewsPicks {
+	kind: NewsKind;
+	level: CefrLevel;
+	size: SummarySize;
+}
+
+/** Last session kind, level, and length the learner chose. */
+export function loadNewsPicks(store: KeyValueStore): NewsPicks {
+	const fallback: NewsPicks = { kind: "talk", level: "B2", size: "medium" };
 	try {
 		const raw = store.getItem(NEWS_PICKS_KEY);
 		if (!raw) return fallback;
-		const parsed = JSON.parse(raw) as { level?: unknown; size?: unknown };
+		const parsed = JSON.parse(raw) as { kind?: unknown; level?: unknown; size?: unknown };
+		const kind: NewsKind = parsed.kind === "read" ? "read" : "talk";
 		const level = CEFR_LEVELS.find((l) => l.level === parsed.level)?.level ?? fallback.level;
 		const size = SUMMARY_SIZES.find((s) => s.size === parsed.size)?.size ?? fallback.size;
-		return { level, size };
+		return { kind, level, size };
 	} catch {
 		return fallback;
 	}
 }
 
-export function storeNewsPicks(
-	store: KeyValueStore,
-	picks: { level: CefrLevel; size: SummarySize }
-): void {
+export function storeNewsPicks(store: KeyValueStore, picks: NewsPicks): void {
 	try {
 		store.setItem(NEWS_PICKS_KEY, JSON.stringify(picks));
 	} catch {
@@ -1993,4 +1999,35 @@ export function parseNewsLaunch(content: string): NewsLaunchTag | null {
 		size = SUMMARY_SIZES.find((s) => s.words === words)?.size ?? "medium";
 	}
 	return { kind, title: head[2] ?? "", source: head[3] ?? "", level, size };
+}
+
+const NEWS_LAUNCH_IMAGE_KEY = "ccez-news-launch-images-v1";
+const NEWS_LAUNCH_IMAGE_MAX = 300;
+
+/** Picture a sent opener shows beside its headline (by headline). */
+export function newsLaunchImage(store: KeyValueStore, title: string): string | null {
+	try {
+		const raw = store.getItem(NEWS_LAUNCH_IMAGE_KEY);
+		const found = raw ? (JSON.parse(raw) as Record<string, unknown>)[title] : undefined;
+		return typeof found === "string" && found.startsWith("http") ? found : null;
+	} catch {
+		return null;
+	}
+}
+
+/** File a launched story's picture (oldest evicted past the cap). */
+export function storeNewsLaunchImage(store: KeyValueStore, title: string, image: string): void {
+	try {
+		const raw = store.getItem(NEWS_LAUNCH_IMAGE_KEY);
+		const images = (raw ? JSON.parse(raw) : {}) as Record<string, string>;
+		delete images[title];
+		images[title] = image;
+		const keys = Object.keys(images);
+		for (const key of keys.slice(0, Math.max(0, keys.length - NEWS_LAUNCH_IMAGE_MAX))) {
+			delete images[key];
+		}
+		store.setItem(NEWS_LAUNCH_IMAGE_KEY, JSON.stringify(images));
+	} catch {
+		// The picture is a nicety; the tag falls back to its icon.
+	}
 }

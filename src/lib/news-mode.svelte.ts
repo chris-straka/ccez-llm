@@ -32,6 +32,7 @@ import {
 	resolveStoryImage,
 	storeFeed,
 	storeNewsImage,
+	storeNewsLaunchImage,
 	storeNewsPicks,
 	storeNewsUrl,
 	translateNewsTitles,
@@ -73,9 +74,11 @@ export interface NewsModeActions {
 	pick: (link: string) => void;
 	/** Take the staged story back out: headlines return. */
 	unpick: () => void;
+	kind: (kind: NewsKind) => void;
 	level: (level: CefrLevel) => void;
 	size: (size: SummarySize) => void;
-	launch: (kind: NewsKind) => void;
+	/** Start the staged story with its chosen kind, level, length. */
+	launch: () => void;
 	close: () => void;
 	retry: () => void;
 }
@@ -136,6 +139,11 @@ export class NewsMode {
 			unpick: () => {
 				this.unpick();
 			},
+			kind: (kind: NewsKind) => {
+				if (!this.staged || this.newsBusy) return;
+				this.staged = { ...this.staged, kind };
+				this.rememberPicks();
+			},
 			level: (level: CefrLevel) => {
 				if (!this.staged || this.newsBusy) return;
 				this.staged = { ...this.staged, level };
@@ -146,10 +154,10 @@ export class NewsMode {
 				this.staged = { ...this.staged, size };
 				this.rememberPicks();
 			},
-			launch: (kind: NewsKind) => {
+			launch: () => {
 				const staged = this.staged;
 				if (!staged) return;
-				void this.launchNewsSession(staged.link, kind, staged.level, staged.size);
+				void this.launchNewsSession(staged.link, staged.kind, staged.level, staged.size);
 			},
 			close: () => {
 				this.close();
@@ -172,6 +180,7 @@ export class NewsMode {
 	private rememberPicks(): void {
 		if (!this.staged) return;
 		storeNewsPicks(this.deps.getStorage(), {
+			kind: this.staged.kind,
 			level: this.staged.level,
 			size: this.staged.size
 		});
@@ -201,6 +210,7 @@ export class NewsMode {
 		const picks = loadNewsPicks(this.deps.getStorage());
 		this.staged = {
 			link,
+			kind: this.staged?.kind ?? picks.kind,
 			level: this.staged?.level ?? picks.level,
 			size: this.staged?.size ?? picks.size,
 			article: "loading",
@@ -506,6 +516,8 @@ export class NewsMode {
 			// Closed, chat switched or deleted, or language-hopped
 			// mid-flight: don't seed a dead panel.
 			if (this.panelSeq !== panel || this.news?.code !== current.code) return;
+			const image = story.image ?? this.newsImages[link];
+			if (image) storeNewsLaunchImage(this.deps.getStorage(), story.title, image);
 			const att = makePastedTextAttachment(`${PASTE_OPEN}${text}${PASTE_CLOSE}`);
 			this.deps.setAttachments([att]);
 			this.news = null;

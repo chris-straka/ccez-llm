@@ -174,16 +174,18 @@ describe("staging a story", () => {
 		expect(mode.news?.status).toBe("ready");
 	});
 
-	it("level and size change the staged story and are remembered", () => {
+	it("kind, level and size change the staged story and are remembered", () => {
 		const { mode, storage } = harness();
 		mode.news = readyPanel();
 		mode.actions.level("A2");
 		expect(mode.staged).toBeNull();
 		mode.actions.pick("link-1");
+		mode.actions.kind("read");
 		mode.actions.level("A2");
 		mode.actions.size("short");
-		expect(mode.staged).toMatchObject({ level: "A2", size: "short" });
+		expect(mode.staged).toMatchObject({ kind: "read", level: "A2", size: "short" });
 		expect(JSON.parse(storage.getItem("ccez-news-picks-v1") ?? "{}")).toEqual({
+			kind: "read",
 			level: "A2",
 			size: "short"
 		});
