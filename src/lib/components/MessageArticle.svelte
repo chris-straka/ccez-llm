@@ -9,7 +9,17 @@ both ends. The in-place editor crosses as a `use:` action (mounts
 where the text sat, like the composer's promptEl pattern). -->
 <script lang="ts">
 	import type { ChatMsg, ChatMsgId } from "$lib/chat";
-	import { CEFR_LEVELS, SUMMARY_SIZES, newsLaunchImage, parseNewsLaunch } from "$lib/news";
+	import {
+		CEFR_LEVELS,
+		SUMMARY_SIZES,
+		newsLaunchImage,
+		parseNewsFollowUp,
+		parseNewsLaunch,
+		type CefrLevel,
+		type NewsFollowUpKind
+	} from "$lib/news";
+	import { cefrTag } from "$lib/cefr";
+	import { fade } from "svelte/transition";
 	import type { LocalAid } from "$lib/reading";
 	import type { AttachTagModel, SentTagAction } from "$lib/attachments";
 	import type {
@@ -51,6 +61,14 @@ import type {
 		ma: MessageActionsActions;
 	}
 
+	/** News-session controls on an opener tag (null: inert tag). */
+	export interface NewsTagControls {
+		busy: boolean;
+		/** Re-run the session from this opener at a new level. */
+		setLevel: (level: CefrLevel) => void;
+		followUp: (kind: NewsFollowUpKind) => void;
+	}
+
 	interface Props {
 		msg: ChatMsg;
 		index: number;
@@ -86,6 +104,7 @@ import type {
 		correction: string | null;
 		aidPreview: boolean;
 		previewing: boolean;
+		news?: NewsTagControls | null;
 		aidKinds: LocalAid[] | undefined;
 		aidPreferred: LocalAid | null;
 		foldTitle: string;
@@ -134,6 +153,7 @@ import type {
 		correction,
 		aidPreview,
 		previewing,
+		news = null,
 		aidKinds,
 		aidPreferred,
 		foldTitle,
@@ -158,6 +178,18 @@ import type {
 			: null
 	);
 	let launchImageBroken = $state(false);
+	const followUp = $derived(msg.role === "user" && !launch ? parseNewsFollowUp(msg.content) : null);
+	const shownLevel = $derived<CefrLevel>(launch?.level ?? "B2");
+	let levelOpen = $state(false);
+	// The level menu closes on any press outside it.
+	$effect(() => {
+		if (!levelOpen) return;
+		const close = (): void => {
+			levelOpen = false;
+		};
+		window.addEventListener("pointerdown", close);
+		return () => window.removeEventListener("pointerdown", close);
+	});
 </script>
 
 {#snippet body(override: string | null | undefined, isFolded: boolean, content: string | null | undefined)}
@@ -259,14 +291,76 @@ import type {
 			{/if}
 			<span class="launch-text">
 				<span class="launch-title">{@render body(launch.title, false, null)}</span>
-				<span class="launch-meta"
-					>{launch.kind === "talk" ? "Conversation" : "Summary"} · {launch.level}
-					{CEFR_LEVELS.find((l) => l.level === launch.level)?.tag ?? ""}{launch.size
-						? ` · ${SUMMARY_SIZES.find((s) => s.size === launch.size)?.label ?? ""}`
-						: ""}{launch.source ? ` · ${launch.source}` : ""}</span
-				>
+				<span class="launch-meta">
+					<span>{launch.kind === "talk" ? "Conversation" : "Summary"}</span>
+					<span aria-hidden="true">·</span>
+					{#if news}
+						<!-- svelte-ignore a11y_no_static_element_interactions -->
+						<span class="level-wrap" onpointerdown={(e) => e.stopPropagation()}>
+							<button
+								type="button"
+								class="launch-level"
+								aria-haspopup="menu"
+								aria-expanded={levelOpen}
+								title="Change the level: the session restarts from here"
+								onclick={(e) => {
+									e.stopPropagation();
+									levelOpen = !levelOpen;
+								}}>{shownLevel} {cefrTag(shownLevel)} ▾</button
+							>
+							{#if levelOpen}
+								<span class="level-menu" role="menu" transition:fade={{ duration: 120 }}>
+									{#each CEFR_LEVELS as l (l.level)}
+										<button
+											type="button"
+											role="menuitemradio"
+											aria-checked={l.level === shownLevel}
+											class:on={l.level === shownLevel}
+											disabled={news.busy}
+											onclick={(e) => {
+												e.stopPropagation();
+												levelOpen = false;
+												if (l.level !== shownLevel) news.setLevel(l.level);
+											}}><b>{l.level}</b> {l.tag}</button
+										>
+									{/each}
+								</span>
+							{/if}
+						</span>
+					{:else}
+						<span>{shownLevel} {cefrTag(shownLevel)}</span>
+					{/if}
+					{#if launch.size}
+						<span aria-hidden="true">·</span>
+						<span>{SUMMARY_SIZES.find((s) => s.size === launch.size)?.label ?? ""}</span>
+					{/if}
+					{#if launch.source}
+						<span aria-hidden="true">·</span>
+						<span>{launch.source}</span>
+					{/if}
+				</span>
+				{#if news}
+					<span class="launch-actions">
+						<button
+							type="button"
+							disabled={news.busy}
+							title="The article itself, rewritten at your level"
+							onclick={(e) => {
+								e.stopPropagation();
+								news.followUp("article");
+							}}>Article at {shownLevel}</button
+						>
+					</span>
+				{/if}
 			</span>
 		</div>
+	{:else if followUp && folded}
+		<div class="bubble news-follow">
+			<span class="follow-kind">Article · {followUp.level}</span>
+			<span class="follow-title">{followUp.title}</span>
+		</div>
+	{:else if followUp}
+		<div class="bubble">{@render body(msg.content, false, null)}</div>
 	{:else if launch}
 		<div class="bubble">{@render body(msg.content, false, null)}</div>
 	{:else}
@@ -335,6 +429,104 @@ import type {
 	.launch-title {
 		font-weight: 600;
 	}
+	.level-wrap {
+		position: relative;
+	}
+	.launch-level {
+		border: 0;
+		padding: 0.1em 0.35em;
+		margin: 0 -0.35em;
+		border-radius: 0.4em;
+		background: transparent;
+		color: inherit;
+		font: inherit;
+		cursor: pointer;
+		transition: background-color 0.15s ease;
+	}
+	.launch-level:hover,
+	.launch-level[aria-expanded="true"] {
+		background: #e5e5ea;
+		background: var(--line-soft);
+	}
+	.level-menu {
+		position: absolute;
+		top: calc(100% + 0.3rem);
+		left: -0.35em;
+		z-index: 20;
+		display: flex;
+		flex-direction: column;
+		min-width: 12em;
+		padding: 0.25rem;
+		border: 1px solid #e5e5ea;
+		border-color: var(--line-overlay);
+		border-radius: 0.7rem;
+		background: #fff;
+		background: var(--bg-overlay);
+		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+	}
+	.level-menu button {
+		display: flex;
+		gap: 0.5em;
+		border: 0;
+		border-radius: 0.45rem;
+		padding: 0.4em 0.6em;
+		background: transparent;
+		color: #1c1c1e;
+		color: var(--ink);
+		font: inherit;
+		text-align: left;
+		cursor: pointer;
+	}
+	.level-menu button:hover,
+	.level-menu button.on {
+		background: #f1f1f4;
+		background: var(--bg-wash);
+	}
+	.launch-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+		margin-top: 0.35rem;
+	}
+	.launch-actions button {
+		border: 1px solid #e5e5ea;
+		border-color: var(--line-soft);
+		border-radius: 999px;
+		padding: 0.25em 0.75em;
+		background: transparent;
+		color: #1c1c1e;
+		color: var(--ink);
+		font: inherit;
+		font-size: calc(0.75rem * var(--font-scale, 1));
+		cursor: pointer;
+		transition:
+			border-color 0.15s ease,
+			transform 0.12s ease;
+	}
+	.launch-actions button:hover:not(:disabled) {
+		border-color: #007aff;
+		border-color: var(--accent);
+	}
+	.launch-actions button:active:not(:disabled) {
+		transform: scale(0.96);
+	}
+	.launch-actions button:disabled {
+		opacity: 0.5;
+		cursor: progress;
+	}
+	.news-follow {
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+	}
+	.follow-kind {
+		font-size: calc(0.72rem * var(--font-scale, 1));
+		color: #6e6e73;
+		color: var(--muted);
+	}
+	.follow-title {
+		font-weight: 600;
+	}
 	.launch-thumb {
 		flex: none;
 		width: calc(4.5rem * min(var(--font-scale, 1), 2));
@@ -343,6 +535,10 @@ import type {
 		border-radius: 0.6rem;
 	}
 	.launch-meta {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.3em;
 		font-size: calc(0.75rem * var(--font-scale, 1));
 		color: #6e6e73;
 		color: var(--muted);

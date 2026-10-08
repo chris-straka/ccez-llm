@@ -3,6 +3,9 @@ import { describe, it, expect } from "vitest";
 import {
 	cachedFeed,
 	loadNewsPicks,
+	newsArticleInstruction,
+	relevelNewsOpener,
+	parseNewsFollowUp,
 	newsLaunchImage,
 	storeNewsLaunchImage,
 	parseNewsLaunch,
@@ -1646,5 +1649,35 @@ describe("sent opener pictures", () => {
 		expect(newsLaunchImage(store, "U")).toBeNull();
 		m.set("ccez-news-launch-images-v1", "{broken");
 		expect(newsLaunchImage(store, "T")).toBeNull();
+	});
+});
+
+describe("news follow-ups", () => {
+	it("round-trips the article request", () => {
+		const art = newsArticleInstruction("Titre", "B1", "French", "https://lemonde.fr/x");
+		expect(art).toContain("[Original article](https://lemonde.fr/x)");
+		expect(parseNewsFollowUp(art)).toEqual({ kind: "article", level: "B1", title: "Titre" });
+		expect(newsArticleInstruction("T", "A2", "French", null)).not.toContain("Original article");
+	});
+	it("leaves look-alikes alone", () => {
+		expect(parseNewsFollowUp('📄 Article · B2\n"T"\nsomething else')).toBeNull();
+		expect(parseNewsFollowUp("hello")).toBeNull();
+	});
+});
+
+describe("relevelNewsOpener", () => {
+	it("swaps the level phrase and shifts the folded article with it", () => {
+		const story = { title: "T", source: "S", link: "l", snippet: "" };
+		const head = `${newsConversationInstruction(story, "B2", "French")} `;
+		const article = "ARTICLE BODY";
+		const content = head + article;
+		const folds = [{ start: head.length, end: content.length, chars: article.length }];
+		const out = relevelNewsOpener(content, folds, "B1")!;
+		expect(out.content).toContain("CEFR B1 (Intermediate)");
+		expect(out.content).not.toContain("CEFR B2");
+		const f = out.pasteFolds[0]!;
+		expect(out.content.slice(f.start, f.end)).toBe(article);
+		expect(parseNewsLaunch(out.content)?.level).toBe("B1");
+		expect(relevelNewsOpener("no level here", [], "A1")).toBeNull();
 	});
 });

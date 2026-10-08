@@ -291,3 +291,46 @@ test.describe("sent news opener", () => {
 		await expect(tag.locator("button.ccez-ann-badge")).toHaveCount(1, { timeout: 10_000 });
 	});
 });
+
+test.describe("news session tag controls", () => {
+	test("a level change restarts the session there; Undo brings the old replies back", async ({
+		page
+	}) => {
+		const opener =
+			'🗣️ "Soupçons de peste en Russie" (CNews)\n' +
+			"Two named locals open a substantial discussion of the pasted article in French " +
+			"at CEFR B2 (Upper intermediate): reactions. Stay in French. [Pasted 3491 chars] ";
+		await seedChat(
+			page,
+			[
+				{ role: "user", content: opener },
+				{ role: "assistant", content: "Ancienne réponse." },
+				{ role: "user", content: "Et alors ?" },
+				{ role: "assistant", content: "Deuxième réponse." }
+			],
+			"fr"
+		);
+		await page.goto("/");
+		const tag = page.locator("article.user .news-launch");
+		await expect(tag).toBeVisible({ timeout: 60_000 });
+		await tag.getByRole("button", { name: /B2 Upper intermediate/ }).click();
+		await tag.getByRole("menuitemradio", { name: /B1/ }).click();
+		// Everything below the tag is replaced by a fresh opener.
+		await expect(tag).toContainText("B1 Intermediate");
+		await expect(page.locator("article")).toHaveCount(2, { timeout: 30_000 });
+		await expect(page.locator(".messages")).not.toContainText("Deuxième réponse.");
+		await expect(page.locator("article.assistant")).toContainText("Mock reply", {
+			timeout: 30_000
+		});
+		// Undo puts the old level and replies back.
+		await page.locator(".toast").click();
+		await expect(page.locator(".messages")).toContainText("Deuxième réponse.");
+		await expect(tag).toContainText("B2 Upper intermediate");
+		// The article at his level goes out as a folded follow-up.
+		await tag.getByRole("button", { name: "Article at B2" }).click();
+		await expect(page.locator("article.user .news-follow")).toContainText("Article · B2", {
+			timeout: 10_000
+		});
+		await expect(page.locator("article.user").last()).not.toContainText("Rewrite the pasted");
+	});
+});

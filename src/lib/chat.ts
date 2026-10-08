@@ -356,6 +356,22 @@ export function setChatReplyLang(
 	persistChats(state, store);
 }
 
+/**
+ * Put back a chat's earlier message list (an Undo of a re-run). The
+ * array is replaced, never mutated in place. Unknown ids are no-ops.
+ */
+export function restoreChatMessages(
+	state: ChatState,
+	id: ChatId,
+	messages: ChatMsg[],
+	store?: KeyValueStore
+): void {
+	const target = state.chats.find((c) => c.id === id);
+	if (!target) return;
+	target.messages = [...messages];
+	persistChats(state, store);
+}
+
 /** Set (or clear) one chat's correction-mode toggle. Persists like siblings. */
 export function setChatCorrection(
 	state: ChatState,

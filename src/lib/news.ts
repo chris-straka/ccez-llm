@@ -6,6 +6,7 @@ import {
 	type FeedItem
 } from "./tools";
 import type { KeyValueStore } from "./settings";
+import { CEFR_LEVELS, type CefrLevel } from "./cefr";
 
 /**
  * Learner news: Google News RSS per reply language, region chips,
@@ -1081,17 +1082,7 @@ export interface NewsStaged {
 	error: string;
 }
 
-/** CEFR levels for conversation sessions. */
-export type CefrLevel = "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
-
-export const CEFR_LEVELS: Array<{ level: CefrLevel; tag: string }> = [
-	{ level: "A1", tag: "Beginner" },
-	{ level: "A2", tag: "Elementary" },
-	{ level: "B1", tag: "Intermediate" },
-	{ level: "B2", tag: "Upper intermediate" },
-	{ level: "C1", tag: "Advanced" },
-	{ level: "C2", tag: "Proficient" }
-];
+export { CEFR_LEVELS, type CefrLevel } from "./cefr";
 
 /** Summary lengths (target words guide the model, not a hard cap). */
 export type SummarySize = "short" | "medium" | "long";
@@ -2030,4 +2021,92 @@ export function storeNewsLaunchImage(store: KeyValueStore, title: string, image:
 	} catch {
 		// The picture is a nicety; the tag falls back to its icon.
 	}
+}
+
+const NEWS_LAUNCH_URL_KEY = "ccez-news-launch-urls-v1";
+
+/** Publisher URL of a launched story (by headline), else null. */
+export function newsLaunchUrl(store: KeyValueStore, title: string): string | null {
+	try {
+		const raw = store.getItem(NEWS_LAUNCH_URL_KEY);
+		const found = raw ? (JSON.parse(raw) as Record<string, unknown>)[title] : undefined;
+		return typeof found === "string" && /^https?:\/\//.test(found) ? found : null;
+	} catch {
+		return null;
+	}
+}
+
+export function storeNewsLaunchUrl(store: KeyValueStore, title: string, url: string): void {
+	try {
+		const raw = store.getItem(NEWS_LAUNCH_URL_KEY);
+		const urls = (raw ? JSON.parse(raw) : {}) as Record<string, string>;
+		delete urls[title];
+		urls[title] = url;
+		const keys = Object.keys(urls);
+		for (const key of keys.slice(0, Math.max(0, keys.length - NEWS_LAUNCH_IMAGE_MAX))) {
+			delete urls[key];
+		}
+		store.setItem(NEWS_LAUNCH_URL_KEY, JSON.stringify(urls));
+	} catch {
+		// The link is a nicety; the rewrite still reads without it.
+	}
+}
+
+/** A follow-up on a news session: the article at his level. */
+export type NewsFollowUpKind = "article";
+
+/**
+ * Request for the article itself, rewritten at the learner's level
+ * in the target language (the pasted article is already in the
+ * chat). The first line is what the chat shows folded.
+ */
+export function newsArticleInstruction(
+	title: string,
+	level: CefrLevel,
+	langName: string,
+	url: string | null
+): string {
+	const tag = CEFR_LEVELS.find((l) => l.level === level)?.tag ?? "";
+	const link = url ? ` End with one line: [Original article](${url})` : "";
+	return (
+		`📄 Article · ${level}\n"${title}"\n` +
+		`Rewrite the pasted article above in ${langName} at CEFR ${level} (${tag}): keep every ` +
+		`fact in its order, a short headline, then plain paragraphs. No commentary, no ` +
+		`questions.${link}`
+	);
+}
+
+/** Reads a sent follow-up back into its tag fields, else null. Pure. */
+export function parseNewsFollowUp(
+	content: string
+): { kind: NewsFollowUpKind; level: CefrLevel; title: string } | null {
+	const m = /^📄 Article · (A1|A2|B1|B2|C1|C2)\n"(.*)"\n/u.exec(content);
+	if (!m) return null;
+	if (!content.slice(m[0].length).startsWith("Rewrite the pasted article")) return null;
+	return { kind: "article", level: m[1] as CefrLevel, title: m[2] ?? "" };
+}
+
+/**
+ * A sent news opener re-levelled: its "CEFR B2 (Upper intermediate)"
+ * phrase swapped for the new level, and every paste fold after the
+ * edit shifted by the length change so the folded article stays put.
+ * Null when the content holds no level phrase. Pure.
+ */
+export function relevelNewsOpener(
+	content: string,
+	folds: Array<{ start: number; end: number; chars: number; open?: boolean }>,
+	level: CefrLevel
+): { content: string; pasteFolds: Array<{ start: number; end: number; chars: number; open?: boolean }> } | null {
+	const m = /CEFR (A1|A2|B1|B2|C1|C2) \(([^)]*)\)/.exec(content);
+	if (!m) return null;
+	const tag = CEFR_LEVELS.find((l) => l.level === level)?.tag ?? "";
+	const next = `CEFR ${level} (${tag})`;
+	const at = m.index;
+	const delta = next.length - m[0].length;
+	return {
+		content: content.slice(0, at) + next + content.slice(at + m[0].length),
+		pasteFolds: folds.map((f) =>
+			f.start >= at + m[0].length ? { ...f, start: f.start + delta, end: f.end + delta } : f
+		)
+	};
 }
