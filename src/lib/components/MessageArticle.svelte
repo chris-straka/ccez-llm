@@ -176,6 +176,30 @@ import type {
 	);
 	let launchImageBroken = $state(false);
 	const shownLevel = $derived<CefrLevel>(launch?.level ?? "B2");
+	const metaKey = $derived(
+		launch ? `${launch.kind}|${shownLevel}|${launch.size ?? ""}|${launch.source}` : ""
+	);
+	/** Hide a meta dot left at the end of a line (its next item
+	wrapped below): re-checks on every resize and content change. */
+	function endDots(node: HTMLElement, _key: string): { update: () => void; destroy: () => void } {
+		const run = (): void => {
+			const items = [...node.children] as HTMLElement[];
+			items.forEach((item, i) => {
+				const sep = item.querySelector<HTMLElement>(":scope > .sep");
+				if (!sep) return;
+				sep.style.visibility = "";
+				const next = items[i + 1];
+				if (!next) return;
+				const wrapped =
+					next.getBoundingClientRect().top >= item.getBoundingClientRect().bottom - 1;
+				if (wrapped) sep.style.visibility = "hidden";
+			});
+		};
+		const ro = new ResizeObserver(run);
+		ro.observe(node);
+		run();
+		return { update: run, destroy: () => ro.disconnect() };
+	}
 	let levelOpen = $state(false);
 	// The level menu closes on any press outside it.
 	$effect(() => {
@@ -287,52 +311,65 @@ import type {
 			{/if}
 			<span class="launch-text">
 				<span class="launch-title">{@render body(launch.title, false, null)}</span>
-				<span class="launch-meta">
-					<span>{launch.kind === "talk" ? "Conversation" : "Summary"}</span>
-					<span aria-hidden="true">·</span>
-					{#if news}
-						<!-- svelte-ignore a11y_no_static_element_interactions -->
-						<span class="level-wrap" onpointerdown={(e) => e.stopPropagation()}>
-							<button
-								type="button"
-								class="launch-level"
-								aria-haspopup="menu"
-								aria-expanded={levelOpen}
-								title="Change the level: the session restarts from here"
-								onclick={(e) => {
-									e.stopPropagation();
-									levelOpen = !levelOpen;
-								}}>{shownLevel} {cefrTag(shownLevel)} ▾</button
-							>
-							{#if levelOpen}
-								<span class="level-menu" role="menu" transition:fade={{ duration: 120 }}>
-									{#each CEFR_LEVELS as l (l.level)}
-										<button
-											type="button"
-											role="menuitemradio"
-											aria-checked={l.level === shownLevel}
-											class:on={l.level === shownLevel}
-											disabled={news.busy}
-											onclick={(e) => {
-												e.stopPropagation();
-												levelOpen = false;
-												if (l.level !== shownLevel) news.setLevel(l.level);
-											}}><b>{l.level}</b> {l.tag}</button
-										>
-									{/each}
-								</span>
-							{/if}
-						</span>
-					{:else}
-						<span>{shownLevel} {cefrTag(shownLevel)}</span>
-					{/if}
+				<!-- Each dot rides the end of the item before it, so a wrap
+				never starts a line with one; `endDots` hides a dot left at
+				a line's end. -->
+				<span class="launch-meta" use:endDots={metaKey}>
+					<span class="meta-item"
+						>{launch.kind === "talk" ? "Conversation" : "Summary"}<span
+							class="sep"
+							aria-hidden="true">·</span
+						></span
+					>
+					<span class="meta-item">
+						{#if news}
+							<!-- svelte-ignore a11y_no_static_element_interactions -->
+							<span class="level-wrap" onpointerdown={(e) => e.stopPropagation()}>
+								<button
+									type="button"
+									class="launch-level"
+									aria-haspopup="menu"
+									aria-expanded={levelOpen}
+									title="Change the level: the session restarts from here"
+									onclick={(e) => {
+										e.stopPropagation();
+										levelOpen = !levelOpen;
+									}}>{shownLevel} {cefrTag(shownLevel)} ▾</button
+								>
+								{#if levelOpen}
+									<span class="level-menu" role="menu" transition:fade={{ duration: 120 }}>
+										{#each CEFR_LEVELS as l (l.level)}
+											<button
+												type="button"
+												role="menuitemradio"
+												aria-checked={l.level === shownLevel}
+												class:on={l.level === shownLevel}
+												disabled={news.busy}
+												onclick={(e) => {
+													e.stopPropagation();
+													levelOpen = false;
+													if (l.level !== shownLevel) news.setLevel(l.level);
+												}}><b>{l.level}</b> {l.tag}</button
+											>
+										{/each}
+									</span>
+								{/if}
+							</span>
+						{:else}
+							<span>{shownLevel} {cefrTag(shownLevel)}</span>
+						{/if}
+						{#if launch.size || launch.source}<span class="sep" aria-hidden="true">·</span>{/if}
+					</span>
 					{#if launch.size}
-						<span aria-hidden="true">·</span>
-						<span>{SUMMARY_SIZES.find((s) => s.size === launch.size)?.label ?? ""}</span>
+						<span class="meta-item"
+							>{SUMMARY_SIZES.find((sz) => sz.size === launch.size)?.label ?? ""}{#if launch.source}<span
+									class="sep"
+									aria-hidden="true">·</span
+								>{/if}</span
+						>
 					{/if}
 					{#if launch.source}
-						<span aria-hidden="true">·</span>
-						<span>{launch.source}</span>
+						<span class="meta-item meta-source">{launch.source}</span>
 					{/if}
 				</span>
 			</span>
@@ -388,7 +425,9 @@ import type {
 <style>
 	.news-launch {
 		display: flex;
-		align-items: center;
+		/* Top-aligned: the picture sits level with the headline's
+		first line, never centered against a two-line title. */
+		align-items: flex-start;
 		gap: 0.7rem;
 		max-width: min(100%, calc(36rem * min(var(--font-scale, 1), 2))) !important;
 	}
@@ -405,12 +444,25 @@ import type {
 	.launch-title {
 		font-weight: 600;
 	}
+	.meta-item {
+		display: inline-flex;
+		align-items: center;
+		white-space: nowrap;
+	}
+	/* A long outlet name may still wrap inside itself. */
+	.meta-item.meta-source {
+		white-space: normal;
+	}
+	.meta-item .sep {
+		margin-left: 0.4em;
+	}
 	.level-wrap {
 		position: relative;
 	}
 	.launch-level {
 		border: 0;
-		padding: 0.1em 0.35em;
+		padding: 0.1em 0.3em;
+		margin: 0 -0.2em;
 		border-radius: 0.4em;
 		background: transparent;
 		color: inherit;
@@ -468,7 +520,9 @@ import type {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
-		gap: 0.3em;
+		/* 0.4em each side of every dot; the level pill's wash reaches
+		0.2em into that, so it always clears a dot. */
+		gap: 0 0.4em;
 		font-size: calc(0.75rem * var(--font-scale, 1));
 		color: #6e6e73;
 		color: var(--muted);
