@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
 	LANGUAGE_MENUS,
+	expandAskFor,
+	expandDraft,
 	menuOrder,
 	menuSections,
 	TYPEAHEAD_RESET_MS,
@@ -330,6 +332,20 @@ describe("stepPillVoice", () => {
 	});
 	it("unknown pill codes never apply", () => {
 		expect(stepPillVoice(state(), "xx", locale)).toEqual(state());
+	});
+});
+
+describe("expand on this part", () => {
+	it("asks in the chat's language, English otherwise", () => {
+		expect(expandAskFor("fr")).toBe("Développe ce passage.");
+		expect(expandAskFor("la")).toBe("Expand on this part.");
+		expect(expandAskFor(null)).toBe("Expand on this part.");
+	});
+	it("quotes every line, then the ask, under any draft", () => {
+		expect(expandDraft("", " line one\nline two ", "Ask.")).toBe(
+			"> line one\n> line two\n\nAsk."
+		);
+		expect(expandDraft("my note ", "q", "Ask.")).toBe("my note\n\n> q\n\nAsk.");
 	});
 });
 

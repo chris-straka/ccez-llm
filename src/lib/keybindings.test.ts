@@ -212,6 +212,22 @@ describe("messageKeyAction", () => {
 		);
 	});
 
+	it("asks to expand a message selection with C, A's guards", () => {
+		const sel = { ...msgBase, key: "c", code: "KeyC", hasSelection: true };
+		expect(messageKeyAction(sel)).toBe("expand-selection");
+		// The pointer already left: a selection standing in message text still owns C.
+		expect(messageKeyAction({ ...sel, hoveredIdx: -1, selInMessage: true })).toBe(
+			"expand-selection"
+		);
+		expect(messageKeyAction({ ...sel, hoveredIdx: -1, selInMessage: false })).toBe(null);
+		expect(messageKeyAction({ ...sel, inField: true })).toBe(null);
+		expect(messageKeyAction({ ...sel, inEditable: true })).toBe(null);
+		expect(messageKeyAction({ ...sel, inEditor: true, selInMessage: false })).toBe(null);
+		expect(messageKeyAction({ ...sel, metaKey: true })).toBe(null);
+		// Shift+C stays the branch key.
+		expect(messageKeyAction({ ...sel, key: "C", shiftKey: true })).toBe("branch-hovered");
+	});
+
 	it("trims only hovered, never shifted or in fields", () => {
 		const trim = { ...msgBase, key: "t", code: "KeyT" };
 		expect(messageKeyAction(trim)).toBe("trim-hovered");
@@ -231,7 +247,7 @@ describe("messageKeyAction", () => {
 		expect(messageKeyAction({ ...msgBase, key: "C", code: "KeyC" })).toBe(
 			"copy-hovered"
 		);
-		// A live selection keeps its keys (the selection menu's own C).
+		// A live selection takes C for "expand on this", never a copy.
 		expect(
 			messageKeyAction({
 				...msgBase,
@@ -239,7 +255,7 @@ describe("messageKeyAction", () => {
 				code: "KeyC",
 				hasSelection: true
 			})
-		).toBe(null);
+		).toBe("expand-selection");
 		// Shift+C is the branch key, never a copy.
 		expect(
 			messageKeyAction({ ...msgBase, key: "C", code: "KeyC", shiftKey: true })
