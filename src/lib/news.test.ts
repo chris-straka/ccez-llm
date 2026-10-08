@@ -3,6 +3,8 @@ import { describe, it, expect } from "vitest";
 import {
 	cachedFeed,
 	loadNewsPicks,
+	newsLaunchImage,
+	storeNewsLaunchImage,
 	parseNewsLaunch,
 	storeFeed,
 	storeNewsPicks,
@@ -1594,14 +1596,14 @@ describe("feed cache", () => {
 });
 
 describe("remembered session picks", () => {
-	it("defaults to B2 medium and round-trips valid picks only", () => {
+	it("defaults to conversation, B2, medium and round-trips valid picks only", () => {
 		const m = new Map<string, string>();
 		const store: KeyValueStore = { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => void m.set(k, v) };
-		expect(loadNewsPicks(store)).toEqual({ level: "B2", size: "medium" });
-		storeNewsPicks(store, { level: "A1", size: "long" });
-		expect(loadNewsPicks(store)).toEqual({ level: "A1", size: "long" });
-		m.set("ccez-news-picks-v1", JSON.stringify({ level: "Z9", size: "huge" }));
-		expect(loadNewsPicks(store)).toEqual({ level: "B2", size: "medium" });
+		expect(loadNewsPicks(store)).toEqual({ kind: "talk", level: "B2", size: "medium" });
+		storeNewsPicks(store, { kind: "read", level: "A1", size: "long" });
+		expect(loadNewsPicks(store)).toEqual({ kind: "read", level: "A1", size: "long" });
+		m.set("ccez-news-picks-v1", JSON.stringify({ kind: "x", level: "Z9", size: "huge" }));
+		expect(loadNewsPicks(store)).toEqual({ kind: "talk", level: "B2", size: "medium" });
 	});
 });
 
@@ -1630,5 +1632,19 @@ describe("parseNewsLaunch", () => {
 	it("leaves ordinary messages alone", () => {
 		expect(parseNewsLaunch("hello")).toBeNull();
 		expect(parseNewsLaunch('📰 "A quote"\nmy own words about CEFR B2')).toBeNull();
+	});
+});
+
+describe("sent opener pictures", () => {
+	it("keeps a launched story's picture by headline, http only", () => {
+		const m = new Map<string, string>();
+		const store: KeyValueStore = { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => void m.set(k, v) };
+		expect(newsLaunchImage(store, "T")).toBeNull();
+		storeNewsLaunchImage(store, "T", "https://img/x.jpg");
+		expect(newsLaunchImage(store, "T")).toBe("https://img/x.jpg");
+		storeNewsLaunchImage(store, "U", "data:image/gif;base64,AA");
+		expect(newsLaunchImage(store, "U")).toBeNull();
+		m.set("ccez-news-launch-images-v1", "{broken");
+		expect(newsLaunchImage(store, "T")).toBeNull();
 	});
 });
