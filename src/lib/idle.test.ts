@@ -3,6 +3,7 @@ import {
 	idleTapAction,
 	shouldHideForAlways,
 	shouldIdleHide,
+	shouldParkForNews,
 	type AlwaysHideFacts,
 	type IdleHideFacts,
 	type IdleTapFacts
@@ -71,5 +72,18 @@ describe("idleTapAction", () => {
 		expect(idleTapAction({ ...tapBase, traveled: true })).toBe(null);
 		expect(idleTapAction({ ...tapBase, inMath: true })).toBe(null);
 		expect(idleTapAction({ ...tapBase, inClickControl: true })).toBe(null);
+	});
+});
+
+describe("shouldParkForNews", () => {
+	const base = { newsOpen: true, phone: false, inPrompt: false, hasText: false };
+	it("parks an unfocused, empty composer over desktop headlines", () => {
+		expect(shouldParkForNews(base)).toBe(true);
+	});
+	it("keeps it up when focused, drafted, on phones, or without news", () => {
+		expect(shouldParkForNews({ ...base, inPrompt: true })).toBe(false);
+		expect(shouldParkForNews({ ...base, hasText: true })).toBe(false);
+		expect(shouldParkForNews({ ...base, phone: true })).toBe(false);
+		expect(shouldParkForNews({ ...base, newsOpen: false })).toBe(false);
 	});
 });

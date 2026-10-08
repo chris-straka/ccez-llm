@@ -469,6 +469,7 @@ import {
 	import {
 		idleTapAction,
 		shouldHideForAlways,
+		shouldParkForNews,
 		shouldIdleHide
 	} from "$lib/idle";
 	import {
@@ -3070,6 +3071,17 @@ import {
 		// parked composer strands with no way back.
 		if (androidUI) return;
 		if (
+			shouldParkForNews({
+				newsOpen: newsMode.news !== null,
+				phone: androidUI,
+				inPrompt: isPromptTarget(next),
+				hasText
+			})
+		) {
+			promptIdle = true;
+			return;
+		}
+		if (
 			!shouldHideForAlways({
 				alwaysMode: settings.promptIdleSec === PROMPT_IDLE_ALWAYS,
 				inPrompt: isPromptTarget(next),
@@ -3199,7 +3211,7 @@ import {
 		 * at component scope).
 		 */
 		const onFocusInIdle = (event: FocusEvent): void => {
-			if (settings.promptIdleSec !== PROMPT_IDLE_ALWAYS) return;
+			if (settings.promptIdleSec !== PROMPT_IDLE_ALWAYS && newsMode.news === null) return;
 			if (!closestFromTarget(event.target, ".prompt .ta-input")) return;
 			restorePrompt();
 		};
@@ -8278,7 +8290,9 @@ import {
 				flashToast(lang.cleared);
 			} else {
 				setReplyLang(lang.code);
-				flashToast(switchToastFor(lang));
+				// The news panel's header names the language in its
+				// own words; a toast there sat over the region pills.
+				if (newsMode.news === null) flashToast(switchToastFor(lang));
 			}
 			// Language picks tick on phones like the
 			// family buttons above do.

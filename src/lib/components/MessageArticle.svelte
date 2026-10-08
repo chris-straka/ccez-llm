@@ -9,6 +9,7 @@ both ends. The in-place editor crosses as a `use:` action (mounts
 where the text sat, like the composer's promptEl pattern). -->
 <script lang="ts">
 	import type { ChatMsg, ChatMsgId } from "$lib/chat";
+	import { CEFR_LEVELS, SUMMARY_SIZES, parseNewsLaunch } from "$lib/news";
 	import type { LocalAid } from "$lib/reading";
 	import type { AttachTagModel, SentTagAction } from "$lib/attachments";
 	import type {
@@ -148,6 +149,9 @@ import type {
 		aidBusy,
 		actions
 	}: Props = $props();
+	/* A news session opener reads as one tag (story, mode, level):
+	its instructions are for the model, not the learner. */
+	const launch = $derived(msg.role === "user" ? parseNewsLaunch(msg.content) : null);
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
@@ -201,6 +205,19 @@ import type {
 		box cancels back to the untouched message. -->
 		<div class="msg-edit" onfocusout={actions.editFocusOut}>
 			<div class="msg-edit-box" use:actions.editAction></div>
+		</div>
+	{:else if launch}
+		<div class="bubble news-launch">
+			<span class="launch-icon" aria-hidden="true">{launch.kind === "talk" ? "🗣️" : "📰"}</span>
+			<span class="launch-text">
+				<span class="launch-title">{launch.title}</span>
+				<span class="launch-meta"
+					>{launch.kind === "talk" ? "Conversation" : "Summary"} · {launch.level}
+					{CEFR_LEVELS.find((l) => l.level === launch.level)?.tag ?? ""}{launch.size
+						? ` · ${SUMMARY_SIZES.find((s) => s.size === launch.size)?.label ?? ""}`
+						: ""}{launch.source ? ` · ${launch.source}` : ""}</span
+				>
+			</span>
 		</div>
 	{:else}
 		<div class:bubble={msg.role === "user"}>
@@ -276,6 +293,36 @@ import type {
 </article>
 
 <style>
+	.news-launch {
+		display: flex;
+		align-items: center;
+		gap: 0.7rem;
+		max-width: min(100%, 32rem) !important;
+	}
+	.launch-icon {
+		font-size: 1.4em;
+		line-height: 1;
+	}
+	.launch-text {
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+		min-width: 0;
+	}
+	.launch-title {
+		font-weight: 600;
+		line-height: 1.3;
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		line-clamp: 2;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+	}
+	.launch-meta {
+		font-size: 0.78em;
+		color: #6e6e73;
+		color: var(--muted);
+	}
 	article {
 		position: relative;
 		border-radius: 10px;

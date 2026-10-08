@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import {
 	cachedFeed,
 	loadNewsPicks,
+	parseNewsLaunch,
 	storeFeed,
 	storeNewsPicks,
 	NEWS_FEED_TTL_MS,
@@ -1604,3 +1605,30 @@ describe("remembered session picks", () => {
 	});
 });
 
+describe("parseNewsLaunch", () => {
+	const story = { title: "Soupçons de peste en Russie", source: "CNews", link: "l", snippet: "" };
+	it("reads a conversation opener back into its tag", () => {
+		const text = `${newsConversationInstruction(story, "B2", "French")} [Pasted 3491 chars] `;
+		expect(parseNewsLaunch(text)).toEqual({
+			kind: "talk",
+			title: "Soupçons de peste en Russie",
+			source: "CNews",
+			level: "B2",
+			size: null
+		});
+	});
+	it("reads a summary opener with its length", () => {
+		const text = newsSummaryInstruction({ ...story, source: "" }, "long", "C1", "German");
+		expect(parseNewsLaunch(text)).toEqual({
+			kind: "read",
+			title: "Soupçons de peste en Russie",
+			source: "",
+			level: "C1",
+			size: "long"
+		});
+	});
+	it("leaves ordinary messages alone", () => {
+		expect(parseNewsLaunch("hello")).toBeNull();
+		expect(parseNewsLaunch('📰 "A quote"\nmy own words about CEFR B2')).toBeNull();
+	});
+});

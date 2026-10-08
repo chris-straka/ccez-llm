@@ -130,6 +130,11 @@ test("headlines park the composer; summon brings it back over them", async ({
 	await page.keyboard.press("i");
 	await expect(prompt).not.toHaveClass(/prompt-idle/);
 	await expect(panel).toBeVisible();
+	// Leaving it empty parks it again: headlines stay uncovered.
+	await page.locator(".news-meta").click();
+	await expect(prompt).toHaveClass(/prompt-idle/);
+	await page.keyboard.press("i");
+	await expect(prompt).not.toHaveClass(/prompt-idle/);
 	await panel.getByRole("button", { name: "Close news" }).click();
 	await expect(panel).toHaveCount(0);
 	await expect(prompt).not.toHaveClass(/prompt-idle/);
@@ -243,3 +248,21 @@ test.describe("mock shell feed", () => {
 	});
 });
 
+test.describe("sent news opener", () => {
+	test("reads as one compact tag, not the instructions", async ({ page }) => {
+		const opener =
+			'🗣️ "Soupçons de peste en Russie" (CNews)\n' +
+			"Two named locals open a substantial discussion of the pasted article in French " +
+			"at CEFR B2 (Upper intermediate): reactions. Stay in French. [Pasted 3491 chars] ";
+		await seedChat(page, [
+			{ role: "user", content: opener },
+			{ role: "assistant", content: "Bonjour !" }
+		]);
+		await page.goto("/");
+		const tag = page.locator("article.user .news-launch");
+		await expect(tag).toBeVisible({ timeout: 60_000 });
+		await expect(tag).toContainText("Soupçons de peste en Russie");
+		await expect(tag).toContainText("Conversation · B2");
+		await expect(page.locator("article.user")).not.toContainText("Two named locals");
+	});
+});
