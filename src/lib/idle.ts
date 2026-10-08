@@ -34,6 +34,23 @@ export function shouldHideForAlways(facts: AlwaysHideFacts): boolean {
 	return facts.alwaysMode && !facts.inPrompt && hideGuardsMet(facts.emptyChat);
 }
 
+/** Facts the news-mode park reads (desktop headlines screen). */
+export interface NewsParkFacts {
+	newsOpen: boolean;
+	phone: boolean;
+	inPrompt: boolean;
+	hasText: boolean;
+}
+
+/**
+ * News headlines own the screen: an empty composer stays parked
+ * unless it holds focus, whatever the idle setting. Phones keep it
+ * up (no summon gesture there); a draft keeps it up too.
+ */
+export function shouldParkForNews(facts: NewsParkFacts): boolean {
+	return facts.newsOpen && !facts.phone && !facts.inPrompt && !facts.hasText;
+}
+
 /** Facts the hide ticker reads (the time beat stays extracted upstream). */
 export interface IdleHideFacts {
 	emptyChat: boolean;

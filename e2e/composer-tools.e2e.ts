@@ -587,7 +587,8 @@ test("desktop send-hold stashes and restores the reply language", async ({
 	// Pick French from the Europe menu (desktop list, in-flow).
 	await page.locator('.lang-menu button:has-text("Europe")').click();
 	await page.locator('.lang-list [role="menuitem"]', { hasText: "French" }).click();
-	await expect(page.locator(".toast").first()).toContainText("français 🇫🇷");
+	// The news panel's header names the pick (no toast over the pills).
+	await expect(page.locator(".news-meta")).toContainText("français 🇫🇷");
 	// Picking on an empty chat opens learner news, which parks the
 	// composer on desktop: summon it back (bare i, the real user
 	// flow) before holding — a parked send eats no presses.
