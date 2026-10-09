@@ -10698,6 +10698,29 @@ import {
 				else listenMode.replay(listenKey === "slow");
 				return;
 			}
+			// Browse screen: hover a channel and F folds its videos (the
+			// message F convention: never from a text field).
+			if (
+				listenMode.open &&
+				listenMode.hoveredChannel &&
+				event.code === "KeyF" &&
+				!event.metaKey &&
+				!event.ctrlKey &&
+				!event.altKey &&
+				!event.shiftKey &&
+				!event.repeat &&
+				!isPromptEditorTarget(event.target) &&
+				!(
+					event.target instanceof HTMLElement &&
+					(event.target.isContentEditable ||
+						event.target instanceof HTMLInputElement ||
+						event.target instanceof HTMLTextAreaElement)
+				)
+			) {
+				consumeEvent(event);
+				listenMode.toggleFold(listenMode.hoveredChannel);
+				return;
+			}
 			// Flashcards own the keyboard while open; closed, the
 			// shell chord opens them.
 			if (

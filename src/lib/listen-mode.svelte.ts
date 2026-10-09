@@ -102,6 +102,8 @@ export class ListenMode {
 	info = new SvelteMap<string, ListenVideo>();
 	/** Probes in flight (`lang|id`). */
 	probing = new SvelteMap<string, true>();
+	/** The channel row under the pointer (hover + F folds it). */
+	hoveredChannel = $state<string | null>(null);
 	/** A video being fetched to start (its id). */
 	starting = $state<string | null>(null);
 	error = $state("");
@@ -302,6 +304,13 @@ export class ListenMode {
 
 	removeChannel(url: string): void {
 		this.deps.setChannels(this.deps.getChannels().filter((c) => c.url !== url));
+	}
+
+	/** Fold or unfold a channel's recent videos (kept across launches). */
+	toggleFold(url: string): void {
+		this.deps.setChannels(
+			this.deps.getChannels().map((c) => (c.url === url ? { ...c, folded: !c.folded } : c))
+		);
 	}
 
 	/** Start a drill on `videoId` in the active (empty) chat. */

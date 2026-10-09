@@ -93,6 +93,8 @@ export function storyboardFrame(board: ListenStoryboard, t: number): StoryboardF
 export interface ListenChannel {
 	url: string;
 	name: string;
+	/** Its recent videos are folded away on the browse screen. */
+	folded?: boolean;
 }
 
 /** What a drill chat stores about its video. */

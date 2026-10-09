@@ -12,6 +12,7 @@ channel or start a video. State lives in `ListenMode`. -->
 		type ListenEntry
 	} from "$lib/listen";
 	import type { ListenMode } from "$lib/listen-mode.svelte";
+	import { slide } from "svelte/transition";
 
 	interface Props {
 		mode: ListenMode;
@@ -25,6 +26,8 @@ channel or start a video. State lives in `ListenMode`. -->
 	let { mode, lang, langName, channels, onClose }: Props = $props();
 
 	let searchBox = $state<HTMLInputElement | null>(null);
+	const reduceMotion =
+		typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 	/** Videos of a channel row worth showing: drillable first, three. */
 	function channelRows(url: string): ListenEntry[] {
@@ -172,8 +175,26 @@ channel or start a video. State lives in `ListenMode`. -->
 		{#each channels as c (c.url)}
 			{@const view = mode.channelViews.get(c.url)}
 			{@const rows = channelRows(c.url)}
-			<div class="channel">
+			<div
+				class="channel"
+				role="group"
+				aria-label={c.name}
+				onmouseenter={() => (mode.hoveredChannel = c.url)}
+				onmouseleave={() => {
+					if (mode.hoveredChannel === c.url) mode.hoveredChannel = null;
+				}}
+			>
 				<div class="channel-head">
+					<button
+						type="button"
+						class="fold"
+						aria-expanded={!c.folded}
+						aria-label={c.folded ? `Show ${c.name}'s videos` : `Fold ${c.name}'s videos`}
+						title="Fold (F)"
+						onclick={() => mode.toggleFold(c.url)}
+					>
+						<svg class:open={!c.folded} viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4" /></svg>
+					</button>
 					<span class="channel-name">{view?.page?.name ?? c.name}</span>
 					<span class="video-meta">
 						{#if view?.status === "ready"}
@@ -192,9 +213,13 @@ channel or start a video. State lives in `ListenMode`. -->
 						onclick={() => mode.removeChannel(c.url)}>×</button
 					>
 				</div>
-				{#each rows as v (v.id)}
-					{@render videoRow(v)}
-				{/each}
+				{#if !c.folded}
+					<div class="channel-videos" transition:slide={{ duration: reduceMotion ? 0 : 180 }}>
+						{#each rows as v (v.id)}
+							{@render videoRow(v)}
+						{/each}
+					</div>
+				{/if}
 			</div>
 		{/each}
 </section>
@@ -399,6 +424,40 @@ channel or start a video. State lives in `ListenMode`. -->
 	.channel-name {
 		font-weight: 600;
 		font-size: 0.95rem;
+	}
+	.fold {
+		align-self: center;
+		display: grid;
+		place-items: center;
+		border: none;
+		background: transparent;
+		color: var(--muted);
+		padding: 0.2rem;
+		margin-left: -0.2rem;
+		border-radius: 0.3rem;
+		cursor: pointer;
+	}
+	.fold:hover {
+		color: var(--ink);
+		background: var(--hover-wash);
+	}
+	.fold svg {
+		width: 0.8rem;
+		height: 0.8rem;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.8;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+		transition: transform 0.15s ease;
+	}
+	.fold svg.open {
+		transform: rotate(90deg);
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.fold svg {
+			transition: none;
+		}
 	}
 	.channel-head .remove {
 		margin-left: auto;

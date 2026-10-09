@@ -293,3 +293,22 @@ test("annotating while a clip plays never reads the quote over it", async ({ pag
 	expect(await page.evaluate(() => (window as unknown as { __spoke: number }).__spoke)).toBe(0);
 	await expect(page.getByText("No voice for this language.")).toHaveCount(0);
 });
+
+test("a channel's videos fold by its chevron or hover + F, and stay folded", async ({ page }) => {
+	await page.getByRole("tab", { name: "Listen" }).click();
+	const channel = page.locator(".listen-panel .channel", { hasText: "Learner Channel" });
+	const videos = channel.locator(".video", { hasText: info.title });
+	await expect(videos).toBeVisible();
+
+	await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+	await channel.hover();
+	await page.keyboard.press("f");
+	await expect(videos).toHaveCount(0);
+	await expect(channel.getByRole("button", { name: "Show Learner Channel's videos" })).toBeVisible();
+	await expect
+		.poll(() => page.evaluate(() => window.localStorage.getItem("ccez-llm-settings-v1")))
+		.toContain('"folded":true');
+
+	await channel.getByRole("button", { name: "Show Learner Channel's videos" }).click();
+	await expect(videos).toBeVisible();
+});
