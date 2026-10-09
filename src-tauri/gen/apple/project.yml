@@ -61,8 +61,8 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-        CFBundleShortVersionString: "0.20.0"
-        CFBundleVersion: "0.20.0"
+        CFBundleShortVersionString: "0.21.0"
+        CFBundleVersion: "0.21.0"
     entitlements:
       path: ccez-llm_iOS/ccez-llm_iOS.entitlements
     scheme:
@@ -110,8 +110,8 @@ targets:
       path: ShareExtension/Info.plist
       properties:
         CFBundleDisplayName: Ccez LLM
-        CFBundleShortVersionString: "0.20.0"
-        CFBundleVersion: "0.20.0"
+        CFBundleShortVersionString: "0.21.0"
+        CFBundleVersion: "0.21.0"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.share-services
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
