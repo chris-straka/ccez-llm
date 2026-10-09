@@ -314,13 +314,16 @@ export interface ListenKeyFacts {
 export type ListenKeyAction = "play" | "slow" | "reveal" | "pass";
 
 /**
- * Drill keys. Space replays and "?" reveals while nothing is typed
- * (no guess starts with either); S replays slowly only outside the
- * composer (guesses start with s). ⌥Space / ⌥S work mid-guess.
- * Matched on `code` where ⌥ rewrites the character (⌥S types ß).
+ * Drill keys. ⌘Enter / Ctrl+Enter reveals, typed or not (a partial
+ * guess is dropped). Space replays and "?" reveals while nothing is
+ * typed (no guess starts with either; "?" is the phone's reveal); S
+ * replays slowly only outside the composer (guesses start with s).
+ * ⌥Space / ⌥S work mid-guess. Matched on `code` where ⌥ rewrites the
+ * character (⌥S types ß).
  */
 export function listenKeyAction(f: ListenKeyFacts): ListenKeyAction {
-	if (!f.inDrill || f.inOtherField || f.meta || f.ctrl) return "pass";
+	if (!f.inDrill || f.inOtherField) return "pass";
+	if (f.meta || f.ctrl) return f.key === "Enter" && !f.alt ? "reveal" : "pass";
 	if (f.alt) {
 		if (f.code === "Space") return "play";
 		if (f.code === "KeyS") return "slow";

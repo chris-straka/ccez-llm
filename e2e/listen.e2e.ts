@@ -5,7 +5,7 @@ import { seedChat } from "./helpers";
  * Listening drills through the app's backend (the `listen_*`
  * commands, stubbed on a mock shell): browse the learner's channel,
  * start a video, guess clip 1 and land on clip 2 at once, reveal with
- * "?", reach the tally. Grading goes to a stub provider whose replies
+ * ⌘Enter, reach the tally. Grading goes to a stub provider whose replies
  * the spec serves, so translations land on the clips.
  */
 const CHANNEL = "https://www.youtube.com/@learner-channel";
@@ -159,10 +159,12 @@ test("a drill runs: guess, next clip at once, reveal, tally", async ({ page }) =
 	await expect(page.locator(".messages")).toContainText("Bonjour à tous et bienvenue.");
 	await expect(box).toHaveValue("");
 
-	// "?" on an empty composer reveals clip 2 as a skip.
-	await box.press("?");
+	// ⌘Enter reveals clip 2 as a skip, dropping the half-typed guess.
+	await box.fill("nous");
+	await box.press("ControlOrMeta+Enter");
 	await expect(clips).toHaveCount(3);
 	await expect(clips.nth(1)).toContainText("Revealed");
+	await expect(box).toHaveValue("");
 
 	// The last guess ends the video: the tally, with the missed clip.
 	await box.fill("merci de votre attention");

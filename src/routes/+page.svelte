@@ -10656,8 +10656,9 @@ import {
 				else if (readerKey !== "swallow") stepReader(readerKey);
 				return;
 			}
-			// Listening drill keys: Space plays, S slows, ? reveals
-			// (decided in listenKeyAction; typing a guess stays typing).
+			// Listening drill keys: Space plays, S slows, ⌘Enter or ?
+			// reveals (decided in listenKeyAction; typing a guess stays
+			// typing). A reveal drops a half-typed guess.
 			const listenKey = listenKeyAction({
 				key: event.key,
 				code: event.code,
@@ -10676,7 +10677,9 @@ import {
 			});
 			if (listenKey !== "pass" && !event.repeat) {
 				consumeEvent(event);
-				if (listenKey === "reveal") listenMode.submit(null);
+				if (listenKey === "reveal") {
+					if (listenMode.submit(null)) editor?.clear();
+				}
 				else listenMode.replay(listenKey === "slow");
 				return;
 			}

@@ -132,6 +132,14 @@ describe("listenKeyAction", () => {
 		expect(listenKeyAction({ ...base, key: "?", code: "Slash" })).toBe("reveal");
 		expect(listenKeyAction({ ...base, key: "?", code: "Slash", composerEmpty: false })).toBe("pass");
 	});
+	it("⌘Enter / Ctrl+Enter reveals, typed or not", () => {
+		const enter = { ...base, key: "Enter", code: "Enter" };
+		expect(listenKeyAction({ ...enter, meta: true })).toBe("reveal");
+		expect(listenKeyAction({ ...enter, ctrl: true, composerEmpty: false })).toBe("reveal");
+		expect(listenKeyAction({ ...enter, meta: true, alt: true })).toBe("pass");
+		expect(listenKeyAction(enter)).toBe("pass");
+	});
+
 	it("S slows outside the composer; a guess can start with s", () => {
 		expect(listenKeyAction({ ...base, key: "s", code: "KeyS" })).toBe("pass");
 		expect(listenKeyAction({ ...base, key: "s", code: "KeyS", inComposer: false })).toBe("slow");
@@ -145,6 +153,7 @@ describe("listenKeyAction", () => {
 		expect(listenKeyAction({ ...base, inDrill: false })).toBe("pass");
 		expect(listenKeyAction({ ...base, inOtherField: true })).toBe("pass");
 		expect(listenKeyAction({ ...base, meta: true })).toBe("pass");
+		expect(listenKeyAction({ ...base, meta: true, key: "Enter", code: "Enter", inDrill: false })).toBe("pass");
 		expect(listenKeyAction({ ...base, ctrl: true })).toBe("pass");
 	});
 });

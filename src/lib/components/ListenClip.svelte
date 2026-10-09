@@ -124,7 +124,11 @@ fold under it (`ListenGloss`). -->
 		>
 	</div>
 	{#if open}
-		<p class="hint">Type what you hear · Enter · <kbd>?</kbd> reveals</p>
+		<p class="hint">
+			Type what you hear · Enter · <kbd class="reveal-ctrl">Ctrl+Enter</kbd><kbd class="reveal-mac"
+				>⌘Enter</kbd
+			><kbd class="reveal-phone">?</kbd> reveals
+		</p>
 	{:else if answered}
 		{#if clip.skipped}
 			<p class="verdict">Revealed</p>
@@ -312,5 +316,18 @@ fold under it (`ListenGloss`). -->
 		.busy {
 			animation: none;
 		}
+	}
+	/* The reveal key the keyboard at hand has: Ctrl+Enter, ⌘Enter on a
+	Mac, "?" on a phone (data-android is set on iPhones too). */
+	.reveal-mac,
+	.reveal-phone,
+	:global(.app[data-mac]) .reveal-ctrl,
+	:global(.app[data-android]) .reveal-ctrl,
+	:global(.app[data-android]) .reveal-mac {
+		display: none;
+	}
+	:global(.app[data-mac]:not([data-android])) .reveal-mac,
+	:global(.app[data-android]) .reveal-phone {
+		display: inline;
 	}
 </style>
