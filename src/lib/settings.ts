@@ -342,6 +342,11 @@ export interface AppSettings {
 	 */
 	listenChannels: ListenChannel[];
 	/**
+	 * Annotation answers in the passage's own language (plain, for a
+	 * learner) instead of English. Off by default; Ctrl+⌥+L flips it.
+	 */
+	annotationAnswersInPassageLang: boolean;
+	/**
 	 * Name each chat with one short model call after its first reply
 	 * (renames always win). On by default; costs a few tokens per chat.
 	 */
@@ -600,6 +605,7 @@ export function defaultSettings(): AppSettings {
 		inspectEnabled: true,
 		flashcardsEnabled: false,
 		listenChannels: [],
+		annotationAnswersInPassageLang: false,
 		aiTitles: true
 	};
 }
@@ -855,6 +861,8 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 						!!c && typeof c.url === "string" && typeof c.name === "string"
 				)
 			: [];
+		if (typeof merged.annotationAnswersInPassageLang !== "boolean")
+			merged.annotationAnswersInPassageLang = false;
 		if (typeof merged.hideMessages !== "boolean") merged.hideMessages = false;
 		if (typeof merged.micEnabled !== "boolean") merged.micEnabled = true;
 		if (typeof merged.captureEnabled !== "boolean")

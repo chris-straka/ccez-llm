@@ -862,7 +862,10 @@ import {
 		getActiveChatId: () => chatState.activeChatId,
 		getChatIds: () => chatState.chats.map((c) => c.id),
 		resolveProvider: () => providerKeys.resolveActive(),
-		answerQuestion: (provider, q) => annotationAnswer(provider, q),
+		answerQuestion: (provider, q) =>
+			annotationAnswer(provider, q, undefined, {
+				inPassageLang: settings.annotationAnswersInPassageLang
+			}),
 		answerContextFor: (ann) =>
 			annotateMode.answerContextFor(ann, ann.quote, ann.at ?? 0),
 		notifyBanner: (message) => showNotice(notices, "banner", message),
@@ -4806,11 +4809,12 @@ import {
 		try {
 			const provider = await providerKeys.resolveActive();
 			if (provider) {
-				const answer = await annotationAnswer(provider, {
-					quote,
-					question: file.comment.trim(),
-					context: line
-				});
+				const answer = await annotationAnswer(
+					provider,
+					{ quote, question: file.comment.trim(), context: line },
+					undefined,
+					{ inPassageLang: settings.annotationAnswersInPassageLang }
+				);
 				const added = list[list.length - 1];
 				if (added) list = attachAnnotationAnswer(list, added.id, answer);
 			}
@@ -10940,6 +10944,17 @@ import {
 			if (chord === "toggle-voice") {
 				consumeEvent(event);
 				setVoiceEnabled(!voiceOn());
+				return;
+			}
+			if (chord === "toggle-annotation-lang") {
+				consumeEvent(event);
+				settings.annotationAnswersInPassageLang = !settings.annotationAnswersInPassageLang;
+				persistSettings();
+				flashToast(
+					settings.annotationAnswersInPassageLang
+						? "Annotation answers in the passage's language"
+						: "Annotation answers in English"
+				);
 				return;
 			}
 			if (chord === "capture-window") {

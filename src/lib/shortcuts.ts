@@ -171,6 +171,7 @@ export function desktopShortcuts(
 		{ group: prompt, name: "Switch model / key", keys: `Ctrl+${altm}+← / →` },
 		{ group: prompt, name: "Thinking level", keys: `Ctrl+${altm}+↓ / ↑` },
 		{ group: reading, name: "Voice readback on / off", keys: `Ctrl+${altm}+S` },
+		{ group: reading, name: "Annotation answers in English / the passage's language", keys: `Ctrl+${altm}+L` },
 		{ group: reading, name: "Stop voice / close", keys: "Esc" },
 		{ group: reading, name: "Reading aids", keys: "M pinyin · N furigana" },
 		{ group: reading, name: "Stroke order step", keys: "H / L in Inspect" },

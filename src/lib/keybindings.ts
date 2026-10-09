@@ -511,6 +511,7 @@ export type CommandChord =
 	| "thinking-prev"
 	| "new-chat"
 	| "toggle-voice"
+	| "toggle-annotation-lang"
 	| "capture-window"
 	| "set-capture-area";
 
@@ -622,6 +623,7 @@ export function commandChord(facts: CommandChordFacts): CommandChord | null {
 		return null;
 	}
 	if (ctrlAlt && facts.code === "KeyS") return "toggle-voice";
+	if (ctrlAlt && facts.code === "KeyL") return "toggle-annotation-lang";
 	return null;
 }
 
