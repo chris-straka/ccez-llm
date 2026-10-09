@@ -191,12 +191,13 @@ the dismiss keeps the 150ms app beat so it never pops. -->
 		transition: none;
 	}
 	.sel-menu button {
-		/* The menu reads next to message text, so it tracks the text
-		size like the annotation pill does — a fixed button next to
-		370% type is unreadable. The viewport cap keeps Annotate and
-		Copy side by side on a phone at giant sizes, where uncapped
+		/* The menu reads next to message text, so it grows with the
+		text size — a fixed button next to 370% type is unreadable —
+		but at half the rate: chrome, not text, so it never rivals the
+		words it sits over. The viewport cap keeps Annotate and Copy
+		side by side on a phone at giant sizes, where uncapped
 		Annotate alone outgrew the screen and clipped Copy. */
-		font-size: min(calc(0.95rem * var(--font-scale, 1)), 9vw);
+		font-size: min(calc(0.95rem * (1 + (var(--font-scale, 1) - 1) * 0.5)), 9vw);
 		border: 0;
 		border-radius: 0;
 		background: none;
