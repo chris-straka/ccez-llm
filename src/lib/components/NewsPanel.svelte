@@ -749,7 +749,7 @@ everything else is theme tokens, never raw hex. -->
 
 	/* Phone column: list rows with a thumbnail, many stories per
 	screen instead of one huge picture each. */
-	@container (max-width: calc(33 * var(--u, 1rem))) {
+	@container (max-width: 33rem) {
 		.news-cards {
 			gap: calc(0.5 * var(--u, 1rem));
 		}
