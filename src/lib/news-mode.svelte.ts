@@ -33,7 +33,6 @@ import {
 	storeFeed,
 	storeNewsImage,
 	storeNewsLaunchImage,
-	storeNewsLaunchUrl,
 	storeNewsPicks,
 	storeNewsUrl,
 	translateNewsTitles,
@@ -124,7 +123,7 @@ export class NewsMode {
 	private rawFeeds = new Map<string, { at: number; stories: Promise<NewsStory[]> }>();
 	/** Article bodies in flight or done, by story link. */
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- fetch bookkeeping, never rendered.
-	private articles = new Map<string, Promise<{ url: string; text: string }>>();
+	private articles = new Map<string, Promise<string>>();
 	readonly actions: NewsModeActions;
 	private readonly deps: NewsModeDeps;
 
@@ -237,7 +236,7 @@ export class NewsMode {
 	}
 
 	/** One article fetch per link, shared by staging and launch. */
-	private articleFor(link: string): Promise<{ url: string; text: string }> {
+	private articleFor(link: string): Promise<string> {
 		let pending = this.articles.get(link);
 		if (!pending) {
 			pending = resolveArticleText(
@@ -245,7 +244,7 @@ export class NewsMode {
 				decodeNewsLink,
 				fetchRawPage,
 				this.deps.getStorage()
-			);
+			).then((r) => r.text);
 			this.articles.set(link, pending);
 		}
 		return pending;
@@ -497,7 +496,7 @@ export class NewsMode {
 		if (!story) return;
 		const instruction =
 			kind === "talk"
-				? newsConversationInstruction(story, level, current.langName)
+				? newsConversationInstruction(story, level, current.langName, size)
 				: newsSummaryInstruction(story, size, level, current.langName);
 		// The story takes the composer: its opener replaces any dirty
 		// draft (the seed lands after the fetch, so a failed launch
@@ -513,13 +512,12 @@ export class NewsMode {
 		const panel = this.panelSeq;
 		this.newsBusy = link;
 		try {
-			const { url, text } = await this.articleFor(link);
+			const text = await this.articleFor(link);
 			// Closed, chat switched or deleted, or language-hopped
 			// mid-flight: don't seed a dead panel.
 			if (this.panelSeq !== panel || this.news?.code !== current.code) return;
 			const image = story.image ?? this.newsImages[link];
 			if (image) storeNewsLaunchImage(this.deps.getStorage(), story.title, image);
-			storeNewsLaunchUrl(this.deps.getStorage(), story.title, url);
 			const att = makePastedTextAttachment(`${PASTE_OPEN}${text}${PASTE_CLOSE}`);
 			this.deps.setAttachments([att]);
 			this.news = null;

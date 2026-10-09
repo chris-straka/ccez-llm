@@ -226,7 +226,7 @@
 		{#if captureRows}
 			<label class="check">
 				<input type="checkbox" bind:checked={settings.captureEnabled} />
-				<span>Enable screen-capture OCR (global shortcut + composer button)</span>
+				<span>Screen-capture OCR</span>
 			</label>
 			<label class="check">
 				<input
@@ -234,7 +234,7 @@
 					bind:checked={settings.gameLine}
 					onchange={() => gameLineToggle()}
 				/>
-				<span>Game line overlay (last capture with furigana + translation)</span>
+				<span>Game line overlay</span>
 			</label>
 		{/if}
 	{/if}

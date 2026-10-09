@@ -303,13 +303,16 @@ owns the row markup and its surfaces. -->
 		outline-color: var(--accent);
 		outline-offset: -1.5px;
 	}
+	/* The line between the main languages and the rest. A capped
+	sheet shrinks its flex items, and an empty line shrinks to nothing,
+	leaving only its margins as a gap: it must not shrink. */
 	.lang-sep {
 		display: block;
+		flex-shrink: 0;
 		height: 1px;
-		margin: 0.3rem 0.45rem;
+		margin: 0.2rem 0.45rem;
 		background: #8e8e93;
 		background: var(--line-hover);
-		opacity: 0.6;
 	}
 	.lang-list button.selected {
 		font-weight: 650;

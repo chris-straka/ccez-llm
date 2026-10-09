@@ -3,9 +3,7 @@ import { describe, it, expect } from "vitest";
 import {
 	cachedFeed,
 	loadNewsPicks,
-	newsArticleInstruction,
 	relevelNewsOpener,
-	parseNewsFollowUp,
 	newsLaunchImage,
 	storeNewsLaunchImage,
 	parseNewsLaunch,
@@ -949,6 +947,7 @@ describe("session prompts", () => {
 		expect(opener).toContain("correct my mistakes");
 		expect(opener).toContain("Never explain grammar or words unless I");
 		expect(opener).toContain("Stay in French");
+		expect(opener).toContain("about 250 words");
 		expect(opener).not.toContain("invite");
 	});
 });
@@ -1619,7 +1618,7 @@ describe("parseNewsLaunch", () => {
 			title: "Soupçons de peste en Russie",
 			source: "CNews",
 			level: "B2",
-			size: null
+			size: "medium"
 		});
 	});
 	it("reads a summary opener with its length", () => {
@@ -1652,16 +1651,22 @@ describe("sent opener pictures", () => {
 	});
 });
 
-describe("news follow-ups", () => {
-	it("round-trips the article request", () => {
-		const art = newsArticleInstruction("Titre", "B1", "French", "https://lemonde.fr/x");
-		expect(art).toContain("[Original article](https://lemonde.fr/x)");
-		expect(parseNewsFollowUp(art)).toEqual({ kind: "article", level: "B1", title: "Titre" });
-		expect(newsArticleInstruction("T", "A2", "French", null)).not.toContain("Original article");
+describe("conversation length", () => {
+	const story = { title: "T", source: "S", link: "l", snippet: "" };
+	it("names the opener's words and reads the length back", () => {
+		const short = newsConversationInstruction(story, "B1", "French", "short");
+		expect(short).toContain("about 120 words");
+		expect(parseNewsLaunch(short)?.size).toBe("short");
+		expect(parseNewsLaunch(newsConversationInstruction(story, "B1", "French", "long"))?.size).toBe(
+			"long"
+		);
 	});
-	it("leaves look-alikes alone", () => {
-		expect(parseNewsFollowUp('📄 Article · B2\n"T"\nsomething else')).toBeNull();
-		expect(parseNewsFollowUp("hello")).toBeNull();
+	it("older openers without a length show none", () => {
+		const old = newsConversationInstruction(story, "B1", "French").replace(
+			/ The opener runs about \d+ words\./,
+			""
+		);
+		expect(parseNewsLaunch(old)?.size).toBeNull();
 	});
 });
 

@@ -1084,18 +1084,26 @@ export interface NewsStaged {
 
 export { CEFR_LEVELS, type CefrLevel } from "./cefr";
 
-/** Summary lengths (target words guide the model, not a hard cap). */
+/** Session lengths (target words guide the model, not a hard cap):
+`words` for a summary, `talkWords` for a conversation's opener. */
 export type SummarySize = "short" | "medium" | "long";
 
 export const SUMMARY_SIZES: Array<{
 	size: SummarySize;
 	label: string;
 	words: number;
+	talkWords: number;
 }> = [
-	{ size: "short", label: "Short", words: 80 },
-	{ size: "medium", label: "Medium", words: 200 },
-	{ size: "long", label: "Long", words: 450 }
+	{ size: "short", label: "Short", words: 80, talkWords: 120 },
+	{ size: "medium", label: "Medium", words: 200, talkWords: 250 },
+	{ size: "long", label: "Long", words: 450, talkWords: 450 }
 ];
+
+/** Target words for a session of this kind and length. */
+export function sessionWords(kind: NewsKind, size: SummarySize): number {
+	const row = SUMMARY_SIZES.find((s) => s.size === size) ?? SUMMARY_SIZES[1]!;
+	return kind === "talk" ? row.talkWords : row.words;
+}
 
 /**
  * Visible session opener for a summary: one short instruction plus
@@ -1131,7 +1139,8 @@ export function newsSummaryInstruction(
 export function newsConversationInstruction(
 	story: NewsStory,
 	level: CefrLevel,
-	langName: string
+	langName: string,
+	size: SummarySize = "medium"
 ): string {
 	const tag = CEFR_LEVELS.find((l) => l.level === level)?.tag ?? "";
 	const byline = story.source ? ` (${story.source})` : "";
@@ -1139,7 +1148,8 @@ export function newsConversationInstruction(
 		`🗣️ "${story.title}"${byline}\n` +
 		`Two named locals open a substantial discussion of the pasted article in ${langName} ` +
 		`at CEFR ${level} (${tag}): reactions, background, and analysis — why it matters, ` +
-		`what follows — never a retelling. Varied structures and connectors, spoken texture, ` +
+		`what follows — never a retelling. The opener runs about ${sessionWords("talk", size)} ` +
+		`words. Varied structures and connectors, spoken texture, ` +
 		`key vocabulary reused across turns. End the opener mid-thread: nothing concluded, ` +
 		`nobody addressing me. Once I join, one voice answers; when I write in ${langName}, ` +
 		`briefly correct my mistakes and continue. Never explain grammar or words unless I ` +
@@ -1963,7 +1973,8 @@ export interface NewsLaunchTag {
 	title: string;
 	source: string;
 	level: CefrLevel;
-	/** Summary length (read sessions only). */
+	/** Session length; null on conversation openers sent before
+	the length choice. */
 	size: SummarySize | null;
 }
 
@@ -1984,11 +1995,13 @@ export function parseNewsLaunch(content: string): NewsLaunchTag | null {
 	if (!lead) return null;
 	const level = /CEFR (A1|A2|B1|B2|C1|C2)\b/.exec(body)?.[1] as CefrLevel | undefined;
 	if (!level) return null;
-	let size: SummarySize | null = null;
-	if (kind === "read") {
-		const words = Number(/about (\d+) words/.exec(body)?.[1]);
-		size = SUMMARY_SIZES.find((s) => s.words === words)?.size ?? "medium";
-	}
+	// Conversation openers from before the length choice name no
+	// words: no length on their tag.
+	const words = Number(/about (\d+) words/.exec(body)?.[1]);
+	const size =
+		kind === "read"
+			? (SUMMARY_SIZES.find((s) => s.words === words)?.size ?? "medium")
+			: (SUMMARY_SIZES.find((s) => s.talkWords === words)?.size ?? null);
 	return { kind, title: head[2] ?? "", source: head[3] ?? "", level, size };
 }
 
@@ -2021,69 +2034,6 @@ export function storeNewsLaunchImage(store: KeyValueStore, title: string, image:
 	} catch {
 		// The picture is a nicety; the tag falls back to its icon.
 	}
-}
-
-const NEWS_LAUNCH_URL_KEY = "ccez-news-launch-urls-v1";
-
-/** Publisher URL of a launched story (by headline), else null. */
-export function newsLaunchUrl(store: KeyValueStore, title: string): string | null {
-	try {
-		const raw = store.getItem(NEWS_LAUNCH_URL_KEY);
-		const found = raw ? (JSON.parse(raw) as Record<string, unknown>)[title] : undefined;
-		return typeof found === "string" && /^https?:\/\//.test(found) ? found : null;
-	} catch {
-		return null;
-	}
-}
-
-export function storeNewsLaunchUrl(store: KeyValueStore, title: string, url: string): void {
-	try {
-		const raw = store.getItem(NEWS_LAUNCH_URL_KEY);
-		const urls = (raw ? JSON.parse(raw) : {}) as Record<string, string>;
-		delete urls[title];
-		urls[title] = url;
-		const keys = Object.keys(urls);
-		for (const key of keys.slice(0, Math.max(0, keys.length - NEWS_LAUNCH_IMAGE_MAX))) {
-			delete urls[key];
-		}
-		store.setItem(NEWS_LAUNCH_URL_KEY, JSON.stringify(urls));
-	} catch {
-		// The link is a nicety; the rewrite still reads without it.
-	}
-}
-
-/** A follow-up on a news session: the article at his level. */
-export type NewsFollowUpKind = "article";
-
-/**
- * Request for the article itself, rewritten at the learner's level
- * in the target language (the pasted article is already in the
- * chat). The first line is what the chat shows folded.
- */
-export function newsArticleInstruction(
-	title: string,
-	level: CefrLevel,
-	langName: string,
-	url: string | null
-): string {
-	const tag = CEFR_LEVELS.find((l) => l.level === level)?.tag ?? "";
-	const link = url ? ` End with one line: [Original article](${url})` : "";
-	return (
-		`📄 Article · ${level}\n"${title}"\n` +
-		`Rewrite the pasted article above in ${langName} at CEFR ${level} (${tag}): keep every ` +
-		`fact in its order, a short headline, then plain paragraphs. No commentary, no ` +
-		`questions.${link}`
-	);
-}
-
-/** Reads a sent follow-up back into its tag fields, else null. Pure. */
-export function parseNewsFollowUp(
-	content: string
-): { kind: NewsFollowUpKind; level: CefrLevel; title: string } | null {
-	const m = /^📄 Article · (A1|A2|B1|B2|C1|C2)\n"(.*)"\n/u.exec(content);
-	if (!m) return null;
-	if (!content.slice(m[0].length).startsWith("Rewrite the pasted article")) return null;
-	return { kind: "article", level: m[1] as CefrLevel, title: m[2] ?? "" };
 }
 
 /**

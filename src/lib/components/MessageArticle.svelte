@@ -14,10 +14,8 @@ where the text sat, like the composer's promptEl pattern). -->
 		CEFR_LEVELS,
 		SUMMARY_SIZES,
 		newsLaunchImage,
-		parseNewsFollowUp,
 		parseNewsLaunch,
-		type CefrLevel,
-		type NewsFollowUpKind
+		type CefrLevel
 	} from "$lib/news";
 	import { cefrTag } from "$lib/cefr";
 	import { fade } from "svelte/transition";
@@ -67,7 +65,6 @@ import type {
 		busy: boolean;
 		/** Re-run the session from this opener at a new level. */
 		setLevel: (level: CefrLevel) => void;
-		followUp: (kind: NewsFollowUpKind) => void;
 	}
 
 	interface Props {
@@ -182,8 +179,31 @@ import type {
 			: null
 	);
 	let launchImageBroken = $state(false);
-	const followUp = $derived(msg.role === "user" && !launch ? parseNewsFollowUp(msg.content) : null);
 	const shownLevel = $derived<CefrLevel>(launch?.level ?? "B2");
+	const metaKey = $derived(
+		launch ? `${launch.kind}|${shownLevel}|${launch.size ?? ""}|${launch.source}` : ""
+	);
+	/** Hide a meta dot left at the end of a line (its next item
+	wrapped below): re-checks on every resize and content change. */
+	function endDots(node: HTMLElement): { update: () => void; destroy: () => void } {
+		const run = (): void => {
+			const items = [...node.children] as HTMLElement[];
+			items.forEach((item, i) => {
+				const sep = item.querySelector<HTMLElement>(":scope > .sep");
+				if (!sep) return;
+				sep.style.visibility = "";
+				const next = items[i + 1];
+				if (!next) return;
+				const wrapped =
+					next.getBoundingClientRect().top >= item.getBoundingClientRect().bottom - 1;
+				if (wrapped) sep.style.visibility = "hidden";
+			});
+		};
+		const ro = new ResizeObserver(run);
+		ro.observe(node);
+		run();
+		return { update: run, destroy: () => ro.disconnect() };
+	}
 	let levelOpen = $state(false);
 	// The level menu closes on any press outside it.
 	$effect(() => {
@@ -284,7 +304,7 @@ import type {
 		<!-- A news opener reads folded as one tag: the article's picture,
 		the headline (a normal annotatable body at the message size),
 		and the mode line. Unfolding shows what was sent. -->
-		<div class="bubble news-launch">
+		<div class="bubble news-launch" class:has-thumb={launchImage && !launchImageBroken}>
 			{#if launchImage && !launchImageBroken}
 				<img
 					class="launch-thumb"
@@ -298,76 +318,69 @@ import type {
 			{/if}
 			<span class="launch-text">
 				<span class="launch-title">{@render body(launch.title, false, null)}</span>
-				<span class="launch-meta">
-					<span>{launch.kind === "talk" ? "Conversation" : "Summary"}</span>
-					<span aria-hidden="true">·</span>
-					{#if news}
-						<!-- svelte-ignore a11y_no_static_element_interactions -->
-						<span class="level-wrap" onpointerdown={(e) => e.stopPropagation()}>
-							<button
-								type="button"
-								class="launch-level"
-								aria-haspopup="menu"
-								aria-expanded={levelOpen}
-								title="Change the level: the session restarts from here"
-								onclick={(e) => {
-									e.stopPropagation();
-									levelOpen = !levelOpen;
-								}}>{shownLevel} {cefrTag(shownLevel)} ▾</button
-							>
-							{#if levelOpen}
-								<span class="level-menu" role="menu" transition:fade={{ duration: 120 }}>
-									{#each CEFR_LEVELS as l (l.level)}
-										<button
-											type="button"
-											role="menuitemradio"
-											aria-checked={l.level === shownLevel}
-											class:on={l.level === shownLevel}
-											disabled={news.busy}
-											onclick={(e) => {
-												e.stopPropagation();
-												levelOpen = false;
-												if (l.level !== shownLevel) news.setLevel(l.level);
-											}}><b>{l.level}</b> {l.tag}</button
-										>
-									{/each}
-								</span>
-							{/if}
-						</span>
-					{:else}
-						<span>{shownLevel} {cefrTag(shownLevel)}</span>
-					{/if}
+				<!-- Each dot rides the end of the item before it, so a wrap
+				never starts a line with one; `endDots` hides a dot left at
+				a line's end. -->
+				<span class="launch-meta" use:endDots={metaKey}>
+					<span class="meta-item"
+						>{launch.kind === "talk" ? "Conversation" : "Summary"}<span
+							class="sep"
+							aria-hidden="true">·</span
+						></span
+					>
+					<span class="meta-item">
+						{#if news}
+							<!-- svelte-ignore a11y_no_static_element_interactions -->
+							<span class="level-wrap" onpointerdown={(e) => e.stopPropagation()}>
+								<button
+									type="button"
+									class="launch-level"
+									aria-haspopup="menu"
+									aria-expanded={levelOpen}
+									title="Change the level: the session restarts from here"
+									onclick={(e) => {
+										e.stopPropagation();
+										levelOpen = !levelOpen;
+									}}>{shownLevel} {cefrTag(shownLevel)} ▾</button
+								>
+								{#if levelOpen}
+									<span class="level-menu" role="menu" transition:fade={{ duration: 120 }}>
+										{#each CEFR_LEVELS as l (l.level)}
+											<button
+												type="button"
+												role="menuitemradio"
+												aria-checked={l.level === shownLevel}
+												class:on={l.level === shownLevel}
+												disabled={news.busy}
+												onclick={(e) => {
+													e.stopPropagation();
+													levelOpen = false;
+													if (l.level !== shownLevel) news.setLevel(l.level);
+												}}><b>{l.level}</b> {l.tag}</button
+											>
+										{/each}
+									</span>
+								{/if}
+							</span>
+						{:else}
+							<span>{shownLevel} {cefrTag(shownLevel)}</span>
+						{/if}
+						{#if launch.size || launch.source}<span class="sep" aria-hidden="true">·</span>{/if}
+					</span>
 					{#if launch.size}
-						<span aria-hidden="true">·</span>
-						<span>{SUMMARY_SIZES.find((s) => s.size === launch.size)?.label ?? ""}</span>
+						<span class="meta-item"
+							>{SUMMARY_SIZES.find((sz) => sz.size === launch.size)?.label ?? ""}{#if launch.source}<span
+									class="sep"
+									aria-hidden="true">·</span
+								>{/if}</span
+						>
 					{/if}
 					{#if launch.source}
-						<span aria-hidden="true">·</span>
-						<span>{launch.source}</span>
+						<span class="meta-item meta-source">{launch.source}</span>
 					{/if}
 				</span>
-				{#if news}
-					<span class="launch-actions">
-						<button
-							type="button"
-							disabled={news.busy}
-							title="The article itself, rewritten at your level"
-							onclick={(e) => {
-								e.stopPropagation();
-								news.followUp("article");
-							}}>Article at {shownLevel}</button
-						>
-					</span>
-				{/if}
 			</span>
 		</div>
-	{:else if followUp && folded}
-		<div class="bubble news-follow">
-			<span class="follow-kind">Article · {followUp.level}</span>
-			<span class="follow-title">{followUp.title}</span>
-		</div>
-	{:else if followUp}
-		<div class="bubble">{@render body(msg.content, false, null)}</div>
 	{:else if launch}
 		<div class="bubble">{@render body(msg.content, false, null)}</div>
 	{:else}
@@ -419,7 +432,9 @@ import type {
 <style>
 	.news-launch {
 		display: flex;
-		align-items: center;
+		/* Top-aligned: the picture sits level with the headline's
+		first line, never centered against a two-line title. */
+		align-items: flex-start;
 		gap: 0.7rem;
 		max-width: min(100%, calc(36rem * min(var(--font-scale, 1), 2))) !important;
 	}
@@ -436,13 +451,25 @@ import type {
 	.launch-title {
 		font-weight: 600;
 	}
+	.meta-item {
+		display: inline-flex;
+		align-items: center;
+		white-space: nowrap;
+	}
+	/* A long outlet name may still wrap inside itself. */
+	.meta-item.meta-source {
+		white-space: normal;
+	}
+	.meta-item .sep {
+		margin-left: 0.4em;
+	}
 	.level-wrap {
 		position: relative;
 	}
 	.launch-level {
 		border: 0;
-		padding: 0.1em 0.35em;
-		margin: 0 -0.35em;
+		padding: 0.1em 0.3em;
+		margin: 0 -0.2em;
 		border-radius: 0.4em;
 		background: transparent;
 		color: inherit;
@@ -458,7 +485,7 @@ import type {
 	.level-menu {
 		position: absolute;
 		top: calc(100% + 0.3rem);
-		left: -0.35em;
+		left: 0;
 		z-index: 20;
 		display: flex;
 		flex-direction: column;
@@ -489,63 +516,40 @@ import type {
 		background: #f1f1f4;
 		background: var(--bg-wash);
 	}
-	.launch-actions {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.4rem;
-		margin-top: 0.35rem;
-	}
-	.launch-actions button {
-		border: 1px solid #e5e5ea;
-		border-color: var(--line-soft);
-		border-radius: 999px;
-		padding: 0.25em 0.75em;
-		background: transparent;
-		color: #1c1c1e;
-		color: var(--ink);
-		font: inherit;
-		font-size: calc(0.75rem * var(--font-scale, 1));
-		cursor: pointer;
-		transition:
-			border-color 0.15s ease,
-			transform 0.12s ease;
-	}
-	.launch-actions button:hover:not(:disabled) {
-		border-color: #007aff;
-		border-color: var(--accent);
-	}
-	.launch-actions button:active:not(:disabled) {
-		transform: scale(0.96);
-	}
-	.launch-actions button:disabled {
-		opacity: 0.5;
-		cursor: progress;
-	}
-	.news-follow {
-		display: flex;
-		flex-direction: column;
-		gap: 0.15rem;
-	}
-	.follow-kind {
-		font-size: calc(0.72rem * var(--font-scale, 1));
-		color: #6e6e73;
-		color: var(--muted);
-	}
-	.follow-title {
-		font-weight: 600;
+	/* The picture is the header's lead: a third of the row, as tall
+	as the headline and meta beside it. Height 0 keeps it out of the
+	row's sizing; min-height 100% then fills whatever the text sets. */
+	.news-launch.has-thumb {
+		display: grid;
+		grid-template-columns: minmax(0, 34%) minmax(0, 1fr);
+		width: min(100%, calc(36rem * min(var(--font-scale, 1), 2)));
 	}
 	.launch-thumb {
-		flex: none;
-		width: calc(4.5rem * min(var(--font-scale, 1), 2));
-		aspect-ratio: 4 / 3;
+		width: 100%;
+		height: 0;
+		min-height: 100%;
 		object-fit: cover;
 		border-radius: 0.6rem;
+	}
+	/* Phones: a side column gets too thin, so the picture leads
+	from above at full width. */
+	@media (max-width: 520px) {
+		.news-launch.has-thumb {
+			grid-template-columns: minmax(0, 1fr);
+		}
+		.launch-thumb {
+			height: auto;
+			min-height: 0;
+			aspect-ratio: 16 / 9;
+		}
 	}
 	.launch-meta {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
-		gap: 0.3em;
+		/* 0.4em each side of every dot; the level pill's wash reaches
+		0.2em into that, so it always clears a dot. */
+		gap: 0 0.4em;
 		font-size: calc(0.75rem * var(--font-scale, 1));
 		color: #6e6e73;
 		color: var(--muted);
