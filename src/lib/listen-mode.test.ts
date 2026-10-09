@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { activeChat, createChatState, type ChatId } from "./chat";
+import { activeChat, createChatState } from "./chat";
 import type { ListenSession } from "./listen";
 import { ListenMode, type NativeGradeResult, type NativeGrader } from "./listen-mode.svelte";
 import { startDrill } from "./listenChat";
@@ -64,7 +64,7 @@ function harness() {
 	});
 	return {
 		mode,
-		chatId: chatId as ChatId,
+		chatId,
 		starts,
 		clip,
 		result,
