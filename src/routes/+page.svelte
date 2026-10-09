@@ -2347,6 +2347,9 @@ import {
 		getScrollBox: () => scrollBox,
 		ensureSwapObserver: () => ensureSwapObserver(),
 		speak: (quote, key, keepMenu, context) => {
+			// A drill clip playing keeps the floor: annotating over it
+			// never talks across the video's audio.
+			if (listenMode.playing) return;
 			void speakQuote(quote, key, keepMenu, context);
 		},
 		selSpeakKey: (sel) => selSpeakKey(sel),

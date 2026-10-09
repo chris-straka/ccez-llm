@@ -256,3 +256,41 @@ test("outside the composer: S slows the hovered clip, A with nothing hovered rev
 	await expect(clips).toHaveCount(3);
 	await expect(clips.nth(1)).toContainText("Revealed");
 });
+
+test("annotating while a clip plays never reads the quote over it", async ({ page }) => {
+	await page.addInitScript(() => {
+		const w = window as unknown as { __spoke: number };
+		w.__spoke = 0;
+		const synth = window.speechSynthesis;
+		const voice = { name: "Thomas", lang: "fr-FR", localService: true, default: true, voiceURI: "Thomas" };
+		Object.defineProperty(synth, "getVoices", { value: () => [voice], configurable: true });
+		Object.defineProperty(synth, "speak", {
+			value: () => {
+				w.__spoke++;
+			},
+			writable: true,
+			configurable: true
+		});
+	});
+	await page.reload();
+	await expect(page.locator(".empty-state")).toBeVisible({ timeout: 60_000 });
+	await page.getByRole("tab", { name: "Listen" }).click();
+	await page.locator(".listen-panel .video", { hasText: info.title }).click();
+	const clips = page.locator(".clip");
+	await expect(clips).toHaveCount(1, { timeout: 10_000 });
+	const box = page.locator(".prompt textarea").first();
+	await box.fill("bonjour");
+	await box.press("Enter");
+	await expect(clips).toHaveCount(2);
+	// Clip 1 is still playing (clip 2 waits for it).
+	await expect(clips.first().getByRole("button", { name: "Pause" })).toBeVisible();
+	const body = page.locator("#msg-0 .rendered");
+	const rect = await body.boundingBox();
+	if (!rect) throw new Error("clip body has no box");
+	await page.mouse.dblclick(rect.x + 20, rect.y + rect.height / 2);
+	await page.locator('.sel-menu button:has-text("Annotate")').click();
+	await expect(page.locator(".ann-pop")).toBeVisible();
+	await page.waitForTimeout(300);
+	expect(await page.evaluate(() => (window as unknown as { __spoke: number }).__spoke)).toBe(0);
+	await expect(page.getByText("No voice for this language.")).toHaveCount(0);
+});
