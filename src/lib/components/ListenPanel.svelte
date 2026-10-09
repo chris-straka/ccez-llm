@@ -272,12 +272,16 @@ channel or start a video. State lives in `ListenMode`. -->
 
 <style>
 	.listen-panel {
+		/* The panel follows the text size like messages do: every size
+		below rides --u (1rem at 100%, scaled with --font-scale). */
+		--u: calc(1rem * var(--font-scale, 1));
+		font-size: var(--u);
 		display: flex;
 		flex-direction: column;
-		gap: 0.6rem;
-		width: calc(100% - 2.4rem);
-		max-width: 40rem;
-		padding-bottom: 1.5rem;
+		gap: calc(0.6 * var(--u, 1rem));
+		width: calc(100% - calc(2.4 * var(--u, 1rem)));
+		max-width: calc(40 * var(--u, 1rem));
+		padding-bottom: calc(1.5 * var(--u, 1rem));
 		user-select: none;
 		-webkit-user-select: none;
 		animation: listen-in 0.22s ease both;
@@ -294,8 +298,8 @@ channel or start a video. State lives in `ListenMode`. -->
 		}
 	}
 	h3 {
-		margin: 0.8rem 0 0;
-		font-size: 0.8rem;
+		margin: calc(0.8 * var(--u, 1rem)) 0 0;
+		font-size: calc(0.8 * var(--u, 1rem));
 		font-weight: 600;
 		letter-spacing: 0.04em;
 		text-transform: uppercase;
@@ -306,11 +310,11 @@ channel or start a video. State lives in `ListenMode`. -->
 		border: none;
 		background: transparent;
 		color: var(--muted);
-		font-size: 1.3rem;
+		font-size: calc(1.3 * var(--u, 1rem));
 		line-height: 1;
 		cursor: pointer;
-		padding: 0.3rem 0.5rem;
-		border-radius: 0.4rem;
+		padding: calc(0.3 * var(--u, 1rem)) calc(0.5 * var(--u, 1rem));
+		border-radius: calc(0.4 * var(--u, 1rem));
 	}
 	.search-close {
 		margin-left: auto;
@@ -324,14 +328,14 @@ channel or start a video. State lives in `ListenMode`. -->
 	.search {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 0.5rem;
+		gap: calc(0.5 * var(--u, 1rem));
 		align-items: center;
 	}
 	/* The box and its clear button: a small round × inside the field's
 	right edge, unlike the panel's close × which sits apart. */
 	.box {
 		position: relative;
-		flex: 1 1 15rem;
+		flex: 1 1 calc(15 * var(--u, 1rem));
 		min-width: 0;
 		display: flex;
 	}
@@ -339,10 +343,11 @@ channel or start a video. State lives in `ListenMode`. -->
 		flex: 1 1 auto;
 		min-width: 0;
 		font: inherit;
-		font-size: 1rem;
-		padding: 0.6rem 2.4rem 0.6rem 0.8rem;
+		font-size: calc(1 * var(--u, 1rem));
+		padding: calc(0.6 * var(--u, 1rem)) calc(2.4 * var(--u, 1rem))
+			calc(0.6 * var(--u, 1rem)) calc(0.8 * var(--u, 1rem));
 		border: 1px solid var(--line-soft);
-		border-radius: 0.7rem;
+		border-radius: calc(0.7 * var(--u, 1rem));
 		background: transparent;
 		color: var(--ink);
 	}
@@ -356,11 +361,11 @@ channel or start a video. State lives in `ListenMode`. -->
 	}
 	.clear {
 		position: absolute;
-		right: 0.55rem;
+		right: calc(0.55 * var(--u, 1rem));
 		top: 50%;
 		transform: translateY(-50%);
-		width: 1.4rem;
-		height: 1.4rem;
+		width: calc(1.4 * var(--u, 1rem));
+		height: calc(1.4 * var(--u, 1rem));
 		display: grid;
 		place-items: center;
 		padding: 0;
@@ -375,8 +380,8 @@ channel or start a video. State lives in `ListenMode`. -->
 		background: var(--line);
 	}
 	.clear svg {
-		width: 0.7rem;
-		height: 0.7rem;
+		width: calc(0.7 * var(--u, 1rem));
+		height: calc(0.7 * var(--u, 1rem));
 		fill: none;
 		stroke: currentColor;
 		stroke-width: 2;
@@ -404,9 +409,9 @@ channel or start a video. State lives in `ListenMode`. -->
 		background: transparent;
 		color: var(--muted);
 		font: inherit;
-		font-size: 0.85rem;
-		padding: 0.5rem 0.8rem;
-		min-height: 2.4rem;
+		font-size: calc(0.85 * var(--u, 1rem));
+		padding: calc(0.5 * var(--u, 1rem)) calc(0.8 * var(--u, 1rem));
+		min-height: calc(2.4 * var(--u, 1rem));
 		cursor: pointer;
 	}
 	.kinds button[aria-checked="true"] {
@@ -416,8 +421,8 @@ channel or start a video. State lives in `ListenMode`. -->
 	.filter {
 		display: flex;
 		align-items: center;
-		gap: 0.45rem;
-		font-size: 0.85rem;
+		gap: calc(0.45 * var(--u, 1rem));
+		font-size: calc(0.85 * var(--u, 1rem));
 		color: var(--muted);
 		cursor: pointer;
 	}
@@ -425,21 +430,21 @@ channel or start a video. State lives in `ListenMode`. -->
 	.channel {
 		display: flex;
 		flex-direction: column;
-		gap: 0.15rem;
+		gap: calc(0.15 * var(--u, 1rem));
 	}
 	.video,
 	.channel-hit {
 		display: flex;
 		align-items: center;
-		gap: 0.7rem;
+		gap: calc(0.7 * var(--u, 1rem));
 		width: 100%;
 		text-align: left;
 		border: none;
 		background: transparent;
 		color: var(--ink);
 		font: inherit;
-		padding: 0.45rem 0.4rem;
-		border-radius: 0.6rem;
+		padding: calc(0.45 * var(--u, 1rem)) calc(0.4 * var(--u, 1rem));
+		border-radius: calc(0.6 * var(--u, 1rem));
 		transition: background-color 0.15s ease;
 	}
 	.video {
@@ -456,16 +461,16 @@ channel or start a video. State lives in `ListenMode`. -->
 	}
 	.thumb {
 		flex: 0 0 auto;
-		width: 6.4rem;
+		width: calc(6.4 * var(--u, 1rem));
 		aspect-ratio: 16 / 9;
 		object-fit: cover;
-		border-radius: 0.45rem;
+		border-radius: calc(0.45 * var(--u, 1rem));
 		background: var(--hover-wash);
 	}
 	.avatar {
 		flex: 0 0 auto;
-		width: 2.6rem;
-		height: 2.6rem;
+		width: calc(2.6 * var(--u, 1rem));
+		height: calc(2.6 * var(--u, 1rem));
 		border-radius: 50%;
 		object-fit: cover;
 		background: var(--hover-wash);
@@ -474,12 +479,12 @@ channel or start a video. State lives in `ListenMode`. -->
 	.channel-text {
 		display: flex;
 		flex-direction: column;
-		gap: 0.15rem;
+		gap: calc(0.15 * var(--u, 1rem));
 		min-width: 0;
 		flex: 1 1 auto;
 	}
 	.video-title {
-		font-size: 0.95rem;
+		font-size: calc(0.95 * var(--u, 1rem));
 		line-height: 1.3;
 		display: -webkit-box;
 		-webkit-line-clamp: 2;
@@ -488,7 +493,7 @@ channel or start a video. State lives in `ListenMode`. -->
 		overflow: hidden;
 	}
 	.video-meta {
-		font-size: 0.8rem;
+		font-size: calc(0.8 * var(--u, 1rem));
 		color: var(--muted);
 	}
 	.avail {
@@ -508,18 +513,18 @@ channel or start a video. State lives in `ListenMode`. -->
 		}
 	}
 	.channel {
-		padding-top: 0.35rem;
+		padding-top: calc(0.35 * var(--u, 1rem));
 		border-top: 1px solid var(--line-soft);
 	}
 	.channel-head {
 		display: flex;
 		align-items: baseline;
-		gap: 0.6rem;
-		padding: 0 0.4rem;
+		gap: calc(0.6 * var(--u, 1rem));
+		padding: 0 calc(0.4 * var(--u, 1rem));
 	}
 	.channel-name {
 		font-weight: 600;
-		font-size: 0.95rem;
+		font-size: calc(0.95 * var(--u, 1rem));
 	}
 	.fold {
 		align-self: center;
@@ -528,9 +533,9 @@ channel or start a video. State lives in `ListenMode`. -->
 		border: none;
 		background: transparent;
 		color: var(--muted);
-		padding: 0.2rem;
+		padding: calc(0.2 * var(--u, 1rem));
 		margin-left: -0.2rem;
-		border-radius: 0.3rem;
+		border-radius: calc(0.3 * var(--u, 1rem));
 		cursor: pointer;
 	}
 	.fold:hover {
@@ -538,8 +543,8 @@ channel or start a video. State lives in `ListenMode`. -->
 		background: var(--hover-wash);
 	}
 	.fold svg {
-		width: 0.8rem;
-		height: 0.8rem;
+		width: calc(0.8 * var(--u, 1rem));
+		height: calc(0.8 * var(--u, 1rem));
 		fill: none;
 		stroke: currentColor;
 		stroke-width: 1.8;
@@ -557,7 +562,7 @@ channel or start a video. State lives in `ListenMode`. -->
 	}
 	.channel-head .remove {
 		margin-left: auto;
-		font-size: 1.1rem;
+		font-size: calc(1.1 * var(--u, 1rem));
 	}
 	.add {
 		flex: 0 0 auto;
@@ -565,9 +570,9 @@ channel or start a video. State lives in `ListenMode`. -->
 		background: transparent;
 		color: var(--accent);
 		font: inherit;
-		font-size: 0.85rem;
-		padding: 0.4rem 0.9rem;
-		min-height: 2.4rem;
+		font-size: calc(0.85 * var(--u, 1rem));
+		padding: calc(0.4 * var(--u, 1rem)) calc(0.9 * var(--u, 1rem));
+		min-height: calc(2.4 * var(--u, 1rem));
 		border-radius: 999px;
 		cursor: pointer;
 	}
@@ -576,16 +581,16 @@ channel or start a video. State lives in `ListenMode`. -->
 		cursor: default;
 	}
 	.quiet {
-		margin: 0.2rem 0.4rem;
+		margin: calc(0.2 * var(--u, 1rem)) calc(0.4 * var(--u, 1rem));
 		color: var(--muted);
-		font-size: 0.9rem;
+		font-size: calc(0.9 * var(--u, 1rem));
 	}
 	.error {
 		margin: 0;
-		padding: 0.5rem 0.8rem;
-		border-radius: 0.6rem;
+		padding: calc(0.5 * var(--u, 1rem)) calc(0.8 * var(--u, 1rem));
+		border-radius: calc(0.6 * var(--u, 1rem));
 		background: var(--error-bg);
 		color: var(--error-ink);
-		font-size: 0.9rem;
+		font-size: calc(0.9 * var(--u, 1rem));
 	}
 </style>

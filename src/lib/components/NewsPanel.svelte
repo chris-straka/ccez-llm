@@ -406,12 +406,16 @@ everything else is theme tokens, never raw hex. -->
 
 <style>
 	.news-panel {
+		/* The panel follows the text size like messages do: every size
+		below rides --u (1rem at 100%, scaled with --font-scale). */
+		--u: calc(1rem * var(--font-scale, 1));
+		font-size: var(--u);
 		container-type: inline-size;
 		display: flex;
 		flex-direction: column;
-		gap: 0.55rem;
-		width: calc(100% - 2.4rem);
-		padding-bottom: 1rem;
+		gap: calc(0.55 * var(--u, 1rem));
+		width: calc(100% - calc(2.4 * var(--u, 1rem)));
+		padding-bottom: calc(1 * var(--u, 1rem));
 		/* Chrome, not content: nothing here selects on a click. */
 		user-select: none;
 		-webkit-user-select: none;
@@ -419,16 +423,17 @@ everything else is theme tokens, never raw hex. -->
 	.news-bar {
 		display: flex;
 		align-items: center;
-		gap: 0.5rem;
+		gap: calc(0.5 * var(--u, 1rem));
 	}
 	.news-chips {
 		flex: 1 1 auto;
 		min-width: 0;
 		display: flex;
 		align-items: center;
-		gap: 0.4rem;
+		gap: calc(0.4 * var(--u, 1rem));
 		overflow-x: auto;
-		padding: 0.15rem 0.1rem 0.25rem;
+		padding: calc(0.15 * var(--u, 1rem)) calc(0.1 * var(--u, 1rem))
+			calc(0.25 * var(--u, 1rem));
 		scrollbar-width: none;
 	}
 	.news-chips::-webkit-scrollbar {
@@ -438,8 +443,8 @@ everything else is theme tokens, never raw hex. -->
 	.news-sep {
 		flex: 0 0 auto;
 		width: 1px;
-		height: 1.6rem;
-		margin: 0 0.3rem;
+		height: calc(1.6 * var(--u, 1rem));
+		margin: 0 calc(0.3 * var(--u, 1rem));
 		background: #8e8e93;
 		background: var(--line-hover);
 	}
@@ -451,9 +456,9 @@ everything else is theme tokens, never raw hex. -->
 		color: #1c1c1e;
 		color: var(--ink);
 		border-radius: 999px;
-		padding: 0.4rem 0.85rem;
-		font-size: 0.85rem;
-		min-height: 2.5rem;
+		padding: calc(0.4 * var(--u, 1rem)) calc(0.85 * var(--u, 1rem));
+		font-size: calc(0.85 * var(--u, 1rem));
+		min-height: calc(2.5 * var(--u, 1rem));
 		cursor: pointer;
 		white-space: nowrap;
 		transition:
@@ -488,9 +493,9 @@ everything else is theme tokens, never raw hex. -->
 		}
 	}
 	.news-chip.icon {
-		font-size: 1.1rem;
+		font-size: calc(1.1 * var(--u, 1rem));
 		line-height: 1;
-		padding: 0.4rem 0.65rem;
+		padding: calc(0.4 * var(--u, 1rem)) calc(0.65 * var(--u, 1rem));
 	}
 	.news-x {
 		flex: 0 0 auto;
@@ -500,9 +505,9 @@ everything else is theme tokens, never raw hex. -->
 		color: #6e6e73;
 		color: var(--muted);
 		border-radius: 999px;
-		width: 2.5rem;
-		height: 2.5rem;
-		font-size: 0.95rem;
+		width: calc(2.5 * var(--u, 1rem));
+		height: calc(2.5 * var(--u, 1rem));
+		font-size: calc(0.95 * var(--u, 1rem));
 		line-height: 1;
 		cursor: pointer;
 		transition:
@@ -520,9 +525,9 @@ everything else is theme tokens, never raw hex. -->
 		display: flex;
 		align-items: baseline;
 		flex-wrap: wrap;
-		gap: 0.25rem 0.6rem;
+		gap: calc(0.25 * var(--u, 1rem)) calc(0.6 * var(--u, 1rem));
 		min-height: 1.5em;
-		font-size: 0.85rem;
+		font-size: calc(0.85 * var(--u, 1rem));
 		color: #6e6e73;
 		color: var(--muted);
 	}
@@ -536,7 +541,7 @@ everything else is theme tokens, never raw hex. -->
 		margin: 0;
 		color: #6e6e73;
 		color: var(--muted);
-		font-size: 0.9rem;
+		font-size: calc(0.9 * var(--u, 1rem));
 	}
 	.news-retry {
 		align-self: flex-start;
@@ -545,14 +550,14 @@ everything else is theme tokens, never raw hex. -->
 		background: transparent;
 		color: #1c1c1e;
 		color: var(--ink);
-		border-radius: 0.6rem;
-		padding: 0.4rem 0.9rem;
-		font-size: 0.85rem;
-		min-height: 2.5rem;
+		border-radius: calc(0.6 * var(--u, 1rem));
+		padding: calc(0.4 * var(--u, 1rem)) calc(0.9 * var(--u, 1rem));
+		font-size: calc(0.85 * var(--u, 1rem));
+		min-height: calc(2.5 * var(--u, 1rem));
 		cursor: pointer;
 	}
 
-	/* Grid: as many ~16rem columns as fit (three on a laptop, one
+	/* Grid: as many ~calc(16 * var(--u, 1rem)) columns as fit (three on a laptop, one
 	list column on a phone); rem-based, so giant text sizes drop
 	columns instead of squeezing headlines. */
 	.news-cards {
@@ -560,8 +565,11 @@ everything else is theme tokens, never raw hex. -->
 		margin: 0;
 		padding: 0;
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
-		gap: 0.75rem;
+		grid-template-columns: repeat(
+			auto-fill,
+			minmax(min(100%, calc(16 * var(--u, 1rem))), 1fr)
+		);
+		gap: calc(0.75 * var(--u, 1rem));
 	}
 	.news-item {
 		display: flex;
@@ -578,11 +586,12 @@ everything else is theme tokens, never raw hex. -->
 		width: 100%;
 		display: flex;
 		flex-direction: column;
-		gap: 0.5rem;
-		padding: 0.55rem 0.55rem 0.7rem;
+		gap: calc(0.5 * var(--u, 1rem));
+		padding: calc(0.55 * var(--u, 1rem)) calc(0.55 * var(--u, 1rem))
+			calc(0.7 * var(--u, 1rem));
 		border: 1px solid #e5e5ea;
 		border-color: var(--line-soft);
-		border-radius: 0.85rem;
+		border-radius: calc(0.85 * var(--u, 1rem));
 		background: #fff;
 		background: var(--bg-raised);
 		color: inherit;
@@ -637,7 +646,7 @@ everything else is theme tokens, never raw hex. -->
 		display: block;
 		width: 100%;
 		aspect-ratio: 16 / 9;
-		border-radius: 0.55rem;
+		border-radius: calc(0.55 * var(--u, 1rem));
 		overflow: hidden;
 		background: #e5e5ea;
 		background: var(--line-soft);
@@ -668,18 +677,18 @@ everything else is theme tokens, never raw hex. -->
 		justify-content: center;
 		color: #6e6e73;
 		color: var(--muted);
-		font-size: 1.8rem;
+		font-size: calc(1.8 * var(--u, 1rem));
 		font-weight: 700;
 	}
 	.news-text {
 		display: flex;
 		flex-direction: column;
-		gap: 0.3rem;
-		padding: 0 0.2rem;
+		gap: calc(0.3 * var(--u, 1rem));
+		padding: 0 calc(0.2 * var(--u, 1rem));
 		min-width: 0;
 	}
 	.news-headline {
-		font-size: 0.93rem;
+		font-size: calc(0.93 * var(--u, 1rem));
 		font-weight: 600;
 		line-height: 1.32;
 		color: #1c1c1e;
@@ -694,7 +703,7 @@ everything else is theme tokens, never raw hex. -->
 		min-height: calc(1.32em * 3);
 	}
 	.news-source {
-		font-size: 0.76rem;
+		font-size: calc(0.76 * var(--u, 1rem));
 		color: #6e6e73;
 		color: var(--muted);
 		white-space: nowrap;
@@ -704,9 +713,9 @@ everything else is theme tokens, never raw hex. -->
 	.skel-line {
 		position: relative;
 		display: block;
-		height: 0.8rem;
-		margin: 0.22rem 0;
-		border-radius: 0.3rem;
+		height: calc(0.8 * var(--u, 1rem));
+		margin: calc(0.22 * var(--u, 1rem)) 0;
+		border-radius: calc(0.3 * var(--u, 1rem));
 		overflow: hidden;
 		background: #e5e5ea;
 		background: var(--line-soft);
@@ -716,38 +725,41 @@ everything else is theme tokens, never raw hex. -->
 	}
 	.skel-line.tiny {
 		width: 35%;
-		height: 0.6rem;
+		height: calc(0.6 * var(--u, 1rem));
 	}
 	.skel-card {
 		box-sizing: border-box;
 		border: 1px solid #e5e5ea;
 		border-color: var(--line-soft);
-		border-radius: 0.85rem;
-		padding: 0.55rem 0.55rem 0.7rem;
+		border-radius: calc(0.85 * var(--u, 1rem));
+		padding: calc(0.55 * var(--u, 1rem)) calc(0.55 * var(--u, 1rem))
+			calc(0.7 * var(--u, 1rem));
 		display: flex;
 		flex-direction: column;
-		gap: 0.5rem;
+		gap: calc(0.5 * var(--u, 1rem));
 		background: #fff;
 		background: var(--bg-raised);
 	}
 	.skel-card .news-text {
 		/* Same footprint as a real headline block plus source. */
-		min-height: calc(0.93rem * 1.32 * 3 + 1.3rem);
+		min-height: calc(
+			calc(0.93 * var(--u, 1rem)) * 1.32 * 3 + calc(1.3 * var(--u, 1rem))
+		);
 	}
 
 	/* Phone column: list rows with a thumbnail, many stories per
 	screen instead of one huge picture each. */
-	@container (max-width: 33rem) {
+	@container (max-width: calc(33 * var(--u, 1rem))) {
 		.news-cards {
-			gap: 0.5rem;
+			gap: calc(0.5 * var(--u, 1rem));
 		}
 		.news-card,
 		.skel-card {
 			display: grid;
-			grid-template-columns: 6.5rem 1fr;
+			grid-template-columns: calc(6.5 * var(--u, 1rem)) 1fr;
 			align-items: start;
-			gap: 0.7rem;
-			padding: 0.5rem;
+			gap: calc(0.7 * var(--u, 1rem));
+			padding: calc(0.5 * var(--u, 1rem));
 		}
 		.news-thumb {
 			aspect-ratio: 4 / 3;
@@ -768,13 +780,13 @@ everything else is theme tokens, never raw hex. -->
 	.news-stage {
 		display: flex;
 		justify-content: center;
-		padding-top: 0.75rem;
+		padding-top: calc(0.75 * var(--u, 1rem));
 	}
 	.session {
-		width: min(100%, 32rem);
+		width: min(100%, calc(32 * var(--u, 1rem)));
 		border: 1px solid #e5e5ea;
 		border-color: var(--line-soft);
-		border-radius: 1.1rem;
+		border-radius: calc(1.1 * var(--u, 1rem));
 		background: #fff;
 		background: var(--bg-raised);
 		overflow: hidden;
@@ -783,17 +795,18 @@ everything else is theme tokens, never raw hex. -->
 	.stage-card {
 		position: relative;
 		display: grid;
-		grid-template-columns: 7.5rem 1fr;
-		gap: 0.9rem;
+		grid-template-columns: calc(7.5 * var(--u, 1rem)) 1fr;
+		gap: calc(0.9 * var(--u, 1rem));
 		align-items: center;
-		padding: 0.85rem 2.6rem 0.85rem 0.85rem;
+		padding: calc(0.85 * var(--u, 1rem)) calc(2.6 * var(--u, 1rem))
+			calc(0.85 * var(--u, 1rem)) calc(0.85 * var(--u, 1rem));
 		border-bottom: 1px solid #e5e5ea;
 		border-bottom-color: var(--line-soft);
 	}
 	.stage-thumb {
 		position: relative;
 		aspect-ratio: 4 / 3;
-		border-radius: 0.6rem;
+		border-radius: calc(0.6 * var(--u, 1rem));
 		overflow: hidden;
 		background: #e5e5ea;
 		background: var(--line-soft);
@@ -807,7 +820,7 @@ everything else is theme tokens, never raw hex. -->
 	.stage-text {
 		display: flex;
 		flex-direction: column;
-		gap: 0.3rem;
+		gap: calc(0.3 * var(--u, 1rem));
 		min-width: 0;
 	}
 	.stage-text .news-headline {
@@ -817,10 +830,10 @@ everything else is theme tokens, never raw hex. -->
 	}
 	.stage-x {
 		position: absolute;
-		top: 0.5rem;
-		right: 0.5rem;
-		width: 2rem;
-		height: 2rem;
+		top: calc(0.5 * var(--u, 1rem));
+		right: calc(0.5 * var(--u, 1rem));
+		width: calc(2 * var(--u, 1rem));
+		height: calc(2 * var(--u, 1rem));
 		border: 0;
 		border-radius: 999px;
 		background: transparent;
@@ -836,17 +849,17 @@ everything else is theme tokens, never raw hex. -->
 	.stage-opts {
 		display: flex;
 		flex-direction: column;
-		gap: 0.9rem;
-		padding: 0.95rem;
+		gap: calc(0.9 * var(--u, 1rem));
+		padding: calc(0.95 * var(--u, 1rem));
 	}
 	.opt-row {
 		display: flex;
 		flex-direction: column;
-		gap: 0.4rem;
+		gap: calc(0.4 * var(--u, 1rem));
 	}
 	.opt-label {
-		padding-left: 0.15rem;
-		font-size: 0.72rem;
+		padding-left: calc(0.15 * var(--u, 1rem));
+		font-size: calc(0.72 * var(--u, 1rem));
 		font-weight: 600;
 		letter-spacing: 0.05em;
 		text-transform: uppercase;
@@ -855,22 +868,22 @@ everything else is theme tokens, never raw hex. -->
 	}
 	.seg {
 		display: flex;
-		gap: 0.25rem;
-		padding: 0.25rem;
-		border-radius: 0.8rem;
+		gap: calc(0.25 * var(--u, 1rem));
+		padding: calc(0.25 * var(--u, 1rem));
+		border-radius: calc(0.8 * var(--u, 1rem));
 		border: 1px solid #e5e5ea;
 		border-color: var(--line-soft);
 	}
 	.seg-opt {
 		flex: 1 1 0;
-		min-height: 2.4rem;
+		min-height: calc(2.4 * var(--u, 1rem));
 		border: 0;
-		border-radius: 0.6rem;
+		border-radius: calc(0.6 * var(--u, 1rem));
 		background: transparent;
 		color: #1c1c1e;
 		color: var(--ink);
 		font: inherit;
-		font-size: 0.88rem;
+		font-size: calc(0.88 * var(--u, 1rem));
 		font-weight: 600;
 		cursor: pointer;
 		transition:
@@ -888,15 +901,15 @@ everything else is theme tokens, never raw hex. -->
 		color: var(--accent-ink);
 	}
 	.news-start {
-		min-height: 3rem;
+		min-height: calc(3 * var(--u, 1rem));
 		border: 0;
-		border-radius: 0.8rem;
+		border-radius: calc(0.8 * var(--u, 1rem));
 		background: #007aff;
 		background: var(--accent);
 		color: #fff;
 		color: var(--accent-ink);
 		font: inherit;
-		font-size: 0.95rem;
+		font-size: calc(0.95 * var(--u, 1rem));
 		font-weight: 650;
 		cursor: pointer;
 		transition:
@@ -919,8 +932,8 @@ everything else is theme tokens, never raw hex. -->
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		gap: 0.6rem;
-		font-size: 0.82rem;
+		gap: calc(0.6 * var(--u, 1rem));
+		font-size: calc(0.82 * var(--u, 1rem));
 		color: #6e6e73;
 		color: var(--muted);
 	}

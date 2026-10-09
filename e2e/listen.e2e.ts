@@ -404,3 +404,19 @@ test("a channel's videos fold by its chevron or hover + F, and stay folded", asy
 		.click();
 	await expect(videos).toBeVisible();
 });
+
+test("the Listen panel follows the text size", async ({ page }) => {
+	await page.getByRole("tab", { name: "Listen" }).click();
+	const panel = page.locator(".listen-panel");
+	const title = panel.locator(".video-title").first();
+	await expect(title).toBeVisible();
+	const size = async () =>
+		parseFloat(await title.evaluate((el) => getComputedStyle(el).fontSize));
+	const base = await size();
+	await page.evaluate(() =>
+		document
+			.querySelector<HTMLElement>(".app")
+			?.style.setProperty("--font-scale", "2")
+	);
+	await expect.poll(size).toBeCloseTo(base * 2, 1);
+});
