@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { activeChat, createChatState } from "./chat";
 import type { ListenEntry, ListenSession } from "./listen";
 import type { ListenBackend } from "./listenBackend";
@@ -135,8 +135,12 @@ describe("search box", () => {
 	/** A browse screen whose searches resolve when `land` is called. */
 	function browse() {
 		const pending: ((rows: ListenEntry[]) => void)[] = [];
+		const queries: string[] = [];
 		const backend = {
-			search: () => new Promise<ListenEntry[]>((resolve) => pending.push(resolve)),
+			search: (q: string) => {
+				queries.push(q);
+				return new Promise<ListenEntry[]>((resolve) => pending.push(resolve));
+			},
 			channel: () => new Promise<never>(() => {}),
 			videos: () => Promise.resolve([]),
 			fetch: () => new Promise<never>(() => {}),
@@ -159,7 +163,7 @@ describe("search box", () => {
 		});
 		mode.searchKind = "channel";
 		mode.enter("fr");
-		return { mode, land: (rows: ListenEntry[]) => pending.shift()?.(rows) };
+		return { mode, land: (rows: ListenEntry[]) => pending.shift()?.(rows), calls: () => queries };
 	}
 
 	it("emptying the box drops the results", async () => {
@@ -173,6 +177,24 @@ describe("search box", () => {
 		expect(mode.results).toEqual([hit]);
 		mode.setQuery("  ");
 		expect(mode.results).toBeNull();
+	});
+
+	it("a pause in typing searches once; Enter after it adds no second call", () => {
+		vi.useFakeTimers();
+		const { mode, calls } = browse();
+		mode.setQuery("pak");
+		vi.advanceTimersByTime(200);
+		mode.setQuery("pakman");
+		vi.advanceTimersByTime(200);
+		expect(calls()).toEqual([]);
+		vi.advanceTimersByTime(300);
+		expect(calls()).toEqual(["pakman"]);
+		void mode.search();
+		expect(calls()).toEqual(["pakman"]);
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
 	});
 
 	it("a search that lands after the box was emptied is ignored", async () => {

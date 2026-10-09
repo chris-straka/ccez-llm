@@ -82,6 +82,8 @@ const GRADE_CONCURRENCY = 2;
 const GRADE_AHEAD = 2;
 /** Recent videos probed per channel row. */
 const CHANNEL_PROBE = 6;
+/** Typing pause before the search box searches by itself. */
+const TYPING_PAUSE_MS = 450;
 
 const infoKey = (id: string, lang: string): string => `${lang}|${id}`;
 
@@ -126,6 +128,9 @@ export class ListenMode {
 	private playRun = 0;
 	private volume = 1;
 	private browseSeq = 0;
+	private typingTimer: ReturnType<typeof setTimeout> | null = null;
+	/** The search last sent (`lang|kind|query`). */
+	private searchedFor = "";
 	private gradeQueue: { chatId: ChatId; i: number }[] = [];
 	private gradesRunning = 0;
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- bookkeeping, never rendered.
@@ -199,11 +204,21 @@ export class ListenMode {
 		}
 	}
 
-	/** The search box's text. Emptying it drops the results and any
-	 * search still in flight, leaving just your channels. */
+	/** The search box's text. A pause in typing searches; emptying it
+	 * drops the results and any search still in flight, leaving just
+	 * your channels. */
 	setQuery(query: string): void {
 		this.query = query;
-		if (query.trim()) return;
+		if (this.typingTimer) clearTimeout(this.typingTimer);
+		this.typingTimer = null;
+		if (query.trim()) {
+			this.typingTimer = setTimeout(() => {
+				this.typingTimer = null;
+				void this.search();
+			}, TYPING_PAUSE_MS);
+			return;
+		}
+		this.searchedFor = "";
 		this.browseSeq++;
 		this.searching = false;
 		this.results = null;
@@ -211,8 +226,14 @@ export class ListenMode {
 	}
 
 	async search(): Promise<void> {
+		if (this.typingTimer) clearTimeout(this.typingTimer);
+		this.typingTimer = null;
 		const q = this.query.trim();
 		if (!q || !this.lang) return;
+		// Enter right after the pause already searched: no second call.
+		const key = `${this.lang}|${this.searchKind}|${q}`;
+		if (key === this.searchedFor && (this.searching || this.results !== null)) return;
+		this.searchedFor = key;
 		const seq = ++this.browseSeq;
 		this.searching = true;
 		this.error = "";
@@ -224,6 +245,8 @@ export class ListenMode {
 			else for (const r of rows.slice(0, 8)) void this.loadChannel(r.id);
 		} catch (error) {
 			if (seq !== this.browseSeq) return;
+			// A failed search may be retried with Enter.
+			this.searchedFor = "";
 			this.error = listenErrorCopy(error, this.deps.langName(this.lang));
 			this.results = [];
 		} finally {
