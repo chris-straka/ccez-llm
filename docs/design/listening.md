@@ -31,41 +31,41 @@ notes), so annotation, read-aloud and reading aids work on them.
 
 ## Pipeline
 
-`src-tauri/listen` (crate `ccez-listen`), all yt-dlp:
+`src-tauri/listen` (crate `ccez-listen`) talks to YouTube's own API
+(InnerTube) over plain HTTPS, the way YouTube's apps do. There's no
+yt-dlp and nothing to install, so the same code runs on the Mac and
+the phone.
 
-- Availability: `yt-dlp -J`, slimmed and cached for 12 h. Native audio in
-  the language wins over a dub. YouTube auto-dubs are audio formats
-  tagged with a language and "dubbed-auto".
-- Captions: YouTube's `<lang>-orig` speech recognition of the chosen
-  track carries word timings, so no Whisper pass is needed. Uploaded
-  subtitles are used when they exist.
+- Session: the visitor id and web client version from the home page.
+  Without one, YouTube answers API calls with a bot check.
+- Tracks: the visionOS client's player response lists every audio
+  track with its language and an `acont` tag (original, dubbed,
+  dubbed-auto). Its media URLs need no signature solving or
+  proof-of-origin token. Native audio in the language wins over a dub.
+- Captions: YouTube's speech recognition of the picked track
+  (`kind: asr` in its language) carries word timings, so no Whisper
+  pass is needed. Uploaded subtitles are used when they exist.
 - Clips: `listenClips.ts` cuts sentence-sized clips (2.2–8 s) on word
   timings, with a little padding. Nothing is re-encoded: the app loads
   the track once and plays each clip by seeking.
-- Frames: the largest storyboard (320×180 sprite sheets, a frame every
-  ~5 s) gives each clip a still from mid-clip. If the sheet doesn't
-  load, the clip shows no frame.
+- Frames: the largest storyboard level gives each clip a still from
+  mid-clip. If the sheet doesn't load, the clip shows no frame.
+- Search and channel pages use the web client (`search`,
+  `navigation/resolve_url`, `browse` on the Videos tab).
+
+Everything caches under the app's cache dir (player responses for 12 h,
+lists for 1 h, media until cleared). When YouTube changes something,
+`cargo test --test live -- --ignored` in `src-tauri/listen` shows which
+step broke. Parsing is pinned by fixtures from real responses.
 
 ## Where it runs
 
-- **Mac desktop**: the shell runs yt-dlp itself (`listen_*` commands).
-  This needs `brew install yt-dlp`, and the cache lives in app data.
-- **Phone and web**: they can't run yt-dlp, so they call the same crate
-  through `ccez-listen serve` on one of your machines. The address goes
-  in the Listen panel ("Clip server"). Only the app's own origins pass
-  (`ORIGINS` in the binary, plus `--allow-origin`). Put it on the
-  tailnet only, behind Tailscale's HTTPS:
+In the app, on the Mac and on Android, through the `listen_*`
+commands. The plain web build has no backend (YouTube refuses browser
+pages), so its Listen entry stays hidden.
 
-  ```sh
-  cargo build --release --features server --manifest-path src-tauri/listen/Cargo.toml
-  ccez-listen serve --addr 127.0.0.1:8797
-  tailscale serve --bg --https=8797 http://127.0.0.1:8797
-  ```
-
-  Then use `https://<machine>.<tailnet>.ts.net:8797` as the clip server.
-
-Trade-off: the desktop-local path has no server to keep running, but
-only the Mac gets it. The server gives phones the same drill and a
-shared cache, but it's one more process. Clips are for personal study:
-they stay in the private cache and every clip links back to its moment
-on YouTube.
+Trade-off: owning the YouTube client means fixing it when YouTube
+changes, where yt-dlp would get a release. It's a few hundred lines,
+the live test names the broken step, and it's the only way the phone
+gets drills. Clips are for personal study: they stay in the private
+cache and every clip links back to its moment on YouTube.

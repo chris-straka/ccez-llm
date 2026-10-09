@@ -55,6 +55,7 @@ jobs:
           workspaces: "src-tauri -> target"
       - run: cargo check --locked
       - run: cargo test --locked
+      - run: cargo test --manifest-path listen/Cargo.toml
 
   rust-linux:
     runs-on: ubuntu-22.04
