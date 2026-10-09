@@ -1,7 +1,6 @@
-//! Listening drills on desktop: the `ccez-listen` crate behind
-//! commands (yt-dlp runs on this machine; clips cache under the app's
-//! cache dir). Phones and the web build reach the same crate through
-//! the `ccez-listen serve` binary instead.
+//! Listening drills: the `ccez-listen` crate behind commands, on every
+//! platform (it talks to YouTube over plain HTTPS; clips cache under
+//! the app's cache dir).
 
 use std::sync::OnceLock;
 
@@ -21,28 +20,18 @@ fn listen(app: &AppHandle) -> Result<&'static Listen, String> {
     Ok(LISTEN.get_or_init(|| Listen::new(dir)))
 }
 
-async fn blocking<T: Send + 'static>(
-    app: AppHandle,
-    f: impl FnOnce(&Listen) -> Result<T, String> + Send + 'static,
-) -> Result<T, String> {
-    let l = listen(&app)?;
-    tauri::async_runtime::spawn_blocking(move || f(l))
-        .await
-        .map_err(|e| e.to_string())?
-}
-
 #[tauri::command]
 pub async fn listen_search(
     app: AppHandle,
     query: String,
     kind: String,
 ) -> Result<Vec<Entry>, String> {
-    blocking(app, move |l| l.search(&query, &kind, 12)).await
+    listen(&app)?.search(&query, &kind, 12).await
 }
 
 #[tauri::command]
 pub async fn listen_channel(app: AppHandle, reference: String) -> Result<ChannelPage, String> {
-    blocking(app, move |l| l.channel(&reference, 15)).await
+    listen(&app)?.channel(&reference, 15).await
 }
 
 #[tauri::command]
@@ -51,12 +40,12 @@ pub async fn listen_videos(
     ids: Vec<String>,
     lang: String,
 ) -> Result<Vec<VideoInfo>, String> {
-    blocking(app, move |l| Ok(l.videos(&ids, &lang))).await
+    Ok(listen(&app)?.videos(&ids, &lang).await)
 }
 
 #[tauri::command]
 pub async fn listen_fetch(app: AppHandle, id: String, lang: String) -> Result<Fetched, String> {
-    blocking(app, move |l| l.fetch(&id, &lang)).await
+    listen(&app)?.fetch(&id, &lang).await
 }
 
 /// The fetched track's bytes, raw (an ArrayBuffer on the JS side).
@@ -66,10 +55,7 @@ pub async fn listen_audio(
     id: String,
     lang: String,
 ) -> Result<tauri::ipc::Response, String> {
-    let bytes = blocking(app, move |l| {
-        let f = l.fetch(&id, &lang)?;
-        std::fs::read(&f.audio_path).map_err(|e| e.to_string())
-    })
-    .await?;
+    let path = listen(&app)?.audio_path(&id, &lang).await?;
+    let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
     Ok(tauri::ipc::Response::new(bytes))
 }

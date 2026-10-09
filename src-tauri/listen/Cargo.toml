@@ -9,15 +9,12 @@ publish = false
 name = "ccez_listen"
 path = "src/lib.rs"
 
-[[bin]]
-name = "ccez-listen"
-path = "src/bin/ccez-listen.rs"
-required-features = ["server"]
-
-[features]
-server = ["dep:tiny_http"]
-
 [dependencies]
+futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-webpki-roots"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tiny_http = { version = "0.12", optional = true }
+tokio = { version = "1", features = ["sync"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

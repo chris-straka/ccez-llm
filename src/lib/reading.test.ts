@@ -1005,6 +1005,13 @@ describe("annotationAnswer", () => {
 		expect(system!.content).toContain("Write in English, whatever language the passage is in");
 	});
 
+	it("answers in the passage's language when the learner asks for it", () => {
+		const [system] = buildAnnotationAnswerMessages(q, { inPassageLang: true });
+		expect(system!.content).toContain("Write in the passage's own language");
+		expect(system!.content).not.toContain("Write in English");
+		expect(system!.content).toContain("quote its words as they are");
+	});
+
 	it("skips the obvious and writes prose, not labeled slots", () => {
 		const [system] = buildAnnotationAnswerMessages(q);
 		expect(system!.content).toContain("Skip what any learner already knows");

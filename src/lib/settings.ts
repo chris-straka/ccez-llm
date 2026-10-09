@@ -342,10 +342,12 @@ export interface AppSettings {
 	 */
 	listenChannels: ListenChannel[];
 	/**
-	 * Listening drills off the desktop: the learner's clip server
-	 * (`ccez-listen serve` on their tailnet). Empty = none.
+	 * Annotation answers in the passage's own language (plain, for a
+	 * learner) instead of English. Off by default; Ctrl+⌥+L flips it.
 	 */
-	listenServer: string;
+	annotationAnswersInPassageLang: boolean;
+	/** What an empty chat in a language opens: news or listening. */
+	emptyChatMode: "news" | "listen";
 	/**
 	 * Name each chat with one short model call after its first reply
 	 * (renames always win). On by default; costs a few tokens per chat.
@@ -605,7 +607,8 @@ export function defaultSettings(): AppSettings {
 		inspectEnabled: true,
 		flashcardsEnabled: false,
 		listenChannels: [],
-		listenServer: "",
+		annotationAnswersInPassageLang: false,
+		emptyChatMode: "news",
 		aiTitles: true
 	};
 }
@@ -861,7 +864,10 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 						!!c && typeof c.url === "string" && typeof c.name === "string"
 				)
 			: [];
-		if (typeof merged.listenServer !== "string") merged.listenServer = "";
+		if (merged.emptyChatMode !== "news" && merged.emptyChatMode !== "listen")
+			merged.emptyChatMode = "news";
+		if (typeof merged.annotationAnswersInPassageLang !== "boolean")
+			merged.annotationAnswersInPassageLang = false;
 		if (typeof merged.hideMessages !== "boolean") merged.hideMessages = false;
 		if (typeof merged.micEnabled !== "boolean") merged.micEnabled = true;
 		if (typeof merged.captureEnabled !== "boolean")

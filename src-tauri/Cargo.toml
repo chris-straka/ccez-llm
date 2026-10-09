@@ -54,6 +54,10 @@ rustls = { version = "0.23", default-features = false, features = ["std", "ring"
 # webpki roots work on every target including Android (native-tls does
 # not). Version pins against the copy already in Cargo.lock.
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls-webpki-roots", "cookies"] }
+# Listening drills: YouTube tracks, captions and lists over plain HTTPS.
+ccez-listen = { path = "listen" }
+# Grading concurrency for listening drills (already in the tree via tauri).
+tokio = { version = "1", features = ["sync", "time"] }
 encoding_rs = "0.8"
 # reqwest also serves the Google News decoder (news.rs), which never
 # impersonates (Google answers plain clients).
@@ -98,8 +102,6 @@ objc2-vision = "0.3"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-mcp-bridge = "0.2"
 tauri-plugin-window-state = "~2.4.1"
-# Listening drills: yt-dlp lookups and fetches (desktop runs them itself).
-ccez-listen = { path = "listen" }
 
 # Android-only native TTS (TextToSpeech over JNI into Tts.kt).
 # jni matches wry's version so JNI types unify (see cargo tree).

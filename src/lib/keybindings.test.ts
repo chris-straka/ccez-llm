@@ -804,6 +804,8 @@ describe("commandChord", () => {
 		expect(commandChord({ ...altGr, key: "ArrowRight", code: "ArrowRight" })).toBe(null);
 		const ctrlAlt = { ...altGr, altGraph: false };
 		expect(commandChord({ ...ctrlAlt, code: "KeyS", key: "s" })).toBe("toggle-voice");
+		// ⌥L types ¬ on a Mac: matched on the physical key.
+		expect(commandChord({ ...ctrlAlt, code: "KeyL", key: "¬" })).toBe("toggle-annotation-lang");
 		expect(commandChord({ ...ctrlAlt, code: "KeyN", key: "n" })).toBe("new-chat");
 	});
 

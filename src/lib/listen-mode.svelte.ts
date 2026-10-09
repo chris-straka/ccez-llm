@@ -38,15 +38,31 @@ export interface ListenModeDeps {
 	langName: (code: string) => string;
 	getChannels: () => ListenChannel[];
 	setChannels: (next: ListenChannel[]) => void;
-	getServer: () => string;
-	setServer: (next: string) => void;
 	resolveProvider: () => Promise<ChatProvider | null>;
 	toast: (message: string) => void;
 	/** After a clip appears: keep the newest clip in view. */
 	reveal: () => void;
 	focusComposer: () => void;
 	openUrl: (url: string) => Promise<void>;
+	/** Rust-side grading (Android shell): keeps going while the app is
+	 * in the background. Null grades from the page instead. */
+	nativeGrader: () => NativeGrader | null;
 }
+
+/** One stored or emitted native grading (`listen-graded`). */
+export interface NativeGradeResult {
+	chat_id: string;
+	i: number;
+	content: string | null;
+	error: string | null;
+}
+
+export interface NativeGrader {
+	start: (chatId: ChatId, items: { i: number; prompt: string; retry: boolean }[]) => Promise<void>;
+	results: (chatId: ChatId) => Promise<NativeGradeResult[]>;
+}
+
+export const GRADED_EVENT = "listen-graded";
 
 export interface ChannelView {
 	status: "loading" | "ready" | "error";
@@ -130,7 +146,7 @@ export class ListenMode {
 
 	private needBackend(): ListenBackend {
 		const backend = this.deps.backend();
-		if (!backend) throw new Error("listen-needs-server");
+		if (!backend) throw new Error("listen-needs-app");
 		return backend;
 	}
 
@@ -238,12 +254,6 @@ export class ListenMode {
 
 	removeChannel(url: string): void {
 		this.deps.setChannels(this.deps.getChannels().filter((c) => c.url !== url));
-	}
-
-	setServer(raw: string): void {
-		this.deps.setServer(raw.trim());
-		this.error = "";
-		if (this.lang) this.enter(this.lang);
 	}
 
 	/** Start a drill on `videoId` in the active (empty) chat. */
@@ -404,7 +414,7 @@ export class ListenMode {
 
 	/** Grade the open clip, the ones after it, and any answered clip
 	 * still ungraded (failed ones retry once per session). */
-	private queueGrades(chatId: ChatId): void {
+	private queueGrades(chatId: ChatId, retry: number | null = null): void {
 		const chat = this.deps.getChatState().chats.find((c) => c.id === chatId);
 		const session = chat?.listen;
 		if (!chat || !session) return;
@@ -414,13 +424,132 @@ export class ListenMode {
 			if (m.clip && m.clip.grade !== "done" && m.clip.grade !== "pending") wanted.push(m.clip.i);
 		}
 		for (let i = open; i < Math.min(session.clips.length, open + 1 + GRADE_AHEAD); i++) wanted.push(i);
+		const fresh: number[] = [];
 		for (const i of wanted) {
 			const key = `${chatId}|${i}`;
 			if (this.gradeAsked.has(key)) continue;
 			this.gradeAsked.add(key);
-			this.gradeQueue.push({ chatId, i });
+			fresh.push(i);
 		}
+		if (fresh.length === 0) return;
+		const native = this.deps.nativeGrader();
+		if (native) {
+			this.startNative(native, chatId, session, fresh, retry);
+			return;
+		}
+		for (const i of fresh) this.gradeQueue.push({ chatId, i });
 		this.pumpGrades();
+	}
+
+	private promptFor(session: ListenSession, i: number): string | null {
+		const clip = session.clips[i];
+		if (!clip) return null;
+		return gradePrompt(clip.text, this.deps.langName(session.lang), clipBefore(session, i));
+	}
+
+	private hasRow(chatId: ChatId, i: number): boolean {
+		return (
+			this.deps
+				.getChatState()
+				.chats.find((c) => c.id === chatId)
+				?.messages.some((m) => m.clip?.i === i) ?? false
+		);
+	}
+
+	private begin(chatId: ChatId, i: number): void {
+		this.inFlight.add(`${chatId}|${i}`);
+		if (this.hasRow(chatId, i)) markGrading(this.deps.getChatState(), chatId, i);
+	}
+
+	/** A grading came back (null = failed): onto its row, or held in
+	 * `early` until the row appears (catchUpGrade). */
+	private settle(chatId: ChatId, i: number, result: ReturnType<typeof parseGrade>): void {
+		this.inFlight.delete(`${chatId}|${i}`);
+		if (this.hasRow(chatId, i)) landGrade(this.deps.getChatState(), chatId, i, result);
+		else this.early.set(`${chatId}|${i}`, result);
+	}
+
+	private startNative(
+		native: NativeGrader,
+		chatId: ChatId,
+		session: ListenSession,
+		indexes: number[],
+		retry: number | null
+	): void {
+		const items = indexes.flatMap((i) => {
+			const prompt = this.promptFor(session, i);
+			return prompt ? [{ i, prompt, retry: i === retry }] : [];
+		});
+		for (const item of items) this.begin(chatId, item.i);
+		native
+			.start(chatId, items)
+			// Results already on file (answered before a relaunch) send
+			// no event: read them back.
+			.then(() => this.resync(chatId))
+			.catch(() => {
+				for (const item of items) this.settle(chatId, item.i, null);
+			});
+	}
+
+	/** A native result (event or file): parse and land it. */
+	landNative(r: NativeGradeResult): void {
+		const chatId = r.chat_id as ChatId;
+		const chat = this.deps.getChatState().chats.find((c) => c.id === chatId);
+		if (!chat?.listen) return;
+		const row = chat.messages.find((m) => m.clip?.i === r.i)?.clip;
+		// A newer retry is running: its own result will land.
+		if (row?.grade === "done" && !r.content) return;
+		this.settle(chatId, r.i, r.content ? parseGrade(r.content) : null);
+	}
+
+	/** Subscribe to native results as they finish. Missed events (a
+	 * paused page) land through `resync` instead. */
+	listenNative(
+		listen: <T>(event: string, cb: (e: { payload: T }) => void) => Promise<() => void>
+	): () => void {
+		let off: (() => void) | null = null;
+		let gone = false;
+		void listen<NativeGradeResult>(GRADED_EVENT, (e) => this.landNative(e.payload))
+			.then((unlisten) => {
+				if (gone) unlisten();
+				else off = unlisten;
+			})
+			.catch(() => undefined);
+		return () => {
+			gone = true;
+			try {
+				off?.();
+			} catch {
+				// Already unlistened; shutdown is best-effort.
+			}
+		};
+	}
+
+	/** Land whatever native grading finished while the page was paused
+	 * or gone (one chat, or every drill still waiting on a grade). */
+	async resync(chatId?: ChatId): Promise<void> {
+		const native = this.deps.nativeGrader();
+		if (!native) return;
+		const chats = this.deps
+			.getChatState()
+			.chats.filter(
+				(c) =>
+					c.listen &&
+					(chatId ? c.id === chatId : c.messages.some((m) => m.clip && m.clip.grade !== "done"))
+			);
+		for (const c of chats) {
+			let results: NativeGradeResult[];
+			try {
+				results = await native.results(c.id);
+			} catch {
+				continue;
+			}
+			for (const r of results) {
+				const row = c.messages.find((m) => m.clip?.i === r.i)?.clip;
+				if (row?.grade === "done") continue;
+				this.landNative(r);
+			}
+		}
 	}
 
 	private pumpGrades(): void {
@@ -436,32 +565,21 @@ export class ListenMode {
 	}
 
 	private async grade(chatId: ChatId, i: number): Promise<void> {
-		const state = this.deps.getChatState();
-		const session = state.chats.find((c) => c.id === chatId)?.listen;
-		const clip = session?.clips[i];
-		if (!session || !clip) return;
-		// Clips ahead of the open one have no row yet: their grade waits
-		// in `early` until the row appears (catchUpGrade).
-		const hasRow = () =>
-			state.chats.find((c) => c.id === chatId)?.messages.some((m) => m.clip?.i === i) ?? false;
-		this.inFlight.add(`${chatId}|${i}`);
-		if (hasRow()) markGrading(state, chatId, i);
+		const session = this.deps.getChatState().chats.find((c) => c.id === chatId)?.listen;
+		const prompt = session ? this.promptFor(session, i) : null;
+		if (!prompt) return;
+		this.begin(chatId, i);
 		let result: ReturnType<typeof parseGrade> = null;
 		try {
 			const provider = await this.deps.resolveProvider();
 			if (provider) {
-				const reply = await provider.chat(
-					[{ role: "user", content: gradePrompt(clip.text, this.deps.langName(session.lang), clipBefore(session, i)) }],
-					{}
-				);
+				const reply = await provider.chat([{ role: "user", content: prompt }], {});
 				result = parseGrade(reply.content);
 			}
 		} catch {
 			result = null;
 		}
-		this.inFlight.delete(`${chatId}|${i}`);
-		if (hasRow()) landGrade(state, chatId, i, result);
-		else this.early.set(`${chatId}|${i}`, result);
+		this.settle(chatId, i, result);
 	}
 
 	/** Clip `i`'s row just appeared: land a grade that came early, or
@@ -486,7 +604,7 @@ export class ListenMode {
 	regrade(i: number): void {
 		const chatId = activeChat(this.deps.getChatState()).id;
 		this.gradeAsked.delete(`${chatId}|${i}`);
-		this.queueGrades(chatId);
+		this.queueGrades(chatId, i);
 	}
 
 	/** The clip's moment on YouTube, in the system browser. */

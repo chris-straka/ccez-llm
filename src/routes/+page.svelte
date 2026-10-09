@@ -306,9 +306,10 @@ import {
 	import { startBlink, startHighlightFade, startMarkFade } from "$lib/blink";
 	import { createRefMemo } from "$lib/aidLoading";
 	import { NewsMode } from "$lib/news-mode.svelte";
-	import { ListenMode } from "$lib/listen-mode.svelte";
+	import { ListenMode, type NativeGradeResult } from "$lib/listen-mode.svelte";
 	import { listenKeyAction, summarizeDrill } from "$lib/listen";
-	import { pickBackend } from "$lib/listenBackend";
+	import { shellBackend } from "$lib/listenBackend";
+	import { nativeRouteFor } from "$lib/turns";
 	import { drillStates } from "$lib/listenChat";
 	import { relevelNewsOpener, type CefrLevel } from "$lib/news";
 	import { AnnotateMode } from "$lib/annotate-mode.svelte";
@@ -861,7 +862,10 @@ import {
 		getActiveChatId: () => chatState.activeChatId,
 		getChatIds: () => chatState.chats.map((c) => c.id),
 		resolveProvider: () => providerKeys.resolveActive(),
-		answerQuestion: (provider, q) => annotationAnswer(provider, q),
+		answerQuestion: (provider, q) =>
+			annotationAnswer(provider, q, undefined, {
+				inPassageLang: settings.annotationAnswersInPassageLang
+			}),
 		answerContextFor: (ann) =>
 			annotateMode.answerContextFor(ann, ann.quote, ann.at ?? 0),
 		notifyBanner: (message) => showNotice(notices, "banner", message),
@@ -1354,11 +1358,15 @@ import {
 				shell: tauriBackendAvailable()
 			});
 			void nativeTurns.reconcile();
+			void listenMode.resync();
 		};
 		// Native turn events (Android shell): token stream, fetch phase,
 		// retry resets, and completion. Suspension-safe by design —
 		// anything missed lands through the return/boot scan instead.
 		const unlistenTurns = nativeTurns.listen(listen);
+		// Native drill grading (Android shell): same suspension-safe
+		// pair, events while visible and a file read on return.
+		const unlistenGrades = tauriBackendAvailable() ? listenMode.listenNative(listen) : () => {};
 		window.addEventListener("pointerdown", stampPress, { passive: true });
 		window.addEventListener("keydown", stampPress);
 		document.addEventListener("visibilitychange", onVisible);
@@ -1373,11 +1381,13 @@ import {
 		// died with the process restarts here (dots again, reply
 		// completes) instead of stranding its placeholder.
 		void nativeTurns.reconcile();
+		void listenMode.resync();
 		return () => {
 			window.removeEventListener("pointerdown", stampPress);
 			window.removeEventListener("keydown", stampPress);
 			document.removeEventListener("visibilitychange", onVisible);
 			unlistenTurns();
+			unlistenGrades();
 			window.removeEventListener("touchstart", trackAnnTouchStart);
 			window.removeEventListener("touchmove", trackAnnTouchMove);
 		};
@@ -2174,18 +2184,13 @@ import {
 	collapses the panel and the chat holds only the session.
 	State and behavior live in `NewsMode`; the page only wires
 	its collaborators here. */
-	/** Listening drills: yt-dlp on the desktop shell, the learner's
-	clip server elsewhere (null = none yet; the panel asks for one). */
+	/** Listening drills: the app's own backend on desktop and phone;
+	the plain web build has none (null), so its entry stays hidden. */
 	function listenBackend() {
-		return pickBackend({
-			desktopShell:
-				tauriBackendAvailable() &&
-				typeof navigator !== "undefined" &&
-				!isAndroidUserAgent(navigator.userAgent),
-			server: settings.listenServer,
-			invoke: async <T,>(cmd: string, args?: Record<string, unknown>) =>
-				(await import("@tauri-apps/api/core")).invoke<T>(cmd, args)
-		});
+		if (!tauriBackendAvailable()) return null;
+		return shellBackend(async <T,>(cmd: string, args?: Record<string, unknown>) =>
+			(await import("@tauri-apps/api/core")).invoke<T>(cmd, args)
+		);
 	}
 	const listenMode = new ListenMode({
 		getChatState: () => chatState,
@@ -2194,10 +2199,6 @@ import {
 		getChannels: () => settings.listenChannels,
 		setChannels: (next) => {
 			settings.listenChannels = next;
-		},
-		getServer: () => settings.listenServer,
-		setServer: (next) => {
-			settings.listenServer = next;
 		},
 		resolveProvider: () => providerKeys.resolveActive(),
 		toast: (message) => flashToast(message),
@@ -2212,6 +2213,40 @@ import {
 			} else {
 				window.open(url, "_blank", "noopener");
 			}
+		},
+		// Phone: grading runs in Rust like a native turn, so it keeps
+		// going after the app leaves the screen.
+		nativeGrader: () => {
+			const config = nativeRouteFor(
+				{
+					androidUI,
+					shell: tauriBackendAvailable(),
+					mock: useMock,
+					onDevice: isOnDeviceProvider(settings.activeProviderId)
+				},
+				[],
+				settings
+			);
+			if (!config) return null;
+			return {
+				start: async (chatId, items) => {
+					const { invoke } = await import("@tauri-apps/api/core");
+					await invoke("listen_grade_start", {
+						req: {
+							chat_id: chatId,
+							base_url: config.baseUrl,
+							api_key: config.apiKey,
+							model: config.model,
+							extra_body: config.extraBody,
+							items
+						}
+					});
+				},
+				results: async (chatId) => {
+					const { invoke } = await import("@tauri-apps/api/core");
+					return invoke<NativeGradeResult[]>("listen_grade_results", { chatId });
+				}
+			};
 		}
 	});
 	/** "Another video": a fresh chat in the same language, browsing. */
@@ -4774,11 +4809,12 @@ import {
 		try {
 			const provider = await providerKeys.resolveActive();
 			if (provider) {
-				const answer = await annotationAnswer(provider, {
-					quote,
-					question: file.comment.trim(),
-					context: line
-				});
+				const answer = await annotationAnswer(
+					provider,
+					{ quote, question: file.comment.trim(), context: line },
+					undefined,
+					{ inPassageLang: settings.annotationAnswersInPassageLang }
+				);
 				const added = list[list.length - 1];
 				if (added) list = attachAnnotationAnswer(list, added.id, answer);
 			}
@@ -8464,8 +8500,12 @@ import {
 		// Empty chats open learner news for the picked language (the
 		// submenu and ⌘number share this funnel); anywhere else the
 		// pick just switches and any open panel goes away.
-		if (activeChat(chatState).messages.length === 0 && listenMode.open) listenMode.enter(code);
-		else if (activeChat(chatState).messages.length === 0) newsMode.enterNewsMode(code);
+		// The News | Listen switch remembers its side.
+		const empty = activeChat(chatState).messages.length === 0;
+		const wantsListen =
+			listenMode.open || (settings.emptyChatMode === "listen" && listenBackend() !== null);
+		if (empty && wantsListen) listenMode.enter(code);
+		else if (empty) newsMode.enterNewsMode(code);
 		else newsMode.news = null;
 	}
 
@@ -10908,6 +10948,17 @@ import {
 			if (chord === "toggle-voice") {
 				consumeEvent(event);
 				setVoiceEnabled(!voiceOn());
+				return;
+			}
+			if (chord === "toggle-annotation-lang") {
+				consumeEvent(event);
+				settings.annotationAnswersInPassageLang = !settings.annotationAnswersInPassageLang;
+				persistSettings();
+				flashToast(
+					settings.annotationAnswersInPassageLang
+						? "Annotation answers in the passage's language"
+						: "Annotation answers in English"
+				);
 				return;
 			}
 			if (chord === "capture-window") {
@@ -13728,12 +13779,21 @@ import {
 				session: chat.listen ?? null,
 				langName: replyLanguageFor(listenMode.lang ?? activeReplyCode ?? "")?.name ?? "",
 				channels: settings.listenChannels,
-				needsServer: listenBackend() === null,
-				server: settings.listenServer,
+				available: listenBackend() !== null,
 				summary: chat.listen && chat.messages.some((m) => m.drillEnd)
 					? summarizeDrill(drillStates(chat))
 					: null,
-				another: anotherDrill
+				another: anotherDrill,
+				showNews: () => {
+					settings.emptyChatMode = "news";
+					listenMode.close();
+					if (!newsMode.news && activeReplyCode) newsMode.enterNewsMode(activeReplyCode);
+				},
+				showListen: () => {
+					settings.emptyChatMode = "listen";
+					if (activeReplyCode) listenMode.enter(activeReplyCode);
+				},
+				close: () => clearReplyLang()
 			}}
 			flashcardsDue={flashcards.due}
 			onFlashcards={() => flashcards.open()}

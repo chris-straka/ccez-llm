@@ -61,6 +61,7 @@ const MAC_SECTIONS: Array<[string, string[]]> = [
 		"Reading & study",
 		[
 			"Voice readback on / off",
+			"Annotation answers in English / the passage's language",
 			"Stop voice / close",
 			"Reading aids",
 			"Stroke order step",

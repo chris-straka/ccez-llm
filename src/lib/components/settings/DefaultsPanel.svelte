@@ -154,6 +154,10 @@
 				<span>Enable inspect for han characters</span>
 			</label>
 			<label class="check">
+				<input type="checkbox" bind:checked={settings.annotationAnswersInPassageLang} />
+				<span>Answer annotations in the passage's language</span>
+			</label>
+			<label class="check">
 				<input type="checkbox" bind:checked={settings.flashcardsEnabled} />
 				<span>Enable flashcards</span>
 			</label>
@@ -204,6 +208,10 @@
 		<label class="check">
 			<input type="checkbox" bind:checked={settings.inspectEnabled} />
 			<span>Enable inspect for han characters</span>
+		</label>
+		<label class="check">
+			<input type="checkbox" bind:checked={settings.annotationAnswersInPassageLang} />
+			<span>Answer annotations in the passage's language</span>
 		</label>
 		<label class="check">
 			<input type="checkbox" bind:checked={settings.flashcardsEnabled} />

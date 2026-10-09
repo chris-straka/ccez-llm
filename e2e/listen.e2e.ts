@@ -1,16 +1,14 @@
-import { Buffer } from "node:buffer";
 import { test, expect, type Page } from "./fixtures";
 import { seedChat } from "./helpers";
 
 /**
- * Listening drills through the clip-server path (the phone and web
- * route): browse the learner's channel, start a video, guess clip 1
- * and land on clip 2 at once, reveal with "?", reach the tally. The
- * server is faked at the network layer; the mock provider's grading
- * isn't JSON, so translations fail into "Try again".
+ * Listening drills through the app's backend (the `listen_*`
+ * commands, stubbed on a mock shell): browse the learner's channel,
+ * start a video, guess clip 1 and land on clip 2 at once, reveal with
+ * "?", reach the tally. Grading goes to a stub provider whose replies
+ * the spec serves, so translations land on the clips.
  */
-const SERVER = "http://clip.test";
-const CHANNEL = "https://www.youtube.com/@learner-channel/videos";
+const CHANNEL = "https://www.youtube.com/@learner-channel";
 const VIDEO = "abcdefghijk";
 
 const info = {
@@ -21,8 +19,8 @@ const info = {
 	duration: 12,
 	thumbnail: "",
 	original_lang: "en-US",
-	audio: { kind: "dub", lang: "fr-FR", format_id: "139-4", ext: "m4a", auto: true },
-	captions: { key: "fr-orig", kind: "asr" }
+	audio: { kind: "dub", lang: "fr-FR", itag: 139, track: "fr-FR.10", mime: "audio/mp4", auto: true },
+	captions: { key: "a.fr", kind: "asr" }
 };
 
 /** Three spoken sentences (each past the 2.2 s clip minimum), one
@@ -42,65 +40,99 @@ function captions(): string {
 	});
 }
 
-/** A short silent WAV: the drill only needs something decodable. */
-function silentWav(seconds: number): Buffer {
-	const rate = 8000;
-	const n = rate * seconds;
-	const buf = Buffer.alloc(44 + n);
-	buf.write("RIFF", 0);
-	buf.writeUInt32LE(36 + n, 4);
-	buf.write("WAVEfmt ", 8);
-	buf.writeUInt32LE(16, 16);
-	buf.writeUInt16LE(1, 20);
-	buf.writeUInt16LE(1, 22);
-	buf.writeUInt32LE(rate, 24);
-	buf.writeUInt32LE(rate, 28);
-	buf.writeUInt16LE(1, 32);
-	buf.writeUInt16LE(8, 34);
-	buf.write("data", 36);
-	buf.writeUInt32LE(n, 40);
-	buf.fill(128, 44);
-	return buf;
+/** A shell whose `listen_*` commands answer from fixtures. */
+async function mockListenShell(page: Page): Promise<void> {
+	await page.addInitScript(
+		(seed: { info: typeof info; captions: string; channel: string }) => {
+			/** A short silent WAV: the drill only needs something decodable. */
+			const silentWav = (seconds: number): ArrayBuffer => {
+				const rate = 8000;
+				const n = rate * seconds;
+				const buf = new DataView(new ArrayBuffer(44 + n));
+				const text = (at: number, s: string) => {
+					for (let k = 0; k < s.length; k++) buf.setUint8(at + k, s.charCodeAt(k));
+				};
+				text(0, "RIFF");
+				buf.setUint32(4, 36 + n, true);
+				text(8, "WAVEfmt ");
+				buf.setUint32(16, 16, true);
+				buf.setUint16(20, 1, true);
+				buf.setUint16(22, 1, true);
+				buf.setUint32(24, rate, true);
+				buf.setUint32(28, rate, true);
+				buf.setUint16(32, 1, true);
+				buf.setUint16(34, 8, true);
+				text(36, "data");
+				buf.setUint32(40, n, true);
+				for (let k = 0; k < n; k++) buf.setUint8(44 + k, 128);
+				return buf.buffer;
+			};
+			const row = {
+				kind: "video",
+				id: seed.info.id,
+				title: seed.info.title,
+				channel: seed.info.channel,
+				channel_url: seed.channel,
+				duration: 12,
+				thumbnail: ""
+			};
+			const shell = {
+				invoke: async (cmd: string): Promise<unknown> => {
+					if (cmd === "listen_channel")
+						return { name: "Learner Channel", url: seed.channel, videos: [row] };
+					if (cmd === "listen_videos") return [seed.info];
+					if (cmd === "listen_search") return [row];
+					if (cmd === "listen_fetch")
+						return {
+							info: seed.info,
+							audio_mime: "audio/wav",
+							captions: seed.captions,
+							caption_kind: "asr",
+							storyboard: null
+						};
+					if (cmd === "listen_audio") return silentWav(12);
+					// Launch-time calls the app tolerates failing.
+					if (cmd === "keychain_get") return null;
+					if (cmd === "keychain_set" || cmd === "keychain_delete") return null;
+					if (cmd === "plugin:event|listen") return 1;
+					throw new Error(`mock-shell: unhandled ${cmd}`);
+				},
+				transformCallback: (): number => 0,
+				unregisterCallback: (): void => {}
+			};
+			(window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = shell;
+		},
+		{ info, captions: captions(), channel: CHANNEL }
+	);
 }
 
-async function fakeServer(page: Page): Promise<void> {
-	const cors = { "access-control-allow-origin": "*" };
-	await page.route(`${SERVER}/v1/**`, async (route) => {
-		const url = new URL(route.request().url());
-		const json = (body: unknown) => route.fulfill({ headers: cors, json: body });
-		switch (url.pathname) {
-			case "/v1/channel":
-				return json({
-					name: "Learner Channel",
-					url: CHANNEL,
-					videos: [
-						{ kind: "video", id: VIDEO, title: info.title, channel: info.channel, channel_url: CHANNEL, duration: 12, thumbnail: "" }
-					]
-				});
-			case "/v1/videos":
-				return json([info]);
-			case "/v1/fetch":
-				return json({ info, audio_mime: "audio/wav", captions: captions(), caption_kind: "asr", storyboard: null });
-			case "/v1/audio":
-				return route.fulfill({ headers: { ...cors, "content-type": "audio/wav" }, body: silentWav(12) });
-			default:
-				return route.fulfill({ status: 404, headers: cors, json: { error: "listen-http-404" } });
-		}
-	});
-}
+/** Every grading reply: a translation plus one note. */
+const GRADE = {
+	translation: "Hello everyone and welcome.",
+	notes: [{ expr: "bienvenue", meaning: "welcome" }]
+};
 
 test.beforeEach(async ({ page }) => {
-	await fakeServer(page);
+	await mockListenShell(page);
+	await page.route("http://grade.test/v1/chat/completions", (route) =>
+		route.fulfill({
+			headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*" },
+			json: { choices: [{ message: { content: JSON.stringify(GRADE) } }] }
+		})
+	);
 	await seedChat(page, [], "fr", {
-		listenServer: SERVER,
-		listenChannels: [{ url: CHANNEL, name: "Learner Channel" }]
+		listenChannels: [{ url: CHANNEL, name: "Learner Channel" }],
+		activeProviderId: "deepseek",
+		providers: {
+			deepseek: { baseUrl: "http://grade.test/v1", apiKey: "test-key", model: "stub", models: [] }
+		}
 	});
 	await page.goto("/");
 	await expect(page.locator(".empty-state")).toBeVisible({ timeout: 60_000 });
 });
 
 test("a drill runs: guess, next clip at once, reveal, tally", async ({ page }) => {
-	await page.getByRole("button", { name: "Listen in French" }).click();
+	await page.getByRole("tab", { name: "Listen" }).click();
 	const panel = page.locator(".listen-panel");
 	await expect(panel).toContainText("Learner Channel");
 	const row = panel.locator(".video", { hasText: info.title });
@@ -140,6 +172,8 @@ test("a drill runs: guess, next clip at once, reveal, tally", async ({ page }) =
 	await expect(end).toContainText("Nous parlons de la peste.");
 	await expect(end.getByRole("button", { name: "Another video" })).toBeVisible();
 
-	// Grading runs behind (the mock's reply isn't JSON): retry offered.
-	await expect(clips.first()).toContainText("Try again", { timeout: 15_000 });
+	// Grading ran behind: each clip's body gains the translation and note.
+	const first = page.locator("#msg-0");
+	await expect(first).toContainText(GRADE.translation, { timeout: 15_000 });
+	await expect(first).toContainText("welcome");
 });

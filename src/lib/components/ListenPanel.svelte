@@ -18,14 +18,12 @@ channel or start a video. State lives in `ListenMode`. -->
 		lang: string;
 		langName: string;
 		channels: ListenChannel[];
-		/** No backend here yet: show the server field. */
-		needsServer: boolean;
-		server: string;
+		/** ×: back to the welcome screen (same as the news panel's). */
+		onClose: () => void;
 	}
 
-	let { mode, lang, langName, channels, needsServer, server }: Props = $props();
+	let { mode, lang, langName, channels, onClose }: Props = $props();
 
-	let serverDraft = $state("");
 	let searchBox = $state<HTMLInputElement | null>(null);
 
 	/** Videos of a channel row worth showing: drillable first, three. */
@@ -91,32 +89,6 @@ channel or start a video. State lives in `ListenMode`. -->
 {/snippet}
 
 <section class="listen-panel" aria-label="Listen">
-	<header class="bar">
-		<h2>Listen <span class="lang">· {langName}</span></h2>
-		<button type="button" class="close" aria-label="Close listening" onclick={() => mode.close()}>×</button>
-	</header>
-
-	{#if needsServer}
-		<form
-			class="server"
-			onsubmit={(e) => {
-				e.preventDefault();
-				mode.setServer(serverDraft);
-			}}
-		>
-			<p>
-				Listening here runs through your clip server (<code>ccez-listen serve</code> on your
-				tailnet). Paste its address:
-			</p>
-			<input
-				type="url"
-				placeholder="https://your-mac.your-tailnet.ts.net"
-				bind:value={serverDraft}
-				autocomplete="off"
-			/>
-			<button type="submit" disabled={!serverDraft.trim()}>Use</button>
-		</form>
-	{:else}
 		<div class="search">
 			<input
 				bind:this={searchBox}
@@ -140,6 +112,7 @@ channel or start a video. State lives in `ListenMode`. -->
 					onclick={() => setKind("channel")}>Channels</button
 				>
 			</div>
+			<button type="button" class="close search-close" aria-label="Close" onclick={onClose}>×</button>
 		</div>
 		<label class="filter">
 			<input type="checkbox" bind:checked={mode.onlyAvailable} />
@@ -225,20 +198,6 @@ channel or start a video. State lives in `ListenMode`. -->
 				{/each}
 			</div>
 		{/each}
-		{#if server}
-			<p class="quiet server-line">
-				Clip server {server} ·
-				<button
-					type="button"
-					class="change"
-					onclick={() => {
-						serverDraft = server;
-						mode.setServer("");
-					}}>Change</button
-				>
-			</p>
-		{/if}
-	{/if}
 </section>
 
 <style>
@@ -264,19 +223,6 @@ channel or start a video. State lives in `ListenMode`. -->
 			animation: none;
 		}
 	}
-	.bar {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-	}
-	h2 {
-		margin: 0;
-		font-size: 1.25rem;
-	}
-	h2 .lang {
-		color: var(--muted);
-		font-weight: 500;
-	}
 	h3 {
 		margin: 0.8rem 0 0;
 		font-size: 0.8rem;
@@ -296,31 +242,23 @@ channel or start a video. State lives in `ListenMode`. -->
 		padding: 0.3rem 0.5rem;
 		border-radius: 0.4rem;
 	}
+	.search-close {
+		margin-left: auto;
+	}
 	.close:hover,
 	.remove:hover {
 		color: var(--ink);
 		background: var(--hover-wash);
 	}
+	/* Phones: the box takes the row, the switch and × wrap below. */
 	.search {
 		display: flex;
+		flex-wrap: wrap;
 		gap: 0.5rem;
 		align-items: center;
 	}
-	.server-line {
-		margin-top: 0.6rem;
-		font-size: 0.8rem;
-	}
-	.change {
-		border: none;
-		background: none;
-		padding: 0;
-		font: inherit;
-		color: var(--accent);
-		cursor: pointer;
-	}
-	.search input,
-	.server input {
-		flex: 1 1 auto;
+	.search input {
+		flex: 1 1 15rem;
 		min-width: 0;
 		font: inherit;
 		font-size: 1rem;
@@ -330,8 +268,7 @@ channel or start a video. State lives in `ListenMode`. -->
 		background: transparent;
 		color: var(--ink);
 	}
-	.search input:focus,
-	.server input:focus {
+	.search input:focus {
 		outline: none;
 		border-color: var(--focus);
 	}
@@ -468,8 +405,7 @@ channel or start a video. State lives in `ListenMode`. -->
 		margin-left: auto;
 		font-size: 1.1rem;
 	}
-	.add,
-	.server button {
+	.add {
 		flex: 0 0 auto;
 		border: 1px solid var(--line-soft);
 		background: transparent;
@@ -481,8 +417,7 @@ channel or start a video. State lives in `ListenMode`. -->
 		border-radius: 999px;
 		cursor: pointer;
 	}
-	.add:disabled,
-	.server button:disabled {
+	.add:disabled {
 		color: var(--muted);
 		cursor: default;
 	}
@@ -497,17 +432,6 @@ channel or start a video. State lives in `ListenMode`. -->
 		border-radius: 0.6rem;
 		background: var(--error-bg);
 		color: var(--error-ink);
-		font-size: 0.9rem;
-	}
-	.server {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.5rem;
-	}
-	.server p {
-		flex: 1 0 100%;
-		margin: 0;
-		color: var(--muted);
 		font-size: 0.9rem;
 	}
 </style>

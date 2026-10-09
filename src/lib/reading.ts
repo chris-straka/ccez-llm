@@ -907,16 +907,21 @@ export interface AnnotationQuestion {
  * asks to be taught the quote).
  */
 export function buildAnnotationAnswerMessages(
-	q: AnnotationQuestion
+	q: AnnotationQuestion,
+	opts: { inPassageLang?: boolean } = {}
 ): Array<{ role: string; content: string }> {
 	const quote = q.quote.trim();
 	const asked = q.question.trim();
+	const language = opts.inPassageLang
+		? `Write in the passage's own language, in plain words an ` +
+			`intermediate learner reads easily; `
+		: `Write in English, whatever language the passage is in; `;
 	return [
 		{
 			role: "system",
 			content:
 				`You explain a quoted passage to a language learner reading ` +
-				`it. Write in English, whatever language the passage is in; ` +
+				`it. ${language}` +
 				`quote its words as they are. First give what it means in this paragraph, in one plain ` +
 				`sentence: its sense here, not a dictionary list. Then teach the ` +
 				`quote as language, not gist, but only what a learner would not ` +
@@ -950,11 +955,12 @@ export function buildAnnotationAnswerMessages(
 export async function annotationAnswer(
 	provider: ChatProvider,
 	q: AnnotationQuestion,
-	signal?: AbortSignal
+	signal?: AbortSignal,
+	opts: { inPassageLang?: boolean } = {}
 ): Promise<string> {
 	if (!q.quote.trim()) throw new Error("Nothing to answer about.");
 	const result = await provider.chat(
-		buildAnnotationAnswerMessages(q) as Array<{
+		buildAnnotationAnswerMessages(q, opts) as Array<{
 			role: "system" | "user" | "assistant";
 			content: string;
 		}>,

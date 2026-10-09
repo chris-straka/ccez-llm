@@ -26,13 +26,13 @@ function video(id: string, audio: ListenVideo["audio"], captions = true): Listen
 		thumbnail: "",
 		original_lang: "en-US",
 		audio,
-		captions: captions && audio ? { key: "fr-orig", kind: "asr" } : null
+		captions: captions && audio ? { key: "a.fr", kind: "asr" } : null
 	};
 }
 const dub = (id: string, auto = true): ListenVideo =>
-	video(id, { kind: "dub", lang: "fr-FR", format_id: "139-4", ext: "m4a", auto });
+	video(id, { kind: "dub", lang: "fr-FR", itag: 139, track: "fr-FR.10", mime: "audio/mp4", auto });
 const native = (id: string): ListenVideo =>
-	video(id, { kind: "native", lang: "fr", format_id: "139", ext: "m4a", auto: false });
+	video(id, { kind: "native", lang: "fr", itag: 139, track: null, mime: "audio/mp4", auto: false });
 
 describe("labels", () => {
 	it("says plainly when a language is missing", () => {
@@ -55,7 +55,8 @@ describe("labels", () => {
 	it("formats durations and errors", () => {
 		expect(formatDuration(521)).toBe("8:41");
 		expect(formatDuration(3723)).toBe("1:02:03");
-		expect(listenErrorCopy(new Error("listen-no-ytdlp"), "French")).toMatch(/brew install yt-dlp/);
+		expect(listenErrorCopy(new Error("listen-needs-app"), "French")).toMatch(/runs in the app/);
+		expect(listenErrorCopy(new Error("listen-network"), "French")).toMatch(/Can't reach YouTube/);
 		expect(listenErrorCopy(new Error("listen-no-track"), "German")).toBe("That video has no German audio.");
 	});
 });

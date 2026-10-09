@@ -24,8 +24,9 @@ export interface ListenVideo {
 	audio: {
 		kind: "native" | "dub";
 		lang: string;
-		format_id: string;
-		ext: string;
+		itag: number;
+		track: string | null;
+		mime: string;
 		auto: boolean;
 	} | null;
 	captions: { key: string; kind: "asr" | "uploaded" } | null;
@@ -133,19 +134,16 @@ export interface ClipState {
 /** Error codes from the backend into one sentence each. */
 export function listenErrorCopy(error: unknown, langName: string): string {
 	const message = error instanceof Error ? error.message : String(error);
-	if (message.includes("listen-no-ytdlp"))
-		return "Listening needs yt-dlp on this Mac: brew install yt-dlp";
-	if (message.includes("listen-needs-server"))
-		return "Listening here needs your clip server: paste its address below.";
+	if (message.includes("listen-needs-app")) return "Listening runs in the app, on your Mac or phone.";
 	if (message.includes("listen-no-track")) return `That video has no ${langName} audio.`;
 	if (message.includes("listen-no-captions"))
 		return `That video's ${langName} audio has no transcript to check against.`;
 	if (message.includes("listen-timeout")) return "YouTube took too long. Try again.";
+	if (message.includes("listen-network")) return "Can't reach YouTube. Check the connection.";
+	if (message.includes("listen-bot-check")) return "YouTube is asking for a check right now. Try again in a minute.";
+	if (message.includes("listen-unavailable")) return "That video can't be played here.";
 	if (message.includes("listen-no-videos")) return "No videos to drill on this channel.";
 	if (message.includes("listen-bad-channel")) return "That doesn't look like a YouTube channel.";
-	if (message.includes("listen-origin")) return "The clip server refused this app.";
-	if (message.includes("Failed to fetch") || message.includes("NetworkError") || message.includes("Load failed"))
-		return "Can't reach the clip server.";
 	return "That didn't load. Try again.";
 }
 
