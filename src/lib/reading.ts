@@ -903,7 +903,8 @@ export interface AnnotationQuestion {
 
 /**
  * One-shot messages answering an annotation in its original context:
- * the system states what the quote means in its paragraph first,
+ * the system glosses the quote on its own first, then what it means
+ * in its paragraph ("Abrupt. Here it means …"),
  * then teaches only the non-obvious language of the quote (never a
  * gist summary, never a slot-by-slot checklist), and caps the length
  * so the answer fits its popup; the user carries
@@ -928,12 +929,12 @@ export function buildAnnotationAnswerMessages(
 					`You gloss a quoted word or phrase for a language learner who ` +
 					`is reading the passage right now, so the context needs no ` +
 					`retelling. ${language}quote its words as they are. Open ` +
-					`straight with "Means" and its sense here, never restating ` +
-					`the quote or opening with "Here": for example "Means soaked, ` +
-					`dripping wet; past participle of tremper." Add one short ` +
-					`clause only for a form, idiom or false friend that would ` +
-					`trip a learner. No markdown. At most ` +
-					`${ANNOTATION_BRIEF_WORDS} words.`
+					`with what the quote means on its own, as a bare gloss with ` +
+					`no preamble, then "Here it means" and its sense in this ` +
+					`sentence: for example "Abrupt, sudden. Here it means the ` +
+					`escalation came all at once." Add one short clause only for ` +
+					`a form, idiom or false friend that would trip a learner. No ` +
+					`markdown. At most ${ANNOTATION_BRIEF_WORDS} words.`
 			},
 			{
 				role: "user",
@@ -947,8 +948,10 @@ export function buildAnnotationAnswerMessages(
 			content:
 				`You explain a quoted passage to a language learner reading ` +
 				`it. ${language}` +
-				`quote its words as they are. First give what it means in this paragraph, in one plain ` +
-				`sentence: its sense here, not a dictionary list. Then teach the ` +
+				`quote its words as they are. Open with what the quote means on its ` +
+				`own, as a bare gloss with no preamble (for example "Abrupt, ` +
+				`sudden."), then "Here it means" and its sense in this paragraph ` +
+				`in one plain sentence, not a dictionary list. Then teach the ` +
 				`quote as language, not gist, but only what a learner would not ` +
 				`work out alone: unexpected word forms, idioms, false friends, ` +
 				`nuance or register, and how the words fit together when that ` +

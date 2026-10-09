@@ -998,13 +998,15 @@ describe("annotationAnswer", () => {
 		expect(system!.content).toContain("word forms");
 		expect(system!.content).toContain("how the words fit together");
 		expect(system!.content).toContain("reusable vocabulary");
-		expect(system!.content).toContain("what it means in this paragraph");
+		expect(system!.content).toContain("means on its own, as a bare gloss");
+		expect(system!.content).toContain('"Here it means" and its sense in this paragraph');
 	});
 
-	it("a bare-A filing gets a short gloss that opens with the meaning", () => {
+	it("a bare-A filing gets a short gloss: the word alone, then here", () => {
 		const [system, user] = buildAnnotationAnswerMessages({ ...q, question: "", brief: true });
 		expect(system!.content).toContain(`${ANNOTATION_BRIEF_WORDS} words`);
-		expect(system!.content).toContain('Open straight with "Means"');
+		expect(system!.content).toContain("means on its own, as a bare gloss");
+		expect(system!.content).toContain('"Here it means"');
 		expect(system!.content).not.toContain(`${ANNOTATION_ANSWER_WORDS} words`);
 		expect(user!.content).toContain('Quoted: "la neige"');
 		expect(user!.content).not.toContain("Question:");
@@ -1034,17 +1036,16 @@ describe("annotationAnswer", () => {
 		expect(system!.content).toContain("Stay on the quoted words");
 	});
 
-	it("states the in-paragraph meaning before the grammar details", () => {
+	it("glosses the quote alone, then its sense here, before the grammar details", () => {
 		const [system] = buildAnnotationAnswerMessages(q);
 		const text = system!.content;
-		// The popup leads with what the quote means here; the word
-		// forms and fit-together come after, never first.
-		expect(text.indexOf("what it means in this paragraph")).toBeGreaterThanOrEqual(
-			0
-		);
-		expect(text.indexOf("what it means in this paragraph")).toBeLessThan(
-			text.indexOf("word forms")
-		);
+		// The popup leads with the bare gloss ("Abrupt."), then what the
+		// quote means here; word forms and fit-together come after.
+		const gloss = text.indexOf("means on its own");
+		const here = text.indexOf('"Here it means"');
+		expect(gloss).toBeGreaterThanOrEqual(0);
+		expect(here).toBeGreaterThan(gloss);
+		expect(here).toBeLessThan(text.indexOf("word forms"));
 	});
 
 	it("asks to be taught the quote for an empty comment", () => {
