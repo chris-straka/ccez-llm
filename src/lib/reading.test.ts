@@ -24,6 +24,7 @@ import {
 	runModelAid,
 	annotationAnswer,
 	buildAnnotationAnswerMessages,
+	ANNOTATION_BRIEF_WORDS,
 	ANNOTATION_ANSWER_WORDS,
 	MODEL_AIDS,
 	MODEL_AID_FOR_SCRIPT,
@@ -998,6 +999,20 @@ describe("annotationAnswer", () => {
 		expect(system!.content).toContain("how the words fit together");
 		expect(system!.content).toContain("reusable vocabulary");
 		expect(system!.content).toContain("what it means in this paragraph");
+	});
+
+	it("a bare-A filing gets a short gloss that opens with the meaning", () => {
+		const [system, user] = buildAnnotationAnswerMessages({ ...q, question: "", brief: true });
+		expect(system!.content).toContain(`${ANNOTATION_BRIEF_WORDS} words`);
+		expect(system!.content).toContain('Open straight with "Means"');
+		expect(system!.content).not.toContain(`${ANNOTATION_ANSWER_WORDS} words`);
+		expect(user!.content).toContain('Quoted: "la neige"');
+		expect(user!.content).not.toContain("Question:");
+	});
+
+	it("a typed question gets the full answer even on a brief filing", () => {
+		const [system] = buildAnnotationAnswerMessages({ ...q, brief: true });
+		expect(system!.content).toContain(`${ANNOTATION_ANSWER_WORDS} words`);
 	});
 
 	it("answers in English even when the passage is not", () => {

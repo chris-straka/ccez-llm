@@ -303,6 +303,13 @@ describe("filing", () => {
 		await vi.waitFor(() => expect(calls.answers).toHaveLength(1));
 	});
 
+	it("a bare-A filing asks for the brief gloss", async () => {
+		const { drafts, calls } = harness();
+		drafts.filePending({ ...note(), brief: true }, "");
+		await vi.waitFor(() => expect(calls.answers).toHaveLength(1));
+		expect(calls.answers[0]?.brief).toBe(true);
+	});
+
 	it("filePending nulls out with nothing pending", () => {
 		const { drafts, calls } = harness();
 		expect(drafts.filePending(null, "why?")).toBeNull();

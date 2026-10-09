@@ -61,6 +61,11 @@ export interface Annotation {
 	 * start unpinned, so a stale approval can't ride a later send).
 	 */
 	pinnedToPrompt?: boolean;
+	/**
+	 * Filed by bare A (the instant path, no note): answered as a short
+	 * gloss instead of the full lesson Shift+A and typed questions get.
+	 */
+	brief?: boolean;
 }
 
 export function newAnnotationId(): AnnotationId {

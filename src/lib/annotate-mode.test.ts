@@ -338,6 +338,7 @@ describe("annotate", () => {
 		expect(filed).toHaveLength(1);
 		expect(filed[0]?.comment).toBe("note");
 		expect(calls.asks).toEqual([filed[0]?.id]);
+		expect(filed[0]?.brief).toBe(true);
 		expect(getPending()).toBeNull();
 		expect(calls.panels).toBe(1);
 	});

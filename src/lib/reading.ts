@@ -889,12 +889,16 @@ export function vocalizeArabic(
 in-context meaning, still short enough for the popup (the page
 scrolls to fit the card). */
 export const ANNOTATION_ANSWER_WORDS = 90;
+/** Cap for a brief (bare A) answer: a gloss, not a lesson. */
+export const ANNOTATION_BRIEF_WORDS = 25;
 
 /** One annotation question: the quote, the comment, and its paragraph. */
 export interface AnnotationQuestion {
 	quote: string;
 	question: string;
 	context: string;
+	/** Bare A filing: a short gloss (ignored once a question is typed). */
+	brief?: boolean;
 }
 
 /**
@@ -916,6 +920,27 @@ export function buildAnnotationAnswerMessages(
 		? `Write in the passage's own language, in plain words an ` +
 			`intermediate learner reads easily; `
 		: `Write in English, whatever language the passage is in; `;
+	if (q.brief && !asked) {
+		return [
+			{
+				role: "system",
+				content:
+					`You gloss a quoted word or phrase for a language learner who ` +
+					`is reading the passage right now, so the context needs no ` +
+					`retelling. ${language}quote its words as they are. Open ` +
+					`straight with "Means" and its sense here, never restating ` +
+					`the quote or opening with "Here": for example "Means soaked, ` +
+					`dripping wet; past participle of tremper." Add one short ` +
+					`clause only for a form, idiom or false friend that would ` +
+					`trip a learner. No markdown. At most ` +
+					`${ANNOTATION_BRIEF_WORDS} words.`
+			},
+			{
+				role: "user",
+				content: `Paragraph:\n${q.context}\n\nQuoted: "${quote}"`
+			}
+		];
+	}
 	return [
 		{
 			role: "system",

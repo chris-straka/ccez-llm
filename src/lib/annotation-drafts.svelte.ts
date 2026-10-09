@@ -248,7 +248,8 @@ export class AnnotationDrafts {
 			const answer = await this.deps.answerQuestion(provider, {
 				quote: ann.quote,
 				question: ann.comment,
-				context: this.deps.answerContextFor(ann)
+				context: this.deps.answerContextFor(ann),
+				...(ann.brief ? { brief: true } : {})
 			});
 			this.list = attachAnnotationAnswer(this.list, ann.id, answer);
 			// Story notes have no badge to turn orange or pin from:
