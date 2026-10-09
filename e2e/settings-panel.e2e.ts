@@ -23,13 +23,13 @@ test("thinking pills fit on one line", async ({ page }) => {
 	expect(new Set(tops).size).toBe(1);
 });
 
-test("own-bubble toggle reads as Enable background on my messages", async ({
+test("own-bubble toggle reads as Background on my messages, under Enable", async ({
 	page
 }) => {
 	await expect(
 		page
 			.locator(".settings-panel")
-			.getByText("Enable background on my messages")
+			.getByText("Background on my messages")
 	).toBeVisible();
 });
 
@@ -82,7 +82,7 @@ test("own-bubble checkbox follows the hover row", async ({ page }) => {
 		};
 		return {
 			hover: find("message buttons on hover"),
-			bubble: find("Enable background on my messages")
+			bubble: find("Background on my messages")
 		};
 	});
 	expect(tops.hover).not.toBeNull();
@@ -269,7 +269,7 @@ test("own-bubble switch keeps left alignment, background follows", async ({
 	await expect(bubble).toHaveCSS("text-align", "left");
 	await page
 		.locator(".settings-panel")
-		.getByText("Enable background on my messages")
+		.getByText("Background on my messages")
 		.click();
 	await expect(bubble).toHaveCSS("background-color", "rgb(241, 241, 244)");
 	await expect(bubble).toHaveCSS("text-align", "left");
@@ -315,7 +315,7 @@ test("transparency sliders are gone and surfaces stay solid", async ({
 test("reply notification toggle persists", async ({ page }) => {
 	const box = page
 		.locator(".settings-panel label", {
-			hasText: "Enable notifications"
+			hasText: "Notifications"
 		})
 		.locator("input");
 	await expect(box).toBeChecked();

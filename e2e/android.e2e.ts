@@ -2553,7 +2553,7 @@ test.describe("touch", () => {
 		await swipeTwoFinger(page, 300, 150);
 		await page.locator(".settings-panel").waitFor();
 		const box = page.locator(
-			'label.check:has-text("Enable haptic feedback") input'
+			'label.check:has-text("Haptic feedback") input'
 		);
 		await expect(box).toBeChecked();
 		// The off state persists through the next settings flush:
@@ -3029,7 +3029,7 @@ test.describe("always-visible prompt", () => {
 		await expect(aside).toHaveClass(/collapsed/);
 	});
 
-	/** Unchecked "Enable fold on swipe" sends the stroke to settings. */
+	/** Unchecked "Fold on swipe" sends the stroke to settings. */
 	test("fold on swipe off opens settings from a message stroke", async ({
 		page
 	}) => {

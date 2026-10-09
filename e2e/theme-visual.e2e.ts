@@ -241,7 +241,7 @@ for (const t of THEMES) {
 		await page.keyboard.press("Meta+,");
 		await page
 			.locator(".settings-panel")
-			.getByText("Enable background on my messages")
+			.getByText("Background on my messages")
 			.click();
 		await expect(page.locator("article.user .bubble").first()).toHaveCSS(
 			"background-color",

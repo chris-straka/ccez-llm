@@ -124,6 +124,7 @@ export class ListenMode {
 	private queued: number | null = null;
 	/** Counts play() calls, so only the latest one's failure counts. */
 	private playRun = 0;
+	private volume = 1;
 	private browseSeq = 0;
 	private gradeQueue: { chatId: ChatId; i: number }[] = [];
 	private gradesRunning = 0;
@@ -343,6 +344,7 @@ export class ListenMode {
 				const url = URL.createObjectURL(new Blob([bytes], { type: fetched.audio_mime }));
 				const el = new Audio();
 				el.preload = "auto";
+				el.volume = this.volume;
 				el.src = url;
 				this.audio = el;
 				this.audioUrl = url;
@@ -358,6 +360,12 @@ export class ListenMode {
 			}
 		})();
 		return this.audioLoad;
+	}
+
+	/** The drill audio's volume (0-1), live on the clip playing. */
+	setVolume(volume: number): void {
+		this.volume = Math.min(1, Math.max(0, volume));
+		if (this.audio) this.audio.volume = this.volume;
 	}
 
 	/** Silence the track (playhead and queue untouched). */

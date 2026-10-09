@@ -850,8 +850,20 @@ this renders exactly as the bare text did. */
 .settings-inner fieldset.hover-row .check {
 	margin-bottom: 0;
 }
-.settings-inner fieldset.hover-row + .check {
+.settings-inner fieldset.hover-row + .check,
+.settings-inner fieldset.hover-row + fieldset {
 	margin-top: 0.9rem;
+}
+/* On/off features: one "Enable" legend over a grid of checks, two
+	columns where they fit (one when the panel is narrow or zoomed).
+	The grid gap replaces the stacked check rhythm. */
+.settings-inner .toggle-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(min(100%, 11.5rem), 1fr));
+	gap: 0.55rem 1.2rem;
+}
+.settings-inner .toggle-grid .check {
+	margin: 0;
 }
 .settings-inner fieldset.hover-row .check + .check {
 	margin-top: 0;

@@ -137,16 +137,16 @@ describe("desktop voice copy and controls", () => {
 		// The toggle moved out of VoicePanel (buried under the pickers)
 		// into DefaultsPanel's Messages group, both branches.
 		const voice = panelSource("VoicePanel.svelte");
-		expect(voice).not.toMatch(/Enable microphone dictation/);
+		expect(voice).not.toMatch(/Microphone dictation/);
 		const defaults = panelSource("DefaultsPanel.svelte");
 		const android = defaults.indexOf("{#if androidUI}");
 		if (android === -1) throw new Error("no android branch");
 		const desktop = defaults.indexOf("{:else}", android);
 		if (desktop === -1) throw new Error("no desktop branch");
 		expect(defaults.slice(android, desktop)).toMatch(
-			/Enable microphone dictation/
+			/Microphone dictation/
 		);
-		expect(defaults.slice(desktop)).toMatch(/Enable microphone dictation/);
+		expect(defaults.slice(desktop)).toMatch(/Microphone dictation/);
 	});
 	it("offers the message-buttons master switch on both platforms", () => {
 		// Phones used to render the row unconditionally (no shortcuts
@@ -156,8 +156,8 @@ describe("desktop voice copy and controls", () => {
 		if (android === -1) throw new Error("no android branch");
 		const desktop = defaults.indexOf("{:else}", android);
 		if (desktop === -1) throw new Error("no desktop branch");
-		expect(defaults.slice(android, desktop)).toMatch(/Enable message buttons/);
-		expect(defaults.slice(desktop)).toMatch(/Enable message buttons/);
+		expect(defaults.slice(android, desktop)).toMatch(/>Message buttons</);
+		expect(defaults.slice(desktop)).toMatch(/>Message buttons</);
 	});
 });
 

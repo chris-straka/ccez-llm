@@ -2257,6 +2257,9 @@ import {
 		setChatReplyLang(chatState, chatState.activeChatId, lang);
 		listenMode.enter(lang);
 	}
+	$effect(() => {
+		listenMode.setVolume(settings.listenVolume);
+	});
 	// Leaving a drill chat stops its sound; a chat with messages never
 	// shows the browse screen. The effect also reruns as messages land,
 	// so only an actual chat switch stops the sound: a new clip row must

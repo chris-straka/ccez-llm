@@ -280,6 +280,8 @@ export interface AppSettings {
 	readerWords: number;
 	/** Voice speed multiplier for every read-aloud (0.5-1.5, 1 = normal). */
 	voiceSpeed: number;
+	/** Listening drill audio volume, 0-1 (1 = as the video has it). */
+	listenVolume: number;
 	/**
 	 * Seconds of no mouse/keyboard/touch input before the main prompt
 	 * slides down out of view (any input restores it instantly).
@@ -593,6 +595,7 @@ export function defaultSettings(): AppSettings {
 		readerMode: "off",
 		readerWords: 0,
 		voiceSpeed: VOICE_SPEED_DEFAULT,
+		listenVolume: 1,
 		promptIdleSec: PROMPT_IDLE_DEFAULT,
 		voiceLangPinned: false,
 		theme: "system",
@@ -923,6 +926,10 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 				VOICE_SPEED_MAX,
 				Math.max(VOICE_SPEED_MIN, merged.voiceSpeed)
 			);
+		merged.listenVolume =
+			typeof merged.listenVolume === "number" && !Number.isNaN(merged.listenVolume)
+				? Math.min(1, Math.max(0, merged.listenVolume))
+				: 1;
 		// Backfill line spacing on older saves; clamp strays into range.
 		if (typeof merged.lineHeight !== "number" || Number.isNaN(merged.lineHeight))
 			merged.lineHeight = LINE_HEIGHT_DEFAULT;

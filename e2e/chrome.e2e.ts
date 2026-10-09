@@ -157,7 +157,7 @@ test("double-click closes the settings panel", async ({ page }) => {
 	// nothing and closes nothing (it toggles the box twice).
 	await openSettings(page);
 	await expect(panel).not.toHaveClass(/closed/);
-	await panel.getByText("Enable background on my messages").dblclick();
+	await panel.getByText("Background on my messages").dblclick();
 	await expect(panel).not.toHaveClass(/closed/);
 });
 

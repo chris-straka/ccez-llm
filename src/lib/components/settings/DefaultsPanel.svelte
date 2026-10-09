@@ -138,50 +138,56 @@
 				<span>Show message buttons only when tapped</span>
 			</label>
 			<label class="check">
-				<input type="checkbox" bind:checked={settings.foldOnSwipe} />
-				<span>Enable fold on swipe</span>
-			</label>
-			<label class="check">
-				<input type="checkbox" bind:checked={settings.showMessageButtons} />
-				<span>Enable message buttons</span>
-			</label>
-			<label class="check">
-				<input type="checkbox" bind:checked={settings.ownBubble} />
-				<span>Enable background on my messages</span>
-			</label>
-			<label class="check">
-				<input type="checkbox" bind:checked={settings.inspectEnabled} />
-				<span>Enable inspect for han characters</span>
-			</label>
-			<label class="check">
 				<input type="checkbox" bind:checked={settings.annotationAnswersInPassageLang} />
 				<span>Answer annotations in the passage's language</span>
 			</label>
-			<label class="check">
-				<input type="checkbox" bind:checked={settings.flashcardsEnabled} />
-				<span>Enable flashcards</span>
-			</label>
-			<label class="check">
-				<input type="checkbox" bind:checked={settings.aiTitles} />
-				<span>Enable AI chat titles</span>
-			</label>
-			<label class="check">
-				<input type="checkbox" bind:checked={settings.hapticsEnabled} />
-				<span>Enable haptic feedback</span>
-			</label>
-			<label class="check">
-				<input type="checkbox" bind:checked={settings.replyNotifications} />
-				<span>Enable notifications</span>
-			</label>
-			<label class="check">
-				<input type="checkbox" bind:checked={settings.micEnabled} />
-				<span>Enable microphone dictation</span>
-			</label>
+		</fieldset>
+		<!-- On/off features under one "Enable" legend, two columns where
+		the panel has room (one when narrow or zoomed). -->
+		<fieldset class="toggles">
+			<legend>Enable</legend>
+			<div class="toggle-grid">
+				<label class="check">
+					<input type="checkbox" bind:checked={settings.foldOnSwipe} />
+					<span>Fold on swipe</span>
+				</label>
+				<label class="check">
+					<input type="checkbox" bind:checked={settings.showMessageButtons} />
+					<span>Message buttons</span>
+				</label>
+				<label class="check">
+					<input type="checkbox" bind:checked={settings.ownBubble} />
+					<span>Background on my messages</span>
+				</label>
+				<label class="check">
+					<input type="checkbox" bind:checked={settings.inspectEnabled} />
+					<span>Inspect for han characters</span>
+				</label>
+				<label class="check">
+					<input type="checkbox" bind:checked={settings.flashcardsEnabled} />
+					<span>Flashcards</span>
+				</label>
+				<label class="check">
+					<input type="checkbox" bind:checked={settings.aiTitles} />
+					<span>AI chat titles</span>
+				</label>
+				<label class="check">
+					<input type="checkbox" bind:checked={settings.hapticsEnabled} />
+					<span>Haptic feedback</span>
+				</label>
+				<label class="check">
+					<input type="checkbox" bind:checked={settings.replyNotifications} />
+					<span>Notifications</span>
+				</label>
+				<label class="check">
+					<input type="checkbox" bind:checked={settings.micEnabled} />
+					<span>Microphone dictation</span>
+				</label>
+			</div>
 		</fieldset>
 	{:else}
 		<!-- One row for both hover toggles: the label names the behavior once,
-		each box names whose buttons it covers. Desktop-only (this branch),
-		with the bubble toggle below the row. -->
+		each box names whose buttons it covers. Desktop-only (this branch). -->
 		<fieldset class="hover-row">
 			<legend>Show message buttons on hover for:</legend>
 			<label class="check">
@@ -193,58 +199,63 @@
 				<span>LLM messages</span>
 			</label>
 		</fieldset>
-		<label class="check">
-			<input type="checkbox" bind:checked={settings.ownBubble} />
-			<span>Enable background on my messages</span>
-		</label>
+		<fieldset class="toggles">
+			<legend>Enable</legend>
+			<div class="toggle-grid">
+				<label class="check">
+					<input type="checkbox" bind:checked={settings.ownBubble} />
+					<span>Background on my messages</span>
+				</label>
+				<label class="check">
+					<input type="checkbox" bind:checked={settings.showMessageButtons} />
+					<span>Message buttons</span>
+				</label>
+				<label class="check">
+					<input type="checkbox" bind:checked={settings.inspectEnabled} />
+					<span>Inspect for han characters</span>
+				</label>
+				<label class="check">
+					<input type="checkbox" bind:checked={settings.flashcardsEnabled} />
+					<span>Flashcards</span>
+				</label>
+				<label class="check">
+					<input type="checkbox" bind:checked={settings.aiTitles} />
+					<span>AI chat titles</span>
+				</label>
+				<label class="check">
+					<input type="checkbox" bind:checked={settings.replyNotifications} />
+					<span>Notifications</span>
+				</label>
+				{#if micRow}
+					<label class="check">
+						<input type="checkbox" bind:checked={settings.micEnabled} />
+						<span>Microphone dictation</span>
+					</label>
+				{/if}
+				{#if captureRows}
+					<label class="check">
+						<input type="checkbox" bind:checked={settings.captureEnabled} />
+						<span>Screen-capture OCR</span>
+					</label>
+					<label class="check">
+						<input
+							type="checkbox"
+							bind:checked={settings.gameLine}
+							onchange={() => gameLineToggle()}
+						/>
+						<span>Game line overlay</span>
+					</label>
+				{/if}
+			</div>
+		</fieldset>
 		<label class="check">
 			<input type="checkbox" bind:checked={settings.scaleActionsWithFont} />
 			<span>Scale message icons with text size</span>
 		</label>
 		<label class="check">
-			<input type="checkbox" bind:checked={settings.showMessageButtons} />
-			<span>Enable message buttons</span>
-		</label>
-		<label class="check">
-			<input type="checkbox" bind:checked={settings.inspectEnabled} />
-			<span>Enable inspect for han characters</span>
-		</label>
-		<label class="check">
 			<input type="checkbox" bind:checked={settings.annotationAnswersInPassageLang} />
 			<span>Answer annotations in the passage's language</span>
 		</label>
-		<label class="check">
-			<input type="checkbox" bind:checked={settings.flashcardsEnabled} />
-			<span>Enable flashcards</span>
-		</label>
-		<label class="check">
-			<input type="checkbox" bind:checked={settings.aiTitles} />
-			<span>Enable AI chat titles</span>
-		</label>
-		<label class="check">
-			<input type="checkbox" bind:checked={settings.replyNotifications} />
-			<span>Enable notifications</span>
-		</label>
-		{#if micRow}
-			<label class="check">
-				<input type="checkbox" bind:checked={settings.micEnabled} />
-				<span>Enable microphone dictation</span>
-			</label>
-		{/if}
-		{#if captureRows}
-			<label class="check">
-				<input type="checkbox" bind:checked={settings.captureEnabled} />
-				<span>Screen-capture OCR</span>
-			</label>
-			<label class="check">
-				<input
-					type="checkbox"
-					bind:checked={settings.gameLine}
-					onchange={() => gameLineToggle()}
-				/>
-				<span>Game line overlay</span>
-			</label>
-		{/if}
 	{/if}
 	<VoicePanel bind:settings {androidUI} {followVoice} />
 	<label class="slider-row">
@@ -274,6 +285,33 @@
 			<output style="min-width: 3.6rem;"
 				>{(settings.voiceSpeed ?? VOICE_SPEED_DEFAULT).toFixed(2)}×</output
 			>
+		</span>
+	</label>
+	<!-- Drill audio level, here rather than beside the clip so a stray
+	click mid-drill never changes it. -->
+	<label class="slider-row">
+		Video volume
+		<button
+			type="button"
+			class="reset-width"
+			title="Reset to full volume"
+			onclick={() => (settings.listenVolume = 1)}>(100%)</button
+		>
+		<span class="font-row">
+			<input
+				type="range"
+				min="0"
+				max="1"
+				step="0.05"
+				value={settings.listenVolume}
+				aria-label="Video volume percent"
+				onpointerdown={noteSliderPress}
+				onpointerup={(e) => sliderRelease(e, () => (settings.listenVolume = 1))}
+				oninput={(e) => {
+					settings.listenVolume = Number(e.currentTarget.value);
+				}}
+			/>
+			<output style="min-width: 3.6rem;">{Math.round(settings.listenVolume * 100)}%</output>
 		</span>
 	</label>
 	<fieldset>

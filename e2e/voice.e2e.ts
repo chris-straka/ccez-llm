@@ -290,7 +290,7 @@ test.describe("ios-voice", () => {
 			box.getByText("Show message buttons only when tapped")
 		).toBeVisible();
 		await expect(
-			box.getByText("Enable background on my messages")
+			box.getByText("Background on my messages")
 		).toBeVisible();
 	});
 
