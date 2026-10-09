@@ -65,6 +65,7 @@ const MAC_SECTIONS: Array<[string, string[]]> = [
 			"Reading aids",
 			"Stroke order step",
 			"Flashcards",
+			"Listening drill",
 			"Capture window text",
 			"Set capture area"
 		]
