@@ -11,6 +11,8 @@ Root keeps what every session needs: `README.md` (what the app is),
 - `design/colors.md` — palette rules (pinned by
   `src/routes/color-tokens.test.ts`).
 - `design/plugins.md` — Tauri plugin inventory and skipped candidates.
+- `design/listening.md` — listening drills: the loop, the yt-dlp
+  pipeline, and the clip server for phone and web.
 - `investigations/cjkdecomp-eval.md` — license and data verdict behind
   `src/lib/cjkdecomp-subset.generated.ts`.
 - `archive/android-native` branch — the pre-Tauri-mobile Kotlin app
