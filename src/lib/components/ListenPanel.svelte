@@ -92,14 +92,30 @@ channel or start a video. State lives in `ListenMode`. -->
 
 <section class="listen-panel" aria-label="Listen">
 		<div class="search">
-			<input
-				bind:this={searchBox}
-				type="search"
-				placeholder={mode.searchKind === "channel" ? "Find a channel" : "Find a video by name or topic"}
-				bind:value={() => mode.query, (v: string) => mode.setQuery(v)}
-				onkeydown={onSearchKey}
-				aria-label="Search YouTube"
-			/>
+			<span class="box">
+				<input
+					bind:this={searchBox}
+					type="search"
+					placeholder={mode.searchKind === "channel" ? "Find a channel" : "Find a video by name or topic"}
+					bind:value={() => mode.query, (v: string) => mode.setQuery(v)}
+					onkeydown={onSearchKey}
+					aria-label="Search YouTube"
+				/>
+				{#if mode.query}
+					<button
+						type="button"
+						class="clear"
+						aria-label="Clear search"
+						title="Clear (Esc)"
+						onclick={() => {
+							mode.setQuery("");
+							searchBox?.focus();
+						}}
+					>
+						<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 5l6 6M11 5l-6 6" /></svg>
+					</button>
+				{/if}
+			</span>
 			<div class="kinds" role="radiogroup" aria-label="Search for">
 				<button
 					type="button"
@@ -281,12 +297,20 @@ channel or start a video. State lives in `ListenMode`. -->
 		gap: 0.5rem;
 		align-items: center;
 	}
-	.search input {
+	/* The box and its clear button: a small round × inside the field's
+	right edge, unlike the panel's close × which sits apart. */
+	.box {
+		position: relative;
 		flex: 1 1 15rem;
+		min-width: 0;
+		display: flex;
+	}
+	.search input {
+		flex: 1 1 auto;
 		min-width: 0;
 		font: inherit;
 		font-size: 1rem;
-		padding: 0.6rem 0.8rem;
+		padding: 0.6rem 2.4rem 0.6rem 0.8rem;
 		border: 1px solid var(--line-soft);
 		border-radius: 0.7rem;
 		background: transparent;
@@ -295,6 +319,48 @@ channel or start a video. State lives in `ListenMode`. -->
 	.search input:focus {
 		outline: none;
 		border-color: var(--focus);
+	}
+	.search input::-webkit-search-cancel-button {
+		-webkit-appearance: none;
+		appearance: none;
+	}
+	.clear {
+		position: absolute;
+		right: 0.55rem;
+		top: 50%;
+		transform: translateY(-50%);
+		width: 1.4rem;
+		height: 1.4rem;
+		display: grid;
+		place-items: center;
+		padding: 0;
+		border: none;
+		border-radius: 50%;
+		background: var(--line-soft);
+		color: var(--ink);
+		cursor: pointer;
+		animation: clear-in 0.12s ease;
+	}
+	.clear:hover {
+		background: var(--line);
+	}
+	.clear svg {
+		width: 0.7rem;
+		height: 0.7rem;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 2;
+		stroke-linecap: round;
+	}
+	@keyframes clear-in {
+		from {
+			opacity: 0;
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.clear {
+			animation: none;
+		}
 	}
 	.kinds {
 		display: flex;

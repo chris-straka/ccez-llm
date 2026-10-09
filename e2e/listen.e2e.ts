@@ -195,6 +195,15 @@ test("the search box searches on a typing pause; emptying it drops the results",
 	await expect(results.locator(".video", { hasText: info.title })).toBeVisible();
 	await search.fill("");
 	await expect(results).toHaveCount(0);
+	await expect(panel.getByRole("button", { name: "Clear search" })).toHaveCount(0);
+
+	// The × inside the box clears it the same way.
+	await search.fill("pakman");
+	await expect(results.locator(".video", { hasText: info.title })).toBeVisible();
+	await panel.getByRole("button", { name: "Clear search" }).click();
+	await expect(search).toHaveValue("");
+	await expect(search).toBeFocused();
+	await expect(results).toHaveCount(0);
 	await expect(panel).toContainText("Learner Channel");
 });
 
