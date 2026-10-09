@@ -38,8 +38,6 @@ export interface ListenModeDeps {
 	langName: (code: string) => string;
 	getChannels: () => ListenChannel[];
 	setChannels: (next: ListenChannel[]) => void;
-	getServer: () => string;
-	setServer: (next: string) => void;
 	resolveProvider: () => Promise<ChatProvider | null>;
 	toast: (message: string) => void;
 	/** After a clip appears: keep the newest clip in view. */
@@ -130,7 +128,7 @@ export class ListenMode {
 
 	private needBackend(): ListenBackend {
 		const backend = this.deps.backend();
-		if (!backend) throw new Error("listen-needs-server");
+		if (!backend) throw new Error("listen-needs-app");
 		return backend;
 	}
 
@@ -238,12 +236,6 @@ export class ListenMode {
 
 	removeChannel(url: string): void {
 		this.deps.setChannels(this.deps.getChannels().filter((c) => c.url !== url));
-	}
-
-	setServer(raw: string): void {
-		this.deps.setServer(raw.trim());
-		this.error = "";
-		if (this.lang) this.enter(this.lang);
 	}
 
 	/** Start a drill on `videoId` in the active (empty) chat. */

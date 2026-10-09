@@ -342,11 +342,6 @@ export interface AppSettings {
 	 */
 	listenChannels: ListenChannel[];
 	/**
-	 * Listening drills off the desktop: the learner's clip server
-	 * (`ccez-listen serve` on their tailnet). Empty = none.
-	 */
-	listenServer: string;
-	/**
 	 * Name each chat with one short model call after its first reply
 	 * (renames always win). On by default; costs a few tokens per chat.
 	 */
@@ -605,7 +600,6 @@ export function defaultSettings(): AppSettings {
 		inspectEnabled: true,
 		flashcardsEnabled: false,
 		listenChannels: [],
-		listenServer: "",
 		aiTitles: true
 	};
 }
@@ -861,7 +855,6 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 						!!c && typeof c.url === "string" && typeof c.name === "string"
 				)
 			: [];
-		if (typeof merged.listenServer !== "string") merged.listenServer = "";
 		if (typeof merged.hideMessages !== "boolean") merged.hideMessages = false;
 		if (typeof merged.micEnabled !== "boolean") merged.micEnabled = true;
 		if (typeof merged.captureEnabled !== "boolean")

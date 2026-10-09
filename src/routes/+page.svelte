@@ -308,7 +308,7 @@ import {
 	import { NewsMode } from "$lib/news-mode.svelte";
 	import { ListenMode } from "$lib/listen-mode.svelte";
 	import { listenKeyAction, summarizeDrill } from "$lib/listen";
-	import { pickBackend } from "$lib/listenBackend";
+	import { shellBackend } from "$lib/listenBackend";
 	import { drillStates } from "$lib/listenChat";
 	import { relevelNewsOpener, type CefrLevel } from "$lib/news";
 	import { AnnotateMode } from "$lib/annotate-mode.svelte";
@@ -2174,18 +2174,13 @@ import {
 	collapses the panel and the chat holds only the session.
 	State and behavior live in `NewsMode`; the page only wires
 	its collaborators here. */
-	/** Listening drills: yt-dlp on the desktop shell, the learner's
-	clip server elsewhere (null = none yet; the panel asks for one). */
+	/** Listening drills: the app's own backend on desktop and phone;
+	the plain web build has none (null), so its entry stays hidden. */
 	function listenBackend() {
-		return pickBackend({
-			desktopShell:
-				tauriBackendAvailable() &&
-				typeof navigator !== "undefined" &&
-				!isAndroidUserAgent(navigator.userAgent),
-			server: settings.listenServer,
-			invoke: async <T,>(cmd: string, args?: Record<string, unknown>) =>
-				(await import("@tauri-apps/api/core")).invoke<T>(cmd, args)
-		});
+		if (!tauriBackendAvailable()) return null;
+		return shellBackend(async <T,>(cmd: string, args?: Record<string, unknown>) =>
+			(await import("@tauri-apps/api/core")).invoke<T>(cmd, args)
+		);
 	}
 	const listenMode = new ListenMode({
 		getChatState: () => chatState,
@@ -2194,10 +2189,6 @@ import {
 		getChannels: () => settings.listenChannels,
 		setChannels: (next) => {
 			settings.listenChannels = next;
-		},
-		getServer: () => settings.listenServer,
-		setServer: (next) => {
-			settings.listenServer = next;
 		},
 		resolveProvider: () => providerKeys.resolveActive(),
 		toast: (message) => flashToast(message),
@@ -13728,8 +13719,7 @@ import {
 				session: chat.listen ?? null,
 				langName: replyLanguageFor(listenMode.lang ?? activeReplyCode ?? "")?.name ?? "",
 				channels: settings.listenChannels,
-				needsServer: listenBackend() === null,
-				server: settings.listenServer,
+				available: listenBackend() !== null,
 				summary: chat.listen && chat.messages.some((m) => m.drillEnd)
 					? summarizeDrill(drillStates(chat))
 					: null,

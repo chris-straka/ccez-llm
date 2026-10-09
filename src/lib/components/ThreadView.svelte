@@ -176,8 +176,8 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 			session: ListenSession | null;
 			langName: string;
 			channels: ListenChannel[];
-			needsServer: boolean;
-			server: string;
+			/** The app's backend exists (not the plain web build). */
+			available: boolean;
 			summary: DrillSummary | null;
 			another: () => void;
 		};
@@ -280,7 +280,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 					{flashcardsDue === 1 ? "1 flashcard due" : `${flashcardsDue} flashcards due`}
 				</button>
 			{/if}
-			{#if activeReplyCode && !listen.mode.open && !previewing}
+			{#if activeReplyCode && listen.available && !listen.mode.open && !previewing}
 				<!-- Listening drills follow the picked language. -->
 				<button
 					type="button"
@@ -296,8 +296,6 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 					lang={listen.mode.lang}
 					langName={listen.langName}
 					channels={listen.channels}
-					needsServer={listen.needsServer}
-					server={listen.server}
 				/>
 			{:else if newsPanel}
 				<NewsPanel
