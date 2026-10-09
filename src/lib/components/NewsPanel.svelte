@@ -570,10 +570,7 @@ everything else is theme tokens, never raw hex. -->
 		margin: 0;
 		padding: 0;
 		display: grid;
-		grid-template-columns: repeat(
-			auto-fill,
-			minmax(min(100%, 12.5em), 1fr)
-		);
+		grid-template-columns: repeat(auto-fill, minmax(min(100%, 12.5em), 1fr));
 		gap: 0.6em;
 	}
 	.news-item {
