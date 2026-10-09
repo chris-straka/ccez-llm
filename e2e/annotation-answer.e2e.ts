@@ -1054,3 +1054,36 @@ test("below-fold badge press survives its own trailing click", async ({
 	await page.mouse.up();
 	await expect(card).toHaveCount(0, { timeout: 5_000 });
 });
+
+/** An open answer card owns selection: a drag over other text
+selects nothing while it reads. */
+test("text outside an open answer can't be selected", async ({ page }) => {
+	test.setTimeout(120_000);
+	await seedChat(page, [
+		{ role: "assistant", content: "a first message with more words in it" },
+		{ role: "assistant", content: "the riverbank at dawn holds the fog" }
+	]);
+	await page.goto("/");
+	await expect(page.locator("article.assistant").first()).toBeVisible({
+		timeout: 60_000
+	});
+	await dragQuote(page, 1, "riverbank");
+	await expect(page.locator(".sel-menu")).toBeVisible({ timeout: 10_000 });
+	await page.keyboard.press("A");
+	await askAtFile(page, "what lives here?");
+	const ready = page.locator("button.ccez-ann-badge.ans-ready");
+	await ready.focus();
+	await page.keyboard.press("Enter");
+	await expect(page.locator(".ann-answer")).toBeVisible({ timeout: 10_000 });
+	// The card hangs below its quote: drag across the message above.
+	const other = page.locator("article.assistant .rendered").nth(0);
+	const box = (await other.boundingBox())!;
+	const y = box.y + box.height / 2;
+	await page.mouse.move(box.x + 4, y);
+	await page.mouse.down();
+	await page.mouse.move(box.x + box.width - 4, y, { steps: 8 });
+	await page.mouse.up();
+	expect(
+		await page.evaluate(() => window.getSelection()?.toString() ?? "")
+	).toBe("");
+});

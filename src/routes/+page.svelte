@@ -12138,6 +12138,37 @@
 		};
 		/** Press point for the drag-vs-click read in onMouseUp below. */
 		let downClient: { x: number; y: number } | null = null;
+		// An open annotation popup (the create pill or an answer card)
+		// owns selection: a press over other text starts no selection
+		// (its click still closes the popup), so a stray drag can't
+		// start a second highlight under it. The popups, fields, and
+		// review dock keep their presses; the create flow's live
+		// highlight stays.
+		const guardPopupSelection = (event: MouseEvent): void => {
+			if (event.button !== 0) return;
+			// A popup already fading out no longer owns the press.
+			const pillOpen = annPop !== null && !annPopClosing;
+			const cardOpen =
+				annotateMode.answerPop !== null && !annotateMode.answerClosing;
+			if (!pillOpen && !cardOpen) return;
+			const el = event.target instanceof Element ? event.target : null;
+			if (
+				!el ||
+				el.closest(
+					".ann-pop, .ann-answer, .review, input, textarea, button, a, [contenteditable], [data-ann-badge]"
+				)
+			)
+				return;
+			event.preventDefault();
+			pressGuarded = true;
+			// The refused press moves no focus: blur the pill's field by
+			// hand so its click-off save (or empty-draft cancel) still runs.
+			const active = document.activeElement;
+			if (active instanceof HTMLElement && active.closest(".ann-pop"))
+				active.blur();
+		};
+		/** This press was refused by guardPopupSelection: no drag arms. */
+		let pressGuarded = false;
 		const noteDownPoint = (event: MouseEvent): void => {
 			downClient =
 				event.button === 0 ? { x: event.clientX, y: event.clientY } : null;
@@ -12340,10 +12371,16 @@
 			// the readings panel for Han quotes (see openBadge), and
 			// this listener runs after it in the same gesture.
 			if (!target?.closest("[data-ann-badge]")) dismissSelPanels();
+			const guarded = pressGuarded;
+			pressGuarded = false;
 			selectingInMessage =
-				event.button === 0 && !!target?.closest(".messages .rendered");
+				!guarded &&
+				event.button === 0 &&
+				!!target?.closest(".messages .rendered");
 			offChatDragArmed =
-				event.button === 0 && !target?.closest(".messages .rendered");
+				!guarded &&
+				event.button === 0 &&
+				!target?.closest(".messages .rendered");
 			lastGoodDragRange = null;
 			containDragTo(selectingInMessage ? annotateMode.articleOf(target) : null);
 		};
@@ -13382,6 +13419,7 @@
 			};
 		};
 		window.addEventListener("pointerdown", onPromptPress, true);
+		window.addEventListener("mousedown", guardPopupSelection, true);
 		window.addEventListener("mousedown", dismissReview, true);
 		window.addEventListener("mousedown", onBadgePress, true);
 		window.addEventListener("mousedown", preserveMessageHighlight, true);
@@ -13395,6 +13433,7 @@
 		window.addEventListener("mouseup", clearMiddleDown);
 		document.addEventListener("selectionchange", trimMessageDrag);
 		document.addEventListener("selectionchange", notePromptSelection);
+
 		// Native fields fire select on their own range (capture: the
 		// event never bubbles).
 		document.addEventListener("select", notePromptSelection, true);
@@ -13617,6 +13656,7 @@
 			window.removeEventListener("blur", onBlur);
 			window.removeEventListener("focusin", onFocusIn);
 			window.removeEventListener("pointerdown", onPromptPress, true);
+			window.removeEventListener("mousedown", guardPopupSelection, true);
 			window.removeEventListener("mousedown", dismissReview, true);
 			window.removeEventListener("mousedown", onBadgePress, true);
 			window.removeEventListener("mousedown", preserveMessageHighlight, true);
@@ -13630,6 +13670,7 @@
 			window.removeEventListener("mouseup", clearMiddleDown);
 			document.removeEventListener("selectionchange", trimMessageDrag);
 			document.removeEventListener("selectionchange", notePromptSelection);
+
 			document.removeEventListener("select", notePromptSelection, true);
 			window.removeEventListener("scroll", onFadeScroll, true);
 			window.removeEventListener("scroll", trackSelPinyin, true);
