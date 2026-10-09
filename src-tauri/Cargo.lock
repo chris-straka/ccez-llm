@@ -587,7 +587,7 @@ dependencies = [
 
 [[package]]
 name = "ccez-llm"
-version = "0.27.0"
+version = "0.28.0"
 dependencies = [
  "base64 0.22.1",
  "block2 0.6.2",
