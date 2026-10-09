@@ -47,7 +47,7 @@ const CLAUSE_END = /[,;:—–،、，；：]["'»”’)\]]*$/u;
 /** A token made only of closing punctuation joins the word before. */
 const TRAILING_PUNCT = /^[\p{Po}\p{Pe}\p{Pf}]+$/u;
 /** Zero-width and bidi marks that uploaded subtitles sprinkle in. */
-const INVISIBLE = /[​-‏⁠﻿]/g;
+const INVISIBLE = /[\u200b-\u200f\u2060\ufeff]/g;
 /** Sound tags: [Musique], [Applause], (rires), ♪. */
 const SOUND_TAG = /^[[(].*[\])]$|^♪+$/u;
 

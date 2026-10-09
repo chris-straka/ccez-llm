@@ -7,6 +7,7 @@ import {
 	formatDuration,
 	gradePrompt,
 	listenErrorCopy,
+	listenKeyAction,
 	parseGrade,
 	rankVideos,
 	summarizeDrill,
@@ -119,5 +120,40 @@ describe("answers and summary", () => {
 			perfect: 1,
 			missed: [2, 1, 3]
 		});
+	});
+});
+
+describe("listenKeyAction", () => {
+	const base = {
+		key: " ",
+		code: "Space",
+		alt: false,
+		meta: false,
+		ctrl: false,
+		inDrill: true,
+		composerEmpty: true,
+		inComposer: true,
+		inOtherField: false
+	};
+	it("Space replays and ? reveals only with nothing typed", () => {
+		expect(listenKeyAction(base)).toBe("play");
+		expect(listenKeyAction({ ...base, composerEmpty: false })).toBe("pass");
+		expect(listenKeyAction({ ...base, key: "?", code: "Slash" })).toBe("reveal");
+		expect(listenKeyAction({ ...base, key: "?", code: "Slash", composerEmpty: false })).toBe("pass");
+	});
+	it("S slows outside the composer; a guess can start with s", () => {
+		expect(listenKeyAction({ ...base, key: "s", code: "KeyS" })).toBe("pass");
+		expect(listenKeyAction({ ...base, key: "s", code: "KeyS", inComposer: false })).toBe("slow");
+	});
+	it("⌥Space and ⌥S work mid-guess (matched on code: ⌥S types ß)", () => {
+		expect(listenKeyAction({ ...base, alt: true, composerEmpty: false })).toBe("play");
+		expect(listenKeyAction({ ...base, alt: true, key: "ß", code: "KeyS", composerEmpty: false })).toBe("slow");
+		expect(listenKeyAction({ ...base, alt: true, key: "å", code: "KeyA" })).toBe("pass");
+	});
+	it("never fires outside a drill, in other fields, or with ⌘/Ctrl", () => {
+		expect(listenKeyAction({ ...base, inDrill: false })).toBe("pass");
+		expect(listenKeyAction({ ...base, inOtherField: true })).toBe("pass");
+		expect(listenKeyAction({ ...base, meta: true })).toBe("pass");
+		expect(listenKeyAction({ ...base, ctrl: true })).toBe("pass");
 	});
 });

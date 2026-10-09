@@ -108,6 +108,7 @@ export function listenErrorCopy(error: unknown, langName: string): string {
 	if (message.includes("listen-no-captions"))
 		return `That video's ${langName} audio has no transcript to check against.`;
 	if (message.includes("listen-timeout")) return "YouTube took too long. Try again.";
+	if (message.includes("listen-no-videos")) return "No videos to drill on this channel.";
 	if (message.includes("listen-bad-channel")) return "That doesn't look like a YouTube channel.";
 	if (message.includes("listen-origin")) return "The clip server refused this app.";
 	if (message.includes("Failed to fetch") || message.includes("NetworkError") || message.includes("Load failed"))
@@ -275,4 +276,41 @@ export function summarizeDrill(states: ClipState[]): DrillSummary {
 		.slice(0, 5)
 		.map((s) => s.i);
 	return { answered: answered.length, got, total, perfect, missed };
+}
+
+export interface ListenKeyFacts {
+	key: string;
+	code: string;
+	alt: boolean;
+	meta: boolean;
+	ctrl: boolean;
+	/** The active chat is a drill with a clip to play. */
+	inDrill: boolean;
+	/** The composer holds no text. */
+	composerEmpty: boolean;
+	/** Focus is in the composer. */
+	inComposer: boolean;
+	/** Focus is in some other text field (search, settings…). */
+	inOtherField: boolean;
+}
+
+export type ListenKeyAction = "play" | "slow" | "reveal" | "pass";
+
+/**
+ * Drill keys. Space replays and "?" reveals while nothing is typed
+ * (no guess starts with either); S replays slowly only outside the
+ * composer (guesses start with s). ⌥Space / ⌥S work mid-guess.
+ * Matched on `code` where ⌥ rewrites the character (⌥S types ß).
+ */
+export function listenKeyAction(f: ListenKeyFacts): ListenKeyAction {
+	if (!f.inDrill || f.inOtherField || f.meta || f.ctrl) return "pass";
+	if (f.alt) {
+		if (f.code === "Space") return "play";
+		if (f.code === "KeyS") return "slow";
+		return "pass";
+	}
+	if (f.code === "Space" && f.composerEmpty) return "play";
+	if (f.key === "?" && f.composerEmpty) return "reveal";
+	if ((f.key === "s" || f.key === "S") && !f.inComposer) return "slow";
+	return "pass";
 }

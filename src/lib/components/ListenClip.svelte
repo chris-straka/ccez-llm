@@ -1,0 +1,291 @@
+<!-- One drill clip, above its message body: play / slow replay, where
+it sits in the video (with the source link), and once answered the
+guess marked against what was said. The transcript, translation and
+notes are the message body itself (annotatable like any reply). -->
+<script lang="ts">
+	import type { ClipState, ListenSession } from "$lib/listen";
+
+	interface Props {
+		session: ListenSession;
+		clip: ClipState;
+		/** This clip waits for the guess. */
+		open: boolean;
+		playing: { i: number; slow: boolean } | null;
+		audioStatus: "idle" | "loading" | "ready" | "error";
+		actions: {
+			play: (slow: boolean) => void;
+			regrade: () => void;
+			openSource: (url: string) => void;
+		};
+	}
+
+	let { session, clip, open, playing, audioStatus, actions }: Props = $props();
+
+	const span = $derived(session.clips[clip.i]);
+	const here = $derived(playing?.i === clip.i);
+	const answered = $derived(clip.heard !== undefined);
+	const source = $derived(
+		`https://www.youtube.com/watch?v=${session.videoId}&t=${Math.floor(span?.start ?? 0)}s`
+	);
+	const stamp = $derived.by(() => {
+		const s = Math.floor(span?.start ?? 0);
+		return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+	});
+	const words = $derived(clip.ops?.filter((o) => o.kind !== "extra").length ?? 0);
+	const heardWords = $derived(
+		clip.ops?.filter((o) => o.kind === "ok" || o.kind === "near").length ?? 0
+	);
+</script>
+
+<div class="clip" class:open class:answered>
+	<div class="controls">
+		<button
+			type="button"
+			class="play"
+			class:on={here && !playing?.slow}
+			aria-label={here && !playing?.slow ? "Stop" : "Play clip"}
+			title="Play (Space)"
+			disabled={audioStatus === "error"}
+			onclick={(e) => {
+				e.stopPropagation();
+				actions.play(false);
+			}}
+		>
+			{#if here && !playing?.slow}
+				<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="4" y="4" width="8" height="8" rx="1.5" /></svg>
+			{:else}
+				<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.2v9.6c0 .5.6.8 1 .5l7.2-4.8a.6.6 0 0 0 0-1L6 2.7c-.4-.3-1 0-1 .5Z" /></svg>
+			{/if}
+		</button>
+		<button
+			type="button"
+			class="slow"
+			class:on={here && playing?.slow}
+			title="Slow replay (S)"
+			disabled={audioStatus === "error"}
+			onclick={(e) => {
+				e.stopPropagation();
+				actions.play(true);
+			}}>0.75×</button
+		>
+		<span class="where">
+			{clip.i + 1} / {session.clips.length}
+			{#if audioStatus === "loading"}
+				· <span class="busy">loading audio…</span>
+			{:else if audioStatus === "error"}
+				· audio didn't load
+			{/if}
+		</span>
+		<button
+			type="button"
+			class="source"
+			title="Open at {stamp} on YouTube"
+			onclick={(e) => {
+				e.stopPropagation();
+				actions.openSource(source);
+			}}>{stamp} ↗</button
+		>
+	</div>
+	{#if open}
+		<p class="hint">Type what you hear · Enter · <kbd>?</kbd> reveals</p>
+	{:else if answered}
+		{#if clip.skipped}
+			<p class="verdict">Revealed</p>
+		{:else}
+			<p class="guess" aria-label="Your guess, marked">
+				{#each clip.ops ?? [] as op, k (k)}
+					{#if op.kind === "ok"}
+						<span class="w ok">{op.guess}</span>
+					{:else if op.kind === "near"}
+						<span class="w near" title="Heard right; spelled {op.ref}">{op.guess}</span>
+					{:else if op.kind === "wrong"}
+						<span class="w wrong"><s>{op.guess}</s> <span class="fix">{op.ref}</span></span>
+					{:else if op.kind === "missed"}
+						<span class="w missed" title="Missed">{op.ref}</span>
+					{:else}
+						<span class="w extra"><s>{op.guess}</s></span>
+					{/if}
+				{/each}
+			</p>
+			<p class="verdict">
+				{heardWords === words ? "All of it" : `${heardWords} of ${words} words`}
+			</p>
+		{/if}
+		{#if clip.grade === "pending"}
+			<p class="verdict busy">translating…</p>
+		{:else if clip.grade === "error"}
+			<p class="verdict">
+				No translation ·
+				<button
+					type="button"
+					class="retry"
+					onclick={(e) => {
+						e.stopPropagation();
+						actions.regrade();
+					}}>Try again</button
+				>
+			</p>
+		{/if}
+	{/if}
+</div>
+
+<style>
+	.clip {
+		display: flex;
+		flex-direction: column;
+		gap: 0.3rem;
+		margin-bottom: 0.4rem;
+		user-select: none;
+		-webkit-user-select: none;
+		animation: clip-in 0.2s ease both;
+	}
+	@keyframes clip-in {
+		from {
+			opacity: 0;
+			transform: translateY(4px);
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.clip {
+			animation: none;
+		}
+	}
+	.controls {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+	.play {
+		flex: 0 0 auto;
+		width: 2.6rem;
+		height: 2.6rem;
+		border-radius: 50%;
+		border: none;
+		background: var(--accent);
+		color: var(--accent-ink);
+		display: grid;
+		place-items: center;
+		cursor: pointer;
+		transition: transform 0.12s ease;
+	}
+	.play:active {
+		transform: scale(0.94);
+	}
+	.play svg {
+		width: 1.1rem;
+		height: 1.1rem;
+		fill: currentColor;
+	}
+	.clip:not(.open) .play {
+		width: 2rem;
+		height: 2rem;
+		background: transparent;
+		color: var(--accent);
+		border: 1px solid var(--line-soft);
+	}
+	.clip:not(.open) .play svg {
+		width: 0.85rem;
+		height: 0.85rem;
+	}
+	.slow {
+		border: 1px solid var(--line-soft);
+		background: transparent;
+		color: var(--muted);
+		font: inherit;
+		font-size: 0.8rem;
+		padding: 0.25rem 0.6rem;
+		min-height: 2rem;
+		border-radius: 999px;
+		cursor: pointer;
+	}
+	.slow.on,
+	.slow:hover {
+		color: var(--ink);
+		border-color: var(--line-hover);
+	}
+	.play:disabled,
+	.slow:disabled {
+		opacity: 0.4;
+		cursor: default;
+	}
+	.where {
+		font-size: 0.8rem;
+		color: var(--muted);
+	}
+	.source {
+		margin-left: auto;
+		border: none;
+		background: none;
+		padding: 0;
+		font: inherit;
+		cursor: pointer;
+		font-size: 0.8rem;
+		color: var(--muted);
+		text-decoration: none;
+	}
+	.source:hover {
+		color: var(--accent);
+	}
+	.hint,
+	.verdict {
+		margin: 0;
+		font-size: 0.8rem;
+		color: var(--muted);
+	}
+	kbd {
+		font: inherit;
+		padding: 0 0.3rem;
+		border: 1px solid var(--line-soft);
+		border-radius: 0.3rem;
+	}
+	.guess {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0 0.3em;
+		margin: 0.1rem 0 0;
+		line-height: 1.6;
+	}
+	.w.ok {
+		color: var(--ok);
+	}
+	.w.near {
+		color: var(--ok);
+		text-decoration: underline dotted;
+		text-underline-offset: 0.2em;
+	}
+	.w.wrong s,
+	.w.extra s {
+		color: var(--danger);
+		opacity: 0.8;
+	}
+	.w.wrong .fix {
+		color: var(--ink);
+		font-weight: 600;
+	}
+	.w.missed {
+		color: var(--muted);
+		text-decoration: underline dashed;
+		text-underline-offset: 0.2em;
+	}
+	.retry {
+		border: none;
+		background: none;
+		padding: 0;
+		font: inherit;
+		color: var(--accent);
+		cursor: pointer;
+	}
+	.busy {
+		animation: clip-pulse 1.4s ease-in-out infinite;
+	}
+	@keyframes clip-pulse {
+		50% {
+			opacity: 0.4;
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.busy {
+			animation: none;
+		}
+	}
+</style>

@@ -9,12 +9,12 @@ import type { ListenChannelPage, ListenEntry, ListenFetched, ListenVideo } from 
 
 export interface ListenBackend {
 	readonly kind: "shell" | "server";
-	search(query: string, kind: "video" | "channel"): Promise<ListenEntry[]>;
-	channel(ref: string): Promise<ListenChannelPage>;
-	videos(ids: string[], lang: string): Promise<ListenVideo[]>;
-	fetch(id: string, lang: string): Promise<ListenFetched>;
+	search: (query: string, kind: "video" | "channel") => Promise<ListenEntry[]>;
+	channel: (ref: string) => Promise<ListenChannelPage>;
+	videos: (ids: string[], lang: string) => Promise<ListenVideo[]>;
+	fetch: (id: string, lang: string) => Promise<ListenFetched>;
 	/** The fetched track's bytes (call after `fetch`). */
-	audio(id: string, lang: string): Promise<ArrayBuffer>;
+	audio: (id: string, lang: string) => Promise<ArrayBuffer>;
 }
 
 type Invoke = <T>(cmd: string, args?: Record<string, unknown>) => Promise<T>;

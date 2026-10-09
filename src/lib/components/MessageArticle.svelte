@@ -8,6 +8,7 @@ MessageActions) untouched, so each child's contract still checks at
 both ends. The in-place editor crosses as a `use:` action (mounts
 where the text sat, like the composer's promptEl pattern). -->
 <script lang="ts">
+	import type { Snippet } from "svelte";
 	import type { ChatMsg, ChatMsgId } from "$lib/chat";
 	import {
 		CEFR_LEVELS,
@@ -119,6 +120,8 @@ import type {
 		pinnedKinds: LocalAid[];
 		aidBusy: boolean;
 		actions: MessageArticleActions;
+		/** Row chrome above the body (listening drill clips). */
+		header?: Snippet | undefined;
 	}
 
 	let {
@@ -167,7 +170,8 @@ import type {
 		localKinds,
 		pinnedKinds,
 		aidBusy,
-		actions
+		actions,
+		header
 	}: Props = $props();
 	/* A news session opener reads as one tag (story, mode, level):
 	its instructions are for the model, not the learner. */
@@ -248,6 +252,9 @@ import type {
 		{ocrBusyId}
 		actions={actions.tags}
 	/>
+	{#if header}
+		{@render header()}
+	{/if}
 	{#if sentRefs}
 		<!-- Baked-annotation refs render in `SentRefs.svelte`;
 		the page keeps the pop flag, the row-edit state (it
@@ -376,7 +383,7 @@ import type {
 		{ocrBusyId}
 		actions={actions.tags}
 	/>
-	{#if showButtons && !(streaming && msg.content.trim() === "")}
+	{#if showButtons && !(streaming && msg.content.trim() === "") && !msg.drillEnd && !(msg.clip && msg.content === "")}
 		<!-- Preview renders the same row inert: the peek
 		reserves the row's space (opening the chat moves
 		nothing) while honoring the hover-only rhythm, so

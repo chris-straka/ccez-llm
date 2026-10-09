@@ -112,7 +112,7 @@ describe("parseJson3", () => {
 	it("reads uploaded cues: no zero-width junk, duplicates dropped, words spread", () => {
 		const tokens = parseJson3(UPLOADED);
 		const text = joinTokens(tokens);
-		expect(text).not.toMatch(/​/);
+		expect(text).not.toMatch(/\u200b/);
 		expect(text.match(/bandeaux/g)).toHaveLength(1);
 		expect(text).toContain("Moi ? Jamais.");
 		// The continuation "…" opening a cue is layout, not speech.
