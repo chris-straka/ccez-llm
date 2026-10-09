@@ -25,6 +25,7 @@ import {
 	annotationAnswer,
 	buildAnnotationAnswerMessages,
 	ANNOTATION_BRIEF_WORDS,
+	ANNOTATION_QUESTION_WORDS,
 	ANNOTATION_ANSWER_WORDS,
 	MODEL_AIDS,
 	MODEL_AID_FOR_SCRIPT,
@@ -987,43 +988,48 @@ describe("annotationAnswer", () => {
 		context: "Regarde la neige. Elle tombe."
 	};
 
-	it("caps the answer length in the system prompt", () => {
-		const [system, user] = buildAnnotationAnswerMessages(q);
-		expect(system!.content).toContain(`${ANNOTATION_ANSWER_WORDS} words`);
-		expect(user!.content).toContain('Quoted: "la neige"');
-		expect(user!.content).toContain("Question: why feminine?");
-		expect(user!.content).toContain("Regarde la neige");
+	const teach = { ...q, question: "" };
+
+	it("every answer opens straight with the in-passage gloss, no preamble", () => {
+		for (const ask of [teach, { ...teach, brief: true }, q]) {
+			const [system, user] = buildAnnotationAnswerMessages(ask);
+			expect(system!.content).toContain(
+				"Open straight with what the quote means in this passage"
+			);
+			expect(system!.content).toContain(
+				'never a preamble such as "Here it means"'
+			);
+			expect(system!.content).toContain("Never a sense the passage rules out");
+			expect(user!.content).toContain('Quoted: "la neige"');
+			expect(user!.content).toContain("Regarde la neige");
+		}
 	});
 
-	it("teaches the quote's language, never a gist summary", () => {
-		const [system] = buildAnnotationAnswerMessages(q);
-		expect(system!.content).toContain("as language, not gist");
-		expect(system!.content).toContain("word forms");
-		expect(system!.content).toContain("how the words fit together");
-		expect(system!.content).toContain("reusable vocabulary");
-		expect(system!.content).toContain("means on its own, as a bare gloss");
-		expect(system!.content).toContain(
-			'"Here it means" and its sense in this paragraph'
-		);
-	});
-
-	it("a bare-A filing gets a short gloss: the word alone, then here", () => {
+	it("bare A stops at the gloss", () => {
 		const [system, user] = buildAnnotationAnswerMessages({
-			...q,
-			question: "",
+			...teach,
 			brief: true
 		});
 		expect(system!.content).toContain(`${ANNOTATION_BRIEF_WORDS} words`);
-		expect(system!.content).toContain("means on its own, as a bare gloss");
-		expect(system!.content).toContain('"Here it means"');
-		expect(system!.content).not.toContain(`${ANNOTATION_ANSWER_WORDS} words`);
-		expect(user!.content).toContain('Quoted: "la neige"');
 		expect(user!.content).not.toContain("Question:");
 	});
 
-	it("a typed question gets the full answer even on a brief filing", () => {
-		const [system] = buildAnnotationAnswerMessages({ ...q, brief: true });
+	it("Shift+A adds only what a learner would not work out alone, briefly", () => {
+		const [system, user] = buildAnnotationAnswerMessages(teach);
 		expect(system!.content).toContain(`${ANNOTATION_ANSWER_WORDS} words`);
+		expect(system!.content).toContain("one or two short sentences");
+		expect(system!.content).toContain("skip this part entirely");
+		expect(system!.content).toContain("no labeled slots");
+		expect(user!.content).not.toContain("Question:");
+	});
+
+	it("a typed question gets answered, even on a brief filing", () => {
+		for (const ask of [q, { ...q, brief: true }]) {
+			const [system, user] = buildAnnotationAnswerMessages(ask);
+			expect(system!.content).toContain(`${ANNOTATION_QUESTION_WORDS} words`);
+			expect(system!.content).toContain("answer the question directly");
+			expect(user!.content).toContain("Question: why feminine?");
+		}
 	});
 
 	it("answers in English even when the passage is not", () => {
@@ -1038,32 +1044,6 @@ describe("annotationAnswer", () => {
 		expect(system!.content).toContain("Write in the passage's own language");
 		expect(system!.content).not.toContain("Write in English");
 		expect(system!.content).toContain("quote its words as they are");
-	});
-
-	it("skips the obvious and writes prose, not labeled slots", () => {
-		const [system] = buildAnnotationAnswerMessages(q);
-		expect(system!.content).toContain("Skip what any learner already knows");
-		expect(system!.content).toContain("never labeled slots");
-		expect(system!.content).toContain("Stay on the quoted words");
-	});
-
-	it("glosses the quote alone, then its sense here, before the grammar details", () => {
-		const [system] = buildAnnotationAnswerMessages(q);
-		const text = system!.content;
-		// The popup leads with the bare gloss ("Abrupt."), then what the
-		// quote means here; word forms and fit-together come after.
-		const gloss = text.indexOf("means on its own");
-		const here = text.indexOf('"Here it means"');
-		expect(gloss).toBeGreaterThanOrEqual(0);
-		expect(here).toBeGreaterThan(gloss);
-		expect(here).toBeLessThan(text.indexOf("word forms"));
-	});
-
-	it("asks to be taught the quote for an empty comment", () => {
-		const [, user] = buildAnnotationAnswerMessages({ ...q, question: "  " });
-		expect(user!.content).toContain(
-			"Teach me the language of this quote and what it means here."
-		);
 	});
 
 	it("asks once per filing, rejecting blanks and empties", async () => {

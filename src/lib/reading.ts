@@ -886,12 +886,13 @@ export function vocalizeArabic(
 	return runModelAid(provider, "tashkeel", text, signal);
 }
 
-/** Cap for annotation answers: room to teach the words plus the
-in-context meaning, still short enough for the popup (the page
-scrolls to fit the card). */
-export const ANNOTATION_ANSWER_WORDS = 90;
-/** Cap for a brief (bare A) answer: a gloss, not a lesson. */
-export const ANNOTATION_BRIEF_WORDS = 25;
+/** Cap for a full (Shift+A) answer: the gloss plus what a learner
+would not work out alone, still a glance, not a lesson. */
+export const ANNOTATION_ANSWER_WORDS = 45;
+/** Cap when a question is typed: room to answer it, still short. */
+export const ANNOTATION_QUESTION_WORDS = 70;
+/** Cap for a brief (bare A) answer: the gloss alone. */
+export const ANNOTATION_BRIEF_WORDS = 15;
 
 /** One annotation question: the quote, the comment, and its paragraph. */
 export interface AnnotationQuestion {
@@ -903,14 +904,13 @@ export interface AnnotationQuestion {
 }
 
 /**
- * One-shot messages answering an annotation in its original context:
- * the system glosses the quote on its own first, then what it means
- * in its paragraph ("Abrupt. Here it means …"),
- * then teaches only the non-obvious language of the quote (never a
- * gist summary, never a slot-by-slot checklist), and caps the length
- * so the answer fits its popup; the user carries
- * the paragraph, the quote, and the question (an empty comment
- * asks to be taught the quote).
+ * One-shot messages answering an annotation in its original context.
+ * The reader is looking at the passage, so every answer opens straight
+ * with what the quote means in it, as a gloss ("Crossed, gone past."),
+ * never a context-free sense ("livres" in a price reads "Pounds", not
+ * "Books") and never a preamble ("Here it means …"). Bare A stops
+ * there; Shift+A adds only what a learner would not work out alone; a
+ * typed question gets answered. Capped to fit the popup.
  */
 export function buildAnnotationAnswerMessages(
 	q: AnnotationQuestion,
@@ -922,57 +922,54 @@ export function buildAnnotationAnswerMessages(
 		? `Write in the passage's own language, in plain words an ` +
 			`intermediate learner reads easily; `
 		: `Write in English, whatever language the passage is in; `;
+	const gloss =
+		`The learner is reading the passage right now and needs no ` +
+		`context retold. ${language}quote its words as they are. Open ` +
+		`straight with what the quote means in this passage, as a short ` +
+		`gloss: for example "Crossed, gone past." Never a sense the ` +
+		`passage rules out, never a preamble such as "Here it means" or ` +
+		`"This word means", and never restate the quote first.`;
+	const user = `Paragraph:\n${q.context}\n\nQuoted: "${quote}"`;
 	if (q.brief && !asked) {
 		return [
 			{
 				role: "system",
 				content:
-					`You gloss a quoted word or phrase for a language learner who ` +
-					`is reading the passage right now, so the context needs no ` +
-					`retelling. ${language}quote its words as they are. Open ` +
-					`with what the quote means on its own, as a bare gloss with ` +
-					`no preamble, then "Here it means" and its sense in this ` +
-					`sentence: for example "Abrupt, sudden. Here it means the ` +
-					`escalation came all at once." Add one short clause only for ` +
-					`a form, idiom or false friend that would trip a learner. No ` +
-					`markdown. At most ${ANNOTATION_BRIEF_WORDS} words.`
+					`You gloss a quoted word or phrase for a language learner. ` +
+					`${gloss} Add a few words only for a trap that would trip ` +
+					`a learner (a false friend, an irregular form). No markdown. ` +
+					`At most ${ANNOTATION_BRIEF_WORDS} words.`
 			},
+			{ role: "user", content: user }
+		];
+	}
+	if (asked) {
+		return [
 			{
-				role: "user",
-				content: `Paragraph:\n${q.context}\n\nQuoted: "${quote}"`
-			}
+				role: "system",
+				content:
+					`You answer a language learner's question about a quoted ` +
+					`word or phrase. ${gloss} Then answer the question directly ` +
+					`in plain connected sentences. No markdown. At most ` +
+					`${ANNOTATION_QUESTION_WORDS} words.`
+			},
+			{ role: "user", content: `${user}\n\nQuestion: ${asked}` }
 		];
 	}
 	return [
 		{
 			role: "system",
 			content:
-				`You explain a quoted passage to a language learner reading ` +
-				`it. ${language}` +
-				`quote its words as they are. Open with what the quote means on its ` +
-				`own, as a bare gloss with no preamble (for example "Abrupt, ` +
-				`sudden."), then "Here it means" and its sense in this paragraph ` +
-				`in one plain sentence, not a dictionary list. Then teach the ` +
-				`quote as language, not gist, but only what a learner would not ` +
-				`work out alone: unexpected word forms, idioms, false friends, ` +
-				`nuance or register, and how the words fit together when that ` +
-				`is not obvious. Skip what any learner already knows, such as ` +
-				`regular plurals, articles, or agreement they can see. Stay on ` +
-				`the quoted words; mention a neighbor only when it changes their ` +
-				`meaning or form. Close with reusable vocabulary only when a ` +
-				`common expression uses the word. Write connected sentences, ` +
-				`never labeled slots like "Structure:" or "Reusable:", and no ` +
-				`markdown. At most ${ANNOTATION_ANSWER_WORDS} words; a single ` +
-				`word usually needs far fewer.`
+				`You explain a quoted word or phrase to a language learner. ` +
+				`${gloss} Then, in one or two short sentences, only what a ` +
+				`learner would not work out alone: an unexpected form (name ` +
+				`the base word), an idiom, a false friend, or a register ` +
+				`note. Skip anything obvious, and skip this part entirely ` +
+				`when there is nothing to add. No dictionary lists, no ` +
+				`labeled slots, no markdown. At most ` +
+				`${ANNOTATION_ANSWER_WORDS} words.`
 		},
-		{
-			role: "user",
-			content:
-				`Paragraph:\n${q.context}\n\nQuoted: "${quote}"\n\n` +
-				(asked
-					? `Question: ${asked}`
-					: `Question: Teach me the language of this quote and what it means here.`)
-		}
+		{ role: "user", content: user }
 	];
 }
 
