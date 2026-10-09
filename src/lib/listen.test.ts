@@ -124,7 +124,9 @@ describe("listenKeyAction", () => {
 		inDrill: true,
 		composerEmpty: true,
 		inComposer: true,
-		inOtherField: false
+		inOtherField: false,
+		hovered: false,
+		selection: false
 	};
 	it("Space replays and ? reveals only with nothing typed", () => {
 		expect(listenKeyAction(base)).toBe("play");
@@ -138,6 +140,14 @@ describe("listenKeyAction", () => {
 		expect(listenKeyAction({ ...enter, ctrl: true, composerEmpty: false })).toBe("reveal");
 		expect(listenKeyAction({ ...enter, meta: true, alt: true })).toBe("pass");
 		expect(listenKeyAction(enter)).toBe("pass");
+	});
+
+	it("A reveals outside the composer, unless a message is hovered or text selected", () => {
+		const a = { ...base, key: "a", code: "KeyA", inComposer: false };
+		expect(listenKeyAction(a)).toBe("reveal");
+		expect(listenKeyAction({ ...a, inComposer: true })).toBe("pass");
+		expect(listenKeyAction({ ...a, hovered: true })).toBe("pass");
+		expect(listenKeyAction({ ...a, selection: true })).toBe("pass");
 	});
 
 	it("S slows outside the composer; a guess can start with s", () => {

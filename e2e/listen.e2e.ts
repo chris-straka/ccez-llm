@@ -234,3 +234,25 @@ test("Space pauses and resumes mid-clip; answering lets the clip finish first", 
 	await expect(clips.nth(1).getByRole("button", { name: "Pause" })).toBeVisible({ timeout: 6_000 });
 	await expect(first.getByRole("button", { name: "Play clip" })).toBeVisible();
 });
+
+test("outside the composer: S slows the hovered clip, A with nothing hovered reveals", async ({ page }) => {
+	await page.getByRole("tab", { name: "Listen" }).click();
+	await page.locator(".listen-panel .video", { hasText: info.title }).click();
+	const clips = page.locator(".clip");
+	await expect(clips).toHaveCount(1, { timeout: 10_000 });
+	const box = page.locator(".prompt textarea").first();
+	await box.fill("bonjour");
+	await box.press("Enter");
+	await expect(clips).toHaveCount(2);
+	await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+
+	await page.locator("#msg-0").hover();
+	await page.keyboard.press("s");
+	await expect(clips.first().locator(".slow.on")).toBeVisible();
+	await expect(clips).toHaveCount(2);
+
+	await page.mouse.move(2, 2);
+	await page.keyboard.press("a");
+	await expect(clips).toHaveCount(3);
+	await expect(clips.nth(1)).toContainText("Revealed");
+});

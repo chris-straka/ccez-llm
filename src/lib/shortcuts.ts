@@ -183,7 +183,7 @@ export function desktopShortcuts(
 		{
 			group: reading,
 			name: "Listening drill",
-			keys: `Space plays · S slow · ${meta}Enter reveals · ${altm}+Space mid-guess`
+			keys: `Space plays · S slow · ${meta}Enter · A reveals · ${altm}+Space mid-guess`
 		},
 		{ group: reading, name: "Capture window text", keys: `${shiftMeta}O` },
 		{ group: reading, name: "Set capture area", keys: `${shiftMeta}U` },

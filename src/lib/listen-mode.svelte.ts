@@ -122,6 +122,8 @@ export class ListenMode {
 	private stopTimer: ReturnType<typeof setInterval> | null = null;
 	/** The next clip, waiting for the one playing to finish. */
 	private queued: number | null = null;
+	/** Counts play() calls, so only the latest one's failure counts. */
+	private playRun = 0;
 	private browseSeq = 0;
 	private gradeQueue: { chatId: ChatId; i: number }[] = [];
 	private gradesRunning = 0;
@@ -405,8 +407,11 @@ export class ListenMode {
 		el.currentTime = at;
 		this.position = { i, t: at };
 		this.playing = { i, slow };
+		// A rejection from an earlier play() (interrupted by this one's
+		// pause) must not clear this one.
+		const run = ++this.playRun;
 		el.play().catch(() => {
-			this.playing = null;
+			if (run === this.playRun) this.halt();
 		});
 		// timeupdate fires every ~250 ms; a tight poll stops on the word.
 		this.stopTimer = setInterval(() => {

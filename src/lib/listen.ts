@@ -309,6 +309,10 @@ export interface ListenKeyFacts {
 	inComposer: boolean;
 	/** Focus is in some other text field (search, settings…). */
 	inOtherField: boolean;
+	/** The pointer rests on a message (its own keys win: A annotates). */
+	hovered: boolean;
+	/** Text is selected (Select + A annotates it). */
+	selection: boolean;
 }
 
 export type ListenKeyAction = "play" | "slow" | "reveal" | "pass";
@@ -316,8 +320,10 @@ export type ListenKeyAction = "play" | "slow" | "reveal" | "pass";
 /**
  * Drill keys. ⌘Enter / Ctrl+Enter reveals, typed or not (a partial
  * guess is dropped). Space replays and "?" reveals while nothing is
- * typed (no guess starts with either; "?" is the phone's reveal); S
- * replays slowly only outside the composer (guesses start with s).
+ * typed (no guess starts with either; "?" is the phone's reveal). S
+ * replays slowly and A reveals only outside the composer (guesses
+ * start with either letter); A also yields to a hovered message or a
+ * selection, where it annotates. The page aims S at a hovered clip.
  * ⌥Space / ⌥S work mid-guess. Matched on `code` where ⌥ rewrites the
  * character (⌥S types ß).
  */
@@ -332,5 +338,6 @@ export function listenKeyAction(f: ListenKeyFacts): ListenKeyAction {
 	if (f.code === "Space" && f.composerEmpty) return "play";
 	if (f.key === "?" && f.composerEmpty) return "reveal";
 	if ((f.key === "s" || f.key === "S") && !f.inComposer) return "slow";
+	if ((f.key === "a" || f.key === "A") && !f.inComposer && !f.hovered && !f.selection) return "reveal";
 	return "pass";
 }

@@ -10660,9 +10660,10 @@ import {
 				else if (readerKey !== "swallow") stepReader(readerKey);
 				return;
 			}
-			// Listening drill keys: Space plays, S slows, ⌘Enter or ?
-			// reveals (decided in listenKeyAction; typing a guess stays
-			// typing). A reveal drops a half-typed guess.
+			// Listening drill keys: Space plays, S slows (the hovered
+			// clip, else the newest), ⌘Enter, ? or A reveals (decided in
+			// listenKeyAction; typing a guess stays typing). A reveal
+			// drops a half-typed guess.
 			const listenKey = listenKeyAction({
 				key: event.key,
 				code: event.code,
@@ -10677,13 +10678,17 @@ import {
 					event.target instanceof HTMLElement &&
 					(event.target.isContentEditable ||
 						event.target instanceof HTMLInputElement ||
-						event.target instanceof HTMLTextAreaElement)
+						event.target instanceof HTMLTextAreaElement),
+				hovered: hoveredIdx >= 0,
+				selection: window.getSelection()?.isCollapsed === false
 			});
 			if (listenKey !== "pass" && !event.repeat) {
 				consumeEvent(event);
+				// S over a clip slows that clip; elsewhere the newest.
+				const hoveredClip = chat.messages[hoveredIdx]?.clip?.i;
 				if (listenKey === "reveal") {
 					if (listenMode.submit(null)) editor?.clear();
-				}
+				} else if (listenKey === "slow" && hoveredClip !== undefined) listenMode.toggle(hoveredClip, true);
 				else listenMode.replay(listenKey === "slow");
 				return;
 			}
