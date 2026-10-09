@@ -886,30 +886,30 @@ export function vocalizeArabic(
 	return runModelAid(provider, "tashkeel", text, signal);
 }
 
-/** Cap for a full (Shift+A) answer: the gloss plus what a learner
-would not work out alone, still a glance, not a lesson. */
-export const ANNOTATION_ANSWER_WORDS = 45;
+/** Cap for a full (Shift+A) answer: the equivalent plus one useful
+note at most. */
+export const ANNOTATION_ANSWER_WORDS = 35;
 /** Cap when a question is typed: room to answer it, still short. */
 export const ANNOTATION_QUESTION_WORDS = 70;
-/** Cap for a brief (bare A) answer: the gloss alone. */
-export const ANNOTATION_BRIEF_WORDS = 15;
+/** Cap for a brief (bare A) answer: the equivalent alone. */
+export const ANNOTATION_BRIEF_WORDS = 8;
 
 /** One annotation question: the quote, the comment, and its paragraph. */
 export interface AnnotationQuestion {
 	quote: string;
 	question: string;
 	context: string;
-	/** Bare A filing: a short gloss (ignored once a question is typed). */
+	/** Bare A filing: the equivalent alone (ignored once a question is typed). */
 	brief?: boolean;
 }
 
 /**
  * One-shot messages answering an annotation in its original context.
- * The reader is looking at the passage, so every answer opens straight
- * with what the quote means in it, as a gloss ("Crossed, gone past."),
- * never a context-free sense ("livres" in a price reads "Pounds", not
- * "Books") and never a preamble ("Here it means …"). Bare A stops
- * there; Shift+A adds only what a learner would not work out alone; a
+ * The reader is looking at the passage, so every answer opens with the
+ * quote's equivalent for the sense it has there, the way a bilingual
+ * dictionary lists it ("Escalation.", "Pounds (sterling).", "Crossed
+ * (franchir)."): a translation, never a definition or a retelling of
+ * the passage. Bare A stops there; Shift+A may add one useful note; a
  * typed question gets answered. Capped to fit the popup.
  */
 export function buildAnnotationAnswerMessages(
@@ -918,27 +918,32 @@ export function buildAnnotationAnswerMessages(
 ): Array<{ role: string; content: string }> {
 	const quote = q.quote.trim();
 	const asked = q.question.trim();
-	const language = opts.inPassageLang
+	const equivalent = opts.inPassageLang
 		? `Write in the passage's own language, in plain words an ` +
-			`intermediate learner reads easily; `
-		: `Write in English, whatever language the passage is in; `;
+			`intermediate learner reads easily. Open with a common synonym ` +
+			`or the plainest few words for the quote's sense in this ` +
+			`passage`
+		: `Write in English, whatever language the passage is in. Open ` +
+			`with the English equivalent of the quote for the sense it has ` +
+			`in this passage, the word or short phrase a bilingual ` +
+			`dictionary lists for that sense ("Escalation.", "Pounds ` +
+			`(sterling).", "Unions.")`;
 	const gloss =
-		`The learner is reading the passage right now and needs no ` +
-		`context retold. ${language}quote its words as they are. Open ` +
-		`straight with what the quote means in this passage, as a short ` +
-		`gloss: for example "Crossed, gone past." Never a sense the ` +
-		`passage rules out, never a preamble such as "Here it means" or ` +
-		`"This word means", and never restate the quote first.`;
+		`The learner is reading the passage right now, so never retell ` +
+		`or explain it. ${equivalent}: never a definition, never a ` +
+		`preamble such as "Here it means", and never the quote restated. ` +
+		`When the quote is a single inflected verb or participle, add its infinitive in ` +
+		`parentheses: "Crossed (franchir)." Quote the passage's words as ` +
+		`they are.`;
 	const user = `Paragraph:\n${q.context}\n\nQuoted: "${quote}"`;
 	if (q.brief && !asked) {
 		return [
 			{
 				role: "system",
 				content:
-					`You gloss a quoted word or phrase for a language learner. ` +
-					`${gloss} Add a few words only for a trap that would trip ` +
-					`a learner (a false friend, an irregular form). No markdown. ` +
-					`At most ${ANNOTATION_BRIEF_WORDS} words.`
+					`You gloss a quoted word or phrase for a language learner, ` +
+					`like a bilingual dictionary. ${gloss} Nothing else. At most ` +
+					`${ANNOTATION_BRIEF_WORDS} words.`
 			},
 			{ role: "user", content: user }
 		];
@@ -960,14 +965,13 @@ export function buildAnnotationAnswerMessages(
 		{
 			role: "system",
 			content:
-				`You explain a quoted word or phrase to a language learner. ` +
-				`${gloss} Then, in one or two short sentences, only what a ` +
-				`learner would not work out alone: an unexpected form (name ` +
-				`the base word), an idiom, a false friend, or a register ` +
-				`note. Skip anything obvious, and skip this part entirely ` +
-				`when there is nothing to add. No dictionary lists, no ` +
-				`labeled slots, no markdown. At most ` +
-				`${ANNOTATION_ANSWER_WORDS} words.`
+				`You gloss a quoted word or phrase for a language learner, ` +
+				`like a bilingual dictionary. ${gloss} Then, only if it helps, ` +
+				`one short sentence: another common sense the learner will ` +
+				`meet ("Also: rock climbing."), an idiom it belongs to, a ` +
+				`register note, or a false friend that genuinely misleads. ` +
+				`When nothing is worth adding, stop after the equivalent. No ` +
+				`markdown. At most ${ANNOTATION_ANSWER_WORDS} words.`
 		},
 		{ role: "user", content: user }
 	];

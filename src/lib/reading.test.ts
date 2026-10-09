@@ -990,36 +990,39 @@ describe("annotationAnswer", () => {
 
 	const teach = { ...q, question: "" };
 
-	it("every answer opens straight with the in-passage gloss, no preamble", () => {
+	it("every answer opens with the dictionary equivalent for this sense", () => {
 		for (const ask of [teach, { ...teach, brief: true }, q]) {
 			const [system, user] = buildAnnotationAnswerMessages(ask);
 			expect(system!.content).toContain(
-				"Open straight with what the quote means in this passage"
+				"the English equivalent of the quote for the sense it has in this passage"
 			);
+			expect(system!.content).toContain("never a definition");
 			expect(system!.content).toContain(
 				'never a preamble such as "Here it means"'
 			);
-			expect(system!.content).toContain("Never a sense the passage rules out");
+			expect(system!.content).toContain("never the quote restated");
+			expect(system!.content).toContain('"Crossed (franchir)."');
 			expect(user!.content).toContain('Quoted: "la neige"');
 			expect(user!.content).toContain("Regarde la neige");
 		}
 	});
 
-	it("bare A stops at the gloss", () => {
+	it("bare A stops at the equivalent", () => {
 		const [system, user] = buildAnnotationAnswerMessages({
 			...teach,
 			brief: true
 		});
 		expect(system!.content).toContain(`${ANNOTATION_BRIEF_WORDS} words`);
+		expect(system!.content).toContain("Nothing else.");
 		expect(user!.content).not.toContain("Question:");
 	});
 
-	it("Shift+A adds only what a learner would not work out alone, briefly", () => {
+	it("Shift+A may add one useful note, or nothing", () => {
 		const [system, user] = buildAnnotationAnswerMessages(teach);
 		expect(system!.content).toContain(`${ANNOTATION_ANSWER_WORDS} words`);
-		expect(system!.content).toContain("one or two short sentences");
-		expect(system!.content).toContain("skip this part entirely");
-		expect(system!.content).toContain("no labeled slots");
+		expect(system!.content).toContain("only if it helps, one short sentence");
+		expect(system!.content).toContain("another common sense");
+		expect(system!.content).toContain("stop after the equivalent");
 		expect(user!.content).not.toContain("Question:");
 	});
 
@@ -1042,8 +1045,9 @@ describe("annotationAnswer", () => {
 	it("answers in the passage's language when the learner asks for it", () => {
 		const [system] = buildAnnotationAnswerMessages(q, { inPassageLang: true });
 		expect(system!.content).toContain("Write in the passage's own language");
+		expect(system!.content).toContain("common synonym");
 		expect(system!.content).not.toContain("Write in English");
-		expect(system!.content).toContain("quote its words as they are");
+		expect(system!.content).toContain("Quote the passage's words as they are");
 	});
 
 	it("asks once per filing, rejecting blanks and empties", async () => {
