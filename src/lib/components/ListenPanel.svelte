@@ -18,9 +18,11 @@ channel or start a video. State lives in `ListenMode`. -->
 		lang: string;
 		langName: string;
 		channels: ListenChannel[];
+		/** ×: back to the welcome screen (same as the news panel's). */
+		onClose: () => void;
 	}
 
-	let { mode, lang, langName, channels }: Props = $props();
+	let { mode, lang, langName, channels, onClose }: Props = $props();
 
 	let searchBox = $state<HTMLInputElement | null>(null);
 
@@ -87,11 +89,6 @@ channel or start a video. State lives in `ListenMode`. -->
 {/snippet}
 
 <section class="listen-panel" aria-label="Listen">
-	<header class="bar">
-		<h2>Listen <span class="lang">· {langName}</span></h2>
-		<button type="button" class="close" aria-label="Close listening" onclick={() => mode.close()}>×</button>
-	</header>
-
 		<div class="search">
 			<input
 				bind:this={searchBox}
@@ -115,6 +112,7 @@ channel or start a video. State lives in `ListenMode`. -->
 					onclick={() => setKind("channel")}>Channels</button
 				>
 			</div>
+			<button type="button" class="close search-close" aria-label="Close" onclick={onClose}>×</button>
 		</div>
 		<label class="filter">
 			<input type="checkbox" bind:checked={mode.onlyAvailable} />
@@ -225,19 +223,6 @@ channel or start a video. State lives in `ListenMode`. -->
 			animation: none;
 		}
 	}
-	.bar {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-	}
-	h2 {
-		margin: 0;
-		font-size: 1.25rem;
-	}
-	h2 .lang {
-		color: var(--muted);
-		font-weight: 500;
-	}
 	h3 {
 		margin: 0.8rem 0 0;
 		font-size: 0.8rem;
@@ -257,18 +242,23 @@ channel or start a video. State lives in `ListenMode`. -->
 		padding: 0.3rem 0.5rem;
 		border-radius: 0.4rem;
 	}
+	.search-close {
+		margin-left: auto;
+	}
 	.close:hover,
 	.remove:hover {
 		color: var(--ink);
 		background: var(--hover-wash);
 	}
+	/* Phones: the box takes the row, the switch and × wrap below. */
 	.search {
 		display: flex;
+		flex-wrap: wrap;
 		gap: 0.5rem;
 		align-items: center;
 	}
 	.search input {
-		flex: 1 1 auto;
+		flex: 1 1 15rem;
 		min-width: 0;
 		font: inherit;
 		font-size: 1rem;

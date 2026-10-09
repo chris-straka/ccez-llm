@@ -132,7 +132,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("a drill runs: guess, next clip at once, reveal, tally", async ({ page }) => {
-	await page.getByRole("button", { name: "Listen in French" }).click();
+	await page.getByRole("tab", { name: "Listen" }).click();
 	const panel = page.locator(".listen-panel");
 	await expect(panel).toContainText("Learner Channel");
 	const row = panel.locator(".video", { hasText: info.title });

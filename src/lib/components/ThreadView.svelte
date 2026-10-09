@@ -180,6 +180,11 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 			available: boolean;
 			summary: DrillSummary | null;
 			another: () => void;
+			/** The News | Listen switch (remembers its side). */
+			showNews: () => void;
+			showListen: () => void;
+			/** × on the listen panel: back to the welcome screen. */
+			close: () => void;
 		};
 		/** Flashcards due now (0 hides the hero's entry). */
 		flashcardsDue: number;
@@ -280,15 +285,23 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 					{flashcardsDue === 1 ? "1 flashcard due" : `${flashcardsDue} flashcards due`}
 				</button>
 			{/if}
-			{#if activeReplyCode && listen.available && !listen.mode.open && !previewing}
-				<!-- Listening drills follow the picked language. -->
-				<button
-					type="button"
-					class="listen-open"
-					onclick={() => activeReplyCode && listen.mode.enter(activeReplyCode)}
-				>
-					Listen in {listen.langName}
-				</button>
+			{#if activeReplyCode && listen.available && !previewing}
+				<!-- One language, two ways in: read its news or listen
+				to videos in it. -->
+				<div class="study-modes" role="tablist" aria-label="Study with">
+					<button
+						type="button"
+						role="tab"
+						aria-selected={newsPanel !== null && !listen.mode.open}
+						onclick={listen.showNews}>News</button
+					>
+					<button
+						type="button"
+						role="tab"
+						aria-selected={listen.mode.open}
+						onclick={listen.showListen}>Listen</button
+					>
+				</div>
 			{/if}
 			{#if listen.mode.open && listen.mode.lang}
 				<ListenPanel
@@ -296,6 +309,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 					lang={listen.mode.lang}
 					langName={listen.langName}
 					channels={listen.channels}
+					onClose={listen.close}
 				/>
 			{:else if newsPanel}
 				<NewsPanel
@@ -710,8 +724,34 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 
 	/* Chat switching snaps instantly on every platform: no slide,
 	no fade — the next chat replaces the current one in place. */
-	.flashcards-open,
-	.listen-open {
+	.study-modes {
+		display: flex;
+		margin-top: 0.2rem;
+		border: 1px solid var(--line-soft);
+		border-radius: 999px;
+		overflow: hidden;
+	}
+	.study-modes button {
+		border: none;
+		background: transparent;
+		color: var(--muted);
+		font: inherit;
+		font-size: 0.9rem;
+		padding: 0.4rem 1.1rem;
+		min-height: 2.3rem;
+		cursor: pointer;
+		transition:
+			color 0.15s ease,
+			background-color 0.15s ease;
+	}
+	.study-modes button[aria-selected="true"] {
+		background: var(--hover-wash);
+		color: var(--ink);
+	}
+	.study-modes button:hover {
+		color: var(--ink);
+	}
+	.flashcards-open {
 		margin-top: 0.4rem;
 		padding: 0.3rem 0.8rem;
 		border: none;
@@ -726,8 +766,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 			color 0.15s ease,
 			background-color 0.15s ease;
 	}
-	.flashcards-open:hover,
-	.listen-open:hover {
+	.flashcards-open:hover {
 		color: var(--ink);
 		background: var(--bg-raised);
 	}
@@ -737,8 +776,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 		}
 	}
 	@media (prefers-reduced-motion: reduce) {
-		.flashcards-open,
-		.listen-open {
+		.flashcards-open {
 			animation: none;
 		}
 	}

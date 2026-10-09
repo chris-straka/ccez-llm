@@ -8500,8 +8500,12 @@ import {
 		// Empty chats open learner news for the picked language (the
 		// submenu and ⌘number share this funnel); anywhere else the
 		// pick just switches and any open panel goes away.
-		if (activeChat(chatState).messages.length === 0 && listenMode.open) listenMode.enter(code);
-		else if (activeChat(chatState).messages.length === 0) newsMode.enterNewsMode(code);
+		// The News | Listen switch remembers its side.
+		const empty = activeChat(chatState).messages.length === 0;
+		const wantsListen =
+			listenMode.open || (settings.emptyChatMode === "listen" && listenBackend() !== null);
+		if (empty && wantsListen) listenMode.enter(code);
+		else if (empty) newsMode.enterNewsMode(code);
 		else newsMode.news = null;
 	}
 
@@ -13779,7 +13783,17 @@ import {
 				summary: chat.listen && chat.messages.some((m) => m.drillEnd)
 					? summarizeDrill(drillStates(chat))
 					: null,
-				another: anotherDrill
+				another: anotherDrill,
+				showNews: () => {
+					settings.emptyChatMode = "news";
+					listenMode.close();
+					if (!newsMode.news && activeReplyCode) newsMode.enterNewsMode(activeReplyCode);
+				},
+				showListen: () => {
+					settings.emptyChatMode = "listen";
+					if (activeReplyCode) listenMode.enter(activeReplyCode);
+				},
+				close: () => clearReplyLang()
 			}}
 			flashcardsDue={flashcards.due}
 			onFlashcards={() => flashcards.open()}

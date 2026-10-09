@@ -346,6 +346,8 @@ export interface AppSettings {
 	 * learner) instead of English. Off by default; Ctrl+⌥+L flips it.
 	 */
 	annotationAnswersInPassageLang: boolean;
+	/** What an empty chat in a language opens: news or listening. */
+	emptyChatMode: "news" | "listen";
 	/**
 	 * Name each chat with one short model call after its first reply
 	 * (renames always win). On by default; costs a few tokens per chat.
@@ -606,6 +608,7 @@ export function defaultSettings(): AppSettings {
 		flashcardsEnabled: false,
 		listenChannels: [],
 		annotationAnswersInPassageLang: false,
+		emptyChatMode: "news",
 		aiTitles: true
 	};
 }
@@ -861,6 +864,8 @@ export function loadSettings(store?: KeyValueStore): AppSettings {
 						!!c && typeof c.url === "string" && typeof c.name === "string"
 				)
 			: [];
+		if (merged.emptyChatMode !== "news" && merged.emptyChatMode !== "listen")
+			merged.emptyChatMode = "news";
 		if (typeof merged.annotationAnswersInPassageLang !== "boolean")
 			merged.annotationAnswersInPassageLang = false;
 		if (typeof merged.hideMessages !== "boolean") merged.hideMessages = false;
