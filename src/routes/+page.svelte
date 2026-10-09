@@ -2198,9 +2198,6 @@
 		resolveProvider: () => providerKeys.resolveActive(),
 		toast: (message) => flashToast(message),
 		reveal: () => scrollAfterRender(),
-		focusComposer: () => {
-			if (!androidUI) void tick().then(() => editor?.focus());
-		},
 		openUrl: async (url) => {
 			if (tauriBackendAvailable()) {
 				const { invoke } = await import("@tauri-apps/api/core");
@@ -7591,15 +7588,6 @@
 	}
 
 	function onSubmit(kind: SubmitKind) {
-		// A drill waiting for a guess: Enter answers it and the next
-		// clip plays at once (grading runs behind). Never a chat turn.
-		if (listenMode.awaitingGuess(chat)) {
-			const guess = composerText().trim();
-			if (!guess) return;
-			listenMode.submit(guess);
-			editor?.clear();
-			return;
-		}
 		// Guards live in submitAction (guard order pinned in
 		// submit.test.ts); the always-hide blur and both bodies stay
 		// here as effects.
@@ -10769,9 +10757,9 @@
 				consumeEvent(event);
 				// S over a clip slows that clip; elsewhere the newest.
 				const hoveredClip = chat.messages[hoveredIdx]?.clip?.i;
-				if (listenKey === "reveal") {
-					if (listenMode.submit(null)) editor?.clear();
-				} else if (listenKey === "slow" && hoveredClip !== undefined)
+				if (listenKey === "reveal") listenMode.submit(null);
+				else if (listenKey === "peek") listenMode.peek();
+				else if (listenKey === "slow" && hoveredClip !== undefined)
 					listenMode.toggle(hoveredClip, true);
 				else listenMode.replay(listenKey === "slow");
 				return;

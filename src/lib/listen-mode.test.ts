@@ -62,7 +62,6 @@ function harness() {
 		resolveProvider: () => Promise.resolve(null),
 		toast: () => {},
 		reveal: () => {},
-		focusComposer: () => {},
 		openUrl: () => Promise.resolve(),
 		nativeGrader: () => native
 	});
@@ -178,7 +177,6 @@ describe("search box", () => {
 			resolveProvider: () => Promise.resolve(null),
 			toast: () => {},
 			reveal: () => {},
-			focusComposer: () => {},
 			openUrl: () => Promise.resolve(),
 			nativeGrader: () => null
 		});

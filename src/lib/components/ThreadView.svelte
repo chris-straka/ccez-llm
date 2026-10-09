@@ -376,7 +376,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 				<ListenClip
 					session={listen.session}
 					clip={msg.clip}
-					open={i === messages.length - 1 && msg.clip.heard === undefined}
+					open={msg.clip.heard === undefined}
 					playing={listen.mode.playing}
 					position={listen.mode.position}
 					audioStatus={listen.mode.audioStatus}
@@ -389,7 +389,10 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 							const c = msg.clip;
 							if (c) listen.mode.seek(c.i, t);
 						},
-						openSource: (url: string) => listen.mode.openSource(url)
+						openSource: (url: string) => listen.mode.openSource(url),
+						guess: (text: string) => void listen.mode.submit(text),
+						peek: () => void listen.mode.peek(),
+						next: () => void listen.mode.submit(null)
 					}}
 				/>
 			{:else if listen.session && listen.summary && msg.drillEnd}

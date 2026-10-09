@@ -131,6 +131,8 @@ export interface ClipState {
 	guess?: string;
 	/** "?" revealed it without a guess. */
 	skipped?: boolean;
+	/** Shift+A showed its text while it still waits (no guess yet). */
+	peeked?: boolean;
 	/** Share of transcript words heard, 0..1. */
 	heard?: number;
 	ops?: DiffOp[];
@@ -356,35 +358,34 @@ export interface ListenKeyFacts {
 	selection: boolean;
 }
 
-export type ListenKeyAction = "play" | "slow" | "reveal" | "pass";
+export type ListenKeyAction = "play" | "slow" | "reveal" | "peek" | "pass";
 
 /**
- * Drill keys. ⌘Enter / Ctrl+Enter reveals, typed or not (a partial
- * guess is dropped). Space replays and "?" reveals while nothing is
- * typed (no guess starts with either; "?" is the phone's reveal). S
- * replays slowly and A reveals only outside the composer (guesses
- * start with either letter); A also yields to a hovered message or a
- * selection, where it annotates. The page aims S at a hovered clip.
- * ⌥Space / ⌥S work mid-guess. Matched on `code` where ⌥ rewrites the
+ * Drill keys. The composer is a normal chat in a drill (questions
+ * about the clips), so typing there stays typing: Space plays and
+ * ⌘Enter / Ctrl+Enter reveals only while it is empty. Outside it, S
+ * replays slowly, a reveals the waiting clip and moves on, and A shows
+ * its text without moving on; a and A yield to a hovered message or a
+ * selection, where they annotate. The page aims S at a hovered clip.
+ * ⌥Space / ⌥S work anywhere. Matched on `code` where ⌥ rewrites the
  * character (⌥S types ß).
  */
 export function listenKeyAction(f: ListenKeyFacts): ListenKeyAction {
 	if (!f.inDrill || f.inOtherField) return "pass";
-	if (f.meta || f.ctrl) return f.key === "Enter" && !f.alt ? "reveal" : "pass";
+	if (f.meta || f.ctrl)
+		return f.key === "Enter" && !f.alt && f.composerEmpty ? "reveal" : "pass";
 	if (f.alt) {
 		if (f.code === "Space") return "play";
 		if (f.code === "KeyS") return "slow";
 		return "pass";
 	}
 	if (f.code === "Space" && f.composerEmpty) return "play";
-	if (f.key === "?" && f.composerEmpty) return "reveal";
-	if ((f.key === "s" || f.key === "S") && !f.inComposer) return "slow";
-	if (
-		(f.key === "a" || f.key === "A") &&
-		!f.inComposer &&
-		!f.hovered &&
-		!f.selection
-	)
-		return "reveal";
+	if (f.inComposer || f.hovered || f.selection) {
+		if ((f.key === "s" || f.key === "S") && !f.inComposer) return "slow";
+		return "pass";
+	}
+	if (f.key === "s" || f.key === "S") return "slow";
+	if (f.key === "a") return "reveal";
+	if (f.key === "A") return "peek";
 	return "pass";
 }

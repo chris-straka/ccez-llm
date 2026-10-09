@@ -58,7 +58,8 @@ export function startDrill(
 
 /** The clip waiting for a guess (the newest unanswered one). */
 export function openClip(chat: Chat): ChatMsg | null {
-	const last = chat.messages.at(-1);
+	// The newest clip row decides: questions and replies can follow it.
+	const last = chat.messages.findLast((m) => m.clip);
 	return last?.clip && last.clip.heard === undefined ? last : null;
 }
 
@@ -111,8 +112,8 @@ function updateClip(
 		const text = clips[m.clip.i]?.text ?? "";
 		const clip = next(m.clip, text);
 		updated = clip;
-		// The transcript shows once answered, never before.
-		const content = clip.heard === undefined ? "" : text;
+		// The transcript shows once answered or shown, never before.
+		const content = clip.heard === undefined && !clip.peeked ? "" : text;
 		return { ...m, clip, content };
 	});
 	if (updated) persistChats(state, store);
@@ -133,6 +134,23 @@ export function answerDrillClip(
 		chatId,
 		(m) => m.id === msgId && m.clip?.heard === undefined,
 		(clip, text) => answerClip(text, clip, guess, lang),
+		store
+	);
+}
+
+/** Shift+A: show the waiting clip's transcript without answering it
+ * (the clip still waits; a guess or a reveal settles it later). */
+export function peekDrillClip(
+	state: ChatState,
+	chatId: ChatId,
+	msgId: ChatMsgId,
+	store?: KeyValueStore
+): ClipState | null {
+	return updateClip(
+		state,
+		chatId,
+		(m) => m.id === msgId && m.clip?.heard === undefined,
+		(clip) => ({ ...clip, peeked: true }),
 		store
 	);
 }

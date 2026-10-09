@@ -199,40 +199,34 @@ describe("listenKeyAction", () => {
 		hovered: false,
 		selection: false
 	};
-	it("Space replays and ? reveals only with nothing typed", () => {
+	it("Space plays only while the composer is empty; ? types", () => {
 		expect(listenKeyAction(base)).toBe("play");
 		expect(listenKeyAction({ ...base, composerEmpty: false })).toBe("pass");
-		expect(listenKeyAction({ ...base, key: "?", code: "Slash" })).toBe(
+		expect(listenKeyAction({ ...base, key: "?", code: "Slash" })).toBe("pass");
+	});
+	it("⌘Enter / Ctrl+Enter reveals only over an empty composer (a typed question sends)", () => {
+		const enter = { ...base, key: "Enter", code: "Enter" };
+		expect(listenKeyAction({ ...enter, meta: true })).toBe("reveal");
+		expect(listenKeyAction({ ...enter, ctrl: true, inComposer: false })).toBe(
 			"reveal"
 		);
 		expect(
-			listenKeyAction({
-				...base,
-				key: "?",
-				code: "Slash",
-				composerEmpty: false
-			})
-		).toBe("pass");
-	});
-	it("⌘Enter / Ctrl+Enter reveals, typed or not", () => {
-		const enter = { ...base, key: "Enter", code: "Enter" };
-		expect(listenKeyAction({ ...enter, meta: true })).toBe("reveal");
-		expect(
 			listenKeyAction({ ...enter, ctrl: true, composerEmpty: false })
-		).toBe("reveal");
+		).toBe("pass");
 		expect(listenKeyAction({ ...enter, meta: true, alt: true })).toBe("pass");
 		expect(listenKeyAction(enter)).toBe("pass");
 	});
 
-	it("A reveals outside the composer, unless a message is hovered or text selected", () => {
+	it("outside the composer: a moves on, A shows the text, unless hovering or selecting", () => {
 		const a = { ...base, key: "a", code: "KeyA", inComposer: false };
 		expect(listenKeyAction(a)).toBe("reveal");
+		expect(listenKeyAction({ ...a, key: "A" })).toBe("peek");
 		expect(listenKeyAction({ ...a, inComposer: true })).toBe("pass");
 		expect(listenKeyAction({ ...a, hovered: true })).toBe("pass");
-		expect(listenKeyAction({ ...a, selection: true })).toBe("pass");
+		expect(listenKeyAction({ ...a, key: "A", selection: true })).toBe("pass");
 	});
 
-	it("S slows outside the composer; a guess can start with s", () => {
+	it("S slows outside the composer; a question can start with s", () => {
 		expect(listenKeyAction({ ...base, key: "s", code: "KeyS" })).toBe("pass");
 		expect(
 			listenKeyAction({ ...base, key: "s", code: "KeyS", inComposer: false })

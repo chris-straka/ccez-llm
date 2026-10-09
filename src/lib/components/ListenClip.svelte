@@ -1,6 +1,8 @@
 <!-- One drill clip, above its message body: play / slow replay, where
 it sits in the video (with the source link), and once answered the
-guess marked against what was said. The transcript is the message
+guess marked against what was said. The clip waiting to be answered
+offers an optional guess field (Enter grades it), Show text (A), and
+Next (a); guessing is never required. The transcript is the message
 body itself (annotatable like any reply); the translation and notes
 fold under it (`ListenGloss`). -->
 <script lang="ts">
@@ -13,7 +15,7 @@ fold under it (`ListenGloss`). -->
 	interface Props {
 		session: ListenSession;
 		clip: ClipState;
-		/** This clip waits for the guess. */
+		/** This clip waits to be answered (the newest clip row). */
 		open: boolean;
 		playing: { i: number; slow: boolean } | null;
 		/** The playhead of the clip playing or paused. */
@@ -23,6 +25,12 @@ fold under it (`ListenGloss`). -->
 			play: (slow: boolean) => void;
 			seek: (t: number) => void;
 			openSource: (url: string) => void;
+			/** Grade a typed guess (the next clip follows). */
+			guess: (text: string) => void;
+			/** Show this clip's text while it still waits. */
+			peek: () => void;
+			/** Reveal this clip and move on. */
+			next: () => void;
 		};
 	}
 
@@ -179,11 +187,50 @@ fold under it (`ListenGloss`). -->
 		>
 	</div>
 	{#if open}
-		<p class="hint">
-			Type what you hear · Enter · <kbd class="reveal-ctrl">Ctrl+Enter</kbd><kbd
-				class="reveal-mac">⌘Enter</kbd
-			><kbd class="reveal-phone">?</kbd> reveals
-		</p>
+		<div class="ask">
+			<input
+				class="guess-box"
+				type="text"
+				lang={session.lang}
+				autocomplete="off"
+				spellcheck="false"
+				placeholder="Type what you hear (optional)"
+				aria-label="Type what you hear"
+				onkeydown={(e) => {
+					if (e.key === "Enter" && !e.metaKey && !e.ctrlKey) {
+						e.preventDefault();
+						const text = e.currentTarget.value.trim();
+						if (!text) return;
+						e.currentTarget.value = "";
+						actions.guess(text);
+					} else if (e.key === "Enter") {
+						e.preventDefault();
+						actions.next();
+					} else if (e.key === "Escape") {
+						e.currentTarget.blur();
+					}
+				}}
+			/>
+			<button
+				type="button"
+				class="step"
+				title="Show the text, stay on this clip (A)"
+				disabled={clip.peeked}
+				onclick={(e) => {
+					e.stopPropagation();
+					actions.peek();
+				}}>Show text</button
+			>
+			<button
+				type="button"
+				class="step next"
+				title="Reveal and play the next clip (a)"
+				onclick={(e) => {
+					e.stopPropagation();
+					actions.next();
+				}}>Next ›</button
+			>
+		</div>
 	{:else if answered}
 		{#if clip.skipped}
 			<p class="verdict">Revealed</p>
@@ -345,17 +392,10 @@ fold under it (`ListenGloss`). -->
 	.source:hover {
 		color: var(--accent);
 	}
-	.hint,
 	.verdict {
 		margin: 0;
 		font-size: 0.8rem;
 		color: var(--muted);
-	}
-	kbd {
-		font: inherit;
-		padding: 0 0.3rem;
-		border: 1px solid var(--line-soft);
-		border-radius: 0.3rem;
 	}
 	.guess {
 		display: flex;
@@ -398,19 +438,6 @@ fold under it (`ListenGloss`). -->
 		.busy {
 			animation: none;
 		}
-	}
-	/* The reveal key the keyboard at hand has: Ctrl+Enter, ⌘Enter on a
-	Mac, "?" on a phone (data-android is set on iPhones too). */
-	.reveal-mac,
-	.reveal-phone,
-	:global(.app[data-mac]) .reveal-ctrl,
-	:global(.app[data-android]) .reveal-ctrl,
-	:global(.app[data-android]) .reveal-mac {
-		display: none;
-	}
-	:global(.app[data-mac]:not([data-android])) .reveal-mac,
-	:global(.app[data-android]) .reveal-phone {
-		display: inline;
 	}
 	/* A slim track that fills to the playhead. Blurs after a drag so
 	Space goes back to play / pause. */
@@ -460,5 +487,51 @@ fold under it (`ListenGloss`). -->
 	.scrub:disabled {
 		opacity: 0.4;
 		cursor: default;
+	}
+	/* The waiting clip's row: an optional guess field and two quiet
+	steps. Nothing here takes focus by itself, so the drill's single-
+	letter keys keep working until the field is clicked. */
+	.ask {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		flex-wrap: wrap;
+	}
+	.guess-box {
+		flex: 1 1 12rem;
+		min-width: 0;
+		font: inherit;
+		font-size: 0.9rem;
+		padding: 0.35rem 0.6rem;
+		border: 1px solid var(--line-soft);
+		border-radius: 0.5rem;
+		background: transparent;
+		color: var(--ink);
+	}
+	.guess-box:focus {
+		outline: none;
+		border-color: var(--focus);
+	}
+	.step {
+		flex: 0 0 auto;
+		font: inherit;
+		font-size: 0.8rem;
+		padding: 0.3rem 0.7rem;
+		border: 1px solid var(--line-soft);
+		border-radius: 999px;
+		background: transparent;
+		color: var(--muted);
+		cursor: pointer;
+	}
+	.step:hover:not(:disabled) {
+		color: var(--ink);
+		border-color: var(--line-hover);
+	}
+	.step:disabled {
+		opacity: 0.45;
+		cursor: default;
+	}
+	.step.next {
+		color: var(--accent);
 	}
 </style>

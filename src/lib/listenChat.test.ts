@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { activeChat, createChatState } from "./chat";
+import {
+	activeChat,
+	buildApiMessages,
+	createChatState,
+	drillContextBlock,
+	type ChatMsgId
+} from "./chat";
 import type { ListenSession } from "./listen";
 import {
 	advanceDrill,
@@ -9,6 +15,7 @@ import {
 	markGrading,
 	nextClipIndex,
 	openClip,
+	peekDrillClip,
 	startDrill
 } from "./listenChat";
 import type { KeyValueStore } from "./settings";
@@ -137,5 +144,70 @@ describe("drill chat", () => {
 			startDrill(state, chat.id, { ...session, clips: [] }, store)
 		).toBeNull();
 		expect(activeChat(state).listen).toBeUndefined();
+	});
+});
+
+describe("drill chat as a conversation", () => {
+	it("Show text reveals the waiting clip without answering it", () => {
+		const { state, chat, store } = fresh();
+		const first = startDrill(state, chat.id, session, store);
+		if (!first) throw new Error("no clip");
+		const shown = peekDrillClip(state, chat.id, first, store);
+		const c = activeChat(state);
+		expect(shown?.peeked).toBe(true);
+		expect(c.messages[0]?.content).toBe("Parlons de la peste.");
+		expect(openClip(c)?.id).toBe(first);
+	});
+
+	it("the waiting clip stays waiting under questions and replies", () => {
+		const { state, chat, store } = fresh();
+		const first = startDrill(state, chat.id, session, store);
+		const c = activeChat(state);
+		c.messages = [
+			...c.messages,
+			{
+				id: "q" as ChatMsgId,
+				role: "user",
+				content: "why?",
+				usage: null,
+				error: null
+			},
+			{
+				id: "r" as ChatMsgId,
+				role: "assistant",
+				content: "Because.",
+				usage: null,
+				error: null
+			}
+		];
+		expect(openClip(activeChat(state))?.id).toBe(first);
+	});
+
+	it("questions read against the heard clips, never the clip rows", () => {
+		const { state, chat, store } = fresh();
+		const first = startDrill(state, chat.id, session, store);
+		if (!first) throw new Error("no clip");
+		answerDrillClip(state, chat.id, first, "parlons", store);
+		advanceDrill(state, chat.id, store);
+		const c = activeChat(state);
+		c.messages = [
+			...c.messages,
+			{
+				id: "q" as ChatMsgId,
+				role: "user",
+				content: "what's peste?",
+				usage: null,
+				error: null
+			}
+		];
+		const block = drillContextBlock(c) ?? "";
+		expect(block).toContain(session.title);
+		expect(block).toContain("- Parlons de la peste.");
+		// Clip 2 still waits: never spoiled.
+		expect(block).not.toContain("Nous couvrons");
+		const api = buildApiMessages(c, "sys");
+		expect(api.map((m) => m.role)).toEqual(["system", "system", "user"]);
+		expect(api.at(-1)?.content).toBe("what's peste?");
+		expect(drillContextBlock(activeChat(createChatState()))).toBeNull();
 	});
 });

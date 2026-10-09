@@ -169,16 +169,19 @@ test("a drill runs: guess, next clip at once, reveal, tally", async ({
 	await expect(row).toContainText("French auto-dub");
 	await row.click();
 
-	// Clip 1 waits for a guess.
+	// Clip 1 waits; guessing is optional, in the clip's own field.
 	const clips = page.locator(".clip");
 	await expect(clips).toHaveCount(1, { timeout: 10_000 });
 	await expect(clips.first()).toContainText("1 / 3");
-	await expect(clips.first()).toContainText("Type what you hear");
+	const guess = (n: number) =>
+		clips.nth(n).getByRole("textbox", { name: "Type what you hear" });
+	await expect(guess(0)).toBeVisible();
+	// The drill grabs no focus: single-letter keys stay free.
+	await expect(guess(0)).not.toBeFocused();
 
 	// A partly right guess: clip 2 shows at once, clip 1 is marked.
-	const box = page.locator(".prompt textarea").first();
-	await box.fill("bonjour a tous bienvenue");
-	await box.press("Enter");
+	await guess(0).fill("bonjour a tous bienvenue");
+	await guess(0).press("Enter");
 	await expect(clips).toHaveCount(2);
 	await expect(clips.nth(1)).toContainText("2 / 3");
 	// "a" for "à" counts as heard, spelled differently.
@@ -189,18 +192,20 @@ test("a drill runs: guess, next clip at once, reveal, tally", async ({
 	await expect(page.locator(".messages")).toContainText(
 		"Bonjour à tous et bienvenue."
 	);
-	await expect(box).toHaveValue("");
 
-	// ⌘Enter reveals clip 2 as a skip, dropping the half-typed guess.
-	await box.fill("nous");
-	await box.press("ControlOrMeta+Enter");
+	// Show text puts clip 2's words up while it still waits; Next moves on.
+	await clips.nth(1).getByRole("button", { name: "Show text" }).click();
+	await expect(page.locator(".messages")).toContainText(
+		"Nous parlons de la peste."
+	);
+	await expect(clips).toHaveCount(2);
+	await clips.nth(1).getByRole("button", { name: "Next ›" }).click();
 	await expect(clips).toHaveCount(3);
 	await expect(clips.nth(1)).toContainText("Revealed");
-	await expect(box).toHaveValue("");
 
 	// The last guess ends the video: the tally, with the missed clip.
-	await box.fill("merci de votre attention");
-	await box.press("Enter");
+	await guess(2).fill("merci de votre attention");
+	await guess(2).press("Enter");
 	const end = page.locator(".end");
 	await expect(end).toContainText("End of the video");
 	await expect(end).toContainText("Nous parlons de la peste.");
@@ -283,8 +288,9 @@ test("Space pauses and resumes mid-clip; answering lets the clip finish first", 
 
 	// A guess while it plays: clip 2 shows, clip 1 keeps playing, then
 	// clip 2 follows on its own.
-	await box.fill("bonjour");
-	await box.press("Enter");
+	const guess = first.getByRole("textbox", { name: "Type what you hear" });
+	await guess.fill("bonjour");
+	await guess.press("Enter");
 	await expect(clips).toHaveCount(2);
 	await expect(pause).toBeVisible();
 	await expect(clips.nth(1).getByRole("button", { name: "Pause" })).toBeVisible(
@@ -293,16 +299,18 @@ test("Space pauses and resumes mid-clip; answering lets the clip finish first", 
 	await expect(first.getByRole("button", { name: "Play clip" })).toBeVisible();
 });
 
-test("outside the composer: S slows the hovered clip, A with nothing hovered reveals", async ({
+test("keys: S slows the hovered clip, A shows the text, a moves on", async ({
 	page
 }) => {
 	await page.getByRole("tab", { name: "Listen" }).click();
 	await page.locator(".listen-panel .video", { hasText: info.title }).click();
 	const clips = page.locator(".clip");
 	await expect(clips).toHaveCount(1, { timeout: 10_000 });
-	const box = page.locator(".prompt textarea").first();
-	await box.fill("bonjour");
-	await box.press("Enter");
+	const guess = clips
+		.first()
+		.getByRole("textbox", { name: "Type what you hear" });
+	await guess.fill("bonjour");
+	await guess.press("Enter");
 	await expect(clips).toHaveCount(2);
 	await page.evaluate(() =>
 		(document.activeElement as HTMLElement | null)?.blur()
@@ -314,9 +322,52 @@ test("outside the composer: S slows the hovered clip, A with nothing hovered rev
 	await expect(clips).toHaveCount(2);
 
 	await page.mouse.move(2, 2);
+	await page.keyboard.press("Shift+A");
+	await expect(page.locator(".messages")).toContainText(
+		"Nous parlons de la peste."
+	);
+	await expect(clips).toHaveCount(2);
 	await page.keyboard.press("a");
 	await expect(clips).toHaveCount(3);
 	await expect(clips.nth(1)).toContainText("Revealed");
+});
+
+test("the composer is a chat: a question reads against the heard clips", async ({
+	page
+}) => {
+	const bodies: string[] = [];
+	page.on("request", (r) => {
+		if (r.url().startsWith("http://grade.test/") && r.method() === "POST")
+			bodies.push(r.postData() ?? "");
+	});
+	await page.getByRole("tab", { name: "Listen" }).click();
+	await page.locator(".listen-panel .video", { hasText: info.title }).click();
+	const clips = page.locator(".clip");
+	await expect(clips).toHaveCount(1, { timeout: 10_000 });
+	const guess = clips
+		.first()
+		.getByRole("textbox", { name: "Type what you hear" });
+	await guess.fill("bonjour");
+	await guess.press("Enter");
+	await expect(clips).toHaveCount(2);
+	const box = page.locator(".prompt textarea").first();
+	await box.fill("what does bienvenue mean?");
+	await box.press("Enter");
+	// Sent as a chat turn, never graded as a guess: clip 2 still waits.
+	await expect(page.locator("article.user")).toContainText(
+		"what does bienvenue mean?"
+	);
+	await expect(
+		clips.nth(1).getByRole("button", { name: "Next ›" })
+	).toBeVisible();
+	await expect
+		.poll(() => bodies.find((b) => b.includes("Listening drill on the video")))
+		.toBeTruthy();
+	const body =
+		bodies.find((b) => b.includes("Listening drill on the video")) ?? "";
+	expect(body).toContain("Bonjour à tous et bienvenue.");
+	// Clip 2 waits: its words never reach the model.
+	expect(body).not.toContain("Nous parlons de la peste.");
 });
 
 test("annotating while a clip plays never reads the quote over it", async ({
@@ -351,9 +402,11 @@ test("annotating while a clip plays never reads the quote over it", async ({
 	await page.locator(".listen-panel .video", { hasText: info.title }).click();
 	const clips = page.locator(".clip");
 	await expect(clips).toHaveCount(1, { timeout: 10_000 });
-	const box = page.locator(".prompt textarea").first();
-	await box.fill("bonjour");
-	await box.press("Enter");
+	const guess = clips
+		.first()
+		.getByRole("textbox", { name: "Type what you hear" });
+	await guess.fill("bonjour");
+	await guess.press("Enter");
 	await expect(clips).toHaveCount(2);
 	// Clip 1 is still playing (clip 2 waits for it).
 	await expect(

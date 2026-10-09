@@ -918,8 +918,14 @@ export function selectHistoryWindow(
 	chat: Chat,
 	excludeId?: ChatMsgId
 ): HistoryWindow {
+	// Drill clip rows never send as turns (their transcripts ride
+	// drillContextBlock instead), nor does the tally row.
 	const eligible = chat.messages.filter(
-		(m) => m.id !== excludeId && !(m.role === "assistant" && m.error)
+		(m) =>
+			m.id !== excludeId &&
+			!(m.role === "assistant" && m.error) &&
+			!m.clip &&
+			!m.drillEnd
 	);
 	let summary: string | null =
 		chat.summary && chat.summary.length > 0 ? chat.summary : null;
@@ -963,6 +969,34 @@ export function selectHistoryWindow(
 	}
 	if (folded < MIN_FOLD_CHARS) fold.length = 0;
 	return { summary, turns, fold };
+}
+
+/** Clips a drill's context block carries at most (the newest). */
+const DRILL_CONTEXT_CLIPS = 30;
+
+/**
+ * A listening drill's clips as model context: one labeled system block
+ * naming the video and the clips the learner has heard so far (revealed
+ * or shown, never the one still waiting), oldest first. Questions typed
+ * in a drill chat read against it. Null outside drills.
+ */
+export function drillContextBlock(chat: Chat): string | null {
+	const session = chat.listen;
+	if (!session) return null;
+	const heard = chat.messages
+		.flatMap((m) =>
+			m.clip && (m.clip.heard !== undefined || m.clip.peeked)
+				? [session.clips[m.clip.i]?.text ?? ""]
+				: []
+		)
+		.filter((t) => t.trim() !== "")
+		.slice(-DRILL_CONTEXT_CLIPS);
+	return (
+		`Listening drill on the video "${session.title}" (${session.channel}), ` +
+		`heard clip by clip. The learner's messages are questions about it. ` +
+		`Clips heard so far, oldest first:\n` +
+		(heard.length > 0 ? heard.map((t) => `- ${t}`).join("\n") : "(none yet)")
+	);
 }
 
 /** Summary as the model reads it: a labeled system block, never prose
@@ -1157,6 +1191,8 @@ export function buildApiMessages(
 	const api: ChatMessage[] = [{ role: "system", content: systemPrompt }];
 	const { summary, turns } = selectHistoryWindow(chat, excludeId);
 	if (summary) api.push({ role: "system", content: summaryBlock(summary) });
+	const drill = drillContextBlock(chat);
+	if (drill) api.push({ role: "system", content: drill });
 	for (const m of turns) api.push({ role: m.role, content: apiContent(m) });
 	return api;
 }
@@ -1621,7 +1657,8 @@ function loadChats(state: ChatState, store: KeyValueStore): void {
 					if (clips) {
 						c.messages = c.messages.map((m) => {
 							const text = m.clip ? clips[m.clip.i]?.text : undefined;
-							return text !== undefined && m.clip?.heard !== undefined
+							return text !== undefined &&
+								(m.clip?.heard !== undefined || m.clip?.peeked)
 								? { ...m, content: text }
 								: m;
 						});

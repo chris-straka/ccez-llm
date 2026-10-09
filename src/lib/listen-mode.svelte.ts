@@ -6,7 +6,7 @@
  */
 
 import { SvelteMap } from "svelte/reactivity";
-import { activeChat, type Chat, type ChatId, type ChatState } from "./chat";
+import { activeChat, type ChatId, type ChatState } from "./chat";
 import {
 	drillable,
 	gradePrompt,
@@ -26,6 +26,7 @@ import {
 	clipBefore,
 	landGrade,
 	markGrading,
+	peekDrillClip,
 	openClip,
 	startDrill
 } from "./listenChat";
@@ -42,7 +43,6 @@ export interface ListenModeDeps {
 	toast: (message: string) => void;
 	/** After a clip appears: keep the newest clip in view. */
 	reveal: () => void;
-	focusComposer: () => void;
 	openUrl: (url: string) => Promise<void>;
 	/** Rust-side grading (Android shell): keeps going while the app is
 	 * in the background. Null grades from the page instead. */
@@ -365,7 +365,6 @@ export class ListenMode {
 			startDrill(state, chatId, session);
 			this.close();
 			this.deps.reveal();
-			this.deps.focusComposer();
 			if (await audioReady) this.play(0, false);
 		} catch (error) {
 			this.error = listenErrorCopy(error, this.deps.langName(lang));
@@ -583,9 +582,16 @@ export class ListenMode {
 		this.toggle(clip.i, slow);
 	}
 
-	/** Is the active chat a drill waiting for a guess? */
-	awaitingGuess(chat: Chat): boolean {
-		return Boolean(chat.listen && openClip(chat));
+	/** Shift+A or Show text: the waiting clip's transcript appears
+	 * while it still waits (Next or a guess settles it). */
+	peek(): boolean {
+		const state = this.deps.getChatState();
+		const chat = activeChat(state);
+		const open = openClip(chat);
+		if (!chat.listen || !open?.clip || open.clip.peeked) return false;
+		peekDrillClip(state, chat.id, open.id);
+		this.deps.reveal();
+		return true;
 	}
 
 	/**

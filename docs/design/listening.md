@@ -13,16 +13,21 @@ click away. Everything follows the reply language picked in the app.
    "no French audio yet". Search finds videos or channels, filtered
    to "Only with French audio", and Add puts a channel on your list.
 2. Picking a video turns the chat into a drill (`Chat.listen`). Clip 1
-   shows its frame and plays. Space replays, S plays at 0.75×, and
-   ⌥Space / ⌥S work mid-guess.
-3. Enter submits the guess. The diff is local, so it shows instantly
-   on clip 1 (heard, misspelled, misheard, missed), and clip 2 appears
-   and plays in the same frame. ⌘Enter (or "?" on an empty prompt,
-   or A outside it) reveals the clip as a skip.
-4. Nothing is translated on the way. Opening a clip's "English" fold
+   shows its frame and plays. Space plays / pauses, S plays at 0.75×,
+   and ⌥Space / ⌥S work anywhere. The drill takes no focus, so its
+   single-letter keys work from the start.
+3. Moving on needs no typing: a (or Next) reveals the waiting clip and
+   plays the next; A (or Show text) shows its words and stays. Guessing
+   is optional, in the waiting clip's own field: Enter grades it with a
+   local diff (heard, misspelled, misheard, missed) and the next clip
+   follows in the same frame.
+4. The composer stays a normal chat: a question sends as a turn, with
+   the video and the clips heard so far as one system block (clip rows
+   never send as turns, and the waiting clip is never spoiled).
+5. Nothing is translated on the way. Opening a clip's "English" fold
    asks the active provider for that clip's translation and notes
    (once; "translating…" while it runs, Try again if it fails).
-5. After the last clip: words heard, and the clips missed most, each
+6. After the last clip: words heard, and the clips missed most, each
    with replay buttons. "Another video" opens a fresh drill chat.
 
 Clip bodies are ordinary assistant messages holding just the

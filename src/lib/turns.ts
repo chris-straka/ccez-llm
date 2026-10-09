@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import {
 	apiContent,
+	drillContextBlock,
 	persistChats,
 	renderFoldText,
 	selectHistoryWindow,
@@ -191,6 +192,8 @@ export function nativeHistoryInput(
 		excludeId ?? undefined
 	);
 	const messages = turnHistory(turns);
+	const drill = drillContextBlock(chat);
+	if (drill) messages.unshift({ role: "system", content: drill });
 	if (summary && fold.length === 0)
 		messages.unshift({ role: "system", content: summaryBlock(summary) });
 	const newest = fold.length > 0 ? fold[fold.length - 1] : undefined;
