@@ -557,9 +557,9 @@ everything else is theme tokens, never raw hex. -->
 		cursor: pointer;
 	}
 
-	/* Grid: as many ~calc(16 * var(--u, 1rem)) columns as fit (three on a laptop, one
-	list column on a phone); rem-based, so giant text sizes drop
-	columns instead of squeezing headlines. */
+	/* Grid: as many 12.5em columns as fit (three on a laptop at 100%,
+	two at big text in a mid window). em is --u here, so giant text
+	sizes drop columns instead of squeezing headlines. */
 	.news-cards {
 		list-style: none;
 		margin: 0;
@@ -567,7 +567,7 @@ everything else is theme tokens, never raw hex. -->
 		display: grid;
 		grid-template-columns: repeat(
 			auto-fill,
-			minmax(min(100%, calc(16 * var(--u, 1rem))), 1fr)
+			minmax(min(100%, 12.5em), 1fr)
 		);
 		gap: calc(0.75 * var(--u, 1rem));
 	}
@@ -747,9 +747,12 @@ everything else is theme tokens, never raw hex. -->
 		);
 	}
 
-	/* Phone column: list rows with a thumbnail, many stories per
-	screen instead of one huge picture each. */
-	@container (max-width: 33rem) {
+	/* List rows with a thumbnail wherever the grid would fall to one
+	column (two 12.5em columns plus the 0.75em gap), so no width or
+	text size ever gets one huge picture per story. em in a container
+	query is the container's font size (--u), so this follows the text
+	size; calc(var()) is not allowed here (lightningcss rejects it). */
+	@container (width < 25.75em) {
 		.news-cards {
 			gap: calc(0.5 * var(--u, 1rem));
 		}
