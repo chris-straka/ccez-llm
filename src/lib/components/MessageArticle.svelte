@@ -119,6 +119,8 @@ import type {
 		actions: MessageArticleActions;
 		/** Row chrome above the body (listening drill clips). */
 		header?: Snippet | undefined;
+		/** Row chrome under the body (a drill clip's folded English). */
+		footer?: Snippet | undefined;
 	}
 
 	let {
@@ -168,7 +170,8 @@ import type {
 		pinnedKinds,
 		aidBusy,
 		actions,
-		header
+		header,
+		footer
 	}: Props = $props();
 	/* A news session opener reads as one tag (story, mode, level):
 	its instructions are for the model, not the learner. */
@@ -386,6 +389,9 @@ import type {
 		<div class="bubble">{@render body(msg.content, false, null)}</div>
 	{:else}
 		<div class:bubble={msg.role === "user"}>{@render body(textOverride, folded, contentOverride)}</div>
+	{/if}
+	{#if footer}
+		{@render footer()}
 	{/if}
 	<!-- Sent image folds render in `SentAttachments.svelte`
 	(variant "inline"); the page keeps the models, the OCR

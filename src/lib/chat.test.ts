@@ -863,6 +863,30 @@ describe("chat", () => {
 		expect(state.chats.map((c) => c.id)).toEqual(["c1"]);
 	});
 
+	it("drill clips saved with their English in the body load as the transcript alone", () => {
+		const store = freshStore();
+		const clip = (i: number, heard?: number) => ({ i, heard, translation: "Let's talk.", grade: "done" });
+		store.setItem(
+			"ccez-llm-chats-v1",
+			JSON.stringify([
+				{
+					id: "c1",
+					createdAt: 1,
+					replyLang: "fr",
+					listen: { clips: [{ i: 0, start: 0, end: 2, text: "Parlons." }, { i: 1, start: 2, end: 4, text: "Bon." }] },
+					messages: [
+						{ id: "m1", role: "assistant", content: "Parlons.\n\n*Let's talk.*", clip: clip(0, 1) },
+						{ id: "m2", role: "assistant", content: "", clip: clip(1) }
+					]
+				}
+			])
+		);
+		const [m1, m2] = createChatState(store).chats[0]?.messages ?? [];
+		expect(m1?.content).toBe("Parlons.");
+		expect(m1?.clip?.translation).toBe("Let's talk.");
+		expect(m2?.content).toBe("");
+	});
+
 	it("keeps a reply pill per chat and persists it on load", async () => {
 		const { state, store } = stateWith(freshStore());
 		newChat(state, store);

@@ -172,9 +172,15 @@ test("a drill runs: guess, next clip at once, reveal, tally", async ({ page }) =
 	await expect(end).toContainText("Nous parlons de la peste.");
 	await expect(end.getByRole("button", { name: "Another video" })).toBeVisible();
 
-	// Grading ran behind: each clip's body gains the translation and note.
+	// Grading ran behind: the English folds under each clip, the body
+	// stays the French.
 	const first = page.locator("#msg-0");
-	await expect(first).toContainText(GRADE.translation, { timeout: 15_000 });
+	const english = first.getByRole("button", { name: "English" });
+	await expect(english).toBeVisible({ timeout: 15_000 });
+	await expect(first).not.toContainText(GRADE.translation);
+	await english.click();
+	await expect(english).toHaveAttribute("aria-expanded", "true");
+	await expect(first).toContainText(GRADE.translation);
 	await expect(first).toContainText("welcome");
 });
 

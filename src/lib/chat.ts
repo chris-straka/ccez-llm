@@ -1613,6 +1613,16 @@ function loadChats(state: ChatState, store: KeyValueStore): void {
 					if (typeof c.correction !== "boolean") c.correction = false;
 					// Pre-overlay chats are never the game chat.
 					if (typeof c.game !== "boolean") c.game = false;
+					// Drill clips once carried their translation and notes in
+					// the body; they fold under the clip now, so the body is
+					// just the transcript.
+					const clips = c.listen?.clips;
+					if (clips) {
+						c.messages = c.messages.map((m) => {
+							const text = m.clip ? clips[m.clip.i]?.text : undefined;
+							return text !== undefined && m.clip?.heard !== undefined ? { ...m, content: text } : m;
+						});
+					}
 					// A missing timestamp renders "Invalid Date" in the
 					// sidebar and switcher: stamp it now instead.
 					if (typeof c.createdAt !== "number" || Number.isNaN(c.createdAt)) {

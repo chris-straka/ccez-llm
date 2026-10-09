@@ -83,9 +83,11 @@ describe("drill chat", () => {
 		// Clip 1: answered, then graded.
 		answerDrillClip(state, chat.id, first, null, store);
 		landGrade(state, chat.id, 0, { translation: "Let's talk about the plague.", notes: [{ expr: "Parlons de", meaning: "let's talk about" }] }, store);
-		expect(activeChat(state).messages[0]?.content).toBe(
-			"Parlons de la peste.\n\n*Let's talk about the plague.*\n\n- **Parlons de**: let's talk about"
-		);
+		// The body stays the transcript; the English rides the clip.
+		const graded = activeChat(state).messages[0];
+		expect(graded?.content).toBe("Parlons de la peste.");
+		expect(graded?.clip?.translation).toBe("Let's talk about the plague.");
+		expect(graded?.clip?.notes).toEqual([{ expr: "Parlons de", meaning: "let's talk about" }]);
 		landGrade(state, chat.id, 0, null, store);
 		expect(activeChat(state).messages[0]?.clip?.grade).toBe("error");
 	});

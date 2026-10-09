@@ -26,8 +26,10 @@ follows the reply language picked in the app.
 5. After the last clip: words heard, and the clips missed most, each
    with replay buttons. "Another video" opens a fresh drill chat.
 
-Clip bodies are ordinary assistant messages (transcript, *translation*,
-notes), so annotation, read-aloud and reading aids work on them.
+Clip bodies are ordinary assistant messages holding just the
+transcript, so annotation, read-aloud and reading aids work on them.
+The translation and notes fold under the clip behind an "English"
+toggle, closed by default.
 
 ## Pipeline
 

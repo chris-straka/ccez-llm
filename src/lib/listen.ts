@@ -5,8 +5,8 @@
  * A drill is a chat. `Chat.listen` holds the video and its clips;
  * each clip is an assistant message whose `clip` field tracks the
  * guess. The message content stays empty until the guess goes in,
- * then holds the transcript (plus the translation and notes once
- * grading lands), so every word is annotatable like any reply.
+ * then holds the transcript, so every word is annotatable like any
+ * reply. The translation and notes live on the clip and fold under it.
  */
 
 import type { ClipSpan } from "./listenClips";
@@ -248,20 +248,6 @@ export function parseGrade(reply: string): { translation: string; notes: ClipNot
 			.filter((n) => n.expr && n.meaning)
 			.slice(0, 3)
 	};
-}
-
-/**
- * A clip message's body once answered: the transcript, then the
- * translation and notes when grading has landed. Plain markdown so
- * annotations, readings, and read-aloud work on it unchanged.
- */
-export function clipContent(text: string, state: ClipState): string {
-	const parts = [text];
-	if (state.translation) parts.push(`*${state.translation.replace(/\*/g, "")}*`);
-	if (state.notes && state.notes.length > 0) {
-		parts.push(state.notes.map((n) => `- **${n.expr.replace(/\*/g, "")}**: ${n.meaning}`).join("\n"));
-	}
-	return parts.join("\n\n");
 }
 
 /** Answer a clip: the diff, instantly. `guess` null is a "?" skip. */

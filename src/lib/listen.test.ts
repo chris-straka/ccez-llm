@@ -3,7 +3,6 @@ import {
 	answerClip,
 	availabilityLabel,
 	channelLabel,
-	clipContent,
 	formatDuration,
 	gradePrompt,
 	listenErrorCopy,
@@ -82,17 +81,6 @@ describe("grading", () => {
 		expect(parseGrade("no json here")).toBeNull();
 		expect(parseGrade('{"notes": []}')).toBeNull();
 		expect(parseGrade('{"translation": "Hi"}')?.notes).toEqual([]);
-	});
-
-	it("builds an annotatable body: transcript, translation, notes", () => {
-		expect(clipContent("On partira pas.", { i: 0 })).toBe("On partira pas.");
-		expect(
-			clipContent("On partira pas.", {
-				i: 0,
-				translation: "We won't leave.",
-				notes: [{ expr: "partira", meaning: "will leave" }]
-			})
-		).toBe("On partira pas.\n\n*We won't leave.*\n\n- **partira**: will leave");
 	});
 });
 

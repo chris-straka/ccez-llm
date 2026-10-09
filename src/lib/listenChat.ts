@@ -14,7 +14,7 @@ import {
 	type ChatMsgId,
 	type ChatState
 } from "./chat";
-import { answerClip, clipContent, type ClipNote, type ClipState, type ListenSession } from "./listen";
+import { answerClip, type ClipNote, type ClipState, type ListenSession } from "./listen";
 import type { KeyValueStore } from "./settings";
 
 function chatById(state: ChatState, id: ChatId): Chat | undefined {
@@ -89,7 +89,7 @@ function updateClip(
 		const clip = next(m.clip, text);
 		updated = clip;
 		// The transcript shows once answered, never before.
-		const content = clip.heard === undefined ? "" : clipContent(text, clip);
+		const content = clip.heard === undefined ? "" : text;
 		return { ...m, clip, content };
 	});
 	if (updated) persistChats(state, store);

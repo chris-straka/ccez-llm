@@ -34,6 +34,7 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 	import { parseNewsLaunch } from "$lib/news";
 	import MessageArticle from "./MessageArticle.svelte";
 	import ListenClip from "./ListenClip.svelte";
+	import ListenGloss from "./ListenGloss.svelte";
 	import ListenEnd from "./ListenEnd.svelte";
 	import ListenPanel from "./ListenPanel.svelte";
 	import type { DrillSummary, ListenChannel, ListenSession } from "$lib/listen";
@@ -382,10 +383,6 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 							if (p?.i === c.i && p.slow === slow) listen.mode.replay(slow);
 							else listen.mode.play(c.i, slow);
 						},
-						regrade: () => {
-							const c = msg.clip;
-							if (c) listen.mode.regrade(c.i);
-						},
 						openSource: (url: string) => listen.mode.openSource(url)
 					}}
 				/>
@@ -401,9 +398,21 @@ bound to (msg, i) here, exactly like the paged actions object was. -->
 				/>
 			{/if}
 		{/snippet}
+		{#snippet clipFooter()}
+			{#if msg.clip}
+				<ListenGloss
+					clip={msg.clip}
+					regrade={() => {
+						const c = msg.clip;
+						if (c) listen.mode.regrade(c.i);
+					}}
+				/>
+			{/if}
+		{/snippet}
 		{#if trimIdx <= 0 || i >= trimIdx}
 		<MessageArticle
 			header={msg.clip || msg.drillEnd ? clipHeader : undefined}
+			footer={msg.clip ? clipFooter : undefined}
 			{msg}
 			index={i}
 			selected={focusMode === "scroll" && selectedIdx === i}

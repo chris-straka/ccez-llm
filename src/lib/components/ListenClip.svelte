@@ -1,7 +1,8 @@
 <!-- One drill clip, above its message body: play / slow replay, where
 it sits in the video (with the source link), and once answered the
-guess marked against what was said. The transcript, translation and
-notes are the message body itself (annotatable like any reply). -->
+guess marked against what was said. The transcript is the message
+body itself (annotatable like any reply); the translation and notes
+fold under it (`ListenGloss`). -->
 <script lang="ts">
 	import { storyboardFrame, type ClipState, type ListenSession } from "$lib/listen";
 
@@ -14,7 +15,6 @@ notes are the message body itself (annotatable like any reply). -->
 		audioStatus: "idle" | "loading" | "ready" | "error";
 		actions: {
 			play: (slow: boolean) => void;
-			regrade: () => void;
 			openSource: (url: string) => void;
 		};
 	}
@@ -146,21 +146,6 @@ notes are the message body itself (annotatable like any reply). -->
 			</p>
 			<p class="verdict">
 				{heardWords === words ? "All of it" : `${heardWords} of ${words} words`}
-			</p>
-		{/if}
-		{#if clip.grade === "pending"}
-			<p class="verdict busy">translating…</p>
-		{:else if clip.grade === "error"}
-			<p class="verdict">
-				No translation ·
-				<button
-					type="button"
-					class="retry"
-					onclick={(e) => {
-						e.stopPropagation();
-						actions.regrade();
-					}}>Try again</button
-				>
 			</p>
 		{/if}
 	{/if}
@@ -314,14 +299,6 @@ notes are the message body itself (annotatable like any reply). -->
 		color: var(--muted);
 		text-decoration: underline dashed;
 		text-underline-offset: 0.2em;
-	}
-	.retry {
-		border: none;
-		background: none;
-		padding: 0;
-		font: inherit;
-		color: var(--accent);
-		cursor: pointer;
 	}
 	.busy {
 		animation: clip-pulse 1.4s ease-in-out infinite;
