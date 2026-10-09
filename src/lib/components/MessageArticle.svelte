@@ -297,7 +297,7 @@ import type {
 		<!-- A news opener reads folded as one tag: the article's picture,
 		the headline (a normal annotatable body at the message size),
 		and the mode line. Unfolding shows what was sent. -->
-		<div class="bubble news-launch">
+		<div class="bubble news-launch" class:has-thumb={launchImage && !launchImageBroken}>
 			{#if launchImage && !launchImageBroken}
 				<img
 					class="launch-thumb"
@@ -509,12 +509,32 @@ import type {
 		background: #f1f1f4;
 		background: var(--bg-wash);
 	}
+	/* The picture is the header's lead: a third of the row, as tall
+	as the headline and meta beside it. Height 0 keeps it out of the
+	row's sizing; min-height 100% then fills whatever the text sets. */
+	.news-launch.has-thumb {
+		display: grid;
+		grid-template-columns: minmax(0, 34%) minmax(0, 1fr);
+		width: min(100%, calc(36rem * min(var(--font-scale, 1), 2)));
+	}
 	.launch-thumb {
-		flex: none;
-		width: calc(4.5rem * min(var(--font-scale, 1), 2));
-		aspect-ratio: 4 / 3;
+		width: 100%;
+		height: 0;
+		min-height: 100%;
 		object-fit: cover;
 		border-radius: 0.6rem;
+	}
+	/* Phones: a side column gets too thin, so the picture leads
+	from above at full width. */
+	@media (max-width: 520px) {
+		.news-launch.has-thumb {
+			grid-template-columns: minmax(0, 1fr);
+		}
+		.launch-thumb {
+			height: auto;
+			min-height: 0;
+			aspect-ratio: 16 / 9;
+		}
 	}
 	.launch-meta {
 		display: flex;
