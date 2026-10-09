@@ -42,8 +42,7 @@ channel or start a video. State lives in `ListenMode`. -->
 		} else if (event.key === "Escape" && mode.query) {
 			event.preventDefault();
 			event.stopPropagation();
-			mode.query = "";
-			mode.results = null;
+			mode.setQuery("");
 		}
 	}
 
@@ -94,7 +93,7 @@ channel or start a video. State lives in `ListenMode`. -->
 				bind:this={searchBox}
 				type="search"
 				placeholder={mode.searchKind === "channel" ? "Find a channel" : "Find a video by name or topic"}
-				bind:value={mode.query}
+				bind:value={() => mode.query, (v: string) => mode.setQuery(v)}
 				onkeydown={onSearchKey}
 				aria-label="Search YouTube"
 			/>

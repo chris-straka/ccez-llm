@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { activeChat, createChatState } from "./chat";
-import type { ListenSession } from "./listen";
+import type { ListenEntry, ListenSession } from "./listen";
+import type { ListenBackend } from "./listenBackend";
 import { ListenMode, type NativeGradeResult, type NativeGrader } from "./listen-mode.svelte";
 import { startDrill } from "./listenChat";
 import type { KeyValueStore } from "./settings";
@@ -117,5 +118,72 @@ describe("native grading", () => {
 		const last = h.starts.at(-1) ?? [];
 		expect(last).toEqual([expect.objectContaining({ i: 0, retry: true })]);
 		expect(h.clip(0)?.grade).toBe("pending");
+	});
+});
+
+describe("search box", () => {
+	const hit: ListenEntry = {
+		kind: "channel",
+		id: "https://www.youtube.com/@DavidPakmanShow",
+		title: "David Pakman",
+		channel: "David Pakman",
+		channel_url: "https://www.youtube.com/@DavidPakmanShow",
+		duration: 0,
+		thumbnail: ""
+	};
+
+	/** A browse screen whose searches resolve when `land` is called. */
+	function browse() {
+		const pending: ((rows: ListenEntry[]) => void)[] = [];
+		const backend = {
+			search: () => new Promise<ListenEntry[]>((resolve) => pending.push(resolve)),
+			channel: () => new Promise<never>(() => {}),
+			videos: () => Promise.resolve([]),
+			fetch: () => new Promise<never>(() => {}),
+			audio: () => new Promise<never>(() => {})
+		} satisfies ListenBackend;
+		const store: KeyValueStore = { getItem: () => null, setItem: () => {} };
+		const state = createChatState(store);
+		const mode = new ListenMode({
+			getChatState: () => state,
+			backend: () => backend,
+			langName: () => "French",
+			getChannels: () => [],
+			setChannels: () => {},
+			resolveProvider: () => Promise.resolve(null),
+			toast: () => {},
+			reveal: () => {},
+			focusComposer: () => {},
+			openUrl: () => Promise.resolve(),
+			nativeGrader: () => null
+		});
+		mode.searchKind = "channel";
+		mode.enter("fr");
+		return { mode, land: (rows: ListenEntry[]) => pending.shift()?.(rows) };
+	}
+
+	it("emptying the box drops the results", async () => {
+		const { mode, land } = browse();
+		mode.setQuery("pakman");
+		const done = mode.search();
+		land([hit]);
+		await done;
+		expect(mode.results).toEqual([hit]);
+		mode.setQuery("pak");
+		expect(mode.results).toEqual([hit]);
+		mode.setQuery("  ");
+		expect(mode.results).toBeNull();
+	});
+
+	it("a search that lands after the box was emptied is ignored", async () => {
+		const { mode, land } = browse();
+		mode.setQuery("pakman");
+		const done = mode.search();
+		mode.setQuery("");
+		expect(mode.searching).toBe(false);
+		land([hit]);
+		await done;
+		expect(mode.results).toBeNull();
+		expect(mode.searching).toBe(false);
 	});
 });

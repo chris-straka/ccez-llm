@@ -185,6 +185,17 @@ export class ListenMode {
 		}
 	}
 
+	/** The search box's text. Emptying it drops the results and any
+	 * search still in flight, leaving just your channels. */
+	setQuery(query: string): void {
+		this.query = query;
+		if (query.trim()) return;
+		this.browseSeq++;
+		this.searching = false;
+		this.results = null;
+		this.error = "";
+	}
+
 	async search(): Promise<void> {
 		const q = this.query.trim();
 		if (!q || !this.lang) return;

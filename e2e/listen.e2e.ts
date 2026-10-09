@@ -177,3 +177,16 @@ test("a drill runs: guess, next clip at once, reveal, tally", async ({ page }) =
 	await expect(first).toContainText(GRADE.translation, { timeout: 15_000 });
 	await expect(first).toContainText("welcome");
 });
+
+test("emptying the search box drops the results", async ({ page }) => {
+	await page.getByRole("tab", { name: "Listen" }).click();
+	const panel = page.locator(".listen-panel");
+	const search = panel.getByRole("searchbox", { name: "Search YouTube" });
+	await search.fill("pakman");
+	await search.press("Enter");
+	const results = panel.locator(".results");
+	await expect(results.locator(".video", { hasText: info.title })).toBeVisible();
+	await search.fill("");
+	await expect(results).toHaveCount(0);
+	await expect(panel).toContainText("Learner Channel");
+});
